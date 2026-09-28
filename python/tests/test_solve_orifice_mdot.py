@@ -106,9 +106,9 @@ class TestSolveOrificeMdot:
 
         # Test all supported correlations
         correlations = [
-            cb.CdCorrelation.ReaderHarrisGallagher,
-            cb.CdCorrelation.Stolz,
-            cb.CdCorrelation.Miller,
+            cb.MeteringCdCorrelation.ReaderHarrisGallagher,
+            cb.MeteringCdCorrelation.Stolz,
+            cb.MeteringCdCorrelation.Miller,
         ]
 
         results = {}

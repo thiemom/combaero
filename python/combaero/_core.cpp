@@ -4194,13 +4194,47 @@ PYBIND11_MODULE(_core, m) {
       .def("volume", &Tube::volume, "Volume [m³]")
       .def("perimeter", &Tube::perimeter, "Circumference [m]");
 
-  // CdCorrelation enum (early binding for default arguments)
-  py::enum_<CdCorrelation>(m, "CdCorrelation",
-                           "Orifice discharge coefficient correlations")
-      .value("ReaderHarrisGallagher", CdCorrelation::ReaderHarrisGallagher,
+  // MeteringCdCorrelation enum (early binding for default arguments)
+  py::enum_<MeteringCdCorrelation>(
+      m, "MeteringCdCorrelation",
+      "Cd correlations for a metering orifice in a pipe -- every member is a\n"
+      "function of beta = d/D. For a hole in a wall that dumps coolant out of\n"
+      "its circuit, use DischargeCdCorrelation instead.")
+      .value("ReaderHarrisGallagher", MeteringCdCorrelation::ReaderHarrisGallagher,
              "ISO 5167-2 / ASME MFC-3M")
-      .value("Stolz", CdCorrelation::Stolz, "ISO 5167:1980 (older)")
-      .value("Miller", CdCorrelation::Miller, "Miller (1996) simplified");
+      .value("Stolz", MeteringCdCorrelation::Stolz, "ISO 5167:1980 (older)")
+      .value("Miller", MeteringCdCorrelation::Miller, "Miller (1996) simplified")
+      .value("Constant", MeteringCdCorrelation::Constant,
+             "Fixed Cd, 0.61 (orifice::defaults::metering_cd)")
+      .value("UserFunction", MeteringCdCorrelation::UserFunction,
+             "Caller-supplied Cd function (C++ only)");
+
+  // DischargeCdCorrelation enum
+  //
+  // Separate from MeteringCdCorrelation because the inputs differ: no beta,
+  // and a crossflow ratio OrificeState cannot express. See orifice.h.
+  py::enum_<DischargeCdCorrelation>(
+      m, "DischargeCdCorrelation",
+      "Cd correlations for a discharge hole -- bleed, film, effusion. Inputs\n"
+      "are L/d, r/d and the inlet-side crossflow ratio, never beta = d/D.")
+      .value("McGreehanSchotsch1988", DischargeCdCorrelation::McGreehanSchotsch1988,
+             "McGreehan & Schotsch (1988), the composite chain of Eqs. (8)-(17)")
+      .value("Idelchik1966Sharp", DischargeCdCorrelation::Idelchik1966Sharp,
+             "Idelchik (1966) diagram 4-17: sharp-edged hole in a large wall,\n"
+             "tabulated from Re = 25 to 1e6")
+      .value("Idelchik1966Thick", DischargeCdCorrelation::Idelchik1966Thick,
+             "Idelchik (1966) diagram 4-18a: thick-walled (deep) hole,\n"
+             "zeta'(l/d) plus a Darcy bore-friction term")
+      .value("Idelchik1966Beveled", DischargeCdCorrelation::Idelchik1966Beveled,
+             "Idelchik (1966) diagram 4-18b: beveled edges, 40-60 deg")
+      .value("Idelchik1966Rounded", DischargeCdCorrelation::Idelchik1966Rounded,
+             "Idelchik (1966) diagram 4-18c: rounded edges")
+      .value("Lichtarowicz1965", DischargeCdCorrelation::Lichtarowicz1965,
+             "DECLARED, NOT IMPLEMENTED. Raises ValueError. The source is in\n"
+             "docs/orifices/ but has not been extracted.")
+      .value("Constant", DischargeCdCorrelation::Constant,
+             "Fixed Cd, 0.60 (orifice::defaults::discharge_cd). Pass an\n"
+             "explicit value to discharge_cd instead to pin a measured one.");
 
   // Annulus struct
   py::class_<Annulus>(geom, "Annulus",
@@ -5001,23 +5035,8 @@ PYBIND11_MODULE(_core, m) {
         "Uses Reader-Harris/Gallagher correlation.\n"
         "Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm");
 
-  m.def("Cd_thick_plate", &Cd_thick_plate, py::arg("geom"), py::arg("state"),
-        "Discharge coefficient for thick-plate orifice.\n\n"
-        "Applies Idelchik thickness correction to thin-plate Cd.\n"
-        "Valid for: 0 < t/d < ~3");
 
-  m.def("Cd_rounded_entry", &Cd_rounded_entry, py::arg("geom"),
-        py::arg("state"),
-        "Discharge coefficient for rounded-entry orifice.\n\n"
-        "Based on Idelchik contraction loss coefficients.\n"
-        "Valid for: 0 < r/d <= 0.2 (typical)");
 
-  m.def("Cd_orifice", &Cd, py::arg("geom"), py::arg("state"),
-        "Discharge coefficient with auto-selected correlation.\n\n"
-        "Selects correlation based on geometry:\n"
-        "  - r/d > 0.01: rounded entry\n"
-        "  - t/d > 0.02: thick plate\n"
-        "  - otherwise: sharp thin plate");
 
   m.def("mcgreehan_schotsch_1988_cd_and_derivatives",
         &orifice::mcgreehan_schotsch::cd_and_derivatives, py::arg("Re"),
@@ -5128,10 +5147,96 @@ PYBIND11_MODULE(_core, m) {
         "derivative. Y also saturates at the critical pressure ratio, below\n"
         "which the isentropic form predicts decreasing flow.");
 
+  // DischargeHoleGeometry struct
+  py::class_<DischargeHoleGeometry>(
+      m, "DischargeHoleGeometry",
+      "Geometry of one discharge hole. There is deliberately no pipe\n"
+      "diameter: a hole in a wall has no beta.")
+      .def(py::init<>())
+      .def(py::init([](double d, double L, double r, double bevel) {
+             DischargeHoleGeometry g;
+             g.d = d;
+             g.L = L;
+             g.r = r;
+             g.bevel = bevel;
+             return g;
+           }),
+           py::arg("d"), py::arg("L") = 0.0, py::arg("r") = 0.0,
+           py::arg("bevel") = 0.0)
+      .def_readwrite("d", &DischargeHoleGeometry::d, "Hole diameter [m]")
+      .def_readwrite("L", &DischargeHoleGeometry::L,
+                     "Hole length along its axis [m] -- the wall thickness for\n"
+                     "a normal hole, t/sin(alpha) for an angled one")
+      .def_readwrite("r", &DischargeHoleGeometry::r,
+                     "Inlet edge radius [m] (0 = sharp)")
+      .def_readwrite("bevel", &DischargeHoleGeometry::bevel,
+                     "Bevel depth along the hole axis [m] (0 = not beveled).\n"
+                     "Idelchik diagram 4-18b's l/Dh at a bevel angle of\n"
+                     "40-60 deg -- NOT the wall thickness.")
+      .def("L_over_d", &DischargeHoleGeometry::L_over_d, "Length ratio L/d [-]")
+      .def("r_over_d", &DischargeHoleGeometry::r_over_d, "Radius ratio r/d [-]")
+      .def("bevel_over_d", &DischargeHoleGeometry::bevel_over_d,
+           "Bevel depth ratio l/d [-]")
+      .def("area", &DischargeHoleGeometry::area, "Hole area [m^2]")
+      .def("is_valid", &DischargeHoleGeometry::is_valid,
+           "True when d > 0 and L, r >= 0");
+
+  // DischargeHoleState struct
+  py::class_<DischargeHoleState>(m, "DischargeHoleState",
+                                 "Flow state at one discharge hole")
+      .def(py::init<>())
+      .def(py::init([](double Re, double U1_over_Vi) {
+             DischargeHoleState f;
+             f.Re = Re;
+             f.U1_over_Vi = U1_over_Vi;
+             return f;
+           }),
+           py::arg("Re"), py::arg("U1_over_Vi") = 0.0)
+      .def_readwrite("Re", &DischargeHoleState::Re,
+                     "Hole Reynolds number, based on d [-]")
+      .def_readwrite("U1_over_Vi", &DischargeHoleState::U1_over_Vi,
+                     "INLET tangential velocity / ideal through-flow velocity\n"
+                     "[-]. A plenum-fed hole has 0. Feeding a discharge-side\n"
+                     "crossflow ratio here is wrong -- see\n"
+                     "mcgreehan_schotsch_1988_cd.");
+
+  m.def(
+      "discharge_cd",
+      [](DischargeCdCorrelation correlation, const DischargeHoleGeometry& hole,
+         const DischargeHoleState& flow, double Cd_constant) {
+        auto c = (correlation == DischargeCdCorrelation::Constant && Cd_constant > 0.0)
+                     ? make_constant_discharge_correlation(Cd_constant)
+                     : make_discharge_correlation(correlation);
+        return c->Cd(hole, flow);
+      },
+      py::arg("correlation"), py::arg("hole"), py::arg("flow"),
+      py::arg("Cd_constant") = 0.0,
+      "Cd of a discharge hole through the selected correlation.\n\n"
+      "Cd_constant is only read for correlation=Constant, where a positive\n"
+      "value pins Cd to a measured or literature number instead of the 0.60\n"
+      "default. Raises ValueError for a correlation that is declared but not\n"
+      "implemented.");
+
+  m.def(
+      "discharge_cd_and_derivatives",
+      [](DischargeCdCorrelation correlation, const DischargeHoleGeometry& hole,
+         const DischargeHoleState& flow, double Cd_constant) {
+        auto c = (correlation == DischargeCdCorrelation::Constant && Cd_constant > 0.0)
+                     ? make_constant_discharge_correlation(Cd_constant)
+                     : make_discharge_correlation(correlation);
+        return c->Cd_and_derivatives(hole, flow);
+      },
+      py::arg("correlation"), py::arg("hole"), py::arg("flow"),
+      py::arg("Cd_constant") = 0.0,
+      "Solver-facing (f, J) form of discharge_cd:\n"
+      "    (Cd, dCd/dRe, dCd/d(U1_over_Vi))\n"
+      "Analytic throughout. L/d and r/d are geometry and never enter the\n"
+      "Jacobian; a Constant correlation returns exactly (Cd, 0, 0).");
+
   m.def("solve_orifice_mdot", &solve_orifice_mdot, py::arg("geom"),
         py::arg("dP"), py::arg("rho"), py::arg("mu"),
         py::arg("P_upstream") = 101325.0, py::arg("kappa") = 0.0,
-        py::arg("correlation") = CdCorrelation::ReaderHarrisGallagher,
+        py::arg("correlation") = MeteringCdCorrelation::ReaderHarrisGallagher,
         py::arg("tol") = 1e-6, py::arg("max_iter") = 20,
         "Iterative solver for orifice mass flow with Cd-Re coupling.\n\n"
         "Solves the coupled system:\n"
@@ -5211,12 +5316,6 @@ PYBIND11_MODULE(_core, m) {
         "Discharge coefficient Cd from loss coefficient K.\n\n"
         "Cd = 1 / sqrt(1 + K / (1 - beta⁴))");
 
-  m.def("orifice_thickness_correction", &orifice::thickness_correction,
-        py::arg("t_over_d"), py::arg("beta"), py::arg("Re_d"),
-        "Thickness correction factor for thick-plate orifices.\n\n"
-        "Idelchik model: Cd rises (reattachment) then falls (friction).\n\n"
-        "Multiplies thin-plate Cd to account for flow reattachment.\n"
-        "Returns 1.0 for t/d <= 0.02 (thin plate).");
 
   // OrificeFlowResult struct binding - Bundle of orifice flow properties
   py::class_<OrificeFlowResult>(
@@ -5262,7 +5361,7 @@ PYBIND11_MODULE(_core, m) {
       "orifice_flow", &orifice_flow, py::arg("geom"), py::arg("dP"),
       py::arg("T"), py::arg("P"), py::arg("mu"), py::arg("Z") = 1.0,
       py::arg("X") = std::vector<double>(), py::arg("kappa") = 0.0,
-      py::arg("correlation") = CdCorrelation::ReaderHarrisGallagher,
+      py::arg("correlation") = MeteringCdCorrelation::ReaderHarrisGallagher,
       "Compute all orifice flow properties at once with real gas "
       "correction.\n\n"
       "Convenience function that computes all orifice flow properties in a\n"
@@ -5306,14 +5405,14 @@ PYBIND11_MODULE(_core, m) {
       "orifice_flow_state",
       [](const OrificeGeometry &geom, double dP, double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-         double Z, double kappa, CdCorrelation correlation) {
+         double Z, double kappa, MeteringCdCorrelation correlation) {
         auto X = to_vec(X_arr);
         double mu = viscosity(T, P, X);
         return orifice_flow(geom, dP, T, P, mu, Z, X, kappa, correlation);
       },
       py::arg("geom"), py::arg("dP"), py::arg("T"), py::arg("P"), py::arg("X"),
       py::arg("Z") = 1.0, py::arg("kappa") = 0.0,
-      py::arg("correlation") = CdCorrelation::ReaderHarrisGallagher,
+      py::arg("correlation") = MeteringCdCorrelation::ReaderHarrisGallagher,
       "Compute all orifice flow properties from thermodynamic state.\n\n"
       "Convenience wrapper around orifice_flow() that computes dynamic "
       "viscosity\n"

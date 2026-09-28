@@ -173,14 +173,23 @@ print(f"Specific impulse: {thrust.specific_impulse} s")
 
 ### Discharge Coefficient Correlations
 ```python
-# Individual correlations
+# Normed metering orifice (ISO 5167 family, a function of beta = d/D)
 Cd = cb.Cd_sharp_thin_plate(geom, state)
-Cd = cb.Cd_thick_plate(geom, state)
-Cd = cb.Cd_rounded_entry(geom, state)
 
-# Auto-selection based on geometry
-Cd = cb.Cd_orifice(geom, state)
+# Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
+# geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.
+hole = cb.DischargeHoleGeometry(d=1e-3, L=2e-3, r=0.0)
+flow = cb.DischargeHoleState(Re=5e4)
+Cd = cb.discharge_cd(cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow)
+
+# Solver-facing form: (Cd, dCd/dRe, dCd/d(U1_over_Vi)), analytic throughout
+Cd, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
+    cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow
+)
 ```
+
+There is deliberately no auto-selection from geometry: it is how a
+rounded-entry request used to come back as Stolz.
 
 #### Plenum-to-plenum holes: McGreehan and Schotsch (1988)
 
@@ -308,8 +317,6 @@ sol = cb.orifice_flow_thermo(T=300, P=2e5, X=air, m_dot=0.1, area=1e-4, Cd=0.65)
 # Impedance with flow effects
 Z = cb.orifice_impedance_with_flow(mdot=0.1, area=1e-4, Cd=0.65, rho=1.2, c=340)
 
-# Thickness corrections
-Cd_corrected = cb.orifice_thickness_correction(Cd=0.65, t_over_d=0.1)
 ```
 
 ### Pressure and Flow Calculations

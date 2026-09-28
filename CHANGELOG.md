@@ -9,6 +9,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Idelchik (1966) wall-orifice discharge coefficients** --
+  `DischargeCdCorrelation::Idelchik1966{Sharp,Thick,Beveled,Rounded}`, from
+  Section IV diagrams 4-17 and 4-18 (a hole in a large wall, `F1 = F2 = inf`,
+  which is the effusion-plate geometry). `zeta` is referenced to the hole
+  velocity and carries the full permanent loss, so `Cd = 1/sqrt(zeta)` is
+  exact rather than a convention-dependent conversion. Valid **Re 25 to 1e6**
+  -- three decades below McGreehan-Schotsch's `re_min = 1e4`, and the range
+  small cooling holes actually operate in. No digitisation was required:
+  every value is tabulated in the source and was read off the page at 400 dpi.
+  Provenance in
+  `validation/cooling/extractions/idelchik_1966_wall_orifice.md`.
+
+  **Cross-source agreement, labelled cross-source:** against McGreehan and
+  Schotsch (1988) the two are within 5% over the whole `L/d` range and
+  **0.05% at the sharp-edged baseline** (0.5923 vs 0.5926) -- independent
+  sources 22 years apart. That is an accuracy result, not a fidelity one.
+
+- **A separate `DischargeCdCorrelation` selector**, with
+  `DischargeHoleGeometry` / `DischargeHoleState` and analytic
+  `discharge_cd_and_derivatives` returning
+  `(Cd, dCd/dRe, dCd/d(U1_over_Vi))`. A hole in a wall has no pipe to form
+  `beta` with and its `Cd` depends on `L/d`, `r/d` and the approach
+  crossflow, none of which `OrificeGeometry`/`OrificeState` can express. One
+  enum over both families forced every caller to pass a meaningless `D` and
+  silently dropped the crossflow.
+
+  Interpolation is monotone cubic (Fritsch-Carlson), not linear: linear would
+  put a derivative jump at each of 14 table knots, and a natural spline would
+  overshoot the flat tails and invent a `Cd` above the source's.
+
+### Changed
+
+- **`CdCorrelation` renamed to `MeteringCdCorrelation`** and narrowed to the
+  normed ISO 5167 device it actually describes:
+  `ReaderHarrisGallagher`, `Stolz`, `Miller`, `Constant`, `UserFunction`.
+  `Constant` and `UserFunction` are now reachable from Python, and all three
+  dispatch sites (`solve_orifice_mdot`, `orifice_flow`, `make_correlation`)
+  go through one factory instead of three divergent switches.
+
+### Removed
+
+- **`Cd_thick_plate`, `Cd_rounded_entry`, `Cd_orifice`,
+  `orifice::thickness_correction`, `orifice::Cd_rounded`, and the
+  `IdelchikThick` / `IdelchikRounded` / `BohlThick` / `BohlRounded` members
+  of the Cd correlation enum.** Replaced by the Idelchik members above.
+
+  These computed an ISO 5167 `Cd` and multiplied it by a correction factor.
+  The base does not apply -- a thick-edged or rounded orifice is not the
+  normed device -- and the factor was an unlabelled fit to Idelchik diagram
+  4-12b that had lost its tail: within 5% to `r/Dh = 0.06`, then **-27% at
+  0.08 and -78% at 0.12**. The thick-plate factor carried a `5.67`
+  commented "friction loss calibration factor" and a `[0.5, 1.3]` clamp.
+
+  Two defects went with them:
+  - an **11.1% jump discontinuity in `Cd` at `Re_D = 1e5`** (0.881391 ->
+    0.979326), a hard C0 break in a solver input;
+  - `Cd_rounded_entry` at `r/d = 0` **silently returned `Cd_Stolz`**.
+
+  None of the 16 tests over that code would have caught either: all were
+  directional. `BohlThick`/`BohlRounded` fell through to the Idelchik
+  implementations, silently returning a different correlation than the one
+  asked for; Bohl was dropped rather than implemented because its orifice
+  content (DIN 1952 normed orifices, standard loss coefficients) is already
+  held by ISO 5167 and Idelchik, so it plugs no coverage gap.
+
+- **`OrificeElement`'s `'Auto'` correlation arm**, and the `'ThickPlate'` /
+  `'RoundedEntry'` strings with their GUI dropdown entries. `'Auto'` picked a
+  correlation from `r` and `t` behind the caller's back, which is how a
+  rounded-entry request came back as Stolz. The new strings are
+  `'IdelchikThick'`, `'IdelchikBeveled'`, `'IdelchikRounded'` and
+  `'McGreehanSchotsch'`; an unknown correlation now raises rather than
+  falling through to auto-selection.
+
 - **Analytic `(f, J)` for the McGreehan and Schotsch discharge coefficient**
   (#383). `mcgreehan_schotsch_1988_cd_and_derivatives` returns
   `(Cd, dCd/dRe, dCd/d(U1/Vi))` via forward-mode `DualN`, cross-checked

@@ -1943,8 +1943,19 @@ class OrificeElement(NetworkElement):
       - 'ReaderHarrisGallagher': Sharp thin-plate (ISO 5167-2 / RHG).
       - 'Stolz': ISO 5167:1980 (Corner taps).
       - 'Miller': Miller (1996) simplified correlation.
-      - 'ThickPlate': Thick-plate sharp-edged orifice (requires plate_thickness).
-      - 'RoundedEntry': Rounded-entry orifice (requires edge_radius).
+      - 'IdelchikThick': Deep hole in a wall, Idelchik diagram 4-18a
+        (requires plate_thickness). Valid Re 25 to 1e6.
+      - 'IdelchikBeveled': Beveled-edge hole, diagram 4-18b
+        (requires bevel_depth).
+      - 'IdelchikRounded': Rounded-edge hole, diagram 4-18c
+        (requires edge_radius).
+      - 'McGreehanSchotsch': Cooling hole with inlet crossflow (1988).
+
+    The first four are NORMED metering correlations: Cd is referenced to the
+    tapping differential and is a function of beta = d/D. The last four are
+    DISCHARGE correlations for a hole in a wall, where zeta is referenced to
+    the hole velocity and there is no beta. They are not interchangeable, and
+    there is deliberately no 'Auto' arm choosing between them from geometry.
     """
 
     def __init__(
@@ -1958,6 +1969,7 @@ class OrificeElement(NetworkElement):
         correlation: str = "ReaderHarrisGallagher",
         plate_thickness: float = 0.0,
         edge_radius: float = 0.0,
+        bevel_depth: float = 0.0,
         area: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
@@ -1979,6 +1991,9 @@ class OrificeElement(NetworkElement):
         self.use_correlation = correlation != "fixed"
         self.plate_thickness = plate_thickness
         self.edge_radius = edge_radius
+        # Bevel DEPTH along the hole axis, Idelchik diagram 4-18b's l/Dh at a
+        # bevel angle of 40-60 deg. Not the wall thickness.
+        self.bevel_depth = bevel_depth
         self.upstream_diameter: float | None = None
         self.downstream_diameter: float | None = None
         # OrificeGeometry built in resolve_topology
@@ -2096,17 +2111,53 @@ class OrificeElement(NetworkElement):
                 + 91.71 * math.pow(b, 2.5) * math.pow(max(flow_state.Re_D, 1.0), -0.75)
             )
             return float(cd)
-        elif self.correlation == "ThickPlate":
-            if self._orifice_geom.t <= 0:
-                return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
-            return float(cb.Cd_thick_plate(self._orifice_geom, flow_state))
-        elif self.correlation == "RoundedEntry":
-            if self._orifice_geom.r <= 0:
-                return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
-            return float(cb.Cd_rounded_entry(self._orifice_geom, flow_state))
+        elif self.correlation in ("IdelchikThick", "IdelchikBeveled", "IdelchikRounded"):
+            # Idelchik's wall-orifice family. These take a hole in a wall,
+            # not a plate in a pipe, so they are fed DischargeHoleGeometry and
+            # the pipe diameter plays no part -- which is the whole reason the
+            # old ThickPlate/RoundedEntry arms were wrong: they multiplied an
+            # ISO 5167 metering Cd by a correction factor.
+            hole = cb.DischargeHoleGeometry(
+                d=self._orifice_geom.d,
+                L=self.plate_thickness,
+                r=self.edge_radius,
+            )
+            hole.bevel = self.bevel_depth
+            selector = {
+                "IdelchikThick": cb.DischargeCdCorrelation.Idelchik1966Thick,
+                "IdelchikBeveled": cb.DischargeCdCorrelation.Idelchik1966Beveled,
+                "IdelchikRounded": cb.DischargeCdCorrelation.Idelchik1966Rounded,
+            }[self.correlation]
+            return float(
+                cb.discharge_cd(
+                    selector,
+                    hole,
+                    cb.DischargeHoleState(Re=max(flow_state.Re_D, 1.0)),
+                )
+            )
+        elif self.correlation == "McGreehanSchotsch":
+            hole = cb.DischargeHoleGeometry(
+                d=self._orifice_geom.d,
+                L=self.plate_thickness,
+                r=self.edge_radius,
+            )
+            return float(
+                cb.discharge_cd(
+                    cb.DischargeCdCorrelation.McGreehanSchotsch1988,
+                    hole,
+                    cb.DischargeHoleState(Re=max(flow_state.Re_D, 1.0)),
+                )
+            )
         else:
-            # Default/Auto
-            return float(cb.Cd_orifice(self._orifice_geom, flow_state))
+            raise ValueError(
+                f"OrificeElement: unknown correlation {self.correlation!r}. "
+                "The 'Auto' arm was removed: it picked a correlation from the "
+                "geometry behind the caller's back, which is how a "
+                "rounded-entry request came back as Stolz. Name one of "
+                "'fixed', 'ReaderHarrisGallagher', 'Stolz', 'Miller', "
+                "'IdelchikThick', 'IdelchikBeveled', 'IdelchikRounded', "
+                "'McGreehanSchotsch'."
+            )
 
     def residuals(
         self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"

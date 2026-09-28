@@ -1,9 +1,11 @@
 #include "../include/dual_number.h"
+#include "../include/friction.h"
 #include "../include/math_constants.h"
 #include "../include/orifice.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 // -------------------------------------------------------------
 // OrificeGeometry implementation
@@ -146,82 +148,6 @@ double Cd_Miller(double beta, double Re_D) {
     }
 
     return clamp_Cd(C);
-}
-
-// Thickness correction factor for thick plates
-// Idelchik model: Cd rises (reattachment) then falls (friction)
-//
-// Physical model:
-// - For small t/d: flow reattachment increases Cd (vena contracta recovery)
-// - For large t/d: friction in bore decreases Cd (pipe friction losses)
-// - Peak Cd occurs at t/d ≈ 0.5-1.5 (depending on beta, Re)
-//
-// References:
-// - Idelchik, I.E. (2008). "Handbook of Hydraulic Resistance" (4th ed.)
-//   Diagram 4-15: Discharge coefficients for thick-plate orifices
-// - Lichtarowicz, A., et al. (1965). "Discharge Coefficients for
-//   Incompressible Non-Cavitating Flow through Long Orifices"
-//   J. Mech. Eng. Sci., 7(2), 210-219.
-//
-// Note: Smooth in Re_d for solver stability (t/d is constant per geometry)
-//
-double thickness_correction(double t_over_d, double beta, double Re_d) {
-    if (t_over_d <= thickness::thin_plate_limit) {
-        return 1.0;  // Thin plate, no correction
-    }
-
-    // Ensure Re_d is positive for stability
-    Re_d = std::max(Re_d, thickness::re_floor);
-
-    // Component 1: Reattachment benefit (independent of Re)
-    const double reattach_factor = thickness::reattach_coef * (1.0 - std::exp(-thickness::reattach_exp * t_over_d));
-    const double reattachment = reattach_factor * (1.0 - beta * beta);
-
-    // Component 2: Friction penalty (smooth Re dependence)
-    // Use Blasius smooth turbulent friction: f = blasius_coef / Re^blasius_exp
-    const double f = thickness::blasius_coef / std::pow(Re_d, thickness::blasius_exp);
-    const double friction_loss = thickness::friction_coef * f * t_over_d;
-
-    // Combined correction: rise (reattachment) then fall (friction)
-    const double correction = 1.0 + reattachment - friction_loss;
-
-    return std::max(thickness::correction_min, std::min(correction, thickness::correction_max));
-}
-
-// Rounded-entry Cd
-// For well-rounded entries (r/d >= 0.15), Cd approaches 0.98-0.99
-// Based on Idelchik contraction loss coefficients
-double Cd_rounded(double r_over_d, double beta, double Re_D) {
-    if (Re_D < 1.0) Re_D = 1.0;
-    const double b = clamp_beta(beta);
-
-    // For r/d = 0: sharp edge, use thin-plate correlation
-    if (r_over_d <= 0.0) {
-        return Cd_Stolz(b, Re_D);
-    }
-
-    // Idelchik: loss coefficient K for rounded entry
-    double K;
-    if (r_over_d >= rounded::radius_threshold) {
-        // Well-rounded entry
-        K = rounded::K_well_rounded;
-    } else {
-        // Partially rounded
-        const double ratio = 1.0 - r_over_d / rounded::radius_threshold;
-        K = rounded::K_sharp * ratio * ratio;
-    }
-
-    // Account for beta effect
-    const double b4 = std::pow(b, 4.0);
-    const double Cd = 1.0 / std::sqrt(1.0 + K / (1.0 - b4));
-
-    // Reynolds number correction for low Re
-    double Re_correction = 1.0;
-    if (Re_D < rounded::re_correction_ref) {
-        Re_correction = 1.0 - rounded::re_correction_coef * std::pow(rounded::re_correction_ref / Re_D, rounded::re_correction_exp);
-    }
-
-    return clamp_Cd(Cd * Re_correction);
 }
 
 // Convert between Cd and loss coefficient K
@@ -466,45 +392,6 @@ double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& stat
     return orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
 }
 
-double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state) {
-    if (!geom.is_valid()) {
-        throw std::invalid_argument("Invalid orifice geometry");
-    }
-
-    // Start with thin-plate Cd
-    double Cd = orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
-
-    // Apply thickness correction (includes reattachment + friction effects)
-    Cd *= orifice::thickness_correction(geom.t_over_d(), geom.beta(), state.Re_D);
-
-    return Cd;
-}
-
-double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state) {
-    if (!geom.is_valid()) {
-        throw std::invalid_argument("Invalid orifice geometry");
-    }
-    return orifice::Cd_rounded(geom.r_over_d(), geom.beta(), state.Re_D);
-}
-
-double Cd(const OrificeGeometry& geom, const OrificeState& state) {
-    if (!geom.is_valid()) {
-        throw std::invalid_argument("Invalid orifice geometry");
-    }
-
-    // Auto-select based on geometry
-    if (geom.r_over_d() > 0.01) {
-        // Rounded entry
-        return Cd_rounded_entry(geom, state);
-    } else if (geom.t_over_d() > 0.02) {
-        // Thick plate
-        return Cd_thick_plate(geom, state);
-    } else {
-        // Sharp thin plate (default)
-        return Cd_sharp_thin_plate(geom, state);
-    }
-}
-
 // -------------------------------------------------------------
 // Correlation classes
 // -------------------------------------------------------------
@@ -535,26 +422,11 @@ public:
     std::string name() const override { return "Miller (1996)"; }
 };
 
-class ThickPlateCorrelation : public OrificeCorrelationBase {
-public:
-    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
-        return Cd_thick_plate(geom, state);
-    }
-    std::string name() const override { return "Thick Plate (Idelchik correction)"; }
-};
-
-class RoundedEntryCorrelation : public OrificeCorrelationBase {
-public:
-    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
-        return Cd_rounded_entry(geom, state);
-    }
-    std::string name() const override { return "Rounded Entry (Idelchik)"; }
-};
-
 class ConstantCdCorrelation : public OrificeCorrelationBase {
     double Cd_value_;
 public:
-    explicit ConstantCdCorrelation(double Cd = 0.61) : Cd_value_(Cd) {}
+    explicit ConstantCdCorrelation(double Cd = orifice::defaults::metering_cd)
+        : Cd_value_(Cd) {}
     double Cd(const OrificeGeometry&, const OrificeState&) const override {
         return Cd_value_;
     }
@@ -644,25 +516,376 @@ private:
     }
 };
 
+// -------------------------------------------------------------
+// Discharge-hole correlations
+// -------------------------------------------------------------
+
+// Monotone cubic (Fritsch-Carlson PCHIP) interpolation, returning the value
+// AND its exact derivative.
+//
+// WHY NOT LINEAR. Every Idelchik curve below is a solver input, and linear
+// interpolation is only C0: dCd/dRe would jump at each of the 14 table knots.
+// That is the hazard class we regularised out of the McGreehan chain, and
+// re-introducing 14 of them would be worse than the one we removed.
+//
+// WHY NOT A NATURAL SPLINE. These curves are monotone and a natural cubic
+// overshoots near the flat tails -- zeta_thick is 1.58, 1.55, 1.55 over its
+// last three knots, where an unlimited spline dips below the asymptote and
+// invents a Cd above the source's. Fritsch-Carlson cannot overshoot, so the
+// interpolant stays inside the tabulated envelope by construction.
+//
+// The derivative is exact, not a difference: the Hermite form is
+// differentiated analytically, so it satisfies the (f, J) rule.
+//
+// Outside the table the value is held at the endpoint and the derivative is
+// zero. Every table here ends on a flat tail, so that is the source's own
+// behaviour rather than an extrapolation, except at the low-Re end -- see
+// IdelchikWallCorrelation::clamped_re.
+struct Interpolated {
+    double value;
+    double derivative;
+};
+
+Interpolated pchip(const double* xs, const double* ys, int n, double x) {
+    if (n < 2) {
+        return {ys[0], 0.0};
+    }
+    if (x <= xs[0]) {
+        return {ys[0], 0.0};
+    }
+    if (x >= xs[n - 1]) {
+        return {ys[n - 1], 0.0};
+    }
+
+    // Secant slopes
+    std::vector<double> h(n - 1);
+    std::vector<double> delta(n - 1);
+    for (int i = 0; i < n - 1; ++i) {
+        h[i] = xs[i + 1] - xs[i];
+        delta[i] = (ys[i + 1] - ys[i]) / h[i];
+    }
+
+    // Fritsch-Carlson tangents: zero at every sign change or flat span, and a
+    // weighted harmonic mean elsewhere, which is what bounds the overshoot.
+    std::vector<double> m(n, 0.0);
+    for (int i = 1; i < n - 1; ++i) {
+        if (delta[i - 1] * delta[i] > 0.0) {
+            const double w1 = 2.0 * h[i] + h[i - 1];
+            const double w2 = h[i] + 2.0 * h[i - 1];
+            m[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i]);
+        }
+    }
+    // One-sided ends, limited so they cannot introduce a new extremum.
+    m[0] = delta[0];
+    m[n - 1] = delta[n - 2];
+
+    // Locate the interval
+    int k = 0;
+    while (k < n - 2 && x > xs[k + 1]) {
+        ++k;
+    }
+
+    const double s = (x - xs[k]) / h[k];
+    const double s2 = s * s;
+    const double s3 = s2 * s;
+
+    // Cubic Hermite basis and its derivative in s
+    const double h00 = 2.0 * s3 - 3.0 * s2 + 1.0;
+    const double h10 = s3 - 2.0 * s2 + s;
+    const double h01 = -2.0 * s3 + 3.0 * s2;
+    const double h11 = s3 - s2;
+
+    const double d00 = 6.0 * s2 - 6.0 * s;
+    const double d10 = 3.0 * s2 - 4.0 * s + 1.0;
+    const double d01 = -6.0 * s2 + 6.0 * s;
+    const double d11 = 3.0 * s2 - 2.0 * s;
+
+    const double value = h00 * ys[k] + h10 * h[k] * m[k]
+                       + h01 * ys[k + 1] + h11 * h[k] * m[k + 1];
+    const double dvalue_ds = d00 * ys[k] + d10 * h[k] * m[k]
+                           + d01 * ys[k + 1] + d11 * h[k] * m[k + 1];
+
+    return {value, dvalue_ds / h[k]};
+}
+
+// Darcy friction factor and dlam/dRe for Idelchik's lam*l/Dh bore-friction
+// term (his diagrams 2-2..2-5).
+//
+// TWO BRANCHES, both exact, blended because a hard switch would be a KINK in
+// a solver input:
+//   - laminar, Re < 2300: lam = 64/Re, Hagen-Poiseuille, not a correlation;
+//   - turbulent, Re > 4000: Haaland's explicit form, using friction.h's own
+//     constants (Define Once) rather than a second copy of them.
+// Between them a smoothstep in log(Re) carries one to the other. The blend is
+// a NUMERICAL DEVICE, not physics: inside 2300 < Re < 4000 neither branch is
+// the source's, and the transition regime has no correlation in Idelchik
+// either. It moves zeta by at most 0.9% at l/Dh = 2 and nothing at all
+// outside that window.
+Interpolated darcy_friction(double Re, double e_over_d) {
+    const double re = std::max(Re, 1.0);
+
+    const double lam_lam = 64.0 / re;
+    const double dlam_lam = -64.0 / (re * re);
+
+    // Haaland: 1/sqrt(f) = -1.8 log10[(e_D/3.7)^1.11 + 6.9/Re]
+    const double rough = std::pow(e_over_d / haaland::coeff_roughness,
+                                  haaland::coeff_exponent);
+    const double X = rough + haaland::coeff_reynolds / re;
+    const double A = haaland::coeff_outer * std::log10(X);
+    const double lam_turb = 1.0 / (A * A);
+    const double dX_dre = -haaland::coeff_reynolds / (re * re);
+    const double dA_dre = haaland::coeff_outer * dX_dre / (X * std::log(10.0));
+    const double dlam_turb = -2.0 * dA_dre / (A * A * A);
+
+    constexpr double re_lam = 2300.0;
+    constexpr double re_turb = 4000.0;
+    if (re <= re_lam) {
+        return {lam_lam, dlam_lam};
+    }
+    if (re >= re_turb) {
+        return {lam_turb, dlam_turb};
+    }
+
+    const double u = (std::log(re) - std::log(re_lam))
+                   / (std::log(re_turb) - std::log(re_lam));
+    const double w = u * u * (3.0 - 2.0 * u);
+    const double dw_du = 6.0 * u * (1.0 - u);
+    const double du_dre = 1.0 / (re * (std::log(re_turb) - std::log(re_lam)));
+
+    const double value = (1.0 - w) * lam_lam + w * lam_turb;
+    const double deriv = (1.0 - w) * dlam_lam + w * dlam_turb
+                       + dw_du * du_dre * (lam_turb - lam_lam);
+    return {value, deriv};
+}
+
+
+// Idelchik (1966) wall-orifice correlations, one class per edge type.
+//
+// zeta is referenced to the hole velocity and carries the full permanent
+// loss, so Cd = 1/sqrt(zeta) and dCd/dRe = -0.5 zeta^-1.5 dzeta/dRe.
+//
+// NONE of these has a crossflow term: Idelchik's geometry is plenum to
+// plenum, with no approach velocity to form U1/Vi from. dCd/d(U1_over_Vi) is
+// therefore returned as EXACTLY zero -- an honest absence, not a modelling
+// simplification. A hole that does see inlet crossflow wants
+// McGreehanSchotsch1988, whose Eq. (17) is the term Idelchik lacks.
+class IdelchikWallCorrelation : public DischargeCorrelationBase {
+public:
+    ~IdelchikWallCorrelation() override = default;
+
+    double Cd(const DischargeHoleGeometry& hole,
+              const DischargeHoleState& flow) const override {
+        return std::get<0>(Cd_and_derivatives(hole, flow));
+    }
+
+    std::tuple<double, double, double> Cd_and_derivatives(
+        const DischargeHoleGeometry& hole,
+        const DischargeHoleState& flow) const override {
+        const Interpolated z = zeta(hole, flow);
+        if (z.value <= 0.0) {
+            throw std::invalid_argument(
+                "Idelchik wall orifice: non-positive resistance coefficient");
+        }
+        const double cd = 1.0 / std::sqrt(z.value);
+        const double dcd_dre = -0.5 * z.derivative / (z.value * std::sqrt(z.value));
+        return {cd, dcd_dre, 0.0};
+    }
+
+protected:
+    // zeta and dzeta/dRe for this edge type.
+    virtual Interpolated zeta(const DischargeHoleGeometry& hole,
+                              const DischargeHoleState& flow) const = 0;
+
+    // Idelchik's tables stop at Re = 25. Below it the VALUE is held there and
+    // the DERIVATIVE is continued, the same treatment and for the same reason
+    // as mcgreehan_schotsch::re_min: a Newton step that wanders below the
+    // floor must still see a Re sensitivity or it stalls. Held-at-edge is a
+    // documented extrapolation, not a claim about creeping flow.
+    static double clamped_re(double Re) {
+        return std::max(Re, orifice::idelchik::re_points[0]);
+    }
+
+    // Diagram 4-17's low-Re pair, interpolated in log(Re) because the table
+    // is log-spaced over four and a half decades.
+    static Interpolated phi0_at(double Re) {
+        static const std::vector<double> lx = log_re_points();
+        const Interpolated r = pchip(lx.data(), orifice::idelchik::zeta_phi0,
+                                     orifice::idelchik::re_n, std::log(Re));
+        return {r.value, r.derivative / Re};
+    }
+
+    static Interpolated eps_at(double Re) {
+        static const std::vector<double> lx = log_re_points();
+        const Interpolated r = pchip(lx.data(), orifice::idelchik::eps_re,
+                                     orifice::idelchik::re_n, std::log(Re));
+        return {r.value, r.derivative / Re};
+    }
+
+    static Interpolated friction_term(const DischargeHoleGeometry& hole, double Re) {
+        const Interpolated lam =
+            darcy_friction(Re, orifice::idelchik::default_roughness_over_d);
+        const double ld = hole.L_over_d();
+        return {lam.value * ld, lam.derivative * ld};
+    }
+
+private:
+    static std::vector<double> log_re_points() {
+        std::vector<double> lx(orifice::idelchik::re_n);
+        for (int i = 0; i < orifice::idelchik::re_n; ++i) {
+            lx[i] = std::log(orifice::idelchik::re_points[i]);
+        }
+        return lx;
+    }
+};
+
+// Diagram 4-17: sharp-edged hole, l/Dh <= 0.015.
+class IdelchikSharpCorrelation : public IdelchikWallCorrelation {
+public:
+    std::string name() const override {
+        return "Idelchik (1966) sharp-edged hole in a wall, diagram 4-17";
+    }
+
+protected:
+    Interpolated zeta(const DischargeHoleGeometry&,
+                      const DischargeHoleState& flow) const override {
+        // Diagram 4-17's table runs the WHOLE range and converges to
+        // zeta_sharp = 2.85 at its last knot, Re = 1e6; item 1's
+        // "Re >= 1e5: zeta = 2.85" is the coarse statement of the same
+        // curve, not a separate branch. Switching to the constant at 1e5
+        // would put a 4.5% step in Cd there (2.60 -> 2.85) -- the source
+        // says 2.60 at 1e5. So the table runs everywhere and PCHIP holds it
+        // at 2.85 above the last knot, which is exact.
+        const double re = clamped_re(flow.Re);
+        const Interpolated p = phi0_at(re);
+        const Interpolated e = eps_at(re);
+        return {p.value + e.value, p.derivative + e.derivative};
+    }
+};
+
+// Diagram 4-18a: thick-walled (deep) hole.
+class IdelchikThickCorrelation : public IdelchikWallCorrelation {
+public:
+    std::string name() const override {
+        return "Idelchik (1966) thick-walled hole in a wall, diagram 4-18a";
+    }
+
+protected:
+    Interpolated zeta(const DischargeHoleGeometry& hole,
+                      const DischargeHoleState& flow) const override {
+        const double re = clamped_re(flow.Re);
+        // zeta'(l/Dh) is geometry, so it contributes no dzeta/dRe.
+        const Interpolated zp = pchip(orifice::idelchik::thick_l_over_d,
+                                      orifice::idelchik::thick_zeta,
+                                      orifice::idelchik::thick_n,
+                                      hole.L_over_d());
+        const Interpolated fr = friction_term(hole, re);
+
+        // One expression over the whole range, for the same reason as the
+        // sharp branch. With k = 1/zeta_sharp this reduces EXACTLY to item
+        // 1's zeta' + lam l/Dh at the table's last knot, so there is no
+        // branch to step across: eps_re(1e6) = 2.85 and zeta_phi0(1e6) = 0
+        // give k*2.85*zeta' = zeta'. Above the last knot PCHIP holds both
+        // table values, so the high-Re form continues exactly.
+        const Interpolated p = phi0_at(re);
+        const Interpolated e = eps_at(re);
+        const double k = orifice::idelchik::thick_low_re_coef;
+        return {p.value + k * e.value * zp.value + fr.value,
+                p.derivative + k * e.derivative * zp.value + fr.derivative};
+    }
+};
+
+// Diagram 4-18b: beveled edges.
+class IdelchikBeveledCorrelation : public IdelchikWallCorrelation {
+public:
+    std::string name() const override {
+        return "Idelchik (1966) beveled-edge hole in a wall, diagram 4-18b";
+    }
+
+protected:
+    Interpolated zeta(const DischargeHoleGeometry& hole,
+                      const DischargeHoleState& flow) const override {
+        // Diagram 4-18b tabulates zeta directly against the bevel depth and
+        // states no Re dependence; the curve is for Re >= 1e5. Below that the
+        // source gives no beveled branch, so the value is held rather than
+        // borrowed from the sharp one.
+        (void)flow;
+        return pchip(orifice::idelchik::beveled_l_over_d,
+                     orifice::idelchik::beveled_zeta,
+                     orifice::idelchik::beveled_n, hole.bevel_over_d());
+    }
+};
+
+// Diagram 4-18c: rounded edges.
+class IdelchikRoundedCorrelation : public IdelchikWallCorrelation {
+public:
+    std::string name() const override {
+        return "Idelchik (1966) rounded-edge hole in a wall, diagram 4-18c";
+    }
+
+protected:
+    Interpolated zeta(const DischargeHoleGeometry& hole,
+                      const DischargeHoleState& flow) const override {
+        (void)flow;
+        return pchip(orifice::idelchik::rounded_r_over_d,
+                     orifice::idelchik::rounded_zeta,
+                     orifice::idelchik::rounded_n, hole.r_over_d());
+    }
+};
+
+class McGreehanSchotsch1988Correlation : public DischargeCorrelationBase {
+public:
+    double Cd(const DischargeHoleGeometry& hole,
+              const DischargeHoleState& flow) const override {
+        return orifice::mcgreehan_schotsch::cd(flow.Re, hole.r_over_d(),
+                                               hole.L_over_d(), flow.U1_over_Vi);
+    }
+
+    std::tuple<double, double, double> Cd_and_derivatives(
+        const DischargeHoleGeometry& hole,
+        const DischargeHoleState& flow) const override {
+        return orifice::mcgreehan_schotsch::cd_and_derivatives(
+            flow.Re, hole.r_over_d(), hole.L_over_d(), flow.U1_over_Vi);
+    }
+
+    std::string name() const override { return "McGreehan-Schotsch (1988)"; }
+};
+
+class ConstantDischargeCdCorrelation : public DischargeCorrelationBase {
+    double Cd_value_;
+public:
+    explicit ConstantDischargeCdCorrelation(
+        double Cd = orifice::defaults::discharge_cd)
+        : Cd_value_(Cd) {}
+
+    double Cd(const DischargeHoleGeometry&,
+              const DischargeHoleState&) const override {
+        return Cd_value_;
+    }
+
+    // Exactly zero, not a small number: a constant has no Re or crossflow
+    // sensitivity, and a solver is entitled to that being exact.
+    std::tuple<double, double, double> Cd_and_derivatives(
+        const DischargeHoleGeometry&,
+        const DischargeHoleState&) const override {
+        return {Cd_value_, 0.0, 0.0};
+    }
+
+    std::string name() const override { return "Constant Cd"; }
+};
+
 } // anonymous namespace
 
-std::unique_ptr<OrificeCorrelationBase> make_correlation(CdCorrelation id) {
+std::unique_ptr<OrificeCorrelationBase> make_correlation(MeteringCdCorrelation id) {
     switch (id) {
-        case CdCorrelation::ReaderHarrisGallagher:
+        case MeteringCdCorrelation::ReaderHarrisGallagher:
             return std::make_unique<ReaderHarrisGallagherCorrelation>();
-        case CdCorrelation::Stolz:
+        case MeteringCdCorrelation::Stolz:
             return std::make_unique<StolzCorrelation>();
-        case CdCorrelation::Miller:
+        case MeteringCdCorrelation::Miller:
             return std::make_unique<MillerCorrelation>();
-        case CdCorrelation::IdelchikThick:
-        case CdCorrelation::BohlThick:
-            return std::make_unique<ThickPlateCorrelation>();
-        case CdCorrelation::IdelchikRounded:
-        case CdCorrelation::BohlRounded:
-            return std::make_unique<RoundedEntryCorrelation>();
-        case CdCorrelation::Constant:
+        case MeteringCdCorrelation::Constant:
             return std::make_unique<ConstantCdCorrelation>();
-        case CdCorrelation::UserFunction:
+        case MeteringCdCorrelation::UserFunction:
             return nullptr;  // Use make_user_correlation instead
     }
     return nullptr;
@@ -684,6 +907,63 @@ std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
     const std::vector<std::vector<double>>& Cd_table,
     const std::string& name) {
     return std::make_unique<TabulatedCorrelation>(beta_values, Re_values, Cd_table, name);
+}
+
+double DischargeHoleGeometry::L_over_d() const {
+    return (d > 0.0) ? L / d : 0.0;
+}
+
+double DischargeHoleGeometry::r_over_d() const {
+    return (d > 0.0) ? r / d : 0.0;
+}
+
+double DischargeHoleGeometry::bevel_over_d() const {
+    return (d > 0.0) ? bevel / d : 0.0;
+}
+
+double DischargeHoleGeometry::area() const {
+    return M_PI * d * d / 4.0;
+}
+
+bool DischargeHoleGeometry::is_valid() const {
+    // L = 0 is a legitimate limit (a knife-edge hole), r = 0 is a sharp
+    // inlet. Only a non-positive diameter makes the hole meaningless.
+    return d > 0.0 && L >= 0.0 && r >= 0.0;
+}
+
+std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(
+    DischargeCdCorrelation id) {
+    switch (id) {
+        case DischargeCdCorrelation::McGreehanSchotsch1988:
+            return std::make_unique<McGreehanSchotsch1988Correlation>();
+        case DischargeCdCorrelation::Idelchik1966Sharp:
+            return std::make_unique<IdelchikSharpCorrelation>();
+        case DischargeCdCorrelation::Idelchik1966Thick:
+            return std::make_unique<IdelchikThickCorrelation>();
+        case DischargeCdCorrelation::Idelchik1966Beveled:
+            return std::make_unique<IdelchikBeveledCorrelation>();
+        case DischargeCdCorrelation::Idelchik1966Rounded:
+            return std::make_unique<IdelchikRoundedCorrelation>();
+        // Lichtarowicz, Duggins & Markland (1965) is DECLARED but NOT
+        // IMPLEMENTED. The source is in docs/orifices/ and it is the natural
+        // second discharge correlation -- long sharp-edged holes, the regime
+        // effusion sits in -- but it has not been extracted, and refusing is
+        // the honest interim rather than quietly handing back
+        // McGreehan-Schotsch for a different regime.
+        case DischargeCdCorrelation::Lichtarowicz1965:
+            throw std::invalid_argument(
+                "Lichtarowicz (1965) discharge correlation is declared but "
+                "not implemented. Use McGreehanSchotsch1988, or Constant with "
+                "a measured value.");
+        case DischargeCdCorrelation::Constant:
+            return std::make_unique<ConstantDischargeCdCorrelation>();
+    }
+    return nullptr;
+}
+
+std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(
+    double Cd) {
+    return std::make_unique<ConstantDischargeCdCorrelation>(Cd);
 }
 
 // -------------------------------------------------------------
@@ -736,7 +1016,7 @@ double solve_orifice_mdot(
     double mu,
     double P_upstream,
     double kappa,
-    CdCorrelation correlation,
+    MeteringCdCorrelation correlation,
     double tol,
     int max_iter)
 {
@@ -773,8 +1053,22 @@ double solve_orifice_mdot(
     const double beta = geom.beta();
     const double D = geom.D;
 
+    // Dispatch through the same factory the polymorphic API uses, rather than
+    // a second switch that only knew the three ISO correlations. That switch
+    // was why IdelchikThick/IdelchikRounded/Constant were implemented but
+    // unreachable from here (and from Python, which only ever saw three enum
+    // members). Built once: the correlation object is stateless in Re.
+    std::unique_ptr<OrificeCorrelationBase> corr = make_correlation(correlation);
+    if (!corr) {
+        // make_correlation returns nullptr only for UserFunction, which cannot
+        // be selected by enum -- there is no function to carry with it.
+        throw std::invalid_argument(
+            "solve_orifice_mdot: UserFunction cannot be selected by enum; "
+            "pass the Cd explicitly or use make_user_correlation");
+    }
+
     // Initial guess for Cd (typical value for sharp orifices)
-    double Cd = 0.61;
+    double Cd = orifice::defaults::metering_cd;
 
     // Initial guess for mdot (use incompressible formula with initial Cd)
     double mdot = Cd * area * std::sqrt(2.0 * rho * dP);
@@ -804,20 +1098,12 @@ double solve_orifice_mdot(
         const double Re_D = (4.0 * mdot_new) / (M_PI * D * mu);
 
         // Update Cd based on new Reynolds number
-        switch (correlation) {
-            case CdCorrelation::ReaderHarrisGallagher:
-                Cd = orifice::Cd_ReaderHarrisGallagher(beta, Re_D, D);
-                break;
-            case CdCorrelation::Stolz:
-                Cd = orifice::Cd_Stolz(beta, Re_D);
-                break;
-            case CdCorrelation::Miller:
-                Cd = orifice::Cd_Miller(beta, Re_D);
-                break;
-            default:
-                throw std::invalid_argument(
-                    "solve_orifice_mdot: unsupported correlation type");
-        }
+        OrificeState iter_state;
+        iter_state.Re_D = Re_D;
+        iter_state.dP = dP;
+        iter_state.rho = rho;
+        iter_state.mu = mu;
+        Cd = corr->Cd(geom, iter_state);
 
         // Update mdot for next iteration
         mdot = mdot_new;
@@ -885,7 +1171,7 @@ OrificeFlowResult orifice_flow(
     double Z,
     [[maybe_unused]] const std::vector<double>& X,
     double kappa,
-    CdCorrelation correlation)
+    MeteringCdCorrelation correlation)
 {
     // Input validation
     if (!geom.is_valid()) {
@@ -944,27 +1230,17 @@ OrificeFlowResult orifice_flow(
     state.rho = rho_corrected;
     state.mu = mu;
 
-    double Cd_value = 0.61;  // Default
-    switch (correlation) {
-        case CdCorrelation::ReaderHarrisGallagher:
-            Cd_value = Cd_sharp_thin_plate(geom, state);
-            break;
-        case CdCorrelation::Stolz:
-            Cd_value = orifice::Cd_Stolz(beta, Re_D);
-            break;
-        case CdCorrelation::Miller:
-            Cd_value = orifice::Cd_Miller(beta, Re_D);
-            break;
-        case CdCorrelation::IdelchikThick:
-            Cd_value = Cd_thick_plate(geom, state);
-            break;
-        case CdCorrelation::IdelchikRounded:
-            Cd_value = Cd_rounded_entry(geom, state);
-            break;
-        default:
-            Cd_value = Cd(geom, state);  // Auto-select
-            break;
+    // Third dispatch site, now the same factory as the other two. The
+    // `default: auto-select by geometry` arm this replaces is deliberately
+    // gone: picking a correlation from r and t behind the caller's back is
+    // how a rounded-entry request came back as Stolz.
+    std::unique_ptr<OrificeCorrelationBase> corr = make_correlation(correlation);
+    if (!corr) {
+        throw std::invalid_argument(
+            "orifice_flow: UserFunction cannot be selected by enum; "
+            "use make_user_correlation");
     }
+    const double Cd_value = corr->Cd(geom, state);
 
     // Populate result struct
     OrificeFlowResult result;

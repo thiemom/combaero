@@ -14,9 +14,15 @@
 //
 // This module provides Cd correlations for various orifice geometries:
 //   - Sharp thin-plate orifices (ISO 5167, Reader-Harris/Gallagher)
-//   - Thick-plate orifices (t/d correction per Idelchik/Bohl)
+//   - Thick-plate orifices (t/d correction per Idelchik)
 //   - Rounded-entry orifices (r/d based, Idelchik)
 //   - User-defined (tabulated or custom function)
+//   - Discharge holes -- bleed, film, effusion (McGreehan & Schotsch 1988)
+//
+// TWO FAMILIES, TWO SELECTORS. MeteringCdCorrelation covers orifices that sit
+// in a pipe and are described by beta = d/D; DischargeCdCorrelation covers
+// holes in a wall, described by L/d, r/d and the approach crossflow. See the
+// comment on DischargeCdCorrelation for why they are not one enum.
 //
 // The discharge coefficient Cd relates actual to ideal flow:
 //   mdot_actual = Cd * mdot_ideal
@@ -42,7 +48,7 @@
 // - ISO 5167-2:2003 - Orifice plates
 // - Reader-Harris & Gallagher (1998) - NEL/ASME correlation
 // - Idelchik, I.E. - Handbook of Hydraulic Resistance (3rd ed.)
-// - Bohl, W. - Technische Stroemungslehre
+// - Bohl, W. - Technische Stroemungslehre (declared, NOT implemented)
 // - Spink, L.K. - Principles and Practice of Flow Meter Engineering
 
 // -------------------------------------------------------------
@@ -93,23 +99,63 @@ struct OrificeState {
 // Correlation identifiers
 // -------------------------------------------------------------
 
-enum class CdCorrelation {
+// Cd correlations for a NORMED measurement orifice -- a standardised plate in
+// a pipe, where Cd is referenced to the TAPPING differential and every member
+// is a function of beta = d/D.
+//
+// The thick-plate and rounded-entry members that used to live here were
+// removed in favour of DischargeCdCorrelation::Idelchik1966*: they computed
+// an ISO 5167 Cd and multiplied it by a correction, but a thick-edged or
+// rounded orifice is not the normed device, so the ISO base does not apply --
+// and Idelchik gives the complete zeta directly, with no ISO base needed.
+enum class MeteringCdCorrelation {
     // Sharp thin-plate correlations
     ReaderHarrisGallagher,  // ISO 5167-2 / ASME MFC-3M (most accurate)
     Stolz,                  // ISO 5167:1980 (older, simpler)
     Miller,                 // Miller (1996) - simplified
 
-    // Thick-plate corrections
-    IdelchikThick,          // Idelchik thick-plate correction
-    BohlThick,              // Bohl thick-plate correction
-
-    // Rounded-entry correlations
-    IdelchikRounded,        // Idelchik rounded-entry
-    BohlRounded,            // Bohl rounded-entry
-
     // Special
     Constant,               // Fixed Cd value (for testing/simple cases)
     UserFunction            // User-provided function
+};
+
+// Cd families for a DISCHARGE hole -- a bleed, film or effusion hole that
+// dumps coolant out of its circuit.
+//
+// WHY THIS IS A SEPARATE SELECTOR from MeteringCdCorrelation, rather than
+// more members on it. The two families do not take the same inputs. A
+// metering orifice sits in a pipe, and every correlation above is a function
+// of beta = d/D and the pipe Reynolds number. A discharge hole has no pipe to
+// form beta with; its Cd is a function of L/d, r/d and the approach
+// crossflow, none of which OrificeGeometry/OrificeState can express (there is
+// no crossflow term in OrificeState at all). One enum over both would have
+// made every caller pass a meaningless D and silently drop the crossflow.
+enum class DischargeCdCorrelation {
+    // McGreehan & Schotsch (1988), the composite chain of Eqs. (8)-(17).
+    // Sharp-to-rounded inlet, finite L/d, inlet-side crossflow.
+    McGreehanSchotsch1988,
+
+    // Idelchik (1966), Section IV: a hole in a LARGE WALL (F1 = F2 = inf --
+    // plenum to plenum, which is the effusion-plate geometry). zeta is
+    // referenced to the hole velocity w0 and DH is the full permanent loss
+    // because there is no downstream recovery, so Cd = 1/sqrt(zeta) is exact
+    // rather than a convention-dependent conversion.
+    //
+    // One member per edge type, each mapping to exactly one diagram; the
+    // geometry does NOT auto-select. All four share the anchor zeta = 2.85 at
+    // zero length and zero radius, so each degrades continuously to sharp.
+    Idelchik1966Sharp,      // diagram 4-17, l/Dh <= 0.015
+    Idelchik1966Thick,      // diagram 4-18a, deep hole, l/Dh > 0.015
+    Idelchik1966Beveled,    // diagram 4-18b
+    Idelchik1966Rounded,    // diagram 4-18c
+
+    // DECLARED, NOT IMPLEMENTED -- see make_discharge_correlation.
+    Lichtarowicz1965,
+
+    // Fixed Cd. The value belongs to the caller: a measured plate value, or a
+    // literature constant such as Florschuetz's 0.79 for a jet plate. Use
+    // make_constant_discharge_correlation to set it.
+    Constant
 };
 
 // -------------------------------------------------------------
@@ -120,23 +166,25 @@ enum class CdCorrelation {
 // Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
 
-// Thick-plate orifice (sharp edges, finite thickness)
-// Applies thickness correction to thin-plate Cd
-// Valid for: 0 < t/d < ~3
-double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state);
-
-// Rounded-entry orifice
-// Valid for: 0 < r/d <= 0.2 (typical)
-double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state);
-
-// Convenience: auto-select correlation based on geometry
-double Cd(const OrificeGeometry& geom, const OrificeState& state);
 
 // -------------------------------------------------------------
 // Individual correlation implementations
 // -------------------------------------------------------------
 
 namespace orifice {
+
+// Fallback Cd values used when a Constant correlation is selected without a
+// value. Both are placeholders for a number the caller should supply, not
+// correlations, and neither varies with anything.
+namespace defaults {
+// Sharp thin-plate metering orifice, high Re: the handbook round number.
+constexpr double metering_cd = 0.61;
+// Plain sharp-edged discharge hole: the round number the discharge-hole
+// sources work around. Deliberately NOT spelled as
+// mcgreehan_schotsch::cd_reference, which happens to share the value but
+// means something else (the reference Cd inside Eq. (16)).
+constexpr double discharge_cd = 0.60;
+} // namespace defaults
 
 // Reader-Harris/Gallagher (1998) - ISO 5167-2 flange-tap constants
 namespace reader_harris {
@@ -208,6 +256,99 @@ constexpr double re_correction_coef = 0.1;
 constexpr double re_correction_ref  = 1.0e5;
 constexpr double re_correction_exp  = 0.2;
 } // namespace rounded
+
+// -------------------------------------------------------------
+// Idelchik (1966) - orifice in a large wall, Section IV
+// -------------------------------------------------------------
+//
+// Idelchik, I.E. "Handbook of Hydraulic Resistance", 1st English edition,
+// AEC-tr-6630 (1966). docs/junction/Idelchik.pdf (gitignored, copyrighted) --
+// the same copy the junction work digitised diagrams 7-1..7-7 from.
+//
+// GEOMETRY: F1 = F2 = infinity, a hole in a wall between two large volumes.
+// That is the effusion-plate case and it is why these correlations take
+// DischargeHoleGeometry, which has no pipe diameter.
+//
+// zeta = DH / (rho w0^2 / 2), referenced to the HOLE velocity w0, and DH is
+// the full permanent loss because nothing recovers downstream. Hence
+//   Cd = 1 / sqrt(zeta)
+// exactly. This is NOT true of Idelchik's in-a-pipe diagrams (4-13..4-16),
+// whose zeta is referenced to the pipe velocity w1 and whose DH is the
+// permanent loss rather than ISO 5167's tapping differential.
+//
+// Every value below was read off the page rendered at 400 dpi with
+// `pdftoppm -r 400`, not the PDF text layer, which garbles these tables.
+// See validation/cooling/extractions/idelchik_1966_wall_orifice.md.
+namespace idelchik {
+
+// Sharp-edged hole, Re >= 1e5 (diagram 4-17). Also the l/Dh = 0 and r/Dh = 0
+// anchor of all three edge tables below, which is what makes them continuous
+// with the sharp case.
+constexpr double zeta_sharp = 2.85;
+
+// Above this Reynolds number zeta is Re-independent (diagram 4-17 item 1).
+constexpr double re_fully_turbulent = 1.0e5;
+
+// Diagram 4-17, low-Re branch: zeta = zeta_phi0(Re) + eps_re(Re).
+// Re spans 25 to 1e6 -- three decades below McGreehan-Schotsch's re_min.
+constexpr int re_n = 14;
+constexpr double re_points[re_n] = {
+    2.5e1, 4.0e1, 6.0e1, 1.0e2, 2.0e2, 4.0e2, 1.0e3,
+    2.0e3, 4.0e3, 1.0e4, 2.0e4, 1.0e5, 2.0e5, 1.0e6};
+constexpr double zeta_phi0[re_n] = {
+    1.94, 1.38, 1.14, 0.89, 0.69, 0.54, 0.39,
+    0.30, 0.22, 0.15, 0.11, 0.04, 0.01, 0.00};
+constexpr double eps_re[re_n] = {
+    1.00, 1.05, 1.09, 1.15, 1.23, 1.37, 1.56,
+    1.71, 1.88, 2.17, 2.38, 2.56, 2.72, 2.85};
+
+// Diagram 4-18a, thick-walled (deep) hole: zeta = zeta_thick(l/Dh) + lam*l/Dh.
+constexpr int thick_n = 12;
+constexpr double thick_l_over_d[thick_n] = {
+    0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 4.0};
+constexpr double thick_zeta[thick_n] = {
+    2.85, 2.72, 2.60, 2.34, 1.95, 1.76, 1.67, 1.62, 1.60, 1.58, 1.55, 1.55};
+
+// Diagram 4-18a low-Re: zeta = zeta_phi0 + k eps_re zeta' + lam l/Dh.
+//
+// The source PRINTS k = 0.342. That value is 1/2.85 rounded to three figures
+// (1/2.85 = 0.350877), and the rounding is the entire 2.5% by which the
+// source's own two formulas disagree at high Re: item 2 must reduce to item 1
+// as eps_re -> 2.85 and zeta_phi0 -> 0, which forces k = 1/zeta_sharp exactly.
+//
+// We use the exact value. Using the printed one would leave a 2.5% STEP in
+// Cd at the top of the table -- a C0 break in a solver input, and the same
+// defect class as the 11% jump this whole correlation replaced. The printed
+// figure is kept below so the discrepancy is on the record rather than
+// silently corrected.
+constexpr double thick_low_re_coef = 1.0 / zeta_sharp;
+constexpr double thick_low_re_coef_as_printed = 0.342;
+
+// Diagram 4-18b, beveled edges (bevel angle 40-60 deg per diagram 4-15).
+constexpr int beveled_n = 12;
+constexpr double beveled_l_over_d[beveled_n] = {
+    0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10, 0.12, 0.16, 0.20};
+constexpr double beveled_zeta[beveled_n] = {
+    2.85, 2.80, 2.70, 2.60, 2.50, 2.41, 2.33, 2.18, 2.08, 1.98, 1.84, 1.80};
+
+// Diagram 4-18c, rounded edges. The leading (0, 2.85) is read from graph c,
+// which the tabulated row starts one point after; it is also forced by the
+// sharp-edged value, so the curve is continuous at r = 0.
+constexpr int rounded_n = 10;
+constexpr double rounded_r_over_d[rounded_n] = {
+    0.0, 0.01, 0.02, 0.03, 0.04, 0.06, 0.08, 0.12, 0.16, 0.20};
+constexpr double rounded_zeta[rounded_n] = {
+    2.85, 2.72, 2.56, 2.40, 2.27, 2.06, 1.88, 1.60, 1.38, 1.37};
+
+// Wall roughness used for the thick-hole friction term lam, which Idelchik
+// takes from diagrams 2-2..2-5 as a function of Re and Delta/Dh. Those
+// diagrams ARE the Colebrook/Nikuradse family, so friction.h's Haaland
+// explicit form reproduces them rather than substituting for them. A drilled
+// or laser-cut cooling hole is hydraulically smooth at these Reynolds
+// numbers; the term is worth ~2% of zeta at l/Dh = 2.
+constexpr double default_roughness_over_d = 0.0;
+
+} // namespace idelchik
 
 // McGreehan and Schotsch (1988) - composite Cd for a long orifice with
 // corner radiusing and inlet crossflow. ASME J. Turbomachinery 110(2),
@@ -475,15 +616,6 @@ double Cd_Stolz(double beta, double Re_D);
 // Miller (1996) - simplified correlation
 double Cd_Miller(double beta, double Re_D);
 
-// Thickness correction factor (multiplies thin-plate Cd)
-// Idelchik model: Cd rises (reattachment) then falls (friction)
-// Smooth in Re_d for solver stability
-double thickness_correction(double t_over_d, double beta, double Re_d);
-
-// Rounded-entry Cd (Idelchik-based)
-// For well-rounded entries, Cd approaches 1.0
-double Cd_rounded(double r_over_d, double beta, double Re_D);
-
 // McGreehan and Schotsch (1988) - the full chain, Eqs. (8) through (17).
 // Convenience wrapper over orifice::mcgreehan_schotsch::cd; see that
 // namespace for the per-equation stages and for what U1_over_Vi means.
@@ -512,11 +644,11 @@ public:
 
 // Factory function to create correlation objects
 // Returns nullptr for UserFunction (use make_user_correlation instead)
-std::unique_ptr<OrificeCorrelationBase> make_correlation(CdCorrelation id);
+std::unique_ptr<OrificeCorrelationBase> make_correlation(MeteringCdCorrelation id);
 
 // Fixed-Cd correlation from an explicit value.
 //
-// make_correlation(CdCorrelation::Constant) can only give you the default,
+// make_correlation(MeteringCdCorrelation::Constant) can only give you the default,
 // so this is the way to pin Cd to a chosen number -- a measured plate value,
 // or a literature constant such as Florschuetz's 0.79 for a jet plate -- and
 // to switch deliberately between a fixed Cd and a computed one.
@@ -564,6 +696,72 @@ std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
     const std::vector<double>& Re_values,
     const std::vector<std::vector<double>>& Cd_table,
     const std::string& name = "Tabulated");
+
+// -------------------------------------------------------------
+// Discharge-hole correlation class (for polymorphic use)
+// -------------------------------------------------------------
+
+// Geometry of one discharge hole. There is deliberately no pipe diameter:
+// nothing here forms beta, and a hole in a wall has no pipe.
+struct DischargeHoleGeometry {
+    double d = 0.0;   // Hole diameter [m]
+    double L = 0.0;   // Hole length ALONG ITS AXIS [m]. Equal to the wall
+                      // thickness for a normal hole; t/sin(alpha) for a hole
+                      // drilled at angle alpha to the wall.
+    double r = 0.0;   // Inlet edge radius [m] (0 = sharp)
+    double bevel = 0.0;  // Bevel depth along the axis [m] (0 = not beveled).
+                         // Idelchik diagram 4-18b's argument is l/Dh, the
+                         // beveled DEPTH over the hole diameter, at a bevel
+                         // angle of 40-60 deg; it is not the wall thickness.
+
+    double L_over_d() const;   // Length ratio L/d [-]
+    double bevel_over_d() const;  // Bevel depth ratio l/d [-]
+    double r_over_d() const;   // Radius ratio r/d [-]
+    double area() const;       // Hole area [m^2]
+
+    bool is_valid() const;
+};
+
+// Flow state at one discharge hole.
+struct DischargeHoleState {
+    double Re = 0.0;          // Hole Reynolds number, based on d [-]
+
+    // Ratio of INLET (approach, supply-side) tangential velocity to ideal
+    // through-flow velocity. A plenum-fed hole has 0. See the note on
+    // orifice::mcgreehan_schotsch::cd for why a discharge-side crossflow
+    // ratio must not be fed here.
+    double U1_over_Vi = 0.0;
+};
+
+class DischargeCorrelationBase {
+public:
+    virtual ~DischargeCorrelationBase() = default;
+
+    virtual double Cd(const DischargeHoleGeometry& hole,
+                      const DischargeHoleState& flow) const = 0;
+
+    // Solver-facing (f, J): (Cd, dCd/dRe, dCd/d(U1_over_Vi)). L/d and r/d are
+    // geometry and never enter the Jacobian. Analytic, never finite
+    // differences -- see the solver rule in CLAUDE.md.
+    virtual std::tuple<double, double, double> Cd_and_derivatives(
+        const DischargeHoleGeometry& hole,
+        const DischargeHoleState& flow) const = 0;
+
+    virtual std::string name() const = 0;
+};
+
+// Factory for discharge-hole correlations.
+//
+// Throws std::invalid_argument for Lichtarowicz1965, which is declared but
+// not implemented.
+std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(
+    DischargeCdCorrelation id);
+
+// Fixed-Cd discharge correlation from an explicit value. This is the way to
+// pin a measured or literature Cd; make_discharge_correlation(Constant) can
+// only give you orifice::defaults::discharge_cd.
+std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(
+    double Cd);
 
 // -------------------------------------------------------------
 // Orifice flow calculations (uses incompressible.h internally)
@@ -627,7 +825,7 @@ double solve_orifice_mdot(
     double mu,
     double P_upstream = 101325.0,
     double kappa = 0.0,
-    CdCorrelation correlation = CdCorrelation::ReaderHarrisGallagher,
+    MeteringCdCorrelation correlation = MeteringCdCorrelation::ReaderHarrisGallagher,
     double tol = 1e-6,
     int max_iter = 20);
 
@@ -668,7 +866,7 @@ OrificeFlowResult orifice_flow(
     double Z = 1.0,
     const std::vector<double>& X = {},
     double kappa = 0.0,
-    CdCorrelation correlation = CdCorrelation::ReaderHarrisGallagher);
+    MeteringCdCorrelation correlation = MeteringCdCorrelation::ReaderHarrisGallagher);
 
 // -------------------------------------------------------------
 // Utility functions

@@ -78,11 +78,11 @@ try:
         BoundaryCondition,
         CanAnnularGeometry,
         Cd_from_zeta,
-        Cd_orifice,
-        Cd_rounded_entry,
         Cd_sharp_thin_plate,
-        Cd_thick_plate,
-        CdCorrelation,
+        MeteringCdCorrelation,
+        DischargeCdCorrelation,
+        DischargeHoleGeometry,
+        DischargeHoleState,
         CorrelationValidity,
         CorrelationResult,
         CombustionMethod,
@@ -254,6 +254,8 @@ try:
         mass_flux_isentropic,
         MassStream,
         mass_to_mole,
+        discharge_cd,
+        discharge_cd_and_derivatives,
         mcgreehan_schotsch_1988_cd,
         mcgreehan_schotsch_1988_cd_and_derivatives,
         mcgreehan_schotsch_1988_crossflow_cd,
@@ -298,7 +300,6 @@ try:
         orifice_mdot_Cd,
         orifice_Q,
         orifice_Re_d_from_mdot,
-        orifice_thickness_correction,
         orifice_velocity,
         orifice_velocity_from_mdot,
         output_units,
@@ -692,13 +693,15 @@ except (ModuleNotFoundError, ImportError) as e:
     # Orifice Cd correlations
     OrificeGeometry = _core.OrificeGeometry
     OrificeState = _core.OrificeState
-    CdCorrelation = _core.CdCorrelation
+    MeteringCdCorrelation = _core.MeteringCdCorrelation
+    DischargeCdCorrelation = _core.DischargeCdCorrelation
+    DischargeHoleGeometry = _core.DischargeHoleGeometry
+    DischargeHoleState = _core.DischargeHoleState
     CorrelationValidity = _core.CorrelationValidity
     CorrelationResult = _core.CorrelationResult
     Cd_sharp_thin_plate = _core.Cd_sharp_thin_plate
-    Cd_thick_plate = _core.Cd_thick_plate
-    Cd_rounded_entry = _core.Cd_rounded_entry
-    Cd_orifice = _core.Cd_orifice
+    discharge_cd = _core.discharge_cd
+    discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     mcgreehan_schotsch_1988_cd = _core.mcgreehan_schotsch_1988_cd
     mcgreehan_schotsch_1988_cd_and_derivatives = _core.mcgreehan_schotsch_1988_cd_and_derivatives
     mcgreehan_schotsch_1988_crossflow_cd = _core.mcgreehan_schotsch_1988_crossflow_cd
@@ -710,7 +713,6 @@ except (ModuleNotFoundError, ImportError) as e:
     orifice_Cd_from_measurement = _core.orifice_Cd_from_measurement
     orifice_K_from_Cd = _core.orifice_K_from_Cd
     orifice_Cd_from_K = _core.orifice_Cd_from_K
-    orifice_thickness_correction = _core.orifice_thickness_correction
     # Orifice flow utilities
     OrificeFlowResult = _core.OrificeFlowResult
     orifice_flow = _core.orifice_flow
@@ -1181,13 +1183,15 @@ __all__ = [
     # Orifice Cd correlations
     "OrificeGeometry",
     "OrificeState",
-    "CdCorrelation",
+    "MeteringCdCorrelation",
+    "DischargeCdCorrelation",
+    "DischargeHoleGeometry",
+    "DischargeHoleState",
     "CorrelationValidity",
     "CorrelationResult",
     "Cd_sharp_thin_plate",
-    "Cd_thick_plate",
-    "Cd_rounded_entry",
-    "Cd_orifice",
+    "discharge_cd",
+    "discharge_cd_and_derivatives",
     "mcgreehan_schotsch_1988_cd",
     "mcgreehan_schotsch_1988_cd_and_derivatives",
     "mcgreehan_schotsch_1988_crossflow_cd",
@@ -1199,7 +1203,6 @@ __all__ = [
     "orifice_Cd_from_measurement",
     "orifice_K_from_Cd",
     "orifice_Cd_from_K",
-    "orifice_thickness_correction",
     # Orifice flow utilities
     "OrificeFlowResult",
     "orifice_flow",
