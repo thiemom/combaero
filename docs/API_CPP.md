@@ -599,29 +599,70 @@ struct OrificeState {
 
 ### Cd Correlations
 ```cpp
-enum class CdCorrelation {
-    // Sharp thin-plate
-    ReaderHarrisGallagher, Stolz, Miller,
-    // Thick-plate corrections
-    IdelchikThick, BohlThick,
-    // Rounded-entry
-    IdelchikRounded, BohlRounded,
-    // Special
+// NORMED measurement orifice: a standardised plate in a pipe, Cd referenced
+// to the TAPPING differential, every member a function of beta = d/D.
+enum class MeteringCdCorrelation {
+    ReaderHarrisGallagher, Stolz, Miller,   // ISO 5167 family
     Constant, UserFunction
 };
 
-// Individual correlations
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
-double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state);
-double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state);
 
-// Auto-select correlation based on geometry
-double Cd(const OrificeGeometry& geom, const OrificeState& state);
-
-// Fixed Cd from an explicit value. make_correlation(CdCorrelation::Constant)
+// Fixed Cd from an explicit value. make_correlation(MeteringCdCorrelation::Constant)
 // can only return the default, so this is how a chosen constant is pinned.
 std::unique_ptr<OrificeCorrelationBase> make_constant_correlation(double Cd);
 ```
+
+### Discharge holes: a separate selector
+
+A hole in a wall that dumps coolant out of its circuit is not a metering
+orifice: there is no pipe to form `beta` with, and `Cd` depends on `L/d`,
+`r/d` and the approach crossflow instead. It gets its own selector and its own
+geometry/state pair.
+
+```cpp
+enum class DischargeCdCorrelation {
+    McGreehanSchotsch1988,   // cooling hole with inlet crossflow
+    Idelchik1966Sharp,       // diagram 4-17, Re 25..1e6
+    Idelchik1966Thick,       // diagram 4-18a, deep hole
+    Idelchik1966Beveled,     // diagram 4-18b
+    Idelchik1966Rounded,     // diagram 4-18c
+    Lichtarowicz1965,        // DECLARED, NOT IMPLEMENTED -- throws
+    Constant
+};
+
+struct DischargeHoleGeometry {
+    double d, L, r, bevel;   // [m]; no pipe diameter, by design
+    double L_over_d() const;
+    double r_over_d() const;
+    double bevel_over_d() const;
+    double area() const;
+    bool is_valid() const;
+};
+
+struct DischargeHoleState {
+    double Re;            // based on the hole diameter
+    double U1_over_Vi;    // INLET tangential velocity ratio; 0 for a plenum
+};
+
+class DischargeCorrelationBase {
+public:
+    virtual double Cd(const DischargeHoleGeometry&, const DischargeHoleState&) const = 0;
+    // (Cd, dCd/dRe, dCd/d(U1_over_Vi)), analytic
+    virtual std::tuple<double, double, double> Cd_and_derivatives(
+        const DischargeHoleGeometry&, const DischargeHoleState&) const = 0;
+    virtual std::string name() const = 0;
+};
+
+std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(DischargeCdCorrelation id);
+std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(double Cd);
+```
+
+For the Idelchik members `zeta` is referenced to the hole velocity and carries
+the full permanent loss, so `Cd = 1/sqrt(zeta)` exactly. See
+`validation/cooling/extractions/idelchik_1966_wall_orifice.md` for the tables,
+the cross-source agreement with McGreehan-Schotsch, and why the in-a-pipe
+diagrams are a different conversion.
 
 ### Plenum-to-plenum holes: McGreehan and Schotsch (1988)
 

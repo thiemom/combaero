@@ -62,27 +62,136 @@ class TestCdCorrelations:
         Cd = cb.Cd_sharp_thin_plate(standard_geom, standard_state)
         assert 0.58 < Cd < 0.68
 
-    def test_Cd_thick_plate_higher(self, standard_geom, standard_state):
-        """Thick plate should have higher Cd than thin plate."""
-        standard_geom.t = 0.010  # 10mm thickness
-        Cd_thin = cb.Cd_sharp_thin_plate(standard_geom, standard_state)
-        Cd_thick = cb.Cd_thick_plate(standard_geom, standard_state)
-        assert Cd_thick > Cd_thin
-        assert Cd_thick < Cd_thin * 1.3
 
-    def test_Cd_rounded_entry_higher(self, standard_geom, standard_state):
-        """Rounded entry should have higher Cd than sharp edge."""
-        standard_geom.r = 0.010  # 10mm radius
-        Cd_sharp = cb.Cd_sharp_thin_plate(standard_geom, standard_state)
-        Cd_round = cb.Cd_rounded_entry(standard_geom, standard_state)
-        assert Cd_round > Cd_sharp
-        assert Cd_round < 1.0
+class TestIdelchikWallOrifice:
+    """Idelchik (1966) diagrams 4-17 and 4-18: a hole in a large wall.
 
-    def test_Cd_orifice_auto_select(self, standard_geom, standard_state):
-        """Auto-select should match thin plate for default geometry."""
-        Cd_auto = cb.Cd_orifice(standard_geom, standard_state)
-        Cd_thin = cb.Cd_sharp_thin_plate(standard_geom, standard_state)
-        assert Cd_auto == pytest.approx(Cd_thin)
+    Ground truth is the source's own tabulated zeta, not the code's output.
+    These replace three directional tests over Cd_thick_plate /
+    Cd_rounded_entry / Cd_orifice, which asserted only that thick > thin and
+    round > sharp and so passed straight over an 11% jump discontinuity at
+    Re = 1e5 and a silent fallback to Stolz at r/d = 0.
+    """
+
+    def test_sharp_edge_reproduces_diagram_4_17(self) -> None:
+        """zeta reaches 2.85 at the table's last knot, Re = 1e6.
+
+        NOT at Re = 1e5: item 1's "Re >= 1e5 -> 2.85" is the coarse statement
+        of the same curve the table gives finely, and the table says 2.60 at
+        1e5. Treating it as a separate branch put a 4.5% step there.
+        """
+        hole = cb.DischargeHoleGeometry(d=1e-3)
+        sel = cb.DischargeCdCorrelation.Idelchik1966Sharp
+        cd = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=1e6))
+        assert cd == pytest.approx(1.0 / math.sqrt(2.85), rel=1e-9)
+        # The table's own value at 1e5, which the old hard switch overrode.
+        cd_1e5 = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=1e5))
+        assert cd_1e5 == pytest.approx(1.0 / math.sqrt(0.04 + 2.56), rel=1e-9)
+
+    def test_rounded_reproduces_diagram_4_18c(self) -> None:
+        # Read off the page rendered at 400 dpi, not the OCR layer.
+        table = {
+            0.01: 2.72,
+            0.02: 2.56,
+            0.03: 2.40,
+            0.04: 2.27,
+            0.06: 2.06,
+            0.08: 1.88,
+            0.12: 1.60,
+            0.16: 1.38,
+            0.20: 1.37,
+        }
+        flow = cb.DischargeHoleState(Re=2e5)
+        for r_over_d, zeta in table.items():
+            hole = cb.DischargeHoleGeometry(d=1e-3, r=r_over_d * 1e-3)
+            cd = cb.discharge_cd(cb.DischargeCdCorrelation.Idelchik1966Rounded, hole, flow)
+            assert cd == pytest.approx(1.0 / math.sqrt(zeta), rel=1e-9), f"r/d = {r_over_d}"
+
+    def test_thick_hole_reproduces_diagram_4_18a(self) -> None:
+        table = {
+            0.0: 2.85,
+            0.2: 2.72,
+            0.4: 2.60,
+            0.6: 2.34,
+            0.8: 1.95,
+            1.0: 1.76,
+        }
+        # At Re = 1e6 the low-Re form reduces exactly to item 1's
+        # zeta' + lam*l/Dh, because k = 1/zeta_sharp (see the header note on
+        # the printed 0.342).
+        flow = cb.DischargeHoleState(Re=1e6)
+        for l_over_d, zeta_prime in table.items():
+            hole = cb.DischargeHoleGeometry(d=1e-3, L=l_over_d * 1e-3)
+            cd = cb.discharge_cd(cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow)
+            # zeta = zeta' + lam*l/Dh, and lam > 0, so Cd sits just below the
+            # friction-free value rather than on it.
+            cd_frictionless = 1.0 / math.sqrt(zeta_prime)
+            assert cd <= cd_frictionless + 1e-12, f"l/d = {l_over_d}"
+            assert cd > cd_frictionless * 0.97, f"l/d = {l_over_d}"
+
+    def test_cd_is_continuous_across_the_1e5_boundary(self) -> None:
+        """The removed rounded-entry code jumped 11.1% at Re_D = 1e5.
+
+        0.881391 -> 0.979326 across 9.999e4 -> 1.0e5: a hard C0 break in a
+        solver input. Idelchik's own low-Re branch has no such step.
+        """
+        hole = cb.DischargeHoleGeometry(d=1e-3)
+        sel = cb.DischargeCdCorrelation.Idelchik1966Sharp
+        below = cb.discharge_cd(hole=hole, correlation=sel, flow=cb.DischargeHoleState(Re=9.999e4))
+        above = cb.discharge_cd(hole=hole, correlation=sel, flow=cb.DischargeHoleState(Re=1.0001e5))
+        assert abs(above - below) < 1e-4
+
+    def test_low_re_reaches_three_decades_below_mcgreehan(self) -> None:
+        """Idelchik's table starts at Re = 25; McGreehan's floor is 1e4."""
+        hole = cb.DischargeHoleGeometry(d=1e-3)
+        sel = cb.DischargeCdCorrelation.Idelchik1966Sharp
+        cd_creep = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=25.0))
+        cd_min = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=400.0))
+        cd_turb = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=1e6))
+        # zeta = 1.94 + 1.00 at Re = 25, 0.54 + 1.37 at 400, 0 + 2.85 at 1e6.
+        assert cd_creep == pytest.approx(1.0 / math.sqrt(2.94), rel=1e-9)
+        assert cd_min == pytest.approx(1.0 / math.sqrt(1.91), rel=1e-9)
+        assert cd_turb == pytest.approx(1.0 / math.sqrt(2.85), rel=1e-9)
+        # Cd is NOT monotone in Re: it peaks near Re = 400 where zeta is
+        # smallest. Idelchik's own table, not an artifact.
+        assert cd_min > cd_creep and cd_min > cd_turb
+
+    def test_crossflow_derivative_is_exactly_zero(self) -> None:
+        """Idelchik is plenum-to-plenum: no approach velocity exists.
+
+        An honest absence, not a truncation -- so exactly 0.0, not small.
+        """
+        hole = cb.DischargeHoleGeometry(d=1e-3, r=1e-4)
+        flow = cb.DischargeHoleState(Re=5e4)
+        _, _, dcd_du = cb.discharge_cd_and_derivatives(
+            cb.DischargeCdCorrelation.Idelchik1966Rounded, hole, flow
+        )
+        assert dcd_du == 0.0
+
+    def test_agrees_with_mcgreehan_schotsch_cross_source(self) -> None:
+        """CROSS-SOURCE accuracy, labelled as such per the validation policy.
+
+        Idelchik (1966) against McGreehan and Schotsch (1988): independent
+        sources, 22 years apart. This is an accuracy check, not fidelity --
+        it says the two agree, not that either mirrors its own paper.
+        """
+        Re = 1e5
+        sel = cb.DischargeCdCorrelation.Idelchik1966Thick
+        for l_over_d in (0.0, 0.4, 1.0, 2.0, 4.0):
+            hole = cb.DischargeHoleGeometry(d=1e-3, L=l_over_d * 1e-3)
+            cd_i = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=Re))
+            cd_m = cb.mcgreehan_schotsch_1988_cd(Re, 0.0, l_over_d, 0.0)
+            assert cd_m == pytest.approx(cd_i, rel=0.06), f"l/d = {l_over_d}"
+        # The sharp-edged anchor is the tight one: 0.5923 vs 0.5926.
+        assert cb.mcgreehan_schotsch_1988_cd(Re, 0.0, 0.0, 0.0) == pytest.approx(
+            1.0 / math.sqrt(2.85), abs=5e-4
+        )
+
+    def test_lichtarowicz_refuses_rather_than_substituting(self) -> None:
+        hole = cb.DischargeHoleGeometry(d=1e-3)
+        flow = cb.DischargeHoleState(Re=1e5)
+        with pytest.raises(ValueError, match="not implemented"):
+            cb.discharge_cd(cb.DischargeCdCorrelation.Lichtarowicz1965, hole, flow)
 
 
 class TestOrificeFlowCalculations:
@@ -140,26 +249,6 @@ class TestUtilityFunctions:
         assert K > 0
         Cd_back = cb.orifice_Cd_from_K(K, beta)
         assert Cd_back == pytest.approx(Cd)
-
-    def test_thickness_correction(self):
-        """Test thickness correction factor with Idelchik model."""
-        Re_d = 1e5  # Typical Reynolds number
-
-        # Thin plate: no correction
-        assert cb.orifice_thickness_correction(0.01, 0.5, Re_d) == pytest.approx(1.0)
-
-        # Small thickness: reattachment benefit
-        corr_small = cb.orifice_thickness_correction(0.2, 0.5, Re_d)
-        assert corr_small > 1.0
-
-        # Peak around t/d ~ 0.3 (calibrated to Idelchik data)
-        corr_peak = cb.orifice_thickness_correction(0.3, 0.5, Re_d)
-        assert corr_peak > corr_small
-
-        # Large thickness: friction reduces Cd (non-monotonic behavior)
-        corr_long = cb.orifice_thickness_correction(3.0, 0.5, Re_d)
-        assert corr_long < corr_peak  # Falls at large t/d due to friction
-        assert corr_long < 1.0  # Long-tube behavior: k_t < 1.0
 
 
 class TestMcGreehanSchotsch1988:

@@ -823,17 +823,28 @@ const Inspector = () => {
 										</option>
 										<option value="Stolz">Stolz (Corner Taps)</option>
 										<option value="Miller">Miller (Simplified)</option>
-										<option value="ThickPlate">Thick Plate (Sharp Edge)</option>
-										<option value="RoundedEntry">Rounded Entry</option>
+										<option value="IdelchikThick">
+											Deep Hole in Wall (Idelchik 4-18a)
+										</option>
+										<option value="IdelchikBeveled">
+											Beveled Hole in Wall (Idelchik 4-18b)
+										</option>
+										<option value="IdelchikRounded">
+											Rounded Hole in Wall (Idelchik 4-18c)
+										</option>
+										<option value="McGreehanSchotsch">
+											Cooling Hole with Crossflow (M-S 1988)
+										</option>
 										<option value="fixed">Manual / Fixed Value</option>
 									</select>
 								</div>
 
 								{/* Conditional Inputs based on correlation */}
-								{selectedNode.data.correlation === "ThickPlate" && (
+								{(selectedNode.data.correlation === "IdelchikThick" ||
+									selectedNode.data.correlation === "McGreehanSchotsch") && (
 									<LengthInput
 										id={`plate_thickness_${selectedNode.id}`}
-										label="Plate Thickness (t)"
+										label="Hole Length (L)"
 										value={selectedNode.data.plate_thickness ?? 0.0}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { plate_thickness: val })
@@ -841,13 +852,25 @@ const Inspector = () => {
 									/>
 								)}
 
-								{selectedNode.data.correlation === "RoundedEntry" && (
+								{(selectedNode.data.correlation === "IdelchikRounded" ||
+									selectedNode.data.correlation === "McGreehanSchotsch") && (
 									<LengthInput
 										id={`edge_radius_${selectedNode.id}`}
 										label="Inlet Edge Radius (r)"
 										value={selectedNode.data.edge_radius ?? 0.0}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { edge_radius: val })
+										}
+									/>
+								)}
+
+								{selectedNode.data.correlation === "IdelchikBeveled" && (
+									<LengthInput
+										id={`bevel_depth_${selectedNode.id}`}
+										label="Bevel Depth (l)"
+										value={selectedNode.data.bevel_depth ?? 0.0}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { bevel_depth: val })
 										}
 									/>
 								)}
