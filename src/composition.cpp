@@ -1,10 +1,10 @@
 #include "../include/composition.h"
 #include "../include/thermo_transport_data.h" // For molar_masses
 #include "../include/thermo.h"               // For species_index_from_name
+#include "../include/correlation_status.h" // For warn()
 #include <numeric>
 #include <algorithm>
 #include <stdexcept>
-#include <iostream>
 #include <cmath>
 
 namespace combaero {
@@ -19,7 +19,7 @@ std::vector<double> normalize_fractions(const std::vector<double>& fractions) {
     std::vector<double> normalized = clamped;
 
     if (std::abs(sum) < 1.0e-10) {
-        std::cerr << "Warning: normalize_fractions received all zeros. Returning all zeros." << std::endl;
+        warn("normalize_fractions received all zeros. Returning all zeros.");
         return fractions;
     }
 
@@ -86,7 +86,7 @@ std::vector<double> convert_to_dry_fractions(const std::vector<double>& mole_fra
     }
 
     if (std::abs(sum) < 1.0e-10) {
-        std::cerr << "Warning: convert_to_dry_fractions received only water vapor. Returning all zeros." << std::endl;
+        warn("convert_to_dry_fractions received only water vapor. Returning all zeros.");
         std::fill(dry_fractions.begin(), dry_fractions.end(), 0.0);
         return dry_fractions;
     }
