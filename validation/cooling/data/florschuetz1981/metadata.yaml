@@ -13,6 +13,36 @@
 # See validation/cooling/extractions/han_impingement.md for the
 # per-panel numbers.
 
+# UNCERTAINTY IS THE MEASUREMENT BAND, NOT THE MODEL'S ERROR (#389).
+#
+# Until 2026-09-29 every series here carried its OWN per-series
+# `uncertainty`, ranging 0.03 to 0.324, and those values had been set from
+# the model's measured error on that same series. The series whose
+# `cross_check` reads "bias +31%, RMS 32%" carried a band of 0.324. So
+# `within` was asking whether the model sits inside its own error, which it
+# largely must: the declared band correlated with the measured RMS at
+# r = +0.9987 over 27 series. That is the #332/#333 defect class living in
+# the data rather than in a test.
+#
+# The band is now the same for every series, because both of its components
+# are properties of the MEASUREMENT and neither is a property of a series:
+#
+#   experimental   +/-5% at 95% confidence. The primary paper's own Nu
+#                  measurement uncertainty, quoted by Han and recorded as
+#                  item 12 of the extraction. NOT item 23's 5.6% standard
+#                  error, which is how well the CORRELATION fits its own
+#                  data -- a property of the model, so out of bounds here.
+#   digitisation   0.97%. Worst y-tick deviation from round numbers across
+#                  all nine panels (see the calibration note above).
+#
+#   root-sum-square -> 0.051
+#
+# The experimental term dominates; digitisation adds 1.9% on top of it.
+#
+# EXPECTED CONSEQUENCE, stated up front: `within` for this source drops from
+# 58.6% to whatever it really is. The old figure was not a measurement of
+# anything.
+
 paper:
   name: florschuetz1981
   citation: >-
@@ -40,7 +70,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.324
+    uncertainty: 0.051
     cross_check: >-
       Worst agreement in the set: this panel sits at the correlation's own
       validity corner (xn/d=5, yn/d=4, z/d=1 all simultaneously at their lower
@@ -78,7 +108,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.03
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -0.7%, RMS 2.8%, max
       |err| 5.8%. Series is monotonically non-increasing with Gc/Gj.
@@ -109,7 +139,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.07
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -6.6%, RMS 7.0%, max
       |err| 10.9%. Series is monotonically non-increasing with Gc/Gj.
@@ -140,7 +170,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.098
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +9.0%, RMS 9.8%, max
       |err| 12.3%. Series is non-monotonic (2 of 8 steps increase --
@@ -173,7 +203,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.034
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -2.6%, RMS 3.4%, max
       |err| 5.7%. Series is non-monotonic (1 of 8 steps increase -- consistent
@@ -205,7 +235,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.071
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -6.2%, RMS 7.1%, max
       |err| 13.2%. Series is monotonically non-increasing with Gc/Gj.
@@ -236,7 +266,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.178
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +16.9%, RMS 17.8%,
       max |err| 23.3%. Series is non-monotonic (2 of 8 steps increase --
@@ -269,7 +299,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.038
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +3.0%, RMS 3.8%, max
       |err| 7.8%. Series is non-monotonic (1 of 8 steps increase -- consistent
@@ -301,7 +331,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.043
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -0.4%, RMS 4.3%, max
       |err| 10.7%. Series is non-monotonic (1 of 8 steps increase --
@@ -334,7 +364,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.071
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=8, bias +6.8%, RMS 7.1%, max
       |err| 9.4%. Series is non-monotonic (2 of 7 steps increase -- consistent
@@ -366,7 +396,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.089
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +6.6%, RMS 8.9%, max
       |err| 12.8%. Series is monotonically non-increasing with Gc/Gj.
@@ -397,7 +427,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.059
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +4.4%, RMS 5.9%, max
       |err| 9.8%. Series is monotonically non-increasing with Gc/Gj.
@@ -428,7 +458,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.084
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +7.6%, RMS 8.4%, max
       |err| 13.9%. Series is non-monotonic (5 of 8 steps increase --
@@ -461,7 +491,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.062
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +4.7%, RMS 6.2%, max
       |err| 10.2%. Series is monotonically non-increasing with Gc/Gj.
@@ -492,7 +522,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.034
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +2.4%, RMS 3.4%, max
       |err| 6.9%. Series is monotonically non-increasing with Gc/Gj.
@@ -523,7 +553,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.121
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +11.4%, RMS 12.1%,
       max |err| 16.8%. Series is non-monotonic (4 of 8 steps increase --
@@ -556,7 +586,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.108
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +8.7%, RMS 10.8%,
       max |err| 16.3%. Series is monotonically non-increasing with Gc/Gj.
@@ -587,7 +617,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.073
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +6.6%, RMS 7.3%, max
       |err| 11.4%. Series is monotonically non-increasing with Gc/Gj.
@@ -618,7 +648,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.03
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -1.1%, RMS 1.9%, max
       |err| 3.6%. Series is non-monotonic (3 of 8 steps increase -- consistent
@@ -650,7 +680,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.073
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -7.1%, RMS 7.3%, max
       |err| 9.3%. Series is non-monotonic (1 of 8 steps increase -- consistent
@@ -713,7 +743,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.06
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -3.1%, RMS 6.0%, max
       |err| 10.8%. Series is non-monotonic (5 of 8 steps increase --
@@ -746,7 +776,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.03
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias -0.7%, RMS 1.7%, max
       |err| 3.5%. Series is monotonically non-increasing with Gc/Gj.
@@ -777,7 +807,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.03
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +0.9%, RMS 2.4%, max
       |err| 3.4%. Series is non-monotonic (1 of 8 steps increase -- consistent
@@ -841,7 +871,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.074
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +7.0%, RMS 7.4%, max
       |err| 9.6%. Series is monotonically non-increasing with Gc/Gj.
@@ -872,7 +902,7 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.08
+    uncertainty: 0.051
     cross_check: >-
       Scored against florschuetz_1981_inline(): n=9, bias +7.9%, RMS 8.0%, max
       |err| 10.2%. Series is monotonically non-increasing with Gc/Gj.

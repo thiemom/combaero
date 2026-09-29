@@ -1230,6 +1230,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A validation series' stated uncertainty was its own model error** (#389).
+  `uncertainty` is meant to be the band the SOURCE measured to, so `within`
+  answers "does the model land inside the experiment's own precision". In 30
+  series it had instead been set from combaero's measured error on that same
+  series, which makes `within` ask whether the model is inside its own error
+  -- a question it largely must answer yes to. The declared band tracked the
+  measured RMS at **r = +0.9987** across `florschuetz1981`'s 27 series; the
+  series whose `cross_check` reads "bias +31%, RMS 32%" carried a band of
+  0.324.
+
+  Repaired at source:
+
+  - all 27 `florschuetz1981` series now carry **0.051**, from
+    `sqrt(0.05^2 + 0.0097^2)` -- the primary paper's own +/-5% Nu measurement
+    uncertainty at 95% confidence (`han_impingement.md` item 12) in
+    root-sum-square with 0.97% digitisation precision. Deliberately NOT item
+    23's 5.6% standard error, which is how well the CORRELATION fits its own
+    data and so is a property of the model.
+  - `han2012/fig4.47_R_vs_alpha` (0.105) and `fig4.47_G_vs_eplus` (0.088) now
+    carry Han and Park's published **6%** (`han_ribbed.md` item 7), as every
+    other scored series in that source already did. The 0.105 was that
+    series' own RMS, in a cell whose `cross_check` said "Han's stated band is
+    6%" in the same breath.
+  - `han2012/fig4.193c_G_scatter` (0.069) now carries **no band**. That 0.069
+    was `han_ribbed_high_re.md`'s own "Eq. (18) against the cloud, RMS 6.9%",
+    and Rallabandi, Yang and Han (2009)'s own uncertainty has not been read.
+    `within` renders `-`, which is the honest report; a band borrowed from a
+    different paper's rig would not be a measurement either.
+
+  **`florschuetz_1981_inline`'s `within` moves 58.7% -> 47.5%.** That figure
+  appears in #333's progress comments and this is a correction to it, not a
+  regression: no model behaviour changed, only the yardstick. Individual
+  series now span 0.0% to 100.0%, where the self-derived band confined them
+  to 33.3%-88.9% -- a series always sits near its own RMS, so it could
+  neither fall wholly outside such a band nor wholly inside it. MAE, RMSE and
+  bias are untouched.
+
+  `python/tests/test_uncertainty_is_measurement.py` pins this four ways: the
+  structural invariant (a band is a property of the instrument and the
+  figure, so it cannot vary between scored series of one figure and
+  quantity), the correlation check, and a pin per repaired source. The
+  structural test is the one that binds -- but it cannot see the three
+  `han2012` series, which are each alone in their group once unscored series
+  are dropped, so those are held by an explicit pin. A numeric "band equals
+  this series' own RMSE" rule was tried and rejected: with a constant 0.051
+  over 27 series, two land on their own RMSE by coincidence.
+
+  `lau1990` was checked and cleared. Its r = +0.97 is a false positive: three
+  series, two bands (+/-5.8% Stanton, +/-10.9% friction, both Kline and
+  McClintock from the paper), correlating only because friction happens to
+  have both the larger band and the larger error.
+
 - **The discharge-hole correlations were given the pipe Reynolds number**
   (regression from #409). `Idelchik1966*` and `McGreehanSchotsch` are
   functions of the HOLE Reynolds number, but `OrificeElement._effective_Cd`

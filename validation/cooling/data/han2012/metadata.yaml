@@ -259,7 +259,12 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.069
+    # No band: Rallabandi, Yang and Han (2009) is a primary paper this
+    # dataset has not read, so it states no uncertainty here. The 0.069
+    # carried until #389 was han_ribbed_high_re.md's own "Eq. (18)
+    # against the cloud, RMS 6.9%" -- the model's error on this very
+    # series, which cannot also be the band that judges it.
+    uncertainty: null
     cross_check: >-
       The cloud must straddle the new-correlation curve and sit above the
       old one at high e+, which is the figure's whole point. Scored against
@@ -2720,7 +2725,12 @@ files:
     extraction: figure-digitised
     confidence: band
     class_confidence: confirmed
-    uncertainty: 0.105
+    # Han and Park's own 6% (han_ribbed.md item 7), as every other
+    # scored series here. Until #389 this read 0.105, which was this
+    # series' own measured RMS against han_park_1988_angled -- the
+    # cross_check below says "Han's stated band is 6%" in the same
+    # breath.
+    uncertainty: 0.06
     cross_check: >-
       Against the printed Eq. 4.17,
       R/[(P/e/10)^0.35 (W/H)^m] = 12.31 - 27.07(a/90) + 17.86(a/90)^2:
@@ -2778,7 +2788,9 @@ files:
     extraction: figure-digitised
     confidence: band
     class_confidence: confirmed
-    uncertainty: 0.088
+    # Han and Park's own 6% (han_ribbed.md item 7). Until #389 this
+    # read 0.088, this series' own measured RMS.
+    uncertainty: 0.06
     cross_check: >-
       Free fit 2.375 (e+)^0.3453 over 115 points, against the printed
       Eq. 4.18 exponent of 0.35 -- agreeing to 0.005. The COEFFICIENT is
