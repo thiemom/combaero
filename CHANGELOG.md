@@ -97,205 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Provenance in
   `validation/cooling/extractions/lichtarowicz_1965_long_orifice.md`.
 
-### Changed
-
-- **`McGreehanSchotsch1988` now warns below its `re_min = 1e4` floor**,
-  naming Lichtarowicz and Idelchik as the valid alternatives. Below the floor
-  the chain holds Re at the floor, so Cd stops responding to flow entirely --
-  documented and deliberate, since Eq. (8) diverges there, but silently
-  returning a frozen Cd is how a plenum-fed hole came to read +21.7% high.
-  Warns rather than refuses, because a network can transit low Re during
-  Newton iteration.
-
-- **`EffusionPlateElement`** (#387) -- a multi-perforated wall panel as a
-  network element, flow side. Geometry is given the way a plate is designed
-  (pitch, hole diameter, wall thickness, inclination angle); the hole count
-  follows from the panel area and is rounded, with `hole_count_exact` and
-  `pitch_actual` recording what the rounding did. An inclined hole is
-  correctly longer than the wall is thick (`L = t/sin(alpha)`), which is why
-  effusion holes are inclined at all. Geometry reproduces Andrews et al.
-  (1988) ASME 88-GT-290 Table 1: `N = 4306 m^-2` and `A/A_h` to 1.5%.
-
-  Defaults to `IdelchikThick` -- diagram 4-18a is a thick-walled hole in a
-  large wall between two plena, which is exactly a plenum-fed effusion
-  plate. ISO 5167 correlations are **refused**: a panel has no pipe and no
-  `beta`, so they are undefined rather than merely inaccurate. For a
-  channel-fed panel the approach flow is a crossflow, so use
-  `'McGreehanSchotsch'`.
-
-  **The effusion CHANNEL needs no new element.** Because the solver balances
-  mass over every element at a node, hanging a panel off each segment of a
-  coolant channel gives `m_channel_in = m_channel_out + m_effusion` -- the
-  coolant flow falling along the wall. That is van de Noort and Ireland's
-  (2022) flow-network structure, and the resolution is the caller's choice of
-  segment count.
-
-  A single panel homogenises, and `diagnostics()` says so where it matters:
-  `is_ingesting` flags a reversed drive (hot-gas ingestion, which a
-  homogenised panel would otherwise average into a healthy net outflow), and
-  `dP_drive` compared across panels shows whether one panel is smearing a
-  gradient that deserves several. Also reports `G_coolant`, the coolant mass
-  flow per unit plate area that Andrews correlates on.
-
-  Thermal modelling is deliberately not included yet: the effectiveness split
-  between internal throat convection and the external film has to be stated
-  explicitly or the two double-count, and that needs its own extraction.
-
-### Fixed
-
-- **The discharge-hole correlations were given the pipe Reynolds number**
-  (regression from #409). `Idelchik1966*` and `McGreehanSchotsch` are
-  functions of the HOLE Reynolds number, but `OrificeElement._effective_Cd`
-  passed `Re_D`, built from the upstream channel diameter. Wrong by 1-8% for
-  an orifice in a pipe, and by up to **38% for a plenum-fed hole**, where
-  `D_up = 0` froze `Re_D` at a `1e5` fallback so the correlation stopped
-  responding to flow entirely. Now computed as
-  `4 m_dot_hole / (pi d_hole mu)` via an overridable `_hole_reynolds` hook,
-  which `EffusionPlateElement` overrides to divide by the hole count.
-
-- **Idelchik (1966) wall-orifice discharge coefficients** --
-  `DischargeCdCorrelation::Idelchik1966{Sharp,Thick,Beveled,Rounded}`, from
-  Section IV diagrams 4-17 and 4-18 (a hole in a large wall, `F1 = F2 = inf`,
-  which is the effusion-plate geometry). `zeta` is referenced to the hole
-  velocity and carries the full permanent loss, so `Cd = 1/sqrt(zeta)` is
-  exact rather than a convention-dependent conversion. Valid **Re 25 to 1e6**
-  -- three decades below McGreehan-Schotsch's `re_min = 1e4`, and the range
-  small cooling holes actually operate in. No digitisation was required:
-  every value is tabulated in the source and was read off the page at 400 dpi.
-  Provenance in
-  `validation/cooling/extractions/idelchik_1966_wall_orifice.md`.
-
-  **Cross-source agreement, labelled cross-source:** against McGreehan and
-  Schotsch (1988) the two are within 5% over the whole `L/d` range and
-  **0.05% at the sharp-edged baseline** (0.5923 vs 0.5926) -- independent
-  sources 22 years apart. That is an accuracy result, not a fidelity one.
-
-- **A separate `DischargeCdCorrelation` selector**, with
-  `DischargeHoleGeometry` / `DischargeHoleState` and analytic
-  `discharge_cd_and_derivatives` returning
-  `(Cd, dCd/dRe, dCd/d(U1_over_Vi))`. A hole in a wall has no pipe to form
-  `beta` with and its `Cd` depends on `L/d`, `r/d` and the approach
-  crossflow, none of which `OrificeGeometry`/`OrificeState` can express. One
-  enum over both families forced every caller to pass a meaningless `D` and
-  silently dropped the crossflow.
-
-  Interpolation is monotone cubic (Fritsch-Carlson), not linear: linear would
-  put a derivative jump at each of 14 table knots, and a natural spline would
-  overshoot the flat tails and invent a `Cd` above the source's.
-
-### Changed
-
-- **`CdCorrelation` renamed to `MeteringCdCorrelation`** and narrowed to the
-  normed ISO 5167 device it actually describes:
-  `ReaderHarrisGallagher`, `Stolz`, `Miller`, `Constant`, `UserFunction`.
-  `Constant` and `UserFunction` are now reachable from Python, and all three
-  dispatch sites (`solve_orifice_mdot`, `orifice_flow`, `make_correlation`)
-  go through one factory instead of three divergent switches.
-
-### Removed
-
-- **`Cd_thick_plate`, `Cd_rounded_entry`, `Cd_orifice`,
-  `orifice::thickness_correction`, `orifice::Cd_rounded`, and the
-  `IdelchikThick` / `IdelchikRounded` / `BohlThick` / `BohlRounded` members
-  of the Cd correlation enum.** Replaced by the Idelchik members above.
-
-  These computed an ISO 5167 `Cd` and multiplied it by a correction factor.
-  The base does not apply -- a thick-edged or rounded orifice is not the
-  normed device -- and the factor was an unlabelled fit to Idelchik diagram
-  4-12b that had lost its tail: within 5% to `r/Dh = 0.06`, then **-27% at
-  0.08 and -78% at 0.12**. The thick-plate factor carried a `5.67`
-  commented "friction loss calibration factor" and a `[0.5, 1.3]` clamp.
-
-  Two defects went with them:
-  - an **11.1% jump discontinuity in `Cd` at `Re_D = 1e5`** (0.881391 ->
-    0.979326), a hard C0 break in a solver input;
-  - `Cd_rounded_entry` at `r/d = 0` **silently returned `Cd_Stolz`**.
-
-  None of the 16 tests over that code would have caught either: all were
-  directional. `BohlThick`/`BohlRounded` fell through to the Idelchik
-  implementations, silently returning a different correlation than the one
-  asked for; Bohl was dropped rather than implemented because its orifice
-  content (DIN 1952 normed orifices, standard loss coefficients) is already
-  held by ISO 5167 and Idelchik, so it plugs no coverage gap.
-
-- **`OrificeElement`'s `'Auto'` correlation arm**, and the `'ThickPlate'` /
-  `'RoundedEntry'` strings with their GUI dropdown entries. `'Auto'` picked a
-  correlation from `r` and `t` behind the caller's back, which is how a
-  rounded-entry request came back as Stolz. The new strings are
-  `'IdelchikThick'`, `'IdelchikBeveled'`, `'IdelchikRounded'` and
-  `'McGreehanSchotsch'`; an unknown correlation now raises rather than
-  falling through to auto-selection.
-
-- **Analytic `(f, J)` for the McGreehan and Schotsch discharge coefficient**
-  (#383). `mcgreehan_schotsch_1988_cd_and_derivatives` returns
-  `(Cd, dCd/dRe, dCd/d(U1/Vi))` via forward-mode `DualN`, cross-checked
-  against finite differences to 3.7e-7 relative. `r/d` and `L/d` are geometry
-  and carry no partials. This is what `OrificeElement` needs before the
-  correlation can be selected there -- without it the Jacobian would be
-  knowingly incomplete, since `Cd` moves 0.60 to 0.99 over the geometry range
-  and is halved by crossflow.
-
-  **The two hazards needed different treatments, and measurement decided
-  which.** Eq. (17)'s `Rv^0.6` and `Rv^0.9` diverge in slope at `U1/Vi = 0` --
-  the default, and the physically right value for a plenum-fed jet plate -- so
-  the input is **regularised in the model**: `U1/Vi -> sqrt((U1/Vi)^2 + eps^2)`
-  with `rv_smooth_eps = 3e-5`. Below `Re = 1e4` the value is held at the
-  validity floor and the derivative was exactly zero; softening the *value*
-  there was measured and **rejected** (a soft-max recovers only 16% of the
-  live slope for 7.1e-3 on `Cd`, in a region the correlation does not cover),
-  so the **Jacobian alone** is continued from the floor. No reported `Cd`
-  changes for that one, and `dCd/dRe` becomes continuous across the floor.
-
-  `eps = 3e-5` sits between two bisected walls, both sourced: worst
-  `|dCd/du|` within 10x the physical derivative scale (0.663, measured on the
-  exact chain over the range Figs. 4-6 carry data for) gives `eps >= 1.86e-5`;
-  departure from Eq. (17) within 10% of the `+/-0.02` scatter the correlation
-  sits in (**the paper states no error statistic at all**) gives
-  `eps <= 4.15e-4`. The default sits 15% across, deliberately towards the
-  low-smoothing end -- over-smoothing stalls this solver harder than a stiff
-  Jacobian does.
-
-### Changed
-
-- **`Cd_McGreehanSchotsch`, `mcgreehan_schotsch::cd` and `cd_with_crossflow`
-  take an `eps` argument** (#383), defaulting to `rv_smooth_eps`. Passing
-  `eps = 0` recovers Eq. (17) exactly at every entry point, as it already did
-  for the expansion factor. At the default the zero-crossflow value sits
-  ~4e-4 above the unregularised one -- 2% of the correlation's own data
-  scatter -- stated rather than silent; the paper's printed 0.60 baseline is
-  still reproduced to 5e-4 at `eps = 0`.
-
-- **Han's `G_bar = 1.2 G` is now applied at every rib angle, as published**
-  (#339 plan 1b). The runner refused anything off 90 degrees on the grounds
-  that 1.2 is a 90 degree result. It is -- but refusing withheld a number
-  Han does publish, and turned a known accuracy limit into a missing
-  answer. Faithful implementation uses the published constant; what it
-  costs is measured and labelled (see docs/VALIDATION_POLICY.md).
-
-  **A generalised replacement was considered and rejected on evidence.**
-  Pooling every closed-form measurement available -- 91-GT-3 table 3
-  (extracted and two-channel verified for this), Lau table 2, and
-  CR-3837's per-run `Nu(R)`/`Nu(AV)` split -- gives 16 configurations
-  across three rigs spanning **1.096 to 1.413** at `e+` = 300, and
-  **69% of that variance is BETWEEN RIGS**:
-
-  | source | n | mean | internal spread |
-  |---|---|---|---|
-  | 91-GT-3 | 4 | 1.160 | 12% |
-  | CR-3837 | 5 | 1.323 | 3% |
-  | lau1990 | 7 | 1.327 | 14% |
-
-  No angle or shape term can reach a rig offset, so a "better" correlation
-  would be fitting rig identity. Han's 1.2 scores MAE 8.3% against that
-  population -- a defensible one-number answer. Pinned by a test that fails
-  if the between-rig share drops, which is the condition under which
-  revisiting would be worthwhile.
-
-  Even at 90 degrees the measured ratio runs 1.29 down to 1.13 across
-  `e+`, so the constant was always a fit, including where it was trusted
-  most.
-
-### Added
 
 - **Validation policy: fidelity, accuracy and tuning are three questions,
   never one number** ([docs/VALIDATION_POLICY.md](docs/VALIDATION_POLICY.md),
@@ -437,100 +238,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `y_axis: G_bar` by Han's Prandtl factor automatically. A test asserts the
   trap stays shut.
 
-### Changed
-
-- **The cooling scorecard now aggregates all three runners** (#333).
-  `validation/cooling/scorecard.py` knew only `runner.py`, so the Florschuetz
-  and orifice series read as "not scored by any set" and there was no single
-  place to see whether cooling as a whole was healthy. `run_dataset()` gives
-  every series to exactly one runner and a rollup reports per correlation
-  set -- six sets, 680 points, in one view for the first time.
-
-  Dispatch is on an explicit `owns()` predicate per runner, not on "the runner
-  returned something". Every runner deliberately returns reason-carrying
-  records for series it cannot score, precisely so a silent zero never
-  masquerades as a good score -- which makes truthiness useless as an
-  ownership test, and was the first version's bug: the jet-array runner
-  claimed the orifice series and reported them unscored.
-
-  Rohde's series are rolled up **per velocity-head-ratio band**, never pooled:
-  the total-to-static factor is 1.01 at VHR 50 and 1.33 at VHR 2, so one
-  number would mix a near-exact comparison with one dominated by the
-  conversion.
-
-### Fixed
-
-- **The `e+` path scored unrecognised quantities against `G`** (#339 plan
-  1a). The branch ended in a catch-all `else: predicted = g`, so any
-  `y_axis` that was not `G_bar` or `R_normalised` -- an absolute `R` among
-  them -- would have been compared against a different physical quantity
-  entirely. Nothing hit it only because every such series carried
-  `scores: null`. Now explicit per quantity, with anything unpredictable
-  returned unscored and with a reason.
-
-- **`han_park_1988_angled` scored every angled series at 90 degrees**
-  (#391). On the `e+` path `run_series` copied `e_D`, `p_e` and `W_H` out of
-  `series.geometry` but never `alpha_deg`, a top-level field, so
-  `_probe_geometry`'s default of 90 survived. Every angled series was scored
-  as though its ribs were transverse -- against the one correlation set
-  whose entire subject is rib angle.
-
-  This invalidates the "RMS 8.5%" cross-check against figure 4.51's
-  parallel-rib classes recorded in `han_ribbed.md`. Re-scored,
-  `fig4.51_G_60par` reports MAE 6.8% and bias -6.8%, and the set moves from
-  bias +4.4% to +1.5%. Nothing failed before the fix; the numbers simply
-  meant something other than what they said.
-
-- **The `fig4.46` class-label dispute is closed** (#393). The `e/D` 0.047,
-  `P/e` 10, `W/H` 2 series was marked `disputed` because its `G` and `R`
-  panels paired on only 2 of 4 marks and the digitised data could not say
-  which symbol the marks belonged to.
-
-  Resolved by going behind the figure rather than re-reading it. **NASA
-  CR-4015** (= AVSCOM 86-C-25, Han/Park/Ibrahim, contract NAS3-24227,
-  September 1986) is the report Fig. 4.46's "This study" classes come from,
-  traced through Han and Park (1988)'s acknowledgement. Its appendix
-  tabulates every run with a self-identifying header, so the class is found
-  by label and the overplotted cluster never has to be resolved: five runs
-  at `Re` 10111-64193 give `e+` 80.7, 150.5, 256.2, 485.8, 512.1, and every
-  mark in both panels lands on one of them.
-
-  Two recorded claims were wrong. The class is not "absent near `e+` ~ 80"
-  -- run 22 sits at 80.7 and the `R` panel picked it up to 0.1% -- and its
-  predicted ceiling of 479 was too low, the true maximum being 512.1. The
-  non-pairing was overplotting, not evidence about the label.
-
-  Both series move to `class_confidence: confirmed`, and a new test pins the
-  finding rather than the prose: every digitised mark must land on one of
-  the five documented runs.
-
-- **Lau metadata quoted a withdrawn resolution** (#392). `lau1990`'s
-  `metadata.yaml` and extraction doc stated that Han's `G_bar` is the
-  Prandtl-normalised `G Pr^-0.57` and "not a four-wall average", citing
-  `han_ribbed.md` item 10. That is item 10's **superseded** form; its current
-  resolution is `G_bar = 1.2 G`, a four-wall average, with the Prandtl
-  reading recorded there as withdrawn. The inverted claim was the stated
-  reason for withholding Lau's `Gbar` and for a test asserting it stay out of
-  the dataset.
-
-  Confirmed from primary raw data rather than re-reading the figure: NASA
-  CR-3837's appendix prints `Nu(R)`, `Nu(S)` and `Nu(AV)` per run, and
-  `Nu(AV)` is their two-way mean to 0.084% over 33 rows. No code defect --
-  `runner.py`'s `G_BAR_OVER_G = 1.2` was correct throughout. The test that
-  pinned the wrong conclusion is replaced by one pinning the guard that
-  actually matters: the `G_bar` path stays restricted to 90 deg ribs.
-
-- **`uncertainty` now means one thing across the cooling dataset** (#333).
-  `han2012` and `florschuetz1981` declare it as the band model agreement is
-  judged against (3-8%); the two orifice sources added in #381 declared
-  digitisation precision instead (0.2%), and for McGreehan-Schotsch it was an
-  *x-axis* calibration residual being compared against a y-error. Both are now
-  `null` -- neither source states an accuracy band -- with the precision
-  figures kept in the metadata headers where they cannot be mistaken for
-  tolerances. A series with no stated band now reports `-` for `within`
-  rather than a structural `0%`.
-
-### Added
 
 - **Adiabatic expansion factor for the McGreehan-Schotsch orifice** (#382):
   `mcgreehan_schotsch_1988_expansion_factor` / `_expansion_orifice` /
@@ -1349,8 +1056,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   networks using either surface should improve; the converged solution for the
   default `friction_model="haaland"` is unchanged.
 
-
 ### Changed
+
+- **`McGreehanSchotsch1988` now warns below its `re_min = 1e4` floor**,
+  naming Lichtarowicz and Idelchik as the valid alternatives. Below the floor
+  the chain holds Re at the floor, so Cd stops responding to flow entirely --
+  documented and deliberate, since Eq. (8) diverges there, but silently
+  returning a frozen Cd is how a plenum-fed hole came to read +21.7% high.
+  Warns rather than refuses, because a network can transit low Re during
+  Newton iteration.
+
+- **`EffusionPlateElement`** (#387) -- a multi-perforated wall panel as a
+  network element, flow side. Geometry is given the way a plate is designed
+  (pitch, hole diameter, wall thickness, inclination angle); the hole count
+  follows from the panel area and is rounded, with `hole_count_exact` and
+  `pitch_actual` recording what the rounding did. An inclined hole is
+  correctly longer than the wall is thick (`L = t/sin(alpha)`), which is why
+  effusion holes are inclined at all. Geometry reproduces Andrews et al.
+  (1988) ASME 88-GT-290 Table 1: `N = 4306 m^-2` and `A/A_h` to 1.5%.
+
+  Defaults to `IdelchikThick` -- diagram 4-18a is a thick-walled hole in a
+  large wall between two plena, which is exactly a plenum-fed effusion
+  plate. ISO 5167 correlations are **refused**: a panel has no pipe and no
+  `beta`, so they are undefined rather than merely inaccurate. For a
+  channel-fed panel the approach flow is a crossflow, so use
+  `'McGreehanSchotsch'`.
+
+  **The effusion CHANNEL needs no new element.** Because the solver balances
+  mass over every element at a node, hanging a panel off each segment of a
+  coolant channel gives `m_channel_in = m_channel_out + m_effusion` -- the
+  coolant flow falling along the wall. That is van de Noort and Ireland's
+  (2022) flow-network structure, and the resolution is the caller's choice of
+  segment count.
+
+  A single panel homogenises, and `diagnostics()` says so where it matters:
+  `is_ingesting` flags a reversed drive (hot-gas ingestion, which a
+  homogenised panel would otherwise average into a healthy net outflow), and
+  `dP_drive` compared across panels shows whether one panel is smearing a
+  gradient that deserves several. Also reports `G_coolant`, the coolant mass
+  flow per unit plate area that Andrews correlates on.
+
+  Thermal modelling is deliberately not included yet: the effectiveness split
+  between internal throat convection and the external film has to be stated
+  explicitly or the two double-count, and that needs its own extraction.
+
+
+- **`CdCorrelation` renamed to `MeteringCdCorrelation`** and narrowed to the
+  normed ISO 5167 device it actually describes:
+  `ReaderHarrisGallagher`, `Stolz`, `Miller`, `Constant`, `UserFunction`.
+  `Constant` and `UserFunction` are now reachable from Python, and all three
+  dispatch sites (`solve_orifice_mdot`, `orifice_flow`, `make_correlation`)
+  go through one factory instead of three divergent switches.
+
+
+- **`Cd_McGreehanSchotsch`, `mcgreehan_schotsch::cd` and `cd_with_crossflow`
+  take an `eps` argument** (#383), defaulting to `rv_smooth_eps`. Passing
+  `eps = 0` recovers Eq. (17) exactly at every entry point, as it already did
+  for the expansion factor. At the default the zero-crossflow value sits
+  ~4e-4 above the unregularised one -- 2% of the correlation's own data
+  scatter -- stated rather than silent; the paper's printed 0.60 baseline is
+  still reproduced to 5e-4 at `eps = 0`.
+
+- **Han's `G_bar = 1.2 G` is now applied at every rib angle, as published**
+  (#339 plan 1b). The runner refused anything off 90 degrees on the grounds
+  that 1.2 is a 90 degree result. It is -- but refusing withheld a number
+  Han does publish, and turned a known accuracy limit into a missing
+  answer. Faithful implementation uses the published constant; what it
+  costs is measured and labelled (see docs/VALIDATION_POLICY.md).
+
+  **A generalised replacement was considered and rejected on evidence.**
+  Pooling every closed-form measurement available -- 91-GT-3 table 3
+  (extracted and two-channel verified for this), Lau table 2, and
+  CR-3837's per-run `Nu(R)`/`Nu(AV)` split -- gives 16 configurations
+  across three rigs spanning **1.096 to 1.413** at `e+` = 300, and
+  **69% of that variance is BETWEEN RIGS**:
+
+  | source | n | mean | internal spread |
+  |---|---|---|---|
+  | 91-GT-3 | 4 | 1.160 | 12% |
+  | CR-3837 | 5 | 1.323 | 3% |
+  | lau1990 | 7 | 1.327 | 14% |
+
+  No angle or shape term can reach a rig offset, so a "better" correlation
+  would be fitting rig identity. Han's 1.2 scores MAE 8.3% against that
+  population -- a defensible one-number answer. Pinned by a test that fails
+  if the between-rig share drops, which is the condition under which
+  revisiting would be worthwhile.
+
+  Even at 90 degrees the measured ratio runs 1.29 down to 1.13 across
+  `e+`, so the constant was always a fit, including where it was trusted
+  most.
+
+
+- **The cooling scorecard now aggregates all three runners** (#333).
+  `validation/cooling/scorecard.py` knew only `runner.py`, so the Florschuetz
+  and orifice series read as "not scored by any set" and there was no single
+  place to see whether cooling as a whole was healthy. `run_dataset()` gives
+  every series to exactly one runner and a rollup reports per correlation
+  set -- six sets, 680 points, in one view for the first time.
+
+  Dispatch is on an explicit `owns()` predicate per runner, not on "the runner
+  returned something". Every runner deliberately returns reason-carrying
+  records for series it cannot score, precisely so a silent zero never
+  masquerades as a good score -- which makes truthiness useless as an
+  ownership test, and was the first version's bug: the jet-array runner
+  claimed the orifice series and reported them unscored.
+
+  Rohde's series are rolled up **per velocity-head-ratio band**, never pooled:
+  the total-to-static factor is 1.01 at VHR 50 and 1.33 at VHR 2, so one
+  number would mix a near-exact comparison with one dominated by the
+  conversion.
+
 - **`CLAUDE.md`'s explicit-includes rule names both strictnesses.** It said
   "macOS-only implicit includes break Linux CI", which is one direction of a
   two-directional problem and misleading: a `std::max({a,b,c})` here passed on
@@ -1412,52 +1228,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `regime="compressible"` no longer layers Fanno friction on top of a drop the
   array already owns.
 
-
-### Removed
-- **Every cooling correlation whose provenance did not survive review.** A
-  correlation-by-correlation audit against the cited sources found that the
-  base convective layer is exact and almost nothing above it is. Removed:
-  `rib_enhancement_factor`, `rib_friction_multiplier`, their `_high_re`
-  variants, `dimple_nusselt_enhancement`, `dimple_friction_multiplier`,
-  `pin_fin_nusselt`, `pin_fin_friction`, `impingement_nusselt`,
-  `film_cooling_effectiveness` and its `_avg` and Sellers multi-row
-  companions, `effusion_effectiveness`, `effusion_discharge_coefficient`,
-  the `channel_ribbed`/`channel_dimpled`/`channel_pin_fin`/`channel_impingement`
-  wrappers, the seven finite-difference `_and_jacobian` helpers built on them,
-  their pybind11 bindings and `units_data.h` entries, the `RibbedModel`,
-  `DimpledModel`, `PinFinModel` and `ImpingementModel` surface types, and the
-  matching GUI node types.
-
-  Why removal rather than repair: repair needs a known-good target and the
-  citations did not provide one. `rib_friction_multiplier` returned **1.4534**
-  where the only rib datum in the repository gives ~6.3 -- a factor of 4-5, in
-  the pair the element actually shipped. The dimple pair swept depth and
-  spacing that its cited source held fixed, and its `S_d` validation would have
-  rejected that source's own geometry. `impingement_nusselt` cited a
-  correlation whose defining term is the crossflow-to-jet mass flux ratio and
-  had no mass flux argument. `film_cooling_effectiveness` decayed
-  exponentially where film effectiveness decays as a power law.
-  `effusion_effectiveness` used `I = M^2*DR` for a momentum flux ratio that is
-  `M^2/DR` -- with the correct definition present but unused in the same file.
-
-  The tests did not catch any of it because they measured the code against
-  itself: `assert 1.0 < multiplier < 10.0` for a value 4-5x off, and
-  `assert 1.3 <= f <= 2.2` against the function's own clamp.
-
-  Migration: pin `combaero~=0.6` to keep the previous behaviour. Rebuilt
-  correlations land per issue #339, ribs first (#334).
-
-- **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
-  the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
-  `Re_Dh` that was **identically zero at every Reynolds number**, because
-  `dimple_friction_multiplier` accepts `Re_Dh` and never uses it -- the
-  multiplier is a function of dimple geometry alone. It obtained that zero by
-  central finite difference, which the Solver (f, J) rule in `CLAUDE.md`
-  forbids. Nothing called it: `channel_dimpled` uses the plain multiplier, and
-  the archived note claiming otherwise was wrong. Callers wanting the value use
-  `dimple_friction_multiplier`; there is no derivative to want.
-
 ### Fixed
+
+- **The discharge-hole correlations were given the pipe Reynolds number**
+  (regression from #409). `Idelchik1966*` and `McGreehanSchotsch` are
+  functions of the HOLE Reynolds number, but `OrificeElement._effective_Cd`
+  passed `Re_D`, built from the upstream channel diameter. Wrong by 1-8% for
+  an orifice in a pipe, and by up to **38% for a plenum-fed hole**, where
+  `D_up = 0` froze `Re_D` at a `1e5` fallback so the correlation stopped
+  responding to flow entirely. Now computed as
+  `4 m_dot_hole / (pi d_hole mu)` via an overridable `_hole_reynolds` hook,
+  which `EffusionPlateElement` overrides to divide by the hole count.
+
+- **Idelchik (1966) wall-orifice discharge coefficients** --
+  `DischargeCdCorrelation::Idelchik1966{Sharp,Thick,Beveled,Rounded}`, from
+  Section IV diagrams 4-17 and 4-18 (a hole in a large wall, `F1 = F2 = inf`,
+  which is the effusion-plate geometry). `zeta` is referenced to the hole
+  velocity and carries the full permanent loss, so `Cd = 1/sqrt(zeta)` is
+  exact rather than a convention-dependent conversion. Valid **Re 25 to 1e6**
+  -- three decades below McGreehan-Schotsch's `re_min = 1e4`, and the range
+  small cooling holes actually operate in. No digitisation was required:
+  every value is tabulated in the source and was read off the page at 400 dpi.
+  Provenance in
+  `validation/cooling/extractions/idelchik_1966_wall_orifice.md`.
+
+  **Cross-source agreement, labelled cross-source:** against McGreehan and
+  Schotsch (1988) the two are within 5% over the whole `L/d` range and
+  **0.05% at the sharp-edged baseline** (0.5923 vs 0.5926) -- independent
+  sources 22 years apart. That is an accuracy result, not a fidelity one.
+
+- **A separate `DischargeCdCorrelation` selector**, with
+  `DischargeHoleGeometry` / `DischargeHoleState` and analytic
+  `discharge_cd_and_derivatives` returning
+  `(Cd, dCd/dRe, dCd/d(U1_over_Vi))`. A hole in a wall has no pipe to form
+  `beta` with and its `Cd` depends on `L/d`, `r/d` and the approach
+  crossflow, none of which `OrificeGeometry`/`OrificeState` can express. One
+  enum over both families forced every caller to pass a meaningless `D` and
+  silently dropped the crossflow.
+
+  Interpolation is monotone cubic (Fritsch-Carlson), not linear: linear would
+  put a derivative jump at each of 14 table knots, and a natural spline would
+  overshoot the flat tails and invent a `Cd` above the source's.
+
+
+- **The `e+` path scored unrecognised quantities against `G`** (#339 plan
+  1a). The branch ended in a catch-all `else: predicted = g`, so any
+  `y_axis` that was not `G_bar` or `R_normalised` -- an absolute `R` among
+  them -- would have been compared against a different physical quantity
+  entirely. Nothing hit it only because every such series carried
+  `scores: null`. Now explicit per quantity, with anything unpredictable
+  returned unscored and with a reason.
+
+- **`han_park_1988_angled` scored every angled series at 90 degrees**
+  (#391). On the `e+` path `run_series` copied `e_D`, `p_e` and `W_H` out of
+  `series.geometry` but never `alpha_deg`, a top-level field, so
+  `_probe_geometry`'s default of 90 survived. Every angled series was scored
+  as though its ribs were transverse -- against the one correlation set
+  whose entire subject is rib angle.
+
+  This invalidates the "RMS 8.5%" cross-check against figure 4.51's
+  parallel-rib classes recorded in `han_ribbed.md`. Re-scored,
+  `fig4.51_G_60par` reports MAE 6.8% and bias -6.8%, and the set moves from
+  bias +4.4% to +1.5%. Nothing failed before the fix; the numbers simply
+  meant something other than what they said.
+
+- **The `fig4.46` class-label dispute is closed** (#393). The `e/D` 0.047,
+  `P/e` 10, `W/H` 2 series was marked `disputed` because its `G` and `R`
+  panels paired on only 2 of 4 marks and the digitised data could not say
+  which symbol the marks belonged to.
+
+  Resolved by going behind the figure rather than re-reading it. **NASA
+  CR-4015** (= AVSCOM 86-C-25, Han/Park/Ibrahim, contract NAS3-24227,
+  September 1986) is the report Fig. 4.46's "This study" classes come from,
+  traced through Han and Park (1988)'s acknowledgement. Its appendix
+  tabulates every run with a self-identifying header, so the class is found
+  by label and the overplotted cluster never has to be resolved: five runs
+  at `Re` 10111-64193 give `e+` 80.7, 150.5, 256.2, 485.8, 512.1, and every
+  mark in both panels lands on one of them.
+
+  Two recorded claims were wrong. The class is not "absent near `e+` ~ 80"
+  -- run 22 sits at 80.7 and the `R` panel picked it up to 0.1% -- and its
+  predicted ceiling of 479 was too low, the true maximum being 512.1. The
+  non-pairing was overplotting, not evidence about the label.
+
+  Both series move to `class_confidence: confirmed`, and a new test pins the
+  finding rather than the prose: every digitised mark must land on one of
+  the five documented runs.
+
+- **Lau metadata quoted a withdrawn resolution** (#392). `lau1990`'s
+  `metadata.yaml` and extraction doc stated that Han's `G_bar` is the
+  Prandtl-normalised `G Pr^-0.57` and "not a four-wall average", citing
+  `han_ribbed.md` item 10. That is item 10's **superseded** form; its current
+  resolution is `G_bar = 1.2 G`, a four-wall average, with the Prandtl
+  reading recorded there as withdrawn. The inverted claim was the stated
+  reason for withholding Lau's `Gbar` and for a test asserting it stay out of
+  the dataset.
+
+  Confirmed from primary raw data rather than re-reading the figure: NASA
+  CR-3837's appendix prints `Nu(R)`, `Nu(S)` and `Nu(AV)` per run, and
+  `Nu(AV)` is their two-way mean to 0.084% over 33 rows. No code defect --
+  `runner.py`'s `G_BAR_OVER_G = 1.2` was correct throughout. The test that
+  pinned the wrong conclusion is replaced by one pinning the guard that
+  actually matters: the `G_bar` path stays restricted to 90 deg ribs.
+
+- **`uncertainty` now means one thing across the cooling dataset** (#333).
+  `han2012` and `florschuetz1981` declare it as the band model agreement is
+  judged against (3-8%); the two orifice sources added in #381 declared
+  digitisation precision instead (0.2%), and for McGreehan-Schotsch it was an
+  *x-axis* calibration residual being compared against a y-error. Both are now
+  `null` -- neither source states an accuracy band -- with the precision
+  figures kept in the metadata headers where they cannot be mistaken for
+  tolerances. A series with no stated band now reports `-` for `within`
+  rather than a structural `0%`.
+
 
 - **Ribbed channels' pressure-drop Jacobian had no temperature or pressure
   column** (issue #378). `ChannelElement._ribbed_residuals` computed `rho`
@@ -1539,6 +1422,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unknowns, which held only while density came from the total state. Chained
   through the inversion instead, the error against a central difference fell
   from 4.7e-2 to 3.1e-8.
+
+### Removed
+
+- **`Cd_thick_plate`, `Cd_rounded_entry`, `Cd_orifice`,
+  `orifice::thickness_correction`, `orifice::Cd_rounded`, and the
+  `IdelchikThick` / `IdelchikRounded` / `BohlThick` / `BohlRounded` members
+  of the Cd correlation enum.** Replaced by the Idelchik members above.
+
+  These computed an ISO 5167 `Cd` and multiplied it by a correction factor.
+  The base does not apply -- a thick-edged or rounded orifice is not the
+  normed device -- and the factor was an unlabelled fit to Idelchik diagram
+  4-12b that had lost its tail: within 5% to `r/Dh = 0.06`, then **-27% at
+  0.08 and -78% at 0.12**. The thick-plate factor carried a `5.67`
+  commented "friction loss calibration factor" and a `[0.5, 1.3]` clamp.
+
+  Two defects went with them:
+  - an **11.1% jump discontinuity in `Cd` at `Re_D = 1e5`** (0.881391 ->
+    0.979326), a hard C0 break in a solver input;
+  - `Cd_rounded_entry` at `r/d = 0` **silently returned `Cd_Stolz`**.
+
+  None of the 16 tests over that code would have caught either: all were
+  directional. `BohlThick`/`BohlRounded` fell through to the Idelchik
+  implementations, silently returning a different correlation than the one
+  asked for; Bohl was dropped rather than implemented because its orifice
+  content (DIN 1952 normed orifices, standard loss coefficients) is already
+  held by ISO 5167 and Idelchik, so it plugs no coverage gap.
+
+- **`OrificeElement`'s `'Auto'` correlation arm**, and the `'ThickPlate'` /
+  `'RoundedEntry'` strings with their GUI dropdown entries. `'Auto'` picked a
+  correlation from `r` and `t` behind the caller's back, which is how a
+  rounded-entry request came back as Stolz. The new strings are
+  `'IdelchikThick'`, `'IdelchikBeveled'`, `'IdelchikRounded'` and
+  `'McGreehanSchotsch'`; an unknown correlation now raises rather than
+  falling through to auto-selection.
+
+- **Analytic `(f, J)` for the McGreehan and Schotsch discharge coefficient**
+  (#383). `mcgreehan_schotsch_1988_cd_and_derivatives` returns
+  `(Cd, dCd/dRe, dCd/d(U1/Vi))` via forward-mode `DualN`, cross-checked
+  against finite differences to 3.7e-7 relative. `r/d` and `L/d` are geometry
+  and carry no partials. This is what `OrificeElement` needs before the
+  correlation can be selected there -- without it the Jacobian would be
+  knowingly incomplete, since `Cd` moves 0.60 to 0.99 over the geometry range
+  and is halved by crossflow.
+
+  **The two hazards needed different treatments, and measurement decided
+  which.** Eq. (17)'s `Rv^0.6` and `Rv^0.9` diverge in slope at `U1/Vi = 0` --
+  the default, and the physically right value for a plenum-fed jet plate -- so
+  the input is **regularised in the model**: `U1/Vi -> sqrt((U1/Vi)^2 + eps^2)`
+  with `rv_smooth_eps = 3e-5`. Below `Re = 1e4` the value is held at the
+  validity floor and the derivative was exactly zero; softening the *value*
+  there was measured and **rejected** (a soft-max recovers only 16% of the
+  live slope for 7.1e-3 on `Cd`, in a region the correlation does not cover),
+  so the **Jacobian alone** is continued from the floor. No reported `Cd`
+  changes for that one, and `dCd/dRe` becomes continuous across the floor.
+
+  `eps = 3e-5` sits between two bisected walls, both sourced: worst
+  `|dCd/du|` within 10x the physical derivative scale (0.663, measured on the
+  exact chain over the range Figs. 4-6 carry data for) gives `eps >= 1.86e-5`;
+  departure from Eq. (17) within 10% of the `+/-0.02` scatter the correlation
+  sits in (**the paper states no error statistic at all**) gives
+  `eps <= 4.15e-4`. The default sits 15% across, deliberately towards the
+  low-smoothing end -- over-smoothing stalls this solver harder than a stiff
+  Jacobian does.
+
+- **Every cooling correlation whose provenance did not survive review.** A
+  correlation-by-correlation audit against the cited sources found that the
+  base convective layer is exact and almost nothing above it is. Removed:
+  `rib_enhancement_factor`, `rib_friction_multiplier`, their `_high_re`
+  variants, `dimple_nusselt_enhancement`, `dimple_friction_multiplier`,
+  `pin_fin_nusselt`, `pin_fin_friction`, `impingement_nusselt`,
+  `film_cooling_effectiveness` and its `_avg` and Sellers multi-row
+  companions, `effusion_effectiveness`, `effusion_discharge_coefficient`,
+  the `channel_ribbed`/`channel_dimpled`/`channel_pin_fin`/`channel_impingement`
+  wrappers, the seven finite-difference `_and_jacobian` helpers built on them,
+  their pybind11 bindings and `units_data.h` entries, the `RibbedModel`,
+  `DimpledModel`, `PinFinModel` and `ImpingementModel` surface types, and the
+  matching GUI node types.
+
+  Why removal rather than repair: repair needs a known-good target and the
+  citations did not provide one. `rib_friction_multiplier` returned **1.4534**
+  where the only rib datum in the repository gives ~6.3 -- a factor of 4-5, in
+  the pair the element actually shipped. The dimple pair swept depth and
+  spacing that its cited source held fixed, and its `S_d` validation would have
+  rejected that source's own geometry. `impingement_nusselt` cited a
+  correlation whose defining term is the crossflow-to-jet mass flux ratio and
+  had no mass flux argument. `film_cooling_effectiveness` decayed
+  exponentially where film effectiveness decays as a power law.
+  `effusion_effectiveness` used `I = M^2*DR` for a momentum flux ratio that is
+  `M^2/DR` -- with the correct definition present but unused in the same file.
+
+  The tests did not catch any of it because they measured the code against
+  itself: `assert 1.0 < multiplier < 10.0` for a value 4-5x off, and
+  `assert 1.3 <= f <= 2.2` against the function's own clamp.
+
+  Migration: pin `combaero~=0.6` to keep the previous behaviour. Rebuilt
+  correlations land per issue #339, ribs first (#334).
+
+- **`dimple_friction_multiplier_and_jacobian`** (C++, its pybind11 binding and
+  the `combaero._solver_tools` re-export). It reported a derivative w.r.t.
+  `Re_Dh` that was **identically zero at every Reynolds number**, because
+  `dimple_friction_multiplier` accepts `Re_Dh` and never uses it -- the
+  multiplier is a function of dimple geometry alone. It obtained that zero by
+  central finite difference, which the Solver (f, J) rule in `CLAUDE.md`
+  forbids. Nothing called it: `channel_dimpled` uses the plain multiplier, and
+  the archived note claiming otherwise was wrong. Callers wanting the value use
+  `dimple_friction_multiplier`; there is no derivative to want.
 
 ## [0.6.0] - 2026-09-09
 
