@@ -285,25 +285,43 @@ def check_series(series: SeriesMetadata) -> list[Finding]:
         )
 
     # 7. Double-picked marks.
-    xs = [p.x for p in points]
-    ys = [p.y for p in points]
-    x_span = max(xs) - min(xs) or 1.0
-    y_span = max(ys) - min(ys) or 1.0
-    dupes = [
-        (a, b)
-        for i, a in enumerate(points)
-        for b in points[i + 1 :]
-        if abs(a.x - b.x) / x_span < DUPLICATE_TOL
-        and abs(a.y - b.y) / y_span < DUPLICATE_TOL
-    ]
-    out.append(
-        Finding(
-            label,
-            "distinct",
-            not dupes,
-            f"{len(dupes)} coincident pairs" if dupes else "no coincident marks",
+    #
+    # Skipped for "pdf-vector-exact": the check catches a DIGITISER clicking
+    # one mark twice, and a vector extraction does no clicking -- the
+    # coordinates come out of the PDF's own path objects. Worse, it cannot
+    # help but fire there: a 1030-point polyline over 17 pitches puts
+    # neighbours ~0.1% of the span apart, below any tolerance that would
+    # catch a real double-pick on a scatter plot.
+    if series.extraction == "pdf-vector-exact":
+        out.append(
+            Finding(
+                label,
+                "distinct",
+                True,
+                "vector extraction: no marks were picked, so none can be "
+                "picked twice",
+            )
         )
-    )
+    else:
+        xs = [p.x for p in points]
+        ys = [p.y for p in points]
+        x_span = max(xs) - min(xs) or 1.0
+        y_span = max(ys) - min(ys) or 1.0
+        dupes = [
+            (a, b)
+            for i, a in enumerate(points)
+            for b in points[i + 1 :]
+            if abs(a.x - b.x) / x_span < DUPLICATE_TOL
+            and abs(a.y - b.y) / y_span < DUPLICATE_TOL
+        ]
+        out.append(
+            Finding(
+                label,
+                "distinct",
+                not dupes,
+                f"{len(dupes)} coincident pairs" if dupes else "no coincident marks",
+            )
+        )
 
     # 8. Declared monotonicity, where the physics or the figure demands it.
     trend = card.get("monotonic")

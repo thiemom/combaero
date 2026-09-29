@@ -84,7 +84,7 @@ files:
       referenced to the plate approach area, vs coolant mass flow per unit
       plate area G [kg/s/m^2], effusion plate C alone (no impingement)
     figure: "8"
-    panel: null
+    panel: single   # Fig. 8 is one plot, not a multi-panel figure
     geometry:
       plate: "C"
       N_per_m2: 4306.0

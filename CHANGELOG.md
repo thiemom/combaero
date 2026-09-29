@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Multi-row film/effusion scoring, and the first verdict on the Baldauf +
+  Sellers chain.** `validation/cooling/film_runner.py` scores superposed
+  film effectiveness against adiabatic effusion-plate data, wired into the
+  scorecard as `baldauf_2002_sellers`. Two datasets land with it:
+  `andrei2014` (six adiabatic curves, BR 1-3 x DR 1.0/1.5, extracted exactly
+  from the publisher's PDF vector stream) and `andrews1988` (effusion
+  internal heat transfer, Fig. 8 plate C).
+
+  Both sides are reduced to per-row means over each pitch interval, and the
+  prediction is averaged over **the same abscissae** as the measurement --
+  comparing an interval mean against a point value at the interval centre
+  overstates the first row badly, where eta climbs from zero.
+
+  **The chain does not describe this plate, and the runner says so.** Pooled
+  over 108 row-means: MAE 45.5%, RMSE 53.1%, every point flagged
+  extrapolated, basis reported as `accuracy` (Baldauf's own data is not in
+  this repo, so `fidelity` is unreachable by construction). The sign of the
+  error flips with blowing rate:
+
+  | | DR 1.0 | DR 1.5 |
+  |---|---|---|
+  | BR 1 | +61.3% | +31.9% |
+  | BR 2 | -7.8% | +17.0% |
+  | BR 3 | -80.9% | -68.4% |
+
+  The cause is jet lift-off. Baldauf's single-row effectiveness peaks near
+  M ~ 0.7-1.0 at any spacing of s/D 3 or wider and collapses above it -- at
+  Andrei's s/D it is 0.081 at M = 1 and 0.007 at M = 3. A dense 18-row plate
+  does not behave that way; the measured effectiveness keeps *rising* with
+  blowing. This is a single-row correlation failing to transfer to a compact
+  array, not an implementation error, and it is not an artefact of
+  extrapolating s/D: the early peak is already there at s/D = 3, inside the
+  published envelope.
+
+  **Gao's per-row alpha cannot be fitted on this family**, and a test now
+  records why. alpha is bounded [0, 1] and only ever reduces the superposed
+  value, but three of the six curves are over-predicted and three
+  under-predicted, so no single (a, b) can serve both. The test goes red if
+  a future change puts every curve on one side -- which is exactly when the
+  original plan becomes viable again.
+
 - **Multi-row film superposition** -- `film_superposition_sellers`
   (Gao Eq. 1), `film_superposition_corrected` (Gao Eq. 7, Sellers with a
   per-row mainstream temperature correction), `mainstream_temperature_correction`

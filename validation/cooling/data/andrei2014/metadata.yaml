@@ -59,6 +59,32 @@
 # curve to 18 per-row means before comparing. The full-resolution curve is
 # committed anyway because it is exact and throwing it away would be a
 # choice the next reader cannot undo.
+#
+# WHERE ROW 1 SITS ON THE ABSCISSA (`row1_x_over_sx` = 0.685, recovered
+# 2026-09-30). The paper does not state it and the figure carries no row
+# markers, but the runner needs it twice: to know which pitch interval a
+# sample belongs to, and each row's distance upstream of that sample. It is
+# NOT fitted against the model -- it comes from the data's own injection
+# points -- and it is cross-checked three ways:
+#
+#   1. RECOVERED INDEPENDENTLY FROM EACH OF THE SIX CURVES. Coolant enters at
+#      a hole row, so a row is where eta rises steepest. Scoring a unit-period
+#      comb by how much total rise falls in the first quarter-pitch after each
+#      tooth peaks at 0.685 on four of the six curves, and at 0.670 and 0.710
+#      on the other two -- a spread of 0.040, or +/-2% of one pitch. A phase
+#      that is a property of the plate must reproduce across curves measured
+#      at different BR and DR, and it does.
+#   2. SPACING. The same clustering gives 14 consecutive row-to-row gaps
+#      averaging 1.000 pitches, matching the FFT period of 1.0005 above from
+#      an independent statistic.
+#   3. RANGE CLOSURE. 18 rows from 0.685 at unit spacing puts row 18 at
+#      17.685. The committed abscissae run 0.673 to 17.992, leaving 0.012 of a
+#      pitch ahead of row 1 -- where eta is exactly 0, as it must be with no
+#      upstream coolant -- and 0.307 after row 18, with no room for a 19th. A
+#      phase wrong by even a quarter pitch breaks one end or the other.
+#
+# That 60-66% of all rise falls within a quarter of each pitch is itself the
+# signature of injection-then-decay rather than noise.
 
 paper:
   name: andrei2014
@@ -85,6 +111,7 @@ files:
       sx_over_d: 9.15
       sz_over_d: 7.37
       rows: 18
+      row1_x_over_sx: 0.685
     alpha_deg: 30.0
     x_axis: x_over_sx
     x_scale: 1.0
@@ -106,7 +133,7 @@ files:
       measurement band. Writing the extraction error into `uncertainty`
       would be the circularity #389 names.
     class_confidence: confirmed
-    scores: null
+    scores: baldauf_2002_sellers
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -121,7 +148,8 @@ files:
     series: "measured adiabatic effectiveness vs x/s_x, BR = 2, DR = 1"
     figure: "4"
     panel: "DR=1"
-    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15, sz_over_d: 7.37, rows: 18}
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
     alpha_deg: 30.0
     x_axis: x_over_sx
     x_scale: 1.0
@@ -134,7 +162,7 @@ files:
       Cross-view agreement with Figure 5 centre panel (BR = 2) red: RMS
       4.2e-4, worst 2.6e-3. Sawtooth period 1.0005.
     class_confidence: confirmed
-    scores: null
+    scores: baldauf_2002_sellers
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -149,7 +177,8 @@ files:
     series: "measured adiabatic effectiveness vs x/s_x, BR = 3, DR = 1"
     figure: "4"
     panel: "DR=1"
-    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15, sz_over_d: 7.37, rows: 18}
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
     alpha_deg: 30.0
     x_axis: x_over_sx
     x_scale: 1.0
@@ -163,7 +192,7 @@ files:
       9.0e-4, worst 6.9e-3 -- the largest disagreement in the set, at a
       sawtooth jump. Sawtooth period 1.0005.
     class_confidence: confirmed
-    scores: null
+    scores: baldauf_2002_sellers
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -178,7 +207,8 @@ files:
     series: "measured adiabatic effectiveness vs x/s_x, BR = 1, DR = 1.5"
     figure: "4"
     panel: "DR=1.5"
-    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15, sz_over_d: 7.37, rows: 18}
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
     alpha_deg: 30.0
     x_axis: x_over_sx
     x_scale: 1.0
@@ -193,7 +223,7 @@ files:
       BR = 1 curve, above its DR = 1 counterpart, which is the density-ratio
       effect the paper exists to show.
     class_confidence: confirmed
-    scores: null
+    scores: baldauf_2002_sellers
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -208,7 +238,8 @@ files:
     series: "measured adiabatic effectiveness vs x/s_x, BR = 2, DR = 1.5"
     figure: "4"
     panel: "DR=1.5"
-    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15, sz_over_d: 7.37, rows: 18}
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
     alpha_deg: 30.0
     x_axis: x_over_sx
     x_scale: 1.0
@@ -223,7 +254,7 @@ files:
       BELOW its DR = 1 counterpart, reversing the ordering seen at BR = 1 --
       the paper's own point that DR matters mainly at low BR.
     class_confidence: confirmed
-    scores: null
+    scores: baldauf_2002_sellers
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -238,7 +269,8 @@ files:
     series: "measured adiabatic effectiveness vs x/s_x, BR = 3, DR = 1.5"
     figure: "4"
     panel: "DR=1.5"
-    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15, sz_over_d: 7.37, rows: 18}
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
     alpha_deg: 30.0
     x_axis: x_over_sx
     x_scale: 1.0
@@ -251,7 +283,7 @@ files:
       Cross-view agreement with Figure 5 right panel (BR = 3) cyan: RMS
       3.5e-4, worst 2.0e-3. Sawtooth period 1.0005.
     class_confidence: confirmed
-    scores: null
+    scores: baldauf_2002_sellers
     verification:
       x_axis_type: linear
       y_axis_type: linear
