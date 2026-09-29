@@ -167,6 +167,8 @@ try:
         complete_state,
         convert_to_dry_fractions,
         cooled_wall_heat_flux,
+        film_effectiveness_baldauf_2002,
+        film_effectiveness_baldauf_2002_and_derivatives,
         cp,
         cp_mass,
         critical_pressure_ratio,
@@ -998,6 +1000,8 @@ __all__ = [
     "thermal_performance_factor",
     "adiabatic_wall_temperature",
     "cooled_wall_heat_flux",
+    "film_effectiveness_baldauf_2002",
+    "film_effectiveness_baldauf_2002_and_derivatives",
     # Channel flow (HTC + pressure drop)
     "ChannelResult",
     "channel_smooth",

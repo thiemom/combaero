@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Baldauf et al. (2002) film-cooling effectiveness** --
+  `film_effectiveness_baldauf_2002`, the laterally averaged adiabatic
+  effectiveness downstream of one row of cylindrical, streamwise-inclined
+  holes. Forty equations, plus `..._and_derivatives` giving
+  `(eta, deta/dM, deta/dP)` analytically through forward-mode dual numbers
+  over the same templated equation chain, so value and derivative cannot
+  drift apart.
+
+  Chosen because the alternatives fail where effusion and film cooling
+  actually live: the review by Xia et al. (2024) notes that single-hole
+  models are "completely wrong in the near wake region" and older row
+  correlations "give an unrealistic maximum at the ejection position". This
+  one is valid from the ejection point and carries the **adjacent jet
+  interaction** -- the lateral hole-spacing effect driving jet lift-off -- as
+  a correlated parameter. `deta/dM` correctly changes sign through the
+  lift-off peak.
+
+  `eta` is `(T_G - T_AW)/(T_G - T_C)`, already combaero's convention, so it
+  composes with `adiabatic_wall_temperature` unchanged.
+
+  **Angle units were measured, not assumed.** The API takes degrees; the
+  paper's trigonometry is in radians. Seven Table 4 coefficients spanning six
+  trig forms reproduce on radians and fail on degrees by 10-30% -- though one
+  of them, `b*_T`, differs by only 0.06% and would have passed a units bug
+  silently.
+
+  **Eq. (31) is implemented as printed and contradicts the paper's own
+  Table 4** by 36% in `b_0`, while the other 17 checkable coefficients
+  reproduce to 2e-6. The printed form was confirmed from four independent
+  channels; no angle convention, unit choice or single-token variant reaches
+  the table's value. Under 5% effect on `eta` below `M ~ 0.5`, up to 50% at
+  `M = 2.5`. Both numbers are pinned in a test so the contradiction cannot be
+  quietly rediscovered or quietly "fixed".
+
+  Validated end to end against the paper's Fig. 14 (its own
+  measurement-versus-correlation case) and Fig. 8's peak-effectiveness bands.
+  Provenance in
+  `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
+
 - **Lichtarowicz, Duggins and Markland (1965) long-orifice discharge
   coefficient** -- `DischargeCdCorrelation::Lichtarowicz1965`, Eqs. (7) and
   (12), replacing the member that had declared-and-refused since #409.

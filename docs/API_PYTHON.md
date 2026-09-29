@@ -253,6 +253,32 @@ RMS `7.54%` -- reading high, and increasingly so with crossflow (`+3%` below
 `U1/Vi = 0.4`, `+16%` at 1.41). Scored by
 `validation/cooling/orifice_runner.py`.
 
+#### Film cooling: Baldauf et al. (2002)
+
+Laterally averaged adiabatic effectiveness downstream of one row of
+cylindrical, streamwise-inclined holes -- valid from the ejection point, and
+carrying the adjacent jet interaction rather than excluding it.
+
+```python
+eta = cb.film_effectiveness_baldauf_2002(
+    x_over_D=20.0, M=2.0, P=1.2, alpha_deg=30.0, s_over_D=3.0, Tu=0.015
+)
+
+# Solver form: (eta, deta/dM, deta/dP), analytic
+eta, deta_dM, deta_dP = cb.film_effectiveness_baldauf_2002_and_derivatives(
+    20.0, 2.0, 1.2, 30.0, 3.0, 0.015
+)
+```
+
+`eta` uses the same convention as `adiabatic_wall_temperature`, so they
+compose. `deta/dM` changes sign through the lift-off peak, which is physical
+and is what a solver needs to push blowing the right way.
+
+Envelope: `M` 0.2-2.5, `P` 1.2-1.8, `s/D` 2-5, `alpha` 30-90 deg,
+`Tu` 0.0035-0.075; the paper's RMS deviation is 5.5%. Eq. (31) is
+implemented as printed and disagrees with the paper's own worked example --
+see `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
+
 ##### Compressibility: the expansion factor
 
 The paper's mass flow is `W = Cd * Y * A * sqrt(2 rho_t1 (P_t1 - P_s2))`. `Y`

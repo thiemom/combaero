@@ -537,6 +537,12 @@ inline constexpr Entry function_units[] = {
     {"heat_rate_from_effectiveness",
      "epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K", "W"},
     {"adiabatic_wall_temperature", "T_hot: K, T_coolant: K, eta: -", "K"},
+    {"film_effectiveness_baldauf_2002",
+     "x_over_D: -, M: -, P: -, alpha_deg: deg, s_over_D: -, Tu: -",
+     "- (eta)"},
+    {"film_effectiveness_baldauf_2002_and_derivatives",
+     "x_over_D: -, M: -, P: -, alpha_deg: deg, s_over_D: -, Tu: -",
+     "- (eta), - (deta/dM), - (deta/dP)"},
     {"cooled_wall_heat_flux",
      "T_hot: K, T_coolant: K, h_hot: W/(m^2*K), h_coolant: W/(m^2*K), eta: -, "
      "t_wall: m, k_wall: W/(m*K)",

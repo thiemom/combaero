@@ -5652,6 +5652,43 @@ PYBIND11_MODULE(_core, m) {
         "  eta       : adiabatic effectiveness [-]\n\n"
         "Returns: adiabatic wall temperature T_aw [K]");
 
+  m.def("film_effectiveness_baldauf_2002",
+        &combaero::cooling::film_effectiveness_baldauf_2002,
+        py::arg("x_over_D"), py::arg("M"), py::arg("P"), py::arg("alpha_deg"),
+        py::arg("s_over_D"), py::arg("Tu"),
+        "Laterally averaged adiabatic film-cooling effectiveness downstream\n"
+        "of ONE row of cylindrical, streamwise-inclined holes.\n\n"
+        "Baldauf, Scheurlen, Schulz & Wittig (2002), ASME J. Turbomachinery\n"
+        "124(4), 686-698. Valid from the ejection point to far downstream,\n"
+        "and it carries the adjacent jet interaction (lateral hole spacing,\n"
+        "jet lift-off) rather than excluding it.\n\n"
+        "eta is (T_G - T_AW)/(T_G - T_C), the same convention as\n"
+        "adiabatic_wall_temperature(), so the two compose directly.\n\n"
+        "Parameters:\n"
+        "  x_over_D  : distance downstream of ejection, in hole diameters\n"
+        "  M         : blowing rate (rho u)_C/(rho u)_G [-], 0.2 to 2.5\n"
+        "  P         : density ratio rho_C/rho_G [-], 1.2 to 1.8\n"
+        "  alpha_deg : ejection angle to the SURFACE [deg], 30 to 90\n"
+        "  s_over_D  : lateral hole spacing / diameter [-], 2 to 5\n"
+        "  Tu        : mainstream turbulence intensity [-], 0.0035 to 0.075\n\n"
+        "Alpha is given in DEGREES and converted internally; the paper's\n"
+        "trigonometry is in radians.\n\n"
+        "NOTE Eq. (31) is implemented as printed and disagrees with the\n"
+        "paper's own Table 4 by 36% in b_0. Under 5% effect below M ~ 0.5,\n"
+        "up to 50% at M = 2.5. See the extraction record.\n\n"
+        "Returns: laterally averaged eta [-]");
+
+  m.def("film_effectiveness_baldauf_2002_and_derivatives",
+        &combaero::cooling::film_effectiveness_baldauf_2002_and_derivatives,
+        py::arg("x_over_D"), py::arg("M"), py::arg("P"), py::arg("alpha_deg"),
+        py::arg("s_over_D"), py::arg("Tu"),
+        "Solver-facing (f, J) form: (eta, d eta/dM, d eta/dP).\n\n"
+        "M and P are what a network solve varies -- M through the coolant\n"
+        "mass flow, P through the temperature ratio. Geometry and Tu are\n"
+        "fixed per element and carry no partials. Analytic throughout, via\n"
+        "forward-mode dual numbers over the same equation chain the value\n"
+        "uses, so the two cannot drift apart.");
+
   m.def("cooled_wall_heat_flux", &combaero::cooling::cooled_wall_heat_flux,
         py::arg("T_hot"), py::arg("T_coolant"), py::arg("h_hot"),
         py::arg("h_coolant"), py::arg("eta"), py::arg("t_wall"),

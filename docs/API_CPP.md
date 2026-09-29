@@ -717,6 +717,43 @@ header and `validation/cooling/extractions/orifice_discharge_coefficient.md`.
 `Cd` is not monotonic in it, and is held constant below `Re = 1e4`, its stated
 validity floor -- both deliberate, both from the source.
 
+### Film cooling: Baldauf et al. (2002)
+
+Laterally averaged adiabatic film-cooling effectiveness downstream of one row
+of **cylindrical**, streamwise-inclined holes. Valid from the ejection point
+rather than only far downstream, and it carries the **adjacent jet
+interaction** -- the lateral hole-spacing effect driving jet lift-off -- as a
+correlated parameter rather than an excluded case.
+
+```cpp
+// eta = (T_G - T_AW)/(T_G - T_C), the same convention as
+// adiabatic_wall_temperature(), so the two compose directly.
+double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
+                                       double alpha_deg, double s_over_D,
+                                       double Tu);
+
+// Solver-facing (f, J): (eta, d eta/dM, d eta/dP), analytic via dual numbers.
+std::tuple<double, double, double>
+film_effectiveness_baldauf_2002_and_derivatives(double x_over_D, double M,
+                                                double P, double alpha_deg,
+                                                double s_over_D, double Tu);
+```
+
+Stated envelope (recorded in `baldauf2002::`, not enforced -- a network solve
+transits odd states during Newton iteration): `M` 0.2-2.5, `P` 1.2-1.8,
+`s/D` 2-5, `alpha` 30-90 deg, `Tu` 0.0035-0.075. The paper's own RMS
+deviation is 5.5%.
+
+`alpha_deg` is the ejection angle to the **surface** and is converted
+internally; the paper's trigonometry is in radians. That is not an
+assumption -- seven of its Table 4 coefficients reproduce on radians and fail
+on degrees by 10-30%.
+
+**Eq. (31) is implemented as printed and contradicts the paper's own
+Table 4** by 36% in `b_0`. Under 5% effect below `M ~ 0.5`, up to 50% at
+`M = 2.5`. See
+`validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
+
 ---
 
 ## Acoustics (acoustics.h)
