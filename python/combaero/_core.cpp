@@ -5652,6 +5652,68 @@ PYBIND11_MODULE(_core, m) {
         "  eta       : adiabatic effectiveness [-]\n\n"
         "Returns: adiabatic wall temperature T_aw [K]");
 
+  m.def("film_superposition_sellers",
+        &combaero::cooling::film_superposition_sellers, py::arg("eta_rows"),
+        "Sellers superposition of per-row film effectiveness:\n"
+        "    eta = 1 - prod_i (1 - eta_i)\n\n"
+        "Assumes the rows are independent. Gao et al. (2025) measure what\n"
+        "that costs: the error accumulates with row count and always\n"
+        "OVERESTIMATES. Use film_superposition_corrected for many rows.");
+
+  m.def("film_superposition_sellers_and_gradient",
+        &combaero::cooling::film_superposition_sellers_and_gradient,
+        py::arg("eta_rows"),
+        "(eta, [d eta / d eta_i]) for Sellers superposition. The partials\n"
+        "are formed from prefix/suffix products rather than by division, so\n"
+        "a fully effective row does not produce a NaN.");
+
+  m.def("film_superposition_corrected",
+        &combaero::cooling::film_superposition_corrected,
+        py::arg("eta_rows"), py::arg("alpha_between_rows"),
+        "Gao et al. (2025) Eq. (7): Sellers with a per-row mainstream\n"
+        "temperature correction.\n\n"
+        "    eta = sum_i [ eta_i prod_{j>=i} alpha_j prod_{k>i} (1 - eta_k) ]\n\n"
+        "alpha_between_rows has one FEWER entry than eta_rows: alpha_j is\n"
+        "the fraction of the film's temperature deficit that survives\n"
+        "mixing between row j and row j+1. All ones reproduces Sellers\n"
+        "exactly.\n\n"
+        "alpha is the tuning knob for matching a rig. Gao publishes its\n"
+        "functional form (see mainstream_temperature_correction) but NOT\n"
+        "the fitted coefficients, so there is no defensible default beyond\n"
+        "1.0, which is plain Sellers.");
+
+  m.def("film_superposition_corrected_and_gradient",
+        &combaero::cooling::film_superposition_corrected_and_gradient,
+        py::arg("eta_rows"), py::arg("alpha_between_rows"),
+        "(eta, [d eta / d eta_i]) for Gao Eq. (7).");
+
+  m.def("mainstream_temperature_correction",
+        &combaero::cooling::mainstream_temperature_correction,
+        py::arg("mass_flow_ratio"), py::arg("a"), py::arg("b"),
+        "Gao et al. (2025) Eq. (5), the published FORM of the mainstream\n"
+        "temperature correction:\n\n"
+        "    alpha = a r / (a r + 1) + b,    r = m_coolant / m_mainstream\n\n"
+        "Derived from an energy balance on mainstream entrained into the\n"
+        "boundary layer at each injection (Eqs. 3-4), so alpha is the\n"
+        "fraction of the film's temperature deficit surviving to the next\n"
+        "row.\n\n"
+        "a and b are REQUIRED, not defaulted: the paper never prints its\n"
+        "fitted values, and a made-up default would acquire an authority it\n"
+        "has not earned.");
+
+  m.def("equivalent_slot_width", &combaero::cooling::equivalent_slot_width,
+        py::arg("hole_area"), py::arg("pitch"),
+        "Gao Eq. (9): s = A_hole / pitch. The equivalent slot width that\n"
+        "lets one row's measured distribution stand in for another spacing\n"
+        "through the X/(M s) scaling of Eq. (8).");
+
+  m.def("equivalent_blowing_ratio",
+        &combaero::cooling::equivalent_blowing_ratio,
+        py::arg("M_baseline"), py::arg("area_baseline"),
+        py::arg("area_equivalent"),
+        "Gao Eq. (10): M_e = M_0 A_0 / A_e. Normalises a hole count and\n"
+        "spacing onto the baseline single-row configuration.");
+
   m.def("film_effectiveness_baldauf_2002",
         &combaero::cooling::film_effectiveness_baldauf_2002,
         py::arg("x_over_D"), py::arg("M"), py::arg("P"), py::arg("alpha_deg"),
