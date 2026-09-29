@@ -5,13 +5,13 @@ It is written to work both when running from the source tree and when
 combaero is installed as a wheel.
 """
 
-from importlib import import_module
+from importlib import import_module as _import_module
 
 try:  # Python 3.8+
-    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
     from importlib.metadata import version as _pkg_version
 except ModuleNotFoundError:  # pragma: no cover - very old Python
-    from importlib_metadata import PackageNotFoundError
+    from importlib_metadata import PackageNotFoundError as _PackageNotFoundError
     from importlib_metadata import version as _pkg_version  # type: ignore[import-not-found]
 
 
@@ -25,7 +25,7 @@ def _load_version() -> str:
 
     try:
         return _pkg_version("combaero")
-    except PackageNotFoundError:
+    except _PackageNotFoundError:
         return "0.0.0+local"
 
 
@@ -440,7 +440,7 @@ except (ModuleNotFoundError, ImportError) as e:
     print(f"DEBUG: Import failed with {type(e).__name__}: {e}")
     # Fallback: attempt to import from an installed combaero package that
     # already has _core available, then re-export the symbols.
-    _core = import_module("combaero._core")
+    _core = _import_module("combaero._core")
     mixture_h = _core.mixture_h
     adiabatic_T_wgs = _core.adiabatic_T_wgs
     cp = _core.cp
@@ -835,12 +835,12 @@ class State(_StateBase):
 # ---------------------------------------------------------------------------
 # suppress_warnings context manager
 # ---------------------------------------------------------------------------
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import Generator as _Generator
+from contextlib import contextmanager as _contextmanager
 
 
-@contextmanager
-def suppress_warnings() -> Generator[None, None, None]:
+@_contextmanager
+def suppress_warnings() -> _Generator[None, None, None]:
     """Context manager that silences all combaero correlation warnings.
 
     Useful for batch solver runs where out-of-range extrapolation warnings
@@ -1254,4 +1254,59 @@ __all__ = [
     "vatistas_delta_p_and_jacobians",
     "VatistasVortex",
     "__version__",
+    # -- reachable on the module but previously undeclared ----------------
+    #
+    # These were exported all along; `__all__` is hand-maintained and had
+    # simply fallen behind, which also hid them from test_units_sync.
+    # Grouped here rather than merged above so the omission stays legible.
+    "Cd_from_zeta",
+    "ChannelSolverResult",
+    "IncompressibleFlowSolution",
+    "MassStream",
+    "MomentumChamberResult",
+    "OrificeResult",
+    "P0_from_static",
+    "P_from_stagnation",
+    "Registry",
+    "T0_from_static",
+    "T0_from_static_v",
+    "T_adiabatic_wall",
+    "T_adiabatic_wall_mach",
+    "T_from_stagnation",
+    "WallCouplingResult",
+    "adiabatic_T_wgs",
+    "annular_area",
+    "channel_flow",
+    "channel_flow_rough",
+    "dcp_dT",
+    "dh_dT",
+    "ds_dT",
+    "fanno_channel",
+    "fanno_channel_rough",
+    "get_material_conductivity",
+    "get_warning_handler",
+    "h0_from_static",
+    "hydraulic_diameter",
+    "hydraulic_diameter_annulus",
+    "hydraulic_diameter_rect",
+    "is_well_behaved",
+    "kinetic_energy",
+    "mach_number",
+    "mixture_h",
+    "molar_mass",
+    "mwmix",
+    "orifice_flow_thermo",
+    "pressure_loss",
+    "recovery_factor",
+    "set_equivalence_ratio_mole",
+    "set_warning_handler",
+    "smr_wgs_equilibrium",
+    "smr_wgs_equilibrium_adiabatic",
+    "standard_dry_air_composition",
+    "suppress_warnings",
+    "v_from_h0",
+    "velocity_from_pressure_loss",
+    "velocity_from_q",
+    "vortex",
+    "zeta_from_Cd",
 ]
