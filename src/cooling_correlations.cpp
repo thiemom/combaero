@@ -1,9 +1,9 @@
 #include "cooling_correlations.h"
 #include "dual_number.h"
 #include "heat_transfer.h"
+#include "correlation_status.h"
 #include "math_constants.h"
 #include <cmath>
-#include <iostream>
 #include <stdexcept>
 #include <algorithm>
 #include <string>
@@ -193,19 +193,75 @@ void check_inputs(double x_over_D, double M, double P, double alpha_deg,
     }
 }
 
+// Warn for each input outside Baldauf's stated envelope, and report whether
+// any was.
+//
+// The bounds have been `constexpr` in the header since the correlation
+// landed, under a comment saying that outside them it is extrapolation --
+// but nothing read them, so the correlation answered a 7.4 hole spacing as
+// confidently as a 3.0 one. That matters beyond a user's own judgement: the
+// validation harness derives its `extrapolated` column from this signal, so
+// a silent correlation makes extrapolation indistinguishable from model
+// error in the scorecard.
+//
+// `status` follows nusselt_dittus_boelter's contract -- when a caller passes
+// one, it takes the flag and no warning is emitted; a null caller gets the
+// warnings.
+bool check_range(double M, double P, double alpha_deg, double sD, double Tu,
+                 CorrelationStatus *status) {
+    bool extrapolated = false;
+
+    const auto flag = [&](bool outside, const char *name, double value,
+                          double lo, double hi) {
+        if (!outside) {
+            return;
+        }
+        extrapolated = true;
+        if (!status) {
+            warn("film_effectiveness_baldauf_2002: " + std::string(name) +
+                 " = " + std::to_string(value) + " is outside validated range ["
+                 + std::to_string(lo) + ", " + std::to_string(hi) +
+                 "]. Extrapolating; check results.");
+        }
+    };
+
+    flag(M < baldauf2002::M_min || M > baldauf2002::M_max, "M", M,
+         baldauf2002::M_min, baldauf2002::M_max);
+    flag(P < baldauf2002::P_min || P > baldauf2002::P_max, "P", P,
+         baldauf2002::P_min, baldauf2002::P_max);
+    flag(alpha_deg < baldauf2002::alpha_deg_min
+             || alpha_deg > baldauf2002::alpha_deg_max,
+         "alpha_deg", alpha_deg, baldauf2002::alpha_deg_min,
+         baldauf2002::alpha_deg_max);
+    flag(sD < baldauf2002::s_over_D_min || sD > baldauf2002::s_over_D_max,
+         "s_over_D", sD, baldauf2002::s_over_D_min,
+         baldauf2002::s_over_D_max);
+    flag(Tu < baldauf2002::Tu_min || Tu > baldauf2002::Tu_max, "Tu", Tu,
+         baldauf2002::Tu_min, baldauf2002::Tu_max);
+
+    if (status) {
+        *status = extrapolated ? CorrelationStatus::Extrapolated
+                               : CorrelationStatus::Valid;
+    }
+    return extrapolated;
+}
+
 }  // anonymous namespace
 
 double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
                                        double alpha_deg, double s_over_D,
-                                       double Tu) {
+                                       double Tu,
+                                       CorrelationStatus *status) {
     check_inputs(x_over_D, M, P, alpha_deg, s_over_D, Tu);
+    check_range(M, P, alpha_deg, s_over_D, Tu, status);
     return baldauf_eta_impl<double>(x_over_D, M, P, alpha_deg, s_over_D, Tu);
 }
 
 std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivatives(
     double x_over_D, double M, double P, double alpha_deg, double s_over_D,
-    double Tu) {
+    double Tu, CorrelationStatus *status) {
     check_inputs(x_over_D, M, P, alpha_deg, s_over_D, Tu);
+    check_range(M, P, alpha_deg, s_over_D, Tu, status);
     using D = DualN<2>;
     const D dM = D::seed(M, 0);
     const D dP = D::seed(P, 1);

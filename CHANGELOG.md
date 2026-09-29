@@ -1239,6 +1239,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Baldauf's film-effectiveness correlation never checked its own validated
+  envelope.** The bounds have been `constexpr` in `cooling_correlations.h`
+  since the correlation landed -- `M_min/M_max`, `P_min/P_max`,
+  `s_over_D_min/max`, `alpha_deg_min/max`, `Tu_min/Tu_max` -- under a comment
+  saying that outside them the correlation is extrapolation. Nothing read
+  them. `film_effectiveness_baldauf_2002` answered a hole spacing of 7.4 as
+  confidently as one of 3.0, silently.
+
+  Both entry points now take an optional `CorrelationStatus *status`,
+  following `nusselt_dittus_boelter`'s contract: pass one to take the
+  extrapolation flag silently, leave it null to get a warning per
+  out-of-range input. **Still reported, not enforced** -- the value outside
+  the envelope is bit-identical to before, because a network solve transits
+  odd states during Newton iteration and refusing there would break
+  convergence rather than protect anyone.
+
+  This matters beyond a caller's own judgement: the validation harness
+  derives its `extrapolated` column from this signal, so a silent
+  correlation makes extrapolation indistinguishable from model error in the
+  scorecard -- which is #389's fidelity/accuracy confusion in concrete form.
+  Measured on the `andrei2014` rig, **all six of its (BR, DR) curves are
+  outside the envelope**: `s/D` 7.37 against a maximum of 5 on every curve,
+  `P` 1.0 against a minimum of 1.2 on three, `M` 3 against a maximum of 2.5
+  on two.
+
 - **A Python warning handler outlived the interpreter and segfaulted at
   exit.** `set_warning_handler()` stores its argument in a function-local
   static on the C++ side; when that argument is a Python callable the static

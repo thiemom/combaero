@@ -279,6 +279,16 @@ Envelope: `M` 0.2-2.5, `P` 1.2-1.8, `s/D` 2-5, `alpha` 30-90 deg,
 implemented as printed and disagrees with the paper's own worked example --
 see `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
 
+Outside the envelope the value is unchanged -- it still answers, finitely --
+but each out-of-range input now raises a warning through the global handler,
+one per parameter:
+
+```python
+with cb.suppress_warnings():          # or set_warning_handler to collect them
+    eta = cb.film_effectiveness_baldauf_2002(20.0, 3.0, 1.0, 30.0, 7.37, 0.05)
+# unsuppressed, that call reports M, P and s_over_D as extrapolated
+```
+
 #### Multi-row film superposition
 
 ```python
