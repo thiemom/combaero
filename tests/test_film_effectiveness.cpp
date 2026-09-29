@@ -5,6 +5,7 @@
 // See validation/cooling/extractions/baldauf_2002_film_effectiveness.md.
 
 #include "cooling_correlations.h"
+#include "correlation_status.h"
 #include "math_constants.h"
 
 #include <gtest/gtest.h>
@@ -28,6 +29,15 @@ constexpr double T3_TU = 0.015;
 double eta(double x_over_D, double M = T3_M, double P = T3_P,
            double alpha = T3_ALPHA, double sD = T3_SD, double Tu = T3_TU) {
     return cc::film_effectiveness_baldauf_2002(x_over_D, M, P, alpha, sD, Tu);
+}
+
+// Same call, but takes the extrapolation flag instead of emitting a warning.
+// Passing a status is also what keeps the suite's own out-of-envelope probes
+// from writing to stderr.
+bool extrapolates(double M, double P, double alpha, double sD, double Tu) {
+    combaero::CorrelationStatus status = combaero::CorrelationStatus::Valid;
+    cc::film_effectiveness_baldauf_2002(20.0, M, P, alpha, sD, Tu, &status);
+    return status == combaero::CorrelationStatus::Extrapolated;
 }
 
 }  // namespace
@@ -156,18 +166,105 @@ TEST(BaldaufFilmEffectiveness, RefusesInputsTheCorrelationCannotRepresent) {
     EXPECT_THROW(eta(10.0, 1.0, 1.2, 120.0), std::invalid_argument);
 }
 
-TEST(BaldaufFilmEffectiveness, PublishedEnvelopeIsRecordedNotEnforced) {
-    // The constants exist so a caller can test their own operating point
-    // against the paper's range. They are deliberately NOT enforced: a
-    // network solve transits odd states during Newton iteration, and
-    // refusing there would break convergence rather than protect anyone.
+TEST(BaldaufFilmEffectiveness, PublishedEnvelopeIsReportedNotEnforced) {
+    // Still NOT enforced, and for the original reason: a network solve
+    // transits odd states during Newton iteration, and refusing there would
+    // break convergence rather than protect anyone. Evaluating outside the
+    // envelope must keep answering, finitely.
     EXPECT_DOUBLE_EQ(B::M_min, 0.2);
     EXPECT_DOUBLE_EQ(B::M_max, 2.5);
     EXPECT_DOUBLE_EQ(B::s_over_D_min, 2.0);
     EXPECT_DOUBLE_EQ(B::s_over_D_max, 5.0);
     EXPECT_DOUBLE_EQ(B::rms_deviation, 0.055);   // the paper's own stated RMS
-    // Evaluating outside it still answers, finitely.
     EXPECT_TRUE(std::isfinite(eta(20.0, 3.0, 1.2, 30.0, 6.0, 0.10)));
+
+    // What changed: it is now REPORTED. The constants were declared with a
+    // comment saying that outside them the correlation is extrapolation, and
+    // for two releases nothing read them -- so the correlation answered a
+    // 7.4 hole spacing as confidently as a 3.0 one. The validation harness
+    // derives its `extrapolated` column from this signal, so silence there
+    // makes extrapolation indistinguishable from model error.
+    EXPECT_TRUE(extrapolates(3.0, 1.2, 30.0, 6.0, 0.10));
+}
+
+TEST(BaldaufFilmEffectiveness, EachEnvelopeBoundIsCheckedIndependently) {
+    // Every bound, low side and high side, one parameter at a time -- so a
+    // missing check cannot hide behind a neighbouring one that fires.
+    EXPECT_FALSE(extrapolates(T3_M, T3_P, T3_ALPHA, T3_SD, T3_TU))
+        << "the paper's own Table 3 case must be inside its own envelope";
+
+    struct Case { const char* what; double M, P, alpha, sD, Tu; };
+    const Case outside[] = {
+        {"M below",        B::M_min * 0.5,  T3_P, T3_ALPHA, T3_SD, T3_TU},
+        {"M above",        B::M_max * 1.5,  T3_P, T3_ALPHA, T3_SD, T3_TU},
+        {"P below",        T3_M, B::P_min * 0.5,  T3_ALPHA, T3_SD, T3_TU},
+        {"P above",        T3_M, B::P_max * 1.5,  T3_ALPHA, T3_SD, T3_TU},
+        {"alpha below",    T3_M, T3_P, B::alpha_deg_min * 0.5, T3_SD, T3_TU},
+        {"s/D below",      T3_M, T3_P, T3_ALPHA, B::s_over_D_min * 0.5, T3_TU},
+        {"s/D above",      T3_M, T3_P, T3_ALPHA, B::s_over_D_max * 1.5, T3_TU},
+        {"Tu below",       T3_M, T3_P, T3_ALPHA, T3_SD, B::Tu_min * 0.5},
+        {"Tu above",       T3_M, T3_P, T3_ALPHA, T3_SD, B::Tu_max * 1.5},
+    };
+    for (const Case& c : outside) {
+        EXPECT_TRUE(extrapolates(c.M, c.P, c.alpha, c.sD, c.Tu)) << c.what;
+    }
+
+    // alpha_deg_max is 90, which check_inputs already refuses above, so the
+    // high side is covered by the throw rather than by this flag.
+    EXPECT_DOUBLE_EQ(B::alpha_deg_max, 90.0);
+
+    // The bounds themselves are inclusive -- sitting exactly on a published
+    // limit is inside the published range, not outside it.
+    EXPECT_FALSE(extrapolates(B::M_min, B::P_min, B::alpha_deg_min,
+                              B::s_over_D_min, B::Tu_min));
+    EXPECT_FALSE(extrapolates(B::M_max, B::P_max, B::alpha_deg_max,
+                              B::s_over_D_max, B::Tu_max));
+}
+
+TEST(BaldaufFilmEffectiveness, AndreiTwentyFourteenRigIsOutsideTheEnvelope) {
+    // The rig behind validation/cooling/data/andrei2014: d = 1.5 mm holes at
+    // 30 deg, spanwise pitch s/d = 7.37, blowing 1 to 3, density ratio 1.0
+    // and 1.5. Recorded as a test because it decides how that dataset may be
+    // read: NO combination of its conditions sits inside Baldauf's envelope,
+    // so scoring against it is a cross-source ACCURACY check on an
+    // extrapolated model, never a fidelity check.
+    const double sD = 7.37, alpha = 30.0, Tu = 0.05;
+    for (double M : {1.0, 2.0, 3.0}) {
+        for (double P : {1.0, 1.5}) {
+            EXPECT_TRUE(extrapolates(M, P, alpha, sD, Tu))
+                << "BR = " << M << ", DR = " << P;
+        }
+    }
+    // s/D alone is enough: 7.37 against a published maximum of 5.
+    EXPECT_GT(sD, B::s_over_D_max);
+}
+
+TEST(BaldaufFilmEffectiveness, DerivativesReportExtrapolationToo) {
+    // The solver-facing form shares the check, so a Newton step cannot
+    // wander outside the envelope unreported while the value form would
+    // have said so.
+    combaero::CorrelationStatus status = combaero::CorrelationStatus::Valid;
+    cc::film_effectiveness_baldauf_2002_and_derivatives(
+        20.0, T3_M, T3_P, T3_ALPHA, B::s_over_D_max * 1.5, T3_TU, &status);
+    EXPECT_EQ(status, combaero::CorrelationStatus::Extrapolated);
+
+    status = combaero::CorrelationStatus::Extrapolated;
+    cc::film_effectiveness_baldauf_2002_and_derivatives(
+        20.0, T3_M, T3_P, T3_ALPHA, T3_SD, T3_TU, &status);
+    EXPECT_EQ(status, combaero::CorrelationStatus::Valid);
+}
+
+TEST(BaldaufFilmEffectiveness, ReportingDoesNotChangeTheValue) {
+    // The whole point of reporting rather than enforcing: eta outside the
+    // envelope must be bit-identical to what it was before the check
+    // existed, whether or not a status is requested.
+    combaero::CorrelationStatus status = combaero::CorrelationStatus::Valid;
+    const double with_status = cc::film_effectiveness_baldauf_2002(
+        20.0, 3.0, 1.0, 30.0, 7.37, 0.05, &status);
+    const double without = cc::film_effectiveness_baldauf_2002(
+        20.0, 3.0, 1.0, 30.0, 7.37, 0.05, nullptr);
+    EXPECT_EQ(with_status, without);
+    EXPECT_EQ(status, combaero::CorrelationStatus::Extrapolated);
 }
 
 TEST(BaldaufFilmEffectiveness, PeakEffectivenessMatchesFigure8Magnitudes) {

@@ -5715,7 +5715,11 @@ PYBIND11_MODULE(_core, m) {
         "spacing onto the baseline single-row configuration.");
 
   m.def("film_effectiveness_baldauf_2002",
-        &combaero::cooling::film_effectiveness_baldauf_2002,
+        [](double x_over_D, double M, double P, double alpha_deg,
+           double s_over_D, double Tu) {
+          return combaero::cooling::film_effectiveness_baldauf_2002(
+              x_over_D, M, P, alpha_deg, s_over_D, Tu, nullptr);
+        },
         py::arg("x_over_D"), py::arg("M"), py::arg("P"), py::arg("alpha_deg"),
         py::arg("s_over_D"), py::arg("Tu"),
         "Laterally averaged adiabatic film-cooling effectiveness downstream\n"
@@ -5741,7 +5745,11 @@ PYBIND11_MODULE(_core, m) {
         "Returns: laterally averaged eta [-]");
 
   m.def("film_effectiveness_baldauf_2002_and_derivatives",
-        &combaero::cooling::film_effectiveness_baldauf_2002_and_derivatives,
+        [](double x_over_D, double M, double P, double alpha_deg,
+           double s_over_D, double Tu) {
+          return combaero::cooling::film_effectiveness_baldauf_2002_and_derivatives(
+              x_over_D, M, P, alpha_deg, s_over_D, Tu, nullptr);
+        },
         py::arg("x_over_D"), py::arg("M"), py::arg("P"), py::arg("alpha_deg"),
         py::arg("s_over_D"), py::arg("Tu"),
         "Solver-facing (f, J) form: (eta, d eta/dM, d eta/dP).\n\n"

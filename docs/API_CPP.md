@@ -730,19 +730,26 @@ correlated parameter rather than an excluded case.
 // adiabatic_wall_temperature(), so the two compose directly.
 double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
                                        double alpha_deg, double s_over_D,
-                                       double Tu);
+                                       double Tu,
+                                       CorrelationStatus *status = nullptr);
 
 // Solver-facing (f, J): (eta, d eta/dM, d eta/dP), analytic via dual numbers.
 std::tuple<double, double, double>
-film_effectiveness_baldauf_2002_and_derivatives(double x_over_D, double M,
-                                                double P, double alpha_deg,
-                                                double s_over_D, double Tu);
+film_effectiveness_baldauf_2002_and_derivatives(
+    double x_over_D, double M, double P, double alpha_deg, double s_over_D,
+    double Tu, CorrelationStatus *status = nullptr);
 ```
 
-Stated envelope (recorded in `baldauf2002::`, not enforced -- a network solve
-transits odd states during Newton iteration): `M` 0.2-2.5, `P` 1.2-1.8,
-`s/D` 2-5, `alpha` 30-90 deg, `Tu` 0.0035-0.075. The paper's own RMS
-deviation is 5.5%.
+Stated envelope (`baldauf2002::`): `M` 0.2-2.5, `P` 1.2-1.8, `s/D` 2-5,
+`alpha` 30-90 deg, `Tu` 0.0035-0.075. The paper's own RMS deviation is 5.5%.
+
+**Reported, not enforced.** Outside the envelope both functions still answer,
+finitely and with an unchanged value -- a network solve transits odd states
+during Newton iteration, and refusing there would break convergence rather
+than protect anyone. They now say so, following
+`nusselt_dittus_boelter`'s contract: pass a `CorrelationStatus*` to take the
+flag silently, or leave it null to get a warning per out-of-range input
+through the global warning handler.
 
 `alpha_deg` is the ejection angle to the **surface** and is converted
 internally; the paper's trigonometry is in radians. That is not an

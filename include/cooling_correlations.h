@@ -1,6 +1,8 @@
 #ifndef COOLING_CORRELATIONS_H
 #define COOLING_CORRELATIONS_H
 
+#include "correlation_status.h"
+
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -162,7 +164,8 @@ constexpr double b0_table4_at_table3 = 0.61626073;
 // Returns: laterally averaged eta [-], Eq. (1) convention.
 double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
                                        double alpha_deg, double s_over_D,
-                                       double Tu);
+                                       double Tu,
+                                       CorrelationStatus *status = nullptr);
 
 // Solver-facing (f, J): (eta, d eta/dM, d eta/dP).
 //
@@ -172,7 +175,7 @@ double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
 // finite differences.
 std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivatives(
     double x_over_D, double M, double P, double alpha_deg, double s_over_D,
-    double Tu);
+    double Tu, CorrelationStatus *status = nullptr);
 
 // -------------------------------------------------------------
 // Multi-row film superposition
