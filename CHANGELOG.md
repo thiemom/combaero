@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Lichtarowicz, Duggins and Markland (1965) long-orifice discharge
+  coefficient** -- `DischargeCdCorrelation::Lichtarowicz1965`, Eqs. (7) and
+  (12), replacing the member that had declared-and-refused since #409.
+  Valid `l/d` 2-10 and **Re 10 to 2e4**.
+
+  **This is the regime a cooling hole actually runs in.** Andrews' effusion
+  plate C spans Re 432 to 8718 across its own measured data, entirely below
+  McGreehan-Schotsch's `re_min = 1e4` floor, where that correlation holds Cd
+  constant and reads **+21.7% high at Re = 432**. Cd genuinely varies 20%
+  over that range.
+
+  Refuses below `l/d = 1.5` rather than clamping: the source's own design
+  recommendation is to avoid that geometry because Cd "varies rapidly" there
+  and there is "the possibility of hysteresis", which a single-valued
+  correlation cannot represent. `l/d` is held at 10 above the range, because
+  Eq. (7) is linear and extrapolates to zero near `l/d = 97`.
+
+  Closed-form, so `dCd/dRe` is differentiated analytically rather than
+  through dual numbers; matches central differences to ~1e-9 relative.
+  Provenance in
+  `validation/cooling/extractions/lichtarowicz_1965_long_orifice.md`.
+
+### Changed
+
+- **`McGreehanSchotsch1988` now warns below its `re_min = 1e4` floor**,
+  naming Lichtarowicz and Idelchik as the valid alternatives. Below the floor
+  the chain holds Re at the floor, so Cd stops responding to flow entirely --
+  documented and deliberate, since Eq. (8) diverges there, but silently
+  returning a frozen Cd is how a plenum-fed hole came to read +21.7% high.
+  Warns rather than refuses, because a network can transit low Re during
+  Newton iteration.
+
 - **`EffusionPlateElement`** (#387) -- a multi-perforated wall panel as a
   network element, flow side. Geometry is given the way a plate is designed
   (pitch, hole diameter, wall thickness, inclination angle); the hole count

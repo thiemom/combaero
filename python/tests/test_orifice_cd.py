@@ -187,11 +187,65 @@ class TestIdelchikWallOrifice:
             1.0 / math.sqrt(2.85), abs=5e-4
         )
 
-    def test_lichtarowicz_refuses_rather_than_substituting(self) -> None:
-        hole = cb.DischargeHoleGeometry(d=1e-3)
-        flow = cb.DischargeHoleState(Re=1e5)
-        with pytest.raises(ValueError, match="not implemented"):
-            cb.discharge_cd(cb.DischargeCdCorrelation.Lichtarowicz1965, hole, flow)
+    def test_lichtarowicz_reproduces_its_own_figure_10(self) -> None:
+        """Eq. (12) at l/d = 2, against the curve the paper plots."""
+        sel = cb.DischargeCdCorrelation.Lichtarowicz1965
+        hole = cb.DischargeHoleGeometry(d=1e-3, L=2e-3)
+        for Re, expected in ((10.0, 0.0817), (100.0, 0.4284), (1000.0, 0.7446)):
+            got = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=Re))
+            assert got == pytest.approx(expected, abs=5e-4), f"Re = {Re}"
+        # Plateaus on Eq. (7): C_du = 0.827 - 0.0085*2 = 0.810.
+        assert cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=1e6)) == pytest.approx(
+            0.810, abs=2e-3
+        )
+
+    def test_lichtarowicz_covers_the_regime_mcgreehan_floors_out_of(self) -> None:
+        """The reason this correlation exists.
+
+        McGreehan-Schotsch floors Re at 1e4, so below that its Cd stops
+        responding to flow. Andrews' own effusion plate C data spans
+        Re 432 to 8718 -- entirely inside the floored region.
+        """
+        licht = cb.DischargeCdCorrelation.Lichtarowicz1965
+        mcg = cb.DischargeCdCorrelation.McGreehanSchotsch1988
+        hole = cb.DischargeHoleGeometry(d=3.27e-3, L=6.3e-3)  # plate C
+
+        lo = cb.DischargeHoleState(Re=432.0)
+        cd_l = cb.discharge_cd(licht, hole, lo)
+        cd_m = cb.discharge_cd(mcg, hole, lo)
+        assert (cd_m - cd_l) / cd_l > 0.15
+
+        # McGreehan is frozen below its floor; Lichtarowicz is not.
+        assert cb.discharge_cd(mcg, hole, cb.DischargeHoleState(Re=432.0)) == (
+            pytest.approx(cb.discharge_cd(mcg, hole, cb.DischargeHoleState(Re=1000.0)))
+        )
+        assert cb.discharge_cd(licht, hole, cb.DischargeHoleState(Re=1000.0)) > cb.discharge_cd(
+            licht, hole, cb.DischargeHoleState(Re=432.0)
+        )
+
+    def test_lichtarowicz_refuses_below_its_own_validity_floor(self) -> None:
+        """Design recommendation (1): avoid l/d < 1.5, hysteresis possible."""
+        sel = cb.DischargeCdCorrelation.Lichtarowicz1965
+        flow = cb.DischargeHoleState(Re=1e4)
+        with pytest.raises(ValueError, match="l/d = 1.5"):
+            cb.discharge_cd(sel, cb.DischargeHoleGeometry(d=1e-3, L=1.0e-3), flow)
+        assert cb.discharge_cd(sel, cb.DischargeHoleGeometry(d=1e-3, L=1.5e-3), flow) > 0.0
+
+    def test_lichtarowicz_derivative_is_analytic(self) -> None:
+        sel = cb.DischargeCdCorrelation.Lichtarowicz1965
+        hole = cb.DischargeHoleGeometry(d=1e-3, L=4e-3)
+        for Re in (50.0, 500.0, 5e3, 1.5e4):
+            h = Re * 1e-6
+            _, dcd, dcd_du = cb.discharge_cd_and_derivatives(
+                sel, hole, cb.DischargeHoleState(Re=Re)
+            )
+            fd = (
+                cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=Re + h))
+                - cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=Re - h))
+            ) / (2 * h)
+            assert dcd == pytest.approx(fd, rel=1e-5), f"Re = {Re}"
+            # Plenum-fed: no crossflow term exists, so exactly zero.
+            assert dcd_du == 0.0
 
 
 class TestOrificeFlowCalculations:

@@ -149,7 +149,11 @@ enum class DischargeCdCorrelation {
     Idelchik1966Beveled,    // diagram 4-18b
     Idelchik1966Rounded,    // diagram 4-18c
 
-    // DECLARED, NOT IMPLEMENTED -- see make_discharge_correlation.
+    // Lichtarowicz, Duggins and Markland (1965): a LONG orifice, l/d 2-10,
+    // down to Re = 10. This is the low-Reynolds regime an effusion hole
+    // actually runs in -- Andrews' own plate C data spans Re 432 to 8700 --
+    // where McGreehan-Schotsch is floored at re_min = 1e4 and returns a
+    // near-constant.
     Lichtarowicz1965,
 
     // Fixed Cd. The value belongs to the caller: a measured plate value, or a
@@ -349,6 +353,69 @@ constexpr double rounded_zeta[rounded_n] = {
 constexpr double default_roughness_over_d = 0.0;
 
 } // namespace idelchik
+
+// -------------------------------------------------------------
+// Lichtarowicz, Duggins and Markland (1965) - long orifices
+// -------------------------------------------------------------
+//
+// Lichtarowicz, A., Duggins, R.K. and Markland, E. (1965). "Discharge
+// coefficients for incompressible non-cavitating flow through long
+// orifices." J. Mech. Engng Sci. 7(2), 210-219.
+// docs/orifices/lichtarowicz-et-al-1965-...pdf (gitignored, copyrighted).
+//
+// WHY IT EARNS A PLACE. It plugs a coverage hole the other two leave:
+//
+//   correlation          Re range        l/d range
+//   McGreehan-Schotsch   >= 1e4          long holes, with crossflow
+//   Idelchik 4-18a       25 to 1e6       l/Dh up to 4
+//   Lichtarowicz         10 to 2e4       2 to 10        <- this one
+//
+// A cooling hole sits at low Re: Andrews' effusion plate C spans Re 432 to
+// 8718 across its own measured range, where Cd varies by 20%. McGreehan's
+// floor makes it blind to that; measured against Lichtarowicz it reads
+// +21.7% high at Re = 432.
+//
+// Equations read off the page rendered at 600 dpi, not the OCR text layer.
+namespace lichtarowicz {
+
+// Eq. (7): the ultimate (high-Re) discharge coefficient. Stated to 1.5%.
+constexpr double cdu_c0 = 0.827;
+constexpr double cdu_c1 = 0.0085;
+
+// For 1.5 <= l/d < 2 the source gives a flat value instead, same accuracy.
+constexpr double cdu_short = 0.810;
+
+// Below l/d = 1.5 the source's design recommendation (1) is to AVOID the
+// geometry entirely: "the discharge coefficient varies rapidly with l/d
+// below this value, and there is the possibility of hysteresis in
+// operation." So this is a refusal boundary, not a clamp -- see
+// LichtarowiczCorrelation::Cd.
+constexpr double l_over_d_min = 1.5;
+constexpr double l_over_d_split = 2.0;
+constexpr double l_over_d_max = 10.0;
+
+// Eq. (12), the low-Re form:
+//   1/Cd = 1/Cdu + (20/Re)(1 + 2.25 l/d)
+//          - (0.005 l/d) / (1 + 7.5 (log10(0.00015 Re))^2)
+// "fits all but a few points to better than 0.02 in the range of l/d from
+// 2 to 10 and of Re from 10 to 2 x 10^4".
+constexpr double visc_c0   = 20.0;
+constexpr double visc_c1   = 2.25;
+constexpr double trans_c0  = 0.005;
+constexpr double trans_c1  = 7.5;
+constexpr double trans_c2  = 0.00015;
+
+constexpr double re_validated_min = 10.0;
+constexpr double re_validated_max = 2.0e4;
+
+// Re is held at this floor rather than allowed to reach zero, where the
+// 20/Re term diverges and Cd collapses to zero. The source plots Eq. (12)
+// down to Re ~ 1 in its Fig. 10, so the floor is below the drawn curve and
+// well below the validated range; it exists to keep the solver finite, not
+// to express physics.
+constexpr double re_floor = 1.0;
+
+} // namespace lichtarowicz
 
 // McGreehan and Schotsch (1988) - composite Cd for a long orifice with
 // corner radiusing and inlet crossflow. ASME J. Turbomachinery 110(2),
