@@ -1058,6 +1058,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`test_thermo_transport` no longer captures stderr**, so the C++ suite runs
+  where `/tmp` is not writable. googletest's `CaptureStderr()` mkstemps into a
+  hardcoded `"/tmp/"` (`gtest-port.cc`) that no environment variable
+  redirects, and a failure there is fatal -- it aborted the whole 175-test
+  binary, not just the two tests using it. They now read combaero's own
+  warning handler through a small RAII `WarningCapture`, which is also the
+  more direct assertion: that the warning was emitted, not that it reached a
+  particular stream. Local `ctest` goes 35/36 to 36/36.
+
 - **`McGreehanSchotsch1988` now warns below its `re_min = 1e4` floor**,
   naming Lichtarowicz and Idelchik as the valid alternatives. Below the floor
   the chain holds Re at the floor, so Cd stops responding to flow entirely --
@@ -1229,6 +1238,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   array already owns.
 
 ### Fixed
+
+- **Two composition warnings bypassed the warning handler**, so
+  `suppress_warnings()` and `set_warning_handler()` could not reach them.
+  `normalize_fractions` (all-zero input) and `convert_to_dry_fractions`
+  (water-vapour-only input) wrote straight to `std::cerr`. Both now go through
+  `warn()` like every other combaero warning, which makes them suppressible
+  for the first time.
+
+  Their prefix therefore changes from `Warning: ` to the handler's standard
+  `[combaero] `; the message text is otherwise unchanged. Nothing in the repo
+  matched on the old prefix.
 
 - **`test_units_sync` was checking `__all__`, not the API.** The Hard Rule is
   that every exported Python symbol carries a `units_data.h` entry or an
