@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <tuple>
 
 // -------------------------------------------------------------
 // Orifice Discharge Coefficient (Cd) Correlations
@@ -13,9 +14,15 @@
 //
 // This module provides Cd correlations for various orifice geometries:
 //   - Sharp thin-plate orifices (ISO 5167, Reader-Harris/Gallagher)
-//   - Thick-plate orifices (t/d correction per Idelchik/Bohl)
+//   - Thick-plate orifices (t/d correction per Idelchik)
 //   - Rounded-entry orifices (r/d based, Idelchik)
 //   - User-defined (tabulated or custom function)
+//   - Discharge holes -- bleed, film, effusion (McGreehan & Schotsch 1988)
+//
+// TWO FAMILIES, TWO SELECTORS. MeteringCdCorrelation covers orifices that sit
+// in a pipe and are described by beta = d/D; DischargeCdCorrelation covers
+// holes in a wall, described by L/d, r/d and the approach crossflow. See the
+// comment on DischargeCdCorrelation for why they are not one enum.
 //
 // The discharge coefficient Cd relates actual to ideal flow:
 //   mdot_actual = Cd * mdot_ideal
@@ -41,7 +48,7 @@
 // - ISO 5167-2:2003 - Orifice plates
 // - Reader-Harris & Gallagher (1998) - NEL/ASME correlation
 // - Idelchik, I.E. - Handbook of Hydraulic Resistance (3rd ed.)
-// - Bohl, W. - Technische Stroemungslehre
+// - Bohl, W. - Technische Stroemungslehre (declared, NOT implemented)
 // - Spink, L.K. - Principles and Practice of Flow Meter Engineering
 
 // -------------------------------------------------------------
@@ -92,23 +99,67 @@ struct OrificeState {
 // Correlation identifiers
 // -------------------------------------------------------------
 
-enum class CdCorrelation {
+// Cd correlations for a NORMED measurement orifice -- a standardised plate in
+// a pipe, where Cd is referenced to the TAPPING differential and every member
+// is a function of beta = d/D.
+//
+// The thick-plate and rounded-entry members that used to live here were
+// removed in favour of DischargeCdCorrelation::Idelchik1966*: they computed
+// an ISO 5167 Cd and multiplied it by a correction, but a thick-edged or
+// rounded orifice is not the normed device, so the ISO base does not apply --
+// and Idelchik gives the complete zeta directly, with no ISO base needed.
+enum class MeteringCdCorrelation {
     // Sharp thin-plate correlations
     ReaderHarrisGallagher,  // ISO 5167-2 / ASME MFC-3M (most accurate)
     Stolz,                  // ISO 5167:1980 (older, simpler)
     Miller,                 // Miller (1996) - simplified
 
-    // Thick-plate corrections
-    IdelchikThick,          // Idelchik thick-plate correction
-    BohlThick,              // Bohl thick-plate correction
-
-    // Rounded-entry correlations
-    IdelchikRounded,        // Idelchik rounded-entry
-    BohlRounded,            // Bohl rounded-entry
-
     // Special
     Constant,               // Fixed Cd value (for testing/simple cases)
     UserFunction            // User-provided function
+};
+
+// Cd families for a DISCHARGE hole -- a bleed, film or effusion hole that
+// dumps coolant out of its circuit.
+//
+// WHY THIS IS A SEPARATE SELECTOR from MeteringCdCorrelation, rather than
+// more members on it. The two families do not take the same inputs. A
+// metering orifice sits in a pipe, and every correlation above is a function
+// of beta = d/D and the pipe Reynolds number. A discharge hole has no pipe to
+// form beta with; its Cd is a function of L/d, r/d and the approach
+// crossflow, none of which OrificeGeometry/OrificeState can express (there is
+// no crossflow term in OrificeState at all). One enum over both would have
+// made every caller pass a meaningless D and silently drop the crossflow.
+enum class DischargeCdCorrelation {
+    // McGreehan & Schotsch (1988), the composite chain of Eqs. (8)-(17).
+    // Sharp-to-rounded inlet, finite L/d, inlet-side crossflow.
+    McGreehanSchotsch1988,
+
+    // Idelchik (1966), Section IV: a hole in a LARGE WALL (F1 = F2 = inf --
+    // plenum to plenum, which is the effusion-plate geometry). zeta is
+    // referenced to the hole velocity w0 and DH is the full permanent loss
+    // because there is no downstream recovery, so Cd = 1/sqrt(zeta) is exact
+    // rather than a convention-dependent conversion.
+    //
+    // One member per edge type, each mapping to exactly one diagram; the
+    // geometry does NOT auto-select. All four share the anchor zeta = 2.85 at
+    // zero length and zero radius, so each degrades continuously to sharp.
+    Idelchik1966Sharp,      // diagram 4-17, l/Dh <= 0.015
+    Idelchik1966Thick,      // diagram 4-18a, deep hole, l/Dh > 0.015
+    Idelchik1966Beveled,    // diagram 4-18b
+    Idelchik1966Rounded,    // diagram 4-18c
+
+    // Lichtarowicz, Duggins and Markland (1965): a LONG orifice, l/d 2-10,
+    // down to Re = 10. This is the low-Reynolds regime an effusion hole
+    // actually runs in -- Andrews' own plate C data spans Re 432 to 8700 --
+    // where McGreehan-Schotsch is floored at re_min = 1e4 and returns a
+    // near-constant.
+    Lichtarowicz1965,
+
+    // Fixed Cd. The value belongs to the caller: a measured plate value, or a
+    // literature constant such as Florschuetz's 0.79 for a jet plate. Use
+    // make_constant_discharge_correlation to set it.
+    Constant
 };
 
 // -------------------------------------------------------------
@@ -119,23 +170,25 @@ enum class CdCorrelation {
 // Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
 
-// Thick-plate orifice (sharp edges, finite thickness)
-// Applies thickness correction to thin-plate Cd
-// Valid for: 0 < t/d < ~3
-double Cd_thick_plate(const OrificeGeometry& geom, const OrificeState& state);
-
-// Rounded-entry orifice
-// Valid for: 0 < r/d <= 0.2 (typical)
-double Cd_rounded_entry(const OrificeGeometry& geom, const OrificeState& state);
-
-// Convenience: auto-select correlation based on geometry
-double Cd(const OrificeGeometry& geom, const OrificeState& state);
 
 // -------------------------------------------------------------
 // Individual correlation implementations
 // -------------------------------------------------------------
 
 namespace orifice {
+
+// Fallback Cd values used when a Constant correlation is selected without a
+// value. Both are placeholders for a number the caller should supply, not
+// correlations, and neither varies with anything.
+namespace defaults {
+// Sharp thin-plate metering orifice, high Re: the handbook round number.
+constexpr double metering_cd = 0.61;
+// Plain sharp-edged discharge hole: the round number the discharge-hole
+// sources work around. Deliberately NOT spelled as
+// mcgreehan_schotsch::cd_reference, which happens to share the value but
+// means something else (the reference Cd inside Eq. (16)).
+constexpr double discharge_cd = 0.60;
+} // namespace defaults
 
 // Reader-Harris/Gallagher (1998) - ISO 5167-2 flange-tap constants
 namespace reader_harris {
@@ -208,6 +261,162 @@ constexpr double re_correction_ref  = 1.0e5;
 constexpr double re_correction_exp  = 0.2;
 } // namespace rounded
 
+// -------------------------------------------------------------
+// Idelchik (1966) - orifice in a large wall, Section IV
+// -------------------------------------------------------------
+//
+// Idelchik, I.E. "Handbook of Hydraulic Resistance", 1st English edition,
+// AEC-tr-6630 (1966). docs/junction/Idelchik.pdf (gitignored, copyrighted) --
+// the same copy the junction work digitised diagrams 7-1..7-7 from.
+//
+// GEOMETRY: F1 = F2 = infinity, a hole in a wall between two large volumes.
+// That is the effusion-plate case and it is why these correlations take
+// DischargeHoleGeometry, which has no pipe diameter.
+//
+// zeta = DH / (rho w0^2 / 2), referenced to the HOLE velocity w0, and DH is
+// the full permanent loss because nothing recovers downstream. Hence
+//   Cd = 1 / sqrt(zeta)
+// exactly. This is NOT true of Idelchik's in-a-pipe diagrams (4-13..4-16),
+// whose zeta is referenced to the pipe velocity w1 and whose DH is the
+// permanent loss rather than ISO 5167's tapping differential.
+//
+// Every value below was read off the page rendered at 400 dpi with
+// `pdftoppm -r 400`, not the PDF text layer, which garbles these tables.
+// See validation/cooling/extractions/idelchik_1966_wall_orifice.md.
+namespace idelchik {
+
+// Sharp-edged hole, Re >= 1e5 (diagram 4-17). Also the l/Dh = 0 and r/Dh = 0
+// anchor of all three edge tables below, which is what makes them continuous
+// with the sharp case.
+constexpr double zeta_sharp = 2.85;
+
+// Above this Reynolds number zeta is Re-independent (diagram 4-17 item 1).
+constexpr double re_fully_turbulent = 1.0e5;
+
+// Diagram 4-17, low-Re branch: zeta = zeta_phi0(Re) + eps_re(Re).
+// Re spans 25 to 1e6 -- three decades below McGreehan-Schotsch's re_min.
+constexpr int re_n = 14;
+constexpr double re_points[re_n] = {
+    2.5e1, 4.0e1, 6.0e1, 1.0e2, 2.0e2, 4.0e2, 1.0e3,
+    2.0e3, 4.0e3, 1.0e4, 2.0e4, 1.0e5, 2.0e5, 1.0e6};
+constexpr double zeta_phi0[re_n] = {
+    1.94, 1.38, 1.14, 0.89, 0.69, 0.54, 0.39,
+    0.30, 0.22, 0.15, 0.11, 0.04, 0.01, 0.00};
+constexpr double eps_re[re_n] = {
+    1.00, 1.05, 1.09, 1.15, 1.23, 1.37, 1.56,
+    1.71, 1.88, 2.17, 2.38, 2.56, 2.72, 2.85};
+
+// Diagram 4-18a, thick-walled (deep) hole: zeta = zeta_thick(l/Dh) + lam*l/Dh.
+constexpr int thick_n = 12;
+constexpr double thick_l_over_d[thick_n] = {
+    0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 4.0};
+constexpr double thick_zeta[thick_n] = {
+    2.85, 2.72, 2.60, 2.34, 1.95, 1.76, 1.67, 1.62, 1.60, 1.58, 1.55, 1.55};
+
+// Diagram 4-18a low-Re: zeta = zeta_phi0 + k eps_re zeta' + lam l/Dh.
+//
+// The source PRINTS k = 0.342. That value is 1/2.85 rounded to three figures
+// (1/2.85 = 0.350877), and the rounding is the entire 2.5% by which the
+// source's own two formulas disagree at high Re: item 2 must reduce to item 1
+// as eps_re -> 2.85 and zeta_phi0 -> 0, which forces k = 1/zeta_sharp exactly.
+//
+// We use the exact value. Using the printed one would leave a 2.5% STEP in
+// Cd at the top of the table -- a C0 break in a solver input, and the same
+// defect class as the 11% jump this whole correlation replaced. The printed
+// figure is kept below so the discrepancy is on the record rather than
+// silently corrected.
+constexpr double thick_low_re_coef = 1.0 / zeta_sharp;
+constexpr double thick_low_re_coef_as_printed = 0.342;
+
+// Diagram 4-18b, beveled edges (bevel angle 40-60 deg per diagram 4-15).
+constexpr int beveled_n = 12;
+constexpr double beveled_l_over_d[beveled_n] = {
+    0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10, 0.12, 0.16, 0.20};
+constexpr double beveled_zeta[beveled_n] = {
+    2.85, 2.80, 2.70, 2.60, 2.50, 2.41, 2.33, 2.18, 2.08, 1.98, 1.84, 1.80};
+
+// Diagram 4-18c, rounded edges. The leading (0, 2.85) is read from graph c,
+// which the tabulated row starts one point after; it is also forced by the
+// sharp-edged value, so the curve is continuous at r = 0.
+constexpr int rounded_n = 10;
+constexpr double rounded_r_over_d[rounded_n] = {
+    0.0, 0.01, 0.02, 0.03, 0.04, 0.06, 0.08, 0.12, 0.16, 0.20};
+constexpr double rounded_zeta[rounded_n] = {
+    2.85, 2.72, 2.56, 2.40, 2.27, 2.06, 1.88, 1.60, 1.38, 1.37};
+
+// Wall roughness used for the thick-hole friction term lam, which Idelchik
+// takes from diagrams 2-2..2-5 as a function of Re and Delta/Dh. Those
+// diagrams ARE the Colebrook/Nikuradse family, so friction.h's Haaland
+// explicit form reproduces them rather than substituting for them. A drilled
+// or laser-cut cooling hole is hydraulically smooth at these Reynolds
+// numbers; the term is worth ~2% of zeta at l/Dh = 2.
+constexpr double default_roughness_over_d = 0.0;
+
+} // namespace idelchik
+
+// -------------------------------------------------------------
+// Lichtarowicz, Duggins and Markland (1965) - long orifices
+// -------------------------------------------------------------
+//
+// Lichtarowicz, A., Duggins, R.K. and Markland, E. (1965). "Discharge
+// coefficients for incompressible non-cavitating flow through long
+// orifices." J. Mech. Engng Sci. 7(2), 210-219.
+// docs/orifices/lichtarowicz-et-al-1965-...pdf (gitignored, copyrighted).
+//
+// WHY IT EARNS A PLACE. It plugs a coverage hole the other two leave:
+//
+//   correlation          Re range        l/d range
+//   McGreehan-Schotsch   >= 1e4          long holes, with crossflow
+//   Idelchik 4-18a       25 to 1e6       l/Dh up to 4
+//   Lichtarowicz         10 to 2e4       2 to 10        <- this one
+//
+// A cooling hole sits at low Re: Andrews' effusion plate C spans Re 432 to
+// 8718 across its own measured range, where Cd varies by 20%. McGreehan's
+// floor makes it blind to that; measured against Lichtarowicz it reads
+// +21.7% high at Re = 432.
+//
+// Equations read off the page rendered at 600 dpi, not the OCR text layer.
+namespace lichtarowicz {
+
+// Eq. (7): the ultimate (high-Re) discharge coefficient. Stated to 1.5%.
+constexpr double cdu_c0 = 0.827;
+constexpr double cdu_c1 = 0.0085;
+
+// For 1.5 <= l/d < 2 the source gives a flat value instead, same accuracy.
+constexpr double cdu_short = 0.810;
+
+// Below l/d = 1.5 the source's design recommendation (1) is to AVOID the
+// geometry entirely: "the discharge coefficient varies rapidly with l/d
+// below this value, and there is the possibility of hysteresis in
+// operation." So this is a refusal boundary, not a clamp -- see
+// LichtarowiczCorrelation::Cd.
+constexpr double l_over_d_min = 1.5;
+constexpr double l_over_d_split = 2.0;
+constexpr double l_over_d_max = 10.0;
+
+// Eq. (12), the low-Re form:
+//   1/Cd = 1/Cdu + (20/Re)(1 + 2.25 l/d)
+//          - (0.005 l/d) / (1 + 7.5 (log10(0.00015 Re))^2)
+// "fits all but a few points to better than 0.02 in the range of l/d from
+// 2 to 10 and of Re from 10 to 2 x 10^4".
+constexpr double visc_c0   = 20.0;
+constexpr double visc_c1   = 2.25;
+constexpr double trans_c0  = 0.005;
+constexpr double trans_c1  = 7.5;
+constexpr double trans_c2  = 0.00015;
+
+constexpr double re_validated_min = 10.0;
+constexpr double re_validated_max = 2.0e4;
+
+// Re is held at this floor rather than allowed to reach zero, where the
+// 20/Re term diverges and Cd collapses to zero. The source plots Eq. (12)
+// down to Re ~ 1 in its Fig. 10, so the floor is below the drawn curve and
+// well below the validated range; it exists to keep the solver finite, not
+// to express physics.
+constexpr double re_floor = 1.0;
+
+} // namespace lichtarowicz
+
 // McGreehan and Schotsch (1988) - composite Cd for a long orifice with
 // corner radiusing and inlet crossflow. ASME J. Turbomachinery 110(2),
 // 213-217. Equation numbers below are the paper's own.
@@ -246,6 +455,70 @@ constexpr double rv_cd_exp    = -3.0;
 // Eq. (8) reproduces to 0.02%. Every /0.6 divisor in Eqs. (1) and (17) is this
 // number, so it is defined once here rather than repeated as a literal.
 constexpr double cd_reference = 0.6;
+
+// Crossflow regularisation width, in U1/Vi units. See cd_and_derivatives.
+//
+// Eq. (17) carries Rv^0.6 and Rv^0.9, both with unbounded slope at Rv = 0 --
+// and U1/Vi = 0 is the DEFAULT, and the physically correct value for a
+// plenum-fed jet plate. The singularity therefore sits exactly where a Newton
+// solver spends most of its time, not in a remote corner of the envelope.
+//
+// The treatment regularises the INPUT, U1/Vi -> sqrt((U1/Vi)^2 + eps^2),
+// rather than Rv: U1/Vi is the physical quantity eps should be scaled
+// against, and Rv carries a cd_base-dependent factor that would make eps mean
+// something different for every geometry.
+//
+// CHOSEN BY MEASUREMENT, between two walls bisected from opposite directions,
+// the same way x_smooth_eps was. Both walls are sourced rather than picked:
+//
+//   LOWER WALL, eps >= 1.86e-5. The worst |dCd/d(U1/Vi)| anywhere must stay
+//   within 10x the PHYSICAL derivative scale, which is 0.663 -- measured on
+//   the exact correlation over u >= 0.01, the range Figs. 4-6 actually carry
+//   data for. Below the wall the Jacobian entry is stiff enough to dominate
+//   a Newton step for no physical reason.
+//
+//   UPPER WALL, eps <= 4.15e-4. The departure from Eq. (17) exactly must stay
+//   within 10% of the scatter the correlation itself sits in. The paper gives
+//   NO error statistic anywhere (extraction item 25); the +/-0.02 in Cd comes
+//   from digitising the spread of its own Fig. 4 data.
+//
+//   The cost MUST be measured including u = 0. That is the default, and the
+//   physically right value for a plenum-fed jet plate, and it is where the
+//   regularisation bites hardest. An earlier sweep that started at u = 0.01
+//   reported the cost as 3.3e-7 when it is really 8.6e-4 -- three orders out,
+//   and it moved the upper wall by a factor of 21.
+//
+// | eps   | max |dCd/du| | x physical | cost     | % of bound | verdict |
+// |-------|--------------|------------|----------|------------|---------|
+// | 0     | unbounded    | --         | 0        | 0%         | stiff   |
+// | 1e-6  | 21.5         | 32.4       | 5.5e-5   | 3%         | stiff   |
+// | 2e-5  | 6.45         | 9.7        | 3.3e-4   | 16%        | no margin |
+// | 3e-5  | 5.47         | 8.2        | 4.2e-4   | 21%        | ok      |  <-- default
+// | 1e-4  | 3.35         | 5.1        | 8.6e-4   | 43%        | ok      |
+// | 1e-3  | 1.26         | 1.9        | 3.4e-3   | 168%       | infidel |
+//
+// The default sits 15% across the window, deliberately towards the LOW-
+// smoothing end -- below where the Y blend's default sits in its own window
+// (29%). Operational experience on this solver is that OVER-smoothing is the
+// worse failure: a residual that no longer matches the physics stalls the
+// solve ("ghost residuals"), and that bit harder than a stiff Jacobian ever
+// did. 3e-5 keeps a factor of 5 of headroom against the fidelity wall while
+// still holding a margin against the stiffness one (8.2x of a 10x limit);
+// 2e-5 would smooth marginally less but sits at 9.7x, with no room for a
+// re-measurement to move it.
+//
+// There is NO PLATEAU here, and looking for one is how this was first got
+// wrong: max |dCd/du| follows a clean eps^-0.4 power law, exactly as the
+// Rv^-0.4 singularity predicts, so every eps trades derivative against
+// fidelity and the choice has to come from the two walls. An early linear
+// sweep appeared to show a plateau at 1.451 -- it had simply never sampled
+// u below 0.002, which is where the whole singularity lives.
+//
+// Honest about what it does: it caps a derivative that physically diverges.
+// It removes a mathematical spike, not a physical one.
+//
+// Passing eps = 0 recovers Eq. (17) exactly, as for the Y smoothing above.
+constexpr double rv_smooth_eps = 3.0e-5;
 // Eq. (4), orifice adiabatic expansion factor
 constexpr double y_orifice_coef = 0.41;
 // Eq. (7), the Cd-dependent blend between orifice and nozzle expansion
@@ -309,7 +582,8 @@ double cd_with_corner_and_length(double Re, double r_over_d, double L_over_d);
 // Not monotonic: Cd rises above its zero-crossflow value by up to ~5.7% near
 // U1_over_Vi ~ 0.09 before falling away. That is the source's own Fig. 4 and
 // its data, not an artifact -- see check F of the extraction.
-double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi);
+double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi,
+          double eps = rv_smooth_eps);
 
 // Eq. (17) applied to a baseline supplied by the caller, rather than one
 // computed from Eqs. (8)-(16).
@@ -323,7 +597,39 @@ double cd(double Re, double r_over_d, double L_over_d, double U1_over_Vi);
 // Use it when a plate's zero-crossflow Cd is KNOWN -- a measured value, or a
 // literature one such as Florschuetz's per-configuration Table 1 -- and only
 // the crossflow correction is wanted.
-double cd_with_crossflow(double cd_base, double U1_over_Vi);
+double cd_with_crossflow(double cd_base, double U1_over_Vi,
+                         double eps = rv_smooth_eps);
+
+// Cd and its derivatives with respect to the two solver unknowns it depends
+// on: (Cd, dCd/dRe, dCd/d(U1/Vi)). r/d and L/d are geometry and stay
+// constant, so they never enter the Jacobian.
+//
+// TWO NUMERICAL TREATMENTS, both solver aids and both stated:
+//
+//  1. The crossflow input is regularised by rv_smooth_eps (above), which
+//     bounds the worst dCd/d(U1/Vi) at 5.47 -- 8.2x the physical derivative
+//     scale -- where the exact chain is unbounded. This one DOES move the
+//     value, worst 4.2e-4 in Cd at U1/Vi = 0, which is 2% of the +/-0.02
+//     scatter the correlation's own data sits in.
+//
+//  2. Below re_min the VALUE stays exactly floored -- Eq. (8) is outside its
+//     validity there and diverges -- but the DERIVATIVE is continued from
+//     re_min rather than reported as the true zero. A Newton step that
+//     wanders below the floor would otherwise see no Re sensitivity at all
+//     and stall, and the exact derivative also jumps discontinuously at
+//     re_min (a KINK the smoothness scan reports at Re ~ 9908).
+//
+//     Softening the VALUE was measured and rejected: a soft-max floor buys
+//     almost no gradient for real Cd error (eps = 1e4 in Re units recovers
+//     only 16% of the live slope while moving Cd by 7.1e-3), and it would
+//     distort a region where the correlation does not apply. Continuing the
+//     derivative alone changes no reported Cd, and makes dCd/dRe continuous
+//     across re_min. The value this returns agrees with cd() to within a
+//     few ULP (measured worst 3.9e-16): same expression, different operation
+//     order through the dual, so it is not bit-identical.
+std::tuple<double, double, double> cd_and_derivatives(double Re, double r_over_d,
+                                                      double L_over_d,
+                                                      double U1_over_Vi);
 
 // -------------------------------------------------------------
 // Adiabatic expansion factor Y, Eqs. (4)-(7)
@@ -377,20 +683,12 @@ double Cd_Stolz(double beta, double Re_D);
 // Miller (1996) - simplified correlation
 double Cd_Miller(double beta, double Re_D);
 
-// Thickness correction factor (multiplies thin-plate Cd)
-// Idelchik model: Cd rises (reattachment) then falls (friction)
-// Smooth in Re_d for solver stability
-double thickness_correction(double t_over_d, double beta, double Re_d);
-
-// Rounded-entry Cd (Idelchik-based)
-// For well-rounded entries, Cd approaches 1.0
-double Cd_rounded(double r_over_d, double beta, double Re_D);
-
 // McGreehan and Schotsch (1988) - the full chain, Eqs. (8) through (17).
 // Convenience wrapper over orifice::mcgreehan_schotsch::cd; see that
 // namespace for the per-equation stages and for what U1_over_Vi means.
 double Cd_McGreehanSchotsch(double Re, double r_over_d, double L_over_d,
-                            double U1_over_Vi);
+                            double U1_over_Vi,
+                            double eps = mcgreehan_schotsch::rv_smooth_eps);
 
 // Loss coefficient K from Cd: K = (1/Cd^2 - 1) * (1 - beta^4)
 double K_from_Cd(double Cd, double beta);
@@ -413,11 +711,11 @@ public:
 
 // Factory function to create correlation objects
 // Returns nullptr for UserFunction (use make_user_correlation instead)
-std::unique_ptr<OrificeCorrelationBase> make_correlation(CdCorrelation id);
+std::unique_ptr<OrificeCorrelationBase> make_correlation(MeteringCdCorrelation id);
 
 // Fixed-Cd correlation from an explicit value.
 //
-// make_correlation(CdCorrelation::Constant) can only give you the default,
+// make_correlation(MeteringCdCorrelation::Constant) can only give you the default,
 // so this is the way to pin Cd to a chosen number -- a measured plate value,
 // or a literature constant such as Florschuetz's 0.79 for a jet plate -- and
 // to switch deliberately between a fixed Cd and a computed one.
@@ -465,6 +763,72 @@ std::unique_ptr<OrificeCorrelationBase> make_tabulated_correlation(
     const std::vector<double>& Re_values,
     const std::vector<std::vector<double>>& Cd_table,
     const std::string& name = "Tabulated");
+
+// -------------------------------------------------------------
+// Discharge-hole correlation class (for polymorphic use)
+// -------------------------------------------------------------
+
+// Geometry of one discharge hole. There is deliberately no pipe diameter:
+// nothing here forms beta, and a hole in a wall has no pipe.
+struct DischargeHoleGeometry {
+    double d = 0.0;   // Hole diameter [m]
+    double L = 0.0;   // Hole length ALONG ITS AXIS [m]. Equal to the wall
+                      // thickness for a normal hole; t/sin(alpha) for a hole
+                      // drilled at angle alpha to the wall.
+    double r = 0.0;   // Inlet edge radius [m] (0 = sharp)
+    double bevel = 0.0;  // Bevel depth along the axis [m] (0 = not beveled).
+                         // Idelchik diagram 4-18b's argument is l/Dh, the
+                         // beveled DEPTH over the hole diameter, at a bevel
+                         // angle of 40-60 deg; it is not the wall thickness.
+
+    double L_over_d() const;   // Length ratio L/d [-]
+    double bevel_over_d() const;  // Bevel depth ratio l/d [-]
+    double r_over_d() const;   // Radius ratio r/d [-]
+    double area() const;       // Hole area [m^2]
+
+    bool is_valid() const;
+};
+
+// Flow state at one discharge hole.
+struct DischargeHoleState {
+    double Re = 0.0;          // Hole Reynolds number, based on d [-]
+
+    // Ratio of INLET (approach, supply-side) tangential velocity to ideal
+    // through-flow velocity. A plenum-fed hole has 0. See the note on
+    // orifice::mcgreehan_schotsch::cd for why a discharge-side crossflow
+    // ratio must not be fed here.
+    double U1_over_Vi = 0.0;
+};
+
+class DischargeCorrelationBase {
+public:
+    virtual ~DischargeCorrelationBase() = default;
+
+    virtual double Cd(const DischargeHoleGeometry& hole,
+                      const DischargeHoleState& flow) const = 0;
+
+    // Solver-facing (f, J): (Cd, dCd/dRe, dCd/d(U1_over_Vi)). L/d and r/d are
+    // geometry and never enter the Jacobian. Analytic, never finite
+    // differences -- see the solver rule in CLAUDE.md.
+    virtual std::tuple<double, double, double> Cd_and_derivatives(
+        const DischargeHoleGeometry& hole,
+        const DischargeHoleState& flow) const = 0;
+
+    virtual std::string name() const = 0;
+};
+
+// Factory for discharge-hole correlations.
+//
+// Throws std::invalid_argument for Lichtarowicz1965, which is declared but
+// not implemented.
+std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(
+    DischargeCdCorrelation id);
+
+// Fixed-Cd discharge correlation from an explicit value. This is the way to
+// pin a measured or literature Cd; make_discharge_correlation(Constant) can
+// only give you orifice::defaults::discharge_cd.
+std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(
+    double Cd);
 
 // -------------------------------------------------------------
 // Orifice flow calculations (uses incompressible.h internally)
@@ -528,7 +892,7 @@ double solve_orifice_mdot(
     double mu,
     double P_upstream = 101325.0,
     double kappa = 0.0,
-    CdCorrelation correlation = CdCorrelation::ReaderHarrisGallagher,
+    MeteringCdCorrelation correlation = MeteringCdCorrelation::ReaderHarrisGallagher,
     double tol = 1e-6,
     int max_iter = 20);
 
@@ -569,7 +933,7 @@ OrificeFlowResult orifice_flow(
     double Z = 1.0,
     const std::vector<double>& X = {},
     double kappa = 0.0,
-    CdCorrelation correlation = CdCorrelation::ReaderHarrisGallagher);
+    MeteringCdCorrelation correlation = MeteringCdCorrelation::ReaderHarrisGallagher);
 
 // -------------------------------------------------------------
 // Utility functions

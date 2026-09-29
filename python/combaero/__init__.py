@@ -5,13 +5,13 @@ It is written to work both when running from the source tree and when
 combaero is installed as a wheel.
 """
 
-from importlib import import_module
+from importlib import import_module as _import_module
 
 try:  # Python 3.8+
-    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
     from importlib.metadata import version as _pkg_version
 except ModuleNotFoundError:  # pragma: no cover - very old Python
-    from importlib_metadata import PackageNotFoundError
+    from importlib_metadata import PackageNotFoundError as _PackageNotFoundError
     from importlib_metadata import version as _pkg_version  # type: ignore[import-not-found]
 
 
@@ -25,7 +25,7 @@ def _load_version() -> str:
 
     try:
         return _pkg_version("combaero")
-    except PackageNotFoundError:
+    except _PackageNotFoundError:
         return "0.0.0+local"
 
 
@@ -78,11 +78,11 @@ try:
         BoundaryCondition,
         CanAnnularGeometry,
         Cd_from_zeta,
-        Cd_orifice,
-        Cd_rounded_entry,
         Cd_sharp_thin_plate,
-        Cd_thick_plate,
-        CdCorrelation,
+        MeteringCdCorrelation,
+        DischargeCdCorrelation,
+        DischargeHoleGeometry,
+        DischargeHoleState,
         CorrelationValidity,
         CorrelationResult,
         CombustionMethod,
@@ -167,6 +167,15 @@ try:
         complete_state,
         convert_to_dry_fractions,
         cooled_wall_heat_flux,
+        equivalent_blowing_ratio,
+        equivalent_slot_width,
+        film_superposition_corrected,
+        film_superposition_corrected_and_gradient,
+        film_superposition_sellers,
+        film_superposition_sellers_and_gradient,
+        mainstream_temperature_correction,
+        film_effectiveness_baldauf_2002,
+        film_effectiveness_baldauf_2002_and_derivatives,
         cp,
         cp_mass,
         critical_pressure_ratio,
@@ -254,7 +263,10 @@ try:
         mass_flux_isentropic,
         MassStream,
         mass_to_mole,
+        discharge_cd,
+        discharge_cd_and_derivatives,
         mcgreehan_schotsch_1988_cd,
+        mcgreehan_schotsch_1988_cd_and_derivatives,
         mcgreehan_schotsch_1988_crossflow_cd,
         mcgreehan_schotsch_1988_expansion_factor,
         mcgreehan_schotsch_1988_expansion_nozzle,
@@ -297,7 +309,6 @@ try:
         orifice_mdot_Cd,
         orifice_Q,
         orifice_Re_d_from_mdot,
-        orifice_thickness_correction,
         orifice_velocity,
         orifice_velocity_from_mdot,
         output_units,
@@ -429,7 +440,7 @@ except (ModuleNotFoundError, ImportError) as e:
     print(f"DEBUG: Import failed with {type(e).__name__}: {e}")
     # Fallback: attempt to import from an installed combaero package that
     # already has _core available, then re-export the symbols.
-    _core = import_module("combaero._core")
+    _core = _import_module("combaero._core")
     mixture_h = _core.mixture_h
     adiabatic_T_wgs = _core.adiabatic_T_wgs
     cp = _core.cp
@@ -691,14 +702,17 @@ except (ModuleNotFoundError, ImportError) as e:
     # Orifice Cd correlations
     OrificeGeometry = _core.OrificeGeometry
     OrificeState = _core.OrificeState
-    CdCorrelation = _core.CdCorrelation
+    MeteringCdCorrelation = _core.MeteringCdCorrelation
+    DischargeCdCorrelation = _core.DischargeCdCorrelation
+    DischargeHoleGeometry = _core.DischargeHoleGeometry
+    DischargeHoleState = _core.DischargeHoleState
     CorrelationValidity = _core.CorrelationValidity
     CorrelationResult = _core.CorrelationResult
     Cd_sharp_thin_plate = _core.Cd_sharp_thin_plate
-    Cd_thick_plate = _core.Cd_thick_plate
-    Cd_rounded_entry = _core.Cd_rounded_entry
-    Cd_orifice = _core.Cd_orifice
+    discharge_cd = _core.discharge_cd
+    discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     mcgreehan_schotsch_1988_cd = _core.mcgreehan_schotsch_1988_cd
+    mcgreehan_schotsch_1988_cd_and_derivatives = _core.mcgreehan_schotsch_1988_cd_and_derivatives
     mcgreehan_schotsch_1988_crossflow_cd = _core.mcgreehan_schotsch_1988_crossflow_cd
     mcgreehan_schotsch_1988_expansion_factor = _core.mcgreehan_schotsch_1988_expansion_factor
     mcgreehan_schotsch_1988_expansion_nozzle = _core.mcgreehan_schotsch_1988_expansion_nozzle
@@ -708,7 +722,6 @@ except (ModuleNotFoundError, ImportError) as e:
     orifice_Cd_from_measurement = _core.orifice_Cd_from_measurement
     orifice_K_from_Cd = _core.orifice_K_from_Cd
     orifice_Cd_from_K = _core.orifice_Cd_from_K
-    orifice_thickness_correction = _core.orifice_thickness_correction
     # Orifice flow utilities
     OrificeFlowResult = _core.OrificeFlowResult
     orifice_flow = _core.orifice_flow
@@ -822,12 +835,12 @@ class State(_StateBase):
 # ---------------------------------------------------------------------------
 # suppress_warnings context manager
 # ---------------------------------------------------------------------------
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import Generator as _Generator
+from contextlib import contextmanager as _contextmanager
 
 
-@contextmanager
-def suppress_warnings() -> Generator[None, None, None]:
+@_contextmanager
+def suppress_warnings() -> _Generator[None, None, None]:
     """Context manager that silences all combaero correlation warnings.
 
     Useful for batch solver runs where out-of-range extrapolation warnings
@@ -994,6 +1007,15 @@ __all__ = [
     "thermal_performance_factor",
     "adiabatic_wall_temperature",
     "cooled_wall_heat_flux",
+    "equivalent_blowing_ratio",
+    "equivalent_slot_width",
+    "film_superposition_corrected",
+    "film_superposition_corrected_and_gradient",
+    "film_superposition_sellers",
+    "film_superposition_sellers_and_gradient",
+    "mainstream_temperature_correction",
+    "film_effectiveness_baldauf_2002",
+    "film_effectiveness_baldauf_2002_and_derivatives",
     # Channel flow (HTC + pressure drop)
     "ChannelResult",
     "channel_smooth",
@@ -1179,14 +1201,17 @@ __all__ = [
     # Orifice Cd correlations
     "OrificeGeometry",
     "OrificeState",
-    "CdCorrelation",
+    "MeteringCdCorrelation",
+    "DischargeCdCorrelation",
+    "DischargeHoleGeometry",
+    "DischargeHoleState",
     "CorrelationValidity",
     "CorrelationResult",
     "Cd_sharp_thin_plate",
-    "Cd_thick_plate",
-    "Cd_rounded_entry",
-    "Cd_orifice",
+    "discharge_cd",
+    "discharge_cd_and_derivatives",
     "mcgreehan_schotsch_1988_cd",
+    "mcgreehan_schotsch_1988_cd_and_derivatives",
     "mcgreehan_schotsch_1988_crossflow_cd",
     "mcgreehan_schotsch_1988_expansion_factor",
     "mcgreehan_schotsch_1988_expansion_nozzle",
@@ -1196,7 +1221,6 @@ __all__ = [
     "orifice_Cd_from_measurement",
     "orifice_K_from_Cd",
     "orifice_Cd_from_K",
-    "orifice_thickness_correction",
     # Orifice flow utilities
     "OrificeFlowResult",
     "orifice_flow",
@@ -1230,4 +1254,59 @@ __all__ = [
     "vatistas_delta_p_and_jacobians",
     "VatistasVortex",
     "__version__",
+    # -- reachable on the module but previously undeclared ----------------
+    #
+    # These were exported all along; `__all__` is hand-maintained and had
+    # simply fallen behind, which also hid them from test_units_sync.
+    # Grouped here rather than merged above so the omission stays legible.
+    "Cd_from_zeta",
+    "ChannelSolverResult",
+    "IncompressibleFlowSolution",
+    "MassStream",
+    "MomentumChamberResult",
+    "OrificeResult",
+    "P0_from_static",
+    "P_from_stagnation",
+    "Registry",
+    "T0_from_static",
+    "T0_from_static_v",
+    "T_adiabatic_wall",
+    "T_adiabatic_wall_mach",
+    "T_from_stagnation",
+    "WallCouplingResult",
+    "adiabatic_T_wgs",
+    "annular_area",
+    "channel_flow",
+    "channel_flow_rough",
+    "dcp_dT",
+    "dh_dT",
+    "ds_dT",
+    "fanno_channel",
+    "fanno_channel_rough",
+    "get_material_conductivity",
+    "get_warning_handler",
+    "h0_from_static",
+    "hydraulic_diameter",
+    "hydraulic_diameter_annulus",
+    "hydraulic_diameter_rect",
+    "is_well_behaved",
+    "kinetic_energy",
+    "mach_number",
+    "mixture_h",
+    "molar_mass",
+    "mwmix",
+    "orifice_flow_thermo",
+    "pressure_loss",
+    "recovery_factor",
+    "set_equivalence_ratio_mole",
+    "set_warning_handler",
+    "smr_wgs_equilibrium",
+    "smr_wgs_equilibrium_adiabatic",
+    "standard_dry_air_composition",
+    "suppress_warnings",
+    "v_from_h0",
+    "velocity_from_pressure_loss",
+    "velocity_from_q",
+    "vortex",
+    "zeta_from_Cd",
 ]

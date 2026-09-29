@@ -296,6 +296,92 @@ dead-zone assertion tested `!= 0`, which passes at `eps = 0.005` where the
 smallest slope is `1.4e-6`. It now requires room (`> 5e-5`), which makes it a
 second, independent lower wall agreeing with the continuity one.
 
+**D14: Cd's own solver treatment, and the two hazards it had to clear.**
+Analytic `(f, J)` for the chain landed with `cd_and_derivatives`, returning
+`(Cd, dCd/dRe, dCd/d(U1/Vi))`. `r/d` and `L/d` are geometry and carry no
+partials. Two hazards, deliberately treated DIFFERENTLY because measurement
+said they are not the same kind of problem.
+
+**Hazard 1, the crossflow singularity -- regularised in the MODEL.**
+Eq. (17)'s `Rv^0.6` and `Rv^0.9` have unbounded slope at `Rv = 0`, and
+`U1/Vi = 0` is both the default and the physically right value for a
+plenum-fed jet plate, so the singularity sits where the solver lives. The
+input is regularised, `U1/Vi -> sqrt((U1/Vi)^2 + eps^2)`.
+
+`rv_smooth_eps = 3e-5` is bounded by two walls, both sourced:
+
+| wall | criterion | value |
+|---|---|---|
+| lower | worst `|dCd/du|` within 10x the physical scale (0.663, measured on the exact chain over `u >= 0.01`, the range Figs. 4-6 carry data for) | `eps >= 1.86e-5` |
+| upper | departure from Eq. (17) within 10% of the scatter the correlation sits in (`+/-0.02` in `Cd`; **the paper states no error statistic at all** -- item 25) | `eps <= 4.15e-4` |
+
+The default sits **15% across**, below where `x_smooth_eps` sits in its own
+window (29%), deliberately. Reviewer's operational experience is that
+OVER-smoothing is the worse failure on this solver -- a residual that no
+longer matches the physics stalls the solve, and that bit harder than a stiff
+Jacobian ever did. 3e-5 keeps 5x headroom against the fidelity wall while
+holding margin on the stiffness one (8.2x of 10x); 2e-5 smooths marginally
+less but sits at 9.7x with no room for a re-measurement to move it.
+
+**Two sampling errors were made reaching that number, and both flattered the
+answer.** The first linear sweep stepped `u` by 0.002 and never sampled below
+it -- the whole singularity lives under 1e-3 -- and reported a "plateau at
+1.451" that does not exist; the true relation is a clean `eps^-0.4` power law,
+exactly as `Rv^-0.4` predicts, so every `eps` trades derivative against
+fidelity and there is no free choice. The second measured the fidelity cost
+over `u >= 0.01` only, excluding `u = 0` -- the default, and where the
+regularisation bites hardest -- reporting 3.3e-7 where the truth is 8.6e-4,
+three orders out, which moved the upper wall by a factor of 21. **A log grid
+including the endpoint is not optional here.** Both were caught by a test, not
+by re-reading.
+
+**Hazard 2, the Re dead zone -- treated in the JACOBIAN ONLY.**
+Below `re_min` the value is held at the floor, which is right: Eq. (8) is
+outside its validity and divergent there. That leaves `dCd/dRe` exactly zero
+over a third of a typical scan range, plus a kink at the boundary.
+
+Softening the VALUE was measured and rejected: a soft-max floor recovers only
+16% of the live slope at `eps = 1e4` in Re units while moving `Cd` by 7.1e-3,
+and it would distort a region where the correlation does not apply. Instead
+the derivative alone is continued from `re_min` -- implemented by seeding
+`max(Re, re_min)` as the dual unknown, so the value stays floored while the
+partial comes out as the live slope at the floor. No reported `Cd` changes,
+and `dCd/dRe` becomes continuous across `re_min`.
+
+The asymmetry is the finding: hazard 1 needed the model regularised, hazard 2
+needed only the Jacobian. Treating them alike would either distort valid
+physics or leave the dead zone in place.
+
+FD cross-checked to 3.7e-7 relative on `dCd/dRe` and ~1e-9 on `dCd/du`.
+`u = 0` is excluded from the FD comparison and separately reasoned: the
+`max(U1_over_Vi, 0)` clamp makes a central difference one-sided there, so FD
+measures a forward slope that cannot be compared; the analytic zero is correct
+because `sqrt(u^2 + eps^2)` has zero slope at the origin.
+
+**The walls hold across the geometry range, and that was checked rather than
+assumed.** Both were bisected at one operating point, and there was a
+specific reason to doubt them elsewhere: `Rv` carries `(cd_base/0.6)^-3`, so
+a rounded long hole at `Cd ~ 0.95` sees the same `U1/Vi` as a 4.5x smaller
+`Rv`, and the regularisation is applied to `U1/Vi` rather than `Rv`. Swept
+over `Re` 1e4-1e6, `r/d` 0-0.2, `L/d` 0.5-5 (`cd_base` 0.76-0.95):
+
+| | across the sweep | wall |
+|---|---|---|
+| ratio to physical scale | 7.8 - 8.3x | 10x |
+| cost | 3.2e-4 - 4.2e-4 | 2.0e-3 |
+
+The ratio is nearly geometry-INVARIANT, and the reason matters: the `Rv`
+stretching moves the regularised peak and the physical maximum together, so
+they cancel. That is what makes a single-point bisection a safe way to set
+`eps` here -- and the prediction that high `cd_base` would be stiffer was
+wrong in direction (it is 7.8x there against 8.2x at `cd_base` 0.77). Pinned
+by `CrossflowSmoothingWallsHoldAcrossTheGeometryRange`, which also asserts
+the invariance itself, since if the ratio stops being flat the single-point
+method stops being valid.
+
+Falsified four ways: `eps` below the lower wall, `eps` above the upper wall,
+and each derivative partial dropped in turn.
+
 **D13: every bound in the expansion factor is soft, and that is scanned for,
 not assumed.** A sweep for zero-derivative regions and derivative
 discontinuities across `Cd`, `S` and `Re` caught a bound this document had

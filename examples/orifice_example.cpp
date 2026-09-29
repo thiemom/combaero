@@ -96,26 +96,43 @@ int main()
     std::cout << "Reference (thin plate, beta=" << beta_ref << ", Re=" << Re_ref << "):\n";
     std::cout << "  Cd_thin = " << cd_thin << "\n\n";
 
-    // Thickness correction: t/d from 0 to 2
-    std::cout << "Thick-plate correction (t/d sweep):\n";
-    std::cout << std::setw(10) << "t/d" << std::setw(12) << "correction" << std::setw(12) << "Cd_eff" << "\n";
-    std::cout << std::string(34, '-') << "\n";
-    for (double t_over_d : {0.0, 0.25, 0.5, 1.0, 1.5, 2.0}) {
-        const double corr = orifice::thickness_correction(t_over_d, beta_ref,
-                                                           state_ref.Re_d(beta_ref));
-        std::cout << std::setw(10) << t_over_d
-                  << std::setw(12) << corr
-                  << std::setw(12) << cd_thin * corr
-                  << "\n";
+    // Idelchik (1966) wall orifice: a hole in a wall, not a plate in a pipe.
+    // Cd = 1/sqrt(zeta) exactly for this geometry -- no ISO base, no
+    // correction factor stacked on top of one.
+    std::cout << "Idelchik thick-walled hole, diagram 4-18a (l/d sweep):\n";
+    std::cout << std::setw(10) << "l/d" << std::setw(12) << "Cd"
+              << std::setw(14) << "Cd (M-S 1988)" << "\n";
+    std::cout << std::string(36, '-') << "\n";
+    {
+        auto thick = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Thick);
+        DischargeHoleState flow;
+        flow.Re = Re_ref;
+        for (double l_over_d : {0.0, 0.25, 0.5, 1.0, 1.5, 2.0}) {
+            DischargeHoleGeometry hole;
+            hole.d = 1.0e-3;
+            hole.L = l_over_d * hole.d;
+            std::cout << std::setw(10) << l_over_d
+                      << std::setw(12) << thick->Cd(hole, flow)
+                      << std::setw(14)
+                      << orifice::Cd_McGreehanSchotsch(Re_ref, 0.0, l_over_d, 0.0)
+                      << "\n";
+        }
     }
 
-    // Rounded-entry: r/d from 0 to 0.2
-    std::cout << "\nRounded-entry correction (r/d sweep):\n";
+    std::cout << "\nIdelchik rounded-edge hole, diagram 4-18c (r/d sweep):\n";
     std::cout << std::setw(10) << "r/d" << std::setw(12) << "Cd" << "\n";
     std::cout << std::string(22, '-') << "\n";
-    for (double r_over_d : {0.0, 0.02, 0.05, 0.10, 0.15, 0.20}) {
-        const double cd_r = orifice::Cd_rounded(r_over_d, beta_ref, Re_ref);
-        std::cout << std::setw(10) << r_over_d << std::setw(12) << cd_r << "\n";
+    {
+        auto rounded = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Rounded);
+        DischargeHoleState flow;
+        flow.Re = Re_ref;
+        for (double r_over_d : {0.0, 0.02, 0.05, 0.10, 0.15, 0.20}) {
+            DischargeHoleGeometry hole;
+            hole.d = 1.0e-3;
+            hole.r = r_over_d * hole.d;
+            std::cout << std::setw(10) << r_over_d
+                      << std::setw(12) << rounded->Cd(hole, flow) << "\n";
+        }
     }
     std::cout << "\n";
 
@@ -154,7 +171,7 @@ int main()
     for (double dP : {500.0, 2000.0, 5000.0, 10000.0, 20000.0}) {
         const double mdot_iter = solve_orifice_mdot(geom_iter, dP, rho_hot, mu_hot,
                                                      P_hot, 0.0,
-                                                     CdCorrelation::ReaderHarrisGallagher);
+                                                     MeteringCdCorrelation::ReaderHarrisGallagher);
         // Fixed Cd for comparison
         const double mdot_fixed = orifice_mdot(geom_iter, 0.61, dP, rho_hot);
         // Back-compute converged Cd
@@ -181,7 +198,7 @@ int main()
     const double dP_ref = 5000.0;
     OrificeFlowResult res = orifice_flow(geom_iter, dP_ref, T_hot, P_hot, mu_hot,
                                           1.0, X_air, 0.0,
-                                          CdCorrelation::ReaderHarrisGallagher);
+                                          MeteringCdCorrelation::ReaderHarrisGallagher);
 
     std::cout << "orifice_flow (dP=" << dP_ref << " Pa):\n";
     std::cout << "  mdot         = " << res.mdot << " kg/s\n";

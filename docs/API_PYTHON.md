@@ -173,14 +173,23 @@ print(f"Specific impulse: {thrust.specific_impulse} s")
 
 ### Discharge Coefficient Correlations
 ```python
-# Individual correlations
+# Normed metering orifice (ISO 5167 family, a function of beta = d/D)
 Cd = cb.Cd_sharp_thin_plate(geom, state)
-Cd = cb.Cd_thick_plate(geom, state)
-Cd = cb.Cd_rounded_entry(geom, state)
 
-# Auto-selection based on geometry
-Cd = cb.Cd_orifice(geom, state)
+# Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
+# geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.
+hole = cb.DischargeHoleGeometry(d=1e-3, L=2e-3, r=0.0)
+flow = cb.DischargeHoleState(Re=5e4)
+Cd = cb.discharge_cd(cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow)
+
+# Solver-facing form: (Cd, dCd/dRe, dCd/d(U1_over_Vi)), analytic throughout
+Cd, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
+    cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow
+)
 ```
+
+There is deliberately no auto-selection from geometry: it is how a
+rounded-entry request used to come back as Stolz.
 
 #### Plenum-to-plenum holes: McGreehan and Schotsch (1988)
 
@@ -243,6 +252,52 @@ Rohde's "basic values are lower".
 RMS `7.54%` -- reading high, and increasingly so with crossflow (`+3%` below
 `U1/Vi = 0.4`, `+16%` at 1.41). Scored by
 `validation/cooling/orifice_runner.py`.
+
+#### Film cooling: Baldauf et al. (2002)
+
+Laterally averaged adiabatic effectiveness downstream of one row of
+cylindrical, streamwise-inclined holes -- valid from the ejection point, and
+carrying the adjacent jet interaction rather than excluding it.
+
+```python
+eta = cb.film_effectiveness_baldauf_2002(
+    x_over_D=20.0, M=2.0, P=1.2, alpha_deg=30.0, s_over_D=3.0, Tu=0.015
+)
+
+# Solver form: (eta, deta/dM, deta/dP), analytic
+eta, deta_dM, deta_dP = cb.film_effectiveness_baldauf_2002_and_derivatives(
+    20.0, 2.0, 1.2, 30.0, 3.0, 0.015
+)
+```
+
+`eta` uses the same convention as `adiabatic_wall_temperature`, so they
+compose. `deta/dM` changes sign through the lift-off peak, which is physical
+and is what a solver needs to push blowing the right way.
+
+Envelope: `M` 0.2-2.5, `P` 1.2-1.8, `s/D` 2-5, `alpha` 30-90 deg,
+`Tu` 0.0035-0.075; the paper's RMS deviation is 5.5%. Eq. (31) is
+implemented as printed and disagrees with the paper's own worked example --
+see `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
+
+#### Multi-row film superposition
+
+```python
+per_row = [cb.film_effectiveness_baldauf_2002(x, M, P, 30.0, 3.0, 0.015)
+           for x in row_distances]
+
+eta = cb.film_superposition_sellers(per_row)                  # Gao Eq. (1)
+eta = cb.film_superposition_corrected(per_row, alphas)        # Gao Eq. (7)
+```
+
+`alphas` has one fewer entry than `per_row`: `alpha_j` is the fraction of the
+film's temperature deficit surviving between row `j` and `j+1`. All ones is
+plain Sellers.
+
+Sellers **overestimates, and worsens as rows accumulate** -- which is why
+`alpha` exists and why effusion cannot reuse a few-row film model unchanged.
+`cb.mainstream_temperature_correction(r, a, b)` gives Gao's published form
+for it; `a` and `b` are required because the paper never prints its fitted
+values.
 
 ##### Compressibility: the expansion factor
 
@@ -308,8 +363,6 @@ sol = cb.orifice_flow_thermo(T=300, P=2e5, X=air, m_dot=0.1, area=1e-4, Cd=0.65)
 # Impedance with flow effects
 Z = cb.orifice_impedance_with_flow(mdot=0.1, area=1e-4, Cd=0.65, rho=1.2, c=340)
 
-# Thickness corrections
-Cd_corrected = cb.orifice_thickness_correction(Cd=0.65, t_over_d=0.1)
 ```
 
 ### Pressure and Flow Calculations
@@ -587,7 +640,7 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
-    TeeJunctionElement, VortexElement,
+    TeeJunctionElement, VortexElement, EffusionPlateElement,
     BorderCarnotLossElement,
 )
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
@@ -595,6 +648,20 @@ from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberE
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
 channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
+
+# Effusion (multi-perforated) wall panel. Geometry is given the way a plate
+# is designed -- pitch, hole diameter, wall thickness, inclination -- and the
+# hole count follows from the panel area.
+panel = EffusionPlateElement(
+    "panel", "coolant", "gas",
+    hole_diameter=0.6e-3, wall_thickness=1.0e-3,
+    pitch=3.0e-3, panel_area=0.02 * 0.02, angle_deg=30.0,
+)
+# One panel is one coolant pressure and one gas pressure, so it cannot show
+# coolant migration WITHIN itself. For a wall along a feed channel, hang a
+# panel off each channel segment -- the node mass balance then gives
+# m_channel_in = m_channel_out + m_effusion, i.e. coolant flow as f(x). The
+# resolution is your choice of segment count.
 
 # Connection elements
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)

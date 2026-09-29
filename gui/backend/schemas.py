@@ -216,11 +216,22 @@ class OrificeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     diameter: float | None = None  # None = inherit from upstream channel
     Cd: float = 0.6
+    # Normed metering (ISO 5167, function of beta) and discharge-hole
+    # (Idelchik / McGreehan-Schotsch, function of L/d and r/d) families. They
+    # are not interchangeable; there is deliberately no "Auto" member.
     correlation: Literal[
-        "ReaderHarrisGallagher", "Stolz", "Miller", "ThickPlate", "RoundedEntry", "fixed"
+        "ReaderHarrisGallagher",
+        "Stolz",
+        "Miller",
+        "IdelchikThick",
+        "IdelchikBeveled",
+        "IdelchikRounded",
+        "McGreehanSchotsch",
+        "fixed",
     ] = "ReaderHarrisGallagher"
-    plate_thickness: float = 0.0  # t [m]
+    plate_thickness: float = 0.0  # t [m], the hole length for a wall orifice
     edge_radius: float = 0.0  # r [m]
+    bevel_depth: float = 0.0  # bevel depth along the hole axis [m]
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None

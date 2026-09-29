@@ -15,6 +15,8 @@
 #include "../include/correlation_status.h"
 #include "../include/incompressible.h"
 #include <cmath>
+#include <cstddef>
+#include <string>
 #include <vector>
 
 using combaero::mwmix;
@@ -23,6 +25,41 @@ using combaero::mass_to_mole;
 using combaero::normalize_fractions;
 
 using namespace combaero;
+
+// Collects warnings through combaero's own handler.
+//
+// Replaces testing::internal::CaptureStderr() for the two tests below. That
+// helper writes to a mkstemp file under a HARDCODED "/tmp/" in googletest's
+// gtest-port.cc, which no environment variable redirects, so it aborts the
+// whole binary wherever /tmp is not writable. Reading the handler is also the
+// more direct assertion: it tests that the warning was EMITTED, not that it
+// happened to reach a particular stream.
+class WarningCapture {
+public:
+    WarningCapture() : previous_(combaero::get_warning_handler()) {
+        combaero::set_warning_handler(
+            [this](const std::string& msg) { messages_.push_back(msg); });
+    }
+
+    ~WarningCapture() { combaero::set_warning_handler(previous_); }
+
+    WarningCapture(const WarningCapture&) = delete;
+    WarningCapture& operator=(const WarningCapture&) = delete;
+
+    std::size_t count() const { return messages_.size(); }
+
+    // True when any captured warning contains `needle`.
+    bool contains(const std::string& needle) const {
+        for (const std::string& m : messages_) {
+            if (m.find(needle) != std::string::npos) return true;
+        }
+        return false;
+    }
+
+private:
+    combaero::WarningHandler previous_;
+    std::vector<std::string> messages_;
+};
 
 // Test fixture for thermo transport tests
 class ThermoTransportTest : public ::testing::Test {
@@ -113,14 +150,14 @@ TEST_F(ThermoTransportTest, NormalizeNormalizedInput) {
 
 // Test normalize_fractions function with all zeros input
 TEST_F(ThermoTransportTest, NormalizeAllZeros) {
-    // Redirect cerr to capture warning
-    testing::internal::CaptureStderr();
+    WarningCapture warnings;
 
     auto result = normalize_fractions(all_zeros);
 
-    // Check that warning was issued
-    std::string output = testing::internal::GetCapturedStderr();
-    EXPECT_TRUE(output.find("Warning") != std::string::npos);
+    // The degenerate input must be reported, not silently absorbed.
+    EXPECT_EQ(warnings.count(), 1u);
+    EXPECT_TRUE(warnings.contains("normalize_fractions"));
+    EXPECT_TRUE(warnings.contains("all zeros"));
 
     // Result should be all zeros
     EXPECT_TRUE(vectors_approx_equal(result, all_zeros));
@@ -139,15 +176,43 @@ TEST_F(ThermoTransportTest, ConvertToDryFractions) {
 }
 
 // Test convert_to_dry_fractions function with pure water vapor
+// The capture helper must put the previous handler back.
+//
+// Not merely tidiness: the handler lambda captures `this`, so a leaked handler
+// leaves the GLOBAL handler holding a pointer to a destroyed WarningCapture,
+// and the next warn() anywhere in the binary writes through it. Deleting the
+// restore from the destructor does not produce a [ FAILED ] line -- it takes
+// the process down with SIGBUS (verified: exit 138). RAII is what makes this
+// safe, and this test is what proves the destructor runs.
+TEST_F(ThermoTransportTest, WarningCaptureRestoresThePreviousHandler) {
+    std::vector<std::string> outer;
+    combaero::WarningHandler original = combaero::get_warning_handler();
+    combaero::set_warning_handler(
+        [&outer](const std::string& msg) { outer.push_back(msg); });
+
+    {
+        WarningCapture inner;
+        combaero::warn("swallowed by the inner capture");
+        EXPECT_EQ(inner.count(), 1u);
+        EXPECT_TRUE(outer.empty()) << "the inner capture did not take over";
+    }
+
+    // Back to the outer handler now that the inner one is out of scope.
+    combaero::warn("seen by the outer handler");
+    ASSERT_EQ(outer.size(), 1u);
+    EXPECT_EQ(outer[0], "seen by the outer handler");
+
+    combaero::set_warning_handler(original);
+}
+
 TEST_F(ThermoTransportTest, ConvertPureWaterVaporToDry) {
-    // Redirect cerr to capture warning
-    testing::internal::CaptureStderr();
+    WarningCapture warnings;
 
     auto result = convert_to_dry_fractions(water_vapor);
 
-    // Check that warning was issued
-    std::string output = testing::internal::GetCapturedStderr();
-    EXPECT_TRUE(output.find("Warning") != std::string::npos);
+    EXPECT_EQ(warnings.count(), 1u);
+    EXPECT_TRUE(warnings.contains("convert_to_dry_fractions"));
+    EXPECT_TRUE(warnings.contains("water vapor"));
 
     // Result should be all zeros
     EXPECT_TRUE(vectors_approx_equal(result, all_zeros));

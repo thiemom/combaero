@@ -94,78 +94,423 @@ TEST_F(OrificeTest, CdSharpThinPlateReynoldsDependence) {
 }
 
 // -------------------------------------------------------------
-// Thick-plate Cd tests
+// Idelchik (1966) wall-orifice Cd tests
 // -------------------------------------------------------------
+//
+// Ground truth is Idelchik's own tabulated zeta, read off diagrams 4-17 and
+// 4-18 rendered at 400 dpi. Cd = 1/sqrt(zeta) is exact for this geometry, so
+// these are equality checks at the knots, not directional ones. The tests
+// they replace asserted only that thick > thin and round > sharp, which the
+// 11% jump discontinuity at Re = 1e5 passed without complaint.
 
-TEST_F(OrificeTest, CdThickPlateCorrection) {
-    // Thick plate should have higher Cd than thin plate
-    geom.t = 0.010;  // 10 mm thickness, t/d = 0.2
+namespace {
 
-    double Cd_thin = Cd_sharp_thin_plate(geom, state);
-    double Cd_thick = Cd_thick_plate(geom, state);
-
-    EXPECT_GT(Cd_thick, Cd_thin);
-    EXPECT_LT(Cd_thick, Cd_thin * 1.3);  // Correction should be bounded
+DischargeHoleGeometry wall_hole(double d, double L, double r, double bevel) {
+    DischargeHoleGeometry hole;
+    hole.d = d;
+    hole.L = L;
+    hole.r = r;
+    hole.bevel = bevel;
+    return hole;
 }
 
-TEST_F(OrificeTest, CdThickPlateVeryThin) {
-    // Very thin plate should have negligible correction
-    geom.t = 0.0005;  // 0.5 mm, t/d = 0.01
-
-    double Cd_thin = Cd_sharp_thin_plate(geom, state);
-    double Cd_thick = Cd_thick_plate(geom, state);
-
-    EXPECT_NEAR(Cd_thick, Cd_thin, 0.001);
+DischargeHoleState wall_flow(double Re) {
+    DischargeHoleState flow;
+    flow.Re = Re;
+    flow.U1_over_Vi = 0.0;
+    return flow;
 }
 
-// -------------------------------------------------------------
-// Rounded-entry Cd tests
-// -------------------------------------------------------------
+}  // namespace
 
-TEST_F(OrificeTest, CdRoundedEntryHigher) {
-    // Rounded entry should have higher Cd than sharp edge
-    geom.r = 0.010;  // 10 mm radius, r/d = 0.2
-
-    double Cd_sharp = Cd_sharp_thin_plate(geom, state);
-    double Cd_round = Cd_rounded_entry(geom, state);
-
-    EXPECT_GT(Cd_round, Cd_sharp);
-    EXPECT_LT(Cd_round, 1.0);  // Cannot exceed 1.0
+TEST(IdelchikWallOrifice, SharpEdgedMatchesDiagram417AtHighRe) {
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Sharp);
+    // zeta reaches 2.85 at the table's LAST knot, Re = 1e6. Item 1's
+    // "Re >= 1e5 -> 2.85" is the coarse statement of the same curve; the
+    // table itself says 2.60 at 1e5, and treating the two as separate
+    // branches put a 4.5% step there.
+    const double expected = 1.0 / std::sqrt(orifice::idelchik::zeta_sharp);
+    EXPECT_NEAR(c->Cd(wall_hole(1e-3, 0.0, 0.0, 0.0), wall_flow(1.0e6)), expected, 1e-9);
+    EXPECT_NEAR(c->Cd(wall_hole(1e-3, 0.0, 0.0, 0.0), wall_flow(1.0e7)), expected, 1e-9);
 }
 
-TEST_F(OrificeTest, CdRoundedEntryWellRounded) {
-    // Well-rounded entry (r/d >= 0.15) should approach ~0.98
-    geom.r = 0.010;  // r/d = 0.2
-
-    double Cd = Cd_rounded_entry(geom, state);
-    EXPECT_GT(Cd, 0.95);
-    EXPECT_LT(Cd, 1.0);
+TEST(IdelchikWallOrifice, LowReBranchReproducesEveryTabulatedPoint) {
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Sharp);
+    // Diagram 4-17 item 2: zeta = zeta_phi0(Re) + eps_re(Re), at each of the
+    // table's own Re. Interpolation must be exact at its knots.
+    for (int i = 0; i < orifice::idelchik::re_n; ++i) {
+        const double Re = orifice::idelchik::re_points[i];
+        const double zeta = orifice::idelchik::zeta_phi0[i] + orifice::idelchik::eps_re[i];
+        const double expected = 1.0 / std::sqrt(zeta);
+        EXPECT_NEAR(c->Cd(wall_hole(1e-3, 0.0, 0.0, 0.0), wall_flow(Re)), expected, 1e-10)
+            << "Re = " << Re;
+    }
 }
 
-// -------------------------------------------------------------
-// Auto-select Cd tests
-// -------------------------------------------------------------
+TEST(IdelchikWallOrifice, RoundedAndBeveledReproduceTheirTables) {
+    auto cr = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Rounded);
+    for (int i = 0; i < orifice::idelchik::rounded_n; ++i) {
+        const double rd = orifice::idelchik::rounded_r_over_d[i];
+        const double expected = 1.0 / std::sqrt(orifice::idelchik::rounded_zeta[i]);
+        EXPECT_NEAR(cr->Cd(wall_hole(1e-3, 0.0, rd * 1e-3, 0.0), wall_flow(1.0e6)),
+                    expected, 1e-10) << "r/d = " << rd;
+    }
 
-TEST_F(OrificeTest, CdAutoSelectThinPlate) {
-    // Default geometry should use thin-plate correlation
-    double Cd_auto = Cd(geom, state);
-    double Cd_thin = Cd_sharp_thin_plate(geom, state);
-    EXPECT_DOUBLE_EQ(Cd_auto, Cd_thin);
+    auto cb = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Beveled);
+    for (int i = 0; i < orifice::idelchik::beveled_n; ++i) {
+        const double ld = orifice::idelchik::beveled_l_over_d[i];
+        const double expected = 1.0 / std::sqrt(orifice::idelchik::beveled_zeta[i]);
+        EXPECT_NEAR(cb->Cd(wall_hole(1e-3, 0.0, 0.0, ld * 1e-3), wall_flow(1.0e6)),
+                    expected, 1e-10) << "l/d = " << ld;
+    }
 }
 
-TEST_F(OrificeTest, CdAutoSelectThickPlate) {
-    geom.t = 0.010;  // t/d = 0.2
-    double Cd_auto = Cd(geom, state);
-    double Cd_thick = Cd_thick_plate(geom, state);
-    EXPECT_DOUBLE_EQ(Cd_auto, Cd_thick);
+TEST(IdelchikWallOrifice, EveryEdgeTypeDegradesToSharpAtZero) {
+    // All three edge tables are anchored on zeta = 2.85, so a hole with no
+    // radius, no bevel and no depth must give the sharp-edged answer whichever
+    // correlation is asked. This is what makes the selector safe to sweep.
+    const double sharp = 1.0 / std::sqrt(orifice::idelchik::zeta_sharp);
+    const auto hole = wall_hole(1e-3, 0.0, 0.0, 0.0);
+    for (auto id : {DischargeCdCorrelation::Idelchik1966Sharp,
+                    DischargeCdCorrelation::Idelchik1966Thick,
+                    DischargeCdCorrelation::Idelchik1966Beveled,
+                    DischargeCdCorrelation::Idelchik1966Rounded}) {
+        auto c = make_discharge_correlation(id);
+        EXPECT_NEAR(c->Cd(hole, wall_flow(1.0e6)), sharp, 1e-9) << c->name();
+    }
 }
 
-TEST_F(OrificeTest, CdAutoSelectRounded) {
-    geom.r = 0.005;  // r/d = 0.1
-    double Cd_auto = Cd(geom, state);
-    double Cd_round = Cd_rounded_entry(geom, state);
-    EXPECT_DOUBLE_EQ(Cd_auto, Cd_round);
+TEST(IdelchikWallOrifice, CdIsContinuousAcrossTheWholeReynoldsRange) {
+    // The correlation this replaces had an 11.1% JUMP at Re = 1e5 (0.881391
+    // -> 0.979326), a C0 break in a solver input. Walk the range finely and
+    // assert no step larger than what a smooth curve can produce.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Sharp);
+    const auto hole = wall_hole(1e-3, 0.0, 0.0, 0.0);
+    double prev = c->Cd(hole, wall_flow(25.0));
+    for (int i = 1; i <= 4000; ++i) {
+        const double Re = 25.0 * std::pow(1.0e6 / 25.0, i / 4000.0);
+        const double cd = c->Cd(hole, wall_flow(Re));
+        EXPECT_LT(std::abs(cd - prev), 2.0e-3) << "step at Re = " << Re;
+        prev = cd;
+    }
 }
+
+TEST(IdelchikWallOrifice, AnalyticDerivativeAgreesWithFiniteDifferences) {
+    // The (f, J) rule: dCd/dRe is differentiated out of the Hermite form, so
+    // it must match a central difference everywhere, including across table
+    // knots where a linear interpolant's derivative would be undefined.
+    for (auto id : {DischargeCdCorrelation::Idelchik1966Sharp,
+                    DischargeCdCorrelation::Idelchik1966Thick}) {
+        auto c = make_discharge_correlation(id);
+        const auto hole = wall_hole(1e-3, 2e-3, 0.0, 0.0);
+        for (double Re : {5.0e1, 3.0e2, 1.5e3, 7.0e3, 3.0e4, 8.0e4, 5.0e5}) {
+            const double h = Re * 1e-6;
+            const auto fj = c->Cd_and_derivatives(hole, wall_flow(Re));
+            const double fd = (c->Cd(hole, wall_flow(Re + h))
+                             - c->Cd(hole, wall_flow(Re - h))) / (2.0 * h);
+            EXPECT_NEAR(std::get<1>(fj), fd, std::max(1e-8, std::abs(fd) * 1e-5))
+                << c->name() << " at Re = " << Re;
+        }
+    }
+}
+
+TEST(IdelchikWallOrifice, CrossflowDerivativeIsExactlyZeroNotApproximately) {
+    // Idelchik's geometry is plenum to plenum: there is no approach velocity,
+    // so the absence of a crossflow term is a property of the source, not a
+    // truncation. Exact zero, and a test that says why.
+    for (auto id : {DischargeCdCorrelation::Idelchik1966Sharp,
+                    DischargeCdCorrelation::Idelchik1966Rounded}) {
+        auto c = make_discharge_correlation(id);
+        const auto fj = c->Cd_and_derivatives(wall_hole(1e-3, 0.0, 1e-4, 0.0),
+                                              wall_flow(5.0e4));
+        EXPECT_EQ(std::get<2>(fj), 0.0);
+    }
+}
+
+TEST(IdelchikWallOrifice, MonotoneInterpolantNeverLeavesTheTabulatedEnvelope) {
+    // Fritsch-Carlson cannot overshoot; a natural cubic would, on flat tails
+    // such as zeta_thick's 1.58, 1.55, 1.55, and would invent a Cd above the
+    // source's. Checked on the beveled and rounded correlations, where zeta
+    // IS the interpolant -- no friction term and no Re factor -- so the
+    // envelope bound is exact rather than approximate.
+    struct Case {
+        DischargeCdCorrelation id;
+        const double* xs;
+        const double* ys;
+        int n;
+        bool by_radius;
+    };
+    const Case cases[] = {
+        {DischargeCdCorrelation::Idelchik1966Beveled,
+         orifice::idelchik::beveled_l_over_d, orifice::idelchik::beveled_zeta,
+         orifice::idelchik::beveled_n, false},
+        {DischargeCdCorrelation::Idelchik1966Rounded,
+         orifice::idelchik::rounded_r_over_d, orifice::idelchik::rounded_zeta,
+         orifice::idelchik::rounded_n, true},
+    };
+
+    for (const auto& tc : cases) {
+        auto c = make_discharge_correlation(tc.id);
+        for (int i = 0; i < tc.n - 1; ++i) {
+            const double z_min = std::min(tc.ys[i], tc.ys[i + 1]);
+            const double z_max = std::max(tc.ys[i], tc.ys[i + 1]);
+            for (int k = 0; k <= 20; ++k) {
+                const double x = tc.xs[i] + (tc.xs[i + 1] - tc.xs[i]) * k / 20.0;
+                const auto hole = tc.by_radius ? wall_hole(1e-3, 0.0, x * 1e-3, 0.0)
+                                               : wall_hole(1e-3, 0.0, 0.0, x * 1e-3);
+                const double cd = c->Cd(hole, wall_flow(1.0e6));
+                const double zeta = 1.0 / (cd * cd);
+                EXPECT_GE(zeta, z_min - 1e-9) << c->name() << " at x = " << x;
+                EXPECT_LE(zeta, z_max + 1e-9) << c->name() << " at x = " << x;
+            }
+        }
+    }
+}
+
+TEST(IdelchikWallOrifice, ThickHoleCdRisesWithDepthThenFrictionTakesOver) {
+    // zeta' falls from 2.85 to 1.55 as the hole deepens (vena-contracta
+    // reattachment) and then goes flat, while the lam*l/Dh friction term
+    // keeps growing. So Cd must rise, peak, and fall -- and the peak is the
+    // source's, not a fitted one. Idelchik's table goes flat at l/Dh = 2.0.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Thick);
+    double best_cd = 0.0;
+    double best_ld = 0.0;
+    for (int i = 0; i <= 200; ++i) {
+        const double ld = 4.0 * i / 200.0;
+        const double cd = c->Cd(wall_hole(1e-3, ld * 1e-3, 0.0, 0.0), wall_flow(1.0e5));
+        if (cd > best_cd) {
+            best_cd = cd;
+            best_ld = ld;
+        }
+    }
+    EXPECT_GT(best_ld, 1.5);
+    EXPECT_LT(best_ld, 3.0);
+    // And the far end is below the peak: friction has taken over.
+    EXPECT_LT(c->Cd(wall_hole(1e-3, 4e-3, 0.0, 0.0), wall_flow(1.0e5)), best_cd);
+}
+
+TEST(IdelchikWallOrifice, LaminarBoreFrictionDominatesADeepHoleAtLowRe) {
+    // Falsification found this gap: swapping the laminar branch (64/Re) for
+    // the turbulent one changed no test result, so nothing pinned it.
+    //
+    // It matters. At Re = 25 with l/d = 2, lam = 64/25 = 2.56 and the
+    // friction term lam*l/Dh = 5.12 is LARGER than zeta' itself (1.55), so
+    // omitting the laminar branch would overstate Cd by more than a factor
+    // of two. A deep hole at creeping flow is a Poiseuille pipe, not an
+    // orifice.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Thick);
+    const auto deep = wall_hole(1e-3, 2e-3, 0.0, 0.0);   // l/d = 2
+
+    const double cd_creep = c->Cd(deep, wall_flow(25.0));
+    // zeta = zeta_phi0(25) + k*eps_re(25)*zeta'(2) + 64/25 * 2
+    //      = 1.94 + (1/2.85)*1.00*1.55 + 5.12
+    const double zeta_expected = 1.94 + (1.0 / 2.85) * 1.00 * 1.55 + 64.0 / 25.0 * 2.0;
+    EXPECT_NEAR(cd_creep, 1.0 / std::sqrt(zeta_expected), 1e-9);
+
+    // Without the laminar branch Haaland would give lam ~ 0.08 here, a
+    // friction term of 0.16 instead of 5.12 -- so the Cd must be far below
+    // what the turbulent branch alone would predict.
+    EXPECT_LT(cd_creep, 0.5 * c->Cd(deep, wall_flow(1.0e5)));
+
+    // A hole with no depth has no bore to rub against, laminar or not.
+    const auto flat = wall_hole(1e-3, 0.0, 0.0, 0.0);
+    EXPECT_NEAR(c->Cd(flat, wall_flow(25.0)),
+                c->Cd(flat, wall_flow(25.0)), 0.0);
+    const double zeta_flat = 1.94 + (1.0 / 2.85) * 1.00 * 2.85;
+    EXPECT_NEAR(c->Cd(flat, wall_flow(25.0)), 1.0 / std::sqrt(zeta_flat), 1e-9);
+}
+
+TEST(IdelchikWallOrifice, FrictionBlendIsContinuousAcrossTheTransitionWindow) {
+    // The laminar/turbulent blend over 2300 < Re < 4000 is a numerical
+    // device, so it must at least not put a step where it removes one.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Thick);
+    const auto deep = wall_hole(1e-3, 2e-3, 0.0, 0.0);
+    double prev = c->Cd(deep, wall_flow(2000.0));
+    for (int i = 1; i <= 2000; ++i) {
+        const double Re = 2000.0 * std::pow(5000.0 / 2000.0, i / 2000.0);
+        const double cd = c->Cd(deep, wall_flow(Re));
+        EXPECT_LT(std::abs(cd - prev), 1.0e-3) << "step at Re = " << Re;
+        prev = cd;
+    }
+}
+
+TEST(IdelchikWallOrifice, AgreesWithMcGreehanSchotschAcrossTheSharedRange) {
+    // CROSS-SOURCE accuracy, labelled as such per the validation policy:
+    // Idelchik (1966, Russian handbook) against McGreehan & Schotsch (1988,
+    // gas-turbine cooling paper). These are independent measurements of the
+    // same physics and they agree to within 5% over the whole L/d range, and
+    // to 0.05% at the sharp-edged baseline. A regression on either side that
+    // broke that agreement would be worth knowing about.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Thick);
+    const double Re = 1.0e5;
+    for (int i = 0; i < orifice::idelchik::thick_n; ++i) {
+        const double ld = orifice::idelchik::thick_l_over_d[i];
+        const auto hole = wall_hole(1e-3, ld * 1e-3, 0.0, 0.0);
+        const double cd_i = c->Cd(hole, wall_flow(Re));
+        const double cd_m = orifice::Cd_McGreehanSchotsch(Re, 0.0, ld, 0.0);
+        EXPECT_NEAR(cd_m, cd_i, 0.06 * cd_i) << "l/d = " << ld;
+    }
+    // The sharp-edged anchor is the tight one: 0.5923 vs 0.5926.
+    EXPECT_NEAR(orifice::Cd_McGreehanSchotsch(Re, 0.0, 0.0, 0.0),
+                1.0 / std::sqrt(orifice::idelchik::zeta_sharp), 5e-4);
+}
+
+TEST(Lichtarowicz1965, ReproducesTheSourcesOwnFigure10) {
+    // Fig. 10 plots Eq. (12) at l/d = 2 from Re ~ 1 to 1e6: it climbs from
+    // near zero, crosses 0.5 around Re ~ 160, and plateaus on Eq. (7).
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto hole = wall_hole(1e-3, 2e-3, 0.0, 0.0);   // l/d = 2
+
+    EXPECT_NEAR(c->Cd(hole, wall_flow(10.0)), 0.0817, 5e-4);
+    EXPECT_NEAR(c->Cd(hole, wall_flow(100.0)), 0.4284, 5e-4);
+    EXPECT_NEAR(c->Cd(hole, wall_flow(1000.0)), 0.7446, 5e-4);
+
+    // The curve crosses 0.5 between Re = 100 and 300, as Fig. 10 shows.
+    EXPECT_LT(c->Cd(hole, wall_flow(100.0)), 0.5);
+    EXPECT_GT(c->Cd(hole, wall_flow(300.0)), 0.5);
+}
+
+TEST(Lichtarowicz1965, ApproachesEquationSevenAtHighReynolds) {
+    // Eq. (12) must reduce to Eq. (7) as the viscous and transition terms
+    // die away. Checked across the stated l/d range at the stated upper Re.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    for (double ld : {2.0, 4.0, 6.0, 8.0, 10.0}) {
+        const double cdu = orifice::lichtarowicz::cdu_c0
+                         - orifice::lichtarowicz::cdu_c1 * ld;
+        const auto hole = wall_hole(1e-3, ld * 1e-3, 0.0, 0.0);
+        EXPECT_NEAR(c->Cd(hole, wall_flow(1.0e6)), cdu, 2e-3) << "l/d = " << ld;
+        // At the validated ceiling it is already within the source's own
+        // +/-0.02 of the asymptote.
+        EXPECT_NEAR(c->Cd(hole, wall_flow(2.0e4)), cdu, 0.02) << "l/d = " << ld;
+    }
+    // And the flat branch the source gives for 1.5 <= l/d < 2.
+    const auto shortish = wall_hole(1e-3, 1.7e-3, 0.0, 0.0);
+    EXPECT_NEAR(c->Cd(shortish, wall_flow(1.0e6)),
+                orifice::lichtarowicz::cdu_short, 2e-3);
+}
+
+TEST(Lichtarowicz1965, RefusesBelowTheSourcesOwnValidityFloor) {
+    // Design recommendation (1): avoid l/d < 1.5, "the discharge coefficient
+    // varies rapidly with l/d below this value, and there is the possibility
+    // of hysteresis". A single-valued correlation cannot represent
+    // hysteresis, so refusing beats returning a number.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    EXPECT_THROW(c->Cd(wall_hole(1e-3, 1.0e-3, 0.0, 0.0), wall_flow(1e4)),
+                 std::invalid_argument);
+    EXPECT_THROW(c->Cd(wall_hole(1e-3, 1.4e-3, 0.0, 0.0), wall_flow(1e4)),
+                 std::invalid_argument);
+    // At and above the floor it answers.
+    EXPECT_GT(c->Cd(wall_hole(1e-3, 1.5e-3, 0.0, 0.0), wall_flow(1e4)), 0.0);
+}
+
+TEST(Lichtarowicz1965, HoldsGeometryAboveTheTabulatedRangeRatherThanExtrapolating) {
+    // Eq. (7) is LINEAR in l/d, so extrapolating past 10 walks Cd down
+    // without bound and reaches zero near l/d = 97. Held instead.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const double at10 = c->Cd(wall_hole(1e-3, 10e-3, 0.0, 0.0), wall_flow(1e4));
+    for (double ld : {12.0, 20.0, 100.0}) {
+        EXPECT_NEAR(c->Cd(wall_hole(1e-3, ld * 1e-3, 0.0, 0.0), wall_flow(1e4)),
+                    at10, 1e-12) << "l/d = " << ld;
+    }
+    EXPECT_GT(at10, 0.7);
+}
+
+TEST(Lichtarowicz1965, AnalyticDerivativeAgreesWithFiniteDifferences) {
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    for (double ld : {2.0, 5.0, 9.0}) {
+        const auto hole = wall_hole(1e-3, ld * 1e-3, 0.0, 0.0);
+        for (double Re : {2.0e1, 5.0e1, 5.0e2, 5.0e3, 1.5e4}) {
+            const double h = Re * 1e-6;
+            const auto fj = c->Cd_and_derivatives(hole, wall_flow(Re));
+            const double fd = (c->Cd(hole, wall_flow(Re + h))
+                             - c->Cd(hole, wall_flow(Re - h))) / (2.0 * h);
+            EXPECT_NEAR(std::get<1>(fj), fd, std::max(1e-12, std::abs(fd) * 1e-5))
+                << "l/d = " << ld << " Re = " << Re;
+        }
+    }
+}
+
+TEST(Lichtarowicz1965, HasNoCrossflowTermAndSaysSoExactly) {
+    // The experiments are plenum-fed; there is no approach velocity. Exact
+    // zero, like Idelchik, not a small number.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto fj = c->Cd_and_derivatives(wall_hole(1e-3, 3e-3, 0.0, 0.0),
+                                          wall_flow(5.0e3));
+    EXPECT_EQ(std::get<2>(fj), 0.0);
+}
+
+TEST(Lichtarowicz1965, IsMonotoneAcrossTheValidatedRange) {
+    // Cd must rise with Re throughout the range the source validates,
+    // Re = 10 to 2e4: more inertia, less viscous loss.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto hole = wall_hole(1e-3, 4e-3, 0.0, 0.0);
+    const double lo = orifice::lichtarowicz::re_validated_min;
+    const double hi = orifice::lichtarowicz::re_validated_max;
+
+    double prev = c->Cd(hole, wall_flow(lo));
+    for (int i = 1; i <= 2000; ++i) {
+        const double Re = lo * std::pow(hi / lo, i / 2000.0);
+        const double cd = c->Cd(hole, wall_flow(Re));
+        EXPECT_TRUE(std::isfinite(cd));
+        EXPECT_GT(cd, prev) << "not monotone at Re = " << Re;
+        prev = cd;
+    }
+    EXPECT_LT(prev, 1.0);
+}
+
+TEST(Lichtarowicz1965, StaysFiniteAndBoundedOutsideTheValidatedRange) {
+    // BELOW: the 20/Re term would diverge and drive Cd to zero, so Re is
+    // held at a floor. The value is held and the derivative reported as
+    // zero, because the value genuinely stops changing.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto hole = wall_hole(1e-3, 4e-3, 0.0, 0.0);
+    const double at_floor = c->Cd(hole, wall_flow(orifice::lichtarowicz::re_floor));
+    EXPECT_TRUE(std::isfinite(at_floor));
+    EXPECT_GT(at_floor, 0.0);
+    EXPECT_NEAR(c->Cd(hole, wall_flow(1e-9)), at_floor, 1e-12);
+    EXPECT_EQ(std::get<1>(c->Cd_and_derivatives(hole, wall_flow(1e-9))), 0.0);
+
+    // ABOVE: Eq. (12) is NOT monotone forever. Its two Re terms pull
+    // opposite ways -- 20(1+2.25 l/d)/Re falls without limit, while the
+    // log-squared term peaks at Re = 1/0.00015 = 6667 and decays either
+    // side. Past Re ~ 8.7e5 the viscous term is spent while the log term is
+    // still decaying, so Cd overshoots Eq. (7) and settles back.
+    //
+    // Recorded rather than smoothed away: the overshoot is 2.2e-4, which is
+    // 43x beyond the source's validated ceiling of 2e4 and roughly 100x
+    // SMALLER than its own stated accuracy of +/-0.02. It is an artifact of
+    // extrapolating the fit, not a defect to correct.
+    const double cdu = orifice::lichtarowicz::cdu_c0
+                     - orifice::lichtarowicz::cdu_c1 * 4.0;
+    double worst = 0.0;
+    for (double Re : {1.0e5, 3.0e5, 8.7e5, 1.0e6, 1.0e7, 1.0e9}) {
+        const double cd = c->Cd(hole, wall_flow(Re));
+        EXPECT_TRUE(std::isfinite(cd));
+        worst = std::max(worst, std::abs(cd - cdu));
+    }
+    EXPECT_LT(worst, 1.0e-3);
+    EXPECT_LT(worst, 0.02);   // far inside the source's own accuracy
+}
+
+TEST(Lichtarowicz1965, DisagreesWithMcGreehanWhereMcGreehanIsFloored) {
+    // CROSS-SOURCE, and the reason this correlation was added. McGreehan's
+    // chain floors Re at 1e4, so below that its Cd stops moving; Lichtarowicz
+    // is validated from Re = 10 and keeps falling. At Re = 432 -- inside
+    // Andrews' own effusion data -- they differ by more than 20%.
+    auto cl = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    auto cm = make_discharge_correlation(DischargeCdCorrelation::McGreehanSchotsch1988);
+    const auto hole = wall_hole(3.27e-3, 6.3e-3, 0.0, 0.0);   // Andrews plate C
+
+    const double lo_l = cl->Cd(hole, wall_flow(432.0));
+    const double lo_m = cm->Cd(hole, wall_flow(432.0));
+    EXPECT_GT((lo_m - lo_l) / lo_l, 0.15) << "expected McGreehan high at low Re";
+
+    // And they converge where both are valid.
+    const double hi_l = cl->Cd(hole, wall_flow(2.0e4));
+    const double hi_m = cm->Cd(hole, wall_flow(2.0e4));
+    EXPECT_NEAR(hi_m, hi_l, 0.03 * hi_l);
+}
+
 
 // -------------------------------------------------------------
 // Flow calculation tests
@@ -201,7 +546,7 @@ TEST_F(OrificeTest, OrificeCdFromMeasurement) {
 // -------------------------------------------------------------
 
 TEST_F(OrificeTest, CorrelationFactory) {
-    auto corr = make_correlation(CdCorrelation::ReaderHarrisGallagher);
+    auto corr = make_correlation(MeteringCdCorrelation::ReaderHarrisGallagher);
     ASSERT_NE(corr, nullptr);
     EXPECT_FALSE(corr->name().empty());
 
@@ -237,25 +582,6 @@ TEST_F(OrificeTest, KFromCd) {
     EXPECT_NEAR(Cd_back, Cd_val, 1e-10);
 }
 
-TEST_F(OrificeTest, ThicknessCorrection) {
-    const double Re_d = 1e5;  // Typical Reynolds number
-
-    // No correction for thin plate
-    EXPECT_DOUBLE_EQ(orifice::thickness_correction(0.01, 0.5, Re_d), 1.0);
-
-    // Small thickness: reattachment benefit
-    double corr_small = orifice::thickness_correction(0.2, 0.5, Re_d);
-    EXPECT_GT(corr_small, 1.0);
-
-    // Peak around t/d ~ 0.3 (calibrated to Idelchik data)
-    double corr_peak = orifice::thickness_correction(0.3, 0.5, Re_d);
-    EXPECT_GT(corr_peak, corr_small);
-
-    // Long tube: friction dominates, k_t < 1.0
-    double corr_long = orifice::thickness_correction(3.0, 0.5, Re_d);
-    EXPECT_LT(corr_long, corr_peak);  // Falls at large t/d
-    EXPECT_LT(corr_long, 1.0);  // Long-tube behavior
-}
 // -------------------------------------------------------------
 // Hardening and Numerical Stability tests
 // -------------------------------------------------------------
@@ -286,14 +612,36 @@ TEST_F(OrificeTest, KFromCdHighBeta) {
     EXPECT_NEAR(Cd_back, Cd_val, 1e-10);
 }
 
-TEST_F(OrificeTest, CdRoundedHighBetaStability) {
-    // Test that Rounded-entry correlation doesn't divide by zero at d=D
-    double beta_extreme = 0.99999;
-    geom.r = 0.005; // Rounded
+TEST(IdelchikWallOrifice, DegenerateGeometryStaysFinite) {
+    // The beta -> 1 singularity this replaces cannot arise here: a hole in a
+    // wall has no pipe to form beta with. What can still be fed in is a
+    // radius or depth far outside the table, which must clamp rather than
+    // extrapolate into a negative zeta.
+    DischargeHoleGeometry hole;
+    hole.d = 1e-3;
+    hole.r = 1.0;      // r/d = 1000, far past the table's 0.20
+    hole.L = 1.0;      // l/d = 1000
+    DischargeHoleState flow;
+    flow.Re = 1.0e5;
 
-    double Cd_val = orifice::Cd_rounded(geom.r / (geom.D * beta_extreme), beta_extreme, state.Re_D);
-    EXPECT_TRUE(std::isfinite(Cd_val));
-    EXPECT_LE(Cd_val, 1.5);
+    for (auto id : {DischargeCdCorrelation::Idelchik1966Rounded,
+                    DischargeCdCorrelation::Idelchik1966Thick}) {
+        auto c = make_discharge_correlation(id);
+        const double cd = c->Cd(hole, flow);
+        EXPECT_TRUE(std::isfinite(cd)) << c->name();
+        EXPECT_GT(cd, 0.0) << c->name();
+    }
+
+    // And below the table's Re floor of 25 the value holds rather than
+    // running off: Idelchik stops there and so do we.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Idelchik1966Sharp);
+    DischargeHoleGeometry sharp;
+    sharp.d = 1e-3;
+    DischargeHoleState creep;
+    creep.Re = 1.0e-3;
+    const double cd_floor = c->Cd(sharp, creep);
+    creep.Re = orifice::idelchik::re_points[0];
+    EXPECT_NEAR(cd_floor, c->Cd(sharp, creep), 1e-12);
 }
 
 // -------------------------------------------------------------
@@ -345,7 +693,19 @@ TEST(McGreehanSchotsch, FactorsAreIdentitiesAtZero) {
 // Eq. (17) must reduce exactly to its input at zero crossflow.
 TEST(McGreehanSchotsch, CrossflowIsIdentityAtZero) {
     const double base = ms::cd_with_corner_and_length(1.0e4, 0.0, 1.0);
-    EXPECT_DOUBLE_EQ(ms::cd(1.0e4, 0.0, 1.0, 0.0), base);
+
+    // Eq. (17) is an identity at zero crossflow (C1 = 1, C2 = 0), and eps = 0
+    // reproduces that exactly. This asserted only the line below until the
+    // regularisation landed; it is kept because the paper's own behaviour is
+    // what the correlation must still be able to give.
+    EXPECT_DOUBLE_EQ(ms::cd_with_crossflow(base, 0.0, 0.0), base);
+
+    // At the default eps the identity holds to the documented cost instead of
+    // exactly -- that is the whole point of the regularisation, and the bound
+    // is what makes it acceptable rather than the exactness.
+    EXPECT_NE(ms::cd(1.0e4, 0.0, 1.0, 0.0), base);
+    EXPECT_NEAR(ms::cd(1.0e4, 0.0, 1.0, 0.0), base, 5.0e-4)
+        << "the zero-crossflow departure exceeds what rv_smooth_eps documents";
 }
 
 // Eq. (13)/(14) against the curve drawn in Fig. 3, read at ~0.01 in Cd.
@@ -763,4 +1123,189 @@ TEST(McGreehanSchotschY, StaysFiniteAndBounded) {
         }
     }
     EXPECT_DOUBLE_EQ(ms::expansion_factor(0.8, 0.7, 1.0), 1.0);  // degenerate gamma
+}
+
+// The crossflow regularisation width, bounded from both sides by measurement
+// rather than chosen. Mirrors DefaultSmoothingSitsInsideItsAdmissibleWindow
+// for the Y blend, but the hazard is the opposite one: Eq. (17) has an
+// UNBOUNDED derivative at U1/Vi = 0, not a dead zone, so the lower wall is a
+// cap on |dCd/du| rather than a floor on it.
+TEST(McGreehanSchotsch, CrossflowSmoothingSitsInsideItsAdmissibleWindow) {
+    const double base = ms::cd(3.2e4, 0.0, 1.0, 0.0);
+
+    // Worst |dCd/du| anywhere. Sampled on a LOG grid: the singularity lives
+    // below u = 1e-3 and a linear sweep walks straight past it, which is how
+    // an early version of this analysis reported a plateau that is not there.
+    auto max_slope = [&](double eps, double lo) {
+        const int per_decade = 80;
+        const double hi = 10.0;
+        const int n = static_cast<int>(std::log10(hi / lo) * per_decade);
+        double worst = 0.0;
+        for (int i = 0; i <= n; ++i) {
+            const double u = lo * std::pow(hi / lo, static_cast<double>(i) / n);
+            const double h = u * 1e-4;
+            worst = std::max(worst,
+                             std::abs((ms::cd_with_crossflow(base, u + h, eps)
+                                       - ms::cd_with_crossflow(base, u - h, eps))
+                                      / (2.0 * h)));
+        }
+        return worst;
+    };
+    // Departure from Eq. (17) exactly, over the range Figs. 4-6 carry data.
+    auto cost = [&](double eps) {
+        double worst = 0.0;
+        for (int i = 0; i <= 240; ++i) {
+            const double u = 0.01 * std::pow(1000.0, static_cast<double>(i) / 240.0);
+            worst = std::max(worst, std::abs(ms::cd_with_crossflow(base, u, eps)
+                                             - ms::cd_with_crossflow(base, u, 0.0)));
+        }
+        return worst;
+    };
+
+    // The physical derivative scale, from the exact correlation over the
+    // validated range. Everything below is measured against this, not against
+    // a round number.
+    const double physical = max_slope(0.0, 0.01);
+    EXPECT_NEAR(physical, 0.663, 0.02) << "the physical scale moved; re-measure the window";
+
+    // The data scatter the correlation sits in. The paper states no error
+    // statistic at all -- this is digitised from its own Fig. 4.
+    const double scatter = 0.02;
+
+    // The default satisfies both walls.
+    EXPECT_LT(max_slope(ms::rv_smooth_eps, 1e-9), 10.0 * physical);
+    EXPECT_LT(cost(ms::rv_smooth_eps), 0.1 * scatter);
+
+    // Below the window the Jacobian entry goes stiff for no physical reason.
+    EXPECT_GT(max_slope(1e-6, 1e-9), 10.0 * physical)
+        << "the lower wall has moved; re-measure the window";
+
+    // Above it, the residual stops matching the physics -- the ghost-residual
+    // stall that over-smoothing causes, which is the worse failure of the two.
+    EXPECT_GT(cost(3e-2), 0.1 * scatter)
+        << "the upper wall has moved; re-measure the window";
+
+    // And the default sits towards the LOW-smoothing end deliberately, so it
+    // cannot drift upward into the region where ghost residuals appear.
+    EXPECT_LT(cost(ms::rv_smooth_eps) / (0.1 * scatter), 0.30);
+
+    // eps = 0 still recovers the paper exactly.
+    EXPECT_DOUBLE_EQ(ms::cd_with_crossflow(base, 0.0, 0.0), base);
+}
+
+// The (f, J) rule: an analytic derivative is cross-checked against finite
+// differences, never shipped on the strength of the derivation alone.
+TEST(McGreehanSchotsch, AnalyticDerivativesAgreeWithFiniteDifferences) {
+    struct Case { double Re, rd, ld, u; };
+    const Case cases[] = {
+        {3.2e4, 0.00, 1.0, 0.05}, {3.2e4, 0.00, 1.0, 0.50},
+        {1.0e5, 0.10, 2.0, 0.20}, {2.0e4, 0.20, 3.0, 1.00},
+        {5.0e4, 0.05, 0.5, 2.00}, {1.5e4, 0.00, 5.0, 0.01},
+        {8.0e5, 0.15, 1.5, 0.30},
+    };
+    for (const auto& c : cases) {
+        const auto [cd, dRe, du] = ms::cd_and_derivatives(c.Re, c.rd, c.ld, c.u);
+
+        const double hRe = c.Re * 1e-6;
+        const double fdRe = (std::get<0>(ms::cd_and_derivatives(c.Re + hRe, c.rd, c.ld, c.u))
+                             - std::get<0>(ms::cd_and_derivatives(c.Re - hRe, c.rd, c.ld, c.u)))
+                            / (2.0 * hRe);
+        EXPECT_NEAR(dRe, fdRe, 1e-5 * std::max(std::abs(fdRe), 1e-12))
+            << "dCd/dRe disagrees with FD at Re = " << c.Re;
+
+        const double hu = c.u * 1e-6;
+        const double fdu = (std::get<0>(ms::cd_and_derivatives(c.Re, c.rd, c.ld, c.u + hu))
+                            - std::get<0>(ms::cd_and_derivatives(c.Re, c.rd, c.ld, c.u - hu)))
+                           / (2.0 * hu);
+        EXPECT_NEAR(du, fdu, 1e-5 * std::max(std::abs(fdu), 1e-12))
+            << "dCd/d(U1/Vi) disagrees with FD at U1/Vi = " << c.u;
+
+        // The value must be the same correlation, not a reimplementation of
+        // it: same expression through the dual, so a few ULP but no more.
+        EXPECT_NEAR(cd, ms::cd(c.Re, c.rd, c.ld, c.u), 1e-14);
+    }
+
+    // u = 0 is deliberately excluded above: max(U1_over_Vi, 0) makes a
+    // central difference one-sided there, so FD measures a forward slope and
+    // cannot be compared. The analytic value is zero because the regularised
+    // input sqrt(u^2 + eps^2) has zero slope at u = 0 -- a smooth stationary
+    // point, not a floor.
+    const auto [cd0, dRe0, du0] = ms::cd_and_derivatives(3.2e4, 0.0, 1.0, 0.0);
+    EXPECT_DOUBLE_EQ(du0, 0.0);
+    EXPECT_LT(dRe0, 0.0) << "Cd must still fall with Re at zero crossflow";
+    EXPECT_GT(cd0, 0.0);
+}
+
+// The Jacobian-only floor continuation: below re_min the VALUE is held, but
+// the derivative is continued from the floor rather than reported as zero.
+TEST(McGreehanSchotsch, ReynoldsFloorKeepsValueButContinuesTheDerivative) {
+    const auto below = ms::cd_and_derivatives(5.0e3, 0.0, 1.0, 0.2);
+    const auto at    = ms::cd_and_derivatives(ms::re_min, 0.0, 1.0, 0.2);
+
+    // Value: floored, exactly as cd() reports it. No Cd changes.
+    EXPECT_DOUBLE_EQ(std::get<0>(below), std::get<0>(at));
+    EXPECT_NEAR(std::get<0>(below), ms::cd(5.0e3, 0.0, 1.0, 0.2), 1e-14);
+
+    // Derivative: NOT the true zero, but the live slope at the floor, so a
+    // Newton step that wanders below has something to climb back on and
+    // dCd/dRe is continuous across re_min rather than jumping.
+    EXPECT_LT(std::get<1>(below), 0.0) << "the dead zone is back";
+    EXPECT_DOUBLE_EQ(std::get<1>(below), std::get<1>(at));
+}
+
+// The eps walls were bisected at one operating point (r/d = 0, t/d = 1,
+// Re = 3.2e4). They must hold across the geometry range, and there is a
+// specific reason to doubt it: Eq. (17)'s Rv carries (cd_base/0.6)^-3, so a
+// rounded long hole at Cd ~ 0.95 sees the same U1/Vi as a 4.5x smaller Rv --
+// and the regularisation is applied to U1/Vi, not Rv, so its effect in
+// Rv-space is geometry-dependent.
+//
+// Measured, the ratio to the physical scale is nearly geometry-INVARIANT
+// (7.8-8.3x across the range) because the Rv stretching moves the regularised
+// peak and the physical maximum together. That is why the lower wall is
+// robust rather than a coincidence of where it was measured.
+TEST(McGreehanSchotsch, CrossflowSmoothingWallsHoldAcrossTheGeometryRange) {
+    auto sweep = [](double Re, double rd, double ld, double eps, double lo) {
+        const double hi = 10.0;
+        const int n = 360;
+        double worst = 0.0;
+        for (int i = 0; i <= n; ++i) {
+            const double u = lo * std::pow(hi / lo, static_cast<double>(i) / n);
+            const double h = u * 1e-4;
+            worst = std::max(worst, std::abs((ms::cd(Re, rd, ld, u + h, eps)
+                                              - ms::cd(Re, rd, ld, u - h, eps))
+                                             / (2.0 * h)));
+        }
+        return worst;
+    };
+    auto cost = [](double Re, double rd, double ld, double eps) {
+        double worst = std::abs(ms::cd(Re, rd, ld, 0.0, eps)
+                                - ms::cd(Re, rd, ld, 0.0, 0.0));
+        for (int i = 0; i <= 240; ++i) {
+            const double u = 1e-9 * std::pow(1e10, static_cast<double>(i) / 240.0);
+            worst = std::max(worst, std::abs(ms::cd(Re, rd, ld, u, eps)
+                                             - ms::cd(Re, rd, ld, u, 0.0)));
+        }
+        return worst;
+    };
+
+    struct G { double Re, rd, ld; };
+    const G geoms[] = {
+        {1.0e4, 0.00, 1.0}, {1.0e4, 0.00, 5.0}, {1.0e4, 0.20, 3.0},
+        {3.2e4, 0.00, 1.0}, {3.2e4, 0.10, 2.0}, {3.2e4, 0.20, 0.5},
+        {1.0e6, 0.00, 1.0}, {1.0e6, 0.20, 3.0},
+    };
+    for (const auto& g : geoms) {
+        const double phys = sweep(g.Re, g.rd, g.ld, 0.0, 0.01);
+        const double got  = sweep(g.Re, g.rd, g.ld, ms::rv_smooth_eps, 1e-9);
+        EXPECT_LT(got, 10.0 * phys)
+            << "stiffness wall broken at Re=" << g.Re << " r/d=" << g.rd
+            << " L/d=" << g.ld;
+        EXPECT_LT(cost(g.Re, g.rd, g.ld, ms::rv_smooth_eps), 0.1 * 0.02)
+            << "fidelity wall broken at Re=" << g.Re << " r/d=" << g.rd
+            << " L/d=" << g.ld;
+        // The ratio really is near-invariant; if it stops being so, the
+        // single-point bisection is no longer a safe way to set eps.
+        EXPECT_LT(got / phys, 9.0);
+    }
 }

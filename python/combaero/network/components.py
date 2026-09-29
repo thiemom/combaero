@@ -1943,8 +1943,19 @@ class OrificeElement(NetworkElement):
       - 'ReaderHarrisGallagher': Sharp thin-plate (ISO 5167-2 / RHG).
       - 'Stolz': ISO 5167:1980 (Corner taps).
       - 'Miller': Miller (1996) simplified correlation.
-      - 'ThickPlate': Thick-plate sharp-edged orifice (requires plate_thickness).
-      - 'RoundedEntry': Rounded-entry orifice (requires edge_radius).
+      - 'IdelchikThick': Deep hole in a wall, Idelchik diagram 4-18a
+        (requires plate_thickness). Valid Re 25 to 1e6.
+      - 'IdelchikBeveled': Beveled-edge hole, diagram 4-18b
+        (requires bevel_depth).
+      - 'IdelchikRounded': Rounded-edge hole, diagram 4-18c
+        (requires edge_radius).
+      - 'McGreehanSchotsch': Cooling hole with inlet crossflow (1988).
+
+    The first four are NORMED metering correlations: Cd is referenced to the
+    tapping differential and is a function of beta = d/D. The last four are
+    DISCHARGE correlations for a hole in a wall, where zeta is referenced to
+    the hole velocity and there is no beta. They are not interchangeable, and
+    there is deliberately no 'Auto' arm choosing between them from geometry.
     """
 
     def __init__(
@@ -1958,6 +1969,7 @@ class OrificeElement(NetworkElement):
         correlation: str = "ReaderHarrisGallagher",
         plate_thickness: float = 0.0,
         edge_radius: float = 0.0,
+        bevel_depth: float = 0.0,
         area: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
@@ -1979,6 +1991,9 @@ class OrificeElement(NetworkElement):
         self.use_correlation = correlation != "fixed"
         self.plate_thickness = plate_thickness
         self.edge_radius = edge_radius
+        # Bevel DEPTH along the hole axis, Idelchik diagram 4-18b's l/Dh at a
+        # bevel angle of 40-60 deg. Not the wall thickness.
+        self.bevel_depth = bevel_depth
         self.upstream_diameter: float | None = None
         self.downstream_diameter: float | None = None
         # OrificeGeometry built in resolve_topology
@@ -2047,6 +2062,31 @@ class OrificeElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
+    def _hole_reynolds(self, state_in: "NetworkMixtureState") -> float:
+        """Reynolds number of the flow through ONE hole, based on its diameter.
+
+        The discharge-hole correlations (Idelchik, McGreehan-Schotsch) are
+        functions of this, not of the pipe Reynolds number. For a plain
+        orifice there is one hole carrying all the flow; EffusionPlateElement
+        overrides this to divide by the hole count.
+        """
+        d = self._orifice_geom.d if self._orifice_geom is not None else 0.0
+        if d <= 0.0:
+            return 1.0e5
+        mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+        if mu <= 0.0:
+            mu = 1.8e-5
+        m_dot_hole = abs(state_in.m_dot) / self._hole_count()
+        if m_dot_hole <= 1e-12:
+            # No flow yet: a mid-range seed, not the top of the table, so the
+            # first Newton step starts on a responsive part of the curve.
+            return 1.0e4
+        return (4.0 * m_dot_hole) / (math.pi * d * mu)
+
+    def _hole_count(self) -> float:
+        """Holes carrying the element's mass flow in parallel. One, here."""
+        return 1.0
+
     def _effective_Cd(
         self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
     ) -> float:
@@ -2070,6 +2110,14 @@ class OrificeElement(NetworkElement):
         flow_state.dP = max(state_in.Pt - state_out.P, 1.0)
         flow_state.rho = cb.density(state_in.T, state_in.P, state_in.X)
         flow_state.mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+
+        # The ISO 5167 correlations below are functions of the PIPE Reynolds
+        # number Re_D, but the discharge-hole family (Idelchik,
+        # McGreehan-Schotsch) is a function of the HOLE Reynolds number.
+        # Feeding Re_D to those was wrong by 1-8% in a pipe, and by up to 38%
+        # for a plenum-fed hole where D_up = 0 freezes Re_D at the 1e5
+        # fallback and the correlation stops responding to flow entirely.
+        Re_hole = self._hole_reynolds(state_in)
 
         # Correlation selection logic
         if self.correlation == "ReaderHarrisGallagher":
@@ -2096,17 +2144,47 @@ class OrificeElement(NetworkElement):
                 + 91.71 * math.pow(b, 2.5) * math.pow(max(flow_state.Re_D, 1.0), -0.75)
             )
             return float(cd)
-        elif self.correlation == "ThickPlate":
-            if self._orifice_geom.t <= 0:
-                return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
-            return float(cb.Cd_thick_plate(self._orifice_geom, flow_state))
-        elif self.correlation == "RoundedEntry":
-            if self._orifice_geom.r <= 0:
-                return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
-            return float(cb.Cd_rounded_entry(self._orifice_geom, flow_state))
+        elif self.correlation in ("IdelchikThick", "IdelchikBeveled", "IdelchikRounded"):
+            # Idelchik's wall-orifice family. These take a hole in a wall,
+            # not a plate in a pipe, so they are fed DischargeHoleGeometry and
+            # the pipe diameter plays no part -- which is the whole reason the
+            # old ThickPlate/RoundedEntry arms were wrong: they multiplied an
+            # ISO 5167 metering Cd by a correction factor.
+            hole = cb.DischargeHoleGeometry(
+                d=self._orifice_geom.d,
+                L=self.plate_thickness,
+                r=self.edge_radius,
+            )
+            hole.bevel = self.bevel_depth
+            selector = {
+                "IdelchikThick": cb.DischargeCdCorrelation.Idelchik1966Thick,
+                "IdelchikBeveled": cb.DischargeCdCorrelation.Idelchik1966Beveled,
+                "IdelchikRounded": cb.DischargeCdCorrelation.Idelchik1966Rounded,
+            }[self.correlation]
+            return float(cb.discharge_cd(selector, hole, cb.DischargeHoleState(Re=Re_hole)))
+        elif self.correlation == "McGreehanSchotsch":
+            hole = cb.DischargeHoleGeometry(
+                d=self._orifice_geom.d,
+                L=self.plate_thickness,
+                r=self.edge_radius,
+            )
+            return float(
+                cb.discharge_cd(
+                    cb.DischargeCdCorrelation.McGreehanSchotsch1988,
+                    hole,
+                    cb.DischargeHoleState(Re=Re_hole),
+                )
+            )
         else:
-            # Default/Auto
-            return float(cb.Cd_orifice(self._orifice_geom, flow_state))
+            raise ValueError(
+                f"OrificeElement: unknown correlation {self.correlation!r}. "
+                "The 'Auto' arm was removed: it picked a correlation from the "
+                "geometry behind the caller's back, which is how a "
+                "rounded-entry request came back as Stolz. Name one of "
+                "'fixed', 'ReaderHarrisGallagher', 'Stolz', 'Miller', "
+                "'IdelchikThick', 'IdelchikBeveled', 'IdelchikRounded', "
+                "'McGreehanSchotsch'."
+            )
 
     def residuals(
         self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
@@ -2224,6 +2302,218 @@ class OrificeElement(NetworkElement):
             "Cd": float(self._effective_Cd(state_in, state_out)),
             "is_correlation": float(self.use_correlation),
         }
+
+
+class EffusionPlateElement(OrificeElement):
+    """A multi-perforated (effusion) wall panel: N holes discharging in parallel.
+
+    Coolant enters from `from_node` and leaves through the wall into
+    `to_node`, so mass leaves the coolant circuit -- which is what makes this
+    an element rather than a `ConvectiveSurface` model.
+
+    GEOMETRY IS GIVEN THE WAY A PLATE IS DESIGNED, not as an area: pitch,
+    hole diameter, wall thickness and inclination angle. The hole count
+    follows from the panel area and the pitch, and is rounded to a whole
+    number of holes -- `hole_count_exact` and `pitch_actual` record what the
+    rounding did, because the rounded count is what the element flows.
+
+        n_holes  = round(panel_area / (pitch_x * pitch_y))
+        L_hole   = wall_thickness / sin(angle)     <- the drilled length
+        A_total  = n_holes * pi * d^2 / 4
+        porosity = A_total / panel_area
+
+    HOMOGENISATION, AND WHEN IT BREAKS. One element is one panel with one
+    coolant pressure and one gas pressure, so it cannot represent coolant
+    migration WITHIN itself. van de Noort and Ireland (2022) show this is not
+    a small effect: with uniform inlet AND outlet pressure, holes at the end
+    of an array can pass ~75% of what a central hole passes, and under a
+    spanwise pressure gradient one row took ~10% of the total while others
+    took ~20% each.
+
+    The answer is to use more panels, not a cleverer one. Because the solver
+    balances mass over every element at a node, a panel hung off each segment
+    of a coolant channel reproduces their flow network directly:
+
+        coolant:  P0 --[Channel]-- n1 --[Channel]-- n2 --[Channel]-- ...
+                                    |               |
+                            [EffusionPanel]  [EffusionPanel]
+                                    |               |
+        gas:                       g1              g2
+
+    At each node, `m_channel_in = m_channel_out + m_effusion`, which is the
+    coolant mass flow falling along the wall -- the effusion CHANNEL case,
+    with no channel-specific element needed. Resolution is the caller's
+    choice of segment count. Compare `dP_drive` across panels to see whether
+    one panel is smearing a gradient that deserves several.
+
+    INGESTION. If the gas pressure exceeds the coolant pressure the panel
+    ingests hot gas. That is a real failure mode (van de Noort's CMF > 0.5),
+    and a homogenised panel would otherwise average it into a healthy net
+    outflow, so `diagnostics()` reports `is_ingesting` rather than staying
+    silent about it.
+
+    DISCHARGE COEFFICIENT. Default `IdelchikThick`: diagram 4-18a is a
+    thick-walled hole in a large wall between two plena, which is exactly a
+    plenum-fed effusion plate, and it is valid down to Re = 25. For a panel
+    fed by a channel rather than a plenum the approach flow is a CROSSFLOW,
+    which is McGreehan-Schotsch's `U1/Vi` term -- use `'McGreehanSchotsch'`
+    there. Note that neither carries a velocity-of-approach `beta` factor:
+    a plenum has no approach velocity to correct for. van de Noort applies
+    one built on a half-pitch square inlet area, which is worth knowing about
+    but is a different convention; at their own pitch it is a 0.3% effect.
+
+    THERMAL. Not yet modelled. This element is the flow path only; the
+    effectiveness split (internal throat convection vs external film) is
+    tracked separately so that the two cannot double-count.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        hole_diameter: float,
+        wall_thickness: float,
+        pitch: float | None = None,
+        panel_area: float | None = None,
+        pitch_x: float | None = None,
+        pitch_y: float | None = None,
+        panel_length: float | None = None,
+        panel_width: float | None = None,
+        angle_deg: float = 90.0,
+        correlation: str = "IdelchikThick",
+        Cd: float = 0.6,
+        edge_radius: float = 0.0,
+    ) -> None:
+        if hole_diameter <= 0.0:
+            raise ValueError("EffusionPlateElement: hole_diameter must be positive")
+        if wall_thickness <= 0.0:
+            raise ValueError("EffusionPlateElement: wall_thickness must be positive")
+        if not 0.0 < angle_deg <= 90.0:
+            raise ValueError(
+                "EffusionPlateElement: angle_deg must be in (0, 90]; it is the "
+                "hole inclination to the wall PLANE, 90 being a normal hole"
+            )
+
+        px = pitch_x if pitch_x is not None else pitch
+        py = pitch_y if pitch_y is not None else pitch
+        if px is None or py is None:
+            raise ValueError(
+                "EffusionPlateElement: give pitch (square array) or both pitch_x and pitch_y"
+            )
+        if px <= 0.0 or py <= 0.0:
+            raise ValueError("EffusionPlateElement: pitch must be positive")
+
+        if panel_area is None:
+            if panel_length is None or panel_width is None:
+                raise ValueError(
+                    "EffusionPlateElement: give panel_area, or both panel_length and panel_width"
+                )
+            panel_area = panel_length * panel_width
+        if panel_area <= 0.0:
+            raise ValueError("EffusionPlateElement: panel_area must be positive")
+
+        cell_area = px * py
+        n_exact = panel_area / cell_area
+        n_holes = int(round(n_exact))
+        if n_holes < 1:
+            raise ValueError(
+                f"EffusionPlateElement: the panel holds {n_exact:.3g} holes at "
+                f"this pitch, which rounds to none. Enlarge the panel or "
+                f"reduce the pitch."
+            )
+
+        self.hole_diameter = hole_diameter
+        self.wall_thickness = wall_thickness
+        self.pitch_x = px
+        self.pitch_y = py
+        self.panel_area = panel_area
+        self.angle_deg = angle_deg
+        self.n_holes = n_holes
+        # What the rounding cost: the caller asked for a pitch, and the whole
+        # number of holes implies a slightly different one.
+        self.hole_count_exact = n_exact
+        self.pitch_actual = math.sqrt(panel_area / n_holes)
+
+        # Drilled length along the hole axis. An inclined hole is longer than
+        # the wall is thick, which is the whole reason effusion holes are
+        # inclined: more internal surface for the same wall.
+        alpha = math.radians(angle_deg)
+        self.hole_length = wall_thickness / math.sin(alpha)
+
+        hole_area = math.pi * hole_diameter * hole_diameter / 4.0
+        self.total_hole_area = n_holes * hole_area
+        self.porosity = self.total_hole_area / panel_area
+
+        super().__init__(
+            id,
+            from_node,
+            to_node,
+            Cd=Cd,
+            area=self.total_hole_area,
+            correlation=correlation,
+            plate_thickness=self.hole_length,
+            edge_radius=edge_radius,
+        )
+        # OrificeElement derived an equivalent single-bore diameter from the
+        # TOTAL area. Keep it for the flow equation, but the correlations must
+        # see one real hole -- see _hole_diameter_for_correlation.
+        self.equivalent_bore = self.diameter
+
+    def _hole_count(self) -> float:
+        return float(self.n_holes)
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """No upstream-diameter discovery: a wall panel has no pipe, hence no
+        beta. The geometry the correlations need is the single hole, which is
+        known at construction."""
+        self._orifice_geom = cb.OrificeGeometry()
+        self._orifice_geom.d = self.hole_diameter
+        self._orifice_geom.D = 0.0
+        self._orifice_geom.t = self.hole_length
+        self._orifice_geom.r = self.edge_radius
+        self.beta = 0.0
+
+    def validate(self) -> None:
+        if self.correlation in ("ReaderHarrisGallagher", "Stolz", "Miller"):
+            raise ValueError(
+                f"EffusionPlateElement {self.id!r}: {self.correlation!r} is a "
+                "NORMED metering correlation for a standardised plate in a "
+                "pipe, referenced to the tapping differential and a function "
+                "of beta = d/D. An effusion panel has no pipe and no beta. "
+                "Use 'IdelchikThick' (plenum-fed), 'McGreehanSchotsch' "
+                "(channel-fed, with approach crossflow), or 'fixed'."
+            )
+        if self.porosity >= 1.0:
+            raise ValueError(
+                f"EffusionPlateElement {self.id!r}: porosity is "
+                f"{self.porosity:.3f}; the holes do not fit in the panel."
+            )
+
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
+        base = super().diagnostics(state_in, state_out)
+        m_dot = abs(state_in.m_dot)
+        dP_drive = state_in.Pt - state_out.P
+        out = {
+            "n_holes": float(self.n_holes),
+            "hole_count_exact": float(self.hole_count_exact),
+            "porosity": float(self.porosity),
+            "hole_length": float(self.hole_length),
+            "L_over_d": float(self.hole_length / self.hole_diameter),
+            "pitch_over_d": float(self.pitch_actual / self.hole_diameter),
+            # Andrews et al. (1988) correlate effusion cooling on the coolant
+            # mass flow per unit PLATE area, not per hole. Their measurements
+            # span G = 0.1 to 1.6 kg/s/m^2.
+            "G_coolant": float(m_dot / self.panel_area),
+            "dP_drive": float(dP_drive),
+            # A homogenised panel would otherwise average an ingesting hole
+            # into a healthy net outflow. Say it instead.
+            "is_ingesting": float(dP_drive <= 0.0),
+        }
+        out.update(base)
+        return out
 
 
 class EffectiveAreaConnectionElement(OrificeElement):
