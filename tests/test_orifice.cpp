@@ -355,10 +355,162 @@ TEST(IdelchikWallOrifice, AgreesWithMcGreehanSchotschAcrossTheSharedRange) {
                 1.0 / std::sqrt(orifice::idelchik::zeta_sharp), 5e-4);
 }
 
-TEST(IdelchikWallOrifice, LichtarowiczRefusesRatherThanSubstituting) {
-    EXPECT_THROW(make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965),
-                 std::invalid_argument);
+TEST(Lichtarowicz1965, ReproducesTheSourcesOwnFigure10) {
+    // Fig. 10 plots Eq. (12) at l/d = 2 from Re ~ 1 to 1e6: it climbs from
+    // near zero, crosses 0.5 around Re ~ 160, and plateaus on Eq. (7).
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto hole = wall_hole(1e-3, 2e-3, 0.0, 0.0);   // l/d = 2
+
+    EXPECT_NEAR(c->Cd(hole, wall_flow(10.0)), 0.0817, 5e-4);
+    EXPECT_NEAR(c->Cd(hole, wall_flow(100.0)), 0.4284, 5e-4);
+    EXPECT_NEAR(c->Cd(hole, wall_flow(1000.0)), 0.7446, 5e-4);
+
+    // The curve crosses 0.5 between Re = 100 and 300, as Fig. 10 shows.
+    EXPECT_LT(c->Cd(hole, wall_flow(100.0)), 0.5);
+    EXPECT_GT(c->Cd(hole, wall_flow(300.0)), 0.5);
 }
+
+TEST(Lichtarowicz1965, ApproachesEquationSevenAtHighReynolds) {
+    // Eq. (12) must reduce to Eq. (7) as the viscous and transition terms
+    // die away. Checked across the stated l/d range at the stated upper Re.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    for (double ld : {2.0, 4.0, 6.0, 8.0, 10.0}) {
+        const double cdu = orifice::lichtarowicz::cdu_c0
+                         - orifice::lichtarowicz::cdu_c1 * ld;
+        const auto hole = wall_hole(1e-3, ld * 1e-3, 0.0, 0.0);
+        EXPECT_NEAR(c->Cd(hole, wall_flow(1.0e6)), cdu, 2e-3) << "l/d = " << ld;
+        // At the validated ceiling it is already within the source's own
+        // +/-0.02 of the asymptote.
+        EXPECT_NEAR(c->Cd(hole, wall_flow(2.0e4)), cdu, 0.02) << "l/d = " << ld;
+    }
+    // And the flat branch the source gives for 1.5 <= l/d < 2.
+    const auto shortish = wall_hole(1e-3, 1.7e-3, 0.0, 0.0);
+    EXPECT_NEAR(c->Cd(shortish, wall_flow(1.0e6)),
+                orifice::lichtarowicz::cdu_short, 2e-3);
+}
+
+TEST(Lichtarowicz1965, RefusesBelowTheSourcesOwnValidityFloor) {
+    // Design recommendation (1): avoid l/d < 1.5, "the discharge coefficient
+    // varies rapidly with l/d below this value, and there is the possibility
+    // of hysteresis". A single-valued correlation cannot represent
+    // hysteresis, so refusing beats returning a number.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    EXPECT_THROW(c->Cd(wall_hole(1e-3, 1.0e-3, 0.0, 0.0), wall_flow(1e4)),
+                 std::invalid_argument);
+    EXPECT_THROW(c->Cd(wall_hole(1e-3, 1.4e-3, 0.0, 0.0), wall_flow(1e4)),
+                 std::invalid_argument);
+    // At and above the floor it answers.
+    EXPECT_GT(c->Cd(wall_hole(1e-3, 1.5e-3, 0.0, 0.0), wall_flow(1e4)), 0.0);
+}
+
+TEST(Lichtarowicz1965, HoldsGeometryAboveTheTabulatedRangeRatherThanExtrapolating) {
+    // Eq. (7) is LINEAR in l/d, so extrapolating past 10 walks Cd down
+    // without bound and reaches zero near l/d = 97. Held instead.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const double at10 = c->Cd(wall_hole(1e-3, 10e-3, 0.0, 0.0), wall_flow(1e4));
+    for (double ld : {12.0, 20.0, 100.0}) {
+        EXPECT_NEAR(c->Cd(wall_hole(1e-3, ld * 1e-3, 0.0, 0.0), wall_flow(1e4)),
+                    at10, 1e-12) << "l/d = " << ld;
+    }
+    EXPECT_GT(at10, 0.7);
+}
+
+TEST(Lichtarowicz1965, AnalyticDerivativeAgreesWithFiniteDifferences) {
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    for (double ld : {2.0, 5.0, 9.0}) {
+        const auto hole = wall_hole(1e-3, ld * 1e-3, 0.0, 0.0);
+        for (double Re : {2.0e1, 5.0e1, 5.0e2, 5.0e3, 1.5e4}) {
+            const double h = Re * 1e-6;
+            const auto fj = c->Cd_and_derivatives(hole, wall_flow(Re));
+            const double fd = (c->Cd(hole, wall_flow(Re + h))
+                             - c->Cd(hole, wall_flow(Re - h))) / (2.0 * h);
+            EXPECT_NEAR(std::get<1>(fj), fd, std::max(1e-12, std::abs(fd) * 1e-5))
+                << "l/d = " << ld << " Re = " << Re;
+        }
+    }
+}
+
+TEST(Lichtarowicz1965, HasNoCrossflowTermAndSaysSoExactly) {
+    // The experiments are plenum-fed; there is no approach velocity. Exact
+    // zero, like Idelchik, not a small number.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto fj = c->Cd_and_derivatives(wall_hole(1e-3, 3e-3, 0.0, 0.0),
+                                          wall_flow(5.0e3));
+    EXPECT_EQ(std::get<2>(fj), 0.0);
+}
+
+TEST(Lichtarowicz1965, IsMonotoneAcrossTheValidatedRange) {
+    // Cd must rise with Re throughout the range the source validates,
+    // Re = 10 to 2e4: more inertia, less viscous loss.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto hole = wall_hole(1e-3, 4e-3, 0.0, 0.0);
+    const double lo = orifice::lichtarowicz::re_validated_min;
+    const double hi = orifice::lichtarowicz::re_validated_max;
+
+    double prev = c->Cd(hole, wall_flow(lo));
+    for (int i = 1; i <= 2000; ++i) {
+        const double Re = lo * std::pow(hi / lo, i / 2000.0);
+        const double cd = c->Cd(hole, wall_flow(Re));
+        EXPECT_TRUE(std::isfinite(cd));
+        EXPECT_GT(cd, prev) << "not monotone at Re = " << Re;
+        prev = cd;
+    }
+    EXPECT_LT(prev, 1.0);
+}
+
+TEST(Lichtarowicz1965, StaysFiniteAndBoundedOutsideTheValidatedRange) {
+    // BELOW: the 20/Re term would diverge and drive Cd to zero, so Re is
+    // held at a floor. The value is held and the derivative reported as
+    // zero, because the value genuinely stops changing.
+    auto c = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    const auto hole = wall_hole(1e-3, 4e-3, 0.0, 0.0);
+    const double at_floor = c->Cd(hole, wall_flow(orifice::lichtarowicz::re_floor));
+    EXPECT_TRUE(std::isfinite(at_floor));
+    EXPECT_GT(at_floor, 0.0);
+    EXPECT_NEAR(c->Cd(hole, wall_flow(1e-9)), at_floor, 1e-12);
+    EXPECT_EQ(std::get<1>(c->Cd_and_derivatives(hole, wall_flow(1e-9))), 0.0);
+
+    // ABOVE: Eq. (12) is NOT monotone forever. Its two Re terms pull
+    // opposite ways -- 20(1+2.25 l/d)/Re falls without limit, while the
+    // log-squared term peaks at Re = 1/0.00015 = 6667 and decays either
+    // side. Past Re ~ 8.7e5 the viscous term is spent while the log term is
+    // still decaying, so Cd overshoots Eq. (7) and settles back.
+    //
+    // Recorded rather than smoothed away: the overshoot is 2.2e-4, which is
+    // 43x beyond the source's validated ceiling of 2e4 and roughly 100x
+    // SMALLER than its own stated accuracy of +/-0.02. It is an artifact of
+    // extrapolating the fit, not a defect to correct.
+    const double cdu = orifice::lichtarowicz::cdu_c0
+                     - orifice::lichtarowicz::cdu_c1 * 4.0;
+    double worst = 0.0;
+    for (double Re : {1.0e5, 3.0e5, 8.7e5, 1.0e6, 1.0e7, 1.0e9}) {
+        const double cd = c->Cd(hole, wall_flow(Re));
+        EXPECT_TRUE(std::isfinite(cd));
+        worst = std::max(worst, std::abs(cd - cdu));
+    }
+    EXPECT_LT(worst, 1.0e-3);
+    EXPECT_LT(worst, 0.02);   // far inside the source's own accuracy
+}
+
+TEST(Lichtarowicz1965, DisagreesWithMcGreehanWhereMcGreehanIsFloored) {
+    // CROSS-SOURCE, and the reason this correlation was added. McGreehan's
+    // chain floors Re at 1e4, so below that its Cd stops moving; Lichtarowicz
+    // is validated from Re = 10 and keeps falling. At Re = 432 -- inside
+    // Andrews' own effusion data -- they differ by more than 20%.
+    auto cl = make_discharge_correlation(DischargeCdCorrelation::Lichtarowicz1965);
+    auto cm = make_discharge_correlation(DischargeCdCorrelation::McGreehanSchotsch1988);
+    const auto hole = wall_hole(3.27e-3, 6.3e-3, 0.0, 0.0);   // Andrews plate C
+
+    const double lo_l = cl->Cd(hole, wall_flow(432.0));
+    const double lo_m = cm->Cd(hole, wall_flow(432.0));
+    EXPECT_GT((lo_m - lo_l) / lo_l, 0.15) << "expected McGreehan high at low Re";
+
+    // And they converge where both are valid.
+    const double hi_l = cl->Cd(hole, wall_flow(2.0e4));
+    const double hi_m = cm->Cd(hole, wall_flow(2.0e4));
+    EXPECT_NEAR(hi_m, hi_l, 0.03 * hi_l);
+}
+
 
 // -------------------------------------------------------------
 // Flow calculation tests

@@ -1,4 +1,5 @@
 #include "../include/dual_number.h"
+#include "../include/correlation_status.h"
 #include "../include/friction.h"
 #include "../include/math_constants.h"
 #include "../include/orifice.h"
@@ -832,10 +833,88 @@ protected:
     }
 };
 
+// Lichtarowicz, Duggins and Markland (1965), Eqs. (7) and (12).
+//
+// The long-orifice, LOW-Reynolds member of the discharge family. Unlike the
+// Idelchik classes this is not a table lookup: the source gives closed-form
+// expressions, so Cd and dCd/dRe are both analytic with no interpolation.
+//
+// There is no crossflow term -- the experiments are plenum-fed -- so
+// dCd/d(U1_over_Vi) is EXACTLY zero, as for Idelchik.
+class LichtarowiczCorrelation : public DischargeCorrelationBase {
+public:
+    std::string name() const override {
+        return "Lichtarowicz, Duggins and Markland (1965) long orifice";
+    }
+
+    double Cd(const DischargeHoleGeometry& hole,
+              const DischargeHoleState& flow) const override {
+        return std::get<0>(Cd_and_derivatives(hole, flow));
+    }
+
+    std::tuple<double, double, double> Cd_and_derivatives(
+        const DischargeHoleGeometry& hole,
+        const DischargeHoleState& flow) const override {
+        namespace L = orifice::lichtarowicz;
+
+        const double ld = hole.L_over_d();
+        if (ld < L::l_over_d_min) {
+            // The source's own design recommendation (1), not our caution:
+            // below l/d = 1.5 "the discharge coefficient varies rapidly with
+            // l/d ... and there is the possibility of hysteresis". A
+            // correlation cannot represent hysteresis, so refusing is the
+            // honest answer rather than returning a single-valued Cd for a
+            // geometry the source says does not have one.
+            throw std::invalid_argument(
+                "Lichtarowicz (1965) is not valid below l/d = 1.5, where the "
+                "source reports rapid variation and possible hysteresis. Use "
+                "Idelchik1966Thick for a short hole, or supply a measured Cd.");
+        }
+
+        const double re = std::max(flow.Re, L::re_floor);
+
+        // Eq. (7), with the source's separate flat value for 1.5 <= l/d < 2.
+        // l/d beyond 10 is HELD at 10 rather than extrapolated: Eq. (7) is
+        // linear and would keep falling without bound.
+        const double ld_eff = std::min(ld, L::l_over_d_max);
+        const double cdu = (ld_eff < L::l_over_d_split)
+                               ? L::cdu_short
+                               : L::cdu_c0 - L::cdu_c1 * ld_eff;
+
+        // Eq. (12)
+        const double b = L::visc_c0 * (1.0 + L::visc_c1 * ld_eff);
+        const double cc = L::trans_c0 * ld_eff;
+        const double u = std::log10(L::trans_c2 * re);
+        const double den = 1.0 + L::trans_c1 * u * u;
+
+        const double inv_cd = 1.0 / cdu + b / re - cc / den;
+        if (inv_cd <= 0.0) {
+            throw std::invalid_argument(
+                "Lichtarowicz (1965): non-positive 1/Cd; check l/d and Re");
+        }
+        const double cd = 1.0 / inv_cd;
+
+        // d(1/Cd)/dRe = -b/Re^2 + 15 cc u / (den^2 Re ln10), then
+        // dCd/dRe = -Cd^2 d(1/Cd)/dRe. Analytic, per the (f, J) rule.
+        const double d_inv_dre = -b / (re * re)
+                               + (2.0 * L::trans_c1) * cc * u
+                                     / (den * den * re * std::log(10.0));
+        const double dcd_dre = -cd * cd * d_inv_dre;
+
+        // Below the floor the VALUE is held and the DERIVATIVE reported as
+        // zero, because the value genuinely stops changing there. This
+        // differs from the Idelchik floor, where the derivative is continued
+        // -- there the floor is the edge of a table and the curve is still
+        // moving; here it is a guard against 20/Re diverging.
+        return {cd, (flow.Re > L::re_floor) ? dcd_dre : 0.0, 0.0};
+    }
+};
+
 class McGreehanSchotsch1988Correlation : public DischargeCorrelationBase {
 public:
     double Cd(const DischargeHoleGeometry& hole,
               const DischargeHoleState& flow) const override {
+        warn_below_floor(flow.Re);
         return orifice::mcgreehan_schotsch::cd(flow.Re, hole.r_over_d(),
                                                hole.L_over_d(), flow.U1_over_Vi);
     }
@@ -843,11 +922,32 @@ public:
     std::tuple<double, double, double> Cd_and_derivatives(
         const DischargeHoleGeometry& hole,
         const DischargeHoleState& flow) const override {
+        warn_below_floor(flow.Re);
         return orifice::mcgreehan_schotsch::cd_and_derivatives(
             flow.Re, hole.r_over_d(), hole.L_over_d(), flow.U1_over_Vi);
     }
 
     std::string name() const override { return "McGreehan-Schotsch (1988)"; }
+
+private:
+    // Below re_min the chain holds Re AT the floor, so Cd stops responding
+    // to flow entirely. That is documented behaviour and deliberate -- Eq.
+    // (8) diverges below it -- but silently returning a frozen Cd to a
+    // caller who does not know is how a plenum-fed hole came to be read
+    // +21.7% high at Re = 432 against Lichtarowicz, which IS valid there.
+    // Warn once per call rather than refuse: refusing would break existing
+    // networks that transit low Re during Newton iteration.
+    static void warn_below_floor(double Re) {
+        if (Re < orifice::mcgreehan_schotsch::re_min) {
+            combaero::warn(
+                "McGreehanSchotsch1988: Re = " + std::to_string(Re) +
+                " is below the correlation's floor of " +
+                std::to_string(orifice::mcgreehan_schotsch::re_min) +
+                "; Cd is held at the floor value and no longer responds to "
+                "flow. For a long hole at low Re use Lichtarowicz1965 "
+                "(valid 10 to 2e4), or Idelchik1966Thick (valid from 25).");
+        }
+    }
 };
 
 class ConstantDischargeCdCorrelation : public DischargeCorrelationBase {
@@ -944,17 +1044,8 @@ std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(
             return std::make_unique<IdelchikBeveledCorrelation>();
         case DischargeCdCorrelation::Idelchik1966Rounded:
             return std::make_unique<IdelchikRoundedCorrelation>();
-        // Lichtarowicz, Duggins & Markland (1965) is DECLARED but NOT
-        // IMPLEMENTED. The source is in docs/orifices/ and it is the natural
-        // second discharge correlation -- long sharp-edged holes, the regime
-        // effusion sits in -- but it has not been extracted, and refusing is
-        // the honest interim rather than quietly handing back
-        // McGreehan-Schotsch for a different regime.
         case DischargeCdCorrelation::Lichtarowicz1965:
-            throw std::invalid_argument(
-                "Lichtarowicz (1965) discharge correlation is declared but "
-                "not implemented. Use McGreehanSchotsch1988, or Constant with "
-                "a measured value.");
+            return std::make_unique<LichtarowiczCorrelation>();
         case DischargeCdCorrelation::Constant:
             return std::make_unique<ConstantDischargeCdCorrelation>();
     }

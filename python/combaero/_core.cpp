@@ -4230,8 +4230,11 @@ PYBIND11_MODULE(_core, m) {
       .value("Idelchik1966Rounded", DischargeCdCorrelation::Idelchik1966Rounded,
              "Idelchik (1966) diagram 4-18c: rounded edges")
       .value("Lichtarowicz1965", DischargeCdCorrelation::Lichtarowicz1965,
-             "DECLARED, NOT IMPLEMENTED. Raises ValueError. The source is in\n"
-             "docs/orifices/ but has not been extracted.")
+             "Lichtarowicz, Duggins & Markland (1965) long orifice, Eqs. (7)\n"
+             "and (12). Valid l/d 2-10 and Re 10 to 2e4 -- the low-Reynolds\n"
+             "regime a cooling hole actually runs in, where\n"
+             "McGreehanSchotsch1988 is floored at Re = 1e4. Refuses below\n"
+             "l/d = 1.5, which the source says to avoid for hysteresis.")
       .value("Constant", DischargeCdCorrelation::Constant,
              "Fixed Cd, 0.60 (orifice::defaults::discharge_cd). Pass an\n"
              "explicit value to discharge_cd instead to pin a measured one.");

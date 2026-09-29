@@ -627,7 +627,7 @@ enum class DischargeCdCorrelation {
     Idelchik1966Thick,       // diagram 4-18a, deep hole
     Idelchik1966Beveled,     // diagram 4-18b
     Idelchik1966Rounded,     // diagram 4-18c
-    Lichtarowicz1965,        // DECLARED, NOT IMPLEMENTED -- throws
+    Lichtarowicz1965,        // long orifice, l/d 2-10, Re 10 to 2e4
     Constant
 };
 
