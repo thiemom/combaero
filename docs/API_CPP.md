@@ -765,6 +765,15 @@ double film_superposition_sellers(const std::vector<double>& eta_rows);
 double film_superposition_corrected(const std::vector<double>& eta_rows,
                                     const std::vector<double>& alpha_between_rows);
 
+// (eta, d eta / d eta_i) for each of the two above. Built from explicit
+// partial products rather than dividing the total, so a fully effective row
+// (eta_j = 1) gives 0, not NaN.
+std::pair<double, std::vector<double>> film_superposition_sellers_and_gradient(
+    const std::vector<double>& eta_rows);
+std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient(
+    const std::vector<double>& eta_rows,
+    const std::vector<double>& alpha_between_rows);
+
 // Gao Eq. (5): the published FORM of alpha. a and b are REQUIRED -- the
 // paper never prints its fitted values.
 double mainstream_temperature_correction(double mass_flow_ratio, double a, double b);

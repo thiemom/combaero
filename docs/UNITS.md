@@ -193,16 +193,20 @@ All functions use consistent units to avoid conversion errors.
 
 #### Bernoulli & Orifice
 
-| Function               | Input Units                                            | Output Unit |
-|------------------------|--------------------------------------------------------|-------------|
-| `bernoulli_P2`         | P1: Pa, v1: m/s, v2: m/s, rho: kg/m^3, dz: m, g: m/s^2 | Pa          |
-| `bernoulli_v2`         | P1: Pa, P2: Pa, v1: m/s, rho: kg/m^3, dz: m, g: m/s^2  | m/s         |
-| `orifice_mdot`         | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | kg/s        |
-| `orifice_Q`            | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | m^3/s       |
-| `orifice_velocity`     | P1: Pa, P2: Pa, rho: kg/m^3                            | m/s         |
-| `orifice_area`         | mdot: kg/s, P1: Pa, P2: Pa, Cd: -, rho: kg/m^3         | m^2         |
-| `orifice_dP`           | mdot: kg/s, A: m^2, Cd: -, rho: kg/m^3                 | Pa          |
-| `expansibility_factor` | beta: -, dP: Pa, P_upstream: Pa, kappa: -              | -           |
+| Function                      | Input Units                                            | Output Unit |
+|-------------------------------|--------------------------------------------------------|-------------|
+| `bernoulli_P2`                | P1: Pa, v1: m/s, v2: m/s, rho: kg/m^3, dz: m, g: m/s^2 | Pa          |
+| `bernoulli_v2`                | P1: Pa, P2: Pa, v1: m/s, rho: kg/m^3, dz: m, g: m/s^2  | m/s         |
+| `orifice_mdot`                | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | kg/s        |
+| `orifice_Q`                   | P1: Pa, P2: Pa, A: m^2, Cd: -, rho: kg/m^3             | m^3/s       |
+| `orifice_velocity`            | P1: Pa, P2: Pa, rho: kg/m^3                            | m/s         |
+| `orifice_area`                | mdot: kg/s, P1: Pa, P2: Pa, Cd: -, rho: kg/m^3         | m^2         |
+| `orifice_dP`                  | mdot: kg/s, A: m^2, Cd: -, rho: kg/m^3                 | Pa          |
+| `expansibility_factor`        | beta: -, dP: Pa, P_upstream: Pa, kappa: -              | -           |
+| `pressure_loss`               | v: m/s, rho: kg/m^3, zeta: -                           | Pa          |
+| `velocity_from_pressure_loss` | dP: Pa, rho: kg/m^3, zeta: -                           | m/s         |
+| `zeta_from_Cd`                | Cd: -                                                  | -           |
+| `Cd_from_zeta`                | zeta: -                                                | -           |
 
 ---
 
@@ -412,6 +416,7 @@ All functions use consistent units to avoid conversion errors.
 | Function                   | Input Units             | Output Unit |
 |----------------------------|-------------------------|-------------|
 | `mwmix`                    | X: mol/mol              | g/mol       |
+| `molar_mass`               | X: mol/mol              | g/mol       |
 | `mole_to_mass`             | X: mol/mol              | kg/kg       |
 | `mass_to_mole`             | Y: kg/kg                | mol/mol     |
 | `normalize_fractions`      | X: mol/mol              | mol/mol     |

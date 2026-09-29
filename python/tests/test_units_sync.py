@@ -12,6 +12,7 @@ IGNORE_LIST = {
     "network",
     "species",
     "geometry",
+    "vortex",
     "_solver_tools",
     # Utilities
     "get_warning_handler",
@@ -74,6 +75,19 @@ IGNORE_LIST = {
     "State::VH",
     "State::set_P",
     "State::set_T",
+    # Result aggregates and the unit registry itself. These carry no single
+    # unit; their MEMBERS are what units_data.h describes, and pybind11
+    # result structs expose those as plain attributes on an instance rather
+    # than on the class, so dir(cls) does not reach them.
+    "ChannelSolverResult",
+    "IncompressibleFlowSolution",
+    "MassStream",
+    "MomentumChamberResult",
+    "OrificeResult",
+    "WallCouplingResult",
+    "Registry",
+    # Deprecated in favour of species.dry_air; a composition, not a quantity.
+    "standard_dry_air_composition",
 }
 
 # Special magic methods created by pybind11 that aren't public calculation points
@@ -89,6 +103,37 @@ IGNORE_METHODS = {
 }
 
 
+def public_surface() -> list[str]:
+    """Every name `import combaero` actually exposes.
+
+    Deliberately NOT `cb.__all__`. That list is hand-maintained, so a symbol
+    added without touching it escaped this check entirely -- 54 of them had,
+    14 with no units entry at all. The surface a user can reach is what has to
+    be covered, and it is the union: `dir()` for what is reachable, `__all__`
+    for anything declared but lazily bound.
+    """
+    reachable = {n for n in dir(cb) if not n.startswith("_")}
+    return sorted(reachable | set(cb.__all__))
+
+
+def test_all_covers_the_public_surface() -> None:
+    """`__all__` must not drift below what the module exposes.
+
+    Keeps the two definitions of "public" from diverging again. A name that is
+    reachable but undeclared is either API that belongs in `__all__` or an
+    accidental import leak that should be underscored at its import site --
+    `contextmanager`, `import_module`, `Generator` and `PackageNotFoundError`
+    were all the latter.
+    """
+    reachable = {n for n in dir(cb) if not n.startswith("_")}
+    undeclared = sorted(reachable - set(cb.__all__))
+    assert not undeclared, (
+        f"{len(undeclared)} names are reachable on `combaero` but absent from "
+        "`__all__`. Add them if they are API; underscore the import if they "
+        f"leaked: {undeclared}"
+    )
+
+
 def test_api_unit_sync():
     """
     Dynamically discover all exposed functions and classes from combaero,
@@ -97,11 +142,13 @@ def test_api_unit_sync():
     """
     missing = []
 
-    for name in cb.__all__:
+    for name in public_surface():
         if name in IGNORE_LIST:
             continue
 
-        obj = getattr(cb, name)
+        obj = getattr(cb, name, None)
+        if obj is None:
+            continue
 
         # Skip strings like __version__
         if isinstance(obj, str):

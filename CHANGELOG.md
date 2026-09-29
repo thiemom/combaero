@@ -1230,6 +1230,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`test_units_sync` was checking `__all__`, not the API.** The Hard Rule is
+  that every exported Python symbol carries a `units_data.h` entry or an
+  explicit `IGNORE_LIST` entry. The test enforced it by walking `cb.__all__`
+  -- a hand-maintained list -- so any symbol added without also editing that
+  list escaped the check entirely. **54 had**, and 14 of those had no units
+  entry at all. The test now walks the real public surface (`dir()` union
+  `__all__`), and a second test keeps `__all__` from falling behind it again.
+
+  - units entries added for `pressure_loss`, `velocity_from_pressure_loss`,
+    `zeta_from_Cd`, `Cd_from_zeta` and `molar_mass` (an alias of `mwmix`, so
+    the sync check saw the alias name rather than the target).
+  - `contextmanager`, `import_module`, `Generator` and `PackageNotFoundError`
+    were reachable as `combaero.<name>` -- plain stdlib imports leaking into
+    the package namespace. Now imported under underscored names. This is the
+    same shape of leak as a dev-only import escaping into a wheel, and
+    nothing in the repo referenced them.
+  - the 50 genuine exports that were missing are now declared in `__all__`,
+    grouped under a comment so the omission stays legible.
+  - result aggregates (`OrificeResult`, `MassStream`, `WallCouplingResult`,
+    `ChannelSolverResult`, `MomentumChamberResult`,
+    `IncompressibleFlowSolution`), the `Registry`, the `vortex` submodule and
+    the deprecated `standard_dry_air_composition` go to `IGNORE_LIST`, which
+    is where the existing convention already puts result structs and modules.
+
+- **`docs/API_CPP.md` was missing `film_superposition_sellers_and_gradient`
+  and `film_superposition_corrected_and_gradient`** (from #413).
+
 - **A validation series' stated uncertainty was its own model error** (#389).
   `uncertainty` is meant to be the band the SOURCE measured to, so `within`
   answers "does the model land inside the experiment's own precision". In 30

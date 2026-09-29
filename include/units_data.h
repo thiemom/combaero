@@ -19,6 +19,7 @@ inline constexpr Entry function_units[] = {
     // composition.h - Composition Utilities
     // -------------------------------------------------------------------------
     {"mwmix", "X: mol/mol", "g/mol"},
+    {"molar_mass", "X: mol/mol", "g/mol"},
     {"mole_to_mass", "X: mol/mol", "kg/kg"},
     {"mass_to_mole", "Y: kg/kg", "mol/mol"},
     {"normalize_fractions", "X: mol/mol", "mol/mol"},
@@ -346,6 +347,10 @@ inline constexpr Entry function_units[] = {
     {"orifice_area", "mdot: kg/s, P1: Pa, P2: Pa, Cd: -, rho: kg/m^3", "m^2"},
     {"orifice_dP", "mdot: kg/s, A: m^2, Cd: -, rho: kg/m^3", "Pa"},
     {"expansibility_factor", "beta: -, dP: Pa, P_upstream: Pa, kappa: -", "-"},
+    {"pressure_loss", "v: m/s, rho: kg/m^3, zeta: -", "Pa"},
+    {"velocity_from_pressure_loss", "dP: Pa, rho: kg/m^3, zeta: -", "m/s"},
+    {"zeta_from_Cd", "Cd: -", "-"},
+    {"Cd_from_zeta", "zeta: -", "-"},
 
     // -------------------------------------------------------------------------
     // incompressible.h - Thermo-Aware High-Level Functions
