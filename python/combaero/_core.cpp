@@ -6675,4 +6675,22 @@ PYBIND11_MODULE(_core, m) {
            "Check if friction model is registered")
       .def("available_friction_models", &Registry::available_friction_models,
            "List all available friction models");
+
+  // Drop any Python warning handler while the interpreter is still alive.
+  //
+  // set_warning_handler() stores its argument in a function-local static in
+  // correlation_status.cpp. When that argument is a Python callable, the
+  // static owns a py::object, and a function-local static is destroyed by
+  // __cxa_atexit -- which runs AFTER Py_Finalize(). Releasing a Python
+  // reference on a finalised interpreter segfaults, so merely installing a
+  // handler and leaving it there crashed the process at exit, including the
+  // `set_warning_handler(lambda msg: None)` this module's own docstring
+  // recommends.
+  //
+  // A capsule stored on the module has its destructor run during module
+  // teardown, before finalisation completes. Resetting to the default
+  // handler there drops the py::object at a point where decref is still
+  // legal, and leaves the static holding a plain C++ function.
+  m.add_object("_warning_handler_cleanup",
+               py::capsule([]() { combaero::set_warning_handler({}); }));
 }

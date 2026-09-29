@@ -1239,6 +1239,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Python warning handler outlived the interpreter and segfaulted at
+  exit.** `set_warning_handler()` stores its argument in a function-local
+  static on the C++ side; when that argument is a Python callable the static
+  owns a `py::object`, and a function-local static is destroyed by
+  `__cxa_atexit` -- which runs *after* `Py_Finalize()`. Releasing a Python
+  reference on a finalised interpreter is a segfault.
+
+  Installing a handler and leaving it in place was enough to trigger it, so
+  the binding's own documented example crashed:
+
+  ```python
+  combaero.set_warning_handler(lambda msg: None)  # exit 139 (SIGSEGV)
+  with combaero.suppress_warnings(): pass         # exit 139
+  ```
+
+  The process did all its work and printed its output first, dying only
+  during shutdown, so nothing in the suite noticed -- `pytest` never leaves a
+  handler installed. `set_warning_handler(None)` was always clean, which is
+  what localised it.
+
+  Fixed with a module-teardown capsule in `_core.cpp` that resets the handler
+  to the C++ default while the interpreter is still alive, leaving the static
+  holding a plain function pointer. Covered by
+  `python/tests/test_warning_handler_lifetime.py`, which runs real
+  subprocesses and asserts on exit codes -- the only place this class of
+  defect is visible.
+
 - **Two composition warnings bypassed the warning handler**, so
   `suppress_warnings()` and `set_warning_handler()` could not reach them.
   `normalize_fractions` (all-zero input) and `convert_to_dry_fractions`
