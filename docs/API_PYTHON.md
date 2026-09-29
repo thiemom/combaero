@@ -594,7 +594,7 @@ energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
-    TeeJunctionElement, VortexElement,
+    TeeJunctionElement, VortexElement, EffusionPlateElement,
     BorderCarnotLossElement,
 )
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
@@ -602,6 +602,20 @@ from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberE
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
 channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
+
+# Effusion (multi-perforated) wall panel. Geometry is given the way a plate
+# is designed -- pitch, hole diameter, wall thickness, inclination -- and the
+# hole count follows from the panel area.
+panel = EffusionPlateElement(
+    "panel", "coolant", "gas",
+    hole_diameter=0.6e-3, wall_thickness=1.0e-3,
+    pitch=3.0e-3, panel_area=0.02 * 0.02, angle_deg=30.0,
+)
+# One panel is one coolant pressure and one gas pressure, so it cannot show
+# coolant migration WITHIN itself. For a wall along a feed channel, hang a
+# panel off each channel segment -- the node mass balance then gives
+# m_channel_in = m_channel_out + m_effusion, i.e. coolant flow as f(x). The
+# resolution is your choice of segment count.
 
 # Connection elements
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
