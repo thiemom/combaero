@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EffusionPlateElement`** (#387) -- a multi-perforated wall panel as a
+  network element, flow side. Geometry is given the way a plate is designed
+  (pitch, hole diameter, wall thickness, inclination angle); the hole count
+  follows from the panel area and is rounded, with `hole_count_exact` and
+  `pitch_actual` recording what the rounding did. An inclined hole is
+  correctly longer than the wall is thick (`L = t/sin(alpha)`), which is why
+  effusion holes are inclined at all. Geometry reproduces Andrews et al.
+  (1988) ASME 88-GT-290 Table 1: `N = 4306 m^-2` and `A/A_h` to 1.5%.
+
+  Defaults to `IdelchikThick` -- diagram 4-18a is a thick-walled hole in a
+  large wall between two plena, which is exactly a plenum-fed effusion
+  plate. ISO 5167 correlations are **refused**: a panel has no pipe and no
+  `beta`, so they are undefined rather than merely inaccurate. For a
+  channel-fed panel the approach flow is a crossflow, so use
+  `'McGreehanSchotsch'`.
+
+  **The effusion CHANNEL needs no new element.** Because the solver balances
+  mass over every element at a node, hanging a panel off each segment of a
+  coolant channel gives `m_channel_in = m_channel_out + m_effusion` -- the
+  coolant flow falling along the wall. That is van de Noort and Ireland's
+  (2022) flow-network structure, and the resolution is the caller's choice of
+  segment count.
+
+  A single panel homogenises, and `diagnostics()` says so where it matters:
+  `is_ingesting` flags a reversed drive (hot-gas ingestion, which a
+  homogenised panel would otherwise average into a healthy net outflow), and
+  `dP_drive` compared across panels shows whether one panel is smearing a
+  gradient that deserves several. Also reports `G_coolant`, the coolant mass
+  flow per unit plate area that Andrews correlates on.
+
+  Thermal modelling is deliberately not included yet: the effectiveness split
+  between internal throat convection and the external film has to be stated
+  explicitly or the two double-count, and that needs its own extraction.
+
+### Fixed
+
+- **The discharge-hole correlations were given the pipe Reynolds number**
+  (regression from #409). `Idelchik1966*` and `McGreehanSchotsch` are
+  functions of the HOLE Reynolds number, but `OrificeElement._effective_Cd`
+  passed `Re_D`, built from the upstream channel diameter. Wrong by 1-8% for
+  an orifice in a pipe, and by up to **38% for a plenum-fed hole**, where
+  `D_up = 0` froze `Re_D` at a `1e5` fallback so the correlation stopped
+  responding to flow entirely. Now computed as
+  `4 m_dot_hole / (pi d_hole mu)` via an overridable `_hole_reynolds` hook,
+  which `EffusionPlateElement` overrides to divide by the hole count.
+
 - **Idelchik (1966) wall-orifice discharge coefficients** --
   `DischargeCdCorrelation::Idelchik1966{Sharp,Thick,Beveled,Rounded}`, from
   Section IV diagrams 4-17 and 4-18 (a hole in a large wall, `F1 = F2 = inf`,
