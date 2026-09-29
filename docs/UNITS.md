@@ -702,6 +702,13 @@ All functions use consistent units to avoid conversion errors.
 | `effectiveness_parallelflow`                      | NTU: -, C_r: -                                                                                                  | -                                 |
 | `heat_rate_from_effectiveness`                    | epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K                                                               | W                                 |
 | `adiabatic_wall_temperature`                      | T_hot: K, T_coolant: K, eta: -                                                                                  | K                                 |
+| `film_superposition_sellers`                      | eta_rows: -                                                                                                     | - (eta)                           |
+| `film_superposition_sellers_and_gradient`         | eta_rows: -                                                                                                     | - (eta), - (d eta/d eta_i)        |
+| `film_superposition_corrected`                    | eta_rows: -, alpha_between_rows: -                                                                              | - (eta)                           |
+| `film_superposition_corrected_and_gradient`       | eta_rows: -, alpha_between_rows: -                                                                              | - (eta), - (d eta/d eta_i)        |
+| `mainstream_temperature_correction`               | mass_flow_ratio: -, a: -, b: -                                                                                  | - (alpha)                         |
+| `equivalent_slot_width`                           | hole_area: m^2, pitch: m                                                                                        | m                                 |
+| `equivalent_blowing_ratio`                        | M_baseline: -, area_baseline: m^2, area_equivalent: m^2                                                         | - (M)                             |
 | `film_effectiveness_baldauf_2002`                 | x_over_D: -, M: -, P: -, alpha_deg: deg, s_over_D: -, Tu: -                                                     | - (eta)                           |
 | `film_effectiveness_baldauf_2002_and_derivatives` | x_over_D: -, M: -, P: -, alpha_deg: deg, s_over_D: -, Tu: -                                                     | - (eta), - (deta/dM), - (deta/dP) |
 | `cooled_wall_heat_flux`                           | T_hot: K, T_coolant: K, h_hot: W/(m^2*K), h_coolant: W/(m^2*K), eta: -, t_wall: m, k_wall: W/(m*K)              | W/m^2                             |

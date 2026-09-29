@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Multi-row film superposition** -- `film_superposition_sellers`
+  (Gao Eq. 1), `film_superposition_corrected` (Gao Eq. 7, Sellers with a
+  per-row mainstream temperature correction), `mainstream_temperature_correction`
+  (Eq. 5's form), `equivalent_slot_width` (Eq. 9) and
+  `equivalent_blowing_ratio` (Eq. 10), each with `..._and_gradient`
+  variants where a solver needs them.
+
+  **Sellers overestimates, and worsens as rows accumulate** -- Gao et al.
+  (2025) measure exactly that. It is worst where effusion lives, many
+  closely spaced rows, which is why #386 and #387 were designed together
+  rather than in sequence.
+
+  The correction `alpha` is derived, not invented: Gao's Eqs. (3)-(4) are an
+  energy balance on mainstream entrained into the boundary layer at each
+  injection, so `alpha` is the fraction of the film's temperature deficit
+  surviving to the next row. It is bounded in [0, 1], and `alpha = 1`
+  reproduces Sellers exactly. This replaced an earlier proposal to tune with
+  an invented coverage exponent.
+
+  **Gao publishes alpha's form but not its fitted coefficients**, so `a` and
+  `b` are required arguments rather than defaulted -- a made-up default
+  would acquire an authority it has not earned. Fitting them against Andrei
+  (2014) and Murray (2018), labelled tuned, is the next step.
+
+  Gradients are built from explicit partial products rather than by dividing
+  the total, so a fully effective row does not produce a NaN.
+
 - **Baldauf et al. (2002) film-cooling effectiveness** --
   `film_effectiveness_baldauf_2002`, the laterally averaged adiabatic
   effectiveness downstream of one row of cylindrical, streamwise-inclined

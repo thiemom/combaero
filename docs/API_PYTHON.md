@@ -279,6 +279,26 @@ Envelope: `M` 0.2-2.5, `P` 1.2-1.8, `s/D` 2-5, `alpha` 30-90 deg,
 implemented as printed and disagrees with the paper's own worked example --
 see `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
 
+#### Multi-row film superposition
+
+```python
+per_row = [cb.film_effectiveness_baldauf_2002(x, M, P, 30.0, 3.0, 0.015)
+           for x in row_distances]
+
+eta = cb.film_superposition_sellers(per_row)                  # Gao Eq. (1)
+eta = cb.film_superposition_corrected(per_row, alphas)        # Gao Eq. (7)
+```
+
+`alphas` has one fewer entry than `per_row`: `alpha_j` is the fraction of the
+film's temperature deficit surviving between row `j` and `j+1`. All ones is
+plain Sellers.
+
+Sellers **overestimates, and worsens as rows accumulate** -- which is why
+`alpha` exists and why effusion cannot reuse a few-row film model unchanged.
+`cb.mainstream_temperature_correction(r, a, b)` gives Gao's published form
+for it; `a` and `b` are required because the paper never prints its fitted
+values.
+
 ##### Compressibility: the expansion factor
 
 The paper's mass flow is `W = Cd * Y * A * sqrt(2 rho_t1 (P_t1 - P_s2))`. `Y`

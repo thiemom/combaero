@@ -2,6 +2,7 @@
 #define COOLING_CORRELATIONS_H
 
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace combaero::cooling {
@@ -172,6 +173,102 @@ double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
 std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivatives(
     double x_over_D, double M, double P, double alpha_deg, double s_over_D,
     double Tu);
+
+// -------------------------------------------------------------
+// Multi-row film superposition
+// -------------------------------------------------------------
+//
+// Sellers, J.P. (1963). "Gaseous film cooling with multiple slot injection."
+// AIAA Journal 1(9), 2154-2156. As restated in:
+//
+//   Gao, Z., Qiu, T., Liu, P., Ding, S., Li, Z., Cheng, R. and Yuan, Q.
+//   (2025). "A Study on the Film Superposition Method for the Multi-Row Film
+//   Cooling of the Turbine Outer Ring." Processes 13, 143, Eqs. (1)-(11).
+//   docs/heat_transfer/film/processes-13-00143-v2.pdf (open access).
+//
+// WHY A CORRECTION IS NEEDED. Sellers assumes the rows are independent. Gao
+// measures what that costs: "the Sellers method accumulates prediction
+// errors as the number of hole rows increases, leading to an OVERESTIMATION
+// of the cooling efficiency." That is worst exactly where effusion lives --
+// many closely spaced rows -- so a film module built for a few rows and then
+// reused for effusion would be wrong in the regime it is needed most.
+//
+// Gao's fix is a per-row mainstream temperature correction alpha. It is not
+// an invented knob: Eqs. (3) and (4) are an energy balance on the mainstream
+// entrained into the boundary layer at each injection, giving
+//
+//   (T_g - T'_aw)/(T_g - T_aw) = C (m_c/m_g) / (C (m_c/m_g) + 1)
+//
+// so alpha is the fraction of the film's temperature deficit that survives
+// mixing on the way to the next row. alpha = 1 recovers Sellers exactly.
+//
+// WHAT GAO DOES NOT PUBLISH. Eq. (5) gives alpha's functional form,
+//
+//   alpha_i = a r / (a r + 1) + b,     r = m_coolant / m_mainstream
+//
+// but the paper never prints the fitted a and b -- there is no coefficient
+// table and no inline value. So the SHAPE is sourced and the CONSTANTS are
+// not. alpha is therefore exposed as a caller input defaulting to 1
+// (i.e. plain Sellers), with Eq. (5) available for anyone fitting their own
+// rig. This is the tuner slot the validation policy reserves: matching a
+// specific rig is the user's job and the harness never scores it.
+namespace film_superposition {
+
+// alpha = 1 is plain Sellers. Anything below it damps the accumulated
+// effectiveness, which is the direction Gao's measurements require.
+constexpr double alpha_sellers = 1.0;
+
+} // namespace film_superposition
+
+// Sellers superposition, Gao Eq. (1):
+//
+//   eta = eta_1 + sum_{i=2..n} eta_i prod_{j<i} (1 - eta_j)
+//       = 1 - prod_i (1 - eta_i)
+//
+// The two forms are algebraically identical; the product form is used
+// because it is O(n) and cannot accumulate the pairwise rounding the sum
+// form does. Known to OVERESTIMATE as the row count grows.
+double film_superposition_sellers(const std::vector<double>& eta_rows);
+
+// (eta, d eta / d eta_i) for the above. d eta/d eta_i = prod_{j != i}
+// (1 - eta_j), computed without division so a fully effective row
+// (eta_j = 1) does not produce a NaN.
+std::pair<double, std::vector<double>> film_superposition_sellers_and_gradient(
+    const std::vector<double>& eta_rows);
+
+// Gao Eq. (7), Sellers with the per-row mainstream temperature correction:
+//
+//   eta = sum_i [ eta_i prod_{j=i..n-1} alpha_j prod_{k=i+1..n} (1 - eta_k) ]
+//
+// alpha_between_rows has n-1 entries for n rows: alpha_j is the correction
+// applied between row j and row j+1. Passing all ones reproduces
+// film_superposition_sellers exactly.
+double film_superposition_corrected(const std::vector<double>& eta_rows,
+                                    const std::vector<double>& alpha_between_rows);
+
+// (eta, d eta / d eta_i) for Eq. (7).
+std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient(
+    const std::vector<double>& eta_rows,
+    const std::vector<double>& alpha_between_rows);
+
+// Gao Eq. (5): the published FORM of the mainstream temperature correction.
+// The coefficients are NOT published -- see the note above -- so a and b are
+// required arguments rather than defaulted, to stop a made-up number
+// acquiring the authority of a default.
+//
+//   mass_flow_ratio : m_coolant / m_mainstream for this row [-]
+double mainstream_temperature_correction(double mass_flow_ratio, double a,
+                                         double b);
+
+// Gao Eq. (9): equivalent slot width of a row of holes, s = A_hole / pitch.
+// This is what lets one row's measured distribution stand in for another
+// spacing, via the X/(M s) scaling of Eq. (8).
+double equivalent_slot_width(double hole_area, double pitch);
+
+// Gao Eq. (10): equivalent blowing ratio, M_e = M_0 A_0 / A_e. Normalises a
+// hole count and spacing onto the baseline single-row configuration.
+double equivalent_blowing_ratio(double M_baseline, double area_baseline,
+                                double area_equivalent);
 
 } // namespace combaero::cooling
 

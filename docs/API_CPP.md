@@ -754,6 +754,35 @@ Table 4** by 36% in `b_0`. Under 5% effect below `M ~ 0.5`, up to 50% at
 `M = 2.5`. See
 `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
 
+### Multi-row film superposition
+
+```cpp
+// Sellers, Gao Eq. (1):  eta = 1 - prod_i (1 - eta_i)
+double film_superposition_sellers(const std::vector<double>& eta_rows);
+
+// Gao Eq. (7): Sellers with a per-row mainstream temperature correction.
+// alpha_between_rows has n-1 entries; all ones reproduces Sellers exactly.
+double film_superposition_corrected(const std::vector<double>& eta_rows,
+                                    const std::vector<double>& alpha_between_rows);
+
+// Gao Eq. (5): the published FORM of alpha. a and b are REQUIRED -- the
+// paper never prints its fitted values.
+double mainstream_temperature_correction(double mass_flow_ratio, double a, double b);
+
+double equivalent_slot_width(double hole_area, double pitch);           // Eq. (9)
+double equivalent_blowing_ratio(double M0, double A0, double Ae);        // Eq. (10)
+```
+
+Both superposition forms also have `..._and_gradient` variants returning
+`(eta, d eta/d eta_i)`, built from partial products so a fully effective row
+does not divide by zero.
+
+**Sellers overestimates, and worsens with row count** -- Gao's measurement,
+and the reason effusion cannot simply reuse a few-row film model. `alpha` is
+the correction: an energy balance on mainstream entrained at each injection
+(Gao Eqs. 3-4), bounded in [0,1], equal to 1 for uncorrected Sellers. See
+`validation/cooling/extractions/film_superposition.md`.
+
 ---
 
 ## Acoustics (acoustics.h)

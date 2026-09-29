@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <algorithm>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace combaero::cooling {
 
@@ -209,6 +211,183 @@ std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivativ
     const D dP = D::seed(P, 1);
     const D r = baldauf_eta_impl<D>(x_over_D, dM, dP, alpha_deg, s_over_D, Tu);
     return {r.v, r.d[0], r.d[1]};
+}
+
+// -------------------------------------------------------------
+// Multi-row film superposition
+// -------------------------------------------------------------
+
+namespace {
+
+void check_rows(const std::vector<double>& eta_rows) {
+    if (eta_rows.empty()) {
+        throw std::invalid_argument(
+            "film superposition: at least one row is required");
+    }
+    for (double e : eta_rows) {
+        if (!(e >= 0.0 && e <= 1.0)) {
+            throw std::invalid_argument(
+                "film superposition: each row effectiveness must lie in "
+                "[0, 1]; eta is a normalised temperature difference");
+        }
+    }
+}
+
+void check_alphas(const std::vector<double>& eta_rows,
+                  const std::vector<double>& alphas) {
+    if (alphas.size() + 1 != eta_rows.size()) {
+        throw std::invalid_argument(
+            "film superposition: alpha_between_rows must have exactly one "
+            "fewer entry than eta_rows -- alpha_j is the correction applied "
+            "between row j and row j+1");
+    }
+    for (double a : alphas) {
+        if (!(a >= 0.0 && a <= 1.0)) {
+            throw std::invalid_argument(
+                "film superposition: each alpha must lie in [0, 1]. It is "
+                "the fraction of the film's temperature deficit surviving "
+                "mixing to the next row; 1 is uncorrected Sellers, and a "
+                "value above 1 would create coolant.");
+        }
+    }
+}
+
+}  // anonymous namespace
+
+double film_superposition_sellers(const std::vector<double>& eta_rows) {
+    check_rows(eta_rows);
+    double remaining = 1.0;
+    for (double e : eta_rows) {
+        remaining *= (1.0 - e);
+    }
+    return 1.0 - remaining;
+}
+
+std::pair<double, std::vector<double>> film_superposition_sellers_and_gradient(
+    const std::vector<double>& eta_rows) {
+    check_rows(eta_rows);
+    const std::size_t n = eta_rows.size();
+
+    // Prefix and suffix products of (1 - eta), so the "product excluding i"
+    // comes out without dividing -- a fully effective row would otherwise
+    // divide by zero.
+    std::vector<double> pre(n + 1, 1.0), suf(n + 1, 1.0);
+    for (std::size_t i = 0; i < n; ++i) {
+        pre[i + 1] = pre[i] * (1.0 - eta_rows[i]);
+    }
+    for (std::size_t i = n; i-- > 0;) {
+        suf[i] = suf[i + 1] * (1.0 - eta_rows[i]);
+    }
+
+    std::vector<double> grad(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        grad[i] = pre[i] * suf[i + 1];
+    }
+    return {1.0 - pre[n], grad};
+}
+
+double film_superposition_corrected(
+    const std::vector<double>& eta_rows,
+    const std::vector<double>& alpha_between_rows) {
+    check_rows(eta_rows);
+    check_alphas(eta_rows, alpha_between_rows);
+    const std::size_t n = eta_rows.size();
+
+    double total = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+        // prod_{j=i..n-2} alpha_j  (zero-based: alpha_j sits between rows
+        // j and j+1, so the film from row i passes alphas i .. n-2)
+        double a = 1.0;
+        for (std::size_t j = i; j + 1 < n; ++j) {
+            a *= alpha_between_rows.at(j);
+        }
+        // prod_{k=i+1..n-1} (1 - eta_k)
+        double b = 1.0;
+        for (std::size_t k = i + 1; k < n; ++k) {
+            b *= (1.0 - eta_rows[k]);
+        }
+        total += eta_rows[i] * a * b;
+    }
+    return total;
+}
+
+std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient(
+    const std::vector<double>& eta_rows,
+    const std::vector<double>& alpha_between_rows) {
+    check_rows(eta_rows);
+    check_alphas(eta_rows, alpha_between_rows);
+    const std::size_t n = eta_rows.size();
+
+    std::vector<double> A(n, 1.0);   // prod of alphas from row i onward
+    for (std::size_t i = 0; i < n; ++i) {
+        double a = 1.0;
+        for (std::size_t j = i; j + 1 < n; ++j) {
+            a *= alpha_between_rows.at(j);
+        }
+        A[i] = a;
+    }
+    std::vector<double> suf(n + 1, 1.0);   // prod_{k>=i} (1 - eta_k)
+    for (std::size_t i = n; i-- > 0;) {
+        suf[i] = suf[i + 1] * (1.0 - eta_rows[i]);
+    }
+
+    double total = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+        total += eta_rows[i] * A[i] * suf[i + 1];
+    }
+
+    // d eta / d eta_m = A_m suf_{m+1}
+    //                 - sum_{i<m} eta_i A_i prod_{k=i+1..n-1, k!=m} (1-eta_k)
+    // The inner product is formed by an explicit loop rather than dividing
+    // suf by (1 - eta_m), which would blow up for a fully effective row.
+    std::vector<double> grad(n, 0.0);
+    for (std::size_t m = 0; m < n; ++m) {
+        double g = A[m] * suf[m + 1];
+        for (std::size_t i = 0; i < m; ++i) {
+            double prod = 1.0;
+            for (std::size_t k = i + 1; k < n; ++k) {
+                if (k != m) {
+                    prod *= (1.0 - eta_rows[k]);
+                }
+            }
+            g -= eta_rows[i] * A[i] * prod;
+        }
+        grad[m] = g;
+    }
+    return {total, grad};
+}
+
+double mainstream_temperature_correction(double mass_flow_ratio, double a,
+                                         double b) {
+    if (mass_flow_ratio < 0.0) {
+        throw std::invalid_argument(
+            "mainstream_temperature_correction: mass_flow_ratio must be "
+            "non-negative");
+    }
+    const double ar = a * mass_flow_ratio;
+    if (ar + 1.0 <= 0.0) {
+        throw std::invalid_argument(
+            "mainstream_temperature_correction: a * mass_flow_ratio + 1 must "
+            "be positive");
+    }
+    return ar / (ar + 1.0) + b;
+}
+
+double equivalent_slot_width(double hole_area, double pitch) {
+    if (hole_area <= 0.0 || pitch <= 0.0) {
+        throw std::invalid_argument(
+            "equivalent_slot_width: hole_area and pitch must be positive");
+    }
+    return hole_area / pitch;
+}
+
+double equivalent_blowing_ratio(double M_baseline, double area_baseline,
+                                double area_equivalent) {
+    if (area_equivalent <= 0.0 || area_baseline <= 0.0) {
+        throw std::invalid_argument(
+            "equivalent_blowing_ratio: areas must be positive");
+    }
+    return M_baseline * area_baseline / area_equivalent;
 }
 
 }  // namespace combaero::cooling
