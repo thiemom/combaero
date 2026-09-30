@@ -47,6 +47,29 @@ to_vec(py::array_t<double, py::array::c_style | py::array::forcecast> arr) {
   return v;
 }
 
+// A Python callable installed as the global warning handler.
+//
+// Deliberately a named type rather than a lambda: it lets
+// get_warning_handler() recognise, via std::function::target, that the
+// current handler is one this module wrapped, and hand back the ORIGINAL
+// Python object instead of wrapping it a second time.
+//
+// Without that, save-and-restore -- which is exactly what
+// suppress_warnings() does -- grew the chain by one layer every time:
+// py::object inside a std::function inside a py::cpp_function inside the
+// next std::function. The layers cost nothing until a warning is emitted,
+// at which point warn() recurses through all of them. Measured: 6000
+// round-trips survived, 12000 overflowed the C stack and killed the
+// process with no catchable Python error.
+struct PyWarningHandler {
+  py::object fn;
+
+  void operator()(const std::string &msg) const {
+    py::gil_scoped_acquire gil;
+    fn(msg);
+  }
+};
+
 PYBIND11_MODULE(_core, m) {
 
   // ---------------------------------------------------------------------
@@ -3603,10 +3626,7 @@ PYBIND11_MODULE(_core, m) {
         if (handler.is_none()) {
           combaero::set_warning_handler({});
         } else {
-          combaero::set_warning_handler([handler](const std::string &msg) {
-            py::gil_scoped_acquire gil;
-            handler(msg);
-          });
+          combaero::set_warning_handler(PyWarningHandler{std::move(handler)});
         }
       },
       py::arg("handler"),
@@ -3623,9 +3643,18 @@ PYBIND11_MODULE(_core, m) {
   m.def(
       "get_warning_handler",
       []() -> py::object {
-        // Return the current C++ handler wrapped as a Python callable.
-        // Used by suppress_warnings() to save/restore the handler.
+        // Used by suppress_warnings() to save and restore the handler.
         auto h = combaero::get_warning_handler();
+        // If this module installed the current handler, hand back the very
+        // object that was passed in. Wrapping it again would make every
+        // save-and-restore cycle add a layer -- see PyWarningHandler.
+        if (const auto *py_handler = h.target<PyWarningHandler>()) {
+          return py_handler->fn;
+        }
+        // A C++-side handler (including the default) still has to be
+        // wrapped; there is no Python object to return. That wrapper is not
+        // a PyWarningHandler, so re-installing it takes the branch above's
+        // negative path exactly once and then stops growing.
         return py::cpp_function([h](const std::string &msg) { h(msg); });
       },
       "Return the current warning handler as a Python callable.\n\n"
