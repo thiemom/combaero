@@ -48,7 +48,14 @@ def test_owns_only_the_effusion_effectiveness_series(andrei) -> None:
     """
     assert all(fr.owns(s) for s in andrei)
 
-    others = [s for s in load_dataset() if not s.label.startswith("andrei2014/")]
+    # murray2018 is the other family this runner owns: same quantity, but
+    # its abscissa is x/D where andrei2014's is x/s_x.
+    murray = [s for s in load_dataset() if s.label.startswith("murray2018/")]
+    assert murray, "murray2018 is not in the dataset"
+    curves = [s for s in murray if s.kind != "frame"]
+    assert all(fr.owns(s) for s in curves), "a murray2018 curve went unclaimed"
+
+    others = [s for s in load_dataset() if not s.label.startswith(("andrei2014/", "murray2018/"))]
     claimed = [s.label for s in others if fr.owns(s)]
     assert not claimed, f"film runner claims series it does not score: {claimed}"
 
@@ -228,3 +235,202 @@ def test_gao_alpha_cannot_be_fitted_on_this_family(andrei) -> None:
         "all six curves now fall the same side of the data; Gao's alpha could "
         f"be fitted after all -- biases {[round(b, 3) for b in biases]}"
     )
+
+
+@pytest.fixture(scope="module")
+def murray():
+    series = [s for s in load_dataset() if s.label.startswith("murray2018/")]
+    assert series, "murray2018 is not in the dataset"
+    return series
+
+
+def _interp(xs, ys, x):
+    if x < xs[0] or x > xs[-1]:
+        return None
+    for i in range(1, len(xs)):
+        if xs[i] >= x:
+            span = xs[i] - xs[i - 1]
+            t = (x - xs[i - 1]) / span if span else 0.0
+            return ys[i - 1] + t * (ys[i] - ys[i - 1])
+    return None
+
+
+def _points(series):
+    pts = sorted((p.x, p.y) for p in load_points(series))
+    return [a for a, _ in pts], [b for _, b in pts]
+
+
+def test_murray_row_comb_is_staggered_half_pitch(murray) -> None:
+    """10 rows at half the primary pitch, not 5 at the full pitch.
+
+    The plate is staggered, so the film meets a row every 5.75/2 = 2.875 D.
+    Measured rather than assumed: clustering the steepest rises on all five
+    curves gives a dominant gap of 2.7-3.1. It also closes the hole count --
+    5 primary rows plus 5 staggered is 10, and the paper's Geometry 2 is a
+    4 x 5 primary array with 40 holes including the staggered ones.
+    """
+    curve = next(s for s in murray if s.label.endswith("exp_M0p19"))
+    rows = fr.row_positions(curve)
+    assert len(rows) == 10
+    gaps = [rows[i + 1] - rows[i] for i in range(len(rows) - 1)]
+    assert all(g == pytest.approx(5.75 / 2.0) for g in gaps)
+
+    # The comb must end before the data does -- the plate stops at row 10
+    # and the film then decays with no further injection.
+    xs, ys = _points(curve)
+    assert rows[-1] < max(xs), "the last row sits past the data"
+    tail = [y for x, y in zip(xs, ys, strict=False) if x > rows[-1] + 0.5]
+    assert len(tail) >= 3, "no post-plate tail to check"
+    assert tail[-1] < tail[0], "eta does not decay after the last row"
+
+
+def test_murray_abscissa_is_diameters_not_pitches(murray) -> None:
+    """The runner must read x/D and x/s_x differently.
+
+    `andrei2014` plots streamwise distance in PITCHES and `murray2018` in
+    DIAMETERS. Treating one as the other misplaces every row by the pitch
+    ratio -- here a factor of 2.875 -- which would look like a modest bias
+    rather than a bug.
+    """
+    m = next(s for s in murray if s.label.endswith("exp_M0p19"))
+    a = next(s for s in load_dataset() if s.label.startswith("andrei2014/"))
+    assert m.x_axis == "x_over_D" and a.x_axis == "x_over_sx"
+    assert fr._diameters_per_x(m) == 1.0
+    assert fr._diameters_per_x(a) == pytest.approx(float(a.geometry["sx_over_d"]))
+
+
+def test_murray_is_uniformly_over_predicted(murray) -> None:
+    """Every Murray curve falls the SAME side, unlike andrei2014.
+
+    This is what makes the family usable for fitting Gao's alpha, which is
+    bounded [0, 1] and can only ever reduce. `andrei2014` split three over
+    and three under -- see the test above -- because Baldauf's lift-off
+    collapse drives its BR 2-3 curves the other way. Murray runs M 0.19 to
+    0.96, entirely below that peak, so the closure does not change sign and
+    the superposition error is measurable on its own.
+
+    If this ever goes red, the family has stopped being a valid fitting set
+    and any alpha fitted on it must be revisited.
+    """
+    biases = {}
+    for series in (s for s in murray if s.kind == "measured"):
+        with cb.suppress_warnings():
+            errs = [r.rel_error for r in fr.run_series(series) if r.rel_error is not None]
+        assert errs, series.label
+        biases[series.label.split("/")[1]] = sum(errs) / len(errs)
+
+    assert len(biases) == 3
+    assert all(b > 0 for b in biases.values()), (
+        f"not all Murray curves over-predict, so alpha cannot serve them all: {biases}"
+    )
+    # And the over-prediction must grow with blowing, which is the trend
+    # alpha has to reproduce.
+    assert biases["fig6_eta_exp_M0p96"] > biases["fig6_eta_exp_M0p19"]
+
+
+def test_superposition_is_the_larger_error_not_the_closure(murray) -> None:
+    """The decomposition #420 could not make.
+
+    Figure 6 carries the paper's OWN Sellers superposition over a
+    single-hole CFD field, so three curves share one axis:
+
+        their/exp   isolates the SUPERPOSITION -- their per-row input is CFD
+        ours/their  isolates the CLOSURE       -- both use Sellers
+        ours/exp    the total
+
+    Measured over x/D 6-27: superposition 1.18x at M = 0.19 rising to 1.74x
+    at M = 0.96, while the closure only moves 1.13x to 1.28x. The
+    superposition is the dominant term and the one that responds to blowing,
+    which is what justifies spending a correction on it.
+    """
+    ratios = {}
+    for tag in ("M0p19", "M0p96"):
+        exp = next(s for s in murray if s.label.endswith(f"exp_{tag}"))
+        sup = next(s for s in murray if s.label.endswith(f"sup_{tag}"))
+        ex, ey = _points(exp)
+        sx, sy = _points(sup)
+        sup_r, clo_r = [], []
+        with cb.suppress_warnings():
+            for st in range(6, 28):
+                e = _interp(ex, ey, st)
+                t = _interp(sx, sy, st)
+                o, _ = fr.predict(exp, float(st))
+                if not (e and t and o) or e < 0.02:
+                    continue
+                sup_r.append(t / e)
+                clo_r.append(o / t)
+        assert sup_r, tag
+        ratios[tag] = (sum(sup_r) / len(sup_r), sum(clo_r) / len(clo_r))
+
+    for tag, (sup_err, clo_err) in ratios.items():
+        assert sup_err > 1.0, f"{tag}: superposition does not over-predict"
+        assert sup_err > clo_err, (
+            f"{tag}: the closure ({clo_err:.2f}x) now exceeds the "
+            f"superposition ({sup_err:.2f}x); the decomposition has changed"
+        )
+
+    # The superposition error responds to blowing far more than the closure.
+    d_sup = ratios["M0p96"][0] - ratios["M0p19"][0]
+    d_clo = ratios["M0p96"][1] - ratios["M0p19"][1]
+    assert d_sup > 2 * d_clo, f"superposition grew {d_sup:.2f} against the closure's {d_clo:.2f}"
+
+
+def test_murray_calibration_ticks_land_on_round_numbers() -> None:
+    """The digitisation's own calibration evidence, checked.
+
+    `fig6_calibration_M0p*.csv` were digitised in DATA coordinates, so the
+    tick marks must fall on the printed round numbers. They are not declared
+    as series: `kind: frame` means a straight panel EDGE in this harness,
+    fitted as a power law to measure skew, and these are a traversal of
+    ticks and corners that includes x = 0 -- which makes `log(x)` blow up.
+    Checking them here is both correct and stronger than a slope fit.
+
+    Traversal order, stated by the digitiser and load-bearing here: from the
+    origin counter-clockwise -- seven x ticks along the bottom, then the
+    bottom-right, top-right and top-left corners, then six y ticks down the
+    left side. These files are therefore NOT sorted.
+
+    Three panels digitised independently agreeing to ~0.4% is the real
+    cross-check; a log/linear slip or a misread tick would not reproduce
+    across all three.
+    """
+    import csv
+
+    x_ticks = [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
+    y_ticks = [0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+    x_span, y_span = 32.0, 0.7
+
+    folder = Path(__file__).resolve().parents[2] / "validation" / "cooling" / "data" / "murray2018"
+    files = sorted(folder.glob("fig6_calibration_*.csv"))
+    assert len(files) == 3, f"expected three calibration panels, got {len(files)}"
+
+    for path in files:
+        rows = [
+            (float(r[0]), float(r[1]))
+            for r in csv.reader(path.open())
+            if not r[0].strip().startswith("x")
+        ]
+        assert len(rows) == 16, f"{path.name}: {len(rows)} points, expected 16"
+
+        xs, corners, ys = rows[0:7], rows[7:10], rows[10:16]
+
+        worst_x = max(abs(p[0] - t) for p, t in zip(xs, x_ticks, strict=True))
+        worst_y = max(abs(p[1] - t) for p, t in zip(ys, y_ticks, strict=True))
+        assert worst_x / x_span < 0.005, (
+            f"{path.name}: x ticks off by {worst_x:.3f} ({worst_x / x_span:.2%} of span)"
+        )
+        assert worst_y / y_span < 0.01, (
+            f"{path.name}: y ticks off by {worst_y:.4f} ({worst_y / y_span:.2%} of span)"
+        )
+
+        # x ticks lie on y = 0 and y ticks on x = 0; that is what makes them
+        # ticks rather than arbitrary points, and it catches a traversal
+        # read in the wrong order.
+        assert max(abs(p[1]) for p in xs) < 0.01, f"{path.name}: x ticks off the axis"
+        assert max(abs(p[0]) for p in ys) < 0.2, f"{path.name}: y ticks off the axis"
+
+        # The three corners close the plot area at (32, 0), (32, 0.7), (0, 0.7).
+        br, tr, tl = corners
+        assert abs(br[0] - x_span) < 0.2 and abs(br[1]) < 0.01, f"{path.name}: BR"
+        assert abs(tr[0] - x_span) < 0.2 and abs(tr[1] - y_span) < 0.01, f"{path.name}: TR"
+        assert abs(tl[0]) < 0.2 and abs(tl[1] - y_span) < 0.01, f"{path.name}: TL"

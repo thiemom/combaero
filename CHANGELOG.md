@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Murray & Ireland (2018) Figure 6, and the decomposition it makes
+  possible.** Five digitised curves on a 5.75D-pitch effusion plate: three
+  PSP measurements (M = 0.19, 0.48, 0.96) and two of the paper's OWN Sellers
+  superpositions over a single-hole CFD field (M = 0.19, 0.96). The
+  superposition curves carry `kind: correlation` and `scores: null` -- they
+  are model output, never scored against, but they are the reference that
+  separates the two error sources #420 could not tell apart.
+
+  **The superposition is the dominant error, not the closure.** Their
+  per-row input is CFD and ours is Baldauf, so with Sellers common to both:
+
+  | M | superposition (theirs/exp) | closure (ours/theirs) | total |
+  |---|---|---|---|
+  | 0.19 | 1.18x | 1.13x | 1.33x |
+  | 0.96 | **1.74x** | 1.28x | 2.24x |
+
+  The superposition error roughly quadruples its excess with blowing while
+  the closure barely moves -- which is what justifies spending a correction
+  on the superposition rather than on the per-row term.
+
+  **And this family CAN carry Gao's alpha, unlike `andrei2014`.** Scored
+  against Baldauf + Sellers the bias is +23.5%, +22.3% and +96.7% -- all
+  over-predicted, because M 0.19-0.96 sits entirely below the lift-off peak
+  that drove Andrei's BR 2-3 curves the other way. alpha only ever reduces,
+  so a family that falls on one side is a prerequisite for fitting it.
+
+  The digitisation reproduces the paper's own prose independently:
+  superposition/experiment is 1.74x mean at M = 0.96 rising to 2.09x by
+  x/D 28, against the paper's "around twice at a blowing ratio of
+  approximately one", and only 1.18x at M = 0.19.
+
+  Notable extraction findings, all recorded in the metadata header: the row
+  comb is **10 rows at 2.875D, not 5 at 5.75D** -- the plate is staggered so
+  the film meets a row every half pitch, measured from the curves' own
+  injection points and confirmed by the hole count (5 primary + 5 staggered
+  against the paper's 4 x 5 array of 40 holes); the source file named
+  "M=0.4" is the **M = 0.48** panel; and calibration ticks digitised in data
+  coordinates land within 0.32% (x) and 0.41% (y) of the printed round
+  numbers across all three panels independently.
+
 - **`b_0_override` on the Baldauf film correlation**, so the paper's Table 4
   reading of Eq. (31) can be tested. Both entry points take it after
   `status`; NaN (the default) uses Eq. (31) as printed, and Python takes
@@ -1134,6 +1174,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default `friction_model="haaland"` is unchanged.
 
 ### Changed
+
+- **The film runner reads both `x_over_sx` and `x_over_D`.** `andrei2014`
+  plots streamwise distance in pitches and `murray2018` in diameters;
+  treating one as the other would misplace every row by the pitch ratio,
+  which looks like a modest bias rather than a bug. The row comb step and
+  the row-to-sample distance now follow the declared abscissa.
 
 - **Murray & Ireland (2018) read, and it separates #420's two error
   sources.** #420 found Baldauf + Sellers failing on `andrei2014` with the

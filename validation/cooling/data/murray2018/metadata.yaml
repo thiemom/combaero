@@ -1,0 +1,302 @@
+# Murray & Ireland (2018) Figure 6 -- spanwise averaged film effectiveness on
+# a 5.75D-pitch effusion plate, at three blowing ratios.
+#
+# WHY THIS SOURCE. #420 scored Baldauf + Sellers against andrei2014 and it
+# failed with the error CHANGING SIGN (+61% at BR 1, -81% at BR 3), which
+# left two candidates -- the superposition or the per-row closure -- and no
+# way to separate them. This figure separates them, because it plots the
+# paper's OWN Sellers superposition applied to a single-hole CFD result
+# alongside the measurement. That isolates the superposition from the
+# closure: their per-row input is CFD, not a correlation.
+#
+# See validation/cooling/extractions/murray_ireland_2018_effusion_superposition.md
+# for what the paper concludes and why Figure 6 was chosen over Figures 4,
+# 7 and 9.
+#
+# WHAT IS COMMITTED. Three experimental curves (M = 0.19, 0.48, 0.96) and
+# two superposition curves (M = 0.19, 0.96 -- the paper plots a third at
+# 0.48 but it was not digitised). Plus one calibration file per panel.
+#
+# GEOMETRY (paper section 2.2, all stated):
+#   hole diameter D    6.0 mm
+#   hole angle         30 deg to the plate surface
+#   primary pitch      5.75 D, STAGGERED
+#   Geometry 2 array   4 x 5 primary holes, 40 holes including the staggered
+#   density ratio      ~1
+#   turbulence         4.43% to 4.72% (stated, unlike andrei2014)
+#
+# THE ROW COMB IS 10 ROWS AT 2.875 D, NOT 5 AT 5.75 D. The plate is
+# staggered, so the film sees a row every HALF primary pitch. Measured, not
+# assumed: clustering the steepest rises on all five curves gives a dominant
+# gap of 2.7-3.1 with mean 2.9 against the predicted 5.75/2 = 2.875. That
+# also closes the hole count -- 5 primary rows plus 5 staggered is 10, and
+# 4 x 5 primary with 40 holes including staggered is the same plate.
+#
+# ROW PHASE 1.16, recovered as for andrei2014 and cross-checked three ways:
+#
+#   1. INDEPENDENTLY FROM EACH CURVE. Scoring a 2.875-period comb by how much
+#      total rise falls in the first quarter-period gives 1.18, 1.11, 1.21
+#      and 1.14 on four of the five curves -- a spread of 0.10, or 3.5% of a
+#      period. The fifth, M = 0.96 experimental, gives 0.69. That curve is
+#      the flattest of the set (eta peaks at 0.30 against 0.46-0.48 for the
+#      others), so its injection rises are the smallest and its phase the
+#      least determined; it is recorded as an outlier rather than averaged
+#      in. Consensus of the other four: 1.16.
+#   2. HOLE COUNT. 10 rows from 1.16 at 2.875 puts the last at 27.0, and no
+#      curve shows a steep rise beyond 27.6.
+#   3. WHAT HAPPENS AFTER. Past x/D 27 the plate has ended, so eta must
+#      decay with no further injection -- and all three experimental curves
+#      do, monotonically, by -0.108 to -0.121 over their last four or five
+#      points. A comb one row too long would predict another jump there.
+#
+# CALIBRATION. `fig6_calibration_M0p*.csv` sit in this directory but are
+# deliberately NOT declared as series. They were digitised in DATA
+# coordinates, so the tick marks are a direct check that the axis mapping is
+# right: they must land on round numbers. Traversal order is from the origin
+# counter-clockwise -- seven x ticks left to right along the bottom, then the
+# bottom-right, top-right and top-left plot corners, then six y ticks top to
+# bottom down the left side. That order IS the file's meaning, so unlike the
+# curve files these are NOT sorted.
+#
+# `kind: frame` would be the wrong label and the harness says so: a frame
+# here is a straight panel EDGE, fitted as a power law to measure skew, and
+# these are a traversal of ticks and corners that includes x = 0. They are
+# checked instead by
+# python/tests/test_film_runner.py::test_murray_calibration_ticks_land_on_round_numbers,
+# which is a stronger guard than a slope fit would have been.
+#
+# Measured deviation from the round numbers, over all three panels:
+#
+#   x ticks (0, 5 .. 30)        worst 0.104   0.27% to 0.32% of the span
+#   y ticks (0.1 .. 0.6)        worst 0.0029  0.26% to 0.41% of the span
+#   corners against (32, 0.7)   within 0.06 in x, 0.0023 in y
+#
+# Three panels digitised separately agreeing to the same ~0.4% is the
+# cross-check; a log/linear slip or a misread tick would not reproduce.
+# Digitisation precision is therefore ~0.4%, negligible beside the paper's
+# own 15% experimental error, so `uncertainty` is that 15% unmodified.
+#
+# THE DIGITISATION REPRODUCES THE PAPER'S OWN HEADLINE. Murray writes that
+# "by a blowing ratio of approximately one, spanwise averaged film
+# effectiveness values via the superposition method were around twice those
+# displayed by the multi-hole CFD simulation and PSP experiment". From these
+# coordinates, superposition/experiment over x/D 5-28 is a mean of 1.74 at
+# M = 0.96, reaching 2.09 by x/D 28 -- and only 1.18 at M = 0.19, which is
+# the same growth with blowing the paper describes. That the prose claim
+# falls out of an independent reading of the figure is the strongest check
+# available on both.
+
+paper:
+  name: murray2018
+  citation: >-
+    Murray, A.V., Ireland, P.T., Wong, T.H., Tang, S.W. and Rawlinson, A.J.
+    (2018). "High Resolution Experimental and Computational Methods for
+    Modelling Multiple Row Effusion Cooling Performance." International
+    Journal of Turbomachinery, Propulsion and Power 3(1), 4.
+    DOI 10.3390/ijtpp3010004. Open access (MDPI, CC BY).
+  secondary: false
+
+files:
+  # -- experimental, PSP via the heat-mass transfer analogy ----------------
+  - path: fig6_eta_exp_M0p19.csv
+    after: null
+    page: 9
+    item: "Figure 6, left panel, blue"
+    series: "PSP spanwise averaged film effectiveness, M = 0.19, S = 5.75D"
+    figure: "6"
+    panel: "M=0.19"
+    geometry: {D_mm: 6.0, angle_deg: 30.0, pitch_over_d: 5.75,
+               sx_over_d: 2.875, sz_over_d: 5.75, rows: 10,
+               row1_x_over_sx: 1.16, staggered: true}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.15
+    cross_check: >-
+      Peak 0.4595 against roughly 0.46 read off the printed panel. The row
+      comb recovered from this curve's own injection points gives a phase of
+      1.18 against the four-curve consensus of 1.16, and its post-plate tail
+      decays monotonically by -0.108 over its last five points, as it must
+      with no coolant downstream of row 10.
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 5, 10, 15, 20, 25, 30]
+      x_multiplier: 1.0
+      y_ticks: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      y_limits: [null, 0.7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [0, 32]
+      plot_y_limits: [0, 0.7]
+
+  - path: fig6_eta_exp_M0p48.csv
+    after: null
+    page: 9
+    item: "Figure 6, centre panel, blue"
+    series: "PSP spanwise averaged film effectiveness, M = 0.48, S = 5.75D"
+    figure: "6"
+    panel: "M=0.48"
+    geometry: {D_mm: 6.0, angle_deg: 30.0, pitch_over_d: 5.75,
+               sx_over_d: 2.875, sz_over_d: 5.75, rows: 10,
+               row1_x_over_sx: 1.16, staggered: true}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.15
+    cross_check: >-
+      The source file was originally named "M=0.4"; it is the M = 0.48
+      panel. Identified by peak: 0.4783 against the centre panel's printed
+      peak of roughly 0.47, with the 0.19 and 0.96 panels accounted for by
+      the other two files. Confirmed by the digitiser and the source file
+      renamed, so the discrepancy no longer exists upstream -- recorded here
+      because the identification, not the name, is what the reader needs.
+      Recovered phase 1.11 against the consensus 1.16; tail decays -0.121.
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 5, 10, 15, 20, 25, 30]
+      x_multiplier: 1.0
+      y_ticks: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      y_limits: [null, 0.7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [0, 32]
+      plot_y_limits: [0, 0.7]
+
+  - path: fig6_eta_exp_M0p96.csv
+    after: null
+    page: 9
+    item: "Figure 6, right panel, blue"
+    series: "PSP spanwise averaged film effectiveness, M = 0.96, S = 5.75D"
+    figure: "6"
+    panel: "M=0.96"
+    geometry: {D_mm: 6.0, angle_deg: 30.0, pitch_over_d: 5.75,
+               sx_over_d: 2.875, sz_over_d: 5.75, rows: 10,
+               row1_x_over_sx: 1.16, staggered: true}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.15
+    cross_check: >-
+      Peak 0.3011 against roughly 0.30 printed -- markedly lower than the
+      other two panels, which is the lift-off the paper describes. This is
+      the curve whose recovered phase (0.69) disagrees with the other four:
+      being the flattest of the set its injection rises are smallest, so its
+      phase is the least determined. Tail decays -0.108 over five points.
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 5, 10, 15, 20, 25, 30]
+      x_multiplier: 1.0
+      y_ticks: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      y_limits: [null, 0.7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [0, 32]
+      plot_y_limits: [0, 0.7]
+
+  # -- the paper's OWN Sellers superposition over a single-hole CFD result.
+  #
+  # `kind: correlation` and `scores: null` on purpose. This is model output,
+  # never a source of truth, and the harness must not score combaero against
+  # another model as though it were data. It is committed because it is the
+  # reference that SEPARATES the two error sources: their superposition uses
+  # a CFD single-hole field where combaero uses Baldauf, so the gap between
+  # the two curves is the closure and the gap to the experiment is the
+  # superposition.
+  - path: fig6_eta_sup_M0p19.csv
+    after: null
+    page: 9
+    item: "Figure 6, left panel, yellow"
+    series: "Sellers superposition of a single-hole CFD result, M = 0.19"
+    figure: "6"
+    panel: "M=0.19"
+    geometry: {D_mm: 6.0, angle_deg: 30.0, pitch_over_d: 5.75,
+               sx_over_d: 2.875, sz_over_d: 5.75, rows: 10,
+               row1_x_over_sx: 1.16, staggered: true}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Runs above the measurement at every station, by a mean factor of 1.18
+      over x/D 5-28, which is the over-prediction the paper reports and is
+      far smaller here than at M = 0.96. Recovered phase 1.21, and 66% of
+      all rise falls in the first quarter-period -- the sharpest comb of the
+      five, as a simulation with no measurement noise should give.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 5, 10, 15, 20, 25, 30]
+      x_multiplier: 1.0
+      y_ticks: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      y_limits: [null, 0.7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [0, 32]
+      plot_y_limits: [0, 0.7]
+
+  - path: fig6_eta_sup_M0p96.csv
+    after: null
+    page: 9
+    item: "Figure 6, right panel, yellow"
+    series: "Sellers superposition of a single-hole CFD result, M = 0.96"
+    figure: "6"
+    panel: "M=0.96"
+    geometry: {D_mm: 6.0, angle_deg: 30.0, pitch_over_d: 5.75,
+               sx_over_d: 2.875, sz_over_d: 5.75, rows: 10,
+               row1_x_over_sx: 1.16, staggered: true}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Peaks at 0.5603 where the measurement reaches only 0.3011 -- a mean
+      factor of 1.74 over x/D 5-28 and 2.09 by x/D 28. The paper states
+      "around twice" at a blowing ratio of approximately one, so an
+      independent reading of the figure reproduces its own prose claim.
+      Note this curve peaks at essentially the same level as the M = 0.19
+      one (0.5596), which is the point: superposition barely responds to
+      blowing while the real plate collapses.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 5, 10, 15, 20, 25, 30]
+      x_multiplier: 1.0
+      y_ticks: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      y_limits: [null, 0.7]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [0, 32]
+      plot_y_limits: [0, 0.7]
