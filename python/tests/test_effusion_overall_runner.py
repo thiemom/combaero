@@ -532,6 +532,22 @@ def test_fig10_calibration_and_why_the_skew_is_not_corrected() -> None:
         f"against {worst_y:.5f}); apply it and re-derive the data"
     )
 
+    # And the committed DATA must still be the raw picks, not a corrected
+    # rebase. Found by falsification: applying the correction to the two
+    # scored curves is caught by the Table 3 check only because the other
+    # six stay raw -- a UNIFORM correction would slip through, since it
+    # moves eta by at most 0.005 and the acceptance bands are wider than
+    # that. So two exact coordinates are pinned as the literal record of
+    # what was digitised.
+    for name, first, last in (
+        ("effusion_B", (0.15308, 0.51094), (1.55143, 0.69329)),
+        ("effusion_C", (0.09499, 0.51304), (1.57724, 0.79076)),
+    ):
+        series = next(x for x in load_dataset() if x.label == f"andrews1988/fig10_eta_{name}")
+        pts = sorted((q.x, q.y) for q in load_points(series))
+        assert pts[0] == pytest.approx(first, abs=5e-5), f"{name} first point"
+        assert pts[-1] == pytest.approx(last, abs=5e-5), f"{name} last point"
+
 
 def test_the_runner_does_not_reimplement_the_correlation(plates) -> None:
     """Predictions must move when the real correlation moves."""

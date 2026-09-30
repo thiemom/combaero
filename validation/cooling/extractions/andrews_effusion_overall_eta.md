@@ -256,3 +256,37 @@ plates as good fits and erase the finding entirely. That is why
 **An overall-effectiveness correlation as the closure.** It would already
 contain the internal convection the network computes, and the two would
 double-count. `eta` is an output here and must stay one.
+
+## Falsification
+
+Eight perturbations, each applied alone and reverted.
+
+| perturbation | result |
+|---|---|
+| `predict()` adds Baldauf's film back in | RED x3 (both plates, element/runner tie, rollup rows) |
+| reporting group per jet regime instead of per plate | RED x2 |
+| gas side uses the duct WIDTH, not the hydraulic diameter | RED |
+| the coolant heat-up term is added to `predict()` | RED x3 |
+| element halves the gas side in the denominator | RED x2 |
+| element takes the jet ratios against the COOLANT density | RED |
+| Fig. 10's A/B and A/C curves swapped | RED (Table 3) |
+| the skew correction IS applied to the committed data | RED (Table 3) |
+
+**Two results worth recording, because the first read was wrong both
+times.**
+
+The heat-up perturbation first looked GREEN, because it was run only
+against the acceptance test, whose bands are deliberately wide -- plate C
+moves to +0.1% and plate B to +19.5%, both still inside. Run against the
+whole file it is red three ways, including the element/runner agreement
+test. The lesson is about the falsification, not the code: a wide
+acceptance band is not the binding test, and checking only it understates
+coverage.
+
+The skew perturbation IS caught, but only INCIDENTALLY. Correcting the
+two scored curves breaks Table 3 because the other six stay raw. A
+UNIFORM correction of all eight would slip through: it moves eta by at
+most 0.005, and both the acceptance bands and Table 3's ratios are wider
+than that. So two exact coordinates per scored curve are now pinned in
+`test_fig10_calibration_and_why_the_skew_is_not_corrected` as the literal
+record of what was digitised.
