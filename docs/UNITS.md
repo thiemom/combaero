@@ -711,6 +711,10 @@ All functions use consistent units to avoid conversion errors.
 | `film_superposition_sellers_and_gradient`         | eta_rows: -                                                                                                     | - (eta), - (d eta/d eta_i)        |
 | `film_superposition_corrected`                    | eta_rows: -, alpha_between_rows: -                                                                              | - (eta)                           |
 | `film_superposition_corrected_and_gradient`       | eta_rows: -, alpha_between_rows: -                                                                              | - (eta), - (d eta/d eta_i)        |
+| `mills_entry_length_factor`                       | L_over_D: -                                                                                                     | -                                 |
+| `effusion_approach_nusselt`                       | Re: -, Pr: -, X_over_L: -                                                                                       | -                                 |
+| `effusion_throat_nusselt`                         | Re: -, Pr: -, L_over_D: -                                                                                       | -                                 |
+| `effusion_internal_nusselt`                       | Re: -, Pr: -, X_over_L: -, L_over_D: -                                                                          | -                                 |
 | `mainstream_temperature_correction`               | mass_flow_ratio: -, a: -, b: -                                                                                  | - (alpha)                         |
 | `equivalent_slot_width`                           | hole_area: m^2, pitch: m                                                                                        | m                                 |
 | `equivalent_blowing_ratio`                        | M_baseline: -, area_baseline: m^2, area_equivalent: m^2                                                         | - (M)                             |

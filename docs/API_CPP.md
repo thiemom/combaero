@@ -771,6 +771,44 @@ Table 4** by 36% in `b_0`. Under 5% effect below `M ~ 0.5`, up to 50% at
 `M = 2.5`. See
 `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
 
+### Effusion plate internal heat transfer
+
+Andrews 86-GT-225. A coolant hole cools its wall in two places and the
+paper's point is that the approach dominates at the Reynolds numbers
+effusion runs at.
+
+```cpp
+// Mills' entry-length factor, Eqs. (13) and (14). Two curve fits meeting
+// at L/D = 2; decays to 1 as the hole lengthens.
+double mills_entry_length_factor(double L_over_D);
+
+// Sparrow's hole approach, Eq. (18): 0.881 Re^0.476 Pr^(1/3) X/(pi L)
+double effusion_approach_nusselt(double Re, double Pr, double X_over_L);
+
+// Mills' short-hole throat, Eq. (12): 0.023 Re^0.8 Pr^(1/3) R_Nu
+double effusion_throat_nusselt(double Re, double Pr, double L_over_D);
+
+// Eq. (19): the two summed.
+double effusion_internal_nusselt(double Re, double Pr, double X_over_L,
+                                 double L_over_D);
+```
+
+`Re` is on the **hole diameter**, and every `Nu` is referenced to the
+**hole internal area** `pi D L` -- which is what makes the two summable.
+For the coefficient per unit **plate** area that an effusion element needs:
+
+```
+h_plate = Nu * k / D * A_h / A,   A_h = pi D L,  A = X^2 - pi D^2 / 4
+```
+
+That factor is 3.46 for Andrews' plate C, so it is not optional. The
+conversion is left to the caller because it needs only geometry.
+
+Scored against Andrews' own Fig. 8 at **-13.5% bias, 14.7% RMSE**, labelled
+**accuracy**: the correlations are the 1986 paper and the data the 1988
+one, and same lab plus different study is cross-source. See
+`validation/cooling/extractions/andrews_effusion_internal_h.md`.
+
 ### Multi-row film superposition
 
 ```cpp

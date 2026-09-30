@@ -334,6 +334,91 @@ double equivalent_slot_width(double hole_area, double pitch);
 double equivalent_blowing_ratio(double M_baseline, double area_baseline,
                                 double area_equivalent);
 
+// -------------------------------------------------------------
+// Effusion plate INTERNAL heat transfer
+// -------------------------------------------------------------
+//
+// Andrews, Alikhanizadeh, Asere, Hussain, Khoshkbar Azari and Mkpadi (1986),
+// "Small Diameter Film Cooling Holes: Wall Convective Heat Transfer",
+// ASME 86-GT-225. See
+// validation/cooling/extractions/andrews_effusion_internal_h.md.
+//
+// A coolant hole cools its wall in TWO places, and the paper's central point
+// is that the first dominates:
+//
+//   1. the APPROACH flow over the coolant-side plate surface, converging
+//      into the hole (Sparrow's multi-hole correlation, Eq. 15);
+//   2. the THROAT, a short tube with a sharp-edged entry (Mills' tabulated
+//      data, Eq. 12 with the entry-length factor R_Nu of Eqs. 13 and 14).
+//
+// Andrews sums them -- "the authors have treated the wall heat transfer as
+// the summation of Equations 13 or 14 and 15" -- after putting both on the
+// same Nusselt definition, which is Eq. 18's job. Both Nu below are
+// therefore referenced to the HOLE DIAMETER and the HOLE INTERNAL AREA
+// pi D L, so they add directly.
+//
+// CONVERTING TO A PLATE-AREA COEFFICIENT. Effusion elements want a
+// coefficient per unit plate area, which is what the source's own Fig. 8
+// plots. That is
+//
+//   h_plate = Nu k / D * A_h / A,   A_h = pi D L,  A = X^2 - pi D^2 / 4
+//
+// and the A_h/A factor is not optional: for Andrews' plate C it is 3.46, so
+// omitting it overstates the coefficient by that factor. The conversion is
+// left to the caller because it needs no correlation -- only geometry.
+namespace andrews1986 {
+
+// Eq. 18's leading constant, 0.881, is Sparrow's multi-hole approach
+// correlation Nu_l = 0.881 Re^0.476 Pr^(1/3) rebased from the surface
+// dimension l (Eq. 16) onto the hole internal area. Independent of
+// pitch-to-diameter ratio, per the paper.
+constexpr double sparrow_coefficient = 0.881;
+constexpr double sparrow_re_exponent = 0.476;
+
+// Mills' throat data, Eq. 12, is Dittus-Boelter in form with a tabulated
+// entry-length multiplier.
+constexpr double mills_coefficient = 0.023;
+constexpr double mills_re_exponent = 0.8;
+
+// R_Nu is curve-fitted in two branches that meet at L/D = 2. They agree
+// there to 1.3e-3, which is how the transcription was checked.
+constexpr double mills_branch_L_over_D = 2.0;
+
+} // namespace andrews1986
+
+// Mills' entry-length factor R_Nu for a sharp-edged tube entry, Andrews
+// Eqs. (13) and (14). A short hole never reaches a developed profile, so
+// R_Nu > 1; it decays to 1 as the hole lengthens.
+//
+//   L/D <= 2 :  R_Nu = 0.13 z^3 - 0.75 z^2 + 1.04 z + 2.24,       z = L/D
+//   L/D >  2 :  R_Nu = 1 - 49.3 w^4 + 58.6 w^3 - 26.5 w^2 + 7.48 w, w = D/L
+double mills_entry_length_factor(double L_over_D);
+
+// Sparrow's hole-approach contribution, Andrews Eq. (18): the coolant-side
+// plate surface converging into the hole, expressed on the hole's own
+// Nusselt definition so it can be summed with the throat term.
+//
+//   Nu = 0.881 Re^0.476 Pr^(1/3) * X / (pi L)
+//
+//   Re        : on the HOLE diameter [-]
+//   X_over_L  : hole pitch / hole length [-]
+double effusion_approach_nusselt(double Re, double Pr, double X_over_L);
+
+// Mills' short-hole throat contribution, Andrews Eq. (12).
+//
+//   Nu = 0.023 Re^0.8 Pr^(1/3) R_Nu(L/D)
+double effusion_throat_nusselt(double Re, double Pr, double L_over_D);
+
+// Andrews Eq. (19): the two summed, both on the hole diameter and hole
+// internal area.
+//
+//   Nu = (0.881 (X/pi L) Re^0.476 + 0.023 Re^0.8 R_Nu) Pr^(1/3)
+//
+// Multiply by k/D for a hole-area coefficient, and by A_h/A again for the
+// plate-area coefficient an effusion element needs.
+double effusion_internal_nusselt(double Re, double Pr, double X_over_L,
+                                 double L_over_D);
+
 } // namespace combaero::cooling
 
 #endif // COOLING_CORRELATIONS_H

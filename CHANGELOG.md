@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Effusion plate INTERNAL heat transfer, closing #387's internal side.**
+  Andrews 86-GT-225: a coolant hole cools its wall in two places, and the
+  paper's point is that the approach dominates at the Reynolds numbers
+  effusion runs at.
+
+  - `mills_entry_length_factor` -- Mills' `R_Nu` for a sharp-edged entry,
+    Eqs. (13) and (14)
+  - `effusion_approach_nusselt` -- Sparrow's hole approach, Eq. (18)
+  - `effusion_throat_nusselt` -- Mills' short-hole throat, Eq. (12)
+  - `effusion_internal_nusselt` -- the two summed, Eq. (19)
+
+  `Re` is on the hole diameter and every `Nu` on the **hole internal area**,
+  which is what makes them summable. A plate-area coefficient needs
+  `* k/D * A_h/A`; that factor is 3.46 for Andrews' plate C, so it is not
+  optional, and the conversion is left to the caller because it needs only
+  geometry.
+
+  **Scored against Andrews' own Fig. 8: bias -13.5%, RMSE 14.7% over 10
+  points, labelled `accuracy`.** Cross-source, not fidelity: the
+  correlations are the 1986 paper and the data the 1988 one, and the
+  validation policy counts same-lab-different-study as cross-source. The
+  first `SET_ORIGIN` entry used the bare author name, matched the
+  `andrews1988` source and reported fidelity -- corrected to name
+  `86-GT-225`.
+
+  The miss is **one-sided**, so it is systematic rather than scatter,
+  though it sits inside the source's own +/-16% spread and the two worst
+  points are the two already flagged as off-trend in the source. Ruled out
+  as causes: coolant temperature (unstated; worth 4 points across
+  280-320 K), the `G` definition (per gross plate area, confirmed by
+  `N = 4306` against `1/X^2 = 4305.8`), and hand-typed properties -- a
+  first spike read -8% using values closer to 400 K air, where combaero's
+  own properties give -13.5%.
+
+  The scan is poor, so each equation was checked against something a
+  transcription could not fake: the two `R_Nu` branches are independent
+  polynomials that must meet at `L/D = 2` and agree to **1.3e-3**; `R_Nu`
+  must decay to 1 for a long hole; and Eq. (19)'s printed `0.27` must equal
+  `0.881 X/(pi L)`, which gives **0.26983**.
+
+  `validation/cooling/effusion_internal_runner.py` wires it into the
+  scorecard, so `andrews1988` is scored rather than carried unused. Record
+  in `validation/cooling/extractions/andrews_effusion_internal_h.md`,
+  including one thing this repo previously asserted and the paper does not
+  say: Eq. (19) is a plain sum of Nusselt numbers, not a temperature chain.
+
 - **Gao's alpha coefficients ARE published, and this repo said they were
   not.** Section 4.3.1 of Gao et al. (2025): "The empirical coefficients in
   Equation (5), a and b, were determined to be 12 and 0.9465,
