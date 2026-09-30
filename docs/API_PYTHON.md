@@ -293,6 +293,27 @@ with cb.suppress_warnings():          # or set_warning_handler to collect them
 # unsuppressed, that call reports M, P and s_over_D as extrapolated
 ```
 
+#### Effusion plate internal heat transfer
+
+```python
+nu = cb.effusion_internal_nusselt(Re=3000.0, Pr=0.727,
+                                  X_over_L=15.24 / 6.3, L_over_D=6.3 / 3.27)
+
+# the two terms separately, if you want to see which dominates
+nu_a = cb.effusion_approach_nusselt(3000.0, 0.727, 15.24 / 6.3)
+nu_t = cb.effusion_throat_nusselt(3000.0, 0.727, 6.3 / 3.27)
+r    = cb.mills_entry_length_factor(6.3 / 3.27)     # entry-length factor
+```
+
+`Re` is on the hole diameter and `Nu` on the **hole internal area**. For a
+plate-area coefficient multiply by `k/D` and then by `A_h/A` with
+`A_h = pi D L` and `A = X**2 - pi D**2/4` -- a factor of 3.46 for Andrews'
+plate C, so not optional.
+
+The approach term leads at low `Re` (exponent 0.476) and the throat
+overtakes it (0.8); the crossover falls inside a typical effusion plate's
+own operating range, which is why both are needed.
+
 #### Multi-row film superposition
 
 ```python

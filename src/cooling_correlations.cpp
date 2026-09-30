@@ -458,4 +458,62 @@ double equivalent_blowing_ratio(double M_baseline, double area_baseline,
     return M_baseline * area_baseline / area_equivalent;
 }
 
+// -------------------------------------------------------------
+// Effusion plate internal heat transfer -- Andrews 86-GT-225
+// -------------------------------------------------------------
+
+namespace {
+
+void check_effusion_inputs(double Re, double Pr) {
+    if (!(Re > 0.0)) {
+        throw std::invalid_argument(
+            "effusion internal Nusselt: Re must be positive");
+    }
+    if (!(Pr > 0.0)) {
+        throw std::invalid_argument(
+            "effusion internal Nusselt: Pr must be positive");
+    }
+}
+
+}  // namespace
+
+double mills_entry_length_factor(double L_over_D) {
+    if (!(L_over_D > 0.0)) {
+        throw std::invalid_argument(
+            "mills_entry_length_factor: L/D must be positive");
+    }
+    namespace A = andrews1986;
+    if (L_over_D <= A::mills_branch_L_over_D) {
+        const double z = L_over_D;                                    // Eq. 13
+        return 0.13 * z * z * z - 0.75 * z * z + 1.04 * z + 2.24;
+    }
+    const double w = 1.0 / L_over_D;                                  // Eq. 14
+    return 1.0 - 49.3 * w * w * w * w + 58.6 * w * w * w
+         - 26.5 * w * w + 7.48 * w;
+}
+
+double effusion_approach_nusselt(double Re, double Pr, double X_over_L) {
+    check_effusion_inputs(Re, Pr);
+    if (!(X_over_L > 0.0)) {
+        throw std::invalid_argument(
+            "effusion_approach_nusselt: X/L must be positive");
+    }
+    namespace A = andrews1986;
+    return A::sparrow_coefficient * std::pow(Re, A::sparrow_re_exponent)
+         * std::cbrt(Pr) * X_over_L / M_PI;                           // Eq. 18
+}
+
+double effusion_throat_nusselt(double Re, double Pr, double L_over_D) {
+    check_effusion_inputs(Re, Pr);
+    namespace A = andrews1986;
+    return A::mills_coefficient * std::pow(Re, A::mills_re_exponent)
+         * std::cbrt(Pr) * mills_entry_length_factor(L_over_D);       // Eq. 12
+}
+
+double effusion_internal_nusselt(double Re, double Pr, double X_over_L,
+                                 double L_over_D) {
+    return effusion_approach_nusselt(Re, Pr, X_over_L)
+         + effusion_throat_nusselt(Re, Pr, L_over_D);                 // Eq. 19
+}
+
 }  // namespace combaero::cooling

@@ -5595,6 +5595,48 @@ PYBIND11_MODULE(_core, m) {
         "Murray and Ireland (2018) show to dominate. Supply your own\n"
         "fitted values.");
 
+  m.def("mills_entry_length_factor",
+        &combaero::cooling::mills_entry_length_factor, py::arg("L_over_D"),
+        "Mills' entry-length factor R_Nu for a sharp-edged tube entry.\n\n"
+        "Andrews 86-GT-225 Eqs. (13) and (14), two curve fits meeting at\n"
+        "L/D = 2. A short hole never develops, so R_Nu > 1; it decays to 1\n"
+        "as the hole lengthens.\n\n"
+        "  L_over_D : hole length / hole diameter [-]\n\n"
+        "Returns: R_Nu [-]");
+
+  m.def("effusion_approach_nusselt",
+        &combaero::cooling::effusion_approach_nusselt, py::arg("Re"),
+        py::arg("Pr"), py::arg("X_over_L"),
+        "Hole-approach contribution to effusion internal heat transfer.\n\n"
+        "Sparrow's multi-hole correlation as Andrews 86-GT-225 Eq. (18)\n"
+        "rebases it onto the hole's own Nusselt definition:\n\n"
+        "  Nu = 0.881 Re^0.476 Pr^(1/3) X/(pi L)\n\n"
+        "  Re       : on the HOLE diameter [-]\n"
+        "  Pr       : coolant Prandtl number [-]\n"
+        "  X_over_L : hole pitch / hole length [-]\n\n"
+        "Returns: Nu on the hole diameter and hole internal area [-]");
+
+  m.def("effusion_throat_nusselt",
+        &combaero::cooling::effusion_throat_nusselt, py::arg("Re"),
+        py::arg("Pr"), py::arg("L_over_D"),
+        "Throat contribution to effusion internal heat transfer.\n\n"
+        "Mills' short-hole data, Andrews 86-GT-225 Eq. (12):\n\n"
+        "  Nu = 0.023 Re^0.8 Pr^(1/3) R_Nu(L/D)\n\n"
+        "Returns: Nu on the hole diameter and hole internal area [-]");
+
+  m.def("effusion_internal_nusselt",
+        &combaero::cooling::effusion_internal_nusselt, py::arg("Re"),
+        py::arg("Pr"), py::arg("X_over_L"), py::arg("L_over_D"),
+        "Effusion plate internal Nusselt number, Andrews 86-GT-225\n"
+        "Eq. (19): the hole-approach and throat terms summed.\n\n"
+        "  Nu = (0.881 (X/pi L) Re^0.476 + 0.023 Re^0.8 R_Nu) Pr^(1/3)\n\n"
+        "Referenced to the hole diameter and the HOLE INTERNAL AREA. For a\n"
+        "coefficient per unit PLATE area, which is what an effusion element\n"
+        "needs, multiply by k/D and then by A_h/A with A_h = pi D L and\n"
+        "A = X^2 - pi D^2/4. That factor is 3.46 for Andrews' plate C, so\n"
+        "it is not optional.\n\n"
+        "Returns: Nu [-]");
+
   m.def("equivalent_slot_width", &combaero::cooling::equivalent_slot_width,
         py::arg("hole_area"), py::arg("pitch"),
         "Gao Eq. (9): s = A_hole / pitch. The equivalent slot width that\n"

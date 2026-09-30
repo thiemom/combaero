@@ -115,7 +115,7 @@ files:
       deriving one from the model's own error on this series is the
       circularity #389 names.
     class_confidence: confirmed
-    scores: null
+    scores: andrews_1986_effusion_internal
     verification:
       x_axis_type: log
       y_axis_type: log

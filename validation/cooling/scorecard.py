@@ -87,13 +87,19 @@ def run_dataset(dataset) -> list[Record]:
     first version's bug: the jet-array runner claimed the orifice series and
     reported them unscored.
     """
-    from validation.cooling import film_runner, jet_array_runner, orifice_runner
+    from validation.cooling import (
+        effusion_internal_runner,
+        film_runner,
+        jet_array_runner,
+        orifice_runner,
+    )
     from validation.cooling.runner import run_series as rib_run
 
     specialists = (
         (jet_array_runner.owns, jet_array_runner.run_series),
         (orifice_runner.owns, orifice_runner.run_series),
         (film_runner.owns, film_runner.run_series),
+        (effusion_internal_runner.owns, effusion_internal_runner.run_series),
     )
 
     out: list[Record] = []
@@ -130,6 +136,11 @@ SET_ORIGIN: dict[str, str] = {
     # the verdict "accuracy" rather than "unknown", so the report states the
     # cross-source basis instead of declining to say.
     "baldauf_2002_sellers": "baldauf",
+    # 86-GT-225, NOT "andrews": the acceptance data is 88-GT-290, a
+    # different study from the same lab, which the validation policy counts
+    # as CROSS-SOURCE. Matching on the bare author name would have matched
+    # the 1988 source and reported fidelity, overstating the claim.
+    "andrews_1986_effusion_internal": "86-GT-225",
 }
 
 
