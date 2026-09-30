@@ -662,6 +662,16 @@ def test_the_rollup_never_pools_across_the_validity_box(dataset) -> None:
     for r in rows:
         assert r.domain in ("in-domain", "out-of-domain")
         assert (r.domain == "out-of-domain") == r.label.endswith(OUT_OF_DOMAIN_MARK)
+        # THE INVARIANT THAT ACTUALLY BINDS THE BUCKETING, and it was
+        # missing. Every row must be PURE. Without this the rollup can
+        # stop keying on domain, mix both regimes into one row and label
+        # it from whichever cell happened to be first -- which is exactly
+        # what a falsification run did while this test stayed green.
+        assert r.n_extrapolated in (0, r.n), (
+            f"{r.label} mixes {r.n_extrapolated} extrapolated points into "
+            f"{r.n}; the row's error describes neither regime"
+        )
+        assert (r.n_extrapolated == r.n) == (r.domain == "out-of-domain")
 
     baldauf = [r for r in rows if r.scored_by == "baldauf_2002_sellers"]
     assert len(baldauf) == 1, "baldauf now spans both domains"

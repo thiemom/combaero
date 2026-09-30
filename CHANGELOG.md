@@ -56,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `measured` accuracy figures above, taken from those very panels, mix
     the two regimes. One more reason they are not bands.
 
+  Falsification found a real gap and it is worth recording: the rollup
+  test passed while the rollup stopped keying on domain at all, because
+  it checked the label and the domain field against each other rather
+  than against the data. It now asserts every rollup row is PURE --
+  `n_extrapolated` is 0 or equal to `n` -- which is the invariant that
+  binds the bucketing.
+
 - **Andrews 88-GT-290 Figure 10 digitised, and #387's overall-effectiveness
   output shipped -- with a measured negative result attached.**
   `EffusionPlateElement.overall_effectiveness(state_in, h_gas, T_gas,
