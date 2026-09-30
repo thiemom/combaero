@@ -1315,6 +1315,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **30 functions advertised a phantom overload.** pybind11 tries overloads
+  in registration order, so a second `m.def` with an identical signature can
+  never be selected -- but it is still documented. `help(combaero.bernoulli_P2)`
+  printed "Overloaded function" and listed two numerically identical
+  signatures, inviting the reader to work out a difference that does not
+  exist. 31 unreachable registrations removed across 30 names
+  (`channel_mdot` had two).
+
+  Most arose from a correlation being bound once in a general section and
+  again in a domain-specific one. Nothing ever failed, which is how they
+  accumulated.
+
+  Where the two differed only in documentation, the **better-documented one
+  was kept** and the other dropped, so this is a pure deletion with no
+  docstring edited. That recovered rather than lost text in four cases:
+  `channel_roughness` keeps its 17-material list, references and worked
+  example; `channel_pressure_drop`, `fanno_max_length` and `mole_to_mass`
+  likewise.
+
+  The five genuine overload pairs are untouched -- `orifice_flow_thermo(..,
+  Cd)` against `(.., cd_fn)`, `channel_flow_rough` with and without
+  `k_loss_fn`, and `combustion_state`/`combustion_state_from_streams`/
+  `equivalence_ratio_mass`. Guarded by
+  `test_units_sync.py::test_no_phantom_overloads`, which compares signature
+  strings at runtime so it cannot drift from the binding.
+
 - **Baldauf's film-effectiveness correlation never checked its own validated
   envelope.** The bounds have been `constexpr` in `cooling_correlations.h`
   since the correlation landed -- `M_min/M_max`, `P_min/P_max`,
