@@ -51,6 +51,90 @@
 #   x ticks (5 .. 10)     worst 0.020   0.37% of span
 #   y ticks (1.5 .. 4)    worst 0.0062  0.22% of span
 #   baseline level to 6e-4; top corners level to 7e-3.
+#
+# ============================================================================
+# FIGURE 8: h_m against G for the four test plates
+# ============================================================================
+#
+# 41 points over four plates from the SAME paper as the correlations, so
+# this is a FIDELITY check -- unlike `andrews1988` Fig. 8, which is the 1988
+# rig and therefore cross-source.
+#
+# h_m IS NOT THE SAME QUANTITY AS andrews1988's h. THIS IS THE WHOLE TRAP.
+# 86-GT-225's nomenclature reads
+#
+#   "h_m  Average heat transfer coefficient, W/m2K, OVER THE HOLE LENGTH"
+#   "     Plate surface area per hole (X^2), m2"
+#
+# so h_m is referenced to the HOLE INTERNAL surface, pi D L. 88-GT-290 instead
+# defines "h Convective heat transfer coefficient based on the surface area,
+# A" with "A Total hole approach surface area (A = X^2 - pi/4 D^2)". Two
+# papers by the same group, two conventions, differing by A/A_h -- which
+# ranges from 1.4 on plate d to 9.8 on plate a.
+#
+# Getting it wrong is not subtle: scoring these points as though h_m were on
+# the plate area gives a pooled bias of -60%. On the correct definition it is
+# -10.4%. That is the #389 class of error in its purest form, and the only
+# thing that catches it is reading both nomenclatures.
+#
+# THE -10.4% IS NOT A TRANSCRIPTION ERROR, AND FIGURE 10 IS WHY. A 10% miss
+# on the author's own data would normally mean our reading of the equations
+# is wrong. Here it cannot be: Fig. 10 of this same paper plots Andrews'
+# own evaluation of his own Eq. (19), and combaero reproduces it to 1.5% --
+# at Re = 2200, which sits inside Fig. 8's range (18 points below, 23 at or
+# above). So the gap is the correlation missing its author's measurements,
+# not us missing the correlation. Pinned by
+# `test_the_fidelity_miss_is_not_a_transcription_error`.
+#
+# THE AXES ARE LOG AND WERE DIGITISED ON A LINEAR CALIBRATION. The committed
+# CSVs are CONVERTED; `fig8_calibration_as_read.csv` is deliberately left in
+# the digitiser's raw linear coordinates because it is the evidence.
+#
+# The tell is in that file: the x ticks at true 0.5 and 1.0 came out at
+# 1.1299 and 1.5689, which is exactly where a linear reading of a log axis
+# spanning 0.1 to 2 puts them (predicted 1.1218 and 1.5619). Likewise the y
+# ticks at true 500 and 1000 read 1789.8 and 2513.9 against predicted 1798.7
+# and 2530.1.
+#
+# The inverse transform, anchored on the frame:
+#
+#     true = t0 * (t1/t0) ** ((read - l0) / (l1 - l0))
+#     x: l0,t0 = 0.1, 0.1        l1,t1 = 2.00202, 2.0
+#     y: l0,t0 = 100.44911, 100  l1,t1 = 3992.8356, 4000
+#
+# Verified on the two ticks it does NOT use: x recovers 0.5 and 1.0 to +1.3%
+# and +1.1%, y recovers 500 and 1000 to -0.8% and -1.5%. Confirmed
+# independently by the paper's own statement that G ran "from 0.1 to 1.7
+# kg/sm2" -- the converted abscissae span 0.089 to 1.79.
+#
+# The y anchors mix corners -- bottom-LEFT (100.44911) with top-RIGHT
+# (3992.8356) -- because those are the two frame extremes the traversal
+# recorded. The page skew this exposes is small: top-left reads 4001.32595
+# against top-right's 3992.8356, 0.21% of value, and anchoring on top-left
+# instead moves a mid-range point by 0.39%. Recorded rather than corrected;
+# it is an order of magnitude below the residual being measured.
+#
+# GEOMETRY, Table 5. The scan loses the n and D columns, but X/D recovers D
+# and the L/D column then checks it:
+#
+#   plate   D mm    L mm   L/D    X mm   X/D    array    technique
+#     a     1.178   6.35   5.38   15.20  12.9   10 x 10  Drilled
+#     b     0.642   6.35   9.92    6.10   9.5   25 x 25  Spark Eroded
+#     c     0.897   6.35   7.05    6.10   6.8   25 x 25  Drilled
+#     d     1.298   6.35   4.85    6.10   4.7   25 x 25  Drilled
+#
+# D = X/(X/D) reproduces each printed L/D to 1%, and the four L/D values
+# land on Figure 10's four abscissae (4.81, 5.35, 7.10, 9.90) to 1% -- so
+# Table 5, Fig. 8 and Fig. 10 are mutually consistent. Plate b is the
+# "X = 6.11, D = 0.64, L = 6.35" geometry Eq. (19) is printed for.
+#
+# PLATE B IS THE WORST FIT AND IS ALSO THE ONLY SPARK-ERODED PLATE.
+# Per-plate bias: a -6.2%, c -5.5%, d -12.5%, b -19.6%. Table 5 records the
+# manufacture technique, and b is the only one not drilled. Spark erosion
+# leaves a different bore finish and entry geometry than drilling, and the
+# throat term assumes a SHARP-EDGED entry -- so this is a plausible
+# mechanism. Recorded as an observation, NOT a demonstrated cause: one plate
+# is not evidence, and no attempt has been made to correct for it.
 
 paper:
   name: andrews1986
@@ -234,3 +318,179 @@ files:
       expected_points: 4
       plot_x_limits: [4.6, 10.1]
       plot_y_limits: [1.4, 4.2]
+
+  - path: fig8_hm_plate_a.csv
+    after: null
+    page: 5
+    item: "Figure 8, inverted triangles"
+    series: >-
+      plate a: average internal heat transfer coefficient h_m over the
+      hole length, against coolant flow per unit plate area G
+    figure: "8"
+    panel: single
+    geometry:
+      D_mm: 1.178
+      X_mm: 15.2
+      thickness_mm: 6.35
+      L_over_D: 5.38
+      X_over_D: 12.9
+      N_per_m2: 4328
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_hole_length
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Plate a: 10 x 10 array, Drilled. Scored against Andrews Eqs. (18)
+      plus (12) at bias -6.2%. Its 15.2 mm pitch is 2.5x the others', so it is the one plate that exercises Eq. (18)'s X/(pi L) dependence -- the same role its point plays in Figure 10.
+
+      `uncertainty` left null: the paper states no per-point band, and
+      back-filling one from the model's own error is what #389 forbids.
+    scores: andrews_1986_effusion_internal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [0.1, 0.5, 1.0, 2.0]
+      x_multiplier: 1.0
+      y_ticks: [100, 500, 1000, 4000]
+      y_limits: [null, 4200]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.08, 2.1]
+      plot_y_limits: [95, 4200]
+
+  - path: fig8_hm_plate_b.csv
+    after: null
+    page: 5
+    item: "Figure 8, triangles"
+    series: >-
+      plate b: average internal heat transfer coefficient h_m over the
+      hole length, against coolant flow per unit plate area G
+    figure: "8"
+    panel: single
+    geometry:
+      D_mm: 0.642
+      X_mm: 6.1
+      thickness_mm: 6.35
+      L_over_D: 9.92
+      X_over_D: 9.5
+      N_per_m2: 27052
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_hole_length
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Plate b: 25 x 25 array, Spark Eroded. Scored against Andrews Eqs. (18)
+      plus (12) at bias -19.6%. The worst-fitting plate and the only one not drilled. It is also the exact geometry Eq. (19) is printed for. Spark erosion leaves a different bore and entry than drilling, and the throat term assumes a sharp-edged entry; recorded as a plausible mechanism, not a demonstrated one.
+
+      `uncertainty` left null: the paper states no per-point band, and
+      back-filling one from the model's own error is what #389 forbids.
+    scores: andrews_1986_effusion_internal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [0.1, 0.5, 1.0, 2.0]
+      x_multiplier: 1.0
+      y_ticks: [100, 500, 1000, 4000]
+      y_limits: [null, 4200]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.08, 2.1]
+      plot_y_limits: [95, 4200]
+
+  - path: fig8_hm_plate_c.csv
+    after: null
+    page: 5
+    item: "Figure 8, circles"
+    series: >-
+      plate c: average internal heat transfer coefficient h_m over the
+      hole length, against coolant flow per unit plate area G
+    figure: "8"
+    panel: single
+    geometry:
+      D_mm: 0.897
+      X_mm: 6.1
+      thickness_mm: 6.35
+      L_over_D: 7.05
+      X_over_D: 6.8
+      N_per_m2: 27052
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_hole_length
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Plate c: 25 x 25 array, Drilled. Scored against Andrews Eqs. (18)
+      plus (12) at bias -5.5%. The best-fitting plate, with 12 points over the full G range.
+
+      `uncertainty` left null: the paper states no per-point band, and
+      back-filling one from the model's own error is what #389 forbids.
+    scores: andrews_1986_effusion_internal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [0.1, 0.5, 1.0, 2.0]
+      x_multiplier: 1.0
+      y_ticks: [100, 500, 1000, 4000]
+      y_limits: [null, 4200]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.08, 2.1]
+      plot_y_limits: [95, 4200]
+
+  - path: fig8_hm_plate_d.csv
+    after: null
+    page: 5
+    item: "Figure 8, squares"
+    series: >-
+      plate d: average internal heat transfer coefficient h_m over the
+      hole length, against coolant flow per unit plate area G
+    figure: "8"
+    panel: single
+    geometry:
+      D_mm: 1.298
+      X_mm: 6.1
+      thickness_mm: 6.35
+      L_over_D: 4.85
+      X_over_D: 4.7
+      N_per_m2: 27052
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_hole_length
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Plate d: 25 x 25 array, Drilled. Scored against Andrews Eqs. (18)
+      plus (12) at bias -12.5%. Shortest hole of the set, so the largest entry-length enhancement.
+
+      `uncertainty` left null: the paper states no per-point band, and
+      back-filling one from the model's own error is what #389 forbids.
+    scores: andrews_1986_effusion_internal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: [0.1, 0.5, 1.0, 2.0]
+      x_multiplier: 1.0
+      y_ticks: [100, 500, 1000, 4000]
+      y_limits: [null, 4200]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.08, 2.1]
+      plot_y_limits: [95, 4200]

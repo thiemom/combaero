@@ -71,7 +71,7 @@ Eq. (16) needed judgement: the typesetting shows `l = plate area/hole pitch
 only holds for `(X^2 - pi D^2/4)/X`. For plate C that is 14.69 mm against
 X = 15.24 mm. Read as the division.
 
-## Scoring against Andrews' own Figure 8
+## Scoring against 88-GT-290's Figure 8
 
 `andrews1988/fig8_h_effusionC`, 10 points, plate C: D = 3.27 mm,
 X = 15.24 mm, thickness 6.3 mm, so L/D = 1.93 -- the Eq. (13) branch.
@@ -135,9 +135,126 @@ The remaining candidates need work this record does not do:
 - Andrews notes the two Sparrow papers -- single-hole (21) and multi-hole
   (22) -- "are incompatible with each other", and only the multi-hole one
   is used here.
-- Fig. 8's other two plates (A, A/C) are digitised in the same figure but
-  not committed; scoring them would show whether the -13.5% is geometry
-  specific or uniform.
+- 88-GT-290 Fig. 8 carries two more plates (A, A/C) that are digitised but
+  not committed. The 1986 plates below answer the geometry question for
+  the 1986 rig; they do not answer it for the 1988 one.
+
+## Scoring against 86-GT-225's own Figure 8 -- the FIDELITY basis
+
+`andrews1986/fig8_hm_plate_{a,b,c,d}`, 41 points over the four Table 5
+plates. Same paper as the correlations, so this is fidelity where the 1988
+comparison above is accuracy, and the scorecard reports them as two rows.
+
+### THE TWO PAPERS DO NOT PLOT THE SAME h
+
+This is the error worth the most here, and nothing in the numbers says
+which convention is meant. The nomenclatures:
+
+| paper | symbol | printed definition | basis |
+|---|---|---|---|
+| 86-GT-225 | `h_m` | "Average heat transfer coefficient, W/m2K, over the hole length" | hole internal, `pi D L` |
+| 88-GT-290 | `h` | "Convective heat transfer coefficient based on the surface area, A" | plate, `A = X^2 - pi D^2/4` |
+
+`A/A_h` runs 1.4 (plate d) to 9.8 (plate a). Scoring the 1986 points on
+the plate-area convention gives **-60%**; on the hole-length convention,
+**-10.4%**. The two are carried as distinct `y_axis` values -- `h_internal`
+and `h_hole_length` -- so the runner cannot pick the wrong one silently,
+and `test_the_two_papers_h_conventions_are_different_quantities` asserts
+both the ratio and the collapse.
+
+86-GT-225's `h_m` needs NO area conversion at all: Eq. (19)'s Nusselt
+number is already on the hole internal area, so `h_m = Nu k / D`.
+
+### Geometry: Table 5, with D recovered
+
+The scan loses Table 5's `n` and `D` columns. `D = X/(X/D)` recovers them,
+and two independent things then check the recovery:
+
+| plate | D mm | L mm | L/D | X mm | X/D | array | technique |
+|---|---|---|---|---|---|---|---|
+| a | 1.178 | 6.35 | 5.38 | 15.20 | 12.9 | 10 x 10 | Drilled |
+| b | 0.642 | 6.35 | 9.92 | 6.10 | 9.5 | 25 x 25 | Spark Eroded |
+| c | 0.897 | 6.35 | 7.05 | 6.10 | 6.8 | 25 x 25 | Drilled |
+| d | 1.298 | 6.35 | 4.85 | 6.10 | 4.7 | 25 x 25 | Drilled |
+
+1. `6.35/D` reproduces each printed `L/D` to 1%.
+2. The four `L/D` land on Figure 10's four abscissae (4.81, 5.35, 7.10,
+   9.90) to 1% -- a different figure, digitised in a different session.
+
+Plate b is the `X = 6.11, D = 0.64, L = 6.35` geometry Eq. (19)'s printed
+`0.27` is evaluated for.
+
+### THE AXES ARE LOG AND WERE DIGITISED ON A LINEAR CALIBRATION
+
+Caught, as the two before it, by a calibration file failing to reproduce
+round numbers. `fig8_calibration_as_read.csv` is committed UNCONVERTED
+because it is the evidence: the x ticks at true 0.5 and 1.0 read 1.1299 and
+1.5689, and a linear pick of a log axis spanning 0.1 to 2 predicts 1.1218
+and 1.5619. The committed data CSVs are converted through
+
+    true = t0 * (t1/t0) ** ((read - l0) / (l1 - l0))
+
+anchored on the frame, which recovers the two ticks it does NOT use to
++1.3%/+1.1% (x) and -0.8%/-1.5% (y). A third channel confirms it: the paper
+states G ran "from 0.1 to 1.7 kg/sm2" and the converted abscissae span
+0.089 to 1.79.
+
+Page skew between the two top corners is 0.21% of value and moves a
+mid-range point by 0.39% -- recorded, not corrected, being an order of
+magnitude below the residual.
+
+### Result
+
+| | |
+|---|---|
+| bias | **-10.4%** |
+| MAE | 11.1% |
+| n | 41 |
+| basis | **fidelity** (the correlations' own paper) |
+
+Per plate: a -6.2%, b -19.6%, c -5.5%, d -12.5%.
+
+### THE FIDELITY MISS IS NOT A TRANSCRIPTION ERROR
+
+A 10% miss on the author's own data would normally be our bug -- that is
+what the fidelity label means. Here it demonstrably is not, and Figure 10
+is why: it plots Andrews' own evaluation of his own Eq. (19), and combaero
+reproduces it to 1.5%. Fig. 10's Re = 2200 sits inside Fig. 8's range (18
+points below, 23 at or above), so the transcription check covers the
+regime the miss is measured in.
+
+So the two figures of one paper separate the two failure modes cleanly:
+**our transcription is right to 1.5%, and Andrews' correlation
+under-predicts Andrews' own measurements by about 10%.** That is a stronger
+statement than either figure alone supports, and it is what made this
+digitisation worth doing.
+
+### What the residual is NOT explained by
+
+- **Reynolds number.** Pooled bias by band: -20.4% below Re 500 (n = 4),
+  -6.9% for 500-1500, -9.1% for 1500-3000, -11.6% above 3000. No monotone
+  trend, and the low-Re band is four points from three different plates
+  (b 405, c 288, d 199, d 404) -- too few to read as a regime.
+- **L/D.** Ordered by L/D the biases run d 4.85 (-12.5%), a 5.38 (-6.2%),
+  c 7.05 (-5.5%), b 9.92 (-19.6%) -- not monotone either.
+- **Pitch.** Plate a is the only plate at X = 15.2 mm and is the second
+  best fit, so the `X/(pi L)` term is not carrying the error.
+
+### An observation, NOT a demonstrated cause
+
+**Plate b is the worst fit and is the only SPARK ERODED plate in Table 5.**
+Spark erosion leaves a different bore finish and entry geometry than
+drilling, and the throat term assumes a sharp-edged entry -- a plausible
+mechanism. It is recorded and nothing more: one plate is not evidence, no
+correction is applied, and the fit is not improved by excluding it (pooled
+bias without plate b is -8.2% over 33 points, which is a smaller number
+for a smaller dataset, not a better model).
+
+### Unlike the 1988 comparison, this is not one-sided
+
+The worst positive error is +3.4%, so this is a strong negative bias with
+scatter rather than a pure offset. Worth distinguishing, because the 1988
+test asserts one-sidedness and this one must not.
 
 ## Deliberately not implemented
 

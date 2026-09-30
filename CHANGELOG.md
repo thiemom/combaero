@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Andrews 86-GT-225 Figure 8 digitised: 41 points, and the effusion
+  internal correlations now report a FIDELITY row as well as an accuracy
+  one.** Four test plates against the paper that publishes the
+  correlations, at **-10.4% bias, 11.1% MAE**. The scorecard reports it
+  separately from the `andrews1988` accuracy row (-13.5%, 10 points),
+  because a fidelity miss and an accuracy miss are different findings.
+
+  | plate | D mm | X mm | L/D | technique | bias |
+  |---|---|---|---|---|---|
+  | a | 1.178 | 15.20 | 5.38 | Drilled | -6.2% |
+  | b | 0.642 | 6.10 | 9.92 | **Spark Eroded** | -19.6% |
+  | c | 0.897 | 6.10 | 7.05 | Drilled | -5.5% |
+  | d | 1.298 | 6.10 | 4.85 | Drilled | -12.5% |
+
+  **The fidelity miss is NOT a transcription error, and that is the
+  finding.** A 10% gap on the author's own data would normally mean our
+  reading of the equations is wrong. Figure 10 of the same paper rules
+  that out: it plots Andrews' own evaluation of his own Eq. (19) and
+  combaero reproduces it to 1.5%, at a Reynolds number that sits inside
+  Fig. 8's range (18 points below, 23 at or above). So the two figures of
+  one paper separate the failure modes outright -- **our transcription is
+  right to 1.5%, and Andrews' correlation under-predicts Andrews' own
+  measurements by about 10%.** Neither figure alone supports that.
+
+  **Two papers, two definitions of "h", worth a factor of up to 9.8.**
+  86-GT-225 defines `h_m` "over the hole length" (the hole internal area,
+  `pi D L`); 88-GT-290 defines `h` "based on the surface area, A" with
+  `A = X^2 - pi D^2/4` (the plate area). Same group, same figure number,
+  different quantity. Scored on the wrong convention these points read
+  **-60%**. The two are now distinct `y_axis` values -- `h_hole_length`
+  and `h_internal` -- so the runner cannot confuse them silently.
+
+  **Plate b is the worst fit and the only spark-eroded plate.** Recorded
+  as an observation and nothing more: one plate is not evidence, no
+  correction is applied, and excluding it gives -8.2% over 33 points --
+  a smaller number for a smaller dataset, not a better model.
+
+  The residual is not explained by Reynolds number, L/D or pitch; each is
+  checked and reported in
+  `validation/cooling/extractions/andrews_effusion_internal_h.md`.
+
+  **The axes are log and were digitised on a linear calibration** -- the
+  third figure in this repo caught by a calibration file failing to
+  reproduce round numbers. `fig8_calibration_as_read.csv` is committed
+  UNCONVERTED as the evidence: the x ticks at true 0.5 and 1.0 read 1.1299
+  and 1.5689 where a linear pick of a log axis predicts 1.1218 and 1.5619.
+  The inverse transform recovers the two ticks it does not use to 1.3% and
+  1.5%, and the paper's own statement that G ran "from 0.1 to 1.7 kg/sm2"
+  confirms the converted span of 0.089 to 1.79.
+
 - **Andrews 86-GT-225 Figure 10 digitised: an IMPLEMENTATION check on the
   effusion internal correlations.** The figure plots four series on one
   axis -- the measurement, and the author's own evaluation of three
@@ -1554,6 +1604,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   array already owns.
 
 ### Fixed
+
+- **`basis_of` matched only the source folder name and its `after` field,
+  so a correlation set keyed on a paper NUMBER could not recognise its own
+  data.** `andrews_1986_effusion_internal` is keyed "86-GT-225" --
+  deliberately, to stop it matching the 1988 study from the same lab --
+  and that string appears only in the citation. The paper's own Figure 8
+  therefore reported "accuracy", understating a fidelity result: the exact
+  mirror of the error the key was introduced to prevent. The source
+  citation now joins the haystack, and
+  `test_every_scored_series_basis_is_what_its_provenance_says` pins the
+  label of every scored series so the wider match cannot claim a false
+  fidelity.
 
 - **Saving and restoring the warning handler nested without bound, and
   eventually segfaulted.** `get_warning_handler()` wrapped the current

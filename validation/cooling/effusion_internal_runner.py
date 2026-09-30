@@ -3,29 +3,49 @@
 The chain under test is Andrews 86-GT-225 Eq. (19) -- Sparrow's hole
 approach summed with Mills' short-hole throat -- called through the real
 implementation, never reimplemented here. The only arithmetic this module
-owns is the two conversions the source's own axes require.
+owns is the conversions the sources' own axes require.
 
-WHAT THE SOURCE PLOTS. Andrews 88-GT-290 Fig. 8 is `h` against `G`, where
-`G` is coolant mass flow per unit plate area and `h` is referenced to the
-plate approach area `A = X^2 - pi D^2/4`. Eq. (19) gives a Nusselt number
-on the hole diameter and the HOLE INTERNAL area, so two conversions stand
-between them:
+TWO PAPERS PLOT "h" AGAINST "G" AND THEY DO NOT MEAN THE SAME h.
+This is the single thing to get right here, and it is worth a factor of
+`A/A_h` -- between 1.4 and 9.8 across the plates involved.
+
+  * **88-GT-290 Fig. 8** (`y_axis: h_internal`) says "h Convective heat
+    transfer coefficient based on the surface area, A", with "A Total hole
+    approach surface area (A = X^2 - pi/4 D^2)". PLATE AREA.
+  * **86-GT-225 Fig. 8** (`y_axis: h_hole_length`) says "h_m Average heat
+    transfer coefficient, W/m2K, over the hole length". HOLE INTERNAL
+    AREA, pi D L -- the same basis Eq. (19)'s Nusselt number already uses,
+    so no area conversion at all.
+
+Eq. (19) gives a Nusselt number on the hole diameter and the hole internal
+area, so the chain is
 
     Re = 4 (G X^2) / (pi D mu)          coolant per hole from G
-    h  = Nu k / D * A_h / A             hole-area Nu to plate-area h
+    h  = Nu k / D                       86-GT-225's h_m, directly
+    h  = Nu k / D * A_h / A             88-GT-290's h, rebased on A
 
-`A_h/A` is 1/3.46 for plate C, so omitting it would overstate `h` by that
-factor -- a definitional error of the #389 class, not a modelling one.
+Using the plate-area form on 86-GT-225's points scores -60%; the correct
+one scores -10.4%. That is a definitional error of the #389 class, not a
+modelling one, and the two conventions are carried as distinct `y_axis`
+values precisely so the runner cannot silently pick the wrong one.
 
-WHAT A MISS MEANS. Tempting to call this fidelity -- same author, same
-group -- but it is ACCURACY. The correlations are Andrews 86-GT-225 and the
-data is Andrews 88-GT-290: same lab, different study, which the validation
-policy counts as cross-source. The scorecard label follows from
-`SET_ORIGIN` naming the 1986 paper rather than the bare author name, which
-would have matched the 1988 source and overstated the claim.
+WHAT A MISS MEANS -- and it differs between the two figures:
 
-The paper states no coolant temperature, so `ASSUMED_T` is an assumption;
-`temperature_sensitivity` reports what it costs rather than hiding it.
+  * **86-GT-225 Fig. 8 is FIDELITY.** Same paper as the correlations, so a
+    miss would normally be our transcription bug. It is not, here: Fig. 10
+    of that paper pins our Eq. (19) against the author's own evaluation of
+    Eq. (19) at 1.5%, so the -10.4% is the correlation missing its
+    author's measurements.
+  * **88-GT-290 Fig. 8 is ACCURACY.** Tempting to call it fidelity -- same
+    author, same group -- but the correlations are 1986 and the data is
+    1988: same lab, different study, which the validation policy counts as
+    cross-source. The scorecard label follows from `SET_ORIGIN` naming the
+    1986 paper rather than the bare author name, which would have matched
+    the 1988 source and overstated the claim.
+
+Neither paper states a coolant temperature, so `ASSUMED_T` is an
+assumption; `temperature_sensitivity` reports what it costs rather than
+hiding it.
 """
 
 from __future__ import annotations
@@ -71,13 +91,22 @@ class Record:
         return abs(err) <= band
 
 
+# The two h conventions, named rather than spelled inline, because the
+# whole point is that a reader must never confuse them. See the module
+# docstring for the nomenclature each paper prints.
+H_PLATE_AREA = "h_internal"  # 88-GT-290: h on A = X^2 - pi D^2/4
+H_HOLE_LENGTH = "h_hole_length"  # 86-GT-225: h_m over the hole length, pi D L
+
+SCORED_Y_AXES = (H_PLATE_AREA, H_HOLE_LENGTH)
+
+
 def owns(series: SeriesMetadata) -> bool:
     """Whether this runner should score ``series``.
 
     Explicit predicate, because `run_series` returns reason-carrying records
     for series it cannot score, which makes truthiness useless for dispatch.
     """
-    return series.x_axis == "G_coolant" and series.y_axis == "h_internal"
+    return series.x_axis == "G_coolant" and series.y_axis in SCORED_Y_AXES
 
 
 def _geometry(series: SeriesMetadata) -> tuple[float, float, float] | None:
@@ -120,11 +149,17 @@ def predict(
 
     nu = cb.effusion_internal_nusselt(Re, pr, X / L, L / D)
 
-    # Nu is on the hole internal area; Fig. 8's h is on the plate approach
-    # area. Both are geometry, no correlation involved.
+    # Nu is already on the hole internal area, which is exactly
+    # 86-GT-225's own h_m basis -- so that convention needs no conversion.
+    h_hole = nu * k / D
+    if series.y_axis == H_HOLE_LENGTH:
+        return h_hole
+
+    # 88-GT-290 references h to the plate approach area instead. Pure
+    # geometry, no correlation involved.
     area_plate = X * X - math.pi * D * D / 4.0
     area_hole = math.pi * D * L
-    return nu * k / D * area_hole / area_plate
+    return h_hole * area_hole / area_plate
 
 
 def run_series(series: SeriesMetadata) -> list[Record]:
