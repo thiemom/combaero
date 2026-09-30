@@ -47,6 +47,13 @@ from validation.cooling.runner import Record
 from validation.cooling.schema import Point, load_points
 
 
+# The marker for a row scored outside its correlation set's declared
+# validity box. Defined once: it is written by `build` onto a series label
+# and by `rollup` onto a set label, and the two drifted apart the first
+# time they were written separately.
+OUT_OF_DOMAIN_MARK = "{out}"
+
+
 @dataclass
 class Cell:
     label: str
@@ -69,6 +76,13 @@ class Cell:
     # "fidelity" (the correlation's own paper) or "accuracy" (cross-source).
     # Never pooled: they answer different questions and fail differently.
     basis: str = "unknown"
+    # "in-domain" or "out-of-domain" against the correlation set's OWN
+    # declared validity box. Never pooled either: a set must not be judged
+    # on conditions its authors never claimed, and today several are --
+    # `baldauf_2002_sellers` scores 138 points of which 138 are outside its
+    # envelope, and `han_1988_orthogonal`'s largest row is 52 of 98. One
+    # number over both says nothing about either (#389).
+    domain: str = "in-domain"
     n_bounded: int = 0  # runs recovered as interval observations
     held: float = float("nan")  # fraction of those the prediction lands inside
 
@@ -259,21 +273,33 @@ def build(records: list[Record], dataset=None) -> list[Cell]:
     interval observations. Without it those columns stay 'unknown' and
     empty -- the metrics are unchanged either way.
     """
-    grouped: dict[str, list[Record]] = defaultdict(list)
+    grouped: dict[tuple[str, str], list[Record]] = defaultdict(list)
     for r in records:
         # A runner may split one series into reported groups -- Rohde's are
         # per velocity-head-ratio band, because pooling them would mix a
         # near-exact comparison with one dominated by a conversion factor.
         group = getattr(r, "group", None)
-        grouped[r.series.label + (f"  [{group}]" if group else "")].append(r)
+        label = r.series.label + (f"  [{group}]" if group else "")
+        # And the harness splits every series by the set's own validity box.
+        # `extrapolated` already flags each point; until now it was only
+        # counted in a column, which made it a number rather than a
+        # decision (#389).
+        domain = (
+            "out-of-domain" if getattr(r, "extrapolated", False) else "in-domain"
+        )
+        grouped[(label, domain)].append(r)
 
     cells: list[Cell] = []
-    for label in sorted(grouped):
-        rs = grouped[label]
+    for label, domain in sorted(grouped):
+        rs = grouped[(label, domain)]
         series = rs[0].series
         errs = [r.rel_error for r in rs if r.rel_error is not None]
         cell = Cell(
-            label=label,
+            # The marker rides on the label so a split series is legible in
+            # the per-series listing without a column nothing else needs.
+            label=label
+            + (f"  {OUT_OF_DOMAIN_MARK}" if domain == "out-of-domain" else ""),
+            domain=domain,
             kind=series.kind,
             scored_by=getattr(rs[0], "scored_by", None) or series.scores,
             n=len(rs),
@@ -344,20 +370,30 @@ def rollup(cells: list[Cell]) -> list[Cell]:
     for c in cells:
         if c.scored_by is None:
             continue
-        group = c.label.split("  [")[1].rstrip("]") if "  [" in c.label else ""
+        group = (
+            c.label.split("  [")[1]
+            .rstrip("]")
+            .replace(f"  {OUT_OF_DOMAIN_MARK}", "")
+            if "  [" in c.label
+            else ""
+        )
         # Segregated by sampling completeness as well as by set and group.
         # A tabulated series and an overplotted one do not measure the same
         # thing: the first gives the model's error, the second an upper
         # bound on it, because only the marks furthest from the cluster
         # centre could be picked. Averaging them produces a number that is
         # neither (#393).
-        buckets[(c.scored_by, group, c.sampling, c.basis)].append(c)
+        buckets[(c.scored_by, group, c.sampling, c.basis, c.domain)].append(c)
 
     out: list[Cell] = []
-    for (set_name, group, sampling, basis), cs in sorted(buckets.items()):
+    for (set_name, group, sampling, basis, domain), cs in sorted(buckets.items()):
         n = sum(c.n for c in cs)
         n_scored = sum(c.n_scored for c in cs)
-        tag = f"  [{basis[:3]}]" + ("" if sampling == "complete" else f" <{sampling[:4]}>")
+        tag = (
+            f"  [{basis[:3]}]"
+            + ("" if sampling == "complete" else f" <{sampling[:4]}>")
+            + ("" if domain == "in-domain" else f" {OUT_OF_DOMAIN_MARK}")
+        )
         agg = Cell(
             label=set_name + (f"  [{group}]" if group else "") + tag,
             kind=f"{len(cs)} series",
@@ -367,6 +403,7 @@ def rollup(cells: list[Cell]) -> list[Cell]:
             n_extrapolated=sum(c.n_extrapolated for c in cs),
             sampling=sampling,
             basis=basis,
+            domain=domain,
             n_bounded=sum(c.n_bounded for c in cs),
         )
         held = [(c.held, c.n_bounded) for c in cs if c.n_bounded]
@@ -386,6 +423,66 @@ def rollup(cells: list[Cell]) -> list[Cell]:
 
 def _pct(v: float) -> str:
     return f"{'-':>7}" if math.isnan(v) else f"{v * 100:6.1f}%"
+
+
+# Correlation sets whose accuracy is carried in C++. The others (film,
+# orifice, effusion) are not `RibCorrelationSet`s and state no band here.
+def _rib_set(name: str):
+    import combaero as cb
+
+    factory = {
+        "han_1988_orthogonal": getattr(cb, "han_1988_orthogonal", None),
+        "han_park_1988_angled": getattr(cb, "han_park_1988_angled", None),
+        "rallabandi_2009_high_re": getattr(cb, "rallabandi_2009_high_re", None),
+    }.get(name)
+    return factory() if factory else None
+
+
+def render_set_accuracy(set_names) -> list[str]:
+    """What each set claims about its OWN accuracy, and whether that is a
+    band anything may be judged against.
+
+    #389 asked for the sets' `accuracy_R`/`accuracy_G` to be used as the
+    source's own band. Reading them showed that cannot be done as stated:
+    only `han_1988_orthogonal`'s are the author's claim. The other two are
+    THIS PROJECT's measurements -- `han_park_1988_angled`'s taken through
+    `evaluate_rib`, the very code path they would be judging. Judging a
+    model against its own error is the circularity #415 removed from the
+    dataset's `uncertainty`; it was still here, one level down.
+
+    So they are REPORTED with their provenance and used as a band by
+    nothing. `usable_as_band()` is the C++ predicate that says which.
+    """
+    import combaero as cb
+
+    rows = []
+    for name in set_names:
+        s = _rib_set(name or "")
+        if s is None:
+            continue
+        for label, acc in (("R", s.accuracy_R), ("G", s.accuracy_G)):
+            if acc.provenance == cb.AccuracyProvenance.Unstated:
+                rows.append((name, label, "  --  ", "unstated", ""))
+                continue
+            rows.append((
+                name,
+                label,
+                f"{acc.value:.1%}",
+                "STATED" if acc.usable_as_band() else "measured",
+                "usable as a band" if acc.usable_as_band()
+                else "this project's own measurement -- NOT a band",
+            ))
+    if not rows:
+        return []
+    out = ["Correlation-set accuracy, as each set declares it:"]
+    for name, label, value, prov, note in rows:
+        out.append(f"  {name:<26} accuracy_{label}  {value:>6}  "
+                   f"{prov:<8} {note}")
+    out.append(
+        "  A `measured` figure is the error of the model it describes, so "
+        "nothing is judged against it (#389)."
+    )
+    return out
 
 
 def render(cells: list[Cell], pools: dict | None = None) -> str:
@@ -437,6 +534,17 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
             "  model's limitation, not ours. Never pooled. See "
             "docs/VALIDATION_POLICY.md."
         )
+        if any(c.domain == "out-of-domain" for c in summary):
+            lines.append(
+                "  {out}: scored OUTSIDE the correlation set's own declared "
+                "validity box. Reported separately because a set"
+            )
+            lines.append(
+                "  must not be judged on conditions its authors never "
+                "claimed -- not because extrapolating is always worse."
+            )
+        lines.append("")
+        lines.extend(render_set_accuracy(sorted({c.scored_by for c in summary})))
     unsupported = [c for c in cells if c.unsupported]
     if pools:
         lines.append("")

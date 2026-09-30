@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <stdexcept>
 
 #include "rib_correlation.h"
 
@@ -483,4 +485,62 @@ TEST(RibCorrelationTest, NormaliserAndConstantAreEquivalentWhenConsistent) {
   EXPECT_NEAR(evaluate_rib(mixed, g, 30000.0).R /
                   evaluate_rib(normalised, g, 30000.0).R,
               std::pow(10.0, 0.35), 1e-9);
+}
+
+// --------------------------------------------------------------------------
+// Accuracy provenance (#389). A band measured FROM a model must never be the
+// band that model is judged against; the type makes the distinction, and
+// validate_rib_set makes it impossible to record half of it.
+// --------------------------------------------------------------------------
+
+TEST(AccuracyProvenance, OnlyAnAuthorStatedFigureIsUsableAsABand) {
+  // Han's own "95% of data within X%" claims -- the only stated pair among
+  // the shipped sets.
+  const auto han = combaero::cooling::han_1988_orthogonal();
+  EXPECT_EQ(han.accuracy_R.provenance,
+            combaero::cooling::AccuracyProvenance::Stated);
+  EXPECT_TRUE(han.accuracy_R.usable_as_band());
+  EXPECT_TRUE(han.accuracy_G.usable_as_band());
+  EXPECT_DOUBLE_EQ(han.accuracy_R.value, 0.06);
+
+  // Measured THROUGH evaluate_rib -- the code path it would be judging.
+  const auto hp = combaero::cooling::han_park_1988_angled();
+  EXPECT_EQ(hp.accuracy_R.provenance,
+            combaero::cooling::AccuracyProvenance::Measured);
+  EXPECT_FALSE(hp.accuracy_R.usable_as_band());
+  EXPECT_FALSE(hp.accuracy_G.usable_as_band());
+
+  // Unstated carries NaN, not 0.0. The old sentinel read as "perfect".
+  const auto ra = combaero::cooling::rallabandi_2009_high_re();
+  EXPECT_EQ(ra.accuracy_R.provenance,
+            combaero::cooling::AccuracyProvenance::Unstated);
+  EXPECT_TRUE(std::isnan(ra.accuracy_R.value));
+  EXPECT_FALSE(ra.accuracy_R.usable_as_band());
+  // A NaN fails every comparison, so an accidental read cannot pass a
+  // tolerance check silently -- which 0.0 would have done.
+  EXPECT_FALSE(ra.accuracy_R.value < 0.10);
+  EXPECT_FALSE(ra.accuracy_R.value >= 0.10);
+  EXPECT_EQ(ra.accuracy_G.provenance,
+            combaero::cooling::AccuracyProvenance::Measured);
+}
+
+TEST(AccuracyProvenance, ValueAndProvenanceCannotDriftApart) {
+  auto s = combaero::cooling::han_1988_orthogonal();
+  EXPECT_NO_THROW(combaero::cooling::validate_rib_set(s));
+
+  // A value with no provenance behind it.
+  s.accuracy_R = combaero::cooling::StatedAccuracy::unstated();
+  s.accuracy_R.value = 0.06;
+  EXPECT_THROW(combaero::cooling::validate_rib_set(s), std::invalid_argument);
+
+  // A provenance with no value behind it.
+  auto t = combaero::cooling::han_1988_orthogonal();
+  t.accuracy_G = combaero::cooling::StatedAccuracy::stated(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(combaero::cooling::validate_rib_set(t), std::invalid_argument);
+
+  // A negative band is not a band.
+  auto u = combaero::cooling::han_1988_orthogonal();
+  u.accuracy_G = combaero::cooling::StatedAccuracy::stated(-0.05);
+  EXPECT_THROW(combaero::cooling::validate_rib_set(u), std::invalid_argument);
 }

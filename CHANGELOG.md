@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The validation harness no longer pools in-domain with out-of-domain
+  scoring, and a correlation's accuracy now carries where it came from**
+  (#389, two of the four remaining items).
+
+  **`AccuracyProvenance` and `StatedAccuracy`.** `#389` asked for the rib
+  sets' `accuracy_R`/`accuracy_G` to be used as "the source's own band".
+  Reading them showed that cannot be done as written: **only
+  `han_1988_orthogonal`'s figures are an author claim.**
+  `han_park_1988_angled`'s 10.5%/8.8% were measured by this project
+  *through `evaluate_rib`* -- the very code path they would be judging --
+  and `rallabandi_2009_high_re`'s 6.9% from the printed equation against
+  digitised points. That is the same circularity #415 removed from the
+  dataset's `uncertainty`, one level down and in C++.
+
+  | set | accuracy_R | accuracy_G | usable as a band |
+  |---|---|---|---|
+  | `han_1988_orthogonal` | 6.0% Stated | 8.0% Stated | **yes** |
+  | `han_park_1988_angled` | 10.5% Measured | 8.8% Measured | no |
+  | `rallabandi_2009_high_re` | Unstated | 6.9% Measured | no |
+
+  `usable_as_band()` is true only for `Stated`, and the report prints the
+  provenance beside every figure so a reader cannot mistake one for the
+  other. **`Unstated` now carries NaN, not 0.0** -- the old sentinel read
+  as "perfect agreement", which is the one thing an absent measurement
+  must never look like. `validate_rib_set` refuses a value without a
+  provenance or a provenance without a value.
+
+  **In-domain and out-of-domain are partitioned, never pooled.** Every
+  point already carried `extrapolated`; the scorecard totalled it into a
+  column beside an error that mixed both regimes. `build` and `rollup`
+  now split on it and tag the out-of-domain rows `{out}`. What that
+  exposes:
+
+  - `baldauf_2002_sellers` scores 138 points of which **all 138** are
+    outside its envelope, so its 48% MAE is an extrapolation figure and
+    now says so.
+  - `han_1988_orthogonal`'s largest fidelity row splits 46 in-domain at
+    6.1% MAE against 52 out-of-domain at **4.6%** -- extrapolation
+    scoring BETTER. Han's `e+ >= 50` floor and 60,000 Reynolds ceiling
+    are conservative there, so filtering out-of-domain points would have
+    discarded the better half. The partition is a report, not a filter,
+    and that case is pinned by a test.
+  - One of Lau's nine `G` points needs a Reynolds number above Han's
+    stated ceiling, and both `fig4.47` panels straddle the box -- so the
+    `measured` accuracy figures above, taken from those very panels, mix
+    the two regimes. One more reason they are not bands.
+
 - **Andrews 88-GT-290 Figure 10 digitised, and #387's overall-effectiveness
   output shipped -- with a measured negative result attached.**
   `EffusionPlateElement.overall_effectiveness(state_in, h_gas, T_gas,

@@ -35,8 +35,10 @@ RibCorrelationSet han_1988_orthogonal() {
   s.valid_eplus = {50.0, 0.0};
   s.valid_Pr = 0.7;
 
-  s.accuracy_R = 0.06;  // 95% of data within 6%
-  s.accuracy_G = 0.08;  // 95% of data within 8%
+  // Han's own claims, and the only STATED pair in this file -- so the only
+  // one the scorecard may judge a model against.
+  s.accuracy_R = StatedAccuracy::stated(0.06);  // "95% of data within 6%"
+  s.accuracy_G = StatedAccuracy::stated(0.08);  // "95% of data within 8%"
   return s;
 }
 
@@ -87,15 +89,17 @@ RibCorrelationSet rallabandi_2009_high_re() {
   s.valid_eplus = {542.0, 25340.0};
   s.valid_Pr = 0.7;  // unchanged from Han; the source does not restate it
 
-  // accuracy_G is NOT an author-stated band, unlike han_1988_orthogonal's
-  // (Han's own "95% within X%" claims). Rallabandi et al. state no percentage
-  // accuracy for Eq. (18) in the extracted text. This is the RMS this
-  // project measured, of Eq. (18) itself against 38 digitised points from
-  // Fig. 4.193c (validation/cooling/data/han2012/fig4.193c_G_scatter.csv):
-  // mean pred/data 0.994, RMS 6.9% -- see han_ribbed_high_re.md, items 27-31.
-  // accuracy_R is left at 0 (unstated): no R data was digitised for this
-  // range, so there is nothing to measure it against.
-  s.accuracy_G = 0.069;
+  // MEASURED, not stated. Rallabandi et al. state no percentage accuracy for
+  // Eq. (18) in the extracted text. This is the RMS this project measured,
+  // of Eq. (18) itself against 38 digitised points from Fig. 4.193c
+  // (validation/cooling/data/han2012/fig4.193c_G_scatter.csv): mean
+  // pred/data 0.994, RMS 6.9% -- see han_ribbed_high_re.md, items 27-31.
+  // Reportable, but never a band to judge the model against, because it IS
+  // the model's error.
+  s.accuracy_G = StatedAccuracy::measured(0.069);
+  // Unstated: no R data was digitised for this range, so there is nothing
+  // to measure it against either. Previously 0.0, which read as "perfect".
+  s.accuracy_R = StatedAccuracy::unstated();
   return s;
 }
 
@@ -149,15 +153,15 @@ RibCorrelationSet han_park_1988_angled() {
   s.valid_eplus = {50.0, 0.0};  // e+ >= 50, same floor as han_1988_orthogonal
   s.valid_Pr = 0.7;
 
-  // Neither accuracy is author-stated for this pair the way Han (1988)'s
-  // own R and G are (6%/8%, "95% of data within"). These are the RMS this
-  // project measured scoring THROUGH evaluate_rib against figure 4.47's
-  // own digitised data (39 points for R, 115 for G) with a representative
-  // geometry (the cloud carries no legend) -- see
+  // MEASURED, and the most circular of the three: these are the RMS this
+  // project measured scoring THROUGH evaluate_rib against figure 4.47's own
+  // digitised data (39 points for R, 115 for G) with a representative
+  // geometry (the cloud carries no legend) -- so they are the error of the
+  // very code path they would be judging. Reportable, never a band. See
   // validation/cooling/extractions/han_ribbed.md and
   // validation/cooling/data/han2012/fig4.47_*.csv.
-  s.accuracy_R = 0.105;
-  s.accuracy_G = 0.088;
+  s.accuracy_R = StatedAccuracy::measured(0.105);
+  s.accuracy_G = StatedAccuracy::measured(0.088);
   return s;
 }
 
@@ -340,10 +344,36 @@ RibResult evaluate_rib(const RibCorrelationSet &set, const RibGeometry &geom,
   return out;
 }
 
+namespace {
+
+// An accuracy figure must carry a finite value exactly when it claims to
+// have one. The old 0.0-means-unstated sentinel could not express that, and
+// a zero read as "perfect agreement" rather than "nothing recorded".
+void check_accuracy(const std::string &set_name, const char *field,
+                    const StatedAccuracy &a) {
+  const bool has_value = std::isfinite(a.value);
+  const bool claims_value = a.provenance != AccuracyProvenance::Unstated;
+  if (has_value != claims_value) {
+    throw std::invalid_argument(
+        "rib correlation set '" + set_name + "': " + std::string(field) +
+        " must carry a finite value if and only if its provenance is not "
+        "Unstated");
+  }
+  if (claims_value && !(a.value >= 0.0)) {
+    throw std::invalid_argument("rib correlation set '" + set_name +
+                                "': " + std::string(field) +
+                                " must be non-negative");
+  }
+}
+
+}  // namespace
+
 void validate_rib_set(const RibCorrelationSet &set) {
   if (set.name.empty()) {
     throw std::invalid_argument("rib correlation set: name must not be empty");
   }
+  check_accuracy(set.name, "accuracy_R", set.accuracy_R);
+  check_accuracy(set.name, "accuracy_G", set.accuracy_G);
   if (set.source.empty()) {
     throw std::invalid_argument(
         "rib correlation set '" + set.name +

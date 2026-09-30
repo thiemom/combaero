@@ -158,6 +158,38 @@ PYBIND11_MODULE(_core, m) {
                     "Outside the set's advisory validity. Advisory because a "
                     "band belongs to the source's rig, not the caller's.");
 
+  py::enum_<combaero::cooling::AccuracyProvenance>(
+      m, "AccuracyProvenance",
+      "Where a correlation's stated accuracy came from. Only Stated may be "
+      "used as a band to judge a model against: a Measured figure IS that "
+      "model's own error, and scoring a model inside its own error answers "
+      "nothing. See docs/VALIDATION_POLICY.md and issue #389.")
+      .value("Unstated", combaero::cooling::AccuracyProvenance::Unstated,
+             "No figure available; value is NaN and must not be read.")
+      .value("Stated", combaero::cooling::AccuracyProvenance::Stated,
+             "The source states it. The only judgeable kind.")
+      .value("Measured", combaero::cooling::AccuracyProvenance::Measured,
+             "This project measured it against digitised data. Reportable, "
+             "never a judging band.");
+
+  py::class_<combaero::cooling::StatedAccuracy>(
+      m, "StatedAccuracy",
+      "A correlation accuracy as a fraction, carried with its provenance.")
+      .def(py::init<>())
+      .def_readwrite("value", &combaero::cooling::StatedAccuracy::value,
+                     "Fraction (0.06 for 'within 6%'); NaN when Unstated.")
+      .def_readwrite("provenance",
+                     &combaero::cooling::StatedAccuracy::provenance)
+      .def("usable_as_band",
+           &combaero::cooling::StatedAccuracy::usable_as_band,
+           "True only for Stated. A Measured figure must never be the band "
+           "a model is judged against.")
+      .def_static("stated", &combaero::cooling::StatedAccuracy::stated,
+                  py::arg("value"))
+      .def_static("measured", &combaero::cooling::StatedAccuracy::measured,
+                  py::arg("value"))
+      .def_static("unstated", &combaero::cooling::StatedAccuracy::unstated);
+
   py::class_<combaero::cooling::RibCorrelationSet>(m, "RibCorrelationSet")
       .def(py::init<>())
       .def_readwrite("name", &combaero::cooling::RibCorrelationSet::name)
