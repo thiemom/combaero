@@ -257,6 +257,37 @@ plates as good fits and erase the finding entirely. That is why
 contain the internal convection the network computes, and the two would
 double-count. `eta` is an output here and must stay one.
 
+## The knobs, and that they reach the target
+
+The library does not correct the 24% miss on plate B -- matching a rig is
+the user's job. But a knob that is offered and does not reach is worse
+than no knob, so each was verified against plate B at `G = 0.6`
+(measured 0.6074, untuned 0.7611, +25.3%):
+
+| knob | value needed | result |
+|---|---|---|
+| `gas_augmentation` | 2.060 | exact to 1e-16 |
+| `eta_film` 0.318 + `gas_augmentation` 4.322 | the physical pair | exact |
+| `internal_Nu_multiplier` | **0.486** | exact -- and WRONG |
+
+**Both single knobs reach the target; only one is attributable.** The
+internal multiplier gets there by halving the coolant-side coefficient,
+which is the wrong direction on the evidence: against Andrews' own Fig. 8
+that correlation runs 10.4% LOW, so correcting it would RAISE `h_i`. The
+number it needs is itself the evidence that it is the wrong dial. Using
+it to absorb a gas-side error would be reward hacking with a user-facing
+knob, and `test_the_internal_knob_also_reaches_it_but_should_not_be_used`
+records that.
+
+**One scalar is a rig match, not a model.** Fitting `gas_augmentation` at
+`G = 1.0` takes plate B from 23.7% MAE to 5.8% -- a real improvement --
+but the residual runs **-28.7% to +3.5%** and is strongly asymmetric,
+because the required augmentation FALLS at low G (1.4 at `G = 0.15`
+against 2.4 at 1.0). The average closing hides the low-G tail.
+
+`internal_Nu_multiplier` was added by this work; the element previously
+had no coolant-side tuner at all, which the verification exposed.
+
 ## Falsification
 
 Eight perturbations, each applied alone and reverted.

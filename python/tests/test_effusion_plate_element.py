@@ -695,3 +695,224 @@ class TestOverallEffectiveness:
         assert etas == sorted(etas, reverse=True)
         # As the gas side vanishes the wall reaches the coolant.
         assert e.overall_effectiveness(state, 1e-4, self.T_GAS)["eta_overall"] > 0.999
+
+
+class TestTheKnobsThatCloseTheDocumentedGap:
+    """The gap is real, and the supported ways to close it must WORK.
+
+    `overall_effectiveness` misses Andrews' plate B by about 25%. The
+    library does not correct that -- matching a rig is the user's job,
+    per docs/VALIDATION_POLICY.md. But a knob that is offered and does
+    not reach the target is worse than no knob, so this verifies each one
+    actually does, and records what each COSTS in attribution.
+    """
+
+    ANDREWS_B = {"hole_diameter": 2.16e-3, "wall_thickness": 6.3e-3, "pitch": 15.24e-3}
+    H0 = 46.120019767899805  # the rig's smooth-duct Dittus-Boelter value
+    T_GAS = 750.0
+    T_COOLANT = 295.0
+
+    class _State:
+        def __init__(self, T, P, X, m_dot):
+            self.T, self.P, self.X, self.m_dot = T, P, X, m_dot
+
+    def _panel(self, G, **kw):
+        e = EffusionPlateElement("p", "c", "g", panel_area=1.0, **self.ANDREWS_B, **kw)
+        return e, self._State(self.T_COOLANT, 101325.0, cb.standard_dry_air_composition(), G)
+
+    def _measured(self, G):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from validation.cooling.schema import load_dataset, load_points
+
+        s = next(x for x in load_dataset() if x.label == "andrews1988/fig10_eta_effusion_B")
+        return min(load_points(s), key=lambda q: abs(q.x - G)).y
+
+    @pytest.mark.parametrize("G", [0.6, 1.0])
+    def test_gas_augmentation_reaches_the_target(self, G):
+        """The knob the physics points at, and the one to use.
+
+        `eta = h_i/(h_i + F h_0)` inverts in closed form, so the required
+        F is computable rather than searched: 2.06 at G = 0.6 and 2.36 at
+        G = 1.0. Both are ordinary film-cooling augmentation once the
+        baseline is right.
+        """
+        target = self._measured(G)
+        e, st = self._panel(G)
+        untuned = e.overall_effectiveness(st, self.H0, self.T_GAS)["eta_overall"]
+        assert untuned / target - 1.0 > 0.20, "the gap this closes has moved"
+
+        h_i = e.internal_heat_transfer(st)["h_plate_area"]
+        needed = h_i * (1.0 - target) / (target * self.H0)
+        assert 1.9 < needed < 2.5, f"required augmentation {needed:.2f}"
+
+        tuned = e.overall_effectiveness(st, self.H0, self.T_GAS, gas_augmentation=needed)
+        assert tuned["eta_overall"] == pytest.approx(target, rel=1e-12)
+        # And the reported breakdown must stay self-consistent.
+        assert tuned["h_gas"] == pytest.approx(self.H0 * needed)
+        assert tuned["gas_augmentation"] == pytest.approx(needed)
+
+    def test_the_physical_pair_reaches_it_too(self):
+        """Film AND augmentation together, which is the honest form.
+
+        Supplying `eta_film` alone would over-predict; supplying it with
+        the augmentation it implies reaches the measurement exactly. That
+        the pair is reachable is the point -- it means the API can express
+        the physics, even though combaero has no correlation for the
+        second half.
+        """
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from validation.cooling import effusion_overall_runner as er
+        from validation.cooling.schema import load_dataset
+
+        G = 0.6
+        target = self._measured(G)
+        series = next(x for x in load_dataset() if x.label == "andrews1988/fig10_eta_effusion_B")
+        eta_film = er.film_effectiveness(series, G)
+        e, st = self._panel(G)
+        h_i = e.internal_heat_transfer(st)["h_plate_area"]
+
+        # Film alone, augmentation left at 1.0 -- WORSE, as it must be.
+        film_only = e.overall_effectiveness(st, self.H0, self.T_GAS, eta_film=eta_film)[
+            "eta_overall"
+        ]
+        untuned = e.overall_effectiveness(st, self.H0, self.T_GAS)["eta_overall"]
+        assert film_only > untuned > target
+
+        needed = h_i * (1.0 - target) / ((target - eta_film) * self.H0)
+        paired = e.overall_effectiveness(
+            st, self.H0, self.T_GAS, gas_augmentation=needed, eta_film=eta_film
+        )
+        assert paired["eta_overall"] == pytest.approx(target, rel=1e-12)
+        # The adiabatic wall must sit between the gas and the coolant, and
+        # the real wall below it.
+        assert self.T_COOLANT < paired["T_wall"] < paired["T_adiabatic_wall"]
+        assert paired["T_adiabatic_wall"] < self.T_GAS
+
+    def test_the_internal_knob_also_reaches_it_but_should_not_be_used(self):
+        """Both knobs can hit the target. Only one of them is ATTRIBUTABLE.
+
+        `internal_Nu_multiplier = 0.486` reaches plate B's measurement at
+        G = 0.6 exactly -- by HALVING the coolant-side coefficient. That
+        is the wrong direction on the evidence: scored against Andrews'
+        own Fig. 8 the internal correlation runs 10.4% LOW, so correcting
+        it would raise `h_i`, not halve it.
+
+        Recorded as a test because a knob that reaches the target is not
+        the same as a knob that should. Using the internal multiplier to
+        absorb a gas-side error would be reward hacking with a
+        user-facing dial, and the number it needs is the evidence that it
+        is the wrong dial.
+        """
+        G = 0.6
+        target = self._measured(G)
+        e, st = self._panel(G)
+        h_i = e.internal_heat_transfer(st)["h_plate_area"]
+
+        needed = target * self.H0 / (h_i * (1.0 - target))
+        tuned_e, tuned_st = self._panel(G, internal_Nu_multiplier=needed)
+        got = tuned_e.overall_effectiveness(tuned_st, self.H0, self.T_GAS)
+        assert got["eta_overall"] == pytest.approx(target, rel=1e-12)
+
+        # It reaches the target by going the WRONG WAY.
+        assert needed < 0.55, f"multiplier {needed:.3f}"
+        assert got["internal_Nu_multiplier"] == pytest.approx(needed)
+        assert got["h_internal_plate_area"] == pytest.approx(h_i * needed)
+
+    def test_one_scalar_cannot_match_the_whole_curve(self):
+        """What tuning at one point does and does not buy.
+
+        The required augmentation is not constant along plate B -- it runs
+        about 1.4 at G = 0.15 to 2.6 at G = 1.55. Tuning at G = 1.0 fixes
+        that point exactly and leaves a real residual elsewhere. Stated so
+        nobody reads a single fitted scalar as having closed the model.
+        """
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from validation.cooling.schema import load_dataset, load_points
+
+        series = next(x for x in load_dataset() if x.label == "andrews1988/fig10_eta_effusion_B")
+        # Anchor on a DIGITISED point, not on a round G -- fitting at
+        # G = 1.0 against the measurement at G = 0.994 would leave a
+        # residual there and make the "exact at the anchor" claim false
+        # for a reason that has nothing to do with the knob.
+        anchor_pt = min(load_points(series), key=lambda q: abs(q.x - 1.0))
+        anchor, target = anchor_pt.x, anchor_pt.y
+        e, st = self._panel(anchor)
+        h_i = e.internal_heat_transfer(st)["h_plate_area"]
+        fitted = h_i * (1.0 - target) / (target * self.H0)
+
+        errs = []
+        for p in load_points(series):
+            panel, state = self._panel(p.x)
+            got = panel.overall_effectiveness(state, self.H0, self.T_GAS, gas_augmentation=fitted)[
+                "eta_overall"
+            ]
+            errs.append(got / p.y - 1.0)
+
+        # Exact at the anchor...
+        at_anchor = next(i for i, p in enumerate(load_points(series)) if p.x == anchor)
+        assert abs(errs[at_anchor]) < 1e-9
+        # ...and a large, ASYMMETRIC residual away from it: -28.7% to
+        # +3.5%. Asymmetric because the required augmentation FALLS at low
+        # G (1.4 at G = 0.15 against 2.4 at G = 1.0), so a scalar fitted
+        # high over-cools the low-G end badly while barely over-shooting
+        # the high-G end.
+        assert min(errs) < -0.20, (
+            f"one scalar now matches the whole curve ({min(errs):.1%} to "
+            f"{max(errs):.1%}); the claim in this docstring needs remeasuring"
+        )
+        assert 0.0 < max(errs) < 0.06
+        assert abs(min(errs)) > 4.0 * max(errs), "the residual is no longer one-sided"
+        # Still an improvement on untuned, which is why the knob exists --
+        # but a partial one, which is why it is not called a fix.
+        untuned = [
+            self._panel(p.x)[0].overall_effectiveness(self._panel(p.x)[1], self.H0, self.T_GAS)[
+                "eta_overall"
+            ]
+            / p.y
+            - 1.0
+            for p in load_points(series)
+        ]
+        mae = sum(abs(v) for v in errs) / len(errs)
+        mae_untuned = sum(abs(v) for v in untuned) / len(untuned)
+        assert mae < mae_untuned, f"tuning made it worse: {mae:.1%} against {mae_untuned:.1%}"
+        # It buys a lot: 23.7% MAE down to 5.8%. The point is not that
+        # the knob is weak -- it is that the AVERAGE closing hides a
+        # -28.7% worst point at low G, so a fitted scalar is a rig match
+        # and not a model.
+        assert mae < 0.30 * mae_untuned
+        assert abs(min(errs)) > 3.0 * mae, (
+            "the worst point is no longer far outside the tuned average; "
+            "the warning this test carries would need restating"
+        )
+
+    def test_the_harness_never_applies_a_knob(self):
+        """Both default to their untuned values, and the scored runner
+        uses the defaults. A tuner the harness set would be scoring the
+        model against a number fitted to the metric judging it."""
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from validation.cooling import effusion_overall_runner as er
+        from validation.cooling.schema import load_dataset
+
+        e, st = self._panel(0.6)
+        assert e.internal_Nu_multiplier == 1.0
+        out = e.overall_effectiveness(st, self.H0, self.T_GAS)
+        assert out["gas_augmentation"] == 1.0
+        assert out["eta_film"] == 0.0
+
+        series = next(x for x in load_dataset() if x.label == "andrews1988/fig10_eta_effusion_B")
+        assert er.predict(series, 0.6) == pytest.approx(
+            e.overall_effectiveness(st, er.gas_side()["h_g"], self.T_GAS)["eta_overall"],
+            rel=2e-3,
+        )

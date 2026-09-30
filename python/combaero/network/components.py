@@ -2397,9 +2397,12 @@ class EffusionPlateElement(OrificeElement):
         correlation: str = "IdelchikThick",
         Cd: float = 0.6,
         edge_radius: float = 0.0,
+        internal_Nu_multiplier: float = 1.0,
     ) -> None:
         if hole_diameter <= 0.0:
             raise ValueError("EffusionPlateElement: hole_diameter must be positive")
+        if internal_Nu_multiplier <= 0.0:
+            raise ValueError("EffusionPlateElement: internal_Nu_multiplier must be positive")
         if wall_thickness <= 0.0:
             raise ValueError("EffusionPlateElement: wall_thickness must be positive")
         if not 0.0 < angle_deg <= 90.0:
@@ -2407,6 +2410,12 @@ class EffusionPlateElement(OrificeElement):
                 "EffusionPlateElement: angle_deg must be in (0, 90]; it is the "
                 "hole inclination to the wall PLANE, 90 being a normal hole"
             )
+
+        # The coolant-side tuner, matching `Nu_multiplier` on ConvectiveSurface.
+        # Andrews 86-GT-225's correlation runs -10.4% against his own Fig. 8,
+        # so a user matching their own plate needs this; the harness never
+        # sets, recommends or scores it. See docs/VALIDATION_POLICY.md.
+        self.internal_Nu_multiplier = float(internal_Nu_multiplier)
 
         px = pitch_x if pitch_x is not None else pitch
         py = pitch_y if pitch_y is not None else pitch
@@ -2548,12 +2557,17 @@ class EffusionPlateElement(OrificeElement):
         area_hole = math.pi * self.hole_diameter * self.hole_length
         area_approach = self.panel_area / self.n_holes - math.pi * (self.hole_diameter**2) / 4.0
 
-        h_hole = (nu_approach + nu_throat) * k / self.hole_diameter
+        # `internal_Nu_multiplier` is the user's rig-matching knob and is 1.0
+        # unless they set it. Applied to the SUM, so the split between the
+        # approach and throat terms stays the correlation's.
+        nu_internal = (nu_approach + nu_throat) * self.internal_Nu_multiplier
+        h_hole = nu_internal * k / self.hole_diameter
         return {
             "Re_hole": float(Re),
             "Nu_approach": float(nu_approach),
             "Nu_throat": float(nu_throat),
-            "Nu_internal": float(nu_approach + nu_throat),
+            "Nu_internal": float(nu_internal),
+            "internal_Nu_multiplier": float(self.internal_Nu_multiplier),
             "h_hole_area": float(h_hole),
             "h_plate_area": float(h_hole * area_hole / area_approach),
             "area_ratio": float(area_approach / area_hole),
@@ -2564,70 +2578,100 @@ class EffusionPlateElement(OrificeElement):
     def overall_effectiveness(
         self,
         state_in: NetworkMixtureState,
-        h_gas: float,
+        h_gas_unblown: float,
         T_gas: float,
         U_gas: float | None = None,
+        gas_augmentation: float = 1.0,
+        eta_film: float = 0.0,
     ) -> dict[str, float]:
         """Overall cooling effectiveness of this panel, as an OUTPUT.
 
-            eta = (T_gas - T_wall) / (T_gas - T_coolant) = h_i / (h_i + h_gas)
+            h_gas = h_gas_unblown * gas_augmentation
+            eta   = (h_i + h_gas eta_film) / (h_i + h_gas)
+            T_wall = T_gas - eta (T_gas - T_coolant)
 
-        `h_gas` is the caller's GAS SIDE and is an input, because the panel
-        does not own it. `eta` and the wall temperature are the outputs. An
-        overall-effectiveness correlation must never be the closure here:
-        it would already contain the internal convection this computes, and
-        the two would double-count.
+        The gas side is the caller's; `eta` and the wall temperature are
+        the outputs. An overall-effectiveness CORRELATION must never be the
+        closure here -- it would already contain the internal convection
+        this computes, and the two would double-count.
 
-        `h_gas` LUMPS THE FILM IN, and that is the thing to understand
-        before choosing a value for it. There is no separate film term
-        here, but not because there is no film: an external film changes
-        both the driving temperature and the coefficient,
+        THE FILM IS TWO NUMBERS, NOT ONE, and the signature says so. The
+        standard film-cooling form is `q = h_f (T_aw - T_w)` with
+        `T_aw = T_gas - eta_film (T_gas - T_c)`, so a film owes you both a
+        driving temperature (`eta_film`) AND a conductance
+        (`gas_augmentation = h_f/h_0`). An adiabatic effectiveness
+        correlation such as `film_effectiveness_baldauf_2002` supplies only
+        the first: an adiabatic wall passes no heat, so the experiment
+        fixes `T_aw` and measures no coefficient. Supplying `eta_film`
+        while leaving `gas_augmentation` at 1.0 therefore OVER-PREDICTS,
+        and both default to their no-film values so that omitting the pair
+        is consistent rather than half-right.
 
-            q = h_f (T_aw - T_w),  T_aw = T_gas - eta_f (T_gas - T_c)
+        `gas_augmentation` IS THE CALLER'S, NEVER FITTED HERE. It matches
+        `Nu_multiplier` on `ConvectiveSurface`: the library states what the
+        correlations give, and matching a specific rig is the user's job.
+        See docs/VALIDATION_POLICY.md.
 
-        and an adiabatic effectiveness correlation supplies only `eta_f`.
-        It cannot supply `h_f`, because an adiabatic wall passes no heat
-        and so measures no coefficient. Offering `eta_f` alone against an
-        unaugmented `h_gas` over-predicts; scored against Andrews
-        88-GT-290 Fig. 10 his data admits a film effectiveness of at most
-        0.105 that way, against the 0.27 to 0.58 Baldauf gives. Admit the
-        film and the same data then demands 1.6 to 4.3 times the
-        smooth-duct coefficient to go with it. Only the pair is
-        identifiable, so `h_gas` is the pair. See
+        MIND WHAT `h_gas_unblown` IS MEASURED AGAINST. An augmentation
+        ratio is meaningless without its baseline, and mixing baselines is
+        a factor-level error, not a refinement. For Andrews 88-GT-290's rig
+        the required `gas_augmentation` is 3.1-4.3 against a fully
+        developed Dittus-Boelter and 1.6-2.5 against the same duct with a
+        thermal-entry correction -- a factor of 1.75 from that choice
+        alone. Published film-cooling ratios are usually referenced to a
+        flat-plate turbulent boundary layer at the same x, which is a third
+        baseline again.
+
+        WHAT SCORING IT AGAINST ANDREWS SHOWED. At `gas_augmentation = 1.0`
+        and `eta_film = 0.0` the closure scores +3.1% on his effusion plate
+        C and +23.7% on plate B -- and plate C's agreement is a
+        CANCELLATION, a real film raising `eta` against its augmentation
+        lowering it, not evidence that either is absent. The two plates
+        need gas-side coefficients differing by 1.7x, and that ratio
+        survives any choice of film model (scaling Baldauf's `eta_film`
+        from 0 to 1.25x moves it only 1.96 to 1.60). So the missing physics
+        is a `gas_augmentation` correlation for full-coverage effusion,
+        which needs a HEATED-wall measurement; a better film correlation
+        cannot supply it. See
         `validation/cooling/extractions/andrews_effusion_overall_eta.md`.
 
-        SO `h_gas` IS NOT A CLEAN-WALL COEFFICIENT. It must already carry
-        whatever the effusion jets do to the gas side, and how much that
-        is depends on a regime this cannot predict: Andrews' two plates
-        need coefficients differing by 1.7x, and the model misses one by
-        3% and the other by 24%.
-
-        Pass `U_gas` and read the reported ratios to see where you are.
+        Pass `U_gas` to get the jet ratios reported beside the result.
         They are REPORTED AND NEVER APPLIED -- no threshold is offered,
-        because the data does not support one. The required augmentation
-        collapses on none of the velocity ratio, the blowing ratio or the
-        momentum flux ratio, and admitting the film does not collapse it
-        either. If `velocity_ratio` exceeds about 1 -- Andrews' plate B
-        ejects at 53 m/s into a 26.8 m/s crossflow -- treat `eta` as an
-        upper bound unless your `h_gas` already accounts for it.
+        because the requirement collapses on none of the velocity ratio,
+        the blowing ratio or the momentum flux ratio. If `velocity_ratio`
+        exceeds about 1 -- Andrews' plate B ejects at 53 m/s into a
+        26.8 m/s crossflow -- treat `eta` as an upper bound unless
+        `gas_augmentation` already accounts for it.
 
-        Returns `{}` when there is no coolant flow. With `U_gas` omitted the
-        jet ratios are absent and only the thermal result is returned.
+        Returns `{}` when there is no coolant flow or no gas side. With
+        `U_gas` omitted the jet ratios are absent rather than guessed.
         """
         internal = self.internal_heat_transfer(state_in)
-        if not internal or h_gas <= 0.0:
+        if not internal or h_gas_unblown <= 0.0 or gas_augmentation <= 0.0:
             return {}
+        if not 0.0 <= eta_film < 1.0:
+            raise ValueError(
+                "EffusionPlateElement: eta_film must be in [0, 1); it is an "
+                "adiabatic effectiveness, not an overall one"
+            )
 
         h_i = internal["h_plate_area"]
+        h_gas = h_gas_unblown * gas_augmentation
         T_c = state_in.T
-        eta = h_i / (h_i + h_gas)
+        eta = (h_i + h_gas * eta_film) / (h_i + h_gas)
+        t_wall = T_gas - eta * (T_gas - T_c)
         out = {
             "eta_overall": float(eta),
-            "T_wall": float(T_gas - eta * (T_gas - T_c)),
+            "T_wall": float(t_wall),
+            "T_adiabatic_wall": float(T_gas - eta_film * (T_gas - T_c)),
             "h_internal_plate_area": float(h_i),
+            "internal_Nu_multiplier": float(self.internal_Nu_multiplier),
+            "h_gas_unblown": float(h_gas_unblown),
+            "gas_augmentation": float(gas_augmentation),
             "h_gas": float(h_gas),
+            "eta_film": float(eta_film),
             "resistance_ratio": float(h_i / h_gas),
-            "q_flux": float(h_gas * (T_gas - (T_gas - eta * (T_gas - T_c)))),
+            "q_flux": float(h_gas * (T_gas - eta_film * (T_gas - T_c) - t_wall)),
         }
         if U_gas is None or U_gas <= 0.0:
             return out

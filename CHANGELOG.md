@@ -81,6 +81,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.00255. This is the Rohde Fig. 10 check run again and coming out the
   other way.
 
+  **The gas side is TWO inputs, not one, because a film is two numbers.**
+  `overall_effectiveness(state_in, h_gas_unblown, T_gas, U_gas=None,
+  gas_augmentation=1.0, eta_film=0.0)`. The standard form is
+  `q = h_f (T_aw - T_w)` with `T_aw = Tg - eta_f (Tg - Tc)`, so a film
+  owes both a driving temperature and a conductance `h_f/h_0`; an
+  adiabatic correlation supplies only the first. A single `h_gas`
+  argument silently meant "the augmented one" and a caller would have
+  passed a clean-wall value -- a factor-of-two error with no symptom.
+  Both new arguments default to their no-film values, so omitting the
+  pair is consistent rather than half-right.
+
+  **`EffusionPlateElement` gains `internal_Nu_multiplier`**, matching
+  `Nu_multiplier` on `ConvectiveSurface`. The element previously had no
+  coolant-side tuner at all -- exposed by verifying that the knobs
+  actually reach a target they are offered for.
+
+  **Both knobs verified to reach, and one of them recorded as the wrong
+  dial.** On plate B at G = 0.6 (measured 0.607, untuned 0.761, +25.3%):
+  `gas_augmentation = 2.060` closes it exactly, as does the physical pair
+  `eta_film = 0.318` with `gas_augmentation = 4.322`. So does
+  `internal_Nu_multiplier = 0.486` -- by HALVING the coolant side, which
+  is the wrong direction, since that correlation runs 10.4% *low* against
+  Andrews' own Fig. 8. Reaching the target is not the same as being
+  attributable, and using the internal knob to absorb a gas-side error
+  would be reward hacking with a user-facing dial.
+
+  **And one scalar is a rig match, not a model.** Fitting
+  `gas_augmentation` at G = 1.0 takes plate B from 23.7% MAE to 5.8% --
+  a real improvement -- but the residual runs -28.7% to +3.5%, because
+  the required augmentation falls at low G. The average closing hides the
+  tail.
+
+  **Augmentation ratios need their baseline stated.** The required
+  `gas_augmentation` for this rig is 3.1-4.3 against a fully developed
+  Dittus-Boelter and 1.6-2.5 against the same duct thermal-entry
+  corrected -- a factor of 1.75 from that choice alone, which is the same
+  class of definitional error as the `h_m`-vs-`h` trap in #430.
+
   Two figure-vs-text conflicts recorded, neither resolved: the plot prints
   `Tg = 744K, Tc = 293K` where the text says 750 K and 295 K, and `Z =
   6.4mm` where the text says "An 8 mm impingement gap was used
