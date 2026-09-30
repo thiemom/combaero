@@ -497,22 +497,73 @@ def test_a_constant_alpha_helps_and_helps_most_where_the_error_is_worst(murray) 
         assert _mae_at_alpha(s96, 0.69) < 0.30
 
 
-def test_gao_alpha_form_cannot_be_fitted_on_murray(murray) -> None:
-    """The negative result, pinned so it is not quietly re-attempted.
+def _by_coupling(rows, C):
+    """eta = eta1 + eta2 - C eta1 eta2, applied recursively. C = 1 is Sellers.
 
-    Gao Eq. (5) is `alpha = a r/(a r + 1) + b`, strictly MONOTONE in r --
-    `d/dr = a/(a r + 1)^2` never changes sign. The best constant alpha per
-    blowing ratio runs 0.85, 0.85, 0.69: flat, then falling. No monotone
-    function passes through that, and for `a > 0` the form is *increasing*,
-    meaning more coolant needs less correction while Murray needs more.
+    Gao's survey of the "third category" of superposition corrections:
+    "scholars established a general form: eta = eta1 + eta2 - C eta1 eta2,
+    where C is adjusted to modify the predicted cooling efficiency."
+    """
+    if not rows:
+        return None
+    total = rows[0]
+    for e in rows[1:]:
+        total = total + e - C * total * e
+    return total
 
-    The assertion is on the ORDERING, not on the fitted numbers, because
-    that is what rules the form out. It is also invariant to how `r` is
-    defined: any `m_coolant/m_mainstream` differs only by a positive scale
-    for one geometry, and `r -> k r` is the same curve with `a -> a/k`.
 
-    Full attempt, including the hold-one-out and the cumulative-r variant,
-    in validation/cooling/extractions/gao_alpha_fit_on_murray.md.
+def _rows_at(series, x):
+    M, P = fr._blowing_and_density(series)
+    g = series.geometry
+    out = []
+    for x_row in fr.row_positions(series):
+        if x_row >= x:
+            break
+        out.append(
+            cb.film_effectiveness_baldauf_2002(
+                (x - x_row) * fr._diameters_per_x(series),
+                M,
+                P,
+                float(g["angle_deg"]),
+                float(g["sz_over_d"]),
+                fr.ASSUMED_TU,
+            )
+        )
+    return out
+
+
+def test_coupling_C_of_one_is_exactly_sellers(murray) -> None:
+    """The identity case, which is what makes C a correction and not a fudge.
+
+    `eta1 + eta2 - C eta1 eta2` at C = 1 is `1 - (1 - eta1)(1 - eta2)`, so
+    the uncorrected model is the classical one rather than an arbitrary
+    reference point -- the same property that makes Gao's alpha = 1 Sellers.
+    """
+    s = next(x for x in murray if x.label.endswith("exp_M0p96"))
+    with cb.suppress_warnings():
+        for x in (8.0, 15.0, 25.0):
+            rows = _rows_at(s, x)
+            assert len(rows) > 2
+            assert _by_coupling(rows, 1.0) == pytest.approx(
+                cb.film_superposition_sellers(rows), abs=1e-12
+            )
+
+
+def test_the_correction_axis_gao_fits_is_not_the_one_murray_varies(murray) -> None:
+    """Why a single (a, b) cannot be fitted here -- and why that is not a
+    verdict on Gao's form.
+
+    Gao fits (a, b) across GEOMETRY at fixed blowing ratio and refits them
+    per blowing ratio: "the correction coefficients ... increased as the
+    blowing ratio decreased". Their four plates span 3.1x in r at one M.
+    `murray2018` is ONE geometry at three blowing ratios -- orthogonal to
+    that axis -- so r and M move together here and no fit can separate them.
+
+    What IS checkable is the direction, and it agrees with Gao: alpha falls
+    as blowing rises, which is their "coefficients increase as blowing
+    decreases" seen from the other side.
+
+    See validation/cooling/extractions/gao_alpha_fit_on_murray.md.
     """
     best = {}
     with cb.suppress_warnings():
@@ -521,14 +572,47 @@ def test_gao_alpha_form_cannot_be_fitted_on_murray(murray) -> None:
             best[tag] = min((0.30 + 0.01 * i for i in range(71)), key=lambda a: _mae_at_alpha(s, a))
 
     lo, mid, hi = best["M0p19"], best["M0p48"], best["M0p96"]
-    # The high-blowing case needs markedly MORE correction than either
-    # lower one -- that is the direction Gao's form gets wrong.
     assert hi < lo - 0.10, f"M=0.96 alpha {hi:.2f} not well below M=0.19 {lo:.2f}"
     assert hi < mid - 0.10, f"M=0.96 alpha {hi:.2f} not well below M=0.48 {mid:.2f}"
-    # And the two low-blowing cases sit together, so the sequence is not
-    # monotone decreasing either -- it is flat, then falls.
     assert abs(mid - lo) < 0.05, (
-        f"M=0.19 and M=0.48 alphas ({lo:.2f}, {mid:.2f}) are no longer "
-        "together; the sequence may have become monotone and Gao's form "
-        "should be re-tested"
+        f"M=0.19 and M=0.48 alphas ({lo:.2f}, {mid:.2f}) have separated; the "
+        "r-vs-M confound may have changed and the fit is worth revisiting"
     )
+
+
+def test_the_coupling_form_fits_murray_better_than_alpha(murray) -> None:
+    """One knob each, and the sourced older form wins at every blowing ratio.
+
+    Both are one parameter per series here, so this compares like with like.
+    The coupling form reaches 13.7%, 17.1% and 16.2% against alpha's 15.8%,
+    21.4% and 23.7% -- and the gap is widest at M = 0.96, where the
+    correction earns its keep. At that point it is close to the paper's own
+    15% experimental uncertainty.
+
+    Recorded because it bears on which correction combaero should implement
+    if it implements one: the coupling form is also parameterised on blowing
+    ratio (Xu et al., via Gao's survey), which is the axis this data varies.
+    """
+    with cb.suppress_warnings():
+        for tag, ceiling in (("M0p19", 0.16), ("M0p48", 0.20), ("M0p96", 0.19)):
+            s = next(x for x in murray if x.label.endswith(f"exp_{tag}"))
+            pts = sorted((p.x, p.y) for p in load_points(s))
+
+            def mae_C(C, s=s, pts=pts):
+                errs = []
+                for x, y in pts:
+                    v = _by_coupling(_rows_at(s, x), C)
+                    if v is not None and y > 0.02:
+                        errs.append(abs(v / y - 1.0))
+                return sum(errs) / len(errs)
+
+            best_C = min((0.5 + 0.02 * i for i in range(226)), key=mae_C)
+            best_alpha = min(
+                (0.30 + 0.01 * i for i in range(71)),
+                key=lambda a, s=s: _mae_at_alpha(s, a),
+            )
+            assert mae_C(best_C) < ceiling, f"{tag}: {mae_C(best_C):.1%}"
+            assert mae_C(best_C) < _mae_at_alpha(s, best_alpha), (
+                f"{tag}: coupling {mae_C(best_C):.1%} no longer beats alpha "
+                f"{_mae_at_alpha(s, best_alpha):.1%}"
+            )

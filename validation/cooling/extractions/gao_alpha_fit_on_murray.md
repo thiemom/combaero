@@ -1,124 +1,181 @@
-# Fitting Gao's alpha on Murray -- a negative result
+# Fitting a superposition correction on Murray
 
 Attempted 2026-09-30, after #425 established that `murray2018` is the first
-family whose curves all fall the same side of the model, which is the
-prerequisite for fitting a correction that only ever reduces.
+family whose curves all fall the same side of the model.
 
-**Outcome: Gao's published form for alpha cannot be fitted on this data.**
-A single constant alpha per blowing ratio works well; the `r` dependence
-Gao prescribes does not describe how that constant moves.
+**Outcome.** A one-knob correction works well and nearly reaches the
+measurement floor. Gao's alpha is the *wrong knob for this dataset* -- not
+because the form is wrong, but because it is parameterised along an axis
+Murray does not vary. The older "third category" coupling form fits better
+here and is the right family for data like this.
 
-## What was being fitted
+## TWO CORRECTIONS to earlier readings, both found by re-reading the paper
 
-Gao Eq. (5), the only part of alpha the paper publishes:
+**1. Gao DOES publish the coefficients.** Section 4.3.1:
 
-    alpha_i = a r / (a r + 1) + b,    r = m_coolant / m_mainstream
+> "The empirical coefficients in Equation (5), a and b, were determined to
+> be 12 and 0.9465, respectively."
 
-`a` and `b` are never printed (searched exhaustively -- see
-`film_superposition.md`), which is why they are required arguments in
-combaero with no default. This was the attempt to supply them from data.
+This repo previously recorded that they were never printed and that the
+search had been exhaustive. Wrong on both counts -- the search looked for
+`a = 12` and the paper states the value in prose. A regex over a paper's
+prose does not justify the word "exhaustive". Now recorded in code as
+`film_superposition::gao_a_case1` / `gao_b_case1`.
 
-For one geometry `r` is the same for every row, so alpha collapses to ONE
-number per blowing ratio and the fit is a scan over a single parameter per
-series -- no optimiser, no local minima, and the objective's shape is
-visible rather than assumed.
+**2. Gao calibrates on ONE geometry across blowing ratios**, which is the
+same axis `murray2018` varies:
 
-## A constant alpha works, and nearly reaches the measurement floor
+> "The empirical coefficients in the correction model were calibrated using
+> the cooling efficiency distributions from Case 1 at blowing ratios of 0.3
+> and 1.0."
 
-| M | alpha = 1 (Sellers) | best constant alpha | MAE there |
-|---|---|---|---|
-| 0.19 | 33.1% | **0.850** | 15.8% |
-| 0.48 | 43.6% | **0.864** | 21.4% |
-| 0.96 | 112.6% | **0.686** | 23.7% |
+So the approach taken here -- fit `(a, b)` on one plate across blowing
+ratios -- matches Gao's own procedure. An intermediate version of this
+record claimed the opposite, that Gao fits across geometry at fixed blowing
+ratio, inferred from their sentence that "the correction coefficients ...
+increased as the blowing ratio decreased". That was an over-reading of one
+sentence against an explicit statement of method elsewhere.
 
-At M = 0.96 a single knob takes the error from 113% to 24%. The residual is
-close to the paper's own stated 15% experimental uncertainty, so a constant
-alpha is not far off the noise floor for this rig.
+## The published pair cannot reach what this plate needs
 
-**The minima are real, not plateaus** -- checked, because a flat objective
-would mean the "best" alpha is not a measurement:
+Not a fitting failure -- arithmetic on the constants. Since
+`a r / (a r + 1) >= 0` for `a > 0` and `r >= 0`:
 
-    M0p19   0.70=25.4%  0.80=17.7%  0.85=15.8%  0.90=17.5%  0.95=23.6%
-    M0p48   0.70=32.7%  0.80=23.5%  0.85=21.5%  0.90=24.3%  0.95=33.0%
-    M0p96   0.65=24.3%  0.70=23.8%  0.75=27.9%  0.85=53.4%  0.95=89.9%
+    alpha >= b = 0.9465    for EVERY r
 
-M = 0.19 and M = 0.48 share a minimum at 0.85 -- their apparent 0.850 vs
-0.864 difference sits inside the flat region and is not a real distinction.
-M = 0.96 is sharply different at 0.686.
+| M | alpha Murray needs | below the floor by |
+|---|---|---|
+| 0.19 | 0.850 | 0.097 |
+| 0.48 | 0.864 | 0.083 |
+| 0.96 | 0.686 | 0.260 |
 
-## Why Gao's form cannot carry that
+All three sit below the floor, so no choice of `r` reaches them. The
+published pair can damp a row by at most **5.35%** while staying at or
+below 1; this plate needs 15% to 31%.
 
-The sequence of best-fit alphas is **0.85, 0.85, 0.69** -- flat, then
-falling. Gao's form is strictly monotone in `r`:
+**This argument is deliberately scale-free, and that matters.** A first
+version claimed the coefficients give `alpha > 1` above M = 0.20 on
+Murray's rig, from an assumed `r = M x A_holes_row / A_duct`. Withdrawn:
+Gao's test-section dimensions are not in the extractable text, so `r`
+cannot be put on their scale. Note the asymmetry that caught me out -- the
+*fit* below is legitimately invariant to `r`'s scale, because `r -> k r` is
+absorbed by `a -> a/k`, but applying PUBLISHED coefficients is not.
 
-    d/dr [a r / (a r + 1)] = a / (a r + 1)^2
+**Checked and not the cause: the `M` versus `Me` distinction.** Gao's
+equivalent blowing ratio `Me = M0 A0/Ae` (Eq. 10) normalises the single-row
+efficiency lookup `eta = f(X/(M s))` onto a baseline hole configuration. It
+is not alpha's `r`, which is `m_i/m_g` from the Eq. (3) energy balance, and
+the quoted calibration values 0.3 and 1.0 are `M`. combaero needs no `Me`
+equivalent because Baldauf takes lateral spacing as an explicit argument
+where Gao's single-row database is fixed at one spacing.
 
-whose sign is `a`'s and never changes. A monotone function cannot reproduce
-flat-then-falling, and more fundamentally the form is *increasing* for
-`a > 0` -- it says MORE coolant needs LESS correction, while Murray needs
-more.
+**The likely cause is structural.** Eq. (5) has no streamwise-spacing term:
 
-Hold-one-out over a grid of `(a, b)` spanning both signs of `a`:
+| rig | spanwise | streamwise |
+|---|---|---|
+| Gao Case 1 (calibration) | 3.5 d | 10.5 d |
+| Gao Case 4 (tightest) | 2.8 d | 8.4 d |
+| Murray 5.75D staggered | 5.75 D | **2.875 D** |
 
-| held out | fitted | predicted alpha | held-out MAE | achievable |
-|---|---|---|---|---|
-| M = 0.19 | a = -10, b = +0.99 | 0.941 | 22.0% | 15.8% |
-| M = 0.48 | a = -5.62, b = +0.86 | 0.789 | 24.2% | 21.4% |
-| M = 0.96 | a = +1e4, b = -0.13 | 0.866 | **58.5%** | 23.7% |
+Murray's rows are 3.7x closer than Gao's calibration plate, and Murray
+proves streamwise spacing is what drives superposition error -- tripling it
+to 17.25 D restores plain superposition to under 10%. Two plates with the
+same coolant fraction and different row spacing get the same alpha from
+this form.
 
-Every hold-out is worse than that series' own constant, and the M = 0.96
-case -- the one that matters, where the correction earns its keep -- is
-2.5x worse. Note also that two of the three fits choose a NEGATIVE `a`,
-which is the sign that makes alpha fall with coolant flow: the fit is
-fighting the form's intended direction.
+Gao's own limits are consistent: "in Case 4, ... when the blowing ratio
+exceeded 0.64, the prediction accuracy decreased compared to the
+traditional Sellers model" -- their tightest plate, above M = 0.64. Murray
+at M = 0.96 and 2.875 D is further into that corner than anything Gao
+tested.
 
-## Two things ruled out before concluding
+## A one-knob correction works
 
-**It is not a matter of getting `r`'s scale right.** Any sensible definition
-of `m_coolant/m_mainstream` -- per-row or total, per-hole area or per-row
-area -- differs only by a positive constant for fixed geometry, and Gao's
-form absorbs a positive scale entirely into `a`, since `r -> k r` is the
-same curve with `a -> a/k`. Demonstrated rather than asserted: refitting
-with `r` scaled by 0.1, 1, 10 and 100 gives an identical held-out alpha of
-0.866 and MAE of 58.5%, with `a` moving 1e5 -> 1e4 -> 1e3 -> 100 exactly as
-the algebra predicts.
+For one geometry `r` is fixed per series, so alpha collapses to ONE number
+per blowing ratio. The fit is then a scan over a single parameter -- no
+optimiser, no local minima, and the objective's shape is visible.
 
-**It is not the per-row versus cumulative reading.** alpha is per-row, so
-`r` might accumulate downstream as `r_i = i r_row`, making alpha rise with
-row index. That is a different model, not a rescaling, so it was fitted
-separately: held-out MAE 16.3%, 24.8% and **47.6%**. Better than the
-constant-`r` reading on the worst case but still twice the achievable
-23.7%, and it still selects a negative `a` (-1, -0.316).
+| M | Sellers | best alpha | MAE | best C | MAE |
+|---|---|---|---|---|---|
+| 0.19 | 33.1% | 0.850 | 15.8% | **2.15** | **13.7%** |
+| 0.48 | 43.6% | 0.864 | 21.4% | **2.16** | **17.1%** |
+| 0.96 | 112.6% | 0.686 | 23.7% | **4.29** | **16.2%** |
 
-## What is NOT being shipped
+At M = 0.96 a single knob takes the error from 113% to 16%, which is close
+to the paper's own stated 15% experimental uncertainty.
 
-**No fitted `(a, b)` default.** The form does not describe the data, so any
-constants would be a curve forced through points it cannot pass near. `a`
-and `b` stay required arguments.
+The minima are genuine, not plateaus -- checked, because a flat objective
+would mean the "best" value is not a measurement:
 
-**No invented replacement.** A monotone-decreasing alpha, or a
-blowing-ratio-indexed table, would both fit better -- and both would be
-made up for the purpose, which is what the tuned-corrections policy
-excludes. The shape has to come from a source.
+    M0p19   alpha  0.70=25.4%  0.80=17.7%  0.85=15.8%  0.90=17.5%  0.95=23.6%
+    M0p48   alpha  0.70=32.7%  0.80=23.5%  0.85=21.5%  0.90=24.3%  0.95=33.0%
+    M0p96   alpha  0.65=24.3%  0.70=23.8%  0.75=27.9%  0.85=53.4%  0.95=89.9%
 
-**The per-series constants above are recorded as a REFERENCE for this rig,
-not as defaults.** Matching a specific rig is the user's job and the
-harness never applies a tuner. Anyone cooling a 5.75D staggered plate at
-M below about 0.5 has a starting point of alpha ~ 0.85 here, clearly
-labelled as tuned to Murray's geometry and no one else's.
+M = 0.19 and M = 0.48 share a minimum at alpha 0.85, so their apparent
+0.850-vs-0.864 difference sits inside the flat region and is not real.
 
-## What would change the verdict
+## The coupling form fits better, and is sourced
 
-- Data at a **different geometry** at the same blowing ratios. Every point
-  here shares one plate, so `r` and `M` move together and the fit cannot
-  tell which one alpha actually responds to. That confound is the single
-  biggest weakness of this attempt, and no amount of extra blowing ratios
-  on the same plate fixes it.
-- Gao's own `(a, b)`, if they ever surface. The form may well be right for
-  the rig Gao fitted it on.
+Gao's own survey of the "third category" of corrections gives the form:
+
+> "scholars established a general form: eta = eta1 + eta2 - C eta1 eta2,
+> where C is adjusted to modify the predicted cooling efficiency."
+
+Applied recursively over rows. **C = 1 is exactly Sellers**, verified to ten
+digits against `film_superposition_sellers` -- the same identity property
+that makes alpha = 1 the classical model.
+
+It beats alpha at every blowing ratio here (13.7 / 17.1 / 16.2 against
+15.8 / 21.4 / 23.7), and most at M = 0.96 where the correction matters.
+Its fitted values 2.15, 2.16, 4.29 are monotone in blowing ratio.
+
+**And critically it is parameterised along the axis Murray varies.** Gao
+attributes the M dependence to Xu et al. [36], who "suggested that the
+correction factor for turbine blades depends on both the blowing ratio, M,
+and the dimensionless distance, X/D". Others in the same family: Huo et al.
+[26] add dimensionless hole pitch; Zhang et al. [37] drop X/D and make C
+depend on hole-row count and hole Reynolds number; Zhang et al. [38] handle
+>50 rows via a spanwise non-uniformity factor and streamwise dissipation
+rate.
+
+Gao's stated reason for not using it: the third category "lacks a
+consideration of streamwise temperature variations and requires extensive
+databases to handle continuous changes in the hole diameter". That is a
+fair objection for their design-iteration purpose. It does not apply to
+scoring one fixed geometry.
+
+## What is NOT shipped
+
+**No fitted `(a, b)`, and no fitted `C`.** The values above are tuned to
+Murray's 5.75D staggered plate and to no one else's. Matching a rig is the
+user's job and the harness never applies a tuner.
+
+**No implementation of the C form yet.** It is one line of recursion and it
+is sourced, so it is a reasonable candidate -- but Xu's actual `C(M, X/D)`
+is in a paper this repo does not have, and shipping the form with `C` as a
+required argument would repeat exactly the `(a, b)` situation: a shape with
+no coefficients. Worth doing only alongside a source for `C`, or as an
+explicit user knob.
+
+**No invented replacement.** A monotone-decreasing alpha or a
+blowing-indexed table would both fit better and both be made up.
+
+## The confound that no fit on this family can escape
+
+Every point shares one plate, so `r` and `M` move together. Nothing fitted
+here can tell which of the two a correction actually responds to -- and
+more blowing ratios on the same plate would not help. That is precisely why
+Gao used four plates.
+
+What would settle it:
+- data at a **different geometry** at the same blowing ratios -- Murray's
+  own 3.0D plate would do it, but Figure 4 is contours with no
+  superposition reference;
+- Gao's `(a, b)`, if they ever surface;
+- Xu et al. [36] for the `C(M, X/D)` form;
 - Murray's Figure 9a at 17.25D streamwise, where superposition nearly
-  works: a fitted alpha should approach 1 there, and a form that cannot
-  produce that limit is wrong regardless of what it does at 5.75D.
+  works: any correction must approach its identity value there (alpha -> 1,
+  C -> 1), and one that cannot is wrong regardless of its fit at 5.75D.
 
 Related: `film_superposition.md`,
 `murray_ireland_2018_effusion_superposition.md`, and #420's finding that

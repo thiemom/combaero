@@ -228,21 +228,59 @@ std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivativ
 // so alpha is the fraction of the film's temperature deficit that survives
 // mixing on the way to the next row. alpha = 1 recovers Sellers exactly.
 //
-// WHAT GAO DOES NOT PUBLISH. Eq. (5) gives alpha's functional form,
+// GAO'S COEFFICIENTS, AND WHY THEY ARE STILL NOT A DEFAULT. Eq. (5) gives
 //
 //   alpha_i = a r / (a r + 1) + b,     r = m_coolant / m_mainstream
 //
-// but the paper never prints the fitted a and b -- there is no coefficient
-// table and no inline value. So the SHAPE is sourced and the CONSTANTS are
-// not. alpha is therefore exposed as a caller input defaulting to 1
-// (i.e. plain Sellers), with Eq. (5) available for anyone fitting their own
-// rig. This is the tuner slot the validation policy reserves: matching a
-// specific rig is the user's job and the harness never scores it.
+// and section 4.3.1 DOES print the fitted values: "The empirical
+// coefficients in Equation (5), a and b, were determined to be 12 and
+// 0.9465, respectively." They are recorded below as gao2025::a_case1 and
+// b_case1. (An earlier note here said they were never published; that was
+// wrong, and it was wrong because a regex looked for "a = 12" while the
+// paper states it in prose.)
+//
+// They are NOT defaulted, because they cannot reach what a tighter plate
+// needs -- and that follows from the constants alone, with no rig
+// arithmetic. Since a r / (a r + 1) >= 0 for a > 0 and r >= 0,
+//
+//     alpha >= b = 0.9465   for EVERY r,
+//
+// so the published pair can never damp a row by more than 5.35% while
+// staying at or below 1 (above 1 the superposition refuses -- alpha > 1
+// would create coolant). Murray & Ireland's 5.75 D staggered plate needs a
+// per-row alpha of about 0.85 at low blowing and 0.69 near M = 1, both
+// BELOW that floor. No choice of r reaches them.
+//
+// This argument is deliberately independent of how r is scaled: Gao's test
+// section dimensions are not stated in the text, so r cannot be put on
+// their scale, and any claim that depended on doing so would be
+// unverifiable.
+//
+// The likely reason is structural: Eq. (5) carries NO streamwise-spacing
+// term, while Murray shows streamwise spacing to be the dominant driver --
+// tripling it to 17.25 D restores plain superposition to under 10% error.
+// Gao calibrated on a plate with 10.5 d streamwise spacing; Murray's
+// effective spacing is 2.875 D, 3.7x tighter. Two plates with the same
+// coolant fraction and different row spacing get the same alpha from this
+// form, which cannot be right if spacing dominates.
+//
+// So alpha stays a caller input defaulting to 1 (plain Sellers). This is
+// the tuner slot the validation policy reserves: matching a specific rig is
+// the user's job and the harness never scores it. See
+// validation/cooling/extractions/gao_alpha_fit_on_murray.md.
 namespace film_superposition {
 
 // alpha = 1 is plain Sellers. Anything below it damps the accumulated
 // effectiveness, which is the direction Gao's measurements require.
 constexpr double alpha_sellers = 1.0;
+
+// Gao's own fitted coefficients for Eq. (5), section 4.3.1. Recorded so the
+// published values are in code rather than only in prose, NOT so they can be
+// used as defaults -- see the note above for why they do not transfer.
+// Calibrated on Case 1 (d = 1.2 mm, spanwise pitch 3.5 d, streamwise spacing
+// 10.5 d) at blowing ratios 0.3 and 1.0.
+constexpr double gao_a_case1 = 12.0;
+constexpr double gao_b_case1 = 0.9465;
 
 } // namespace film_superposition
 
@@ -277,10 +315,10 @@ std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient
     const std::vector<double>& eta_rows,
     const std::vector<double>& alpha_between_rows);
 
-// Gao Eq. (5): the published FORM of the mainstream temperature correction.
-// The coefficients are NOT published -- see the note above -- so a and b are
-// required arguments rather than defaulted, to stop a made-up number
-// acquiring the authority of a default.
+// Gao Eq. (5), the mainstream temperature correction. Both the form and the
+// coefficients are published (gao_a_case1, gao_b_case1 above), but a and b
+// stay REQUIRED rather than defaulted: the published pair is calibrated on
+// one plate and returns alpha > 1 on a tighter one -- see the note above.
 //
 //   mass_flow_ratio : m_coolant / m_mainstream for this row [-]
 double mainstream_temperature_correction(double mass_flow_ratio, double a,

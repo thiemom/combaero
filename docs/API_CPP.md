@@ -792,7 +792,9 @@ std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient
     const std::vector<double>& alpha_between_rows);
 
 // Gao Eq. (5): the published FORM of alpha. a and b are REQUIRED -- the
-// paper never prints its fitted values.
+// published values 12 and 0.9465 (gao_a_case1/b_case1) do not transfer:
+// alpha >= b for every r, so they cannot reach the 0.69-0.85 a tighter
+// plate needs.
 double mainstream_temperature_correction(double mass_flow_ratio, double a, double b);
 
 double equivalent_slot_width(double hole_area, double pitch);           // Eq. (9)
