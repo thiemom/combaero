@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Gao's alpha fitted on Murray -- and the published form does not fit.**
+  #425 established `murray2018` as the first family whose curves all fall
+  one side of the model, which is the prerequisite for a correction that
+  only ever reduces. The fit was attempted and the result is negative,
+  recorded in
+  `validation/cooling/extractions/gao_alpha_fit_on_murray.md`.
+
+  **A constant alpha per blowing ratio works well**, and for one geometry
+  that is all alpha can be, since `r` is then fixed per series:
+
+  | M | Sellers (alpha = 1) | best constant alpha | MAE |
+  |---|---|---|---|
+  | 0.19 | 33.1% | 0.850 | 15.8% |
+  | 0.48 | 43.6% | 0.864 | 21.4% |
+  | 0.96 | 112.6% | 0.686 | 23.7% |
+
+  At M = 0.96 one knob takes 113% to 24%, close to the paper's own 15%
+  experimental uncertainty. The minima are genuine, not plateaus.
+
+  **But Gao Eq. (5) cannot carry it.** `alpha = a r/(a r + 1) + b` is
+  strictly monotone in `r` -- `d/dr = a/(a r + 1)^2` never changes sign --
+  while the best-fit sequence is 0.85, 0.85, 0.69: flat, then falling. For
+  `a > 0` the form is *increasing*, i.e. more coolant needs less
+  correction, where Murray needs more. Hold-one-out over both signs of `a`
+  gives held-out MAE of 22.0%, 24.2% and **58.5%** against achievable
+  15.8%, 21.4% and 23.7% -- every case worse than that series' own
+  constant, and the M = 0.96 case, where the correction earns its keep,
+  2.5x worse. Two of three fits select a NEGATIVE `a`, fighting the form's
+  intended direction.
+
+  Two explanations ruled out before concluding. It is **not** `r`'s scale:
+  any definition differs by a positive constant for one geometry and the
+  form absorbs it into `a`, verified by refitting over four decades for an
+  identical held-out 0.866 / 58.5%. It is **not** the per-row versus
+  cumulative reading: `r_i = i r_row` was fitted separately and still gives
+  47.6% on the worst hold-out, still with a negative `a`.
+
+  **Nothing is shipped as a default.** `a` and `b` remain required
+  arguments; no replacement form is invented, since a monotone-decreasing
+  alpha or a blowing-indexed table would both fit better and both be made
+  up for the purpose. The per-series constants are recorded as a reference
+  for that rig, labelled tuned. The confound worth naming: every point
+  shares one plate, so `r` and `M` move together and no fit on this family
+  alone can tell which alpha responds to.
+
 - **Murray & Ireland (2018) Figure 6, and the decomposition it makes
   possible.** Five digitised curves on a 5.75D-pitch effusion plate: three
   PSP measurements (M = 0.19, 0.48, 0.96) and two of the paper's OWN Sellers

@@ -434,3 +434,101 @@ def test_murray_calibration_ticks_land_on_round_numbers() -> None:
         assert abs(br[0] - x_span) < 0.2 and abs(br[1]) < 0.01, f"{path.name}: BR"
         assert abs(tr[0] - x_span) < 0.2 and abs(tr[1] - y_span) < 0.01, f"{path.name}: TR"
         assert abs(tl[0]) < 0.2 and abs(tl[1] - y_span) < 0.01, f"{path.name}: TL"
+
+
+def _predict_with_alpha(series, x, alpha):
+    """Superposed eta at x with a uniform per-row alpha."""
+    M, P = fr._blowing_and_density(series)
+    g = series.geometry
+    rows = []
+    for x_row in fr.row_positions(series):
+        if x_row >= x:
+            break
+        rows.append(
+            cb.film_effectiveness_baldauf_2002(
+                (x - x_row) * fr._diameters_per_x(series),
+                M,
+                P,
+                float(g["angle_deg"]),
+                float(g["sz_over_d"]),
+                fr.ASSUMED_TU,
+            )
+        )
+    if not rows:
+        return None
+    if len(rows) == 1:
+        return rows[0]
+    return cb.film_superposition_corrected(rows, [alpha] * (len(rows) - 1))
+
+
+def _mae_at_alpha(series, alpha):
+    pts = sorted((p.x, p.y) for p in load_points(series))
+    errs = []
+    for x, y in pts:
+        v = _predict_with_alpha(series, x, alpha)
+        if v is not None and y > 0.02:
+            errs.append(abs(v / y - 1.0))
+    return sum(errs) / len(errs)
+
+
+def test_a_constant_alpha_helps_and_helps_most_where_the_error_is_worst(murray) -> None:
+    """One knob is worth having, which is why the fit was attempted at all.
+
+    Sellers uncorrected gives 33%, 44% and 113% MAE at M = 0.19, 0.48 and
+    0.96. A single constant alpha takes those to roughly 16%, 21% and 24% --
+    at M = 0.96 that is 113% down to 24%, and the residual is close to the
+    paper's own stated 15% experimental uncertainty.
+    """
+    with cb.suppress_warnings():
+        for tag, alpha, ceiling in (
+            ("M0p19", 0.85, 0.20),
+            ("M0p48", 0.85, 0.25),
+            ("M0p96", 0.69, 0.28),
+        ):
+            s = next(x for x in murray if x.label.endswith(f"exp_{tag}"))
+            corrected = _mae_at_alpha(s, alpha)
+            uncorrected = _mae_at_alpha(s, 1.0)
+            assert corrected < ceiling, f"{tag}: {corrected:.1%} at alpha {alpha}"
+            assert corrected < uncorrected, f"{tag}: alpha made it worse"
+
+        # It earns its keep at high blowing in particular.
+        s96 = next(x for x in murray if x.label.endswith("exp_M0p96"))
+        assert _mae_at_alpha(s96, 1.0) > 1.0, "M = 0.96 should be over 100% uncorrected"
+        assert _mae_at_alpha(s96, 0.69) < 0.30
+
+
+def test_gao_alpha_form_cannot_be_fitted_on_murray(murray) -> None:
+    """The negative result, pinned so it is not quietly re-attempted.
+
+    Gao Eq. (5) is `alpha = a r/(a r + 1) + b`, strictly MONOTONE in r --
+    `d/dr = a/(a r + 1)^2` never changes sign. The best constant alpha per
+    blowing ratio runs 0.85, 0.85, 0.69: flat, then falling. No monotone
+    function passes through that, and for `a > 0` the form is *increasing*,
+    meaning more coolant needs less correction while Murray needs more.
+
+    The assertion is on the ORDERING, not on the fitted numbers, because
+    that is what rules the form out. It is also invariant to how `r` is
+    defined: any `m_coolant/m_mainstream` differs only by a positive scale
+    for one geometry, and `r -> k r` is the same curve with `a -> a/k`.
+
+    Full attempt, including the hold-one-out and the cumulative-r variant,
+    in validation/cooling/extractions/gao_alpha_fit_on_murray.md.
+    """
+    best = {}
+    with cb.suppress_warnings():
+        for tag in ("M0p19", "M0p48", "M0p96"):
+            s = next(x for x in murray if x.label.endswith(f"exp_{tag}"))
+            best[tag] = min((0.30 + 0.01 * i for i in range(71)), key=lambda a: _mae_at_alpha(s, a))
+
+    lo, mid, hi = best["M0p19"], best["M0p48"], best["M0p96"]
+    # The high-blowing case needs markedly MORE correction than either
+    # lower one -- that is the direction Gao's form gets wrong.
+    assert hi < lo - 0.10, f"M=0.96 alpha {hi:.2f} not well below M=0.19 {lo:.2f}"
+    assert hi < mid - 0.10, f"M=0.96 alpha {hi:.2f} not well below M=0.48 {mid:.2f}"
+    # And the two low-blowing cases sit together, so the sequence is not
+    # monotone decreasing either -- it is flat, then falls.
+    assert abs(mid - lo) < 0.05, (
+        f"M=0.19 and M=0.48 alphas ({lo:.2f}, {mid:.2f}) are no longer "
+        "together; the sequence may have become monotone and Gao's form "
+        "should be re-tested"
+    )
