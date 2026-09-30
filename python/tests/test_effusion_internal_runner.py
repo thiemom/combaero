@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import combaero as cb  # noqa: E402
 from validation.cooling import effusion_internal_runner as er  # noqa: E402
-from validation.cooling.schema import load_dataset  # noqa: E402
+from validation.cooling.schema import load_dataset, load_points  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -171,3 +171,164 @@ def test_the_runner_does_not_reimplement_the_correlation(plate_c) -> None:
     assert er.predict(thicker, 0.5) != er.predict(plate_c, 0.5)
     # A longer hole has a lower entry-length enhancement.
     assert cb.mills_entry_length_factor(20.0 / 3.27) < cb.mills_entry_length_factor(6.3 / 3.27)
+
+
+# ---------------------------------------------------------------------------
+# Andrews 86-GT-225 Figure 10: the author's own evaluation of his own
+# equations. This is an IMPLEMENTATION check -- did we transcribe Eqs. (12)
+# to (19) correctly from a poor scan -- which is a different and stronger
+# question than Fig. 8's model-vs-data check. The two together separate the
+# failure modes #389 exists to keep apart.
+# ---------------------------------------------------------------------------
+
+FIG10_RE = 2200.0
+FIG10_PR = 0.72
+FIG10_L_MM = 6.35
+FIG10_X_MM = 6.11  # the 25 x 25 plates, and what Eq. (19) is printed for
+
+
+def _fig10(name):
+    series = next(s for s in load_dataset() if s.label == f"andrews1986/{name}")
+    return sorted((p.x, p.y) for p in load_points(series))
+
+
+def _nu_inf():
+    return 0.023 * FIG10_RE**0.8 * FIG10_PR ** (1 / 3)
+
+
+def test_fig10_throat_series_reproduces_our_entry_length_factor() -> None:
+    """The triangles ARE R_Nu, so this checks Eqs. (13) and (14) directly.
+
+    Dividing the throat Nusselt number by the fully developed value leaves
+    the entry-length factor alone, so the paper has effectively plotted
+    `mills_entry_length_factor` for us. That is the most direct check
+    available on two polynomials transcribed from a scan that renders them
+    as "RNu 0.13(n) - 0*75(r) + 1.04(r) + 2.24".
+
+    WHAT THIS TEST DOES AND DOES NOT CONSTRAIN, measured by perturbation.
+    Fig. 10 spans L/D 4.8 to 9.9, so `w = D/L` runs 0.10 to 0.21 and the
+    high-order terms of Eq. (14) barely contribute: changing the `w^3`
+    coefficient from 58.6 to 56.6 moves R_Nu under 1% and this test stays
+    green. Changing the LINEAR 7.48 to 7.00 turns it red.
+
+    The high-order terms are pinned elsewhere, by
+    `MillsBranchesAgreeWhereTheyMeet` in tests/test_effusion_internal.cpp:
+    at the L/D = 2 junction `w` is 0.5, where they dominate, and that test
+    does catch the 58.6 change. Neither test alone constrains the whole
+    polynomial; together they do.
+    """
+    errs = []
+    for LD, y in _fig10("fig10_eq12_throat_only"):
+        ours = cb.mills_entry_length_factor(LD)
+        errs.append(abs(ours / y - 1.0))
+        assert ours == pytest.approx(y, rel=0.03), f"L/D = {LD}"
+    assert sum(errs) / len(errs) < 0.02, "mean disagreement grew"
+
+    # And the same numbers must come back through the throat correlation,
+    # which is what actually ships.
+    for LD, y in _fig10("fig10_eq12_throat_only"):
+        assert cb.effusion_throat_nusselt(FIG10_RE, FIG10_PR, LD) / _nu_inf() == (
+            pytest.approx(y, rel=0.03)
+        )
+
+
+def test_fig10_eq19_series_reproduces_our_summed_correlation() -> None:
+    """Our Eq. (19) against the author's own Eq. (19).
+
+    This is the check that our assembly -- approach rebased by X/(pi L),
+    plus throat, both on the hole internal area -- is the assembly the
+    paper means. Agreement is 1.5% mean, 2.5% worst, which is digitisation
+    precision plus the marker-centre read.
+    """
+    errs = []
+    for LD, y in _fig10("fig10_eq19_summed"):
+        ours = (
+            cb.effusion_internal_nusselt(FIG10_RE, FIG10_PR, FIG10_X_MM / FIG10_L_MM, LD)
+            / _nu_inf()
+        )
+        errs.append(ours / y - 1.0)
+        assert ours == pytest.approx(y, rel=0.04), f"L/D = {LD}"
+    assert abs(sum(errs) / len(errs)) < 0.025
+
+
+def test_fig10_plate_a_is_a_pitch_test_not_an_outlier() -> None:
+    """The point that looks 50% wrong is the only one that tests the pitch.
+
+    Plate a is a 10 x 10 array on a 152 mm plate, so its pitch is 15.2 mm
+    against 6.08 mm for the 25 x 25 plates -- and Eq. (18)'s approach term
+    scales with X/(pi L). Evaluated at plate a's own pitch, Eq. (19)
+    reproduces its measurement to under 5%; evaluated at the others' pitch
+    it misses by a third.
+
+    The other three points share one X and so cannot distinguish the pitch
+    dependence at all, which is what makes this single point worth naming.
+    """
+    measured = _fig10("fig10_measured")
+    plate_a = next(p for p in measured if 5.0 < p[0] < 5.8)
+    LD, y = plate_a
+    assert y > 4.0, "plate a should be the high point"
+
+    at_own_pitch = (
+        cb.effusion_internal_nusselt(FIG10_RE, FIG10_PR, 15.2 / FIG10_L_MM, LD) / _nu_inf()
+    )
+    at_other_pitch = (
+        cb.effusion_internal_nusselt(FIG10_RE, FIG10_PR, FIG10_X_MM / FIG10_L_MM, LD) / _nu_inf()
+    )
+
+    assert at_own_pitch == pytest.approx(y, rel=0.05)
+    assert at_other_pitch < 0.75 * y, "the wrong pitch should miss badly"
+
+
+def test_fig10_shows_why_the_approach_term_is_needed() -> None:
+    """Throat-only sits far below the measurement, which is the paper's
+    whole argument: "the differences emphasise the importance of the hole
+    approach flow heat transfer, which is the dominant process at all L/D
+    of relevance to gas turbine film cooling applications"."""
+    throat = dict(_fig10("fig10_eq12_throat_only"))
+    summed = dict(_fig10("fig10_eq19_summed"))
+    assert max(throat.values()) < 2.0
+    assert min(summed.values()) > 2.3
+    for LD_t, y_t in throat.items():
+        nearest = min(summed, key=lambda k: abs(k - LD_t))
+        assert summed[nearest] > y_t, f"L/D ~ {LD_t}"
+
+
+def test_fig10_calibration_ticks_land_on_round_numbers() -> None:
+    """The digitisation's own evidence, as for murray2018.
+
+    Not declared as a series: `kind: frame` means a straight panel EDGE
+    fitted as a power law, and this is a traversal -- left origin, x ticks
+    5 to 10, top-right corner, top of the y axis, then y ticks 4 down to
+    1.5. It is therefore NOT sorted, and that order is its meaning.
+    """
+    import csv
+
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "validation"
+        / "cooling"
+        / "data"
+        / "andrews1986"
+        / "fig10_calibration.csv"
+    )
+    rows = [
+        (float(r[0]), float(r[1]))
+        for r in csv.reader(path.open())
+        if not r[0].strip().startswith("x")
+    ]
+    assert len(rows) == 13
+
+    origin, x_ticks, top_right, y_top, y_ticks = (rows[0], rows[1:7], rows[7], rows[8], rows[9:])
+    x_span = top_right[0] - origin[0]
+    y_span = y_top[1] - origin[1]
+
+    worst_x = max(abs(p[0] - t) for p, t in zip(x_ticks, [5, 6, 7, 8, 9, 10], strict=True))
+    worst_y = max(abs(p[1] - t) for p, t in zip(y_ticks, [4, 3, 2, 1.5], strict=True))
+    assert worst_x / x_span < 0.01, f"x ticks off by {worst_x:.3f}"
+    assert worst_y / y_span < 0.01, f"y ticks off by {worst_y:.4f}"
+
+    # The ticks must sit on their axes, which is what makes them ticks.
+    assert max(abs(p[1] - origin[1]) for p in x_ticks) < 0.01
+    assert max(abs(p[0] - origin[0]) for p in y_ticks) < 0.02
+    # And the frame must close.
+    assert abs(top_right[1] - y_top[1]) < 0.01

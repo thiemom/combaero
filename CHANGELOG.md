@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Andrews 86-GT-225 Figure 10 digitised: an IMPLEMENTATION check on the
+  effusion internal correlations.** The figure plots four series on one
+  axis -- the measurement, and the author's own evaluation of three
+  correlations including his Eq. (19), which is what combaero implements.
+  That makes it a different and stronger question than `andrews1988`
+  Fig. 8's model-vs-data check, and the two together separate the failure
+  modes #389 exists to keep apart: **did we transcribe the equations
+  correctly** against **do the equations describe a rig**.
+
+  | series | checks | agreement |
+  |---|---|---|
+  | triangles, Eqs. (12)-(14) | `mills_entry_length_factor` | **0.8% mean, 1.6% worst** |
+  | squares, Eq. (19) | `effusion_internal_nusselt` | **1.5% mean, 2.5% worst** |
+
+  That is digitisation precision, and it means the -13.5% against Fig. 8 is
+  a **model limitation rather than our bug** -- a distinction the earlier
+  PR could state only as an inference.
+
+  **Plate A is not an outlier, it is the only pitch test in the figure.**
+  Its measured point sits at 4.09 where the Eq. (19) curve is 2.73, which
+  looks like a 50% miss. The paper explains it: plate a is a 10 x 10 array
+  on a 152 mm plate, so its pitch is 15.2 mm against 6.08 mm for the 25 x
+  25 plates -- and Eq. (18)'s approach term scales with `X/(pi L)`.
+  Evaluated at plate a's own pitch, our Eq. (19) gives 4.21 against the
+  measured 4.09, agreeing to **2.8%**. The other three points share one X
+  and cannot distinguish the pitch dependence at all.
+
+  The paper's own words: "the smaller number of holes has increased the
+  heat transfer coefficient at a fixed mass flow rate".
+
+  Recorded with the coverage split the perturbations revealed: Fig. 10
+  spans `w = D/L` of 0.10 to 0.21, so it pins Eq. (14)'s LINEAR term and
+  not its high-order ones -- changing `w^3`'s 58.6 to 56.6 leaves it green.
+  Those are pinned instead by the branch-junction test at `w = 0.5`.
+  Neither test alone constrains the polynomial; together they do.
+
 - **`EffusionPlateElement.internal_heat_transfer()`** wires the Andrews
   86-GT-225 correlations into the element, so a solved panel reports its
   coolant-side coefficient in `diagnostics()` rather than only through the

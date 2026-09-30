@@ -1,0 +1,236 @@
+# Andrews et al. (1986), ASME 86-GT-225, Figure 10 -- "overall heat transfer
+# enhancement as a function of L/D for Re = 2200".
+#
+# WHY THIS FIGURE IS WORTH MORE THAN IT LOOKS. It plots FOUR series on one
+# axis: the measurement, and the paper's own evaluation of three
+# correlations including its Eq. (19), which is what combaero implements.
+# That makes it an IMPLEMENTATION check -- our Eq. (19) against the
+# author's own numbers for Eq. (19) -- which is a different and stronger
+# question than the model-vs-data check `andrews1988` Fig. 8 provides.
+#
+# The two together separate the two failure modes that #389 exists to keep
+# apart: Fig. 10 says whether we transcribed the equations correctly, and
+# Fig. 8 says whether the equations describe a rig.
+#
+# AXES. x is L/D, y is Nu/Nu_inf where Nu_inf is the fully developed tube
+# value 0.023 Re^0.8 Pr^(1/3). Re is fixed at 2200 throughout.
+#
+# THE FOUR PLATES, from the paper's own text:
+#   "Plate a consisted of a 10 x 10 square hole array on the present 152 mm
+#    square test size and plates b, c and d were 25 x 25 hole arrays."
+#
+# So plate a's pitch is 152/10 = 15.2 mm and the others' is 152/25 = 6.08 mm
+# -- and 6.08 is essentially the 6.11 mm that Eq. (19) is printed for. The
+# plates are all 6.35 mm thick and differ in hole diameter, which is what
+# moves L/D.
+#
+# PLATE A IS NOT AN OUTLIER, IT IS THE ONLY PITCH TEST. Its measured point
+# sits at Nu/Nu_inf = 4.09 where the Eq. (19) curve is 2.73, which looks
+# like a 50% miss until the pitch is accounted for. Eq. (18)'s approach term
+# scales with X/(pi L), so plate a's is 2.5x larger; evaluating Eq. (19) at
+# X = 15.2 mm gives 4.21 against the measured 4.09, a 2.8% agreement. The
+# paper says the same thing in words: "the smaller number of holes has
+# increased the heat transfer coefficient at a fixed mass flow rate".
+#
+# That single point is therefore the only one in this figure that exercises
+# the pitch dependence of the approach term at all -- the other three share
+# one X and cannot distinguish it.
+#
+# CALIBRATION. Digitised in DATA coordinates; `fig10_calibration.csv` holds
+# the axis ticks and plot bounds and is NOT declared as a series, for the
+# same reason as `murray2018`: `kind: frame` here means a straight panel
+# EDGE fitted as a power law, and this is a traversal. Checked by
+# python/tests/test_effusion_internal_runner.py instead.
+#
+# Traversal order, stated by the digitiser: left origin (unlabelled), then
+# x ticks 5 through 10, the top-right corner, the top of the y axis
+# (unlabelled), then y ticks 4, 3, 2, 1.5. NOT sorted -- that order is what
+# identifies which point is which tick.
+#
+# Measured deviation from the printed round numbers:
+#   x ticks (5 .. 10)     worst 0.020   0.37% of span
+#   y ticks (1.5 .. 4)    worst 0.0062  0.22% of span
+#   baseline level to 6e-4; top corners level to 7e-3.
+
+paper:
+  name: andrews1986
+  citation: >-
+    Andrews, G.E., Alikhanizadeh, M., Asere, A.A., Hussain, C.I.,
+    Khoshkbar Azari, M.S. and Mkpadi, M.C. (1986). "Small Diameter Film
+    Cooling Holes: Wall Convective Heat Transfer." ASME 86-GT-225,
+    Gas Turbine Conference. Department of Fuel and Energy, University of
+    Leeds.
+  secondary: false
+
+files:
+  - path: fig10_measured.csv
+    after: null
+    page: 7
+    item: "Figure 10, open circles"
+    series: >-
+      measured overall heat transfer enhancement Nu/Nu_inf against L/D at
+      Re = 2200, four test plates
+    figure: "10"
+    panel: single
+    geometry:
+      plate_thickness_mm: 6.35
+      test_plate_mm: 152.0
+      # Pitch is NOT common to the four points: plate a is a 10 x 10 array
+      # and the rest are 25 x 25. Recorded per point in the cross_check
+      # rather than here, because one value would be wrong for one of them.
+      pitch_mm_25x25: 6.08
+      pitch_mm_10x10: 15.2
+    alpha_deg: 90.0
+    x_axis: L_over_D
+    x_scale: 1.0
+    y_axis: Nu_over_Nu_inf
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Four plates in ascending L/D: 4.81, 5.35, 7.10, 9.90. The second is
+      plate a, the 10 x 10 array -- its 4.09 against the Eq. (19) curve's
+      2.73 is not a miss but a different pitch, and evaluating Eq. (19) at
+      plate a's own X = 15.2 mm gives 4.21, agreeing to 2.8%. The paper
+      states the mechanism directly: "the smaller number of holes has
+      increased the heat transfer coefficient at a fixed mass flow rate.
+      One cause of this is the higher hole Re for the larger diameter
+      holes."
+
+      `uncertainty` left null: the paper states no band for these points,
+      and back-filling one from the model's own error on them is exactly
+      what #389 forbids.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [5, 6, 7, 8, 9, 10]
+      x_multiplier: 1.0
+      y_ticks: [1.5, 2, 3, 4]
+      y_limits: [null, 4.2]
+      printed_curve: null
+      monotonic: null
+      expected_points: 4
+      plot_x_limits: [4.6, 10.1]
+      plot_y_limits: [1.4, 4.2]
+
+  # -- the paper's OWN evaluation of three correlations ---------------------
+  #
+  # `kind: correlation` and `scores: null` throughout. The harness must not
+  # score combaero against another model as though it were data. These are
+  # committed because they are an IMPLEMENTATION reference: our Eq. (19)
+  # against the author's own Eq. (19). That comparison lives in
+  # python/tests/test_effusion_internal_runner.py, where it belongs, because
+  # it is a transcription check and not a physics result.
+  - path: fig10_eq19_summed.csv
+    after: null
+    page: 7
+    item: "Figure 10, squares"
+    series: "Eq. (19), hole approach plus throat, evaluated by the author"
+    figure: "10"
+    panel: single
+    geometry: {plate_thickness_mm: 6.35, pitch_mm: 6.11}
+    alpha_deg: 90.0
+    x_axis: L_over_D
+    x_scale: 1.0
+    y_axis: Nu_over_Nu_inf
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      combaero's `effusion_internal_nusselt` reproduces these to a mean of
+      1.5% and a worst of 2.5% at X = 6.11 mm, L = 6.35 mm, Re = 2200,
+      Pr = 0.72 -- within the digitisation precision of roughly 0.4% plus
+      the marker-centre read. This is the check that our transcription of
+      Eqs. (12) through (19) from a poor scan is correct.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [5, 6, 7, 8, 9, 10]
+      x_multiplier: 1.0
+      y_ticks: [1.5, 2, 3, 4]
+      y_limits: [null, 4.2]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: 4
+      plot_x_limits: [4.6, 10.1]
+      plot_y_limits: [1.4, 4.2]
+
+  - path: fig10_eq12_throat_only.csv
+    after: null
+    page: 7
+    item: "Figure 10, triangles"
+    series: "Eqs. (12) to (14), Mills short-hole throat alone"
+    figure: "10"
+    panel: single
+    geometry: {plate_thickness_mm: 6.35}
+    alpha_deg: 90.0
+    x_axis: L_over_D
+    x_scale: 1.0
+    y_axis: Nu_over_Nu_inf
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      This series IS R_Nu, because the throat Nusselt number divided by the
+      fully developed value leaves the entry-length factor alone.
+      combaero's `mills_entry_length_factor` gives 1.840, 1.794, 1.671 and
+      1.540 against the digitised 1.832, 1.766, 1.658 and 1.537 -- a mean
+      of 0.8% and a worst of 1.6%. It is the most direct check available on
+      Eqs. (13) and (14), which were transcribed from a scan that renders
+      them as "RNu 0.13(n) - 0*75(r) + 1.04(r) + 2.24".
+
+      It also shows why the approach term is needed: throat-only sits near
+      1.5 to 1.8 where the measurement is 2.4 to 4.1.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [5, 6, 7, 8, 9, 10]
+      x_multiplier: 1.0
+      y_ticks: [1.5, 2, 3, 4]
+      y_limits: [null, 4.2]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: 4
+      plot_x_limits: [4.6, 10.1]
+      plot_y_limits: [1.4, 4.2]
+
+  - path: fig10_eq11.csv
+    after: null
+    page: 7
+    item: "Figure 10, crosses"
+    series: "Eq. (11), an alternative short-hole correlation from the review"
+    figure: "10"
+    panel: single
+    geometry: {plate_thickness_mm: 6.35}
+    alpha_deg: 90.0
+    x_axis: L_over_D
+    x_scale: 1.0
+    y_axis: Nu_over_Nu_inf
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Committed for context, NOT implemented. Eq. (11) is one of the
+      literature correlations the paper's Table 2 reviews rather than one
+      it adopts; it runs 3.10 down to 2.61 across the L/D range, above
+      Eq. (19) at low L/D and converging on it by L/D 10.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [5, 6, 7, 8, 9, 10]
+      x_multiplier: 1.0
+      y_ticks: [1.5, 2, 3, 4]
+      y_limits: [null, 4.2]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: 4
+      plot_x_limits: [4.6, 10.1]
+      plot_y_limits: [1.4, 4.2]
