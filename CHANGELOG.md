@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`b_0_override` on the Baldauf film correlation**, so the paper's Table 4
+  reading of Eq. (31) can be tested. Both entry points take it after
+  `status`; NaN (the default) uses Eq. (31) as printed, and Python takes
+  `b_0=None`.
+
+  **Deliberately an override, not a second formula.** The paper contains no
+  alternative: Table 4 states one number at the Table 3 conditions, and
+  reaching it needs `sin(...) = -0.167` where the printed equation gives
+  `+0.470` -- no sign, unit or angle convention makes that argument negative
+  at 30 deg. Scaling Eq. (31) by the 0.737 ratio would be an invented
+  correction, so the choice stays with whoever has evidence for it. Also
+  confirmed dead: the "treat the sine argument as degrees" reading is
+  *algebraically identical* to the printed one, because the 0.86 scale
+  passes straight through a linear argument.
+
+- **Corrected: Eq. (31)'s discrepancy is governed by `x/D`, not by `M`.**
+  The header claimed "under 5% below M ~ 0.5 and up to 50% at M = 2.5". That
+  misattributes it -- `b_0` reaches the model only through
+  `b_1 = b_0/(1 + M^-3)` (Eq. 32), the *descending-branch* gradient, so near
+  the hole it does nothing whatever the blowing. Measured with the new
+  override across the whole envelope:
+
+  | | effect |
+  |---|---|
+  | `x/D <= 20`, any `M` | under 1% |
+  | `x/D = 200`, `M = 2.0` | -19% |
+  | `x/D = 400`, `M = 2.0` | -28% |
+  | worst in the box (`s/D` 5, 90 deg, `Tu` 0.0035, `M` 2.5, `x/D` 400) | **-75%** |
+
+  Practical consequence: at effusion row spacings -- Murray's 5.75 D,
+  Andrei's 9.15 D -- the two readings differ by **under 1%**, so no effusion
+  dataset can arbitrate Eq. (31), and it cannot explain the Baldauf +
+  Sellers failure measured in #420. Only far-downstream single-row data
+  could settle it. Pinned by
+  `EquationThirtyOneMattersFarDownstreamNotAtHighM`.
+
 - **Multi-row film/effusion scoring, and the first verdict on the Baldauf +
   Sellers chain.** `validation/cooling/film_runner.py` scores superposed
   film effectiveness against adiabatic effusion-plate data, wired into the

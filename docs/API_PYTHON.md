@@ -279,6 +279,10 @@ Envelope: `M` 0.2-2.5, `P` 1.2-1.8, `s/D` 2-5, `alpha` 30-90 deg,
 implemented as printed and disagrees with the paper's own worked example --
 see `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
 
+`b_0=<float>` replaces Eq. (31)'s `b_0` (default `None` = as printed), so the
+paper's Table 4 reading can be tested. Its effect is governed by `x/D`, not
+`M`: under 1% for `x/D <= 20` at any blowing, -28% by `x/D = 400`.
+
 Outside the envelope the value is unchanged -- it still answers, finitely --
 but each out-of-range input now raises a warning through the global handler,
 one per parameter:

@@ -88,7 +88,7 @@ inline DualN<N> as_const(double v, const DualN<N>&) { return DualN<N>::constant(
 // of sync with the value.
 template <typename T>
 T baldauf_eta_impl(double x_over_D, const T& M, const T& P, double alpha_deg,
-                   double sD, double Tu) {
+                   double sD, double Tu, double b_0_override){
     namespace B = combaero::cooling::baldauf2002;
 
     // Degrees in, radians inside every trig function -- established from
@@ -118,9 +118,18 @@ T baldauf_eta_impl(double x_over_D, const T& M, const T& P, double alpha_deg,
     // Eq. (31), IMPLEMENTED AS PRINTED. It disagrees with the paper's own
     // Table 4 by 36% (0.83612467 against 0.61626073) while all 17 other
     // checkable coefficients reproduce to 2e-6. See the header note.
-    const double b_0 = 0.8 - 0.014 * sD * sD
+    //
+    // A caller may substitute its own b_0 to test the Table 4 reading. The
+    // library offers no second FORMULA because the paper contains none:
+    // Table 4 states one number at the Table 3 conditions, and reaching it
+    // would need sin(...) = -0.167 where the printed equation gives +0.470
+    // -- no sign, unit or angle convention makes that argument negative.
+    // Scaling Eq. (31) by the 0.737 ratio would be an invented correction,
+    // so the choice is left with whoever has evidence for it.
+    const double b_0_printed = 0.8 - 0.014 * sD * sD
                      + (1.5 - 2.0 / std::sqrt(sD))
                        * std::sin(0.86 * a * (1.0 + 0.754 / (1.0 + 0.87 * sD * sD)));
+    const double b_0 = std::isnan(b_0_override) ? b_0_printed : b_0_override;
     const double c_1 = 7.5 + sD;                                          // Eq. (33)
 
     const double b_T = 0.7 * (1.0 + (1.22 / (1.0 + 7.0 * std::pow(sD - 1.0, -7.0))
@@ -251,21 +260,24 @@ bool check_range(double M, double P, double alpha_deg, double sD, double Tu,
 double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
                                        double alpha_deg, double s_over_D,
                                        double Tu,
-                                       CorrelationStatus *status) {
+                                       CorrelationStatus *status,
+                                       double b_0_override) {
     check_inputs(x_over_D, M, P, alpha_deg, s_over_D, Tu);
     check_range(M, P, alpha_deg, s_over_D, Tu, status);
-    return baldauf_eta_impl<double>(x_over_D, M, P, alpha_deg, s_over_D, Tu);
+    return baldauf_eta_impl<double>(x_over_D, M, P, alpha_deg, s_over_D, Tu,
+                                    b_0_override);
 }
 
 std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivatives(
     double x_over_D, double M, double P, double alpha_deg, double s_over_D,
-    double Tu, CorrelationStatus *status) {
+    double Tu, CorrelationStatus *status, double b_0_override) {
     check_inputs(x_over_D, M, P, alpha_deg, s_over_D, Tu);
     check_range(M, P, alpha_deg, s_over_D, Tu, status);
     using D = DualN<2>;
     const D dM = D::seed(M, 0);
     const D dP = D::seed(P, 1);
-    const D r = baldauf_eta_impl<D>(x_over_D, dM, dP, alpha_deg, s_over_D, Tu);
+    const D r = baldauf_eta_impl<D>(x_over_D, dM, dP, alpha_deg, s_over_D, Tu,
+                                    b_0_override);
     return {r.v, r.d[0], r.d[1]};
 }
 

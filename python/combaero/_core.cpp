@@ -2,6 +2,8 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <limits>
+#include <optional>
 #include <vector>
 
 #include "acoustics.h"
@@ -5604,12 +5606,13 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("film_effectiveness_baldauf_2002",
         [](double x_over_D, double M, double P, double alpha_deg,
-           double s_over_D, double Tu) {
+           double s_over_D, double Tu, std::optional<double> b_0) {
           return combaero::cooling::film_effectiveness_baldauf_2002(
-              x_over_D, M, P, alpha_deg, s_over_D, Tu, nullptr);
+              x_over_D, M, P, alpha_deg, s_over_D, Tu, nullptr,
+              b_0 ? *b_0 : std::numeric_limits<double>::quiet_NaN());
         },
         py::arg("x_over_D"), py::arg("M"), py::arg("P"), py::arg("alpha_deg"),
-        py::arg("s_over_D"), py::arg("Tu"),
+        py::arg("s_over_D"), py::arg("Tu"), py::arg("b_0") = py::none(),
         "Laterally averaged adiabatic film-cooling effectiveness downstream\n"
         "of ONE row of cylindrical, streamwise-inclined holes.\n\n"
         "Baldauf, Scheurlen, Schulz & Wittig (2002), ASME J. Turbomachinery\n"
@@ -5634,12 +5637,13 @@ PYBIND11_MODULE(_core, m) {
 
   m.def("film_effectiveness_baldauf_2002_and_derivatives",
         [](double x_over_D, double M, double P, double alpha_deg,
-           double s_over_D, double Tu) {
+           double s_over_D, double Tu, std::optional<double> b_0) {
           return combaero::cooling::film_effectiveness_baldauf_2002_and_derivatives(
-              x_over_D, M, P, alpha_deg, s_over_D, Tu, nullptr);
+              x_over_D, M, P, alpha_deg, s_over_D, Tu, nullptr,
+              b_0 ? *b_0 : std::numeric_limits<double>::quiet_NaN());
         },
         py::arg("x_over_D"), py::arg("M"), py::arg("P"), py::arg("alpha_deg"),
-        py::arg("s_over_D"), py::arg("Tu"),
+        py::arg("s_over_D"), py::arg("Tu"), py::arg("b_0") = py::none(),
         "Solver-facing (f, J) form: (eta, d eta/dM, d eta/dP).\n\n"
         "M and P are what a network solve varies -- M through the coolant\n"
         "mass flow, P through the temperature ratio. Geometry and Tu are\n"

@@ -728,17 +728,27 @@ correlated parameter rather than an excluded case.
 ```cpp
 // eta = (T_G - T_AW)/(T_G - T_C), the same convention as
 // adiabatic_wall_temperature(), so the two compose directly.
-double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
-                                       double alpha_deg, double s_over_D,
-                                       double Tu,
-                                       CorrelationStatus *status = nullptr);
+double film_effectiveness_baldauf_2002(
+    double x_over_D, double M, double P, double alpha_deg, double s_over_D,
+    double Tu, CorrelationStatus *status = nullptr,
+    double b_0_override = std::numeric_limits<double>::quiet_NaN());
 
 // Solver-facing (f, J): (eta, d eta/dM, d eta/dP), analytic via dual numbers.
 std::tuple<double, double, double>
 film_effectiveness_baldauf_2002_and_derivatives(
     double x_over_D, double M, double P, double alpha_deg, double s_over_D,
-    double Tu, CorrelationStatus *status = nullptr);
+    double Tu, CorrelationStatus *status = nullptr,
+    double b_0_override = std::numeric_limits<double>::quiet_NaN());
 ```
+
+`b_0_override` replaces Eq. (31)'s `b_0`; NaN (the default) uses Eq. (31) as
+printed. It exists so the paper's Table 4 reading can be *tested* -- the
+library offers no second formula because the paper contains none. **The
+discrepancy is governed by `x/D`, not by `M`**: `b_0` reaches the model only
+through `b_1 = b_0 / (1 + M^-3)` (Eq. 32), the descending-branch gradient, so
+it is under 1% at every `M` for `x/D <= 20` and reaches -28% by `x/D = 400`
+(worst over the envelope, -75%). At effusion row spacings no effusion dataset
+can arbitrate it.
 
 Stated envelope (`baldauf2002::`): `M` 0.2-2.5, `P` 1.2-1.8, `s/D` 2-5,
 `alpha` 30-90 deg, `Tu` 0.0035-0.075. The paper's own RMS deviation is 5.5%.
