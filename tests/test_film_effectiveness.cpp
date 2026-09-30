@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace cc = combaero::cooling;
@@ -332,6 +333,74 @@ TEST(BaldaufFilmEffectiveness, PinnedValuesAcrossTheEnvelope) {
 // TRANSCRIPTION -- they do not exercise the library -- and they are here so
 // that the one place the paper contradicts itself cannot be quietly
 // rediscovered or quietly "fixed" later.
+
+TEST(BaldaufFilmEffectiveness, BZeroOverrideReplacesEquationThirtyOne) {
+    // The override exists so the Table 4 reading can be TESTED without the
+    // library inventing a second formula. Default behaviour must be
+    // untouched, and supplying Eq. (31)'s own value must reproduce it.
+    const double x = 200.0;   // far downstream, where b_0 actually bites
+    const double as_printed = eta(x);
+
+    // NaN means "use Eq. (31)", which is the default.
+    EXPECT_EQ(cc::film_effectiveness_baldauf_2002(
+                  x, T3_M, T3_P, T3_ALPHA, T3_SD, T3_TU, nullptr,
+                  std::numeric_limits<double>::quiet_NaN()),
+              as_printed);
+
+    // Eq. (31) at the Table 3 conditions is 0.83612467; supplying it must
+    // land on the default to the precision that value is quoted at.
+    EXPECT_NEAR(cc::film_effectiveness_baldauf_2002(
+                    x, T3_M, T3_P, T3_ALPHA, T3_SD, T3_TU, nullptr, 0.83612467),
+                as_printed, 1e-7);
+
+    // And Table 4's value must actually change the answer, or the override
+    // is not wired through.
+    EXPECT_NE(cc::film_effectiveness_baldauf_2002(
+                  x, T3_M, T3_P, T3_ALPHA, T3_SD, T3_TU, nullptr,
+                  B::b0_table4_at_table3),
+              as_printed);
+
+    // The derivative form shares the override.
+    const auto [v, dM, dP] = cc::film_effectiveness_baldauf_2002_and_derivatives(
+        x, T3_M, T3_P, T3_ALPHA, T3_SD, T3_TU, nullptr, B::b0_table4_at_table3);
+    EXPECT_TRUE(std::isfinite(v) && std::isfinite(dM) && std::isfinite(dP));
+    EXPECT_NE(v, as_printed);
+}
+
+TEST(BaldaufFilmEffectiveness, EquationThirtyOneMattersFarDownstreamNotAtHighM) {
+    // Corrects a claim this file's header used to carry -- "under 5% below
+    // M ~ 0.5 and up to 50% at M = 2.5" -- which attributed the size of the
+    // Eq. (31) discrepancy to blowing rate. It is governed by x/D instead:
+    // b_0 reaches the model only through b_1 = b_0 / (1 + M^-3), Eq. (32),
+    // and b_1 is the DESCENDING-branch gradient. Near the hole it does
+    // nothing, at any M.
+    auto effect = [](double x, double M) {
+        const double a = cc::film_effectiveness_baldauf_2002(
+            x, M, T3_P, T3_ALPHA, T3_SD, T3_TU);
+        const double b = cc::film_effectiveness_baldauf_2002(
+            x, M, T3_P, T3_ALPHA, T3_SD, T3_TU, nullptr,
+            B::b0_table4_at_table3);
+        return std::abs(b / a - 1.0);
+    };
+
+    // Near the hole: negligible at every blowing rate, including the top.
+    for (double M : {0.2, 0.5, 1.0, 2.0, 2.5}) {
+        EXPECT_LT(effect(20.0, M), 0.01) << "x/D = 20, M = " << M;
+    }
+    // In particular, high M alone does NOT make it large.
+    EXPECT_LT(effect(20.0, 2.5), 0.01);
+
+    // Far downstream it becomes substantial, and monotonically so.
+    EXPECT_GT(effect(400.0, 2.0), 0.20);
+    EXPECT_GT(effect(400.0, 2.0), effect(200.0, 2.0));
+    EXPECT_GT(effect(200.0, 2.0), effect(50.0, 2.0));
+
+    // Effusion row spacings sit in the negligible region, which is why no
+    // effusion dataset can arbitrate Eq. (31). Murray's streamwise pitch is
+    // 5.75 D and Andrei's 9.15 D.
+    EXPECT_LT(effect(5.75, 1.0), 0.01);
+    EXPECT_LT(effect(9.15, 1.0), 0.01);
+}
 
 TEST(BaldaufTable4, SeventeenCoefficientsReproduceThePapersWorkedExample) {
     const double sD = T3_SD, M = T3_M, P = T3_P, Tu = T3_TU;

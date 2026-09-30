@@ -3,6 +3,7 @@
 
 #include "correlation_status.h"
 
+#include <limits>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -114,7 +115,26 @@ double cooled_wall_heat_flux(double T_hot, double T_coolant,
 // convention, unit choice or single-token variant reaches Table 4's value,
 // and Table 4 is self-consistent with Eq. (32) to the digit. We implement the
 // PRINTED equation, because fidelity means implementing what the paper
-// states. The effect is under 5% below M ~ 0.5 and up to 50% at M = 2.5; see
+// states, and `b_0_override` lets a caller test the Table 4 reading without
+// the library inventing a second formula -- the paper contains none. Table 4
+// gives one number at the Table 3 conditions; reaching it needs
+// sin(...) = -0.167 where the printed equation gives +0.470, and no sign,
+// unit or angle convention makes that argument negative at alpha = 30 deg.
+//
+// THE EFFECT IS GOVERNED BY x/D, NOT BY M. An earlier note here said "under
+// 5% below M ~ 0.5 and up to 50% at M = 2.5", which misattributes it: b_0
+// feeds b_1 through Eq. (32), and b_1 is the DESCENDING-branch gradient, so
+// it does nothing near the hole whatever the blowing. Measured by sweeping
+// the envelope with b_0_override:
+//
+//   x/D <= 20            under 1% at every M
+//   x/D = 200, M = 2.0   -19%
+//   x/D = 400, M = 2.0   -28%
+//   worst over the box   -75%  (s/D 5, alpha 90, Tu 0.0035, M 2.5, x/D 400)
+//
+// Practical consequence: at effusion row spacings (x/D of 6 to 9) the two
+// readings differ by under 1%, so no effusion dataset can arbitrate Eq. (31).
+// Only far-downstream single-row data could. See
 // validation/cooling/extractions/baldauf_2002_film_effectiveness.md.
 namespace baldauf2002 {
 
@@ -165,7 +185,9 @@ constexpr double b0_table4_at_table3 = 0.61626073;
 double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
                                        double alpha_deg, double s_over_D,
                                        double Tu,
-                                       CorrelationStatus *status = nullptr);
+                                       CorrelationStatus *status = nullptr,
+                                       double b_0_override =
+                                           std::numeric_limits<double>::quiet_NaN());
 
 // Solver-facing (f, J): (eta, d eta/dM, d eta/dP).
 //
@@ -175,7 +197,8 @@ double film_effectiveness_baldauf_2002(double x_over_D, double M, double P,
 // finite differences.
 std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivatives(
     double x_over_D, double M, double P, double alpha_deg, double s_over_D,
-    double Tu, CorrelationStatus *status = nullptr);
+    double Tu, CorrelationStatus *status = nullptr,
+    double b_0_override = std::numeric_limits<double>::quiet_NaN());
 
 // -------------------------------------------------------------
 // Multi-row film superposition
