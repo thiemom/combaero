@@ -1,0 +1,292 @@
+# Andrei et al. (2014) -- adiabatic effectiveness of an effusion plate.
+#
+# WHY THIS SOURCE, AND WHY ADIABATIC MATTERS. Effusion cools in three places:
+# the coolant-side hole approach, the throat, and the external film. Andrews
+# (88-GT-290) shows they are NOT additive in effectiveness -- "the film
+# cooling reduces the mean gas temperature adjacent to the wall... which in
+# turn reduces the heat flux removed by the internal wall cooling". So an
+# OVERALL effectiveness correlation cannot close the external side: it
+# already contains the internal convection that combaero's resistance
+# network computes separately, and using it would double-count.
+#
+# This dataset is ADIABATIC by construction -- Pressure Sensitive Paint via
+# the mass-transfer analogy, on an adiabatic plate -- so it cannot contain
+# internal convection at all. That is precisely why it is the external-side
+# closure. See validation/cooling/extractions/effusion_plate_flow.md.
+#
+# EXTRACTED FROM THE PDF VECTOR STREAM, NOT DIGITISED. The figures are
+# vector polylines with colour-coded strokes, so the curve coordinates are
+# exact rather than pixel-measured. Extraction verified three independent
+# ways, none of which shares an assumption with the others:
+#
+#   1. Figures 4 and 5 plot the SAME six curves in two different panel
+#      layouts, with different panel origins and therefore independent
+#      calibrations. Agreement over 400 common abscissae: RMS 3.5e-4 to
+#      9.0e-4 in eta, worst single point 6.9e-3 (1.4% of the eta range, at a
+#      sawtooth jump where interpolation onto a shared grid is sensitive).
+#      This validates panel assignment, colour mapping and y-calibration
+#      together.
+#   2. The y gridlines are uniformly spaced (10.2625 pt per 0.1 eta over all
+#      nine), confirming a LINEAR axis -- the log/linear misread that bit the
+#      Han figures cannot be present here.
+#   3. Each sawtooth is one hole row, so the dominant spatial period must be
+#      exactly 1.0 in x/s_x. Measured by FFT on the detrended signal:
+#      1.0005 on every one of the twelve series, a 0.05% error. This
+#      validates the x-calibration independently of the gridlines.
+#
+# No manual re-digitisation pass was run, and none is warranted: there is no
+# pixel measurement to verify. Only the Fig. 4 view is committed; Fig. 5 is
+# the same six curves and is the cross-check above, not a second dataset.
+#
+# GEOMETRY (paper section 2, all stated explicitly):
+#   hole diameter d      1.5 mm
+#   hole angle           30 deg to the wall
+#   L/d                  6.25   -> L = 9.375 mm, wall t = L sin(30) = 4.688 mm
+#   s_x/d                9.15   -> streamwise pitch 13.725 mm
+#   s_z/d                7.37   -> spanwise pitch 11.055 mm
+#   arrangement          staggered, 18 rows, 153 holes
+#   porosity             ~1.17%
+# These map directly onto EffusionPlateElement's constructor.
+#
+# WHAT eta_ad IS: the adiabatic film effectiveness on the gas-side surface,
+# (T_g - T_aw)/(T_g - T_c), laterally averaged, as a function of streamwise
+# distance in hole pitches. It rises from 0 at the leading edge to 0.37-0.49
+# by row 18 as successive rows superpose. The sawtooth is physical -- one
+# tooth per hole row -- not noise.
+#
+# SCORING USES ROW MEANS. A homogenised panel model predicts a row-averaged
+# effectiveness, not the within-row sawtooth, so the runner reduces each
+# curve to 18 per-row means before comparing. The full-resolution curve is
+# committed anyway because it is exact and throwing it away would be a
+# choice the next reader cannot undo.
+#
+# WHERE ROW 1 SITS ON THE ABSCISSA (`row1_x_over_sx` = 0.685, recovered
+# 2026-09-30). The paper does not state it and the figure carries no row
+# markers, but the runner needs it twice: to know which pitch interval a
+# sample belongs to, and each row's distance upstream of that sample. It is
+# NOT fitted against the model -- it comes from the data's own injection
+# points -- and it is cross-checked three ways:
+#
+#   1. RECOVERED INDEPENDENTLY FROM EACH OF THE SIX CURVES. Coolant enters at
+#      a hole row, so a row is where eta rises steepest. Scoring a unit-period
+#      comb by how much total rise falls in the first quarter-pitch after each
+#      tooth peaks at 0.685 on four of the six curves, and at 0.670 and 0.710
+#      on the other two -- a spread of 0.040, or +/-2% of one pitch. A phase
+#      that is a property of the plate must reproduce across curves measured
+#      at different BR and DR, and it does.
+#   2. SPACING. The same clustering gives 14 consecutive row-to-row gaps
+#      averaging 1.000 pitches, matching the FFT period of 1.0005 above from
+#      an independent statistic.
+#   3. RANGE CLOSURE. 18 rows from 0.685 at unit spacing puts row 18 at
+#      17.685. The committed abscissae run 0.673 to 17.992, leaving 0.012 of a
+#      pitch ahead of row 1 -- where eta is exactly 0, as it must be with no
+#      upstream coolant -- and 0.307 after row 18, with no room for a 19th. A
+#      phase wrong by even a quarter pitch breaks one end or the other.
+#
+# That 60-66% of all rise falls within a quarter of each pitch is itself the
+# signature of injection-then-decay rather than noise.
+
+paper:
+  name: andrei2014
+  citation: >-
+    Andrei, L., Andreini, A., Bianchini, C., Caciolli, G., Facchini, B.,
+    Mazzei, L., Picchi, A. and Turrini, F. (2014). "Effusion cooling plates
+    for combustor liners: experimental and numerical investigations on the
+    effect of density ratio." Energy Procedia 45, 1402-1411.
+    DOI 10.1016/j.egypro.2014.01.147. Open access (CC BY-NC-ND).
+  secondary: false
+
+files:
+  - path: fig4_eta_ad_BR1_DR1.csv
+    after: null
+    page: 1409
+    item: "Figure 4, left panel (DR = 1), red curve"
+    series: "measured adiabatic effectiveness vs x/s_x, BR = 1, DR = 1"
+    figure: "4"
+    panel: "DR=1"
+    geometry:
+      d_mm: 1.5
+      angle_deg: 30.0
+      L_over_d: 6.25
+      sx_over_d: 9.15
+      sz_over_d: 7.37
+      rows: 18
+      row1_x_over_sx: 0.685
+    alpha_deg: 30.0
+    x_axis: x_over_sx
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: pdf-vector-exact
+    confidence: exact
+    uncertainty: null
+    cross_check: >-
+      Extracted from the PDF vector stream, not pixel-digitised. The same
+      curve appears as Figure 5 left panel (BR = 1) red, plotted in a
+      different panel with an independent calibration: the two agree to RMS
+      3.8e-4 in eta over 400 common abscissae, worst point 1.5e-3. Sawtooth
+      period 1.0005 against the exact 1.0 expected for one tooth per hole
+      row. Monotonically non-decreasing in the row means.
+      `uncertainty` is deliberately null -- the EXPERIMENTAL uncertainty of
+      the PSP measurement is not stated per-point in the paper, and the
+      extraction error measured above (1e-3) is an extraction bound, not a
+      measurement band. Writing the extraction error into `uncertainty`
+      would be the circularity #389 names.
+    class_confidence: confirmed
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 18.0]
+      plot_y_limits: [0.0, 0.8]
+      kind: measured
+
+  - path: fig4_eta_ad_BR2_DR1.csv
+    after: null
+    page: 1409
+    item: "Figure 4, left panel (DR = 1), blue curve"
+    series: "measured adiabatic effectiveness vs x/s_x, BR = 2, DR = 1"
+    figure: "4"
+    panel: "DR=1"
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
+    alpha_deg: 30.0
+    x_axis: x_over_sx
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: pdf-vector-exact
+    confidence: exact
+    uncertainty: null
+    cross_check: >-
+      Cross-view agreement with Figure 5 centre panel (BR = 2) red: RMS
+      4.2e-4, worst 2.6e-3. Sawtooth period 1.0005.
+    class_confidence: confirmed
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 18.0]
+      plot_y_limits: [0.0, 0.8]
+      kind: measured
+
+  - path: fig4_eta_ad_BR3_DR1.csv
+    after: null
+    page: 1409
+    item: "Figure 4, left panel (DR = 1), black curve"
+    series: "measured adiabatic effectiveness vs x/s_x, BR = 3, DR = 1"
+    figure: "4"
+    panel: "DR=1"
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
+    alpha_deg: 30.0
+    x_axis: x_over_sx
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: pdf-vector-exact
+    confidence: exact
+    uncertainty: null
+    cross_check: >-
+      Cross-view agreement with Figure 5 right panel (BR = 3) red: RMS
+      9.0e-4, worst 6.9e-3 -- the largest disagreement in the set, at a
+      sawtooth jump. Sawtooth period 1.0005.
+    class_confidence: confirmed
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 18.0]
+      plot_y_limits: [0.0, 0.8]
+      kind: measured
+
+  - path: fig4_eta_ad_BR1_DR1p5.csv
+    after: null
+    page: 1409
+    item: "Figure 4, right panel (DR = 1.5), red curve"
+    series: "measured adiabatic effectiveness vs x/s_x, BR = 1, DR = 1.5"
+    figure: "4"
+    panel: "DR=1.5"
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
+    alpha_deg: 30.0
+    x_axis: x_over_sx
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: pdf-vector-exact
+    confidence: exact
+    uncertainty: null
+    cross_check: >-
+      Cross-view agreement with Figure 5 left panel (BR = 1) cyan: RMS
+      6.8e-4, worst 3.5e-3. Sawtooth period 1.0005. This is the highest
+      BR = 1 curve, above its DR = 1 counterpart, which is the density-ratio
+      effect the paper exists to show.
+    class_confidence: confirmed
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 18.0]
+      plot_y_limits: [0.0, 0.8]
+      kind: measured
+
+  - path: fig4_eta_ad_BR2_DR1p5.csv
+    after: null
+    page: 1409
+    item: "Figure 4, right panel (DR = 1.5), blue curve"
+    series: "measured adiabatic effectiveness vs x/s_x, BR = 2, DR = 1.5"
+    figure: "4"
+    panel: "DR=1.5"
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
+    alpha_deg: 30.0
+    x_axis: x_over_sx
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: pdf-vector-exact
+    confidence: exact
+    uncertainty: null
+    cross_check: >-
+      Cross-view agreement with Figure 5 centre panel (BR = 2) cyan: RMS
+      3.7e-4, worst 2.2e-3. Sawtooth period 1.0005. NOTE this curve sits
+      BELOW its DR = 1 counterpart, reversing the ordering seen at BR = 1 --
+      the paper's own point that DR matters mainly at low BR.
+    class_confidence: confirmed
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 18.0]
+      plot_y_limits: [0.0, 0.8]
+      kind: measured
+
+  - path: fig4_eta_ad_BR3_DR1p5.csv
+    after: null
+    page: 1409
+    item: "Figure 4, right panel (DR = 1.5), black curve"
+    series: "measured adiabatic effectiveness vs x/s_x, BR = 3, DR = 1.5"
+    figure: "4"
+    panel: "DR=1.5"
+    geometry: {d_mm: 1.5, angle_deg: 30.0, L_over_d: 6.25, sx_over_d: 9.15,
+               sz_over_d: 7.37, rows: 18, row1_x_over_sx: 0.685}
+    alpha_deg: 30.0
+    x_axis: x_over_sx
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: pdf-vector-exact
+    confidence: exact
+    uncertainty: null
+    cross_check: >-
+      Cross-view agreement with Figure 5 right panel (BR = 3) cyan: RMS
+      3.5e-4, worst 2.0e-3. Sawtooth period 1.0005.
+    class_confidence: confirmed
+    scores: baldauf_2002_sellers
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [0.0, 18.0]
+      plot_y_limits: [0.0, 0.8]
+      kind: measured

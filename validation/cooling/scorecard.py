@@ -87,12 +87,13 @@ def run_dataset(dataset) -> list[Record]:
     first version's bug: the jet-array runner claimed the orifice series and
     reported them unscored.
     """
-    from validation.cooling import jet_array_runner, orifice_runner
+    from validation.cooling import film_runner, jet_array_runner, orifice_runner
     from validation.cooling.runner import run_series as rib_run
 
     specialists = (
         (jet_array_runner.owns, jet_array_runner.run_series),
         (orifice_runner.owns, orifice_runner.run_series),
+        (film_runner.owns, film_runner.run_series),
     )
 
     out: list[Record] = []
@@ -124,6 +125,11 @@ SET_ORIGIN: dict[str, str] = {
     "florschuetz_1981_inline": "florschuetz1981",
     "mcgreehan_schotsch_1988_cd": "mcgreehan_schotsch1988",
     "mcgreehan_schotsch_1988_crossflow_cd": "mcgreehan_schotsch1988",
+    # Baldauf's own data is not in this repo, so nothing scored by this set
+    # can ever read "fidelity" -- which is correct. Naming the origin makes
+    # the verdict "accuracy" rather than "unknown", so the report states the
+    # cross-source basis instead of declining to say.
+    "baldauf_2002_sellers": "baldauf",
 }
 
 
@@ -155,7 +161,15 @@ def sampling_of(series, dataset) -> str:
     """
     from validation.cooling.recovery import PAIR_TOL, _partner
 
-    if series.extraction == "tabulated" or series.kind in ("correlation", "frame"):
+    # "pdf-vector-exact" joins "tabulated" for the same reason: the marks are
+    # separate path objects in the PDF, each with its own stroke colour, so
+    # overplotting cannot occlude one. There is no pixel measurement that a
+    # neighbouring curve could have hidden -- the failure mode `partial`
+    # exists to flag simply cannot occur.
+    if series.extraction in ("tabulated", "pdf-vector-exact") or series.kind in (
+        "correlation",
+        "frame",
+    ):
         return "complete"
     partner = _partner(series, dataset)
     if partner is not None:

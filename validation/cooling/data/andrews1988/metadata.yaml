@@ -1,0 +1,124 @@
+# Andrews et al. (1988), ASME 88-GT-290 -- effusion wall INTERNAL heat
+# transfer coefficient, Figure 8, the "C Effusion" series.
+#
+# WHY THIS SERIES AND NOT FIGURE 10. Fig. 10 plots the OVERALL cooling
+# effectiveness, which is the obvious-looking validation target and the wrong
+# one. Reproducing it needs a chain: a gas-side h (the rig is a propane
+# preheater at 750 K and Mach 0.05, but the duct geometry is not given), the
+# wall conduction, the internal convection AND the film. An error in an
+# assumed gas-side h would be attributed to the effusion model. Fig. 8 is h
+# against G directly -- one mechanism, no chain, no assumptions.
+#
+# Validating each mechanism on its own data is also what the double-counting
+# split needs: if the combination is wrong later, we know which half.
+# Fig. 10 remains a secondary sanity comparison with its assumptions stated,
+# not a scorecard entry.
+#
+# WHAT h IS HERE. Per the paper's nomenclature, h is referenced to the plate
+# approach area A = X^2 - pi D^2/4, NOT to the hole internal area A_h. So it
+# is an EFFECTIVE internal coefficient per unit plate area, lumping the
+# coolant-side hole approach and the throat convection -- which is exactly
+# the quantity an effusion element needs, and a different number from a
+# throat-only h. Comparing against a throat Nusselt number without the
+# A/A_h conversion would be a definitional error of the #389 class.
+#
+# GEOMETRY -- Table 1, effusion plate C:
+#   N = 4306 m^-2, D = 3.27 mm, X = 15.24 mm (printed as 15.2; see below),
+#   X/D = 4.7, A/A_h = 3.4, plate thickness 6.3 mm, square array.
+#
+# X IS 0.6 INCH, NOT THE PRINTED 15.2 mm. 1/(15.2e-3)^2 = 4328, which is not
+# the tabulated N = 4306; 1/(15.24e-3)^2 = 4305.8 is. The table prints a
+# rounded conversion of an imperial pitch. Using 15.2 shows a spurious 0.5%
+# error in any N = 1/X^2 check.
+#
+# EXTRACTION. Page rendered at 600 dpi with `pdftoppm -r 600`. Markers found
+# by enclosed-hole topology -- an open circle keeps a white interior even
+# where the fitted line crosses it -- then classified by hole fill ratio,
+# which separates the three series cleanly and without reference to position:
+#   triangle (A/C)      fill 0.53-0.65
+#   circle   (C)        fill 0.76-0.82   (pi/4 = 0.785)
+#   square   (A)        fill 0.85-0.97
+# An overlay of the detections on the source was checked before the count was
+# believed: 10 data circles plus the legend marker, none missed, none false.
+#
+# CALIBRATION, verified on six independent ticks. Log-log. The decade marks
+# at G = 0.1 and 1.0 give 970.5 px/decade; on that scale the left and right
+# frame edges land on 0.049 and 3.00 against the printed 0.05 and 3. The
+# minor ticks at 0.06, 0.2, 0.4, 0.5 and 0.7 all reproduce within 0.6%.
+# The y axis is pinned by the frame at 40 and 1000, and the major tick
+# detected at y = 1098 px predicts 100.7 against the printed 100.
+#
+# PAGE SKEW IS PRESENT BUT BELOW THE DATA SCATTER. The bottom frame line
+# drops 4.55 px from left to right, a 1.21% effect in h. The raw picks are
+# committed uncorrected and `fig8_frame.csv` records the four frame corners
+# so the correction is reproducible rather than a typed constant -- but it is
+# NOT applied, because the series' own scatter about its power law is +/-16%,
+# more than ten times larger. Correcting a 1.2% skew inside a 16% scatter
+# would be false precision.
+#
+# THE SCATTER IS THE SOURCE'S, NOT THE EXTRACTION'S. A power-law fit gives
+# h = 194 G^0.607 with R^2 = 0.981 and a worst residual of +16% at the lowest
+# G. Both off-trend points were zoomed and inspected: the markers are cleanly
+# isolated and exactly centred, and at the lowest G the paper's own fitted
+# line does not even extend that far left. So the residual is 1988
+# transient-technique measurement scatter, which is what an `uncertainty`
+# band here should reflect -- but the paper states no per-point band, so it
+# is left null rather than back-filled from the model error (#389).
+
+paper:
+  name: andrews1988
+  citation: >-
+    Andrews, G.E., Asere, A.A., Hussain, C.I., Mkpadi, M.C. and Nazari, A.
+    (1988). "Impingement/Effusion Cooling: Overall Wall Heat Transfer."
+    ASME 88-GT-290, Gas Turbine and Aeroengine Congress, Amsterdam.
+    Department of Fuel and Energy, University of Leeds.
+  secondary: false
+
+files:
+  - path: fig8_h_effusionC.csv
+    after: null
+    page: 6
+    item: "Figure 8, circle markers, 'C Effusion'"
+    series: >-
+      measured effective internal heat transfer coefficient h [W/m^2 K],
+      referenced to the plate approach area, vs coolant mass flow per unit
+      plate area G [kg/s/m^2], effusion plate C alone (no impingement)
+    figure: "8"
+    panel: single   # Fig. 8 is one plot, not a multi-panel figure
+    geometry:
+      plate: "C"
+      N_per_m2: 4306.0
+      D_mm: 3.27
+      X_mm: 15.24
+      X_over_D: 4.7
+      A_over_Ah: 3.4
+      thickness_mm: 6.3
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_internal
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      10 circles recovered by enclosed-hole topology with fill-ratio
+      classification, overlay-verified against the source before the count
+      was accepted. Calibration reproduces six independent ticks within 0.6%
+      and both frame edges to 0.05 and 3.00 as printed. Page skew measured at
+      1.21% in h across the plot width, recorded in fig8_frame.csv and
+      deliberately NOT applied, being far below the series' own +/-16%
+      scatter about its power law (h = 194 G^0.607, R^2 = 0.981). The two
+      off-trend points were zoomed and confirmed as clean, isolated markers,
+      so the scatter is the 1988 experiment's, not the extraction's.
+      `uncertainty` left null: the paper states no per-point band, and
+      deriving one from the model's own error on this series is the
+      circularity #389 names.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [0.05, 3.0]
+      plot_y_limits: [40.0, 1000.0]
+      kind: measured
