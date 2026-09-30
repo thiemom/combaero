@@ -202,6 +202,18 @@ def test_gao_alpha_cannot_be_fitted_on_this_family(andrei) -> None:
     If a future change makes every curve fall the same side, this test goes
     red and the plan becomes viable again -- which is exactly when someone
     should be told.
+
+    NOT a verdict on alpha itself, and the distinction matters. Murray &
+    Ireland (2018) applied Sellers to a single-hole CFD result -- no
+    correlation involved -- and measured a ~2x OVER-prediction at M ~ 1 for a
+    5.75D pitch, growing with blowing, caused by streamwise jet interaction
+    and largely cured by tripling the streamwise pitch. So the error alpha
+    exists to correct is real, one-signed, and exactly alpha's shape. What
+    disqualifies THIS family is that Baldauf's lift-off collapse above
+    M ~ 1 drives BR 2-3 the other way and masks it. Murray's blowing range
+    of 0.1-1.2 sits entirely below that peak, which is where alpha can be
+    measured cleanly. See
+    validation/cooling/extractions/murray_ireland_2018_effusion_superposition.md.
     """
     biases = []
     for series in andrei:
