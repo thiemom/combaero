@@ -78,13 +78,30 @@ class Record:
         return abs(err) <= band
 
 
+# Abscissa conventions this runner understands, and how to turn one into
+# hole diameters. `andrei2014` plots streamwise distance in PITCHES,
+# `murray2018` in DIAMETERS; Baldauf wants diameters either way.
+X_AXES = ("x_over_sx", "x_over_D")
+
+
 def owns(series: SeriesMetadata) -> bool:
     """Whether this runner should score ``series``.
 
     Explicit predicate, because `run_series` returns reason-carrying records
     for series it cannot score, which makes truthiness useless for dispatch.
     """
-    return series.x_axis == "x_over_sx" and series.y_axis == "eta_adiabatic"
+    return series.x_axis in X_AXES and series.y_axis == "eta_adiabatic"
+
+
+def _diameters_per_x(series: SeriesMetadata) -> float:
+    """How many hole diameters one unit of the abscissa spans.
+
+    Row positions are expressed in the same units as the abscissa, so this
+    converts a row-to-sample distance into the x/D that Baldauf takes.
+    """
+    if series.x_axis == "x_over_D":
+        return 1.0
+    return float(series.geometry["sx_over_d"])
 
 
 def _blowing_and_density(series: SeriesMetadata) -> tuple[float, float] | None:
@@ -101,8 +118,15 @@ def _blowing_and_density(series: SeriesMetadata) -> tuple[float, float] | None:
             br = float(token[2:].replace("p", "."))
         elif token.startswith("DR"):
             dr = float(token[2:].replace("p", "."))
-    if br is None or dr is None:
+        elif token.startswith("M") and token[1:2].isdigit():
+            # murray2018 names the blowing ratio alone, as M0p96; its
+            # density ratio is ~1 for every run and is stated in the text
+            # rather than the label.
+            br = float(token[1:].replace("p", "."))
+    if br is None:
         return None
+    if dr is None:
+        dr = float(series.geometry.get("density_ratio", 1.0))
     return br, dr
 
 
@@ -116,7 +140,10 @@ def row_positions(series: SeriesMetadata) -> list[float]:
     g = series.geometry
     n = int(g["rows"])
     x1 = float(g["row1_x_over_sx"])
-    return [x1 + i for i in range(n)]
+    # Row-to-row step in ABSCISSA units: one pitch is 1.0 when x is measured
+    # in pitches, and `sx_over_d` diameters when x is measured in diameters.
+    step = 1.0 if series.x_axis == "x_over_sx" else float(g["sx_over_d"])
+    return [x1 + i * step for i in range(n)]
 
 
 def predict(
@@ -129,7 +156,7 @@ def predict(
     M, P = cond
 
     g = series.geometry
-    sx_over_d = float(g["sx_over_d"])
+    per_x = _diameters_per_x(series)
     sz_over_d = float(g["sz_over_d"])
     alpha_deg = float(g["angle_deg"])
 
@@ -137,7 +164,7 @@ def predict(
     for x_row in row_positions(series):
         if x_row >= x:
             break  # downstream rows cannot cool an upstream point
-        x_over_D = (x - x_row) * sx_over_d
+        x_over_D = (x - x_row) * per_x
         per_row.append(
             cb.film_effectiveness_baldauf_2002(
                 x_over_D, M, P, alpha_deg, sz_over_d, Tu
@@ -205,7 +232,8 @@ def row_intervals(
     rows = row_positions(series)
     out: list[tuple[float, float, list[float], list[float]]] = []
     for i, x_row in enumerate(rows):
-        x_end = rows[i + 1] if i + 1 < len(rows) else x_row + 1.0
+        step = rows[1] - rows[0] if len(rows) > 1 else 1.0
+        x_end = rows[i + 1] if i + 1 < len(rows) else x_row + step
         xs = [p.x for p in points if x_row <= p.x < x_end]
         ys = [p.y for p in points if x_row <= p.x < x_end]
         if not xs:
