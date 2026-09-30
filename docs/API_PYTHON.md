@@ -310,8 +310,12 @@ plain Sellers.
 Sellers **overestimates, and worsens as rows accumulate** -- which is why
 `alpha` exists and why effusion cannot reuse a few-row film model unchanged.
 `cb.mainstream_temperature_correction(r, a, b)` gives Gao's published form
-for it; `a` and `b` are required because the paper never prints its fitted
-values.
+for it. `a` and `b` are required rather than defaulted even though the paper *does*
+print them (12 and 0.9465, section 4.3.1). Since `a r/(a r + 1) >= 0`, that
+pair gives `alpha >= 0.9465` for **every** `r`, so it cannot reach the
+0.69-0.85 per-row damping a tighter-pitched plate needs -- an argument that
+holds however `r` is scaled. Eq. (5) carries no streamwise-spacing term,
+and that is the variable Murray shows to dominate.
 
 ##### Compressibility: the expansion factor
 

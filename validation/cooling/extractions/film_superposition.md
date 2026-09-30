@@ -1,7 +1,7 @@
 # Extraction: multi-row film superposition (Sellers, and Gao's correction)
 
 **Status: IMPLEMENTED 2026-09-29**, with one deliberate gap: Gao's
-correction coefficients are not published, so `alpha` is a caller input
+correction coefficients ARE published but do not transfer, so `alpha` is a caller input
 defaulting to plain Sellers rather than a fitted default.
 
 ## Sources, pinned
@@ -94,24 +94,59 @@ Eq. (5) gives alpha's form,
 
     alpha_i = a r / (a r + 1) + b,    r = m_coolant / m_mainstream
 
-**but the paper never prints the fitted `a` and `b`.** Searched
-exhaustively: no coefficient table (Tables 1-5 are existing models, window
-positions, plate geometry, infrared calibration and a deviation comparison),
-and no inline value anywhere in the text. The shape is sourced; the
-constants are not.
+**CORRECTION, 2026-09-30: the paper DOES print them.** Section 4.3.1:
 
-So `a` and `b` are REQUIRED arguments rather than defaulted. A made-up
-default would acquire an authority it has not earned, and the validation
-policy already reserves this slot: matching a specific rig is the user's
-job, and the harness never scores a tuner.
+> "The empirical coefficients in Equation (5), a and b, were determined to
+> be 12 and 0.9465, respectively."
 
-Table 5 cannot fill the gap either -- it benchmarks Gao's corrected model
-against Zhang et al. [38], not against uncorrected Sellers, so it does not
-even quantify what the correction buys.
+This record previously said they were never printed and that the search had
+been exhaustive. It was not. The search looked for `a = 12`; the paper
+states the value in prose, in a sentence naming the coefficients rather than
+assigning them. A grep over a maths paper's prose is not an exhaustive
+search for a constant, and "searched exhaustively" should not have been
+written on the strength of one.
 
-**The intended path to a default** is our own data: fit `(a, b)` against
-Andrei (2014) and Murray (2018), label it tuned, and state its envelope.
-That has not been done yet.
+They are recorded in code as `film_superposition::gao_a_case1` and
+`gao_b_case1`.
+
+**They are still not defaults, and the reason needs no rig arithmetic.**
+Since `a r / (a r + 1) >= 0` for `a > 0` and `r >= 0`,
+
+    alpha >= b = 0.9465    for EVERY r
+
+so the published pair can damp a row by at most 5.35% while staying at or
+below 1 -- and above 1 the superposition refuses, because `alpha > 1` would
+create coolant. Murray's 5.75 D staggered plate needs a per-row alpha of
+about 0.85 at low blowing and 0.69 near M = 1. **Both are below the floor,
+so no choice of `r` reaches them.**
+
+That argument is deliberately scale-free. A first version of this note
+claimed the coefficients give `alpha > 1` above M = 0.20 on Murray's rig,
+computed from an assumed `r = M x A_holes_row / A_duct`. It was withdrawn:
+Gao's test-section dimensions are not stated in the extractable text, so
+`r` cannot be placed on their scale, and a claim resting on that is
+unverifiable. Note the asymmetry -- the earlier *fit* was legitimately
+scale-invariant, because `r -> k r` is absorbed by `a -> a/k`, but applying
+PUBLISHED coefficients is not.
+
+The likely cause is structural: Eq. (5) carries no streamwise-spacing term,
+while Murray shows streamwise spacing dominates -- tripling it to 17.25 D
+restores plain superposition to under 10%. Gao calibrated at 10.5 d
+streamwise spacing; Murray's effective spacing is 2.875 D, 3.7x tighter.
+Two plates with the same coolant fraction and different row spacing get the
+same alpha from this form.
+
+One thing checked and found NOT to be the issue: Gao's equivalent blowing
+ratio `Me = M0 A0/Ae` (Eq. 10) is used to normalise the single-row
+efficiency lookup `eta = f(X/(M s))` onto a baseline hole configuration, not
+to form alpha's `r`. Alpha's `r` is `m_i/m_g`, the mass-flow ratio from the
+Eq. (3) energy balance, and the quoted calibration blowing ratios 0.3 and
+1.0 are `M`, not `Me`. combaero needs no `Me` equivalent because Baldauf
+takes lateral spacing `s/D` as an explicit argument where Gao's single-row
+database is fixed at one spacing.
+
+See `gao_alpha_fit_on_murray.md` for the full comparison, including the
+older coupling form that fits Murray better.
 
 ## Falsification
 

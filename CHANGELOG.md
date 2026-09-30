@@ -9,6 +9,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Gao's alpha coefficients ARE published, and this repo said they were
+  not.** Section 4.3.1 of Gao et al. (2025): "The empirical coefficients in
+  Equation (5), a and b, were determined to be 12 and 0.9465,
+  respectively." `film_superposition.md` recorded that the paper never
+  prints them and that the search had been exhaustive -- it had looked for
+  `a = 12` while the paper states the value in prose. Now recorded in code
+  as `film_superposition::gao_a_case1` / `gao_b_case1`, with the header,
+  both API references and the Python docstring corrected.
+
+- **They still are not defaults, and the reason is arithmetic rather than a
+  fit.** Since `a r/(a r + 1) >= 0`, that pair gives `alpha >= b = 0.9465`
+  for **every** `r`. Murray's 5.75D staggered plate needs a per-row alpha of
+  0.850, 0.864 and 0.686 at M = 0.19, 0.48 and 0.96 -- all below the floor,
+  so no choice of `r` reaches them. The published pair can damp a row by at
+  most 5.35%; this plate needs 15% to 31%. The likely cause is structural:
+  Eq. (5) carries no streamwise-spacing term, and Murray's rows are 3.7x
+  closer than Gao's calibration plate, which is the variable Murray proves
+  dominant.
+
+- **A superposition correction fitted on Murray, and the decision to keep
+  exactly one.** #425 made `murray2018` the first family whose curves all
+  fall one side of the model. For one geometry `r` is fixed per series, so
+  the fit is a single-parameter scan:
+
+  | M | Sellers | best alpha | MAE | best C | MAE |
+  |---|---|---|---|---|---|
+  | 0.19 | 33.1% | 0.850 | 15.8% | 2.15 | 13.7% |
+  | 0.48 | 43.6% | 0.864 | 21.4% | 2.16 | 17.1% |
+  | 0.96 | 112.6% | 0.686 | 23.7% | 4.29 | 16.2% |
+
+  At M = 0.96 one knob takes the error from 113% to ~16-24%, close to the
+  paper's own 15% experimental uncertainty.
+
+  **The older "third category" coupling form `eta = eta1 + eta2 -
+  C eta1 eta2` was evaluated and rejected**, so combaero continues to ship
+  Gao's alpha alone. It fits 2-7 points better and shares the identity case
+  (`C = 1` is exactly Sellers, verified to twelve digits) -- but it is
+  **not bounded**: a plain sweep over C, eta and row count reaches
+  **-1.7e5**, and it carries a hard ceiling at `eta = 1/C`. Gao's alpha
+  never leaves [0, 1] over the same sweep, by construction. A network solve
+  transits odd states during Newton iteration, so a correction that
+  diverges there cannot be the one that ships, and a fit advantage inside
+  the measurement band is not worth buying with divergence. alpha is also
+  derived rather than asserted, and being a per-row vector it already
+  subsumes what the coupling family wanted C for.
+
+  Neither set of fitted values is shipped as a default -- they are tuned to
+  Murray's plate and no one else's. Full record, including two earlier
+  misreadings of the paper that were corrected, in
+  `validation/cooling/extractions/gao_alpha_fit_on_murray.md`.
+
 - **Murray & Ireland (2018) Figure 6, and the decomposition it makes
   possible.** Five digitised curves on a 5.75D-pitch effusion plate: three
   PSP measurements (M = 0.19, 0.48, 0.96) and two of the paper's OWN Sellers

@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
@@ -215,4 +216,107 @@ TEST(FilmSuperposition, RefusesMalformedInput) {
                  std::invalid_argument);
     EXPECT_THROW(cc::film_superposition_corrected({0.3, 0.2}, {-0.1}),
                  std::invalid_argument);
+}
+
+TEST(FilmSuperposition, GaosPublishedCoefficientsAreRecordedButNotUsable) {
+    // Gao section 4.3.1: "The empirical coefficients in Equation (5), a and
+    // b, were determined to be 12 and 0.9465, respectively." An earlier note
+    // in this repo claimed they were never published -- a grep looked for
+    // "a = 12" while the paper states the value in prose.
+    namespace FS = combaero::cooling::film_superposition;
+    EXPECT_DOUBLE_EQ(FS::gao_a_case1, 12.0);
+    EXPECT_DOUBLE_EQ(FS::gao_b_case1, 0.9465);
+
+    // Why they are recorded rather than defaulted. With b = 0.9465 the
+    // whole reachable range of alpha is [b, 1 + b), so the correction
+    // saturates at 5.35% per row however much coolant is added.
+    EXPECT_NEAR(cc::mainstream_temperature_correction(0.0, FS::gao_a_case1,
+                                                      FS::gao_b_case1),
+                FS::gao_b_case1, 1e-12);
+    const double reachable = 1.0 - FS::gao_b_case1;
+    EXPECT_LT(reachable, 0.06) << "the published pair can barely correct";
+
+    // The floor is what rules them out, and it needs no rig arithmetic:
+    // a r/(a r + 1) >= 0, so alpha >= b for EVERY r. Murray's plate needs
+    // about 0.85 at low blowing and 0.69 near M = 1, both below b.
+    //
+    // Asserted this way ON PURPOSE. An r-dependent claim -- "alpha exceeds
+    // 1 above M = 0.20 on that rig" -- was written first and withdrawn:
+    // Gao's test section dimensions are not stated in the paper, so r
+    // cannot be put on their scale and the claim was unverifiable.
+    for (double r : {0.0, 1e-6, 1e-4, 0.001, 0.01, 0.1, 1.0, 100.0}) {
+        EXPECT_GE(cc::mainstream_temperature_correction(r, FS::gao_a_case1,
+                                                        FS::gao_b_case1),
+                  FS::gao_b_case1) << "r = " << r;
+    }
+    EXPECT_LT(0.85, FS::gao_b_case1) << "Murray's low-blowing alpha is reachable";
+    EXPECT_LT(0.69, FS::gao_b_case1) << "Murray's high-blowing alpha is reachable";
+
+    // Large r takes alpha past 1, which the superposition must refuse.
+    const double big = cc::mainstream_temperature_correction(
+        1.0, FS::gao_a_case1, FS::gao_b_case1);
+    EXPECT_GT(big, 1.0);
+    EXPECT_THROW(cc::film_superposition_corrected({0.3, 0.2}, {big}),
+                 std::invalid_argument);
+}
+
+TEST(FilmSuperposition, TheCouplingFormWasEvaluatedAndRejected) {
+    // combaero ships ONE superposition correction, and this records why it
+    // is Gao's alpha rather than the older "third category" coupling form
+    //
+    //     eta = eta1 + eta2 - C eta1 eta2,  applied row by row
+    //
+    // from Gao's own survey (Xu, Huo, Zhang). The comparison was close on
+    // fit and decisive on robustness.
+    auto coupled = [](const std::vector<double>& e, double C) {
+        double total = e.at(0);
+        for (std::size_t i = 1; i < e.size(); ++i) {
+            total = total + e[i] - C * total * e[i];
+        }
+        return total;
+    };
+
+    // IN ITS FAVOUR: it has the same identity case, which is what makes a
+    // correction a correction rather than a free curve.
+    for (const std::vector<double>& e :
+         {std::vector<double>{0.3, 0.2},
+          std::vector<double>{0.30, 0.22, 0.18, 0.12},
+          std::vector<double>(10, 0.08)}) {
+        EXPECT_NEAR(coupled(e, 1.0), cc::film_superposition_sellers(e), 1e-12);
+    }
+    // And it fitted Murray slightly better -- 13.7/17.1/16.2% against
+    // alpha's 15.8/21.4/23.7%. Real, but inside that data's own 15%
+    // experimental band.
+
+    // AGAINST IT, and decisive: it is not bounded. eta can go NEGATIVE, and
+    // not marginally -- a plain sweep reaches -1.7e5. A network solve
+    // transits odd states during Newton iteration, so a correction that
+    // diverges there cannot be the one that ships.
+    double worst = 0.0;
+    for (double C : {4.29, 6.0}) {
+        for (double e : {0.1, 0.2, 0.35, 0.5}) {
+            for (std::size_t n = 1; n <= 20; ++n) {
+                worst = std::min(worst, coupled(std::vector<double>(n, e), C));
+            }
+        }
+    }
+    EXPECT_LT(worst, -1.0) << "the coupling form is expected to diverge here";
+
+    // Gao's alpha over the same sweep never leaves [0, 1] -- by
+    // construction, since Eq. (7) is a sum of non-negative partial products.
+    for (double a : {0.1, 0.5, 0.85}) {
+        for (double e : {0.1, 0.35, 0.9}) {
+            for (std::size_t n = 2; n <= 20; ++n) {
+                const double v = cc::film_superposition_corrected(
+                    std::vector<double>(n, e), std::vector<double>(n - 1, a));
+                EXPECT_GE(v, 0.0);
+                EXPECT_LE(v, 1.0);
+            }
+        }
+    }
+
+    // A second reason, less decisive but worth recording: alpha is already
+    // a per-row VECTOR, so it subsumes what the coupling family wanted C
+    // for -- Zhang et al. make C depend on the hole-row count, and
+    // alpha_between_rows expresses that directly.
 }

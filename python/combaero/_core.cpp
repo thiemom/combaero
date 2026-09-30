@@ -5587,9 +5587,13 @@ PYBIND11_MODULE(_core, m) {
         "boundary layer at each injection (Eqs. 3-4), so alpha is the\n"
         "fraction of the film's temperature deficit surviving to the next\n"
         "row.\n\n"
-        "a and b are REQUIRED, not defaulted: the paper never prints its\n"
-        "fitted values, and a made-up default would acquire an authority it\n"
-        "has not earned.");
+        "a and b are REQUIRED, not defaulted. The paper does print them\n"
+        "(12 and 0.9465, section 4.3.1), but a r/(a r + 1) >= 0 means that\n"
+        "pair gives alpha >= 0.9465 for EVERY r, so it cannot reach the\n"
+        "0.69 to 0.85 per-row damping a tighter-pitched plate needs. Eq. (5)\n"
+        "carries no streamwise-spacing term, and that is the variable\n"
+        "Murray and Ireland (2018) show to dominate. Supply your own\n"
+        "fitted values.");
 
   m.def("equivalent_slot_width", &combaero::cooling::equivalent_slot_width,
         py::arg("hole_area"), py::arg("pitch"),

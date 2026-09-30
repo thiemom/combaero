@@ -434,3 +434,185 @@ def test_murray_calibration_ticks_land_on_round_numbers() -> None:
         assert abs(br[0] - x_span) < 0.2 and abs(br[1]) < 0.01, f"{path.name}: BR"
         assert abs(tr[0] - x_span) < 0.2 and abs(tr[1] - y_span) < 0.01, f"{path.name}: TR"
         assert abs(tl[0]) < 0.2 and abs(tl[1] - y_span) < 0.01, f"{path.name}: TL"
+
+
+def _predict_with_alpha(series, x, alpha):
+    """Superposed eta at x with a uniform per-row alpha."""
+    M, P = fr._blowing_and_density(series)
+    g = series.geometry
+    rows = []
+    for x_row in fr.row_positions(series):
+        if x_row >= x:
+            break
+        rows.append(
+            cb.film_effectiveness_baldauf_2002(
+                (x - x_row) * fr._diameters_per_x(series),
+                M,
+                P,
+                float(g["angle_deg"]),
+                float(g["sz_over_d"]),
+                fr.ASSUMED_TU,
+            )
+        )
+    if not rows:
+        return None
+    if len(rows) == 1:
+        return rows[0]
+    return cb.film_superposition_corrected(rows, [alpha] * (len(rows) - 1))
+
+
+def _mae_at_alpha(series, alpha):
+    pts = sorted((p.x, p.y) for p in load_points(series))
+    errs = []
+    for x, y in pts:
+        v = _predict_with_alpha(series, x, alpha)
+        if v is not None and y > 0.02:
+            errs.append(abs(v / y - 1.0))
+    return sum(errs) / len(errs)
+
+
+def test_a_constant_alpha_helps_and_helps_most_where_the_error_is_worst(murray) -> None:
+    """One knob is worth having, which is why the fit was attempted at all.
+
+    Sellers uncorrected gives 33%, 44% and 113% MAE at M = 0.19, 0.48 and
+    0.96. A single constant alpha takes those to roughly 16%, 21% and 24% --
+    at M = 0.96 that is 113% down to 24%, and the residual is close to the
+    paper's own stated 15% experimental uncertainty.
+    """
+    with cb.suppress_warnings():
+        for tag, alpha, ceiling in (
+            ("M0p19", 0.85, 0.20),
+            ("M0p48", 0.85, 0.25),
+            ("M0p96", 0.69, 0.28),
+        ):
+            s = next(x for x in murray if x.label.endswith(f"exp_{tag}"))
+            corrected = _mae_at_alpha(s, alpha)
+            uncorrected = _mae_at_alpha(s, 1.0)
+            assert corrected < ceiling, f"{tag}: {corrected:.1%} at alpha {alpha}"
+            assert corrected < uncorrected, f"{tag}: alpha made it worse"
+
+        # It earns its keep at high blowing in particular.
+        s96 = next(x for x in murray if x.label.endswith("exp_M0p96"))
+        assert _mae_at_alpha(s96, 1.0) > 1.0, "M = 0.96 should be over 100% uncorrected"
+        assert _mae_at_alpha(s96, 0.69) < 0.30
+
+
+def _by_coupling(rows, C):
+    """eta = eta1 + eta2 - C eta1 eta2, applied recursively. C = 1 is Sellers.
+
+    Gao's survey of the "third category" of superposition corrections:
+    "scholars established a general form: eta = eta1 + eta2 - C eta1 eta2,
+    where C is adjusted to modify the predicted cooling efficiency."
+    """
+    if not rows:
+        return None
+    total = rows[0]
+    for e in rows[1:]:
+        total = total + e - C * total * e
+    return total
+
+
+def _rows_at(series, x):
+    M, P = fr._blowing_and_density(series)
+    g = series.geometry
+    out = []
+    for x_row in fr.row_positions(series):
+        if x_row >= x:
+            break
+        out.append(
+            cb.film_effectiveness_baldauf_2002(
+                (x - x_row) * fr._diameters_per_x(series),
+                M,
+                P,
+                float(g["angle_deg"]),
+                float(g["sz_over_d"]),
+                fr.ASSUMED_TU,
+            )
+        )
+    return out
+
+
+def test_coupling_C_of_one_is_exactly_sellers(murray) -> None:
+    """The identity case, which is what makes C a correction and not a fudge.
+
+    `eta1 + eta2 - C eta1 eta2` at C = 1 is `1 - (1 - eta1)(1 - eta2)`, so
+    the uncorrected model is the classical one rather than an arbitrary
+    reference point -- the same property that makes Gao's alpha = 1 Sellers.
+    """
+    s = next(x for x in murray if x.label.endswith("exp_M0p96"))
+    with cb.suppress_warnings():
+        for x in (8.0, 15.0, 25.0):
+            rows = _rows_at(s, x)
+            assert len(rows) > 2
+            assert _by_coupling(rows, 1.0) == pytest.approx(
+                cb.film_superposition_sellers(rows), abs=1e-12
+            )
+
+
+def test_the_correction_axis_gao_fits_is_not_the_one_murray_varies(murray) -> None:
+    """Why a single (a, b) cannot be fitted here -- and why that is not a
+    verdict on Gao's form.
+
+    Gao fits (a, b) across GEOMETRY at fixed blowing ratio and refits them
+    per blowing ratio: "the correction coefficients ... increased as the
+    blowing ratio decreased". Their four plates span 3.1x in r at one M.
+    `murray2018` is ONE geometry at three blowing ratios -- orthogonal to
+    that axis -- so r and M move together here and no fit can separate them.
+
+    What IS checkable is the direction, and it agrees with Gao: alpha falls
+    as blowing rises, which is their "coefficients increase as blowing
+    decreases" seen from the other side.
+
+    See validation/cooling/extractions/gao_alpha_fit_on_murray.md.
+    """
+    best = {}
+    with cb.suppress_warnings():
+        for tag in ("M0p19", "M0p48", "M0p96"):
+            s = next(x for x in murray if x.label.endswith(f"exp_{tag}"))
+            best[tag] = min((0.30 + 0.01 * i for i in range(71)), key=lambda a: _mae_at_alpha(s, a))
+
+    lo, mid, hi = best["M0p19"], best["M0p48"], best["M0p96"]
+    assert hi < lo - 0.10, f"M=0.96 alpha {hi:.2f} not well below M=0.19 {lo:.2f}"
+    assert hi < mid - 0.10, f"M=0.96 alpha {hi:.2f} not well below M=0.48 {mid:.2f}"
+    assert abs(mid - lo) < 0.05, (
+        f"M=0.19 and M=0.48 alphas ({lo:.2f}, {mid:.2f}) have separated; the "
+        "r-vs-M confound may have changed and the fit is worth revisiting"
+    )
+
+
+def test_the_coupling_form_fits_murray_better_than_alpha(murray) -> None:
+    """One knob each, and the sourced older form wins at every blowing ratio.
+
+    Both are one parameter per series here, so this compares like with like.
+    The coupling form reaches 13.7%, 17.1% and 16.2% against alpha's 15.8%,
+    21.4% and 23.7% -- and the gap is widest at M = 0.96, where the
+    correction earns its keep. At that point it is close to the paper's own
+    15% experimental uncertainty.
+
+    Recorded because it bears on which correction combaero should implement
+    if it implements one: the coupling form is also parameterised on blowing
+    ratio (Xu et al., via Gao's survey), which is the axis this data varies.
+    """
+    with cb.suppress_warnings():
+        for tag, ceiling in (("M0p19", 0.16), ("M0p48", 0.20), ("M0p96", 0.19)):
+            s = next(x for x in murray if x.label.endswith(f"exp_{tag}"))
+            pts = sorted((p.x, p.y) for p in load_points(s))
+
+            def mae_C(C, s=s, pts=pts):
+                errs = []
+                for x, y in pts:
+                    v = _by_coupling(_rows_at(s, x), C)
+                    if v is not None and y > 0.02:
+                        errs.append(abs(v / y - 1.0))
+                return sum(errs) / len(errs)
+
+            best_C = min((0.5 + 0.02 * i for i in range(226)), key=mae_C)
+            best_alpha = min(
+                (0.30 + 0.01 * i for i in range(71)),
+                key=lambda a, s=s: _mae_at_alpha(s, a),
+            )
+            assert mae_C(best_C) < ceiling, f"{tag}: {mae_C(best_C):.1%}"
+            assert mae_C(best_C) < _mae_at_alpha(s, best_alpha), (
+                f"{tag}: coupling {mae_C(best_C):.1%} no longer beats alpha "
+                f"{_mae_at_alpha(s, best_alpha):.1%}"
+            )
