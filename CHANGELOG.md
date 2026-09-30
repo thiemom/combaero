@@ -28,25 +28,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closer than Gao's calibration plate, which is the variable Murray proves
   dominant.
 
-- **A superposition correction fitted on Murray.** #425 made `murray2018`
-  the first family whose curves all fall one side of the model. For one
-  geometry `r` is fixed per series, so the fit is a single-parameter scan:
+- **A superposition correction fitted on Murray, and the decision to keep
+  exactly one.** #425 made `murray2018` the first family whose curves all
+  fall one side of the model. For one geometry `r` is fixed per series, so
+  the fit is a single-parameter scan:
 
   | M | Sellers | best alpha | MAE | best C | MAE |
   |---|---|---|---|---|---|
-  | 0.19 | 33.1% | 0.850 | 15.8% | 2.15 | **13.7%** |
-  | 0.48 | 43.6% | 0.864 | 21.4% | 2.16 | **17.1%** |
-  | 0.96 | 112.6% | 0.686 | 23.7% | 4.29 | **16.2%** |
+  | 0.19 | 33.1% | 0.850 | 15.8% | 2.15 | 13.7% |
+  | 0.48 | 43.6% | 0.864 | 21.4% | 2.16 | 17.1% |
+  | 0.96 | 112.6% | 0.686 | 23.7% | 4.29 | 16.2% |
 
-  At M = 0.96 one knob takes the error from 113% to 16%, close to the
-  paper's own 15% experimental uncertainty. The older coupling form
-  `eta = eta1 + eta2 - C eta1 eta2` from Gao's own survey of the "third
-  category" beats alpha at every blowing ratio; `C = 1` is exactly Sellers,
-  verified to twelve digits. Neither is shipped as a default and the
-  coupling form is not implemented -- the fitted values are tuned to
-  Murray's plate and no one else's. Full record in
-  `validation/cooling/extractions/gao_alpha_fit_on_murray.md`, including
-  two earlier readings of the paper that were corrected.
+  At M = 0.96 one knob takes the error from 113% to ~16-24%, close to the
+  paper's own 15% experimental uncertainty.
+
+  **The older "third category" coupling form `eta = eta1 + eta2 -
+  C eta1 eta2` was evaluated and rejected**, so combaero continues to ship
+  Gao's alpha alone. It fits 2-7 points better and shares the identity case
+  (`C = 1` is exactly Sellers, verified to twelve digits) -- but it is
+  **not bounded**: a plain sweep over C, eta and row count reaches
+  **-1.7e5**, and it carries a hard ceiling at `eta = 1/C`. Gao's alpha
+  never leaves [0, 1] over the same sweep, by construction. A network solve
+  transits odd states during Newton iteration, so a correction that
+  diverges there cannot be the one that ships, and a fit advantage inside
+  the measurement band is not worth buying with divergence. alpha is also
+  derived rather than asserted, and being a per-row vector it already
+  subsumes what the coupling family wanted C for.
+
+  Neither set of fitted values is shipped as a default -- they are tuned to
+  Murray's plate and no one else's. Full record, including two earlier
+  misreadings of the paper that were corrected, in
+  `validation/cooling/extractions/gao_alpha_fit_on_murray.md`.
 
 - **Murray & Ireland (2018) Figure 6, and the decomposition it makes
   possible.** Five digitised curves on a 5.75D-pitch effusion plate: three

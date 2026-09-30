@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
@@ -259,16 +260,14 @@ TEST(FilmSuperposition, GaosPublishedCoefficientsAreRecordedButNotUsable) {
                  std::invalid_argument);
 }
 
-TEST(FilmSuperposition, CouplingFormWithCOneIsExactlySellers) {
-    // The "third category" correction from Gao's own survey:
-    // eta = eta1 + eta2 - C eta1 eta2, applied recursively. C = 1 must be
-    // Sellers exactly, the same identity property alpha = 1 has -- that is
-    // what makes it a correction rather than a free curve.
+TEST(FilmSuperposition, TheCouplingFormWasEvaluatedAndRejected) {
+    // combaero ships ONE superposition correction, and this records why it
+    // is Gao's alpha rather than the older "third category" coupling form
     //
-    // Recorded here because it fits Murray better than alpha does and is
-    // parameterised on blowing ratio, the axis that data varies. Not
-    // implemented as an API: see
-    // validation/cooling/extractions/gao_alpha_fit_on_murray.md.
+    //     eta = eta1 + eta2 - C eta1 eta2,  applied row by row
+    //
+    // from Gao's own survey (Xu, Huo, Zhang). The comparison was close on
+    // fit and decisive on robustness.
     auto coupled = [](const std::vector<double>& e, double C) {
         double total = e.at(0);
         for (std::size_t i = 1; i < e.size(); ++i) {
@@ -276,14 +275,48 @@ TEST(FilmSuperposition, CouplingFormWithCOneIsExactlySellers) {
         }
         return total;
     };
+
+    // IN ITS FAVOUR: it has the same identity case, which is what makes a
+    // correction a correction rather than a free curve.
     for (const std::vector<double>& e :
          {std::vector<double>{0.3, 0.2},
           std::vector<double>{0.30, 0.22, 0.18, 0.12},
           std::vector<double>(10, 0.08)}) {
         EXPECT_NEAR(coupled(e, 1.0), cc::film_superposition_sellers(e), 1e-12);
     }
-    // C > 1 damps, which is the direction the data requires.
-    const std::vector<double> rows(10, 0.08);
-    EXPECT_LT(coupled(rows, 2.15), cc::film_superposition_sellers(rows));
-    EXPECT_LT(coupled(rows, 4.29), coupled(rows, 2.15));
+    // And it fitted Murray slightly better -- 13.7/17.1/16.2% against
+    // alpha's 15.8/21.4/23.7%. Real, but inside that data's own 15%
+    // experimental band.
+
+    // AGAINST IT, and decisive: it is not bounded. eta can go NEGATIVE, and
+    // not marginally -- a plain sweep reaches -1.7e5. A network solve
+    // transits odd states during Newton iteration, so a correction that
+    // diverges there cannot be the one that ships.
+    double worst = 0.0;
+    for (double C : {4.29, 6.0}) {
+        for (double e : {0.1, 0.2, 0.35, 0.5}) {
+            for (std::size_t n = 1; n <= 20; ++n) {
+                worst = std::min(worst, coupled(std::vector<double>(n, e), C));
+            }
+        }
+    }
+    EXPECT_LT(worst, -1.0) << "the coupling form is expected to diverge here";
+
+    // Gao's alpha over the same sweep never leaves [0, 1] -- by
+    // construction, since Eq. (7) is a sum of non-negative partial products.
+    for (double a : {0.1, 0.5, 0.85}) {
+        for (double e : {0.1, 0.35, 0.9}) {
+            for (std::size_t n = 2; n <= 20; ++n) {
+                const double v = cc::film_superposition_corrected(
+                    std::vector<double>(n, e), std::vector<double>(n - 1, a));
+                EXPECT_GE(v, 0.0);
+                EXPECT_LE(v, 1.0);
+            }
+        }
+    }
+
+    // A second reason, less decisive but worth recording: alpha is already
+    // a per-row VECTOR, so it subsumes what the coupling family wanted C
+    // for -- Zhang et al. make C depend on the hole-row count, and
+    // alpha_between_rows expresses that directly.
 }

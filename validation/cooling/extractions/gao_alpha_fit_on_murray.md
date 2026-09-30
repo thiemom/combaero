@@ -114,35 +114,67 @@ would mean the "best" value is not a measurement:
 M = 0.19 and M = 0.48 share a minimum at alpha 0.85, so their apparent
 0.850-vs-0.864 difference sits inside the flat region and is not real.
 
-## The coupling form fits better, and is sourced
+## ONE correction ships, and it is alpha
 
-Gao's own survey of the "third category" of corrections gives the form:
+combaero carries a single superposition correction. The older "third
+category" coupling form from Gao's own survey (Xu, Huo, Zhang),
 
-> "scholars established a general form: eta = eta1 + eta2 - C eta1 eta2,
-> where C is adjusted to modify the predicted cooling efficiency."
+    eta = eta1 + eta2 - C eta1 eta2,   applied row by row
 
-Applied recursively over rows. **C = 1 is exactly Sellers**, verified to ten
-digits against `film_superposition_sellers` -- the same identity property
-that makes alpha = 1 the classical model.
+was evaluated against it and rejected.
 
-It beats alpha at every blowing ratio here (13.7 / 17.1 / 16.2 against
-15.8 / 21.4 / 23.7), and most at M = 0.96 where the correction matters.
-Its fitted values 2.15, 2.16, 4.29 are monotone in blowing ratio.
+**In its favour.** Same identity case -- `C = 1` is exactly Sellers,
+verified to twelve digits -- and it fits Murray slightly better at every
+blowing ratio: 13.7 / 17.1 / 16.2% against alpha's 15.8 / 21.4 / 23.7%.
+Its `C` also rises monotonically with blowing (2.15, 2.16, 4.29), and Gao
+attributes that `M` dependence to Xu et al., which is the axis this data
+varies.
 
-**And critically it is parameterised along the axis Murray varies.** Gao
-attributes the M dependence to Xu et al. [36], who "suggested that the
-correction factor for turbine blades depends on both the blowing ratio, M,
-and the dimensionless distance, X/D". Others in the same family: Huo et al.
-[26] add dimensionless hole pitch; Zhang et al. [37] drop X/D and make C
-depend on hole-row count and hole Reynolds number; Zhang et al. [38] handle
->50 rows via a spanwise non-uniformity factor and streamwise dissipation
-rate.
+**Against it, decisively: it is not bounded.** `eta` can go negative, and
+not marginally -- a plain sweep over `C` in {4.29, 6}, `eta_row` in
+{0.1 .. 0.5} and up to 20 rows reaches **-1.7e5**. It also carries a hard
+ceiling at `eta = 1/C` that no number of rows can pass. Gao's alpha over
+the same sweep never leaves [0, 1], by construction: Eq. (7) is a sum of
+non-negative partial products.
 
-Gao's stated reason for not using it: the third category "lacks a
-consideration of streamwise temperature variations and requires extensive
-databases to handle continuous changes in the hole diameter". That is a
-fair objection for their design-iteration purpose. It does not apply to
-scoring one fixed geometry.
+A network solve transits odd states during Newton iteration -- the same
+argument that keeps Baldauf's envelope reported rather than enforced -- so
+a correction that diverges there cannot be the one that ships. The fit
+advantage is 2 to 7 points, inside that data's own 15% experimental band,
+and is not worth buying with divergence.
+
+**Two further reasons.** alpha is derived, from the Eq. (3)-(4) energy
+balance, where the coupling form is introduced as a shape that "scholars
+established". And alpha is already a per-row VECTOR, so it subsumes what
+the coupling family wanted `C` for: Zhang et al. make `C` depend on the
+hole-row count, and `alpha_between_rows` expresses that directly.
+
+Recorded in `tests/test_film_superposition.cpp` as
+`TheCouplingFormWasEvaluatedAndRejected`, which asserts both halves -- the
+identity case it shares and the divergence it does not survive.
+
+## What the framework generalises to
+
+The pipeline Gao describes has two independent corrections, and combaero
+already holds both pieces:
+
+| step | Gao | combaero |
+|---|---|---|
+| single-row efficiency | database `eta = f(X/(M s))`, Eq. (8) | `film_effectiveness_baldauf_2002`, or any per-row source |
+| geometry normalisation | equivalent slot width `s = A_hole/P`, Eq. (9), and equivalent blowing ratio `Me = M0 A0/Ae`, Eq. (10) | `equivalent_slot_width`, `equivalent_blowing_ratio` |
+| row-interaction correction | per-row alpha, Eqs. (5) and (7) | `mainstream_temperature_correction`, `film_superposition_corrected` |
+
+**The geometry-normalisation step is optional for combaero and usually
+unnecessary.** `Me` exists because Gao's single-row database is measured at
+one fixed spacing, so a different hole configuration has to be mapped onto
+it. Baldauf takes lateral spacing `s/D` as an explicit argument, so the
+per-row closure already covers spacing directly. The functions are exposed
+for anyone whose per-row source IS a fixed-spacing database.
+
+**What does not generalise is `(a, b)`.** They are geometry-specific --
+Gao's own pair cannot reach what a 3.7x tighter plate needs -- so they stay
+required arguments. The framework is: bring your own per-row closure, fit
+alpha on your own rig, and label it tuned.
 
 ## What is NOT shipped
 
