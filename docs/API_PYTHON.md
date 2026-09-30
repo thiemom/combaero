@@ -331,11 +331,66 @@ diag["Nu_approach"], diag["Nu_throat"]
 using one where the other is meant is a factor-of-three error. For a panel
 energy balance: `Q = h_plate_area * area_approach_total * dT`.
 
-The external film is **not** included, deliberately. Andrews (88-GT-290)
-shows the internal and film contributions are not additive in
-effectiveness, so an overall-effectiveness correlation must never be the
-closure here -- it already contains this convection. Pair this with an
-adiabatic external effectiveness and let the overall be an output.
+The external film is **not** included here, and `overall_effectiveness()`
+below explains why that is a measured decision rather than a gap.
+
+##### Overall effectiveness, as an output
+
+```python
+out = panel.overall_effectiveness(state_in, h_gas_unblown=250.0,
+                                  T_gas=1600.0, U_gas=80.0,
+                                  gas_augmentation=1.0, eta_film=0.0)
+out["eta_overall"]       # (Tg - Tw)/(Tg - Tc)
+out["T_wall"]            # K
+out["T_adiabatic_wall"]  # K, what eta_film sets
+out["resistance_ratio"]  # h_internal / h_gas
+out["velocity_ratio"]    # jet / mainstream -- reported, never applied
+out["blowing_ratio"], out["momentum_flux_ratio"]
+```
+
+```
+h_gas = h_gas_unblown * gas_augmentation
+eta   = (h_i + h_gas * eta_film) / (h_i + h_gas)
+```
+
+An overall-effectiveness **correlation** must never be the closure here
+-- it already contains the internal convection this computes, and the two
+would double-count. So `eta` is an output and the gas side is the
+caller's input.
+
+**A film is TWO numbers, and the signature says so.** The standard form
+is `q = h_f (T_aw - T_w)` with `T_aw = Tg - eta_f (Tg - Tc)`, so a film
+owes both a driving temperature (`eta_film`) and a conductance
+(`gas_augmentation = h_f/h_0`). `film_effectiveness_baldauf_2002` gives
+only the first -- an adiabatic wall passes no heat, so it measures no
+coefficient. **Passing `eta_film` while leaving `gas_augmentation` at 1.0
+over-predicts**; both default to their no-film values so that omitting
+the pair is consistent rather than half-right.
+
+**Mind what `h_gas_unblown` is measured against.** An augmentation ratio
+is meaningless without its baseline. For Andrews 88-GT-290's rig the
+required `gas_augmentation` is 3.1-4.3 against a fully developed
+Dittus-Boelter and 1.6-2.5 against the same duct with a thermal-entry
+correction -- a factor of 1.75 from that choice alone. Published
+film-cooling ratios are usually referenced to a flat-plate turbulent
+boundary layer at the same x, a third baseline again.
+
+**`gas_augmentation` and `internal_Nu_multiplier` are yours, never
+fitted here**, matching `Nu_multiplier` on `ConvectiveSurface`. At their
+defaults the closure scores +3.1% on Andrews' effusion plate C and +23.7%
+on plate B; setting `gas_augmentation = 2.06` closes plate B at G = 0.6
+exactly. Note that `internal_Nu_multiplier = 0.486` also closes it -- by
+halving the coolant side, which is the wrong direction, since that
+correlation runs 10.4% LOW against Andrews' Fig. 8. Reaching the target
+is not the same as being the right dial.
+
+**How good `eta` is depends on a regime this cannot predict.** Andrews'
+two plates need gas-side coefficients differing by 1.7x, and that ratio
+survives any choice of film model. Pass `U_gas` and read the reported
+ratios; if `velocity_ratio` exceeds about 1, treat `eta` as an upper
+bound unless `gas_augmentation` already accounts for the jets. No
+threshold is applied, because the data supports none -- see
+`validation/cooling/extractions/andrews_effusion_overall_eta.md`.
 
 #### Multi-row film superposition
 

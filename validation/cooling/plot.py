@@ -82,6 +82,7 @@ AXIS_NAMES = {
     # exactly how 86-GT-225's h_m and 88-GT-290's h get confused.
     "h_internal": "h on plate area A = X2 - piD2/4 [W/m2K]",
     "h_hole_length": "h_m on hole area piDL [W/m2K]",
+    "eta_overall": "overall cooling effectiveness (Tg-Tw)/(Tg-Tc)",
 }
 
 
