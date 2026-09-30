@@ -1315,6 +1315,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Saving and restoring the warning handler nested without bound, and
+  eventually segfaulted.** `get_warning_handler()` wrapped the current
+  handler in a fresh `py::cpp_function` on every call and
+  `set_warning_handler()` wrapped that again, so each save-and-restore cycle
+  added a layer. The layers cost nothing until a warning is emitted, at
+  which point `warn()` recurses through all of them. Measured: **6000 cycles
+  survived, 12000 took the process down** with no catchable Python error.
+
+  Not exotic usage -- `suppress_warnings()` performs exactly this cycle, and
+  a validation runner that probed a correlation's envelope once per sample
+  reached ~6000 calls and segfaulted the whole test suite.
+
+  The handler installed from Python is now a named `PyWarningHandler` rather
+  than a lambda, so `get_warning_handler()` can recognise it through
+  `std::function::target` and hand back **the original object** instead of a
+  new wrapper. The cycle is idempotent: `get_warning_handler() is handler`.
+  50000 cycles now pass, and the handler fires once rather than N times.
+
+  A C++-side handler (the default included) still has to be wrapped, since
+  there is no Python object to return -- but that wrapper is not a
+  `PyWarningHandler`, so the chain stops at one layer instead of growing.
+  Covered separately.
+
+  Distinct from the at-exit crash fixed earlier in this release: that was a
+  Python reference released after `Py_Finalize()`, this is unbounded
+  recursion during the run.
+
 - **30 functions advertised a phantom overload.** pybind11 tries overloads
   in registration order, so a second `m.def` with an identical signature can
   never be selected -- but it is still documented. `help(combaero.bernoulli_P2)`
