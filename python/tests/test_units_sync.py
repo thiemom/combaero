@@ -134,6 +134,44 @@ def test_all_covers_the_public_surface() -> None:
     )
 
 
+def test_no_phantom_overloads() -> None:
+    """A function must not advertise two identical signatures.
+
+    pybind11 tries overloads in registration order, so a second `m.def` with
+    the SAME signature can never be selected -- but it is still documented.
+    `help()` prints "Overloaded function" and lists it as "2.", so a reader
+    is invited to work out a difference that does not exist.
+
+    30 functions carried one, `channel_mdot` two. Most arose from a
+    correlation being bound in a general section and again in a
+    domain-specific one; nothing failed, which is why they accumulated.
+
+    Distinct signatures are left alone -- `orifice_flow_thermo(.., Cd)` and
+    `orifice_flow_thermo(.., cd_fn)` are a real, useful overload pair.
+    """
+    import re
+
+    offenders = {}
+    for name in public_surface():
+        doc = getattr(getattr(cb, name, None), "__doc__", None) or ""
+        if "Overloaded function" not in doc:
+            continue
+        sigs = [
+            m.strip()
+            for m in re.findall(r"^\s*\d+\.\s+(.*)$", doc, re.M)
+            if m.strip().startswith(name + "(")
+        ]
+        distinct = list(dict.fromkeys(sigs))
+        if len(sigs) > len(distinct):
+            offenders[name] = f"{len(sigs)} listed, {len(distinct)} distinct"
+
+    assert not offenders, (
+        "these functions register the same signature more than once in "
+        "_core.cpp; every registration after the first is unreachable but "
+        f"still shows up in help(): {offenders}"
+    )
+
+
 def test_api_unit_sync():
     """
     Dynamically discover all exposed functions and classes from combaero,
