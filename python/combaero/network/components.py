@@ -2362,9 +2362,22 @@ class EffusionPlateElement(OrificeElement):
     one built on a half-pitch square inlet area, which is worth knowing about
     but is a different convention; at their own pitch it is a 0.3% effect.
 
-    THERMAL. Not yet modelled. This element is the flow path only; the
-    effectiveness split (internal throat convection vs external film) is
-    tracked separately so that the two cannot double-count.
+    THERMAL, INTERNAL SIDE. `internal_heat_transfer()` gives the coolant-side
+    coefficient from Andrews 86-GT-225: the hole APPROACH flow over the
+    coolant-side surface plus the THROAT, summed. The approach term dominates
+    at effusion Reynolds numbers, which is the paper's own headline and the
+    reason a throat-only treatment recovers only a fraction of the measured
+    coefficient.
+
+    THE EXTERNAL FILM IS NOT INCLUDED, and that is deliberate. Andrews
+    (88-GT-290) states the two are NOT additive in effectiveness -- "the film
+    cooling reduces the mean gas temperature adjacent to the wall... which in
+    turn reduces the heat flux removed by the internal wall cooling". So an
+    OVERALL effectiveness correlation must never be the closure here: it
+    already contains the internal convection this method computes. Combine
+    this with an ADIABATIC external effectiveness
+    (`film_effectiveness_baldauf_2002` superposed over rows) and let the
+    overall effectiveness be an output.
     """
 
     def __init__(
@@ -2490,6 +2503,64 @@ class EffusionPlateElement(OrificeElement):
                 f"{self.porosity:.3f}; the holes do not fit in the panel."
             )
 
+    def internal_heat_transfer(self, state_in: NetworkMixtureState) -> dict[str, float]:
+        """Coolant-side heat transfer for this panel, Andrews 86-GT-225.
+
+        The hole approach and the throat, summed (Eq. 19). Returns the two
+        Nusselt numbers, the Reynolds number they share, and the coefficient
+        expressed BOTH ways -- because which area an `h` belongs to is
+        exactly the kind of thing that goes wrong silently:
+
+          `h_hole_area`  : on the hole internal surface, pi d L_hole
+          `h_plate_area` : on the approach area per hole, cell - hole, which
+                           is Andrews' own definition and what his Fig. 8
+                           plots
+
+        The two differ by `area_ratio` -- 3.46 for Andrews' plate C -- so
+        using one where the other is meant is a factor-of-three error, not a
+        refinement. For a panel energy balance use
+        `Q = h_plate_area * area_approach_total * dT`.
+
+        Properties are taken at the COOLANT inlet state. The coolant heats up
+        through the hole, so a large temperature rise makes this a first
+        approximation; Andrews' own rig was near-ambient.
+
+        NON-SQUARE ARRAYS. Andrews' plates are square and Eq. (18) carries
+        the pitch explicitly, so a rectangular array is represented by its
+        equivalent square pitch, `pitch_actual`. Fine while the aspect ratio
+        is near one; a strongly rectangular array is outside what the
+        correlation was fitted on.
+        """
+        ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+        mu = ts.mu if ts.mu > 0.0 else 1.8e-5
+        k = ts.k
+        pr = ts.Pr
+
+        m_hole = abs(state_in.m_dot) / self.n_holes
+        if m_hole <= 0.0:
+            return {}
+        Re = 4.0 * m_hole / (math.pi * self.hole_diameter * mu)
+
+        X = self.pitch_actual
+        nu_approach = cb.effusion_approach_nusselt(Re, pr, X / self.hole_length)
+        nu_throat = cb.effusion_throat_nusselt(Re, pr, self.hole_length / self.hole_diameter)
+
+        area_hole = math.pi * self.hole_diameter * self.hole_length
+        area_approach = self.panel_area / self.n_holes - math.pi * (self.hole_diameter**2) / 4.0
+
+        h_hole = (nu_approach + nu_throat) * k / self.hole_diameter
+        return {
+            "Re_hole": float(Re),
+            "Nu_approach": float(nu_approach),
+            "Nu_throat": float(nu_throat),
+            "Nu_internal": float(nu_approach + nu_throat),
+            "h_hole_area": float(h_hole),
+            "h_plate_area": float(h_hole * area_hole / area_approach),
+            "area_ratio": float(area_approach / area_hole),
+            "area_approach_total": float(area_approach * self.n_holes),
+            "area_hole_total": float(area_hole * self.n_holes),
+        }
+
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float]:
@@ -2512,6 +2583,8 @@ class EffusionPlateElement(OrificeElement):
             # into a healthy net outflow. Say it instead.
             "is_ingesting": float(dP_drive <= 0.0),
         }
+        # Coolant-side heat transfer, when there is flow to carry it.
+        out.update(self.internal_heat_transfer(state_in))
         out.update(base)
         return out
 

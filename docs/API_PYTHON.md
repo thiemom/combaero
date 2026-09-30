@@ -314,6 +314,29 @@ The approach term leads at low `Re` (exponent 0.476) and the throat
 overtakes it (0.8); the crossover falls inside a typical effusion plate's
 own operating range, which is why both are needed.
 
+##### On the element
+
+`EffusionPlateElement.internal_heat_transfer(state_in)` applies the above to
+the panel's own geometry and appears in `diagnostics()` after a solve:
+
+```python
+diag = result["__element_diag__"]["panel"]
+diag["h_plate_area"]   # W/m^2 K on the approach area, Andrews' definition
+diag["h_hole_area"]    # W/m^2 K on the hole internal area
+diag["area_ratio"]     # approach / hole internal, 3.46 for Andrews' plate C
+diag["Nu_approach"], diag["Nu_throat"]
+```
+
+**Both coefficients are reported because they differ by `area_ratio`**, and
+using one where the other is meant is a factor-of-three error. For a panel
+energy balance: `Q = h_plate_area * area_approach_total * dT`.
+
+The external film is **not** included, deliberately. Andrews (88-GT-290)
+shows the internal and film contributions are not additive in
+effectiveness, so an overall-effectiveness correlation must never be the
+closure here -- it already contains this convection. Pair this with an
+adiabatic external effectiveness and let the overall be an output.
+
 #### Multi-row film superposition
 
 ```python

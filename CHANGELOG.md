@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EffusionPlateElement.internal_heat_transfer()`** wires the Andrews
+  86-GT-225 correlations into the element, so a solved panel reports its
+  coolant-side coefficient in `diagnostics()` rather than only through the
+  validation harness. Returns `Re_hole`, `Nu_approach`, `Nu_throat` and the
+  coefficient **both ways** -- `h_hole_area` on the hole internal surface
+  and `h_plate_area` on the approach area, Andrews' own definition -- plus
+  the `area_ratio` between them, 3.46 for his plate C. Reporting both is
+  the point: using one where the other is meant is a factor-of-three error,
+  and the identity `h_hole * A_hole == h_plate * A_approach` is asserted.
+
+  Cross-checked against the runner scored on Andrews Fig. 8: the element
+  and the harness agree to **0.02%**, the residual being the element's
+  rounding to a whole number of holes.
+
+  The external film is deliberately excluded -- Andrews shows internal and
+  film are not additive in effectiveness, so an overall-effectiveness
+  correlation must never be the closure here. No flow returns no
+  coefficient rather than a zero.
+
+  A falsification that found **nothing** is recorded as its own test:
+  substituting `wall_thickness` for the drilled `hole_length` in the
+  approach term passed every existing test, because they all used
+  90-degree holes where the two are equal. At 30 degrees it doubles the
+  approach Nusselt number silently.
+
 - **Effusion plate INTERNAL heat transfer, closing #387's internal side.**
   Andrews 86-GT-225: a coolant hole cools its wall in two places, and the
   paper's point is that the approach dominates at the Reynolds numbers
