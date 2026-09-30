@@ -157,3 +157,79 @@ def test_suppress_warnings_actually_suppresses_and_then_restores() -> None:
         """)
     assert result.returncode == 0, result.stderr
     assert "OK" in result.stdout
+
+
+def test_save_and_restore_does_not_nest() -> None:
+    """`get` then `set` must not grow the handler chain.
+
+    `get_warning_handler` used to wrap the current handler in a fresh
+    `py::cpp_function` every call, and `set_warning_handler` wrapped that
+    again -- so each save-and-restore cycle added a layer. The layers cost
+    nothing until a warning is emitted, at which point `warn()` recurses
+    through all of them. Measured before the fix: 6000 cycles survived,
+    12000 took the process down with no catchable Python error.
+
+    This is not exotic usage. `suppress_warnings()` does exactly this cycle,
+    and a validation runner that probed a correlation's envelope per sample
+    hit it at ~6000 calls and segfaulted the test suite.
+    """
+    result = run_script("""
+        import combaero as cb
+
+        seen = []
+        cb.set_warning_handler(seen.append)
+        for _ in range(50000):
+            cb.set_warning_handler(cb.get_warning_handler())
+
+        cb.nusselt_dittus_boelter(100.0, 0.7, True)   # emits one warning
+        assert len(seen) == 1, f"handler ran {len(seen)} times, so it nested"
+        print("OK")
+        """)
+    assert result.returncode == 0, (
+        f"50000 save/restore cycles exited {result.returncode}; the handler "
+        f"chain is nesting again.\nstderr: {result.stderr[-2000:]}"
+    )
+    assert "OK" in result.stdout
+
+
+def test_round_trip_returns_the_same_object() -> None:
+    """The mechanism behind the test above, asserted directly.
+
+    `get_warning_handler` recognises a handler this module installed -- via
+    `std::function::target<PyWarningHandler>` -- and hands back the very
+    object that was passed in. Identity is what makes the cycle idempotent;
+    an equal-but-new wrapper would still nest.
+    """
+    result = run_script("""
+        import combaero as cb
+
+        def handler(msg):
+            pass
+
+        cb.set_warning_handler(handler)
+        assert cb.get_warning_handler() is handler, "a new wrapper was made"
+        print("OK")
+        """)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout
+
+
+def test_the_cpp_default_handler_round_trip_stabilises() -> None:
+    """The default handler has no Python object to return, so it IS wrapped.
+
+    That wrapper is not a `PyWarningHandler`, so the first `get` wraps and
+    every subsequent one unwraps -- the chain stops at one layer instead of
+    growing. Covered because it is the path the identity test above cannot
+    reach.
+    """
+    result = run_script("""
+        import combaero as cb
+
+        cb.set_warning_handler(None)          # C++ default
+        for _ in range(50000):
+            cb.set_warning_handler(cb.get_warning_handler())
+        cb.nusselt_dittus_boelter(100.0, 0.7, True)
+        print("OK")
+        """)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout
