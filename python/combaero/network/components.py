@@ -2561,6 +2561,94 @@ class EffusionPlateElement(OrificeElement):
             "area_hole_total": float(area_hole * self.n_holes),
         }
 
+    def overall_effectiveness(
+        self,
+        state_in: NetworkMixtureState,
+        h_gas: float,
+        T_gas: float,
+        U_gas: float | None = None,
+    ) -> dict[str, float]:
+        """Overall cooling effectiveness of this panel, as an OUTPUT.
+
+            eta = (T_gas - T_wall) / (T_gas - T_coolant) = h_i / (h_i + h_gas)
+
+        `h_gas` is the caller's GAS SIDE and is an input, because the panel
+        does not own it. `eta` and the wall temperature are the outputs. An
+        overall-effectiveness correlation must never be the closure here:
+        it would already contain the internal convection this computes, and
+        the two would double-count.
+
+        `h_gas` LUMPS THE FILM IN, and that is the thing to understand
+        before choosing a value for it. There is no separate film term
+        here, but not because there is no film: an external film changes
+        both the driving temperature and the coefficient,
+
+            q = h_f (T_aw - T_w),  T_aw = T_gas - eta_f (T_gas - T_c)
+
+        and an adiabatic effectiveness correlation supplies only `eta_f`.
+        It cannot supply `h_f`, because an adiabatic wall passes no heat
+        and so measures no coefficient. Offering `eta_f` alone against an
+        unaugmented `h_gas` over-predicts; scored against Andrews
+        88-GT-290 Fig. 10 his data admits a film effectiveness of at most
+        0.105 that way, against the 0.27 to 0.58 Baldauf gives. Admit the
+        film and the same data then demands 1.6 to 4.3 times the
+        smooth-duct coefficient to go with it. Only the pair is
+        identifiable, so `h_gas` is the pair. See
+        `validation/cooling/extractions/andrews_effusion_overall_eta.md`.
+
+        SO `h_gas` IS NOT A CLEAN-WALL COEFFICIENT. It must already carry
+        whatever the effusion jets do to the gas side, and how much that
+        is depends on a regime this cannot predict: Andrews' two plates
+        need coefficients differing by 1.7x, and the model misses one by
+        3% and the other by 24%.
+
+        Pass `U_gas` and read the reported ratios to see where you are.
+        They are REPORTED AND NEVER APPLIED -- no threshold is offered,
+        because the data does not support one. The required augmentation
+        collapses on none of the velocity ratio, the blowing ratio or the
+        momentum flux ratio, and admitting the film does not collapse it
+        either. If `velocity_ratio` exceeds about 1 -- Andrews' plate B
+        ejects at 53 m/s into a 26.8 m/s crossflow -- treat `eta` as an
+        upper bound unless your `h_gas` already accounts for it.
+
+        Returns `{}` when there is no coolant flow. With `U_gas` omitted the
+        jet ratios are absent and only the thermal result is returned.
+        """
+        internal = self.internal_heat_transfer(state_in)
+        if not internal or h_gas <= 0.0:
+            return {}
+
+        h_i = internal["h_plate_area"]
+        T_c = state_in.T
+        eta = h_i / (h_i + h_gas)
+        out = {
+            "eta_overall": float(eta),
+            "T_wall": float(T_gas - eta * (T_gas - T_c)),
+            "h_internal_plate_area": float(h_i),
+            "h_gas": float(h_gas),
+            "resistance_ratio": float(h_i / h_gas),
+            "q_flux": float(h_gas * (T_gas - (T_gas - eta * (T_gas - T_c)))),
+        }
+        if U_gas is None or U_gas <= 0.0:
+            return out
+
+        rho_c = cb.density(T_c, state_in.P, state_in.X)
+        area_hole = math.pi * (self.hole_diameter**2) / 4.0
+        mass_flux_c = abs(state_in.m_dot) / self.n_holes / area_hole
+        u_jet = mass_flux_c / rho_c
+        rho_g = rho_c * T_c / T_gas  # same static pressure, ideal gas
+        blowing = mass_flux_c / (rho_g * U_gas)
+        out.update(
+            {
+                "u_jet": float(u_jet),
+                "velocity_ratio": float(u_jet / U_gas),
+                "blowing_ratio": float(blowing),
+                "momentum_flux_ratio": float(blowing * blowing / (rho_c / rho_g)),
+                "density_ratio": float(rho_c / rho_g),
+            }
+        )
+        return out
+
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float]:

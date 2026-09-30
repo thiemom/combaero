@@ -528,25 +528,45 @@ def test_every_scored_series_basis_is_what_its_provenance_says(dataset) -> None:
     assert not missing, f"these source/set pairs no longer exist: {sorted(missing)}"
 
 
-def test_the_two_andrews_figures_report_as_separate_rows(dataset) -> None:
-    """One correlation set, two Andrews figures, and they must not pool.
+def test_the_andrews_figures_report_as_separate_rows(dataset) -> None:
+    """One correlation set, four questions, and they must not pool.
 
-    86-GT-225 Fig. 8 is the correlations' own paper (fidelity, 41 points,
-    -10.4%); 88-GT-290 Fig. 8 is the same lab's later rig (accuracy, 10
-    points, -13.5%). Averaging them would produce a number that answers
-    neither question -- and would hide that the transcription is sound
-    while the correlation under-predicts.
+    All four rows come from `andrews_1986_effusion_internal`, and every
+    pair of them would be misleading to average:
+
+      86-GT-225 Fig. 8   the correlations' OWN paper -- fidelity
+      88-GT-290 Fig. 8   the same lab's later rig -- accuracy
+      88-GT-290 Fig. 10  overall eta, plate C -- a different QUANTITY
+      88-GT-290 Fig. 10  overall eta, plate B -- a different REGIME
+
+    Pooling the first two would hide that the transcription is sound
+    while the correlation under-predicts. Pooling the h rows with the eta
+    rows would average unlike quantities. Pooling the two plates would
+    give +13%, describing neither the 3% fit nor the 24% miss.
     """
     rows = [
         r
         for r in rollup(build(run_dataset(dataset), dataset))
         if r.scored_by == "andrews_1986_effusion_internal"
     ]
-    by_basis = {r.basis: r for r in rows}
-    assert set(by_basis) == {"fidelity", "accuracy"}, (
-        f"andrews_1986_effusion_internal reports {sorted(by_basis)}"
-    )
-    assert by_basis["fidelity"].n_scored == 41
-    assert by_basis["accuracy"].n_scored == 10
-    assert -0.16 < by_basis["fidelity"].bias < -0.05
-    assert -0.20 < by_basis["accuracy"].bias < -0.05
+    keyed = {
+        (r.basis, r.label.split("  [")[1].rstrip("]") if r.label.count("  [") > 1 else ""): r
+        for r in rows
+    }
+    assert len(keyed) == len(rows) == 4, f"rows: {[r.label for r in rows]}"
+
+    h_fidelity = keyed[("fidelity", "")]
+    h_accuracy = keyed[("accuracy", "")]
+    eta_b = keyed[("accuracy", "overall eta, plate B")]
+    eta_c = keyed[("accuracy", "overall eta, plate C")]
+
+    assert h_fidelity.n_scored == 41
+    assert h_accuracy.n_scored == 10
+    assert -0.16 < h_fidelity.bias < -0.05
+    assert -0.20 < h_accuracy.bias < -0.05
+
+    assert eta_c.n_scored == 72 and eta_b.n_scored == 66
+    assert 0.0 < eta_c.bias < 0.08
+    assert 0.17 < eta_b.bias < 0.30
+    # The two plates must stay far apart; a pooled row would be +13%.
+    assert eta_b.bias - eta_c.bias > 0.15

@@ -331,11 +331,45 @@ diag["Nu_approach"], diag["Nu_throat"]
 using one where the other is meant is a factor-of-three error. For a panel
 energy balance: `Q = h_plate_area * area_approach_total * dT`.
 
-The external film is **not** included, deliberately. Andrews (88-GT-290)
-shows the internal and film contributions are not additive in
-effectiveness, so an overall-effectiveness correlation must never be the
-closure here -- it already contains this convection. Pair this with an
-adiabatic external effectiveness and let the overall be an output.
+The external film is **not** included here, and `overall_effectiveness()`
+below explains why that is a measured decision rather than a gap.
+
+##### Overall effectiveness, as an output
+
+```python
+out = panel.overall_effectiveness(state_in, h_gas=250.0, T_gas=1600.0,
+                                  U_gas=80.0)
+out["eta_overall"]     # (Tg - Tw)/(Tg - Tc)
+out["T_wall"]          # K, following from eta and Eq. (3)
+out["resistance_ratio"]  # h_internal / h_gas
+out["velocity_ratio"]  # jet / mainstream -- reported, never applied
+out["blowing_ratio"], out["momentum_flux_ratio"]
+```
+
+`eta = h_i/(h_i + h_gas)`. An overall-effectiveness **correlation** must
+never be the closure here -- it already contains the internal convection
+this computes, and the two would double-count. So `eta` is an output and
+`h_gas` is the caller's input.
+
+**`h_gas` lumps the film in, and is not a clean-wall coefficient.** An
+external film changes both the driving temperature and the coefficient:
+`q = h_f (T_aw - T_w)` with `T_aw = T_gas - eta_f (T_gas - T_c)`. An
+adiabatic effectiveness correlation such as `film_effectiveness_baldauf_2002`
+supplies `eta_f` only -- an adiabatic wall passes no heat, so it measures
+no coefficient. Supplying `eta_f` against an unaugmented `h_gas`
+over-predicts: scored against Andrews 88-GT-290 Fig. 10, his data admits
+at most `eta_f = 0.105` that way, against the 0.27-0.58 Baldauf gives.
+Admit the film and the same data demands 1.6-4.3x the smooth-duct
+coefficient alongside it. Only the pair is identifiable, so `h_gas` is
+the pair.
+
+**How good `eta` is depends on a regime this cannot predict.** Andrews'
+two effusion plates need gas-side coefficients differing by 1.7x, and the
+closure misses one by 3% and the other by 24%. Pass `U_gas` and read the
+reported ratios; if `velocity_ratio` exceeds about 1, treat `eta` as an
+upper bound unless your `h_gas` already accounts for the jets. No
+threshold is applied, because the data supports none -- see
+`validation/cooling/extractions/andrews_effusion_overall_eta.md`.
 
 #### Multi-row film superposition
 

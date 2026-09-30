@@ -560,3 +560,138 @@ class TestInternalHeatTransfer:
             ),
             rel=1e-3,
         )
+
+
+class TestOverallEffectiveness:
+    """`overall_effectiveness` is #387's last piece, and it is an OUTPUT.
+
+    Ground truth is Andrews 88-GT-290 Fig. 10, scored by
+    `validation/cooling/effusion_overall_runner.py`. What these tests guard
+    is that the element's own path reaches the same answer and reports the
+    regime that decides whether the answer is any good.
+    """
+
+    GAS_H = 46.1  # W/m2K, the rig duct; see the runner for where it comes from
+    T_GAS = 750.0
+    U_GAS = 26.75  # m/s, M = 0.05 at 750 K
+
+    class _State:
+        """Minimal stand-in for a solved NetworkMixtureState."""
+
+        def __init__(self, T, P, X, m_dot):
+            self.T, self.P, self.X, self.m_dot = T, P, X, m_dot
+
+    def _panel(self, geom, G):
+        e = EffusionPlateElement("p", "c", "g", panel_area=1.0, **geom)
+        state = self._State(295.0, 101325.0, cb.standard_dry_air_composition(), G * e.panel_area)
+        return e, state
+
+    def test_eta_is_the_two_resistance_result_and_nothing_more(self):
+        """eta = h_i/(h_i + h_gas), with the gas side supplied by the caller.
+
+        Asserted by reconstruction from the element's own internal `h`, so
+        a change that quietly folded a film or a wall resistance into the
+        closure would show up here.
+        """
+        e, state = self._panel(ANDREWS_C, 0.6)
+        out = e.overall_effectiveness(state, self.GAS_H, self.T_GAS)
+        h_i = e.internal_heat_transfer(state)["h_plate_area"]
+
+        assert out["eta_overall"] == pytest.approx(h_i / (h_i + self.GAS_H))
+        assert out["h_internal_plate_area"] == pytest.approx(h_i)
+        assert out["resistance_ratio"] == pytest.approx(h_i / self.GAS_H)
+        # The wall temperature must follow from eta and Eq. (3), not be
+        # computed some second way that could drift from it.
+        assert out["T_wall"] == pytest.approx(
+            self.T_GAS - out["eta_overall"] * (self.T_GAS - 295.0)
+        )
+        assert 295.0 < out["T_wall"] < self.T_GAS
+
+    def test_agrees_with_the_scored_runner(self):
+        """The element and the validation runner must not drift apart.
+
+        They share `effusion_internal_nusselt` but assemble the geometry
+        differently -- the element from pitch and panel area with a whole
+        hole count, the runner from the metadata's D, X and thickness. The
+        residual is the hole-count rounding.
+        """
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from validation.cooling import effusion_overall_runner as er
+        from validation.cooling.schema import load_dataset
+
+        series = {
+            (s.geometry or {}).get("plate"): s
+            for s in load_dataset()
+            if s.label.startswith("andrews1988/fig10_eta_effusion_")
+        }
+        for tag, geom in (("B", ANDREWS_B), ("C", ANDREWS_C)):
+            for G in (0.3, 0.8, 1.3):
+                e, state = self._panel(geom, G)
+                mine = e.overall_effectiveness(state, er.gas_side()["h_g"], er.T_GAS)
+                theirs = er.predict(series[tag], G)
+                assert mine["eta_overall"] == pytest.approx(theirs, rel=2e-3), (
+                    f"plate {tag} at G={G}"
+                )
+
+    def test_reports_the_jet_regime_that_decides_the_accuracy(self):
+        """Andrews' two plates differ by a factor of ten in error, and the
+        mechanism is jet stirring. So the numbers that describe it travel
+        with the result -- reported, never applied.
+
+        Plate B ejects above the crossflow and misses by 24%; plate C
+        ejects below it and lands at 3%. Nothing here corrects for that,
+        because two plates cannot establish a threshold: the enhancement
+        collapses on none of VR, M or I.
+        """
+        vr = {}
+        for tag, geom in (("B", ANDREWS_B), ("C", ANDREWS_C)):
+            e, state = self._panel(geom, 1.0)
+            out = e.overall_effectiveness(state, self.GAS_H, self.T_GAS, self.U_GAS)
+            vr[tag] = out["velocity_ratio"]
+            assert out["u_jet"] == pytest.approx(out["velocity_ratio"] * self.U_GAS)
+            assert out["momentum_flux_ratio"] == pytest.approx(
+                out["blowing_ratio"] ** 2 / out["density_ratio"]
+            )
+            assert out["density_ratio"] == pytest.approx(self.T_GAS / 295.0, rel=0.02)
+
+        # The split the whole finding rests on: B's jets beat the
+        # mainstream at G = 1.0, C's do not.
+        assert vr["B"] > 1.0 > vr["C"]
+        assert vr["B"] == pytest.approx(1.98, rel=0.05)
+        assert vr["C"] == pytest.approx(0.86, rel=0.05)
+
+        # Without U_gas the ratios are simply absent, not guessed.
+        e, state = self._panel(ANDREWS_C, 1.0)
+        bare = e.overall_effectiveness(state, self.GAS_H, self.T_GAS)
+        assert "velocity_ratio" not in bare
+        assert "eta_overall" in bare
+
+    def test_declines_rather_than_inventing_an_answer(self):
+        """No flow and no gas side are both `{}`, not a plausible number."""
+        e, state = self._panel(ANDREWS_C, 1.0)
+        assert e.overall_effectiveness(state, 0.0, self.T_GAS) == {}
+        _, dead = self._panel(ANDREWS_C, 0.0)
+        assert e.overall_effectiveness(dead, self.GAS_H, self.T_GAS) == {}
+
+    def test_eta_rises_with_coolant_flow_and_falls_with_gas_side_h(self):
+        """Both monotonicities the two-resistance form requires."""
+        previous = None
+        for G in (0.1, 0.3, 0.6, 1.0, 1.5):
+            e, state = self._panel(ANDREWS_C, G)
+            v = e.overall_effectiveness(state, self.GAS_H, self.T_GAS)["eta_overall"]
+            assert 0.0 < v < 1.0
+            if previous is not None:
+                assert v > previous, f"G = {G}"
+            previous = v
+
+        e, state = self._panel(ANDREWS_C, 0.6)
+        etas = [
+            e.overall_effectiveness(state, h, self.T_GAS)["eta_overall"]
+            for h in (20.0, 46.1, 100.0, 400.0)
+        ]
+        assert etas == sorted(etas, reverse=True)
+        # As the gas side vanishes the wall reaches the coolant.
+        assert e.overall_effectiveness(state, 1e-4, self.T_GAS)["eta_overall"] > 0.999

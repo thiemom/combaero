@@ -9,6 +9,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Andrews 88-GT-290 Figure 10 digitised, and #387's overall-effectiveness
+  output shipped -- with a measured negative result attached.**
+  `EffusionPlateElement.overall_effectiveness(state_in, h_gas, T_gas,
+  U_gas=None)` returns `eta = (Tg - Tw)/(Tg - Tc)` and the wall
+  temperature as OUTPUTS, with the gas side as the caller's input. Scored
+  against Andrews' two effusion plates:
+
+  | plate | D mm | X/D | n | bias | MAE |
+  |---|---|---|---|---|---|
+  | C | 3.27 | 4.7 | 72 | **+3.1%** | 4.6% |
+  | B | 2.16 | 7.1 | 66 | **+23.7%** | 23.7% |
+
+  Reported as two rollup rows, never pooled -- a pooled +13% would
+  describe neither. Grouped per PLATE and not per jet regime: a
+  velocity-ratio split looks informative (+7% below VR=1 against +19%
+  above) but both plates cross VR=1 inside their own G range, so it
+  reports the plate mix as physics. Holding the regime fixed, plate B is
+  +21.2% where plate C is +2.2%.
+
+  **The closure carries no separate film term, and that is not because
+  there is no film.** An external film changes both the driving
+  temperature and the coefficient -- `q = h_f (T_aw - T_w)` with
+  `T_aw = Tg - eta_f (Tg - Tc)` -- and an adiabatic effectiveness
+  correlation supplies only `eta_f`, because an adiabatic wall passes no
+  heat and so measures no coefficient. Offered alone at the smooth-duct
+  `h_g`, Andrews' data admits at most `eta_f = 0.105` (and NEGATIVE film
+  at all 66 of plate B's points) against the 0.27-0.58 Baldauf gives over
+  ten rows. Admitted with its matching augmentation, the same data demands
+  1.6-4.3x the smooth-duct coefficient. Only the pair is identifiable from
+  one eta curve, so `h_gas` is the pair -- a form with zero free
+  parameters, where the split form fits anything.
+
+  **What Baldauf does contain, corrected.** The counter-rotating vortex
+  pair entraining hot gas under a lifted jet changes `T_aw`, which is
+  exactly what IR on an insulated wall records -- so Baldauf HAS it, in
+  Eq. (38), decaying as steeply as `mu^-4.57` at plate B's spacing.
+  Andrews' "jet stirring of the cooling film" sentence describes that same
+  film destruction, so it names a mechanism the correlation models rather
+  than a missing one. An earlier draft of the provenance record had this
+  backwards.
+
+  **The finding: a gas-side residual no film correlation can close.**
+  Plate B needs about 1.7x plate C's gas-side coefficient, and the
+  smooth-duct value divides out of that ratio, so it rests on no
+  assumption about the rig. Scaling Baldauf's `eta_f` from 0 to 1.25x
+  moves the absolute requirement a long way (plate B's from 2.07 to 5.99)
+  and the ratio only from 1.96 to 1.60 -- **so the split is bounded away
+  from 1 whatever film model is chosen.** Closing it needs a gas-side
+  augmentation `h_f/h_0` for full-coverage effusion, which is a heated-wall
+  measurement; a better lift-off film correlation would not do it.
+
+  No threshold is offered and none is applied: the requirement collapses
+  on none of the velocity ratio, the blowing ratio or the momentum flux
+  ratio. `jet_regime()` and the element report all three beside the
+  result so a caller can see where they are.
+
+  Six further Fig. 10 curves are committed unscored -- A/B, A/C and
+  impingement A need a closure that does not exist here, and the porous
+  wall, Lamilloy and Transply curves are other technologies. They earn
+  their place: **the paper's own Table 3 tabulates the ratios BETWEEN
+  these curves**, and reading it as `(eta_num - eta_den)/eta_den`
+  reproduces all nine evaluable cells to 0.57 percentage points -- a third
+  channel that validates the curve identification, not just the
+  coordinates.
+
+  **The page is rotated and the raw picks are committed anyway.** The
+  frame corners give 0.94% skew one way and 0.96% the other -- one real
+  rotation, measured twice. But the digitiser's affine already absorbed
+  it: the four-corner inverse makes the y ticks *worse*, 0.00178 to
+  0.00255. This is the Rohde Fig. 10 check run again and coming out the
+  other way.
+
+  Two figure-vs-text conflicts recorded, neither resolved: the plot prints
+  `Tg = 744K, Tc = 293K` where the text says 750 K and 295 K, and `Z =
+  6.4mm` where the text says "An 8 mm impingement gap was used
+  throughout". Neither touches the scored curves.
+
 - **Andrews 86-GT-225 Figure 8 digitised: 41 points, and the effusion
   internal correlations now report a FIDELITY row as well as an accuracy
   one.** Four test plates against the paper that publishes the

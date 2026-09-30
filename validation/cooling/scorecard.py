@@ -89,6 +89,7 @@ def run_dataset(dataset) -> list[Record]:
     """
     from validation.cooling import (
         effusion_internal_runner,
+        effusion_overall_runner,
         film_runner,
         jet_array_runner,
         orifice_runner,
@@ -100,6 +101,7 @@ def run_dataset(dataset) -> list[Record]:
         (orifice_runner.owns, orifice_runner.run_series),
         (film_runner.owns, film_runner.run_series),
         (effusion_internal_runner.owns, effusion_internal_runner.run_series),
+        (effusion_overall_runner.owns, effusion_overall_runner.run_series),
     )
 
     out: list[Record] = []

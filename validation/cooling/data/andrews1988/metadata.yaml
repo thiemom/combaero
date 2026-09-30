@@ -64,6 +64,136 @@
 # transient-technique measurement scatter, which is what an `uncertainty`
 # band here should reflect -- but the paper states no per-point band, so it
 # is left null rather than back-filled from the model error (#389).
+#
+# ============================================================================
+# FIGURE 10: overall cooling effectiveness against G -- and the closure it
+#            falsifies
+# ============================================================================
+#
+# "Cooling effectiveness as a function of G for effusion B and C alone and
+# impingement A alone and for the Imp/Eff combinations A/B and A/C and a
+# comparison with transpiration walls." Page 7, eta = (Tg - Tw)/(Tg - Tc),
+# the paper's Eq. (3).
+#
+# THIS FIGURE CLOSES #387's LAST PIECE, AND IT RESHAPES IT.
+# The recorded plan was to produce overall eta as an OUTPUT of a resistance
+# network -- internal convection from 86-GT-225 plus an external film from
+# Baldauf and Sellers, added as separate terms. Andrews' data says those
+# are not separable here, so the shipped closure lumps them:
+#
+#   eta = h_i / (h_i + h_gas)      h_gas supplied by the caller
+#
+# NOT "there is no film". The two-temperature form an external film really
+# needs is
+#
+#   q = h_f (T_aw - T_w),   T_aw = T_g - eta_f (T_g - T_c)
+#   eta = (h_i + h_f eta_f) / (h_i + h_f)
+#
+# and it takes BOTH eta_f and h_f. An adiabatic effectiveness correlation
+# supplies only the first: an adiabatic wall passes no heat, so the
+# experiment fixes T_aw and says nothing about the coefficient.
+#
+# WHAT BALDAUF DOES CONTAIN, since an earlier reading of this had it
+# backwards. The counter-rotating vortex pair entraining hot gas under a
+# lifted jet changes T_aw -- exactly what IR on an insulated wall records.
+# Baldauf HAS that, in Eq. (38)'s decay branch, and steeply: the falling
+# exponent b_pk = exp(1.92 - 7.5 (s/D)^-1.5) is 4.57 at plate B's spacing
+# and 3.24 at plate C's. Andrews' own "jet stirring of the cooling film"
+# sentence describes that same film destruction, so it names a mechanism
+# Baldauf models rather than a missing one.
+#
+# THE MEASUREMENT, READ BOTH WAYS:
+#   * film offered alone at the smooth-duct h_g -- REFUSED. The admissible
+#     eta_f is negative at all 66 of plate B's points and reaches at most
+#     +0.105 on plate C, against 0.27 to 0.58 from Baldauf over ten rows.
+#   * film admitted with its matching augmentation -- CONSISTENT. The same
+#     measurement then demands F = h_f/h_0 of 1.6 to 4.3.
+#
+# Only the pair is identifiable from one eta curve, so the caller supplies
+# it as one h_gas. That form has zero free parameters, which is what makes
+# it falsifiable where the split form fits anything. See
+# `validation/cooling/extractions/andrews_effusion_overall_eta.md`.
+#
+# THE B/C SPLIT IS THE REAL FINDING, and the ratio needs no assumed gas
+# side at all -- h_0 divides out of it:
+#
+#     required h_gas, plate B / plate C     G=0.6   G=1.0   G=1.4
+#       with no film term                    1.82    1.86    1.96
+#       with Baldauf's own film              1.75    1.67    1.79
+#
+# Plate B needs about 1.7x plate C's gas-side coefficient EITHER WAY.
+# Admitting the film does not explain the split, so the residual is a
+# geometry dependence two plates cannot separate from a jet one. Three
+# candidates survive and none is chosen: Baldauf extrapolating hard (M to
+# 7.0 against a 2.5 limit, s/D 7.06 against 5), a genuine difference in
+# h_f/h_0, and Sellers over ten rows, which Gao et al. (2025) measure as
+# always overestimating and accumulating with row count.
+#
+# THE ABSOLUTE LEVEL IS CONFOUNDED; THE RATIO IS NOT. The test plate sits
+# only x/D_h = 1.5 into the duct, deep in the entry region where
+# Dittus-Boelter's fully developed value understates h_0. A standard entry
+# correction raises it 1.75x -- from 46 to 81 W/m2K -- and brings plate C's
+# required F to 0.9-1.6, ordinary film-cooling augmentation. Not applied,
+# because the runner's job is to report the rig as the paper describes it;
+# recorded so the absolute F values are not over-read.
+#
+# NO THRESHOLD IS OFFERED, BECAUSE THE DATA DOES NOT SUPPORT ONE.
+# The enhancement was tested for collapse against the velocity ratio, the
+# blowing ratio and the momentum flux ratio. It collapses on NONE of them:
+# at equal VR the two plates still differ by 1.5-1.6x, at equal M by
+# 1.35-1.45x, at equal I by 1.3-1.5x. Two plates cannot separate a jet
+# parameter from a geometry one, so the runner REPORTS VR, M and I beside
+# the result and fits nothing.
+#
+# WHY NO COOLANT HEAT-UP TERM. The coolant gains 12 K at G = 1.4 and 60 K
+# at G = 0.2 passing through the wall, so an explicit heat-up looks
+# obviously missing. It is not: 86-GT-225's h is fitted from the plate's
+# transient cooling rate against the SUPPLY temperature (Eqs. 1-2 here), so
+# the heat-up is already inside it. The evidence is that adding it does not
+# flatten the error -- it tilts it. Without: plate C runs -2.8% to +5.8%
+# across G (8.6 points). With: -8.8% to +4.2% (13 points). A genuinely
+# missing G-dependent term would have shown as a G-dependent error, and the
+# error has no such trend.
+#
+# Wall conduction is omitted for the same reason and is small anyway:
+# 6.3 mm of Nimonic 75 is 5.7e-4 m2K/W, 3.5% of 1/h_i, and the transient
+# technique lumps the plate (m Cp) so the through-wall gradient is inside
+# the measured h too.
+#
+# THE FIGURE AND THE TEXT DISAGREE, TWICE. Recorded, not resolved:
+#   * the plot prints "Tg = 744K, Tc = 293K"; the body text says the
+#     measurements "were made at a Tg of 750K and Tc of 295K". The runner
+#     uses the text's values and reports the sensitivity; the difference is
+#     worth under 0.5% on eta because eta is a ratio.
+#   * the plot prints "Z = 6.4mm"; page 3 says "An 8 mm impingement gap was
+#     used throughout", and Z is defined as the impingement gap. It does
+#     not touch the effusion-only curves B and C, which are the scored
+#     ones.
+#
+# THE PAGE IS ROTATED AND THE RAW PICKS ARE COMMITTED ANYWAY. The frame
+# corners give 0.94% skew read as y-per-x-span and 0.96% read as x-per-y-
+# span -- two independent measurements of one real rotation. But the
+# digitiser's own affine already absorbed it: applying the four-corner
+# inverse makes the y ticks WORSE, from a worst error of 0.00178 (0.30% of
+# the span) to 0.00255, and leaves the x ticks unchanged at 0.44%. The
+# third channel cannot separate them either (Table 3, below, scores 0.57
+# against 0.52 percentage points). Uncorrected, per the evidence.
+#
+# TABLE 3 IS A THIRD CHANNEL AND IT VALIDATES THE CURVE LABELS, NOT JUST
+# THE COORDINATES. Page 7 tabulates the ratios BETWEEN these curves at
+# G = 0.2, 0.5 and 1.0. Read as (eta_num - eta_den)/eta_den, the
+# digitisation reproduces all nine printed cells to 0.57 percentage points
+# mean -- including A/B vs A_imp at 6.5% against 6% and A/C vs C at 20.0%
+# against 20%. The table's dashes in the A_imp columns at G = 0.2 match the
+# A_imp curve starting at G = 0.487. Pinned by
+# `test_fig10_reproduces_the_papers_own_table_3`.
+#
+# WHAT IS SCORED AND WHAT IS NOT. Only B and C, the effusion-only curves,
+# are scored: they are the only ones combaero models. A/B, A/C and A alone
+# need an impingement closure that does not exist here, and the porous
+# wall, Lamilloy and Transply curves are other people's measurements of
+# other technologies (refs 14, 18, 19, 20) -- committed because they set
+# the scale effusion is being judged against, scored by nothing.
 
 paper:
   name: andrews1988
@@ -122,3 +252,340 @@ files:
       plot_x_limits: [0.05, 3.0]
       plot_y_limits: [40.0, 1000.0]
       kind: measured
+
+  - path: fig10_eta_effusion_B.csv
+    after: null
+    page: 7
+    item: "Figure 10, solid line labelled B"
+    series: >-
+      effusion B alone: overall cooling effectiveness eta =
+      (Tg - Tw)/(Tg - Tc) against coolant flow per unit plate area G
+    figure: "10"
+    panel: single
+    geometry:
+      plate: "B"
+      N_per_m2: 4306.0
+      D_mm: 2.16
+      X_mm: 15.24
+      X_over_D: 7.1
+      A_over_Ah: 5.28
+      thickness_mm: 6.3
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Scored at bias +23.3% against a two-resistance closure: combaero's
+      internal h from 86-GT-225 against a smooth-duct gas-side h
+      (Dittus-Boelter on the 76 x 152 mm duct, Re_Dh = 38375, 46.1 W/m2K).
+      Scored at bias +23.3% against the two-resistance closure: combaero's
+      internal h from 86-GT-225 against a smooth-duct gas-side h
+      (Dittus-Boelter on the 76 x 152 mm duct, Re_Dh = 38375, 46.1 W/m2K).
+
+      THE PLATE THE MODEL MISSES, and the one that carries the finding.
+      Its 2.16 mm holes eject at 53 m/s into a 26.8 m/s crossflow at
+      G = 1.0 and it requires 1.44x to 2.56x the smooth-duct gas-side h to
+      be explained -- 3.1x to 4.3x if Baldauf's film is admitted alongside.
+      Either way it needs about 1.7x what plate C needs, which is the
+      residual no jet parameter accounts for.
+
+      `uncertainty` left null: the paper states no band for these curves,
+      and back-filling one from the model's own error is what #389 forbids.
+
+      `uncertainty` left null: the paper states no band for these curves,
+      and back-filling one from the model's own error is what #389 forbids.
+    scores: andrews_1986_effusion_internal
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
+
+  - path: fig10_eta_effusion_C.csv
+    after: null
+    page: 7
+    item: "Figure 10, solid line labelled C"
+    series: >-
+      effusion C alone: overall cooling effectiveness eta =
+      (Tg - Tw)/(Tg - Tc) against coolant flow per unit plate area G
+    figure: "10"
+    panel: single
+    geometry:
+      plate: "C"
+      N_per_m2: 4306.0
+      D_mm: 3.27
+      X_mm: 15.24
+      X_over_D: 4.7
+      A_over_Ah: 3.4
+      thickness_mm: 6.3
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Scored at bias +3.1% against a two-resistance closure: combaero's
+      internal h from 86-GT-225 against a smooth-duct gas-side h
+      (Dittus-Boelter on the 76 x 152 mm duct, Re_Dh = 38375, 46.1 W/m2K).
+      Scored at bias +3.1% against the two-resistance closure: combaero's
+      internal h from 86-GT-225 against a smooth-duct gas-side h
+      (Dittus-Boelter on the 76 x 152 mm duct, Re_Dh = 38375, 46.1 W/m2K).
+
+      THE PLATE THE MODEL FITS, and not evidence that the closure is right
+      in general -- it is one geometry, and plate B is the other. Its
+      3.27 mm holes eject at 23 m/s, below the 26.8 m/s crossflow, and the
+      implied gas-side h is 0.94x to 1.31x the smooth duct. The agreement
+      is a CANCELLATION rather than an absence: a real film would raise
+      eta and its gas-side augmentation would lower it, and at this
+      geometry the two nearly balance.
+
+      NOT uniformly over-predicted. Plate C runs -2.8% at G = 0.2 to +5.8%
+      at G = 1.0, so its low-G end is the one place in this dataset that
+      admits any film at all, up to eta_f = 0.105.
+
+      `uncertainty` left null: the paper states no band for these curves,
+      and back-filling one from the model's own error is what #389 forbids.
+
+      `uncertainty` left null: the paper states no band for these curves,
+      and back-filling one from the model's own error is what #389 forbids.
+    scores: andrews_1986_effusion_internal
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
+
+  - path: fig10_eta_imp_effusion_AB.csv
+    after: null
+    page: 7
+    item: "Figure 10, solid line labelled A/B"
+    series: >-
+      impingement A over effusion B, the combined system: overall cooling
+      effectiveness eta against G
+    figure: "10"
+    panel: single
+    geometry: null
+    alpha_deg: null
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Needs an impingement closure combaero does not have. Committed because
+      Table 3's ratios against it are the third channel that validates this
+      whole digitisation.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
+
+  - path: fig10_eta_imp_effusion_AC.csv
+    after: null
+    page: 7
+    item: "Figure 10, solid line labelled A/C"
+    series: >-
+      impingement A over effusion C, the combined system: overall cooling
+      effectiveness eta against G
+    figure: "10"
+    panel: single
+    geometry: null
+    alpha_deg: null
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      As A/B. The paper's point is that A/C beats A/B on effectiveness while the
+      two differ little in wall heat transfer -- the film, again, is what
+      separates them.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
+
+  - path: fig10_eta_impingement_A.csv
+    after: null
+    page: 7
+    item: "Figure 10, long-short dashed line labelled A IMP."
+    series: >-
+      impingement plate A alone, no effusion: overall cooling effectiveness eta
+      against G
+    figure: "10"
+    panel: single
+    geometry: null
+    alpha_deg: null
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Starts at G = 0.487, which is why Table 3's A_imp columns are dashed at G
+      = 0.2 -- an independent confirmation that this curve is the one the table
+      means.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
+
+  - path: fig10_eta_porous_wall.csv
+    after: "Andrews and Asere (1984); Andrews et al., ASME 87-GT-93 (1987)"
+    page: 7
+    item: "Figure 10, long-long-short dashed line"
+    series: >-
+      porous / transpiration wall, the paper's refs 14 and 18: overall cooling
+      effectiveness eta against G
+    figure: "10"
+    panel: single
+    geometry: null
+    alpha_deg: null
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Another technology, not combaero's model. Committed because it sets the
+      ceiling effusion is judged against: it reaches eta 0.99 where effusion C
+      reaches 0.79.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
+
+  - path: fig10_eta_lamilloy.csv
+    after: "Wassel and Bhangu, ASME 80-GT-66"
+    page: 7
+    item: "Figure 10, short-dashed line"
+    series: >-
+      best Lamilloy laminated porous wall, the paper's ref 20: overall cooling
+      effectiveness eta against G
+    figure: "10"
+    panel: single
+    geometry: null
+    alpha_deg: null
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Another technology, scored by nothing.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: increasing
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
+
+  - path: fig10_eta_transply.csv
+    after: "Abdul Husain, Andrews, Asere and Ndiema, 1988 ASME Gas Turbine Conference"
+    page: 7
+    item: "Figure 10, filled circles"
+    series: >-
+      Transply laminated porous wall, the paper's ref 19: overall cooling
+      effectiveness eta against G
+    figure: "10"
+    panel: single
+    geometry: null
+    alpha_deg: null
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: eta_overall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Five points only, and NOT monotone as digitised -- two sit at nearly the
+      same G with different eta. Committed as read; it scores nothing, so the
+      ambiguity costs nothing.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6]
+      x_multiplier: 1.0
+      y_ticks: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+      y_limits: [0.4, 1.0]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [0.0, 1.6]
+      plot_y_limits: [0.4, 1.0]
