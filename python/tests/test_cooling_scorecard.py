@@ -478,3 +478,75 @@ def test_han_1988_fidelity_rests_on_very_few_clean_points(dataset) -> None:
         "the clean fidelity set has grown; update docs/VALIDATION_POLICY.md's "
         "worked example, which says it rests on eight points"
     )
+
+
+def test_every_scored_series_basis_is_what_its_provenance_says(dataset) -> None:
+    """`basis_of` matches a substring, and the haystack includes the source
+    CITATION -- which is wide enough that a citation naming another paper
+    could claim a false fidelity. So the label is pinned per source rather
+    than trusted.
+
+    The citation is in the haystack because a folder name cannot always
+    carry the key: `andrews1986` holds 86-GT-225's Fig. 8 AND Fig. 10, and
+    the set is keyed "86-GT-225" to stop it matching the 1988 study. That
+    string appears only in the citation, so without it the paper's own data
+    reported "accuracy" -- understating a fidelity result, the mirror of
+    the error the key exists to prevent.
+
+    The pair of Andrews figures is the case worth stating outright: same
+    author, same group, same figure number, and the basis differs.
+    """
+    from validation.cooling.scorecard import SET_ORIGIN, basis_of
+
+    expected = {
+        # (source folder, correlation set): basis
+        ("andrews1986", "andrews_1986_effusion_internal"): "fidelity",
+        ("andrews1988", "andrews_1986_effusion_internal"): "accuracy",
+        ("florschuetz1981", "florschuetz_1981_inline"): "fidelity",
+        ("mcgreehan_schotsch1988", "mcgreehan_schotsch_1988_crossflow_cd"): "fidelity",
+        ("rohde1969", "mcgreehan_schotsch_1988_cd"): "accuracy",
+        ("murray2018", "baldauf_2002_sellers"): "accuracy",
+        ("andrei2014", "baldauf_2002_sellers"): "accuracy",
+        ("lau1990", "han_1988_orthogonal"): "accuracy",
+        ("han_park_lei1984", "han_park_1988_angled"): "accuracy",
+    }
+    seen = set()
+    for series in dataset:
+        if series.scores is None or series.scores not in SET_ORIGIN:
+            continue
+        key = (series.source.name, series.scores)
+        got = basis_of(series, series.scores)
+        seen.add(key)
+        if key in expected:
+            assert got == expected[key], f"{series.label} reports {got}"
+        else:
+            # Not enumerated above, but it must still resolve to one of the
+            # two -- never "unknown", and never silently something new.
+            assert got in ("fidelity", "accuracy"), f"{series.label}: {got}"
+
+    missing = set(expected) - seen
+    assert not missing, f"these source/set pairs no longer exist: {sorted(missing)}"
+
+
+def test_the_two_andrews_figures_report_as_separate_rows(dataset) -> None:
+    """One correlation set, two Andrews figures, and they must not pool.
+
+    86-GT-225 Fig. 8 is the correlations' own paper (fidelity, 41 points,
+    -10.4%); 88-GT-290 Fig. 8 is the same lab's later rig (accuracy, 10
+    points, -13.5%). Averaging them would produce a number that answers
+    neither question -- and would hide that the transcription is sound
+    while the correlation under-predicts.
+    """
+    rows = [
+        r
+        for r in rollup(build(run_dataset(dataset), dataset))
+        if r.scored_by == "andrews_1986_effusion_internal"
+    ]
+    by_basis = {r.basis: r for r in rows}
+    assert set(by_basis) == {"fidelity", "accuracy"}, (
+        f"andrews_1986_effusion_internal reports {sorted(by_basis)}"
+    )
+    assert by_basis["fidelity"].n_scored == 41
+    assert by_basis["accuracy"].n_scored == 10
+    assert -0.16 < by_basis["fidelity"].bias < -0.05
+    assert -0.20 < by_basis["accuracy"].bias < -0.05

@@ -121,9 +121,16 @@ def run_dataset(dataset) -> list[Record]:
 #
 # This cannot be read off the C++ set: `RibCorrelationSet.provenance` is an
 # Extracted/Fitted/User enum, not a citation. It is matched against a
-# series' `after` field (the original author of a reprinted figure) and
-# falling back to its source name, so a textbook reprint of the set's own
-# paper still counts as the author's own data.
+# series' `after` field (the original author of a reprinted figure), its
+# source name, and its source CITATION, so a textbook reprint of the set's
+# own paper still counts as the author's own data.
+#
+# The CITATION is in the haystack because a folder name cannot always carry
+# the identifier a set is keyed on. `andrews1986` holds BOTH 86-GT-225's
+# Fig. 8 and Fig. 10; the set is keyed "86-GT-225" to keep it from matching
+# the 1988 study, and that string appears only in the citation. Without it
+# the paper's own data reported "accuracy", understating a fidelity result
+# -- the mirror of the error the key was introduced to prevent.
 SET_ORIGIN: dict[str, str] = {
     "han_1988_orthogonal": "ASME J. Heat Transfer 110, 321",
     "han_park_1988_angled": "IJHMT 31(1), 183",
@@ -143,6 +150,11 @@ SET_ORIGIN: dict[str, str] = {
     "andrews_1986_effusion_internal": "86-GT-225",
 }
 
+# Matching on the citation widens the haystack, so a citation that NAMES
+# another paper could claim a false fidelity. Bounded by
+# `test_every_scored_series_basis_is_what_its_provenance_says`, which pins
+# the label of every scored series rather than trusting the substring.
+
 
 def basis_of(series, set_name: str | None) -> str:
     """"fidelity" when the data is the correlation's own paper, else "accuracy".
@@ -154,7 +166,9 @@ def basis_of(series, set_name: str | None) -> str:
     origin = SET_ORIGIN.get(set_name or "")
     if origin is None:
         return "unknown"
-    haystack = f"{series.after or ''} {series.source.name}".lower()
+    haystack = (
+        f"{series.after or ''} {series.source.name} {series.source.citation}"
+    ).lower()
     return "fidelity" if origin.lower() in haystack else "accuracy"
 
 

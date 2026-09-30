@@ -77,6 +77,11 @@ AXIS_NAMES = {
     "R_normalised": "R / (P/e/10)^0.35",
     "f_ratio": "f / f_0",
     "Nu_ratio": "Nu_r / Nu_0",
+    "G_coolant": "G [kg/s/m2], coolant per unit plate area",
+    # The two h conventions spelled out, because a bare "h" on an axis is
+    # exactly how 86-GT-225's h_m and 88-GT-290's h get confused.
+    "h_internal": "h on plate area A = X2 - piD2/4 [W/m2K]",
+    "h_hole_length": "h_m on hole area piDL [W/m2K]",
 }
 
 
