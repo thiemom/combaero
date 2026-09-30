@@ -365,3 +365,198 @@ class TestChannelByComposition:
         assert spread(sol_grad) < 0.5 * spread(sol_flat)
         # Still not uniform: the compensation is partial, not exact.
         assert spread(sol_grad) > 0.02
+
+
+class TestInternalHeatTransfer:
+    """The coolant-side coefficient, Andrews 86-GT-225 wired into the element.
+
+    The correlations themselves are pinned in
+    `tests/test_effusion_internal.cpp` against the paper's algebra, and
+    scored against Andrews Fig. 8 by
+    `validation/cooling/effusion_internal_runner.py`. What these tests guard
+    is the element's geometry bookkeeping -- which areas, which pitch, which
+    length -- because that is where the two can silently disagree.
+    """
+
+    class _State:
+        """Minimal stand-in for a solved NetworkMixtureState."""
+
+        def __init__(self, T, P, X, m_dot):
+            self.T, self.P, self.X, self.m_dot = T, P, X, m_dot
+
+    def _panel(self, panel_area=0.01, **overrides):
+        geom = {**ANDREWS_C, **overrides}
+        return EffusionPlateElement("panel", "cool", "gas", panel_area=panel_area, **geom)
+
+    def _state(self, elem, G, T=300.0):
+        return self._State(T, 101325.0, cb.standard_dry_air_composition(), G * elem.panel_area)
+
+    def test_matches_the_runner_that_was_scored_against_figure_eight(self):
+        """Two independent paths to the same coefficient must agree.
+
+        The runner builds it from the dataset metadata and the raw
+        correlation; the element from its own constructor geometry. They
+        agree to 0.02%, the residual being the element's rounding to a whole
+        43 holes -- a real and deliberate difference, not drift.
+        """
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from validation.cooling import effusion_internal_runner as er
+        from validation.cooling.schema import load_dataset
+
+        series = next(s for s in load_dataset() if s.label.endswith("fig8_h_effusionC"))
+        elem = self._panel(panel_area=0.01)
+        for G in (0.1, 0.4, 1.0, 1.8):
+            got = elem.internal_heat_transfer(self._state(elem, G, er.ASSUMED_T))
+            assert got["h_plate_area"] == pytest.approx(er.predict(series, G), rel=1e-3), f"G = {G}"
+
+    def test_the_two_areas_are_both_reported_and_differ_by_the_ratio(self):
+        """Which area an h belongs to is the thing that goes wrong silently.
+
+        For plate C the hole internal area and the approach area differ by
+        3.46, so using one where the other is meant is a factor-of-three
+        error. Both are returned, and the identity between them is the check
+        that neither has drifted.
+        """
+        elem = self._panel()
+        out = elem.internal_heat_transfer(self._state(elem, 0.5))
+
+        assert out["area_ratio"] == pytest.approx(3.46, abs=0.03)
+        assert out["h_hole_area"] == pytest.approx(
+            out["h_plate_area"] * out["area_ratio"], rel=1e-12
+        )
+        # The same heat, whichever pair is used -- which is what makes the
+        # two interchangeable only in matched pairs.
+        assert out["h_hole_area"] * out["area_hole_total"] == pytest.approx(
+            out["h_plate_area"] * out["area_approach_total"], rel=1e-12
+        )
+
+    def test_the_sum_is_the_approach_plus_the_throat(self):
+        elem = self._panel()
+        out = elem.internal_heat_transfer(self._state(elem, 0.5))
+        assert out["Nu_internal"] == pytest.approx(out["Nu_approach"] + out["Nu_throat"])
+        assert out["Nu_approach"] > 0 and out["Nu_throat"] > 0
+
+    def test_the_approach_term_leads_at_effusion_reynolds_numbers(self):
+        """Andrews' headline, at the flows his own rig ran.
+
+        "the hole approach flow heat transfer is much larger than the
+        internal hole heat transfer". It is a claim about exponents (0.476
+        against 0.8), so it holds at low flow and reverses at high -- which
+        is why a throat-only treatment under-predicts and both terms are
+        carried.
+        """
+        elem = self._panel()
+        low = elem.internal_heat_transfer(self._state(elem, 0.1))
+        assert low["Nu_approach"] > low["Nu_throat"]
+
+        high = elem.internal_heat_transfer(self._state(elem, 5.0))
+        assert high["Nu_approach"] < high["Nu_throat"]
+
+    def test_an_inclined_hole_transfers_more_heat(self):
+        """The reason effusion holes are inclined: more internal surface for
+        the same wall thickness, and a longer entry length."""
+        normal = self._panel(angle_deg=90.0)
+        angled = self._panel(angle_deg=30.0)
+        assert angled.hole_length == pytest.approx(2.0 * normal.hole_length)
+
+        a = angled.internal_heat_transfer(self._state(angled, 0.5))
+        n = normal.internal_heat_transfer(self._state(normal, 0.5))
+        assert a["area_hole_total"] > n["area_hole_total"]
+        # More surface at the same coefficient scale means more heat, even
+        # though the longer hole has a LOWER entry-length enhancement.
+        assert (
+            a["h_plate_area"] * a["area_approach_total"]
+            > n["h_plate_area"] * n["area_approach_total"]
+        )
+        assert cb.mills_entry_length_factor(
+            angled.hole_length / angled.hole_diameter
+        ) < cb.mills_entry_length_factor(normal.hole_length / normal.hole_diameter)
+
+    def test_no_flow_means_no_coefficient_rather_than_a_zero(self):
+        """A zero would read as "computed, and it is nothing". Nothing was
+        computed, so nothing is reported -- the same discipline the scorecard
+        uses for an unscored series."""
+        elem = self._panel()
+        assert elem.internal_heat_transfer(self._state(elem, 0.0)) == {}
+
+    def test_it_rises_with_coolant_flow(self):
+        elem = self._panel()
+        previous = None
+        for G in (0.05, 0.2, 0.6, 1.5):
+            v = elem.internal_heat_transfer(self._state(elem, G))["h_plate_area"]
+            if previous is not None:
+                assert v > previous, f"G = {G}"
+            previous = v
+
+    def test_diagnostics_surfaces_it_after_a_solve(self):
+        """The coefficient has to reach the user, not just exist."""
+        net = FlowNetwork()
+        net.add_node(_air_boundary("cool", 120e3))
+        net.add_node(_air_boundary("gas", 100e3))
+        net.add_element(EffusionPlateElement("panel", "cool", "gas", panel_area=0.01, **ANDREWS_C))
+        result = NetworkSolver(net).solve()
+        m_dot = result["panel.m_dot"]
+        assert m_dot > 0.0, "the panel should blow, not ingest"
+
+        diag = result["__element_diag__"]["panel"]
+        for key in (
+            "Re_hole",
+            "Nu_approach",
+            "Nu_throat",
+            "h_hole_area",
+            "h_plate_area",
+            "area_ratio",
+        ):
+            assert key in diag, f"{key} missing from diagnostics"
+        assert diag["h_plate_area"] > 0.0
+
+        # It must describe the flow the solver actually found rather than a
+        # default: rebuild Re from the reported mass flow.
+        elem = net.elements["panel"]
+        mu = cb.transport_state(300.0, 120e3, cb.standard_dry_air_composition()).mu
+        assert diag["Re_hole"] == pytest.approx(
+            4.0 * (m_dot / elem.n_holes) / (math.pi * elem.hole_diameter * mu),
+            rel=0.05,
+        )
+
+    def test_the_approach_term_uses_the_drilled_length_not_the_wall_thickness(
+        self,
+    ):
+        """Eq. (18)'s X/(pi L) is the DRILLED length, not the wall thickness.
+
+        Added because a falsification found nothing: swapping `hole_length`
+        for `wall_thickness` in the approach term passed every other test in
+        this class, since they all use 90-degree holes where the two are
+        equal. At 30 degrees they differ by a factor of two, so the
+        substitution would double the approach Nusselt number silently.
+
+        Checked against the correlation called directly, which is the only
+        way to pin WHICH length reaches it.
+        """
+        elem = self._panel(angle_deg=30.0)
+        assert elem.hole_length == pytest.approx(2.0 * elem.wall_thickness)
+
+        out = elem.internal_heat_transfer(self._state(elem, 0.5))
+        expected = cb.effusion_approach_nusselt(
+            out["Re_hole"], 0.7272, elem.pitch_actual / elem.hole_length
+        )
+        assert out["Nu_approach"] == pytest.approx(expected, rel=1e-3)
+
+        # And it is NOT what the wall thickness would give -- the thing the
+        # other tests could not distinguish.
+        wrong = cb.effusion_approach_nusselt(
+            out["Re_hole"], 0.7272, elem.pitch_actual / elem.wall_thickness
+        )
+        assert wrong == pytest.approx(2.0 * expected, rel=1e-3)
+        assert out["Nu_approach"] != pytest.approx(wrong, rel=0.1)
+
+        # The throat term likewise: R_Nu is on the drilled L/D.
+        assert out["Nu_throat"] == pytest.approx(
+            cb.effusion_throat_nusselt(
+                out["Re_hole"], 0.7272, elem.hole_length / elem.hole_diameter
+            ),
+            rel=1e-3,
+        )
