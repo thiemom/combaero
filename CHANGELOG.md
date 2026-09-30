@@ -1099,6 +1099,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Murray & Ireland (2018) read, and it separates #420's two error
+  sources.** #420 found Baldauf + Sellers failing on `andrei2014` with the
+  error changing sign (+61% at BR 1, -81% at BR 3) and could not say whether
+  the superposition or the per-row closure was at fault. Murray applies
+  Sellers to a single-hole **CFD** result -- no correlation involved -- and
+  measures a **~2x over-prediction at M ~ 1** for a 5.75D pitch, growing with
+  blowing, caused by streamwise jet interaction. Tripling the streamwise
+  pitch to 17.25D restores agreement to under 10% by the third row.
+
+  So: superposition over-predicts and grows with blowing and tightness; the
+  Baldauf closure under-predicts above M ~ 1 through lift-off. `andrei2014`
+  shows both, which is why its error changes sign, and its streamwise pitch
+  of 9.15D sits between Murray's failing and working cases as the +61% at
+  BR 1 suggests it should.
+
+  This **qualifies** #420's "Gao's alpha cannot be fitted" conclusion. That
+  holds for `andrei2014`, but the reason is narrower than recorded: alpha is
+  exactly the right shape for the superposition error, and Murray's
+  independent CFD confirms that error is real and one-signed. What
+  disqualifies Andrei is the closure contaminating BR 2-3. The test docstring
+  now says so.
+
+  No data extracted yet. Recorded in
+  `validation/cooling/extractions/murray_ireland_2018_effusion_superposition.md`,
+  with a per-pitch map of what the paper actually offers: the superposition
+  comparison exists **only at 5.75D** (Fig. 6) and at 17.25D streamwise
+  (Fig. 9a), while the 3.0D data is contours with no superposition column.
+  Figure 6 is the target because it puts measurement, CFD reference and
+  superposition on one axis, and its M 0.19-0.96 sits entirely below the
+  lift-off peak that wrecked `andrei2014` -- but its s/D of 5.75 is still
+  outside Baldauf's 2-5, by 15% against Andrei's 47%. Also recorded: the
+  measurement band to use (the paper's stated 15%) and the warning that
+  every figure page is raster, so this needs pixel digitisation rather than
+  the exact vector extraction `andrei2014` allowed.
+
 - **`test_thermo_transport` no longer captures stderr**, so the C++ suite runs
   where `/tmp` is not writable. googletest's `CaptureStderr()` mkstemps into a
   hardcoded `"/tmp/"` (`gtest-port.cc`) that no environment variable
