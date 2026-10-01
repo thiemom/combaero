@@ -27,6 +27,7 @@ from typing import Literal
 
 import combaero as cb
 
+from validation.cooling import conventions
 from validation.cooling.schema import SeriesMetadata, load_points
 
 Mode = Literal["eq17", "chain"]
@@ -74,11 +75,25 @@ def vhr_to_crossflow_ratio(vhr: float) -> float:
     return 1.0 / math.sqrt(vhr - 1.0)
 
 
+def _static_factor(vhr: float) -> float:
+    """The total-to-static factor, taken from the CONVENTION REGISTRY.
+
+    It used to be written here and declared nowhere, so the conversion was
+    inferred from an axis name: correct, but nothing would have noticed a
+    series arriving already on the static basis. `conventions` now holds
+    the declaration and the derivation, and this reads it rather than
+    repeating it (#389).
+    """
+    conversion = conventions.CONVERSIONS[("Cd_total", "Cd_static")]
+    assert conversion.factor is not None
+    return conversion.factor(vhr)
+
+
 def vhr_to_static_cd(vhr: float, cd_total_referenced: float) -> float:
     """Rohde references his ideal flow to duct TOTAL pressure; Eq. (17) wants
     it referenced to duct STATIC. The factor diverges as VHR -> 1, which is
     why scores are reported per VHR band and never pooled."""
-    return cd_total_referenced * math.sqrt(vhr / (vhr - 1.0))
+    return cd_total_referenced * _static_factor(vhr)
 
 
 # Rohde scores are reported per velocity-head-ratio band, never pooled: the
@@ -177,6 +192,22 @@ def run_series(series: SeriesMetadata, mode: Mode = "eq17") -> list[Record]:
 
     if series.x_axis == "velocity_head_ratio":
         # Rohde's own coordinates. Deskew, then convert both axes.
+        #
+        # The Cd conversion is applied because the registry says this
+        # series' convention differs from the set's, NOT because the axis
+        # happens to be named this. Asserted so the two cannot drift: if a
+        # Rohde-shaped series ever arrives already on the static basis,
+        # this fires rather than converting it twice.
+        resolution = conventions.resolve(series, series.scores)
+        if resolution.status == conventions.STATUS_DIRECT:
+            raise ValueError(
+                f"{series.label} declares the set's own Cd convention, so the "
+                "total-to-static conversion below would be applied twice. "
+                "Check `conventions.SOURCE_PUBLISHES`."
+            )
+        if resolution.status != conventions.STATUS_CONVERTED:
+            raise ValueError(f"{series.label}: {resolution.detail}")
+
         dy_lo, dy_hi = deskew(series)
         out = []
         for p in load_points(series):

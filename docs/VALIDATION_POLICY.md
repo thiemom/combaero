@@ -56,6 +56,18 @@ must never look the same on a scorecard.
   not a filter: `han_1988_orthogonal`'s largest fidelity row scores better
   outside its box than inside it, so dropping extrapolated points would
   have discarded the better half.
+- **Two sides must be measuring the same quantity, and say so.** A series
+  declares what its y quantity is referenced to and a correlation set
+  declares what it produces (`validation/cooling/conventions.py`).
+  Scoring matches them, applies a REGISTERED conversion, or refuses. No
+  range check can catch this: every coordinate is in range, the quantity
+  is simply not the same one.
+- **A registered conversion is geometry or algebra, never a fit.** Rohde's
+  `Cd` on duct total against McGreehan-Schotsch's on static is
+  `sqrt(VHR/(VHR-1))` -- definitional, and registered. Han's
+  `G_bar = 1.2 G` looks the same shape and is NOT registered: it is a
+  published constant whose measured ratio spans 1.096-1.413, so it is
+  applied as the source's own correlation with its cost measured.
 - **Fidelity needs completely-sampled data to mean anything.** See below.
 
 ## The trap: sampling completeness cuts across both
@@ -110,6 +122,12 @@ validity box**. Those never pool with in-domain rows. Read them as what
 extrapolating that set costs, not as its accuracy:
 `baldauf_2002_sellers` scores 138 points of which all 138 are outside its
 envelope, so its 48% MAE is entirely an extrapolation figure.
+
+**`Measurement conventions, series against the set scoring it`** counts
+`direct` / `converted` / `undeclared` and lists every conversion applied and
+every refusal. A refusal is a category error, not a disagreement -- it
+replaces the numbers rather than appearing beside them, because a large
+error reported for a mismatched quantity reads as a model limitation.
 
 The report ends with **`Correlation-set accuracy, as each set declares it`**,
 which prints each set's `accuracy_R`/`accuracy_G` with its provenance and

@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Measurement conventions are declared and checked, so scoring can no
+  longer compare two different quantities** (#389's third remaining item).
+  `validation/cooling/conventions.py`: a series declares what its y
+  quantity is referenced to, a correlation set declares what it produces,
+  and scoring matches them, applies a **registered** conversion, or
+  refuses. No range check can see this failure -- every coordinate is in
+  range, the quantity is simply not the same one.
+
+  The project had hit it three times, and all three are now named in one
+  place with their cost: Rohde's `Cd` on duct **total** against
+  McGreehan-Schotsch's on **static** (1.33x at VHR 2); Andrews
+  86-GT-225's `h_m` over the **hole length** against 88-GT-290's `h` on
+  the **plate area** (-60% versus -10%, #430); and a gas-side `h` quoted
+  without its unblown baseline (1.75x, #431).
+
+  The whole dataset resolves: **100 direct, 3 converted, 0 undeclared**,
+  and `test_every_scored_series_declares_a_convention` makes a new scored
+  source fail until its convention is written down.
+
+  **The declaration is a table keyed (source, quantity), not a field on
+  103 series.** A convention is a property of how a rig was instrumented,
+  not of the individual curve; one auditable table beats the same string
+  copied 103 times and drifting. `SERIES_OVERRIDE` covers the exception.
+
+  **`orifice_runner` now applies the Rohde conversion because the registry
+  says to, not because an axis is named `velocity_head_ratio`.** The
+  conversion was always correct; what was missing is that nothing would
+  have noticed a series arriving already on the static basis. It now
+  raises rather than converting twice -- 41% high at VHR 2.
+
+  **A registered conversion must be geometry or algebra, never a fit.**
+  Han's `G_bar = 1.2 G` is the case that tests the rule: same shape, and
+  deliberately NOT registered, because the measured ratio spans
+  1.096-1.413 with 69% of the variance between rigs (#401). It stays a
+  published constant applied with its cost measured.
+
+  **`eta_adiabatic` and `eta_overall` are declared incompatible**, with
+  the reason recorded: an adiabatic wall passes no heat so its
+  effectiveness carries no coefficient, and an overall-eta correlation
+  used as a closure would double-count the convection the resistance
+  network computes (#387).
+
 - **The validation harness no longer pools in-domain with out-of-domain
   scoring, and a correlation's accuracy now carries where it came from**
   (#389, two of the four remaining items).
