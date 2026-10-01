@@ -9,6 +9,7 @@
 
 using combaero::cooling::evaluate_rib;
 using combaero::cooling::han_1988_orthogonal;
+using combaero::cooling::han_1989_narrow_channel;
 using combaero::cooling::han_park_1988_angled;
 using combaero::cooling::rallabandi_2009_high_re;
 using combaero::cooling::RibCorrelationSet;
@@ -458,6 +459,184 @@ TEST(RibCorrelationTest, HanParkAgreesWithHan1988OnRButNotG) {
 
   const double G_ratio = r_park.G / r_han.G;
   EXPECT_GT(std::abs(G_ratio - 1.0), 0.05);  // genuinely disagree
+}
+
+// Eq. 4.19 (Han et al. 1989), narrow-aspect-ratio channels, W/H < 1.
+// R has no printed equation (han_ribbed.md item 40) -- the coefficients here
+// are this project's own fit to Fig. 4.48a's drawn line, hand-checked
+// against the raw quadratic rather than a stored magic number.
+TEST(RibCorrelationTest, ReproducesTheConfirmedHan1989NarrowExtraction) {
+  const auto set = han_1989_narrow_channel();
+
+  // Wide sub-band (1/2 <= W/H < 1), alpha = 90 deg: R from the wide
+  // quadratic, G = 2.24 (e+)^0.35 exactly (text-extracted, item 37).
+  RibGeometry wide;
+  wide.e_D = 0.0625;
+  wide.p_e = 15.0;
+  wide.W_H = 0.5;
+  wide.alpha_deg = 90.0;
+  const auto r1 = evaluate_rib(set, wide, 30000.0);
+  const double u1 = 1.0;  // alpha/90
+  const double expected_R1 = 10.66406939 + -21.43911537 * u1 +
+                             15.49713879 * u1 * u1;
+  EXPECT_NEAR(r1.R, expected_R1, 1e-6);
+  EXPECT_NEAR(r1.G, 2.24 * std::pow(r1.e_plus, 0.35), 1e-4);  // e+ floor
+
+  // Narrow sub-band (1/4 < W/H < 1/2), alpha = 45 deg (off-axis, C = 1.80):
+  // both C and n carry the (W/H)^-0.76 / (W/H)^0.44 correction.
+  RibGeometry narrow;
+  narrow.e_D = 0.0625;
+  narrow.p_e = 15.0;
+  narrow.W_H = 0.25;
+  narrow.alpha_deg = 45.0;
+  const auto r2 = evaluate_rib(set, narrow, 30000.0);
+  const double u2 = 0.5;  // alpha/90
+  const double expected_R2 = 8.79873413 + -14.76786182 * u2 +
+                             12.4724873 * u2 * u2;
+  EXPECT_NEAR(r2.R, expected_R2, 1e-6);
+  const double expected_C2 = 1.80 * std::pow(0.25, -0.76);
+  const double expected_n2 = 0.35 * std::pow(0.25, 0.44);
+  EXPECT_NEAR(r2.G, expected_C2 * std::pow(r2.e_plus, expected_n2),
+              1e-4);  // e+ floor
+}
+
+// Both switches this set introduces are genuine discontinuities the source
+// states, not numerical artefacts -- pin the jump sizes the same way
+// HanParkRAndGSwitchesAreGenuineDiscontinuities does for the other set.
+TEST(RibCorrelationTest, HanNarrowRAndGSwitchesAreGenuineDiscontinuities) {
+  const auto set = han_1989_narrow_channel();
+
+  // R: the two sub-bands are independently fitted quadratics, so there is
+  // no reason for them to meet at the boundary -- confirm they do not.
+  RibGeometry g;
+  g.e_D = 0.0625;
+  g.p_e = 15.0;
+  g.alpha_deg = 60.0;
+  g.W_H = 0.5;  // wide branch (>= boundary)
+  const double R_wide_side = evaluate_rib(set, g, 30000.0).R;
+  g.W_H = 0.5 - 1e-6;  // narrow branch
+  const double R_narrow_side = evaluate_rib(set, g, 30000.0).R;
+  EXPECT_GT(std::abs(R_narrow_side / R_wide_side - 1.0), 0.01);
+
+  // G: a ~20% jump in C at alpha == 90 deg (1.80/2.24 - 1 = -19.6%, for any
+  // W/H), not a rounding-sized difference.
+  RibGeometry g2;
+  g2.e_D = 0.06;
+  g2.p_e = 12.0;
+  g2.W_H = 0.5;
+  g2.alpha_deg = 90.0;
+  const double G_at_90 = evaluate_rib(set, g2, 40000.0).G;
+  g2.alpha_deg = 90.0 - 1e-6;
+  const double G_just_below_90 = evaluate_rib(set, g2, 40000.0).G;
+  EXPECT_GT(std::abs(G_just_below_90 / G_at_90 - 1.0), 0.15);
+}
+
+// Same reverse-flow symmetry as the other three sets: parallel angled ribs
+// reversed are the mirror image.
+TEST(RibCorrelationTest, HanNarrowReverseFlowIsSymmetricInMagnitude) {
+  const auto set = han_1989_narrow_channel();
+  RibGeometry g;
+  g.e_D = 0.0625;
+  g.p_e = 15.0;
+  g.W_H = 0.3;
+  g.alpha_deg = 45.0;
+  const auto fwd = evaluate_rib(set, g, 30000.0);
+  const auto rev = evaluate_rib(set, g, -30000.0);
+
+  EXPECT_NEAR(fwd.G, rev.G, 1e-9);
+  EXPECT_NEAR(fwd.St_r, rev.St_r, 1e-9);
+  EXPECT_NEAR(fwd.e_plus, -rev.e_plus, 1e-6);
+}
+
+// Every state a solver can probe must return finite, positive numbers,
+// across both switch boundaries.
+TEST(RibCorrelationTest, HanNarrowGuardsHoldForStatesTheSolverActuallyProbes) {
+  const auto set = han_1989_narrow_channel();
+  for (double alpha : {30.0, 45.0, 89.999, 90.0, 90.001}) {
+    for (double W_H : {0.25, 0.4999, 0.5, 0.5001, 0.75, 0.9999}) {
+      RibGeometry g;
+      g.e_D = 0.0625;
+      g.p_e = 15.0;
+      g.W_H = W_H;
+      g.alpha_deg = alpha;
+      for (double Re : {-1e6, -1.0, 0.0, 1.0, 1e8}) {
+        const auto r = evaluate_rib(set, g, Re);
+        EXPECT_TRUE(std::isfinite(r.f))
+            << "alpha=" << alpha << " W_H=" << W_H << " Re=" << Re;
+        EXPECT_TRUE(std::isfinite(r.G))
+            << "alpha=" << alpha << " W_H=" << W_H << " Re=" << Re;
+        EXPECT_TRUE(std::isfinite(r.St_r))
+            << "alpha=" << alpha << " W_H=" << W_H << " Re=" << Re;
+        EXPECT_GT(r.f, 0.0) << "alpha=" << alpha << " W_H=" << W_H;
+        EXPECT_GT(r.St_r, 0.0) << "alpha=" << alpha << " W_H=" << W_H;
+      }
+    }
+  }
+}
+
+TEST(RibCorrelationTest, HanNarrowStantonDerivativeMatchesCentralDifferences) {
+  const auto set = han_1989_narrow_channel();
+  RibGeometry g;
+  g.e_D = 0.0625;
+  g.p_e = 15.0;
+  g.W_H = 0.3;
+  g.alpha_deg = 45.0;
+  for (double Re : {50000.0, 20000.0, 100.0, 10.0}) {
+    const double h = std::max(1e-6, std::abs(Re) * 1e-6);
+    const double fd = (evaluate_rib(set, g, Re + h).St_r -
+                       evaluate_rib(set, g, Re - h).St_r) /
+                      (2.0 * h);
+    const double analytic = evaluate_rib(set, g, Re).dSt_dRe;
+    const double scale = std::max({std::abs(fd), std::abs(analytic), 1e-14});
+    EXPECT_LT(std::abs(analytic - fd) / scale, 1e-5) << "Re = " << Re;
+  }
+}
+
+TEST(RibCorrelationTest, HanNarrowSetPassesValidation) {
+  EXPECT_NO_THROW(validate_rib_set(han_1989_narrow_channel()));
+
+  // C_R and C_G play no role in this set's shapes, so they must NOT be
+  // rejected for being unset (0.0) the way the plain power-law shapes are.
+  auto s = han_1989_narrow_channel();
+  EXPECT_EQ(s.C_R, 0.0);
+  EXPECT_EQ(s.C_G, 0.0);
+  EXPECT_NO_THROW(validate_rib_set(s));
+
+  auto bad_boundary = han_1989_narrow_channel();
+  bad_boundary.R_WH_band_boundary = -1.0;
+  EXPECT_THROW(validate_rib_set(bad_boundary), std::invalid_argument);
+
+  auto bad_g_boundary = han_1989_narrow_channel();
+  bad_g_boundary.G_narrow_WH_band_boundary = 0.0;
+  EXPECT_THROW(validate_rib_set(bad_g_boundary), std::invalid_argument);
+}
+
+// Adding this set must not perturb any of the other three -- new enum
+// values and fields are additive, defaulted to the prior behaviour. Their
+// own extraction tests (ReproducesTheConfirmedExtraction,
+// ReproducesTheConfirmedRallabandiExtraction,
+// ReproducesTheConfirmedHanParkExtraction) running unmodified alongside
+// this one, in the same binary, is the proof; this test only pins the
+// cheap, explicit version of that claim.
+TEST(RibCorrelationTest, HanNarrowChannelDoesNotPerturbTheOtherThreeSets) {
+  RibGeometry g;
+  g.e_D = 0.0625;
+  g.p_e = 15.0;
+  g.W_H = 1.0;
+  g.alpha_deg = 90.0;
+
+  const auto han = evaluate_rib(han_1988_orthogonal(), g, 30000.0);
+  EXPECT_NEAR(han.R, 3.2 * std::pow(15.0 / 10.0, 0.35), 1e-9);
+
+  g.W_H = 2.0;
+  g.alpha_deg = 45.0;
+  const auto park = evaluate_rib(han_park_1988_angled(), g, 30000.0);
+  EXPECT_NEAR(park.R, 4.7592382829, 1e-6);
+
+  g.W_H = 1.0;
+  g.alpha_deg = 45.0;
+  const auto ra = evaluate_rib(rallabandi_2009_high_re(), g, 100000.0);
+  EXPECT_TRUE(std::isfinite(ra.G));
 }
 
 // The normaliser is data, not a convention: the same correlation written

@@ -1411,6 +1411,29 @@ make this representable as data: setting `R_alpha_shape` to
 angle-dependent `R`, the same way `RibTerm`'s normaliser lets one describe
 its own geometry dependence.
 
+**A fourth set extends the same family to narrow channels**,
+`han_1989_narrow_channel` (Eq. 4.19, `alpha` 30-90 deg, `W/H` 1/4-1):
+
+```python
+narrow = cb.han_1989_narrow_channel()
+g = cb.RibGeometry(e_D=0.0625, p_e=15.0, W_H=0.3, alpha_deg=45.0)
+r = cb.evaluate_rib(narrow, g, Re=30_000)
+r.R, r.G
+```
+
+Its source has **no printed equation for `R`** below `W/H = 1` -- only a
+drawn figure line -- so `R_alpha_shape = QuadraticAlphaTwoBand`'s
+coefficients (`R_quad_c0/c1/c2` for `1/2 <= W/H < 1`,
+`R_quad_narrow_c0/c1/c2` for `1/4 < W/H < 1/2`, switched by
+`R_WH_band_boundary`) are this project's own fit to that line, and the
+set's `provenance` is `Fitted` rather than `Extracted` -- see
+`validation/cooling/extractions/han_ribbed.md`, item 40. `G`
+(`GShapeModel.NarrowChannelAlphaSwitch`) *is* text-extracted: a genuine
+~20% jump in its leading constant at `alpha == 90 deg`
+(`G_narrow_C_alpha90` vs `G_narrow_C_off_axis`), plus a further `(W/H)`
+correction to both the constant and the `e+` exponent itself below
+`G_narrow_WH_band_boundary`.
+
 **Supply your own.** Real hardware needs it -- no published correlation is
 precise enough for a specific rig:
 

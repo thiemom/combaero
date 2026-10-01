@@ -85,6 +85,9 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     ("lau1990", "G_bar"): "G_four_wall",
     ("han_park_lei1984", "R"): "R_ribbed_wall",
     ("lau1990", "R"): "R_ribbed_wall",
+    # Figure 4.48's R panel (#402) plots raw R, unlike figures 4.46/4.47's
+    # normalised ordinate -- same quantity as han_park_lei1984/lau1990's "R".
+    ("han2012", "R"): "R_ribbed_wall",
     ("han2012", "R_normalised"): "R_normalised_pe",
     ("han2012", "R_normalised_angled"): "R_normalised_angled",
     ("florschuetz1981", "Nu_over_Nu1"): "Nu_over_Nu1",
@@ -107,6 +110,7 @@ SERIES_OVERRIDE: dict[str, str] = {}
 SET_PRODUCES: dict[str, str] = {
     "han_1988_orthogonal": "G_ribbed_wall",
     "han_park_1988_angled": "G_ribbed_wall",
+    "han_1989_narrow_channel": "G_ribbed_wall",
     "rallabandi_2009_high_re": "G_ribbed_wall",
     "florschuetz_1981_inline": "Nu_over_Nu1",
     "mcgreehan_schotsch_1988_cd": "Cd_static",
@@ -132,6 +136,9 @@ SET_ALSO_PRODUCES: dict[str, tuple[str, ...]] = {
         "G_four_wall",
     ),
     "rallabandi_2009_high_re": ("R_ribbed_wall", "R_normalised_pe"),
+    # Fig. 4.48's R panel plots raw R (no (p/e/10)^0.35 normalisation unlike
+    # figures 4.46/4.47), so this set needs no R_normalised_* entry.
+    "han_1989_narrow_channel": ("R_ribbed_wall",),
     # The effusion set's overall-eta closure is a network result built from
     # the same internal h -- an OUTPUT of the set, not a conversion of it.
     "andrews_1986_effusion_internal": (

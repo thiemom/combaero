@@ -165,6 +165,78 @@ RibCorrelationSet han_park_1988_angled() {
   return s;
 }
 
+RibCorrelationSet han_1989_narrow_channel() {
+  RibCorrelationSet s;
+  s.name = "han_1989_narrow_channel";
+  s.source = "Han, J.C. et al. (1989), Eq. 4.19 (G), via Han, Dutta & Ekkad "
+             "(2012) 2nd ed. Fig. 4.48 (R, this project's own fit -- no "
+             "printed R equation exists for W/H < 1)";
+  s.validity_source = s.source;
+  // R is FITTED by this project to Fig. 4.48a's drawn correlation line (no
+  // printed equation exists -- han_ribbed.md item 40); G is text-extracted
+  // (items 36-38). One enum per set, so the more cautious value is kept --
+  // see decision D6 and the header comment on this factory.
+  s.provenance = RibProvenance::Fitted;
+  // Parallel angled ribs, same reasoning as han_park_1988_angled: reversal
+  // gives the mirror image, same magnitude.
+  s.symmetric = true;
+
+  // R: no printed equation for W/H < 1 (item 40). Fitted to Fig. 4.48a's own
+  // drawn correlation line, one quadratic-in-alpha per W/H sub-band, same
+  // shape Eq. 4.17 already uses. RMS against the line itself: 0.99% (wide
+  // sub-band, validation/cooling/data/han2012/fig4.48_R_correlation_WH0.5.csv)
+  // and 0.62% (narrow sub-band, ..._WH0.25.csv).
+  s.R_alpha_shape = RibCorrelationSet::RAlphaShape::QuadraticAlphaTwoBand;
+  s.R_quad_c0 = 10.66406939;
+  s.R_quad_c1 = -21.43911537;
+  s.R_quad_c2 = 15.49713879;
+  s.R_quad_narrow_c0 = 8.79873413;
+  s.R_quad_narrow_c1 = -14.76786182;
+  s.R_quad_narrow_c2 = 12.4724873;
+  s.R_WH_band_boundary = 0.5;
+
+  // G = C(e+)^n, Eq. 4.19 (p. 378): C = 2.24 at alpha = 90 deg, 1.80
+  // off-axis; below W/H = 1/2 both C and n pick up a (W/H) correction.
+  s.G_shape_model = RibCorrelationSet::GShapeModel::NarrowChannelAlphaSwitch;
+  // C_G is unused by this shape -- G_narrow_C_alpha90/off_axis replace it --
+  // and exempt from validate_rib_set's positivity check, so it is left at
+  // its default rather than carrying a dummy value nothing reads.
+  s.G_eplus_exponent = 0.35;  // base n, before the narrow-band (W/H)^0.44
+  s.G_narrow_C_alpha90 = 2.24;
+  s.G_narrow_C_off_axis = 1.80;
+  s.G_narrow_WH_band_boundary = 0.5;
+  s.G_narrow_WH_C_exponent = -0.76;
+  s.G_narrow_WH_n_exponent = 0.44;
+
+  s.valid_Re = {10000.0, 60000.0};
+  s.valid_eD = {0.047, 0.078};
+  s.valid_pe = {10.0, 20.0};
+  // Carried over from han_park_1988_angled's box (same figure family) --
+  // the text gives no separate Re/e_D/p_e/Pr range for Eq. 4.19, only the
+  // W/H and alpha domain below. Not a source claim; an explicit assumption.
+  s.valid_WH = {0.25, 1.0};  // 1/4 < W/H < 1; W/H = 1 stays with the wide
+                             // sets (item 41's convention)
+  s.valid_alpha = {30.0, 90.0};
+  s.valid_eplus = {50.0, 0.0};
+  s.valid_Pr = 0.7;
+
+  // MEASURED by this project, never a judging band. R: pooled RMS 5.4%
+  // (bias -0.9%/+0.4% per sub-band) against the 16 raw digitised points in
+  // fig4.48_R_WH0.25.csv/_WH0.5.csv -- the fitted coefficients above were
+  // derived from the drawn LINE, so this is a genuinely separate check
+  // against the scatter, same split rallabandi_2009_high_re observes. G:
+  // pooled RMS 5.4% (bias +1.9%) against fig4.48_G_WH0.25.csv/_WH0.5.csv,
+  // evaluated at alpha = 90 deg uniformly because those series pool
+  // multiple rib angles onto one e+-vs-G curve with no per-point angle
+  // recorded -- checked, not assumed, that this doesn't hide a 24%-scale
+  // defect: a free power-law fit to the pooled scatter ALONE (ignoring the
+  // text's alpha switch entirely) already lands within 3.9-5.0% RMS, so the
+  // angles are not separable on this axis to begin with.
+  s.accuracy_R = StatedAccuracy::measured(0.054);
+  s.accuracy_G = StatedAccuracy::measured(0.054);
+  return s;
+}
+
 namespace {
 
 void require_positive_reference(const RibTerm &t, const std::string &field) {
@@ -266,6 +338,37 @@ double han_park_R(const RibCorrelationSet &set, double e_D, double W_H,
   return alpha_poly * power_term(set.R_pe, p_e) * WH_term;
 }
 
+// Eq. 4.19's R (han_ribbed.md item 40): no printed equation, so this project
+// fitted one quadratic-in-alpha per W/H sub-band to Fig. 4.48a's drawn line.
+// Unlike han_park_R there is no p/e or W/H power-law term -- W/H only picks
+// which quadratic applies.
+double han_narrow_R(const RibCorrelationSet &set, double W_H,
+                    double alpha_deg) {
+  const double u = alpha_deg / 90.0;
+  if (W_H < set.R_WH_band_boundary) {
+    return set.R_quad_narrow_c0 + set.R_quad_narrow_c1 * u +
+           set.R_quad_narrow_c2 * u * u;
+  }
+  return set.R_quad_c0 + set.R_quad_c1 * u + set.R_quad_c2 * u * u;
+}
+
+// Eq. 4.19's G: a hard switch on alpha == 90 deg (not a continuous function
+// of alpha, unlike every other shape in this file), with a further W/H
+// correction to both the leading constant and the e+ exponent itself below
+// W/H = 1/2. See the GShapeModel::NarrowChannelAlphaSwitch header comment.
+double han_narrow_G(const RibCorrelationSet &set, double W_H,
+                    double alpha_deg, double e_plus_safe) {
+  double C = is_alpha_90(alpha_deg) ? set.G_narrow_C_alpha90
+                                    : set.G_narrow_C_off_axis;
+  double n = set.G_eplus_exponent;
+  if (W_H < set.G_narrow_WH_band_boundary && W_H > 0.0 &&
+      std::isfinite(W_H)) {
+    C *= std::pow(W_H, set.G_narrow_WH_C_exponent);
+    n *= std::pow(W_H, set.G_narrow_WH_n_exponent);
+  }
+  return C * std::pow(e_plus_safe, n);
+}
+
 }  // namespace
 
 RibResult evaluate_rib(const RibCorrelationSet &set, const RibGeometry &geom,
@@ -275,7 +378,11 @@ RibResult evaluate_rib(const RibCorrelationSet &set, const RibGeometry &geom,
   const double e_D = geom.e_D;
   const double W_H = geom.W_H;
 
-  if (set.R_alpha_shape == RibCorrelationSet::RAlphaShape::QuadraticAlpha) {
+  if (set.R_alpha_shape ==
+      RibCorrelationSet::RAlphaShape::QuadraticAlphaTwoBand) {
+    out.R = han_narrow_R(set, W_H, geom.alpha_deg);
+  } else if (set.R_alpha_shape ==
+             RibCorrelationSet::RAlphaShape::QuadraticAlpha) {
     out.R = han_park_R(set, e_D, W_H, geom.p_e, geom.alpha_deg);
   } else {
     out.R =
@@ -301,26 +408,45 @@ RibResult evaluate_rib(const RibCorrelationSet &set, const RibGeometry &geom,
   const double ep_safe =
       std::sqrt(out.e_plus * out.e_plus + EPLUS_FLOOR * EPLUS_FLOOR);
 
-  double G_alpha_term, G_pe_term;
-  if (set.G_shape_model == RibCorrelationSet::GShapeModel::SquareVsRectangular) {
-    const bool square = is_square_channel(W_H);
-    const double m = square ? set.G_shape_alpha_exponent_square
-                            : set.G_shape_alpha_exponent_rect;
-    const double n = square ? set.G_shape_pe_exponent_square
-                            : set.G_shape_pe_exponent_rect;
-    G_alpha_term = (m != 0.0) ? std::pow(geom.alpha_deg / 90.0, m) : 1.0;
-    G_pe_term = (n != 0.0 && geom.p_e / 10.0 > 0.0)
-                    ? std::pow(geom.p_e / 10.0, n)
-                    : 1.0;
-  } else {
-    G_alpha_term =
-        power_term(set.G_alpha, geom.alpha_deg / 90.0 * set.G_alpha.reference);
-    G_pe_term = power_term(set.G_pe, geom.p_e);
-  }
+  // The exponent actually applied to ep_safe in out.G -- NOT always
+  // set.G_eplus_exponent. NarrowChannelAlphaSwitch's narrow sub-band scales
+  // the base exponent by (W/H)^n_exponent, and the Re-derivative below must
+  // differentiate THAT exponent, not the unscaled base, or it silently
+  // disagrees with central differences whenever the narrow correction is
+  // active (W/H and alpha are fixed geometry here, so this is still a
+  // constant with respect to Re, same as every other shape).
+  double g_eplus_exponent_effective = set.G_eplus_exponent;
 
-  out.G = set.C_G * power_term(set.G_eD, e_D) * G_pe_term *
-          power_term(set.G_WH, W_H) * G_alpha_term *
-          std::pow(ep_safe, set.G_eplus_exponent);
+  if (set.G_shape_model ==
+      RibCorrelationSet::GShapeModel::NarrowChannelAlphaSwitch) {
+    if (W_H < set.G_narrow_WH_band_boundary && W_H > 0.0 &&
+        std::isfinite(W_H)) {
+      g_eplus_exponent_effective *= std::pow(W_H, set.G_narrow_WH_n_exponent);
+    }
+    out.G = han_narrow_G(set, W_H, geom.alpha_deg, ep_safe);
+  } else {
+    double G_alpha_term, G_pe_term;
+    if (set.G_shape_model ==
+        RibCorrelationSet::GShapeModel::SquareVsRectangular) {
+      const bool square = is_square_channel(W_H);
+      const double m = square ? set.G_shape_alpha_exponent_square
+                              : set.G_shape_alpha_exponent_rect;
+      const double n = square ? set.G_shape_pe_exponent_square
+                              : set.G_shape_pe_exponent_rect;
+      G_alpha_term = (m != 0.0) ? std::pow(geom.alpha_deg / 90.0, m) : 1.0;
+      G_pe_term = (n != 0.0 && geom.p_e / 10.0 > 0.0)
+                      ? std::pow(geom.p_e / 10.0, n)
+                      : 1.0;
+    } else {
+      G_alpha_term = power_term(
+          set.G_alpha, geom.alpha_deg / 90.0 * set.G_alpha.reference);
+      G_pe_term = power_term(set.G_pe, geom.p_e);
+    }
+
+    out.G = set.C_G * power_term(set.G_eD, e_D) * G_pe_term *
+            power_term(set.G_WH, W_H) * G_alpha_term *
+            std::pow(ep_safe, set.G_eplus_exponent);
+  }
 
   const double root_f2 = std::sqrt(out.f / 2.0);
   const double denom =
@@ -332,7 +458,8 @@ RibResult evaluate_rib(const RibCorrelationSet &set, const RibGeometry &geom,
   // d ep_safe/dRe = e_plus * (e_D * sqrt(f/2)) / ep_safe.
   const double dep_dRe = e_D * root_f2;
   const double dep_safe_dRe = out.e_plus * dep_dRe / ep_safe;
-  const double dG_dRe = set.G_eplus_exponent * out.G / ep_safe * dep_safe_dRe;
+  const double dG_dRe =
+      g_eplus_exponent_effective * out.G / ep_safe * dep_safe_dRe;
   out.dSt_dRe = -out.f * root_f2 * dG_dRe / (2.0 * denom * denom);
 
   out.extrapolated =
@@ -400,19 +527,67 @@ void validate_rib_set(const RibCorrelationSet &set) {
           "rib correlation set '" + set.name +
           "': R_quad_WH_cap must be finite and non-negative (0 = uncapped)");
     }
+  } else if (set.R_alpha_shape ==
+             RibCorrelationSet::RAlphaShape::QuadraticAlphaTwoBand) {
+    // Same exemption as QuadraticAlpha above: C_R plays no part here either.
+    if (!std::isfinite(set.R_quad_c0) || !std::isfinite(set.R_quad_c1) ||
+        !std::isfinite(set.R_quad_c2) ||
+        !std::isfinite(set.R_quad_narrow_c0) ||
+        !std::isfinite(set.R_quad_narrow_c1) ||
+        !std::isfinite(set.R_quad_narrow_c2)) {
+      throw std::invalid_argument(
+          "rib correlation set '" + set.name +
+          "': R_quad_c0/c1/c2 and R_quad_narrow_c0/c1/c2 must be finite");
+    }
+    if (!(set.R_WH_band_boundary > 0.0) ||
+        !std::isfinite(set.R_WH_band_boundary)) {
+      throw std::invalid_argument(
+          "rib correlation set '" + set.name +
+          "': R_WH_band_boundary must be finite and positive, got " +
+          std::to_string(set.R_WH_band_boundary));
+    }
   } else if (!(set.C_R > 0.0) || !std::isfinite(set.C_R)) {
     throw std::invalid_argument("rib correlation set '" + set.name +
                                 "': C_R must be finite and positive, got " +
                                 std::to_string(set.C_R));
   }
-  if (!(set.C_G > 0.0) || !std::isfinite(set.C_G)) {
-    throw std::invalid_argument("rib correlation set '" + set.name +
-                                "': C_G must be finite and positive, got " +
-                                std::to_string(set.C_G));
+  if (set.G_shape_model !=
+      RibCorrelationSet::GShapeModel::NarrowChannelAlphaSwitch) {
+    // C_G plays no part in NarrowChannelAlphaSwitch -- G_narrow_C_alpha90/
+    // off_axis replace it entirely -- so it is exempt here, same reasoning
+    // as C_R's exemption for the quadratic R shapes above.
+    if (!(set.C_G > 0.0) || !std::isfinite(set.C_G)) {
+      throw std::invalid_argument(
+          "rib correlation set '" + set.name +
+          "': C_G must be finite and positive, got " +
+          std::to_string(set.C_G));
+    }
   }
   if (!std::isfinite(set.G_eplus_exponent)) {
     throw std::invalid_argument("rib correlation set '" + set.name +
                                 "': G_eplus_exponent must be finite");
+  }
+  if (set.G_shape_model ==
+      RibCorrelationSet::GShapeModel::NarrowChannelAlphaSwitch) {
+    if (!std::isfinite(set.G_narrow_C_alpha90) ||
+        !std::isfinite(set.G_narrow_C_off_axis)) {
+      throw std::invalid_argument(
+          "rib correlation set '" + set.name +
+          "': G_narrow_C_alpha90/off_axis must be finite");
+    }
+    if (!(set.G_narrow_WH_band_boundary > 0.0) ||
+        !std::isfinite(set.G_narrow_WH_band_boundary)) {
+      throw std::invalid_argument(
+          "rib correlation set '" + set.name +
+          "': G_narrow_WH_band_boundary must be finite and positive, got " +
+          std::to_string(set.G_narrow_WH_band_boundary));
+    }
+    if (!std::isfinite(set.G_narrow_WH_C_exponent) ||
+        !std::isfinite(set.G_narrow_WH_n_exponent)) {
+      throw std::invalid_argument(
+          "rib correlation set '" + set.name +
+          "': G_narrow_WH_C_exponent/n_exponent must be finite");
+    }
   }
   if (set.G_shape_model == RibCorrelationSet::GShapeModel::SquareVsRectangular) {
     if (!std::isfinite(set.G_shape_alpha_exponent_square) ||

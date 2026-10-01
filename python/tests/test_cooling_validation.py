@@ -656,12 +656,28 @@ def test_figure_448_nothing_is_scored_against_the_wrong_paper(dataset) -> None:
     han_1988_orthogonal's valid range, but it reproduces Eq. 4.18
     (C=2.24, n=0.35), a DIFFERENT published form from the one
     han_1988_orthogonal encodes (Eq. 4.15/16, n=0.28). Scoring it would
-    report that ~15% cross-paper gap as model error. Every figure 4.48
-    series is therefore unscored, regardless of geometry.
+    report that ~15% cross-paper gap as model error.
+
+    #402 added han_1989_narrow_channel, Eq. 4.19's own set, and wired the
+    four W/H<1 raw-scatter series to it -- that is the RIGHT paper, not the
+    wrong one this test guards against, so those four are now expected to
+    score. Every OTHER figure 4.48 series (the drawn correlation lines and
+    the W/H=1 [Ref. 3] curve/error bars) must still be unscored, regardless
+    of geometry.
     """
     fig448 = [s for s in dataset if s.figure == "4.48"]
     assert fig448, "figure 4.48 is not filed"
-    assert all(s.scores is None for s in fig448), [s.label for s in fig448 if s.scores is not None]
+    narrow_channel_series = {
+        "fig4.48_R_WH0.25",
+        "fig4.48_R_WH0.5",
+        "fig4.48_G_WH0.5",
+        "fig4.48_G_WH0.25",
+    }
+    for s in fig448:
+        if s.path.stem in narrow_channel_series:
+            assert s.scores == "han_1989_narrow_channel", s.label
+        else:
+            assert s.scores is None, s.label
 
 
 def test_han_park_1988_angled_scores_its_own_source(records) -> None:
