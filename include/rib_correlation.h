@@ -27,6 +27,7 @@
 // df/d(mdot) identically zero. A correlation whose R varies with e+ cannot be
 // expressed here and would need its own implicit solve.
 
+#include <limits>
 #include <string>
 
 namespace combaero {
@@ -57,6 +58,51 @@ struct RibRange {
   double lo = 0.0;
   double hi = 0.0;
   bool bounded() const { return hi > lo; }
+};
+
+// WHERE AN ACCURACY FIGURE CAME FROM, and it decides what may be done with
+// it. This distinction is not bookkeeping: judging a model against a band
+// derived from that same model's error is circular, and it is the defect
+// #389 exists to remove. It was removed from the dataset's `uncertainty`
+// field in #415 and it was still here, one level down.
+//
+// Of the three shipped sets, only han_1988_orthogonal's figures are the
+// author's own claim. han_park_1988_angled's were measured by this project
+// THROUGH evaluate_rib -- through the very code path they would be judging
+// -- and rallabandi_2009_high_re's from the printed equation against
+// digitised data. Both are useful information and neither is a band.
+enum class AccuracyProvenance {
+  // No figure available. `value` is NaN and must not be read.
+  Unstated,
+  // The source states it ("95% of data within 6%"). The ONLY kind that may
+  // be used as a band to judge a model against.
+  Stated,
+  // This project measured it against digitised data. Reportable, never a
+  // judging band -- see usable_as_band().
+  Measured,
+};
+
+struct StatedAccuracy {
+  // NaN unless `provenance` says otherwise, so an unstated figure read by
+  // accident propagates loudly rather than reading as "perfect agreement".
+  // That is what the previous 0.0 sentinel did.
+  double value = std::numeric_limits<double>::quiet_NaN();
+  AccuracyProvenance provenance = AccuracyProvenance::Unstated;
+
+  // Whether this figure may be used as the band a model is judged against.
+  // True only for Stated: a Measured figure is the model's own error, and
+  // scoring a model inside its own error answers nothing.
+  bool usable_as_band() const {
+    return provenance == AccuracyProvenance::Stated;
+  }
+
+  static StatedAccuracy stated(double v) {
+    return {v, AccuracyProvenance::Stated};
+  }
+  static StatedAccuracy measured(double v) {
+    return {v, AccuracyProvenance::Measured};
+  }
+  static StatedAccuracy unstated() { return {}; }
 };
 
 struct RibCorrelationSet {
@@ -128,9 +174,12 @@ struct RibCorrelationSet {
   RibRange valid_Re, valid_eD, valid_pe, valid_WH, valid_alpha, valid_eplus;
   double valid_Pr = 0.0;  // 0 means unstated
 
-  // Stated accuracy, as a fraction (0.06 for "within 6%"). 0 means unstated.
-  double accuracy_R = 0.0;
-  double accuracy_G = 0.0;
+  // Accuracy of the correlation, as a fraction (0.06 for "within 6%"),
+  // carried WITH where the number came from. See AccuracyProvenance: two of
+  // the three shipped sets carry this project's own measurement here, not an
+  // author claim, and a band measured from a model must never be used to
+  // judge that model.
+  StatedAccuracy accuracy_R, accuracy_G;
 };
 
 // Han, J.C. (1988), ASME J. Heat Transfer 110, 321, for 90 deg orthogonal ribs

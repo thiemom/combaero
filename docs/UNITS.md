@@ -499,6 +499,17 @@ All functions use consistent units to avoid conversion errors.
 | `RibCorrelationSet::valid_Pr`                      | -                                                                | -                 |
 | `RibCorrelationSet::accuracy_R`                    | -                                                                | -                 |
 | `RibCorrelationSet::accuracy_G`                    | -                                                                | -                 |
+| `StatedAccuracy::value`                            | -                                                                | -                 |
+| `StatedAccuracy::provenance`                       | -                                                                | -                 |
+| `StatedAccuracy::usable_as_band`                   | -                                                                | -                 |
+| `StatedAccuracy::stated`                           | -                                                                | -                 |
+| `StatedAccuracy::measured`                         | -                                                                | -                 |
+| `StatedAccuracy::unstated`                         | -                                                                | -                 |
+| `AccuracyProvenance::Unstated`                     | -                                                                | -                 |
+| `AccuracyProvenance::Stated`                       | -                                                                | -                 |
+| `AccuracyProvenance::Measured`                     | -                                                                | -                 |
+| `AccuracyProvenance::name`                         | -                                                                | -                 |
+| `AccuracyProvenance::value`                        | -                                                                | -                 |
 | `RibRange::lo`                                     | -                                                                | -                 |
 | `RibRange::hi`                                     | -                                                                | -                 |
 | `RibResult::extrapolated`                          | -                                                                | -                 |

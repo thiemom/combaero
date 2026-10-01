@@ -447,6 +447,25 @@ RibCorrelationSet han_1988_orthogonal();       // 90 deg, Re 10e3-60e3
 RibCorrelationSet rallabandi_2009_high_re();   // 45 deg sharp ribs, Re 30e3-400e3
 RibCorrelationSet han_park_1988_angled();      // 30-90 deg, W/H 1-4, Re 10e3-60e3
 void validate_rib_set(const RibCorrelationSet& set);   // throws on a bad set
+
+// Accuracy carries WHERE IT CAME FROM, because only an author's own claim
+// may be used as the band a model is judged against. A figure this project
+// measured is that model's own error, and scoring a model inside its own
+// error answers nothing (#389).
+enum class AccuracyProvenance { Unstated, Stated, Measured };
+struct StatedAccuracy {
+  double value = NaN;                 // NaN unless provenance says otherwise
+  AccuracyProvenance provenance = AccuracyProvenance::Unstated;
+  bool usable_as_band() const;        // true only for Stated
+  static StatedAccuracy stated(double v);
+  static StatedAccuracy measured(double v);
+  static StatedAccuracy unstated();
+};
+// set.accuracy_R / set.accuracy_G are StatedAccuracy. Of the three shipped
+// sets only han_1988_orthogonal's are Stated (Han's "95% within 6%/8%");
+// han_park_1988_angled's were measured through evaluate_rib itself, and
+// rallabandi_2009_high_re's accuracy_R is Unstated -- previously 0.0, which
+// read as perfect agreement.
 RibResult evaluate_rib(const RibCorrelationSet& set,
                        const RibGeometry& geom, double Re);
 // evaluate_rib never throws: Re may be negative or zero and the guards are

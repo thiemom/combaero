@@ -39,8 +39,23 @@ must never look the same on a scorecard.
 - **A stated uncertainty band must be a MEASUREMENT band** -- the source's
   own experimental uncertainty, or digitisation precision. Never derived
   from the model's error on that series. Guard it: a declared band that
-  correlates with measured model RMS is circular. (`florschuetz1981`
-  currently correlates at r = +0.9987 and is the open case -- see #389.)
+  correlates with measured model RMS is circular.
+- **This applies to the CORRELATION's accuracy too, not only the data's.**
+  `RibCorrelationSet::accuracy_R`/`accuracy_G` carry an
+  `AccuracyProvenance`, and only `Stated` -- the author's own claim -- may
+  be used as a band. Of the three shipped sets exactly one qualifies:
+  `han_park_1988_angled`'s 10.5%/8.8% were measured by this project
+  *through* `evaluate_rib`, and `rallabandi_2009_high_re`'s 6.9% from the
+  printed equation against digitised points. They are reported with their
+  provenance and judged against by nothing (#389).
+- **An absent figure is not a zero.** `Unstated` carries NaN, so an
+  accidental read fails every comparison instead of passing as "perfect".
+- **A set is not judged on conditions its authors never claimed.** Scored
+  error is partitioned in-domain / out-of-domain against the set's own
+  validity box and the two are never pooled. The partition is a REPORT,
+  not a filter: `han_1988_orthogonal`'s largest fidelity row scores better
+  outside its box than inside it, so dropping extrapolated points would
+  have discarded the better half.
 - **Fidelity needs completely-sampled data to mean anything.** See below.
 
 ## The trap: sampling completeness cuts across both
@@ -89,3 +104,14 @@ would have been indistinguishable from an implementation bug.
 upper bound on the error. `unknown` means the series shares a panel and
 nothing independent says how many runs it should have -- neither an estimate
 nor a bound.
+
+A row tagged `{out}` was scored **outside the correlation set's own declared
+validity box**. Those never pool with in-domain rows. Read them as what
+extrapolating that set costs, not as its accuracy:
+`baldauf_2002_sellers` scores 138 points of which all 138 are outside its
+envelope, so its 48% MAE is entirely an extrapolation figure.
+
+The report ends with **`Correlation-set accuracy, as each set declares it`**,
+which prints each set's `accuracy_R`/`accuracy_G` with its provenance and
+says which are usable as bands. A `measured` figure is the error of the model
+it describes; nothing is judged against it.

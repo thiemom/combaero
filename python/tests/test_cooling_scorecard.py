@@ -14,7 +14,13 @@ import pytest
 
 from validation.cooling import jet_array_runner, orifice_runner
 from validation.cooling.schema import load_dataset
-from validation.cooling.scorecard import Cell, build, rollup, run_dataset
+from validation.cooling.scorecard import (
+    OUT_OF_DOMAIN_MARK,
+    Cell,
+    build,
+    rollup,
+    run_dataset,
+)
 
 
 @pytest.fixture(scope="module")
@@ -151,6 +157,23 @@ def test_within_is_blank_where_no_band_is_stated(cells) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _by_series(cells, label):
+    """Every cell for one series, across the in/out-of-domain split.
+
+    `build` splits a series whose points straddle the correlation set's own
+    validity box (#389), so a lookup by exact label now finds only the
+    in-domain half. Tests that mean "the whole series" say so.
+    """
+    return [c for c in cells if c.label.split(f"  {OUT_OF_DOMAIN_MARK}")[0] == label]
+
+
+def _pooled(cells, label):
+    """The whole series as one cell-like tuple: (n, n_scored)."""
+    cs = _by_series(cells, label)
+    assert cs, f"no cells for {label}"
+    return sum(c.n for c in cs), sum(c.n_scored for c in cs)
+
+
 def test_lau_independently_confirms_han_G(cells) -> None:
     """A different lab, rig and decade reproducing han_1988_orthogonal's
     heat-transfer roughness function.
@@ -158,13 +181,27 @@ def test_lau_independently_confirms_han_G(cells) -> None:
     Han prints G = 3.7 (e+)^0.28, Lau 4.218 (e+)^0.257 -- different
     coefficient AND exponent, agreeing because the forms cross near e+ = 300.
     """
-    c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_G")
-    assert c.n_scored == 9
-    assert c.rmse < 0.03, f"agreement degraded to {c.rmse:.4f}"
-    assert abs(c.bias) < 0.02
-    # Every point inside Lau's own stated +/-5.8% Stanton uncertainty -- a
-    # MEASUREMENT band from the source, not a model-derived one.
-    assert c.within == 1.0
+    n, n_scored = _pooled(cells, "lau1990/fig_table2_90deg_G")
+    assert n_scored == 9
+
+    # ONE of the nine is out of Han's declared box, and it is the top e+
+    # point: reaching e+ = 636 at this geometry needs a Reynolds number
+    # above Han's stated 60000 ceiling. The split reports it separately
+    # rather than folding it into the agreement (#389).
+    in_domain = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_G")
+    out_domain = next(
+        c for c in cells if c.label == f"lau1990/fig_table2_90deg_G  {OUT_OF_DOMAIN_MARK}"
+    )
+    assert in_domain.n_scored == 8 and out_domain.n_scored == 1
+    assert in_domain.domain == "in-domain"
+    assert out_domain.domain == "out-of-domain"
+
+    for c in (in_domain, out_domain):
+        assert c.rmse < 0.03, f"agreement degraded to {c.rmse:.4f} ({c.label})"
+        assert abs(c.bias) < 0.02
+        # Every point inside Lau's own stated +/-5.8% Stanton uncertainty
+        # -- a MEASUREMENT band from the source, not a model-derived one.
+        assert c.within == 1.0
 
 
 def test_lau_R_is_scored_now_that_an_absolute_R_branch_exists(cells) -> None:
@@ -175,10 +212,10 @@ def test_lau_R_is_scored_now_that_an_absolute_R_branch_exists(cells) -> None:
 
     The disagreement itself is pinned in
     test_lau_R_disagreement_is_now_scored_not_just_narrated."""
-    c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_R")
-    assert c.n == 9
-    assert c.n_scored == 9
-    assert not math.isnan(c.rmse)
+    n, n_scored = _pooled(cells, "lau1990/fig_table2_90deg_R")
+    assert n == 9
+    assert n_scored == 9
+    assert all(not math.isnan(c.rmse) for c in _by_series(cells, "lau1990/fig_table2_90deg_R"))
 
 
 def test_lau_Gbar_independently_confirms_hans_1p2_factor(cells) -> None:
@@ -194,15 +231,27 @@ def test_lau_Gbar_independently_confirms_hans_1p2_factor(cells) -> None:
     Lau's Gbar would apply a "Prandtl factor" -- by quoting the WITHDRAWN
     form of han_ribbed.md item 10. See #392.
     """
-    c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_Gbar")
-    assert c.n == 9
-    assert c.n_scored == 9
+    n, n_scored = _pooled(cells, "lau1990/fig_table2_90deg_Gbar")
+    assert n == 9
+    assert n_scored == 9
+
     # Two labs' wall-averaging ratios differ by 3-4% (Lau 1.235-1.251 against
     # Han's constant 1.200), so this confirms the relationship without
-    # reproducing it exactly. Pinned as a band, not a point.
+    # reproducing it exactly. Pinned as a band, not a point -- and on the
+    # IN-DOMAIN points, because the ninth sits outside Han's Reynolds
+    # ceiling and is reported separately (#389).
+    c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_Gbar")
+    assert c.n_scored == 8
     assert 0.02 < c.rmse < 0.06, f"RMSE {c.rmse:.3f} outside the recorded band"
     assert c.bias < 0.0, "Han's 1.2 should sit below Lau's ratio, not above"
     assert c.within >= 0.85
+
+    # The out-of-domain point confirms the same relationship, which is
+    # worth saying: extrapolating past the declared box did not break it.
+    out = next(
+        c for c in cells if c.label == f"lau1990/fig_table2_90deg_Gbar  {OUT_OF_DOMAIN_MARK}"
+    )
+    assert out.n_scored == 1 and out.bias < 0.0
 
 
 def test_gbar_series_score_at_every_angle_and_are_labelled_accuracy(dataset, cells) -> None:
@@ -570,3 +619,136 @@ def test_the_andrews_figures_report_as_separate_rows(dataset) -> None:
     assert 0.17 < eta_b.bias < 0.30
     # The two plates must stay far apart; a pooled row would be +13%.
     assert eta_b.bias - eta_c.bias > 0.15
+
+
+# ---------------------------------------------------------------------------
+# In-domain / out-of-domain (#389): a set must not be judged on conditions
+# its authors never claimed.
+# ---------------------------------------------------------------------------
+
+
+def test_scored_error_is_split_by_the_sets_own_validity_box(cells) -> None:
+    """`extrapolated` was a column; now it is a partition.
+
+    Every point already carried the flag -- `evaluate_rib` sets it when any
+    of `Re`, `e/D`, `p/e`, `W/H`, `alpha` or `e+` falls outside the set's
+    declared range -- and the scorecard totalled it into a number beside an
+    error that pooled both regimes. Pooling is what this removes.
+    """
+    split = [c for c in cells if c.domain == "out-of-domain"]
+    assert split, "nothing is out of domain; the partition scores nothing"
+
+    for c in cells:
+        assert c.domain in ("in-domain", "out-of-domain")
+        # The flag and the partition must agree, or the column is lying.
+        if c.domain == "out-of-domain":
+            assert c.n_extrapolated == c.n, c.label
+            assert c.label.endswith(OUT_OF_DOMAIN_MARK)
+        else:
+            assert c.n_extrapolated == 0, c.label
+            assert not c.label.endswith(OUT_OF_DOMAIN_MARK)
+
+
+def test_the_rollup_never_pools_across_the_validity_box(dataset) -> None:
+    """The row that would otherwise mislead, named.
+
+    `baldauf_2002_sellers` scores 138 points and every one of them is
+    outside its envelope -- Andrei's s/D of 7.37 against a stated maximum
+    of 5, and Murray's 5.75. A row reading "48% MAE" without saying that
+    invites reading it as the model's accuracy rather than as what
+    extrapolating it costs.
+    """
+    rows = rollup(build(run_dataset(dataset), dataset))
+    for r in rows:
+        assert r.domain in ("in-domain", "out-of-domain")
+        assert (r.domain == "out-of-domain") == r.label.endswith(OUT_OF_DOMAIN_MARK)
+        # THE INVARIANT THAT ACTUALLY BINDS THE BUCKETING, and it was
+        # missing. Every row must be PURE. Without this the rollup can
+        # stop keying on domain, mix both regimes into one row and label
+        # it from whichever cell happened to be first -- which is exactly
+        # what a falsification run did while this test stayed green.
+        assert r.n_extrapolated in (0, r.n), (
+            f"{r.label} mixes {r.n_extrapolated} extrapolated points into "
+            f"{r.n}; the row's error describes neither regime"
+        )
+        assert (r.n_extrapolated == r.n) == (r.domain == "out-of-domain")
+
+    baldauf = [r for r in rows if r.scored_by == "baldauf_2002_sellers"]
+    assert len(baldauf) == 1, "baldauf now spans both domains"
+    assert baldauf[0].domain == "out-of-domain"
+    assert baldauf[0].n_scored == 138
+
+    # And a set that straddles must report BOTH rows, never one.
+    han = [r for r in rows if r.scored_by == "han_1988_orthogonal"]
+    assert {r.domain for r in han} == {"in-domain", "out-of-domain"}
+
+
+def test_out_of_domain_is_not_assumed_to_be_worse(dataset) -> None:
+    """The reason the split is a REPORT and not a filter.
+
+    `han_1988_orthogonal`'s largest fidelity row scores BETTER outside its
+    declared box than inside it -- roughly 4.6% against 6.1% MAE. Han's
+    stated `e+ >= 50` floor and 10,000-60,000 Reynolds ceiling are
+    conservative there, and dropping or down-weighting extrapolated points
+    would have thrown away the better half.
+
+    So the harness separates them and judges neither. If this ever flips it
+    is a finding, not a failure -- but it should be noticed, which is why
+    it is pinned.
+    """
+    rows = rollup(build(run_dataset(dataset), dataset))
+    pairs: dict[tuple, dict[str, float]] = {}
+    for r in rows:
+        key = (r.scored_by, r.sampling, r.basis)
+        if r.n_scored:
+            pairs.setdefault(key, {})[r.domain] = r.mae
+
+    both = {k: v for k, v in pairs.items() if len(v) == 2}
+    assert both, "no set straddles its own validity box any more"
+
+    better_outside = [k for k, v in both.items() if v["out-of-domain"] < v["in-domain"]]
+    assert better_outside, (
+        "every straddling set now scores worse outside its box; the claim "
+        "that extrapolation is not automatically worse needs remeasuring"
+    )
+    assert ("han_1988_orthogonal", "partial", "fidelity") in better_outside
+
+
+def test_a_measured_accuracy_is_never_used_as_a_band(dataset) -> None:
+    """The guard, and the reason `usable_as_band()` exists.
+
+    Two of the three rib sets carry THIS PROJECT's own measured error in
+    `accuracy_R`/`accuracy_G`. Judging a model against its own error is
+    what #415 removed from the dataset's `uncertainty`; it must not come
+    back through the correlation set.
+
+    `within` is computed from the SERIES' `uncertainty` and from nothing
+    else, which is asserted here directly rather than trusted.
+    """
+    import combaero as cb
+    from validation.cooling.scorecard import render_set_accuracy
+
+    measured = [
+        (name, field)
+        for name in ("han_park_1988_angled", "rallabandi_2009_high_re")
+        for field in ("accuracy_R", "accuracy_G")
+        if getattr(getattr(cb, name)(), field).provenance == cb.AccuracyProvenance.Measured
+    ]
+    assert measured, "the measured figures this guards have gone"
+
+    # None of those values may appear as a band anywhere in the scoring.
+    cells = build(run_dataset(dataset), dataset)
+    banded = {c.label: c.within for c in cells if not math.isnan(c.within)}
+    for label, within in banded.items():
+        series = next(s for s in dataset if s.label == label.split("  ")[0])
+        assert series.uncertainty is not None, (
+            f"{label} reports a within fraction with no series band; it must "
+            "be coming from somewhere it should not"
+        )
+        assert 0.0 <= within <= 1.0
+
+    # And the report states the provenance rather than printing a bare
+    # number a reader would take for an author claim.
+    text = "\n".join(render_set_accuracy(["han_1988_orthogonal", "han_park_1988_angled"]))
+    assert "STATED" in text and "measured" in text
+    assert "NOT a band" in text

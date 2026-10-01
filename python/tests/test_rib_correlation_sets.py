@@ -41,8 +41,14 @@ def test_shipped_set_carries_its_provenance() -> None:
     s = han()
     assert s.provenance == _core.RibProvenance.Extracted
     assert "Han" in s.source and "1988" in s.source
-    assert s.accuracy_R == pytest.approx(0.06)
-    assert s.accuracy_G == pytest.approx(0.08)
+    # Han's own "95% of data within X%" claims, and the only STATED pair
+    # among the shipped sets -- so the only one usable as a band to judge
+    # a model against. See AccuracyProvenance (#389).
+    assert s.accuracy_R.value == pytest.approx(0.06)
+    assert s.accuracy_G.value == pytest.approx(0.08)
+    assert s.accuracy_R.provenance == _core.AccuracyProvenance.Stated
+    assert s.accuracy_G.provenance == _core.AccuracyProvenance.Stated
+    assert s.accuracy_R.usable_as_band() and s.accuracy_G.usable_as_band()
     assert s.valid_Pr == pytest.approx(0.7)
 
 
@@ -145,3 +151,96 @@ def test_friction_factor_does_not_depend_on_reynolds_number() -> None:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ---------------------------------------------------------------------------
+# Accuracy provenance (#389): a band measured FROM a model must never be the
+# band that model is judged against.
+# ---------------------------------------------------------------------------
+
+
+def test_only_an_author_stated_accuracy_is_usable_as_a_band() -> None:
+    """The circularity #415 removed from the dataset, found again in C++.
+
+    #389's scope said to use the sets' `accuracy_R`/`accuracy_G` as "the
+    source's own band". Reading them showed that cannot be done as
+    written: only `han_1988_orthogonal`'s figures are the author's claim
+    ("95% of data within 6%"). The other two are THIS PROJECT's
+    measurements, and `han_park_1988_angled`'s were taken THROUGH
+    `evaluate_rib` -- the very code path they would be judging.
+
+    So the field carries its provenance and `usable_as_band()` gates it.
+    This test pins which sets are which, because the whole point is that
+    the answer is not uniform and cannot be assumed.
+    """
+    expected = {
+        "han_1988_orthogonal": {
+            "R": (_core.AccuracyProvenance.Stated, 0.06),
+            "G": (_core.AccuracyProvenance.Stated, 0.08),
+        },
+        "han_park_1988_angled": {
+            "R": (_core.AccuracyProvenance.Measured, 0.105),
+            "G": (_core.AccuracyProvenance.Measured, 0.088),
+        },
+        "rallabandi_2009_high_re": {
+            "R": (_core.AccuracyProvenance.Unstated, None),
+            "G": (_core.AccuracyProvenance.Measured, 0.069),
+        },
+    }
+    for name, fields in expected.items():
+        s = getattr(_core, name)()
+        for field, (provenance, value) in fields.items():
+            acc = getattr(s, f"accuracy_{field}")
+            assert acc.provenance == provenance, f"{name}.accuracy_{field}"
+            if value is None:
+                assert math.isnan(acc.value), (
+                    f"{name}.accuracy_{field} is Unstated but carries a value; "
+                    "a number nothing recorded must not be readable"
+                )
+            else:
+                assert acc.value == pytest.approx(value)
+            assert acc.usable_as_band() == (provenance == _core.AccuracyProvenance.Stated)
+
+    # Exactly one of the three sets has a judgeable band. If that changes,
+    # it is because a source was read, not because a default moved.
+    judgeable = [
+        name
+        for name in expected
+        for f in ("R", "G")
+        if getattr(getattr(_core, name)(), f"accuracy_{f}").usable_as_band()
+    ]
+    assert judgeable == ["han_1988_orthogonal"] * 2
+
+
+def test_unstated_is_not_zero_and_cannot_read_as_perfect() -> None:
+    """The sentinel this replaced. `accuracy_R = 0.0` meant "unstated" and
+    read as "perfect agreement" -- the two states a validation harness
+    must never confuse. NaN propagates instead of flattering."""
+    r = _core.rallabandi_2009_high_re().accuracy_R
+    assert r.provenance == _core.AccuracyProvenance.Unstated
+    assert math.isnan(r.value)
+    assert not (r.value < 0.10)  # a NaN comparison, i.e. no silent pass
+    assert not r.usable_as_band()
+
+    blank = _core.StatedAccuracy()
+    assert math.isnan(blank.value)
+    assert blank.provenance == _core.AccuracyProvenance.Unstated
+
+
+def test_a_set_cannot_claim_a_provenance_without_a_value() -> None:
+    """Validation binds the two together, so they cannot drift apart."""
+    s = _core.han_1988_orthogonal()
+    s.accuracy_R = _core.StatedAccuracy.unstated()
+    s.accuracy_R.value = 0.06  # a value with no provenance to back it
+    with pytest.raises(ValueError, match="if and only if"):
+        _core.validate_rib_set(s)
+
+    t = _core.han_1988_orthogonal()
+    t.accuracy_G = _core.StatedAccuracy.stated(float("nan"))
+    with pytest.raises(ValueError, match="if and only if"):
+        _core.validate_rib_set(t)
+
+    u = _core.han_1988_orthogonal()
+    u.accuracy_G = _core.StatedAccuracy.stated(-0.05)
+    with pytest.raises(ValueError, match="non-negative"):
+        _core.validate_rib_set(u)

@@ -646,17 +646,35 @@ def test_han_park_1988_angled_scores_its_own_source(records) -> None:
     geometry (the cloud carries no legend). Bands are what this project
     measured, not an author claim -- see the C++ set's accuracy_R/accuracy_G
     comment for why that distinction matters here specifically.
+
+    THE COUNTS ARE POOLED ACROSS THE VALIDITY SPLIT, and that is itself
+    worth knowing: `build` now separates in- and out-of-domain points
+    (#389), and part of each panel falls outside han_park_1988_angled's
+    own declared box. So the `measured` accuracy figures the C++ set
+    carries -- 10.5% and 8.8%, taken from these very panels -- mix the two
+    regimes. One more reason they are reported rather than used as a band.
     """
     from validation.cooling.scorecard import build
 
-    cells = {c.label: c for c in build(records)}
-    r_cell = cells["han2012/fig4.47_R_vs_alpha"]
-    g_cell = cells["han2012/fig4.47_G_vs_eplus"]
+    cells = build(records)
 
-    assert r_cell.n_scored == 39
-    assert r_cell.rmse < 0.12
-    assert g_cell.n_scored == 115
-    assert g_cell.rmse < 0.10
+    def panel(label):
+        cs = [c for c in cells if c.label.split("  {out}")[0] == label]
+        assert cs, label
+        n_scored = sum(c.n_scored for c in cs)
+        worst = max(c.rmse for c in cs)
+        return n_scored, worst, len(cs)
+
+    r_scored, r_rmse, r_parts = panel("han2012/fig4.47_R_vs_alpha")
+    g_scored, g_rmse, g_parts = panel("han2012/fig4.47_G_vs_eplus")
+
+    assert r_scored == 39
+    assert r_rmse < 0.13
+    assert g_scored == 115
+    assert g_rmse < 0.11
+    # Both panels really do straddle the box; if one stopped, the note
+    # above about the measured figures mixing regimes would need redoing.
+    assert r_parts == 2 and g_parts == 2
 
 
 def test_han_park_1988_angled_confirmed_independently_by_figure_451(

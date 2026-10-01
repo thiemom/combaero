@@ -36,7 +36,9 @@ try:
     # Preferred: local extension in the same package (installed wheel or
     # in-tree build where _core was successfully built next to this file).
     from ._core import (
+        AccuracyProvenance,
         RibCorrelationSet,
+        StatedAccuracy,
         RibGeometry,
         GShapeModel,
         RAlphaShape,
@@ -870,7 +872,9 @@ def suppress_warnings() -> _Generator[None, None, None]:
 
 
 __all__ = [
+    "AccuracyProvenance",
     "RibCorrelationSet",
+    "StatedAccuracy",
     "RibGeometry",
     "GShapeModel",
     "RAlphaShape",
