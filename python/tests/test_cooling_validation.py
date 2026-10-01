@@ -680,6 +680,61 @@ def test_figure_448_nothing_is_scored_against_the_wrong_paper(dataset) -> None:
             assert s.scores is None, s.label
 
 
+def test_figure_453_90deg_scores_on_the_performance_curve(records) -> None:
+    """#435: Nu_ratio against f_ratio, with Re recovered from f_ratio.
+
+    Han and Zhang state Re 15,000-80,000 and nothing else about the rig.
+    The chain's recovered Re landing inside that range is a check the
+    borrowed geometry and the fbar convention could have failed.
+    """
+    rows = [r for r in records if r.series.label == "han2012/fig4.53_90deg_continuous_Nu_ratio"]
+    assert len(rows) == 5
+    assert all(r.predicted is not None for r in rows), [r.reason for r in rows]
+    assert all(15_000 <= r.re_used <= 80_000 for r in rows), [r.re_used for r in rows]
+    mae = sum(abs(r.rel_error) for r in rows) / len(rows)
+    assert mae < 0.10, f"MAE {mae:.1%}; recorded at 7.9% when #435 landed"
+
+
+def test_figure_453_reading_f_ratio_as_four_sided_f_is_caught() -> None:
+    """The convention trap, falsified rather than asserted.
+
+    figure 4.53's f_ratio is the channel-average fbar over f_s. Read as
+    evaluate_rib's four-sided f instead, the model's ratio is ~1.8x the
+    measured one across the whole stated Re range, so no Re reaches it.
+    """
+    import combaero as cb
+    from validation.cooling.runner import SMOOTH_F_COEF, SMOOTH_F_EXP
+
+    s = cb.han_1988_orthogonal()
+    g = cb.RibGeometry(e_D=0.0625, p_e=10.0, W_H=1.0, alpha_deg=90.0)
+    for re in (15_000, 80_000):
+        f4 = cb.evaluate_rib(s, g, re).f / (SMOOTH_F_COEF * re**SMOOTH_F_EXP)
+        assert f4 > 8.0, "four-sided ratio overlaps the measured 5.4-6.3"
+
+
+def test_figure_453_60deg_vee_stays_refused(dataset) -> None:
+    """Rib SHAPE has no representation (#434). Scoring the V-shaped series
+    against han_park_1988_angled would alias a V onto a parallel rib."""
+    series = next(s for s in dataset if s.label == "han2012/fig4.53_60deg_vcontinuous_Nu_ratio")
+    assert series.scores is None
+    assert "#434" in series.cross_check
+
+
+def test_f_ratio_path_refuses_what_it_cannot_predict(dataset) -> None:
+    import dataclasses
+
+    from validation.cooling.runner import run_series
+
+    series = next(s for s in dataset if s.label == "han2012/fig4.53_90deg_continuous_Nu_ratio")
+    for impostor, word in (
+        (dataclasses.replace(series, y_axis="G"), "only predicts Nu_ratio"),
+        (dataclasses.replace(series, geometry=None), "no rig geometry"),
+    ):
+        recs = run_series(impostor)
+        assert all(r.predicted is None for r in recs)
+        assert all(word in (r.reason or "") for r in recs)
+
+
 def test_han_park_1988_angled_scores_its_own_source(records) -> None:
     """han_park_1988_angled must reproduce figure 4.47, its own source.
 
