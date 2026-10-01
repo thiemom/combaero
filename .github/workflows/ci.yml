@@ -35,6 +35,15 @@ jobs:
               - 'include/**'
               - 'python/**'
               - 'tests/**'
+              # validation/ holds BOTH the scored dataset and the runners
+              # that consume it -- scorecard.py, conventions.py, fidelity.py
+              # and the per-physics runners are code, and they live here
+              # rather than under python/. Without this line a change to
+              # either skips every test job and the status-check passes
+              # vacuously, which is how PR #437 merged with 10 of 14 checks
+              # skipped. The tests that read validation/cooling/data/** are
+              # exactly the ones a dataset change can break.
+              - 'validation/**'
               - 'scripts/**'
               - 'examples/**'
               - '.github/workflows/**'
