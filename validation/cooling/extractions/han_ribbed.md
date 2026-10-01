@@ -12,13 +12,19 @@ reviewer has signed off in the review log. This document is released for
 implementation under #334.
 
 Modelling decisions accepted with it -- **D1** (treat `R` as constant
-in `e+`), **D2** (use `12.31`), and **D5** (extend `RibCorrelationSet` rather
-than give Eq. 4.17/4.18 its own type). **D3 was withdrawn**: it recorded a
-departure from the printed four-sided friction factor that turned out not to
-exist. Nothing in the implementation diverges from the source.
+in `e+`), **D2** (use `12.31`), **D5** (extend `RibCorrelationSet` rather
+than give Eq. 4.17/4.18 its own type), and **D6** (fit `R` for `W/H < 1` to
+Fig. 4.48a's drawn line, since no printed equation exists). **D3 was
+withdrawn**: it recorded a departure from the printed four-sided friction
+factor that turned out not to exist. Nothing in the implementation
+diverges from the source, except D6's R, which is explicitly NOT an
+extraction and is labelled `Fitted`.
 
 Eq. 4.17 (R vs alpha) and Eq. 4.18 (G, square/rectangular switch)
 IMPLEMENTED 2026-09-20 as `combaero.han_park_1988_angled()`.
+
+Eq. 4.19 (G, narrow-channel alpha switch; R from D6's fit) IMPLEMENTED
+2026-10-01 as `combaero.han_1989_narrow_channel()` (#402).
 
 Changes after this point go in the review log, not silently into the tables. If
 implementation surfaces something the extraction got wrong, that reopens the
@@ -514,7 +520,7 @@ with the `G` correlation attributed in the text to Han et al. (1989).
 | 37 | `1/2 < W/H < 1` | `n = 0.35`; `C = 2.24` at `alpha = 90 deg`, `C = 1.80` for `30 < alpha < 90` | confirmed by text |
 | 38 | `1/4 < W/H < 1/2` | `n = 0.35 (W/H)^0.44`; `C = 2.24 (W/H)^-0.76` at `alpha = 90 deg`, `C = 1.80 (W/H)^-0.76` for `30 < alpha < 90` | confirmed by text |
 | 39 | `R` behaviour, Fig. 4.48 | `R` increases with decreasing `W/H`; all three aspect ratios coincide at `alpha = 30 deg` | confirmed by text |
-| 40 | `R` correlation for narrow channels | plotted in Fig. 4.48a, no closed form in the extracted text | **missing -- digitised as data, see below** |
+| 40 | `R` correlation for narrow channels | plotted in Fig. 4.48a, no closed form in the extracted text | **resolved by D6: fitted, not extracted** |
 
 ### Cross-check: Eq. 4.18 and Eq. 4.19 meet exactly at `W/H = 1`
 
@@ -773,6 +779,70 @@ A caller whose solver traverses either boundary exactly needs a guard this
 evaluator does not supply; the jump sizes are pinned by
 `HanParkRAndGSwitchesAreGenuineDiscontinuities` in `test_rib_correlation.cpp`
 so a future "helpful" smoothing change cannot land silently.
+
+### D6. Fit `R` for `W/H < 1` to Fig. 4.48a's drawn line -- not an extraction
+
+**Decision, 2026-10-01 (#402).** Item 40: Han et al. (1989)/Fig. 4.48 give a
+closed-form `G` (Eq. 4.19) but print no equation for `R` below `W/H = 1` --
+only a drawn correlation line. `han_1989_narrow_channel()` needed a value
+for `R` anyway, since it feeds directly into `f` through the wall-law
+inversion every other set in this file also uses.
+
+**What was fitted, and against what.** A quadratic in `alpha/90`, the same
+functional shape Eq. 4.17 already uses for angled ribs -- one triple of
+coefficients per `W/H` sub-band (`1/2 <= W/H < 1` and `1/4 < W/H < 1/2`,
+the same split item 41 already established), least-squares fit to the two
+already-digitised drawn-line series,
+`fig4.48_R_correlation_WH0.5.csv`/`_WH0.25.csv`. RMS against the line
+itself: 0.99% (wide band), 0.62% (narrow band) -- both far inside Han's
+usual 6% scatter, so the quadratic shape is not a stretch for this family.
+
+**Why this is not an extraction.** Every other coefficient in this file is
+transcribed from a printed equation and checked against the source. These
+two quadratics were never printed anywhere -- they are this project's own
+choice of functional form, fitted to a figure we also digitised. That is
+exactly what `RibProvenance::Fitted` exists to distinguish from
+`Extracted`, and it is the first time this project has actually populated
+it (previously defined, unused by any of the three earlier sets).
+
+**The set-level `provenance` is `Fitted`, even though `G` alone is
+`Extracted`.** `RibCorrelationSet::provenance` is one enum per set, and
+splitting it into `provenance_R`/`provenance_G` would touch the Python
+bindings, the GUI surface and every existing test for a distinction that
+is explained in one sentence in the factory's own doc comment. The more
+cautious of the two values was kept rather than the more flattering one --
+a reader who only checks `provenance` should not be told the whole set is
+`Extracted` when a third of its claim (the friction side) is not.
+
+**Accuracy is `Measured`, against the RAW scatter, separately from the
+fit.** The coefficients above were fitted to the drawn LINE; `accuracy_R`
+(pooled RMS 5.4%, bias -0.9%/+0.4% per band) is measured against the 16
+raw digitised points in `fig4.48_R_WH0.25.csv`/`_WH0.5.csv` instead -- the
+same fit/score separation `rallabandi_2009_high_re` already observes.
+Never a judging band (`AccuracyProvenance::Measured`), same as every other
+measured figure in this file.
+
+**`G`'s accuracy is also `Measured`, at `alpha = 90` deg uniformly, and
+that is a checked simplification, not an unresolved gap.** The raw `G`
+scatter (`fig4.48_G_WH0.25.csv`/`_WH0.5.csv`) pools multiple rib angles
+onto one e+-vs-G curve with no per-point angle recorded, so Eq. 4.19's
+alpha switch (`C=2.24` at 90 deg, `1.80` off-axis -- a nominal 24% jump)
+cannot be resolved per point. Scored at `alpha=90` uniformly regardless
+(pooled RMS 5.4%, bias +1.9% over 21 points), consistent with how
+`G_BAR_OVER_G` in `runner.py` already applies a published constant
+everywhere and reports the resulting error as accuracy rather than
+refusing. Checked rather than assumed: a free power-law fit to the pooled
+scatter ALONE, ignoring the text's alpha switch entirely, already lands
+within 3.9-5.0% RMS -- so the angles are not separable on this axis in the
+first place, and scoring at one fixed angle is not hiding a 24%-scale
+defect.
+
+**What this does NOT do.** It does not extend to any `W/H` or `alpha`
+Han's own figure does not cover, and it does not smooth the genuine
+discontinuities Eq. 4.19 states (the alpha switch; the `W/H` sub-band
+boundary at 1/2). Both are pinned by
+`HanNarrowRAndGSwitchesAreGenuineDiscontinuities` in
+`test_rib_correlation.cpp`, the same discipline D5 established.
 
 ### D2. Use `12.31`, not `12.3`, in Eq. 4.17
 
@@ -1084,6 +1154,7 @@ confirmation it was waiting for came from a different and stronger place.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-10-01 | Claude | **Eq. 4.19 implemented** as `combaero.han_1989_narrow_channel()` (#402), settling item 40 via decision D6. `G` is text-extracted (items 36-38); `R` has no printed equation below `W/H=1` and is this project's own quadratic-in-alpha fit to Fig. 4.48a's drawn line (0.99%/0.62% RMS against the two sub-bands' lines), scored separately against the raw digitised scatter (`accuracy_R` 5.4% RMS over 16 points). `G`'s raw scatter pools multiple rib angles with no per-point angle recorded, so it is scored at `alpha=90` uniformly; checked rather than assumed that this does not hide Eq. 4.19's own ~24% alpha switch, since a free fit to the pooled points alone already lands within 3.9-5.0% RMS (`accuracy_G` 5.4% RMS over 21 points). Wired 37 previously-unscored Fig. 4.48 points (`fig4.48_{R,G}_WH{0.25,0.5}`); the `*_WH1_ref3` drawn-line and error-bar series stay deliberately unscored, unaffected -- the issue's "58 points" estimate did not account for that, and the real unlock is 37. New schema shapes (`RAlphaShape::QuadraticAlphaTwoBand`, `GShapeModel::NarrowChannelAlphaSwitch`) follow D5's precedent: additive fields, `han_1988_orthogonal`/`rallabandi_2009_high_re`/`han_park_1988_angled`'s test suites pass unmodified. Writing the Stanton-derivative test caught a real bug before it shipped: the generic `dG/dRe` formula used the shape's unscaled base `e+` exponent rather than the `(W/H)`-corrected one actually applied in the narrow sub-band, silently wrong by as much as 40% there until fixed. |
 | 2026-09-26 | reviewer + Claude | **Han's rib implementation wrapped up; open-items list swept.** Items 6, 18 and 23 were all already resolved in this document's own Resolved table while still listed as open -- item 23 twice, with different content in each place. Nothing was reopened by the sweep. Two decisions recorded rather than left hanging. **(1) Eq. 4.18 reads low on `G`**, confirmed out-of-sample by CR-3837 at every rib angle (-0.8% to -19.9%); recorded as a known accuracy limit of the published correlation, not a defect, since "improving" a paper against one dataset is a new feature with its own evidence bar. **(2) No generalised `G_bar/G`.** Pooling 91-GT-3's table 3 (extracted for this), Lau's table 2 and CR-3837's per-run split gives 16 configurations over three rigs spanning 1.096-1.413, and **69% of that variance is BETWEEN rigs** -- no angle or shape term can reach a rig offset, so a "better" correlation would fit rig identity. Han's 1.2 scores MAE 8.3% against the pooled population and is applied as published at every angle (#401). Pinned by a test that fails if the between-rig share drops, which is the condition for revisiting. |
 | 2026-09-26 | reviewer + Claude | **`han_park_1988_angled` was scoring every angled series at 90 degrees.** Found while wiring NASA CR-3837 in as a tabulated primary (see `han_park_lei_1984_cr3837.md`): on the `e+` path `run_series` copied `e_D`, `p_e` and `W_H` out of `series.geometry` but never `alpha_deg`, which is a top-level field rather than part of that mapping, so `_probe_geometry`'s default of 90 survived. Every angled series was therefore scored as though its ribs were transverse -- against the one set whose entire subject is rib angle. **This invalidates the "RMS 8.5%" cross-check against figure 4.51's parallel-rib classes recorded in the 2026-09-20 entry below**; that number was computed at 90 degrees for 45 and 60 degree data. Re-scored after the fix, `fig4.51_G_60par` reports MAE 6.8%, bias -6.8%, and the set as a whole moves from bias +4.4% to +1.5%. Fixed with a test that checks the prediction against `evaluate_rib` at the declared angle rather than against a stored number, falsified by reverting the fix. The defect is the shape this project exists to catch: nothing failed, the numbers merely meant something other than what they said. |
 | 2026-09-26 | reviewer + Claude | **The `e/D` 0.047 / `P/e` 10 / `W/H` 2 class dispute is closed, from behind the figure rather than by re-reading it.** Its two panels paired on only 2 of 4 marks, and the digitised data could not say which symbol they belonged to. Resolved with **NASA CR-4015** (= AVSCOM 86-C-25), Han, Park and Ibrahim, contract NAS3-24227, September 1986 -- the report Fig. 4.46's "This study" classes come from, traced through the acknowledgement in Han and Park (1988), which names NAS3-24227 where CR-3837 carries NAG3-311. Its appendix 7.3 tabulates every run with a self-identifying header (`E/D`, `P/E`, `ALPHA`, `HYD DIA`), so the class is found BY LABEL and the overplotted cluster is never resolved. Five runs on pp.141-145 at `Re` 10111, 18869, 32117, 60898, 64193 give `e+` 80.7, 150.5, 256.2, 485.8, 512.1, and **every mark in both panels lands on one of them**. Two recorded claims were wrong: the class is not "absent near `e+` ~ 80" (run 22 sits at 80.7 and the `R` panel picked it up to 0.1%), and its predicted ceiling of 479 was too low (the true maximum is 512.1, so the 546.6 mark is 6.7% out, not outside the class). The non-pairing was overplotting: the panels share `e+`, so a mark visible in one proves the run exists in both and silence in the other only means buried -- see #393. Reviewer independently confirmed the one clipped digit (`Re` 32117) by mass-flow ratio against run 24. |

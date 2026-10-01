@@ -3060,9 +3060,11 @@ files:
       against the physics: R must rise as W/H falls, and these solid
       points measure R(alpha=90) ~ 6.23 against the open (W/H=2/4)
       points' 5.05 and the W/H=1 reference curve's 3.20 -- monotonic in
-      the right direction. Not scored: outside han_1988_orthogonal's
-      valid_WH=[1,4]; acceptance data for Eq. 4.19 (#334).
-    scores: null
+      the right direction. Outside han_1988_orthogonal/han_park_1988_angled's
+      valid_WH=[1,4]; scored by han_1989_narrow_channel instead (#402),
+      whose R is this project's own fit to the drawn correlation line (no
+      printed equation exists at W/H < 1).
+    scores: han_1989_narrow_channel
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -3095,9 +3097,10 @@ files:
     cross_check: >-
       Attribution by marker fill (open). R(alpha=90) ~ 5.05, between the
       solid (W/H=1/4) points at 6.23 and the W/H=1 reference at 3.20 --
-      the required ordering. Not scored: outside valid_WH=[1,4];
-      acceptance data for Eq. 4.19 (#334).
-    scores: null
+      the required ordering. Outside han_1988_orthogonal/
+      han_park_1988_angled's valid_WH=[1,4]; scored by
+      han_1989_narrow_channel instead (#402).
+    scores: han_1989_narrow_channel
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -3275,9 +3278,15 @@ files:
     class_confidence: confirmed
     uncertainty: 0.06
     cross_check: >-
-      Attribution by fill (open), matching panel (a)'s split. Not scored:
-      outside valid_WH=[1,4]; acceptance data for Eq. 4.19 (#334).
-    scores: null
+      Attribution by fill (open), matching panel (a)'s split. Outside
+      valid_WH=[1,4]; scored by han_1989_narrow_channel instead (#402),
+      at alpha=90 deg uniformly -- this series pools multiple rib angles
+      onto one e+-vs-G curve with no per-point angle recorded, and a free
+      power-law fit to the pooled points alone already lands within 5% RMS
+      even though Eq. 4.19's own text states a 24% swing in its leading
+      constant between alpha=90 and off-axis, so the angles are not
+      separable on this axis to begin with.
+    scores: han_1989_narrow_channel
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -3308,9 +3317,10 @@ files:
     class_confidence: confirmed
     uncertainty: 0.06
     cross_check: >-
-      Attribution by fill (solid). Not scored: outside valid_WH=[1,4];
-      acceptance data for Eq. 4.19 (#334).
-    scores: null
+      Attribution by fill (solid). Outside valid_WH=[1,4]; scored by
+      han_1989_narrow_channel instead (#402), at alpha=90 deg uniformly --
+      same pooled-angle reasoning as fig4.48_G_WH0.5.csv.
+    scores: han_1989_narrow_channel
     verification:
       x_axis_type: log
       y_axis_type: log

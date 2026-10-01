@@ -157,6 +157,12 @@ def run_dataset(dataset) -> list[Record]:
 SET_ORIGIN: dict[str, str] = {
     "han_1988_orthogonal": "ASME J. Heat Transfer 110, 321",
     "han_park_1988_angled": "IJHMT 31(1), 183",
+    # Fig. 4.48 (where all of this set's scored series live) is credited
+    # "Han, J.C. et al. (1988). IJHMT 31(1), 183" -- the same journal
+    # citation as han_park_1988_angled's Fig. 4.47, even though Eq. 4.19's G
+    # is attributed in the running text to a companion Han et al. (1989).
+    # Same figure, same research effort: Fig. 4.48 is this set's own data.
+    "han_1989_narrow_channel": "IJHMT 31(1), 183",
     "rallabandi_2009_high_re": "rallabandi",
     "florschuetz_1981_inline": "florschuetz1981",
     "mcgreehan_schotsch_1988_cd": "mcgreehan_schotsch1988",
@@ -495,6 +501,7 @@ def _rib_set(name: str):
         "han_1988_orthogonal": getattr(cb, "han_1988_orthogonal", None),
         "han_park_1988_angled": getattr(cb, "han_park_1988_angled", None),
         "rallabandi_2009_high_re": getattr(cb, "rallabandi_2009_high_re", None),
+        "han_1989_narrow_channel": getattr(cb, "han_1989_narrow_channel", None),
     }.get(name)
     return factory() if factory else None
 

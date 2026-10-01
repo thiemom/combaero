@@ -440,12 +440,22 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
 // validation/cooling/extractions/han_ribbed.md, decision D5, and
 // RibCorrelationSet::RAlphaShape / GShapeModel in rib_correlation.h.
 //
+// han_1989_narrow_channel (Eq. 4.19, W/H < 1) adds two more shapes. R has
+// NO PRINTED EQUATION in this source -- only a drawn figure line -- so its
+// quadratic-in-alpha coefficients (QuadraticAlphaTwoBand, one per W/H
+// sub-band) are this project's OWN FIT to that line, not an extraction;
+// provenance is Fitted. G (NarrowChannelAlphaSwitch) IS text-extracted: a
+// hard ~20% switch in its leading constant at alpha == 90 deg, plus a
+// further W/H correction to both the constant and the e+ exponent itself
+// below W/H = 1/2. See han_ribbed.md item 40 and decision D6.
+//
 // Named sets, selected explicitly -- there is no auto-switching between
 // them, since they cover disjoint regimes rather than one being an update
 // of the other:
 RibCorrelationSet han_1988_orthogonal();       // 90 deg, Re 10e3-60e3
 RibCorrelationSet rallabandi_2009_high_re();   // 45 deg sharp ribs, Re 30e3-400e3
 RibCorrelationSet han_park_1988_angled();      // 30-90 deg, W/H 1-4, Re 10e3-60e3
+RibCorrelationSet han_1989_narrow_channel();   // 30-90 deg, W/H 1/4-1, Re 10e3-60e3
 void validate_rib_set(const RibCorrelationSet& set);   // throws on a bad set
 
 // Accuracy carries WHERE IT CAME FROM, because only an author's own claim
@@ -461,11 +471,11 @@ struct StatedAccuracy {
   static StatedAccuracy measured(double v);
   static StatedAccuracy unstated();
 };
-// set.accuracy_R / set.accuracy_G are StatedAccuracy. Of the three shipped
+// set.accuracy_R / set.accuracy_G are StatedAccuracy. Of the four shipped
 // sets only han_1988_orthogonal's are Stated (Han's "95% within 6%/8%");
-// han_park_1988_angled's were measured through evaluate_rib itself, and
-// rallabandi_2009_high_re's accuracy_R is Unstated -- previously 0.0, which
-// read as perfect agreement.
+// han_park_1988_angled's and han_1989_narrow_channel's were measured
+// through evaluate_rib itself, and rallabandi_2009_high_re's accuracy_R is
+// Unstated -- previously 0.0, which read as perfect agreement.
 RibResult evaluate_rib(const RibCorrelationSet& set,
                        const RibGeometry& geom, double Re);
 // evaluate_rib never throws: Re may be negative or zero and the guards are

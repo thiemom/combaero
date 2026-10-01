@@ -448,6 +448,7 @@ All functions use consistent units to avoid conversion errors.
 | `han_1988_orthogonal`                              | -                                                                | RibCorrelationSet |
 | `rallabandi_2009_high_re`                          | -                                                                | RibCorrelationSet |
 | `han_park_1988_angled`                             | -                                                                | RibCorrelationSet |
+| `han_1989_narrow_channel`                          | -                                                                | RibCorrelationSet |
 | `validate_rib_set`                                 | correlation_set: RibCorrelationSet                               | None              |
 | `evaluate_rib`                                     | correlation_set: RibCorrelationSet, geometry: RibGeometry, Re: - | RibResult         |
 | `RibGeometry::e_D`                                 | -                                                                | -                 |
@@ -479,6 +480,10 @@ All functions use consistent units to avoid conversion errors.
 | `RibCorrelationSet::R_quad_WH_exponent_at_90`      | -                                                                | -                 |
 | `RibCorrelationSet::R_quad_WH_exponent_off_90`     | -                                                                | -                 |
 | `RibCorrelationSet::R_quad_WH_cap`                 | -                                                                | -                 |
+| `RibCorrelationSet::R_quad_narrow_c0`              | -                                                                | -                 |
+| `RibCorrelationSet::R_quad_narrow_c1`              | -                                                                | -                 |
+| `RibCorrelationSet::R_quad_narrow_c2`              | -                                                                | -                 |
+| `RibCorrelationSet::R_WH_band_boundary`            | -                                                                | -                 |
 | `RibCorrelationSet::G_shape_model`                 | -                                                                | -                 |
 | `RibCorrelationSet::C_G`                           | -                                                                | -                 |
 | `RibCorrelationSet::G_eD`                          | -                                                                | -                 |
@@ -490,6 +495,11 @@ All functions use consistent units to avoid conversion errors.
 | `RibCorrelationSet::G_shape_alpha_exponent_rect`   | -                                                                | -                 |
 | `RibCorrelationSet::G_shape_pe_exponent_square`    | -                                                                | -                 |
 | `RibCorrelationSet::G_shape_pe_exponent_rect`      | -                                                                | -                 |
+| `RibCorrelationSet::G_narrow_C_alpha90`            | -                                                                | -                 |
+| `RibCorrelationSet::G_narrow_C_off_axis`           | -                                                                | -                 |
+| `RibCorrelationSet::G_narrow_WH_band_boundary`     | -                                                                | -                 |
+| `RibCorrelationSet::G_narrow_WH_C_exponent`        | -                                                                | -                 |
+| `RibCorrelationSet::G_narrow_WH_n_exponent`        | -                                                                | -                 |
 | `RibCorrelationSet::valid_Re`                      | -                                                                | -                 |
 | `RibCorrelationSet::valid_eD`                      | -                                                                | -                 |
 | `RibCorrelationSet::valid_pe`                      | -                                                                | -                 |
@@ -520,10 +530,12 @@ All functions use consistent units to avoid conversion errors.
 | `RibProvenance::value`                             | -                                                                | -                 |
 | `RAlphaShape::PowerLaw`                            | -                                                                | -                 |
 | `RAlphaShape::QuadraticAlpha`                      | -                                                                | -                 |
+| `RAlphaShape::QuadraticAlphaTwoBand`               | -                                                                | -                 |
 | `RAlphaShape::name`                                | -                                                                | -                 |
 | `RAlphaShape::value`                               | -                                                                | -                 |
 | `GShapeModel::Fixed`                               | -                                                                | -                 |
 | `GShapeModel::SquareVsRectangular`                 | -                                                                | -                 |
+| `GShapeModel::NarrowChannelAlphaSwitch`            | -                                                                | -                 |
 | `GShapeModel::name`                                | -                                                                | -                 |
 | `GShapeModel::value`                               | -                                                                | -                 |
 

@@ -59,6 +59,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`han_1989_narrow_channel`: Eq. 4.19 as its own selectable `RibCorrelationSet`,
+  extending the Han rib family to narrow-aspect-ratio channels (`W/H` 1/4-1,
+  `alpha` 30-90 deg).** Closes #402, the largest single block of unscored
+  rib data left -- 37 previously-"not scored by any set" points in
+  `fig4.48_{R,G}_WH{0.25,0.5}` now score.
+
+  `G` is text-extracted: a hard ~20% switch in its leading constant at
+  `alpha == 90 deg`, plus a further `W/H` correction below `W/H = 1/2` to
+  both the constant and the `e+` exponent itself (`GShapeModel::
+  NarrowChannelAlphaSwitch`). `R` has **no printed equation** below
+  `W/H = 1` -- only a drawn figure line -- so its coefficients
+  (`RAlphaShape::QuadraticAlphaTwoBand`, one quadratic-in-alpha per `W/H`
+  sub-band) are this project's own fit to that line, and the set's
+  `provenance` is `Fitted` rather than `Extracted` as a result. See
+  `validation/cooling/extractions/han_ribbed.md`, item 40 and decision D6.
+
+  Both new schema shapes are additive, following the same pattern #334
+  used for `han_park_1988_angled`: `han_1988_orthogonal`,
+  `rallabandi_2009_high_re` and `han_park_1988_angled` are provably
+  unaffected, their full test suites passing unmodified. The `*_WH1_ref3`
+  drawn-line and error-bar series stay deliberately unscored.
+
 - **Taslim & Spring (1987), AIAA-87-2009 digitised -- the first rib source in
   this dataset that is not Texas A&M.** Northeastern plus General Electric.
   38 series over five figures: friction and Nusselt for eight two-side

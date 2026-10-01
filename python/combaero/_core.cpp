@@ -97,7 +97,15 @@ PYBIND11_MODULE(_core, m) {
              combaero::cooling::RibCorrelationSet::RAlphaShape::QuadraticAlpha,
              "R/[(p/e/10)^0.35 (W/H)^m] is a quadratic in alpha/90 (the "
              "R_quad_* fields), with m switching on alpha == 90 deg. "
-             "R_eD, R_WH and R_alpha are ignored in this shape.");
+             "R_eD, R_WH and R_alpha are ignored in this shape.")
+      .value("QuadraticAlphaTwoBand",
+             combaero::cooling::RibCorrelationSet::RAlphaShape::
+                 QuadraticAlphaTwoBand,
+             "R is a quadratic in alpha/90 with no p/e or W/H power-law "
+             "term; W/H alone selects which of two quadratics applies "
+             "(R_quad_* above R_WH_band_boundary, R_quad_narrow_* below). "
+             "Fitted by this project to a drawn figure line, not an "
+             "extraction -- see han_ribbed.md item 40.");
 
   py::enum_<combaero::cooling::RibCorrelationSet::GShapeModel>(
       m, "GShapeModel")
@@ -109,7 +117,14 @@ PYBIND11_MODULE(_core, m) {
                  SquareVsRectangular,
              "G's alpha and p/e exponents switch on whether W/H == 1 "
              "(square, the G_shape_*_square fields) or not (rectangular, "
-             "the G_shape_*_rect fields). G_alpha and G_pe are ignored.");
+             "the G_shape_*_rect fields). G_alpha and G_pe are ignored.")
+      .value("NarrowChannelAlphaSwitch",
+             combaero::cooling::RibCorrelationSet::GShapeModel::
+                 NarrowChannelAlphaSwitch,
+             "G = C(e+)^n, with C switching on alpha == 90 deg "
+             "(G_narrow_C_alpha90/off_axis) and, below "
+             "G_narrow_WH_band_boundary, a further (W/H) correction to "
+             "both C and n. C_G, G_eD, G_pe, G_WH and G_alpha are ignored.");
 
   py::class_<combaero::cooling::RibTerm>(m, "RibTerm")
       .def(py::init<>())
@@ -221,6 +236,14 @@ PYBIND11_MODULE(_core, m) {
           &combaero::cooling::RibCorrelationSet::R_quad_WH_exponent_off_90)
       .def_readwrite("R_quad_WH_cap",
                      &combaero::cooling::RibCorrelationSet::R_quad_WH_cap)
+      .def_readwrite("R_quad_narrow_c0",
+                     &combaero::cooling::RibCorrelationSet::R_quad_narrow_c0)
+      .def_readwrite("R_quad_narrow_c1",
+                     &combaero::cooling::RibCorrelationSet::R_quad_narrow_c1)
+      .def_readwrite("R_quad_narrow_c2",
+                     &combaero::cooling::RibCorrelationSet::R_quad_narrow_c2)
+      .def_readwrite("R_WH_band_boundary",
+                     &combaero::cooling::RibCorrelationSet::R_WH_band_boundary)
       .def_readwrite("G_shape_model",
                      &combaero::cooling::RibCorrelationSet::G_shape_model)
       .def_readwrite("C_G", &combaero::cooling::RibCorrelationSet::C_G)
@@ -242,6 +265,21 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite(
           "G_shape_pe_exponent_rect",
           &combaero::cooling::RibCorrelationSet::G_shape_pe_exponent_rect)
+      .def_readwrite(
+          "G_narrow_C_alpha90",
+          &combaero::cooling::RibCorrelationSet::G_narrow_C_alpha90)
+      .def_readwrite(
+          "G_narrow_C_off_axis",
+          &combaero::cooling::RibCorrelationSet::G_narrow_C_off_axis)
+      .def_readwrite(
+          "G_narrow_WH_band_boundary",
+          &combaero::cooling::RibCorrelationSet::G_narrow_WH_band_boundary)
+      .def_readwrite(
+          "G_narrow_WH_C_exponent",
+          &combaero::cooling::RibCorrelationSet::G_narrow_WH_C_exponent)
+      .def_readwrite(
+          "G_narrow_WH_n_exponent",
+          &combaero::cooling::RibCorrelationSet::G_narrow_WH_n_exponent)
       .def_readwrite("valid_Re",
                      &combaero::cooling::RibCorrelationSet::valid_Re)
       .def_readwrite("valid_eD",
@@ -272,6 +310,11 @@ PYBIND11_MODULE(_core, m) {
         "Han and Park (1988) angled ribs in broad-aspect-ratio rectangular "
         "ducts. Extracted and confirmed; see "
         "validation/cooling/extractions/han_ribbed.md.");
+  m.def("han_1989_narrow_channel", &combaero::cooling::han_1989_narrow_channel,
+        "Han et al. (1989), Eq. 4.19, narrow-aspect-ratio channels "
+        "(1/4 < W/H < 1). G is extracted from the text; R has no printed "
+        "equation and is this project's own fit to Fig. 4.48a's drawn "
+        "line -- see validation/cooling/extractions/han_ribbed.md, item 40.");
   m.def("validate_rib_set", &combaero::cooling::validate_rib_set,
         py::arg("correlation_set"),
         "Reject a set that cannot be evaluated. Hard errors, unlike the "

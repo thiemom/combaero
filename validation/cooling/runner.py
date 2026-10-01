@@ -103,6 +103,7 @@ SETS = {
     "han_1988_orthogonal": cb.han_1988_orthogonal,
     "rallabandi_2009_high_re": cb.rallabandi_2009_high_re,
     "han_park_1988_angled": cb.han_park_1988_angled,
+    "han_1989_narrow_channel": cb.han_1989_narrow_channel,
 }
 
 
@@ -168,8 +169,16 @@ def _gbar_reason(series: SeriesMetadata) -> str | None:
 
 
 def _binds_geometry(rib_set: "cb.RibCorrelationSet") -> bool:
-    """True when the set's G actually depends on the rig geometry."""
-    return any(
+    """True when the set's G actually depends on the rig geometry.
+
+    A shape switch (SquareVsRectangular, NarrowChannelAlphaSwitch) binds G
+    to geometry through dedicated fields, not through G_eD/G_pe/G_WH/G_alpha
+    -- han_park_1988_angled happens to also set a nonzero G_WH exponent, so
+    the term check alone has caught it so far, but that was never the real
+    reason. Checked explicitly so a future shape-only set doesn't slip
+    through silently.
+    """
+    return rib_set.G_shape_model != cb.GShapeModel.Fixed or any(
         t.exponent != 0.0
         for t in (rib_set.G_eD, rib_set.G_pe, rib_set.G_WH, rib_set.G_alpha)
     )
@@ -194,6 +203,11 @@ def _assert_geometry_free(rib_set: "cb.RibCorrelationSet") -> None:
         "alpha": rib_set.G_alpha,
     }
     bound = [name for name, t in terms.items() if t.exponent != 0.0]
+    if rib_set.G_shape_model != cb.GShapeModel.Fixed:
+        # Same reasoning as _binds_geometry: a shape switch binds G to
+        # geometry through its own dedicated fields, not through the terms
+        # above.
+        bound.append("G_shape_model")
     if bound:
         raise ValueError(
             f"{rib_set.name} binds G to {', '.join(bound)}, but the digitised "

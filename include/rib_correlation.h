@@ -140,7 +140,26 @@ struct RibCorrelationSet {
   // alpha = 90, at W/H = 4 it is 62.5%. No smooth interpolation is given by
   // the source, so none is invented here -- see evaluate_rib's comment for
   // what that means for a solver that traverses this exact angle.
-  enum class RAlphaShape { PowerLaw, QuadraticAlpha };
+  //
+  //   QuadraticAlphaTwoBand  R = R_quad_c0 + R_quad_c1*(alpha/90) +
+  //                              R_quad_c2*(alpha/90)^2          if W/H >=
+  //                              R_WH_band_boundary ("wide" sub-band,
+  //                              1/2 <= W/H < 1)
+  //                          R = R_quad_narrow_c0 + R_quad_narrow_c1*(a/90)
+  //                              + R_quad_narrow_c2*(a/90)^2     otherwise
+  //                              ("narrow" sub-band, 1/4 < W/H < 1/2)
+  //                  (Han et al. 1989 narrow-channel extension, Eq. 4.19 /
+  //                  Fig. 4.48a). No printed equation for R exists at
+  //                  W/H < 1 -- these two quadratics are THIS PROJECT's own
+  //                  fit to the figure's drawn correlation line (same
+  //                  functional shape as Eq. 4.17's QuadraticAlpha, chosen
+  //                  because it reproduces that line to <1% RMS), not an
+  //                  extraction. See validation/cooling/extractions/
+  //                  han_ribbed.md, item 40 and decision D6. R_eD, R_pe,
+  //                  R_WH and R_alpha are IGNORED in this shape too -- there
+  //                  is no p/e or W/H power-law term; W/H only selects
+  //                  which quadratic applies.
+  enum class RAlphaShape { PowerLaw, QuadraticAlpha, QuadraticAlphaTwoBand };
   RAlphaShape R_alpha_shape = RAlphaShape::PowerLaw;
   double C_R = 0.0;
   RibTerm R_eD, R_pe, R_WH, R_alpha;
@@ -149,6 +168,11 @@ struct RibCorrelationSet {
   double R_quad_WH_exponent_off_90 = 0.0;
   // Eq. 4.17's own cap: "if W/H > 2, set W/H = 2". 0 means uncapped.
   double R_quad_WH_cap = 0.0;
+  // QuadraticAlphaTwoBand only: the second (narrow) sub-band's quadratic,
+  // and the W/H value that switches between it and R_quad_c0/c1/c2.
+  double R_quad_narrow_c0 = 0.0, R_quad_narrow_c1 = 0.0,
+         R_quad_narrow_c2 = 0.0;
+  double R_WH_band_boundary = 0.0;
 
   // Heat-transfer roughness function. G_alpha and G_pe are either fixed
   // constants (Fixed, the default -- Han 1988, Rallabandi 2009) or switch
@@ -162,13 +186,37 @@ struct RibCorrelationSet {
   // G_alpha and G_pe are IGNORED when G_shape_model is SquareVsRectangular.
   // Same caveat as R's switch: a genuine, unsmoothed discontinuity at
   // W/H = 1, up to 27% at alpha = 30, p/e = 20.
-  enum class GShapeModel { Fixed, SquareVsRectangular };
+  //
+  //   NarrowChannelAlphaSwitch (Han et al. 1989, Eq. 4.19, W/H < 1):
+  //
+  //     G = C * (e+)^n, with
+  //       C = G_narrow_C_alpha90    if alpha == 90 deg
+  //       C = G_narrow_C_off_axis   otherwise (30 < alpha < 90)
+  //       n = G_eplus_exponent (the base 0.35)
+  //     and, only below G_narrow_WH_band_boundary (the narrow sub-band,
+  //     1/4 < W/H < 1/2):
+  //       C *= (W/H)^G_narrow_WH_C_exponent
+  //       n *= (W/H)^G_narrow_WH_n_exponent
+  //
+  //   This is a genuine switch the text states directly (page 378: "C =
+  //   2.24 if alpha = 90 deg, and C = 1.80 if 30 deg < alpha < 90 deg"),
+  //   not a numerical artefact -- a 24% jump in C at alpha = 90 for any
+  //   W/H. Unlike SquareVsRectangular, the switch is on alpha and the
+  //   constant itself, not on channel shape and the alpha/p-e exponents;
+  //   it needs its own fields because no existing combination expresses an
+  //   exponent that is itself a function of W/H. G_alpha, G_pe, G_WH and
+  //   G_eD are IGNORED in this shape.
+  enum class GShapeModel { Fixed, SquareVsRectangular, NarrowChannelAlphaSwitch };
   GShapeModel G_shape_model = GShapeModel::Fixed;
   double C_G = 0.0;
   RibTerm G_eD, G_pe, G_WH, G_alpha;
   double G_eplus_exponent = 0.0;
   double G_shape_alpha_exponent_square = 0.0, G_shape_alpha_exponent_rect = 0.0;
   double G_shape_pe_exponent_square = 0.0, G_shape_pe_exponent_rect = 0.0;
+  // NarrowChannelAlphaSwitch only.
+  double G_narrow_C_alpha90 = 0.0, G_narrow_C_off_axis = 0.0;
+  double G_narrow_WH_band_boundary = 0.0;
+  double G_narrow_WH_C_exponent = 0.0, G_narrow_WH_n_exponent = 0.0;
 
   // Advisory validity.
   RibRange valid_Re, valid_eD, valid_pe, valid_WH, valid_alpha, valid_eplus;
@@ -212,6 +260,26 @@ RibCorrelationSet rallabandi_2009_high_re();
 // configurations that are not obliged to agree. See
 // validation/cooling/extractions/han_ribbed.md, item 23.
 RibCorrelationSet han_park_1988_angled();
+
+// Han, J.C. et al. (1989), Eq. 4.19, via Han, Dutta & Ekkad (2012) 2nd ed.
+// Fig. 4.48 -- extends the same rib family to narrow-aspect-ratio channels,
+// 1/4 < W/H < 1, alpha 30-90 deg. A different W/H domain from
+// han_1988_orthogonal and han_park_1988_angled (both 1-4), not a revision of
+// either: W/H = 1 stays with the wide sets by the same figure-driven
+// convention that resolved Fig. 4.48's own branch-boundary discontinuity
+// (validation/cooling/extractions/han_ribbed.md, item 41).
+//
+// G is text-extracted (items 36-38): a hard switch on alpha (C = 2.24 at
+// 90 deg, 1.80 off-axis) with a further W/H correction below W/H = 1/2.
+//
+// R has NO PRINTED EQUATION in this source (item 40) -- only a drawn
+// correlation line in Fig. 4.48a. The coefficients here are THIS PROJECT's
+// own fit to that line (same quadratic-in-alpha shape as Eq. 4.17, <1% RMS
+// against the drawn curve), not an extraction, so `provenance` is `Fitted`
+// for the set as a whole even though G alone would be `Extracted` -- see
+// decision D6 in han_ribbed.md for why a single set-level enum was kept
+// rather than splitting it per quantity.
+RibCorrelationSet han_1989_narrow_channel();
 
 // Geometry of the ribbed channel, as the correlation sees it.
 struct RibGeometry {
