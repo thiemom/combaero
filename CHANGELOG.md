@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **"16 configurations across three rigs" now says that all three rigs are
+  Texas A&M.** #401 rejected a generalised `G_bar/G` correlation because
+  69% of the variance in the pooled population falls BETWEEN rigs rather
+  than within them. True, and the phrase reads as more independent than it
+  is: 91-GT-3 and CR-3837 are Han's own laboratory, `lau1990` is Lau's in
+  the same department. It cuts both ways and both are now recorded where
+  the number lives:
+
+  - **the conclusion is STRONGER** -- three rigs inside one laboratory
+    tradition separating this far makes the offset rig-level (geometry,
+    instrumentation, data reduction) rather than an artefact of comparing
+    institutions, so there is even less for an angle or shape term to
+    reach;
+  - **the MAE 8.3% is OPTIMISTIC** -- this is not a sample of the world's
+    rigs, so the 29% spread is a LOWER BOUND and Han's 1.2 may do worse
+    against a non-TAMU rig.
+
+  Nothing computed changes. Added to `runner.py`'s decision comment, the
+  91-GT-3 extraction record, and the test that pins the evidence -- which
+  now also fails if a fourth source joins the pool, since that is when the
+  "lower bound" caveat becomes testable rather than stated.
+
 ### Added
 
 - **Taslim & Spring (1987), AIAA-87-2009 digitised -- the first rib source in

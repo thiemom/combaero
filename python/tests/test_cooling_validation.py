@@ -449,6 +449,21 @@ def test_keeping_hans_constant_is_justified_by_the_pooled_measurements() -> None
     shape term can reach a rig offset, so a "better" correlation would be
     fitting rig identity. Against the pooled population Han's 1.2 scores
     MAE 8.3%, a defensible one-number answer to a quantity spanning 29%.
+
+    ALL THREE RIGS ARE TEXAS A&M, which "three rigs" does not convey.
+    91-GT-3 and CR-3837 are Han's own laboratory; lau1990 is Lau's, in the
+    same department. That cuts both ways and both are asserted below:
+
+      * the conclusion is STRONGER -- three rigs inside one laboratory
+        tradition separating this far makes the offset rig-level, not an
+        artefact of comparing institutions, so there is even less for an
+        angle or shape term to reach;
+      * the MAE is OPTIMISTIC -- this is not a sample of the world's rigs,
+        so 29% is a LOWER BOUND on the true spread and 1.2 may do worse
+        against a non-TAMU rig.
+
+    Same monoculture as #403 item 2, where it blocks the Lau friction
+    disagreement outright.
     """
     import statistics
 
@@ -491,6 +506,16 @@ def test_keeping_hans_constant_is_justified_by_the_pooled_measurements() -> None
     )
     mae = statistics.mean(abs(1.2 / v - 1) for v in pooled)
     assert mae < 0.12, f"Han's 1.2 now misses the pooled population by {mae:.1%}"
+
+    # The pool is three rigs from ONE institution, so this MAE is a
+    # best case. If a non-TAMU source is ever added here, the assertion
+    # above should be re-derived rather than widened -- the number
+    # getting worse would be the finding, not a regression.
+    assert len(groups) == 3, (
+        "a fourth source joined the pool; if it is not Texas A&M, the "
+        "'lower bound on the spread' caveat in this docstring is now "
+        "testable and should be tested"
+    )
 
 
 def test_90_degree_gbar_still_scores(dataset) -> None:
