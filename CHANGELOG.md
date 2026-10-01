@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CI skipped every test job for changes under `validation/`, and the
+  status check passed anyway.** The `source` path filter listed
+  `src/ include/ python/ tests/ scripts/ examples/` but not `validation/`,
+  so a pull request touching only that tree ran the two path detectors and
+  the two aggregators and nothing else. PR #437 merged with **10 of 14
+  checks skipped** that way.
+
+  Two kinds of change were affected, and the second is worse:
+
+  - **the scored dataset** -- `validation/cooling/data/**`, which
+    `test_every_digitised_series_passes_its_figure_card` and the scorecard
+    tests read directly. Those are precisely the tests a bad dataset
+    breaks.
+  - **the runners** -- `scorecard.py`, `conventions.py`, `fidelity.py` and
+    the per-physics runners live under `validation/`, not `python/`. A
+    change to any of them skipped CI unless it happened to touch
+    `python/tests/` as well, which is the only reason #432 and #433 were
+    exercised.
+
+  `validation/**` added to the `source` filter in both `ci.yml` and
+  `validation-tests.yml`. A dataset-only change now also triggers the C++
+  matrix, which is wasted but harmless; splitting the filter further would
+  not have covered the runner case.
+
 ### Changed
 
 - **"16 configurations across three rigs" now says that all three rigs are
