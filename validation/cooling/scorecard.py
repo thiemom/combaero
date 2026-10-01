@@ -43,6 +43,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 
+from validation.cooling import conventions, fidelity
 from validation.cooling.runner import Record
 from validation.cooling.schema import Point, load_points
 
@@ -76,6 +77,12 @@ class Cell:
     # "fidelity" (the correlation's own paper) or "accuracy" (cross-source).
     # Never pooled: they answer different questions and fail differently.
     basis: str = "unknown"
+    # How the series' measurement convention met the set's: "direct",
+    # "converted", "undeclared", "incompatible" or "unregistered". The last
+    # two are REFUSALS -- scoring two different quantities is a category
+    # error, not a disagreement, and no range check can see it (#389).
+    convention: str = "undeclared"
+    convention_detail: str = ""
     # "in-domain" or "out-of-domain" against the correlation set's OWN
     # declared validity box. Never pooled either: a set must not be judged
     # on conditions its authors never claimed, and today several are --
@@ -309,6 +316,18 @@ def build(records: list[Record], dataset=None) -> list[Cell]:
                 (r.reason for r in rs if getattr(r, "reason", None)), None
             ),
         )
+        resolution = conventions.resolve(series, cell.scored_by)
+        cell.convention = resolution.status
+        cell.convention_detail = resolution.detail
+        if not resolution.scorable:
+            # Refused, and the refusal replaces the numbers rather than
+            # sitting beside them. A category error reported as a large
+            # error would be read as a model limitation.
+            cell.reason = f"{resolution.status}: {resolution.detail}"
+            cell.n_scored = 0
+            cells.append(cell)
+            continue
+
         if dataset is not None:
             cell.basis = basis_of(series, cell.scored_by)
             cell.sampling = sampling_of(series, dataset)
@@ -425,6 +444,48 @@ def _pct(v: float) -> str:
     return f"{'-':>7}" if math.isnan(v) else f"{v * 100:6.1f}%"
 
 
+def render_conventions(cells: list[Cell]) -> list[str]:
+    """How each scored series' measurement convention met its set's.
+
+    A range check cannot see a convention mismatch -- every coordinate is
+    in range, the quantity is simply not the same one. So it is resolved
+    explicitly and reported, including the refusals (#389).
+    """
+    from collections import Counter
+
+    counts = Counter(
+        c.convention for c in cells if c.convention != conventions.STATUS_NOT_SCORED
+    )
+    if not counts:
+        return []
+    out = ["Measurement conventions, series against the set scoring it:"]
+    for status in (
+        conventions.STATUS_DIRECT,
+        conventions.STATUS_CONVERTED,
+        conventions.STATUS_UNDECLARED,
+        conventions.STATUS_UNREGISTERED,
+        conventions.STATUS_INCOMPATIBLE,
+    ):
+        if counts.get(status):
+            out.append(f"  {status:<14} {counts[status]:>4}")
+    seen: set[tuple[str, str]] = set()
+    for c in cells:
+        key = (c.label.split("  ")[0], c.convention_detail)
+        if c.convention == conventions.STATUS_CONVERTED and key not in seen:
+            seen.add(key)
+            out.append(f"    converted: {key[0]:<40} {c.convention_detail}")
+        elif c.convention in (
+            conventions.STATUS_UNREGISTERED,
+            conventions.STATUS_INCOMPATIBLE,
+        ):
+            out.append(f"    REFUSED:   {key[0]:<40} {c.convention_detail[:90]}")
+    out.append(
+        "  A refusal is a CATEGORY error, not a disagreement: no range check "
+        "can see it, so it is declared."
+    )
+    return out
+
+
 # Correlation sets whose accuracy is carried in C++. The others (film,
 # orifice, effusion) are not `RibCorrelationSet`s and state no band here.
 def _rib_set(name: str):
@@ -485,7 +546,9 @@ def render_set_accuracy(set_names) -> list[str]:
     return out
 
 
-def render(cells: list[Cell], pools: dict | None = None) -> str:
+def render(
+    cells: list[Cell], pools: dict | None = None, dataset=None
+) -> str:
     pools = pools or {}
     head = (
         f"{'series':<44} {'kind':<12} {'N':>3} {'scored':>6} "
@@ -544,6 +607,10 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
                 "claimed -- not because extrapolating is always worse."
             )
         lines.append("")
+        lines.extend(fidelity.render(dataset))
+        lines.append("")
+        lines.extend(render_conventions(cells))
+        lines.append("")
         lines.extend(render_set_accuracy(sorted({c.scored_by for c in summary})))
     unsupported = [c for c in cells if c.unsupported]
     if pools:
@@ -571,7 +638,7 @@ def main() -> None:
         "han2012/fig4.46_R_*  (lower panel)": pool(records, "han2012/fig4.46_R_eD"),
         "han2012/fig4.46_G_*  (upper panel)": pool(records, "han2012/fig4.46_G_eD"),
     }
-    print(render(build(records, dataset), pools))
+    print(render(build(records, dataset), pools, dataset))
 
 
 if __name__ == "__main__":
