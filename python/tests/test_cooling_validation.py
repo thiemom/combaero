@@ -207,10 +207,12 @@ def test_stated_6pct_behaves_as_one_sigma_not_a_95pct_bound(records) -> None:
 def test_disputed_class_labels_are_declared_and_surfaced(dataset) -> None:
     """A disputed class label must stay visible, not decay into a comment.
 
-    The four fig4.51 45-deg series return G_bar/G below 1, which is not
-    physically attainable; which panel duplicated the other cannot be
-    settled from the digitised data and needs the primary paper, Han,
-    Zhang and Lee (1991) ASME JHT 113, 590-598.
+    The four fig4.51 45-deg series returned G_bar/G below 1, which is not
+    physically attainable. Resolved 2026-10-01 against the primary paper,
+    Han, Zhang and Lee (1991) JHT 113, 590, Table 2: both panels carry the
+    G marks, so the two G series are confirmed and the two G_bar series
+    stay disputed, unscored, as a record of the duplicate
+    (extractions/han_zhang_lee_1991_jht.md).
 
     fig4.46_G_eD0.047_pe10_wh2 was the fifth and is now resolved -- see
     test_fig446_wh2_class_is_pinned_to_its_source_runs.
@@ -228,10 +230,16 @@ def test_disputed_class_labels_are_declared_and_surfaced(dataset) -> None:
     for s in disputed:
         # The route to resolution differs -- a figure may settle one, a
         # primary paper another -- but a dispute with no route recorded is
-        # just an unexplained flag.
-        assert "NEEDS THE" in s.cross_check, (
-            f"{s.label} is disputed but records no route to resolve it"
-        )
+        # just an unexplained flag. A RESOLVED dispute keeps its label when
+        # the resolution is "this is not the quantity it is labelled as", so
+        # nothing pools it; it must then cite the evidence and stay unscored.
+        if "RESOLVED" in s.cross_check:
+            assert "extractions/" in s.cross_check, f"{s.label}: resolution cites no record"
+            assert s.scores is None, f"{s.label}: resolved as mislabelled but still scored"
+        else:
+            assert "NEEDS THE" in s.cross_check, (
+                f"{s.label} is disputed but records no route to resolve it"
+            )
 
     reported = {f.series for f in check_all() if f.check == "class-label"}
     for s in disputed:
@@ -794,7 +802,20 @@ def test_han_park_1988_angled_confirmed_independently_by_figure_451(
     ]
     assert scored_parallel, "no figure 4.51 parallel class scored"
     for c in scored_parallel:
-        assert c.rmse < 0.15, f"{c.label}: RMSE {c.rmse:.1%}"
+        if "60par" in c.label:
+            assert c.rmse < 0.15, f"{c.label}: RMSE {c.rmse:.1%}"
+
+    # 45 deg parallel scores only since #403 item 1 was resolved (it was a
+    # disputed label, refused). It reads LOW, ~14% -- the same direction and
+    # size as the recorded Eq. 4.18 accuracy limit from CR-3837 (-0.8% to
+    # -19.9%, han_ribbed.md "Recorded as a known accuracy limit"). An
+    # ACCURACY result, pinned as one rather than asserted away: it must stay
+    # negative, and a move outside 20% means something changed.
+    g45 = [c for c in scored_parallel if "fig4.51_G_45par" in c.label]
+    assert g45, "45 deg parallel G should score now that its label is resolved"
+    for c in g45:
+        assert c.bias < 0.0, f"{c.label}: bias {c.bias:+.1%}, expected the known low reading"
+        assert c.rmse < 0.20, f"{c.label}: RMSE {c.rmse:.1%}"
 
     # The other seven shapes must NOT be silently scored against this set.
     unscored_shapes = [

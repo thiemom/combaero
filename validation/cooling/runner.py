@@ -65,19 +65,19 @@ from validation.cooling.schema import Point, SeriesMetadata, load_points
 G_BAR_OVER_G = 1.2
 
 # Smooth-channel references for the performance-curve view (Nu_ratio
-# against f_ratio, figure 4.53). Han's lab prints both in NASA CR-4015
-# (Han, Park & Ibrahim 1986), Eqs. (4)/(5):
+# against f_ratio, figure 4.53), as printed by Han, Zhang and Lee (1991)
+# JHT 113, 590, Eqs. (2) and (4) -- the paper whose continuous-rib data
+# figure 4.53 reprints for comparison (extractions/han_zhang_lee_1991_jht.md):
 #
-#     f(FD)  = 0.079 Re^-0.25            Blasius, four-sided smooth channel
-#     Nu(FD) = 0.023 Re^0.8 Pr^0.4       Dittus-Boelter
+#     f_0  = 0.046 Re^-0.2               Blasius form, smooth circular tube
+#     Nu_0 = 0.023 Re^0.8 Pr^0.4         McAdams / Dittus-Boelter
 #
-# Han and Zhang (1992), whose data figure 4.53 is, is not on disk, so these
-# are the LAB'S printed convention carried across, not that paper's own
-# statement. Sensitivity is small where it was measured: swapping in
-# 0.046 Re^-0.2 for f_s moves the 90 deg score by 0.3%. Written out here
-# rather than calling nusselt_dittus_boelter, which warns below Re 10,000
-# on every bisection probe.
-SMOOTH_F_COEF, SMOOTH_F_EXP = 0.079, -0.25
+# Superseded CR-4015's four-sided 0.079 Re^-0.25 (Han's lab, 1986), which
+# #440 used before this paper was on disk; the two differ by under 3% over
+# Re 15k-80k and the score by 0.3%. Written out here rather than calling
+# nusselt_dittus_boelter, which warns below Re 10,000 on every bisection
+# probe.
+SMOOTH_F_COEF, SMOOTH_F_EXP = 0.046, -0.2
 SMOOTH_NU_COEF, SMOOTH_NU_RE_EXP, SMOOTH_NU_PR_EXP = 0.023, 0.8, 0.4
 
 # Bracket for the Re bisection. Deliberately far wider than any set's

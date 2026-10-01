@@ -312,10 +312,12 @@ files:
     panel: upper
     item: "Figure 4.53, solid circles"
     series: "90 deg continuous rib, ribbed-side Nu ratio"
-    # INFERRED, not stated: the extracted text gives Re 15,000-80,000 and
-    # nothing else about the rig. Taken from 91-GT-3 (Han, Zhang & Lee
-    # 1991, extractions/han_zhang_lee_91gt3_table3.md) -- same lab, Zhang
-    # on both, same Re range: square channel, e/D 0.0625, P/e 10.
+    # STATED for the rig this curve almost certainly comes from: the text
+    # says the continuous-rib data are "included for direct comparison",
+    # and Han, Zhang and Lee (1991) JHT 113, 590 -- square channel, e/D
+    # 0.0625, P/e 10, L/D 20, in-line ribs, Re 15,000-90,000 -- prints the
+    # matching numbers (60 deg V: Nu ratio 2.7-3.5 at f ratio 8-11).
+    # Identity of the data is an inference; the rig of that paper is not.
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}
     alpha_deg: 90.0
     x_axis: f_ratio
@@ -324,17 +326,25 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: null  # Han and Zhang (1992) is not on disk; its band is unread
+    # The 1991 paper states <8% on Nu and f for its rig, but that this curve
+    # IS that paper's data is inferred, and a band carried across papers is
+    # not a measurement (test_han2012_scored_bands_are_the_sources_stated_value).
+    uncertainty: null
     cross_check: >-
       Nu ratio must fall and f ratio rise with Reynolds number along the
       series, the trend the section text states for all ribs. Scored by
       han_1988_orthogonal (#435) on the performance-curve path: Re is
       recovered from f_ratio through the set's own chain, and lands at
       34,000-65,000 -- inside the stated 15,000-80,000, a check that could
-      have failed. f_ratio is CHANNEL-AVERAGE fbar over Blasius; read as the
-      four-sided f the model would sit 1.8x off. The geometry is borrowed
-      from 91-GT-3 and the score moves with it: -10% to +6% bias across
-      Han's own e/D 0.047-0.078 band.
+      have failed. f_ratio is CHANNEL-AVERAGE f over 0.046 Re^-0.2, as Han,
+      Zhang and Lee (1991) Eqs. (1)-(2) define it; read as the four-sided
+      f_r = 2f - f_0 the model would sit 1.8x off. The score moves with e/D:
+      -10% to +6% bias across Han's own 0.047-0.078 band. Declared and NOT
+      corrected: this Nu ratio is averaged over the whole heated length,
+      X/D 0-20, INCLUDING the entrance region (that paper's Fig. 3 shows the
+      spike over the first sections), while han_1988_orthogonal is fully
+      developed -- so a model reading a few percent low here is the
+      expected sign, not a defect.
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -2112,41 +2122,17 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    class_confidence: disputed
+    class_confidence: confirmed
     uncertainty: 0.06
     cross_check: >-
-      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
-      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
-      impossible: G_bar averages the ribbed and smooth sides and the
-      smooth side carries the lower h, so G_bar > G strictly. Its two
-      panels hold what appear to be the same marks -- points agreeing
-      within 2%, abscissae within 0.3%.
-
-      Three readings survive and the digitised data separates none:
-      (1) the figure duplicates this class's G marks into the G_bar panel,
-      (2) it duplicates the other way, (3) this configuration genuinely
-      has G_bar ~ G, its smooth wall performing nearly as well as its
-      ribbed wall. Reconstructing the missing panel from the seven clean
-      classes makes (1) consistent with Han's text and (2) inconsistent,
-      but that is an inference from the TEXT, not evidence about the PLOT,
-      and plausibility does not promote a reading.
-
-      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
-      Transfer 113, 590 -- not the reprint. Whether the two panels rank
-      configurations identically turns on exactly this pair and stays open
-      until then.
-
-      Cross-panel independent check: han_park_1988_angled was fitted to
-      Han and Park (1988)'s OWN parallel-rib data (figure 4.47); this
-      series is Han et al. (1991)'s parallel-rib class from a DIFFERENT
-      paper and rig. Scored with a representative W/H=1 (square), since
-      figure 4.51's own channel geometry is not stated in the extracted
-      text -- the only anchor is that its 90 deg class matches Han (1988)
-      at any W/H, which is consistent with a square rig but does not
-      establish one. Was previously scored against han_1988_orthogonal,
-      which always refused it (alpha=45/60 outside that set's 90-90 range)
-      -- silently stale until han_park_1988_angled existed to score it
-      correctly.
+      RESOLVED (#403 item 1) against the primary paper, Han, Zhang and
+      Lee (1991) JHT 113, 590, Table 2, which prints this class's
+      G = 2.07 (e+)^0.36 and G_bar = 3.01 (e+)^0.32. These
+      marks reproduce the printed G (bias +2.8%) and miss the printed
+      G_bar (+18.2%), the same split every confirmed class shows on its
+      own panel (within 2.8%). This is the genuine G series; its G_bar
+      twin is the duplicate. Printed G_bar/G is ~1.15, above 1 as it
+      must be. See extractions/han_zhang_lee_1991_jht.md.
     scores: han_park_1988_angled
     verification:
       x_axis_type: log
@@ -2178,39 +2164,17 @@ files:
     class_confidence: disputed
     uncertainty: 0.06
     cross_check: >-
-      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
-      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
-      impossible: G_bar averages the ribbed and smooth sides and the
-      smooth side carries the lower h, so G_bar > G strictly. Its two
-      panels hold what appear to be the same marks -- points agreeing
-      within 2%, abscissae within 0.3%.
-
-      Three readings survive and the digitised data separates none:
-      (1) the figure duplicates this class's G marks into the G_bar panel,
-      (2) it duplicates the other way, (3) this configuration genuinely
-      has G_bar ~ G, its smooth wall performing nearly as well as its
-      ribbed wall. Reconstructing the missing panel from the seven clean
-      classes makes (1) consistent with Han's text and (2) inconsistent,
-      but that is an inference from the TEXT, not evidence about the PLOT,
-      and plausibility does not promote a reading.
-
-      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
-      Transfer 113, 590 -- not the reprint. Whether the two panels rank
-      configurations identically turns on exactly this pair and stays open
-      until then.
-
-      Cross-panel independent check: han_park_1988_angled was fitted to
-      Han and Park (1988)'s OWN parallel-rib data (figure 4.47); this
-      series is Han et al. (1991)'s parallel-rib class from a DIFFERENT
-      paper and rig. Scored with a representative W/H=1 (square), since
-      figure 4.51's own channel geometry is not stated in the extracted
-      text -- the only anchor is that its 90 deg class matches Han (1988)
-      at any W/H, which is consistent with a square rig but does not
-      establish one. Was previously scored against han_1988_orthogonal,
-      which always refused it (alpha=45/60 outside that set's 90-90 range)
-      -- silently stale until han_park_1988_angled existed to score it
-      correctly.
-    scores: han_park_1988_angled
+      NOT G_bar DATA -- RESOLVED (#403 item 1). Han, Zhang and Lee (1991)
+      JHT 113, 590, Table 2 prints this class's G and G_bar separately.
+      These marks reproduce the printed G (bias +3.8%) and miss the
+      printed G_bar (+18.6%); every confirmed class's G_bar panel
+      instead matches its printed G_bar within 2.5%. So the G_bar panel
+      for this class carries the G marks a second time -- whether in the
+      textbook redraw or our digitisation is not established, and does
+      not matter. Kept as a record of the duplicate; never scored, and
+      the label stays disputed so nothing pools it as G_bar. See
+      extractions/han_zhang_lee_1991_jht.md.
+    scores: null
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2238,29 +2202,17 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    class_confidence: disputed
+    class_confidence: confirmed
     uncertainty: 0.06
     cross_check: >-
-      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
-      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
-      impossible: G_bar averages the ribbed and smooth sides and the
-      smooth side carries the lower h, so G_bar > G strictly. Its two
-      panels hold what appear to be the same marks -- points agreeing
-      within 2%, abscissae within 0.3%.
-
-      Three readings survive and the digitised data separates none:
-      (1) the figure duplicates this class's G marks into the G_bar panel,
-      (2) it duplicates the other way, (3) this configuration genuinely
-      has G_bar ~ G, its smooth wall performing nearly as well as its
-      ribbed wall. Reconstructing the missing panel from the seven clean
-      classes makes (1) consistent with Han's text and (2) inconsistent,
-      but that is an inference from the TEXT, not evidence about the PLOT,
-      and plausibility does not promote a reading.
-
-      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
-      Transfer 113, 590 -- not the reprint. Whether the two panels rank
-      configurations identically turns on exactly this pair and stays open
-      until then.
+      RESOLVED (#403 item 1) against the primary paper, Han, Zhang and
+      Lee (1991) JHT 113, 590, Table 2, which prints this class's
+      G = 2.11 (e+)^0.37 and G_bar = 2.43 (e+)^0.37. These
+      marks reproduce the printed G (bias -2.9%) and miss the printed
+      G_bar (+11.8%), the same split every confirmed class shows on its
+      own panel (within 2.8%). This is the genuine G series; its G_bar
+      twin is the duplicate. Printed G_bar/G is ~1.15, above 1 as it
+      must be. See extractions/han_zhang_lee_1991_jht.md.
     scores: han_1988_orthogonal
     verification:
       x_axis_type: log
@@ -2292,27 +2244,17 @@ files:
     class_confidence: disputed
     uncertainty: 0.06
     cross_check: >-
-      DISPUTED CLASS DATA -- pool, never use per-class, and exclude from
-      any G_bar/G conclusion. This class returns G_bar/G below 1, which is
-      impossible: G_bar averages the ribbed and smooth sides and the
-      smooth side carries the lower h, so G_bar > G strictly. Its two
-      panels hold what appear to be the same marks -- points agreeing
-      within 2%, abscissae within 0.3%.
-
-      Three readings survive and the digitised data separates none:
-      (1) the figure duplicates this class's G marks into the G_bar panel,
-      (2) it duplicates the other way, (3) this configuration genuinely
-      has G_bar ~ G, its smooth wall performing nearly as well as its
-      ribbed wall. Reconstructing the missing panel from the seven clean
-      classes makes (1) consistent with Han's text and (2) inconsistent,
-      but that is an inference from the TEXT, not evidence about the PLOT,
-      and plausibility does not promote a reading.
-
-      NEEDS THE PRIMARY PAPER: Han, J.C. et al. (1985/1991), ASME J. Heat
-      Transfer 113, 590 -- not the reprint. Whether the two panels rank
-      configurations identically turns on exactly this pair and stays open
-      until then.
-    scores: han_1988_orthogonal
+      NOT G_bar DATA -- RESOLVED (#403 item 1). Han, Zhang and Lee (1991)
+      JHT 113, 590, Table 2 prints this class's G and G_bar separately.
+      These marks reproduce the printed G (bias -2.1%) and miss the
+      printed G_bar (+12.8%); every confirmed class's G_bar panel
+      instead matches its printed G_bar within 2.5%. So the G_bar panel
+      for this class carries the G marks a second time -- whether in the
+      textbook redraw or our digitisation is not established, and does
+      not matter. Kept as a record of the duplicate; never scored, and
+      the label stays disputed so nothing pools it as G_bar. See
+      extractions/han_zhang_lee_1991_jht.md.
+    scores: null
     verification:
       x_axis_type: log
       y_axis_type: log
