@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   used as a closure would double-count the convection the resistance
   network computes (#387).
 
+  Falsification caught a promise with nothing behind it: the module
+  docstring named `test_the_undeclared_count_does_not_grow` as the
+  ratchet keeping `undeclared` from becoming permanent, and that test did
+  not exist. Written, and it goes red when a source is dropped from the
+  table.
+
 - **The validation harness no longer pools in-domain with out-of-domain
   scoring, and a correlation's accuracy now carries where it came from**
   (#389, two of the four remaining items).

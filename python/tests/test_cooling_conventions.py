@@ -245,3 +245,61 @@ def test_every_named_convention_is_documented_and_used() -> None:
 
     unused = sorted(set(C.CONVENTION_NOTES) - used)
     assert not unused, f"documented but referenced by nothing: {unused}"
+
+
+def test_the_undeclared_count_does_not_grow(dataset) -> None:
+    """`undeclared` scores, so it needs a ratchet or it becomes permanent.
+
+    The design lets an undeclared pair through rather than refusing, so
+    that incomplete bookkeeping cannot hide working results. That is only
+    honest if the gap is counted and cannot quietly widen -- the
+    `conventions.py` docstring promised this test and it was written
+    after a falsification run showed nothing held the promise.
+
+    Today the count is ZERO. If it ever rises, the right fix is to
+    declare the convention, not to raise the bound.
+    """
+    from validation.cooling.scorecard import build, run_dataset
+
+    cells = build(run_dataset(dataset), dataset)
+    undeclared = sorted(c.label for c in cells if c.convention == C.STATUS_UNDECLARED)
+    assert not undeclared, (
+        f"{len(undeclared)} scored rows declare no convention: "
+        f"{undeclared[:5]}. Add them to conventions.SOURCE_PUBLISHES."
+    )
+
+    # And the status really is reachable -- a ratchet pinned at zero that
+    # could never be non-zero would assert nothing.
+    probe = C.resolve(_fake_series("not_a_source", "not_an_axis"), "han_1988_orthogonal")
+    assert probe.status == C.STATUS_UNDECLARED
+    assert probe.scorable, "undeclared must still score; refusing would hide results"
+
+
+def test_a_refusal_replaces_the_numbers_rather_than_sitting_beside_them(
+    dataset,
+) -> None:
+    """How a refusal reaches the scorecard.
+
+    A category error reported as a large error reads as a model
+    limitation, so `build` zeroes the scored count and writes the reason
+    instead. Exercised by pointing a real series at a set producing an
+    incompatible quantity.
+    """
+    import dataclasses
+
+    from validation.cooling.scorecard import build, run_dataset
+
+    murray = next(s for s in dataset if s.label == "murray2018/fig6_eta_exp_M0p19")
+    assert C.resolve(murray, murray.scores).status == C.STATUS_DIRECT
+
+    crossed = dataclasses.replace(murray, scores="andrews_1986_effusion_internal")
+    r = C.resolve(crossed, crossed.scores)
+    assert r.status == C.STATUS_UNREGISTERED, r.status
+    assert not r.scorable
+
+    cell = next(
+        c for c in build(run_dataset([crossed]), [crossed]) if c.label.startswith("murray2018/")
+    )
+    assert cell.n_scored == 0, "a refused series must report no score"
+    assert cell.reason and r.status in cell.reason
+    assert math.isnan(cell.mae) and math.isnan(cell.bias)
