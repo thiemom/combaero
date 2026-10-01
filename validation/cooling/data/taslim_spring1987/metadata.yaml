@@ -1,0 +1,1522 @@
+# Taslim, M.E. and Spring, S.D. (1987), AIAA-87-2009 -- "Friction Factors and
+# Heat Transfer Coefficients in Turbulated Cooling Passages of Different Aspect
+# Ratios, Part I: Experimental Results". 23rd Joint Propulsion Conference,
+# San Diego. DOI 10.2514/6.1987-2009.
+#
+# THE FIRST NON-TEXAS-A&M RIB SOURCE IN THIS DATASET, and that is the point.
+# Northeastern University (Taslim) with General Electric (Spring). Every other
+# rib source here -- han2012, han_park_lei1984, lau1990 -- traces to Han's or
+# Lau's laboratory, and #403 item 2 is blocked precisely because no TAMU source
+# can arbitrate a TAMU disagreement.
+#
+# SCOPE. Square-sectioned rig, turbulated sidewall width B = 3.0 in fixed, the
+# non-turbulated wall height A varied. Turbulators 90 deg TRANSVERSE, in-line
+# on two opposite walls (and separately on one wall), e = .25/.50/.75 in, with
+# e/s held at 0.10 throughout, i.e. P/e = 10. Re 20,000 to 190,000.
+#
+# ASPECT RATIO IS INVERTED RELATIVE TO HAN. Taslim's AR = A/B = HEIGHT/WIDTH;
+# Han's W/H is WIDTH/HEIGHT. They are reciprocals, and confusing them silently
+# relabels a narrow channel as a wide one:
+#
+#     Taslim AR   D_H      Han W/H    e/D_H tested
+#        0.5      2.000      2.0      .125 .250
+#        1.0      3.000      1.0      .083 .167 .250
+#        3.5      4.667      0.286    .053 .107 .161
+#
+# Both are recorded in every `geometry` block below. The e/D_H values are not
+# free: e is fixed at three sizes and D_H follows from the aspect ratio, so
+# e/D_H is COUPLED to AR -- low blockage occurs only at high AR. That is why
+# no Taslim configuration reaches Han's 0.047-0.078 band at a square channel;
+# AR 1.0 bottoms out at 0.083.
+#
+# WHY IT IS COMMITTED UNSCORED. The quantities here are the passage-average
+# Fanning friction factor and the turbulated-surface Nusselt number. combaero's
+# rib sets produce R and G, the law-of-the-wall roughness functions. Getting
+# from one to the other needs this source's OWN decomposition -- Han, Ou, Park
+# and Lei (1989) Eq. (5)-(9), whose R carries an aspect-ratio term INSIDE the
+# logarithm and is therefore not the same R the shipped sets produce. Scoring
+# it without declaring that conversion is the category error #389/#433 exist to
+# refuse. The runner work belongs with #402 and #403; the data is committed now
+# because it is verified and because it was expensive to produce.
+#
+# ============================================================================
+# VERIFICATION -- five figures, each cross-checking at least one other
+# ============================================================================
+#
+# CALIBRATION, worst tick error as a fraction of the axis span:
+#
+#     figure   x        y       note
+#     fig4     0.78%    0.23%   best of the set
+#     fig5     1.06%    0.20%
+#     fig9     0.60%    0.57%
+#     fig11    1.20%    0.20%   log-log; x anchored on ticks 1 and 20
+#     fig12    1.80%    0.28%   linear
+#
+# Every x axis shows the same bow -- near zero at the anchors, peaking
+# mid-range -- so it is the scan, not the digitiser. On fig11 it is harmless:
+# the paper's own result is that f is independent of Re, so only y is read.
+#
+# THE SMOOTH-DUCT REFERENCE CURVE IS A FREE CHECK, and it passes twice.
+# Figures 4 and 5 each draw Nu_s = 0.023 Re^0.8 Pr^0.4. Digitised and compared
+# against that formula at Pr = 0.70:
+#
+#     fig4  bias +0.30%, MAE 0.64%, slope 0.816
+#     fig5  bias -1.77%, MAE 1.77%, slope 0.802      (0.8 expected)
+#
+# That confirms the y axis is Nu x 1e-3 without being told, and validates both
+# calibrations independently of any correlation.
+#
+# Nu_T ~ Re^0.6, THE PAPER'S OWN CLAIM, RECOVERED FROM THE MARKS:
+#     fig5 series   0.602  0.647  0.580  0.606
+#     fig4 series   0.518  0.616  0.594      and the author's own fit line 0.613
+# The 0.518 is the e/D 0.053 series and is NOT one bad mark -- leave-one-out
+# gives 0.511 to 0.528. It is the series most buried in fig4's symbol clusters.
+# Recorded as a disagreement with the paper's stated exponent, not corrected.
+#
+# FIGURES 4+5 RECONSTRUCT FIGURE 9 TO 5.4%. Figure 9's ordinate is
+# (Nu_T/Nu_s)(Re_DH/Re_ref)^0.2 with Re_ref = 1e4 -- the 0.2 cancels the
+# residual Re dependence, since Nu_T ~ Re^0.6 and Nu_s ~ Re^0.8. Rebuilding it
+# from the fig4 and fig5 marks reproduces all seven of fig9's points at
+# 5.4% MAE, -0.4% bias. The naive Nu_T/Nu_s reads 42% low, so the
+# normalisation is confirmed rather than assumed.
+#
+# THE EXPONENT IS 0.2 AND THE FIGURE APPEARS TO SAY 2. The superscript's
+# decimal point does not survive the scan. The body text states ".2" twice and
+# explains why; exponent 2 would put the ordinate at 35 to 523 on an axis that
+# stops at 5. Same class as the lost decimal in Han's (e/D)^0.014, worth 22%
+# there. Flagged because the figure alone would mislead.
+#
+# FIGURE 12 MISDRAWS ONE MARKER, AND IT IS THE MOST VALUABLE ONE.
+# Six of its seven marks land on their declared e/D to within the x bow
+# (+0.002 to +0.004). The seventh, AR 1.0 at e/D 0.083, is drawn at x = 0.1306
+# -- off by +0.047, thirteen times the bow -- and its f reads 0.0746 against
+# fig11's 0.0468 from eight marks. Wrong in BOTH coordinates. Confirmed by
+# rendering the page at 450 dpi: there is no marker anywhere near e/D 0.083 on
+# that curve. Fig12's own FIT CURVE at 0.083 gives 0.0437, within 7% of
+# fig11's value, so the curve is right and the symbol is misplaced.
+#
+# USE FIG11 OVER FIG12 WHEREVER THEY OVERLAP. fig11 gives 4 to 11 marks per
+# series on a two-decade log axis; fig12 gives one mark per configuration on a
+# linear 0-0.4 axis that cannot resolve small f. At AR 3.5 the fig12 CURVE
+# disagrees with fig11 by up to 41% -- which is 0.0044 absolute, about 1% of
+# fig12's full scale. The marks agree far better (1.2% to 13%).
+#
+# WHAT FIG12 CANNOT SHOW: AR 0.5 at e/D 0.250 has f = 0.5165 (fig11), above
+# fig12's 0.4 frame top. Its curve exits the top at x = 0.233 and the marker is
+# genuinely absent -- independently confirming the off-scale reading.
+#
+# SEVEN CONFIGURATIONS CARRY BOTH f AND Nu; THE EIGHTH CARRIES ONLY f.
+# AR 1.0 at e/D 0.250 is measured for friction (fig11, f = 0.3385) and appears
+# in NO Nusselt figure -- not fig4, not fig5, and not fig9, whose AR 1.0 fit
+# curve stops at e/D 0.215. That is the study, not a gap in the digitisation.
+#
+# MARKER COUNTS WERE SEALED BEFORE THE MANUAL PASS on fig4, following the
+# Rohde Fig. 10 precedent. Sealed 6/7/6; the manual pass found 7/7/7. The two
+# undercounts fall in the three symbol clusters (Re ~ 5.4, 14.4, 17.5) that
+# the seal had flagged LOW confidence -- the known failure mode of an
+# automated centroid read in dense overlap, quantified rather than assumed.
+#
+# CALIBRATION FILES are committed as `fig*_axes_bounds.csv` and deliberately
+# NOT listed below: they are a counter-clockwise frame traversal, not a series,
+# and verify.py's frame check is a power-law fit for a drawn distortion line.
+
+paper:
+  name: taslim_spring1987
+  citation: >-
+    Taslim, M.E. and Spring, S.D. (1987). "Friction Factors and Heat Transfer
+    Coefficients in Turbulated Cooling Passages of Different Aspect Ratios,
+    Part I: Experimental Results." AIAA-87-2009, AIAA/SAE/ASME/ASEE 23rd Joint
+    Propulsion Conference, San Diego, California. DOI 10.2514/6.1987-2009.
+    Northeastern University and General Electric Company.
+  secondary: false
+
+files:
+  - path: fig11_ar_0.5_open_hex_1_side_eDh_0.250.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 0.5, 1 wall(s) turbulated, e/D_H 0.250.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 0.5
+      W_H: 2.0
+      D_H_in: 2.0
+      e_D: 0.250.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, one wall(s) turbulated, e/D_H 0.250.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_0.5_open_square_1_side_eDh_0.125.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 0.5, 1 wall(s) turbulated, e/D_H 0.125.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 0.5
+      W_H: 2.0
+      D_H_in: 2.0
+      e_D: 0.125.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, one wall(s) turbulated, e/D_H 0.125.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_0.5_solid_hex_2_sides_eDh_0.250.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 0.5, 2 wall(s) turbulated, e/D_H 0.250.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 0.5
+      W_H: 2.0
+      D_H_in: 2.0
+      e_D: 0.250.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.250.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+      # Too short to infer a slope from -- fig12's series are 1 to 3
+      # marks by construction (one per configuration), and these
+      # fig5/fig11 series simply stop early. Acknowledged rather
+      # than suppressed: the marks are good, the SPAN is not.
+      slope_unreliable: true
+  - path: fig11_ar_0.5_solid_square_2_sides_eDh_0.125.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 0.5, 2 wall(s) turbulated, e/D_H 0.125.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 0.5
+      W_H: 2.0
+      D_H_in: 2.0
+      e_D: 0.125.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.125.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_1.0_open_circles_1_side_eDh_0.083.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 1.0, 1 wall(s) turbulated, e/D_H 0.083.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.083.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.083.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_1.0_open_half_circles_1_side_eDh_0.250.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 1.0, 1 wall(s) turbulated, e/D_H 0.250.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.250.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.250.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_1.0_open_tri_1_side_eDh_0.167.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 1.0, 1 wall(s) turbulated, e/D_H 0.167.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.167.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.167.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_1.0_solid_circles_2_sides_eDh_0.083.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 1.0, 2 wall(s) turbulated, e/D_H 0.083.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.083.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated, e/D_H 0.083.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_1.0_solid_half_circles_2_sides_eDh_0.250.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 1.0, 2 wall(s) turbulated, e/D_H 0.250.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.250.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated, e/D_H 0.250.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_1.0_solid_tri_2_sides_eDh_0.167.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 1.0, 2 wall(s) turbulated, e/D_H 0.167.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.167.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated, e/D_H 0.167.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_3.5_open_tri_down_1_side_eDh_0.053.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 3.5, 1 wall(s) turbulated, e/D_H 0.053.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.053.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.053.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+      # Too short to infer a slope from -- fig12's series are 1 to 3
+      # marks by construction (one per configuration), and these
+      # fig5/fig11 series simply stop early. Acknowledged rather
+      # than suppressed: the marks are good, the SPAN is not.
+      slope_unreliable: true
+  - path: fig11_ar_3.5_open_tri_left_1_side_eDh_0.107.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 3.5, 1 wall(s) turbulated, e/D_H 0.107.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.107.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.107.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_3.5_open_tri_right_1_side_eDh_0.161.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 3.5, 1 wall(s) turbulated, e/D_H 0.161.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.161.
+      p_e: 10.0
+      turbulated_walls: 1
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.161.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_3.5_solid_tri_down_2_sides_eDh_0.053.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 3.5, 2 wall(s) turbulated, e/D_H 0.053.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.053.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.053.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_3.5_solid_tri_left_2_sides_eDh_0.107.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 3.5, 2 wall(s) turbulated, e/D_H 0.107.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.107.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.107.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig11_ar_3.5_solid_tri_right_2_sides_eDh_0.161.csv
+    after: null
+    page: 6
+    item: "Figure 11"
+    series: >-
+      f series, AR 3.5, 2 wall(s) turbulated, e/D_H 0.161.
+    figure: "11"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.161.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.161.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig12_ar_0.5_circles.csv
+    after: null
+    page: 6
+    item: "Figure 12"
+    series: >-
+      f series, AR 0.5, 2 wall(s) turbulated
+    figure: "12"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+      # Too short to infer a slope from -- fig12's series are 1 to 3
+      # marks by construction (one per configuration), and these
+      # fig5/fig11 series simply stop early. Acknowledged rather
+      # than suppressed: the marks are good, the SPAN is not.
+      slope_unreliable: true
+  - path: fig12_ar_0.5_circles_fit.csv
+    after: null
+    page: 6
+    item: "Figure 12"
+    series: >-
+      f series, AR 0.5, 2 wall(s) turbulated
+    figure: "12"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The author's own drawn fit. On fig4 it digitises to an exponent of 0.613 against the Re^0.6 printed on it. On fig12 the AR 1.0 curve is the only record of the e/D 0.083 point, whose MARKER that figure misplaces. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig12_ar_1.0_squares.csv
+    after: null
+    page: 6
+    item: "Figure 12"
+    series: >-
+      f series, AR 1.0, 2 wall(s) turbulated
+    figure: "12"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+      # Too short to infer a slope from -- fig12's series are 1 to 3
+      # marks by construction (one per configuration), and these
+      # fig5/fig11 series simply stop early. Acknowledged rather
+      # than suppressed: the marks are good, the SPAN is not.
+      slope_unreliable: true
+  - path: fig12_ar_1.0_squares_fit.csv
+    after: null
+    page: 6
+    item: "Figure 12"
+    series: >-
+      f series, AR 1.0, 2 wall(s) turbulated
+    figure: "12"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The author's own drawn fit. On fig4 it digitises to an exponent of 0.613 against the Re^0.6 printed on it. On fig12 the AR 1.0 curve is the only record of the e/D 0.083 point, whose MARKER that figure misplaces. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig12_ar_3.5_tri.csv
+    after: null
+    page: 6
+    item: "Figure 12"
+    series: >-
+      f series, AR 3.5, 2 wall(s) turbulated
+    figure: "12"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+      # Too short to infer a slope from -- fig12's series are 1 to 3
+      # marks by construction (one per configuration), and these
+      # fig5/fig11 series simply stop early. Acknowledged rather
+      # than suppressed: the marks are good, the SPAN is not.
+      slope_unreliable: true
+  - path: fig12_ar_3.5_tri_fit.csv
+    after: null
+    page: 6
+    item: "Figure 12"
+    series: >-
+      f series, AR 3.5, 2 wall(s) turbulated
+    figure: "12"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: f_fanning_passage
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The author's own drawn fit. On fig4 it digitises to an exponent of 0.613 against the Re^0.6 printed on it. On fig12 the AR 1.0 curve is the only record of the e/D 0.083 point, whose MARKER that figure misplaces. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig4_ar_3.5_fit_Re_Dh^0.6.csv
+    after: null
+    page: 4
+    item: "Figure 4"
+    series: >-
+      Nu series, AR 3.5, 2 wall(s) turbulated
+    figure: "4"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The author's own drawn fit. On fig4 it digitises to an exponent of 0.613 against the Re^0.6 printed on it. On fig12 the AR 1.0 curve is the only record of the e/D 0.083 point, whose MARKER that figure misplaces. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig4_ar_3.5_smooth_duct_0.023Re_Dh^0.8Pr^0.4.csv
+    after: null
+    page: 4
+    item: "Figure 4"
+    series: >-
+      Nu series, AR 3.5, 2 wall(s) turbulated
+    figure: "4"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The paper's own smooth-duct reference, Nu_s = 0.023 Re^0.8 Pr^0.4. Digitised and compared against that formula at Pr = 0.70 it agrees to +0.30% (fig4) and -1.77% (fig5), with slopes 0.816 and 0.802 against 0.8 -- which is what confirms the ordinate is Nu x 1e-3 and validates the calibration without reference to any correlation. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig4_ar_3.5_solid_circles_eDh_0.053.csv
+    after: null
+    page: 4
+    item: "Figure 4"
+    series: >-
+      Nu series, AR 3.5, 2 wall(s) turbulated, e/D_H 0.053.
+    figure: "4"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.053.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.053.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig4_ar_3.5_solid_squares_eDh_0.107.csv
+    after: null
+    page: 4
+    item: "Figure 4"
+    series: >-
+      Nu series, AR 3.5, 2 wall(s) turbulated, e/D_H 0.107.
+    figure: "4"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.107.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.107.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig4_ar_3.5_solid_tri_eDh_0.161.csv
+    after: null
+    page: 4
+    item: "Figure 4"
+    series: >-
+      Nu series, AR 3.5, 2 wall(s) turbulated, e/D_H 0.161.
+    figure: "4"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 3.5
+      W_H: 0.286
+      D_H_in: 4.667
+      e_D: 0.161.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.161.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig5_ar_0.5_open_circles_eDh_0.125.csv
+    after: null
+    page: 5
+    item: "Figure 5"
+    series: >-
+      Nu series, AR 0.5, 2 wall(s) turbulated, e/D_H 0.125.
+    figure: "5"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 0.5
+      W_H: 2.0
+      D_H_in: 2.0
+      e_D: 0.125.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.125.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+      # Too short to infer a slope from -- fig12's series are 1 to 3
+      # marks by construction (one per configuration), and these
+      # fig5/fig11 series simply stop early. Acknowledged rather
+      # than suppressed: the marks are good, the SPAN is not.
+      slope_unreliable: true
+  - path: fig5_ar_0.5_open_squares_eDh_0.250.csv
+    after: null
+    page: 5
+    item: "Figure 5"
+    series: >-
+      Nu series, AR 0.5, 2 wall(s) turbulated, e/D_H 0.250.
+    figure: "5"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 0.5
+      W_H: 2.0
+      D_H_in: 2.0
+      e_D: 0.250.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.250.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+      # Too short to infer a slope from -- fig12's series are 1 to 3
+      # marks by construction (one per configuration), and these
+      # fig5/fig11 series simply stop early. Acknowledged rather
+      # than suppressed: the marks are good, the SPAN is not.
+      slope_unreliable: true
+  - path: fig5_ar_1.0_half_circles_eDh_0.083.csv
+    after: null
+    page: 5
+    item: "Figure 5"
+    series: >-
+      Nu series, AR 1.0, 2 wall(s) turbulated, e/D_H 0.083.
+    figure: "5"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.083.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated, e/D_H 0.083.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig5_ar_1.0_half_squares_eDh_0.167.csv
+    after: null
+    page: 5
+    item: "Figure 5"
+    series: >-
+      Nu series, AR 1.0, 2 wall(s) turbulated, e/D_H 0.167.
+    figure: "5"
+    panel: single
+    geometry:
+      aspect_ratio_taslim: 1.0
+      W_H: 1.0
+      D_H_in: 3.0
+      e_D: 0.167.
+      p_e: 10.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated, e/D_H 0.167.. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig5_smooth_duct_0.023Re_Dh^0.8Pr^0.4.csv
+    after: null
+    page: 5
+    item: "Figure 5"
+    series: >-
+      Nu series, AR None, 2 wall(s) turbulated
+    figure: "5"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: Re_Dh
+    x_scale: 1.0
+    y_axis: Nu_turbulated
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The paper's own smooth-duct reference, Nu_s = 0.023 Re^0.8 Pr^0.4. Digitised and compared against that formula at Pr = 0.70 it agrees to +0.30% (fig4) and -1.77% (fig5), with slopes 0.816 and 0.802 against 0.8 -- which is what confirms the ordinate is Nu x 1e-3 and validates the calibration without reference to any correlation. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig9_AR_0.5_solid_circles.csv
+    after: null
+    page: 5
+    item: "Figure 9"
+    series: >-
+      Nu series, AR 0.5, 2 wall(s) turbulated
+    figure: "9"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: Nu_ratio_Re_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig9_AR_0.5_solid_circles_fit.csv
+    after: null
+    page: 5
+    item: "Figure 9"
+    series: >-
+      Nu series, AR 0.5, 2 wall(s) turbulated
+    figure: "9"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: Nu_ratio_Re_normalised
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The author's own drawn fit. On fig4 it digitises to an exponent of 0.613 against the Re^0.6 printed on it. On fig12 the AR 1.0 curve is the only record of the e/D 0.083 point, whose MARKER that figure misplaces. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig9_AR_1.0_solid_squares.csv
+    after: null
+    page: 5
+    item: "Figure 9"
+    series: >-
+      Nu series, AR 1.0, 2 wall(s) turbulated
+    figure: "9"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: Nu_ratio_Re_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig9_AR_1.0_solid_squares_fit.csv
+    after: null
+    page: 5
+    item: "Figure 9"
+    series: >-
+      Nu series, AR 1.0, 2 wall(s) turbulated
+    figure: "9"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: Nu_ratio_Re_normalised
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The author's own drawn fit. On fig4 it digitises to an exponent of 0.613 against the Re^0.6 printed on it. On fig12 the AR 1.0 curve is the only record of the e/D 0.083 point, whose MARKER that figure misplaces. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig9_AR_3.5_solid_tri.csv
+    after: null
+    page: 5
+    item: "Figure 9"
+    series: >-
+      Nu series, AR 3.5, 2 wall(s) turbulated
+    figure: "9"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: Nu_ratio_Re_normalised
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]
+  - path: fig9_AR_3.5_solid_tri_fit.csv
+    after: null
+    page: 5
+    item: "Figure 9"
+    series: >-
+      Nu series, AR 3.5, 2 wall(s) turbulated
+    figure: "9"
+    panel: single
+    geometry: null
+    alpha_deg: 90.0
+    x_axis: e_over_Dh
+    x_scale: 1.0
+    y_axis: Nu_ratio_Re_normalised
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      The author's own drawn fit. On fig4 it digitises to an exponent of 0.613 against the Re^0.6 printed on it. On fig12 the AR 1.0 curve is the only record of the e/D 0.083 point, whose MARKER that figure misplaces. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: null
+      x_multiplier: 1.0
+      y_ticks: null
+      y_limits: [null, null]
+      printed_curve: null
+      monotonic: null
+      expected_points: null
+      plot_x_limits: [null, null]
+      plot_y_limits: [null, null]

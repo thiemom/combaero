@@ -33,6 +33,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Taslim & Spring (1987), AIAA-87-2009 digitised -- the first rib source in
+  this dataset that is not Texas A&M.** Northeastern plus General Electric.
+  38 series over five figures: friction and Nusselt for eight two-side
+  turbulated configurations and their one-side counterparts, 90 degree
+  transverse in-line ribs, `P/e` = 10, Re 20k-190k, three aspect ratios.
+
+  **It covers two things nothing else here does.** Taslim's AR 3.5 is Han's
+  `W/H` = 0.286, inside the `1/4 <= W/H < 1/2` branch of Eq. 4.19 that #402
+  will implement from a TAMU source. And `e/D` 0.083 at a square channel is
+  the closest any independent measurement gets to Han's 0.047-0.078, which
+  is what #403 item 2 is blocked on.
+
+  **The aspect ratio is INVERTED relative to Han** -- Taslim's is
+  height/width, Han's `W/H` is width/height -- and `e/D_H` is *coupled* to
+  it, because `e` is fixed at three sizes and `D_H` follows. So low blockage
+  occurs only at high aspect ratio, and no configuration here reaches Han's
+  band at a square channel. A property of the rig: every independent
+  arbitration of #403 item 2 will carry an extrapolation cost.
+
+  **Five figures, each cross-checking another.** Calibration 0.6-1.8% on x,
+  0.20-0.57% on y. The paper's own smooth-duct curve reproduces
+  `0.023 Re^0.8 Pr^0.4` to **+0.30%** (fig4) and -1.77% (fig5), confirming
+  the `Nu x 1e-3` ordinate without being told. Figures 4+5 reconstruct
+  figure 9 to **5.4% MAE, -0.4% bias**. The paper's `Nu_T ~ Re^0.6` comes
+  back out of the marks at 0.58-0.65.
+
+  **Figure 12 misdraws one marker and it is the most valuable one.** Six of
+  seven land within the x bow; AR 1.0 at `e/D` 0.083 is off by +0.047 in x
+  and reads `f` = 0.0746 against figure 11's **0.0468** from eight marks --
+  wrong in both coordinates, confirmed at 450 dpi. Figure 12's own fit curve
+  gives 0.0437 there, so the curve is right and the symbol is misplaced.
+  **Figure 11 supersedes figure 12 wherever they overlap.**
+
+  **Figure 9's exponent is 0.2 and the figure appears to say 2** -- the
+  superscript's decimal point does not survive the scan. The body text says
+  ".2" twice; exponent 2 would put the ordinate at 35-523 on an axis ending
+  at 5. Same class as the lost decimal in Han's `(e/D)^0.014`, worth 22%.
+
+  **Committed UNSCORED.** The source publishes a passage-average *Fanning*
+  friction factor and a turbulated-surface Nusselt number, not `R` and `G`.
+  The conversion needs this family's own decomposition, whose `R` carries an
+  aspect-ratio term inside the logarithm and is therefore a different
+  quantity -- declaring that before applying it is exactly what #433 built.
+  Runner work belongs with #402 and #403.
+
+  Record: `validation/cooling/extractions/taslim_spring_1987_aspect_ratio.md`.
+
 - **The scorecard answers #389's question 1 for the first time: a fidelity
   count per correlation set.** Fidelity was "partly built and entirely
   invisible" -- the checks existed, scattered across unit tests and
