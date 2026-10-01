@@ -1119,12 +1119,12 @@ and Park never measured. It is the same direction as the old item 23
 internal disagreement, so an independent dataset now takes the figure's
 side.
 
-**A second dataset agrees (2026-10-01).** Han, Zhang and Lee (1991)'s
-45 deg parallel class, scoreable since #403 item 1 was resolved, reads
--13.8% (4 points in domain) against Eq. 4.18; 60 deg parallel reads
--6.8%. Both are scored at the runner's probe `P/e` 15 -- at that paper's
-stated `P/e` 10 they read lower still, -17.7% and -10.5% -- so the probe
-has been flattering the model on figure 4.51 (see
+**A second dataset agrees (2026-10-01/02).** Han, Zhang and Lee (1991)'s
+parallel classes, scored at that paper's stated rig (square, `e/D`
+0.0625, `P/e` 10), read low against Eq. 4.18: 45 deg -17.2% and 60 deg
+-9.3% bias in domain (`G`), 60 deg -8.2% (`G_bar`). Until 2026-10-02 they
+were scored at the runner's probe `P/e` 15, which reads Eq. 4.18 ~4% high
+through its `(P/e/10)^0.1` and had been hiding part of the gap (see
 `han_zhang_lee_1991_jht.md`).
 
 `han_park_1988_angled` ships Eq. 4.18, so this is a property of the model
@@ -1162,6 +1162,7 @@ confirmation it was waiting for came from a different and stronger place.
 
 | date | reviewer | outcome |
 |---|---|---|
+| 2026-10-02 | Claude | **Figure 4.51 scored at its stated rig** (`e/D` 0.0625, `P/e` 10, square; Han, Zhang and Lee 1991 p. 590) instead of the runner's probe `P/e` 15, which had read Eq. 4.18 ~4% high. `han_park_1988_angled` in-domain bias: 60 deg parallel -6.8% -> -9.3%, 45 deg -13.8% -> -17.2%. The known low reading, larger; 90 deg unchanged. |
 | 2026-10-01 | reviewer + Claude | **#403 item 1 resolved against the primary paper**, Han, Zhang and Lee (1991) JHT 113, 590 (`han_zhang_lee_1991_jht.md`). Its Table 2 prints `G` and `G_bar` for all nine configurations; every confirmed figure 4.51 class lands on its own panel's fit within 2.8%, while BOTH panels of the 45 deg parallel and crossed classes land on the printed `G`. So the `G_bar` panel carried the `G` marks twice: `G_45par`/`G_45crs` confirmed, `Gbar_45par`/`Gbar_45crs` kept disputed and unscored. Printed `G_bar/G` is 1.07-1.26 across all nine, never below 1. Also corrected: 91-GT-3 had been recorded as this paper's conference version; it is the heat-flux-ratio companion, with the same `R` and a `G` up to 23% different. |
 | 2026-10-01 | Claude | **Figure 4.53 (Han and Zhang 1992) scored on its own axes (#435).** The 90 deg continuous series goes through a new `f_ratio` path in `runner.py` against `han_1988_orthogonal`: MAE 7.9%, bias -2.1% over 5 points, ACCURACY. The issue said "no source needed"; that was not quite true -- the rig is unstated, so e/D 0.0625 / P/e 10 / square are borrowed from 91-GT-3, and the smooth references (Blasius `0.079 Re^-0.25`, Dittus-Boelter) are the lab's as printed in NASA CR-4015 Eqs. (4)/(5). `f_ratio` is the channel-average `fbar`, not the four-sided `f` (1.8x apart); a test falsifies the four-sided reading. The 60 deg V-shaped series stays refused pending #434. |
 | 2026-10-01 | Claude | **Eq. 4.19 implemented** as `combaero.han_1989_narrow_channel()` (#402), settling item 40 via decision D6. `G` is text-extracted (items 36-38); `R` has no printed equation below `W/H=1` and is this project's own quadratic-in-alpha fit to Fig. 4.48a's drawn line (0.99%/0.62% RMS against the two sub-bands' lines), scored separately against the raw digitised scatter (`accuracy_R` 5.4% RMS over 16 points). `G`'s raw scatter pools multiple rib angles with no per-point angle recorded, so it is scored at `alpha=90` uniformly; checked rather than assumed that this does not hide Eq. 4.19's own ~24% alpha switch, since a free fit to the pooled points alone already lands within 3.9-5.0% RMS (`accuracy_G` 5.4% RMS over 21 points). Wired 37 previously-unscored Fig. 4.48 points (`fig4.48_{R,G}_WH{0.25,0.5}`); the `*_WH1_ref3` drawn-line and error-bar series stay deliberately unscored, unaffected -- the issue's "58 points" estimate did not account for that, and the real unlock is 37. New schema shapes (`RAlphaShape::QuadraticAlphaTwoBand`, `GShapeModel::NarrowChannelAlphaSwitch`) follow D5's precedent: additive fields, `han_1988_orthogonal`/`rallabandi_2009_high_re`/`han_park_1988_angled`'s test suites pass unmodified. Writing the Stanton-derivative test caught a real bug before it shipped: the generic `dG/dRe` formula used the shape's unscaled base `e+` exponent rather than the `(W/H)`-corrected one actually applied in the narrow sub-band, silently wrong by as much as 40% there until fixed. |

@@ -1739,7 +1739,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "90 deg transverse, solid circle"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 90.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -1774,7 +1774,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "90 deg transverse, solid circle"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 90.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -1809,7 +1809,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "60 deg parallel, solid triangle up"
-    geometry: {W_H: 1.0}
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -1828,11 +1828,11 @@ files:
       Cross-panel independent check: han_park_1988_angled was fitted to
       Han and Park (1988)'s OWN parallel-rib data (figure 4.47); this
       series is Han et al. (1991)'s parallel-rib class from a DIFFERENT
-      paper and rig. Scored with a representative W/H=1 (square), since
-      figure 4.51's own channel geometry is not stated in the extracted
-      text -- the only anchor is that its 90 deg class matches Han (1988)
-      at any W/H, which is consistent with a square rig but does not
-      establish one. Was previously scored against han_1988_orthogonal,
+      paper and rig. Scored at that paper's STATED rig -- square, e/D
+      0.0625, P/e 10 (Han, Zhang and Lee 1991, p. 590) -- since
+      2026-10-02; before the paper was on disk it carried only a
+      representative W/H=1 and the runner's probe P/e 15, which read the
+      model ~4% high through Eq. 4.18's (P/e/10)^0.1. Was previously scored against han_1988_orthogonal,
       which always refused it (alpha=45/60 outside that set's 90-90 range)
       -- silently stale until han_park_1988_angled existed to score it
       correctly.
@@ -1856,7 +1856,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "60 deg parallel, solid triangle up"
-    geometry: {W_H: 1.0}
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -1875,11 +1875,11 @@ files:
       Cross-panel independent check: han_park_1988_angled was fitted to
       Han and Park (1988)'s OWN parallel-rib data (figure 4.47); this
       series is Han et al. (1991)'s parallel-rib class from a DIFFERENT
-      paper and rig. Scored with a representative W/H=1 (square), since
-      figure 4.51's own channel geometry is not stated in the extracted
-      text -- the only anchor is that its 90 deg class matches Han (1988)
-      at any W/H, which is consistent with a square rig but does not
-      establish one. Was previously scored against han_1988_orthogonal,
+      paper and rig. Scored at that paper's STATED rig -- square, e/D
+      0.0625, P/e 10 (Han, Zhang and Lee 1991, p. 590) -- since
+      2026-10-02; before the paper was on disk it carried only a
+      representative W/H=1 and the runner's probe P/e 15, which read the
+      model ~4% high through Eq. 4.18's (P/e/10)^0.1. Was previously scored against han_1988_orthogonal,
       which always refused it (alpha=45/60 outside that set's 90-90 range)
       -- silently stale until han_park_1988_angled existed to score it
       correctly.
@@ -1903,7 +1903,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "60 deg crossed, solid diamond"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -1938,7 +1938,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "60 deg crossed, solid diamond"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -1974,7 +1974,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "60 deg V-shaped, solid square"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2009,7 +2009,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "60 deg V-shaped, solid square"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2044,7 +2044,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "60 deg lambda-shaped, solid triangle down"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2079,7 +2079,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "60 deg lambda-shaped, solid triangle down"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2114,7 +2114,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "45 deg parallel, open triangle up"
-    geometry: {W_H: 1.0}
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2153,7 +2153,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "45 deg parallel, open triangle up"
-    geometry: {W_H: 1.0}
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2194,7 +2194,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "45 deg crossed, open diamond"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2233,7 +2233,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "45 deg crossed, open diamond"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2274,7 +2274,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "45 deg V-shaped, open square"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2309,7 +2309,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "45 deg V-shaped, open square"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2344,7 +2344,7 @@ files:
     panel: upper
     item: "Figure 4.51 upper panel"
     series: "45 deg lambda-shaped, open triangle down"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
@@ -2379,7 +2379,7 @@ files:
     panel: lower
     item: "Figure 4.51 lower panel"
     series: "45 deg lambda-shaped, open triangle down"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
     x_axis: e_plus
     x_scale: 1.0e4
