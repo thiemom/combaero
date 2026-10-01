@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Figure 4.51's disputed 45 deg classes resolved against the primary
+  paper (#403 item 1).** Han, Zhang and Lee (1991) JHT 113, 590 -- now on
+  disk -- prints `G` and `G_bar` fits for all nine of its rib
+  configurations (Table 2). Every confirmed figure 4.51 class lands on its
+  own panel's fit within 2.8%; for 45 deg parallel and crossed, BOTH panels
+  land on the printed `G` (bias +3.8% / -2.1%) and miss `G_bar` by 13-19%.
+  The `G_bar` panel carried the `G` marks twice, so `G_45par`/`G_45crs` are
+  now confirmed and `Gbar_45par`/`Gbar_45crs` stay disputed and unscored.
+  The "impossible `G_bar/G` < 1" was the duplicate, not physics: the
+  printed ratio is 1.07-1.26 for all nine shapes.
+
+  **What it surfaced.** 45 deg parallel `G` now scores against
+  `han_park_1988_angled` and reads -13.8%: the recorded "Eq. 4.18 reads
+  low" accuracy limit, now in a second independent dataset. The test that
+  asserted every figure 4.51 parallel class within 15% is rewritten to pin
+  that as the accuracy result it is (bias must stay negative), not
+  loosened to pass.
+
+- **Figure 4.53's smooth-friction reference is the one the source prints.**
+  The same paper states `f_0 = 0.046 Re^-0.2` (its Eq. 2) for the rig whose
+  continuous-rib data figure 4.53 reprints; #440 had carried CR-4015's
+  four-sided `0.079 Re^-0.25` across before the paper was on disk. MAE
+  7.9% -> 7.6%. It also states the rig (no longer borrowed from 91-GT-3),
+  and that its Nu ratio is averaged over X/D 0-20 INCLUDING the entrance
+  region -- now declared on the series and in `conventions.py`, since
+  `han_1988_orthogonal` is fully developed.
+
 - **CI skipped every test job for changes under `validation/`, and the
   status check passed anyway.** The `source` path filter listed
   `src/ include/ python/ tests/ scripts/ examples/` but not `validation/`,

@@ -56,8 +56,9 @@ CONVENTION_NOTES: dict[str, str] = {
     "R_normalised_angled": "R normalised for the angled-rib quadratic form",
     "Nu_ratio_ribbed_DB_vs_fbar": (
         "RIBBED-side Nu over Dittus-Boelter 0.023 Re^0.8 Pr^0.4, plotted "
-        "against CHANNEL-AVERAGE fbar over Blasius 0.079 Re^-0.25 (Han's lab, "
-        "CR-4015 Eqs. 4/5). Not the four-sided f: 1.8x apart at e/D 0.0625"
+        "against CHANNEL-AVERAGE f over 0.046 Re^-0.2 (Han, Zhang & Lee 1991, "
+        "Eqs. 2/4). Not the four-sided f: 1.8x apart at e/D 0.0625. Nu is "
+        "averaged over X/D 0-20 including the entrance region"
     ),
     # Jet impingement
     "Nu_over_Nu1": "row Nusselt divided by the first-row value, same correlation",
@@ -95,7 +96,7 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     ("han2012", "R"): "R_ribbed_wall",
     ("han2012", "R_normalised"): "R_normalised_pe",
     # Figure 4.53, Han and Zhang (1992). Their own normalisation is not on
-    # disk; the lab's, printed in CR-4015, is declared (#435).
+    # disk; the 1991 paper it reprints from prints it (#435).
     ("han2012", "Nu_ratio"): "Nu_ratio_ribbed_DB_vs_fbar",
     ("han2012", "R_normalised_angled"): "R_normalised_angled",
     ("florschuetz1981", "Nu_over_Nu1"): "Nu_over_Nu1",
