@@ -123,6 +123,21 @@ extrapolating that set costs, not as its accuracy:
 `baldauf_2002_sellers` scores 138 points of which all 138 are outside its
 envelope, so its 48% MAE is entirely an extrapolation figure.
 
+**`Fidelity: checks against quantities the source PRINTS`** answers
+question 1 -- does the implementation mirror the paper? A check here
+compares against something the source prints: a constant, a table entry,
+an equation the author evaluates himself, or an identity between two
+printed equations. Scoring against a digitised figure is NOT one: that is
+the fidelity/accuracy basis above, and it cannot separate "we transcribed
+it wrong" from "the model misses". A printed quantity can -- which is how
+Andrews' -13.5% became a model limitation rather than our bug.
+
+**The count is evidence, not a score.** A set with more checks is better
+evidenced, not more accurate; `baldauf_2002_sellers` carries one whose
+RESULT is that the paper contradicts itself. Sets with no check at all
+are named rather than left absent, because "no check" and "nobody looked"
+both read as zero.
+
 **`Measurement conventions, series against the set scoring it`** counts
 `direct` / `converted` / `undeclared` and lists every conversion applied and
 every refusal. A refusal is a category error, not a disagreement -- it

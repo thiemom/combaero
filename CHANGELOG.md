@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The scorecard answers #389's question 1 for the first time: a fidelity
+  count per correlation set.** Fidelity was "partly built and entirely
+  invisible" -- the checks existed, scattered across unit tests and
+  extraction records, and nothing reported how many printed quantities an
+  implementation had been checked against.
+
+  ```
+  Fidelity: checks against quantities the source PRINTS
+    andrews_1986_effusion_internal             7
+    baldauf_2002_sellers                       2
+    han_1988_orthogonal                        1
+    han_park_1988_angled                       1  (1 from figure cards)
+    No printed-quantity check at all: florschuetz_1981_inline,
+    mcgreehan_schotsch_1988_cd, mcgreehan_schotsch_1988_crossflow_cd,
+    rallabandi_2009_high_re
+  ```
+
+  **A check compares against something the source PRINTS** -- a constant,
+  a table entry, an equation the author evaluates himself, or an identity
+  between two printed equations. Scoring against a digitised figure is
+  not one: that is the basis the scorecard already reports, and it cannot
+  separate "we transcribed it wrong" from "the model misses". Andrews
+  Eq. (19)'s printed `0.27` against our `0.26983` can.
+
+  **#389 expected this to be "mostly aggregation of checks that already
+  run", and measuring showed it is not.** `verify.py` finds nine
+  `printed-curve`/`printed-exponent` findings across the whole dataset
+  and only ONE lands on a scored set -- the rest sit on `scores: null`
+  correlation curves belonging to no set. So each substantial check is
+  declared with its quantity, location, agreement and the test that pins
+  it, and `test_every_declared_check_exists` resolves every named pytest
+  node by collection and every gtest against the C++ sources.
+
+  **The count is evidence, not a score.** `baldauf_2002_sellers` carries
+  a check whose result is that Eq. (31) disagrees with the paper's own
+  Table 4 by 36% -- fidelity evidence of the most useful kind, and it
+  would be perverse for it to read as a defect. Sets with no check are
+  NAMED, because "no check" and "nobody looked" both read as zero.
+
+  The no-check list is derived, not declared: a hard-coded one reported
+  `han_park_1988_angled` as having none while the machine count found
+  one, contradicting itself in adjacent lines of the same report.
+
 - **Measurement conventions are declared and checked, so scoring can no
   longer compare two different quantities** (#389's third remaining item).
   `validation/cooling/conventions.py`: a series declares what its y

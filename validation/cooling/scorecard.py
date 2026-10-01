@@ -43,7 +43,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 
-from validation.cooling import conventions
+from validation.cooling import conventions, fidelity
 from validation.cooling.runner import Record
 from validation.cooling.schema import Point, load_points
 
@@ -546,7 +546,9 @@ def render_set_accuracy(set_names) -> list[str]:
     return out
 
 
-def render(cells: list[Cell], pools: dict | None = None) -> str:
+def render(
+    cells: list[Cell], pools: dict | None = None, dataset=None
+) -> str:
     pools = pools or {}
     head = (
         f"{'series':<44} {'kind':<12} {'N':>3} {'scored':>6} "
@@ -605,6 +607,8 @@ def render(cells: list[Cell], pools: dict | None = None) -> str:
                 "claimed -- not because extrapolating is always worse."
             )
         lines.append("")
+        lines.extend(fidelity.render(dataset))
+        lines.append("")
         lines.extend(render_conventions(cells))
         lines.append("")
         lines.extend(render_set_accuracy(sorted({c.scored_by for c in summary})))
@@ -634,7 +638,7 @@ def main() -> None:
         "han2012/fig4.46_R_*  (lower panel)": pool(records, "han2012/fig4.46_R_eD"),
         "han2012/fig4.46_G_*  (upper panel)": pool(records, "han2012/fig4.46_G_eD"),
     }
-    print(render(build(records, dataset), pools))
+    print(render(build(records, dataset), pools, dataset))
 
 
 if __name__ == "__main__":
