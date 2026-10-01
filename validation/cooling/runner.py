@@ -36,7 +36,25 @@ from validation.cooling.schema import Point, SeriesMetadata, load_points
 # 69% of that variance is BETWEEN RIGS, not within them (per-source means
 # 1.160 / 1.323 / 1.327, internal spreads 12% / 3% / 14%). No angle or
 # shape term can reach a rig offset, so a "better" correlation would be
-# fitting rig identity. Against the pooled population Han's 1.2 scores
+# fitting rig identity.
+#
+# ALL THREE RIGS ARE TEXAS A&M, and that cuts both ways. 91-GT-3 and
+# CR-3837 are Han's own laboratory; lau1990 is Lau's, in the same
+# department, and Lau sat on the committees for the rest. So:
+#
+#   * the "no correlation" conclusion gets STRONGER. If three rigs within
+#     one laboratory tradition differ by 69% of the variance between
+#     them, the offset is rig-level -- geometry, instrumentation, data
+#     reduction -- and not an artefact of comparing institutions. There
+#     is even less for an angle or shape term to reach.
+#   * the "MAE 8.3%" gets WEAKER. This is not a sample of the world's
+#     rigs, so the 29% spread is a LOWER BOUND on the true one and Han's
+#     1.2 may score worse against a non-TAMU rig than it does here.
+#
+# Recorded because "16 configurations across three rigs" reads as more
+# independent than it is. See #403 item 2 on the same monoculture.
+#
+# Against the pooled population Han's 1.2 scores
 # bias -6.1%, MAE 8.3% -- a defensible compromise for one number, and
 # close to what a least-squares fit over the same population would give.
 #

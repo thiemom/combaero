@@ -72,6 +72,24 @@ printed 1.2 is a mid-range approximation of a moving quantity).
 | CR-3837 | 5 | 1.323 | 3% |
 | lau1990 | 7 | 1.327 | 14% |
 
+### "Three rigs" is not three laboratories
+
+91-GT-3 and CR-3837 are Han's own laboratory; `lau1990` is Lau's, in the
+same department, and Lau sat on the committees for the others. The phrase
+reads as more independent than it is, and the consequence is two-sided:
+
+* **the "no generalised correlation" conclusion is STRONGER.** Three rigs
+  inside one laboratory tradition differing by 69% of the variance
+  between them makes the offset rig-level -- geometry, instrumentation,
+  data reduction -- rather than an artefact of comparing institutions.
+  There is even less for an angle or shape term to reach.
+* **the "MAE 8.3%" is OPTIMISTIC.** This is not a sample of the world's
+  rigs. The 29% spread is a LOWER BOUND on the true one, and Han's 1.2
+  may score worse against a non-TAMU rig than it does against this pool.
+
+Same monoculture as #403 item 2, where it blocks the Lau friction
+disagreement outright. Noted 2026-10-01.
+
 No angle or shape term can reach a rig offset, so a "generalised" `G_bar/G`
 would be fitting rig identity. Against the pooled population Han's 1.2
 scores bias -6.1%, MAE 8.3%.
