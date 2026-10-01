@@ -54,6 +54,11 @@ CONVENTION_NOTES: dict[str, str] = {
     "R_ribbed_wall": "friction roughness function on the ribbed wall",
     "R_normalised_pe": "R divided by (P/e/10)^0.35, Han's figure 4.46 ordinate",
     "R_normalised_angled": "R normalised for the angled-rib quadratic form",
+    "Nu_ratio_ribbed_DB_vs_fbar": (
+        "RIBBED-side Nu over Dittus-Boelter 0.023 Re^0.8 Pr^0.4, plotted "
+        "against CHANNEL-AVERAGE fbar over Blasius 0.079 Re^-0.25 (Han's lab, "
+        "CR-4015 Eqs. 4/5). Not the four-sided f: 1.8x apart at e/D 0.0625"
+    ),
     # Jet impingement
     "Nu_over_Nu1": "row Nusselt divided by the first-row value, same correlation",
     # Film and effusion
@@ -89,6 +94,9 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     # normalised ordinate -- same quantity as han_park_lei1984/lau1990's "R".
     ("han2012", "R"): "R_ribbed_wall",
     ("han2012", "R_normalised"): "R_normalised_pe",
+    # Figure 4.53, Han and Zhang (1992). Their own normalisation is not on
+    # disk; the lab's, printed in CR-4015, is declared (#435).
+    ("han2012", "Nu_ratio"): "Nu_ratio_ribbed_DB_vs_fbar",
     ("han2012", "R_normalised_angled"): "R_normalised_angled",
     ("florschuetz1981", "Nu_over_Nu1"): "Nu_over_Nu1",
     ("andrei2014", "eta_adiabatic"): "eta_adiabatic",
@@ -130,6 +138,7 @@ SET_ALSO_PRODUCES: dict[str, tuple[str, ...]] = {
     # runner selects between; and G_bar through Han's published 1.2.
     "han_1988_orthogonal": (
         "R_ribbed_wall", "R_normalised_pe", "G_four_wall",
+        "Nu_ratio_ribbed_DB_vs_fbar",
     ),
     "han_park_1988_angled": (
         "R_ribbed_wall", "R_normalised_pe", "R_normalised_angled",

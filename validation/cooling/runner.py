@@ -64,6 +64,22 @@ from validation.cooling.schema import Point, SeriesMetadata, load_points
 # refused anything off 90 deg; that withheld a number Han does publish.
 G_BAR_OVER_G = 1.2
 
+# Smooth-channel references for the performance-curve view (Nu_ratio
+# against f_ratio, figure 4.53). Han's lab prints both in NASA CR-4015
+# (Han, Park & Ibrahim 1986), Eqs. (4)/(5):
+#
+#     f(FD)  = 0.079 Re^-0.25            Blasius, four-sided smooth channel
+#     Nu(FD) = 0.023 Re^0.8 Pr^0.4       Dittus-Boelter
+#
+# Han and Zhang (1992), whose data figure 4.53 is, is not on disk, so these
+# are the LAB'S printed convention carried across, not that paper's own
+# statement. Sensitivity is small where it was measured: swapping in
+# 0.046 Re^-0.2 for f_s moves the 90 deg score by 0.3%. Written out here
+# rather than calling nusselt_dittus_boelter, which warns below Re 10,000
+# on every bisection probe.
+SMOOTH_F_COEF, SMOOTH_F_EXP = 0.079, -0.25
+SMOOTH_NU_COEF, SMOOTH_NU_RE_EXP, SMOOTH_NU_PR_EXP = 0.023, 0.8, 0.4
+
 # Bracket for the Re bisection. Deliberately far wider than any set's
 # stated validity: a series may sit outside it, and reporting that as
 # extrapolated is the point rather than something to avoid.
@@ -300,6 +316,63 @@ def _r_at_alpha(
 ARBITRARY_RE = 30000.0
 
 
+def _performance_ratios(
+    rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, re: float
+) -> tuple[float, float, bool]:
+    """(f_ratio, Nu_ratio, extrapolated) at one Reynolds number.
+
+    f_ratio is CHANNEL-AVERAGE friction over smooth: Han's measured `fbar`
+    for two opposite ribbed walls, not the four-sided equivalent `f` that
+    evaluate_rib returns. Inverting Han's `f = fbar + (H/W)(fbar - f_s)`:
+    `fbar = (f W/H + f_s) / (W/H + 1)`. Taking `f/f_s` instead is a 1.8x
+    error at figure 4.53's geometry -- the same trap CR-3837's `Rbar` set
+    (han_park_lei_1984_cr3837.md, "The conversion").
+
+    Nu_ratio is the RIBBED-side Nusselt number over Dittus-Boelter, which is
+    what St_r already is.
+    """
+    res = cb.evaluate_rib(rib_set, geom, re)
+    f_s = SMOOTH_F_COEF * re**SMOOTH_F_EXP
+    fbar = (res.f * geom.W_H + f_s) / (geom.W_H + 1.0)
+    pr = rib_set.valid_Pr
+    nu_r = res.St_r * re * pr
+    nu_s = SMOOTH_NU_COEF * re**SMOOTH_NU_RE_EXP * pr**SMOOTH_NU_PR_EXP
+    return fbar / f_s, nu_r / nu_s, res.extrapolated
+
+
+def _at_f_ratio(
+    rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, target: float
+) -> tuple[float, bool, float] | None:
+    """Nu_ratio where the set's own f_ratio reaches `target`, via Re.
+
+    The performance curve plots both ratios against each other with Re
+    eliminated, and the digitised points carry no Re. So Re is recovered
+    the way the e+ path recovers it from e+: bisect the real chain until
+    its f_ratio lands on the abscissa. A friction error therefore shifts
+    WHERE on the curve a point is compared, which is how a reader of the
+    figure compares curves too. f_ratio rises monotonically with Re for
+    this family (f is Re-independent, f_s falls).
+    """
+    lo, hi = RE_LO, RE_HI
+    if not (
+        _performance_ratios(rib_set, geom, lo)[0]
+        < target
+        < _performance_ratios(rib_set, geom, hi)[0]
+    ):
+        return None
+    for _ in range(BISECT_STEPS):
+        mid = (lo * hi) ** 0.5
+        if _performance_ratios(rib_set, geom, mid)[0] < target:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 1e-9 * hi:
+            break
+    re = (lo * hi) ** 0.5
+    _, nu_ratio, extrapolated = _performance_ratios(rib_set, geom, re)
+    return nu_ratio, extrapolated, re
+
+
 def run_series(
     series: SeriesMetadata, points: list[Point] | None = None
 ) -> list[Record]:
@@ -318,9 +391,27 @@ def run_series(
             Record(series, p.x, p.y, None, False, None, "not scored by any set")
             for p in points
         ]
-    if series.x_axis not in ("e_plus", "alpha_deg"):
+    if series.x_axis not in ("e_plus", "alpha_deg", "f_ratio"):
         return [
             Record(series, p.x, p.y, None, False, None, f"x axis is {series.x_axis}")
+            for p in points
+        ]
+    if series.x_axis == "f_ratio" and series.y_axis != "Nu_ratio":
+        return [
+            Record(
+                series, p.x, p.y, None, False, None,
+                f"the f_ratio path only predicts Nu_ratio, not {series.y_axis}",
+            )
+            for p in points
+        ]
+    if series.x_axis == "f_ratio" and not series.geometry:
+        # Unlike G on the e+ path, both performance ratios depend on e/D
+        # through f for EVERY set, so there is no geometry-free case.
+        return [
+            Record(
+                series, p.x, p.y, None, False, None,
+                "performance ratios depend on e/D through f; no rig geometry recorded",
+            )
             for p in points
         ]
     if series.x_axis == "alpha_deg" and not series.y_axis.startswith("R"):
@@ -384,6 +475,19 @@ def run_series(
     # which is how it was missed when e_D/p_e/W_H were wired through.
     if series.alpha_deg is not None:
         geom.alpha_deg = float(series.alpha_deg)
+
+    if series.x_axis == "f_ratio":
+        records = []
+        for p in points:
+            found = _at_f_ratio(rib_set, geom, p.x)
+            if found is None:
+                records.append(
+                    Record(series, p.x, p.y, None, True, None, "f ratio unreachable")
+                )
+                continue
+            nu_ratio, extrapolated, re = found
+            records.append(Record(series, p.x, p.y, nu_ratio, extrapolated, re))
+        return records
 
     if series.x_axis == "alpha_deg":
         # R vs alpha (figure 4.47's own axis): no e+/Re bisection needed --

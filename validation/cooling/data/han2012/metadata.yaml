@@ -312,7 +312,11 @@ files:
     panel: upper
     item: "Figure 4.53, solid circles"
     series: "90 deg continuous rib, ribbed-side Nu ratio"
-    geometry: null
+    # INFERRED, not stated: the extracted text gives Re 15,000-80,000 and
+    # nothing else about the rig. Taken from 91-GT-3 (Han, Zhang & Lee
+    # 1991, extractions/han_zhang_lee_91gt3_table3.md) -- same lab, Zhang
+    # on both, same Re range: square channel, e/D 0.0625, P/e 10.
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}
     alpha_deg: 90.0
     x_axis: f_ratio
     x_scale: 1.0
@@ -320,10 +324,17 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.08
+    uncertainty: null  # Han and Zhang (1992) is not on disk; its band is unread
     cross_check: >-
       Nu ratio must fall and f ratio rise with Reynolds number along the
-      series, the trend the section text states for all ribs.
+      series, the trend the section text states for all ribs. Scored by
+      han_1988_orthogonal (#435) on the performance-curve path: Re is
+      recovered from f_ratio through the set's own chain, and lands at
+      34,000-65,000 -- inside the stated 15,000-80,000, a check that could
+      have failed. f_ratio is CHANNEL-AVERAGE fbar over Blasius; read as the
+      four-sided f the model would sit 1.8x off. The geometry is borrowed
+      from 91-GT-3 and the score moves with it: -10% to +6% bias across
+      Han's own e/D 0.047-0.078 band.
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -340,7 +351,7 @@ files:
       # would be a check that fails on correct data.
       monotonic: null
       expected_points: null
-    scores: null
+    scores: han_1988_orthogonal
 
   - path: fig4.53_60deg_vcontinuous_Nu_ratio.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
@@ -357,10 +368,14 @@ files:
     kind: measured
     extraction: figure-digitised
     confidence: band
-    uncertainty: 0.08
+    uncertainty: null  # Han and Zhang (1992) is not on disk; its band is unread
     cross_check: >-
       Must sit above the 90 deg continuous series at every Reynolds number;
       the text calls the 60 deg V continuous rib the highest of the group.
+      Not scored: the performance-curve path exists (#435), but no set can
+      express a V-SHAPED rib -- han_park_1988_angled would score it as a
+      parallel 60 deg rib, which is aliasing one shape onto another. Blocked
+      on #434.
     verification:
       x_axis_type: linear
       y_axis_type: linear

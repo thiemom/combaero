@@ -59,6 +59,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Figure 4.53's 90 deg continuous rib is scored on the performance curve
+  (#435).** `runner.py` gains an `f_ratio` path: `Nu_ratio` against
+  `f_ratio` with Re eliminated, so Re is recovered by bisecting the set's
+  own chain until its `f_ratio` lands on the abscissa -- the same move the
+  `e+` path makes. Against `han_1988_orthogonal`: 5 points, MAE 7.9%, bias
+  -2.1%, labelled ACCURACY (Han and Zhang 1992 is a different study).
+
+  **Two conventions, and only one of them matters.** `f_ratio` is
+  CHANNEL-AVERAGE `fbar` over smooth, not the four-sided `f` that
+  `evaluate_rib` returns -- read the other way the model sits 1.8x off and
+  no Re reaches the data. The smooth references are Han's lab's own, printed
+  in NASA CR-4015 Eqs. (4)/(5) (Blasius, Dittus-Boelter); Han and Zhang's
+  paper is not on disk, and swapping `f_s` for `0.046 Re^-0.2` moves the
+  score 0.3%. Declared in `conventions.py`.
+
+  **The geometry is inferred and the score moves with it.** The text states
+  only Re 15,000-80,000; e/D 0.0625, P/e 10, square channel are borrowed
+  from 91-GT-3 (same lab, same Re range). Recovered Re lands at
+  34,000-65,000, inside the stated range -- a check that could have failed.
+  Across Han's own e/D band 0.047-0.078 the bias runs -10% to +6%.
+
+  The 60 deg V-shaped series stays unscored: no set expresses rib shape,
+  and scoring it as a parallel rib would alias one shape onto another
+  (#434). Both figure 4.53 series drop their `uncertainty: 0.08` to `null`:
+  Han and Zhang's own band is unread, and a band borrowed from another
+  paper is not a measurement (same treatment as fig4.193c).
+
 - **`han_1989_narrow_channel`: Eq. 4.19 as its own selectable `RibCorrelationSet`,
   extending the Han rib family to narrow-aspect-ratio channels (`W/H` 1/4-1,
   `alpha` 30-90 deg).** Closes #402, the largest single block of unscored
