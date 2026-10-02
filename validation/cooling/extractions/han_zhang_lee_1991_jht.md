@@ -103,8 +103,10 @@ than of the data reduction.
   data: its text gives 60 deg V at Nu ratio 2.7-3.5 for f ratio 8-11, which
   the digitised series reproduce (2.7-3.6 at 8.3-11.1). Its Figs. 8/9 plot
   both ratios against Re, which would remove the Re recovery step.
-- **Figure 4.51 geometry.** Its series carry `W/H` 1 or nothing; the rig is
-  now stated (`e/D` 0.0625, `P/e` 10). Adding it changes what
-  `han_park_1988_angled` predicts (its square-channel `G` carries
-  `(p/e/10)^0.1`, currently evaluated at the probe's `P/e` 15), so it is a
-  separate, measured change.
+- ~~**Figure 4.51 geometry.**~~ **DONE 2026-10-02.** All 18 measured
+  series now carry the stated rig (`e/D` 0.0625, `P/e` 10, `W/H` 1).
+  `han_park_1988_angled`'s square-channel `G` carries `(P/e/10)^0.1`, so
+  leaving the probe's `P/e` 15 had read it ~4% high: in-domain bias moved
+  60 deg parallel -6.8% -> -9.3%, 45 deg -13.8% -> -17.2%. The 90 deg
+  classes do not move -- `han_1988_orthogonal`'s `G` has no geometry term.
+  Pinned by `test_figure_451_carries_its_stated_rig`.
