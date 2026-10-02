@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   series carry `x_scale: 1.0e4`; 23 `geometry.e_D` entries ended in a stray
   full stop (`0.083.`) and parsed as strings.
 
+- **Figure 4.51 is scored at the rig its paper states.** Han, Zhang and Lee
+  (1991) p. 590 gives square, `e/D` 0.0625, `P/e` 10; the 18 measured
+  series carried `W/H` 1 or nothing, so the runner probed
+  `han_park_1988_angled` at its validity midpoint `P/e` 15. Eq. 4.18's
+  square-channel `G` carries `(P/e/10)^0.1`, so that read the model ~4%
+  HIGH -- flattering it. In-domain bias moves 60 deg parallel -6.8% ->
+  -9.3%, 45 deg -13.8% -> -17.2%; the 90 deg classes do not move
+  (`han_1988_orthogonal`'s `G` has no geometry term). Both parallel classes
+  now read low by more, the same known Eq. 4.18 accuracy limit. The figure
+  4.51 test keeps its bounds on the in-domain cells and holds only the sign
+  on the single extrapolated points, which the corrected geometry pushed
+  just past them (60 deg 15.2%); `test_figure_451_carries_its_stated_rig`
+  pins the geometry, since a regression here would IMPROVE the score.
+
 - **Figure 4.51's disputed 45 deg classes resolved against the primary
   paper (#403 item 1).** Han, Zhang and Lee (1991) JHT 113, 590 -- now on
   disk -- prints `G` and `G_bar` fits for all nine of its rib

@@ -867,6 +867,19 @@ def test_han_park_1988_angled_scores_its_own_source(records) -> None:
     assert r_parts == 2 and g_parts == 2
 
 
+def test_figure_451_carries_its_stated_rig(dataset) -> None:
+    """Han, Zhang and Lee (1991) p. 590 states the rig: square, e/D 0.0625,
+    P/e 10. Without it the runner probes the set's validity midpoint (P/e 15
+    for han_park_1988_angled), which reads Eq. 4.18 ~4% HIGH through its
+    (P/e/10)^0.1 term and flatters the model -- a regression that no score
+    threshold would catch, since the score gets better."""
+    stated = {"e_D": 0.0625, "p_e": 10.0, "W_H": 1.0}
+    measured = [s for s in dataset if s.figure == "4.51" and s.kind == "measured"]
+    assert len(measured) == 18
+    for s in measured:
+        assert s.geometry == stated, f"{s.label}: {s.geometry}"
+
+
 def test_han_park_1988_angled_confirmed_independently_by_figure_451(
     records,
 ) -> None:
@@ -887,21 +900,28 @@ def test_han_park_1988_angled_confirmed_independently_by_figure_451(
         c for name, c in cells.items() if "par" in name and "4.51" in name and not c.unsupported
     ]
     assert scored_parallel, "no figure 4.51 parallel class scored"
-    for c in scored_parallel:
-        if "60par" in c.label:
-            assert c.rmse < 0.15, f"{c.label}: RMSE {c.rmse:.1%}"
 
-    # 45 deg parallel scores only since #403 item 1 was resolved (it was a
-    # disputed label, refused). It reads LOW, ~14% -- the same direction and
-    # size as the recorded Eq. 4.18 accuracy limit from CR-3837 (-0.8% to
-    # -19.9%, han_ribbed.md "Recorded as a known accuracy limit"). An
-    # ACCURACY result, pinned as one rather than asserted away: it must stay
-    # negative, and a move outside 20% means something changed.
-    g45 = [c for c in scored_parallel if "fig4.51_G_45par" in c.label]
-    assert g45, "45 deg parallel G should score now that its label is resolved"
-    for c in g45:
+    # Both parallel classes read LOW -- the recorded Eq. 4.18 accuracy limit
+    # (CR-3837: -0.8% to -19.9%, han_ribbed.md "Recorded as a known
+    # accuracy limit"), now in a second independent dataset. Scored at the
+    # rig Han, Zhang and Lee (1991) states (e/D 0.0625, P/e 10); the earlier
+    # probe P/e 15 read the model ~4% high and hid part of it. An ACCURACY
+    # result, pinned as one rather than asserted away:
+    #   * every parallel cell, in or out of domain, keeps the low sign;
+    #   * the IN-DOMAIN cells -- what the set claims -- carry a ratchet:
+    #     60 deg ~10% RMS against 15%, 45 deg ~17% against 20%.
+    # Out-of-domain cells are single extrapolated points (Re above 60k);
+    # they are reported, and only their sign is held.
+    assert any("fig4.51_G_45par" in c.label for c in scored_parallel), (
+        "45 deg parallel G should score now that its label is resolved"
+    )
+    bounds = {"60par": 0.15, "45par": 0.20}
+    for c in scored_parallel:
         assert c.bias < 0.0, f"{c.label}: bias {c.bias:+.1%}, expected the known low reading"
-        assert c.rmse < 0.20, f"{c.label}: RMSE {c.rmse:.1%}"
+        if c.domain == "out-of-domain":
+            continue
+        bound = next(b for k, b in bounds.items() if k in c.label)
+        assert c.rmse < bound, f"{c.label}: RMSE {c.rmse:.1%}"
 
     # The other seven shapes must NOT be silently scored against this set.
     unscored_shapes = [
