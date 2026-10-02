@@ -702,14 +702,13 @@ def test_taslim_friction_is_compared_as_fbar_not_four_sided_f() -> None:
     prediction would sit ~60% HIGH at e/D 0.083 instead of ~15% low.
     """
     import csv
-    from pathlib import Path
 
     import combaero as cb
     from validation.cooling.runner import SMOOTH_F_COEF, SMOOTH_F_EXP
+    from validation.cooling.schema import DATA_ROOT
 
-    path = Path(
-        "validation/cooling/data/taslim_spring1987/fig11_ar_1.0_solid_circles_2_sides_eDh_0.083.csv"
-    )
+    # DATA_ROOT, not a cwd-relative path: CI runs pytest from python/tests.
+    path = DATA_ROOT / "taslim_spring1987" / "fig11_ar_1.0_solid_circles_2_sides_eDh_0.083.csv"
     pts = [(float(x) * 1.0e4, float(y)) for x, y in list(csv.reader(path.open()))[1:]]
     g = cb.RibGeometry(e_D=0.083, p_e=10.0, W_H=1.0, alpha_deg=90.0)
     s = cb.han_1988_orthogonal()
