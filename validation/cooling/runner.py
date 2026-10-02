@@ -76,7 +76,8 @@ G_BAR_OVER_G = 1.2
 # #440 used before this paper was on disk; the two differ by under 3% over
 # Re 15k-80k and the score by 0.3%. Written out here rather than calling
 # nusselt_dittus_boelter, which warns below Re 10,000 on every bisection
-# probe.
+# probe. The same f_0 is the f_s in Han's four-sided decomposition, so it
+# also converts a measured passage friction (_channel_fbar).
 SMOOTH_F_COEF, SMOOTH_F_EXP = 0.046, -0.2
 SMOOTH_NU_COEF, SMOOTH_NU_RE_EXP, SMOOTH_NU_PR_EXP = 0.023, 0.8, 0.4
 
@@ -316,6 +317,21 @@ def _r_at_alpha(
 ARBITRARY_RE = 30000.0
 
 
+def _channel_fbar(f_four_sided: float, w_h: float, re: float) -> tuple[float, float]:
+    """(fbar, f_s): the MEASURED channel friction from the four-sided one.
+
+    Han measures `fbar`, the passage-average Fanning friction of a channel
+    with two opposite ribbed walls, and converts it to the four-sided
+    equivalent `f = fbar + (H/W)(fbar - f_s)` before forming R (Han 1988;
+    Han, Zhang and Lee 1991 Eq. 6 at W/H = 1). evaluate_rib returns that
+    four-sided `f`, so comparing it with a measured passage friction needs
+    the inverse, `fbar = (f W/H + f_s) / (W/H + 1)`, with the same `f_s` the
+    decomposition used.
+    """
+    f_s = SMOOTH_F_COEF * re**SMOOTH_F_EXP
+    return (f_four_sided * w_h + f_s) / (w_h + 1.0), f_s
+
+
 def _performance_ratios(
     rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, re: float
 ) -> tuple[float, float, bool]:
@@ -332,8 +348,7 @@ def _performance_ratios(
     what St_r already is.
     """
     res = cb.evaluate_rib(rib_set, geom, re)
-    f_s = SMOOTH_F_COEF * re**SMOOTH_F_EXP
-    fbar = (res.f * geom.W_H + f_s) / (geom.W_H + 1.0)
+    fbar, f_s = _channel_fbar(res.f, geom.W_H, re)
     pr = rib_set.valid_Pr
     nu_r = res.St_r * re * pr
     nu_s = SMOOTH_NU_COEF * re**SMOOTH_NU_RE_EXP * pr**SMOOTH_NU_PR_EXP
@@ -391,11 +406,23 @@ def run_series(
             Record(series, p.x, p.y, None, False, None, "not scored by any set")
             for p in points
         ]
-    if series.x_axis not in ("e_plus", "alpha_deg", "f_ratio"):
+    if series.x_axis not in ("e_plus", "alpha_deg", "f_ratio", "Re_Dh"):
         return [
             Record(series, p.x, p.y, None, False, None, f"x axis is {series.x_axis}")
             for p in points
         ]
+    if series.x_axis == "Re_Dh":
+        refusal = None
+        if series.y_axis != "f_fanning_passage":
+            refusal = f"the Re_Dh path only predicts f_fanning_passage, not {series.y_axis}"
+        elif not series.geometry:
+            refusal = "friction depends on e/D and W/H; no rig geometry recorded"
+        elif series.geometry.get("turbulated_walls", 2) != 2:
+            # Han's decomposition assumes two OPPOSITE ribbed walls; a
+            # one-side-turbulated passage is a different configuration.
+            refusal = "one-side-turbulated passage; the set's f decomposition is for two ribbed walls"
+        if refusal is not None:
+            return [Record(series, p.x, p.y, None, False, None, refusal) for p in points]
     if series.x_axis == "f_ratio" and series.y_axis != "Nu_ratio":
         return [
             Record(
@@ -475,6 +502,18 @@ def run_series(
     # which is how it was missed when e_D/p_e/W_H were wired through.
     if series.alpha_deg is not None:
         geom.alpha_deg = float(series.alpha_deg)
+
+    if series.x_axis == "Re_Dh":
+        # Measured passage friction against Re directly: no e+ bisection and
+        # no R conversion on the measured side. Comparing in f, not R, keeps
+        # the law-of-the-wall formalism out of the arbitration -- which
+        # matters, since that formalism is part of what is in question.
+        records = []
+        for p in points:
+            res = cb.evaluate_rib(rib_set, geom, p.x)
+            fbar, _ = _channel_fbar(res.f, geom.W_H, p.x)
+            records.append(Record(series, p.x, p.y, fbar, res.extrapolated, p.x))
+        return records
 
     if series.x_axis == "f_ratio":
         records = []

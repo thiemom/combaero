@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Taslim & Spring's figure 11 is on its printed axis, and its `e/D` are
+  numbers.** The axis is `Reynolds No. (x10^-4)`, so the 16 figure 11
+  series carry `x_scale: 1.0e4`; 23 `geometry.e_D` entries ended in a stray
+  full stop (`0.083.`) and parsed as strings.
+
 - **Figure 4.51 is scored at the rig its paper states.** Han, Zhang and Lee
   (1991) p. 590 gives square, `e/D` 0.0625, `P/e` 10; the 18 measured
   series carried `W/H` 1 or nothing, so the runner probed
@@ -99,6 +104,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "lower bound" caveat becomes testable rather than stated.
 
 ### Added
+
+- **Independent-lab rib friction is scored, and it closes #403 item 2
+  (Lau vs Han) without picking a winner.** `runner.py` gains a `Re_Dh`
+  path for passage-average friction: Taslim & Spring (1987)'s three AR 1.0
+  two-side-turbulated series -- Han's own square-channel configuration from
+  Northeastern / GE -- score against `han_1988_orthogonal` in `f` directly.
+  The set's four-sided `f` is converted with Han's own `fbar` decomposition,
+  so nothing on the measured side passes through `R`.
+
+  | `e/D` | Han `fbar` vs measured |
+  |---|---|
+  | 0.083 | -14.9% |
+  | 0.167 | -24.9% |
+  | 0.250 | -49.1% |
+
+  All out of domain (every `e/D` above Han's 0.047-0.078). On Han's basis
+  Taslim's `R` is 2.77 against Han's 3.2 and Lau's ~3.6: the three labs
+  BRACKET Han by about +/-13%, so there is no outlier to arbitrate. That
+  spread is now the recorded cross-source accuracy of the Han family's
+  friction. A test falsifies the convention trap: read as the four-sided
+  `f`, the comparison flips to ~+60%.
 
 - **Figure 4.53's 90 deg continuous rib is scored on the performance curve
   (#435).** `runner.py` gains an `f_ratio` path: `Nu_ratio` against
@@ -2049,8 +2075,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regimes. The array correlations are incompressible by construction, so
   `regime="compressible"` no longer layers Fanno friction on top of a drop the
   array already owns.
-
-### Fixed
 
 - **`basis_of` matched only the source folder name and its `after` field,
   so a correlation set keyed on a paper NUMBER could not recognise its own

@@ -175,7 +175,38 @@ AR 1.0 at `e/D` 0.250 appears in no Nusselt figure -- not 4, not 5, and
 not 9, whose AR 1.0 fit curve stops at `e/D` 0.215. That is the study, not
 a gap in the digitisation.
 
-## Committed UNSCORED, deliberately
+## Square-channel friction SCORED (2026-10-02, #403 item 2)
+
+The three **AR 1.0, two-side-turbulated** friction series (Fig. 11) now
+score against `han_1988_orthogonal`. At AR 1.0 the aspect-ratio term inside
+the logarithm below is exactly 1, and the comparison is made in `f`, not
+`R`: Taslim's passage-average Fanning `f` is Han's measured `fbar` (same
+definition, Han's Eq. 1), so the set's four-sided `f` is converted with
+Han's own `fbar = (f W/H + f_s)/(W/H + 1)` and nothing on the measured side
+passes through the law-of-the-wall formalism. Fig. 11's x axis is printed
+as `Reynolds No. (x10^-4)`; every Fig. 11 series now carries
+`x_scale: 1.0e4`.
+
+| `e/D_H` | n | Han `fbar` vs measured | Taslim `R` on Han's basis |
+|---|---|---|---|
+| 0.083 | 8 | **-14.9%** | **2.77** (Han 3.20) |
+| 0.167 | 8 | -24.9% | 2.73 |
+| 0.250 | 7 | -49.1% | 2.50 |
+
+All rows are out of domain: every `e/D` here is above Han's 0.047-0.078
+(0.083 by 6%). `R` is flat from 0.083 to 0.167 and falls at 0.250 -- Han's
+`e/D`-independence holds at moderate blockage and fails at high, as
+Rallabandi found. **What it settles:** Lau's `R` sits ~12% ABOVE Han's,
+Taslim's ~13% BELOW, so the independent lab does not side with either --
+see `lau_1990_v_ribs.md` L2. The rib cross-section shape is not stated in
+the paper, and nor is a measurement uncertainty.
+
+The rest of this source stays unscored, for the reasons below: the Nusselt
+series, the non-square friction series (whose `R` conversion carries the
+aspect-ratio term) and all one-side-turbulated series (refused by the
+runner: Han's decomposition is for two ribbed walls).
+
+## Committed UNSCORED, deliberately (the rest)
 
 This source publishes a passage-average **Fanning** friction factor
 (`f = dP D_H g_c / 2 L rho V^2`) and a turbulated-surface Nusselt number.

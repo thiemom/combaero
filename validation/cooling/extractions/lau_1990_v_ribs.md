@@ -191,6 +191,26 @@ Converted via `R = sqrt(2/f_r) + 2.5 ln(2 e/D) + 2.5`: Han's `R = 3.2` implies
 ribbed-wall friction factor for nominally the same configuration.** Recorded,
 not reconciled -- see reviewer item L2.
 
+**L2 CLOSED 2026-10-02 (#403 item 2) -- by a third lab that sides with
+neither.** Taslim & Spring (1987), Northeastern / GE, measure Han's own
+square-channel configuration (two opposite walls, 90 deg in-line, `P/e` 10)
+and score against `han_1988_orthogonal` in `f` directly
+(`taslim_spring_1987_aspect_ratio.md`). At `e/D` 0.083, the nearest they
+get to Han's band, Han's friction is 14.9% LOW; on Han's basis their `R` is
+2.77.
+
+| source | lab | `R`, 90 deg, square |
+|---|---|---|
+| Lau (1990) | Texas A&M, Lau | ~3.6 (+12%) |
+| Han (1988); CR-3837 (3.195) | Texas A&M, Han | 3.2 |
+| Taslim & Spring (1987), `e/D` 0.083 | Northeastern / GE | 2.77 (-13%) |
+
+So there is no outlier to find: the labs bracket Han by roughly +/-13% in
+`R`. That spread is the honest cross-source accuracy of the friction side of
+the Han family, and a fourth source would add a point to the spread, not
+arbitrate it. Two caveats travel with it: Taslim's `e/D` is 6% above Han's
+band, and the comparison rests on Han's own `fbar` decomposition.
+
 Not scored by the harness: `runner.py`'s `e+` path resolves `y_axis` to `G`,
 `G_bar` or `R_normalised` and has no absolute-`R` branch. The series is
 committed with `scores: null` so the gap is visible rather than absent.
