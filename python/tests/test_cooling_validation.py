@@ -657,6 +657,92 @@ def test_figure_448_R_axis_is_linear_not_log(dataset) -> None:
             )
 
 
+TASLIM_SQUARE = {
+    "taslim_spring1987/fig11_ar_1.0_solid_circles_2_sides_eDh_0.083": 0.083,
+    "taslim_spring1987/fig11_ar_1.0_solid_tri_2_sides_eDh_0.167": 0.167,
+    "taslim_spring1987/fig11_ar_1.0_solid_half_circles_2_sides_eDh_0.250": 0.250,
+}
+
+
+def test_taslim_square_channel_friction_is_scored_against_han(records) -> None:
+    """#403 item 2: the independent-lab friction that sits on the other side.
+
+    Taslim & Spring (1987) -- Northeastern / GE -- measure Han's own
+    square-channel configuration (two opposite walls, 90 deg in-line, P/e
+    10). Han under-predicts their passage friction; in R terms their 2.77
+    sits ~13% below Han's 3.2 while Lau's sits ~12% above it, so the three
+    labs bracket Han rather than one of them arbitrating. Every e/D here is
+    above Han's band, so every row is out of domain by construction.
+
+    The recovered Re range also guards figure 11's x units (Re x 10^-4):
+    read raw, Re would be 2-10 and the smooth-friction term would swamp f.
+    """
+    rows = {}
+    for r in records:
+        if r.series.label in TASLIM_SQUARE:
+            rows.setdefault(r.series.label, []).append(r)
+    assert set(rows) == set(TASLIM_SQUARE)
+    for label, rs in rows.items():
+        assert all(r.predicted is not None for r in rs), label
+        assert all(r.extrapolated for r in rs), f"{label}: e/D above Han's band"
+        assert all(20_000 <= r.re_used <= 110_000 for r in rs), label
+        bias = sum(r.rel_error for r in rs) / len(rs)
+        assert bias < 0.0, f"{label}: Han should under-predict, bias {bias:+.1%}"
+
+    near = rows["taslim_spring1987/fig11_ar_1.0_solid_circles_2_sides_eDh_0.083"]
+    bias = sum(r.rel_error for r in near) / len(near)
+    assert -0.20 < bias < -0.10, f"recorded at -14.9% when #403 item 2 closed, now {bias:+.1%}"
+
+
+def test_taslim_friction_is_compared_as_fbar_not_four_sided_f() -> None:
+    """The convention trap, falsified rather than asserted.
+
+    Taslim's f is the passage average of a channel with two ribbed walls --
+    Han's measured fbar. Read as the four-sided f_r that R is built on, Han's
+    prediction would sit ~60% HIGH at e/D 0.083 instead of ~15% low.
+    """
+    import csv
+    from pathlib import Path
+
+    import combaero as cb
+    from validation.cooling.runner import SMOOTH_F_COEF, SMOOTH_F_EXP
+
+    path = Path(
+        "validation/cooling/data/taslim_spring1987/fig11_ar_1.0_solid_circles_2_sides_eDh_0.083.csv"
+    )
+    pts = [(float(x) * 1.0e4, float(y)) for x, y in list(csv.reader(path.open()))[1:]]
+    g = cb.RibGeometry(e_D=0.083, p_e=10.0, W_H=1.0, alpha_deg=90.0)
+    s = cb.han_1988_orthogonal()
+    four_sided = [cb.evaluate_rib(s, g, re).f / f - 1.0 for re, f in pts]
+    channel = [
+        (cb.evaluate_rib(s, g, re).f + SMOOTH_F_COEF * re**SMOOTH_F_EXP) / 2.0 / f - 1.0
+        for re, f in pts
+    ]
+    assert sum(four_sided) / len(four_sided) > 0.40
+    assert sum(channel) / len(channel) < 0.0
+
+
+def test_taslim_friction_path_refuses_what_it_cannot_predict(dataset) -> None:
+    import dataclasses
+
+    from validation.cooling.runner import run_series
+
+    one_side = next(
+        s
+        for s in dataset
+        if s.label == "taslim_spring1987/fig11_ar_1.0_open_circles_1_side_eDh_0.083"
+    )
+    base = next(s for s in dataset if s.label in TASLIM_SQUARE)
+    for impostor, word in (
+        (dataclasses.replace(one_side, scores="han_1988_orthogonal"), "one-side"),
+        (dataclasses.replace(base, y_axis="Nu"), "only predicts f_fanning_passage"),
+        (dataclasses.replace(base, geometry=None), "no rig geometry"),
+    ):
+        recs = run_series(impostor)
+        assert recs and all(r.predicted is None for r in recs)
+        assert all(word in (r.reason or "") for r in recs), recs[0].reason
+
+
 def test_figure_448_nothing_is_scored_against_the_wrong_paper(dataset) -> None:
     """Overlapping data must not silently score against a cross-paper gap.
 

@@ -53,6 +53,11 @@ CONVENTION_NOTES: dict[str, str] = {
     "G_four_wall": "G_bar, averaged over two ribbed and two smooth walls",
     "R_ribbed_wall": "friction roughness function on the ribbed wall",
     "R_normalised_pe": "R divided by (P/e/10)^0.35, Han's figure 4.46 ordinate",
+    "f_channel_two_ribbed": (
+        "passage-average FANNING friction of a channel with two opposite "
+        "ribbed walls -- Han's measured fbar, NOT the four-sided f_r = "
+        "fbar + (H/W)(fbar - f_s) his R is built on"
+    ),
     "R_normalised_angled": "R normalised for the angled-rib quadratic form",
     "Nu_ratio_ribbed_DB_vs_fbar": (
         "RIBBED-side Nu over Dittus-Boelter 0.023 Re^0.8 Pr^0.4, plotted "
@@ -90,6 +95,9 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     ("han2012", "G_bar"): "G_four_wall",
     ("lau1990", "G_bar"): "G_four_wall",
     ("han_park_lei1984", "R"): "R_ribbed_wall",
+    # Taslim & Spring (1987) Fig. 11, f = dP gc / (2 (L/D_H) rho V^2) over
+    # the passage -- the same definition as Han's Eq. (1) (#403 item 2).
+    ("taslim_spring1987", "f_fanning_passage"): "f_channel_two_ribbed",
     ("lau1990", "R"): "R_ribbed_wall",
     # Figure 4.48's R panel (#402) plots raw R, unlike figures 4.46/4.47's
     # normalised ordinate -- same quantity as han_park_lei1984/lau1990's "R".
@@ -138,7 +146,7 @@ SET_ALSO_PRODUCES: dict[str, tuple[str, ...]] = {
     # The rib sets produce R as well as G, in several normalisations the
     # runner selects between; and G_bar through Han's published 1.2.
     "han_1988_orthogonal": (
-        "R_ribbed_wall", "R_normalised_pe", "G_four_wall",
+        "R_ribbed_wall", "R_normalised_pe", "G_four_wall", "f_channel_two_ribbed",
         "Nu_ratio_ribbed_DB_vs_fbar",
     ),
     "han_park_1988_angled": (
