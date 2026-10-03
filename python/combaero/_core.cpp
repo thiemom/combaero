@@ -15,6 +15,7 @@
 #include "cooling_correlations.h"
 #include "impingement_correlation.h"
 #include "rib_correlation.h"
+#include "rib_ratio_correlation.h"
 #include "correlation_status.h"
 #include "ejector.h"
 #include "equilibrium.h"
@@ -353,6 +354,92 @@ PYBIND11_MODULE(_core, m) {
         py::arg("correlation_set"), py::arg("geometry"), py::arg("Re"),
         "Evaluate the chain. Re may be negative or zero; the guards are "
         "smooth through both.");
+
+  // -- Ratio-form rib sets (#444): Nu/Nu0 and f/f0 on a declared baseline --
+  py::class_<combaero::cooling::RatioBaseline>(
+      m, "RatioBaseline",
+      "Power-law smooth-duct baseline: coeff Re^re_exponent Pr^pr_exponent. "
+      "Dittus-Boelter heating is (0.023, 0.8, 0.4).")
+      .def(py::init<>())
+      .def(py::init([](double coeff, double re_exponent, double pr_exponent) {
+             return combaero::cooling::RatioBaseline{coeff, re_exponent, pr_exponent};
+           }),
+           py::arg("coeff"), py::arg("re_exponent"), py::arg("pr_exponent") = 0.0)
+      .def_readwrite("coeff", &combaero::cooling::RatioBaseline::coeff)
+      .def_readwrite("re_exponent", &combaero::cooling::RatioBaseline::re_exponent)
+      .def_readwrite("pr_exponent", &combaero::cooling::RatioBaseline::pr_exponent);
+
+  py::enum_<combaero::cooling::RatioBelowFloor>(m, "RatioBelowFloor",
+                                  "What Nu hands over to below the fitted Re range.")
+      .value("Gnielinski", combaero::cooling::RatioBelowFloor::Gnielinski,
+             "Smooth-pipe Gnielinski: laminar-limited as Re -> 0.")
+      .value("SourceBaseline", combaero::cooling::RatioBelowFloor::SourceBaseline,
+             "Hold the ratio on the source baseline (D-B tends to 0).")
+      .value("User", combaero::cooling::RatioBelowFloor::User,
+             "The caller's own power-law Nu0 (RibRatioOptions.user_Nu0).");
+
+  py::class_<combaero::cooling::RibRatioOptions>(m, "RibRatioOptions")
+      .def(py::init<>())
+      .def_readwrite("below_floor", &combaero::cooling::RibRatioOptions::below_floor)
+      .def_readwrite("user_Nu0", &combaero::cooling::RibRatioOptions::user_Nu0);
+
+  py::class_<combaero::cooling::RibRatioSet>(
+      m, "RibRatioSet",
+      "Nu/Nu0 and f/f0 as multipliers on the baseline the source fitted to. "
+      "In range Nu = r Nu0_source; below Re_floor a C1 handover to an "
+      "extrapolation baseline. See include/rib_ratio_correlation.h.")
+      .def(py::init<>())
+      .def_readwrite("name", &combaero::cooling::RibRatioSet::name)
+      .def_readwrite("source", &combaero::cooling::RibRatioSet::source)
+      .def_readwrite("validity_source", &combaero::cooling::RibRatioSet::validity_source)
+      .def_readwrite("provenance", &combaero::cooling::RibRatioSet::provenance)
+      .def_readwrite("shape", &combaero::cooling::RibRatioSet::shape)
+      .def_readwrite("symmetric", &combaero::cooling::RibRatioSet::symmetric)
+      .def_readwrite("C_Nu", &combaero::cooling::RibRatioSet::C_Nu)
+      .def_readwrite("Nu_Re", &combaero::cooling::RibRatioSet::Nu_Re)
+      .def_readwrite("Nu_eD", &combaero::cooling::RibRatioSet::Nu_eD)
+      .def_readwrite("Nu_pe", &combaero::cooling::RibRatioSet::Nu_pe)
+      .def_readwrite("Nu_WH", &combaero::cooling::RibRatioSet::Nu_WH)
+      .def_readwrite("Nu_alpha", &combaero::cooling::RibRatioSet::Nu_alpha)
+      .def_readwrite("C_f", &combaero::cooling::RibRatioSet::C_f)
+      .def_readwrite("f_Re", &combaero::cooling::RibRatioSet::f_Re)
+      .def_readwrite("f_eD", &combaero::cooling::RibRatioSet::f_eD)
+      .def_readwrite("f_pe", &combaero::cooling::RibRatioSet::f_pe)
+      .def_readwrite("f_WH", &combaero::cooling::RibRatioSet::f_WH)
+      .def_readwrite("f_alpha", &combaero::cooling::RibRatioSet::f_alpha)
+      .def_readwrite("Nu0_source", &combaero::cooling::RibRatioSet::Nu0_source)
+      .def_readwrite("f0_source", &combaero::cooling::RibRatioSet::f0_source)
+      .def_readwrite("Re_floor", &combaero::cooling::RibRatioSet::Re_floor)
+      .def_readwrite("valid_Re", &combaero::cooling::RibRatioSet::valid_Re)
+      .def_readwrite("valid_eD", &combaero::cooling::RibRatioSet::valid_eD)
+      .def_readwrite("valid_pe", &combaero::cooling::RibRatioSet::valid_pe)
+      .def_readwrite("valid_WH", &combaero::cooling::RibRatioSet::valid_WH)
+      .def_readwrite("valid_alpha", &combaero::cooling::RibRatioSet::valid_alpha)
+      .def_readwrite("valid_Pr", &combaero::cooling::RibRatioSet::valid_Pr)
+      .def_readwrite("accuracy_Nu", &combaero::cooling::RibRatioSet::accuracy_Nu)
+      .def_readwrite("accuracy_f", &combaero::cooling::RibRatioSet::accuracy_f);
+
+  py::class_<combaero::cooling::RibRatioResult>(m, "RibRatioResult")
+      .def_readonly("Nu", &combaero::cooling::RibRatioResult::Nu)
+      .def_readonly("dNu_dRe", &combaero::cooling::RibRatioResult::dNu_dRe)
+      .def_readonly("f", &combaero::cooling::RibRatioResult::f)
+      .def_readonly("df_dRe", &combaero::cooling::RibRatioResult::df_dRe)
+      .def_readonly("ratio_Nu", &combaero::cooling::RibRatioResult::ratio_Nu)
+      .def_readonly("ratio_f", &combaero::cooling::RibRatioResult::ratio_f)
+      .def_readonly("below_floor", &combaero::cooling::RibRatioResult::below_floor)
+      .def_readonly("extrapolated", &combaero::cooling::RibRatioResult::extrapolated);
+
+  m.def("evaluate_rib_ratio", &combaero::cooling::evaluate_rib_ratio, py::arg("correlation_set"),
+        py::arg("geometry"), py::arg("Re"), py::arg("Pr"),
+        py::arg("options") = combaero::cooling::RibRatioOptions{},
+        "Nu, f and their analytic Re-derivatives. Never raises: Re may be "
+        "negative or zero, and every output is finite and non-negative.");
+  m.def("validate_rib_ratio_set", &combaero::cooling::validate_rib_ratio_set,
+        py::arg("correlation_set"),
+        "Reject a ratio set that cannot be evaluated -- mistakes, not "
+        "operating points.");
+  m.def("validate_rib_ratio_options", &combaero::cooling::validate_rib_ratio_options,
+        py::arg("options"));
 
   // ---------------------------------------------------------------------
   // Jet impingement correlations

@@ -105,6 +105,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ratio-form rib correlation sets: `Nu/Nu0` and `f/f0` beside `R`/`G`
+  (#444).** `RibRatioSet` + `evaluate_rib_ratio` carry a correlation as a
+  multiplier on the smooth-duct baseline its source fitted to, for sources
+  that publish ratios -- without forcing their data through the
+  law-of-the-wall similarity `R`/`G` assumes. The type only: which
+  correlations to ship comes next, with Taslim & Spring and NASA CR-4396 as
+  acceptance data.
+
+  - **In range** `Nu = r * Nu0_source`: the paper, whatever baseline a
+    caller prefers (re-referencing exactly cancels).
+  - **Below the fitted Re floor** a C1 blend in `ln Re` hands over to
+    `k * Nu0_ext`, `k` matched at the floor; `Nu0_ext` is smooth-pipe
+    Gnielinski by default, so Nu keeps its laminar 3.66 limit as Re -> 0
+    instead of collapsing with Dittus-Boelter. Friction holds its ratio at
+    the floor.
+  - **Robust for user coefficients too:** never divides by `Nu0`; `Re`
+    enters as `sqrt(Re^2 + 1)`, so Nu and f are even and their analytic
+    derivatives odd and finite through `Re = 0`; mistakes are rejected by
+    `validate_rib_ratio_set` / `validate_rib_ratio_options`, and the
+    evaluator never throws.
+  - Smooth-pipe Gnielinski gets an analytic `(Nu, dNu/dRe)` for the
+    handover, pinned to `nusselt_gnielinski` to 1e-12 -- the existing
+    `nusselt_and_jacobian_gnielinski` differentiates by finite differences
+    and returns 0 for `Re <= 0`. Its blend anchors (Re 1000, 2300) and
+    friction clamp (Re 3000) are now named constants in `heat_transfer.h`.
+
 - **Rib shape, and Han, Zhang & Lee (1991)'s nine configurations -- closes
   #434.** `RibCorrelationSet` gains `shape` (`RibShape`: Transverse,
   Parallel, Crossed, V, Lambda; `Unspecified` binds nothing), and the rib

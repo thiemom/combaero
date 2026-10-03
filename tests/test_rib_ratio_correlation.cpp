@@ -1,0 +1,203 @@
+#include <gtest/gtest.h>
+
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+
+#include "heat_transfer.h"
+#include "rib_ratio_correlation.h"
+
+using combaero::cooling::evaluate_rib_ratio;
+using combaero::cooling::gnielinski_smooth_analytic;
+using combaero::cooling::RatioBelowFloor;
+using combaero::cooling::RibGeometry;
+using combaero::cooling::RibRatioOptions;
+using combaero::cooling::RibRatioSet;
+using combaero::cooling::validate_rib_ratio_options;
+using combaero::cooling::validate_rib_ratio_set;
+
+namespace {
+
+// A user-style set: ratio Nu/Nu_DB = 2.5 (Re/1e4)^-0.2, f/f0 = 8 (Re/1e4)^0.1,
+// Dittus-Boelter and Blasius-form baselines, fitted down to Re 1e4. The
+// NEGATIVE Re exponent is deliberate: held naively it would blow up at Re->0.
+RibRatioSet user_set() {
+  RibRatioSet s;
+  s.name = "test_ratio";
+  s.source = "unit test";
+  s.C_Nu = 2.5;
+  s.Nu_Re = {-0.2, 1.0e4};
+  s.C_f = 8.0;
+  s.f_Re = {0.1, 1.0e4};
+  s.Nu0_source = {0.023, 0.8, 0.4};
+  s.f0_source = {0.046, -0.2, 0.0};
+  s.Re_floor = 1.0e4;
+  s.valid_Re = {1.0e4, 9.0e4};
+  return s;
+}
+
+RibGeometry geom() {
+  RibGeometry g;
+  g.e_D = 0.0625;
+  g.p_e = 10.0;
+  g.W_H = 1.0;
+  g.alpha_deg = 90.0;
+  return g;
+}
+
+}  // namespace
+
+// The analytic smooth-pipe Gnielinski must BE nusselt_gnielinski(Re, Pr) --
+// a second copy that drifts would silently change every handover.
+TEST(RibRatioTest, AnalyticGnielinskiMatchesTheLibraryFunction) {
+  combaero::CorrelationStatus st;  // suppresses the below-range warning
+  for (double Re : {500.0, 1000.0, 1500.0, 2299.0, 2300.0, 2900.0, 3000.0,
+                    3100.0, 1.0e4, 1.0e5, 1.0e6}) {
+    for (double Pr : {0.7, 3.0}) {
+      const double ref = combaero::nusselt_gnielinski(Re, Pr, &st);
+      EXPECT_NEAR(gnielinski_smooth_analytic(Re, Pr).Nu, ref, 1e-12 * ref)
+          << "Re=" << Re << " Pr=" << Pr;
+    }
+  }
+}
+
+TEST(RibRatioTest, AnalyticGnielinskiDerivativeMatchesCentralDifferences) {
+  for (double Re : {1200.0, 2000.0, 2600.0, 5000.0, 1.0e5}) {
+    const double h = Re * 1e-6;
+    const double fd = (gnielinski_smooth_analytic(Re + h, 0.7).Nu -
+                       gnielinski_smooth_analytic(Re - h, 0.7).Nu) /
+                      (2.0 * h);
+    const double an = gnielinski_smooth_analytic(Re, 0.7).dNu_dRe;
+    EXPECT_LT(std::abs(an - fd) / std::max(std::abs(fd), 1e-12), 1e-5) << "Re=" << Re;
+  }
+}
+
+// Inside the fitted range the set reproduces the paper -- r * Nu0_source --
+// whatever extrapolation baseline the caller picks.
+TEST(RibRatioTest, InRangeIsTheSourceProductForEveryBelowFloorChoice) {
+  const auto s = user_set();
+  for (auto choice : {RatioBelowFloor::Gnielinski, RatioBelowFloor::SourceBaseline,
+                      RatioBelowFloor::User}) {
+    RibRatioOptions o;
+    o.below_floor = choice;
+    o.user_Nu0 = {0.02, 0.8, 0.33};
+    for (double Re : {1.0e4, 3.0e4, 9.0e4}) {
+      const auto r = evaluate_rib_ratio(s, geom(), Re, 0.7, o);
+      const double x = std::sqrt(Re * Re + 1.0);
+      const double expect = 2.5 * std::pow(x / 1e4, -0.2) * 0.023 *
+                            std::pow(x, 0.8) * std::pow(0.7, 0.4);
+      EXPECT_NEAR(r.Nu, expect, 1e-7 * expect) << "Re=" << Re;
+      EXPECT_FALSE(r.below_floor);
+    }
+  }
+}
+
+// Far below the floor, Nu is the extrapolation baseline scaled to match at
+// the floor, and with Gnielinski it inherits the laminar limit at Re -> 0
+// instead of Dittus-Boelter's collapse to zero.
+TEST(RibRatioTest, BelowTheFloorHandsOverToGnielinski) {
+  const auto s = user_set();
+  const auto at_floor = evaluate_rib_ratio(s, geom(), 1.0e4, 0.7);
+  const double k = at_floor.Nu / gnielinski_smooth_analytic(1.0e4, 0.7).Nu;
+  for (double Re : {3000.0, 500.0, 1.0, 0.0}) {
+    const auto r = evaluate_rib_ratio(s, geom(), Re, 0.7);
+    const double x = std::sqrt(Re * Re + 1.0);
+    EXPECT_NEAR(r.Nu, k * gnielinski_smooth_analytic(x, 0.7).Nu, 1e-8 * r.Nu)
+        << "Re=" << Re;
+    EXPECT_TRUE(r.below_floor && r.extrapolated);
+  }
+  const double laminar = evaluate_rib_ratio(s, geom(), 0.0, 0.7).Nu;
+  EXPECT_NEAR(laminar, k * combaero::NU_LAMINAR_CONST_T, 1e-8 * laminar);
+
+  // Holding the ratio on a Dittus-Boelter source instead collapses toward 0:
+  // at Re = 0 (smoothed |Re| = 1) it is under 1% of the laminar handover.
+  RibRatioOptions src;
+  src.below_floor = RatioBelowFloor::SourceBaseline;
+  EXPECT_LT(evaluate_rib_ratio(s, geom(), 0.0, 0.7, src).Nu, 0.01 * laminar);
+}
+
+// Every state the solver can reach: finite, non-negative, even in Re with an
+// odd derivative -- including the negative-exponent ratio at Re = 0.
+TEST(RibRatioTest, GuardsHoldAcrossZeroAndBothSigns) {
+  const auto s = user_set();
+  for (double Re : {-1e7, -2e4, -1e4, -7e3, -1.0, 0.0, 1.0, 7e3, 1e4, 2e4, 1e7}) {
+    for (double Pr : {-1.0, 0.0, 0.7, 50.0}) {
+      const auto p = evaluate_rib_ratio(s, geom(), Re, Pr);
+      const auto m = evaluate_rib_ratio(s, geom(), -Re, Pr);
+      EXPECT_TRUE(std::isfinite(p.Nu) && std::isfinite(p.f) &&
+                  std::isfinite(p.dNu_dRe) && std::isfinite(p.df_dRe))
+          << "Re=" << Re << " Pr=" << Pr;
+      EXPECT_GE(p.Nu, 0.0);
+      EXPECT_GE(p.f, 0.0);
+      EXPECT_DOUBLE_EQ(p.Nu, m.Nu);
+      EXPECT_DOUBLE_EQ(p.f, m.f);
+      EXPECT_DOUBLE_EQ(p.dNu_dRe, -m.dNu_dRe);
+      EXPECT_DOUBLE_EQ(p.df_dRe, -m.df_dRe);
+    }
+  }
+}
+
+// Analytic derivatives against central differences in every regime: in
+// range, inside the blend band, far below it, near and at Re = 0 -- for all
+// three below-floor choices. Re 3000 itself is avoided: smooth-pipe
+// Gnielinski has a pre-existing slope jump there (its Petukhov friction is
+// clamped with max(Re, 3000)), which the handover reproduces exactly and a
+// central difference straddling it cannot match (#446).
+TEST(RibRatioTest, DerivativesMatchCentralDifferencesEverywhere) {
+  const auto s = user_set();
+  for (auto choice : {RatioBelowFloor::Gnielinski, RatioBelowFloor::SourceBaseline,
+                      RatioBelowFloor::User}) {
+    RibRatioOptions o;
+    o.below_floor = choice;
+    o.user_Nu0 = {0.02, 0.8, 0.33};
+    for (double Re : {5.0e4, 1.2e4, 8.0e3, 6.0e3, 5.2e3, 3.5e3, 2000.0, 0.5, -2.5e3}) {
+      const double h = std::max(1e-4, std::abs(Re) * 1e-6);
+      const auto c = evaluate_rib_ratio(s, geom(), Re, 0.7, o);
+      const auto p = evaluate_rib_ratio(s, geom(), Re + h, 0.7, o);
+      const auto m = evaluate_rib_ratio(s, geom(), Re - h, 0.7, o);
+      const double fdN = (p.Nu - m.Nu) / (2.0 * h);
+      const double fdF = (p.f - m.f) / (2.0 * h);
+      EXPECT_LT(std::abs(c.dNu_dRe - fdN) / std::max({std::abs(fdN), 1e-9}), 1e-4)
+          << "Nu, Re=" << Re;
+      EXPECT_LT(std::abs(c.df_dRe - fdF) / std::max({std::abs(fdF), 1e-12}), 1e-4)
+          << "f, Re=" << Re;
+    }
+  }
+}
+
+// C1 across the blend band ends: the value and slope just inside and just
+// outside each end agree.
+TEST(RibRatioTest, HandoverIsC1AtBothEndsOfTheBlend) {
+  const auto s = user_set();
+  for (double edge : {1.0e4, 5.0e3}) {
+    const auto lo = evaluate_rib_ratio(s, geom(), edge * (1.0 - 1e-7), 0.7);
+    const auto hi = evaluate_rib_ratio(s, geom(), edge * (1.0 + 1e-7), 0.7);
+    EXPECT_NEAR(lo.Nu, hi.Nu, 1e-6 * hi.Nu) << edge;
+    EXPECT_NEAR(lo.dNu_dRe, hi.dNu_dRe, 1e-4 * std::abs(hi.dNu_dRe)) << edge;
+    EXPECT_NEAR(lo.f, hi.f, 1e-6 * hi.f) << edge;
+    EXPECT_NEAR(lo.df_dRe, hi.df_dRe, 1e-4 * std::abs(hi.df_dRe) + 1e-15) << edge;
+  }
+}
+
+TEST(RibRatioTest, MistakesAreRejectedOnce) {
+  EXPECT_NO_THROW(validate_rib_ratio_set(user_set()));
+  auto a = user_set();
+  a.C_Nu = 0.0;
+  EXPECT_THROW(validate_rib_ratio_set(a), std::invalid_argument);
+  auto b = user_set();
+  b.Nu0_source = {};
+  EXPECT_THROW(validate_rib_ratio_set(b), std::invalid_argument);
+  auto c = user_set();
+  c.Re_floor = -1.0;
+  EXPECT_THROW(validate_rib_ratio_set(c), std::invalid_argument);
+  auto d = user_set();
+  d.f_Re = {0.1, 0.0};
+  EXPECT_THROW(validate_rib_ratio_set(d), std::invalid_argument);
+
+  RibRatioOptions o;
+  o.below_floor = RatioBelowFloor::User;
+  EXPECT_THROW(validate_rib_ratio_options(o), std::invalid_argument);
+  // ...and an evaluation with those unvalidated options still stays finite.
+  const auto r = evaluate_rib_ratio(user_set(), geom(), 100.0, 0.7, o);
+  EXPECT_TRUE(std::isfinite(r.Nu) && r.Nu >= 0.0);
+}

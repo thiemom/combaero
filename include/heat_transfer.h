@@ -75,6 +75,12 @@ double nusselt_dittus_boelter(double Re, double Pr, bool heating = true,
 namespace gnielinski {
 constexpr double coeff_prandtl_factor = 12.7;  // 12.7 * sqrt(f/8) * (Pr^(2/3) - 1)
 constexpr double coeff_re_offset      = 1000.0; // (Re - 1000) in numerator
+// C1 Hermite blend to laminar Nu between these two Re (the raw formula goes
+// negative below Re 1000); constant laminar Nu below the lower one.
+constexpr double blend_re_laminar     = 1000.0;
+constexpr double blend_re_turbulent   = 2300.0;
+// The smooth-pipe overload holds its Petukhov friction at this Re and below.
+constexpr double smooth_friction_re_min = 3000.0;
 } // namespace gnielinski
 double nusselt_gnielinski(double Re, double Pr, double f,
                           CorrelationStatus *status = nullptr);

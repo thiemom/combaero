@@ -87,7 +87,7 @@ double nusselt_gnielinski(double Re, double Pr, double f,
   double Pr_23 = std::pow(Pr, 2.0 / 3.0);
   double denom = 1.0 + gnielinski::coeff_prandtl_factor * sqrt_f8 * (Pr_23 - 1.0);
 
-  if (Re >= 2300.0) {
+  if (Re >= gnielinski::blend_re_turbulent) {
     return f8 * (Re - gnielinski::coeff_re_offset) * Pr / denom;
   }
 
@@ -104,8 +104,8 @@ double nusselt_gnielinski(double Re, double Pr, double f,
   }
 
   // Anchor points for the Hermite cubic
-  constexpr double Re0 = 1000.0;         // lower anchor: laminar Nu
-  constexpr double Re1 = 2300.0;         // upper anchor: Gnielinski
+  constexpr double Re0 = gnielinski::blend_re_laminar;   // lower anchor: laminar Nu
+  constexpr double Re1 = gnielinski::blend_re_turbulent; // upper anchor: Gnielinski
   const double Nu0 = NU_LAMINAR_CONST_T; // 3.66
   const double dNu0 = 0.0;               // laminar: flat w.r.t. Re
   const double Nu1 = f8 * (Re1 - gnielinski::coeff_re_offset) * Pr / denom;
@@ -129,8 +129,8 @@ double nusselt_gnielinski(double Re, double Pr, double f,
 
 double nusselt_gnielinski(double Re, double Pr,
                           combaero::CorrelationStatus *status) {
-  double f =
-      friction_petukhov(std::max(Re, 3000.0)); // avoid log(0) in Petukhov
+  double f = friction_petukhov(std::max(
+      Re, gnielinski::smooth_friction_re_min)); // avoid log(0) in Petukhov
   return nusselt_gnielinski(Re, Pr, f, status);
 }
 
