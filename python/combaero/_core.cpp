@@ -87,6 +87,20 @@ PYBIND11_MODULE(_core, m) {
       .value("User", combaero::cooling::RibProvenance::User,
              "Supplied by the caller. Carries no claim.");
 
+  py::enum_<combaero::cooling::RibShape>(
+      m, "RibShape",
+      "Rib shape beyond its angle. A set binds one shape; a series of "
+      "another shape is refused rather than scored.")
+      .value("Unspecified", combaero::cooling::RibShape::Unspecified,
+             "Binds nothing: the default for a user-built set.")
+      .value("Transverse", combaero::cooling::RibShape::Transverse)
+      .value("Parallel", combaero::cooling::RibShape::Parallel)
+      .value("Crossed", combaero::cooling::RibShape::Crossed)
+      .value("V", combaero::cooling::RibShape::V,
+             "Forward V, pointing downstream.")
+      .value("Lambda", combaero::cooling::RibShape::Lambda,
+             "Pointing upstream: a V with the flow reversed.");
+
   py::enum_<combaero::cooling::RibCorrelationSet::RAlphaShape>(
       m, "RAlphaShape")
       .value("PowerLaw",
@@ -168,6 +182,10 @@ PYBIND11_MODULE(_core, m) {
                     "Ribbed-side Stanton number. Combining it with the smooth "
                     "walls is the caller's job.")
       .def_readonly("dSt_dRe", &combaero::cooling::RibResult::dSt_dRe)
+      .def_readonly("G_bar", &combaero::cooling::RibResult::G_bar,
+                    "Four-wall average G, when the set prints its own; 0 "
+                    "otherwise -- check has_G_bar.")
+      .def_readonly("has_G_bar", &combaero::cooling::RibResult::has_G_bar)
       .def_readonly("extrapolated",
                     &combaero::cooling::RibResult::extrapolated,
                     "Outside the set's advisory validity. Advisory because a "
@@ -215,6 +233,7 @@ PYBIND11_MODULE(_core, m) {
                      &combaero::cooling::RibCorrelationSet::provenance)
       .def_readwrite("symmetric",
                      &combaero::cooling::RibCorrelationSet::symmetric)
+      .def_readwrite("shape", &combaero::cooling::RibCorrelationSet::shape)
       .def_readwrite("R_alpha_shape",
                      &combaero::cooling::RibCorrelationSet::R_alpha_shape)
       .def_readwrite("C_R", &combaero::cooling::RibCorrelationSet::C_R)
@@ -280,6 +299,11 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite(
           "G_narrow_WH_n_exponent",
           &combaero::cooling::RibCorrelationSet::G_narrow_WH_n_exponent)
+      .def_readwrite("C_Gbar", &combaero::cooling::RibCorrelationSet::C_Gbar,
+                     "Printed four-wall G_bar coefficient; 0 = not printed.")
+      .def_readwrite(
+          "Gbar_eplus_exponent",
+          &combaero::cooling::RibCorrelationSet::Gbar_eplus_exponent)
       .def_readwrite("valid_Re",
                      &combaero::cooling::RibCorrelationSet::valid_Re)
       .def_readwrite("valid_eD",
@@ -315,6 +339,12 @@ PYBIND11_MODULE(_core, m) {
         "(1/4 < W/H < 1). G is extracted from the text; R has no printed "
         "equation and is this project's own fit to Fig. 4.48a's drawn "
         "line -- see validation/cooling/extractions/han_ribbed.md, item 40.");
+  m.def("han_zhang_lee_1991", &combaero::cooling::han_zhang_lee_1991,
+        py::arg("shape"), py::arg("alpha_deg"),
+        "Han, Zhang and Lee (1991) JHT 113, 590, Table 2: R, G and G_bar "
+        "for Transverse at 90 deg and Parallel/Crossed/V/Lambda at 45 or 60 "
+        "deg, one rig (square, e/D 0.0625, P/e 10). Anything else raises. "
+        "See validation/cooling/extractions/han_zhang_lee_1991_jht.md.");
   m.def("validate_rib_set", &combaero::cooling::validate_rib_set,
         py::arg("correlation_set"),
         "Reject a set that cannot be evaluated. Hard errors, unlike the "

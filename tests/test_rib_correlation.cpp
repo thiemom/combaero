@@ -4,12 +4,15 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 #include "rib_correlation.h"
 
 using combaero::cooling::evaluate_rib;
 using combaero::cooling::han_1988_orthogonal;
 using combaero::cooling::han_1989_narrow_channel;
+using combaero::cooling::han_zhang_lee_1991;
+using combaero::cooling::RibShape;
 using combaero::cooling::han_park_1988_angled;
 using combaero::cooling::rallabandi_2009_high_re;
 using combaero::cooling::RibCorrelationSet;
@@ -722,4 +725,101 @@ TEST(AccuracyProvenance, ValueAndProvenanceCannotDriftApart) {
   auto u = combaero::cooling::han_1988_orthogonal();
   u.accuracy_G = combaero::cooling::StatedAccuracy::stated(-0.05);
   EXPECT_THROW(combaero::cooling::validate_rib_set(u), std::invalid_argument);
+}
+
+// Han, Zhang and Lee (1991) JHT 113, 590, Table 2 -- every row, against the
+// printed coefficients (four-channel verified). G and G_bar are a (e+)^b at
+// the chain's own e+; the smooth e+ floor is negligible at these e+.
+TEST(RibCorrelationTest, HanZhangLee1991ReproducesTable2) {
+  struct Row {
+    RibShape shape;
+    double alpha, R_a, G_a, G_b, Gbar_a, Gbar_b;
+    bool symmetric;
+  };
+  const Row rows[] = {
+      {RibShape::Transverse, 90, 3.18, 3.97, 0.28, 4.86, 0.28, true},
+      {RibShape::Parallel, 60, 2.05, 1.52, 0.41, 2.41, 0.36, true},
+      {RibShape::Crossed, 60, 3.18, 3.24, 0.32, 4.57, 0.28, true},
+      {RibShape::V, 60, 1.72, 1.35, 0.42, 1.76, 0.40, false},
+      {RibShape::Lambda, 60, 1.42, 1.59, 0.43, 2.12, 0.41, false},
+      {RibShape::Parallel, 45, 3.05, 2.07, 0.36, 3.01, 0.32, true},
+      {RibShape::Crossed, 45, 4.40, 2.11, 0.37, 2.43, 0.37, true},
+      {RibShape::V, 45, 2.04, 1.36, 0.43, 1.93, 0.40, false},
+      {RibShape::Lambda, 45, 1.70, 1.83, 0.41, 2.49, 0.38, false},
+  };
+  for (const auto &row : rows) {
+    const auto s = han_zhang_lee_1991(row.shape, row.alpha);
+    EXPECT_NO_THROW(validate_rib_set(s)) << s.name;
+    EXPECT_EQ(s.shape, row.shape) << s.name;
+    EXPECT_EQ(s.symmetric, row.symmetric) << s.name;
+    RibGeometry g;
+    g.e_D = 0.0625;
+    g.p_e = 10.0;
+    g.W_H = 1.0;
+    g.alpha_deg = row.alpha;
+    for (double Re : {15000.0, 40000.0, 90000.0}) {
+      const auto r = evaluate_rib(s, g, Re);
+      EXPECT_NEAR(r.R, row.R_a, 1e-12) << s.name;
+      EXPECT_NEAR(r.G, row.G_a * std::pow(r.e_plus, row.G_b), 1e-4 * r.G) << s.name;
+      ASSERT_TRUE(r.has_G_bar) << s.name;
+      EXPECT_NEAR(r.G_bar, row.Gbar_a * std::pow(r.e_plus, row.Gbar_b), 1e-4 * r.G_bar)
+          << s.name;
+      EXPECT_GT(r.G_bar, r.G) << s.name << ": printed G_bar/G is 1.07-1.26";
+      EXPECT_FALSE(r.extrapolated) << s.name << " at its own rig, Re " << Re;
+    }
+  }
+}
+
+// The paper tested nine configurations; a nearby one is not a substitute.
+TEST(RibCorrelationTest, HanZhangLee1991RefusesUntestedConfigurations) {
+  EXPECT_THROW(han_zhang_lee_1991(RibShape::V, 30.0), std::invalid_argument);
+  EXPECT_THROW(han_zhang_lee_1991(RibShape::Transverse, 60.0), std::invalid_argument);
+  EXPECT_THROW(han_zhang_lee_1991(RibShape::Parallel, 90.0), std::invalid_argument);
+  EXPECT_THROW(han_zhang_lee_1991(RibShape::Unspecified, 90.0), std::invalid_argument);
+}
+
+TEST(RibCorrelationTest, HanZhangLee1991GuardsAndDerivative) {
+  for (auto shape : {RibShape::Crossed, RibShape::V, RibShape::Lambda}) {
+    const auto s = han_zhang_lee_1991(shape, 60.0);
+    RibGeometry g;
+    g.e_D = 0.0625;
+    g.p_e = 10.0;
+    g.W_H = 1.0;
+    g.alpha_deg = 60.0;
+    for (double Re : {-1e6, -1.0, 0.0, 1.0, 1e8}) {
+      const auto r = evaluate_rib(s, g, Re);
+      EXPECT_TRUE(std::isfinite(r.G) && std::isfinite(r.G_bar) && std::isfinite(r.St_r))
+          << s.name << " Re=" << Re;
+      EXPECT_GT(r.St_r, 0.0) << s.name << " Re=" << Re;
+    }
+    for (double Re : {50000.0, 20000.0, 100.0}) {
+      const double h = std::max(1e-6, std::abs(Re) * 1e-6);
+      const double fd =
+          (evaluate_rib(s, g, Re + h).St_r - evaluate_rib(s, g, Re - h).St_r) / (2.0 * h);
+      const double an = evaluate_rib(s, g, Re).dSt_dRe;
+      EXPECT_LT(std::abs(an - fd) / std::max({std::abs(fd), std::abs(an), 1e-14}), 1e-5)
+          << s.name << " Re=" << Re;
+    }
+  }
+}
+
+// Adding shape and printed G_bar must leave the four earlier sets as they
+// were: each declares its shape, prints no G_bar, and validates.
+TEST(RibCorrelationTest, EarlierSetsDeclareShapeAndPrintNoGbar) {
+  const std::pair<RibCorrelationSet, RibShape> sets[] = {
+      {han_1988_orthogonal(), RibShape::Transverse},
+      {han_park_1988_angled(), RibShape::Parallel},
+      {rallabandi_2009_high_re(), RibShape::Parallel},
+      {han_1989_narrow_channel(), RibShape::Parallel},
+  };
+  for (const auto &[s, shape] : sets) {
+    EXPECT_EQ(s.shape, shape) << s.name;
+    EXPECT_EQ(s.C_Gbar, 0.0) << s.name;
+    EXPECT_FALSE(evaluate_rib(s, ref_geometry(), 30000.0).has_G_bar) << s.name;
+  }
+  EXPECT_EQ(RibCorrelationSet{}.shape, RibShape::Unspecified);
+
+  auto bad = han_zhang_lee_1991(RibShape::V, 60.0);
+  bad.C_Gbar = -1.0;
+  EXPECT_THROW(validate_rib_set(bad), std::invalid_argument);
 }

@@ -449,6 +449,15 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
 // further W/H correction to both the constant and the e+ exponent itself
 // below W/H = 1/2. See han_ribbed.md item 40 and decision D6.
 //
+// Rib SHAPE is part of a set (#434): continuous-angled, V, crossed and
+// Lambda ribs at the same alpha are different geometries, and a set refuses
+// a series of another shape rather than aliasing onto it. Unspecified (the
+// default for a user-built set) binds nothing.
+enum class RibShape { Unspecified, Transverse, Parallel, Crossed, V, Lambda };
+// set.shape; set.C_Gbar / set.Gbar_eplus_exponent carry a source's OWN
+// printed four-wall G_bar (0 = not printed -> RibResult::has_G_bar false,
+// callers fall back to Han's G_bar = 1.2 G).
+//
 // Named sets, selected explicitly -- there is no auto-switching between
 // them, since they cover disjoint regimes rather than one being an update
 // of the other:
@@ -456,6 +465,10 @@ RibCorrelationSet han_1988_orthogonal();       // 90 deg, Re 10e3-60e3
 RibCorrelationSet rallabandi_2009_high_re();   // 45 deg sharp ribs, Re 30e3-400e3
 RibCorrelationSet han_park_1988_angled();      // 30-90 deg, W/H 1-4, Re 10e3-60e3
 RibCorrelationSet han_1989_narrow_channel();   // 30-90 deg, W/H 1/4-1, Re 10e3-60e3
+// Han, Zhang & Lee (1991) Table 2: Transverse at 90; Parallel, Crossed, V,
+// Lambda at 45 or 60. One rig (square, e/D 0.0625, P/e 10); anything else
+// throws. Prints its own G_bar per configuration.
+RibCorrelationSet han_zhang_lee_1991(RibShape shape, double alpha_deg);
 void validate_rib_set(const RibCorrelationSet& set);   // throws on a bad set
 
 // Accuracy carries WHERE IT CAME FROM, because only an author's own claim

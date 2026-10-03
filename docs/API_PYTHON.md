@@ -1434,6 +1434,21 @@ set's `provenance` is `Fitted` rather than `Extracted` -- see
 correction to both the constant and the `e+` exponent itself below
 `G_narrow_WH_band_boundary`.
 
+**Rib shape, and nine configurations from one paper.** A set declares the
+`RibShape` it was fitted to (`Transverse`, `Parallel`, `Crossed`, `V`,
+`Lambda`; `Unspecified` binds nothing) because V, crossed and Lambda ribs at
+the same angle are different geometries. `han_zhang_lee_1991` returns Han,
+Zhang & Lee (1991)'s Table 2 row for a tested configuration -- one rig,
+square channel, `e/D` 0.0625, `P/e` 10 -- and raises for anything else:
+
+```python
+vee = cb.han_zhang_lee_1991(cb.RibShape.V, 60.0)
+g = cb.RibGeometry(e_D=0.0625, p_e=10.0, W_H=1.0, alpha_deg=60.0)
+r = cb.evaluate_rib(vee, g, Re=30_000)
+r.G, r.G_bar, r.has_G_bar           # its own printed G_bar, not 1.2 G
+vee.symmetric                       # False: a V reversed is a Lambda
+```
+
 **Supply your own.** Real hardware needs it -- no published correlation is
 precise enough for a specific rig:
 

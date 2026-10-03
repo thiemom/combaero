@@ -164,6 +164,15 @@ SET_ALSO_PRODUCES: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Han, Zhang and Lee (1991) Table 2: R and G on Han's basis (four-sided f_r,
+# ribbed-side St), plus the source's OWN printed G_bar; the 60 deg V set also
+# answers figure 4.53's performance curve through the f_ratio path.
+for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee", "45lam"):
+    SET_PRODUCES[f"han_zhang_lee_1991_{_tag}"] = "G_ribbed_wall"
+    SET_ALSO_PRODUCES[f"han_zhang_lee_1991_{_tag}"] = (
+        "R_ribbed_wall", "G_four_wall", "Nu_ratio_ribbed_DB_vs_fbar",
+    )
+
 
 @dataclass(frozen=True)
 class Conversion:

@@ -61,6 +61,10 @@ class SeriesMetadata:
     cross_check: str
     class_confidence: ClassConfidence
     scores: str | None  # correlation-set name, or None if not scored
+    # Rib SHAPE beyond the angle: transverse, parallel, crossed, v, lambda,
+    # v_broken. None means not recorded; a set that binds a non-trivial
+    # shape refuses such a series rather than assuming one.
+    rib_shape: str | None = None
     # The figure card: what the printed axes and equations say, read off
     # the page independently of where the digitiser put the points. See
     # validation/cooling/verify.py.
@@ -129,6 +133,7 @@ def load_dataset(root: Path | None = None) -> list[SeriesMetadata]:
                         "class_confidence", "confirmed"
                     ),
                     scores=entry.get("scores"),
+                    rib_shape=entry.get("rib_shape"),
                     verification=entry.get("verification"),
                 )
             )

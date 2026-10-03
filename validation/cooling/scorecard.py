@@ -179,6 +179,11 @@ SET_ORIGIN: dict[str, str] = {
     "andrews_1986_effusion_internal": "86-GT-225",
 }
 
+# Han, Zhang and Lee (1991) Table 2 -- every configuration's origin is the
+# same paper, whose Fig. 12 figure 4.51 reprints.
+for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee", "45lam"):
+    SET_ORIGIN[f"han_zhang_lee_1991_{_tag}"] = "ASME J. Heat Transfer 113, 590"
+
 # Matching on the citation widens the haystack, so a citation that NAMES
 # another paper could claim a false fidelity. Bounded by
 # `test_every_scored_series_basis_is_what_its_provenance_says`, which pins
@@ -495,14 +500,11 @@ def render_conventions(cells: list[Cell]) -> list[str]:
 # Correlation sets whose accuracy is carried in C++. The others (film,
 # orifice, effusion) are not `RibCorrelationSet`s and state no band here.
 def _rib_set(name: str):
-    import combaero as cb
+    # The rib runner's own registry, so a set added there is reported here
+    # without a second list to keep in step.
+    from validation.cooling.runner import SETS
 
-    factory = {
-        "han_1988_orthogonal": getattr(cb, "han_1988_orthogonal", None),
-        "han_park_1988_angled": getattr(cb, "han_park_1988_angled", None),
-        "rallabandi_2009_high_re": getattr(cb, "rallabandi_2009_high_re", None),
-        "han_1989_narrow_channel": getattr(cb, "han_1989_narrow_channel", None),
-    }.get(name)
+    factory = SETS.get(name)
     return factory() if factory else None
 
 

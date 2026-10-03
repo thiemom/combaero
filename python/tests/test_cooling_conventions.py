@@ -91,8 +91,9 @@ def test_the_whole_dataset_resolves(dataset) -> None:
         k: v[:3] for k, v in statuses.items()
     }
     # +4 #402, +1 #435, -2 fig4.51 Gbar 45par/45crs resolved as duplicates of
-    # G, +3 Taslim & Spring square-channel friction (#403 item 2)
-    assert len(statuses[C.STATUS_DIRECT]) == 106
+    # G, +3 Taslim & Spring square-channel friction (#403 item 2), +1 fig4.53
+    # 60 deg V on its own shape (#434)
+    assert len(statuses[C.STATUS_DIRECT]) == 107
     assert sorted(statuses[C.STATUS_CONVERTED]) == [
         "rohde1969/fig10_rd0_triangles",
         "rohde1969/fig10_rd0p195_squares",
