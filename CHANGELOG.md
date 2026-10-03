@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Smooth-pipe Gnielinski is C1 at Re 3000, and its Jacobian is exact
+  (#446).** Every smooth-pipe path held Petukhov friction with
+  `max(Re, 3000)`, which left `dNu/dRe` jumping by 25% at Re 3000
+  (value continuous) -- a Jacobian kink for any element in the transitional
+  range. The hold is now `friction_petukhov_clamped`, a C1 quadratic soft-max
+  over Re 2500-3500, used at all five sites (`nusselt_gnielinski`,
+  `nusselt_petukhov`, and the three channel paths).
+
+  **What moved:** nothing outside Re 2500-3500 (bit-identical); inside,
+  Nu by at most -1.53%, at Re 3000 (friction there -1.36%). The validation
+  scorecard is byte-identical before and after.
+
+  `nusselt_and_jacobian_gnielinski` now returns the exact derivative
+  instead of a central difference, and for Re <= 0 the laminar value with
+  zero slope (flagged extrapolated) instead of `(0, 0)` INVALID.
+  `nusselt_gnielinski_with_derivative` / `_smooth_with_derivative` expose
+  the analytic form in C++; the ratio-set handover (#444) uses it, replacing
+  its private copy.
+
 - **Taslim & Spring's figure 11 is on its printed axis, and its `e/D` are
   numbers.** The axis is `Reynolds No. (x10^-4)`, so the 16 figure 11
   series carry `x_scale: 1.0e4`; 23 `geometry.e_D` entries ended in a stray
@@ -125,11 +144,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     derivatives odd and finite through `Re = 0`; mistakes are rejected by
     `validate_rib_ratio_set` / `validate_rib_ratio_options`, and the
     evaluator never throws.
-  - Smooth-pipe Gnielinski gets an analytic `(Nu, dNu/dRe)` for the
-    handover, pinned to `nusselt_gnielinski` to 1e-12 -- the existing
-    `nusselt_and_jacobian_gnielinski` differentiates by finite differences
-    and returns 0 for `Re <= 0`. Its blend anchors (Re 1000, 2300) and
-    friction clamp (Re 3000) are now named constants in `heat_transfer.h`.
+  - The handover uses smooth-pipe Gnielinski's exact derivative (see the
+    #446 entry). Its blend anchors (Re 1000, 2300) are now named constants
+    in `heat_transfer.h`.
 
 - **Rib shape, and Han, Zhang & Lee (1991)'s nine configurations -- closes
   #434.** `RibCorrelationSet` gains `shape` (`RibShape`: Transverse,

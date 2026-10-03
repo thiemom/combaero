@@ -79,16 +79,31 @@ constexpr double coeff_re_offset      = 1000.0; // (Re - 1000) in numerator
 // negative below Re 1000); constant laminar Nu below the lower one.
 constexpr double blend_re_laminar     = 1000.0;
 constexpr double blend_re_turbulent   = 2300.0;
-// The smooth-pipe overload holds its Petukhov friction at this Re and below.
-constexpr double smooth_friction_re_min = 3000.0;
 } // namespace gnielinski
 double nusselt_gnielinski(double Re, double Pr, double f,
                           CorrelationStatus *status = nullptr);
 
 // Gnielinski with automatic friction factor (smooth pipe)
-// Uses Petukhov friction correlation: f = (0.790*ln(Re) - 1.64)^(-2)
+// Uses Petukhov friction correlation: f = (0.790*ln(Re) - 1.64)^(-2), held
+// below Re 3000 by the C1 friction_petukhov_clamped (friction.h).
 double nusselt_gnielinski(double Re, double Pr,
                           CorrelationStatus *status = nullptr);
+
+// Gnielinski's value and its EXACT Re-derivative, for solver Jacobians. Pure
+// arithmetic -- no warnings, no status. `df_dRe` is the slope of the friction
+// passed in: 0 for a fixed f (the three-argument form), the clamped-Petukhov
+// slope for the smooth-pipe form. Re <= blend_re_laminar returns the laminar
+// value with zero slope, as nusselt_gnielinski does.
+struct NuAndDerivative {
+  double Nu = 0.0;
+  double dNu_dRe = 0.0;
+};
+NuAndDerivative nusselt_gnielinski_with_derivative(double Re, double Pr,
+                                                   double f,
+                                                   double df_dRe = 0.0);
+// Smooth-pipe form: friction_petukhov_clamped(Re) and its slope.
+NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re,
+                                                          double Pr);
 
 // Sieder-Tate correlation (1936)
 // Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ_bulk / μ_wall)^0.14

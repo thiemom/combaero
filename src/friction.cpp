@@ -166,3 +166,40 @@ double friction_petukhov(double Re) {
   double x = petukhov::coeff_a * std::log(Re) - petukhov::coeff_b;
   return 1.0 / (x * x);
 }
+
+namespace {
+
+// C1 soft-max of Re against petukhov::clamp_re, and its slope.
+struct ClampedRe {
+  double re;
+  double dre;
+};
+
+ClampedRe petukhov_clamp(double Re) {
+  const double lo = petukhov::clamp_re - petukhov::clamp_halfwidth;
+  const double hi = petukhov::clamp_re + petukhov::clamp_halfwidth;
+  if (Re >= hi) {
+    return {Re, 1.0};
+  }
+  if (Re <= lo) {
+    return {petukhov::clamp_re, 0.0};
+  }
+  const double u = Re - lo;
+  return {petukhov::clamp_re + u * u / (4.0 * petukhov::clamp_halfwidth),
+          u / (2.0 * petukhov::clamp_halfwidth)};
+}
+
+}  // namespace
+
+double friction_petukhov_clamped(double Re) {
+  return friction_petukhov(petukhov_clamp(Re).re);
+}
+
+double friction_petukhov_clamped_dRe(double Re) {
+  const ClampedRe c = petukhov_clamp(Re);
+  if (c.dre == 0.0) {
+    return 0.0;
+  }
+  const double x = petukhov::coeff_a * std::log(c.re) - petukhov::coeff_b;
+  return -2.0 * petukhov::coeff_a / (x * x * x * c.re) * c.dre;
+}

@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "friction.h"
 #include "heat_transfer.h"
 
 namespace combaero {
@@ -113,48 +112,6 @@ void check_accuracy(const std::string &set_name, const char *field,
 
 }  // namespace
 
-NuWithDerivative gnielinski_smooth_analytic(double Re, double Pr) {
-  using namespace gnielinski;
-  if (Re <= blend_re_laminar) {
-    return {NU_LAMINAR_CONST_T, 0.0};
-  }
-  // Petukhov friction, held at smooth_friction_re_min and below -- exactly
-  // what nusselt_gnielinski(Re, Pr) passes to the three-argument form.
-  const double re_f = Re > smooth_friction_re_min ? Re : smooth_friction_re_min;
-  const double xf = petukhov::coeff_a * std::log(re_f) - petukhov::coeff_b;
-  const double f = 1.0 / (xf * xf);
-  const double df =
-      Re > smooth_friction_re_min ? -2.0 * petukhov::coeff_a / (xf * xf * xf * Re)
-                                  : 0.0;
-  const double f8 = f / 8.0;
-  const double df8 = df / 8.0;
-  const double sqrt_f8 = std::sqrt(f8);
-  const double pr_term = std::pow(Pr, 2.0 / 3.0) - 1.0;
-  const double denom = 1.0 + coeff_prandtl_factor * sqrt_f8 * pr_term;
-
-  if (Re >= blend_re_turbulent) {
-    const double num = f8 * (Re - coeff_re_offset) * Pr;
-    const double dnum = (df8 * (Re - coeff_re_offset) + f8) * Pr;
-    const double ddenom = coeff_prandtl_factor * pr_term * df8 / (2.0 * sqrt_f8);
-    return {num / denom, (dnum * denom - num * ddenom) / (denom * denom)};
-  }
-
-  // Hermite blend; below re_f the friction is constant, so the anchors are.
-  const double h = blend_re_turbulent - blend_re_laminar;
-  const double nu1 = f8 * (blend_re_turbulent - coeff_re_offset) * Pr / denom;
-  const double dnu1 = f8 * Pr / denom;
-  const double t = (Re - blend_re_laminar) / h;
-  const double t2 = t * t;
-  const double t3 = t2 * t;
-  const double nu = (2.0 * t3 - 3.0 * t2 + 1.0) * NU_LAMINAR_CONST_T +
-                    (-2.0 * t3 + 3.0 * t2) * nu1 + (t3 - t2) * h * dnu1;
-  const double dnu = ((6.0 * t2 - 6.0 * t) * NU_LAMINAR_CONST_T +
-                      (-6.0 * t2 + 6.0 * t) * nu1 +
-                      (3.0 * t2 - 2.0 * t) * h * dnu1) /
-                     h;
-  return {nu, dnu};
-}
-
 RibRatioResult evaluate_rib_ratio(const RibRatioSet &set,
                                   const RibGeometry &geom, double Re,
                                   double Pr, const RibRatioOptions &options) {
@@ -192,7 +149,7 @@ RibRatioResult evaluate_rib_ratio(const RibRatioSet &set,
     auto ext = [&](double at) -> ValueSlope {
       switch (options.below_floor) {
         case RatioBelowFloor::Gnielinski: {
-          const auto g = gnielinski_smooth_analytic(at, pr);
+          const auto g = nusselt_gnielinski_smooth_with_derivative(at, pr);
           return {g.Nu, g.dNu_dRe};
         }
         case RatioBelowFloor::User:

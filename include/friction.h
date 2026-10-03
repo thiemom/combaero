@@ -58,8 +58,22 @@ double friction_colebrook(double Re, double e_D, double tol = 1e-10,
 namespace petukhov {
 constexpr double coeff_a = 0.790; // ln(Re) coefficient
 constexpr double coeff_b = 1.64;  // offset
+// Smooth-pipe heat-transfer paths hold Petukhov friction at clamp_re and
+// below (the fit is not meant for laminar Re, and ln(Re) is undefined at 0).
+// The hold is a C1 quadratic soft-max of Re over
+// [clamp_re - clamp_halfwidth, clamp_re + clamp_halfwidth]: identical to
+// max(Re, clamp_re) outside that band, continuous slope through it. The
+// hard max() it replaces left a 25% dNu/dRe jump in Gnielinski at Re 3000
+// (#446).
+constexpr double clamp_re = 3000.0;
+constexpr double clamp_halfwidth = 500.0;
 } // namespace petukhov
 double friction_petukhov(double Re);
+
+// Petukhov friction at the C1-clamped Reynolds number, and its exact
+// Re-derivative (0 below clamp_re - clamp_halfwidth).
+double friction_petukhov_clamped(double Re);
+double friction_petukhov_clamped_dRe(double Re);
 
 // -------------------------------------------------------------
 // Channel Roughness Database
