@@ -8,7 +8,6 @@
 #include "rib_ratio_correlation.h"
 
 using combaero::cooling::evaluate_rib_ratio;
-using combaero::cooling::gnielinski_smooth_analytic;
 using combaero::cooling::RatioBelowFloor;
 using combaero::cooling::RibGeometry;
 using combaero::cooling::RibRatioOptions;
@@ -47,31 +46,6 @@ RibGeometry geom() {
 
 }  // namespace
 
-// The analytic smooth-pipe Gnielinski must BE nusselt_gnielinski(Re, Pr) --
-// a second copy that drifts would silently change every handover.
-TEST(RibRatioTest, AnalyticGnielinskiMatchesTheLibraryFunction) {
-  combaero::CorrelationStatus st;  // suppresses the below-range warning
-  for (double Re : {500.0, 1000.0, 1500.0, 2299.0, 2300.0, 2900.0, 3000.0,
-                    3100.0, 1.0e4, 1.0e5, 1.0e6}) {
-    for (double Pr : {0.7, 3.0}) {
-      const double ref = combaero::nusselt_gnielinski(Re, Pr, &st);
-      EXPECT_NEAR(gnielinski_smooth_analytic(Re, Pr).Nu, ref, 1e-12 * ref)
-          << "Re=" << Re << " Pr=" << Pr;
-    }
-  }
-}
-
-TEST(RibRatioTest, AnalyticGnielinskiDerivativeMatchesCentralDifferences) {
-  for (double Re : {1200.0, 2000.0, 2600.0, 5000.0, 1.0e5}) {
-    const double h = Re * 1e-6;
-    const double fd = (gnielinski_smooth_analytic(Re + h, 0.7).Nu -
-                       gnielinski_smooth_analytic(Re - h, 0.7).Nu) /
-                      (2.0 * h);
-    const double an = gnielinski_smooth_analytic(Re, 0.7).dNu_dRe;
-    EXPECT_LT(std::abs(an - fd) / std::max(std::abs(fd), 1e-12), 1e-5) << "Re=" << Re;
-  }
-}
-
 // Inside the fitted range the set reproduces the paper -- r * Nu0_source --
 // whatever extrapolation baseline the caller picks.
 TEST(RibRatioTest, InRangeIsTheSourceProductForEveryBelowFloorChoice) {
@@ -98,11 +72,11 @@ TEST(RibRatioTest, InRangeIsTheSourceProductForEveryBelowFloorChoice) {
 TEST(RibRatioTest, BelowTheFloorHandsOverToGnielinski) {
   const auto s = user_set();
   const auto at_floor = evaluate_rib_ratio(s, geom(), 1.0e4, 0.7);
-  const double k = at_floor.Nu / gnielinski_smooth_analytic(1.0e4, 0.7).Nu;
+  const double k = at_floor.Nu / combaero::nusselt_gnielinski_smooth_with_derivative(1.0e4, 0.7).Nu;
   for (double Re : {3000.0, 500.0, 1.0, 0.0}) {
     const auto r = evaluate_rib_ratio(s, geom(), Re, 0.7);
     const double x = std::sqrt(Re * Re + 1.0);
-    EXPECT_NEAR(r.Nu, k * gnielinski_smooth_analytic(x, 0.7).Nu, 1e-8 * r.Nu)
+    EXPECT_NEAR(r.Nu, k * combaero::nusselt_gnielinski_smooth_with_derivative(x, 0.7).Nu, 1e-8 * r.Nu)
         << "Re=" << Re;
     EXPECT_TRUE(r.below_floor && r.extrapolated);
   }
@@ -139,10 +113,8 @@ TEST(RibRatioTest, GuardsHoldAcrossZeroAndBothSigns) {
 
 // Analytic derivatives against central differences in every regime: in
 // range, inside the blend band, far below it, near and at Re = 0 -- for all
-// three below-floor choices. Re 3000 itself is avoided: smooth-pipe
-// Gnielinski has a pre-existing slope jump there (its Petukhov friction is
-// clamped with max(Re, 3000)), which the handover reproduces exactly and a
-// central difference straddling it cannot match (#446).
+// three below-floor choices -- including Re 3000, where smooth-pipe
+// Gnielinski's friction clamp had a slope jump until #446 made it C1.
 TEST(RibRatioTest, DerivativesMatchCentralDifferencesEverywhere) {
   const auto s = user_set();
   for (auto choice : {RatioBelowFloor::Gnielinski, RatioBelowFloor::SourceBaseline,
@@ -150,7 +122,7 @@ TEST(RibRatioTest, DerivativesMatchCentralDifferencesEverywhere) {
     RibRatioOptions o;
     o.below_floor = choice;
     o.user_Nu0 = {0.02, 0.8, 0.33};
-    for (double Re : {5.0e4, 1.2e4, 8.0e3, 6.0e3, 5.2e3, 3.5e3, 2000.0, 0.5, -2.5e3}) {
+    for (double Re : {5.0e4, 1.2e4, 8.0e3, 6.0e3, 5.2e3, 3.5e3, 3.0e3, 2000.0, 0.5, -3.0e3}) {
       const double h = std::max(1e-4, std::abs(Re) * 1e-6);
       const auto c = evaluate_rib_ratio(s, geom(), Re, 0.7, o);
       const auto p = evaluate_rib_ratio(s, geom(), Re + h, 0.7, o);

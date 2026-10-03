@@ -140,20 +140,15 @@ nusselt_and_jacobian_dittus_boelter(double Re, double Pr, bool heating) {
 
 CorrelationResult<std::tuple<double, double>>
 nusselt_and_jacobian_gnielinski(double Re, double Pr, double f) {
-  if (Re <= 0.0) {
-    return {{0.0, 0.0},
-            CorrelationValidity::INVALID,
-            "nusselt_gnielinski requires Re > 0"};
-  }
-  // Gnielinski uses Hermite blending and is complex; use tight analytical-like
-  // FD
-  const double eps =
-      std::max(1e-6, Re * 1e-6); // tightly bracketed minimum perturbation
-  double Nu_plus = nusselt_gnielinski(Re + eps, Pr, f);
-  double Nu_minus = nusselt_gnielinski(Re - eps, Pr, f);
-  double dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps);
-  double Nu = nusselt_gnielinski(Re, Pr, f); // center evaluation
-  return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
+  // Exact derivative at fixed f (#446) -- previously a central difference.
+  // Below the laminar anchor, including Re <= 0, Gnielinski is the laminar
+  // value with zero slope: defined, so returned, but flagged as extrapolated
+  // rather than INVALID.
+  const auto r = nusselt_gnielinski_with_derivative(Re, Pr, f, 0.0);
+  const auto validity = Re >= gnielinski::blend_re_turbulent
+                            ? CorrelationValidity::VALID
+                            : CorrelationValidity::EXTRAPOLATED;
+  return {{r.Nu, r.dNu_dRe}, validity, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>

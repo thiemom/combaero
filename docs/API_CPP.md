@@ -389,6 +389,10 @@ double friction_haaland(double Re, double e_D);
 double friction_serghides(double Re, double e_D);
 double friction_colebrook(double Re, double e_D, double tol = 1e-10, int max_iter = 20);
 double friction_petukhov(double Re);
+// Petukhov held below Re 3000 by a C1 soft-max over Re 2500-3500 (#446);
+// used by every smooth-pipe Gnielinski / Petukhov heat-transfer path.
+double friction_petukhov_clamped(double Re);
+double friction_petukhov_clamped_dRe(double Re);
 ```
 
 ---
@@ -404,6 +408,10 @@ double friction_petukhov(double Re);
 double nusselt_dittus_boelter(double Re, double Pr, bool heating = true);
 double nusselt_gnielinski(double Re, double Pr);
 double nusselt_gnielinski(double Re, double Pr, double f);
+// Value and EXACT Re-derivative (no warnings); df_dRe = slope of the f passed.
+NuAndDerivative nusselt_gnielinski_with_derivative(double Re, double Pr,
+                                                   double f, double df_dRe = 0.0);
+NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re, double Pr);
 double nusselt_sieder_tate(double Re, double Pr, double mu_ratio);
 ```
 

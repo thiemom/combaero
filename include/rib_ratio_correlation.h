@@ -132,14 +132,5 @@ RibRatioResult evaluate_rib_ratio(const RibRatioSet &set,
 void validate_rib_ratio_set(const RibRatioSet &set);
 void validate_rib_ratio_options(const RibRatioOptions &options);
 
-// Smooth-pipe Gnielinski (Petukhov friction, laminar Hermite blend) with an
-// ANALYTIC Re-derivative, at Re > 0 -- the same function as
-// nusselt_gnielinski(Re, Pr), pinned to it by test. Returns {Nu, dNu/dRe}.
-struct NuWithDerivative {
-  double Nu = 0.0;
-  double dNu_dRe = 0.0;
-};
-NuWithDerivative gnielinski_smooth_analytic(double Re, double Pr);
-
 }  // namespace cooling
 }  // namespace combaero

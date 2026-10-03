@@ -129,9 +129,56 @@ double nusselt_gnielinski(double Re, double Pr, double f,
 
 double nusselt_gnielinski(double Re, double Pr,
                           combaero::CorrelationStatus *status) {
-  double f = friction_petukhov(std::max(
-      Re, gnielinski::smooth_friction_re_min)); // avoid log(0) in Petukhov
-  return nusselt_gnielinski(Re, Pr, f, status);
+  return nusselt_gnielinski(Re, Pr, friction_petukhov_clamped(Re), status);
+}
+
+NuAndDerivative nusselt_gnielinski_with_derivative(double Re, double Pr,
+                                                   double f, double df_dRe) {
+  using namespace gnielinski;
+  if (Re <= blend_re_laminar) {
+    return {NU_LAMINAR_CONST_T, 0.0};
+  }
+  const double f8 = f / 8.0;
+  const double sqrt_f8 = std::sqrt(f8);
+  const double pr_term = std::pow(Pr, 2.0 / 3.0) - 1.0;
+  const double denom = 1.0 + coeff_prandtl_factor * sqrt_f8 * pr_term;
+  // q = f8 / denom carries all the friction dependence; dq/df for the
+  // chain rule through a Re-dependent f.
+  const double q = f8 / denom;
+  const double ddenom_df = coeff_prandtl_factor * pr_term / (16.0 * sqrt_f8);
+  const double dq_df = (denom / 8.0 - f8 * ddenom_df) / (denom * denom);
+
+  if (Re >= blend_re_turbulent) {
+    const double nu = q * (Re - coeff_re_offset) * Pr;
+    const double dnu = q * Pr + (Re - coeff_re_offset) * Pr * dq_df * df_dRe;
+    return {nu, dnu};
+  }
+  // C1 Hermite blend to laminar, as in nusselt_gnielinski; the turbulent
+  // anchors depend on f, so a Re-dependent f moves them too.
+  const double h = blend_re_turbulent - blend_re_laminar;
+  const double nu1 = q * (blend_re_turbulent - coeff_re_offset) * Pr;
+  const double dnu1 = q * Pr;
+  const double dnu1_df = (blend_re_turbulent - coeff_re_offset) * Pr * dq_df;
+  const double ddnu1_df = Pr * dq_df;
+  const double t = (Re - blend_re_laminar) / h;
+  const double t2 = t * t;
+  const double t3 = t2 * t;
+  const double h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
+  const double h01 = -2.0 * t3 + 3.0 * t2;
+  const double h11 = t3 - t2;
+  const double nu = h00 * NU_LAMINAR_CONST_T + h01 * nu1 + h11 * h * dnu1;
+  const double dnu_dt = (6.0 * t2 - 6.0 * t) * NU_LAMINAR_CONST_T +
+                        (-6.0 * t2 + 6.0 * t) * nu1 +
+                        (3.0 * t2 - 2.0 * t) * h * dnu1;
+  const double dnu = dnu_dt / h +
+                     (h01 * dnu1_df + h11 * h * ddnu1_df) * df_dRe;
+  return {nu, dnu};
+}
+
+NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re,
+                                                          double Pr) {
+  return nusselt_gnielinski_with_derivative(
+      Re, Pr, friction_petukhov_clamped(Re), friction_petukhov_clamped_dRe(Re));
 }
 
 double nusselt_sieder_tate(double Re, double Pr, double mu_ratio,
@@ -203,7 +250,7 @@ double nusselt_petukhov(double Re, double Pr, double f,
 double nusselt_petukhov(double Re, double Pr,
                         combaero::CorrelationStatus *status) {
   double f =
-      friction_petukhov(std::max(Re, 3000.0)); // avoid log(0) in Petukhov
+      friction_petukhov_clamped(Re); // avoid log(0) in Petukhov
   return nusselt_petukhov(Re, Pr, f, status);
 }
 
@@ -678,7 +725,7 @@ double nusselt_circular_channel(const State &s, double velocity, double diameter
   if (e_D > 0 && Re > 4000) {
     f = friction_colebrook(Re, e_D);
   } else {
-    f = friction_petukhov(std::max(Re, 3000.0));
+    f = friction_petukhov_clamped(Re);
   }
 
   return nusselt_gnielinski(Re, Pr, f);
@@ -734,7 +781,7 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
       if (e_D > 0 && Re > 4000) {
         f = friction_colebrook(Re, e_D);
       } else {
-        f = friction_petukhov(std::max(Re, 3000.0));
+        f = friction_petukhov_clamped(Re);
       }
       Nu = nusselt_gnielinski(Re, Pr, f);
     }
@@ -838,7 +885,7 @@ channel_smooth(double T, double P, const std::vector<double> &X,
   } else if (e_D > 0.0 && Re > 4000.0) {
     f = friction_colebrook(Re, e_D);
   } else {
-    f = friction_petukhov(std::max(Re, 3000.0));
+    f = friction_petukhov_clamped(Re);
   }
 
   // Apply f_multiplier before Nu computation so that correlations where
