@@ -989,8 +989,9 @@ inline constexpr Entry function_units[] = {
     // heat_transfer.h - Channel flow functions (HTC + pressure drop)
     // -------------------------------------------------------------------------
     {"channel_smooth",
-     "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_wall: "
-     "K",
+     "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_hot: "
+     "K, correlation: str, heating: bool, mu_ratio: -, roughness: m, "
+     "Nu_multiplier: -, f_multiplier: -",
      "ChannelResult"},
 
     // -------------------------------------------------------------------------

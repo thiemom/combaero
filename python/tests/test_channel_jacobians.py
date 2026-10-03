@@ -183,3 +183,45 @@ def test_channel_smooth_zero_velocity():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+@pytest.mark.parametrize("roughness", [0.0, 2e-5, 2e-4])
+@pytest.mark.parametrize("target_re", [1500.0, 2450.0, 2700.0, 2950.0, 3300.0, 3800.0, 6000.0])
+def test_channel_smooth_is_c1_and_its_jacobian_exact_through_transition(
+    target_re: float, roughness: float
+) -> None:
+    """#448: through the laminar/turbulent band (Re 2300-3000) and the
+    smooth/rough band (3000-4000), channel_smooth's analytic dh/dmdot and
+    ddP/dvelocity match central differences -- the network solver's Jacobian
+    no longer sees the +78% Nu / +64% f steps the hard switches made."""
+    T, P = 300.0, 1.0e5
+    X = cb.species.dry_air()
+    diameter, length = 0.01, 0.5
+    rho, mu = cb.density(T, P, X), cb.viscosity(T, P, X)
+    velocity = target_re * mu / (rho * diameter)
+    A_cross = np.pi / 4 * diameter**2
+
+    def run(v: float):
+        return cb.channel_smooth(
+            T,
+            P,
+            X,
+            v,
+            diameter,
+            length,
+            T_hot=400.0,
+            correlation="gnielinski",
+            roughness=roughness,
+        )
+
+    base = run(velocity)
+    assert base.Re == pytest.approx(target_re, rel=1e-9)
+    _assert_ddP_dvelocity_matches_fd(run, velocity, base.ddP_dvelocity)
+
+    h = velocity * 1e-6
+    dh_dv = (run(velocity + h).h - run(velocity - h).h) / (2.0 * h)
+    dh_dmdot_fd = dh_dv / (rho * A_cross)
+    scale = max(abs(dh_dmdot_fd), abs(base.dh_dmdot), 1e-12)
+    assert abs(base.dh_dmdot - dh_dmdot_fd) / scale < 1e-5, (
+        f"dh_dmdot {base.dh_dmdot:.6e} vs central difference {dh_dmdot_fd:.6e}"
+    )

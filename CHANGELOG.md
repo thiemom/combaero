@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Channel heat transfer and friction no longer jump at regime switches
+  (#448).** `channel_smooth`, `nusselt_circular_channel` and
+  `htc_circular_channel` (gnielinski branch) switched regime with hard `if`s:
+  Nu jumped +80% and f +64% at Re 2300, and rough-wall friction stepped from
+  smooth Petukhov to Colebrook at Re 4000 (+42.7% at e/D 0.02). Each switch
+  is now a C1 smoothstep, and each regime stays EXACT outside its band:
+
+  | band | blend |
+  |---|---|
+  | Re 2300-3000 | f `64/Re` -> turbulent; Nu laminar (3.66/4.36) -> Gnielinski |
+  | Re 3000-4000 | rough walls: clamped Petukhov -> Colebrook |
+
+  Laminar flow keeps its exact Nu and `64/Re` up to 2300 -- the band starts
+  where transition does, and ends where Petukhov's stated validity begins.
+  **What moved:** only Re inside the bands (outside them, at machine
+  precision: |change| < 1e-15). Inside, Nu and f sit between the two
+  regimes they join -- e.g. Re 2450: Nu 7.35 -> 4.10, f 0.0456 -> 0.0284
+  (the old values were Gnielinski and Petukhov already at 2301). The
+  validation scorecard is byte-identical.
+
+  **The Jacobian is exact where it was not.** `channel_smooth`'s Gnielinski
+  `dNu/dRe` and Colebrook `df/dRe` were central differences; its Petukhov
+  `df/dRe` ignored #449's clamp, and the Gnielinski and Petukhov stencils
+  used smooth Petukhov even for rough walls. All now come from the same
+  functions as the values: `friction_channel_and_derivative`,
+  `nusselt_channel_gnielinski_and_derivative`, and an implicit
+  `friction_colebrook_dRe`. `channel_smooth`'s units entry named a `T_wall`
+  argument that does not exist and omitted six others; corrected.
+
 - **Smooth-pipe Gnielinski is C1 at Re 3000, and its Jacobian is exact
   (#446).** Every smooth-pipe path held Petukhov friction with
   `max(Re, 3000)`, which left `dNu/dRe` jumping by 25% at Re 3000

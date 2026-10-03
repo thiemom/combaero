@@ -922,9 +922,9 @@ All functions use consistent units to avoid conversion errors.
 
 ### heat_transfer.h - Channel flow functions (HTC + pressure drop)
 
-| Function         | Input Units                                                               | Output Unit   |
-|------------------|---------------------------------------------------------------------------|---------------|
-| `channel_smooth` | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_wall: K | ChannelResult |
+| Function         | Input Units                                                                                                                                                             | Output Unit   |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `channel_smooth` | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_hot: K, correlation: str, heating: bool, mu_ratio: -, roughness: m, Nu_multiplier: -, f_multiplier: - | ChannelResult |
 
 ### correlation_status.h - Extrapolation validity utilities
 
