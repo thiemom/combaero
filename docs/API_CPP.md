@@ -494,6 +494,30 @@ RibResult evaluate_rib(const RibCorrelationSet& set,
 // evaluate_rib never throws: Re may be negative or zero and the guards are
 // smooth through both, because the solver probes states that are not physical.
 
+// Ratio-form rib sets -- rib_ratio_correlation.h (#444). Nu/Nu0 and f/f0 as
+// multipliers on the baseline the SOURCE fitted to, beside the R/G sets, for
+// sources that publish ratios (and so that their data is not forced through
+// the law-of-the-wall similarity R/G assumes).
+//
+//   in range:    Nu = r(Re, geom) * Nu0_source        (reproduces the paper)
+//   below floor: C1 blend in ln Re over [Re_floor/2, Re_floor] to
+//                k * Nu0_ext, k matching the value at Re_floor;
+//                Nu0_ext = smooth-pipe Gnielinski by default (laminar 3.66
+//                limit at Re -> 0), the source baseline, or a user power law.
+//   friction:    ratio held at its floor value below the range.
+//
+// Never divides by Nu0; Re enters as sqrt(Re^2 + 1) so Nu, f are even and
+// their analytic derivatives odd and finite through Re = 0.
+struct RatioBaseline { double coeff, re_exponent, pr_exponent; };  // c Re^m Pr^n
+enum class RatioBelowFloor { Gnielinski, SourceBaseline, User };
+struct RibRatioOptions { RatioBelowFloor below_floor; RatioBaseline user_Nu0; };
+RibRatioResult evaluate_rib_ratio(const RibRatioSet& set, const RibGeometry& geom,
+                                  double Re, double Pr,
+                                  const RibRatioOptions& options = {});
+// -> Nu, dNu_dRe, f, df_dRe, ratio_Nu, ratio_f, below_floor, extrapolated
+void validate_rib_ratio_set(const RibRatioSet& set);
+void validate_rib_ratio_options(const RibRatioOptions& options);
+
 // Enhanced surfaces removed in 0.7.0 for unprovenanced correlations (issue
 // #339). Ribbed is re-added on han_1988_orthogonal / rallabandi_2009_high_re
 // above, wired through RibbedModel (components.py) into the GUI and network

@@ -1449,6 +1449,31 @@ r.G, r.G_bar, r.has_G_bar           # its own printed G_bar, not 1.2 G
 vee.symmetric                       # False: a V reversed is a Lambda
 ```
 
+**Ratio-form sets** (`RibRatioSet`, #444) carry `Nu/Nu0` and `f/f0` as
+multipliers on the smooth-duct baseline the source normalised by --
+`Nu0_source` is required, because a ratio without its reference is not a
+number. In the fitted range they reproduce the paper; below `Re_floor` they
+hand over smoothly to Gnielinski by default, so Nu keeps a laminar floor as
+Re -> 0 rather than collapsing with Dittus-Boelter:
+
+```python
+s = cb.RibRatioSet()
+s.name, s.source = "my_rig", "measured 2026-10"
+s.C_Nu, s.Nu_Re = 2.5, cb.RibTerm(-0.2, 1.0e4)       # Nu/Nu0 = 2.5 (Re/1e4)^-0.2
+s.C_f, s.f_Re = 8.0, cb.RibTerm(0.1, 1.0e4)           # f/f0  = 8 (Re/1e4)^0.1
+s.Nu0_source = cb.RatioBaseline(0.023, 0.8, 0.4)     # Dittus-Boelter
+s.f0_source = cb.RatioBaseline(0.046, -0.2)
+s.Re_floor = 1.0e4
+cb.validate_rib_ratio_set(s)
+r = cb.evaluate_rib_ratio(s, g, Re=30_000, Pr=0.7)
+r.Nu, r.dNu_dRe, r.f, r.df_dRe, r.below_floor
+```
+
+`RibRatioOptions.below_floor` picks the handover (`Gnielinski`,
+`SourceBaseline`, or `User` with your own `user_Nu0`). It only acts below the
+fitted range: inside it, Nu is the paper's whatever you choose -- matching a
+specific rig across the range is what `Nu_multiplier` is for.
+
 **Supply your own.** Real hardware needs it -- no published correlation is
 precise enough for a specific rig:
 
