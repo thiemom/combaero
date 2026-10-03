@@ -44,6 +44,24 @@ enum class RibProvenance {
   User,
 };
 
+// What SHAPE a rib is, beyond its angle. Continuous-angled, V, crossed and
+// Lambda ribs at the same alpha are different geometries with different
+// secondary-flow structure and measurably different G (Han, Zhang and Lee
+// 1991, Table 2: at 60 deg, G spans 1.35 to 3.24 times (e+)^b across shapes),
+// so a set binds one shape and a series of another shape is refused rather
+// than scored -- aliasing one shape onto another reads as model error.
+//
+//   Transverse  90 deg, continuous across the wall
+//   Parallel    angled; the ribs on the two walls are parallel
+//   Crossed     angled; the ribs on the two walls cross each other
+//   V           pointing downstream (forward V)
+//   Lambda      pointing upstream -- a V with the flow reversed, which is
+//               why a V or Lambda set is not `symmetric`
+//
+// Unspecified binds nothing: it is what a user-built set gets by default,
+// and the user then owns the shape question.
+enum class RibShape { Unspecified, Transverse, Parallel, Crossed, V, Lambda };
+
 // One power-law term. `reference` is what the variable is divided by before
 // the exponent is applied; 1.0 means the raw value.
 struct RibTerm {
@@ -120,6 +138,9 @@ struct RibCorrelationSet {
   // literature measures as a different geometry. True for 90 deg orthogonal
   // and parallel angled ribs, where reversal is a mirror operation.
   bool symmetric = true;
+
+  // Rib shape this set was fitted to. See RibShape.
+  RibShape shape = RibShape::Unspecified;
 
   // Friction roughness function. Two shapes exist in the sources:
   //
@@ -218,6 +239,15 @@ struct RibCorrelationSet {
   double G_narrow_WH_band_boundary = 0.0;
   double G_narrow_WH_C_exponent = 0.0, G_narrow_WH_n_exponent = 0.0;
 
+  // The FOUR-WALL average heat-transfer roughness function, when the source
+  // prints its own: G_bar = C_Gbar (e+)^Gbar_eplus_exponent. C_Gbar = 0 means
+  // unstated, and RibResult::has_G_bar is then false -- callers fall back to
+  // Han's published G_bar = 1.2 G. A source that prints G_bar per
+  // configuration (Han, Zhang and Lee 1991: G_bar/G 1.07-1.26 across nine)
+  // must not have its own value replaced by that single constant.
+  double C_Gbar = 0.0;
+  double Gbar_eplus_exponent = 0.0;
+
   // Advisory validity.
   RibRange valid_Re, valid_eD, valid_pe, valid_WH, valid_alpha, valid_eplus;
   double valid_Pr = 0.0;  // 0 means unstated
@@ -281,6 +311,19 @@ RibCorrelationSet han_park_1988_angled();
 // rather than splitting it per quantity.
 RibCorrelationSet han_1989_narrow_channel();
 
+// Han, J.C., Zhang, Y.M. and Lee, C.P. (1991), ASME J. Heat Transfer 113,
+// 590, Table 2: R, G and G_bar for nine rib configurations in ONE rig --
+// square channel, e/D 0.0625, P/e 10, in-line ribs, Re 15,000-90,000. Table 2
+// verified on four channels (validation/cooling/extractions/
+// han_zhang_lee_1991_jht.md). Supported configurations:
+//
+//   Transverse at 90 deg; Parallel, Crossed, V, Lambda at 45 or 60 deg.
+//
+// Anything else throws std::invalid_argument -- the paper did not test it,
+// and a nearby configuration is not a substitute. The validity range is a
+// single point in e/D, P/e and W/H; everything off it is extrapolation.
+RibCorrelationSet han_zhang_lee_1991(RibShape shape, double alpha_deg);
+
 // Geometry of the ribbed channel, as the correlation sees it.
 struct RibGeometry {
   double e_D = 0.0;        // rib height / hydraulic diameter
@@ -303,6 +346,10 @@ struct RibResult {
   // d(St_r)/d(Re). df/dRe is identically zero for this family -- R carries no
   // e+ term -- so it is not reported.
   double dSt_dRe = 0.0;
+  // Four-wall average G, only when the set prints it (C_Gbar > 0); 0 and
+  // false otherwise. Evaluated at the same smoothed e+ as G.
+  double G_bar = 0.0;
+  bool has_G_bar = false;
   bool extrapolated = false;  // outside the set's advisory validity
 };
 

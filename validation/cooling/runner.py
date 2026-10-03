@@ -123,6 +123,32 @@ SETS = {
     "han_1989_narrow_channel": cb.han_1989_narrow_channel,
 }
 
+# Han, Zhang and Lee (1991) Table 2: one set per tested configuration, keyed
+# by the name the C++ factory gives it (han_zhang_lee_1991_60vee, ...).
+HZL_1991_CONFIGS = (
+    ("90", "Transverse", 90.0),
+    ("60par", "Parallel", 60.0), ("60crs", "Crossed", 60.0),
+    ("60vee", "V", 60.0), ("60lam", "Lambda", 60.0),
+    ("45par", "Parallel", 45.0), ("45crs", "Crossed", 45.0),
+    ("45vee", "V", 45.0), ("45lam", "Lambda", 45.0),
+)
+for _tag, _shape, _alpha in HZL_1991_CONFIGS:
+    SETS[f"han_zhang_lee_1991_{_tag}"] = (
+        lambda shape=_shape, alpha=_alpha: cb.han_zhang_lee_1991(
+            getattr(cb.RibShape, shape), alpha
+        )
+    )
+
+# Series metadata names a rib shape as a lowercase string; v_broken has no
+# RibShape because no implemented set models broken ribs.
+SERIES_RIB_SHAPE = {
+    "transverse": "Transverse",
+    "parallel": "Parallel",
+    "crossed": "Crossed",
+    "v": "V",
+    "lambda": "Lambda",
+}
+
 
 def _binding_reason(
     rib_set: "cb.RibCorrelationSet", series: SeriesMetadata
@@ -138,6 +164,21 @@ def _binding_reason(
     is the shape of misleading metric this harness exists to prevent, so
     the configuration mismatch is refused rather than scored.
     """
+    set_shape = rib_set.shape
+    if set_shape != cb.RibShape.Unspecified:
+        declared = series.rib_shape
+        if declared is None:
+            # Transverse and parallel sets predate shape metadata and score
+            # series that never recorded one; a crossed, V or Lambda set must
+            # never assume it.
+            if set_shape not in (cb.RibShape.Transverse, cb.RibShape.Parallel):
+                return (
+                    f"series records no rib shape; {rib_set.name} binds "
+                    f"{set_shape.name} ribs only"
+                )
+        elif SERIES_RIB_SHAPE.get(declared) != set_shape.name:
+            return f"{declared} ribs; {rib_set.name} binds {set_shape.name} ribs only"
+
     alpha = series.alpha_deg
     rng = rib_set.valid_alpha
     if alpha is not None and rng.hi >= rng.lo:
@@ -269,8 +310,8 @@ def _normalised_R(
 
 def _at_eplus(
     rib_set: "cb.RibCorrelationSet", geom: cb.RibGeometry, target: float
-) -> tuple[float, float, float, bool, float] | None:
-    """G, absolute R and normalised R at a target e+, via the real chain.
+) -> tuple[float, float, float, bool, float, float] | None:
+    """G, absolute R, normalised R and G_bar at a target e+, via the real chain.
 
     The lower panel of Figure 4.46 plots R/(P/e/10)^0.35, which is what
     the set's C_R is defined as, so the normalised value is returned
@@ -296,7 +337,10 @@ def _at_eplus(
     pe_term = rib_set.R_pe
     norm = (geom.p_e / pe_term.reference) ** pe_term.exponent if pe_term.reference else 1.0
     r_norm = res.R / norm if norm else res.R
-    return res.G, res.R, r_norm, res.extrapolated, re
+    # The source's own printed G_bar when the set carries one; Han's 1.2
+    # otherwise (see G_BAR_OVER_G).
+    g_bar = res.G_bar if res.has_G_bar else res.G * G_BAR_OVER_G
+    return res.G, res.R, r_norm, res.extrapolated, re, g_bar
 
 
 def _r_at_alpha(
@@ -560,7 +604,7 @@ def run_series(
                 Record(series, p.x, p.y, None, True, None, "e+ unreachable")
             )
             continue
-        g, r_abs, r_norm, extrapolated, re = found
+        g, r_abs, r_norm, extrapolated, re, g_bar = found
         # Explicit per quantity. This was a catch-all `else: predicted = g`,
         # so any y_axis that was not G_bar or R_normalised -- an absolute R
         # among them -- was silently scored against G. Nothing hit it only
@@ -568,7 +612,7 @@ def run_series(
         if series.y_axis == "G":
             predicted = g
         elif series.y_axis == "G_bar":
-            predicted = g * G_BAR_OVER_G
+            predicted = g_bar
         elif series.y_axis == "R_normalised":
             predicted = r_norm
         elif series.y_axis == "R":

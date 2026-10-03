@@ -16,6 +16,7 @@ RibCorrelationSet han_1988_orthogonal() {
   s.provenance = RibProvenance::Extracted;
   // 90 deg orthogonal ribs: reversing the flow leaves the geometry unchanged.
   s.symmetric = true;
+  s.shape = RibShape::Transverse;
 
   // R = 3.2 (p/e / 10)^0.35, independent of e+.
   s.C_R = 3.2;
@@ -54,6 +55,7 @@ RibCorrelationSet rallabandi_2009_high_re() {
   // symmetric duct. Not orthogonal (unlike han_1988_orthogonal), but still
   // symmetric -- see the case A/B/C reverse-flow discussion on #334.
   s.symmetric = true;
+  s.shape = RibShape::Parallel;
 
   // R = 1.13 (e/D)^-0.17 (p/e)^0.38. Raw e/D and p/e, no /10 normaliser --
   // unlike han_1988_orthogonal's R_pe, which divides by 10 because that is
@@ -116,6 +118,7 @@ RibCorrelationSet han_park_1988_angled() {
   // V-shaped rib reversed becomes an inverted V, a different measured
   // geometry). See the case A/B/C reverse-flow discussion on #334.
   s.symmetric = true;
+  s.shape = RibShape::Parallel;
 
   // R/[(P/e/10)^0.35 (W/H)^m] = 12.31 - 27.07(alpha/90) + 17.86(alpha/90)^2
   // m = 0 at alpha = 90 deg (any W/H collapses to 1), m = 0.35 otherwise.
@@ -180,6 +183,7 @@ RibCorrelationSet han_1989_narrow_channel() {
   // Parallel angled ribs, same reasoning as han_park_1988_angled: reversal
   // gives the mirror image, same magnitude.
   s.symmetric = true;
+  s.shape = RibShape::Parallel;
 
   // R: no printed equation for W/H < 1 (item 40). Fitted to Fig. 4.48a's own
   // drawn correlation line, one quadratic-in-alpha per W/H sub-band, same
@@ -234,6 +238,82 @@ RibCorrelationSet han_1989_narrow_channel() {
   // angles are not separable on this axis to begin with.
   s.accuracy_R = StatedAccuracy::measured(0.054);
   s.accuracy_G = StatedAccuracy::measured(0.054);
+  return s;
+}
+
+namespace {
+
+// Han, Zhang and Lee (1991) JHT 113, 590, Table 2 (p. 595), verified on four
+// channels. R = R_a (e+)^0 for every case; G and G_bar are a (e+)^b.
+struct HzlRow {
+  RibShape shape;
+  double alpha_deg;
+  const char *tag;
+  double R_a, G_a, G_b, Gbar_a, Gbar_b;
+};
+
+constexpr HzlRow kHzlTable2[] = {
+    {RibShape::Transverse, 90.0, "90", 3.18, 3.97, 0.28, 4.86, 0.28},
+    {RibShape::Parallel, 60.0, "60par", 2.05, 1.52, 0.41, 2.41, 0.36},
+    {RibShape::Crossed, 60.0, "60crs", 3.18, 3.24, 0.32, 4.57, 0.28},
+    {RibShape::V, 60.0, "60vee", 1.72, 1.35, 0.42, 1.76, 0.40},
+    {RibShape::Lambda, 60.0, "60lam", 1.42, 1.59, 0.43, 2.12, 0.41},
+    {RibShape::Parallel, 45.0, "45par", 3.05, 2.07, 0.36, 3.01, 0.32},
+    {RibShape::Crossed, 45.0, "45crs", 4.40, 2.11, 0.37, 2.43, 0.37},
+    {RibShape::V, 45.0, "45vee", 2.04, 1.36, 0.43, 1.93, 0.40},
+    {RibShape::Lambda, 45.0, "45lam", 1.70, 1.83, 0.41, 2.49, 0.38},
+};
+
+}  // namespace
+
+RibCorrelationSet han_zhang_lee_1991(RibShape shape, double alpha_deg) {
+  const HzlRow *row = nullptr;
+  for (const auto &r : kHzlTable2) {
+    if (r.shape == shape && std::abs(r.alpha_deg - alpha_deg) < 1e-9) {
+      row = &r;
+      break;
+    }
+  }
+  if (row == nullptr) {
+    throw std::invalid_argument(
+        "han_zhang_lee_1991: no Table 2 row for this shape at alpha = " +
+        std::to_string(alpha_deg) +
+        " deg. Tested: Transverse at 90; Parallel, Crossed, V, Lambda at 45 "
+        "or 60. A nearby configuration is not a substitute.");
+  }
+
+  RibCorrelationSet s;
+  s.name = std::string("han_zhang_lee_1991_") + row->tag;
+  s.source = "Han, J.C., Zhang, Y.M. and Lee, C.P. (1991). ASME J. Heat "
+             "Transfer 113, 590. Table 2";
+  s.validity_source = s.source;
+  s.provenance = RibProvenance::Extracted;
+  s.shape = row->shape;
+  // A V reversed is a Lambda -- a different measured configuration -- so
+  // neither is symmetric under flow reversal. Parallel, crossed and
+  // transverse ribs are their own mirror image.
+  s.symmetric = !(row->shape == RibShape::V || row->shape == RibShape::Lambda);
+
+  // R = a (e+)^0: independent of e+, the paper's own finding (b = 0 in every
+  // row), so it fits the plain power law with no geometry terms.
+  s.C_R = row->R_a;
+  s.C_G = row->G_a;
+  s.G_eplus_exponent = row->G_b;
+  s.C_Gbar = row->Gbar_a;
+  s.Gbar_eplus_exponent = row->Gbar_b;
+
+  // One rig. Point ranges flag everything off it as extrapolation.
+  s.valid_Re = {15000.0, 90000.0};
+  s.valid_eD = {0.0625, 0.0625};
+  s.valid_pe = {10.0, 10.0};
+  s.valid_WH = {1.0, 1.0};
+  s.valid_alpha = {row->alpha_deg, row->alpha_deg};
+  s.valid_Pr = 0.7;
+
+  // The paper states MEASUREMENT uncertainty (Nu and f under 8%), not an
+  // accuracy for its fits, so nothing is claimed here.
+  s.accuracy_R = StatedAccuracy::unstated();
+  s.accuracy_G = StatedAccuracy::unstated();
   return s;
 }
 
@@ -448,6 +528,12 @@ RibResult evaluate_rib(const RibCorrelationSet &set, const RibGeometry &geom,
             std::pow(ep_safe, set.G_eplus_exponent);
   }
 
+  // The source's own four-wall average, when printed. Same smoothed e+ as G.
+  if (set.C_Gbar > 0.0) {
+    out.G_bar = set.C_Gbar * std::pow(ep_safe, set.Gbar_eplus_exponent);
+    out.has_G_bar = true;
+  }
+
   const double root_f2 = std::sqrt(out.f / 2.0);
   const double denom =
       softmin_floor(1.0 + (out.G - out.R) * root_f2, ST_DENOM_FLOOR);
@@ -501,6 +587,14 @@ void validate_rib_set(const RibCorrelationSet &set) {
   }
   check_accuracy(set.name, "accuracy_R", set.accuracy_R);
   check_accuracy(set.name, "accuracy_G", set.accuracy_G);
+  // C_Gbar = 0 means "not printed"; anything else must be a usable fit.
+  if (!(set.C_Gbar >= 0.0) || !std::isfinite(set.C_Gbar) ||
+      !std::isfinite(set.Gbar_eplus_exponent)) {
+    throw std::invalid_argument(
+        "rib correlation set '" + set.name +
+        "': C_Gbar must be finite and non-negative (0 = not printed), and "
+        "Gbar_eplus_exponent finite");
+  }
   if (set.source.empty()) {
     throw std::invalid_argument(
         "rib correlation set '" + set.name +

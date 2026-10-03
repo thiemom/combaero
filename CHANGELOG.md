@@ -105,6 +105,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rib shape, and Han, Zhang & Lee (1991)'s nine configurations -- closes
+  #434.** `RibCorrelationSet` gains `shape` (`RibShape`: Transverse,
+  Parallel, Crossed, V, Lambda; `Unspecified` binds nothing), and the rib
+  runner refuses a series of another shape for the SHAPE, not incidentally
+  through rib angle. `han_zhang_lee_1991(shape, alpha_deg)` returns the
+  paper's Table 2 row -- verified on four channels, including a reviewer
+  reading the original -- for Transverse at 90 deg and Parallel, Crossed, V
+  and Lambda at 45/60 deg, one rig (square, `e/D` 0.0625, `P/e` 10);
+  anything else raises. Sets can now carry a source's OWN printed `G_bar`
+  (`C_Gbar`, `RibResult.G_bar`/`has_G_bar`); the runner uses it instead of
+  Han's 1.2 wherever it exists. V and Lambda sets are not `symmetric`.
+
+  | scored, as fidelity | n | MAE |
+  |---|---|---|
+  | figure 4.51 crossed / V / Lambda, `G` | 35 | 0.9-2.9% per class |
+  | figure 4.51 crossed / V / Lambda, printed `G_bar` | 26 | 1.9-2.4% |
+  | figure 4.53 60 deg V, `Nu_ratio` vs `f_ratio` (accuracy) | 5 | 2.5% |
+
+  66 of #434's 71 points score; figure 4.54's 45 deg BROKEN V ribs (4)
+  stay refused with the reason recorded -- no source on disk covers broken
+  ribs. The four earlier sets declare their shape and are otherwise
+  unchanged.
+
 - **Independent-lab rib friction is scored, and it closes #403 item 2
   (Lau vs Han) without picking a winner.** `runner.py` gains a `Re_Dh`
   path for passage-average friction: Taslim & Spring (1987)'s three AR 1.0

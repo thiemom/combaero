@@ -1,7 +1,8 @@
 # Han, Zhang and Lee (1991) JHT 113, 590: the primary behind figure 4.51
 
-**Status: extracted 2026-10-01, single channel (visual read of the
-publisher PDF, text layer cross-read). Not committed as scored series.**
+**Status: Table 2 CONFIRMED 2026-10-03 on four independent channels, 54 of
+54 cells, zero disagreements (see "Table 2 verification"). Implemented as
+`han_zhang_lee_1991(shape, alpha_deg)` under #434.**
 
 Source: `docs/heat_transfer/film/han_1991_590_vol_113.pdf` (gitignored --
 copyrighted; filed under `film/` by mistake, it is a rib paper).
@@ -59,6 +60,21 @@ The 90 deg row, `G = 3.97 (e+)^0.28`, sits within 7% of Han (1988)'s
 `3.7 (e+)^0.28` and the paper says so ("about the same as the previous
 correlation"); `R` 3.18 against 3.2.
 
+### Table 2 verification (2026-10-03)
+
+All 54 cells (nine rows x `R` a/b, `G` a/b, `G_bar` a/b) read on four
+channels, with zero disagreements between any pair:
+
+| channel | reads | independent of |
+|---|---|---|
+| publisher's embedded text layer (pypdf) | the PDF text | the image |
+| macOS Vision OCR, 400 dpi render of p. 595 (`scripts/ocr_page.swift`) | the image; every number at confidence 1.00 | the text layer |
+| visual read of the same render | the image | the text layer |
+| **reviewer, reading the original on a separate device** | the original | all of the above |
+
+The first transcription (2026-10-01) was single-read and may have leaned on
+the text layer; the two image-only channels and the reviewer close that.
+
 ## #403 item 1: which figure 4.51 panel duplicated the other
 
 Every digitised figure 4.51 series scored against both printed fits:
@@ -95,10 +111,15 @@ than of the data reduction.
 
 ## What this paper makes possible (not done here)
 
-- **#434, rib shape.** Table 2 is a printed `R`/`G`/`G_bar` source for
-  crossed and Lambda ribs as well as V and parallel -- the half #434 called
-  unavailable. Fidelity data is figure 4.51 itself (this paper's Fig. 12).
-  Validity is a single point in `e/D`, `P/e`, `W/H`, in-line ribs only.
+- ~~**#434, rib shape.**~~ **DONE 2026-10-03** as
+  `han_zhang_lee_1991(shape, alpha_deg)` with a `RibShape` binding and the
+  printed `G_bar` carried per configuration. Figure 4.51's crossed, V and
+  Lambda classes (61 points) score as fidelity at G MAE 0.9-2.9% and
+  printed-`G_bar` MAE 1.9-2.4%; figure 4.53's 60 deg V performance curve (5
+  points) at MAE 2.5% through the full f -> Nu chain. Figure 4.54's
+  BROKEN V ribs stay refused -- no source. Parallel and 90 deg classes stay
+  on `han_park_1988_angled` / `han_1988_orthogonal`, whose cross-paper
+  scores carry the Eq. 4.18 accuracy evidence.
 - **Figure 4.53's continuous ribs** (#435/#440) appear to be this paper's
   data: its text gives 60 deg V at Nu ratio 2.7-3.5 for f ratio 8-11, which
   the digitised series reproduce (2.7-3.6 at 8.3-11.1). Its Figs. 8/9 plot

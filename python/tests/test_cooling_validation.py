@@ -805,12 +805,65 @@ def test_figure_453_reading_f_ratio_as_four_sided_f_is_caught() -> None:
         assert f4 > 8.0, "four-sided ratio overlaps the measured 5.4-6.3"
 
 
-def test_figure_453_60deg_vee_stays_refused(dataset) -> None:
-    """Rib SHAPE has no representation (#434). Scoring the V-shaped series
-    against han_park_1988_angled would alias a V onto a parallel rib."""
+def test_figure_453_60deg_vee_scores_against_its_own_shape(dataset, records) -> None:
+    """#434: the 60 deg V series scores against the 60 deg forward-V row of
+    Han, Zhang and Lee (1991) Table 2 -- never a parallel set, which would
+    alias a V onto a parallel rib. Through the full f -> Nu chain on the
+    performance-curve path it lands at ~2.5% MAE."""
     series = next(s for s in dataset if s.label == "han2012/fig4.53_60deg_vcontinuous_Nu_ratio")
-    assert series.scores is None
-    assert "#434" in series.cross_check
+    assert series.scores == "han_zhang_lee_1991_60vee"
+    assert series.rib_shape == "v"
+    rows = [r for r in records if r.series.label == series.label]
+    assert rows and all(r.predicted is not None for r in rows)
+    mae = sum(abs(r.rel_error) for r in rows) / len(rows)
+    assert mae < 0.05, f"recorded at 2.5% when #434 landed, now {mae:.1%}"
+
+
+def test_rib_shape_is_bound_not_aliased(dataset) -> None:
+    """A set binds its rib shape. A V series offered to a parallel set, a
+    series with no recorded shape offered to a crossed set, and a broken-V
+    series offered to a continuous-V set are each refused for the SHAPE --
+    the reason that used to surface only incidentally through rib angle."""
+    import dataclasses
+
+    from validation.cooling.runner import run_series
+
+    vee = next(s for s in dataset if s.label == "han2012/fig4.51_G_60vee")
+    crs = next(s for s in dataset if s.label == "han2012/fig4.51_G_60crs")
+    broken = next(s for s in dataset if s.label == "han2012/fig4.54_45deg_vbroken_Gbar_data")
+    cases = (
+        (dataclasses.replace(vee, scores="han_park_1988_angled"), "binds Parallel"),
+        (dataclasses.replace(crs, rib_shape=None), "records no rib shape"),
+        (
+            dataclasses.replace(
+                broken,
+                scores="han_zhang_lee_1991_45vee",
+                geometry={"e_D": 0.0625, "p_e": 10.0, "W_H": 1.0},
+            ),
+            "v_broken ribs",
+        ),
+    )
+    for impostor, word in cases:
+        recs = run_series(impostor)
+        assert recs and all(r.predicted is None for r in recs), impostor.label
+        assert all(word in (r.reason or "") for r in recs), recs[0].reason
+
+
+def test_printed_g_bar_is_used_not_the_1_2_proxy(records) -> None:
+    """Table 2 prints G_bar per configuration (G_bar/G 1.07-1.26). Where a set
+    carries it, a G_bar series is scored against THAT, not Han's 1.2 G:
+    falsifiable, since at 60 deg V the printed ratio is ~1.16, not 1.2."""
+    import combaero as cb
+
+    s = cb.han_zhang_lee_1991(cb.RibShape.V, 60.0)
+    rows = [r for r in records if r.series.label == "han2012/fig4.51_Gbar_60vee"]
+    assert rows
+    for r in rows:
+        g = cb.RibGeometry(e_D=0.0625, p_e=10.0, W_H=1.0, alpha_deg=60.0)
+        res = cb.evaluate_rib(s, g, r.re_used)
+        assert res.has_G_bar
+        assert abs(r.predicted - res.G_bar) < 1e-9 * res.G_bar
+        assert abs(r.predicted - 1.2 * res.G) > 0.01 * res.G
 
 
 def test_f_ratio_path_refuses_what_it_cannot_predict(dataset) -> None:
@@ -922,16 +975,20 @@ def test_han_park_1988_angled_confirmed_independently_by_figure_451(
         bound = next(b for k, b in bounds.items() if k in c.label)
         assert c.rmse < bound, f"{c.label}: RMSE {c.rmse:.1%}"
 
-    # The other seven shapes must NOT be silently scored against this set.
-    unscored_shapes = [
+    # The other shapes must NEVER be scored against this set, which cannot
+    # represent rib shape. Since #434 they score against Han, Zhang and Lee
+    # (1991)'s own row for their shape -- and only that.
+    other_shapes = [
         c
         for name, c in cells.items()
         if "4.51" in name and any(t in name for t in ("crs", "vee", "lam")) and c.n > 0
     ]
-    assert unscored_shapes
-    assert all(c.unsupported for c in unscored_shapes), [
-        c.label for c in unscored_shapes if not c.unsupported
-    ]
+    assert other_shapes
+    for c in other_shapes:
+        if c.unsupported:
+            continue  # the Gbar_45crs duplicate (#403 item 1)
+        cls = c.label.split("_")[-1].split()[0]
+        assert c.scored_by == f"han_zhang_lee_1991_{cls}", (c.label, c.scored_by)
 
 
 def test_han_park_r_alpha_normalisation_is_not_raw_R(records) -> None:

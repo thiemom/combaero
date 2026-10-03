@@ -449,6 +449,7 @@ All functions use consistent units to avoid conversion errors.
 | `rallabandi_2009_high_re`                          | -                                                                | RibCorrelationSet |
 | `han_park_1988_angled`                             | -                                                                | RibCorrelationSet |
 | `han_1989_narrow_channel`                          | -                                                                | RibCorrelationSet |
+| `han_zhang_lee_1991`                               | shape: RibShape, alpha_deg: deg                                  | RibCorrelationSet |
 | `validate_rib_set`                                 | correlation_set: RibCorrelationSet                               | None              |
 | `evaluate_rib`                                     | correlation_set: RibCorrelationSet, geometry: RibGeometry, Re: - | RibResult         |
 | `RibGeometry::e_D`                                 | -                                                                | -                 |
@@ -463,11 +464,14 @@ All functions use consistent units to avoid conversion errors.
 | `RibResult::G`                                     | -                                                                | -                 |
 | `RibResult::St_r`                                  | -                                                                | -                 |
 | `RibResult::dSt_dRe`                               | -                                                                | -                 |
+| `RibResult::G_bar`                                 | -                                                                | -                 |
+| `RibResult::has_G_bar`                             | -                                                                | -                 |
 | `RibCorrelationSet::name`                          | -                                                                | -                 |
 | `RibCorrelationSet::source`                        | -                                                                | -                 |
 | `RibCorrelationSet::validity_source`               | -                                                                | -                 |
 | `RibCorrelationSet::provenance`                    | -                                                                | -                 |
 | `RibCorrelationSet::symmetric`                     | -                                                                | -                 |
+| `RibCorrelationSet::shape`                         | -                                                                | -                 |
 | `RibCorrelationSet::R_alpha_shape`                 | -                                                                | -                 |
 | `RibCorrelationSet::C_R`                           | -                                                                | -                 |
 | `RibCorrelationSet::R_eD`                          | -                                                                | -                 |
@@ -500,6 +504,8 @@ All functions use consistent units to avoid conversion errors.
 | `RibCorrelationSet::G_narrow_WH_band_boundary`     | -                                                                | -                 |
 | `RibCorrelationSet::G_narrow_WH_C_exponent`        | -                                                                | -                 |
 | `RibCorrelationSet::G_narrow_WH_n_exponent`        | -                                                                | -                 |
+| `RibCorrelationSet::C_Gbar`                        | -                                                                | -                 |
+| `RibCorrelationSet::Gbar_eplus_exponent`           | -                                                                | -                 |
 | `RibCorrelationSet::valid_Re`                      | -                                                                | -                 |
 | `RibCorrelationSet::valid_eD`                      | -                                                                | -                 |
 | `RibCorrelationSet::valid_pe`                      | -                                                                | -                 |
@@ -526,6 +532,14 @@ All functions use consistent units to avoid conversion errors.
 | `RibProvenance::Extracted`                         | -                                                                | -                 |
 | `RibProvenance::Fitted`                            | -                                                                | -                 |
 | `RibProvenance::User`                              | -                                                                | -                 |
+| `RibShape::Unspecified`                            | -                                                                | -                 |
+| `RibShape::Transverse`                             | -                                                                | -                 |
+| `RibShape::Parallel`                               | -                                                                | -                 |
+| `RibShape::Crossed`                                | -                                                                | -                 |
+| `RibShape::V`                                      | -                                                                | -                 |
+| `RibShape::Lambda`                                 | -                                                                | -                 |
+| `RibShape::name`                                   | -                                                                | -                 |
+| `RibShape::value`                                  | -                                                                | -                 |
 | `RibProvenance::name`                              | -                                                                | -                 |
 | `RibProvenance::value`                             | -                                                                | -                 |
 | `RAlphaShape::PowerLaw`                            | -                                                                | -                 |

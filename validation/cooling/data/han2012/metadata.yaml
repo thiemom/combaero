@@ -82,6 +82,7 @@ files:
     series: "90 deg continuous rib, measured points"
     geometry: null
     alpha_deg: 90.0
+    rib_shape: transverse
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -116,6 +117,7 @@ files:
     series: "45 deg V-shaped broken rib, measured points"
     geometry: null
     alpha_deg: 45.0
+    rib_shape: v_broken
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -130,8 +132,11 @@ files:
       e+ = 500 -- matching the text's claim that broken V ribs are the best
       performers of the group. A sign error in the digitisation would
       invert it.
-    # Deliberately NOT scored: broken V ribs are a different rib family and
-    # han_1988_orthogonal has no binding for them. Carried because it is the
+    # Deliberately NOT scored: BROKEN V ribs are a different rib family and
+    # no source on disk gives a correlation for them -- Han, Zhang and Lee
+    # (1991) Table 2 covers continuous V ribs only, and scoring a broken rib
+    # against a continuous one would alias one shape onto another (#434,
+    # declare-and-refuse). Carried because it is the
     # reference point behind the extraction's "26% better" claim, and a
     # scorecard row of 'unsupported' is more honest than omitting the series.
     verification:
@@ -320,6 +325,7 @@ files:
     # Identity of the data is an inference; the rig of that paper is not.
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}
     alpha_deg: 90.0
+    rib_shape: transverse
     x_axis: f_ratio
     x_scale: 1.0
     y_axis: Nu_ratio
@@ -370,8 +376,9 @@ files:
     panel: upper
     item: "Figure 4.53, solid diamonds"
     series: "60 deg V-shaped continuous rib, ribbed-side Nu ratio"
-    geometry: null
+    geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: v
     x_axis: f_ratio
     x_scale: 1.0
     y_axis: Nu_ratio
@@ -382,10 +389,13 @@ files:
     cross_check: >-
       Must sit above the 90 deg continuous series at every Reynolds number;
       the text calls the 60 deg V continuous rib the highest of the group.
-      Not scored: the performance-curve path exists (#435), but no set can
-      express a V-SHAPED rib -- han_park_1988_angled would score it as a
-      parallel 60 deg rib, which is aliasing one shape onto another. Blocked
-      on #434.
+      Scored (#434) by han_zhang_lee_1991_60vee, the 60 deg forward-V row of
+      Han, Zhang and Lee (1991) Table 2, on the performance-curve path (#435).
+      The text says the continuous-rib data are "included for direct
+      comparison", and that paper prints the matching numbers (60 deg V: Nu
+      ratio 2.7-3.5 at f ratio 8-11) for this rig, whose geometry is stated.
+      Labelled ACCURACY all the same: the figure is credited to Han and Zhang
+      (1992), and that the curve IS the 1991 data is an inference.
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -397,7 +407,7 @@ files:
       printed_curve: null
       monotonic: decreasing
       expected_points: null
-    scores: null
+    scores: han_zhang_lee_1991_60vee
 
   # -- Figure 4.46 panel frames: distortion standards, not data ----------
   #
@@ -1741,6 +1751,7 @@ files:
     series: "90 deg transverse, solid circle"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 90.0
+    rib_shape: transverse
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -1776,6 +1787,7 @@ files:
     series: "90 deg transverse, solid circle"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 90.0
+    rib_shape: transverse
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -1811,6 +1823,7 @@ files:
     series: "60 deg parallel, solid triangle up"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: parallel
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -1858,6 +1871,7 @@ files:
     series: "60 deg parallel, solid triangle up"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: parallel
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -1905,6 +1919,7 @@ files:
     series: "60 deg crossed, solid diamond"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: crossed
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -1918,7 +1933,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_60crs
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1940,6 +1955,7 @@ files:
     series: "60 deg crossed, solid diamond"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: crossed
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -1953,7 +1969,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_60crs
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1976,6 +1992,7 @@ files:
     series: "60 deg V-shaped, solid square"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: v
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -1989,7 +2006,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_60vee
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2011,6 +2028,7 @@ files:
     series: "60 deg V-shaped, solid square"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: v
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -2024,7 +2042,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_60vee
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2046,6 +2064,7 @@ files:
     series: "60 deg lambda-shaped, solid triangle down"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: lambda
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -2059,7 +2078,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_60lam
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2081,6 +2100,7 @@ files:
     series: "60 deg lambda-shaped, solid triangle down"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 60.0
+    rib_shape: lambda
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -2094,7 +2114,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_60lam
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2116,6 +2136,7 @@ files:
     series: "45 deg parallel, open triangle up"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: parallel
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -2155,6 +2176,7 @@ files:
     series: "45 deg parallel, open triangle up"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: parallel
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -2196,6 +2218,7 @@ files:
     series: "45 deg crossed, open diamond"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: crossed
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -2213,7 +2236,7 @@ files:
       own panel (within 2.8%). This is the genuine G series; its G_bar
       twin is the duplicate. Printed G_bar/G is ~1.15, above 1 as it
       must be. See extractions/han_zhang_lee_1991_jht.md.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_45crs
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2235,6 +2258,7 @@ files:
     series: "45 deg crossed, open diamond"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: crossed
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -2276,6 +2300,7 @@ files:
     series: "45 deg V-shaped, open square"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: v
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -2289,7 +2314,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_45vee
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2311,6 +2336,7 @@ files:
     series: "45 deg V-shaped, open square"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: v
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -2324,7 +2350,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_45vee
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2346,6 +2372,7 @@ files:
     series: "45 deg lambda-shaped, open triangle down"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: lambda
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G
@@ -2359,7 +2386,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_45lam
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2381,6 +2408,7 @@ files:
     series: "45 deg lambda-shaped, open triangle down"
     geometry: {e_D: 0.0625, p_e: 10.0, W_H: 1.0}  # stated: Han, Zhang & Lee 1991, p. 590
     alpha_deg: 45.0
+    rib_shape: lambda
     x_axis: e_plus
     x_scale: 1.0e4
     y_axis: G_bar
@@ -2394,7 +2422,7 @@ files:
       Checkable here: every mark lies on its panel, the abscissae pair
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
-    scores: han_1988_orthogonal
+    scores: han_zhang_lee_1991_45lam
     verification:
       x_axis_type: log
       y_axis_type: log
