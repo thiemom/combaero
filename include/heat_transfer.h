@@ -105,6 +105,47 @@ NuAndDerivative nusselt_gnielinski_with_derivative(double Re, double Pr,
 NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re,
                                                           double Pr);
 
+// -------------------------------------------------------------
+// Channel regime transitions (#448)
+// -------------------------------------------------------------
+// The channel paths (nusselt_circular_channel, htc_circular_channel,
+// channel_smooth) used to switch regime with hard ifs, so Nu jumped +78% and
+// f +64% at Re 2300, and rough-pipe friction up to +18% at Re 4000. Each
+// switch is now a C1 smoothstep in Re over a band, and each regime is EXACT
+// outside its band:
+//
+//   laminar   -> turbulent : [laminar_end, turbulent_start] = [2300, 3000]
+//                            (2300 is the classical transition; 3000 is the
+//                            bottom of Petukhov's stated validity)
+//   smooth    -> rough     : [turbulent_start, rough_full]  = [3000, 4000]
+//                            (Colebrook from 4000, as before)
+//
+// Laminar Nu and f stay exact below 2300, turbulent above 3000 (smooth) or
+// 4000 (rough): only the bands, where no correlation claims validity, move.
+namespace channel_transition {
+constexpr double laminar_end = 2300.0;
+constexpr double turbulent_start = 3000.0;
+constexpr double rough_full = 4000.0;
+}  // namespace channel_transition
+
+struct FrictionAndDerivative {
+  double f = 0.0;       // Darcy friction factor
+  double df_dRe = 0.0;  // exact
+};
+// Turbulent Darcy friction: clamped Petukhov for a smooth wall; for e_D > 0
+// blended C1 into Colebrook over [turbulent_start, rough_full].
+FrictionAndDerivative friction_turbulent_and_derivative(double Re, double e_D);
+// Channel Darcy friction across all Re > 0: 64/Re, blended C1 into
+// friction_turbulent_and_derivative over [laminar_end, turbulent_start].
+// Re <= 0 returns 0 (no flow).
+FrictionAndDerivative friction_channel_and_derivative(double Re, double e_D);
+// Channel Nu for the gnielinski branch: Nu_laminar below laminar_end,
+// Gnielinski at friction (f_turb, df_turb_dRe) above turbulent_start, C1
+// between. f_turb is the TURBULENT friction (multiplier applied), never the
+// laminar-blended one.
+NuAndDerivative nusselt_channel_gnielinski_and_derivative(
+    double Re, double Pr, double f_turb, double df_turb_dRe, double Nu_laminar);
+
 // Sieder-Tate correlation (1936)
 // Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ_bulk / μ_wall)^0.14
 //

@@ -412,6 +412,18 @@ double nusselt_gnielinski(double Re, double Pr, double f);
 NuAndDerivative nusselt_gnielinski_with_derivative(double Re, double Pr,
                                                    double f, double df_dRe = 0.0);
 NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re, double Pr);
+
+// Channel regime transitions (#448): every switch is a C1 smoothstep, each
+// regime EXACT outside its band. channel_smooth, nusselt_circular_channel and
+// htc_circular_channel (gnielinski branch) use these, so neither the value nor
+// the Jacobian steps at Re 2300 or 4000.
+//   laminar -> turbulent  Re 2300-3000   f: 64/Re -> turbulent; Nu: 3.66/4.36 -> Gnielinski
+//   smooth  -> rough      Re 3000-4000   f: clamped Petukhov -> Colebrook (e_D > 0)
+FrictionAndDerivative friction_channel_and_derivative(double Re, double e_D);   // Darcy, exact df/dRe
+FrictionAndDerivative friction_turbulent_and_derivative(double Re, double e_D);
+NuAndDerivative nusselt_channel_gnielinski_and_derivative(
+    double Re, double Pr, double f_turb, double df_turb_dRe, double Nu_laminar);
+double friction_colebrook_dRe(double Re, double e_D);  // implicit, exact (friction.h)
 double nusselt_sieder_tate(double Re, double Pr, double mu_ratio);
 ```
 

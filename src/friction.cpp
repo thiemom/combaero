@@ -191,6 +191,23 @@ ClampedRe petukhov_clamp(double Re) {
 
 }  // namespace
 
+double friction_colebrook_dRe(double Re, double e_D) {
+  // friction_colebrook evaluates at Re_s = sqrt(Re^2 + 64^2); differentiate
+  // through that too.
+  const double re_s = std::sqrt(Re * Re + 64.0 * 64.0);
+  const double dre_s = Re / re_s;
+  const double f = friction_colebrook(Re, e_D);
+  const double x = 1.0 / std::sqrt(f);  // Colebrook's 1/sqrt(f)
+  const double ln10 = std::log(10.0);
+  const double arg = e_D / serghides::coeff_roughness +
+                     serghides::coeff_reynolds_BC * x / re_s;
+  // F(x, Re_s) = x + 2 log10(arg) = 0  =>  dx/dRe_s = -F_Re / F_x
+  const double F_x = 1.0 + 2.0 * serghides::coeff_reynolds_BC / (re_s * ln10 * arg);
+  const double F_re = -2.0 * serghides::coeff_reynolds_BC * x / (re_s * re_s * ln10 * arg);
+  const double dx = -F_re / F_x;
+  return -2.0 * dx / (x * x * x) * dre_s;
+}
+
 double friction_petukhov_clamped(double Re) {
   return friction_petukhov(petukhov_clamp(Re).re);
 }

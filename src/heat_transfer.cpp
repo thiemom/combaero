@@ -181,6 +181,83 @@ NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re,
       Re, Pr, friction_petukhov_clamped(Re), friction_petukhov_clamped_dRe(Re));
 }
 
+namespace {
+
+// C1 smoothstep weight over [lo, hi] in Re: 0 below, 1 above, zero slope at
+// both ends.
+struct Weight {
+  double w;
+  double dw;
+};
+
+Weight smoothstep(double Re, double lo, double hi) {
+  if (Re <= lo) {
+    return {0.0, 0.0};
+  }
+  if (Re >= hi) {
+    return {1.0, 0.0};
+  }
+  const double s = (Re - lo) / (hi - lo);
+  return {s * s * (3.0 - 2.0 * s), 6.0 * s * (1.0 - s) / (hi - lo)};
+}
+
+}  // namespace
+
+FrictionAndDerivative friction_turbulent_and_derivative(double Re, double e_D) {
+  const FrictionAndDerivative smooth{friction_petukhov_clamped(Re),
+                                     friction_petukhov_clamped_dRe(Re)};
+  if (!(e_D > 0.0)) {
+    return smooth;
+  }
+  const Weight w = smoothstep(Re, channel_transition::turbulent_start,
+                              channel_transition::rough_full);
+  if (w.w == 0.0) {
+    return smooth;
+  }
+  const FrictionAndDerivative rough{friction_colebrook(Re, e_D),
+                                    friction_colebrook_dRe(Re, e_D)};
+  if (w.w == 1.0) {
+    return rough;
+  }
+  return {w.w * rough.f + (1.0 - w.w) * smooth.f,
+          w.dw * (rough.f - smooth.f) + w.w * rough.df_dRe +
+              (1.0 - w.w) * smooth.df_dRe};
+}
+
+FrictionAndDerivative friction_channel_and_derivative(double Re, double e_D) {
+  if (!(Re > 0.0)) {
+    return {0.0, 0.0};
+  }
+  const FrictionAndDerivative lam{64.0 / Re, -64.0 / (Re * Re)};
+  const Weight w = smoothstep(Re, channel_transition::laminar_end,
+                              channel_transition::turbulent_start);
+  if (w.w == 0.0) {
+    return lam;
+  }
+  const FrictionAndDerivative turb = friction_turbulent_and_derivative(Re, e_D);
+  if (w.w == 1.0) {
+    return turb;
+  }
+  return {w.w * turb.f + (1.0 - w.w) * lam.f,
+          w.dw * (turb.f - lam.f) + w.w * turb.df_dRe + (1.0 - w.w) * lam.df_dRe};
+}
+
+NuAndDerivative nusselt_channel_gnielinski_and_derivative(
+    double Re, double Pr, double f_turb, double df_turb_dRe, double Nu_laminar) {
+  const Weight w = smoothstep(Re, channel_transition::laminar_end,
+                              channel_transition::turbulent_start);
+  if (w.w == 0.0) {
+    return {Nu_laminar, 0.0};
+  }
+  const NuAndDerivative turb =
+      nusselt_gnielinski_with_derivative(Re, Pr, f_turb, df_turb_dRe);
+  if (w.w == 1.0) {
+    return turb;
+  }
+  return {w.w * turb.Nu + (1.0 - w.w) * Nu_laminar,
+          w.dw * (turb.Nu - Nu_laminar) + w.w * turb.dNu_dRe};
+}
+
 double nusselt_sieder_tate(double Re, double Pr, double mu_ratio,
                            combaero::CorrelationStatus *status) {
   if (mu_ratio <= 0.0) {
@@ -710,25 +787,12 @@ double nusselt_circular_channel(const State &s, double velocity, double diameter
   double Re = rho * velocity * diameter / mu;
   double Pr = s.Pr();
 
-  // Laminar flow
-  if (Re < 2300) {
-    return heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
-  }
-
-  // Transition region (2300 < Re < 10000): use Gnielinski
-  // Turbulent (Re > 10000): Gnielinski is still good, or could use
-  // Dittus-Boelter
-
-  // Get friction factor
-  double e_D = roughness / diameter;
-  double f;
-  if (e_D > 0 && Re > 4000) {
-    f = friction_colebrook(Re, e_D);
-  } else {
-    f = friction_petukhov_clamped(Re);
-  }
-
-  return nusselt_gnielinski(Re, Pr, f);
+  // Laminar below 2300, Gnielinski above 3000, C1 between (#448).
+  const double Nu_lam = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+  const auto ft = friction_turbulent_and_derivative(Re, roughness / diameter);
+  return nusselt_channel_gnielinski_and_derivative(Re, Pr, ft.f, ft.df_dRe,
+                                                    Nu_lam)
+      .Nu;
 }
 
 double htc_circular_channel(const State &s, double velocity, double diameter,
@@ -770,21 +834,12 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
   double Nu;
 
   if (correlation == "gnielinski") {
-    // Gnielinski: 2300 < Re < 5e6, 0.5 < Pr < 2000
-    if (Re < 2300) {
-      // Laminar flow
-      Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
-    } else {
-      // Get friction factor
-      double e_D = roughness / diameter;
-      double f;
-      if (e_D > 0 && Re > 4000) {
-        f = friction_colebrook(Re, e_D);
-      } else {
-        f = friction_petukhov_clamped(Re);
-      }
-      Nu = nusselt_gnielinski(Re, Pr, f);
-    }
+    // Laminar below 2300, Gnielinski above 3000, C1 between (#448).
+    const double Nu_lam = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+    const auto ft = friction_turbulent_and_derivative(Re, roughness / diameter);
+    Nu = nusselt_channel_gnielinski_and_derivative(Re, Pr, ft.f, ft.df_dRe,
+                                                    Nu_lam)
+             .Nu;
   } else if (correlation == "dittus_boelter") {
     // Dittus-Boelter: Re > 10000, 0.6 < Pr < 160
     if (Re < 2300) {
@@ -877,28 +932,29 @@ channel_smooth(double T, double P, const std::vector<double> &X,
   // Reynolds number
   double Re = (velocity > 0.0) ? rho * velocity * diameter / mu : 0.0;
 
-  // Friction factor
-  double e_D = roughness / diameter;
-  double f;
-  if (Re < 2300.0) {
-    f = (Re > 0.0) ? 64.0 / Re : 0.0;
-  } else if (e_D > 0.0 && Re > 4000.0) {
-    f = friction_colebrook(Re, e_D);
-  } else {
-    f = friction_petukhov_clamped(Re);
-  }
-
-  // Apply f_multiplier before Nu computation so that correlations where
-  // f appears in the Nu formula (Gnielinski, Petukhov) use the multiplied
-  // friction factor consistently with the Jacobian FD stencils.
-  f *= f_multiplier;
+  // Friction factor: 64/Re below 2300, turbulent above 3000, C1 between;
+  // rough walls blend Petukhov into Colebrook over 3000-4000 (#448).
+  const double e_D = roughness / diameter;
+  const FrictionAndDerivative f_chan = friction_channel_and_derivative(Re, e_D);
+  // f_multiplier applies to every friction the correlations see, so the
+  // Gnielinski/Petukhov Nu and its derivative use the multiplied value.
+  double f = f_chan.f * f_multiplier;
 
   // Nusselt number
+  const double Nu_lam = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+  FrictionAndDerivative f_turb{};
+  NuAndDerivative nu_gn{};
   double Nu;
-  if (Re < 2300.0) {
-    Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
-  } else if (correlation == "gnielinski") {
-    Nu = nusselt_gnielinski(Re, Pr, f);
+  if (correlation == "gnielinski") {
+    // Gnielinski sees the TURBULENT friction, never the laminar-blended one.
+    f_turb = friction_turbulent_and_derivative(Re, e_D);
+    f_turb.f *= f_multiplier;
+    f_turb.df_dRe *= f_multiplier;
+    nu_gn = nusselt_channel_gnielinski_and_derivative(Re, Pr, f_turb.f,
+                                                      f_turb.df_dRe, Nu_lam);
+    Nu = nu_gn.Nu;
+  } else if (Re < 2300.0) {
+    Nu = Nu_lam;
   } else if (correlation == "dittus_boelter") {
     if (Re < 10000.0) {
       throw std::invalid_argument(
@@ -972,46 +1028,30 @@ channel_smooth(double T, double P, const std::vector<double> &X,
     double dNu_dPr = 0.0;
     double df_dRe = 0.0;
 
-    if (Re < 2300.0) {
-      // Laminar: f = 64/Re, so df/dRe = -64/Re^2 = -f/Re
-      if (Re > 0.0) {
-        df_dRe = -f / Re;
-      }
-      // Nu is constant in laminar regime, dNu/dRe = 0
+    // Friction derivative: exact in every regime and band (#448) -- the
+    // previous Petukhov formula ignored the Re 3000 clamp and Colebrook used
+    // a central difference.
+    df_dRe = f_chan.df_dRe * f_multiplier;
+
+    if (correlation == "gnielinski") {
+      // Exact total derivative through the laminar/turbulent blend and the
+      // friction chain (previously a central difference whose stencil used
+      // the unclamped Petukhov friction).
+      dNu_dRe = nu_gn.dNu_dRe * Nu_multiplier;
+
+      // dNu/dPr via central FD at fixed Re and turbulent friction
+      double eps_Pr = std::max(1e-6, Pr * 1e-6);
+      double Nu_Pr_plus = nusselt_channel_gnielinski_and_derivative(
+                              Re, Pr + eps_Pr, f_turb.f, f_turb.df_dRe, Nu_lam)
+                              .Nu;
+      double Nu_Pr_minus = nusselt_channel_gnielinski_and_derivative(
+                               Re, Pr - eps_Pr, f_turb.f, f_turb.df_dRe, Nu_lam)
+                               .Nu;
+      dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
+    } else if (Re < 2300.0) {
+      // Laminar Nu is constant: dNu/dRe = dNu/dPr = 0
     } else {
-      // Friction factor derivative (needed first for Gnielinski/Petukhov)
-      if (e_D > 0.0 && Re > 4000.0) {
-        // Colebrook - use finite difference
-        double eps = std::max(1.0, Re * 1e-6);
-        double f_plus = friction_colebrook(Re + eps, e_D);
-        double f_minus = friction_colebrook(Re - eps, e_D);
-        df_dRe = (f_plus - f_minus) / (2.0 * eps) * f_multiplier;
-      } else {
-        // Petukhov: f_raw = (0.79*ln(Re) - 1.64)^(-2)
-        // df_raw/dRe = -2 * f_raw^1.5 * 0.79 / Re
-        // df/dRe = f_mult * df_raw/dRe  (f_raw = f / f_multiplier)
-        df_dRe = -2.0 * std::pow(f / f_multiplier, 1.5) * 0.79 / Re * f_multiplier;
-      }
-
-      // Turbulent correlations have Re and Pr derivatives
-      if (correlation == "gnielinski") {
-        // Gnielinski: Nu = Nu(Re, Pr, f), so dNu/dRe_total = ∂Nu/∂Re + ∂Nu/∂f · df/dRe
-        // Use finite difference for total derivative
-        double eps = std::max(1.0, Re * 1e-6);
-        double f_plus = (e_D > 0.0 && Re + eps > 4000.0) ? friction_colebrook(Re + eps, e_D) : friction_petukhov(Re + eps);
-        double f_minus = (e_D > 0.0 && Re - eps > 4000.0) ? friction_colebrook(Re - eps, e_D) : friction_petukhov(Re - eps);
-        f_plus *= f_multiplier;
-        f_minus *= f_multiplier;
-        double Nu_plus = nusselt_gnielinski(Re + eps, Pr, f_plus);
-        double Nu_minus = nusselt_gnielinski(Re - eps, Pr, f_minus);
-        dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
-
-        // dNu/dPr via central FD (f already includes f_multiplier)
-        double eps_Pr = std::max(1e-6, Pr * 1e-6);
-        double Nu_Pr_plus = nusselt_gnielinski(Re, Pr + eps_Pr, f);
-        double Nu_Pr_minus = nusselt_gnielinski(Re, Pr - eps_Pr, f);
-        dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
-      } else if (correlation == "dittus_boelter") {
+      if (correlation == "dittus_boelter") {
         // Nu = 0.023 * Re^0.8 * Pr^n  =>  dNu/dRe = 0.8 * Nu / Re, dNu/dPr = n * Nu / Pr
         dNu_dRe = 0.8 * Nu / Re;
         double n = heating ? 0.4 : 0.3;
@@ -1022,9 +1062,11 @@ channel_smooth(double T, double P, const std::vector<double> &X,
         dNu_dPr = (1.0 / 3.0) * Nu / Pr;
       } else if (correlation == "petukhov") {
         // Petukhov: Nu = Nu(Re, Pr, f), so dNu/dRe_total = ∂Nu/∂Re + ∂Nu/∂f · df/dRe
+        // The stencil uses the SAME channel friction as the value (it used
+        // smooth Petukhov even for rough walls).
         double eps = std::max(1.0, Re * 1e-6);
-        double f_plus = friction_petukhov(Re + eps) * f_multiplier;
-        double f_minus = friction_petukhov(Re - eps) * f_multiplier;
+        double f_plus = friction_channel_and_derivative(Re + eps, e_D).f * f_multiplier;
+        double f_minus = friction_channel_and_derivative(Re - eps, e_D).f * f_multiplier;
         double Nu_plus = nusselt_petukhov(Re + eps, Pr, f_plus);
         double Nu_minus = nusselt_petukhov(Re - eps, Pr, f_minus);
         dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
@@ -1036,7 +1078,6 @@ channel_smooth(double T, double P, const std::vector<double> &X,
         dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
       }
     }
-    // Laminar: Nu and f are constant or 1/Re (derivatives handled separately if needed)
 
     // dh/dmdot = (dh/dNu) * (dNu/dRe) * (dRe/dmdot) = (k/D) * dNu/dRe * dRe/dmdot
     result.dh_dmdot = (k / diameter) * dNu_dRe * dRe_dmdot;
