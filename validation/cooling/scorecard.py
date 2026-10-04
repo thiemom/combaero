@@ -114,11 +114,13 @@ def run_dataset(dataset) -> list[Record]:
         film_runner,
         jet_array_runner,
         orifice_runner,
+        ratio_runner,
     )
     from validation.cooling.runner import run_series as rib_run
 
     specialists = (
         (jet_array_runner.owns, jet_array_runner.run_series),
+        (ratio_runner.owns, ratio_runner.run_series),
         (orifice_runner.owns, orifice_runner.run_series),
         (film_runner.owns, film_runner.run_series),
         (effusion_internal_runner.owns, effusion_internal_runner.run_series),
@@ -178,6 +180,11 @@ SET_ORIGIN: dict[str, str] = {
     # the 1988 source and reported fidelity, overstating the claim.
     "andrews_1986_effusion_internal": "86-GT-225",
 }
+
+# Taslim & Spring (1987) ratio sets (#444): their own paper's data.
+for _ar, _ed in ((0.5, 0.125), (0.5, 0.250), (1.0, 0.083), (1.0, 0.167),
+                 (3.5, 0.053), (3.5, 0.107), (3.5, 0.161)):
+    SET_ORIGIN[f"taslim_spring_1987_ar{_ar:.1f}_eD{_ed:.3f}"] = "taslim"
 
 # Han, Zhang and Lee (1991) Table 2 -- every configuration's origin is the
 # same paper, whose Fig. 12 figure 4.51 reprints.

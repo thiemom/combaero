@@ -1469,6 +1469,19 @@ r = cb.evaluate_rib_ratio(s, g, Re=30_000, Pr=0.7)
 r.Nu, r.dNu_dRe, r.f, r.df_dRe, r.below_floor
 ```
 
+Shipped: `cb.taslim_spring_1987(aspect_ratio_taslim, e_D)`, one set per
+two-side configuration Taslim & Spring (1987) tested -- AR 0.5 (e/D 0.125,
+0.250), 1.0 (0.083, 0.167), 3.5 (0.053, 0.107, 0.161), transverse ribs,
+p/e 10; anything else raises. Their AR is height/width, so `W/H = 1/AR`.
+Friction is a constant Fanning `f` over its own measured range
+(`Re_floor_f`, which may differ from Nu's `Re_floor`):
+
+```python
+t = cb.taslim_spring_1987(1.0, 0.083)
+g1 = cb.RibGeometry(e_D=0.083, p_e=10.0, W_H=1.0, alpha_deg=90.0)
+cb.evaluate_rib_ratio(t, g1, Re=50_000, Pr=0.7).Nu
+```
+
 `RibRatioOptions.below_floor` picks the handover (`Gnielinski`,
 `SourceBaseline`, or `User` with your own `user_Nu0`). It only acts below the
 fitted range: inside it, Nu is the paper's whatever you choose -- matching a

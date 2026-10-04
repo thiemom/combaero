@@ -1070,15 +1070,23 @@ files:
       turbulated_walls: 2
     alpha_deg: 90.0
     x_axis: Re_Dh
-    x_scale: 1.0
+    x_scale: 1.0e4  # axis printed as Reynolds No. (x10^-4)
+    y_scale: 1.0e3  # ordinate printed as Nu x 1e-3 (smooth-duct check, extraction record)
     y_axis: Nu_turbulated
     kind: measured
     extraction: figure-digitised
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.053. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 3.5 = Han W/H 0.286, two walls turbulated, e/D_H 0.053.
+      Scored (#444) by taslim_spring_1987_ar3.5_eD0.053, a ratio set: Nu_T = C (Re/1e4)^-0.2 *
+      Dittus-Boelter, the paper's stated form, with C its own Fig. 9
+      marker for this configuration. Fidelity -- the paper's own data --
+      and NOT circular: C comes from Fig. 9, these points from Fig. 4/5,
+      two figures digitised independently, and the Re dependence here is
+      a test of the stated Re^0.6. Evaluated at Pr 0.70, where the
+      figures' own smooth-duct curve reproduces Dittus-Boelter.
+    scores: taslim_spring_1987_ar3.5_eD0.053
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1108,15 +1116,23 @@ files:
       turbulated_walls: 2
     alpha_deg: 90.0
     x_axis: Re_Dh
-    x_scale: 1.0
+    x_scale: 1.0e4  # axis printed as Reynolds No. (x10^-4)
+    y_scale: 1.0e3  # ordinate printed as Nu x 1e-3 (smooth-duct check, extraction record)
     y_axis: Nu_turbulated
     kind: measured
     extraction: figure-digitised
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.107. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 3.5 = Han W/H 0.286, two walls turbulated, e/D_H 0.107.
+      Scored (#444) by taslim_spring_1987_ar3.5_eD0.107, a ratio set: Nu_T = C (Re/1e4)^-0.2 *
+      Dittus-Boelter, the paper's stated form, with C its own Fig. 9
+      marker for this configuration. Fidelity -- the paper's own data --
+      and NOT circular: C comes from Fig. 9, these points from Fig. 4/5,
+      two figures digitised independently, and the Re dependence here is
+      a test of the stated Re^0.6. Evaluated at Pr 0.70, where the
+      figures' own smooth-duct curve reproduces Dittus-Boelter.
+    scores: taslim_spring_1987_ar3.5_eD0.107
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1146,15 +1162,23 @@ files:
       turbulated_walls: 2
     alpha_deg: 90.0
     x_axis: Re_Dh
-    x_scale: 1.0
+    x_scale: 1.0e4  # axis printed as Reynolds No. (x10^-4)
+    y_scale: 1.0e3  # ordinate printed as Nu x 1e-3 (smooth-duct check, extraction record)
     y_axis: Nu_turbulated
     kind: measured
     extraction: figure-digitised
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.161. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 3.5 = Han W/H 0.286, two walls turbulated, e/D_H 0.161.
+      Scored (#444) by taslim_spring_1987_ar3.5_eD0.161, a ratio set: Nu_T = C (Re/1e4)^-0.2 *
+      Dittus-Boelter, the paper's stated form, with C its own Fig. 9
+      marker for this configuration. Fidelity -- the paper's own data --
+      and NOT circular: C comes from Fig. 9, these points from Fig. 4/5,
+      two figures digitised independently, and the Re dependence here is
+      a test of the stated Re^0.6. Evaluated at Pr 0.70, where the
+      figures' own smooth-duct curve reproduces Dittus-Boelter.
+    scores: taslim_spring_1987_ar3.5_eD0.161
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1184,15 +1208,23 @@ files:
       turbulated_walls: 2
     alpha_deg: 90.0
     x_axis: Re_Dh
-    x_scale: 1.0
+    x_scale: 1.0e4  # axis printed as Reynolds No. (x10^-4)
+    y_scale: 1.0e3  # ordinate printed as Nu x 1e-3 (smooth-duct check, extraction record)
     y_axis: Nu_turbulated
     kind: measured
     extraction: figure-digitised
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.125. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 0.5 = Han W/H 2, two walls turbulated, e/D_H 0.125.
+      Scored (#444) by taslim_spring_1987_ar0.5_eD0.125, a ratio set: Nu_T = C (Re/1e4)^-0.2 *
+      Dittus-Boelter, the paper's stated form, with C its own Fig. 9
+      marker for this configuration. Fidelity -- the paper's own data --
+      and NOT circular: C comes from Fig. 9, these points from Fig. 4/5,
+      two figures digitised independently, and the Re dependence here is
+      a test of the stated Re^0.6. Evaluated at Pr 0.70, where the
+      figures' own smooth-duct curve reproduces Dittus-Boelter.
+    scores: taslim_spring_1987_ar0.5_eD0.125
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1227,15 +1259,23 @@ files:
       turbulated_walls: 2
     alpha_deg: 90.0
     x_axis: Re_Dh
-    x_scale: 1.0
+    x_scale: 1.0e4  # axis printed as Reynolds No. (x10^-4)
+    y_scale: 1.0e3  # ordinate printed as Nu x 1e-3 (smooth-duct check, extraction record)
     y_axis: Nu_turbulated
     kind: measured
     extraction: figure-digitised
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.250. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 0.5 = Han W/H 2, two walls turbulated, e/D_H 0.25.
+      Scored (#444) by taslim_spring_1987_ar0.5_eD0.250, a ratio set: Nu_T = C (Re/1e4)^-0.2 *
+      Dittus-Boelter, the paper's stated form, with C its own Fig. 9
+      marker for this configuration. Fidelity -- the paper's own data --
+      and NOT circular: C comes from Fig. 9, these points from Fig. 4/5,
+      two figures digitised independently, and the Re dependence here is
+      a test of the stated Re^0.6. Evaluated at Pr 0.70, where the
+      figures' own smooth-duct curve reproduces Dittus-Boelter.
+    scores: taslim_spring_1987_ar0.5_eD0.250
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1270,15 +1310,23 @@ files:
       turbulated_walls: 2
     alpha_deg: 90.0
     x_axis: Re_Dh
-    x_scale: 1.0
+    x_scale: 1.0e4  # axis printed as Reynolds No. (x10^-4)
+    y_scale: 1.0e3  # ordinate printed as Nu x 1e-3 (smooth-duct check, extraction record)
     y_axis: Nu_turbulated
     kind: measured
     extraction: figure-digitised
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated, e/D_H 0.083. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 1.0 = Han W/H 1, two walls turbulated, e/D_H 0.083.
+      Scored (#444) by taslim_spring_1987_ar1.0_eD0.083, a ratio set: Nu_T = C (Re/1e4)^-0.2 *
+      Dittus-Boelter, the paper's stated form, with C its own Fig. 9
+      marker for this configuration. Fidelity -- the paper's own data --
+      and NOT circular: C comes from Fig. 9, these points from Fig. 4/5,
+      two figures digitised independently, and the Re dependence here is
+      a test of the stated Re^0.6. Evaluated at Pr 0.70, where the
+      figures' own smooth-duct curve reproduces Dittus-Boelter.
+    scores: taslim_spring_1987_ar1.0_eD0.083
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1308,15 +1356,23 @@ files:
       turbulated_walls: 2
     alpha_deg: 90.0
     x_axis: Re_Dh
-    x_scale: 1.0
+    x_scale: 1.0e4  # axis printed as Reynolds No. (x10^-4)
+    y_scale: 1.0e3  # ordinate printed as Nu x 1e-3 (smooth-duct check, extraction record)
     y_axis: Nu_turbulated
     kind: measured
     extraction: figure-digitised
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 1.0 = Han W/H 1.0, two wall(s) turbulated, e/D_H 0.167. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 1.0 = Han W/H 1, two walls turbulated, e/D_H 0.167.
+      Scored (#444) by taslim_spring_1987_ar1.0_eD0.167, a ratio set: Nu_T = C (Re/1e4)^-0.2 *
+      Dittus-Boelter, the paper's stated form, with C its own Fig. 9
+      marker for this configuration. Fidelity -- the paper's own data --
+      and NOT circular: C comes from Fig. 9, these points from Fig. 4/5,
+      two figures digitised independently, and the Re dependence here is
+      a test of the stated Re^0.6. Evaluated at Pr 0.70, where the
+      figures' own smooth-duct curve reproduces Dittus-Boelter.
+    scores: taslim_spring_1987_ar1.0_eD0.167
     verification:
       x_axis_type: log
       y_axis_type: log

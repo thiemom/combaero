@@ -173,3 +173,39 @@ TEST(RibRatioTest, MistakesAreRejectedOnce) {
   const auto r = evaluate_rib_ratio(user_set(), geom(), 100.0, 0.7, o);
   EXPECT_TRUE(std::isfinite(r.Nu) && r.Nu >= 0.0);
 }
+
+// Taslim & Spring (1987): the shipped ratio sets reproduce their own inputs
+// -- C at Re_ref, the Re-independent f across the friction range -- and
+// refuse configurations the paper did not test.
+TEST(RibRatioTest, TaslimSpring1987SetsCarryThePapersNumbers) {
+  using combaero::cooling::taslim_spring_1987;
+  struct Cfg {
+    double ar, eD, C, f;
+  };
+  const Cfg cfgs[] = {{0.5, 0.125, 3.34316, 0.10146}, {0.5, 0.250, 3.90148, 0.51645},
+                      {1.0, 0.083, 3.42519, 0.04680}, {1.0, 0.167, 3.99269, 0.11610},
+                      {3.5, 0.053, 3.03740, 0.01498}, {3.5, 0.107, 3.12189, 0.02090},
+                      {3.5, 0.161, 3.33653, 0.03162}};
+  for (const auto &c : cfgs) {
+    const auto s = taslim_spring_1987(c.ar, c.eD);
+    EXPECT_NO_THROW(validate_rib_ratio_set(s)) << s.name;
+    EXPECT_NEAR(s.valid_WH.lo, 1.0 / c.ar, 1e-12) << "Han W/H = 1 / Taslim AR";
+    RibGeometry g;
+    g.e_D = c.eD;
+    g.p_e = 10.0;
+    g.W_H = 1.0 / c.ar;
+    g.alpha_deg = 90.0;
+    // At Re = 1e4 * k with k chosen inside the fitted range, Nu/Nu_DB is
+    // C (Re/1e4)^-0.2 exactly; f is the configuration's mean.
+    const double Re = std::max(s.Re_floor, s.Re_floor_f) * 1.5;
+    const auto r = evaluate_rib_ratio(s, g, Re, 0.70);
+    const double x = std::sqrt(Re * Re + 1.0);
+    const double nu_db = 0.023 * std::pow(x, 0.8) * std::pow(0.70, 0.4);
+    EXPECT_NEAR(r.Nu, c.C * std::pow(x / 1e4, -0.2) * nu_db, 1e-6 * r.Nu) << s.name;
+    EXPECT_NEAR(r.f, c.f, 1e-6 * c.f) << s.name;
+    EXPECT_FALSE(r.extrapolated) << s.name;
+  }
+  EXPECT_THROW(taslim_spring_1987(1.0, 0.250), std::invalid_argument)
+      << "AR 1.0 e/D 0.25 has friction but no Nu in the paper";
+  EXPECT_THROW(taslim_spring_1987(2.0, 0.125), std::invalid_argument);
+}

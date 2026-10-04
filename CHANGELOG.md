@@ -153,6 +153,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Taslim & Spring (1987), the first shipped ratio-form rib sets (#444).**
+  `taslim_spring_1987(aspect_ratio_taslim, e_D)` returns one `RibRatioSet`
+  per configuration the paper tested with two ribbed walls (seven: AR 0.5 /
+  1.0 / 3.5, transverse ribs, p/e 10), in the form the paper states:
+  `Nu/Nu_DB = C (Re/1e4)^-0.2` (their `Nu ~ Re^0.6`) and a Re-independent
+  passage-average Fanning `f`. `C` is read from figure 9's markers and `f`
+  is figure 11's mean, so provenance is `Fitted`; an untested configuration
+  throws rather than interpolating. Taslim's aspect ratio is height/width,
+  so the set's `W/H` is `1/AR`.
+
+  - **New field `RibRatioSet.Re_floor_f`:** friction's own lower bound
+    (0 = use `Re_floor`). Taslim measured friction to lower Re than heat
+    transfer; with one shared floor, f drifted off the paper's constant
+    inside its own measured range.
+  - **Scored on figures 4/5**, the paper's own Nu-vs-Re data, so this is
+    fidelity: 43 points, all in range, pooled MAE 6.1%, per configuration
+    2.6-10.7%. The two largest (AR 0.5 e/D 0.125 at +10.7%, AR 1.0 e/D
+    0.167 at -9.6%) are offsets between figure 9 and figures 4/5 in the
+    paper itself. Dropping the `Re^-0.2` raises the MAE to 45%, so the
+    score responds to the form.
+  - **Friction is not re-scored:** figure 11's AR 1.0 series stay with
+    `han_1988_orthogonal` as an independent-lab check (#443); the ratio
+    sets' f comes from that same figure, so scoring it there would be
+    circular.
+  - Validation harness: a ratio runner beside the rib/jet/orifice runners,
+    and `y_scale` in series metadata for figures plotted as `Nu x 1e-3`.
+
 - **Ratio-form rib correlation sets: `Nu/Nu0` and `f/f0` beside `R`/`G`
   (#444).** `RibRatioSet` + `evaluate_rib_ratio` carry a correlation as a
   multiplier on the smooth-duct baseline its source fitted to, for sources

@@ -53,6 +53,10 @@ CONVENTION_NOTES: dict[str, str] = {
     "G_four_wall": "G_bar, averaged over two ribbed and two smooth walls",
     "R_ribbed_wall": "friction roughness function on the ribbed wall",
     "R_normalised_pe": "R divided by (P/e/10)^0.35, Han's figure 4.46 ordinate",
+    "Nu_turbulated_wall": (
+        "absolute Nusselt number on the TURBULATED wall, on D_H and the "
+        "projected wall area (Taslim & Spring 1987)"
+    ),
     "f_channel_two_ribbed": (
         "passage-average FANNING friction of a channel with two opposite "
         "ribbed walls -- Han's measured fbar, NOT the four-sided f_r = "
@@ -98,6 +102,7 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     # Taslim & Spring (1987) Fig. 11, f = dP gc / (2 (L/D_H) rho V^2) over
     # the passage -- the same definition as Han's Eq. (1) (#403 item 2).
     ("taslim_spring1987", "f_fanning_passage"): "f_channel_two_ribbed",
+    ("taslim_spring1987", "Nu_turbulated"): "Nu_turbulated_wall",
     ("lau1990", "R"): "R_ribbed_wall",
     # Figure 4.48's R panel (#402) plots raw R, unlike figures 4.46/4.47's
     # normalised ordinate -- same quantity as han_park_lei1984/lau1990's "R".
@@ -163,6 +168,13 @@ SET_ALSO_PRODUCES: dict[str, tuple[str, ...]] = {
         "h_plate_approach_area", "eta_overall",
     ),
 }
+
+# Taslim & Spring (1987) ratio sets (#444): turbulated-wall Nu and the
+# passage-average Fanning f, both the paper's own quantities.
+for _ar, _ed in ((0.5, 0.125), (0.5, 0.250), (1.0, 0.083), (1.0, 0.167),
+                 (3.5, 0.053), (3.5, 0.107), (3.5, 0.161)):
+    SET_PRODUCES[f"taslim_spring_1987_ar{_ar:.1f}_eD{_ed:.3f}"] = "Nu_turbulated_wall"
+    SET_ALSO_PRODUCES[f"taslim_spring_1987_ar{_ar:.1f}_eD{_ed:.3f}"] = ("f_channel_two_ribbed",)
 
 # Han, Zhang and Lee (1991) Table 2: R and G on Han's basis (four-sided f_r,
 # ribbed-side St), plus the source's OWN printed G_bar; the 60 deg V set also

@@ -543,6 +543,7 @@ All functions use consistent units to avoid conversion errors.
 | `evaluate_rib_ratio`                               | correlation_set: RibRatioSet, geometry: RibGeometry, Re: -, Pr: -, options: RibRatioOptions | RibRatioResult    |
 | `validate_rib_ratio_set`                           | correlation_set: RibRatioSet                                                                | None              |
 | `validate_rib_ratio_options`                       | options: RibRatioOptions                                                                    | None              |
+| `taslim_spring_1987`                               | aspect_ratio_taslim: -, e_D: -                                                              | RibRatioSet       |
 | `RatioBaseline::coeff`                             | -                                                                                           | -                 |
 | `RatioBaseline::re_exponent`                       | -                                                                                           | -                 |
 | `RatioBaseline::pr_exponent`                       | -                                                                                           | -                 |
@@ -582,6 +583,7 @@ All functions use consistent units to avoid conversion errors.
 | `RibRatioSet::Nu0_source`                          | -                                                                                           | -                 |
 | `RibRatioSet::f0_source`                           | -                                                                                           | -                 |
 | `RibRatioSet::Re_floor`                            | -                                                                                           | -                 |
+| `RibRatioSet::Re_floor_f`                          | -                                                                                           | -                 |
 | `RibRatioSet::valid_Re`                            | -                                                                                           | -                 |
 | `RibRatioSet::valid_eD`                            | -                                                                                           | -                 |
 | `RibRatioSet::valid_pe`                            | -                                                                                           | -                 |
