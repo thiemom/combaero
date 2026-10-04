@@ -75,6 +75,12 @@ double friction_petukhov(double Re);
 double friction_petukhov_clamped(double Re);
 double friction_petukhov_clamped_dRe(double Re);
 
+// Exact Re-derivative of friction_colebrook, by implicit differentiation of
+// the Colebrook equation at its converged root (including the Re smoothing
+// friction_colebrook applies internally). Replaces central differences in
+// solver Jacobians (#448).
+double friction_colebrook_dRe(double Re, double e_D);
+
 // -------------------------------------------------------------
 // Channel Roughness Database
 // -------------------------------------------------------------
