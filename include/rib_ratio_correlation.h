@@ -104,6 +104,9 @@ struct RibRatioSet {
 
   // Bottom of the fitted Re range. Below it the handover applies.
   double Re_floor = 0.0;
+  // Friction's own floor, when its data reaches a different Re than Nu's
+  // (Taslim & Spring measured f below their lowest Nu point). 0 = Re_floor.
+  double Re_floor_f = 0.0;
 
   RibRange valid_Re, valid_eD, valid_pe, valid_WH, valid_alpha;
   double valid_Pr = 0.0;  // 0 means unstated
@@ -130,6 +133,27 @@ RibRatioResult evaluate_rib_ratio(const RibRatioSet &set,
 
 // Reject a set that cannot be evaluated. Hard errors, named by field.
 void validate_rib_ratio_set(const RibRatioSet &set);
+
+// Taslim, M.E. and Spring, S.D. (1987), AIAA-87-2009 (Northeastern / GE):
+// 90 deg transverse in-line turbulators on TWO opposite walls, P/e 10, the
+// first non-Texas A&M rib source in this project. One set per tested
+// configuration, keyed by Taslim's aspect ratio (HEIGHT/WIDTH, so Han's
+// W/H = 1 / aspect_ratio_taslim) and e/D_H:
+//
+//   AR 0.5: e/D 0.125, 0.250     AR 1.0: 0.083, 0.167
+//   AR 3.5: e/D 0.053, 0.107, 0.161
+//
+// FORM, stated by the paper (text and conclusions 1-2): Nu_T ~ Re^0.6, so
+//   Nu_T / Nu_DB = C (Re / 1e4)^-0.2,  Nu_DB = 0.023 Re^0.8 Pr^0.4
+// and a passage-average Fanning f independent of Re (conclusion; 1.4-4.1%
+// spread per configuration), carried exactly as f/f0 = C_f (Re/1e4)^0.2 on a
+// declared Fanning f0 = 0.046 Re^-0.2.
+//
+// COEFFICIENTS are not printed: C is figure 9's marker for the
+// configuration, C_f the mean of its figure 11 marks -- digitised values, so
+// provenance is Fitted. See validation/cooling/extractions/
+// taslim_spring_1987_aspect_ratio.md. Anything untested throws.
+RibRatioSet taslim_spring_1987(double aspect_ratio_taslim, double e_D);
 void validate_rib_ratio_options(const RibRatioOptions &options);
 
 }  // namespace cooling

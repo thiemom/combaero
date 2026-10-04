@@ -490,6 +490,7 @@ def check_candidate(csv_path: Path, card_path: Path) -> list[Finding]:
         alpha_deg=None,
         x_axis=card.get("x_axis", "e_plus"),
         x_scale=float(card.get("x_scale", 1.0)),
+        y_scale=float(card.get("y_scale", 1.0)),
         y_axis=card.get("y_axis", "G"),
         kind=card.get("kind", "correlation"),
         extraction="figure-digitised",

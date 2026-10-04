@@ -1,6 +1,8 @@
 #include "rib_ratio_correlation.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 
@@ -178,10 +180,12 @@ RibRatioResult evaluate_rib_ratio(const RibRatioSet &set,
   out.dNu_dRe = dnu * dx_dRe;
 
   // ---- f: ratio held at its floor value below the range ----
+  const double xf_hi = set.Re_floor_f > 0.0 ? set.Re_floor_f : set.Re_floor;
+  const ValueSlope wf = blend_weight(x, xf_hi / RATIO_BLEND_FACTOR, xf_hi);
   const ValueSlope rF = ratio_law(set.C_f, gF, set.f_Re, x);
-  const ValueSlope rF_floor = ratio_law(set.C_f, gF, set.f_Re, x_hi);
-  const double rf = w.v * rF.v + (1.0 - w.v) * rF_floor.v;
-  const double drf = w.d * (rF.v - rF_floor.v) + w.v * rF.d;
+  const ValueSlope rF_floor = ratio_law(set.C_f, gF, set.f_Re, xf_hi);
+  const double rf = wf.v * rF.v + (1.0 - wf.v) * rF_floor.v;
+  const double drf = wf.d * (rF.v - rF_floor.v) + wf.v * rF.d;
   const ValueSlope F0 = baseline_law(set.f0_source, x, pr);
   out.ratio_f = rf;
   out.f = rf * F0.v;
@@ -194,6 +198,87 @@ RibRatioResult evaluate_rib_ratio(const RibRatioSet &set,
                      outside(set.valid_WH, geom.W_H) ||
                      outside(set.valid_alpha, geom.alpha_deg);
   return out;
+}
+
+namespace {
+
+// Taslim & Spring (1987): figure 9 markers (C, the Re-normalised ratio) and
+// figure 11 means (Fanning f), per configuration, with the tested Re range
+// of the Nu data (figures 4/5) and of the friction data (figure 11).
+struct TaslimRow {
+  double ar, e_D, C_Nu, f_mean, re_nu_lo, re_f_lo, re_hi;
+};
+
+// Re bounds are the digitised extremes rounded OUTWARD, so every measured
+// point sits inside its own configuration's box.
+constexpr TaslimRow kTaslim1987[] = {
+    {0.5, 0.125, 3.34316, 0.10146, 28119.0, 10831.0, 108478.0},
+    {0.5, 0.250, 3.90148, 0.51645, 21544.0, 20850.0, 61550.0},
+    {1.0, 0.083, 3.42519, 0.04680, 26292.0, 21287.0, 102470.0},
+    {1.0, 0.167, 3.99269, 0.11610, 27820.0, 21280.0, 103921.0},
+    {3.5, 0.053, 3.03740, 0.01498, 36460.0, 52396.0, 209006.0},
+    {3.5, 0.107, 3.12189, 0.02090, 33668.0, 51910.0, 192254.0},
+    {3.5, 0.161, 3.33653, 0.03162, 37590.0, 52445.0, 217071.0},
+};
+
+// Re normaliser for both ratios, the paper's own Re_ref.
+constexpr double kTaslimReRef = 1.0e4;
+// Declared Fanning friction baseline the constant f is carried on.
+constexpr double kFanningF0Coeff = 0.046;
+constexpr double kFanningF0Exp = -0.2;
+
+}  // namespace
+
+RibRatioSet taslim_spring_1987(double aspect_ratio_taslim, double e_D) {
+  const TaslimRow *row = nullptr;
+  for (const auto &r : kTaslim1987) {
+    if (std::abs(r.ar - aspect_ratio_taslim) < 1e-9 && std::abs(r.e_D - e_D) < 1e-6) {
+      row = &r;
+      break;
+    }
+  }
+  if (row == nullptr) {
+    throw std::invalid_argument(
+        "taslim_spring_1987: no two-side configuration at AR " +
+        std::to_string(aspect_ratio_taslim) + ", e/D " + std::to_string(e_D) +
+        ". Tested: AR 0.5 (e/D 0.125, 0.25), 1.0 (0.083, 0.167), 3.5 (0.053, "
+        "0.107, 0.161).");
+  }
+  char tag[64];
+  std::snprintf(tag, sizeof(tag), "taslim_spring_1987_ar%.1f_eD%.3f", row->ar,
+                row->e_D);
+
+  RibRatioSet s;
+  s.name = tag;
+  s.source = "Taslim, M.E. and Spring, S.D. (1987), AIAA-87-2009. Form stated "
+             "(Nu_T ~ Re^0.6, D-B normalised); C from Fig. 9 markers, f from "
+             "Fig. 11 means (digitised)";
+  s.validity_source = s.source;
+  s.provenance = RibProvenance::Fitted;
+  s.shape = RibShape::Transverse;
+  s.symmetric = true;
+
+  s.C_Nu = row->C_Nu;
+  s.Nu_Re = {-0.2, kTaslimReRef};
+  s.Nu0_source = {0.023, 0.8, 0.4};  // Dittus-Boelter, as Taslim normalises
+
+  // f is Re-independent: f/f0 = C_f (Re/ref)^0.2 cancels f0's Re^-0.2 exactly.
+  s.C_f = row->f_mean / (kFanningF0Coeff * std::pow(kTaslimReRef, kFanningF0Exp));
+  s.f_Re = {0.2, kTaslimReRef};
+  s.f0_source = {kFanningF0Coeff, kFanningF0Exp, 0.0};
+
+  s.Re_floor = row->re_nu_lo;
+  s.Re_floor_f = row->re_f_lo;
+  s.valid_Re = {std::min(row->re_nu_lo, row->re_f_lo), row->re_hi};
+  s.valid_eD = {row->e_D, row->e_D};
+  s.valid_pe = {10.0, 10.0};
+  s.valid_WH = {1.0 / row->ar, 1.0 / row->ar};
+  s.valid_alpha = {90.0, 90.0};
+  s.valid_Pr = 0.7;
+  // No accuracy is stated; the scorecard reports what the data says.
+  s.accuracy_Nu = StatedAccuracy::unstated();
+  s.accuracy_f = StatedAccuracy::unstated();
+  return s;
 }
 
 void validate_rib_ratio_set(const RibRatioSet &set) {
@@ -214,6 +299,11 @@ void validate_rib_ratio_set(const RibRatioSet &set) {
   if (!(set.Re_floor > 0.0) || !std::isfinite(set.Re_floor)) {
     throw std::invalid_argument("rib ratio set '" + set.name +
                                 "': Re_floor must be finite and positive");
+  }
+  if (!(set.Re_floor_f >= 0.0) || !std::isfinite(set.Re_floor_f)) {
+    throw std::invalid_argument(
+        "rib ratio set '" + set.name +
+        "': Re_floor_f must be finite and non-negative (0 = Re_floor)");
   }
   require_baseline(set.name, set.Nu0_source, "Nu0_source");
   require_baseline(set.name, set.f0_source, "f0_source");

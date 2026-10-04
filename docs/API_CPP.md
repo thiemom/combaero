@@ -537,6 +537,14 @@ RibRatioResult evaluate_rib_ratio(const RibRatioSet& set, const RibGeometry& geo
 // -> Nu, dNu_dRe, f, df_dRe, ratio_Nu, ratio_f, below_floor, extrapolated
 void validate_rib_ratio_set(const RibRatioSet& set);
 void validate_rib_ratio_options(const RibRatioOptions& options);
+// set.Re_floor_f: friction's own floor (0 = Re_floor), for sources that
+// measured f over a different Re range than Nu.
+RibRatioSet taslim_spring_1987(double aspect_ratio_taslim, double e_D);
+// Taslim & Spring (1987), two ribbed walls, transverse, p/e 10. Seven tested
+// configurations: AR 0.5 (e/D 0.125, 0.250), 1.0 (0.083, 0.167), 3.5 (0.053,
+// 0.107, 0.161); any other throws. Taslim's AR is height/width: W/H = 1/AR.
+// Nu/Nu_DB = C (Re/1e4)^-0.2 (fig. 9), f Fanning passage-average constant
+// (fig. 11). Provenance Fitted; accuracy Unstated.
 
 // Enhanced surfaces removed in 0.7.0 for unprovenanced correlations (issue
 // #339). Ribbed is re-added on han_1988_orthogonal / rallabandi_2009_high_re

@@ -410,6 +410,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readwrite("Nu0_source", &combaero::cooling::RibRatioSet::Nu0_source)
       .def_readwrite("f0_source", &combaero::cooling::RibRatioSet::f0_source)
       .def_readwrite("Re_floor", &combaero::cooling::RibRatioSet::Re_floor)
+      .def_readwrite("Re_floor_f", &combaero::cooling::RibRatioSet::Re_floor_f)
       .def_readwrite("valid_Re", &combaero::cooling::RibRatioSet::valid_Re)
       .def_readwrite("valid_eD", &combaero::cooling::RibRatioSet::valid_eD)
       .def_readwrite("valid_pe", &combaero::cooling::RibRatioSet::valid_pe)
@@ -440,6 +441,13 @@ PYBIND11_MODULE(_core, m) {
         "operating points.");
   m.def("validate_rib_ratio_options", &combaero::cooling::validate_rib_ratio_options,
         py::arg("options"));
+  m.def("taslim_spring_1987", &combaero::cooling::taslim_spring_1987,
+        py::arg("aspect_ratio_taslim"), py::arg("e_D"),
+        "Taslim & Spring (1987) two-side transverse turbulators, P/e 10, one "
+        "ratio set per tested configuration. aspect_ratio_taslim is HEIGHT/"
+        "WIDTH (Han's W/H = 1/AR). Nu/Nu_DB = C (Re/1e4)^-0.2 as the paper "
+        "states; C and f digitised from its Figs. 9 and 11 (provenance "
+        "Fitted). Untested configurations raise.");
 
   // ---------------------------------------------------------------------
   // Jet impingement correlations
