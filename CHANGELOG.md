@@ -153,6 +153,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Pin-fin arrays: provenanced sets, exact basis converters and a fin
+  model (#335).** `pin_fin_correlation.h` carries each source in its own form
+  and converts it exactly, from geometry alone, to one canonical basis:
+  `Re_D` on the pin diameter and the velocity at the minimum flow area,
+  `Nu_D = h D/k`, and `f = dP/(2 rho Vmax^2 N)`. Heat transfer and friction
+  are separate sets.
+
+  | set | form | box |
+  |---|---|---|
+  | `metzger_1986_staggered_nu` (default) | `0.135 Re^0.69 (X/D)^-0.34` | H/D <= 3, 2 <= S/D <= 4, 1.5 <= X/D <= 5 |
+  | `metzger_1982_staggered_friction` (default) | two branches, C1-blended at Re 1e4 | 0.5 <= H/D <= 6, 2 <= S/D <= 4 |
+  | `vanfossen_1982_staggered_nu` | D' basis | H/D 0.5-2 |
+  | `damerow_1972_staggered_friction` | per (N-1) rows | S/D 4.24-7.07 |
+  | `chyu_1998_nu` | staggered/inline x pin/endwall/total | S/D = X/D = 2.5, H/D 1 |
+
+  - **Converters:** D'/D, A'/A_min, D_h/D and A_min/A_frontal (the smaller of
+    the transverse and staggered diagonal gaps), plus per-wall area
+    fractions.
+  - **Fin model:** `pin_fin_array_efficiency`, with an analytic d/dh.
+  - **Data-backed ratio modifier:** `chyu_1998_inline_over_staggered`,
+    0.76-1.0 over Re 5k-30k.
+  - **Inline friction:** no source is in hand, so none ships, and the
+    modifier says so (`has_f = False`).
+  - **Behaviour:** outside its box a set is flagged `extrapolated`, never
+    refused. Evaluators never throw, and derivatives are analytic.
+  - **What the code removed in #332 got wrong, confirmed against the
+    sources:**
+    - dP was a factor of 4 low (`rho V^2/2` against Metzger's
+      `2 rho V^2`);
+    - the friction exponent was -0.25;
+    - a Pr^0.4 term and three spacing/length terms were invented;
+    - friction was credited to Simoneau & VanFossen.
+  - **Sources:** see `validation/cooling/extractions/pin_fin_sources.md`.
+  - **Not yet included:** the network element (`PinFinModel`) and validation
+    scoring follow.
+
 - **Taslim & Spring (1987), the first shipped ratio-form rib sets (#444).**
   `taslim_spring_1987(aspect_ratio_taslim, e_D)` returns one `RibRatioSet`
   per configuration the paper tested with two ribbed walls (seven: AR 0.5 /

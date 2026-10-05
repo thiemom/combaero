@@ -1696,13 +1696,74 @@ looser forms (Eq. 4.6 Kercher-Tabakoff -- graphical, not closed-form anyway;
 Eq. 4.7/4.8 -- Florschuetz's own less-tight alternate) are out of scope,
 deferred per the extraction's I3.
 
+### Pin-Fin Correlations (parametrised)
+
+Pin-fin arrays (#335) as provenanced sets in each source's own form, with
+exact geometry-only conversion to one canonical basis: `Re_D` on the pin
+diameter and the velocity at the minimum flow area, `Nu_D = h D / k`, and
+`f = dP / (2 rho Vmax^2 N)` (per row, so `dP = 2 rho Vmax^2 N f`). Heat
+transfer and friction are separate sets, so any Nu set can pair with any
+friction set.
+
+```python
+import combaero as cb
+
+g = cb.PinFinGeometry(S_D=2.5, X_D=2.5, H_D=1.0, N_rows=10)   # staggered
+nu = cb.evaluate_pin_fin_nu(cb.metzger_1986_staggered_nu(), g, Re_D=2.0e4, Pr=0.7)
+f = cb.evaluate_pin_fin_friction(cb.metzger_1982_staggered_friction(), g, Re_D=2.0e4)
+nu.Nu, nu.dNu_dRe, nu.extrapolated     # 91.78, 0.00317, False
+f.f, f.extrapolated                    # 0.0755, False
+
+# VanFossen works in its own D' basis; the result comes back canonical.
+cb.evaluate_pin_fin_nu(cb.vanfossen_1982_staggered_nu(), g, 2.0e4, 0.7).Nu   # 90.91
+```
+
+The second call is flagged `extrapolated`: VanFossen's arrays had 4 rows, not
+10. A set outside its validity box still evaluates; it never refuses.
+
+| set | what | box |
+|---|---|---|
+| `metzger_1986_staggered_nu()` (default) | `0.135 Re_D^0.69 (X/D)^-0.34`, pin + endwall | H/D <= 3, 2 <= S/D <= 4, 1.5 <= X/D <= 5, Re 1e3-1e5, 10 rows |
+| `metzger_1982_staggered_friction()` (default) | `0.317 Re^-0.132` / `1.76 Re^-0.318`, C1 blend at 1e4 | 0.5 <= H/D <= 6, 2 <= S/D <= 4 |
+| `vanfossen_1982_staggered_nu()` | `0.153 Re_D'^0.685` on D' = 4V/A_t | H/D 0.5-2, 4 rows |
+| `damerow_1972_staggered_friction()` | `2.06 (S/D)^-1.1 Re^-0.16`, per (N-1) rows | S/D 4.24-7.07 |
+| `chyu_1998_nu(arrangement, surface)` | Han Table 4.7, staggered or inline, pin / endwall / total | S/D = X/D = 2.5, H/D = 1 |
+| `chyu_1998_inline_over_staggered()` | inline/staggered Nu ratio, no friction ratio | Chyu's geometry |
+
+**Inline arrays** have heat transfer (Chyu) but **no friction set ships**: no
+inline friction source is in hand yet. The ratio modifier carries `has_f =
+False` rather than inventing one.
+
+**Fin efficiency** of conducting pins (each wall feeds the pin to mid-height):
+
+```python
+frac = cb.pin_fin_area_fractions(g)                 # per wall, over base area
+e = cb.pin_fin_array_efficiency(h=2000.0, k_pin=20.0, D=1e-3, H=1e-3,
+                                A_f_over_A_t=frac.pin_over_total)
+e.eta_fin, e.eta_t, e.deta_t_dh                     # 0.968, 0.993, analytic
+```
+
+**Supply your own** by copying the default and saying so:
+
+```python
+mine = cb.metzger_1986_staggered_nu()
+mine.name, mine.source = "rig_7", "measured 2026-10"
+mine.provenance = cb.RibProvenance.User
+mine.C = 0.150
+cb.validate_pin_fin_nu_set(mine)
+```
+
+Not yet carried, and declared rather than assumed: row-count correction (a
+geometry with a different `N_rows` is flagged), channel convergence, long pins
+(H/D > 3), pin-endwall fillets and inline friction.
+
 ### Enhanced Cooling Surfaces
 
 Removed in 0.7.0. The pin-fin, dimple, rib and impingement correlations could
 not be traced to their cited sources -- the rib friction multiplier was 4-5x
-below the only rib datum in the repository. Provenanced rib and jet
-impingement correlations are re-added above (issues #334, #337); see issue
-#339 for the rebuild.
+below the only rib datum in the repository. Provenanced rib, jet
+impingement and pin-fin correlations are re-added above (issues #334, #337,
+#335); see issue #339 for the rebuild.
 
 `channel_smooth` and the base convective correlations (Gnielinski,
 Dittus-Boelter, Sieder-Tate, Petukhov) are unaffected, as are the user-set

@@ -928,6 +928,130 @@ All functions use consistent units to avoid conversion errors.
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
 | `channel_smooth` | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_hot: K, correlation: str, heating: bool, mu_ratio: -, roughness: m, Nu_multiplier: -, f_multiplier: - | ChannelResult |
 
+### pin_fin_correlation.h - Pin-fin arrays (#335)
+
+| Function                                | Input Units                                                            | Output Unit          |
+|-----------------------------------------|------------------------------------------------------------------------|----------------------|
+| `PIN_FIN_RE_EPS`                        | -                                                                      | -                    |
+| `PIN_FIN_F_BLEND`                       | -                                                                      | -                    |
+| `pin_fin_min_gap_D`                     | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_amin_over_afrontal`            | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_dprime_over_D`                 | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_aprime_over_amin`              | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_dh_over_D`                     | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_area_fractions`                | geometry: PinFinGeometry                                               | PinFinAreaFractions  |
+| `pin_fin_array_efficiency`              | h: W/(m^2*K), k_pin: W/(m*K), D: m, H: m, A_f_over_A_t: -              | PinFinEfficiency     |
+| `evaluate_pin_fin_nu`                   | correlation_set: PinFinNuSet, geometry: PinFinGeometry, Re_D: -, Pr: - | PinFinNuResult       |
+| `evaluate_pin_fin_friction`             | correlation_set: PinFinFrictionSet, geometry: PinFinGeometry, Re_D: -  | PinFinFrictionResult |
+| `evaluate_pin_fin_modifier`             | modifier: PinFinRatioModifier, geometry: PinFinGeometry, Re_D: -       | PinFinModifierResult |
+| `validate_pin_fin_geometry`             | geometry: PinFinGeometry                                               | None                 |
+| `validate_pin_fin_nu_set`               | correlation_set: PinFinNuSet                                           | None                 |
+| `validate_pin_fin_friction_set`         | correlation_set: PinFinFrictionSet                                     | None                 |
+| `validate_pin_fin_modifier`             | modifier: PinFinRatioModifier                                          | None                 |
+| `metzger_1986_staggered_nu`             | -                                                                      | PinFinNuSet          |
+| `metzger_1982_staggered_friction`       | -                                                                      | PinFinFrictionSet    |
+| `vanfossen_1982_staggered_nu`           | -                                                                      | PinFinNuSet          |
+| `damerow_1972_staggered_friction`       | -                                                                      | PinFinFrictionSet    |
+| `chyu_1998_nu`                          | arrangement: PinArrangement, surface: PinNuSurface                     | PinFinNuSet          |
+| `chyu_1998_inline_over_staggered`       | -                                                                      | PinFinRatioModifier  |
+| `PinFinGeometry::S_D`                   | -                                                                      | -                    |
+| `PinFinGeometry::X_D`                   | -                                                                      | -                    |
+| `PinFinGeometry::H_D`                   | -                                                                      | -                    |
+| `PinFinGeometry::N_rows`                | -                                                                      | -                    |
+| `PinFinGeometry::arrangement`           | -                                                                      | -                    |
+| `PinFinAreaFractions::endwall_exposed`  | -                                                                      | -                    |
+| `PinFinAreaFractions::pin`              | -                                                                      | -                    |
+| `PinFinAreaFractions::pin_over_total`   | -                                                                      | -                    |
+| `PinFinEfficiency::eta_fin`             | -                                                                      | -                    |
+| `PinFinEfficiency::eta_t`               | -                                                                      | -                    |
+| `PinFinEfficiency::deta_fin_dh`         | -                                                                      | m^2*K/W              |
+| `PinFinEfficiency::deta_t_dh`           | -                                                                      | m^2*K/W              |
+| `PinFinNuSet::name`                     | -                                                                      | -                    |
+| `PinFinNuSet::source`                   | -                                                                      | -                    |
+| `PinFinNuSet::validity_source`          | -                                                                      | -                    |
+| `PinFinNuSet::provenance`               | -                                                                      | -                    |
+| `PinFinNuSet::arrangement`              | -                                                                      | -                    |
+| `PinFinNuSet::surface`                  | -                                                                      | -                    |
+| `PinFinNuSet::re_basis`                 | -                                                                      | -                    |
+| `PinFinNuSet::C`                        | -                                                                      | -                    |
+| `PinFinNuSet::Re_exp`                   | -                                                                      | -                    |
+| `PinFinNuSet::Pr_exp`                   | -                                                                      | -                    |
+| `PinFinNuSet::term_XD`                  | -                                                                      | -                    |
+| `PinFinNuSet::term_SD`                  | -                                                                      | -                    |
+| `PinFinNuSet::term_HD`                  | -                                                                      | -                    |
+| `PinFinNuSet::valid_Re`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_SD`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_XD`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_HD`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_Nrows`              | -                                                                      | -                    |
+| `PinFinNuSet::valid_Pr`                 | -                                                                      | -                    |
+| `PinFinNuSet::accuracy_Nu`              | -                                                                      | -                    |
+| `PinFinFrictionSet::name`               | -                                                                      | -                    |
+| `PinFinFrictionSet::source`             | -                                                                      | -                    |
+| `PinFinFrictionSet::validity_source`    | -                                                                      | -                    |
+| `PinFinFrictionSet::provenance`         | -                                                                      | -                    |
+| `PinFinFrictionSet::arrangement`        | -                                                                      | -                    |
+| `PinFinFrictionSet::basis`              | -                                                                      | -                    |
+| `PinFinFrictionSet::C1`                 | -                                                                      | -                    |
+| `PinFinFrictionSet::Re_exp1`            | -                                                                      | -                    |
+| `PinFinFrictionSet::C2`                 | -                                                                      | -                    |
+| `PinFinFrictionSet::Re_exp2`            | -                                                                      | -                    |
+| `PinFinFrictionSet::Re_split`           | -                                                                      | -                    |
+| `PinFinFrictionSet::term_SD`            | -                                                                      | -                    |
+| `PinFinFrictionSet::term_XD`            | -                                                                      | -                    |
+| `PinFinFrictionSet::term_HD`            | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_Re`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_SD`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_XD`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_HD`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_Nrows`        | -                                                                      | -                    |
+| `PinFinFrictionSet::accuracy_f`         | -                                                                      | -                    |
+| `PinFinRatioModifier::name`             | -                                                                      | -                    |
+| `PinFinRatioModifier::source`           | -                                                                      | -                    |
+| `PinFinRatioModifier::provenance`       | -                                                                      | -                    |
+| `PinFinRatioModifier::from_arrangement` | -                                                                      | -                    |
+| `PinFinRatioModifier::to_arrangement`   | -                                                                      | -                    |
+| `PinFinRatioModifier::surface`          | -                                                                      | -                    |
+| `PinFinRatioModifier::C_Nu`             | -                                                                      | -                    |
+| `PinFinRatioModifier::Nu_Re_exp`        | -                                                                      | -                    |
+| `PinFinRatioModifier::has_f`            | -                                                                      | -                    |
+| `PinFinRatioModifier::C_f`              | -                                                                      | -                    |
+| `PinFinRatioModifier::f_Re_exp`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_Re`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_SD`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_XD`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_HD`         | -                                                                      | -                    |
+| `PinFinNuResult::Nu`                    | -                                                                      | -                    |
+| `PinFinNuResult::dNu_dRe`               | -                                                                      | -                    |
+| `PinFinNuResult::Re_native`             | -                                                                      | -                    |
+| `PinFinNuResult::extrapolated`          | -                                                                      | -                    |
+| `PinFinFrictionResult::f`               | -                                                                      | -                    |
+| `PinFinFrictionResult::df_dRe`          | -                                                                      | -                    |
+| `PinFinFrictionResult::extrapolated`    | -                                                                      | -                    |
+| `PinFinModifierResult::ratio_Nu`        | -                                                                      | -                    |
+| `PinFinModifierResult::dratio_Nu_dRe`   | -                                                                      | -                    |
+| `PinFinModifierResult::ratio_f`         | -                                                                      | -                    |
+| `PinFinModifierResult::dratio_f_dRe`    | -                                                                      | -                    |
+| `PinFinModifierResult::has_f`           | -                                                                      | -                    |
+| `PinFinModifierResult::extrapolated`    | -                                                                      | -                    |
+| `PinArrangement::Staggered`             | -                                                                      | -                    |
+| `PinArrangement::Inline`                | -                                                                      | -                    |
+| `PinArrangement::name`                  | -                                                                      | -                    |
+| `PinArrangement::value`                 | -                                                                      | -                    |
+| `PinNuSurface::Total`                   | -                                                                      | -                    |
+| `PinNuSurface::Endwall`                 | -                                                                      | -                    |
+| `PinNuSurface::Pin`                     | -                                                                      | -                    |
+| `PinNuSurface::name`                    | -                                                                      | -                    |
+| `PinNuSurface::value`                   | -                                                                      | -                    |
+| `PinReBasis::DiameterVmax`              | -                                                                      | -                    |
+| `PinReBasis::VanFossenDprime`           | -                                                                      | -                    |
+| `PinReBasis::name`                      | -                                                                      | -                    |
+| `PinReBasis::value`                     | -                                                                      | -                    |
+| `PinFrictionBasis::PerRowVmax`          | -                                                                      | -                    |
+| `PinFrictionBasis::PerRowGapVmax`       | -                                                                      | -                    |
+| `PinFrictionBasis::name`                | -                                                                      | -                    |
+| `PinFrictionBasis::value`               | -                                                                      | -                    |
+
 ### correlation_status.h - Extrapolation validity utilities
 
 | Function                                        | Input Units                                      | Output Unit                           |
