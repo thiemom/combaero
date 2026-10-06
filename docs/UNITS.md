@@ -954,6 +954,9 @@ All functions use consistent units to avoid conversion errors.
 | `damerow_1972_staggered_friction`       | -                                                                      | PinFinFrictionSet    |
 | `chyu_1998_nu`                          | arrangement: PinArrangement, surface: PinNuSurface                     | PinFinNuSet          |
 | `chyu_1998_inline_over_staggered`       | -                                                                      | PinFinRatioModifier  |
+| `chyu_1990_nu`                          | arrangement: PinArrangement, fillet: bool                              | PinFinNuSet          |
+| `chyu_1990_friction`                    | arrangement: PinArrangement, fillet: bool                              | PinFinFrictionSet    |
+| `chyu_1990_fillet_over_straight`        | arrangement: PinArrangement                                            | PinFinRatioModifier  |
 | `PinFinGeometry::S_D`                   | -                                                                      | -                    |
 | `PinFinGeometry::X_D`                   | -                                                                      | -                    |
 | `PinFinGeometry::H_D`                   | -                                                                      | -                    |
@@ -1049,6 +1052,7 @@ All functions use consistent units to avoid conversion errors.
 | `PinReBasis::value`                     | -                                                                      | -                    |
 | `PinFrictionBasis::PerRowVmax`          | -                                                                      | -                    |
 | `PinFrictionBasis::PerRowGapVmax`       | -                                                                      | -                    |
+| `PinFrictionBasis::PerRowHalfHeadVmax`  | -                                                                      | -                    |
 | `PinFrictionBasis::name`                | -                                                                      | -                    |
 | `PinFrictionBasis::value`               | -                                                                      | -                    |
 

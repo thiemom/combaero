@@ -634,7 +634,9 @@ PYBIND11_MODULE(_core, m) {
         .value("PerRowVmax", cc::PinFrictionBasis::PerRowVmax,
                "f = dP / (2 rho Vmax^2 N) (canonical, Metzger)")
         .value("PerRowGapVmax", cc::PinFrictionBasis::PerRowGapVmax,
-               "f = dP / (2 rho Vmax^2 (N - 1)) (Damerow 1972)");
+               "f = dP / (2 rho Vmax^2 (N - 1)) (Damerow 1972)")
+        .value("PerRowHalfHeadVmax", cc::PinFrictionBasis::PerRowHalfHeadVmax,
+               "f = 2 dP / (rho Vmax^2 N), 4x canonical (Chyu 1990)");
 
     py::class_<cc::PinFinGeometry>(m, "PinFinGeometry",
                                    "Pin array geometry, pitches and height "
@@ -817,6 +819,16 @@ PYBIND11_MODULE(_core, m) {
     m.def("chyu_1998_nu", &cc::chyu_1998_nu, py::arg("arrangement"),
           py::arg("surface"),
           "Chyu et al. (1998), ASME 98-GT-175, via Han Table 4.7.");
+    m.def("chyu_1990_nu", &cc::chyu_1990_nu, py::arg("arrangement"),
+          py::arg("fillet") = false,
+          "Chyu (1990) Table 2, pin surface, straight or fillet pins.");
+    m.def("chyu_1990_friction", &cc::chyu_1990_friction,
+          py::arg("arrangement"), py::arg("fillet") = false,
+          "Chyu (1990) Fig. 6, digitised and fitted (provenance Fitted). The "
+          "inline straight set is the default inline friction.");
+    m.def("chyu_1990_fillet_over_straight",
+          &cc::chyu_1990_fillet_over_straight, py::arg("arrangement"),
+          "Chyu (1990) fillet/straight Nu ratio; no friction ratio.");
     m.def("chyu_1998_inline_over_staggered",
           &cc::chyu_1998_inline_over_staggered,
           "Chyu (1998) inline/staggered Total Nu ratio; no friction ratio.");

@@ -78,4 +78,39 @@ Read by eye from the figures, not digitised; scoring is PR C.
 - **Convergence:** Metzger phi = 2.28 Re^-0.096; Brown f multiplier exp(-0.0612 theta); Brigham 1984 attributes the effect to pin height. Unresolved.
 - **Long pins:** Faulkner 1971 Eq. D-2, whose pin-height term rests on Kays & London PF-4 only.
 - **Pin-endwall fillets:** Chyu 1990.
-- **Inline friction:** Chyu 1990, JHT 112, 926, not in hand.
+- **Fillets and inline friction** beyond Chyu (1990)'s single geometry.
+
+## Chyu (1990), J. Heat Transfer 112, 926
+
+Carnegie Mellon, naphthalene. Inline and staggered arrays, H/D 1, S/D = X/D = 2.5, 7 rows, straight and fillet pins.
+
+- **Basis:** `Re = Umax D/nu`, `Umax = Q/A_min` (Eqs 8-9), the canonical basis.
+- **Table 2 (printed):** `Nu/Pr^0.4 = A Re^B`, measured on the pins. Table 1: endwall/pin Sh 0.89-1.09.
+
+  | array | pin | A | B |
+  |---|---|---|---|
+  | inline | straight | 0.463 | 0.537 |
+  | inline | fillet | 0.403 | 0.550 |
+  | staggered | straight | 0.690 | 0.511 |
+  | staggered | fillet | 0.234 | 0.608 |
+
+- **Friction (Fig. 6 only):** `f = 2 dp/(rho Umax^2 N)` (Eq. 16), 4x canonical.
+  - Digitised 2026-10-06 into `validation/cooling/data/chyu1990/`; calibration and overlay are recorded in its metadata header.
+  - Fits:
+
+    | series | fit | rms |
+    |---|---|---|
+    | inline straight | constant 0.1693 (slope +0.004) | 1.4% |
+    | inline fillet | 0.685 Re^-0.139 | 3 points |
+    | staggered straight | 1.616 Re^-0.187 | 2.0% |
+    | staggered fillet | 9.387 Re^-0.363 | 1.9% |
+
+- **Cross-check against Gemini's independent digitisation:** where the same marker was read, the two agree within 0.001 in f.
+  - **Every disagreement resolved against the scan's pixels**, and probed twice (both of Gemini's attempts carry the same points):
+    - Gemini's squares at Re 0.72e4 and 0.92e4, its diamond at 0.95e4 and its triangle at 0.95e4 land on blank paper (0 dark pixels in a 21 px window). The real markers are 0.1-0.15e4 to the right: an x offset in Gemini's read.
+    - Its square at 1.82e4 is a line dash.
+    - Its square at 2.26e4 is the last staggered-fillet triangle.
+    - Its circle at 2.22e4 is the inline-fillet diamond.
+  - **User-confirmed 2026-10-06** on a scan overlay: calibrated frame and ticks on the printed axes, and all 21 points on their markers.
+  - A third table supplied as a "digitisation" contains smooth invented values with the inline levels near 0.29; it was discarded.
+- **Staggered straight vs Metzger 1982b:** 16-25% lower at the same geometry. Reported, not reconciled.

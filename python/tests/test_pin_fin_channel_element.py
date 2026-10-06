@@ -72,9 +72,18 @@ def test_conducting_pins_lose_effectiveness_and_isothermal_pins_do_not() -> None
     assert iso.h > alloy.h > ceramic.h
 
 
-def test_inline_without_a_friction_set_is_refused_not_given_staggered_friction() -> None:
-    with pytest.raises(ValueError, match="inline array needs a friction set"):
-        PinFinModel(arrangement=cb.PinArrangement.Inline)
+def test_inline_defaults_to_chyu_friction_never_to_staggered() -> None:
+    """Chyu (1990) Fig. 6 is the only inline friction source in hand."""
+    model = PinFinModel(arrangement=cb.PinArrangement.Inline, N_rows=7)
+    assert model.resolved_f_set().name == "chyu_1990_inline_straight_friction"
+    r = _run(ConvectiveSurface(area=0.01, model=model))
+    assert r.f == pytest.approx(0.1693 / 4.0, rel=1e-12)
+    # A staggered friction set on an inline array is refused, not used.
+    with pytest.raises(ValueError, match="not substituted"):
+        PinFinModel(
+            arrangement=cb.PinArrangement.Inline,
+            f_set=cb.metzger_1982_staggered_friction(),
+        )
 
 
 def test_inline_with_a_user_friction_set_and_the_chyu_transfer() -> None:

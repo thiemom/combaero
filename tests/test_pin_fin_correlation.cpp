@@ -240,3 +240,61 @@ TEST(PinFinTest, ValidatorsRejectMistakes) {
                std::invalid_argument);
   EXPECT_NO_THROW(validate_pin_fin_geometry(staggered(2.5, 2.5, 1.0, 10)));
 }
+
+// Chyu (1990): Table 2 reproduced, Fig. 6 fits converted by 1/4, and the
+// fillet modifier is the exact ratio of the two Table 2 sets.
+TEST(PinFinTest, Chyu1990TableTwoAndFigureSixFits) {
+  const auto g_stag = staggered(2.5, 2.5, 1.0, 7);
+  auto g_inl = g_stag;
+  g_inl.arrangement = PinArrangement::Inline;
+  const double Re = 1.5e4;
+  const double x = std::sqrt(Re * Re + 1.0);
+  struct Row {
+    PinArrangement a;
+    bool fillet;
+    double A, B;
+  };
+  for (const Row &r : {Row{PinArrangement::Inline, false, 0.463, 0.537},
+                       Row{PinArrangement::Inline, true, 0.403, 0.550},
+                       Row{PinArrangement::Staggered, false, 0.690, 0.511},
+                       Row{PinArrangement::Staggered, true, 0.234, 0.608}}) {
+    const auto set = chyu_1990_nu(r.a, r.fillet);
+    validate_pin_fin_nu_set(set);
+    const auto &g = r.a == PinArrangement::Inline ? g_inl : g_stag;
+    const auto nu = evaluate_pin_fin_nu(set, g, Re, 0.7);
+    EXPECT_LT(rel(nu.Nu, r.A * std::pow(x, r.B) * std::pow(0.7, 0.4)), 1e-6)
+        << set.name;
+    EXPECT_FALSE(nu.extrapolated) << set.name;
+    EXPECT_EQ(set.surface, PinNuSurface::Pin);
+  }
+  // Inline straight friction is Re-independent: 0.1693 in Chyu's basis.
+  const auto fi = chyu_1990_friction(PinArrangement::Inline, false);
+  validate_pin_fin_friction_set(fi);
+  EXPECT_EQ(fi.provenance, RibProvenance::Fitted);
+  EXPECT_NEAR(evaluate_pin_fin_friction(fi, g_inl, Re).f, 0.1693 / 4.0, 1e-12);
+  EXPECT_FALSE(evaluate_pin_fin_friction(fi, g_inl, Re).extrapolated);
+  const auto fs = chyu_1990_friction(PinArrangement::Staggered, false);
+  EXPECT_LT(rel(evaluate_pin_fin_friction(fs, g_stag, Re).f,
+                1.6163 * std::pow(x, -0.1867) / 4.0),
+            1e-12);
+  // The paper's own reading of its fillet effect: -25 / -17 / -8 %.
+  const auto mod = chyu_1990_fillet_over_straight(PinArrangement::Staggered);
+  validate_pin_fin_modifier(mod);
+  EXPECT_NEAR(evaluate_pin_fin_modifier(mod, g_stag, 5.0e3).ratio_Nu, 0.775,
+              0.005);
+  EXPECT_NEAR(evaluate_pin_fin_modifier(mod, g_stag, 3.0e4).ratio_Nu, 0.92,
+              0.005);
+  for (double R : {6.0e3, 2.5e4}) {
+    const double straight =
+        evaluate_pin_fin_nu(chyu_1990_nu(PinArrangement::Staggered, false),
+                            g_stag, R, 0.7)
+            .Nu;
+    const double fillet =
+        evaluate_pin_fin_nu(chyu_1990_nu(PinArrangement::Staggered, true),
+                            g_stag, R, 0.7)
+            .Nu;
+    EXPECT_LT(rel(straight * evaluate_pin_fin_modifier(mod, g_stag, R).ratio_Nu,
+                  fillet),
+              1e-12);
+  }
+}

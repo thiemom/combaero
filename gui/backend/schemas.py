@@ -94,8 +94,8 @@ class PinFinModelData(BaseModel):
     Field names are the pre-0.7.0 ones, so a network saved then loads with its
     values intact; ``channel_height`` / ``pin_diameter`` is the pin H/D. The
     defaults are a working example inside the Metzger sets' validity box.
-    Inline arrays are rejected on solve until an inline friction source
-    exists (none is in hand).
+    Inline arrays use Chyu (1990)'s inline friction, the only inline source
+    in hand, measured at one geometry (H/D 1, S/D = X/D = 2.5).
     """
 
     model_config = ConfigDict(extra="ignore")

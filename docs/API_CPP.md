@@ -599,7 +599,11 @@ PinFinNuSet vanfossen_1982_staggered_nu();           // D' basis
 PinFinFrictionSet damerow_1972_staggered_friction(); // per (N-1) rows, wide S/D
 PinFinNuSet chyu_1998_nu(PinArrangement a, PinNuSurface s);
 PinFinRatioModifier chyu_1998_inline_over_staggered(); // has_f = false
-// No inline friction set ships (no source in hand).
+PinFinNuSet chyu_1990_nu(PinArrangement a, bool fillet);          // Table 2, pin surface
+PinFinFrictionSet chyu_1990_friction(PinArrangement a, bool fillet); // Fig. 6, Fitted,
+// basis PerRowHalfHeadVmax (f = 2 dP/(rho Vmax^2 N), 4x canonical); the only
+// inline friction source in hand.
+PinFinRatioModifier chyu_1990_fillet_over_straight(PinArrangement a);
 ```
 
 ### Jet Impingement Correlations

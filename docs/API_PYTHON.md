@@ -1577,10 +1577,10 @@ ch = ChannelElement("te", "A", "B", length=0.125, diameter=0.009,
   `dP = 2 rho Vmax^2 N f(Re_D)`, with an analytic Jacobian in mass flow,
   upstream T and P (through rho and mu). The code removed in 0.7.0 used
   `rho V^2/2` here, a factor of 4 low.
-- **Inline arrays need a user `f_set`.** No inline friction source is
-  available, and staggered friction is not substituted:
-  `PinFinModel(arrangement=Inline)` without one raises. Heat transfer
-  defaults to Chyu's inline set, or use
+- **Inline arrays** default to `chyu_1990_friction(Inline)`, the only
+  inline friction source in hand (one geometry: H/D 1, S/D = X/D = 2.5).
+  Staggered friction is never substituted: a staggered `f_set` on an inline
+  array raises. Heat transfer defaults to Chyu's inline set, or use
   `modifier=cb.chyu_1998_inline_over_staggered()` to transfer a staggered
   set.
 - **Known gaps:**
@@ -1762,10 +1762,14 @@ The second call is flagged `extrapolated`: VanFossen's arrays had 4 rows, not
 | `damerow_1972_staggered_friction()` | `2.06 (S/D)^-1.1 Re^-0.16`, per (N-1) rows | S/D 4.24-7.07 |
 | `chyu_1998_nu(arrangement, surface)` | Han Table 4.7, staggered or inline, pin / endwall / total | S/D = X/D = 2.5, H/D = 1 |
 | `chyu_1998_inline_over_staggered()` | inline/staggered Nu ratio, no friction ratio | Chyu's geometry |
+| `chyu_1990_nu(arrangement, fillet=False)` | Chyu 1990 Table 2, pin surface, straight or fillet pins | S/D = X/D = 2.5, H/D = 1, Re 5e3-3e4 |
+| `chyu_1990_friction(arrangement, fillet=False)` | Chyu 1990 Fig. 6, digitised and **Fitted**; inline straight = 0.1693/4, Re-independent | same, Re about 9e3-2.2e4 |
+| `chyu_1990_fillet_over_straight(arrangement)` | fillet/straight Nu ratio (staggered 0.78-0.92), no friction ratio | same |
 
-**Inline arrays** have heat transfer (Chyu) but **no friction set ships**: no
-inline friction source is in hand yet. The ratio modifier carries `has_f =
-False` rather than inventing one.
+**Inline friction** comes from one rig at one geometry: Chyu (1990) Fig. 6,
+digitised (points in `validation/cooling/data/chyu1990/`). Chyu's staggered
+straight-pin friction sits 16-25% below Metzger's at the same geometry, a
+disagreement between the labs that is reported, not reconciled.
 
 **Fin efficiency** of conducting pins (each wall feeds the pin to mid-height):
 
@@ -1790,7 +1794,7 @@ To use a set in a network, see **Pin-Fin Channels** (`PinFinModel`).
 
 Not yet carried, and declared rather than assumed: row-count correction (a
 geometry with a different `N_rows` is flagged), channel convergence, long pins
-(H/D > 3), pin-endwall fillets and inline friction.
+(H/D > 3), and fillets beyond Chyu's single geometry.
 
 ### Enhanced Cooling Surfaces
 

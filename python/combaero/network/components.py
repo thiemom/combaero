@@ -259,10 +259,11 @@ class PinFinModel:
         ``chyu_1998_nu(Inline, Total)`` for inline ones.
     f_set : object
         A ``combaero.PinFinFrictionSet``. Defaults to
-        ``metzger_1982_staggered_friction()`` for staggered arrays. **Inline
-        arrays have no default**: no inline friction source is in hand, so an
-        inline model without one is rejected rather than given staggered
-        friction.
+        ``metzger_1982_staggered_friction()`` for staggered arrays and
+        ``chyu_1990_friction(Inline)`` for inline ones -- the only inline
+        friction source in hand, fitted to its digitised Fig. 6 at one
+        geometry (H/D 1, S/D = X/D = 2.5). Staggered friction is never
+        substituted for inline.
     modifier : object
         An optional ``combaero.PinFinRatioModifier`` applied to ``nu_set``
         (and to ``f_set`` when it carries a friction ratio), e.g.
@@ -312,13 +313,13 @@ class PinFinModel:
         if not (self.pin_diameter > 0.0):
             raise ValueError("PinFinModel: pin_diameter must be positive [m]")
         cb.validate_pin_fin_geometry(self.geometry())
-        inline = self.arrangement == cb.PinArrangement.Inline
-        if inline and self.f_set is None:
+        f_arr = self.resolved_f_set().arrangement
+        if f_arr != self.arrangement:
             raise ValueError(
-                "PinFinModel: an inline array needs a friction set (f_set). No "
-                "inline pin-fin friction source is in hand yet -- Chyu (1990), "
-                "J. Heat Transfer 112, 926 is the lead -- and staggered friction "
-                "is not substituted for it. Supply your own PinFinFrictionSet."
+                f"PinFinModel: f_set {self.resolved_f_set().name!r} is "
+                f"{f_arr.name}, but this array is {self.arrangement.name}. "
+                "Staggered and inline friction differ by about 1.6x (Chyu "
+                "1990, Fig. 6) and are not substituted for each other."
             )
         if self.modifier is not None:
             nu_arr = self.resolved_nu_set().arrangement
@@ -357,8 +358,11 @@ class PinFinModel:
         return cb.metzger_1986_staggered_nu()
 
     def resolved_f_set(self):
-        # __post_init__ guarantees f_set for inline arrays.
-        return self.f_set if self.f_set is not None else cb.metzger_1982_staggered_friction()
+        if self.f_set is not None:
+            return self.f_set
+        if self.arrangement == cb.PinArrangement.Inline:
+            return cb.chyu_1990_friction(cb.PinArrangement.Inline)
+        return cb.metzger_1982_staggered_friction()
 
 
 @dataclass

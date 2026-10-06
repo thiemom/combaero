@@ -46,9 +46,8 @@
 //   * channel convergence (Metzger 1986 phi; Brown 1980; Brigham 1984), whose
 //     cause is unresolved in the literature;
 //   * long pins (Faulkner 1971, an exponential geometry coefficient, a later
-//     Nu form) and pin-endwall fillets (Chyu 1990);
-//   * inline friction: no source in hand (Chyu 1990, JHT 112, 926 is the
-//     lead). An inline element must be given a user friction set.
+//     Nu form);
+//   * inline friction from one rig only (Chyu 1990), at one geometry.
 
 #include <string>
 
@@ -86,6 +85,9 @@ enum class PinFrictionBasis {
   // f = dP_T rho / (2 (N - 1) (w / A_min)^2): per contraction-expansion pair,
   // total pressure first to last row (Damerow et al. 1972, Eq. 10).
   PerRowGapVmax,
+  // f = 2 dP / (rho Vmax^2 N) = dP / (0.5 rho Vmax^2 N): per row on the
+  // dynamic head, 4x the canonical value (Chyu 1990, Eq. 16).
+  PerRowHalfHeadVmax,
 };
 
 struct PinFinGeometry {
@@ -292,6 +294,34 @@ PinFinNuSet chyu_1998_nu(PinArrangement arrangement, PinNuSurface surface);
 // exact algebra: (0.068 / 0.320) Re_D^(0.733 - 0.583). Same rig, same
 // geometry; no friction ratio (has_f = false).
 PinFinRatioModifier chyu_1998_inline_over_staggered();
+
+// Chyu (1990), J. Heat Transfer 112, 926, Table 2: Sh/Sc^0.4 = Nu/Pr^0.4 =
+// A Re^B for straight or pin-endwall-FILLET pins, inline or staggered.
+// Geometry H/D = 1, S/D = X/D = 2.5, 7 rows, Re 5e3 to 3e4, Re = Umax D/nu
+// with Umax = Q/A_min (Eqs 8-9), naphthalene (Sh uncertainty 4%). Measured on
+// the PIN surfaces; Table 1 finds endwall/pin Sh 0.89-1.09, so the paper
+// treats it as the array value -- the surface is recorded as Pin.
+PinFinNuSet chyu_1990_nu(PinArrangement arrangement, bool fillet);
+
+// Chyu (1990) Fig. 6, per-row friction f = 2 dP / (rho Umax^2 N) (Eq. 16),
+// digitised (no correlation is printed) and fitted, so provenance is Fitted:
+//   inline straight    0.1693           (no Re trend; 3 points, 1.4% rms)
+//   inline fillet      0.685 Re^-0.139  (3 points)
+//   staggered straight 1.616 Re^-0.187  (8 points, 2.0% rms)
+//   staggered fillet   9.387 Re^-0.363  (7 points, 1.9% rms)
+// converted to the canonical basis by 1/4. The digitised points are in
+// validation/cooling/data/chyu1990/. The inline straight set is the default
+// inline friction; it is the ONLY inline friction source in hand. Chyu's
+// staggered straight values sit 16-25% below Metzger (1982) at the same
+// geometry -- a real disagreement between the two labs, reported, not
+// reconciled.
+PinFinFrictionSet chyu_1990_friction(PinArrangement arrangement, bool fillet);
+
+// Fillet over straight-pin Nu from Chyu (1990) Table 2, exact algebra; same
+// arrangement in and out. Staggered 0.339 Re^0.097 (0.78 / 0.83 / 0.92 at
+// Re 5e3 / 1e4 / 3e4, the paper's -25 / -17 / -8%); inline about 0.97-1.
+// No friction ratio (use chyu_1990_friction with fillet = true).
+PinFinRatioModifier chyu_1990_fillet_over_straight(PinArrangement arrangement);
 
 }  // namespace cooling
 }  // namespace combaero
