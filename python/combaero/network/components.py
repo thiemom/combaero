@@ -150,13 +150,14 @@ class ImpingementModel:
         discharge-coefficient correlation of its own for a jet-plate array
         yet, see issue #375.
 
-    What this element assumes about mass flow. ``self.area`` (on the
-    enclosing ``ConvectiveSurface``) is taken as THIS ROW's own target-plate
-    footprint, so the number of holes in the row is recovered as
-    ``area / (xn_d * d_jet * yn_d * d_jet)`` and this row's own jet velocity
-    from the upstream state's total mass flow through that area -- the same
-    "total flow over this element's own area" convention every other
-    ``ConvectiveSurface`` model uses, not a new one. Whether every row gets
+    What this element assumes about mass flow. The ELEMENT's mass flow is
+    this row's jet flow, and ``self.area`` (on the enclosing
+    ``ConvectiveSurface``) is THIS ROW's target-plate footprint, which counts
+    its holes: ``n = area / (xn_d d_jet * yn_d d_jet)``, so each hole carries
+    ``m_dot / n`` and ``Re_j = 4 (m_dot/n) / (pi d_jet mu)`` -- Florschuetz's
+    jet mass velocity on the hole area. (Until #460 the flow was taken as
+    ``rho v * area``, which made it scale with the target area.) Whether every
+    row gets
     the same total flow (a uniform-supply approximation) or a row-dependent
     one (Florschuetz's own Eq. 7, deliberately not implemented -- see
     ``impingement_correlation.h``'s module comment) is up to how the caller
@@ -219,10 +220,10 @@ class SingleJetImpingementModel:
         the source's closed-form check point uses 5.0, but that is a
         worked example, not a universal choice.
 
-    Mass flow. Same convention as ``ImpingementModel``: ``self.area`` is
-    taken as this jet's own target patch, and its own jet velocity comes
-    from the upstream state's total mass flow through that area -- with no
-    hole-density division, since there is exactly one hole.
+    Mass flow. The ELEMENT's mass flow is the jet's flow, through its one
+    hole: ``Re = 4 m_dot / (pi d_jet mu)``, Goldstein's nozzle Reynolds
+    number. ``self.area`` is the target patch the reported h applies to; it
+    does not set the flow. (Until #460 it did, as ``rho v * area``.)
 
     Pressure drop is not modelled here for the same reason as
     ``ImpingementModel``: model the nozzle's own loss with a proper
@@ -476,11 +477,17 @@ class ConvectiveSurface:
     heating: bool | None = None  # None = auto-detect
     Nu_multiplier: float = 1.0  # empirical correction on Nu
     f_multiplier: float = 1.0  # empirical correction on f
+    # The calling element's flow area for the current evaluation (see
+    # htc_and_T); not a parameter of the surface.
+    _flow_area: float | None = field(default=None, init=False, repr=False, compare=False)
 
-    @staticmethod
-    def _channel_mdot(rho: float, velocity: float, diameter: float) -> float:
+    def _channel_mdot(self, rho: float, velocity: float, diameter: float) -> float:
         """The solver's mass flow for this surface: through the CHANNEL
-        cross-section, ``rho v pi Dh^2 / 4``.
+        cross-section -- the element's own flow area when it passed one
+        (``flow_area`` on ``htc_and_T``), else ``pi Dh^2 / 4`` as
+        ``channel_smooth`` assumes. A non-circular channel given a separate
+        ``Dh`` needs the real area: ``pi Dh^2/4`` is then off by
+        ``(Dh/diameter)^2`` (#460).
 
         Every ``dh_dmdot`` this class returns is a derivative with respect to
         the element's own ``m_dot`` -- that is what the solver's wall coupling
@@ -490,7 +497,8 @@ class ConvectiveSurface:
         area, not a flow area. Using it here scaled the ribbed and impingement
         derivatives by ``A_cross / A_surface`` (#456).
         """
-        return rho * abs(velocity) * math.pi / 4.0 * diameter * diameter
+        area = self._flow_area if self._flow_area else math.pi / 4.0 * diameter * diameter
+        return rho * abs(velocity) * area
 
     def _ribbed_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
         """Ribbed-channel heat transfer and pressure drop.
@@ -642,7 +650,11 @@ class ConvectiveSurface:
         k = cs.transport.k
         Pr = cs.transport.Pr
 
-        mdot_total = rho * velocity * self.area if self.area > 0.0 else 0.0
+        # The element's mass flow IS this row's jet flow (Florschuetz: G_j is
+        # the jet mass velocity on the hole area). The convective area only
+        # counts the holes. It used to supply the flow as well, as
+        # rho v * area -- wrong by A_surface/A_cross (#460).
+        mdot_total = self._channel_mdot(rho, velocity, diameter)
         hole_footprint = model.xn_d * model.d_jet * model.yn_d * model.d_jet
         n_holes = self.area / hole_footprint if hole_footprint > 0.0 else 0.0
         mdot_per_hole = mdot_total / n_holes if n_holes > 0.0 else 0.0
@@ -714,7 +726,9 @@ class ConvectiveSurface:
         mu = cs.transport.mu
         k = cs.transport.k
 
-        mdot_total = rho * velocity * self.area if self.area > 0.0 else 0.0
+        # The element's mass flow IS the jet's flow (Goldstein: nozzle Re on
+        # the jet's own exit area), not rho v * the target-patch area (#460).
+        mdot_total = self._channel_mdot(rho, velocity, diameter)
         hole_area = math.pi / 4.0 * model.d_jet**2
         v_jet = mdot_total / (rho * hole_area) if rho * hole_area > 0.0 else 0.0
         Re = rho * v_jet * model.d_jet / mu if mu > 0.0 else 0.0
@@ -863,6 +877,7 @@ class ConvectiveSurface:
         diameter: float,
         length: float,
         T_hot: float = math.nan,
+        flow_area: float | None = None,
     ):
         """Compute heat transfer coefficient and adiabatic wall temperature.
 
@@ -882,6 +897,10 @@ class ConvectiveSurface:
             Channel length [m].
         T_hot : float, optional
             Wall temperature [K]. Used for auto-detection of heating/cooling.
+        flow_area : float, optional
+            The element's flow cross-section [m^2], from which it computed
+            ``velocity``. Lets the surface recover the element's mass flow
+            exactly; without it ``pi diameter^2 / 4`` is assumed.
 
         Returns
         -------
@@ -892,6 +911,7 @@ class ConvectiveSurface:
 
         if self.area == 0.0 or abs(velocity) < 1e-12:
             return None
+        self._flow_area = flow_area
 
         # Auto-detect heating direction from T_hot - T sign
         if self.heating is not None:
@@ -1685,6 +1705,7 @@ class MomentumChamberNode(NetworkNode):
             diameter=diameter,
             length=length,
             T_hot=T_hot,
+            flow_area=self.area,
         )
 
     def residuals(
@@ -2172,6 +2193,7 @@ class CombustorNode(NetworkNode):
             diameter=diameter,
             length=length,
             T_hot=T_hot,
+            flow_area=self.area,
         )
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -3353,6 +3375,7 @@ class PressureLossElement(NetworkElement):
             diameter=diameter,
             length=length,
             T_hot=math.nan,
+            flow_area=self.area,
         )
 
     def unknowns(self) -> list[str]:
@@ -4087,6 +4110,7 @@ class ChannelElement(NetworkElement):
             diameter=self.Dh or self.diameter,
             length=self.length,
             T_hot=T_hot,
+            flow_area=self.area,
         )
 
     def n_equations(self) -> int:

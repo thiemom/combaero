@@ -18,7 +18,9 @@ from validation.cooling.schema import load_dataset
 
 @pytest.fixture(scope="module")
 def dataset():
-    return [s for s in load_dataset() if s.source.name == "florschuetz1981"]
+    # Figure 6 only. Figure 5 (absolute Nu1, #460) is in the same source but is
+    # exercised through the element in test_impingement_element_validation.py.
+    return [s for s in load_dataset() if s.source.name == "florschuetz1981" and s.figure == "6"]
 
 
 @pytest.fixture(scope="module")

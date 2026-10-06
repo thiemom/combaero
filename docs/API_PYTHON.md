@@ -1611,12 +1611,14 @@ ones. Model a real array by chaining `n_rows` separate elements, each with
 its own `row`; row 1 sees zero crossflow by definition (`Gc/Gj = 0`,
 Florschuetz's own `Nu1`).
 
-**Mass flow is recovered from `area`, the same convention every
-`ConvectiveSurface` model uses** -- `ImpingementModel` does not introduce a
-new one. The element treats `area` as this row's own footprint, divides by
-`xn_d * d_jet * yn_d * d_jet` to get the row's hole count, and gets this
-row's own jet velocity from the upstream state's total mass flow through
-that area. Whether every row gets the same total flow (a uniform-supply
+**The element's mass flow is this row's jet flow; `area` counts the
+holes.** `area` is the row's target-plate footprint, so the row has
+`n = area / (xn_d d_jet * yn_d d_jet)` holes, each carrying `m_dot / n`, and
+`Re_j = 4 (m_dot / n) / (pi d_jet mu)` -- Florschuetz's jet mass velocity on
+the hole area. Until #460 the jet flow was taken as `rho v * area`, which
+made Re_j scale with the target area: driven with the paper's own flow, the
+element then missed Florschuetz's Fig. 5 by +268% on average; it now matches
+it to 5.2%, like the correlation. Whether every row gets the same total flow (a uniform-supply
 approximation) or a row-dependent one (Florschuetz's own Eq. 7, deliberately
 not implemented -- see `impingement_correlation.h`'s module comment) is a
 choice for whoever assembles the chain, not something this element decides.
