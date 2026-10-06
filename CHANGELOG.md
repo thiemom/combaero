@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Wall-coupling `dh_dmdot` was wrong for ribbed and impingement surfaces
+  (#456).** It was off by a factor of 3.3 (ribbed) and 20 (impingement) in
+  the cases checked. `dh_dmdot` is a derivative with respect to the
+  element's own mass flow (what the solver's wall coupling multiplies it
+  by), but:
+  - **Wrong area:** the ribbed and both impingement paths took the mass flow
+    on the CONVECTIVE area instead of the channel cross-section, scaling the
+    derivative by `A_cross/A_surface`.
+  - **Missing term:** the ribbed side `h_r = St rho v cp` differentiated only
+    `St`, dropping the dominant `St d(rho v cp)/dmdot` term.
+
+  | case | before | now = finite difference on the channel mass flow |
+  |---|---|---|
+  | ribbed (the issue's case) | 2320 | 7652 |
+  | impingement array (surface area 0.05 m^2) | 3466 | 353,081 |
+
+  - **Jacobian only:** converged solutions are unchanged; a pressure-driven
+    coupled ribbed network reaches the same temperatures within 3e-6 K.
+  - **New FD tests:** ribbed (1/2/4 walls, two areas), impingement array and
+    single jet. The old impingement tests converted through the convective
+    area, so they agreed with the bug.
+
 - **Channel heat transfer and friction no longer jump at regime switches
   (#448).** `channel_smooth`, `nusselt_circular_channel` and
   `htc_circular_channel` (gnielinski branch) switched regime with hard `if`s:
