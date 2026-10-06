@@ -51,6 +51,15 @@ paper:
     ASME J. Heat Transfer 103, 337-342.
   secondary: false
 
+
+# FIGURE 5 (added 2026-10-06, #460): first-row Nu1 vs yn/d at Re_j = 1e4,
+# inline, xn/d 5/10/15 by bracket, z/d 1/2/3 by symbol. Automated digitising of
+# flohrshuetz_truman_1981_fig_5.png: y calibrated on all six ticks (20-70,
+# worst residual 0.16 Nu), x on the 2/4/6/8/10 ticks; markers at exactly
+# yn/d = 4/6/8. Overlapping markers were separated by shape from zoomed crops
+# (a marker is about 18 px tall; stacked centres sit 9 px in from the merged
+# blob's edges; concentric pairs share the blob centre). Scan overlay sent
+# for user confirmation, 2026-10-06 (pending).
 files:
   - path: rc_00_circles_zd_1.csv
     after: null
@@ -913,4 +922,346 @@ files:
       y_axis_type: linear
       plot_x_limits: [0.0, 0.8]
       plot_y_limits: [0.4, 1.0]
+      kind: measured
+
+  - path: fig5_xn_5_zd_1_circles.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=5, z/d=1 (circle symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 5.0
+      z_d: 1.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_5_zd_2_squares.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=5, z/d=2 (square symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 5.0
+      z_d: 2.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_5_zd_3_triangles.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=5, z/d=3 (triangle symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 5.0
+      z_d: 3.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_10_zd_1_circles.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=10, z/d=1 (circle symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 10.0
+      z_d: 1.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_10_zd_2_squares.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=10, z/d=2 (square symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 10.0
+      z_d: 2.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_10_zd_3_triangles.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=10, z/d=3 (triangle symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 10.0
+      z_d: 3.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_15_zd_1_circles.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=15, z/d=1 (circle symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 15.0
+      z_d: 1.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_15_zd_2_squares.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=15, z/d=2 (square symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 15.0
+      z_d: 2.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
+      kind: measured
+
+  - path: fig5_xn_15_zd_3_triangles.csv
+    after: null
+    page: null
+    item: "Figure 5"
+    series: "measured Nu1 vs yn/d at Re_j = 1e4, inline, xn/d=15, z/d=3 (triangle symbol)"
+    figure: "5"
+    panel: single
+    geometry:
+      xn_d: 15.0
+      z_d: 3.0
+      Re_j: 10000.0
+      row: 1
+    alpha_deg: null
+    x_axis: yn_d
+    x_scale: 1.0
+    y_axis: Nu1
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.051
+    cross_check: >-
+      Absolute first-row Nu1 at a stated Re_j = 1e4, the only absolute-Nu
+      data digitised from this paper (Fig. 6 is Nu/Nu1, in which Re_j
+      cancels). Used by python/tests/test_impingement_element_validation.py
+      to drive the ImpingementModel ELEMENT with the paper's flow (#460).
+      florschuetz_1981_inline() at Re_j = 1e4, Gc/Gj = 0 reproduces all 27
+      Fig. 5 points with bias -1.5%, MAE 5.6%, max 15% -- the paper's own
+      data, so fidelity. Not routed through the scorecard: the jet-array
+      runner scores Nu/Nu1 vs Gc/Gj only.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      plot_x_limits: [2.0, 10.0]
+      plot_y_limits: [20.0, 70.0]
       kind: measured

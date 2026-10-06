@@ -31,7 +31,9 @@ FLOW = {"velocity": 5.0, "diameter": 0.02, "length": 0.05, "T_hot": 900.0}
 def _array_surface(**kw) -> ConvectiveSurface:
     model_kw = {"d_jet": 0.002, "xn_d": 8.0, "yn_d": 6.0, "z_d": 2.0, "row": 3}
     model_kw.update(kw)
-    return ConvectiveSurface(area=0.01, model=ImpingementModel(**model_kw))
+    # 0.0015 m^2 is about 8 holes at this pitch: the element's flow spread
+    # over them gives Re_j near 1e4, inside Florschuetz's range (#460).
+    return ConvectiveSurface(area=0.0015, model=ImpingementModel(**model_kw))
 
 
 def _single_jet_surface(**kw) -> ConvectiveSurface:
@@ -137,19 +139,40 @@ def test_single_jet_wall_coupling_derivative_matches_finite_difference() -> None
     assert r0.dh_dmdot == pytest.approx(dh_dv_fd / _channel_rho_a(), rel=2e-3)
 
 
-def test_array_wall_coupling_derivative_does_not_depend_on_the_convective_area() -> None:
-    """For the array, h depends on velocity alone (the per-hole flow is
-    area / footprint holes sharing rho v area), so dh/dmdot cannot depend on
-    the convective area. It did, linearly, before #456.
-
-    Not asserted for the single jet: by its documented convention the jet's
-    flow IS rho v area, so its h depends on the area by construction.
+def test_the_element_flow_is_the_jet_flow_and_the_area_counts_holes() -> None:
+    """#460. The element's mass flow is the jet flow; the convective area only
+    counts holes. So at a fixed element flow, a larger target area means more
+    holes, less flow each, and Re_j ~ 1/area. Before #460 the jet flow was
+    rho v * area, which made Re_j independent of the area instead.
     """
     a = _array_surface()
     b = _array_surface()
-    b.area = 7.0 * a.area
+    b.area = 2.0 * a.area
+    assert _run(b).Re == pytest.approx(0.5 * _run(a).Re, rel=1e-12)
+    assert _run(b).h < _run(a).h
+
+
+def test_single_jet_does_not_depend_on_the_target_patch_area() -> None:
+    """#460. One jet carries the element's whole flow; the target patch the
+    reported h applies to does not set it. Before #460 the jet's flow was
+    rho v * patch area."""
+    a = _single_jet_surface()
+    b = _single_jet_surface()
+    b.area = 9.0 * a.area
+    assert _run(a).Re == pytest.approx(_run(b).Re, rel=1e-12)
     assert _run(a).h == pytest.approx(_run(b).h, rel=1e-12)
-    assert _run(a).dh_dmdot == pytest.approx(_run(b).dh_dmdot, rel=1e-12)
+
+
+def test_jet_reynolds_number_is_the_paper_definition() -> None:
+    """Re_j = 4 (m_dot/n) / (pi d mu) with m_dot the element's flow through
+    the channel cross-section (Florschuetz's G_j on the hole area)."""
+    s = _array_surface()
+    r = _run(s)
+    rho = cb.density(STATE["T"], STATE["P"], STATE["X"])
+    mu = cb.complete_state(STATE["T"], STATE["P"], STATE["X"]).transport.mu
+    mdot = rho * FLOW["velocity"] * math.pi / 4.0 * FLOW["diameter"] ** 2
+    n = s.area / (8.0 * 6.0 * 0.002**2)
+    assert r.Re == pytest.approx(4.0 * (mdot / n) / (math.pi * 0.002 * mu), rel=1e-9)
 
 
 def test_disabled_surface_returns_none() -> None:

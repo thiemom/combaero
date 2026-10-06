@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Impingement elements used the wrong jet flow (#460).** Both
+  `ImpingementModel` and `SingleJetImpingementModel` took the jet flow as
+  `rho v * ConvectiveSurface.area`: the convective area scaled the
+  element's flow by `A_surface/A_cross`. Both sources define Re on the jet's
+  own flow through its own hole (Goldstein 1986: nozzle Re; Florschuetz
+  1981: jet mass velocity on the hole area).
+  - **What changed:** the element's mass flow is now the jet flow. The
+    convective area only counts the array's holes; for the single jet it is
+    only the patch the reported h applies to.
+  - **Validated against data.** Driven with Florschuetz's own flow (row 1,
+    Re_j = 1e4) through a `ChannelElement`:
+
+    | | bias vs Fig. 5 | MAE |
+    |---|---|---|
+    | before | +268% (range +45% to +762%) | |
+    | after | -0.2% | 5.2% |
+
+    The correlation alone gets 5.6% MAE. Fig. 5 (27 points, absolute
+    first-row Nu1) is newly digitised; Fig. 6 is Nu/Nu1, where Re_j
+    cancels.
+  - **Elements now pass their flow area** to `ConvectiveSurface.htc_and_T`
+    (new `flow_area` argument), so a non-circular channel with a separate
+    `Dh` recovers its mass flow exactly. The fallback
+    `pi Dh^2/4` is off by `(Dh/diameter)^2`, -79% on the validation
+    channel.
+  - **Results change wherever the convective area differs from the
+    channel cross-section.** GUI defaults (a 1 m x 0.05 m channel), single
+    jet at 0.01 kg/s: Re 1.4e7 -> 1.7e5, h 84,584 -> 3,027 W/(m^2 K).
+
 - **Wall-coupling `dh_dmdot` was wrong for ribbed and impingement surfaces
   (#456).** It was off by a factor of 3.3 (ribbed) and 20 (impingement) in
   the cases checked. `dh_dmdot` is a derivative with respect to the
