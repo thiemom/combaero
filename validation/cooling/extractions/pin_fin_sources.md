@@ -106,6 +106,11 @@ Carnegie Mellon, naphthalene. Inline and staggered arrays, H/D 1, S/D = X/D = 2.
     | staggered fillet | 9.387 Re^-0.363 | 1.9% |
 
 - **Cross-check against Gemini's independent digitisation:** where the same marker was read, the two agree within 0.001 in f.
-  - The differences, by the calibrated pixel read, are Gemini's: an x offset of about -0.15e4 on the leftmost points, the inline-fillet diamond at 2.21 counted as a circle, and the last staggered-fillet triangle counted as a square. The user's visual check of these points on the scan is pending.
+  - **Every disagreement resolved against the scan's pixels**, and probed twice (both of Gemini's attempts carry the same points):
+    - Gemini's squares at Re 0.72e4 and 0.92e4, its diamond at 0.95e4 and its triangle at 0.95e4 land on blank paper (0 dark pixels in a 21 px window). The real markers are 0.1-0.15e4 to the right: an x offset in Gemini's read.
+    - Its square at 1.82e4 is a line dash.
+    - Its square at 2.26e4 is the last staggered-fillet triangle.
+    - Its circle at 2.22e4 is the inline-fillet diamond.
+  - The user agreed with this reading; a precise visual check was not possible on a phone.
   - A third table supplied as a "digitisation" contains smooth invented values with the inline levels near 0.29; it was discarded.
 - **Staggered straight vs Metzger 1982b:** 16-25% lower at the same geometry. Reported, not reconciled.

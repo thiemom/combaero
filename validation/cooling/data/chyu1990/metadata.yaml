@@ -22,6 +22,10 @@
 #   * marker centres from the outline extents in a 25 px window, ignoring rows
 #     a curve line crosses; checked by overlay, every centre on its marker.
 #   * all markers are cleanly separated; none overplotted.
+#   * cross-checked against an independent (Gemini) read: within 0.001 in f on
+#     every common marker. Its extra points were probed on the pixels and are
+#     blank paper (Re 0.72/0.92/0.95e4, an x offset), a line dash (1.82e4), or
+#     other series' markers (2.22e4 diamond, 2.26e4 triangle).
 #
 # WHY UNSCORED. These points are what chyu_1990_friction() was FITTED to
 # (provenance Fitted), so scoring that set here would measure its fit, not
