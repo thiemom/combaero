@@ -26,6 +26,8 @@
 #     every common marker. Its extra points were probed on the pixels and are
 #     blank paper (Re 0.72/0.92/0.95e4, an x offset), a line dash (1.82e4), or
 #     other series' markers (2.22e4 diamond, 2.26e4 triangle).
+#   * user-confirmed (2026-10-06) on a scan overlay: calibrated frame on the
+#     printed axes, all 21 points on their markers.
 #
 # WHY UNSCORED. These points are what chyu_1990_friction() was FITTED to
 # (provenance Fitted), so scoring that set here would measure its fit, not

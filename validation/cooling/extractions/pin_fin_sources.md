@@ -111,6 +111,6 @@ Carnegie Mellon, naphthalene. Inline and staggered arrays, H/D 1, S/D = X/D = 2.
     - Its square at 1.82e4 is a line dash.
     - Its square at 2.26e4 is the last staggered-fillet triangle.
     - Its circle at 2.22e4 is the inline-fillet diamond.
-  - The user agreed with this reading; a precise visual check was not possible on a phone.
+  - **User-confirmed 2026-10-06** on a scan overlay: calibrated frame and ticks on the printed axes, and all 21 points on their markers.
   - A third table supplied as a "digitisation" contains smooth invented values with the inline levels near 0.29; it was discarded.
 - **Staggered straight vs Metzger 1982b:** 16-25% lower at the same geometry. Reported, not reconciled.
