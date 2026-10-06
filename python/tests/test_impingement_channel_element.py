@@ -12,6 +12,8 @@ CHAIN from mdot -> Re_j -> h -> dh_dmdot is new code, not covered there.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 import combaero as cb
@@ -36,6 +38,12 @@ def _single_jet_surface(**kw) -> ConvectiveSurface:
     model_kw = {"d_jet": 0.003, "L_D": 7.75, "R_D": 5.0}
     model_kw.update(kw)
     return ConvectiveSurface(area=0.001, model=SingleJetImpingementModel(**model_kw))
+
+
+def _channel_rho_a() -> float:
+    """rho * A_cross: the solver's mass flow per unit velocity."""
+    rho = cb.density(STATE["T"], STATE["P"], STATE["X"])
+    return rho * math.pi / 4.0 * FLOW["diameter"] ** 2
 
 
 def _run(surface: ConvectiveSurface, **flow_overrides):
@@ -90,15 +98,12 @@ def test_array_wall_coupling_derivative_matches_finite_difference() -> None:
     r_plus = _run(surface, velocity=v0 + dv)
     r_minus = _run(surface, velocity=v0 - dv)
 
-    # dh/dmdot = dh/dvelocity / (rho * area); recover dh/dvelocity by FD, then
-    # convert both sides through the same rho*area factor used inside the
-    # element so the comparison is apples to apples.
+    # dh/dmdot is with respect to the SOLVER's mass flow, through the channel
+    # cross-section rho v pi D^2/4 -- not the convective area. The first
+    # version of this test converted through the convective area too, so it
+    # agreed with the bug it should have caught (#456).
     dh_dv_fd = (r_plus.h - r_minus.h) / (2.0 * dv)
-    rho_val = cb.density(STATE["T"], STATE["P"], STATE["X"])
-    area = 0.01
-    dh_dmdot_fd = dh_dv_fd / (rho_val * area)
-
-    assert r0.dh_dmdot == pytest.approx(dh_dmdot_fd, rel=2e-3)
+    assert r0.dh_dmdot == pytest.approx(dh_dv_fd / _channel_rho_a(), rel=2e-3)
 
 
 def test_array_reports_extra_fields_a_channel_result_does_not_have() -> None:
@@ -129,11 +134,22 @@ def test_single_jet_wall_coupling_derivative_matches_finite_difference() -> None
     r_minus = _run(surface, velocity=v0 - dv)
 
     dh_dv_fd = (r_plus.h - r_minus.h) / (2.0 * dv)
-    rho_val = cb.density(STATE["T"], STATE["P"], STATE["X"])
-    area = 0.001
-    dh_dmdot_fd = dh_dv_fd / (rho_val * area)
+    assert r0.dh_dmdot == pytest.approx(dh_dv_fd / _channel_rho_a(), rel=2e-3)
 
-    assert r0.dh_dmdot == pytest.approx(dh_dmdot_fd, rel=2e-3)
+
+def test_array_wall_coupling_derivative_does_not_depend_on_the_convective_area() -> None:
+    """For the array, h depends on velocity alone (the per-hole flow is
+    area / footprint holes sharing rho v area), so dh/dmdot cannot depend on
+    the convective area. It did, linearly, before #456.
+
+    Not asserted for the single jet: by its documented convention the jet's
+    flow IS rho v area, so its h depends on the area by construction.
+    """
+    a = _array_surface()
+    b = _array_surface()
+    b.area = 7.0 * a.area
+    assert _run(a).h == pytest.approx(_run(b).h, rel=1e-12)
+    assert _run(a).dh_dmdot == pytest.approx(_run(b).dh_dmdot, rel=1e-12)
 
 
 def test_disabled_surface_returns_none() -> None:

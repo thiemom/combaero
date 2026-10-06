@@ -477,6 +477,21 @@ class ConvectiveSurface:
     Nu_multiplier: float = 1.0  # empirical correction on Nu
     f_multiplier: float = 1.0  # empirical correction on f
 
+    @staticmethod
+    def _channel_mdot(rho: float, velocity: float, diameter: float) -> float:
+        """The solver's mass flow for this surface: through the CHANNEL
+        cross-section, ``rho v pi Dh^2 / 4``.
+
+        Every ``dh_dmdot`` this class returns is a derivative with respect to
+        the element's own ``m_dot`` -- that is what the solver's wall coupling
+        multiplies it by -- and ``ChannelElement.htc_and_T`` derives the
+        velocity from that mass flow and the channel area, the same convention
+        ``channel_smooth`` uses. The convective ``area`` is a heat-transfer
+        area, not a flow area. Using it here scaled the ribbed and impingement
+        derivatives by ``A_cross / A_surface`` (#456).
+        """
+        return rho * abs(velocity) * math.pi / 4.0 * diameter * diameter
+
     def _ribbed_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
         """Ribbed-channel heat transfer and pressure drop.
 
@@ -546,13 +561,17 @@ class ConvectiveSurface:
         # The correlation's f is already the four-sided channel value.
         dP = rib.f * (length / diameter) * 0.5 * rho * velocity * abs(velocity)
 
-        # Wall-coupling derivatives. The ribbed side moves with mass flow
-        # through e+; the smooth side brings its own, already computed by the
-        # base correlation. Both are area-weighted exactly as h is, so the
-        # derivative of the average is the average of the derivatives.
-        dSt_dRe = rib.dSt_dRe
-        dRe_dmdot = abs(Re / m_dot_ref) if (m_dot_ref := rho * velocity * self.area or 0.0) else 0.0
-        dh_ribbed_dmdot = dSt_dRe * dRe_dmdot * rho * abs(velocity) * cp
+        # Wall-coupling derivatives. The ribbed side is h_r = St(Re) rho|v| cp,
+        # and BOTH Re and |v| are proportional to the mass flow, so
+        #     dh_r/dmdot = (Re dSt/dRe + St) rho |v| cp / mdot.
+        # The St term dominates (h_r grows roughly as mdot^0.8); it was missing,
+        # and the mass flow was taken on the convective area (#456). The
+        # smooth side brings its own derivative from the base correlation;
+        # both are area-weighted exactly as h is.
+        mdot = self._channel_mdot(rho, velocity, diameter)
+        dh_ribbed_dmdot = (
+            (Re * rib.dSt_dRe + rib.St_r) * rho * abs(velocity) * cp / mdot if mdot else 0.0
+        )
         dh_dmdot = (
             frac_ribbed * dh_ribbed_dmdot + frac_smooth * smooth.dh_dmdot
         ) * self.Nu_multiplier
@@ -655,7 +674,10 @@ class ConvectiveSurface:
             f_multiplier=1.0,
         )
 
-        dRe_j_dmdot = abs(Re_j / mdot_total) if mdot_total else 0.0
+        # Re_j is proportional to the element's mass flow; the per-hole split
+        # above is this row's own bookkeeping, not the solver's m_dot (#456).
+        mdot = self._channel_mdot(rho, velocity, diameter)
+        dRe_j_dmdot = abs(Re_j / mdot) if mdot else 0.0
         dh_dmdot = jet.dNu_dRe_j * dRe_j_dmdot * (k / model.d_jet if model.d_jet > 0.0 else 0.0)
         dh_dmdot *= self.Nu_multiplier
         # Temperature sensitivity of the correlation itself is not exposed;
@@ -713,7 +735,8 @@ class ConvectiveSurface:
             f_multiplier=1.0,
         )
 
-        dRe_dmdot = abs(Re / mdot_total) if mdot_total else 0.0
+        mdot = self._channel_mdot(rho, velocity, diameter)
+        dRe_dmdot = abs(Re / mdot) if mdot else 0.0
         dh_dmdot = jet.dNu_dRe * dRe_dmdot * (k / model.d_jet if model.d_jet > 0.0 else 0.0)
         dh_dmdot *= self.Nu_multiplier
         dh_dT = smooth.dh_dT * self.Nu_multiplier
@@ -807,7 +830,7 @@ class ConvectiveSurface:
             f_multiplier=1.0,
         )
 
-        mdot = rho * velocity * math.pi / 4.0 * diameter * diameter
+        mdot = self._channel_mdot(rho, velocity, diameter)
         dRe_dmdot = abs(Re / mdot) if mdot else 0.0
         dh_dmdot = dh_eff_dh * dh_array_dRe * dRe_dmdot * self.Nu_multiplier
         dh_dT = smooth.dh_dT * (h_eff / smooth.h) * self.Nu_multiplier if smooth.h > 0.0 else 0.0
