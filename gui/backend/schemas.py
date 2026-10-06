@@ -84,13 +84,44 @@ class SingleJetImpingementModelData(BaseModel):
     R_D: float = 5.0
 
 
-# Dimpled and pin-fin surfaces were removed in 0.7.0 -- their correlations
-# could not be traced to their cited sources -- and remain deferred (issue
-# #339). Saved networks carrying them are rejected with a message naming the
-# reason; see graph_builder. Ribbed and impingement were both restored on
-# provenanced replacements (#334, #337).
+class PinFinModelData(BaseModel):
+    """A pin-fin array on provenanced correlation sets (#335).
+
+    Restored after the previous pin-fin correlation was removed for failing
+    provenance review: among other things its pressure drop was a factor of 4
+    low against Metzger's own friction definition.
+
+    Field names are the pre-0.7.0 ones, so a network saved then loads with its
+    values intact; ``channel_height`` / ``pin_diameter`` is the pin H/D. The
+    defaults are a working example inside the Metzger sets' validity box.
+    Inline arrays are rejected on solve until an inline friction source
+    exists (none is in hand).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["pin_fin"] = "pin_fin"
+    pin_diameter: float = 0.005
+    channel_height: float = 0.005
+    S_D: float = 2.5
+    X_D: float = 2.5
+    N_rows: int = 10
+    is_staggered: bool = True
+    # Pin conductivity for the fin efficiency [W/(m K)]; 20 is a nickel
+    # superalloy at metal temperature.
+    k_pin: float = 20.0
+
+
+# Dimpled surfaces were removed in 0.7.0 -- their correlation could not be
+# traced to its cited source -- and remain deferred (issue #339). Saved
+# networks carrying one are rejected with a message naming the reason; see
+# graph_builder. Ribbed, impingement and pin-fin were restored on provenanced
+# replacements (#334, #337, #335).
 SurfaceModelData = (
-    SmoothModelData | RibbedModelData | ImpingementModelData | SingleJetImpingementModelData
+    SmoothModelData
+    | RibbedModelData
+    | ImpingementModelData
+    | SingleJetImpingementModelData
+    | PinFinModelData
 )
 
 

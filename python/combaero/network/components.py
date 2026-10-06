@@ -243,6 +243,125 @@ class SingleJetImpingementModel:
 
 
 @dataclass
+class PinFinModel:
+    """A pin-fin array, evaluated from provenanced parameter sets (#335).
+
+    Heat transfer and friction are separate sets, each in its source's own
+    form, evaluated in one canonical basis: ``Re_D`` on the pin diameter and
+    the velocity at the minimum flow area, ``Nu_D = h D / k``, and
+    ``f = dP / (2 rho Vmax^2 N)``. See ``pin_fin_correlation.h``.
+
+    Parameters
+    ----------
+    nu_set : object
+        A ``combaero.PinFinNuSet`` on the Total surface. Defaults to
+        ``metzger_1986_staggered_nu()`` for staggered arrays and
+        ``chyu_1998_nu(Inline, Total)`` for inline ones.
+    f_set : object
+        A ``combaero.PinFinFrictionSet``. Defaults to
+        ``metzger_1982_staggered_friction()`` for staggered arrays. **Inline
+        arrays have no default**: no inline friction source is in hand, so an
+        inline model without one is rejected rather than given staggered
+        friction.
+    modifier : object
+        An optional ``combaero.PinFinRatioModifier`` applied to ``nu_set``
+        (and to ``f_set`` when it carries a friction ratio), e.g.
+        ``chyu_1998_inline_over_staggered()`` to transfer a staggered set to
+        an inline array. Its ``from_arrangement`` must match ``nu_set``'s and
+        its ``to_arrangement`` this array's.
+    pin_diameter : float
+        Pin diameter D [m].
+    S_D, X_D, H_D : float
+        Transverse pitch, streamwise pitch and pin height (= channel height),
+        each over D.
+    N_rows : int
+        Pin rows along the flow. Sets the pressure drop and is checked against
+        the sets' own row counts (no row correction is applied yet).
+    arrangement : object
+        ``combaero.PinArrangement``.
+    k_pin : float
+        Pin thermal conductivity [W/(m K)] for the fin efficiency. 20 is a
+        nickel superalloy at turbine metal temperatures; ``math.inf`` treats
+        the pins as isothermal.
+
+    Area and velocity conventions. ``ConvectiveSurface.area`` is the BASE
+    (planform) area of the endwall this surface couples to; the effective
+    coefficient returned is referenced to it,
+    ``h_eff = h (A_endwall_exposed + eta_fin A_pin_half) / A_base``, with each
+    wall feeding its pins to mid-height. The element's flow area is the
+    UNOBSTRUCTED channel cross-section; Vmax follows from it exactly through
+    the array geometry.
+
+    The defaults are a working example inside the Metzger sets' box
+    (5 mm pins, H/D 1, S/D = X/D = 2.5, 10 rows, Inconel-class pins), not a
+    generic "typical" pin fin.
+    """
+
+    nu_set: object = None
+    f_set: object = None
+    modifier: object = None
+    pin_diameter: float = 0.005
+    S_D: float = 2.5
+    X_D: float = 2.5
+    H_D: float = 1.0
+    N_rows: int = 10
+    arrangement: object = cb.PinArrangement.Staggered
+    k_pin: float = 20.0
+
+    def __post_init__(self) -> None:
+        if not (self.pin_diameter > 0.0):
+            raise ValueError("PinFinModel: pin_diameter must be positive [m]")
+        cb.validate_pin_fin_geometry(self.geometry())
+        inline = self.arrangement == cb.PinArrangement.Inline
+        if inline and self.f_set is None:
+            raise ValueError(
+                "PinFinModel: an inline array needs a friction set (f_set). No "
+                "inline pin-fin friction source is in hand yet -- Chyu (1990), "
+                "J. Heat Transfer 112, 926 is the lead -- and staggered friction "
+                "is not substituted for it. Supply your own PinFinFrictionSet."
+            )
+        if self.modifier is not None:
+            nu_arr = self.resolved_nu_set().arrangement
+            if self.modifier.from_arrangement != nu_arr:
+                raise ValueError(
+                    f"PinFinModel: modifier {self.modifier.name!r} transfers from "
+                    f"{self.modifier.from_arrangement.name}, but nu_set is "
+                    f"{nu_arr.name}."
+                )
+            if self.modifier.to_arrangement != self.arrangement:
+                raise ValueError(
+                    f"PinFinModel: modifier {self.modifier.name!r} transfers to "
+                    f"{self.modifier.to_arrangement.name}, but this array is "
+                    f"{self.arrangement.name}."
+                )
+
+    def geometry(self):
+        return cb.PinFinGeometry(
+            S_D=self.S_D,
+            X_D=self.X_D,
+            H_D=self.H_D,
+            N_rows=self.N_rows,
+            arrangement=self.arrangement,
+        )
+
+    def resolved_nu_set(self):
+        if self.nu_set is not None:
+            return self.nu_set
+        if self.modifier is not None:
+            # A transfer modifier starts from its own source arrangement.
+            if self.modifier.from_arrangement == cb.PinArrangement.Staggered:
+                return cb.metzger_1986_staggered_nu()
+            return cb.chyu_1998_nu(self.modifier.from_arrangement, cb.PinNuSurface.Total)
+        if self.arrangement == cb.PinArrangement.Inline:
+            return cb.chyu_1998_nu(cb.PinArrangement.Inline, cb.PinNuSurface.Total)
+        return cb.metzger_1986_staggered_nu()
+
+    def resolved_f_set(self):
+        # __post_init__ guarantees f_set for inline arrays.
+        return self.f_set if self.f_set is not None else cb.metzger_1982_staggered_friction()
+
+
+@dataclass
 class _ImpingementChannelResult:
     """What either impingement model returns.
 
@@ -253,6 +372,32 @@ class _ImpingementChannelResult:
     """
 
     h: float
+    Nu: float
+    Re: float
+    Pr: float
+    f: float
+    dP: float
+    T_aw: float
+    extrapolated: bool = False
+    dh_dmdot: float = 0.0
+    dh_dT: float = 0.0
+    dT_aw_dmdot: float = 0.0
+    dT_aw_dT: float = 0.0
+
+
+@dataclass
+class _PinFinChannelResult:
+    """What a pin-fin array returns.
+
+    ``h`` is the effective coefficient on the BASE area (fin efficiency
+    included); ``h_array`` is the correlation's own coefficient on the total
+    pin + endwall area, before the fin model, so both halves of that
+    modelling step are visible.
+    """
+
+    h: float
+    h_array: float
+    eta_fin: float
     Nu: float
     Re: float
     Pr: float
@@ -298,7 +443,9 @@ class _RibbedChannelResult:
     dT_aw_dT: float = 0.0
 
 
-ChannelModel = SmoothModel | RibbedModel | ImpingementModel | SingleJetImpingementModel
+ChannelModel = (
+    SmoothModel | RibbedModel | ImpingementModel | SingleJetImpingementModel | PinFinModel
+)
 
 
 @dataclass
@@ -581,6 +728,105 @@ class ConvectiveSurface:
             dT_aw_dT=smooth.dT_aw_dT,
         )
 
+    def _pin_fin_terms(self, Re: float, Pr: float):
+        """Nu and f (with modifier) at canonical Re_D, and their Re-slopes."""
+        model = self.model
+        geom = model.geometry()
+        nu = cb.evaluate_pin_fin_nu(model.resolved_nu_set(), geom, Re, Pr)
+        fr = cb.evaluate_pin_fin_friction(model.resolved_f_set(), geom, Re)
+        Nu, dNu = nu.Nu, nu.dNu_dRe
+        f, df = fr.f, fr.df_dRe
+        extrapolated = nu.extrapolated or fr.extrapolated
+        if model.modifier is not None:
+            m = cb.evaluate_pin_fin_modifier(model.modifier, geom, Re)
+            Nu, dNu = Nu * m.ratio_Nu, dNu * m.ratio_Nu + Nu * m.dratio_Nu_dRe
+            if m.has_f:
+                f, df = f * m.ratio_f, df * m.ratio_f + f * m.dratio_f_dRe
+            extrapolated = extrapolated or m.extrapolated
+        return Nu, dNu, f, df, extrapolated
+
+    def _pin_fin_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
+        """Pin-fin array: Metzger et al. (and others) via pin_fin_correlation.h.
+
+        ``velocity`` is the bulk velocity through the UNOBSTRUCTED channel
+        cross-section; Vmax = velocity / (A_min/A_frontal), exactly. The
+        correlation's h lives on the total pin + endwall area; the fin model
+        turns it into ``h`` on this surface's BASE area:
+
+            h_eff = h (f_endwall + eta_fin(h) f_pin)
+
+        with the per-wall fractions of ``pin_fin_area_fractions``.
+
+        ``dh_dmdot`` uses the element's mass flow through the channel
+        cross-section, ``rho v pi Dh^2 / 4`` -- the same convention as
+        ``channel_smooth``. T_aw and its derivatives are borrowed from the
+        smooth correlation, as the impingement paths do; ``dh_dT`` is the
+        smooth result's relative property sensitivity scaled to ``h_eff``, a
+        documented proxy: the pin correlations expose no temperature
+        derivative of their own.
+        """
+        model = self.model
+        D = model.pin_diameter
+        geom = model.geometry()
+
+        rho, _ = _safe_rho(cb.density(T, P, X))
+        cs = cb.complete_state(T, P, X)
+        mu = cs.transport.mu
+        k = cs.transport.k
+        Pr = cs.transport.Pr
+
+        amin = cb.pin_fin_amin_over_afrontal(geom)
+        v_max = velocity / amin
+        Re = rho * v_max * D / mu if mu > 0.0 else 0.0
+
+        Nu, dNu, f, _, extrapolated = self._pin_fin_terms(Re, Pr)
+        h_array = Nu * k / D
+        dh_array_dRe = dNu * k / D
+
+        frac = cb.pin_fin_area_fractions(geom)
+        eff = cb.pin_fin_array_efficiency(
+            h_array, model.k_pin, D, model.H_D * D, frac.pin_over_total
+        )
+        h_eff = h_array * (frac.endwall_exposed + eff.eta_fin * frac.pin)
+        dh_eff_dh = frac.endwall_exposed + frac.pin * (eff.eta_fin + h_array * eff.deta_fin_dh)
+
+        smooth = cb.channel_smooth(
+            T,
+            P,
+            X,
+            velocity,
+            diameter,
+            length,
+            T_hot=T_hot,
+            heating=heating,
+            Nu_multiplier=1.0,
+            f_multiplier=1.0,
+        )
+
+        mdot = rho * velocity * math.pi / 4.0 * diameter * diameter
+        dRe_dmdot = abs(Re / mdot) if mdot else 0.0
+        dh_dmdot = dh_eff_dh * dh_array_dRe * dRe_dmdot * self.Nu_multiplier
+        dh_dT = smooth.dh_dT * (h_eff / smooth.h) * self.Nu_multiplier if smooth.h > 0.0 else 0.0
+
+        dP = 2.0 * rho * v_max * abs(v_max) * model.N_rows * f
+
+        return _PinFinChannelResult(
+            h=h_eff * self.Nu_multiplier,
+            h_array=h_array,
+            eta_fin=eff.eta_fin,
+            Nu=Nu,
+            Re=Re,
+            Pr=Pr,
+            f=f * self.f_multiplier,
+            dP=dP * self.f_multiplier,
+            T_aw=smooth.T_aw,
+            extrapolated=extrapolated,
+            dh_dmdot=dh_dmdot,
+            dh_dT=dh_dT,
+            dT_aw_dmdot=smooth.dT_aw_dmdot,
+            dT_aw_dT=smooth.dT_aw_dT,
+        )
+
     def htc_and_T(
         self,
         T: float,
@@ -653,6 +899,8 @@ class ConvectiveSurface:
             result = self._single_jet_impingement_result(
                 T, P, X, velocity, diameter, length, T_hot, heating
             )
+        elif isinstance(self.model, PinFinModel):
+            result = self._pin_fin_result(T, P, X, velocity, diameter, length, T_hot, heating)
         else:
             raise TypeError(
                 f"Unsupported channel model {type(self.model).__name__}. "
@@ -3340,15 +3588,15 @@ class ChannelElement(NetworkElement):
         friction factor is restated in this file.
 
     Convective surfaces
-        A ``ConvectiveSurface`` adds heat transfer and modifies the drop, in
-        one of two ways. Ribbed and dimpled surfaces contribute a MULTIPLIER on
-        pipe friction, both geometry-only. Pin-fin and impingement arrays
-        instead OWN their drop: those correlations return dP directly, and the
-        element takes it rather than converting it into a multiplier -- see
-        ``residuals``. Provenance for each correlation lives with it in
-        ``cooling_correlations.h`` and ``heat_transfer.h``: Chyu et al. (1997)
-        for dimples, Metzger for pin fins, Florschuetz (1981) / Martin (1977)
-        for impingement.
+        A ``ConvectiveSurface`` adds heat transfer. Ribbed and pin-fin surfaces
+        also OWN the drop: their correlations return the channel's friction
+        factor (ribs: the four-sided Darcy value; pins: Metzger's per-row
+        ``dP / (2 rho Vmax^2 N)``), and the element uses it directly rather
+        than as a multiplier on pipe friction -- see ``_ribbed_residuals`` and
+        ``_pin_fin_residuals``. Impingement surfaces leave the drop to the
+        smooth path (model the jet plate with an ``OrificeElement``).
+        Provenance lives with each correlation set: ``rib_correlation.h``,
+        ``pin_fin_correlation.h``, ``impingement_correlation.h``.
 
     Known gaps
         The array correlations expose no dP sensitivity to static pressure or
@@ -3501,6 +3749,79 @@ class ChannelElement(NetworkElement):
         }
         return res, jac
 
+    def _pin_fin_residuals(self, state_in: NetworkMixtureState, state_out: NetworkMixtureState):
+        """Pin-fin array: the correlation owns the drop, per row.
+
+            dP = 2 rho Vmax^2 N f(Re_D),   Vmax = mdot / (rho A_min)
+               = 2 N f mdot |mdot| / (rho A_min^2)
+            Re_D = mdot D / (mu A_min)                          (signed)
+
+        with ``A_min = A_channel * (A_min/A_frontal)`` from the array geometry
+        and ``f`` the canonical per-row factor of ``pin_fin_correlation.h``.
+        Unlike ribs, pin friction DOES depend on Re, so
+
+            d(dP)/dmdot = 2N/(rho A_min^2) (2 |mdot| f + mdot |mdot| f' D/(mu A_min))
+
+        which is even in mdot, as the ribbed path's. Upstream T and P enter
+        through rho (``-dP/rho``) and through mu in Re
+        (``dP/df * f' * (-Re/mu) * dmu``), both from analytic or tabulated
+        property derivatives (``density_and_jacobians``,
+        ``viscosity_and_jacobians``). Composition sensitivity is the same
+        accepted gap as every other channel-friction path here.
+        """
+        m_dot = state_in.m_dot
+        model = self.surface.model
+        f_mult = self.surface.f_multiplier
+
+        rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
+            state_in.T, state_in.P, state_in.X
+        )
+        rho, drho_draw = _safe_rho(rho_raw)
+        drho_dT = drho_draw * drho_raw_dT
+        drho_dP = drho_draw * drho_raw_dP
+        area = self.area or 0.0
+        if area <= 0.0:
+            return [state_in.Pt - state_out.Pt], {
+                0: {
+                    f"{self.from_node}.Pt": 1.0,
+                    f"{self.to_node}.Pt": -1.0,
+                }
+            }
+
+        mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
+            state_in.T, state_in.P, state_in.X
+        )
+        D = model.pin_diameter
+        a_min = area * cb.pin_fin_amin_over_afrontal(model.geometry())
+        Re = m_dot * D / (a_min * mu) if mu > 0.0 else 0.0
+
+        _, _, f, df_dRe, _ = self.surface._pin_fin_terms(Re, 0.7)
+        f *= f_mult
+        df_dRe *= f_mult
+
+        coeff = 2.0 * model.N_rows / (rho * a_min * a_min)
+        dP = coeff * f * m_dot * abs(m_dot)
+        dRe_dmdot = D / (a_min * mu) if mu > 0.0 else 0.0
+        d_dP_d_mdot = coeff * (2.0 * abs(m_dot) * f + m_dot * abs(m_dot) * df_dRe * dRe_dmdot)
+
+        # Through rho (dP ~ 1/rho at fixed f) and through mu in Re.
+        d_dP_drho = -dP / rho if rho > 0.0 else 0.0
+        d_dP_dmu = coeff * m_dot * abs(m_dot) * df_dRe * (-Re / mu) if mu > 0.0 else 0.0
+        d_dP_dT = d_dP_drho * drho_dT + d_dP_dmu * dmu_dT
+        d_dP_dP_static = d_dP_drho * drho_dP + d_dP_dmu * dmu_dP
+
+        res = [state_in.Pt - state_out.Pt - dP]
+        jac = {
+            0: {
+                f"{self.id}.m_dot": -d_dP_d_mdot,
+                f"{self.from_node}.Pt": 1.0,
+                f"{self.to_node}.Pt": -1.0,
+                f"{self.from_node}.T": -d_dP_dT,
+                f"{self.from_node}.P": -d_dP_dP_static,
+            }
+        }
+        return res, jac
+
     def _exit_head_lost(self, m_dot: float) -> bool:
         """Whether this channel's exit dynamic head is lost downstream.
 
@@ -3528,6 +3849,8 @@ class ChannelElement(NetworkElement):
 
         if self.surface and isinstance(self.surface.model, RibbedModel):
             return self._ribbed_residuals(state_in, state_out)
+        if self.surface and isinstance(self.surface.model, PinFinModel):
+            return self._pin_fin_residuals(state_in, state_out)
 
         if self.regime == "compressible":
             # Use compressible Fanno flow with friction

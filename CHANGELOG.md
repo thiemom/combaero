@@ -153,6 +153,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Pin-fin channels in the network and GUI (#335).** `PinFinModel` on a
+  `ChannelElement`'s `ConvectiveSurface` uses the pin-fin sets.
+
+  - **Velocity:** Vmax comes exactly from the array geometry.
+  - **Heat transfer:** `h` is referenced to the endwall's base area and
+    includes the fin efficiency of pins fed to mid-height (`k_pin`, default
+    20 W/(m K)).
+  - **Drop:** the correlation's own per-row `dP = 2 rho Vmax^2 N f(Re_D)`,
+    with an analytic Jacobian in mass flow and upstream T and P (through rho
+    and mu).
+  - **Inline arrays require a user friction set.** None is available, and
+    staggered friction is not substituted.
+  - **GUI:** the "Pin-Fin Array" surface type is back, and networks saved
+    before 0.7.0 load under their old field names (`pin_diameter`,
+    `channel_height`, `is_staggered`).
+  - **Known gaps:** `T_aw` is borrowed from the smooth correlation, and
+    `dh_dT` is a scaled smooth-correlation proxy. Both are documented.
+
 - **Pin-fin arrays: provenanced sets, exact basis converters and a fin
   model (#335).** `pin_fin_correlation.h` carries each source in its own form
   and converts it exactly, from geometry alone, to one canonical basis:

@@ -15,6 +15,7 @@ from combaero.network import (
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
+    PinFinModel,
     PlenumNode,
     PressureBoundary,
     PressureLossElement,
@@ -46,6 +47,7 @@ from .schemas import (
     MPCETeeData,
     NetworkGraphSchema,
     OrificeData,
+    PinFinModelData,
     PlenumData,
     PressureBoundaryData,
     RibbedModelData,
@@ -118,8 +120,27 @@ def map_surface_model(data):
             L_D=getattr(data, "L_D", d.L_D),
             R_D=getattr(data, "R_D", d.R_D),
         )
+    if isinstance(data, PinFinModelData) or data.type == "pin_fin":
+        import combaero as cb
 
-    # Dimpled and pin-fin were removed in 0.7.0. Reject rather than silently
+        d = PinFinModelData()
+        D = getattr(data, "pin_diameter", d.pin_diameter)
+        H = getattr(data, "channel_height", d.channel_height)
+        return PinFinModel(
+            pin_diameter=D,
+            H_D=H / D if D else d.channel_height / d.pin_diameter,
+            S_D=getattr(data, "S_D", d.S_D),
+            X_D=getattr(data, "X_D", d.X_D),
+            N_rows=getattr(data, "N_rows", d.N_rows),
+            arrangement=(
+                cb.PinArrangement.Staggered
+                if getattr(data, "is_staggered", d.is_staggered)
+                else cb.PinArrangement.Inline
+            ),
+            k_pin=getattr(data, "k_pin", d.k_pin),
+        )
+
+    # Dimpled was removed in 0.7.0. Reject rather than silently
     # falling back to smooth: a saved network asking for one of these and
     # getting an unenhanced surface back is a wrong answer presented as a
     # right one.

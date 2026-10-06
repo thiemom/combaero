@@ -28,6 +28,9 @@ interface SurfaceModelData {
 	N_rows?: number;
 	is_staggered?: boolean;
 	channel_height?: number;
+	// Pin-fin, rebuilt on provenanced sets (#335). The fields above keep their
+	// pre-0.7.0 names so saved networks load intact; k_pin is new.
+	k_pin?: number;
 	// Impingement (array), rebuilt in 0.9.0 on Florschuetz, Truman and Metzger
 	// (1981) with a real Gc/Gj crossflow term -- see issue #337. d_jet is
 	// shared with the single-jet block below.
@@ -78,11 +81,12 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 			pin_fin: {
 				type: "pin_fin",
 				pin_diameter: 0.005,
-				channel_height: 0.01,
+				channel_height: 0.005,
 				S_D: 2.5,
 				X_D: 2.5,
 				N_rows: 10,
 				is_staggered: true,
+				k_pin: 20.0,
 			},
 			impingement: {
 				type: "impingement",
@@ -131,18 +135,17 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 					<option value="single_jet_impingement">
 						Impingement (Single Jet)
 					</option>
-					{/* Dimpled and pin-fin were removed in 0.7.0: their correlations
-					    could not be traced to their cited sources, and remain
-					    deferred (issue #339). Ribbed returned in 0.8.0 on a
-					    provenanced correlation set; impingement returned in 0.9.0
-					    on Florschuetz (1981) with a real crossflow term (#337).
+					<option value="pin_fin">Pin-Fin Array</option>
+					{/* Dimpled was removed in 0.7.0: its correlation could not be
+					    traced to its cited source, and remains deferred (issue
+					    #339). Ribbed returned in 0.8.0, impingement in 0.9.0
+					    (#337) and pin-fin on provenanced sets (#335).
 
-					    Dimpled/pin-fin's parameter blocks below are deliberately
-					    KEPT. They are unreachable from this dropdown, so no new one
-					    can be created -- but a network saved before 0.7.0 still
-					    carries one, and removing the blocks would hide its
-					    parameters and risk losing them on the next save. The user
-					    can see what is there; the backend explains on solve why it
+					    Dimpled's parameter block below is deliberately KEPT. It is
+					    unreachable from this dropdown, so no new one can be created
+					    -- but a network saved before 0.7.0 still carries one, and
+					    removing the block would hide its parameters and risk losing
+					    them on the next save. The backend explains on solve why it
 					    will not run. */}
 				</select>
 			</div>
@@ -296,10 +299,24 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 						/>
 					</div>
 					<LengthInput
-						label="Channel Height"
-						value={surface.channel_height || 0.01}
+						label="Channel (Pin) Height"
+						value={surface.channel_height || 0.005}
 						onChange={(val) => updateFields({ channel_height: val })}
 					/>
+					<div className="flex flex-col gap-1">
+						<label className="text-[10px] text-stone-500">
+							Pin Conductivity (W/m-K)
+						</label>
+						<NumericInput
+							value={surface.k_pin || 20.0}
+							onChange={(val) => updateFields({ k_pin: val })}
+							className="p-1 border rounded text-xs"
+						/>
+						<span className="text-[9px] text-stone-400">
+							For the fin efficiency. 20 is a nickel superalloy at metal
+							temperature.
+						</span>
+					</div>
 					<div className="flex items-center justify-between gap-2 mt-1 px-1">
 						<label className="text-[10px] font-bold text-gray-500 uppercase">
 							Staggered
@@ -311,6 +328,12 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 							className="w-3 h-3 accent-blue-500"
 						/>
 					</div>
+					{surface.is_staggered === false && (
+						<span className="text-[9px] text-amber-600">
+							Inline arrays will not solve yet: no inline pin-fin friction
+							source is available, and staggered friction is not substituted.
+						</span>
+					)}
 				</div>
 			)}
 
