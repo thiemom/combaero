@@ -555,6 +555,53 @@ RibRatioSet taslim_spring_1987(double aspect_ratio_taslim, double e_D);
 // (#335-336).
 ```
 
+### Pin-Fin Correlations
+```cpp
+// pin_fin_correlation.h (#335). Sets carry each source's own form and basis;
+// evaluators take and return one canonical basis:
+//   Re_D = mdot D / (mu A_min),  Nu_D = h D / k,  f = dP / (2 rho Vmax^2 N)
+// Heat transfer and friction are separate sets. Outside a set's box the
+// result is flagged `extrapolated`, never refused; evaluators never throw.
+enum class PinArrangement { Staggered, Inline };
+enum class PinNuSurface { Total, Endwall, Pin };
+enum class PinReBasis { DiameterVmax, VanFossenDprime };
+enum class PinFrictionBasis { PerRowVmax, PerRowGapVmax };
+struct PinFinGeometry { double S_D, X_D, H_D; int N_rows; PinArrangement arrangement; };
+
+// Exact converters (Armstrong & Winstanley 1988, Eqs 8, 10, 13): D'/D, A'/A_min,
+// D_h/D, A_min/A_frontal (min of transverse and staggered diagonal gap), and
+// per-wall area fractions with pins to mid-height.
+double pin_fin_min_gap_D(const PinFinGeometry& g);
+double pin_fin_amin_over_afrontal(const PinFinGeometry& g);
+double pin_fin_dprime_over_D(const PinFinGeometry& g);
+double pin_fin_aprime_over_amin(const PinFinGeometry& g);
+double pin_fin_dh_over_D(const PinFinGeometry& g);
+PinFinAreaFractions pin_fin_area_fractions(const PinFinGeometry& g);
+// eta_fin = tanh(mL)/(mL), L = H/2, m = sqrt(4h/(k D)); eta_t and d/dh analytic.
+PinFinEfficiency pin_fin_array_efficiency(double h, double k_pin, double D,
+                                          double H, double A_f_over_A_t);
+
+PinFinNuResult evaluate_pin_fin_nu(const PinFinNuSet& set, const PinFinGeometry& g,
+                                   double Re_D, double Pr);         // Nu, dNu_dRe
+PinFinFrictionResult evaluate_pin_fin_friction(const PinFinFrictionSet& set,
+                                               const PinFinGeometry& g,
+                                               double Re_D);        // f, df_dRe
+PinFinModifierResult evaluate_pin_fin_modifier(const PinFinRatioModifier& mod,
+                                               const PinFinGeometry& g, double Re_D);
+void validate_pin_fin_geometry(const PinFinGeometry& g);
+void validate_pin_fin_nu_set(const PinFinNuSet& set);
+void validate_pin_fin_friction_set(const PinFinFrictionSet& set);
+void validate_pin_fin_modifier(const PinFinRatioModifier& mod);
+
+PinFinNuSet metzger_1986_staggered_nu();             // default Nu
+PinFinFrictionSet metzger_1982_staggered_friction(); // default f, C1 blend at 1e4
+PinFinNuSet vanfossen_1982_staggered_nu();           // D' basis
+PinFinFrictionSet damerow_1972_staggered_friction(); // per (N-1) rows, wide S/D
+PinFinNuSet chyu_1998_nu(PinArrangement a, PinNuSurface s);
+PinFinRatioModifier chyu_1998_inline_over_staggered(); // has_f = false
+// No inline friction set ships (no source in hand).
+```
+
 ### Jet Impingement Correlations
 ```cpp
 // impingement_correlation.h -- two independent regimes, matching

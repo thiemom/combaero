@@ -14,6 +14,7 @@
 #include "compressible.h"
 #include "cooling_correlations.h"
 #include "impingement_correlation.h"
+#include "pin_fin_correlation.h"
 #include "rib_correlation.h"
 #include "rib_ratio_correlation.h"
 #include "correlation_status.h"
@@ -604,6 +605,222 @@ PYBIND11_MODULE(_core, m) {
         py::arg("z_d"), py::arg("C_D"), py::arg("row"),
         "Gc/Gj at discrete spanwise row (1-indexed, counting from "
         "upstream). Row 1 is exactly 0.");
+
+  // ---------------------------------------------------------------------
+  // Pin-fin arrays (#335): provenanced sets, exact basis converters, fin
+  // model. Canonical basis: Re_D on D and Vmax at A_min, Nu_D = h D / k,
+  // f = dP / (2 rho Vmax^2 N).
+  // ---------------------------------------------------------------------
+  {
+    namespace cc = combaero::cooling;
+    m.attr("PIN_FIN_RE_EPS") = cc::PIN_FIN_RE_EPS;
+    m.attr("PIN_FIN_F_BLEND") = cc::PIN_FIN_F_BLEND;
+
+    py::enum_<cc::PinArrangement>(m, "PinArrangement")
+        .value("Staggered", cc::PinArrangement::Staggered)
+        .value("Inline", cc::PinArrangement::Inline);
+    py::enum_<cc::PinNuSurface>(m, "PinNuSurface",
+                                "Which surface a set's Nu describes.")
+        .value("Total", cc::PinNuSurface::Total,
+               "Pin and endwall, area-weighted (what an array element uses)")
+        .value("Endwall", cc::PinNuSurface::Endwall)
+        .value("Pin", cc::PinNuSurface::Pin);
+    py::enum_<cc::PinReBasis>(m, "PinReBasis")
+        .value("DiameterVmax", cc::PinReBasis::DiameterVmax,
+               "Re_D = mdot D / (mu A_min) (canonical)")
+        .value("VanFossenDprime", cc::PinReBasis::VanFossenDprime,
+               "Re_D' = mdot D' / (mu A'), D' = 4V/A_t, A' = V/L");
+    py::enum_<cc::PinFrictionBasis>(m, "PinFrictionBasis")
+        .value("PerRowVmax", cc::PinFrictionBasis::PerRowVmax,
+               "f = dP / (2 rho Vmax^2 N) (canonical, Metzger)")
+        .value("PerRowGapVmax", cc::PinFrictionBasis::PerRowGapVmax,
+               "f = dP / (2 rho Vmax^2 (N - 1)) (Damerow 1972)");
+
+    py::class_<cc::PinFinGeometry>(m, "PinFinGeometry",
+                                   "Pin array geometry, pitches and height "
+                                   "over the pin diameter.")
+        .def(py::init<>())
+        .def(py::init([](double S_D, double X_D, double H_D, int N_rows,
+                         cc::PinArrangement arrangement) {
+               cc::PinFinGeometry g;
+               g.S_D = S_D;
+               g.X_D = X_D;
+               g.H_D = H_D;
+               g.N_rows = N_rows;
+               g.arrangement = arrangement;
+               return g;
+             }),
+             py::arg("S_D") = 2.5, py::arg("X_D") = 2.5, py::arg("H_D") = 1.0,
+             py::arg("N_rows") = 10,
+             py::arg("arrangement") = cc::PinArrangement::Staggered)
+        .def_readwrite("S_D", &cc::PinFinGeometry::S_D)
+        .def_readwrite("X_D", &cc::PinFinGeometry::X_D)
+        .def_readwrite("H_D", &cc::PinFinGeometry::H_D)
+        .def_readwrite("N_rows", &cc::PinFinGeometry::N_rows)
+        .def_readwrite("arrangement", &cc::PinFinGeometry::arrangement);
+
+    m.def("pin_fin_min_gap_D", &cc::pin_fin_min_gap_D, py::arg("geometry"),
+          "Minimum gap per transverse pitch / D: min(S - 1, diagonal) "
+          "staggered, S - 1 inline.");
+    m.def("pin_fin_amin_over_afrontal", &cc::pin_fin_amin_over_afrontal,
+          py::arg("geometry"), "A_min / A_frontal = Vchannel / Vmax.");
+    m.def("pin_fin_dprime_over_D", &cc::pin_fin_dprime_over_D,
+          py::arg("geometry"), "VanFossen D' / D (Armstrong-Winstanley Eq. 8).");
+    m.def("pin_fin_aprime_over_amin", &cc::pin_fin_aprime_over_amin,
+          py::arg("geometry"), "VanFossen A' / A_min (Eq. 10).");
+    m.def("pin_fin_dh_over_D", &cc::pin_fin_dh_over_D, py::arg("geometry"),
+          "Tube-bank D_h / D = 4 A_min L / (A_t D) (Eq. 13).");
+
+    py::class_<cc::PinFinAreaFractions>(m, "PinFinAreaFractions")
+        .def_readonly("endwall_exposed",
+                      &cc::PinFinAreaFractions::endwall_exposed)
+        .def_readonly("pin", &cc::PinFinAreaFractions::pin)
+        .def_readonly("pin_over_total",
+                      &cc::PinFinAreaFractions::pin_over_total);
+    m.def("pin_fin_area_fractions", &cc::pin_fin_area_fractions,
+          py::arg("geometry"),
+          "Per-wall areas over the base (planform) area, pins to mid-height.");
+
+    py::class_<cc::PinFinEfficiency>(m, "PinFinEfficiency")
+        .def_readonly("eta_fin", &cc::PinFinEfficiency::eta_fin)
+        .def_readonly("eta_t", &cc::PinFinEfficiency::eta_t)
+        .def_readonly("deta_fin_dh", &cc::PinFinEfficiency::deta_fin_dh)
+        .def_readonly("deta_t_dh", &cc::PinFinEfficiency::deta_t_dh);
+    m.def("pin_fin_array_efficiency", &cc::pin_fin_array_efficiency,
+          py::arg("h"), py::arg("k_pin"), py::arg("D"), py::arg("H"),
+          py::arg("A_f_over_A_t"),
+          "Fin and array efficiency, fin length H/2 (Eqs 14-16), with "
+          "analytic d/dh.");
+
+    py::class_<cc::PinFinNuSet>(m, "PinFinNuSet",
+                                "Pin-fin Nu set in its source's own basis.")
+        .def(py::init<>())
+        .def_readwrite("name", &cc::PinFinNuSet::name)
+        .def_readwrite("source", &cc::PinFinNuSet::source)
+        .def_readwrite("validity_source", &cc::PinFinNuSet::validity_source)
+        .def_readwrite("provenance", &cc::PinFinNuSet::provenance)
+        .def_readwrite("arrangement", &cc::PinFinNuSet::arrangement)
+        .def_readwrite("surface", &cc::PinFinNuSet::surface)
+        .def_readwrite("re_basis", &cc::PinFinNuSet::re_basis)
+        .def_readwrite("C", &cc::PinFinNuSet::C)
+        .def_readwrite("Re_exp", &cc::PinFinNuSet::Re_exp)
+        .def_readwrite("Pr_exp", &cc::PinFinNuSet::Pr_exp)
+        .def_readwrite("term_XD", &cc::PinFinNuSet::term_XD)
+        .def_readwrite("term_SD", &cc::PinFinNuSet::term_SD)
+        .def_readwrite("term_HD", &cc::PinFinNuSet::term_HD)
+        .def_readwrite("valid_Re", &cc::PinFinNuSet::valid_Re)
+        .def_readwrite("valid_SD", &cc::PinFinNuSet::valid_SD)
+        .def_readwrite("valid_XD", &cc::PinFinNuSet::valid_XD)
+        .def_readwrite("valid_HD", &cc::PinFinNuSet::valid_HD)
+        .def_readwrite("valid_Nrows", &cc::PinFinNuSet::valid_Nrows)
+        .def_readwrite("valid_Pr", &cc::PinFinNuSet::valid_Pr)
+        .def_readwrite("accuracy_Nu", &cc::PinFinNuSet::accuracy_Nu);
+
+    py::class_<cc::PinFinFrictionSet>(m, "PinFinFrictionSet",
+                                      "Pin-fin friction set, one or two Re "
+                                      "segments blended C1 in ln Re.")
+        .def(py::init<>())
+        .def_readwrite("name", &cc::PinFinFrictionSet::name)
+        .def_readwrite("source", &cc::PinFinFrictionSet::source)
+        .def_readwrite("validity_source",
+                       &cc::PinFinFrictionSet::validity_source)
+        .def_readwrite("provenance", &cc::PinFinFrictionSet::provenance)
+        .def_readwrite("arrangement", &cc::PinFinFrictionSet::arrangement)
+        .def_readwrite("basis", &cc::PinFinFrictionSet::basis)
+        .def_readwrite("C1", &cc::PinFinFrictionSet::C1)
+        .def_readwrite("Re_exp1", &cc::PinFinFrictionSet::Re_exp1)
+        .def_readwrite("C2", &cc::PinFinFrictionSet::C2)
+        .def_readwrite("Re_exp2", &cc::PinFinFrictionSet::Re_exp2)
+        .def_readwrite("Re_split", &cc::PinFinFrictionSet::Re_split)
+        .def_readwrite("term_SD", &cc::PinFinFrictionSet::term_SD)
+        .def_readwrite("term_XD", &cc::PinFinFrictionSet::term_XD)
+        .def_readwrite("term_HD", &cc::PinFinFrictionSet::term_HD)
+        .def_readwrite("valid_Re", &cc::PinFinFrictionSet::valid_Re)
+        .def_readwrite("valid_SD", &cc::PinFinFrictionSet::valid_SD)
+        .def_readwrite("valid_XD", &cc::PinFinFrictionSet::valid_XD)
+        .def_readwrite("valid_HD", &cc::PinFinFrictionSet::valid_HD)
+        .def_readwrite("valid_Nrows", &cc::PinFinFrictionSet::valid_Nrows)
+        .def_readwrite("accuracy_f", &cc::PinFinFrictionSet::accuracy_f);
+
+    py::class_<cc::PinFinRatioModifier>(
+        m, "PinFinRatioModifier",
+        "A data-backed ratio applied to another set's output.")
+        .def(py::init<>())
+        .def_readwrite("name", &cc::PinFinRatioModifier::name)
+        .def_readwrite("source", &cc::PinFinRatioModifier::source)
+        .def_readwrite("provenance", &cc::PinFinRatioModifier::provenance)
+        .def_readwrite("from_arrangement",
+                       &cc::PinFinRatioModifier::from_arrangement)
+        .def_readwrite("to_arrangement",
+                       &cc::PinFinRatioModifier::to_arrangement)
+        .def_readwrite("surface", &cc::PinFinRatioModifier::surface)
+        .def_readwrite("C_Nu", &cc::PinFinRatioModifier::C_Nu)
+        .def_readwrite("Nu_Re_exp", &cc::PinFinRatioModifier::Nu_Re_exp)
+        .def_readwrite("has_f", &cc::PinFinRatioModifier::has_f)
+        .def_readwrite("C_f", &cc::PinFinRatioModifier::C_f)
+        .def_readwrite("f_Re_exp", &cc::PinFinRatioModifier::f_Re_exp)
+        .def_readwrite("valid_Re", &cc::PinFinRatioModifier::valid_Re)
+        .def_readwrite("valid_SD", &cc::PinFinRatioModifier::valid_SD)
+        .def_readwrite("valid_XD", &cc::PinFinRatioModifier::valid_XD)
+        .def_readwrite("valid_HD", &cc::PinFinRatioModifier::valid_HD);
+
+    py::class_<cc::PinFinNuResult>(m, "PinFinNuResult")
+        .def_readonly("Nu", &cc::PinFinNuResult::Nu)
+        .def_readonly("dNu_dRe", &cc::PinFinNuResult::dNu_dRe)
+        .def_readonly("Re_native", &cc::PinFinNuResult::Re_native)
+        .def_readonly("extrapolated", &cc::PinFinNuResult::extrapolated);
+    py::class_<cc::PinFinFrictionResult>(m, "PinFinFrictionResult")
+        .def_readonly("f", &cc::PinFinFrictionResult::f)
+        .def_readonly("df_dRe", &cc::PinFinFrictionResult::df_dRe)
+        .def_readonly("extrapolated",
+                      &cc::PinFinFrictionResult::extrapolated);
+    py::class_<cc::PinFinModifierResult>(m, "PinFinModifierResult")
+        .def_readonly("ratio_Nu", &cc::PinFinModifierResult::ratio_Nu)
+        .def_readonly("dratio_Nu_dRe",
+                      &cc::PinFinModifierResult::dratio_Nu_dRe)
+        .def_readonly("ratio_f", &cc::PinFinModifierResult::ratio_f)
+        .def_readonly("dratio_f_dRe", &cc::PinFinModifierResult::dratio_f_dRe)
+        .def_readonly("has_f", &cc::PinFinModifierResult::has_f)
+        .def_readonly("extrapolated",
+                      &cc::PinFinModifierResult::extrapolated);
+
+    m.def("evaluate_pin_fin_nu", &cc::evaluate_pin_fin_nu,
+          py::arg("correlation_set"), py::arg("geometry"), py::arg("Re_D"),
+          py::arg("Pr"),
+          "Canonical Nu_D (and analytic dNu/dRe_D) from a set in any basis. "
+          "Never throws.");
+    m.def("evaluate_pin_fin_friction", &cc::evaluate_pin_fin_friction,
+          py::arg("correlation_set"), py::arg("geometry"), py::arg("Re_D"),
+          "Canonical f = dP / (2 rho Vmax^2 N) and df/dRe_D. Never throws.");
+    m.def("evaluate_pin_fin_modifier", &cc::evaluate_pin_fin_modifier,
+          py::arg("modifier"), py::arg("geometry"), py::arg("Re_D"));
+    m.def("validate_pin_fin_geometry", &cc::validate_pin_fin_geometry,
+          py::arg("geometry"));
+    m.def("validate_pin_fin_nu_set", &cc::validate_pin_fin_nu_set,
+          py::arg("correlation_set"));
+    m.def("validate_pin_fin_friction_set", &cc::validate_pin_fin_friction_set,
+          py::arg("correlation_set"));
+    m.def("validate_pin_fin_modifier", &cc::validate_pin_fin_modifier,
+          py::arg("modifier"));
+
+    m.def("metzger_1986_staggered_nu", &cc::metzger_1986_staggered_nu,
+          "Metzger et al. (1986) via Armstrong-Winstanley Eq. 2. Default.");
+    m.def("metzger_1982_staggered_friction",
+          &cc::metzger_1982_staggered_friction,
+          "Metzger, Fan & Shepard (1982) via Armstrong-Winstanley Eqs 20-21. "
+          "Default.");
+    m.def("vanfossen_1982_staggered_nu", &cc::vanfossen_1982_staggered_nu,
+          "VanFossen (1982), NASA TM-81696 Eq. 16, D' basis.");
+    m.def("damerow_1972_staggered_friction",
+          &cc::damerow_1972_staggered_friction,
+          "Damerow et al. (1972), NASA CR-120883 Eq. 18.");
+    m.def("chyu_1998_nu", &cc::chyu_1998_nu, py::arg("arrangement"),
+          py::arg("surface"),
+          "Chyu et al. (1998), ASME 98-GT-175, via Han Table 4.7.");
+    m.def("chyu_1998_inline_over_staggered",
+          &cc::chyu_1998_inline_over_staggered,
+          "Chyu (1998) inline/staggered Total Nu ratio; no friction ratio.");
+  }
 
   m.doc() = "Python bindings for combaero core";
 
@@ -6497,10 +6714,6 @@ PYBIND11_MODULE(_core, m) {
 
 
 
-
-  // -----------------------------------------------------------------
-  // pin_fin_friction (scalar, low-level)
-  // -----------------------------------------------------------------
 
   // -----------------------------------------------------------------
   // Internal Solver Tools (f, J) exact Jacobians
