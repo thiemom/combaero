@@ -37,6 +37,11 @@ class ImpingementModelData(BaseModel):
     """Jet array impingement cooling, one row (Florschuetz, Truman and
     Metzger 1981), on a real crossflow term.
 
+    The channel is the row's crossflow channel and its mass flow is the row's
+    jet flow. The convective area defaults to the row's target footprint
+    matched to the channel cross-section, A_flow * (xn/d) / (z/d), so the
+    hole count follows from the channel (#462).
+
     Restored in 0.9.0 after the previous impingement correlation was removed
     for citing this same paper while taking no crossflow input at all,
     making it structurally unable to be that correlation. See issue #337.
@@ -63,12 +68,13 @@ class ImpingementModelData(BaseModel):
 
 
 class SingleJetImpingementModelData(BaseModel):
-    """A single free round jet (Goldstein, Behbahani and Heppelmann 1986),
-    at a representative radial position.
+    """A single free round jet (Goldstein, Behbahani and Heppelmann 1986).
 
     Unlike ImpingementModelData, there is no array and no crossflow. Nu is
-    LOCAL to the radial position R_D, not area-averaged -- this reports one
-    representative value for the target patch, not a profile.
+    the AVERAGE over the disc of radius R_D * d_jet around the stagnation
+    point (Han Eq. 4.1, "an average heat-transfer coefficient correlation"),
+    and the channel's convective area defaults to exactly that disc (#462).
+    The channel's mass flow is the jet's flow.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -78,9 +84,8 @@ class SingleJetImpingementModelData(BaseModel):
     # Jet-to-target-plate spacing / d_jet. 7.75 is the correlation's own
     # optimum spacing.
     L_D: float = 7.75
-    # Radial distance from the jet centerline / d_jet. 5.0 matches the
-    # source's own closed-form check point, a worked example, not a default
-    # that suits every rig.
+    # Radius of the averaging disc / d_jet. 5.0 matches the source's own
+    # closed-form check point (Re 25,000, L/D 7.75: Nu 60 / 56).
     R_D: float = 5.0
 
 

@@ -1,3 +1,5 @@
+import pytest
+
 from gui.backend.graph_builder import _expand_initial_guess, build_network_from_schema
 from gui.backend.schemas import NetworkGraphSchema
 
@@ -251,3 +253,54 @@ def test_prior_result_warm_start_used_when_converged():
 
     ok_elem = {"result": {"success": True, "m_dot": 0.4}}
     assert _guess_from_prior_result(ok_elem, "ch")["ch.m_dot"] == 0.4
+
+
+def _impingement_channel_schema(surface: dict) -> NetworkGraphSchema:
+    return NetworkGraphSchema(
+        nodes=[
+            {"id": "p_in", "type": "plenum", "position": {"x": 0.0, "y": 0.0}, "data": {}},
+            {"id": "p_out", "type": "plenum", "position": {"x": 400.0, "y": 0.0}, "data": {}},
+            {
+                "id": "ch",
+                "type": "channel",
+                "position": {"x": 200.0, "y": 0.0},
+                "data": {"L": 1.0, "D": 0.05, "surface": surface},
+            },
+        ],
+        edges=[
+            {"id": "e1", "source": "p_in", "target": "ch", "data": {}},
+            {"id": "e2", "source": "ch", "target": "p_out", "data": {}},
+        ],
+    )
+
+
+def test_gui_impingement_channel_gets_the_row_footprint_not_the_wetted_wall():
+    """#462: the GUI used pi D L, which put a default flow over ~820 holes."""
+    import math
+
+    net = build_network_from_schema(
+        _impingement_channel_schema(
+            {"type": "impingement", "d_jet": 0.002, "xn_d": 8.0, "yn_d": 6.0, "z_d": 2.0}
+        )
+    )
+    net.resolve_all_topology()
+    ch = net.elements["ch"]
+    assert ch.surface.area == pytest.approx(math.pi / 4 * 0.05**2 * 8.0 / 2.0, rel=1e-12)
+
+
+def test_gui_single_jet_channel_gets_the_averaging_disc():
+    import math
+
+    net = build_network_from_schema(
+        _impingement_channel_schema({"type": "single_jet_impingement", "d_jet": 0.003, "R_D": 5.0})
+    )
+    net.resolve_all_topology()
+    assert net.elements["ch"].surface.area == pytest.approx(math.pi * (5.0 * 0.003) ** 2)
+
+
+def test_gui_smooth_channel_keeps_the_wetted_wall():
+    import math
+
+    net = build_network_from_schema(_impingement_channel_schema({"type": "smooth"}))
+    net.resolve_all_topology()
+    assert net.elements["ch"].surface.area == pytest.approx(math.pi * 0.05 * 1.0)
