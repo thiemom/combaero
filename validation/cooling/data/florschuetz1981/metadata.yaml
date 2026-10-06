@@ -58,8 +58,9 @@ paper:
 # worst residual 0.16 Nu), x on the 2/4/6/8/10 ticks; markers at exactly
 # yn/d = 4/6/8. Overlapping markers were separated by shape from zoomed crops
 # (a marker is about 18 px tall; stacked centres sit 9 px in from the merged
-# blob's edges; concentric pairs share the blob centre). Scan overlay sent
-# for user confirmation, 2026-10-06 (pending).
+# blob's edges; concentric pairs share the blob centre). User-confirmed on
+# a scan overlay, 2026-10-06: accepted; a finer centroid would move points
+# only marginally.
 files:
   - path: rc_00_circles_zd_1.csv
     after: null
