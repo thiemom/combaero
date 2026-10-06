@@ -7,10 +7,10 @@ right one, so `map_surface_model` raises instead of falling through.
 
 Ribbed returned in 0.8.0 on a provenanced correlation set; impingement (both
 the jet array and the single-jet form) returned in 0.9.0 on Florschuetz,
-Truman and Metzger (1981) with a real crossflow term (#337). Dimpled and
-pin-fin remain deferred indefinitely (#339). This file pins three things:
-that ribbed and both impingement forms map again, that the still-deferred two
-refuse, and that every field survives the JSON round trip.
+Truman and Metzger (1981) with a real crossflow term (#337). Pin-fin returned
+on provenanced sets (#335). Dimpled remains deferred (#339). This file pins
+three things: that the restored surfaces map again, that dimpled refuses, and
+that every field survives the JSON round trip.
 """
 
 from __future__ import annotations
@@ -69,12 +69,42 @@ def test_single_jet_impingement_maps_again() -> None:
     assert pytest.approx(7.75) == m.L_D
 
 
-@pytest.mark.parametrize("surface", ["dimpled", "pin_fin"])
+@pytest.mark.parametrize("surface", ["dimpled"])
 def test_deferred_surfaces_report_removal(surface: str) -> None:
     with pytest.raises(ValueError, match="removed in 0.7.0") as exc:
         map_surface_model(_Surface(surface))
     assert "#339" in str(exc.value)
     assert "temporarily" not in str(exc.value)
+
+
+def test_pin_fin_maps_again_from_a_pre_0_7_0_saved_network() -> None:
+    """Pin-fin returned on provenanced sets (#335), under the OLD field names.
+
+    A network saved before 0.7.0 carries pin_diameter / channel_height /
+    is_staggered; those must reach the element unchanged, with H/D derived.
+    """
+    import combaero as cb
+    from combaero.network.components import PinFinModel
+
+    s = _Surface("pin_fin")
+    s.pin_diameter, s.channel_height = 0.004, 0.006
+    s.S_D, s.X_D, s.N_rows, s.is_staggered = 3.0, 2.0, 10, True
+    m = map_surface_model(s)
+    assert isinstance(m, PinFinModel)
+    assert m.pin_diameter == pytest.approx(0.004)
+    assert pytest.approx(1.5) == m.H_D
+    assert (m.S_D, m.X_D, m.N_rows) == (3.0, 2.0, 10)
+    assert m.arrangement == cb.PinArrangement.Staggered
+    # A type-only network gets the schema's working-example defaults.
+    d = map_surface_model(_Surface("pin_fin"))
+    assert pytest.approx(1.0) == d.H_D
+
+
+def test_inline_pin_fin_is_refused_with_the_reason() -> None:
+    s = _Surface("pin_fin")
+    s.is_staggered = False
+    with pytest.raises(ValueError, match="inline array needs a friction set"):
+        map_surface_model(s)
 
 
 def test_unknown_surface_is_rejected_too() -> None:

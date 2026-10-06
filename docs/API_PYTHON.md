@@ -517,7 +517,8 @@ temps, q = cb.wall_temperature_profile(T_hot=1200, T_cold=300, h_hot=200, h_cold
 Defines convective heat transfer properties on network elements. Supports different channel models.
 
 ```python
-from combaero.heat_transfer import ConvectiveSurface, SmoothModel, RibbedModel, DimpledModel, PinFinModel, ImpingementModel
+import combaero as cb
+from combaero.heat_transfer import ConvectiveSurface, PinFinModel, RibbedModel, SmoothModel
 
 # Smooth channel with Gnielinski correlation (default)
 surface = ConvectiveSurface(
@@ -525,27 +526,17 @@ surface = ConvectiveSurface(
     model=SmoothModel(correlation="gnielinski")
 )
 
-# Ribbed surface with geometry parameters
+# Ribbed walls (see "Ribbed Channels" below)
 ribbed = ConvectiveSurface(
     area=2.5,
-    model=RibbedModel(
-        e_D=0.05,      # Rib height / hydraulic diameter
-        p_e=10.0,     # Pitch / height
-        w_e=0.5,      # Rib width / height
-        correlation="gnielinski"
-    )
+    model=RibbedModel(e_D=0.06, p_e=10.0, alpha_deg=90.0, W_H=1.0, n_ribbed_walls=2),
 )
 
-# Pin fin array
-pin_fin = ConvectiveSurface(
-    area=3.0,
-    model=PinFinModel(
-        L_H=1.0,       # Fin height / hydraulic diameter
-        S_H=2.0,       # Spanwise spacing / height
-        S_L=2.0,       # Streamwise spacing / height
-        t_D=0.1,       # Fin thickness / diameter
-        correlation="gnielinski"
-    )
+# Staggered pin-fin array (see "Pin-Fin Channels" below); area is the
+# endwall's BASE (planform) area
+pins = ConvectiveSurface(
+    area=0.01,
+    model=PinFinModel(pin_diameter=0.005, S_D=2.5, X_D=2.5, H_D=1.0, N_rows=10),
 )
 ```
 
@@ -1557,6 +1548,48 @@ That knob exists because the ribbed side already has a better one: change `C_G`
 on the parameter set, which records what you changed and why. The smooth walls
 come from Gnielinski and have no set of their own.
 
+### Pin-Fin Channels
+
+`PinFinModel` puts a pin-fin array on a `ChannelElement`'s `ConvectiveSurface`
+(#335). It uses the pin-fin sets below: heat transfer from `nu_set`
+(default `metzger_1986_staggered_nu()`), the drop from `f_set` (default
+`metzger_1982_staggered_friction()`), optionally transferred by a
+`modifier`.
+
+```python
+from combaero.network import ChannelElement, ConvectiveSurface, PinFinModel
+
+pins = PinFinModel(pin_diameter=0.005, S_D=2.5, X_D=2.5, H_D=1.0, N_rows=10,
+                   k_pin=20.0)     # W/(m K), for the fin efficiency
+ch = ChannelElement("te", "A", "B", length=0.125, diameter=0.009,
+                    surface=ConvectiveSurface(area=0.01, model=pins))
+```
+
+- **The element's flow area is the unobstructed channel.** Vmax follows
+  exactly from the array geometry (`A_min/A_frontal`), and
+  `Re_D = rho Vmax D / mu`.
+- **`ConvectiveSurface.area` is the endwall's base (planform) area.** The
+  returned `h` is referenced to it and includes the fin efficiency of
+  pins fed from each wall to mid-height:
+  `h_eff = h (A_endwall_exposed + eta_fin A_pin) / A_base`. `h_array` and
+  `eta_fin` on the result show both halves.
+- **The drop is the correlation's own per-row form,**
+  `dP = 2 rho Vmax^2 N f(Re_D)`, with an analytic Jacobian in mass flow,
+  upstream T and P (through rho and mu). The code removed in 0.7.0 used
+  `rho V^2/2` here, a factor of 4 low.
+- **Inline arrays need a user `f_set`.** No inline friction source is
+  available, and staggered friction is not substituted:
+  `PinFinModel(arrangement=Inline)` without one raises. Heat transfer
+  defaults to Chyu's inline set, or use
+  `modifier=cb.chyu_1998_inline_over_staggered()` to transfer a staggered
+  set.
+- **Known gaps:**
+  - `T_aw` is borrowed from the smooth correlation, as the impingement
+    paths do.
+  - `dh_dT` is the smooth result's relative property sensitivity scaled to
+    `h`; the pin correlations expose no temperature derivative of their
+    own.
+
 ### Impingement Channels
 
 ```python
@@ -1752,6 +1785,8 @@ mine.provenance = cb.RibProvenance.User
 mine.C = 0.150
 cb.validate_pin_fin_nu_set(mine)
 ```
+
+To use a set in a network, see **Pin-Fin Channels** (`PinFinModel`).
 
 Not yet carried, and declared rather than assumed: row-count correction (a
 geometry with a different `N_rows` is flagged), channel convergence, long pins
