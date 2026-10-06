@@ -330,8 +330,9 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 					</div>
 					{surface.is_staggered === false && (
 						<span className="text-[9px] text-amber-600">
-							Inline arrays will not solve yet: no inline pin-fin friction
-							source is available, and staggered friction is not substituted.
+							Inline friction comes from a single source (Chyu 1990) at one
+							geometry: H/D 1, S/D = X/D = 2.5. Results elsewhere are flagged as
+							extrapolated.
 						</span>
 					)}
 				</div>

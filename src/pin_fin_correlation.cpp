@@ -255,6 +255,8 @@ PinFinFrictionResult evaluate_pin_fin_friction(const PinFinFrictionSet &set,
   if (set.basis == PinFrictionBasis::PerRowGapVmax && geom.N_rows >= 1) {
     to_canonical = static_cast<double>(geom.N_rows - 1) /
                    static_cast<double>(geom.N_rows);
+  } else if (set.basis == PinFrictionBasis::PerRowHalfHeadVmax) {
+    to_canonical = 0.25;
   }
   out.f = f.v * to_canonical;
   out.df_dRe = f.d * to_canonical * dx_dRe;
@@ -529,6 +531,106 @@ PinFinRatioModifier chyu_1998_inline_over_staggered() {
   m.Nu_Re_exp = 0.733 - 0.583;
   m.has_f = false;
   m.valid_Re = range(5.0e3, 2.5e4);
+  m.valid_SD = range(2.45, 2.55);
+  m.valid_XD = range(2.45, 2.55);
+  m.valid_HD = range(0.95, 1.05);
+  return m;
+}
+
+PinFinNuSet chyu_1990_nu(PinArrangement arrangement, bool fillet) {
+  // Chyu (1990) Table 2.
+  double A = 0.0, B = 0.0;
+  if (arrangement == PinArrangement::Inline) {
+    A = fillet ? 0.403 : 0.463;
+    B = fillet ? 0.550 : 0.537;
+  } else {
+    A = fillet ? 0.234 : 0.690;
+    B = fillet ? 0.608 : 0.511;
+  }
+  PinFinNuSet s;
+  s.name = std::string("chyu_1990_") +
+           (arrangement == PinArrangement::Inline ? "inline" : "staggered") +
+           (fillet ? "_fillet" : "_straight");
+  s.source =
+      "Chyu (1990), J. Heat Transfer 112, 926, Table 2 (naphthalene, pin "
+      "surface; endwall/pin Sh 0.89-1.09 per Table 1)";
+  s.validity_source =
+      "Chyu (1990): H/D = 1, S/D = X/D = 2.5, 7 rows, Re 5e3 to 3e4";
+  s.provenance = RibProvenance::Extracted;
+  s.arrangement = arrangement;
+  s.surface = PinNuSurface::Pin;
+  s.re_basis = PinReBasis::DiameterVmax;
+  s.C = A;
+  s.Re_exp = B;
+  s.Pr_exp = 0.4;
+  s.valid_Re = range(5.0e3, 3.0e4);
+  s.valid_SD = range(2.45, 2.55);
+  s.valid_XD = range(2.45, 2.55);
+  s.valid_HD = range(0.95, 1.05);
+  s.valid_Nrows = range(6.5, 7.5);
+  s.valid_Pr = 0.7;
+  return s;
+}
+
+PinFinFrictionSet chyu_1990_friction(PinArrangement arrangement, bool fillet) {
+  // Fitted to Chyu (1990) Fig. 6 as digitised in
+  // validation/cooling/data/chyu1990/; Re ranges are the digitised extremes,
+  // rounded outward.
+  struct Fit {
+    double C, m, re_lo, re_hi, rms;
+  };
+  Fit fit{};
+  if (arrangement == PinArrangement::Inline) {
+    fit = fillet ? Fit{0.6851, -0.1388, 1.02e4, 2.21e4, 0.0021}
+                 : Fit{0.1693, 0.0, 8.8e3, 2.08e4, 0.0137};
+  } else {
+    fit = fillet ? Fit{9.3866, -0.3632, 1.04e4, 2.24e4, 0.0188}
+                 : Fit{1.6163, -0.1867, 9.2e3, 2.12e4, 0.0202};
+  }
+  PinFinFrictionSet s;
+  s.name = std::string("chyu_1990_") +
+           (arrangement == PinArrangement::Inline ? "inline" : "staggered") +
+           (fillet ? "_fillet" : "_straight") + "_friction";
+  s.source =
+      "Chyu (1990), J. Heat Transfer 112, 926, Fig. 6, digitised and fitted "
+      "(validation/cooling/data/chyu1990)";
+  s.validity_source =
+      "Chyu (1990): H/D = 1, S/D = X/D = 2.5, 7 rows; Re span of the "
+      "digitised points";
+  s.provenance = RibProvenance::Fitted;
+  s.arrangement = arrangement;
+  s.basis = PinFrictionBasis::PerRowHalfHeadVmax;
+  s.C1 = fit.C;
+  s.Re_exp1 = fit.m;
+  s.valid_Re = range(fit.re_lo, fit.re_hi);
+  s.valid_SD = range(2.45, 2.55);
+  s.valid_XD = range(2.45, 2.55);
+  s.valid_HD = range(0.95, 1.05);
+  s.valid_Nrows = range(6.5, 7.5);
+  // The fit's own residual against the points it was fitted to: reportable,
+  // never a judging band.
+  s.accuracy_f = StatedAccuracy::measured(fit.rms);
+  return s;
+}
+
+PinFinRatioModifier chyu_1990_fillet_over_straight(
+    PinArrangement arrangement) {
+  const PinFinNuSet straight = chyu_1990_nu(arrangement, false);
+  const PinFinNuSet fillet = chyu_1990_nu(arrangement, true);
+  PinFinRatioModifier m;
+  m.name = std::string("chyu_1990_fillet_over_straight_") +
+           (arrangement == PinArrangement::Inline ? "inline" : "staggered");
+  m.source =
+      "Chyu (1990), J. Heat Transfer 112, 926: the ratio of the fillet and "
+      "straight-pin correlations of Table 2";
+  m.provenance = RibProvenance::Extracted;
+  m.from_arrangement = arrangement;
+  m.to_arrangement = arrangement;
+  m.surface = PinNuSurface::Pin;
+  m.C_Nu = fillet.C / straight.C;
+  m.Nu_Re_exp = fillet.Re_exp - straight.Re_exp;
+  m.has_f = false;
+  m.valid_Re = range(5.0e3, 3.0e4);
   m.valid_SD = range(2.45, 2.55);
   m.valid_XD = range(2.45, 2.55);
   m.valid_HD = range(0.95, 1.05);

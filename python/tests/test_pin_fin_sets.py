@@ -66,16 +66,34 @@ def test_converters_match_the_unit_cell() -> None:
     )
 
 
-def test_inline_ships_heat_transfer_and_a_ratio_but_no_friction() -> None:
+def test_the_chyu_ratio_carries_no_friction_ratio() -> None:
     mod = cb.chyu_1998_inline_over_staggered()
     assert mod.has_f is False
     inline = cb.PinFinGeometry(arrangement=cb.PinArrangement.Inline, N_rows=7)
     r = cb.evaluate_pin_fin_modifier(mod, inline, 1.0e4)
     assert r.ratio_f == 1.0
     assert 0.8 < r.ratio_Nu < 0.9  # 0.846 at Re 1e4
-    # Every shipped friction set is staggered.
-    for f in (cb.metzger_1982_staggered_friction(), cb.damerow_1972_staggered_friction()):
-        assert f.arrangement == cb.PinArrangement.Staggered
+
+
+@pytest.mark.parametrize("arrangement", ["Inline", "Staggered"])
+@pytest.mark.parametrize("fillet", [False, True])
+def test_chyu_1990_friction_reproduces_its_digitised_points(arrangement: str, fillet: bool) -> None:
+    """The Fitted sets must sit on the Fig. 6 points they were fitted to.
+
+    Fit quality, not fidelity: this guards the transcription of the fit into
+    the factory, and that the data on disk is what the fit came from.
+    """
+    from validation.cooling.schema import DATA_ROOT
+
+    arr = getattr(cb.PinArrangement, arrangement)
+    tag = f"{arrangement.lower()}_{'fillet' if fillet else 'straight'}"
+    path = next((DATA_ROOT / "chyu1990").glob(f"fig6_{tag}_*.csv"))
+    rows = [tuple(map(float, ln.split(","))) for ln in path.read_text().splitlines()[1:]]
+    s = cb.chyu_1990_friction(arr, fillet)
+    g = cb.PinFinGeometry(arrangement=arr, N_rows=7)
+    for x, f_chyu in rows:
+        f = cb.evaluate_pin_fin_friction(s, g, x * 1.0e4).f
+        assert f * 4.0 == pytest.approx(f_chyu, rel=0.04), (tag, x)
 
 
 def test_fin_efficiency_through_the_binding() -> None:

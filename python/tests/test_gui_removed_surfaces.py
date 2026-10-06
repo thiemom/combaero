@@ -100,11 +100,14 @@ def test_pin_fin_maps_again_from_a_pre_0_7_0_saved_network() -> None:
     assert pytest.approx(1.0) == d.H_D
 
 
-def test_inline_pin_fin_is_refused_with_the_reason() -> None:
+def test_inline_pin_fin_maps_with_chyu_friction() -> None:
+    import combaero as cb
+
     s = _Surface("pin_fin")
     s.is_staggered = False
-    with pytest.raises(ValueError, match="inline array needs a friction set"):
-        map_surface_model(s)
+    m = map_surface_model(s)
+    assert m.arrangement == cb.PinArrangement.Inline
+    assert m.resolved_f_set().name == "chyu_1990_inline_straight_friction"
 
 
 def test_unknown_surface_is_rejected_too() -> None:

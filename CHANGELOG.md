@@ -153,6 +153,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Chyu (1990) pin-fin sets, and inline friction (#335).**
+  - `chyu_1990_nu(arrangement, fillet)`: Table 2, straight or pin-endwall-fillet pins, inline or staggered (pin surface).
+  - `chyu_1990_friction(arrangement, fillet)`: Fig. 6, digitised and fitted (provenance Fitted). The points are committed in `validation/cooling/data/chyu1990/`.
+  - `chyu_1990_fillet_over_straight`: a fillet modifier (staggered 0.78-0.92).
+  - **Inline pin-fin arrays now solve.** `PinFinModel` defaults inline friction to Chyu's set, the only inline source, measured at one geometry. A staggered friction set on an inline array is refused.
+  - **New friction basis:** `PinFrictionBasis.PerRowHalfHeadVmax` for Chyu's `f = 2 dP/(rho Vmax^2 N)`, 4x the canonical value.
+  - **Cross-lab disagreement:** Chyu's staggered friction is 16-25% below Metzger's at the same geometry. Reported, not reconciled.
+
 - **Pin-fin channels in the network and GUI (#335).** `PinFinModel` on a
   `ChannelElement`'s `ConvectiveSurface` uses the pin-fin sets.
 
