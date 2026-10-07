@@ -1033,6 +1033,16 @@ std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient
     const std::vector<double>& eta_rows,
     const std::vector<double>& alpha_between_rows);
 
+// Panel-averaged effusion film (#471): Baldauf per row, Sellers-superposed,
+// averaged over the rows -- (1/N) sum_n Sellers{eta(j pitch_x/D), j=1..n}.
+// The alternative closure Andrews 88-GT-290 refuses offered alone; select it
+// explicitly. extrapolated flags Baldauf's envelope.
+struct EffusionPanelFilm { double eta; bool extrapolated; };
+EffusionPanelFilm effusion_panel_film_effectiveness(int n_rows, double pitch_x_over_D,
+                                                    double s_over_D, double M,
+                                                    double density_ratio,
+                                                    double alpha_deg, double Tu);
+
 // Gao Eq. (5): the published FORM of alpha. a and b are REQUIRED -- the
 // published values 12 and 0.9465 (gao_a_case1/b_case1) do not transfer:
 // alpha >= b for every r, so they cannot reach the 0.69-0.85 a tighter

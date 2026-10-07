@@ -285,6 +285,37 @@ class OrificeData(BaseModel):
         return data
 
 
+class EffusionPlateData(BaseModel):
+    """Effusion / film plate, plenum-fed (#471): it owns its wall.
+
+    The node it discharges into decides the gas side: a momentum chamber
+    (flow) gives the gas coefficient, temperature and blowing ratio; a plenum
+    (state, no flow) takes the imposed gas_heat_flux. Defaults are Andrews et
+    al.'s plate C (86-GT-225 / 88-GT-290), the geometry the closure is scored
+    on: 3.27 mm holes, 6.3 mm wall, 15.24 mm square pitch, 152 mm panel.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    hole_diameter: float = Field(default=3.27e-3, gt=0.0)
+    wall_thickness: float = Field(default=6.3e-3, gt=0.0)
+    pitch_x: float = Field(default=15.24e-3, gt=0.0)
+    pitch_y: float = Field(default=15.24e-3, gt=0.0)
+    panel_length: float = Field(default=0.152, gt=0.0)
+    panel_width: float = Field(default=0.152, gt=0.0)
+    angle_deg: float = Field(default=90.0, gt=0.0, le=90.0)
+    correlation: Literal["IdelchikThick", "Lichtarowicz", "McGreehanSchotsch", "fixed"] = (
+        "IdelchikThick"
+    )
+    Cd: float = 0.6
+    internal_Nu_multiplier: float = Field(default=1.0, gt=0.0)
+    wall_conductivity: float = Field(default=20.0, gt=0.0)
+    gas_film: Literal["none", "baldauf_sellers"] = "none"
+    gas_augmentation: float = Field(default=1.0, gt=0.0)
+    turbulence_intensity: float = Field(default=0.05, gt=0.0)
+    gas_heat_flux: float = 0.0
+    label: str | None = None
+
+
 class ImpingementArrayData(BaseModel):
     """Impingement array, channel exit (#465): ONE configuration.
 

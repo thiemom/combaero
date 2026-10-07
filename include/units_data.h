@@ -689,6 +689,12 @@ inline constexpr Entry function_units[] = {
      "epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K", "W"},
     {"adiabatic_wall_temperature", "T_hot: K, T_coolant: K, eta: -", "K"},
     {"film_superposition_sellers", "eta_rows: -", "- (eta)"},
+    {"effusion_panel_film_effectiveness",
+     "n_rows: -, pitch_x_over_D: -, s_over_D: -, M: -, density_ratio: -, "
+     "alpha_deg: deg, Tu: -",
+     "EffusionPanelFilm"},
+    {"EffusionPanelFilm::eta", "-", "-"},
+    {"EffusionPanelFilm::extrapolated", "-", "-"},
     {"film_superposition_sellers_and_gradient", "eta_rows: -",
      "- (eta), - (d eta/d eta_i)"},
     {"film_superposition_corrected", "eta_rows: -, alpha_between_rows: -",

@@ -7,6 +7,7 @@ from combaero.network import (
     ConstantFractionLoss,
     ConstantHeadLoss,
     ConvectiveSurface,
+    EffusionPlateElement,
     FlowNetwork,
     ImpingementArray,
     ImpingementModel,
@@ -39,6 +40,7 @@ from .schemas import (
     ConstantFractionLossData,
     ConstantHeadLossData,
     DiscreteLossData,
+    EffusionPlateData,
     EjectorData,
     ImpingementArrayData,
     ImpingementModelData,
@@ -971,6 +973,29 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             if not elem.initial_guess:
                 elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
+            net.add_element(elem)
+        elif elem_type == "effusion_plate":
+            data = EffusionPlateData(**elem_data)
+            elem = EffusionPlateElement(
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                hole_diameter=data.hole_diameter,
+                wall_thickness=data.wall_thickness,
+                pitch_x=data.pitch_x,
+                pitch_y=data.pitch_y,
+                panel_length=data.panel_length,
+                panel_width=data.panel_width,
+                angle_deg=data.angle_deg,
+                correlation=data.correlation,
+                Cd=data.Cd,
+                internal_Nu_multiplier=data.internal_Nu_multiplier,
+                wall_conductivity=data.wall_conductivity,
+                gas_film=data.gas_film,
+                gas_augmentation=data.gas_augmentation,
+                turbulence_intensity=data.turbulence_intensity,
+                gas_heat_flux=data.gas_heat_flux,
+            )
             net.add_element(elem)
         elif elem_type == "impingement_array":
             data = ImpingementArrayData(**elem_data)

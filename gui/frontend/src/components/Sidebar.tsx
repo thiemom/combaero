@@ -5,6 +5,7 @@ import {
 	Crosshair,
 	Database,
 	Flame,
+	Grip,
 	Link,
 	LogIn,
 	LogOut,
@@ -266,6 +267,17 @@ const Sidebar = () => {
 			>
 				<ShowerHead size={18} className="text-orange-400" />
 				<span>Impingement Array</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "effusion_plate")}
+				draggable
+				title="Plenum-fed effusion/film plate; owns its wall. Discharge into a momentum chamber (gas flow) or a plenum (imposed heat flux)."
+			>
+				<Grip size={18} className="text-orange-400" />
+				<span>Effusion Plate</span>
 			</button>
 
 			<button

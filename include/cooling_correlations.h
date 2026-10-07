@@ -334,6 +334,31 @@ double equivalent_slot_width(double hole_area, double pitch);
 double equivalent_blowing_ratio(double M_baseline, double area_baseline,
                                 double area_equivalent);
 
+// Panel-averaged adiabatic film effectiveness of an effusion plate: Baldauf
+// (2002) per row, Sellers-superposed, averaged over the panel's rows. A
+// point at row n sees rows 1..n upstream at distances j * pitch_x, so
+//
+//   eta_panel = (1/N) sum_{n=1..N} Sellers{ eta_Baldauf(j pitch_x / D), j = 1..n }
+//
+// This is the alternative closure the Andrews 88-GT-290 scoring reports
+// beside the validated two-resistance one (validation/cooling/
+// effusion_overall_runner.py): the data there REFUSE it offered alone, and
+// the missing physics is a gas-side augmentation. It exists to be selected
+// explicitly and reported, not as a default.
+//
+// `extrapolated` is set when any row is outside Baldauf's envelope (M, P,
+// s/D, alpha, Tu); for full-coverage effusion it usually is, through s/D and M.
+struct EffusionPanelFilm {
+  double eta = 0.0;
+  bool extrapolated = false;
+};
+
+EffusionPanelFilm effusion_panel_film_effectiveness(int n_rows,
+                                                    double pitch_x_over_D,
+                                                    double s_over_D, double M,
+                                                    double density_ratio,
+                                                    double alpha_deg, double Tu);
+
 // -------------------------------------------------------------
 // Effusion plate INTERNAL heat transfer
 // -------------------------------------------------------------

@@ -2832,6 +2832,54 @@ class OrificeElement(NetworkElement):
         }
 
 
+def _effusion_wall(
+    h_i: float, T_c: float, h_gas: float, T_aw_gas: float, t_over_k: float
+) -> tuple[float, float, float]:
+    """(T_wall_hot, T_wall_cold, q) of a plate between gas and coolant.
+
+    Per unit area, one conduction layer, through C++'s wall coupling. The one
+    wall core both EffusionPlateElement.overall_effectiveness (no conduction)
+    and wall_heat_transfer use.
+    """
+    w = _solver_tools.wall_coupling_and_jacobian_multilayer(
+        h_gas, T_aw_gas, h_i, T_c, [t_over_k], 1.0, 0.0
+    )
+    q = float(w.Q)
+    return float(w.T_hot), T_c + q / h_i, q
+
+
+def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, float] | None:
+    """What a discharge node offers a wall as its gas side, or None.
+
+    Only a MomentumChamberNode has flow, hence a coefficient: its own surface
+    correlation (the user's choice on that node) is the UNBLOWN h, and its
+    velocity the gas velocity. The gas TEMPERATURE is the stream the wall
+    sees: a merge chamber's state is the MIXED outlet, already diluted by
+    the side streams -- with liner effusion at 20-30% of the flow that is a
+    large, unconservative drop -- so when the chamber has a main inlet the
+    approaching main stream's temperature is used instead. A plenum (state,
+    no flow) returns None.
+    """
+    if not isinstance(node, MomentumChamberNode) or node.area <= 0.0:
+        return None
+    gas = node.htc_and_T(state)
+    if gas is None:
+        return None
+    rho_g, _ = _safe_rho(cb.density(state.T, state.P, state.X))
+    T_gas, from_main = float(gas.T_aw), False
+    if node.main_inlet is not None and node.has_side_streams():
+        for eid, st, _names in getattr(node, "_inflows", []):
+            if eid == node.main_inlet:
+                T_gas, from_main = float(st.T), True
+    return {
+        "h_unblown": float(gas.h),
+        "T_gas": T_gas,
+        "T_from_main_inlet": from_main,
+        "U_gas": abs(getattr(node, "_total_m_dot", 0.0)) / (rho_g * node.area),
+        "rho_gas": rho_g,
+    }
+
+
 class EffusionPlateElement(OrificeElement):
     """A multi-perforated (effusion) wall panel: N holes discharging in parallel.
 
@@ -2897,15 +2945,27 @@ class EffusionPlateElement(OrificeElement):
     reason a throat-only treatment recovers only a fraction of the measured
     coefficient.
 
-    THE EXTERNAL FILM IS NOT INCLUDED, and that is deliberate. Andrews
-    (88-GT-290) states the two are NOT additive in effectiveness -- "the film
-    cooling reduces the mean gas temperature adjacent to the wall... which in
-    turn reduces the heat flux removed by the internal wall cooling". So an
-    OVERALL effectiveness correlation must never be the closure here: it
-    already contains the internal convection this method computes. Combine
-    this with an ADIABATIC external effectiveness
-    (`film_effectiveness_baldauf_2002` superposed over rows) and let the
-    overall effectiveness be an output.
+    THE PLATE OWNS ITS WALL (#471). `wall_heat_transfer()` -- reported in
+    the diagnostics -- solves the wall with the coolant side above and a gas
+    side the DISCHARGE NODE decides: a MomentumChamberNode (flow) supplies
+    its own unblown coefficient, gas temperature and velocity; a plenum
+    (state, no flow) takes the imposed `gas_heat_flux`. No ThermalWall
+    connects to this element.
+
+    AN OVERALL EFFECTIVENESS CORRELATION IS NEVER THE CLOSURE. Andrews
+    (88-GT-290) states internal and film cooling are NOT additive -- "the
+    film cooling reduces the mean gas temperature adjacent to the wall...
+    which in turn reduces the heat flux removed by the internal wall
+    cooling" -- and an overall correlation already contains the internal
+    convection computed here. The overall effectiveness is an OUTPUT. An
+    adiabatic film (Baldauf + Sellers, `gas_film='baldauf_sellers'`) is
+    selectable, off by default: scored on Andrews, the data refuse it offered
+    alone; the missing physics is the gas-side augmentation
+    (`gas_augmentation`, the caller's).
+
+    PLENUM-FED. This 2-port plate leaves McGreehan-Schotsch's U1/Vi at 0 and
+    uses Andrews' still-plenum coolant side; `coolant_crossflow_ignored`
+    flags a supply node a channel runs through.
     """
 
     def __init__(
@@ -2926,9 +2986,33 @@ class EffusionPlateElement(OrificeElement):
         Cd: float = 0.6,
         edge_radius: float = 0.0,
         internal_Nu_multiplier: float = 1.0,
+        wall_conductivity: float = 20.0,
+        gas_film: Literal["none", "baldauf_sellers"] = "none",
+        gas_augmentation: float = 1.0,
+        turbulence_intensity: float = 0.05,
+        gas_heat_flux: float = 0.0,
     ) -> None:
         if hole_diameter <= 0.0:
             raise ValueError("EffusionPlateElement: hole_diameter must be positive")
+        if wall_conductivity <= 0.0:
+            raise ValueError("EffusionPlateElement: wall_conductivity must be positive")
+        if gas_augmentation <= 0.0:
+            raise ValueError("EffusionPlateElement: gas_augmentation must be positive")
+        if gas_film not in ("none", "baldauf_sellers"):
+            raise ValueError("EffusionPlateElement: gas_film is 'none' or 'baldauf_sellers'")
+        if gas_film == "baldauf_sellers" and panel_length is None:
+            raise ValueError(
+                "EffusionPlateElement: gas_film='baldauf_sellers' needs panel_length "
+                "to count the hole rows the film builds over"
+            )
+        # The plate's own wall (#471): conduction through it, and the gas
+        # side the discharge node decides -- see wall_heat_transfer().
+        self.wall_conductivity = float(wall_conductivity)
+        self.gas_film = gas_film
+        self.gas_augmentation = float(gas_augmentation)
+        self.turbulence_intensity = float(turbulence_intensity)
+        self.gas_heat_flux = float(gas_heat_flux)
+        self.panel_length = panel_length
         if internal_Nu_multiplier <= 0.0:
             raise ValueError("EffusionPlateElement: internal_Nu_multiplier must be positive")
         if wall_thickness <= 0.0:
@@ -3019,13 +3103,29 @@ class EffusionPlateElement(OrificeElement):
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         """No upstream-diameter discovery: a wall panel has no pipe, hence no
         beta. The geometry the correlations need is the single hole, which is
-        known at construction."""
+        known at construction. The discharge node decides the gas side."""
         self._orifice_geom = cb.OrificeGeometry()
         self._orifice_geom.d = self.hole_diameter
         self._orifice_geom.D = 0.0
         self._orifice_geom.t = self.hole_length
         self._orifice_geom.r = self.edge_radius
         self.beta = 0.0
+        self._discharge_node = graph.nodes.get(self.to_node)
+        # A supply node a channel runs THROUGH feeds the holes with a
+        # crossflow. This 2-port plate is plenum-fed: McGreehan-Schotsch's
+        # U1/Vi stays 0 and Andrews' coolant side assumes a still plenum, so
+        # say so rather than model it (the 3-port liner segment will).
+        through = (
+            [
+                e
+                for e in graph.get_upstream_elements(self.from_node)
+                + graph.get_downstream_elements(self.from_node)
+                if isinstance(e, ChannelElement)
+            ]
+            if self.from_node in graph.nodes
+            else []
+        )
+        self._coolant_crossflow_ignored = len(through) >= 2
 
     def validate(self) -> None:
         super().validate()
@@ -3190,8 +3290,11 @@ class EffusionPlateElement(OrificeElement):
         h_i = internal["h_plate_area"]
         h_gas = h_gas_unblown * gas_augmentation
         T_c = state_in.T
-        eta = (h_i + h_gas * eta_film) / (h_i + h_gas)
-        t_wall = T_gas - eta * (T_gas - T_c)
+        # The two-resistance closure eta = (h_i + h_gas eta_film)/(h_i + h_gas)
+        # is the wall core below with no conduction resistance.
+        T_aw = T_gas - eta_film * (T_gas - T_c)
+        t_wall, _, _ = _effusion_wall(h_i, T_c, h_gas, T_aw, 0.0)
+        eta = (T_gas - t_wall) / (T_gas - T_c) if T_gas != T_c else 0.0
         out = {
             "eta_overall": float(eta),
             "T_wall": float(t_wall),
@@ -3225,6 +3328,110 @@ class EffusionPlateElement(OrificeElement):
         )
         return out
 
+    def wall_heat_transfer(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float]:
+        """The plate's own wall, with the gas side its discharge node decides.
+
+        The plate IS the wall the coolant flows through, so it owns it: no
+        ThermalWall connects to it. Its heat goes from the gas into the
+        effusing coolant, which discharges back into the same node, so the
+        network's energy balance is unchanged; the wall temperatures and the
+        heat flux are outputs.
+
+        COOLANT SIDE: Andrews 86-GT-225 on the plate area (`internal_heat_
+        transfer`), at the supply temperature.
+
+        GAS SIDE, by discharge node:
+
+        * a MomentumChamberNode has flow. Its own surface correlation gives
+          the UNBLOWN coefficient and gas temperature, its velocity the
+          blowing ratio. `gas_augmentation` (the caller's, 1.0 unless set;
+          never fitted -- see docs/VALIDATION_POLICY.md) scales the
+          coefficient; Andrews 88-GT-290 shows that augmentation, not a
+          film correlation, is the missing physics. `gas_film` stays 'none'
+          by default for the same reason: Baldauf + Sellers
+          ('baldauf_sellers') is selectable and reported with its envelope
+          flag, but the data refuse it offered alone.
+        * anything else (a plenum) has a state but no flow, so no
+          coefficient: the gas side is the imposed `gas_heat_flux` [W/m^2],
+          0 by default (adiabatic). Radiation is not modelled.
+
+        WALL: one layer, `wall_thickness / wall_conductivity`, through C++'s
+        wall_coupling_and_jacobian. Returns {} without coolant flow.
+        """
+        internal = self.internal_heat_transfer(state_in)
+        if not internal:
+            return {}
+        h_i = internal["h_plate_area"]
+        T_c = float(state_in.T)
+        A = self.panel_area
+        t_over_k = self.wall_thickness / self.wall_conductivity
+        out: dict[str, float] = {
+            "h_internal_plate_area": float(h_i),
+            "wall_conductivity": float(self.wall_conductivity),
+            "coolant_crossflow_ignored": float(getattr(self, "_coolant_crossflow_ignored", False)),
+        }
+        gas = _chamber_gas_side(getattr(self, "_discharge_node", None), state_out)
+        if gas is None:
+            q = self.gas_heat_flux
+            t_cold = T_c + q / h_i
+            out.update(
+                {
+                    "gas_side_chamber": 0.0,
+                    "gas_heat_flux_imposed": float(q),
+                    "q_wall": float(q),
+                    "Q_wall": float(q * A),
+                    "T_wall_cold": float(t_cold),
+                    "T_wall_hot": float(t_cold + q * t_over_k),
+                }
+            )
+            return out
+
+        rho_c, _ = _safe_rho(cb.density(T_c, state_out.P, state_in.X))
+        U_g, rho_g, T_g = gas["U_gas"], gas["rho_gas"], gas["T_gas"]
+        hole_area = math.pi * self.hole_diameter**2 / 4.0
+        G_jet = abs(state_in.m_dot) / (self.n_holes * hole_area)
+        blowing = G_jet / (rho_g * U_g) if U_g > 0.0 else math.inf
+        eta_film, film_extrapolated = 0.0, False
+        if self.gas_film == "baldauf_sellers" and math.isfinite(blowing):
+            film = cb.effusion_panel_film_effectiveness(
+                max(1, round(self.panel_length / self.pitch_x)),
+                self.pitch_x / self.hole_diameter,
+                self.pitch_y / self.hole_diameter,
+                blowing,
+                rho_c / rho_g,
+                self.angle_deg,
+                self.turbulence_intensity,
+            )
+            eta_film, film_extrapolated = float(film.eta), bool(film.extrapolated)
+        T_aw_g = T_g - eta_film * (T_g - T_c)
+        h_g = gas["h_unblown"] * self.gas_augmentation
+        t_hot, t_cold, q = _effusion_wall(h_i, T_c, h_g, T_aw_g, t_over_k)
+        out.update(
+            {
+                "gas_side_chamber": 1.0,
+                "h_gas_unblown": float(gas["h_unblown"]),
+                "gas_augmentation": float(self.gas_augmentation),
+                "h_gas": float(h_g),
+                "T_gas": float(T_g),
+                "T_gas_from_main_inlet": float(gas["T_from_main_inlet"]),
+                "eta_film": eta_film,
+                "film_extrapolated": float(film_extrapolated),
+                "T_adiabatic_wall": float(T_aw_g),
+                "q_wall": float(q),
+                "Q_wall": float(q * A),
+                "T_wall_hot": float(t_hot),
+                "T_wall_cold": float(t_cold),
+                "eta_overall": float((T_g - t_hot) / (T_g - T_c)) if T_g != T_c else 0.0,
+                "U_gas": float(U_g),
+                "blowing_ratio": float(blowing),
+                "density_ratio": float(rho_c / rho_g),
+                "velocity_ratio": float(G_jet / rho_c / U_g) if U_g > 0.0 else math.inf,
+            }
+        )
+        return out
+
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float]:
@@ -3247,8 +3454,10 @@ class EffusionPlateElement(OrificeElement):
             # into a healthy net outflow. Say it instead.
             "is_ingesting": float(dP_drive <= 0.0),
         }
-        # Coolant-side heat transfer, when there is flow to carry it.
+        # Coolant-side heat transfer, when there is flow to carry it, and the
+        # plate's own wall with the gas side its discharge node decides.
         out.update(self.internal_heat_transfer(state_in))
+        out.update(self.wall_heat_transfer(state_in, state_out))
         out.update(base)
         return out
 
