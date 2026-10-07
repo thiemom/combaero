@@ -1085,6 +1085,30 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     # Result assembly reports each array under its GUI id (runner.py).
     net._gui_arrays = gui_arrays
 
+    # Merge chambers (#471): inflows on a momentum chamber's "side-target"
+    # handle are side streams; the one inflow on its flow handle is the main
+    # inlet, which sets the chamber's axis and area. Declared, never inferred.
+    for node_schema in schema.nodes:
+        if node_schema.type != "momentum_chamber":
+            continue
+        nid = node_schema.id
+        inflows = [
+            e
+            for e in schema.edges
+            if e.target == nid and not (e.data and e.data.get("type") == "thermal")
+        ]
+        side = [e for e in inflows if e.targetHandle == "side-target"]
+        if not side:
+            continue
+        main = [e for e in inflows if e.targetHandle != "side-target"]
+        if len(main) != 1:
+            raise ValueError(
+                f"Momentum chamber '{nid}' has side streams and {len(main)} main "
+                "inlets; it needs exactly one main inlet on its flow handle."
+            )
+        src = main[0].source
+        nodes_map[nid].main_inlet = src if src in net.elements else f"__auto_link__{src}__{nid}"
+
     # 4. Fourth Pass: Thermal Walls
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":

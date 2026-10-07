@@ -746,6 +746,45 @@ momentum = MomentumChamberNode("momentum", P=2e5, T=1800, Y=products, regime="co
 energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
 ```
 
+#### Merge chamber: main inlet plus side streams (#471)
+
+A `MomentumChamberNode` with `main_inlet` declared accepts further inflows as
+SIDE STREAMS, still with exactly one outlet. The chamber's axis is its outlet
+direction; the main stream arrives along it; each side stream brings
+`m u_jet cos(theta)` of axial momentum and discharges at the chamber's static
+pressure. A constant-area control volume closes it:
+
+    P_face A + m_main u_main + sum(m_s u_jet cos theta) = P A + m_out u_out
+
+```python
+liner = MomentumChamberNode("liner", main_inlet="duct")   # area inherited from "duct"
+panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
+                             wall_thickness=2e-3, pitch=6e-3, panel_area=0.01,
+                             angle_deg=30.0)               # jets at 30 deg to the gas
+```
+
+- **The node's `(P, Pt)` is the chamber (outlet) state.** The main-inlet
+  element sees the MAIN-FACE state the momentum balance gives
+  (`cb.chamber_merge_face_offset`). With no side streams the offset is zero,
+  so declaring a single-inlet chamber's main inlet changes nothing.
+- **No loss coefficient.** The stagnation-pressure loss of mixing follows
+  from momentum; transverse momentum is reacted by the walls and its kinetic
+  energy dissipated. Normal injection costs the main stream its mixing loss;
+  inclined jets push it, ejector-like.
+- **Directions live only inside the junction.** Edges carry scalars and a
+  channel is 1D along its own axis, so no angle is ever passed on.
+- **One area.** The main inlet's port area is the chamber area, inherited
+  from the main-inlet element; an explicit area that disagrees is refused.
+- **The injector owns its jet.** Orifice-type elements carry
+  `injection_angle_deg` (90 by default, no axial momentum);
+  `EffusionPlateElement` uses its hole inclination `angle_deg`. The jet
+  velocity is the element's own, `m / (rho Cd A)` at the chamber pressure.
+- **Refused:** two inflows without `main_inlet`, a `main_inlet` that does not
+  flow in, and any split (more than one outlet needs a loss closure: use a
+  tee).
+- In the GUI, inflows on the chamber's "s" handle are side streams; the one on
+  its flow handle is the main inlet.
+
 ### Network Elements
 ```python
 from combaero.network import (

@@ -88,6 +88,21 @@ const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 				style={handleStyle(Position.Right, rotation)}
 				id="flow-source"
 			/>
+			{/* Side streams (#471): a merge chamber's further inflows. The flow
+			    handle on the left is the MAIN inlet and sets the axis and area. */}
+			<Handle
+				type="target"
+				position={rotPos(Position.Top, rotation)}
+				style={{ ...handleStyle(Position.Top, rotation), left: "22%" }}
+				id="side-target"
+				title="Side stream (merge)"
+			/>
+			<div
+				className="absolute -top-3 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-purple-500"
+				style={{ left: "17%", transform: `rotate(${-rotation}deg)` }}
+			>
+				s
+			</div>
 			<Handle
 				type="target"
 				position={rotPos(Position.Top, rotation)}

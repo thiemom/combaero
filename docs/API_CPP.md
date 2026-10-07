@@ -683,6 +683,19 @@ JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet& set,
 struct SideStreamMomentum { double dP, d_dm_out, d_dm_arr, d_drho; };
 SideStreamMomentum side_stream_momentum_drop(double m_arr, double m_out,
                                              double rho, double area);
+
+// Merge chamber (#471): main-inlet face relative to the chamber (outlet)
+// state, from constant-area axial momentum. side_momentum = sum m u cos(theta).
+//   P_face  - P  = (m_out|m_out| - m_main|m_main|)/(rho A^2) - S/A
+//   Pt_face - Pt = (m_out|m_out| - m_main|m_main|)/(2 rho A^2) - S/A
+struct ChamberMergeOffset {
+    double dP_face, dPt_face;
+    double dP_dm_main, dP_dm_out, dP_dS, dP_drho;
+    double dPt_dm_main, dPt_dm_out, dPt_dS, dPt_drho;
+};
+ChamberMergeOffset chamber_merge_face_offset(double m_main, double m_out,
+                                             double side_momentum,
+                                             double rho, double area);
 ```
 
 ### Wall Coupling
