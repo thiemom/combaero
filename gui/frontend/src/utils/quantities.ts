@@ -44,6 +44,16 @@ export const QUANTITY_CATALOGUE: Record<
 	Cd: { label: "Cd", unit: "—", format: (v) => v.toFixed(4) },
 	Nu: { label: "Nu", unit: "—", format: (v) => v.toFixed(2) },
 	htc: { label: "htc", unit: "W/m²/K", format: (v) => v.toFixed(1) },
+	Re_surface: {
+		label: "Re (surface)",
+		unit: "—",
+		format: (v) => v.toLocaleString("en", { maximumFractionDigits: 0 }),
+	},
+	surface_extrapolated: {
+		label: "Surface out of range",
+		unit: "—",
+		format: (v) => (v ? "yes" : "no"),
+	},
 	Q: { label: "Q", unit: "W", format: (v) => v.toFixed(0) },
 	ref_location: { label: "Ref Loc", unit: "—", format: (v) => String(v) },
 	// State results (accessed via result.state.*)

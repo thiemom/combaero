@@ -340,6 +340,13 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 
 			{currentType === "impingement" && (
 				<div className="grid grid-cols-1 gap-3 bg-stone-50 p-2 rounded border border-stone-100">
+					<span className="text-[9px] text-stone-400">
+						One spanwise row. The channel is the row&apos;s crossflow channel
+						and its mass flow is the row&apos;s jet flow; the heated area is the
+						row&apos;s footprint, so the hole count follows from the channel.
+						Check &quot;Re (surface)&quot; after solving: Florschuetz covers
+						Re_j 2,500 to 70,000.
+					</span>
 					<LengthInput
 						label="Jet Diameter"
 						value={surface.d_jet || 0.002}
@@ -412,6 +419,12 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 
 			{currentType === "single_jet_impingement" && (
 				<div className="grid grid-cols-1 gap-3 bg-stone-50 p-2 rounded border border-stone-100">
+					<span className="text-[9px] text-stone-400">
+						One jet carries the channel&apos;s whole mass flow. Nu is the
+						average over a disc of radius R/D jet diameters, which is also the
+						heated area. Check &quot;Re (surface)&quot; after solving; the
+						source&apos;s check point is Re 25,000.
+					</span>
 					<div className="flex flex-col gap-1">
 						<label className="text-[10px] text-stone-500">
 							Boundary Condition

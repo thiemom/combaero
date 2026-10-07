@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Impingement channels in the GUI are a working example again (#462).**
+  Since #460 the convective area counts the impingement holes, but channels
+  defaulted it to the wetted wall `pi D L`. On a default 1 m channel that
+  spread the flow over about 820 holes: `Re_j` 318, flagged.
+  - **Default convective area by model** (`ChannelElement.default_convective_area`):
+    - impingement row: footprint matched to the channel cross-section,
+      `A_flow (xn/d)/(z/d)`;
+    - single jet: Goldstein's averaging disc, `pi (R_D d)^2`;
+    - everything else: unchanged.
+  - **Result:** the GUI default array at 0.01 kg/s now gives `Re_j` 6,373,
+    inside Florschuetz's 2,500-70,000.
+  - **New channel diagnostics** `Re_surface` and `surface_extrapolated`,
+    shown in the GUI as "Re (surface)" and "Surface out of range".
+  - **Docstring correction:** the single-jet Nu was described as LOCAL at
+    R/D. Han's Eq. 4.1 is an AVERAGE over the disc of radius R.
+
 - **Impingement elements used the wrong jet flow (#460).** Both
   `ImpingementModel` and `SingleJetImpingementModel` took the jet flow as
   `rho v * ConvectiveSurface.area`: the convective area scaled the

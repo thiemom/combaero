@@ -1623,6 +1623,14 @@ approximation) or a row-dependent one (Florschuetz's own Eq. 7, deliberately
 not implemented -- see `impingement_correlation.h`'s module comment) is a
 choice for whoever assembles the chain, not something this element decides.
 
+**Default convective area.** A `ChannelElement` whose surface was given no
+`area` gets one that follows the model (#462): an impingement row gets its
+target footprint matched to the channel's crossflow cross-section,
+`A_flow * (xn/d) / (z/d)`, so the hole count follows from the channel; a single
+jet gets Goldstein's averaging disc, `pi (R_D d_jet)^2`; every other surface
+keeps the wetted wall `pi D L`. The channel diagnostics report the surface's
+own `Re_surface` and `surface_extrapolated`.
+
 **Pressure drop is not modelled here.** Model the jet plate's own orifice
 loss with a proper `OrificeElement` upstream, using a real
 discharge-coefficient correlation -- duplicating it inside this heat-transfer

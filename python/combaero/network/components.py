@@ -192,11 +192,11 @@ class SingleJetImpingementModel:
     Behbahani and Heppelmann 1986), at a representative radial position.
 
     Unlike ``ImpingementModel``, there is no array and no crossflow -- this
-    is one jet, one target patch. ``R_D`` is a real modelling choice, not a
-    detail: the correlation's Nu is LOCAL (a function of radial distance from
-    the jet centerline), so using it for one lumped ``ConvectiveSurface``
-    means picking a representative position rather than area-averaging the
-    source's own radial profile, which this element does not do.
+    is one jet, one target patch. The correlation's Nu is the AVERAGE over the
+    disc of radius ``R`` around the stagnation point (Han: "an average
+    heat-transfer coefficient correlation"; Eq. 4.1's ``Nu_bar``), so ``R_D``
+    sets the patch it describes. A ``ChannelElement`` left without a
+    convective area gets exactly that disc, ``pi (R_D d_jet)^2`` (#462).
 
     Parameters
     ----------
@@ -215,10 +215,10 @@ class SingleJetImpingementModel:
         source's own optimum spacing -- a defensible default, not a claim
         about any particular rig.
     R_D : float
-        Radial distance from the jet centerline / ``d_jet``, at the
-        representative position this element reports Nu for. No default:
-        the source's closed-form check point uses 5.0, but that is a
-        worked example, not a universal choice.
+        Radius of the averaging disc / ``d_jet``: Nu is Goldstein's average
+        over the disc of radius ``R`` around the stagnation point. No
+        default: the source's closed-form check point uses 5.0, but that is
+        a worked example, not a universal choice.
 
     Mass flow. The ELEMENT's mass flow is the jet's flow, through its one
     hole: ``Re = 4 m_dot / (pi d_jet mu)``, Goldstein's nozzle Reynolds
@@ -3999,8 +3999,15 @@ class ChannelElement(NetworkElement):
         mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 and v_out > 0 else 0.0
 
         h_res = self.htc_and_T(state_in)
+        surface_diag: dict[str, float] = {}
         if h_res is not None:
             Nu, htc, T_aw, f = h_res.Nu, h_res.h, h_res.T_aw, h_res.f
+            # The surface correlation's own Re (jet Re_j for impingement, pin
+            # Re_D for pin fins) and whether it is outside its validity box.
+            surface_diag["Re_surface"] = float(h_res.Re)
+            surface_diag["surface_extrapolated"] = float(
+                bool(getattr(h_res, "extrapolated", False))
+            )
         else:
             Nu, htc, T_aw = 0.0, 0.0, state_in.T
             dh_diag = self.Dh or self.diameter or 1.0
@@ -4028,6 +4035,7 @@ class ChannelElement(NetworkElement):
             "htc": float(htc),
             "T_aw": float(T_aw),
             "f": float(f),
+            **surface_diag,
         }
 
     def get_spatial_profile(
@@ -4121,6 +4129,7 @@ class ChannelElement(NetworkElement):
         # the early return so it is set even when the diameter is explicit.
         self._downstream_node = graph.nodes.get(self.to_node)
         if self.diameter is not None:
+            self._fill_convective_area()
             return
         # Inherit diameter from the nearest geometry source. The channel's
         # area sets its friction and Mach behaviour, so a defaulted diameter
@@ -4138,8 +4147,31 @@ class ChannelElement(NetworkElement):
         if self.Dh is None:
             self.Dh = self.diameter
         # Update convective surface area (was 0 if diameter was deferred)
+        self._fill_convective_area()
+
+    def default_convective_area(self) -> float:
+        """The convective area a surface gets when none was set, by model.
+
+        * Impingement array (one row): the row's target footprint matched to
+          this channel's crossflow cross-section. The channel is z wide in
+          the jet direction, so its span is ``A_flow / z`` and the footprint
+          ``xn * span = A_flow * (xn/d) / (z/d)``; the hole count then
+          follows from the channel itself (#462).
+        * Single jet: the disc of radius ``R`` that Goldstein et al. (1986)
+          average Nu over (Han Eq. 4.1 is an AVERAGE Nu out to R/D),
+          ``pi (R_D d_jet)^2``.
+        * Anything else: the wetted wall, ``pi D L``.
+        """
+        model = self.surface.model if self.surface else None
+        if isinstance(model, ImpingementModel) and self.area and model.z_d > 0.0:
+            return self.area * model.xn_d / model.z_d
+        if isinstance(model, SingleJetImpingementModel):
+            return math.pi * (model.R_D * model.d_jet) ** 2
+        return math.pi * (self.diameter or 0.0) * self.length
+
+    def _fill_convective_area(self) -> None:
         if self.surface and self.surface.area == 0.0:
-            self.surface.area = math.pi * self.diameter * self.length
+            self.surface.area = self.default_convective_area()
 
 
 class AreaChangeElement(NetworkElement):
