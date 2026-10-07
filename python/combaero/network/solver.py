@@ -1040,8 +1040,12 @@ class NetworkSolver:
                     state_b.m_dot = x[m_indices_b[0]]
 
             # Call htc_and_T() on both objects
-            ch_result_a = obj_a.htc_and_T(state_a) if obj_a.has_convective_surface else None
-            ch_result_b = obj_b.htc_and_T(state_b) if obj_b.has_convective_surface else None
+            ch_result_a = (
+                self._htc_and_T(obj_a, state_a, x) if obj_a.has_convective_surface else None
+            )
+            ch_result_b = (
+                self._htc_and_T(obj_b, state_b, x) if obj_b.has_convective_surface else None
+            )
 
             # Only proceed if both elements have heat transfer surfaces
             if ch_result_a is not None and ch_result_b is not None:
@@ -1296,6 +1300,11 @@ class NetworkSolver:
                             )
                             nr["T"] += factor_mdot_a
 
+                        # Neighbour flows the side-A htc reads (#465)
+                        self._relay_flow_inputs(
+                            relay[nid], obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dh_a
+                        )
+
                         # Side B contributions
                         obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
                         from_b = eb_id if eb_id in self.network.nodes else obj_b.from_node
@@ -1333,6 +1342,10 @@ class NetworkSolver:
                             )
                             nr["T"] += factor_mdot_b
 
+                        self._relay_flow_inputs(
+                            relay[nid], obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b
+                        )
+
             # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])
             for unk_idx in node_unks:
@@ -1344,6 +1357,56 @@ class NetworkSolver:
                     node_relay["Pt"] = 1.0
 
         return relay
+
+    def _network_flows(self, obj: Any, x: np.ndarray) -> dict[str, float] | None:
+        """Flows an element reads besides its own, or None if it reads none.
+
+        Opt-in: an element that defines ``network_flow_inputs()`` -- a list of
+        (element id, node id) pairs -- gets each element's flow at that node,
+        taken from the unknown vector, as ``flows=`` on ``residuals``,
+        ``htc_and_T`` and ``diagnostics``. ImpingementPlateElement reads the
+        crossflow approaching its row; ImpingementCrossflowElement reads the
+        jets merging at its outlet (#465). Residual Jacobians name the
+        neighbours' unknowns directly; an htc's neighbour sensitivity comes
+        back as ``dh_dsources`` and is relayed by ``_relay_flow_inputs``.
+        """
+        inputs = getattr(obj, "network_flow_inputs", None)
+        if inputs is None:
+            return None
+        flows: dict[str, float] = {}
+        for eid, node_id in inputs():
+            indices = self._unknown_indices.get(eid, [])
+            if indices:
+                flows[eid] = float(self.network.elements[eid].flow_at_node(node_id, x, indices))
+        return flows
+
+    def _htc_and_T(self, obj: Any, state: NetworkMixtureState, x: np.ndarray) -> Any:
+        flows = self._network_flows(obj, x)
+        if flows is None:
+            return obj.htc_and_T(state)
+        return obj.htc_and_T(state, flows=flows)
+
+    def _relay_flow_inputs(self, node_relay: dict, obj: Any, ch: Any, dT_dh: float) -> None:
+        """Relay ``dh_dsources`` onto the neighbours' flow unknowns.
+
+        The wall's own-flow path carries ``dh_dmdot`` to the element's first
+        unknown only; an htc that reads a neighbour's flow would otherwise
+        lose that column of the Jacobian.
+        """
+        dh_ds = getattr(ch, "dh_dsources", None)
+        inputs = getattr(obj, "network_flow_inputs", None)
+        if not dh_ds or inputs is None:
+            return
+        for eid, node_id in inputs():
+            indices = self._unknown_indices.get(eid, [])
+            if not indices or eid not in dh_ds:
+                continue
+            elem = self.network.elements[eid]
+            for col, coeff in elem.flow_jac_at_node(node_id, indices).items():
+                nr = node_relay.setdefault(
+                    col, {"T": 0.0, "Y": np.zeros(self._n_species), "Pt": 0.0}
+                )
+                nr["T"] += dT_dh * dh_ds[eid] * coeff
 
     def _get_node_state_with_prev(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
         """
@@ -1650,7 +1713,11 @@ class NetworkSolver:
                     state_in.m_dot = x[m_indices[0]]
                     state_out.m_dot = x[m_indices[0]]
 
-                elem_res, elem_jac = element.residuals(state_in, state_out)
+                flows = self._network_flows(element, x)
+                if flows is None:
+                    elem_res, elem_jac = element.residuals(state_in, state_out)
+                else:
+                    elem_res, elem_jac = element.residuals(state_in, state_out, flows=flows)
             res.extend(elem_res)
 
             if compute_jacobian:
@@ -2770,7 +2837,11 @@ class NetworkSolver:
                     m_solved = float(final_x[m_indices[0]])
                     state_in.m_dot = m_solved
                     state_out.m_dot = m_solved
-                diag = element.diagnostics(state_in, state_out)
+                flows = self._network_flows(element, final_x)
+                if flows is None:
+                    diag = element.diagnostics(state_in, state_out)
+                else:
+                    diag = element.diagnostics(state_in, state_out, flows=flows)
             sol_dict["__element_diag__"][eid] = diag
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val
@@ -2809,8 +2880,12 @@ class NetworkSolver:
                 if m_indices_b:
                     state_b.m_dot = final_x[m_indices_b[0]]
 
-            ch_result_a = obj_a.htc_and_T(state_a) if obj_a.has_convective_surface else None
-            ch_result_b = obj_b.htc_and_T(state_b) if obj_b.has_convective_surface else None
+            ch_result_a = (
+                self._htc_and_T(obj_a, state_a, final_x) if obj_a.has_convective_surface else None
+            )
+            ch_result_b = (
+                self._htc_and_T(obj_b, state_b, final_x) if obj_b.has_convective_surface else None
+            )
 
             if ch_result_a and ch_result_b:
                 # Call multi-layer coupling logic (same as in residual evaluation)

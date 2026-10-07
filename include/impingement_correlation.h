@@ -167,6 +167,11 @@ struct JetArrayImpingementResult {
   // so it and the geometry terms are held fixed here -- only the Re_j power
   // law needs differentiating, same rationale as SingleJetImpingementResult.
   double dNu_dRe_j = 0.0;
+  // d(Nu)/d(Gc_Gj) at fixed Re_j, analytic through the smoothed crossflow
+  // argument s = sqrt((z/d Gc/Gj)^2 + floor^2), so it is finite at Gc/Gj = 0
+  // even though the bracket's exponent n is below 1. Needed when Gc/Gj comes
+  // from the network's crossflow rather than the closed form (#465).
+  double dNu_dGc_Gj = 0.0;
   bool extrapolated = false;  // outside the set's advisory validity
 };
 

@@ -186,6 +186,9 @@ Cd = cb.discharge_cd(cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow)
 Cd, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
     cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow
 )
+
+# Inside the source's own Re and l/d range? A flag, never a selector.
+cb.discharge_cd_in_range(cb.DischargeCdCorrelation.Lichtarowicz1965, hole, flow)
 ```
 
 There is deliberately no auto-selection from geometry: it is how a
@@ -1590,6 +1593,76 @@ ch = ChannelElement("te", "A", "B", length=0.125, diameter=0.009,
     `h`; the pin correlations expose no temperature derivative of their
     own.
 
+### Impingement-Cooled Walls (jet-plate arrays)
+
+A jet plate fed from a plenum, impinging on a target wall, the spent air
+leaving through the gap as crossflow. Build it from two elements, one pair per
+spanwise row (#465):
+
+```python
+from combaero.network import ImpingementCrossflowElement, ImpingementPlateElement
+
+d, span = 0.00254, 0.122
+for i in range(1, 11):
+    net.add_element(ImpingementPlateElement(
+        f"p{i}", "supply", f"c{i}", d_jet=d, xn_d=5.0, yn_d=4.0, z_d=2.0,
+        span=span, plate_thickness=d, row=i,   # row: diagnostics only
+    ))
+    net.add_element(ImpingementCrossflowElement(
+        f"x{i}", f"c{i}", f"c{i+1}" if i < 10 else "exit",
+        length=5.0 * d, height=2.0 * d, span=span,
+    ))
+```
+
+```
+supply plenum ---+--------------+--------------+
+                 |              |              |
+            [Plate 1]      [Plate 2]      [Plate 3]
+                 |              |              |
+crossflow:      c1 --[Cross]-- c2 --[Cross]-- c3 --[Cross]-- exit
+```
+
+**`ImpingementPlateElement`** is an orifice (`n_holes = round(span/(yn d))`
+holes in parallel) whose flow is the row's jet flow, plus Florschuetz,
+Truman and Metzger's (1981) heat transfer on the target footprint
+`n_holes xn yn d^2`. Its **Gc/Gj comes from the network**, not the
+uniform-supply closed form:
+
+    Gc/Gj = (m_c / m_j) (pi/4) / ((yn/d)(z/d))
+
+where `m_j` is the plate's own flow and `m_c` every other inflow to its
+`to_node`, i.e. the crossflow approaching the row. A non-uniform supply, a row
+of different geometry or a bleed therefore shows up in the heat transfer.
+`h` depends on a neighbour's flow, so the element returns `dh_dsources` and
+the solver relays it into the Jacobian (the `network_flow_inputs()` opt-in).
+`T_aw` is the supply plenum temperature, Florschuetz's own reference.
+- Hole Cd: default `'fixed'` at Florschuetz's 0.79 (measured 0.73-0.85);
+  alternatives `'IdelchikThick'`, `'Lichtarowicz'` (long hole, l/d 2-10)
+  and `'McGreehanSchotsch'` (supply-side `U1/Vi = 0`, never Gc/Gj).
+  `Cd_in_range` reports whether the plate is inside the chosen source's range.
+- Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `htc`, `T_aw`,
+  `surface_extrapolated`, and `Gc_Gj_closed_form` (Eq. 8) when `row` is given.
+- Not modelled: the temperature sensitivity of the correlation's properties
+  (`dh_dT = 0`) and the crossflow's own temperature.
+
+**`ImpingementCrossflowElement`** is a `ChannelElement` (area `height *
+span`) plus the momentum the jets cost: they enter with no streamwise
+momentum, so each merge drops the static pressure by
+`(m_b|m_b| - m_a|m_a|)/(rho A^2)`. The drop is split half-and-half between
+the segments either side, so each crossflow node holds the static pressure at
+its row centre. **Without this term every row sees the same pressure
+difference and the supply stays uniform.** That puts Gc/Gj at twice Eq. 8 on
+Florschuetz's strongest-crossflow geometry.
+
+**Measured against the source** (`python/tests/test_impingement_plate_validation.py`):
+- **Flow model:** over the 27 Fig. 6 geometries x 10 rows, the network
+  reproduces Florschuetz's own 1D flow model (Eq. 8, and the cosh jet
+  distribution behind it) to a max 3.7% in Gc/Gj (bias -0.5%) and 3.8% in
+  Gj/Gj_mean.
+- **Fig. 6:** the chain's Nu/Nu1 scores +4.0% bias and 6.9% MAE over 242
+  points. The correlation at the paper's own abscissae scores +3.7% / 6.8%.
+- **Row 1 vs Fig. 5:** absolute Nu1 matches as in #461.
+
 ### Impingement Channels
 
 ```python
@@ -1603,6 +1676,10 @@ surface = ConvectiveSurface(
     ),
 )
 ```
+
+For a jet plate fed from a plenum use the elements above: they carry the
+row's own jet flow and read Gc/Gj from the network. `ImpingementModel` on a
+`ChannelElement` remains for a row whose flow you impose yourself.
 
 **One element models one spanwise row**, not a whole array -- there is no
 single "channel Nu" for a jet array the way there is for a smooth or ribbed
@@ -1651,8 +1728,8 @@ surface = ConvectiveSurface(
 ```
 
 `R_D` is a real modelling choice, not a detail: the correlation's `Nu` is
-LOCAL to the radial position, so this reports one representative value
-rather than an area-averaged profile.
+the AVERAGE over the disc of radius `R = R_D d_jet` (Han's Eq. 4.1), so the
+convective area should be that disc.
 
 Both models expose the same wall-coupling derivatives (`dh_dmdot`, `dh_dT`,
 `dT_aw_dmdot`, `dT_aw_dT`) and an `extrapolated` flag (array only -- a single

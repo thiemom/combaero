@@ -801,6 +801,11 @@ public:
 
 std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(DischargeCdCorrelation id);
 std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(double Cd);
+
+// Inside the source's own Re and l/d (or bevel, r/d) range? A flag to
+// report, never a selector: Cd is still returned outside it.
+bool discharge_cd_in_range(DischargeCdCorrelation id,
+                           const DischargeHoleGeometry&, const DischargeHoleState&);
 ```
 
 For the Idelchik members `zeta` is referenced to the hole velocity and carries

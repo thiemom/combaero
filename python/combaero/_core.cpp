@@ -570,6 +570,9 @@ PYBIND11_MODULE(_core, m) {
           "dNu_dRe_j",
           &combaero::cooling::JetArrayImpingementResult::dNu_dRe_j)
       .def_readonly(
+          "dNu_dGc_Gj",
+          &combaero::cooling::JetArrayImpingementResult::dNu_dGc_Gj)
+      .def_readonly(
           "extrapolated",
           &combaero::cooling::JetArrayImpingementResult::extrapolated);
 
@@ -5544,6 +5547,13 @@ PYBIND11_MODULE(_core, m) {
       "value pins Cd to a measured or literature number instead of the 0.60\n"
       "default. Raises ValueError for a correlation that is declared but not\n"
       "implemented.");
+
+  m.def("discharge_cd_in_range", &discharge_cd_in_range, py::arg("correlation"),
+        py::arg("hole"), py::arg("flow"),
+        "True when (hole, flow) lies inside the range the correlation was\n"
+        "fitted or tabulated on: Re, and the l/d (or bevel, r/d) axis of its\n"
+        "source. A flag to report, never a selector; discharge_cd still\n"
+        "returns a value outside it.");
 
   m.def(
       "discharge_cd_and_derivatives",

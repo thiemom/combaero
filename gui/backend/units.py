@@ -97,6 +97,14 @@ UNIT_MAP: dict[str, str] = {
     "ratio": "-",  # AreaChangeElement (renamed to area_ratio in Phase 2)
     "area_ratio": "-",  # Phase 2 name
     "is_correlation": "-",
+    "Cd_in_range": "-",  # 1 inside the discharge correlation's source range
+    # --- Impingement plate / crossflow (#465) ---
+    "n_holes": "-",
+    "Re_j": "-",
+    "Gc_Gj": "-",
+    "Gc_Gj_closed_form": "-",
+    "surface_extrapolated": "-",
+    "dP_momentum": "Pa",
     "f": "-",
     "Cd": "-",
     "phi": "-",
