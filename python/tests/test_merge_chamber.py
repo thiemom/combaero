@@ -85,7 +85,10 @@ def test_the_solution_satisfies_the_control_volume_momentum_balance(angle: float
     )
     chamber = NetworkMixtureState(T=T, P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
     S, _ = eff.injection_momentum(supply, chamber)
-    lhs = P_face * A + m_main**2 / (rho * A) + S
+    # Exact impulse: the main face at its own density (the main stream's T
+    # at the face pressure), the outlet at the chamber's.
+    rho_face = cb.density(1200.0, P_face, X_AIR)
+    lhs = P_face * A + m_main**2 / (rho_face * A) + S
     rhs = P * A + m_out**2 / (rho * A)
     # Relative to the momentum fluxes, not to P A, which would hide an error.
     assert lhs - rhs == pytest.approx(0.0, abs=1e-6 * (m_out**2 / (rho * A) + abs(S)))
@@ -176,3 +179,57 @@ def test_a_single_inlet_chamber_is_unchanged_by_declaring_it_main() -> None:
     a, b = solo(None), solo("c1")
     assert b["c1.m_dot"] == pytest.approx(a["c1.m_dot"], rel=1e-10)
     assert b["ch.P"] == pytest.approx(a["ch.P"], rel=1e-12)
+
+
+def test_a_compressible_liner_balances_the_exact_impulse() -> None:
+    """Compressible channels, hot gas well into compressible territory. The
+    face is the exact impulse root at its own density, and the chamber's own
+    closure is the entropy-based stagnation relation; both must hold."""
+    g = FlowNetwork()
+    g.add_node(_pb("gas_in", 1.25e5, 1200.0))
+    g.add_node(_pb("exit", 1.0e5, 1200.0))
+    g.add_node(_pb("cool", 1.35e5, 600.0))
+    g.add_node(MomentumChamberNode("ch", main_inlet="duct"))
+    for eid, a, b in (("duct", "gas_in", "ch"), ("tail", "ch", "exit")):
+        g.add_element(
+            ChannelElement(
+                eid, a, b, length=0.2, diameter=0.08, roughness=0.0, regime="compressible"
+            )
+        )
+    g.add_element(
+        EffusionPlateElement(
+            "eff",
+            "cool",
+            "ch",
+            hole_diameter=0.8e-3,
+            wall_thickness=2e-3,
+            pitch=6e-3,
+            panel_area=0.01,
+            angle_deg=30.0,
+        )
+    )
+    s, r = _solve(g)
+    d = r["__element_diag__"]
+    ch = s.network.nodes["ch"]
+    P, T = r["ch.P"], s._derived_states["ch"][0]
+    rho = cb.density(T, P, X_AIR)
+    A = ch.area
+    m_main, m_out = d["duct"]["m_dot"], d["tail"]["m_dot"]
+    assert m_out / (rho * A) / cb.speed_of_sound(T, X_AIR) > 0.3
+    P_face = d["duct"]["P_out"]
+    rho_face = cb.density(1200.0, P_face, X_AIR)
+    supply = NetworkMixtureState(
+        T=600.0, P=1.35e5, Pt=1.35e5, Tt=600.0, m_dot=d["eff"]["m_dot"], Y=Y_AIR
+    )
+    chamber = NetworkMixtureState(T=T, P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
+    S, _ = s.network.elements["eff"].injection_momentum(supply, chamber)
+    lhs = P_face * A + m_main**2 / (rho_face * A) + S
+    rhs = P * A + m_out**2 / (rho * A)
+    assert lhs - rhs == pytest.approx(0.0, abs=1e-6 * (m_out**2 / (rho * A) + abs(S)))
+    x = np.array(r["__x_solution__"], dtype=float)
+    _, jac = s._residuals_and_jacobian(x)
+    fd = approx_derivative(
+        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-7, 1e-10)
+    )
+    mask = np.abs(fd) > 1e-3
+    assert (np.abs(jac.toarray() - fd)[mask] / np.abs(fd[mask])).max() < 1e-3

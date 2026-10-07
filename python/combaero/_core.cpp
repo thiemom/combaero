@@ -657,32 +657,60 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dP", &combaero::SideStreamMomentum::dP)
       .def_readonly("d_dm_out", &combaero::SideStreamMomentum::d_dm_out)
       .def_readonly("d_dm_arr", &combaero::SideStreamMomentum::d_dm_arr)
-      .def_readonly("d_drho", &combaero::SideStreamMomentum::d_drho);
+      .def_readonly("d_dP_arr", &combaero::SideStreamMomentum::d_dP_arr)
+      .def_readonly("d_dT_arr", &combaero::SideStreamMomentum::d_dT_arr)
+      .def_readonly("d_dP_out", &combaero::SideStreamMomentum::d_dP_out)
+      .def_readonly("d_dT_out", &combaero::SideStreamMomentum::d_dT_out);
   m.def("side_stream_momentum_drop", &combaero::side_stream_momentum_drop,
-        py::arg("m_arr"), py::arg("m_out"), py::arg("rho"), py::arg("area"),
+        py::arg("m_arr"), py::arg("m_out"), py::arg("P_arr"), py::arg("T_arr"),
+        py::arg("X_arr"), py::arg("P_out"), py::arg("T_out"), py::arg("X_out"),
+        py::arg("area"),
         "Centred static-pressure drop of a channel segment between two\n"
-        "stations where side streams join with no streamwise momentum:\n"
-        "(m_out|m_out| - m_arr|m_arr|) / (2 rho A^2), with analytic\n"
-        "derivatives.");
+        "stations where side streams join normally, each station at the\n"
+        "density of its own static (P, T, X): (m_out|m_out|/rho_out -\n"
+        "m_arr|m_arr|/rho_arr) / (2 A^2). Derivatives with respect to the\n"
+        "flows and to each station's P and T. Exact impulse, compressible.");
 
-  py::class_<combaero::ChamberMergeOffset>(m, "ChamberMergeOffset")
-      .def_readonly("dP_face", &combaero::ChamberMergeOffset::dP_face)
-      .def_readonly("dPt_face", &combaero::ChamberMergeOffset::dPt_face)
-      .def_readonly("dP_dm_main", &combaero::ChamberMergeOffset::dP_dm_main)
-      .def_readonly("dP_dm_out", &combaero::ChamberMergeOffset::dP_dm_out)
-      .def_readonly("dP_dS", &combaero::ChamberMergeOffset::dP_dS)
-      .def_readonly("dP_drho", &combaero::ChamberMergeOffset::dP_drho)
-      .def_readonly("dPt_dm_main", &combaero::ChamberMergeOffset::dPt_dm_main)
-      .def_readonly("dPt_dm_out", &combaero::ChamberMergeOffset::dPt_dm_out)
-      .def_readonly("dPt_dS", &combaero::ChamberMergeOffset::dPt_dS)
-      .def_readonly("dPt_drho", &combaero::ChamberMergeOffset::dPt_drho);
-  m.def("chamber_merge_face_offset", &combaero::chamber_merge_face_offset,
-        py::arg("m_main"), py::arg("m_out"), py::arg("side_momentum"),
-        py::arg("rho"), py::arg("area"),
-        "Main-inlet face of a merge chamber relative to its (outlet) state,\n"
-        "from the axial momentum balance over a constant-area control\n"
-        "volume: P_face - P and Pt_face - Pt, with analytic derivatives.\n"
-        "side_momentum = sum of m u_jet cos(theta) over the side streams.");
+  py::class_<combaero::MergeFaceState>(m, "MergeFaceState")
+      .def_readonly("P_face", &combaero::MergeFaceState::P_face)
+      .def_readonly("Pt_face", &combaero::MergeFaceState::Pt_face)
+      .def_readonly("M_face", &combaero::MergeFaceState::M_face)
+      .def_readonly("choked", &combaero::MergeFaceState::choked)
+      .def_readonly("dPf_dm_main", &combaero::MergeFaceState::dPf_dm_main)
+      .def_readonly("dPf_dm_out", &combaero::MergeFaceState::dPf_dm_out)
+      .def_readonly("dPf_dJ", &combaero::MergeFaceState::dPf_dJ)
+      .def_readonly("dPf_dP", &combaero::MergeFaceState::dPf_dP)
+      .def_readonly("dPf_dT", &combaero::MergeFaceState::dPf_dT)
+      .def_readonly("dPf_dT_main", &combaero::MergeFaceState::dPf_dT_main)
+      .def_readonly("dPtf_dm_main", &combaero::MergeFaceState::dPtf_dm_main)
+      .def_readonly("dPtf_dm_out", &combaero::MergeFaceState::dPtf_dm_out)
+      .def_readonly("dPtf_dJ", &combaero::MergeFaceState::dPtf_dJ)
+      .def_readonly("dPtf_dP", &combaero::MergeFaceState::dPtf_dP)
+      .def_readonly("dPtf_dT", &combaero::MergeFaceState::dPtf_dT)
+      .def_readonly("dPtf_dT_main", &combaero::MergeFaceState::dPtf_dT_main);
+  m.def("chamber_merge_face_state", &combaero::chamber_merge_face_state,
+        py::arg("m_main"), py::arg("T_main"), py::arg("X_main"), py::arg("m_out"),
+        py::arg("P"), py::arg("T"), py::arg("X"), py::arg("side_momentum"),
+        py::arg("area"),
+        "Main-inlet face of a merge chamber from the exact (compressible)\n"
+        "impulse balance over a constant-area control volume: face static P\n"
+        "on the subsonic root of the ideal-gas quadratic, face Pt from the\n"
+        "same entropy-based stagnation closure as the chamber. P, T: the\n"
+        "chamber (outlet) state; T_main: the main stream's static T;\n"
+        "side_momentum: sum of the side streams' streamwise impulse.");
+
+  py::class_<combaero::JetImpulse>(m, "JetImpulse")
+      .def_readonly("J", &combaero::JetImpulse::J)
+      .def_readonly("dJ_dm", &combaero::JetImpulse::dJ_dm)
+      .def_readonly("dJ_dPt", &combaero::JetImpulse::dJ_dPt)
+      .def_readonly("dJ_dTt", &combaero::JetImpulse::dJ_dTt)
+      .def_readonly("dJ_dP", &combaero::JetImpulse::dJ_dP)
+      .def_readonly("choked", &combaero::JetImpulse::choked);
+  m.def("jet_impulse", &combaero::jet_impulse, py::arg("m"), py::arg("Pt"),
+        py::arg("Tt"), py::arg("P"), py::arg("X"),
+        "Streamwise impulse of a jet from stagnation (Pt, Tt) into static P,\n"
+        "per unit cos(theta): isentropic velocity (variable cp), or the sonic\n"
+        "momentum plus pressure thrust when choked. Cd does not enter.");
 
   // ---------------------------------------------------------------------
   // Pin-fin arrays (#335): provenanced sets, exact basis converters, fin

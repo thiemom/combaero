@@ -1360,28 +1360,34 @@ class NetworkSolver:
 
     @staticmethod
     def _main_face(element: Any, node_out: Any, state_out: NetworkMixtureState) -> Any:
-        """Shift ``state_out`` to the main-inlet face of a merge chamber (#471).
+        """Hand ``state_out`` the main-inlet face of a merge chamber (#471).
 
         The chamber's (P, Pt) is its outlet state; the declared main inlet
-        arrives at the face state the axial momentum balance gives. Returns
-        the offset (for the Jacobian chain) or None when it does not apply.
+        arrives at the face state the impulse balance gives. Returns the face
+        (for the Jacobian chain) or None when it does not apply.
         """
         if getattr(node_out, "main_inlet", None) != element.id:
             return None
         if not node_out.has_side_streams():
             return None
-        face = node_out.main_face_offset(state_out)
-        state_out.P += face[0]
-        state_out.Pt += face[1]
+        face = node_out.main_face_state(state_out)
+        state_out.P = face[0]
+        state_out.Pt = face[1]
         return face
 
     @staticmethod
     def _chain_main_face(elem_jac: dict, node_id: str, face: Any) -> None:
-        """d(res)/d(var) += d(res)/d(P_face) dP_face/d(var), same for Pt."""
+        """Replace the element's d/d(chamber P, Pt) by the face's chain.
+
+        The element was handed the face (P_face, Pt_face) in place of the
+        chamber's (P, Pt), so its entries for those names are really
+        d(res)/d(P_face) and d(res)/d(Pt_face); the face depends on the
+        chamber state and the flows through jac_P / jac_Pt.
+        """
         _, _, jac_P, jac_Pt = face
         for row in elem_jac.values():
-            c_P = row.get(f"{node_id}.P", 0.0)
-            c_Pt = row.get(f"{node_id}.Pt", 0.0)
+            c_P = row.pop(f"{node_id}.P", 0.0)
+            c_Pt = row.pop(f"{node_id}.Pt", 0.0)
             for coeff, offs in ((c_P, jac_P), (c_Pt, jac_Pt)):
                 if coeff == 0.0:
                     continue
