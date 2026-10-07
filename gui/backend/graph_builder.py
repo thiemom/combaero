@@ -8,6 +8,7 @@ from combaero.network import (
     ConstantHeadLoss,
     ConvectiveSurface,
     FlowNetwork,
+    ImpingementArray,
     ImpingementModel,
     LinearThetaFractionLoss,
     LinearThetaHeadLoss,
@@ -39,6 +40,7 @@ from .schemas import (
     ConstantHeadLossData,
     DiscreteLossData,
     EjectorData,
+    ImpingementArrayData,
     ImpingementModelData,
     LinearThetaFractionLossData,
     LinearThetaHeadLossData,
@@ -664,6 +666,12 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             element_nodes.append(node_schema)
 
     element_ids = {node.id for node in element_nodes}
+    # Impingement arrays (#465) expand into a row chain. Their ends fan out to
+    # N plates (supply) or collect the last crossflow segment (exit), which a
+    # MomentumChamberNode junction cannot represent, so element-to-array links
+    # get a PlenumNode instead -- the jet supply plenum the source assumes.
+    array_ids = {node.id for node in element_nodes if node.type == "impingement_array"}
+    gui_arrays: dict[str, ImpingementArray] = {}
     # Junction elements with named handle ports (common/straight/branch for
     # the tee; primary/secondary/outlet for the ejector). Both get the same
     # per-port MomentumChamberNode auto-insertion below.
@@ -687,7 +695,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             # Standard element-to-element: auto-insert MomentumChamberNode
             junction_id = f"__junction__{edge.source}__{edge.target}"
             if junction_id not in nodes_map:
-                junction_node = MomentumChamberNode(junction_id)
+                to_array = edge.source in array_ids or edge.target in array_ids
+                junction_node = (
+                    PlenumNode(junction_id) if to_array else MomentumChamberNode(junction_id)
+                )
                 net.add_node(junction_node)
                 nodes_map[junction_id] = junction_node
             edge_junction_map[(edge.source, edge.target)] = junction_id
@@ -961,6 +972,25 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if not elem.initial_guess:
                 elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
+        elif elem_type == "impingement_array":
+            data = ImpingementArrayData(**elem_data)
+            arr = ImpingementArray(
+                elem_id,
+                n_rows=data.n_rows,
+                d_jet=data.d_jet,
+                xn_d=data.xn_d,
+                yn_d=data.yn_d,
+                z_d=data.z_d,
+                span=data.span,
+                plate_thickness=data.plate_thickness,
+                pattern=data.pattern,
+                correlation=data.correlation,
+                Cd=data.Cd,
+                Nu_multiplier=data.Nu_multiplier * (schema.solver_settings.Nu_multiplier or 1.0),
+                roughness=data.roughness,
+            )
+            arr.add_to(net, source_id, target_id)
+            gui_arrays[elem_id] = arr
         elif elem_type == "area_change":
             data = AreaChangeData(**elem_data)
             elem = AreaChangeElement(
@@ -1052,6 +1082,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 )
                 net.add_element(elem)
 
+    # Result assembly reports each array under its GUI id (runner.py).
+    net._gui_arrays = gui_arrays
+
     # 4. Fourth Pass: Thermal Walls
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
@@ -1076,6 +1109,22 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 k = data.conductivity if data.conductivity is not None else 20.0
                 layers = [WallLayer(thickness=t, conductivity=k)]
 
+            if edge.source in gui_arrays or edge.target in gui_arrays:
+                # One wall to an array is one wall per row, each on that
+                # row's target footprint; the edge's own area does not apply.
+                array_is_a = edge.source in gui_arrays
+                arr = gui_arrays[edge.source if array_is_a else edge.target]
+                if edge.source in gui_arrays and edge.target in gui_arrays:
+                    raise ValueError(f"Thermal wall '{wall_id}' joins two impingement arrays.")
+                arr.add_wall(
+                    net,
+                    wall_id,
+                    hot_element=edge.target if array_is_a else edge.source,
+                    layers=layers,
+                    R_fouling=data.R_fouling,
+                    array_is_side_a=array_is_a,
+                )
+                continue
             net.add_wall(
                 ThermalWall(
                     id=wall_id,

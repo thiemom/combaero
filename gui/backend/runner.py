@@ -139,7 +139,36 @@ def _build_result_objects(
         if edge_keys:
             edge_results[edge_id] = edge_keys
 
+    # Impingement arrays (#465) are one GUI node but many network elements:
+    # report the array under its own id, and each wall to it as one edge.
+    for arr_id, arr in getattr(net, "_gui_arrays", {}).items():
+        if not elem_diags:
+            continue
+        summary = arr.summarize(elem_diags)
+        m_total = summary.pop("m_dot")
+        element_results[arr_id] = ElementResult(m_dot=m_total, success=success, **summary)
+        plates = {arr.plate_id(i) for i in range(1, int(arr.n_rows) + 1)}
+        rows: dict[str, list[dict]] = {}
+        for wid, wall in net.walls.items():
+            if wid in edge_results and {wall.element_a, wall.element_b} & plates:
+                # ImpingementArray.add_wall names row walls f"{edge_id}__r{i}".
+                rows.setdefault(wid.rpartition("__r")[0], []).append(edge_results[wid])
+        for base, per_row in rows.items():
+            edge_results[base] = _aggregate_array_wall(per_row)
+
     return node_results, element_results, edge_results
+
+
+def _aggregate_array_wall(per_row: list[dict]) -> dict:
+    """One GUI wall spread over an array's rows: the total heat, and the
+    profile of the HOTTEST row (the one a designer checks the wall against).
+    The per-row values stay available as ``rows_Q`` and ``rows_T_hot``."""
+    hottest = max(per_row, key=lambda r: float(r.get("T_hot", 0.0)))
+    out = dict(hottest)
+    out["Q"] = float(sum(float(r.get("Q", 0.0)) for r in per_row))
+    out["rows_Q"] = [float(r.get("Q", 0.0)) for r in per_row]
+    out["rows_T_hot"] = [float(r.get("T_hot", 0.0)) for r in per_row]
+    return out
 
 
 # ---------------------------------------------------------------------------

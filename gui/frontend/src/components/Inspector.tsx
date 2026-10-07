@@ -835,13 +835,17 @@ const Inspector = () => {
 										<option value="McGreehanSchotsch">
 											Cooling Hole with Crossflow (M-S 1988)
 										</option>
+										<option value="Lichtarowicz">
+											Long Orifice, l/d 2-10 (Lichtarowicz 1965)
+										</option>
 										<option value="fixed">Manual / Fixed Value</option>
 									</select>
 								</div>
 
 								{/* Conditional Inputs based on correlation */}
 								{(selectedNode.data.correlation === "IdelchikThick" ||
-									selectedNode.data.correlation === "McGreehanSchotsch") && (
+									selectedNode.data.correlation === "McGreehanSchotsch" ||
+									selectedNode.data.correlation === "Lichtarowicz") && (
 									<LengthInput
 										id={`plate_thickness_${selectedNode.id}`}
 										label="Hole Length (L)"
@@ -932,6 +936,148 @@ const Inspector = () => {
 									</select>
 								</div>
 								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
+
+				{selectedNode.type === "impingement_array" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const dJet: number = d.d_jet ?? 0.00254;
+						const ynD: number = d.yn_d ?? 4.0;
+						const span: number = d.span ?? 0.122;
+						const holesPerRow = Math.max(1, Math.round(span / (ynD * dJet)));
+						const ratio = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const rows: number[] | undefined = d.result?.rows_Nu;
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									Jet plate fed from the upstream node, impinging on a target;
+									the spent air leaves down the gap to the downstream node
+									(Florschuetz, Truman and Metzger 1981). Gc/Gj comes from the
+									solved crossflow. A bypass crossflow (#467) or spent air
+									leaving through the target (#468) are different elements.
+								</div>
+								{ratio("n_rows", "Rows", 10)}
+								<LengthInput
+									id={`d_jet_${selectedNode.id}`}
+									label="Hole Diameter (d)"
+									value={dJet}
+									onChange={(val) => set({ d_jet: val })}
+								/>
+								{ratio("xn_d", "Streamwise Pitch xn/d", 5.0)}
+								{ratio("yn_d", "Spanwise Pitch yn/d", 4.0)}
+								{ratio("z_d", "Gap z/d", 2.0)}
+								<LengthInput
+									id={`span_${selectedNode.id}`}
+									label="Span"
+									value={span}
+									onChange={(val) => set({ span: val })}
+								/>
+								<div className="text-[9px] text-gray-400 -mt-1">
+									{holesPerRow} holes per row
+								</div>
+								<LengthInput
+									id={`plate_thickness_${selectedNode.id}`}
+									label="Jet Plate Thickness"
+									value={d.plate_thickness ?? 0.00254}
+									onChange={(val) => set({ plate_thickness: val })}
+								/>
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Pattern
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.pattern || "inline"}
+										onChange={(e) => set({ pattern: e.target.value })}
+									>
+										<option value="inline">Inline</option>
+										<option value="staggered">Staggered</option>
+									</select>
+								</div>
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.correlation || "fixed"}
+										onChange={(e) => set({ correlation: e.target.value })}
+									>
+										<option value="fixed">Fixed (Florschuetz 0.79)</option>
+										<option value="IdelchikThick">
+											Deep Hole in Wall (Idelchik 4-18a)
+										</option>
+										<option value="Lichtarowicz">
+											Long Orifice, l/d 2-10 (Lichtarowicz 1965)
+										</option>
+										<option value="McGreehanSchotsch">
+											Cooling Hole (M-S 1988, plenum-fed)
+										</option>
+									</select>
+								</div>
+								{(d.correlation || "fixed") === "fixed" &&
+									ratio("Cd", "Fixed Cd Value", 0.79)}
+								{ratio("Nu_multiplier", "Nu Multiplier (rig matching)", 1.0)}
+								{rows && rows.length > 0 && (
+									<div className="flex flex-col gap-1 mt-2">
+										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+											Per Row
+										</label>
+										<table className="text-[10px] font-mono">
+											<thead>
+												<tr className="text-gray-500">
+													<th className="text-left">row</th>
+													<th className="text-right">Re_j</th>
+													<th className="text-right">Gc/Gj</th>
+													<th className="text-right">Nu</th>
+													<th className="text-right">h</th>
+												</tr>
+											</thead>
+											<tbody>
+												{rows.map((nu, i) => (
+													<tr key={`row_${i + 1}`}>
+														<td>{i + 1}</td>
+														<td className="text-right">
+															{d.result.rows_Re_j[i].toFixed(0)}
+														</td>
+														<td className="text-right">
+															{d.result.rows_Gc_Gj[i].toFixed(3)}
+														</td>
+														<td className="text-right">{nu.toFixed(1)}</td>
+														<td className="text-right">
+															{d.result.rows_htc[i].toFixed(0)}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
+										{d.result.surface_extrapolated > 0 && (
+											<div className="text-[10px] text-amber-600">
+												Outside Florschuetz's range on at least one row.
+											</div>
+										)}
+									</div>
+								)}
 							</>
 						);
 					})()}

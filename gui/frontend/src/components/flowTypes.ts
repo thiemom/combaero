@@ -4,6 +4,7 @@ import ChannelNode from "./nodes/ChannelNode";
 import CombustorNode from "./nodes/CombustorNode.tsx";
 import DiscreteLossNode from "./nodes/DiscreteLossNode";
 import EjectorNode from "./nodes/EjectorNode";
+import ImpingementArrayNode from "./nodes/ImpingementArrayNode";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
 import MomentumChamberNode from "./nodes/MomentumChamberNode.tsx";
@@ -22,6 +23,7 @@ export const nodeTypes = {
 	pressure_boundary: PressureBoundaryNode,
 	channel: ChannelNode,
 	orifice: OrificeNode,
+	impingement_array: ImpingementArrayNode,
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,
 	discrete_loss: DiscreteLossNode,

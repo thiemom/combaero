@@ -228,6 +228,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Impingement array, channel exit, as one element (#465): Python `ImpingementArray` and the GUI node "Impingement Array".** It models exactly one configuration: a jet plate fed from the upstream node, impinging on a target, with the spent air leaving down the gap to the downstream node (Florschuetz et al. 1981).
+  - **Expansion:** the array becomes the validated row chain (`{id}__p{i}`, `{id}__x{i}`, `{id}__c{i}`).
+  - **Thermal wall:** one wall to it is spread over the rows, each row on its own target footprint.
+  - **Results:** reported back under the array's own id:
+    - total flow and supply-to-exit dP;
+    - Re_j range, max Gc/Gj, mean Nu/h, jet-flow non-uniformity;
+    - out-of-range flags;
+    - per-row lists, shown as a table in the Inspector.
+  - **Wall result:** the edge reports the total Q and the hottest row's wall profile.
+  - **Default:** a Florschuetz test geometry (0.1 in holes, (5, 4, 2), 10 rows) that solves inside the correlation's range.
+  - **Other configurations:** a bypass crossflow (#467) and spent air leaving through the target (#468) will be separate elements.
+- **GUI orifice offers `Lichtarowicz`** (long orifice, l/d 2-10).
+
 - **Generic C++ core for jet-plate rows (#465).** The physics behind
   `ImpingementPlateElement` and `ImpingementCrossflowElement` moved from
   Python into C++ (f, J) functions that later configurations reuse:

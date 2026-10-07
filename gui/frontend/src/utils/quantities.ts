@@ -44,6 +44,23 @@ export const QUANTITY_CATALOGUE: Record<
 	Cd: { label: "Cd", unit: "—", format: (v) => v.toFixed(4) },
 	Nu: { label: "Nu", unit: "—", format: (v) => v.toFixed(2) },
 	htc: { label: "htc", unit: "W/m²/K", format: (v) => v.toFixed(1) },
+	// Impingement array (#465): the array's own summary of its rows.
+	Re_j_min: { label: "Re_j min", unit: "—", format: (v) => v.toFixed(0) },
+	Re_j_max: { label: "Re_j max", unit: "—", format: (v) => v.toFixed(0) },
+	Gc_Gj_max: { label: "Gc/Gj max", unit: "—", format: (v) => v.toFixed(3) },
+	Nu_mean: { label: "Nu mean", unit: "—", format: (v) => v.toFixed(1) },
+	htc_mean: { label: "h mean", unit: "W/m²/K", format: (v) => v.toFixed(0) },
+	jet_flow_nonuniformity: {
+		label: "Jet flow max/min",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	n_holes: { label: "Holes", unit: "—", format: (v) => v.toFixed(0) },
+	Cd_in_range: {
+		label: "Cd in range",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
 	Re_surface: {
 		label: "Re (surface)",
 		unit: "—",

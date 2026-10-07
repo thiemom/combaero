@@ -66,6 +66,23 @@ const NetworkCanvas = () => {
 				} as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
+			} else if (type === "impingement_array") {
+				// A Florschuetz test geometry, so the default is a working
+				// example inside the correlation's range (#465).
+				data = {
+					...data,
+					n_rows: 10,
+					d_jet: 0.00254,
+					xn_d: 5.0,
+					yn_d: 4.0,
+					z_d: 2.0,
+					span: 0.122,
+					plate_thickness: 0.00254,
+					pattern: "inline",
+					correlation: "fixed",
+					Cd: 0.79,
+					Nu_multiplier: 1.0,
+				} as any;
 			} else if (type === "discrete_loss") {
 				data = {
 					...data,
