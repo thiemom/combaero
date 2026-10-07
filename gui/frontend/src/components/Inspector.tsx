@@ -940,6 +940,136 @@ const Inspector = () => {
 						);
 					})()}
 
+				{selectedNode.type === "effusion_plate" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const num = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const len = (key: string, label: string, fallback: number) => (
+							<LengthInput
+								id={`${key}_${selectedNode.id}`}
+								label={label}
+								value={d[key] ?? fallback}
+								onChange={(val) => set({ [key]: val })}
+							/>
+						);
+						const r = d.result;
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									Plenum-fed plate that owns its wall. Discharge into a momentum
+									chamber: the chamber's flow and surface give the gas side.
+									Discharge into a plenum: the gas side is the imposed heat flux
+									below. Connect it to a chamber's "s" handle to add its jets'
+									momentum.
+								</div>
+								{len("hole_diameter", "Hole Diameter", 3.27e-3)}
+								{len("wall_thickness", "Wall Thickness", 6.3e-3)}
+								{len("pitch_x", "Streamwise Pitch", 15.24e-3)}
+								{len("pitch_y", "Spanwise Pitch", 15.24e-3)}
+								{len("panel_length", "Panel Length", 0.152)}
+								{len("panel_width", "Panel Width", 0.152)}
+								{num("angle_deg", "Hole Angle to Wall [deg]", 90)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.correlation || "IdelchikThick"}
+										onChange={(e) => set({ correlation: e.target.value })}
+									>
+										<option value="IdelchikThick">
+											Deep Hole in Wall (Idelchik 4-18a)
+										</option>
+										<option value="Lichtarowicz">
+											Long Orifice, l/d 2-10 (Lichtarowicz 1965)
+										</option>
+										<option value="McGreehanSchotsch">
+											Cooling Hole (M-S 1988, plenum-fed)
+										</option>
+										<option value="fixed">Manual / Fixed Value</option>
+									</select>
+								</div>
+								{d.correlation === "fixed" && num("Cd", "Fixed Cd Value", 0.6)}
+								{num("wall_conductivity", "Wall Conductivity [W/m/K]", 20)}
+								<div className="text-[10px] font-bold text-gray-500 uppercase mt-2">
+									Gas Side
+								</div>
+								{num("gas_augmentation", "Gas h Augmentation (user)", 1.0)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Film
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.gas_film || "none"}
+										onChange={(e) => set({ gas_film: e.target.value })}
+									>
+										<option value="none">None (validated closure)</option>
+										<option value="baldauf_sellers">
+											Baldauf + Sellers (not supported by Andrews data)
+										</option>
+									</select>
+								</div>
+								{d.gas_film === "baldauf_sellers" &&
+									num("turbulence_intensity", "Turbulence Intensity", 0.05)}
+								{num("gas_heat_flux", "Imposed Heat Flux [W/m²] (plenum)", 0)}
+								{r && r.T_wall_hot != null && (
+									<div className="flex flex-col gap-0.5 mt-2 bg-blue-50/50 p-2 rounded border border-blue-100/50 text-[10px] font-mono">
+										<span>
+											Gas side:{" "}
+											{r.gas_side_chamber ? "chamber (flow)" : "imposed flux"}
+										</span>
+										<span>
+											T wall hot/cold: {r.T_wall_hot.toFixed(0)} /{" "}
+											{r.T_wall_cold.toFixed(0)} K
+										</span>
+										<span>q: {(r.q_wall / 1000).toFixed(1)} kW/m²</span>
+										{r.gas_side_chamber ? (
+											<>
+												<span>
+													T gas: {r.T_gas.toFixed(0)} K (
+													{r.T_gas_from_main_inlet ? "main inlet" : "chamber"})
+												</span>
+												<span>η overall: {r.eta_overall.toFixed(3)}</span>
+												<span>h gas: {r.h_gas.toFixed(0)} W/m²/K</span>
+												<span>M: {r.blowing_ratio.toFixed(2)}</span>
+											</>
+										) : null}
+										{r.film_extrapolated > 0 && (
+											<span className="text-amber-600">
+												Film outside Baldauf's range
+											</span>
+										)}
+										{r.coolant_crossflow_ignored > 0 && (
+											<span className="text-amber-600">
+												Supply has crossflow: not modelled (plenum-fed plate)
+											</span>
+										)}
+									</div>
+								)}
+							</>
+						);
+					})()}
+
 				{selectedNode.type === "impingement_array" &&
 					(() => {
 						const d = selectedNode.data;

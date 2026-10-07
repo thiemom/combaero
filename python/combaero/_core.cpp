@@ -6084,6 +6084,18 @@ PYBIND11_MODULE(_core, m) {
         "  eta       : adiabatic effectiveness [-]\n\n"
         "Returns: adiabatic wall temperature T_aw [K]");
 
+  py::class_<combaero::cooling::EffusionPanelFilm>(m, "EffusionPanelFilm")
+      .def_readonly("eta", &combaero::cooling::EffusionPanelFilm::eta)
+      .def_readonly("extrapolated", &combaero::cooling::EffusionPanelFilm::extrapolated);
+  m.def("effusion_panel_film_effectiveness",
+        &combaero::cooling::effusion_panel_film_effectiveness, py::arg("n_rows"),
+        py::arg("pitch_x_over_D"), py::arg("s_over_D"), py::arg("M"),
+        py::arg("density_ratio"), py::arg("alpha_deg"), py::arg("Tu"),
+        "Panel-averaged adiabatic film effectiveness of an effusion plate:\n"
+        "Baldauf (2002) per row, Sellers-superposed, averaged over the rows.\n"
+        "The alternative closure Andrews 88-GT-290 refuses offered alone --\n"
+        "select it explicitly; extrapolated flags Baldauf's envelope.");
+
   m.def("film_superposition_sellers",
         &combaero::cooling::film_superposition_sellers, py::arg("eta_rows"),
         "Sellers superposition of per-row film effectiveness:\n"

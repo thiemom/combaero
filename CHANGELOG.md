@@ -239,6 +239,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`EffusionPlateElement` owns its wall; the discharge node decides the gas side (#471).**
+  - **The wall.** The plate is the wall the coolant passes through. Its diagnostics now carry the wall solution: `T_wall_hot`, `T_wall_cold`, `q_wall`, `Q_wall`, `eta_overall`.
+    - **Coolant side:** Andrews 86-GT-225.
+    - **Conduction:** `wall_thickness / wall_conductivity`, through C++'s wall coupling.
+  - **Gas side, by discharge node:**
+    - **A momentum chamber (flow):** its own surface correlation gives the unblown coefficient, and its velocity gives the blowing ratio. The gas temperature is the approaching main stream's, not the mixed chamber state, which the effused coolant dilutes. `gas_augmentation` is the caller's input, default 1.
+    - **A plenum (state, no flow):** the imposed `gas_heat_flux`, default 0 (adiabatic).
+  - **Network energy:** unchanged. The heat returns with the coolant into the same node.
+  - **Film:** off by default. Baldauf + Sellers (`gas_film="baldauf_sellers"`) is selectable and flagged outside its envelope. Its panel average moved into C++ (`effusion_panel_film_effectiveness`), shared with the Andrews validation runner, which gives bit-identical results.
+  - **Coolant crossflow:** a channel-fed supply is flagged (`coolant_crossflow_ignored`). This 2-port plate is plenum-fed.
+  - **One wall core:** `overall_effectiveness` now uses the same C++ wall core, with zero conduction resistance. Its results are unchanged.
+  - **GUI:** new "Effusion Plate" node, defaulting to Andrews' plate C, the geometry the closure is scored on. Connect it to a chamber's side handle.
+
 - **The merge chamber, the jet momentum and the impingement crossflow term are compressible (#471).** The incompressible first version used one density for the main face and the outlet, `Pt - P = ½ρu²`, and a jet density at the supply total temperature. All three evaluations now come from C++:
   - **Exact impulse.** `chamber_merge_face_state` solves the face from the exact impulse balance (the ideal-gas quadratic on its subsonic root, flagged when no such root exists). It takes the face Pt from the chamber's own entropy-based closure.
   - **Jet momentum.** `jet_impulse` uses the isentropic jet velocity, or the sonic momentum plus pressure thrust when choked.

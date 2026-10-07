@@ -337,6 +337,42 @@ energy balance: `Q = h_plate_area * area_approach_total * dT`.
 The external film is **not** included here, and `overall_effectiveness()`
 below explains why that is a measured decision rather than a gap.
 
+##### The plate's own wall in a network (#471)
+
+The plate IS the wall the coolant passes through, so it owns it: no
+`ThermalWall` connects to it, and its diagnostics carry the wall solution
+(`wall_heat_transfer`). The node it DISCHARGES into decides the gas side:
+
+| Discharge into | Gas side |
+|---|---|
+| `MomentumChamberNode` (flow) | the chamber's own surface correlation is the unblown `h_gas_unblown` (so the chamber's surface model IS the baseline); its velocity gives `blowing_ratio`; `gas_augmentation` (the caller's, 1.0) scales h. `T_gas` is the approaching MAIN stream when the chamber has one -- its own state is the mixed outlet, diluted by the effused coolant |
+| a plenum (state, no flow) | the imposed `gas_heat_flux` [W/m^2], 0 by default (adiabatic) |
+
+```python
+panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=3.27e-3,
+                             wall_thickness=6.3e-3, pitch=15.24e-3,
+                             panel_length=0.152, panel_width=0.152,
+                             wall_conductivity=20.0,      # one layer, t/k
+                             gas_augmentation=1.0,        # the caller's
+                             gas_film="none",             # or "baldauf_sellers"
+                             gas_heat_flux=0.0)           # plenum discharge only
+diag["T_wall_hot"], diag["T_wall_cold"], diag["q_wall"], diag["eta_overall"]
+```
+
+- **Energy-neutral for the network.** The wall heat leaves the gas and
+  returns with the effusing coolant into the same node, so it is an output,
+  not a source.
+- **Film off by default.** `gas_film="baldauf_sellers"` adds C++'s
+  `effusion_panel_film_effectiveness` (Baldauf per row, Sellers over the
+  panel's rows; needs `panel_length`), flagged `film_extrapolated` outside
+  Baldauf's envelope. Scored on Andrews 88-GT-290 the data refuse it offered
+  alone; the missing physics is the gas-side augmentation.
+- **Plenum-fed.** McGreehan-Schotsch's U1/Vi stays 0 and the coolant side is
+  Andrews' still plenum; `coolant_crossflow_ignored` flags a supply node a
+  channel runs through. A channel-fed liner segment is a separate element.
+- With `wall_conductivity` large the wall reduces exactly to
+  `overall_effectiveness` below.
+
 ##### Overall effectiveness, as an output
 
 ```python

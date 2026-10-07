@@ -61,6 +61,21 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => (v > 0 ? "yes" : "no"),
 	},
+	// Effusion plate wall (#471)
+	T_wall_hot: { label: "T wall (hot)", unit: "K", format: (v) => v.toFixed(0) },
+	T_wall_cold: {
+		label: "T wall (cold)",
+		unit: "K",
+		format: (v) => v.toFixed(0),
+	},
+	q_wall: {
+		label: "q wall",
+		unit: "kW/m²",
+		format: (v) => (v / 1000).toFixed(1),
+	},
+	eta_overall: { label: "η overall", unit: "—", format: (v) => v.toFixed(3) },
+	eta_film: { label: "η film", unit: "—", format: (v) => v.toFixed(3) },
+	blowing_ratio: { label: "M", unit: "—", format: (v) => v.toFixed(2) },
 	Re_surface: {
 		label: "Re (surface)",
 		unit: "—",

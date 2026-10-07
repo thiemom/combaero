@@ -322,6 +322,35 @@ void check_alphas(const std::vector<double>& eta_rows,
 
 }  // anonymous namespace
 
+EffusionPanelFilm effusion_panel_film_effectiveness(int n_rows,
+                                                    double pitch_x_over_D,
+                                                    double s_over_D, double M,
+                                                    double density_ratio,
+                                                    double alpha_deg, double Tu) {
+  if (n_rows < 1 || !(pitch_x_over_D > 0.0)) {
+    throw std::invalid_argument(
+        "effusion_panel_film_effectiveness: n_rows >= 1 and pitch_x_over_D > 0");
+  }
+  EffusionPanelFilm out;
+  double total = 0.0;
+  std::vector<double> rows;
+  rows.reserve(static_cast<std::size_t>(n_rows));
+  for (int n = 1; n <= n_rows; ++n) {
+    rows.clear();
+    for (int j = 1; j <= n; ++j) {
+      CorrelationStatus status = CorrelationStatus::Valid;
+      rows.push_back(film_effectiveness_baldauf_2002(j * pitch_x_over_D, M, density_ratio,
+                                                     alpha_deg, s_over_D, Tu, &status));
+      if (status != CorrelationStatus::Valid) {
+        out.extrapolated = true;
+      }
+    }
+    total += film_superposition_sellers(rows);
+  }
+  out.eta = total / n_rows;
+  return out;
+}
+
 double film_superposition_sellers(const std::vector<double>& eta_rows) {
     check_rows(eta_rows);
     double remaining = 1.0;

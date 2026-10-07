@@ -66,6 +66,26 @@ const NetworkCanvas = () => {
 				} as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
+			} else if (type === "effusion_plate") {
+				// Andrews et al.'s plate C, the geometry the closure is scored
+				// on (#471): a working example, not invented typical values.
+				data = {
+					...data,
+					hole_diameter: 3.27e-3,
+					wall_thickness: 6.3e-3,
+					pitch_x: 15.24e-3,
+					pitch_y: 15.24e-3,
+					panel_length: 0.152,
+					panel_width: 0.152,
+					angle_deg: 90.0,
+					correlation: "IdelchikThick",
+					Cd: 0.6,
+					wall_conductivity: 20.0,
+					gas_film: "none",
+					gas_augmentation: 1.0,
+					turbulence_intensity: 0.05,
+					gas_heat_flux: 0.0,
+				} as any;
 			} else if (type === "impingement_array") {
 				// A Florschuetz test geometry, so the default is a working
 				// example inside the correlation's range (#465).

@@ -319,16 +319,10 @@ def film_effectiveness(series: SeriesMetadata, G: float) -> float | None:
     blowing = (G * X * X / (math.pi * D * D / 4.0)) / (gas["rho_g"] * gas["U_g"])
     density_ratio = rho_c / gas["rho_g"]
 
-    total = 0.0
-    for n in range(1, FILM_ROWS + 1):
-        rows = [
-            cb.film_effectiveness_baldauf_2002(
-                j * X / D, blowing, density_ratio, 90.0, X / D, 0.05
-            )
-            for j in range(1, n + 1)
-        ]
-        total += cb.film_superposition_sellers(rows)
-    return total / FILM_ROWS
+    # The panel average lives in C++ so the element and this runner share it.
+    return cb.effusion_panel_film_effectiveness(
+        FILM_ROWS, X / D, X / D, blowing, density_ratio, 90.0, 0.05
+    ).eta
 
 
 def implied_gas_side_h(
