@@ -196,6 +196,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`ImpingementPlateElement` refuses wiring it does not model (#465).** The
+  Florschuetz configuration is spent air leaving down the crossflow channel.
+  The plate now refuses three other configurations at set-up:
+  - a bypass or initial crossflow feeding the chain (#467);
+  - a gap draining through the target, as in impingement-effusion or film
+    (#468);
+  - two plates on one node.
+
 - **"16 configurations across three rigs" now says that all three rigs are
   Texas A&M.** #401 rejected a generalised `G_bar/G` correlation because
   69% of the variance in the pooled population falls BETWEEN rigs rather
@@ -219,6 +227,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "lower bound" caveat becomes testable rather than stated.
 
 ### Added
+
+- **Generic C++ core for jet-plate rows (#465).** The physics behind
+  `ImpingementPlateElement` and `ImpingementCrossflowElement` moved from
+  Python into C++ (f, J) functions that later configurations reuse:
+  - `jet_row_heat_transfer(set, JetRowGeometry, m_jet, m_crossflow, mu, k, Pr)`
+    returns h with analytic `dh_dm_jet` / `dh_dm_crossflow`;
+  - `side_stream_momentum_drop(m_arr, m_out, rho, area)` gives the centred
+    momentum term for side streams joining a channel.
+
+  The validation numbers are unchanged to the digit.
 
 - **Impingement-cooled walls as a network (#465).** Two new elements, one
   pair per spanwise row, model a plenum-fed jet plate with its target and

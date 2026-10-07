@@ -17,6 +17,7 @@
 #include "pin_fin_correlation.h"
 #include "rib_correlation.h"
 #include "rib_ratio_correlation.h"
+#include "side_stream_momentum.h"
 #include "correlation_status.h"
 #include "ejector.h"
 #include "equilibrium.h"
@@ -608,6 +609,61 @@ PYBIND11_MODULE(_core, m) {
         py::arg("z_d"), py::arg("C_D"), py::arg("row"),
         "Gc/Gj at discrete spanwise row (1-indexed, counting from "
         "upstream). Row 1 is exactly 0.");
+
+  // Jet-plate row from network flows (#465): the generic core the
+  // impingement elements call. See impingement_correlation.h.
+  py::class_<combaero::cooling::JetRowGeometry>(m, "JetRowGeometry")
+      .def(py::init([](double d, double xn_d, double yn_d, double z_d,
+                       double n_holes) {
+             combaero::cooling::JetRowGeometry g;
+             g.d = d;
+             g.xn_d = xn_d;
+             g.yn_d = yn_d;
+             g.z_d = z_d;
+             g.n_holes = n_holes;
+             return g;
+           }),
+           py::arg("d"), py::arg("xn_d"), py::arg("yn_d"), py::arg("z_d"),
+           py::arg("n_holes"))
+      .def_readwrite("d", &combaero::cooling::JetRowGeometry::d)
+      .def_readwrite("xn_d", &combaero::cooling::JetRowGeometry::xn_d)
+      .def_readwrite("yn_d", &combaero::cooling::JetRowGeometry::yn_d)
+      .def_readwrite("z_d", &combaero::cooling::JetRowGeometry::z_d)
+      .def_readwrite("n_holes", &combaero::cooling::JetRowGeometry::n_holes);
+  py::class_<combaero::cooling::JetRowHeatTransfer>(m, "JetRowHeatTransfer")
+      .def_readonly("h", &combaero::cooling::JetRowHeatTransfer::h)
+      .def_readonly("Nu", &combaero::cooling::JetRowHeatTransfer::Nu)
+      .def_readonly("Re_j", &combaero::cooling::JetRowHeatTransfer::Re_j)
+      .def_readonly("Gc_Gj", &combaero::cooling::JetRowHeatTransfer::Gc_Gj)
+      .def_readonly("dh_dm_jet",
+                    &combaero::cooling::JetRowHeatTransfer::dh_dm_jet)
+      .def_readonly("dh_dm_crossflow",
+                    &combaero::cooling::JetRowHeatTransfer::dh_dm_crossflow)
+      .def_readonly("extrapolated",
+                    &combaero::cooling::JetRowHeatTransfer::extrapolated);
+  m.def("jet_row_gc_gj_per_flow_ratio",
+        &combaero::cooling::jet_row_gc_gj_per_flow_ratio, py::arg("yn_d"),
+        py::arg("z_d"),
+        "(pi/4)/((yn/d)(z/d)): Gc/Gj per unit m_crossflow/m_jet.");
+  m.def("jet_row_heat_transfer", &combaero::cooling::jet_row_heat_transfer,
+        py::arg("correlation_set"), py::arg("geometry"), py::arg("m_jet"),
+        py::arg("m_crossflow"), py::arg("mu"), py::arg("k"), py::arg("Pr"),
+        "Target-side h of one jet-plate row from its own jet flow and the\n"
+        "crossflow mass approaching it, with analytic dh/dm_jet and\n"
+        "dh/dm_crossflow. Which flows count as crossflow is the caller's\n"
+        "configuration.");
+
+  py::class_<combaero::SideStreamMomentum>(m, "SideStreamMomentum")
+      .def_readonly("dP", &combaero::SideStreamMomentum::dP)
+      .def_readonly("d_dm_out", &combaero::SideStreamMomentum::d_dm_out)
+      .def_readonly("d_dm_arr", &combaero::SideStreamMomentum::d_dm_arr)
+      .def_readonly("d_drho", &combaero::SideStreamMomentum::d_drho);
+  m.def("side_stream_momentum_drop", &combaero::side_stream_momentum_drop,
+        py::arg("m_arr"), py::arg("m_out"), py::arg("rho"), py::arg("area"),
+        "Centred static-pressure drop of a channel segment between two\n"
+        "stations where side streams join with no streamwise momentum:\n"
+        "(m_out|m_out| - m_arr|m_arr|) / (2 rho A^2), with analytic\n"
+        "derivatives.");
 
   // ---------------------------------------------------------------------
   // Pin-fin arrays (#335): provenanced sets, exact basis converters, fin

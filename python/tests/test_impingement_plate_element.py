@@ -19,6 +19,7 @@ import combaero as cb
 from combaero.network import (
     ChannelElement,
     ConvectiveSurface,
+    EffusionPlateElement,
     FlowNetwork,
     ImpingementCrossflowElement,
     ImpingementPlateElement,
@@ -174,7 +175,7 @@ def test_the_momentum_term_is_half_of_both_adjacent_merges() -> None:
     seg, _ = _segment_with_neighbours()
     m, m_arr, m_jet = 0.02, 0.015, 0.006
     st = _state(m, P=1.0e5)
-    dP, _, _ = seg._momentum_drop(st, {"x1": m_arr, "p3": m_jet})
+    dP = seg._momentum_drop(st, {"x1": m_arr, "p3": m_jet})[0].dP
     rho = cb.density(300.0, 1.0e5, cb.species.dry_air())
     A = 2 * D * 0.1
     merge_up = (m**2 - m_arr**2) / (rho * A * A)  # row 2, arriving -> this segment
@@ -322,3 +323,108 @@ def test_global_jacobian_carries_the_neighbour_flow_sensitivity() -> None:
                 pure += 1
                 assert with_relay[i, j] == pytest.approx(fd[i, j], rel=1e-3)
     assert pure > 0
+
+
+def _hand_wired(extra) -> FlowNetwork:
+    """Two rows, channel exit, plus whatever ``extra`` adds."""
+    g = FlowNetwork()
+    for n, pt in (("supply", 1.03e5), ("exit", 1.0e5)):
+        b = PressureBoundary(n)
+        b.Pt, b.Tt, b.Y = pt, 300.0, Y_AIR
+        g.add_node(b)
+    for n in ("c1", "c2"):
+        g.add_node(PlenumNode(n))
+    span = 12 * 4.0 * D
+    for i, to in ((1, "c2"), (2, "exit")):
+        g.add_element(
+            ImpingementPlateElement(
+                f"p{i}",
+                "supply",
+                f"c{i}",
+                d_jet=D,
+                xn_d=5.0,
+                yn_d=4.0,
+                z_d=2.0,
+                span=span,
+                plate_thickness=D,
+            )
+        )
+        g.add_element(
+            ImpingementCrossflowElement(f"x{i}", f"c{i}", to, length=5 * D, height=2 * D, span=span)
+        )
+    extra(g, span)
+    return g
+
+
+def test_the_channel_exit_configuration_is_accepted() -> None:
+    res = NetworkSolver(_hand_wired(lambda g, span: None)).solve()
+    assert res["__success__"], res.get("__message__")
+
+
+def test_a_bypass_crossflow_is_refused() -> None:
+    """External crossflow into the chain is #467's configuration, not this one."""
+
+    def bypass(g, span):
+        b = PressureBoundary("bypass")
+        b.Pt, b.Tt, b.Y = 1.03e5, 300.0, Y_AIR
+        g.add_node(b)
+        g.add_element(ChannelElement("byp", "bypass", "c1", length=0.01, diameter=0.01))
+
+    with pytest.raises(ValueError, match="#467"):
+        NetworkSolver(_hand_wired(bypass)).solve()
+
+
+def test_spent_air_through_the_target_is_refused() -> None:
+    """A gap that drains through effusion holes is #468's configuration."""
+    g = FlowNetwork()
+    for n, pt in (("supply", 1.03e5), ("gas", 1.0e5)):
+        b = PressureBoundary(n)
+        b.Pt, b.Tt, b.Y = pt, 300.0, Y_AIR
+        g.add_node(b)
+    g.add_node(PlenumNode("gap"))
+    g.add_element(
+        ImpingementPlateElement(
+            "p",
+            "supply",
+            "gap",
+            d_jet=D,
+            xn_d=5.0,
+            yn_d=4.0,
+            z_d=2.0,
+            span=0.1,
+            plate_thickness=D,
+        )
+    )
+    g.add_element(
+        EffusionPlateElement(
+            "eff",
+            "gap",
+            "gas",
+            hole_diameter=D,
+            wall_thickness=2 * D,
+            pitch=8 * D,
+            panel_area=0.01,
+        )
+    )
+    with pytest.raises(ValueError, match="#468"):
+        NetworkSolver(g).solve()
+
+
+def test_two_plates_on_one_node_are_refused() -> None:
+    def twin(g, span):
+        g.add_element(
+            ImpingementPlateElement(
+                "p1b",
+                "supply",
+                "c1",
+                d_jet=D,
+                xn_d=5.0,
+                yn_d=4.0,
+                z_d=2.0,
+                span=span,
+                plate_thickness=D,
+            )
+        )
+
+    with pytest.raises(ValueError, match="more than one plate"):
+        NetworkSolver(_hand_wired(twin)).solve()
