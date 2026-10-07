@@ -1636,6 +1636,10 @@ of different geometry or a bleed therefore shows up in the heat transfer.
 `h` depends on a neighbour's flow, so the element returns `dh_dsources` and
 the solver relays it into the Jacobian (the `network_flow_inputs()` opt-in).
 `T_aw` is the supply plenum temperature, Florschuetz's own reference.
+The physics is C++'s `cb.jet_row_heat_transfer(set, cb.JetRowGeometry(...),
+m_jet, m_crossflow, mu, k, Pr)`, which returns `h` and its analytic
+derivatives with respect to both flows; the element only decides which flows
+are crossflow.
 - Hole Cd: default `'fixed'` at Florschuetz's 0.79 (measured 0.73-0.85);
   alternatives `'IdelchikThick'`, `'Lichtarowicz'` (long hole, l/d 2-10)
   and `'McGreehanSchotsch'` (supply-side `U1/Vi = 0`, never Gc/Gj).
@@ -1652,7 +1656,15 @@ momentum, so each merge drops the static pressure by
 the segments either side, so each crossflow node holds the static pressure at
 its row centre. **Without this term every row sees the same pressure
 difference and the supply stays uniform.** That puts Gc/Gj at twice Eq. 8 on
-Florschuetz's strongest-crossflow geometry.
+Florschuetz's strongest-crossflow geometry. The term is C++'s
+`cb.side_stream_momentum_drop(m_arr, m_out, rho, area)`.
+
+**One configuration only.** These elements cover spent air leaving down the
+crossflow channel. A hand-wired network describing a different
+configuration is refused at set-up, naming it:
+- a bypass or initial crossflow feeding the chain (#467);
+- spent air leaving through the target, impingement-effusion or film (#468);
+- two plates merging at one node.
 
 **Measured against the source** (`python/tests/test_impingement_plate_validation.py`):
 - **Flow model:** over the 27 Fig. 6 geometries x 10 rows, the network

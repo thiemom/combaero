@@ -33,7 +33,6 @@ import pytest
 
 import combaero as cb
 from combaero.network import (
-    ChannelElement,
     FlowNetwork,
     ImpingementCrossflowElement,
     ImpingementPlateElement,
@@ -48,6 +47,14 @@ D = 0.00254  # Florschuetz's 0.1 in holes
 N_ROWS = 10
 CD = cb.FLORSCHUETZ_1981_DEFAULT_CD
 Y_AIR = cb.mole_to_mass(cb.species.dry_air())
+
+
+class _FrictionOnlySegment(ImpingementCrossflowElement):
+    """The segment with its momentum term switched off: friction only, the
+    way a plain ChannelElement would carry the crossflow."""
+
+    def _momentum_drop(self, state_in, flows):
+        return cb.side_stream_momentum_drop(0.0, 0.0, 1.0, self.area), 1.0
 
 
 def _boundary(name: str, Pt: float) -> PressureBoundary:
@@ -89,15 +96,8 @@ def _chain(
                 f"x{i}", f"c{i}", to, length=xn_d * D, height=height, span=span
             )
         else:
-            area = height * span
-            seg = ChannelElement(
-                f"x{i}",
-                f"c{i}",
-                to,
-                length=xn_d * D,
-                diameter=math.sqrt(4.0 * area / math.pi),
-                Dh=2.0 * height * span / (height + span),
-                roughness=0.0,
+            seg = _FrictionOnlySegment(
+                f"x{i}", f"c{i}", to, length=xn_d * D, height=height, span=span
             )
         g.add_element(seg)
     res = NetworkSolver(g).solve()

@@ -607,62 +607,81 @@ All functions use consistent units to avoid conversion errors.
 
 ### impingement_correlation.h - Jet impingement correlations
 
-| Function                                        | Input Units                                                                                 | Output Unit                |
-|-------------------------------------------------|---------------------------------------------------------------------------------------------|----------------------------|
-| `goldstein_1986_single_jet`                     | -                                                                                           | SingleJetImpingementSet    |
-| `validate_single_jet_set`                       | correlation_set: SingleJetImpingementSet                                                    | None                       |
-| `single_jet_impingement_nu`                     | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -   | -                          |
-| `single_jet_impingement`                        | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -   | SingleJetImpingementResult |
-| `florschuetz_1981_inline`                       | -                                                                                           | JetArrayCorrelationSet     |
-| `florschuetz_1981_staggered`                    | -                                                                                           | JetArrayCorrelationSet     |
-| `validate_jet_array_set`                        | correlation_set: JetArrayCorrelationSet                                                     | None                       |
-| `jet_array_impingement_nu`                      | correlation_set: JetArrayCorrelationSet, Re_j: -, Gc_Gj: -, Pr: -, xn_d: -, yn_d: -, z_d: - | JetArrayImpingementResult  |
-| `crossflow_to_jet_ratio_at_x`                   | yn_d: -, z_d: -, C_D: -, x_over_xn: -                                                       | -                          |
-| `crossflow_to_jet_ratio_at_row`                 | yn_d: -, z_d: -, C_D: -, row: -                                                             | -                          |
-| `FLORSCHUETZ_1981_DEFAULT_CD`                   | -                                                                                           | -                          |
-| `SingleJetImpingementSet::name`                 | -                                                                                           | -                          |
-| `SingleJetImpingementSet::source`               | -                                                                                           | -                          |
-| `SingleJetImpingementSet::A`                    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::B`                    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::C`                    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::Re_exponent`          | -                                                                                           | -                          |
-| `SingleJetImpingementSet::n_const_heat_flux`    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::n_const_wall_temp`    | -                                                                                           | -                          |
-| `JetArrayGeometricFit::C`                       | -                                                                                           | -                          |
-| `JetArrayGeometricFit::nx`                      | -                                                                                           | -                          |
-| `JetArrayGeometricFit::ny`                      | -                                                                                           | -                          |
-| `JetArrayGeometricFit::nz`                      | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::name`                  | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::source`                | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::validity_source`       | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::pattern`               | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::A_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::m_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::B_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::n_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_Re_j`            | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_Gc_Gj`           | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_xn_d`            | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_yn_d`            | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_z_d`             | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_aspect_ratio`    | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::standard_error`        | -                                                                                           | -                          |
-| `JetArrayImpingementResult::Nu`                 | -                                                                                           | -                          |
-| `JetArrayImpingementResult::dNu_dRe_j`          | -                                                                                           | -                          |
-| `JetArrayImpingementResult::dNu_dGc_Gj`         | -                                                                                           | -                          |
-| `JetArrayImpingementResult::extrapolated`       | -                                                                                           | -                          |
-| `SingleJetImpingementResult::Nu`                | -                                                                                           | -                          |
-| `SingleJetImpingementResult::dNu_dRe`           | -                                                                                           | -                          |
-| `ImpingementRange::lo`                          | -                                                                                           | -                          |
-| `ImpingementRange::hi`                          | -                                                                                           | -                          |
-| `ImpingementThermalBC::ConstantHeatFlux`        | -                                                                                           | -                          |
-| `ImpingementThermalBC::ConstantWallTemperature` | -                                                                                           | -                          |
-| `ImpingementThermalBC::name`                    | -                                                                                           | -                          |
-| `ImpingementThermalBC::value`                   | -                                                                                           | -                          |
-| `JetHolePattern::Inline`                        | -                                                                                           | -                          |
-| `JetHolePattern::Staggered`                     | -                                                                                           | -                          |
-| `JetHolePattern::name`                          | -                                                                                           | -                          |
-| `JetHolePattern::value`                         | -                                                                                           | -                          |
+| Function                                        | Input Units                                                                                                                    | Output Unit                |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|----------------------------|
+| `goldstein_1986_single_jet`                     | -                                                                                                                              | SingleJetImpingementSet    |
+| `validate_single_jet_set`                       | correlation_set: SingleJetImpingementSet                                                                                       | None                       |
+| `single_jet_impingement_nu`                     | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -                                      | -                          |
+| `single_jet_impingement`                        | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -                                      | SingleJetImpingementResult |
+| `florschuetz_1981_inline`                       | -                                                                                                                              | JetArrayCorrelationSet     |
+| `florschuetz_1981_staggered`                    | -                                                                                                                              | JetArrayCorrelationSet     |
+| `validate_jet_array_set`                        | correlation_set: JetArrayCorrelationSet                                                                                        | None                       |
+| `jet_array_impingement_nu`                      | correlation_set: JetArrayCorrelationSet, Re_j: -, Gc_Gj: -, Pr: -, xn_d: -, yn_d: -, z_d: -                                    | JetArrayImpingementResult  |
+| `crossflow_to_jet_ratio_at_x`                   | yn_d: -, z_d: -, C_D: -, x_over_xn: -                                                                                          | -                          |
+| `crossflow_to_jet_ratio_at_row`                 | yn_d: -, z_d: -, C_D: -, row: -                                                                                                | -                          |
+| `jet_row_gc_gj_per_flow_ratio`                  | yn_d: -, z_d: -                                                                                                                | -                          |
+| `jet_row_heat_transfer`                         | correlation_set: JetArrayCorrelationSet, geometry: JetRowGeometry, m_jet: kg/s, m_crossflow: kg/s, mu: Pa*s, k: W/(m*K), Pr: - | JetRowHeatTransfer         |
+| `JetRowGeometry::d`                             | m                                                                                                                              | m                          |
+| `JetRowGeometry::xn_d`                          | -                                                                                                                              | -                          |
+| `JetRowGeometry::yn_d`                          | -                                                                                                                              | -                          |
+| `JetRowGeometry::z_d`                           | -                                                                                                                              | -                          |
+| `JetRowGeometry::n_holes`                       | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::h`                         | W/(m^2*K)                                                                                                                      | W/(m^2*K)                  |
+| `JetRowHeatTransfer::Nu`                        | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::Re_j`                      | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::Gc_Gj`                     | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::dh_dm_jet`                 | W/(m^2*K)/(kg/s)                                                                                                               | W/(m^2*K)/(kg/s)           |
+| `JetRowHeatTransfer::dh_dm_crossflow`           | W/(m^2*K)/(kg/s)                                                                                                               | W/(m^2*K)/(kg/s)           |
+| `JetRowHeatTransfer::extrapolated`              | -                                                                                                                              | -                          |
+| `side_stream_momentum_drop`                     | m_arr: kg/s, m_out: kg/s, rho: kg/m^3, area: m^2                                                                               | SideStreamMomentum         |
+| `SideStreamMomentum::dP`                        | Pa                                                                                                                             | Pa                         |
+| `SideStreamMomentum::d_dm_out`                  | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `SideStreamMomentum::d_dm_arr`                  | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `SideStreamMomentum::d_drho`                    | Pa/(kg/m^3)                                                                                                                    | Pa/(kg/m^3)                |
+| `FLORSCHUETZ_1981_DEFAULT_CD`                   | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::name`                 | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::source`               | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::A`                    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::B`                    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::C`                    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::Re_exponent`          | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::n_const_heat_flux`    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::n_const_wall_temp`    | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::C`                       | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::nx`                      | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::ny`                      | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::nz`                      | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::name`                  | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::source`                | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::validity_source`       | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::pattern`               | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::A_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::m_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::B_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::n_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_Re_j`            | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_Gc_Gj`           | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_xn_d`            | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_yn_d`            | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_z_d`             | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_aspect_ratio`    | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::standard_error`        | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::Nu`                 | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::dNu_dRe_j`          | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::dNu_dGc_Gj`         | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::extrapolated`       | -                                                                                                                              | -                          |
+| `SingleJetImpingementResult::Nu`                | -                                                                                                                              | -                          |
+| `SingleJetImpingementResult::dNu_dRe`           | -                                                                                                                              | -                          |
+| `ImpingementRange::lo`                          | -                                                                                                                              | -                          |
+| `ImpingementRange::hi`                          | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::ConstantHeatFlux`        | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::ConstantWallTemperature` | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::name`                    | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::value`                   | -                                                                                                                              | -                          |
+| `JetHolePattern::Inline`                        | -                                                                                                                              | -                          |
+| `JetHolePattern::Staggered`                     | -                                                                                                                              | -                          |
+| `JetHolePattern::name`                          | -                                                                                                                              | -                          |
+| `JetHolePattern::value`                         | -                                                                                                                              | -                          |
 
 ### acoustics.h - Acoustic Properties
 
@@ -1318,6 +1337,7 @@ All functions use consistent units to avoid conversion errors.
 | `DischargeHoleState::Re`                        | -                                                | -                                     |
 | `DischargeHoleState::U1_over_Vi`                | -                                                | -                                     |
 | `discharge_cd`                                  | correlation: -, hole: m, flow: -, Cd_constant: - | - (Cd)                                |
+| `discharge_cd_in_range`                         | correlation: -, hole: m, flow: -                 | - (bool)                              |
 | `discharge_cd_and_derivatives`                  | correlation: -, hole: m, flow: -, Cd_constant: - | - (Cd), - (dCd/dRe), - (dCd/d(U1/Vi)) |
 | `orifice_mdot_Cd`                               | -                                                | kg/s                                  |
 | `orifice_dP_Cd`                                 | -                                                | Pa                                    |

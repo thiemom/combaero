@@ -656,6 +656,33 @@ double crossflow_to_jet_ratio_at_x(double yn_d, double z_d, double C_D,
                                    double x_over_xn);
 double crossflow_to_jet_ratio_at_row(double yn_d, double z_d, double C_D,
                                      int row);  // row 1 is exactly 0
+
+// One row from NETWORK flows (#465): the generic core of a jet-plate row.
+// Gc/Gj = (m_crossflow/m_jet)(pi/4)/((yn/d)(z/d)), Re_j = 4 m_jet/(n pi d mu).
+// Which flows count as crossflow is the caller's configuration.
+struct JetRowGeometry { double d, xn_d, yn_d, z_d, n_holes; };
+struct JetRowHeatTransfer {
+    double h, Nu, Re_j, Gc_Gj;
+    double dh_dm_jet;        // analytic, includes the Gc/Gj ~ 1/m_jet term
+    double dh_dm_crossflow;  // analytic
+    bool extrapolated;
+};
+double jet_row_gc_gj_per_flow_ratio(double yn_d, double z_d);
+JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet& set,
+                                         const JetRowGeometry& geom,
+                                         double m_jet, double m_crossflow,
+                                         double mu, double k, double Pr);
+```
+
+### Side-Stream Momentum (`side_stream_momentum.h`)
+```cpp
+// Streams joining a channel with no streamwise momentum (impingement jets
+// turning into the crossflow). Centred segment form: half of each adjacent
+// station's drop, so a node sits at its station's middle.
+//   dP = (m_out|m_out| - m_arr|m_arr|) / (2 rho A^2)
+struct SideStreamMomentum { double dP, d_dm_out, d_dm_arr, d_drho; };
+SideStreamMomentum side_stream_momentum_drop(double m_arr, double m_out,
+                                             double rho, double area);
 ```
 
 ### Wall Coupling

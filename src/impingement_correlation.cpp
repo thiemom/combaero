@@ -230,6 +230,42 @@ double crossflow_to_jet_ratio_at_row(double yn_d, double z_d, double C_D,
                                      static_cast<double>(row) - 0.5);
 }
 
+double jet_row_gc_gj_per_flow_ratio(double yn_d, double z_d) {
+  return (M_PI / 4.0) / (yn_d * z_d);
+}
+
+JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet &set,
+                                         const JetRowGeometry &geom,
+                                         double m_jet, double m_crossflow,
+                                         double mu, double k, double Pr) {
+  if (!(geom.d > 0.0) || !(geom.n_holes > 0.0) || !(mu > 0.0)) {
+    throw std::invalid_argument(
+        "jet_row_heat_transfer: d, n_holes and mu must be positive");
+  }
+  JetRowHeatTransfer out;
+  const double c = jet_row_gc_gj_per_flow_ratio(geom.yn_d, geom.z_d);
+  const double dRe_dm = 4.0 / (geom.n_holes * M_PI * geom.d * mu);
+  out.Re_j = dRe_dm * m_jet;
+  const bool has_jet = std::abs(m_jet) > JET_ROW_MDOT_FLOOR;
+  out.Gc_Gj = has_jet ? c * m_crossflow / m_jet : 0.0;
+
+  const auto jet = jet_array_impingement_nu(set, out.Re_j, out.Gc_Gj, Pr,
+                                            geom.xn_d, geom.yn_d, geom.z_d);
+  const double scale = k / geom.d;
+  out.Nu = jet.Nu;
+  out.h = jet.Nu * scale;
+  out.extrapolated = jet.extrapolated;
+  // Re_j is linear in m_jet; Gc/Gj = c m_c / m_jet.
+  if (has_jet) {
+    out.dh_dm_jet = scale * (jet.dNu_dRe_j * dRe_dm -
+                             jet.dNu_dGc_Gj * out.Gc_Gj / m_jet);
+    out.dh_dm_crossflow = scale * jet.dNu_dGc_Gj * c / m_jet;
+  } else {
+    out.dh_dm_jet = scale * jet.dNu_dRe_j * dRe_dm;
+  }
+  return out;
+}
+
 void validate_single_jet_set(const SingleJetImpingementSet &set) {
   if (!(set.A > 0.0) || !std::isfinite(set.A)) {
     throw std::invalid_argument("validate_single_jet_set: A must be positive");
