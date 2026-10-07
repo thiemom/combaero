@@ -649,6 +649,7 @@ All functions use consistent units to avoid conversion errors.
 | `JetArrayCorrelationSet::standard_error`        | -                                                                                           | -                          |
 | `JetArrayImpingementResult::Nu`                 | -                                                                                           | -                          |
 | `JetArrayImpingementResult::dNu_dRe_j`          | -                                                                                           | -                          |
+| `JetArrayImpingementResult::dNu_dGc_Gj`         | -                                                                                           | -                          |
 | `JetArrayImpingementResult::extrapolated`       | -                                                                                           | -                          |
 | `SingleJetImpingementResult::Nu`                | -                                                                                           | -                          |
 | `SingleJetImpingementResult::dNu_dRe`           | -                                                                                           | -                          |

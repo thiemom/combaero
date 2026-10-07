@@ -252,3 +252,25 @@ TEST(CrossflowRatioTest, StaysFiniteForDegenerateGeometry) {
   EXPECT_TRUE(std::isfinite(crossflow_to_jet_ratio_at_row(0.0, 0.0, 0.79, 5)));
   EXPECT_TRUE(std::isfinite(crossflow_to_jet_ratio_at_row(8.0, 2.0, 0.0, 5)));
 }
+
+// d(Nu)/d(Gc_Gj) for network-supplied crossflow (#465): analytic against
+// central differences across the validity range and down to Gc/Gj = 0, where
+// the bracket's exponent n < 1 would be singular without the smoothing.
+TEST(JetArrayImpingement, AnalyticGcGjDerivativeMatchesFiniteDifference) {
+  for (const auto &set : {florschuetz_1981_inline(), florschuetz_1981_staggered()}) {
+    for (double G : {0.0, 1e-4, 0.05, 0.3, 0.6, 0.8}) {
+      for (double z_d : {1.0, 3.0}) {
+        const auto r = jet_array_impingement_nu(set, 2.0e4, G, 0.7, 8.0, 6.0, z_d);
+        const double h = 1e-6;
+        const double fd = (jet_array_impingement_nu(set, 2.0e4, G + h, 0.7, 8.0, 6.0, z_d).Nu -
+                           jet_array_impingement_nu(set, 2.0e4, G - h, 0.7, 8.0, 6.0, z_d).Nu) /
+                          (2.0 * h);
+        EXPECT_NEAR(r.dNu_dGc_Gj, fd, std::abs(fd) * 1e-5 + 1e-6) << G << " " << z_d;
+        EXPECT_TRUE(std::isfinite(r.dNu_dGc_Gj));
+        if (G > 0.01) {
+          EXPECT_LT(r.dNu_dGc_Gj, 0.0) << "crossflow degrades Nu";
+        }
+      }
+    }
+  }
+}

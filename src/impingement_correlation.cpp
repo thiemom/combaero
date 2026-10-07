@@ -199,6 +199,9 @@ JetArrayImpingementResult jet_array_impingement_nu(
 
   out.Nu = A * Re_term * bracket * Pr_term;
   out.dNu_dRe_j = re_derivative_factor(out.Nu, m, Re_j, Re_j_safe);
+  // d(bracket)/d(Gc_Gj) = -B n s^(n-1) ds/dGc_Gj, ds/dGc_Gj = z_d^2 Gc_Gj / s.
+  out.dNu_dGc_Gj = A * Re_term * Pr_term * (-B * n * std::pow(crossflow_safe, n - 1.0)) *
+                   (z_d * crossflow_arg / crossflow_safe);
   out.extrapolated = outside(set.valid_Re_j, std::abs(Re_j)) ||
                      outside(set.valid_Gc_Gj, Gc_Gj) ||
                      outside(set.valid_xn_d, xn_d) ||

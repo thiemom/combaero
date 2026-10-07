@@ -220,6 +220,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Impingement-cooled walls as a network (#465).** Two new elements, one
+  pair per spanwise row, model a plenum-fed jet plate with its target and
+  crossflow channel.
+  - **`ImpingementPlateElement`:** an orifice of `n_holes` holes whose
+    flow is the row's jet flow, plus Florschuetz et al. (1981) heat
+    transfer on the target. **Gc/Gj comes from the network:** the crossflow
+    approaching the row is every other inflow to the plate's crossflow node,
+    not the uniform-supply closed form.
+  - **`ImpingementCrossflowElement`:** a channel carrying the momentum the
+    jets cost, `(m_b|m_b| - m_a|m_a|)/(rho A^2)` per merge, split between
+    adjacent segments.
+  - **Result:** over the 27 Fig. 6 geometries the network reproduces
+    Florschuetz's own flow model (Eq. 8) to 3.7% max in Gc/Gj. Without the
+    momentum term the supply stays uniform and misses it by 2.2x.
+  - **Fig. 6 Nu/Nu1 through the chain:** +4.0% bias and 6.9% MAE, against
+    the correlation's +3.7% / 6.8%.
+  - **Solver opt-in:** an element defining `network_flow_inputs()` receives
+    the neighbours' flows as `flows=` on `residuals`, `htc_and_T` and
+    `diagnostics`. An htc that reads them returns `dh_dsources`, which the
+    wall relay carries into the Jacobian.
+  - **C++:** `JetArrayImpingementResult.dNu_dGc_Gj`, analytic.
+- **`'Lichtarowicz'` hole Cd on `OrificeElement` and `EffusionPlateElement`
+  (#465).** Lichtarowicz, Duggins and Markland's (1965) long-orifice
+  correlation (l/d 2-10, Re 10-2e4) already existed in C++ but no element
+  could select it. Below l/d = 1.5 it is refused at set-up, naming the
+  element.
+- **`discharge_cd_in_range` and the `Cd_in_range` orifice diagnostic (#465).**
+  Reports whether a discharge-hole Cd is inside its source's own Re and l/d
+  range. It is a flag, never a selector.
+
 - **Chyu (1990) pin-fin sets, and inline friction (#335).**
   - `chyu_1990_nu(arrangement, fillet)`: Table 2, straight or pin-endwall-fillet pins, inline or staggered (pin surface).
   - `chyu_1990_friction(arrangement, fillet)`: Fig. 6, digitised and fitted (provenance Fitted). The points are committed in `validation/cooling/data/chyu1990/`.
