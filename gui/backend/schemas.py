@@ -263,6 +263,7 @@ class OrificeData(BaseModel):
         "IdelchikBeveled",
         "IdelchikRounded",
         "McGreehanSchotsch",
+        "Lichtarowicz",
         "fixed",
     ] = "ReaderHarrisGallagher"
     plate_thickness: float = 0.0  # t [m], the hole length for a wall orifice
@@ -282,6 +283,33 @@ class OrificeData(BaseModel):
             if area_val > 0:
                 data["diameter"] = math.sqrt(4.0 * area_val / math.pi)
         return data
+
+
+class ImpingementArrayData(BaseModel):
+    """Impingement array, channel exit (#465): ONE configuration.
+
+    A jet plate fed from the upstream node, impinging on a target, the spent
+    air leaving down the gap to the downstream node (Florschuetz, Truman and
+    Metzger 1981). The builder expands it into the row chain. The defaults are
+    a Florschuetz test geometry (0.1 in holes, (5, 4, 2), 10 rows) and sit
+    inside the correlation's range at a few kPa across the array.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    n_rows: int = Field(default=10, ge=1)
+    d_jet: float = Field(default=0.00254, gt=0.0)
+    xn_d: float = Field(default=5.0, gt=0.0)
+    yn_d: float = Field(default=4.0, gt=0.0)
+    z_d: float = Field(default=2.0, gt=0.0)
+    span: float = Field(default=0.122, gt=0.0)
+    plate_thickness: float = Field(default=0.00254, gt=0.0)
+    pattern: Literal["inline", "staggered"] = "inline"
+    # Discharge-hole family only: a jet plate has no pipe, so no beta.
+    correlation: Literal["fixed", "IdelchikThick", "Lichtarowicz", "McGreehanSchotsch"] = "fixed"
+    Cd: float = 0.79  # Florschuetz's own default, cb.FLORSCHUETZ_1981_DEFAULT_CD
+    Nu_multiplier: float = Field(default=1.0, gt=0.0)
+    roughness: float = Field(default=0.0, ge=0.0)
+    label: str | None = None
 
 
 class AreaChangeData(BaseModel):

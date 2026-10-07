@@ -1596,8 +1596,31 @@ ch = ChannelElement("te", "A", "B", length=0.125, diameter=0.009,
 ### Impingement-Cooled Walls (jet-plate arrays)
 
 A jet plate fed from a plenum, impinging on a target wall, the spent air
-leaving through the gap as crossflow. Build it from two elements, one pair per
-spanwise row (#465):
+leaving through the gap as crossflow. **This is one configuration**, and
+`ImpingementArray` builds it as one object (#465):
+
+```python
+from combaero.network import ImpingementArray, WallLayer
+
+arr = ImpingementArray("ia", n_rows=10, d_jet=0.00254, xn_d=5.0, yn_d=4.0, z_d=2.0,
+                       span=0.122, plate_thickness=0.00254)
+arr.add_to(net, supply="supply", exit="exit")            # rows ia__p{i}, ia__x{i}, ia__c{i}
+arr.add_wall(net, "w", hot_element="hot", layers=[WallLayer(0.001, 20.0)])
+res = NetworkSolver(net).solve()
+arr.summarize(res["__element_diag__"])   # m_dot, dP, Re_j/Gc_Gj ranges, rows_Nu, ...
+```
+
+`add_wall` puts one `ThermalWall` per row on that row's target footprint; the
+hot side is evaluated once per row at its own state, so a hot side that changes
+along the array needs its own segments. Heating the crossflow lowers its
+density, which raises the jets' momentum cost and the supply non-uniformity
+beyond Florschuetz's isothermal model (1.88 vs 1.61 on a 10-row (5,4,2) array
+against 1200 K gas) -- the direction is physical; the isothermal source cannot
+score it.
+
+A bypass crossflow (#467) and spent air leaving through the target (#468) are
+different configurations, with their own elements to come. The building
+blocks below are public for hand-built networks, one pair per spanwise row:
 
 ```python
 from combaero.network import ImpingementCrossflowElement, ImpingementPlateElement
