@@ -764,9 +764,14 @@ panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
 ```
 
 - **The node's `(P, Pt)` is the chamber (outlet) state.** The main-inlet
-  element sees the MAIN-FACE state the momentum balance gives
-  (`cb.chamber_merge_face_offset`). With no side streams the offset is zero,
-  so declaring a single-inlet chamber's main inlet changes nothing.
+  element sees the MAIN-FACE state the impulse balance gives
+  (`cb.chamber_merge_face_state`): exact for compressible flow, the face
+  static pressure on the subsonic root and its Pt from the same
+  entropy-based closure as the chamber. With no side streams the face is the
+  chamber, so declaring a single-inlet chamber's main inlet changes nothing.
+- **Jets are compressible too.** A side stream's impulse is `cb.jet_impulse`:
+  the isentropic velocity from its supply (Pt, Tt) to the chamber pressure,
+  or, choked, the sonic momentum plus its pressure thrust.
 - **No loss coefficient.** The stagnation-pressure loss of mixing follows
   from momentum; transverse momentum is reacted by the walls and its kinetic
   energy dissipated. Normal injection costs the main stream its mixing loss;
@@ -778,7 +783,7 @@ panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
 - **The injector owns its jet.** Orifice-type elements carry
   `injection_angle_deg` (90 by default, no axial momentum);
   `EffusionPlateElement` uses its hole inclination `angle_deg`. The jet
-  velocity is the element's own, `m / (rho Cd A)` at the chamber pressure.
+  velocity is the element's own, from its supply's stagnation state.
 - **Refused:** two inflows without `main_inlet`, a `main_inlet` that does not
   flow in, and any split (more than one outlet needs a loss closure: use a
   tee).
@@ -1719,7 +1724,8 @@ the segments either side, so each crossflow node holds the static pressure at
 its row centre. **Without this term every row sees the same pressure
 difference and the supply stays uniform.** That puts Gc/Gj at twice Eq. 8 on
 Florschuetz's strongest-crossflow geometry. The term is C++'s
-`cb.side_stream_momentum_drop(m_arr, m_out, rho, area)`.
+`cb.side_stream_momentum_drop`, each station at the density of its own static
+state (exact impulse, compressible).
 
 **One configuration only.** These elements cover spent air leaving down the
 crossflow channel. A hand-wired network describing a different

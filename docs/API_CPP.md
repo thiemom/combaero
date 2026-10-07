@@ -676,26 +676,40 @@ JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet& set,
 
 ### Side-Stream Momentum (`side_stream_momentum.h`)
 ```cpp
-// Streams joining a channel with no streamwise momentum (impingement jets
-// turning into the crossflow). Centred segment form: half of each adjacent
-// station's drop, so a node sits at its station's middle.
-//   dP = (m_out|m_out| - m_arr|m_arr|) / (2 rho A^2)
-struct SideStreamMomentum { double dP, d_dm_out, d_dm_arr, d_drho; };
-SideStreamMomentum side_stream_momentum_drop(double m_arr, double m_out,
-                                             double rho, double area);
+// Exact (compressible) impulse of streams joining a channel; each station at
+// the density of its own static (P, T, X). Derivatives w.r.t. the solver's
+// variables, densities through density_and_jacobians.
 
-// Merge chamber (#471): main-inlet face relative to the chamber (outlet)
-// state, from constant-area axial momentum. side_momentum = sum m u cos(theta).
-//   P_face  - P  = (m_out|m_out| - m_main|m_main|)/(rho A^2) - S/A
-//   Pt_face - Pt = (m_out|m_out| - m_main|m_main|)/(2 rho A^2) - S/A
-struct ChamberMergeOffset {
-    double dP_face, dPt_face;
-    double dP_dm_main, dP_dm_out, dP_dS, dP_drho;
-    double dPt_dm_main, dPt_dm_out, dPt_dS, dPt_drho;
+// Centred crossflow segment (#465): half of each adjacent station's drop.
+//   dP = (m_out|m_out|/rho_out - m_arr|m_arr|/rho_arr) / (2 A^2)
+struct SideStreamMomentum {
+    double dP, d_dm_out, d_dm_arr, d_dP_arr, d_dT_arr, d_dP_out, d_dT_out;
 };
-ChamberMergeOffset chamber_merge_face_offset(double m_main, double m_out,
-                                             double side_momentum,
-                                             double rho, double area);
+SideStreamMomentum side_stream_momentum_drop(
+    double m_arr, double m_out, double P_arr, double T_arr, const std::vector<double>& X_arr,
+    double P_out, double T_out, const std::vector<double>& X_out, double area);
+
+// Merge chamber (#471): the main-inlet face from the impulse balance
+//   P_f + m_main^2 R T_main / (P_f A^2) = P + m_out^2/(rho A^2) - J/A
+// (subsonic root, closed form); Pt_face = P0_from_static(P_f, T_main, M_f),
+// the chamber's own entropy-based stagnation closure. `choked` flags a face
+// that cannot carry the impulse subsonically.
+struct MergeFaceState {
+    double P_face, Pt_face, M_face; bool choked;
+    double dPf_dm_main, dPf_dm_out, dPf_dJ, dPf_dP, dPf_dT, dPf_dT_main;
+    double dPtf_dm_main, dPtf_dm_out, dPtf_dJ, dPtf_dP, dPtf_dT, dPtf_dT_main;
+};
+MergeFaceState chamber_merge_face_state(
+    double m_main, double T_main, const std::vector<double>& X_main,
+    double m_out, double P, double T, const std::vector<double>& X,
+    double side_momentum, double area);
+
+// Streamwise jet impulse per unit cos(theta), J = m w: isentropic velocity to
+// P (variable cp), or choked: w = u* + (P* - P)/(rho* u*). C1 across choking;
+// Cd does not enter.
+struct JetImpulse { double J, dJ_dm, dJ_dPt, dJ_dTt, dJ_dP; bool choked; };
+JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
+                       const std::vector<double>& X);
 ```
 
 ### Wall Coupling

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`critical_pressure_ratio` returned 0.5636 whatever the gas or temperature (#471).** Its golden-section search kept its probe points in the opposite order to its update and shrank onto a fixed point.
+  - **True value for air:** 0.528 at 300 K, 0.542 at 1500 K. That is where the isentropic mass flux peaks at M = 1.
+  - **Choked mass flux:** it came out 0.1-0.3% low, and `nozzle_flow` declared choking early. The compressible orifice uses `nozzle_flow`.
+  - **Tests:** `compressible.h` had no C++ tests; the new ones check M = 1 and the flux peak.
+- **The compressible `ChannelElement` filed its inlet-pressure sensitivity under the upstream static P (#471).** The Fanno march inverts the inlet static state from the inlet TOTAL pressure (#359), so the C++ derivative is with respect to Pt.
+  - **Behind a plenum:** harmless, since P and Pt are tied.
+  - **Behind a momentum chamber:** 25% wrong, because the two are separate unknowns.
+  - **Now:** the global Jacobian matches finite differences to 5e-6 there.
+
 - **Orifice Jacobian now carries the discharge-hole Cd's flow dependence (#471).** For Idelchik, Lichtarowicz and McGreehan-Schotsch, Cd depends on the hole Reynolds number, hence on the flow. The residual's d/d(m_dot) left that out and was off by 1.5-3.6%. It is now analytic via `discharge_cd_and_derivatives`. Solutions are unchanged; Newton converges where it previously stalled, for example 30-degree effusion into a merge chamber.
 
 - **Impingement channels in the GUI are a working example again (#462).**
@@ -230,8 +239,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The merge chamber, the jet momentum and the impingement crossflow term are compressible (#471).** The incompressible first version used one density for the main face and the outlet, `Pt - P = ½ρu²`, and a jet density at the supply total temperature. All three evaluations now come from C++:
+  - **Exact impulse.** `chamber_merge_face_state` solves the face from the exact impulse balance (the ideal-gas quadratic on its subsonic root, flagged when no such root exists). It takes the face Pt from the chamber's own entropy-based closure.
+  - **Jet momentum.** `jet_impulse` uses the isentropic jet velocity, or the sonic momentum plus pressure thrust when choked.
+  - **Crossflow segment.** `side_stream_momentum_drop` puts each station at its own density.
+  - **Jacobians.** The density derivatives come from `density_and_jacobians`, so no density derivative is computed in Python.
+  - **Validation shift.** The impingement chain's Gc/Gj vs Eq. 8 (an incompressible model) moved from max 3.7% to 4.1% over a 3% pressure drop. Fig. 6 is unchanged (+4.04% / 6.89%).
+
 - **Merge chamber: a `MomentumChamberNode` with a declared main inlet accepts side streams (#471).** It still has one outlet and is closed by the axial momentum balance over a constant-area control volume, with no loss coefficient.
-  - **Momentum:** each side stream brings `m u_jet cos(theta)` of axial momentum and discharges at the chamber's static pressure. The main-inlet element sees the main-face state (`cb.chamber_merge_face_offset`).
+  - **Momentum:** each side stream brings `m u_jet cos(theta)` of axial momentum and discharges at the chamber's static pressure. The main-inlet element sees the main-face state (`cb.chamber_merge_face_state`).
   - **Validation:** the solved network satisfies the control-volume balance, normal injection costs the main stream its mixing loss, and inclined jets pump it. The global Jacobian matches finite differences to 1e-4.
   - **Injection angle:** orifice-type elements gain `injection_angle_deg` (90 by default). `EffusionPlateElement` uses its hole angle.
   - **Area:** inherited from the main inlet; a mismatch is refused.
@@ -257,7 +273,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Python into C++ (f, J) functions that later configurations reuse:
   - `jet_row_heat_transfer(set, JetRowGeometry, m_jet, m_crossflow, mu, k, Pr)`
     returns h with analytic `dh_dm_jet` / `dh_dm_crossflow`;
-  - `side_stream_momentum_drop(m_arr, m_out, rho, area)` gives the centred
+  - `side_stream_momentum_drop` gives the centred
     momentum term for side streams joining a channel.
 
   The validation numbers are unchanged to the digit.

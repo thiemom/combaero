@@ -1,45 +1,184 @@
 #include "side_stream_momentum.h"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
+#include "compressible.h"
+#include "solver_interface.h"
+#include "stagnation.h"
+#include "thermo.h"
+
 namespace combaero {
 
-SideStreamMomentum side_stream_momentum_drop(double m_arr, double m_out,
-                                             double rho, double area) {
-  if (!(rho > 0.0) || !(area > 0.0)) {
+namespace {
+// Floor on the impulse quadratic's discriminant, relative to Pi^2, so a
+// choked face stays finite and differentiable (flagged, not hidden).
+constexpr double MERGE_DISCRIMINANT_FLOOR = 1e-8;
+// Central-difference steps for the smooth temperature sensitivities.
+constexpr double T_STEP_REL = 1e-6;
+constexpr double P_STEP_REL = 1e-7;
+}  // namespace
+
+SideStreamMomentum side_stream_momentum_drop(
+    double m_arr, double m_out, double P_arr, double T_arr,
+    const std::vector<double>& X_arr, double P_out, double T_out,
+    const std::vector<double>& X_out, double area) {
+  if (!(area > 0.0) || !(P_arr > 0.0) || !(T_arr > 0.0) || !(P_out > 0.0) ||
+      !(T_out > 0.0)) {
     throw std::invalid_argument(
-        "side_stream_momentum_drop: rho and area must be positive");
+        "side_stream_momentum_drop: area and both station states must be positive");
   }
-  const double k = 0.5 / (rho * area * area);
+  auto [rho_arr, drho_arr_dT, drho_arr_dP] =
+      solver::density_and_jacobians(T_arr, P_arr, X_arr);
+  auto [rho_out, drho_out_dT, drho_out_dP] =
+      solver::density_and_jacobians(T_out, P_out, X_out);
+  const double k = 0.5 / (area * area);
+  const double f_out = m_out * std::abs(m_out) / rho_out;
+  const double f_arr = m_arr * std::abs(m_arr) / rho_arr;
   SideStreamMomentum out;
-  out.dP = (m_out * std::abs(m_out) - m_arr * std::abs(m_arr)) * k;
-  out.d_dm_out = 2.0 * std::abs(m_out) * k;
-  out.d_dm_arr = -2.0 * std::abs(m_arr) * k;
-  out.d_drho = -out.dP / rho;
+  out.dP = (f_out - f_arr) * k;
+  out.d_dm_out = 2.0 * std::abs(m_out) / rho_out * k;
+  out.d_dm_arr = -2.0 * std::abs(m_arr) / rho_arr * k;
+  const double d_drho_out = -f_out / rho_out * k;
+  const double d_drho_arr = f_arr / rho_arr * k;
+  out.d_dP_out = d_drho_out * drho_out_dP;
+  out.d_dT_out = d_drho_out * drho_out_dT;
+  out.d_dP_arr = d_drho_arr * drho_arr_dP;
+  out.d_dT_arr = d_drho_arr * drho_arr_dT;
   return out;
 }
 
-ChamberMergeOffset chamber_merge_face_offset(double m_main, double m_out,
-                                             double side_momentum,
-                                             double rho, double area) {
-  if (!(rho > 0.0) || !(area > 0.0)) {
+namespace {
+struct FaceCore {
+  double P_f, Pt_f, M_f;
+  bool choked;
+  // analytic partials of P_f wrt Pi and c, and of Pt_f wrt P_f and m_main
+  double dPf_dPi, dPf_dc, dPt_dPf, dPt_dm;
+};
+
+FaceCore face_core(double m_main, double T_main, const std::vector<double>& X_main,
+                   double m_out, double P, double T, const std::vector<double>& X,
+                   double J, double A, double* dPi_dP_out, double* dPi_dmout_out,
+                   double* c_out) {
+  const double rho = density(T, P, X);
+  const double Pi = P + m_out * std::abs(m_out) / (rho * A * A) - J / A;
+  const double RT = specific_gas_constant(X_main) * T_main;
+  const double c = m_main * m_main * RT / (A * A);
+  const double D_raw = Pi * Pi - 4.0 * c;
+  const double D_min = MERGE_DISCRIMINANT_FLOOR * Pi * Pi;
+  const bool choked = D_raw < D_min;
+  const double sD = std::sqrt(std::max(D_raw, D_min));
+  FaceCore f{};
+  f.choked = choked;
+  f.P_f = 0.5 * (Pi + sD);
+  // Held at the floor, the root no longer moves with c; with Pi it moves as
+  // the floored discriminant does.
+  f.dPf_dPi = choked ? 0.5 * (1.0 + std::sqrt(MERGE_DISCRIMINANT_FLOOR))
+                     : 0.5 * (1.0 + Pi / sD);
+  f.dPf_dc = choked ? 0.0 : -1.0 / sD;
+  const double a = speed_of_sound(T_main, X_main);
+  const double u = std::abs(m_main) * RT / (f.P_f * A);
+  f.M_f = a > 0.0 ? u / a : 0.0;
+  auto [P0, dP0_dM] = solver::P0_from_static_and_jacobian_M(f.P_f, T_main, f.M_f, X_main);
+  f.Pt_f = P0;
+  // P0 = P exp(...) at fixed (M, T): dP0/dP_f = P0/P_f, and M ~ 1/P_f.
+  f.dPt_dPf = P0 / f.P_f + dP0_dM * (-f.M_f / f.P_f);
+  const double sgn = m_main >= 0.0 ? 1.0 : -1.0;
+  f.dPt_dm = (a > 0.0 && f.P_f > 0.0) ? dP0_dM * sgn * RT / (f.P_f * A * a) : 0.0;
+  // Ideal gas: drho/dP = rho/P at fixed T.
+  if (dPi_dP_out) *dPi_dP_out = 1.0 - m_out * std::abs(m_out) / (rho * A * A) / P;
+  if (dPi_dmout_out) *dPi_dmout_out = 2.0 * std::abs(m_out) / (rho * A * A);
+  if (c_out) *c_out = c;
+  return f;
+}
+}  // namespace
+
+MergeFaceState chamber_merge_face_state(double m_main, double T_main,
+                                        const std::vector<double>& X_main,
+                                        double m_out, double P, double T,
+                                        const std::vector<double>& X,
+                                        double side_momentum, double area) {
+  if (!(area > 0.0) || !(P > 0.0) || !(T > 0.0) || !(T_main > 0.0)) {
     throw std::invalid_argument(
-        "chamber_merge_face_offset: rho and area must be positive");
+        "chamber_merge_face_state: area, P, T and T_main must be positive");
   }
-  const double k = 1.0 / (rho * area * area);
-  const double dyn = (m_out * std::abs(m_out) - m_main * std::abs(m_main)) * k;
-  ChamberMergeOffset out;
-  out.dP_face = dyn - side_momentum / area;
-  out.dPt_face = 0.5 * dyn - side_momentum / area;
-  out.dP_dm_out = 2.0 * std::abs(m_out) * k;
-  out.dP_dm_main = -2.0 * std::abs(m_main) * k;
-  out.dP_dS = -1.0 / area;
-  out.dP_drho = -dyn / rho;
-  out.dPt_dm_out = 0.5 * out.dP_dm_out;
-  out.dPt_dm_main = 0.5 * out.dP_dm_main;
-  out.dPt_dS = -1.0 / area;
-  out.dPt_drho = -0.5 * dyn / rho;
+  double dPi_dP = 0.0, dPi_dmout = 0.0, c = 0.0;
+  const FaceCore f = face_core(m_main, T_main, X_main, m_out, P, T, X,
+                               side_momentum, area, &dPi_dP, &dPi_dmout, &c);
+  MergeFaceState out;
+  out.P_face = f.P_f;
+  out.Pt_face = f.Pt_f;
+  out.M_face = f.M_f;
+  out.choked = f.choked;
+
+  // P_f(Pi, c): Pi carries P, m_out and J; c carries m_main.
+  const double dc_dmm = 2.0 * c / (m_main != 0.0 ? m_main : 1.0);
+  out.dPf_dP = f.dPf_dPi * dPi_dP;
+  out.dPf_dm_out = f.dPf_dPi * dPi_dmout;
+  out.dPf_dJ = f.dPf_dPi * (-1.0 / area);
+  out.dPf_dm_main = m_main != 0.0 ? f.dPf_dc * dc_dmm : 0.0;
+  out.dPtf_dP = f.dPt_dPf * out.dPf_dP;
+  out.dPtf_dm_out = f.dPt_dPf * out.dPf_dm_out;
+  out.dPtf_dJ = f.dPt_dPf * out.dPf_dJ;
+  out.dPtf_dm_main = f.dPt_dPf * out.dPf_dm_main + f.dPt_dm;
+
+  // Temperatures: central differences of the whole (smooth) evaluation.
+  auto eval = [&](double Tm, double Tc) {
+    return face_core(m_main, Tm, X_main, m_out, P, Tc, X, side_momentum, area,
+                     nullptr, nullptr, nullptr);
+  };
+  const double hm = std::max(1e-4, T_main * T_STEP_REL);
+  const FaceCore mp = eval(T_main + hm, T), mm = eval(T_main - hm, T);
+  out.dPf_dT_main = (mp.P_f - mm.P_f) / (2.0 * hm);
+  out.dPtf_dT_main = (mp.Pt_f - mm.Pt_f) / (2.0 * hm);
+  const double hc = std::max(1e-4, T * T_STEP_REL);
+  const FaceCore cp = eval(T_main, T + hc), cm = eval(T_main, T - hc);
+  out.dPf_dT = (cp.P_f - cm.P_f) / (2.0 * hc);
+  out.dPtf_dT = (cp.Pt_f - cm.Pt_f) / (2.0 * hc);
+  return out;
+}
+
+namespace {
+struct JetW {
+  double w;
+  bool choked;
+};
+
+JetW jet_w(double Pt, double Tt, double P, const std::vector<double>& X) {
+  if (!(Pt > 0.0) || !(Tt > 0.0) || !(P > 0.0) || P >= Pt) {
+    return {0.0, false};
+  }
+  const double P_star = critical_pressure_ratio(Tt, Pt, X) * Pt;
+  if (P >= P_star) {
+    const double M = mach_from_pressure_ratio(Tt, Pt, P, X);
+    const double Ts = T_from_stagnation(Tt, M, X);
+    return {M * speed_of_sound(Ts, X), false};
+  }
+  const double T_star = T_from_stagnation(Tt, 1.0, X);
+  const double u_star = speed_of_sound(T_star, X);
+  const double rho_star = density(T_star, P_star, X);
+  return {u_star + (P_star - P) / (rho_star * u_star), true};
+}
+}  // namespace
+
+JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
+                       const std::vector<double>& X) {
+  const JetW base = jet_w(Pt, Tt, P, X);
+  JetImpulse out;
+  out.J = m * base.w;
+  out.dJ_dm = base.w;
+  out.choked = base.choked;
+  if (base.w == 0.0) {
+    return out;
+  }
+  // w(Pt, Tt, P) is smooth (C1 across choking); central differences, kept
+  // inside C++ like the chamber's own stagnation sensitivities.
+  const double hP = std::max(1.0, Pt * P_STEP_REL);
+  const double hT = std::max(1e-4, Tt * T_STEP_REL);
+  out.dJ_dPt = m * (jet_w(Pt + hP, Tt, P, X).w - jet_w(Pt - hP, Tt, P, X).w) / (2.0 * hP);
+  out.dJ_dTt = m * (jet_w(Pt, Tt + hT, P, X).w - jet_w(Pt, Tt - hT, P, X).w) / (2.0 * hT);
+  out.dJ_dP = m * (jet_w(Pt, Tt, P + hP, X).w - jet_w(Pt, Tt, P - hP, X).w) / (2.0 * hP);
   return out;
 }
 

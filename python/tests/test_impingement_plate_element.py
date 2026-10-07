@@ -174,13 +174,15 @@ def test_the_segment_reads_the_right_neighbours() -> None:
 def test_the_momentum_term_is_half_of_both_adjacent_merges() -> None:
     seg, _ = _segment_with_neighbours()
     m, m_arr, m_jet = 0.02, 0.015, 0.006
-    st = _state(m, P=1.0e5)
-    dP = seg._momentum_drop(st, {"x1": m_arr, "p3": m_jet})[0].dP
-    rho = cb.density(300.0, 1.0e5, cb.species.dry_air())
+    st_in, st_out = _state(m, P=1.0e5), _state(m, P=0.95e5)
+    dP = seg._momentum_drop(st_in, st_out, {"x1": m_arr, "p3": m_jet}).dP
+    X = cb.species.dry_air()
+    r_in, r_out = cb.density(300.0, 1.0e5, X), cb.density(300.0, 0.95e5, X)
     A = 2 * D * 0.1
-    merge_up = (m**2 - m_arr**2) / (rho * A * A)  # row 2, arriving -> this segment
-    merge_dn = ((m + m_jet) ** 2 - m**2) / (rho * A * A)  # row 3
-    assert dP == pytest.approx(0.5 * (merge_up + merge_dn), rel=1e-9)
+    # Each station at its own density; the segment's own flow cancels between
+    # the two halves, so only the arriving and leaving fluxes remain.
+    expected = 0.5 * ((m + m_jet) ** 2 / r_out - m_arr**2 / r_in) / (A * A)
+    assert dP == pytest.approx(expected, rel=1e-9)
 
 
 def test_segment_residual_jacobian_matches_central_differences() -> None:

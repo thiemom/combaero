@@ -1620,7 +1620,7 @@ class MomentumChamberNode(NetworkNode):
         # brings m u_jet cos(theta) of axial momentum (the injecting element's
         # injection_momentum) and discharges at the chamber static pressure.
         # The node's (P, Pt) is the chamber/outlet state; the main-inlet
-        # element sees the main-face state from chamber_merge_face_offset.
+        # element sees the main-face state from chamber_merge_face_state.
         # Splits stay refused: one momentum equation cannot set two outlet
         # pressures.
         self.main_inlet = main_inlet
@@ -1767,53 +1767,64 @@ class MomentumChamberNode(NetworkNode):
     def has_side_streams(self) -> bool:
         return self.main_inlet is not None and len(getattr(self, "_inflows", [])) > 1
 
-    def main_face_offset(
+    def main_face_state(
         self, state: NetworkMixtureState
     ) -> tuple[float, float, dict[str, float], dict[str, float]]:
-        """(P_face - P, Pt_face - Pt, d/d(name) of each) for the main inlet.
+        """(P_face, Pt_face, dP_face/d(name), dPt_face/d(name)) for the main inlet.
 
-        Constant-area axial momentum over the chamber; see
-        side_stream_momentum.h. Derivatives are keyed by unknown name; a
-        ``"<node>.T"`` key is relayed by the solver.
+        Exact (compressible) impulse over the constant-area chamber, C++'s
+        ``chamber_merge_face_state``: the face static pressure on the subsonic
+        root, the face Pt from the same stagnation closure as the chamber.
+        Derivatives are keyed by unknown name; ``"<node>.T"`` keys are relayed
+        by the solver.
         """
         elems = {e.id: e for e in self.upstream_elements}
-        m_main, main_names = 0.0, {}
+        main_state, main_names = None, {}
         S, dS = 0.0, {}
         for eid, st, names in getattr(self, "_inflows", []):
             if eid == self.main_inlet:
-                m_main, main_names = float(st.m_dot), names
+                main_state, main_names = st, names
                 continue
-            elem = elems.get(eid)
-            hook = getattr(elem, "injection_momentum", None)
+            hook = getattr(elems.get(eid), "injection_momentum", None)
             if hook is None:
                 continue
             J, dJ = hook(st, state)
             S += J
             for k, v in dJ.items():
                 dS[k] = dS.get(k, 0.0) + v
+        m_main = float(main_state.m_dot) if main_state is not None else 0.0
+        T_main = float(main_state.T) if main_state is not None else float(state.T)
+        X_main = main_state.X if main_state is not None else state.X
         m_out = float(getattr(self, "_total_m_dot", 0.0))
-        rho, _ = _safe_rho(state.density())
-        r = cb.chamber_merge_face_offset(m_main, m_out, S, rho, self.area)
+        r = cb.chamber_merge_face_state(
+            m_main, T_main, X_main, m_out, state.P, state.T, state.X, S, self.area
+        )
+        self._face_choked = bool(r.choked)
+        main_src = elems[self.main_inlet].from_node if self.main_inlet in elems else None
 
-        def chain(d_main: float, d_out: float, d_S: float, d_rho: float) -> dict[str, float]:
+        def chain(d_mm, d_mo, d_J, d_P, d_T, d_Tm) -> dict[str, float]:
             out: dict[str, float] = {}
+
+            def add(k: str, v: float) -> None:
+                out[k] = out.get(k, 0.0) + v
+
             for k, v in main_names.items():
-                out[k] = out.get(k, 0.0) + d_main * v
+                add(k, d_mm * v)
             for k, v in getattr(self, "_upstream_m_dot_jac", {}).items():
-                out[k] = out.get(k, 0.0) + d_out * v
+                add(k, d_mo * v)
             for k, v in dS.items():
-                out[k] = out.get(k, 0.0) + d_S * v
-            # rho = P mw / (R T) at the chamber state.
-            P_key, T_key = f"{self.id}.P", f"{self.id}.T"
-            out[P_key] = out.get(P_key, 0.0) + d_rho * rho / state.P
-            out[T_key] = out.get(T_key, 0.0) - d_rho * rho / state.T
+                add(k, d_J * v)
+            add(f"{self.id}.P", d_P)
+            add(f"{self.id}.T", d_T)
+            if main_src is not None:
+                add(f"{main_src}.T", d_Tm)
             return out
 
         return (
-            float(r.dP_face),
-            float(r.dPt_face),
-            chain(r.dP_dm_main, r.dP_dm_out, r.dP_dS, r.dP_drho),
-            chain(r.dPt_dm_main, r.dPt_dm_out, r.dPt_dS, r.dPt_drho),
+            float(r.P_face),
+            float(r.Pt_face),
+            chain(r.dPf_dm_main, r.dPf_dm_out, r.dPf_dJ, r.dPf_dP, r.dPf_dT, r.dPf_dT_main),
+            chain(r.dPtf_dm_main, r.dPtf_dm_out, r.dPtf_dJ, r.dPtf_dP, r.dPtf_dT, r.dPtf_dT_main),
         )
 
     def mach(self, state: NetworkMixtureState) -> float:
@@ -2606,27 +2617,26 @@ class OrificeElement(NetworkElement):
     def injection_momentum(
         self, state_in: "NetworkMixtureState", state_chamber: "NetworkMixtureState"
     ) -> tuple[float, dict[str, float]]:
-        """Axial momentum this jet brings into a merge chamber (#471).
+        """Streamwise momentum this jet brings into a merge chamber (#471).
 
-        J = m |m| cos(theta) / (rho_jet Cd A), the jet velocity at the vena
-        contracta, rho_jet at the supply temperature and the chamber static
-        pressure. Returns (J, dJ/d(name)) keyed by unknown name, including the
-        discharge-hole Cd's dependence on the flow. Normal injection (90 deg)
-        brings none.
+        J = m w cos(theta), with w from C++'s ``jet_impulse``: the isentropic
+        velocity from the supply's (Pt, Tt) to the chamber static pressure,
+        or, choked, the sonic momentum plus its pressure thrust. Cd sets the
+        jet's area, not its velocity, so it does not enter. Returns (J,
+        dJ/d(name)) keyed by unknown name. Normal injection (90 deg) brings
+        none.
         """
         cos_t = math.cos(math.radians(self.injection_angle_deg))
-        if abs(cos_t) < 1e-12 or not self.area:
+        if abs(cos_t) < 1e-12:
             return 0.0, {}
-        m = float(state_in.m_dot)
-        rho_j, _ = _safe_rho(cb.density(state_in.T, state_chamber.P, state_in.X))
-        cd = self._effective_Cd(state_in, state_chamber)
-        k = cos_t / (rho_j * cd * self.area)
-        J = m * abs(m) * k
-        return J, {
-            f"{self.id}.m_dot": 2.0 * abs(m) * k - J / cd * self._dCd_dmdot(state_in),
-            # rho_jet = P mw / (R T): J ~ T / P_chamber.
-            f"{self.from_node}.T": J / state_in.T,
-            f"{self.to_node}.P": -J / state_chamber.P,
+        jet = cb.jet_impulse(
+            float(state_in.m_dot), state_in.Pt, state_in.Tt, state_chamber.P, state_in.X
+        )
+        return jet.J * cos_t, {
+            f"{self.id}.m_dot": jet.dJ_dm * cos_t,
+            f"{self.from_node}.Pt": jet.dJ_dPt * cos_t,
+            f"{self.from_node}.T": jet.dJ_dTt * cos_t,
+            f"{self.to_node}.P": jet.dJ_dP * cos_t,
         }
 
     def _discharge_hole(self) -> "cb.DischargeHoleGeometry":
@@ -4518,9 +4528,15 @@ class ChannelElement(NetworkElement):
                 f"{downstream_id}.Pt": -1.0,
             }
         }
-        if self.regime != "compressible" and (
-            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-        ):
+        if self.regime == "compressible":
+            # The compressible march inverts the inlet STATIC state from the
+            # inlet TOTAL pressure (#359), so its pressure sensitivity is
+            # d(dP)/d(Pt_up) despite the field's name -- C++ perturbs
+            # P_total_up. Filing it under the static P was harmless into a
+            # plenum (P and Pt tied) but 25% wrong behind a momentum chamber,
+            # where they are separate unknowns (#471).
+            jac[0][f"{upstream_id}.Pt"] -= res_cpp.d_dP_dP_static_up
+        elif getattr(self, "_incompressible_p_ref", "inlet") == "outlet":
             # Density evaluated at the downstream static: the friction-loss
             # pressure sensitivity moves onto the downstream node's P.
             jac[0][f"{downstream_id}.P"] = -res_cpp.d_dP_dP_static_up
@@ -4824,9 +4840,12 @@ class ImpingementCrossflowElement(ChannelElement):
         ]
 
     def _momentum_drop(
-        self, state_in: NetworkMixtureState, flows: dict[str, float] | None
-    ) -> tuple["cb.SideStreamMomentum", float]:
-        """C++'s centred side-stream term, and the density it used.
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None,
+    ) -> "cb.SideStreamMomentum":
+        """C++'s centred side-stream term, each station at its own state.
 
         m_out = m + (streams merging at to_node), so d/dm = d/dm_out.
         """
@@ -4834,8 +4853,17 @@ class ImpingementCrossflowElement(ChannelElement):
         m = float(state_in.m_dot)
         m_out = m + sum(flows.get(e.id, 0.0) for e in self._merge_sources)
         m_arr = sum(flows.get(e.id, 0.0) for e in self._arriving)
-        rho, _ = _safe_rho(cb.density(state_in.T, state_in.P, state_in.X))
-        return cb.side_stream_momentum_drop(m_arr, m_out, rho, self.area), rho
+        return cb.side_stream_momentum_drop(
+            m_arr,
+            m_out,
+            state_in.P,
+            state_in.T,
+            state_in.X,
+            state_out.P,
+            state_out.T,
+            state_out.X,
+            self.area,
+        )
 
     def _add_flow_jac(
         self, row: dict[str, float], elems: list[NetworkElement], node: str, d: float
@@ -4853,17 +4881,19 @@ class ImpingementCrossflowElement(ChannelElement):
         flows: dict[str, float] | None = None,
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         res, jac = super().residuals(state_in, state_out)
-        mom, rho = self._momentum_drop(state_in, flows)
+        mom = self._momentum_drop(state_in, state_out, flows)
         res[0] -= mom.dP
         row = jac[0]
         row[f"{self.id}.m_dot"] = row.get(f"{self.id}.m_dot", 0.0) - mom.d_dm_out
         self._add_flow_jac(row, self._merge_sources, self.to_node, mom.d_dm_out)
         self._add_flow_jac(row, self._arriving, self.from_node, mom.d_dm_arr)
-        # rho = P mw / (R T) for the ideal-gas mixture: drho/dT = -rho/T,
-        # drho/dP = rho/P.
-        T_key, P_key = f"{self.from_node}.T", f"{self.from_node}.P"
-        row[T_key] = row.get(T_key, 0.0) + mom.d_drho * rho / state_in.T
-        row[P_key] = row.get(P_key, 0.0) - mom.d_drho * rho / state_in.P
+        for key, d in (
+            (f"{self.from_node}.P", mom.d_dP_arr),
+            (f"{self.from_node}.T", mom.d_dT_arr),
+            (f"{self.to_node}.P", mom.d_dP_out),
+            (f"{self.to_node}.T", mom.d_dT_out),
+        ):
+            row[key] = row.get(key, 0.0) - d
         return res, jac
 
     def htc_and_T(self, state: NetworkMixtureState, flows: dict[str, float] | None = None):
@@ -4876,7 +4906,7 @@ class ImpingementCrossflowElement(ChannelElement):
         flows: dict[str, float] | None = None,
     ) -> dict[str, float | str]:
         out = super().diagnostics(state_in, state_out)
-        out["dP_momentum"] = float(self._momentum_drop(state_in, flows)[0].dP)
+        out["dP_momentum"] = float(self._momentum_drop(state_in, state_out, flows).dP)
         return out
 
 

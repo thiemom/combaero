@@ -81,38 +81,44 @@ double compute_mass_flux(double T0, double P0, double P, double s0, double h0,
 double find_critical_pressure(double T0, double P0, double s0, double h0,
                               const std::vector<double>& X,
                               double tol, std::size_t max_iter) {
-    const double phi = 0.5 * (3.0 - std::sqrt(5.0));  // Golden ratio conjugate
+    // Golden-section MAXIMISATION of the isentropic mass flux G(P). The
+    // critical (sonic) pressure is where G peaks. Interior points lo < hi,
+    // kept in that order: if G(lo) > G(hi) the peak lies below hi, else above
+    // lo. (The previous version kept them the other way round while updating
+    // as if lo < hi, so it shrank onto a fixed point near 0.5636 P0 whatever
+    // the gas or temperature -- 6% high for air, and the choked mass flux
+    // 0.1-0.3% low. See #471.)
+    const double r = 0.5 * (std::sqrt(5.0) - 1.0);  // 0.618...
 
-    // For ideal gas, P*/P0 ~ 0.528 for gamma=1.4
-    // Search in a reasonable range around this
-    double a = 0.3 * P0;   // Lower bound (below typical critical ratio)
-    double b = 0.99 * P0;  // Upper bound (just below stagnation)
+    // For an ideal gas P*/P0 ~ 0.528 at gamma = 1.4; bracket generously.
+    double a = 0.3 * P0;
+    double b = 0.99 * P0;
 
-    double x1 = b - phi * (b - a);
-    double x2 = a + phi * (b - a);
+    double lo = b - r * (b - a);
+    double hi = a + r * (b - a);
+    double f_lo = compute_mass_flux(T0, P0, lo, s0, h0, X, tol, max_iter);
+    double f_hi = compute_mass_flux(T0, P0, hi, s0, h0, X, tol, max_iter);
 
-    double f1 = compute_mass_flux(T0, P0, x1, s0, h0, X, tol, max_iter);
-    double f2 = compute_mass_flux(T0, P0, x2, s0, h0, X, tol, max_iter);
-
-    for (std::size_t it = 0; it < max_iter; ++it) {
+    // Each step shrinks the bracket by 0.618; 200 steps reach any tol.
+    const std::size_t n_steps = std::max<std::size_t>(max_iter, 200);
+    for (std::size_t it = 0; it < n_steps; ++it) {
         if (std::abs(b - a) < tol * (1.0 + std::abs(a) + std::abs(b))) break;
-
-        if (f1 < f2) {
-            a = x1;
-            x1 = x2;
-            f1 = f2;
-            x2 = a + phi * (b - a);
-            f2 = compute_mass_flux(T0, P0, x2, s0, h0, X, tol, max_iter);
+        if (f_lo > f_hi) {
+            b = hi;
+            hi = lo;
+            f_hi = f_lo;
+            lo = b - r * (b - a);
+            f_lo = compute_mass_flux(T0, P0, lo, s0, h0, X, tol, max_iter);
         } else {
-            b = x2;
-            x2 = x1;
-            f2 = f1;
-            x1 = b - phi * (b - a);
-            f1 = compute_mass_flux(T0, P0, x1, s0, h0, X, tol, max_iter);
+            a = lo;
+            lo = hi;
+            f_lo = f_hi;
+            hi = a + r * (b - a);
+            f_hi = compute_mass_flux(T0, P0, hi, s0, h0, X, tol, max_iter);
         }
     }
 
-    return (f1 > f2) ? x1 : x2;
+    return 0.5 * (a + b);
 }
 
 }  // anonymous namespace
