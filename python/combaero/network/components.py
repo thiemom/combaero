@@ -1611,8 +1611,19 @@ class MomentumChamberNode(NetworkNode):
         surface: ConvectiveSurface | None = None,
         t_hot: float | None = None,
         Dh: float | None = None,
+        main_inlet: str | None = None,
     ):
         super().__init__(id)
+        # MERGE CHAMBER (#471). With main_inlet declared the chamber accepts
+        # further inflows as SIDE STREAMS, still one outlet. Its axis is the
+        # outlet direction; the main stream arrives along it, each side stream
+        # brings m u_jet cos(theta) of axial momentum (the injecting element's
+        # injection_momentum) and discharges at the chamber static pressure.
+        # The node's (P, Pt) is the chamber/outlet state; the main-inlet
+        # element sees the main-face state from chamber_merge_face_offset.
+        # Splits stay refused: one momentum equation cannot set two outlet
+        # pressures.
+        self.main_inlet = main_inlet
         self._auto_area = area is None
         self.area = area if area is not None else 0.0
         #: Where self.area came from once resolved (issue #262).
@@ -1670,6 +1681,13 @@ class MomentumChamberNode(NetworkNode):
                         self._upstream_m_dot_jac[var] = (
                             self._upstream_m_dot_jac.get(var, 0.0) + coeff
                         )
+
+        # Merge chamber: keep each inflow's supply state for the main-face
+        # offset, which needs the chamber's own state (main_face_offset).
+        self._inflows = [
+            (getattr(s, "_element_id", None), s, dict(getattr(s, "_m_dot_jac_names", {})))
+            for s in upstream_states
+        ]
 
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
@@ -1746,6 +1764,58 @@ class MomentumChamberNode(NetworkNode):
 
         return res, jac
 
+    def has_side_streams(self) -> bool:
+        return self.main_inlet is not None and len(getattr(self, "_inflows", [])) > 1
+
+    def main_face_offset(
+        self, state: NetworkMixtureState
+    ) -> tuple[float, float, dict[str, float], dict[str, float]]:
+        """(P_face - P, Pt_face - Pt, d/d(name) of each) for the main inlet.
+
+        Constant-area axial momentum over the chamber; see
+        side_stream_momentum.h. Derivatives are keyed by unknown name; a
+        ``"<node>.T"`` key is relayed by the solver.
+        """
+        elems = {e.id: e for e in self.upstream_elements}
+        m_main, main_names = 0.0, {}
+        S, dS = 0.0, {}
+        for eid, st, names in getattr(self, "_inflows", []):
+            if eid == self.main_inlet:
+                m_main, main_names = float(st.m_dot), names
+                continue
+            elem = elems.get(eid)
+            hook = getattr(elem, "injection_momentum", None)
+            if hook is None:
+                continue
+            J, dJ = hook(st, state)
+            S += J
+            for k, v in dJ.items():
+                dS[k] = dS.get(k, 0.0) + v
+        m_out = float(getattr(self, "_total_m_dot", 0.0))
+        rho, _ = _safe_rho(state.density())
+        r = cb.chamber_merge_face_offset(m_main, m_out, S, rho, self.area)
+
+        def chain(d_main: float, d_out: float, d_S: float, d_rho: float) -> dict[str, float]:
+            out: dict[str, float] = {}
+            for k, v in main_names.items():
+                out[k] = out.get(k, 0.0) + d_main * v
+            for k, v in getattr(self, "_upstream_m_dot_jac", {}).items():
+                out[k] = out.get(k, 0.0) + d_out * v
+            for k, v in dS.items():
+                out[k] = out.get(k, 0.0) + d_S * v
+            # rho = P mw / (R T) at the chamber state.
+            P_key, T_key = f"{self.id}.P", f"{self.id}.T"
+            out[P_key] = out.get(P_key, 0.0) + d_rho * rho / state.P
+            out[T_key] = out.get(T_key, 0.0) - d_rho * rho / state.T
+            return out
+
+        return (
+            float(r.dP_face),
+            float(r.dPt_face),
+            chain(r.dP_dm_main, r.dP_dm_out, r.dP_dS, r.dP_drho),
+            chain(r.dPt_dm_main, r.dPt_dm_out, r.dPt_dS, r.dPt_drho),
+        )
+
     def mach(self, state: NetworkMixtureState) -> float:
         """Computes Mach number using internal total mass flow and area."""
 
@@ -1805,6 +1875,19 @@ class MomentumChamberNode(NetworkNode):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         self.upstream_elements = graph.get_upstream_elements(self.id)
+        if self.main_inlet is not None:
+            # Merge chamber: one area, and the main inlet's port area IS it.
+            # Inherit it from the main-inlet element; an explicit area that
+            # disagrees is refused in validate(), never silently reconciled.
+            main = graph.elements.get(self.main_inlet)
+            main_area = getattr(main, "area", None) if main is not None else None
+            self._main_inlet_area = main_area if main_area else None
+            if self._auto_area and self._main_inlet_area:
+                self.area = self._main_inlet_area
+                self.Dh = getattr(main, "Dh", None) or 2.0 * math.sqrt(self.area / math.pi)
+                self.surface.area = self.area
+                self._area_source = f"inherited from {self.main_inlet}"
+                return
         # Inherit hydraulic diameter from upstream channel when not user-specified
         if self.Dh is None:
             for elem in self.upstream_elements:
@@ -1833,6 +1916,24 @@ class MomentumChamberNode(NetworkNode):
                 self.area = DEFAULT_CHAMBER_AREA
                 self.surface.area = self.area
                 self._area_source = "default"
+
+    def validate(self) -> None:
+        if self.main_inlet is None:
+            return
+        ids = [e.id for e in self.upstream_elements]
+        if self.main_inlet not in ids:
+            raise ValueError(
+                f"MomentumChamberNode {self.id!r}: main_inlet {self.main_inlet!r} "
+                f"does not flow into it (inflows: {sorted(ids)})."
+            )
+        main_area = getattr(self, "_main_inlet_area", None)
+        if not self._auto_area and main_area and abs(self.area / main_area - 1.0) > 1e-9:
+            raise ValueError(
+                f"MomentumChamberNode {self.id!r}: area {self.area:.6g} m^2 differs "
+                f"from its main inlet {self.main_inlet!r} ({main_area:.6g} m^2). "
+                "A merge chamber is a constant-area control volume; leave the "
+                "area unset to inherit it."
+            )
 
 
 class PressureBoundary(NetworkNode):
@@ -2282,8 +2383,12 @@ class OrificeElement(NetworkElement):
         edge_radius: float = 0.0,
         bevel_depth: float = 0.0,
         area: float | None = None,
+        injection_angle_deg: float = 90.0,
     ):
         super().__init__(id, from_node, to_node)
+        # Angle of the discharged jet to the axis of a merge chamber it feeds
+        # as a side stream (#471). 90 = normal injection, no axial momentum.
+        self.injection_angle_deg = float(injection_angle_deg)
 
         if diameter is not None:
             self.diameter: float | None = diameter
@@ -2498,6 +2603,32 @@ class OrificeElement(NetworkElement):
                 "'McGreehanSchotsch', 'Lichtarowicz'."
             )
 
+    def injection_momentum(
+        self, state_in: "NetworkMixtureState", state_chamber: "NetworkMixtureState"
+    ) -> tuple[float, dict[str, float]]:
+        """Axial momentum this jet brings into a merge chamber (#471).
+
+        J = m |m| cos(theta) / (rho_jet Cd A), the jet velocity at the vena
+        contracta, rho_jet at the supply temperature and the chamber static
+        pressure. Returns (J, dJ/d(name)) keyed by unknown name, including the
+        discharge-hole Cd's dependence on the flow. Normal injection (90 deg)
+        brings none.
+        """
+        cos_t = math.cos(math.radians(self.injection_angle_deg))
+        if abs(cos_t) < 1e-12 or not self.area:
+            return 0.0, {}
+        m = float(state_in.m_dot)
+        rho_j, _ = _safe_rho(cb.density(state_in.T, state_chamber.P, state_in.X))
+        cd = self._effective_Cd(state_in, state_chamber)
+        k = cos_t / (rho_j * cd * self.area)
+        J = m * abs(m) * k
+        return J, {
+            f"{self.id}.m_dot": 2.0 * abs(m) * k - J / cd * self._dCd_dmdot(state_in),
+            # rho_jet = P mw / (R T): J ~ T / P_chamber.
+            f"{self.from_node}.T": J / state_in.T,
+            f"{self.to_node}.P": -J / state_chamber.P,
+        }
+
     def _discharge_hole(self) -> "cb.DischargeHoleGeometry":
         """One real hole, as the discharge-hole correlations see it."""
         hole = cb.DischargeHoleGeometry(
@@ -2525,6 +2656,26 @@ class OrificeElement(NetworkElement):
                     f"{type(self).__name__} {self.id!r}: plate_thickness/d = "
                     f"{self.plate_thickness / self._orifice_geom.d:.3g}. {exc}"
                 ) from exc
+
+    def _dCd_dmdot(self, state_in: "NetworkMixtureState") -> float:
+        """d(Cd)/d(m_dot) through the hole Reynolds number, analytic.
+
+        Only the discharge-hole family carries it (C++'s
+        discharge_cd_and_derivatives); 'fixed' has none, and the normed
+        metering correlations keep their documented gap. Re_hole is linear in
+        m_dot, so dRe/dm = Re/m.
+        """
+        selector = _DISCHARGE_SELECTORS.get(self.correlation)
+        if selector is None or self._orifice_geom is None:
+            return 0.0
+        m = float(state_in.m_dot)
+        if abs(m) <= 1e-12:
+            return 0.0
+        Re = self._hole_reynolds(state_in)
+        _, dCd_dRe, _ = cb.discharge_cd_and_derivatives(
+            selector, self._discharge_hole(), cb.DischargeHoleState(Re=Re)
+        )
+        return float(dCd_dRe) * Re / abs(m) * (1.0 if m > 0 else -1.0)
 
     def _cd_in_range(self, state_in: "NetworkMixtureState") -> bool:
         """Is the discharge-hole Cd inside its source's Re and l/d range?
@@ -2585,10 +2736,18 @@ class OrificeElement(NetworkElement):
 
         res = [m_dot - res_cpp.m_dot_calc]
 
+        # m_calc is proportional to Cd, and a discharge-hole Cd depends on the
+        # flow through Re_hole: d(m_calc)/d(m_dot) = (m_calc/Cd) dCd/dm.
+        dmcalc_dm = (
+            res_cpp.m_dot_calc / effective_cd * self._dCd_dmdot(state_in)
+            if effective_cd > 0.0
+            else 0.0
+        )
+
         # Assemble Jacobian with respect to all node and element unknowns
         jac = {
             0: {
-                f"{self.id}.m_dot": 1.0,
+                f"{self.id}.m_dot": 1.0 - dmcalc_dm,
                 f"{self.from_node}.Pt": -res_cpp.d_mdot_dP_total_up,
                 f"{self.from_node}.T": -res_cpp.d_mdot_dT_up,
             }
@@ -2840,6 +2999,9 @@ class EffusionPlateElement(OrificeElement):
         # TOTAL area. Keep it for the flow equation, but the correlations must
         # see one real hole -- see _hole_diameter_for_correlation.
         self.equivalent_bore = self.diameter
+        # Discharged into a merge chamber, the holes' inclination to the wall
+        # is the jets' angle to the gas axis (holes pointing downstream).
+        self.injection_angle_deg = float(angle_deg)
 
     def _hole_count(self) -> float:
         return float(self.n_holes)

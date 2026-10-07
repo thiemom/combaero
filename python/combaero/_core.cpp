@@ -665,6 +665,25 @@ PYBIND11_MODULE(_core, m) {
         "(m_out|m_out| - m_arr|m_arr|) / (2 rho A^2), with analytic\n"
         "derivatives.");
 
+  py::class_<combaero::ChamberMergeOffset>(m, "ChamberMergeOffset")
+      .def_readonly("dP_face", &combaero::ChamberMergeOffset::dP_face)
+      .def_readonly("dPt_face", &combaero::ChamberMergeOffset::dPt_face)
+      .def_readonly("dP_dm_main", &combaero::ChamberMergeOffset::dP_dm_main)
+      .def_readonly("dP_dm_out", &combaero::ChamberMergeOffset::dP_dm_out)
+      .def_readonly("dP_dS", &combaero::ChamberMergeOffset::dP_dS)
+      .def_readonly("dP_drho", &combaero::ChamberMergeOffset::dP_drho)
+      .def_readonly("dPt_dm_main", &combaero::ChamberMergeOffset::dPt_dm_main)
+      .def_readonly("dPt_dm_out", &combaero::ChamberMergeOffset::dPt_dm_out)
+      .def_readonly("dPt_dS", &combaero::ChamberMergeOffset::dPt_dS)
+      .def_readonly("dPt_drho", &combaero::ChamberMergeOffset::dPt_drho);
+  m.def("chamber_merge_face_offset", &combaero::chamber_merge_face_offset,
+        py::arg("m_main"), py::arg("m_out"), py::arg("side_momentum"),
+        py::arg("rho"), py::arg("area"),
+        "Main-inlet face of a merge chamber relative to its (outlet) state,\n"
+        "from the axial momentum balance over a constant-area control\n"
+        "volume: P_face - P and Pt_face - Pt, with analytic derivatives.\n"
+        "side_momentum = sum of m u_jet cos(theta) over the side streams.");
+
   // ---------------------------------------------------------------------
   // Pin-fin arrays (#335): provenanced sets, exact basis converters, fin
   // model. Canonical basis: Re_D on D and Vmax at A_min, Nu_D = h D / k,

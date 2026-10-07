@@ -37,4 +37,36 @@ struct SideStreamMomentum {
 SideStreamMomentum side_stream_momentum_drop(double m_arr, double m_out,
                                              double rho, double area);
 
+// ---------------------------------------------------------------
+// Merge chamber: main inlet + side streams -> one outlet (#471)
+// ---------------------------------------------------------------
+//
+// A constant-area control volume of area A, axis = the outlet direction.
+// The main stream arrives along the axis; each side stream brings axial
+// momentum J_s = m_s u_jet cos(theta) (zero at 90 deg) and discharges at the
+// chamber static pressure. Momentum along the axis,
+//
+//   P_face A + m_main u_main + S = P A + m_out u_out,   S = sum J_s,
+//
+// with u = m / (rho A) at the chamber density, gives the main-inlet face
+// relative to the chamber (outlet) state:
+//
+//   P_face  - P  = (m_out|m_out| - m_main|m_main|) / (rho A^2) - S / A
+//   Pt_face - Pt = (m_out|m_out| - m_main|m_main|) / (2 rho A^2) - S / A
+//
+// No loss coefficient: the stagnation-pressure loss of mixing follows from
+// momentum. Transverse momentum is reacted by the walls and its kinetic
+// energy is dissipated. With no side streams (m_out = m_main, S = 0) both
+// offsets vanish, which is the single-inlet chamber.
+struct ChamberMergeOffset {
+  double dP_face = 0.0;    // P_face - P [Pa]
+  double dPt_face = 0.0;   // Pt_face - Pt [Pa]
+  double dP_dm_main = 0.0, dP_dm_out = 0.0, dP_dS = 0.0, dP_drho = 0.0;
+  double dPt_dm_main = 0.0, dPt_dm_out = 0.0, dPt_dS = 0.0, dPt_drho = 0.0;
+};
+
+ChamberMergeOffset chamber_merge_face_offset(double m_main, double m_out,
+                                             double side_momentum,
+                                             double rho, double area);
+
 }  // namespace combaero

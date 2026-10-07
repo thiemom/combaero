@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Orifice Jacobian now carries the discharge-hole Cd's flow dependence (#471).** For Idelchik, Lichtarowicz and McGreehan-Schotsch, Cd depends on the hole Reynolds number, hence on the flow. The residual's d/d(m_dot) left that out and was off by 1.5-3.6%. It is now analytic via `discharge_cd_and_derivatives`. Solutions are unchanged; Newton converges where it previously stalled, for example 30-degree effusion into a merge chamber.
+
 - **Impingement channels in the GUI are a working example again (#462).**
   Since #460 the convective area counts the impingement holes, but channels
   defaulted it to the wetted wall `pi D L`. On a default 1 m channel that
@@ -227,6 +229,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "lower bound" caveat becomes testable rather than stated.
 
 ### Added
+
+- **Merge chamber: a `MomentumChamberNode` with a declared main inlet accepts side streams (#471).** It still has one outlet and is closed by the axial momentum balance over a constant-area control volume, with no loss coefficient.
+  - **Momentum:** each side stream brings `m u_jet cos(theta)` of axial momentum and discharges at the chamber's static pressure. The main-inlet element sees the main-face state (`cb.chamber_merge_face_offset`).
+  - **Validation:** the solved network satisfies the control-volume balance, normal injection costs the main stream its mixing loss, and inclined jets pump it. The global Jacobian matches finite differences to 1e-4.
+  - **Injection angle:** orifice-type elements gain `injection_angle_deg` (90 by default). `EffusionPlateElement` uses its hole angle.
+  - **Area:** inherited from the main inlet; a mismatch is refused.
+  - **Splits:** still refused.
+  - **GUI:** the chamber node gains a side-stream handle.
+  - **Solver:** merge networks join the LM fallback, restarted from the cold guess.
 
 - **Impingement array, channel exit, as one element (#465): Python `ImpingementArray` and the GUI node "Impingement Array".** It models exactly one configuration: a jet plate fed from the upstream node, impinging on a target, with the spent air leaving down the gap to the downstream node (Florschuetz et al. 1981).
   - **Expansion:** the array becomes the validated row chain (`{id}__p{i}`, `{id}__x{i}`, `{id}__c{i}`).

@@ -1358,6 +1358,36 @@ class NetworkSolver:
 
         return relay
 
+    @staticmethod
+    def _main_face(element: Any, node_out: Any, state_out: NetworkMixtureState) -> Any:
+        """Shift ``state_out`` to the main-inlet face of a merge chamber (#471).
+
+        The chamber's (P, Pt) is its outlet state; the declared main inlet
+        arrives at the face state the axial momentum balance gives. Returns
+        the offset (for the Jacobian chain) or None when it does not apply.
+        """
+        if getattr(node_out, "main_inlet", None) != element.id:
+            return None
+        if not node_out.has_side_streams():
+            return None
+        face = node_out.main_face_offset(state_out)
+        state_out.P += face[0]
+        state_out.Pt += face[1]
+        return face
+
+    @staticmethod
+    def _chain_main_face(elem_jac: dict, node_id: str, face: Any) -> None:
+        """d(res)/d(var) += d(res)/d(P_face) dP_face/d(var), same for Pt."""
+        _, _, jac_P, jac_Pt = face
+        for row in elem_jac.values():
+            c_P = row.get(f"{node_id}.P", 0.0)
+            c_Pt = row.get(f"{node_id}.Pt", 0.0)
+            for coeff, offs in ((c_P, jac_P), (c_Pt, jac_Pt)):
+                if coeff == 0.0:
+                    continue
+                for k, v in offs.items():
+                    row[k] = row.get(k, 0.0) + coeff * v
+
     def _network_flows(self, obj: Any, x: np.ndarray) -> dict[str, float] | None:
         """Flows an element reads besides its own, or None if it reads none.
 
@@ -1713,11 +1743,15 @@ class NetworkSolver:
                     state_in.m_dot = x[m_indices[0]]
                     state_out.m_dot = x[m_indices[0]]
 
+                face = self._main_face(element, node_out, state_out)
+
                 flows = self._network_flows(element, x)
                 if flows is None:
                     elem_res, elem_jac = element.residuals(state_in, state_out)
                 else:
                     elem_res, elem_jac = element.residuals(state_in, state_out, flows=flows)
+                if face is not None:
+                    self._chain_main_face(elem_jac, node_out.id, face)
             res.extend(elem_res)
 
             if compute_jacobian:
@@ -2378,8 +2412,15 @@ class NetworkSolver:
 
         _has_tee = any(isinstance(e, _TeeJE) for e in self.network.elements.values())
         _has_mpce = any(isinstance(e, _MPCElem) for e in self.network.elements.values())
+        # Merge chambers (#471) are junctions too: side-stream momentum feeds
+        # back on the main inflow, and from a cold guess hybr can step into
+        # reversed main flow where the merge is not a merge. LM from x0
+        # converges (2026-10-07, 30-deg effusion into a liner chamber).
+        _has_merge = any(
+            getattr(n, "main_inlet", None) is not None for n in self.network.nodes.values()
+        )
         _has_compressible = method == "hybr" and (
-            bool(self._compressible_element_overrides()) or _has_tee or _has_mpce
+            bool(self._compressible_element_overrides()) or _has_tee or _has_mpce or _has_merge
         )
         _hybr_budget = timeout * 0.65 if (_has_compressible and timeout is not None) else timeout
         # Mutable so the LM fallback block can extend the effective limit.
@@ -2608,7 +2649,7 @@ class NetworkSolver:
                 # LM from x0 in that case to avoid getting trapped in hybr's
                 # poor basin. For tee / compressible networks the existing
                 # warm-start-from-hybr path is fine.
-                _lm_x0_scaled = x0_scaled if _has_mpce else best_x * inv_D_x
+                _lm_x0_scaled = x0_scaled if (_has_mpce or _has_merge) else best_x * inv_D_x
                 try:
                     root(
                         residuals_wrapper,
@@ -2837,6 +2878,7 @@ class NetworkSolver:
                     m_solved = float(final_x[m_indices[0]])
                     state_in.m_dot = m_solved
                     state_out.m_dot = m_solved
+                self._main_face(element, self.network.nodes[element.to_node], state_out)
                 flows = self._network_flows(element, final_x)
                 if flows is None:
                     diag = element.diagnostics(state_in, state_out)
