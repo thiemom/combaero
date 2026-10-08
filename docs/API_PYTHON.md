@@ -650,6 +650,21 @@ With it the network's energy balance closes:
 (`python/tests/test_energy_conservation_cooling.py` checks it to 1e-9 for
 every cooling configuration).
 
+- **Reversed flow (#481).** Streams follow the SIGN of an element's flow: a
+  2-port element with `m_dot < 0` delivers into its `from_node`, at its
+  `to_node`'s state, and a wall puts that side's heat into the node the flow
+  goes into. Junction and tee elements keep their declared directions, which
+  their own models enforce.
+- **k(T) layers** (a `material` from `cb.list_materials()`) take their
+  conductivity at the wall temperatures of the same evaluation, iterated to
+  a fixed point -- not from the previous one.
+- **h <= 0** from a correlation past its range is floored smoothly at
+  `cb.WALL_HTC_KNEE` (1e-2 W/(m^2 K)); the wall never refuses it.
+- With `thermal_coupling_enabled = False` the walls report nothing.
+
+Every converged solve in the test suite is also checked for this balance
+(`python/tests/conftest.py`, `_closure_check.py`).
+
 #### Element Integration
 Elements with convective surfaces support heat transfer calculations.
 
@@ -803,6 +818,12 @@ solver = NetworkSolver(graph)
 # A cold solve of a network with walls that still fails is then
 # retried from the same network solved WITHOUT its walls -- the
 # message says "Converged from the wall-free flow solution ...".
+# An iterate the model refuses (an exception, NaN/inf) is answered with a
+# residual ten times the last physical one, so the trust region rejects
+# the step and shrinks; a failed solve lists the rejected probes in its
+# message. Each evaluation repeats the state propagation until states read
+# ahead of its order (wall back-edges, recirculation) settle, so the
+# residual is a function of x alone.
 # Stall detection ends doomed phases early: when hybr's best |F|
 # plateaus far from tolerance it hands over to the LM fallback, and
 # when the LM fallback plateaus too the attempt fails fast so the

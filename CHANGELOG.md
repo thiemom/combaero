@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reversed flow conserves energy, and its temperatures are right (#481).** A node used to mix only the elements declared INTO it, at whatever sign their flow had.
+  - **Upstream element reversed:** it entered as negative mass at the wrong node's temperature. Measured: feeds at 300 K and 800 K gave a 1380 K node (+57 kW).
+  - **Downstream element reversed:** the fluid it delivered was never mixed in. Measured: a 600 K feed left the plenum at 400 K.
+  - **Also wrong:** densities, and with them the flows.
+  - **Now:** streams follow the sign of a 2-port element's flow, the propagation order is built from the signed flows, and walls put their heat into the node the flow goes into.
+  - **Unchanged:** forward-flow networks are bit-identical.
+- **The residual is a function of x alone (#481).** Two kinds of state used to carry over from the PREVIOUS evaluation, whatever trial point the solver had probed:
+  - **Walls on back-edges** read ahead of the propagation order, so the same x evaluated three times differed by 3 Pa, then 0.003 Pa. That also corrupted finite-difference Jacobians (38% on a GUI tee network).
+  - **k(T) wall layers.**
+  - **Now:** the propagation repeats until such states settle, and k(T) is iterated at the call's own wall temperatures.
+  - A mixing-plenum test marked "non-deterministic in suite" now passes reliably; its xfail is removed.
+- **Incompressible channel Jacobian under reversed flow had the wrong sign** (+9.7e4 vs -8.0e4 by finite differences). dP is odd in m_dot, so its slope is even. The wall relay had the same error: surface correlations take |m_dot|, and their dh/dm was relayed unsigned (+0.096 vs -0.096).
+
+- **A non-positive htc no longer stops the wall (#481).** A correlation past its range can return h <= 0 at an iterate; Florschuetz's jet-array bracket does for a nearly stopped jet under crossflow.
+  - **Before:** `wall_temperature_profile` threw, and `wall_coupling_and_jacobian` switched to R = 1e15 while taking dQ/dh from the raw h.
+  - **Now:** h is floored smoothly below `WALL_HTC_KNEE` = 1e-2 W/(m^2 K) by knee^2/(2 knee - h), which is C1, positive and never underflows. dQ/dh is the slope of the floored value.
+- **Iterates the model refuses are rejected (#481).**
+  - **Before:** an exception was answered with F = x - x_best and J = I. That F is SMALL near x_best, so the trust region could accept the step. NaN and inf went straight to MINPACK, and any recovered exception turned a failed solve into an ERROR.
+  - **Now:** the answer is a residual ten times the last physical one, with its Jacobian, and NaN and inf count as refusals. A failed solve lists its rejected probes. A model that fails on every evaluation is still an ERROR.
+- **With `thermal_coupling_enabled = False` the walls report no heat.** They reported Q and `Q_wall_out` for heat the solution never saw.
+- **Cold convergence, impingement array under a hot duct** (4 row counts x 4 pressures, no retry): 9/16 after the htc floor and channel sign, 11/16 with the penalty, 16/16 with sign-aware streams. The failures sat in reversed-jet basins at 1500-3100 K, which the old mixing made self-consistent.
+- **Every converged solve in the test suite is now checked for global energy and node mass closure** (`python/tests/conftest.py`). A test that builds a deliberately non-closing network opts out with `@pytest.mark.no_closure_check`.
+
 - **Network energy balance now closes for every cooling configuration (#471).** Three leaks, each locked by `test_energy_conservation_cooling.py`:
   - **The mixers withheld part of the heat they were given.** They divided Q by `sqrt(m^2 + 1e-6)` instead of the flow, which lost 5e-5 of Q at 0.1 kg/s, 0.5% at 10 g/s and 11% at 2 g/s. This affected `mixer_from_streams_and_jacobians` and the two combustion variants. Q / m is now exact at or above 2 g/s (`kMixerHeatMdotFloor`); below that, a C1 floor applies.
   - **Wall heat put on a boundary disappeared.** A boundary's state is fixed, so that heat leaves with the stream crossing it. It is now reported as `{wall}.Q_to_boundary` and `{boundary}.Q_wall_out` (W). Before, the hot duct of an impingement array lost its walls' entire Q from the balance.

@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <utility>
 
 
 
@@ -1141,33 +1142,25 @@ WallCouplingResult wall_coupling_and_jacobian(
     double h_b, double T_aw_b,
     double t_over_k,
     double A) {
-  WallCouplingResult result;
-
-  // Overall HTC: U = 1 / (1/h_a + t/k + 1/h_b)
-  double R_a = (h_a > 1e-10) ? 1.0 / h_a : 1e15;
-  double R_b = (h_b > 1e-10) ? 1.0 / h_b : 1e15;
-  double R_total = R_a + t_over_k + R_b;
-  double U = 1.0 / R_total;
-
-  // Heat transfer rate: Q = U * A * (T_aw_a - T_aw_b)
-  double dT = T_aw_a - T_aw_b;
-  result.Q = U * A * dT;
-
-  // Wall temperature on side A (surface temperature)
-  // Safely handled via resistance ratio to avoid 0/0
-  result.T_hot = T_aw_a - dT * (R_a / R_total);
-
-  // Jacobians: dQ/dh = A * dT * dU/dh
-  // dU/dh_a = 1 / (R_total * h_a)^2
-  double factor_a = 1.0 / (1.0 + (R_total - R_a) * h_a);
-  double factor_b = 1.0 / (1.0 + (R_total - R_b) * h_b);
-  result.dQ_dh_a = (factor_a * factor_a) * A * dT;
-  result.dQ_dh_b = (factor_b * factor_b) * A * dT;
-  result.dQ_dT_aw_a = U * A;
-  result.dQ_dT_aw_b = -U * A;
-
-  return result;
+  return wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b,
+                                    std::vector<double>{t_over_k}, A, 0.0);
 }
+
+namespace {
+// h above WALL_HTC_KNEE as is; below it knee^2 / (2 knee - h): C1 at the
+// knee, monotone, strictly positive and decaying only like 1/|h| (an
+// exponential tail underflows to 0 within a few knees and makes R infinite),
+// so an iterate whose correlation went to h <= 0 still sees a finite wall
+// and a derivative of the h actually used (#481).
+std::pair<double, double> floored_htc(double h) {
+  if (h >= WALL_HTC_KNEE) {
+    return {h, 1.0};
+  }
+  const double k = WALL_HTC_KNEE;
+  const double d = 2.0 * k - h;
+  return {k * k / d, k * k / (d * d)};
+}
+}  // namespace
 
 WallCouplingResult wall_coupling_and_jacobian(
     double h_a, double T_aw_a,
@@ -1183,8 +1176,10 @@ WallCouplingResult wall_coupling_and_jacobian(
     R_wall += tk;
   }
 
-  double R_a = (h_a > 1e-10) ? 1.0 / h_a : 1e15;
-  double R_b = (h_b > 1e-10) ? 1.0 / h_b : 1e15;
+  const auto [ha, dha] = floored_htc(h_a);
+  const auto [hb, dhb] = floored_htc(h_b);
+  const double R_a = 1.0 / ha;
+  const double R_b = 1.0 / hb;
   double R_total = R_a + R_wall + R_b;
   double U = 1.0 / R_total;
 
@@ -1195,13 +1190,14 @@ WallCouplingResult wall_coupling_and_jacobian(
   // T_hot on side A (surface temperature)
   result.T_hot = T_aw_a - dT * (R_a / R_total);
 
-  // Jacobians
-  double factor_a = 1.0 / (1.0 + (R_total - R_a) * h_a);
-  double factor_b = 1.0 / (1.0 + (R_total - R_b) * h_b);
+  // dQ/dh = A dT dU/dh, dU/dh_a = (R_a / R_total)^2 at the floored h, times
+  // the floor's own slope.
+  const double factor_a = R_a / R_total;
+  const double factor_b = R_b / R_total;
   result.dQ_dT_aw_a = U * A;
 
-  result.dQ_dh_a = (factor_a * factor_a) * A * dT;
-  result.dQ_dh_b = (factor_b * factor_b) * A * dT;
+  result.dQ_dh_a = (factor_a * factor_a) * A * dT * dha;
+  result.dQ_dh_b = (factor_b * factor_b) * A * dT * dhb;
 
   result.dQ_dT_aw_b = -U * A;
 
