@@ -1208,7 +1208,14 @@ class NetworkSolver:
                         # flow_jac_at_node maps each unknown index to its coefficient
                         # in d(stream_i.m_dot)/d(x). For 2-port: {idx: 1.0}. For tee:
                         # may involve 2 unknowns (m_dot_com and m_dot_branch).
-                        for idx, coeff in elem.flow_jac_at_node(src_nid, m_indices).items():
+                        # The stream's flow is the one INTO this node for a
+                        # single-source element (flow_at_node(nid), as set in
+                        # stream_info above), so its derivative must be taken at
+                        # nid too. Taking it at src_nid gave a branching tee's
+                        # straight sink d/d(m_com) only and dropped the -1 on
+                        # m_branch.
+                        jac_node = nid if len(elem.all_source_nodes()) == 1 else src_nid
+                        for idx, coeff in elem.flow_jac_at_node(jac_node, m_indices).items():
                             node_relay = relay[nid].setdefault(
                                 idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                             )
