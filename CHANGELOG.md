@@ -291,6 +291,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fanno flow integrated in Mach number** (`fanno_mach.h`: `fanno_duct`, `fanno_choked_mass_flux`, `fanno_length_between`, `fanno_inlet_mach`, `fanno_sonic_mass_flux`, `fanno_state_at_mach`, `fanno_dx_dmach`). It is the kernel for the compressible-channel redesign.
+  - **Method:** at fixed mass flux the station state is algebraic in M, so the length is a smooth integral that is exactly 0 at sonic. L* and the choked flux are exact, with no M = 0.999 cutoff, gradient floor or step control.
+  - **Accuracy:** it agrees with the 20000-step x-march to 1e-13 to 1e-9 at constant f and to ~1e-8 with Haaland. Its choked flow matches the march's choke bisection.
+  - **Cost:** 1.5 ms per duct, 2.8 ms per choked-flux root.
+  - **Why not the march:** near choke the x-march stalls at 1e-4 to 1e-5 whatever its step count.
+
 - **Effusion liner: a duct-fed effusion wall (#471).** Python `EffusionLiner` and the GUI node "Effusion Liner": coolant in, coolant out and discharge ports.
   - **Structure:** N stations along the backside duct, each a Bassett bleed (`CrossflowSegmentElement`) feeding a duct-fed panel into the gas.
   - **Crossflow Cd:** panels take McGreehan-Schotsch's supply-side U1/Vi from the duct's mean velocity at their station and the static-referenced ideal jet velocity (C++ `crossflow_velocity_ratio`). The derivative chain runs into the neighbour segments.
