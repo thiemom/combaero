@@ -680,14 +680,20 @@ JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet& set,
 // the density of its own static (P, T, X). Derivatives w.r.t. the solver's
 // variables, densities through density_and_jacobians.
 
-// Centred crossflow segment (#465): half of each adjacent station's drop.
-//   dP = (m_out|m_out|/rho_out - m_arr|m_arr|/rho_arr) / (2 A^2)
-struct SideStreamMomentum {
-    double dP, d_dm_out, d_dm_arr, d_dP_arr, d_dT_arr, d_dP_out, d_dT_out;
-};
-SideStreamMomentum side_stream_momentum_drop(
-    double m_arr, double m_out, double P_arr, double T_arr, const std::vector<double>& X_arr,
-    double P_out, double T_out, const std::vector<double>& X_out, double area);
+// One side-stream station, half at a time (#465, #471). m_a arrives, m_b
+// leaves along the channel; the side stream's axial velocity is kappa*u_a:
+//   dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+// kappa = 0: normal injection (merge, Florschuetz). kappa = 0.75: bleed,
+// Bassett et al. (2001) K2/K5 Eq. 15 exactly. A segment carries half of the
+// station at each end, each at its node's density.
+constexpr double STATION_KAPPA_MERGE_NORMAL = 0.0;
+constexpr double STATION_KAPPA_BLEED_BASSETT = 0.75;
+struct StationHalfDrop { double dP, d_dm_a, d_dm_b, d_dP, d_dT; };
+StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
+                                  const std::vector<double>& X, double area, double kappa);
+// Reservoir entry into a duct: (1 + K_in) m|m| / (2 rho A^2).
+StationHalfDrop channel_entry_drop(double m, double P, double T,
+                                   const std::vector<double>& X, double area, double K_in);
 
 // Merge chamber (#471): the main-inlet face from the impulse balance
 //   P_f + m_main^2 R T_main / (P_f A^2) = P + m_out^2/(rho A^2) - J/A

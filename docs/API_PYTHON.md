@@ -1760,8 +1760,44 @@ the segments either side, so each crossflow node holds the static pressure at
 its row centre. **Without this term every row sees the same pressure
 difference and the supply stays uniform.** That puts Gc/Gj at twice Eq. 8 on
 Florschuetz's strongest-crossflow geometry. The term is C++'s
-`cb.side_stream_momentum_drop`, each station at the density of its own static
-state (exact impulse, compressible).
+`cb.station_half_drop` with `kappa = 0`, each station at the density of its
+own node (see `CrossflowSegmentElement` below).
+
+#### Crossflow segments: merge and bleed stations (#471)
+
+`ImpingementCrossflowElement` is one case of `CrossflowSegmentElement`, a
+channel segment whose end nodes are side-stream STATIONS. Over a station, with
+the side stream's axial velocity `kappa * u_arriving`:
+
+    dP_static = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+
+| `kappa` | station | source |
+|---|---|---|
+| `cb.STATION_KAPPA_MERGE_NORMAL` = 0 | jets merging normally (impingement) | Florschuetz's P + G^2/rho = const |
+| `cb.STATION_KAPPA_BLEED_BASSETT` = 0.75 | bleed through the wall (effusion holes) | Bassett et al. (2001) K2/K5, Eq. 15, reproduced for every split |
+
+```python
+from combaero.network import CrossflowSegmentElement
+
+seg = CrossflowSegmentElement("s1", "b1", "b2", length=0.02, area=4e-3, Dh=0.01,
+                              from_kappa=cb.STATION_KAPPA_BLEED_BASSETT, prev_seg="s0",
+                              to_kappa=cb.STATION_KAPPA_BLEED_BASSETT, next_seg="s2")
+first = CrossflowSegmentElement("s0", "plenum", "b1", length=0.01, area=4e-3,
+                                entry_K=0.5,          # reservoir entry, sharp
+                                to_kappa=cb.STATION_KAPPA_BLEED_BASSETT, next_seg="s1")
+```
+
+- **Centred.** A segment carries half of the station at each end, each at its
+  node's own density, so every node holds its station's mid static pressure.
+  Station nodes must be `PlenumNode`s (Pt = P).
+- **Ends are explicit.** `prev_seg`/`next_seg` name the neighbour segments;
+  `entry_K` makes `from_node` a reservoir; a segment into a plenum with no
+  `to_kappa` dumps its dynamic head (static continuity).
+- **Bleed scored on Bassett's own measured K5** (Fig. 7c, 43 points): MAE
+  0.039 in K overall, 0.021 at q >= 0.6 (the few-percent bleed of an effusion
+  station). Bassett measured psi = 1-3; a station bleeding through holes far
+  smaller than the duct is an extrapolation in psi, which K5 is independent
+  of by derivation.
 
 **One configuration only.** These elements cover spent air leaving down the
 crossflow channel. A hand-wired network describing a different

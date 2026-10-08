@@ -4956,19 +4956,183 @@ class ChannelElement(NetworkElement):
             self.surface.area = self.default_convective_area()
 
 
-class ImpingementCrossflowElement(ChannelElement):
+class CrossflowSegmentElement(ChannelElement):
+    """A channel segment between side-stream STATIONS: merges and bleeds (#465, #471).
+
+    A ``ChannelElement`` (friction, stagnation-pressure coupling) plus the
+    momentum of side streams joining or leaving at its end nodes. Over one
+    station, ``m_a`` arriving and ``m_b`` leaving along the channel of area
+    A, with the side stream's AXIAL velocity ``kappa * u_a``, momentum gives
+    the static-pressure drop
+
+        dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+
+    * ``kappa = 0``: normal injection (impingement jets). Florschuetz's
+      P + G^2/rho = const.
+    * ``kappa = 0.75`` (``cb.STATION_KAPPA_BLEED_BASSETT``): bleed through the
+      wall. Bassett, Winterbone & Pearson's (2001) separating straight-run
+      coefficient K2/K5 (Eq. 15), theta- and psi-independent, reproduced for
+      every split.
+
+    CENTRED: a segment carries half of the station at each end, each at its
+    node's own density (C++ ``station_half_drop``), so every node holds the
+    static pressure at the middle of its station. Ends are explicit, wired by
+    whoever builds the chain:
+
+    * ``from_kappa`` with ``prev_seg``: a station at ``from_node``; the flow
+      arriving there is ``prev_seg``'s (0 if None: a closed end).
+    * ``to_kappa`` with ``next_seg``: a station at ``to_node``; the flow
+      leaving it is ``next_seg``'s.
+    * ``entry_K``: ``from_node`` is a reservoir; the segment carries the
+      entry acceleration ``(1 + K_in) m^2/(2 rho A^2)`` at the duct (to-node)
+      density instead of a from-station.
+    * an exit into a plenum (no to-station) loses the dynamic head: static
+      continuity, as any Pt-coupled channel into a plenum.
+
+    Station nodes must be PlenumNodes (Pt = P): the node pressure is the
+    channel's static pressure, which is what a side stream sees.
+
+    FRICTION follows ``ChannelElement``: Darcy-Weisbach on the
+    equivalent-area diameter (the C++ channel's circular convention, #463).
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        length: float,
+        area: float,
+        Dh: float | None = None,
+        roughness: float = 0.0,
+        regime: CompressibilityLiteral = "incompressible",
+        friction_model: FrictionModelLiteral = "haaland",
+        from_kappa: float | None = None,
+        to_kappa: float | None = None,
+        prev_seg: str | None = None,
+        next_seg: str | None = None,
+        entry_K: float | None = None,
+    ) -> None:
+        if length <= 0.0 or area <= 0.0:
+            raise ValueError(f"{type(self).__name__}: length and area must be positive")
+        if entry_K is not None and from_kappa is not None:
+            raise ValueError(
+                f"{type(self).__name__} {id!r}: from_node is either a reservoir "
+                "(entry_K) or a station (from_kappa), not both"
+            )
+        super().__init__(
+            id,
+            from_node,
+            to_node,
+            length=length,
+            diameter=math.sqrt(4.0 * area / math.pi),
+            Dh=Dh,
+            roughness=roughness,
+            regime=regime,
+            friction_model=friction_model,
+        )
+        self.from_kappa = from_kappa
+        self.to_kappa = to_kappa
+        self.prev_seg = prev_seg
+        self.next_seg = next_seg
+        self.entry_K = entry_K
+        self._prev: NetworkElement | None = None
+        self._next: NetworkElement | None = None
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        super().resolve_topology(graph)
+        self._prev = graph.elements.get(self.prev_seg) if self.prev_seg else None
+        self._next = graph.elements.get(self.next_seg) if self.next_seg else None
+
+    def network_flow_inputs(self) -> list[tuple[str, str]]:
+        """The neighbour segments' flows, each read at the station it shares."""
+        out = []
+        if self._prev is not None:
+            out.append((self._prev.id, self.from_node))
+        if self._next is not None:
+            out.append((self._next.id, self.to_node))
+        return out
+
+    def _momentum_terms(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None,
+    ) -> list[tuple["cb.StationHalfDrop", str, str | None, str, NetworkElement | None]]:
+        """Each momentum term: (C++ result, node it sits at, which derivative is
+        this segment's own flow ('a' or 'b' or None), neighbour's node, the
+        neighbour element)."""
+        flows = flows or {}
+        m = float(state_in.m_dot)
+        terms = []
+        if self.entry_K is not None:
+            r = cb.channel_entry_drop(
+                m, state_out.P, state_out.T, state_out.X, self.area, self.entry_K
+            )
+            terms.append((r, self.to_node, "a", self.to_node, None))
+        if self.from_kappa is not None:
+            m_a = flows.get(self._prev.id, 0.0) if self._prev is not None else 0.0
+            r = cb.station_half_drop(
+                m_a, m, state_in.P, state_in.T, state_in.X, self.area, self.from_kappa
+            )
+            terms.append((r, self.from_node, "b", self.from_node, self._prev))
+        if self.to_kappa is not None and self._next is not None:
+            m_b = flows.get(self._next.id, m)
+            r = cb.station_half_drop(
+                m, m_b, state_out.P, state_out.T, state_out.X, self.area, self.to_kappa
+            )
+            terms.append((r, self.to_node, "a", self.to_node, self._next))
+        return terms
+
+    def _momentum_drop_value(self, state_in, state_out, flows) -> float:
+        return float(sum(t[0].dP for t in self._momentum_terms(state_in, state_out, flows)))
+
+    def residuals(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        res, jac = super().residuals(state_in, state_out)
+        row = jac[0]
+        own = f"{self.id}.m_dot"
+        for r, node, own_side, nb_node, nb in self._momentum_terms(state_in, state_out, flows):
+            res[0] -= r.dP
+            d_own = r.d_dm_a if own_side == "a" else r.d_dm_b
+            row[own] = row.get(own, 0.0) - d_own
+            if nb is not None:
+                d_nb = r.d_dm_b if own_side == "a" else r.d_dm_a
+                names = nb.unknowns()
+                for local, coeff in nb.flow_jac_at_node(nb_node, list(range(len(names)))).items():
+                    row[names[local]] = row.get(names[local], 0.0) - d_nb * coeff
+            for key, d in ((f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)):
+                row[key] = row.get(key, 0.0) - d
+        return res, jac
+
+    def htc_and_T(self, state: NetworkMixtureState, flows: dict[str, float] | None = None):
+        return super().htc_and_T(state)
+
+    def diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float | str]:
+        out = super().diagnostics(state_in, state_out)
+        out["dP_momentum"] = self._momentum_drop_value(state_in, state_out, flows)
+        return out
+
+
+class ImpingementCrossflowElement(CrossflowSegmentElement):
     """The crossflow channel between a jet plate and its target, one row pitch (#465).
 
-    A ``ChannelElement`` (friction, stagnation-pressure coupling) plus the one
-    term an impingement array cannot do without: jets arrive with NO
-    streamwise momentum, so the crossflow must accelerate them. A momentum
-    balance over one row's merge, crossflow ``m_a`` arriving and ``m_b``
-    leaving, gives a static pressure drop ``(m_b|m_b| - m_a|m_a|)/(rho A^2)``
-    with ``A = height * span``. That is the discrete form of the momentum
-    equation behind Florschuetz, Truman and Metzger's (1981) flow
-    distribution (Eqs. 7-8): P + G_c^2/rho = const along a frictionless
-    channel. Without it every row sees the same pressure difference and the
-    supply stays uniform; with it the downstream rows draw more.
+    A ``CrossflowSegmentElement`` with normal-injection stations
+    (``kappa = 0``): the jets that merge at each row arrive with NO
+    streamwise momentum, so the crossflow must accelerate them -- the
+    momentum equation behind Florschuetz, Truman and Metzger's (1981) flow
+    distribution (Eqs. 7-8), P + G_c^2/rho = const. Without it every row sees
+    the same pressure difference and the supply stays uniform; with it the
+    downstream rows draw more. Area ``height * span``.
 
     Chain it with plenum crossflow nodes, one per row:
 
@@ -4976,25 +5140,13 @@ class ImpingementCrossflowElement(ChannelElement):
          |                  |                  |
       [Plate 1]          [Plate 2]          [Plate 3]
 
-    CENTRED. Each merge's drop is split half-and-half between the segments
-    either side, so a node holds the static pressure at the MIDDLE of its
-    row's merge -- the row centre, where Florschuetz's continuous model
-    evaluates the pressure the jets discharge into. One segment therefore
-    carries
-
-        dP_mom = (m_out|m_out| - m_arr|m_arr|) / (2 rho A^2)
-
-    where ``m_out = m + (other inflows to to_node)`` leaves the next merge
-    and ``m_arr`` is the crossflow arriving at ``from_node`` through other
-    ``ImpingementCrossflowElement`` s (zero at row 1). Putting the whole
-    merge downstream instead (nodes at the post-merge static) over-feeds the
-    downstream rows: Gc/Gj at row 10 of Florschuetz's strongest-crossflow
-    geometry came out 13% below Eq. 8, against a few percent centred.
-
-    FRICTION follows ``ChannelElement``: Darcy-Weisbach on the
-    equivalent-area diameter (the C++ channel's circular convention, #463),
-    so for a thin gap it is a lower bound. Florschuetz's own model neglects
-    friction; the momentum term is the part that matters.
+    The neighbours are found from the chain itself: the crossflow segment
+    arriving at ``from_node`` (none at row 1: a closed end) and the one
+    leaving ``to_node`` (none into the exit, where the dynamic head is lost).
+    Centred, each node holds its row's mid-merge static pressure: putting the
+    whole merge downstream instead over-fed the downstream rows (Gc/Gj at row
+    10 of Florschuetz's strongest-crossflow geometry 13% below Eq. 8, against
+    a few percent centred).
     """
 
     def __init__(
@@ -5013,110 +5165,36 @@ class ImpingementCrossflowElement(ChannelElement):
             raise ValueError(
                 "ImpingementCrossflowElement: length, height and span must be positive"
             )
-        area = height * span
         super().__init__(
             id,
             from_node,
             to_node,
             length=length,
-            diameter=math.sqrt(4.0 * area / math.pi),
+            area=height * span,
             Dh=2.0 * height * span / (height + span),
             roughness=roughness,
             regime=regime,
             friction_model=friction_model,
+            from_kappa=cb.STATION_KAPPA_MERGE_NORMAL,
+            to_kappa=cb.STATION_KAPPA_MERGE_NORMAL,
         )
         self.height = height
         self.span = span
-        # Streams merging at to_node, and crossflow arriving at from_node.
-        self._merge_sources: list[NetworkElement] = []
-        self._arriving: list[NetworkElement] = []
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
-        super().resolve_topology(graph)
-        self._merge_sources = [
-            e for e in graph.get_upstream_elements(self.to_node) if e.id != self.id
-        ]
-        self._arriving = [
+        prev = [
             e
             for e in graph.get_upstream_elements(self.from_node)
             if isinstance(e, ImpingementCrossflowElement)
         ]
-
-    def network_flow_inputs(self) -> list[tuple[str, str]]:
-        """Streams merging at ``to_node`` and crossflow arriving at ``from_node``."""
-        return [(e.id, self.to_node) for e in self._merge_sources] + [
-            (e.id, self.from_node) for e in self._arriving
+        nxt = [
+            e
+            for e in graph.get_downstream_elements(self.to_node)
+            if isinstance(e, ImpingementCrossflowElement)
         ]
-
-    def _momentum_drop(
-        self,
-        state_in: NetworkMixtureState,
-        state_out: NetworkMixtureState,
-        flows: dict[str, float] | None,
-    ) -> "cb.SideStreamMomentum":
-        """C++'s centred side-stream term, each station at its own state.
-
-        m_out = m + (streams merging at to_node), so d/dm = d/dm_out.
-        """
-        flows = flows or {}
-        m = float(state_in.m_dot)
-        m_out = m + sum(flows.get(e.id, 0.0) for e in self._merge_sources)
-        m_arr = sum(flows.get(e.id, 0.0) for e in self._arriving)
-        return cb.side_stream_momentum_drop(
-            m_arr,
-            m_out,
-            state_in.P,
-            state_in.T,
-            state_in.X,
-            state_out.P,
-            state_out.T,
-            state_out.X,
-            self.area,
-        )
-
-    def _add_flow_jac(
-        self, row: dict[str, float], elems: list[NetworkElement], node: str, d: float
-    ) -> None:
-        """row -= d * d(flow of each elem at node)/d(its unknowns), by name."""
-        for e in elems:
-            names = e.unknowns()
-            for local, coeff in e.flow_jac_at_node(node, list(range(len(names)))).items():
-                row[names[local]] = row.get(names[local], 0.0) - d * coeff
-
-    def residuals(
-        self,
-        state_in: NetworkMixtureState,
-        state_out: NetworkMixtureState,
-        flows: dict[str, float] | None = None,
-    ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        res, jac = super().residuals(state_in, state_out)
-        mom = self._momentum_drop(state_in, state_out, flows)
-        res[0] -= mom.dP
-        row = jac[0]
-        row[f"{self.id}.m_dot"] = row.get(f"{self.id}.m_dot", 0.0) - mom.d_dm_out
-        self._add_flow_jac(row, self._merge_sources, self.to_node, mom.d_dm_out)
-        self._add_flow_jac(row, self._arriving, self.from_node, mom.d_dm_arr)
-        for key, d in (
-            (f"{self.from_node}.P", mom.d_dP_arr),
-            (f"{self.from_node}.T", mom.d_dT_arr),
-            (f"{self.to_node}.P", mom.d_dP_out),
-            (f"{self.to_node}.T", mom.d_dT_out),
-        ):
-            row[key] = row.get(key, 0.0) - d
-        return res, jac
-
-    def htc_and_T(self, state: NetworkMixtureState, flows: dict[str, float] | None = None):
-        return super().htc_and_T(state)
-
-    def diagnostics(
-        self,
-        state_in: NetworkMixtureState,
-        state_out: NetworkMixtureState,
-        flows: dict[str, float] | None = None,
-    ) -> dict[str, float | str]:
-        out = super().diagnostics(state_in, state_out)
-        out["dP_momentum"] = float(self._momentum_drop(state_in, state_out, flows).dP)
-        return out
+        self.prev_seg = prev[0].id if prev else None
+        self.next_seg = nxt[0].id if nxt else None
+        super().resolve_topology(graph)
 
 
 class AreaChangeElement(NetworkElement):

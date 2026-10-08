@@ -653,23 +653,25 @@ PYBIND11_MODULE(_core, m) {
         "dh/dm_crossflow. Which flows count as crossflow is the caller's\n"
         "configuration.");
 
-  py::class_<combaero::SideStreamMomentum>(m, "SideStreamMomentum")
-      .def_readonly("dP", &combaero::SideStreamMomentum::dP)
-      .def_readonly("d_dm_out", &combaero::SideStreamMomentum::d_dm_out)
-      .def_readonly("d_dm_arr", &combaero::SideStreamMomentum::d_dm_arr)
-      .def_readonly("d_dP_arr", &combaero::SideStreamMomentum::d_dP_arr)
-      .def_readonly("d_dT_arr", &combaero::SideStreamMomentum::d_dT_arr)
-      .def_readonly("d_dP_out", &combaero::SideStreamMomentum::d_dP_out)
-      .def_readonly("d_dT_out", &combaero::SideStreamMomentum::d_dT_out);
-  m.def("side_stream_momentum_drop", &combaero::side_stream_momentum_drop,
-        py::arg("m_arr"), py::arg("m_out"), py::arg("P_arr"), py::arg("T_arr"),
-        py::arg("X_arr"), py::arg("P_out"), py::arg("T_out"), py::arg("X_out"),
-        py::arg("area"),
-        "Centred static-pressure drop of a channel segment between two\n"
-        "stations where side streams join normally, each station at the\n"
-        "density of its own static (P, T, X): (m_out|m_out|/rho_out -\n"
-        "m_arr|m_arr|/rho_arr) / (2 A^2). Derivatives with respect to the\n"
-        "flows and to each station's P and T. Exact impulse, compressible.");
+  m.attr("STATION_KAPPA_MERGE_NORMAL") = combaero::STATION_KAPPA_MERGE_NORMAL;
+  m.attr("STATION_KAPPA_BLEED_BASSETT") = combaero::STATION_KAPPA_BLEED_BASSETT;
+  py::class_<combaero::StationHalfDrop>(m, "StationHalfDrop")
+      .def_readonly("dP", &combaero::StationHalfDrop::dP)
+      .def_readonly("d_dm_a", &combaero::StationHalfDrop::d_dm_a)
+      .def_readonly("d_dm_b", &combaero::StationHalfDrop::d_dm_b)
+      .def_readonly("d_dP", &combaero::StationHalfDrop::d_dP)
+      .def_readonly("d_dT", &combaero::StationHalfDrop::d_dT);
+  m.def("station_half_drop", &combaero::station_half_drop, py::arg("m_a"), py::arg("m_b"),
+        py::arg("P"), py::arg("T"), py::arg("X"), py::arg("area"), py::arg("kappa"),
+        "Half the static-pressure drop over one side-stream station (m_a\n"
+        "arriving, m_b leaving along a channel of area A), at the station\n"
+        "node's density: (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) /\n"
+        "(2 rho A^2). kappa = 0: normal injection (merge); kappa = 0.75:\n"
+        "bleed, Bassett et al. (2001) K2/K5 exactly.");
+  m.def("channel_entry_drop", &combaero::channel_entry_drop, py::arg("m"), py::arg("P"),
+        py::arg("T"), py::arg("X"), py::arg("area"), py::arg("K_in"),
+        "Static drop entering a duct from a reservoir: (1 + K_in) m|m| /\n"
+        "(2 rho A^2), at the duct density. Derivative in d_dm_a.");
 
   py::class_<combaero::MergeFaceState>(m, "MergeFaceState")
       .def_readonly("P_face", &combaero::MergeFaceState::P_face)

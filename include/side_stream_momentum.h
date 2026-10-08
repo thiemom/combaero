@@ -20,34 +20,54 @@
 namespace combaero {
 
 // ---------------------------------------------------------------
-// Crossflow segment, centred (impingement crossflow, #465)
+// One station, half at a time: merge AND bleed (#471)
 // ---------------------------------------------------------------
 //
-// A network segment runs between two stations. Splitting each station's
-// drop half-and-half between the segments either side puts every node at the
-// MIDDLE of its station, where a continuous model evaluates the pressure the
-// side stream sees. With normal injection (J = 0) one segment carries
+// A station is a node where a side stream joins (merge) or leaves (bleed) a
+// channel of cross-section A; m_a arrives, m_b leaves along the channel.
+// With the side stream's AXIAL velocity written as u_s = kappa * u_a,
+// momentum over the station gives the static-pressure DROP
 //
-//   dP = (m_out|m_out| / rho_out - m_arr|m_arr| / rho_arr) / (2 A^2)
+//   dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
 //
-// m_arr arriving at its upstream station, m_out leaving its downstream
-// station, each density from that station's own static (P, T, X). Putting the whole drop
-// downstream instead over-fed the downstream rows: -13% in Gc/Gj at row 10
-// of Florschuetz's strongest-crossflow geometry, against -2.5% centred.
-struct SideStreamMomentum {
-  double dP = 0.0;          // static-pressure drop along the segment [Pa]
-  double d_dm_out = 0.0;    // [Pa/(kg/s)]
-  double d_dm_arr = 0.0;    // [Pa/(kg/s)]
-  // With respect to each station's own static state, through its density
-  // (C++'s density_and_jacobians, the mixture's own equation of state).
-  double d_dP_arr = 0.0, d_dT_arr = 0.0;   // [-], [Pa/K]
-  double d_dP_out = 0.0, d_dT_out = 0.0;   // [-], [Pa/K]
+// at the station node's own density.
+//
+//   kappa = 0     normal injection (merge): the jets bring no axial momentum.
+//                 Florschuetz's P + G^2/rho = const; the #465 impingement term.
+//   kappa = 0.75  bleed through the wall: Bassett, Winterbone & Pearson (2001)
+//                 separating straight-run coefficient K2/K5, Eq. (15),
+//                 K = q^2 - 1.5 q + 0.5 (q = m_b/m_a), theta- and
+//                 psi-independent, rated excellent against their data. The
+//                 station reproduces it for EVERY q exactly at kappa = 0.75:
+//                 (Pt_a - Pt_b)/(rho u_a^2 / 2) = 2(1-q)(kappa - (1+q)/2).
+//
+// A network segment between two stations carries HALF of each, so every node
+// sits at the middle of its station (the centred scheme of #465). The
+// segment's own flow then enters both halves at their own densities, which
+// keeps the term m^2 (1/rho_from - 1/rho_to)/(2 A^2) that a single-density
+// form drops. One state per node makes the scheme consistent to
+// O(M^2 dm/m), not exact.
+constexpr double STATION_KAPPA_MERGE_NORMAL = 0.0;
+constexpr double STATION_KAPPA_BLEED_BASSETT = 0.75;
+
+struct StationHalfDrop {
+  double dP = 0.0;      // half the station's static-pressure drop [Pa]
+  double d_dm_a = 0.0;  // [Pa/(kg/s)]
+  double d_dm_b = 0.0;  // [Pa/(kg/s)]
+  double d_dP = 0.0;    // d/d(station static P) [-]
+  double d_dT = 0.0;    // d/d(station T) [Pa/K]
 };
 
-SideStreamMomentum side_stream_momentum_drop(
-    double m_arr, double m_out, double P_arr, double T_arr,
-    const std::vector<double>& X_arr, double P_out, double T_out,
-    const std::vector<double>& X_out, double area);
+StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
+                                  const std::vector<double>& X, double area,
+                                  double kappa);
+
+// Entry from a reservoir (Pt) into a duct, static at the entry node:
+//   dP = (1 + K_in) m|m| / (2 rho A^2)
+// the dynamic head plus the entry loss (K_in = 0.5 sharp, ~0 well rounded).
+StationHalfDrop channel_entry_drop(double m, double P, double T,
+                                   const std::vector<double>& X, double area,
+                                   double K_in);
 
 // ---------------------------------------------------------------
 // Merge chamber: main inlet + side streams -> one outlet (#471)

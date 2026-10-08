@@ -1,4 +1,5 @@
 from .components import (
+    CrossflowSegmentElement,
     PressureBoundary,
     MassFlowBoundary,
     CombustorNode,
@@ -63,6 +64,7 @@ __all__: list[str] = [
     "OrificeElement",
     "EffectiveAreaConnectionElement",
     "EffusionPlateElement",
+    "CrossflowSegmentElement",
     "ImpingementCrossflowElement",
     "ImpingementPlateElement",
     "ImpingementArray",
