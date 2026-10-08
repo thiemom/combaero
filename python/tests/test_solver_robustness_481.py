@@ -257,3 +257,32 @@ def test_a_probe_the_model_refuses_is_rejected_not_accepted(monkeypatch) -> None
     r = s.solve()
     assert r["__success__"]
     assert 0.0 < r["o.m_dot"] < limit
+
+
+def test_a_wall_on_a_reversed_channel_relays_the_right_sign() -> None:
+    """Surface correlations take |m_dot|, so their dh/dm is in |m|: for a
+    reversed element the relay must flip it (+0.096 vs -0.096 before)."""
+    g = FlowNetwork()
+    g.add_node(_pb("A", 1.00e5, 400.0))
+    g.add_node(_pb("B", 1.02e5, 900.0))
+    g.add_node(PlenumNode("p"))
+    area = 3.14159 * 0.02
+    surface = ConvectiveSurface(area=area)
+    g.add_element(ChannelElement("hot", "A", "p", length=1.0, diameter=0.02, surface=surface))
+    g.add_element(_orifice("o", "p", "B", 0.02))
+    g.add_node(MassFlowBoundary("cin", m_dot=0.01, Tt=300.0, Y=Y_AIR))
+    g.add_node(PlenumNode("cp"))
+    g.add_node(_pb("cout", 1.0e5, 300.0))
+    g.add_element(
+        ChannelElement(
+            "cold", "cin", "cp", length=1.0, diameter=0.02, surface=ConvectiveSurface(area=area)
+        )
+    )
+    g.add_element(_orifice("co", "cp", "cout", 0.02))
+    g.add_wall(
+        ThermalWall(id="w", element_a="hot", element_b="cold", layers=[WallLayer(0.002, 20.0)])
+    )
+    s = NetworkSolver(g)
+    r = s.solve()
+    assert r["__success__"] and r["hot.m_dot"] < 0.0 and r["w.Q"] > 0.0
+    assert _jac_vs_fd(s, np.array(r["__x_solution__"])) < 1e-4

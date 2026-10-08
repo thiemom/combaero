@@ -1407,6 +1407,7 @@ class NetworkSolver:
                             factor_mdot_a = (
                                 dT_mix_dQ
                                 * sign
+                                * self._htc_mdot_sign(obj_a, x)
                                 * (
                                     wall_result.dQ_dh_a * ch_a.dh_dmdot
                                     + wall_result.dQ_dT_aw_a * ch_a.dT_aw_dmdot
@@ -1449,6 +1450,7 @@ class NetworkSolver:
                             factor_mdot_b = (
                                 dT_mix_dQ
                                 * sign
+                                * self._htc_mdot_sign(obj_b, x)
                                 * (
                                     wall_result.dQ_dh_b * ch_b.dh_dmdot
                                     + wall_result.dQ_dT_aw_b * ch_b.dT_aw_dmdot
@@ -1532,6 +1534,17 @@ class NetworkSolver:
             if indices:
                 flows[eid] = float(self.network.elements[eid].flow_at_node(node_id, x, indices))
         return flows
+
+    def _htc_mdot_sign(self, obj: Any, x: np.ndarray) -> float:
+        """Sign that turns an htc's own-flow derivative into one in the
+        signed unknown. Surface correlations take |m_dot| (the element hands
+        them abs(m_dot)), so for a reversed element d/dm = -d/d|m| (#481);
+        an element whose derivative is already signed says so with
+        ``_htc_dmdot_is_signed``."""
+        if getattr(obj, "_htc_dmdot_is_signed", False):
+            return 1.0
+        i = self._two_port_mdot_indices().get(getattr(obj, "id", None))
+        return -1.0 if i is not None and x[i] < 0.0 else 1.0
 
     def _htc_and_T(self, obj: Any, state: NetworkMixtureState, x: np.ndarray) -> Any:
         flows = self._network_flows(obj, x)

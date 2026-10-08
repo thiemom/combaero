@@ -3667,6 +3667,9 @@ class ImpingementPlateElement(OrificeElement):
         The user's rig-matching knob. 1.0 unless they set it.
     """
 
+    # htc_and_T's dh_dmdot comes from C++ in the signed jet flow (#481).
+    _htc_dmdot_is_signed = True
+
     def __init__(
         self,
         id: str,

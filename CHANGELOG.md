@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **k(T) wall layers.**
   - **Now:** the propagation repeats until such states settle, and k(T) is iterated at the call's own wall temperatures.
   - A mixing-plenum test marked "non-deterministic in suite" now passes reliably; its xfail is removed.
-- **Incompressible channel Jacobian under reversed flow had the wrong sign** (+9.7e4 vs -8.0e4 by finite differences). dP is odd in m_dot, so its slope is even.
+- **Incompressible channel Jacobian under reversed flow had the wrong sign** (+9.7e4 vs -8.0e4 by finite differences). dP is odd in m_dot, so its slope is even. The wall relay had the same error: surface correlations take |m_dot|, and their dh/dm was relayed unsigned (+0.096 vs -0.096).
+
 - **A non-positive htc no longer stops the wall (#481).** A correlation past its range can return h <= 0 at an iterate; Florschuetz's jet-array bracket does for a nearly stopped jet under crossflow.
   - **Before:** `wall_temperature_profile` threw, and `wall_coupling_and_jacobian` switched to R = 1e15 while taking dQ/dh from the raw h.
   - **Now:** h is floored smoothly below `WALL_HTC_KNEE` = 1e-2 W/(m^2 K) by knee^2/(2 knee - h), which is C1, positive and never underflows. dQ/dh is the slope of the floored value.
