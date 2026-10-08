@@ -4750,18 +4750,74 @@ class ChannelElement(NetworkElement):
         }
         return res, jac
 
-    def _exit_head_lost(self, m_dot: float) -> bool:
-        """Whether this channel's exit dynamic head is lost downstream.
+    @property
+    def residual_scale_kind(self) -> str:
+        """Units of this element's residual row (RESIDUAL-ROW-SCALING, see
+        NetworkSolver._build_residual_scales): "mdot" for the compressible
+        mass-flow form m - m_calc (#481), "p" for the pressure-drop forms
+        (incompressible, ribbed, pin-fin). Must change with the residual."""
+        if self.regime == "compressible" and not (
+            self.surface and isinstance(self.surface.model, (RibbedModel, PinFinModel))
+        ):
+            return "mdot"
+        return "p"
 
-        Only a PressureBoundary declares a coupling; anything else (a plenum, a
-        momentum chamber, a junction port) carries its own constitutive
-        relation and receives the stagnation pressure as before. See #360.
+    def _exit_head_lost(self, m_dot: float) -> bool:
+        """Whether this channel's exit dynamic head is lost where it discharges.
+
+        The exit is the node the flow goes INTO: to_node forward, from_node
+        when reversed. Only a PressureBoundary declares a coupling; anything
+        else (a plenum, a momentum chamber, a junction port) carries its own
+        constitutive relation and receives the stagnation pressure. See #360.
         """
-        node = getattr(self, "_downstream_node", None)
+        attr = "_downstream_node" if m_dot >= 0.0 else "_upstream_node"
+        node = getattr(self, attr, None)
         if node is None or not hasattr(node, "exit_head_lost"):
             return False
-        # Flow leaving this element toward the boundary is an OUTflow at it.
-        return bool(node.exit_head_lost(m_dot >= 0.0))
+        return bool(node.exit_head_lost(True))
+
+    def _compressible_flow(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState, f_mult: float
+    ) -> tuple[float, dict[str, float], Any]:
+        """Fanno mass flow m_calc and d(m_calc)/d(node unknowns) (#481).
+
+        The duct is fed isentropically from the stagnation state of the node
+        the flow comes FROM and discharges against the other node's
+        stagnation pressure, matched to its exit static pressure (head lost)
+        or exit stagnation pressure (recovered). The flux rises monotonically
+        as that pressure falls and saturates at the choked flux: it exists for
+        every state, so there is no infeasible region and no barrier.
+        """
+        A = self.area
+        forward = state_in.Pt >= state_out.Pt
+        src, dst = (state_in, state_out) if forward else (state_out, state_in)
+        src_id, dst_id = (
+            (self.from_node, self.to_node) if forward else (self.to_node, self.from_node)
+        )
+        lost = self._exit_head_lost(1.0 if forward else -1.0)
+        flow = cb.fanno_channel_flow(
+            src.Pt,
+            src.Tt,
+            src.X,
+            dst.Pt,
+            not lost,
+            self.length,
+            self.diameter,
+            self.roughness,
+            self.friction_model,
+            f_mult,
+            getattr(self, "_last_M_exit", -1.0),
+        )
+        # Warm start only: the flow does not depend on it.
+        if not flow.choked:
+            self._last_M_exit = float(flow.M_exit)
+        sign = 1.0 if forward else -1.0
+        derivs = {
+            f"{src_id}.Pt": sign * A * flow.dG_dPt0,
+            f"{src_id}.T": sign * A * flow.dG_dTt0,
+            f"{dst_id}.Pt": sign * A * flow.dG_dP_target,
+        }
+        return sign * A * flow.G, derivs, flow
 
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
@@ -4781,20 +4837,16 @@ class ChannelElement(NetworkElement):
             return self._pin_fin_residuals(state_in, state_out)
 
         if self.regime == "compressible":
-            # Use compressible Fanno flow with friction
-            res_cpp = _solver_tools.channel_compressible_residuals_and_jacobian(
-                m_dot,
-                state_in.Pt,
-                state_in.Tt,
-                state_in.Y,
-                state_out.P,
-                self.length,
-                self.diameter,
-                self.roughness,
-                self.friction_model,
-                f_mult,
-                self._exit_head_lost(m_dot),
-            )
+            # Mass-flow form, like the compressible orifice: m - m_calc, with
+            # m_calc the Fanno flow the end states drive (#481). The former
+            # drop-given-m form had no physical drop past choke and patched
+            # one in with a barrier, which converged choked ducts 5-20% above
+            # their choked flow.
+            m_calc, derivs, _ = self._compressible_flow(state_in, state_out, f_mult)
+            jac_c: dict[str, float] = {f"{self.id}.m_dot": 1.0}
+            for name, d in derivs.items():
+                jac_c[name] = jac_c.get(name, 0.0) - d
+            return [m_dot - m_calc], {0: jac_c}
         else:
             # Use incompressible Darcy-Weisbach formulation. Density
             # reference: upstream static by default, downstream static when
@@ -4839,15 +4891,7 @@ class ChannelElement(NetworkElement):
                 f"{downstream_id}.Pt": -1.0,
             }
         }
-        if self.regime == "compressible":
-            # The compressible march inverts the inlet STATIC state from the
-            # inlet TOTAL pressure (#359), so its pressure sensitivity is
-            # d(dP)/d(Pt_up) despite the field's name -- C++ perturbs
-            # P_total_up. Filing it under the static P was harmless into a
-            # plenum (P and Pt tied) but 25% wrong behind a momentum chamber,
-            # where they are separate unknowns (#471).
-            jac[0][f"{upstream_id}.Pt"] -= res_cpp.d_dP_dP_static_up
-        elif getattr(self, "_incompressible_p_ref", "inlet") == "outlet":
+        if getattr(self, "_incompressible_p_ref", "inlet") == "outlet":
             # Density evaluated at the downstream static: the friction-loss
             # pressure sensitivity moves onto the downstream node's P.
             jac[0][f"{downstream_id}.P"] = -res_cpp.d_dP_dP_static_up
@@ -4910,10 +4954,24 @@ class ChannelElement(NetworkElement):
                 # its own pressure drop.
                 f = cb._core.friction_and_jacobian(self.friction_model, re_eff, e_D).result[0]
 
+        duct: dict[str, float] = {}
+        if self.regime == "compressible":
+            # The duct's own Fanno solution: inlet and exit Mach inside the
+            # duct (the node states above are the plenum/boundary states), and
+            # whether it is choked -- its flow then independent of the back
+            # pressure.
+            f_mult = self.surface.f_multiplier if self.surface else 1.0
+            _, _, flow = self._compressible_flow(state_in, state_out, f_mult)
+            duct = {
+                "choked": float(flow.choked),
+                "M_in_duct": float(flow.M_in),
+                "M_exit_duct": float(flow.M_exit),
+            }
         return {
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
+            **duct,
             "Dh": float(self.Dh or self.diameter or 0.0),
             "Nu": float(Nu),
             "htc": float(htc),
@@ -4951,17 +5009,34 @@ class ChannelElement(NetworkElement):
             return res.profile
 
         elif self.regime == "compressible":
-            res = cb.fanno_channel(
-                state_in.T,
-                state_in.P,
-                cb.mass_to_mole(
-                    state_in.Y
-                ),  # C++ expects mole fractions for Fanno solver currently
-                state_in.m_dot,
+            # The x-march from the duct's inlet STATIC state, which the Mach
+            # solution gives (isentropic from the feeding node's stagnation
+            # state). It called fanno_channel with its arguments out of order
+            # and raised for every compressible channel (#481).
+            G = abs(state_in.m_dot) / self.area
+            if G <= 0.0:
+                return []
+            duct = cb.fanno_duct(
+                state_in.Pt,
+                state_in.Tt,
+                G,
+                state_in.X,
                 self.length,
                 self.diameter,
                 self.roughness,
                 self.friction_model,
+                self.surface.f_multiplier if self.surface else 1.0,
+            )
+            res = cb.fanno_channel_rough(
+                duct.inlet.T,
+                duct.inlet.P,
+                duct.inlet.u,
+                self.length,
+                self.diameter,
+                self.roughness,
+                state_in.X,
+                self.friction_model,
+                self.surface.f_multiplier if self.surface else 1.0,
                 n_steps,
                 True,
             )
@@ -5012,6 +5087,7 @@ class ChannelElement(NetworkElement):
         # Cached for the exit-coupling lookup in residuals (#360); done before
         # the early return so it is set even when the diameter is explicit.
         self._downstream_node = graph.nodes.get(self.to_node)
+        self._upstream_node = graph.nodes.get(self.from_node)
         if self.diameter is not None:
             self._fill_convective_area()
             return
@@ -5951,7 +6027,8 @@ class MultiPortChamberBase(NetworkElement):
 
     def row_scale_kinds(self) -> list[str]:
         """Per-row scale kind ("p" or "mdot") for the solver's row-scaling
-        vector, in the same order as `residuals()`'s returned list.
+        vector (RESIDUAL-ROW-SCALING, see NetworkSolver._build_residual_scales),
+        in the same order as `residuals()`'s returned list.
 
         Default matches this class's own impulse-CV rows: N pressure-
         magnitude rows (P_i + rho_i u_i^2 - P_jct) followed by one mass-

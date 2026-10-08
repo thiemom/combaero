@@ -90,4 +90,42 @@ double fanno_choked_mass_flux(double Pt, double Tt,
                               const std::string& friction_model,
                               double f_multiplier = 1.0);
 
+// Mass flux a duct passes from a stagnation state (Pt0, Tt0) against a
+// downstream pressure, with its derivatives. The physical inverse of
+// fanno_duct, and the form a network residual wants: it rises monotonically
+// as P_target falls and SATURATES at the choked flux once the exit chokes,
+// so it exists for every P_target (no infeasible region, no barrier).
+//
+// exit_total selects what P_target is matched against:
+//   true  -- the exit STAGNATION pressure (the exit dynamic head is recovered
+//            downstream: a diffuser, or a node that carries its own Pt);
+//   false -- the exit STATIC pressure (the head is lost in a sudden expansion,
+//            a bare exit into a plenum or the atmosphere).
+//
+// Below kFannoFlowDriveFloor of drive (Pt0 - P_target) the flux law, whose
+// slope is infinite at zero drive, is blended C1 into an odd cubic through
+// zero that matches its value and slope at the floor; at or below zero drive the flux is 0 (the caller reverses
+// the duct for reversed flow).
+struct FannoChannelFlow {
+  double G = 0.0;              // mass flux [kg/(m^2 s)], >= 0
+  bool choked = false;         // exit at sonic, flux independent of P_target
+  double M_in = 0.0;           // inlet Mach
+  double M_exit = 0.0;         // exit Mach (1 when choked)
+  double dG_dPt0 = 0.0;        // [kg/(m^2 s Pa)]
+  double dG_dTt0 = 0.0;        // [kg/(m^2 s K)]
+  double dG_dP_target = 0.0;   // [kg/(m^2 s Pa)], 0 when choked
+};
+
+// Drive [Pa] below which the flux is blended to a finite slope at zero.
+constexpr double kFannoFlowDriveFloor = 1.0;
+
+FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<double>& X,
+                                    double P_target, bool exit_total, double L, double D,
+                                    double roughness, const std::string& friction_model,
+                                    double f_multiplier = 1.0,
+                                    // Previous exit Mach, if any: a warm start
+                                    // for the root (the result does not depend
+                                    // on it, only the cost).
+                                    double M_exit_guess = -1.0);
+
 }  // namespace combaero

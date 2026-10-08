@@ -736,6 +736,23 @@ PYBIND11_MODULE(_core, m) {
         py::arg("friction_model"), py::arg("f_multiplier") = 1.0,
         "Mass flux [kg/(m^2 s)] at which a duct of length L chokes exactly at its exit.");
 
+  py::class_<combaero::FannoChannelFlow>(m, "FannoChannelFlow")
+      .def_readonly("G", &combaero::FannoChannelFlow::G)
+      .def_readonly("choked", &combaero::FannoChannelFlow::choked)
+      .def_readonly("M_in", &combaero::FannoChannelFlow::M_in)
+      .def_readonly("M_exit", &combaero::FannoChannelFlow::M_exit)
+      .def_readonly("dG_dPt0", &combaero::FannoChannelFlow::dG_dPt0)
+      .def_readonly("dG_dTt0", &combaero::FannoChannelFlow::dG_dTt0)
+      .def_readonly("dG_dP_target", &combaero::FannoChannelFlow::dG_dP_target);
+  m.attr("FANNO_FLOW_DRIVE_FLOOR") = combaero::kFannoFlowDriveFloor;
+  m.def("fanno_channel_flow", &combaero::fanno_channel_flow, py::arg("Pt0"), py::arg("Tt0"),
+        py::arg("X"), py::arg("P_target"), py::arg("exit_total"), py::arg("L"), py::arg("D"),
+        py::arg("roughness"), py::arg("friction_model"), py::arg("f_multiplier") = 1.0,
+        py::arg("M_exit_guess") = -1.0,
+        "Mass flux a duct passes from (Pt0, Tt0) against P_target (matched to the exit\n"
+        "stagnation pressure if exit_total, else the exit static), with derivatives.\n"
+        "Saturates at the choked flux; 0 at or below zero drive.");
+
   py::class_<combaero::MergeFaceState>(m, "MergeFaceState")
       .def_readonly("P_face", &combaero::MergeFaceState::P_face)
       .def_readonly("Pt_face", &combaero::MergeFaceState::Pt_face)
@@ -1233,24 +1250,6 @@ PYBIND11_MODULE(_core, m) {
         py::arg("beta") = 0.0,
         "Compressible orifice for network solver with all derivatives.");
 
-  m.def(
-      "channel_compressible_mdot_and_jacobian",
-      &solver::channel_compressible_mdot_and_jacobian, py::arg("T_in"),
-      py::arg("P_in"), py::arg("u_in"), py::arg("X"), py::arg("L"),
-      py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
-      py::arg("f_multiplier") = 1.0, py::arg("compute_jacobians") = true,
-      py::arg("inlet_static_resolved") = true,
-      py::arg("exit_head_lost") = false,
-      "Compressible channel flow using Fanno model with variable friction.\n\n"
-      "Returns: (dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)");
-
-  m.def("channel_compressible_residuals_and_jacobian",
-        &solver::channel_compressible_residuals_and_jacobian, py::arg("m_dot"),
-        py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
-        py::arg("P_static_down"), py::arg("L"), py::arg("D"),
-        py::arg("roughness"), py::arg("friction_model"),
-        py::arg("f_multiplier") = 1.0, py::arg("exit_head_lost") = false,
-        "Compressible channel for network solver with all derivatives.");
 
   m.def("momentum_chamber_residual_and_jacobian",
         &solver::momentum_chamber_residual_and_jacobian, py::arg("P"),

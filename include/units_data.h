@@ -505,6 +505,10 @@ inline constexpr Entry function_units[] = {
      "Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol, L: m, D: m, roughness: m, "
      "friction_model: str, f_multiplier: -",
      "FannoDuctResult"},
+    {"fanno_channel_flow",
+     "Pt0: Pa, Tt0: K, X: mol/mol, P_target: Pa, exit_total: bool, L: m, D: m, "
+     "roughness: m, friction_model: str, f_multiplier: -, M_exit_guess: -",
+     "FannoChannelFlow"},
     {"fanno_choked_mass_flux",
      "Pt: Pa, Tt: K, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, "
      "f_multiplier: -",
@@ -560,14 +564,6 @@ inline constexpr Entry function_units[] = {
      "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
      "Cd: -, area: m^2, beta: -",
      "OrificeResult"},
-    {"channel_compressible_mdot_and_jacobian",
-     "T_in: K, P_in: Pa, u_in: m/s, X: mol/mol, L: m, D: m, roughness: m, "
-     "friction_model: str, f_multiplier: - (default 1.0)",
-     "tuple(Pa, -, Pa/K, Pa/(m/s))"},
-    {"channel_compressible_residuals_and_jacobian",
-     "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
-     "L: m, D: m, roughness: m, friction_model: str, f_multiplier: - (default 1.0)",
-     "ChannelResult"},
 
     // -------------------------------------------------------------------------
     // geometry.h - Geometric Utilities
@@ -1346,6 +1342,14 @@ inline constexpr Entry function_units[] = {
     {"FannoDuctResult::exit", "-", "FannoMachState"},
     {"FannoDuctResult::Pt_exit", "-", "Pa"},
     {"FANNO_MACH_REL_TOL", "-", "-"},
+    {"FannoChannelFlow::G", "-", "kg/(m^2*s)"},
+    {"FannoChannelFlow::choked", "-", "-"},
+    {"FannoChannelFlow::M_in", "-", "-"},
+    {"FannoChannelFlow::M_exit", "-", "-"},
+    {"FannoChannelFlow::dG_dPt0", "-", "kg/(m^2*s*Pa)"},
+    {"FannoChannelFlow::dG_dTt0", "-", "kg/(m^2*s*K)"},
+    {"FannoChannelFlow::dG_dP_target", "-", "kg/(m^2*s*Pa)"},
+    {"FANNO_FLOW_DRIVE_FLOOR", "-", "Pa"},
     {"solve_A_eff_from_mdot", "-", "-"},
     {"solve_P_back_from_mdot", "-", "-"},
     {"solve_P0_from_mdot", "-", "-"},

@@ -216,10 +216,46 @@ class NetworkSolver:
         return ref_p_residual, ref_mdot
 
     def _build_residual_scales(self, x0_use: np.ndarray) -> np.ndarray:
-        """Build characteristic residual scales by equation type.
+        """Per-row residual scales D_f, one per residual row, by the row's UNITS.
 
-        Pressure-like residuals use ``ref_p_residual`` [Pa] (based on boundary DP).
-        Mass-flow-like residuals use ``ref_mdot`` [kg/s].
+        RESIDUAL-ROW-SCALING -- the canonical description; every place that
+        declares a row's units or compares Jacobians points here.
+
+        What the solver iterates on:
+            F_scaled[i] = F_real[i] / D_f[i]            (rows,    see inv_D_f)
+            x_real[j]   = x_scaled[j] * D_x[j]          (columns, D_x = |x0|)
+            J_scaled    = diag(1/D_f) @ J_real @ diag(D_x)
+        hybr/LM accept or reject steps on ||F_scaled||, so D_f decides how
+        much each equation counts.
+
+        D_f[i] is chosen by what row i MEASURES, not by which object owns it:
+            "p"    -> ref_p    [Pa]   (boundary pressure spread)
+            "mdot" -> ref_mdot [kg/s] (median flow unknown)
+        ref_p / ref_mdot is ~1e5, so a row filed under the wrong kind is
+        weighted ~1e5 too heavily or too lightly and Newton stalls. This has
+        happened repeatedly:
+          * MPCE impulse rows filed as "mdot" (2026-07): 187 s stalls.
+          * the compressible ChannelElement switched to a mass-flow residual
+            (m - m_calc) while still filed as "p" (#481): 697 evaluations
+            and a failed solve where 15 sufficed.
+
+        Who declares what (in residual-row order):
+          * nodes: their own rows "p", then the mass-conservation row "mdot"
+            (skipped for junction ports);
+          * MultiPortChamberBase subclasses: row_scale_kinds() -- REQUIRED
+            when the row pattern differs (EjectorElement overrides it);
+          * any element whose units depend on its configuration: a
+            ``residual_scale_kind`` property (ChannelElement: "mdot" when
+            compressible, "p" otherwise);
+          * everything else by class: ChannelElement, LosslessConnection and
+            TeeJunction "p"; other elements "mdot".
+        Changing an element's residual form means changing its declared kind
+        in the same commit.
+
+        Testing Jacobians against finite differences has the same trap: a row
+        mixes kg/s and Pa columns, so compare J_ij |x_j| (scaled variables),
+        never raw entries normalised by the row's largest -- that hid a 100%
+        error in a Pa column next to d/dm = 1 (#481).
         """
         ref_p, ref_mdot = self._reference_scales(x0_use)
 
@@ -263,14 +299,21 @@ class NetworkSolver:
             if isinstance(element, MultiPortChamberBase):
                 scales.extend(_row_scale_kind_map[k] for k in element.row_scale_kinds())
                 continue
-            elem_scale = (
-                ref_p
-                if isinstance(
-                    element,
-                    (ChannelElement, LosslessConnectionElement, TeeJunctionElement),
+            # RESIDUAL-ROW-SCALING: an element whose residual's units depend
+            # on its configuration declares them (residual_scale_kind); see
+            # this method's docstring.
+            kind = getattr(element, "residual_scale_kind", None)
+            if kind is not None:
+                elem_scale = _row_scale_kind_map[kind]
+            else:
+                elem_scale = (
+                    ref_p
+                    if isinstance(
+                        element,
+                        (ChannelElement, LosslessConnectionElement, TeeJunctionElement),
+                    )
+                    else ref_mdot
                 )
-                else ref_mdot
-            )
             scales.extend([elem_scale] * element.n_equations())
 
         return np.asarray(scales, dtype=float)
@@ -2638,11 +2681,12 @@ class NetworkSolver:
         if len(x0_use) != len(res0):
             raise ValueError(f"System not square: {len(x0_use)} unknowns vs {len(res0)} equations.")
 
-        # --- Variable & residual scaling --------------------------------
-        # Scale unknowns so they are O(1): x_real = x_scaled * D_x
-        # Scale residuals so they are O(1): F_scaled = F_real * D_f
-        # This dramatically improves Jacobian conditioning when unknowns
-        # span different orders of magnitude (Pa vs kg/s).
+        # --- Variable & residual scaling (RESIDUAL-ROW-SCALING) ----------
+        # Unknowns:  x_real = x_scaled * D_x            (D_x = |x0|)
+        # Residuals: F_scaled = F_real / D_f = F_real * inv_D_f
+        # D_f is per row, by the row's units: see _build_residual_scales,
+        # which is the canonical description. (This comment used to say
+        # F_real * D_f, the inverse of what the code does.)
         D_x = np.abs(x0_use).copy()
         D_x[D_x < 1e-12] = 1.0  # avoid division by zero for near-zero guesses
         D_f = self._build_residual_scales(x0_use)

@@ -373,6 +373,18 @@ FannoDuctResult fanno_duct(double Pt, double Tt, double G, const std::vector<dou
 double fanno_choked_mass_flux(double Pt, double Tt, const std::vector<double>& X, double L,
                               double D, double roughness, const std::string& friction_model,
                               double f_multiplier = 1.0);  // G with L* = L
+
+// Mass flux from (Pt0, Tt0) against P_target -- the duct's exit stagnation
+// pressure if exit_total, else its exit static -- with dG/dPt0, dG/dTt0,
+// dG/dP_target. Monotone in P_target, saturating exactly at the choked flux
+// (choked = true, dG/dP_target = 0); 0 at or below zero drive, and blended C1
+// to a finite slope below kFannoFlowDriveFloor = 1 Pa. Unchoked it solves for
+// the exit Mach (P_exit is linear in G at fixed M, so G(M_exit) is explicit)
+// and differentiates implicitly, well conditioned up to the choke.
+FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<double>& X,
+                                    double P_target, bool exit_total, double L, double D,
+                                    double roughness, const std::string& friction_model,
+                                    double f_multiplier = 1.0, double M_exit_guess = -1.0);
 ```
 
 ### Rocket Nozzle Thrust
@@ -1239,16 +1251,10 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
-// Compressible channel flow using Fanno model with variable friction
-std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
-    double T_in, double P_in, double u_in, const std::vector<double>& X,
-    double L, double D, double roughness, const std::string& friction_model);
-
-// Full compressible channel evaluation for network solver
-ChannelResult channel_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
-    double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model);
+// The compressible channel's network residual is m - m_calc with m_calc from
+// fanno_channel_flow (fanno_mach.h): mass flow a duct passes from its feeding
+// node's stagnation state against the other node's pressure, saturating at
+// the choked flux, with derivatives. See "Fanno flow integrated in Mach number".
 ```
 
 ### Tee Junction Components (tee_junction.h + solver_interface.h)

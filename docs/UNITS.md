@@ -166,18 +166,19 @@ All functions use consistent units to avoid conversion errors.
 
 #### Fanno Flow
 
-| Function                 | Input Units                                                                                                         | Output Unit     |
-|--------------------------|---------------------------------------------------------------------------------------------------------------------|-----------------|
-| `fanno_channel`          | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol                                                          | FannoSolution   |
-| `fanno_channel_rough`    | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, correlation: str, f_multiplier: - (default 1.0) | FannoSolution   |
-| `fanno_max_length`       | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol                                                                | m               |
-| `fanno_state_at_mach`    | G: kg/(m^2*s), Tt: K, M: -, X: mol/mol                                                                              | FannoMachState  |
-| `fanno_dx_dmach`         | G: kg/(m^2*s), Tt: K, M: -, X: mol/mol, D: m, roughness: m, friction_model: str, f_multiplier: -                    | m               |
-| `fanno_length_between`   | G: kg/(m^2*s), Tt: K, M1: -, M2: -, X: mol/mol, D: m, roughness: m, friction_model: str, f_multiplier: -            | m               |
-| `fanno_inlet_mach`       | Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol                                                                            | -               |
-| `fanno_sonic_mass_flux`  | Pt: Pa, Tt: K, X: mol/mol                                                                                           | kg/(m^2*s)      |
-| `fanno_duct`             | Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -            | FannoDuctResult |
-| `fanno_choked_mass_flux` | Pt: Pa, Tt: K, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -                           | kg/(m^2*s)      |
+| Function                 | Input Units                                                                                                                                  | Output Unit      |
+|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| `fanno_channel`          | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol                                                                                   | FannoSolution    |
+| `fanno_channel_rough`    | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, correlation: str, f_multiplier: - (default 1.0)                          | FannoSolution    |
+| `fanno_max_length`       | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol                                                                                         | m                |
+| `fanno_state_at_mach`    | G: kg/(m^2*s), Tt: K, M: -, X: mol/mol                                                                                                       | FannoMachState   |
+| `fanno_dx_dmach`         | G: kg/(m^2*s), Tt: K, M: -, X: mol/mol, D: m, roughness: m, friction_model: str, f_multiplier: -                                             | m                |
+| `fanno_length_between`   | G: kg/(m^2*s), Tt: K, M1: -, M2: -, X: mol/mol, D: m, roughness: m, friction_model: str, f_multiplier: -                                     | m                |
+| `fanno_inlet_mach`       | Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol                                                                                                     | -                |
+| `fanno_sonic_mass_flux`  | Pt: Pa, Tt: K, X: mol/mol                                                                                                                    | kg/(m^2*s)       |
+| `fanno_duct`             | Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -                                     | FannoDuctResult  |
+| `fanno_channel_flow`     | Pt0: Pa, Tt0: K, X: mol/mol, P_target: Pa, exit_total: bool, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -, M_exit_guess: - | FannoChannelFlow |
+| `fanno_choked_mass_flux` | Pt: Pa, Tt: K, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -                                                    | kg/(m^2*s)       |
 
 #### Thrust
 
@@ -754,12 +755,10 @@ All functions use consistent units to avoid conversion errors.
 
 ### solver_interface.h - Compressible Flow Elements
 
-| Function                                      | Input Units                                                                                                                                        | Output Unit                                 |
-|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| `orifice_compressible_mdot_and_jacobian`      | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                                                   | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
-| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: -                                                    | OrificeResult                               |
-| `channel_compressible_mdot_and_jacobian`      | T_in: K, P_in: Pa, u_in: m/s, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: - (default 1.0)                             | tuple(Pa, -, Pa/K, Pa/(m/s))                |
-| `channel_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, L: m, D: m, roughness: m, friction_model: str, f_multiplier: - (default 1.0) | ChannelResult                               |
+| Function                                      | Input Units                                                                                     | Output Unit                                 |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------|---------------------------------------------|
+| `orifice_compressible_mdot_and_jacobian`      | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
+| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: - | OrificeResult                               |
 
 ### geometry.h - Geometric Utilities
 
@@ -1253,6 +1252,14 @@ All functions use consistent units to avoid conversion errors.
 | `FannoDuctResult::exit`                         | -                                                | FannoMachState                        |
 | `FannoDuctResult::Pt_exit`                      | -                                                | Pa                                    |
 | `FANNO_MACH_REL_TOL`                            | -                                                | -                                     |
+| `FannoChannelFlow::G`                           | -                                                | kg/(m^2*s)                            |
+| `FannoChannelFlow::choked`                      | -                                                | -                                     |
+| `FannoChannelFlow::M_in`                        | -                                                | -                                     |
+| `FannoChannelFlow::M_exit`                      | -                                                | -                                     |
+| `FannoChannelFlow::dG_dPt0`                     | -                                                | kg/(m^2*s*Pa)                         |
+| `FannoChannelFlow::dG_dTt0`                     | -                                                | kg/(m^2*s*K)                          |
+| `FannoChannelFlow::dG_dP_target`                | -                                                | kg/(m^2*s*Pa)                         |
+| `FANNO_FLOW_DRIVE_FLOOR`                        | -                                                | Pa                                    |
 | `solve_A_eff_from_mdot`                         | -                                                | -                                     |
 | `solve_P_back_from_mdot`                        | -                                                | -                                     |
 | `solve_P0_from_mdot`                            | -                                                | -                                     |

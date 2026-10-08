@@ -25,75 +25,13 @@ namespace {
 
 constexpr double kL = 1.0;
 constexpr double kD = 0.10;
-constexpr double kRough = 1e-5;
-constexpr double kT = 1700.0;
-constexpr double kPt = 130000.0;
-
-double dP_at(double m_dot, const std::vector<double>& Y) {
-    const auto res = solver::channel_compressible_residuals_and_jacobian(
-        m_dot, kPt, kT, Y, 101325.0, kL, kD, kRough, "haaland", 1.0);
-    return res.dP_calc;
-}
 
 }  // namespace
 
-// The Fanno march truncates at a step boundary when it chokes. L_choke is
-// interpolated within the breaking step; if the outlet state is not, the
-// reported drop snaps to the march grid and the gradient develops a sawtooth
-// -- measured at 22% peak-to-peak before the fix.
-TEST(FannoChokeSmoothnessTest, ChokedBranchGradientHasNoMarchGridSawtooth) {
-    const std::vector<double> Y = mole_to_mass(dry_air());
-
-    // Inside the choked band for this duct. Re-derived: choke onset for this
-    // configuration moved from m_dot ~ 1.54 to 0.9142 once the march gained
-    // the Fanno compressibility group (#362). The old band sat in a region
-    // that, with a correct gradient, does not choke at all -- the previous
-    // numbers were measuring a march that never reached M = 1.
-    const double m_lo = 0.920;
-    const double step = 5e-4;
-    const int n = 30;
-
-    std::vector<double> slopes;
-    double prev = dP_at(m_lo, Y);
-    for (int i = 1; i <= n; ++i) {
-        const double m = m_lo + i * step;
-        const double cur = dP_at(m, Y);
-        slopes.push_back((cur - prev) / step);
-        prev = cur;
-    }
-
-    // Consecutive slopes must differ by only the smooth physical trend. The
-    // grid staircase alternated by ~22%; require well under that.
-    double worst = 0.0;
-    for (std::size_t i = 1; i < slopes.size(); ++i) {
-        const double rel = std::abs(slopes[i] - slopes[i - 1]) /
-                           std::max(std::abs(slopes[i - 1]), 1.0);
-        worst = std::max(worst, rel);
-    }
-    EXPECT_LT(worst, 0.05) << "gradient sawtooth in the choked band: "
-                           << worst * 100.0 << "% between consecutive samples";
-}
-
-// The drop must not fall as m_dot rises. It used to: the truncated drop covers
-// the marched part only, so it collapses as choking moves upstream, and with a
-// weak barrier the composite went non-monotone -- which is precisely the
-// spurious-root condition the barrier exists to prevent.
-TEST(FannoChokeSmoothnessTest, DropIsMonotoneThroughChokeOnset) {
-    const std::vector<double> Y = mole_to_mass(dry_air());
-
-    // Spans choke onset at 0.9142, stopping below the inlet sonic limit where
-    // no static state exists and the drop reverts to the previous behaviour.
-    double prev = dP_at(0.850, Y);
-    for (double m = 0.852; m <= 0.960; m += 0.002) {
-        const double cur = dP_at(m, Y);
-        EXPECT_GE(cur, prev) << "drop decreased with rising m_dot at m = " << m;
-        prev = cur;
-    }
-}
-
-// When the march chokes, the reported outlet has to sit on the same station as
-// L_choke. If it lags at the overshooting step boundary, refining the march
-// moves the reported outlet -- the signature of grid snapping.
+// The network's compressible channel no longer differences this march (it
+// uses the Mach-quadrature Fanno flow, fanno_mach.h, #481); the march remains
+// the profile API and an independent reference, so its choke station must
+// stay grid independent.
 TEST(FannoChokeSmoothnessTest, ChokedOutletIsGridIndependent) {
     const std::vector<double> X = dry_air();
     const double T = 1700.0;

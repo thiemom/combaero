@@ -19,8 +19,6 @@ adiabatic_T_equilibrium_and_jacobians_from_streams = (
     _core.adiabatic_T_equilibrium_and_jacobians_from_streams
 )
 area_change_residuals_and_jacobian = _core.area_change_residuals_and_jacobian
-channel_compressible_mdot_and_jacobian = _core.channel_compressible_mdot_and_jacobian
-channel_compressible_residuals_and_jacobian = _core.channel_compressible_residuals_and_jacobian
 channel_residuals_and_jacobian = _core.channel_residuals_and_jacobian
 combustor_residuals_and_jacobians = _core.combustor_residuals_and_jacobians
 conical_area_change_residuals_and_jacobian = _core.conical_area_change_residuals_and_jacobian
@@ -65,8 +63,6 @@ __all__ = [
     "adiabatic_T_equilibrium_and_jacobians",
     "adiabatic_T_equilibrium_and_jacobians_from_streams",
     "area_change_residuals_and_jacobian",
-    "channel_compressible_mdot_and_jacobian",
-    "channel_compressible_residuals_and_jacobian",
     "channel_residuals_and_jacobian",
     "combustor_residuals_and_jacobians",
     "conical_area_change_residuals_and_jacobian",
