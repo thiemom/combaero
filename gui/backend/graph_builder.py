@@ -7,6 +7,7 @@ from combaero.network import (
     ConstantFractionLoss,
     ConstantHeadLoss,
     ConvectiveSurface,
+    EffusionLiner,
     EffusionPlateElement,
     FlowNetwork,
     ImpingementArray,
@@ -40,6 +41,7 @@ from .schemas import (
     ConstantFractionLossData,
     ConstantHeadLossData,
     DiscreteLossData,
+    EffusionLinerData,
     EffusionPlateData,
     EjectorData,
     ImpingementArrayData,
@@ -677,7 +679,13 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     # Junction elements with named handle ports (common/straight/branch for
     # the tee; primary/secondary/outlet for the ejector). Both get the same
     # per-port MomentumChamberNode auto-insertion below.
-    junction_ids = {node.id for node in element_nodes if node.type in ("mpce_tee", "ejector")}
+    junction_ids = {
+        node.id for node in element_nodes if node.type in ("mpce_tee", "ejector", "effusion_liner")
+    }
+    # An effusion liner's ports are a reservoir, a dump and a discharge that
+    # N panels merge into: plenum semantics. A momentum chamber there would
+    # refuse the N inflows and mis-state the reservoir (#471).
+    liner_ids = {node.id for node in element_nodes if node.type == "effusion_liner"}
 
     # 1b. Create implicit junction nodes for element -> element visual links.
     # For direct element<->element connections we auto-insert a MomentumChamberNode.
@@ -712,7 +720,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if port and (edge.source, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.source}_{port}"
                 if jid not in nodes_map:
-                    jn = MomentumChamberNode(jid)
+                    jn = PlenumNode(jid) if edge.source in liner_ids else MomentumChamberNode(jid)
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.source, port)] = jid
@@ -724,7 +732,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if port and (edge.target, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.target}_{port}"
                 if jid not in nodes_map:
-                    jn = MomentumChamberNode(jid)
+                    jn = PlenumNode(jid) if edge.target in liner_ids else MomentumChamberNode(jid)
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.target, port)] = jid
@@ -893,6 +901,45 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             _seed_ejector_warmstart(
                 net, _ejector, (_primary, _secondary, _outlet), schema.edges, nodes_map
             )
+            continue
+
+        # Effusion liner (#471): three named ports, expanded into N stations.
+        if elem_type == "effusion_liner":
+            _ld = EffusionLinerData(**elem_data)
+            _lports = ("coolantin", "coolantout", "discharge")
+            _ends = [
+                _find_junction_port(
+                    schema.edges,
+                    elem_id,
+                    port,
+                    nodes_map,
+                    tee_port_node_map,
+                    _wall_edge_remap,
+                    all_ports=_lports,
+                )
+                for port in _lports
+            ]
+            liner = EffusionLiner(
+                elem_id,
+                n_segments=_ld.n_segments,
+                length=_ld.length,
+                width=_ld.width,
+                duct_height=_ld.duct_height,
+                hole_diameter=_ld.hole_diameter,
+                wall_thickness=_ld.wall_thickness,
+                pitch_x=_ld.pitch_x,
+                pitch_y=_ld.pitch_y,
+                angle_deg=_ld.angle_deg,
+                entry_K=_ld.entry_K,
+                roughness=_ld.roughness,
+                wall_conductivity=_ld.wall_conductivity,
+                gas_film=_ld.gas_film,
+                gas_augmentation=_ld.gas_augmentation,
+                turbulence_intensity=_ld.turbulence_intensity,
+                gas_heat_flux=_ld.gas_heat_flux,
+            )
+            liner.add_to(net, _ends[0], _ends[1], _ends[2])
+            gui_arrays[elem_id] = liner
             continue
 
         source_id = None

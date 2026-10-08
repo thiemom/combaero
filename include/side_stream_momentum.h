@@ -127,4 +127,34 @@ struct JetImpulse {
 JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
                        const std::vector<double>& X);
 
+// ---------------------------------------------------------------
+// Supply-side crossflow ratio of a duct-fed hole (#471)
+// ---------------------------------------------------------------
+//
+// McGreehan & Schotsch (1988) correlate a hole fed from a duct on U1/Vi:
+//   U1 : the duct's tangential (approach) velocity at the hole,
+//        (m_a + m_b) / (2 rho A) -- the mean of the flows arriving at and
+//        leaving the hole's station, the same mean the bleed station uses;
+//   Vi : the IDEAL jet velocity built from the duct's STATIC state (their
+//        caution, extraction item 22: "not the total pressure based on the
+//        tangential velocity") -- the isentropic velocity from (P, T) to the
+//        discharge static P_down, jet_impulse's w with the static state as
+//        its stagnation.
+// Vi is held above VI_FLOOR (sqrt(Vi^2 + floor^2)) so a vanishing drive gives
+// a large, finite ratio rather than a division by zero; the correlation's own
+// regularisation handles U1/Vi -> 0.
+constexpr double CROSSFLOW_VI_FLOOR = 0.1;  // [m/s]
+
+struct CrossflowRatio {
+  double U1_over_Vi = 0.0;
+  double U1 = 0.0, Vi = 0.0;  // [m/s]
+  double d_dm_a = 0.0, d_dm_b = 0.0;   // [1/(kg/s)]
+  double d_dP = 0.0, d_dT = 0.0;       // duct station static P [1/Pa], T [1/K]
+  double d_dP_down = 0.0;              // discharge static [1/Pa]
+};
+
+CrossflowRatio crossflow_velocity_ratio(double m_a, double m_b, double P,
+                                        double T, const std::vector<double>& X,
+                                        double P_down, double area);
+
 }  // namespace combaero

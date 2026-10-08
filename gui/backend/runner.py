@@ -147,6 +147,8 @@ def _build_result_objects(
         summary = arr.summarize(elem_diags)
         m_total = summary.pop("m_dot")
         element_results[arr_id] = ElementResult(m_dot=m_total, success=success, **summary)
+        if not hasattr(arr, "plate_id"):
+            continue  # an effusion liner owns its walls: no wall edge to aggregate
         plates = {arr.plate_id(i) for i in range(1, int(arr.n_rows) + 1)}
         rows: dict[str, list[dict]] = {}
         for wid, wall in net.walls.items():

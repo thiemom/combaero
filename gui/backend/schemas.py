@@ -285,6 +285,40 @@ class OrificeData(BaseModel):
         return data
 
 
+class EffusionLinerData(BaseModel):
+    """Effusion liner (#471): a backside coolant duct whose wall bleeds
+    through effusion holes into the gas. Expanded into N stations: a Bassett
+    bleed plus a duct-fed McGreehan-Schotsch panel each.
+
+    Defaults: Andrews et al.'s plate C holes and pitch (3.27 mm, 6.3 mm wall,
+    15.24 mm), a hole t/d inside Rohde's crossflow-tested 0.51-4, over a 30 mm
+    backside duct. The crossflow ratio U1/Vi is set mainly by the duct's own
+    pressure drop against the holes' drive (roughly sqrt(dp_duct/dp_hole)),
+    not by the duct size: a pressure-driven duct carries more flow when made
+    bigger. With 200 Pa along the duct and ~3.8 kPa across the holes it peaks
+    at 0.27, inside the Rohde-scored band.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    n_segments: int = Field(default=4, ge=1)
+    length: float = Field(default=0.152, gt=0.0)
+    width: float = Field(default=0.152, gt=0.0)
+    duct_height: float = Field(default=0.03, gt=0.0)
+    hole_diameter: float = Field(default=3.27e-3, gt=0.0)
+    wall_thickness: float = Field(default=6.3e-3, gt=0.0)
+    pitch_x: float = Field(default=15.24e-3, gt=0.0)
+    pitch_y: float = Field(default=15.24e-3, gt=0.0)
+    angle_deg: float = Field(default=90.0, gt=0.0, le=90.0)
+    entry_K: float = Field(default=0.5, ge=0.0)
+    roughness: float = Field(default=0.0, ge=0.0)
+    wall_conductivity: float = Field(default=20.0, gt=0.0)
+    gas_film: Literal["none", "baldauf_sellers"] = "none"
+    gas_augmentation: float = Field(default=1.0, gt=0.0)
+    turbulence_intensity: float = Field(default=0.05, gt=0.0)
+    gas_heat_flux: float = 0.0
+    label: str | None = None
+
+
 class EffusionPlateData(BaseModel):
     """Effusion / film plate, plenum-fed (#471): it owns its wall.
 

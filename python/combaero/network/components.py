@@ -2515,7 +2515,10 @@ class OrificeElement(NetworkElement):
         return 1.0
 
     def _effective_Cd(
-        self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None = None,
     ) -> float:
         """Return effective Cd: from correlation or user-supplied fixed value."""
         if not self.use_correlation or self._orifice_geom is None:
@@ -2571,36 +2574,19 @@ class OrificeElement(NetworkElement):
                 + 91.71 * math.pow(b, 2.5) * math.pow(max(flow_state.Re_D, 1.0), -0.75)
             )
             return float(cd)
-        elif self.correlation in (
-            "IdelchikThick",
-            "IdelchikBeveled",
-            "IdelchikRounded",
-            "Lichtarowicz",
-        ):
-            # Idelchik's wall-orifice family. These take a hole in a wall,
-            # not a plate in a pipe, so they are fed DischargeHoleGeometry and
-            # the pipe diameter plays no part -- which is the whole reason the
-            # old ThickPlate/RoundedEntry arms were wrong: they multiplied an
-            # ISO 5167 metering Cd by a correction factor. Lichtarowicz is
-            # the same kind of hole, long and plenum-fed.
+        elif self.correlation in _DISCHARGE_SELECTORS:
+            # The discharge-hole family: a hole in a wall, not a plate in a
+            # pipe, so DischargeHoleGeometry and no pipe diameter -- the
+            # reason the old ThickPlate/RoundedEntry arms were wrong: they
+            # multiplied an ISO 5167 metering Cd by a correction factor. The
+            # supply-side crossflow U1/Vi (0 for a plenum-fed hole) only moves
+            # McGreehan-Schotsch; the others have no crossflow term.
+            u1_vi, _ = self._supply_crossflow(state_in, state_out, flows)
             return float(
                 cb.discharge_cd(
                     _DISCHARGE_SELECTORS[self.correlation],
                     self._discharge_hole(),
-                    cb.DischargeHoleState(Re=Re_hole),
-                )
-            )
-        elif self.correlation == "McGreehanSchotsch":
-            hole = cb.DischargeHoleGeometry(
-                d=self._orifice_geom.d,
-                L=self.plate_thickness,
-                r=self.edge_radius,
-            )
-            return float(
-                cb.discharge_cd(
-                    cb.DischargeCdCorrelation.McGreehanSchotsch1988,
-                    hole,
-                    cb.DischargeHoleState(Re=Re_hole),
+                    cb.DischargeHoleState(Re=Re_hole, U1_over_Vi=u1_vi),
                 )
             )
         else:
@@ -2667,25 +2653,48 @@ class OrificeElement(NetworkElement):
                     f"{self.plate_thickness / self._orifice_geom.d:.3g}. {exc}"
                 ) from exc
 
-    def _dCd_dmdot(self, state_in: "NetworkMixtureState") -> float:
-        """d(Cd)/d(m_dot) through the hole Reynolds number, analytic.
+    def _supply_crossflow(
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None,
+    ) -> tuple[float, dict[str, float]]:
+        """McGreehan-Schotsch's supply-side U1/Vi and d(U1/Vi)/d(name).
+
+        0 for a plain orifice: a plenum feeds it. A duct-fed hole overrides
+        this (EffusionPlateElement with crossflow segments).
+        """
+        return 0.0, {}
+
+    def _dCd_dnames(
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float]:
+        """d(Cd)/d(unknown), keyed by name, analytic.
 
         Only the discharge-hole family carries it (C++'s
-        discharge_cd_and_derivatives); 'fixed' has none, and the normed
-        metering correlations keep their documented gap. Re_hole is linear in
-        m_dot, so dRe/dm = Re/m.
+        discharge_cd_and_derivatives): through the hole Reynolds number
+        (linear in m_dot, so dRe/dm = Re/m) and, for a duct-fed hole, through
+        U1/Vi. 'fixed' has none, and the normed metering correlations keep
+        their documented gap.
         """
         selector = _DISCHARGE_SELECTORS.get(self.correlation)
-        if selector is None or self._orifice_geom is None:
-            return 0.0
-        m = float(state_in.m_dot)
-        if abs(m) <= 1e-12:
-            return 0.0
+        if selector is None or self._orifice_geom is None or not self.use_correlation:
+            return {}
+        u1_vi, du = self._supply_crossflow(state_in, state_out, flows)
         Re = self._hole_reynolds(state_in)
-        _, dCd_dRe, _ = cb.discharge_cd_and_derivatives(
-            selector, self._discharge_hole(), cb.DischargeHoleState(Re=Re)
+        _, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
+            selector, self._discharge_hole(), cb.DischargeHoleState(Re=Re, U1_over_Vi=u1_vi)
         )
-        return float(dCd_dRe) * Re / abs(m) * (1.0 if m > 0 else -1.0)
+        out: dict[str, float] = {}
+        m = float(state_in.m_dot)
+        if abs(m) > 1e-12:
+            out[f"{self.id}.m_dot"] = float(dCd_dRe) * Re / abs(m) * (1.0 if m > 0 else -1.0)
+        for name, d in du.items():
+            out[name] = out.get(name, 0.0) + float(dCd_dU) * d
+        return out
 
     def _cd_in_range(self, state_in: "NetworkMixtureState") -> bool:
         """Is the discharge-hole Cd inside its source's Re and l/d range?
@@ -2706,11 +2715,14 @@ class OrificeElement(NetworkElement):
         )
 
     def residuals(
-        self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None = None,
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
 
         m_dot = state_in.m_dot
-        effective_cd = self._effective_Cd(state_in, state_out)
+        effective_cd = self._effective_Cd(state_in, state_out, flows)
 
         if self.regime == "compressible":
             res_cpp = _solver_tools.orifice_compressible_residuals_and_jacobian(
@@ -2746,18 +2758,10 @@ class OrificeElement(NetworkElement):
 
         res = [m_dot - res_cpp.m_dot_calc]
 
-        # m_calc is proportional to Cd, and a discharge-hole Cd depends on the
-        # flow through Re_hole: d(m_calc)/d(m_dot) = (m_calc/Cd) dCd/dm.
-        dmcalc_dm = (
-            res_cpp.m_dot_calc / effective_cd * self._dCd_dmdot(state_in)
-            if effective_cd > 0.0
-            else 0.0
-        )
-
         # Assemble Jacobian with respect to all node and element unknowns
         jac = {
             0: {
-                f"{self.id}.m_dot": 1.0 - dmcalc_dm,
+                f"{self.id}.m_dot": 1.0,
                 f"{self.from_node}.Pt": -res_cpp.d_mdot_dP_total_up,
                 f"{self.from_node}.T": -res_cpp.d_mdot_dT_up,
             }
@@ -2777,13 +2781,24 @@ class OrificeElement(NetworkElement):
         for i, val in enumerate(res_cpp.d_mdot_dY_up):
             jac[0][f"{self.from_node}.Y[{i}]"] = -val
 
+        # m_calc is proportional to Cd, and a discharge-hole Cd moves with the
+        # flow (Re_hole) and, duct-fed, with the crossflow (U1/Vi):
+        # d(m_calc)/d(x) += (m_calc/Cd) dCd/dx.
+        if effective_cd > 0.0:
+            scale = res_cpp.m_dot_calc / effective_cd
+            for name, dcd in self._dCd_dnames(state_in, state_out, flows).items():
+                jac[0][name] = jac[0].get(name, 0.0) - scale * dcd
+
         return res, jac
 
     def n_equations(self) -> int:
         return 1
 
     def diagnostics(
-        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
     ) -> dict[str, float]:
         if state_in.P <= 0 or state_in.T <= 0:
             return {}
@@ -2826,7 +2841,7 @@ class OrificeElement(NetworkElement):
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
             "mach_throat": float(mach_throat),
-            "Cd": float(self._effective_Cd(state_in, state_out)),
+            "Cd": float(self._effective_Cd(state_in, state_out, flows)),
             "is_correlation": float(self.use_correlation),
             "Cd_in_range": float(self._cd_in_range(state_in)),
         }
@@ -2991,9 +3006,23 @@ class EffusionPlateElement(OrificeElement):
         gas_augmentation: float = 1.0,
         turbulence_intensity: float = 0.05,
         gas_heat_flux: float = 0.0,
+        crossflow_segments: tuple[str | None, str | None] | None = None,
+        crossflow_area: float | None = None,
     ) -> None:
         if hole_diameter <= 0.0:
             raise ValueError("EffusionPlateElement: hole_diameter must be positive")
+        if crossflow_segments is not None and not (crossflow_area and crossflow_area > 0.0):
+            raise ValueError(
+                "EffusionPlateElement: a crossflow-fed panel needs the backside "
+                "duct's crossflow_area"
+            )
+        # DUCT-FED (#471): the panel's supply node is a station of a backside
+        # duct; crossflow_segments = (arriving, leaving) segment ids there. The
+        # duct's mean velocity at the station, over the static-referenced ideal
+        # jet velocity, is McGreehan-Schotsch's U1/Vi.
+        self.crossflow_segments = crossflow_segments
+        self.crossflow_area = crossflow_area
+        self._xf_elems: list[tuple[NetworkElement, str]] = []
         if wall_conductivity <= 0.0:
             raise ValueError("EffusionPlateElement: wall_conductivity must be positive")
         if gas_augmentation <= 0.0:
@@ -3125,7 +3154,45 @@ class EffusionPlateElement(OrificeElement):
             if self.from_node in graph.nodes
             else []
         )
-        self._coolant_crossflow_ignored = len(through) >= 2
+        self._coolant_crossflow_ignored = len(through) >= 2 and self.crossflow_segments is None
+        self._xf_elems = []
+        if self.crossflow_segments is not None:
+            for eid in self.crossflow_segments:
+                if eid is not None:
+                    self._xf_elems.append((graph.elements[eid], eid))
+
+    def network_flow_inputs(self) -> list[tuple[str, str]]:
+        """The backside segments' flows at this panel's supply station."""
+        return [(eid, self.from_node) for _, eid in self._xf_elems]
+
+    def _supply_crossflow(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None,
+    ) -> tuple[float, dict[str, float]]:
+        if self.crossflow_segments is None:
+            return 0.0, {}
+        flows = flows or {}
+        prev_id, next_id = self.crossflow_segments
+        m_a = flows.get(prev_id, 0.0) if prev_id else 0.0
+        m_b = flows.get(next_id, 0.0) if next_id else 0.0
+        r = cb.crossflow_velocity_ratio(
+            m_a, m_b, state_in.P, state_in.T, state_in.X, state_out.P, self.crossflow_area
+        )
+        d: dict[str, float] = {}
+        for elem, eid in self._xf_elems:
+            coeff_m = r.d_dm_a if eid == prev_id else r.d_dm_b
+            names = elem.unknowns()
+            for local, c in elem.flow_jac_at_node(self.from_node, list(range(len(names)))).items():
+                d[names[local]] = d.get(names[local], 0.0) + coeff_m * c
+        for key, v in (
+            (f"{self.from_node}.P", r.d_dP),
+            (f"{self.from_node}.T", r.d_dT),
+            (f"{self.to_node}.P", r.d_dP_down),
+        ):
+            d[key] = d.get(key, 0.0) + v
+        return float(r.U1_over_Vi), d
 
     def validate(self) -> None:
         super().validate()
@@ -3142,6 +3209,12 @@ class EffusionPlateElement(OrificeElement):
             raise ValueError(
                 f"EffusionPlateElement {self.id!r}: porosity is "
                 f"{self.porosity:.3f}; the holes do not fit in the panel."
+            )
+        if self.crossflow_segments is not None and self.correlation != "McGreehanSchotsch":
+            raise ValueError(
+                f"EffusionPlateElement {self.id!r}: a duct-fed panel needs the "
+                "supply-side crossflow term, which only 'McGreehanSchotsch' has "
+                f"({self.correlation!r} would silently treat the duct as a plenum)."
             )
 
     def internal_heat_transfer(self, state_in: NetworkMixtureState) -> dict[str, float]:
@@ -3371,6 +3444,10 @@ class EffusionPlateElement(OrificeElement):
             "h_internal_plate_area": float(h_i),
             "wall_conductivity": float(self.wall_conductivity),
             "coolant_crossflow_ignored": float(getattr(self, "_coolant_crossflow_ignored", False)),
+            # Duct-fed: the Cd sees the crossflow, but the coolant-side heat
+            # transfer is still Andrews' still-plenum correlation (provisional
+            # until a crossflow-supply source; #471 PR4).
+            "coolant_ht_plenum_assumed": float(self.crossflow_segments is not None),
         }
         gas = _chamber_gas_side(getattr(self, "_discharge_node", None), state_out)
         if gas is None:
@@ -3433,11 +3510,26 @@ class EffusionPlateElement(OrificeElement):
         return out
 
     def diagnostics(
-        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        base = super().diagnostics(state_in, state_out)
+        base = super().diagnostics(state_in, state_out, flows)
         m_dot = abs(state_in.m_dot)
         dP_drive = state_in.Pt - state_out.P
+        if self.crossflow_segments is not None:
+            u1_vi, _ = self._supply_crossflow(state_in, state_out, flows)
+            # Rohde-scored bounds of McGreehan-Schotsch's crossflow term
+            # (orifice_discharge_coefficient.md): about +8% while U1/Vi < 0.2,
+            # degrading badly beyond 0.35, worst for sharp edges.
+            base.update(
+                {
+                    "U1_over_Vi": float(u1_vi),
+                    "crossflow_cd_beyond_8pct": float(u1_vi > 0.2),
+                    "crossflow_cd_degraded": float(u1_vi > 0.35),
+                }
+            )
         out = {
             "n_holes": float(self.n_holes),
             "hole_count_exact": float(self.hole_count_exact),

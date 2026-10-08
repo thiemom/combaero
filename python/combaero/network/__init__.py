@@ -42,6 +42,7 @@ from .combustion import (
 )
 from .graph import FlowNetwork
 from .impingement_array import ImpingementArray
+from .effusion_liner import EffusionLiner
 from .pressure_loss import (
     ConstantFractionLoss,
     ConstantHeadLoss,
@@ -68,6 +69,7 @@ __all__: list[str] = [
     "ImpingementCrossflowElement",
     "ImpingementPlateElement",
     "ImpingementArray",
+    "EffusionLiner",
     "LosslessConnectionElement",
     "DiameterDischargeCoefficientConnectionElement",
     "PressureLossElement",

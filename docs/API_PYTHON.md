@@ -373,6 +373,41 @@ diag["T_wall_hot"], diag["T_wall_cold"], diag["q_wall"], diag["eta_overall"]
 - With `wall_conductivity` large the wall reduces exactly to
   `overall_effectiveness` below.
 
+##### Duct-fed: the effusion liner (#471)
+
+A liner's coolant usually runs along a backside duct and bleeds through the
+wall, so the holes see a SUPPLY-side crossflow. `EffusionLiner` builds that
+configuration from N stations:
+
+```python
+from combaero.network import EffusionLiner
+
+liner = EffusionLiner("ln", n_segments=4, length=0.152, width=0.152, duct_height=0.03,
+                      hole_diameter=3.27e-3, wall_thickness=6.3e-3,
+                      pitch_x=15.24e-3, pitch_y=15.24e-3)
+liner.add_to(net, coolant_in="cin", coolant_out="cout", gas="liner_chamber")
+liner.summarize(res["__element_diag__"])   # bleed, U1/Vi, Cd, P_backside, T_wall per station
+```
+
+- **Stations are Bassett bleeds** (`CrossflowSegmentElement`, kappa 0.75):
+  the backside static pressure rises along the duct as it slows, so the
+  downstream panels see more drive.
+- **Each panel is duct-fed**: `EffusionPlateElement(crossflow_segments=(prev,
+  next), crossflow_area=A)` takes McGreehan-Schotsch's supply-side
+  `U1/Vi`, with `U1` the duct's mean velocity at the station and `Vi` the
+  isentropic jet velocity from the station's STATIC state (C++
+  `crossflow_velocity_ratio`). Only `McGreehanSchotsch` has a crossflow term,
+  so a duct-fed panel refuses the others.
+- **What sets U1/Vi** is mainly the duct's own pressure drop against the
+  holes' drive, roughly `sqrt(dp_duct/dp_hole)`, not the duct size: a
+  pressure-driven duct carries more flow when made bigger. Flags:
+  `crossflow_cd_beyond_8pct` (> 0.2) and `crossflow_cd_degraded` (> 0.35),
+  the Rohde-scored bounds.
+- **Flagged, provisional:** the coolant-side heat transfer is still Andrews'
+  plenum-fed correlation (`coolant_ht_plenum_assumed`), and the stations
+  bleed through holes far smaller than the duct, beyond Bassett's measured
+  psi = 1-3 (`station_psi_beyond_bassett`).
+
 ##### Overall effectiveness, as an output
 
 ```python

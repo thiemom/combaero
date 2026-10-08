@@ -695,6 +695,14 @@ StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
 StationHalfDrop channel_entry_drop(double m, double P, double T,
                                    const std::vector<double>& X, double area, double K_in);
 
+// Supply-side crossflow ratio of a duct-fed hole (McGreehan-Schotsch U1/Vi):
+// U1 = (m_a + m_b)/(2 rho A) at the station, Vi = isentropic velocity from
+// the duct's STATIC (P, T) to P_down (floored at CROSSFLOW_VI_FLOOR).
+struct CrossflowRatio { double U1_over_Vi, U1, Vi, d_dm_a, d_dm_b, d_dP, d_dT, d_dP_down; };
+CrossflowRatio crossflow_velocity_ratio(double m_a, double m_b, double P, double T,
+                                        const std::vector<double>& X, double P_down,
+                                        double area);
+
 // Merge chamber (#471): the main-inlet face from the impulse balance
 //   P_f + m_main^2 R T_main / (P_f A^2) = P + m_out^2/(rho A^2) - J/A
 // (subsonic root, closed form); Pt_face = P0_from_static(P_f, T_main, M_f),

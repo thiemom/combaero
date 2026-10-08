@@ -283,6 +283,17 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "effusion_liner")}
+				draggable
+				title="Backside coolant duct whose wall bleeds through effusion holes into the gas. Ports: coolant in, coolant out, discharge (to a chamber's s handle)."
+			>
+				<Grip size={18} className="text-orange-500" />
+				<span>Effusion Liner</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "area_change")}
 				draggable
 			>
