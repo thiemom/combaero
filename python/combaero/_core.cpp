@@ -655,6 +655,7 @@ PYBIND11_MODULE(_core, m) {
 
   m.attr("STATION_KAPPA_MERGE_NORMAL") = combaero::STATION_KAPPA_MERGE_NORMAL;
   m.attr("STATION_KAPPA_BLEED_BASSETT") = combaero::STATION_KAPPA_BLEED_BASSETT;
+  m.attr("WALL_HTC_KNEE") = combaero::WALL_HTC_KNEE;
   py::class_<combaero::StationHalfDrop>(m, "StationHalfDrop")
       .def_readonly("dP", &combaero::StationHalfDrop::dP)
       .def_readonly("d_dm_a", &combaero::StationHalfDrop::d_dm_a)

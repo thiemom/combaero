@@ -733,6 +733,11 @@ WallCouplingResult wall_coupling_and_jacobian(
     double t_over_k,   // wall_thickness / wall_conductivity [m²·K/W]
     double A = 1.0     // contact area [m²]
 );
+// Multi-layer overload: t_over_k_layers, A, R_fouling. h is used as given
+// at or above WALL_HTC_KNEE = 1e-2 W/(m^2 K); below it the C1, strictly
+// positive floor knee^2/(2 knee - h), so a correlation driven to h <= 0 at a
+// solver iterate still gives a finite wall. dQ/dh is the slope of the
+// floored value.
 ```
 
 ### Data Structures

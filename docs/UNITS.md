@@ -652,6 +652,7 @@ All functions use consistent units to avoid conversion errors.
 | `CrossflowRatio::d_dP_down`                     | 1/Pa                                                                                                                           | 1/Pa                       |
 | `STATION_KAPPA_MERGE_NORMAL`                    | -                                                                                                                              | -                          |
 | `STATION_KAPPA_BLEED_BASSETT`                   | -                                                                                                                              | -                          |
+| `WALL_HTC_KNEE`                                 | -                                                                                                                              | W/(m^2*K)                  |
 | `chamber_merge_face_state`                      | m_main: kg/s, T_main: K, X_main: -, m_out: kg/s, P: Pa, T: K, X: -, side_momentum: N, area: m^2                                | MergeFaceState             |
 | `MergeFaceState::P_face`                        | Pa                                                                                                                             | Pa                         |
 | `MergeFaceState::Pt_face`                       | Pa                                                                                                                             | Pa                         |

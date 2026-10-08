@@ -943,28 +943,27 @@ class NetworkSolver:
         updated every Newton iteration inside ``_propagate_states``.
         """
 
-        def _endpoint_to_node_id(endpoint_id: str) -> str | None:
+        def _endpoint_to_node_ids(endpoint_id: str) -> list[str] | None:
+            # Either end of an element can receive the heat: the one its
+            # flow goes into, which reverses with the flow (#481).
             if endpoint_id in self.network.elements:
-                return self.network.elements[endpoint_id].to_node
+                e = self.network.elements[endpoint_id]
+                return [e.to_node, e.from_node]
             if endpoint_id in self.network.nodes:
-                return endpoint_id
+                return [endpoint_id]
             return None
 
         # Build a mapping: node_id -> set of wall IDs that affect it
         affected_nodes: dict[str, set[str]] = {}
         for wall in self.network.walls.values():
-            node_a = _endpoint_to_node_id(wall.element_a)
-            node_b = _endpoint_to_node_id(wall.element_b)
+            nodes_a = _endpoint_to_node_ids(wall.element_a)
+            nodes_b = _endpoint_to_node_ids(wall.element_b)
 
-            if node_a is None or node_b is None:
+            if nodes_a is None or nodes_b is None:
                 continue
 
-            # Skip walls where both sides feed the same node (net Q = 0)
-            if node_a == node_b:
-                continue
-
-            affected_nodes.setdefault(node_a, set()).add(wall.id)
-            affected_nodes.setdefault(node_b, set()).add(wall.id)
+            for n in nodes_a + nodes_b:
+                affected_nodes.setdefault(n, set()).add(wall.id)
 
         for nid in affected_nodes:
             node = self.network.nodes[nid]
@@ -1007,9 +1006,10 @@ class NetworkSolver:
             if obj_a is None or obj_b is None:
                 continue
 
-            # Find the actual target node for side A and side B
-            target_node_a = obj_a.id if endpoint_a_is_node else obj_a.to_node
-            target_node_b = obj_b.id if endpoint_b_is_node else obj_b.to_node
+            # The node each side's heat goes into, and the node feeding it,
+            # by the sign of that side's flow (#481).
+            feed_a, target_node_a = self._flow_ends(obj_a, x)
+            feed_b, target_node_b = self._flow_ends(obj_b, x)
 
             # This wall does not affect the current node
             if nid not in (target_node_a, target_node_b):
@@ -1023,19 +1023,8 @@ class NetworkSolver:
             is_side_a = target_node_a == nid
 
             # Get states for both sides (previous-iteration fallback for back-edges)
-            node_feeding_a = (
-                self.network.nodes[obj_a.id]
-                if endpoint_a_is_node
-                else self.network.nodes[obj_a.from_node]
-            )
-            node_feeding_b = (
-                self.network.nodes[obj_b.id]
-                if endpoint_b_is_node
-                else self.network.nodes[obj_b.from_node]
-            )
-
-            state_a = self._get_node_state_with_prev(node_feeding_a, x)
-            state_b = self._get_node_state_with_prev(node_feeding_b, x)
+            state_a = self._get_node_state_with_prev(self.network.nodes[feed_a], x)
+            state_b = self._get_node_state_with_prev(self.network.nodes[feed_b], x)
 
             # Set mass flow rates from solver vector for elements
             if not endpoint_a_is_node:
@@ -1092,26 +1081,126 @@ class NetworkSolver:
 
         return wall_contributions
 
+    # Propagation passes per evaluation when a state is read ahead of the
+    # order (wall back-edges, recirculation): enough for the contraction seen
+    # on wall-coupled networks (x1000 per pass), bounded for safety.
+    _MAX_PROPAGATION_PASSES = 50
+
+    def _two_port_mdot_indices(self) -> dict[str, int]:
+        """element id -> index of its own m_dot, for plain 2-port elements
+        (whose flow may reverse); multi-port elements keep their declared
+        directions, which their own models enforce."""
+        cache = getattr(self, "_two_port_cache", None)
+        if cache is not None and cache[0] is self.unknown_names:
+            return cache[1]
+        out: dict[str, int] = {}
+        for eid, e in self.network.elements.items():
+            ind = self._unknown_indices.get(eid, [])
+            if (
+                len(ind) == 1
+                and self.unknown_names[ind[0]] == f"{eid}.m_dot"
+                and e.all_source_nodes() == [e.from_node]
+                and e.all_sink_nodes() == [e.to_node]
+            ):
+                out[eid] = ind[0]
+        self._two_port_cache = (self.unknown_names, out)
+        return out
+
+    def _reversed_elements(self, x: np.ndarray) -> set[str]:
+        return {eid for eid, i in self._two_port_mdot_indices().items() if x[i] < 0.0}
+
+    def _flow_ends(self, obj: Any, x: np.ndarray) -> tuple[str, str]:
+        """(node feeding the flow, node it delivers into) of a wall endpoint:
+        a node is both; an element by the sign of its flow (#481)."""
+        if obj.id in self.network.nodes:
+            return obj.id, obj.id
+        i = self._two_port_mdot_indices().get(obj.id)
+        if i is not None and x[i] < 0.0:
+            return obj.to_node, obj.from_node
+        return obj.from_node, obj.to_node
+
+    def _signed_order(self, reversed_ids: set[str]) -> list[str]:
+        """Propagation order with each reversed element pointing the way its
+        flow goes; nodes left in a cycle follow in network order."""
+        nodes = list(self.network.nodes)
+        preds: dict[str, set[str]] = {n: set() for n in nodes}
+        succ: dict[str, set[str]] = {n: set() for n in nodes}
+        for e in self.network.elements.values():
+            if e.id in reversed_ids:
+                srcs, sinks = [e.to_node], [e.from_node]
+            else:
+                srcs, sinks = e.all_source_nodes(), e.all_sink_nodes()
+            for a in srcs:
+                for b in sinks:
+                    if a != b:
+                        preds[b].add(a)
+                        succ[a].add(b)
+        order: list[str] = []
+        done: set[str] = set()
+        queue = [n for n in nodes if not preds[n]]
+        while queue:
+            n = queue.pop(0)
+            if n in done:
+                continue
+            done.add(n)
+            order.append(n)
+            for m in sorted(succ[n], key=nodes.index):
+                if m not in done and preds[m] <= done:
+                    queue.append(m)
+        order += [n for n in nodes if n not in done]
+        return order
+
     def _propagate_states(self, x: np.ndarray) -> dict:
+        """Derive every node's T and Y (and the relay) at x.
+
+        Streams follow the SIGN of the flow: a reversed element feeds its
+        from_node from its to_node (#481). When a pass reads a state ahead of
+        its order (a wall back-edge, a recirculation loop) the pass is
+        repeated from its own result until the temperatures settle, so the
+        residual depends on x alone and not on the previous evaluation.
         """
-        Forward-propagate T and Y through the network graph in topological order.
-        Also computes global sensitivities (relay) for the chain-rule.
-        """
-        # Preserve previous iteration's derived states for back-edge wall coupling
         self._prev_derived_states = getattr(self, "_derived_states", {})
-        self._derived_states = {}
+        reversed_ids = self._reversed_elements(x)
+        order = self._signed_order(reversed_ids) if reversed_ids else self._topological_order
+        relay: dict = {}
+        for _ in range(self._MAX_PROPAGATION_PASSES):
+            self._lagged_read = False
+            self._derived_states = {}
+            relay = self._propagate_pass(x, order, reversed_ids)
+            if not self._lagged_read:
+                break
+            change = 0.0
+            for n, (T, _, _) in self._derived_states.items():
+                prev = self._prev_derived_states.get(n)
+                T_prev = float(prev[0]) if prev is not None else 0.0
+                change = max(change, abs(float(T) - T_prev) / max(abs(float(T)), 1.0))
+            self._prev_derived_states = self._derived_states
+            if change < 1e-13:
+                break
+        return relay
+
+    def _propagate_pass(self, x: np.ndarray, order: list[str], reversed_ids: set[str]) -> dict:
+        """One pass of the state propagation in ``order`` (see _propagate_states)."""
         # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx], 'Pt_mix': dP_total_mix/dx}
         relay = {nid: {} for nid in self.network.nodes}
 
         has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
 
-        for nid in self._topological_order:
+        for nid in order:
             node = self.network.nodes[nid]
 
-            up_elems = self.network.get_upstream_elements(nid)
+            # Elements delivering INTO nid by the sign of their flow (#481).
+            up_elems = [
+                e for e in self.network.get_upstream_elements(nid) if e.id not in reversed_ids
+            ]
+            rev_in = [e for e in self.network.get_downstream_elements(nid) if e.id in reversed_ids]
 
-            # Boundaries with NO upstream connections are pure sources
-            if isinstance(node, (PressureBoundary, MassFlowBoundary)) and not up_elems:
+            # Boundaries with NO inflow are pure sources
+            if (
+                isinstance(node, (PressureBoundary, MassFlowBoundary))
+                and not up_elems
+                and not rev_in
+            ):
                 T, Y, _ = node.compute_derived_state([])
                 self._derived_states[nid] = (T, Y, None)
                 # Seed relay for boundary's own unknowns
@@ -1141,7 +1230,7 @@ class NetworkSolver:
                             elem_jac_names[self.unknown_names[col]] = coeff
                 _single_source = len(elem.all_source_nodes()) == 1
                 for src_nid in elem.all_source_nodes():
-                    state_up = self._get_node_state(self.network.nodes[src_nid], x)
+                    state_up = self._get_node_state_with_prev(self.network.nodes[src_nid], x)
                     if indices:
                         # For single-source elements (channels, branching tees) use the
                         # flow INTO the current sink node (nid) so that each sink's
@@ -1155,8 +1244,16 @@ class NetworkSolver:
                             state_up.m_dot = elem.flow_at_node(src_nid, x, indices)
                         state_up._element_id = elem.id
                         state_up._m_dot_jac_names = elem_jac_names
-                    stream_info.append((state_up, elem, src_nid))
-            up_states = [s for s, _, _ in stream_info]
+                    stream_info.append((state_up, elem, src_nid, None))
+            # A reversed element delivers -m_dot from its to_node (#481).
+            for elem in rev_in:
+                i_m = self._two_port_mdot_indices()[elem.id]
+                state_up = self._get_node_state_with_prev(self.network.nodes[elem.to_node], x)
+                state_up.m_dot = -float(x[i_m])
+                state_up._element_id = elem.id
+                state_up._m_dot_jac_names = {f"{elem.id}.m_dot": -1.0}
+                stream_info.append((state_up, elem, elem.to_node, {i_m: -1.0}))
+            up_states = [s for s, _, _, _ in stream_info]
 
             # Wall Coupling: evaluate walls BEFORE compute_derived_state
             # so that Q flows through the EnergyBoundary abstraction.
@@ -1204,7 +1301,7 @@ class NetworkSolver:
                 n_species = self._n_species
                 # Iterate over stream_info (one entry per upstream stream, including
                 # multiple entries for multi-port elements like TeeJunctionElement).
-                for i, (_, elem, src_nid) in enumerate(stream_info):
+                for i, (_, elem, src_nid, coeffs) in enumerate(stream_info):
                     t_jac = mix_res.dT_mix_d_stream[i]
                     pt_jac = mix_res.dP_total_mix_d_stream[i]
                     # dY_mix_d_stream is indexed by [species][stream]
@@ -1223,7 +1320,12 @@ class NetworkSolver:
                         # straight sink d/d(m_com) only and dropped the -1 on
                         # m_branch.
                         jac_node = nid if len(elem.all_source_nodes()) == 1 else src_nid
-                        for idx, coeff in elem.flow_jac_at_node(jac_node, m_indices).items():
+                        flow_jac = (
+                            coeffs
+                            if coeffs is not None
+                            else elem.flow_jac_at_node(jac_node, m_indices)
+                        )
+                        for idx, coeff in flow_jac.items():
                             node_relay = relay[nid].setdefault(
                                 idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                             )
@@ -1278,7 +1380,7 @@ class NetworkSolver:
 
                         # Side A contributions
                         obj_a = self.network.elements.get(ea_id) or self.network.nodes.get(ea_id)
-                        from_a = ea_id if ea_id in self.network.nodes else obj_a.from_node
+                        from_a = self._flow_ends(obj_a, x)[0]
                         m_indices_a = self._unknown_indices.get(ea_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_a
@@ -1322,7 +1424,7 @@ class NetworkSolver:
 
                         # Side B contributions
                         obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
-                        from_b = eb_id if eb_id in self.network.nodes else obj_b.from_node
+                        from_b = self._flow_ends(obj_b, x)[0]
                         m_indices_b = self._unknown_indices.get(eb_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_b
@@ -1460,56 +1562,26 @@ class NetworkSolver:
                 nr["T"] += dT_dh * dh_ds[eid] * coeff
 
     def _get_node_state_with_prev(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
+        """The node's state, its T/Y from the PREVIOUS pass if this pass has
+        not derived it yet (a back-edge: a wall or stream read ahead of the
+        propagation order). Such a read is flagged, and _propagate_states
+        repeats the pass until the lagged states settle, so the residual is a
+        function of x alone (#481). Pressures come from x with the same
+        floors as ``_get_node_state``.
         """
-        Constructs a NetworkMixtureState for a node, using previous iteration's derived state
-        for back-edges (nodes not yet visited in current topological pass).
-        This ensures wall coupling uses lagged values for cross-stream coupling.
-        """
-        default_Y = self._default_Y
-
-        # Boundaries always use current values
-        if isinstance(node, (PressureBoundary, MassFlowBoundary)):
-            return self._get_node_state(node, x)
-
-        # For interior nodes, check if already propagated in current iteration
-        if node.id in self._derived_states:
-            # Use current iteration's values
-            return self._get_node_state(node, x)
-
-        # Back-edge: use previous iteration's derived state
+        state = self._get_node_state(node, x)
+        if (
+            isinstance(node, (PressureBoundary, MassFlowBoundary))
+            or node.id in self._derived_states
+        ):
+            return state
+        self._lagged_read = True
         if node.id in self._prev_derived_states:
             T_prev, Y_prev, _ = self._prev_derived_states[node.id]
-        else:
-            # First iteration: use defaults
-            T_prev = 300.0
-            Y_prev = default_Y
-
-        # Get pressure unknowns from current x vector
-        indices = self._unknown_indices.get(node.id, [])
-        unknowns = node.unknowns()
-
-        state_dict = {
-            "P": 101325.0,
-            "Pt": 101325.0,
-            "T": T_prev,
-            "Tt": T_prev,
-            "m_dot": 0.0,
-            "Y": Y_prev,
-        }
-
-        for i, unk in zip(indices, unknowns, strict=False):
-            var_name = unk.split(".")[-1]
-            if var_name in state_dict:
-                state_dict[var_name] = x[i]
-
-        return NetworkMixtureState(
-            float(state_dict["P"]),
-            float(state_dict["Pt"]),
-            float(state_dict["T"]),
-            float(state_dict["Tt"]),
-            float(state_dict["m_dot"]),
-            state_dict["Y"],
-        )
+            state.T = float(T_prev)
+            state.Tt = float(T_prev)
+            state.Y = Y_prev
+        return state
 
     def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
         """Constructs a NetworkMixtureState for a given node based on the current solver vector x."""
@@ -2572,6 +2644,10 @@ class NetworkSolver:
         best_x = x0_use.copy()
         best_res_norm = np.linalg.norm(res0)
         last_exception: Exception | None = None
+        # Last PHYSICAL evaluation (scaled F, scaled J): what a rejected
+        # probe is answered with (see the except branch below).
+        last_ok: list[Any] = [None, None]
+        n_rejected = [0]
 
         def residuals_wrapper(x_scaled: np.ndarray) -> Any:
             nonlocal best_x, best_res_norm, last_exception
@@ -2586,6 +2662,10 @@ class NetworkSolver:
             try:
                 # Evaluate residuals and jacobian
                 res, jac = self._residuals_and_jacobian(x_real)
+                if not np.all(np.isfinite(res)) or (
+                    jac is not None and not np.all(np.isfinite(jac.data))
+                ):
+                    raise FloatingPointError("non-finite residual or Jacobian at a solver iterate")
 
                 # Track best iterate (in real space, unscaled residual)
                 res_norm = np.linalg.norm(res)
@@ -2656,8 +2736,10 @@ class NetworkSolver:
                     # J_scaled = diag(inv_D_f) @ J @ diag(D_x)
                     jac_dense = jac.toarray()
                     jac_scaled = (inv_D_f[:, None] * jac_dense) * D_x[None, :]
+                    last_ok[0], last_ok[1] = res_scaled, jac_scaled
                     return res_scaled, jac_scaled
                 else:
+                    last_ok[0] = res_scaled
                     return res_scaled
             except SolverTimeoutError:
                 raise
@@ -2675,14 +2757,24 @@ class NetworkSolver:
                         stacklevel=2,
                     )
                     self._penalty_warning_issued = True
-                # Penalty that pulls Newton back toward the best physical point
-                # seen so far.  F = x_scaled - x_best means Newton step = x_best
-                # exactly (J=I), so hybr retreats to a known-safe iterate rather
-                # than stepping deeper into unphysical territory.
-                x_best_scaled = best_x * inv_D_x
-                penalty = x_scaled - x_best_scaled
+                n_rejected[0] += 1
+                # A penalty the trust region must REJECT: the last physical
+                # residual's direction at ten times its norm (at least 10 in
+                # scaled units), with the last physical Jacobian. The step then
+                # reads as a clear increase and the region shrinks. The former
+                # F = x - x_best (J = I) was SMALL near x_best, so a step into
+                # the unphysical region read as an improvement and was
+                # accepted (#481).
+                f_ref, j_ref = last_ok
+                n_f = len(x_scaled)
+                if f_ref is None:
+                    f_ref = np.ones(n_f)
+                ref_norm = float(np.linalg.norm(f_ref))
+                direction = f_ref / ref_norm if ref_norm > 0.0 else np.ones(n_f) / np.sqrt(n_f)
+                target = 10.0 * max(ref_norm, 1.0)
+                penalty = direction * target
                 if use_jac and method in ("hybr", "lm"):
-                    return penalty, np.eye(len(x_scaled))
+                    return penalty, (j_ref if j_ref is not None else np.eye(n_f))
                 return penalty
 
         # Solve with timing
@@ -2708,8 +2800,17 @@ class NetworkSolver:
                     f"Solver reported success but |F|={final_norm:.3e} "
                     f"exceeds residual tolerance ({_RESIDUAL_TOL})."
                 )
-            if not success and last_exception:
+            if not success and last_exception is not None and _eval_count[0] == 0:
+                # Not one physical evaluation since the start: that is a
+                # failing model, not a search that strayed.
                 raise last_exception
+            if not success and last_exception is not None:
+                # Rejected probes are part of the search, not the outcome:
+                # say so, keep the classification of why the solve stopped.
+                message = (
+                    f"{message} [{n_rejected[0]} unphysical probe(s) rejected; "
+                    f"last: {type(last_exception).__name__}: {str(last_exception)[:160]}]"
+                )
         except SolverTimeoutError as e:
             final_x = best_x
             success = False
@@ -2999,10 +3100,12 @@ class NetworkSolver:
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val
 
-        # Wall-specific thermodynamics
-        import combaero as cb
+        # Wall-specific thermodynamics. With coupling off the walls applied no
+        # heat, so they report none: a Q computed here would be heat the
+        # solution never saw (#481).
 
-        for wid, wall in self.network.walls.items():
+        walls = self.network.walls if self.network.thermal_coupling_enabled else {}
+        for wid, wall in walls.items():
             obj_a = self.network.elements.get(wall.element_a) or self.network.nodes.get(
                 wall.element_a
             )
@@ -3010,19 +3113,10 @@ class NetworkSolver:
                 wall.element_b
             )
 
-            node_feeding_a = (
-                obj_a
-                if wall.element_a in self.network.nodes
-                else self.network.nodes[obj_a.from_node]
-            )
-            node_feeding_b = (
-                obj_b
-                if wall.element_b in self.network.nodes
-                else self.network.nodes[obj_b.from_node]
-            )
-
-            state_a = self._get_node_state(node_feeding_a, final_x)
-            state_b = self._get_node_state(node_feeding_b, final_x)
+            feed_a, tgt_a = self._flow_ends(obj_a, final_x)
+            feed_b, tgt_b = self._flow_ends(obj_b, final_x)
+            state_a = self._get_node_state(self.network.nodes[feed_a], final_x)
+            state_b = self._get_node_state(self.network.nodes[feed_b], final_x)
 
             if wall.element_a in self.network.elements:
                 m_indices_a = self._unknown_indices.get(wall.element_a, [])
@@ -3060,8 +3154,6 @@ class NetworkSolver:
                 # and the far side is out of scope. Report it, so the balance
                 # closes: the stream leaves with m h(T_upstream) + Q_wall_out.
                 # Q > 0 flows A -> B, so A's target receives -Q and B's +Q.
-                tgt_a = wall.element_a if wall.element_a in self.network.nodes else obj_a.to_node
-                tgt_b = wall.element_b if wall.element_b in self.network.nodes else obj_b.to_node
                 q_to_boundary = 0.0
                 if tgt_a != tgt_b:
                     for tgt, q_in in ((tgt_a, -float(wall_res.Q)), (tgt_b, float(wall_res.Q))):
@@ -3073,18 +3165,10 @@ class NetworkSolver:
                 sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
                 sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
 
-                # Detailed temperature profile [K] (diagnostics)
-                # Ensure profile uses correct side-A/side-B ordering
-                t_over_k_layers = [L.r_val for L in wall.layers]
-                profile, _q = cb.wall_temperature_profile(
-                    ch_result_a.T_aw,
-                    ch_result_b.T_aw,
-                    ch_result_a.h,
-                    ch_result_b.h,
-                    t_over_k_layers,
-                    wall.R_fouling,
-                )
-                sol_dict[f"{wid}.T_interface"] = [float(tp) for tp in profile]
+                # Temperature profile [K], side A to side B: the one
+                # compute_coupling just placed for these inputs (k(T) at its
+                # fixed point, h floored as the coupling floors it).
+                sol_dict[f"{wid}.T_interface"] = list(wall._last_profile or [])
 
         sol_dict["__complete_states__"] = self.extract_complete_states(sol_dict)
         sol_dict["__success__"] = success

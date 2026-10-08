@@ -1292,8 +1292,12 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
   ChannelResult res;
   res.dP_calc = dP_calc;
 
+  // dP = f(Re(|m|)) (L/D) m|m| / (2 rho A^2) is odd in m, so its slope is
+  // even: |m| (f + |m| f'(Re) dRe/d|m| / 2) (L/D) / (rho A^2). Signed m here
+  // gave reversed flow a slope of the wrong sign (#481).
   double dRe_dmdot = D / (mu * area);
-  res.d_dP_d_mdot = (L / D) * (1.0 / (rho * area * area)) * m_dot * (f + 0.5 * m_dot * df_dRe * dRe_dmdot);
+  const double abs_m = std::abs(m_dot);
+  res.d_dP_d_mdot = (L / D) * (1.0 / (rho * area * area)) * abs_m * (f + 0.5 * abs_m * df_dRe * dRe_dmdot);
 
   const double eps_P = 1.0;
   auto [rho_p, drho_dT_p, drho_dP_p] = density_and_jacobians(T_up, P_static_up + eps_P, X_up);

@@ -1053,32 +1053,44 @@ class ThermalWall:
         WallCouplingResult
             Object containing Q [W], T_hot [K], and analytical Jacobians.
         """
-        # 1. Update layer conductivities using temperatures from previous solve iteration
-        # This implement the "lagged" k(T) update for stability.
-        if self._last_profile and len(self._last_profile) == len(self.layers) + 1:
-            for i, layer in enumerate(self.layers):
-                # profile index [i] is hot-side of layer, [i+1] is cold-side
-                t_avg = 0.5 * (self._last_profile[i] + self._last_profile[i + 1])
-                layer.update_conductivity(t_avg)
-
-        # 2. Effective area
         A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
 
-        # 3. Multi-layer R values (thickness / conductivity)
-        t_over_k_layers = [L.r_val for L in self.layers]
+        # The profile only places the layer temperatures; it refuses h <= 0,
+        # which a correlation past its range can return at a solver iterate,
+        # so it sees the coupling's own floor (WALL_HTC_KNEE).
+        h_pa = max(float(h_a), cb.WALL_HTC_KNEE)
+        h_pb = max(float(h_b), cb.WALL_HTC_KNEE)
 
-        # 4. Call C++ solver function
+        def profile(t_over_k: list[float]) -> list[float]:
+            prof, _q = cb.wall_temperature_profile(
+                T_aw_a, T_aw_b, h_pa, h_pb, t_over_k, self.R_fouling
+            )
+            return [float(tp) for tp in prof]
+
+        t_over_k_layers = [L.r_val for L in self.layers]
+        prof = profile(t_over_k_layers)
+        if any(L.material.lower() not in ("generic", "custom") for L in self.layers):
+            # k(T) at THIS call's wall temperatures, iterated to its fixed
+            # point, so Q depends on the inputs alone. It used to be lagged
+            # from the previous call -- any trial point the solver probed --
+            # which made the residual depend on evaluation history (#481).
+            for _ in range(30):
+                for i, layer in enumerate(self.layers):
+                    layer.update_conductivity(0.5 * (prof[i] + prof[i + 1]))
+                new = [L.r_val for L in self.layers]
+                change = max(
+                    abs(a - b) / max(abs(b), 1e-300)
+                    for a, b in zip(new, t_over_k_layers, strict=True)
+                )
+                t_over_k_layers = new
+                prof = profile(t_over_k_layers)
+                if change < 1e-12:
+                    break
+
         res = _solver_tools.wall_coupling_and_jacobian_multilayer(
             h_a, T_aw_a, h_b, T_aw_b, t_over_k_layers, A_eff, self.R_fouling
         )
-
-        # 5. Update cached temperature profile for next iteration
-        # We compute the profile here using the current solution HTCs and updated k values.
-        profile, _q = cb.wall_temperature_profile(
-            T_aw_a, T_aw_b, h_a, h_b, t_over_k_layers, self.R_fouling
-        )
-        self._last_profile = [float(tp) for tp in profile]
-
+        self._last_profile = prof
         return res
 
 

@@ -633,6 +633,11 @@ struct WallCouplingResult {
   double dQ_dT_aw_b = 0.0;   // ∂Q/∂T_aw_b [W/K]
 };
 
+// Wall coupling uses h as given at or above this [W/(m^2 K)]; below it a C1,
+// positive rational floor knee^2/(2 knee - h) (a correlation driven past its range can return
+// h <= 0 at a solver iterate). Physical gas-side h is >= ~1 W/(m^2 K).
+constexpr double WALL_HTC_KNEE = 1e-2;
+
 // Compute heat transfer and Jacobians for wall coupling between two elements
 //
 // Parameters:
