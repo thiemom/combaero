@@ -7,11 +7,11 @@
 #include "compressible.h"
 #include "side_stream_momentum.h"
 #include "stagnation.h"
+#include "tee_junction.h"
 #include "thermo.h"
 
 using combaero::chamber_merge_face_state;
 using combaero::jet_impulse;
-using combaero::side_stream_momentum_drop;
 
 namespace {
 std::vector<double> air() {
@@ -22,61 +22,6 @@ std::vector<double> air() {
   return X;
 }
 }  // namespace
-
-// ---- centred crossflow segment -------------------------------------------
-
-TEST(SideStreamMomentum, IsHalfOfBothAdjacentStationsWithTheirOwnDensities) {
-  const auto X = air();
-  const double m_arr = 0.015, m = 0.02, m_out = 0.026, A = 5e-4;
-  const double Pa = 1.04e5, Ta = 320.0, Pm = 1.02e5, Tm = 330.0, Po = 1.0e5, To = 340.0;
-  const auto r = side_stream_momentum_drop(m_arr, m_out, Pa, Ta, X, Po, To, X, A);
-  const double ra = combaero::density(Ta, Pa, X), rm = combaero::density(Tm, Pm, X);
-  const double ro = combaero::density(To, Po, X);
-  const double up = (m * m / rm - m_arr * m_arr / ra) / (A * A);
-  const double dn = (m_out * m_out / ro - m * m / rm) / (A * A);
-  EXPECT_NEAR(r.dP, 0.5 * (up + dn), 1e-9 * r.dP);
-}
-
-TEST(SideStreamMomentum, DerivativesMatchCentralDifferences) {
-  const auto X = air();
-  const double A = 3e-4, e = 1e-8;
-  const double Pa = 1.05e5, Ta = 310.0, Po = 1.0e5, To = 360.0;
-  for (double m_arr : {-0.004, 0.003, 0.01}) {
-    for (double m_out : {-0.002, 0.005, 0.02}) {
-      const auto r = side_stream_momentum_drop(m_arr, m_out, Pa, Ta, X, Po, To, X, A);
-      auto f = [&](double a, double b, double pa, double ta, double po, double to) {
-        return side_stream_momentum_drop(a, b, pa, ta, X, po, to, X, A).dP;
-      };
-      const double hP = 1.0, hT = 1e-3;
-      const double fo = (f(m_arr, m_out + e, Pa, Ta, Po, To) - f(m_arr, m_out - e, Pa, Ta, Po, To)) / (2 * e);
-      const double fa = (f(m_arr + e, m_out, Pa, Ta, Po, To) - f(m_arr - e, m_out, Pa, Ta, Po, To)) / (2 * e);
-      const double fPa = (f(m_arr, m_out, Pa + hP, Ta, Po, To) - f(m_arr, m_out, Pa - hP, Ta, Po, To)) / (2 * hP);
-      const double fTa = (f(m_arr, m_out, Pa, Ta + hT, Po, To) - f(m_arr, m_out, Pa, Ta - hT, Po, To)) / (2 * hT);
-      const double fPo = (f(m_arr, m_out, Pa, Ta, Po + hP, To) - f(m_arr, m_out, Pa, Ta, Po - hP, To)) / (2 * hP);
-      const double fTo = (f(m_arr, m_out, Pa, Ta, Po, To + hT) - f(m_arr, m_out, Pa, Ta, Po, To - hT)) / (2 * hT);
-      EXPECT_NEAR(r.d_dm_out, fo, 1e-6 * std::abs(fo));
-      EXPECT_NEAR(r.d_dm_arr, fa, 1e-6 * std::abs(fa));
-      EXPECT_NEAR(r.d_dP_arr, fPa, 1e-5 * std::abs(fPa) + 1e-12);
-      EXPECT_NEAR(r.d_dT_arr, fTa, 1e-5 * std::abs(fTa) + 1e-12);
-      EXPECT_NEAR(r.d_dP_out, fPo, 1e-5 * std::abs(fPo) + 1e-12);
-      EXPECT_NEAR(r.d_dT_out, fTo, 1e-5 * std::abs(fTo) + 1e-12);
-    }
-  }
-}
-
-TEST(SideStreamMomentum, ZeroFlowHasZeroSlopeAndBadInputsThrow) {
-  const auto X = air();
-  const auto r = side_stream_momentum_drop(0.0, 0.0, 1e5, 300.0, X, 1e5, 300.0, X, 1e-3);
-  EXPECT_EQ(r.d_dm_out, 0.0);
-  EXPECT_EQ(r.d_dm_arr, 0.0);
-  // Near, not equal: FMA contraction leaves a 1e-16 residue in a - a.
-  EXPECT_NEAR(side_stream_momentum_drop(0.01, 0.01, 1e5, 300.0, X, 1e5, 300.0, X, 1e-3).dP,
-              0.0, 1e-12);
-  EXPECT_THROW(side_stream_momentum_drop(0.01, 0.02, 0.0, 300.0, X, 1e5, 300.0, X, 1e-3),
-               std::invalid_argument);
-  EXPECT_THROW(side_stream_momentum_drop(0.01, 0.02, 1e5, 300.0, X, 1e5, 300.0, X, 0.0),
-               std::invalid_argument);
-}
 
 // ---- merge chamber face ----------------------------------------------------
 
@@ -197,4 +142,69 @@ TEST(JetImpulse, NoOutflowNoMomentum) {
   const auto r = jet_impulse(0.01, 1.0e5, 600.0, 1.0e5, X);
   EXPECT_EQ(r.J, 0.0);
   EXPECT_EQ(r.dJ_dm, 0.0);
+}
+
+// ---- one station, half at a time (#471) ------------------------------------
+
+TEST(StationHalfDrop, BleedAtBassettKappaIsBassettK5ForEverySplit) {
+  // Constant density: both halves at one state make the whole station.
+  const auto X = air();
+  const double P = 1.2e5, T = 500.0, A = 4e-3, m_a = 0.4;
+  const double rho = combaero::density(T, P, X);
+  for (double q : {0.0, 0.2, 0.5, 0.8, 0.95, 1.0}) {
+    const double m_b = q * m_a;
+    const auto h = combaero::station_half_drop(m_a, m_b, P, T, X, A,
+                                               combaero::STATION_KAPPA_BLEED_BASSETT);
+    const double drop = 2.0 * h.dP;  // P_a - P_b
+    const double ua = m_a / (rho * A), ub = m_b / (rho * A);
+    const double K = (drop + 0.5 * rho * (ua * ua - ub * ub)) / (0.5 * rho * ua * ua);
+    EXPECT_NEAR(K, combaero::K5(q), 1e-12) << q;
+  }
+}
+
+TEST(StationHalfDrop, NormalMergeIsTheImpingementTerm) {
+  const auto X = air();
+  const double P = 1.0e5, T = 300.0, A = 5e-4;
+  const auto h = combaero::station_half_drop(0.015, 0.021, P, T, X, A,
+                                             combaero::STATION_KAPPA_MERGE_NORMAL);
+  const double rho = combaero::density(T, P, X);
+  EXPECT_NEAR(h.dP, 0.5 * (0.021 * 0.021 - 0.015 * 0.015) / (rho * A * A), 1e-12 * h.dP);
+}
+
+TEST(StationHalfDrop, DerivativesMatchCentralDifferences) {
+  const auto X = air();
+  const double P = 1.1e5, T = 420.0, A = 2e-3, e = 1e-8;
+  for (double kappa : {0.0, 0.75, 1.0}) {
+    for (double ma : {-0.05, 0.08}) {
+      for (double mb : {-0.03, 0.06}) {
+        const auto r = combaero::station_half_drop(ma, mb, P, T, X, A, kappa);
+        auto f = [&](double a, double b, double p, double t) {
+          return combaero::station_half_drop(a, b, p, t, X, A, kappa).dP;
+        };
+        const double fa = (f(ma + e, mb, P, T) - f(ma - e, mb, P, T)) / (2 * e);
+        const double fb = (f(ma, mb + e, P, T) - f(ma, mb - e, P, T)) / (2 * e);
+        const double fP = (f(ma, mb, P + 1.0, T) - f(ma, mb, P - 1.0, T)) / 2.0;
+        const double fT = (f(ma, mb, P, T + 1e-3) - f(ma, mb, P, T - 1e-3)) / 2e-3;
+        // Absolute floor: round-off of a ~1e2 Pa value over a 1e-8 step,
+        // where the analytic slope can be exactly 0 (2|m_b| = kappa m_a).
+        EXPECT_NEAR(r.d_dm_a, fa, 1e-6 * std::abs(fa) + 1e-4);
+        EXPECT_NEAR(r.d_dm_b, fb, 1e-6 * std::abs(fb) + 1e-4);
+        EXPECT_NEAR(r.d_dP, fP, 1e-5 * std::abs(fP) + 1e-12);
+        EXPECT_NEAR(r.d_dT, fT, 1e-5 * std::abs(fT) + 1e-12);
+      }
+    }
+  }
+}
+
+TEST(ChannelEntryDrop, IsTheDynamicHeadPlusTheEntryLoss) {
+  const auto X = air();
+  const double P = 1.0e5, T = 300.0, A = 1e-3, m = 0.05;
+  const double rho = combaero::density(T, P, X);
+  const double u = m / (rho * A);
+  const auto r = combaero::channel_entry_drop(m, P, T, X, A, 0.5);
+  EXPECT_NEAR(r.dP, 1.5 * 0.5 * rho * u * u, 1e-9 * r.dP);
+  const double e = 1e-8;
+  const double fd = (combaero::channel_entry_drop(m + e, P, T, X, A, 0.5).dP -
+                     combaero::channel_entry_drop(m - e, P, T, X, A, 0.5).dP) / (2 * e);
+  EXPECT_NEAR(r.d_dm_a, fd, 1e-6 * fd);
 }

@@ -50,12 +50,13 @@ Y_AIR = cb.mole_to_mass(cb.species.dry_air())
 
 
 class _FrictionOnlySegment(ImpingementCrossflowElement):
-    """The segment with its momentum term switched off: friction only, the
-    way a plain ChannelElement would carry the crossflow."""
+    """The segment with its stations switched off: friction only, the way a
+    plain ChannelElement would carry the crossflow."""
 
-    def _momentum_drop(self, state_in, state_out, flows):
-        X = cb.species.dry_air()
-        return cb.side_stream_momentum_drop(0.0, 0.0, 1e5, 300.0, X, 1e5, 300.0, X, self.area)
+    def resolve_topology(self, graph) -> None:
+        super().resolve_topology(graph)
+        self.from_kappa = None
+        self.to_kappa = None
 
 
 def _boundary(name: str, Pt: float) -> PressureBoundary:
@@ -156,13 +157,13 @@ def test_the_network_reproduces_florschuetz_flow_model() -> None:
         f"\nGc/Gj vs Eq. 8: bias {gc_err.mean():+.2%}, max |err| {np.abs(gc_err).max():.2%}"
         f"\nGj/Gj_mean vs cosh: bias {gj_err.mean():+.2%}, max |err| {np.abs(gj_err).max():.2%}"
     )
-    # Measured 2026-10-07: Gc/Gj bias -0.57%, max 4.1%; Gj bias -0.12%, max
-    # 4.0% -- the discretisation of a continuous model, the segment's
+    # Measured 2026-10-08: Gc/Gj bias -0.54%, max 3.8%; Gj bias -0.11%, max
+    # 3.8% -- the discretisation of a continuous model, the segment's
     # friction, and compressibility, all three of which Florschuetz's 1D model
-    # omits. Each station's own density (#471) moved the max from 3.7% to
-    # 4.1% across this 3% pressure drop; incompressible is the source's
-    # simplification, not ours to copy. Uncentred, the max was 13%; with no
-    # momentum term at all, a factor of two.
+    # omits. History: 3.7% (incompressible, #466), 4.1% (each station's own
+    # density, #473), 3.8% (the segment's own-flow density term restored,
+    # #471 bleed PR). Uncentred, the max was 13%; with no momentum term at
+    # all, a factor of two.
     assert abs(gc_err.mean()) < 0.01
     assert np.abs(gc_err).max() < 0.045
     assert np.abs(gj_err).max() < 0.045

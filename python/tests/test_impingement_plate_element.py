@@ -137,16 +137,17 @@ def test_metering_correlations_are_refused() -> None:
         p.validate()
 
 
-def _segment_with_neighbours() -> tuple[ImpingementCrossflowElement, list[str]]:
-    """x2 between c2 and c3; x1 arrives at c2, plate p3 merges at c3."""
+def _segment_with_neighbours() -> ImpingementCrossflowElement:
+    """x2 between c2 and c3: x1 arrives at c2, x3 leaves c3; plates at c2, c3."""
     g = FlowNetwork()
-    for n in ("s", "c2", "c3", "c1"):
+    for n in ("s", "c1", "c2", "c3", "c4"):
         g.add_node(PlenumNode(n))
-    seg = ImpingementCrossflowElement("x2", "c2", "c3", length=5 * D, height=2 * D, span=0.1)
-    g.add_element(
-        ImpingementCrossflowElement("x1", "c1", "c2", length=5 * D, height=2 * D, span=0.1)
-    )
-    g.add_element(seg)
+    for i in (1, 2, 3):
+        g.add_element(
+            ImpingementCrossflowElement(
+                f"x{i}", f"c{i}", f"c{i + 1}", length=5 * D, height=2 * D, span=0.1
+            )
+        )
     for row in (2, 3):
         g.add_element(
             ImpingementPlateElement(
@@ -161,45 +162,59 @@ def _segment_with_neighbours() -> tuple[ImpingementCrossflowElement, list[str]]:
                 plate_thickness=D,
             )
         )
-    seg.resolve_topology(g)
-    return seg, [eid for eid, _ in seg.network_flow_inputs()]
+    seg = g.elements["x2"]
+    for e in g.elements.values():
+        e.resolve_topology(g)
+    return seg
 
 
-def test_the_segment_reads_the_right_neighbours() -> None:
-    seg, inputs = _segment_with_neighbours()
-    assert seg.network_flow_inputs() == [("p3", "c3"), ("x1", "c2")]
-    assert sorted(inputs) == ["p3", "x1"]
+def test_the_segment_reads_its_neighbour_segments() -> None:
+    """The stations' other flows are the neighbouring SEGMENTS' (the jets
+    follow from the node mass balance), and a chain end has none."""
+    seg = _segment_with_neighbours()
+    assert seg.network_flow_inputs() == [("x1", "c2"), ("x3", "c3")]
+    assert seg.prev_seg == "x1" and seg.next_seg == "x3"
+    g_first = seg._prev
+    assert g_first.prev_seg is None  # row 1: closed end
 
 
-def test_the_momentum_term_is_half_of_both_adjacent_merges() -> None:
-    seg, _ = _segment_with_neighbours()
-    m, m_arr, m_jet = 0.02, 0.015, 0.006
+def test_the_momentum_term_is_half_of_each_station_at_its_own_density() -> None:
+    seg = _segment_with_neighbours()
+    m, m_arr, m_next = 0.02, 0.015, 0.026
     st_in, st_out = _state(m, P=1.0e5), _state(m, P=0.95e5)
-    dP = seg._momentum_drop(st_in, st_out, {"x1": m_arr, "p3": m_jet}).dP
+    dP = seg._momentum_drop_value(st_in, st_out, {"x1": m_arr, "x3": m_next})
     X = cb.species.dry_air()
     r_in, r_out = cb.density(300.0, 1.0e5, X), cb.density(300.0, 0.95e5, X)
     A = 2 * D * 0.1
-    # Each station at its own density; the segment's own flow cancels between
-    # the two halves, so only the arriving and leaving fluxes remain.
-    expected = 0.5 * ((m + m_jet) ** 2 / r_out - m_arr**2 / r_in) / (A * A)
+    # Normal injection (kappa = 0): each half at its node's density. The
+    # segment's own flow appears in both halves and leaves the own-flow term
+    # m^2 (1/r_in - 1/r_out)/2.
+    expected = 0.5 * ((m**2 - m_arr**2) / r_in + (m_next**2 - m**2) / r_out) / (A * A)
     assert dP == pytest.approx(expected, rel=1e-9)
 
 
 def test_segment_residual_jacobian_matches_central_differences() -> None:
-    seg, _ = _segment_with_neighbours()
-    m, flows = 0.02, {"x1": 0.015, "p3": 0.006}
-    st_out = _state(m, P=0.99e5)
-    _, jac = seg.residuals(_state(m, P=1.0e5), st_out, flows=flows)
+    seg = _segment_with_neighbours()
+    m, flows = 0.02, {"x1": 0.015, "x3": 0.026}
+    st_in, st_out = _state(m, P=1.0e5), _state(m, P=0.99e5)
+    _, jac = seg.residuals(st_in, st_out, flows=flows)
     row = jac[0]
 
-    def r(m_=m, fl=flows, T=300.0, P=1.0e5):
-        return seg.residuals(_state(m_, T=T, P=P), st_out, flows=fl)[0][0]
+    def r(m_=m, fl=flows, P_in=1.0e5, P_out=0.99e5):
+        return seg.residuals(_state(m_, P=P_in), _state(m, P=P_out), flows=fl)[0][0]
 
     e = 1e-7
     assert row["x2.m_dot"] == pytest.approx((r(m_=m + e) - r(m_=m - e)) / (2 * e), rel=1e-6)
-    for src in ("x1", "p3"):
+    for src in ("x1", "x3"):
         up, dn = dict(flows, **{src: flows[src] + e}), dict(flows, **{src: flows[src] - e})
         assert row[f"{src}.m_dot"] == pytest.approx((r(fl=up) - r(fl=dn)) / (2 * e), rel=1e-6)
+    # The helper moves a plenum's P and Pt together (Pt = P), so the finite
+    # difference sees the channel's -1 on Pt plus the momentum's density term
+    # on P.
+    h = 1.0
+    fd_out = (r(P_out=0.99e5 + h) - r(P_out=0.99e5 - h)) / (2 * h)
+    assert row["c3.P"] + row["c3.Pt"] == pytest.approx(fd_out, rel=1e-6)
+    assert row["c3.P"] != 0.0
 
 
 def _wall_coupled_chain(n_rows: int = 3) -> NetworkSolver:

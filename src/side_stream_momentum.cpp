@@ -20,32 +20,39 @@ constexpr double T_STEP_REL = 1e-6;
 constexpr double P_STEP_REL = 1e-7;
 }  // namespace
 
-SideStreamMomentum side_stream_momentum_drop(
-    double m_arr, double m_out, double P_arr, double T_arr,
-    const std::vector<double>& X_arr, double P_out, double T_out,
-    const std::vector<double>& X_out, double area) {
-  if (!(area > 0.0) || !(P_arr > 0.0) || !(T_arr > 0.0) || !(P_out > 0.0) ||
-      !(T_out > 0.0)) {
-    throw std::invalid_argument(
-        "side_stream_momentum_drop: area and both station states must be positive");
+StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
+                                  const std::vector<double>& X, double area,
+                                  double kappa) {
+  if (!(area > 0.0) || !(P > 0.0) || !(T > 0.0)) {
+    throw std::invalid_argument("station_half_drop: area, P and T must be positive");
   }
-  auto [rho_arr, drho_arr_dT, drho_arr_dP] =
-      solver::density_and_jacobians(T_arr, P_arr, X_arr);
-  auto [rho_out, drho_out_dT, drho_out_dP] =
-      solver::density_and_jacobians(T_out, P_out, X_out);
-  const double k = 0.5 / (area * area);
-  const double f_out = m_out * std::abs(m_out) / rho_out;
-  const double f_arr = m_arr * std::abs(m_arr) / rho_arr;
-  SideStreamMomentum out;
-  out.dP = (f_out - f_arr) * k;
-  out.d_dm_out = 2.0 * std::abs(m_out) / rho_out * k;
-  out.d_dm_arr = -2.0 * std::abs(m_arr) / rho_arr * k;
-  const double d_drho_out = -f_out / rho_out * k;
-  const double d_drho_arr = f_arr / rho_arr * k;
-  out.d_dP_out = d_drho_out * drho_out_dP;
-  out.d_dT_out = d_drho_out * drho_out_dT;
-  out.d_dP_arr = d_drho_arr * drho_arr_dP;
-  out.d_dT_arr = d_drho_arr * drho_arr_dT;
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  const double k = 0.5 / (rho * area * area);
+  const double f = m_b * std::abs(m_b) - m_a * std::abs(m_a) + kappa * m_a * (m_a - m_b);
+  StationHalfDrop out;
+  out.dP = f * k;
+  out.d_dm_a = (-2.0 * std::abs(m_a) + kappa * (2.0 * m_a - m_b)) * k;
+  out.d_dm_b = (2.0 * std::abs(m_b) - kappa * m_a) * k;
+  const double d_drho = -out.dP / rho;
+  out.d_dP = d_drho * drho_dP;
+  out.d_dT = d_drho * drho_dT;
+  return out;
+}
+
+StationHalfDrop channel_entry_drop(double m, double P, double T,
+                                   const std::vector<double>& X, double area,
+                                   double K_in) {
+  if (!(area > 0.0) || !(P > 0.0) || !(T > 0.0)) {
+    throw std::invalid_argument("channel_entry_drop: area, P and T must be positive");
+  }
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  const double k = 0.5 * (1.0 + K_in) / (rho * area * area);
+  StationHalfDrop out;
+  out.dP = m * std::abs(m) * k;
+  out.d_dm_a = 2.0 * std::abs(m) * k;  // the entering flow is "m_a"
+  const double d_drho = -out.dP / rho;
+  out.d_dP = d_drho * drho_dP;
+  out.d_dT = d_drho * drho_dT;
   return out;
 }
 

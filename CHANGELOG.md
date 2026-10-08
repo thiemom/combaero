@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Effect:** a heated node behind a branching tee's straight leg saw d/d(m_com) only and lost the −1 on m_branch. That Jacobian entry was 0 against a finite difference of −1.9.
   - **Now:** the global Jacobian matches finite differences to 2e-5. Solutions are unchanged; only Newton's path is.
 
+- **The centred side-stream term dropped the segment's own-flow density term (#471).** The term is `m^2 (1/rho_from - 1/rho_to)/(2A^2)`. It is restored by building every segment from two half-stations at their nodes' densities.
+  - **Florschuetz chain vs Eq. 8:** max 4.1% -> 3.8%.
+  - **Replaced API:** `side_stream_momentum_drop` (unreleased) is replaced by `station_half_drop`.
+
 - **`critical_pressure_ratio` returned 0.5636 whatever the gas or temperature (#471).** Its golden-section search kept its probe points in the opposite order to its update and shrank onto a fixed point.
   - **True value for air:** 0.528 at 300 K, 0.542 at 1500 K. That is where the isentropic mass flux peaks at M = 1.
   - **Choked mass flux:** it came out 0.1-0.3% low, and `nozzle_flow` declared choking early. The compressible orifice uses `nozzle_flow`.
@@ -243,6 +247,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Bleed through a duct wall: `CrossflowSegmentElement` with Bassett stations (#471).** This generalises the impingement crossflow segment.
+  - **Stations:** a channel segment whose end nodes are side-stream stations, merge or bleed. The C++ (f, J) `station_half_drop(m_a, m_b, P, T, X, A, kappa)` carries half of each station at its node's density, and `channel_entry_drop` covers a reservoir entry.
+  - **Merge:** `kappa = 0` (normal injection) is Florschuetz's term.
+  - **Bleed:** `kappa = 0.75` is exactly Bassett, Winterbone & Pearson's (2001) separating straight-run K2/K5 (Eq. 15) for every split. Scored on Bassett's measured K5 (Fig. 7c, 43 points): MAE 0.039 in K, 0.021 at q >= 0.6.
+  - **Inheritance:** `ImpingementCrossflowElement` is now a `kappa = 0` subclass.
+
 - **`EffusionPlateElement` owns its wall; the discharge node decides the gas side (#471).**
   - **The wall.** The plate is the wall the coolant passes through. Its diagnostics now carry the wall solution: `T_wall_hot`, `T_wall_cold`, `q_wall`, `Q_wall`, `eta_overall`.
     - **Coolant side:** Andrews 86-GT-225.
@@ -259,7 +269,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The merge chamber, the jet momentum and the impingement crossflow term are compressible (#471).** The incompressible first version used one density for the main face and the outlet, `Pt - P = ½ρu²`, and a jet density at the supply total temperature. All three evaluations now come from C++:
   - **Exact impulse.** `chamber_merge_face_state` solves the face from the exact impulse balance (the ideal-gas quadratic on its subsonic root, flagged when no such root exists). It takes the face Pt from the chamber's own entropy-based closure.
   - **Jet momentum.** `jet_impulse` uses the isentropic jet velocity, or the sonic momentum plus pressure thrust when choked.
-  - **Crossflow segment.** `side_stream_momentum_drop` puts each station at its own density.
+  - **Crossflow segment.** The crossflow term puts each station at its own density (now `station_half_drop`).
   - **Jacobians.** The density derivatives come from `density_and_jacobians`, so no density derivative is computed in Python.
   - **Validation shift.** The impingement chain's Gc/Gj vs Eq. 8 (an incompressible model) moved from max 3.7% to 4.1% over a 3% pressure drop. Fig. 6 is unchanged (+4.04% / 6.89%).
 
@@ -290,7 +300,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Python into C++ (f, J) functions that later configurations reuse:
   - `jet_row_heat_transfer(set, JetRowGeometry, m_jet, m_crossflow, mu, k, Pr)`
     returns h with analytic `dh_dm_jet` / `dh_dm_crossflow`;
-  - `side_stream_momentum_drop` gives the centred
+  - `side_stream_momentum_drop` (since replaced by `station_half_drop`, #471) gives the centred
     momentum term for side streams joining a channel.
 
   The validation numbers are unchanged to the digit.
