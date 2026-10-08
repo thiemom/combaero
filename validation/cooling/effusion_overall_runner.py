@@ -339,7 +339,7 @@ def implied_gas_side_h(
     NO assumption about the rig's gas side -- which is why the B/C
     comparison is stated in terms of it. With Baldauf's own film it
     returns the augmented coefficient the measurement then requires,
-    F = 1.6 to 4.3 times the smooth duct.
+    F = 1.6 to 4.7 times the smooth duct.
 
     Returns None where the measurement is at or below the film's own
     effectiveness, which the two-temperature form cannot represent.

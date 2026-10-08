@@ -118,6 +118,16 @@ def find_similar_species(target: str, available: list[str]) -> list[str]:
 # =============================================================================
 
 
+def transport_is_flagged(transport: dict[str, Any]) -> bool:
+    """Whether a mechanism marks a species' transport as an unreferenced
+    estimate. NUIGMech1.1 does so in the note: '\\AUTHOR: WARNING !\\REF:
+    WARNING !\\COMMENT: theoret trans'. Its O2 entry (eps 676.4 K against
+    107.4 K in GRI30, JetSurf2, Aramco2 and San Diego) made air viscosity
+    11.8% low, O2's 44.5% (#485)."""
+    note = str(transport.get("note", "") or "")
+    return "WARNING" in note.upper() or "THEORET" in note.upper()
+
+
 def extract_from_yaml(
     yaml_file: Path,
     selected_species: list[str] | None = None,
@@ -185,6 +195,11 @@ def extract_from_yaml(
                 "rotational_relaxation": transport.get("rotational-relaxation", None),
                 "dipole": transport.get("dipole", None),
             },
+            # Where the transport parameters came from, and whether the
+            # mechanism itself flags them as unreferenced estimates (see
+            # transport_is_flagged and merge_yaml_sources).
+            "transport_source": str(Path(yaml_file).name),
+            "transport_flagged": transport_is_flagged(transport),
         }
 
         species_data[species_norm] = entry
@@ -333,6 +348,21 @@ def merge_yaml_sources(
         for name_norm, entry in data.items():
             if name_norm not in merged:
                 merged[name_norm] = entry
+                continue
+            # Transport only: a flagged (unreferenced) set yields to the first
+            # later source with an unflagged one. Thermo keeps first-wins.
+            have = merged[name_norm]
+            new_tr = entry.get("transport", {})
+            if (
+                have.get("transport_flagged")
+                and not entry.get("transport_flagged")
+                and new_tr.get("well_depth") is not None
+            ):
+                have = dict(have)
+                have["transport"] = new_tr
+                have["transport_source"] = entry.get("transport_source")
+                have["transport_flagged"] = False
+                merged[name_norm] = have
     return merged
 
 

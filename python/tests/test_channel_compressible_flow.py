@@ -90,10 +90,11 @@ def test_a_recovered_exit_chokes_at_the_same_flow(P_down: float) -> None:
 
 @pytest.mark.parametrize(
     ("P_down", "m_ref"),
-    [(1.9e5, 0.047316), (1.6e5, 0.087499), (1.3e5, 0.104956), (1.1e5, 0.110651)],
+    [(1.9e5, 0.047171), (1.6e5, 0.087337), (1.3e5, 0.104803), (1.1e5, 0.110507)],
 )
 def test_unchoked_flows_are_the_fanno_flows(P_down: float, m_ref: float) -> None:
-    """Below choke the physics is unchanged: the same Fanno flows as before."""
+    """Below choke the physics is unchanged: the same Fanno flows as before
+    (values after air's viscosity correction, #485: 0.1-0.3% lower, f(Re))."""
     r = NetworkSolver(_duct(P_down)).solve()
     assert r["__success__"]
     assert r["c.m_dot"] == pytest.approx(m_ref, abs=1e-6)

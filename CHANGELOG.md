@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Air's viscosity was 11.8% low, O2's 44.5% (#485).** The generated transport data took Lennard-Jones parameters from NUIGMech1.1 entries that its own authors flag as unreferenced (`theoret trans`). For O2 that meant eps 676 K, against 107.4 K in GRI30, JetSurf2, Aramco2 and San Diego. H2 (304.7 vs 38.0 K), H2O and Ar were wrong too.
+  - **Generator change:** the extractor now lets a flagged transport set yield to the first later unflagged source, for transport only. The header is regenerated; thermo is unchanged.
+  - **Viscosity at 300 K, after:** O2 -0.2%, N2 +1.0%, Ar +1.6%, H2 +0.4%, CO2 +0.3%, air +0.6% against literature. Alkanes move 1-3%.
+  - **Affects every Re, Pr and Nu computed for air or O2-bearing gas.**
+  - **Validation:** 7 of 240 cooling series move, all Andrews effusion, because they compute Re from rig conditions:
+    - internal h accuracy bias -13.5% -> -9.9%;
+    - fidelity pooled bias -10.4% -> -7.1%;
+    - plate B -19.6% -> -16.5%;
+    - overall eta plate B +23.7% -> +24.6%.
+
+    The documents quoting them are updated. One note had blamed hand-typed properties for a gap the library's own viscosity caused; it is corrected.
+  - **Tests:** the Cantera transport tolerance drops from 35% (which let this through) to 7%. A literature test pins pure-species and air viscosity independently of any mechanism. Restoring the old data fails 4 of 6 literature tests and 9 of 17 Cantera transport tests.
+
 - **The compressible `ChannelElement` passes its choked flow, not more (#481).** Its residual is now in mass-flow form, `m - m_calc`. `m_calc` comes from the new `fanno_channel_flow`; it rises monotonically as the back pressure falls and saturates exactly at the choked flow, like the compressible orifice. Measured on a 20 mm by 1 m duct at 2 bar:
   - **Choked flow:** pressure-driven ducts past choke converged 5-7% (exit lost) and 6-20% (recovered) ABOVE their choked flow, because the infeasible region was patched with a barrier. They now converge on it exactly (1e-8).
   - **Failed solves:** the 60 kPa back-pressure case now converges.

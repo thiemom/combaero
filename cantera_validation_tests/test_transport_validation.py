@@ -6,9 +6,10 @@ from combaero._core import num_species, species_index_from_name, species_name
 # Polar-species tolerance notes:
 # - NH3: CombAero params (eps=481 K, sigma=2.92 A) match GRI-Mech exactly ->
 #         viscosity error <2%. Conductivity error ~5-8% (Eucken model differences).
-# - H2O: CombAero params differ from GRI-Mech (eps=637 vs 572 K, sigma=2.94 vs 2.61 A)
-#         -> viscosity error ~15-20% even with correct polar Omega22 table.
-#         This is a transport-database difference, not a model error.
+# - H2O: CombAero params now match GRI-Mech (eps=572.4 K, sigma=2.605 A). The
+#         earlier 637/2.94 came from NUIGMech1.1 entries flagged as unreferenced
+#         estimates and caused a ~15-20% viscosity error -- a data bug, not a
+#         database difference (#485).
 
 
 class TestTransportProperties:
