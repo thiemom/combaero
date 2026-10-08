@@ -496,6 +496,13 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // -----------------------------------------------------------------------------
 
 
+// Below this total flow [kg/s] the heat Q is spread over a C1 floor
+// m_eff = (m^2 + m0^2)/(2 m0) >= m0/2 instead of |m|, keeping Q/m finite as
+// the flow vanishes. At or above it Q/m is exact, so the heat a node is given
+// is the heat it receives (energy conservation; the previous
+// sqrt(m^2 + 1e-6) lost 5e-5 of Q at 0.1 kg/s and 11% at 2 g/s).
+constexpr double kMixerHeatMdotFloor = 2e-3;
+
 // Mix generalized non-reacting incoming streams into a single outgoing state,
 // and compute all analytical Jacobians w.r.t upstream mass flows, Temperatures,
 // and mass fractions (Y_i).

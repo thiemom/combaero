@@ -634,6 +634,22 @@ wall = WallConnection(
 network.add_wall(wall)
 ```
 
+Each side's heat goes into that element's `to_node` (or the node itself when
+the wall names a node). A **boundary** cannot take it -- its state is fixed --
+so heat a wall puts there leaves the network with the stream crossing that
+boundary, and the result reports it:
+
+```python
+res["coupling_wall.Q"]              # W, side a -> side b
+res["coupling_wall.Q_to_boundary"]  # W, the part that landed on boundaries (0 if none)
+res["outlet.Q_wall_out"]            # W, wall heat leaving through boundary "outlet"
+```
+
+With it the network's energy balance closes:
+`sum_out m h(T_upstream) + sum_boundaries Q_wall_out = sum_in m h(T_in)`
+(`python/tests/test_energy_conservation_cooling.py` checks it to 1e-9 for
+every cooling configuration).
+
 #### Element Integration
 Elements with convective surfaces support heat transfer calculations.
 
@@ -784,6 +800,9 @@ solver = NetworkSolver(graph)
 # MPCE networks are retried once from an outlet-referenced
 # incompressible warm start (densities at the downstream static).
 # The primary attempt gets 40% of `timeout`, the retry the rest.
+# A cold solve of a network with walls that still fails is then
+# retried from the same network solved WITHOUT its walls -- the
+# message says "Converged from the wall-free flow solution ...".
 # Stall detection ends doomed phases early: when hybr's best |F|
 # plateaus far from tolerance it hands over to the LM fallback, and
 # when the LM fallback plateaus too the attempt fails fast so the

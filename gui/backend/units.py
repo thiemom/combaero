@@ -83,6 +83,8 @@ UNIT_MAP: dict[str, str] = {
     "h_a": "W/m²/K",
     "h_b": "W/m²/K",
     "Q": "W",
+    "Q_to_boundary": "W",  # wall heat that left with a stream into a boundary
+    "Q_wall_out": "W",
     # --- Tee junction ---
     "m_dot_com": "kg/s",
     "m_dot_straight": "kg/s",
