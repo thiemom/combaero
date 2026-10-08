@@ -489,6 +489,26 @@ inline constexpr Entry function_units[] = {
      "FannoSolution"},
     {"fanno_max_length", "T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol",
      "m"},
+    // fanno_mach.h - Fanno flow integrated in Mach number
+    {"fanno_state_at_mach", "G: kg/(m^2*s), Tt: K, M: -, X: mol/mol", "FannoMachState"},
+    {"fanno_dx_dmach",
+     "G: kg/(m^2*s), Tt: K, M: -, X: mol/mol, D: m, roughness: m, "
+     "friction_model: str, f_multiplier: -",
+     "m"},
+    {"fanno_length_between",
+     "G: kg/(m^2*s), Tt: K, M1: -, M2: -, X: mol/mol, D: m, roughness: m, "
+     "friction_model: str, f_multiplier: -",
+     "m"},
+    {"fanno_inlet_mach", "Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol", "-"},
+    {"fanno_sonic_mass_flux", "Pt: Pa, Tt: K, X: mol/mol", "kg/(m^2*s)"},
+    {"fanno_duct",
+     "Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol, L: m, D: m, roughness: m, "
+     "friction_model: str, f_multiplier: -",
+     "FannoDuctResult"},
+    {"fanno_choked_mass_flux",
+     "Pt: Pa, Tt: K, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, "
+     "f_multiplier: -",
+     "kg/(m^2*s)"},
 
     // -------------------------------------------------------------------------
     // compressible.h - Thrust
@@ -1313,6 +1333,19 @@ inline constexpr Entry function_units[] = {
     {"FannoSolution::mdot", "-", "kg/s"},
     {"FannoSolution::outlet", "-", "-"},
     {"FannoSolution::profile", "-", "-"},
+    {"FannoMachState::M", "-", "-"},
+    {"FannoMachState::T", "-", "K"},
+    {"FannoMachState::P", "-", "Pa"},
+    {"FannoMachState::rho", "-", "kg/m³"},
+    {"FannoMachState::u", "-", "m/s"},
+    {"FannoMachState::a", "-", "m/s"},
+    {"FannoDuctResult::choked", "-", "-"},
+    {"FannoDuctResult::G", "-", "kg/(m^2*s)"},
+    {"FannoDuctResult::L_star", "-", "m"},
+    {"FannoDuctResult::inlet", "-", "FannoMachState"},
+    {"FannoDuctResult::exit", "-", "FannoMachState"},
+    {"FannoDuctResult::Pt_exit", "-", "Pa"},
+    {"FANNO_MACH_REL_TOL", "-", "-"},
     {"solve_A_eff_from_mdot", "-", "-"},
     {"solve_P_back_from_mdot", "-", "-"},
     {"solve_P0_from_mdot", "-", "-"},

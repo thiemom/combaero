@@ -18,6 +18,7 @@
 #include "rib_correlation.h"
 #include "rib_ratio_correlation.h"
 #include "side_stream_momentum.h"
+#include "fanno_mach.h"
 #include "correlation_status.h"
 #include "ejector.h"
 #include "equilibrium.h"
@@ -693,6 +694,47 @@ PYBIND11_MODULE(_core, m) {
         "the duct's mean velocity at the hole's station, (m_a + m_b)/(2 rho A);\n"
         "Vi the isentropic jet velocity from the duct's STATIC (P, T) to the\n"
         "discharge static P_down. Analytic derivatives.");
+
+  py::class_<combaero::FannoMachState>(m, "FannoMachState")
+      .def_readonly("M", &combaero::FannoMachState::M)
+      .def_readonly("T", &combaero::FannoMachState::T)
+      .def_readonly("P", &combaero::FannoMachState::P)
+      .def_readonly("rho", &combaero::FannoMachState::rho)
+      .def_readonly("u", &combaero::FannoMachState::u)
+      .def_readonly("a", &combaero::FannoMachState::a);
+  py::class_<combaero::FannoDuctResult>(m, "FannoDuctResult")
+      .def_readonly("choked", &combaero::FannoDuctResult::choked)
+      .def_readonly("G", &combaero::FannoDuctResult::G)
+      .def_readonly("L_star", &combaero::FannoDuctResult::L_star)
+      .def_readonly("inlet", &combaero::FannoDuctResult::inlet)
+      .def_readonly("exit", &combaero::FannoDuctResult::exit)
+      .def_readonly("Pt_exit", &combaero::FannoDuctResult::Pt_exit);
+  m.attr("FANNO_MACH_REL_TOL") = combaero::kFannoMachRelTol;
+  m.def("fanno_state_at_mach", &combaero::fanno_state_at_mach, py::arg("G"), py::arg("Tt"),
+        py::arg("M"), py::arg("X"),
+        "Fanno station state at Mach M for mass flux G and stagnation T (algebraic).");
+  m.def("fanno_dx_dmach", &combaero::fanno_dx_dmach, py::arg("G"), py::arg("Tt"), py::arg("M"),
+        py::arg("X"), py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
+        py::arg("f_multiplier") = 1.0,
+        "Fanno dx/dM [m]; friction_model 'fixed' means a constant Darcy f = f_multiplier.");
+  m.def("fanno_length_between", &combaero::fanno_length_between, py::arg("G"), py::arg("Tt"),
+        py::arg("M1"), py::arg("M2"), py::arg("X"), py::arg("D"), py::arg("roughness"),
+        py::arg("friction_model"), py::arg("f_multiplier") = 1.0,
+        "Duct length over which Fanno flow goes from M1 to M2 (Mach quadrature).");
+  m.def("fanno_inlet_mach", &combaero::fanno_inlet_mach, py::arg("Pt"), py::arg("Tt"),
+        py::arg("G"), py::arg("X"),
+        "Subsonic Mach of an isentropic inlet from (Pt, Tt) at mass flux G (1 if choked).");
+  m.def("fanno_sonic_mass_flux", &combaero::fanno_sonic_mass_flux, py::arg("Pt"), py::arg("Tt"),
+        py::arg("X"), "Sonic isentropic mass flux of a stagnation state [kg/(m^2 s)].");
+  m.def("fanno_duct", &combaero::fanno_duct, py::arg("Pt"), py::arg("Tt"), py::arg("G"),
+        py::arg("X"), py::arg("L"), py::arg("D"), py::arg("roughness"),
+        py::arg("friction_model"), py::arg("f_multiplier") = 1.0,
+        "Fanno duct fed isentropically from (Pt, Tt) at mass flux G: inlet and exit\n"
+        "states, L*, choked flag. Integrated in Mach number, exact to L* = L.");
+  m.def("fanno_choked_mass_flux", &combaero::fanno_choked_mass_flux, py::arg("Pt"), py::arg("Tt"),
+        py::arg("X"), py::arg("L"), py::arg("D"), py::arg("roughness"),
+        py::arg("friction_model"), py::arg("f_multiplier") = 1.0,
+        "Mass flux [kg/(m^2 s)] at which a duct of length L chokes exactly at its exit.");
 
   py::class_<combaero::MergeFaceState>(m, "MergeFaceState")
       .def_readonly("P_face", &combaero::MergeFaceState::P_face)

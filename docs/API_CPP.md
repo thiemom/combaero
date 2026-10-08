@@ -350,6 +350,31 @@ double fanno_max_length(double T_in, double P_in, double u_in,
                        double tol = 1e-6, std::size_t max_iter = 100);
 ```
 
+### Fanno flow integrated in Mach number (`fanno_mach.h`)
+
+At fixed mass flux G and stagnation temperature Tt the station state is
+algebraic in M (energy `h(T) + M^2 a^2/2 = h(Tt)`; `u = M a`, `rho = G/u`,
+`P = rho R T`), so momentum leaves one smooth integral,
+`dx/dM = -(P' + G u') 2D / (f G u)`, which is 0 at M = 1. L* is exact (no
+cutoff Mach, no gradient floor); the integral is a fixed 4-panel x 12-point
+Gauss-Legendre rule in `s = 1/M^2`, smooth in its arguments.
+
+```cpp
+FannoMachState fanno_state_at_mach(double G, double Tt, double M, const std::vector<double>& X);
+double fanno_dx_dmach(double G, double Tt, double M, const std::vector<double>& X, double D,
+                      double roughness, const std::string& friction_model,
+                      double f_multiplier = 1.0);  // "fixed": constant Darcy f = f_multiplier
+double fanno_length_between(double G, double Tt, double M1, double M2, ...);  // [m]
+double fanno_inlet_mach(double Pt, double Tt, double G, const std::vector<double>& X);
+double fanno_sonic_mass_flux(double Pt, double Tt, const std::vector<double>& X);
+FannoDuctResult fanno_duct(double Pt, double Tt, double G, const std::vector<double>& X,
+                           double L, double D, double roughness,
+                           const std::string& friction_model, double f_multiplier = 1.0);
+double fanno_choked_mass_flux(double Pt, double Tt, const std::vector<double>& X, double L,
+                              double D, double roughness, const std::string& friction_model,
+                              double f_multiplier = 1.0);  // G with L* = L
+```
+
 ### Rocket Nozzle Thrust
 ```cpp
 struct ThrustResult {

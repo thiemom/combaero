@@ -152,6 +152,23 @@ G = cb.mass_flux_isentropic(T0=300, P0=2e5, P=1.5e5, X=air)
 L_max = cb.fanno_max_length(T_in=300, P_in=2e5, u_in=50, D=0.05, f=0.02, X=air)
 ```
 
+### Fanno flow in Mach number
+Integrated in M rather than x: the state is algebraic in M at fixed mass flux,
+so the duct length is a smooth integral that vanishes at sonic -- exact L*,
+no cutoff. Fed isentropically from a stagnation state:
+
+```python
+G_ch = cb.fanno_choked_mass_flux(Pt=2e5, Tt=300, X=air, L=1.0, D=0.02,
+                                 roughness=1e-5, friction_model="haaland")  # kg/(m^2 s)
+r = cb.fanno_duct(2e5, 300, 0.8 * G_ch, air, 1.0, 0.02, 1e-5, "haaland")
+r.inlet.M, r.exit.M, r.exit.P, r.Pt_exit, r.L_star, r.choked
+cb.fanno_length_between(G=300, Tt=300, M1=0.3, M2=1.0, X=air, D=0.02,
+                        roughness=0.0, friction_model="fixed", f_multiplier=0.02)
+```
+Agrees with the x-march (`fanno_channel_rough`, 20000 steps) to 1e-9 at
+constant f and to ~1e-8 with a Re-dependent f, the floor set by kinks in
+mu(T).
+
 ### Rocket Nozzle Functions
 ```python
 # Converging-diverging nozzle analysis
