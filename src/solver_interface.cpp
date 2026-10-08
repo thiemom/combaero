@@ -704,15 +704,27 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   // Heat is spread over the actual flow, floored only near zero flow.
   const auto [mdot_eff, dmdot_eff] = heat_flow_divisor(mdot_tot);
 
-  // Apply energy transfer: delta_h = Q/mdot_eff + fraction * h_mix_base
-  double delta_h = Q / mdot_eff + fraction * h_mix_base;
+  std::vector<double> normalized_Y_mix = combaero::normalize_fractions(Y_mix);
+
+  // 'fraction' scales the SENSIBLE enthalpy, h - h(T_ref) at the mixture's
+  // composition: absolute h includes formation enthalpy, so a fraction of it
+  // heated air at ambient and combustion products alike (#481).
+  std::vector<double> href_k(n_species, 0.0);
+  double h_ref = 0.0;
+  for (std::size_t k = 0; k < n_species; ++k) {
+    href_k[k] = J_per_mol_to_J_per_kg(combaero::h_species(k, kSensibleEnthalpyRefT),
+                                      combaero::species_molar_mass(k));
+    h_ref += normalized_Y_mix[k] * href_k[k];
+  }
+
+  // Apply energy transfer: delta_h = Q/mdot_eff + fraction * (h_mix_base - h_ref)
+  double delta_h = Q / mdot_eff + fraction * (h_mix_base - h_ref);
 
   double h_mix = h_mix_base + delta_h;
   double P_total_mix = (mdot_tot > 0.0)
                             ? (P_total_tot / mdot_tot)
                             : (n_streams > 0 ? streams[0].P_total : 0.0);
 
-  std::vector<double> normalized_Y_mix = combaero::normalize_fractions(Y_mix);
   std::vector<double> X_mix = combaero::mass_to_mole(normalized_Y_mix);
   double T_guess = 300.0;
   if (n_streams > 0)
@@ -757,41 +769,39 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
       // Base contribution
       double dT_base_dT = (streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
 
-      // Fraction contribution: d(fraction * h_mix_base)/d(T_i)
-      // = fraction * (mdot_i / mdot_tot) * cp_i
+      // Fraction contribution: d(fraction * (h_mix_base - h_ref))/d(T_i)
+      // = fraction * (mdot_i / mdot_tot) * cp_i  (h_ref does not move with T)
       double dT_frac_dT = (fraction * streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
 
       dT_jac.d_T = dT_base_dT + dT_frac_dT;
 
-      // d(T_mix)/d(m_dot_i)
-      // Base contribution: d(h_mix_base)/d(mdot_i)
+      // d(T_mix)/d(m_dot_i). h_mix = (1+f) h_base - f h_ref + Q/m_eff, then T
+      // at fixed h moves with the composition: -sum_k hk(T_mix) dY_k/dm_i.
+      // Only the enthalpy terms carry (1+f), not the composition term.
       double h_diff = (h_stream[i] - h_mix_base);
       double y_sum = 0.0;
+      double ref_sum = 0.0;
       for (std::size_t k = 0; k < n_species; ++k) {
         y_sum += hk_mix[k] * (streams[i].Y[k] - Y_mix[k]);
+        ref_sum += href_k[k] * (streams[i].Y[k] - Y_mix[k]);
       }
-      double dh_base_dmdot = (h_diff - y_sum) / mdot_tot;
+      double dh_mix_dmdot = ((1.0 + fraction) * h_diff - fraction * ref_sum) / mdot_tot;
 
       // Q contribution: d(Q/mdot_eff)/d(mdot_i) = -Q * mdot_eff' / mdot_eff^2
       double dh_Q_dmdot = -Q * dmdot_eff / (mdot_eff * mdot_eff);
 
-      // Fraction contribution: d(fraction * h_mix_base)/d(mdot_i)
-      // = fraction * d(h_mix_base)/d(mdot_i)
-      double dh_frac_dmdot = fraction * dh_base_dmdot;
+      dT_jac.d_mdot = (dh_mix_dmdot + dh_Q_dmdot - y_sum / mdot_tot) / cp_mix;
 
-      // Total: dT/dmdot = (1/cp_mix) * (dh_base + dh_Q + dh_frac) / dmdot
-      dT_jac.d_mdot = (dh_base_dmdot + dh_Q_dmdot + dh_frac_dmdot) / cp_mix;
-
-      // d(T_mix)/d(Y_i,k)
+      // d(T_mix)/d(Y_i,k): h_base moves by w hk_i, h_ref by w (href_k - h_ref)
+      // and the normalised composition by w (e_k - Y), w = m_i / m; the last
+      // shifts T at fixed h by -w (hk_mix - h_mix) -- the FINAL h_mix, which
+      // the base-only form (h_mix_base) got wrong whenever Q or f was set.
+      const double w = streams[i].m_dot / mdot_tot;
       for (std::size_t k = 0; k < n_species; ++k) {
-        // Base contribution
-        double dT_base_dY = streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix_base) / (mdot_tot * cp_mix);
-
-        // Fraction contribution: d(fraction * h_mix_base)/d(Y_i,k)
-        // = fraction * (mdot_i / mdot_tot) * (hk_i - hk_mix + h_mix_base)
-        double dT_frac_dY = fraction * streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix_base) / (mdot_tot * cp_mix);
-
-        dT_jac.d_Y[k] = dT_base_dY + dT_frac_dY;
+        dT_jac.d_Y[k] = w *
+                        ((1.0 + fraction) * hk_mass[i][k] - fraction * (href_k[k] - h_ref) -
+                         hk_mix[k] + h_mix) /
+                        cp_mix;
       }
 
       // Y_mix sensitivities
@@ -850,8 +860,10 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   // Heat is spread over the actual flow, floored only near zero flow.
   const double mdot_eff = heat_flow_divisor(mdot_tot).first;
 
-  // Compute delta_h from Q and fraction
-  double delta_h = Q / mdot_eff + fraction * h_mix_base;
+  // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
+  // and the burnt composition are known (#481).
+  double delta_h = Q / mdot_eff;
+  (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto complete_res =
@@ -861,16 +873,21 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   std::vector<double> X_b = std::get<2>(complete_res);
   std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
-  // Post-combustion enthalpy shift
+  // Post-combustion enthalpy shift: h_out = h_ad + Q/m + f (h_ad - h_ref_b),
+  // so dh_out/dT_ad = (1 + f) cp_ad.
   double dT_out_dT_ad = 1.0;
   double cp_out = combaero::cp_mass(T_ad, X_b);
   double T_out = T_ad;
+  if (fraction != 0.0) {
+    delta_h += fraction * (combaero::h_mass(T_ad, X_b) -
+                           combaero::h_mass(kSensibleEnthalpyRefT, X_b));
+  }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
     T_out = combaero::calc_T_from_h_mass(h_ad + delta_h, X_b, T_ad);
     cp_out = combaero::cp_mass(T_out, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
-    dT_out_dT_ad = cp_ad / cp_out;
+    dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
   T_ad = T_out;
 
@@ -1002,8 +1019,10 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   // Heat is spread over the actual flow, floored only near zero flow.
   const double mdot_eff = heat_flow_divisor(mdot_tot).first;
 
-  // Compute delta_h from Q and fraction
-  double delta_h = Q / mdot_eff + fraction * h_mix_base;
+  // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
+  // and the burnt composition are known (#481).
+  double delta_h = Q / mdot_eff;
+  (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto eq_base_res =
@@ -1013,16 +1032,21 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   std::vector<double> X_b = std::get<3>(eq_base_res);
   std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
-  // Post-combustion enthalpy shift
+  // Post-combustion enthalpy shift: h_out = h_ad + Q/m + f (h_ad - h_ref_b),
+  // so dh_out/dT_ad = (1 + f) cp_ad.
   double dT_out_dT_ad = 1.0;
   double cp_out = combaero::cp_mass(T_ad, X_b);
   double T_out = T_ad;
+  if (fraction != 0.0) {
+    delta_h += fraction * (combaero::h_mass(T_ad, X_b) -
+                           combaero::h_mass(kSensibleEnthalpyRefT, X_b));
+  }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
     T_out = combaero::calc_T_from_h_mass(h_ad + delta_h, X_b, T_ad);
     cp_out = combaero::cp_mass(T_out, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
-    dT_out_dT_ad = cp_ad / cp_out;
+    dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
   T_ad = T_out;
 

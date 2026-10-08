@@ -4,10 +4,11 @@ The network is the control volume. Enthalpy enters with every stream that
 leaves a boundary and leaves with every stream that enters one, at the state
 of the node the stream comes FROM -- by the sign of its flow, not the
 element's declared direction. Heat enters through the user's
-EnergyBoundaries and leaves through walls that put heat on a boundary
-(``{node}.Q_wall_out``):
+EnergyBoundaries (Q, and ``{node}.Q_fraction`` for 'fraction'), leaves
+through walls that put heat on a boundary (``{node}.Q_wall_out``), and is
+not taken up where a node cannot absorb it (``{node}.Q_withheld``):
 
-    sum_out m h + sum Q_wall_out - sum_in m h - sum Q_user = 0
+    sum_out m h + sum Q_wall_out + sum Q_withheld - sum_in m h - sum Q_user = 0
 
 conftest.py runs this on every converged ``NetworkSolver.solve`` in the
 suite, so every test network is also a conservation test.
@@ -20,7 +21,7 @@ from typing import Any
 import numpy as np
 
 import combaero as cb
-from combaero.network import MassFlowBoundary, PressureBoundary
+from combaero.network import CombustorNode, MassFlowBoundary, PressureBoundary
 
 
 def _h(state: Any) -> float:
@@ -37,15 +38,26 @@ def closure(solver: Any, result: dict) -> dict[str, float] | None:
     """Imbalances of a converged solve, or None where the check does not apply."""
     net = solver.network
     nodes = net.nodes
-    bnd = {n for n, o in nodes.items() if isinstance(o, (PressureBoundary, MassFlowBoundary))}
-    for nid, node in nodes.items():
-        # A MassFlowBoundary between elements is an injection (#481, A2);
-        # 'fraction' energy boundaries are on absolute h (#481, A3).
-        if isinstance(node, MassFlowBoundary) and (
-            net.get_upstream_elements(nid) and net.get_downstream_elements(nid)
+    # A MassFlowBoundary between elements is an injection: an interior node
+    # with a source stream of its own (m_dot at its Tt and Y).
+    injections = {
+        n: o
+        for n, o in nodes.items()
+        if isinstance(o, MassFlowBoundary)
+        and net.get_upstream_elements(n)
+        and net.get_downstream_elements(n)
+    }
+    bnd = {
+        n
+        for n, o in nodes.items()
+        if isinstance(o, (PressureBoundary, MassFlowBoundary)) and n not in injections
+    }
+    for node in nodes.values():
+        # A combustor's 'fraction' acts on its products' sensible enthalpy,
+        # which the result does not report.
+        if isinstance(node, CombustorNode) and any(
+            getattr(eb, "fraction", 0.0) for eb in getattr(node, "energy_boundaries", []) or []
         ):
-            return None
-        if any(getattr(eb, "fraction", 0.0) for eb in getattr(node, "energy_boundaries", []) or []):
             return None
 
     x = np.asarray(result["__x_solution__"], dtype=float)
@@ -95,20 +107,31 @@ def closure(solver: Any, result: dict) -> dict[str, float] | None:
                 e_out += q * h_e
             imbalance[n] += q
 
+    for n, o in injections.items():
+        Y = o.Y if o.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
+        X = cb.mass_to_mole(list(Y))
+        e_in += float(o.m_dot) * float(cb.h_mass(float(o.Tt), X))
+        thermal += abs(float(o.m_dot)) * float(cb.cp_mass(float(o.Tt), X)) * float(o.Tt)
+        imbalance[n] += float(o.m_dot)
+
     q_user = sum(
         eb.Q
         for nid, node in nodes.items()
         for eb in getattr(node, "energy_boundaries", []) or []
         if eb.id != f"_wall_{nid}"
     )
+    q_user += sum(v for k, v in result.items() if isinstance(k, str) and k.endswith(".Q_fraction"))
     q_wall_out = sum(
         v for k, v in result.items() if isinstance(k, str) and k.endswith(".Q_wall_out")
+    )
+    q_withheld = sum(
+        v for k, v in result.items() if isinstance(k, str) and k.endswith(".Q_withheld")
     )
     mass = sum(abs(v) for n, v in imbalance.items() if n not in bnd)
     h_span = max((abs(v) for v in h.values()), default=0.0)
     scale = max(abs(e_in), abs(e_out), abs(q_user), thermal, 1.0)
     return {
-        "energy": e_out + q_wall_out - e_in - q_user,
+        "energy": e_out + q_wall_out + q_withheld - e_in - q_user,
         "energy_tol": 1e-7 * scale + mass * (h_span + 1.0),
         "mass": mass,
         "scale": scale,

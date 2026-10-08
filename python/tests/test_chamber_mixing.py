@@ -3,7 +3,6 @@
 import combaero as cb
 from combaero.network.components import (
     CombustorNode,
-    MassFlowBoundary,
     MomentumChamberNode,
     NetworkMixtureState,
     PlenumNode,
@@ -48,25 +47,6 @@ def test_combustor_node_creation():
     assert len(unknowns) == 2
 
     assert combustor.method == "complete"
-
-
-def test_combustor_fuel_boundary():
-    """Test setting fuel boundary on combustor."""
-    combustor = CombustorNode("test_combustor")
-
-    # Create a fuel boundary
-    fuel_bc = MassFlowBoundary(
-        "fuel_injector",
-        m_dot=0.02,
-        Tt=300.0,
-        Y=cb.species.dry_air_mass(),
-    )
-
-    # Set fuel boundary
-    combustor.set_fuel_boundary(fuel_bc)
-
-    assert combustor.fuel_boundary is not None
-    assert combustor.fuel_boundary.id == "fuel_injector"
 
 
 def test_chamber_topology_resolution():

@@ -340,6 +340,8 @@ inline constexpr Entry function_units[] = {
     {"STATION_KAPPA_MERGE_NORMAL", "-", "-"},
     {"STATION_KAPPA_BLEED_BASSETT", "-", "-"},
     {"WALL_HTC_KNEE", "-", "W/(m^2*K)"},
+    {"MIXER_HEAT_MDOT_FLOOR", "-", "kg/s"},
+    {"SENSIBLE_ENTHALPY_REF_T", "-", "K"},
     {"chamber_merge_face_state",
      "m_main: kg/s, T_main: K, X_main: -, m_out: kg/s, P: Pa, T: K, X: -, "
      "side_momentum: N, area: m^2",

@@ -855,7 +855,19 @@ junction = PlenumNode("junction", P=1.5e5, T=350, Y=air)
 combustor = CombustorNode("combustor", P=2e5, T=1800, Y=products)
 momentum = MomentumChamberNode("momentum", P=2e5, T=1800, Y=products, regime="compressible")
 energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
+loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enthalpy
 ```
+
+- **`fraction`** scales the inflow's sensible enthalpy, `h(T) - h(298.15 K)`
+  at its own composition (`cb.SENSIBLE_ENTHALPY_REF_T`); on a combustor, the
+  products'. It is not a fraction of absolute enthalpy, which includes
+  formation enthalpy (#481). The heat it applied is reported as
+  `{node}.Q_fraction` [W].
+- **`Q`** is spread over the node's real inflow. Only a stagnant node (below
+  `cb.MIXER_HEAT_MDOT_FLOOR` = 1 mg/s) cannot take it; what it withholds is
+  reported as `{node}.Q_withheld` [W], as is wall heat aimed at a `WallNode`.
+- **A `MassFlowBoundary` between elements** is an injection: its `m_dot`
+  joins the node at its own `Tt` and `Y`.
 
 #### Merge chamber: main inlet plus side streams (#471)
 

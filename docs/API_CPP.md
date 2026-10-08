@@ -1423,7 +1423,7 @@ AdiabaticResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
 
 // All three add Q as Q / m_tot exactly (energy-conserving) for total flows of
-// at least kMixerHeatMdotFloor = 2e-3 kg/s; below it Q / m_eff with the C1
+// at least kMixerHeatMdotFloor = 1e-6 kg/s; below it Q / m_eff with the C1
 // floor m_eff = (m^2 + m0^2) / (2 m0) >= 1e-3 keeps the heat finite as the
 // flow vanishes.
 

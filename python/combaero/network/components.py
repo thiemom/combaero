@@ -2150,7 +2150,6 @@ class CombustorNode(NetworkNode):
         self.surface = surface or ConvectiveSurface()
         self.t_hot = t_hot
         self.upstream_elements = []
-        self.fuel_boundary = None
         self.energy_boundaries: list[EnergyBoundary] = []
         # Populated by compute_derived_state so PressureLossElement can read theta.
         self._T_unburned: float = 300.0
@@ -2163,10 +2162,6 @@ class CombustorNode(NetworkNode):
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this combustor (post-combustion)."""
         self.energy_boundaries.append(eb)
-
-    def set_fuel_boundary(self, fuel_bc: MassFlowBoundary) -> None:
-        """Set the fuel boundary condition for this combustor."""
-        self.fuel_boundary = fuel_bc
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.

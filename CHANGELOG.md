@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `MassFlowBoundary` between elements now injects its own stream (#481).** The mass balance counted its `m_dot`, but the mixing dropped its enthalpy and species. Measured: 50 g/s injected at 800 K left the node at the inflow's 300 K (-26 kW).
+- **`EnergyBoundary.fraction` now scales sensible enthalpy (#481).**
+  - **What it means:** h(T) - h(298.15 K) at the stream's own composition; on a combustor, the products'.
+  - **Before:** it scaled absolute enthalpy, which includes formation enthalpy, so a "-5%" HEATED air at 298 K and combustion products.
+  - **Now:** -5% removes exactly 5% of the sensible heat. The heat applied is reported as `{node}.Q_fraction`.
+- **Mixer Jacobian with heat or `fraction`.** Measured against finite differences, 1e-9 now:
+  - d/dY used the base enthalpy where the final one belongs: 46% off with Q.
+  - The fraction term multiplied the composition term by (1 + f): d/dm off by 2%, d/dY by 280%.
+- **Heat is spread over the real flow down to 1 mg/s (#481).** The mixer floor was 2 g/s, so a node at 1 g/s took up only 80% of its heat, unreported.
+  - `MIXER_HEAT_MDOT_FLOOR` is now 1e-6 kg/s; convergence measured the same.
+  - What a stagnant node cannot take is reported as `{node}.Q_withheld`, as is wall heat aimed at a `WallNode` (previously booked as `Q_wall_out` with no stream to carry it).
+
 - **Reversed flow conserves energy, and its temperatures are right (#481).** A node used to mix only the elements declared INTO it, at whatever sign their flow had.
   - **Upstream element reversed:** it entered as negative mass at the wrong node's temperature. Measured: feeds at 300 K and 800 K gave a 1380 K node (+57 kW).
   - **Downstream element reversed:** the fluid it delivered was never mixed in. Measured: a 600 K feed left the plenum at 400 K.
@@ -2883,6 +2895,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from 4.7e-2 to 3.1e-8.
 
 ### Removed
+
+- **`CombustorNode.set_fuel_boundary`** (#481). It stored a boundary nothing read: fuel only ever counted when wired through an element. Use an element from a MassFlowBoundary, or an injecting MassFlowBoundary.
 
 - **`Cd_thick_plate`, `Cd_rounded_entry`, `Cd_orifice`,
   `orifice::thickness_correction`, `orifice::Cd_rounded`, and the
