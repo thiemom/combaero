@@ -940,6 +940,149 @@ const Inspector = () => {
 						);
 					})()}
 
+				{selectedNode.type === "effusion_liner" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const num = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const len = (key: string, label: string, fallback: number) => (
+							<LengthInput
+								id={`${key}_${selectedNode.id}`}
+								label={label}
+								value={d[key] ?? fallback}
+								onChange={(val) => set({ [key]: val })}
+							/>
+						);
+						const r = d.result;
+						const rows: number[] | undefined = r?.rows_m_dot_bleed;
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									Backside coolant duct (C in to C out) whose wall bleeds
+									through effusion holes into the gas (G: connect to a chamber's
+									"s" handle). Each station is a Bassett bleed and a panel whose
+									Cd sees the duct crossflow (McGreehan-Schotsch U1/Vi).
+									Coolant-side heat transfer is still the plenum-fed Andrews
+									model: provisional.
+								</div>
+								{num("n_segments", "Stations", 4)}
+								{len("length", "Liner Length (along duct)", 0.152)}
+								{len("width", "Liner Width", 0.152)}
+								{len("duct_height", "Backside Duct Height", 0.03)}
+								{len("hole_diameter", "Hole Diameter", 3.27e-3)}
+								{len("wall_thickness", "Wall Thickness", 6.3e-3)}
+								{len("pitch_x", "Streamwise Pitch", 15.24e-3)}
+								{len("pitch_y", "Spanwise Pitch", 15.24e-3)}
+								{num("angle_deg", "Hole Angle to Wall [deg]", 90)}
+								{num("entry_K", "Duct Entry Loss K", 0.5)}
+								{num("wall_conductivity", "Wall Conductivity [W/m/K]", 20)}
+								<div className="text-[10px] font-bold text-gray-500 uppercase mt-2">
+									Gas Side
+								</div>
+								{num("gas_augmentation", "Gas h Augmentation (user)", 1.0)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Film
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.gas_film || "none"}
+										onChange={(e) => set({ gas_film: e.target.value })}
+									>
+										<option value="none">None (validated closure)</option>
+										<option value="baldauf_sellers">
+											Baldauf + Sellers (not supported by Andrews data)
+										</option>
+									</select>
+								</div>
+								{num("gas_heat_flux", "Imposed Heat Flux [W/m²] (plenum)", 0)}
+								{rows && rows.length > 0 && (
+									<div className="flex flex-col gap-1 mt-2">
+										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+											Per Station (bleed {(100 * r.bleed_fraction).toFixed(0)}%)
+										</label>
+										<table className="text-[10px] font-mono">
+											<thead>
+												<tr className="text-gray-500">
+													<th className="text-left">#</th>
+													<th className="text-right">ṁ g/s</th>
+													<th className="text-right">U1/Vi</th>
+													<th className="text-right">Cd</th>
+													<th className="text-right">P kPa</th>
+													<th className="text-right">T wall</th>
+												</tr>
+											</thead>
+											<tbody>
+												{rows.map((m, i) => (
+													<tr key={`st_${i + 1}`}>
+														<td>{i + 1}</td>
+														<td className="text-right">
+															{(1000 * m).toFixed(2)}
+														</td>
+														<td className="text-right">
+															{r.rows_U1_over_Vi[i].toFixed(3)}
+														</td>
+														<td className="text-right">
+															{r.rows_Cd[i].toFixed(3)}
+														</td>
+														<td className="text-right">
+															{(r.rows_P_backside[i] / 1000).toFixed(2)}
+														</td>
+														<td className="text-right">
+															{r.rows_T_wall_hot
+																? r.rows_T_wall_hot[i].toFixed(0)
+																: "—"}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
+										{r.crossflow_cd_degraded > 0 ? (
+											<div className="text-[10px] text-amber-600">
+												U1/Vi above 0.35: the crossflow Cd degrades badly there
+												(Rohde-scored). It follows the duct's pressure drop
+												against the hole drive, not the duct size.
+											</div>
+										) : r.crossflow_cd_beyond_8pct > 0 ? (
+											<div className="text-[10px] text-amber-600">
+												U1/Vi above 0.2: crossflow Cd beyond its ~8% band.
+											</div>
+										) : null}
+										{r.station_psi_beyond_bassett > 0 && (
+											<div className="text-[10px] text-gray-500">
+												Duct/hole area ratio {r.station_psi_min.toFixed(1)}{" "}
+												beyond Bassett's measured 3 (bleed station extrapolated
+												in psi).
+											</div>
+										)}
+										{r.is_ingesting > 0 && (
+											<div className="text-[10px] text-red-600">
+												At least one station ingests hot gas.
+											</div>
+										)}
+									</div>
+								)}
+							</>
+						);
+					})()}
+
 				{selectedNode.type === "effusion_plate" &&
 					(() => {
 						const d = selectedNode.data;

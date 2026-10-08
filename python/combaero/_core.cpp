@@ -673,6 +673,24 @@ PYBIND11_MODULE(_core, m) {
         "Static drop entering a duct from a reservoir: (1 + K_in) m|m| /\n"
         "(2 rho A^2), at the duct density. Derivative in d_dm_a.");
 
+  m.attr("CROSSFLOW_VI_FLOOR") = combaero::CROSSFLOW_VI_FLOOR;
+  py::class_<combaero::CrossflowRatio>(m, "CrossflowRatio")
+      .def_readonly("U1_over_Vi", &combaero::CrossflowRatio::U1_over_Vi)
+      .def_readonly("U1", &combaero::CrossflowRatio::U1)
+      .def_readonly("Vi", &combaero::CrossflowRatio::Vi)
+      .def_readonly("d_dm_a", &combaero::CrossflowRatio::d_dm_a)
+      .def_readonly("d_dm_b", &combaero::CrossflowRatio::d_dm_b)
+      .def_readonly("d_dP", &combaero::CrossflowRatio::d_dP)
+      .def_readonly("d_dT", &combaero::CrossflowRatio::d_dT)
+      .def_readonly("d_dP_down", &combaero::CrossflowRatio::d_dP_down);
+  m.def("crossflow_velocity_ratio", &combaero::crossflow_velocity_ratio, py::arg("m_a"),
+        py::arg("m_b"), py::arg("P"), py::arg("T"), py::arg("X"), py::arg("P_down"),
+        py::arg("area"),
+        "McGreehan-Schotsch's supply-side U1/Vi for a hole in a duct wall: U1\n"
+        "the duct's mean velocity at the hole's station, (m_a + m_b)/(2 rho A);\n"
+        "Vi the isentropic jet velocity from the duct's STATIC (P, T) to the\n"
+        "discharge static P_down. Analytic derivatives.");
+
   py::class_<combaero::MergeFaceState>(m, "MergeFaceState")
       .def_readonly("P_face", &combaero::MergeFaceState::P_face)
       .def_readonly("Pt_face", &combaero::MergeFaceState::Pt_face)

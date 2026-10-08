@@ -247,6 +247,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Effusion liner: a duct-fed effusion wall (#471).** Python `EffusionLiner` and the GUI node "Effusion Liner": coolant in, coolant out and discharge ports.
+  - **Structure:** N stations along the backside duct, each a Bassett bleed (`CrossflowSegmentElement`) feeding a duct-fed panel into the gas.
+  - **Crossflow Cd:** panels take McGreehan-Schotsch's supply-side U1/Vi from the duct's mean velocity at their station and the static-referenced ideal jet velocity (C++ `crossflow_velocity_ratio`). The derivative chain runs into the neighbour segments.
+  - **Physics as solved:** the backside static pressure rises along the duct, the downstream panels pass more, and the upstream panels (faster crossflow) have the lower Cd.
+  - **Flags:** U1/Vi beyond the Rohde-scored bounds (0.2, 0.35); psi beyond Bassett's measured 3; the provisional plenum-fed coolant-side heat transfer.
+  - **GUI default:** Andrews plate C holes over a 30 mm duct. With a 200 Pa duct drop against ~3.8 kPa hole drive, U1/Vi peaks at 0.27.
+- **`EffusionPlateElement(crossflow_segments=..., crossflow_area=...)`:** duct-fed panels. `OrificeElement` discharge-hole Cds take `U1_over_Vi`, and their Jacobian carries every Cd dependence by name.
+
 - **Bleed through a duct wall: `CrossflowSegmentElement` with Bassett stations (#471).** This generalises the impingement crossflow segment.
   - **Stations:** a channel segment whose end nodes are side-stream stations, merge or bleed. The C++ (f, J) `station_half_drop(m_a, m_b, P, T, X, A, kappa)` carries half of each station at its node's density, and `channel_entry_drop` covers a reservoir entry.
   - **Merge:** `kappa = 0` (normal injection) is Florschuetz's term.

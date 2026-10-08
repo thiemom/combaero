@@ -66,6 +66,27 @@ const NetworkCanvas = () => {
 				} as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
+			} else if (type === "effusion_liner") {
+				// Andrews plate C holes and pitch over a 30 mm backside duct
+				// (#471). U1/Vi follows the duct drop against the hole drive.
+				data = {
+					...data,
+					n_segments: 4,
+					length: 0.152,
+					width: 0.152,
+					duct_height: 0.03,
+					hole_diameter: 3.27e-3,
+					wall_thickness: 6.3e-3,
+					pitch_x: 15.24e-3,
+					pitch_y: 15.24e-3,
+					angle_deg: 90.0,
+					entry_K: 0.5,
+					wall_conductivity: 20.0,
+					gas_film: "none",
+					gas_augmentation: 1.0,
+					turbulence_intensity: 0.05,
+					gas_heat_flux: 0.0,
+				} as any;
 			} else if (type === "effusion_plate") {
 				// Andrews et al.'s plate C, the geometry the closure is scored
 				// on (#471): a working example, not invented typical values.

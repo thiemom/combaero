@@ -189,4 +189,35 @@ JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
   return out;
 }
 
+CrossflowRatio crossflow_velocity_ratio(double m_a, double m_b, double P,
+                                        double T, const std::vector<double>& X,
+                                        double P_down, double area) {
+  if (!(area > 0.0) || !(P > 0.0) || !(T > 0.0)) {
+    throw std::invalid_argument(
+        "crossflow_velocity_ratio: area, P and T must be positive");
+  }
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  const double m_mean = 0.5 * (m_a + m_b);
+  const double sgn = m_mean >= 0.0 ? 1.0 : -1.0;
+  const double U1 = std::abs(m_mean) / (rho * area);
+  // Unit-flow jet impulse: J = w, the isentropic velocity from (P, T) to P_down.
+  const JetImpulse jet = jet_impulse(1.0, P, T, P_down, X);
+  const double Vi = std::sqrt(jet.J * jet.J + CROSSFLOW_VI_FLOOR * CROSSFLOW_VI_FLOOR);
+  const double dVi_dw = Vi > 0.0 ? jet.J / Vi : 0.0;
+
+  CrossflowRatio out;
+  out.U1 = U1;
+  out.Vi = Vi;
+  out.U1_over_Vi = U1 / Vi;
+  const double dU1_dm = 0.5 * sgn / (rho * area);
+  out.d_dm_a = dU1_dm / Vi;
+  out.d_dm_b = dU1_dm / Vi;
+  const double dU1_drho = -U1 / rho;
+  const double r_over_Vi = out.U1_over_Vi / Vi;
+  out.d_dP = dU1_drho * drho_dP / Vi - r_over_Vi * dVi_dw * jet.dJ_dPt;
+  out.d_dT = dU1_drho * drho_dT / Vi - r_over_Vi * dVi_dw * jet.dJ_dTt;
+  out.d_dP_down = -r_over_Vi * dVi_dw * jet.dJ_dP;
+  return out;
+}
+
 }  // namespace combaero

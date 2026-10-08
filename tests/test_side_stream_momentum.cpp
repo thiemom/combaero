@@ -208,3 +208,41 @@ TEST(ChannelEntryDrop, IsTheDynamicHeadPlusTheEntryLoss) {
                      combaero::channel_entry_drop(m - e, P, T, X, A, 0.5).dP) / (2 * e);
   EXPECT_NEAR(r.d_dm_a, fd, 1e-6 * fd);
 }
+
+// ---- supply-side crossflow ratio (#471) ------------------------------------
+
+TEST(CrossflowRatio, IsTheMeanDuctVelocityOverTheStaticIdealJet) {
+  const auto X = air();
+  const double ma = 0.30, mb = 0.28, P = 1.05e5, T = 600.0, Pd = 1.0e5, A = 1.5e-3;
+  const auto r = combaero::crossflow_velocity_ratio(ma, mb, P, T, X, Pd, A);
+  const double rho = combaero::density(T, P, X);
+  EXPECT_NEAR(r.U1, 0.5 * (ma + mb) / (rho * A), 1e-12 * r.U1);
+  // Low pressure ratio: Bernoulli on the STATIC drive.
+  EXPECT_NEAR(r.Vi, std::sqrt(2.0 * (P - Pd) / rho), 2e-2 * r.Vi);
+  EXPECT_NEAR(r.U1_over_Vi, r.U1 / r.Vi, 1e-12);
+}
+
+TEST(CrossflowRatio, DerivativesMatchCentralDifferences) {
+  const auto X = air();
+  const double ma = 0.30, mb = 0.28, P = 1.05e5, T = 600.0, Pd = 1.0e5, A = 1.5e-3;
+  const auto r = combaero::crossflow_velocity_ratio(ma, mb, P, T, X, Pd, A);
+  auto f = [&](double a, double b, double p, double t, double pd) {
+    return combaero::crossflow_velocity_ratio(a, b, p, t, X, pd, A).U1_over_Vi;
+  };
+  const double e = 1e-7, hP = 1.0, hT = 1e-3;
+  EXPECT_NEAR(r.d_dm_a, (f(ma + e, mb, P, T, Pd) - f(ma - e, mb, P, T, Pd)) / (2 * e), 1e-5 * std::abs(r.d_dm_a));
+  EXPECT_NEAR(r.d_dm_b, (f(ma, mb + e, P, T, Pd) - f(ma, mb - e, P, T, Pd)) / (2 * e), 1e-5 * std::abs(r.d_dm_b));
+  const double fP = (f(ma, mb, P + hP, T, Pd) - f(ma, mb, P - hP, T, Pd)) / (2 * hP);
+  const double fT = (f(ma, mb, P, T + hT, Pd) - f(ma, mb, P, T - hT, Pd)) / (2 * hT);
+  const double fPd = (f(ma, mb, P, T, Pd + hP) - f(ma, mb, P, T, Pd - hP)) / (2 * hP);
+  EXPECT_NEAR(r.d_dP, fP, 1e-3 * std::abs(fP));
+  EXPECT_NEAR(r.d_dT, fT, 1e-3 * std::abs(fT));
+  EXPECT_NEAR(r.d_dP_down, fPd, 1e-3 * std::abs(fPd));
+}
+
+TEST(CrossflowRatio, VanishingDriveStaysFinite) {
+  const auto X = air();
+  const auto r = combaero::crossflow_velocity_ratio(0.3, 0.3, 1.0e5, 300.0, X, 1.0e5, 1e-3);
+  EXPECT_TRUE(std::isfinite(r.U1_over_Vi));
+  EXPECT_NEAR(r.Vi, combaero::CROSSFLOW_VI_FLOOR, 1e-12);
+}

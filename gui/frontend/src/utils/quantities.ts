@@ -76,6 +76,27 @@ export const QUANTITY_CATALOGUE: Record<
 	eta_overall: { label: "η overall", unit: "—", format: (v) => v.toFixed(3) },
 	eta_film: { label: "η film", unit: "—", format: (v) => v.toFixed(3) },
 	blowing_ratio: { label: "M", unit: "—", format: (v) => v.toFixed(2) },
+	// Effusion liner (#471)
+	bleed_fraction: {
+		label: "Bleed",
+		unit: "%",
+		format: (v) => (100 * v).toFixed(1),
+	},
+	U1_over_Vi_max: {
+		label: "U1/Vi max",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	bleed_nonuniformity: {
+		label: "Bleed max/min",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	T_wall_hot_max: {
+		label: "T wall max",
+		unit: "K",
+		format: (v) => v.toFixed(0),
+	},
 	Re_surface: {
 		label: "Re (surface)",
 		unit: "—",
