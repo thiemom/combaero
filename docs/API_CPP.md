@@ -1064,7 +1064,8 @@ h_plate = Nu * k / D * A_h / A,   A_h = pi D L,  A = X^2 - pi D^2 / 4
 That factor is 3.46 for Andrews' plate C, so it is not optional. The
 conversion is left to the caller because it needs only geometry.
 
-Scored against Andrews' own Fig. 8 at **-13.5% bias, 14.7% RMSE**, labelled
+Scored against Andrews' own Fig. 8 at **-9.9% bias, 11.6% RMSE** (-13.5% /
+14.7% while air's viscosity was 11.8% low, #485), labelled
 **accuracy**: the correlations are the 1986 paper and the data the 1988
 one, and same lab plus different study is cross-source. See
 `validation/cooling/extractions/andrews_effusion_internal_h.md`.

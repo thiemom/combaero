@@ -71,9 +71,10 @@ def test_the_choked_flux_chokes_exactly_at_the_exit() -> None:
     assert not _core.fanno_duct(PT, TT, G_ch * (1 - 1e-6), X, L, D, ROUGH, "haaland").choked
     assert _core.fanno_duct(PT, TT, G_ch * (1 + 1e-6), X, L, D, ROUGH, "haaland").choked
     # The x-march's own choke flag, bisected (to the 6 digits recorded),
-    # lands on the same flow.
+    # lands on the same flow (0.113142 after air's viscosity fix, #485; it
+    # was 0.113271 with mu 11.8% low).
     area = math.pi * D * D / 4
-    assert G_ch * area == pytest.approx(0.113271, rel=1e-5)
+    assert G_ch * area == pytest.approx(0.113142, rel=1e-5)
     assert G_ch < _core.fanno_sonic_mass_flux(PT, TT, X)
 
 

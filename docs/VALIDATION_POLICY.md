@@ -130,7 +130,10 @@ an equation the author evaluates himself, or an identity between two
 printed equations. Scoring against a digitised figure is NOT one: that is
 the fidelity/accuracy basis above, and it cannot separate "we transcribed
 it wrong" from "the model misses". A printed quantity can -- which is how
-Andrews' -13.5% became a model limitation rather than our bug.
+Andrews' -13.5% became a model limitation rather than our bug. (Part of it
+WAS ours after all, in a place no transcription check reaches: air's
+viscosity was 11.8% low from flagged transport data, #485; corrected, the
+miss is -9.9%. Property values need their own literature check.)
 
 **The count is evidence, not a score.** A set with more checks is better
 evidenced, not more accurate; `baldauf_2002_sellers` carries one whose

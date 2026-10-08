@@ -468,9 +468,9 @@ boundary layer at the same x, a third baseline again.
 
 **`gas_augmentation` and `internal_Nu_multiplier` are yours, never
 fitted here**, matching `Nu_multiplier` on `ConvectiveSurface`. At their
-defaults the closure scores +3.1% on Andrews' effusion plate C and +23.7%
-on plate B; setting `gas_augmentation = 2.06` closes plate B at G = 0.6
-exactly. Note that `internal_Nu_multiplier = 0.486` also closes it -- by
+defaults the closure scores +4.0% on Andrews' effusion plate C and +24.6%
+on plate B; setting `gas_augmentation = 2.12` closes plate B at G = 0.6
+exactly. Note that `internal_Nu_multiplier = 0.471` also closes it -- by
 halving the coolant side, which is the wrong direction, since that
 correlation runs 10.4% LOW against Andrews' Fig. 8. Reaching the target
 is not the same as being the right dial.

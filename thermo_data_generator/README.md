@@ -170,6 +170,20 @@ When a species' transport data appears in a secondary mechanism but not your
 primary one, pass both to `extract_species_data.py --yaml primary.yaml secondary.yaml`.
 The first file takes priority on conflicts; later files fill gaps.
 
+**Flagged transport yields (#485).** A mechanism can mark a species' transport
+as an unreferenced estimate. NUIGMech1.1 does so for every species here:
+`\AUTHOR: WARNING !\REF: WARNING !\COMMENT: theoret trans`. Such a set is
+replaced by the first later source with unflagged parameters, for TRANSPORT
+ONLY; thermo keeps first-wins. Each entry records `transport_source` and
+`transport_flagged` in `merged_species.json`. Without this, NUIGMech's O2
+(eps 676 K against 107.4 K in GRI30, JetSurf2, Aramco2 and San Diego) made
+air's viscosity 11.8% low. The current header comes from
+`--yaml NUIGMech1.1.yaml JetSurf2.yaml --cea NASA9_subset.txt`: thermo from
+NASA-9, transport from JetSurf2, and NUIGMech for NH3 alone.
+
+Check new transport data against literature, not only against another
+mechanism (`python/tests/test_transport_literature.py`).
+
 **Note — PyYAML boolean parsing**: species names like `NO` parse as `False`
 in YAML 1.1. The extractor handles this automatically.
 
