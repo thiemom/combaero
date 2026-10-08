@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The state relay of a single-source, multi-sink element took the stream's flow derivative at the wrong node.** This affects branching junctions. The stream into a sink is `flow_at_node(sink)`, but the relay differentiated `flow_at_node(source)`.
+  - **Effect:** a heated node behind a branching tee's straight leg saw d/d(m_com) only and lost the −1 on m_branch. That Jacobian entry was 0 against a finite difference of −1.9.
+  - **Now:** the global Jacobian matches finite differences to 2e-5. Solutions are unchanged; only Newton's path is.
+
 - **`critical_pressure_ratio` returned 0.5636 whatever the gas or temperature (#471).** Its golden-section search kept its probe points in the opposite order to its update and shrank onto a fixed point.
   - **True value for air:** 0.528 at 300 K, 0.542 at 1500 K. That is where the isentropic mass flux peaks at M = 1.
   - **Choked mass flux:** it came out 0.1-0.3% low, and `nozzle_flow` declared choking early. The compressible orifice uses `nozzle_flow`.
