@@ -12,6 +12,7 @@ import combaero as cb
 
 from .components import (
     ChannelElement,
+    CombustorNode,
     EnergyBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
@@ -1253,6 +1254,24 @@ class NetworkSolver:
                 state_up._element_id = elem.id
                 state_up._m_dot_jac_names = {f"{elem.id}.m_dot": -1.0}
                 stream_info.append((state_up, elem, elem.to_node, {i_m: -1.0}))
+            # A MassFlowBoundary between elements injects its own stream: the
+            # mass row already counts its m_dot, so the mixing must too, at
+            # its own Tt and Y (#481). Fixed, so it has no relay column.
+            if (
+                isinstance(node, MassFlowBoundary)
+                and self.network.get_upstream_elements(nid)
+                and self.network.get_downstream_elements(nid)
+            ):
+                own = self._get_node_state(node, x)
+                inj = NetworkMixtureState(
+                    P=own.P,
+                    Pt=own.Pt,
+                    T=float(node.Tt),
+                    Tt=float(node.Tt),
+                    m_dot=float(node.m_dot),
+                    Y=node.Y if node.Y is not None else self._default_Y,
+                )
+                stream_info.append((inj, None, nid, {}))
             up_states = [s for s, _, _, _ in stream_info]
 
             # Wall Coupling: evaluate walls BEFORE compute_derived_state
@@ -1302,6 +1321,8 @@ class NetworkSolver:
                 # Iterate over stream_info (one entry per upstream stream, including
                 # multiple entries for multi-port elements like TeeJunctionElement).
                 for i, (_, elem, src_nid, coeffs) in enumerate(stream_info):
+                    if elem is None:
+                        continue  # a fixed injection: nothing to relay
                     t_jac = mix_res.dT_mix_d_stream[i]
                     pt_jac = mix_res.dP_total_mix_d_stream[i]
                     # dY_mix_d_stream is indexed by [species][stream]
@@ -1534,6 +1555,46 @@ class NetworkSolver:
             if indices:
                 flows[eid] = float(self.network.elements[eid].flow_at_node(node_id, x, indices))
         return flows
+
+    def _node_inflows(self, nid: str, x: np.ndarray) -> list[tuple[float, float, list[float]]]:
+        """(m_dot, Tt, Y) of every stream INTO nid, as the propagation mixes
+        them: by flow sign for 2-port elements, a MassFlowBoundary's own
+        injection included."""
+        two = self._two_port_mdot_indices()
+        out: list[tuple[float, float, list[float]]] = []
+
+        def state(n: str) -> NetworkMixtureState:
+            return self._get_node_state(self.network.nodes[n], x)
+
+        for e in self.network.get_upstream_elements(nid):
+            if e.id in two:
+                m = float(x[two[e.id]])
+                if m > 0.0:
+                    st = state(e.from_node)
+                    out.append((m, float(st.Tt), list(st.Y)))
+                continue
+            ind = self._unknown_indices.get(e.id, [])
+            single = len(e.all_source_nodes()) == 1
+            for src in e.all_source_nodes():
+                try:
+                    m = float(e.flow_at_node(nid if single else src, x, ind))
+                except (IndexError, TypeError):
+                    m = 0.0
+                st = state(src)
+                out.append((m, float(st.Tt), list(st.Y)))
+        for e in self.network.get_downstream_elements(nid):
+            if e.id in two and x[two[e.id]] < 0.0:
+                st = state(e.to_node)
+                out.append((-float(x[two[e.id]]), float(st.Tt), list(st.Y)))
+        node = self.network.nodes[nid]
+        if (
+            isinstance(node, MassFlowBoundary)
+            and self.network.get_upstream_elements(nid)
+            and self.network.get_downstream_elements(nid)
+        ):
+            Y = node.Y if node.Y is not None else self._default_Y
+            out.append((float(node.m_dot), float(node.Tt), list(Y)))
+        return out
 
     def _htc_mdot_sign(self, obj: Any, x: np.ndarray) -> float:
         """Sign that turns an htc's own-flow derivative into one in the
@@ -2481,8 +2542,6 @@ class NetworkSolver:
                     self.network.resolve_all_topology()
 
         if x0 is None and init_strategy == "homotopy":
-            from .components import MassFlowBoundary
-
             # Identify all MassFlowBoundary nodes and their target m_dot
             targets = {
                 nid: node.m_dot
@@ -3170,10 +3229,19 @@ class NetworkSolver:
                 q_to_boundary = 0.0
                 if tgt_a != tgt_b:
                     for tgt, q_in in ((tgt_a, -float(wall_res.Q)), (tgt_b, float(wall_res.Q))):
-                        if tgt not in self._wall_ebs:
+                        if tgt in self._wall_ebs:
+                            continue
+                        if isinstance(
+                            self.network.nodes[tgt], (PressureBoundary, MassFlowBoundary)
+                        ):
                             q_to_boundary += q_in
                             key = f"{tgt}.Q_wall_out"
-                            sol_dict[key] = sol_dict.get(key, 0.0) + q_in
+                        else:
+                            # A node that takes no heat (a WallNode): no
+                            # stream carries it anywhere, so it is withheld,
+                            # not 'out' (#481).
+                            key = f"{tgt}.Q_withheld"
+                        sol_dict[key] = sol_dict.get(key, 0.0) + q_in
                 sol_dict[f"{wid}.Q_to_boundary"] = q_to_boundary
                 sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
                 sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
@@ -3182,6 +3250,36 @@ class NetworkSolver:
                 # compute_coupling just placed for these inputs (k(T) at its
                 # fixed point, h floored as the coupling floors it).
                 sol_dict[f"{wid}.T_interface"] = list(wall._last_profile or [])
+
+        # Heat an energy boundary gives a node that the node does not take up:
+        # Q is spread over max(flow, a 1 mg/s floor), so only a stagnant node
+        # withholds any (#481). And the heat a 'fraction' boundary applied.
+        for nid, node in self.network.nodes.items():
+            ebs = getattr(node, "energy_boundaries", None) or []
+            if not ebs:
+                continue
+            q_given = sum(float(eb.Q) for eb in ebs)
+            frac = sum(float(eb.fraction) for eb in ebs)
+            inflows = self._node_inflows(nid, final_x)
+            m_in = sum(m for m, _, _ in inflows)
+            if q_given != 0.0:
+                m0 = cb.MIXER_HEAT_MDOT_FLOOR
+                m_eff = abs(m_in) if abs(m_in) >= m0 else (m_in * m_in + m0 * m0) / (2.0 * m0)
+                withheld = q_given * (1.0 - m_in / m_eff)
+                if withheld != 0.0:
+                    sol_dict[f"{nid}.Q_withheld"] = (
+                        sol_dict.get(f"{nid}.Q_withheld", 0.0) + withheld
+                    )
+            if frac != 0.0 and not isinstance(node, CombustorNode) and m_in > 0.0:
+                Y_mix = np.zeros(self._n_species)
+                H = 0.0
+                for m, Tt, Y in inflows:
+                    X = cb.mass_to_mole(list(Y))
+                    H += m * float(cb.h_mass(Tt, X))
+                    Y_mix += m * np.asarray(Y, dtype=float)
+                X_mix = cb.mass_to_mole(list(Y_mix / m_in))
+                h_ref = float(cb.h_mass(cb.SENSIBLE_ENTHALPY_REF_T, X_mix))
+                sol_dict[f"{nid}.Q_fraction"] = frac * (H - m_in * h_ref)
 
         sol_dict["__complete_states__"] = self.extract_complete_states(sol_dict)
         sol_dict["__success__"] = success

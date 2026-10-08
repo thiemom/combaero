@@ -500,8 +500,15 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // m_eff = (m^2 + m0^2)/(2 m0) >= m0/2 instead of |m|, keeping Q/m finite as
 // the flow vanishes. At or above it Q/m is exact, so the heat a node is given
 // is the heat it receives (energy conservation; the previous
-// sqrt(m^2 + 1e-6) lost 5e-5 of Q at 0.1 kg/s and 11% at 2 g/s).
-constexpr double kMixerHeatMdotFloor = 2e-3;
+// sqrt(m^2 + 1e-6) lost 5e-5 of Q at 0.1 kg/s and 11% at 2 g/s). 1 mg/s: below
+// any flow a real network carries, so only a stagnant node (a dead end) is
+// floored; the solver reports what it withholds there as {node}.Q_withheld.
+// Convergence measured the same at 2e-3 and 1e-6 (#481).
+constexpr double kMixerHeatMdotFloor = 1e-6;
+
+// Reference temperature [K] of the sensible enthalpy h(T) - h(T_ref) that an
+// EnergyBoundary 'fraction' scales (at the stream's own composition).
+constexpr double kSensibleEnthalpyRefT = 298.15;
 
 // Mix generalized non-reacting incoming streams into a single outgoing state,
 // and compute all analytical Jacobians w.r.t upstream mass flows, Temperatures,

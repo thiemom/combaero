@@ -656,6 +656,8 @@ PYBIND11_MODULE(_core, m) {
   m.attr("STATION_KAPPA_MERGE_NORMAL") = combaero::STATION_KAPPA_MERGE_NORMAL;
   m.attr("STATION_KAPPA_BLEED_BASSETT") = combaero::STATION_KAPPA_BLEED_BASSETT;
   m.attr("WALL_HTC_KNEE") = combaero::WALL_HTC_KNEE;
+  m.attr("MIXER_HEAT_MDOT_FLOOR") = combaero::solver::kMixerHeatMdotFloor;
+  m.attr("SENSIBLE_ENTHALPY_REF_T") = combaero::solver::kSensibleEnthalpyRefT;
   py::class_<combaero::StationHalfDrop>(m, "StationHalfDrop")
       .def_readonly("dP", &combaero::StationHalfDrop::dP)
       .def_readonly("d_dm_a", &combaero::StationHalfDrop::d_dm_a)
