@@ -892,6 +892,14 @@ class NetworkSolver:
         self._topological_order = self._compute_topological_order()
 
         # Set up flow-dependent wall EnergyBoundaries for thermal coupling
+        # The wall EBs live on the nodes, so drop any a previous setup left:
+        # each would keep the heat of that attempt's last iterate (a retry,
+        # or a second solver on the same network, used to add a second EB
+        # beside the stale one -- the heat counted twice).
+        for node in self.network.nodes.values():
+            ebs = getattr(node, "energy_boundaries", None)
+            if ebs:
+                ebs[:] = [eb for eb in ebs if eb.id != f"_wall_{node.id}"]
         self._wall_ebs: dict[str, EnergyBoundary] = {}
         if self.network.thermal_coupling_enabled and self.network.walls:
             self._setup_wall_energy_boundaries()
@@ -1861,7 +1869,97 @@ class NetworkSolver:
         Certified audit (2026-07): 16/16 same-root on branch
         topologies, 11/16 on merge -- prefer 'default' /
         'analytical_pt_prop' for merge networks.
+
+        A cold solve of a network with ``ThermalWall`` s that still fails
+        is retried once more from the same network solved WITHOUT its walls
+        (``thermal_coupling_enabled = False``): the walls move a lot of heat
+        into small flows, and a cold Newton step that reverses one of them
+        leaves a node heated with almost nothing to carry the heat. The
+        wall-less flows are a start on the right side of that (#471:
+        impingement array under a hot duct, 6/9 cold vs 9/9 seeded).
         """
+        _t0 = time.time()
+        sol = self._solve_flow_retries(
+            method=method,
+            timeout=timeout,
+            options=options,
+            use_jac=use_jac,
+            x0=x0,
+            init_strategy=init_strategy,
+            warmstart_maxfev=warmstart_maxfev,
+            lambda_steps=lambda_steps,
+            auto_retry=auto_retry,
+        )
+        if (
+            sol.get("__success__", False)
+            or not auto_retry
+            or x0 is not None
+            or not (self.network.thermal_coupling_enabled and self.network.walls)
+        ):
+            return sol
+        remaining = None
+        if timeout is not None:
+            remaining = timeout - (time.time() - _t0)
+            if remaining <= 0.0:
+                return sol
+        seed = self._wall_free_seed(method=method, timeout=remaining, use_jac=use_jac)
+        if seed is None:
+            return sol
+        _primary_diag = getattr(self, "_diagnostic_data", None)
+        if timeout is not None:
+            remaining = max(timeout - (time.time() - _t0), 0.0)
+        retry = self._solve_impl(
+            method=method, timeout=remaining, options=options, use_jac=use_jac, x0=seed
+        )
+        primary_msg = str(sol.get("__message__", "")).strip()
+        if retry.get("__success__", False):
+            retry["__message__"] = (
+                "Converged from the wall-free flow solution after the cold "
+                f"attempt failed ({primary_msg[:120]})."
+            )
+            return retry
+        r_norm, p_norm = retry.get("__final_norm__"), sol.get("__final_norm__")
+        if r_norm is not None and p_norm is not None and float(r_norm) < float(p_norm):
+            return retry
+        if _primary_diag is not None:
+            self._diagnostic_data = _primary_diag
+        sol["__message__"] = f"{primary_msg} [wall-free warm-start retry also failed]"
+        return sol
+
+    def _wall_free_seed(
+        self, method: str, timeout: float | None, use_jac: bool
+    ) -> np.ndarray | None:
+        """This network's solution with its walls switched off, ordered as
+        this solver's unknowns; ``None`` when it fails or the unknowns differ."""
+        net = self.network
+        net.thermal_coupling_enabled = False
+        try:
+            seed_solver = NetworkSolver(net)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                r = seed_solver.solve(method=method, timeout=timeout, use_jac=use_jac)
+        finally:
+            net.thermal_coupling_enabled = True
+        if not r.get("__success__", False):
+            return None
+        by_name = dict(zip(seed_solver.unknown_names, r["__x_solution__"], strict=True))
+        if set(by_name) != set(self.unknown_names):
+            return None
+        return np.array([by_name[k] for k in self.unknown_names], dtype=float)
+
+    def _solve_flow_retries(
+        self,
+        method: str,
+        timeout: float | None,
+        options: dict[str, Any] | None,
+        use_jac: bool,
+        x0: np.ndarray | None,
+        init_strategy: str,
+        warmstart_maxfev: int,
+        lambda_steps: list[float] | None,
+        auto_retry: bool,
+    ) -> dict[str, float]:
+        """The cold solve with its outlet-referenced auto-retry (see solve)."""
         self._apply_barrier_scale()
         retry_applicable = (
             auto_retry
@@ -1904,7 +2002,7 @@ class NetworkSolver:
             "auto-retrying from an outlet-referenced incompressible warm "
             "start. Pass auto_retry=False to disable.",
             RuntimeWarning,
-            stacklevel=2,
+            stacklevel=3,
         )
         # Heavy networks (high Re, thermal surfaces) can need tens of
         # seconds even for the incompressible proxy (observed 35 s on a
@@ -2955,6 +3053,23 @@ class NetworkSolver:
 
                 sol_dict[f"{wid}.Q"] = float(wall_res.Q)
                 sol_dict[f"{wid}.T_hot"] = float(wall_res.T_hot)
+
+                # Heat injected into a node that cannot take it -- a boundary,
+                # whose state is fixed -- leaves the network with the stream
+                # crossing that boundary: the network is the control volume
+                # and the far side is out of scope. Report it, so the balance
+                # closes: the stream leaves with m h(T_upstream) + Q_wall_out.
+                # Q > 0 flows A -> B, so A's target receives -Q and B's +Q.
+                tgt_a = wall.element_a if wall.element_a in self.network.nodes else obj_a.to_node
+                tgt_b = wall.element_b if wall.element_b in self.network.nodes else obj_b.to_node
+                q_to_boundary = 0.0
+                if tgt_a != tgt_b:
+                    for tgt, q_in in ((tgt_a, -float(wall_res.Q)), (tgt_b, float(wall_res.Q))):
+                        if tgt not in self._wall_ebs:
+                            q_to_boundary += q_in
+                            key = f"{tgt}.Q_wall_out"
+                            sol_dict[key] = sol_dict.get(key, 0.0) + q_in
+                sol_dict[f"{wid}.Q_to_boundary"] = q_to_boundary
                 sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
                 sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
 

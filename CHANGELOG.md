@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Network energy balance now closes for every cooling configuration (#471).** Three leaks, each locked by `test_energy_conservation_cooling.py`:
+  - **The mixers withheld part of the heat they were given.** They divided Q by `sqrt(m^2 + 1e-6)` instead of the flow, which lost 5e-5 of Q at 0.1 kg/s, 0.5% at 10 g/s and 11% at 2 g/s. This affected `mixer_from_streams_and_jacobians` and the two combustion variants. Q / m is now exact at or above 2 g/s (`kMixerHeatMdotFloor`); below that, a C1 floor applies.
+  - **Wall heat put on a boundary disappeared.** A boundary's state is fixed, so that heat leaves with the stream crossing it. It is now reported as `{wall}.Q_to_boundary` and `{boundary}.Q_wall_out` (W). Before, the hot duct of an impingement array lost its walls' entire Q from the balance.
+  - **Re-solving a network counted wall heat twice.** Every solver setup hung another wall `EnergyBoundary` on the heated nodes beside the previous one, which kept the last attempt's heat. That happened with a second `NetworkSolver` on the same network and with the solver's own retries. Setup now replaces it.
+  - **Result:** closure is 1e-9 relative or better, against 1e-5 to 1 before.
+- **A failed cold solve of a network with walls is retried from its wall-free flows.** The walls move a lot of heat into small flows. A cold Newton step that reversed one of them left a node with heat and nothing to carry it.
+  - **Impingement array under a hot duct:** 6 of 9 cases converged cold, now 9 of 9 (3/5/8 rows, 1-5 kPa).
+  - **Old mixer, for comparison:** 7 of 9. The exact heat made the cold path no easier.
+
 - **The state relay of a single-source, multi-sink element took the stream's flow derivative at the wrong node.** This affects branching junctions. The stream into a sink is `flow_at_node(sink)`, but the relay differentiated `flow_at_node(source)`.
   - **Effect:** a heated node behind a branching tee's straight leg saw d/d(m_com) only and lost the −1 on m_branch. That Jacobian entry was 0 against a finite difference of −1.9.
   - **Now:** the global Jacobian matches finite differences to 2e-5. Solutions are unchanged; only Newton's path is.

@@ -20,11 +20,23 @@
 #include <cmath>
 #include <stdexcept>
 #include <limits>
+#include <utility>
 
 namespace combaero {
 namespace solver {
 
 namespace {
+// Flow Q is divided by in the mixers, and its derivative w.r.t. the total
+// flow: |m| at or above kMixerHeatMdotFloor, a C1 parabola below it.
+std::pair<double, double> heat_flow_divisor(double mdot_tot) {
+  const double m0 = kMixerHeatMdotFloor;
+  const double a = std::abs(mdot_tot);
+  if (a >= m0) {
+    return {a, mdot_tot >= 0.0 ? 1.0 : -1.0};
+  }
+  return {(mdot_tot * mdot_tot + m0 * m0) / (2.0 * m0), mdot_tot / m0};
+}
+
 // Get global minimum temperature across all species from NASA9 thermo data
 // Used to derive smooth floor limits for finite difference calculations
 double get_global_thermo_T_min() {
@@ -689,9 +701,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   double h_mix_base = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
                                         : (n_streams > 0 ? h_stream[0] : 0.0);
 
-  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
-  // mdot_eff is strictly positive and smooth through 0. Minimum bound is 1e-3 kg/s
-  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+  // Heat is spread over the actual flow, floored only near zero flow.
+  const auto [mdot_eff, dmdot_eff] = heat_flow_divisor(mdot_tot);
 
   // Apply energy transfer: delta_h = Q/mdot_eff + fraction * h_mix_base
   double delta_h = Q / mdot_eff + fraction * h_mix_base;
@@ -761,9 +772,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
       }
       double dh_base_dmdot = (h_diff - y_sum) / mdot_tot;
 
-      // Q contribution: d(Q/mdot_eff)/d(mdot_i) = -Q * mdot_tot / (mdot_eff^3)
-      double mdot_eff_3 = mdot_eff * mdot_eff * mdot_eff;
-      double dh_Q_dmdot = -Q * mdot_tot / mdot_eff_3;
+      // Q contribution: d(Q/mdot_eff)/d(mdot_i) = -Q * mdot_eff' / mdot_eff^2
+      double dh_Q_dmdot = -Q * dmdot_eff / (mdot_eff * mdot_eff);
 
       // Fraction contribution: d(fraction * h_mix_base)/d(mdot_i)
       // = fraction * d(h_mix_base)/d(mdot_i)
@@ -837,8 +847,8 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
-  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
-  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+  // Heat is spread over the actual flow, floored only near zero flow.
+  const double mdot_eff = heat_flow_divisor(mdot_tot).first;
 
   // Compute delta_h from Q and fraction
   double delta_h = Q / mdot_eff + fraction * h_mix_base;
@@ -989,8 +999,8 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
-  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
-  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+  // Heat is spread over the actual flow, floored only near zero flow.
+  const double mdot_eff = heat_flow_divisor(mdot_tot).first;
 
   // Compute delta_h from Q and fraction
   double delta_h = Q / mdot_eff + fraction * h_mix_base;
