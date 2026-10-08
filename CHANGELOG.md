@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The compressible `ChannelElement` passes its choked flow, not more (#481).** Its residual is now in mass-flow form, `m - m_calc`. `m_calc` comes from the new `fanno_channel_flow`; it rises monotonically as the back pressure falls and saturates exactly at the choked flow, like the compressible orifice. Measured on a 20 mm by 1 m duct at 2 bar:
+  - **Choked flow:** pressure-driven ducts past choke converged 5-7% (exit lost) and 6-20% (recovered) ABOVE their choked flow, because the infeasible region was patched with a barrier. They now converge on it exactly (1e-8).
+  - **Failed solves:** the 60 kPa back-pressure case now converges.
+  - **Unchoked flows:** unchanged, being the same Fanno physics.
+  - **Imposed flow above choke:** it raises the supply pressure until the duct can carry it.
+- **Compressible channel defects the redesign removes (#481):**
+  - **Reversed flow** marched from the upstream node; it is now fed from the downstream node's stagnation state.
+  - **The composition Jacobian** `d_dP_dY` was off by about 1e5x, because it differenced a different function. The new form has no composition column (see Not changed in #481).
+  - **`get_spatial_profile`** raised TypeError for every compressible channel. It now marches from the duct's inlet static state.
+  - **Residual shape past sonic:** dP(m) was non-monotone, jumped, and had d/dm = 0 past inlet-sonic.
+- **Residual-row scaling is declared by the element (`residual_scale_kind`)** and documented once, under the searchable tag `RESIDUAL-ROW-SCALING` in `NetworkSolver._build_residual_scales`.
+  - **The bug:** the compressible channel's new kg/s row, filed as a pressure row, stalled a GUI tee network (697 evaluations, failed). Correctly filed, it converges in 48 evaluations and 1.8 s; the old element took 1.9 s.
+  - **Also fixed:** the scaling comment said `F_real * D_f`, the inverse of what the code does.
+
 - **A `MassFlowBoundary` between elements now injects its own stream (#481).** The mass balance counted its `m_dot`, but the mixing dropped its enthalpy and species. Measured: 50 g/s injected at 800 K left the node at the inflow's 300 K (-26 kW).
 - **`EnergyBoundary.fraction` now scales sensible enthalpy (#481).**
   - **What it means:** h(T) - h(298.15 K) at the stream's own composition; on a combustor, the products'.
@@ -290,6 +304,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "lower bound" caveat becomes testable rather than stated.
 
 ### Added
+
+- **`fanno_channel_flow`:** the mass flux a duct passes from a stagnation state against a back pressure, with dG/dPt0, dG/dTt0 and dG/dP_target. It saturates at the choked flux and is never infeasible.
+  - **Method:** it solves for the exit Mach, because P_exit is linear in G at fixed M so G(M_exit) is explicit, and differentiates implicitly. That stays well conditioned up to the choke and C1 through it.
+  - **Below 1 Pa of drive** the flux is blended C1 to a finite slope.
+  - **Accuracy:** it inverts `fanno_duct` to 1e-11.
+  - **Cost:** about 4 ms per unchoked call, 6 ms choked.
 
 - **Fanno flow integrated in Mach number** (`fanno_mach.h`: `fanno_duct`, `fanno_choked_mass_flux`, `fanno_length_between`, `fanno_inlet_mach`, `fanno_sonic_mass_flux`, `fanno_state_at_mach`, `fanno_dx_dmach`). It is the kernel for the compressible-channel redesign.
   - **Method:** at fixed mass flux the station state is algebraic in M, so the length is a smooth integral that is exactly 0 at sonic. L* and the choked flux are exact, with no M = 0.999 cutoff, gradient floor or step control.
@@ -2901,6 +2921,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from 4.7e-2 to 3.1e-8.
 
 ### Removed
+
+- **`channel_compressible_residuals_and_jacobian`, `channel_compressible_mdot_and_jacobian`** and the barrier constants `kChannelChokeMinMarched`, `kChannelChokeBarrierKappa`, `kChannelChokeBarrierBeta` (#481). They posed the channel as "given m, find the drop", which has no answer past choke; replaced by `fanno_channel_flow`. Their unit tests went with them; the march's own grid-independence test stays.
 
 - **`CombustorNode.set_fuel_boundary`** (#481). It stored a boundary nothing read: fuel only ever counted when wired through an element. Use an element from a MassFlowBoundary, or an injecting MassFlowBoundary.
 

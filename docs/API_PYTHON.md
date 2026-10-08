@@ -943,6 +943,13 @@ from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberE
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
 channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
+# Compressible channel (#481): residual m - m_calc, m_calc = A * fanno_channel_flow(
+# feeding node's Pt/Tt, other node's Pt). The duct is fed isentropically from the
+# node the flow comes FROM (reversed flow: the to_node), discharges with its exit
+# head lost into a PressureBoundary (coupling "static"/default) or recovered into
+# anything else, and its flow SATURATES at the choked flow -- a choked duct
+# converges on its choked flow, never past it. Diagnostics: "choked",
+# "M_in_duct", "M_exit_duct".
 
 # Effusion (multi-perforated) wall panel. Geometry is given the way a plate
 # is designed -- pitch, hole diameter, wall thickness, inclination -- and the

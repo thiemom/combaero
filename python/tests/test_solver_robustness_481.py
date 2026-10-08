@@ -51,8 +51,13 @@ def _jac_vs_fd(s: NetworkSolver, x: np.ndarray) -> float:
     fd = approx_derivative(
         lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-5, 1e-7)
     )
-    scale = np.maximum(np.max(np.abs(fd), axis=1, keepdims=True), 1e-300)
-    return float(np.max(np.abs(J.toarray() - fd) / scale))
+    # RESIDUAL-ROW-SCALING (NetworkSolver._build_residual_scales). In scaled
+    # variables (J_ij |x_j|): rows mix kg/s and Pa columns, and raw
+    # row scaling hides a wrong entry in the small-unit columns.
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    Js, fds = J.toarray() * cols, fd * cols
+    scale = np.maximum(np.max(np.abs(fds), axis=1, keepdims=True), 1e-300)
+    return float(np.max(np.abs(Js - fds) / scale))
 
 
 # --- reversed flow: the plenum takes the stream that actually feeds it ------
