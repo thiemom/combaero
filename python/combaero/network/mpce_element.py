@@ -621,10 +621,15 @@ class MultiPortChamberElement(MultiPortChamberBase):
         # configurations with the right count but wrong port distribution
         # (e.g., for "merge" port_mdots=[-, +, -] has 2 suppliers but at
         # the wrong ports). Per-port catches this exactly.
-        # Correct direction at port i: sign(port_mdots[i]) == sign(port_signs[i]),
-        # i.e., port_signs[i] * port_mdots[i] > 0. Wrong when the product is
-        # strictly negative (a tolerance keeps the boundary mdot=0 quiet).
-        wrong_ports = [i for i in range(N) if self._port_signs[i] * port_mdots[i] < -1e-9]
+        # Correct direction at port i: an inlet (port_signs -1) supplies, U > 0;
+        # an outlet collects, U < 0. Wrong when -port_signs[i] * U[i] is
+        # negative beyond the SAME 1e-9 the supplier/collector masks use. A
+        # tolerance on the mass flow instead (1e-9 kg/s) let an inlet carrying
+        # 1e-9 kg/s outward -- U ~ 1e-6 m/s, a collector to the masks -- pass as
+        # "not wrong" with no supplier left, and the kernel refused it (#481).
+        wrong_ports = [
+            i for i in range(N) if -float(self._port_signs[i]) * float(U_mynard[i]) < -1e-9
+        ]
         if wrong_ports:
             if self.strict:
                 expected = [

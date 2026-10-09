@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **No throw, no NaN and no jump where a solver probe can reach (#481).** The suite's converged solves (485) were probed through flow reversal, zero flow and out-of-range pressures. Each fix is exact wherever its closure is defined.
+  - **Turbulent-only Nusselt correlations** (`dittus_boelter`, `sieder_tate`, `petukhov`) threw for 2300 <= Re < 1e4 in `channel_smooth` and `htc_circular_channel`. They now use the VDI Heat Atlas transition: linear in Re from laminar Nu at 2300 to the correlation at 1e4, with exact derivatives. Values from 1e4 up are unchanged.
+  - **`fanno_channel_flow`** threw at a back pressure <= 0. That now gives the choked flux, continuous with P -> 0+.
+  - **Ejector:** the residual was NaN for every primary flow below ~0.9 of the operating one, and on most pressure probes. The jet-pump and critical closures took sqrt of a negative once the mixing-plane pressure passed a supply's, and a hard M_py = 0 switch divided by zero.
+    - **Fix:** their arguments continue through a C1 positive floor, `dpos_floor`: eps^2/(2 eps - a) below eps. Unlike an exponential tail at the small eps a domain guard needs, it never underflows.
+    - **Also:** the subsonic mixing root is now taken in its cancellation-free form.
+  - **Legacy `TeeJunctionElement`** went NaN with an idle branch: the datum is the collector there (x = 1, phi = 0), and K -> 0 but evaluated 0 * inf.
+  - **`MultiPortChamberElement`** classified a wrong-direction port by a 1e-9 kg/s tolerance but its suppliers and collectors by 1e-9 m/s. An inlet carrying 1e-9 kg/s outward passed as "not wrong", left no supplier, and the kernel raised. Both tests now use the velocity.
+  - **A node with no inflow** (all its flows leaving) set its flow to 1 kg/s. That put a 4.3 kPa jump in a momentum chamber's dynamic-head row as its last feed reversed. It now carries no flow, continuous with a vanishing feed.
+    - **Not shipped:** a continuous T/Y fallback for such a node, mixing the states it would be fed from weighted 1/|m|. It removed most remaining zero-flow jumps, but doubled the cold-start time of hot impingement arrays and failed one, with no gain elsewhere. Its T/Y stay at the 300 K-air fallback.
+  - **Not changed:** a node's state still switches source when a series line reverses (upwinding). The merge chamber's main-inlet face still switches off for a reversed main; that is tracked as #493. In the 240-case junction sweep, none of the 10 solvable failures ends near zero flow.
+  - **Measured:** over the suite's 490 converged solves, every throw and NaN is gone and zero-flow jump rows fall from ~750 to 543. On the 292-network benchmark the outcomes are unchanged, and junctions take +2% evaluations: a just-reversed junction port now takes the soft barrier, not the kernel's refusal.
+
 - **Compressible channel derivatives are exact at low drive; the flow is smooth below the 1 Pa floor (#481).**
   - **Cause:** at low drive the duct's inlet and exit Mach nearly coincide, with (Me - M_in)/Me ~ drive/P (7e-6 at 1.5 Pa on 2 bar). `fanno_channel_flow`'s implicit derivatives combine terms ~P/drive times larger than their result, and two of those terms were finite differences: the inlet flux slope and the exit-pressure-per-flux slope. Their 1e-8 to 1e-10 rounding, amplified ~1e5, put up to 8e-3 into dG/dPt0 and dG/dP_target at a few Pa. Below the floor it also put 1e-5 noise into the flow itself, through the blend exponent sigma, so that G jumped when Tt or the composition was nudged.
   - **Fix:** both slopes are now closed form (energy plus isentropic relations); the moving inlet limit is taken by Leibniz's rule.

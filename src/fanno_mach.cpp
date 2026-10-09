@@ -521,7 +521,10 @@ std::vector<double> d_ddir(const std::vector<double>& X,
 FannoChannelFlow raw_flow(const FlowProblem& pb) {
   const std::vector<double>& X = *pb.X;
   FannoChannelFlow out;
-  const double choked_test = psi(1.0, pb.P, pb.Pt0, pb.Tt0, pb);
+  // A back pressure at or below zero (a solver probe; vacuum at best) chokes
+  // any duct: the choked branch, which P_target -> 0+ already reaches. psi
+  // itself would build a non-positive flux there.
+  const double choked_test = (pb.P > 0.0) ? psi(1.0, pb.P, pb.Pt0, pb.Tt0, pb) : 0.0;
   if (choked_test >= 0.0) {
     // Choked: even a sonic exit at this back pressure would need more duct
     // than there is, so the exit sits at sonic above P and the flux is the

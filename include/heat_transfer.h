@@ -128,6 +128,17 @@ constexpr double turbulent_start = 3000.0;
 constexpr double rough_full = 4000.0;
 }  // namespace channel_transition
 
+// Turbulent-only Nusselt correlations (Dittus-Boelter, Sieder-Tate, Petukhov)
+// claim Re >= 1e4. Between laminar_end and 1e4 the channel paths use the
+// transition interpolation of the VDI Heat Atlas (Gnielinski, G1 sec. 4.2):
+//   Nu = (1 - g) Nu_lam + g Nu_turb(1e4),  g = (Re - 2300) / (1e4 - 2300),
+// linear in Re, exact at both ends (they threw there before, #481). Gnielinski
+// keeps its own transition above.
+namespace vdi_transition {
+constexpr double re_laminar = channel_transition::laminar_end;
+constexpr double re_turbulent = 1.0e4;
+}  // namespace vdi_transition
+
 struct FrictionAndDerivative {
   double f = 0.0;       // Darcy friction factor
   double df_dRe = 0.0;  // exact
