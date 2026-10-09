@@ -1642,7 +1642,9 @@ class NetworkSolver:
             return None
         if not node_out.has_side_streams():
             return None
-        face = node_out.main_face_state(state_out)
+        # The element's own signed flow into the chamber: a reversed main
+        # keeps its face (#493).
+        face = node_out.main_face_state(state_out, m_main=float(state_out.m_dot))
         state_out.P = face[0]
         state_out.Pt = face[1]
         return face
