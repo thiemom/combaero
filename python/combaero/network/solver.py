@@ -1194,8 +1194,12 @@ class NetworkSolver:
         order += [n for n in nodes if n not in done]
         return order
 
-    def _propagate_states(self, x: np.ndarray) -> dict:
+    def _propagate_states(self, x: np.ndarray, with_relay: bool = True) -> dict:
         """Derive every node's T and Y (and the relay) at x.
+
+        with_relay=False skips the sensitivity relay (dT/dx, dY/dx), which
+        only the Jacobian uses and which dominates a residual evaluation on
+        mixing and wall networks; the states are the same either way.
 
         Streams follow the SIGN of the flow: a reversed element feeds its
         from_node from its to_node (#481). When a pass reads a state ahead of
@@ -1210,7 +1214,7 @@ class NetworkSolver:
         for _ in range(self._MAX_PROPAGATION_PASSES):
             self._lagged_read = False
             self._derived_states = {}
-            relay = self._propagate_pass(x, order, reversed_ids)
+            relay = self._propagate_pass(x, order, reversed_ids, with_relay)
             if not self._lagged_read:
                 break
             change = 0.0
@@ -1223,7 +1227,9 @@ class NetworkSolver:
                 break
         return relay
 
-    def _propagate_pass(self, x: np.ndarray, order: list[str], reversed_ids: set[str]) -> dict:
+    def _propagate_pass(
+        self, x: np.ndarray, order: list[str], reversed_ids: set[str], with_relay: bool = True
+    ) -> dict:
         """One pass of the state propagation in ``order`` (see _propagate_states)."""
         # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx], 'Pt_mix': dP_total_mix/dx}
         relay = {nid: {} for nid in self.network.nodes}
@@ -1247,6 +1253,8 @@ class NetworkSolver:
             ):
                 T, Y, _ = node.compute_derived_state([])
                 self._derived_states[nid] = (T, Y, None)
+                if not with_relay:
+                    continue
                 # Seed relay for boundary's own unknowns
                 node_indices = self._unknown_indices.get(nid, [])
                 unknown_names = self.unknown_names
@@ -1357,6 +1365,9 @@ class NetworkSolver:
                             "ch_result_b": ch_b,
                         }
                     )
+
+            if not with_relay:
+                continue
 
             # Sensitivity Relay (Chain-Rule)
             if mix_res:
@@ -1806,14 +1817,25 @@ class NetworkSolver:
     ) -> tuple[np.ndarray, Any]:
         """
         Evaluates the global residual vector and its sparse Jacobian.
+
+        LAZY JACOBIAN (#489): the evaluation collects every element's and
+        node's derivative dicts (they come with the residuals anyway); only
+        the sparse ASSEMBLY -- name lookup, relay chaining, coo->csr -- is
+        deferred. With compute_jacobian=False it is kept for the point just
+        evaluated, and _jacobian_at_last(x) assembles it if the root finder
+        then asks for J at that same point, so asking costs no second
+        evaluation.
         """
-        # Pure Pressure-Flow: Propagate states forward first
-        relay = self._propagate_states(x)
+        # Pure Pressure-Flow: Propagate states forward first. The relay
+        # (state sensitivities) only for an immediate assembly; a deferred one
+        # rebuilds it at the same x if J is asked for.
+        relay = self._propagate_states(x, with_relay=compute_jacobian)
 
         res = []
-        rows = [] if compute_jacobian else None
-        cols = [] if compute_jacobian else None
-        data = [] if compute_jacobian else None
+        # (first row, {eq_idx: {unknown: d}}, chains "Pt" relays)
+        terms: list[tuple[int, dict, bool]] = []
+        # (row, element, node id, unknown indices, sign) for the mass rows
+        mass_terms: list[tuple[int, Any, str, list[int], float]] = []
 
         # 1. Node Residuals
         for node_id, node in self.network.nodes.items():
@@ -1826,37 +1848,7 @@ class NetworkSolver:
             state = self._get_node_state(node, x)
             node_res, node_jac = node.residuals(state)
             res.extend(node_res)
-
-            # Assemble node Jacobian entries
-            if compute_jacobian:
-                for eq_idx, var_derivs in node_jac.items():
-                    row = start_res_idx + eq_idx
-                    for unk_name, deriv in var_derivs.items():
-                        if unk_name in self._name_to_index:
-                            rows.append(row)
-                            cols.append(self._name_to_index[unk_name])
-                            data.append(deriv)
-                        elif "." in unk_name:
-                            # Relay for derived properties (T, Y) in node residuals
-                            parts = unk_name.split(".")
-                            nid, prop = parts[0], parts[1]
-                            if nid in relay:
-                                for unk_idx, sens_pkg in relay[nid].items():
-                                    if prop == "T" and "T" in sens_pkg:
-                                        rows.append(row)
-                                        cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["T"])
-                                    elif prop.startswith("Y") and "Y" in sens_pkg:
-                                        # Handle species composition relay
-                                        if "[" in prop:
-                                            s_idx = int(prop.split("[")[1].replace("]", ""))
-                                            rows.append(row)
-                                            cols.append(unk_idx)
-                                            data.append(deriv * sens_pkg["Y"][s_idx])
-                                    elif prop == "Pt_mix" and "Pt_mix" in sens_pkg:
-                                        rows.append(row)
-                                        cols.append(unk_idx)
-                                        data.append(deriv * sens_pkg["Pt_mix"])
+            terms.append((start_res_idx, node_jac, False))
 
             # Mass Conservation: Sum(m_dot_in) - Sum(m_dot_out) = 0
             #
@@ -1886,11 +1878,7 @@ class NetworkSolver:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_in += elem.flow_at_node(node_id, x, indices)
-                    if compute_jacobian:
-                        for col, coeff in elem.flow_jac_at_node(node_id, indices).items():
-                            rows.append(mass_res_idx)
-                            cols.append(col)
-                            data.append(coeff)
+                    mass_terms.append((mass_res_idx, elem, node_id, indices, 1.0))
                 else:
                     from_node = self.network.nodes[elem.from_node]
                     m_dot_in += getattr(from_node, "m_dot", 0.0)
@@ -1899,11 +1887,7 @@ class NetworkSolver:
                 indices = self._unknown_indices.get(elem.id)
                 if indices:
                     m_dot_out += elem.flow_at_node(node_id, x, indices)
-                    if compute_jacobian:
-                        for col, coeff in elem.flow_jac_at_node(node_id, indices).items():
-                            rows.append(mass_res_idx)
-                            cols.append(col)
-                            data.append(-coeff)
+                    mass_terms.append((mass_res_idx, elem, node_id, indices, -1.0))
                 else:
                     to_node = self.network.nodes[elem.to_node]
                     m_dot_out += getattr(to_node, "m_dot", 0.0)
@@ -1963,17 +1947,30 @@ class NetworkSolver:
                 if face is not None:
                     self._chain_main_face(elem_jac, node_out.id, face)
             res.extend(elem_res)
+            terms.append((start_res_idx, elem_jac, True))
 
-            if compute_jacobian:
-                for eq_idx, var_derivs in elem_jac.items():
-                    row = start_res_idx + eq_idx
+        n_res = len(res)
+
+        def assemble() -> Any:
+            nonlocal relay
+            if not compute_jacobian:
+                # Same x, same states: only the sensitivities are new.
+                relay = self._propagate_states(x)
+            rows: list[int] = []
+            cols: list[int] = []
+            data: list[float] = []
+            name_to_index = self._name_to_index
+            for start, jac_dict, chain_pt in terms:
+                for eq_idx, var_derivs in jac_dict.items():
+                    row = start + eq_idx
                     for unk_name, deriv in var_derivs.items():
-                        if unk_name in self._name_to_index:
+                        if unk_name in name_to_index:
                             rows.append(row)
-                            cols.append(self._name_to_index[unk_name])
+                            cols.append(name_to_index[unk_name])
                             data.append(deriv)
                         elif "." in unk_name:
-                            # Relay for derived properties (T, Y) in element residuals
+                            # Relay for derived properties (T, Y, Pt_mix; and
+                            # Pt for element residuals)
                             parts = unk_name.split(".")
                             nid, prop = parts[0], parts[1]
                             if nid in relay:
@@ -1983,6 +1980,7 @@ class NetworkSolver:
                                         cols.append(unk_idx)
                                         data.append(deriv * sens_pkg["T"])
                                     elif prop.startswith("Y") and "Y" in sens_pkg:
+                                        # Handle species composition relay
                                         if "[" in prop:
                                             s_idx = int(prop.split("[")[1].replace("]", ""))
                                             rows.append(row)
@@ -1992,16 +1990,30 @@ class NetworkSolver:
                                         rows.append(row)
                                         cols.append(unk_idx)
                                         data.append(deriv * sens_pkg["Pt_mix"])
-                                    elif prop == "Pt" and "Pt" in sens_pkg:
+                                    elif chain_pt and prop == "Pt" and "Pt" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
                                         data.append(deriv * sens_pkg["Pt"])
+            for row, elem, node_id, indices, sign in mass_terms:
+                for col, coeff in elem.flow_jac_at_node(node_id, indices).items():
+                    rows.append(row)
+                    cols.append(col)
+                    data.append(sign * coeff)
+            return sp.coo_matrix((data, (rows, cols)), shape=(n_res, len(x))).tocsr()
 
-        jac_sparse = None
         if compute_jacobian:
-            jac_sparse = sp.coo_matrix((data, (rows, cols)), shape=(len(res), len(x))).tocsr()
+            self._deferred_jacobian = None
+            return np.array(res, dtype=float), assemble()
+        self._deferred_jacobian = (x.copy(), assemble)
+        return np.array(res, dtype=float), None
 
-        return np.array(res, dtype=float), jac_sparse
+    def _jacobian_at_last(self, x: np.ndarray) -> Any:
+        """The deferred Jacobian of the last residual-only evaluation, if it
+        was at exactly x; else None (the caller evaluates afresh)."""
+        pending = getattr(self, "_deferred_jacobian", None)
+        if pending is None or not np.array_equal(pending[0], x):
+            return None
+        return pending[1]()
 
     def _residuals(self, x: np.ndarray) -> np.ndarray:
         """
@@ -2763,9 +2775,30 @@ class NetworkSolver:
         # Last PHYSICAL evaluation (scaled F, scaled J): what a rejected
         # probe is answered with (see the except branch below).
         last_ok: list[Any] = [None, None]
+
+        # LAZY JACOBIAN (#489). The residual callback returns F only and the
+        # Jacobian is a separate callable, assembled only when the root
+        # finder asks for it. MINPACK hybrj asks at the start and on
+        # restarts, running Broyden updates in between: 74 of 401
+        # evaluations on a 36-case mixing study. Returning (F, J) from one
+        # callback (scipy's MemoizeJac) assembled J on every evaluation.
+        def _jac_for(m: str) -> Any:
+            return jacobian_wrapper if (use_jac and m in ("hybr", "lm")) else False
+
         n_rejected = [0]
 
+        # The last (x_scaled, F_scaled) answered: scipy evaluates F at x0
+        # once to check its shape and the root finder again to start.
+        last_call: list[Any] = [None, None]
+
         def residuals_wrapper(x_scaled: np.ndarray) -> Any:
+            if last_call[0] is not None and np.array_equal(last_call[0], x_scaled):
+                return last_call[1]
+            f = _residuals_scaled(x_scaled)
+            last_call[0], last_call[1] = x_scaled.copy(), f
+            return f
+
+        def _residuals_scaled(x_scaled: np.ndarray) -> Any:
             nonlocal best_x, best_res_norm, last_exception
 
             # Check timeout
@@ -2776,12 +2809,10 @@ class NetworkSolver:
             x_real = x_scaled * D_x
 
             try:
-                # Evaluate residuals and jacobian
-                res, jac = self._residuals_and_jacobian(x_real)
-                if not np.all(np.isfinite(res)) or (
-                    jac is not None and not np.all(np.isfinite(jac.data))
-                ):
-                    raise FloatingPointError("non-finite residual or Jacobian at a solver iterate")
+                # Residuals only: the Jacobian is jacobian_wrapper's job.
+                res, _ = self._residuals_and_jacobian(x_real, compute_jacobian=False)
+                if not np.all(np.isfinite(res)):
+                    raise FloatingPointError("non-finite residual at a solver iterate")
 
                 # Track best iterate (in real space, unscaled residual)
                 res_norm = np.linalg.norm(res)
@@ -2847,16 +2878,8 @@ class NetworkSolver:
 
                 # Scale residuals
                 res_scaled = res * inv_D_f
-
-                if use_jac and method in ("hybr", "lm"):
-                    # J_scaled = diag(inv_D_f) @ J @ diag(D_x)
-                    jac_dense = jac.toarray()
-                    jac_scaled = (inv_D_f[:, None] * jac_dense) * D_x[None, :]
-                    last_ok[0], last_ok[1] = res_scaled, jac_scaled
-                    return res_scaled, jac_scaled
-                else:
-                    last_ok[0] = res_scaled
-                    return res_scaled
+                last_ok[0] = res_scaled
+                return res_scaled
             except SolverTimeoutError:
                 raise
             except Exception as e:
@@ -2876,29 +2899,59 @@ class NetworkSolver:
                 n_rejected[0] += 1
                 # A penalty the trust region must REJECT: the last physical
                 # residual's direction at ten times its norm (at least 10 in
-                # scaled units), with the last physical Jacobian. The step then
+                # scaled units); jacobian_wrapper answers a Jacobian request
+                # there with the last physical Jacobian. The step then
                 # reads as a clear increase and the region shrinks. The former
                 # F = x - x_best (J = I) was SMALL near x_best, so a step into
                 # the unphysical region read as an improvement and was
                 # accepted (#481).
-                f_ref, j_ref = last_ok
+                f_ref = last_ok[0]
                 n_f = len(x_scaled)
                 if f_ref is None:
                     f_ref = np.ones(n_f)
                 ref_norm = float(np.linalg.norm(f_ref))
                 direction = f_ref / ref_norm if ref_norm > 0.0 else np.ones(n_f) / np.sqrt(n_f)
                 target = 10.0 * max(ref_norm, 1.0)
-                penalty = direction * target
-                if use_jac and method in ("hybr", "lm"):
-                    return penalty, (j_ref if j_ref is not None else np.eye(n_f))
-                return penalty
+                return direction * target
+
+        def jacobian_wrapper(x_scaled: np.ndarray) -> np.ndarray:
+            """Scaled Jacobian at x_scaled, assembled on request only."""
+            if _timeout_eff[0] is not None and (time.perf_counter() - start_time) > _timeout_eff[0]:
+                raise SolverTimeoutError(f"Solver timed out after {_timeout_eff[0]:.1f} seconds.")
+            try:
+                x_real = x_scaled * D_x
+                # Usually the point F was just evaluated at: assemble its
+                # deferred Jacobian instead of evaluating again.
+                jac = self._jacobian_at_last(x_real)
+                if jac is not None and np.array_equal(last_call[0], x_scaled):
+                    f_scaled = last_call[1]
+                else:
+                    res, jac = self._residuals_and_jacobian(x_real)
+                    f_scaled = res * inv_D_f
+                if not np.all(np.isfinite(jac.data)) or not np.all(np.isfinite(f_scaled)):
+                    raise FloatingPointError("non-finite Jacobian at a solver iterate")
+                # J_scaled = diag(inv_D_f) @ J @ diag(D_x)
+                jac_scaled = (inv_D_f[:, None] * jac.toarray()) * D_x[None, :]
+                # The root finder asks for J at the point it has ACCEPTED, so
+                # that point's residual is the reference a later rejected
+                # probe is answered from (the penalty above).
+                last_ok[0], last_ok[1] = f_scaled, jac_scaled
+                return jac_scaled
+            except SolverTimeoutError:
+                raise
+            except Exception:
+                # A point the model refuses: the last physical Jacobian, as
+                # for the rejected-probe residual above.
+                return last_ok[1] if last_ok[1] is not None else np.eye(len(x_scaled))
 
         # Solve with timing
         _RESIDUAL_TOL = 1e-3
         solve_start_time = time.time()
         outcome: SolveOutcome = SolveOutcome.NOT_CONVERGED
         try:
-            sol = root(residuals_wrapper, x0_scaled, method=method, options=options, jac=use_jac)
+            sol = root(
+                residuals_wrapper, x0_scaled, method=method, options=options, jac=_jac_for(method)
+            )
             solve_end_time = time.time()
             self._wall_time = solve_end_time - solve_start_time
             final_x = best_x
@@ -2946,7 +2999,7 @@ class NetworkSolver:
         # nonlinear systems.
         if not success and method != "hybr":
             try:
-                sol2 = root(residuals_wrapper, x0_scaled, method="hybr", jac=use_jac)
+                sol2 = root(residuals_wrapper, x0_scaled, method="hybr", jac=_jac_for("hybr"))
                 fallback_x = best_x
                 fallback_norm = float(best_res_norm)
                 if sol2.success and fallback_norm < _RESIDUAL_TOL:
@@ -2983,7 +3036,7 @@ class NetworkSolver:
                         residuals_wrapper,
                         _lm_x0_scaled,
                         method="lm",
-                        jac=use_jac,
+                        jac=_jac_for("lm"),
                         options={"maxiter": _default_iters},
                     )
                     _lm_norm = float(best_res_norm)
