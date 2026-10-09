@@ -910,7 +910,8 @@ channel_smooth(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length,
                double T_hot, const std::string &correlation,
                              bool heating, double mu_ratio, double roughness,
-                             double Nu_multiplier, double f_multiplier) {
+                             double Nu_multiplier, double f_multiplier,
+                             double flow_area) {
   // Use absolute velocity: Re, Nu, f, and dP are sign-independent.
   // Negative velocity can arise from reversed flow during Newton iteration
   // or from negative mass-flow boundary conditions.
@@ -1033,7 +1034,11 @@ channel_smooth(double T, double P, const std::vector<double> &X,
 
   // Only compute Jacobians if flow exists
   if (velocity > 0.0 && Re > 0.0) {
-    double A_cross = M_PI / 4.0 * diameter * diameter;
+    // The flow area velocity was taken on: the caller's when given (a
+    // non-circular channel), else circular (#463).
+    double A_cross = (std::isfinite(flow_area) && flow_area > 0.0)
+                         ? flow_area
+                         : M_PI / 4.0 * diameter * diameter;
     double mdot = rho * velocity * A_cross;
 
     // Thermal conductivity and Prandtl derivatives via central FD
