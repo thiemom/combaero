@@ -305,6 +305,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`NetworkSolver` assembles the Jacobian only when the root finder asks for it (#489).**
+  - **Before:** the residual callback returned (F, J), so every evaluation built the state-sensitivity relay (dT/dx, dY/dx) and the sparse Jacobian. hybr uses J only at the start and on restarts: 74 of 401 evaluations on a 36-case mixing study.
+  - **Now:** F-only evaluations skip the relay. A Jacobian request at the point F was just evaluated reuses that evaluation's element derivatives and rebuilds only the relay, so the answer is the eager Jacobian and asking costs no second evaluation.
+  - **Results unchanged:** on 292 networks (mixing plenums with compressible ducts, hot impingement arrays, 240 random junctions) the solutions are bitwise identical and the evaluation counts are the same.
+  - **Faster:** impingement arrays 2.1x (3.3 -> 1.6 s), random junctions 24% (7.2 -> 5.5 s). Mixing networks are unchanged (2.3 s); their cost is the Fanno kernel.
+  - **Penalty reference:** a rejected probe's penalty still references the residual at the root finder's accepted point, which is the point it asks J at. Referencing the last trial point instead turned a converging MPCE cold start into a warm-start retry.
+
 - **`ImpingementPlateElement` refuses wiring it does not model (#465).** The
   Florschuetz configuration is spent air leaving down the crossflow channel.
   The plate now refuses three other configurations at set-up:
