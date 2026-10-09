@@ -133,7 +133,7 @@ def test_the_barrier_fixed_point_follows_the_closed_form():
         strict=False,
     )
     element.soft_penalty_alpha = 1.0e7
-    alpha = element.effective_penalty_alpha()
+    alpha = element.soft_penalty_alpha
     assert alpha == pytest.approx(1.0e7)
 
     Pt_jct = 100_300.0

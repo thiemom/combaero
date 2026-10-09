@@ -51,45 +51,18 @@ from combaero.network.components import (
 FlowDirection = Literal["merge", "branch"]
 
 
-#: Fallback soft-barrier weight, in Pa/(kg/s)^2. Only used when the solver has
-#: not supplied a scale-aware value (see ``scaled_penalty_alpha``).
+#: Soft-barrier weight, in Pa/(kg/s)^2.
+#:
+#: It carries units, so it holds the barrier's fixed point
+#: (``slack* = sqrt(dP / alpha)``) at a sensible fraction of the flow for one
+#: network size only. A solver-derived ``P_ref / (0.005 m_ref)^2`` replaced it
+#: for a while (#272, MPCE_CPP_PORT_DESIGN.md 7e) and was deleted once the
+#: closure-consistent junction seed started every port in its declared basin:
+#: over 100 random junctions at sizes 1e-6 to 1e4 and the whole junction
+#: scorecard the two weights no longer changed a single outcome. If a network
+#: far from 0.1 kg/s ever parks a port in the barrier, this constant is the
+#: first suspect.
 DEFAULT_SOFT_PENALTY_ALPHA: float = 1.0e11
-
-#: Where the soft barrier's fixed point is placed, as a fraction of the
-#: network's reference mass flow.
-#:
-#: The barrier's penalty shares a residual row with the continuity relation, so
-#: it balances against a pressure error rather than driving the slack to zero,
-#: giving a fixed point at ``slack* = sqrt(dP / alpha)``. Solving that for alpha
-#: at ``slack* = f * m_ref`` and taking the reference pressure as the largest
-#: error the network could absorb gives
-#:
-#:     alpha = P_ref / (f * m_ref)^2
-#:
-#: which is dimensionally consistent and therefore size-independent, unlike a
-#: fixed alpha. 0.5% is not a fitted value: measured on the random boundary
-#: harness the response is monotone in alpha and flat well below this, so the
-#: choice is a margin above the point where solves stop parking in the barrier
-#: (measured at roughly 14% of the reference flow for the traced case, and
-#: case-dependent). Using ``P_ref`` in place of the pressure error the network
-#: can really absorb overestimates it, which errs toward a larger alpha and a
-#: smaller fixed point -- the safe direction (issue #272).
-BARRIER_SLACK_FRACTION: float = 0.005
-
-
-def scaled_penalty_alpha(ref_pressure: float, ref_mdot: float) -> float:
-    """Soft-barrier weight for a network of the given pressure and flow scale.
-
-    Returns ``DEFAULT_SOFT_PENALTY_ALPHA`` when either scale is unusable, so a
-    degenerate reference state can never produce a weaker barrier than the
-    fallback.
-    """
-    if not (math.isfinite(ref_pressure) and math.isfinite(ref_mdot)):
-        return DEFAULT_SOFT_PENALTY_ALPHA
-    if ref_pressure <= 0.0 or ref_mdot <= 0.0:
-        return DEFAULT_SOFT_PENALTY_ALPHA
-    slack = BARRIER_SLACK_FRACTION * ref_mdot
-    return float(ref_pressure / (slack * slack))
 
 
 def _port_gamma(state) -> float:
@@ -166,22 +139,8 @@ class MultiPortChamberElement(MultiPortChamberBase):
     # mass flow. At 1e11 it is 0.45%, small enough that the sign flip that
     # restores the declared regime happens instead.
     #
-    # NOT dimensionless: alpha carries Pa/(kg/s)^2, so a fixed value is tied
-    # to one network size. Measured on a single junction scaled over five
-    # decades with every dimensionless group held fixed, the alpha needed to
-    # converge follows 1/m_ref^2 exactly -- two decades of alpha per decade of
-    # size -- and this constant fails on the same junction at a hundredth of
-    # its size. It is therefore only the FALLBACK. ``NetworkSolver`` derives a
-    # scale-aware value from the network's own reference pressure and mass
-    # flow and hands it over (see ``BARRIER_SLACK_FRACTION`` and
-    # ``scaled_penalty_alpha``); this value is used when no solver has supplied
-    # one, or when a caller has set ``soft_penalty_alpha`` explicitly, which
-    # always wins.
+    # Carries Pa/(kg/s)^2; see ``DEFAULT_SOFT_PENALTY_ALPHA``.
     soft_penalty_alpha: float = DEFAULT_SOFT_PENALTY_ALPHA
-
-    #: Scale-aware weight supplied by ``NetworkSolver`` before a solve. ``None``
-    #: when no solver has run, in which case ``soft_penalty_alpha`` is used.
-    _barrier_alpha_scaled: float | None = None
 
     #: TUNED CONSTANT -- combaero's joining-side etransfer correction, an
     #: extension to Mynard 2015 (not in the paper). Vanishes at psi = 1 by
@@ -498,21 +457,6 @@ class MultiPortChamberElement(MultiPortChamberBase):
         diag["Pt_jct"] = float(Pt_jct)
         return diag
 
-    def effective_penalty_alpha(self) -> float:
-        """The soft-barrier weight this element will actually use.
-
-        An explicitly set ``soft_penalty_alpha`` always wins -- that is the
-        tuning knob, and a caller who has reached for it means it. Otherwise
-        the scale-aware value the solver derived from the network's own
-        pressure and mass scales is used, falling back to the fixed default
-        when no solver has supplied one.
-        """
-        if self.soft_penalty_alpha != DEFAULT_SOFT_PENALTY_ALPHA:
-            return float(self.soft_penalty_alpha)
-        if self._barrier_alpha_scaled is None:
-            return float(self.soft_penalty_alpha)
-        return float(self._barrier_alpha_scaled)
-
     def _soft_barrier_residual(
         self,
         states: list[NetworkMixtureState],
@@ -531,7 +475,7 @@ class MultiPortChamberElement(MultiPortChamberBase):
         next iteration.
         """
         N = self.N
-        alpha = float(self.effective_penalty_alpha())
+        alpha = float(self.soft_penalty_alpha)
         residuals: list[float] = []
         jac: dict[int, dict[str, float]] = {}
         for i in range(N):
@@ -561,6 +505,117 @@ class MultiPortChamberElement(MultiPortChamberBase):
             mass_row[mass_var] = mass_row.get(mass_var, 0.0) + self._port_signs[i]
         jac[N] = mass_row
         return residuals, jac
+
+    def closure_split_seed(
+        self,
+        common_i: int,
+        dpt: list[float | None],
+        rho: float,
+        m_common: float | None = None,
+        prefer: float | None = None,
+    ) -> tuple[dict[int, float], float] | None:
+        """Initial port flows from this junction's OWN closure (#272).
+
+        ``dpt[i]`` is the guessed ``Pt_i - Pt_common``. The residual says each
+        non-common port's total-pressure difference to the common port is
+        ``K_i(split) * q_com`` (a drop on a dividing junction's collectors, a
+        rise on a joining one's suppliers), so the ratio of the two fixes the
+        split independently of the level, and either one then gives the
+        common head ``q_com`` and with it the common flow. Returns
+        ``({port: share of the common flow}, m_common)``, or None where it
+        does not apply (not three ports, a pressure missing, no consistent
+        split) and the solver's generic share is used instead.
+
+        A three-pressure network can have TWO consistent splits -- Bassett's
+        own K5 changes sign at a straight fraction of 1/2, which makes the
+        ratio non-monotone, e.g. q = 0.48 and q = 0.026 for his Fig 7b target
+        at 0.48. The seed takes the one carrying the most flow; the solve
+        remains free to go to the other.
+        """
+        if self.N != 3 or len(dpt) != 3 or not rho > 0.0:
+            return None
+        a, b = (i for i in range(3) if i != common_i)
+        if dpt[a] is None or dpt[b] is None:
+            return None
+        dividing = self._port_signs[common_i] < 0  # the common port supplies
+        # The residual's sign: collectors sit BELOW a supplying common port.
+        d_a = -dpt[a] if dividing else dpt[a]
+        d_b = -dpt[b] if dividing else dpt[b]
+        if d_a == 0.0 and d_b == 0.0:
+            return None
+        areas = np.asarray([float(x) for x in self.port_areas])
+        theta = np.asarray([math.radians(float(t)) for t in self.port_angles_deg])
+        theta[common_i] = math.pi  # axial-back, as the kernel re-points it
+        signs = np.asarray([float(s) for s in self._port_signs])
+
+        def K_ab(s: float) -> tuple[float, float] | None:
+            m = np.zeros(3)
+            m[common_i], m[a], m[b] = 1.0, s, 1.0 - s
+            U = -signs * m / areas  # Mynard: positive into the junction
+            res = junction_loss_coefficient(
+                U, areas, theta, self.joining_etransfer_alpha, self.eta_scale
+            )
+            K = None if res.K is None else np.atleast_1d(res.K)
+            if K is None or len(K) != 2:
+                return None
+            return float(K[0]), float(K[1])  # the two non-common ports, in order
+
+        q_known = None
+        if m_common is not None and m_common > 0.0:
+            # An imposed flow fixes the head; the common port's pressure is
+            # then the unknown guess, and only the DIFFERENCE of the two other
+            # ports' pressures is reliable: (K_a - K_b) q_com = d_a - d_b.
+            q_known = m_common * m_common / (2.0 * rho * float(areas[common_i]) ** 2)
+
+        def g(s: float) -> float:
+            K = K_ab(s)
+            if K is None:
+                return math.nan
+            if q_known is not None:
+                return (K[0] - K[1]) * q_known - (d_a - d_b)
+            return K[0] * d_b - K[1] * d_a
+
+        # Uniform in the bulk, geometric toward both ends: a port that is
+        # nearly idle (a share of 1e-4) is a real operating point too.
+        ends = np.geomspace(1e-6, 1e-2, 9)
+        grid = np.unique(np.concatenate([ends, np.linspace(1e-2, 1.0 - 1e-2, 50), 1.0 - ends]))
+        vals = [g(s) for s in grid]
+        best: tuple[float, float] | None = None  # (q_com, share of port a)
+        for s0, s1, g0, g1 in zip(grid[:-1], grid[1:], vals[:-1], vals[1:], strict=True):
+            if not (math.isfinite(g0) and math.isfinite(g1)) or g0 * g1 > 0.0:
+                continue
+            lo, hi, glo = s0, s1, g0
+            for _ in range(50):  # bisection: g is smooth in s, no need for more
+                mid = 0.5 * (lo + hi)
+                gm = g(mid)
+                if not math.isfinite(gm):
+                    break
+                if glo * gm <= 0.0:
+                    hi = mid
+                else:
+                    lo, glo = mid, gm
+            s = 0.5 * (lo + hi)
+            K = K_ab(s)
+            if K is None:
+                continue
+            if q_known is not None:
+                # Several splits fit an imposed flow: the closure cannot choose
+                # between them, so the one nearest the caller's own share.
+                rank = -abs(s - prefer) if prefer is not None else 0.0
+                if best is None or rank > best[0]:
+                    best = (rank, s)
+                continue
+            k, d = (K[0], d_a) if abs(K[0]) >= abs(K[1]) else (K[1], d_b)
+            q_com = d / k if k != 0.0 else -1.0
+            if q_com > 0.0 and (best is None or q_com > best[0]):
+                best = (q_com, s)
+        if best is None:
+            return None
+        if q_known is not None:
+            return {a: best[1], b: 1.0 - best[1]}, float(m_common)
+        q_com, s = best
+        m_common = float(areas[common_i]) * math.sqrt(2.0 * rho * q_com)
+        return {a: s, b: 1.0 - s}, m_common
 
     def residuals(  # type: ignore[override]
         self,
