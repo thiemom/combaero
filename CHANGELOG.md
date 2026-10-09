@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Compressible channel derivatives are exact at low drive; the flow is smooth below the 1 Pa floor (#481).**
+  - **Cause:** at low drive the duct's inlet and exit Mach nearly coincide, with (Me - M_in)/Me ~ drive/P (7e-6 at 1.5 Pa on 2 bar). `fanno_channel_flow`'s implicit derivatives combine terms ~P/drive times larger than their result, and two of those terms were finite differences: the inlet flux slope and the exit-pressure-per-flux slope. Their 1e-8 to 1e-10 rounding, amplified ~1e5, put up to 8e-3 into dG/dPt0 and dG/dP_target at a few Pa. Below the floor it also put 1e-5 noise into the flow itself, through the blend exponent sigma, so that G jumped when Tt or the composition was nudged.
+  - **Fix:** both slopes are now closed form (energy plus isentropic relations); the moving inlet limit is taken by Leibniz's rule.
+  - **Result:**
+    - dG/dPt0, dG/dP_target and dG/dTt0 hold to <= 1e-5 from 1.5 Pa of drive up (were up to 8e-3, 8e-3 and 5e-3);
+    - G's noise below the floor fell from 1e-5 to 1e-8 of G;
+    - the kernel is 13% faster (4.75 -> 4.1 ms per call), and compressible-duct network solves ~10% faster.
+  - **Tests:** reverting either slope to its difference fails the new tests.
+
 - **Collision integrals are exact and smooth; transport derivatives are analytic (#485).**
   - **Interpolation error:** Omega*(2,2) was interpolated linearly in raw T* on the Monchick-Mason table. That was off by up to 2.7% between nodes and left 2-17% kinks in dmu/dT at every node.
   - **Table error:** the table's own Lennard-Jones column was off by up to 0.6% at the nodes; Kim & Monroe (2014) and an independent quadrature agree with each other to 5e-5.
@@ -327,6 +336,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "lower bound" caveat becomes testable rather than stated.
 
 ### Added
+
+- **`fanno_channel_flow(..., with_dG_dY=True)`** also returns `dG_dY`: dG/dY_k for each species present, with the other mass fractions held fixed (the convention of an element's `"{node}.Y[k]"` Jacobian column). Exact to 1.5e-7 against Richardson differences on the unchoked, choked and near-choke branches, and to <= 3e-3 of the column at 3 Pa of drive on 2 bar. Opt-in, because it costs about two length integrals per species.
+  - **Why `ChannelElement` doesn't use it yet:** gated to plenums whose composition moves, it makes the Jacobian exact (inflow-column error 2e-2 -> 1e-8). But it saves only 6.5% of evaluations for 2.2x the solve time, because the solver assembles the Jacobian on every evaluation while hybr uses it on 18% of them (#489).
 
 - **`transport_and_dT`, `omega22_and_derivative`, `dcp_R_dT`:** mixture viscosity and conductivity with analytic d/dT, the collision integral with its slope, and per-species d(cp/R)/dT (#485). At the NASA polynomials' 1000 K range join, cp's slope jumps, so dk/dT is one-sided there.
 
