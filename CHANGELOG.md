@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Mass-flow derivatives of a non-circular channel (#463).** `channel_smooth` took its mass flow on pi D^2/4, so for a channel with a separate hydraulic diameter dh/dmdot, ddP/dmdot and dT_aw/dmdot were off by (Dh/D)^2. Values were unaffected.
+  - **Fix:** a new `flow_area` argument (default: the circular area) carries the element's real cross-section. `ConvectiveSurface` passes it on every path: smooth, ribbed, impingement and pin-fin.
+  - **Measured:** global Jacobian error 1.2e-1 -> 1.2e-3 on a wall-coupled flat-duct network. The remainder is the missing pressure column, #496.
+- **The wall relay through a feedback loop (#481).**
+  - **Cause:** a wall coupling a node's outflow to its inflow feeds the node's temperature back into its own heat input, T' = a + b T', and the relay read that node's half-built sensitivities. Separately, a node read ahead of its order (a back-edge) gave an empty relay on every pass.
+  - **Effect:** dT/d(cooling flow) was 19% short in a two-wall series network.
+  - **Fix:** both reads now take the previous pass's sensitivities. The passes iterate until every borrowed sensitivity equals what the pass computed (1e-9).
+  - **Cost:** junction networks read ahead through chains that carry nothing and settle in the first pass. The 240-case junction benchmark takes +5%; impingement and mixing are unchanged.
+
 - **Jacobian completeness (#481 C1, C4, C5).** The analytic network Jacobian now equals differences where it dropped a dependence.
   - **Theta-sourced `PressureLossElement`:**
     - **Unburned temperature:** the combustor's unburned temperature enters through theta = T_b/T_u - 1 and as the correlation's reference temperature. It was never relayed and now is, through the combustor's inflows.

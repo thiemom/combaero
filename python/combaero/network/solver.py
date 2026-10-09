@@ -1206,6 +1206,12 @@ class NetworkSolver:
         its order (a wall back-edge, a recirculation loop) the pass is
         repeated from its own result until the temperatures settle, so the
         residual depends on x alone and not on the previous evaluation.
+
+        The relay iterates with them: a node read ahead of its order takes
+        that node's sensitivities from the previous pass, and the passes go on
+        until those settle too. Each pass used to start the relay from empty,
+        so a back-edge dropped its whole chain from the Jacobian -- 19% of
+        d(row)/d(cooling flow) in a two-wall series network (#481).
         """
         self._prev_derived_states = getattr(self, "_derived_states", {})
         reversed_ids = self._reversed_elements(x)
@@ -1213,8 +1219,10 @@ class NetworkSolver:
         relay: dict = {}
         for _ in range(self._MAX_PROPAGATION_PASSES):
             self._lagged_read = False
+            self._relay_borrowed: set[str] = set()
             self._derived_states = {}
-            relay = self._propagate_pass(x, order, reversed_ids, with_relay)
+            prev_relay = relay
+            relay = self._propagate_pass(x, order, reversed_ids, with_relay, prev_relay)
             if not self._lagged_read:
                 break
             change = 0.0
@@ -1223,21 +1231,66 @@ class NetworkSolver:
                 T_prev = float(prev[0]) if prev is not None else 0.0
                 change = max(change, abs(float(T) - T_prev) / max(abs(float(T)), 1.0))
             self._prev_derived_states = self._derived_states
-            if change < 1e-13:
+            # The relay is at its fixed point when every sensitivity a pass
+            # BORROWED from the previous one (read ahead of order, or a node
+            # through its own walls) equals what this pass computed for it.
+            # Junction networks read ahead nearly every evaluation through
+            # chains that carry nothing: they settle in the first pass.
+            if change < 1e-13 and (
+                not with_relay or self._relay_settled(relay, prev_relay, self._relay_borrowed)
+            ):
                 break
         return relay
 
+    @staticmethod
+    def _relay_settled(relay: dict, prev: dict, borrowed: set[str]) -> bool:
+        """Each BORROWED node's relayed T and Pt sensitivities equal what the
+        pass used for it (the previous pass's; missing = 0) to 1e-9 -- the
+        Jacobian's own accuracy. The composition sensitivities iterate with
+        the same contraction and are not compared."""
+        for nid in borrowed:
+            cols = relay.get(nid, {})
+            pcols = prev.get(nid, {})
+            for idx in cols.keys() | pcols.keys():
+                pkg, ppkg = cols.get(idx, {}), pcols.get(idx, {})
+                for key in ("T", "Pt", "Pt_mix"):
+                    a, b = pkg.get(key, 0.0), ppkg.get(key, 0.0)
+                    if abs(a - b) > 1e-9 * max(abs(a), abs(b)):
+                        return False
+        return True
+
     def _propagate_pass(
-        self, x: np.ndarray, order: list[str], reversed_ids: set[str], with_relay: bool = True
+        self,
+        x: np.ndarray,
+        order: list[str],
+        reversed_ids: set[str],
+        with_relay: bool = True,
+        prev_relay: dict | None = None,
     ) -> dict:
         """One pass of the state propagation in ``order`` (see _propagate_states)."""
         # relay[node_id][global_unknown_index] = {'T': dT/dx, 'Y': [dY/dx], 'Pt_mix': dP_total_mix/dx}
         relay = {nid: {} for nid in self.network.nodes}
+        # A node read ahead of its order (a back-edge) gives the previous
+        # pass's sensitivities, as it gives its previous state -- and so does
+        # the node being processed, read through its own walls (a self-loop:
+        # its relay is still being built). The passes iterate T' = a + b T'
+        # to its fixed point.
+        done: set[str] = set()
+        current: list[str] = [""]
+        prev_relay = prev_relay or {}
+
+        def up(n: str) -> dict:
+            if n in done and n != current[0]:
+                return relay[n]
+            self._relay_borrowed.add(n)
+            return prev_relay.get(n, {})
 
         has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
 
         for nid in order:
             node = self.network.nodes[nid]
+            done.add(nid)
+            current[0] = nid
 
             # Elements delivering INTO nid by the sign of their flow (#481).
             up_elems = [
@@ -1429,7 +1482,7 @@ class NetworkSolver:
 
                     # 2. Recursive dependency on upstream P/T/Y via src_nid relay
                     if src_nid in relay:
-                        for idx, sens_up in relay[src_nid].items():
+                        for idx, sens_up in up(src_nid).items():
                             node_relay = relay[nid].setdefault(
                                 idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                             )
@@ -1487,7 +1540,7 @@ class NetworkSolver:
                                     + wall_result.dQ_dh_a * ch_a.dh_dT
                                 )
                             )
-                            for idx, sens_up in relay[from_a].items():
+                            for idx, sens_up in up(from_a).items():
                                 nr = relay[nid].setdefault(
                                     idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                                 )
@@ -1531,7 +1584,7 @@ class NetworkSolver:
                                     + wall_result.dQ_dh_b * ch_b.dh_dT
                                 )
                             )
-                            for idx, sens_up in relay[from_b].items():
+                            for idx, sens_up in up(from_b).items():
                                 nr = relay[nid].setdefault(
                                     idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                                 )

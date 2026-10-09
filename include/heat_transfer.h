@@ -706,6 +706,11 @@ WallCouplingResult wall_coupling_and_jacobian(
 //   roughness  : absolute wall roughness [m]  (default 0.0 = smooth)
 //   Nu_multiplier : empirical correction factor on Nu (default 1.0)
 //   f_multiplier  : empirical correction factor on f (default 1.0)
+//   flow_area  : the channel's flow cross-section [m^2] that velocity was
+//                taken on; NaN (default) = pi D^2/4. Only the mass-flow
+//                derivatives use it (dh/dmdot, ddP/dmdot, dT_aw/dmdot): for a
+//                non-circular channel with a separate Dh, pi Dh^2/4 is off by
+//                (Dh/D)^2 (#463). Values come from velocity and D.
 ChannelResult
 channel_smooth(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length,
@@ -713,7 +718,8 @@ channel_smooth(double T, double P, const std::vector<double> &X,
                const std::string &correlation = "gnielinski",
                bool heating = true, double mu_ratio = 1.0,
                double roughness = 0.0,
-               double Nu_multiplier = 1.0, double f_multiplier = 1.0);
+               double Nu_multiplier = 1.0, double f_multiplier = 1.0,
+               double flow_area = std::numeric_limits<double>::quiet_NaN());
 
 } // namespace combaero
 

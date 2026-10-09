@@ -500,6 +500,11 @@ class ConvectiveSurface:
         area = self._flow_area if self._flow_area else math.pi / 4.0 * diameter * diameter
         return rho * abs(velocity) * area
 
+    def _flow_area_arg(self) -> float:
+        """The element's flow area for channel_smooth's mass-flow derivatives,
+        NaN when it passed none (channel_smooth then assumes pi D^2/4, #463)."""
+        return self._flow_area if getattr(self, "_flow_area", None) else math.nan
+
     def _ribbed_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
         """Ribbed-channel heat transfer and pressure drop.
 
@@ -561,6 +566,7 @@ class ConvectiveSurface:
             heating=heating,
             Nu_multiplier=model.smooth_wall_Nu_multiplier,
             f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
         )
 
         frac_ribbed, frac_smooth = self._ribbed_wall_fractions()
@@ -684,6 +690,7 @@ class ConvectiveSurface:
             heating=heating,
             Nu_multiplier=1.0,
             f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
         )
 
         # Re_j is proportional to the element's mass flow; the per-hole split
@@ -747,6 +754,7 @@ class ConvectiveSurface:
             heating=heating,
             Nu_multiplier=1.0,
             f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
         )
 
         mdot = self._channel_mdot(rho, velocity, diameter)
@@ -842,6 +850,7 @@ class ConvectiveSurface:
             heating=heating,
             Nu_multiplier=1.0,
             f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
         )
 
         mdot = self._channel_mdot(rho, velocity, diameter)
@@ -937,6 +946,7 @@ class ConvectiveSurface:
                 roughness=self.model.roughness,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
+                flow_area=self._flow_area_arg(),
             )
         elif isinstance(self.model, RibbedModel):
             result = self._ribbed_result(T, P, X, velocity, diameter, length, T_hot, heating)

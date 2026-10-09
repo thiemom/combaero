@@ -1095,7 +1095,7 @@ inline constexpr Entry function_units[] = {
     {"channel_smooth",
      "T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_hot: "
      "K, correlation: str, heating: bool, mu_ratio: -, roughness: m, "
-     "Nu_multiplier: -, f_multiplier: -",
+     "Nu_multiplier: -, f_multiplier: -, flow_area: m^2",
      "ChannelResult"},
 
     // -------------------------------------------------------------------------

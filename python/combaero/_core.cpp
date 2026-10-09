@@ -6912,10 +6912,11 @@ PYBIND11_MODULE(_core, m) {
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double velocity, double diameter, double length, double T_hot,
          const std::string &correlation, bool heating, double mu_ratio,
-         double roughness, double Nu_multiplier, double f_multiplier) {
+         double roughness, double Nu_multiplier, double f_multiplier,
+         double flow_area) {
         return channel_smooth(T, P, to_vec(X_arr), velocity, diameter, length,
                               T_hot, correlation, heating, mu_ratio, roughness,
-                              Nu_multiplier, f_multiplier);
+                              Nu_multiplier, f_multiplier, flow_area);
       },
       py::arg("T"), py::arg("P"), py::arg("X"), py::arg("velocity"),
       py::arg("diameter"), py::arg("length"),
@@ -6923,6 +6924,7 @@ PYBIND11_MODULE(_core, m) {
       py::arg("correlation") = "gnielinski", py::arg("heating") = true,
       py::arg("mu_ratio") = 1.0, py::arg("roughness") = 0.0,
       py::arg("Nu_multiplier") = 1.0, py::arg("f_multiplier") = 1.0,
+      py::arg("flow_area") = std::numeric_limits<double>::quiet_NaN(),
       "Smooth channel/duct: combined HTC + pressure drop.\n\n"
       "Parameters:\n"
       "  T, P, X    : bulk static thermodynamic state\n"
@@ -6936,7 +6938,9 @@ PYBIND11_MODULE(_core, m) {
       "  mu_ratio   : mu_bulk/mu_wall for Sieder-Tate\n"
       "  roughness  : absolute wall roughness [m]\n"
       "  Nu_multiplier : empirical correction factor on Nu (default 1.0)\n"
-      "  f_multiplier  : empirical correction factor on f (default 1.0)\n\n"
+      "  f_multiplier  : empirical correction factor on f (default 1.0)\n"
+      "  flow_area  : flow cross-section [m^2] velocity was taken on (nan = "
+      "pi D^2/4); the mass-flow derivatives use it\n\n"
       "Returns: ChannelResult with Jacobian fields populated");
 
 

@@ -515,7 +515,8 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
                               double T_hot = std::numeric_limits<double>::quiet_NaN(),
                               const std::string& correlation = "gnielinski",
                               bool heating = true, double Nu_multiplier = 1.0,
-                              double f_multiplier = 1.0);
+                              double f_multiplier = 1.0,
+                              double flow_area = NaN);  // NaN: pi D^2/4; used by the mdot derivatives (#463)
 
 // Parametrised rib correlations -- rib_correlation.h
 //
