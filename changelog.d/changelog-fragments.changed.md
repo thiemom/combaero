@@ -1,0 +1,3 @@
+- **Changelog entries are fragments in `changelog.d/`, not edits to `CHANGELOG.md`.** Every PR used to write its entry at the top of `[Unreleased]`, so any two open PRs conflicted there.
+  - **Now:** a change adds `changelog.d/<id>.<category>.md` (see `changelog.d/README.md`). `scripts/changelog.py release X.Y.Z` folds them into a dated block at release time, merging them with what is already under `[Unreleased]` one section per category. It also moves the compare links on and deletes the fragments.
+  - **Validation:** `scripts/changelog.py check` runs as a pre-commit hook.
