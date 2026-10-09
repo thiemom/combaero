@@ -388,6 +388,7 @@ class _ImpingementChannelResult:
     dh_dT: float = 0.0
     dT_aw_dmdot: float = 0.0
     dT_aw_dT: float = 0.0
+    dT_aw_dP: float = 0.0
 
 
 @dataclass
@@ -414,6 +415,7 @@ class _PinFinChannelResult:
     dh_dT: float = 0.0
     dT_aw_dmdot: float = 0.0
     dT_aw_dT: float = 0.0
+    dT_aw_dP: float = 0.0
 
 
 @dataclass
@@ -446,6 +448,7 @@ class _RibbedChannelResult:
     dh_dT: float = 0.0
     dT_aw_dmdot: float = 0.0
     dT_aw_dT: float = 0.0
+    dT_aw_dP: float = 0.0
 
 
 ChannelModel = (
@@ -599,6 +602,7 @@ class ConvectiveSurface:
             dh_dT=dh_dT,
             dT_aw_dmdot=smooth.dT_aw_dmdot,
             dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
             h=h_avg * self.Nu_multiplier,
             h_ribbed=h_ribbed,
             h_smooth=smooth.h,
@@ -717,6 +721,7 @@ class ConvectiveSurface:
             dh_dT=dh_dT,
             dT_aw_dmdot=smooth.dT_aw_dmdot,
             dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
         )
 
     def _single_jet_impingement_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
@@ -775,6 +780,7 @@ class ConvectiveSurface:
             dh_dT=dh_dT,
             dT_aw_dmdot=smooth.dT_aw_dmdot,
             dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
         )
 
     def _pin_fin_terms(self, Re: float, Pr: float):
@@ -875,6 +881,7 @@ class ConvectiveSurface:
             dh_dT=dh_dT,
             dT_aw_dmdot=smooth.dT_aw_dmdot,
             dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
         )
 
     def htc_and_T(

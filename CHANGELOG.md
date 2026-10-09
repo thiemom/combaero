@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The wall relay's pressure column (#496).** A wall's heat moves with its channel's static pressure at fixed flow through the adiabatic wall temperature: T_aw = T + r v^2/(2 cp) with v = mdot/(rho A), so dT_aw/dP = -2 (T_aw - T)/P. h does not move (Re, Pr and k do not depend on P).
+  - **Before:** the relay had no pressure column. That was 1e-3 of the scaled Jacobian in a two-wall network, its largest entry after #463.
+  - **Now:** `ChannelResult.dT_aw_dP` carries it through the smooth, ribbed, impingement and pin-fin paths, and the relay chains it into the feed node's P. The network Jacobian is exact to ~3e-9.
+
 - **A merge chamber keeps its main-inlet face when the main flow reverses (#493).**
   - **Before:** the chamber hands its declared main inlet the face state of its impulse balance, but only while the main was an inflow. At m_main -> 0+ the face sits below the chamber pressure, because the side streams carry momentum out. So the main's exit pressure stepped 245 Pa, and its residual 3.5 kPa, as its flow crossed zero.
   - **Now:** the impulse holds for either sign (the x-momentum flux through the face is m_main^2/(rho A) both ways), so the face is kept. A reversed main gets the chamber's fluid at the face, and the outlet carries the side streams less the main's outflow.

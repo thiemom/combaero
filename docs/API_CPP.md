@@ -838,6 +838,7 @@ struct ChannelResult {
     double ddP_dT;         // d(dP)/dT [Pa/K]
     double dT_aw_dmdot;    // dT_aw/dmdot [K·s/kg]
     double dT_aw_dT;       // dT_aw/dT [-] (approx 1 at low Mach)
+    double dT_aw_dP;       // dT_aw/dP [K/Pa] at fixed mdot, T (#496)
     double dq_dmdot;       // dq/dmdot [W·s/(m²·kg)]
     double dq_dT;          // dq/dT [W/(m²·K)]
     double dq_dT_hot;     // dq/dT_hot [W/(m²·K)]
