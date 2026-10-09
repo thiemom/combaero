@@ -997,6 +997,7 @@ All functions use consistent units to avoid conversion errors.
 | `ChannelResult::ddP_dT`        | -           | Pa/K                    |
 | `ChannelResult::dT_aw_dmdot`   | -           | K*s/kg                  |
 | `ChannelResult::dT_aw_dT`      | -           | - (dimensionless)       |
+| `ChannelResult::dT_aw_dP`      | -           | K/Pa                    |
 | `ChannelResult::dq_dmdot`      | -           | W*s/(m^2*kg)            |
 | `ChannelResult::dq_dT`         | -           | W/(m^2*K)               |
 | `ChannelResult::dq_dT_hot`     | -           | W/(m^2*K)               |

@@ -1569,6 +1569,16 @@ class NetworkSolver:
                             relay[nid], obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dh_a
                         )
 
+                        # Pressure coupling (#496): the side's T_aw moves with its feed
+                        # node's static P at fixed flow (v ~ 1/rho); h does not.
+                        idx_P_a = self._name_to_index.get(f"{from_a}.P")
+                        dTaw_dP_a = getattr(ch_a, "dT_aw_dP", 0.0)
+                        if idx_P_a is not None and dTaw_dP_a != 0.0:
+                            nr = relay[nid].setdefault(
+                                idx_P_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
+                            )
+                            nr["T"] += dT_mix_dQ * sign * wall_result.dQ_dT_aw_a * dTaw_dP_a
+
                         # Side B contributions
                         obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
                         from_b = self._flow_ends(obj_b, x)[0]
@@ -1610,6 +1620,16 @@ class NetworkSolver:
                         self._relay_flow_inputs(
                             relay[nid], obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b
                         )
+
+                        # Pressure coupling (#496): the side's T_aw moves with its feed
+                        # node's static P at fixed flow (v ~ 1/rho); h does not.
+                        idx_P_b = self._name_to_index.get(f"{from_b}.P")
+                        dTaw_dP_b = getattr(ch_b, "dT_aw_dP", 0.0)
+                        if idx_P_b is not None and dTaw_dP_b != 0.0:
+                            nr = relay[nid].setdefault(
+                                idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
+                            )
+                            nr["T"] += dT_mix_dQ * sign * wall_result.dQ_dT_aw_b * dTaw_dP_b
 
             # On the [200, 5000] K clamp the derived T is flat: its relayed
             # sensitivities are zero, not the mixer's (#481 C4). Downstream
