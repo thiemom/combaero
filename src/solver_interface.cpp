@@ -432,22 +432,13 @@ viscosity_and_jacobians(double T, double P, const std::vector<double> &X) {
   double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
   double dPeff_dP = (P > 1.0) ? 1.0 : 0.1;
 
-  // Base viscosity
-  double mu = combaero::viscosity(T_eff, P_eff, X);
-
-  // 1. Temperature Derivative
-  double dT_p = 1e-3; // 1 mK perturbation
-  double mu_plus = combaero::viscosity(T_eff + dT_p, P_eff, X);
-  double mu_minus = combaero::viscosity(T_eff - dT_p, P_eff, X);
-  double d_mu_d_T = ((mu_plus - mu_minus) / (2.0 * dT_p)) * dTeff_dT;
-
-  // 2. Pressure Derivative
-  double dP_p = 1.0; // 1 Pascal perturbation
-  double mu_P_plus = combaero::viscosity(T_eff, P_eff + dP_p, X);
-  double mu_P_minus = combaero::viscosity(T_eff, P_eff - dP_p, X);
-  double d_mu_d_P = ((mu_P_plus - mu_P_minus) / (2.0 * dP_p)) * dPeff_dP;
-
-  return {mu, d_mu_d_T, d_mu_d_P};
+  // Analytic d/dT through the C1 collision-integral interpolation and the
+  // Wilke rule (#485); it was a +/-1 mK central difference, exact on each
+  // linear segment of the old table but discontinuous at every node.
+  // Dilute-gas viscosity does not depend on pressure.
+  (void)dPeff_dP;
+  const combaero::TransportDerivatives tr = combaero::transport_and_dT(T_eff, P_eff, X);
+  return {tr.mu, tr.dmu_dT * dTeff_dT, 0.0};
 }
 
 std::tuple<double, double>

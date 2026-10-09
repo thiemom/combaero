@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Collision integrals are exact and smooth; transport derivatives are analytic (#485).**
+  - **Interpolation error:** Omega*(2,2) was interpolated linearly in raw T* on the Monchick-Mason table. That was off by up to 2.7% between nodes and left 2-17% kinks in dmu/dT at every node.
+  - **Table error:** the table's own Lennard-Jones column was off by up to 0.6% at the nodes; Kim & Monroe (2014) and an independent quadrature agree with each other to 5e-5.
+  - **Now:** the delta* = 0 column (values and slopes) comes from quadrature of the classical collision integrals, generated into `include/collision_integral_data.h` (`thermo_data_generator/collision_integrals.py`). It agrees with Kim & Monroe to <= 1e-4 from T* = 0.3 to 400, between nodes included. The grid extends to T* = 400, which covers hydrogen to about 15000 K.
+  - **Interpolant:** cubic Hermite in (ln T*, ln Omega*) with the tabulated slopes; C1 in T. Picked on a study against the exact function: 0.032% max between nodes, against 0.093% for the best spline and 0.23% for PCHIP.
+  - **Polar columns:** scaled by the same exact/tabulated ratio, so they no longer sit 0.6% off the LJ column at T* = 100.
+  - **Derivative:** `viscosity_and_jacobians` now returns the analytic dmu/dT instead of a +/-1 mK difference.
+  - **Measured effect:** the old kinks cost no convergence (24,039 solves: evaluations -0.05%, no outcome flips). They did cost a 0.3% Jacobian error near zero drive in the compressible channel's dG/dTt0 (#486 had attributed it to the friction laminar blend), and a ~1e-8 precision floor on Re-dependent integrals.
+  - **Values** change by tenths of a percent: air +0.1% at 300 K; 1 of 240 cooling validation series moves by 0.1 point.
+
 - **Air's viscosity was 11.8% low, O2's 44.5% (#485).** The generated transport data took Lennard-Jones parameters from NUIGMech1.1 entries that its own authors flag as unreferenced (`theoret trans`). For O2 that meant eps 676 K, against 107.4 K in GRI30, JetSurf2, Aramco2 and San Diego. H2 (304.7 vs 38.0 K), H2O and Ar were wrong too.
   - **Generator change:** the extractor now lets a flagged transport set yield to the first later unflagged source, for transport only. The header is regenerated; thermo is unchanged.
   - **Viscosity at 300 K, after:** O2 -0.2%, N2 +1.0%, Ar +1.6%, H2 +0.4%, CO2 +0.3%, air +0.6% against literature. Alkanes move 1-3%.
@@ -317,6 +327,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "lower bound" caveat becomes testable rather than stated.
 
 ### Added
+
+- **`transport_and_dT`, `omega22_and_derivative`, `dcp_R_dT`:** mixture viscosity and conductivity with analytic d/dT, the collision integral with its slope, and per-species d(cp/R)/dT (#485). At the NASA polynomials' 1000 K range join, cp's slope jumps, so dk/dT is one-sided there.
 
 - **`fanno_channel_flow`:** the mass flux a duct passes from a stagnation state against a back pressure, with dG/dPt0, dG/dTt0 and dG/dP_target. It saturates at the choked flux and is never infeasible.
   - **Method:** it solves for the exit Mach, because P_exit is linear in G at fixed M so G(M_exit) is explicit, and differentiates implicitly. That stays well conditioned up to the choke and C1 through it.

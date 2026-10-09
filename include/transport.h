@@ -10,6 +10,23 @@ namespace combaero {
 double linear_interp(double x, const std::vector<double>& x_values, const std::vector<double>& y_values);
 double omega22(double T_star, double delta_star);
 
+// Omega*(2,2) and dOmega*/dT*: cubic Hermite in (ln T*, ln Omega*) with
+// tabulated node values and slopes (C1); see src/transport.cpp.
+struct Omega22Result {
+    double omega = 0.0;
+    double domega_dTstar = 0.0;
+};
+Omega22Result omega22_and_derivative(double T_star, double delta_star);
+
+// Mixture viscosity and thermal conductivity with analytic d/dT.
+struct TransportDerivatives {
+    double mu = 0.0;      // [Pa·s]
+    double dmu_dT = 0.0;  // [Pa·s/K]
+    double k = 0.0;       // [W/(m·K)]
+    double dk_dT = 0.0;   // [W/(m·K^2)]
+};
+TransportDerivatives transport_and_dT(double T, double P, const std::vector<double>& X);
+
 // Transport properties
 double viscosity(double T, double P, const std::vector<double>& X);
 double thermal_conductivity(double T, double P, const std::vector<double>& X);

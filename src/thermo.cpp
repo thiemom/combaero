@@ -277,15 +277,26 @@ double dh_dT(double T, const std::vector<double> &X) { return cp(T, X); }
 
 double ds_dT(double T, const std::vector<double> &X) { return cp(T, X) / T; }
 
+double dcp_R_dT(std::size_t species_idx, double T) {
+  if (species_idx >= species_names.size()) {
+    throw std::out_of_range("dcp_R_dT: species index out of bounds");
+  }
+  if (T < 10.0) {
+    return 0.0;  // cp_R holds its 10 K value below the clamp
+  }
+  const auto& a = get_interval(species_idx, T).coeffs;
+  // d(Cp/R)/dT = -2*a1/T^3 - a2/T^2 + a4 + 2*a5*T + 3*a6*T^2 + 4*a7*T^3
+  return -2.0*a[0]/(T*T*T) - a[1]/(T*T) + a[3] + 2.0*a[4]*T +
+         3.0*a[5]*T*T + 4.0*a[6]*T*T*T;
+}
+
 double dcp_dT(double T, const std::vector<double> &X) {
   double dcp_mix = 0.0;
   for (std::size_t i = 0; i < X.size(); ++i) {
-    const auto& interval = get_interval(i, T);
-    const auto& a = interval.coeffs;
-    // d(Cp/R)/dT = -2*a1/T^3 - a2/T^2 + a4 + 2*a5*T + 3*a6*T^2 + 4*a7*T^3
-    double dcp_R_dT = -2.0*a[0]/(T*T*T) - a[1]/(T*T) + a[3] + 2.0*a[4]*T +
-                      3.0*a[5]*T*T + 4.0*a[6]*T*T*T;
-    dcp_mix += X[i] * dcp_R_dT * thermo::R_GAS;
+    const auto& a = get_interval(i, T).coeffs;
+    double dcp_R = -2.0*a[0]/(T*T*T) - a[1]/(T*T) + a[3] + 2.0*a[4]*T +
+                   3.0*a[5]*T*T + 4.0*a[6]*T*T*T;
+    dcp_mix += X[i] * dcp_R * thermo::R_GAS;
   }
   return dcp_mix;
 }
