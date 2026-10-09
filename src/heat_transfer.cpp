@@ -1130,6 +1130,8 @@ channel_smooth(double T, double P, const std::vector<double> &X,
     double T_aw_plus = T_adiabatic_wall(T + eps_T_aw, v_plus, T + eps_T_aw, P, X, turbulent_flow);
     double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
+    // At fixed mdot, v ~ 1/rho ~ 1/P (ideal gas): T_aw - T ~ 1/P^2 (#496).
+    result.dT_aw_dP = (P > 0.0) ? -2.0 * (T_aw - T) / P : 0.0;
 
     if (std::isfinite(T_hot)) {
       double dT_diff = result.T_aw - T_hot;

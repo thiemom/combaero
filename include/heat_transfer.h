@@ -626,6 +626,10 @@ struct ChannelResult {
   double ddP_dT = 0.0;       // ∂(dP)/∂T [Pa/K]
   double dT_aw_dmdot = 0.0;  // ∂T_aw/∂ṁ [K·s/kg]
   double dT_aw_dT = 0.0;     // ∂T_aw/∂T [-] (≈1 at low Mach)
+  // dT_aw/dP [K/Pa] at fixed mass flow and T: the dynamic rise r v^2/(2 cp)
+  // with v = mdot/(rho A), rho ~ P, so -2 (T_aw - T)/P. h does not move with
+  // P at fixed mdot (Re, Pr, k do not). The wall relay's pressure column (#496).
+  double dT_aw_dP = 0.0;
   double dq_dmdot = 0.0;     // ∂q/∂ṁ  [W·s/(m²·kg)]
   double dq_dT = 0.0;        // ∂q/∂T  [W/(m²·K)]
   double dq_dT_hot = 0.0;   // ∂q/∂T_hot [W/(m²·K)]  (= -h when T_hot finite)
