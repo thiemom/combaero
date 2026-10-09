@@ -1296,6 +1296,7 @@ class NetworkSolver:
                             state_up.m_dot = elem.flow_at_node(src_nid, x, indices)
                         state_up._element_id = elem.id
                         state_up._m_dot_jac_names = elem_jac_names
+                    state_up._src_node = src_nid
                     stream_info.append((state_up, elem, src_nid, None))
             # A reversed element delivers -m_dot from its to_node (#481).
             for elem in rev_in:
@@ -1304,6 +1305,7 @@ class NetworkSolver:
                 state_up.m_dot = -float(x[i_m])
                 state_up._element_id = elem.id
                 state_up._m_dot_jac_names = {f"{elem.id}.m_dot": -1.0}
+                state_up._src_node = elem.to_node
                 stream_info.append((state_up, elem, elem.to_node, {i_m: -1.0}))
             # A MassFlowBoundary between elements injects its own stream: the
             # mass row already counts its m_dot, so the mixing must too, at
@@ -1348,13 +1350,13 @@ class NetworkSolver:
                 node._inflows = []
                 node._upstream_m_dot_jac = {}
                 node._upstream_element_ids = []
+            T_clamped = not (200.0 < float(T) < 5000.0)
             T = min(max(float(T), 200.0), 5000.0)
             self._derived_states[nid] = (T, Y, mix_res)
 
             # Store wall coupling debug info on the node
             if wall_contributions:
-                m_dot_total_dbg = sum(s.m_dot for s in up_states) or 1.0
-                dT_mix_dQ = (mix_res.dT_mix_d_delta_h / m_dot_total_dbg) if mix_res else 0.0
+                dT_mix_dQ = mix_res.dT_mix_dQ if mix_res else 0.0
                 node._wall_couplings = []
                 for (
                     wall,
@@ -1453,10 +1455,10 @@ class NetworkSolver:
                 #   dQ/dmdot = dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot + (side B terms)
                 #   dQ/dT    = dQ/dh_a * dh_a/dT    + dQ/dT_aw_a * dT_aw_a/dT    + (side B terms)
                 if wall_contributions:
-                    # dT_mix_d_delta_h = 1/cp_mix is dT/d(specific_h) [K/(J/kg)].
-                    # Wall Q is total heat rate [W], so dT/dQ = (1/cp) / m_dot_total.
-                    m_dot_total = sum(s.m_dot for s in up_states) or 1.0
-                    dT_mix_dQ = mix_res.dT_mix_d_delta_h / m_dot_total
+                    # Wall Q is a heat rate [W]: dT/dQ = (1/cp) / m_eff, m_eff
+                    # the flow the mixer spreads Q over (dT_mix_dQ, exact also
+                    # below kMixerHeatMdotFloor and for a non-positive total).
+                    dT_mix_dQ = mix_res.dT_mix_dQ
                     for (
                         _wall,
                         _Qi,
@@ -1555,6 +1557,13 @@ class NetworkSolver:
                         self._relay_flow_inputs(
                             relay[nid], obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b
                         )
+
+            # On the [200, 5000] K clamp the derived T is flat: its relayed
+            # sensitivities are zero, not the mixer's (#481 C4). Downstream
+            # nodes chain from this, so it is cleared before they are reached.
+            if T_clamped:
+                for pkg in relay[nid].values():
+                    pkg["T"] = 0.0
 
             # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])
@@ -3194,6 +3203,32 @@ class NetworkSolver:
                     "initial guess."
                 )
 
+        # A node's derived T held at the [200, 5000] K clamp discards the
+        # energy that would have taken its FLOW past (190 kW in a heated
+        # plenum): the residuals can close there while energy does not. Not
+        # admissible (#481 C4), and reported, not silently accepted. A
+        # stagnant node on the clamp carries no enthalpy anywhere -- its heat
+        # is reported as Q_withheld -- so only a node with inflow counts.
+        _T_clamped: list[str] = []
+        if success:
+            self._propagate_states(final_x, with_relay=False)
+            _T_clamped = [
+                nid
+                for nid, (T_n, _, _) in self._derived_states.items()
+                if not 200.0 < float(T_n) < 5000.0
+                and sum(m for m, _, _ in self._node_inflows(nid, final_x))
+                >= cb.MIXER_HEAT_MDOT_FLOOR
+            ]
+            if _T_clamped:
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                message = (
+                    f"Converged with node temperature(s) on the [200, 5000] K clamp at "
+                    f"{_T_clamped}: the clamp discards energy, so the balance does not "
+                    "close. Check heat inputs against the flow they heat."
+                )
+
         if not success:
             warnings.warn(
                 f"NetworkSolver did not converge: {message} "
@@ -3445,6 +3480,7 @@ class NetworkSolver:
         sol_dict["__converged__"] = bool(converged)
         sol_dict["__consistent__"] = consistent
         sol_dict["__inconsistent_elements__"] = list(_bad_junctions)
+        sol_dict["__T_clamped__"] = list(_T_clamped)
         sol_dict["__outcome__"] = outcome
         # The rows carrying the residual, largest first. Already computed for
         # the diagnostic payload; a failed solve is far easier to read with

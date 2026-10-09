@@ -1156,6 +1156,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("P_total_mix", &solver::MixerResult::P_total_mix)
       .def_readonly("Y_mix", &solver::MixerResult::Y_mix)
       .def_readonly("dT_mix_d_delta_h", &solver::MixerResult::dT_mix_d_delta_h)
+      .def_readonly("dT_mix_dQ", &solver::MixerResult::dT_mix_dQ)
       .def_readonly("dT_mix_d_stream", &solver::MixerResult::dT_mix_d_stream)
       .def_readonly("dP_total_mix_d_stream",
                     &solver::MixerResult::dP_total_mix_d_stream)

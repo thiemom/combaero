@@ -742,6 +742,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
 
   // Store dT/d(delta_h) for reference (not directly used in Jacobians)
   res.dT_mix_d_delta_h = (cp_mix > 0.0) ? (1.0 / cp_mix) : 0.0;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
 
   for (std::size_t i = 0; i < n_streams; ++i) {
     StreamJacobian &dT_jac = res.dT_mix_d_stream[i];
@@ -918,6 +919,7 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
   res.dT_mix_d_stream.resize(n_streams);
   res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
@@ -1086,6 +1088,7 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
   res.dT_mix_d_stream.resize(n_streams);
   res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));

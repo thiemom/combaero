@@ -1242,6 +1242,7 @@ struct MixerResult {
     double P_total_mix;
     std::vector<double> Y_mix;
     double dT_mix_d_delta_h;
+    double dT_mix_dQ;  // = dT_mix_d_delta_h / m_eff (the flow Q is spread over)
     std::vector<StreamJacobian> dT_mix_d_stream;
     std::vector<StreamJacobian> dP_total_mix_d_stream;
     std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;

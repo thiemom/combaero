@@ -59,6 +59,11 @@ struct MixerResult {
   double P_total_mix;
   std::vector<double> Y_mix;
   double dT_mix_d_delta_h = 0.0;
+  // dT_mix/dQ [K/W] = dT_mix_d_delta_h / m_eff, with m_eff the flow Q is
+  // spread over (|m| above kMixerHeatMdotFloor, a C1 parabola below). A
+  // caller relaying a heat input (a wall) needs this, not 1/(cp sum m),
+  // which was wrong below the floor and for a zero or negative total (#481).
+  double dT_mix_dQ = 0.0;
   std::vector<StreamJacobian> dT_mix_d_stream;
   std::vector<StreamJacobian> dP_total_mix_d_stream;
   std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;

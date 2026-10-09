@@ -2217,6 +2217,18 @@ class CombustorNode(NetworkNode):
             if self._total_m_dot > 0
             else 300.0
         )
+        # The streams behind T_unburned, for its Jacobian in a theta-sourced
+        # PressureLossElement: (m, Tt, {unknown: dm/d(unknown)}, source node).
+        # T_u = sum(m Tt) / M is not a relayed node property (#481 C1).
+        self._unburned_streams = [
+            (
+                float(s.m_dot),
+                float(s.Tt),
+                dict(getattr(s, "_m_dot_jac_names", {})),
+                getattr(s, "_src_node", None),
+            )
+            for s in upstream_states
+        ]
 
         # Store upstream element IDs for momentum-chamber Jacobian (d_res_dmdot entries)
         self._upstream_element_ids = [
@@ -4440,6 +4452,22 @@ class PressureLossElement(NetworkElement):
         # Residual: Pt_out - Pt_in * (1 - xi) = 0.
         res = [state_out.Pt - state_in.Pt * (1.0 - xi)]
 
+        # The Jacobian is differenced (one or two correlation calls per
+        # variable and per species present), so it is computed only when the
+        # solver reads it (LazyJacobian, #489).
+        def jacobian() -> dict[int, dict[str, float]]:
+            return self._jacobian(state_in, graph, ctx, xi, dxi_dtheta)
+
+        return res, LazyJacobian(jacobian)
+
+    def _jacobian(
+        self,
+        state_in: NetworkMixtureState,
+        graph: "FlowNetwork | None",
+        ctx: SimpleNamespace,
+        xi: float,
+        dxi_dtheta: float,
+    ) -> dict[int, dict[str, float]]:
         jac: dict[int, dict[str, float]] = {
             0: {
                 f"{self.from_node}.Pt": -(1.0 - xi),
@@ -4484,8 +4512,67 @@ class PressureLossElement(NetworkElement):
             dxi_dT_in = _dxi_dvar("T_in", ctx.T_in, 0.01)
             if dxi_dT_in != 0.0:
                 jac[0][f"{self.from_node}.T"] = state_in.Pt * dxi_dT_in
+        elif graph is not None and ctx.T_in > 0:
+            self._add_unburned_jacobian(jac[0], graph, ctx, state_in.Pt, dxi_dtheta, _dxi_dvar)
 
-        return res, jac
+        # Composition of the inlet state (a head loss's density): per species
+        # present, other mass fractions fixed, relayed as "{node}.Y[k]". A
+        # combustor's burned composition moves with its fuel flow; this column
+        # was missing (#481 C1).
+        Y_in = list(state_in.Y)
+        X_saved = ctx.X_in
+        try:
+            for k, y in enumerate(Y_in):
+                if not y > 0.0:
+                    continue
+                h = min(1e-6, 0.5 * y)
+                xi_pm = []
+                for sgn in (1.0, -1.0):
+                    Yk = list(Y_in)
+                    Yk[k] += sgn * h
+                    ctx.X_in = list(cb.mass_to_mole(Yk))
+                    xi_pm.append(self.correlation(ctx)[0])
+                d = (xi_pm[0] - xi_pm[1]) / (2.0 * h)
+                if d != 0.0:
+                    jac[0][f"{self.from_node}.Y[{k}]"] = state_in.Pt * d
+        finally:
+            ctx.X_in = X_saved
+
+        return jac
+
+    def _add_unburned_jacobian(
+        self,
+        row: dict[str, float],
+        graph: "FlowNetwork",
+        ctx: SimpleNamespace,
+        Pt_in: float,
+        dxi_dtheta: float,
+        dxi_dvar: Callable[[str, float, float], float],
+    ) -> None:
+        """d(res)/d(unknowns) through the source's UNBURNED temperature (#481 C1).
+
+        T_u enters twice: theta = T_b/T_u - 1 (d theta/dT_u = -T_b/T_u^2) and
+        as the correlation's reference temperature ctx.T_in (a head loss's
+        density). T_u = sum(m_i Tt_i)/M over the source's inflows, so
+        dT_u = sum((Tt_i - T_u)/M dm_i + m_i/M dTt_i): the flows' unknowns
+        directly, each Tt_i through its node's relayed "{src}.T". It was
+        missing: d/d(fuel flow) read 0 against 95 by differences.
+        """
+        src = graph.nodes[self._theta_source_resolved]
+        streams = getattr(src, "_unburned_streams", None)
+        M = sum(m for m, _, _, _ in streams) if streams else 0.0
+        if not streams or M <= 0.0:
+            return
+        T_u, T_b = ctx.T_in, ctx.T_ad
+        dres_dTu = Pt_in * (dxi_dtheta * (-T_b / (T_u * T_u)) + dxi_dvar("T_in", T_u, 0.01))
+        if dres_dTu == 0.0:
+            return
+        for m, Tt, names, src_node in streams:
+            for var, coeff in names.items():
+                row[var] = row.get(var, 0.0) + dres_dTu * (Tt - T_u) / M * coeff
+            if src_node is not None:
+                key = f"{src_node}.T"
+                row[key] = row.get(key, 0.0) + dres_dTu * m / M
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
