@@ -516,7 +516,7 @@ inline constexpr Entry function_units[] = {
      "FannoDuctResult"},
     {"fanno_channel_flow",
      "Pt0: Pa, Tt0: K, X: mol/mol, P_target: Pa, exit_total: bool, L: m, D: m, "
-     "roughness: m, friction_model: str, f_multiplier: -, M_exit_guess: -, with_dG_dY: bool",
+     "roughness: m, friction_model: str, f_multiplier: -, M_exit_guess: -, dY_directions: kg/kg, with_derivatives: bool",
      "FannoChannelFlow"},
     {"fanno_choked_mass_flux",
      "Pt: Pa, Tt: K, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, "
@@ -1358,7 +1358,7 @@ inline constexpr Entry function_units[] = {
     {"FannoChannelFlow::dG_dPt0", "-", "kg/(m^2*s*Pa)"},
     {"FannoChannelFlow::dG_dTt0", "-", "kg/(m^2*s*K)"},
     {"FannoChannelFlow::dG_dP_target", "-", "kg/(m^2*s*Pa)"},
-    {"FannoChannelFlow::dG_dY", "-", "kg/(m^2*s)"},
+    {"FannoChannelFlow::dG_ddir", "-", "kg/(m^2*s)"},
     {"FANNO_FLOW_DRIVE_FLOOR", "-", "Pa"},
     {"solve_A_eff_from_mdot", "-", "-"},
     {"solve_P_back_from_mdot", "-", "-"},

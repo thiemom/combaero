@@ -1956,6 +1956,13 @@ class NetworkSolver:
             if not compute_jacobian:
                 # Same x, same states: only the sensitivities are new.
                 relay = self._propagate_states(x)
+            # Before any element Jacobian is read (LazyJacobians compute on
+            # first read): for each node whose composition moves with x, the
+            # directions it moves in -- where a costly d/dY is worth computing,
+            # and the only directions it is needed along.
+            directions = self._composition_directions(relay, x)
+            for element in self.network.elements.values():
+                element._composition_directions = directions
             rows: list[int] = []
             cols: list[int] = []
             data: list[float] = []
@@ -2006,6 +2013,40 @@ class NetworkSolver:
             return np.array(res, dtype=float), assemble()
         self._deferred_jacobian = (x.copy(), assemble)
         return np.array(res, dtype=float), None
+
+    @staticmethod
+    def _composition_directions(relay: dict[str, Any], x: np.ndarray) -> dict[str, list[Any]]:
+        """Per node whose derived composition moves with the unknowns, an
+        orthonormal basis of the directions it moves in.
+
+        A node's dY/dx_j, over all unknowns j, span at most (inflow
+        compositions - 1) directions: ONE for a plenum mixing two gases. An
+        element differentiating along that basis and projecting back,
+        g = sum_i (dG/dv_i) v_i, has g . dY/dx_j = dG/dY . dY/dx_j exactly for
+        every j, at one directional derivative instead of one per species.
+
+        A node fed by one gas has dY/dx = 0 up to rounding (~1e-17/m); the
+        columns are weighted by |x_j| (the change in Y over a 100% change of
+        x_j) and directions below 1e-10 of that, or 1e-9 of the largest, are
+        dropped.
+        """
+        directions: dict[str, list[Any]] = {}
+        for nid, cols in relay.items():
+            vecs = [
+                pkg["Y"] * max(abs(x[idx]), 1e-3)
+                for idx, pkg in cols.items()
+                if pkg.get("Y") is not None
+            ]
+            if not vecs:
+                continue
+            M = np.column_stack(vecs)
+            if float(np.max(np.abs(M))) <= 1e-10:
+                continue
+            U, S, _ = np.linalg.svd(M, full_matrices=False)
+            keep = max(1e-10, 1e-9 * S[0]) < S
+            if np.any(keep):
+                directions[nid] = [U[:, i].copy() for i in np.flatnonzero(keep)]
+        return directions
 
     def _jacobian_at_last(self, x: np.ndarray) -> Any:
         """The deferred Jacobian of the last residual-only evaluation, if it

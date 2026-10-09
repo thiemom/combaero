@@ -949,7 +949,8 @@ channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05,
 # head lost into a PressureBoundary (coupling "static"/default) or recovered into
 # anything else, and its flow SATURATES at the choked flow -- a choked duct
 # converges on its choked flow, never past it. Diagnostics: "choked",
-# "M_in_duct", "M_exit_duct".
+# "M_in_duct", "M_exit_duct". Where the feeding node mixes gases, its Jacobian
+# carries d/dY along the directions that composition moves in (#489).
 
 # Effusion (multi-perforated) wall panel. Geometry is given the way a plate
 # is designed -- pitch, hole diameter, wall thickness, inclination -- and the
