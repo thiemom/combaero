@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Jacobian completeness (#481 C1, C4, C5).** The analytic network Jacobian now equals differences where it dropped a dependence.
+  - **Theta-sourced `PressureLossElement`:**
+    - **Unburned temperature:** the combustor's unburned temperature enters through theta = T_b/T_u - 1 and as the correlation's reference temperature. It was never relayed and now is, through the combustor's inflows.
+    - **Inlet composition:** a head loss's density depends on the inlet composition, which now has a composition column.
+    - **Before:** errors were 2.6% in d/d(air flow) and 5% in d/d(fuel flow); both now hold to ~4e-6.
+    - **Lazy:** the element's differenced Jacobian is now a `LazyJacobian`.
+  - **Temperature clamp:** a node whose derived temperature sits on the [200, 5000] K clamp relays zero temperature sensitivity. Its flat value used to carry the mixer's full slope, 5% off.
+    - **New check:** a converged solve with a flowing node on the clamp is now reported INCONSISTENT (`__success__` False, nodes in `__T_clamped__`). The clamp discards energy -- 190 kW in a heated test plenum -- so the residuals can close while the balance does not.
+    - **Not flagged:** a stagnant node on the clamp, whose heat is already reported as `Q_withheld`.
+  - **Wall heat relay:** this took dT/dQ = 1/(cp * sum m). The mixer spreads Q over m_eff: |m| above `MIXER_HEAT_MDOT_FLOOR`, a C1 parabola below. The old form was 2x off below the floor and had the wrong sign for a negative total. `MixerResult.dT_mix_dQ` now gives the exact value, also for the combustor mixers.
+
 - **No throw, no NaN and no jump where a solver probe can reach (#481).** The suite's converged solves (485) were probed through flow reversal, zero flow and out-of-range pressures. Each fix is exact wherever its closure is defined.
   - **Turbulent-only Nusselt correlations** (`dittus_boelter`, `sieder_tate`, `petukhov`) threw for 2300 <= Re < 1e4 in `channel_smooth` and `htc_circular_channel`. They now use the VDI Heat Atlas transition: linear in Re from laminar Nu at 2300 to the correlation at 1e4, with exact derivatives. Values from 1e4 up are unchanged.
   - **`fanno_channel_flow`** threw at a back pressure <= 0. That now gives the choked flux, continuous with P -> 0+.

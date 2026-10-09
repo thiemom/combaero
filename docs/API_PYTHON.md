@@ -778,6 +778,7 @@ bookkeeping keys. Five of them say what happened:
 | `__converged__` | `bool` | the root finder reached the residual tolerance, whatever the consistency checks then said |
 | `__consistent__` | `bool \| None` | the elements' own physical-consistency verdict. **`None` means not checked** -- either the solve never converged, or no element in this network has a verifier. It is not a pass. |
 | `__inconsistent_elements__` | `list[str]` | ids of the elements that rejected the solution |
+| `__T_clamped__` | `list[str]` | nodes with flow whose temperature sits on the [200, 5000] K clamp at the solution. The clamp discards energy, so the solve is reported INCONSISTENT (`__success__` False). |
 | `__outcome__` | `SolveOutcome` | why it ended, in one machine-readable value |
 | `__worst_residuals__` | `list[dict]` | the rows carrying the residual, largest first |
 
