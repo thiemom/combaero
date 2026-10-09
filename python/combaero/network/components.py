@@ -3,7 +3,7 @@ import math
 import sys
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal
@@ -1469,6 +1469,43 @@ def _element_reference_block(
     }
 
 
+class LazyJacobian(MutableMapping):
+    """An element's local Jacobian, computed on first access (#489).
+
+    The solver's residual-only evaluations never read an element's Jacobian;
+    it is assembled only when the root finder asks for J (hybr: at the start
+    and on restarts). An element whose derivatives are costly -- the
+    compressible channel's implicit Fanno derivatives -- returns this from
+    ``residuals`` instead of a dict, and pays for them only when they are
+    read. To any reader it is the ``{eq_idx: {unknown: d}}`` dict.
+    """
+
+    def __init__(self, compute: Callable[[], dict[int, dict[str, float]]]) -> None:
+        self._compute: Callable[[], dict[int, dict[str, float]]] | None = compute
+        self._jac: dict[int, dict[str, float]] = {}
+
+    def _resolved(self) -> dict[int, dict[str, float]]:
+        if self._compute is not None:
+            compute, self._compute = self._compute, None
+            self._jac = compute()
+        return self._jac
+
+    def __getitem__(self, key: int) -> dict[str, float]:
+        return self._resolved()[key]
+
+    def __setitem__(self, key: int, value: dict[str, float]) -> None:
+        self._resolved()[key] = value
+
+    def __delitem__(self, key: int) -> None:
+        del self._resolved()[key]
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._resolved())
+
+    def __len__(self) -> int:
+        return len(self._resolved())
+
+
 class NetworkElement(ABC):
     def __init__(self, id: str, from_node: str, to_node: str):
         self.id = id
@@ -1491,7 +1528,8 @@ class NetworkElement(ABC):
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         """
         Returns (residuals, local_jacobian).
-        local_jacobian is a dict mapping equation_index to a dict of {unknown_name: partial_derivative}.
+        local_jacobian is a dict mapping equation_index to a dict of {unknown_name: partial_derivative},
+        or a LazyJacobian that computes it when first read.
         """
         pass
 
@@ -4777,7 +4815,11 @@ class ChannelElement(NetworkElement):
         return bool(node.exit_head_lost(True))
 
     def _compressible_flow(
-        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState, f_mult: float
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        f_mult: float,
+        derivatives: bool = True,
     ) -> tuple[float, dict[str, float], Any]:
         """Fanno mass flow m_calc and d(m_calc)/d(node unknowns) (#481).
 
@@ -4787,6 +4829,15 @@ class ChannelElement(NetworkElement):
         or exit stagnation pressure (recovered). The flux rises monotonically
         as that pressure falls and saturates at the choked flux: it exists for
         every state, so there is no infeasible region and no barrier.
+
+        derivatives=False returns m_calc only (empty derivs): the kernel then
+        skips its implicit derivatives. With derivatives, d/dY of the feeding
+        node is included where its composition moves with the solve: the
+        solver sets _composition_directions -- per such node, an orthonormal
+        basis of the directions it moves in -- before it reads a Jacobian.
+        The kernel differentiates along that basis and the gradient is
+        projected back onto per-species keys, exact for every relay column.
+        Standalone (unset): per species present, other fractions fixed.
         """
         A = self.area
         forward = state_in.Pt >= state_out.Pt
@@ -4795,6 +4846,14 @@ class ChannelElement(NetworkElement):
             (self.from_node, self.to_node) if forward else (self.to_node, self.from_node)
         )
         lost = self._exit_head_lost(1.0 if forward else -1.0)
+        known = getattr(self, "_composition_directions", None)
+        if not derivatives:
+            dirs: list[Any] = []
+        elif known is None:
+            n_sp = len(src.Y)
+            dirs = [[float(j == k) for j in range(n_sp)] for k, y in enumerate(src.Y) if y > 0.0]
+        else:
+            dirs = known.get(src_id, [])
         flow = cb.fanno_channel_flow(
             src.Pt,
             src.Tt,
@@ -4807,16 +4866,31 @@ class ChannelElement(NetworkElement):
             self.friction_model,
             f_mult,
             getattr(self, "_last_M_exit", -1.0),
+            [list(v) for v in dirs],
+            derivatives,
         )
         # Warm start only: the flow does not depend on it.
         if not flow.choked:
             self._last_M_exit = float(flow.M_exit)
         sign = 1.0 if forward else -1.0
+        if not derivatives:
+            return sign * A * flow.G, {}, flow
         derivs = {
             f"{src_id}.Pt": sign * A * flow.dG_dPt0,
             f"{src_id}.T": sign * A * flow.dG_dTt0,
             f"{dst_id}.Pt": sign * A * flow.dG_dP_target,
         }
+        # Composition of the feeding node: the directional derivatives
+        # projected back onto species, g = sum_i (dG/dv_i) v_i, chained by the
+        # solver with dY/dx from its mixing relay.
+        if dirs:
+            g = [0.0] * len(src.Y)
+            for d, v in zip(flow.dG_ddir, dirs, strict=True):
+                for k, vk in enumerate(v):
+                    g[k] += d * float(vk)
+            for k, gk in enumerate(g):
+                if gk != 0.0:
+                    derivs[f"{src_id}.Y[{k}]"] = sign * A * gk
         return sign * A * flow.G, derivs, flow
 
     def residuals(
@@ -4842,11 +4916,18 @@ class ChannelElement(NetworkElement):
             # drop-given-m form had no physical drop past choke and patched
             # one in with a barrier, which converged choked ducts 5-20% above
             # their choked flow.
-            m_calc, derivs, _ = self._compressible_flow(state_in, state_out, f_mult)
-            jac_c: dict[str, float] = {f"{self.id}.m_dot": 1.0}
-            for name, d in derivs.items():
-                jac_c[name] = jac_c.get(name, 0.0) - d
-            return [m_dot - m_calc], {0: jac_c}
+            # The residual needs the flow only; its implicit derivatives are
+            # computed if and when the Jacobian is read (LazyJacobian, #489).
+            m_calc, _, _ = self._compressible_flow(state_in, state_out, f_mult, derivatives=False)
+
+            def jacobian() -> dict[int, dict[str, float]]:
+                _, derivs, _ = self._compressible_flow(state_in, state_out, f_mult)
+                jac_c: dict[str, float] = {f"{self.id}.m_dot": 1.0}
+                for name, d in derivs.items():
+                    jac_c[name] = jac_c.get(name, 0.0) - d
+                return {0: jac_c}
+
+            return [m_dot - m_calc], LazyJacobian(jacobian)
         else:
             # Use incompressible Darcy-Weisbach formulation. Density
             # reference: upstream static by default, downstream static when
@@ -4961,7 +5042,7 @@ class ChannelElement(NetworkElement):
             # whether it is choked -- its flow then independent of the back
             # pressure.
             f_mult = self.surface.f_multiplier if self.surface else 1.0
-            _, _, flow = self._compressible_flow(state_in, state_out, f_mult)
+            _, _, flow = self._compressible_flow(state_in, state_out, f_mult, derivatives=False)
             duct = {
                 "choked": float(flow.choked),
                 "M_in_duct": float(flow.M_in),

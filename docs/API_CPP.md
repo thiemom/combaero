@@ -406,15 +406,18 @@ double fanno_choked_mass_flux(double Pt, double Tt, const std::vector<double>& X
 // to a finite slope below kFannoFlowDriveFloor = 1 Pa. Unchoked it solves for
 // the exit Mach (P_exit is linear in G at fixed M, so G(M_exit) is explicit)
 // and differentiates implicitly, well conditioned up to the choke.
-// with_dG_dY also fills dG_dY: dG/dY_k per species present, other mass
-// fractions held fixed (an element's "{node}.Y[k]" column); about two length
-// integrals per species. ChannelElement does not request it yet: assembled on
-// every evaluation it costs more than the evaluations it saves (#489).
+// dY_directions: mass-fraction directions v; dG_ddir returns dG/ds along each
+// (Y -> Y + s v, X renormalised), about two length integrals per direction. A
+// unit vector e_k gives dG/dY_k at fixed others. ChannelElement passes an
+// orthonormal basis of its feeding node's dY/dx -- usually one vector -- and
+// projects back onto "{node}.Y[k]" keys. with_derivatives = false computes G,
+// choked and the Mach numbers only (a residual-only evaluation).
 FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<double>& X,
                                     double P_target, bool exit_total, double L, double D,
                                     double roughness, const std::string& friction_model,
                                     double f_multiplier = 1.0, double M_exit_guess = -1.0,
-                                    bool with_dG_dY = false);
+                                    const std::vector<std::vector<double>>& dY_directions = {},
+                                    bool with_derivatives = true);
 ```
 
 ### Rocket Nozzle Thrust

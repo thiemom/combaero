@@ -441,7 +441,8 @@ struct FlowProblem {
   const std::string* model;
   bool exit_total;
   double Me_guess;
-  bool with_dG_dY;
+  const std::vector<std::vector<double>>* dirs;
+  bool with_derivatives;
 };
 
 // Length the flux G(Me) = P / exit_per_flux(Me) needs to reach exit Mach Me,
@@ -461,28 +462,57 @@ double psi(double Me, double P, double Pt0, double Tt0, const FlowProblem& pb) {
   return fanno_length_between(G, Tt0, Mi, Me, X, pb.D, pb.rough, *pb.model, pb.fmult) - pb.L;
 }
 
-// d g(X)/d Y_k for each species present in X, the other mass fractions held
-// fixed and X renormalised -- the convention of an element's "{node}.Y[k]"
-// Jacobian column. The solver chains it with dY/dx, which sums to zero, so the
-// off-simplex part of the direction never contributes. Central differences of
-// a smooth function at fixed (G or Me); the step stays inside Y_k >= 0.
-// Absent species get 0: their dY/dx vanishes unless a stream carrying them
-// sits at exactly zero flow, and covering that would cost one difference per
-// species in the mechanism.
+// d g(X)/ds along each direction v in mass-fraction space, Y -> Y + s v (X
+// renormalised). An element chains it with the solver's relay: the feeding
+// node's dY/dx all lie in the span of the directions it passes (an
+// orthonormal basis, usually ONE vector for two mixing streams), so the
+// projected gradient sum_i (dg/dv_i) v_i reproduces dg/dY . dY/dx exactly at
+// a fraction of a per-species gradient's cost. A unit vector e_k gives the
+// per-species partial with the other mass fractions fixed.
+//
+// Central differences of a smooth function at fixed (G or Me), the largest
+// component of the step 1e-5; one-sided where the central step would take a
+// fraction below zero (a species absent here but carried by an inflow).
 template <class Fn>
-std::vector<double> d_dY(const std::vector<double>& X, Fn&& g) {
+std::vector<double> d_ddir(const std::vector<double>& X,
+                           const std::vector<std::vector<double>>& dirs, Fn&& g) {
   const std::vector<double> Y = mole_to_mass(X);
-  std::vector<double> out(Y.size(), 0.0);
-  for (std::size_t k = 0; k < Y.size(); ++k) {
-    if (!(Y[k] > 0.0)) {
+  std::vector<double> out(dirs.size(), 0.0);
+  auto at = [&](const std::vector<double>& v, double s) {
+    std::vector<double> Ys = Y;
+    for (std::size_t k = 0; k < Y.size(); ++k) {
+      Ys[k] += s * v[k];
+    }
+    return g(mass_to_mole(Ys));
+  };
+  auto feasible = [&](const std::vector<double>& v, double s) {
+    for (std::size_t k = 0; k < Y.size(); ++k) {
+      if (Y[k] + s * v[k] < 0.0) {
+        return false;
+      }
+    }
+    return true;
+  };
+  for (std::size_t i = 0; i < dirs.size(); ++i) {
+    const std::vector<double>& v = dirs[i];
+    if (v.size() != Y.size()) {
+      throw std::invalid_argument("fanno_channel_flow: a dY direction has the wrong length");
+    }
+    double vmax = 0.0;
+    for (double vk : v) {
+      vmax = std::max(vmax, std::abs(vk));
+    }
+    if (!(vmax > 0.0)) {
       continue;
     }
-    const double h = std::min(1e-5, 0.5 * Y[k]);
-    std::vector<double> Yp = Y;
-    std::vector<double> Ym = Y;
-    Yp[k] += h;
-    Ym[k] -= h;
-    out[k] = (g(mass_to_mole(Yp)) - g(mass_to_mole(Ym))) / (2.0 * h);
+    const double h = 1e-5 / vmax;
+    if (feasible(v, h) && feasible(v, -h)) {
+      out[i] = (at(v, h) - at(v, -h)) / (2.0 * h);
+    } else if (feasible(v, h)) {
+      out[i] = (at(v, h) - g(X)) / h;
+    } else if (feasible(v, -h)) {
+      out[i] = (g(X) - at(v, -h)) / h;
+    }
   }
   return out;
 }
@@ -500,6 +530,9 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
     out.M_exit = 1.0;
     out.G = fanno_choked_mass_flux(pb.Pt0, pb.Tt0, X, pb.L, pb.D, pb.rough, *pb.model, pb.fmult);
     out.M_in = fanno_inlet_mach(pb.Pt0, pb.Tt0, out.G, X);
+    if (!pb.with_derivatives) {
+      return out;
+    }
     // L*(G; Pt0, Tt0) = L, differentiated implicitly.
     auto Lstar = [&](double G, double Pt0, double Tt0) {
       const double Mi = fanno_inlet_mach(Pt0, Tt0, G, X);
@@ -512,15 +545,15 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
     out.dG_dPt0 = -LP / LG;
     out.dG_dTt0 = -LT / LG;
     out.dG_dP_target = 0.0;
-    if (!pb.with_dG_dY) {
+    if (pb.dirs->empty()) {
       return out;
     }
-    out.dG_dY = d_dY(X, [&](const std::vector<double>& Xk) {
+    out.dG_ddir = d_ddir(X, *pb.dirs, [&](const std::vector<double>& Xk) {
       const double Mi = fanno_inlet_mach(pb.Pt0, pb.Tt0, out.G, Xk);
       return fanno_length_between(out.G, pb.Tt0, Mi, 1.0, Xk, pb.D, pb.rough, *pb.model,
                                   pb.fmult);
     });
-    for (double& d : out.dG_dY) {
+    for (double& d : out.dG_ddir) {
       d = -d / LG;
     }
     return out;
@@ -568,6 +601,9 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
   out.M_exit = Me;
   out.G = pb.P / phi;
   out.M_in = fanno_inlet_mach(pb.Pt0, pb.Tt0, out.G, X);
+  if (!pb.with_derivatives) {
+    return out;
+  }
   // psi(Me; P, Pt0, Tt0) = 0, differentiated implicitly. Its slope in Me stays
   // finite at sonic -- dx/dM -> 0 there, but G(Me) still moves -- so this is
   // well conditioned right up to the choke, where it meets the choked branch.
@@ -624,22 +660,25 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
   out.dG_dP_target = G_P + G_M * dMe_dP;
   out.dG_dPt0 = G_M * dMe_dPt;
   out.dG_dTt0 = G_T + G_M * dMe_dT;
-  if (!pb.with_dG_dY) {
+  if (pb.dirs->empty()) {
     return out;
   }
-  // Composition, the same way: psi_Y = Lam_G G_Y + Lam_Y at fixed Me, with
-  // G_Y = -P phi_Y / phi^2 and Lam_Y = ell_Y - dx/dM(M_in) dM_in/dY.
-  const auto phi_Y = d_dY(X, [&](const std::vector<double>& Xk) {
+  // Composition, the same way along each direction v: psi_v = Lam_G G_v +
+  // Lam_v at fixed Me, with G_v = -P phi_v / phi^2 and
+  // Lam_v = ell_v - dx/dM(M_in) dM_in/dv.
+  const std::vector<std::vector<double>>& dirs = *pb.dirs;
+  const auto phi_v = d_ddir(X, dirs, [&](const std::vector<double>& Xk) {
     return exit_per_flux(Me, pb.Tt0, Xk, pb.exit_total);
   });
-  const auto ell_Y = d_dY(X, [&](const std::vector<double>& Xk) { return ell(G, pb.Tt0, Xk); });
-  const auto flux_Y = d_dY(
-      X, [&](const std::vector<double>& Xk) { return isentropic_flux(pb.Pt0, pb.Tt0, Mi, Xk); });
-  out.dG_dY.assign(X.size(), 0.0);
-  for (std::size_t k = 0; k < X.size(); ++k) {
-    const double G_Y = -pb.P * phi_Y[k] / (phi * phi);
-    const double psi_Y = Lam_G * G_Y + ell_Y[k] + dx_Mi * flux_Y[k] / flux_M;
-    out.dG_dY[k] = G_Y - G_M * psi_Y / psi_M;
+  const auto ell_v = d_ddir(X, dirs, [&](const std::vector<double>& Xk) { return ell(G, pb.Tt0, Xk); });
+  const auto flux_v = d_ddir(X, dirs, [&](const std::vector<double>& Xk) {
+    return isentropic_flux(pb.Pt0, pb.Tt0, Mi, Xk);
+  });
+  out.dG_ddir.assign(dirs.size(), 0.0);
+  for (std::size_t i = 0; i < dirs.size(); ++i) {
+    const double G_v = -pb.P * phi_v[i] / (phi * phi);
+    const double psi_v = Lam_G * G_v + ell_v[i] + dx_Mi * flux_v[i] / flux_M;
+    out.dG_ddir[i] = G_v - G_M * psi_v / psi_M;
   }
   return out;
 }
@@ -649,18 +688,20 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
 FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<double>& X,
                                     double P_target, bool exit_total, double L, double D,
                                     double roughness, const std::string& friction_model,
-                                    double f_multiplier, double M_exit_guess, bool with_dG_dY) {
+                                    double f_multiplier, double M_exit_guess,
+                                    const std::vector<std::vector<double>>& dY_directions,
+                                    bool with_derivatives) {
   check_duct(L, D);
   FannoChannelFlow out;
   const double drive = Pt0 - P_target;
+  static const std::vector<std::vector<double>> kNoDirections;
+  const std::vector<std::vector<double>>& dirs = with_derivatives ? dY_directions : kNoDirections;
   if (!(drive > 0.0) || !(Pt0 > 0.0) || !(Tt0 > 0.0)) {
-    if (with_dG_dY) {
-      out.dG_dY.assign(X.size(), 0.0);
-    }
+    out.dG_ddir.assign(dirs.size(), 0.0);
     return out;
   }
   FlowProblem pb{Pt0, Tt0, P_target, L, D, roughness, f_multiplier, &X, &friction_model, exit_total,
-                 M_exit_guess, with_dG_dY};
+                 M_exit_guess, &dirs, with_derivatives};
   if (drive >= kFannoFlowDriveFloor) {
     return raw_flow(pb);
   }
@@ -671,6 +712,7 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   //   h(t) = (3 - sigma)/2 t + (sigma - 1)/2 t^3,   h(1) = 1, h'(1) = sigma,
   // finite and positive at t = 0 and monotone for sigma < 3.
   pb.P = Pt0 - kFannoFlowDriveFloor;
+  pb.with_derivatives = true;  // sigma needs the slope at the floor
   const FannoChannelFlow at = raw_flow(pb);
   const double sigma =
       (at.G > 0.0) ? std::clamp(-at.dG_dP_target * kFannoFlowDriveFloor / at.G, 0.0, 2.9) : 0.5;
@@ -685,7 +727,7 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   out.dG_dP_target = -at.G * dh / kFannoFlowDriveFloor;
   out.dG_dPt0 = at.G * dh / kFannoFlowDriveFloor + h * (at.dG_dPt0 + at.dG_dP_target);
   out.dG_dTt0 = h * at.dG_dTt0;
-  for (double& d : out.dG_dY) {
+  for (double& d : out.dG_ddir) {
     d *= h;
   }
   return out;

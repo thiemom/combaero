@@ -744,12 +744,14 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dG_dPt0", &combaero::FannoChannelFlow::dG_dPt0)
       .def_readonly("dG_dTt0", &combaero::FannoChannelFlow::dG_dTt0)
       .def_readonly("dG_dP_target", &combaero::FannoChannelFlow::dG_dP_target)
-      .def_readonly("dG_dY", &combaero::FannoChannelFlow::dG_dY);
+      .def_readonly("dG_ddir", &combaero::FannoChannelFlow::dG_ddir);
   m.attr("FANNO_FLOW_DRIVE_FLOOR") = combaero::kFannoFlowDriveFloor;
   m.def("fanno_channel_flow", &combaero::fanno_channel_flow, py::arg("Pt0"), py::arg("Tt0"),
         py::arg("X"), py::arg("P_target"), py::arg("exit_total"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"), py::arg("f_multiplier") = 1.0,
-        py::arg("M_exit_guess") = -1.0, py::arg("with_dG_dY") = false,
+        py::arg("M_exit_guess") = -1.0,
+        py::arg("dY_directions") = std::vector<std::vector<double>>{},
+        py::arg("with_derivatives") = true,
         "Mass flux a duct passes from (Pt0, Tt0) against P_target (matched to the exit\n"
         "stagnation pressure if exit_total, else the exit static), with derivatives.\n"
         "Saturates at the choked flux; 0 at or below zero drive.");

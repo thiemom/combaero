@@ -344,8 +344,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`fanno_channel_flow(..., with_dG_dY=True)`** also returns `dG_dY`: dG/dY_k for each species present, with the other mass fractions held fixed (the convention of an element's `"{node}.Y[k]"` Jacobian column). Exact to 1.5e-7 against Richardson differences on the unchoked, choked and near-choke branches, and to <= 3e-3 of the column at 3 Pa of drive on 2 bar. Opt-in, because it costs about two length integrals per species.
-  - **Why `ChannelElement` doesn't use it yet:** gated to plenums whose composition moves, it makes the Jacobian exact (inflow-column error 2e-2 -> 1e-8). But it saves only 6.5% of evaluations for 2.2x the solve time, because the solver assembles the Jacobian on every evaluation while hybr uses it on 18% of them (#489).
+- **`fanno_channel_flow(..., dY_directions, with_derivatives)`** (#489).
+  - **`dY_directions`:** mass-fraction directions v; `dG_ddir` returns dG/ds along each (Y -> Y + s v). A unit vector e_k gives dG/dY_k with the other fractions fixed. Exact to 1.5e-7 against Richardson differences on the unchoked, choked and near-choke branches, and to <= 3e-3 of the column at 3 Pa of drive on 2 bar. Where a central step would make a fraction negative (a species absent from the node but carried by an inflow), the difference is one-sided.
+  - **`with_derivatives=False`:** returns G, choked and the Mach numbers only, for residual-only evaluations.
+
+- **The compressible `ChannelElement`'s Jacobian carries the feeding node's composition (#489).** Where the plenum feeding a duct mixes gases, the composition moves with the inflows, and that column was missing: the inflow columns of the global Jacobian were 1.6-2.9% off. They now agree with differences to ~1e-8.
+  - **Directional:** the solver passes an orthonormal basis of the directions the node's composition moves in. That basis comes from an SVD of its relay dY/dx and is one vector for two mixing gases. The kernel differentiates along it, and the gradient is projected back onto per-species keys, which is exact for every relay column. A per-species gradient made the column cost more than it saved: 2.2x the solve time eagerly, still +11% once lazy.
+  - **Lazy:** an element's `residuals` may now return a `LazyJacobian`, a mapping computed on first read. The compressible channel does, so its implicit Fanno derivatives and the column are computed only when the solver asks for J, and residual-only evaluations skip them.
+  - **Measured** on 36 H2/CH4/CO2 mixing networks: 431 -> 401 evaluations and 2.3 -> 1.8 s against main, all converged as before. Solutions agree with main's to a median 4e-12, max 5.5e-8.
 
 - **`transport_and_dT`, `omega22_and_derivative`, `dcp_R_dT`:** mixture viscosity and conductivity with analytic d/dT, the collision integral with its slope, and per-species d(cp/R)/dT (#485). At the NASA polynomials' 1000 K range join, cp's slope jumps, so dk/dT is one-sided there.
 

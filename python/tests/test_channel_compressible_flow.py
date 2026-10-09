@@ -197,6 +197,71 @@ def test_the_global_jacobian_through_a_reversed_duct() -> None:
     assert _jac_err(s, np.array(r["__x_solution__"])) < 1e-4
 
 
+def _mixing_net(gas: dict[str, float], P_gas: float, reversed_duct: bool) -> FlowNetwork:
+    """Air and a second gas mix in a plenum that feeds the duct, so the duct's
+    feeding composition moves with the two inflows. reversed_duct: every
+    element is declared against its flow (out -> p, p -> air, p -> gas), so the
+    duct is fed from its to_node and the mixing relay runs on reversed
+    orifices."""
+    Xg = [0.0] * cb.num_species()
+    for k, v in gas.items():
+        Xg[cb.species_index_from_name(k)] = v
+    g = FlowNetwork()
+    g.add_node(_pb("air", 2.0e5, 300.0))
+    gas_b = PressureBoundary("gas")
+    gas_b.Pt, gas_b.Tt, gas_b.Y = P_gas, 500.0, list(cb.mole_to_mass(Xg))
+    g.add_node(gas_b)
+    g.add_node(_pb("out", 1.0e5))
+    g.add_node(PlenumNode("p"))
+    for eid, src, d in (("oa", "air", 0.015), ("og", "gas", 0.012)):
+        ends_o = ("p", src) if reversed_duct else (src, "p")
+        g.add_element(OrificeElement(eid, *ends_o, Cd=0.8, diameter=d, correlation="fixed"))
+    ends = ("out", "p") if reversed_duct else ("p", "out")
+    g.add_element(
+        ChannelElement("c", *ends, length=L, diameter=D, roughness=ROUGH, regime="compressible")
+    )
+    return g
+
+
+@pytest.mark.parametrize("reversed_duct", [False, True])
+@pytest.mark.parametrize(
+    ("gas", "P_gas"),
+    [({"CO2": 0.8, "H2O": 0.2}, 2.05e5), ({"H2": 1.0}, 2.1e5), ({"CH4": 1.0}, 1.95e5)],
+    ids=["co2", "h2", "ch4"],
+)
+def test_the_global_jacobian_carries_the_feeding_composition(
+    gas: dict[str, float], P_gas: float, reversed_duct: bool
+) -> None:
+    """Without d/dY of the mixing plenum the inflow columns were 1.6-2.9%
+    off (the inflows set the composition, the composition sets G)."""
+    s = NetworkSolver(_mixing_net(gas, P_gas, reversed_duct))
+    r = s.solve()
+    assert r["__success__"], r["__message__"]
+    assert (r["c.m_dot"] < 0.0) == reversed_duct
+    assert _jac_err(s, np.array(r["__x_solution__"])) < 1e-6
+
+
+def test_only_a_moving_composition_is_differentiated() -> None:
+    """The column costs two length integrals per direction, so it is computed
+    only where the feeding node's composition moves, and only along the
+    directions it moves in."""
+    mixing = NetworkSolver(_mixing_net({"CO2": 1.0}, 2.05e5, False))
+    air = {cb.species_name(i): x for i, x in enumerate(X) if x > 0.0}
+    single = NetworkSolver(_mixing_net(air, 2.05e5, False))
+    for s, expected in ((mixing, {"p"}), (single, set())):
+        x = np.array(s.solve()["__x_solution__"])
+        dirs = s._composition_directions(s._propagate_states(x), x)
+        assert set(dirs) == expected
+        # Two gases mix: one direction, Y_air - Y_co2 normalised.
+        assert all(len(v) == 1 for v in dirs.values())
+        s._residuals_and_jacobian(x)
+        jac = s.network.elements["c"].residuals(
+            s._get_node_state(s.network.nodes["p"], x), s._get_node_state(s.network.nodes["out"], x)
+        )[1]
+        has_y = any(".Y[" in k for k in jac[0])
+        assert has_y == bool(expected)
+
+
 def test_the_residual_row_is_scaled_as_a_mass_flow() -> None:
     """Mis-scaled by ref_p it stalled a GUI tee network (697 evaluations)."""
     c = ChannelElement("c", "a", "b", length=L, diameter=D, regime="compressible")
