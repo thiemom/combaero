@@ -132,14 +132,39 @@ double prandtl(double T, double P, const std::vector<double>& X);
 double kinematic_viscosity(double T, double P, const std::vector<double>& X);
 double thermal_diffusivity(double T, double P, const std::vector<double>& X);
 double reynolds_from_state(double rho, double v, double L, double mu);
+
+// Viscosity and conductivity with analytic d/dT (chain through the collision
+// integral interpolation, the modified Eucken factors and both mixing rules).
+struct TransportDerivatives { double mu, dmu_dT, k, dk_dT; };
+TransportDerivatives transport_and_dT(double T, double P, const std::vector<double>& X);
+
+// Omega*(2,2) and dOmega*/dT* (C1 cubic Hermite, see Transport Model below).
+struct Omega22Result { double omega, domega_dTstar; };
+Omega22Result omega22_and_derivative(double T_star, double delta_star);
+
+// thermo.h: d(cp/R)/dT of one species [1/K].
+double dcp_R_dT(std::size_t species_idx, double T);
 ```
 
 ### Transport Model
 
-Viscosity uses Chapman-Enskog kinetic theory with the Monchick-Mason
-Omega*(2,2) collision integral (37 x 8 bilinear table in T* and delta*).
-Polar species (H2O, NH3, CO) use the full 2D table; non-polar species use the
-delta*=0 column. Mixture viscosity uses the Wilke mixing rule.
+Viscosity uses Chapman-Enskog kinetic theory with the Omega*(2,2) collision
+integral from `include/collision_integral_data.h` (41 T* x 8 delta*, generated
+by `thermo_data_generator/collision_integrals.py`), interpolated by cubic
+Hermite in (ln T*, ln Omega*) with TABULATED node slopes -- C1 in T, so
+dmu/dT and dk/dT are continuous and analytic -- and linearly in delta*
+(constant per species). Mixture viscosity uses the Wilke mixing rule.
+
+- **delta* = 0** (Lennard-Jones): values and slopes from quadrature of the
+  classical collision integrals; agrees with Kim & Monroe (2014) to <= 1e-4
+  from T* = 0.3 to 400, between nodes included. The Monchick-Mason column it
+  replaces was off by up to 0.6% at the nodes, and linear interpolation in raw
+  T* added up to 2.7% between them (#485).
+- **delta* > 0** (Stockmayer, polar species H2O, NH3, CO): Monchick-Mason
+  values scaled by the delta* = 0 column's exact/tabulated ratio, slopes
+  estimated by a natural cubic spline. No exact polar reference is computed.
+- Outside T* 0.1-400: continued linearly in (ln T*, ln Omega*) with the end
+  slope (C1).
 
 Thermal conductivity uses the Mason-Monchick modified Eucken formula with
 Parker Z_rot temperature correction, matching the Cantera GasTransport model.

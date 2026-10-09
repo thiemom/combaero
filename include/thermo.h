@@ -36,6 +36,8 @@ double species_molar_mass_from_name(const std::string& name);
 
 // NASA polynomial evaluations (dimensionless)
 double cp_R(std::size_t species_idx, double T);
+// d(cp/R)/dT of one species [1/K]; 0 below the 10 K clamp cp_R applies.
+double dcp_R_dT(std::size_t species_idx, double T);
 double h_RT(std::size_t species_idx, double T);
 double s_R(std::size_t species_idx, double T);
 double g_over_RT(std::size_t species_idx, double T);

@@ -86,16 +86,17 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Molar Basis)
 
-| Function | Input Units                        | Output Unit |
-|----------|------------------------------------|-------------|
-| `cp`     | T: K, X: mol/mol                   | J/(mol*K)   |
-| `cv`     | T: K, X: mol/mol                   | J/(mol*K)   |
-| `h`      | T: K, X: mol/mol                   | J/mol       |
-| `u`      | T: K, X: mol/mol                   | J/mol       |
-| `s`      | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(mol*K)   |
-| `dh_dT`  | T: K, X: mol/mol                   | J/(mol*K)   |
-| `ds_dT`  | T: K, X: mol/mol                   | J/(mol*K^2) |
-| `dcp_dT` | T: K, X: mol/mol                   | J/(mol*K^2) |
+| Function   | Input Units                        | Output Unit |
+|------------|------------------------------------|-------------|
+| `cp`       | T: K, X: mol/mol                   | J/(mol*K)   |
+| `cv`       | T: K, X: mol/mol                   | J/(mol*K)   |
+| `h`        | T: K, X: mol/mol                   | J/mol       |
+| `u`        | T: K, X: mol/mol                   | J/mol       |
+| `s`        | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(mol*K)   |
+| `dh_dT`    | T: K, X: mol/mol                   | J/(mol*K)   |
+| `ds_dT`    | T: K, X: mol/mol                   | J/(mol*K^2) |
+| `dcp_dT`   | T: K, X: mol/mol                   | J/(mol*K^2) |
+| `dcp_R_dT` | species_idx: -, T: K               | 1/K         |
 
 #### Mixture Properties (Mass/Other Basis)
 
@@ -138,16 +139,24 @@ All functions use consistent units to avoid conversion errors.
 
 #### Transport Properties
 
-| Function               | Input Units                           | Output Unit |
-|------------------------|---------------------------------------|-------------|
-| `viscosity`            | T: K, P: Pa, X: mol/mol               | Pa*s        |
-| `thermal_conductivity` | T: K, P: Pa, X: mol/mol               | W/(m*K)     |
-| `prandtl`              | T: K, P: Pa, X: mol/mol               | - (Pr)      |
-| `kinematic_viscosity`  | T: K, P: Pa, X: mol/mol               | m^2/s       |
-| `thermal_diffusivity`  | T: K, P: Pa, X: mol/mol               | m^2/s       |
-| `reynolds`             | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Re)      |
-| `reynolds_from_state`  | rho: kg/m^3, v: m/s, L: m, mu: Pa*s   | - (Re)      |
-| `peclet`               | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Pe)      |
+| Function                       | Input Units                           | Output Unit          |
+|--------------------------------|---------------------------------------|----------------------|
+| `viscosity`                    | T: K, P: Pa, X: mol/mol               | Pa*s                 |
+| `transport_and_dT`             | T: K, P: Pa, X: mol/mol               | TransportDerivatives |
+| `TransportDerivatives::mu`     | -                                     | Pa*s                 |
+| `TransportDerivatives::dmu_dT` | -                                     | Pa*s/K               |
+| `TransportDerivatives::k`      | -                                     | W/(m*K)              |
+| `TransportDerivatives::dk_dT`  | -                                     | W/(m*K^2)            |
+| `omega22_and_derivative`       | T_star: -, delta_star: -              | Omega22Result        |
+| `Omega22Result::omega`         | -                                     | -                    |
+| `Omega22Result::domega_dTstar` | -                                     | -                    |
+| `thermal_conductivity`         | T: K, P: Pa, X: mol/mol               | W/(m*K)              |
+| `prandtl`                      | T: K, P: Pa, X: mol/mol               | - (Pr)               |
+| `kinematic_viscosity`          | T: K, P: Pa, X: mol/mol               | m^2/s                |
+| `thermal_diffusivity`          | T: K, P: Pa, X: mol/mol               | m^2/s                |
+| `reynolds`                     | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Re)               |
+| `reynolds_from_state`          | rho: kg/m^3, v: m/s, L: m, mu: Pa*s   | - (Re)               |
+| `peclet`                       | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Pe)               |
 
 ---
 

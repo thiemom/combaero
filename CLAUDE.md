@@ -9,7 +9,7 @@
 ## Hard Rules
 - **Virtual environment only:** use `uv run` and `uv pip`. Never install into system Python or use global `pip`.
 - **Never bypass pre-commit hooks** or CI checks. All code must pass cleanly before pushing.
-- **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`). Use the scripts below.
+- **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`, `include/collision_integral_data.h`). Use the scripts below.
 - **API sync is mandatory:** adding/removing/changing any function or property requires updating `include/units_data.h` and the relevant API reference ([docs/API_CPP.md](docs/API_CPP.md) or [docs/API_PYTHON.md](docs/API_PYTHON.md)) in the same commit.
 - **CHANGELOG is mandatory:** every user-visible change must have an entry added under `[Unreleased]` in `CHANGELOG.md` in the same commit. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) (Added / Changed / Fixed / Removed). At release time the `[Unreleased]` block becomes `[x.y.z] - YYYY-MM-DD`.
 - **Documentation Hygiene:** Active references (API, build, workflow, schemas) live in `docs/`; historical feature reports and design records go to `docs/archive/`. Keep core guides high-signal — a doc points at the file that owns a fact rather than transcribing it.
@@ -60,6 +60,7 @@ uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 |--------|--------|-----------------|
 | `docs/UNITS.md` | `include/units_data.h` | `uv run scripts/generate_units_md.py` |
 | `include/thermo_transport_data.h` | `thermo_data_generator/` | see `thermo_data_generator/README.md` |
+| `include/collision_integral_data.h` | `thermo_data_generator/collision_integrals.py` | `uv run python thermo_data_generator/collision_integrals.py` (repo root, main env) |
 
 ## Git Workflow
 - **Branch protection on `main`:** never push directly to `main`. Always work on a feature/fix branch and open a PR (`feature-branch → main`).

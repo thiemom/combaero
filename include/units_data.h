@@ -61,6 +61,7 @@ inline constexpr Entry function_units[] = {
     {"dh_dT", "T: K, X: mol/mol", "J/(mol*K)"},
     {"ds_dT", "T: K, X: mol/mol", "J/(mol*K^2)"},
     {"dcp_dT", "T: K, X: mol/mol", "J/(mol*K^2)"},
+    {"dcp_R_dT", "species_idx: -, T: K", "1/K"},
 
     // -------------------------------------------------------------------------
     // thermo.h - Mixture Properties (Mass/Other Basis)
@@ -457,6 +458,14 @@ inline constexpr Entry function_units[] = {
     // transport.h - Transport Properties
     // -------------------------------------------------------------------------
     {"viscosity", "T: K, P: Pa, X: mol/mol", "Pa*s"},
+    {"transport_and_dT", "T: K, P: Pa, X: mol/mol", "TransportDerivatives"},
+    {"TransportDerivatives::mu", "-", "Pa*s"},
+    {"TransportDerivatives::dmu_dT", "-", "Pa*s/K"},
+    {"TransportDerivatives::k", "-", "W/(m*K)"},
+    {"TransportDerivatives::dk_dT", "-", "W/(m*K^2)"},
+    {"omega22_and_derivative", "T_star: -, delta_star: -", "Omega22Result"},
+    {"Omega22Result::omega", "-", "-"},
+    {"Omega22Result::domega_dTstar", "-", "-"},
     {"thermal_conductivity", "T: K, P: Pa, X: mol/mol", "W/(m*K)"},
     {"prandtl", "T: K, P: Pa, X: mol/mol", "- (Pr)"},
     {"kinematic_viscosity", "T: K, P: Pa, X: mol/mol", "m^2/s"},
