@@ -1825,10 +1825,15 @@ class MomentumChamberNode(NetworkNode):
         return res, jac
 
     def has_side_streams(self) -> bool:
-        return self.main_inlet is not None and len(getattr(self, "_inflows", [])) > 1
+        """A merge: a declared main inlet and at least one OTHER inflow. The
+        main itself need not be flowing in -- a reversed main keeps its face
+        (#493)."""
+        if self.main_inlet is None:
+            return False
+        return any(eid != self.main_inlet for eid, _, _ in getattr(self, "_inflows", []))
 
     def main_face_state(
-        self, state: NetworkMixtureState
+        self, state: NetworkMixtureState, m_main: float | None = None
     ) -> tuple[float, float, dict[str, float], dict[str, float]]:
         """(P_face, Pt_face, dP_face/d(name), dPt_face/d(name)) for the main inlet.
 
@@ -1837,6 +1842,14 @@ class MomentumChamberNode(NetworkNode):
         root, the face Pt from the same stagnation closure as the chamber.
         Derivatives are keyed by unknown name; ``"<node>.T"`` keys are relayed
         by the solver.
+
+        ``m_main`` is the main element's signed flow into the chamber, for a
+        main that is not among the inflows -- REVERSED (#493). The impulse
+        holds for either sign (the x-momentum flux through the face is
+        m_main^2 / (rho A) both ways), so the face is kept: the fluid at the
+        face is then the chamber's, and the outlet carries the side streams
+        less the main's outflow. It used to switch off, a 245 Pa step in the
+        main's exit pressure as its flow crossed zero.
         """
         elems = {e.id: e for e in self.upstream_elements}
         main_state, main_names = None, {}
@@ -1852,10 +1865,24 @@ class MomentumChamberNode(NetworkNode):
             S += J
             for k, v in dJ.items():
                 dS[k] = dS.get(k, 0.0) + v
-        m_main = float(main_state.m_dot) if main_state is not None else 0.0
-        T_main = float(main_state.T) if main_state is not None else float(state.T)
-        X_main = main_state.X if main_state is not None else state.X
+        out_names = dict(getattr(self, "_upstream_m_dot_jac", {}))
         m_out = float(getattr(self, "_total_m_dot", 0.0))
+        main_T_key = None
+        if main_state is not None:
+            m_main = float(main_state.m_dot)
+            T_main = float(main_state.T)
+            X_main = main_state.X
+        else:
+            # Reversed (or idle) main: chamber fluid leaves through the face.
+            m_main = float(m_main) if m_main is not None else 0.0
+            T_main = float(state.T)
+            X_main = state.X
+            main_names = {f"{self.main_inlet}.m_dot": 1.0}
+            m_out += m_main
+            out_names[f"{self.main_inlet}.m_dot"] = (
+                out_names.get(f"{self.main_inlet}.m_dot", 0.0) + 1.0
+            )
+            main_T_key = f"{self.id}.T"
         r = cb.chamber_merge_face_state(
             m_main, T_main, X_main, m_out, state.P, state.T, state.X, S, self.area
         )
@@ -1870,13 +1897,15 @@ class MomentumChamberNode(NetworkNode):
 
             for k, v in main_names.items():
                 add(k, d_mm * v)
-            for k, v in getattr(self, "_upstream_m_dot_jac", {}).items():
+            for k, v in out_names.items():
                 add(k, d_mo * v)
             for k, v in dS.items():
                 add(k, d_J * v)
             add(f"{self.id}.P", d_P)
             add(f"{self.id}.T", d_T)
-            if main_src is not None:
+            if main_T_key is not None:
+                add(main_T_key, d_Tm)
+            elif main_src is not None:
                 add(f"{main_src}.T", d_Tm)
             return out
 

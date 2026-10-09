@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A merge chamber keeps its main-inlet face when the main flow reverses (#493).**
+  - **Before:** the chamber hands its declared main inlet the face state of its impulse balance, but only while the main was an inflow. At m_main -> 0+ the face sits below the chamber pressure, because the side streams carry momentum out. So the main's exit pressure stepped 245 Pa, and its residual 3.5 kPa, as its flow crossed zero.
+  - **Now:** the impulse holds for either sign (the x-momentum flux through the face is m_main^2/(rho A) both ways), so the face is kept. A reversed main gets the chamber's fluid at the face, and the outlet carries the side streams less the main's outflow.
+  - **Measured:** continuous through zero; Jacobian exact (<= 5e-9 scaled) with the main forward, reversed and just past zero. Forward values are unchanged.
+
 - **Mass-flow derivatives of a non-circular channel (#463).** `channel_smooth` took its mass flow on pi D^2/4, so for a channel with a separate hydraulic diameter dh/dmdot, ddP/dmdot and dT_aw/dmdot were off by (Dh/D)^2. Values were unaffected.
   - **Fix:** a new `flow_area` argument (default: the circular area) carries the element's real cross-section. `ConvectiveSurface` passes it on every path: smooth, ribbed, impingement and pin-fin.
   - **Measured:** global Jacobian error 1.2e-1 -> 1.2e-3 on a wall-coupled flat-duct network. The remainder is the missing pressure column, #496.
