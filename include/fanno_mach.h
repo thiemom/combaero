@@ -114,6 +114,11 @@ struct FannoChannelFlow {
   double dG_dPt0 = 0.0;        // [kg/(m^2 s Pa)]
   double dG_dTt0 = 0.0;        // [kg/(m^2 s K)]
   double dG_dP_target = 0.0;   // [kg/(m^2 s Pa)], 0 when choked
+  // dG/dY_k [kg/(m^2 s)] per species, the other MASS fractions held fixed
+  // (X renormalised): the convention of a network element's "{node}.Y[k]"
+  // Jacobian column. Filled for species present in X (0 for absent ones)
+  // when with_dG_dY is set; empty otherwise.
+  std::vector<double> dG_dY;
 };
 
 // Drive [Pa] below which the flux is blended to a finite slope at zero.
@@ -126,6 +131,9 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
                                     // Previous exit Mach, if any: a warm start
                                     // for the root (the result does not depend
                                     // on it, only the cost).
-                                    double M_exit_guess = -1.0);
+                                    double M_exit_guess = -1.0,
+                                    // Fill dG_dY (costs about two length
+                                    // integrals per species present).
+                                    bool with_dG_dY = false);
 
 }  // namespace combaero

@@ -1,5 +1,6 @@
 #include "../include/fanno_mach.h"
 
+#include "../include/composition.h"
 #include "../include/solver_interface.h"
 #include "../include/stagnation.h"
 #include "../include/thermo.h"
@@ -188,6 +189,36 @@ double isentropic_flux(double Pt, double Tt, double M, const std::vector<double>
   return density(T, P, X) * M * std::sqrt(sound_speed_sq(T, X));
 }
 
+// d flux/dM and d flux/dTt (Pt, X fixed), exact. With s = s(T) - R ln P:
+//   energy      dT  = (cp(Tt) dTt - M a^2 dM) / (cp(T) + M^2/2 da^2/dT)
+//   isentropic  d ln P = cp(T)/(R T) dT - cp(Tt)/(R Tt) dTt
+//   d ln rho = d ln P - dT/T,  d ln u = dM/M + (da^2/dT)/(2 a^2) dT.
+// Differenced instead, these carried ~3e-8 rounding (flux good to ~3e-15,
+// step 1e-7), which the low-drive cancellation in raw_flow amplifies ~1e5.
+struct FluxSlopes {
+  double dM = 0.0;
+  double dTt = 0.0;
+};
+
+FluxSlopes isentropic_flux_slopes(double Pt, double Tt, double M, const std::vector<double>& X) {
+  const double T = static_T(Tt, M, X);
+  const double R = specific_gas_constant(X);
+  const double a2 = sound_speed_sq(T, X);
+  const double da2 = sound_speed_sq_dT(T, X);
+  const double cpT = cp_mass(T, X);
+  const double cpTt = cp_mass(Tt, X);
+  const double den = cpT + 0.5 * M * M * da2;
+  const double flux = isentropic_flux(Pt, Tt, M, X);
+  const double dT_dM = -M * a2 / den;
+  const double dT_dTt = cpTt / den;
+  // d ln flux = (cp/R - 1)/T dT + dM/M + da2/(2 a2) dT - cp(Tt)/(R Tt) dTt
+  const double per_dT = (cpT / R - 1.0) / T + 0.5 * da2 / a2;
+  FluxSlopes s;
+  s.dM = flux * (per_dT * dT_dM + 1.0 / M);
+  s.dTt = flux * (per_dT * dT_dTt - cpTt / (R * Tt));
+  return s;
+}
+
 void check_duct(double L, double D) {
   if (!(L > 0.0) || !(D > 0.0)) {
     throw std::invalid_argument("fanno (Mach): L and D must be positive");
@@ -369,12 +400,48 @@ double exit_per_flux(double Me, double Tt, const std::vector<double>& X, bool ex
   return s.P * std::exp((s_mass(Tt, X, 101325.0) - s_mass(s.T, X, 101325.0)) / R);
 }
 
+// d exit_per_flux/dM and d/dTt, exact (same energy relation as
+// isentropic_flux_slopes): ln phi = ln(R T) - ln M - ln(a^2)/2, times the
+// isentropic ratio exp((s(Tt) - s(T))/R) for the exit stagnation pressure.
+// Differenced, these left ~1e-10 noise, which the low-drive cancellation in
+// raw_flow amplified into the drive-floor exponent sigma -- 1e-5 noise in G
+// below the floor.
+struct PhiSlopes {
+  double dM = 0.0;
+  double dTt = 0.0;
+};
+
+PhiSlopes exit_per_flux_slopes(double Me, double Tt, const std::vector<double>& X,
+                               bool exit_total) {
+  const double phi = exit_per_flux(Me, Tt, X, exit_total);
+  const double T = static_T(Tt, Me, X);
+  const double R = specific_gas_constant(X);
+  const double a2 = sound_speed_sq(T, X);
+  const double da2 = sound_speed_sq_dT(T, X);
+  const double cpT = cp_mass(T, X);
+  const double cpTt = cp_mass(Tt, X);
+  const double den = cpT + 0.5 * Me * Me * da2;
+  const double dT_dM = -Me * a2 / den;
+  const double dT_dTt = cpTt / den;
+  double per_dT = 1.0 / T - 0.5 * da2 / a2;
+  double per_dTt = 0.0;
+  if (exit_total) {
+    per_dT -= cpT / (R * T);
+    per_dTt = cpTt / (R * Tt);
+  }
+  PhiSlopes s;
+  s.dM = phi * (per_dT * dT_dM - 1.0 / Me);
+  s.dTt = phi * (per_dT * dT_dTt + per_dTt);
+  return s;
+}
+
 struct FlowProblem {
   double Pt0, Tt0, P, L, D, rough, fmult;
   const std::vector<double>* X;
   const std::string* model;
   bool exit_total;
   double Me_guess;
+  bool with_dG_dY;
 };
 
 // Length the flux G(Me) = P / exit_per_flux(Me) needs to reach exit Mach Me,
@@ -392,6 +459,32 @@ double psi(double Me, double P, double Pt0, double Tt0, const FlowProblem& pb) {
     return -pb.L;
   }
   return fanno_length_between(G, Tt0, Mi, Me, X, pb.D, pb.rough, *pb.model, pb.fmult) - pb.L;
+}
+
+// d g(X)/d Y_k for each species present in X, the other mass fractions held
+// fixed and X renormalised -- the convention of an element's "{node}.Y[k]"
+// Jacobian column. The solver chains it with dY/dx, which sums to zero, so the
+// off-simplex part of the direction never contributes. Central differences of
+// a smooth function at fixed (G or Me); the step stays inside Y_k >= 0.
+// Absent species get 0: their dY/dx vanishes unless a stream carrying them
+// sits at exactly zero flow, and covering that would cost one difference per
+// species in the mechanism.
+template <class Fn>
+std::vector<double> d_dY(const std::vector<double>& X, Fn&& g) {
+  const std::vector<double> Y = mole_to_mass(X);
+  std::vector<double> out(Y.size(), 0.0);
+  for (std::size_t k = 0; k < Y.size(); ++k) {
+    if (!(Y[k] > 0.0)) {
+      continue;
+    }
+    const double h = std::min(1e-5, 0.5 * Y[k]);
+    std::vector<double> Yp = Y;
+    std::vector<double> Ym = Y;
+    Yp[k] += h;
+    Ym[k] -= h;
+    out[k] = (g(mass_to_mole(Yp)) - g(mass_to_mole(Ym))) / (2.0 * h);
+  }
+  return out;
 }
 
 // The raw (unregularised) solve at drive Pt0 - P > 0.
@@ -419,6 +512,17 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
     out.dG_dPt0 = -LP / LG;
     out.dG_dTt0 = -LT / LG;
     out.dG_dP_target = 0.0;
+    if (!pb.with_dG_dY) {
+      return out;
+    }
+    out.dG_dY = d_dY(X, [&](const std::vector<double>& Xk) {
+      const double Mi = fanno_inlet_mach(pb.Pt0, pb.Tt0, out.G, Xk);
+      return fanno_length_between(out.G, pb.Tt0, Mi, 1.0, Xk, pb.D, pb.rough, *pb.model,
+                                  pb.fmult);
+    });
+    for (double& d : out.dG_dY) {
+      d = -d / LG;
+    }
     return out;
   }
   // Unchoked: the exit Mach is the root of psi, which falls monotonically in
@@ -469,38 +573,44 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
   // well conditioned right up to the choke, where it meets the choked branch.
   //
   // psi(Me, P) = Lam(G, Me) with G = P / phi(Me, Tt0) and
-  // Lam = (length from M_in(G, Pt0, Tt0) to Me) - L, so most partials are
-  // exact: d Lam/d Me = dx/dM at Me (the upper limit), and Pt0 acts only
-  // through M_in, with d Lam/d M_in = -dx/dM at M_in. Only d Lam/d G and
-  // d Lam/d Tt0 are differenced, each on smooth fixed-rule integrals.
+  // Lam = (length from M_in(G, Pt0, Tt0, Y) to Me) - L. Leibniz: the limits
+  // are taken exactly -- d Lam/d Me = dx/dM at Me, and every parameter that
+  // moves M_in contributes -dx/dM(M_in) dM_in/d(.), with dM_in/d(.) from the
+  // isentropic inlet flux(Pt0, Tt0, M_in, Y) = G -- and only the length at
+  // FIXED limits is differenced (in G, Tt0, Y), with the smooth inlet flux.
+  //
+  // Differencing the length through a re-solved M_in instead is ill
+  // conditioned at low drive: (Me - M_in)/Me ~ drive/P, 7e-6 at 1.5 Pa on
+  // 2 bar, which amplifies the inlet solve's ~1e-15 noise to ~4e-10 in the
+  // length. A 1e-6 step then left 4e-4 noise in Lam_G -- a 5e-4 jump in G
+  // below the drive floor, through sigma -- and several % in dG/dY, where
+  // two O(G) terms cancel to 0.4% of G at low Mach.
   const double G = out.G;
   const double Mi = out.M_in;
   const std::string& model = *pb.model;
-  auto Lam = [&](double Gx, double Ptx, double Ttx) {
-    const double Mix = fanno_inlet_mach(Ptx, Ttx, Gx, X);
-    return fanno_length_between(Gx, Ttx, Mix, Me, X, pb.D, pb.rough, model, pb.fmult) - pb.L;
+  auto ell = [&](double Gx, double Ttx, const std::vector<double>& Xx) {
+    return fanno_length_between(Gx, Ttx, Mi, Me, Xx, pb.D, pb.rough, model, pb.fmult);
   };
   const double hG = 1e-6 * G;
   const double hT = 1e-6 * pb.Tt0;
-  const double Lam_G = (Lam(G + hG, pb.Pt0, pb.Tt0) - Lam(G - hG, pb.Pt0, pb.Tt0)) / (2.0 * hG);
-  const double Lam_T = (Lam(G, pb.Pt0, pb.Tt0 + hT) - Lam(G, pb.Pt0, pb.Tt0 - hT)) / (2.0 * hT);
-  const double Lam_Me = fanno_dx_dmach(G, pb.Tt0, Me, X, pb.D, pb.rough, model, pb.fmult);
-  // Isentropic inlet: flux(Pt0, Tt0, M_in) = G with flux proportional to Pt0
-  // at fixed (Tt0, M), so d M_in/d Pt0 = -(G / Pt0) / (d flux/d M).
-  const double hMi = 1e-7 * std::max(Mi, 1e-4);
-  const double flux_M = (isentropic_flux(pb.Pt0, pb.Tt0, Mi + hMi, X) -
-                         isentropic_flux(pb.Pt0, pb.Tt0, Mi - hMi, X)) /
-                        (2.0 * hMi);
+  const double dx_Mi = fanno_dx_dmach(G, pb.Tt0, Mi, X, pb.D, pb.rough, model, pb.fmult);
+  const FluxSlopes fs = isentropic_flux_slopes(pb.Pt0, pb.Tt0, Mi, X);
+  const double flux_M = fs.dM;
+  const double flux_T = fs.dTt;
+  // flux is proportional to Pt0 at fixed (Tt0, M), so flux_Pt = G / Pt0.
+  const double dMi_dG = 1.0 / flux_M;
   const double dMi_dPt = -(G / pb.Pt0) / flux_M;
-  const double Lam_Pt = -fanno_dx_dmach(G, pb.Tt0, Mi, X, pb.D, pb.rough, model, pb.fmult) * dMi_dPt;
+  const double dMi_dT = -flux_T / flux_M;
+  const double Lam_G = (ell(G + hG, pb.Tt0, X) - ell(G - hG, pb.Tt0, X)) / (2.0 * hG) -
+                       dx_Mi * dMi_dG;
+  const double Lam_T = (ell(G, pb.Tt0 + hT, X) - ell(G, pb.Tt0 - hT, X)) / (2.0 * hT) -
+                       dx_Mi * dMi_dT;
+  const double Lam_Pt = -dx_Mi * dMi_dPt;
+  const double Lam_Me = fanno_dx_dmach(G, pb.Tt0, Me, X, pb.D, pb.rough, model, pb.fmult);
   // G = P / phi(Me, Tt0)
-  const double hM = 1e-6 * Me;
-  const double Mp = std::min(Me + hM, 1.0);
-  const double Mm = Mp - 2.0 * hM;
-  const double phi_M = (exit_per_flux(Mp, pb.Tt0, X, pb.exit_total) -
-                        exit_per_flux(Mm, pb.Tt0, X, pb.exit_total)) / (Mp - Mm);
-  const double phi_T = (exit_per_flux(Me, pb.Tt0 + hT, X, pb.exit_total) -
-                        exit_per_flux(Me, pb.Tt0 - hT, X, pb.exit_total)) / (2.0 * hT);
+  const PhiSlopes ps = exit_per_flux_slopes(Me, pb.Tt0, X, pb.exit_total);
+  const double phi_M = ps.dM;
+  const double phi_T = ps.dTt;
   const double G_P = 1.0 / phi;
   const double G_M = -pb.P * phi_M / (phi * phi);
   const double G_T = -pb.P * phi_T / (phi * phi);
@@ -514,6 +624,23 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
   out.dG_dP_target = G_P + G_M * dMe_dP;
   out.dG_dPt0 = G_M * dMe_dPt;
   out.dG_dTt0 = G_T + G_M * dMe_dT;
+  if (!pb.with_dG_dY) {
+    return out;
+  }
+  // Composition, the same way: psi_Y = Lam_G G_Y + Lam_Y at fixed Me, with
+  // G_Y = -P phi_Y / phi^2 and Lam_Y = ell_Y - dx/dM(M_in) dM_in/dY.
+  const auto phi_Y = d_dY(X, [&](const std::vector<double>& Xk) {
+    return exit_per_flux(Me, pb.Tt0, Xk, pb.exit_total);
+  });
+  const auto ell_Y = d_dY(X, [&](const std::vector<double>& Xk) { return ell(G, pb.Tt0, Xk); });
+  const auto flux_Y = d_dY(
+      X, [&](const std::vector<double>& Xk) { return isentropic_flux(pb.Pt0, pb.Tt0, Mi, Xk); });
+  out.dG_dY.assign(X.size(), 0.0);
+  for (std::size_t k = 0; k < X.size(); ++k) {
+    const double G_Y = -pb.P * phi_Y[k] / (phi * phi);
+    const double psi_Y = Lam_G * G_Y + ell_Y[k] + dx_Mi * flux_Y[k] / flux_M;
+    out.dG_dY[k] = G_Y - G_M * psi_Y / psi_M;
+  }
   return out;
 }
 
@@ -522,15 +649,18 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
 FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<double>& X,
                                     double P_target, bool exit_total, double L, double D,
                                     double roughness, const std::string& friction_model,
-                                    double f_multiplier, double M_exit_guess) {
+                                    double f_multiplier, double M_exit_guess, bool with_dG_dY) {
   check_duct(L, D);
   FannoChannelFlow out;
   const double drive = Pt0 - P_target;
   if (!(drive > 0.0) || !(Pt0 > 0.0) || !(Tt0 > 0.0)) {
+    if (with_dG_dY) {
+      out.dG_dY.assign(X.size(), 0.0);
+    }
     return out;
   }
   FlowProblem pb{Pt0, Tt0, P_target, L, D, roughness, f_multiplier, &X, &friction_model, exit_total,
-                 M_exit_guess};
+                 M_exit_guess, with_dG_dY};
   if (drive >= kFannoFlowDriveFloor) {
     return raw_flow(pb);
   }
@@ -555,6 +685,9 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   out.dG_dP_target = -at.G * dh / kFannoFlowDriveFloor;
   out.dG_dPt0 = at.G * dh / kFannoFlowDriveFloor + h * (at.dG_dPt0 + at.dG_dP_target);
   out.dG_dTt0 = h * at.dG_dTt0;
+  for (double& d : out.dG_dY) {
+    d *= h;
+  }
   return out;
 }
 
