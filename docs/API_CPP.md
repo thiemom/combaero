@@ -489,6 +489,10 @@ NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re, double Pr);
 // the Jacobian steps at Re 2300 or 4000.
 //   laminar -> turbulent  Re 2300-3000   f: 64/Re -> turbulent; Nu: 3.66/4.36 -> Gnielinski
 //   smooth  -> rough      Re 3000-4000   f: clamped Petukhov -> Colebrook (e_D > 0)
+// Turbulent-only Nu (dittus_boelter, sieder_tate, petukhov; Re >= 1e4) in
+// channel_smooth and htc_circular_channel: the VDI Heat Atlas transition
+// (vdi_transition) -- linear in Re from laminar Nu at 2300 to the correlation
+// at 1e4, exact derivatives; they threw in that band (#481).
 FrictionAndDerivative friction_channel_and_derivative(double Re, double e_D);   // Darcy, exact df/dRe
 FrictionAndDerivative friction_turbulent_and_derivative(double Re, double e_D);
 NuAndDerivative nusselt_channel_gnielinski_and_derivative(

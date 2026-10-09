@@ -2144,6 +2144,22 @@ CompressibleTeeResult compressible_merging_tee_rj(
     const double Ps = str.P_static, Ts = str.T, Rs = str.R_gas, gs = str.gamma_eff, As = str.A;
     const double Pb = bra.P_static, Tb = bra.T, Rb = bra.R_gas, gb = bra.gamma_eff, Ab = bra.A;
 
+    // No net supply (a solver probe: every flow zero, or the suppliers' sum
+    // reversed): the pseudodatum is stagnant, p0_dat = p_dat and q_ref = 0 --
+    // the m_dat -> 0+ limit of the general case. Dividing the suppliers'
+    // momentum and enthalpy by the eps floor instead gave a negative datum
+    // temperature and NaN (#481).
+    if (m_dat < eps_m) {
+        CompressibleTeeResult stagnant{};
+        stagnant.R_0 = Ps - Pb;
+        stagnant.R_1 = Ps - com.Pt;
+        stagnant.dR0_dP_str = 1.0;
+        stagnant.dR0_dP_bra = -1.0;
+        stagnant.dR1_dP_str = 1.0;
+        stagnant.dR1_dPt_com = -1.0;
+        return stagnant;
+    }
+
     const double cp_s = gs * Rs / (gs - 1.0);
     const double cp_b = gb * Rb / (gb - 1.0);
     const double cp_dat = cp_s;  // reference = straight supplier

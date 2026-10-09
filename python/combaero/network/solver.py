@@ -1323,6 +1323,9 @@ class NetworkSolver:
                     Y=node.Y if node.Y is not None else self._default_Y,
                 )
                 stream_info.append((inj, None, nid, {}))
+            no_inflow = not stream_info and not isinstance(
+                node, (PressureBoundary, MassFlowBoundary)
+            )
             up_states = [s for s, _, _, _ in stream_info]
 
             # Wall Coupling: evaluate walls BEFORE compute_derived_state
@@ -1332,6 +1335,19 @@ class NetworkSolver:
                 wall_contributions = self._evaluate_walls_for_node(nid, up_elems, x)
 
             T, Y, mix_res = node.compute_derived_state(up_states)
+            if no_inflow:
+                # A node whose flows all leave it carries no flow: continuous
+                # with a vanishing last inflow. Nodes used to set 1 kg/s here,
+                # a 4.3 kPa jump in a momentum chamber's dynamic head as its
+                # feed reversed (#481). Its T/Y stay the nodes' fallback: a
+                # continuous fallback (the sources it would be fed from,
+                # weighted 1/|m|) was measured and REJECTED -- it doubled the
+                # cold-start time of hot impingement arrays and failed one,
+                # with no gain elsewhere.
+                node._total_m_dot = 0.0
+                node._inflows = []
+                node._upstream_m_dot_jac = {}
+                node._upstream_element_ids = []
             T = min(max(float(T), 200.0), 5000.0)
             self._derived_states[nid] = (T, Y, mix_res)
 
