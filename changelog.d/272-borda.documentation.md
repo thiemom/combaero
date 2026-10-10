@@ -1,0 +1,4 @@
+- **`BorderCarnotLossElement` is not for junction ports (#272).** The API_PYTHON example put one on a `MultiPortChamberElement` lateral port. The Mynard closure already carries that turning loss, so the pair double-counts it.
+  - **Measured on Bassett's 90 deg, psi = 1 dividing tee:** K6 = 0.867 from the closure alone (Bassett 0.867), but 1.249 with the element at q = 0.5. That is +16% at q = 0.3 and +78% at q = 0.7.
+  - **Docs corrected:** the example, the docstrings and the C++ header comments.
+  - **Validation status:** the element is described as never validated. Its only check was paired with the junction model removed in 0.6.0.

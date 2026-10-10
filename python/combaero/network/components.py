@@ -6092,9 +6092,9 @@ class TeeJunctionElement(NetworkElement):
 
 
 # ---------------------------------------------------------------------------
-# Momentum-CV junction (momentum cv implementation guide.pdf).
-# Sanctioned successor to TeeJunctionElement: junction = pure conservation,
-# loss = separate per-port elements (BorderCarnotLossElement below).
+# Momentum-CV junction machinery (momentum cv implementation guide.pdf). The
+# residuals live in the subclasses (mpce_element.py), whose closures carry the
+# port losses; BorderCarnotLossElement below is NOT a companion for them.
 # ---------------------------------------------------------------------------
 
 
@@ -6108,17 +6108,14 @@ class MultiPortChamberBase(NetworkElement):
     its own. Its impulse-function model was deprecated in 0.5.0 and removed
     here; ``MultiPortChamberElement`` supersedes it (issue #271).
 
-    Owns one scalar unknown ``{id}.P_jct`` (junction internal static pressure).
-    Emits N per-port impulse-function residuals plus a global mass residual:
-
-        R_mom_i = (P_i + rho_i * u_i^2) - P_jct = 0     (per port)
-        R_mass  = sum_i mdot_port_i = 0                 (global)
-
-    The impulse residual is sign-free (u_i^2 is direction-invariant); the
-    sum-mass residual uses a per-port orientation derived from the topology
-    (positive = flow out of junction). All empirical loss content lives in
-    companion :class:`BorderCarnotLossElement` instances bolted onto specific
-    ports; this element itself is purely conservation.
+    Subclasses own one scalar unknown ``{id}.P_jct`` and emit N per-port
+    relations plus a global mass residual ``sum_i mdot_port_i = 0``, with a
+    per-port orientation derived from the topology (positive = flow out of
+    the junction). The per-port relation, and with it the port losses, is
+    the subclass's closure -- Mynard's for ``MultiPortChamberElement``, fixed
+    K for ``ConstantKTeeElement``. Do not add a
+    :class:`BorderCarnotLossElement` on a port as well: that double-counts
+    the turning loss (#272).
 
     Topology contract (see PDF Section 2 + addendum task #10):
 
@@ -6152,10 +6149,11 @@ class MultiPortChamberBase(NetworkElement):
     """
 
     # Opt-in for the solver's junction split seed (`_junction_split_guess`).
-    # True here because a chamber junction's port flows DO follow a Bernoulli
-    # share of the imposed port pressure differences, which is what that seed
-    # assumes. Subclasses whose port flows are set by their own internal
-    # physics must turn it off -- see `EjectorElement`.
+    # True here because a chamber junction's port flows follow from the port
+    # pressure differences: through the element's own closure where it offers
+    # `closure_split_seed` (#272), else a Bernoulli share. Subclasses whose
+    # port flows are set by their own internal physics must turn it off -- see
+    # `EjectorElement`.
     seeds_ports_by_pressure_split: bool = True
 
     def __init__(
@@ -6437,8 +6435,16 @@ class MultiPortChamberBase(NetworkElement):
 
 class BorderCarnotLossElement(NetworkElement):
     """
-    Per-port Border-Carnot turning-loss element. Companion to
-    :class:`MultiPortChamberBase`; bolted onto lateral ports of the junction.
+    Border-Carnot turning-loss element: a two-port in-line loss. It was the
+    lateral-port companion of the momentum-CV junction's impulse model,
+    removed in 0.6.0 (#322).
+
+    NOT FOR JUNCTION PORTS. ``MultiPortChamberElement`` and
+    ``ConstantKTeeElement`` carry each port's turning loss in their own
+    closure, and adding this element double-counts it: on Bassett's 90 deg,
+    psi = 1 dividing tee, K6 at q = 0.5 is 0.867 from the closure alone
+    (Bassett 0.867) and 1.249 with this element (+16% at q = 0.3, +78% at
+    0.7; #272).
 
     Residual (PDF Section 3.1):
 
@@ -6447,13 +6453,11 @@ class BorderCarnotLossElement(NetworkElement):
 
     The (3/4) factor is Hager's effective-angle correction for sharp-edged
     lateral branches. The form is *intended* to reproduce Hager xi_l and
-    Bassett K_inc at M -> 0 on a sharp-edged 90-deg lateral, but this is NOT
-    yet demonstrated: the Tier-1 tests
-    (``python/tests/test_momentum_cv_tier1_bassett.py``) are xfail, measuring
-    11-29% deviation from Bassett K6 on the lateral. See issue #272 -- do not
-    rely on this element being quantitatively anchored to Hager/Bassett.
-    Straight-through ports (delta_geom = 0) get L = 0 and need no loss element
-    at all.
+    Bassett K_inc at M -> 0 on a sharp-edged 90-deg lateral. That was never
+    demonstrated: its only check, paired with the removed junction model,
+    missed Bassett K6 by 11-29%, and the tests went with that model (#322).
+    Do not rely on it being anchored to Hager or Bassett. delta_geom = 0
+    gives L = 0.
 
     The element is sign-free in m_dot (mdot^2 in the dynamic head). The
     initial form has no direction asymmetry parameter; an
