@@ -21,6 +21,8 @@ validation/junction/
   runner.py                    # iterate (model, dataset) -> records
   scorecard.py                 # records -> metrics + scorecards
   random_robustness.py         # convergence on RANDOM physical BCs, no dataset
+  mynard_fidelity.py           # the kernel against Mynard 2015's own figures
+  digitise_mynard2015.py       # colour extraction of those figures
 ```
 
 ## Excluded sources
@@ -35,10 +37,9 @@ dataset:
 
 ## What each source can measure
 
-None of the sources is the closure's own paper (Mynard 2015), so nothing here
-scores fidelity -- and no fidelity check against Mynard's own results exists
-yet: `tests/test_mynard_junction.cpp` holds the C++ port to the Python one, not
-the Python one to the paper. What separates them is whether a source set a constant.
+None of the measured sources is the closure's own paper (Mynard 2015), so none
+of them scores fidelity; that is done against Mynard's figures (next section).
+What separates them is whether a source set a constant.
 `network_runner.SOURCE_ROLES` declares it and the network scorecard prints it
 per row:
 
@@ -48,6 +49,33 @@ per row:
 | Hager 1984 | selected | the same decision, with Bassett |
 | Idelchik 1966 | tuned | `joining_etransfer_alpha = 0.2` is its in-network optimum. Its theta = 30 tables (diagrams 7-1/7-2) are calculating formulas with no experiment behind them (the handbook's own diagram list); 45 and 90 are formulas refined by Kinne's and Vogel's experiments |
 | Wang 2014 | x-source | set nothing -- the one CROSS-SOURCE accuracy check |
+
+## Fidelity: Mynard 2015 against his own figures
+
+`mynard_fidelity.py` holds the Python kernel (`_mynard2010`) to the paper, and
+`tests/test_mynard_junction.cpp` holds the C++ port to the Python. The paper has
+no tables: Figs 4 and 6-11 plot his model ("Unified0D", red) and his CFD
+("Ref3D", black markers) over 31 panels. `digitise_mynard2015.py` extracts both
+by colour from the 150-dpi scans into `data/mynard2015/` (see its README).
+
+- **Fidelity.** The kernel in his configuration (eta on, no joining alpha, no
+  dividing-streamline recovery) is evaluated at his CFD samples and splined
+  between them, as his curves are, and compared with every visible red point:
+  29 panels within 2.7 px (<= 0.032 in K), Fig 4 and Fig 6d within 4.2 px.
+  Fig 4's dashed eta_j = 0 curve is within 2.2 px. Each production departure
+  moves the panels it acts on by 15-80 px, so the check sees it.
+- **Ref3D** is reported per flow type and branch, faithful against production
+  (`python -m validation.junction.mynard_fidelity`). It is laminar CFD at
+  Re 350-2400 and our production closure departs from his model on purpose;
+  nothing is tuned on it. All 158 samples: MAE 0.212 faithful, 0.219
+  production. Fig 4, where his eta was fitted: 0.022 / 0.126. The six psi != 1
+  joining samples, the only ones the joining alpha acts on: 0.198 / 0.202.
+- **Conventions resolved against his curves**, stated in `_junction`:
+  - the angle is measured between the side branch and the downstream main
+    branch, for both flow directions;
+  - Fig 9's area sweep holds both inlet velocities equal;
+  - **Fig 9's rows are swapped against its caption.** His own Unified0D, and
+    the dead-branch limit K -> -1, both put the side inlet on the bottom row.
 
 ## Endpoints
 

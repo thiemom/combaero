@@ -1,0 +1,315 @@
+# Written by validation/junction/digitise_mynard2015.py -- do not edit.
+# px_per_x / px_per_K: the scan's resolution per data unit, used to state
+# fidelity agreement in pixels. calib_residual_px: worst tick-label
+# misfit of the linear calibration (x, y).
+fig04:
+  calib_residual_px:
+  - 2.23
+  - 0.43
+  n_ref3d: 7
+  n_unified0d:
+  - 35
+  - 30
+  px_per_K: 199.406
+  px_per_x: 3.3029
+  red_band_px: 4
+fig06a:
+  calib_residual_px:
+  - 0.65
+  - 0.41
+  n_ref3d: 4
+  n_unified0d:
+  - 42
+  px_per_K: 64.0293
+  px_per_x: 0.0709
+  red_band_px: 4
+fig06b:
+  calib_residual_px:
+  - 0.47
+  - 0.0
+  n_ref3d: 5
+  n_unified0d:
+  - 58
+  px_per_K: 64.0
+  px_per_x: 142.0054
+  red_band_px: 3
+fig06c:
+  calib_residual_px:
+  - 0.15
+  - 0.41
+  n_ref3d: 5
+  n_unified0d:
+  - 83
+  px_per_K: 64.0293
+  px_per_x: 0.946
+  red_band_px: 4
+fig06d:
+  calib_residual_px:
+  - 2.02
+  - 0.23
+  n_ref3d: 5
+  n_unified0d:
+  - 48
+  px_per_K: 2.7911
+  px_per_x: 145.95
+  red_band_px: 3
+fig06e:
+  calib_residual_px:
+  - 0.65
+  - 0.0
+  n_ref3d: 4
+  n_unified0d:
+  - 18
+  px_per_K: 72.0
+  px_per_x: 0.0709
+  red_band_px: 3
+fig06f:
+  calib_residual_px:
+  - 0.52
+  - 0.0
+  n_ref3d: 5
+  n_unified0d:
+  - 101
+  px_per_K: 72.0
+  px_per_x: 142.2925
+  red_band_px: 4
+fig06g:
+  calib_residual_px:
+  - 0.2
+  - 0.0
+  n_ref3d: 5
+  n_unified0d:
+  - 58
+  px_per_K: 72.0
+  px_per_x: 0.947
+  red_band_px: 3
+fig06h:
+  calib_residual_px:
+  - 0.79
+  - 0.0
+  n_ref3d: 5
+  n_unified0d:
+  - 108
+  px_per_K: 72.0
+  px_per_x: 141.5893
+  red_band_px: 4
+fig07a:
+  calib_residual_px:
+  - 1.57
+  - 0.19
+  n_ref3d: 4
+  n_unified0d:
+  - 85
+  px_per_K: 99.1823
+  px_per_x: 0.0747
+  red_band_px: 3
+fig07b:
+  calib_residual_px:
+  - 1.59
+  - 0.3
+  n_ref3d: 5
+  n_unified0d:
+  - 93
+  px_per_K: 99.2051
+  px_per_x: 149.4822
+  red_band_px: 4
+fig07c:
+  calib_residual_px:
+  - 1.96
+  - 0.3
+  n_ref3d: 5
+  n_unified0d:
+  - 144
+  px_per_K: 99.2051
+  px_per_x: 1.0035
+  red_band_px: 5
+fig07d:
+  calib_residual_px:
+  - 1.59
+  - 0.3
+  n_ref3d: 4
+  n_unified0d:
+  - 71
+  px_per_K: 99.2051
+  px_per_x: 149.4822
+  red_band_px: 3
+fig08a:
+  calib_residual_px:
+  - 0.35
+  - 0.22
+  n_ref3d: 4
+  n_unified0d:
+  - 15
+  px_per_K: 120.4171
+  px_per_x: 0.0999
+  red_band_px: 2
+fig08b:
+  calib_residual_px:
+  - 0.57
+  - 0.22
+  n_ref3d: 5
+  n_unified0d:
+  - 121
+  px_per_K: 120.4171
+  px_per_x: 200.3627
+  red_band_px: 4
+fig08c:
+  calib_residual_px:
+  - 0.48
+  - 0.23
+  n_ref3d: 10
+  n_unified0d:
+  - 142
+  px_per_K: 120.2923
+  px_per_x: 1.6724
+  red_band_px: 4
+fig09a:
+  calib_residual_px:
+  - 0.2
+  - 0.34
+  n_ref3d: 5
+  n_unified0d:
+  - 113
+  px_per_K: 76.6865
+  px_per_x: 0.0596
+  red_band_px: 4
+fig09b:
+  calib_residual_px:
+  - 0.36
+  - 0.29
+  n_ref3d: 5
+  n_unified0d:
+  - 80
+  px_per_K: 76.8292
+  px_per_x: 142.7177
+  red_band_px: 3
+fig09c:
+  calib_residual_px:
+  - 0.2
+  - 0.29
+  n_ref3d: 5
+  n_unified0d:
+  - 96
+  px_per_K: 76.8292
+  px_per_x: 0.953
+  red_band_px: 3
+fig09d:
+  calib_residual_px:
+  - 0.3
+  - 0.34
+  n_ref3d: 4
+  n_unified0d:
+  - 125
+  px_per_K: 76.6865
+  px_per_x: 142.9306
+  red_band_px: 3
+fig09e:
+  calib_residual_px:
+  - 0.2
+  - 0.29
+  n_ref3d: 5
+  n_unified0d:
+  - 51
+  px_per_K: 76.8292
+  px_per_x: 0.0596
+  red_band_px: 2
+fig09f:
+  calib_residual_px:
+  - 0.35
+  - 0.29
+  n_ref3d: 5
+  n_unified0d:
+  - 46
+  px_per_K: 76.8292
+  px_per_x: 142.6461
+  red_band_px: 4
+fig09g:
+  calib_residual_px:
+  - 0.2
+  - 0.29
+  n_ref3d: 5
+  n_unified0d:
+  - 84
+  px_per_K: 76.8292
+  px_per_x: 0.953
+  red_band_px: 3
+fig09h:
+  calib_residual_px:
+  - 0.49
+  - 0.29
+  n_ref3d: 4
+  n_unified0d:
+  - 109
+  px_per_K: 76.8292
+  px_per_x: 143.2901
+  red_band_px: 3
+fig10a:
+  calib_residual_px:
+  - 0.36
+  - 0.15
+  n_ref3d: 5
+  n_unified0d:
+  - 114
+  px_per_K: 57.4764
+  px_per_x: 0.0579
+  red_band_px: 3
+fig10b:
+  calib_residual_px:
+  - 0.78
+  - 0.3
+  n_ref3d: 5
+  n_unified0d:
+  - 106
+  px_per_K: 57.4646
+  px_per_x: 145.447
+  red_band_px: 4
+fig10c:
+  calib_residual_px:
+  - 0.0
+  - 0.23
+  n_ref3d: 5
+  n_unified0d:
+  - 98
+  px_per_K: 57.5598
+  px_per_x: 0.97
+  red_band_px: 3
+fig10d:
+  calib_residual_px:
+  - 0.72
+  - 0.3
+  n_ref3d: 5
+  n_unified0d:
+  - 128
+  px_per_K: 57.4646
+  px_per_x: 145.941
+  red_band_px: 3
+fig11a:
+  calib_residual_px:
+  - 0.24
+  - 0.19
+  n_ref3d: 5
+  n_unified0d:
+  - 158
+  px_per_K: 70.6289
+  px_per_x: 0.0801
+  red_band_px: 4
+fig11b:
+  calib_residual_px:
+  - 0.33
+  - 0.16
+  n_ref3d: 5
+  n_unified0d:
+  - 143
+  px_per_K: 70.5431
+  px_per_x: 200.5734
+  red_band_px: 3
+fig11c:
+  calib_residual_px:
+  - 0.51
+  - 0.23
+  n_ref3d: 8
+  n_unified0d:
+  - 162
+  px_per_K: 70.6004
+  px_per_x: 1.5439
+  red_band_px: 4
