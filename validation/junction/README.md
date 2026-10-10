@@ -49,14 +49,27 @@ per row:
 | Idelchik 1966 | tuned | `joining_etransfer_alpha = 0.2` is its in-network optimum |
 | Wang 2014 | x-source | set nothing -- the one CROSS-SOURCE accuracy check |
 
+## Endpoints
+
+At q = 0 or 1 one port carries no flow. Its residual has a kink where the flow
+sign flips, so an imposed_q solve there either stalls or is refused as an
+unphysical root; until #272 every such record went unscored (Idelchik's
+q = 0 / 1 columns, Wang's q = 0 / 1 curves, Bassett's digitised end points --
+173 records). The measured value at an endpoint is the one-sided limit of a
+curve whose flow has a direction, so `network_runner` solves it
+`_ENDPOINT_EPS` = 1e-3 inside the range, scores it against the measured
+endpoint value, and marks the record `endpoint_limit`. The limit is stable:
+every endpoint cell's bias moves <= 0.03 between 1e-3 and 1e-4.
+
 ## Tier 2 (finite Mach, #272)
 
-- **Wang 2014 is the Tier-2 source.** Cross-source: 116 of 200 points, MAE
-  0.108, flat with Mach (0.097 below M 0.15, 0.113 above 0.45), worst at
-  area ratio 2.44 (0.181). Wang states no uncertainty, so there is no band to
-  be within; `python/tests/test_junction_tier2.py` pins regression floors and
-  a falsification. The 84 unscored points are the dead-branch q = 0 / 1 curves
-  and four high-Mach a = 2.44 points.
+- **Wang 2014 is the Tier-2 source.** Cross-source: 188 of 200 points, MAE
+  0.131 (interior 0.108, the q = 0 / 1 curves 0.170), flat with Mach (0.124
+  below M 0.15, 0.128 above 0.45), worst at area ratio 2.44 (0.195) and at
+  K_23 with a dead straight inlet (q = 1, bias -0.33). Wang states no
+  uncertainty, so there is no band to be within;
+  `python/tests/test_junction_tier2.py` pins regression floors and a
+  falsification. The 12 unscored points are all at a = 2.44 above M 0.49.
 - **Perez-Garcia 2010 is not a validation source for the closure.** Its K_hat
   (Eq 41) depends only on the two branch Mach numbers; a junction with NO loss
   reproduces its Table 1 within U95 in 57 of 72 cells, every one at

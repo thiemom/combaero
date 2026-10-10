@@ -1,0 +1,8 @@
+- **Junction validation harness (#272).**
+  - **`random_robustness.has_root` judges a pressure-driven root by the direction of (K_straight, K_branch)**, not by the ratio K_s/K_b.
+    - **Why:** the ratio's pole where K_b crosses zero hid real roots (four solvable draws in 240 called rootless) and invented one through the pole.
+    - **Result:** all 7 changed verdicts in the first 400 draws now agree with the solver.
+  - **imposed_q endpoints (q = 0 or 1) are scored at their one-sided limit, 1e-3 inside the range.**
+    - **Before:** all 173 such records went unscored. Exactly at the endpoint a port carries no flow, and its residual kinks there.
+    - **Now:** 165 are scored, and each record is flagged `endpoint_limit`.
+    - **Wang:** 188 of 200 points scored, MAE 0.131 (interior 0.108).

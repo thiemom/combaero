@@ -486,19 +486,13 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
     const std::vector<double> &Y, double area);
 
 // -----------------------------------------------------------------------------
-// Multi-port chamber (momentum-CV junction).
-// PDF spec: docs/junction/momentum cv implementation guide.pdf, Section 2.
-// Junction owns one scalar P_jct. Emits N per-port impulse-function residuals
-//   R_mom,i = (P_i + rho_i * u_i^2) - P_jct = 0
-// plus a global mass residual
-//   R_mass = sum_i mdot_i = 0
-// Sign convention: mdot_i > 0 means flow OUT of the junction through port i.
-// u_i^2 is direction-invariant, so the impulse residual is sign-free.
-//
-// The junction emits 0 empirical loss; per-port turning/contraction losses go
-// on companion BorderCarnotLossElement instances bolted onto lateral ports.
-
-// Per-port impulse-residual Jacobian.
+// Border-Carnot turning loss: a two-port in-line loss,
+//   Pt_in - Pt_out - L(delta_geom) * 0.5 * rho_in * u_in^2 = 0,
+//   L = 4 * (1 - cos((3/4) * delta_geom))^2.
+// It was the lateral-port companion of the momentum-CV junction's impulse
+// model, which was removed in 0.6.0 (#322). Never validated, and NOT for a
+// MultiPortChamberElement or ConstantKTeeElement port: those closures already
+// carry the port's turning loss (see BC_LOSS_PREFACTOR, multi_port_chamber.h).
 struct BorderCarnotLossResult {
   double residual;
   double d_res_dPt_in;

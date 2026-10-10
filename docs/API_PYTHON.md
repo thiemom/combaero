@@ -937,7 +937,6 @@ from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
     TeeJunctionElement, VortexElement, EffusionPlateElement,
-    BorderCarnotLossElement,
 )
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
@@ -989,7 +988,8 @@ tee_branch = TeeJunctionElement(
 
 # Momentum-CV junction (PDF spec, supersedes K-closure for n>3 manifolds and
 # high-Mach / ejector behaviour; see docs/junction/momentum cv implementation guide.pdf).
-# N port-MCNs feed a single junction; each lateral port carries a turning loss.
+# N port-MCNs feed a single junction, whose closure carries every port's loss --
+# connect the ports with plain elements (channels, LosslessConnectionElement).
 mc_com = MomentumChamberNode("mc_com", area=0.01)
 mc_str = MomentumChamberNode("mc_str", area=0.01)
 mc_bra = MomentumChamberNode("mc_bra", area=0.008)
@@ -1006,13 +1006,11 @@ jct = MultiPortChamberElement(
     flow_direction="branch",         # 1 supplier + N-1 collectors
     # port_areas (length = N_in + N_out) inherited from connecting channels if not given
 )
-# Lateral port turning loss (sharp-edged 90 deg branch). Straight ports
-# (delta_geom = 0) do not need a loss element.
-loss_bra = BorderCarnotLossElement(
-    "loss_bra", from_node="mc_bra", to_node="ch_bra_in",
-    delta_geom_deg=90.0,
-    # area inherited from neighbouring channel if not given
-)
+# Do NOT add a BorderCarnotLossElement on a port: the Mynard closure already
+# carries the lateral turning loss, and the two together double-count it
+# (Bassett K6 at 90 deg, psi = 1, q = 0.5: 0.867 alone, which is Bassett's
+# value; 1.249 with the element; #272). BorderCarnotLossElement remains as a
+# standalone, never-validated in-line turning loss.
 # Solved unknowns: jct.P_jct (junction static pressure). Per-port mass flows
 # live on the connecting channels / loss elements; the junction reads them via
 # the graph. The N+1 residuals = N port total-pressure relations

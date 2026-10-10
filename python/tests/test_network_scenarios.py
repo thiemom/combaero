@@ -2,9 +2,9 @@ import pytest
 
 import combaero as cb
 from combaero.network import (
-    BorderCarnotLossElement,
     ChannelElement,
     FlowNetwork,
+    LosslessConnectionElement,
     MomentumChamberNode,
     NetworkSolver,
     OrificeElement,
@@ -160,18 +160,13 @@ def test_step_4_adding_bypass():
 
     # mc1: splitting junction (1 inflow from o1, 2 outflows to p2 and p_bypass).
     # Port-face MCNs: com (inlet) + str (straight outlet) + bra (branch outlet,
-    # 90 deg). BorderCarnotLossElement carries the angled-arm loss on bra.
+    # 90 deg). The junction's closure carries the bypass arm's turning loss;
+    # a BorderCarnotLossElement here as well would double-count it (#272).
     mc1_com = MomentumChamberNode("mc1_com", area=A_main)
     mc1_str = MomentumChamberNode("mc1_str", area=A_main)
     mc1_bra = MomentumChamberNode("mc1_bra", area=A_bypass)
     mc1_bra_post = MomentumChamberNode("mc1_bra_post", area=A_bypass)
-    loss_mc1_bra = BorderCarnotLossElement(
-        "loss_mc1_bra",
-        from_node="mc1_bra",
-        to_node="mc1_bra_post",
-        delta_geom_deg=90.0,
-        area=A_bypass,
-    )
+    lc_mc1_bra = LosslessConnectionElement("lc_mc1_bra", "mc1_bra", "mc1_bra_post")
     mpce_mc1 = MultiPortChamberElement(
         id="mpce_mc1",
         inlet_nodes=["mc1_com"],
@@ -189,13 +184,7 @@ def test_step_4_adding_bypass():
     mc2_bra_pre = MomentumChamberNode("mc2_bra_pre", area=A_bypass)
     mc2_bra = MomentumChamberNode("mc2_bra", area=A_bypass)
     mc2_com = MomentumChamberNode("mc2_com", area=A_main)
-    loss_mc2_bra = BorderCarnotLossElement(
-        "loss_mc2_bra",
-        from_node="mc2_bra_pre",
-        to_node="mc2_bra",
-        delta_geom_deg=90.0,
-        area=A_bypass,
-    )
+    lc_mc2_bra = LosslessConnectionElement("lc_mc2_bra", "mc2_bra_pre", "mc2_bra")
     mpce_mc2 = MultiPortChamberElement(
         id="mpce_mc2",
         inlet_nodes=["mc2_str", "mc2_bra"],
@@ -249,9 +238,9 @@ def test_step_4_adding_bypass():
         p4,
         p_bypass,
         o_bypass,
-        loss_mc1_bra,
+        lc_mc1_bra,
         mpce_mc1,
-        loss_mc2_bra,
+        lc_mc2_bra,
         mpce_mc2,
     ]:
         graph.add_element(e)

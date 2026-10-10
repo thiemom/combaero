@@ -146,22 +146,31 @@ def test_wang_is_declared_cross_source():
 
 
 def test_wang_cross_source_accuracy(wang):
-    """CROSS-SOURCE. Measured 2026-10-10: 116 of 200 points scored, MAE 0.108;
-    by area ratio 0.072 / 0.089 / 0.181 at a = 1 / 1.56 / 2.44 (biases +0.06,
-    0.00, -0.12). The 84 unscored are the dead-branch q = 0 and q = 1 curves
-    (80, rejected by the direction verifier) and four a = 2.44, q = 0.8 points
-    above M 0.49 -- coverage, tracked on #272, not error."""
-    assert len(wang) >= 116
-    assert _mae(wang) < 0.12
+    """CROSS-SOURCE. Measured 2026-10-10: 188 of 200 points scored, MAE 0.131.
+
+    - Interior (0 < q < 1): 116 points, MAE 0.108.
+    - Endpoints: the q = 0 / 1 curves, scored at their one-sided limit (#272;
+      network_runner._ENDPOINT_EPS). 72 points, MAE 0.170.
+    - By area ratio: 0.107 / 0.111 / 0.195 at a = 1 / 1.56 / 2.44.
+    - Worst: K_23 at q = 1, where the straight inlet is dead and all the flow
+      comes through the lateral (bias -0.33 over 16 points). That is a
+      limitation of the model there, not a reason to drop the curve.
+
+    Unscored: 8 endpoint points and 4 interior points, all at a = 2.44 and
+    above M 0.49. They are coverage, not error.
+    """
+    assert len(wang) >= 188
+    assert _mae(wang) < 0.145
+    assert _mae([r for r in wang if not r.endpoint_limit]) < 0.12
     by_area = {a: _mae([r for r in wang if r.psi == a]) for a in (1.0, 1.56, 2.44)}
-    assert by_area[1.0] < 0.09
-    assert by_area[1.56] < 0.11
-    assert by_area[2.44] < 0.21
+    assert by_area[1.0] < 0.12
+    assert by_area[1.56] < 0.125
+    assert by_area[2.44] < 0.215
 
 
 def test_wang_error_does_not_grow_with_mach(wang):
     """The compressible part of the claim. MAE by Mach band, measured:
-    0.097 below 0.15, 0.117, 0.101, 0.113 above 0.45 -- flat. An
+    0.124 below 0.15, 0.165, 0.115, 0.128 above 0.45 -- flat. An
     incompressible reference head would add ~9% of K at M 0.6."""
     lowest = _mae([r for r in wang if _mach_bin(r.mach) == "M<0.15"])
     highest = _mae([r for r in wang if _mach_bin(r.mach) == "M>0.45"])
@@ -171,7 +180,7 @@ def test_wang_error_does_not_grow_with_mach(wang):
 def test_the_wang_score_sees_the_closure(wang):
     """Falsify the metric: switching off the joining energy transfer (alpha,
     which acts only when psi != 1) must move the a = 2.44 score, and must
-    leave a = 1 untouched. Measured 0.181 -> 0.285 and 0.072 -> 0.072."""
+    leave a = 1 untouched. Measured 0.195 -> 0.313 and 0.107 -> 0.107."""
     off = _wang_errors(joining_etransfer_alpha=0.0)
     on_244 = _mae([r for r in wang if r.psi == 2.44])
     off_244 = _mae([r for r in off if r.psi == 2.44])

@@ -74,6 +74,9 @@ class NetworkRecord:
     # must be compared against. None when the solve did not converge, or when
     # the operating point it reached lies outside the curve's digitised range.
     K_measured_at_q_converged: float | None = None
+    #: An imposed_q endpoint (q = 0 or 1) solved at its one-sided limit,
+    #: `_ENDPOINT_EPS` inside the range.
+    endpoint_limit: bool = False
 
     @property
     def q_drift(self) -> float | None:
@@ -157,6 +160,18 @@ _Q_SNAP = 1e-6
 # longer EVIDENCE about the q the dataset asked for, which is why coverage is
 # reported separately from accuracy.
 _Q_OFF_POINT = 0.05
+
+# How far inside the range an imposed_q endpoint is solved. At q = 0 or 1 one
+# port carries no flow, its residual has a kink where the flow sign flips, and
+# the solve either stalls there or is refused as an unphysical root -- which
+# left all 152 endpoint records (Idelchik's q = 0/1 columns, Wang's q = 0/1
+# curves) unscored (#272). The measured value at an endpoint is the one-sided
+# limit of a curve whose flow has a direction, so it is scored at that limit.
+# Measured: every endpoint cell's bias moves <= 0.03 between 1e-3 and 1e-4
+# (Idelchik K12 at q = 1 most, -0.605 -> -0.573), while 1e-2 is visibly off
+# (-0.930); 1e-3 keeps the dead port's flow two decades above the verifier's
+# 1e-6 kg/s direction threshold.
+_ENDPOINT_EPS = 1e-3
 
 
 def _which_K(K_id: str) -> str | None:
@@ -245,8 +260,11 @@ def iter_network_records(
                 # applicable to.
                 if mach_axis and topology != "imposed_q":
                     continue
+                q_eval = q_val
+                if topology == "imposed_q":
+                    q_eval = min(max(q_val, _ENDPOINT_EPS), 1.0 - _ENDPOINT_EPS)
                 result = model.evaluate_network(
-                    paper, K_id, q_val, psi_val, theta_rad, topology=topology, mach=mach_val
+                    paper, K_id, q_eval, psi_val, theta_rad, topology=topology, mach=mach_val
                 )
                 K_ext = (
                     (result.K_lateral if which == "lateral" else result.K_straight)
@@ -276,6 +294,9 @@ def iter_network_records(
                     K_measured_at_q_converged=(
                         K_m
                         if mach_axis
+                        # An endpoint's measured value IS the one-sided limit
+                        # it was solved at.
+                        or q_eval != q_val
                         or result.q_converged is None
                         or abs(result.q_converged - q_val) <= _Q_SNAP
                         else _curve_value_at(curve, result.q_converged)
@@ -283,6 +304,7 @@ def iter_network_records(
                     if result.converged
                     else None,
                     mach=mach_val,
+                    endpoint_limit=q_eval != q_val,
                 )
 
 
