@@ -245,7 +245,8 @@ def test_border_carnot_loss_inherits_area_from_a_chamber():
     net.add_node(PlenumNode("mid"))
     _pb(net)
     net.add_element(LosslessConnectionElement("feed", "mfb", "chamber"))
-    loss = BorderCarnotLossElement("turn", "chamber", "mid", delta_geom_deg=90.0)
+    with pytest.warns(DeprecationWarning):
+        loss = BorderCarnotLossElement("turn", "chamber", "mid", delta_geom_deg=90.0)
     net.add_element(loss)
     net.add_element(LosslessConnectionElement("exit", "mid", "pb"))
 

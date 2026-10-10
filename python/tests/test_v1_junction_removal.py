@@ -104,9 +104,9 @@ def test_diagnostics_survived_as_machinery():
 
 
 def test_the_border_carnot_loss_element_is_untouched():
-    """It pairs with a junction in the Tier-1 design but is a separate element
-    and did not leave with v1. Its own coverage lives in test_area_inference
-    and test_network_scenarios."""
+    """It paired with a junction in the Tier-1 design but is a separate element
+    and did not leave with v1. Deprecated in 0.7.0 for removal in 0.8.0 (see
+    test_border_carnot_deprecation.py); this guard goes with it."""
     assert BorderCarnotLossElement is not None
     assert "residuals" in BorderCarnotLossElement.__dict__
 
