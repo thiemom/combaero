@@ -46,7 +46,7 @@ per row:
 |---|---|---|
 | Bassett 2001 | selected | chose `eta_scale = 0` and the dividing-streamline recovery (with Hager); its K11/K12 also weighed in alpha |
 | Hager 1984 | selected | the same decision, with Bassett |
-| Idelchik 1966 | tuned | `joining_etransfer_alpha = 0.2` is its in-network optimum |
+| Idelchik 1966 | tuned | `joining_etransfer_alpha = 0.2` is its in-network optimum. Its theta = 30 tables (diagrams 7-1/7-2) are calculating formulas with no experiment behind them (the handbook's own diagram list); 45 and 90 are formulas refined by Kinne's and Vogel's experiments |
 | Wang 2014 | x-source | set nothing -- the one CROSS-SOURCE accuracy check |
 
 ## Endpoints
@@ -138,7 +138,10 @@ For each `ValidationCase` (one row of a measured CSV):
 
 The scorecard reports per (model, K, regime, psi-bin, theta-bin):
 - `N`, `RMSE_meas`, `MAE_meas`, `bias_meas`, `pct_within_uncertainty`,
-  `Delta_vs_ceiling`.
+  `Delta_vs_ceiling`. `pct_within_uncertainty` uses each paper's STATED
+  measurement uncertainty and shows `-` where there is none -- which today is
+  every junction source: Bassett and Hager compile other experimenters' data
+  without a band, Idelchik's handbook disclaims one, Wang states none.
 - For network-mode evaluation: `pct_converged`, `median_wall_time_ms`,
   `median_residual_norm`.
 

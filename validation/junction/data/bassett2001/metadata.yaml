@@ -8,7 +8,10 @@ paper:
   citation: "M D Bassett, D E Winterbone, R J Pearson. Calculation of steady flow pressure loss coefficients for pipe junctions. Proc IMechE Part C 215(8):861-881, 2001."
   doi: "10.1177/095440620121500801"
   q_convention: bassett   # q = m_other / m_com per Table 1
-  default_uncertainty_K: 0.05
+  # No uncertainty is stated (full text checked 2026-10-10), and the measured
+  # points are compiled from other experimenters (DeCorte and Deprez [33] and
+  # others) rather than Bassett's own rig. The 0.05 that stood here had no source.
+  default_uncertainty_K: null
 
 fit_tiers:
   K1: very_good

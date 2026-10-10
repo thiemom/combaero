@@ -5,7 +5,11 @@ paper:
   citation: "W H Hager. An approximate treatment of flow in branches and bends. Proc IMechE Part C 198C(4):63-69, 1984."
   doi: "10.1243/PIME_PROC_1984_198_088_02"
   q_convention: hager   # q = lateral / total -- OPPOSITE of Bassett K5; runner flips for cross-paper comparison
-  default_uncertainty_K: 0.05   # envelope (4b) gives explicit bounds for half the data
+  # No uncertainty is stated; the data are compiled (Mock, Iwanami, ...). Fig 4b's
+  # upper/lower envelope is the SCATTER of the compiled xi_t data, digitised as
+  # its own series -- a sourced spread for that one curve, not a per-point band
+  # for the paper. The 0.05 that stood here had no source (2026-10-10).
+  default_uncertainty_K: null
 
 fit_tiers:
   xi_t: good     # paper text claims good agreement with Eq 8
