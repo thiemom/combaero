@@ -1009,8 +1009,9 @@ jct = MultiPortChamberElement(
 # Do NOT add a BorderCarnotLossElement on a port: the Mynard closure already
 # carries the lateral turning loss, and the two together double-count it
 # (Bassett K6 at 90 deg, psi = 1, q = 0.5: 0.867 alone, which is Bassett's
-# value; 1.249 with the element; #272). BorderCarnotLossElement remains as a
-# standalone, never-validated in-line turning loss.
+# value; 1.249 with the element; #272). BorderCarnotLossElement is DEPRECATED
+# (removal in 0.8.0): it is exactly PressureLossElement with
+# correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area).
 # Solved unknowns: jct.P_jct (junction static pressure). Per-port mass flows
 # live on the connecting channels / loss elements; the junction reads them via
 # the graph. The N+1 residuals = N port total-pressure relations

@@ -6439,6 +6439,20 @@ class BorderCarnotLossElement(NetworkElement):
     lateral-port companion of the momentum-CV junction's impulse model,
     removed in 0.6.0 (#322).
 
+    DEPRECATED in 0.7.0, for removal in 0.8.0. Its residual is exactly a
+    constant head loss, so the replacement reproduces it to round-off
+    (measured 1e-11 in Pt drop and mass flow)::
+
+        PressureLossElement(id, from_node, to_node,
+            correlation=ConstantHeadLoss(
+                zeta=4 * (1 - cos(0.75 * delta)) ** 2, area=area),
+            area=area)
+
+    with ``delta`` the geometric turn in radians. The only thing this class
+    adds is that zeta formula, which was derived for a junction's lateral
+    branch -- physics both junction closures now carry -- and was never
+    compared against bend data. Choose a bend's K from a handbook instead.
+
     NOT FOR JUNCTION PORTS. ``MultiPortChamberElement`` and
     ``ConstantKTeeElement`` carry each port's turning loss in their own
     closure, and adding this element double-counts it: on Bassett's 90 deg,
@@ -6473,6 +6487,15 @@ class BorderCarnotLossElement(NetworkElement):
         delta_geom_deg: float,
         area: float | None = None,
     ):
+        warnings.warn(
+            "BorderCarnotLossElement is deprecated and will be removed in 0.8.0. "
+            "It is exactly PressureLossElement with "
+            "correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area); "
+            "its zeta formula is a junction-lateral loss that MultiPortChamberElement "
+            "and ConstantKTeeElement already carry, so never put it on their ports.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(id, from_node, to_node)
         self.delta_geom_deg = float(delta_geom_deg)
         self.area = area

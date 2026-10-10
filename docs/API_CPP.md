@@ -1446,6 +1446,11 @@ Residual sign convention: `R_straight = dP0_straight + K_straight * q_dyn`,
 
 ### Border-Carnot Turning Loss (former momentum-CV junction companion)
 
+> **Deprecated in 0.7.0, removed in 0.8.0 together with the Python
+> `BorderCarnotLossElement`** -- it is exactly a constant head loss
+> (`PressureLossElement` + `ConstantHeadLoss`), and its K formula is junction
+> physics the closures already carry.
+
 > **Never validated, and not for junction ports.** `MultiPortChamberElement`
 > and `ConstantKTeeElement` carry each port's turning loss in their own closure;
 > putting this element on a port as well double-counts it. Measured on
