@@ -33,6 +33,38 @@ dataset:
   reflection coefficients), not steady K. Could be a separate
   acoustic-tier dataset later if needed.
 
+## What each source can measure
+
+None of the sources is the closure's own paper (Mynard 2015), so nothing here
+scores fidelity -- and no fidelity check against Mynard's own results exists
+yet: `tests/test_mynard_junction.cpp` holds the C++ port to the Python one, not
+the Python one to the paper. What separates them is whether a source set a constant.
+`network_runner.SOURCE_ROLES` declares it and the network scorecard prints it
+per row:
+
+| source | role | why |
+|---|---|---|
+| Bassett 2001 | selected | chose `eta_scale = 0` and the dividing-streamline recovery (with Hager); its K11/K12 also weighed in alpha |
+| Hager 1984 | selected | the same decision, with Bassett |
+| Idelchik 1966 | tuned | `joining_etransfer_alpha = 0.2` is its in-network optimum |
+| Wang 2014 | x-source | set nothing -- the one CROSS-SOURCE accuracy check |
+
+## Tier 2 (finite Mach, #272)
+
+- **Wang 2014 is the Tier-2 source.** Cross-source: 116 of 200 points, MAE
+  0.108, flat with Mach (0.097 below M 0.15, 0.113 above 0.45), worst at
+  area ratio 2.44 (0.181). Wang states no uncertainty, so there is no band to
+  be within; `python/tests/test_junction_tier2.py` pins regression floors and
+  a falsification. The 84 unscored points are the dead-branch q = 0 / 1 curves
+  and four high-Mach a = 2.44 points.
+- **Perez-Garcia 2010 is not a validation source for the closure.** Its K_hat
+  (Eq 41) depends only on the two branch Mach numbers; a junction with NO loss
+  reproduces its Table 1 within U95 in 57 of 72 cells, every one at
+  M3* <= 0.3. Its band is worth 22 units of Miller K at M3* = 0.3 and only
+  approaches the model's own error (0.1-0.4) at M3* = 0.7 with a branch
+  carrying >= 3/4 of the flow. The same test file pins this so nobody wires a
+  vacuous K_hat check. Table 1 was re-transcribed (seven values were wrong).
+
 ## Joining flow types
 
 Bassett defines six flow types. Types 4 and 6 are both joining tees with one

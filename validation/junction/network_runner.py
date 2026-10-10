@@ -326,6 +326,10 @@ class NetworkCell:
     # dataset asked for. They are scored where they landed; this is the
     # COVERAGE loss, which RMSE alone cannot show.
     n_off_point: int = 0
+    #: Sources pooled into this cell (canonical_K is a cross-paper name, so a
+    #: cell can hold more than one), and their roles from SOURCE_ROLES.
+    papers: str = ""
+    role: str = ""
 
 
 #: Mach bands for the compressible source. The first is where an
@@ -394,6 +398,7 @@ def build_network_cells(records: list[NetworkRecord]) -> list[NetworkCell]:
         wt_ms = 1000.0 * _median([r.wall_time_s for r in recs])
         drifts = [d for r in conv if (d := r.q_drift) is not None]
         drift = _median(drifts) if drifts else math.nan
+        papers = sorted({r.paper for r in recs})
         cells.append(
             NetworkCell(
                 canonical_K=cK,
@@ -410,9 +415,28 @@ def build_network_cells(records: list[NetworkRecord]) -> list[NetworkCell]:
                 median_q_drift=drift,
                 n_off_curve=n_off,
                 n_off_point=n_off_pt,
+                papers=",".join(papers),
+                role="+".join(sorted({SOURCE_ROLES.get(p, ("?", ""))[0] for p in papers})),
             )
         )
     return cells
+
+
+#: What each source can say about the MPCE closure (docs/VALIDATION_POLICY.md).
+#: None is the closure's own paper (Mynard 2015), so none scores fidelity
+#: here (and nothing yet checks the closure against Mynard's own results). What separates them is whether the source set
+#: a constant: one that did is a consistency check on that constant, and only
+#: a source that set nothing measures accuracy.
+SOURCE_ROLES: dict[str, tuple[str, str]] = {
+    "bassett2001": (
+        "selected",
+        "chose eta_scale = 0 and the dividing-streamline recovery (with Hager); "
+        "its K11/K12 also weighed in alpha",
+    ),
+    "hager1984": ("selected", "chose eta_scale = 0 and the recovery, with Bassett"),
+    "idelchik1966": ("tuned", "joining_etransfer_alpha = 0.2 is its in-network optimum"),
+    "wang2014": ("x-source", "set no constant: CROSS-SOURCE accuracy"),
+}
 
 
 def format_network_scorecard(model_name: str, cells: list[NetworkCell]) -> str:
@@ -420,10 +444,10 @@ def format_network_scorecard(model_name: str, cells: list[NetworkCell]) -> str:
     lines = []
     lines.append(f"=== Network scorecard: {model_name} ===")
     lines.append(
-        f"{'canonical_K':<18} {'psi':>5} {'theta':>5} {'mach':>8} {'topology':<12} "
+        f"{'canonical_K':<18} {'role':<8} {'psi':>5} {'theta':>5} {'mach':>8} {'topology':<12} "
         f"{'N':>4} {'%conv':>6} {'RMSE':>8} {'bias':>8} {'dq':>6} {'off':>6} {'t_ms':>6}"
     )
-    lines.append("-" * 95)
+    lines.append("-" * 104)
     n_total = 0
     n_conv = 0
     for c in cells:
@@ -437,12 +461,12 @@ def format_network_scorecard(model_name: str, cells: list[NetworkCell]) -> str:
             "-" if not (c.n_off_point or c.n_off_curve) else f"{c.n_off_point}/{c.n_off_curve}"
         )
         lines.append(
-            f"{c.canonical_K:<18} {c.psi_bin:>5} {c.theta_bin:>5} {c.mach_bin:>8} "
+            f"{c.canonical_K:<18} {c.role:<8} {c.psi_bin:>5} {c.theta_bin:>5} {c.mach_bin:>8} "
             f"{c.topology:<12} "
             f"{c.N:>4} {c.pct_converged * 100:>5.0f}% {rmse_str:>8} {bias_str:>8} "
             f"{drift_str:>6} {off_str:>6} {c.median_wall_time_ms:>5.1f}"
         )
-    lines.append("-" * 95)
+    lines.append("-" * 104)
     overall_conv = n_conv / n_total if n_total else 0.0
     # Per-topology summary
     from collections import defaultdict
@@ -505,4 +529,9 @@ def format_network_scorecard(model_name: str, cells: list[NetworkCell]) -> str:
         "would measure the"
     )
     lines.append("       fixture. See docs/archive/JUNCTION_OPERATING_POINT_271.md.")
+    papers = sorted({p for c in cells for p in c.papers.split(",") if p})
+    lines.append("role = what the source can measure about this closure (VALIDATION_POLICY):")
+    for paper in papers:
+        role, why = SOURCE_ROLES.get(paper, ("?", "no role declared"))
+        lines.append(f"       {paper:<14} {role:<8} {why}")
     return "\n".join(lines)

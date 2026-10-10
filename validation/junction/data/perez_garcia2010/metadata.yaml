@@ -7,7 +7,7 @@ paper:
   name: Perez-Garcia 2010
   citation: "J Perez-Garcia, E Sanmiguel-Rojas, A Viedma. New Coefficient to Characterize Energy Losses in Compressible Flow at T-Junctions. Appl Math Modelling 34:4289-4305, 2010."
   doi: "10.1016/j.apm.2010.04.022"
-  q_convention: perez_garcia   # q = G_1 / G_3 = inlet (or outlet) 1 / common
+  q_convention: perez_garcia   # q = G_2 / G_3 (Fig 2: lateral in C1, STRAIGHT in D1)
   default_uncertainty_K: null   # not applicable -- analytical correlation only
 
 fit_tiers:
