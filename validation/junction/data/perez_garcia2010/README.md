@@ -9,17 +9,17 @@ PDF in `docs/junction/Perez-García-2010.pdf` (gitignored — copyright).
 ## Conventions
 
 - Compressible flow, 90-deg T-junctions only.
-- `K_hat = (p0_03 / p3 - 1) / (p0_0j / pj - 1)`, where index 3 = common,
-  j in {1, 2} = inlet/outlet branches (Eq 42).
+- `K_hat = (p0_3 / p3 - 1) / (p0_j / pj)` -- no `- 1` in the denominator --
+  where index 3 = common, j in {1, 2} = the other branches (Eqs 41/42).
 - `M3*` = extrapolated Mach number in the common branch after frictional
   losses are subtracted (Section 3).
-- `q = G_1 / G_3` = inlet 1 (or outlet 1) / common.
-- Four flow types per Fig 2:
-  - **C1**: combining, K_hat_1 (branch 3 <- branch 1) and K_hat_2 (3 <- 2)
-  - **C2**: combining, both branches symmetric -> only K_hat_2 tabulated;
-    K_hat_1 = K_hat_2(q -> 1-q)
-  - **D1**: dividing, K_hat_1 (3 -> 1) and K_hat_2 (3 -> 2)
-  - **D2**: dividing, symmetric -> only K_hat_2; K_hat_1 = K_hat_2(q -> 1-q)
+- `q = G_2 / G_3` (nomenclature; `q' = 1 - q = G_1 / G_3`).
+- Four flow types per Fig 2 (3 is always the common branch):
+  - **C1**: combining; 1 straight inlet, 2 lateral inlet -> q is the lateral fraction
+  - **C2**: combining, 1 and 2 opposite inlets on the main run, 3 the leg;
+    only K_hat_2 tabulated, K_hat_1 = K_hat_2(q -> 1-q)
+  - **D1**: dividing; 2 straight outlet, 1 lateral outlet -> q is the STRAIGHT fraction
+  - **D2**: dividing, 3 the leg, 1 and 2 opposite outlets; K_hat_1 = K_hat_2(q -> 1-q)
 
 ## No digitized data
 
@@ -33,8 +33,10 @@ The paper publishes its own measured-vs-numerical comparison points (Figs 3,
 4, 5 — 3D regression planes) but they are awkward to digitize from 3D
 isometric plots and provide low marginal value over the closed-form Eq 44.
 
-## Use in the scorecard
+## Not a validation source for the junction closure
 
-Perez-Garcia K_hat acts as a **compressible-flow ceiling reference** for
-candidate junction models. Range: 0.15 < M3* < 0.7. Outside this range the
-correlation is documented as extrapolated; the runner flags such cases.
+K_hat cannot test a loss model: a junction with no loss at all reproduces
+Table 1 within its U95 in 57 of 72 cells (every cell at M3* <= 0.3). See
+`validation/junction/README.md` ("Tier 2") and
+`python/tests/test_junction_tier2.py`. The Table 1 transcription was corrected
+on 2026-10-10 (seven values).
