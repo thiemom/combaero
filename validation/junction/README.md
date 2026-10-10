@@ -52,8 +52,16 @@ per row:
 
 ## Fidelity: Mynard 2015 against his own figures
 
-`mynard_fidelity.py` holds the Python kernel (`_mynard2010`) to the paper, and
-`tests/test_mynard_junction.cpp` holds the C++ port to the Python. The paper has
+`mynard_fidelity.py` holds the Python kernel (`_mynard2010`) to the paper.
+Production runs the C++ port, which is held to the Python two ways:
+- **Golden headers:** `tests/test_mynard_junction.cpp` and
+  `tests/test_mpce_junction.cpp` compare against values generated from the
+  Python.
+- **Live:** `python/tests/test_junction_cpp_python_equivalence.py` compares
+  through the binding at every Mynard sample (632 cases, 1.1e-14), and fails
+  when either header no longer regenerates to what is committed.
+
+The paper has
 no tables: Figs 4 and 6-11 plot his model ("Unified0D", red) and his CFD
 ("Ref3D", black markers) over 31 panels. `digitise_mynard2015.py` extracts both
 by colour from the 150-dpi scans into `data/mynard2015/` (see its README).
