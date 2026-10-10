@@ -47,6 +47,7 @@ combaero::solver::MpceResidualJacobian Evaluate(const MpceCase& c) {
   geom.port_sign = c.port_sign;
   geom.joining_etransfer_alpha = c.joining_etransfer_alpha;
   geom.eta_scale = c.eta_scale;
+  geom.gamma = c.gamma;
   return mpce_residuals_and_jacobian(c.p_static, c.p_total, c.rho, c.drho_dp,
                                         c.outer_mdot, c.pt_jct, geom);
 }
