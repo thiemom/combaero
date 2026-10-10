@@ -472,14 +472,25 @@ class NetworkSolver:
             if isinstance(node, PressureBoundary):
                 p_guess[nid] = getattr(node, "Pt", ref["P"])
 
-        # Estimated per-element dP: spread across elements, or 0.1 % of ref_P
+        # Estimated per-element dP: spread across the elements that HAVE a
+        # drop, or 0.1 % of ref_P. A LosslessConnectionElement imposes Pt
+        # continuity, so it carries none (#272): applying a hop's dP across one
+        # put a junction port above its own supply (a straight outlet 50 Pa
+        # over the inlet in Bassett's Fig 7b network), and the junction seed
+        # read flows in the wrong direction from it.
         seed_pressures = list(p_guess.values())
+        lossy = [
+            e
+            for e in self.network.elements.values()
+            if not isinstance(e, LosslessConnectionElement)
+        ]
         if len(seed_pressures) >= 2:
-            dp_est = (max(seed_pressures) - min(seed_pressures)) / max(
-                len(self.network.elements), 1
-            )
+            dp_est = (max(seed_pressures) - min(seed_pressures)) / max(len(lossy), 1)
         else:
             dp_est = ref["P"] * 0.001
+
+        def hop(elem: Any) -> float:
+            return 0.0 if isinstance(elem, LosslessConnectionElement) else dp_est
 
         # BFS propagation from known nodes.
         # Seed the queue from the dict, NOT from `visited`: iterating a set of
@@ -498,13 +509,13 @@ class NetworkSolver:
             for elem in self.network.get_downstream_elements(nid):
                 to_id = elem.to_node
                 if to_id not in visited:
-                    p_guess[to_id] = p_guess[nid] - dp_est
+                    p_guess[to_id] = p_guess[nid] - hop(elem)
                     visited.add(to_id)
                     queue.append(to_id)
             for elem in self.network.get_upstream_elements(nid):
                 from_id = elem.from_node
                 if from_id not in visited:
-                    p_guess[from_id] = p_guess[nid] + dp_est
+                    p_guess[from_id] = p_guess[nid] + hop(elem)
                     visited.add(from_id)
                     queue.append(from_id)
 
@@ -715,6 +726,69 @@ class NetworkSolver:
         if total <= 0.0:
             return {}
 
+        # The element's OWN closure, inverted on the guessed port pressures,
+        # where it offers one (#272): a junction's port drops are K_i(split)
+        # times the common head, so their ratio fixes the split and either one
+        # the level. The Bernoulli share below assumes each port's drop drives
+        # its own flow, which a dividing straight leg contradicts -- its total
+        # pressure RISES for a lateral fraction under 1/2 (K5 < 0) -- and it
+        # seeded q ~ 0.25 whatever the target, on the far side of that sign
+        # change, from where Newton collapsed onto a dead lateral. The level is
+        # taken from the closure only on a pressure-driven network: an imposed
+        # flow sets it otherwise.
+        closure_seed = getattr(elem, "closure_split_seed", None)
+        if closure_seed is not None:
+            dpt = [None if p_guess.get(n) is None else p_guess[n] - pt_com for n in port_nodes]
+            # The common flow is KNOWN when the common port's own element ends
+            # at a MassFlowBoundary (source or sink): the closure then solves
+            # for the split at that flow, and the common port's pressure --
+            # only a guess there -- drops out.
+            m_imposed = None
+            common_elem = self.network.elements.get(port_elems[common_i])
+            if common_elem is not None:
+                for end in (common_elem.from_node, common_elem.to_node):
+                    node = self.network.nodes.get(end)
+                    if isinstance(node, MassFlowBoundary):
+                        m_imposed = abs(float(node.m_dot))
+            prefer = None
+            if m_imposed is not None:
+                generic = self._bernoulli_shares(
+                    port_nodes, areas, common_i, pt_com, p_guess, rho_ref
+                )
+                prefer = generic.get(next(i for i in range(len(port_nodes)) if i != common_i))
+            seed = closure_seed(common_i, dpt, rho_ref, m_common=m_imposed, prefer=prefer)
+            if seed is not None:
+                shares, m_common = seed
+                total = m_common
+                out: dict[str, float] = {}
+                if port_elems[common_i]:
+                    out[f"{port_elems[common_i]}.m_dot"] = total
+                for i, share in shares.items():
+                    if port_elems[i]:
+                        out[f"{port_elems[i]}.m_dot"] = share * total
+                return out
+
+        out = {}
+        if port_elems[common_i]:
+            out[f"{port_elems[common_i]}.m_dot"] = total
+        for i, share in self._bernoulli_shares(
+            port_nodes, areas, common_i, pt_com, p_guess, rho_ref
+        ).items():
+            if port_elems[i]:
+                out[f"{port_elems[i]}.m_dot"] = share * total
+        return out
+
+    @staticmethod
+    def _bernoulli_shares(
+        port_nodes: list[str],
+        areas: list[float],
+        common_i: int,
+        pt_com: float,
+        p_guess: dict[str, float],
+        rho_ref: float,
+    ) -> dict[int, float]:
+        """Each non-common port's share of the common flow, A_i sqrt(2 rho
+        dPt_i) normalised; area-weighted where no pressure difference is known."""
         others = [i for i in range(len(port_nodes)) if i != common_i]
         shares = []
         for i in others:
@@ -724,55 +798,8 @@ class NetworkSolver:
             shares.append(area * math.sqrt(2.0 * rho_ref * dpt) if dpt > 0.0 else 0.0)
         if sum(shares) <= 0.0:
             shares = [abs(float(areas[i])) or 1.0 for i in others]
-
-        scale = total / sum(shares)
-        out: dict[str, float] = {}
-        if port_elems[common_i]:
-            out[f"{port_elems[common_i]}.m_dot"] = total
-        for i, share in zip(others, shares, strict=True):
-            if port_elems[i]:
-                out[f"{port_elems[i]}.m_dot"] = share * scale
-        return out
-
-    def _apply_barrier_scale(self) -> None:
-        """Give every chamber element a soft-barrier weight matched to this
-        network's scales.
-
-        The barrier's penalty shares a residual row with the continuity
-        relation, so it balances against a pressure error instead of driving
-        the offending mass flow to zero, and its fixed point sits at
-        ``slack* = sqrt(dP / alpha)``. ``alpha`` therefore carries
-        Pa/(kg/s)^2 and a fixed value only holds the fixed point at a sensible
-        fraction of the flow for ONE network size. Measured on a single
-        junction scaled over five decades with every dimensionless group held
-        fixed, the alpha needed to converge follows ``1/m_ref^2`` exactly, and
-        the shipped fallback fails on that junction at a hundredth of its size
-        (issue #272).
-
-        The weight is frozen for the solve rather than recomputed per
-        iterate, so it stays a constant in the residual and the Jacobian is
-        unchanged. A caller who sets ``soft_penalty_alpha`` explicitly keeps
-        it; see ``MultiPortChamberElement.effective_penalty_alpha``.
-        """
-        # Only elements that actually own a soft barrier. The chamber base is
-        # shared with EjectorElement and ConstantKTeeElement, and reaching for
-        # every subclass is how the junction seed broke the GUI ejector.
-        elements = [
-            e
-            for e in self.network.elements.values()
-            if isinstance(e, MultiPortChamberBase) and hasattr(e, "effective_penalty_alpha")
-        ]
-        if not elements:
-            return
-        # Imported here, not at module scope: mpce_element pulls in the
-        # sympy-derived Jacobian, and sympy is not installed in the minimal
-        # build environments that only import combaero (Windows/MSVC CI).
-        from .mpce_element import scaled_penalty_alpha
-
-        ref = self._infer_reference_state()
-        alpha = scaled_penalty_alpha(float(ref["P"]), float(ref["m_dot"]))
-        for element in elements:
-            element._barrier_alpha_scaled = alpha
+        total = sum(shares)
+        return {i: s / total for i, s in zip(others, shares, strict=True)}
 
     def _build_x0(self) -> np.ndarray:
         """
@@ -2302,7 +2329,6 @@ class NetworkSolver:
         auto_retry: bool,
     ) -> dict[str, float]:
         """The cold solve with its outlet-referenced auto-retry (see solve)."""
-        self._apply_barrier_scale()
         retry_applicable = (
             auto_retry
             and x0 is None

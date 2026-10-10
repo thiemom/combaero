@@ -1,0 +1,7 @@
+- **Junction seed lands on the closure's operating point (#272).** `NetworkSolver` now starts a three-port `MultiPortChamberElement` from the split its own Mynard closure predicts, not a Bernoulli share of guessed pressures.
+  - **Pressure guess:** a `LosslessConnectionElement` carries no pressure drop. Before, it took a share like any lossy element, which put a junction's straight port above its own supply.
+  - **Pressure-driven networks** (every port at a pressure boundary): split and flow level come from the closure, taking the root that carries the most flow.
+  - **Flow-driven networks** (a `MassFlowBoundary` on the common port): the imposed flow is kept, and the split is the closure root nearest the Bernoulli share.
+  - **Measured on the junction scorecard (2546 records):** +38 converged, -1. The loss is an Idelchik q = 1 endpoint in a documented worst cell. Bassett three_pb now converges at lateral fractions 0.5-0.8, where it failed before.
+  - **Random harness:** unchanged at 157/240.
+  - **Below q = 0.5 three_pb has two genuine roots,** e.g. (0.2, 0.33). The seed takes the higher-flow one.

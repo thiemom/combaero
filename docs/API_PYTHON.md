@@ -1147,7 +1147,7 @@ pins the documented values.
 ### The Junction Soft-Barrier Weight
 
 Distinct from the tuned constants above: this is a **numerical** parameter, not
-physics, and it is derived rather than declared.
+physics.
 
 When `strict=False` and a port flows against its declared direction,
 `MultiPortChamberElement` replaces the physics with a continuity residual plus a
@@ -1156,32 +1156,16 @@ shares its row with the continuity relation, so it balances against a pressure
 error rather than driving the offending flow to zero, and has a fixed point at
 `slack* = sqrt(dP / alpha)`. A solve that reaches it parks there.
 
-`alpha` therefore carries `Pa/(kg/s)^2` and cannot be a constant: the weight
-needed scales as `1/m_ref^2`, two decades per decade of network size.
-`NetworkSolver` derives it before each solve from the reference state it
-already computes for seeding:
+`alpha` is `soft_penalty_alpha`, default `DEFAULT_SOFT_PENALTY_ALPHA = 1e11`
+Pa/(kg/s)^2. It carries units, so it places the fixed point at a sensible
+fraction of the flow for one network size only. The solver used to derive it
+from the network's scales; that hand-off was removed once the junction seed
+stopped starting ports in the wrong basin and it no longer changed any outcome
+from 1e-6 to 1e4 times the reference size (#272). Set it explicitly for a
+network far from ~0.1 kg/s that parks a port in the barrier:
 
 ```python
-alpha = P_ref / (BARRIER_SLACK_FRACTION * m_ref) ** 2   # f = 0.005
-```
-
-placing the fixed point at 0.5% of the reference mass flow whatever the
-network's size. It is frozen for the solve, so the residual and Jacobian are
-unchanged in form.
-
-| name | where | meaning |
-|---|---|---|
-| `BARRIER_SLACK_FRACTION` | `combaero.network.mpce_element` | where the fixed point is placed, as a fraction of `m_ref` |
-| `DEFAULT_SOFT_PENALTY_ALPHA` | same | fallback when no solver has supplied a weight, or the reference state is degenerate |
-| `scaled_penalty_alpha(P_ref, m_ref)` | same | the derivation, exposed for testing |
-| `MultiPortChamberElement.effective_penalty_alpha()` | element | the weight actually used, after precedence |
-
-Precedence: an explicitly set `soft_penalty_alpha` always wins, then the
-solver-supplied scale-aware weight, then the fallback. So the tuning knob keeps
-working:
-
-```python
-element.soft_penalty_alpha = 5.0e7   # explicit: overrides the derived weight
+element.soft_penalty_alpha = 5.0e7
 ```
 
 Raising `alpha` shrinks the fixed point and never destabilises the solve --
