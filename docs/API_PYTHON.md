@@ -1134,10 +1134,18 @@ agreement on the digitised validation data; the on/off tables live on issue
 #271. `eta_scale` exists for that measurement:
 
 ```python
-MultiPortChamberElement(..., eta_scale=1.0)   # default: the faithful Mynard port
-MultiPortChamberElement(..., eta_scale=0.0)   # energy-transfer term off, for scoring
-junction_loss_coefficient(U, A, theta, eta_scale=0.0)
+MultiPortChamberElement(..., eta_scale=0.0)   # default: energy-transfer term off
+MultiPortChamberElement(..., eta_scale=1.0)   # Mynard's Eq 36 term on
+
+# Mynard's published model -- the dividing-streamline recovery is a combaero
+# addition (on by default) and has to be switched off too:
+junction_loss_coefficient(U, A, theta, joining_etransfer_alpha=0.0,
+                          eta_scale=1.0, dividing_streamline_recovery=0.0)
 ```
+
+That configuration is held to Mynard 2015's own figures (Figs 4, 6-11) by
+`python/tests/test_junction_mynard_fidelity.py`; see
+`validation/junction/README.md`, "Fidelity".
 
 Changing any of these values is a retune and needs a before/after table
 before it lands, not a silent edit -- `python/tests/test_junction_tuned_constants.py`

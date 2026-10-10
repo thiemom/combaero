@@ -180,7 +180,7 @@ class MultiPortChamberElement(MultiPortChamberBase):
     #: No effect on any dividing cell or any psi = 1 cell, verified.
     #: Switch: pass 0.0.
     #: Multiplier on Mynard's CFD-fitted energy-transfer factor (Eq 35-36).
-    #: **Default 0.0 since 2026-09-05**, which was 1.0 (the faithful port).
+    #: **Default 0.0 since 2026-09-05**, which was 1.0 (Mynard's value).
     #:
     #: Restoring the dividing-streamline recovery that Hager and Bassett derive
     #: (``_mynard2010.DIVIDING_STREAMLINE_RECOVERY``) made the transfer factor's
@@ -201,8 +201,10 @@ class MultiPortChamberElement(MultiPortChamberBase):
     #: of about 0.25, so it does not earn its place at the default.
     #:
     #: It is kept as a knob, not deleted: it is Mynard's own Eq 36 fitted to his
-    #: Fig 4 CFD, and ``eta_scale=1.0`` restores the faithful port for anyone
-    #: measuring against it. Mynard's `(1 - lambda_j)` factor makes it inert in
+    #: Fig 4 CFD. Mynard's published model is ``_mynard2010.junction_loss_coefficient``
+    #: with ``eta_scale=1.0`` AND ``dividing_streamline_recovery=0.0`` (the
+    #: recovery is ours); validation/junction/mynard_fidelity.py holds that
+    #: configuration to his figures. Mynard's `(1 - lambda_j)` factor makes it inert in
     #: joining flow, so this default affects diverging junctions only.
     DEFAULT_ETA_SCALE: float = 0.0
 

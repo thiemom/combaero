@@ -51,9 +51,15 @@ broken — it's failing where 1D physics itself fails. The scorecard's
   ψ²-vs-ψ transcription bug was wrong — the correct Bassett formula has
   ψ (not ψ²) inside the bracket. Verified at psi=3, q=0.5: C++ K12 gives
   1.47, measured K12 from Fig 10c gives 1.46.
-- **K8 in `include/tee_junction.h` has a real transcription error.** Code
-  uses `2*(1-q)^2 * cos(theta')/psi` where Bassett Table 2 has
-  `2*(1-q) * psi * cos(theta')`. At psi=4, q=0.5: code gives 0.77, the
-  correct formula gives 1.53, Fig 12b measured gives 1.73. Code is off
-  by ~1.0; correct formula is within Bassett's ~12% typical fit. Fix
-  belongs in a separate `fix(junction):` PR.
+- **K8 in `include/tee_junction.h` had a transcription error, since fixed.**
+  It divided by psi where Bassett Table 2 multiplies: Table 2 prints
+  `K8 = 1 - q^2 + 2 (1-q)^2 psi cos(theta)`, which is what the code and
+  `models/bassett2001.py` now carry (re-read from the PDF's text layer
+  2026-10-10).
+
+## Fidelity of the transcription
+
+`python/tests/test_junction_mynard_fidelity.py` holds `models/bassett2001.py`
+to Bassett's own calculated curves (the `_calc` files): max error 0.012-0.024
+at psi = 1, about 0.1 at psi = 3 / 4. Curves for K4-K8 and K11 (Figs 7, 8,
+11-13) are not digitised yet, so those coefficients have no such check.

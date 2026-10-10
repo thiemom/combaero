@@ -446,7 +446,7 @@ def build_network_cells(records: list[NetworkRecord]) -> list[NetworkCell]:
 
 #: What each source can say about the MPCE closure (docs/VALIDATION_POLICY.md).
 #: None is the closure's own paper (Mynard 2015), so none scores fidelity
-#: here (and nothing yet checks the closure against Mynard's own results). What separates them is whether the source set
+#: here; that is mynard_fidelity.py, against his figures. What separates them is whether the source set
 #: a constant: one that did is a consistency check on that constant, and only
 #: a source that set nothing measures accuracy.
 SOURCE_ROLES: dict[str, tuple[str, str]] = {
