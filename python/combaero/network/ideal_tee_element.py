@@ -64,6 +64,14 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
     port Pt does not enter. Density derivatives are ``rho / P`` (ideal gas, the
     same rule ``MultiPortChamberElement`` uses).
 
+    RANGE: subsonic supplying ports. Every supplier sits at the junction
+    static pressure, so a supplier that would really choke -- under-expanded,
+    its static above the junction's -- has no state here; the solve drives it
+    supersonic and stalls at Mach 1, where the port's mass flux peaks. Measured
+    on Wang 2014 a = 2.44, q >= 0.8, M3 >= 0.4 (lateral driven to Mach ~1.55;
+    Wang's own rig choked there, p. 1606). Not refused or flagged; a choked-
+    supplier branch would be a model extension (#517).
+
     Do not add a ``BorderCarnotLossElement`` on a port: the closure already
     carries the turning loss.
     """
