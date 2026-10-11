@@ -72,18 +72,21 @@ def tolerance_config():
 
     Tolerances based on measured deviations:
     - Temperature: 5.0 K (observed max: 4.6 K for C3H8, NASA-7 vs NASA-9)
-    - Transport: 35% (observed: up to 30% at high T, different correlations)
+    - Transport: 7% (observed after #485: viscosity <= 3.4%, conductivity <= ~6%
+      at 1000-1500 K and with polar species -- Eucken vs Cantera's full model)
     - Equilibrium: 0.01% composition, 1 K temperature (observed: 0.002%, 0.0 K)
     - Enthalpy: 1.5% (observed: up to 1.02%, small data source differences)
 
-    NOTE: Transport tolerance is high due to different models between CombAero and Cantera.
-    CombAero uses kinetic theory with L-J parameters, but values still differ from Cantera.
+    NOTE: this was 35%, which let O2's viscosity sit 44.5% low (and air's 11.8%)
+    for months: the generated transport data took NUIGMech1.1 parameters its
+    own authors flag as unreferenced estimates (#485). The tolerance is set
+    just above the largest difference the models themselves explain.
     """
     return {
         "temperature": 5.0,  # K
         "mole_fraction": 0.01,  # absolute
         "enthalpy": 0.015,  # relative (1.5%) - small differences in thermo data
-        "transport": 0.35,  # relative (35%) - different transport correlations
+        "transport": 0.07,  # relative (7%) - conductivity model differences, see above
         "density": 0.01,  # relative (1%)
         "equilibrium_composition": 0.0001,  # absolute (0.01%) - WGS equilibrium
         "equilibrium_temperature": 1.0,  # K - adiabatic equilibrium

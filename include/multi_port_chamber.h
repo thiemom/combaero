@@ -39,8 +39,12 @@ inline constexpr double HAGER_FRACTION = 0.75;
 // Border-Carnot dynamic-head prefactor in L_i = 4 * (1 - cos(theta_eff))^2.
 // PDF Section 3.1 claims the squared form (vs the naive 2*(1-cos(theta))
 // linear form) reproduces Hager xi_l and Bassett K_inc exactly at M -> 0.
-// That claim is UNVERIFIED in this repo: the Tier-1 tests are xfail at
-// 11-29% deviation on the lateral (see issue #272).
+// NEVER VALIDATED: its only check was paired with the momentum-CV junction
+// removed in 0.6.0, which missed Bassett K6 by 11-29%, and the tests went
+// with it (#322). It must not be put on a MultiPortChamberElement or
+// ConstantKTeeElement port: their closures already carry the port's turning
+// loss, and adding it double-counts (Bassett K6 at 90 deg, psi = 1, q = 0.5:
+// 0.867 from the closure alone, 1.249 with this element; #272).
 inline constexpr double BC_LOSS_PREFACTOR = 4.0;
 
 // -----------------------------------------------------------------------------

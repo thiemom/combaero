@@ -21,6 +21,8 @@ validation/junction/
   runner.py                    # iterate (model, dataset) -> records
   scorecard.py                 # records -> metrics + scorecards
   random_robustness.py         # convergence on RANDOM physical BCs, no dataset
+  mynard_fidelity.py           # the kernel against Mynard 2015's own figures
+  digitise_mynard2015.py       # colour extraction of those figures
 ```
 
 ## Excluded sources
@@ -32,6 +34,85 @@ dataset:
 - **Torregrosa 2017**: unsteady wave propagation (transmission /
   reflection coefficients), not steady K. Could be a separate
   acoustic-tier dataset later if needed.
+
+## What each source can measure
+
+None of the measured sources is the closure's own paper (Mynard 2015), so none
+of them scores fidelity; that is done against Mynard's figures (next section).
+What separates them is whether a source set a constant.
+`network_runner.SOURCE_ROLES` declares it and the network scorecard prints it
+per row:
+
+| source | role | why |
+|---|---|---|
+| Bassett 2001 | selected | chose `eta_scale = 0` and the dividing-streamline recovery (with Hager); its K11/K12 also weighed in alpha |
+| Hager 1984 | selected | the same decision, with Bassett |
+| Idelchik 1966 | tuned | `joining_etransfer_alpha = 0.2` is its in-network optimum. Its theta = 30 tables (diagrams 7-1/7-2) are calculating formulas with no experiment behind them (the handbook's own diagram list); 45 and 90 are formulas refined by Kinne's and Vogel's experiments |
+| Wang 2014 | x-source | set nothing -- the one CROSS-SOURCE accuracy check |
+
+## Fidelity: Mynard 2015 against his own figures
+
+`mynard_fidelity.py` holds the Python kernel (`_mynard2010`) to the paper.
+Production runs the C++ port, which is held to the Python two ways:
+- **Golden headers:** `tests/test_mynard_junction.cpp` and
+  `tests/test_mpce_junction.cpp` compare against values generated from the
+  Python.
+- **Live:** `python/tests/test_junction_cpp_python_equivalence.py` compares
+  through the binding at every Mynard sample (632 cases, 1.1e-14), and fails
+  when either header no longer regenerates to what is committed.
+
+The paper has
+no tables: Figs 4 and 6-11 plot his model ("Unified0D", red) and his CFD
+("Ref3D", black markers) over 31 panels. `digitise_mynard2015.py` extracts both
+by colour from the 150-dpi scans into `data/mynard2015/` (see its README).
+
+- **Fidelity.** The kernel in his configuration (eta on, no joining alpha, no
+  dividing-streamline recovery) is evaluated at his CFD samples and splined
+  between them, as his curves are, and compared with every visible red point:
+  29 panels within 2.7 px (<= 0.032 in K), Fig 4 and Fig 6d within 4.2 px.
+  Fig 4's dashed eta_j = 0 curve is within 2.2 px. Each production departure
+  moves the panels it acts on by 15-80 px, so the check sees it.
+- **Ref3D** is reported per flow type and branch, faithful against production
+  (`python -m validation.junction.mynard_fidelity`). It is laminar CFD at
+  Re 350-2400 and our production closure departs from his model on purpose;
+  nothing is tuned on it. All 158 samples: MAE 0.212 faithful, 0.219
+  production. Fig 4, where his eta was fitted: 0.022 / 0.126. The six psi != 1
+  joining samples, the only ones the joining alpha acts on: 0.198 / 0.202.
+- **Conventions resolved against his curves**, stated in `_junction`:
+  - the angle is measured between the side branch and the downstream main
+    branch, for both flow directions;
+  - Fig 9's area sweep holds both inlet velocities equal;
+  - **Fig 9's rows are swapped against its caption.** His own Unified0D, and
+    the dead-branch limit K -> -1, both put the side inlet on the bottom row.
+
+## Endpoints
+
+At q = 0 or 1 one port carries no flow. Its residual has a kink where the flow
+sign flips, so an imposed_q solve there either stalls or is refused as an
+unphysical root; until #272 every such record went unscored (Idelchik's
+q = 0 / 1 columns, Wang's q = 0 / 1 curves, Bassett's digitised end points --
+173 records). The measured value at an endpoint is the one-sided limit of a
+curve whose flow has a direction, so `network_runner` solves it
+`_ENDPOINT_EPS` = 1e-3 inside the range, scores it against the measured
+endpoint value, and marks the record `endpoint_limit`. The limit is stable:
+every endpoint cell's bias moves <= 0.03 between 1e-3 and 1e-4.
+
+## Tier 2 (finite Mach, #272)
+
+- **Wang 2014 is the Tier-2 source.** Cross-source: 188 of 200 points, MAE
+  0.131 (interior 0.108, the q = 0 / 1 curves 0.170), flat with Mach (0.124
+  below M 0.15, 0.128 above 0.45), worst at area ratio 2.44 (0.195) and at
+  K_23 with a dead straight inlet (q = 1, bias -0.33). Wang states no
+  uncertainty, so there is no band to be within;
+  `python/tests/test_junction_tier2.py` pins regression floors and a
+  falsification. The 12 unscored points are all at a = 2.44 above M 0.49.
+- **Perez-Garcia 2010 is not a validation source for the closure.** Its K_hat
+  (Eq 41) depends only on the two branch Mach numbers; a junction with NO loss
+  reproduces its Table 1 within U95 in 57 of 72 cells, every one at
+  M3* <= 0.3. Its band is worth 22 units of Miller K at M3* = 0.3 and only
+  approaches the model's own error (0.1-0.4) at M3* = 0.7 with a branch
+  carrying >= 3/4 of the flow. The same test file pins this so nobody wires a
+  vacuous K_hat check. Table 1 was re-transcribed (seven values were wrong).
 
 ## Joining flow types
 
@@ -93,7 +174,10 @@ For each `ValidationCase` (one row of a measured CSV):
 
 The scorecard reports per (model, K, regime, psi-bin, theta-bin):
 - `N`, `RMSE_meas`, `MAE_meas`, `bias_meas`, `pct_within_uncertainty`,
-  `Delta_vs_ceiling`.
+  `Delta_vs_ceiling`. `pct_within_uncertainty` uses each paper's STATED
+  measurement uncertainty and shows `-` where there is none -- which today is
+  every junction source: Bassett and Hager compile other experimenters' data
+  without a band, Idelchik's handbook disclaims one, Wang states none.
 - For network-mode evaluation: `pct_converged`, `median_wall_time_ms`,
   `median_residual_norm`.
 

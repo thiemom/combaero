@@ -269,3 +269,27 @@ def test_ribbed_result_carries_the_wall_coupling_derivatives() -> None:
     # dh/dmdot must be real, not a placeholder zero: heat transfer rises with
     # flow, so the ribbed side has to contribute.
     assert r.dh_dmdot != 0.0
+
+
+@pytest.mark.parametrize("area", [0.01, 0.1])
+@pytest.mark.parametrize("n_walls", [1, 2, 4])
+def test_ribbed_wall_coupling_derivative_matches_finite_difference(
+    area: float, n_walls: int
+) -> None:
+    """dh/dmdot against central differences on the SOLVER's mass flow.
+
+    The existing check above only asked for a nonzero value, which is how two
+    defects survived (#456): the mass flow was taken on the convective area,
+    and the St d(rho v cp)/dmdot term of h_r = St rho v cp was missing -- the
+    analytic value read 2320 against a true 7652 here.
+    """
+    import math
+
+    s = ConvectiveSurface(area=area, model=RibbedModel(e_D=0.06, p_e=10.0, n_ribbed_walls=n_walls))
+    v, dv = FLOW["velocity"], 1e-4
+    flow = {k: val for k, val in FLOW.items() if k != "velocity"}
+    up = s.htc_and_T(**STATE, **flow, velocity=v + dv).h
+    dn = s.htc_and_T(**STATE, **flow, velocity=v - dv).h
+    rho = cb.density(STATE["T"], STATE["P"], STATE["X"])
+    rho_a = rho * math.pi / 4.0 * FLOW["diameter"] ** 2
+    assert _run(s).dh_dmdot == pytest.approx((up - dn) / (2 * dv) / rho_a, rel=1e-4)

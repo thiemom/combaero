@@ -128,6 +128,9 @@ TEST(EnergyBoundaryTest, MixerQ_TwoStreams) {
 // =============================================================================
 // 2. Mixer: Fraction parameter accuracy and enthalpy conservation
 // =============================================================================
+// 'fraction' scales the sensible enthalpy h(T) - h(298.15 K). air_Y() is pure
+// N2/O2, whose h(298.15 K) is zero (elements in their reference state), so on
+// it the sensible and absolute forms coincide.
 
 TEST(EnergyBoundaryTest, MixerFraction_NegativeCooling) {
   // Single air stream, fraction=-0.05 → 5% enthalpy loss
@@ -457,11 +460,14 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Fraction_Cooling) {
   // Cooled T should be lower
   EXPECT_LT(res_cooled.T_mix, res_base.T_mix);
 
-  // Enthalpy should be reduced by fraction
+  // The products' SENSIBLE enthalpy is reduced by the fraction (#481): on
+  // absolute h, which carries the products' formation enthalpy, a loss would
+  // raise their temperature.
   std::vector<double> X_b = mass_to_mole(normalize_fractions(res_base.Y_mix));
+  const double h_ref = h_mass(sv::kSensibleEnthalpyRefT, X_b);
   double h_ad = h_mass(res_base.T_mix, X_b);
   double h_cooled = h_mass(res_cooled.T_mix, X_b);
-  EXPECT_NEAR(h_cooled / h_ad, 1.0 + fraction, 1e-4);
+  EXPECT_NEAR((h_cooled - h_ref) / (h_ad - h_ref), 1.0 + fraction, 1e-9);
 }
 
 TEST(EnergyBoundaryTest, CompleteCombustion_Q_Zero_IsNoop) {

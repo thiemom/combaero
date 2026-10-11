@@ -1,0 +1,3 @@
+- **The solver-derived junction barrier weight (#272).** Removed: `scaled_penalty_alpha`, `BARRIER_SLACK_FRACTION`, `MultiPortChamberElement.effective_penalty_alpha()` and the solver hand-off.
+  - **Why:** with the closure-consistent seed the soft barrier is seldom reached. Derived and fixed weights now give identical outcomes over 600 scaled random junctions (sizes 1e-6 to 1e4) and the full junction scorecard. The control test's documented exit was deletion.
+  - **What remains:** `soft_penalty_alpha` (default 1e11) is used directly. Set it explicitly for a network far from ~0.1 kg/s that parks a port in the barrier.

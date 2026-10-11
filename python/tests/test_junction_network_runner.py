@@ -217,3 +217,25 @@ def test_a_mach_indexed_source_is_not_charged_for_topologies_it_cannot_use():
 
     assert records
     assert {r.topology for r in records} == {"imposed_q"}
+
+
+def test_endpoints_are_scored_at_their_one_sided_limit():
+    """At q = 0 or 1 a port carries no flow and its residual has a kink where
+    the flow sign flips; solved exactly there, all 173 endpoint records went
+    unscored (#272). They are solved `_ENDPOINT_EPS` inside the range, scored
+    against the measured endpoint value, and flagged."""
+    from validation.junction.models.mpce_network import MPCENetwork
+    from validation.junction.network_runner import _ENDPOINT_EPS
+
+    records = [
+        r
+        for r in iter_network_records(MPCENetwork(), load_dataset(), topologies=("imposed_q",))
+        if r.q <= 0.0 or r.q >= 1.0
+    ]
+    assert len(records) == 173
+    assert all(r.endpoint_limit for r in records)
+    scored = [r for r in records if r.error is not None]
+    # Idelchik's and Bassett's all solve; 8 of Wang's 80 (a = 2.44, M > 0.49) do not.
+    assert len(scored) == 165
+    assert all(r.K_measured_at_q_converged == r.K_measured for r in scored)
+    assert all(abs(r.q_converged - min(max(r.q, 0.0), 1.0)) <= 1.01 * _ENDPOINT_EPS for r in scored)

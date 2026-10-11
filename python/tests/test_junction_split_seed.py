@@ -17,11 +17,17 @@ Measured effect on the junction scorecard, seed off then on:
 The seed is opt-in per element class, because a junction subclass whose port
 flows follow its own internal physics must not have them overwritten -- see
 `EjectorElement`.
+
+Since #272 a junction that offers ``closure_split_seed`` (the Mynard chamber)
+gets its split -- and on a pressure-driven network its level -- from its OWN
+closure inverted on the guessed port pressures, instead of the Bernoulli share
+sqrt(dPt) that is kept as the fallback. A dividing junction's straight leg
+gains total pressure for a lateral fraction under 1/2 (K5 < 0), which the
+Bernoulli share cannot represent: it seeded q ~ 0.25 whatever the target, and
+Bassett's Fig 7b three-pressure case failed above q = 0.5.
 """
 
 from __future__ import annotations
-
-import math
 
 import pytest
 
@@ -90,29 +96,32 @@ def test_the_start_state_conserves_mass_at_the_junction():
     )
 
 
-def test_the_start_split_follows_the_propagated_pressures():
-    """The leg with the larger propagated pressure drop gets the larger seed,
-    in the Bernoulli ratio sqrt(dPt_bra / dPt_str).
-
-    Against the PROPAGATED differences, not the boundary ones: the seed reads
-    `_propagate_pressure_guess`, which walks outward from the boundaries with a
-    uniform step, so the port-face estimates are not the boundary values. That
-    is the contract being pinned -- the seed uses the best pressure estimate
-    available at x0, whatever the propagator's own accuracy.
-    """
+def test_a_lossless_link_carries_no_pressure_drop_in_the_guess():
+    """A LosslessConnectionElement imposes Pt continuity, so the pressure
+    guess must not spend a hop's drop across it. It did: the straight port of
+    Bassett's Fig 7b network came out 50 Pa ABOVE its own supply, and the
+    junction seed read the flows from that (#272)."""
     net = _net(pt_str=99_990.0, pt_bra=99_960.0)
     solver = NetworkSolver(net)
     solver.network.resolve_all_topology()
-    solver.network.validate()
     p_guess = solver._propagate_pressure_guess(solver._infer_reference_state())
-    d_str = abs(p_guess["port_com"] - p_guess["port_str"])
-    d_bra = abs(p_guess["port_com"] - p_guess["port_bra"])
-    assert d_str > 0.0 and d_bra > d_str, "fixture must give the legs different drops"
+    for port, bnd in (("port_com", "pb_in"), ("port_str", "pb_str"), ("port_bra", "pb_bra")):
+        assert p_guess[port] == p_guess[bnd]
 
+
+@pytest.mark.parametrize("pt_bra", [99_960.0, 99_900.0, 99_800.0])
+def test_with_imposed_port_pressures_the_seed_is_the_closures_operating_point(pt_bra):
+    """The junction inverts its OWN closure on the guessed port pressures: the
+    two drops are K_i(split) times the common head, so their ratio fixes the
+    split and either one the level. With every port pressure imposed through
+    lossless links the guess is exact, and the seed must be the solution to
+    within the compressible head (the closure is inverted incompressibly)."""
+    net = _net(pt_str=99_990.0, pt_bra=pt_bra)
     x0 = _x0(net)
-
-    ratio = x0["lc_bra.m_dot"] / x0["lc_str.m_dot"]
-    assert ratio == pytest.approx(math.sqrt(d_bra / d_str), rel=1e-6)
+    r = NetworkSolver(_net(pt_str=99_990.0, pt_bra=pt_bra)).solve()
+    assert r["__success__"], r["__message__"]
+    for key in ("lc_com.m_dot", "lc_str.m_dot", "lc_bra.m_dot"):
+        assert x0[key] == pytest.approx(r[key], rel=0.01), key
 
 
 def test_equal_pressures_fall_back_to_an_area_weighted_split():
@@ -134,19 +143,37 @@ def test_every_port_is_seeded_in_its_own_canonical_direction():
         assert x0[key] > 0.0, f"{key} seeded against its declared direction"
 
 
-def test_the_total_comes_from_the_existing_propagator():
-    """The seed fixes the SPLIT and the CONTINUITY; it introduces no new
-    flow-scale heuristic, so the level still comes from whatever the
-    topological propagator put on the common port."""
-    net = _net(pt_str=99_980.0, pt_bra=99_950.0)
-    solver = NetworkSolver(net)
-    solver.network.resolve_all_topology()
-    solver.network.validate()
-    ref = solver._infer_reference_state()
-    # `_propagate_mdot_guess` is keyed by ELEMENT ID, not by unknown name.
-    expected = abs(solver._propagate_mdot_guess(ref)["lc_com"])
+def test_an_imposed_common_flow_sets_the_level():
+    """Where the common port's element ends at a MassFlowBoundary the flow is
+    known: the seed keeps it and the closure only chooses the split, from the
+    difference of the two other ports' pressures (the common port's own
+    pressure is then just a guess)."""
+    from combaero.network import MassFlowBoundary
 
-    assert _x0(net)["lc_com.m_dot"] == pytest.approx(expected, rel=1e-9)
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("mb_in", m_dot=0.08, Tt=300.0, Y=_Y))
+    net.add_node(PressureBoundary("pb_str", Pt=99_980.0, Tt=300.0, Y=_Y))
+    net.add_node(PressureBoundary("pb_bra", Pt=99_950.0, Tt=300.0, Y=_Y))
+    for n in ("port_com", "port_str", "port_bra"):
+        net.add_node(MomentumChamberNode(n, area=_A))
+    net.add_element(LosslessConnectionElement("lc_com", "mb_in", "port_com"))
+    net.add_element(LosslessConnectionElement("lc_str", "port_str", "pb_str"))
+    net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "pb_bra"))
+    net.add_element(
+        MultiPortChamberElement(
+            id="jct",
+            inlet_nodes=["port_com"],
+            outlet_nodes=["port_str", "port_bra"],
+            inlet_angles_deg=[0.0],
+            outlet_angles_deg=[0.0, 45.0],
+            port_areas=[_A, _A, _A],
+            flow_direction="branch",
+            strict=False,
+        )
+    )
+    x0 = _x0(net)
+    assert x0["lc_com.m_dot"] == pytest.approx(0.08, rel=1e-12)
+    assert x0["lc_str.m_dot"] + x0["lc_bra.m_dot"] == pytest.approx(0.08, rel=1e-9)
 
 
 # ---------------------------------------------------------------------------

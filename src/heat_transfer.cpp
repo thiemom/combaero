@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <utility>
 
 
 
@@ -772,6 +773,23 @@ double effectiveness_parallelflow(double NTU, double C_r) {
 // State-based convenience functions
 // -------------------------------------------------------------
 
+// VDI Heat Atlas transition (vdi_transition, heat_transfer.h) for a
+// turbulent-only correlation nu_turb(Re): laminar Nu below 2300, the linear
+// interpolation to nu_turb(1e4) up to 1e4, nu_turb above.
+template <class Fn>
+static double vdi_transition_blend(double Re, bool heating, Fn &&nu_turb) {
+  const double Nu_lam = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
+  if (Re < vdi_transition::re_laminar) {
+    return Nu_lam;
+  }
+  if (Re >= vdi_transition::re_turbulent) {
+    return nu_turb(Re);
+  }
+  const double g = (Re - vdi_transition::re_laminar) /
+                   (vdi_transition::re_turbulent - vdi_transition::re_laminar);
+  return (1.0 - g) * Nu_lam + g * nu_turb(vdi_transition::re_turbulent);
+}
+
 double nusselt_circular_channel(const State &s, double velocity, double diameter,
                                 bool heating, double roughness) {
     if (velocity <= 0) {
@@ -842,38 +860,19 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
              .Nu;
   } else if (correlation == "dittus_boelter") {
     // Dittus-Boelter: Re > 10000, 0.6 < Pr < 160
-    if (Re < 2300) {
-      Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
-    } else if (Re < 10000) {
-      throw std::invalid_argument(
-          "htc_circular_channel: Dittus-Boelter requires Re > 10000 (got Re=" +
-          std::to_string(Re) + "). Use 'gnielinski' for transition region.");
-    } else {
-      Nu = nusselt_dittus_boelter(Re, Pr, heating);
-    }
+    Nu = vdi_transition_blend(Re, heating, [&](double Re_t) {
+      return nusselt_dittus_boelter(Re_t, Pr, heating);
+    });
   } else if (correlation == "sieder_tate") {
     // Sieder-Tate: Re > 10000, 0.7 < Pr < 16700
-    if (Re < 2300) {
-      Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
-    } else if (Re < 10000) {
-      throw std::invalid_argument(
-          "htc_circular_channel: Sieder-Tate requires Re > 10000 (got Re=" +
-          std::to_string(Re) + "). Use 'gnielinski' for transition region.");
-    } else {
-      Nu = nusselt_sieder_tate(Re, Pr, mu_ratio);
-    }
+    Nu = vdi_transition_blend(Re, heating, [&](double Re_t) {
+      return nusselt_sieder_tate(Re_t, Pr, mu_ratio);
+    });
   } else if (correlation == "petukhov") {
     // Petukhov: 1e4 < Re < 5e6, 0.5 < Pr < 2000
-    if (Re < 2300) {
-      Nu = heating ? NU_LAMINAR_CONST_T : NU_LAMINAR_CONST_Q;
-    } else if (Re < 1e4) {
-      throw std::invalid_argument(
-          "htc_circular_channel: Petukhov requires Re > 10000 (got Re=" +
-          std::to_string(Re) + "). Use 'gnielinski' for transition region.");
-    } else {
-      double f = friction_petukhov(Re);
-      Nu = nusselt_petukhov(Re, Pr, f);
-    }
+    Nu = vdi_transition_blend(Re, heating, [&](double Re_t) {
+      return nusselt_petukhov(Re_t, Pr, friction_petukhov(Re_t));
+    });
   } else {
     throw std::invalid_argument("htc_circular_channel: unknown correlation '" +
                                 correlation + "'. " +
@@ -911,7 +910,8 @@ channel_smooth(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length,
                double T_hot, const std::string &correlation,
                              bool heating, double mu_ratio, double roughness,
-                             double Nu_multiplier, double f_multiplier) {
+                             double Nu_multiplier, double f_multiplier,
+                             double flow_area) {
   // Use absolute velocity: Re, Nu, f, and dP are sign-independent.
   // Negative velocity can arise from reversed flow during Newton iteration
   // or from negative mass-flow boundary conditions.
@@ -945,6 +945,9 @@ channel_smooth(double T, double P, const std::vector<double> &X,
   FrictionAndDerivative f_turb{};
   NuAndDerivative nu_gn{};
   double Nu;
+  // Turbulent-only correlations: d(Nu)/dRe and d(Nu)/dPr before Nu_multiplier.
+  double dNu_dRe_raw = 0.0;
+  double dNu_dPr_raw = 0.0;
   if (correlation == "gnielinski") {
     // Gnielinski sees the TURBULENT friction, never the laminar-blended one.
     f_turb = friction_turbulent_and_derivative(Re, e_D);
@@ -953,29 +956,56 @@ channel_smooth(double T, double P, const std::vector<double> &X,
     nu_gn = nusselt_channel_gnielinski_and_derivative(Re, Pr, f_turb.f,
                                                       f_turb.df_dRe, Nu_lam);
     Nu = nu_gn.Nu;
-  } else if (Re < 2300.0) {
-    Nu = Nu_lam;
-  } else if (correlation == "dittus_boelter") {
-    if (Re < 10000.0) {
-      throw std::invalid_argument(
-          "channel_smooth: dittus_boelter requires Re > 10000 (got " +
-          std::to_string(Re) + "). Use gnielinski for transition region.");
+  } else if (correlation == "dittus_boelter" || correlation == "sieder_tate" ||
+             correlation == "petukhov") {
+    // Turbulent-only (Re >= 1e4): exact there; laminar below 2300; the VDI
+    // Heat Atlas interpolation between (vdi_transition, heat_transfer.h).
+    // Each partial is taken at Re_t = max(Re, 1e4), where the correlation is
+    // evaluated.
+    struct Turb {
+      double Nu, dRe, dPr;
+    };
+    auto turb = [&](double Re_t) -> Turb {
+      if (correlation == "dittus_boelter") {
+        const double n = heating ? 0.4 : 0.3;
+        const double v = nusselt_dittus_boelter(Re_t, Pr, heating);
+        return {v, 0.8 * v / Re_t, n * v / Pr};
+      }
+      if (correlation == "sieder_tate") {
+        const double v = nusselt_sieder_tate(Re_t, Pr, mu_ratio);
+        return {v, 0.8 * v / Re_t, v / (3.0 * Pr)};
+      }
+      // Petukhov with the channel friction it sees (f_multiplier included).
+      auto f_at = [&](double R) { return friction_channel_and_derivative(R, e_D).f * f_multiplier; };
+      const double v = nusselt_petukhov(Re_t, Pr, f_at(Re_t));
+      // The stencil straddles 1e4 at the band edge: a status pointer keeps
+      // its sub-range point from warning (the value above still does).
+      CorrelationStatus quiet{};
+      const double eps = std::max(1.0, Re_t * 1e-6);
+      const double dRe = (nusselt_petukhov(Re_t + eps, Pr, f_at(Re_t + eps), &quiet) -
+                          nusselt_petukhov(Re_t - eps, Pr, f_at(Re_t - eps), &quiet)) /
+                         (2.0 * eps);
+      const double eps_Pr = std::max(1e-6, Pr * 1e-6);
+      const double dPr = (nusselt_petukhov(Re_t, Pr + eps_Pr, f_at(Re_t), &quiet) -
+                          nusselt_petukhov(Re_t, Pr - eps_Pr, f_at(Re_t), &quiet)) /
+                         (2.0 * eps_Pr);
+      return {v, dRe, dPr};
+    };
+    if (Re < vdi_transition::re_laminar) {
+      Nu = Nu_lam;
+    } else if (Re < vdi_transition::re_turbulent) {
+      const Turb t = turb(vdi_transition::re_turbulent);
+      const double span = vdi_transition::re_turbulent - vdi_transition::re_laminar;
+      const double g = (Re - vdi_transition::re_laminar) / span;
+      Nu = (1.0 - g) * Nu_lam + g * t.Nu;
+      dNu_dRe_raw = (t.Nu - Nu_lam) / span;
+      dNu_dPr_raw = g * t.dPr;
+    } else {
+      const Turb t = turb(Re);
+      Nu = t.Nu;
+      dNu_dRe_raw = t.dRe;
+      dNu_dPr_raw = t.dPr;
     }
-    Nu = nusselt_dittus_boelter(Re, Pr, heating);
-  } else if (correlation == "sieder_tate") {
-    if (Re < 10000.0) {
-      throw std::invalid_argument(
-          "channel_smooth: sieder_tate requires Re > 10000 (got " +
-          std::to_string(Re) + "). Use gnielinski for transition region.");
-    }
-    Nu = nusselt_sieder_tate(Re, Pr, mu_ratio);
-  } else if (correlation == "petukhov") {
-    if (Re < 10000.0) {
-      throw std::invalid_argument(
-          "channel_smooth: petukhov requires Re > 10000 (got " +
-          std::to_string(Re) + "). Use gnielinski for transition region.");
-    }
-    Nu = nusselt_petukhov(Re, Pr, f);
   } else {
     throw std::invalid_argument("channel_smooth: unknown correlation '" +
                                 correlation + "'");
@@ -1004,7 +1034,11 @@ channel_smooth(double T, double P, const std::vector<double> &X,
 
   // Only compute Jacobians if flow exists
   if (velocity > 0.0 && Re > 0.0) {
-    double A_cross = M_PI / 4.0 * diameter * diameter;
+    // The flow area velocity was taken on: the caller's when given (a
+    // non-circular channel), else circular (#463).
+    double A_cross = (std::isfinite(flow_area) && flow_area > 0.0)
+                         ? flow_area
+                         : M_PI / 4.0 * diameter * diameter;
     double mdot = rho * velocity * A_cross;
 
     // Thermal conductivity and Prandtl derivatives via central FD
@@ -1048,35 +1082,11 @@ channel_smooth(double T, double P, const std::vector<double> &X,
                                Re, Pr - eps_Pr, f_turb.f, f_turb.df_dRe, Nu_lam)
                                .Nu;
       dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
-    } else if (Re < 2300.0) {
-      // Laminar Nu is constant: dNu/dRe = dNu/dPr = 0
     } else {
-      if (correlation == "dittus_boelter") {
-        // Nu = 0.023 * Re^0.8 * Pr^n  =>  dNu/dRe = 0.8 * Nu / Re, dNu/dPr = n * Nu / Pr
-        dNu_dRe = 0.8 * Nu / Re;
-        double n = heating ? 0.4 : 0.3;
-        dNu_dPr = n * Nu / Pr;
-      } else if (correlation == "sieder_tate") {
-        // Nu = 0.027 * Re^0.8 * Pr^(1/3) * mu_ratio^0.14  =>  dNu/dRe = 0.8 * Nu / Re, dNu/dPr = (1/3) * Nu / Pr
-        dNu_dRe = 0.8 * Nu / Re;
-        dNu_dPr = (1.0 / 3.0) * Nu / Pr;
-      } else if (correlation == "petukhov") {
-        // Petukhov: Nu = Nu(Re, Pr, f), so dNu/dRe_total = ∂Nu/∂Re + ∂Nu/∂f · df/dRe
-        // The stencil uses the SAME channel friction as the value (it used
-        // smooth Petukhov even for rough walls).
-        double eps = std::max(1.0, Re * 1e-6);
-        double f_plus = friction_channel_and_derivative(Re + eps, e_D).f * f_multiplier;
-        double f_minus = friction_channel_and_derivative(Re - eps, e_D).f * f_multiplier;
-        double Nu_plus = nusselt_petukhov(Re + eps, Pr, f_plus);
-        double Nu_minus = nusselt_petukhov(Re - eps, Pr, f_minus);
-        dNu_dRe = (Nu_plus - Nu_minus) / (2.0 * eps) * Nu_multiplier;
-
-        // dNu/dPr via central FD (f already includes f_multiplier)
-        double eps_Pr = std::max(1e-6, Pr * 1e-6);
-        double Nu_Pr_plus = nusselt_petukhov(Re, Pr + eps_Pr, f);
-        double Nu_Pr_minus = nusselt_petukhov(Re, Pr - eps_Pr, f);
-        dNu_dPr = (Nu_Pr_plus - Nu_Pr_minus) / (2.0 * eps_Pr) * Nu_multiplier;
-      }
+      // Turbulent-only correlations: partials from the value section (the
+      // VDI transition's are exact; laminar's are zero).
+      dNu_dRe = dNu_dRe_raw * Nu_multiplier;
+      dNu_dPr = dNu_dPr_raw * Nu_multiplier;
     }
 
     // dh/dmdot = (dh/dNu) * (dNu/dRe) * (dRe/dmdot) = (k/D) * dNu/dRe * dRe/dmdot
@@ -1120,6 +1130,8 @@ channel_smooth(double T, double P, const std::vector<double> &X,
     double T_aw_plus = T_adiabatic_wall(T + eps_T_aw, v_plus, T + eps_T_aw, P, X, turbulent_flow);
     double T_aw_minus = T_adiabatic_wall(T - eps_T_aw, v_minus, T - eps_T_aw, P, X, turbulent_flow);
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
+    // At fixed mdot, v ~ 1/rho ~ 1/P (ideal gas): T_aw - T ~ 1/P^2 (#496).
+    result.dT_aw_dP = (P > 0.0) ? -2.0 * (T_aw - T) / P : 0.0;
 
     if (std::isfinite(T_hot)) {
       double dT_diff = result.T_aw - T_hot;
@@ -1141,33 +1153,25 @@ WallCouplingResult wall_coupling_and_jacobian(
     double h_b, double T_aw_b,
     double t_over_k,
     double A) {
-  WallCouplingResult result;
-
-  // Overall HTC: U = 1 / (1/h_a + t/k + 1/h_b)
-  double R_a = (h_a > 1e-10) ? 1.0 / h_a : 1e15;
-  double R_b = (h_b > 1e-10) ? 1.0 / h_b : 1e15;
-  double R_total = R_a + t_over_k + R_b;
-  double U = 1.0 / R_total;
-
-  // Heat transfer rate: Q = U * A * (T_aw_a - T_aw_b)
-  double dT = T_aw_a - T_aw_b;
-  result.Q = U * A * dT;
-
-  // Wall temperature on side A (surface temperature)
-  // Safely handled via resistance ratio to avoid 0/0
-  result.T_hot = T_aw_a - dT * (R_a / R_total);
-
-  // Jacobians: dQ/dh = A * dT * dU/dh
-  // dU/dh_a = 1 / (R_total * h_a)^2
-  double factor_a = 1.0 / (1.0 + (R_total - R_a) * h_a);
-  double factor_b = 1.0 / (1.0 + (R_total - R_b) * h_b);
-  result.dQ_dh_a = (factor_a * factor_a) * A * dT;
-  result.dQ_dh_b = (factor_b * factor_b) * A * dT;
-  result.dQ_dT_aw_a = U * A;
-  result.dQ_dT_aw_b = -U * A;
-
-  return result;
+  return wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b,
+                                    std::vector<double>{t_over_k}, A, 0.0);
 }
+
+namespace {
+// h above WALL_HTC_KNEE as is; below it knee^2 / (2 knee - h): C1 at the
+// knee, monotone, strictly positive and decaying only like 1/|h| (an
+// exponential tail underflows to 0 within a few knees and makes R infinite),
+// so an iterate whose correlation went to h <= 0 still sees a finite wall
+// and a derivative of the h actually used (#481).
+std::pair<double, double> floored_htc(double h) {
+  if (h >= WALL_HTC_KNEE) {
+    return {h, 1.0};
+  }
+  const double k = WALL_HTC_KNEE;
+  const double d = 2.0 * k - h;
+  return {k * k / d, k * k / (d * d)};
+}
+}  // namespace
 
 WallCouplingResult wall_coupling_and_jacobian(
     double h_a, double T_aw_a,
@@ -1183,8 +1187,10 @@ WallCouplingResult wall_coupling_and_jacobian(
     R_wall += tk;
   }
 
-  double R_a = (h_a > 1e-10) ? 1.0 / h_a : 1e15;
-  double R_b = (h_b > 1e-10) ? 1.0 / h_b : 1e15;
+  const auto [ha, dha] = floored_htc(h_a);
+  const auto [hb, dhb] = floored_htc(h_b);
+  const double R_a = 1.0 / ha;
+  const double R_b = 1.0 / hb;
   double R_total = R_a + R_wall + R_b;
   double U = 1.0 / R_total;
 
@@ -1195,13 +1201,14 @@ WallCouplingResult wall_coupling_and_jacobian(
   // T_hot on side A (surface temperature)
   result.T_hot = T_aw_a - dT * (R_a / R_total);
 
-  // Jacobians
-  double factor_a = 1.0 / (1.0 + (R_total - R_a) * h_a);
-  double factor_b = 1.0 / (1.0 + (R_total - R_b) * h_b);
+  // dQ/dh = A dT dU/dh, dU/dh_a = (R_a / R_total)^2 at the floored h, times
+  // the floor's own slope.
+  const double factor_a = R_a / R_total;
+  const double factor_b = R_b / R_total;
   result.dQ_dT_aw_a = U * A;
 
-  result.dQ_dh_a = (factor_a * factor_a) * A * dT;
-  result.dQ_dh_b = (factor_b * factor_b) * A * dT;
+  result.dQ_dh_a = (factor_a * factor_a) * A * dT * dha;
+  result.dQ_dh_b = (factor_b * factor_b) * A * dT * dhb;
 
   result.dQ_dT_aw_b = -U * A;
 

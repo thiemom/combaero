@@ -234,7 +234,15 @@ def _closure_curve(case: Case) -> tuple[np.ndarray, np.ndarray]:
         else:
             U = np.array([10.0, -(1.0 - q) * 10.0, -q * 10.0 * case.psi])
             angles = np.array([math.pi, 0.0, math.radians(case.theta_deg)])
-        result = junction_loss_coefficient(U, areas, angles)
+        # The element's OWN constants: the joining energy transfer acts
+        # whenever psi != 1, and the network solves with them.
+        result = junction_loss_coefficient(
+            U,
+            areas,
+            angles,
+            MultiPortChamberElement.DEFAULT_JOINING_ETRANSFER_ALPHA,
+            MultiPortChamberElement.DEFAULT_ETA_SCALE,
+        )
         if result.K is None or len(result.K) != 2:
             straight.append(np.nan)
             branch.append(np.nan)
@@ -268,21 +276,40 @@ def has_root(case: Case) -> bool | None:
         target = (case.k_branch - case.k_straight) * (-1.0 if case.joining else 1.0)
         spread = straight - branch if case.joining else branch - straight
         return bool(spread.min() <= target <= spread.max())
-    if abs(case.k_branch) < 1e-9:
-        return None
-    target = case.k_straight / case.k_branch
-    with np.errstate(divide="ignore", invalid="ignore"):
-        ratio = straight / branch
-    crossings = np.where(np.diff(np.sign(ratio - target)) != 0)[0]
-    if crossings.size == 0:
-        return False
-    # Matching the ratio is necessary but NOT sufficient. The level that
-    # crossing implies is q_dyn = dP_branch / K_lat, and a negative q_dyn has
-    # no real mass flow behind it, so such a crossing is not a root. Leaving
-    # this out made the test optimistic: it called 11 of 60 draws solvable
-    # that have no solution, and the solver was then blamed for failing on
-    # them. The same condition is what `predicted_root` applies.
-    return bool(any(case.k_branch * branch[i] > 0.0 for i in crossings))
+    return bool(_direction_crossings(case, straight, branch))
+
+
+def _direction_crossings(
+    case: Case, straight: np.ndarray, branch: np.ndarray
+) -> list[tuple[int, float]]:
+    """Where the closure's (K_straight, K_branch) points the way the target does.
+
+    With every pressure imposed the level is free, so a root is a split at
+    which the closure's pair is a POSITIVE multiple of the drawn pair -- same
+    direction, so the level ``q_dyn = dP / K`` is real. Compared as the angle
+    of each pair, which is continuous wherever the pair is not zero.
+
+    It used to be compared as the ratio ``K_s / K_b``, which has a pole
+    wherever ``K_b`` crosses zero, and that broke both ways (#272): a crossing
+    lying between the pole and the next grid point is invisible (draw 52 jumps
+    from -15.6 to 8.57 in one step past a target of 11.2 -- four solvable
+    draws in 240 called rootless, all four then converged), and a sign flip
+    THROUGH the pole reads as a crossing (draw 142, which has none). Returns
+    ``(grid index, fraction of the step)`` per crossing.
+    """
+    if abs(case.k_straight) < 1e-12 and abs(case.k_branch) < 1e-12:
+        return []
+    phi = np.unwrap(np.arctan2(branch, straight))
+    target = math.atan2(case.k_branch, case.k_straight)
+    out = []
+    for i in range(len(phi) - 1):
+        lo, hi = sorted((phi[i], phi[i + 1]))
+        # Any 2 pi image of the target inside this step is a crossing.
+        k = math.ceil((lo - target) / (2.0 * math.pi))
+        image = target + 2.0 * math.pi * k
+        if image <= hi and hi > lo:
+            out.append((i, (image - phi[i]) / (phi[i + 1] - phi[i])))
+    return out
 
 
 
@@ -302,17 +329,17 @@ def operating_point(case: Case) -> tuple[float, float] | None:
         spread = ks - kl if case.joining else kl - ks
         idx = np.where(np.diff(np.sign(spread - target)) != 0)[0]
         return (m_ref, float(qs[idx[0]])) if idx.size else None
-    if abs(case.k_branch) < 1e-12:
+    crossings = _direction_crossings(case, ks, kl)
+    if not crossings:
         return None
+    i, frac = crossings[0]
+    k_pair = np.hypot(ks[i] + frac * (ks[i + 1] - ks[i]), kl[i] + frac * (kl[i + 1] - kl[i]))
+    if k_pair == 0.0:
+        return None
+    # Same direction, so the level is the ratio of the two lengths.
+    q_dyn = math.hypot(case.k_straight, case.k_branch) * q_dyn_ref / k_pair
     rho = float(cb.density(case.Tt, case.Pt, _X))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        ratio = ks / kl
-    for i in np.where(np.diff(np.sign(ratio - case.k_straight / case.k_branch)) != 0)[0]:
-        dp_bra = case.k_branch * q_dyn_ref
-        if kl[i] == 0.0 or dp_bra / kl[i] <= 0.0:
-            continue
-        return case.area * math.sqrt(2.0 * rho * dp_bra / kl[i]), float(qs[i])
-    return None
+    return case.area * math.sqrt(2.0 * rho * q_dyn), float(qs[i] + frac * (qs[i + 1] - qs[i]))
 
 
 def max_port_mach(case: Case) -> float | None:

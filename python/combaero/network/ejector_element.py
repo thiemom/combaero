@@ -249,8 +249,8 @@ class EjectorElement(MultiPortChamberBase):
         """Rows 0-2 (choked flow, entrainment closure, mass conservation)
         are mass-flow-valued; row 3 (P_jct - P_c*) is pressure-valued --
         the OPPOSITE pattern from the base class's own impulse-CV rows.
-        See the module docstring's residual design section and the
-        solver.py scaling block this overrides."""
+        See the module docstring's residual design section and
+        RESIDUAL-ROW-SCALING (NetworkSolver._build_residual_scales)."""
         return ["mdot", "mdot", "mdot", "p"]
 
     # smootherstep window for s_choke, on mp / choked_mass_flow(Pt_p): s = 0

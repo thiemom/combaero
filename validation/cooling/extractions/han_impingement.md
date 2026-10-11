@@ -347,6 +347,37 @@ field names. Figure-based validation-harness scoring (Figs. 8/9) still not
 done -- proposed as candidates in "Validation targets" above, not yet
 digitised.
 
+**D5 (2026-10-07, #465): the network now solves the row-to-row flow
+distribution itself, which supersedes D3 for a plenum-fed jet plate.**
+`ImpingementPlateElement` carries one row's jet flow (an orifice with
+`n_holes` holes) and Florschuetz's heat transfer on its target, and reads
+`Gc/Gj = (m_c/m_j)(pi/4)/((yn/d)(z/d))` from the solved flows: `m_c` is
+every other inflow to its crossflow node. This is item 21's definition (Eqs.
+1-8), with the flows the network solved in place of Eq. 7's continuous
+solution. `ImpingementCrossflowElement` joins the rows and carries the
+momentum term behind Eqs. 2-6, `P + G_c^2/rho = const`. Each merge's
+static-pressure drop is split half-and-half between adjacent segments, so a
+node sits at its row centre. Eq. 7 itself is still not implemented: the
+network reproduces it rather than calling it.
+
+Evidence (`python/tests/test_impingement_plate_validation.py`):
+- **Against Eq. 8 and Eq. 7:** over the 27 Fig. 6 geometries x 10 rows,
+  Gc/Gj is within 3.7% max (bias -0.5%) and Gj/Gj_mean within 3.8%.
+- **Without the momentum term:** the supply stays uniform and row 10 of
+  `(5,4,1)` lands at 2.2x Eq. 8.
+- **Uncentred** (whole merge downstream): -13% at that row.
+- **Fig. 6 through the chain:** +4.0% bias, 6.9% MAE (242 points). The
+  correlation at the paper's own abscissae gives +3.7% / 6.8%, so the
+  network's distribution costs 0.3 points.
+
+The two comparisons are different things. The first is model-to-model: the
+discretisation against the source's own flow model. The second is fidelity
+on the author's data.
+
+The Fig. 6 abscissae are themselves Eq. 8 values (measured `C_D`); each
+point was mapped to the row whose Eq. 8 value is nearest, with a worst gap
+of 0.084.
+
 ---
 
 ## Review log

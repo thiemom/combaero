@@ -5,13 +5,14 @@ paper:
   citation: "Wenhui Wang, Zhenhua Lu, Kangyao Deng, Shuan Qu. An experimental study of compressible combining flow at 45 degree T-junctions. Proc IMechE Part C 229(9):1600-1610, 2015."
   doi: "10.1177/0954406214546678"
   q_convention: wang   # q = m_1 / m_3 = lateral / common
-  default_uncertainty_K: 0.04   # ~1% measurement repeatability per paper; conservative 4% absolute K
+  default_uncertainty_K: null   # the paper states NO uncertainty (full text checked 2026-10-10); the
+                                # 0.04 / "~1% repeatability per paper" that stood here had no source
 
 # Wang's K_13 / K_23 are compressible-flow joining loss coefficients. They
 # correspond physically to Bassett's K12 / K11 in the M->0 limit but include
 # Mach-dependent corrections; only the M_3 -> 0 slice is directly comparable.
 fit_tiers:
-  K_13: excellent   # paper reports measurement repeatability ~1%
+  K_13: excellent   # no stated uncertainty; tier is the paper's data quality, not a band
   K_23: excellent
 
 files:

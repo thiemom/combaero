@@ -37,6 +37,11 @@ class ImpingementModelData(BaseModel):
     """Jet array impingement cooling, one row (Florschuetz, Truman and
     Metzger 1981), on a real crossflow term.
 
+    The channel is the row's crossflow channel and its mass flow is the row's
+    jet flow. The convective area defaults to the row's target footprint
+    matched to the channel cross-section, A_flow * (xn/d) / (z/d), so the
+    hole count follows from the channel (#462).
+
     Restored in 0.9.0 after the previous impingement correlation was removed
     for citing this same paper while taking no crossflow input at all,
     making it structurally unable to be that correlation. See issue #337.
@@ -63,12 +68,13 @@ class ImpingementModelData(BaseModel):
 
 
 class SingleJetImpingementModelData(BaseModel):
-    """A single free round jet (Goldstein, Behbahani and Heppelmann 1986),
-    at a representative radial position.
+    """A single free round jet (Goldstein, Behbahani and Heppelmann 1986).
 
     Unlike ImpingementModelData, there is no array and no crossflow. Nu is
-    LOCAL to the radial position R_D, not area-averaged -- this reports one
-    representative value for the target patch, not a profile.
+    the AVERAGE over the disc of radius R_D * d_jet around the stagnation
+    point (Han Eq. 4.1, "an average heat-transfer coefficient correlation"),
+    and the channel's convective area defaults to exactly that disc (#462).
+    The channel's mass flow is the jet's flow.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -78,19 +84,49 @@ class SingleJetImpingementModelData(BaseModel):
     # Jet-to-target-plate spacing / d_jet. 7.75 is the correlation's own
     # optimum spacing.
     L_D: float = 7.75
-    # Radial distance from the jet centerline / d_jet. 5.0 matches the
-    # source's own closed-form check point, a worked example, not a default
-    # that suits every rig.
+    # Radius of the averaging disc / d_jet. 5.0 matches the source's own
+    # closed-form check point (Re 25,000, L/D 7.75: Nu 60 / 56).
     R_D: float = 5.0
 
 
-# Dimpled and pin-fin surfaces were removed in 0.7.0 -- their correlations
-# could not be traced to their cited sources -- and remain deferred (issue
-# #339). Saved networks carrying them are rejected with a message naming the
-# reason; see graph_builder. Ribbed and impingement were both restored on
-# provenanced replacements (#334, #337).
+class PinFinModelData(BaseModel):
+    """A pin-fin array on provenanced correlation sets (#335).
+
+    Restored after the previous pin-fin correlation was removed for failing
+    provenance review: among other things its pressure drop was a factor of 4
+    low against Metzger's own friction definition.
+
+    Field names are the pre-0.7.0 ones, so a network saved then loads with its
+    values intact; ``channel_height`` / ``pin_diameter`` is the pin H/D. The
+    defaults are a working example inside the Metzger sets' validity box.
+    Inline arrays use Chyu (1990)'s inline friction, the only inline source
+    in hand, measured at one geometry (H/D 1, S/D = X/D = 2.5).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    type: Literal["pin_fin"] = "pin_fin"
+    pin_diameter: float = 0.005
+    channel_height: float = 0.005
+    S_D: float = 2.5
+    X_D: float = 2.5
+    N_rows: int = 10
+    is_staggered: bool = True
+    # Pin conductivity for the fin efficiency [W/(m K)]; 20 is a nickel
+    # superalloy at metal temperature.
+    k_pin: float = 20.0
+
+
+# Dimpled surfaces were removed in 0.7.0 -- their correlation could not be
+# traced to its cited source -- and remain deferred (issue #339). Saved
+# networks carrying one are rejected with a message naming the reason; see
+# graph_builder. Ribbed, impingement and pin-fin were restored on provenanced
+# replacements (#334, #337, #335).
 SurfaceModelData = (
-    SmoothModelData | RibbedModelData | ImpingementModelData | SingleJetImpingementModelData
+    SmoothModelData
+    | RibbedModelData
+    | ImpingementModelData
+    | SingleJetImpingementModelData
+    | PinFinModelData
 )
 
 
@@ -227,6 +263,7 @@ class OrificeData(BaseModel):
         "IdelchikBeveled",
         "IdelchikRounded",
         "McGreehanSchotsch",
+        "Lichtarowicz",
         "fixed",
     ] = "ReaderHarrisGallagher"
     plate_thickness: float = 0.0  # t [m], the hole length for a wall orifice
@@ -246,6 +283,98 @@ class OrificeData(BaseModel):
             if area_val > 0:
                 data["diameter"] = math.sqrt(4.0 * area_val / math.pi)
         return data
+
+
+class EffusionLinerData(BaseModel):
+    """Effusion liner (#471): a backside coolant duct whose wall bleeds
+    through effusion holes into the gas. Expanded into N stations: a Bassett
+    bleed plus a duct-fed McGreehan-Schotsch panel each.
+
+    Defaults: Andrews et al.'s plate C holes and pitch (3.27 mm, 6.3 mm wall,
+    15.24 mm), a hole t/d inside Rohde's crossflow-tested 0.51-4, over a 30 mm
+    backside duct. The crossflow ratio U1/Vi is set mainly by the duct's own
+    pressure drop against the holes' drive (roughly sqrt(dp_duct/dp_hole)),
+    not by the duct size: a pressure-driven duct carries more flow when made
+    bigger. With 200 Pa along the duct and ~3.8 kPa across the holes it peaks
+    at 0.27, inside the Rohde-scored band.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    n_segments: int = Field(default=4, ge=1)
+    length: float = Field(default=0.152, gt=0.0)
+    width: float = Field(default=0.152, gt=0.0)
+    duct_height: float = Field(default=0.03, gt=0.0)
+    hole_diameter: float = Field(default=3.27e-3, gt=0.0)
+    wall_thickness: float = Field(default=6.3e-3, gt=0.0)
+    pitch_x: float = Field(default=15.24e-3, gt=0.0)
+    pitch_y: float = Field(default=15.24e-3, gt=0.0)
+    angle_deg: float = Field(default=90.0, gt=0.0, le=90.0)
+    entry_K: float = Field(default=0.5, ge=0.0)
+    roughness: float = Field(default=0.0, ge=0.0)
+    wall_conductivity: float = Field(default=20.0, gt=0.0)
+    gas_film: Literal["none", "baldauf_sellers"] = "none"
+    gas_augmentation: float = Field(default=1.0, gt=0.0)
+    turbulence_intensity: float = Field(default=0.05, gt=0.0)
+    gas_heat_flux: float = 0.0
+    label: str | None = None
+
+
+class EffusionPlateData(BaseModel):
+    """Effusion / film plate, plenum-fed (#471): it owns its wall.
+
+    The node it discharges into decides the gas side: a momentum chamber
+    (flow) gives the gas coefficient, temperature and blowing ratio; a plenum
+    (state, no flow) takes the imposed gas_heat_flux. Defaults are Andrews et
+    al.'s plate C (86-GT-225 / 88-GT-290), the geometry the closure is scored
+    on: 3.27 mm holes, 6.3 mm wall, 15.24 mm square pitch, 152 mm panel.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    hole_diameter: float = Field(default=3.27e-3, gt=0.0)
+    wall_thickness: float = Field(default=6.3e-3, gt=0.0)
+    pitch_x: float = Field(default=15.24e-3, gt=0.0)
+    pitch_y: float = Field(default=15.24e-3, gt=0.0)
+    panel_length: float = Field(default=0.152, gt=0.0)
+    panel_width: float = Field(default=0.152, gt=0.0)
+    angle_deg: float = Field(default=90.0, gt=0.0, le=90.0)
+    correlation: Literal["IdelchikThick", "Lichtarowicz", "McGreehanSchotsch", "fixed"] = (
+        "IdelchikThick"
+    )
+    Cd: float = 0.6
+    internal_Nu_multiplier: float = Field(default=1.0, gt=0.0)
+    wall_conductivity: float = Field(default=20.0, gt=0.0)
+    gas_film: Literal["none", "baldauf_sellers"] = "none"
+    gas_augmentation: float = Field(default=1.0, gt=0.0)
+    turbulence_intensity: float = Field(default=0.05, gt=0.0)
+    gas_heat_flux: float = 0.0
+    label: str | None = None
+
+
+class ImpingementArrayData(BaseModel):
+    """Impingement array, channel exit (#465): ONE configuration.
+
+    A jet plate fed from the upstream node, impinging on a target, the spent
+    air leaving down the gap to the downstream node (Florschuetz, Truman and
+    Metzger 1981). The builder expands it into the row chain. The defaults are
+    a Florschuetz test geometry (0.1 in holes, (5, 4, 2), 10 rows) and sit
+    inside the correlation's range at a few kPa across the array.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    n_rows: int = Field(default=10, ge=1)
+    d_jet: float = Field(default=0.00254, gt=0.0)
+    xn_d: float = Field(default=5.0, gt=0.0)
+    yn_d: float = Field(default=4.0, gt=0.0)
+    z_d: float = Field(default=2.0, gt=0.0)
+    span: float = Field(default=0.122, gt=0.0)
+    plate_thickness: float = Field(default=0.00254, gt=0.0)
+    pattern: Literal["inline", "staggered"] = "inline"
+    # Discharge-hole family only: a jet plate has no pipe, so no beta.
+    correlation: Literal["fixed", "IdelchikThick", "Lichtarowicz", "McGreehanSchotsch"] = "fixed"
+    Cd: float = 0.79  # Florschuetz's own default, cb.FLORSCHUETZ_1981_DEFAULT_CD
+    Nu_multiplier: float = Field(default=1.0, gt=0.0)
+    roughness: float = Field(default=0.0, ge=0.0)
+    label: str | None = None
 
 
 class AreaChangeData(BaseModel):

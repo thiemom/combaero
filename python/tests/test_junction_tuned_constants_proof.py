@@ -22,17 +22,48 @@ from validation.junction.models.mpce_network import MPCENetwork
 from validation.junction.network_runner import run_network
 
 
-def _mae_bias(alpha: float, eta: float, paper: str, K_ids: set[str]) -> tuple[float, float, int]:
-    recs = [
-        r
+def _errors(alpha: float, eta: float, paper: str, K_ids: set[str]) -> dict[tuple, float]:
+    """K_extracted - K_measured per scored record, keyed by its cell and point.
+
+    K_measured is in the key because a source can carry two points at one
+    (psi, theta, q) -- Hager does."""
+    return {
+        (r.K_id, r.psi, r.theta_deg, r.q, r.K_measured): r.K_extracted - r.K_measured
         for r in run_network(
             MPCENetwork(joining_etransfer_alpha=alpha, eta_scale=eta),
             topologies=("imposed_q",),
         )
         if r.paper == paper and r.K_id in K_ids and r.converged and r.K_extracted is not None
-    ]
-    errs = [r.K_extracted - r.K_measured for r in recs]
+    }
+
+
+def _mae_bias(alpha: float, eta: float, paper: str, K_ids: set[str]) -> tuple[float, float, int]:
+    errs = list(_errors(alpha, eta, paper, K_ids).values())
     return statistics.fmean(abs(e) for e in errs), statistics.fmean(errs), len(errs)
+
+
+def _common(a: dict[tuple, float], b: dict[tuple, float]) -> tuple[dict, dict]:
+    """The two scored sets on the records both converged.
+
+    A record converging under one setting and not the other is allowed only at
+    a curve endpoint (q = 0 or 1). There one port carries zero flow, its
+    residual has a kink where the flow sign flips, and whether a solve that
+    stalls next to the kink clears the verifier's m_dot > 1e-6 threshold is
+    incidental (#272: Idelchik K11/K12, psi = 10, theta = 30, q = 0 accepted
+    at eta = 1 with 1.3e-6 kg/s on the dead port, rejected at eta = 0). Every
+    interior record must converge under both, or the comparison is not like
+    for like.
+    """
+    differing = set(a) ^ set(b)
+    assert all(k[3] in (0.0, 1.0) for k in differing), sorted(differing)
+    assert len(differing) <= 2
+    keys = set(a) & set(b)
+    return {k: a[k] for k in keys}, {k: b[k] for k in keys}
+
+
+def _stats(errs: dict) -> tuple[float, float, int]:
+    e = list(errs.values())
+    return statistics.fmean(abs(x) for x in e), statistics.fmean(e), len(e)
 
 
 @pytest.fixture(scope="module")
@@ -47,7 +78,7 @@ def bassett_dividing():
 
 @pytest.fixture(scope="module")
 def idelchik_by_alpha():
-    return {a: _mae_bias(a, 1.0, "idelchik1966", {"K11", "K12"}) for a in (0.0, 0.2, 0.3)}
+    return {a: _errors(a, 1.0, "idelchik1966", {"K11", "K12"}) for a in (0.0, 0.2, 0.3)}
 
 
 def test_eta_no_longer_earns_its_place_on_the_independent_straight_data(hager):
@@ -95,19 +126,24 @@ def test_eta_does_not_touch_joining_cells():
     """Its (1 - lambda) factor is zero for a single collector, so joining
     coefficients must be identical with the term on and off -- a difference
     here is a plumbing defect, not a physics result."""
-    off = _mae_bias(0.2, 0.0, "idelchik1966", {"K11", "K12"})
-    on = _mae_bias(0.2, 1.0, "idelchik1966", {"K11", "K12"})
+    off, on = _common(
+        _errors(0.2, 0.0, "idelchik1966", {"K11", "K12"}),
+        _errors(0.2, 1.0, "idelchik1966", {"K11", "K12"}),
+    )
 
-    assert on[2] == off[2]
-    assert on[0] == pytest.approx(off[0], abs=2e-3)
+    # The MAE, not each record: the closure's joining K is eta-independent to
+    # the last digit, but where each solve stops inside its tolerance still
+    # moves single extracted K by up to ~0.015 at psi = 10 (also on main
+    # before #272), and that averages out.
+    assert _stats(on)[0] == pytest.approx(_stats(off)[0], abs=2e-3)
 
 
 def test_alpha_improves_joining_flow_over_off(idelchik_by_alpha):
     """alpha = 0 leaves Idelchik K11 under-predicted by ~0.3; 0.2 removes it."""
-    mae0, bias0, n0 = idelchik_by_alpha[0.0]
-    mae2, bias2, n2 = idelchik_by_alpha[0.2]
+    e0, e2 = _common(idelchik_by_alpha[0.0], idelchik_by_alpha[0.2])
+    mae0, bias0, _ = _stats(e0)
+    mae2, bias2, _ = _stats(e2)
 
-    assert n0 == n2
     assert mae2 < mae0 - 0.1
     assert abs(bias2) < abs(bias0) - 0.2
 
@@ -116,8 +152,9 @@ def test_alpha_default_beats_the_anchor_refit_in_network(idelchik_by_alpha):
     """The corrected-axis anchor refit (#283) proposed ~0.3; the measured and
     tabulated data prefer 0.2. Pins that the in-network table, not the
     analytical anchors, decides the value."""
-    mae2, _, _ = idelchik_by_alpha[0.2]
-    mae3, _, _ = idelchik_by_alpha[0.3]
+    e2, e3 = _common(idelchik_by_alpha[0.2], idelchik_by_alpha[0.3])
+    mae2, _, _ = _stats(e2)
+    mae3, _, _ = _stats(e3)
 
     assert mae2 < mae3 - 0.02
 

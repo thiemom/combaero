@@ -3,7 +3,7 @@ import math
 import sys
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal
@@ -150,13 +150,14 @@ class ImpingementModel:
         discharge-coefficient correlation of its own for a jet-plate array
         yet, see issue #375.
 
-    What this element assumes about mass flow. ``self.area`` (on the
-    enclosing ``ConvectiveSurface``) is taken as THIS ROW's own target-plate
-    footprint, so the number of holes in the row is recovered as
-    ``area / (xn_d * d_jet * yn_d * d_jet)`` and this row's own jet velocity
-    from the upstream state's total mass flow through that area -- the same
-    "total flow over this element's own area" convention every other
-    ``ConvectiveSurface`` model uses, not a new one. Whether every row gets
+    What this element assumes about mass flow. The ELEMENT's mass flow is
+    this row's jet flow, and ``self.area`` (on the enclosing
+    ``ConvectiveSurface``) is THIS ROW's target-plate footprint, which counts
+    its holes: ``n = area / (xn_d d_jet * yn_d d_jet)``, so each hole carries
+    ``m_dot / n`` and ``Re_j = 4 (m_dot/n) / (pi d_jet mu)`` -- Florschuetz's
+    jet mass velocity on the hole area. (Until #460 the flow was taken as
+    ``rho v * area``, which made it scale with the target area.) Whether every
+    row gets
     the same total flow (a uniform-supply approximation) or a row-dependent
     one (Florschuetz's own Eq. 7, deliberately not implemented -- see
     ``impingement_correlation.h``'s module comment) is up to how the caller
@@ -191,11 +192,11 @@ class SingleJetImpingementModel:
     Behbahani and Heppelmann 1986), at a representative radial position.
 
     Unlike ``ImpingementModel``, there is no array and no crossflow -- this
-    is one jet, one target patch. ``R_D`` is a real modelling choice, not a
-    detail: the correlation's Nu is LOCAL (a function of radial distance from
-    the jet centerline), so using it for one lumped ``ConvectiveSurface``
-    means picking a representative position rather than area-averaging the
-    source's own radial profile, which this element does not do.
+    is one jet, one target patch. The correlation's Nu is the AVERAGE over the
+    disc of radius ``R`` around the stagnation point (Han: "an average
+    heat-transfer coefficient correlation"; Eq. 4.1's ``Nu_bar``), so ``R_D``
+    sets the patch it describes. A ``ChannelElement`` left without a
+    convective area gets exactly that disc, ``pi (R_D d_jet)^2`` (#462).
 
     Parameters
     ----------
@@ -214,15 +215,15 @@ class SingleJetImpingementModel:
         source's own optimum spacing -- a defensible default, not a claim
         about any particular rig.
     R_D : float
-        Radial distance from the jet centerline / ``d_jet``, at the
-        representative position this element reports Nu for. No default:
-        the source's closed-form check point uses 5.0, but that is a
-        worked example, not a universal choice.
+        Radius of the averaging disc / ``d_jet``: Nu is Goldstein's average
+        over the disc of radius ``R`` around the stagnation point. No
+        default: the source's closed-form check point uses 5.0, but that is
+        a worked example, not a universal choice.
 
-    Mass flow. Same convention as ``ImpingementModel``: ``self.area`` is
-    taken as this jet's own target patch, and its own jet velocity comes
-    from the upstream state's total mass flow through that area -- with no
-    hole-density division, since there is exactly one hole.
+    Mass flow. The ELEMENT's mass flow is the jet's flow, through its one
+    hole: ``Re = 4 m_dot / (pi d_jet mu)``, Goldstein's nozzle Reynolds
+    number. ``self.area`` is the target patch the reported h applies to; it
+    does not set the flow. (Until #460 it did, as ``rho v * area``.)
 
     Pressure drop is not modelled here for the same reason as
     ``ImpingementModel``: model the nozzle's own loss with a proper
@@ -240,6 +241,129 @@ class SingleJetImpingementModel:
     R_D: float = 0.0
     Nu_multiplier: float = 1.0
     f_multiplier: float = 1.0
+
+
+@dataclass
+class PinFinModel:
+    """A pin-fin array, evaluated from provenanced parameter sets (#335).
+
+    Heat transfer and friction are separate sets, each in its source's own
+    form, evaluated in one canonical basis: ``Re_D`` on the pin diameter and
+    the velocity at the minimum flow area, ``Nu_D = h D / k``, and
+    ``f = dP / (2 rho Vmax^2 N)``. See ``pin_fin_correlation.h``.
+
+    Parameters
+    ----------
+    nu_set : object
+        A ``combaero.PinFinNuSet`` on the Total surface. Defaults to
+        ``metzger_1986_staggered_nu()`` for staggered arrays and
+        ``chyu_1998_nu(Inline, Total)`` for inline ones.
+    f_set : object
+        A ``combaero.PinFinFrictionSet``. Defaults to
+        ``metzger_1982_staggered_friction()`` for staggered arrays and
+        ``chyu_1990_friction(Inline)`` for inline ones -- the only inline
+        friction source in hand, fitted to its digitised Fig. 6 at one
+        geometry (H/D 1, S/D = X/D = 2.5). Staggered friction is never
+        substituted for inline.
+    modifier : object
+        An optional ``combaero.PinFinRatioModifier`` applied to ``nu_set``
+        (and to ``f_set`` when it carries a friction ratio), e.g.
+        ``chyu_1998_inline_over_staggered()`` to transfer a staggered set to
+        an inline array. Its ``from_arrangement`` must match ``nu_set``'s and
+        its ``to_arrangement`` this array's.
+    pin_diameter : float
+        Pin diameter D [m].
+    S_D, X_D, H_D : float
+        Transverse pitch, streamwise pitch and pin height (= channel height),
+        each over D.
+    N_rows : int
+        Pin rows along the flow. Sets the pressure drop and is checked against
+        the sets' own row counts (no row correction is applied yet).
+    arrangement : object
+        ``combaero.PinArrangement``.
+    k_pin : float
+        Pin thermal conductivity [W/(m K)] for the fin efficiency. 20 is a
+        nickel superalloy at turbine metal temperatures; ``math.inf`` treats
+        the pins as isothermal.
+
+    Area and velocity conventions. ``ConvectiveSurface.area`` is the BASE
+    (planform) area of the endwall this surface couples to; the effective
+    coefficient returned is referenced to it,
+    ``h_eff = h (A_endwall_exposed + eta_fin A_pin_half) / A_base``, with each
+    wall feeding its pins to mid-height. The element's flow area is the
+    UNOBSTRUCTED channel cross-section; Vmax follows from it exactly through
+    the array geometry.
+
+    The defaults are a working example inside the Metzger sets' box
+    (5 mm pins, H/D 1, S/D = X/D = 2.5, 10 rows, Inconel-class pins), not a
+    generic "typical" pin fin.
+    """
+
+    nu_set: object = None
+    f_set: object = None
+    modifier: object = None
+    pin_diameter: float = 0.005
+    S_D: float = 2.5
+    X_D: float = 2.5
+    H_D: float = 1.0
+    N_rows: int = 10
+    arrangement: object = cb.PinArrangement.Staggered
+    k_pin: float = 20.0
+
+    def __post_init__(self) -> None:
+        if not (self.pin_diameter > 0.0):
+            raise ValueError("PinFinModel: pin_diameter must be positive [m]")
+        cb.validate_pin_fin_geometry(self.geometry())
+        f_arr = self.resolved_f_set().arrangement
+        if f_arr != self.arrangement:
+            raise ValueError(
+                f"PinFinModel: f_set {self.resolved_f_set().name!r} is "
+                f"{f_arr.name}, but this array is {self.arrangement.name}. "
+                "Staggered and inline friction differ by about 1.6x (Chyu "
+                "1990, Fig. 6) and are not substituted for each other."
+            )
+        if self.modifier is not None:
+            nu_arr = self.resolved_nu_set().arrangement
+            if self.modifier.from_arrangement != nu_arr:
+                raise ValueError(
+                    f"PinFinModel: modifier {self.modifier.name!r} transfers from "
+                    f"{self.modifier.from_arrangement.name}, but nu_set is "
+                    f"{nu_arr.name}."
+                )
+            if self.modifier.to_arrangement != self.arrangement:
+                raise ValueError(
+                    f"PinFinModel: modifier {self.modifier.name!r} transfers to "
+                    f"{self.modifier.to_arrangement.name}, but this array is "
+                    f"{self.arrangement.name}."
+                )
+
+    def geometry(self):
+        return cb.PinFinGeometry(
+            S_D=self.S_D,
+            X_D=self.X_D,
+            H_D=self.H_D,
+            N_rows=self.N_rows,
+            arrangement=self.arrangement,
+        )
+
+    def resolved_nu_set(self):
+        if self.nu_set is not None:
+            return self.nu_set
+        if self.modifier is not None:
+            # A transfer modifier starts from its own source arrangement.
+            if self.modifier.from_arrangement == cb.PinArrangement.Staggered:
+                return cb.metzger_1986_staggered_nu()
+            return cb.chyu_1998_nu(self.modifier.from_arrangement, cb.PinNuSurface.Total)
+        if self.arrangement == cb.PinArrangement.Inline:
+            return cb.chyu_1998_nu(cb.PinArrangement.Inline, cb.PinNuSurface.Total)
+        return cb.metzger_1986_staggered_nu()
+
+    def resolved_f_set(self):
+        if self.f_set is not None:
+            return self.f_set
+        if self.arrangement == cb.PinArrangement.Inline:
+            return cb.chyu_1990_friction(cb.PinArrangement.Inline)
+        return cb.metzger_1982_staggered_friction()
 
 
 @dataclass
@@ -264,6 +388,34 @@ class _ImpingementChannelResult:
     dh_dT: float = 0.0
     dT_aw_dmdot: float = 0.0
     dT_aw_dT: float = 0.0
+    dT_aw_dP: float = 0.0
+
+
+@dataclass
+class _PinFinChannelResult:
+    """What a pin-fin array returns.
+
+    ``h`` is the effective coefficient on the BASE area (fin efficiency
+    included); ``h_array`` is the correlation's own coefficient on the total
+    pin + endwall area, before the fin model, so both halves of that
+    modelling step are visible.
+    """
+
+    h: float
+    h_array: float
+    eta_fin: float
+    Nu: float
+    Re: float
+    Pr: float
+    f: float
+    dP: float
+    T_aw: float
+    extrapolated: bool = False
+    dh_dmdot: float = 0.0
+    dh_dT: float = 0.0
+    dT_aw_dmdot: float = 0.0
+    dT_aw_dT: float = 0.0
+    dT_aw_dP: float = 0.0
 
 
 @dataclass
@@ -296,9 +448,12 @@ class _RibbedChannelResult:
     dh_dT: float = 0.0
     dT_aw_dmdot: float = 0.0
     dT_aw_dT: float = 0.0
+    dT_aw_dP: float = 0.0
 
 
-ChannelModel = SmoothModel | RibbedModel | ImpingementModel | SingleJetImpingementModel
+ChannelModel = (
+    SmoothModel | RibbedModel | ImpingementModel | SingleJetImpingementModel | PinFinModel
+)
 
 
 @dataclass
@@ -325,6 +480,33 @@ class ConvectiveSurface:
     heating: bool | None = None  # None = auto-detect
     Nu_multiplier: float = 1.0  # empirical correction on Nu
     f_multiplier: float = 1.0  # empirical correction on f
+    # The calling element's flow area for the current evaluation (see
+    # htc_and_T); not a parameter of the surface.
+    _flow_area: float | None = field(default=None, init=False, repr=False, compare=False)
+
+    def _channel_mdot(self, rho: float, velocity: float, diameter: float) -> float:
+        """The solver's mass flow for this surface: through the CHANNEL
+        cross-section -- the element's own flow area when it passed one
+        (``flow_area`` on ``htc_and_T``), else ``pi Dh^2 / 4`` as
+        ``channel_smooth`` assumes. A non-circular channel given a separate
+        ``Dh`` needs the real area: ``pi Dh^2/4`` is then off by
+        ``(Dh/diameter)^2`` (#460).
+
+        Every ``dh_dmdot`` this class returns is a derivative with respect to
+        the element's own ``m_dot`` -- that is what the solver's wall coupling
+        multiplies it by -- and ``ChannelElement.htc_and_T`` derives the
+        velocity from that mass flow and the channel area, the same convention
+        ``channel_smooth`` uses. The convective ``area`` is a heat-transfer
+        area, not a flow area. Using it here scaled the ribbed and impingement
+        derivatives by ``A_cross / A_surface`` (#456).
+        """
+        area = self._flow_area if self._flow_area else math.pi / 4.0 * diameter * diameter
+        return rho * abs(velocity) * area
+
+    def _flow_area_arg(self) -> float:
+        """The element's flow area for channel_smooth's mass-flow derivatives,
+        NaN when it passed none (channel_smooth then assumes pi D^2/4, #463)."""
+        return self._flow_area if getattr(self, "_flow_area", None) else math.nan
 
     def _ribbed_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
         """Ribbed-channel heat transfer and pressure drop.
@@ -387,6 +569,7 @@ class ConvectiveSurface:
             heating=heating,
             Nu_multiplier=model.smooth_wall_Nu_multiplier,
             f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
         )
 
         frac_ribbed, frac_smooth = self._ribbed_wall_fractions()
@@ -395,13 +578,17 @@ class ConvectiveSurface:
         # The correlation's f is already the four-sided channel value.
         dP = rib.f * (length / diameter) * 0.5 * rho * velocity * abs(velocity)
 
-        # Wall-coupling derivatives. The ribbed side moves with mass flow
-        # through e+; the smooth side brings its own, already computed by the
-        # base correlation. Both are area-weighted exactly as h is, so the
-        # derivative of the average is the average of the derivatives.
-        dSt_dRe = rib.dSt_dRe
-        dRe_dmdot = abs(Re / m_dot_ref) if (m_dot_ref := rho * velocity * self.area or 0.0) else 0.0
-        dh_ribbed_dmdot = dSt_dRe * dRe_dmdot * rho * abs(velocity) * cp
+        # Wall-coupling derivatives. The ribbed side is h_r = St(Re) rho|v| cp,
+        # and BOTH Re and |v| are proportional to the mass flow, so
+        #     dh_r/dmdot = (Re dSt/dRe + St) rho |v| cp / mdot.
+        # The St term dominates (h_r grows roughly as mdot^0.8); it was missing,
+        # and the mass flow was taken on the convective area (#456). The
+        # smooth side brings its own derivative from the base correlation;
+        # both are area-weighted exactly as h is.
+        mdot = self._channel_mdot(rho, velocity, diameter)
+        dh_ribbed_dmdot = (
+            (Re * rib.dSt_dRe + rib.St_r) * rho * abs(velocity) * cp / mdot if mdot else 0.0
+        )
         dh_dmdot = (
             frac_ribbed * dh_ribbed_dmdot + frac_smooth * smooth.dh_dmdot
         ) * self.Nu_multiplier
@@ -415,6 +602,7 @@ class ConvectiveSurface:
             dh_dT=dh_dT,
             dT_aw_dmdot=smooth.dT_aw_dmdot,
             dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
             h=h_avg * self.Nu_multiplier,
             h_ribbed=h_ribbed,
             h_smooth=smooth.h,
@@ -472,7 +660,11 @@ class ConvectiveSurface:
         k = cs.transport.k
         Pr = cs.transport.Pr
 
-        mdot_total = rho * velocity * self.area if self.area > 0.0 else 0.0
+        # The element's mass flow IS this row's jet flow (Florschuetz: G_j is
+        # the jet mass velocity on the hole area). The convective area only
+        # counts the holes. It used to supply the flow as well, as
+        # rho v * area -- wrong by A_surface/A_cross (#460).
+        mdot_total = self._channel_mdot(rho, velocity, diameter)
         hole_footprint = model.xn_d * model.d_jet * model.yn_d * model.d_jet
         n_holes = self.area / hole_footprint if hole_footprint > 0.0 else 0.0
         mdot_per_hole = mdot_total / n_holes if n_holes > 0.0 else 0.0
@@ -502,9 +694,13 @@ class ConvectiveSurface:
             heating=heating,
             Nu_multiplier=1.0,
             f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
         )
 
-        dRe_j_dmdot = abs(Re_j / mdot_total) if mdot_total else 0.0
+        # Re_j is proportional to the element's mass flow; the per-hole split
+        # above is this row's own bookkeeping, not the solver's m_dot (#456).
+        mdot = self._channel_mdot(rho, velocity, diameter)
+        dRe_j_dmdot = abs(Re_j / mdot) if mdot else 0.0
         dh_dmdot = jet.dNu_dRe_j * dRe_j_dmdot * (k / model.d_jet if model.d_jet > 0.0 else 0.0)
         dh_dmdot *= self.Nu_multiplier
         # Temperature sensitivity of the correlation itself is not exposed;
@@ -525,6 +721,7 @@ class ConvectiveSurface:
             dh_dT=dh_dT,
             dT_aw_dmdot=smooth.dT_aw_dmdot,
             dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
         )
 
     def _single_jet_impingement_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
@@ -541,7 +738,9 @@ class ConvectiveSurface:
         mu = cs.transport.mu
         k = cs.transport.k
 
-        mdot_total = rho * velocity * self.area if self.area > 0.0 else 0.0
+        # The element's mass flow IS the jet's flow (Goldstein: nozzle Re on
+        # the jet's own exit area), not rho v * the target-patch area (#460).
+        mdot_total = self._channel_mdot(rho, velocity, diameter)
         hole_area = math.pi / 4.0 * model.d_jet**2
         v_jet = mdot_total / (rho * hole_area) if rho * hole_area > 0.0 else 0.0
         Re = rho * v_jet * model.d_jet / mu if mu > 0.0 else 0.0
@@ -560,9 +759,11 @@ class ConvectiveSurface:
             heating=heating,
             Nu_multiplier=1.0,
             f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
         )
 
-        dRe_dmdot = abs(Re / mdot_total) if mdot_total else 0.0
+        mdot = self._channel_mdot(rho, velocity, diameter)
+        dRe_dmdot = abs(Re / mdot) if mdot else 0.0
         dh_dmdot = jet.dNu_dRe * dRe_dmdot * (k / model.d_jet if model.d_jet > 0.0 else 0.0)
         dh_dmdot *= self.Nu_multiplier
         dh_dT = smooth.dh_dT * self.Nu_multiplier
@@ -579,6 +780,108 @@ class ConvectiveSurface:
             dh_dT=dh_dT,
             dT_aw_dmdot=smooth.dT_aw_dmdot,
             dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
+        )
+
+    def _pin_fin_terms(self, Re: float, Pr: float):
+        """Nu and f (with modifier) at canonical Re_D, and their Re-slopes."""
+        model = self.model
+        geom = model.geometry()
+        nu = cb.evaluate_pin_fin_nu(model.resolved_nu_set(), geom, Re, Pr)
+        fr = cb.evaluate_pin_fin_friction(model.resolved_f_set(), geom, Re)
+        Nu, dNu = nu.Nu, nu.dNu_dRe
+        f, df = fr.f, fr.df_dRe
+        extrapolated = nu.extrapolated or fr.extrapolated
+        if model.modifier is not None:
+            m = cb.evaluate_pin_fin_modifier(model.modifier, geom, Re)
+            Nu, dNu = Nu * m.ratio_Nu, dNu * m.ratio_Nu + Nu * m.dratio_Nu_dRe
+            if m.has_f:
+                f, df = f * m.ratio_f, df * m.ratio_f + f * m.dratio_f_dRe
+            extrapolated = extrapolated or m.extrapolated
+        return Nu, dNu, f, df, extrapolated
+
+    def _pin_fin_result(self, T, P, X, velocity, diameter, length, T_hot, heating):
+        """Pin-fin array: Metzger et al. (and others) via pin_fin_correlation.h.
+
+        ``velocity`` is the bulk velocity through the UNOBSTRUCTED channel
+        cross-section; Vmax = velocity / (A_min/A_frontal), exactly. The
+        correlation's h lives on the total pin + endwall area; the fin model
+        turns it into ``h`` on this surface's BASE area:
+
+            h_eff = h (f_endwall + eta_fin(h) f_pin)
+
+        with the per-wall fractions of ``pin_fin_area_fractions``.
+
+        ``dh_dmdot`` uses the element's mass flow through the channel
+        cross-section, ``rho v pi Dh^2 / 4`` -- the same convention as
+        ``channel_smooth``. T_aw and its derivatives are borrowed from the
+        smooth correlation, as the impingement paths do; ``dh_dT`` is the
+        smooth result's relative property sensitivity scaled to ``h_eff``, a
+        documented proxy: the pin correlations expose no temperature
+        derivative of their own.
+        """
+        model = self.model
+        D = model.pin_diameter
+        geom = model.geometry()
+
+        rho, _ = _safe_rho(cb.density(T, P, X))
+        cs = cb.complete_state(T, P, X)
+        mu = cs.transport.mu
+        k = cs.transport.k
+        Pr = cs.transport.Pr
+
+        amin = cb.pin_fin_amin_over_afrontal(geom)
+        v_max = velocity / amin
+        Re = rho * v_max * D / mu if mu > 0.0 else 0.0
+
+        Nu, dNu, f, _, extrapolated = self._pin_fin_terms(Re, Pr)
+        h_array = Nu * k / D
+        dh_array_dRe = dNu * k / D
+
+        frac = cb.pin_fin_area_fractions(geom)
+        eff = cb.pin_fin_array_efficiency(
+            h_array, model.k_pin, D, model.H_D * D, frac.pin_over_total
+        )
+        h_eff = h_array * (frac.endwall_exposed + eff.eta_fin * frac.pin)
+        dh_eff_dh = frac.endwall_exposed + frac.pin * (eff.eta_fin + h_array * eff.deta_fin_dh)
+
+        smooth = cb.channel_smooth(
+            T,
+            P,
+            X,
+            velocity,
+            diameter,
+            length,
+            T_hot=T_hot,
+            heating=heating,
+            Nu_multiplier=1.0,
+            f_multiplier=1.0,
+            flow_area=self._flow_area_arg(),
+        )
+
+        mdot = self._channel_mdot(rho, velocity, diameter)
+        dRe_dmdot = abs(Re / mdot) if mdot else 0.0
+        dh_dmdot = dh_eff_dh * dh_array_dRe * dRe_dmdot * self.Nu_multiplier
+        dh_dT = smooth.dh_dT * (h_eff / smooth.h) * self.Nu_multiplier if smooth.h > 0.0 else 0.0
+
+        dP = 2.0 * rho * v_max * abs(v_max) * model.N_rows * f
+
+        return _PinFinChannelResult(
+            h=h_eff * self.Nu_multiplier,
+            h_array=h_array,
+            eta_fin=eff.eta_fin,
+            Nu=Nu,
+            Re=Re,
+            Pr=Pr,
+            f=f * self.f_multiplier,
+            dP=dP * self.f_multiplier,
+            T_aw=smooth.T_aw,
+            extrapolated=extrapolated,
+            dh_dmdot=dh_dmdot,
+            dh_dT=dh_dT,
+            dT_aw_dmdot=smooth.dT_aw_dmdot,
+            dT_aw_dT=smooth.dT_aw_dT,
+            dT_aw_dP=smooth.dT_aw_dP,
         )
 
     def htc_and_T(
@@ -590,6 +893,7 @@ class ConvectiveSurface:
         diameter: float,
         length: float,
         T_hot: float = math.nan,
+        flow_area: float | None = None,
     ):
         """Compute heat transfer coefficient and adiabatic wall temperature.
 
@@ -609,6 +913,10 @@ class ConvectiveSurface:
             Channel length [m].
         T_hot : float, optional
             Wall temperature [K]. Used for auto-detection of heating/cooling.
+        flow_area : float, optional
+            The element's flow cross-section [m^2], from which it computed
+            ``velocity``. Lets the surface recover the element's mass flow
+            exactly; without it ``pi diameter^2 / 4`` is assumed.
 
         Returns
         -------
@@ -619,6 +927,7 @@ class ConvectiveSurface:
 
         if self.area == 0.0 or abs(velocity) < 1e-12:
             return None
+        self._flow_area = flow_area
 
         # Auto-detect heating direction from T_hot - T sign
         if self.heating is not None:
@@ -644,6 +953,7 @@ class ConvectiveSurface:
                 roughness=self.model.roughness,
                 Nu_multiplier=self.Nu_multiplier,
                 f_multiplier=self.f_multiplier,
+                flow_area=self._flow_area_arg(),
             )
         elif isinstance(self.model, RibbedModel):
             result = self._ribbed_result(T, P, X, velocity, diameter, length, T_hot, heating)
@@ -653,6 +963,8 @@ class ConvectiveSurface:
             result = self._single_jet_impingement_result(
                 T, P, X, velocity, diameter, length, T_hot, heating
             )
+        elif isinstance(self.model, PinFinModel):
+            result = self._pin_fin_result(T, P, X, velocity, diameter, length, T_hot, heating)
         else:
             raise TypeError(
                 f"Unsupported channel model {type(self.model).__name__}. "
@@ -758,32 +1070,44 @@ class ThermalWall:
         WallCouplingResult
             Object containing Q [W], T_hot [K], and analytical Jacobians.
         """
-        # 1. Update layer conductivities using temperatures from previous solve iteration
-        # This implement the "lagged" k(T) update for stability.
-        if self._last_profile and len(self._last_profile) == len(self.layers) + 1:
-            for i, layer in enumerate(self.layers):
-                # profile index [i] is hot-side of layer, [i+1] is cold-side
-                t_avg = 0.5 * (self._last_profile[i] + self._last_profile[i + 1])
-                layer.update_conductivity(t_avg)
-
-        # 2. Effective area
         A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
 
-        # 3. Multi-layer R values (thickness / conductivity)
-        t_over_k_layers = [L.r_val for L in self.layers]
+        # The profile only places the layer temperatures; it refuses h <= 0,
+        # which a correlation past its range can return at a solver iterate,
+        # so it sees the coupling's own floor (WALL_HTC_KNEE).
+        h_pa = max(float(h_a), cb.WALL_HTC_KNEE)
+        h_pb = max(float(h_b), cb.WALL_HTC_KNEE)
 
-        # 4. Call C++ solver function
+        def profile(t_over_k: list[float]) -> list[float]:
+            prof, _q = cb.wall_temperature_profile(
+                T_aw_a, T_aw_b, h_pa, h_pb, t_over_k, self.R_fouling
+            )
+            return [float(tp) for tp in prof]
+
+        t_over_k_layers = [L.r_val for L in self.layers]
+        prof = profile(t_over_k_layers)
+        if any(L.material.lower() not in ("generic", "custom") for L in self.layers):
+            # k(T) at THIS call's wall temperatures, iterated to its fixed
+            # point, so Q depends on the inputs alone. It used to be lagged
+            # from the previous call -- any trial point the solver probed --
+            # which made the residual depend on evaluation history (#481).
+            for _ in range(30):
+                for i, layer in enumerate(self.layers):
+                    layer.update_conductivity(0.5 * (prof[i] + prof[i + 1]))
+                new = [L.r_val for L in self.layers]
+                change = max(
+                    abs(a - b) / max(abs(b), 1e-300)
+                    for a, b in zip(new, t_over_k_layers, strict=True)
+                )
+                t_over_k_layers = new
+                prof = profile(t_over_k_layers)
+                if change < 1e-12:
+                    break
+
         res = _solver_tools.wall_coupling_and_jacobian_multilayer(
             h_a, T_aw_a, h_b, T_aw_b, t_over_k_layers, A_eff, self.R_fouling
         )
-
-        # 5. Update cached temperature profile for next iteration
-        # We compute the profile here using the current solution HTCs and updated k values.
-        profile, _q = cb.wall_temperature_profile(
-            T_aw_a, T_aw_b, h_a, h_b, t_over_k_layers, self.R_fouling
-        )
-        self._last_profile = [float(tp) for tp in profile]
-
+        self._last_profile = prof
         return res
 
 
@@ -1162,6 +1486,43 @@ def _element_reference_block(
     }
 
 
+class LazyJacobian(MutableMapping):
+    """An element's local Jacobian, computed on first access (#489).
+
+    The solver's residual-only evaluations never read an element's Jacobian;
+    it is assembled only when the root finder asks for J (hybr: at the start
+    and on restarts). An element whose derivatives are costly -- the
+    compressible channel's implicit Fanno derivatives -- returns this from
+    ``residuals`` instead of a dict, and pays for them only when they are
+    read. To any reader it is the ``{eq_idx: {unknown: d}}`` dict.
+    """
+
+    def __init__(self, compute: Callable[[], dict[int, dict[str, float]]]) -> None:
+        self._compute: Callable[[], dict[int, dict[str, float]]] | None = compute
+        self._jac: dict[int, dict[str, float]] = {}
+
+    def _resolved(self) -> dict[int, dict[str, float]]:
+        if self._compute is not None:
+            compute, self._compute = self._compute, None
+            self._jac = compute()
+        return self._jac
+
+    def __getitem__(self, key: int) -> dict[str, float]:
+        return self._resolved()[key]
+
+    def __setitem__(self, key: int, value: dict[str, float]) -> None:
+        self._resolved()[key] = value
+
+    def __delitem__(self, key: int) -> None:
+        del self._resolved()[key]
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._resolved())
+
+    def __len__(self) -> int:
+        return len(self._resolved())
+
+
 class NetworkElement(ABC):
     def __init__(self, id: str, from_node: str, to_node: str):
         self.id = id
@@ -1184,7 +1545,8 @@ class NetworkElement(ABC):
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         """
         Returns (residuals, local_jacobian).
-        local_jacobian is a dict mapping equation_index to a dict of {unknown_name: partial_derivative}.
+        local_jacobian is a dict mapping equation_index to a dict of {unknown_name: partial_derivative},
+        or a LazyJacobian that computes it when first read.
         """
         pass
 
@@ -1316,8 +1678,19 @@ class MomentumChamberNode(NetworkNode):
         surface: ConvectiveSurface | None = None,
         t_hot: float | None = None,
         Dh: float | None = None,
+        main_inlet: str | None = None,
     ):
         super().__init__(id)
+        # MERGE CHAMBER (#471). With main_inlet declared the chamber accepts
+        # further inflows as SIDE STREAMS, still one outlet. Its axis is the
+        # outlet direction; the main stream arrives along it, each side stream
+        # brings m u_jet cos(theta) of axial momentum (the injecting element's
+        # injection_momentum) and discharges at the chamber static pressure.
+        # The node's (P, Pt) is the chamber/outlet state; the main-inlet
+        # element sees the main-face state from chamber_merge_face_state.
+        # Splits stay refused: one momentum equation cannot set two outlet
+        # pressures.
+        self.main_inlet = main_inlet
         self._auto_area = area is None
         self.area = area if area is not None else 0.0
         #: Where self.area came from once resolved (issue #262).
@@ -1376,6 +1749,13 @@ class MomentumChamberNode(NetworkNode):
                             self._upstream_m_dot_jac.get(var, 0.0) + coeff
                         )
 
+        # Merge chamber: keep each inflow's supply state for the main-face
+        # offset, which needs the chamber's own state (main_face_offset).
+        self._inflows = [
+            (getattr(s, "_element_id", None), s, dict(getattr(s, "_m_dot_jac_names", {})))
+            for s in upstream_states
+        ]
+
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
@@ -1410,6 +1790,7 @@ class MomentumChamberNode(NetworkNode):
             diameter=diameter,
             length=length,
             T_hot=T_hot,
+            flow_area=self.area,
         )
 
     def residuals(
@@ -1449,6 +1830,98 @@ class MomentumChamberNode(NetworkNode):
                 jac[0][var_name] = jac[0].get(var_name, 0.0) + result.d_res_dmdot * coeff
 
         return res, jac
+
+    def has_side_streams(self) -> bool:
+        """A merge: a declared main inlet and at least one OTHER inflow. The
+        main itself need not be flowing in -- a reversed main keeps its face
+        (#493)."""
+        if self.main_inlet is None:
+            return False
+        return any(eid != self.main_inlet for eid, _, _ in getattr(self, "_inflows", []))
+
+    def main_face_state(
+        self, state: NetworkMixtureState, m_main: float | None = None
+    ) -> tuple[float, float, dict[str, float], dict[str, float]]:
+        """(P_face, Pt_face, dP_face/d(name), dPt_face/d(name)) for the main inlet.
+
+        Exact (compressible) impulse over the constant-area chamber, C++'s
+        ``chamber_merge_face_state``: the face static pressure on the subsonic
+        root, the face Pt from the same stagnation closure as the chamber.
+        Derivatives are keyed by unknown name; ``"<node>.T"`` keys are relayed
+        by the solver.
+
+        ``m_main`` is the main element's signed flow into the chamber, for a
+        main that is not among the inflows -- REVERSED (#493). The impulse
+        holds for either sign (the x-momentum flux through the face is
+        m_main^2 / (rho A) both ways), so the face is kept: the fluid at the
+        face is then the chamber's, and the outlet carries the side streams
+        less the main's outflow. It used to switch off, a 245 Pa step in the
+        main's exit pressure as its flow crossed zero.
+        """
+        elems = {e.id: e for e in self.upstream_elements}
+        main_state, main_names = None, {}
+        S, dS = 0.0, {}
+        for eid, st, names in getattr(self, "_inflows", []):
+            if eid == self.main_inlet:
+                main_state, main_names = st, names
+                continue
+            hook = getattr(elems.get(eid), "injection_momentum", None)
+            if hook is None:
+                continue
+            J, dJ = hook(st, state)
+            S += J
+            for k, v in dJ.items():
+                dS[k] = dS.get(k, 0.0) + v
+        out_names = dict(getattr(self, "_upstream_m_dot_jac", {}))
+        m_out = float(getattr(self, "_total_m_dot", 0.0))
+        main_T_key = None
+        if main_state is not None:
+            m_main = float(main_state.m_dot)
+            T_main = float(main_state.T)
+            X_main = main_state.X
+        else:
+            # Reversed (or idle) main: chamber fluid leaves through the face.
+            m_main = float(m_main) if m_main is not None else 0.0
+            T_main = float(state.T)
+            X_main = state.X
+            main_names = {f"{self.main_inlet}.m_dot": 1.0}
+            m_out += m_main
+            out_names[f"{self.main_inlet}.m_dot"] = (
+                out_names.get(f"{self.main_inlet}.m_dot", 0.0) + 1.0
+            )
+            main_T_key = f"{self.id}.T"
+        r = cb.chamber_merge_face_state(
+            m_main, T_main, X_main, m_out, state.P, state.T, state.X, S, self.area
+        )
+        self._face_choked = bool(r.choked)
+        main_src = elems[self.main_inlet].from_node if self.main_inlet in elems else None
+
+        def chain(d_mm, d_mo, d_J, d_P, d_T, d_Tm) -> dict[str, float]:
+            out: dict[str, float] = {}
+
+            def add(k: str, v: float) -> None:
+                out[k] = out.get(k, 0.0) + v
+
+            for k, v in main_names.items():
+                add(k, d_mm * v)
+            for k, v in out_names.items():
+                add(k, d_mo * v)
+            for k, v in dS.items():
+                add(k, d_J * v)
+            add(f"{self.id}.P", d_P)
+            add(f"{self.id}.T", d_T)
+            if main_T_key is not None:
+                add(main_T_key, d_Tm)
+            elif main_src is not None:
+                add(f"{main_src}.T", d_Tm)
+            return out
+
+        return (
+            float(r.P_face),
+            float(r.Pt_face),
+            chain(r.dPf_dm_main, r.dPf_dm_out, r.dPf_dJ, r.dPf_dP, r.dPf_dT, r.dPf_dT_main),
+            chain(r.dPtf_dm_main, r.dPtf_dm_out, r.dPtf_dJ, r.dPtf_dP, r.dPtf_dT, r.dPtf_dT_main),
+        )
 
     def mach(self, state: NetworkMixtureState) -> float:
         """Computes Mach number using internal total mass flow and area."""
@@ -1509,6 +1982,19 @@ class MomentumChamberNode(NetworkNode):
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         self.upstream_elements = graph.get_upstream_elements(self.id)
+        if self.main_inlet is not None:
+            # Merge chamber: one area, and the main inlet's port area IS it.
+            # Inherit it from the main-inlet element; an explicit area that
+            # disagrees is refused in validate(), never silently reconciled.
+            main = graph.elements.get(self.main_inlet)
+            main_area = getattr(main, "area", None) if main is not None else None
+            self._main_inlet_area = main_area if main_area else None
+            if self._auto_area and self._main_inlet_area:
+                self.area = self._main_inlet_area
+                self.Dh = getattr(main, "Dh", None) or 2.0 * math.sqrt(self.area / math.pi)
+                self.surface.area = self.area
+                self._area_source = f"inherited from {self.main_inlet}"
+                return
         # Inherit hydraulic diameter from upstream channel when not user-specified
         if self.Dh is None:
             for elem in self.upstream_elements:
@@ -1537,6 +2023,24 @@ class MomentumChamberNode(NetworkNode):
                 self.area = DEFAULT_CHAMBER_AREA
                 self.surface.area = self.area
                 self._area_source = "default"
+
+    def validate(self) -> None:
+        if self.main_inlet is None:
+            return
+        ids = [e.id for e in self.upstream_elements]
+        if self.main_inlet not in ids:
+            raise ValueError(
+                f"MomentumChamberNode {self.id!r}: main_inlet {self.main_inlet!r} "
+                f"does not flow into it (inflows: {sorted(ids)})."
+            )
+        main_area = getattr(self, "_main_inlet_area", None)
+        if not self._auto_area and main_area and abs(self.area / main_area - 1.0) > 1e-9:
+            raise ValueError(
+                f"MomentumChamberNode {self.id!r}: area {self.area:.6g} m^2 differs "
+                f"from its main inlet {self.main_inlet!r} ({main_area:.6g} m^2). "
+                "A merge chamber is a constant-area control volume; leave the "
+                "area unset to inherit it."
+            )
 
 
 class PressureBoundary(NetworkNode):
@@ -1730,7 +2234,6 @@ class CombustorNode(NetworkNode):
         self.surface = surface or ConvectiveSurface()
         self.t_hot = t_hot
         self.upstream_elements = []
-        self.fuel_boundary = None
         self.energy_boundaries: list[EnergyBoundary] = []
         # Populated by compute_derived_state so PressureLossElement can read theta.
         self._T_unburned: float = 300.0
@@ -1743,10 +2246,6 @@ class CombustorNode(NetworkNode):
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this combustor (post-combustion)."""
         self.energy_boundaries.append(eb)
-
-    def set_fuel_boundary(self, fuel_bc: MassFlowBoundary) -> None:
-        """Set the fuel boundary condition for this combustor."""
-        self.fuel_boundary = fuel_bc
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
@@ -1764,6 +2263,18 @@ class CombustorNode(NetworkNode):
             if self._total_m_dot > 0
             else 300.0
         )
+        # The streams behind T_unburned, for its Jacobian in a theta-sourced
+        # PressureLossElement: (m, Tt, {unknown: dm/d(unknown)}, source node).
+        # T_u = sum(m Tt) / M is not a relayed node property (#481 C1).
+        self._unburned_streams = [
+            (
+                float(s.m_dot),
+                float(s.Tt),
+                dict(getattr(s, "_m_dot_jac_names", {})),
+                getattr(s, "_src_node", None),
+            )
+            for s in upstream_states
+        ]
 
         # Store upstream element IDs for momentum-chamber Jacobian (d_res_dmdot entries)
         self._upstream_element_ids = [
@@ -1897,6 +2408,7 @@ class CombustorNode(NetworkNode):
             diameter=diameter,
             length=length,
             T_hot=T_hot,
+            flow_area=self.area,
         )
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -1931,6 +2443,17 @@ class CombustorNode(NetworkNode):
                 self._area_source = "default"
 
 
+# The discharge-hole family: a hole in a wall, no pipe, no beta. 'fixed' and
+# the ISO 5167 metering correlations are deliberately not in this map.
+_DISCHARGE_SELECTORS = {
+    "IdelchikThick": cb.DischargeCdCorrelation.Idelchik1966Thick,
+    "IdelchikBeveled": cb.DischargeCdCorrelation.Idelchik1966Beveled,
+    "IdelchikRounded": cb.DischargeCdCorrelation.Idelchik1966Rounded,
+    "McGreehanSchotsch": cb.DischargeCdCorrelation.McGreehanSchotsch1988,
+    "Lichtarowicz": cb.DischargeCdCorrelation.Lichtarowicz1965,
+}
+
+
 class OrificeElement(NetworkElement):
     """
     Orifice flow element with incompressible or compressible formulation.
@@ -1950,9 +2473,12 @@ class OrificeElement(NetworkElement):
       - 'IdelchikRounded': Rounded-edge hole, diagram 4-18c
         (requires edge_radius).
       - 'McGreehanSchotsch': Cooling hole with inlet crossflow (1988).
+      - 'Lichtarowicz': LONG orifice, Lichtarowicz, Duggins and Markland
+        (1965), l/d 2-10 and Re 10 to 2e4 (requires plate_thickness).
+        Refused below l/d = 1.5, where the source reports hysteresis.
 
     The first four are NORMED metering correlations: Cd is referenced to the
-    tapping differential and is a function of beta = d/D. The last four are
+    tapping differential and is a function of beta = d/D. The last five are
     DISCHARGE correlations for a hole in a wall, where zeta is referenced to
     the hole velocity and there is no beta. They are not interchangeable, and
     there is deliberately no 'Auto' arm choosing between them from geometry.
@@ -1971,8 +2497,12 @@ class OrificeElement(NetworkElement):
         edge_radius: float = 0.0,
         bevel_depth: float = 0.0,
         area: float | None = None,
+        injection_angle_deg: float = 90.0,
     ):
         super().__init__(id, from_node, to_node)
+        # Angle of the discharged jet to the axis of a merge chamber it feeds
+        # as a side stream (#471). 90 = normal injection, no axial momentum.
+        self.injection_angle_deg = float(injection_angle_deg)
 
         if diameter is not None:
             self.diameter: float | None = diameter
@@ -2088,7 +2618,10 @@ class OrificeElement(NetworkElement):
         return 1.0
 
     def _effective_Cd(
-        self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None = None,
     ) -> float:
         """Return effective Cd: from correlation or user-supplied fixed value."""
         if not self.use_correlation or self._orifice_geom is None:
@@ -2144,35 +2677,19 @@ class OrificeElement(NetworkElement):
                 + 91.71 * math.pow(b, 2.5) * math.pow(max(flow_state.Re_D, 1.0), -0.75)
             )
             return float(cd)
-        elif self.correlation in ("IdelchikThick", "IdelchikBeveled", "IdelchikRounded"):
-            # Idelchik's wall-orifice family. These take a hole in a wall,
-            # not a plate in a pipe, so they are fed DischargeHoleGeometry and
-            # the pipe diameter plays no part -- which is the whole reason the
-            # old ThickPlate/RoundedEntry arms were wrong: they multiplied an
-            # ISO 5167 metering Cd by a correction factor.
-            hole = cb.DischargeHoleGeometry(
-                d=self._orifice_geom.d,
-                L=self.plate_thickness,
-                r=self.edge_radius,
-            )
-            hole.bevel = self.bevel_depth
-            selector = {
-                "IdelchikThick": cb.DischargeCdCorrelation.Idelchik1966Thick,
-                "IdelchikBeveled": cb.DischargeCdCorrelation.Idelchik1966Beveled,
-                "IdelchikRounded": cb.DischargeCdCorrelation.Idelchik1966Rounded,
-            }[self.correlation]
-            return float(cb.discharge_cd(selector, hole, cb.DischargeHoleState(Re=Re_hole)))
-        elif self.correlation == "McGreehanSchotsch":
-            hole = cb.DischargeHoleGeometry(
-                d=self._orifice_geom.d,
-                L=self.plate_thickness,
-                r=self.edge_radius,
-            )
+        elif self.correlation in _DISCHARGE_SELECTORS:
+            # The discharge-hole family: a hole in a wall, not a plate in a
+            # pipe, so DischargeHoleGeometry and no pipe diameter -- the
+            # reason the old ThickPlate/RoundedEntry arms were wrong: they
+            # multiplied an ISO 5167 metering Cd by a correction factor. The
+            # supply-side crossflow U1/Vi (0 for a plenum-fed hole) only moves
+            # McGreehan-Schotsch; the others have no crossflow term.
+            u1_vi, _ = self._supply_crossflow(state_in, state_out, flows)
             return float(
                 cb.discharge_cd(
-                    cb.DischargeCdCorrelation.McGreehanSchotsch1988,
-                    hole,
-                    cb.DischargeHoleState(Re=Re_hole),
+                    _DISCHARGE_SELECTORS[self.correlation],
+                    self._discharge_hole(),
+                    cb.DischargeHoleState(Re=Re_hole, U1_over_Vi=u1_vi),
                 )
             )
         else:
@@ -2183,15 +2700,132 @@ class OrificeElement(NetworkElement):
                 "rounded-entry request came back as Stolz. Name one of "
                 "'fixed', 'ReaderHarrisGallagher', 'Stolz', 'Miller', "
                 "'IdelchikThick', 'IdelchikBeveled', 'IdelchikRounded', "
-                "'McGreehanSchotsch'."
+                "'McGreehanSchotsch', 'Lichtarowicz'."
             )
 
+    def injection_momentum(
+        self, state_in: "NetworkMixtureState", state_chamber: "NetworkMixtureState"
+    ) -> tuple[float, dict[str, float]]:
+        """Streamwise momentum this jet brings into a merge chamber (#471).
+
+        J = m w cos(theta), with w from C++'s ``jet_impulse``: the isentropic
+        velocity from the supply's (Pt, Tt) to the chamber static pressure,
+        or, choked, the sonic momentum plus its pressure thrust. Cd sets the
+        jet's area, not its velocity, so it does not enter. Returns (J,
+        dJ/d(name)) keyed by unknown name. Normal injection (90 deg) brings
+        none.
+        """
+        cos_t = math.cos(math.radians(self.injection_angle_deg))
+        if abs(cos_t) < 1e-12:
+            return 0.0, {}
+        jet = cb.jet_impulse(
+            float(state_in.m_dot), state_in.Pt, state_in.Tt, state_chamber.P, state_in.X
+        )
+        return jet.J * cos_t, {
+            f"{self.id}.m_dot": jet.dJ_dm * cos_t,
+            f"{self.from_node}.Pt": jet.dJ_dPt * cos_t,
+            f"{self.from_node}.T": jet.dJ_dTt * cos_t,
+            f"{self.to_node}.P": jet.dJ_dP * cos_t,
+        }
+
+    def _discharge_hole(self) -> "cb.DischargeHoleGeometry":
+        """One real hole, as the discharge-hole correlations see it."""
+        hole = cb.DischargeHoleGeometry(
+            d=self._orifice_geom.d,
+            L=self.plate_thickness,
+            r=self.edge_radius,
+        )
+        hole.bevel = self.bevel_depth
+        return hole
+
+    def validate(self) -> None:
+        # Lichtarowicz refuses short holes (l/d < 1.5, the source's own
+        # hysteresis warning). Ask it once here, so the refusal names this
+        # element at set-up rather than surfacing mid-solve. The limit lives
+        # in C++ only.
+        if self.correlation == "Lichtarowicz" and self._orifice_geom is not None:
+            try:
+                cb.discharge_cd(
+                    _DISCHARGE_SELECTORS[self.correlation],
+                    self._discharge_hole(),
+                    cb.DischargeHoleState(Re=1.0e4),
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"{type(self).__name__} {self.id!r}: plate_thickness/d = "
+                    f"{self.plate_thickness / self._orifice_geom.d:.3g}. {exc}"
+                ) from exc
+
+    def _supply_crossflow(
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None,
+    ) -> tuple[float, dict[str, float]]:
+        """McGreehan-Schotsch's supply-side U1/Vi and d(U1/Vi)/d(name).
+
+        0 for a plain orifice: a plenum feeds it. A duct-fed hole overrides
+        this (EffusionPlateElement with crossflow segments).
+        """
+        return 0.0, {}
+
+    def _dCd_dnames(
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float]:
+        """d(Cd)/d(unknown), keyed by name, analytic.
+
+        Only the discharge-hole family carries it (C++'s
+        discharge_cd_and_derivatives): through the hole Reynolds number
+        (linear in m_dot, so dRe/dm = Re/m) and, for a duct-fed hole, through
+        U1/Vi. 'fixed' has none, and the normed metering correlations keep
+        their documented gap.
+        """
+        selector = _DISCHARGE_SELECTORS.get(self.correlation)
+        if selector is None or self._orifice_geom is None or not self.use_correlation:
+            return {}
+        u1_vi, du = self._supply_crossflow(state_in, state_out, flows)
+        Re = self._hole_reynolds(state_in)
+        _, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
+            selector, self._discharge_hole(), cb.DischargeHoleState(Re=Re, U1_over_Vi=u1_vi)
+        )
+        out: dict[str, float] = {}
+        m = float(state_in.m_dot)
+        if abs(m) > 1e-12:
+            out[f"{self.id}.m_dot"] = float(dCd_dRe) * Re / abs(m) * (1.0 if m > 0 else -1.0)
+        for name, d in du.items():
+            out[name] = out.get(name, 0.0) + float(dCd_dU) * d
+        return out
+
+    def _cd_in_range(self, state_in: "NetworkMixtureState") -> bool:
+        """Is the discharge-hole Cd inside its source's Re and l/d range?
+
+        A flag for diagnostics, never a selector. True for 'fixed' (the value
+        is the caller's) and for the normed metering family, whose ranges are
+        ISO 5167's and are not checked here.
+        """
+        selector = _DISCHARGE_SELECTORS.get(self.correlation)
+        if selector is None or self._orifice_geom is None:
+            return True
+        return bool(
+            cb.discharge_cd_in_range(
+                selector,
+                self._discharge_hole(),
+                cb.DischargeHoleState(Re=self._hole_reynolds(state_in)),
+            )
+        )
+
     def residuals(
-        self, state_in: "NetworkMixtureState", state_out: "NetworkMixtureState"
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None = None,
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
 
         m_dot = state_in.m_dot
-        effective_cd = self._effective_Cd(state_in, state_out)
+        effective_cd = self._effective_Cd(state_in, state_out, flows)
 
         if self.regime == "compressible":
             res_cpp = _solver_tools.orifice_compressible_residuals_and_jacobian(
@@ -2250,13 +2884,24 @@ class OrificeElement(NetworkElement):
         for i, val in enumerate(res_cpp.d_mdot_dY_up):
             jac[0][f"{self.from_node}.Y[{i}]"] = -val
 
+        # m_calc is proportional to Cd, and a discharge-hole Cd moves with the
+        # flow (Re_hole) and, duct-fed, with the crossflow (U1/Vi):
+        # d(m_calc)/d(x) += (m_calc/Cd) dCd/dx.
+        if effective_cd > 0.0:
+            scale = res_cpp.m_dot_calc / effective_cd
+            for name, dcd in self._dCd_dnames(state_in, state_out, flows).items():
+                jac[0][name] = jac[0].get(name, 0.0) - scale * dcd
+
         return res, jac
 
     def n_equations(self) -> int:
         return 1
 
     def diagnostics(
-        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
     ) -> dict[str, float]:
         if state_in.P <= 0 or state_in.T <= 0:
             return {}
@@ -2299,9 +2944,58 @@ class OrificeElement(NetworkElement):
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
             "mach_throat": float(mach_throat),
-            "Cd": float(self._effective_Cd(state_in, state_out)),
+            "Cd": float(self._effective_Cd(state_in, state_out, flows)),
             "is_correlation": float(self.use_correlation),
+            "Cd_in_range": float(self._cd_in_range(state_in)),
         }
+
+
+def _effusion_wall(
+    h_i: float, T_c: float, h_gas: float, T_aw_gas: float, t_over_k: float
+) -> tuple[float, float, float]:
+    """(T_wall_hot, T_wall_cold, q) of a plate between gas and coolant.
+
+    Per unit area, one conduction layer, through C++'s wall coupling. The one
+    wall core both EffusionPlateElement.overall_effectiveness (no conduction)
+    and wall_heat_transfer use.
+    """
+    w = _solver_tools.wall_coupling_and_jacobian_multilayer(
+        h_gas, T_aw_gas, h_i, T_c, [t_over_k], 1.0, 0.0
+    )
+    q = float(w.Q)
+    return float(w.T_hot), T_c + q / h_i, q
+
+
+def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, float] | None:
+    """What a discharge node offers a wall as its gas side, or None.
+
+    Only a MomentumChamberNode has flow, hence a coefficient: its own surface
+    correlation (the user's choice on that node) is the UNBLOWN h, and its
+    velocity the gas velocity. The gas TEMPERATURE is the stream the wall
+    sees: a merge chamber's state is the MIXED outlet, already diluted by
+    the side streams -- with liner effusion at 20-30% of the flow that is a
+    large, unconservative drop -- so when the chamber has a main inlet the
+    approaching main stream's temperature is used instead. A plenum (state,
+    no flow) returns None.
+    """
+    if not isinstance(node, MomentumChamberNode) or node.area <= 0.0:
+        return None
+    gas = node.htc_and_T(state)
+    if gas is None:
+        return None
+    rho_g, _ = _safe_rho(cb.density(state.T, state.P, state.X))
+    T_gas, from_main = float(gas.T_aw), False
+    if node.main_inlet is not None and node.has_side_streams():
+        for eid, st, _names in getattr(node, "_inflows", []):
+            if eid == node.main_inlet:
+                T_gas, from_main = float(st.T), True
+    return {
+        "h_unblown": float(gas.h),
+        "T_gas": T_gas,
+        "T_from_main_inlet": from_main,
+        "U_gas": abs(getattr(node, "_total_m_dot", 0.0)) / (rho_g * node.area),
+        "rho_gas": rho_g,
+    }
 
 
 class EffusionPlateElement(OrificeElement):
@@ -2369,15 +3063,27 @@ class EffusionPlateElement(OrificeElement):
     reason a throat-only treatment recovers only a fraction of the measured
     coefficient.
 
-    THE EXTERNAL FILM IS NOT INCLUDED, and that is deliberate. Andrews
-    (88-GT-290) states the two are NOT additive in effectiveness -- "the film
-    cooling reduces the mean gas temperature adjacent to the wall... which in
-    turn reduces the heat flux removed by the internal wall cooling". So an
-    OVERALL effectiveness correlation must never be the closure here: it
-    already contains the internal convection this method computes. Combine
-    this with an ADIABATIC external effectiveness
-    (`film_effectiveness_baldauf_2002` superposed over rows) and let the
-    overall effectiveness be an output.
+    THE PLATE OWNS ITS WALL (#471). `wall_heat_transfer()` -- reported in
+    the diagnostics -- solves the wall with the coolant side above and a gas
+    side the DISCHARGE NODE decides: a MomentumChamberNode (flow) supplies
+    its own unblown coefficient, gas temperature and velocity; a plenum
+    (state, no flow) takes the imposed `gas_heat_flux`. No ThermalWall
+    connects to this element.
+
+    AN OVERALL EFFECTIVENESS CORRELATION IS NEVER THE CLOSURE. Andrews
+    (88-GT-290) states internal and film cooling are NOT additive -- "the
+    film cooling reduces the mean gas temperature adjacent to the wall...
+    which in turn reduces the heat flux removed by the internal wall
+    cooling" -- and an overall correlation already contains the internal
+    convection computed here. The overall effectiveness is an OUTPUT. An
+    adiabatic film (Baldauf + Sellers, `gas_film='baldauf_sellers'`) is
+    selectable, off by default: scored on Andrews, the data refuse it offered
+    alone; the missing physics is the gas-side augmentation
+    (`gas_augmentation`, the caller's).
+
+    PLENUM-FED. This 2-port plate leaves McGreehan-Schotsch's U1/Vi at 0 and
+    uses Andrews' still-plenum coolant side; `coolant_crossflow_ignored`
+    flags a supply node a channel runs through.
     """
 
     def __init__(
@@ -2398,9 +3104,47 @@ class EffusionPlateElement(OrificeElement):
         Cd: float = 0.6,
         edge_radius: float = 0.0,
         internal_Nu_multiplier: float = 1.0,
+        wall_conductivity: float = 20.0,
+        gas_film: Literal["none", "baldauf_sellers"] = "none",
+        gas_augmentation: float = 1.0,
+        turbulence_intensity: float = 0.05,
+        gas_heat_flux: float = 0.0,
+        crossflow_segments: tuple[str | None, str | None] | None = None,
+        crossflow_area: float | None = None,
     ) -> None:
         if hole_diameter <= 0.0:
             raise ValueError("EffusionPlateElement: hole_diameter must be positive")
+        if crossflow_segments is not None and not (crossflow_area and crossflow_area > 0.0):
+            raise ValueError(
+                "EffusionPlateElement: a crossflow-fed panel needs the backside "
+                "duct's crossflow_area"
+            )
+        # DUCT-FED (#471): the panel's supply node is a station of a backside
+        # duct; crossflow_segments = (arriving, leaving) segment ids there. The
+        # duct's mean velocity at the station, over the static-referenced ideal
+        # jet velocity, is McGreehan-Schotsch's U1/Vi.
+        self.crossflow_segments = crossflow_segments
+        self.crossflow_area = crossflow_area
+        self._xf_elems: list[tuple[NetworkElement, str]] = []
+        if wall_conductivity <= 0.0:
+            raise ValueError("EffusionPlateElement: wall_conductivity must be positive")
+        if gas_augmentation <= 0.0:
+            raise ValueError("EffusionPlateElement: gas_augmentation must be positive")
+        if gas_film not in ("none", "baldauf_sellers"):
+            raise ValueError("EffusionPlateElement: gas_film is 'none' or 'baldauf_sellers'")
+        if gas_film == "baldauf_sellers" and panel_length is None:
+            raise ValueError(
+                "EffusionPlateElement: gas_film='baldauf_sellers' needs panel_length "
+                "to count the hole rows the film builds over"
+            )
+        # The plate's own wall (#471): conduction through it, and the gas
+        # side the discharge node decides -- see wall_heat_transfer().
+        self.wall_conductivity = float(wall_conductivity)
+        self.gas_film = gas_film
+        self.gas_augmentation = float(gas_augmentation)
+        self.turbulence_intensity = float(turbulence_intensity)
+        self.gas_heat_flux = float(gas_heat_flux)
+        self.panel_length = panel_length
         if internal_Nu_multiplier <= 0.0:
             raise ValueError("EffusionPlateElement: internal_Nu_multiplier must be positive")
         if wall_thickness <= 0.0:
@@ -2481,6 +3225,9 @@ class EffusionPlateElement(OrificeElement):
         # TOTAL area. Keep it for the flow equation, but the correlations must
         # see one real hole -- see _hole_diameter_for_correlation.
         self.equivalent_bore = self.diameter
+        # Discharged into a merge chamber, the holes' inclination to the wall
+        # is the jets' angle to the gas axis (holes pointing downstream).
+        self.injection_angle_deg = float(angle_deg)
 
     def _hole_count(self) -> float:
         return float(self.n_holes)
@@ -2488,15 +3235,70 @@ class EffusionPlateElement(OrificeElement):
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         """No upstream-diameter discovery: a wall panel has no pipe, hence no
         beta. The geometry the correlations need is the single hole, which is
-        known at construction."""
+        known at construction. The discharge node decides the gas side."""
         self._orifice_geom = cb.OrificeGeometry()
         self._orifice_geom.d = self.hole_diameter
         self._orifice_geom.D = 0.0
         self._orifice_geom.t = self.hole_length
         self._orifice_geom.r = self.edge_radius
         self.beta = 0.0
+        self._discharge_node = graph.nodes.get(self.to_node)
+        # A supply node a channel runs THROUGH feeds the holes with a
+        # crossflow. This 2-port plate is plenum-fed: McGreehan-Schotsch's
+        # U1/Vi stays 0 and Andrews' coolant side assumes a still plenum, so
+        # say so rather than model it (the 3-port liner segment will).
+        through = (
+            [
+                e
+                for e in graph.get_upstream_elements(self.from_node)
+                + graph.get_downstream_elements(self.from_node)
+                if isinstance(e, ChannelElement)
+            ]
+            if self.from_node in graph.nodes
+            else []
+        )
+        self._coolant_crossflow_ignored = len(through) >= 2 and self.crossflow_segments is None
+        self._xf_elems = []
+        if self.crossflow_segments is not None:
+            for eid in self.crossflow_segments:
+                if eid is not None:
+                    self._xf_elems.append((graph.elements[eid], eid))
+
+    def network_flow_inputs(self) -> list[tuple[str, str]]:
+        """The backside segments' flows at this panel's supply station."""
+        return [(eid, self.from_node) for _, eid in self._xf_elems]
+
+    def _supply_crossflow(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None,
+    ) -> tuple[float, dict[str, float]]:
+        if self.crossflow_segments is None:
+            return 0.0, {}
+        flows = flows or {}
+        prev_id, next_id = self.crossflow_segments
+        m_a = flows.get(prev_id, 0.0) if prev_id else 0.0
+        m_b = flows.get(next_id, 0.0) if next_id else 0.0
+        r = cb.crossflow_velocity_ratio(
+            m_a, m_b, state_in.P, state_in.T, state_in.X, state_out.P, self.crossflow_area
+        )
+        d: dict[str, float] = {}
+        for elem, eid in self._xf_elems:
+            coeff_m = r.d_dm_a if eid == prev_id else r.d_dm_b
+            names = elem.unknowns()
+            for local, c in elem.flow_jac_at_node(self.from_node, list(range(len(names)))).items():
+                d[names[local]] = d.get(names[local], 0.0) + coeff_m * c
+        for key, v in (
+            (f"{self.from_node}.P", r.d_dP),
+            (f"{self.from_node}.T", r.d_dT),
+            (f"{self.to_node}.P", r.d_dP_down),
+        ):
+            d[key] = d.get(key, 0.0) + v
+        return float(r.U1_over_Vi), d
 
     def validate(self) -> None:
+        super().validate()
         if self.correlation in ("ReaderHarrisGallagher", "Stolz", "Miller"):
             raise ValueError(
                 f"EffusionPlateElement {self.id!r}: {self.correlation!r} is a "
@@ -2510,6 +3312,12 @@ class EffusionPlateElement(OrificeElement):
             raise ValueError(
                 f"EffusionPlateElement {self.id!r}: porosity is "
                 f"{self.porosity:.3f}; the holes do not fit in the panel."
+            )
+        if self.crossflow_segments is not None and self.correlation != "McGreehanSchotsch":
+            raise ValueError(
+                f"EffusionPlateElement {self.id!r}: a duct-fed panel needs the "
+                "supply-side crossflow term, which only 'McGreehanSchotsch' has "
+                f"({self.correlation!r} would silently treat the duct as a plenum)."
             )
 
     def internal_heat_transfer(self, state_in: NetworkMixtureState) -> dict[str, float]:
@@ -2658,8 +3466,11 @@ class EffusionPlateElement(OrificeElement):
         h_i = internal["h_plate_area"]
         h_gas = h_gas_unblown * gas_augmentation
         T_c = state_in.T
-        eta = (h_i + h_gas * eta_film) / (h_i + h_gas)
-        t_wall = T_gas - eta * (T_gas - T_c)
+        # The two-resistance closure eta = (h_i + h_gas eta_film)/(h_i + h_gas)
+        # is the wall core below with no conduction resistance.
+        T_aw = T_gas - eta_film * (T_gas - T_c)
+        t_wall, _, _ = _effusion_wall(h_i, T_c, h_gas, T_aw, 0.0)
+        eta = (T_gas - t_wall) / (T_gas - T_c) if T_gas != T_c else 0.0
         out = {
             "eta_overall": float(eta),
             "T_wall": float(t_wall),
@@ -2693,12 +3504,135 @@ class EffusionPlateElement(OrificeElement):
         )
         return out
 
-    def diagnostics(
+    def wall_heat_transfer(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float]:
-        base = super().diagnostics(state_in, state_out)
+        """The plate's own wall, with the gas side its discharge node decides.
+
+        The plate IS the wall the coolant flows through, so it owns it: no
+        ThermalWall connects to it. Its heat goes from the gas into the
+        effusing coolant, which discharges back into the same node, so the
+        network's energy balance is unchanged; the wall temperatures and the
+        heat flux are outputs.
+
+        COOLANT SIDE: Andrews 86-GT-225 on the plate area (`internal_heat_
+        transfer`), at the supply temperature.
+
+        GAS SIDE, by discharge node:
+
+        * a MomentumChamberNode has flow. Its own surface correlation gives
+          the UNBLOWN coefficient and gas temperature, its velocity the
+          blowing ratio. `gas_augmentation` (the caller's, 1.0 unless set;
+          never fitted -- see docs/VALIDATION_POLICY.md) scales the
+          coefficient; Andrews 88-GT-290 shows that augmentation, not a
+          film correlation, is the missing physics. `gas_film` stays 'none'
+          by default for the same reason: Baldauf + Sellers
+          ('baldauf_sellers') is selectable and reported with its envelope
+          flag, but the data refuse it offered alone.
+        * anything else (a plenum) has a state but no flow, so no
+          coefficient: the gas side is the imposed `gas_heat_flux` [W/m^2],
+          0 by default (adiabatic). Radiation is not modelled.
+
+        WALL: one layer, `wall_thickness / wall_conductivity`, through C++'s
+        wall_coupling_and_jacobian. Returns {} without coolant flow.
+        """
+        internal = self.internal_heat_transfer(state_in)
+        if not internal:
+            return {}
+        h_i = internal["h_plate_area"]
+        T_c = float(state_in.T)
+        A = self.panel_area
+        t_over_k = self.wall_thickness / self.wall_conductivity
+        out: dict[str, float] = {
+            "h_internal_plate_area": float(h_i),
+            "wall_conductivity": float(self.wall_conductivity),
+            "coolant_crossflow_ignored": float(getattr(self, "_coolant_crossflow_ignored", False)),
+            # Duct-fed: the Cd sees the crossflow, but the coolant-side heat
+            # transfer is still Andrews' still-plenum correlation (provisional
+            # until a crossflow-supply source; #471 PR4).
+            "coolant_ht_plenum_assumed": float(self.crossflow_segments is not None),
+        }
+        gas = _chamber_gas_side(getattr(self, "_discharge_node", None), state_out)
+        if gas is None:
+            q = self.gas_heat_flux
+            t_cold = T_c + q / h_i
+            out.update(
+                {
+                    "gas_side_chamber": 0.0,
+                    "gas_heat_flux_imposed": float(q),
+                    "q_wall": float(q),
+                    "Q_wall": float(q * A),
+                    "T_wall_cold": float(t_cold),
+                    "T_wall_hot": float(t_cold + q * t_over_k),
+                }
+            )
+            return out
+
+        rho_c, _ = _safe_rho(cb.density(T_c, state_out.P, state_in.X))
+        U_g, rho_g, T_g = gas["U_gas"], gas["rho_gas"], gas["T_gas"]
+        hole_area = math.pi * self.hole_diameter**2 / 4.0
+        G_jet = abs(state_in.m_dot) / (self.n_holes * hole_area)
+        blowing = G_jet / (rho_g * U_g) if U_g > 0.0 else math.inf
+        eta_film, film_extrapolated = 0.0, False
+        if self.gas_film == "baldauf_sellers" and math.isfinite(blowing):
+            film = cb.effusion_panel_film_effectiveness(
+                max(1, round(self.panel_length / self.pitch_x)),
+                self.pitch_x / self.hole_diameter,
+                self.pitch_y / self.hole_diameter,
+                blowing,
+                rho_c / rho_g,
+                self.angle_deg,
+                self.turbulence_intensity,
+            )
+            eta_film, film_extrapolated = float(film.eta), bool(film.extrapolated)
+        T_aw_g = T_g - eta_film * (T_g - T_c)
+        h_g = gas["h_unblown"] * self.gas_augmentation
+        t_hot, t_cold, q = _effusion_wall(h_i, T_c, h_g, T_aw_g, t_over_k)
+        out.update(
+            {
+                "gas_side_chamber": 1.0,
+                "h_gas_unblown": float(gas["h_unblown"]),
+                "gas_augmentation": float(self.gas_augmentation),
+                "h_gas": float(h_g),
+                "T_gas": float(T_g),
+                "T_gas_from_main_inlet": float(gas["T_from_main_inlet"]),
+                "eta_film": eta_film,
+                "film_extrapolated": float(film_extrapolated),
+                "T_adiabatic_wall": float(T_aw_g),
+                "q_wall": float(q),
+                "Q_wall": float(q * A),
+                "T_wall_hot": float(t_hot),
+                "T_wall_cold": float(t_cold),
+                "eta_overall": float((T_g - t_hot) / (T_g - T_c)) if T_g != T_c else 0.0,
+                "U_gas": float(U_g),
+                "blowing_ratio": float(blowing),
+                "density_ratio": float(rho_c / rho_g),
+                "velocity_ratio": float(G_jet / rho_c / U_g) if U_g > 0.0 else math.inf,
+            }
+        )
+        return out
+
+    def diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float]:
+        base = super().diagnostics(state_in, state_out, flows)
         m_dot = abs(state_in.m_dot)
         dP_drive = state_in.Pt - state_out.P
+        if self.crossflow_segments is not None:
+            u1_vi, _ = self._supply_crossflow(state_in, state_out, flows)
+            # Rohde-scored bounds of McGreehan-Schotsch's crossflow term
+            # (orifice_discharge_coefficient.md): about +8% while U1/Vi < 0.2,
+            # degrading badly beyond 0.35, worst for sharp edges.
+            base.update(
+                {
+                    "U1_over_Vi": float(u1_vi),
+                    "crossflow_cd_beyond_8pct": float(u1_vi > 0.2),
+                    "crossflow_cd_degraded": float(u1_vi > 0.35),
+                }
+            )
         out = {
             "n_holes": float(self.n_holes),
             "hole_count_exact": float(self.hole_count_exact),
@@ -2715,10 +3649,347 @@ class EffusionPlateElement(OrificeElement):
             # into a healthy net outflow. Say it instead.
             "is_ingesting": float(dP_drive <= 0.0),
         }
-        # Coolant-side heat transfer, when there is flow to carry it.
+        # Coolant-side heat transfer, when there is flow to carry it, and the
+        # plate's own wall with the gas side its discharge node decides.
         out.update(self.internal_heat_transfer(state_in))
+        out.update(self.wall_heat_transfer(state_in, state_out))
         out.update(base)
         return out
+
+
+@dataclass
+class _ImpingementPlateResult:
+    """What ``ImpingementPlateElement.htc_and_T`` returns to the wall code.
+
+    ``dh_dsources`` is the part no other element has: the derivative of ``h``
+    with respect to each crossflow source's mass flow at this plate's
+    ``to_node``, keyed by element id. The solver relays it through the
+    element's ``network_flow_inputs()`` (#465).
+    """
+
+    h: float
+    Nu: float
+    Re: float
+    Pr: float
+    T_aw: float
+    Gc_Gj: float
+    extrapolated: bool = False
+    dh_dmdot: float = 0.0
+    dh_dT: float = 0.0
+    dT_aw_dmdot: float = 0.0
+    dT_aw_dT: float = 1.0
+    dh_dsources: dict[str, float] = field(default_factory=dict)
+
+
+class ImpingementPlateElement(OrificeElement):
+    """One spanwise row of an impingement jet plate, with its target wall (#465).
+
+    The element's mass flow IS the row's jet flow: it leaves the supply plenum
+    (``from_node``) through ``n_holes`` holes and joins the crossflow channel
+    between jet plate and target (``to_node``). So the same element carries
+    the orifice flow AND the Florschuetz, Truman and Metzger (1981) heat
+    transfer on the target, which is what ``ImpingementModel`` on a
+    ``ChannelElement`` cannot do: there the element's flow is the channel's.
+
+    A full array is a chain, one plate per row:
+
+        supply plenum ---+---------------+---------------+
+                         |               |               |
+                    [Plate 1]       [Plate 2]       [Plate 3]
+                         |               |               |
+        crossflow:      c1 --[Channel]-- c2 --[Channel]-- c3 --[Channel]-- exit
+
+    CROSSFLOW FROM THE NETWORK. Florschuetz's crossflow-to-jet mass velocity
+    ratio is
+
+        Gc/Gj = (m_c / m_j) (pi/4) / ((yn/d)(z/d))
+
+    with ``m_j`` this row's jet flow and ``m_c`` the crossflow APPROACHING the
+    row: every inflow to ``to_node`` except this element's own. In the chain
+    above that is the channel from the previous crossflow node, which carries
+    rows 1..i-1 -- Florschuetz's Eq. 8 evaluated at x - xn/2. The ratio is
+    read from the solved flows, not from the uniform-supply closed form, so a
+    non-uniform supply, a row of different geometry, or a bleed shows up in
+    the heat transfer. ``h`` therefore depends on a NEIGHBOUR's mass flow; the
+    element exposes that as ``dh_dsources`` and the solver relays it into the
+    Jacobian.
+
+    An INITIAL crossflow (flow entering upstream of row 1) is representable
+    but outside the source: Florschuetz et al. (1981) had none. ``Gc/Gj``
+    beyond 0.8 is flagged by the set's own range check.
+
+    THE TARGET. ``surface.area`` is the target footprint of the holes,
+    ``n_holes * xn * yn``. ``T_aw`` is the supply plenum temperature, which
+    is Florschuetz's own reference temperature for h (plenum-fed, so static
+    and total coincide). The heat leaves the wall into ``to_node``: the
+    spent air carries it downstream.
+
+    DISCHARGE COEFFICIENT. Default ``'fixed'`` at Florschuetz's own 0.79
+    (measured 0.73-0.85 across their plates). The hole Cd does not depend on
+    the crossflow: McGreehan-Schotsch's ``U1/Vi`` is the SUPPLY-side
+    approach velocity, zero for a plenum, never Gc/Gj. Selectable
+    alternatives, never chosen automatically: ``'IdelchikThick'``,
+    ``'Lichtarowicz'`` (long hole, l/d 2-10) and ``'McGreehanSchotsch'``.
+    ``Cd_in_range`` in the diagnostics says whether the plate is inside the
+    chosen correlation's source range.
+
+    NOT MODELLED. The temperature sensitivity of the correlation's
+    properties (``dh_dT`` is 0, the same documented gap the channel
+    impingement path has), the crossflow's own temperature (Florschuetz
+    referenced h to the plenum), and the jet plate's own heat pick-up.
+
+    Parameters
+    ----------
+    d_jet : float
+        Hole diameter [m].
+    xn_d, yn_d, z_d : float
+        Streamwise pitch, spanwise pitch and plate-to-target gap over d_jet.
+    span : float
+        Plate span [m]; ``n_holes = round(span / (yn_d d_jet))``.
+    plate_thickness : float
+        Jet plate thickness [m]: the hole length the Cd correlations read.
+    pattern : {'inline', 'staggered'}
+        Selects Florschuetz's inline or staggered set when
+        ``correlation_set`` is None.
+    row : int or None
+        Only for diagnostics: when given, ``Gc_Gj_closed_form`` reports Eq. 8
+        at this row beside the network value.
+    Nu_multiplier : float
+        The user's rig-matching knob. 1.0 unless they set it.
+    """
+
+    # htc_and_T's dh_dmdot comes from C++ in the signed jet flow (#481).
+    _htc_dmdot_is_signed = True
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        d_jet: float,
+        xn_d: float,
+        yn_d: float,
+        z_d: float,
+        span: float,
+        plate_thickness: float,
+        pattern: Literal["inline", "staggered"] = "inline",
+        correlation: str = "fixed",
+        Cd: float = cb.FLORSCHUETZ_1981_DEFAULT_CD,
+        correlation_set: object | None = None,
+        row: int | None = None,
+        Nu_multiplier: float = 1.0,
+        edge_radius: float = 0.0,
+    ) -> None:
+        for name, val in (
+            ("d_jet", d_jet),
+            ("xn_d", xn_d),
+            ("yn_d", yn_d),
+            ("z_d", z_d),
+            ("span", span),
+            ("plate_thickness", plate_thickness),
+            ("Nu_multiplier", Nu_multiplier),
+        ):
+            if val <= 0.0:
+                raise ValueError(f"ImpingementPlateElement: {name} must be positive")
+        if pattern not in ("inline", "staggered"):
+            raise ValueError("ImpingementPlateElement: pattern is 'inline' or 'staggered'")
+
+        n_exact = span / (yn_d * d_jet)
+        n_holes = int(round(n_exact))
+        if n_holes < 1:
+            raise ValueError(
+                f"ImpingementPlateElement: the span holds {n_exact:.3g} holes at this "
+                "spanwise pitch, which rounds to none."
+            )
+
+        self.d_jet = d_jet
+        self.xn_d = xn_d
+        self.yn_d = yn_d
+        self.z_d = z_d
+        self.span = span
+        self.pattern = pattern
+        self.row = row
+        self.Nu_multiplier = float(Nu_multiplier)
+        self.n_holes = n_holes
+        self.hole_count_exact = n_exact
+        if correlation_set is None:
+            correlation_set = (
+                cb.florschuetz_1981_inline()
+                if pattern == "inline"
+                else cb.florschuetz_1981_staggered()
+            )
+        self.correlation_set = correlation_set
+
+        super().__init__(
+            id,
+            from_node,
+            to_node,
+            Cd=Cd,
+            area=n_holes * math.pi * d_jet * d_jet / 4.0,
+            correlation=correlation,
+            plate_thickness=plate_thickness,
+            edge_radius=edge_radius,
+        )
+        # The target footprint of the holes this element flows.
+        self.surface = ConvectiveSurface(area=n_holes * xn_d * yn_d * d_jet * d_jet)
+        self._row_geometry = cb.JetRowGeometry(
+            d=d_jet, xn_d=xn_d, yn_d=yn_d, z_d=z_d, n_holes=float(n_holes)
+        )
+        self._crossflow_sources: list[str] = []
+
+    @property
+    def has_convective_surface(self) -> bool:
+        return True
+
+    def _hole_count(self) -> float:
+        return float(self.n_holes)
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """A plate has no pipe, so no beta; the correlations see one hole.
+        The crossflow sources are every other inflow to ``to_node``."""
+        self._orifice_geom = cb.OrificeGeometry()
+        self._orifice_geom.d = self.d_jet
+        self._orifice_geom.D = 0.0
+        self._orifice_geom.t = self.plate_thickness
+        self._orifice_geom.r = self.edge_radius
+        self.beta = 0.0
+        self._crossflow_sources = [
+            e.id for e in graph.get_upstream_elements(self.to_node) if e.id != self.id
+        ]
+        self._topology_error = self._configuration_error(graph)
+
+    def _configuration_error(self, graph: "FlowNetwork") -> str | None:
+        """Why this wiring is not the configuration the model covers, or None.
+
+        Florschuetz et al. (1981) is ONE configuration: spent air leaving down
+        the channel, the crossflow generated by the rows themselves. A
+        hand-wired network can describe others that look alike but are not:
+
+        * spent air leaving through the target or between the jets (#468):
+          the row's node must drain through one ImpingementCrossflowElement;
+        * an external, bypass crossflow (#467): every stream feeding the
+          crossflow chain upstream must be another row's jets;
+        * two plates merging at one node would read each other's jets as
+          crossflow.
+        """
+        out = graph.get_downstream_elements(self.to_node)
+        if len(out) != 1 or not isinstance(out[0], ImpingementCrossflowElement):
+            return (
+                f"its node {self.to_node!r} must drain through exactly one "
+                "ImpingementCrossflowElement. Spent air leaving through the "
+                "target (impingement-effusion/film) or between the jets is a "
+                "different configuration with no model yet (#468)."
+            )
+        node, seen = self.to_node, set()
+        while node not in seen:
+            seen.add(node)
+            inflow = [e for e in graph.get_upstream_elements(node) if e.id != self.id]
+            plates = [e for e in inflow if isinstance(e, ImpingementPlateElement)]
+            segments = [e for e in inflow if isinstance(e, ImpingementCrossflowElement)]
+            if len(plates) > (0 if node == self.to_node else 1):
+                return (
+                    f"node {node!r} has more than one plate merging; each row "
+                    "needs its own crossflow node."
+                )
+            other = [e for e in inflow if e not in plates and e not in segments]
+            if other:
+                return (
+                    f"crossflow node {node!r} is fed by {other[0].id!r}, which is "
+                    "not a jet row: an external or bypass crossflow is a "
+                    "different configuration with no model yet (#467)."
+                )
+            if not segments:
+                break
+            node = segments[0].from_node
+        return None
+
+    def validate(self) -> None:
+        super().validate()
+        if self.correlation in ("ReaderHarrisGallagher", "Stolz", "Miller"):
+            raise ValueError(
+                f"ImpingementPlateElement {self.id!r}: {self.correlation!r} is a "
+                "metering correlation for a plate in a pipe; a jet plate has no "
+                "pipe and no beta. Use 'fixed', 'IdelchikThick', 'Lichtarowicz' "
+                "or 'McGreehanSchotsch'."
+            )
+        if getattr(self, "_topology_error", None):
+            raise ValueError(
+                f"ImpingementPlateElement {self.id!r}: covers jet rows whose spent "
+                "air leaves down the crossflow channel (Florschuetz et al. "
+                f"1981) only; {self._topology_error}"
+            )
+
+    def network_flow_inputs(self) -> list[tuple[str, str]]:
+        """(element id, node id) of every flow ``htc_and_T`` reads besides its
+        own: the crossflow sources, each read at ``to_node``."""
+        return [(eid, self.to_node) for eid in self._crossflow_sources]
+
+    def residuals(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """The orifice flow. ``flows`` is accepted and unused: the hole Cd
+        does not depend on the crossflow (see the class docstring)."""
+        return super().residuals(state_in, state_out)
+
+    def htc_and_T(
+        self, state: NetworkMixtureState, flows: dict[str, float] | None = None
+    ) -> _ImpingementPlateResult:
+        """Target-side h from this row's jets and the network's crossflow.
+
+        ``state`` is the supply (``from_node``) state with ``m_dot`` set to
+        this element's flow; ``flows`` maps each crossflow source to its flow
+        into ``to_node``. Without ``flows`` the row sees no crossflow. The
+        physics and both flow derivatives are C++'s ``jet_row_heat_transfer``.
+        """
+        flows = flows or {}
+        cs = cb.complete_state(state.T, state.P, state.X)
+        tr = cs.transport
+        m_c = float(sum(flows.get(eid, 0.0) for eid in self._crossflow_sources))
+        row = cb.jet_row_heat_transfer(
+            self.correlation_set, self._row_geometry, float(state.m_dot), m_c, tr.mu, tr.k, tr.Pr
+        )
+        mult = self.Nu_multiplier
+        return _ImpingementPlateResult(
+            h=row.h * mult,
+            Nu=row.Nu,
+            Re=row.Re_j,
+            Pr=tr.Pr,
+            T_aw=float(state.T),
+            Gc_Gj=row.Gc_Gj,
+            extrapolated=bool(row.extrapolated),
+            dh_dmdot=row.dh_dm_jet * mult,
+            dh_dsources=dict.fromkeys(self._crossflow_sources, row.dh_dm_crossflow * mult),
+        )
+
+    def diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float]:
+        base = super().diagnostics(state_in, state_out)
+        if not base:
+            return base
+        r = self.htc_and_T(state_in, flows=flows)
+        out = {
+            "n_holes": float(self.n_holes),
+            "Re_j": float(r.Re),
+            "Nu": float(r.Nu),
+            "htc": float(r.h),
+            "T_aw": float(r.T_aw),
+            "Gc_Gj": float(r.Gc_Gj),
+            "surface_extrapolated": float(r.extrapolated),
+        }
+        if self.row is not None:
+            # Florschuetz's uniform-supply Eq. 8 at this row, for comparison.
+            cd = self._effective_Cd(state_in, state_out)
+            out["Gc_Gj_closed_form"] = float(
+                cb.crossflow_to_jet_ratio_at_row(self.yn_d, self.z_d, cd, self.row)
+            )
+        return {**base, **out}
 
 
 class EffectiveAreaConnectionElement(OrificeElement):
@@ -3078,6 +4349,7 @@ class PressureLossElement(NetworkElement):
             diameter=diameter,
             length=length,
             T_hot=math.nan,
+            flow_area=self.area,
         )
 
     def unknowns(self) -> list[str]:
@@ -3226,6 +4498,22 @@ class PressureLossElement(NetworkElement):
         # Residual: Pt_out - Pt_in * (1 - xi) = 0.
         res = [state_out.Pt - state_in.Pt * (1.0 - xi)]
 
+        # The Jacobian is differenced (one or two correlation calls per
+        # variable and per species present), so it is computed only when the
+        # solver reads it (LazyJacobian, #489).
+        def jacobian() -> dict[int, dict[str, float]]:
+            return self._jacobian(state_in, graph, ctx, xi, dxi_dtheta)
+
+        return res, LazyJacobian(jacobian)
+
+    def _jacobian(
+        self,
+        state_in: NetworkMixtureState,
+        graph: "FlowNetwork | None",
+        ctx: SimpleNamespace,
+        xi: float,
+        dxi_dtheta: float,
+    ) -> dict[int, dict[str, float]]:
         jac: dict[int, dict[str, float]] = {
             0: {
                 f"{self.from_node}.Pt": -(1.0 - xi),
@@ -3270,8 +4558,67 @@ class PressureLossElement(NetworkElement):
             dxi_dT_in = _dxi_dvar("T_in", ctx.T_in, 0.01)
             if dxi_dT_in != 0.0:
                 jac[0][f"{self.from_node}.T"] = state_in.Pt * dxi_dT_in
+        elif graph is not None and ctx.T_in > 0:
+            self._add_unburned_jacobian(jac[0], graph, ctx, state_in.Pt, dxi_dtheta, _dxi_dvar)
 
-        return res, jac
+        # Composition of the inlet state (a head loss's density): per species
+        # present, other mass fractions fixed, relayed as "{node}.Y[k]". A
+        # combustor's burned composition moves with its fuel flow; this column
+        # was missing (#481 C1).
+        Y_in = list(state_in.Y)
+        X_saved = ctx.X_in
+        try:
+            for k, y in enumerate(Y_in):
+                if not y > 0.0:
+                    continue
+                h = min(1e-6, 0.5 * y)
+                xi_pm = []
+                for sgn in (1.0, -1.0):
+                    Yk = list(Y_in)
+                    Yk[k] += sgn * h
+                    ctx.X_in = list(cb.mass_to_mole(Yk))
+                    xi_pm.append(self.correlation(ctx)[0])
+                d = (xi_pm[0] - xi_pm[1]) / (2.0 * h)
+                if d != 0.0:
+                    jac[0][f"{self.from_node}.Y[{k}]"] = state_in.Pt * d
+        finally:
+            ctx.X_in = X_saved
+
+        return jac
+
+    def _add_unburned_jacobian(
+        self,
+        row: dict[str, float],
+        graph: "FlowNetwork",
+        ctx: SimpleNamespace,
+        Pt_in: float,
+        dxi_dtheta: float,
+        dxi_dvar: Callable[[str, float, float], float],
+    ) -> None:
+        """d(res)/d(unknowns) through the source's UNBURNED temperature (#481 C1).
+
+        T_u enters twice: theta = T_b/T_u - 1 (d theta/dT_u = -T_b/T_u^2) and
+        as the correlation's reference temperature ctx.T_in (a head loss's
+        density). T_u = sum(m_i Tt_i)/M over the source's inflows, so
+        dT_u = sum((Tt_i - T_u)/M dm_i + m_i/M dTt_i): the flows' unknowns
+        directly, each Tt_i through its node's relayed "{src}.T". It was
+        missing: d/d(fuel flow) read 0 against 95 by differences.
+        """
+        src = graph.nodes[self._theta_source_resolved]
+        streams = getattr(src, "_unburned_streams", None)
+        M = sum(m for m, _, _, _ in streams) if streams else 0.0
+        if not streams or M <= 0.0:
+            return
+        T_u, T_b = ctx.T_in, ctx.T_ad
+        dres_dTu = Pt_in * (dxi_dtheta * (-T_b / (T_u * T_u)) + dxi_dvar("T_in", T_u, 0.01))
+        if dres_dTu == 0.0:
+            return
+        for m, Tt, names, src_node in streams:
+            for var, coeff in names.items():
+                row[var] = row.get(var, 0.0) + dres_dTu * (Tt - T_u) / M * coeff
+            if src_node is not None:
+                key = f"{src_node}.T"
+                row[key] = row.get(key, 0.0) + dres_dTu * m / M
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
@@ -3340,15 +4687,15 @@ class ChannelElement(NetworkElement):
         friction factor is restated in this file.
 
     Convective surfaces
-        A ``ConvectiveSurface`` adds heat transfer and modifies the drop, in
-        one of two ways. Ribbed and dimpled surfaces contribute a MULTIPLIER on
-        pipe friction, both geometry-only. Pin-fin and impingement arrays
-        instead OWN their drop: those correlations return dP directly, and the
-        element takes it rather than converting it into a multiplier -- see
-        ``residuals``. Provenance for each correlation lives with it in
-        ``cooling_correlations.h`` and ``heat_transfer.h``: Chyu et al. (1997)
-        for dimples, Metzger for pin fins, Florschuetz (1981) / Martin (1977)
-        for impingement.
+        A ``ConvectiveSurface`` adds heat transfer. Ribbed and pin-fin surfaces
+        also OWN the drop: their correlations return the channel's friction
+        factor (ribs: the four-sided Darcy value; pins: Metzger's per-row
+        ``dP / (2 rho Vmax^2 N)``), and the element uses it directly rather
+        than as a multiplier on pipe friction -- see ``_ribbed_residuals`` and
+        ``_pin_fin_residuals``. Impingement surfaces leave the drop to the
+        smooth path (model the jet plate with an ``OrificeElement``).
+        Provenance lives with each correlation set: ``rib_correlation.h``,
+        ``pin_fin_correlation.h``, ``impingement_correlation.h``.
 
     Known gaps
         The array correlations expose no dP sensitivity to static pressure or
@@ -3501,18 +4848,183 @@ class ChannelElement(NetworkElement):
         }
         return res, jac
 
-    def _exit_head_lost(self, m_dot: float) -> bool:
-        """Whether this channel's exit dynamic head is lost downstream.
+    def _pin_fin_residuals(self, state_in: NetworkMixtureState, state_out: NetworkMixtureState):
+        """Pin-fin array: the correlation owns the drop, per row.
 
-        Only a PressureBoundary declares a coupling; anything else (a plenum, a
-        momentum chamber, a junction port) carries its own constitutive
-        relation and receives the stagnation pressure as before. See #360.
+            dP = 2 rho Vmax^2 N f(Re_D),   Vmax = mdot / (rho A_min)
+               = 2 N f mdot |mdot| / (rho A_min^2)
+            Re_D = mdot D / (mu A_min)                          (signed)
+
+        with ``A_min = A_channel * (A_min/A_frontal)`` from the array geometry
+        and ``f`` the canonical per-row factor of ``pin_fin_correlation.h``.
+        Unlike ribs, pin friction DOES depend on Re, so
+
+            d(dP)/dmdot = 2N/(rho A_min^2) (2 |mdot| f + mdot |mdot| f' D/(mu A_min))
+
+        which is even in mdot, as the ribbed path's. Upstream T and P enter
+        through rho (``-dP/rho``) and through mu in Re
+        (``dP/df * f' * (-Re/mu) * dmu``), both from analytic or tabulated
+        property derivatives (``density_and_jacobians``,
+        ``viscosity_and_jacobians``). Composition sensitivity is the same
+        accepted gap as every other channel-friction path here.
         """
-        node = getattr(self, "_downstream_node", None)
+        m_dot = state_in.m_dot
+        model = self.surface.model
+        f_mult = self.surface.f_multiplier
+
+        rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
+            state_in.T, state_in.P, state_in.X
+        )
+        rho, drho_draw = _safe_rho(rho_raw)
+        drho_dT = drho_draw * drho_raw_dT
+        drho_dP = drho_draw * drho_raw_dP
+        area = self.area or 0.0
+        if area <= 0.0:
+            return [state_in.Pt - state_out.Pt], {
+                0: {
+                    f"{self.from_node}.Pt": 1.0,
+                    f"{self.to_node}.Pt": -1.0,
+                }
+            }
+
+        mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
+            state_in.T, state_in.P, state_in.X
+        )
+        D = model.pin_diameter
+        a_min = area * cb.pin_fin_amin_over_afrontal(model.geometry())
+        Re = m_dot * D / (a_min * mu) if mu > 0.0 else 0.0
+
+        _, _, f, df_dRe, _ = self.surface._pin_fin_terms(Re, 0.7)
+        f *= f_mult
+        df_dRe *= f_mult
+
+        coeff = 2.0 * model.N_rows / (rho * a_min * a_min)
+        dP = coeff * f * m_dot * abs(m_dot)
+        dRe_dmdot = D / (a_min * mu) if mu > 0.0 else 0.0
+        d_dP_d_mdot = coeff * (2.0 * abs(m_dot) * f + m_dot * abs(m_dot) * df_dRe * dRe_dmdot)
+
+        # Through rho (dP ~ 1/rho at fixed f) and through mu in Re.
+        d_dP_drho = -dP / rho if rho > 0.0 else 0.0
+        d_dP_dmu = coeff * m_dot * abs(m_dot) * df_dRe * (-Re / mu) if mu > 0.0 else 0.0
+        d_dP_dT = d_dP_drho * drho_dT + d_dP_dmu * dmu_dT
+        d_dP_dP_static = d_dP_drho * drho_dP + d_dP_dmu * dmu_dP
+
+        res = [state_in.Pt - state_out.Pt - dP]
+        jac = {
+            0: {
+                f"{self.id}.m_dot": -d_dP_d_mdot,
+                f"{self.from_node}.Pt": 1.0,
+                f"{self.to_node}.Pt": -1.0,
+                f"{self.from_node}.T": -d_dP_dT,
+                f"{self.from_node}.P": -d_dP_dP_static,
+            }
+        }
+        return res, jac
+
+    @property
+    def residual_scale_kind(self) -> str:
+        """Units of this element's residual row (RESIDUAL-ROW-SCALING, see
+        NetworkSolver._build_residual_scales): "mdot" for the compressible
+        mass-flow form m - m_calc (#481), "p" for the pressure-drop forms
+        (incompressible, ribbed, pin-fin). Must change with the residual."""
+        if self.regime == "compressible" and not (
+            self.surface and isinstance(self.surface.model, (RibbedModel, PinFinModel))
+        ):
+            return "mdot"
+        return "p"
+
+    def _exit_head_lost(self, m_dot: float) -> bool:
+        """Whether this channel's exit dynamic head is lost where it discharges.
+
+        The exit is the node the flow goes INTO: to_node forward, from_node
+        when reversed. Only a PressureBoundary declares a coupling; anything
+        else (a plenum, a momentum chamber, a junction port) carries its own
+        constitutive relation and receives the stagnation pressure. See #360.
+        """
+        attr = "_downstream_node" if m_dot >= 0.0 else "_upstream_node"
+        node = getattr(self, attr, None)
         if node is None or not hasattr(node, "exit_head_lost"):
             return False
-        # Flow leaving this element toward the boundary is an OUTflow at it.
-        return bool(node.exit_head_lost(m_dot >= 0.0))
+        return bool(node.exit_head_lost(True))
+
+    def _compressible_flow(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        f_mult: float,
+        derivatives: bool = True,
+    ) -> tuple[float, dict[str, float], Any]:
+        """Fanno mass flow m_calc and d(m_calc)/d(node unknowns) (#481).
+
+        The duct is fed isentropically from the stagnation state of the node
+        the flow comes FROM and discharges against the other node's
+        stagnation pressure, matched to its exit static pressure (head lost)
+        or exit stagnation pressure (recovered). The flux rises monotonically
+        as that pressure falls and saturates at the choked flux: it exists for
+        every state, so there is no infeasible region and no barrier.
+
+        derivatives=False returns m_calc only (empty derivs): the kernel then
+        skips its implicit derivatives. With derivatives, d/dY of the feeding
+        node is included where its composition moves with the solve: the
+        solver sets _composition_directions -- per such node, an orthonormal
+        basis of the directions it moves in -- before it reads a Jacobian.
+        The kernel differentiates along that basis and the gradient is
+        projected back onto per-species keys, exact for every relay column.
+        Standalone (unset): per species present, other fractions fixed.
+        """
+        A = self.area
+        forward = state_in.Pt >= state_out.Pt
+        src, dst = (state_in, state_out) if forward else (state_out, state_in)
+        src_id, dst_id = (
+            (self.from_node, self.to_node) if forward else (self.to_node, self.from_node)
+        )
+        lost = self._exit_head_lost(1.0 if forward else -1.0)
+        known = getattr(self, "_composition_directions", None)
+        if not derivatives:
+            dirs: list[Any] = []
+        elif known is None:
+            n_sp = len(src.Y)
+            dirs = [[float(j == k) for j in range(n_sp)] for k, y in enumerate(src.Y) if y > 0.0]
+        else:
+            dirs = known.get(src_id, [])
+        flow = cb.fanno_channel_flow(
+            src.Pt,
+            src.Tt,
+            src.X,
+            dst.Pt,
+            not lost,
+            self.length,
+            self.diameter,
+            self.roughness,
+            self.friction_model,
+            f_mult,
+            getattr(self, "_last_M_exit", -1.0),
+            [list(v) for v in dirs],
+            derivatives,
+        )
+        # Warm start only: the flow does not depend on it.
+        if not flow.choked:
+            self._last_M_exit = float(flow.M_exit)
+        sign = 1.0 if forward else -1.0
+        if not derivatives:
+            return sign * A * flow.G, {}, flow
+        derivs = {
+            f"{src_id}.Pt": sign * A * flow.dG_dPt0,
+            f"{src_id}.T": sign * A * flow.dG_dTt0,
+            f"{dst_id}.Pt": sign * A * flow.dG_dP_target,
+        }
+        # Composition of the feeding node: the directional derivatives
+        # projected back onto species, g = sum_i (dG/dv_i) v_i, chained by the
+        # solver with dY/dx from its mixing relay.
+        if dirs:
+            g = [0.0] * len(src.Y)
+            for d, v in zip(flow.dG_ddir, dirs, strict=True):
+                for k, vk in enumerate(v):
+                    g[k] += d * float(vk)
+            for k, gk in enumerate(g):
+                if gk != 0.0:
+                    derivs[f"{src_id}.Y[{k}]"] = sign * A * gk
+        return sign * A * flow.G, derivs, flow
 
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
@@ -3528,22 +5040,27 @@ class ChannelElement(NetworkElement):
 
         if self.surface and isinstance(self.surface.model, RibbedModel):
             return self._ribbed_residuals(state_in, state_out)
+        if self.surface and isinstance(self.surface.model, PinFinModel):
+            return self._pin_fin_residuals(state_in, state_out)
 
         if self.regime == "compressible":
-            # Use compressible Fanno flow with friction
-            res_cpp = _solver_tools.channel_compressible_residuals_and_jacobian(
-                m_dot,
-                state_in.Pt,
-                state_in.Tt,
-                state_in.Y,
-                state_out.P,
-                self.length,
-                self.diameter,
-                self.roughness,
-                self.friction_model,
-                f_mult,
-                self._exit_head_lost(m_dot),
-            )
+            # Mass-flow form, like the compressible orifice: m - m_calc, with
+            # m_calc the Fanno flow the end states drive (#481). The former
+            # drop-given-m form had no physical drop past choke and patched
+            # one in with a barrier, which converged choked ducts 5-20% above
+            # their choked flow.
+            # The residual needs the flow only; its implicit derivatives are
+            # computed if and when the Jacobian is read (LazyJacobian, #489).
+            m_calc, _, _ = self._compressible_flow(state_in, state_out, f_mult, derivatives=False)
+
+            def jacobian() -> dict[int, dict[str, float]]:
+                _, derivs, _ = self._compressible_flow(state_in, state_out, f_mult)
+                jac_c: dict[str, float] = {f"{self.id}.m_dot": 1.0}
+                for name, d in derivs.items():
+                    jac_c[name] = jac_c.get(name, 0.0) - d
+                return {0: jac_c}
+
+            return [m_dot - m_calc], LazyJacobian(jacobian)
         else:
             # Use incompressible Darcy-Weisbach formulation. Density
             # reference: upstream static by default, downstream static when
@@ -3588,9 +5105,7 @@ class ChannelElement(NetworkElement):
                 f"{downstream_id}.Pt": -1.0,
             }
         }
-        if self.regime != "compressible" and (
-            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-        ):
+        if getattr(self, "_incompressible_p_ref", "inlet") == "outlet":
             # Density evaluated at the downstream static: the friction-loss
             # pressure sensitivity moves onto the downstream node's P.
             jac[0][f"{downstream_id}.P"] = -res_cpp.d_dP_dP_static_up
@@ -3626,8 +5141,15 @@ class ChannelElement(NetworkElement):
         mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 and v_out > 0 else 0.0
 
         h_res = self.htc_and_T(state_in)
+        surface_diag: dict[str, float] = {}
         if h_res is not None:
             Nu, htc, T_aw, f = h_res.Nu, h_res.h, h_res.T_aw, h_res.f
+            # The surface correlation's own Re (jet Re_j for impingement, pin
+            # Re_D for pin fins) and whether it is outside its validity box.
+            surface_diag["Re_surface"] = float(h_res.Re)
+            surface_diag["surface_extrapolated"] = float(
+                bool(getattr(h_res, "extrapolated", False))
+            )
         else:
             Nu, htc, T_aw = 0.0, 0.0, state_in.T
             dh_diag = self.Dh or self.diameter or 1.0
@@ -3646,15 +5168,30 @@ class ChannelElement(NetworkElement):
                 # its own pressure drop.
                 f = cb._core.friction_and_jacobian(self.friction_model, re_eff, e_D).result[0]
 
+        duct: dict[str, float] = {}
+        if self.regime == "compressible":
+            # The duct's own Fanno solution: inlet and exit Mach inside the
+            # duct (the node states above are the plenum/boundary states), and
+            # whether it is choked -- its flow then independent of the back
+            # pressure.
+            f_mult = self.surface.f_multiplier if self.surface else 1.0
+            _, _, flow = self._compressible_flow(state_in, state_out, f_mult, derivatives=False)
+            duct = {
+                "choked": float(flow.choked),
+                "M_in_duct": float(flow.M_in),
+                "M_exit_duct": float(flow.M_exit),
+            }
         return {
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
+            **duct,
             "Dh": float(self.Dh or self.diameter or 0.0),
             "Nu": float(Nu),
             "htc": float(htc),
             "T_aw": float(T_aw),
             "f": float(f),
+            **surface_diag,
         }
 
     def get_spatial_profile(
@@ -3686,17 +5223,34 @@ class ChannelElement(NetworkElement):
             return res.profile
 
         elif self.regime == "compressible":
-            res = cb.fanno_channel(
-                state_in.T,
-                state_in.P,
-                cb.mass_to_mole(
-                    state_in.Y
-                ),  # C++ expects mole fractions for Fanno solver currently
-                state_in.m_dot,
+            # The x-march from the duct's inlet STATIC state, which the Mach
+            # solution gives (isentropic from the feeding node's stagnation
+            # state). It called fanno_channel with its arguments out of order
+            # and raised for every compressible channel (#481).
+            G = abs(state_in.m_dot) / self.area
+            if G <= 0.0:
+                return []
+            duct = cb.fanno_duct(
+                state_in.Pt,
+                state_in.Tt,
+                G,
+                state_in.X,
                 self.length,
                 self.diameter,
                 self.roughness,
                 self.friction_model,
+                self.surface.f_multiplier if self.surface else 1.0,
+            )
+            res = cb.fanno_channel_rough(
+                duct.inlet.T,
+                duct.inlet.P,
+                duct.inlet.u,
+                self.length,
+                self.diameter,
+                self.roughness,
+                state_in.X,
+                self.friction_model,
+                self.surface.f_multiplier if self.surface else 1.0,
                 n_steps,
                 True,
             )
@@ -3737,6 +5291,7 @@ class ChannelElement(NetworkElement):
             diameter=self.Dh or self.diameter,
             length=self.length,
             T_hot=T_hot,
+            flow_area=self.area,
         )
 
     def n_equations(self) -> int:
@@ -3746,7 +5301,9 @@ class ChannelElement(NetworkElement):
         # Cached for the exit-coupling lookup in residuals (#360); done before
         # the early return so it is set even when the diameter is explicit.
         self._downstream_node = graph.nodes.get(self.to_node)
+        self._upstream_node = graph.nodes.get(self.from_node)
         if self.diameter is not None:
+            self._fill_convective_area()
             return
         # Inherit diameter from the nearest geometry source. The channel's
         # area sets its friction and Mach behaviour, so a defaulted diameter
@@ -3764,8 +5321,272 @@ class ChannelElement(NetworkElement):
         if self.Dh is None:
             self.Dh = self.diameter
         # Update convective surface area (was 0 if diameter was deferred)
+        self._fill_convective_area()
+
+    def default_convective_area(self) -> float:
+        """The convective area a surface gets when none was set, by model.
+
+        * Impingement array (one row): the row's target footprint matched to
+          this channel's crossflow cross-section. The channel is z wide in
+          the jet direction, so its span is ``A_flow / z`` and the footprint
+          ``xn * span = A_flow * (xn/d) / (z/d)``; the hole count then
+          follows from the channel itself (#462).
+        * Single jet: the disc of radius ``R`` that Goldstein et al. (1986)
+          average Nu over (Han Eq. 4.1 is an AVERAGE Nu out to R/D),
+          ``pi (R_D d_jet)^2``.
+        * Anything else: the wetted wall, ``pi D L``.
+        """
+        model = self.surface.model if self.surface else None
+        if isinstance(model, ImpingementModel) and self.area and model.z_d > 0.0:
+            return self.area * model.xn_d / model.z_d
+        if isinstance(model, SingleJetImpingementModel):
+            return math.pi * (model.R_D * model.d_jet) ** 2
+        return math.pi * (self.diameter or 0.0) * self.length
+
+    def _fill_convective_area(self) -> None:
         if self.surface and self.surface.area == 0.0:
-            self.surface.area = math.pi * self.diameter * self.length
+            self.surface.area = self.default_convective_area()
+
+
+class CrossflowSegmentElement(ChannelElement):
+    """A channel segment between side-stream STATIONS: merges and bleeds (#465, #471).
+
+    A ``ChannelElement`` (friction, stagnation-pressure coupling) plus the
+    momentum of side streams joining or leaving at its end nodes. Over one
+    station, ``m_a`` arriving and ``m_b`` leaving along the channel of area
+    A, with the side stream's AXIAL velocity ``kappa * u_a``, momentum gives
+    the static-pressure drop
+
+        dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+
+    * ``kappa = 0``: normal injection (impingement jets). Florschuetz's
+      P + G^2/rho = const.
+    * ``kappa = 0.75`` (``cb.STATION_KAPPA_BLEED_BASSETT``): bleed through the
+      wall. Bassett, Winterbone & Pearson's (2001) separating straight-run
+      coefficient K2/K5 (Eq. 15), theta- and psi-independent, reproduced for
+      every split.
+
+    CENTRED: a segment carries half of the station at each end, each at its
+    node's own density (C++ ``station_half_drop``), so every node holds the
+    static pressure at the middle of its station. Ends are explicit, wired by
+    whoever builds the chain:
+
+    * ``from_kappa`` with ``prev_seg``: a station at ``from_node``; the flow
+      arriving there is ``prev_seg``'s (0 if None: a closed end).
+    * ``to_kappa`` with ``next_seg``: a station at ``to_node``; the flow
+      leaving it is ``next_seg``'s.
+    * ``entry_K``: ``from_node`` is a reservoir; the segment carries the
+      entry acceleration ``(1 + K_in) m^2/(2 rho A^2)`` at the duct (to-node)
+      density instead of a from-station.
+    * an exit into a plenum (no to-station) loses the dynamic head: static
+      continuity, as any Pt-coupled channel into a plenum.
+
+    Station nodes must be PlenumNodes (Pt = P): the node pressure is the
+    channel's static pressure, which is what a side stream sees.
+
+    FRICTION follows ``ChannelElement``: Darcy-Weisbach on the
+    equivalent-area diameter (the C++ channel's circular convention, #463).
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        length: float,
+        area: float,
+        Dh: float | None = None,
+        roughness: float = 0.0,
+        regime: CompressibilityLiteral = "incompressible",
+        friction_model: FrictionModelLiteral = "haaland",
+        from_kappa: float | None = None,
+        to_kappa: float | None = None,
+        prev_seg: str | None = None,
+        next_seg: str | None = None,
+        entry_K: float | None = None,
+    ) -> None:
+        if length <= 0.0 or area <= 0.0:
+            raise ValueError(f"{type(self).__name__}: length and area must be positive")
+        if entry_K is not None and from_kappa is not None:
+            raise ValueError(
+                f"{type(self).__name__} {id!r}: from_node is either a reservoir "
+                "(entry_K) or a station (from_kappa), not both"
+            )
+        super().__init__(
+            id,
+            from_node,
+            to_node,
+            length=length,
+            diameter=math.sqrt(4.0 * area / math.pi),
+            Dh=Dh,
+            roughness=roughness,
+            regime=regime,
+            friction_model=friction_model,
+        )
+        self.from_kappa = from_kappa
+        self.to_kappa = to_kappa
+        self.prev_seg = prev_seg
+        self.next_seg = next_seg
+        self.entry_K = entry_K
+        self._prev: NetworkElement | None = None
+        self._next: NetworkElement | None = None
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        super().resolve_topology(graph)
+        self._prev = graph.elements.get(self.prev_seg) if self.prev_seg else None
+        self._next = graph.elements.get(self.next_seg) if self.next_seg else None
+
+    def network_flow_inputs(self) -> list[tuple[str, str]]:
+        """The neighbour segments' flows, each read at the station it shares."""
+        out = []
+        if self._prev is not None:
+            out.append((self._prev.id, self.from_node))
+        if self._next is not None:
+            out.append((self._next.id, self.to_node))
+        return out
+
+    def _momentum_terms(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None,
+    ) -> list[tuple["cb.StationHalfDrop", str, str | None, str, NetworkElement | None]]:
+        """Each momentum term: (C++ result, node it sits at, which derivative is
+        this segment's own flow ('a' or 'b' or None), neighbour's node, the
+        neighbour element)."""
+        flows = flows or {}
+        m = float(state_in.m_dot)
+        terms = []
+        if self.entry_K is not None:
+            r = cb.channel_entry_drop(
+                m, state_out.P, state_out.T, state_out.X, self.area, self.entry_K
+            )
+            terms.append((r, self.to_node, "a", self.to_node, None))
+        if self.from_kappa is not None:
+            m_a = flows.get(self._prev.id, 0.0) if self._prev is not None else 0.0
+            r = cb.station_half_drop(
+                m_a, m, state_in.P, state_in.T, state_in.X, self.area, self.from_kappa
+            )
+            terms.append((r, self.from_node, "b", self.from_node, self._prev))
+        if self.to_kappa is not None and self._next is not None:
+            m_b = flows.get(self._next.id, m)
+            r = cb.station_half_drop(
+                m, m_b, state_out.P, state_out.T, state_out.X, self.area, self.to_kappa
+            )
+            terms.append((r, self.to_node, "a", self.to_node, self._next))
+        return terms
+
+    def _momentum_drop_value(self, state_in, state_out, flows) -> float:
+        return float(sum(t[0].dP for t in self._momentum_terms(state_in, state_out, flows)))
+
+    def residuals(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        res, jac = super().residuals(state_in, state_out)
+        row = jac[0]
+        own = f"{self.id}.m_dot"
+        for r, node, own_side, nb_node, nb in self._momentum_terms(state_in, state_out, flows):
+            res[0] -= r.dP
+            d_own = r.d_dm_a if own_side == "a" else r.d_dm_b
+            row[own] = row.get(own, 0.0) - d_own
+            if nb is not None:
+                d_nb = r.d_dm_b if own_side == "a" else r.d_dm_a
+                names = nb.unknowns()
+                for local, coeff in nb.flow_jac_at_node(nb_node, list(range(len(names)))).items():
+                    row[names[local]] = row.get(names[local], 0.0) - d_nb * coeff
+            for key, d in ((f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)):
+                row[key] = row.get(key, 0.0) - d
+        return res, jac
+
+    def htc_and_T(self, state: NetworkMixtureState, flows: dict[str, float] | None = None):
+        return super().htc_and_T(state)
+
+    def diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float | str]:
+        out = super().diagnostics(state_in, state_out)
+        out["dP_momentum"] = self._momentum_drop_value(state_in, state_out, flows)
+        return out
+
+
+class ImpingementCrossflowElement(CrossflowSegmentElement):
+    """The crossflow channel between a jet plate and its target, one row pitch (#465).
+
+    A ``CrossflowSegmentElement`` with normal-injection stations
+    (``kappa = 0``): the jets that merge at each row arrive with NO
+    streamwise momentum, so the crossflow must accelerate them -- the
+    momentum equation behind Florschuetz, Truman and Metzger's (1981) flow
+    distribution (Eqs. 7-8), P + G_c^2/rho = const. Without it every row sees
+    the same pressure difference and the supply stays uniform; with it the
+    downstream rows draw more. Area ``height * span``.
+
+    Chain it with plenum crossflow nodes, one per row:
+
+        c1 --[Crossflow]-- c2 --[Crossflow]-- c3 --[Crossflow]-- exit
+         |                  |                  |
+      [Plate 1]          [Plate 2]          [Plate 3]
+
+    The neighbours are found from the chain itself: the crossflow segment
+    arriving at ``from_node`` (none at row 1: a closed end) and the one
+    leaving ``to_node`` (none into the exit, where the dynamic head is lost).
+    Centred, each node holds its row's mid-merge static pressure: putting the
+    whole merge downstream instead over-fed the downstream rows (Gc/Gj at row
+    10 of Florschuetz's strongest-crossflow geometry 13% below Eq. 8, against
+    a few percent centred).
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        length: float,
+        height: float,
+        span: float,
+        roughness: float = 0.0,
+        regime: CompressibilityLiteral = "incompressible",
+        friction_model: FrictionModelLiteral = "haaland",
+    ) -> None:
+        if length <= 0.0 or height <= 0.0 or span <= 0.0:
+            raise ValueError(
+                "ImpingementCrossflowElement: length, height and span must be positive"
+            )
+        super().__init__(
+            id,
+            from_node,
+            to_node,
+            length=length,
+            area=height * span,
+            Dh=2.0 * height * span / (height + span),
+            roughness=roughness,
+            regime=regime,
+            friction_model=friction_model,
+            from_kappa=cb.STATION_KAPPA_MERGE_NORMAL,
+            to_kappa=cb.STATION_KAPPA_MERGE_NORMAL,
+        )
+        self.height = height
+        self.span = span
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        prev = [
+            e
+            for e in graph.get_upstream_elements(self.from_node)
+            if isinstance(e, ImpingementCrossflowElement)
+        ]
+        nxt = [
+            e
+            for e in graph.get_downstream_elements(self.to_node)
+            if isinstance(e, ImpingementCrossflowElement)
+        ]
+        self.prev_seg = prev[0].id if prev else None
+        self.next_seg = nxt[0].id if nxt else None
+        super().resolve_topology(graph)
 
 
 class AreaChangeElement(NetworkElement):
@@ -4271,9 +6092,9 @@ class TeeJunctionElement(NetworkElement):
 
 
 # ---------------------------------------------------------------------------
-# Momentum-CV junction (momentum cv implementation guide.pdf).
-# Sanctioned successor to TeeJunctionElement: junction = pure conservation,
-# loss = separate per-port elements (BorderCarnotLossElement below).
+# Momentum-CV junction machinery (momentum cv implementation guide.pdf). The
+# residuals live in the subclasses (mpce_element.py), whose closures carry the
+# port losses; BorderCarnotLossElement below is NOT a companion for them.
 # ---------------------------------------------------------------------------
 
 
@@ -4287,17 +6108,14 @@ class MultiPortChamberBase(NetworkElement):
     its own. Its impulse-function model was deprecated in 0.5.0 and removed
     here; ``MultiPortChamberElement`` supersedes it (issue #271).
 
-    Owns one scalar unknown ``{id}.P_jct`` (junction internal static pressure).
-    Emits N per-port impulse-function residuals plus a global mass residual:
-
-        R_mom_i = (P_i + rho_i * u_i^2) - P_jct = 0     (per port)
-        R_mass  = sum_i mdot_port_i = 0                 (global)
-
-    The impulse residual is sign-free (u_i^2 is direction-invariant); the
-    sum-mass residual uses a per-port orientation derived from the topology
-    (positive = flow out of junction). All empirical loss content lives in
-    companion :class:`BorderCarnotLossElement` instances bolted onto specific
-    ports; this element itself is purely conservation.
+    Subclasses own one scalar unknown ``{id}.P_jct`` and emit N per-port
+    relations plus a global mass residual ``sum_i mdot_port_i = 0``, with a
+    per-port orientation derived from the topology (positive = flow out of
+    the junction). The per-port relation, and with it the port losses, is
+    the subclass's closure -- Mynard's for ``MultiPortChamberElement``, fixed
+    K for ``ConstantKTeeElement``. Do not add a
+    :class:`BorderCarnotLossElement` on a port as well: that double-counts
+    the turning loss (#272).
 
     Topology contract (see PDF Section 2 + addendum task #10):
 
@@ -4331,10 +6149,11 @@ class MultiPortChamberBase(NetworkElement):
     """
 
     # Opt-in for the solver's junction split seed (`_junction_split_guess`).
-    # True here because a chamber junction's port flows DO follow a Bernoulli
-    # share of the imposed port pressure differences, which is what that seed
-    # assumes. Subclasses whose port flows are set by their own internal
-    # physics must turn it off -- see `EjectorElement`.
+    # True here because a chamber junction's port flows follow from the port
+    # pressure differences: through the element's own closure where it offers
+    # `closure_split_seed` (#272), else a Bernoulli share. Subclasses whose
+    # port flows are set by their own internal physics must turn it off -- see
+    # `EjectorElement`.
     seeds_ports_by_pressure_split: bool = True
 
     def __init__(
@@ -4420,7 +6239,8 @@ class MultiPortChamberBase(NetworkElement):
 
     def row_scale_kinds(self) -> list[str]:
         """Per-row scale kind ("p" or "mdot") for the solver's row-scaling
-        vector, in the same order as `residuals()`'s returned list.
+        vector (RESIDUAL-ROW-SCALING, see NetworkSolver._build_residual_scales),
+        in the same order as `residuals()`'s returned list.
 
         Default matches this class's own impulse-CV rows: N pressure-
         magnitude rows (P_i + rho_i u_i^2 - P_jct) followed by one mass-
@@ -4615,8 +6435,30 @@ class MultiPortChamberBase(NetworkElement):
 
 class BorderCarnotLossElement(NetworkElement):
     """
-    Per-port Border-Carnot turning-loss element. Companion to
-    :class:`MultiPortChamberBase`; bolted onto lateral ports of the junction.
+    Border-Carnot turning-loss element: a two-port in-line loss. It was the
+    lateral-port companion of the momentum-CV junction's impulse model,
+    removed in 0.6.0 (#322).
+
+    DEPRECATED in 0.7.0, for removal in 0.8.0. Its residual is exactly a
+    constant head loss, so the replacement reproduces it to round-off
+    (measured 1e-11 in Pt drop and mass flow)::
+
+        PressureLossElement(id, from_node, to_node,
+            correlation=ConstantHeadLoss(
+                zeta=4 * (1 - cos(0.75 * delta)) ** 2, area=area),
+            area=area)
+
+    with ``delta`` the geometric turn in radians. The only thing this class
+    adds is that zeta formula, which was derived for a junction's lateral
+    branch -- physics both junction closures now carry -- and was never
+    compared against bend data. Choose a bend's K from a handbook instead.
+
+    NOT FOR JUNCTION PORTS. ``MultiPortChamberElement`` and
+    ``ConstantKTeeElement`` carry each port's turning loss in their own
+    closure, and adding this element double-counts it: on Bassett's 90 deg,
+    psi = 1 dividing tee, K6 at q = 0.5 is 0.867 from the closure alone
+    (Bassett 0.867) and 1.249 with this element (+16% at q = 0.3, +78% at
+    0.7; #272).
 
     Residual (PDF Section 3.1):
 
@@ -4625,13 +6467,11 @@ class BorderCarnotLossElement(NetworkElement):
 
     The (3/4) factor is Hager's effective-angle correction for sharp-edged
     lateral branches. The form is *intended* to reproduce Hager xi_l and
-    Bassett K_inc at M -> 0 on a sharp-edged 90-deg lateral, but this is NOT
-    yet demonstrated: the Tier-1 tests
-    (``python/tests/test_momentum_cv_tier1_bassett.py``) are xfail, measuring
-    11-29% deviation from Bassett K6 on the lateral. See issue #272 -- do not
-    rely on this element being quantitatively anchored to Hager/Bassett.
-    Straight-through ports (delta_geom = 0) get L = 0 and need no loss element
-    at all.
+    Bassett K_inc at M -> 0 on a sharp-edged 90-deg lateral. That was never
+    demonstrated: its only check, paired with the removed junction model,
+    missed Bassett K6 by 11-29%, and the tests went with that model (#322).
+    Do not rely on it being anchored to Hager or Bassett. delta_geom = 0
+    gives L = 0.
 
     The element is sign-free in m_dot (mdot^2 in the dynamic head). The
     initial form has no direction asymmetry parameter; an
@@ -4647,6 +6487,15 @@ class BorderCarnotLossElement(NetworkElement):
         delta_geom_deg: float,
         area: float | None = None,
     ):
+        warnings.warn(
+            "BorderCarnotLossElement is deprecated and will be removed in 0.8.0. "
+            "It is exactly PressureLossElement with "
+            "correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area); "
+            "its zeta formula is a junction-lateral loss that MultiPortChamberElement "
+            "and ConstantKTeeElement already carry, so never put it on their ports.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(id, from_node, to_node)
         self.delta_geom_deg = float(delta_geom_deg)
         self.area = area

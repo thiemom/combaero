@@ -21,6 +21,7 @@ import math
 import random
 from collections import Counter
 
+import numpy as np
 import pytest
 
 from validation.junction import random_robustness as rr
@@ -127,6 +128,43 @@ def test_an_unattainable_pressure_difference_has_no_root():
 
 def test_an_attainable_pressure_difference_does():
     assert rr.has_root(_case(drive="flow_and_pressures", k_straight=0.0, k_branch=1.0)) is True
+
+
+def test_a_root_next_to_the_ratio_pole_is_found():
+    """K_branch crosses zero inside one grid step and the target direction is
+    crossed between the pole and the next point. As the ratio K_s/K_b this
+    step runs -14 -> +9.3 and the target 11.2 is never bracketed (draw 52's
+    shape, #272); as the direction angle it is crossed."""
+    case = _case(drive="all_pressures", k_straight=1.521, k_branch=0.135)
+    straight = np.array([0.28, 0.28])
+    branch = np.array([-0.02, 0.03])
+    assert rr._direction_crossings(case, straight, branch)
+
+
+def test_a_sign_flip_through_the_ratio_pole_is_not_a_root():
+    """K_branch falls through zero: the ratio runs +50 -> +inf | -inf -> -14
+    and never equals the target 11.2, but its sign against the target flips
+    and K_branch is positive at the left point, so the ratio form called it a
+    root (the draw 142 class, #272). The direction angle goes 0.020 -> -0.071
+    and the target sits at 0.089: none."""
+    case = _case(drive="all_pressures", k_straight=1.521, k_branch=0.135)
+    straight = np.array([0.28, 0.28])
+    branch = np.array([0.0056, -0.02])
+    assert not rr._direction_crossings(case, straight, branch)
+
+
+def test_the_root_verdict_agrees_with_the_solver_where_it_used_not_to():
+    """The seven draws in the first 400 whose verdict the direction form
+    changed (#272). Every one now matches what the solver does: the five
+    with a root converge to a verified solution, the two without fail."""
+    rng = random.Random(_SEED)
+    cases = [rr.sample(rng) for _ in range(400)]
+    for i in (52, 87, 190, 235, 353):
+        assert rr.has_root(cases[i]) is True, i
+        assert rr.classify(rr.build(cases[i])) == "converged", i
+    for i in (142, 383):
+        assert rr.has_root(cases[i]) is False, i
+        assert rr.classify(rr.build(cases[i])) != "converged", i
 
 
 def test_a_draw_with_no_root_is_not_counted_as_a_solver_failure(summary):

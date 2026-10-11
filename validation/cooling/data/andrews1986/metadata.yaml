@@ -129,7 +129,7 @@
 # "X = 6.11, D = 0.64, L = 6.35" geometry Eq. (19) is printed for.
 #
 # PLATE B IS THE WORST FIT AND IS ALSO THE ONLY SPARK-ERODED PLATE.
-# Per-plate bias: a -6.2%, c -5.5%, d -12.5%, b -19.6%. Table 5 records the
+# Per-plate bias: a -2.4%, c -2.0%, d -9.3%, b -16.5% (after #485; before: a -6.2%, c -5.5%, d -12.5%, b -19.6%). Table 5 records the
 # manufacture technique, and b is the only one not drilled. Spark erosion
 # leaves a different bore finish and entry geometry than drilling, and the
 # throat term assumes a SHARP-EDGED entry -- so this is a plausible
@@ -345,7 +345,7 @@ files:
     uncertainty: null
     cross_check: >-
       Plate a: 10 x 10 array, Drilled. Scored against Andrews Eqs. (18)
-      plus (12) at bias -6.2%. Its 15.2 mm pitch is 2.5x the others', so it is the one plate that exercises Eq. (18)'s X/(pi L) dependence -- the same role its point plays in Figure 10.
+      plus (12) at bias -2.4% (-6.2% before #485). Its 15.2 mm pitch is 2.5x the others', so it is the one plate that exercises Eq. (18)'s X/(pi L) dependence -- the same role its point plays in Figure 10.
 
       `uncertainty` left null: the paper states no per-point band, and
       back-filling one from the model's own error is what #389 forbids.
@@ -389,7 +389,7 @@ files:
     uncertainty: null
     cross_check: >-
       Plate b: 25 x 25 array, Spark Eroded. Scored against Andrews Eqs. (18)
-      plus (12) at bias -19.6%. The worst-fitting plate and the only one not drilled. It is also the exact geometry Eq. (19) is printed for. Spark erosion leaves a different bore and entry than drilling, and the throat term assumes a sharp-edged entry; recorded as a plausible mechanism, not a demonstrated one.
+      plus (12) at bias -16.5% (-19.6% before #485). The worst-fitting plate and the only one not drilled. It is also the exact geometry Eq. (19) is printed for. Spark erosion leaves a different bore and entry than drilling, and the throat term assumes a sharp-edged entry; recorded as a plausible mechanism, not a demonstrated one.
 
       `uncertainty` left null: the paper states no per-point band, and
       back-filling one from the model's own error is what #389 forbids.
@@ -433,7 +433,7 @@ files:
     uncertainty: null
     cross_check: >-
       Plate c: 25 x 25 array, Drilled. Scored against Andrews Eqs. (18)
-      plus (12) at bias -5.5%. The best-fitting plate, with 12 points over the full G range.
+      plus (12) at bias -2.0% (-5.5% before #485). The best-fitting plate, with 12 points over the full G range.
 
       `uncertainty` left null: the paper states no per-point band, and
       back-filling one from the model's own error is what #389 forbids.
@@ -477,7 +477,7 @@ files:
     uncertainty: null
     cross_check: >-
       Plate d: 25 x 25 array, Drilled. Scored against Andrews Eqs. (18)
-      plus (12) at bias -12.5%. Shortest hole of the set, so the largest entry-length enhancement.
+      plus (12) at bias -9.3% (-12.5% before #485). Shortest hole of the set, so the largest entry-length enhancement.
 
       `uncertainty` left null: the paper states no per-point band, and
       back-filling one from the model's own error is what #389 forbids.

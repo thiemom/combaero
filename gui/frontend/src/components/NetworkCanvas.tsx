@@ -66,6 +66,64 @@ const NetworkCanvas = () => {
 				} as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
+			} else if (type === "effusion_liner") {
+				// Andrews plate C holes and pitch over a 30 mm backside duct
+				// (#471). U1/Vi follows the duct drop against the hole drive.
+				data = {
+					...data,
+					n_segments: 4,
+					length: 0.152,
+					width: 0.152,
+					duct_height: 0.03,
+					hole_diameter: 3.27e-3,
+					wall_thickness: 6.3e-3,
+					pitch_x: 15.24e-3,
+					pitch_y: 15.24e-3,
+					angle_deg: 90.0,
+					entry_K: 0.5,
+					wall_conductivity: 20.0,
+					gas_film: "none",
+					gas_augmentation: 1.0,
+					turbulence_intensity: 0.05,
+					gas_heat_flux: 0.0,
+				} as any;
+			} else if (type === "effusion_plate") {
+				// Andrews et al.'s plate C, the geometry the closure is scored
+				// on (#471): a working example, not invented typical values.
+				data = {
+					...data,
+					hole_diameter: 3.27e-3,
+					wall_thickness: 6.3e-3,
+					pitch_x: 15.24e-3,
+					pitch_y: 15.24e-3,
+					panel_length: 0.152,
+					panel_width: 0.152,
+					angle_deg: 90.0,
+					correlation: "IdelchikThick",
+					Cd: 0.6,
+					wall_conductivity: 20.0,
+					gas_film: "none",
+					gas_augmentation: 1.0,
+					turbulence_intensity: 0.05,
+					gas_heat_flux: 0.0,
+				} as any;
+			} else if (type === "impingement_array") {
+				// A Florschuetz test geometry, so the default is a working
+				// example inside the correlation's range (#465).
+				data = {
+					...data,
+					n_rows: 10,
+					d_jet: 0.00254,
+					xn_d: 5.0,
+					yn_d: 4.0,
+					z_d: 2.0,
+					span: 0.122,
+					plate_thickness: 0.00254,
+					pattern: "inline",
+					correlation: "fixed",
+					Cd: 0.79,
+					Nu_multiplier: 1.0,
+				} as any;
 			} else if (type === "discrete_loss") {
 				data = {
 					...data,

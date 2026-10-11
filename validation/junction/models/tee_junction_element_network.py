@@ -21,7 +21,6 @@ import math
 from dataclasses import replace
 
 from combaero.network import (
-    BorderCarnotLossElement,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,

@@ -1,9 +1,12 @@
 from .components import (
+    CrossflowSegmentElement,
     PressureBoundary,
     MassFlowBoundary,
     CombustorNode,
     EffectiveAreaConnectionElement,
     EffusionPlateElement,
+    ImpingementCrossflowElement,
+    ImpingementPlateElement,
     EnergyBoundary,
     LosslessConnectionElement,
     NetworkMixtureState,
@@ -17,6 +20,7 @@ from .components import (
     DiameterDischargeCoefficientConnectionElement,
     ConvectiveSurface,
     ImpingementModel,
+    PinFinModel,
     RibbedModel,
     SingleJetImpingementModel,
     SmoothModel,
@@ -37,6 +41,8 @@ from .combustion import (
     mix_streams,
 )
 from .graph import FlowNetwork
+from .impingement_array import ImpingementArray
+from .effusion_liner import EffusionLiner
 from .pressure_loss import (
     ConstantFractionLoss,
     ConstantHeadLoss,
@@ -59,6 +65,11 @@ __all__: list[str] = [
     "OrificeElement",
     "EffectiveAreaConnectionElement",
     "EffusionPlateElement",
+    "CrossflowSegmentElement",
+    "ImpingementCrossflowElement",
+    "ImpingementPlateElement",
+    "ImpingementArray",
+    "EffusionLiner",
     "LosslessConnectionElement",
     "DiameterDischargeCoefficientConnectionElement",
     "PressureLossElement",
@@ -86,6 +97,7 @@ __all__: list[str] = [
     "ALL_KNOWN_FIELDS",
     "ConvectiveSurface",
     "ImpingementModel",
+    "PinFinModel",
     "RibbedModel",
     "SingleJetImpingementModel",
     "SmoothModel",

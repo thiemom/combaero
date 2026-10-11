@@ -124,13 +124,31 @@ class DiagnosticSpec:
 _SPECS: dict[str, DiagnosticSpec] = {
     # -- Elements --
     "OrificeElement": DiagnosticSpec(
-        required=(*ELEMENT_UNIVERSAL_FIELDS, "Cd", "mach_throat", "is_correlation"),
+        required=(*ELEMENT_UNIVERSAL_FIELDS, "Cd", "mach_throat", "is_correlation", "Cd_in_range"),
     ),
     "EffectiveAreaConnectionElement": DiagnosticSpec(
         required=(*ELEMENT_UNIVERSAL_FIELDS, "Cd", "mach_throat", "is_correlation"),
     ),
     "DiameterDischargeCoefficientConnectionElement": DiagnosticSpec(
         required=(*ELEMENT_UNIVERSAL_FIELDS, "Cd", "mach_throat", "is_correlation"),
+    ),
+    "ImpingementPlateElement": DiagnosticSpec(
+        required=(
+            *ELEMENT_UNIVERSAL_FIELDS,
+            "Cd",
+            "mach_throat",
+            "is_correlation",
+            "Cd_in_range",
+            *HEAT_TRANSFER_FIELDS,
+            "n_holes",
+            "Re_j",
+            "Gc_Gj",
+            "surface_extrapolated",
+        ),
+        optional=("Gc_Gj_closed_form",),
+    ),
+    "ImpingementCrossflowElement": DiagnosticSpec(
+        required=(*ELEMENT_UNIVERSAL_FIELDS, "f", "Dh", *HEAT_TRANSFER_FIELDS, "dP_momentum"),
     ),
     "PressureLossElement": DiagnosticSpec(
         required=(*ELEMENT_UNIVERSAL_FIELDS, "xi", "theta"),

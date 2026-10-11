@@ -178,23 +178,28 @@ def test_pressure_driven_solve_reports_where_it_actually_landed(model):
     legs, and with the pairing corrected ``mfb_two_pb`` lands within 0.005 of
     what it was asked for.
 
-    So the case moved to ``three_pb``, which still drifts and for a reason
-    that is not a defect: it imposes every total pressure and leaves the flow
-    level free, so the residual constrains only ``K_lat - K_str`` and any
-    point on that curve is a root. The field has to report which one.
+    So the case moved to ``three_pb``, which imposes every total pressure and
+    leaves the flow level free. The residual then constrains only the ratio of
+    the two closure K's, and that ratio is not monotone in the split -- K5
+    changes sign at a straight fraction of 0.5 -- so below a lateral fraction
+    of 0.5 there are two genuine roots, mirror pairs such as (0.2, ~0.33) and
+    (0.1, ~0.42). The seed takes the one carrying the most flow (#272), which
+    at q = 0.2 is the mirror. (Before #272 the case ran at q = 0.3 and drifted
+    off every root, a seed defect; it now lands on 0.3.)
 
-    Written against a measured drift rather than a pinned number -- the old
+    Written against the measured mirror rather than a pinned number -- the old
     0.857/0.831 constant had already been re-derived twice.
     """
-    q_asked = 0.3
+    q_asked = 0.2
     r = model.evaluate_network("bassett2001", "K6", q_asked, _PSI, _THETA, topology="three_pb")
 
     assert r.converged, r.message
     assert r.q_converged is not None, "a pressure-driven solve must report where it landed"
     assert r.q_converged != pytest.approx(q_asked, abs=0.01), (
-        "this case no longer drifts, so it cannot show that the field reports "
-        f"the achieved point (asked {q_asked}, reached {r.q_converged})"
+        "this case no longer lands on the mirror root, so it cannot show that the "
+        f"field reports the achieved point (asked {q_asked}, reached {r.q_converged})"
     )
+    assert 0.30 < r.q_converged < 0.36, "landed, but not on the closure's mirror root"
     assert 0.0 < r.q_converged < 1.0
 
 

@@ -401,8 +401,14 @@ struct BranchState {
 // drove the Newton residual against its Jacobian (v1 convergence failures).
 template <typename T>
 T K_dat_j_closed(T x_j, T phi_j, T M_dat2) {
+    // K_inc = |1 - x e^{i phi}|^2 vanishes at x = 1, phi = 0 (a datum that IS
+    // the collector: a merging tee whose branch carries nothing). K -> 0
+    // there, but the closed form evaluates 0 * inf = NaN (#481). The constant
+    // keeps it finite (kappa -> its limit -1) and smooth -- also under the
+    // complex step -- and moves K by 1e-24 at most.
+    constexpr double kKincRegularizer = 1e-24;
     const T cosphi  = std::cos(phi_j);
-    const T K_inc   = T{1.0} + x_j * x_j - T{2.0} * x_j * cosphi;
+    const T K_inc   = T{1.0} + x_j * x_j - T{2.0} * x_j * cosphi + T{kKincRegularizer};
     const T sqrtK   = std::sqrt(K_inc);
     const T mu0     = x_j + sqrtK;
     const T s       = mu0 * mu0 - T{1.0};

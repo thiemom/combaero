@@ -10,6 +10,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: changelog-fragments
+        name: Changelog fragments (changelog.d/)
+        entry: uv run scripts/changelog.py check
+        language: system
+        pass_filenames: false
+        files: ^changelog\.d/
+        stages: [pre-commit]
+
       - id: python-style-check
         name: Python style checks (ruff + ruff format + optional mypy)
         entry: bash -c './scripts/check-python-style.sh'

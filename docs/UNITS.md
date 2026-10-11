@@ -86,16 +86,17 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Molar Basis)
 
-| Function | Input Units                        | Output Unit |
-|----------|------------------------------------|-------------|
-| `cp`     | T: K, X: mol/mol                   | J/(mol*K)   |
-| `cv`     | T: K, X: mol/mol                   | J/(mol*K)   |
-| `h`      | T: K, X: mol/mol                   | J/mol       |
-| `u`      | T: K, X: mol/mol                   | J/mol       |
-| `s`      | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(mol*K)   |
-| `dh_dT`  | T: K, X: mol/mol                   | J/(mol*K)   |
-| `ds_dT`  | T: K, X: mol/mol                   | J/(mol*K^2) |
-| `dcp_dT` | T: K, X: mol/mol                   | J/(mol*K^2) |
+| Function   | Input Units                        | Output Unit |
+|------------|------------------------------------|-------------|
+| `cp`       | T: K, X: mol/mol                   | J/(mol*K)   |
+| `cv`       | T: K, X: mol/mol                   | J/(mol*K)   |
+| `h`        | T: K, X: mol/mol                   | J/mol       |
+| `u`        | T: K, X: mol/mol                   | J/mol       |
+| `s`        | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(mol*K)   |
+| `dh_dT`    | T: K, X: mol/mol                   | J/(mol*K)   |
+| `ds_dT`    | T: K, X: mol/mol                   | J/(mol*K^2) |
+| `dcp_dT`   | T: K, X: mol/mol                   | J/(mol*K^2) |
+| `dcp_R_dT` | species_idx: -, T: K               | 1/K         |
 
 #### Mixture Properties (Mass/Other Basis)
 
@@ -138,16 +139,24 @@ All functions use consistent units to avoid conversion errors.
 
 #### Transport Properties
 
-| Function               | Input Units                           | Output Unit |
-|------------------------|---------------------------------------|-------------|
-| `viscosity`            | T: K, P: Pa, X: mol/mol               | Pa*s        |
-| `thermal_conductivity` | T: K, P: Pa, X: mol/mol               | W/(m*K)     |
-| `prandtl`              | T: K, P: Pa, X: mol/mol               | - (Pr)      |
-| `kinematic_viscosity`  | T: K, P: Pa, X: mol/mol               | m^2/s       |
-| `thermal_diffusivity`  | T: K, P: Pa, X: mol/mol               | m^2/s       |
-| `reynolds`             | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Re)      |
-| `reynolds_from_state`  | rho: kg/m^3, v: m/s, L: m, mu: Pa*s   | - (Re)      |
-| `peclet`               | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Pe)      |
+| Function                       | Input Units                           | Output Unit          |
+|--------------------------------|---------------------------------------|----------------------|
+| `viscosity`                    | T: K, P: Pa, X: mol/mol               | Pa*s                 |
+| `transport_and_dT`             | T: K, P: Pa, X: mol/mol               | TransportDerivatives |
+| `TransportDerivatives::mu`     | -                                     | Pa*s                 |
+| `TransportDerivatives::dmu_dT` | -                                     | Pa*s/K               |
+| `TransportDerivatives::k`      | -                                     | W/(m*K)              |
+| `TransportDerivatives::dk_dT`  | -                                     | W/(m*K^2)            |
+| `omega22_and_derivative`       | T_star: -, delta_star: -              | Omega22Result        |
+| `Omega22Result::omega`         | -                                     | -                    |
+| `Omega22Result::domega_dTstar` | -                                     | -                    |
+| `thermal_conductivity`         | T: K, P: Pa, X: mol/mol               | W/(m*K)              |
+| `prandtl`                      | T: K, P: Pa, X: mol/mol               | - (Pr)               |
+| `kinematic_viscosity`          | T: K, P: Pa, X: mol/mol               | m^2/s                |
+| `thermal_diffusivity`          | T: K, P: Pa, X: mol/mol               | m^2/s                |
+| `reynolds`                     | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Re)               |
+| `reynolds_from_state`          | rho: kg/m^3, v: m/s, L: m, mu: Pa*s   | - (Re)               |
+| `peclet`                       | T: K, P: Pa, X: mol/mol, V: m/s, L: m | - (Pe)               |
 
 ---
 
@@ -166,11 +175,19 @@ All functions use consistent units to avoid conversion errors.
 
 #### Fanno Flow
 
-| Function              | Input Units                                                                                                         | Output Unit   |
-|-----------------------|---------------------------------------------------------------------------------------------------------------------|---------------|
-| `fanno_channel`       | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol                                                          | FannoSolution |
-| `fanno_channel_rough` | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, correlation: str, f_multiplier: - (default 1.0) | FannoSolution |
-| `fanno_max_length`    | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol                                                                | m             |
+| Function                 | Input Units                                                                                                                                                                                | Output Unit      |
+|--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
+| `fanno_channel`          | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, f: -, X: mol/mol                                                                                                                                 | FannoSolution    |
+| `fanno_channel_rough`    | T_in: K, P_in: Pa, u_in: m/s, L: m, D: m, roughness: m, X: mol/mol, correlation: str, f_multiplier: - (default 1.0)                                                                        | FannoSolution    |
+| `fanno_max_length`       | T_in: K, P_in: Pa, u_in: m/s, D: m, f: -, X: mol/mol                                                                                                                                       | m                |
+| `fanno_state_at_mach`    | G: kg/(m^2*s), Tt: K, M: -, X: mol/mol                                                                                                                                                     | FannoMachState   |
+| `fanno_dx_dmach`         | G: kg/(m^2*s), Tt: K, M: -, X: mol/mol, D: m, roughness: m, friction_model: str, f_multiplier: -                                                                                           | m                |
+| `fanno_length_between`   | G: kg/(m^2*s), Tt: K, M1: -, M2: -, X: mol/mol, D: m, roughness: m, friction_model: str, f_multiplier: -                                                                                   | m                |
+| `fanno_inlet_mach`       | Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol                                                                                                                                                   | -                |
+| `fanno_sonic_mass_flux`  | Pt: Pa, Tt: K, X: mol/mol                                                                                                                                                                  | kg/(m^2*s)       |
+| `fanno_duct`             | Pt: Pa, Tt: K, G: kg/(m^2*s), X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -                                                                                   | FannoDuctResult  |
+| `fanno_channel_flow`     | Pt0: Pa, Tt0: K, X: mol/mol, P_target: Pa, exit_total: bool, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -, M_exit_guess: -, dY_directions: kg/kg, with_derivatives: bool | FannoChannelFlow |
+| `fanno_choked_mass_flux` | Pt: Pa, Tt: K, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: -                                                                                                  | kg/(m^2*s)       |
 
 #### Thrust
 
@@ -607,61 +624,122 @@ All functions use consistent units to avoid conversion errors.
 
 ### impingement_correlation.h - Jet impingement correlations
 
-| Function                                        | Input Units                                                                                 | Output Unit                |
-|-------------------------------------------------|---------------------------------------------------------------------------------------------|----------------------------|
-| `goldstein_1986_single_jet`                     | -                                                                                           | SingleJetImpingementSet    |
-| `validate_single_jet_set`                       | correlation_set: SingleJetImpingementSet                                                    | None                       |
-| `single_jet_impingement_nu`                     | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -   | -                          |
-| `single_jet_impingement`                        | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -   | SingleJetImpingementResult |
-| `florschuetz_1981_inline`                       | -                                                                                           | JetArrayCorrelationSet     |
-| `florschuetz_1981_staggered`                    | -                                                                                           | JetArrayCorrelationSet     |
-| `validate_jet_array_set`                        | correlation_set: JetArrayCorrelationSet                                                     | None                       |
-| `jet_array_impingement_nu`                      | correlation_set: JetArrayCorrelationSet, Re_j: -, Gc_Gj: -, Pr: -, xn_d: -, yn_d: -, z_d: - | JetArrayImpingementResult  |
-| `crossflow_to_jet_ratio_at_x`                   | yn_d: -, z_d: -, C_D: -, x_over_xn: -                                                       | -                          |
-| `crossflow_to_jet_ratio_at_row`                 | yn_d: -, z_d: -, C_D: -, row: -                                                             | -                          |
-| `FLORSCHUETZ_1981_DEFAULT_CD`                   | -                                                                                           | -                          |
-| `SingleJetImpingementSet::name`                 | -                                                                                           | -                          |
-| `SingleJetImpingementSet::source`               | -                                                                                           | -                          |
-| `SingleJetImpingementSet::A`                    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::B`                    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::C`                    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::Re_exponent`          | -                                                                                           | -                          |
-| `SingleJetImpingementSet::n_const_heat_flux`    | -                                                                                           | -                          |
-| `SingleJetImpingementSet::n_const_wall_temp`    | -                                                                                           | -                          |
-| `JetArrayGeometricFit::C`                       | -                                                                                           | -                          |
-| `JetArrayGeometricFit::nx`                      | -                                                                                           | -                          |
-| `JetArrayGeometricFit::ny`                      | -                                                                                           | -                          |
-| `JetArrayGeometricFit::nz`                      | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::name`                  | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::source`                | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::validity_source`       | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::pattern`               | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::A_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::m_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::B_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::n_fit`                 | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_Re_j`            | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_Gc_Gj`           | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_xn_d`            | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_yn_d`            | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_z_d`             | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::valid_aspect_ratio`    | -                                                                                           | -                          |
-| `JetArrayCorrelationSet::standard_error`        | -                                                                                           | -                          |
-| `JetArrayImpingementResult::Nu`                 | -                                                                                           | -                          |
-| `JetArrayImpingementResult::dNu_dRe_j`          | -                                                                                           | -                          |
-| `JetArrayImpingementResult::extrapolated`       | -                                                                                           | -                          |
-| `SingleJetImpingementResult::Nu`                | -                                                                                           | -                          |
-| `SingleJetImpingementResult::dNu_dRe`           | -                                                                                           | -                          |
-| `ImpingementRange::lo`                          | -                                                                                           | -                          |
-| `ImpingementRange::hi`                          | -                                                                                           | -                          |
-| `ImpingementThermalBC::ConstantHeatFlux`        | -                                                                                           | -                          |
-| `ImpingementThermalBC::ConstantWallTemperature` | -                                                                                           | -                          |
-| `ImpingementThermalBC::name`                    | -                                                                                           | -                          |
-| `ImpingementThermalBC::value`                   | -                                                                                           | -                          |
-| `JetHolePattern::Inline`                        | -                                                                                           | -                          |
-| `JetHolePattern::Staggered`                     | -                                                                                           | -                          |
-| `JetHolePattern::name`                          | -                                                                                           | -                          |
-| `JetHolePattern::value`                         | -                                                                                           | -                          |
+| Function                                        | Input Units                                                                                                                    | Output Unit                |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|----------------------------|
+| `goldstein_1986_single_jet`                     | -                                                                                                                              | SingleJetImpingementSet    |
+| `validate_single_jet_set`                       | correlation_set: SingleJetImpingementSet                                                                                       | None                       |
+| `single_jet_impingement_nu`                     | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -                                      | -                          |
+| `single_jet_impingement`                        | correlation_set: SingleJetImpingementSet, bc: ImpingementThermalBC, Re: -, L_D: -, R_D: -                                      | SingleJetImpingementResult |
+| `florschuetz_1981_inline`                       | -                                                                                                                              | JetArrayCorrelationSet     |
+| `florschuetz_1981_staggered`                    | -                                                                                                                              | JetArrayCorrelationSet     |
+| `validate_jet_array_set`                        | correlation_set: JetArrayCorrelationSet                                                                                        | None                       |
+| `jet_array_impingement_nu`                      | correlation_set: JetArrayCorrelationSet, Re_j: -, Gc_Gj: -, Pr: -, xn_d: -, yn_d: -, z_d: -                                    | JetArrayImpingementResult  |
+| `crossflow_to_jet_ratio_at_x`                   | yn_d: -, z_d: -, C_D: -, x_over_xn: -                                                                                          | -                          |
+| `crossflow_to_jet_ratio_at_row`                 | yn_d: -, z_d: -, C_D: -, row: -                                                                                                | -                          |
+| `jet_row_gc_gj_per_flow_ratio`                  | yn_d: -, z_d: -                                                                                                                | -                          |
+| `jet_row_heat_transfer`                         | correlation_set: JetArrayCorrelationSet, geometry: JetRowGeometry, m_jet: kg/s, m_crossflow: kg/s, mu: Pa*s, k: W/(m*K), Pr: - | JetRowHeatTransfer         |
+| `JetRowGeometry::d`                             | m                                                                                                                              | m                          |
+| `JetRowGeometry::xn_d`                          | -                                                                                                                              | -                          |
+| `JetRowGeometry::yn_d`                          | -                                                                                                                              | -                          |
+| `JetRowGeometry::z_d`                           | -                                                                                                                              | -                          |
+| `JetRowGeometry::n_holes`                       | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::h`                         | W/(m^2*K)                                                                                                                      | W/(m^2*K)                  |
+| `JetRowHeatTransfer::Nu`                        | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::Re_j`                      | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::Gc_Gj`                     | -                                                                                                                              | -                          |
+| `JetRowHeatTransfer::dh_dm_jet`                 | W/(m^2*K)/(kg/s)                                                                                                               | W/(m^2*K)/(kg/s)           |
+| `JetRowHeatTransfer::dh_dm_crossflow`           | W/(m^2*K)/(kg/s)                                                                                                               | W/(m^2*K)/(kg/s)           |
+| `JetRowHeatTransfer::extrapolated`              | -                                                                                                                              | -                          |
+| `station_half_drop`                             | m_a: kg/s, m_b: kg/s, P: Pa, T: K, X: -, area: m^2, kappa: -                                                                   | StationHalfDrop            |
+| `channel_entry_drop`                            | m: kg/s, P: Pa, T: K, X: -, area: m^2, K_in: -                                                                                 | StationHalfDrop            |
+| `StationHalfDrop::dP`                           | Pa                                                                                                                             | Pa                         |
+| `StationHalfDrop::d_dm_a`                       | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `StationHalfDrop::d_dm_b`                       | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `StationHalfDrop::d_dP`                         | -                                                                                                                              | -                          |
+| `StationHalfDrop::d_dT`                         | Pa/K                                                                                                                           | Pa/K                       |
+| `CROSSFLOW_VI_FLOOR`                            | m/s                                                                                                                            | m/s                        |
+| `crossflow_velocity_ratio`                      | m_a: kg/s, m_b: kg/s, P: Pa, T: K, X: -, P_down: Pa, area: m^2                                                                 | CrossflowRatio             |
+| `CrossflowRatio::U1_over_Vi`                    | -                                                                                                                              | -                          |
+| `CrossflowRatio::U1`                            | m/s                                                                                                                            | m/s                        |
+| `CrossflowRatio::Vi`                            | m/s                                                                                                                            | m/s                        |
+| `CrossflowRatio::d_dm_a`                        | 1/(kg/s)                                                                                                                       | 1/(kg/s)                   |
+| `CrossflowRatio::d_dm_b`                        | 1/(kg/s)                                                                                                                       | 1/(kg/s)                   |
+| `CrossflowRatio::d_dP`                          | 1/Pa                                                                                                                           | 1/Pa                       |
+| `CrossflowRatio::d_dT`                          | 1/K                                                                                                                            | 1/K                        |
+| `CrossflowRatio::d_dP_down`                     | 1/Pa                                                                                                                           | 1/Pa                       |
+| `STATION_KAPPA_MERGE_NORMAL`                    | -                                                                                                                              | -                          |
+| `STATION_KAPPA_BLEED_BASSETT`                   | -                                                                                                                              | -                          |
+| `WALL_HTC_KNEE`                                 | -                                                                                                                              | W/(m^2*K)                  |
+| `MIXER_HEAT_MDOT_FLOOR`                         | -                                                                                                                              | kg/s                       |
+| `SENSIBLE_ENTHALPY_REF_T`                       | -                                                                                                                              | K                          |
+| `chamber_merge_face_state`                      | m_main: kg/s, T_main: K, X_main: -, m_out: kg/s, P: Pa, T: K, X: -, side_momentum: N, area: m^2                                | MergeFaceState             |
+| `MergeFaceState::P_face`                        | Pa                                                                                                                             | Pa                         |
+| `MergeFaceState::Pt_face`                       | Pa                                                                                                                             | Pa                         |
+| `MergeFaceState::M_face`                        | -                                                                                                                              | -                          |
+| `MergeFaceState::choked`                        | -                                                                                                                              | -                          |
+| `MergeFaceState::dPf_dm_main`                   | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `MergeFaceState::dPf_dm_out`                    | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `MergeFaceState::dPf_dJ`                        | 1/m^2                                                                                                                          | 1/m^2                      |
+| `MergeFaceState::dPf_dP`                        | -                                                                                                                              | -                          |
+| `MergeFaceState::dPf_dT`                        | Pa/K                                                                                                                           | Pa/K                       |
+| `MergeFaceState::dPf_dT_main`                   | Pa/K                                                                                                                           | Pa/K                       |
+| `MergeFaceState::dPtf_dm_main`                  | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `MergeFaceState::dPtf_dm_out`                   | Pa/(kg/s)                                                                                                                      | Pa/(kg/s)                  |
+| `MergeFaceState::dPtf_dJ`                       | 1/m^2                                                                                                                          | 1/m^2                      |
+| `MergeFaceState::dPtf_dP`                       | -                                                                                                                              | -                          |
+| `MergeFaceState::dPtf_dT`                       | Pa/K                                                                                                                           | Pa/K                       |
+| `MergeFaceState::dPtf_dT_main`                  | Pa/K                                                                                                                           | Pa/K                       |
+| `jet_impulse`                                   | m: kg/s, Pt: Pa, Tt: K, P: Pa, X: -                                                                                            | JetImpulse                 |
+| `JetImpulse::J`                                 | N                                                                                                                              | N                          |
+| `JetImpulse::dJ_dm`                             | m/s                                                                                                                            | m/s                        |
+| `JetImpulse::dJ_dPt`                            | N/Pa                                                                                                                           | N/Pa                       |
+| `JetImpulse::dJ_dTt`                            | N/K                                                                                                                            | N/K                        |
+| `JetImpulse::dJ_dP`                             | N/Pa                                                                                                                           | N/Pa                       |
+| `JetImpulse::choked`                            | -                                                                                                                              | -                          |
+| `FLORSCHUETZ_1981_DEFAULT_CD`                   | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::name`                 | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::source`               | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::A`                    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::B`                    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::C`                    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::Re_exponent`          | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::n_const_heat_flux`    | -                                                                                                                              | -                          |
+| `SingleJetImpingementSet::n_const_wall_temp`    | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::C`                       | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::nx`                      | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::ny`                      | -                                                                                                                              | -                          |
+| `JetArrayGeometricFit::nz`                      | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::name`                  | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::source`                | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::validity_source`       | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::pattern`               | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::A_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::m_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::B_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::n_fit`                 | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_Re_j`            | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_Gc_Gj`           | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_xn_d`            | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_yn_d`            | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_z_d`             | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::valid_aspect_ratio`    | -                                                                                                                              | -                          |
+| `JetArrayCorrelationSet::standard_error`        | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::Nu`                 | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::dNu_dRe_j`          | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::dNu_dGc_Gj`         | -                                                                                                                              | -                          |
+| `JetArrayImpingementResult::extrapolated`       | -                                                                                                                              | -                          |
+| `SingleJetImpingementResult::Nu`                | -                                                                                                                              | -                          |
+| `SingleJetImpingementResult::dNu_dRe`           | -                                                                                                                              | -                          |
+| `ImpingementRange::lo`                          | -                                                                                                                              | -                          |
+| `ImpingementRange::hi`                          | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::ConstantHeatFlux`        | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::ConstantWallTemperature` | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::name`                    | -                                                                                                                              | -                          |
+| `ImpingementThermalBC::value`                   | -                                                                                                                              | -                          |
+| `JetHolePattern::Inline`                        | -                                                                                                                              | -                          |
+| `JetHolePattern::Staggered`                     | -                                                                                                                              | -                          |
+| `JetHolePattern::name`                          | -                                                                                                                              | -                          |
+| `JetHolePattern::value`                         | -                                                                                                                              | -                          |
 
 ### acoustics.h - Acoustic Properties
 
@@ -686,12 +764,10 @@ All functions use consistent units to avoid conversion errors.
 
 ### solver_interface.h - Compressible Flow Elements
 
-| Function                                      | Input Units                                                                                                                                        | Output Unit                                 |
-|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| `orifice_compressible_mdot_and_jacobian`      | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                                                   | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
-| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: -                                                    | OrificeResult                               |
-| `channel_compressible_mdot_and_jacobian`      | T_in: K, P_in: Pa, u_in: m/s, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, f_multiplier: - (default 1.0)                             | tuple(Pa, -, Pa/K, Pa/(m/s))                |
-| `channel_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, L: m, D: m, roughness: m, friction_model: str, f_multiplier: - (default 1.0) | ChannelResult                               |
+| Function                                      | Input Units                                                                                     | Output Unit                                 |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------|---------------------------------------------|
+| `orifice_compressible_mdot_and_jacobian`      | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
+| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: - | OrificeResult                               |
 
 ### geometry.h - Geometric Utilities
 
@@ -797,6 +873,9 @@ All functions use consistent units to avoid conversion errors.
 | `heat_rate_from_effectiveness`                    | epsilon: -, C_min: W/K, T_hot_in: K, T_cold_in: K                                                               | W                                 |
 | `adiabatic_wall_temperature`                      | T_hot: K, T_coolant: K, eta: -                                                                                  | K                                 |
 | `film_superposition_sellers`                      | eta_rows: -                                                                                                     | - (eta)                           |
+| `effusion_panel_film_effectiveness`               | n_rows: -, pitch_x_over_D: -, s_over_D: -, M: -, density_ratio: -, alpha_deg: deg, Tu: -                        | EffusionPanelFilm                 |
+| `EffusionPanelFilm::eta`                          | -                                                                                                               | -                                 |
+| `EffusionPanelFilm::extrapolated`                 | -                                                                                                               | -                                 |
 | `film_superposition_sellers_and_gradient`         | eta_rows: -                                                                                                     | - (eta), - (d eta/d eta_i)        |
 | `film_superposition_corrected`                    | eta_rows: -, alpha_between_rows: -                                                                              | - (eta)                           |
 | `film_superposition_corrected_and_gradient`       | eta_rows: -, alpha_between_rows: -                                                                              | - (eta), - (d eta/d eta_i)        |
@@ -918,15 +997,144 @@ All functions use consistent units to avoid conversion errors.
 | `ChannelResult::ddP_dT`        | -           | Pa/K                    |
 | `ChannelResult::dT_aw_dmdot`   | -           | K*s/kg                  |
 | `ChannelResult::dT_aw_dT`      | -           | - (dimensionless)       |
+| `ChannelResult::dT_aw_dP`      | -           | K/Pa                    |
 | `ChannelResult::dq_dmdot`      | -           | W*s/(m^2*kg)            |
 | `ChannelResult::dq_dT`         | -           | W/(m^2*K)               |
 | `ChannelResult::dq_dT_hot`     | -           | W/(m^2*K)               |
 
 ### heat_transfer.h - Channel flow functions (HTC + pressure drop)
 
-| Function         | Input Units                                                                                                                                                             | Output Unit   |
-|------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| `channel_smooth` | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_hot: K, correlation: str, heating: bool, mu_ratio: -, roughness: m, Nu_multiplier: -, f_multiplier: - | ChannelResult |
+| Function         | Input Units                                                                                                                                                                             | Output Unit   |
+|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `channel_smooth` | T: K, P: Pa, X: mol/mol, velocity: m/s, diameter: m, length: m, T_hot: K, correlation: str, heating: bool, mu_ratio: -, roughness: m, Nu_multiplier: -, f_multiplier: -, flow_area: m^2 | ChannelResult |
+
+### pin_fin_correlation.h - Pin-fin arrays (#335)
+
+| Function                                | Input Units                                                            | Output Unit          |
+|-----------------------------------------|------------------------------------------------------------------------|----------------------|
+| `PIN_FIN_RE_EPS`                        | -                                                                      | -                    |
+| `PIN_FIN_F_BLEND`                       | -                                                                      | -                    |
+| `pin_fin_min_gap_D`                     | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_amin_over_afrontal`            | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_dprime_over_D`                 | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_aprime_over_amin`              | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_dh_over_D`                     | geometry: PinFinGeometry                                               | -                    |
+| `pin_fin_area_fractions`                | geometry: PinFinGeometry                                               | PinFinAreaFractions  |
+| `pin_fin_array_efficiency`              | h: W/(m^2*K), k_pin: W/(m*K), D: m, H: m, A_f_over_A_t: -              | PinFinEfficiency     |
+| `evaluate_pin_fin_nu`                   | correlation_set: PinFinNuSet, geometry: PinFinGeometry, Re_D: -, Pr: - | PinFinNuResult       |
+| `evaluate_pin_fin_friction`             | correlation_set: PinFinFrictionSet, geometry: PinFinGeometry, Re_D: -  | PinFinFrictionResult |
+| `evaluate_pin_fin_modifier`             | modifier: PinFinRatioModifier, geometry: PinFinGeometry, Re_D: -       | PinFinModifierResult |
+| `validate_pin_fin_geometry`             | geometry: PinFinGeometry                                               | None                 |
+| `validate_pin_fin_nu_set`               | correlation_set: PinFinNuSet                                           | None                 |
+| `validate_pin_fin_friction_set`         | correlation_set: PinFinFrictionSet                                     | None                 |
+| `validate_pin_fin_modifier`             | modifier: PinFinRatioModifier                                          | None                 |
+| `metzger_1986_staggered_nu`             | -                                                                      | PinFinNuSet          |
+| `metzger_1982_staggered_friction`       | -                                                                      | PinFinFrictionSet    |
+| `vanfossen_1982_staggered_nu`           | -                                                                      | PinFinNuSet          |
+| `damerow_1972_staggered_friction`       | -                                                                      | PinFinFrictionSet    |
+| `chyu_1998_nu`                          | arrangement: PinArrangement, surface: PinNuSurface                     | PinFinNuSet          |
+| `chyu_1998_inline_over_staggered`       | -                                                                      | PinFinRatioModifier  |
+| `chyu_1990_nu`                          | arrangement: PinArrangement, fillet: bool                              | PinFinNuSet          |
+| `chyu_1990_friction`                    | arrangement: PinArrangement, fillet: bool                              | PinFinFrictionSet    |
+| `chyu_1990_fillet_over_straight`        | arrangement: PinArrangement                                            | PinFinRatioModifier  |
+| `PinFinGeometry::S_D`                   | -                                                                      | -                    |
+| `PinFinGeometry::X_D`                   | -                                                                      | -                    |
+| `PinFinGeometry::H_D`                   | -                                                                      | -                    |
+| `PinFinGeometry::N_rows`                | -                                                                      | -                    |
+| `PinFinGeometry::arrangement`           | -                                                                      | -                    |
+| `PinFinAreaFractions::endwall_exposed`  | -                                                                      | -                    |
+| `PinFinAreaFractions::pin`              | -                                                                      | -                    |
+| `PinFinAreaFractions::pin_over_total`   | -                                                                      | -                    |
+| `PinFinEfficiency::eta_fin`             | -                                                                      | -                    |
+| `PinFinEfficiency::eta_t`               | -                                                                      | -                    |
+| `PinFinEfficiency::deta_fin_dh`         | -                                                                      | m^2*K/W              |
+| `PinFinEfficiency::deta_t_dh`           | -                                                                      | m^2*K/W              |
+| `PinFinNuSet::name`                     | -                                                                      | -                    |
+| `PinFinNuSet::source`                   | -                                                                      | -                    |
+| `PinFinNuSet::validity_source`          | -                                                                      | -                    |
+| `PinFinNuSet::provenance`               | -                                                                      | -                    |
+| `PinFinNuSet::arrangement`              | -                                                                      | -                    |
+| `PinFinNuSet::surface`                  | -                                                                      | -                    |
+| `PinFinNuSet::re_basis`                 | -                                                                      | -                    |
+| `PinFinNuSet::C`                        | -                                                                      | -                    |
+| `PinFinNuSet::Re_exp`                   | -                                                                      | -                    |
+| `PinFinNuSet::Pr_exp`                   | -                                                                      | -                    |
+| `PinFinNuSet::term_XD`                  | -                                                                      | -                    |
+| `PinFinNuSet::term_SD`                  | -                                                                      | -                    |
+| `PinFinNuSet::term_HD`                  | -                                                                      | -                    |
+| `PinFinNuSet::valid_Re`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_SD`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_XD`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_HD`                 | -                                                                      | -                    |
+| `PinFinNuSet::valid_Nrows`              | -                                                                      | -                    |
+| `PinFinNuSet::valid_Pr`                 | -                                                                      | -                    |
+| `PinFinNuSet::accuracy_Nu`              | -                                                                      | -                    |
+| `PinFinFrictionSet::name`               | -                                                                      | -                    |
+| `PinFinFrictionSet::source`             | -                                                                      | -                    |
+| `PinFinFrictionSet::validity_source`    | -                                                                      | -                    |
+| `PinFinFrictionSet::provenance`         | -                                                                      | -                    |
+| `PinFinFrictionSet::arrangement`        | -                                                                      | -                    |
+| `PinFinFrictionSet::basis`              | -                                                                      | -                    |
+| `PinFinFrictionSet::C1`                 | -                                                                      | -                    |
+| `PinFinFrictionSet::Re_exp1`            | -                                                                      | -                    |
+| `PinFinFrictionSet::C2`                 | -                                                                      | -                    |
+| `PinFinFrictionSet::Re_exp2`            | -                                                                      | -                    |
+| `PinFinFrictionSet::Re_split`           | -                                                                      | -                    |
+| `PinFinFrictionSet::term_SD`            | -                                                                      | -                    |
+| `PinFinFrictionSet::term_XD`            | -                                                                      | -                    |
+| `PinFinFrictionSet::term_HD`            | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_Re`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_SD`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_XD`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_HD`           | -                                                                      | -                    |
+| `PinFinFrictionSet::valid_Nrows`        | -                                                                      | -                    |
+| `PinFinFrictionSet::accuracy_f`         | -                                                                      | -                    |
+| `PinFinRatioModifier::name`             | -                                                                      | -                    |
+| `PinFinRatioModifier::source`           | -                                                                      | -                    |
+| `PinFinRatioModifier::provenance`       | -                                                                      | -                    |
+| `PinFinRatioModifier::from_arrangement` | -                                                                      | -                    |
+| `PinFinRatioModifier::to_arrangement`   | -                                                                      | -                    |
+| `PinFinRatioModifier::surface`          | -                                                                      | -                    |
+| `PinFinRatioModifier::C_Nu`             | -                                                                      | -                    |
+| `PinFinRatioModifier::Nu_Re_exp`        | -                                                                      | -                    |
+| `PinFinRatioModifier::has_f`            | -                                                                      | -                    |
+| `PinFinRatioModifier::C_f`              | -                                                                      | -                    |
+| `PinFinRatioModifier::f_Re_exp`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_Re`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_SD`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_XD`         | -                                                                      | -                    |
+| `PinFinRatioModifier::valid_HD`         | -                                                                      | -                    |
+| `PinFinNuResult::Nu`                    | -                                                                      | -                    |
+| `PinFinNuResult::dNu_dRe`               | -                                                                      | -                    |
+| `PinFinNuResult::Re_native`             | -                                                                      | -                    |
+| `PinFinNuResult::extrapolated`          | -                                                                      | -                    |
+| `PinFinFrictionResult::f`               | -                                                                      | -                    |
+| `PinFinFrictionResult::df_dRe`          | -                                                                      | -                    |
+| `PinFinFrictionResult::extrapolated`    | -                                                                      | -                    |
+| `PinFinModifierResult::ratio_Nu`        | -                                                                      | -                    |
+| `PinFinModifierResult::dratio_Nu_dRe`   | -                                                                      | -                    |
+| `PinFinModifierResult::ratio_f`         | -                                                                      | -                    |
+| `PinFinModifierResult::dratio_f_dRe`    | -                                                                      | -                    |
+| `PinFinModifierResult::has_f`           | -                                                                      | -                    |
+| `PinFinModifierResult::extrapolated`    | -                                                                      | -                    |
+| `PinArrangement::Staggered`             | -                                                                      | -                    |
+| `PinArrangement::Inline`                | -                                                                      | -                    |
+| `PinArrangement::name`                  | -                                                                      | -                    |
+| `PinArrangement::value`                 | -                                                                      | -                    |
+| `PinNuSurface::Total`                   | -                                                                      | -                    |
+| `PinNuSurface::Endwall`                 | -                                                                      | -                    |
+| `PinNuSurface::Pin`                     | -                                                                      | -                    |
+| `PinNuSurface::name`                    | -                                                                      | -                    |
+| `PinNuSurface::value`                   | -                                                                      | -                    |
+| `PinReBasis::DiameterVmax`              | -                                                                      | -                    |
+| `PinReBasis::VanFossenDprime`           | -                                                                      | -                    |
+| `PinReBasis::name`                      | -                                                                      | -                    |
+| `PinReBasis::value`                     | -                                                                      | -                    |
+| `PinFrictionBasis::PerRowVmax`          | -                                                                      | -                    |
+| `PinFrictionBasis::PerRowGapVmax`       | -                                                                      | -                    |
+| `PinFrictionBasis::PerRowHalfHeadVmax`  | -                                                                      | -                    |
+| `PinFrictionBasis::name`                | -                                                                      | -                    |
+| `PinFrictionBasis::value`               | -                                                                      | -                    |
 
 ### correlation_status.h - Extrapolation validity utilities
 
@@ -1041,6 +1249,28 @@ All functions use consistent units to avoid conversion errors.
 | `FannoSolution::mdot`                           | -                                                | kg/s                                  |
 | `FannoSolution::outlet`                         | -                                                | -                                     |
 | `FannoSolution::profile`                        | -                                                | -                                     |
+| `FannoMachState::M`                             | -                                                | -                                     |
+| `FannoMachState::T`                             | -                                                | K                                     |
+| `FannoMachState::P`                             | -                                                | Pa                                    |
+| `FannoMachState::rho`                           | -                                                | kg/m³                                 |
+| `FannoMachState::u`                             | -                                                | m/s                                   |
+| `FannoMachState::a`                             | -                                                | m/s                                   |
+| `FannoDuctResult::choked`                       | -                                                | -                                     |
+| `FannoDuctResult::G`                            | -                                                | kg/(m^2*s)                            |
+| `FannoDuctResult::L_star`                       | -                                                | m                                     |
+| `FannoDuctResult::inlet`                        | -                                                | FannoMachState                        |
+| `FannoDuctResult::exit`                         | -                                                | FannoMachState                        |
+| `FannoDuctResult::Pt_exit`                      | -                                                | Pa                                    |
+| `FANNO_MACH_REL_TOL`                            | -                                                | -                                     |
+| `FannoChannelFlow::G`                           | -                                                | kg/(m^2*s)                            |
+| `FannoChannelFlow::choked`                      | -                                                | -                                     |
+| `FannoChannelFlow::M_in`                        | -                                                | -                                     |
+| `FannoChannelFlow::M_exit`                      | -                                                | -                                     |
+| `FannoChannelFlow::dG_dPt0`                     | -                                                | kg/(m^2*s*Pa)                         |
+| `FannoChannelFlow::dG_dTt0`                     | -                                                | kg/(m^2*s*K)                          |
+| `FannoChannelFlow::dG_dP_target`                | -                                                | kg/(m^2*s*Pa)                         |
+| `FannoChannelFlow::dG_ddir`                     | -                                                | kg/(m^2*s)                            |
+| `FANNO_FLOW_DRIVE_FLOOR`                        | -                                                | Pa                                    |
 | `solve_A_eff_from_mdot`                         | -                                                | -                                     |
 | `solve_P_back_from_mdot`                        | -                                                | -                                     |
 | `solve_P0_from_mdot`                            | -                                                | -                                     |
@@ -1189,6 +1419,7 @@ All functions use consistent units to avoid conversion errors.
 | `DischargeHoleState::Re`                        | -                                                | -                                     |
 | `DischargeHoleState::U1_over_Vi`                | -                                                | -                                     |
 | `discharge_cd`                                  | correlation: -, hole: m, flow: -, Cd_constant: - | - (Cd)                                |
+| `discharge_cd_in_range`                         | correlation: -, hole: m, flow: -                 | - (bool)                              |
 | `discharge_cd_and_derivatives`                  | correlation: -, hole: m, flow: -, Cd_constant: - | - (Cd), - (dCd/dRe), - (dCd/d(U1/Vi)) |
 | `orifice_mdot_Cd`                               | -                                                | kg/s                                  |
 | `orifice_dP_Cd`                                 | -                                                | Pa                                    |

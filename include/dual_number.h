@@ -139,6 +139,25 @@ template <int N> DualN<N> dexp(const DualN<N>& a) {
   return r;
 }
 // d/dx log(u) = u'/u
+// C1 positive floor: a itself for a >= eps, eps^2 / (2 eps - a) below. Value
+// and slope match at eps; the continuation is positive, monotone, and decays
+// only like eps^2/|a|, so it never underflows to 0 (an exponential tail with
+// the small eps a domain guard needs does, within a few units of a). Guards a
+// closure's sqrt/pow argument that a solver probe can push out of its domain:
+// exact inside it, finite and C1 outside (#481), instead of a NaN that
+// poisons a whole residual. The same form as the wall htc knee.
+template <int N> DualN<N> dpos_floor(const DualN<N>& a, double eps) {
+  if (a.v >= eps) {
+    return a;
+  }
+  DualN<N> r;
+  const double den = 2.0 * eps - a.v;
+  r.v = eps * eps / den;
+  const double slope = r.v / den;  // eps^2 / den^2
+  for (int i = 0; i < N; ++i) r.d[i] = a.d[i] * slope;
+  return r;
+}
+
 template <int N> DualN<N> dlog(const DualN<N>& a) {
   DualN<N> r;
   r.v = std::log(a.v);

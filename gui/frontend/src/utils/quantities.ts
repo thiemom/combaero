@@ -44,6 +44,69 @@ export const QUANTITY_CATALOGUE: Record<
 	Cd: { label: "Cd", unit: "—", format: (v) => v.toFixed(4) },
 	Nu: { label: "Nu", unit: "—", format: (v) => v.toFixed(2) },
 	htc: { label: "htc", unit: "W/m²/K", format: (v) => v.toFixed(1) },
+	// Impingement array (#465): the array's own summary of its rows.
+	Re_j_min: { label: "Re_j min", unit: "—", format: (v) => v.toFixed(0) },
+	Re_j_max: { label: "Re_j max", unit: "—", format: (v) => v.toFixed(0) },
+	Gc_Gj_max: { label: "Gc/Gj max", unit: "—", format: (v) => v.toFixed(3) },
+	Nu_mean: { label: "Nu mean", unit: "—", format: (v) => v.toFixed(1) },
+	htc_mean: { label: "h mean", unit: "W/m²/K", format: (v) => v.toFixed(0) },
+	jet_flow_nonuniformity: {
+		label: "Jet flow max/min",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	n_holes: { label: "Holes", unit: "—", format: (v) => v.toFixed(0) },
+	Cd_in_range: {
+		label: "Cd in range",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
+	// Effusion plate wall (#471)
+	T_wall_hot: { label: "T wall (hot)", unit: "K", format: (v) => v.toFixed(0) },
+	T_wall_cold: {
+		label: "T wall (cold)",
+		unit: "K",
+		format: (v) => v.toFixed(0),
+	},
+	q_wall: {
+		label: "q wall",
+		unit: "kW/m²",
+		format: (v) => (v / 1000).toFixed(1),
+	},
+	eta_overall: { label: "η overall", unit: "—", format: (v) => v.toFixed(3) },
+	eta_film: { label: "η film", unit: "—", format: (v) => v.toFixed(3) },
+	blowing_ratio: { label: "M", unit: "—", format: (v) => v.toFixed(2) },
+	// Effusion liner (#471)
+	bleed_fraction: {
+		label: "Bleed",
+		unit: "%",
+		format: (v) => (100 * v).toFixed(1),
+	},
+	U1_over_Vi_max: {
+		label: "U1/Vi max",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	bleed_nonuniformity: {
+		label: "Bleed max/min",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	T_wall_hot_max: {
+		label: "T wall max",
+		unit: "K",
+		format: (v) => v.toFixed(0),
+	},
+	Re_surface: {
+		label: "Re (surface)",
+		unit: "—",
+		format: (v) => v.toLocaleString("en", { maximumFractionDigits: 0 }),
+	},
+	surface_extrapolated: {
+		label: "Surface out of range",
+		unit: "—",
+		format: (v) => (v ? "yes" : "no"),
+	},
 	Q: { label: "Q", unit: "W", format: (v) => v.toFixed(0) },
 	ref_location: { label: "Ref Loc", unit: "—", format: (v) => String(v) },
 	// State results (accessed via result.state.*)

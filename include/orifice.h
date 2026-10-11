@@ -290,6 +290,10 @@ namespace idelchik {
 // with the sharp case.
 constexpr double zeta_sharp = 2.85;
 
+// Diagram 4-17 is the sharp (thin-walled) hole up to this depth; deeper
+// holes are diagram 4-18a's. Only used to flag the range, never to select.
+constexpr double sharp_l_over_d_max = 0.015;
+
 // Above this Reynolds number zeta is Re-independent (diagram 4-17 item 1).
 constexpr double re_fully_turbulent = 1.0e5;
 
@@ -817,12 +821,23 @@ public:
     virtual std::string name() const = 0;
 };
 
-// Factory for discharge-hole correlations.
-//
-// Throws std::invalid_argument for Lichtarowicz1965, which is declared but
-// not implemented.
+// Factory for discharge-hole correlations. Every member is implemented.
 std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(
     DischargeCdCorrelation id);
+
+// True when (hole, flow) lies inside the range the selected correlation was
+// fitted or tabulated on. A FLAG, never a selector: the Cd itself is still
+// returned outside the range (held or extrapolated, per correlation), and the
+// caller reports the flag. The ranges are the sources' own:
+//   McGreehanSchotsch1988  Re >= re_min (no stated l/d limit)
+//   Idelchik1966*          Re 25 to 1e6, plus the diagram's own geometry
+//                          axis (l/d <= 0.015 sharp, l/d <= 4 thick, bevel
+//                          and r/d within their tables)
+//   Lichtarowicz1965       Re 10 to 2e4, l/d 2 to 10
+//   Constant               always
+bool discharge_cd_in_range(DischargeCdCorrelation id,
+                           const DischargeHoleGeometry& hole,
+                           const DischargeHoleState& flow);
 
 // Fixed-Cd discharge correlation from an explicit value. This is the way to
 // pin a measured or literature Cd; make_discharge_correlation(Constant) can

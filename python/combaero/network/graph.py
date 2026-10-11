@@ -242,19 +242,31 @@ class FlowNetwork:
             # itself. >1 incoming or >1 outgoing edges puts MCN outside its
             # valid envelope; use MultiPortChamberBase (momentum-CV
             # junction with one MCN per port) for those topologies.
+            #
+            # A MERGE is the exception (#471): with ``main_inlet`` declared the
+            # chamber closes several inflows by axial momentum (main face
+            # offset, see MomentumChamberNode). A split stays refused -- one
+            # momentum equation cannot set two outlet pressures.
+            is_merge = getattr(node, "main_inlet", None) is not None
             if type(node).__name__ == "MomentumChamberNode" and (
-                len(upstream) > 1 or len(downstream) > 1
+                (len(upstream) > 1 and not is_merge) or len(downstream) > 1
             ):
-                direction = "incoming" if len(upstream) > 1 else "outgoing"
-                edges = upstream if len(upstream) > 1 else downstream
+                direction = "outgoing" if len(downstream) > 1 else "incoming"
+                edges = downstream if len(downstream) > 1 else upstream
+                hint = (
+                    "A split needs a loss closure: use a tee / MultiPortChamberBase junction."
+                    if direction == "outgoing"
+                    else "Declare main_inlet to make it a merge chamber: the "
+                    "other inflows become side streams closed by axial momentum."
+                )
                 raise ValueError(
                     f"FlowNetwork validation failed: MomentumChamberNode "
                     f"'{node_id}' has multiple {direction} edges ({sorted(edges)}). "
-                    "MCN's scalar Pt = P + 0.5 rho v^2 closure cannot represent "
-                    "merging or splitting streams. Use a MultiPortChamberBase "
-                    "junction (one MCN per port) instead -- see "
-                    "python/tests/test_multi_port_chamber.py for the pattern."
+                    f"{hint}"
                 )
+            node_validate = getattr(node, "validate", None)
+            if callable(node_validate):
+                node_validate()
 
     def to_dict(self) -> dict:
         """

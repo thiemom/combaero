@@ -1,0 +1,5 @@
+- **`BorderCarnotLossElement`, for removal in 0.8.0.** Its residual is exactly a constant head loss.
+  - **Migration:** `PressureLossElement(id, from_node, to_node, correlation=ConstantHeadLoss(zeta=4 * (1 - cos(0.75 * delta)) ** 2, area=area), area=area)` reproduces it to round-off (1e-11 measured), with `delta` in radians.
+  - **Why it goes:** its only addition is that zeta formula. It was derived for a junction's lateral branch, and `MultiPortChamberElement` and `ConstantKTeeElement` already carry that loss, so adding it to their ports double-counts (#272). It was never compared against bend data.
+  - **Usage:** nothing in the package, GUI or examples uses it. Constructing one now emits a `DeprecationWarning`.
+  - **C++:** the backing `border_carnot_loss_residual_and_jacobian` and `border_carnot_L` go with it.

@@ -57,11 +57,18 @@ paper:
   citation: "I. E. Idel'chik, Handbook of Hydraulic Resistance: Coefficients of Local Resistance and of Friction. Translated from Russian, Israel Program for Scientific Translations, Jerusalem 1966 (AEC-tr-6630). Originally Gosenergoizdat, Moskva-Leningrad, 1960."
   doi: null
   q_convention: idelchik   # equivalent to bassett for joining-type-6
-  default_uncertainty_K: 0.10   # tabulated handbook values; broader band than Bassett's 0.05
+  # The handbook states no accuracy: its preface says it deliberately includes
+  # "data obtained by crude experiments, and those obtained theoretically or by
+  # approximate calculations". The 0.10 that stood here had no source (2026-10-10).
+  default_uncertainty_K: null
 
 fit_tiers:
-  # Idelchik's own assessment is implicit in the source attribution: Levin/Taliev
-  # formulas refined by Kinne/Petermann/Vogel experiments. Treat as 'good'.
+  # Section VII's diagram list (7-3, p. 258) gives each diagram's basis:
+  #   7-1 / 7-2 (theta = 30): "Calculating formulas" (Levin, Taliev) -- NO
+  #     experiment behind them at all;
+  #   7-3 / 7-4 (theta = 45): calculating formulas refined by Kinne's experiments;
+  #   7-7 (theta = 90): calculating formulas refined by Vogel's experiments.
+  # So the theta = 30 tables are a formula, not a measurement. Treat as 'good'.
   K11: good
   K12: good
 

@@ -835,13 +835,17 @@ const Inspector = () => {
 										<option value="McGreehanSchotsch">
 											Cooling Hole with Crossflow (M-S 1988)
 										</option>
+										<option value="Lichtarowicz">
+											Long Orifice, l/d 2-10 (Lichtarowicz 1965)
+										</option>
 										<option value="fixed">Manual / Fixed Value</option>
 									</select>
 								</div>
 
 								{/* Conditional Inputs based on correlation */}
 								{(selectedNode.data.correlation === "IdelchikThick" ||
-									selectedNode.data.correlation === "McGreehanSchotsch") && (
+									selectedNode.data.correlation === "McGreehanSchotsch" ||
+									selectedNode.data.correlation === "Lichtarowicz") && (
 									<LengthInput
 										id={`plate_thickness_${selectedNode.id}`}
 										label="Hole Length (L)"
@@ -932,6 +936,421 @@ const Inspector = () => {
 									</select>
 								</div>
 								<InitialGuessEditor node={selectedNode} />
+							</>
+						);
+					})()}
+
+				{selectedNode.type === "effusion_liner" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const num = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const len = (key: string, label: string, fallback: number) => (
+							<LengthInput
+								id={`${key}_${selectedNode.id}`}
+								label={label}
+								value={d[key] ?? fallback}
+								onChange={(val) => set({ [key]: val })}
+							/>
+						);
+						const r = d.result;
+						const rows: number[] | undefined = r?.rows_m_dot_bleed;
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									Backside coolant duct (C in to C out) whose wall bleeds
+									through effusion holes into the gas (G: connect to a chamber's
+									"s" handle). Each station is a Bassett bleed and a panel whose
+									Cd sees the duct crossflow (McGreehan-Schotsch U1/Vi).
+									Coolant-side heat transfer is still the plenum-fed Andrews
+									model: provisional.
+								</div>
+								{num("n_segments", "Stations", 4)}
+								{len("length", "Liner Length (along duct)", 0.152)}
+								{len("width", "Liner Width", 0.152)}
+								{len("duct_height", "Backside Duct Height", 0.03)}
+								{len("hole_diameter", "Hole Diameter", 3.27e-3)}
+								{len("wall_thickness", "Wall Thickness", 6.3e-3)}
+								{len("pitch_x", "Streamwise Pitch", 15.24e-3)}
+								{len("pitch_y", "Spanwise Pitch", 15.24e-3)}
+								{num("angle_deg", "Hole Angle to Wall [deg]", 90)}
+								{num("entry_K", "Duct Entry Loss K", 0.5)}
+								{num("wall_conductivity", "Wall Conductivity [W/m/K]", 20)}
+								<div className="text-[10px] font-bold text-gray-500 uppercase mt-2">
+									Gas Side
+								</div>
+								{num("gas_augmentation", "Gas h Augmentation (user)", 1.0)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Film
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.gas_film || "none"}
+										onChange={(e) => set({ gas_film: e.target.value })}
+									>
+										<option value="none">None (validated closure)</option>
+										<option value="baldauf_sellers">
+											Baldauf + Sellers (not supported by Andrews data)
+										</option>
+									</select>
+								</div>
+								{num("gas_heat_flux", "Imposed Heat Flux [W/m²] (plenum)", 0)}
+								{rows && rows.length > 0 && (
+									<div className="flex flex-col gap-1 mt-2">
+										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+											Per Station (bleed {(100 * r.bleed_fraction).toFixed(0)}%)
+										</label>
+										<table className="text-[10px] font-mono">
+											<thead>
+												<tr className="text-gray-500">
+													<th className="text-left">#</th>
+													<th className="text-right">ṁ g/s</th>
+													<th className="text-right">U1/Vi</th>
+													<th className="text-right">Cd</th>
+													<th className="text-right">P kPa</th>
+													<th className="text-right">T wall</th>
+												</tr>
+											</thead>
+											<tbody>
+												{rows.map((m, i) => (
+													<tr key={`st_${i + 1}`}>
+														<td>{i + 1}</td>
+														<td className="text-right">
+															{(1000 * m).toFixed(2)}
+														</td>
+														<td className="text-right">
+															{r.rows_U1_over_Vi[i].toFixed(3)}
+														</td>
+														<td className="text-right">
+															{r.rows_Cd[i].toFixed(3)}
+														</td>
+														<td className="text-right">
+															{(r.rows_P_backside[i] / 1000).toFixed(2)}
+														</td>
+														<td className="text-right">
+															{r.rows_T_wall_hot
+																? r.rows_T_wall_hot[i].toFixed(0)
+																: "—"}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
+										{r.crossflow_cd_degraded > 0 ? (
+											<div className="text-[10px] text-amber-600">
+												U1/Vi above 0.35: the crossflow Cd degrades badly there
+												(Rohde-scored). It follows the duct's pressure drop
+												against the hole drive, not the duct size.
+											</div>
+										) : r.crossflow_cd_beyond_8pct > 0 ? (
+											<div className="text-[10px] text-amber-600">
+												U1/Vi above 0.2: crossflow Cd beyond its ~8% band.
+											</div>
+										) : null}
+										{r.station_psi_beyond_bassett > 0 && (
+											<div className="text-[10px] text-gray-500">
+												Duct/hole area ratio {r.station_psi_min.toFixed(1)}{" "}
+												beyond Bassett's measured 3 (bleed station extrapolated
+												in psi).
+											</div>
+										)}
+										{r.is_ingesting > 0 && (
+											<div className="text-[10px] text-red-600">
+												At least one station ingests hot gas.
+											</div>
+										)}
+									</div>
+								)}
+							</>
+						);
+					})()}
+
+				{selectedNode.type === "effusion_plate" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const num = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const len = (key: string, label: string, fallback: number) => (
+							<LengthInput
+								id={`${key}_${selectedNode.id}`}
+								label={label}
+								value={d[key] ?? fallback}
+								onChange={(val) => set({ [key]: val })}
+							/>
+						);
+						const r = d.result;
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									Plenum-fed plate that owns its wall. Discharge into a momentum
+									chamber: the chamber's flow and surface give the gas side.
+									Discharge into a plenum: the gas side is the imposed heat flux
+									below. Connect it to a chamber's "s" handle to add its jets'
+									momentum.
+								</div>
+								{len("hole_diameter", "Hole Diameter", 3.27e-3)}
+								{len("wall_thickness", "Wall Thickness", 6.3e-3)}
+								{len("pitch_x", "Streamwise Pitch", 15.24e-3)}
+								{len("pitch_y", "Spanwise Pitch", 15.24e-3)}
+								{len("panel_length", "Panel Length", 0.152)}
+								{len("panel_width", "Panel Width", 0.152)}
+								{num("angle_deg", "Hole Angle to Wall [deg]", 90)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.correlation || "IdelchikThick"}
+										onChange={(e) => set({ correlation: e.target.value })}
+									>
+										<option value="IdelchikThick">
+											Deep Hole in Wall (Idelchik 4-18a)
+										</option>
+										<option value="Lichtarowicz">
+											Long Orifice, l/d 2-10 (Lichtarowicz 1965)
+										</option>
+										<option value="McGreehanSchotsch">
+											Cooling Hole (M-S 1988, plenum-fed)
+										</option>
+										<option value="fixed">Manual / Fixed Value</option>
+									</select>
+								</div>
+								{d.correlation === "fixed" && num("Cd", "Fixed Cd Value", 0.6)}
+								{num("wall_conductivity", "Wall Conductivity [W/m/K]", 20)}
+								<div className="text-[10px] font-bold text-gray-500 uppercase mt-2">
+									Gas Side
+								</div>
+								{num("gas_augmentation", "Gas h Augmentation (user)", 1.0)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Film
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.gas_film || "none"}
+										onChange={(e) => set({ gas_film: e.target.value })}
+									>
+										<option value="none">None (validated closure)</option>
+										<option value="baldauf_sellers">
+											Baldauf + Sellers (not supported by Andrews data)
+										</option>
+									</select>
+								</div>
+								{d.gas_film === "baldauf_sellers" &&
+									num("turbulence_intensity", "Turbulence Intensity", 0.05)}
+								{num("gas_heat_flux", "Imposed Heat Flux [W/m²] (plenum)", 0)}
+								{r && r.T_wall_hot != null && (
+									<div className="flex flex-col gap-0.5 mt-2 bg-blue-50/50 p-2 rounded border border-blue-100/50 text-[10px] font-mono">
+										<span>
+											Gas side:{" "}
+											{r.gas_side_chamber ? "chamber (flow)" : "imposed flux"}
+										</span>
+										<span>
+											T wall hot/cold: {r.T_wall_hot.toFixed(0)} /{" "}
+											{r.T_wall_cold.toFixed(0)} K
+										</span>
+										<span>q: {(r.q_wall / 1000).toFixed(1)} kW/m²</span>
+										{r.gas_side_chamber ? (
+											<>
+												<span>
+													T gas: {r.T_gas.toFixed(0)} K (
+													{r.T_gas_from_main_inlet ? "main inlet" : "chamber"})
+												</span>
+												<span>η overall: {r.eta_overall.toFixed(3)}</span>
+												<span>h gas: {r.h_gas.toFixed(0)} W/m²/K</span>
+												<span>M: {r.blowing_ratio.toFixed(2)}</span>
+											</>
+										) : null}
+										{r.film_extrapolated > 0 && (
+											<span className="text-amber-600">
+												Film outside Baldauf's range
+											</span>
+										)}
+										{r.coolant_crossflow_ignored > 0 && (
+											<span className="text-amber-600">
+												Supply has crossflow: not modelled (plenum-fed plate)
+											</span>
+										)}
+									</div>
+								)}
+							</>
+						);
+					})()}
+
+				{selectedNode.type === "impingement_array" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const dJet: number = d.d_jet ?? 0.00254;
+						const ynD: number = d.yn_d ?? 4.0;
+						const span: number = d.span ?? 0.122;
+						const holesPerRow = Math.max(1, Math.round(span / (ynD * dJet)));
+						const ratio = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const rows: number[] | undefined = d.result?.rows_Nu;
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									Jet plate fed from the upstream node, impinging on a target;
+									the spent air leaves down the gap to the downstream node
+									(Florschuetz, Truman and Metzger 1981). Gc/Gj comes from the
+									solved crossflow. A bypass crossflow (#467) or spent air
+									leaving through the target (#468) are different elements.
+								</div>
+								{ratio("n_rows", "Rows", 10)}
+								<LengthInput
+									id={`d_jet_${selectedNode.id}`}
+									label="Hole Diameter (d)"
+									value={dJet}
+									onChange={(val) => set({ d_jet: val })}
+								/>
+								{ratio("xn_d", "Streamwise Pitch xn/d", 5.0)}
+								{ratio("yn_d", "Spanwise Pitch yn/d", 4.0)}
+								{ratio("z_d", "Gap z/d", 2.0)}
+								<LengthInput
+									id={`span_${selectedNode.id}`}
+									label="Span"
+									value={span}
+									onChange={(val) => set({ span: val })}
+								/>
+								<div className="text-[9px] text-gray-400 -mt-1">
+									{holesPerRow} holes per row
+								</div>
+								<LengthInput
+									id={`plate_thickness_${selectedNode.id}`}
+									label="Jet Plate Thickness"
+									value={d.plate_thickness ?? 0.00254}
+									onChange={(val) => set({ plate_thickness: val })}
+								/>
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Pattern
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.pattern || "inline"}
+										onChange={(e) => set({ pattern: e.target.value })}
+									>
+										<option value="inline">Inline</option>
+										<option value="staggered">Staggered</option>
+									</select>
+								</div>
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.correlation || "fixed"}
+										onChange={(e) => set({ correlation: e.target.value })}
+									>
+										<option value="fixed">Fixed (Florschuetz 0.79)</option>
+										<option value="IdelchikThick">
+											Deep Hole in Wall (Idelchik 4-18a)
+										</option>
+										<option value="Lichtarowicz">
+											Long Orifice, l/d 2-10 (Lichtarowicz 1965)
+										</option>
+										<option value="McGreehanSchotsch">
+											Cooling Hole (M-S 1988, plenum-fed)
+										</option>
+									</select>
+								</div>
+								{(d.correlation || "fixed") === "fixed" &&
+									ratio("Cd", "Fixed Cd Value", 0.79)}
+								{ratio("Nu_multiplier", "Nu Multiplier (rig matching)", 1.0)}
+								{rows && rows.length > 0 && (
+									<div className="flex flex-col gap-1 mt-2">
+										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+											Per Row
+										</label>
+										<table className="text-[10px] font-mono">
+											<thead>
+												<tr className="text-gray-500">
+													<th className="text-left">row</th>
+													<th className="text-right">Re_j</th>
+													<th className="text-right">Gc/Gj</th>
+													<th className="text-right">Nu</th>
+													<th className="text-right">h</th>
+												</tr>
+											</thead>
+											<tbody>
+												{rows.map((nu, i) => (
+													<tr key={`row_${i + 1}`}>
+														<td>{i + 1}</td>
+														<td className="text-right">
+															{d.result.rows_Re_j[i].toFixed(0)}
+														</td>
+														<td className="text-right">
+															{d.result.rows_Gc_Gj[i].toFixed(3)}
+														</td>
+														<td className="text-right">{nu.toFixed(1)}</td>
+														<td className="text-right">
+															{d.result.rows_htc[i].toFixed(0)}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
+										{d.result.surface_extrapolated > 0 && (
+											<div className="text-[10px] text-amber-600">
+												Outside Florschuetz's range on at least one row.
+											</div>
+										)}
+									</div>
+								)}
 							</>
 						);
 					})()}

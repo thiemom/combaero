@@ -128,6 +128,17 @@ constexpr double turbulent_start = 3000.0;
 constexpr double rough_full = 4000.0;
 }  // namespace channel_transition
 
+// Turbulent-only Nusselt correlations (Dittus-Boelter, Sieder-Tate, Petukhov)
+// claim Re >= 1e4. Between laminar_end and 1e4 the channel paths use the
+// transition interpolation of the VDI Heat Atlas (Gnielinski, G1 sec. 4.2):
+//   Nu = (1 - g) Nu_lam + g Nu_turb(1e4),  g = (Re - 2300) / (1e4 - 2300),
+// linear in Re, exact at both ends (they threw there before, #481). Gnielinski
+// keeps its own transition above.
+namespace vdi_transition {
+constexpr double re_laminar = channel_transition::laminar_end;
+constexpr double re_turbulent = 1.0e4;
+}  // namespace vdi_transition
+
 struct FrictionAndDerivative {
   double f = 0.0;       // Darcy friction factor
   double df_dRe = 0.0;  // exact
@@ -615,6 +626,10 @@ struct ChannelResult {
   double ddP_dT = 0.0;       // ∂(dP)/∂T [Pa/K]
   double dT_aw_dmdot = 0.0;  // ∂T_aw/∂ṁ [K·s/kg]
   double dT_aw_dT = 0.0;     // ∂T_aw/∂T [-] (≈1 at low Mach)
+  // dT_aw/dP [K/Pa] at fixed mass flow and T: the dynamic rise r v^2/(2 cp)
+  // with v = mdot/(rho A), rho ~ P, so -2 (T_aw - T)/P. h does not move with
+  // P at fixed mdot (Re, Pr, k do not). The wall relay's pressure column (#496).
+  double dT_aw_dP = 0.0;
   double dq_dmdot = 0.0;     // ∂q/∂ṁ  [W·s/(m²·kg)]
   double dq_dT = 0.0;        // ∂q/∂T  [W/(m²·K)]
   double dq_dT_hot = 0.0;   // ∂q/∂T_hot [W/(m²·K)]  (= -h when T_hot finite)
@@ -632,6 +647,11 @@ struct WallCouplingResult {
   double dQ_dT_aw_a = 0.0;   // ∂Q/∂T_aw_a [W/K]
   double dQ_dT_aw_b = 0.0;   // ∂Q/∂T_aw_b [W/K]
 };
+
+// Wall coupling uses h as given at or above this [W/(m^2 K)]; below it a C1,
+// positive rational floor knee^2/(2 knee - h) (a correlation driven past its range can return
+// h <= 0 at a solver iterate). Physical gas-side h is >= ~1 W/(m^2 K).
+constexpr double WALL_HTC_KNEE = 1e-2;
 
 // Compute heat transfer and Jacobians for wall coupling between two elements
 //
@@ -690,6 +710,11 @@ WallCouplingResult wall_coupling_and_jacobian(
 //   roughness  : absolute wall roughness [m]  (default 0.0 = smooth)
 //   Nu_multiplier : empirical correction factor on Nu (default 1.0)
 //   f_multiplier  : empirical correction factor on f (default 1.0)
+//   flow_area  : the channel's flow cross-section [m^2] that velocity was
+//                taken on; NaN (default) = pi D^2/4. Only the mass-flow
+//                derivatives use it (dh/dmdot, ddP/dmdot, dT_aw/dmdot): for a
+//                non-circular channel with a separate Dh, pi Dh^2/4 is off by
+//                (Dh/D)^2 (#463). Values come from velocity and D.
 ChannelResult
 channel_smooth(double T, double P, const std::vector<double> &X,
                double velocity, double diameter, double length,
@@ -697,7 +722,8 @@ channel_smooth(double T, double P, const std::vector<double> &X,
                const std::string &correlation = "gnielinski",
                bool heating = true, double mu_ratio = 1.0,
                double roughness = 0.0,
-               double Nu_multiplier = 1.0, double f_multiplier = 1.0);
+               double Nu_multiplier = 1.0, double f_multiplier = 1.0,
+               double flow_area = std::numeric_limits<double>::quiet_NaN());
 
 } // namespace combaero
 

@@ -167,6 +167,11 @@ struct JetArrayImpingementResult {
   // so it and the geometry terms are held fixed here -- only the Re_j power
   // law needs differentiating, same rationale as SingleJetImpingementResult.
   double dNu_dRe_j = 0.0;
+  // d(Nu)/d(Gc_Gj) at fixed Re_j, analytic through the smoothed crossflow
+  // argument s = sqrt((z/d Gc/Gj)^2 + floor^2), so it is finite at Gc/Gj = 0
+  // even though the bracket's exponent n is below 1. Needed when Gc/Gj comes
+  // from the network's crossflow rather than the closed form (#465).
+  double dNu_dGc_Gj = 0.0;
   bool extrapolated = false;  // outside the set's advisory validity
 };
 
@@ -210,6 +215,52 @@ double crossflow_to_jet_ratio_at_row(double yn_d, double z_d, double C_D,
 // Reject a set that cannot be evaluated. Throws with a message naming the
 // field. Unlike the validity ranges, these are hard errors: they are
 // mistakes, not operating points.
+// ---------------------------------------------------------------
+// One spanwise row from NETWORK flows (#465)
+// ---------------------------------------------------------------
+//
+// The generic core of a jet-plate row element: the row's own jet flow and the
+// crossflow mass approaching it go in, the target-side coefficient and its
+// derivatives with respect to BOTH flows come out. Which flows count as
+// "approaching crossflow" is the caller's configuration (self-generated only,
+// or with a bypass, #467); this function only applies Florschuetz's
+// definitions:
+//
+//   n holes in parallel, Re_j = 4 m_jet / (n pi d mu)
+//   Gc/Gj = (m_crossflow / m_jet) (pi/4) / ((yn/d)(z/d))
+//   h     = Nu(Re_j, Gc/Gj, Pr) k / d
+//
+// Gc is on the channel cross-section z * (n yn d), Gj on the hole area.
+struct JetRowGeometry {
+  double d = 0.0;        // hole diameter [m]
+  double xn_d = 0.0;     // streamwise pitch / d [-]
+  double yn_d = 0.0;     // spanwise pitch / d [-]
+  double z_d = 0.0;      // jet plate to target gap / d [-]
+  double n_holes = 0.0;  // holes in the row [-]
+};
+
+struct JetRowHeatTransfer {
+  double h = 0.0;      // target-side coefficient [W/(m^2 K)]
+  double Nu = 0.0;     // h d / k [-]
+  double Re_j = 0.0;   // per-hole jet Reynolds number [-]
+  double Gc_Gj = 0.0;  // crossflow-to-jet mass velocity ratio [-]
+  double dh_dm_jet = 0.0;        // [W/(m^2 K)/(kg/s)], includes Gc/Gj ~ 1/m_jet
+  double dh_dm_crossflow = 0.0;  // [W/(m^2 K)/(kg/s)]
+  bool extrapolated = false;
+};
+
+// (pi/4) / ((yn/d)(z/d)): Gc/Gj per unit m_crossflow/m_jet.
+double jet_row_gc_gj_per_flow_ratio(double yn_d, double z_d);
+
+// mu, k, Pr: coolant properties at the jet supply state. Below a jet flow of
+// JET_ROW_MDOT_FLOOR the crossflow ratio is undefined and is taken as 0.
+JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet &set,
+                                         const JetRowGeometry &geom,
+                                         double m_jet, double m_crossflow,
+                                         double mu, double k, double Pr);
+
+constexpr double JET_ROW_MDOT_FLOOR = 1e-12;  // [kg/s]
+
 void validate_single_jet_set(const SingleJetImpingementSet &set);
 void validate_jet_array_set(const JetArrayCorrelationSet &set);
 

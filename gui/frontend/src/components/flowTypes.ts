@@ -3,7 +3,10 @@ import AreaChangeNode from "./nodes/AreaChangeNode";
 import ChannelNode from "./nodes/ChannelNode";
 import CombustorNode from "./nodes/CombustorNode.tsx";
 import DiscreteLossNode from "./nodes/DiscreteLossNode";
+import EffusionLinerNode from "./nodes/EffusionLinerNode";
+import EffusionPlateNode from "./nodes/EffusionPlateNode";
 import EjectorNode from "./nodes/EjectorNode";
+import ImpingementArrayNode from "./nodes/ImpingementArrayNode";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
 import MomentumChamberNode from "./nodes/MomentumChamberNode.tsx";
@@ -22,6 +25,9 @@ export const nodeTypes = {
 	pressure_boundary: PressureBoundaryNode,
 	channel: ChannelNode,
 	orifice: OrificeNode,
+	impingement_array: ImpingementArrayNode,
+	effusion_plate: EffusionPlateNode,
+	effusion_liner: EffusionLinerNode,
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,
 	discrete_loss: DiscreteLossNode,

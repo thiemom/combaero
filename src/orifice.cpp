@@ -1057,6 +1057,36 @@ std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(
     return std::make_unique<ConstantDischargeCdCorrelation>(Cd);
 }
 
+bool discharge_cd_in_range(DischargeCdCorrelation id,
+                           const DischargeHoleGeometry& hole,
+                           const DischargeHoleState& flow) {
+    namespace I = orifice::idelchik;
+    namespace L = orifice::lichtarowicz;
+    const double re = flow.Re;
+    const double ld = hole.L_over_d();
+    const bool idelchik_re = re >= I::re_points[0] && re <= I::re_points[I::re_n - 1];
+    switch (id) {
+        case DischargeCdCorrelation::McGreehanSchotsch1988:
+            return re >= orifice::mcgreehan_schotsch::re_min;
+        case DischargeCdCorrelation::Idelchik1966Sharp:
+            return idelchik_re && ld <= I::sharp_l_over_d_max;
+        case DischargeCdCorrelation::Idelchik1966Thick:
+            return idelchik_re && ld <= I::thick_l_over_d[I::thick_n - 1];
+        case DischargeCdCorrelation::Idelchik1966Beveled:
+            return idelchik_re &&
+                   hole.bevel_over_d() <= I::beveled_l_over_d[I::beveled_n - 1];
+        case DischargeCdCorrelation::Idelchik1966Rounded:
+            return idelchik_re &&
+                   hole.r_over_d() <= I::rounded_r_over_d[I::rounded_n - 1];
+        case DischargeCdCorrelation::Lichtarowicz1965:
+            return re >= L::re_validated_min && re <= L::re_validated_max &&
+                   ld >= L::l_over_d_split && ld <= L::l_over_d_max;
+        case DischargeCdCorrelation::Constant:
+            return true;
+    }
+    return false;
+}
+
 // -------------------------------------------------------------
 // Flow calculations
 // -------------------------------------------------------------

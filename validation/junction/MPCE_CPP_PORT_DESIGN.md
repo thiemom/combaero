@@ -717,7 +717,7 @@ choice, because that is precisely the condition that places the fixed point at
 that mdot. The criterion is the fixed point's location, not the penalty's
 size.
 
-**Declared limitation -- since measured and removed, see section 7e.**
+**Declared limitation -- since measured and removed, see section 7e (and 7f).**
 `alpha` carries Pa/(kg/s)^2, so 1e11 is tied to the scales of the validation
 set. Measured on one junction scaled over five decades, the alpha needed
 follows 1/m_ref^2 exactly and 1e11 fails at a hundredth of the size. The
@@ -814,6 +814,32 @@ scorecard solves the barrier is evaluated 4809 times and the derived weight is
 used every one of them, spanning 1.8e10 to 6.4e12. The `root exists` cell
 moves by one draw of 395, which is noise. The gain is entirely in the size
 range the validation set does not cover.
+
+## 7f. The hand-off, removed (2026-10-09)
+
+7e's derived weight was kept on a control test with a stated exit: if it ever
+stopped converging strictly more scaled junctions than the fixed 1e11, delete
+it rather than relax the test. The closure-consistent junction seed (#272)
+triggered that exit. The seed now starts every port in its declared basin, so
+the barrier is seldom reached.
+
+| measured on | before the seed (derived / fixed) | with the seed (derived / fixed) |
+|---|---|---|
+| control population, 30 junctions x {1e-4, 1e-2} | 50 / 48 | 50 / 50, pair for pair |
+| 100 junctions x {1e-6, 1e-4, 1e-2, 1}, separating pairs | 1 of 400 | 0 of 400 |
+| same, x {1e2, 1e4} | -- | 0 of 200 |
+| junction scorecard (2546 records) | -- | identical, record for record |
+
+`NetworkSolver._apply_barrier_scale`, `scaled_penalty_alpha`,
+`BARRIER_SLACK_FRACTION` and `effective_penalty_alpha` are gone;
+`soft_penalty_alpha` is used directly. 7e's dimensional argument still holds;
+what changed is how often the barrier is reached. Even 7d's original 1e7 now
+converges the same 157 of 240 random draws and the same scorecard, record for
+record -- it only changes how the failing solves fail (13 draws move between
+"no progress", "rejected" and "residual too large"). So no test can pin the
+value any more: the size test in `python/tests/test_barrier_scale_awareness.py`
+guards scale robustness, not the weight. If a network far from 0.1 kg/s parks
+a port in the barrier, the fixed weight is the first suspect.
 
 ## 8. The port, sequenced by provenance
 

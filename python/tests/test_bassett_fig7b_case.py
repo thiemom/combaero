@@ -91,19 +91,6 @@ def _run(model, topology: str, q: float):
 # ---------------------------------------------------------------------------
 
 
-_INADMISSIBLE = (
-    "The model is not DISSIPATIVE at a low lateral fraction for this "
-    "geometry: its mass-weighted mean K goes negative below q ~ 0.22 "
-    "(psi=3, theta=45), so the junction would create flow work. The "
-    "post-solve energy check added for #271 defect 10 now refuses those "
-    "states, which is correct -- Bassett's own coefficients keep the "
-    "weighted mean at +0.19 or better everywhere. The three_pb cases fail "
-    "for the same reason at one remove: that topology wanders down to "
-    "q ~ 0.02, inside the inadmissible band. These come off when #272 "
-    "closes the K_straight gap."
-)
-
-
 @pytest.mark.parametrize("q", [0.2, 0.4, 0.6, 0.8])
 def test_imposed_q_converges_across_the_curve(model, q):
     r = _run(model, "imposed_q", q)
@@ -189,35 +176,39 @@ def test_mfb_two_pb_now_lands_on_the_operating_point_it_was_asked_for(model):
 
 
 # ---------------------------------------------------------------------------
-# Targets: infeasible until the K_straight gap closes
+# three_pb: every pressure imposed
 # ---------------------------------------------------------------------------
 
 
-_THREE_PB_HIGH_Q = (
-    "three_pb does not converge above q ~ 0.5, and unlike the reason this "
-    "xfail replaces, the system IS feasible: the model reproduces Bassett's "
-    "K5 and K6 to three decimals, so the corrected target equals the model's "
-    "own K_lat - K_str at the asked q and a root exists there by "
-    "construction. This topology imposes every total pressure and leaves the "
-    "flow level free, so the residual constrains only the DIFFERENCE and the "
-    "solve has a one-parameter family to wander along. A solver and seeding "
-    "problem, not a modelling one -- the opposite of what the xfail it "
-    "replaces claimed. strict=True so it is noticed either way."
-)
-
-
 @pytest.mark.parametrize("q", [0.5, 0.6, 0.8])
-@pytest.mark.xfail(strict=True, reason=_THREE_PB_HIGH_Q)
 def test_three_pb_converges_at_high_lateral_fraction(model, q):
-    assert _run(model, "three_pb", q).converged
+    """Was a strict xfail, blamed on a free flow level. Measured, the root is
+    isolated (scaled condition ~1e5) and the cause was the seed (#272): the
+    pressure guess put a lossless link's hop drop on the junction ports --
+    the straight outlet 50 Pa ABOVE its own supply -- and the generic
+    Bernoulli split then seeded q ~ 0.25 whatever the target, on the far side
+    of K5's sign change, from where Newton collapsed onto a dead lateral.
+    With Pt continuity across lossless links and the split taken from the
+    junction's own closure, it lands on the asked point."""
+    r = _run(model, "three_pb", q)
+    assert r.converged, r.message
+    assert r.q_converged == pytest.approx(q, abs=0.01)
 
 
-def test_three_pb_low_lateral_fraction_lands_on_the_asked_point(model):
+def test_three_pb_low_lateral_fraction_lands_on_a_root_of_the_closure(model):
     """Was a strict xfail on the grounds that no root existed. It did exist --
-    the target was built from two different operating points."""
+    the target was built from two different operating points.
+
+    Below q = 1/2 there are TWO: with every pressure imposed the split must
+    reproduce the ratio K_lat/K_str, and K5 changes sign at a straight
+    fraction of 1/2, so the ratio is non-monotone. Bassett's own correlation
+    has the pair (0.200, 0.332) for this target, and they are mirror images
+    about its extremum (the model's own pair is 0.200 and 0.336). The seed
+    takes the one carrying more flow. No K comparison: in this topology the
+    extracted K is the imposed target whatever the model does."""
     r = _run(model, "three_pb", 0.2)
     assert r.converged, r.message
-    assert r.q_converged == pytest.approx(0.2, abs=0.005)
+    assert min(abs(r.q_converged - 0.2), abs(r.q_converged - 0.336)) < 0.005
 
 
 def test_mfb_two_pb_low_lateral_fraction_converges(model):

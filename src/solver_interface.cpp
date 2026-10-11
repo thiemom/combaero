@@ -20,11 +20,23 @@
 #include <cmath>
 #include <stdexcept>
 #include <limits>
+#include <utility>
 
 namespace combaero {
 namespace solver {
 
 namespace {
+// Flow Q is divided by in the mixers, and its derivative w.r.t. the total
+// flow: |m| at or above kMixerHeatMdotFloor, a C1 parabola below it.
+std::pair<double, double> heat_flow_divisor(double mdot_tot) {
+  const double m0 = kMixerHeatMdotFloor;
+  const double a = std::abs(mdot_tot);
+  if (a >= m0) {
+    return {a, mdot_tot >= 0.0 ? 1.0 : -1.0};
+  }
+  return {(mdot_tot * mdot_tot + m0 * m0) / (2.0 * m0), mdot_tot / m0};
+}
+
 // Get global minimum temperature across all species from NASA9 thermo data
 // Used to derive smooth floor limits for finite difference calculations
 double get_global_thermo_T_min() {
@@ -420,22 +432,13 @@ viscosity_and_jacobians(double T, double P, const std::vector<double> &X) {
   double dTeff_dT = (T > 10.0) ? 1.0 : 0.1;
   double dPeff_dP = (P > 1.0) ? 1.0 : 0.1;
 
-  // Base viscosity
-  double mu = combaero::viscosity(T_eff, P_eff, X);
-
-  // 1. Temperature Derivative
-  double dT_p = 1e-3; // 1 mK perturbation
-  double mu_plus = combaero::viscosity(T_eff + dT_p, P_eff, X);
-  double mu_minus = combaero::viscosity(T_eff - dT_p, P_eff, X);
-  double d_mu_d_T = ((mu_plus - mu_minus) / (2.0 * dT_p)) * dTeff_dT;
-
-  // 2. Pressure Derivative
-  double dP_p = 1.0; // 1 Pascal perturbation
-  double mu_P_plus = combaero::viscosity(T_eff, P_eff + dP_p, X);
-  double mu_P_minus = combaero::viscosity(T_eff, P_eff - dP_p, X);
-  double d_mu_d_P = ((mu_P_plus - mu_P_minus) / (2.0 * dP_p)) * dPeff_dP;
-
-  return {mu, d_mu_d_T, d_mu_d_P};
+  // Analytic d/dT through the C1 collision-integral interpolation and the
+  // Wilke rule (#485); it was a +/-1 mK central difference, exact on each
+  // linear segment of the old table but discontinuous at every node.
+  // Dilute-gas viscosity does not depend on pressure.
+  (void)dPeff_dP;
+  const combaero::TransportDerivatives tr = combaero::transport_and_dT(T_eff, P_eff, X);
+  return {tr.mu, tr.dmu_dT * dTeff_dT, 0.0};
 }
 
 std::tuple<double, double>
@@ -689,19 +692,30 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   double h_mix_base = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
                                         : (n_streams > 0 ? h_stream[0] : 0.0);
 
-  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
-  // mdot_eff is strictly positive and smooth through 0. Minimum bound is 1e-3 kg/s
-  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+  // Heat is spread over the actual flow, floored only near zero flow.
+  const auto [mdot_eff, dmdot_eff] = heat_flow_divisor(mdot_tot);
 
-  // Apply energy transfer: delta_h = Q/mdot_eff + fraction * h_mix_base
-  double delta_h = Q / mdot_eff + fraction * h_mix_base;
+  std::vector<double> normalized_Y_mix = combaero::normalize_fractions(Y_mix);
+
+  // 'fraction' scales the SENSIBLE enthalpy, h - h(T_ref) at the mixture's
+  // composition: absolute h includes formation enthalpy, so a fraction of it
+  // heated air at ambient and combustion products alike (#481).
+  std::vector<double> href_k(n_species, 0.0);
+  double h_ref = 0.0;
+  for (std::size_t k = 0; k < n_species; ++k) {
+    href_k[k] = J_per_mol_to_J_per_kg(combaero::h_species(k, kSensibleEnthalpyRefT),
+                                      combaero::species_molar_mass(k));
+    h_ref += normalized_Y_mix[k] * href_k[k];
+  }
+
+  // Apply energy transfer: delta_h = Q/mdot_eff + fraction * (h_mix_base - h_ref)
+  double delta_h = Q / mdot_eff + fraction * (h_mix_base - h_ref);
 
   double h_mix = h_mix_base + delta_h;
   double P_total_mix = (mdot_tot > 0.0)
                             ? (P_total_tot / mdot_tot)
                             : (n_streams > 0 ? streams[0].P_total : 0.0);
 
-  std::vector<double> normalized_Y_mix = combaero::normalize_fractions(Y_mix);
   std::vector<double> X_mix = combaero::mass_to_mole(normalized_Y_mix);
   double T_guess = 300.0;
   if (n_streams > 0)
@@ -728,6 +742,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
 
   // Store dT/d(delta_h) for reference (not directly used in Jacobians)
   res.dT_mix_d_delta_h = (cp_mix > 0.0) ? (1.0 / cp_mix) : 0.0;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
 
   for (std::size_t i = 0; i < n_streams; ++i) {
     StreamJacobian &dT_jac = res.dT_mix_d_stream[i];
@@ -746,42 +761,39 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
       // Base contribution
       double dT_base_dT = (streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
 
-      // Fraction contribution: d(fraction * h_mix_base)/d(T_i)
-      // = fraction * (mdot_i / mdot_tot) * cp_i
+      // Fraction contribution: d(fraction * (h_mix_base - h_ref))/d(T_i)
+      // = fraction * (mdot_i / mdot_tot) * cp_i  (h_ref does not move with T)
       double dT_frac_dT = (fraction * streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
 
       dT_jac.d_T = dT_base_dT + dT_frac_dT;
 
-      // d(T_mix)/d(m_dot_i)
-      // Base contribution: d(h_mix_base)/d(mdot_i)
+      // d(T_mix)/d(m_dot_i). h_mix = (1+f) h_base - f h_ref + Q/m_eff, then T
+      // at fixed h moves with the composition: -sum_k hk(T_mix) dY_k/dm_i.
+      // Only the enthalpy terms carry (1+f), not the composition term.
       double h_diff = (h_stream[i] - h_mix_base);
       double y_sum = 0.0;
+      double ref_sum = 0.0;
       for (std::size_t k = 0; k < n_species; ++k) {
         y_sum += hk_mix[k] * (streams[i].Y[k] - Y_mix[k]);
+        ref_sum += href_k[k] * (streams[i].Y[k] - Y_mix[k]);
       }
-      double dh_base_dmdot = (h_diff - y_sum) / mdot_tot;
+      double dh_mix_dmdot = ((1.0 + fraction) * h_diff - fraction * ref_sum) / mdot_tot;
 
-      // Q contribution: d(Q/mdot_eff)/d(mdot_i) = -Q * mdot_tot / (mdot_eff^3)
-      double mdot_eff_3 = mdot_eff * mdot_eff * mdot_eff;
-      double dh_Q_dmdot = -Q * mdot_tot / mdot_eff_3;
+      // Q contribution: d(Q/mdot_eff)/d(mdot_i) = -Q * mdot_eff' / mdot_eff^2
+      double dh_Q_dmdot = -Q * dmdot_eff / (mdot_eff * mdot_eff);
 
-      // Fraction contribution: d(fraction * h_mix_base)/d(mdot_i)
-      // = fraction * d(h_mix_base)/d(mdot_i)
-      double dh_frac_dmdot = fraction * dh_base_dmdot;
+      dT_jac.d_mdot = (dh_mix_dmdot + dh_Q_dmdot - y_sum / mdot_tot) / cp_mix;
 
-      // Total: dT/dmdot = (1/cp_mix) * (dh_base + dh_Q + dh_frac) / dmdot
-      dT_jac.d_mdot = (dh_base_dmdot + dh_Q_dmdot + dh_frac_dmdot) / cp_mix;
-
-      // d(T_mix)/d(Y_i,k)
+      // d(T_mix)/d(Y_i,k): h_base moves by w hk_i, h_ref by w (href_k - h_ref)
+      // and the normalised composition by w (e_k - Y), w = m_i / m; the last
+      // shifts T at fixed h by -w (hk_mix - h_mix) -- the FINAL h_mix, which
+      // the base-only form (h_mix_base) got wrong whenever Q or f was set.
+      const double w = streams[i].m_dot / mdot_tot;
       for (std::size_t k = 0; k < n_species; ++k) {
-        // Base contribution
-        double dT_base_dY = streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix_base) / (mdot_tot * cp_mix);
-
-        // Fraction contribution: d(fraction * h_mix_base)/d(Y_i,k)
-        // = fraction * (mdot_i / mdot_tot) * (hk_i - hk_mix + h_mix_base)
-        double dT_frac_dY = fraction * streams[i].m_dot * (hk_mass[i][k] - hk_mix[k] + h_mix_base) / (mdot_tot * cp_mix);
-
-        dT_jac.d_Y[k] = dT_base_dY + dT_frac_dY;
+        dT_jac.d_Y[k] = w *
+                        ((1.0 + fraction) * hk_mass[i][k] - fraction * (href_k[k] - h_ref) -
+                         hk_mix[k] + h_mix) /
+                        cp_mix;
       }
 
       // Y_mix sensitivities
@@ -837,11 +849,13 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
-  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
-  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+  // Heat is spread over the actual flow, floored only near zero flow.
+  const double mdot_eff = heat_flow_divisor(mdot_tot).first;
 
-  // Compute delta_h from Q and fraction
-  double delta_h = Q / mdot_eff + fraction * h_mix_base;
+  // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
+  // and the burnt composition are known (#481).
+  double delta_h = Q / mdot_eff;
+  (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto complete_res =
@@ -851,16 +865,21 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   std::vector<double> X_b = std::get<2>(complete_res);
   std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
-  // Post-combustion enthalpy shift
+  // Post-combustion enthalpy shift: h_out = h_ad + Q/m + f (h_ad - h_ref_b),
+  // so dh_out/dT_ad = (1 + f) cp_ad.
   double dT_out_dT_ad = 1.0;
   double cp_out = combaero::cp_mass(T_ad, X_b);
   double T_out = T_ad;
+  if (fraction != 0.0) {
+    delta_h += fraction * (combaero::h_mass(T_ad, X_b) -
+                           combaero::h_mass(kSensibleEnthalpyRefT, X_b));
+  }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
     T_out = combaero::calc_T_from_h_mass(h_ad + delta_h, X_b, T_ad);
     cp_out = combaero::cp_mass(T_out, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
-    dT_out_dT_ad = cp_ad / cp_out;
+    dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
   T_ad = T_out;
 
@@ -900,6 +919,7 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
   res.dT_mix_d_stream.resize(n_streams);
   res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
@@ -989,11 +1009,13 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
-  // Use effective mass flow for heat addition to avoid singularity when mdot_tot -> 0
-  double mdot_eff = std::sqrt(mdot_tot * mdot_tot + 1e-6);
+  // Heat is spread over the actual flow, floored only near zero flow.
+  const double mdot_eff = heat_flow_divisor(mdot_tot).first;
 
-  // Compute delta_h from Q and fraction
-  double delta_h = Q / mdot_eff + fraction * h_mix_base;
+  // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
+  // and the burnt composition are known (#481).
+  double delta_h = Q / mdot_eff;
+  (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
   auto eq_base_res =
@@ -1003,16 +1025,21 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   std::vector<double> X_b = std::get<3>(eq_base_res);
   std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
-  // Post-combustion enthalpy shift
+  // Post-combustion enthalpy shift: h_out = h_ad + Q/m + f (h_ad - h_ref_b),
+  // so dh_out/dT_ad = (1 + f) cp_ad.
   double dT_out_dT_ad = 1.0;
   double cp_out = combaero::cp_mass(T_ad, X_b);
   double T_out = T_ad;
+  if (fraction != 0.0) {
+    delta_h += fraction * (combaero::h_mass(T_ad, X_b) -
+                           combaero::h_mass(kSensibleEnthalpyRefT, X_b));
+  }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
     T_out = combaero::calc_T_from_h_mass(h_ad + delta_h, X_b, T_ad);
     cp_out = combaero::cp_mass(T_out, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
-    dT_out_dT_ad = cp_ad / cp_out;
+    dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
   T_ad = T_out;
 
@@ -1061,6 +1088,7 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
   res.dT_mix_d_stream.resize(n_streams);
   res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
@@ -1282,8 +1310,12 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
   ChannelResult res;
   res.dP_calc = dP_calc;
 
+  // dP = f(Re(|m|)) (L/D) m|m| / (2 rho A^2) is odd in m, so its slope is
+  // even: |m| (f + |m| f'(Re) dRe/d|m| / 2) (L/D) / (rho A^2). Signed m here
+  // gave reversed flow a slope of the wrong sign (#481).
   double dRe_dmdot = D / (mu * area);
-  res.d_dP_d_mdot = (L / D) * (1.0 / (rho * area * area)) * m_dot * (f + 0.5 * m_dot * df_dRe * dRe_dmdot);
+  const double abs_m = std::abs(m_dot);
+  res.d_dP_d_mdot = (L / D) * (1.0 / (rho * area * area)) * abs_m * (f + 0.5 * abs_m * df_dRe * dRe_dmdot);
 
   const double eps_P = 1.0;
   auto [rho_p, drho_dT_p, drho_dP_p] = density_and_jacobians(T_up, P_static_up + eps_P, X_up);
@@ -1626,360 +1658,6 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     auto [mdot_plus, dummy1, dummy2, dummy3] =
         orifice_compressible_mdot_and_jacobian(T_up, P_total_up, P_static_down, X_plus, Cd, area, beta);
     res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
-  }
-
-  return res;
-}
-
-std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
-    double T_in, double P_in, double u_in,
-    const std::vector<double>& X,
-    double L, double D, double roughness,
-    const std::string& friction_model,
-    double f_multiplier,
-    bool compute_jacobians,
-    bool inlet_static_resolved,
-    bool exit_head_lost) {
-
-  // Handle reverse flow by swapping direction
-  bool reverse_flow = (u_in < 0.0);
-  double u_fwd = std::abs(u_in);
-
-  // Forward-direction friction drop with an infeasibility barrier on top of
-  // the truncated Fanno march (see kChannelChokeBarrierKappa in the header
-  // for the rationale and the barrier shape).
-  const double duct_area = 0.25 * M_PI * D * D;
-
-  // Stagnation drop across the march, not the static one.
-  //
-  // This returned P - sol.outlet.P, a STATIC difference, while ChannelElement
-  // consumes it as a TOTAL drop (Pt_up - Pt_down = dP_calc). In Fanno flow
-  // those are not interchangeable: the flow accelerates along the duct and
-  // converts static head into dynamic, so static falls much faster than total
-  // -- tens of kPa apart at M ~ 0.8, the same order as the drop itself.
-  // Friction is what lowers Pt, so Pt_in - Pt_out is the quantity the element
-  // is asking for. See issue #359.
-  // exit_head_lost selects how the duct couples to what it discharges into:
-  //
-  //   false -- full recovery. The drop is Pt_in - Pt_out, i.e. the downstream
-  //            node receives the duct's STAGNATION pressure. Appropriate when a
-  //            diffuser recovers the dynamic head.
-  //   true  -- full loss. The drop is Pt_in - Ps_out, so the downstream node
-  //            receives the duct's STATIC pressure and the exit dynamic head is
-  //            dissipated in the sudden expansion. This is the standard model
-  //            for a bare duct discharging into a plenum or to atmosphere.
-  //
-  // Reality lies between; these are the two limits, and a bare exit is much
-  // nearer the second. Pinning stagnation pressure at such an exit caps the
-  // mass flux at the sonic value for that pressure -- a constraint the physical
-  // problem never imposed. See issue #360.
-  auto total_drop = [&](const combaero::FannoSolution& sol, double T_in,
-                        double P_in, double u_abs) -> double {
-    const double a_in = combaero::speed_of_sound(T_in, X);
-    const double M_in = (a_in > 1e-9) ? u_abs / a_in : 0.0;
-    const double Pt_in = combaero::P0_from_static(P_in, T_in, M_in, X);
-
-    const double rho_out = combaero::density(sol.outlet.T, sol.outlet.P, X);
-    const double u_out =
-        (rho_out > 1e-12) ? std::abs(sol.mdot) / (rho_out * duct_area) : 0.0;
-    const double a_out = combaero::speed_of_sound(sol.outlet.T, X);
-    const double M_out = (a_out > 1e-9) ? u_out / a_out : 0.0;
-    if (exit_head_lost) {
-      return Pt_in - sol.outlet.P;
-    }
-    const double Pt_out =
-        combaero::P0_from_static(sol.outlet.P, sol.outlet.T, M_out, X);
-    return Pt_in - Pt_out;
-  };
-
-  auto dp_forward = [&](double T, double P, double u_abs) -> double {
-    auto sol = combaero::fanno_channel_rough(T, P, u_abs, L, D, roughness, X,
-                                             friction_model, f_multiplier);
-    // Stagnation drop where the inlet static state was resolved by the
-    // inversion; the old static drop where it was not. Mixing the two -- the
-    // previous density with the new drop -- is not monotone in m_dot past the
-    // sonic limit, which breaks the property test_fanno_choke_smoothness pins
-    // (#358). The fallback region is deliberately out of scope here, so it
-    // keeps its previous behaviour exactly rather than half of it.
-    double dP = inlet_static_resolved ? total_drop(sol, T, P, u_abs)
-                                      : P - sol.outlet.P;
-    if (!sol.choked) {
-      return dP;
-    }
-    const double a = combaero::speed_of_sound(T, X);
-    if (u_abs >= a) {
-      // Supersonic inlet: the march never started (outlet == inlet).
-      const double rho = combaero::density(T, P, X);
-      return kChannelChokeBarrierKappa * P +
-             0.5 * kChannelChokeBarrierBeta * rho * (u_abs * u_abs - a * a);
-    }
-    // Subsonic inlet choked at L_choke < L: this m_dot cannot traverse the
-    // full channel.
-    //
-    // dP here is the drop over the MARCHED part only, so it collapses as the
-    // choke point moves upstream -- measured slope +13934 just below onset
-    // against -86257 just above, a sign reversal in the base term itself. The
-    // old linear barrier did not remove that kink, it merely outshouted it
-    // (+1124234 of barrier against -86257 of collapse, a 74.5x derivative
-    // step at onset that Newton stalls against).
-    //
-    // So extrapolate the marched drop to the full length first -- same drop
-    // per unit length, applied over L -- which is continuous through onset
-    // because L_choke -> L there. The barrier then only has to encode
-    // infeasibility depth, and can be quadratic in s = 1 - L_choke/L so that
-    // it switches on with zero slope. See issue #356.
-    const double s_trunc = 1.0 - sol.L_choke / L;
-    const double frac_marched = std::max(sol.L_choke / L, kChannelChokeMinMarched);
-    return dP / frac_marched + kChannelChokeBarrierKappa * P * s_trunc * s_trunc;
-  };
-
-  double dP = dp_forward(T_in, P_in, u_fwd);
-
-  // For reverse flow, negate dP to maintain sign convention
-  if (reverse_flow) {
-    dP = -dP;
-  }
-
-  double d_dP_dP_in = 0.0;
-  double d_dP_dT_in = 0.0;
-  double d_dP_du_in = 0.0;
-
-  if (compute_jacobians) {
-    // Compute Jacobians via finite differences on the composite (Fanno +
-    // barrier) drop so Newton sees a consistent gradient in both regions.
-    const double eps_P = std::max(1e-6, std::abs(P_in) * 1e-6);
-    const double eps_T = std::max(1e-6, std::abs(T_in) * 1e-6);
-    const double eps_u = std::max(1e-6, std::abs(u_in) * 1e-6);
-
-    // Jacobian w.r.t. P_in
-    d_dP_dP_in = (dp_forward(T_in, P_in + eps_P, u_fwd) -
-                  dp_forward(T_in, P_in - eps_P, u_fwd)) /
-                 (2.0 * eps_P);
-
-    // Jacobian w.r.t. T_in
-    d_dP_dT_in = (dp_forward(T_in + eps_T, P_in, u_fwd) -
-                  dp_forward(T_in - eps_T, P_in, u_fwd)) /
-                 (2.0 * eps_T);
-
-    if (reverse_flow) {
-      d_dP_dP_in = -d_dP_dP_in;
-      d_dP_dT_in = -d_dP_dT_in;
-    }
-
-    // Jacobian w.r.t. u_in. u_in is signed while the march uses u_fwd; the
-    // reverse-flow negations of sample and direction cancel, so the forward
-    // difference quotient is already d(dP)/d(u_in).
-    d_dP_du_in = (dp_forward(T_in, P_in, u_fwd + eps_u) -
-                  dp_forward(T_in, P_in, std::max(1e-9, u_fwd - eps_u))) /
-                 (2.0 * eps_u);
-  }
-
-  return {dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in};
-}
-
-namespace {
-
-// Static state at a duct station, from the stagnation state and the flow.
-//
-// The compressible channel used to take rho at the TOTAL pressure and derive
-// velocity from it, with the comment "uses P_total as proxy for P_static
-// (low-Mach approximation)". Above M ~ 0.3 that is not a small error, and it
-// fails in a particular way: it makes the channel report a converged solution
-// for a flow that cannot exist. Measured on the outlet duct of #351 at
-// D = 0.1 m and 1.03 kg/s, the proxy is 1.59x too dense at sonic, reports
-// M = 0.759, and happily solves at 1.37x its own choked limit.
-//
-// The static state is fixed by three relations in (Ts, Ps, u):
-//   energy      h0 = h(Ts) + u^2/2        adiabatic, h0 conserved
-//   isentropic  s(Ts, Ps) = s(Tt, Pt)     static<->total, isentropic BY DEFINITION
-//   continuity  mdot = rho(Ts, Ps) * u * A
-// Fanno is irreversible ALONG the duct -- Pt falls station to station -- but
-// the static/total relation AT a station stays isentropic, which is what
-// "total" means, so the two are compatible.
-//
-// Parameterised by Mach it is a 1-D root find: T_from_stagnation and
-// P_from_stagnation give (Ts, Ps), leaving one scalar residual in the mass
-// flux. G(M) is monotone on the subsonic branch and peaks at M = 1, so the
-// bracket (0, 1] is unconditionally safe and bisection cannot stray onto the
-// supersonic branch.
-//
-// No root means the duct cannot pass this flow at this stagnation state --
-// which IS choking, exactly, with no constant to tune. See issue #359.
-struct ChannelStaticState {
-  bool feasible = false;
-  double M = 0.0;
-  double T = 0.0;
-  double P = 0.0;
-  double u = 0.0;
-  double G_required = 0.0;
-  double G_max = 0.0;
-};
-
-ChannelStaticState channel_static_state(double P_total, double T_total,
-                                        double m_dot, double area,
-                                        const std::vector<double>& X) {
-  ChannelStaticState out;
-  if (area <= 0.0 || P_total <= 0.0 || T_total <= 0.0) {
-    return out;
-  }
-  const double G_req = std::abs(m_dot) / area;
-  out.G_required = G_req;
-
-  auto flux_at = [&](double M, double& Ts, double& Ps) -> double {
-    Ts = combaero::T_from_stagnation(T_total, M, X);
-    Ps = combaero::P_from_stagnation(P_total, T_total, M, X);
-    if (Ts <= 0.0 || Ps <= 0.0) {
-      return 0.0;
-    }
-    return combaero::density(Ts, Ps, X) * M * combaero::speed_of_sound(Ts, X);
-  };
-
-  double Ts = 0.0, Ps = 0.0;
-  out.G_max = flux_at(1.0, Ts, Ps);
-  if (G_req <= 0.0) {
-    out.feasible = true;
-    out.M = 0.0;
-    out.T = T_total;
-    out.P = P_total;
-    out.u = 0.0;
-    return out;
-  }
-  if (G_req > out.G_max) {
-    return out;  // choked: no state carries this flux at this stagnation state
-  }
-
-  double lo = 0.0, hi = 1.0;
-  for (int i = 0; i < 80; ++i) {
-    const double mid = 0.5 * (lo + hi);
-    if (flux_at(mid, Ts, Ps) < G_req) {
-      lo = mid;
-    } else {
-      hi = mid;
-    }
-  }
-  out.M = hi;
-  flux_at(out.M, Ts, Ps);
-  out.T = Ts;
-  out.P = Ps;
-  out.u = std::copysign(out.M * combaero::speed_of_sound(Ts, X), m_dot);
-  out.feasible = true;
-  return out;
-}
-
-}  // namespace
-
-ChannelResult channel_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up,
-    const std::vector<double>& Y_up,
-    double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model,
-    double f_multiplier, bool exit_head_lost) {
-
-  (void)P_static_down;  // Computed from Fanno flow, not an input
-
-  const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
-
-  // Solve the inlet STATIC state from the stagnation state and the flow, then
-  // march from it. P_total_up and T_up are both TOTAL (the element passes
-  // state_in.Pt and state_in.Tt); using them as static is the defect this
-  // replaces -- see channel_static_state above and issue #359.
-  double area = 0.25 * M_PI * D * D;
-  const ChannelStaticState st =
-      channel_static_state(P_total_up, T_up, m_dot, area, X_up);
-
-  ChannelResult res;
-
-  // Where no static state exists -- the demanded flux exceeds the sonic
-  // ceiling for this stagnation state -- fall back to the previous behaviour
-  // rather than invent a barrier for it.
-  //
-  // Detecting infeasibility precisely, across every driving mode and topology,
-  // is deliberately out of scope (see #359 / #360): the criterion differs for
-  // imposed and free mass flow, a choked PRESSURE-driven duct settling at
-  // mdot_choke is the physical answer rather than an artifact, and most of the
-  // infeasibility seen on #351 was manufactured by how the pressure boundary
-  // couples rather than by physics. #360 addresses that root. Here the aim is
-  // narrower and unconditional: where a static state exists, use it.
-  double inlet_T = T_up;
-  double inlet_P = P_total_up;
-  if (st.feasible) {
-    inlet_T = st.T;
-    inlet_P = st.P;
-  }
-
-  auto [rho, drho_dT, drho_dP] = density_and_jacobians(inlet_T, inlet_P, X_up);
-  double u_in = st.feasible ? st.u : m_dot / (rho * area);
-
-  // Get pressure drop and partial Jacobians w.r.t. (P_in, T_in, u_in)
-  auto [dP_calc, d_dP_dP_in, d_dP_dT_in, d_dP_du_in] =
-      channel_compressible_mdot_and_jacobian(inlet_T, inlet_P, u_in, X_up, L, D, roughness, friction_model, f_multiplier, true, st.feasible, exit_head_lost);
-
-  res.dP_calc = dP_calc;
-
-  // --- Chain rule through the static-state inversion ---
-  //
-  // The march's partials are with respect to its OWN inputs (P_in, T_in,
-  // u_in), which are now the static state, not the element's unknowns. Those
-  // three all move together when Pt, Tt or m_dot moves, through the inversion:
-  //
-  //   d(dP)/dX = dP/dP_in * dPs/dX + dP/dT_in * dTs/dX + dP/du_in * du/dX
-  //
-  // Before this the code chained only through u and treated P_in = P_total,
-  // T_in = T_total as independent, which was consistent while the density came
-  // from the total state. With the inversion it is not, and the error is
-  // large: 4.7% on d/dm_dot, 3.1% on d/dP, 2.9% on d/dT against a central
-  // difference.
-  //
-  // dPs/dX, dTs/dX and du/dX come from differencing the INVERSION only -- it
-  // is a bisection on a smooth monotone flux, with no march and no Fanno
-  // integration, so this is cheap and clean. Differencing the whole pipeline
-  // instead would mean six more marches per residual.
-  (void)drho_dT;
-  (void)drho_dP;
-  auto invert_at = [&](double Pt_x, double Tt_x, double m_x) {
-    return channel_static_state(Pt_x, Tt_x, m_x, area, X_up);
-  };
-  // Structured bindings cannot be captured in C++17, so copy the march's
-  // partials into plain locals first.
-  const double dP_dPin = d_dP_dP_in;
-  const double dP_dTin = d_dP_dT_in;
-  const double dP_duin = d_dP_du_in;
-  auto chain = [&](const ChannelStaticState& plus,
-                   const ChannelStaticState& minus, double h) -> double {
-    if (!plus.feasible || !minus.feasible || h <= 0.0) {
-      return 0.0;
-    }
-    const double dPs = (plus.P - minus.P) / (2.0 * h);
-    const double dTs = (plus.T - minus.T) / (2.0 * h);
-    const double du = (plus.u - minus.u) / (2.0 * h);
-    return dP_dPin * dPs + dP_dTin * dTs + dP_duin * du;
-  };
-
-  const double h_m = std::max(1e-9, std::abs(m_dot) * 1e-6);
-  res.d_dP_d_mdot = chain(invert_at(P_total_up, T_up, m_dot + h_m),
-                          invert_at(P_total_up, T_up, m_dot - h_m), h_m);
-
-  const double h_P = std::max(1e-3, std::abs(P_total_up) * 1e-6);
-  res.d_dP_dP_static_up = chain(invert_at(P_total_up + h_P, T_up, m_dot),
-                                invert_at(P_total_up - h_P, T_up, m_dot), h_P);
-
-  const double h_T = std::max(1e-4, std::abs(T_up) * 1e-6);
-  res.d_dP_dT_up = chain(invert_at(P_total_up, T_up + h_T, m_dot),
-                         invert_at(P_total_up, T_up - h_T, m_dot), h_T);
-
-  // Compute d(dP)/d(Y[i]) using finite differences
-  res.d_dP_dY_up.resize(Y_up.size(), 0.0);
-  const double eps_Y = 1e-6;
-  for (std::size_t i = 0; i < Y_up.size(); ++i) {
-    std::vector<double> Y_plus = Y_up;
-    Y_plus[i] += eps_Y;
-    auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
-    auto [rho_plus, dummy1, dummy2] = density_and_jacobians(T_up, P_total_up, X_plus);
-    double u_plus = m_dot / (rho_plus * area);
-
-    auto [dP_plus, dummy3, dummy4, dummy5] =
-        channel_compressible_mdot_and_jacobian(T_up, P_total_up, u_plus, X_plus, L, D, roughness, friction_model, f_multiplier, false, true, exit_head_lost);
-    res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
   }
 
   return res;
@@ -2468,6 +2146,22 @@ CompressibleTeeResult compressible_merging_tee_rj(
 
     const double Ps = str.P_static, Ts = str.T, Rs = str.R_gas, gs = str.gamma_eff, As = str.A;
     const double Pb = bra.P_static, Tb = bra.T, Rb = bra.R_gas, gb = bra.gamma_eff, Ab = bra.A;
+
+    // No net supply (a solver probe: every flow zero, or the suppliers' sum
+    // reversed): the pseudodatum is stagnant, p0_dat = p_dat and q_ref = 0 --
+    // the m_dat -> 0+ limit of the general case. Dividing the suppliers'
+    // momentum and enthalpy by the eps floor instead gave a negative datum
+    // temperature and NaN (#481).
+    if (m_dat < eps_m) {
+        CompressibleTeeResult stagnant{};
+        stagnant.R_0 = Ps - Pb;
+        stagnant.R_1 = Ps - com.Pt;
+        stagnant.dR0_dP_str = 1.0;
+        stagnant.dR0_dP_bra = -1.0;
+        stagnant.dR1_dP_str = 1.0;
+        stagnant.dR1_dPt_com = -1.0;
+        return stagnant;
+    }
 
     const double cp_s = gs * Rs / (gs - 1.0);
     const double cp_b = gb * Rb / (gb - 1.0);

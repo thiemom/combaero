@@ -539,25 +539,27 @@ class TestInternalHeatTransfer:
         elem = self._panel(angle_deg=30.0)
         assert elem.hole_length == pytest.approx(2.0 * elem.wall_thickness)
 
-        out = elem.internal_heat_transfer(self._state(elem, 0.5))
+        state = self._state(elem, 0.5)
+        out = elem.internal_heat_transfer(state)
+        # The Prandtl number the element itself uses, not a pinned constant
+        # (0.7272 was air's Pr while its viscosity was 11.8% low, #485).
+        pr = cb.complete_state(state.T, state.P, state.X).transport.Pr
         expected = cb.effusion_approach_nusselt(
-            out["Re_hole"], 0.7272, elem.pitch_actual / elem.hole_length
+            out["Re_hole"], pr, elem.pitch_actual / elem.hole_length
         )
         assert out["Nu_approach"] == pytest.approx(expected, rel=1e-3)
 
         # And it is NOT what the wall thickness would give -- the thing the
         # other tests could not distinguish.
         wrong = cb.effusion_approach_nusselt(
-            out["Re_hole"], 0.7272, elem.pitch_actual / elem.wall_thickness
+            out["Re_hole"], pr, elem.pitch_actual / elem.wall_thickness
         )
         assert wrong == pytest.approx(2.0 * expected, rel=1e-3)
         assert out["Nu_approach"] != pytest.approx(wrong, rel=0.1)
 
         # The throat term likewise: R_Nu is on the drilled L/D.
         assert out["Nu_throat"] == pytest.approx(
-            cb.effusion_throat_nusselt(
-                out["Re_hole"], 0.7272, elem.hole_length / elem.hole_diameter
-            ),
+            cb.effusion_throat_nusselt(out["Re_hole"], pr, elem.hole_length / elem.hole_diameter),
             rel=1e-3,
         )
 
@@ -708,7 +710,9 @@ class TestTheKnobsThatCloseTheDocumentedGap:
     """
 
     ANDREWS_B = {"hole_diameter": 2.16e-3, "wall_thickness": 6.3e-3, "pitch": 15.24e-3}
-    H0 = 46.120019767899805  # the rig's smooth-duct Dittus-Boelter value
+    # The rig's smooth-duct Dittus-Boelter value (effusion_overall_runner
+    # .gas_side()); 46.12 while air's viscosity was 11.8% low (#485).
+    H0 = 46.57566602979162
     T_GAS = 750.0
     T_COOLANT = 295.0
 
@@ -735,8 +739,8 @@ class TestTheKnobsThatCloseTheDocumentedGap:
         """The knob the physics points at, and the one to use.
 
         `eta = h_i/(h_i + F h_0)` inverts in closed form, so the required
-        F is computable rather than searched: 2.06 at G = 0.6 and 2.36 at
-        G = 1.0. Both are ordinary film-cooling augmentation once the
+        F is computable rather than searched: 2.12 at G = 0.6 and 2.43 at
+        G = 1.0 (2.06 / 2.36 while air's viscosity was 11.8% low, #485). Both are ordinary film-cooling augmentation once the
         baseline is right.
         """
         target = self._measured(G)
@@ -797,10 +801,10 @@ class TestTheKnobsThatCloseTheDocumentedGap:
     def test_the_internal_knob_also_reaches_it_but_should_not_be_used(self):
         """Both knobs can hit the target. Only one of them is ATTRIBUTABLE.
 
-        `internal_Nu_multiplier = 0.486` reaches plate B's measurement at
+        `internal_Nu_multiplier = 0.471` reaches plate B's measurement at
         G = 0.6 exactly -- by HALVING the coolant-side coefficient. That
         is the wrong direction on the evidence: scored against Andrews'
-        own Fig. 8 the internal correlation runs 10.4% LOW, so correcting
+        own Fig. 8 the internal correlation runs 7.1% LOW, so correcting
         it would raise `h_i`, not halve it.
 
         Recorded as a test because a knob that reaches the target is not

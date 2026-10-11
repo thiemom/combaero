@@ -292,18 +292,22 @@ class TestHtcChannelComposite:
         with pytest.raises(ValueError, match="unknown correlation"):
             cb.htc_channel(T, P, X, v, D, correlation="invalid_correlation")
 
-    def test_htc_channel_dittus_boelter_low_re_error(self):
-        """Test that Dittus-Boelter raises error for Re < 10000 in transition."""
+    def test_htc_channel_dittus_boelter_transition_is_the_vdi_interpolation(self):
+        """2300 < Re < 1e4 is below Dittus-Boelter's range: the VDI Heat Atlas
+        (Gnielinski) interpolation from laminar Nu at 2300 to Dittus-Boelter at
+        1e4, linear in Re (#481). It used to raise."""
         T = 300.0  # K
         P = 101325.0  # Pa
         X = cb.species.dry_air()
-        v = 2.0  # m/s (low velocity)
+        v = 2.0  # m/s: Re ~ 6300
         D = 0.05  # m
 
-        # This should give Re in transition region (2300 < Re < 10000)
-        # Dittus-Boelter should raise error
-        with pytest.raises(ValueError, match="Dittus-Boelter requires Re > 10000"):
-            cb.htc_channel(T, P, X, v, D, correlation="dittus_boelter")
+        h, Nu, Re = cb.htc_channel(T, P, X, v, D, correlation="dittus_boelter")
+        assert 2300.0 < Re < 1.0e4
+        Pr = cb.prandtl(T, P, X)
+        g = (Re - 2300.0) / (1.0e4 - 2300.0)
+        expected = (1.0 - g) * 3.66 + g * cb.nusselt_dittus_boelter(1.0e4, Pr, True)
+        assert Nu == pytest.approx(expected, rel=1e-12)
 
     def test_htc_channel_multiple_compositions(self):
         """Test htc_channel with different gas compositions."""

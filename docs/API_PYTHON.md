@@ -152,6 +152,23 @@ G = cb.mass_flux_isentropic(T0=300, P0=2e5, P=1.5e5, X=air)
 L_max = cb.fanno_max_length(T_in=300, P_in=2e5, u_in=50, D=0.05, f=0.02, X=air)
 ```
 
+### Fanno flow in Mach number
+Integrated in M rather than x: the state is algebraic in M at fixed mass flux,
+so the duct length is a smooth integral that vanishes at sonic -- exact L*,
+no cutoff. Fed isentropically from a stagnation state:
+
+```python
+G_ch = cb.fanno_choked_mass_flux(Pt=2e5, Tt=300, X=air, L=1.0, D=0.02,
+                                 roughness=1e-5, friction_model="haaland")  # kg/(m^2 s)
+r = cb.fanno_duct(2e5, 300, 0.8 * G_ch, air, 1.0, 0.02, 1e-5, "haaland")
+r.inlet.M, r.exit.M, r.exit.P, r.Pt_exit, r.L_star, r.choked
+cb.fanno_length_between(G=300, Tt=300, M1=0.3, M2=1.0, X=air, D=0.02,
+                        roughness=0.0, friction_model="fixed", f_multiplier=0.02)
+```
+Agrees with the x-march (`fanno_channel_rough`, 20000 steps) to 1e-9 at
+constant f and to ~1e-8 with a Re-dependent f, the floor set by kinks in
+mu(T).
+
 ### Rocket Nozzle Functions
 ```python
 # Converging-diverging nozzle analysis
@@ -186,6 +203,9 @@ Cd = cb.discharge_cd(cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow)
 Cd, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
     cb.DischargeCdCorrelation.Idelchik1966Thick, hole, flow
 )
+
+# Inside the source's own Re and l/d range? A flag, never a selector.
+cb.discharge_cd_in_range(cb.DischargeCdCorrelation.Lichtarowicz1965, hole, flow)
 ```
 
 There is deliberately no auto-selection from geometry: it is how a
@@ -334,6 +354,77 @@ energy balance: `Q = h_plate_area * area_approach_total * dT`.
 The external film is **not** included here, and `overall_effectiveness()`
 below explains why that is a measured decision rather than a gap.
 
+##### The plate's own wall in a network (#471)
+
+The plate IS the wall the coolant passes through, so it owns it: no
+`ThermalWall` connects to it, and its diagnostics carry the wall solution
+(`wall_heat_transfer`). The node it DISCHARGES into decides the gas side:
+
+| Discharge into | Gas side |
+|---|---|
+| `MomentumChamberNode` (flow) | the chamber's own surface correlation is the unblown `h_gas_unblown` (so the chamber's surface model IS the baseline); its velocity gives `blowing_ratio`; `gas_augmentation` (the caller's, 1.0) scales h. `T_gas` is the approaching MAIN stream when the chamber has one -- its own state is the mixed outlet, diluted by the effused coolant |
+| a plenum (state, no flow) | the imposed `gas_heat_flux` [W/m^2], 0 by default (adiabatic) |
+
+```python
+panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=3.27e-3,
+                             wall_thickness=6.3e-3, pitch=15.24e-3,
+                             panel_length=0.152, panel_width=0.152,
+                             wall_conductivity=20.0,      # one layer, t/k
+                             gas_augmentation=1.0,        # the caller's
+                             gas_film="none",             # or "baldauf_sellers"
+                             gas_heat_flux=0.0)           # plenum discharge only
+diag["T_wall_hot"], diag["T_wall_cold"], diag["q_wall"], diag["eta_overall"]
+```
+
+- **Energy-neutral for the network.** The wall heat leaves the gas and
+  returns with the effusing coolant into the same node, so it is an output,
+  not a source.
+- **Film off by default.** `gas_film="baldauf_sellers"` adds C++'s
+  `effusion_panel_film_effectiveness` (Baldauf per row, Sellers over the
+  panel's rows; needs `panel_length`), flagged `film_extrapolated` outside
+  Baldauf's envelope. Scored on Andrews 88-GT-290 the data refuse it offered
+  alone; the missing physics is the gas-side augmentation.
+- **Plenum-fed.** McGreehan-Schotsch's U1/Vi stays 0 and the coolant side is
+  Andrews' still plenum; `coolant_crossflow_ignored` flags a supply node a
+  channel runs through. A channel-fed liner segment is a separate element.
+- With `wall_conductivity` large the wall reduces exactly to
+  `overall_effectiveness` below.
+
+##### Duct-fed: the effusion liner (#471)
+
+A liner's coolant usually runs along a backside duct and bleeds through the
+wall, so the holes see a SUPPLY-side crossflow. `EffusionLiner` builds that
+configuration from N stations:
+
+```python
+from combaero.network import EffusionLiner
+
+liner = EffusionLiner("ln", n_segments=4, length=0.152, width=0.152, duct_height=0.03,
+                      hole_diameter=3.27e-3, wall_thickness=6.3e-3,
+                      pitch_x=15.24e-3, pitch_y=15.24e-3)
+liner.add_to(net, coolant_in="cin", coolant_out="cout", gas="liner_chamber")
+liner.summarize(res["__element_diag__"])   # bleed, U1/Vi, Cd, P_backside, T_wall per station
+```
+
+- **Stations are Bassett bleeds** (`CrossflowSegmentElement`, kappa 0.75):
+  the backside static pressure rises along the duct as it slows, so the
+  downstream panels see more drive.
+- **Each panel is duct-fed**: `EffusionPlateElement(crossflow_segments=(prev,
+  next), crossflow_area=A)` takes McGreehan-Schotsch's supply-side
+  `U1/Vi`, with `U1` the duct's mean velocity at the station and `Vi` the
+  isentropic jet velocity from the station's STATIC state (C++
+  `crossflow_velocity_ratio`). Only `McGreehanSchotsch` has a crossflow term,
+  so a duct-fed panel refuses the others.
+- **What sets U1/Vi** is mainly the duct's own pressure drop against the
+  holes' drive, roughly `sqrt(dp_duct/dp_hole)`, not the duct size: a
+  pressure-driven duct carries more flow when made bigger. Flags:
+  `crossflow_cd_beyond_8pct` (> 0.2) and `crossflow_cd_degraded` (> 0.35),
+  the Rohde-scored bounds.
+- **Flagged, provisional:** the coolant-side heat transfer is still Andrews'
+  plenum-fed correlation (`coolant_ht_plenum_assumed`), and the stations
+  bleed through holes far smaller than the duct, beyond Bassett's measured
+  psi = 1-3 (`station_psi_beyond_bassett`).
+
 ##### Overall effectiveness, as an output
 
 ```python
@@ -377,9 +468,9 @@ boundary layer at the same x, a third baseline again.
 
 **`gas_augmentation` and `internal_Nu_multiplier` are yours, never
 fitted here**, matching `Nu_multiplier` on `ConvectiveSurface`. At their
-defaults the closure scores +3.1% on Andrews' effusion plate C and +23.7%
-on plate B; setting `gas_augmentation = 2.06` closes plate B at G = 0.6
-exactly. Note that `internal_Nu_multiplier = 0.486` also closes it -- by
+defaults the closure scores +4.0% on Andrews' effusion plate C and +24.6%
+on plate B; setting `gas_augmentation = 2.12` closes plate B at G = 0.6
+exactly. Note that `internal_Nu_multiplier = 0.471` also closes it -- by
 halving the coolant side, which is the wrong direction, since that
 correlation runs 10.4% LOW against Andrews' Fig. 8. Reaching the target
 is not the same as being the right dial.
@@ -517,7 +608,8 @@ temps, q = cb.wall_temperature_profile(T_hot=1200, T_cold=300, h_hot=200, h_cold
 Defines convective heat transfer properties on network elements. Supports different channel models.
 
 ```python
-from combaero.heat_transfer import ConvectiveSurface, SmoothModel, RibbedModel, DimpledModel, PinFinModel, ImpingementModel
+import combaero as cb
+from combaero.heat_transfer import ConvectiveSurface, PinFinModel, RibbedModel, SmoothModel
 
 # Smooth channel with Gnielinski correlation (default)
 surface = ConvectiveSurface(
@@ -525,27 +617,17 @@ surface = ConvectiveSurface(
     model=SmoothModel(correlation="gnielinski")
 )
 
-# Ribbed surface with geometry parameters
+# Ribbed walls (see "Ribbed Channels" below)
 ribbed = ConvectiveSurface(
     area=2.5,
-    model=RibbedModel(
-        e_D=0.05,      # Rib height / hydraulic diameter
-        p_e=10.0,     # Pitch / height
-        w_e=0.5,      # Rib width / height
-        correlation="gnielinski"
-    )
+    model=RibbedModel(e_D=0.06, p_e=10.0, alpha_deg=90.0, W_H=1.0, n_ribbed_walls=2),
 )
 
-# Pin fin array
-pin_fin = ConvectiveSurface(
-    area=3.0,
-    model=PinFinModel(
-        L_H=1.0,       # Fin height / hydraulic diameter
-        S_H=2.0,       # Spanwise spacing / height
-        S_L=2.0,       # Streamwise spacing / height
-        t_D=0.1,       # Fin thickness / diameter
-        correlation="gnielinski"
-    )
+# Staggered pin-fin array (see "Pin-Fin Channels" below); area is the
+# endwall's BASE (planform) area
+pins = ConvectiveSurface(
+    area=0.01,
+    model=PinFinModel(pin_diameter=0.005, S_D=2.5, X_D=2.5, H_D=1.0, N_rows=10),
 )
 ```
 
@@ -568,6 +650,37 @@ wall = WallConnection(
 # Add to network
 network.add_wall(wall)
 ```
+
+Each side's heat goes into that element's `to_node` (or the node itself when
+the wall names a node). A **boundary** cannot take it -- its state is fixed --
+so heat a wall puts there leaves the network with the stream crossing that
+boundary, and the result reports it:
+
+```python
+res["coupling_wall.Q"]              # W, side a -> side b
+res["coupling_wall.Q_to_boundary"]  # W, the part that landed on boundaries (0 if none)
+res["outlet.Q_wall_out"]            # W, wall heat leaving through boundary "outlet"
+```
+
+With it the network's energy balance closes:
+`sum_out m h(T_upstream) + sum_boundaries Q_wall_out = sum_in m h(T_in)`
+(`python/tests/test_energy_conservation_cooling.py` checks it to 1e-9 for
+every cooling configuration).
+
+- **Reversed flow (#481).** Streams follow the SIGN of an element's flow: a
+  2-port element with `m_dot < 0` delivers into its `from_node`, at its
+  `to_node`'s state, and a wall puts that side's heat into the node the flow
+  goes into. Junction and tee elements keep their declared directions, which
+  their own models enforce.
+- **k(T) layers** (a `material` from `cb.list_materials()`) take their
+  conductivity at the wall temperatures of the same evaluation, iterated to
+  a fixed point -- not from the previous one.
+- **h <= 0** from a correlation past its range is floored smoothly at
+  `cb.WALL_HTC_KNEE` (1e-2 W/(m^2 K)); the wall never refuses it.
+- With `thermal_coupling_enabled = False` the walls report nothing.
+
+Every converged solve in the test suite is also checked for this balance
+(`python/tests/conftest.py`, `_closure_check.py`).
 
 #### Element Integration
 Elements with convective surfaces support heat transfer calculations.
@@ -665,6 +778,7 @@ bookkeeping keys. Five of them say what happened:
 | `__converged__` | `bool` | the root finder reached the residual tolerance, whatever the consistency checks then said |
 | `__consistent__` | `bool \| None` | the elements' own physical-consistency verdict. **`None` means not checked** -- either the solve never converged, or no element in this network has a verifier. It is not a pass. |
 | `__inconsistent_elements__` | `list[str]` | ids of the elements that rejected the solution |
+| `__T_clamped__` | `list[str]` | nodes with flow whose temperature sits on the [200, 5000] K clamp at the solution. The clamp discards energy, so the solve is reported INCONSISTENT (`__success__` False). |
 | `__outcome__` | `SolveOutcome` | why it ended, in one machine-readable value |
 | `__worst_residuals__` | `list[dict]` | the rows carrying the residual, largest first |
 
@@ -719,6 +833,15 @@ solver = NetworkSolver(graph)
 # MPCE networks are retried once from an outlet-referenced
 # incompressible warm start (densities at the downstream static).
 # The primary attempt gets 40% of `timeout`, the retry the rest.
+# A cold solve of a network with walls that still fails is then
+# retried from the same network solved WITHOUT its walls -- the
+# message says "Converged from the wall-free flow solution ...".
+# An iterate the model refuses (an exception, NaN/inf) is answered with a
+# residual ten times the last physical one, so the trust region rejects
+# the step and shrinks; a failed solve lists the rejected probes in its
+# message. Each evaluation repeats the state propagation until states read
+# ahead of its order (wall back-edges, recirculation) settle, so the
+# residual is a function of x alone.
 # Stall detection ends doomed phases early: when hybr's best |F|
 # plateaus far from tolerance it hands over to the LM fallback, and
 # when the LM fallback plateaus too the attempt fails fast so the
@@ -750,7 +873,63 @@ junction = PlenumNode("junction", P=1.5e5, T=350, Y=air)
 combustor = CombustorNode("combustor", P=2e5, T=1800, Y=products)
 momentum = MomentumChamberNode("momentum", P=2e5, T=1800, Y=products, regime="compressible")
 energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
+loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enthalpy
 ```
+
+- **`fraction`** scales the inflow's sensible enthalpy, `h(T) - h(298.15 K)`
+  at its own composition (`cb.SENSIBLE_ENTHALPY_REF_T`); on a combustor, the
+  products'. It is not a fraction of absolute enthalpy, which includes
+  formation enthalpy (#481). The heat it applied is reported as
+  `{node}.Q_fraction` [W].
+- **`Q`** is spread over the node's real inflow. Only a stagnant node (below
+  `cb.MIXER_HEAT_MDOT_FLOOR` = 1 mg/s) cannot take it; what it withholds is
+  reported as `{node}.Q_withheld` [W], as is wall heat aimed at a `WallNode`.
+- **A `MassFlowBoundary` between elements** is an injection: its `m_dot`
+  joins the node at its own `Tt` and `Y`.
+
+#### Merge chamber: main inlet plus side streams (#471)
+
+A `MomentumChamberNode` with `main_inlet` declared accepts further inflows as
+SIDE STREAMS, still with exactly one outlet. The chamber's axis is its outlet
+direction; the main stream arrives along it; each side stream brings
+`m u_jet cos(theta)` of axial momentum and discharges at the chamber's static
+pressure. A constant-area control volume closes it:
+
+    P_face A + m_main u_main + sum(m_s u_jet cos theta) = P A + m_out u_out
+
+```python
+liner = MomentumChamberNode("liner", main_inlet="duct")   # area inherited from "duct"
+panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
+                             wall_thickness=2e-3, pitch=6e-3, panel_area=0.01,
+                             angle_deg=30.0)               # jets at 30 deg to the gas
+```
+
+- **The node's `(P, Pt)` is the chamber (outlet) state.** The main-inlet
+  element sees the MAIN-FACE state the impulse balance gives
+  (`cb.chamber_merge_face_state`): exact for compressible flow, the face
+  static pressure on the subsonic root and its Pt from the same
+  entropy-based closure as the chamber. With no side streams the face is the
+  chamber, so declaring a single-inlet chamber's main inlet changes nothing.
+- **Jets are compressible too.** A side stream's impulse is `cb.jet_impulse`:
+  the isentropic velocity from its supply (Pt, Tt) to the chamber pressure,
+  or, choked, the sonic momentum plus its pressure thrust.
+- **No loss coefficient.** The stagnation-pressure loss of mixing follows
+  from momentum; transverse momentum is reacted by the walls and its kinetic
+  energy dissipated. Normal injection costs the main stream its mixing loss;
+  inclined jets push it, ejector-like.
+- **Directions live only inside the junction.** Edges carry scalars and a
+  channel is 1D along its own axis, so no angle is ever passed on.
+- **One area.** The main inlet's port area is the chamber area, inherited
+  from the main-inlet element; an explicit area that disagrees is refused.
+- **The injector owns its jet.** Orifice-type elements carry
+  `injection_angle_deg` (90 by default, no axial momentum);
+  `EffusionPlateElement` uses its hole inclination `angle_deg`. The jet
+  velocity is the element's own, from its supply's stagnation state.
+- **Refused:** two inflows without `main_inlet`, a `main_inlet` that does not
+  flow in, and any split (more than one outlet needs a loss closure: use a
+  tee).
+- In the GUI, inflows on the chamber's "s" handle are side streams; the one on
+  its flow handle is the main inlet.
 
 ### Network Elements
 ```python
@@ -758,13 +937,20 @@ from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
     TeeJunctionElement, VortexElement, EffusionPlateElement,
-    BorderCarnotLossElement,
 )
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
 channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
+# Compressible channel (#481): residual m - m_calc, m_calc = A * fanno_channel_flow(
+# feeding node's Pt/Tt, other node's Pt). The duct is fed isentropically from the
+# node the flow comes FROM (reversed flow: the to_node), discharges with its exit
+# head lost into a PressureBoundary (coupling "static"/default) or recovered into
+# anything else, and its flow SATURATES at the choked flow -- a choked duct
+# converges on its choked flow, never past it. Diagnostics: "choked",
+# "M_in_duct", "M_exit_duct". Where the feeding node mixes gases, its Jacobian
+# carries d/dY along the directions that composition moves in (#489).
 
 # Effusion (multi-perforated) wall panel. Geometry is given the way a plate
 # is designed -- pitch, hole diameter, wall thickness, inclination -- and the
@@ -802,7 +988,8 @@ tee_branch = TeeJunctionElement(
 
 # Momentum-CV junction (PDF spec, supersedes K-closure for n>3 manifolds and
 # high-Mach / ejector behaviour; see docs/junction/momentum cv implementation guide.pdf).
-# N port-MCNs feed a single junction; each lateral port carries a turning loss.
+# N port-MCNs feed a single junction, whose closure carries every port's loss --
+# connect the ports with plain elements (channels, LosslessConnectionElement).
 mc_com = MomentumChamberNode("mc_com", area=0.01)
 mc_str = MomentumChamberNode("mc_str", area=0.01)
 mc_bra = MomentumChamberNode("mc_bra", area=0.008)
@@ -819,13 +1006,12 @@ jct = MultiPortChamberElement(
     flow_direction="branch",         # 1 supplier + N-1 collectors
     # port_areas (length = N_in + N_out) inherited from connecting channels if not given
 )
-# Lateral port turning loss (sharp-edged 90 deg branch). Straight ports
-# (delta_geom = 0) do not need a loss element.
-loss_bra = BorderCarnotLossElement(
-    "loss_bra", from_node="mc_bra", to_node="ch_bra_in",
-    delta_geom_deg=90.0,
-    # area inherited from neighbouring channel if not given
-)
+# Do NOT add a BorderCarnotLossElement on a port: the Mynard closure already
+# carries the lateral turning loss, and the two together double-count it
+# (Bassett K6 at 90 deg, psi = 1, q = 0.5: 0.867 alone, which is Bassett's
+# value; 1.249 with the element; #272). BorderCarnotLossElement is DEPRECATED
+# (removal in 0.8.0): it is exactly PressureLossElement with
+# correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area).
 # Solved unknowns: jct.P_jct (junction static pressure). Per-port mass flows
 # live on the connecting channels / loss elements; the junction reads them via
 # the graph. The N+1 residuals = N port total-pressure relations
@@ -948,10 +1134,18 @@ agreement on the digitised validation data; the on/off tables live on issue
 #271. `eta_scale` exists for that measurement:
 
 ```python
-MultiPortChamberElement(..., eta_scale=1.0)   # default: the faithful Mynard port
-MultiPortChamberElement(..., eta_scale=0.0)   # energy-transfer term off, for scoring
-junction_loss_coefficient(U, A, theta, eta_scale=0.0)
+MultiPortChamberElement(..., eta_scale=0.0)   # default: energy-transfer term off
+MultiPortChamberElement(..., eta_scale=1.0)   # Mynard's Eq 36 term on
+
+# Mynard's published model -- the dividing-streamline recovery is a combaero
+# addition (on by default) and has to be switched off too:
+junction_loss_coefficient(U, A, theta, joining_etransfer_alpha=0.0,
+                          eta_scale=1.0, dividing_streamline_recovery=0.0)
 ```
+
+That configuration is held to Mynard 2015's own figures (Figs 4, 6-11) by
+`python/tests/test_junction_mynard_fidelity.py`; see
+`validation/junction/README.md`, "Fidelity".
 
 Changing any of these values is a retune and needs a before/after table
 before it lands, not a silent edit -- `python/tests/test_junction_tuned_constants.py`
@@ -960,7 +1154,7 @@ pins the documented values.
 ### The Junction Soft-Barrier Weight
 
 Distinct from the tuned constants above: this is a **numerical** parameter, not
-physics, and it is derived rather than declared.
+physics.
 
 When `strict=False` and a port flows against its declared direction,
 `MultiPortChamberElement` replaces the physics with a continuity residual plus a
@@ -969,32 +1163,16 @@ shares its row with the continuity relation, so it balances against a pressure
 error rather than driving the offending flow to zero, and has a fixed point at
 `slack* = sqrt(dP / alpha)`. A solve that reaches it parks there.
 
-`alpha` therefore carries `Pa/(kg/s)^2` and cannot be a constant: the weight
-needed scales as `1/m_ref^2`, two decades per decade of network size.
-`NetworkSolver` derives it before each solve from the reference state it
-already computes for seeding:
+`alpha` is `soft_penalty_alpha`, default `DEFAULT_SOFT_PENALTY_ALPHA = 1e11`
+Pa/(kg/s)^2. It carries units, so it places the fixed point at a sensible
+fraction of the flow for one network size only. The solver used to derive it
+from the network's scales; that hand-off was removed once the junction seed
+stopped starting ports in the wrong basin and it no longer changed any outcome
+from 1e-6 to 1e4 times the reference size (#272). Set it explicitly for a
+network far from ~0.1 kg/s that parks a port in the barrier:
 
 ```python
-alpha = P_ref / (BARRIER_SLACK_FRACTION * m_ref) ** 2   # f = 0.005
-```
-
-placing the fixed point at 0.5% of the reference mass flow whatever the
-network's size. It is frozen for the solve, so the residual and Jacobian are
-unchanged in form.
-
-| name | where | meaning |
-|---|---|---|
-| `BARRIER_SLACK_FRACTION` | `combaero.network.mpce_element` | where the fixed point is placed, as a fraction of `m_ref` |
-| `DEFAULT_SOFT_PENALTY_ALPHA` | same | fallback when no solver has supplied a weight, or the reference state is degenerate |
-| `scaled_penalty_alpha(P_ref, m_ref)` | same | the derivation, exposed for testing |
-| `MultiPortChamberElement.effective_penalty_alpha()` | element | the weight actually used, after precedence |
-
-Precedence: an explicitly set `soft_penalty_alpha` always wins, then the
-solver-supplied scale-aware weight, then the fallback. So the tuning knob keeps
-working:
-
-```python
-element.soft_penalty_alpha = 5.0e7   # explicit: overrides the derived weight
+element.soft_penalty_alpha = 5.0e7
 ```
 
 Raising `alpha` shrinks the fixed point and never destabilises the solve --
@@ -1557,6 +1735,190 @@ That knob exists because the ribbed side already has a better one: change `C_G`
 on the parameter set, which records what you changed and why. The smooth walls
 come from Gnielinski and have no set of their own.
 
+### Pin-Fin Channels
+
+`PinFinModel` puts a pin-fin array on a `ChannelElement`'s `ConvectiveSurface`
+(#335). It uses the pin-fin sets below: heat transfer from `nu_set`
+(default `metzger_1986_staggered_nu()`), the drop from `f_set` (default
+`metzger_1982_staggered_friction()`), optionally transferred by a
+`modifier`.
+
+```python
+from combaero.network import ChannelElement, ConvectiveSurface, PinFinModel
+
+pins = PinFinModel(pin_diameter=0.005, S_D=2.5, X_D=2.5, H_D=1.0, N_rows=10,
+                   k_pin=20.0)     # W/(m K), for the fin efficiency
+ch = ChannelElement("te", "A", "B", length=0.125, diameter=0.009,
+                    surface=ConvectiveSurface(area=0.01, model=pins))
+```
+
+- **The element's flow area is the unobstructed channel.** Vmax follows
+  exactly from the array geometry (`A_min/A_frontal`), and
+  `Re_D = rho Vmax D / mu`.
+- **`ConvectiveSurface.area` is the endwall's base (planform) area.** The
+  returned `h` is referenced to it and includes the fin efficiency of
+  pins fed from each wall to mid-height:
+  `h_eff = h (A_endwall_exposed + eta_fin A_pin) / A_base`. `h_array` and
+  `eta_fin` on the result show both halves.
+- **The drop is the correlation's own per-row form,**
+  `dP = 2 rho Vmax^2 N f(Re_D)`, with an analytic Jacobian in mass flow,
+  upstream T and P (through rho and mu). The code removed in 0.7.0 used
+  `rho V^2/2` here, a factor of 4 low.
+- **Inline arrays** default to `chyu_1990_friction(Inline)`, the only
+  inline friction source in hand (one geometry: H/D 1, S/D = X/D = 2.5).
+  Staggered friction is never substituted: a staggered `f_set` on an inline
+  array raises. Heat transfer defaults to Chyu's inline set, or use
+  `modifier=cb.chyu_1998_inline_over_staggered()` to transfer a staggered
+  set.
+- **Known gaps:**
+  - `T_aw` is borrowed from the smooth correlation, as the impingement
+    paths do.
+  - `dh_dT` is the smooth result's relative property sensitivity scaled to
+    `h`; the pin correlations expose no temperature derivative of their
+    own.
+
+### Impingement-Cooled Walls (jet-plate arrays)
+
+A jet plate fed from a plenum, impinging on a target wall, the spent air
+leaving through the gap as crossflow. **This is one configuration**, and
+`ImpingementArray` builds it as one object (#465):
+
+```python
+from combaero.network import ImpingementArray, WallLayer
+
+arr = ImpingementArray("ia", n_rows=10, d_jet=0.00254, xn_d=5.0, yn_d=4.0, z_d=2.0,
+                       span=0.122, plate_thickness=0.00254)
+arr.add_to(net, supply="supply", exit="exit")            # rows ia__p{i}, ia__x{i}, ia__c{i}
+arr.add_wall(net, "w", hot_element="hot", layers=[WallLayer(0.001, 20.0)])
+res = NetworkSolver(net).solve()
+arr.summarize(res["__element_diag__"])   # m_dot, dP, Re_j/Gc_Gj ranges, rows_Nu, ...
+```
+
+`add_wall` puts one `ThermalWall` per row on that row's target footprint; the
+hot side is evaluated once per row at its own state, so a hot side that changes
+along the array needs its own segments. Heating the crossflow lowers its
+density, which raises the jets' momentum cost and the supply non-uniformity
+beyond Florschuetz's isothermal model (1.88 vs 1.61 on a 10-row (5,4,2) array
+against 1200 K gas) -- the direction is physical; the isothermal source cannot
+score it.
+
+A bypass crossflow (#467) and spent air leaving through the target (#468) are
+different configurations, with their own elements to come. The building
+blocks below are public for hand-built networks, one pair per spanwise row:
+
+```python
+from combaero.network import ImpingementCrossflowElement, ImpingementPlateElement
+
+d, span = 0.00254, 0.122
+for i in range(1, 11):
+    net.add_element(ImpingementPlateElement(
+        f"p{i}", "supply", f"c{i}", d_jet=d, xn_d=5.0, yn_d=4.0, z_d=2.0,
+        span=span, plate_thickness=d, row=i,   # row: diagnostics only
+    ))
+    net.add_element(ImpingementCrossflowElement(
+        f"x{i}", f"c{i}", f"c{i+1}" if i < 10 else "exit",
+        length=5.0 * d, height=2.0 * d, span=span,
+    ))
+```
+
+```
+supply plenum ---+--------------+--------------+
+                 |              |              |
+            [Plate 1]      [Plate 2]      [Plate 3]
+                 |              |              |
+crossflow:      c1 --[Cross]-- c2 --[Cross]-- c3 --[Cross]-- exit
+```
+
+**`ImpingementPlateElement`** is an orifice (`n_holes = round(span/(yn d))`
+holes in parallel) whose flow is the row's jet flow, plus Florschuetz,
+Truman and Metzger's (1981) heat transfer on the target footprint
+`n_holes xn yn d^2`. Its **Gc/Gj comes from the network**, not the
+uniform-supply closed form:
+
+    Gc/Gj = (m_c / m_j) (pi/4) / ((yn/d)(z/d))
+
+where `m_j` is the plate's own flow and `m_c` every other inflow to its
+`to_node`, i.e. the crossflow approaching the row. A non-uniform supply, a row
+of different geometry or a bleed therefore shows up in the heat transfer.
+`h` depends on a neighbour's flow, so the element returns `dh_dsources` and
+the solver relays it into the Jacobian (the `network_flow_inputs()` opt-in).
+`T_aw` is the supply plenum temperature, Florschuetz's own reference.
+The physics is C++'s `cb.jet_row_heat_transfer(set, cb.JetRowGeometry(...),
+m_jet, m_crossflow, mu, k, Pr)`, which returns `h` and its analytic
+derivatives with respect to both flows; the element only decides which flows
+are crossflow.
+- Hole Cd: default `'fixed'` at Florschuetz's 0.79 (measured 0.73-0.85);
+  alternatives `'IdelchikThick'`, `'Lichtarowicz'` (long hole, l/d 2-10)
+  and `'McGreehanSchotsch'` (supply-side `U1/Vi = 0`, never Gc/Gj).
+  `Cd_in_range` reports whether the plate is inside the chosen source's range.
+- Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `htc`, `T_aw`,
+  `surface_extrapolated`, and `Gc_Gj_closed_form` (Eq. 8) when `row` is given.
+- Not modelled: the temperature sensitivity of the correlation's properties
+  (`dh_dT = 0`) and the crossflow's own temperature.
+
+**`ImpingementCrossflowElement`** is a `ChannelElement` (area `height *
+span`) plus the momentum the jets cost: they enter with no streamwise
+momentum, so each merge drops the static pressure by
+`(m_b|m_b| - m_a|m_a|)/(rho A^2)`. The drop is split half-and-half between
+the segments either side, so each crossflow node holds the static pressure at
+its row centre. **Without this term every row sees the same pressure
+difference and the supply stays uniform.** That puts Gc/Gj at twice Eq. 8 on
+Florschuetz's strongest-crossflow geometry. The term is C++'s
+`cb.station_half_drop` with `kappa = 0`, each station at the density of its
+own node (see `CrossflowSegmentElement` below).
+
+#### Crossflow segments: merge and bleed stations (#471)
+
+`ImpingementCrossflowElement` is one case of `CrossflowSegmentElement`, a
+channel segment whose end nodes are side-stream STATIONS. Over a station, with
+the side stream's axial velocity `kappa * u_arriving`:
+
+    dP_static = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+
+| `kappa` | station | source |
+|---|---|---|
+| `cb.STATION_KAPPA_MERGE_NORMAL` = 0 | jets merging normally (impingement) | Florschuetz's P + G^2/rho = const |
+| `cb.STATION_KAPPA_BLEED_BASSETT` = 0.75 | bleed through the wall (effusion holes) | Bassett et al. (2001) K2/K5, Eq. 15, reproduced for every split |
+
+```python
+from combaero.network import CrossflowSegmentElement
+
+seg = CrossflowSegmentElement("s1", "b1", "b2", length=0.02, area=4e-3, Dh=0.01,
+                              from_kappa=cb.STATION_KAPPA_BLEED_BASSETT, prev_seg="s0",
+                              to_kappa=cb.STATION_KAPPA_BLEED_BASSETT, next_seg="s2")
+first = CrossflowSegmentElement("s0", "plenum", "b1", length=0.01, area=4e-3,
+                                entry_K=0.5,          # reservoir entry, sharp
+                                to_kappa=cb.STATION_KAPPA_BLEED_BASSETT, next_seg="s1")
+```
+
+- **Centred.** A segment carries half of the station at each end, each at its
+  node's own density, so every node holds its station's mid static pressure.
+  Station nodes must be `PlenumNode`s (Pt = P).
+- **Ends are explicit.** `prev_seg`/`next_seg` name the neighbour segments;
+  `entry_K` makes `from_node` a reservoir; a segment into a plenum with no
+  `to_kappa` dumps its dynamic head (static continuity).
+- **Bleed scored on Bassett's own measured K5** (Fig. 7c, 43 points): MAE
+  0.039 in K overall, 0.021 at q >= 0.6 (the few-percent bleed of an effusion
+  station). Bassett measured psi = 1-3; a station bleeding through holes far
+  smaller than the duct is an extrapolation in psi, which K5 is independent
+  of by derivation.
+
+**One configuration only.** These elements cover spent air leaving down the
+crossflow channel. A hand-wired network describing a different
+configuration is refused at set-up, naming it:
+- a bypass or initial crossflow feeding the chain (#467);
+- spent air leaving through the target, impingement-effusion or film (#468);
+- two plates merging at one node.
+
+**Measured against the source** (`python/tests/test_impingement_plate_validation.py`):
+- **Flow model:** over the 27 Fig. 6 geometries x 10 rows, the network
+  reproduces Florschuetz's own 1D flow model (Eq. 8, and the cosh jet
+  distribution behind it) to a max 3.7% in Gc/Gj (bias -0.5%) and 3.8% in
+  Gj/Gj_mean.
+- **Fig. 6:** the chain's Nu/Nu1 scores +4.0% bias and 6.9% MAE over 242
+  points. The correlation at the paper's own abscissae scores +3.7% / 6.8%.
+- **Row 1 vs Fig. 5:** absolute Nu1 matches as in #461.
+
 ### Impingement Channels
 
 ```python
@@ -1571,6 +1933,10 @@ surface = ConvectiveSurface(
 )
 ```
 
+For a jet plate fed from a plenum use the elements above: they carry the
+row's own jet flow and read Gc/Gj from the network. `ImpingementModel` on a
+`ChannelElement` remains for a row whose flow you impose yourself.
+
 **One element models one spanwise row**, not a whole array -- there is no
 single "channel Nu" for a jet array the way there is for a smooth or ribbed
 duct, since downstream rows see progressively more crossflow than upstream
@@ -1578,15 +1944,25 @@ ones. Model a real array by chaining `n_rows` separate elements, each with
 its own `row`; row 1 sees zero crossflow by definition (`Gc/Gj = 0`,
 Florschuetz's own `Nu1`).
 
-**Mass flow is recovered from `area`, the same convention every
-`ConvectiveSurface` model uses** -- `ImpingementModel` does not introduce a
-new one. The element treats `area` as this row's own footprint, divides by
-`xn_d * d_jet * yn_d * d_jet` to get the row's hole count, and gets this
-row's own jet velocity from the upstream state's total mass flow through
-that area. Whether every row gets the same total flow (a uniform-supply
+**The element's mass flow is this row's jet flow; `area` counts the
+holes.** `area` is the row's target-plate footprint, so the row has
+`n = area / (xn_d d_jet * yn_d d_jet)` holes, each carrying `m_dot / n`, and
+`Re_j = 4 (m_dot / n) / (pi d_jet mu)` -- Florschuetz's jet mass velocity on
+the hole area. Until #460 the jet flow was taken as `rho v * area`, which
+made Re_j scale with the target area: driven with the paper's own flow, the
+element then missed Florschuetz's Fig. 5 by +268% on average; it now matches
+it to 5.2%, like the correlation. Whether every row gets the same total flow (a uniform-supply
 approximation) or a row-dependent one (Florschuetz's own Eq. 7, deliberately
 not implemented -- see `impingement_correlation.h`'s module comment) is a
 choice for whoever assembles the chain, not something this element decides.
+
+**Default convective area.** A `ChannelElement` whose surface was given no
+`area` gets one that follows the model (#462): an impingement row gets its
+target footprint matched to the channel's crossflow cross-section,
+`A_flow * (xn/d) / (z/d)`, so the hole count follows from the channel; a single
+jet gets Goldstein's averaging disc, `pi (R_D d_jet)^2`; every other surface
+keeps the wetted wall `pi D L`. The channel diagnostics report the surface's
+own `Re_surface` and `surface_extrapolated`.
 
 **Pressure drop is not modelled here.** Model the jet plate's own orifice
 loss with a proper `OrificeElement` upstream, using a real
@@ -1608,8 +1984,8 @@ surface = ConvectiveSurface(
 ```
 
 `R_D` is a real modelling choice, not a detail: the correlation's `Nu` is
-LOCAL to the radial position, so this reports one representative value
-rather than an area-averaged profile.
+the AVERAGE over the disc of radius `R = R_D d_jet` (Han's Eq. 4.1), so the
+convective area should be that disc.
 
 Both models expose the same wall-coupling derivatives (`dh_dmdot`, `dh_dT`,
 `dT_aw_dmdot`, `dT_aw_dT`) and an `extrapolated` flag (array only -- a single
@@ -1696,13 +2072,80 @@ looser forms (Eq. 4.6 Kercher-Tabakoff -- graphical, not closed-form anyway;
 Eq. 4.7/4.8 -- Florschuetz's own less-tight alternate) are out of scope,
 deferred per the extraction's I3.
 
+### Pin-Fin Correlations (parametrised)
+
+Pin-fin arrays (#335) as provenanced sets in each source's own form, with
+exact geometry-only conversion to one canonical basis: `Re_D` on the pin
+diameter and the velocity at the minimum flow area, `Nu_D = h D / k`, and
+`f = dP / (2 rho Vmax^2 N)` (per row, so `dP = 2 rho Vmax^2 N f`). Heat
+transfer and friction are separate sets, so any Nu set can pair with any
+friction set.
+
+```python
+import combaero as cb
+
+g = cb.PinFinGeometry(S_D=2.5, X_D=2.5, H_D=1.0, N_rows=10)   # staggered
+nu = cb.evaluate_pin_fin_nu(cb.metzger_1986_staggered_nu(), g, Re_D=2.0e4, Pr=0.7)
+f = cb.evaluate_pin_fin_friction(cb.metzger_1982_staggered_friction(), g, Re_D=2.0e4)
+nu.Nu, nu.dNu_dRe, nu.extrapolated     # 91.78, 0.00317, False
+f.f, f.extrapolated                    # 0.0755, False
+
+# VanFossen works in its own D' basis; the result comes back canonical.
+cb.evaluate_pin_fin_nu(cb.vanfossen_1982_staggered_nu(), g, 2.0e4, 0.7).Nu   # 90.91
+```
+
+The second call is flagged `extrapolated`: VanFossen's arrays had 4 rows, not
+10. A set outside its validity box still evaluates; it never refuses.
+
+| set | what | box |
+|---|---|---|
+| `metzger_1986_staggered_nu()` (default) | `0.135 Re_D^0.69 (X/D)^-0.34`, pin + endwall | H/D <= 3, 2 <= S/D <= 4, 1.5 <= X/D <= 5, Re 1e3-1e5, 10 rows |
+| `metzger_1982_staggered_friction()` (default) | `0.317 Re^-0.132` / `1.76 Re^-0.318`, C1 blend at 1e4 | 0.5 <= H/D <= 6, 2 <= S/D <= 4 |
+| `vanfossen_1982_staggered_nu()` | `0.153 Re_D'^0.685` on D' = 4V/A_t | H/D 0.5-2, 4 rows |
+| `damerow_1972_staggered_friction()` | `2.06 (S/D)^-1.1 Re^-0.16`, per (N-1) rows | S/D 4.24-7.07 |
+| `chyu_1998_nu(arrangement, surface)` | Han Table 4.7, staggered or inline, pin / endwall / total | S/D = X/D = 2.5, H/D = 1 |
+| `chyu_1998_inline_over_staggered()` | inline/staggered Nu ratio, no friction ratio | Chyu's geometry |
+| `chyu_1990_nu(arrangement, fillet=False)` | Chyu 1990 Table 2, pin surface, straight or fillet pins | S/D = X/D = 2.5, H/D = 1, Re 5e3-3e4 |
+| `chyu_1990_friction(arrangement, fillet=False)` | Chyu 1990 Fig. 6, digitised and **Fitted**; inline straight = 0.1693/4, Re-independent | same, Re about 9e3-2.2e4 |
+| `chyu_1990_fillet_over_straight(arrangement)` | fillet/straight Nu ratio (staggered 0.78-0.92), no friction ratio | same |
+
+**Inline friction** comes from one rig at one geometry: Chyu (1990) Fig. 6,
+digitised (points in `validation/cooling/data/chyu1990/`). Chyu's staggered
+straight-pin friction sits 16-25% below Metzger's at the same geometry, a
+disagreement between the labs that is reported, not reconciled.
+
+**Fin efficiency** of conducting pins (each wall feeds the pin to mid-height):
+
+```python
+frac = cb.pin_fin_area_fractions(g)                 # per wall, over base area
+e = cb.pin_fin_array_efficiency(h=2000.0, k_pin=20.0, D=1e-3, H=1e-3,
+                                A_f_over_A_t=frac.pin_over_total)
+e.eta_fin, e.eta_t, e.deta_t_dh                     # 0.968, 0.993, analytic
+```
+
+**Supply your own** by copying the default and saying so:
+
+```python
+mine = cb.metzger_1986_staggered_nu()
+mine.name, mine.source = "rig_7", "measured 2026-10"
+mine.provenance = cb.RibProvenance.User
+mine.C = 0.150
+cb.validate_pin_fin_nu_set(mine)
+```
+
+To use a set in a network, see **Pin-Fin Channels** (`PinFinModel`).
+
+Not yet carried, and declared rather than assumed: row-count correction (a
+geometry with a different `N_rows` is flagged), channel convergence, long pins
+(H/D > 3), and fillets beyond Chyu's single geometry.
+
 ### Enhanced Cooling Surfaces
 
 Removed in 0.7.0. The pin-fin, dimple, rib and impingement correlations could
 not be traced to their cited sources -- the rib friction multiplier was 4-5x
-below the only rib datum in the repository. Provenanced rib and jet
-impingement correlations are re-added above (issues #334, #337); see issue
-#339 for the rebuild.
+below the only rib datum in the repository. Provenanced rib, jet
+impingement and pin-fin correlations are re-added above (issues #334, #337,
+#335); see issue #339 for the rebuild.
 
 `channel_smooth` and the base convective correlations (Gnielinski,
 Dittus-Boelter, Sieder-Tate, Petukhov) are unaffected, as are the user-set

@@ -79,7 +79,9 @@ def test_the_gas_side_is_the_rig_not_a_fitted_number(plates) -> None:
     g = er.gas_side()
     assert g["D_h"] == pytest.approx(4 * (0.076 * 0.152) / (2 * (0.076 + 0.152)))
     assert g["U_g"] == pytest.approx(26.8, abs=0.3)
-    assert g["Re_duct"] == pytest.approx(38400, rel=0.02)
+    # 35,900 with air's viscosity corrected (#485); it read 38,400 while
+    # combaero's air mu was 11.8% low. Not a number from the paper.
+    assert g["Re_duct"] == pytest.approx(35900, rel=0.02)
     assert g["h_g"] == pytest.approx(46.1, rel=0.02)
     # Turbulent, so Dittus-Boelter is at least the right family of
     # correlation -- a laminar duct would need a different one entirely.

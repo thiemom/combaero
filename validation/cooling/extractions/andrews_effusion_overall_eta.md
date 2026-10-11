@@ -129,9 +129,11 @@ every ratio below.
 
 | | bias | MAE | n |
 |---|---|---|---|
-| plate C (X/D 4.7) | **+3.1%** | 4.6% | 72 |
-| plate B (X/D 7.1) | **+23.7%** | 23.7% | 66 |
+| plate C (X/D 4.7) | **+4.0%** | 5.0% | 72 |
+| plate B (X/D 7.1) | **+24.6%** | 24.6% | 66 |
 | basis | **accuracy** (1986 correlations, 1988 data) | | |
+
+(re-scored 2026-10-08 after #485: air's viscosity was 11.8% low before); it was +3.1% / +23.7%.
 
 Reported as two rows, never pooled: a pooled +13% would describe neither.
 The runner's reporting group is per plate so the rollup cannot form it.
@@ -249,7 +251,7 @@ measurement, on a heated wall.
 ## Deliberately not implemented
 
 **A fitted gas-side augmentation.** Doubling `h_g` takes plate B from
-+23.7% to +1.6%, so a runner that "calibrated" it would report both
++24.6% to +2.7%, so a runner that "calibrated" it would report both
 plates as good fits and erase the finding entirely. That is why
 `gas_side_sensitivity()` reports the multiplier and never applies it.
 
@@ -259,30 +261,30 @@ double-count. `eta` is an output here and must stay one.
 
 ## The knobs, and that they reach the target
 
-The library does not correct the 24% miss on plate B -- matching a rig is
+The library does not correct the 25% miss on plate B -- matching a rig is
 the user's job. But a knob that is offered and does not reach is worse
 than no knob, so each was verified against plate B at `G = 0.6`
-(measured 0.6074, untuned 0.7611, +25.3%):
+(measured 0.6074, untuned 0.7665, +26.2%; values after #485):
 
 | knob | value needed | result |
 |---|---|---|
-| `gas_augmentation` | 2.060 | exact to 1e-16 |
-| `eta_film` 0.318 + `gas_augmentation` 4.322 | the physical pair | exact |
-| `internal_Nu_multiplier` | **0.486** | exact -- and WRONG |
+| `gas_augmentation` | 2.123 | exact to 1e-16 |
+| `eta_film` 0.318 + `gas_augmentation` 4.454 | the physical pair | exact |
+| `internal_Nu_multiplier` | **0.471** | exact -- and WRONG |
 
 **Both single knobs reach the target; only one is attributable.** The
 internal multiplier gets there by halving the coolant-side coefficient,
 which is the wrong direction on the evidence: against Andrews' own Fig. 8
-that correlation runs 10.4% LOW, so correcting it would RAISE `h_i`. The
+that correlation runs 7.1% LOW, so correcting it would RAISE `h_i`. The
 number it needs is itself the evidence that it is the wrong dial. Using
 it to absorb a gas-side error would be reward hacking with a user-facing
 knob, and `test_the_internal_knob_also_reaches_it_but_should_not_be_used`
 records that.
 
 **One scalar is a rig match, not a model.** Fitting `gas_augmentation` at
-`G = 1.0` takes plate B from 23.7% MAE to 5.8% -- a real improvement --
-but the residual runs **-28.7% to +3.5%** and is strongly asymmetric,
-because the required augmentation FALLS at low G (1.4 at `G = 0.15`
+`G = 1.0` takes plate B from 24.6% MAE to 5.7% -- a real improvement --
+but the residual runs **-28.4% to +3.5%** and is strongly asymmetric,
+because the required augmentation FALLS at low G (1.3 at `G = 0.15`
 against 2.4 at 1.0). The average closing hides the low-G tail.
 
 `internal_Nu_multiplier` was added by this work; the element previously

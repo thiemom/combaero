@@ -1309,3 +1309,31 @@ TEST(McGreehanSchotsch, CrossflowSmoothingWallsHoldAcrossTheGeometryRange) {
         EXPECT_LT(got / phys, 9.0);
     }
 }
+
+TEST(DischargeCdInRange, FlagsEachSourcesOwnEnvelope) {
+    using C = DischargeCdCorrelation;
+    // Lichtarowicz: l/d 2 to 10 and Re 10 to 2e4 (#465 jet plates sit at
+    // t/d 1-3, so the l/d edge is the one that bites).
+    EXPECT_TRUE(discharge_cd_in_range(C::Lichtarowicz1965, wall_hole(1e-3, 3e-3, 0.0, 0.0),
+                                      wall_flow(1.0e4)));
+    EXPECT_FALSE(discharge_cd_in_range(C::Lichtarowicz1965, wall_hole(1e-3, 1.8e-3, 0.0, 0.0),
+                                       wall_flow(1.0e4)));
+    EXPECT_FALSE(discharge_cd_in_range(C::Lichtarowicz1965, wall_hole(1e-3, 3e-3, 0.0, 0.0),
+                                       wall_flow(3.0e4)));
+    // Idelchik 4-18a: Re 25 to 1e6, l/d up to 4.
+    EXPECT_TRUE(discharge_cd_in_range(C::Idelchik1966Thick, wall_hole(1e-3, 1e-3, 0.0, 0.0),
+                                      wall_flow(1.0e4)));
+    EXPECT_FALSE(discharge_cd_in_range(C::Idelchik1966Thick, wall_hole(1e-3, 5e-3, 0.0, 0.0),
+                                       wall_flow(1.0e4)));
+    EXPECT_FALSE(discharge_cd_in_range(C::Idelchik1966Thick, wall_hole(1e-3, 1e-3, 0.0, 0.0),
+                                       wall_flow(10.0)));
+    EXPECT_FALSE(discharge_cd_in_range(C::Idelchik1966Sharp, wall_hole(1e-3, 1e-3, 0.0, 0.0),
+                                       wall_flow(1.0e4)));
+    // McGreehan-Schotsch: its stated floor Re = 1e4.
+    EXPECT_TRUE(discharge_cd_in_range(C::McGreehanSchotsch1988, wall_hole(1e-3, 1e-3, 0.0, 0.0),
+                                      wall_flow(2.0e4)));
+    EXPECT_FALSE(discharge_cd_in_range(C::McGreehanSchotsch1988,
+                                       wall_hole(1e-3, 1e-3, 0.0, 0.0), wall_flow(5.0e3)));
+    EXPECT_TRUE(discharge_cd_in_range(C::Constant, wall_hole(1e-3, 9e-3, 0.0, 0.0),
+                                      wall_flow(1.0)));
+}

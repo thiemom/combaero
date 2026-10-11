@@ -6,7 +6,8 @@ Metrics per cell:
     RMSE_meas               vs measured truth
     MAE_meas                vs measured truth
     bias_meas               signed mean error (model - measured)
-    pct_within_uncertainty  fraction within paper's stated uncertainty
+    pct_within_uncertainty  fraction within the paper's STATED measurement
+                            uncertainty; NaN where the paper states none
     Delta_vs_ceiling        RMSE_meas(model) - RMSE_meas(ceiling); negative = beating literature
 
 Headline (per model):
@@ -80,8 +81,22 @@ def _bin_label(values: set[float | None]) -> str:
     return "all"
 
 
-def build_cells(records: list[Record], *, uncertainty_K: float = 0.05) -> list[Cell]:
-    """Group records by (canonical_K, psi, theta) and compute metrics."""
+def build_cells(
+    records: list[Record], *, bands: dict[str, float | None] | None = None
+) -> list[Cell]:
+    """Group records by (canonical_K, psi, theta) and compute metrics.
+
+    ``bands`` maps paper -> its stated measurement uncertainty in K (the
+    dataset's ``default_uncertainty_K``, loaded when not given). A cell holding
+    any record whose paper states none reports ``pct_within_uncertainty`` as
+    NaN. It used to apply a flat 0.05 to every source, which no junction source
+    states (#272 follow-up; docs/VALIDATION_POLICY.md: a band must be a
+    measurement band).
+    """
+    if bands is None:
+        from validation.junction.schema import load_dataset
+
+        bands = {name: p.default_uncertainty_K for name, p in load_dataset().papers.items()}
     groups: dict[tuple[str, float | None, float | None], list[Record]] = defaultdict(list)
     for r in records:
         groups[(r.canonical_K, r.psi, r.theta_deg)].append(r)
@@ -126,8 +141,14 @@ def build_cells(records: list[Record], *, uncertainty_K: float = 0.05) -> list[C
         mae = sum(abs(e) for e in model_errs) / len(model_errs)
         bias = sum(model_errs) / len(model_errs)
         max_err = max(abs(e) for e in model_errs)
-        within = sum(1 for e in model_errs if abs(e) <= uncertainty_K)
-        pct = within / len(model_errs)
+        cell_bands = [bands.get(r.paper) for r in recs if r.K_model is not None]
+        if any(b is None for b in cell_bands):
+            pct = nan
+        else:
+            scored = [
+                (r.K_model - r.K_measured, bands[r.paper]) for r in recs if r.K_model is not None
+            ]
+            pct = sum(1 for e, b in scored if abs(e) <= b) / len(scored)
         cells.append(
             Cell(
                 canonical_K=cK,

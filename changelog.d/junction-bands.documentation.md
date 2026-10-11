@@ -1,0 +1,5 @@
+- **The junction scorecard no longer invents an uncertainty band.**
+  - **Before:** `pct_within_uncertainty` applied a flat 0.05 to every source. Bassett's metadata said 0.05, Hager's 0.05 and Idelchik's 0.10, none with a source.
+  - **The full texts state no measurement uncertainty.** Bassett and Hager compile other experimenters' data, and Idelchik's preface disclaims accuracy outright.
+  - **Now:** each paper's band is null with its reason, and "within" reads `-` rather than a score.
+  - **Idelchik provenance:** its theta = 30 tables (diagrams 7-1/7-2) are calculating formulas with no experiment behind them, per the handbook's own diagram list. This is recorded in the metadata and README.

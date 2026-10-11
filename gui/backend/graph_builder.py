@@ -7,7 +7,10 @@ from combaero.network import (
     ConstantFractionLoss,
     ConstantHeadLoss,
     ConvectiveSurface,
+    EffusionLiner,
+    EffusionPlateElement,
     FlowNetwork,
+    ImpingementArray,
     ImpingementModel,
     LinearThetaFractionLoss,
     LinearThetaHeadLoss,
@@ -15,6 +18,7 @@ from combaero.network import (
     MassFlowBoundary,
     MomentumChamberNode,
     OrificeElement,
+    PinFinModel,
     PlenumNode,
     PressureBoundary,
     PressureLossElement,
@@ -37,7 +41,10 @@ from .schemas import (
     ConstantFractionLossData,
     ConstantHeadLossData,
     DiscreteLossData,
+    EffusionLinerData,
+    EffusionPlateData,
     EjectorData,
+    ImpingementArrayData,
     ImpingementModelData,
     LinearThetaFractionLossData,
     LinearThetaHeadLossData,
@@ -46,6 +53,7 @@ from .schemas import (
     MPCETeeData,
     NetworkGraphSchema,
     OrificeData,
+    PinFinModelData,
     PlenumData,
     PressureBoundaryData,
     RibbedModelData,
@@ -118,8 +126,27 @@ def map_surface_model(data):
             L_D=getattr(data, "L_D", d.L_D),
             R_D=getattr(data, "R_D", d.R_D),
         )
+    if isinstance(data, PinFinModelData) or data.type == "pin_fin":
+        import combaero as cb
 
-    # Dimpled and pin-fin were removed in 0.7.0. Reject rather than silently
+        d = PinFinModelData()
+        D = getattr(data, "pin_diameter", d.pin_diameter)
+        H = getattr(data, "channel_height", d.channel_height)
+        return PinFinModel(
+            pin_diameter=D,
+            H_D=H / D if D else d.channel_height / d.pin_diameter,
+            S_D=getattr(data, "S_D", d.S_D),
+            X_D=getattr(data, "X_D", d.X_D),
+            N_rows=getattr(data, "N_rows", d.N_rows),
+            arrangement=(
+                cb.PinArrangement.Staggered
+                if getattr(data, "is_staggered", d.is_staggered)
+                else cb.PinArrangement.Inline
+            ),
+            k_pin=getattr(data, "k_pin", d.k_pin),
+        )
+
+    # Dimpled was removed in 0.7.0. Reject rather than silently
     # falling back to smooth: a saved network asking for one of these and
     # getting an unenhanced surface back is a wrong answer presented as a
     # right one.
@@ -643,10 +670,22 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             element_nodes.append(node_schema)
 
     element_ids = {node.id for node in element_nodes}
+    # Impingement arrays (#465) expand into a row chain. Their ends fan out to
+    # N plates (supply) or collect the last crossflow segment (exit), which a
+    # MomentumChamberNode junction cannot represent, so element-to-array links
+    # get a PlenumNode instead -- the jet supply plenum the source assumes.
+    array_ids = {node.id for node in element_nodes if node.type == "impingement_array"}
+    gui_arrays: dict[str, ImpingementArray] = {}
     # Junction elements with named handle ports (common/straight/branch for
     # the tee; primary/secondary/outlet for the ejector). Both get the same
     # per-port MomentumChamberNode auto-insertion below.
-    junction_ids = {node.id for node in element_nodes if node.type in ("mpce_tee", "ejector")}
+    junction_ids = {
+        node.id for node in element_nodes if node.type in ("mpce_tee", "ejector", "effusion_liner")
+    }
+    # An effusion liner's ports are a reservoir, a dump and a discharge that
+    # N panels merge into: plenum semantics. A momentum chamber there would
+    # refuse the N inflows and mis-state the reservoir (#471).
+    liner_ids = {node.id for node in element_nodes if node.type == "effusion_liner"}
 
     # 1b. Create implicit junction nodes for element -> element visual links.
     # For direct element<->element connections we auto-insert a MomentumChamberNode.
@@ -666,7 +705,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             # Standard element-to-element: auto-insert MomentumChamberNode
             junction_id = f"__junction__{edge.source}__{edge.target}"
             if junction_id not in nodes_map:
-                junction_node = MomentumChamberNode(junction_id)
+                to_array = edge.source in array_ids or edge.target in array_ids
+                junction_node = (
+                    PlenumNode(junction_id) if to_array else MomentumChamberNode(junction_id)
+                )
                 net.add_node(junction_node)
                 nodes_map[junction_id] = junction_node
             edge_junction_map[(edge.source, edge.target)] = junction_id
@@ -678,7 +720,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if port and (edge.source, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.source}_{port}"
                 if jid not in nodes_map:
-                    jn = MomentumChamberNode(jid)
+                    jn = PlenumNode(jid) if edge.source in liner_ids else MomentumChamberNode(jid)
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.source, port)] = jid
@@ -690,7 +732,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if port and (edge.target, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.target}_{port}"
                 if jid not in nodes_map:
-                    jn = MomentumChamberNode(jid)
+                    jn = PlenumNode(jid) if edge.target in liner_ids else MomentumChamberNode(jid)
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.target, port)] = jid
@@ -861,6 +903,45 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             continue
 
+        # Effusion liner (#471): three named ports, expanded into N stations.
+        if elem_type == "effusion_liner":
+            _ld = EffusionLinerData(**elem_data)
+            _lports = ("coolantin", "coolantout", "discharge")
+            _ends = [
+                _find_junction_port(
+                    schema.edges,
+                    elem_id,
+                    port,
+                    nodes_map,
+                    tee_port_node_map,
+                    _wall_edge_remap,
+                    all_ports=_lports,
+                )
+                for port in _lports
+            ]
+            liner = EffusionLiner(
+                elem_id,
+                n_segments=_ld.n_segments,
+                length=_ld.length,
+                width=_ld.width,
+                duct_height=_ld.duct_height,
+                hole_diameter=_ld.hole_diameter,
+                wall_thickness=_ld.wall_thickness,
+                pitch_x=_ld.pitch_x,
+                pitch_y=_ld.pitch_y,
+                angle_deg=_ld.angle_deg,
+                entry_K=_ld.entry_K,
+                roughness=_ld.roughness,
+                wall_conductivity=_ld.wall_conductivity,
+                gas_film=_ld.gas_film,
+                gas_augmentation=_ld.gas_augmentation,
+                turbulence_intensity=_ld.turbulence_intensity,
+                gas_heat_flux=_ld.gas_heat_flux,
+            )
+            liner.add_to(net, _ends[0], _ends[1], _ends[2])
+            gui_arrays[elem_id] = liner
+            continue
+
         source_id = None
         target_id = None
         incoming_count = 0
@@ -891,8 +972,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
 
         if elem_type == "channel":
             data = ChannelData(**elem_data)
-            # conv_area is deferred to 0 when D=None; resolve_topology updates it
-            conv_area = (3.1415926535 * data.D * data.L) if data.D is not None else 0.0
+            # The convective area is left to the element: it depends on the
+            # surface model (#462) and, when D is inherited, on the resolved
+            # diameter. ChannelElement.resolve_topology fills it.
+            conv_area = 0.0
             elem = ChannelElement(
                 elem_id,
                 from_node=source_id,
@@ -938,6 +1021,48 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if not elem.initial_guess:
                 elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
+        elif elem_type == "effusion_plate":
+            data = EffusionPlateData(**elem_data)
+            elem = EffusionPlateElement(
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                hole_diameter=data.hole_diameter,
+                wall_thickness=data.wall_thickness,
+                pitch_x=data.pitch_x,
+                pitch_y=data.pitch_y,
+                panel_length=data.panel_length,
+                panel_width=data.panel_width,
+                angle_deg=data.angle_deg,
+                correlation=data.correlation,
+                Cd=data.Cd,
+                internal_Nu_multiplier=data.internal_Nu_multiplier,
+                wall_conductivity=data.wall_conductivity,
+                gas_film=data.gas_film,
+                gas_augmentation=data.gas_augmentation,
+                turbulence_intensity=data.turbulence_intensity,
+                gas_heat_flux=data.gas_heat_flux,
+            )
+            net.add_element(elem)
+        elif elem_type == "impingement_array":
+            data = ImpingementArrayData(**elem_data)
+            arr = ImpingementArray(
+                elem_id,
+                n_rows=data.n_rows,
+                d_jet=data.d_jet,
+                xn_d=data.xn_d,
+                yn_d=data.yn_d,
+                z_d=data.z_d,
+                span=data.span,
+                plate_thickness=data.plate_thickness,
+                pattern=data.pattern,
+                correlation=data.correlation,
+                Cd=data.Cd,
+                Nu_multiplier=data.Nu_multiplier * (schema.solver_settings.Nu_multiplier or 1.0),
+                roughness=data.roughness,
+            )
+            arr.add_to(net, source_id, target_id)
+            gui_arrays[elem_id] = arr
         elif elem_type == "area_change":
             data = AreaChangeData(**elem_data)
             elem = AreaChangeElement(
@@ -1029,6 +1154,33 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 )
                 net.add_element(elem)
 
+    # Result assembly reports each array under its GUI id (runner.py).
+    net._gui_arrays = gui_arrays
+
+    # Merge chambers (#471): inflows on a momentum chamber's "side-target"
+    # handle are side streams; the one inflow on its flow handle is the main
+    # inlet, which sets the chamber's axis and area. Declared, never inferred.
+    for node_schema in schema.nodes:
+        if node_schema.type != "momentum_chamber":
+            continue
+        nid = node_schema.id
+        inflows = [
+            e
+            for e in schema.edges
+            if e.target == nid and not (e.data and e.data.get("type") == "thermal")
+        ]
+        side = [e for e in inflows if e.targetHandle == "side-target"]
+        if not side:
+            continue
+        main = [e for e in inflows if e.targetHandle != "side-target"]
+        if len(main) != 1:
+            raise ValueError(
+                f"Momentum chamber '{nid}' has side streams and {len(main)} main "
+                "inlets; it needs exactly one main inlet on its flow handle."
+            )
+        src = main[0].source
+        nodes_map[nid].main_inlet = src if src in net.elements else f"__auto_link__{src}__{nid}"
+
     # 4. Fourth Pass: Thermal Walls
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
@@ -1053,6 +1205,22 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 k = data.conductivity if data.conductivity is not None else 20.0
                 layers = [WallLayer(thickness=t, conductivity=k)]
 
+            if edge.source in gui_arrays or edge.target in gui_arrays:
+                # One wall to an array is one wall per row, each on that
+                # row's target footprint; the edge's own area does not apply.
+                array_is_a = edge.source in gui_arrays
+                arr = gui_arrays[edge.source if array_is_a else edge.target]
+                if edge.source in gui_arrays and edge.target in gui_arrays:
+                    raise ValueError(f"Thermal wall '{wall_id}' joins two impingement arrays.")
+                arr.add_wall(
+                    net,
+                    wall_id,
+                    hot_element=edge.target if array_is_a else edge.source,
+                    layers=layers,
+                    R_fouling=data.R_fouling,
+                    array_is_side_a=array_is_a,
+                )
+                continue
             net.add_wall(
                 ThermalWall(
                     id=wall_id,

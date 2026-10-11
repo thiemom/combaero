@@ -22,6 +22,11 @@ current C++ Unified0D implementation omits:
 The Python port is structurally identical to the Matlab; variable names
 follow the original where reasonable (`PseudoSupAngle`, `AreaRatio`,
 `etransferfactor`). See the Matlab file for line-by-line correspondence.
+
+The function's DEFAULTS are not Mynard's model: the dividing-streamline
+recovery is ours and on, eta is off. His model is ``eta_scale=1.0,
+joining_etransfer_alpha=0.0, dividing_streamline_recovery=0.0``, held to his
+Figs 4 and 6-11 by python/tests/test_junction_mynard_fidelity.py.
 """
 
 from __future__ import annotations
@@ -93,7 +98,8 @@ class MynardResult:
 # continuing collector, and it makes the junction a net source of flow work
 # below a lateral fraction of about 0.25. The table justifying the switch is on
 # `MultiPortChamberElement.DEFAULT_ETA_SCALE`. The coefficients stay because
-# `eta_scale=1.0` must keep reproducing the faithful port.
+# `eta_scale=1.0` must keep reproducing Mynard's model (with the recovery below
+# switched off): python/tests/test_junction_mynard_fidelity.py holds it to his figures.
 MYNARD_ETA_A0: float = 0.8
 MYNARD_ETA_A1: float = -0.2
 
@@ -150,6 +156,7 @@ def junction_loss_coefficient(
     theta: np.ndarray,
     joining_etransfer_alpha: float = 0.0,
     eta_scale: float = 0.0,
+    dividing_streamline_recovery: float = DIVIDING_STREAMLINE_RECOVERY,
 ) -> MynardResult:
     """Compute Mynard Unified0D loss coefficients for a junction.
 
@@ -177,9 +184,17 @@ def junction_loss_coefficient(
             and the validation is the in-network scorecard (issue #271).
 
         eta_scale: multiplier on Mynard's energy-transfer factor eta_j
-            (MYNARD_ETA_A0 / MYNARD_ETA_A1). 1.0 is the faithful port; 0.0
+            (MYNARD_ETA_A0 / MYNARD_ETA_A1). 1.0 is Mynard's value; 0.0
             switches the term off. Exists so the term can be measured on
             and off against the validation data (issue #271).
+
+        dividing_streamline_recovery: the Hager/Bassett recovery on a
+            collinear continuing collector (``DIVIDING_STREAMLINE_RECOVERY``,
+            which this repo adds -- Mynard's own formulation does not carry
+            it). 0.0 removes it. Mynard's published model is
+            ``eta_scale=1.0, joining_etransfer_alpha=0.0,
+            dividing_streamline_recovery=0.0``; that is the configuration
+            validation/junction/mynard_fidelity.py holds to his figures.
 
     Returns:
         MynardResult with per-branch C and per-collector K (only for n<=3).
@@ -271,7 +286,7 @@ def junction_loss_coefficient(
         # so "collinear" would stop being a statement about geometry.
         if int(np.sum(Si)) == 1:
             continuing = np.abs(np.abs(phi) - math.pi) < COLLINEAR_TOL_RAD
-            K = K - DIVIDING_STREAMLINE_RECOVERY * (1.0 - flow_ratio) * continuing
+            K = K - dividing_streamline_recovery * (1.0 - flow_ratio) * continuing
 
     return MynardResult(
         C=C_all,

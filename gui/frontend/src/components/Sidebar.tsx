@@ -5,11 +5,13 @@ import {
 	Crosshair,
 	Database,
 	Flame,
+	Grip,
 	Link,
 	LogIn,
 	LogOut,
 	Maximize2,
 	Save,
+	ShowerHead,
 	Split,
 	Square,
 	Tornado,
@@ -254,6 +256,39 @@ const Sidebar = () => {
 			>
 				<ChevronRight size={18} className="text-orange-400" />
 				<span>Orifice</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "impingement_array")}
+				draggable
+				title="Jet plate impinging on a target; spent air exits down the gap (Florschuetz 1981)"
+			>
+				<ShowerHead size={18} className="text-orange-400" />
+				<span>Impingement Array</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "effusion_plate")}
+				draggable
+				title="Plenum-fed effusion/film plate; owns its wall. Discharge into a momentum chamber (gas flow) or a plenum (imposed heat flux)."
+			>
+				<Grip size={18} className="text-orange-400" />
+				<span>Effusion Plate</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "effusion_liner")}
+				draggable
+				title="Backside coolant duct whose wall bleeds through effusion holes into the gas. Ports: coolant in, coolant out, discharge (to a chamber's s handle)."
+			>
+				<Grip size={18} className="text-orange-500" />
+				<span>Effusion Liner</span>
 			</button>
 
 			<button

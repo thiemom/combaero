@@ -155,8 +155,22 @@ EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
 
   // Both streams expand isentropically to the common mixing static P_py:
   // lambda = sqrt((g+1)/(g-1) * (1 - (P_py/P0)^((g-1)/g))). Subsonic (< 1).
-  D lambda1 = dsqrt((gp1 / gm1) * (1.0 - dpow(p_py / p_g, k)));
-  D lambda2 = dsqrt((gp1 / gm1) * (1.0 - dpow(p_py / p_e, k)));
+  //
+  // Out of domain (#481): a solver probe can put P_py above a supply's Pt
+  // (no expansion: lambda^2 < 0), at or below zero, or reverse a flow. The
+  // arguments then continue through a C1 positive floor (dpos_floor), so the
+  // discharge stays finite and smooth instead of NaN -- which otherwise
+  // poisoned the whole blended residual over most of the low-primary range.
+  // Exact wherever the closure is defined.
+  constexpr double kRatioFloor = 1e-12;
+  constexpr double kLambdaSqFloor = 1e-8;
+  auto lambda_of = [&](const D& p0) {
+    const D r = dpos_floor(p_py / p0, kRatioFloor);
+    return dsqrt(dpos_floor((gp1 / gm1) * (1.0 - dpow(r, k)), kLambdaSqFloor));
+  };
+  D lambda1 = lambda_of(p_g);
+  D lambda2 = lambda_of(p_e);
+  gam = dpos_floor(gam, kRatioFloor);
   D theta21 = t_e / t_g;
 
   // Kracik & Dvorak mixing (their Eqs. 7-13), identical to the critical path's
@@ -164,11 +178,14 @@ EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
   D z1 = lambda1 + 1.0 / lambda1;
   D z2 = lambda2 + 1.0 / lambda2;
   D z3 = (z1 + gam * dsqrt(theta21) * z2) / dsqrt((1.0 + gam) * (1.0 + gam * theta21));
-  D lambda3 = (z3 - dsqrt(z3 * z3 - 4.0)) * 0.5; // subsonic root (Eq. 12)
+  // Subsonic root (Eq. 12), (z3 - sqrt(z3^2 - 4)) / 2 in the cancellation-free
+  // form: a floored lambda makes z3 large, where the difference rounds to 0.
+  // z3 >= 2 analytically; the floor only catches rounding at z3 = 2.
+  D lambda3 = 2.0 / (z3 + dsqrt(dpos_floor(z3 * z3 - 4.0, kRatioFloor)));
 
   double k7 = std::pow(gp1 / 2.0, 1.0 / gm1);
   auto q_of = [&](const D& lam) {
-    return dpow(1.0 - (gm1 / gp1) * lam * lam, 1.0 / gm1) * k7 * lam;
+    return dpow(dpos_floor(1.0 - (gm1 / gp1) * lam * lam, kRatioFloor), 1.0 / gm1) * k7 * lam;
   };
   D q1 = q_of(lambda1);
   D q2 = q_of(lambda2);
@@ -206,9 +223,6 @@ Dual4 operator+(const Dual4& a, const Dual4& b) {
 Dual4 operator+(const Dual4& a, double c) { return {a.v + c, a.dpg, a.dtg, a.dpe, a.dte}; }
 Dual4 operator+(double c, const Dual4& a) { return a + c; }
 
-Dual4 operator-(const Dual4& a, const Dual4& b) {
-  return {a.v - b.v, a.dpg - b.dpg, a.dtg - b.dtg, a.dpe - b.dpe, a.dte - b.dte};
-}
 Dual4 operator-(const Dual4& a, double c) { return {a.v - c, a.dpg, a.dtg, a.dpe, a.dte}; }
 Dual4 operator-(double c, const Dual4& a) { return {c - a.v, -a.dpg, -a.dtg, -a.dpe, -a.dte}; }
 
@@ -243,6 +257,27 @@ Dual4 dpow(const Dual4& a, double c) {
   return {v, a.dpg * coef, a.dtg * coef, a.dpe * coef, a.dte * coef};
 }
 
+// C1 positive floor (dpos_floor in dual_number.h, for Dual4): exact for
+// a >= eps, eps^2 / (2 eps - a) below. Keeps the critical closure finite when
+// a probe puts it outside its domain (#481).
+Dual4 dpos_floor4(const Dual4& a, double eps) {
+  if (a.v >= eps) {
+    return a;
+  }
+  const double den = 2.0 * eps - a.v;
+  const double slope = eps * eps / (den * den);
+  return {eps * eps / den, a.dpg * slope, a.dtg * slope, a.dpe * slope, a.dte * slope};
+}
+
+// Out of the critical closure's domain -- the secondary's choke pressure at or
+// above the primary's nozzle exit pressure (M_py^2 <= 0), or a primary core
+// that fills the mixing area (A_sy <= 0) -- the arguments continue through
+// dpos_floor4: exact wherever the closure is defined. The former hard switch
+// M_py = 0 there divided by zero (A_py = inf) and the blended element residual
+// went NaN.
+constexpr double kMachSqFloor = 1e-8;
+constexpr double kAreaFloorFrac = 1e-6;  // of the mixing area ratio
+
 } // namespace
 
 EjectorEntrainmentJacobian ejector_entrainment_ratio_and_jacobian(
@@ -272,13 +307,13 @@ EjectorEntrainmentJacobian ejector_entrainment_ratio_and_jacobian(
   // Invert Eq. 4 for the primary-core Mach at y-y.
   Dual4 core = (1.0 + 0.5 * gm1 * mach_p1 * mach_p1) * dpow(p_py / p_p1, -gm1 / gamma);
   Dual4 mach_py_sq = (core - 1.0) / (0.5 * gm1);
-  Dual4 mach_py = mach_py_sq.v > 0.0 ? dsqrt(mach_py_sq) : Dual4::constant(0.0);
+  Dual4 mach_py = dsqrt(dpos_floor4(mach_py_sq, kMachSqFloor));
 
   // Areas at y-y (Eqs. 5, 8).
   Dual4 area_py =
       ejector::phi_p * (1.0 / mach_py) *
       dpow(2.0 / gp1 * (1.0 + 0.5 * gm1 * mach_py * mach_py), gp1 / (2.0 * gm1));
-  Dual4 area_sy = geom.area_ratio_mix - area_py;
+  Dual4 area_sy = dpos_floor4(geom.area_ratio_mix - area_py, kAreaFloorFrac * geom.area_ratio_mix);
 
   Dual4 omega = (p_e / p_g) * area_sy * dsqrt(t_g / t_e) * std::sqrt(ejector::eta_s / ejector::eta_p);
 
@@ -316,12 +351,12 @@ EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
 
   Dual4 core = (1.0 + 0.5 * gm1 * mach_p1 * mach_p1) * dpow(p_py / p_p1, -gm1 / gamma);
   Dual4 mach_py_sq = (core - 1.0) / (0.5 * gm1);
-  Dual4 mach_py = mach_py_sq.v > 0.0 ? dsqrt(mach_py_sq) : Dual4::constant(0.0);
+  Dual4 mach_py = dsqrt(dpos_floor4(mach_py_sq, kMachSqFloor));
 
   Dual4 area_py =
       ejector::phi_p * (1.0 / mach_py) *
       dpow(2.0 / gp1 * (1.0 + 0.5 * gm1 * mach_py * mach_py), gp1 / (2.0 * gm1));
-  Dual4 area_sy = geom.area_ratio_mix - area_py;
+  Dual4 area_sy = dpos_floor4(geom.area_ratio_mix - area_py, kAreaFloorFrac * geom.area_ratio_mix);
 
   Dual4 omega = (p_e / p_g) * area_sy * dsqrt(t_g / t_e) * std::sqrt(ejector::eta_s / ejector::eta_p);
 
@@ -342,13 +377,14 @@ EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
   Dual4 z1 = lambda1 + 1.0 / lambda1;
   Dual4 z2 = lambda2 + 1.0 / lambda2;
   Dual4 z3 = (z1 + gam * dsqrt(theta21) * z2) / dsqrt((1.0 + gam) * (1.0 + gam * theta21));
-  Dual4 lambda3 = (z3 - dsqrt(z3 * z3 - 4.0)) * 0.5; // subsonic root (Eq. 12)
+  // Subsonic root (Eq. 12) in the cancellation-free form 2/(z3 + sqrt(z3^2-4)).
+  Dual4 lambda3 = 2.0 / (z3 + dsqrt(dpos_floor4(z3 * z3 - 4.0, 1e-12)));
 
   double gm1_local = gm1;
   double gp1_local = gp1;
   double k7 = std::pow(gp1_local / 2.0, 1.0 / gm1_local);
   auto q_of = [&](const Dual4& lam) {
-    Dual4 term = 1.0 - (gm1_local / gp1_local) * lam * lam;
+    Dual4 term = dpos_floor4(1.0 - (gm1_local / gp1_local) * lam * lam, 1e-12);
     return dpow(term, 1.0 / gm1_local) * k7 * lam;
   };
   Dual4 q1 = q_of(lambda1);
@@ -455,7 +491,11 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   // would still poison the value/Jacobian -- so evaluate each branch ONLY where
   // its weight is nonzero, leaving a hard-zero dual otherwise (C1-consistent
   // with the flat endpoint).
-  D omega_eff = ms / mp; // ACTUAL ratio for the discharge (R1 pins ms itself)
+  // ACTUAL ratio for the discharge (R1 pins ms itself). A probe can drive
+  // either flow to zero or reverse it: both are floored C1 at 1e-9 of the
+  // choked flow, so omega stays finite and positive (#481).
+  const double m_floor = 1e-9 * cap.v;
+  D omega_eff = dpos_floor(ms, m_floor) / dpos_floor(mp, m_floor);
   const bool crit_active = s.v > 0.0;
   const bool jet_active = s.v < 1.0;
 

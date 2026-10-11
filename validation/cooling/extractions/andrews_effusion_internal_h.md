@@ -95,8 +95,10 @@ settles it: N = 4306 per square metre against 1/X^2 = 4305.8.
 
 | | |
 |---|---|
-| bias | **-13.5%** |
-| RMSE | 14.7% |
+| bias | **-9.9%** |
+| RMSE | 11.6% |
+
+(re-scored 2026-10-08 after #485: air's viscosity was 11.8% low before). It was -13.5% bias and 14.7% RMSE with the low viscosity.
 | basis | **accuracy** (cross-source) |
 
 **This is ACCURACY, not fidelity, and the distinction was nearly missed.**
@@ -115,14 +117,17 @@ two the `andrews1988` metadata already flags as off-trend in the source.
 ### What was ruled out as the cause
 
 - **Coolant temperature.** Not stated in the paper. Across 280-320 K the
-  bias moves -15.3% to -11.7%, so the assumption is worth about 4 points
-  and cannot explain 13.5%. Reported by `temperature_sensitivity`, never
+  bias moves -11.8% to -8.1%, so the assumption is worth about 4 points
+  and cannot explain 9.9%. Reported by `temperature_sensitivity`, never
   tuned -- picking the temperature that scores best would be fitting an
   unmeasured input to the metric judging it.
 - **Property values.** A first spike used hand-typed air properties and got
-  -8%; combaero's own properties at the same temperature give -13.5%. The
-  hand-typed values were closer to 400 K air. Recorded because the 6-point
-  swing came entirely from not using the library's own properties.
+  -8%; combaero's own properties then gave -13.5%. This note used to blame
+  the hand-typed values (closer to 400 K air). It had it backwards: the
+  library's air viscosity was 11.8% low, from flagged transport data
+  (#485). With that fixed combaero gives -9.9%, close to the hand-typed
+  -8%. The lesson stands, inverted: a property swing this size is a reason
+  to check the library's properties against literature, not to trust them.
 - **The `G` definition.** Per net area rather than gross changes the flow
   by 3.6% and moves the bias the wrong way.
 
@@ -207,12 +212,14 @@ magnitude below the residual.
 
 | | |
 |---|---|
-| bias | **-10.4%** |
-| MAE | 11.1% |
+| bias | **-7.1%** |
+| MAE | 9.2% |
 | n | 41 |
+
+(re-scored 2026-10-08 after #485: air's viscosity was 11.8% low before); it was -10.4% bias, 11.1% MAE.
 | basis | **fidelity** (the correlations' own paper) |
 
-Per plate: a -6.2%, b -19.6%, c -5.5%, d -12.5%.
+Per plate: a -2.4%, b -16.5%, c -2.0%, d -9.3% (before #485: a -6.2%, b -19.6%, c -5.5%, d -12.5%).
 
 ### THE FIDELITY MISS IS NOT A TRANSCRIPTION ERROR
 
@@ -225,18 +232,18 @@ regime the miss is measured in.
 
 So the two figures of one paper separate the two failure modes cleanly:
 **our transcription is right to 1.5%, and Andrews' correlation
-under-predicts Andrews' own measurements by about 10%.** That is a stronger
+under-predicts Andrews' own measurements by about 7%.** That is a stronger
 statement than either figure alone supports, and it is what made this
 digitisation worth doing.
 
 ### What the residual is NOT explained by
 
-- **Reynolds number.** Pooled bias by band: -20.4% below Re 500 (n = 4),
+- **Reynolds number** (band figures from before #485; not re-run). Pooled bias by band: -20.4% below Re 500 (n = 4),
   -6.9% for 500-1500, -9.1% for 1500-3000, -11.6% above 3000. No monotone
   trend, and the low-Re band is four points from three different plates
   (b 405, c 288, d 199, d 404) -- too few to read as a regime.
-- **L/D.** Ordered by L/D the biases run d 4.85 (-12.5%), a 5.38 (-6.2%),
-  c 7.05 (-5.5%), b 9.92 (-19.6%) -- not monotone either.
+- **L/D.** Ordered by L/D the biases run d 4.85 (-9.3%), a 5.38 (-2.4%),
+  c 7.05 (-2.0%), b 9.92 (-16.5%) -- not monotone either.
 - **Pitch.** Plate a is the only plate at X = 15.2 mm and is the second
   best fit, so the `X/(pi L)` term is not carrying the error.
 

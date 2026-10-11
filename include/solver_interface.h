@@ -59,6 +59,11 @@ struct MixerResult {
   double P_total_mix;
   std::vector<double> Y_mix;
   double dT_mix_d_delta_h = 0.0;
+  // dT_mix/dQ [K/W] = dT_mix_d_delta_h / m_eff, with m_eff the flow Q is
+  // spread over (|m| above kMixerHeatMdotFloor, a C1 parabola below). A
+  // caller relaying a heat input (a wall) needs this, not 1/(cp sum m),
+  // which was wrong below the floor and for a zero or negative total (#481).
+  double dT_mix_dQ = 0.0;
   std::vector<StreamJacobian> dT_mix_d_stream;
   std::vector<StreamJacobian> dP_total_mix_d_stream;
   std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
@@ -194,85 +199,6 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
-
-// Infeasible-flow barrier constants for the solver-facing compressible
-// channel residual.
-//
-// fanno_channel_rough reports choked flow by truncating the march: at
-// M_in >= 1 it returns outlet == inlet (dP = 0, zero slope), and for
-// in-channel choking (L_choke < L) the reported friction drop collapses
-// toward zero as the requested velocity approaches sonic. A Newton solver
-// reads that as "no resistance", which turns the infeasible region into a
-// flat attractor with exact spurious network roots (dead branch arms,
-// reversed supplies). channel_compressible_mdot_and_jacobian therefore
-// replaces the truncated result with a monotone barrier:
-//   in-channel choking: dP = dP_truncated + kappa * P_in * (1 - L_choke/L)^2
-//   supersonic inlet:   dP = kappa * P_in + (beta/2) * rho_in * (u^2 - a^2)
-// Both branches are continuous at their region boundaries and increase with
-// the depth of infeasibility, so the residual always pushes m_dot back
-// toward the feasible branch.
-//
-// The in-channel term is QUADRATIC in the truncated fraction s = 1 - L_choke/L
-// rather than linear, so that d/ds vanishes at s = 0. A linear barrier is
-// continuous at onset but switches on at full slope: measured on a D=0.1 m
-// duct at 1700 K, d(dP)/d(m_dot) jumped 13934 -> 1037977 across the onset
-// point, a 74.5x step. Newton reads that kink as a wall and stalls against it.
-// Quadratic keeps both endpoints (0 at onset, kappa * P_in when choking
-// reaches the inlet) and the monotone push back toward feasibility, while
-// being C1 where the solver actually crosses. See issue #356.
-// Floor on the marched fraction L_choke/L when extrapolating the truncated
-// drop to full length. Keeps dP/frac finite as choking reaches the inlet,
-// where the supersonic branch takes over anyway.
-constexpr double kChannelChokeMinMarched = 1e-3;
-constexpr double kChannelChokeBarrierKappa = 1.0;
-constexpr double kChannelChokeBarrierBeta = 2.0;
-
-// Compressible channel flow using Fanno model with variable friction.
-//
-// Method: Finite Difference Jacobians (fanno_channel_rough is iterative)
-// Inputs:
-//   T_in   : Inlet static temperature [K]
-//   P_in   : Inlet static pressure [Pa]
-//   u_in   : Inlet velocity [m/s]
-//   X      : Mole fractions [-]
-//   L      : Pipe length [m]
-//   D      : Pipe diameter [m]
-//   roughness : Absolute roughness [m]
-//   friction_model : Friction correlation name
-//
-// Returns:
-//   tuple(dP, d_dP_dP_in, d_dP_dT_in, d_dP_du_in)
-//   dP         : Pressure drop [Pa]
-//   d_dP_dP_in : Jacobian w.r.t. inlet pressure [Pa/Pa] = [-]
-//   d_dP_dT_in : Jacobian w.r.t. inlet temperature [Pa/K]
-//   d_dP_du_in : Jacobian w.r.t. inlet velocity [Pa/(m/s)]
-std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
-    double T_in, double P_in, double u_in,
-    const std::vector<double>& X,
-    double L, double D, double roughness,
-    const std::string& friction_model,
-    double f_multiplier = 1.0,
-    bool compute_jacobians = true,
-    // Whether the caller resolved the inlet STATIC state (issue #359). When
-    // false the drop stays the previous static difference, so the region where
-    // no static state exists keeps exactly its previous behaviour.
-    bool inlet_static_resolved = true,
-    // Whether the exit dynamic head is lost to what the duct discharges into
-    // (issue #360). False keeps the previous full-recovery coupling.
-    bool exit_head_lost = false);
-
-
-// Full compressible channel evaluation with all derivatives for network solver.
-ChannelResult channel_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up,
-    const std::vector<double>& Y_up,
-    double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model,
-    double f_multiplier = 1.0,
-    // Exit coupling: true when the duct discharges into a plenum and loses its
-    // dynamic head, false for full recovery. See issue #360.
-    bool exit_head_lost = false);
-
 
 // -----------------------------------------------------------------------------
 // 2. Heat Transfer Components
@@ -496,6 +422,20 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // -----------------------------------------------------------------------------
 
 
+// Below this total flow [kg/s] the heat Q is spread over a C1 floor
+// m_eff = (m^2 + m0^2)/(2 m0) >= m0/2 instead of |m|, keeping Q/m finite as
+// the flow vanishes. At or above it Q/m is exact, so the heat a node is given
+// is the heat it receives (energy conservation; the previous
+// sqrt(m^2 + 1e-6) lost 5e-5 of Q at 0.1 kg/s and 11% at 2 g/s). 1 mg/s: below
+// any flow a real network carries, so only a stagnant node (a dead end) is
+// floored; the solver reports what it withholds there as {node}.Q_withheld.
+// Convergence measured the same at 2e-3 and 1e-6 (#481).
+constexpr double kMixerHeatMdotFloor = 1e-6;
+
+// Reference temperature [K] of the sensible enthalpy h(T) - h(T_ref) that an
+// EnergyBoundary 'fraction' scales (at the stream's own composition).
+constexpr double kSensibleEnthalpyRefT = 298.15;
+
 // Mix generalized non-reacting incoming streams into a single outgoing state,
 // and compute all analytical Jacobians w.r.t upstream mass flows, Temperatures,
 // and mass fractions (Y_i).
@@ -546,19 +486,13 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
     const std::vector<double> &Y, double area);
 
 // -----------------------------------------------------------------------------
-// Multi-port chamber (momentum-CV junction).
-// PDF spec: docs/junction/momentum cv implementation guide.pdf, Section 2.
-// Junction owns one scalar P_jct. Emits N per-port impulse-function residuals
-//   R_mom,i = (P_i + rho_i * u_i^2) - P_jct = 0
-// plus a global mass residual
-//   R_mass = sum_i mdot_i = 0
-// Sign convention: mdot_i > 0 means flow OUT of the junction through port i.
-// u_i^2 is direction-invariant, so the impulse residual is sign-free.
-//
-// The junction emits 0 empirical loss; per-port turning/contraction losses go
-// on companion BorderCarnotLossElement instances bolted onto lateral ports.
-
-// Per-port impulse-residual Jacobian.
+// Border-Carnot turning loss: a two-port in-line loss,
+//   Pt_in - Pt_out - L(delta_geom) * 0.5 * rho_in * u_in^2 = 0,
+//   L = 4 * (1 - cos((3/4) * delta_geom))^2.
+// It was the lateral-port companion of the momentum-CV junction's impulse
+// model, which was removed in 0.6.0 (#322). Never validated, and NOT for a
+// MultiPortChamberElement or ConstantKTeeElement port: those closures already
+// carry the port's turning loss (see BC_LOSS_PREFACTOR, multi_port_chamber.h).
 struct BorderCarnotLossResult {
   double residual;
   double d_res_dPt_in;

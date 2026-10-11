@@ -1,0 +1,6 @@
+- **The junction closure is checked against its own paper, Mynard & Valen-Sendstad 2015.**
+  - **Before:** the C++ port was held to the Python one, and nothing held the Python to the paper.
+  - **Fidelity:** the kernel in Mynard's configuration draws his model's curves on all 31 panels of Figs 4 and 6-11, within 4.2 px of the 150-dpi scans and 2.7 px on 29 of them (<= 0.032 in K). Fig 4's eta_j = 0 curve matches too. The curves were digitised by colour, reproducibly, with `validation/junction/digitise_mynard2015.py`.
+  - **His CFD (laminar, Re 350-2400)** is reported against both configurations by `python -m validation.junction.mynard_fidelity`, and is not tuned on. Over all 158 samples: MAE 0.212 for his model, 0.219 for production.
+  - **New argument:** `_mynard2010.junction_loss_coefficient(dividing_streamline_recovery=...)`. The recovery is a repo addition with no switch until now, so `eta_scale=1.0` alone never gave his model. The default is unchanged.
+  - **Bassett 2001's Table 2 transcription** is now pinned against his own calculated curves.

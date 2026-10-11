@@ -132,14 +132,39 @@ double prandtl(double T, double P, const std::vector<double>& X);
 double kinematic_viscosity(double T, double P, const std::vector<double>& X);
 double thermal_diffusivity(double T, double P, const std::vector<double>& X);
 double reynolds_from_state(double rho, double v, double L, double mu);
+
+// Viscosity and conductivity with analytic d/dT (chain through the collision
+// integral interpolation, the modified Eucken factors and both mixing rules).
+struct TransportDerivatives { double mu, dmu_dT, k, dk_dT; };
+TransportDerivatives transport_and_dT(double T, double P, const std::vector<double>& X);
+
+// Omega*(2,2) and dOmega*/dT* (C1 cubic Hermite, see Transport Model below).
+struct Omega22Result { double omega, domega_dTstar; };
+Omega22Result omega22_and_derivative(double T_star, double delta_star);
+
+// thermo.h: d(cp/R)/dT of one species [1/K].
+double dcp_R_dT(std::size_t species_idx, double T);
 ```
 
 ### Transport Model
 
-Viscosity uses Chapman-Enskog kinetic theory with the Monchick-Mason
-Omega*(2,2) collision integral (37 x 8 bilinear table in T* and delta*).
-Polar species (H2O, NH3, CO) use the full 2D table; non-polar species use the
-delta*=0 column. Mixture viscosity uses the Wilke mixing rule.
+Viscosity uses Chapman-Enskog kinetic theory with the Omega*(2,2) collision
+integral from `include/collision_integral_data.h` (41 T* x 8 delta*, generated
+by `thermo_data_generator/collision_integrals.py`), interpolated by cubic
+Hermite in (ln T*, ln Omega*) with TABULATED node slopes -- C1 in T, so
+dmu/dT and dk/dT are continuous and analytic -- and linearly in delta*
+(constant per species). Mixture viscosity uses the Wilke mixing rule.
+
+- **delta* = 0** (Lennard-Jones): values and slopes from quadrature of the
+  classical collision integrals; agrees with Kim & Monroe (2014) to <= 1e-4
+  from T* = 0.3 to 400, between nodes included. The Monchick-Mason column it
+  replaces was off by up to 0.6% at the nodes, and linear interpolation in raw
+  T* added up to 2.7% between them (#485).
+- **delta* > 0** (Stockmayer, polar species H2O, NH3, CO): Monchick-Mason
+  values scaled by the delta* = 0 column's exact/tabulated ratio, slopes
+  estimated by a natural cubic spline. No exact polar reference is computed.
+- Outside T* 0.1-400: continued linearly in (ln T*, ln Omega*) with the end
+  slope (C1).
 
 Thermal conductivity uses the Mason-Monchick modified Eucken formula with
 Parker Z_rot temperature correction, matching the Cantera GasTransport model.
@@ -350,6 +375,51 @@ double fanno_max_length(double T_in, double P_in, double u_in,
                        double tol = 1e-6, std::size_t max_iter = 100);
 ```
 
+### Fanno flow integrated in Mach number (`fanno_mach.h`)
+
+At fixed mass flux G and stagnation temperature Tt the station state is
+algebraic in M (energy `h(T) + M^2 a^2/2 = h(Tt)`; `u = M a`, `rho = G/u`,
+`P = rho R T`), so momentum leaves one smooth integral,
+`dx/dM = -(P' + G u') 2D / (f G u)`, which is 0 at M = 1. L* is exact (no
+cutoff Mach, no gradient floor); the integral is a fixed 4-panel x 12-point
+Gauss-Legendre rule in `s = 1/M^2`, smooth in its arguments.
+
+```cpp
+FannoMachState fanno_state_at_mach(double G, double Tt, double M, const std::vector<double>& X);
+double fanno_dx_dmach(double G, double Tt, double M, const std::vector<double>& X, double D,
+                      double roughness, const std::string& friction_model,
+                      double f_multiplier = 1.0);  // "fixed": constant Darcy f = f_multiplier
+double fanno_length_between(double G, double Tt, double M1, double M2, ...);  // [m]
+double fanno_inlet_mach(double Pt, double Tt, double G, const std::vector<double>& X);
+double fanno_sonic_mass_flux(double Pt, double Tt, const std::vector<double>& X);
+FannoDuctResult fanno_duct(double Pt, double Tt, double G, const std::vector<double>& X,
+                           double L, double D, double roughness,
+                           const std::string& friction_model, double f_multiplier = 1.0);
+double fanno_choked_mass_flux(double Pt, double Tt, const std::vector<double>& X, double L,
+                              double D, double roughness, const std::string& friction_model,
+                              double f_multiplier = 1.0);  // G with L* = L
+
+// Mass flux from (Pt0, Tt0) against P_target -- the duct's exit stagnation
+// pressure if exit_total, else its exit static -- with dG/dPt0, dG/dTt0,
+// dG/dP_target. Monotone in P_target, saturating exactly at the choked flux
+// (choked = true, dG/dP_target = 0); 0 at or below zero drive, and blended C1
+// to a finite slope below kFannoFlowDriveFloor = 1 Pa. Unchoked it solves for
+// the exit Mach (P_exit is linear in G at fixed M, so G(M_exit) is explicit)
+// and differentiates implicitly, well conditioned up to the choke.
+// dY_directions: mass-fraction directions v; dG_ddir returns dG/ds along each
+// (Y -> Y + s v, X renormalised), about two length integrals per direction. A
+// unit vector e_k gives dG/dY_k at fixed others. ChannelElement passes an
+// orthonormal basis of its feeding node's dY/dx -- usually one vector -- and
+// projects back onto "{node}.Y[k]" keys. with_derivatives = false computes G,
+// choked and the Mach numbers only (a residual-only evaluation).
+FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<double>& X,
+                                    double P_target, bool exit_total, double L, double D,
+                                    double roughness, const std::string& friction_model,
+                                    double f_multiplier = 1.0, double M_exit_guess = -1.0,
+                                    const std::vector<std::vector<double>>& dY_directions = {},
+                                    bool with_derivatives = true);
+```
+
 ### Rocket Nozzle Thrust
 ```cpp
 struct ThrustResult {
@@ -419,6 +489,10 @@ NuAndDerivative nusselt_gnielinski_smooth_with_derivative(double Re, double Pr);
 // the Jacobian steps at Re 2300 or 4000.
 //   laminar -> turbulent  Re 2300-3000   f: 64/Re -> turbulent; Nu: 3.66/4.36 -> Gnielinski
 //   smooth  -> rough      Re 3000-4000   f: clamped Petukhov -> Colebrook (e_D > 0)
+// Turbulent-only Nu (dittus_boelter, sieder_tate, petukhov; Re >= 1e4) in
+// channel_smooth and htc_circular_channel: the VDI Heat Atlas transition
+// (vdi_transition) -- linear in Re from laminar Nu at 2300 to the correlation
+// at 1e4, exact derivatives; they threw in that band (#481).
 FrictionAndDerivative friction_channel_and_derivative(double Re, double e_D);   // Darcy, exact df/dRe
 FrictionAndDerivative friction_turbulent_and_derivative(double Re, double e_D);
 NuAndDerivative nusselt_channel_gnielinski_and_derivative(
@@ -441,7 +515,8 @@ ChannelResult channel_smooth(double T, double P, const std::vector<double>& X,
                               double T_hot = std::numeric_limits<double>::quiet_NaN(),
                               const std::string& correlation = "gnielinski",
                               bool heating = true, double Nu_multiplier = 1.0,
-                              double f_multiplier = 1.0);
+                              double f_multiplier = 1.0,
+                              double flow_area = NaN);  // NaN: pi D^2/4; used by the mdot derivatives (#463)
 
 // Parametrised rib correlations -- rib_correlation.h
 //
@@ -555,6 +630,57 @@ RibRatioSet taslim_spring_1987(double aspect_ratio_taslim, double e_D);
 // (#335-336).
 ```
 
+### Pin-Fin Correlations
+```cpp
+// pin_fin_correlation.h (#335). Sets carry each source's own form and basis;
+// evaluators take and return one canonical basis:
+//   Re_D = mdot D / (mu A_min),  Nu_D = h D / k,  f = dP / (2 rho Vmax^2 N)
+// Heat transfer and friction are separate sets. Outside a set's box the
+// result is flagged `extrapolated`, never refused; evaluators never throw.
+enum class PinArrangement { Staggered, Inline };
+enum class PinNuSurface { Total, Endwall, Pin };
+enum class PinReBasis { DiameterVmax, VanFossenDprime };
+enum class PinFrictionBasis { PerRowVmax, PerRowGapVmax };
+struct PinFinGeometry { double S_D, X_D, H_D; int N_rows; PinArrangement arrangement; };
+
+// Exact converters (Armstrong & Winstanley 1988, Eqs 8, 10, 13): D'/D, A'/A_min,
+// D_h/D, A_min/A_frontal (min of transverse and staggered diagonal gap), and
+// per-wall area fractions with pins to mid-height.
+double pin_fin_min_gap_D(const PinFinGeometry& g);
+double pin_fin_amin_over_afrontal(const PinFinGeometry& g);
+double pin_fin_dprime_over_D(const PinFinGeometry& g);
+double pin_fin_aprime_over_amin(const PinFinGeometry& g);
+double pin_fin_dh_over_D(const PinFinGeometry& g);
+PinFinAreaFractions pin_fin_area_fractions(const PinFinGeometry& g);
+// eta_fin = tanh(mL)/(mL), L = H/2, m = sqrt(4h/(k D)); eta_t and d/dh analytic.
+PinFinEfficiency pin_fin_array_efficiency(double h, double k_pin, double D,
+                                          double H, double A_f_over_A_t);
+
+PinFinNuResult evaluate_pin_fin_nu(const PinFinNuSet& set, const PinFinGeometry& g,
+                                   double Re_D, double Pr);         // Nu, dNu_dRe
+PinFinFrictionResult evaluate_pin_fin_friction(const PinFinFrictionSet& set,
+                                               const PinFinGeometry& g,
+                                               double Re_D);        // f, df_dRe
+PinFinModifierResult evaluate_pin_fin_modifier(const PinFinRatioModifier& mod,
+                                               const PinFinGeometry& g, double Re_D);
+void validate_pin_fin_geometry(const PinFinGeometry& g);
+void validate_pin_fin_nu_set(const PinFinNuSet& set);
+void validate_pin_fin_friction_set(const PinFinFrictionSet& set);
+void validate_pin_fin_modifier(const PinFinRatioModifier& mod);
+
+PinFinNuSet metzger_1986_staggered_nu();             // default Nu
+PinFinFrictionSet metzger_1982_staggered_friction(); // default f, C1 blend at 1e4
+PinFinNuSet vanfossen_1982_staggered_nu();           // D' basis
+PinFinFrictionSet damerow_1972_staggered_friction(); // per (N-1) rows, wide S/D
+PinFinNuSet chyu_1998_nu(PinArrangement a, PinNuSurface s);
+PinFinRatioModifier chyu_1998_inline_over_staggered(); // has_f = false
+PinFinNuSet chyu_1990_nu(PinArrangement a, bool fillet);          // Table 2, pin surface
+PinFinFrictionSet chyu_1990_friction(PinArrangement a, bool fillet); // Fig. 6, Fitted,
+// basis PerRowHalfHeadVmax (f = 2 dP/(rho Vmax^2 N), 4x canonical); the only
+// inline friction source in hand.
+PinFinRatioModifier chyu_1990_fillet_over_straight(PinArrangement a);
+```
+
 ### Jet Impingement Correlations
 ```cpp
 // impingement_correlation.h -- two independent regimes, matching
@@ -605,6 +731,74 @@ double crossflow_to_jet_ratio_at_x(double yn_d, double z_d, double C_D,
                                    double x_over_xn);
 double crossflow_to_jet_ratio_at_row(double yn_d, double z_d, double C_D,
                                      int row);  // row 1 is exactly 0
+
+// One row from NETWORK flows (#465): the generic core of a jet-plate row.
+// Gc/Gj = (m_crossflow/m_jet)(pi/4)/((yn/d)(z/d)), Re_j = 4 m_jet/(n pi d mu).
+// Which flows count as crossflow is the caller's configuration.
+struct JetRowGeometry { double d, xn_d, yn_d, z_d, n_holes; };
+struct JetRowHeatTransfer {
+    double h, Nu, Re_j, Gc_Gj;
+    double dh_dm_jet;        // analytic, includes the Gc/Gj ~ 1/m_jet term
+    double dh_dm_crossflow;  // analytic
+    bool extrapolated;
+};
+double jet_row_gc_gj_per_flow_ratio(double yn_d, double z_d);
+JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet& set,
+                                         const JetRowGeometry& geom,
+                                         double m_jet, double m_crossflow,
+                                         double mu, double k, double Pr);
+```
+
+### Side-Stream Momentum (`side_stream_momentum.h`)
+```cpp
+// Exact (compressible) impulse of streams joining a channel; each station at
+// the density of its own static (P, T, X). Derivatives w.r.t. the solver's
+// variables, densities through density_and_jacobians.
+
+// One side-stream station, half at a time (#465, #471). m_a arrives, m_b
+// leaves along the channel; the side stream's axial velocity is kappa*u_a:
+//   dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+// kappa = 0: normal injection (merge, Florschuetz). kappa = 0.75: bleed,
+// Bassett et al. (2001) K2/K5 Eq. 15 exactly. A segment carries half of the
+// station at each end, each at its node's density.
+constexpr double STATION_KAPPA_MERGE_NORMAL = 0.0;
+constexpr double STATION_KAPPA_BLEED_BASSETT = 0.75;
+struct StationHalfDrop { double dP, d_dm_a, d_dm_b, d_dP, d_dT; };
+StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
+                                  const std::vector<double>& X, double area, double kappa);
+// Reservoir entry into a duct: (1 + K_in) m|m| / (2 rho A^2).
+StationHalfDrop channel_entry_drop(double m, double P, double T,
+                                   const std::vector<double>& X, double area, double K_in);
+
+// Supply-side crossflow ratio of a duct-fed hole (McGreehan-Schotsch U1/Vi):
+// U1 = (m_a + m_b)/(2 rho A) at the station, Vi = isentropic velocity from
+// the duct's STATIC (P, T) to P_down (floored at CROSSFLOW_VI_FLOOR).
+struct CrossflowRatio { double U1_over_Vi, U1, Vi, d_dm_a, d_dm_b, d_dP, d_dT, d_dP_down; };
+CrossflowRatio crossflow_velocity_ratio(double m_a, double m_b, double P, double T,
+                                        const std::vector<double>& X, double P_down,
+                                        double area);
+
+// Merge chamber (#471): the main-inlet face from the impulse balance
+//   P_f + m_main^2 R T_main / (P_f A^2) = P + m_out^2/(rho A^2) - J/A
+// (subsonic root, closed form); Pt_face = P0_from_static(P_f, T_main, M_f),
+// the chamber's own entropy-based stagnation closure. `choked` flags a face
+// that cannot carry the impulse subsonically.
+struct MergeFaceState {
+    double P_face, Pt_face, M_face; bool choked;
+    double dPf_dm_main, dPf_dm_out, dPf_dJ, dPf_dP, dPf_dT, dPf_dT_main;
+    double dPtf_dm_main, dPtf_dm_out, dPtf_dJ, dPtf_dP, dPtf_dT, dPtf_dT_main;
+};
+MergeFaceState chamber_merge_face_state(
+    double m_main, double T_main, const std::vector<double>& X_main,
+    double m_out, double P, double T, const std::vector<double>& X,
+    double side_momentum, double area);
+
+// Streamwise jet impulse per unit cos(theta), J = m w: isentropic velocity to
+// P (variable cp), or choked: w = u* + (P* - P)/(rho* u*). C1 across choking;
+// Cd does not enter.
+struct JetImpulse { double J, dJ_dm, dJ_dPt, dJ_dTt, dJ_dP; bool choked; };
+JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
+                       const std::vector<double>& X);
 ```
 
 ### Wall Coupling
@@ -614,6 +808,11 @@ WallCouplingResult wall_coupling_and_jacobian(
     double t_over_k,   // wall_thickness / wall_conductivity [m²·K/W]
     double A = 1.0     // contact area [m²]
 );
+// Multi-layer overload: t_over_k_layers, A, R_fouling. h is used as given
+// at or above WALL_HTC_KNEE = 1e-2 W/(m^2 K); below it the C1, strictly
+// positive floor knee^2/(2 knee - h), so a correlation driven to h <= 0 at a
+// solver iterate still gives a finite wall. dQ/dh is the slope of the
+// floored value.
 ```
 
 ### Data Structures
@@ -639,6 +838,7 @@ struct ChannelResult {
     double ddP_dT;         // d(dP)/dT [Pa/K]
     double dT_aw_dmdot;    // dT_aw/dmdot [K·s/kg]
     double dT_aw_dT;       // dT_aw/dT [-] (approx 1 at low Mach)
+    double dT_aw_dP;       // dT_aw/dP [K/Pa] at fixed mdot, T (#496)
     double dq_dmdot;       // dq/dmdot [W·s/(m²·kg)]
     double dq_dT;          // dq/dT [W/(m²·K)]
     double dq_dT_hot;     // dq/dT_hot [W/(m²·K)]
@@ -750,6 +950,11 @@ public:
 
 std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(DischargeCdCorrelation id);
 std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(double Cd);
+
+// Inside the source's own Re and l/d (or bevel, r/d) range? A flag to
+// report, never a selector: Cd is still returned outside it.
+bool discharge_cd_in_range(DischargeCdCorrelation id,
+                           const DischargeHoleGeometry&, const DischargeHoleState&);
 ```
 
 For the Idelchik members `zeta` is referenced to the hole velocity and carries
@@ -898,7 +1103,8 @@ h_plate = Nu * k / D * A_h / A,   A_h = pi D L,  A = X^2 - pi D^2 / 4
 That factor is 3.46 for Andrews' plate C, so it is not optional. The
 conversion is left to the caller because it needs only geometry.
 
-Scored against Andrews' own Fig. 8 at **-13.5% bias, 14.7% RMSE**, labelled
+Scored against Andrews' own Fig. 8 at **-9.9% bias, 11.6% RMSE** (-13.5% /
+14.7% while air's viscosity was 11.8% low, #485), labelled
 **accuracy**: the correlations are the 1986 paper and the data the 1988
 one, and same lab plus different study is cross-source. See
 `validation/cooling/extractions/andrews_effusion_internal_h.md`.
@@ -922,6 +1128,16 @@ std::pair<double, std::vector<double>> film_superposition_sellers_and_gradient(
 std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient(
     const std::vector<double>& eta_rows,
     const std::vector<double>& alpha_between_rows);
+
+// Panel-averaged effusion film (#471): Baldauf per row, Sellers-superposed,
+// averaged over the rows -- (1/N) sum_n Sellers{eta(j pitch_x/D), j=1..n}.
+// The alternative closure Andrews 88-GT-290 refuses offered alone; select it
+// explicitly. extrapolated flags Baldauf's envelope.
+struct EffusionPanelFilm { double eta; bool extrapolated; };
+EffusionPanelFilm effusion_panel_film_effectiveness(int n_rows, double pitch_x_over_D,
+                                                    double s_over_D, double M,
+                                                    double density_ratio,
+                                                    double alpha_deg, double Tu);
 
 // Gao Eq. (5): the published FORM of alpha. a and b are REQUIRED -- the
 // published values 12 and 0.9465 (gao_a_case1/b_case1) do not transfer:
@@ -1028,6 +1244,7 @@ struct MixerResult {
     double P_total_mix;
     std::vector<double> Y_mix;
     double dT_mix_d_delta_h;
+    double dT_mix_dQ;  // = dT_mix_d_delta_h / m_eff (the flow Q is spread over)
     std::vector<StreamJacobian> dT_mix_d_stream;
     std::vector<StreamJacobian> dP_total_mix_d_stream;
     std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
@@ -1075,16 +1292,10 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
-// Compressible channel flow using Fanno model with variable friction
-std::tuple<double, double, double, double> channel_compressible_mdot_and_jacobian(
-    double T_in, double P_in, double u_in, const std::vector<double>& X,
-    double L, double D, double roughness, const std::string& friction_model);
-
-// Full compressible channel evaluation for network solver
-ChannelResult channel_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
-    double P_static_down, double L, double D, double roughness,
-    const std::string& friction_model);
+// The compressible channel's network residual is m - m_calc with m_calc from
+// fanno_channel_flow (fanno_mach.h): mass flow a duct passes from its feeding
+// node's stagnation state against the other node's pressure, saturating at
+// the choked flux, with derivatives. See "Fanno flow integrated in Mach number".
 ```
 
 ### Tee Junction Components (tee_junction.h + solver_interface.h)
@@ -1233,11 +1444,20 @@ For combaero's mixtures `drho/dP = rho/P` holds to 1e-11.
 Residual sign convention: `R_straight = dP0_straight + K_straight * q_dyn`,
 `R_branch = dP0_branch + K_branch * q_dyn`.
 
-### Multi-Port Chamber (Momentum-CV Junction)
+### Border-Carnot Turning Loss (former momentum-CV junction companion)
 
-Sanctioned successor to the K-closure tee for N-port junctions
-(`docs/junction/momentum cv implementation guide.pdf`). Junction = pure
-conservation, loss = separate per-port `BorderCarnotLossElement`s.
+> **Deprecated in 0.7.0, removed in 0.8.0 together with the Python
+> `BorderCarnotLossElement`** -- it is exactly a constant head loss
+> (`PressureLossElement` + `ConstantHeadLoss`), and its K formula is junction
+> physics the closures already carry.
+
+> **Never validated, and not for junction ports.** `MultiPortChamberElement`
+> and `ConstantKTeeElement` carry each port's turning loss in their own closure;
+> putting this element on a port as well double-counts it. Measured on
+> Bassett's 90 deg, psi = 1 dividing tee (#272): K6 = 0.867 from the closure
+> alone (Bassett 0.867), 1.249 with the element at q = 0.5 (+16% at q = 0.3,
+> +78% at 0.7). Its only check was paired with the junction model removed in
+> 0.6.0, which missed Bassett K6 by 11-29%; those tests went with it (#322).
 
 > **The junction half of this was removed in 0.6.0.** `multi_port_chamber_residuals_and_jacobian` and its result structs backed `MultiPortChamberBase`'s own impulse model, which is gone; `MultiPortChamberElement` supersedes it and computes its own whole-element `(f, J)` (see the Momentum-CV Junction section above). What remains here is the Border-Carnot loss element, which is unaffected.
 
@@ -1253,9 +1473,9 @@ double dborder_carnot_L_ddelta(double delta_geom);
 // Result structs (solver_interface.h)
 // Two-port in-line loss element: Pt_in - Pt_out - L*0.5*rho*u_in^2 = 0.
 // L applies the Hager (3/4) effective-angle correction, INTENDED to reproduce
-// Hager xi_l and Bassett K_inc at M -> 0 on a sharp-edged lateral -- unverified,
-// Tier-1 tests xfail at 11-29% deviation (issue #272). Sign-free in mdot
-// (mdot^2 in the dynamic head).
+// Hager xi_l and Bassett K_inc at M -> 0 on a sharp-edged lateral -- never
+// validated (see the note above). Sign-free in mdot (mdot^2 in the dynamic
+// head).
 BorderCarnotLossResult border_carnot_loss_residual_and_jacobian(
     double mdot,
     double Pt_in, double Pt_out,
@@ -1282,6 +1502,11 @@ AdiabaticResult adiabatic_T_complete_and_jacobian_T_from_streams(
 // Adiabatic equilibrium combustion
 AdiabaticResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
+
+// All three add Q as Q / m_tot exactly (energy-conserving) for total flows of
+// at least kMixerHeatMdotFloor = 1e-6 kg/s; below it Q / m_eff with the C1
+// floor m_eff = (m^2 + m0^2) / (2 m0) >= 1e-3 keeps the heat finite as the
+// flow vanishes.
 
 // Combined combustion with analytical pressure loss
 ChamberResult combustor_residuals_and_jacobians(

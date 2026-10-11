@@ -15,7 +15,7 @@ import math
 from validation.junction.models import bassett2001
 from validation.junction.models.paper_ceiling import PaperCeiling
 from validation.junction.models.tee_junction_raw import TeeJunctionRaw
-from validation.junction.runner import run
+from validation.junction.runner import Record, run
 from validation.junction.schema import load_dataset
 from validation.junction.scorecard import build_cells, headline
 
@@ -65,3 +65,41 @@ def test_runner_produces_scorecard():
     # are Bassett's own analytical correlations, so model should approximately
     # match the ceiling -> low Delta_vs_ceiling.
     assert h.core_rmse < 1.0, f"core_RMSE = {h.core_rmse}, unexpectedly high"
+
+
+def _rec(paper: str, err: float) -> Record:
+    return Record(
+        paper=paper,
+        file="f",
+        K_id="K6",
+        canonical_K="K_lateral_sep",
+        psi=1.0,
+        theta_deg=90.0,
+        q=0.5,
+        M_3=None,
+        K_measured=1.0,
+        K_model=1.0 + err,
+        K_ceiling=None,
+    )
+
+
+def test_within_uses_each_papers_stated_band_and_none_where_none_is_stated():
+    """A flat 0.05 used to be applied to every source; no junction source states
+    a measurement uncertainty, so "within" must read as unknown, not as a score."""
+    recs = [_rec("a", 0.01), _rec("a", 0.2)]
+    (cell,) = build_cells(recs, bands={"a": 0.05})
+    assert cell.pct_within_uncertainty == 0.5
+    (cell,) = build_cells(recs, bands={"a": None})
+    assert math.isnan(cell.pct_within_uncertainty)
+
+
+def test_no_junction_source_states_a_measurement_band():
+    """Checked against the full texts 2026-10-10. If a band is added, it must
+    come with the source's own statement -- this test is the reminder."""
+    assert {p: m.default_uncertainty_K for p, m in load_dataset().papers.items()} == {
+        "bassett2001": None,
+        "hager1984": None,
+        "idelchik1966": None,
+        "perez_garcia2010": None,
+        "wang2014": None,
+    }

@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "impingement_correlation.h"
+#include "math_constants.h"
 
 using combaero::cooling::crossflow_to_jet_ratio_at_row;
 using combaero::cooling::crossflow_to_jet_ratio_at_x;
@@ -251,4 +252,91 @@ TEST(CrossflowRatioTest, RowConvenienceMatchesTheContinuousForm) {
 TEST(CrossflowRatioTest, StaysFiniteForDegenerateGeometry) {
   EXPECT_TRUE(std::isfinite(crossflow_to_jet_ratio_at_row(0.0, 0.0, 0.79, 5)));
   EXPECT_TRUE(std::isfinite(crossflow_to_jet_ratio_at_row(8.0, 2.0, 0.0, 5)));
+}
+
+// d(Nu)/d(Gc_Gj) for network-supplied crossflow (#465): analytic against
+// central differences across the validity range and down to Gc/Gj = 0, where
+// the bracket's exponent n < 1 would be singular without the smoothing.
+TEST(JetArrayImpingement, AnalyticGcGjDerivativeMatchesFiniteDifference) {
+  for (const auto &set : {florschuetz_1981_inline(), florschuetz_1981_staggered()}) {
+    for (double G : {0.0, 1e-4, 0.05, 0.3, 0.6, 0.8}) {
+      for (double z_d : {1.0, 3.0}) {
+        const auto r = jet_array_impingement_nu(set, 2.0e4, G, 0.7, 8.0, 6.0, z_d);
+        const double h = 1e-6;
+        const double fd = (jet_array_impingement_nu(set, 2.0e4, G + h, 0.7, 8.0, 6.0, z_d).Nu -
+                           jet_array_impingement_nu(set, 2.0e4, G - h, 0.7, 8.0, 6.0, z_d).Nu) /
+                          (2.0 * h);
+        EXPECT_NEAR(r.dNu_dGc_Gj, fd, std::abs(fd) * 1e-5 + 1e-6) << G << " " << z_d;
+        EXPECT_TRUE(std::isfinite(r.dNu_dGc_Gj));
+        if (G > 0.01) {
+          EXPECT_LT(r.dNu_dGc_Gj, 0.0) << "crossflow degrades Nu";
+        }
+      }
+    }
+  }
+}
+
+// jet_row_heat_transfer (#465): the network row core. It must equal the
+// correlation at the row's own Re_j and Gc/Gj, and its two flow derivatives
+// must match central differences, including the Gc/Gj ~ 1/m_jet term.
+TEST(JetRowHeatTransfer, IsTheCorrelationAtTheRowsOwnReAndGc) {
+  combaero::cooling::JetRowGeometry g;
+  g.d = 0.00254;
+  g.xn_d = 5.0;
+  g.yn_d = 4.0;
+  g.z_d = 2.0;
+  g.n_holes = 12.0;
+  const double mu = 1.85e-5, k = 0.026, Pr = 0.71;
+  const auto set = florschuetz_1981_inline();
+  const auto r = combaero::cooling::jet_row_heat_transfer(set, g, 0.004, 0.012, mu, k, Pr);
+  const double Re = 4.0 * 0.004 / (12.0 * M_PI * g.d * mu);
+  const double G = (M_PI / 4.0) / (4.0 * 2.0) * 0.012 / 0.004;
+  EXPECT_NEAR(r.Re_j, Re, Re * 1e-12);
+  EXPECT_NEAR(r.Gc_Gj, G, G * 1e-12);
+  const double nu = jet_array_impingement_nu(set, Re, G, Pr, 5.0, 4.0, 2.0).Nu;
+  EXPECT_NEAR(r.h, nu * k / g.d, nu * k / g.d * 1e-12);
+}
+
+TEST(JetRowHeatTransfer, FlowDerivativesMatchCentralDifferences) {
+  combaero::cooling::JetRowGeometry g;
+  g.d = 0.00254;
+  g.xn_d = 10.0;
+  g.yn_d = 8.0;
+  g.z_d = 1.0;
+  g.n_holes = 20.0;
+  const double mu = 1.85e-5, k = 0.026, Pr = 0.71;
+  for (const auto &set : {florschuetz_1981_inline(), florschuetz_1981_staggered()}) {
+    for (double mc : {0.0, 0.002, 0.02}) {
+      const double mj = 0.005, e = 1e-8;
+      const auto r = combaero::cooling::jet_row_heat_transfer(set, g, mj, mc, mu, k, Pr);
+      auto h = [&](double a, double b) {
+        return combaero::cooling::jet_row_heat_transfer(set, g, a, b, mu, k, Pr).h;
+      };
+      const double fd_j = (h(mj + e, mc) - h(mj - e, mc)) / (2 * e);
+      const double fd_c = (h(mj, mc + e) - h(mj, mc - e)) / (2 * e);
+      EXPECT_NEAR(r.dh_dm_jet, fd_j, std::abs(fd_j) * 1e-5 + 1e-6) << mc;
+      EXPECT_NEAR(r.dh_dm_crossflow, fd_c, std::abs(fd_c) * 1e-5 + 1e-6) << mc;
+      if (mc > 0.0) {
+        EXPECT_LT(r.dh_dm_crossflow, 0.0);
+      }
+    }
+  }
+}
+
+TEST(JetRowHeatTransfer, NoJetFlowMeansNoCrossflowRatio) {
+  combaero::cooling::JetRowGeometry g;
+  g.d = 0.00254;
+  g.xn_d = 5.0;
+  g.yn_d = 4.0;
+  g.z_d = 2.0;
+  g.n_holes = 12.0;
+  const auto r = combaero::cooling::jet_row_heat_transfer(florschuetz_1981_inline(), g, 0.0,
+                                                          0.01, 1.85e-5, 0.026, 0.71);
+  EXPECT_EQ(r.Gc_Gj, 0.0);
+  EXPECT_TRUE(std::isfinite(r.h));
+  EXPECT_EQ(r.dh_dm_crossflow, 0.0);
+  g.n_holes = 0.0;
+  EXPECT_THROW(combaero::cooling::jet_row_heat_transfer(florschuetz_1981_inline(), g, 0.01,
+                                                        0.0, 1.85e-5, 0.026, 0.71),
+               std::invalid_argument);
 }
