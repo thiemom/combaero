@@ -61,5 +61,19 @@ broken — it's failing where 1D physics itself fails. The scorecard's
 
 `python/tests/test_junction_mynard_fidelity.py` holds `models/bassett2001.py`
 to Bassett's own calculated curves (the `_calc` files): max error 0.012-0.024
-at psi = 1, about 0.1 at psi = 3 / 4. Curves for K4-K8 and K11 (Figs 7, 8,
-11-13) are not digitised yet, so those coefficients have no such check.
+at psi = 1, about 0.1 at psi = 3 / 4 for K12 (Fig 10c).
+
+K4-K8 and K11 (Figs 7, 8, 11-13, 32 curves) were traced on 2026-10-11 from
+the paper's 300-dpi images. Each panel is calibrated on its axis lines and
+ticks (residual <= 3.4 px), and each curve is traced by snapping to the ink
+within 8 px of our formula, every 0.02 in q, skipping q where another curve
+of the panel is close. The committed points are therefore within 0.031 of
+our formulas by construction; the evidence that the formulas are Bassett's
+is that the unsnapped ink distance is 0.5-3 px along the curves, whereas a
+re-planted K8 /psi typo sits 12-18 px off and K11 raw-for-corrected 6-21 px.
+K7, K8 and K11 use the Eq 33/34 angle correction, as the captions state.
+
+Bassett's psi > 1 curves sit where our formulas put an area ratio 1-3% off
+nominal (Fig 11b "3" fits psi 2.91, Fig 13b "4" fits 4.08, Fig 7b "3" fits
+2.97), at most about 0.05 in K: the ratios he computed with, not a
+transcription error.
