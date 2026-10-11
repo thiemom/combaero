@@ -1189,6 +1189,81 @@ class NetworkSolver:
     def _reversed_elements(self, x: np.ndarray) -> set[str]:
         return {eid for eid, i in self._two_port_mdot_indices().items() if x[i] < 0.0}
 
+    def _reversed_junctions(self, x: np.ndarray) -> dict[str, tuple[list[float], list[int]]]:
+        """Junctions with at least one port running against its declared
+        direction: id -> (port flows, positive OUT of the junction; the
+        global index of each port's outer m_dot).
+
+        A junction feeds its port nodes in the declared direction otherwise
+        (flow_at_node). At a reversed port that counts the stream leaving the
+        node as a negative inflow, which cancels the real inflow from the
+        reversed outer element: the node saw no flow and its Pt fell to P
+        (0 Pa against a 711 Pa head, #517). Junctions listed here are fed by
+        the sign of their port flows instead -- see _junction_streams. Fully
+        forward junctions are not listed, so their propagation is unchanged.
+        """
+        from .components import MultiPortChamberBase
+
+        out: dict[str, tuple[list[float], list[int]]] = {}
+        for eid, e in self.network.elements.items():
+            if not isinstance(e, MultiPortChamberBase):
+                continue
+            idx_map = getattr(e, "_port_outer_mdot_idx", None) or {}
+            idxs = [idx_map.get(oid) for oid in e._port_element_ids]
+            if any(i is None for i in idxs):
+                continue
+            outer = [float(x[i]) for i in idxs]
+            if all(m >= 0.0 for m in outer):
+                continue
+            flows = [float(s) * m for s, m in zip(e._port_signs, outer, strict=True)]
+            out[eid] = (flows, [int(i) for i in idxs])
+        return out
+
+    def _junction_streams(
+        self, elem: Any, nid: str, flows: list[float], idxs: list[int]
+    ) -> list[tuple[str, float, dict[int, float]]]:
+        """Streams a reversed-port junction delivers INTO port node nid, by
+        the sign of the port flows: (supplying port node, mass, d mass/d x).
+
+        A port that supplies the junction (flow into it) gets nothing from
+        it. A receiving port j gets its own flow m_j, drawn from the
+        suppliers k (flow m_k < 0):
+
+        - one supplier: one stream of m_j from it -- what a dividing junction
+          does in its declared direction;
+        - one receiver: one stream of |m_k| from each supplier -- what a
+          joining junction does in its declared direction;
+        - several of each: m_j |m_k| / sum|m| from each supplier, so every
+          receiver carries the supplied mixture at its own flow.
+
+        The derivatives are in the outer m_dot unknowns (m_i = sign_i x_i).
+        """
+        i = elem.port_nodes.index(nid)
+        m_i = flows[i]
+        if not m_i > 0.0:
+            return []
+        signs = elem._port_signs
+        sup = [k for k, m in enumerate(flows) if m < 0.0]
+        rec = [j for j, m in enumerate(flows) if m > 0.0]
+        if not sup:
+            return []
+        if len(sup) == 1:
+            k = sup[0]
+            return [(elem.port_nodes[k], m_i, {idxs[i]: float(signs[i])})]
+        if len(rec) == 1:
+            return [(elem.port_nodes[k], -flows[k], {idxs[k]: -float(signs[k])}) for k in sup]
+        total = -sum(flows[k] for k in sup)
+        out = []
+        for k in sup:
+            a_k = -flows[k]
+            jac: dict[int, float] = {idxs[i]: float(signs[i]) * a_k / total}
+            for k2 in sup:
+                # d(m_i a_k / S)/d a_k2, then d a_k2 / d x_k2 = -sign_k2.
+                d_a = m_i * ((total - a_k) if k2 == k else -a_k) / (total * total)
+                jac[idxs[k2]] = jac.get(idxs[k2], 0.0) - float(signs[k2]) * d_a
+            out.append((elem.port_nodes[k], m_i * a_k / total, jac))
+        return out
+
     def _flow_ends(self, obj: Any, x: np.ndarray) -> tuple[str, str]:
         """(node feeding the flow, node it delivers into) of a wall endpoint:
         a node is both; an element by the sign of its flow (#481)."""
@@ -1199,14 +1274,25 @@ class NetworkSolver:
             return obj.to_node, obj.from_node
         return obj.from_node, obj.to_node
 
-    def _signed_order(self, reversed_ids: set[str]) -> list[str]:
+    def _signed_order(
+        self,
+        reversed_ids: set[str],
+        reversed_junctions: dict[str, tuple[list[float], list[int]]] | None = None,
+    ) -> list[str]:
         """Propagation order with each reversed element pointing the way its
-        flow goes; nodes left in a cycle follow in network order."""
+        flow goes; nodes left in a cycle follow in network order. A junction
+        with a reversed port points from the ports that supply it to the
+        ports it supplies."""
         nodes = list(self.network.nodes)
         preds: dict[str, set[str]] = {n: set() for n in nodes}
         succ: dict[str, set[str]] = {n: set() for n in nodes}
+        reversed_junctions = reversed_junctions or {}
         for e in self.network.elements.values():
-            if e.id in reversed_ids:
+            if e.id in reversed_junctions:
+                flows = reversed_junctions[e.id][0]
+                srcs = [n for n, m in zip(e.port_nodes, flows, strict=True) if m < 0.0]
+                sinks = [n for n, m in zip(e.port_nodes, flows, strict=True) if m > 0.0]
+            elif e.id in reversed_ids:
                 srcs, sinks = [e.to_node], [e.from_node]
             else:
                 srcs, sinks = e.all_source_nodes(), e.all_sink_nodes()
@@ -1251,7 +1337,12 @@ class NetworkSolver:
         """
         self._prev_derived_states = getattr(self, "_derived_states", {})
         reversed_ids = self._reversed_elements(x)
-        order = self._signed_order(reversed_ids) if reversed_ids else self._topological_order
+        self._rev_junctions = self._reversed_junctions(x)
+        order = (
+            self._signed_order(reversed_ids, self._rev_junctions)
+            if reversed_ids or self._rev_junctions
+            else self._topological_order
+        )
         relay: dict = {}
         for _ in range(self._MAX_PROPAGATION_PASSES):
             self._lagged_read = False
@@ -1328,17 +1419,29 @@ class NetworkSolver:
             done.add(nid)
             current[0] = nid
 
-            # Elements delivering INTO nid by the sign of their flow (#481).
+            # Elements delivering INTO nid by the sign of their flow (#481). A
+            # junction with a reversed port delivers by the sign of its port
+            # flows instead, below (#517).
+            rev_jct = getattr(self, "_rev_junctions", {})
             up_elems = [
-                e for e in self.network.get_upstream_elements(nid) if e.id not in reversed_ids
+                e
+                for e in self.network.get_upstream_elements(nid)
+                if e.id not in reversed_ids and e.id not in rev_jct
             ]
             rev_in = [e for e in self.network.get_downstream_elements(nid) if e.id in reversed_ids]
+            jct_in = [
+                e
+                for e in self.network.get_upstream_elements(nid)
+                + self.network.get_downstream_elements(nid)
+                if e.id in rev_jct
+            ]
 
             # Boundaries with NO inflow are pure sources
             if (
                 isinstance(node, (PressureBoundary, MassFlowBoundary))
                 and not up_elems
                 and not rev_in
+                and not jct_in
             ):
                 T, Y, _ = node.compute_derived_state([])
                 self._derived_states[nid] = (T, Y, None)
@@ -1396,6 +1499,25 @@ class NetworkSolver:
                 state_up._m_dot_jac_names = {f"{elem.id}.m_dot": -1.0}
                 state_up._src_node = elem.to_node
                 stream_info.append((state_up, elem, elem.to_node, {i_m: -1.0}))
+            # A junction with a reversed port, by the sign of its port flows.
+            for elem in jct_in:
+                flows, idxs = rev_jct[elem.id]
+                streams = self._junction_streams(elem, nid, flows, idxs)
+                # The node takes d(total inflow)/dx once per element (it
+                # de-duplicates by element id), so every stream carries the
+                # element's TOTAL, as flow_jac_at_node does for a merge.
+                total_jac: dict[str, float] = {}
+                for _, _, jac in streams:
+                    for col, coeff in jac.items():
+                        name = self.unknown_names[col]
+                        total_jac[name] = total_jac.get(name, 0.0) + coeff
+                for src_nid, m, jac in streams:
+                    state_up = self._get_node_state_with_prev(self.network.nodes[src_nid], x)
+                    state_up.m_dot = m
+                    state_up._element_id = elem.id
+                    state_up._m_dot_jac_names = total_jac
+                    state_up._src_node = src_nid
+                    stream_info.append((state_up, elem, src_nid, jac))
             # A MassFlowBoundary between elements injects its own stream: the
             # mass row already counts its m_dot, so the mixing must too, at
             # its own Tt and Y (#481). Fixed, so it has no relay column.
@@ -1756,7 +1878,17 @@ class NetworkSolver:
         def state(n: str) -> NetworkMixtureState:
             return self._get_node_state(self.network.nodes[n], x)
 
+        rev_jct = self._reversed_junctions(x)
+        for e in self.network.get_upstream_elements(nid) + self.network.get_downstream_elements(
+            nid
+        ):
+            if e.id in rev_jct:
+                for src, m, _ in self._junction_streams(e, nid, *rev_jct[e.id]):
+                    st = state(src)
+                    out.append((m, float(st.Tt), list(st.Y)))
         for e in self.network.get_upstream_elements(nid):
+            if e.id in rev_jct:
+                continue
             if e.id in two:
                 m = float(x[two[e.id]])
                 if m > 0.0:

@@ -1042,9 +1042,9 @@ jct_k = ConstantKTeeElement(
 # Borda-Carnot loss on every receiver (Idelchik Eq 7-6, A' = 1). No
 # flow_direction: roles follow the flow smoothly, 2 to 6 ports. Angles as for
 # the other tees (outward axis = angle for outlets, pi - angle for inlets).
-# A converged answer with a port running against its declared direction is
-# demoted to inconsistent: the solver's port-node propagation cannot represent
-# a reversed junction port yet. Kernel: ideal_junction_residuals_and_jacobian
+# Any port may converge reversed (the solver feeds a reversed junction port by
+# the sign of its flow); on an all-pressure network that can make more than
+# one root admissible. Kernel: ideal_junction_residuals_and_jacobian
 # (API_CPP.md).
 from combaero.network import IdealMomentumTeeElement
 jct_ideal = IdealMomentumTeeElement(
