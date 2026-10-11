@@ -21,15 +21,17 @@ Roles are not declared. Every port carries both, blended smoothly over 1e-4 of
 the throughput (``include/ideal_junction.h``), so the residual is smooth through
 flow reversal and at zero flow: no flow ratio, no direction classification, no
 degenerate fallback, no soft barrier. The inlet/outlet declaration fixes the
-canonical graph direction and the geometry -- and, for now, the direction a
-converged answer must run: the solver cannot yet represent a reversed junction
-port (see ``verify_solution_consistent``).
+canonical graph direction and the geometry only: a converged answer may run any
+port either way (the solver feeds a reversed junction port by the sign of its
+flow).
 """
 
 from __future__ import annotations
 
 import math
+from functools import cache
 
+import combaero as cb
 from combaero import _core
 from combaero.network.components import (
     MultiPortChamberBase,
@@ -39,6 +41,11 @@ from combaero.network.components import (
 #: Mirrors ``kIdealMaxPorts`` in include/ideal_junction.h; the kernel refuses
 #: more ports, so the element refuses them at construction instead of mid-solve.
 IDEAL_MAX_PORTS: int = 6
+
+
+@cache
+def _species_molar_mass(k: int) -> float:
+    return float(cb.species_molar_mass(k))
 
 
 class IdealMomentumTeeElement(MultiPortChamberBase):
@@ -91,7 +98,13 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
             for a, s in zip(self.port_angles_deg, self._port_signs, strict=True)
         ]
 
-    def _kernel(self, states: list[NetworkMixtureState], p_jn: float, port_mdots: list[float]):
+    def _kernel(
+        self,
+        states: list[NetworkMixtureState],
+        p_jn: float,
+        port_mdots: list[float],
+        with_density_derivative: bool = True,
+    ):
         geom = _core.IdealJunctionGeometry()
         geom.area = [float(a) for a in self.port_areas]
         geom.axis_rad = self.axis_rad()
@@ -100,13 +113,12 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         rho = [float(s.density()) for s in states]
         # outer_mdot: the connecting elements' own flows; port flow = sign * outer.
         outer = [float(m) * float(s) for m, s in zip(port_mdots, self._port_signs, strict=True)]
+        drho_dp = [
+            r / p if p > 0.0 and with_density_derivative else 0.0
+            for r, p in zip(rho, p_static, strict=True)
+        ]
         return _core.ideal_junction_residuals_and_jacobian(
-            p_static,
-            rho,
-            [r / p if p > 0.0 else 0.0 for r, p in zip(rho, p_static, strict=True)],
-            outer,
-            float(p_jn),
-            geom,
+            p_static, rho, drho_dp, outer, float(p_jn), geom
         )
 
     def residuals(
@@ -133,7 +145,56 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
                 if value != 0.0:
                     entries[name] = entries.get(name, 0.0) + value
             jac[row] = entries
+        self._add_density_columns(states, P_jct, port_mdots, kernel, jac)
         return residuals, jac
+
+    def _add_density_columns(
+        self,
+        states: list[NetworkMixtureState],
+        P_jct: float,
+        port_mdots: list[float],
+        kernel: object,
+        jac: dict[int, dict[str, float]],
+    ) -> None:
+        """d(row)/d(port T) and d(row)/d(port Y[k]) through the port density.
+
+        A port node's T and Y are not unknowns: the solver derives them by
+        mixing and relays a ``{port}.T`` / ``{port}.Y[k]`` entry through that
+        chain. Without these the junction rows missed how a port's density
+        follows its mixed temperature, measured at 1.2e-4 (scaled) on a hot
+        forward merge and 8.7e-4 on a hot reversed one (#517).
+
+        d(row)/d(rho_i) comes from the kernel without assuming its row form:
+        a second call with d(rho)/dP = 0 leaves only the explicit P column, and
+        the difference is d(row)/d(rho_i) * rho_i/P_i. Ideal gas then gives
+        d(rho)/dT = -rho/T and d(rho)/dY_k = -rho W/W_k (W the mixture molar
+        mass).
+        """
+        N = self.N
+        explicit = self._kernel(states, P_jct, port_mdots, with_density_derivative=False)
+        for i in range(N):
+            P_i, T_i = float(states[i].P), float(getattr(states[i], "T", 0.0) or 0.0)
+            if not (P_i > 0.0 and T_i > 0.0):
+                continue
+            rho_i = float(states[i].density())
+            drho_dp = rho_i / P_i
+            W = float(cb.mwmix(states[i].X))
+            Y = list(states[i].Y)
+            for row in range(N + 1):
+                d_rho = (
+                    float(kernel.jacobian[row][i]) - float(explicit.jacobian[row][i])
+                ) / drho_dp
+                if d_rho == 0.0:
+                    continue
+                entries = jac[row]
+                name_T = f"{self.port_nodes[i]}.T"
+                entries[name_T] = entries.get(name_T, 0.0) - d_rho * rho_i / T_i
+                for k, y in enumerate(Y):
+                    if y <= 0.0:
+                        continue
+                    name_Y = f"{self.port_nodes[i]}.Y[{k}]"
+                    W_k = _species_molar_mass(k)
+                    entries[name_Y] = entries.get(name_Y, 0.0) - d_rho * rho_i * W / W_k
 
     def seed_P_jct(self, pt_common: float, m_common: float, rho: float, common_i: int) -> float:
         """Initial ``p_jn`` from the common port's guessed Pt and flow.
@@ -150,29 +211,18 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
             return pt_common
         return pt_common - m_common * m_common / (2.0 * rho * A * A)
 
-    #: A converged port may run against its declared direction by this share
-    #: of the largest port flow and still count as dead rather than reversed.
-    #: The port node's head error from such a flow is (share)^2 of the head.
-    REVERSED_PORT_SHARE: float = 1e-6
-
     def verify_solution_consistent(
         self,
         sol: dict[str, float],
         energy_rel_tol: float = 1e-9,
     ) -> bool:
-        """Post-solve check: no port reversed, no flow work created.
+        """Post-solve check that the junction did not create flow work.
 
-        **Reversed ports.** The closure models them; the NETWORK does not yet.
-        The solver's state propagation feeds a junction port node its flow in
-        the declared direction only, so at a reversed port the junction's
-        throughflow and the reversed outer element's cancel, the node sees no
-        flow, and its Pt collapses to P (measured: 0 Pa against a 711 Pa head).
-        A reversed converged state is therefore not trustworthy, and is
-        demoted. Reversal DURING the iteration is fine -- there is no barrier,
-        which is where this closure's smoothness pays -- only the answer must
-        run the declared way.
+        Unlike ``MultiPortChamberElement`` there is no direction check: a
+        reversed port is a state this closure models, and the solver feeds a
+        reversed junction port by the sign of its flow.
 
-        **Energy.** The closure cannot create flow work: measured
+        The closure cannot create flow work: measured
         volumetrically relative to ``p_jn``, every exact root dissipates
         ``sum_in m_k |v_k|^2/2 - M |V|^2/2 + sum_out m_j |v_j - V|^2/2 >= 0``
         (Jensen on the mass-weighted mean, plus a sum of squares). What this
@@ -189,10 +239,6 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
                 return True
             flows.append(float(self._port_signs[i]) * float(sol[m_key]))
             pts.append(float(sol[pt_key]))
-        m_max = max(abs(f) for f in flows)
-        outer = [s * f for s, f in zip(self._port_signs, flows, strict=True)]
-        if any(m < -self.REVERSED_PORT_SHARE * m_max for m in outer):
-            return False
         net_outflow_of_energy = sum(f * pt for f, pt in zip(flows, pts, strict=True))
         scale = sum(abs(f) for f in flows) * max(abs(pt) for pt in pts)
         return net_outflow_of_energy <= energy_rel_tol * scale

@@ -37,12 +37,13 @@ def _branch_net(
     theta: float = 90.0,
     regime: str = "incompressible",
     pt_bra: float = 1.9e5,
+    tt_bra: float = 300.0,
 ) -> FlowNetwork:
     """MFB-fed dividing tee into two PB sinks through long arm channels."""
     net = FlowNetwork()
     net.add_node(MassFlowBoundary("src", m_dot=m_in, Tt=300.0, Y=_Y))
     net.add_node(PressureBoundary("pb_str", Pt=1.9e5, Tt=300.0, Y=_Y))
-    net.add_node(PressureBoundary("pb_bra", Pt=pt_bra, Tt=300.0, Y=_Y))
+    net.add_node(PressureBoundary("pb_bra", Pt=pt_bra, Tt=tt_bra, Y=_Y))
     for nid in ("mc_com", "mc_str", "mc_bra"):
         net.add_node(MomentumChamberNode(nid, area=_A))
     net.add_element(
@@ -174,31 +175,58 @@ def _reversed_branch_solution() -> dict:
     return sol
 
 
-def test_a_reversed_converged_port_is_demoted() -> None:
-    """The closure's rows hold through the reversal -- both suppliers sit at
-    p_jn -- but the network cannot represent the reversed port, so the
-    answer is reported as inconsistent rather than returned as converged."""
+def test_a_reversed_port_is_a_state_not_an_error() -> None:
+    """The branch flows back in and the declared dividing tee runs as a merge.
+    The Mynard tee raises here (strict) or barriers it away (soft); this
+    closure converges to the merge: both suppliers at p_jn, the one receiver
+    on its momentum balance with V the mass-weighted supplied velocity."""
     sol = _reversed_branch_solution()
+    assert sol["__success__"], sol.get("__message__")
+    assert sol["__consistent__"] is True
+    m_c, m_b, m_s = sol["ch_in.m_dot"], -sol["ch_bra.m_dot"], sol["ch_str.m_dot"]
+    assert m_s == pytest.approx(m_c + m_b, rel=1e-9)
     head = sol["mc_str.Pt"] - sol["mc_str.P"]
     assert sol["mc_com.P"] == pytest.approx(sol["jct.P_jct"], abs=1e-4 * head)
     assert sol["mc_bra.P"] == pytest.approx(sol["jct.P_jct"], abs=1e-4 * head)
-    assert sol["__consistent__"] is False
-    assert not sol["__success__"]
+    # Common inflow arrives along the main axis, the branch inflow normal to
+    # it, so only the common stream carries momentum along the straight run.
+    u_c = m_c / (_rho(sol, "mc_com") * _A)
+    V_x = m_c * u_c / (m_c + m_b)
+    assert _receiver_identity(sol, "mc_str", m_s, V_x) == pytest.approx(0.0, abs=1e-4 * head)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="junction-port state propagation follows the declared direction: a "
-    "reversed port node sees zero flow and drops its head (Pt = P)",
-)
 def test_a_reversed_port_node_keeps_its_dynamic_head() -> None:
-    """Flips when the solver feeds junction ports by the sign of their flow.
-    Then the reversal demotion in verify_solution_consistent can go."""
+    """The solver feeds a junction port by the sign of its flow (#517). It
+    used to follow the declared direction: the reversed port node saw the
+    junction's outflow as a negative inflow cancelling the real one, and its
+    Pt fell to P (0 Pa against a 711 Pa head)."""
     sol = _reversed_branch_solution()
     m = sol["ch_bra.m_dot"]
     rho = sol["mc_bra.rho"]
     head = 0.5 * rho * (m / (rho * _A)) ** 2
-    assert sol["mc_bra.Pt"] - sol["mc_bra.P"] == pytest.approx(head, rel=1e-2)
+    # Isentropic port head vs rho u^2/2 at M ~ 0.07: ~1e-3 apart.
+    assert sol["mc_bra.Pt"] - sol["mc_bra.P"] == pytest.approx(head, rel=5e-3)
+
+
+@pytest.mark.parametrize("regime", ["incompressible", "compressible"])
+def test_network_jacobian_matches_central_differences_at_a_reversed_state(regime: str) -> None:
+    """The reversed-port streams carry their own d(mass)/dx; checked at the
+    reversed root perturbed by 1e-3, so every port keeps its sign. The
+    reversed branch draws from a HOT sink, so the receiver's mixed T -- and
+    with it its density -- depends on each stream's share."""
+    net = _branch_net(pt_bra=1.95e5, regime=regime, tt_bra=400.0)
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=60.0, use_jac=False)
+    assert sol["__success__"] and sol["ch_bra.m_dot"] < 0.0
+    x = np.array([sol[n] for n in solver.unknown_names], dtype=float)
+    x = x * (1.0 + 1e-3 * np.random.default_rng(1).standard_normal(x.size))
+    _, J = solver._residuals_and_jacobian(x)
+    J = J.toarray()
+    step = np.maximum(np.abs(x) * 1e-7, 1e-10)
+    J_fd = approx_derivative(solver._residuals, x, method="3-point", abs_step=step)
+    scaled_err = np.abs(J - J_fd) * np.abs(x)
+    row_ref = np.max(np.abs(J_fd) * np.abs(x), axis=1) + 1e-30
+    assert float(np.max(scaled_err.max(axis=1) / row_ref)) < 1e-5
 
 
 @pytest.mark.parametrize("builder", [_branch_net, _merge_net])
@@ -318,11 +346,10 @@ def test_energy_verifier_rejects_a_junction_that_creates_flow_work() -> None:
     bad = {**flows, "mc_str.Pt": 1.9010e5, "mc_bra.Pt": 1.9012e5, "mc_com.Pt": 1.9020e5}
     assert jct.verify_solution_consistent(good) is True
     assert jct.verify_solution_consistent(bad) is False
-    # A dead port is fine, a reversed one is not (see the xfail above).
-    dead = {**good, "ch_bra.m_dot": -1e-9, "ch_str.m_dot": 0.05}
+    # A reversed port is judged on energy alone: here the reversed branch
+    # leaves at a Pt above the supplier's, paid for by the outlet.
     reversed_ = {**good, "ch_bra.m_dot": -0.01, "ch_str.m_dot": 0.06}
-    assert jct.verify_solution_consistent(dead) is True
-    assert jct.verify_solution_consistent(reversed_) is False
+    assert jct.verify_solution_consistent(reversed_) is True
 
 
 def test_diagnostics_name_the_regime_from_the_converged_flows() -> None:
@@ -337,3 +364,88 @@ def test_diagnostics_name_the_regime_from_the_converged_flows() -> None:
     q_b = diag["mass_flow_ratio"]
     assert diag["K_branch"] == pytest.approx(1.0 + q_b * q_b, abs=2e-3)
     assert "K11" not in diag
+
+
+def _cross_net(pt_left: float, tt_left: float = 300.0) -> FlowNetwork:
+    """One supply, a straight run and two opposed 90-deg side arms."""
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("src", m_dot=0.05, Tt=300.0, Y=_Y))
+    net.add_node(PressureBoundary("pb_s", Pt=1.9e5, Tt=300.0, Y=_Y))
+    net.add_node(PressureBoundary("pb_l", Pt=pt_left, Tt=tt_left, Y=_Y))
+    net.add_node(PressureBoundary("pb_r", Pt=1.9e5, Tt=300.0, Y=_Y))
+    for nid in ("mc_c", "mc_s", "mc_l", "mc_r"):
+        net.add_node(MomentumChamberNode(nid, area=_A))
+    net.add_element(ChannelElement("ch_in", "src", "mc_c", length=0.5, diameter=_D))
+    for arm in ("s", "l", "r"):
+        net.add_element(
+            ChannelElement(f"ch_{arm}", f"mc_{arm}", f"pb_{arm}", length=5.0, diameter=_D)
+        )
+    net.add_element(
+        IdealMomentumTeeElement(
+            "jct",
+            inlet_nodes=["mc_c"],
+            outlet_nodes=["mc_s", "mc_l", "mc_r"],
+            inlet_angles_deg=[0.0],
+            outlet_angles_deg=[0.0, 90.0, -90.0],
+        )
+    )
+    return net
+
+
+def test_two_suppliers_into_two_receivers() -> None:
+    """A reversed side arm makes two suppliers (common, left) feed two
+    receivers (straight, right): each receiver carries the supplied mixture
+    at its own flow, so every port node holds its own head, and the
+    Jacobian of those split streams matches central differences. The left
+    supply is hot, so the receivers' T depends on the split."""
+    net = _cross_net(pt_left=1.93e5, tt_left=400.0)
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=60.0)
+    assert sol["__success__"], sol.get("__message__")
+    assert sol["ch_l.m_dot"] < 0.0 < sol["ch_r.m_dot"] and sol["ch_s.m_dot"] > 0.0
+    for node, elem in (("mc_c", "ch_in"), ("mc_s", "ch_s"), ("mc_l", "ch_l"), ("mc_r", "ch_r")):
+        m, rho = sol[f"{elem}.m_dot"], sol[f"{node}.rho"]
+        head = 0.5 * rho * (m / (rho * _A)) ** 2
+        assert sol[f"{node}.Pt"] - sol[f"{node}.P"] == pytest.approx(head, rel=5e-3), node
+    # Both receivers carry the same supplied mixture.
+    assert sol["mc_s.T"] == pytest.approx(sol["mc_r.T"], rel=1e-9)
+    assert 300.0 < sol["mc_s.Tt"] < 400.0
+    x = np.array([sol[n] for n in solver.unknown_names], dtype=float)
+    x = x * (1.0 + 1e-3 * np.random.default_rng(2).standard_normal(x.size))
+    _, J = solver._residuals_and_jacobian(x)
+    J = J.toarray()
+    step = np.maximum(np.abs(x) * 1e-7, 1e-10)
+    J_fd = approx_derivative(solver._residuals, x, method="3-point", abs_step=step)
+    scaled_err = np.abs(J - J_fd) * np.abs(x)
+    row_ref = np.max(np.abs(J_fd) * np.abs(x), axis=1) + 1e-30
+    assert float(np.max(scaled_err.max(axis=1) / row_ref)) < 1e-5
+
+
+def test_jacobian_carries_port_temperature_and_composition() -> None:
+    """A forward merge of air with HOT CO2: each port's density follows the
+    T and Y the solver mixes into it, so the rows need d/d(port T) and
+    d/d(port Y[k]). Without them the hot merge alone was off by 1.2e-4
+    (scaled) in the flow columns."""
+    net = _merge_net()
+    co2 = list(cb.species.pure_species("CO2"))
+    net.nodes["mfb_bra"].Tt = 450.0
+    net.nodes["mfb_bra"].Y = list(cb.mole_to_mass(co2))
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=60.0, use_jac=False)
+    assert sol["__success__"], sol.get("__message__")
+    x = np.array([sol[n] for n in solver.unknown_names], dtype=float)
+    x = x * (1.0 + 1e-3 * np.random.default_rng(3).standard_normal(x.size))
+    _, J = solver._residuals_and_jacobian(x)
+    J = J.toarray()
+    step = np.maximum(np.abs(x) * 1e-7, 1e-10)
+    J_fd = approx_derivative(solver._residuals, x, method="3-point", abs_step=step)
+    scaled_err = np.abs(J - J_fd) * np.abs(x)
+    row_ref = np.max(np.abs(J_fd) * np.abs(x), axis=1) + 1e-30
+    rel = scaled_err.max(axis=1) / row_ref
+    # The junction's N + 1 rows come last: element rows follow node rows,
+    # and it is the last element added. Only those are judged. The port
+    # node's own Pt closure (MomentumChamberNode) relays d/dT but not
+    # d/dY[k], and is off by 7.6e-5 here with either junction -- a
+    # separate, pre-existing gap.
+    assert len(rel) == len(solver.unknown_names) == 14
+    assert float(np.max(rel[-4:])) < 1e-5
