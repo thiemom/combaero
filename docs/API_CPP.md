@@ -1453,6 +1453,56 @@ For combaero's mixtures `drho/dP = rho/P` holds to 1e-11.
 Residual sign convention: `R_straight = dP0_straight + K_straight * q_dyn`,
 `R_branch = dP0_branch + K_branch * q_dyn`.
 
+### Ideal Momentum Junction: whole-element (f, J)
+
+A parameter-free junction closure (#517), parallel to the Mynard closure above, not
+a replacement: a baseline for configurations no tuned closure covers. Nothing in it
+is fitted (`include/ideal_junction.h`).
+
+```cpp
+struct IdealJunctionGeometry {
+    std::vector<double> area, axis_rad, port_sign;  // axis_rad: OUTWARD port axis
+};
+
+struct IdealJunctionResult {
+    std::vector<double> residual;               // N port rows [Pa] + mass [kg/s]
+    std::vector<std::vector<double>> jacobian;  // [row][col]
+    std::vector<double> velocity;               // u_i, + out of the junction
+    double V_x, V_y;                            // supplied mean velocity
+};
+
+IdealJunctionResult ideal_junction_residuals_and_jacobian(
+    const std::vector<double>& p_static, const std::vector<double>& rho,
+    const std::vector<double>& drho_dp, const std::vector<double>& outer_mdot,
+    double p_jn, const IdealJunctionGeometry& geom);  // 2..6 ports
+```
+
+Rows, with `v_i = u_i n_i` and `V` the supplied mass-weighted mean velocity vector:
+
+| port | row |
+|---|---|
+| supplier k | `P_k - p_jn = 0` |
+| receiver j | `P_j - p_jn + (m_j / A_j)(u_j - V . n_j) = 0` |
+| mass | `sum m_i = 0` |
+
+- **Merge** (one receiver): Blaisdell & Manson's theory -- common static pressure,
+  momentum projected on the outlet axis, no wall term.
+- **Split** (one supplier): every receiver loses `rho/2 |v_j - v_s|^2 >= 0`, the vector
+  Borda-Carnot loss -- Idelchik's diverging-branch Eq 7-6 with `A' = 1`; a collinear
+  equal-area receiver gives `(1 - q)^2` on its own flow fraction.
+- **Compressible:** written in static pressure with each port's own density, so the
+  momentum balance is exact at any Mach number for uniform port profiles; there is no
+  Mach inversion in the kernel.
+- **Roles are smooth.** Every port carries both roles with weights `w_out = m s(m)`,
+  `w_in = w_out - m`, `s` a smooth step of width `IDEAL_ROLE_EPS_REL = 1e-4` of the
+  throughput. Rows are C-infinity everywhere, the all-zero state included, so there is no
+  degenerate-state fallback; the smoothing moves a row by `O((eps/m)^2)` (measured
+  <= 5e-6 of the collector head over the B&M merge grid; worst at a supplier carrying 5%
+  of the flow at psi = 16).
+
+Columns: `p_static[0..N-1]`, `outer_mdot[0..N-1]`, `p_jn`. Density is passed as values
+(`rho`, `drho/dP`), as for the Mynard kernel.
+
 ### Border-Carnot Turning Loss (former momentum-CV junction companion)
 
 > **Deprecated in 0.7.0, removed in 0.8.0 together with the Python

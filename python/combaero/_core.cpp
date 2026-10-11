@@ -27,6 +27,7 @@
 #include "heat_transfer.h"
 #include "humidair.h"
 #include "incompressible.h"
+#include "ideal_junction.h"
 #include "mpce_junction.h"
 #include "materials.h"
 #include "orifice.h"
@@ -1299,6 +1300,36 @@ PYBIND11_MODULE(_core, m) {
         "the Jacobian comes back already in the solver's own unknowns.\n\n"
         "Returns: MpceResidualJacobian (valid=False when the flow pattern\n"
         "is not a junction at all).");
+
+  // --- Ideal momentum junction: whole-element (f, J), #517 ----------------
+  py::class_<solver::IdealJunctionGeometry>(
+      m, "IdealJunctionGeometry",
+      "Port geometry for the ideal momentum junction kernel")
+      .def(py::init<>())
+      .def_readwrite("area", &solver::IdealJunctionGeometry::area)
+      .def_readwrite("axis_rad", &solver::IdealJunctionGeometry::axis_rad)
+      .def_readwrite("port_sign", &solver::IdealJunctionGeometry::port_sign);
+
+  py::class_<solver::IdealJunctionResult>(
+      m, "IdealJunctionResult",
+      "Whole-element residuals and Jacobian for the ideal momentum junction")
+      .def_readonly("residual", &solver::IdealJunctionResult::residual)
+      .def_readonly("jacobian", &solver::IdealJunctionResult::jacobian)
+      .def_readonly("velocity", &solver::IdealJunctionResult::velocity)
+      .def_readonly("V_x", &solver::IdealJunctionResult::V_x)
+      .def_readonly("V_y", &solver::IdealJunctionResult::V_y);
+
+  m.def("ideal_junction_residuals_and_jacobian",
+        &solver::ideal_junction_residuals_and_jacobian, py::arg("p_static"),
+        py::arg("rho"), py::arg("drho_dp"), py::arg("outer_mdot"),
+        py::arg("p_jn"), py::arg("geom"),
+        "Parameter-free momentum junction (#517), whole-element (f, J), 2-6\n"
+        "ports. Suppliers sit at the junction static p_jn; each receiver j\n"
+        "satisfies P_j - p_jn + (m_j/A_j)(u_j - V . n_j) = 0, V the supplied\n"
+        "mass-weighted velocity vector. Merge = Blaisdell & Manson theory;\n"
+        "split = vector Borda-Carnot loss (Idelchik Eq 7-6, A' = 1).\n"
+        "See include/ideal_junction.h.\n\n"
+        "Jacobian columns: p_static[0..N-1], outer_mdot[0..N-1], p_jn.");
 
   // Border-Carnot loss element
   py::class_<solver::BorderCarnotLossResult>(
