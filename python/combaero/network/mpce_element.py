@@ -37,10 +37,12 @@ longer fail?), we move to either analytical Jacobian or a C++ port.
 from __future__ import annotations
 
 import math
+from functools import cache
 from typing import Literal
 
 import numpy as np
 
+import combaero as cb
 from combaero import _core
 from combaero.network._mynard2010 import junction_loss_coefficient
 from combaero.network.components import (
@@ -82,6 +84,48 @@ def _port_gamma(state) -> float:
         return float(_core.isentropic_expansion_coefficient(float(T), X))
     except Exception:
         return 0.0
+
+
+@cache
+def _species_molar_mass(k: int) -> float:
+    return float(cb.species_molar_mass(k))
+
+
+def _add_density_columns(
+    jac: dict[int, dict[str, float]],
+    states: list,
+    port_nodes: list[str],
+    J_full: list[list[float]],
+    J_explicit: list[list[float]],
+    drho_dp: list[float],
+) -> None:
+    """Add d(row)/d(port T) and d(row)/d(port Y[k]) through the port density.
+
+    Columns 0..N-1 of both kernel Jacobians are the port static pressures;
+    their difference is d(row)/d(rho_i) * drho_dp[i]. Ideal gas: d(rho)/dT =
+    -rho/T and d(rho)/dY_k = -rho W/W_k, W the mixture molar mass. Ports
+    whose state carries no temperature or composition are skipped.
+    """
+    for i, st in enumerate(states):
+        T_i = float(getattr(st, "T", 0.0) or 0.0)
+        X_i = getattr(st, "X", None)
+        if not (drho_dp[i] > 0.0 and T_i > 0.0) or X_i is None:
+            continue
+        rho_i = float(st.density())
+        W = float(cb.mwmix(X_i))
+        Y = list(st.Y)
+        for row, entries in jac.items():
+            d_rho = (float(J_full[row][i]) - float(J_explicit[row][i])) / drho_dp[i]
+            if d_rho == 0.0:
+                continue
+            name_T = f"{port_nodes[i]}.T"
+            entries[name_T] = entries.get(name_T, 0.0) - d_rho * rho_i / T_i
+            for k, y in enumerate(Y):
+                if y > 0.0:
+                    name_Y = f"{port_nodes[i]}.Y[{k}]"
+                    entries[name_Y] = entries.get(name_Y, 0.0) - (
+                        d_rho * rho_i * W / _species_molar_mass(k)
+                    )
 
 
 class MultiPortChamberElement(MultiPortChamberBase):
@@ -816,6 +860,25 @@ class MultiPortChamberElement(MultiPortChamberBase):
                     entries[name] = entries.get(name, 0.0) + value
             jac[row] = entries
 
+        # d(row)/d(port T, Y[k]) through the port density (#517). A port
+        # node's T and Y are derived by mixing, not unknowns; the solver
+        # relays these entries through that chain. d(row)/d(rho_i) comes from
+        # the kernel itself: the same call with d(rho)/dP = 0 leaves only the
+        # explicit P column, and the difference is d(row)/d(rho_i) rho_i/P_i.
+        drho_dp = [float(rho_port[i]) / p_static[i] if p_static[i] > 0.0 else 0.0 for i in range(N)]
+        explicit = _core.mpce_residuals_and_jacobian(
+            p_static,
+            [float(s.Pt) for s in states],
+            [float(r) for r in rho_port],
+            [0.0] * N,
+            outer_mdot,
+            float(Pt_jct),
+            geom,
+        )
+        _add_density_columns(
+            jac, states, self.port_nodes, kernel.jacobian, explicit.jacobian, drho_dp
+        )
+
         return residuals, jac
 
 
@@ -919,16 +982,18 @@ class ConstantKTeeElement(MultiPortChamberElement):
         dq_dm = m_c / (rho_c * A_c * A_c)
         dq_dP = -q_dyn / P_c if P_c > 0.0 else 0.0
         dq_dT = q_dyn / T_c if T_c > 0.0 else 0.0
+        dq_dY: dict[int, float] = {}
         if g_c > 1.0 and P_c > 0.0 and rho_c > 0.0:
 
-            def _q(P_x: float, T_x: float, m_x: float) -> float:
+            def _q(P_x: float, T_x: float, m_x: float, X_x: list[float] | None = None) -> float:
                 """Isentropic stagnation rise of the common port's own state.
 
                 M^2 = rho*u^2/(g*P) for an ideal gas (a^2 = g*P/rho), so no
                 temperature is needed beyond what gamma and rho carry.
                 """
-                g = float(_core.isentropic_expansion_coefficient(T_x, states[common].X))
-                rho_x = float(_core.density(T_x, P_x, states[common].X))
+                X_x = states[common].X if X_x is None else X_x
+                g = float(_core.isentropic_expansion_coefficient(T_x, X_x))
+                rho_x = float(_core.density(T_x, P_x, X_x))
                 m2 = (m_x * m_x) / (rho_x * A_c * A_c * g * P_x)
                 return P_x * ((1.0 + 0.5 * (g - 1.0) * m2) ** (g / (g - 1.0)) - 1.0)
 
@@ -947,6 +1012,24 @@ class ConstantKTeeElement(MultiPortChamberElement):
             dq_dP = q_dyn / P_c + dq_dm2 * (-2.0 * m2 / P_c)
             h_T = max(1e-4, abs(T_c) * 1e-6)
             dq_dT = (_q(P_c, T_c + h_T, m_c) - _q(P_c, T_c - h_T, m_c)) / (2.0 * h_T)
+            # dq/dY_k, the same way and for the same reason: gamma and rho both
+            # follow the composition, and a port mixing gases of different molar
+            # mass moves it with every split (#517: 7.5e-5 on a CO2 / air
+            # merge). Per species present, on the normalised fractions, so any
+            # mass-conserving direction of the solver's relay is exact.
+            Y_c = [float(y) for y in states[common].Y]
+            h_Y = 1e-7 * sum(Y_c)
+            for k_sp, y in enumerate(Y_c):
+                if not y > h_Y:
+                    continue
+                probes = []
+                for dy in (h_Y, -h_Y):
+                    Y_p = list(Y_c)
+                    Y_p[k_sp] += dy
+                    total_Y = sum(Y_p)
+                    Y_p = [v / total_Y for v in Y_p]
+                    probes.append(_q(P_c, T_c, m_c, list(cb.mass_to_mole(Y_p))))
+                dq_dY[k_sp] = (probes[0] - probes[1]) / (2.0 * h_Y)
 
         residuals: list[float] = []
         jac: dict[int, dict[str, float]] = {}
@@ -968,6 +1051,9 @@ class ConstantKTeeElement(MultiPortChamberElement):
                 )
                 row[p_var_c] = row.get(p_var_c, 0.0) + sign * K_i * dq_dP
                 row[t_var_c] = row.get(t_var_c, 0.0) + sign * K_i * dq_dT
+                for k_sp, d in dq_dY.items():
+                    name = f"{self.port_nodes[common]}.Y[{k_sp}]"
+                    row[name] = row.get(name, 0.0) + sign * K_i * d
             jac[i] = row
 
         residuals.append(sum(port_mdots))

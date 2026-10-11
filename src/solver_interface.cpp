@@ -1470,6 +1470,42 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
     res.d_res_dT = (res_at(T + hT) - res_at(T - hT)) / (2.0 * hT);
   }
 
+  // d(res)/dY_k, the same way and for the same reason. The node's port flows
+  // can mix gases of different molar mass, and the relay only reaches this
+  // row through these entries; without them a hot CO2 / air merge left the
+  // row 7.6e-5 off on the network Jacobian check (#517).
+  res.d_res_dY.assign(Y.size(), 0.0);
+  if (sum_Y >= eps) {
+    auto res_at_Y = [&](const std::vector<double> &Y_probe) -> double {
+      const std::vector<double> X_p =
+          combaero::mass_to_mole(combaero::normalize_fractions(Y_probe));
+      const double rho_p = std::get<0>(density_and_jacobians(T, P, X_p));
+      const double v_p = m_dot / (rho_p * area);
+      const double a_p = combaero::speed_of_sound(T, X_p);
+      const double M_p = (a_p > 1e-9) ? std::abs(v_p) / a_p : 0.0;
+      return P_total - P0_from_static(P, T, M_p, X_p);
+    };
+    // Step from a study on a CO2 / air node: the difference is converged to
+    // 1e-6 (relative) at 1e-4 and 1e-3, and drifts by up to 2e-3 at 1e-7 --
+    // P0 comes from an inner entropy solve whose tolerance a tiny step
+    // amplifies (the closed-form T path does not have that problem).
+    const double hY = 1e-4 * sum_Y;
+    for (std::size_t k = 0; k < Y.size(); ++k) {
+      if (!(Y[k] > 0.0)) {
+        continue;
+      }
+      std::vector<double> Y_p = Y;
+      std::vector<double> Y_m = Y;
+      Y_p[k] += hY;
+      if (Y[k] > hY) {
+        Y_m[k] -= hY;
+        res.d_res_dY[k] = (res_at_Y(Y_p) - res_at_Y(Y_m)) / (2.0 * hY);
+      } else {
+        res.d_res_dY[k] = (res_at_Y(Y_p) - res.residual) / hY;
+      }
+    }
+  }
+
   return res;
 }
 

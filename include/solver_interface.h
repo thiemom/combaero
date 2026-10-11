@@ -479,6 +479,11 @@ struct MomentumChamberResult {
   // its absence; the stagnation closure also depends on T through T0, a(T)
   // and s(T), and leaving it out costs ~1.6e-4 on the network Jacobian check.
   double d_res_dT;
+  // Composition sensitivity, per species mass fraction (Y is normalised
+  // inside, so any mass-conserving direction of the relay is exact). Y
+  // enters through rho, a and s. Zero for species absent at the node: no
+  // stream carries them, so the relay never moves them.
+  std::vector<double> d_res_dY;
 };
 
 MomentumChamberResult momentum_chamber_residual_and_jacobian(

@@ -1225,7 +1225,8 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("d_res_dP_total",
                     &solver::MomentumChamberResult::d_res_dP_total)
       .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot)
-      .def_readonly("d_res_dT", &solver::MomentumChamberResult::d_res_dT);
+      .def_readonly("d_res_dT", &solver::MomentumChamberResult::d_res_dT)
+      .def_readonly("d_res_dY", &solver::MomentumChamberResult::d_res_dY);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
