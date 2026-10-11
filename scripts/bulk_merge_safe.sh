@@ -103,6 +103,11 @@ merge_one() {
         state=$(pr_field "$n" mergeStateStatus)
     fi
     [[ "$(checks_state "$n")" == "PASS" ]] || { echo "    skip: checks not all passed"; return 1; }
+    local tries=0
+    while [[ "$state" == "UNKNOWN" ]] && (( tries++ < 8 )); do
+        sleep 15  # GitHub is still computing mergeability for the new head
+        state=$(pr_field "$n" mergeStateStatus)
+    done
     [[ "$state" == "CLEAN" ]] || { echo "    skip: mergeStateStatus $state"; return 1; }
 
     head=$(pr_field "$n" headRefOid)
