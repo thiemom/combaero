@@ -85,6 +85,46 @@ by colour from the 150-dpi scans into `data/mynard2015/` (see its README).
   - **Fig 9's rows are swapped against its caption.** His own Unified0D, and
     the dead-branch limit K -> -1, both put the side inlet on the bottom row.
 
+## Record: what the joining alpha stands in for
+
+`alpha_record.py` scores the frozen closure set (`joining_variants.MODELS`)
+at kernel level on every joining source, at the q each network solve reached
+(kernel and network agree to 1.4% relative). Nothing is tuned; alpha stays
+0.2. MAE, joining only:
+
+| source (role) | psi > 1: shipped | psi > 1: P2 raw | psi = 1: shipped | psi = 1: P2 raw |
+|---|---|---|---|---|
+| Wang 2014 interior (x-source) | 0.123 | 0.086 | 0.058 | 0.138 |
+| Idelchik 1966 (tuned) | 0.439 | 0.159 | 0.138 | 0.178 |
+| Bassett 2001 (selected) | 0.288 | 0.179 | 0.117 | 0.187 |
+| Mynard Ref3D, Fig 9 area sweep (laminar CFD) | 0.202 | 0.234 | | |
+
+P2 raw is Bassett's joining control volume with raw angles and no fitted
+constant. Mynard's closure is that control volume with three changes, shown
+algebraically: Hager's 3/4 angle law, one flow-weighted merge direction, and
+no pressure term on the lateral opening.
+
+- **At psi > 1 the parameter-free control volume beats the tuned alpha on
+  every measured source**, including Idelchik, which alpha was fitted to. At
+  psi = 1 the closure wins. The area effect is physics the closure lacks, and
+  alpha patches it.
+- **No single alpha fits.** Within one Bassett cell the alpha a point implies
+  rises from about 0.05 to above 0.5 with the flow split; the pooled optimum
+  (0.2-0.25) averages contradictory needs.
+- **Blaisdell & Manson 1963** (`bm1963_score.py`, pre-registered) says the
+  same per branch: for psi > 1 the zeta_u alpha grows with deflection
+  (about 0.1 at 15-30 deg to 1 at 75-105) while zeta_b wants a small one, and
+  at psi = 1 alpha is unidentifiable. See
+  [its README](data/blaisdell_manson1963/README.md).
+- **Reading:** the jet's angle law depends on jet strength. A weak jet is bent
+  by the main flow (Hager's 3/4); a fast jet from a narrow lateral holds its
+  line. Raw angles win at psi > 1, the 3/4 law at psi = 1, and jets opposing
+  the main flow (Bassett's type 4) need the 3/4 law at any psi.
+- **Wang is spent for this question.** It was unsealed once to score these
+  variants. A closure form chosen from these numbers, e.g. a jet-strength
+  angle law, needs new joining data at psi > 1 (the Vogel/Kinne originals,
+  Ito & Imai, Oka & Ito 2005, Serre 1994) to be validated.
+
 ## Endpoints
 
 At q = 0 or 1 one port carries no flow. Its residual has a kink where the flow

@@ -98,13 +98,13 @@ files:
   bassett_fig12a_K8_theta=60_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig12a_K8_theta=90_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: measured}
 
-  # ----- Fig 12b: K8 at theta=45 (assumed -- paper subfig b convention), psi sweep -----
+  # ----- Fig 12b: K8 at theta=45 (stated in the figure caption), psi sweep -----
   # NOTE: paper does NOT report psi=3 for this subfigure; user digitized {1, 2, 4}.
   bassett_fig12b_K8_psi=1_measured.csv: {K_id: K8, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig12b_K8_psi=2_measured.csv: {K_id: K8, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig12b_K8_psi=4_measured.csv: {K_id: K8, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
 
-  # ----- Fig 13b: K7 at theta=45, psi sweep (same theta convention as 12b) -----
+  # ----- Fig 13b: K7 at theta=45 (stated in the figure caption), psi sweep -----
   bassett_fig13b_K7_psi=1_measured.csv: {K_id: K7, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig13b_K7_psi=2_measured.csv: {K_id: K7, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
   bassett_fig13b_K7_psi=4_measured.csv: {K_id: K7, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: measured}
