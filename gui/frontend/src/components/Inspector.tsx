@@ -1825,9 +1825,10 @@ const Inspector = () => {
 										<option value="merge">Merge (2 inlets, 1 outlet)</option>
 									</select>
 									<p className="text-[9px] text-gray-400 italic">
-										Constrained: the Mynard residual asserts at solve time and
-										errors if the observed flow direction disagrees with this
-										declaration.
+										{(selectedNode.data.junction_model ?? "mynard") ===
+										"ideal_momentum"
+											? "Wiring only: the ideal momentum closure takes each port's role from its flow, so any port may run reversed."
+											: "Constrained: the residual asserts at solve time and errors if the observed flow direction disagrees with this declaration."}
 									</p>
 								</div>
 
@@ -1847,12 +1848,26 @@ const Inspector = () => {
 									>
 										<option value="mynard">Momentum CV (Mynard)</option>
 										<option value="constant_k">Constant K (handbook)</option>
+										<option value="ideal_momentum">
+											Ideal momentum (parameter-free)
+										</option>
 									</select>
 									<p className="text-[9px] text-gray-400 italic">
 										Constant K: fixed loss coefficients referenced to the
 										common-leg dynamic head (Idelchik convention); the Mynard
 										closure is disabled and K does not vary with the flow split.
 									</p>
+									{selectedNode.data.junction_model === "ideal_momentum" && (
+										<p className="text-[9px] text-gray-400 italic">
+											Ideal momentum: a baseline with nothing tuned. Suppliers
+											share one junction static pressure; each receiving port
+											gets the momentum it can draw from the supplied streams,
+											the misaligned part is lost (merge = Blaisdell &amp;
+											Manson, split = vector Borda-Carnot). Expect higher losses
+											than measured on dividing tees (Bassett: K straight +0.26,
+											K branch +0.23). Valid for subsonic supplying ports only.
+										</p>
+									)}
 								</div>
 
 								{(selectedNode.data.junction_model ?? "mynard") ===

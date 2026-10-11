@@ -390,3 +390,80 @@ def test_mpce_tee_data_constant_k_defaults():
     assert d2.junction_model == "constant_k"
     assert d2.K_straight == 0.25
     assert d2.K_branch == 2.0
+
+
+@pytest.mark.parametrize("flow_direction", ["branch", "merge"])
+def test_ideal_momentum_model_builds_the_ideal_element(flow_direction: str) -> None:
+    """junction_model='ideal_momentum' dispatches to IdealMomentumTeeElement
+    (#517). It takes no K and no direction: flow_direction only wires the
+    ports, and the areas are inherited exactly as for the other closures."""
+    import math
+
+    from combaero.network import IdealMomentumTeeElement
+
+    schema = _mpce_with_channels_schema(flow_direction)
+    node = next(n for n in schema.nodes if n.id == "mpce")
+    node.data["junction_model"] = "ideal_momentum"
+    net = build_network_from_schema(schema)
+    net.resolve_all_topology()
+    e = _get_element(net, "mpce")
+    assert isinstance(e, IdealMomentumTeeElement)
+    a_main, a_bra = math.pi * 0.05**2, math.pi * 0.025**2
+    if flow_direction == "branch":
+        assert e.port_areas == pytest.approx([a_main, a_main, a_bra])
+        assert e.axis_rad() == pytest.approx([math.pi, 0.0, math.pi / 2])
+    else:
+        assert e.port_areas == pytest.approx([a_main, a_bra, a_main])
+        assert e.axis_rad() == pytest.approx([math.pi, math.pi / 2, 0.0])
+
+
+def _ideal_runner_row(pt_branch: float):
+    """Mass-fed (0.2 kg/s) tee wired as a split into two pressure sinks,
+    solved through the GUI runner; returns the tee's result row."""
+    from gui.backend.runner import NetworkRunner
+
+    schema = _mpce_with_channels_schema("branch").model_dump()
+    for n in schema["nodes"]:
+        if n["id"] == "p_com":
+            n["type"], n["data"] = "mass_boundary", {"m_dot": 0.2, "Tt": 300.0}
+        elif n["id"] == "p_str":
+            n["type"], n["data"] = "pressure_boundary", {"Pt": 1.0e5, "Tt": 300.0}
+        elif n["id"] == "p_bra":
+            n["type"], n["data"] = "pressure_boundary", {"Pt": pt_branch, "Tt": 300.0}
+        elif n["id"] == "mpce":
+            n["data"]["junction_model"] = "ideal_momentum"
+    df = NetworkRunner.from_dict(schema).solve(timeout=60.0).to_dataframe()
+    row = df[df["id"] == "mpce"].iloc[0]
+    assert bool(row["success"]), "ideal tee GUI solve did not converge"
+    # Result columns carry their unit: "p_jn [Pa]".
+    return {c.split(" [")[0]: row[c] for c in df.columns}
+
+
+def test_ideal_momentum_runner_dividing_tee_reports_split_coefficients() -> None:
+    """Branch sink 3 kPa below the straight one: a genuine split. The row
+    carries p_jn and the dividing aliases, and the branch Borda loss is >= 0."""
+    row = _ideal_runner_row(pt_branch=0.97e5)
+    assert row["p_jn"] > 0.0
+    assert row["n_reversed_ports"] == 0
+    assert row["m_dot_com"] == pytest.approx(row["m_dot_straight"] + row["m_dot_branch"])
+    assert 0.0 < row["mass_flow_ratio"] < 1.0
+    assert row["K_branch"] >= 0.0 and row["K_straight"] >= 0.0
+
+
+def test_ideal_momentum_runner_entrainment_is_reported_as_reversal() -> None:
+    """Both sinks at 1 bar: the common jet's static pressure sits below the
+    branch boundary, so it DRAWS flow in through the branch (a jet pump) and
+    the tee runs as a merge. The flows keep their geometric names, signed in
+    the wired direction; split coefficients are not reported under a split's
+    names for a state that is not a split."""
+    row = _ideal_runner_row(pt_branch=1.0e5)
+    assert row["m_dot_branch"] < 0.0
+    assert row["n_reversed_ports"] == 1
+    assert row["m_dot_straight"] == pytest.approx(row["m_dot_com"] - row["m_dot_branch"])
+    assert row["p_jn"] < 1.0e5  # below the branch boundary: what draws it in
+    for key in ("K_straight", "K_branch", "mass_flow_ratio"):
+        assert key not in row or row[key] != row[key], key  # absent or NaN
+
+
+def test_mpce_tee_data_accepts_ideal_momentum() -> None:
+    assert MPCETeeData(junction_model="ideal_momentum").junction_model == "ideal_momentum"

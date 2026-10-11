@@ -94,6 +94,8 @@ UNIT_MAP: dict[str, str] = {
     "mass_flow_ratio": "kg/kg",
     "K_straight": "-",
     "K_branch": "-",
+    "p_jn": "Pa",  # ideal momentum tee: junction STATIC pressure (#517)
+    "n_reversed_ports": "-",  # ideal momentum tee: ports run against the wiring
     # --- Element diagnostics ---
     "xi": "-",
     "theta": "-",

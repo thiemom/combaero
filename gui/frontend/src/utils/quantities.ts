@@ -133,7 +133,8 @@ export const QUANTITY_CATALOGUE: Record<
 	m_dot_straight: { label: "ṁ str", unit: "kg/s", format: (v) => v.toFixed(4) },
 	m_dot_branch: { label: "ṁ br", unit: "kg/s", format: (v) => v.toFixed(4) },
 	mass_flow_ratio: {
-		label: "ṁ str/ṁ com",
+		// Every tee closure reports the BRANCH share of the common flow.
+		label: "ṁ br/ṁ com",
 		unit: "kg/kg",
 		format: (v) => v.toFixed(3),
 	},
@@ -145,6 +146,13 @@ export const QUANTITY_CATALOGUE: Record<
 	// Chamber stagnation pressure (MPCE-v2 emits Pt_jct; legacy P_jct stored too)
 	Pt_jct: { label: "Pt jct", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	P_jct: { label: "P jct", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
+	// Ideal momentum tee: the junction STATIC pressure (#517)
+	p_jn: { label: "p jn", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
+	n_reversed_ports: {
+		label: "reversed ports",
+		unit: "—",
+		format: (v) => v.toFixed(0),
+	},
 	// Element-specific diagnostics (Static)
 	P_in: { label: "Pi", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	P_out: { label: "Po", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },

@@ -31,6 +31,7 @@ from combaero.network import (
     WallNode,
 )
 from combaero.network.ejector_element import EjectorElement
+from combaero.network.ideal_tee_element import IdealMomentumTeeElement
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 from .schemas import (
@@ -829,6 +830,18 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     flow_direction=_md.flow_direction,
                     strict=False,
                     K_ports=_k_ports,
+                )
+            elif _md.junction_model == "ideal_momentum":
+                # Parameter-free baseline (#517): no K, no tuning, no
+                # declared direction -- the inlet/outlet split above only
+                # wires the ports and sets the angle convention.
+                _mpce = IdealMomentumTeeElement(
+                    id=elem_id,
+                    inlet_nodes=_inlets,
+                    outlet_nodes=_outlets,
+                    inlet_angles_deg=_inlet_angles,
+                    outlet_angles_deg=_outlet_angles,
+                    port_areas=_port_areas,
                 )
             else:
                 _mpce = MultiPortChamberElement(
