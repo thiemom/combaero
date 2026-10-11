@@ -55,6 +55,10 @@ jobs:
               - 'uv.lock'
             gui:
               - 'gui/**'
+              - 'biome.json'
+              - '.pre-commit-config.yaml'
+              - '.github/workflows/ci.yml'
+              - 'scripts/check_version_sync.py'
             documentation:
               - 'docs/**'
               - 'README.md'
@@ -105,10 +109,13 @@ jobs:
       - name: Check Python style (GUI backend)
         run: uv run ruff check gui/ && uv run ruff format --check gui/
 
+      - name: Check pinned tool versions agree
+        run: uv run scripts/check_version_sync.py
+
       - name: Set up Biome
         uses: biomejs/setup-biome@v2
         with:
-          version: 2.4.9
+          version: 2.5.15
 
       - name: Check frontend style (Biome)
         run: biome check gui/frontend/src

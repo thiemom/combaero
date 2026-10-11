@@ -81,4 +81,6 @@ When changing Python version or tool versions, keep in sync:
 `.python-version` · `ruff.toml` · `ci.yml` · `validation-tests.yml` · `.pre-commit-config.yaml` · `Makefile`
 
 When changing frontend tool versions, keep in sync:
-`gui/frontend/package.json` · `biome.json` (`$schema` version) · `.pre-commit-config.yaml` (biome rev + `@biomejs/biome` pin)
+`gui/frontend/package.json` · `biome.json` (`$schema` version) · `.pre-commit-config.yaml` (biome rev + `@biomejs/biome` pin) · `ci.yml` (`setup-biome` version). `scripts/check_version_sync.py` enforces the biome set (CI + pre-commit).
+
+Dependabot PRs: `scripts/bulk_merge_safe.sh [--dry-run] [PR ...]` merges safe ones one at a time -- main requires up-to-date branches, so each PR is rebased, re-run through CI, re-checked (clean, version sync at its head) and merged at exactly that commit.

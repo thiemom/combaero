@@ -69,6 +69,22 @@ and smoke-tests that the server starts and serves JS assets with the correct MIM
 ./scripts/test-pypi-wheel.sh --skip-combaero-build  # Use existing dist/combaero-*.whl
 ```
 
+## Dependency Scripts
+
+### bulk_merge_safe.sh
+Merges safe Dependabot PRs (grouped safe-updates, or same-major bumps) one at a
+time. `main` requires up-to-date branches, so each PR is rebased onto main,
+waits for CI, is re-checked (all checks passed or skipped, `CLEAN`, pinned
+versions agree at its head) and squash-merged at exactly the verified commit.
+```bash
+./scripts/bulk_merge_safe.sh --dry-run      # report only
+./scripts/bulk_merge_safe.sh 510            # one PR
+```
+
+### check_version_sync.py
+Fails when a tool pinned in several files (biome: package.json, biome.json,
+pre-commit, ci.yml) disagrees. `--ref REF` checks a git ref, e.g. a PR head.
+
 ## Quick Reference
 
 | Task | Command |

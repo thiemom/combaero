@@ -18,6 +18,14 @@ repos:
         files: ^changelog\.d/
         stages: [pre-commit]
 
+      - id: version-sync
+        name: Pinned tool versions agree (biome)
+        entry: uv run scripts/check_version_sync.py
+        language: system
+        pass_filenames: false
+        files: ^(gui/frontend/package\.json|biome\.json|\.pre-commit-config\.yaml|\.github/workflows/ci\.yml|scripts/check_version_sync\.py)$
+        stages: [pre-commit]
+
       - id: python-style-check
         name: Python style checks (ruff + ruff format + optional mypy)
         entry: bash -c './scripts/check-python-style.sh'
