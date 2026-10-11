@@ -42,6 +42,18 @@ is_safe_title() {
 
 pr_field() { $GH_BIN pr view "$1" --json "$2" --jq ".$2"; }
 
+merge_state() {
+    # mergeStateStatus, waiting out UNKNOWN (~2 min): GitHub recomputes it
+    # whenever main or the PR head moves, and BEHIND hides behind it.
+    local n="$1" tries=0 s
+    s=$(pr_field "$n" mergeStateStatus)
+    while [[ "$s" == "UNKNOWN" ]] && (( tries++ < 8 )); do
+        sleep 15
+        s=$(pr_field "$n" mergeStateStatus)
+    done
+    echo "$s"
+}
+
 checks_state() {
     # PASS when every check finished and none failed; PENDING; or FAIL.
     $GH_BIN pr view "$1" --json statusCheckRollup --jq '
@@ -83,7 +95,7 @@ merge_one() {
     fi
     is_safe_title "$title" || { echo "    skip: not a safe (grouped/minor/patch) bump"; return 1; }
 
-    state=$(pr_field "$n" mergeStateStatus)
+    state=$(merge_state "$n")
     if [[ "$state" == "BEHIND" ]]; then
         if $DRY_RUN; then echo "    would ask Dependabot to rebase, wait for CI, then re-check"; return 0; fi
         echo "    behind main: asking Dependabot to rebase"
@@ -95,19 +107,14 @@ merge_one() {
         fi
         echo "    rebased; waiting for CI..."
         [[ "$(wait_for_checks "$n")" == "PASS" ]] || { echo "    skip: CI did not pass after rebase"; return 1; }
-        state=$(pr_field "$n" mergeStateStatus)
+        state=$(merge_state "$n")
     fi
     if [[ "$(checks_state "$n")" == "PENDING" ]] && ! $DRY_RUN; then
         echo "    CI still running; waiting..."
         wait_for_checks "$n" >/dev/null
-        state=$(pr_field "$n" mergeStateStatus)
+        state=$(merge_state "$n")
     fi
     [[ "$(checks_state "$n")" == "PASS" ]] || { echo "    skip: checks not all passed"; return 1; }
-    local tries=0
-    while [[ "$state" == "UNKNOWN" ]] && (( tries++ < 8 )); do
-        sleep 15  # GitHub is still computing mergeability for the new head
-        state=$(pr_field "$n" mergeStateStatus)
-    done
     [[ "$state" == "CLEAN" ]] || { echo "    skip: mergeStateStatus $state"; return 1; }
 
     head=$(pr_field "$n" headRefOid)
