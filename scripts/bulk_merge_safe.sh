@@ -4,7 +4,10 @@
 # ONE AT A TIME: main is branch-protected and requires up-to-date branches,
 # so every merge leaves the next PR behind. For each PR, in order:
 #   1. author must be app/dependabot and the bump safe;
-#   2. if behind main: rebase it (gh pr update-branch --rebase) and wait for CI;
+#   2. if behind main: ask Dependabot to rebase ("@dependabot rebase"), wait
+#      for the new head, then for CI. NOT gh pr update-branch: the Iron
+#      ruleset requires signed commits and a GitHub-side rebase is unsigned;
+#      Dependabot re-signs its own;
 #   3. all checks finished, none failed (SKIPPED/NEUTRAL are fine);
 #   4. mergeStateStatus CLEAN;
 #   5. pinned tool versions agree at the PR head (scripts/check_version_sync.py);
@@ -49,6 +52,17 @@ checks_state() {
         else "FAIL" end'
 }
 
+wait_for_new_head() {
+    # Echo the new head oid once it differs from $2, or TIMEOUT (~20 min).
+    local n="$1" old="$2" i=0 h
+    while :; do
+        sleep 30
+        h=$(pr_field "$n" headRefOid)
+        [[ "$h" != "$old" ]] && { echo "$h"; return; }
+        (( i++ > 40 )) && { echo "TIMEOUT"; return; }
+    done
+}
+
 wait_for_checks() {
     local n="$1" i=0 s
     sleep 20  # let GitHub register the checks of a new head
@@ -71,10 +85,15 @@ merge_one() {
 
     state=$(pr_field "$n" mergeStateStatus)
     if [[ "$state" == "BEHIND" ]]; then
-        if $DRY_RUN; then echo "    would rebase onto main, wait for CI, then re-check"; return 0; fi
-        echo "    behind main: rebasing"
-        $GH_BIN pr update-branch "$n" --rebase >/dev/null
-        echo "    waiting for CI..."
+        if $DRY_RUN; then echo "    would ask Dependabot to rebase, wait for CI, then re-check"; return 0; fi
+        echo "    behind main: asking Dependabot to rebase"
+        local old; old=$(pr_field "$n" headRefOid)
+        $GH_BIN pr comment "$n" --body "@dependabot rebase" >/dev/null
+        if [[ "$(wait_for_new_head "$n" "$old")" == "TIMEOUT" ]]; then
+            echo "    skip: Dependabot did not rebase (if it says the branch was edited, comment '@dependabot recreate')"
+            return 1
+        fi
+        echo "    rebased; waiting for CI..."
         [[ "$(wait_for_checks "$n")" == "PASS" ]] || { echo "    skip: CI did not pass after rebase"; return 1; }
         state=$(pr_field "$n" mergeStateStatus)
     fi
