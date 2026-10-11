@@ -1044,7 +1044,9 @@ jct_k = ConstantKTeeElement(
 # the other tees (outward axis = angle for outlets, pi - angle for inlets).
 # Any port may converge reversed (the solver feeds a reversed junction port by
 # the sign of its flow); on an all-pressure network that can make more than
-# one root admissible. Kernel: ideal_junction_residuals_and_jacobian
+# one root admissible. Range: subsonic supplying ports -- a supplier that would
+# choke (Wang 2014, a = 2.44, high q and M3) is driven supersonic and the solve
+# stalls at Mach 1; not refused or flagged. Kernel: ideal_junction_residuals_and_jacobian
 # (API_CPP.md).
 from combaero.network import IdealMomentumTeeElement
 jct_ideal = IdealMomentumTeeElement(
