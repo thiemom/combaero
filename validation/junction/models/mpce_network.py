@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import replace
+from typing import Any
 
 from combaero.network import LosslessConnectionElement
 from combaero.network.mpce_element import MultiPortChamberElement
@@ -94,6 +95,16 @@ class MPCENetwork:
         # scorecard measures production rather than a value frozen here.
         self.eta_scale = (
             MultiPortChamberElement.DEFAULT_ETA_SCALE if eta_scale is None else float(eta_scale)
+        )
+
+    def _junction(self, flow_direction: str, **kw: Any) -> Any:
+        """The junction element under test; subclasses swap the closure."""
+        return MultiPortChamberElement(
+            **kw,
+            flow_direction=flow_direction,
+            strict=self.strict,
+            joining_etransfer_alpha=self.joining_etransfer_alpha,
+            eta_scale=self.eta_scale,
         )
 
     def evaluate_network(
@@ -250,17 +261,14 @@ class MPCENetwork:
         net.nodes["port_bra"].area = A_bra
 
         net.add_element(LosslessConnectionElement("lc_bra", "port_bra", lateral_terminal))
-        jct = MultiPortChamberElement(
+        jct = self._junction(
+            "branch",
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],
             inlet_angles_deg=[0.0],
             outlet_angles_deg=[0.0, math.degrees(theta_rad)],
             port_areas=[_F_C, _F_C, A_bra],
-            flow_direction="branch",
-            strict=self.strict,
-            joining_etransfer_alpha=self.joining_etransfer_alpha,
-            eta_scale=self.eta_scale,
         )
         net.add_element(jct)
         return solve_and_extract(
@@ -316,17 +324,14 @@ class MPCENetwork:
 
         # MPCE-v1 inlet/outlet declaration: for joining, str and bra are
         # inlets (flow into junction from supply), com is the outlet.
-        jct = MultiPortChamberElement(
+        jct = self._junction(
+            "merge",
             id="jct",
             inlet_nodes=["port_str", "port_bra"],
             outlet_nodes=["port_com"],
             inlet_angles_deg=[0.0, math.degrees(theta_rad)],
             outlet_angles_deg=[0.0],
             port_areas=[_F_C, A_bra, _F_C],
-            flow_direction="merge",
-            strict=self.strict,
-            joining_etransfer_alpha=self.joining_etransfer_alpha,
-            eta_scale=self.eta_scale,
         )
         net.add_element(jct)
         return solve_and_extract(
