@@ -97,6 +97,11 @@ merge_one() {
         [[ "$(wait_for_checks "$n")" == "PASS" ]] || { echo "    skip: CI did not pass after rebase"; return 1; }
         state=$(pr_field "$n" mergeStateStatus)
     fi
+    if [[ "$(checks_state "$n")" == "PENDING" ]] && ! $DRY_RUN; then
+        echo "    CI still running; waiting..."
+        wait_for_checks "$n" >/dev/null
+        state=$(pr_field "$n" mergeStateStatus)
+    fi
     [[ "$(checks_state "$n")" == "PASS" ]] || { echo "    skip: checks not all passed"; return 1; }
     [[ "$state" == "CLEAN" ]] || { echo "    skip: mergeStateStatus $state"; return 1; }
 
