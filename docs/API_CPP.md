@@ -103,6 +103,15 @@ double dcp_dT(double T, const std::vector<double>& X);
 double dg_over_RT_dT(double T, const std::vector<double>& X);
 ```
 
+> [!NOTE]
+> The species polynomials switch range at 1000 K. Values (cp, h, s, k, mu)
+> are continuous there to ~1e-9, but slopes are one-sided: dcp/dT jumps
+> -0.01% for air and -0.4% for lean CH4 products, and dk/dT -0.01% / -0.1%.
+> Pure H2 is the outlier, with a 20% jump in its own dcp/dT. The
+> data are left unblended: the jump is far below what Newton needs, and a
+> blend would change every species' thermo data. Finite-difference checks
+> should not straddle 1000 K.
+
 ### State-Based Overloads
 ```cpp
 double mwmix(const State& s);
