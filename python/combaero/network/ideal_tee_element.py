@@ -1,0 +1,245 @@
+"""Ideal momentum junction: a parameter-free closure beside the shipped tee (#517).
+
+One junction static pressure ``p_jn`` (the element's ``P_jct`` unknown, which
+for this closure is a STATIC pressure, not the stagnation pressure the Mynard
+and constant-K tees carry in the same slot). Port ``i`` has an outward axis
+``n_i`` and a signed flow ``m_i`` (positive out of the junction):
+
+    supplier  k:  P_k - p_jn = 0
+    receiver  j:  P_j - p_jn + (m_j / A_j) (u_j - V . n_j) = 0
+    mass:         sum_i m_i = 0
+
+with ``V`` the mass-weighted velocity vector of the supplied streams. The rows
+are an exact momentum balance on each receiver in static pressure, with each
+port's own density. Merge reduces to Blaisdell & Manson's theory; split gives
+every receiver the vector Borda-Carnot loss ``rho/2 |v_j - v_s|^2``
+(Idelchik Eq 7-6 with A' = 1). Nothing is fitted, and the model is not meant to
+beat a tuned closure: it is a baseline, and a fallback where no tuned loss
+applies.
+
+Roles are not declared. Every port carries both, blended smoothly over 1e-4 of
+the throughput (``include/ideal_junction.h``), so the residual is smooth through
+flow reversal and at zero flow: no flow ratio, no direction classification, no
+degenerate fallback, no soft barrier. The inlet/outlet declaration fixes the
+canonical graph direction and the geometry -- and, for now, the direction a
+converged answer must run: the solver cannot yet represent a reversed junction
+port (see ``verify_solution_consistent``).
+"""
+
+from __future__ import annotations
+
+import math
+
+from combaero import _core
+from combaero.network.components import (
+    MultiPortChamberBase,
+    NetworkMixtureState,
+)
+
+#: Mirrors ``kIdealMaxPorts`` in include/ideal_junction.h; the kernel refuses
+#: more ports, so the element refuses them at construction instead of mid-solve.
+IDEAL_MAX_PORTS: int = 6
+
+
+class IdealMomentumTeeElement(MultiPortChamberBase):
+    """Parameter-free momentum junction, parallel to ``MultiPortChamberElement``.
+
+    Angles follow the tee convention of the other junction elements: each port's
+    geometric angle from the main axis, inlets and outlets alike, so a straight
+    run is 0 on both sides and a normal branch is 90. The outward axis the
+    kernel needs is that angle for an outlet and ``pi - angle`` for an inlet --
+    an inlet's flow arrives travelling along its angle, so it points away from
+    the junction the other way. This reproduces the deflection convention of
+    Blaisdell & Manson and of the validation tee (``joining_variants.tee``).
+
+    Residual and Jacobian come whole from ``_core.ideal_junction_residuals_and_jacobian``.
+    The rows depend on port static pressures, port flows and ``p_jn`` only; the
+    port Pt does not enter. Density derivatives are ``rho / P`` (ideal gas, the
+    same rule ``MultiPortChamberElement`` uses).
+
+    Do not add a ``BorderCarnotLossElement`` on a port: the closure already
+    carries the turning loss.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        inlet_nodes: list[str],
+        outlet_nodes: list[str],
+        inlet_angles_deg: list[float] | None = None,
+        outlet_angles_deg: list[float] | None = None,
+        port_areas: list[float] | None = None,
+    ):
+        super().__init__(
+            id=id,
+            inlet_nodes=inlet_nodes,
+            outlet_nodes=outlet_nodes,
+            inlet_angles_deg=inlet_angles_deg,
+            outlet_angles_deg=outlet_angles_deg,
+            port_areas=port_areas,
+        )
+        if self.N > IDEAL_MAX_PORTS:
+            raise ValueError(
+                f"IdealMomentumTeeElement '{id}': {self.N} ports, the kernel takes at most "
+                f"{IDEAL_MAX_PORTS}."
+            )
+
+    def axis_rad(self) -> list[float]:
+        """Outward port axes, in the kernel's frame (see the class docstring)."""
+        return [
+            math.radians(float(a)) if s > 0.0 else math.pi - math.radians(float(a))
+            for a, s in zip(self.port_angles_deg, self._port_signs, strict=True)
+        ]
+
+    def _kernel(self, states: list[NetworkMixtureState], p_jn: float, port_mdots: list[float]):
+        geom = _core.IdealJunctionGeometry()
+        geom.area = [float(a) for a in self.port_areas]
+        geom.axis_rad = self.axis_rad()
+        geom.port_sign = [float(s) for s in self._port_signs]
+        p_static = [float(s.P) for s in states]
+        rho = [float(s.density()) for s in states]
+        # outer_mdot: the connecting elements' own flows; port flow = sign * outer.
+        outer = [float(m) * float(s) for m, s in zip(port_mdots, self._port_signs, strict=True)]
+        return _core.ideal_junction_residuals_and_jacobian(
+            p_static,
+            rho,
+            [r / p if p > 0.0 else 0.0 for r, p in zip(rho, p_static, strict=True)],
+            outer,
+            float(p_jn),
+            geom,
+        )
+
+    def residuals(
+        self,
+        states: list[NetworkMixtureState],
+        P_jct: float,
+        port_mdots: list[float],
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        N = self.N
+        kernel = self._kernel(states, P_jct, port_mdots)
+        residuals = [float(v) for v in kernel.residual]
+        # Column order fixed by include/ideal_junction.h: P[0..N-1],
+        # outer_mdot[0..N-1], p_jn.
+        seed_names = (
+            [f"{self.port_nodes[i]}.P" for i in range(N)]
+            + [f"{self._port_element_ids[i]}.m_dot" for i in range(N)]
+            + [f"{self.id}.P_jct"]
+        )
+        jac: dict[int, dict[str, float]] = {}
+        for row in range(N + 1):
+            entries: dict[str, float] = {}
+            for col, name in enumerate(seed_names):
+                value = float(kernel.jacobian[row][col])
+                if value != 0.0:
+                    entries[name] = entries.get(name, 0.0) + value
+            jac[row] = entries
+        return residuals, jac
+
+    def seed_P_jct(self, pt_common: float, m_common: float, rho: float, common_i: int) -> float:
+        """Initial ``p_jn`` from the common port's guessed Pt and flow.
+
+        ``P_jct`` is a static pressure here. Where the common port supplies
+        (a dividing tee) it sits AT ``p_jn``, so ``p_jn = Pt - m^2/(2 rho A^2)``;
+        where it collects, the suppliers sit at ``p_jn`` and their heads are
+        smaller than the common one by roughly the same amount, so the same
+        subtraction is the better first guess there too. The other junction
+        elements carry Pt in this slot and keep the solver's default.
+        """
+        A = float(self.port_areas[common_i] or 0.0)
+        if not (A > 0.0 and rho > 0.0):
+            return pt_common
+        return pt_common - m_common * m_common / (2.0 * rho * A * A)
+
+    #: A converged port may run against its declared direction by this share
+    #: of the largest port flow and still count as dead rather than reversed.
+    #: The port node's head error from such a flow is (share)^2 of the head.
+    REVERSED_PORT_SHARE: float = 1e-6
+
+    def verify_solution_consistent(
+        self,
+        sol: dict[str, float],
+        energy_rel_tol: float = 1e-9,
+    ) -> bool:
+        """Post-solve check: no port reversed, no flow work created.
+
+        **Reversed ports.** The closure models them; the NETWORK does not yet.
+        The solver's state propagation feeds a junction port node its flow in
+        the declared direction only, so at a reversed port the junction's
+        throughflow and the reversed outer element's cancel, the node sees no
+        flow, and its Pt collapses to P (measured: 0 Pa against a 711 Pa head).
+        A reversed converged state is therefore not trustworthy, and is
+        demoted. Reversal DURING the iteration is fine -- there is no barrier,
+        which is where this closure's smoothness pays -- only the answer must
+        run the declared way.
+
+        **Energy.** The closure cannot create flow work: measured
+        volumetrically relative to ``p_jn``, every exact root dissipates
+        ``sum_in m_k |v_k|^2/2 - M |V|^2/2 + sum_out m_j |v_j - V|^2/2 >= 0``
+        (Jensen on the mass-weighted mean, plus a sum of squares). What this
+        guards is the SOLVE: a stalled state reported as converged, or a
+        future change to the rows. Pt is used mass-weighted, as the other
+        junctions do, because the solution dict carries no density.
+        """
+        flows: list[float] = []
+        pts: list[float] = []
+        for i in range(self.N):
+            m_key = f"{self._port_element_ids[i]}.m_dot"
+            pt_key = f"{self.port_nodes[i]}.Pt"
+            if not self._port_element_ids[i] or m_key not in sol or pt_key not in sol:
+                return True
+            flows.append(float(self._port_signs[i]) * float(sol[m_key]))
+            pts.append(float(sol[pt_key]))
+        m_max = max(abs(f) for f in flows)
+        outer = [s * f for s, f in zip(self._port_signs, flows, strict=True)]
+        if any(m < -self.REVERSED_PORT_SHARE * m_max for m in outer):
+            return False
+        net_outflow_of_energy = sum(f * pt for f, pt in zip(flows, pts, strict=True))
+        scale = sum(abs(f) for f in flows) * max(abs(pt) for pt in pts)
+        return net_outflow_of_energy <= energy_rel_tol * scale
+
+    def diagnostics(
+        self,
+        states: list[NetworkMixtureState],
+        P_jct: float,
+        port_mdots: list[float] | None = None,
+    ) -> dict[str, float]:
+        """Port bookkeeping, ``p_jn``, and the loss coefficients the closure produced.
+
+        ``port_i_K`` is referenced to the common port's dynamic head (its own
+        ``Pt - P``, what the port node calls dynamic head): ``(Pt_c - Pt_i)/q_c``
+        on a dividing junction, ``(Pt_i - Pt_c)/q_c`` on a joining one -- the
+        conventions of Bassett's K5/K6 and K11/K12. The common port is read off
+        the CONVERGED flows (the lone port flowing the other way), not off the
+        declaration; where there is no lone port the K fields are omitted.
+        """
+        diag = super().diagnostics(states, P_jct, port_mdots)
+        diag["p_jn"] = float(P_jct)
+        if port_mdots is None or len(port_mdots) != self.N:
+            return diag
+        out = [i for i in range(self.N) if port_mdots[i] > 0.0]
+        inn = [i for i in range(self.N) if port_mdots[i] < 0.0]
+        if len(inn) == 1 and len(out) == self.N - 1:
+            common, dividing = inn[0], True
+        elif len(out) == 1 and len(inn) == self.N - 1:
+            common, dividing = out[0], False
+        else:
+            return diag
+        q_c = float(states[common].Pt) - float(states[common].P)
+        if not q_c > 0.0:
+            return diag
+        m_c = abs(float(port_mdots[common]))
+        others = [i for i in range(self.N) if i != common]
+        for i in others:
+            dpt = float(states[common].Pt) - float(states[i].Pt)
+            diag[f"port_{i}_K"] = (dpt if dividing else -dpt) / q_c
+            diag[f"port_{i}_flow_fraction"] = abs(float(port_mdots[i])) / m_c
+        if self.N == 3:
+            straight, branch = others
+            if dividing:
+                diag["K_straight"] = diag[f"port_{straight}_K"]
+                diag["K_branch"] = diag[f"port_{branch}_K"]
+            else:
+                diag["K11"] = diag[f"port_{straight}_K"]
+                diag["K12"] = diag[f"port_{branch}_K"]
+            diag["mass_flow_ratio"] = diag[f"port_{branch}_flow_fraction"]
+        return diag

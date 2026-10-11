@@ -1034,6 +1034,29 @@ jct_k = ConstantKTeeElement(
     K_ports={1: 0.4, 2: 1.0},   # K_straight, K_branch
 )
 
+# Ideal momentum junction (#517): parameter-free, a baseline beside the tuned
+# closures rather than a replacement. Suppliers sit at one junction STATIC
+# pressure p_jn (here P_jct is static, not Pt); each receiver obeys
+# P_j - p_jn + (m_j/A_j)(u_j - V.n_j) = 0, V the supplied mass-weighted
+# velocity vector. Merge = Blaisdell & Manson's theory; split = vector
+# Borda-Carnot loss on every receiver (Idelchik Eq 7-6, A' = 1). No
+# flow_direction: roles follow the flow smoothly, 2 to 6 ports. Angles as for
+# the other tees (outward axis = angle for outlets, pi - angle for inlets).
+# A converged answer with a port running against its declared direction is
+# demoted to inconsistent: the solver's port-node propagation cannot represent
+# a reversed junction port yet. Kernel: ideal_junction_residuals_and_jacobian
+# (API_CPP.md).
+from combaero.network import IdealMomentumTeeElement
+jct_ideal = IdealMomentumTeeElement(
+    "jct",
+    inlet_nodes=["mc_com"],
+    outlet_nodes=["mc_str", "mc_bra"],
+    inlet_angles_deg=[0.0],
+    outlet_angles_deg=[0.0, 90.0],
+)
+# Diagnostics: p_jn, port_i_K referenced to the common port's own head, and
+# K_straight/K_branch (dividing) or K11/K12 (joining) by the converged flows.
+
 # Rotating cavity / disc-pump pressure rise (Vatistas n-vortex model)
 vortex = VortexElement(
     "vortex", "node_in", "node_out",

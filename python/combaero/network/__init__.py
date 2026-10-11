@@ -34,6 +34,7 @@ from .components import (
     WallNode,
 )
 from .mpce_element import ConstantKTeeElement, MultiPortChamberElement
+from .ideal_tee_element import IdealMomentumTeeElement
 from .combustion import (
     CombustionResult,
     combustion_from_streams,
@@ -79,6 +80,7 @@ __all__: list[str] = [
     "MultiPortChamberBase",
     "MultiPortChamberElement",
     "ConstantKTeeElement",
+    "IdealMomentumTeeElement",
     "BorderCarnotLossElement",
     "EnergyBoundary",
     "NetworkMixtureState",
