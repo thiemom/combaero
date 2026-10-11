@@ -677,6 +677,15 @@ class NetworkSolver:
                     overrides.update(
                         self._junction_split_guess(elem, common, p_guess, rho_ref, ref)
                     )
+                # A closure whose P_jct is a STATIC pressure (#517) moves the
+                # seed off the common port's Pt by that port's head.
+                seed_P_jct = getattr(elem, "seed_P_jct", None)
+                common_elem = elem._port_element_ids[elem.port_nodes.index(common)]
+                m_common = overrides.get(f"{common_elem}.m_dot")
+                if seed_P_jct is not None and m_common is not None:
+                    overrides[f"{elem_id}.P_jct"] = seed_P_jct(
+                        pt, float(m_common), rho_ref, elem.port_nodes.index(common)
+                    )
         return overrides
 
     def _junction_split_guess(
