@@ -657,6 +657,20 @@ inline constexpr Entry function_units[] = {
      "common_port: -, k_term_sign: -, k_per_port: list[-])"},
 
     // -------------------------------------------------------------------------
+    // ideal_junction.h - Ideal momentum junction, whole-element (f, J) (#517)
+    // -------------------------------------------------------------------------
+    {"ideal_junction_residuals_and_jacobian",
+     "p_static: list[Pa], rho: list[kg/m^3], drho_dp: list[kg/(m^3*Pa)], "
+     "outer_mdot: list[kg/s] (the CONNECTING element's flow; geom.port_sign "
+     "maps it to junction convention, + out), p_jn: Pa, "
+     "geom: IdealJunctionGeometry (area: list[m^2], axis_rad: list[rad] "
+     "outward port axis, port_sign: list[-])",
+     "IdealJunctionResult (residual: list[Pa] with a final kg/s mass row, "
+     "jacobian: list[list[d(row)/d(col)]] over columns "
+     "[p_static x N, outer_mdot x N, p_jn], velocity: list[m/s] (+ out), "
+     "V_x: m/s, V_y: m/s)"},
+
+    // -------------------------------------------------------------------------
     // friction.h - Friction Factor Correlations
     // -------------------------------------------------------------------------
     {"friction_haaland", "Re: -, e_D: -", "- (f)"},

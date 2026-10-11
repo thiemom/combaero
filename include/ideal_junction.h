@@ -1,0 +1,177 @@
+#pragma once
+
+// -----------------------------------------------------------------------------
+// Ideal momentum junction: whole-element (f, J), parameter-free (#517).
+//
+// A baseline closure, parallel to the shipped Mynard tee (mpce_junction.h). It
+// is not fitted to any data and is not meant to beat tuned losses on their own
+// data; it is meant to be physically honest and robust where tuned closures are
+// out of range.
+//
+// PHYSICS. One junction static pressure p_jn. Every port i has a fixed outward
+// axis n_i (pointing away from the junction) and a signed mass flow m_i,
+// positive OUT of the junction, so its velocity vector is
+//
+//     v_i = u_i n_i,   u_i = m_i / (rho_i A_i)
+//
+// for inflow and outflow alike. The supplying streams arrive at p_jn (Benson)
+// and mix into their mass-weighted mean velocity V = sum_in |m_k| v_k /
+// sum_in |m_k|. Each receiving port j then takes its momentum along its own
+// axis from V, the misaligned part being lost to the walls:
+//
+//     supplier k:   P_k - p_jn = 0
+//     receiver j:   P_j - p_jn + (m_j / A_j) (u_j - V . n_j) = 0
+//
+// i.e. (p_jn - P_j) A_j = m_j (u_j - V . n_j), the momentum balance along n_j.
+//
+//   - Merge (one receiver on the main axis): (p_jn - P_c) A_c = rho_c u_c^2 A_c
+//     - sum_k rho_k u_k^2 A_k cos d_k, Blaisdell & Manson's theory (their Eqs
+//     12/19; `bassett_cv(..., wall=False)` in validation/junction).
+//   - Split (one supplier): V = v_s, and each receiver loses
+//     Pt_s - Pt_j = rho/2 |v_j - v_s|^2 >= 0, the vector Borda-Carnot loss --
+//     Idelchik's diverging-branch Eq 7-6 with A' = 1, and kappa = 1 (straight
+//     run (1 - q)^2 on the straight fraction) for a collinear receiver.
+//
+// COMPRESSIBLE. The balances are written in static pressure with each port's
+// own density, so they are the exact control-volume momentum balance at any
+// Mach number (for uniform port profiles). There is no Mach inversion here:
+// Pt <-> P is the port node's own closure.
+//
+// ROLES ARE SMOOTH. Which ports supply and which receive follows the flow
+// signs, so the rows would switch form at m_i = 0 (value continuous, slope
+// jump m_s cos / (rho A)). Instead every port carries both roles with smooth
+// weights
+//
+//     s(m) = (1 + m / sqrt(m^2 + eps^2)) / 2,  w_out = m s(m),  w_in = w_out - m
+//
+// with eps = sqrt((IDEAL_ROLE_EPS_REL * |m|_2)^2 + IDEAL_ROLE_EPS_ABS^2), a
+// fixed fraction of the junction's throughput. Both weights vanish at m = 0, so
+// a dead port neither dilutes V nor departs from p_jn; away from reversal the
+// smoothing moves a row by O((eps/m)^2). The rows are C-infinity everywhere,
+// including the all-zero state (V's denominator carries IDEAL_ROLE_EPS_ABS),
+// so there is no degenerate-state fallback and no direction classification.
+//
+// DENSITY. Thermodynamics-free like mpce_junction.h: rho and drho/dP per port
+// enter as values, seeded first order on P_i.
+//
+// JACOBIAN columns: P[0..N-1], outer_mdot[0..N-1], p_jn. outer_mdot is the
+// CONNECTING element's flow; port_sign maps it to junction convention.
+// -----------------------------------------------------------------------------
+
+#include <cmath>
+#include <stdexcept>
+#include <vector>
+
+#include "dual_number.h"
+
+namespace combaero::solver {
+
+constexpr int kIdealMaxPorts = 6;
+constexpr int kIdealSeeds = 2 * kIdealMaxPorts + 1;
+
+// Width of the supplier/receiver role blend, as a fraction of the junction's
+// throughput |m|_2. Not a physics parameter: it only smooths the switch.
+constexpr double IDEAL_ROLE_EPS_REL = 1.0e-4;
+// Absolute floor [kg/s] so the all-zero state stays smooth.
+constexpr double IDEAL_ROLE_EPS_ABS = 1.0e-9;
+
+struct IdealJunctionGeometry {
+  std::vector<double> area;       // [m^2]
+  std::vector<double> axis_rad;   // outward port axis angle [rad]
+  std::vector<double> port_sign;  // +1: connecting flow positive OUT of junction
+};
+
+struct IdealJunctionResult {
+  // N port rows [Pa] then the mass row [kg/s].
+  std::vector<double> residual;
+  // [row][col], columns P[0..N-1], outer_mdot[0..N-1], p_jn.
+  std::vector<std::vector<double>> jacobian;
+  // Signed port velocity u_i (positive out) [m/s] and the supplied mean
+  // velocity vector V [m/s], for diagnostics.
+  std::vector<double> velocity;
+  double V_x = 0.0;
+  double V_y = 0.0;
+};
+
+inline IdealJunctionResult ideal_junction_residuals_and_jacobian(
+    const std::vector<double>& p_static, const std::vector<double>& rho,
+    const std::vector<double>& drho_dp, const std::vector<double>& outer_mdot,
+    double p_jn, const IdealJunctionGeometry& geom) {
+  const int n = static_cast<int>(p_static.size());
+  if (n < 2 || n > kIdealMaxPorts) {
+    throw std::invalid_argument(
+        "ideal_junction_residuals_and_jacobian: 2..6 ports required");
+  }
+  const auto sz = static_cast<std::size_t>(n);
+  if (rho.size() != sz || drho_dp.size() != sz || outer_mdot.size() != sz ||
+      geom.area.size() != sz || geom.axis_rad.size() != sz ||
+      geom.port_sign.size() != sz) {
+    throw std::invalid_argument(
+        "ideal_junction_residuals_and_jacobian: inconsistent port counts");
+  }
+
+  using D = DualN<kIdealSeeds>;
+  std::vector<D> P(sz), M(sz), U(sz);
+  for (int i = 0; i < n; ++i) {
+    P[i] = D::seed(p_static[i], i);
+    D Rho = D::constant(rho[i]);
+    Rho.d[i] = drho_dp[i];
+    M[i] = D::seed(outer_mdot[i], kIdealMaxPorts + i) * geom.port_sign[i];
+    U[i] = M[i] / (Rho * geom.area[i]);
+  }
+  const D Pjn = D::seed(p_jn, 2 * kIdealMaxPorts);
+
+  D m2 = D::constant(0.0);
+  for (int i = 0; i < n; ++i) m2 = m2 + M[i] * M[i];
+  const D eps2 = m2 * (IDEAL_ROLE_EPS_REL * IDEAL_ROLE_EPS_REL) +
+                 IDEAL_ROLE_EPS_ABS * IDEAL_ROLE_EPS_ABS;
+
+  std::vector<D> w_out(sz), w_in(sz);
+  D w_in_sum = D::constant(IDEAL_ROLE_EPS_ABS);
+  D Vx = D::constant(0.0);
+  D Vy = D::constant(0.0);
+  for (int i = 0; i < n; ++i) {
+    // s = smooth step 0 -> 1 across m = 0; s(m) + s(-m) = 1, so
+    // w_out - w_in = m exactly and both vanish at m = 0.
+    const D s = (M[i] / dsqrt(M[i] * M[i] + eps2) + 1.0) * 0.5;
+    w_out[i] = M[i] * s;
+    w_in[i] = w_out[i] - M[i];
+    const double cx = std::cos(geom.axis_rad[i]);
+    const double cy = std::sin(geom.axis_rad[i]);
+    w_in_sum = w_in_sum + w_in[i];
+    Vx = Vx + w_in[i] * U[i] * cx;
+    Vy = Vy + w_in[i] * U[i] * cy;
+  }
+  Vx = Vx / w_in_sum;
+  Vy = Vy / w_in_sum;
+
+  IdealJunctionResult out;
+  out.residual.assign(sz + 1, 0.0);
+  out.jacobian.assign(sz + 1, std::vector<double>((2 * sz) + 1, 0.0));
+  auto store = [&](int row, const D& r) {
+    out.residual[row] = r.v;
+    for (int c = 0; c < n; ++c) {
+      out.jacobian[row][c] = r.d[c];
+      out.jacobian[row][n + c] = r.d[kIdealMaxPorts + c];
+    }
+    out.jacobian[row][2 * sz] = r.d[kIdealSeeds - 1];
+  };
+
+  for (int j = 0; j < n; ++j) {
+    const D V_axial = Vx * std::cos(geom.axis_rad[j]) +
+                      Vy * std::sin(geom.axis_rad[j]);
+    const D row = P[j] - Pjn + w_out[j] / geom.area[j] * (U[j] - V_axial);
+    store(j, row);
+  }
+  D mass = D::constant(0.0);
+  for (int i = 0; i < n; ++i) mass = mass + M[i];
+  store(n, mass);
+
+  out.velocity.resize(sz);
+  for (int i = 0; i < n; ++i) out.velocity[i] = U[i].v;
+  out.V_x = Vx.v;
+  out.V_y = Vy.v;
+  return out;
+}
+
+}  // namespace combaero::solver
