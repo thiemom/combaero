@@ -86,6 +86,10 @@ def test_every_reported_name_is_one_the_solver_knows():
         | {f"{n}.Pt" for n in element.port_nodes}
         | {f"{e}.m_dot" for e in element._port_element_ids}
         | {f"{element.id}.P_jct"}
+        # Relayed, not unknowns: a port node's derived T and Y reach the
+        # columns through the propagation chain (#517, density columns).
+        | {f"{n}.T" for n in element.port_nodes}
+        | {f"{n}.Y[{k}]" for n in element.port_nodes for k in range(len(_states()[0].Y))}
     )
     for row, entries in jac.items():
         for name in entries:

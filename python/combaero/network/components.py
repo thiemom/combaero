@@ -1819,6 +1819,11 @@ class MomentumChamberNode(NetworkNode):
                 f"{self.id}.T": result.d_res_dT,
             }
         }
+        # Composition, relayed the same way: a node mixing gases of
+        # different molar mass moves rho, a and s with every split (#517).
+        for k, d in enumerate(result.d_res_dY):
+            if d != 0.0:
+                jac[0][f"{self.id}.Y[{k}]"] = d
 
         # Add Jacobian entries for upstream element mass flows using the
         # named Jacobian built in compute_derived_state. This correctly handles
