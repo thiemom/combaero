@@ -154,12 +154,51 @@ _BASSETT = Path(__file__).resolve().parents[2] / "validation" / "junction" / "da
         ("bassett_fig10c_K12_theta=45_psi=4_calc.csv", bassett.K12_corr, 4, 45, 0.11),
         ("bassett_fig14_K9_theta=90_psi=1_calc_raw.csv", bassett.K9_raw, 1, 90, 0.05),
         ("bassett_fig14_K9_theta=90_psi=1_calc_corr.csv", bassett.K9_corr, 1, 90, 0.03),
+        ("bassett_fig07a_K6_theta=120_psi=1_calc.csv", bassett.K6, 1, 120, 0.035),
+        ("bassett_fig07a_K6_theta=90_psi=1_calc.csv", bassett.K6, 1, 90, 0.035),
+        ("bassett_fig07a_K6_theta=60_psi=1_calc.csv", bassett.K6, 1, 60, 0.035),
+        ("bassett_fig07a_K6_theta=45_psi=1_calc.csv", bassett.K6, 1, 45, 0.035),
+        ("bassett_fig07b_K6_theta=45_psi=1_calc.csv", bassett.K6, 1, 45, 0.035),
+        ("bassett_fig07b_K6_theta=45_psi=3_calc.csv", bassett.K6, 3, 45, 0.035),
+        ("bassett_fig07c_K5_calc.csv", bassett.K5, 1, 45, 0.035),
+        ("bassett_fig08_K4_theta=135_psi=1_calc.csv", bassett.K4, 1, 135, 0.035),
+        ("bassett_fig08_K4_theta=90_psi=1_calc.csv", bassett.K4, 1, 90, 0.035),
+        ("bassett_fig08_K4_theta=45_psi=1_calc.csv", bassett.K4, 1, 45, 0.035),
+        ("bassett_fig11a_K11_theta=90_psi=1_calc.csv", bassett.K11_corr, 1, 90, 0.035),
+        ("bassett_fig11a_K11_theta=60_psi=1_calc.csv", bassett.K11_corr, 1, 60, 0.035),
+        ("bassett_fig11a_K11_theta=45_psi=1_calc.csv", bassett.K11_corr, 1, 45, 0.035),
+        ("bassett_fig11a_K11_theta=30_psi=1_calc.csv", bassett.K11_corr, 1, 30, 0.035),
+        ("bassett_fig11b_K11_theta=45_psi=1_calc.csv", bassett.K11_corr, 1, 45, 0.035),
+        ("bassett_fig11b_K11_theta=45_psi=2_calc.csv", bassett.K11_corr, 2, 45, 0.035),
+        ("bassett_fig11b_K11_theta=45_psi=3_calc.csv", bassett.K11_corr, 3, 45, 0.035),
+        ("bassett_fig11b_K11_theta=45_psi=4_calc.csv", bassett.K11_corr, 4, 45, 0.035),
+        ("bassett_fig12a_K8_theta=90_psi=1_calc.csv", bassett.K8_corr, 1, 90, 0.035),
+        ("bassett_fig12a_K8_theta=60_psi=1_calc.csv", bassett.K8_corr, 1, 60, 0.035),
+        ("bassett_fig12a_K8_theta=45_psi=1_calc.csv", bassett.K8_corr, 1, 45, 0.035),
+        ("bassett_fig12a_K8_theta=30_psi=1_calc.csv", bassett.K8_corr, 1, 30, 0.035),
+        ("bassett_fig12b_K8_theta=45_psi=1_calc.csv", bassett.K8_corr, 1, 45, 0.035),
+        ("bassett_fig12b_K8_theta=45_psi=2_calc.csv", bassett.K8_corr, 2, 45, 0.035),
+        ("bassett_fig12b_K8_theta=45_psi=4_calc.csv", bassett.K8_corr, 4, 45, 0.035),
+        ("bassett_fig13a_K7_theta=90_psi=1_calc.csv", bassett.K7_corr, 1, 90, 0.035),
+        ("bassett_fig13a_K7_theta=60_psi=1_calc.csv", bassett.K7_corr, 1, 60, 0.035),
+        ("bassett_fig13a_K7_theta=45_psi=1_calc.csv", bassett.K7_corr, 1, 45, 0.035),
+        ("bassett_fig13a_K7_theta=30_psi=1_calc.csv", bassett.K7_corr, 1, 30, 0.035),
+        ("bassett_fig13b_K7_theta=45_psi=1_calc.csv", bassett.K7_corr, 1, 45, 0.035),
+        ("bassett_fig13b_K7_theta=45_psi=2_calc.csv", bassett.K7_corr, 2, 45, 0.035),
+        ("bassett_fig13b_K7_theta=45_psi=4_calc.csv", bassett.K7_corr, 4, 45, 0.035),
     ],
 )
 def test_bassett_table_2_draws_his_curves(name, fn, psi, theta, bound):
     """Measured 2026-10-10: max |error| 0.012-0.024 at psi = 1 (K9 raw
     0.041), 0.097 / 0.082 at psi = 3 / 4, where the Fig 10c axis is
-    coarser. Digitised curves, so an upper bound on the transcription error."""
+    coarser. Digitised curves, so an upper bound on the transcription error.
+
+    K4-K8 and K11 (Figs 7, 8, 11-13, traced 2026-10-11): the trace snaps to
+    ink within 8 px of our formula, so its max error (<= 0.031) is bounded by
+    construction; the evidence that the formulas are his is the coverage and
+    the unbiased ink distance (median 0.5-3 px), against 6-21 px for a
+    re-planted K8 /psi typo or a raw-for-corrected K11. As committed data the
+    files still catch any later change to these formulas."""
     rows = np.loadtxt(_BASSETT / name, delimiter=",", comments="#", ndmin=2, skiprows=1)
     err = [fn(q, psi, math.radians(theta)) - k for q, k in rows]
     assert max(map(abs, err)) < bound

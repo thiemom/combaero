@@ -113,3 +113,38 @@ files:
   bassett_fig14_K9_theta=90_psi=1_measured_ito_imai.csv: {K_id: K9, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: measured, source: "Ito and Imai 1973"}
   bassett_fig14_K9_theta=90_psi=1_calc_raw.csv:          {K_id: K9, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: raw}
   bassett_fig14_K9_theta=90_psi=1_calc_corr.csv:         {K_id: K9, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+
+  # ----- Calculated curves, Figs 7, 8, 11-13: traced 2026-10-11 along our Table 2 forms
+  # (angle-corrected for K7/K8/K11, as the captions state); see README 'Fidelity of the transcription'. -----
+  bassett_fig07a_K6_theta=120_psi=1_calc.csv: {K_id: K6, psi: 1.0, theta_deg: 120, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig07a_K6_theta=90_psi=1_calc.csv: {K_id: K6, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig07a_K6_theta=60_psi=1_calc.csv: {K_id: K6, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig07a_K6_theta=45_psi=1_calc.csv: {K_id: K6, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig07b_K6_theta=45_psi=1_calc.csv: {K_id: K6, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig07b_K6_theta=45_psi=3_calc.csv: {K_id: K6, psi: 3.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig07c_K5_calc.csv: {K_id: K5, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig08_K4_theta=135_psi=1_calc.csv: {K_id: K4, psi: 1.0, theta_deg: 135, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig08_K4_theta=90_psi=1_calc.csv: {K_id: K4, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig08_K4_theta=45_psi=1_calc.csv: {K_id: K4, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: separating, kind: calc}
+  bassett_fig11a_K11_theta=90_psi=1_calc.csv: {K_id: K11, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig11a_K11_theta=60_psi=1_calc.csv: {K_id: K11, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig11a_K11_theta=45_psi=1_calc.csv: {K_id: K11, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig11a_K11_theta=30_psi=1_calc.csv: {K_id: K11, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig11b_K11_theta=45_psi=1_calc.csv: {K_id: K11, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig11b_K11_theta=45_psi=2_calc.csv: {K_id: K11, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig11b_K11_theta=45_psi=3_calc.csv: {K_id: K11, psi: 3.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig11b_K11_theta=45_psi=4_calc.csv: {K_id: K11, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig12a_K8_theta=90_psi=1_calc.csv: {K_id: K8, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig12a_K8_theta=60_psi=1_calc.csv: {K_id: K8, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig12a_K8_theta=45_psi=1_calc.csv: {K_id: K8, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig12a_K8_theta=30_psi=1_calc.csv: {K_id: K8, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig12b_K8_theta=45_psi=1_calc.csv: {K_id: K8, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig12b_K8_theta=45_psi=2_calc.csv: {K_id: K8, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig12b_K8_theta=45_psi=4_calc.csv: {K_id: K8, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig13a_K7_theta=90_psi=1_calc.csv: {K_id: K7, psi: 1.0, theta_deg: 90, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig13a_K7_theta=60_psi=1_calc.csv: {K_id: K7, psi: 1.0, theta_deg: 60, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig13a_K7_theta=45_psi=1_calc.csv: {K_id: K7, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig13a_K7_theta=30_psi=1_calc.csv: {K_id: K7, psi: 1.0, theta_deg: 30, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig13b_K7_theta=45_psi=1_calc.csv: {K_id: K7, psi: 1.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig13b_K7_theta=45_psi=2_calc.csv: {K_id: K7, psi: 2.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
+  bassett_fig13b_K7_theta=45_psi=4_calc.csv: {K_id: K7, psi: 4.0, theta_deg: 45, x_axis: q, flow_regime: joining, kind: calc, calc_variant: angle_corrected}
