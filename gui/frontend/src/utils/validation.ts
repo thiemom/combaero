@@ -90,9 +90,10 @@ export function validateNetwork(nodes: Node[]): string[] {
 		}
 		if (node.type === "mpce_tee") {
 			const thetaDeg = node.data.theta_deg ?? 90;
-			if (Math.abs(thetaDeg) > 90) {
+			// Mirrors MPCETeeData's validator: 0 lays the branch on the straight run.
+			if (!(Math.abs(thetaDeg) > 0 && Math.abs(thetaDeg) <= 90)) {
 				errors.push(
-					`${node.id}: Tee branch angle |theta| must be <= 90 deg, got ${thetaDeg} deg`,
+					`${node.id}: Tee branch angle must satisfy 0 < |theta| <= 90 deg, got ${thetaDeg} deg`,
 				);
 			}
 			// null F_C means "inherit from connected channels" — only flag explicit non-positive values
