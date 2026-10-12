@@ -70,6 +70,7 @@ const NumericInput: React.FC<NumericInputProps> = ({
 		const parsed = Number.parseFloat(raw);
 		if (!Number.isNaN(parsed) && /^-?\d*\.?\d*$/.test(raw)) {
 			if (min !== undefined && parsed < min) return;
+			if (max !== undefined && parsed > max) return;
 			onChange(parsed);
 		}
 	};
