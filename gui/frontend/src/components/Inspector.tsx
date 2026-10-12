@@ -1863,11 +1863,14 @@ const Inspector = () => {
 											Ideal momentum (parameter-free)
 										</option>
 									</select>
-									<p className="text-[9px] text-gray-400 italic">
-										Constant K: fixed loss coefficients referenced to the
-										common-leg dynamic head (Idelchik convention); the Mynard
-										closure is disabled and K does not vary with the flow split.
-									</p>
+									{selectedNode.data.junction_model === "constant_k" && (
+										<p className="text-[9px] text-gray-400 italic">
+											Constant K: fixed loss coefficients referenced to the
+											common-leg dynamic head (Idelchik convention); the Mynard
+											closure is disabled and K does not vary with the flow
+											split.
+										</p>
+									)}
 									{selectedNode.data.junction_model === "ideal_momentum" && (
 										<p className="text-[9px] text-gray-400 italic">
 											Ideal momentum: a baseline with nothing tuned. Suppliers
@@ -2051,13 +2054,13 @@ const Inspector = () => {
 											{(dFromF(effectiveFC) * lu).toFixed(2)} {lu_label})
 										</span>
 										<span className="italic text-[9px] text-stone-400">
-											= F_C (Mynard)
+											= F_C
 										</span>
 									</div>
 									<p className="text-[9px] text-stone-400 italic">
-										Mynard's pseudosupplier geometry assumes F_S = F_C. For a
-										physically different straight arm, add an AreaChange
-										element.
+										Every junction model takes F_S = F_C (Mynard's
+										pseudosupplier geometry requires it). For a physically
+										different straight arm, add an AreaChange element.
 									</p>
 								</div>
 
