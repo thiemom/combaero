@@ -1,4 +1,4 @@
-# Gardel & Rechsteiner 1970 -- unsplit-flow tables E, F, G
+# Gardel & Rechsteiner 1970 -- tables E, F, G and the raw points of Figs 12-15
 
 Gardel, A. and Rechsteiner, G. F. (1970), *Les pertes de charge dans les
 branchements en Te des conduites de section circulaire*, Bulletin technique de
@@ -87,9 +87,69 @@ is therefore null.
       text layer has -0.86. On a 3x zoom of the page it is -0.88.
 - **Scripts:** the extraction scripts were throw-away and are not in the repo.
 
+## `detail_points.csv`
+
+The measured points of the four shapes the paper plots point by point, digitised
+from the scan. One row per point.
+
+| fig | delta | phi | rho |
+|---|---|---|---|
+| 12 | 90 | 1 | 0 |
+| 13 | 90 | 1 | 0.2 |
+| 14 | 90 | 0.69 | 0 |
+| 15 | 135 | 1 | 0 |
+
+| column | meaning |
+|---|---|
+| `mode` | flow mode as numbered in the paper: 1 dividing (alpha feeds beta and gamma), 2 joining (alpha and beta feed gamma), 3 beta feeds alpha and gamma, 4 alpha and gamma both flow into beta |
+| `abscissa`, `q` | the figure's own abscissa: `q_beta` in modes 1 and 2 (0..1 and -1..0), `q_gamma` in modes 3 and 4 (0..1 and 0..-1) |
+| `series` | `h_ba`, `h_ya`, `h_yb`, as in the tables; same normalisation and signs |
+| `h` | the value read off the plot, to 3 decimals |
+
+**Layout.** Each figure is one strip of four panels, left to right mode 3, 2,
+1, 4. Adjacent panels share their end, an unsplit case: q_gamma = 1 / q_beta =
+-1 (table G), q_beta = 0 (table E), q_beta = +1 (table F). A point exactly on
+a shared end is listed once, under the left panel.
+
+**How the points were read.**
+- **Renders:** the figure pages at 500 dpi.
+- **Calibration:** the scan is rotated and warped by up to 14 px, so a linear
+  axis fit is biased by up to 0.03 in h. Every printed grid line was traced
+  across the figure, and each point is mapped by interpolating between the
+  traced lines.
+- **Detection:** an open-ring detector (every angular sector of the annulus
+  dark, the centre white once grid lines are removed).
+- **Series:** assigned by tracking each curve across a panel. Fig. 15 needed
+  rough guide curves where the three series cross with sparse points.
+- **Manual pass, Fig. 15:** its rings are printed fainter, and the detector
+  missed about 27. They were clicked by hand, with the series and one
+  relabelling decided by eye. 24 were snapped to the ring centre and read
+  through the traced grid; 3 rings too faint to snap keep the click's value
+  (calibration residual 0.004).
+- **Review:** every point was checked on an overlay of the scan.
+
+**Checks.**
+- **Panel ends against tables E/F/G:** 36 comparisons, 33 within 0.015, the
+  largest 0.029 (Fig. 14, q_beta = +1).
+- **Head identity:** `h_ya = h_yb + h_ba` holds in every flow case. On cases
+  with one point of each series at the same abscissa:
+
+  | fig | cases | MAD of residual | over 0.05 |
+  |---|---|---|---|
+  | 12 | 84 | 0.0026 | 0 |
+  | 13 | 92 | 0.0030 | 0 |
+  | 14 | 80 | 0.0027 | 0 |
+  | 15 | 69 | 0.0024 | 0 |
+
+  The identity cannot see a swap of `h_ba` and `h_yb` (the sum is the same);
+  those were checked by eye on the overlay.
+
+**Known limits.** Heavily overplotted rings can merge into one, so a cluster of repeated
+measurements yields fewer rows than the paper took. No uncertainty is stated,
+so the band stays null.
+
 ## Not transcribed here
 
-- **Figs 12-15:** the raw points, four shapes.
 - **Figs 18-27:** smoothed curves for all 33 shapes. These are curves through
   the data, not formulas, but the scatter is gone.
 - **Figs 28-34:** replot tables E-G and add curves in phi.
