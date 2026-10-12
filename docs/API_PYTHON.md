@@ -1056,8 +1056,11 @@ jct_ideal = IdealMomentumTeeElement(
     inlet_angles_deg=[0.0],
     outlet_angles_deg=[0.0, 90.0],
 )
-# Diagnostics: p_jn, port_i_K referenced to the common port's own head, and
-# K_straight/K_branch (dividing) or K11/K12 (joining) by the converged flows.
+# Diagnostics: p_jn; port_i_K referenced to the converged common port's head;
+# for a 3-port tee the geometric flows m_dot_com/straight/branch (signed in the
+# wired direction) and n_reversed_ports, plus K_straight/K_branch (dividing) or
+# K11/K12 (joining) only when the converged regime is the wired one. Exposed in
+# the GUI as the tee's "Ideal momentum (parameter-free)" junction model.
 
 # Rotating cavity / disc-pump pressure rise (Vatistas n-vortex model)
 vortex = VortexElement(

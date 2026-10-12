@@ -408,8 +408,12 @@ class MPCETeeData(BaseModel):
     # Junction closure model. "mynard" (default) is the full Unified0D
     # pseudosupplier physics; "constant_k" is the simplest-model tier:
     # fixed handbook loss coefficients referenced to the common-leg
-    # dynamic head (Idelchik convention), K independent of the split.
-    junction_model: Literal["mynard", "constant_k"] = "mynard"
+    # dynamic head (Idelchik convention), K independent of the split;
+    # "ideal_momentum" is the parameter-free baseline (#517): one junction
+    # static pressure, momentum balance on every receiving port, no tuned
+    # loss. Its flow_direction sets the port wiring only -- roles follow the
+    # flow.
+    junction_model: Literal["mynard", "constant_k", "ideal_momentum"] = "mynard"
     K_straight: float = 0.4  # constant_k only: straight-arm loss coeff [-]
     K_branch: float = 1.0  # constant_k only: branch-arm loss coeff [-]
     theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder

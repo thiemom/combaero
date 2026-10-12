@@ -262,14 +262,32 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         ``port_i_K`` is referenced to the common port's dynamic head (its own
         ``Pt - P``, what the port node calls dynamic head): ``(Pt_c - Pt_i)/q_c``
         on a dividing junction, ``(Pt_i - Pt_c)/q_c`` on a joining one -- the
-        conventions of Bassett's K5/K6 and K11/K12. The common port is read off
-        the CONVERGED flows (the lone port flowing the other way), not off the
-        declaration; where there is no lone port the K fields are omitted.
+        conventions of Bassett's K5/K6 and K11/K12. The common port of THAT
+        definition is read off the CONVERGED flows (the lone port flowing the
+        other way); where there is no lone port the K fields are omitted.
+
+        For a three-port tee the named aliases are GEOMETRIC, as the GUI wires
+        them: ``m_dot_com`` / ``m_dot_straight`` / ``m_dot_branch`` are the
+        declared ports' flows, signed positive in the declared direction (a
+        negative one ran reversed; ``n_reversed_ports`` counts them). The K
+        aliases -- ``K_straight``/``K_branch`` dividing, ``K11``/``K12``
+        joining -- and ``mass_flow_ratio`` are emitted only when the converged
+        regime IS the declared one, so a tee that ran as a merge although wired
+        as a split never reports a merge coefficient under a split's name.
         """
         diag = super().diagnostics(states, P_jct, port_mdots)
         diag["p_jn"] = float(P_jct)
         if port_mdots is None or len(port_mdots) != self.N:
             return diag
+        outer = [float(s) * float(m) for s, m in zip(self._port_signs, port_mdots, strict=True)]
+        diag["n_reversed_ports"] = float(sum(m < 0.0 for m in outer))
+        declared_common = None
+        if self.N == 3:
+            declared_common = 0 if len(self.inlet_nodes) == 1 else self.N - 1
+            d_straight, d_branch = (i for i in range(self.N) if i != declared_common)
+            diag["m_dot_com"] = outer[declared_common]
+            diag["m_dot_straight"] = outer[d_straight]
+            diag["m_dot_branch"] = outer[d_branch]
         out = [i for i in range(self.N) if port_mdots[i] > 0.0]
         inn = [i for i in range(self.N) if port_mdots[i] < 0.0]
         if len(inn) == 1 and len(out) == self.N - 1:
@@ -287,13 +305,12 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
             dpt = float(states[common].Pt) - float(states[i].Pt)
             diag[f"port_{i}_K"] = (dpt if dividing else -dpt) / q_c
             diag[f"port_{i}_flow_fraction"] = abs(float(port_mdots[i])) / m_c
-        if self.N == 3:
-            straight, branch = others
+        if declared_common is not None and common == declared_common:
             if dividing:
-                diag["K_straight"] = diag[f"port_{straight}_K"]
-                diag["K_branch"] = diag[f"port_{branch}_K"]
+                diag["K_straight"] = diag[f"port_{d_straight}_K"]
+                diag["K_branch"] = diag[f"port_{d_branch}_K"]
             else:
-                diag["K11"] = diag[f"port_{straight}_K"]
-                diag["K12"] = diag[f"port_{branch}_K"]
-            diag["mass_flow_ratio"] = diag[f"port_{branch}_flow_fraction"]
+                diag["K11"] = diag[f"port_{d_straight}_K"]
+                diag["K12"] = diag[f"port_{d_branch}_K"]
+            diag["mass_flow_ratio"] = diag[f"port_{d_branch}_flow_fraction"]
         return diag
