@@ -26,3 +26,22 @@ describe("tee branch angle", () => {
 		expect(angleErrors(theta)).toHaveLength(1);
 	});
 });
+
+describe("tee loss factor", () => {
+	const ideal = (loss_factor: number): Node => ({
+		id: "tee",
+		type: "mpce_tee",
+		position: { x: 0, y: 0 },
+		data: { junction_model: "ideal_momentum", loss_factor },
+	});
+	const errs = (f: number) =>
+		validateNetwork([ideal(f)]).filter((e) => e.includes("loss factor"));
+
+	it.each([0.25, 1.0, 3.0])("accepts %s", (f) => {
+		expect(errs(f)).toHaveLength(0);
+	});
+
+	it.each([0.2, 0, -1])("refuses %s", (f) => {
+		expect(errs(f)).toHaveLength(1);
+	});
+});

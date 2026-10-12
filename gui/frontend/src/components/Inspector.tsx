@@ -1881,6 +1881,32 @@ const Inspector = () => {
 									)}
 								</div>
 
+								{selectedNode.data.junction_model === "ideal_momentum" && (
+									<div className="flex flex-col gap-2">
+										<label className="text-xs font-bold text-gray-500 uppercase">
+											Loss Factor [-]
+										</label>
+										<NumericInput
+											value={selectedNode.data.loss_factor ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { loss_factor: val })
+											}
+											className="p-2 border rounded"
+											placeholder="1.0"
+											min={0.25}
+										/>
+										<p className="text-[9px] text-gray-400 italic">
+											Scales each receiving port&apos;s loss against the mixed
+											supplied stream; the mixing of several suppliers is not
+											scaled. 1.0 is the parameter-free model. A knob for
+											matching your rig, not a validated setting: nothing here
+											recommends a value. Minimum 0.25, below which the solve
+											loses robustness and a nearly lossless split creates flow
+											work.
+										</p>
+									</div>
+								)}
+
 								{(selectedNode.data.junction_model ?? "mynard") ===
 									"constant_k" && (
 									<>
