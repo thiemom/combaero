@@ -72,6 +72,21 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
     Wang's own rig choked there, p. 1606). Not refused or flagged; a choked-
     supplier branch would be a model extension (#517).
 
+    LOSS FACTOR (#526). ``loss_factor`` (one value for every port, or one per
+    port in inlets-then-outlets order) scales each RECEIVER's loss against the
+    mixed supplied stream, ``Pt_j = Pt_mix - f_j rho_j/2 |v_j - V|^2``, while
+    the suppliers' mixing loss stays at its ideal value. The default 1.0 is the
+    parameter-free closure exactly; any f >= 0 keeps the junction's mechanical
+    dissipation non-negative, so no guard is needed. A port keeps its factor
+    when it reverses, and the factor acts only while the port receives. In a
+    split (one supplier) there is no mixing, so f scales the whole loss --
+    and f -> 0 meets the energy check: the loss is written at low Mach
+    (rho u^2/2) while the port Pt is isentropic, ~M^2/4 of the head larger,
+    so a split below f ~ M^2/4 creates flow work and is refused. The
+    factor is the user's rig-matching knob, like ``f_multiplier``: the scored
+    closure is f = 1 (dividing bias on Bassett 2001, K straight +0.26, K branch
+    +0.23), and the harness reports, never recommends, other values.
+
     Do not add a ``BorderCarnotLossElement`` on a port: the closure already
     carries the turning loss.
     """
@@ -84,6 +99,7 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         inlet_angles_deg: list[float] | None = None,
         outlet_angles_deg: list[float] | None = None,
         port_areas: list[float] | None = None,
+        loss_factor: float | list[float] = 1.0,
     ):
         super().__init__(
             id=id,
@@ -98,6 +114,23 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
                 f"IdealMomentumTeeElement '{id}': {self.N} ports, the kernel takes at most "
                 f"{IDEAL_MAX_PORTS}."
             )
+        factors = (
+            [float(loss_factor)] * self.N
+            if isinstance(loss_factor, int | float)
+            else [float(f) for f in loss_factor]
+        )
+        if len(factors) != self.N:
+            raise ValueError(
+                f"IdealMomentumTeeElement '{id}': loss_factor has {len(factors)} entries "
+                f"for {self.N} ports."
+            )
+        if not all(math.isfinite(f) and f >= 0.0 for f in factors):
+            raise ValueError(
+                f"IdealMomentumTeeElement '{id}': loss_factor must be finite and >= 0, "
+                f"got {factors}."
+            )
+        #: Per-port receiver loss factor (inlets first, then outlets).
+        self.loss_factor: list[float] = factors
 
     def axis_rad(self) -> list[float]:
         """Outward port axes, in the kernel's frame (see the class docstring)."""
@@ -117,6 +150,8 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         geom.area = [float(a) for a in self.port_areas]
         geom.axis_rad = self.axis_rad()
         geom.port_sign = [float(s) for s in self._port_signs]
+        if any(f != 1.0 for f in self.loss_factor):
+            geom.loss_factor = list(self.loss_factor)
         p_static = [float(s.P) for s in states]
         rho = [float(s.density()) for s in states]
         # outer_mdot: the connecting elements' own flows; port flow = sign * outer.

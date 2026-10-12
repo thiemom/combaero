@@ -38,6 +38,7 @@ def _branch_net(
     regime: str = "incompressible",
     pt_bra: float = 1.9e5,
     tt_bra: float = 300.0,
+    loss_factor: float | list[float] = 1.0,
 ) -> FlowNetwork:
     """MFB-fed dividing tee into two PB sinks through long arm channels."""
     net = FlowNetwork()
@@ -62,13 +63,17 @@ def _branch_net(
             outlet_nodes=["mc_str", "mc_bra"],
             inlet_angles_deg=[0.0],
             outlet_angles_deg=[0.0, theta],
+            loss_factor=loss_factor,
         )
     )
     return net
 
 
 def _merge_net(
-    m: tuple[float, float] = (0.03, 0.02), theta: float = 90.0, regime: str = "incompressible"
+    m: tuple[float, float] = (0.03, 0.02),
+    theta: float = 90.0,
+    regime: str = "incompressible",
+    loss_factor: float | list[float] = 1.0,
 ) -> FlowNetwork:
     """Two MFB suppliers joining into one PB sink."""
     net = FlowNetwork()
@@ -93,6 +98,7 @@ def _merge_net(
             outlet_nodes=["mc_com"],
             inlet_angles_deg=[0.0, theta],
             outlet_angles_deg=[0.0],
+            loss_factor=loss_factor,
         )
     )
     return net
@@ -449,3 +455,116 @@ def test_jacobian_carries_port_temperature_and_composition() -> None:
     # separate, pre-existing gap.
     assert len(rel) == len(solver.unknown_names) == 14
     assert float(np.max(rel[-4:])) < 1e-5
+
+
+# --- receiver loss factor (#526) -----------------------------------------------
+
+
+def _fd_scaled_error(solver: NetworkSolver, sol: dict, seed: int) -> float:
+    x = np.array([sol[n] for n in solver.unknown_names], dtype=float)
+    x = x * (1.0 + 1e-3 * np.random.default_rng(seed).standard_normal(x.size))
+    _, J = solver._residuals_and_jacobian(x)
+    J = J.toarray()
+    step = np.maximum(np.abs(x) * 1e-7, 1e-10)
+    J_fd = approx_derivative(solver._residuals, x, method="3-point", abs_step=step)
+    scaled_err = np.abs(J - J_fd) * np.abs(x)
+    row_ref = np.max(np.abs(J_fd) * np.abs(x), axis=1) + 1e-30
+    return float(np.max(scaled_err.max(axis=1) / row_ref))
+
+
+@pytest.mark.parametrize("builder", [_branch_net, _merge_net])
+def test_unit_loss_factor_is_the_closure_bit_for_bit(builder) -> None:
+    """f = 1, scalar or per port, is the parameter-free closure: same
+    residuals and Jacobian, exactly, at the same state."""
+    ref = NetworkSolver(builder())
+    sol = ref.solve(timeout=60.0)
+    x = np.array([sol[n] for n in ref.unknown_names], dtype=float)
+    r0, J0 = ref._residuals_and_jacobian(x)
+    for f in (1.0, [1.0, 1.0, 1.0]):
+        other = NetworkSolver(builder(loss_factor=f))
+        other.solve(timeout=60.0)  # resolves topology (inherited port areas)
+        assert other.unknown_names == ref.unknown_names
+        r1, J1 = other._residuals_and_jacobian(x)
+        assert np.array_equal(r0, r1)
+        assert np.array_equal(J0.toarray(), J1.toarray())
+
+
+@pytest.mark.parametrize("f", [0.05, 0.5, 1.5])
+def test_dividing_loss_is_f_times_vector_borda(f: float) -> None:
+    """One supplier, no mixing: each receiver loses f times its vector Borda
+    head at the split the network converged to (low Mach, as the f = 1 test)."""
+    theta = 60.0
+    sol, _ = _solve(_branch_net(theta=theta, loss_factor=f))
+    q_c = sol["mc_com.Pt"] - sol["mc_com.P"]
+    q_s = sol["ch_str.m_dot"] / sol["ch_in.m_dot"]
+    q_b = sol["ch_bra.m_dot"] / sol["ch_in.m_dot"]
+    K_s = (sol["mc_com.Pt"] - sol["mc_str.Pt"]) / q_c
+    K_b = (sol["mc_com.Pt"] - sol["mc_bra.Pt"]) / q_c
+    assert K_s == pytest.approx(f * (1.0 - q_s) ** 2, abs=2e-3)
+    borda = 1.0 + q_b**2 - 2.0 * q_b * math.cos(math.radians(theta))
+    assert K_b == pytest.approx(f * borda, abs=2e-3)
+
+
+@pytest.mark.parametrize("f", [0.0, 0.5, 1.5])
+def test_merge_scales_only_the_collector_loss(f: float) -> None:
+    """Two suppliers: f scales the collector's loss against the MIXED stream,
+    rho/2 |v_c - V|^2, and leaves the suppliers' mixing alone, so the K pair
+    moves from Blaisdell & Manson's by exactly (1 - f) L_c / q_c."""
+    theta = 90.0
+    sol, _ = _solve(_merge_net(theta=theta, loss_factor=f))
+    q_c = sol["mc_com.Pt"] - sol["mc_com.P"]
+    m_s, m_b, m_c = sol["ch_str.m_dot"], sol["ch_bra.m_dot"], sol["ch_out.m_dot"]
+    q_lat = m_b / m_c
+    U, A, th = jv.tee(q_lat, 1.0, theta)
+    ref = jv.MODELS["BM theory"](U, A, th)
+    # Mixed supplied velocity: the straight stream along +x, the lateral normal.
+    u_s = m_s / (_rho(sol, "mc_str") * _A)
+    u_b = m_b / (_rho(sol, "mc_bra") * _A)
+    u_c = m_c / (_rho(sol, "mc_com") * _A)
+    V_x, V_y = m_s * u_s / m_c, m_b * u_b / m_c
+    L_c = 0.5 * _rho(sol, "mc_com") * ((u_c - V_x) ** 2 + V_y**2)
+    shift = (1.0 - f) * L_c / q_c
+    assert (sol["mc_str.Pt"] - sol["mc_com.Pt"]) / q_c == pytest.approx(ref[1] - shift, abs=2e-3)
+    assert (sol["mc_bra.Pt"] - sol["mc_com.Pt"]) / q_c == pytest.approx(ref[2] - shift, abs=2e-3)
+    assert sol["__consistent__"] is True  # dissipation >= 0 down to f = 0
+
+
+@pytest.mark.parametrize("builder", [_branch_net, _merge_net])
+@pytest.mark.parametrize("regime", ["incompressible", "compressible"])
+def test_network_jacobian_with_unequal_loss_factors(builder, regime: str) -> None:
+    net = builder(regime=regime, loss_factor=[0.3, 0.6, 1.4])
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=60.0, use_jac=False)
+    assert sol["__success__"], sol.get("__message__")
+    assert _fd_scaled_error(solver, sol, seed=2) < 1e-5
+
+
+def test_network_jacobian_with_loss_factors_at_a_reversed_state() -> None:
+    """The reversed branch supplies while its factor (0.3) is set: the factor
+    must act only through the receiver weight, and the hot sink's density
+    columns must still carry it."""
+    net = _branch_net(
+        pt_bra=1.95e5, regime="compressible", tt_bra=400.0, loss_factor=[0.5, 1.4, 0.3]
+    )
+    solver = NetworkSolver(net)
+    sol = solver.solve(timeout=60.0, use_jac=False)
+    assert sol["__success__"] and sol["ch_bra.m_dot"] < 0.0
+    assert _fd_scaled_error(solver, sol, seed=3) < 1e-5
+
+
+@pytest.mark.parametrize("f", [-0.1, float("nan"), float("inf"), [1.0, 1.0]])
+def test_invalid_loss_factor_is_refused(f) -> None:
+    with pytest.raises(ValueError, match="loss_factor"):
+        _branch_net(loss_factor=f)
+
+
+def test_lossless_split_is_refused_by_the_energy_check() -> None:
+    """f = 0 removes a split's only loss as written at low Mach (rho u^2/2),
+    but the port nodes' Pt is isentropic, larger by ~M^2/4 of the head. So a
+    "lossless" split creates flow work of that size, and the energy check
+    refuses it: measured -3.2e-4 of the supplied flow's head at port Mach
+    0.034, where M^2/4 = 2.9e-4. Any f above ~M^2/4 dissipates (0.05 is
+    tested above); a merge keeps its mixing loss and converges at f = 0."""
+    sol = NetworkSolver(_branch_net(theta=60.0, loss_factor=0.0)).solve(timeout=60.0)
+    assert not sol["__success__"]
+    assert "unphysical" in sol["__message__"]
