@@ -71,6 +71,21 @@
 // f = 1. The same algebra is Pt = P + rho u^2/2, i.e. the low-Mach reading of
 // the loss; the rows themselves stay the exact momentum balance.
 //
+// FADE AT A DEAD PORT. With f != 1 a receiver carrying vanishing flow still
+// has L_j -> rho_j |V|^2 / 2, so its static tends to p_jn + (1 - f) rho|V|^2/2
+// while as a supplier it sits at p_jn: a step of (f - 1) supplied heads across
+// reversal (measured 4.0 heads at f = 5 over +-1e-4 of the throughput, none at
+// f = 1). The role blend alone turned that into a cliff Newton stalled on, or
+// landed in and was refused, whenever a branch shut off or reversed. So the
+// factor fades to 1 with the port's flow:
+//
+//     f_eff,j = 1 + (f_j - 1) phi_j,  phi_j = m_j^2 / (m_j^2 + delta^2),
+//
+// delta = IDEAL_LOSS_FADE_REL of the throughput. A dead port is back at p_jn,
+// f_eff lies between 1 and f_j (so >= 0, sign-safe), and f = 1 is untouched.
+// A port carrying a share s of the throughput keeps 1 - delta^2/s^2 of its
+// factor's effect: 96% at s = 5%, 99% at 10%.
+//
 // DENSITY. Thermodynamics-free like mpce_junction.h: rho and drho/dP per port
 // enter as values, seeded first order on P_i.
 //
@@ -94,6 +109,9 @@ constexpr int kIdealSeeds = 2 * kIdealMaxPorts + 1;
 constexpr double IDEAL_ROLE_EPS_REL = 1.0e-4;
 // Absolute floor [kg/s] so the all-zero state stays smooth.
 constexpr double IDEAL_ROLE_EPS_ABS = 1.0e-9;
+// Flow share below which a receiver's loss factor fades back to 1 (#526),
+// as a fraction of the throughput |m|_2. A smoothing width, not physics.
+constexpr double IDEAL_LOSS_FADE_REL = 1.0e-2;
 
 struct IdealJunctionGeometry {
   std::vector<double> area;       // [m^2]
@@ -203,7 +221,10 @@ inline IdealJunctionResult ideal_junction_residuals_and_jacobian(
       const D dx = U[j] * std::cos(geom.axis_rad[j]) - Vx;
       const D dy = U[j] * std::sin(geom.axis_rad[j]) - Vy;
       const D L = Rho[j] * 0.5 * (dx * dx + dy * dy);
-      row = row + S[j] * L * (f - 1.0);
+      const D delta2 = m2 * (IDEAL_LOSS_FADE_REL * IDEAL_LOSS_FADE_REL) +
+                       IDEAL_ROLE_EPS_ABS * IDEAL_ROLE_EPS_ABS;
+      const D phi = M[j] * M[j] / (M[j] * M[j] + delta2);
+      row = row + S[j] * L * phi * (f - 1.0);
     }
     store(j, row);
   }

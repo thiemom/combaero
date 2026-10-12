@@ -114,8 +114,13 @@ def test_loss_factor_scales_each_receivers_loss_through_the_binding() -> None:
     base = _split_Pt_drop(None)
     assert _split_Pt_drop([1.0, 1.0, 1.0]) == base
     scaled = _split_Pt_drop([0.0, 0.5, 1.5])
-    assert scaled[0] == pytest.approx(0.5 * base[0], rel=1e-6)
-    assert scaled[1] == pytest.approx(1.5 * base[1], rel=1e-6)
+    # Each factor fades to 1 with its port's flow share (IDEAL_LOSS_FADE_REL
+    # = 1e-2 of |m|_2), so the effective one is 1 + (f - 1) phi.
+    m = np.array([-RHO * 1.0, RHO * 0.6, RHO * 0.8 * 0.5])  # rho U A, + out
+    d2 = 1e-4 * float(np.sum(m * m))
+    phi = m * m / (m * m + d2)
+    assert scaled[0] == pytest.approx((1.0 - 0.5 * phi[1]) * base[0], rel=1e-6)
+    assert scaled[1] == pytest.approx((1.0 + 0.5 * phi[2]) * base[1], rel=1e-6)
 
 
 @pytest.mark.parametrize("f", [[1.0, -0.1, 1.0], [1.0, 1.0]])
