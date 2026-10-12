@@ -946,6 +946,51 @@ class ConstantKTeeElement(MultiPortChamberElement):
         # then outlets); the common port's entry is ignored (K = 0).
         self.K_ports: dict[int, float] = dict(K_ports) if K_ports else {}
 
+    @staticmethod
+    def bassett_design_K(
+        flow_direction: FlowDirection,
+        q_branch: float,
+        psi: float,
+        theta_deg: float,
+    ) -> tuple[float, float]:
+        """(K_straight, K_branch) from Bassett 2001's analytical pair at a
+        DESIGN split, for use as constant K.
+
+        A constant K belongs to one operating point: the branch loss of a tee
+        referenced to the common-leg head grows like (q psi)^2, so a K typed
+        for an equal-area tee is several times too low for a narrow branch.
+        This evaluates Bassett, Winterbone & Pearson (2001, Proc IMechE C
+        215(8)) at the split the user designs for -- the analytical pair the
+        junction harness scores (K5/K6 dividing; K11/K12 joining, angle-
+        corrected per Eq 33) -- so the default follows the geometry. The
+        element still holds the result fixed: away from ``q_branch`` the
+        loss is wrong in the way any constant K is.
+
+        ``q_branch`` is the branch's share of the common-leg mass flow,
+        ``psi = F_common / F_branch``. Each coefficient is read at the
+        fraction of its OWN leg (Table 1), i.e. the straight one at
+        ``1 - q_branch`` (see bassett2001.separating_pair_at for the slip
+        this avoids). Sign convention as the element's: dividing K =
+        (Pt_com - Pt_arm)/q_com, joining K = (Pt_arm - Pt_com)/q_com.
+        """
+        if not 0.0 < q_branch < 1.0:
+            raise ValueError(f"q_branch must lie in (0, 1), got {q_branch}")
+        if psi <= 0.0:
+            raise ValueError(f"psi must be > 0, got {psi}")
+        q = float(q_branch)
+        qs = 1.0 - q
+        # Hager's 3/4 effective-angle factor, intrinsic to Bassett's dividing
+        # forms and his Eq 33 joining correction.
+        c = math.cos(0.75 * math.radians(float(theta_deg)))
+        if flow_direction == "branch":
+            K5 = qs * qs - 1.5 * qs + 0.5
+            K6 = 1.0 + q * q * psi * psi - 2.0 * q * psi * c
+            return K5, K6
+        D = psi + 0.5 * c
+        K11 = (2.0 * psi / D) * (1.0 - qs * qs - q * q * psi * c) + qs * qs - 1.0
+        K12 = (2.0 * psi / D) * (1.0 - qs * qs - q * q * psi * c) + q * q * psi * psi - 1.0
+        return K11, K12
+
     def _common_port_index(self) -> int:
         # Port order is inlet_nodes + outlet_nodes: the single inlet of a
         # branch tee is port 0; the single outlet of a merge tee is the

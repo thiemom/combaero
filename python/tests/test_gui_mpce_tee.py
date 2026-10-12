@@ -359,8 +359,30 @@ def test_constant_k_model_builds_constant_k_element_merge():
     e = _get_element(net, "mpce")
     assert isinstance(e, ConstantKTeeElement)
     assert e.flow_direction == "merge"
-    # Schema defaults: K_straight=0.4, K_branch=1.0.
-    assert e.K_ports == {0: 0.4, 1: 1.0}
+    # Blank K: Bassett's joining pair at the default design share (0.5), the
+    # resolved psi (equal areas here) and the fixture's 45 deg.
+    K11, K12 = ConstantKTeeElement.bassett_design_K("merge", 0.5, 1.0, 45.0)
+    assert e.K_ports == pytest.approx({0: K11, 1: K12})
+
+
+@pytest.mark.parametrize("flow_direction", ["branch", "merge"])
+def test_constant_k_blank_K_follows_the_resolved_geometry(flow_direction: str) -> None:
+    """A blank K is Bassett's pair at the design share and the INHERITED
+    areas (branch channel D 0.05 vs 0.1: psi = 4) and angle; a typed K
+    overrides only its own leg."""
+    from combaero.network.mpce_element import ConstantKTeeElement
+
+    schema = _mpce_with_channels_schema(flow_direction)
+    node = next(n for n in schema.nodes if n.id == "mpce")
+    node.data.update(junction_model="constant_k", design_branch_share=0.7, K_straight=0.25)
+    e = _get_element(build_network_from_schema(schema), "mpce")
+    _, K_bra = ConstantKTeeElement.bassett_design_K(flow_direction, 0.7, 4.0, 90.0)
+    if flow_direction == "branch":
+        assert e.K_ports == pytest.approx({1: 0.25, 2: K_bra})
+    else:
+        assert e.K_ports == pytest.approx({0: 0.25, 1: K_bra})
+    # psi = 4 at a 0.7 share: the branch K is several times the equal-area one.
+    assert K_bra > 3.0 * ConstantKTeeElement.bassett_design_K(flow_direction, 0.7, 1.0, 90.0)[1]
 
 
 def test_default_and_legacy_schemas_build_mynard_element():
@@ -384,8 +406,8 @@ def test_default_and_legacy_schemas_build_mynard_element():
 def test_mpce_tee_data_constant_k_defaults():
     d = MPCETeeData()
     assert d.junction_model == "mynard"
-    assert d.K_straight == 0.4
-    assert d.K_branch == 1.0
+    assert d.K_straight is None and d.K_branch is None  # blank = from design share
+    assert d.design_branch_share == 0.5
     d2 = MPCETeeData(junction_model="constant_k", K_straight=0.25, K_branch=2.0)
     assert d2.junction_model == "constant_k"
     assert d2.K_straight == 0.25
@@ -479,6 +501,14 @@ def test_mpce_tee_data_refuses_branch_angles_out_of_range(theta: float) -> None:
 
     with pytest.raises(ValidationError, match="branch angle"):
         MPCETeeData(theta_deg=theta)
+
+
+@pytest.mark.parametrize("share", [0.0, 1.0, -0.1, 1.5])
+def test_mpce_tee_data_refuses_design_share_outside_open_unit_interval(share: float) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        MPCETeeData(design_branch_share=share)
 
 
 def test_mpce_tee_data_accepts_ideal_momentum() -> None:

@@ -816,10 +816,17 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 # port, referenced to the common-leg dynamic head. Port
                 # order is inlets first: branch = [common, straight,
                 # branch]; merge = [straight, branch, common].
+                # A K left blank comes from Bassett's analytical pair at the
+                # design split and the resolved geometry.
+                _K_str_d, _K_bra_d = ConstantKTeeElement.bassett_design_K(
+                    _md.flow_direction, _md.design_branch_share, _psi, _md.theta_deg
+                )
+                _K_str = _md.K_straight if _md.K_straight is not None else _K_str_d
+                _K_bra = _md.K_branch if _md.K_branch is not None else _K_bra_d
                 if _md.flow_direction == "branch":
-                    _k_ports = {1: _md.K_straight, 2: _md.K_branch}
+                    _k_ports = {1: _K_str, 2: _K_bra}
                 else:
-                    _k_ports = {0: _md.K_straight, 1: _md.K_branch}
+                    _k_ports = {0: _K_str, 1: _K_bra}
                 _mpce = ConstantKTeeElement(
                     id=elem_id,
                     inlet_nodes=_inlets,
