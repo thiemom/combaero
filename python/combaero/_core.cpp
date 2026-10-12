@@ -1309,7 +1309,10 @@ PYBIND11_MODULE(_core, m) {
       .def(py::init<>())
       .def_readwrite("area", &solver::IdealJunctionGeometry::area)
       .def_readwrite("axis_rad", &solver::IdealJunctionGeometry::axis_rad)
-      .def_readwrite("port_sign", &solver::IdealJunctionGeometry::port_sign);
+      .def_readwrite("port_sign", &solver::IdealJunctionGeometry::port_sign)
+      .def_readwrite("loss_factor", &solver::IdealJunctionGeometry::loss_factor,
+                     "Receiver loss factor f_i >= 0 per port (#526); empty = all 1, "
+                     "the parameter-free closure.");
 
   py::class_<solver::IdealJunctionResult>(
       m, "IdealJunctionResult",

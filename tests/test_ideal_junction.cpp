@@ -206,8 +206,11 @@ void expect_jacobian_matches_fd(const std::vector<double>& P0,
   for (std::size_t c = 0; c < 2 * n + 1; ++c) {
     const double x = c < n ? P0[c] : (c < 2 * n ? m0[c - n] : pjn0);
     // Flow steps well inside the role blend (width 1e-4 of the throughput),
-    // or central differences carry its curvature as truncation error.
-    const double h = c < 2 * n && c >= n ? 1e-8 * std::max(mscale, 1e-6)
+    // or central differences carry its curvature as truncation error. The
+    // loss-factor term (#526) adds curvature: at 1e-7 / 1e-8 of the throughput
+    // the worst excess was 8.8e-4 / 8.8e-6 -- the h^2 of truncation, not a
+    // Jacobian error -- so the step is 1e-9.
+    const double h = c < 2 * n && c >= n ? 1e-9 * std::max(mscale, 1e-6)
                                          : 1e-6 * std::max(std::abs(x), 1.0);
     const std::vector<double> rp = eval(c, h), rm = eval(c, -h);
     // Compare J_ij * |dx_j| for a unit change of the column's natural scale.
@@ -289,4 +292,149 @@ TEST(IdealJunction, RejectsInconsistentPorts) {
   EXPECT_THROW(ideal_junction_residuals_and_jacobian(one, one, one, one, 0.0, g),
                std::invalid_argument);
   (void)two;
+}
+
+// ---------------------------------------------------------------------------
+// Receiver loss factor f (#526): Pt_j = Pt_mix,j - f_j L_j.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+std::vector<double> solved_statics_f(Ports p, const std::vector<double>& f) {
+  p.g.loss_factor = f;
+  return solved_statics(p);
+}
+
+double rel2(const Ports& p, std::size_t i, double Vx, double Vy) {
+  const double u = p.m[i] / (kRho * p.g.area[i]);
+  const double dx = u * std::cos(p.g.axis_rad[i]) - Vx;
+  const double dy = u * std::sin(p.g.axis_rad[i]) - Vy;
+  return dx * dx + dy * dy;
+}
+
+}  // namespace
+
+// f = 1 is the closure itself: not "close", identical, in rows and Jacobian.
+TEST(IdealJunctionLossFactor, UnitFactorIsBitIdentical) {
+  const std::vector<double> P = {2.00e5, 2.01e5, 1.99e5};
+  const std::vector<double> rho = {2.3, 2.31, 2.29};
+  std::vector<double> drho(3);
+  for (int i = 0; i < 3; ++i) drho[i] = rho[i] / P[i];
+  for (Ports p : {merge_tee(0.35, 2.0, 1.0), split_tee(0.6, 3.0, 1.2),
+                  split_tee(1.0 + 1e-5, 1.0, 0.8)}) {
+    for (double& a : p.g.area) a *= 0.02;
+    const IdealJunctionResult base =
+        ideal_junction_residuals_and_jacobian(P, rho, drho, p.m, 2.005e5, p.g);
+    p.g.loss_factor = {1.0, 1.0, 1.0};
+    const IdealJunctionResult one =
+        ideal_junction_residuals_and_jacobian(P, rho, drho, p.m, 2.005e5, p.g);
+    for (std::size_t r = 0; r < base.residual.size(); ++r) {
+      EXPECT_EQ(one.residual[r], base.residual[r]);
+      for (std::size_t c = 0; c < base.jacobian[r].size(); ++c) {
+        EXPECT_EQ(one.jacobian[r][c], base.jacobian[r][c]);
+      }
+    }
+  }
+}
+
+// Split: one supplier, no mixing, so each receiver loses exactly f_j times its
+// vector Borda head -- per port, with unequal factors.
+TEST(IdealJunctionLossFactor, SplitLossScalesPerPort) {
+  for (double th_deg : {45.0, 90.0}) {
+    for (double qs : {0.2, 0.5, 0.8}) {
+      for (const std::vector<double>& f :
+           {std::vector<double>{1.0, 0.0, 0.0}, std::vector<double>{0.0, 0.5, 1.5},
+            std::vector<double>{2.5, 2.0, 0.3}}) {
+        const Ports p = split_tee(qs, 2.0, th_deg * M_PI / 180.0);
+        const std::vector<double> P = solved_statics_f(p, f);
+        const double u0 = 1.0 / kRho;
+        const double head = 0.5 * kRho * u0 * u0;
+        const double Pt0 = total_pressure(P[0], p.m[0], p.g.area[0]);
+        for (std::size_t j : {1u, 2u}) {
+          const double Ptj = total_pressure(P[j], p.m[j], p.g.area[j]);
+          const double borda = 0.5 * kRho * rel2(p, j, u0, 0.0);
+          EXPECT_NEAR((Pt0 - Ptj) / head, f[j] * borda / head, kSmoothTol)
+              << "port " << j << " th " << th_deg << " qs " << qs << " f " << f[j];
+        }
+        // The supplier sits at p_jn whatever ITS factor: a port keeps its f when
+        // it reverses, and the factor must act only while it receives.
+        EXPECT_NEAR(P[0], 0.0, kSmoothTol * head);
+      }
+    }
+  }
+}
+
+// Merge: the dissipation is the suppliers' mixing term plus the SCALED
+// receiver term, so it stays >= 0 for every f >= 0 (f = 0: mixing only).
+TEST(IdealJunctionLossFactor, MergeDissipationIsMixingPlusScaledReceiverLoss) {
+  for (double psi : {1.0, 2.0, 4.0}) {
+    for (double d_deg : {30.0, 90.0, 150.0}) {
+      for (double q : {0.1, 0.5, 0.9}) {
+        for (double fc : {0.0, 0.5, 1.0, 1.5}) {
+          const Ports p = merge_tee(q, psi, d_deg * M_PI / 180.0);
+          const std::vector<double> P = solved_statics_f(p, {fc, 0.3, 2.0});
+          // V from the suppliers (ports 1 and 2), mass-weighted.
+          double Vx = 0.0, Vy = 0.0;
+          for (std::size_t k : {1u, 2u}) {
+            const double u = p.m[k] / (kRho * p.g.area[k]);
+            Vx += -p.m[k] * u * std::cos(p.g.axis_rad[k]);
+            Vy += -p.m[k] * u * std::sin(p.g.axis_rad[k]);
+          }
+          double phi = 0.0;
+          for (std::size_t i = 0; i < 3; ++i) {
+            phi -= p.m[i] * total_pressure(P[i], p.m[i], p.g.area[i]);
+          }
+          const double mix =
+              0.5 * kRho * (-p.m[1] * rel2(p, 1, Vx, Vy) - p.m[2] * rel2(p, 2, Vx, Vy));
+          const double rec = fc * p.m[0] * 0.5 * kRho * rel2(p, 0, Vx, Vy);
+          const double head = 0.5 * kRho / (kRho * kRho);
+          EXPECT_NEAR(phi / head, (mix + rec) / head, 10.0 * kSmoothTol)
+              << "psi " << psi << " d " << d_deg << " q " << q << " f " << fc;
+          EXPECT_GE(phi, -1e-9);
+          // Suppliers (factors 0.3 and 2.0, both with v_k != V) stay at p_jn.
+          EXPECT_NEAR(P[1], 0.0, kSmoothTol * head);
+          EXPECT_NEAR(P[2], 0.0, kSmoothTol * head);
+        }
+      }
+    }
+  }
+}
+
+// Jacobian with factors: merge, split, unequal per-port factors, and through
+// the role blend where a port turns from receiver to supplier.
+TEST(IdealJunctionLossFactor, JacobianMatchesCentralDifferences) {
+  const std::vector<double> P = {2.00e5, 2.01e5, 1.99e5};
+  const std::vector<double> rho = {2.3, 2.31, 2.29};
+  std::vector<double> drho(3);
+  for (int i = 0; i < 3; ++i) drho[i] = rho[i] / P[i];
+  auto realistic = [](Ports p, const std::vector<double>& f) {
+    for (double& a : p.g.area) a *= 0.02;
+    p.g.loss_factor = f;
+    return p;
+  };
+  for (const std::vector<double>& f :
+       {std::vector<double>{0.0, 0.0, 0.0}, std::vector<double>{0.5, 0.5, 0.5},
+        std::vector<double>{1.5, 1.5, 1.5}, std::vector<double>{0.2, 1.7, 0.6}}) {
+    const Ports merge = realistic(merge_tee(0.35, 2.0, 60.0 * M_PI / 180.0), f);
+    expect_jacobian_matches_fd(P, rho, drho, merge.m, 2.005e5, merge.g);
+    const Ports split = realistic(split_tee(0.6, 3.0, 90.0 * M_PI / 180.0), f);
+    expect_jacobian_matches_fd(P, rho, drho, split.m, 2.005e5, split.g);
+    for (double s : {-1e-4, -1e-5, 0.0, 1e-5, 1e-4, 3e-3}) {
+      const Ports p = realistic(split_tee(1.0 - s, 1.0, 45.0 * M_PI / 180.0), f);
+      expect_jacobian_matches_fd(P, rho, drho, p.m, 2.005e5, p.g);
+    }
+  }
+}
+
+TEST(IdealJunctionLossFactor, RejectsInvalidFactors) {
+  Ports p = split_tee(0.5, 1.0, M_PI / 2.0);
+  const std::vector<double> P = {1e5, 1e5, 1e5}, rho = {1.2, 1.2, 1.2};
+  const std::vector<double> z = {0.0, 0.0, 0.0};
+  for (const std::vector<double>& f :
+       {std::vector<double>{1.0, -0.1, 1.0}, std::vector<double>{1.0, NAN, 1.0},
+        std::vector<double>{1.0, INFINITY, 1.0}, std::vector<double>{1.0, 1.0}}) {
+    p.g.loss_factor = f;
+    EXPECT_THROW(ideal_junction_residuals_and_jacobian(P, rho, z, p.m, 1e5, p.g),
+                 std::invalid_argument);
+  }
 }

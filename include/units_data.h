@@ -664,7 +664,8 @@ inline constexpr Entry function_units[] = {
      "outer_mdot: list[kg/s] (the CONNECTING element's flow; geom.port_sign "
      "maps it to junction convention, + out), p_jn: Pa, "
      "geom: IdealJunctionGeometry (area: list[m^2], axis_rad: list[rad] "
-     "outward port axis, port_sign: list[-])",
+     "outward port axis, port_sign: list[-], loss_factor: list[-] receiver "
+     "loss factor f >= 0, empty = all 1)",
      "IdealJunctionResult (residual: list[Pa] with a final kg/s mass row, "
      "jacobian: list[list[d(row)/d(col)]] over columns "
      "[p_static x N, outer_mdot x N, p_jn], velocity: list[m/s] (+ out), "
