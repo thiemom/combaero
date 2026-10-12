@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SmoothModelData(BaseModel):
@@ -426,6 +426,17 @@ class MPCETeeData(BaseModel):
     # (faithful Mynard); set to a custom value for re-calibrated workflows.
     joining_etransfer_alpha: float | None = None
     initial_guess: dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("theta_deg")
+    @classmethod
+    def _branch_angle_in_range(cls, v: float) -> float:
+        # The rule the frontend has enforced since #141. The closures read the
+        # angle only through cos/sin, so an unbounded value is not refused
+        # there: 900 silently becomes a 180 deg tee, and 0 lays the branch on
+        # the straight run. A negative angle is the mirror image.
+        if not 0.0 < abs(v) <= 90.0:
+            raise ValueError(f"tee branch angle must satisfy 0 < |theta| <= 90 deg, got {v}")
+        return v
 
 
 class EjectorData(BaseModel):

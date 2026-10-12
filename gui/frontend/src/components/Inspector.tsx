@@ -1918,10 +1918,12 @@ const Inspector = () => {
 										}
 										className="p-2 border rounded"
 										placeholder="90"
+										min={-90}
+										max={90}
 									/>
 									<p className="text-[9px] text-gray-400 italic">
-										Branch arm angle measured from the main axis. Mynard's
-										smooth K relation is valid across the full 0-180 deg range.
+										Branch arm angle measured from the main axis, 0 &lt; |theta|
+										&lt;= 90 deg; a negative angle is the mirror image.
 									</p>
 								</div>
 

@@ -465,5 +465,21 @@ def test_ideal_momentum_runner_entrainment_is_reported_as_reversal() -> None:
         assert key not in row or row[key] != row[key], key  # absent or NaN
 
 
+@pytest.mark.parametrize("theta", [90.0, 45.0, -90.0, 1e-3])
+def test_mpce_tee_data_accepts_branch_angles_in_range(theta: float) -> None:
+    assert MPCETeeData(theta_deg=theta).theta_deg == theta
+
+
+@pytest.mark.parametrize("theta", [0.0, 900.0, 180.0, 91.0, -91.0])
+def test_mpce_tee_data_refuses_branch_angles_out_of_range(theta: float) -> None:
+    """The closures read the angle only through cos/sin, so nothing below the
+    schema refuses it: 900 solved silently as a 180 deg tee and 0 as a branch
+    lying on the straight run. Same rule as the frontend's check (#141)."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="branch angle"):
+        MPCETeeData(theta_deg=theta)
+
+
 def test_mpce_tee_data_accepts_ideal_momentum() -> None:
     assert MPCETeeData(junction_model="ideal_momentum").junction_model == "ideal_momentum"
