@@ -1514,6 +1514,13 @@ mass-weighted Pt dissipation is the suppliers' mixing term
   as `(f_j - 1) s_j L_j`. A supplying port's row is untouched; a port keeps its factor
   when it reverses, and the factor acts only while the port receives.
 - `f = 1` (or an empty vector) is the parameter-free closure, bit for bit.
+- The factor fades to 1 with the port's flow, `f_eff = 1 + (f - 1) m^2/(m^2 + delta^2)`,
+  with `delta = IDEAL_LOSS_FADE_REL = 1e-2` of the throughput.
+  - Without it, a receiver carrying vanishing flow sat at `p_jn + (1 - f) rho|V|^2/2`
+    while as a supplier it sits at `p_jn`: a step of `(f - 1)` supplied heads across
+    reversal, which stalled or misled the solve whenever a branch shut off.
+  - A port with share `s` keeps `1 - delta^2/s^2` of the factor's effect: 96% at 5%,
+    99% at 10%.
 - The mixing term is not scaled, so `f = 0` is lossless only in a split.
 - Any `f >= 0` keeps the mechanical dissipation non-negative. Negative or non-finite
   factors are refused.

@@ -317,7 +317,10 @@ def test_the_loss_factor_reaches_the_ideal_element_and_its_root_curve():
     case = _case(drive="flow_and_pressures")
     s1, _ = rr._closure_curve(case, "ideal", 1.0)
     s5, _ = rr._closure_curve(case, "ideal", 0.5)
-    assert np.allclose(s5, 0.5 * s1, rtol=0.0, atol=1e-4)
+    # Where the straight leg carries >= 20%: below that the factor fades to 1
+    # by design (IDEAL_LOSS_FADE_REL), keeping >= 99.6% of its effect here.
+    keep = rr._Q_GRID <= 0.8
+    assert np.allclose(s5[keep], 0.5 * s1[keep], rtol=0.0, atol=2e-3)
 
 
 def test_the_loss_factor_is_refused_for_the_mynard_model():

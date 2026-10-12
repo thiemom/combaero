@@ -78,7 +78,10 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
     the suppliers' mixing loss stays at its ideal value. The default 1.0 is the
     parameter-free closure exactly; any f >= 0 keeps the junction's mechanical
     dissipation non-negative, so no guard is needed. A port keeps its factor
-    when it reverses, and the factor acts only while the port receives. In a
+    when it reverses, and the factor acts only while the port receives; it
+    fades to 1 as the port's flow share drops below ~1% of the throughput, so
+    a branch that shuts off or reverses keeps a continuous static pressure
+    (``IDEAL_LOSS_FADE_REL`` in include/ideal_junction.h). In a
     split (one supplier) there is no mixing, so f scales the whole loss --
     and f -> 0 meets the energy check: the loss is written at low Mach
     (rho u^2/2) while the port Pt is isentropic, ~M^2/4 of the head larger,

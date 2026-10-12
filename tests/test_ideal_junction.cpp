@@ -305,6 +305,15 @@ std::vector<double> solved_statics_f(Ports p, const std::vector<double>& f) {
   return solved_statics(p);
 }
 
+// The factor a port actually carries: f faded to 1 with its flow share,
+// written out here independently of the kernel.
+double f_eff(const Ports& p, std::size_t i, double f) {
+  double m2 = 0.0;
+  for (double m : p.m) m2 += m * m;
+  const double d2 = 1e-4 * m2;  // (IDEAL_LOSS_FADE_REL = 1e-2)^2
+  return 1.0 + (f - 1.0) * p.m[i] * p.m[i] / (p.m[i] * p.m[i] + d2);
+}
+
 double rel2(const Ports& p, std::size_t i, double Vx, double Vy) {
   const double u = p.m[i] / (kRho * p.g.area[i]);
   const double dx = u * std::cos(p.g.axis_rad[i]) - Vx;
@@ -353,7 +362,7 @@ TEST(IdealJunctionLossFactor, SplitLossScalesPerPort) {
         for (std::size_t j : {1u, 2u}) {
           const double Ptj = total_pressure(P[j], p.m[j], p.g.area[j]);
           const double borda = 0.5 * kRho * rel2(p, j, u0, 0.0);
-          EXPECT_NEAR((Pt0 - Ptj) / head, f[j] * borda / head, kSmoothTol)
+          EXPECT_NEAR((Pt0 - Ptj) / head, f_eff(p, j, f[j]) * borda / head, kSmoothTol)
               << "port " << j << " th " << th_deg << " qs " << qs << " f " << f[j];
         }
         // The supplier sits at p_jn whatever ITS factor: a port keeps its f when
@@ -386,7 +395,7 @@ TEST(IdealJunctionLossFactor, MergeDissipationIsMixingPlusScaledReceiverLoss) {
           }
           const double mix =
               0.5 * kRho * (-p.m[1] * rel2(p, 1, Vx, Vy) - p.m[2] * rel2(p, 2, Vx, Vy));
-          const double rec = fc * p.m[0] * 0.5 * kRho * rel2(p, 0, Vx, Vy);
+          const double rec = f_eff(p, 0, fc) * p.m[0] * 0.5 * kRho * rel2(p, 0, Vx, Vy);
           const double head = 0.5 * kRho / (kRho * kRho);
           EXPECT_NEAR(phi / head, (mix + rec) / head, 10.0 * kSmoothTol)
               << "psi " << psi << " d " << d_deg << " q " << q << " f " << fc;
@@ -436,5 +445,34 @@ TEST(IdealJunctionLossFactor, RejectsInvalidFactors) {
     p.g.loss_factor = f;
     EXPECT_THROW(ideal_junction_residuals_and_jacobian(P, rho, z, p.m, 1e5, p.g),
                  std::invalid_argument);
+  }
+}
+
+// A port whose flow passes through zero keeps a continuous static pressure at
+// any f. Without the fade a receiver's static tended to p_jn + (1 - f) q_V
+// while a supplier's sits at p_jn: a step of 4.0 supplied heads at f = 5 over
+// +-1e-4 of the throughput. Now it is continuous and the dead port is at p_jn.
+TEST(IdealJunctionLossFactor, DeadPortIsContinuousThroughReversal) {
+  for (double f : {0.0, 0.5, 2.0, 5.0, 20.0}) {
+    auto P_branch = [&](double mb) {
+      Ports p = split_tee(1.0 - mb, 1.0, M_PI / 2.0);
+      p.g.loss_factor = {f, f, f};
+      return solved_statics(p)[2];
+    };
+    const double q = 0.5 * kRho * (1.0 / kRho) * (1.0 / kRho);
+    EXPECT_NEAR(P_branch(0.0) / q, 0.0, 1e-9) << "f " << f;
+    // Across the role blend (1e-4 of the throughput) the step is now
+    // (f - 1) phi, phi ~ (1e-4 / 1e-2)^2.
+    EXPECT_LT(std::abs(P_branch(1e-4) - P_branch(-1e-4)) / q, 1e-3 * std::max(1.0, f))
+        << "f " << f;
+    // Well above the fade width the factor is back in full.
+    const double far = P_branch(0.2) / q;
+    Ports p = split_tee(0.8, 1.0, M_PI / 2.0);
+    const double V = 1.0 / kRho;
+    const double u = 0.2 / kRho;
+    const double L = 0.5 * kRho * (u * u + V * V);  // 90 deg: |v - V|^2 = u^2 + V^2
+    // P = p_jn + rho V^2/2 - f_eff L - rho u^2/2 (Pt_j = Pt_mix - f L).
+    const double want = (0.5 * kRho * V * V - f_eff(p, 2, f) * L - 0.5 * kRho * u * u) / q;
+    EXPECT_NEAR(far, want, kSmoothTol) << "f " << f;
   }
 }
