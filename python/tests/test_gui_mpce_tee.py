@@ -513,3 +513,52 @@ def test_mpce_tee_data_refuses_design_share_outside_open_unit_interval(share: fl
 
 def test_mpce_tee_data_accepts_ideal_momentum() -> None:
     assert MPCETeeData(junction_model="ideal_momentum").junction_model == "ideal_momentum"
+
+
+def test_ideal_momentum_loss_factor_reaches_the_element() -> None:
+    """loss_factor (#526) is passed to every port; the default is the closure."""
+    from combaero.network import IdealMomentumTeeElement
+
+    for f, want in ((None, 1.0), (0.6, 0.6)):
+        schema = _mpce_with_channels_schema("branch")
+        node = next(n for n in schema.nodes if n.id == "mpce")
+        node.data["junction_model"] = "ideal_momentum"
+        if f is not None:
+            node.data["loss_factor"] = f
+        e = _get_element(build_network_from_schema(schema), "mpce")
+        assert isinstance(e, IdealMomentumTeeElement)
+        assert e.loss_factor == [want] * 3
+
+
+@pytest.mark.parametrize("f", [0.2, 0.0, -1.0])
+def test_mpce_tee_data_refuses_a_loss_factor_below_the_robust_floor(f: float) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        MPCETeeData(junction_model="ideal_momentum", loss_factor=f)
+
+
+def test_ideal_momentum_runner_loss_factor_lowers_the_branch_loss() -> None:
+    """A genuine split through the GUI runner at f = 0.5 converges, and its
+    branch K is lower than at f = 1 (the split itself moves, so not exactly
+    half)."""
+    from gui.backend.runner import NetworkRunner
+
+    def k_branch(f: float) -> float:
+        schema = _mpce_with_channels_schema("branch").model_dump()
+        for n in schema["nodes"]:
+            if n["id"] == "p_com":
+                n["type"], n["data"] = "mass_boundary", {"m_dot": 0.2, "Tt": 300.0}
+            elif n["id"] == "p_str":
+                n["type"], n["data"] = "pressure_boundary", {"Pt": 1.0e5, "Tt": 300.0}
+            elif n["id"] == "p_bra":
+                n["type"], n["data"] = "pressure_boundary", {"Pt": 0.97e5, "Tt": 300.0}
+            elif n["id"] == "mpce":
+                n["data"].update(junction_model="ideal_momentum", loss_factor=f)
+        df = NetworkRunner.from_dict(schema).solve(timeout=60.0).to_dataframe()
+        row = df[df["id"] == "mpce"].iloc[0]
+        assert bool(row["success"])
+        return float(row["K_branch [-]"])
+
+    k1, k5 = k_branch(1.0), k_branch(0.5)
+    assert 0.0 < k5 < k1

@@ -839,9 +839,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     K_ports=_k_ports,
                 )
             elif _md.junction_model == "ideal_momentum":
-                # Parameter-free baseline (#517): no K, no tuning, no
-                # declared direction -- the inlet/outlet split above only
-                # wires the ports and sets the angle convention.
+                # Parameter-free baseline (#517): no K, no declared
+                # direction -- the inlet/outlet split above only wires the
+                # ports and sets the angle convention. loss_factor (#526) is
+                # the user's knob; 1.0 is the closure itself.
                 _mpce = IdealMomentumTeeElement(
                     id=elem_id,
                     inlet_nodes=_inlets,
@@ -849,6 +850,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     inlet_angles_deg=_inlet_angles,
                     outlet_angles_deg=_outlet_angles,
                     port_areas=_port_areas,
+                    loss_factor=_md.loss_factor,
                 )
             else:
                 _mpce = MultiPortChamberElement(

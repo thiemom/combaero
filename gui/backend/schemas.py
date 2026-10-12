@@ -421,6 +421,12 @@ class MPCETeeData(BaseModel):
     K_straight: float | None = None
     K_branch: float | None = None
     design_branch_share: float = Field(default=0.5, gt=0.0, lt=1.0)
+    # ideal_momentum only (#526): receiver loss factor f. 1.0 is the
+    # parameter-free closure. The floor is the robustness sweep's: down to
+    # 0.25 convergence inside Mach 0.3 stays >= 98.4% (99.5% at 1.0), at 0 it
+    # is 64%, and a split below f ~ M^2/4 is refused by the energy check. No
+    # ceiling: f > 1 is only more loss than the ideal.
+    loss_factor: float = Field(default=1.0, ge=0.25)
     theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
     F_C: float | None = None  # None = inherit from common/straight-arm channel
     F_branch: float | None = None  # None = inherit from branch-arm channel

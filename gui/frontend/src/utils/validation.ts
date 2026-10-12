@@ -96,6 +96,11 @@ export function validateNetwork(nodes: Node[]): string[] {
 					`${node.id}: Tee branch angle must satisfy 0 < |theta| <= 90 deg, got ${thetaDeg} deg`,
 				);
 			}
+			const lossFactor = node.data.loss_factor ?? 1.0;
+			if (!(lossFactor >= 0.25))
+				errors.push(
+					`${node.id}: Tee loss factor must be >= 0.25, got ${lossFactor}`,
+				);
 			const share = node.data.design_branch_share ?? 0.5;
 			if (!(share > 0 && share < 1))
 				errors.push(
