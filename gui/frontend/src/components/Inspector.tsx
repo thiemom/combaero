@@ -7,6 +7,7 @@ import {
 	QUANTITY_CATALOGUE,
 	TRANSPORT_KEYS,
 } from "../utils/quantities";
+import { bassettDesignK } from "../utils/teeK";
 import { validateNetwork } from "../utils/validation";
 import AreaInput from "./AreaInput";
 import CompositionEditor from "./CompositionEditor";
@@ -1741,6 +1742,16 @@ const Inspector = () => {
 							: (inheritedFBranch ?? effectiveFC);
 						const psi =
 							effectiveFBranch > 0 ? effectiveFC / effectiveFBranch : null;
+						// Constant-K: a blank K shows (and solves with) Bassett's pair
+						// at the design share and these resolved areas.
+						const designShare: number =
+							selectedNode.data.design_branch_share ?? 0.5;
+						const [autoKStraight, autoKBranch] = bassettDesignK(
+							isMerge ? "merge" : "branch",
+							designShare,
+							psi ?? 1,
+							selectedNode.data.theta_deg ?? 90,
+						);
 						const dFromF = (f: number) => Math.sqrt((4 * f) / Math.PI);
 						const lu = unitPreferences.length === "mm" ? 1000 : 1;
 						const lu_label = unitPreferences.length;
@@ -1875,15 +1886,41 @@ const Inspector = () => {
 									<>
 										<div className="flex flex-col gap-2">
 											<label className="text-xs font-bold text-gray-500 uppercase">
+												Design Branch Share [-]
+											</label>
+											<NumericInput
+												value={designShare}
+												onChange={(val) =>
+													updateNodeData(selectedNode.id, {
+														design_branch_share: val,
+													})
+												}
+												className="p-2 border rounded"
+												placeholder="0.5"
+												min={0}
+												max={1}
+											/>
+											<p className="text-[9px] text-gray-400 italic">
+												Branch share of the common-leg flow the K values are
+												meant for. A blank K comes from Bassett 2001&apos;s
+												analytical pair at this share, the arm areas and the
+												angle; a constant K is right only near its design split.
+											</p>
+										</div>
+										<div className="flex flex-col gap-2">
+											<label className="text-xs font-bold text-gray-500 uppercase">
 												K Straight [-]
 											</label>
 											<NumericInput
-												value={selectedNode.data.K_straight ?? 0.4}
+												value={selectedNode.data.K_straight ?? null}
+												placeholder={autoKStraight.toFixed(3)}
 												onChange={(val) =>
 													updateNodeData(selectedNode.id, { K_straight: val })
 												}
+												onClear={() =>
+													updateNodeData(selectedNode.id, { K_straight: null })
+												}
 												className="p-2 border rounded"
-												placeholder="0.4"
 											/>
 										</div>
 										<div className="flex flex-col gap-2">
@@ -1891,16 +1928,20 @@ const Inspector = () => {
 												K Branch [-]
 											</label>
 											<NumericInput
-												value={selectedNode.data.K_branch ?? 1.0}
+												value={selectedNode.data.K_branch ?? null}
+												placeholder={autoKBranch.toFixed(3)}
 												onChange={(val) =>
 													updateNodeData(selectedNode.id, { K_branch: val })
 												}
+												onClear={() =>
+													updateNodeData(selectedNode.id, { K_branch: null })
+												}
 												className="p-2 border rounded"
-												placeholder="1.0"
 											/>
 											<p className="text-[9px] text-gray-400 italic">
 												Pt_arm = Pt_jct -/+ K * q_common (separating/joining).
-												Defaults are representative for a sharp 90-deg tee.
+												Blank = from the design share (greyed value); type to
+												override, clear to return to it.
 											</p>
 										</div>
 									</>

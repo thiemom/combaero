@@ -96,6 +96,11 @@ export function validateNetwork(nodes: Node[]): string[] {
 					`${node.id}: Tee branch angle must satisfy 0 < |theta| <= 90 deg, got ${thetaDeg} deg`,
 				);
 			}
+			const share = node.data.design_branch_share ?? 0.5;
+			if (!(share > 0 && share < 1))
+				errors.push(
+					`${node.id}: Tee design branch share must lie in (0, 1), got ${share}`,
+				);
 			// null F_C means "inherit from connected channels" — only flag explicit non-positive values
 			if (node.data.F_C != null && node.data.F_C <= 0)
 				errors.push(`${node.id}: Tee common arm area F_C must be > 0`);

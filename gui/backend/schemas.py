@@ -414,8 +414,13 @@ class MPCETeeData(BaseModel):
     # loss. Its flow_direction sets the port wiring only -- roles follow the
     # flow.
     junction_model: Literal["mynard", "constant_k", "ideal_momentum"] = "mynard"
-    K_straight: float = 0.4  # constant_k only: straight-arm loss coeff [-]
-    K_branch: float = 1.0  # constant_k only: branch-arm loss coeff [-]
+    # constant_k only: arm loss coefficients [-], referenced to the common-leg
+    # head. None = Bassett 2001's analytical pair at design_branch_share, the
+    # resolved areas and theta (ConstantKTeeElement.bassett_design_K): a
+    # constant K belongs to one split, and the branch's grows like (q psi)^2.
+    K_straight: float | None = None
+    K_branch: float | None = None
+    design_branch_share: float = Field(default=0.5, gt=0.0, lt=1.0)
     theta_deg: float = 90.0  # branch angle [deg], converted to radians in graph_builder
     F_C: float | None = None  # None = inherit from common/straight-arm channel
     F_branch: float | None = None  # None = inherit from branch-arm channel

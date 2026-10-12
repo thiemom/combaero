@@ -1033,6 +1033,14 @@ jct_k = ConstantKTeeElement(
     flow_direction="branch",
     K_ports={1: 0.4, 2: 1.0},   # K_straight, K_branch
 )
+# A constant K belongs to one split: the branch K grows like (q psi)^2, so a
+# value for an equal-area tee is several times too low for a narrow branch.
+# bassett_design_K gives Bassett 2001's analytical pair (dividing K5/K6,
+# joining K11/K12 angle-corrected) at a DESIGN branch share; the GUI uses it
+# for any K left blank (design_branch_share, default 0.5).
+K_str, K_bra = ConstantKTeeElement.bassett_design_K(
+    "branch", q_branch=0.5, psi=4.0, theta_deg=90.0   # -> (0.0, 3.47)
+)
 
 # Ideal momentum junction (#517): parameter-free, a baseline beside the tuned
 # closures rather than a replacement. Suppliers sit at one junction STATIC
