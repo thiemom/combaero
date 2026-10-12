@@ -93,3 +93,32 @@ def test_binding_reports_velocities_and_column_layout() -> None:
     assert r.residual[3] == pytest.approx(0.0, abs=1e-15)  # -0.01 + 0.006 + 0.004
     assert r.jacobian[3][3] == pytest.approx(-1.0)  # mass row vs outer_mdot[0]
     assert r.jacobian[0][6] == pytest.approx(-1.0)  # port row vs p_jn
+
+
+def _split_Pt_drop(f: list[float] | None) -> tuple[float, float]:
+    """(Pt_supply - Pt_straight, Pt_supply - Pt_branch) on a 90-deg split, psi 2."""
+    U = np.array([1.0, -0.6, -0.4 * 2.0])  # + into the junction
+    A = np.array([1.0, 1.0, 0.5])
+    m = [-RHO * float(u) * float(a) for u, a in zip(U, A, strict=True)]
+    geom = _core.IdealJunctionGeometry()
+    geom.area, geom.axis_rad, geom.port_sign = list(A), [math.pi, 0.0, math.pi / 2], [1.0] * 3
+    if f is not None:
+        geom.loss_factor = f
+    r = _core.ideal_junction_residuals_and_jacobian([0.0] * 3, [RHO] * 3, [0.0] * 3, m, 0.0, geom)
+    Pt = [-x + 0.5 * RHO * float(u) ** 2 for x, u in zip(r.residual[:3], U, strict=True)]
+    return Pt[0] - Pt[1], Pt[0] - Pt[2]
+
+
+def test_loss_factor_scales_each_receivers_loss_through_the_binding() -> None:
+    """#526: empty and all-ones are the closure; a factor scales its own port."""
+    base = _split_Pt_drop(None)
+    assert _split_Pt_drop([1.0, 1.0, 1.0]) == base
+    scaled = _split_Pt_drop([0.0, 0.5, 1.5])
+    assert scaled[0] == pytest.approx(0.5 * base[0], rel=1e-6)
+    assert scaled[1] == pytest.approx(1.5 * base[1], rel=1e-6)
+
+
+@pytest.mark.parametrize("f", [[1.0, -0.1, 1.0], [1.0, 1.0]])
+def test_loss_factor_refuses_negative_or_misshaped(f: list[float]) -> None:
+    with pytest.raises(ValueError, match="loss_factor"):
+        _split_Pt_drop(f)

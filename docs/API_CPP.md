@@ -1462,6 +1462,7 @@ is fitted (`include/ideal_junction.h`).
 ```cpp
 struct IdealJunctionGeometry {
     std::vector<double> area, axis_rad, port_sign;  // axis_rad: OUTWARD port axis
+    std::vector<double> loss_factor;  // receiver loss factor f_i >= 0; empty = all 1
 };
 
 struct IdealJunctionResult {
@@ -1502,6 +1503,21 @@ Rows, with `v_i = u_i n_i` and `V` the supplied mass-weighted mean velocity vect
 
 Columns: `p_static[0..N-1]`, `outer_mdot[0..N-1]`, `p_jn`. Density is passed as values
 (`rho`, `drho/dP`), as for the Mynard kernel.
+
+**Loss factor (#526).** Each receiver row rearranges exactly to
+`Pt_j = Pt_mix,j - L_j`, with `Pt_mix,j = p_jn + rho_j |V|^2/2` the mixed supplied
+stream and `L_j = rho_j/2 |v_j - V|^2 >= 0`. At uniform density the junction's
+mass-weighted Pt dissipation is the suppliers' mixing term
+`rho/2 sum |m_k| |v_k - V|^2` plus `sum m_j L_j`, both sums of squares.
+
+- `loss_factor` scales `L_j` per port: `Pt_j = Pt_mix,j - f_j L_j`, added to the row
+  as `(f_j - 1) s_j L_j`. A supplying port's row is untouched; a port keeps its factor
+  when it reverses, and the factor acts only while the port receives.
+- `f = 1` (or an empty vector) is the parameter-free closure, bit for bit.
+- The mixing term is not scaled, so `f = 0` is lossless only in a split.
+- Any `f >= 0` keeps the mechanical dissipation non-negative. Negative or non-finite
+  factors are refused.
+- `f` is the user's rig-matching knob; the scored closure is `f = 1`.
 
 ### Border-Carnot Turning Loss (former momentum-CV junction companion)
 
