@@ -152,13 +152,15 @@ def _scales(case: Case) -> tuple[float, float]:
     return m_com, q_dyn
 
 
-def _junction(model: Model, flow_direction: str, **kw: Any) -> Any:
+def _junction(model: Model, flow_direction: str, loss_factor: float = 1.0, **kw: Any) -> Any:
     if model == "ideal":
-        return IdealMomentumTeeElement(**kw)
+        return IdealMomentumTeeElement(**kw, loss_factor=loss_factor)
+    if loss_factor != 1.0:
+        raise ValueError("loss_factor applies to the ideal model only (#526)")
     return MultiPortChamberElement(**kw, flow_direction=flow_direction, strict=False)
 
 
-def build(case: Case, model: Model = "mynard") -> FlowNetwork:
+def build(case: Case, model: Model = "mynard", loss_factor: float = 1.0) -> FlowNetwork:
     """The three-port network for this case, wired as production wires one."""
     m_com, q_dyn = _scales(case)
     a_bra = case.area / case.psi
@@ -199,6 +201,7 @@ def build(case: Case, model: Model = "mynard") -> FlowNetwork:
         junction = _junction(
             model,
             "merge",
+            loss_factor=loss_factor,
             id="jct",
             inlet_nodes=["port_str", "port_bra"],
             outlet_nodes=["port_com"],
@@ -226,6 +229,7 @@ def build(case: Case, model: Model = "mynard") -> FlowNetwork:
         junction = _junction(
             model,
             "branch",
+            loss_factor=loss_factor,
             id="jct",
             inlet_nodes=["port_com"],
             outlet_nodes=["port_str", "port_bra"],
@@ -237,7 +241,13 @@ def build(case: Case, model: Model = "mynard") -> FlowNetwork:
     return net
 
 
-def _ideal_pair(U: np.ndarray, areas: np.ndarray, angles: np.ndarray, joining: bool) -> tuple[float, float]:
+def _ideal_pair(
+    U: np.ndarray,
+    areas: np.ndarray,
+    angles: np.ndarray,
+    joining: bool,
+    loss_factor: float = 1.0,
+) -> tuple[float, float]:
     """(K_straight, K_branch) of the ideal momentum junction, incompressible.
 
     Same frame as the Mynard call: axes point away from the junction and U is
@@ -248,6 +258,7 @@ def _ideal_pair(U: np.ndarray, areas: np.ndarray, angles: np.ndarray, joining: b
     geom.area = [float(a) for a in areas]
     geom.axis_rad = [float(t) for t in angles]
     geom.port_sign = [1.0, 1.0, 1.0]
+    geom.loss_factor = [float(loss_factor)] * 3
     m = [-rho * float(u) * float(a) for u, a in zip(U, areas, strict=True)]
     r = _core.ideal_junction_residuals_and_jacobian([0.0] * 3, [rho] * 3, [0.0] * 3, m, 0.0, geom)
     Pt = [-p + 0.5 * rho * float(u) ** 2 for p, u in zip(r.residual[:3], U, strict=True)]
@@ -257,7 +268,9 @@ def _ideal_pair(U: np.ndarray, areas: np.ndarray, angles: np.ndarray, joining: b
     return sign * (Pt[s] - Pt[c]) / head, sign * (Pt[b] - Pt[c]) / head
 
 
-def _closure_curve(case: Case, model: Model = "mynard") -> tuple[np.ndarray, np.ndarray]:
+def _closure_curve(
+    case: Case, model: Model = "mynard", loss_factor: float = 1.0
+) -> tuple[np.ndarray, np.ndarray]:
     """The closure's own straight and branch coefficients over the split."""
     a_bra = case.area / case.psi
     areas = np.array([case.area, case.area, a_bra])
@@ -270,7 +283,7 @@ def _closure_curve(case: Case, model: Model = "mynard") -> tuple[np.ndarray, np.
             U = np.array([10.0, -(1.0 - q) * 10.0, -q * 10.0 * case.psi])
             angles = np.array([math.pi, 0.0, math.radians(case.theta_deg)])
         if model == "ideal":
-            ks, kb = _ideal_pair(U, areas, angles, case.joining)
+            ks, kb = _ideal_pair(U, areas, angles, case.joining, loss_factor)
             straight.append(ks)
             branch.append(kb)
             continue
@@ -292,7 +305,7 @@ def _closure_curve(case: Case, model: Model = "mynard") -> tuple[np.ndarray, np.
     return np.array(straight), np.array(branch)
 
 
-def has_root(case: Case, model: Model = "mynard") -> bool | None:
+def has_root(case: Case, model: Model = "mynard", loss_factor: float = 1.0) -> bool | None:
     """Whether the drawn boundary conditions admit a solution at all.
 
     With both flows imposed the split is a boundary condition and a root always
@@ -307,7 +320,7 @@ def has_root(case: Case, model: Model = "mynard") -> bool | None:
     """
     if case.drive == "imposed_flows":
         return True
-    straight, branch = _closure_curve(case, model)
+    straight, branch = _closure_curve(case, model, loss_factor)
     ok = ~(np.isnan(straight) | np.isnan(branch))
     if not ok.any():
         return None
@@ -353,13 +366,13 @@ def _direction_crossings(
 
 
 
-def operating_point(case: Case, model: Model = "mynard") -> tuple[float, float] | None:
+def operating_point(case: Case, model: Model = "mynard", loss_factor: float = 1.0) -> tuple[float, float] | None:
     """(common mass flow, split) the case will run at, as far as it can be
     predicted from the reduced incompressible system."""
     m_ref, q_dyn_ref = _scales(case)
     if case.drive == "imposed_flows":
         return m_ref, case.split
-    straight, branch = _closure_curve(case, model)
+    straight, branch = _closure_curve(case, model, loss_factor)
     ok = np.isfinite(straight) & np.isfinite(branch)
     if not ok.any():
         return None
@@ -382,7 +395,7 @@ def operating_point(case: Case, model: Model = "mynard") -> tuple[float, float] 
     return case.area * math.sqrt(2.0 * rho * q_dyn), float(qs[i] + frac * (qs[i + 1] - qs[i]))
 
 
-def max_port_mach(case: Case, model: Model = "mynard") -> float | None:
+def max_port_mach(case: Case, model: Model = "mynard", loss_factor: float = 1.0) -> float | None:
     """The highest Mach any port reaches at the operating point.
 
     The closure is incompressible and documented for low Mach, and WHICH port
@@ -396,7 +409,7 @@ def max_port_mach(case: Case, model: Model = "mynard") -> float | None:
     0.56, and 84% of failures need a port above 0.3. Restricted to draws that
     stay inside the documented range, convergence is 98.4%.
     """
-    op = operating_point(case, model)
+    op = operating_point(case, model, loss_factor)
     if op is None:
         return None
     m, q = op
@@ -443,6 +456,7 @@ class Summary:
     n: int
     seed: int
     model: str = "mynard"
+    loss_factor: float = 1.0
     outcomes: Counter = field(default_factory=Counter)
     by_cut: dict[tuple[str, str], Counter] = field(
         default_factory=lambda: defaultdict(Counter)
@@ -473,15 +487,17 @@ def _bucket(name: str, value: float, edges: tuple[float, float]) -> str:
     return f"{name}<{lo:g}" if value < lo else (f"{name}{lo:g}-{hi:g}" if value < hi else f"{name}>{hi:g}")
 
 
-def run(n: int = 2000, seed: int = 20260906, model: Model = "mynard") -> Summary:
+def run(
+    n: int = 2000, seed: int = 20260906, model: Model = "mynard", loss_factor: float = 1.0
+) -> Summary:
     """Draw and solve ``n`` random cases. Deterministic for a given seed;
     the draws do not depend on ``model``, so two models see the same cases."""
     rng = random.Random(seed)
-    summary = Summary(n=n, seed=seed, model=model)
+    summary = Summary(n=n, seed=seed, model=model, loss_factor=loss_factor)
     for _ in range(n):
         case = sample(rng)
-        root = has_root(case, model)
-        outcome = classify(build(case, model))
+        root = has_root(case, model, loss_factor)
+        outcome = classify(build(case, model, loss_factor))
         if root is False and outcome in ("no progress", "residual too large", "other"):
             outcome = "no root exists"
         summary.outcomes[outcome] += 1
@@ -489,7 +505,7 @@ def run(n: int = 2000, seed: int = 20260906, model: Model = "mynard") -> Summary
         summary.by_cut[("root", label)][outcome] += 1
         if root is True:
             summary.by_cut[("solvable drive", case.drive)][outcome] += 1
-            mach = max_port_mach(case, model)
+            mach = max_port_mach(case, model, loss_factor)
             if mach is not None:
                 label = (
                     "within Mach 0.3"
@@ -521,7 +537,8 @@ _CLASSES = (
 def format_summary(summary: Summary) -> str:
     lines = [
         f"Random physical boundary conditions, n = {summary.n}, seed {summary.seed}, "
-        f"model {summary.model}",
+        f"model {summary.model}"
+        + (f", loss factor {summary.loss_factor:g}" if summary.loss_factor != 1.0 else ""),
         "",
         f"  {'outcome':<20} {'n':>6} {'share':>7}",
     ]
@@ -565,7 +582,8 @@ def main(argv: list[str] | None = None) -> None:
     model = args[2] if len(args) > 2 else "mynard"
     if model not in MODELS:
         raise SystemExit(f"model must be one of {MODELS}, got {model!r}")
-    print(format_summary(run(n=n, seed=seed, model=model)))
+    loss_factor = float(args[3]) if len(args) > 3 else 1.0
+    print(format_summary(run(n=n, seed=seed, model=model, loss_factor=loss_factor)))
 
 
 if __name__ == "__main__":

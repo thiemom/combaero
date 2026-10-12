@@ -1069,6 +1069,19 @@ jct_ideal = IdealMomentumTeeElement(
 # wired direction) and n_reversed_ports, plus K_straight/K_branch (dividing) or
 # K11/K12 (joining) only when the converged regime is the wired one. Exposed in
 # the GUI as the tee's "Ideal momentum (parameter-free)" junction model.
+#
+# loss_factor (#526): scales each RECEIVER's loss against the mixed supplied
+# stream, Pt_j = Pt_mix - f rho/2 |v_j - V|^2; the suppliers' mixing loss is
+# not scaled. One value for all ports or one per port (inlets, then outlets).
+# Default 1.0 = the parameter-free closure, bit for bit; any f >= 0 keeps the
+# mechanical dissipation >= 0. In a split (no mixing) f scales the whole loss,
+# and below f ~ M^2/4 the energy check refuses it (the loss is written at low
+# Mach, the port Pt is isentropic). A rig-matching knob for the user; the
+# harness scores only f = 1.
+jct_tuned = IdealMomentumTeeElement(
+    "jct", inlet_nodes=["mc_com"], outlet_nodes=["mc_str", "mc_bra"],
+    inlet_angles_deg=[0.0], outlet_angles_deg=[0.0, 90.0], loss_factor=0.8,
+)
 
 # Rotating cavity / disc-pump pressure rise (Vatistas n-vortex model)
 vortex = VortexElement(

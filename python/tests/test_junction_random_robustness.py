@@ -301,3 +301,25 @@ def test_the_operating_point_is_predicted_for_every_drive():
         if rr.has_root(c) is True and rr.operating_point(c) is not None:
             seen.add(c.drive)
     assert seen == set(rr.DRIVES)
+
+
+# ---------------------------------------------------------------------------
+# Receiver loss factor (#526)
+# ---------------------------------------------------------------------------
+
+
+def test_the_loss_factor_reaches_the_ideal_element_and_its_root_curve():
+    """The sweep's f must reach both the network and the closure curve that
+    decides whether a draw has a root, or the two would judge different
+    models. A dividing straight run loses f (1 - q)^2 at f != 1."""
+    net = rr.build(_case(), "ideal", 0.5)
+    assert net.elements["jct"].loss_factor == [0.5, 0.5, 0.5]
+    case = _case(drive="flow_and_pressures")
+    s1, _ = rr._closure_curve(case, "ideal", 1.0)
+    s5, _ = rr._closure_curve(case, "ideal", 0.5)
+    assert np.allclose(s5, 0.5 * s1, rtol=0.0, atol=1e-4)
+
+
+def test_the_loss_factor_is_refused_for_the_mynard_model():
+    with pytest.raises(ValueError, match="ideal model only"):
+        rr.build(_case(), "mynard", 0.5)
