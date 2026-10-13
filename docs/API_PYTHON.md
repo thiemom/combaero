@@ -1070,6 +1070,12 @@ jct_ideal = IdealMomentumTeeElement(
 # K11/K12 (joining) only when the converged regime is the wired one. Exposed in
 # the GUI as the tee's "Ideal momentum (parameter-free)" junction model.
 #
+# Every multi-port junction also reports port_i_outer_area (the connected
+# element's own area), port_i_area_ratio (that over the port area) and
+# port_area_mismatch (ports off by more than PORT_AREA_MISMATCH_TOL = 5%): an
+# area step there is not modelled, and this closure, coupled on static
+# pressure, then creates total pressure across it (#536).
+#
 # loss_factor (#526): scales each RECEIVER's loss against the mixed supplied
 # stream, Pt_j = Pt_mix - f rho/2 |v_j - V|^2; the suppliers' mixing loss is
 # not scaled. One value for all ports or one per port (inlets, then outlets).
