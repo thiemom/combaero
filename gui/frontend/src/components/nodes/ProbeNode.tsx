@@ -2,6 +2,7 @@ import { memo, useMemo } from "react";
 import { Handle, Position } from "reactflow";
 import useStore from "../../store/useStore";
 
+import { nodeTypeLabel } from "../../utils/nodeUtils";
 import { QUANTITY_CATALOGUE } from "../../utils/quantities";
 
 function resolveQuantity(result: any, key: string): number | undefined {
@@ -67,7 +68,7 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 		(targetElement as any)?.type === "thermal"
 			? (targetElement?.data?.label ?? "Thermal Wall")
 			: targetElement?.data?.label ||
-				targetElement?.type?.replace(/_/g, " ") ||
+				nodeTypeLabel(targetElement?.type) ||
 				(data.target_id ? "Unknown target" : "No target");
 	const hasTarget = !!data.target_id;
 

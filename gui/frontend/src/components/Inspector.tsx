@@ -2,6 +2,7 @@ import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
+import { nodeTypeLabel } from "../utils/nodeUtils";
 import {
 	BASIC_STATE_KEYS,
 	QUANTITY_CATALOGUE,
@@ -175,7 +176,7 @@ const Inspector = () => {
 								.filter((n) => n.id !== selectedNode?.id && n.type !== "probe")
 								.map((n) => (
 									<option key={n.id} value={n.id}>
-										{n.data?.label || n.type?.replace(/_/g, " ") || n.id}
+										{n.data?.label || nodeTypeLabel(n.type) || n.id}
 									</option>
 								))}
 						</optgroup>
@@ -252,12 +253,7 @@ const Inspector = () => {
 					</div>
 				)}
 				<h2 className="text-lg font-bold border-b pb-2 capitalize flex justify-between items-center">
-					<span>
-						{selectedNode.type === "mpce_tee"
-							? "Tee"
-							: (selectedNode.type || "unknown").replace("_", " ")}{" "}
-						Node
-					</span>
+					<span>{nodeTypeLabel(selectedNode.type) || "unknown"} Node</span>
 					<div className="flex gap-2">
 						<button
 							type="button"

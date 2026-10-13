@@ -75,3 +75,11 @@ export const handleStyle = (
 	...HANDLE_BASE[basePos],
 	transform: `rotate(${-rotation}deg)`,
 });
+
+// Display names for node types whose type string is internal. The type
+// strings themselves are persisted in saved networks and never change.
+const TYPE_LABEL: Record<string, string> = { mpce_tee: "Tee" };
+
+/** User-facing name for a node type: "mpce_tee" -> "Tee", else underscores to spaces. */
+export const nodeTypeLabel = (type?: string | null): string =>
+	type ? (TYPE_LABEL[type] ?? type.replace(/_/g, " ")) : "";
