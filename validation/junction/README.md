@@ -22,6 +22,7 @@ validation/junction/
   scorecard.py                 # records -> metrics + scorecards
   random_robustness.py         # convergence on RANDOM physical BCs, no dataset
   mynard_fidelity.py           # the kernel against Mynard 2015's own figures
+  gardel1970_score.py          # closures against Gardel 1970's raw points (cross-source)
   digitise_mynard2015.py       # colour extraction of those figures
 ```
 
@@ -48,7 +49,8 @@ per row:
 | Bassett 2001 | selected | chose `eta_scale = 0` and the dividing-streamline recovery (with Hager); its K11/K12 also weighed in alpha |
 | Hager 1984 | selected | the same decision, with Bassett |
 | Idelchik 1966 | tuned | `joining_etransfer_alpha = 0.2` is its in-network optimum. Its theta = 30 tables (diagrams 7-1/7-2) are calculating formulas with no experiment behind them (the handbook's own diagram list); 45 and 90 are formulas refined by Kinne's and Vogel's experiments |
-| Wang 2014 | x-source | set nothing -- the one CROSS-SOURCE accuracy check |
+| Wang 2014 | x-source | set nothing -- the one CROSS-SOURCE accuracy check in the network runner |
+| Gardel & Rechsteiner 1970 | x-source | set nothing; water, so scored at kernel level by `gardel1970_score.py`, not by the network runner |
 
 ## Fidelity: Mynard 2015 against his own figures
 
@@ -124,6 +126,49 @@ no pressure term on the lateral opening.
   variants. A closure form chosen from these numbers, e.g. a jet-strength
   angle law, needs new joining data at psi > 1 (the Vogel/Kinne originals,
   Ito & Imai, Oka & Ito 2005, Serre 1994) to be validated.
+
+## Gardel & Rechsteiner 1970 (cross-source)
+
+`gardel1970_score.py` scores three closures on the raw points of Gardel's
+Figs 12-15 (`data/gardel1970/`): 1426 points, four shapes, all four flow modes
+including the two the other sources lack, where the branch is the common leg.
+Every model is evaluated on Gardel's own flow pattern at constant density
+(water): the ideal tee through the production C++ kernel, Bassett through his
+published corrected coefficient for each flow type, the shipped tee through
+Mynard with the production constants. Error = model loss - measured loss, on
+Gardel's head (total flow over the MAIN pipe area). No band is stated.
+
+| | n | ideal | Bassett | shipped |
+|---|---|---|---|---|
+| mode 1, dividing | 282 | 0.358 (+0.358) | 0.094 (+0.090) | 0.102 (+0.084) |
+| mode 2, joining | 303 | 0.398 (+0.366) | 0.155 (-0.049) | 0.164 (-0.029) |
+| mode 3, branch splits both ways | 523 | 0.600 (+0.600) | 0.256 (+0.178) | 0.260 (+0.170) |
+| mode 4, both mains into branch | 318 | 0.781 (+0.748) | 0.308 (+0.190) | 0.307 (+0.182) |
+| all | 1426 | 0.550 (+0.535) | 0.214 (+0.115) | 0.219 (+0.113) |
+
+MAE (bias), 2026-10-12.
+
+- **The ideal tee over-predicts everywhere**, as a parameter-free vector
+  Borda/momentum loss must: +0.36 on the classic tees, about twice that
+  where the branch is the common leg. This is the baseline's measured cost,
+  not a defect.
+- **Bassett and the shipped tee are level** (0.21 vs 0.22) and both lean
+  high. Their worst cells are the branch-common modes 3 and 4 at 90 deg
+  (bias +0.09 to +0.46), and Fig 13's rounded edge, rho = 0.2, which no model
+  represents (bias +0.26 and +0.28 pooled).
+- **Joining at psi = 1.45** (Fig 14, mode 2) is the psi > 1 data the alpha
+  question wanted. On the straight inlet (`h_ya`) Bassett and the shipped tee
+  both under-predict, by -0.27, and the ideal tee over-predicts, by +0.16.
+  This is one shape: it does not settle alpha by itself.
+- **At delta = 90 a mode-2 merge is both Bassett type 4 and type 6**, and his
+  two corrected forms disagree there; type 6 is used, as in his own 90 deg
+  K11/K12 curves. The repo's general control volume (`joining_variants.
+  bassett_cv`) is not used: at 90 deg it drops the opening wall term that his
+  corrected K11/K12 keep, which moves K by 0.15-0.25.
+
+`python/tests/test_junction_gardel1970.py` pins the plumbing (mode 1 equals
+his K5/K6, the kernel equals the vector Borda loss, the h-to-loss signs at the
+table ends), the pooled numbers, and a falsification of the metric.
 
 ## Endpoints
 
