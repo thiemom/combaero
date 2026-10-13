@@ -1,4 +1,4 @@
-# Gardel & Rechsteiner 1970 -- tables E-G, the raw points of Figs 12-15, the curves of Figs 18-24
+# Gardel & Rechsteiner 1970 -- tables E-G, the raw points of Figs 12-15, the curves of Figs 18-27
 
 Gardel, A. and Rechsteiner, G. F. (1970), *Les pertes de charge dans les
 branchements en Te des conduites de section circulaire*, Bulletin technique de
@@ -235,10 +235,152 @@ left to right mode 3, 2, 1, 4. There are always five grid lines per unit of h.
   Do not read its exact position from this file.
 - **Uncertainty:** none is stated, so the band stays null.
 
+## `curves_phi_lt1.csv`
+
+The authors' smoothed curves for the 12 shapes at phi < 1 (Figs 25-27: delta
+60, 90, 120, each at phi 0.69 and 0.44 and rho 0 and 0.2), traced from the
+scan and sampled every 0.02 in q. The caveats of `curves_phi1.csv` apply:
+these are curves drawn through the data, not measurements. Prefer
+`detail_points.csv` where a shape has both (90/0.69/0 is Fig. 14).
+
+**Columns.** Those of `curves_phi1.csv`, plus:
+- `state`: `A` or `B` for the two flow states of mode 3 at 90/0.44 (below),
+  empty everywhere else.
+- `branch_ba`, `branch_ya`, `branch_yb`: which drawn branch a state value was
+  read from, `hi` (upper on the plot) or `lo` (lower). Empty for single curves
+  and where the two branches coincide.
+
+Rows: 12 shapes x 4 modes x 51 samples, except mode 3 at 90/0.44, which has
+one row per state. 90/0.44/0 adds two h_ya-only rows per q (next section):
+2652 rows. 27 values are bridged rather than traced (`traced_* = 0`).
+
+**The dashed lines in mode 3.**
+- **The paper:** the text describes the flow becoming unstable in mode 3. The
+  measured loss jumps there rather than scattering more: for 90/0.69/0,
+  h_yb goes from -2.1 to -1.6 as q_gamma passes 0.87 -> 0.92, and from -1.8
+  to -1.05 as it passes 0.12 -> 0.08. The authors read this as a change in the
+  flow pattern. They do not say what the dashes mean.
+- **On 10 of the 12 shapes**, a dashed stretch is only the near-vertical jump:
+  one curve, with the dash marking a transition that no measurement sits on.
+  Fig. 14's raw points (90/0.69/0) put both jumps where the text does.
+- **At 90/0.44 (both rho)**, mode 3 has two branches. Both are dashed where
+  they differ and become one solid line where they agree. Our reading is
+  hysteresis between two flow states, but the figure does not say which state
+  goes with which direction of approach. So they are labelled `A` and `B`:
+  - **Pairing the series into states.** One state flips at one q, so its three
+    curves jump together. The jumps pair h_ba's upper branch with h_yb's lower
+    branch. The head identity agrees: median residual 0.05 for that pairing,
+    against 0.15 for the other.
+  - **The two shapes differ in detail:**
+
+    | shape | state A | state B | A jumps at q_gamma | B jumps at q_gamma |
+    |---|---|---|---|---|
+    | 90/0.44/0 | h_ba hi, h_yb lo | h_ba lo, h_yb hi | 0.08-0.09, 0.91-0.92 | 0.12-0.13, 0.87-0.88 |
+    | 90/0.44/0.2 | h_ba hi, h_ya lo, h_yb lo | the other three | 0.035-0.039, 0.962-0.966 | 0.068-0.079, 0.927-0.932 |
+
+    On 90/0.44/0.2, both h_ya branches drop at q = 0.937 on the right, so
+    there the drawing is not consistent with its own pairing.
+  - **90/0.44/0 h_ya:** its two branches step by only 0.07-0.10, and neither
+    the jumps nor the identity can assign them. In the A/B rows h_ya is blank
+    wherever the two branches differ by more than 0.02 (31 q). Both branches
+    are kept as rows with an empty `state` that carry only h_ya.
+  - **State A encloses state B** in both shapes: it jumps in earlier and out
+    later. That is not the one-sided shift that a simple increasing- versus
+    decreasing-q hysteresis would draw.
+
+**How the curves were read.** As for `curves_phi1.csv`, except:
+- **Scale:** the tick labels give true h. phi 0.69 has about 200 px per unit
+  of h, and phi 0.44 about 100 px per unit, spanning about +6 to -6.
+- **Calibration:**
+  - Strips were found from their frames.
+  - Integer h lines were found from their margin labels.
+  - The faint minor lines are interpolated between the traced integer lines,
+    not fitted. Fitting them gave quadratics that swung by tens of pixels.
+- **Grid removal:**
+  - Curve ink is the run mask of `curves_phi1.csv` plus any pixel darker than
+    120. At phi 0.44 the thin curves are no darker than the minor lines they
+    ride.
+  - Line runs were removed on every row at phi 0.69, but only on integer rows
+    at phi 0.44.
+- **Tracking:** after a gap, the tracker re-acquires the curve across a mode-3
+  jump.
+- **Merging:**
+  - A direction is kept unless its far end misses the table by more than 0.5.
+    At phi < 1 both directions often agree on a curve whose end sits away from
+    the table.
+  - Rejected and re-bridged:
+    - a sample more than 0.1 off its rolling median;
+    - a single sample further off the line through its neighbours than 0.04,
+      than twice the neighbouring step, and than the gap between the
+      neighbours (this keeps cusps and jump samples);
+    - a traced run of at most two samples between gaps (label ink).
+  - Bridged samples were then read off the raw ink column where a single dark
+    run lies within 0.06 of the bridge. That fixes curves running along a grid
+    line, which grid removal takes out with the line. 69 values were read this
+    way; 3 that landed on label ink were reverted.
+  - An untraced panel end takes the traced value of the panel that shares that
+    u.
+- **120/0.44 at u = 1** (mode 3 q = 1 = mode 2 q = -1): no table value exists
+  there, and the curves fall steeply across the panel line. The value was read
+  off the scan just either side of the line and used for both panels.
+- **90/0.44/0.2 mode 3** was digitised by hand. Its outer branches run on the
+  frame lines, where curve and frame are the same ink. The clicks were
+  calibrated against the traced grid, which agrees with the clicks' own axis
+  calibration within 0.011.
+- **Review:** every shape was checked on an overlay of the scan, with numbered
+  markers on the suspect samples.
+
+**Checks.**
+- **Panel ends against tables E-G** (with the mirror ends for modes 3 and 4):
+  286 ends, 87% within 0.05 and 98% within 0.1. The six worst are the table G
+  inconsistency below.
+- **Against `detail_points.csv`** (Fig. 14 = 90/0.69/0):
+  - Per mode and series, the median offset is at most 0.017 and the MAD at
+    most 0.023.
+  - The large offsets (0.18-0.42) are raw points straddling the two mode-3
+    jumps.
+  - Two mode-4 h_ba points at q_gamma = -1 sit 0.68 and 1.15 below the curve.
+    They are not explained.
+- **Head identity** `h_ya = h_yb + h_ba` at each sampled q (state rows count
+  once per state; the h_ya-only rows are left out):
+
+  | fig | delta | phi | rho | rows | bridged values | median abs residual | max |
+  |---|---|---|---|---|---|---|---|
+  | 25 | 60 | 0.69 | 0 | 204 | 0 | 0.015 | 0.132 |
+  | 25 | 60 | 0.69 | 0.2 | 204 | 1 | 0.009 | 0.058 |
+  | 25 | 60 | 0.44 | 0 | 204 | 1 | 0.056 | 0.139 |
+  | 25 | 60 | 0.44 | 0.2 | 204 | 3 | 0.025 | 0.170 |
+  | 26 | 90 | 0.69 | 0 | 204 | 0 | 0.017 | 0.239 |
+  | 26 | 90 | 0.69 | 0.2 | 204 | 0 | 0.017 | 0.099 |
+  | 26 | 90 | 0.44 | 0 | 357 | 8 | 0.021 | 0.109 |
+  | 26 | 90 | 0.44 | 0.2 | 255 | 7 | 0.034 | 0.513 |
+  | 27 | 120 | 0.69 | 0 | 204 | 0 | 0.016 | 0.124 |
+  | 27 | 120 | 0.69 | 0.2 | 204 | 4 | 0.010 | 0.057 |
+  | 27 | 120 | 0.44 | 0 | 204 | 1 | 0.030 | 0.122 |
+  | 27 | 120 | 0.44 | 0.2 | 204 | 2 | 0.023 | 0.203 |
+
+  - The maxima sit at mode-3 jumps, where the three series jump at slightly
+    different q.
+  - 60/0.44/0 carries a steady offset of about 0.06 per panel. It looks like
+    the drawing itself.
+
+**Table G against the figures.**
+- **The table:** for 60/0.69/0.2, table G gives h_ab = -1.72 and h_ga = 0.85
+  at q_beta = -1. The paper's text layer gives the same values, so this is not
+  a transcription error.
+- **The figures:** the curves end at h_ba = 1.50 and h_ya = 0.62 there
+  (Fig. 25). The mirrored end of 120/0.69/0.2 in Fig. 27 shows the same
+  -1.51/-0.64, and both tracing directions agree with the curve.
+- **Status:** a source inconsistency, left as found in both files. The
+  neighbouring rho = 0 entry is -1.46.
+
+**Known limits.**
+- **Steps:** as for `curves_phi1.csv`, a step is resolved only to the 0.02
+  sampling in q.
+- **90/0.44/0.2 mode 2:** its start (q_beta = -1) sits 0.06-0.09 below both
+  the table and the hand-digitised mode-3 end it shares.
+- **Uncertainty:** none is stated, so the band stays null.
+
 ## Not transcribed here
 
-- **Figs 25-27:** smoothed curves for the 12 shapes at phi = 0.69 and 0.44.
-  - Their h scale is halved (phi 0.69) or quartered (phi 0.44).
-  - Mode 3 is drawn twice, solid and dashed, with jumps (the unstable zone of
-    Fig. 16g), and this file does not yet say what the dashed lines mean.
 - **Figs 28-34:** replot tables E-G and add curves in phi.
