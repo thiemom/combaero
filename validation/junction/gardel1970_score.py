@@ -6,8 +6,14 @@ parameter-free, Bassett 2001 is his own analysis, and the shipped Mynard tee
 was tuned on Bassett and Idelchik. The source states no uncertainty, so no
 band is applied and nothing here is "within" anything.
 
-Data: ``data/gardel1970/detail_points.csv``, the raw points of Figs 12-15
-(water, so every model is evaluated at constant density). Gardel's four flow
+Data (water, so every model is evaluated at constant density):
+  - ``data/gardel1970/detail_points.csv``, the raw points of Figs 12-15;
+  - ``curves_phi1.csv`` and ``curves_phi_lt1.csv``, the authors' smoothed
+    curves of all 33 shapes (Figs 18-27), sampled every 0.02 in q. These are
+    curves drawn through the data, so they carry no scatter and no point
+    counts; they are scored separately and never pooled with the points. The
+    two flow states of mode 3 at 90/0.44 (rows with a ``state``) are reported
+    apart, so the hysteresis does not count twice. Gardel's four flow
 modes on his branches alpha (upstream main), gamma (downstream main) and beta
 (branch, at delta to alpha):
 
@@ -55,6 +61,7 @@ from combaero.network._mynard2010 import junction_loss_coefficient
 from validation.junction.models import bassett2001 as bassett
 
 DATA = Path(__file__).parent / "data" / "gardel1970" / "detail_points.csv"
+CURVES = (DATA.parent / "curves_phi1.csv", DATA.parent / "curves_phi_lt1.csv")
 
 ALPHA, GAMMA, BETA = 0, 1, 2
 NAMES = {ALPHA: "a", GAMMA: "y", BETA: "b"}
@@ -172,16 +179,39 @@ def load() -> list[dict]:
         return list(csv.DictReader(fh))
 
 
+def load_curves() -> list[dict]:
+    """The smoothed curves in the long form of ``load()``, plus ``state``.
+
+    A wide row carries the three series of one flow case. The 90/0.44/0 rows
+    that carry only h_ya (its two mode-3 branches, not assignable to a state)
+    give one series and no case, so they are skipped; a blank value never
+    scores."""
+    rows = []
+    for path in CURVES:
+        with path.open() as fh:
+            for r in csv.DictReader(fh):
+                if r.get("state", "") == "" and not r["h_ba"]:
+                    continue
+                for name in SERIES:
+                    if r[name]:
+                        rows.append({**{k: r[k] for k in ("fig", "delta_deg", "phi", "rho", "mode", "q")},
+                                     "series": name, "h": r[name], "state": r.get("state", "")})
+    return rows
+
+
 MODELS = ("ideal", "bassett", "shipped")
 
-Cell = tuple[str, str, str, str]  # fig, delta/phi/rho, mode, series
+Cell = tuple[str, str, str, str]  # fig, delta/phi/rho, mode, series (+ state for curves)
 
 
-def score() -> tuple[dict[Cell, np.ndarray], int]:
-    """Per cell, rows of (measured loss, error of each model in MODELS); dead-port taps left out."""
+def score(rows: list[dict] | None = None) -> tuple[dict[Cell, np.ndarray], int]:
+    """Per cell, rows of (measured loss, error of each model in MODELS); dead-port taps left out.
+
+    ``rows`` defaults to the raw points; pass ``load_curves()`` for the curves,
+    whose cells carry the ``state`` as a fifth key (empty for one curve)."""
     cells: dict[Cell, list[tuple[float, ...]]] = defaultdict(list)
     taps = 0
-    for r in load():
+    for r in load() if rows is None else rows:
         mode, name = r["mode"], r["series"]
         other = scored_series(mode).get(name)
         if other is None:
@@ -194,7 +224,10 @@ def score() -> tuple[dict[Cell, np.ndarray], int]:
             continue
         meas = loss_from_h(h, name, m_out)
         errs = [model_losses(m, delta, phi, mode, q)[other] - meas for m in MODELS]
-        cells[(r["fig"], f"{delta:g}/{phi:g}/{r['rho']}", mode, name)].append((meas, *errs))
+        key = (r["fig"], f"{delta:g}/{phi:g}/{float(r['rho']):g}", mode, name)
+        if "state" in r:
+            key = (*key, r["state"])
+        cells[key].append((meas, *errs))
     return {k: np.array(v) for k, v in cells.items()}, taps
 
 
@@ -225,6 +258,34 @@ def main() -> None:
     for fig in ("12", "13", "14", "15"):
         print(_line(f"all, fig {fig}", pooled(cells, lambda c, fig=fig: c[0] == fig)))
     print(_line("all", pooled(cells)))
+    print(f"\ndead-port pressure taps left out: {taps}")
+    curves_report()
+
+
+def curves_report() -> None:
+    cells, taps = score(load_curves())
+    one = {k: v for k, v in cells.items() if k[4] == ""}
+    print("\n\nSmoothed curves, Figs 18-27 (33 shapes, q step 0.02) -- CROSS-SOURCE ACCURACY;")
+    print("curves drawn through the data, not measurements: no scatter, no point counts\n")
+    print(f"{'fig  delta/phi/rho':31s} {'n':>4s}" + "".join(f"  {m:>16s}" for m in MODELS))
+    shapes = sorted({(k[0], k[1]) for k in one}, key=lambda s: (int(s[0]), s[1]))
+    for fig, shape in shapes:
+        print(_line(f"{fig:>3}  {shape:>13}", pooled(one, lambda c, f=fig, s=shape: (c[0], c[1]) == (f, s))))
+    print()
+    for mode in "1234":
+        print(_line(f"all, mode {mode}", pooled(one, lambda c, mode=mode: c[2] == mode)))
+    # phi and rho together: phi < 1 has no rho = 0.1 shapes, so either alone mixes the other in
+    for phi, rho in sorted({tuple(c[1].split("/")[1:]) for c in one}, key=lambda t: (-float(t[0]), float(t[1]))):
+        print(_line(f"all, phi {phi}, rho {rho}", pooled(one, lambda c, p=phi, r=rho: c[1].split("/")[1:] == [p, r])))
+    for v in sorted({c[1].split("/")[0] for c in one}, key=float):  # phi = 1 only: 60/90/120 also carry phi < 1
+        print(_line(f"phi 1, delta {v}", pooled(one, lambda c, v=v: c[1].split("/")[:2] == [v, "1"])))
+    print(_line("all (one curve per case)", pooled(one)))
+    two = {k: v for k, v in cells.items() if k[4] != ""}
+    if two:
+        print("\nmode 3 at 90/0.44, two flow states (left out of the pooled lines):")
+        for st in sorted({k[4] for k in two}):
+            for shape in sorted({k[1] for k in two}):
+                print(_line(f"  state {st}, {shape}", pooled(two, lambda c, st=st, s=shape: (c[4], c[1]) == (st, s))))
     print(f"\ndead-port pressure taps left out: {taps}")
 
 
