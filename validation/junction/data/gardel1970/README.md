@@ -1,4 +1,4 @@
-# Gardel & Rechsteiner 1970 -- tables E, F, G and the raw points of Figs 12-15
+# Gardel & Rechsteiner 1970 -- tables E-G, the raw points of Figs 12-15, the curves of Figs 18-24
 
 Gardel, A. and Rechsteiner, G. F. (1970), *Les pertes de charge dans les
 branchements en Te des conduites de section circulaire*, Bulletin technique de
@@ -148,8 +148,97 @@ a shared end is listed once, under the left panel.
 measurements yields fewer rows than the paper took. No uncertainty is stated,
 so the band stays null.
 
+## `curves_phi1.csv`
+
+The authors' smoothed curves for the 21 shapes at phi = 1 (Figs 18-24: delta
+45, 60, 75, 90, 105, 120, 135, each at rho 0, 0.1, 0.2), traced from the scan
+and sampled every 0.02 in q. **These are curves drawn through the data, not
+measurements.** The scatter is gone, and so is the information on how many
+points support each stretch. Score against them as smoothed data, and prefer
+`detail_points.csv` where a shape has both.
+
+One row per flow case, so the three series of a case sit side by side: 21
+shapes x 4 modes x 51 samples = 4284 rows.
+- **Columns:** `fig`, `delta_deg`, `phi`, `rho`, `mode`, `abscissa`, `q` as in
+  `detail_points.csv`; `h_ba`, `h_ya`, `h_yb` the three heads; `traced_ba`,
+  `traced_ya`, `traced_yb` one flag per series.
+- **Panel ends:** each panel includes both of its ends, so an unsplit case
+  shared by two adjacent panels appears in both.
+- **Traced flags:** `1` = read from the printed curve. `0` = bridged linearly
+  between traced samples (74 values): under a curve label, or where a curve
+  runs along the frame line.
+
+**Layout and scale.** As for `detail_points.csv`: one strip per shape, panels
+left to right mode 3, 2, 1, 4. There are always five grid lines per unit of h.
+
+**How the curves were read.**
+- **Renders and calibration:** 500 dpi renders, and the traced-grid
+  calibration of `detail_points.csv`. The zero line was located from its
+  margin label.
+- **Grid removal:** grid lines were removed one run at a time across each
+  line's fitted path. A run no thicker than that line is the bare line; a curve
+  crossing or running along the line makes the run thicker, so it stays. A
+  plain thickness threshold fails here: the unit lines are as wide as a curve.
+- **Tracking:**
+  - Every panel was traced in both directions, each seeded from tables E/F/G
+    at its end.
+  - Modes 3 and 4 have no tabulated outer end. It was taken from the mirror
+    shape: the paper (p. 376) obtains modes 3 and 4 at delta from the 180 -
+    delta flows with alpha and gamma swapped. So at the outer end
+    h_ba = -h_yb', h_yb = -h_ba' and h_ya = -h_ya', the primes being the
+    mirror shape's table values.
+  - Through a crossing, each curve keeps its own slope.
+- **Merging the two directions:**
+  - A direction is dropped if its far end misses the table by more than 0.1.
+  - Where the two kept directions disagree by more than 0.03, the head
+    identity picks the value.
+- **Review:** every shape was checked on an overlay of the scan.
+
+**Checks.**
+- **Far ends against the tables:** 493 directions used, all within 0.076 of
+  the table value at their far end, 98% within 0.05.
+- **Against `detail_points.csv`** (Figs 12, 13 and 15 are the same shapes as
+  Figs 21 and 24): per shape and mode, the median offset is at most 0.007 and
+  the MAD at most 0.011. The largest single offsets (0.17) are raw points
+  inside mode 3's near-vertical steps, where 0.02 sampling cannot follow the
+  step.
+- **Head identity** `h_ya = h_yb + h_ba` at each sampled q:
+
+  | fig | delta | rho | bridged rows | median abs residual | max |
+  |---|---|---|---|---|---|
+  | 18 | 45 | 0 | 11 | 0.010 | 0.061 |
+  | 18 | 45 | 0.1 | 8 | 0.009 | 0.045 |
+  | 18 | 45 | 0.2 | 1 | 0.009 | 0.086 |
+  | 19 | 60 | 0 | 2 | 0.012 | 0.072 |
+  | 19 | 60 | 0.1 | 1 | 0.009 | 0.031 |
+  | 19 | 60 | 0.2 | 2 | 0.008 | 0.052 |
+  | 20 | 75 | 0 | 2 | 0.007 | 0.034 |
+  | 20 | 75 | 0.1 | 0 | 0.008 | 0.034 |
+  | 20 | 75 | 0.2 | 2 | 0.008 | 0.041 |
+  | 21 | 90 | 0 | 2 | 0.010 | 0.039 |
+  | 21 | 90 | 0.1 | 1 | 0.007 | 0.055 |
+  | 21 | 90 | 0.2 | 2 | 0.008 | 0.073 |
+  | 22 | 105 | 0 | 9 | 0.005 | 0.029 |
+  | 22 | 105 | 0.1 | 1 | 0.008 | 0.027 |
+  | 22 | 105 | 0.2 | 8 | 0.008 | 0.036 |
+  | 23 | 120 | 0 | 2 | 0.008 | 0.078 |
+  | 23 | 120 | 0.1 | 1 | 0.007 | 0.032 |
+  | 23 | 120 | 0.2 | 7 | 0.007 | 0.052 |
+  | 24 | 135 | 0 | 2 | 0.010 | 0.033 |
+  | 24 | 135 | 0.1 | 5 | 0.011 | 0.041 |
+  | 24 | 135 | 0.2 | 5 | 0.009 | 0.051 |
+
+  The largest residuals sit at mode 3's near-vertical steps.
+
+**Known limits.**
+- **Steps:** a near-vertical step is resolved only to the 0.02 sampling in q.
+  Do not read its exact position from this file.
+- **Uncertainty:** none is stated, so the band stays null.
+
 ## Not transcribed here
 
-- **Figs 18-27:** smoothed curves for all 33 shapes. These are curves through
-  the data, not formulas, but the scatter is gone.
+- **Figs 25-27:** smoothed curves for the 12 shapes at phi = 0.69 and 0.44.
+  - Their h scale is halved (phi 0.69) or quartered (phi 0.44).
+  - Mode 3 is drawn twice, solid and dashed, with jumps (the unstable zone of
+    Fig. 16g), and this file does not yet say what the dashed lines mean.
 - **Figs 28-34:** replot tables E-G and add curves in phi.
