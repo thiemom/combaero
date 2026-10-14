@@ -1163,6 +1163,32 @@ PYBIND11_MODULE(_core, m) {
                     &solver::MixerResult::dP_total_mix_d_stream)
       .def_readonly("dY_mix_d_stream", &solver::MixerResult::dY_mix_d_stream);
 
+  py::class_<solver::EntropyGenerationResult>(
+      m, "EntropyGenerationResult",
+      "Internal entropy generation of a control volume (#545)")
+      .def_readonly("sigma", &solver::EntropyGenerationResult::sigma,
+                    "Entropy generation [W/K]")
+      .def_readonly("sigma_norm", &solver::EntropyGenerationResult::sigma_norm,
+                    "sigma / (R m_in) [-]; -ln(Pt_out/Pt_in) for an adiabatic two-port");
+  m.def("entropy_generation", &solver::entropy_generation, py::arg("inflows"),
+        py::arg("outflows"), py::arg("S_heat") = 0.0,
+        R"doc(Internal entropy generation of a control volume (#545).
+
+sigma = sum_out m s - sum_in m s - S_heat, with each MassStream at its
+stagnation state (T = total temperature, P_total) and S_heat [W/K] the
+entropy the heat brought in (heat_entropy_flux). Returns
+EntropyGenerationResult(sigma [W/K], sigma_norm [-]); sigma_norm =
+sigma / (R m_in), which for an adiabatic two-port of fixed composition is
+-ln(P_total_out / P_total_in).)doc");
+  m.def("heat_entropy_flux", &solver::heat_entropy_flux, py::arg("m_dot"),
+        py::arg("T0_in"), py::arg("T0_out"), py::arg("Y"), py::arg("M_in") = 0.0,
+        py::arg("M_out") = 0.0,
+        R"doc(Entropy [W/K] heat added to a stream brings in (#545).
+
+Integral of dQ / T as the stream's total temperature runs from T0_in to
+T0_out [K], dQ = m_dot dh(T0), at the static temperature T(T0, M); the Mach
+number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
+
   m.def("mixer_from_streams_and_jacobians",
         &solver::mixer_from_streams_and_jacobians, py::arg("streams"),
         py::arg("Q") = 0.0, py::arg("fraction") = 0.0);
