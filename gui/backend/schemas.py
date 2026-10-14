@@ -490,6 +490,10 @@ class DiscreteLossData(BaseModel):
     xi: float = 0.03
     k: float = 0.001
     xi0: float = 0.02
+    #: Design mass flow [kg/s] of a fraction loss (#550): below it the loss
+    #: scales with the dynamic head and vanishes at zero flow, so the flow can
+    #: run low or reverse. None keeps a constant fraction at every flow.
+    m_ref: float | None = None
     zeta: float = 1.0
     zeta0: float = 1.0
     area: float | None = None

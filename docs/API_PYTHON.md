@@ -915,6 +915,11 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
 
   A `WallNode` is a boundary nothing crosses. An injecting `MassFlowBoundary`
   is still a flow boundary.
+- **A discrete loss (`PressureLossElement`) follows the flow** (#550).
+  - "In" is the upstream node of the flow as it runs, and the correlation sees `|m_dot|`.
+  - Through zero flow the forward and reverse forms blend over `FLOW_REVERSAL_M_SCALE` (1e-4 kg/s), as the area change does.
+  - A fraction loss (`ConstantFractionLoss`, `LinearThetaFractionLoss`) takes an optional design flow `m_ref` [kg/s]: at and above it the loss is exactly the fraction; below it the loss scales with the dynamic head (`1 - (1 - r^2)^3`, `r = |m_dot|/m_ref`, C2) and vanishes at zero flow.
+  - Set `m_ref` wherever the flow may run low or reverse. A constant fraction holds a pressure difference at zero flow, and a reversing flow cannot be carried through it.
 
 #### Merge chamber: main inlet plus side streams (#471)
 
