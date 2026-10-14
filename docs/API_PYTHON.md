@@ -1147,7 +1147,8 @@ ejector = EjectorElement(
     "ej1", primary_node="mc_primary", secondary_node="mc_secondary", outlet_node="mc_outlet",
     throat_area=3.14e-5,      # primary nozzle throat area A_t [m^2]
     nozzle_exit_area=1.0e-4,  # primary nozzle exit area A_p1 [m^2], must exceed throat_area
-    mixing_area=8.0e-4,       # constant-area mixing section A_3 [m^2], must exceed nozzle_exit_area
+    mixing_area=8.0e-4,       # mixing section A_3 [m^2], > nozzle_exit_area; None = inherit
+                              # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA)
     recovery_efficiency=1.0,  # multiplies the lossless mixed stagnation pressure; not fitted to data
 )
 # Solved unknowns: the three port mass flows + ej1.P_jct, the single owned scalar,

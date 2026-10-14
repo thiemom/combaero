@@ -1273,6 +1273,11 @@ def _element_area_facing(elem: "NetworkElement", node_id: str) -> float | None:
         return float(elem.F_C)
     if isinstance(elem, (BorderCarnotLossElement, PressureLossElement)):
         return float(elem.area) if elem.area is not None else None
+    # Elements defined outside this module (e.g. the ejector's outlet duct)
+    # declare their own faces.
+    facing = getattr(elem, "area_facing", None)
+    if callable(facing):
+        return facing(node_id)
     return None
 
 

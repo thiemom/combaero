@@ -464,7 +464,9 @@ class EjectorData(BaseModel):
     label: str | None = None
     throat_area: float = 3.14e-5  # primary nozzle throat area A_t [m^2]
     nozzle_exit_area: float = 1.0e-4  # primary nozzle exit area A_p1 [m^2], > throat
-    mixing_area: float = 8.0e-4  # constant-area mixing section A_3 [m^2], > nozzle_exit
+    # Constant-area mixing section A_3 [m^2], > nozzle_exit. None = inherit from
+    # the outlet pipe, else EjectorElement.DEFAULT_EJECTOR_MIXING_AREA (#559).
+    mixing_area: float | None = None
     # Multiplies the lossless mixed stagnation pressure to give the critical
     # back pressure P_c*. 1.0 = no artificial loss (not fitted to data).
     recovery_efficiency: float = 1.0

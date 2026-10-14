@@ -2052,29 +2052,50 @@ const Inspector = () => {
 
 				{selectedNode.type === "ejector" && (
 					<div className="flex flex-col gap-4">
-						<AreaInput
-							id={`throat_area_${selectedNode.id}`}
-							label="Throat Area A_t"
-							value={selectedNode.data.throat_area ?? 3.14e-5}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { throat_area: val })
+						{/* Throat and nozzle exit are internal geometry and never
+						    inherit; the mixing duct A_3 is the same duct as the outlet
+						    pipe, so it inherits from it (or the pipe from it) (#559). */}
+						<GeometryFields
+							idPrefix={`ej_t_${selectedNode.id}`}
+							title="Nozzle throat (A_t)"
+							stores="A"
+							userValue={selectedNode.data.throat_area}
+							inherited={{ value: 3.14e-5, source: "default" }}
+							inheritable={false}
+							onChange={(v) =>
+								updateNodeData(selectedNode.id, { throat_area: v })
 							}
 						/>
-						<AreaInput
-							id={`nozzle_exit_area_${selectedNode.id}`}
-							label="Nozzle Exit Area A_p1"
-							value={selectedNode.data.nozzle_exit_area ?? 1.0e-4}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { nozzle_exit_area: val })
+						<GeometryFields
+							idPrefix={`ej_p1_${selectedNode.id}`}
+							title="Nozzle exit (A_p1)"
+							stores="A"
+							userValue={selectedNode.data.nozzle_exit_area}
+							inherited={{ value: 1.0e-4, source: "default" }}
+							inheritable={false}
+							onChange={(v) =>
+								updateNodeData(selectedNode.id, { nozzle_exit_area: v })
 							}
 						/>
-						<AreaInput
-							id={`mixing_area_${selectedNode.id}`}
-							label="Mixing Area A_3"
-							value={selectedNode.data.mixing_area ?? 8.0e-4}
-							onChange={(val) =>
-								updateNodeData(selectedNode.id, { mixing_area: val })
+						<GeometryFields
+							idPrefix={`ej_3_${selectedNode.id}`}
+							title="Mixing duct / outlet (A_3)"
+							stores="A"
+							userValue={selectedNode.data.mixing_area}
+							inherited={
+								inheritedField(
+									previewItems,
+									selectedNode.id,
+									"mixing_area",
+								) ?? {
+									value: 8.0e-4,
+									source: "default",
+								}
 							}
+							onChange={(v) =>
+								updateNodeData(selectedNode.id, { mixing_area: v })
+							}
+							defaultHint="No outlet pipe with a known diameter — the 8e-4 m² default is used. Connect a pipe, or untick Inherit to set A_3."
 						/>
 						<div className="flex flex-col gap-1">
 							<label className="text-xs font-bold text-gray-500 uppercase">

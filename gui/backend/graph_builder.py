@@ -506,8 +506,28 @@ def _trace_boundary(
     PressureBoundary or MassFlowBoundary) or None. Used only to derive a
     warm-start; a miss just means no seed for that port.
     """
-    seen = {port_id}
+    seen = {port_id, junction_id}
     frontier = [port_id]
+    # An auto-inserted port MCN (a channel/element on the port) is a synthetic
+    # node with no canvas edges: start from whatever is wired to the junction's
+    # handle for that port instead, or the outlet of e.g. a channel-fed ejector
+    # gets no seed at all (and the stiff cold solve stalls).
+    if port_id.startswith("__tee_jct__") and port_id.rsplit("_", 1)[-1]:
+        role = port_id.rsplit("_", 1)[-1]
+        for edge in edges:
+            if edge.source == junction_id:
+                handle = edge.sourceHandle
+            elif edge.target == junction_id:
+                handle = edge.targetHandle
+            else:
+                handle = None
+            if handle and f"port-{role}-" in handle:
+                frontier.append(edge.target if edge.source == junction_id else edge.source)
+        for nid in frontier[1:]:
+            node = nodes_map.get(nid)
+            if node is not None and node.is_flow_boundary:
+                return node
+            seen.add(nid)
     for _ in range(max_hops):
         nxt: list[str] = []
         for nid in frontier:

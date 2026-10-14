@@ -166,7 +166,8 @@ const NetworkCanvas = () => {
 					...data,
 					throat_area: 3.14e-5,
 					nozzle_exit_area: 1.0e-4,
-					mixing_area: 8.0e-4,
+					// null: inherit A_3 from the outlet pipe (or the 8e-4 m^2 default).
+					mixing_area: null,
 					recovery_efficiency: 1.0,
 				} as any;
 			} else if (type === "vortex") {

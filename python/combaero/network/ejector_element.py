@@ -110,7 +110,15 @@ from typing import Any
 import combaero as cb
 from combaero import _solver_tools
 from combaero.network._ejector_huang1999 import ETA_P, ETA_S, EjectorGeometry
-from combaero.network.components import MultiPortChamberBase, NetworkMixtureState
+from combaero.network.components import (
+    MultiPortChamberBase,
+    NetworkMixtureState,
+    _element_area_facing,
+)
+
+#: Mixing-section area A_3 [m^2] used when it is neither set nor inferable
+#: from the outlet pipe (#559). Matches the GUI's historical default.
+DEFAULT_EJECTOR_MIXING_AREA = 8.0e-4
 
 
 def _real_gamma(t: float, x: Any) -> float:
@@ -158,7 +166,7 @@ class EjectorElement(MultiPortChamberBase):
         outlet_node: str,
         throat_area: float,
         nozzle_exit_area: float,
-        mixing_area: float,
+        mixing_area: float | None = None,
         recovery_efficiency: float = 1.0,
     ):
         """Build an ejector.
@@ -173,7 +181,11 @@ class EjectorElement(MultiPortChamberBase):
                 exceed throat_area (the nozzle must diverge to expand
                 supersonically).
             mixing_area: Constant-area mixing-section area A_3 [m^2]. Must
-                exceed nozzle_exit_area (room for the entrained flow).
+                exceed nozzle_exit_area (room for the entrained flow). None =
+                inherit it from the outlet pipe (the mixing duct and the pipe
+                downstream are the same duct), else DEFAULT_EJECTOR_MIXING_AREA.
+                The inlet faces never inherit: the nozzle exit and the suction
+                annulus are internal geometry, not the feed pipes' areas.
             recovery_efficiency: Multiplies the lossless mixed stagnation
                 pressure to give the critical back pressure P_c*. Defaults
                 to 1.0 (no artificial loss); see this module's and
@@ -190,7 +202,7 @@ class EjectorElement(MultiPortChamberBase):
                 f"exceed throat_area ({throat_area}) -- the primary nozzle must "
                 f"diverge to expand supersonically."
             )
-        if mixing_area <= nozzle_exit_area:
+        if mixing_area is not None and mixing_area <= nozzle_exit_area:
             raise ValueError(
                 f"EjectorElement '{id}': mixing_area ({mixing_area}) must exceed "
                 f"nozzle_exit_area ({nozzle_exit_area}) -- the constant-area section "
@@ -212,11 +224,18 @@ class EjectorElement(MultiPortChamberBase):
         #   primary  -> nozzle exit A_p1 (motive jet plane)
         #   secondary-> annular suction A_3 - A_p1
         #   outlet   -> mixing/diffuser duct A_3
-        port_areas = [
-            float(nozzle_exit_area),
-            float(mixing_area - nozzle_exit_area),
-            float(mixing_area),
-        ]
+        # An inherited A_3 is filled in by resolve_topology, which sets all
+        # three (the base class's own inheritance would give the suction port
+        # the suction pipe's area, which is not the annulus).
+        port_areas: list[float | None] = (
+            [
+                float(nozzle_exit_area),
+                float(mixing_area - nozzle_exit_area),
+                float(mixing_area),
+            ]
+            if mixing_area is not None
+            else [float(nozzle_exit_area), None, None]
+        )
         super().__init__(
             id,
             inlet_nodes=[primary_node, secondary_node],
@@ -228,8 +247,58 @@ class EjectorElement(MultiPortChamberBase):
         self.outlet_node = outlet_node
         self.throat_area = float(throat_area)
         self.nozzle_exit_area = float(nozzle_exit_area)
-        self.mixing_area = float(mixing_area)
+        self._auto_mixing = mixing_area is None
+        self.mixing_area: float | None = float(mixing_area) if mixing_area is not None else None
+        #: Where mixing_area came from (#559): "user", "channel '<id>'" /
+        #: "<Element> '<id>'" (the outlet pipe), or "default".
+        self._mixing_source = "user" if mixing_area is not None else ""
         self.recovery_efficiency = float(recovery_efficiency)
+
+    def area_facing(self, node_id: str) -> float | None:
+        """The flow area this ejector presents at ``node_id``: the mixing duct
+        A_3 at the outlet, so an outlet pipe can inherit it. None at the inlets
+        (internal nozzle exit / suction annulus, not a feed pipe's area)."""
+        if node_id == self.outlet_node and self.mixing_area is not None:
+            return self.mixing_area
+        return None
+
+    def resolve_topology(self, graph: Any) -> None:
+        if self._auto_mixing:
+            area, source = self._outlet_pipe_area(graph)
+            if area is not None:
+                self.mixing_area, self._mixing_source = area, source
+            elif self.mixing_area is None:
+                self.mixing_area = DEFAULT_EJECTOR_MIXING_AREA
+                self._mixing_source = "default"
+            if self.mixing_area <= self.nozzle_exit_area:
+                raise ValueError(
+                    f"EjectorElement '{self.id}': the mixing area inherited from "
+                    f"the outlet pipe ({self.mixing_area:.4g} m^2, {self._mixing_source}) "
+                    f"must exceed nozzle_exit_area ({self.nozzle_exit_area:.4g} m^2). "
+                    f"Set mixing_area explicitly or widen the outlet pipe."
+                )
+            a3, ap1 = self.mixing_area, self.nozzle_exit_area
+            self.port_areas = [ap1, a3 - ap1, a3]
+            self._port_area_sources = ["user", self._mixing_source, self._mixing_source]
+        super().resolve_topology(graph)
+
+    def _outlet_pipe_area(self, graph: Any) -> tuple[float | None, str]:
+        """The area of the element on the outside of the outlet port, unless
+        that element itself took its area from this ejector (which would turn a
+        default into an "inherited" value on the next pass)."""
+        own = f"'{self.id}'"
+        for elem in graph.get_upstream_elements(self.outlet_node) + graph.get_downstream_elements(
+            self.outlet_node
+        ):
+            if elem is self or own in str(getattr(elem, "_area_source", "")):
+                continue
+            area = _element_area_facing(elem, self.outlet_node)
+            if area is not None:
+                return (
+                    area,
+                    f"{'channel' if type(elem).__name__ == 'ChannelElement' else type(elem).__name__} '{elem.id}'",
+                )
+        return None, ""
 
     @property
     def area_ratio_nozzle(self) -> float:
