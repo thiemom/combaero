@@ -3439,11 +3439,24 @@ class NetworkSolver:
                     "(wrong-direction port flow under a soft barrier, an "
                     "energy-inconsistent mirror root, or a state where the "
                     "junction's own loss closure is not net dissipative). "
-                    "Treating as "
-                    "non-converged; try "
-                    "init_strategy='analytical_pt_prop' or a different "
-                    "initial guess."
+                    "Treating as non-converged; "
                 )
+                # Suggest another start only where one is left to try: a root
+                # the topology-aware seed itself converged to is the model's
+                # answer for this geometry, and re-solving lands on it again
+                # (#536: a tee port narrower than its channel, reproduced from
+                # every start).
+                if x0 is not None or init_strategy != "analytical_pt_prop":
+                    message += (
+                        "try init_strategy='analytical_pt_prop' or a different initial guess."
+                    )
+                else:
+                    message += (
+                        "this root was reached from the topology-aware start, so "
+                        "a different start rarely changes it. Check the junction's "
+                        "geometry first: a port area that differs from the "
+                        "connected element's is the usual cause."
+                    )
 
         # A node's derived T held at the [200, 5000] K clamp discards the
         # energy that would have taken its FLOW past (190 kW in a heated
