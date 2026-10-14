@@ -7,6 +7,7 @@ export default defineConfig({
 	server: {
 		proxy: {
 			"/solve": "http://localhost:8000",
+			"/resolve_preview": "http://localhost:8000",
 			"/export": "http://localhost:8000",
 			"/metadata": "http://localhost:8000",
 			"/solver": "http://localhost:8000",

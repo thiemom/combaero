@@ -1,0 +1,3 @@
+- **`/resolve_preview` endpoint: geometry inheritance without solving (#559).**
+  - A new backend endpoint (backed by `gui.backend.resolve_preview`) runs the authoritative resolve pass without solving and returns, per drawn element/node, each geometry field's resolved value and provenance (`"user"` / `"inherited from ..."` / `"default"`), plus whether it is unresolved -- the network is not yet solvable, and why.
+  - This is the single source of truth the GUI will read for inherited placeholders and to flag required values before Solve, instead of re-deriving inheritance in its own graph walk (B2 of the geometry-inheritance roadmap).
