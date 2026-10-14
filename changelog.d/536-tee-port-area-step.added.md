@@ -1,0 +1,4 @@
+- **Tee port area vs the connected channel is reported.** Every multi-port junction now reports, per port, the connected element's own area and its ratio to the port area, plus `port_area_mismatch`: the number of ports that differ by more than 5%.
+  - In the GUI, the tee Inspector shows an amber note naming those ports and both diameters.
+  - Such a step is not modelled. The straight port takes the main pipe's area, so a narrower straight channel leaves an undeclared contraction there. The ideal momentum tee, which couples on static pressure, then creates total pressure across it, and its solve is rejected (#536).
+  - Nothing is corrected; how to model the step is still open in #536.

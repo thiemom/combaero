@@ -11,6 +11,7 @@ import combaero as cb
 from combaero.network import NetworkSolver
 
 from .graph_builder import build_network_from_schema
+from .messages import humanize
 from .runner import NetworkResult, _build_result_objects, _schema_maps
 from .schemas import (
     NetworkGraphSchema,
@@ -148,7 +149,7 @@ async def solve(schema: NetworkGraphSchema):
 
         return SolveResponse(
             success=result.get("__success__", False),
-            message=result.get("__message__", "Solve completed"),
+            message=humanize(result.get("__message__", "Solve completed"), schema),
             final_norm=result.get("__final_norm__"),
             node_results=node_results,
             element_results=element_results,
@@ -166,9 +167,9 @@ async def solve(schema: NetworkGraphSchema):
             "different init strategy.",
         ) from None
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=humanize(str(e), schema)) from e
 
 
 @app.post("/export")
@@ -217,9 +218,9 @@ async def export_results(schema: NetworkGraphSchema):
             detail=f"Export solve exceeded the hard timeout of {hard_timeout:.0f}s.",
         ) from None
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=humanize(str(e), schema)) from e
 
 
 @app.get("/solver/continuation_available")

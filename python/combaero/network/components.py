@@ -6160,6 +6160,10 @@ class MultiPortChamberBase(NetworkElement):
     inability to represent ejector / merge-split direction natively).
     """
 
+    #: |connected element area / port area - 1| above which a port is reported
+    #: as an unmodelled area step (``port_area_mismatch``).
+    PORT_AREA_MISMATCH_TOL = 0.05
+
     # Opt-in for the solver's junction split seed (`_junction_split_guess`).
     # True here because a chamber junction's port flows follow from the port
     # pressure differences: through the element's own closure where it offers
@@ -6241,7 +6245,9 @@ class MultiPortChamberBase(NetworkElement):
 
         # Resolved during resolve_topology:
         #   self._port_element_ids[i] = id of the element connected at port i
+        #   self._outer_areas[i] = that element's own flow area, when it has one
         self._port_element_ids: list[str] = [""] * self.N
+        self._outer_areas: list[float | None] = [None] * self.N
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.P_jct"]
@@ -6389,11 +6395,14 @@ class MultiPortChamberBase(NetworkElement):
                 )
 
             # 2. Inherit port area from connecting channel if not set.
+            outer_area: float | None = None
+            if isinstance(outer, ChannelElement) and outer.diameter is not None:
+                outer_area = math.pi * (outer.diameter / 2.0) ** 2
+            elif isinstance(outer, BorderCarnotLossElement) and outer.area is not None:
+                outer_area = float(outer.area)
+            self._outer_areas[i] = outer_area
             if self.port_areas[i] is None:
-                if isinstance(outer, ChannelElement) and outer.diameter is not None:
-                    self.port_areas[i] = math.pi * (outer.diameter / 2.0) ** 2
-                elif isinstance(outer, BorderCarnotLossElement) and outer.area is not None:
-                    self.port_areas[i] = outer.area
+                self.port_areas[i] = outer_area
             if self.port_areas[i] is None:
                 raise ValueError(
                     f"MultiPortChamberBase '{self.id}': could not infer "
@@ -6442,6 +6451,23 @@ class MultiPortChamberBase(NetworkElement):
             diag[f"port_{i}_sign"] = float(self._port_signs[i])
             if port_mdots is not None and i < len(port_mdots):
                 diag[f"port_{i}_m_dot"] = float(port_mdots[i])
+        # A port whose area differs from the element connected to it leaves an
+        # area step that no element models (#536). Reported, never corrected.
+        n_mismatch = 0
+        outer_areas = (
+            getattr(self, "_outer_areas", None) or [None] * self.N
+        )  # unresolved: nothing to compare
+        for i in range(self.N):
+            outer_area = outer_areas[i]
+            area = self.port_areas[i]
+            if outer_area is None or not area:
+                continue
+            ratio = float(outer_area) / float(area)
+            diag[f"port_{i}_outer_area"] = float(outer_area)
+            diag[f"port_{i}_area_ratio"] = ratio
+            if abs(ratio - 1.0) > self.PORT_AREA_MISMATCH_TOL:
+                n_mismatch += 1
+        diag["port_area_mismatch"] = float(n_mismatch)
         return diag
 
 

@@ -2,6 +2,7 @@ import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
+import { nodeTypeLabel } from "../utils/nodeUtils";
 import {
 	BASIC_STATE_KEYS,
 	QUANTITY_CATALOGUE,
@@ -175,7 +176,7 @@ const Inspector = () => {
 								.filter((n) => n.id !== selectedNode?.id && n.type !== "probe")
 								.map((n) => (
 									<option key={n.id} value={n.id}>
-										{n.data?.label || n.type?.replace(/_/g, " ") || n.id}
+										{n.data?.label || nodeTypeLabel(n.type) || n.id}
 									</option>
 								))}
 						</optgroup>
@@ -252,12 +253,7 @@ const Inspector = () => {
 					</div>
 				)}
 				<h2 className="text-lg font-bold border-b pb-2 capitalize flex justify-between items-center">
-					<span>
-						{selectedNode.type === "mpce_tee"
-							? "Tee"
-							: (selectedNode.type || "unknown").replace("_", " ")}{" "}
-						Node
-					</span>
+					<span>{nodeTypeLabel(selectedNode.type) || "unknown"} Node</span>
 					<div className="flex gap-2">
 						<button
 							type="button"
@@ -2269,6 +2265,39 @@ const Inspector = () => {
 												</>
 											)}
 										</div>
+										{/* Port area vs the connected channel (#536) */}
+										{(result.port_area_mismatch ?? 0) > 0 && (
+											<div className="mt-3 text-[10px] text-amber-600">
+												Area step not modelled at{" "}
+												{(isMerge
+													? ["straight", "branch", "common"]
+													: ["common", "straight", "branch"]
+												)
+													.map((name, i) => ({
+														name,
+														r: result[`port_${i}_area_ratio`] as
+															| number
+															| undefined,
+														a: result[`port_${i}_area`] as number | undefined,
+														o: result[`port_${i}_outer_area`] as
+															| number
+															| undefined,
+													}))
+													.filter(
+														(p) => p.r != null && Math.abs(p.r - 1) > 0.05,
+													)
+													.map(
+														(p) =>
+															`${p.name} (tee D ${(dFromF(p.a ?? 0) * lu).toFixed(1)}, channel D ${(dFromF(p.o ?? 0) * lu).toFixed(1)} ${lu_label})`,
+													)
+													.join(", ")}
+												. The junction model uses the tee's area; the step to
+												the channel carries no contraction or expansion loss.
+												The ideal momentum model can then report a
+												total-pressure gain and the solve is rejected; size the
+												channel to the tee, or set F_C / F_branch.
+											</div>
+										)}
 									</div>
 								)}
 							</div>

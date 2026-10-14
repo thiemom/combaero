@@ -127,6 +127,13 @@ a shared end is listed once, under the left panel.
   through the traced grid; 3 rings too faint to snap keep the click's value
   (calibration residual 0.004).
 - **Review:** every point was checked on an overlay of the scan.
+- **Removed 2026-10-13:** two Fig. 14 rows (mode 4, h_ba, q_gamma = -1,
+  h -1.98 and -2.446). They were the "2" of the right-margin label "-2" and
+  the "0" of the q-axis label "-1.0", which had passed the ring detector. The
+  real last point there is -1.385 at q_gamma = -0.997. They came to light
+  when the Fig. 26 curve of the same shape was compared with the points. Both
+  sat at a dead port (alpha carries no flow at q_gamma = -1), so no score
+  used them.
 
 **Checks.**
 - **Panel ends against tables E/F/G:** 36 comparisons, 33 within 0.015, the
@@ -339,8 +346,9 @@ one row per state. 90/0.44/0 adds two h_ya-only rows per q (next section):
     most 0.023.
   - The large offsets (0.18-0.42) are raw points straddling the two mode-3
     jumps.
-  - Two mode-4 h_ba points at q_gamma = -1 sit 0.68 and 1.15 below the curve.
-    They are not explained.
+  - This check found two mode-4 h_ba "points" at q_gamma = -1, 0.68 and 1.15
+    below the curve. They were tick-label glyphs (see `detail_points.csv`)
+    and have been removed.
 - **Head identity** `h_ya = h_yb + h_ba` at each sampled q (state rows count
   once per state; the h_ya-only rows are left out):
 

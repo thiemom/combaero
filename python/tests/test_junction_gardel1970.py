@@ -52,7 +52,7 @@ def test_pooled_scores_sit_where_they_were_measured() -> None:
     cells, taps = g.score()
     stats = g.pooled(cells)
     assert stats["ideal"][0] == 1426
-    assert taps == 18
+    assert taps == 16  # 18 before two label glyphs were removed from Fig. 14 (2026-10-13)
     # 2026-10-12: ideal 0.550 (+0.535), Bassett 0.214 (+0.115), shipped 0.219 (+0.113).
     assert stats["ideal"][1] == pytest.approx(0.550, abs=0.01)
     assert stats["bassett"][1] == pytest.approx(0.214, abs=0.01)
