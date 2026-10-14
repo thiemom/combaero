@@ -86,7 +86,7 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
     if isinstance(item, (MomentumChamberNode, CombustorNode)):
         return {
             "area": FieldResolution(_f(item, "area"), _s(item, "_area_source")),
-            "Dh": FieldResolution(_f(item, "Dh"), _s(item, "_area_source")),
+            "Dh": FieldResolution(_f(item, "Dh"), _s(item, "_Dh_source")),
         }
     # Elements. Order matters: Effusion/Impingement plates subclass Orifice but
     # take their geometry from construction, so they are not inheriting items.

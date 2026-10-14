@@ -196,3 +196,53 @@ def test_tee_reports_the_builder_resolved_sources() -> None:
     rep = resolve_preview(build_network_from_schema(_three_plenum_mpce_schema("branch")))
     assert rep["mpce"].fields["F_C"].source == "default"
     assert rep["mpce"].fields["F_branch"].source == "derived from F_C / psi"
+
+
+def test_gui_momentum_chamber_with_null_area_inherits_it() -> None:
+    """A freshly dropped chamber carries area=None (the GUI no longer seeds
+    0.1, which counted as user-set): it inherits the connected channel's flow
+    area, and the convective surface follows the inherited area."""
+    from gui.backend.graph_builder import build_network_from_schema as build
+
+    def _n(nid: str, ntype: str, data: dict) -> dict:
+        return {"id": nid, "type": ntype, "data": {"id": nid, **data}, "position": {"x": 0, "y": 0}}
+
+    def _e(eid: str, src: str, tgt: str) -> dict:
+        return {
+            "id": eid,
+            "source": src,
+            "sourceHandle": "flow-source",
+            "target": tgt,
+            "targetHandle": "flow-target",
+            "data": {},
+        }
+
+    graph = {
+        "nodes": [
+            _n("pb_in", "pressure_boundary", {"Pt": 200000, "Tt": 300}),
+            _n("ch_u", "channel", {"L": 1.0, "D": 0.1}),
+            _n("mc", "momentum_chamber", {"area": None}),
+            _n("ch_d", "channel", {"L": 1.0, "D": 0.1}),
+            _n("pb_out", "pressure_boundary", {"Pt": 100000, "Tt": 300}),
+        ],
+        "edges": [
+            _e("e1", "pb_in", "ch_u"),
+            _e("e2", "ch_u", "mc"),
+            _e("e3", "mc", "ch_d"),
+            _e("e4", "ch_d", "pb_out"),
+        ],
+    }
+    net = build(NetworkGraphSchema(**graph))
+    rep = resolve_preview(net)
+    area = rep["mc"].fields["area"]
+    assert rep["mc"].status == "resolved"
+    assert area.source == "channel 'ch_u'"
+    assert rep["mc"].fields["Dh"].source == "channel 'ch_u'"
+    assert abs(area.value - 0.25 * 3.141592653589793 * 0.1**2) < 1e-12
+    assert net.nodes["mc"].surface.area == area.value
+
+    # A user Dh: the area is derived from it, and says so.
+    graph["nodes"][2]["data"]["Dh"] = 0.2
+    rep = resolve_preview(build(NetworkGraphSchema(**graph)))
+    assert rep["mc"].fields["Dh"].source == "user"
+    assert rep["mc"].fields["area"].source == "derived from Dh"

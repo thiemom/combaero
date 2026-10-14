@@ -1733,6 +1733,9 @@ class MomentumChamberNode(NetworkNode):
         self.port_angles_deg: dict[str, float] = port_angles_deg or {}
         self.length = length
         self.Dh = Dh
+        #: Where self.Dh came from; set here (not in resolve) so a second
+        #: resolve pass does not relabel an inherited Dh as user-set.
+        self._Dh_source = "user" if Dh is not None else ""
         self.surface = surface or ConvectiveSurface()
         self.t_hot = t_hot
         self.upstream_elements = []
@@ -2036,17 +2039,20 @@ class MomentumChamberNode(NetworkNode):
                 self.Dh = getattr(main, "Dh", None) or 2.0 * math.sqrt(self.area / math.pi)
                 self.surface.area = self.area
                 self._area_source = f"inherited from {self.main_inlet}"
+                self._Dh_source = self._area_source
                 return
         # Inherit hydraulic diameter from upstream channel when not user-specified
         if self.Dh is None:
             for elem in self.upstream_elements:
                 if isinstance(elem, ChannelElement) and elem.diameter is not None:
                     self.Dh = elem.diameter
+                    self._Dh_source = f"channel '{elem.id}'"
                     break
         # Derive cross-section area from Dh when area was not user-specified
         if self._auto_area and self.Dh is not None:
             self.area = math.pi * (self.Dh / 2.0) ** 2
             self.surface.area = self.area
+            self._area_source = "derived from Dh" if self._Dh_source == "user" else self._Dh_source
         elif self._auto_area:
             # No channel to inherit from: widen the search to any area-bearing
             # neighbour before falling back (issue #262).
@@ -2054,6 +2060,7 @@ class MomentumChamberNode(NetworkNode):
             if area is not None:
                 self.area = area
                 self.Dh = 2.0 * math.sqrt(area / math.pi)
+                self._Dh_source = source
                 self.surface.area = area
                 self._area_source = source
             else:
@@ -2281,6 +2288,9 @@ class CombustorNode(NetworkNode):
         #: Where self.area came from once resolved (issue #262).
         self._area_source = "user" if area is not None else ""
         self.Dh = Dh
+        #: Where self.Dh came from; set here (not in resolve) so a second
+        #: resolve pass does not relabel an inherited Dh as user-set.
+        self._Dh_source = "user" if Dh is not None else ""
         self.surface = surface or ConvectiveSurface()
         self.t_hot = t_hot
         self.upstream_elements = []
@@ -2470,11 +2480,13 @@ class CombustorNode(NetworkNode):
             for elem in self.upstream_elements:
                 if isinstance(elem, ChannelElement) and elem.diameter is not None:
                     self.Dh = elem.diameter
+                    self._Dh_source = f"channel '{elem.id}'"
                     break
         # Derive cross-section area from Dh when area was not user-specified
         if self._auto_area and self.Dh is not None:
             self.area = math.pi * (self.Dh / 2.0) ** 2
             self.surface.area = self.area
+            self._area_source = "derived from Dh" if self._Dh_source == "user" else self._Dh_source
         elif self._auto_area:
             # No channel to inherit from: widen the search to any area-bearing
             # neighbour before falling back (issue #262).
@@ -2482,6 +2494,7 @@ class CombustorNode(NetworkNode):
             if area is not None:
                 self.area = area
                 self.Dh = 2.0 * math.sqrt(area / math.pi)
+                self._Dh_source = source
                 self.surface.area = area
                 self._area_source = source
             else:
