@@ -481,12 +481,14 @@ def _find_junction_port(
             nid = edge.source
         else:
             continue
+        # An auto-inserted port node wins: it is also created for a plenum or
+        # boundary wired straight to the port (build pass 1b).
+        if tee_port_node_map and (junction_id, port) in tee_port_node_map:
+            return tee_port_node_map[(junction_id, port)]
         if nid in nodes_map:
             if wall_edge_remap and edge.id in wall_edge_remap:
                 return wall_edge_remap[edge.id]
             return nid
-        if tee_port_node_map and (junction_id, port) in tee_port_node_map:
-            return tee_port_node_map[(junction_id, port)]
         raise ValueError(
             f"Junction '{junction_id}' port '{port}' connects to '{nid}', which is "
             "not a physical node (plenum or boundary). All junction ports must "
@@ -773,6 +775,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     # users don't need to manually place a plenum on every tee arm.
     edge_junction_map: dict[tuple[str, str], str] = {}
     tee_port_node_map: dict[tuple[str, str], str] = {}  # (junction_id, port) -> node_id
+    # (from_node, to_node) lossless links joining a directly-wired plenum or
+    # boundary to the port node inserted for it.
+    port_node_links: list[tuple[str, str]] = []
     for edge in schema.edges:
         if edge.data and edge.data.get("type") == "thermal":
             continue
@@ -817,6 +822,32 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.target, port)] = jid
                 edge_junction_map[(edge.source, edge.target)] = jid
+
+        elif (src_tee and edge.target in nodes_map) or (tgt_tee and edge.source in nodes_map):
+            # Junction port <-> plenum / boundary wired directly. The junction
+            # needs a MomentumChamberNode on each port (MultiPortChamberBase
+            # refuses anything else), so insert one and join it to the node with
+            # a lossless link, as a channel on the port would get (#559 audit).
+            # A momentum chamber the user placed is used as-is; a liner's ports
+            # are plenums by design.
+            jct, other = (edge.source, edge.target) if src_tee else (edge.target, edge.source)
+            handle = edge.sourceHandle if src_tee else edge.targetHandle
+            port = _port_from_handle(handle)
+            if (
+                port
+                and jct not in liner_ids
+                and not isinstance(nodes_map[other], MomentumChamberNode)
+                and (jct, port) not in tee_port_node_map
+            ):
+                jid = f"__tee_jct__{jct}_{port}"
+                if jid not in nodes_map:
+                    jn = MomentumChamberNode(jid)
+                    net.add_node(jn)
+                    nodes_map[jid] = jn
+                tee_port_node_map[(jct, port)] = jid
+                # Flow direction follows the canvas edge: node -> port (inlet)
+                # or port -> node (outlet).
+                port_node_links.append((other, jid) if tgt_tee else (jid, other))
 
     # 1c. A tee port whose channel has a different area meets it through a
     # sharp step (#536). The tee's ports keep the closures' geometry (F_S =
@@ -1309,6 +1340,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     auto_id, from_node=edge.source, to_node=edge.target
                 )
                 net.add_element(elem)
+
+    for src, dst in port_node_links:
+        link_id = f"__auto_link__{src}__{dst}"
+        if link_id not in net.elements:
+            net.add_element(LosslessConnectionElement(link_id, from_node=src, to_node=dst))
 
     # Result assembly reports each array under its GUI id (runner.py).
     net._gui_arrays = gui_arrays
