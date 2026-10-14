@@ -506,7 +506,12 @@ def test_step_into_a_chamber_loses_exactly_its_loss(F0: float, F1: float, model_
 
 
 def test_step_into_a_chamber_jacobian_matches_fd() -> None:
-    """Global analytic Jacobian vs FD with the stagnation-coupled row."""
+    """Global analytic Jacobian vs FD with the stagnation-coupled row.
+
+    Row-scaled (each entry as J_ij |x_j| against its row's largest term), with
+    a 1e-6 relative step: at 1e-7 the m_dot columns (x ~ 0.06) sit in FD
+    round-off, which read 1.1e-4 on Linux CI against 2.7e-6 at this step.
+    """
     from scipy.optimize._numdiff import approx_derivative
 
     solver = _step_into_chamber(_F_BIG, _F_SMALL)
@@ -515,8 +520,8 @@ def test_step_into_a_chamber_jacobian_matches_fd() -> None:
     x = np.array([sol[n] for n in solver.unknown_names], dtype=float)
     _, jac = solver._residuals_and_jacobian(x)
     jac = jac.toarray()
-    step = np.maximum(np.abs(x) * 1e-7, 1e-10)
+    step = np.maximum(np.abs(x) * 1e-6, 1e-10)
     fd = approx_derivative(lambda v: solver._residuals(v), x, method="3-point", abs_step=step)
-    scale = np.abs(fd).max(axis=0) + 1e-300
-    err = np.abs(jac - fd) / scale
-    assert err.max() < 1e-4, err.max()
+    row_scale = np.abs(fd * x).max(axis=1, keepdims=True) + 1e-300
+    err = np.abs(jac - fd) * np.abs(x) / row_scale
+    assert err.max() < 1e-6, err.max()
