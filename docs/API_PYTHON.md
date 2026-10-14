@@ -886,6 +886,16 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
   reported as `{node}.Q_withheld` [W], as is wall heat aimed at a `WallNode`.
 - **A `MassFlowBoundary` between elements** is an injection: its `m_dot`
   joins the node at its own `Tt` and `Y`.
+- **Where the network ends** is a property of the node class, read by graph
+  validation, the solver and the GUI export (#545):
+
+  | attribute | True on | meaning |
+  |---|---|---|
+  | `is_boundary` | `PressureBoundary`, `MassFlowBoundary`, `WallNode` | the network may end here: one connected element, or flow one way only |
+  | `is_flow_boundary` | `PressureBoundary`, `MassFlowBoundary` | mass and enthalpy cross the control volume here, at the state the node imposes |
+
+  A `WallNode` is a boundary nothing crosses. An injecting `MassFlowBoundary`
+  is still a flow boundary.
 
 #### Merge chamber: main inlet plus side streams (#471)
 

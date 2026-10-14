@@ -1332,6 +1332,17 @@ class NetworkNode(ABC):
     #: ``compute_derived_state`` has been called.
     has_theta: bool = False
 
+    #: The network ends here, so the node may be a dead end: one connected
+    #: element, or flow in one direction only. The single definition graph
+    #: validation, the solver and the GUI read (#545).
+    is_boundary: bool = False
+
+    #: Mass and enthalpy cross the network's control volume here, at the state
+    #: the node imposes. Every flow boundary is a boundary; a WallNode is a
+    #: boundary nothing crosses. A MassFlowBoundary between two elements is
+    #: still a flow boundary: it injects its stream into the network.
+    is_flow_boundary: bool = False
+
     def __init__(self, id: str):
         self.id = id
 
@@ -2054,6 +2065,9 @@ class PressureBoundary(NetworkNode):
     Essential as a reference pressure and absolute mass sink/source for the network.
     """
 
+    is_boundary: bool = True
+    is_flow_boundary: bool = True
+
     def __init__(
         self,
         id: str,
@@ -2126,6 +2140,9 @@ class MassFlowBoundary(NetworkNode):
     Cannot exclusively define a network, a pressure reference is also required.
     """
 
+    is_boundary: bool = True
+    is_flow_boundary: bool = True
+
     def __init__(
         self,
         id: str,
@@ -2181,6 +2198,8 @@ class WallNode(NetworkNode):
     The solver's automatic mass-balance equation (applied to every non-PressureBoundary
     node) forces m_dot = 0 on all connected elements without any additional logic here.
     """
+
+    is_boundary: bool = True
 
     def __init__(self, id: str) -> None:
         super().__init__(id)

@@ -306,7 +306,6 @@ class NetworkResult:
         with all available diagnostic quantities.  Column names carry unit
         annotations matching the GUI export (e.g. ``'P [Pa]'``, ``'T [K]'``).
         """
-        _BOUNDARY_KINDS = {"mass_boundary", "pressure_boundary"}
         species_labels: list[str] = list(cb.species.names)
         data: list[dict] = []
 
@@ -318,7 +317,7 @@ class NetworkResult:
             row: dict = {
                 "type": "node",
                 "kind": kind,
-                "is_boundary": kind in _BOUNDARY_KINDS,
+                "is_boundary": bool(getattr(self._net.nodes.get(node_id), "is_boundary", False)),
                 "combustion_method": self._id_to_method.get(node_id, ""),
                 "id": node_id,
                 "label": self._id_to_label.get(node_id, ""),
