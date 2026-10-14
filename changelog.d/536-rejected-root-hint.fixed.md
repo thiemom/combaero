@@ -1,0 +1,4 @@
+- **A rejected junction root no longer tells the user to try `init_strategy='analytical_pt_prop'` when that start produced it (#536).**
+  - **Before:** re-solving from that start reproduced the same root.
+  - **Now:** the message points at the junction's geometry instead; a port area that differs from the connected element's is the usual cause.
+  - **Still suggested:** from any other start, or from a user `x0`.

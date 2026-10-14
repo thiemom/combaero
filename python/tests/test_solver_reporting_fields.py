@@ -283,3 +283,37 @@ def test_a_rejected_root_reports_converged_true_and_consistent_false():
         assert sol["__final_norm__"] < 1e-3
         return
     pytest.skip("no converging draw available to reject")
+
+
+def test_a_rejected_root_suggests_another_start_only_where_one_is_left():
+    """#536: the message told the user to try 'analytical_pt_prop' after a
+    root that start had itself produced; re-solving reproduced it. From that
+    start it now points at the geometry instead; from any other it still
+    suggests the topology-aware start."""
+    rng = random.Random(20260906)
+    for _ in range(40):
+        net = rr.build(rr.sample(rng))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            clean = NetworkSolver(net).solve(timeout=30.0)
+        if not clean["__success__"]:
+            continue
+
+        element = next(e for e in net.elements.values() if hasattr(e, "verify_solution_consistent"))
+        element.verify_solution_consistent = lambda *a, **k: False
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            seeded = NetworkSolver(net).solve(
+                init_strategy="analytical_pt_prop", timeout=30.0, auto_retry=False
+            )
+            warm = NetworkSolver(net).solve(
+                x0=clean["__x_solution__"], timeout=30.0, auto_retry=False
+            )
+
+        assert seeded["__outcome__"] == SolveOutcome.INCONSISTENT
+        assert "try init_strategy" not in seeded["__message__"]
+        assert "port area" in seeded["__message__"]
+        assert warm["__outcome__"] == SolveOutcome.INCONSISTENT
+        assert "try init_strategy='analytical_pt_prop'" in warm["__message__"]
+        return
+    pytest.skip("no converging draw available to reject")
