@@ -1,0 +1,76 @@
+"""User-facing wording for solver errors and messages (#321 item 1).
+
+The network elements raise with their internal ids: a tee or ejector port is
+the auto-inserted node ``__tee_jct__<node id>_<port>``, and every element is
+its React Flow id. The GUI shows neither -- a tee's ports are labelled c, s, b
+and an ejector's p, s, o -- so the message is rewritten here, at the HTTP
+boundary, and the elements keep raising what a script user needs.
+"""
+
+from __future__ import annotations
+
+import re
+
+from .schemas import NetworkGraphSchema
+
+#: handle port name -> the letter the node draws next to that port
+PORT_TAG = {
+    "common": "c",
+    "straight": "s",
+    "branch": "b",
+    "primary": "p",
+    "secondary": "s",
+    "outlet": "o",
+    "coolantin": "coolant in",
+    "coolantout": "coolant out",
+    "discharge": "discharge",
+}
+
+#: node type -> the name the palette uses, where the type string differs
+KIND_NAME = {
+    "mpce_tee": "Tee",
+    "momentum_chamber": "Momentum Chamber",
+    "mass_boundary": "Mass Flow Boundary",
+    "pressure_boundary": "Pressure Boundary",
+}
+
+_PORT_ID = re.compile(r"__tee_jct__(.+?)_(" + "|".join(PORT_TAG) + r")\b")
+
+HINTS = (
+    (
+        "is declared as an",
+        "Hint: this usually means the junction's flow direction (merge / branch) "
+        "does not match how it is wired.",
+    ),
+    (
+        "must be a MomentumChamberNode",
+        "Hint: connect this port through an element (for example a channel), "
+        "not straight to a boundary or plenum.",
+    ),
+)
+
+
+def node_name(schema: NetworkGraphSchema, node_id: str) -> str:
+    """The user's label for a node, with its kind; the kind alone if unlabelled."""
+    node = next((n for n in schema.nodes if n.id == node_id), None)
+    if node is None:
+        return node_id
+    kind = KIND_NAME.get(node.type, node.type.replace("_", " ").title())
+    label = (node.data or {}).get("label")
+    return f"{label} ({kind})" if label else kind
+
+
+def humanize(message: str, schema: NetworkGraphSchema) -> str:
+    """Rewrite internal ids in a solver message into what the canvas shows."""
+    if not message:
+        return message
+    out = _PORT_ID.sub(
+        lambda m: f"{node_name(schema, m[1])} port {m[2]} ({PORT_TAG[m[2]]})",
+        message,
+    )
+    for node in schema.nodes:
+        quoted = f"'{node.id}'"
+        if quoted in out:
+            out = out.replace(quoted, f"'{node.id}' [{node_name(schema, node.id)}]")
+    hints = [hint for trigger, hint in HINTS if trigger in out]
+    return "\n".join([out, *hints])

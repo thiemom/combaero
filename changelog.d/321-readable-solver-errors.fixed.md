@@ -1,0 +1,9 @@
+- **GUI solver errors name what is on the canvas (#321).**
+  - A tee or ejector port is shown as the node's label and the letter it draws: `'__tee_jct__node_..._branch'` becomes "T1 (Tee) port branch (b)".
+  - Every node id in the message is followed by its label and kind.
+  - The two common junction errors carry a hint:
+    - a port wired against the declared direction points at the merge / branch setting;
+    - a port wired straight to a boundary asks for an element in between.
+  - Applies to the error of a failed solve and to the solver message.
+- **"mpce tee" no longer appears in user-facing text.** The probe's target list and the probe node now say "Tee". The saved type string `mpce_tee` is unchanged.
+- **`scripts/run-gui.sh` uses pnpm**, as the repo does, instead of npm.

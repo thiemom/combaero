@@ -42,9 +42,9 @@ sleep 2
 
 # 2. Start Vite Frontend
 echo "Starting Frontend (Vite)..."
-echo "NOTE: If this fails, ensure you ran 'npm install' in gui/frontend following the React 19 upgrade."
+echo "NOTE: If this fails, run 'pnpm install' in gui/frontend first."
 cd gui/frontend
-npm run dev -- --port 5173 --host
+pnpm run dev --port 5173 --host
 
 # The script will wait here until Vite is stopped (Ctrl+C)
 # Cleanup is handled by the trap
