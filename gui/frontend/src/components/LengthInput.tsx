@@ -11,6 +11,7 @@ interface LengthInputProps {
 	onClear?: () => void;
 	disabled?: boolean;
 	inputClassName?: string;
+	readOnly?: boolean;
 }
 
 const LengthInput: React.FC<LengthInputProps> = ({
@@ -22,6 +23,7 @@ const LengthInput: React.FC<LengthInputProps> = ({
 	placeholder = "0.00",
 	disabled,
 	inputClassName,
+	readOnly,
 }) => {
 	const { unitPreferences, setLengthUnit } = useStore();
 	const unit = unitPreferences.length;
@@ -50,6 +52,7 @@ const LengthInput: React.FC<LengthInputProps> = ({
 					value={scaledValue}
 					onChange={(v) => onChange(v / displayScale)}
 					onClear={onClear}
+					readOnly={readOnly}
 					className={`min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none${inputClassName ? ` ${inputClassName}` : ""}`}
 					placeholder={scaledPlaceholder.toString()}
 					disabled={disabled}

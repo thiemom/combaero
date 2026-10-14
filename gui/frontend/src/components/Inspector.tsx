@@ -2,11 +2,7 @@ import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
-import {
-	inheritedField,
-	inheritedNote,
-	unresolvedReason,
-} from "../utils/inheritance";
+import { inheritedField } from "../utils/inheritance";
 import { nodeTypeLabel } from "../utils/nodeUtils";
 import {
 	BASIC_STATE_KEYS,
@@ -18,6 +14,7 @@ import { bassettDesignK } from "../utils/teeK";
 import { validateNetwork } from "../utils/validation";
 import AreaInput from "./AreaInput";
 import CompositionEditor from "./CompositionEditor";
+import GeometryFields from "./GeometryFields";
 import LengthInput from "./LengthInput";
 import NumericInput from "./NumericInput";
 import SurfaceEnhancementInspector from "./SurfaceEnhancementInspector";
@@ -448,34 +445,13 @@ const Inspector = () => {
 					(() => {
 						// Inheritance comes from the solver's own resolve pass
 						// (/resolve_preview, #559), not a frontend graph walk, so the
-						// value shown is the value the solve will use.
-						const userSetD =
-							selectedNode.data.D !== null && selectedNode.data.D !== undefined;
-						const userSetDh =
-							selectedNode.data.Dh !== null &&
-							selectedNode.data.Dh !== undefined;
+						// value shown is the value the solve will use. The solver never
+						// inherits a channel's Dh (unset = circular), so no inherited Dh.
 						const geomD = inheritedField(
 							previewItems,
 							selectedNode.id,
 							"diameter",
 						);
-						// The inherited D (only meaningful while D is unset). Undefined
-						// while the preview loads or when nothing can be inherited.
-						const inheritedD = userSetD
-							? undefined
-							: (geomD?.value ?? undefined);
-						const inheritNote = inheritedNote(geomD?.source);
-						const unresolved = userSetD
-							? undefined
-							: unresolvedReason(previewItems, selectedNode.id);
-						const effectiveD: number | undefined = userSetD
-							? (selectedNode.data.D as number)
-							: inheritedD;
-						// The solver sets Dh = D whenever Dh is unset (it never inherits a
-						// non-circular Dh), so the unset Dh is computed locally, exactly.
-						const shownDh: number | null = userSetDh
-							? (selectedNode.data.Dh as number)
-							: (effectiveD ?? null);
 						return (
 							<>
 								<LengthInput
@@ -486,89 +462,19 @@ const Inspector = () => {
 										updateNodeData(selectedNode.id, { L: val })
 									}
 								/>
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Channel Inner Diameter
-										</label>
-										{userSetD && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { D: null })
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
-									<LengthInput
-										id={`D_${selectedNode.id}`}
-										label=""
-										value={userSetD ? selectedNode.data.D : null}
-										placeholder={inheritedD ?? "set D"}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { D: val })
-										}
-										onClear={() => updateNodeData(selectedNode.id, { D: null })}
-										inputClassName={
-											userSetD ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetD && inheritedD != null && inheritNote && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											{inheritNote}. Edit to override.
-										</p>
-									)}
-									{unresolved && (
-										<p
-											className="text-[9px] text-amber-700 -mt-1"
-											title={unresolved}
-										>
-											Nothing to inherit a diameter from — set D for this
-											channel.
-										</p>
-									)}
-								</div>
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Hydraulic Diameter Dh
-										</label>
-										{userSetDh && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { Dh: null })
-												}
-											>
-												Reset to circular
-											</button>
-										)}
-									</div>
-									<LengthInput
-										id={`Dh_${selectedNode.id}`}
-										label=""
-										value={shownDh}
-										placeholder={effectiveD ?? "= D"}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { Dh: val })
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { Dh: null })
-										}
-										inputClassName={
-											userSetDh ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetDh && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Dh = D (circular). Override for non-circular ducts.
-										</p>
-									)}
-								</div>
+								<GeometryFields
+									idPrefix={`ch_${selectedNode.id}`}
+									title="Channel cross-section"
+									stores="D"
+									userValue={selectedNode.data.D}
+									inherited={geomD}
+									onChange={(v) => updateNodeData(selectedNode.id, { D: v })}
+									dh={{
+										userValue: selectedNode.data.Dh,
+										onChange: (v) => updateNodeData(selectedNode.id, { Dh: v }),
+									}}
+									missingHint="Nothing to inherit a diameter from — set D or A for this channel."
+								/>
 								<div className="flex flex-col gap-2">
 									<label className="text-xs font-bold text-gray-500 uppercase">
 										Friction Model
@@ -1311,30 +1217,12 @@ const Inspector = () => {
 						// Face areas come from the solver's resolve pass
 						// (/resolve_preview, #559): F0 from the upstream side, F1 from
 						// the downstream side, exactly as the solve will use them.
-						const userSetF0 =
-							selectedNode.data.F0 !== null &&
-							selectedNode.data.F0 !== undefined;
-						const userSetF1 =
-							selectedNode.data.F1 !== null &&
-							selectedNode.data.F1 !== undefined;
 						const geomF0 = inheritedField(previewItems, selectedNode.id, "F0");
 						const geomF1 = inheritedField(previewItems, selectedNode.id, "F1");
-						const inheritedF0 = userSetF0
-							? undefined
-							: (geomF0?.value ?? undefined);
-						const inheritedF1 = userSetF1
-							? undefined
-							: (geomF1?.value ?? undefined);
-						const f0Note = inheritedNote(geomF0?.source);
-						const f1Note = inheritedNote(geomF1?.source);
-						// An area change refuses when a face has nothing to inherit from.
-						const unresolved = unresolvedReason(previewItems, selectedNode.id);
-						const effectiveF0: number | undefined = userSetF0
-							? (selectedNode.data.F0 as number)
-							: inheritedF0;
-						const effectiveF1: number | undefined = userSetF1
-							? (selectedNode.data.F1 as number)
-							: inheritedF1;
+						const effectiveF0: number | undefined =
+							selectedNode.data.F0 ?? geomF0?.value ?? undefined;
+						const effectiveF1: number | undefined =
+							selectedNode.data.F1 ?? geomF1?.value ?? undefined;
 						return (
 							<>
 								<div className="flex flex-col gap-2">
@@ -1355,99 +1243,24 @@ const Inspector = () => {
 									</select>
 								</div>
 
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Upstream Area (F0)
-										</label>
-										{userSetF0 && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { F0: null })
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
-									<AreaInput
-										id={`F0_${selectedNode.id}`}
-										label=""
-										value={userSetF0 ? selectedNode.data.F0 : null}
-										placeholder={inheritedF0 ?? "set F0"}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { F0: val })
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { F0: null })
-										}
-										inputClassName={
-											userSetF0 ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetF0 && inheritedF0 != null && f0Note && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											{f0Note}. Edit to override.
-										</p>
-									)}
-									{!userSetF0 && inheritedF0 == null && unresolved && (
-										<p
-											className="text-[9px] text-amber-700 -mt-1"
-											title={unresolved}
-										>
-											Nothing upstream to inherit F0 from — set it.
-										</p>
-									)}
-								</div>
-
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Downstream Area (F1)
-										</label>
-										{userSetF1 && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { F1: null })
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
-									<AreaInput
-										id={`F1_${selectedNode.id}`}
-										label=""
-										value={userSetF1 ? selectedNode.data.F1 : null}
-										placeholder={inheritedF1 ?? "set F1"}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { F1: val })
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { F1: null })
-										}
-										inputClassName={
-											userSetF1 ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetF1 && inheritedF1 != null && f1Note && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											{f1Note}. Edit to override.
-										</p>
-									)}
-									{!userSetF1 && inheritedF1 == null && unresolved && (
-										<p
-											className="text-[9px] text-amber-700 -mt-1"
-											title={unresolved}
-										>
-											Nothing downstream to inherit F1 from — set it.
-										</p>
-									)}
-								</div>
+								<GeometryFields
+									idPrefix={`F0_${selectedNode.id}`}
+									title="Upstream face (F0)"
+									stores="A"
+									userValue={selectedNode.data.F0}
+									inherited={geomF0}
+									onChange={(v) => updateNodeData(selectedNode.id, { F0: v })}
+									missingHint="Nothing upstream to inherit F0 from — set D or A."
+								/>
+								<GeometryFields
+									idPrefix={`F1_${selectedNode.id}`}
+									title="Downstream face (F1)"
+									stores="A"
+									userValue={selectedNode.data.F1}
+									inherited={geomF1}
+									onChange={(v) => updateNodeData(selectedNode.id, { F1: v })}
+									missingHint="Nothing downstream to inherit F1 from — set D or A."
+								/>
 
 								{(() => {
 									// Only once both faces are known (set, or resolved by the
@@ -1455,8 +1268,6 @@ const Inspector = () => {
 									if (effectiveF0 == null || effectiveF1 == null) return null;
 									const ratio =
 										effectiveF0 > 0 ? effectiveF1 / effectiveF0 : null;
-									const d0 = Math.sqrt((4 * effectiveF0) / Math.PI);
-									const d1 = Math.sqrt((4 * effectiveF1) / Math.PI);
 									const label =
 										ratio == null
 											? null
@@ -1487,19 +1298,6 @@ const Inspector = () => {
 												<span className="text-stone-400">F₁/F₀</span>
 												<span className="font-mono font-semibold">
 													{ratio.toFixed(4)}
-												</span>
-											</div>
-											<div className="flex justify-between">
-												<span className="text-stone-400">D₀ → D₁</span>
-												<span className="font-mono">
-													{(
-														d0 * (unitPreferences.length === "mm" ? 1000 : 1)
-													).toFixed(1)}{" "}
-													→{" "}
-													{(
-														d1 * (unitPreferences.length === "mm" ? 1000 : 1)
-													).toFixed(1)}{" "}
-													{unitPreferences.length}
 												</span>
 											</div>
 										</div>
@@ -1578,9 +1376,6 @@ const Inspector = () => {
 						const inheritedFBranch = userSetFBranch
 							? undefined
 							: (geomFBranch?.value ?? undefined);
-						const fcNote = inheritedNote(geomFC?.source);
-						const fBranchNote = inheritedNote(geomFBranch?.source);
-						const fcIsDefault = !userSetFC && geomFC?.source === "default";
 
 						// A tee always resolves (it has fallbacks), so these are always
 						// numbers in the solve. Until the preview arrives, show the
@@ -1853,50 +1648,15 @@ const Inspector = () => {
 								{/* ── Arm areas (3-arm with Mynard labels) ── */}
 
 								{/* Common arm (F_C) */}
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Common Arm Area (F_C)
-										</label>
-										{userSetFC && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { F_C: null })
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
-									<AreaInput
-										id={`F_C_mpce_${selectedNode.id}`}
-										label=""
-										value={userSetFC ? selectedNode.data.F_C : null}
-										placeholder={effectiveFC}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { F_C: val })
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { F_C: null })
-										}
-										inputClassName={
-											userSetFC ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetFC && fcNote && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											{fcNote}. Edit to override.
-										</p>
-									)}
-									{fcIsDefault && (
-										<p className="text-[9px] text-amber-700 -mt-1">
-											No channel connected directly to the common or straight
-											port — using the 0.01 m² default. Set F_C.
-										</p>
-									)}
-								</div>
+								<GeometryFields
+									idPrefix={`F_C_mpce_${selectedNode.id}`}
+									title="Common arm (F_C)"
+									stores="A"
+									userValue={selectedNode.data.F_C}
+									inherited={geomFC ?? { value: 0.01, source: "default" }}
+									onChange={(v) => updateNodeData(selectedNode.id, { F_C: v })}
+									defaultHint="No channel connected directly to the common or straight port — the 0.01 m² default is used. Untick Inherit to set F_C."
+								/>
 
 								{/* Straight arm (read-only = F_C — Mynard joining type-6 sets F_S = F_C) */}
 								<div className="flex flex-col gap-1">
@@ -1922,44 +1682,27 @@ const Inspector = () => {
 								</div>
 
 								{/* Branch arm (F_branch) */}
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Branch Arm Area (F_B)
-										</label>
-										{userSetFBranch && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { F_branch: null })
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
-									</div>
-									<AreaInput
-										id={`F_branch_mpce_${selectedNode.id}`}
-										label=""
-										value={userSetFBranch ? selectedNode.data.F_branch : null}
-										placeholder={effectiveFBranch}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { F_branch: val })
+								<GeometryFields
+									idPrefix={`F_branch_mpce_${selectedNode.id}`}
+									title="Branch arm (F_B)"
+									stores="A"
+									userValue={selectedNode.data.F_branch}
+									inherited={
+										geomFBranch ?? {
+											value:
+												inheritedFBranch ??
+												effectiveFC /
+													Math.max(
+														(selectedNode.data.psi as number) ?? 1.0,
+														1e-12,
+													),
+											source: "derived from F_C / psi",
 										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { F_branch: null })
-										}
-										inputClassName={
-											userSetFBranch ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									{!userSetFBranch && fBranchNote && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											{fBranchNote}. Edit to override.
-										</p>
-									)}
-								</div>
+									}
+									onChange={(v) =>
+										updateNodeData(selectedNode.id, { F_branch: v })
+									}
+								/>
 
 								{/* Derived ratio summary */}
 								{psi != null && (
@@ -1988,13 +1731,6 @@ const Inspector = () => {
 											<span className="text-stone-400">psi = F_C / F_B</span>
 											<span className="font-mono font-semibold">
 												{psi.toFixed(4)}
-											</span>
-										</div>
-										<div className="flex justify-between">
-											<span className="text-stone-400">D_C → D_B</span>
-											<span className="font-mono">
-												{(dFromF(effectiveFC) * lu).toFixed(1)} →{" "}
-												{(dFromF(effectiveFBranch) * lu).toFixed(1)} {lu_label}
 											</span>
 										</div>
 									</div>
@@ -2393,14 +2129,6 @@ const Inspector = () => {
 						const inheritedArea = userSetArea
 							? undefined
 							: (geomArea?.value ?? undefined);
-						const areaNote = inheritedNote(geomArea?.source);
-						const areaIsDefault =
-							!userSetArea && geomArea?.source === "default";
-						// A discrete loss always resolves (it falls back to the 0.1 m^2
-						// chamber default), so until the preview arrives show that.
-						const displayArea: number = userSetArea
-							? selectedNode.data.area
-							: (inheritedArea ?? 0.1);
 
 						// Compute available has_theta nodes (combustors)
 						const thetaNodes = nodes.filter(
@@ -2493,59 +2221,20 @@ const Inspector = () => {
 								</div>
 
 								{/* Flow Area — always shown, inherited from upstream by default */}
-								<div className="flex flex-col gap-2">
-									<div className="flex items-center justify-between">
-										<label className="text-xs font-bold text-gray-500 uppercase">
-											Flow Area (m²)
-										</label>
-										{userSetArea && (
-											<button
-												type="button"
-												className="text-[9px] text-blue-500 hover:underline"
-												onClick={() =>
-													updateNodeData(selectedNode.id, { area: null })
-												}
-											>
-												Reset to inherited
-											</button>
-										)}
+								<GeometryFields
+									idPrefix={`dl_${selectedNode.id}`}
+									title="Flow cross-section"
+									stores="A"
+									userValue={selectedNode.data.area}
+									inherited={geomArea ?? { value: 0.1, source: "default" }}
+									onChange={(v) => updateNodeData(selectedNode.id, { area: v })}
+									defaultHint="No neighbour with a known area — the 0.1 m² default is used. Connect a channel, or untick Inherit to set the area."
+								/>
+								{areaWarning && (
+									<div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+										⚠ Area ≤ 0 — head loss will be undefined.
 									</div>
-									<NumericInput
-										value={userSetArea ? selectedNode.data.area : null}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { area: val })
-										}
-										onClear={() =>
-											// Clearing the field is semantically the same as clicking
-											// "Reset to inherited": we drop the user override so the
-											// backend auto-infers from the upstream node again.
-											updateNodeData(selectedNode.id, { area: null })
-										}
-										min={0}
-										className={`p-2 border rounded ${
-											userSetArea
-												? "text-gray-900 font-semibold"
-												: "text-gray-400"
-										}`}
-										placeholder={Number(displayArea.toPrecision(4)).toString()}
-									/>
-									{!userSetArea && areaNote && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											{areaNote}. Edit to override.
-										</p>
-									)}
-									{areaIsDefault && (
-										<p className="text-[9px] text-amber-700 -mt-1">
-											No neighbour with a known area — using the 0.1 m² default.
-											Connect a channel or set the area.
-										</p>
-									)}
-									{areaWarning && (
-										<div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-											⚠ Area ≤ 0 — head loss will be undefined.
-										</div>
-									)}
-								</div>
+								)}
 
 								{/* Parameters */}
 								{(corrType === "constant_fraction" ||
@@ -2763,12 +2452,6 @@ const Inspector = () => {
 						// (/resolve_preview, #559): Dh from the nearest upstream channel,
 						// area derived from it (or inferred from a neighbour), else the
 						// 0.1 m^2 chamber default.
-						const userSetDhComb =
-							selectedNode.data.Dh !== null &&
-							selectedNode.data.Dh !== undefined;
-						const userSetAreaComb =
-							selectedNode.data.area !== null &&
-							selectedNode.data.area !== undefined;
 						const geomAreaComb = inheritedField(
 							previewItems,
 							selectedNode.id,
@@ -2779,21 +2462,6 @@ const Inspector = () => {
 							selectedNode.id,
 							"Dh",
 						);
-						const inheritedAreaComb = userSetAreaComb
-							? undefined
-							: (geomAreaComb?.value ?? undefined);
-						const inheritedDhComb = userSetDhComb
-							? undefined
-							: (geomDhComb?.value ?? undefined);
-						const combNote = inheritedNote(geomAreaComb?.source);
-						const combIsDefault =
-							!userSetAreaComb && geomAreaComb?.source === "default";
-						// The chamber always resolves (it defaults), so until the preview
-						// arrives show the 0.1 m^2 default.
-						const shownAreaComb: number = userSetAreaComb
-							? (selectedNode.data.area as number)
-							: (inheritedAreaComb ?? 0.1);
-						const circularDhComb = Math.sqrt((4 * shownAreaComb) / Math.PI);
 						return (
 							<div className="flex flex-col gap-4">
 								<div className="flex flex-col gap-2">
@@ -2818,85 +2486,20 @@ const Inspector = () => {
 									</select>
 								</div>
 
-								<div className="grid grid-cols-2 gap-2 pb-2">
-									<AreaInput
-										id={`area_comb_${selectedNode.id}`}
-										label="Area"
-										value={userSetAreaComb ? selectedNode.data.area : null}
-										placeholder={shownAreaComb}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												area: val,
-											})
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { area: null })
-										}
-										inputClassName={
-											userSetAreaComb ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									<div className="flex flex-col gap-1">
-										<div className="flex items-center justify-between">
-											<label className="text-xs font-bold text-gray-500 uppercase">
-												Dh
-											</label>
-											{userSetDhComb && (
-												<button
-													type="button"
-													className="text-[9px] text-blue-500 hover:underline"
-													onClick={() =>
-														updateNodeData(selectedNode.id, {
-															Dh: null,
-														})
-													}
-												>
-													Reset to inherited
-												</button>
-											)}
-										</div>
-										<LengthInput
-											id={`Dh_comb_${selectedNode.id}`}
-											label=""
-											value={userSetDhComb ? selectedNode.data.Dh : null}
-											placeholder={inheritedDhComb ?? circularDhComb}
-											onChange={(val) =>
-												updateNodeData(selectedNode.id, {
-													Dh: val,
-												})
-											}
-											onClear={() =>
-												updateNodeData(selectedNode.id, {
-													Dh: null,
-												})
-											}
-											inputClassName={
-												userSetDhComb ? "font-semibold" : "text-gray-400"
-											}
-										/>
-										{!userSetDhComb && inheritedDhComb != null && combNote && (
-											<p className="text-[9px] text-gray-400 italic -mt-1">
-												{combNote}.
-											</p>
-										)}
-										{combIsDefault && (
-											<p className="text-[9px] text-amber-700 -mt-1">
-												Nothing upstream to size the combustor from — using the
-												0.1 m² default. Set the area or Dh.
-											</p>
-										)}
-										{!userSetDhComb && inheritedDhComb == null && (
-											<p className="text-[9px] text-gray-400 italic -mt-1">
-												Circular from area (D ={" "}
-												{(
-													circularDhComb *
-													(unitPreferences.length === "mm" ? 1000 : 1)
-												).toFixed(2)}{" "}
-												{unitPreferences.length}).
-											</p>
-										)}
-									</div>
-								</div>
+								<GeometryFields
+									idPrefix={`comb_${selectedNode.id}`}
+									title="Combustor cross-section"
+									stores="A"
+									userValue={selectedNode.data.area}
+									inherited={geomAreaComb ?? { value: 0.1, source: "default" }}
+									onChange={(v) => updateNodeData(selectedNode.id, { area: v })}
+									dh={{
+										userValue: selectedNode.data.Dh,
+										inherited: geomDhComb,
+										onChange: (v) => updateNodeData(selectedNode.id, { Dh: v }),
+									}}
+									defaultHint="Nothing upstream to size the combustor from — the 0.1 m² default is used. Connect a channel, or untick Inherit to set the area or Dh."
+								/>
 								<div className="grid grid-cols-2 gap-3">
 									<div className="flex flex-col gap-2">
 										<label className="text-xs font-bold text-gray-500 uppercase">
@@ -2953,12 +2556,6 @@ const Inspector = () => {
 						// (/resolve_preview, #559): a merge chamber takes its main
 						// inlet's area; otherwise Dh from the nearest upstream channel and
 						// the area from it (or a neighbour), else the 0.1 m^2 default.
-						const userSetDhMom =
-							selectedNode.data.Dh !== null &&
-							selectedNode.data.Dh !== undefined;
-						const userSetAreaMom =
-							selectedNode.data.area !== null &&
-							selectedNode.data.area !== undefined;
 						const geomAreaMom = inheritedField(
 							previewItems,
 							selectedNode.id,
@@ -2969,100 +2566,22 @@ const Inspector = () => {
 							selectedNode.id,
 							"Dh",
 						);
-						const inheritedAreaMom = userSetAreaMom
-							? undefined
-							: (geomAreaMom?.value ?? undefined);
-						const inheritedDhMom = userSetDhMom
-							? undefined
-							: (geomDhMom?.value ?? undefined);
-						const momNote = inheritedNote(geomAreaMom?.source);
-						const momIsDefault =
-							!userSetAreaMom && geomAreaMom?.source === "default";
-						const shownAreaMom: number = userSetAreaMom
-							? (selectedNode.data.area as number)
-							: (inheritedAreaMom ?? 0.1);
-						const circularDh = Math.sqrt((4 * shownAreaMom) / Math.PI);
 						return (
 							<div className="flex flex-col gap-4">
-								<div className="grid grid-cols-2 gap-2 pb-2">
-									<AreaInput
-										id={`area_mom_${selectedNode.id}`}
-										label="Area"
-										value={userSetAreaMom ? selectedNode.data.area : null}
-										placeholder={shownAreaMom}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, {
-												area: val,
-											})
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { area: null })
-										}
-										inputClassName={
-											userSetAreaMom ? "font-semibold" : "text-gray-400"
-										}
-									/>
-									<div className="flex flex-col gap-1">
-										<div className="flex items-center justify-between">
-											<label className="text-xs font-bold text-gray-500 uppercase">
-												Dh
-											</label>
-											{userSetDhMom && (
-												<button
-													type="button"
-													className="text-[9px] text-blue-500 hover:underline"
-													onClick={() =>
-														updateNodeData(selectedNode.id, {
-															Dh: null,
-														})
-													}
-												>
-													Reset to inherited
-												</button>
-											)}
-										</div>
-										<LengthInput
-											id={`Dh_mom_${selectedNode.id}`}
-											label=""
-											value={userSetDhMom ? selectedNode.data.Dh : null}
-											placeholder={inheritedDhMom ?? circularDh}
-											onChange={(val) =>
-												updateNodeData(selectedNode.id, {
-													Dh: val,
-												})
-											}
-											onClear={() =>
-												updateNodeData(selectedNode.id, {
-													Dh: null,
-												})
-											}
-											inputClassName={
-												userSetDhMom ? "font-semibold" : "text-gray-400"
-											}
-										/>
-										{!userSetDhMom && inheritedDhMom != null && momNote && (
-											<p className="text-[9px] text-gray-400 italic -mt-1">
-												{momNote}.
-											</p>
-										)}
-										{momIsDefault && (
-											<p className="text-[9px] text-amber-700 -mt-1">
-												Nothing upstream to size the chamber from — using the
-												0.1 m² default. Set the area or Dh.
-											</p>
-										)}
-										{!userSetDhMom && inheritedDhMom == null && (
-											<p className="text-[9px] text-gray-400 italic -mt-1">
-												Circular from area (D ={" "}
-												{(
-													circularDh *
-													(unitPreferences.length === "mm" ? 1000 : 1)
-												).toFixed(2)}{" "}
-												{unitPreferences.length}).
-											</p>
-										)}
-									</div>
-								</div>
+								<GeometryFields
+									idPrefix={`mom_${selectedNode.id}`}
+									title="Chamber cross-section"
+									stores="A"
+									userValue={selectedNode.data.area}
+									inherited={geomAreaMom ?? { value: 0.1, source: "default" }}
+									onChange={(v) => updateNodeData(selectedNode.id, { area: v })}
+									dh={{
+										userValue: selectedNode.data.Dh,
+										inherited: geomDhMom,
+										onChange: (v) => updateNodeData(selectedNode.id, { Dh: v }),
+									}}
+									defaultHint="Nothing upstream to size the chamber from — the 0.1 m² default is used. Connect a channel, or untick Inherit to set the area or Dh."
+								/>
 								<div className="grid grid-cols-2 gap-3">
 									<div className="flex flex-col gap-2">
 										<label className="text-xs font-bold text-gray-500 uppercase">

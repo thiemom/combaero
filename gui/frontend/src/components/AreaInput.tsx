@@ -14,6 +14,7 @@ interface AreaInputProps {
 	placeholder?: string | number;
 	onClear?: () => void;
 	inputClassName?: string;
+	readOnly?: boolean;
 }
 
 const AreaInput: React.FC<AreaInputProps> = ({
@@ -24,6 +25,7 @@ const AreaInput: React.FC<AreaInputProps> = ({
 	onClear,
 	placeholder = "0.00",
 	inputClassName,
+	readOnly,
 }) => {
 	const { unitPreferences, setAreaUnit } = useStore();
 	const unit = unitPreferences.area;
@@ -52,6 +54,7 @@ const AreaInput: React.FC<AreaInputProps> = ({
 					}
 					onChange={(v) => onChange(v / displayScale)}
 					onClear={onClear}
+					readOnly={readOnly}
 					className={`min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none${inputClassName ? ` ${inputClassName}` : ""}`}
 					placeholder={scaledPlaceholder}
 				/>
