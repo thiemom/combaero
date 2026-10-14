@@ -114,7 +114,17 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
     if isinstance(item, PressureLossElement):
         return {"area": FieldResolution(_f(item, "area"), _s(item, "_area_source"))}
     if type(item) is OrificeElement:  # not the plate subclasses
-        return {"diameter": FieldResolution(_f(item, "diameter"), _s(item, "_area_source"))}
+        # The bore never inherits (it is the restriction); the upstream pipe's
+        # diameter does, and sets beta = d / D for the velocity-of-approach
+        # factor. beta = 0 means no correction: no single upstream channel, or a
+        # bore >= the pipe (the GUI warns on the latter).
+        return {
+            "diameter": FieldResolution(_f(item, "diameter"), _s(item, "_area_source")),
+            "pipe_diameter": FieldResolution(
+                _f(item, "upstream_diameter"), _s(item, "_upstream_source")
+            ),
+            "beta": FieldResolution(_f(item, "beta"), "derived from bore / pipe D"),
+        }
     return {}
 
 

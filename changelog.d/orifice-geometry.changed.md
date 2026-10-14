@@ -1,0 +1,4 @@
+- **Orifice: the bore uses the shared D | Dh | A block, and β comes from the pipe the solver actually uses (#559).**
+  - The 0.08 m default bore is shown greyed and marked as a default instead of being written into the field as if typed.
+  - The pipe diameter behind β = d/D now comes from the solver's resolve pass, so an upstream pipe that *inherits* its D is picked up. Before, the Inspector saw only a D typed on the adjacent channel and showed no β otherwise. Its source is shown.
+  - Warns when the bore is equal to the pipe D (no restriction; behaves as a continuous pipe) or larger than it (likely not intended); the solver skips the velocity-of-approach correction (E = 1) in both cases.

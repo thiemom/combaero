@@ -2,7 +2,7 @@ import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
-import { inheritedField } from "../utils/inheritance";
+import { inheritedField, inheritedNote } from "../utils/inheritance";
 import { nodeTypeLabel } from "../utils/nodeUtils";
 import {
 	BASIC_STATE_KEYS,
@@ -576,89 +576,103 @@ const Inspector = () => {
 
 				{selectedNode.type === "orifice" &&
 					(() => {
-						const upstreamEdge = edges.find(
-							(e) => e.target === selectedNode.id && !e.data?.type,
+						// Bore and pipe diameter from the solver's resolve pass
+						// (/resolve_preview, #559). The bore never inherits (it is the
+						// restriction; unset = the 0.08 m default); the single upstream
+						// channel's D -- inherited or not -- sets beta = d / D.
+						const geomBore = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"diameter",
 						);
-						const upstreamNode = upstreamEdge
-							? nodes.find((n) => n.id === upstreamEdge.source)
-							: undefined;
-						const upstreamChannelD: number | null | undefined =
-							upstreamNode?.type === "channel"
-								? (upstreamNode.data.D as number | null | undefined)
-								: undefined;
-						const boreDiameter: number = selectedNode.data.diameter ?? 0.08;
-						const boreArea = (Math.PI / 4) * boreDiameter * boreDiameter;
+						const geomPipe = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"pipe_diameter",
+						);
+						const boreDiameter: number =
+							selectedNode.data.diameter ?? geomBore?.value ?? 0.08;
+						const pipeD =
+							geomPipe?.value != null && geomPipe.value > 0
+								? geomPipe.value
+								: null;
+						const beta =
+							pipeD != null && boreDiameter < pipeD
+								? boreDiameter / pipeD
+								: null;
+						const E = beta != null ? 1.0 / Math.sqrt(1 - beta ** 4) : null;
+						const lu = unitPreferences.length === "mm" ? 1000 : 1;
+						const boreVsPipe =
+							pipeD == null
+								? null
+								: Math.abs(boreDiameter - pipeD) <= 1e-9 * pipeD
+									? "equal"
+									: boreDiameter > pipeD
+										? "larger"
+										: null;
 						return (
 							<>
-								<div className="flex flex-col gap-2">
-									<label className="text-xs font-bold text-gray-500 uppercase">
-										Bore Diameter
-									</label>
-									<LengthInput
-										id={`diameter_${selectedNode.id}`}
-										label=""
-										value={boreDiameter}
-										placeholder={0.08}
-										onChange={(val) =>
-											updateNodeData(selectedNode.id, { diameter: val })
-										}
-										onClear={() =>
-											updateNodeData(selectedNode.id, { diameter: null })
-										}
-									/>
-									{(() => {
-										const pipeD =
-											upstreamChannelD != null && upstreamChannelD > 0
-												? upstreamChannelD
-												: null;
-										const beta =
-											pipeD != null && boreDiameter < pipeD
-												? boreDiameter / pipeD
-												: null;
-										const beta2 = beta != null ? beta ** 2 : null;
-										const E =
-											beta != null ? 1.0 / Math.sqrt(1 - beta ** 4) : null;
-										return (
-											<div className="text-[9px] text-gray-400 -mt-1 flex flex-col gap-0.5">
-												<span>
-													Bore area:{" "}
-													<span className="font-mono">
-														{boreArea.toExponential(3)} m²
-													</span>
-													{beta2 != null && (
-														<>
-															{" · "}Area ratio β²:{" "}
-															<span className="font-mono">
-																{beta2.toFixed(4)}
-															</span>
-														</>
-													)}
+								<GeometryFields
+									idPrefix={`ori_${selectedNode.id}`}
+									title="Orifice bore"
+									stores="D"
+									userValue={selectedNode.data.diameter}
+									inherited={geomBore ?? { value: 0.08, source: "default" }}
+									inheritable={false}
+									onChange={(v) =>
+										updateNodeData(selectedNode.id, { diameter: v })
+									}
+									defaultHint="No bore set — the 0.08 m default bore is used. Set D or A."
+								/>
+								<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
+									<div className="flex justify-between">
+										<span className="text-stone-400">Pipe D (upstream)</span>
+										<span className="font-mono">
+											{pipeD != null
+												? `${(pipeD * lu).toFixed(unitPreferences.length === "mm" ? 1 : 4)} ${unitPreferences.length}`
+												: "—"}
+										</span>
+									</div>
+									{pipeD != null && geomPipe?.source && (
+										<span className="text-[9px] italic text-stone-400">
+											{inheritedNote(geomPipe.source)}.
+										</span>
+									)}
+									{beta != null && E != null && (
+										<>
+											<div className="flex justify-between">
+												<span className="text-stone-400">β = d / D</span>
+												<span className="font-mono font-semibold">
+													{beta.toFixed(4)}
 												</span>
-												{pipeD != null && (
-													<span>
-														Pipe D:{" "}
-														<span className="font-mono">
-															{pipeD.toFixed(4)} m
-														</span>
-														{beta != null && E != null ? (
-															<>
-																{" · "}β = {beta.toFixed(4)} → E ={" "}
-																<span className="font-mono">
-																	{E.toFixed(4)}
-																</span>{" "}
-																(velocity-of-approach)
-															</>
-														) : (
-															<span className="text-amber-500">
-																{" · "}β ≥ 1 — correction skipped
-															</span>
-														)}
-													</span>
-												)}
 											</div>
-										);
-									})()}
+											<div className="flex justify-between">
+												<span className="text-stone-400">
+													E (velocity of approach)
+												</span>
+												<span className="font-mono">{E.toFixed(4)}</span>
+											</div>
+										</>
+									)}
+									{pipeD == null && (
+										<span className="text-[9px] italic text-stone-400">
+											No single upstream channel: no velocity-of-approach
+											correction (β = 0).
+										</span>
+									)}
 								</div>
+								{boreVsPipe === "equal" && (
+									<p className="text-[9px] text-amber-700">
+										Bore = pipe D: no restriction — this behaves as a continuous
+										pipe (E = 1).
+									</p>
+								)}
+								{boreVsPipe === "larger" && (
+									<p className="text-[9px] text-amber-700">
+										Bore larger than the pipe it sits in — likely not intended.
+										The velocity-of-approach correction is skipped (E = 1).
+									</p>
+								)}
 
 								<div className="flex flex-col gap-2">
 									<label className="text-xs font-bold text-gray-500 uppercase">
