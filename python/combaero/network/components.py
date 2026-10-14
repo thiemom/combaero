@@ -1191,6 +1191,22 @@ class NetworkMixtureState:
 #: ``area_source = "default"`` in its diagnostics (issue #262).
 DEFAULT_CHAMBER_AREA = 0.1
 
+#: Mass flow [kg/s] over which a directional loss blends its forward and
+#: reverse forms, logistic in m_dot / scale (C++ ``sigmoid`` in
+#: area_change.cpp). Outside a few scales either form holds alone.
+FLOW_REVERSAL_M_SCALE = 1e-4
+
+
+def _flow_blend(m_dot: float) -> tuple[float, float]:
+    """(w, dw/dm): the forward weight of a directional loss, 1 for m >> scale."""
+    x = m_dot / FLOW_REVERSAL_M_SCALE
+    if x > 30.0:
+        return 1.0, 0.0
+    if x < -30.0:
+        return 0.0, 0.0
+    w = 1.0 / (1.0 + math.exp(-x))
+    return w, w * (1.0 - w) / FLOW_REVERSAL_M_SCALE
+
 
 # ---------------------------------------------------------------------------
 # Flow-area inference
@@ -4302,6 +4318,14 @@ class PressureLossElement(NetworkElement):
     Discrete pressure-loss edge.  Enforces ``Pt_out = Pt_in * (1 - xi)``
     where ``xi`` is supplied by a user correlation callable.
 
+    The loss follows the FLOW: "in" is the upstream node of the flow as it
+    runs, and the correlation sees ``|m_dot|`` and that node's state. A
+    reversed element used to apply its loss in the declared direction, which
+    for a constant fraction raised total pressure by ``1 / (1 - xi)`` (#550),
+    and a head loss returned no loss at all. Through zero flow the forward
+    and reverse forms are blended (``FLOW_REVERSAL_M_SCALE``), as the area
+    change does.
+
     Four standard correlations are provided in :mod:`combaero.network.pressure_loss`:
 
     - :class:`ConstantFractionLoss` -- fixed fractional total-pressure drop.
@@ -4505,28 +4529,66 @@ class PressureLossElement(NetworkElement):
             Y_products=[],
         )
 
-    def residuals(
-        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
-    ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        # Graph reference is stashed on the element by the solver pre-pass;
-        # fall back to ctx without theta sourcing if unavailable.
+    def _directed(
+        self,
+        up: NetworkMixtureState,
+        dn: NetworkMixtureState,
+        up_id: str,
+        dn_id: str,
+        m_dot: float,
+    ) -> tuple[float, Callable[[], dict[str, float]]]:
+        """Residual and lazy Jacobian row of the loss with the flow up -> dn."""
         graph = getattr(self, "_graph_ref", None)
-        ctx = self._build_ctx(state_in, state_out, graph)
+        ctx = self._build_ctx(up, dn, graph)
+        ctx.mdot_total = abs(float(m_dot))
         try:
             xi, dxi_dtheta = self.correlation(ctx)
         except Exception as exc:
             raise RuntimeError(
                 f"PressureLossElement '{self.id}' correlation raised: {exc}"
             ) from exc
+        # Pt_dn - Pt_up * (1 - xi) = 0, in the direction the flow runs.
+        res = dn.Pt - up.Pt * (1.0 - xi)
+        m_sign = 1.0 if m_dot >= 0.0 else -1.0
 
-        # Residual: Pt_out - Pt_in * (1 - xi) = 0.
-        res = [state_out.Pt - state_in.Pt * (1.0 - xi)]
+        def row() -> dict[str, float]:
+            return self._jacobian(up, graph, ctx, xi, dxi_dtheta, up_id, dn_id, m_sign)[0]
+
+        return res, row
+
+    def residuals(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        m = float(state_in.m_dot)
+        w, dw_dm = _flow_blend(m)
+        parts: list[tuple[float, float, Callable[[], dict[str, float]]]] = []
+        if w > 0.0:
+            r_f, j_f = self._directed(state_in, state_out, self.from_node, self.to_node, m)
+            parts.append((w, r_f, j_f))
+        if w < 1.0:
+            # Written in the forward orientation (Pt_to - Pt_from - xi Pt_to):
+            # blended as Pt_from - Pt_to (1 - xi), the Pt difference cancels at
+            # w = 1/2 and the row loses its pressures.
+            r_r, j_r = self._directed(state_out, state_in, self.to_node, self.from_node, m)
+
+            def j_rev(j_r: Callable[[], dict[str, float]] = j_r) -> dict[str, float]:
+                return {k: -v for k, v in j_r().items()}
+
+            parts.append((1.0 - w, -r_r, j_rev))
+        res = [sum(wt * r for wt, r, _ in parts)]
 
         # The Jacobian is differenced (one or two correlation calls per
         # variable and per species present), so it is computed only when the
         # solver reads it (LazyJacobian, #489).
         def jacobian() -> dict[int, dict[str, float]]:
-            return self._jacobian(state_in, graph, ctx, xi, dxi_dtheta)
+            out: dict[str, float] = {}
+            for wt, _, row in parts:
+                for k, v in row().items():
+                    out[k] = out.get(k, 0.0) + wt * v
+            if len(parts) == 2 and dw_dm:
+                key = f"{self.id}.m_dot"
+                out[key] = out.get(key, 0.0) + dw_dm * (parts[0][1] - parts[1][1])
+            return {0: out}
 
         return res, LazyJacobian(jacobian)
 
@@ -4537,11 +4599,17 @@ class PressureLossElement(NetworkElement):
         ctx: SimpleNamespace,
         xi: float,
         dxi_dtheta: float,
+        up_id: str,
+        dn_id: str,
+        m_sign: float,
     ) -> dict[int, dict[str, float]]:
+        """d(Pt_dn - Pt_up (1 - xi))/dx with ``state_in`` the flow-upstream
+        node's state; the correlation saw ``|m_dot|``, so its m column carries
+        the flow's sign."""
         jac: dict[int, dict[str, float]] = {
             0: {
-                f"{self.from_node}.Pt": -(1.0 - xi),
-                f"{self.to_node}.Pt": 1.0,
+                f"{up_id}.Pt": -(1.0 - xi),
+                f"{dn_id}.Pt": 1.0,
             }
         }
 
@@ -4569,19 +4637,19 @@ class PressureLossElement(NetworkElement):
         # (skip for constant fraction to avoid unneeded correlation calls).
         dxi_dmdot = _dxi_dvar("mdot_total", ctx.mdot_total, 1e-6)
         if dxi_dmdot != 0.0:
-            jac[0][f"{self.id}.m_dot"] = state_in.Pt * dxi_dmdot
+            jac[0][f"{self.id}.m_dot"] = state_in.Pt * dxi_dmdot * m_sign
 
         dxi_dP_in = _dxi_dvar("P_in", ctx.P_in, 1.0)
         if dxi_dP_in != 0.0:
             # P_in = state_in.P.  Static P is driven by the node's P unknown.
-            jac[0][f"{self.from_node}.P"] = state_in.Pt * dxi_dP_in
+            jac[0][f"{up_id}.P"] = state_in.Pt * dxi_dP_in
 
         if self._theta_source_resolved is None:
             # When no theta source, ctx.T_in = state_in.T (a derived state).
             # Emit a relay-routable T Jacobian on the upstream node.
             dxi_dT_in = _dxi_dvar("T_in", ctx.T_in, 0.01)
             if dxi_dT_in != 0.0:
-                jac[0][f"{self.from_node}.T"] = state_in.Pt * dxi_dT_in
+                jac[0][f"{up_id}.T"] = state_in.Pt * dxi_dT_in
         elif graph is not None and ctx.T_in > 0:
             self._add_unburned_jacobian(jac[0], graph, ctx, state_in.Pt, dxi_dtheta, _dxi_dvar)
 
@@ -4604,7 +4672,7 @@ class PressureLossElement(NetworkElement):
                     xi_pm.append(self.correlation(ctx)[0])
                 d = (xi_pm[0] - xi_pm[1]) / (2.0 * h)
                 if d != 0.0:
-                    jac[0][f"{self.from_node}.Y[{k}]"] = state_in.Pt * d
+                    jac[0][f"{up_id}.Y[{k}]"] = state_in.Pt * d
         finally:
             ctx.X_in = X_saved
 
@@ -4651,7 +4719,11 @@ class PressureLossElement(NetworkElement):
             return {}
 
         graph = getattr(self, "_graph_ref", None)
-        ctx = self._build_ctx(state_in, state_out, graph)
+        # xi of the flow as it runs: from its upstream node, at |m_dot|.
+        forward = state_in.m_dot >= 0.0
+        up, dn = (state_in, state_out) if forward else (state_out, state_in)
+        ctx = self._build_ctx(up, dn, graph)
+        ctx.mdot_total = abs(float(state_in.m_dot))
         try:
             xi, _ = self.correlation(ctx)
         except Exception:
@@ -5688,7 +5760,7 @@ class AreaChangeElement(NetworkElement):
                 P_static_down=state_out.P,
                 F0=self.F0,
                 F1=self.F1,
-                m_scale=1e-4,
+                m_scale=FLOW_REVERSAL_M_SCALE,
                 D_h=self.D_h or 0.0,
             )
         else:
@@ -5702,7 +5774,7 @@ class AreaChangeElement(NetworkElement):
                 F0=self.F0,
                 F1=self.F1,
                 length=self.length,
-                m_scale=1e-4,
+                m_scale=FLOW_REVERSAL_M_SCALE,
             )
 
         # dP_calc is the stagnation-pressure LOSS (zeta * q_small), so the

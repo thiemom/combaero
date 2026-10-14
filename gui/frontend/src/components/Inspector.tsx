@@ -2777,6 +2777,38 @@ const Inspector = () => {
 												P_out = P_in · (1 − ξ). e.g. 0.03 = 3%
 											</p>
 										)}
+										{/* Design flow (#550): a fraction loss quoted at its
+										    design point scales with the dynamic head below it,
+										    so the flow can run low or reverse. */}
+										<label
+											htmlFor={`m_ref_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Design flow ṁ_ref [kg/s]
+										</label>
+										<NumericInput
+											id={`m_ref_${selectedNode.id}`}
+											value={selectedNode.data.m_ref ?? null}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													m_ref: val > 0 ? val : null,
+												})
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, { m_ref: null })
+											}
+											min={0}
+											placeholder="none: constant at every flow"
+											className="p-2 border rounded"
+										/>
+										<p className="text-[9px] text-gray-400 italic">
+											At and above ṁ_ref the loss is exactly the fraction; below
+											it the loss scales with the dynamic head and vanishes at
+											zero flow. Set it if the flow may run low or reverse: a
+											constant fraction holds a pressure difference at zero
+											flow, and the solver cannot carry a reversing flow through
+											it.
+										</p>
 									</div>
 								)}
 
