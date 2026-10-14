@@ -19,10 +19,14 @@ from combaero.network import (
     AreaChangeElement,
     ChannelElement,
     FlowNetwork,
+    LosslessConnectionElement,
+    MomentumChamberNode,
     NetworkSolver,
+    OrificeElement,
     PlenumNode,
     PressureBoundary,
 )
+from combaero.network.mpce_element import MultiPortChamberElement
 
 Y_AIR = list(cb.mole_to_mass(cb.species.dry_air()))
 
@@ -71,3 +75,51 @@ def test_area_change_reports_per_face_source() -> None:
     assert "ch_d" in d["F1_source"]
     assert d["F0"] == pytest.approx(math.pi / 4 * 0.1**2)
     assert d["F1"] == pytest.approx(math.pi / 4 * 0.08**2)
+
+
+def test_orifice_reports_user_vs_default_bore() -> None:
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=2e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PlenumNode("p"))
+    net.add_node(PressureBoundary("out", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    net.add_element(OrificeElement("orf_u", "in", "p", diameter=0.05, Cd=0.6, correlation="fixed"))
+    net.add_element(OrificeElement("orf_d", "p", "out", Cd=0.6, correlation="fixed"))
+
+    r = _solve(net)
+    assert r["__success__"], r.get("__message__")
+    assert _diag(r, "orf_u")["area_source"] == "user"
+    # No diameter/area given: the bore falls back to DEFAULT_ORIFICE_BORE (0.08),
+    # reported as "default" (it cannot be inferred from a neighbour).
+    assert _diag(r, "orf_d")["area_source"] == "default"
+    assert _diag(r, "orf_d")["diameter"] == pytest.approx(0.08)
+
+
+def test_junction_port_reports_inherited_vs_user_area() -> None:
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("pb_in", Pt=2.1e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PressureBoundary("pb_str", Pt=2.0e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PressureBoundary("pb_bra", Pt=1.9e5, Tt=300.0, Y=Y_AIR))
+    for pid in ("port_com", "port_str", "port_bra"):
+        net.add_node(MomentumChamberNode(pid, area=0.01))
+    net.add_element(ChannelElement("ch_in", "pb_in", "port_com", length=0.3, diameter=0.05))
+    net.add_element(LosslessConnectionElement("lc_str", "port_str", "pb_str"))
+    net.add_element(LosslessConnectionElement("lc_bra", "port_bra", "pb_bra"))
+    net.add_element(
+        MultiPortChamberElement(
+            id="jct",
+            inlet_nodes=["port_com"],
+            outlet_nodes=["port_str", "port_bra"],
+            inlet_angles_deg=[0.0],
+            outlet_angles_deg=[0.0, 90.0],
+            port_areas=[None, 0.01, 0.02],  # common inherits; the two outlets are user
+            flow_direction="branch",
+            strict=False,
+        )
+    )
+    net.resolve_all_topology()
+    jct = net.elements["jct"]
+    # The idempotent per-pass resolve must label the channel-fed port as inherited
+    # (not "user", which an earlier pass's already-set value would wrongly imply).
+    assert jct._port_area_sources[0] == "inherited from ch_in"
+    assert jct._port_area_sources[1] == "user"
+    assert jct._port_area_sources[2] == "user"

@@ -1191,6 +1191,14 @@ class NetworkMixtureState:
 #: ``area_source = "default"`` in its diagnostics (issue #262).
 DEFAULT_CHAMBER_AREA = 0.1
 
+#: Bore diameter [m] an orifice falls back to when the user set neither its
+#: diameter nor its area. Unlike a chamber area, a bore IS the physics -- it
+#: should be set explicitly -- but an orifice is a restriction, not a channel
+#: area a neighbour can measure against, so there is nothing to infer; the
+#: default keeps the network solvable and is reported as ``area_source =
+#: "default"`` (issue #559).
+DEFAULT_ORIFICE_BORE = 0.08
+
 #: Mass flow [kg/s] over which a directional loss blends its forward and
 #: reverse forms, logistic in m_dot / scale (C++ ``sigmoid`` in
 #: area_change.cpp). Outside a few scales either form holds alone.
@@ -2555,9 +2563,13 @@ class OrificeElement(NetworkElement):
             self.area = area
             self.diameter = math.sqrt(4.0 * area / math.pi)
         else:
-            # Both None: inherit from upstream channel in resolve_topology
+            # Both None: fall back to DEFAULT_ORIFICE_BORE in resolve_topology
+            # (a bore cannot be inferred from a neighbour).
             self.diameter = None
             self.area = None
+        # Provenance of the bore: "user" when a diameter or area was given, else
+        # set to "default" in resolve_topology (issue #559).
+        self._area_source = "user" if (diameter is not None or area is not None) else ""
 
         self.Cd = Cd
         self.regime = regime
@@ -2570,6 +2582,9 @@ class OrificeElement(NetworkElement):
         self.bevel_depth = bevel_depth
         self.upstream_diameter: float | None = None
         self.downstream_diameter: float | None = None
+        # Velocity-of-approach ratio; recomputed in resolve_topology. Initialized
+        # here so diagnostics() is safe before resolve runs.
+        self.beta = 0.0
         # OrificeGeometry built in resolve_topology
         self._orifice_geom: object | None = None
 
@@ -2592,11 +2607,14 @@ class OrificeElement(NetworkElement):
         if len(downstream_channels) == 1:
             self.downstream_diameter = downstream_channels[0].diameter
 
-        # Bore must be explicitly set by the user; fall back to 0.08 when unspecified.
-        # (upstream_diameter is kept only for the velocity-of-approach Beta correction.)
+        # Bore must be explicitly set by the user; fall back to the default when
+        # unspecified (an orifice bore cannot be inferred from a neighbour -- it
+        # is a restriction, not the channel area). upstream_diameter is kept only
+        # for the velocity-of-approach Beta correction.
         if self.diameter is None:
-            self.diameter = 0.08
+            self.diameter = DEFAULT_ORIFICE_BORE
             self.area = math.pi * (self.diameter / 2.0) ** 2
+            self._area_source = "default"
 
         # Pre-compute beta for velocity-of-approach factor
 
@@ -2946,7 +2964,7 @@ class OrificeElement(NetworkElement):
         state_in: NetworkMixtureState,
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None = None,
-    ) -> dict[str, float]:
+    ) -> dict[str, float | str]:
         if state_in.P <= 0 or state_in.T <= 0:
             return {}
         cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
@@ -2991,6 +3009,9 @@ class OrificeElement(NetworkElement):
             "Cd": float(self._effective_Cd(state_in, state_out, flows)),
             "is_correlation": float(self.use_correlation),
             "Cd_in_range": float(self._cd_in_range(state_in)),
+            "diameter": float(self.diameter or 0.0),
+            "beta": float(self.beta),
+            "area_source": self._area_source,
         }
 
 
@@ -6363,6 +6384,11 @@ class MultiPortChamberBase(NetworkElement):
         #   self._outer_areas[i] = that element's own flow area, when it has one
         self._port_element_ids: list[str] = [""] * self.N
         self._outer_areas: list[float | None] = [None] * self.N
+        #: Per-port area provenance: "user" (set at construction), "inherited
+        #: from <id>" (set in resolve_topology), or "" until resolved (#559).
+        self._port_area_sources: list[str] = [
+            "user" if a is not None else "" for a in self.port_areas
+        ]
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.P_jct"]
@@ -6516,8 +6542,12 @@ class MultiPortChamberBase(NetworkElement):
             elif isinstance(outer, BorderCarnotLossElement) and outer.area is not None:
                 outer_area = float(outer.area)
             self._outer_areas[i] = outer_area
-            if self.port_areas[i] is None:
+            # Only the unset ports inherit; this branch is idempotent across
+            # resolve passes (after it runs once port_areas[i] is no longer None),
+            # and user-set ports keep the "user" source from construction.
+            if self.port_areas[i] is None and outer_area is not None:
                 self.port_areas[i] = outer_area
+                self._port_area_sources[i] = f"inherited from {outer.id}"
             if self.port_areas[i] is None:
                 raise ValueError(
                     f"MultiPortChamberBase '{self.id}': could not infer "
@@ -6558,11 +6588,13 @@ class MultiPortChamberBase(NetworkElement):
         which is why the warning is guarded on the exact type rather than on
         ``isinstance``.
         """
-        diag: dict[str, float] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
+        diag: dict[str, float | str] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
+        port_area_sources = getattr(self, "_port_area_sources", None) or [""] * self.N
         for i in range(self.N):
             diag[f"port_{i}_P"] = float(states[i].P)
             diag[f"port_{i}_T"] = float(states[i].T)
             diag[f"port_{i}_area"] = float(self.port_areas[i] or 0.0)
+            diag[f"port_{i}_area_source"] = port_area_sources[i]
             diag[f"port_{i}_sign"] = float(self._port_signs[i])
             if port_mdots is not None and i < len(port_mdots):
                 diag[f"port_{i}_m_dot"] = float(port_mdots[i])
