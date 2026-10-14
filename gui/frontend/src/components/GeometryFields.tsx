@@ -71,9 +71,6 @@ const GeometryFields: React.FC<GeometryFieldsProps> = ({
 			: user
 				? "font-semibold"
 				: "text-gray-400";
-	// Editable fields show the user's value; anything else is a placeholder.
-	const shownD = v.userSet ? v.D : null;
-	const shownA = v.userSet ? v.A : null;
 	const note = v.userSet ? "" : inheritedNote(v.source);
 	const circular =
 		v.D !== null && v.Dh !== null && Math.abs(v.Dh - v.D) <= 1e-12 * v.D;
@@ -98,7 +95,7 @@ const GeometryFields: React.FC<GeometryFieldsProps> = ({
 			<LengthInput
 				id={`${idPrefix}_D`}
 				label="Diameter D"
-				value={shownD}
+				value={v.valueD}
 				placeholder={v.D ?? (stores === "D" ? "set D" : "set D or A")}
 				readOnly={v.locked}
 				onChange={(val) => onChange(storedFrom(stores, "D", val))}
@@ -130,7 +127,7 @@ const GeometryFields: React.FC<GeometryFieldsProps> = ({
 			<AreaInput
 				id={`${idPrefix}_A`}
 				label="Area A"
-				value={shownA}
+				value={v.valueA}
 				placeholder={v.A ?? (stores === "A" ? "set A" : "set D or A")}
 				readOnly={v.locked}
 				onChange={(val) => onChange(storedFrom(stores, "A", val))}
@@ -141,7 +138,9 @@ const GeometryFields: React.FC<GeometryFieldsProps> = ({
 			{!v.userSet && v.source === "default" && (
 				<p className="text-[9px] text-amber-700">
 					{defaultHint ??
-						"Nothing to inherit from — a nominal default is used. Untick Inherit to set it."}
+						(inheritable === false
+							? "Not set — a nominal default is used. Enter D or A to set it."
+							: "Nothing to inherit from — a nominal default is used. Untick Inherit to set it.")}
 				</p>
 			)}
 			{v.userSet && (

@@ -472,6 +472,15 @@ class EjectorData(BaseModel):
     recovery_efficiency: float = 1.0
     initial_guess: dict[str, float] = Field(default_factory=dict)
 
+    @field_validator("throat_area", "nozzle_exit_area", mode="before")
+    @classmethod
+    def _unset_area_is_the_default(cls, v: object, info: object) -> object:
+        # The Inspector shows an unset throat / nozzle exit as its default
+        # (#559); a cleared field arrives as null and must mean the same here.
+        if v is None:
+            return cls.model_fields[info.field_name].default  # type: ignore[attr-defined]
+        return v
+
 
 class VortexData(BaseModel):
     model_config = ConfigDict(extra="ignore")

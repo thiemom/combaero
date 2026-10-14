@@ -408,3 +408,11 @@ def test_jet_pump_with_an_outlet_pipe_converges():
     row = df[df["id"] == "ej1"]
     assert bool(row["success"].iloc[0])
     assert float(row["omega"].iloc[0]) > 3.0
+
+
+def test_cleared_throat_and_nozzle_exit_mean_the_default():
+    """The Inspector shows an unset throat / nozzle exit as its default; a
+    cleared field arrives as null and must build with that default, not fail."""
+    d = EjectorData(throat_area=None, nozzle_exit_area=None)
+    assert d.throat_area == EjectorData.model_fields["throat_area"].default
+    assert d.nozzle_exit_area == EjectorData.model_fields["nozzle_exit_area"].default
