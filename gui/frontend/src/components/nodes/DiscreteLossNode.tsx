@@ -53,16 +53,16 @@ const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="flex flex-col items-start flex-1 min-w-0"
+				className="flex flex-col items-start flex-1 min-w-0 overflow-hidden"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap truncate max-w-full">
 					{data.label ? data.label : "Discrete Loss"}
 				</div>
 				{isSolved ? (
 					<NodeDiagRows result={data.result} maxRows={1} />
 				) : (
-					<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
+					<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 						{formula}
 					</div>
 				)}

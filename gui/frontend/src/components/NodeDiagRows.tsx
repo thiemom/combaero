@@ -51,7 +51,7 @@ export function NodeDiagRows({ result, maxRows = 3 }: Props) {
 			{rows.map((row) => (
 				<div
 					key={row.key}
-					className="text-[9px] text-gray-500 font-mono whitespace-nowrap"
+					className="text-[9px] text-gray-500 font-mono whitespace-nowrap truncate max-w-full"
 				>
 					{row.label}: {row.formatted}{" "}
 					<span className="text-gray-400">{row.unit}</span>
