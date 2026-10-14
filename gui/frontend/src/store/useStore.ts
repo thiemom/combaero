@@ -10,8 +10,9 @@ import {
 	type NodeChange,
 } from "reactflow";
 import { create } from "zustand";
-import { exportResults } from "../api";
+import { exportResults, resolvePreview } from "../api";
 import { discoverFields } from "../utils/diagnostics";
+import type { PreviewItems } from "../utils/inheritance";
 
 // Stored per-node/edge results warm-start the next solve (backend
 // graph_builder). A structural edit (add/remove node or edge, new
@@ -49,6 +50,11 @@ export interface RFState {
 		preserveResults?: boolean,
 	) => void;
 	setSolveResults: (results: any) => void;
+	// Authoritative geometry-inheritance view from /resolve_preview (#559),
+	// keyed by canvas node id. The Inspector reads this instead of re-deriving
+	// inheritance itself. refreshPreview re-fetches it for the current graph.
+	previewItems: PreviewItems;
+	refreshPreview: () => Promise<void>;
 	speciesMetadata: { names: string[]; molar_masses: number[] } | null;
 	fetchSpeciesMetadata: () => Promise<void>;
 	displaySettings: string[];
@@ -93,6 +99,26 @@ const useStore = create<RFState>((set, get) => ({
 	edges: [],
 	solveResults: null,
 	isExporting: false,
+	previewItems: {},
+
+	refreshPreview: async () => {
+		const { nodes, edges, solverSettings } = get();
+		if (nodes.length === 0) {
+			set({ previewItems: {} });
+			return;
+		}
+		try {
+			const res = await resolvePreview({
+				nodes,
+				edges,
+				solver_settings: solverSettings,
+			});
+			set({ previewItems: res.items });
+		} catch {
+			// Advisory only: on a backend error (or backend down) keep the last
+			// good preview; the solve path surfaces real errors.
+		}
+	},
 
 	onNodesChange: (changes: NodeChange[]) => {
 		const nodes = applyNodeChanges(changes, get().nodes);

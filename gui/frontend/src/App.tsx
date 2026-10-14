@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { isBackendReachable, solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
@@ -19,8 +19,23 @@ const App = () => {
 		setSolveResults,
 		isExporting,
 		exportNetworkResults,
+		refreshPreview,
 	} = useStore();
 	const [isSolving, setIsSolving] = useState(false);
+
+	// Keep the geometry-inheritance preview (#559) fresh as the graph changes,
+	// debounced so a drag or a burst of edits triggers one resolve, not many.
+	// The preview is advisory: the Inspector reads it for inherited placeholders
+	// and to flag unresolved geometry before Solve. nodes/edges are intentional
+	// re-run triggers -- refreshPreview reads the current graph from the store via
+	// get(), so biome cannot see that the effect depends on them.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: nodes/edges are intentional re-run triggers; refreshPreview reads the graph via store get()
+	useEffect(() => {
+		const t = setTimeout(() => {
+			void refreshPreview();
+		}, 300);
+		return () => clearTimeout(t);
+	}, [nodes, edges, refreshPreview]);
 
 	const handleSolve = async () => {
 		const errors = validateNetwork(nodes);
