@@ -37,11 +37,11 @@ const WallNode = ({ id, data, selected }: NodeProps) => {
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				{data.label && (
-					<span className="text-[10px] font-bold text-gray-500 uppercase whitespace-nowrap">
+					<span className="text-[10px] font-bold text-gray-500 uppercase whitespace-nowrap truncate max-w-full">
 						{data.label}
 					</span>
 				)}
-				<div className="text-[10px] text-stone-500 font-mono whitespace-nowrap">
+				<div className="text-[10px] text-stone-500 font-mono whitespace-nowrap truncate max-w-full">
 					m = 0 kg/s
 				</div>
 			</div>

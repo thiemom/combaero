@@ -39,7 +39,7 @@ const MassBoundaryNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-xs font-bold whitespace-nowrap">
 					{data.label ? data.label : "Mass Flow"}
 				</div>
-				<div className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
+				<div className="text-[10px] text-gray-500 font-mono whitespace-nowrap truncate max-w-full">
 					{data.m_dot} kg/s
 				</div>
 			</div>

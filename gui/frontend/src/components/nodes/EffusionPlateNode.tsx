@@ -32,7 +32,7 @@ const EffusionPlateNode = ({ id, data, selected }: NodeProps) => {
 						: "border-stone-300"
 			}`}
 			style={{
-				width: 120,
+				width: 140,
 				height: 48,
 				transform: `rotate(${rotation}deg)`,
 				transformOrigin: "center center",
@@ -43,13 +43,13 @@ const EffusionPlateNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="flex flex-col items-start flex-1 min-w-0"
+				className="flex flex-col items-start flex-1 min-w-0 overflow-hidden"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap truncate max-w-full">
 					{data.label ? data.label : "Effusion"}
 				</div>
-				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
+				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					T wall:{" "}
 					{data.result?.T_wall_hot != null
 						? `${data.result.T_wall_hot.toFixed(0)} K`
