@@ -66,3 +66,15 @@ export const checkContinuationAvailable = async (): Promise<boolean> => {
 	);
 	return response.data.available;
 };
+
+// Probe used after a failed request to tell "backend is down" apart from
+// "backend answered with an error". Returns false on any failure (no response,
+// connection refused, timeout).
+export const isBackendReachable = async (): Promise<boolean> => {
+	try {
+		await axios.get(`${API_BASE_URL}/health`, { timeout: 3000 });
+		return true;
+	} catch {
+		return false;
+	}
+};

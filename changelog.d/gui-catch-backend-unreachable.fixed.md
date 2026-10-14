@@ -1,0 +1,3 @@
+- **GUI tells you when the solver backend is unreachable.**
+  - Before: if the backend was not running, a solve attempt showed only "Solve failed. Check console for details." -- indistinguishable from a real solver failure.
+  - Now: after a failed request the GUI probes `/health`; when the backend is down it says so and how to start it (`./scripts/run-gui.sh` or `combaero-gui`), instead of the generic message. A backend that is up but returns an error still shows that error's detail.
