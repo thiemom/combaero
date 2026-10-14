@@ -2055,8 +2055,10 @@ const Inspector = () => {
 									</div>
 									<p className="text-[9px] text-stone-400 italic">
 										Every junction model takes F_S = F_C (Mynard's
-										pseudosupplier geometry requires it). For a physically
-										different straight arm, add an AreaChange element.
+										pseudosupplier geometry requires it). A channel on any port
+										whose bore differs by more than 5% meets the port through a
+										sharp contraction or expansion, inserted automatically and
+										reported under Port steps.
 									</p>
 								</div>
 
@@ -2296,6 +2298,38 @@ const Inspector = () => {
 												The ideal momentum model can then report a
 												total-pressure gain and the solve is rejected; size the
 												channel to the tee, or set F_C / F_branch.
+											</div>
+										)}
+										{/* Sharp steps the solver inserted where a channel's bore
+										    differs from the port's (#536). */}
+										{(["common", "straight", "branch"] as const).some(
+											(p) => result[`step_${p}_zeta`] != null,
+										) && (
+											<div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] leading-snug text-amber-800">
+												<div className="font-bold uppercase mb-0.5">
+													Port steps
+												</div>
+												{(["common", "straight", "branch"] as const)
+													.filter((p) => result[`step_${p}_zeta`] != null)
+													.map((p) => (
+														<div key={p} className="font-mono">
+															{p}: A_channel / A_port{" "}
+															{(
+																result[`step_${p}_area_ratio`] as number
+															).toFixed(2)}
+															, ζ{" "}
+															{(result[`step_${p}_zeta`] as number).toFixed(3)},
+															ΔPt{" "}
+															{(result[`step_${p}_dPt`] as number).toFixed(0)}{" "}
+															Pa
+														</div>
+													))}
+												<div className="italic text-amber-700 mt-0.5">
+													The connected channel's bore differs from the port's,
+													so the two meet through a sharp contraction or
+													expansion (Weisbach / Borda-Carnot) inserted at the
+													port.
+												</div>
 											</div>
 										)}
 									</div>

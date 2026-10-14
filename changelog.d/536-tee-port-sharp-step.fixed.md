@@ -1,0 +1,10 @@
+- **GUI: a tee port whose channel has a different bore meets it through a sharp step (#536).**
+  - **Before:** the straight port always took the main area, whatever channel was connected, with nothing joining the two.
+    - With a narrower straight channel, the ideal momentum tee raised that channel's total pressure and the solve was rejected.
+    - Mynard contracted losslessly.
+  - **Now:** where a directly connected channel's area differs from its port's by more than 5%, the GUI inserts a hidden sharp `AreaChangeElement` (Weisbach contraction / Borda-Carnot expansion).
+    - The tee's result reports each step's zeta, total-pressure drop and area ratio (`step_<port>_*`), shown under "Port steps".
+    - A port with a step is modelled, so `port_area_mismatch` (#539) does not count it. The diagnostic still flags unmodelled steps in networks built in a script.
+    - Solver errors name a step as `the area step at <tee> port <p>`, not by its internal id.
+  - **On the reported network:** the ideal tee now solves. The ideal and Mynard tees put 0.0518 and 0.0495 kg/s down the straight leg.
+- **A failed solve no longer aborts when an element cannot evaluate the diverged end state** (e.g. a negative pressure). That element reports no diagnostics, and the auto-retry runs. A converged state that cannot be evaluated still raises.
