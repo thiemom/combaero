@@ -3571,47 +3571,59 @@ class NetworkSolver:
 
         sol_dict["__element_diag__"] = {}
         for eid, element in self.network.elements.items():
-            m_indices = self._unknown_indices.get(eid, [])
-            if isinstance(element, _TeeJunctionElement):
-                nodes = self.network.nodes
-                state_com = self._get_node_state(nodes[element.common_node], final_x)
-                state_straight = self._get_node_state(nodes[element.straight_node], final_x)
-                state_branch = self._get_node_state(nodes[element.branch_node], final_x)
-                if m_indices:
-                    state_com.m_dot = float(final_x[m_indices[0]])
-                    state_branch.m_dot = float(final_x[m_indices[1]])
-                    state_straight.m_dot = float(final_x[m_indices[0]]) - float(
-                        final_x[m_indices[1]]
-                    )
-                diag = element.diagnostics(state_com, state_straight, state_branch)
-            elif isinstance(element, _MultiPortChamberBase):
-                nodes = self.network.nodes
-                port_states = [
-                    self._get_node_state(nodes[pid], final_x) for pid in element.port_nodes
-                ]
-                P_jct_val = float(final_x[m_indices[0]]) if m_indices else 0.0
-                # Per-port mdots in junction convention (positive = out of
-                # junction), same sign-mapping the residual call uses.
-                port_mdots: list[float] = []
-                for i, outer_id in enumerate(element._port_element_ids):
-                    outer_indices = self._unknown_indices.get(outer_id, [])
-                    outer_mdot = float(final_x[outer_indices[0]]) if outer_indices else 0.0
-                    port_mdots.append(element._port_signs[i] * outer_mdot)
-                diag = element.diagnostics(port_states, P_jct_val, port_mdots)
-            else:
-                state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
-                state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
-                # Inject solved m_dot so velocity-dependent diagnostics (e.g. Mach) are correct
-                if m_indices:
-                    m_solved = float(final_x[m_indices[0]])
-                    state_in.m_dot = m_solved
-                    state_out.m_dot = m_solved
-                self._main_face(element, self.network.nodes[element.to_node], state_out)
-                flows = self._network_flows(element, final_x)
-                if flows is None:
-                    diag = element.diagnostics(state_in, state_out)
+            try:
+                m_indices = self._unknown_indices.get(eid, [])
+                if isinstance(element, _TeeJunctionElement):
+                    nodes = self.network.nodes
+                    state_com = self._get_node_state(nodes[element.common_node], final_x)
+                    state_straight = self._get_node_state(nodes[element.straight_node], final_x)
+                    state_branch = self._get_node_state(nodes[element.branch_node], final_x)
+                    if m_indices:
+                        state_com.m_dot = float(final_x[m_indices[0]])
+                        state_branch.m_dot = float(final_x[m_indices[1]])
+                        state_straight.m_dot = float(final_x[m_indices[0]]) - float(
+                            final_x[m_indices[1]]
+                        )
+                    diag = element.diagnostics(state_com, state_straight, state_branch)
+                elif isinstance(element, _MultiPortChamberBase):
+                    nodes = self.network.nodes
+                    port_states = [
+                        self._get_node_state(nodes[pid], final_x) for pid in element.port_nodes
+                    ]
+                    P_jct_val = float(final_x[m_indices[0]]) if m_indices else 0.0
+                    # Per-port mdots in junction convention (positive = out of
+                    # junction), same sign-mapping the residual call uses.
+                    port_mdots: list[float] = []
+                    for i, outer_id in enumerate(element._port_element_ids):
+                        outer_indices = self._unknown_indices.get(outer_id, [])
+                        outer_mdot = float(final_x[outer_indices[0]]) if outer_indices else 0.0
+                        port_mdots.append(element._port_signs[i] * outer_mdot)
+                    diag = element.diagnostics(port_states, P_jct_val, port_mdots)
                 else:
-                    diag = element.diagnostics(state_in, state_out, flows=flows)
+                    state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
+                    state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
+                    # Inject solved m_dot so velocity-dependent diagnostics (e.g. Mach) are correct
+                    if m_indices:
+                        m_solved = float(final_x[m_indices[0]])
+                        state_in.m_dot = m_solved
+                        state_out.m_dot = m_solved
+                    self._main_face(element, self.network.nodes[element.to_node], state_out)
+                    flows = self._network_flows(element, final_x)
+                    if flows is None:
+                        diag = element.diagnostics(state_in, state_out)
+                    else:
+                        diag = element.diagnostics(state_in, state_out, flows=flows)
+            except (ValueError, RuntimeError):
+                # A failed solve can end on a state no element can evaluate
+                # (a negative pressure from a diverging iterate). Raising here
+                # threw away the auto-retry that would have recovered it (#536:
+                # a tee with port steps, recovered by the warm-start retry), so
+                # a FAILED solve reports no diagnostics for that element
+                # instead. A converged state that cannot be evaluated is a bug
+                # and still raises.
+                if success:
+                    raise
+                diag = {}
             sol_dict["__element_diag__"][eid] = diag
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val

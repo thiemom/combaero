@@ -17,6 +17,7 @@ from combaero.network import (
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
+    MultiPortChamberBase,
     OrificeElement,
     PinFinModel,
     PlenumNode,
@@ -64,6 +65,13 @@ from .schemas import (
     VortexData,
     WallData,
 )
+
+#: |channel area / port area - 1| above which a tee port and its directly
+#: connected channel are joined through a sharp step (#536). Below it the bores
+#: count as the same size, so round-off in a typed diameter inserts no step.
+#: The same bound as the junction's unmodelled-step diagnostic (#539), so a
+#: step the builder leaves out is never one that diagnostic reports.
+TEE_PORT_STEP_TOL = MultiPortChamberBase.PORT_AREA_MISMATCH_TOL
 
 
 def build_pressure_loss(data, area: float = 0.1):
@@ -306,6 +314,20 @@ def _channel_D_at_tee_port(
     user has not explicitly set them. Returns None when no channel is
     directly connected (e.g., plenum, boundary, multi-hop).
     """
+    hit = _channel_at_tee_port(schema_edges, schema_nodes, tee_id, port)
+    return None if hit is None else hit[1]
+
+
+def _channel_at_tee_port(
+    schema_edges,
+    schema_nodes,
+    tee_id: str,
+    port: str,
+):
+    """The edge joining a tee port straight to a channel, and that channel's D [m].
+
+    None when no channel with a positive D is directly connected.
+    """
     src_handle = f"port-{port}-source"
     tgt_handle = f"port-{port}-target"
     for edge in schema_edges:
@@ -329,7 +351,7 @@ def _channel_D_at_tee_port(
         except (TypeError, ValueError):
             continue
         if d_val > 0.0:
-            return d_val
+            return edge, d_val
     return None
 
 
@@ -738,6 +760,53 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.target, port)] = jid
                 edge_junction_map[(edge.source, edge.target)] = jid
+
+    # 1c. A tee port whose channel has a different area meets it through a
+    # sharp step (#536). The tee's ports keep the closures' geometry (F_S =
+    # F_C), so a straight channel narrower than the main pipe used to join a
+    # port of the main area with nothing in between: the ideal tee, which
+    # couples on static pressure, then raised the channel's Pt by its dynamic
+    # head, and Mynard, which couples on Pt, contracted losslessly. Bolted
+    # together, two bores of different size are a sharp contraction or
+    # expansion, so that is what is inserted: a hidden AreaChangeElement
+    # (Weisbach / Borda-Carnot) and a momentum chamber on the channel side.
+    tee_steps: dict[str, tuple[str, str, float]] = {}
+    for tee_node in element_nodes:
+        if tee_node.type != "mpce_tee":
+            continue
+        _td = MPCETeeData(**tee_node.data)
+        _F_C, _F_B, _ = _resolve_tee_areas(
+            schema.edges, schema.nodes, tee_node.id, _td.F_C, _td.F_branch, _td.psi
+        )
+        for port, A_port in (("common", _F_C), ("straight", _F_C), ("branch", _F_B)):
+            hit = _channel_at_tee_port(schema.edges, schema.nodes, tee_node.id, port)
+            if hit is None:
+                continue
+            edge, D = hit
+            A_ch = _math.pi / 4.0 * D * D
+            if abs(A_ch / A_port - 1.0) <= TEE_PORT_STEP_TOL:
+                continue
+            key = (edge.source, edge.target)
+            port_node = edge_junction_map.get(key)
+            if port_node is None:
+                continue
+            step_id = f"__tee_step__{tee_node.id}_{port}"
+            side_id = f"{step_id}__node"
+            side = MomentumChamberNode(side_id)
+            net.add_node(side)
+            nodes_map[side_id] = side
+            if edge.source == tee_node.id:  # drawn tee -> channel
+                step = AreaChangeElement(
+                    step_id, port_node, side_id, F0=A_port, F1=A_ch, model_type="sharp"
+                )
+            else:
+                step = AreaChangeElement(
+                    step_id, side_id, port_node, F0=A_ch, F1=A_port, model_type="sharp"
+                )
+            net.add_element(step)
+            edge_junction_map[key] = side_id
+            tee_steps[step_id] = (tee_node.id, port, A_ch / A_port)
+    net._gui_tee_steps = tee_steps
 
     # Pre-scan: for each edge whose target is a WallNode, the 2nd+ connection
     # gets its own clone so the solver enforces m_dot=0 per branch individually

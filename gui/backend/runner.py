@@ -121,6 +121,21 @@ def _build_result_objects(
         diag.pop("m_dot", None)
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 
+    # A tee port's hidden sharp step (#536) is reported on the tee the user
+    # drew: the step's loss coefficient, its total-pressure drop and the
+    # channel-to-port area ratio, per port.
+    for step_id, (tee_id, port, ratio) in getattr(net, "_gui_tee_steps", {}).items():
+        step = elem_diags.get(step_id)
+        tee_res = element_results.get(tee_id)
+        if not step or tee_res is None:
+            continue
+        extra = {
+            f"step_{port}_zeta": float(step.get("zeta", 0.0)),
+            f"step_{port}_dPt": float(step.get("dPt", 0.0)),
+            f"step_{port}_area_ratio": float(ratio),
+        }
+        element_results[tee_id] = ElementResult(**{**tee_res.model_dump(), **extra})
+
     def _safe_float(v: Any) -> Any:
         try:
             if isinstance(v, (list, tuple, dict)):

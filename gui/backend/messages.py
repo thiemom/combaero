@@ -1,8 +1,10 @@
 """User-facing wording for solver errors and messages (#321 item 1).
 
 The network elements raise with their internal ids: a tee or ejector port is
-the auto-inserted node ``__tee_jct__<node id>_<port>``, and every element is
-its React Flow id. The GUI shows neither -- a tee's ports are labelled c, s, b
+the auto-inserted node ``__tee_jct__<node id>_<port>``, a sharp step the
+builder put between a tee port and a channel of another bore is
+``__tee_step__<node id>_<port>`` (its far node adds ``__node``), and every
+element is its React Flow id. The GUI shows neither -- a tee's ports are labelled c, s, b
 and an ejector's p, s, o -- so the message is rewritten here, at the HTTP
 boundary, and the elements keep raising what a script user needs.
 """
@@ -34,7 +36,7 @@ KIND_NAME = {
     "pressure_boundary": "Pressure Boundary",
 }
 
-_PORT_ID = re.compile(r"__tee_jct__(.+?)_(" + "|".join(PORT_TAG) + r")\b")
+_PORT_ID = re.compile(r"__tee_(jct|step)__(.+?)_(" + "|".join(PORT_TAG) + r")(?:__node)?\b")
 
 HINTS = (
     (
@@ -65,7 +67,10 @@ def humanize(message: str, schema: NetworkGraphSchema) -> str:
     if not message:
         return message
     out = _PORT_ID.sub(
-        lambda m: f"{node_name(schema, m[1])} port {m[2]} ({PORT_TAG[m[2]]})",
+        lambda m: (
+            ("the area step at " if m[1] == "step" else "")
+            + f"{node_name(schema, m[2])} port {m[3]} ({PORT_TAG[m[3]]})"
+        ),
         message,
     )
     for node in schema.nodes:

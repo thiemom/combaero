@@ -47,6 +47,18 @@ def test_tee_port_id_becomes_the_node_label_and_port_letter() -> None:
     assert "flow direction (merge / branch)" in out
 
 
+def test_an_inserted_tee_port_step_is_named_after_its_port() -> None:
+    """The builder's sharp step at a port of another bore (#536) and its far
+    node are internal ids too."""
+    msg = (
+        "Element '__tee_step__node_17_straight' failed: state at "
+        "'__tee_step__node_17_straight__node' has negative pressure."
+    )
+    out = humanize(msg, _schema(("node_17", "mpce_tee", {"label": "T1"})))
+    assert "__tee_step__" not in out and "__node" not in out
+    assert out.count("the area step at T1 (Tee) port straight (s)") == 2
+
+
 def test_ejector_boundary_port_gets_the_connect_through_an_element_hint() -> None:
     # Verbatim from #321: a boundary wired straight onto an ejector port.
     msg = (

@@ -8,6 +8,8 @@ Verifies that the graph_builder converts an `mpce_tee` node to an
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from combaero.network.mpce_element import MultiPortChamberElement
@@ -564,15 +566,7 @@ def test_ideal_momentum_runner_loss_factor_lowers_the_branch_loss() -> None:
     assert 0.0 < k5 < k1
 
 
-@pytest.mark.parametrize("model", ["ideal_momentum", "mynard", "constant_k"])
-@pytest.mark.parametrize("D_straight,expected", [(0.1, 0), (0.05, 1)])
-def test_port_area_step_to_the_connected_channel_is_reported(
-    model: str, D_straight: float, expected: int
-) -> None:
-    """The straight port takes the main area F_C (F_s = F_c), whatever channel
-    is attached. A narrower straight channel leaves an area step that no
-    element models; the ideal tee's static coupling then creates total
-    pressure there (#536). The diagnostics report it, for every model."""
+def _port_bookkeeping(model: str, D_straight: float) -> dict:
     from types import SimpleNamespace
 
     schema = _mpce_with_channels_schema("branch", D_straight=D_straight)
@@ -582,7 +576,32 @@ def test_port_area_step_to_the_connected_channel_is_reported(
     net.resolve_all_topology()
     e = _get_element(net, "mpce")
     states = [SimpleNamespace(P=1.0e5, T=300.0) for _ in range(e.N)]
-    diag = e.diagnostics(states, 1.0e5, None)  # no flows: the port bookkeeping only
+    return e.diagnostics(states, 1.0e5, None)  # no flows: the port bookkeeping only
+
+
+@pytest.mark.parametrize("model", ["ideal_momentum", "mynard", "constant_k"])
+@pytest.mark.parametrize("D_straight,expected", [(0.1, 0), (0.05, 1)])
+def test_port_area_step_to_the_connected_channel_is_reported(
+    model: str, D_straight: float, expected: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The straight port takes the main area F_C (F_s = F_c), whatever channel
+    is attached. Without the GUI's sharp step, a narrower straight channel
+    leaves an area step that no element models; the ideal tee's static
+    coupling then creates total pressure there (#536). The diagnostics report
+    it, for every model. Step insertion is switched off here, which is what a
+    network built in a script looks like."""
+    import gui.backend.graph_builder as gb
+
+    monkeypatch.setattr(gb, "TEE_PORT_STEP_TOL", math.inf)
+    diag = _port_bookkeeping(model, D_straight)
     assert diag["port_area_mismatch"] == expected
     assert diag["port_1_area_ratio"] == pytest.approx((D_straight / 0.1) ** 2)
     assert diag["port_2_area_ratio"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("model", ["ideal_momentum", "mynard", "constant_k"])
+def test_the_gui_leaves_no_unmodelled_port_step(model: str) -> None:
+    """The GUI inserts the sharp step (#536), so the warning has nothing to report."""
+    diag = _port_bookkeeping(model, 0.05)
+    assert diag["port_area_mismatch"] == 0
+    assert "port_1_area_ratio" not in diag

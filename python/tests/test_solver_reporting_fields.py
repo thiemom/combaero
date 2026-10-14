@@ -317,3 +317,51 @@ def test_a_rejected_root_suggests_another_start_only_where_one_is_left():
         assert "try init_strategy='analytical_pt_prop'" in warm["__message__"]
         return
     pytest.skip("no converging draw available to reject")
+
+
+def _orifice_channel_net():
+    from combaero.network import (
+        ChannelElement,
+        FlowNetwork,
+        OrificeElement,
+        PlenumNode,
+        PressureBoundary,
+    )
+
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))
+    net.add_node(PlenumNode("n1"))
+    net.add_node(PressureBoundary("out", Pt=101325.0, Tt=300.0))
+    net.add_element(
+        OrificeElement("orf", "in", "n1", Cd=0.6, diameter=0.112838, correlation="fixed")
+    )
+    net.add_element(ChannelElement("ch", "n1", "out", length=1.0, diameter=0.1, roughness=1e-5))
+    return net
+
+
+def _unevaluable(*args, **kwargs):
+    raise ValueError("thermo_state: pressure must be positive")
+
+
+def test_a_failed_solve_survives_an_element_that_cannot_evaluate_its_end_state():
+    """A diverging iterate (a negative pressure) made an element's diagnostics
+    raise, which threw away the auto-retry that would have recovered the solve
+    (#536, the multi-wall tee fixture with port steps). A FAILED solve now
+    reports no diagnostics for that element instead."""
+    net = _orifice_channel_net()
+    net.elements["ch"].diagnostics = _unevaluable
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sol = NetworkSolver(net).solve(timeout=1e-9, auto_retry=False)
+    assert sol["__success__"] is False
+    assert sol["__element_diag__"]["ch"] == {}
+    assert sol["__element_diag__"]["orf"]  # the others still report
+
+
+def test_a_converged_state_that_cannot_be_evaluated_still_raises():
+    net = _orifice_channel_net()
+    net.elements["ch"].diagnostics = _unevaluable
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        with pytest.raises(ValueError, match="pressure must be positive"):
+            NetworkSolver(net).solve()
