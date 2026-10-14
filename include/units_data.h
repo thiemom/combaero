@@ -1080,6 +1080,12 @@ inline constexpr Entry function_units[] = {
     {"T_adiabatic_wall_mach", "T_static: K, M: -, T: K, P: Pa, X: mol/mol",
      "K"},
     {"stagnation_from_static", "T: K, P: Pa, v: m/s, X: mol/mol", "tuple(K, Pa)"},
+    // solver_interface.h - Second law of a control volume (#545)
+    {"entropy_generation",
+     "inflows: MassStream (kg/s, K, Pa, kg/kg), outflows: MassStream, S_heat: W/K",
+     "EntropyGenerationResult (sigma: W/K, sigma_norm: -)"},
+    {"heat_entropy_flux", "m_dot: kg/s, T0_in: K, T0_out: K, Y: kg/kg, M_in: -, M_out: -",
+     "W/K"},
 
     // -------------------------------------------------------------------------
     // heat_transfer.h - ChannelResult fields

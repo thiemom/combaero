@@ -411,22 +411,24 @@ All functions use consistent units to avoid conversion errors.
 
 #### Stagnation/Static Conversions
 
-| Function                 | Input Units                                  | Output Unit  |
-|--------------------------|----------------------------------------------|--------------|
-| `kinetic_energy`         | v: m/s                                       | J/kg         |
-| `bulk_velocity`          | m_dot: kg/s, rho: kg/m^3, area: m^2          | m/s          |
-| `h0_from_static`         | h_static: J/kg, v: m/s                       | J/kg         |
-| `v_from_h0`              | h0: J/kg, h_static: J/kg                     | m/s          |
-| `mach_number`            | v: m/s, T: K, X: mol/mol                     | - (M)        |
-| `T0_from_static`         | T: K, M: -, X: mol/mol                       | K            |
-| `T0_from_static_v`       | T: K, v: m/s, X: mol/mol                     | K            |
-| `T_from_stagnation`      | T0: K, M: -, X: mol/mol                      | K            |
-| `P0_from_static`         | P: Pa, T: K, M: -, X: mol/mol                | Pa           |
-| `P_from_stagnation`      | P0: Pa, T0: K, M: -, X: mol/mol              | Pa           |
-| `recovery_factor`        | Pr: -                                        | - (r)        |
-| `T_adiabatic_wall`       | T_static: K, v: m/s, T: K, P: Pa, X: mol/mol | K            |
-| `T_adiabatic_wall_mach`  | T_static: K, M: -, T: K, P: Pa, X: mol/mol   | K            |
-| `stagnation_from_static` | T: K, P: Pa, v: m/s, X: mol/mol              | tuple(K, Pa) |
+| Function                 | Input Units                                                                 | Output Unit                                         |
+|--------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------|
+| `kinetic_energy`         | v: m/s                                                                      | J/kg                                                |
+| `bulk_velocity`          | m_dot: kg/s, rho: kg/m^3, area: m^2                                         | m/s                                                 |
+| `h0_from_static`         | h_static: J/kg, v: m/s                                                      | J/kg                                                |
+| `v_from_h0`              | h0: J/kg, h_static: J/kg                                                    | m/s                                                 |
+| `mach_number`            | v: m/s, T: K, X: mol/mol                                                    | - (M)                                               |
+| `T0_from_static`         | T: K, M: -, X: mol/mol                                                      | K                                                   |
+| `T0_from_static_v`       | T: K, v: m/s, X: mol/mol                                                    | K                                                   |
+| `T_from_stagnation`      | T0: K, M: -, X: mol/mol                                                     | K                                                   |
+| `P0_from_static`         | P: Pa, T: K, M: -, X: mol/mol                                               | Pa                                                  |
+| `P_from_stagnation`      | P0: Pa, T0: K, M: -, X: mol/mol                                             | Pa                                                  |
+| `recovery_factor`        | Pr: -                                                                       | - (r)                                               |
+| `T_adiabatic_wall`       | T_static: K, v: m/s, T: K, P: Pa, X: mol/mol                                | K                                                   |
+| `T_adiabatic_wall_mach`  | T_static: K, M: -, T: K, P: Pa, X: mol/mol                                  | K                                                   |
+| `stagnation_from_static` | T: K, P: Pa, v: m/s, X: mol/mol                                             | tuple(K, Pa)                                        |
+| `entropy_generation`     | inflows: MassStream (kg/s, K, Pa, kg/kg), outflows: MassStream, S_heat: W/K | EntropyGenerationResult (sigma: W/K, sigma_norm: -) |
+| `heat_entropy_flux`      | m_dot: kg/s, T0_in: K, T0_out: K, Y: kg/kg, M_in: -, M_out: -               | W/K                                                 |
 
 ### composition.h - Composition Utilities
 
