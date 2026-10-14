@@ -2594,6 +2594,7 @@ class OrificeElement(NetworkElement):
         # bevel angle of 40-60 deg. Not the wall thickness.
         self.bevel_depth = bevel_depth
         self.upstream_diameter: float | None = None
+        self._upstream_source = ""
         self.downstream_diameter: float | None = None
         # Velocity-of-approach ratio; recomputed in resolve_topology. Initialized
         # here so diagnostics() is safe before resolve runs.
@@ -2616,6 +2617,8 @@ class OrificeElement(NetworkElement):
 
         if len(upstream_channels) == 1:
             self.upstream_diameter = upstream_channels[0].diameter
+            # Provenance of the pipe diameter that sets beta (#559).
+            self._upstream_source = f"channel '{upstream_channels[0].id}'"
 
         if len(downstream_channels) == 1:
             self.downstream_diameter = downstream_channels[0].diameter

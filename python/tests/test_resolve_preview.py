@@ -246,3 +246,35 @@ def test_gui_momentum_chamber_with_null_area_inherits_it() -> None:
     rep = resolve_preview(build(NetworkGraphSchema(**graph)))
     assert rep["mc"].fields["Dh"].source == "user"
     assert rep["mc"].fields["area"].source == "derived from Dh"
+
+
+def test_orifice_reports_pipe_diameter_and_beta() -> None:
+    """The bore never inherits; the upstream pipe's D does (even when that pipe
+    inherits its own D), and the preview reports it with beta = d / D."""
+    from combaero.network import OrificeElement
+
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=2e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PlenumNode("p1"))
+    net.add_node(PlenumNode("p2"))
+    net.add_node(PressureBoundary("out", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    net.add_element(ChannelElement("ch_u", "in", "p1", length=1.0, diameter=0.1))
+    net.add_element(ChannelElement("ch_inh", "p1", "p2", length=1.0))  # inherits 0.1
+    net.add_element(OrificeElement("ori", "p2", "out", diameter=0.05))
+
+    f = resolve_preview(net)["ori"].fields
+    assert f["diameter"].value == 0.05
+    assert f["diameter"].source == "user"
+    assert f["pipe_diameter"].value == 0.1
+    assert f["pipe_diameter"].source == "channel 'ch_inh'"
+    assert abs(f["beta"].value - 0.5) < 1e-12
+
+    # No bore given: the default bore, marked as such.
+    net2 = FlowNetwork()
+    net2.add_node(PressureBoundary("in", Pt=2e5, Tt=300.0, Y=Y_AIR))
+    net2.add_node(PressureBoundary("out", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    net2.add_element(OrificeElement("ori", "in", "out"))
+    f = resolve_preview(net2)["ori"].fields
+    assert f["diameter"].source == "default"
+    assert f["pipe_diameter"].value is None
+    assert f["beta"].value == 0.0
