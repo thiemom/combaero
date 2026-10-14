@@ -83,6 +83,12 @@ def test_a_chamber_discharge_takes_its_gas_side_from_the_chamber() -> None:
     assert d["gas_side_chamber"] == 1.0
     assert d["h_gas_unblown"] == pytest.approx(gas.h, rel=1e-6)
     assert 600.0 < d["T_wall_cold"] < d["T_wall_hot"] < d["T_gas"]
+    # What the augmentation multiplies is reported with it (#476).
+    model = ch.surface.model
+    assert d["h_gas_unblown_model"].startswith(type(model).__name__)
+    assert d["h_gas_unblown_Re"] == pytest.approx(gas.Re, rel=1e-6)
+    assert d["h_gas_unblown_Pr"] == pytest.approx(gas.Pr, rel=1e-6)
+    assert d["h_gas_unblown_Nu"] == pytest.approx(gas.Nu, rel=1e-6)
 
 
 def test_the_gas_temperature_is_the_approaching_main_stream() -> None:

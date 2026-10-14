@@ -3259,7 +3259,7 @@ def _effusion_wall(
     return float(w.T_hot), T_c + q / h_i, q
 
 
-def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, float] | None:
+def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, Any] | None:
     """What a discharge node offers a wall as its gas side, or None.
 
     Only a MomentumChamberNode has flow, hence a coefficient: its own surface
@@ -3283,8 +3283,17 @@ def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, floa
         for eid, st, _names in getattr(node, "_inflows", []):
             if eid == node.main_inlet:
                 T_gas, from_main = float(st.T), True
+    model = node.surface.model
+    corr = getattr(model, "correlation", None)
     return {
         "h_unblown": float(gas.h),
+        # What the augmentation multiplies (#476): the chamber surface's own
+        # model, at the chamber's Re and Pr. The smooth-duct correlations are
+        # fully developed (channel_smooth takes no entry-length correction).
+        "baseline_model": f"{type(model).__name__}({corr})" if corr else type(model).__name__,
+        "Re_unblown": float(gas.Re),
+        "Pr_unblown": float(gas.Pr),
+        "Nu_unblown": float(gas.Nu),
         "T_gas": T_gas,
         "T_from_main_inlet": from_main,
         "U_gas": abs(getattr(node, "_total_m_dot", 0.0)) / (rho_g * node.area),
@@ -3886,6 +3895,10 @@ class EffusionPlateElement(OrificeElement):
             {
                 "gas_side_chamber": 1.0,
                 "h_gas_unblown": float(gas["h_unblown"]),
+                "h_gas_unblown_model": gas["baseline_model"],
+                "h_gas_unblown_Re": gas["Re_unblown"],
+                "h_gas_unblown_Pr": gas["Pr_unblown"],
+                "h_gas_unblown_Nu": gas["Nu_unblown"],
                 "gas_augmentation": float(self.gas_augmentation),
                 "h_gas": float(h_g),
                 "T_gas": float(T_g),
