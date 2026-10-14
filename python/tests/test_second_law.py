@@ -1,0 +1,298 @@
+"""Second-law check per element and the control-volume ledger (#545).
+
+Every converged solve now reports, REPORT ONLY:
+
+* ``__second_law__``: per element, the internal entropy generation of its
+  control volume (``sigma_norm``; for an adiabatic two-port exactly
+  ``-ln(Pt_out/Pt_in)``) and a verdict -- pass, fail, or not_checked with the
+  reason.
+* ``__ledger__``: mass and energy over the network's control volume, from
+  the flow boundaries, the heat given, and the heat leaving or withheld.
+
+The networks are the suite's own, one per element kind; the broken element
+is #541's area change, which coupled the downstream static pressure and so
+created the dynamic head of a downstream chamber as total pressure.
+"""
+
+from __future__ import annotations
+
+import io
+import math
+import warnings
+from contextlib import redirect_stdout
+
+import numpy as np
+import pytest
+
+import combaero as cb
+from combaero.network import (
+    AreaChangeElement,
+    ChannelElement,
+    ConvectiveSurface,
+    EnergyBoundary,
+    FlowNetwork,
+    MassFlowBoundary,
+    NetworkSolver,
+    OrificeElement,
+    PlenumNode,
+    PressureBoundary,
+    ThermalWall,
+    WallLayer,
+)
+from combaero.network.second_law import SIGMA_TOL
+
+with redirect_stdout(io.StringIO()):
+    import test_area_change as area_cases
+    import test_combustor_network as combustor_cases
+    import test_effusion_liner as liner_cases
+    import test_impingement_array as array_cases
+    import test_merge_chamber as merge_cases
+    import test_tee_network as tee_cases
+
+    from validation.junction import random_robustness as rr
+
+Y_AIR = list(cb.mole_to_mass(cb.species.dry_air()))
+
+
+def _solve(net: FlowNetwork, **kw) -> dict:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return NetworkSolver(net).solve(**kw)
+
+
+# --- networks, one per element kind -----------------------------------------
+
+
+def _heated_pair(Q_sign: float = 1.0) -> FlowNetwork:
+    """Two channels coupled by a wall; the hot one cools, the cold one heats."""
+    g = FlowNetwork()
+    g.add_node(MassFlowBoundary("hot_in", m_dot=0.1, Tt=800.0, Y=Y_AIR))
+    g.add_node(MassFlowBoundary("cold_in", m_dot=0.05, Tt=400.0, Y=Y_AIR))
+    for n in ("hot_out", "cold_out"):
+        g.add_node(PressureBoundary(n, Pt=2e5, Tt=300.0, Y=Y_AIR))
+    for n in ("hot_p", "cold_p"):
+        g.add_node(PlenumNode(n))
+    area = math.pi * 0.04
+    for name in ("hot", "cold"):
+        g.add_element(
+            ChannelElement(
+                name,
+                f"{name}_in",
+                f"{name}_p",
+                length=1.0,
+                diameter=0.04,
+                roughness=0.0,
+                surface=ConvectiveSurface(area=area),
+            )
+        )
+        g.add_element(
+            OrificeElement(
+                f"{name}_o",
+                f"{name}_p",
+                f"{name}_out",
+                Cd=0.8,
+                diameter=0.0357,
+                correlation="fixed",
+            )
+        )
+    g.add_wall(
+        ThermalWall(id="w", element_a="hot", element_b="cold", layers=[WallLayer(0.002, 25.0)])
+    )
+    return g
+
+
+def _junction() -> FlowNetwork:
+    import random
+
+    return rr.build(rr.sample(random.Random(3)))
+
+
+NETWORKS = {
+    "orifices_and_heat": lambda: _heated_pair(),
+    "area_change_step": lambda: area_cases._step_into_chamber(1e-3, 4e-4).network,
+    "impingement_array": lambda: array_cases._net(array_cases._array(4), hot=True),
+    "effusion_liner": lambda: liner_cases._net(liner_cases._liner(), chamber=True),
+    "merge_chamber": lambda: merge_cases._liner(),
+    "combustor": lambda: combustor_cases._make_simple_combustor_net(0.05)[0],
+    "mpce_junction": _junction,
+    "legacy_tee": lambda: tee_cases._branching_net(),
+}
+
+
+@pytest.mark.parametrize("name", NETWORKS)
+def test_every_element_of_a_working_network_passes(name: str) -> None:
+    """No element of a physical solution manufactures flow work, and every
+    element gets a verdict -- never a silent gap."""
+    net = NETWORKS[name]()
+    r = _solve(net)
+    assert r["__converged__"], r["__message__"]
+    verdicts = r["__second_law__"]
+    assert set(verdicts) == set(net.elements)
+    assert r["__second_law_failures__"] == []
+    for eid, v in verdicts.items():
+        if v["verdict"] == "not_checked":
+            assert v["reason"], eid
+        else:
+            assert v["verdict"] == "pass", (eid, v)
+            assert v["sigma_norm_low"] <= v["sigma_norm"] <= v["sigma_norm_high"]
+
+
+@pytest.mark.parametrize("name", NETWORKS)
+def test_the_ledger_closes_over_the_network(name: str) -> None:
+    net = NETWORKS[name]()
+    led = _solve(net)["__ledger__"]
+    assert abs(led["mass_closure_rel"]) < 1e-6, led
+    assert abs(led["energy_closure_rel"]) < 1e-6, led
+    assert led["m_dot_in"] > 0.0 and led["H_in"] != 0.0
+
+
+def test_a_two_port_reports_its_total_pressure_ratio() -> None:
+    r = _solve(area_cases._step_into_chamber(1e-3, 4e-4).network)
+    v = r["__second_law__"]["step"]
+    assert v["sigma_norm"] == pytest.approx(
+        -math.log(r["down.Pt"] / r["up.Pt"]), rel=1e-9, abs=1e-12
+    )
+    assert r["step.sigma_norm"] == v["sigma_norm"]
+
+
+def test_a_chain_is_one_control_volume_ending_at_its_boundary() -> None:
+    """A segment's momentum spans half of each station, so the chain is the
+    control volume; the last segment's exit station is the outlet boundary,
+    and the stream into it leaves the chain."""
+    net = array_cases._net(array_cases._array(4))
+    v = _solve(net)["__second_law__"]
+    chain = sorted(e for e in net.elements if e.startswith("ia__x"))
+    groups = {v[e]["group"] for e in chain}
+    assert groups == {"+".join(chain)}
+    assert v[chain[0]]["verdict"] == "pass"
+
+
+def test_the_legacy_tee_is_not_checked_and_says_so() -> None:
+    v = _solve(tee_cases._branching_net())["__second_law__"]["tee"]
+    assert v == {"verdict": "not_checked", "reason": "legacy TeeJunctionElement"}
+
+
+# --- heat ---------------------------------------------------------------------
+
+
+def test_heat_counts_where_it_matters() -> None:
+    """The heated channel's stream gains entropy from its heat; without the
+    heat term that entropy would read as generated in the cold channel and
+    destroyed in the hot one."""
+    r = _solve(_heated_pair())
+    assert r["w.Q"] > 0.0
+    v = r["__second_law__"]
+    assert v["hot"]["verdict"] == v["cold"]["verdict"] == "pass"
+
+
+def test_without_the_heat_term_a_heated_channel_would_fail(monkeypatch) -> None:
+    """Falsification in the suite: drop the heat's entropy and the cooled
+    channel reads as destroying entropy."""
+    monkeypatch.setattr(cb, "heat_entropy_flux", lambda *a, **k: 0.0)
+    v = _solve(_heated_pair())["__second_law__"]
+    assert v["hot"]["verdict"] == "fail"
+
+
+# --- the broken element -------------------------------------------------------
+
+
+class _Pre541AreaChange(AreaChangeElement):
+    """#541 as it was: the loss coupled to the downstream STATIC pressure, so
+    a downstream chamber's dynamic head appeared as free total pressure."""
+
+    def residuals(self, state_in, state_out):
+        res, jac = super().residuals(state_in, state_out)
+        res[0] += state_out.Pt - state_out.P
+        row = jac[0]
+        row[f"{self.to_node}.Pt"] = row.get(f"{self.to_node}.Pt", 0.0) + 1.0
+        row[f"{self.to_node}.P"] = row.get(f"{self.to_node}.P", 0.0) - 1.0
+        return res, jac
+
+
+def test_the_541_area_change_is_caught_at_that_element_only() -> None:
+    solver = area_cases._step_into_chamber(1e-3, 4e-4)
+    net = solver.network
+    old = net.elements["step"]
+    net.elements["step"] = _Pre541AreaChange(
+        "step", old.from_node, old.to_node, F0=old.F0, F1=old.F1, model_type="sharp", length=0.05
+    )
+    net.resolve_all_topology()
+    r = _solve(net)
+    assert r["__converged__"]
+    assert r["down.Pt"] > r["up.Pt"]  # the defect: total pressure rose across a loss
+    assert r["__second_law_failures__"] == ["step"]
+    assert r["__second_law__"]["step"]["sigma_norm_high"] < -SIGMA_TOL
+    # report only: the solve's verdict is untouched
+    assert r["__success__"] is True
+
+
+# --- the ledger ---------------------------------------------------------------
+
+
+def test_the_ledger_counts_an_injection_at_its_own_state() -> None:
+    """A MassFlowBoundary between two elements injects its stream: that stream,
+    at its own Tt and Y, is what crosses the control volume there."""
+    Y_inj = list(np.array(Y_AIR) * 0.8)
+    Y_inj[cb.species.indices["CH4"]] += 0.2
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("a", Pt=2e5, Tt=300.0, Y=Y_AIR))
+    g.add_node(PressureBoundary("out", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    g.add_node(MassFlowBoundary("inj", m_dot=0.05, Tt=800.0, Y=Y_inj))
+    g.add_element(OrificeElement("e1", "a", "inj", Cd=0.8, diameter=0.02, correlation="fixed"))
+    g.add_element(OrificeElement("e2", "inj", "out", Cd=0.8, diameter=0.03, correlation="fixed"))
+    led = _solve(g)["__ledger__"]
+    inj = [row for row in led["streams"] if row["via"] == "inj"]
+    assert inj == [
+        {
+            "node": "inj",
+            "via": "inj",
+            "m_dot_in": 0.05,
+            "H_in": pytest.approx(0.05 * cb.h_mass(800.0, cb.mass_to_mole(Y_inj))),
+        }
+    ]
+    assert abs(led["energy_closure_rel"]) < 1e-9
+
+
+def test_the_ledger_shows_heat_the_temperature_clamp_discarded() -> None:
+    """A plenum held at the 5000 K clamp throws ~190 kW away; the solver
+    already refuses it, and the ledger shows the gap."""
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("a", Pt=1.1e5, Tt=300.0, Y=Y_AIR))
+    g.add_node(PressureBoundary("b", Pt=1.0e5, Tt=300.0, Y=Y_AIR))
+    p = PlenumNode("p")
+    p.add_energy_boundary(EnergyBoundary(id="heat", Q=2e5))
+    g.add_node(p)
+    g.add_element(OrificeElement("o1", "a", "p", Cd=0.8, diameter=0.01, correlation="fixed"))
+    g.add_element(OrificeElement("o2", "p", "b", Cd=0.8, diameter=0.01, correlation="fixed"))
+    r = _solve(g, auto_retry=False)
+    assert r["__converged__"] and not r["__success__"]
+    assert r["__ledger__"]["energy_closure"] > 1e5
+
+
+# --- the report never takes the solve down ---------------------------------
+
+
+def test_a_control_volume_that_cannot_be_evaluated_is_not_checked(monkeypatch) -> None:
+    """Stress-tested: a wall taking more heat than a stream holds made the
+    heat term raise, and the converged solve raised with it."""
+
+    def refuse(*a, **k):
+        raise ValueError("heat_entropy_flux: temperatures must be positive")
+
+    monkeypatch.setattr(cb, "heat_entropy_flux", refuse)
+    r = _solve(_heated_pair())
+    assert r["__converged__"]
+    v = r["__second_law__"]["hot"]
+    assert v["verdict"] == "not_checked"
+    assert "cannot be evaluated" in v["reason"]
+    assert r["__second_law__"]["hot_o"]["verdict"] == "pass"  # the rest still checked
+
+
+def test_heat_beyond_the_streams_enthalpy_is_refused_by_name() -> None:
+    """calc_T_from_h_mass returns a huge negative T below its range instead
+    of raising; the check refuses it with the heat and the stream named."""
+    from combaero.network.second_law import SecondLawReport, _Stream
+
+    report = SecondLawReport.__new__(SecondLawReport)
+    with pytest.raises(ValueError, match="more than the stream's enthalpy"):
+        report._heated(_Stream(0.005, 1600.0, 2e5, Y_AIR), -18000.0)

@@ -11,6 +11,7 @@
 #include "../include/friction.h"
 #include "../include/heat_transfer.h"
 #include "../include/registry.h"
+#include "../include/quadrature.h"
 #include "../include/stagnation.h"
 #include "../include/thermo.h"
 #include "../include/math_constants.h"
@@ -643,6 +644,64 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // -----------------------------------------------------------------------------
 // 7. Stream-Based Network Solvers
 // -----------------------------------------------------------------------------
+
+EntropyGenerationResult entropy_generation(const std::vector<Stream> &inflows,
+                                           const std::vector<Stream> &outflows,
+                                           double S_heat) {
+  if (inflows.empty()) {
+    throw std::invalid_argument("entropy_generation: a control volume needs an inflow");
+  }
+  auto flux = [](const std::vector<Stream> &streams, double &m_sum) {
+    double S = 0.0;
+    for (const auto &st : streams) {
+      if (!(st.m_dot >= 0.0)) {
+        throw std::invalid_argument("entropy_generation: a stream's m_dot must be >= 0");
+      }
+      m_sum += st.m_dot;
+      S += st.m_dot * s_mass(st.T, mass_to_mole(st.Y), st.P_total);
+    }
+    return S;
+  };
+  double m_in = 0.0;
+  double m_out = 0.0;
+  const double S_in = flux(inflows, m_in);
+  const double S_out = flux(outflows, m_out);
+  const Stream &ref = *std::max_element(
+      inflows.begin(), inflows.end(),
+      [](const Stream &a, const Stream &b) { return a.m_dot < b.m_dot; });
+  const double sigma = S_out - S_in - S_heat;
+  const double scale = specific_gas_constant(mass_to_mole(ref.Y)) * m_in;
+  return {sigma, scale > 0.0 ? sigma / scale : 0.0};
+}
+
+double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
+                         const std::vector<double> &Y, double M_in, double M_out) {
+  if (!(T0_in > 0.0 && T0_out > 0.0)) {
+    throw std::invalid_argument("heat_entropy_flux: temperatures must be positive");
+  }
+  if (!(M_in >= 0.0 && M_out >= 0.0)) {
+    throw std::invalid_argument("heat_entropy_flux: Mach numbers must be >= 0");
+  }
+  if (T0_in == T0_out) {
+    return 0.0;
+  }
+  const std::vector<double> X = mass_to_mole(Y);
+  // integral cp / T = integral cp / T0 + integral cp (1/T - 1/T0). The first
+  // is exactly the constant-pressure entropy rise (the NASA polynomials' own
+  // s, no quadrature across their 1000 K break); only the small Mach part is
+  // integrated.
+  const double at_rest = s_mass(T0_out, X, 1.0e5) - s_mass(T0_in, X, 1.0e5);
+  if (M_in == 0.0 && M_out == 0.0) {
+    return m_dot * at_rest;
+  }
+  const double span = T0_out - T0_in;
+  auto mach_part = [&](double T0) {
+    const double M = M_in + (M_out - M_in) * (T0 - T0_in) / span;
+    const double T = M > 0.0 ? T_from_stagnation(T0, M, X) : T0;
+    return cp_mass(T0, X) * (1.0 / T - 1.0 / T0);
+  };
+  return m_dot * (at_rest + composite_simpson(mach_part, T0_in, T0_out, 64));
+}
 
 MixerResult
 mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,

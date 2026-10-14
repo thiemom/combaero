@@ -1,0 +1,4 @@
+- **GUI: the second-law verdicts and the network balance (#545).** Report only: a solve's success is unchanged.
+  - **Status badge:** after a solve it says how many elements create total pressure, or that the balance does not close. It links to a "Network balance" window that lists what enters and leaves at each boundary, the heat terms, the mass and energy closure, and the failing elements.
+  - **Inspector:** an amber "Second law" box appears on any node that owns a failing element. That includes a tee whose hidden port step fails, and a liner or array whose segments fail.
+  - **Element results:** each carries its verdict (`second_law`) and `sigma_norm`, which is also selectable as a diagnostic.

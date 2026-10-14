@@ -445,6 +445,41 @@ MixerResult
 mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
                                 double Q = 0.0, double fraction = 0.0);
 
+// Internal entropy generation of a control volume (#545): the second-law
+// check the network applies to every element after a solve.
+//
+//   sigma = sum_out m s(T, P_total, Y) - sum_in m s(T, P_total, Y) - S_heat
+//
+// Streams carry STAGNATION states (T is the total temperature, as in the
+// mixer); s(T0, P0) = s(T, P) by definition of the stagnation state. S_heat
+// [W/K] is the entropy the heat brought in, integral dQ / T at the fluid's
+// static temperature (heat_entropy_flux), which makes sigma the INTERNAL
+// generation: a necessary condition that needs no wall temperature.
+//
+// sigma_norm = sigma / (R m_in), with R the specific gas constant of the
+// largest inflow. For an adiabatic two-port of fixed composition it is
+// exactly -ln(P_total_out / P_total_in).
+struct EntropyGenerationResult {
+  double sigma;       // [W/K]
+  double sigma_norm;  // [-]
+};
+
+EntropyGenerationResult entropy_generation(const std::vector<Stream> &inflows,
+                                           const std::vector<Stream> &outflows,
+                                           double S_heat = 0.0);
+
+// Entropy [W/K] that heat added to a stream brings in: integral of dQ / T as
+// the stream's total temperature runs from T0_in to T0_out, dQ = m_dot
+// dh(T0), at the STATIC temperature T(T0, M) (T_from_stagnation). The Mach
+// number runs linearly in T0 from M_in to M_out; pass M_in == M_out for a
+// constant one. At M = 0 it is m_dot [s(T0_out, P) - s(T0_in, P)], for any
+// P. Heating at Mach M brings in more entropy than at M = 0 -- the static
+// temperature is lower -- which is the total-pressure cost of Rayleigh flow,
+// and cooling the gain. Variable cp throughout (composite Simpson, n = 64).
+double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
+                         const std::vector<double> &Y, double M_in = 0.0,
+                         double M_out = 0.0);
+
 // Combust multiple generalized incoming streams to exactly complete
 // equilibrium, outputting the theoretical adiabatic flame temperature and
 // product mass fractions. Computes all exact analytical Jacobians w.r.t

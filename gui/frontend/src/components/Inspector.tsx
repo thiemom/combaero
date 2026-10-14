@@ -8,6 +8,7 @@ import {
 	QUANTITY_CATALOGUE,
 	TRANSPORT_KEYS,
 } from "../utils/quantities";
+import { describeElement, failuresFor } from "../utils/secondLaw";
 import { bassettDesignK } from "../utils/teeK";
 import { validateNetwork } from "../utils/validation";
 import AreaInput from "./AreaInput";
@@ -31,6 +32,7 @@ const Inspector = () => {
 		exportNetworkResults,
 		displaySettings,
 		solverSettings,
+		solveResults,
 	} = useStore();
 
 	const validationErrors = validateNetwork(nodes);
@@ -316,6 +318,35 @@ const Inspector = () => {
 						disabled
 					/>
 				</div>
+				{/* Second law (#545): this node's control volume -- or a hidden
+				    element it owns, such as a tee's port step -- destroys entropy:
+				    a passive element creating total pressure. Reported only. */}
+				{failuresFor(selectedNode.id, solveResults?.second_law_failures)
+					.length > 0 && (
+					<div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-800">
+						<div className="font-bold uppercase mb-0.5">
+							Second law: total pressure created
+						</div>
+						{failuresFor(
+							selectedNode.id,
+							solveResults?.second_law_failures,
+						).map((f) => (
+							<div key={f.element_id} className="font-mono">
+								{describeElement(f)}: σ/(R ṁ) = {f.sigma_norm.toExponential(2)}
+							</div>
+						))}
+						<div className="italic text-amber-700 mt-0.5">
+							In the solved state total pressure rises across{" "}
+							{failuresFor(selectedNode.id, solveResults?.second_law_failures)
+								.length > 1
+								? "these"
+								: "it"}{" "}
+							without work or cooling to pay for it, which no passive element
+							can do. Usually a modelling gap (an area step or loss left out);
+							the solve is not rejected for it.
+						</div>
+					</div>
+				)}
 				{selectedNode.type === "plenum" && (
 					<InitialGuessEditor node={selectedNode} />
 				)}
@@ -2746,6 +2777,38 @@ const Inspector = () => {
 												P_out = P_in · (1 − ξ). e.g. 0.03 = 3%
 											</p>
 										)}
+										{/* Design flow (#550): a fraction loss quoted at its
+										    design point scales with the dynamic head below it,
+										    so the flow can run low or reverse. */}
+										<label
+											htmlFor={`m_ref_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Design flow ṁ_ref [kg/s]
+										</label>
+										<NumericInput
+											id={`m_ref_${selectedNode.id}`}
+											value={selectedNode.data.m_ref ?? null}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, {
+													m_ref: val > 0 ? val : null,
+												})
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, { m_ref: null })
+											}
+											min={0}
+											placeholder="none: constant at every flow"
+											className="p-2 border rounded"
+										/>
+										<p className="text-[9px] text-gray-400 italic">
+											At and above ṁ_ref the loss is exactly the fraction; below
+											it the loss scales with the dynamic head and vanishes at
+											zero flow. Set it if the flow may run low or reverse: a
+											constant fraction holds a pressure difference at zero
+											flow, and the solver cannot carry a reversing flow through
+											it.
+										</p>
 									</div>
 								)}
 

@@ -286,17 +286,18 @@ def _build_discrete_loss_correlation(
     zeta: float,
     zeta0: float,
     area: float,
+    m_ref: float | None = None,
 ):
     """Build a pressure loss correlation object from discrete loss params."""
     if corr_type == "constant_fraction":
-        return ConstantFractionLoss(xi=xi)
+        return ConstantFractionLoss(xi=xi, m_ref=m_ref)
     if corr_type == "linear_theta_fraction":
-        return LinearThetaFractionLoss(k=k, xi0=xi0)
+        return LinearThetaFractionLoss(k=k, xi0=xi0, m_ref=m_ref)
     if corr_type == "constant_head":
         return ConstantHeadLoss(zeta=zeta, area=area)
     if corr_type == "linear_theta_head":
         return LinearThetaHeadLoss(k=k, zeta0=zeta0, area=area)
-    return ConstantFractionLoss(xi=xi)
+    return ConstantFractionLoss(xi=xi, m_ref=m_ref)
 
 
 def _channel_D_at_tee_port(
@@ -1188,6 +1189,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 data.zeta,
                 data.zeta0,
                 area if area and area > 0 else 0.1,
+                m_ref=data.m_ref if data.m_ref and data.m_ref > 0 else None,
             )
             theta_source = data.theta_source if data.theta_source not in (None, "none") else None
             surface = ConvectiveSurface(

@@ -34,6 +34,7 @@ from combaero.network import NetworkSolver
 
 from .graph_builder import build_network_from_schema
 from .schemas import ElementResult, NetworkGraphSchema, NodeResult, StateResult
+from .second_law_view import element_fields
 from .units import label_with_unit
 
 # ---------------------------------------------------------------------------
@@ -119,6 +120,7 @@ def _build_result_objects(
             )
         )
         diag.pop("m_dot", None)
+        diag.update(element_fields((result.get("__second_law__") or {}).get(elem_id)))
         element_results[elem_id] = ElementResult(m_dot=m_dot, success=success, **diag)
 
     # A tee port's hidden sharp step (#536) is reported on the tee the user

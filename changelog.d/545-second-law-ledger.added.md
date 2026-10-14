@@ -1,0 +1,11 @@
+- **Every converged solve reports a second-law verdict per element and a control-volume ledger (#545).** Report only: `__success__` is unchanged.
+  - **`__second_law__`:** each element's internal entropy generation, `sigma = sum_out m s - sum_in m s - integral dQ/T`, with streams at their stagnation states and heat at the fluid's static temperature.
+    - For an adiabatic two-port, `sigma_norm` is exactly `-ln(Pt_out/Pt_in)`.
+    - Heating at Mach M costs total pressure and cooling may raise it; the heat term allows exactly that, bracketed over the element's Mach path.
+    - The verdict is pass, fail or not_checked (with the reason). A crossflow chain is checked as one control volume; the legacy `TeeJunctionElement` is not checked.
+  - **`__ledger__`:** mass and energy over the network's control volume (streams at the flow boundaries, heat given, heat leaving or withheld) and their closure.
+  - **Measured on the test suite** (25,356 converged solves):
+    - No element of a working network fails. The only failures are junction roots the existing junction check already rejects.
+    - Re-creating the #541 area-change bug fails exactly that element.
+    - The ledger closes to 1.1e-7, except where the solver's temperature clamp discarded energy, which it shows.
+  - **C++:** `entropy_generation` and `heat_entropy_flux` (variable cp, exact at rest, Mach part by quadrature).

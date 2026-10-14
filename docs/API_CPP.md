@@ -1585,6 +1585,21 @@ AdiabaticResult adiabatic_T_complete_and_jacobian_T_from_streams(
 AdiabaticResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
 
+// Second law of a control volume (#545). Streams at their stagnation state
+// (T = total temperature); S_heat [W/K] the entropy the heat brought in.
+// sigma = sum_out m s - sum_in m s - S_heat; sigma_norm = sigma / (R m_in),
+// exactly -ln(Pt_out / Pt_in) for an adiabatic two-port.
+EntropyGenerationResult entropy_generation(
+    const std::vector<Stream>& inflows, const std::vector<Stream>& outflows,
+    double S_heat = 0.0);
+
+// integral dQ / T [W/K] as a stream's total temperature runs T0_in -> T0_out,
+// at the STATIC temperature (Mach linear in T0 from M_in to M_out). At M = 0
+// exactly m [s(T0_out, P) - s(T0_in, P)]; the Mach part by composite Simpson.
+double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
+                         const std::vector<double>& Y, double M_in = 0.0,
+                         double M_out = 0.0);
+
 // All three add Q as Q / m_tot exactly (energy-conserving) for total flows of
 // at least kMixerHeatMdotFloor = 1e-6 kg/s; below it Q / m_eff with the C1
 // floor m_eff = (m^2 + m0^2) / (2 m0) >= 1e-3 keeps the heat finite as the

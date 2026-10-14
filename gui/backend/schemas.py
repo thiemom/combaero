@@ -490,6 +490,10 @@ class DiscreteLossData(BaseModel):
     xi: float = 0.03
     k: float = 0.001
     xi0: float = 0.02
+    #: Design mass flow [kg/s] of a fraction loss (#550): below it the loss
+    #: scales with the dynamic head and vanishes at zero flow, so the flow can
+    #: run low or reverse. None keeps a constant fraction at every flow.
+    m_ref: float | None = None
     zeta: float = 1.0
     zeta0: float = 1.0
     area: float | None = None
@@ -650,6 +654,15 @@ class WorstResidual(BaseModel):
     residual: float
 
 
+class SecondLawFlag(BaseModel):
+    """An element whose control volume destroys entropy (#545), on the canvas."""
+
+    element_id: str
+    owner_id: str
+    sigma_norm: float
+    sigma_norm_high: float
+
+
 class SolveResponse(BaseModel):
     success: bool
     message: str = ""
@@ -661,3 +674,9 @@ class SolveResponse(BaseModel):
     worst_residuals: list[WorstResidual] = []
     solver_settings_used: dict = {}
     lm_started_at_eval: int | None = None
+    #: Report only (#545): elements that fail the second-law check, each
+    #: attributed to the canvas node that owns it.
+    second_law_failures: list[SecondLawFlag] = []
+    #: Mass and energy over the network's control volume (empty if the root
+    #: finder did not converge).
+    ledger: dict = {}

@@ -82,6 +82,7 @@ IGNORE_LIST = {
     "ChannelSolverResult",
     "IncompressibleFlowSolution",
     "MassStream",
+    "EntropyGenerationResult",
     "MomentumChamberResult",
     "OrificeResult",
     "WallCouplingResult",

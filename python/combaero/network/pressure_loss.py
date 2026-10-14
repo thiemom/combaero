@@ -40,6 +40,26 @@ class PressureLossCallable(Protocol):
 # ---------------------------------------------------------------------------
 
 
+def _low_flow_factor(ctx: object, m_ref: float | None) -> float:
+    """1 at and above the design flow, falling to 0 like 3 (m/m_ref)^2 below.
+
+    A fraction loss is a head loss quoted at its design point: below it the
+    drop scales with the dynamic head, and at zero flow it vanishes. Without
+    this a constant fraction holds a pressure difference at zero flow, and a
+    reversing flow must jump through it -- the residual steps by xi Pt where
+    the flow changes sign, which the solver cannot cross (#550).
+    ``1 - (1 - r^2)^3`` is C2 at r = 1.
+    """
+    if m_ref is None:
+        return 1.0
+    if m_ref <= 0.0:
+        raise ValueError(f"m_ref must be positive, got {m_ref}")
+    r = abs(float(ctx.mdot_total)) / m_ref  # type: ignore[attr-defined]
+    if r >= 1.0:
+        return 1.0
+    return 1.0 - (1.0 - r * r) ** 3
+
+
 @dataclass
 class ConstantFractionLoss:
     """Constant fractional total-pressure loss.
@@ -50,6 +70,11 @@ class ConstantFractionLoss:
     ----------
     xi : float
         Fractional total-pressure loss [-].  E.g. 0.03 = 3% of P_in.
+    m_ref : float | None
+        Design mass flow [kg/s]. Below it the loss scales with the dynamic
+        head and vanishes at zero flow (``_low_flow_factor``); at and above
+        it the loss is exactly ``xi``. Set it wherever the flow may run low
+        or reverse. ``None`` keeps a constant fraction at every flow.
 
     Notes
     -----
@@ -58,9 +83,10 @@ class ConstantFractionLoss:
     """
 
     xi: float = 0.03
+    m_ref: float | None = None
 
     def __call__(self, ctx: object) -> tuple[float, float]:
-        return self.xi, 0.0
+        return self.xi * _low_flow_factor(ctx, self.m_ref), 0.0
 
 
 @dataclass
@@ -77,6 +103,8 @@ class LinearThetaFractionLoss:
         Positive k means more heat release = higher pressure loss.
     xi0 : float
         Cold-flow base loss fraction [-] (value at Theta = 0).
+    m_ref : float | None
+        Design mass flow [kg/s], as for :class:`ConstantFractionLoss`.
 
     Notes
     -----
@@ -86,10 +114,12 @@ class LinearThetaFractionLoss:
 
     k: float = 0.5
     xi0: float = 0.02
+    m_ref: float | None = None
 
     def __call__(self, ctx: object) -> tuple[float, float]:
         theta = ctx.theta  # type: ignore[attr-defined]
-        return self.k * theta + self.xi0, self.k
+        g = _low_flow_factor(ctx, self.m_ref)
+        return (self.k * theta + self.xi0) * g, self.k * g
 
 
 # ---------------------------------------------------------------------------

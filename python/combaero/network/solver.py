@@ -3725,6 +3725,34 @@ class NetworkSolver:
                 h_ref = float(cb.h_mass(cb.SENSIBLE_ENTHALPY_REF_T, X_mix))
                 sol_dict[f"{nid}.Q_fraction"] = frac * (H - m_in * h_ref)
 
+        # Second law per element and the network's control-volume ledger
+        # (#545). REPORTED only: nothing is demoted on either until the check
+        # has proven itself. Evaluated where the root finder converged; a
+        # diverged iterate has no balance worth reporting.
+        verdicts: dict[str, dict[str, Any]] = {}
+        ledger: dict[str, Any] = {}
+        if converged:
+            from .second_law import SecondLawReport
+
+            report = SecondLawReport(self, final_x, sol_dict)
+            verdicts = report.element_verdicts()
+            try:
+                ledger = report.ledger()
+            except (ValueError, RuntimeError) as exc:
+                # a report, never a reason for the solve to raise
+                ledger = {"error": str(exc)}
+        for eid, verdict in verdicts.items():
+            if "sigma_norm" in verdict:
+                sol_dict[f"{eid}.sigma_norm"] = verdict["sigma_norm"]
+                sol_dict["__element_diag__"].setdefault(eid, {})["sigma_norm"] = verdict[
+                    "sigma_norm"
+                ]
+        sol_dict["__second_law__"] = verdicts
+        sol_dict["__second_law_failures__"] = sorted(
+            eid for eid, v in verdicts.items() if v["verdict"] == "fail"
+        )
+        sol_dict["__ledger__"] = ledger
+
         sol_dict["__complete_states__"] = self.extract_complete_states(sol_dict)
         sol_dict["__success__"] = success
         sol_dict["__message__"] = message

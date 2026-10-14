@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { Ledger, SecondLawFlag } from "./utils/secondLaw";
 
 const API_BASE_URL = "";
 
@@ -36,6 +37,8 @@ export interface SolveResponse {
 	worst_residuals?: WorstResidual[];
 	solver_settings_used?: Record<string, unknown>;
 	lm_started_at_eval?: number | null;
+	second_law_failures?: SecondLawFlag[];
+	ledger?: Ledger | Record<string, never>;
 }
 
 export const solveNetwork = async (

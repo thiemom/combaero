@@ -781,6 +781,25 @@ bookkeeping keys. Five of them say what happened:
 | `__T_clamped__` | `list[str]` | nodes with flow whose temperature sits on the [200, 5000] K clamp at the solution. The clamp discards energy, so the solve is reported INCONSISTENT (`__success__` False). |
 | `__outcome__` | `SolveOutcome` | why it ended, in one machine-readable value |
 | `__worst_residuals__` | `list[dict]` | the rows carrying the residual, largest first |
+| `__second_law__` | `dict[str, dict]` | per element: `verdict` (`"pass"`, `"fail"`, `"not_checked"` with a `reason`), `sigma` [W/K], `sigma_norm` [-] and its band `sigma_norm_low`/`_high`; chain members carry their `group`. **Report only** (#545): it never changes `__success__`. |
+| `__second_law_failures__` | `list[str]` | ids whose verdict is `"fail"` |
+| `__ledger__` | `dict` | mass and energy over the network's control volume: `streams` (one row per crossing, `m_dot_in` > 0 entering), `m_dot_in/out`, `H_in/out`, `Q_given`, `Q_wall_out`, `Q_withheld`, `mass_closure(_rel)`, `energy_closure(_rel)`. Empty when the root finder did not converge. |
+
+**Second law per element (#545).** Each element's control volume must not
+destroy entropy: `sigma = sum_out m s - sum_in m s - integral dQ/T >= 0`, with
+the streams at their stagnation states (`cb.s_mass(Tt, X, Pt)`, ideal mixing
+included) and the heat taken at the fluid's static temperature
+(`cb.heat_entropy_flux`), which makes `sigma` the internal generation. For an
+adiabatic two-port `sigma_norm = sigma / (R m)` is exactly `-ln(Pt_out/Pt_in)`:
+total pressure does not rise. Heating at Mach `M` costs total pressure and
+cooling may raise it (Rayleigh); the heat term allows exactly that. Inside an
+element only its end Mach numbers are known, so the heat is evaluated along a
+linear Mach path and bracketed by constant-Mach paths at either end; a
+`"fail"` holds even for the most favourable one (`sigma_norm_high <
+-SIGMA_TOL`, `SIGMA_TOL = 1e-6`). A chain of crossflow segments is one control
+volume (a segment's momentum spans half of each station). The legacy
+`TeeJunctionElement` is not checked. Each element's `sigma_norm` also appears
+in its diagnostics.
 
 `__success__` is False in two quite different situations, and reading it alone
 cannot tell them apart: Newton never got there, or Newton got there and a
@@ -896,6 +915,11 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
 
   A `WallNode` is a boundary nothing crosses. An injecting `MassFlowBoundary`
   is still a flow boundary.
+- **A discrete loss (`PressureLossElement`) follows the flow** (#550).
+  - "In" is the upstream node of the flow as it runs, and the correlation sees `|m_dot|`.
+  - Through zero flow the forward and reverse forms blend over `FLOW_REVERSAL_M_SCALE` (1e-4 kg/s), as the area change does.
+  - A fraction loss (`ConstantFractionLoss`, `LinearThetaFractionLoss`) takes an optional design flow `m_ref` [kg/s]: at and above it the loss is exactly the fraction; below it the loss scales with the dynamic head (`1 - (1 - r^2)^3`, `r = |m_dot|/m_ref`, C2) and vanishes at zero flow.
+  - Set `m_ref` wherever the flow may run low or reverse. A constant fraction holds a pressure difference at zero flow, and a reversing flow cannot be carried through it.
 
 #### Merge chamber: main inlet plus side streams (#471)
 
