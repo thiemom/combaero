@@ -2,11 +2,12 @@ import axios from "axios";
 import { Download, Play, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
-import { solveNetwork } from "./api";
+import { isBackendReachable, solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
 import NetworkCanvas from "./components/NetworkCanvas";
 import Sidebar from "./components/Sidebar";
 import useStore from "./store/useStore";
+import { solveErrorMessage } from "./utils/solveError";
 import { validateNetwork } from "./utils/validation";
 
 const App = () => {
@@ -41,25 +42,14 @@ const App = () => {
 			setSolveResults(results);
 		} catch (err) {
 			console.error("Solve failed:", err);
-			if (axios.isAxiosError(err)) {
-				const detail = err.response?.data?.detail;
-				const message = detail
-					? `Solve failed: ${detail}`
-					: "Solve failed. Check console for details.";
-
-				setSolveResults({
-					success: false,
-					message: message,
-					isTopologyMismatch:
-						detail?.includes("Topology mismatch") ||
-						detail?.includes("Initial guess mismatch") ||
-						detail?.includes("x0 length does not match"),
-				});
-				return;
-			}
+			// A request error may mean the backend is down rather than the solve
+			// failing; a /health probe tells the two apart.
+			const backendReachable = axios.isAxiosError(err)
+				? await isBackendReachable()
+				: true;
 			setSolveResults({
 				success: false,
-				message: "Solve failed. Check console for details.",
+				...solveErrorMessage(err, backendReachable),
 			});
 		} finally {
 			setIsSolving(false);
