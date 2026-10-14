@@ -18,6 +18,8 @@ interface NumericInputProps {
 	min?: number;
 	max?: number;
 	disabled?: boolean;
+	// Shown but not editable (an inherited value locked until the user opts out).
+	readOnly?: boolean;
 }
 
 const NumericInput: React.FC<NumericInputProps> = ({
@@ -30,6 +32,7 @@ const NumericInput: React.FC<NumericInputProps> = ({
 	min,
 	max,
 	disabled,
+	readOnly,
 }) => {
 	const [localValue, setLocalValue] = useState(
 		value !== undefined && value !== null ? value.toString() : "",
@@ -113,6 +116,7 @@ const NumericInput: React.FC<NumericInputProps> = ({
 			className={className}
 			placeholder={placeholder}
 			disabled={disabled}
+			readOnly={readOnly}
 		/>
 	);
 };
