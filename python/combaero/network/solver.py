@@ -3736,7 +3736,11 @@ class NetworkSolver:
 
             report = SecondLawReport(self, final_x, sol_dict)
             verdicts = report.element_verdicts()
-            ledger = report.ledger()
+            try:
+                ledger = report.ledger()
+            except (ValueError, RuntimeError) as exc:
+                # a report, never a reason for the solve to raise
+                ledger = {"error": str(exc)}
         for eid, verdict in verdicts.items():
             if "sigma_norm" in verdict:
                 sol_dict[f"{eid}.sigma_norm"] = verdict["sigma_norm"]

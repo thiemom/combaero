@@ -58,6 +58,7 @@ Not checked: elements without a solved flow, the legacy
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -188,7 +189,15 @@ class SecondLawReport:
             return inflow.Tt
         X = _X(inflow.Y)
         h = float(cb.h_mass(inflow.Tt, X)) + Q / inflow.m
-        return float(cb.calc_T_from_h_mass(h, X, inflow.Tt))
+        T = float(cb.calc_T_from_h_mass(h, X, inflow.Tt))
+        # The inverse does not refuse an enthalpy below its range: it returned
+        # -2.4e25 K for a wall taking 3.5 MJ/kg from a stream holding 1.45.
+        if not (math.isfinite(T) and T > 0.0):
+            raise ValueError(
+                f"the heat ({Q:.4g} W) takes more than the stream's enthalpy "
+                f"({inflow.m:.4g} kg/s at {inflow.Tt:.1f} K)"
+            )
+        return T
 
     # -- control volumes ---------------------------------------------------
 
@@ -339,11 +348,19 @@ class SecondLawReport:
 
         out: dict[str, dict[str, Any]] = {}
 
-        def record(eids: list[str], cv: _Volume | str, group: str | None) -> None:
-            if isinstance(cv, str):
-                verdict: dict[str, Any] = {"verdict": "not_checked", "reason": cv}
+        def record(eids: list[str], build: Any, group: str | None) -> None:
+            # A REPORT must never take the solve down: a control volume that
+            # cannot be evaluated (a converged but clamped state, heat beyond
+            # what a stream holds) is not checked, and says why.
+            try:
+                cv = build()
+                verdict_or_reason: dict[str, Any] | str = cv if isinstance(cv, str) else _sigma(cv)
+            except (ValueError, RuntimeError) as exc:
+                verdict_or_reason = f"cannot be evaluated: {exc}"
+            if isinstance(verdict_or_reason, str):
+                verdict: dict[str, Any] = {"verdict": "not_checked", "reason": verdict_or_reason}
             else:
-                verdict = _sigma(cv)
+                verdict = verdict_or_reason
                 # Fail only where even the most favourable Mach path does.
                 ok = verdict["sigma_norm_high"] >= -SIGMA_TOL
                 verdict["verdict"] = "pass" if ok else "fail"
@@ -357,16 +374,16 @@ class SecondLawReport:
             if not self._stations(chain):
                 continue  # no side streams: each segment is a plain two-port
             chained.update(chain)
-            record(chain, self._chain(chain), group="+".join(chain))
+            record(chain, lambda chain=chain: self._chain(chain), group="+".join(chain))
         for eid, element in self.net.elements.items():
             if eid in chained:
                 continue
             if isinstance(element, TeeJunctionElement):
-                record([eid], "legacy TeeJunctionElement", None)
+                record([eid], lambda: "legacy TeeJunctionElement", None)
             elif isinstance(element, MultiPortChamberBase):
-                record([eid], self._junction(element), None)
+                record([eid], lambda element=element: self._junction(element), None)
             else:
-                record([eid], self._two_port(eid, element), None)
+                record([eid], lambda eid=eid, element=element: self._two_port(eid, element), None)
         return out
 
     def ledger(self) -> dict[str, Any]:

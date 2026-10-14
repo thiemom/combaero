@@ -267,3 +267,32 @@ def test_the_ledger_shows_heat_the_temperature_clamp_discarded() -> None:
     r = _solve(g, auto_retry=False)
     assert r["__converged__"] and not r["__success__"]
     assert r["__ledger__"]["energy_closure"] > 1e5
+
+
+# --- the report never takes the solve down ---------------------------------
+
+
+def test_a_control_volume_that_cannot_be_evaluated_is_not_checked(monkeypatch) -> None:
+    """Stress-tested: a wall taking more heat than a stream holds made the
+    heat term raise, and the converged solve raised with it."""
+
+    def refuse(*a, **k):
+        raise ValueError("heat_entropy_flux: temperatures must be positive")
+
+    monkeypatch.setattr(cb, "heat_entropy_flux", refuse)
+    r = _solve(_heated_pair())
+    assert r["__converged__"]
+    v = r["__second_law__"]["hot"]
+    assert v["verdict"] == "not_checked"
+    assert "cannot be evaluated" in v["reason"]
+    assert r["__second_law__"]["hot_o"]["verdict"] == "pass"  # the rest still checked
+
+
+def test_heat_beyond_the_streams_enthalpy_is_refused_by_name() -> None:
+    """calc_T_from_h_mass returns a huge negative T below its range instead
+    of raising; the check refuses it with the heat and the stream named."""
+    from combaero.network.second_law import SecondLawReport, _Stream
+
+    report = SecondLawReport.__new__(SecondLawReport)
+    with pytest.raises(ValueError, match="more than the stream's enthalpy"):
+        report._heated(_Stream(0.005, 1600.0, 2e5, Y_AIR), -18000.0)
