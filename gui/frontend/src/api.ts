@@ -48,6 +48,31 @@ export const solveNetwork = async (
 	return response.data;
 };
 
+// --- geometry-inheritance preview (resolve without solving, #559) ----------
+
+export interface PreviewField {
+	value: number | null;
+	// "user" | "inherited from <id>" | "channel '<id>'" | "default" | ""
+	source: string;
+}
+
+export interface PreviewItem {
+	status: "resolved" | "unresolved";
+	reason: string;
+	fields: Record<string, PreviewField>;
+}
+
+export interface ResolvePreviewResponse {
+	items: Record<string, PreviewItem>;
+}
+
+export const resolvePreview = async (
+	graph: NetworkGraph,
+): Promise<ResolvePreviewResponse> => {
+	const response = await axios.post(`${API_BASE_URL}/resolve_preview`, graph);
+	return response.data;
+};
+
 export const exportResults = async (graph: NetworkGraph): Promise<Blob> => {
 	const response = await axios.post(`${API_BASE_URL}/export`, graph, {
 		responseType: "blob",
