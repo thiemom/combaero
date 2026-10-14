@@ -13,6 +13,7 @@ from combaero.network import NetworkSolver
 from . import second_law_view
 from .graph_builder import build_network_from_schema
 from .messages import humanize
+from .resolve_preview import resolve_preview
 from .runner import NetworkResult, _build_result_objects, _schema_maps
 from .schemas import (
     NetworkGraphSchema,
@@ -169,6 +170,45 @@ async def solve(schema: NetworkGraphSchema):
             detail=f"Solver exceeded the hard timeout of {hard_timeout:.0f}s. "
             "Try raising the solver timeout, simplifying the network, or a "
             "different init strategy.",
+        ) from None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=humanize(str(e), schema)) from e
+
+
+def _resolve_preview_sync(schema: NetworkGraphSchema) -> dict:
+    net = build_network_from_schema(schema)
+    report = resolve_preview(net)
+    gui_ids = {n.id for n in schema.nodes}
+    items: dict[str, dict] = {}
+    for item_id, res in report.items():
+        if item_id not in gui_ids:
+            continue  # synthetic builder items (auto-links, tee steps) are not drawn
+        items[item_id] = {
+            "status": res.status,
+            "reason": res.reason,
+            "fields": {k: {"value": fr.value, "source": fr.source} for k, fr in res.fields.items()},
+        }
+    return {"items": items}
+
+
+@app.post("/resolve_preview")
+async def resolve_preview_endpoint(schema: NetworkGraphSchema):
+    """Resolve geometry inheritance WITHOUT solving (#559).
+
+    Per drawn element/node, returns each geometry field's resolved value and
+    provenance ("user" / "inherited from ..." / "default"), and whether the item
+    is unresolved -- the network is not yet solvable, and why. The GUI reads this
+    for inherited placeholders and to flag required values before Solve.
+    """
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_resolve_preview_sync, schema), timeout=30.0
+        )
+    except TimeoutError:
+        raise HTTPException(
+            status_code=504, detail="resolve_preview exceeded its timeout."
         ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
