@@ -9,7 +9,9 @@ interface AreaInputProps {
 	value?: number | null;
 	onChange: (val: number) => void;
 	id?: string;
-	placeholder?: string;
+	// A number is an area in m^2 (e.g. an inherited value shown greyed until
+	// the user overrides it) and is scaled to the display unit.
+	placeholder?: string | number;
 	onClear?: () => void;
 	inputClassName?: string;
 }
@@ -30,6 +32,11 @@ const AreaInput: React.FC<AreaInputProps> = ({
 	// 1 m2 = 1,000,000 mm2
 	const displayScale = unit === "mm²" ? 1000000 : 1;
 
+	const scaledPlaceholder =
+		typeof placeholder === "number"
+			? Number((placeholder * displayScale).toPrecision(4)).toString()
+			: placeholder;
+
 	return (
 		<div className="flex flex-col gap-1">
 			<label htmlFor={id} className="text-xs font-medium text-stone-500">
@@ -46,7 +53,7 @@ const AreaInput: React.FC<AreaInputProps> = ({
 					onChange={(v) => onChange(v / displayScale)}
 					onClear={onClear}
 					className={`min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none${inputClassName ? ` ${inputClassName}` : ""}`}
-					placeholder={placeholder}
+					placeholder={scaledPlaceholder}
 				/>
 				<select
 					value={unit}

@@ -506,9 +506,7 @@ const Inspector = () => {
 									<LengthInput
 										id={`D_${selectedNode.id}`}
 										label=""
-										value={
-											userSetD ? selectedNode.data.D : (inheritedD ?? null)
-										}
+										value={userSetD ? selectedNode.data.D : null}
 										placeholder={inheritedD ?? "set D"}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { D: val })
@@ -1377,10 +1375,8 @@ const Inspector = () => {
 									<AreaInput
 										id={`F0_${selectedNode.id}`}
 										label=""
-										value={effectiveF0 ?? null}
-										placeholder={
-											inheritedF0 != null ? inheritedF0.toFixed(5) : "set F0"
-										}
+										value={userSetF0 ? selectedNode.data.F0 : null}
+										placeholder={inheritedF0 ?? "set F0"}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F0: val })
 										}
@@ -1426,10 +1422,8 @@ const Inspector = () => {
 									<AreaInput
 										id={`F1_${selectedNode.id}`}
 										label=""
-										value={effectiveF1 ?? null}
-										placeholder={
-											inheritedF1 != null ? inheritedF1.toFixed(5) : "set F1"
-										}
+										value={userSetF1 ? selectedNode.data.F1 : null}
+										placeholder={inheritedF1 ?? "set F1"}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F1: val })
 										}
@@ -1879,8 +1873,8 @@ const Inspector = () => {
 									<AreaInput
 										id={`F_C_mpce_${selectedNode.id}`}
 										label=""
-										value={effectiveFC}
-										placeholder={effectiveFC.toFixed(5)}
+										value={userSetFC ? selectedNode.data.F_C : null}
+										placeholder={effectiveFC}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F_C: val })
 										}
@@ -1948,8 +1942,8 @@ const Inspector = () => {
 									<AreaInput
 										id={`F_branch_mpce_${selectedNode.id}`}
 										label=""
-										value={effectiveFBranch}
-										placeholder={effectiveFBranch.toFixed(5)}
+										value={userSetFBranch ? selectedNode.data.F_branch : null}
+										placeholder={effectiveFBranch}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F_branch: val })
 										}
@@ -2517,7 +2511,7 @@ const Inspector = () => {
 										)}
 									</div>
 									<NumericInput
-										value={displayArea}
+										value={userSetArea ? selectedNode.data.area : null}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { area: val })
 										}
@@ -2533,7 +2527,7 @@ const Inspector = () => {
 												? "text-gray-900 font-semibold"
 												: "text-gray-400"
 										}`}
-										placeholder={displayArea.toFixed(4)}
+										placeholder={Number(displayArea.toPrecision(4)).toString()}
 									/>
 									{!userSetArea && areaNote && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
@@ -2828,8 +2822,8 @@ const Inspector = () => {
 									<AreaInput
 										id={`area_comb_${selectedNode.id}`}
 										label="Area"
-										value={shownAreaComb}
-										placeholder={shownAreaComb.toFixed(5)}
+										value={userSetAreaComb ? selectedNode.data.area : null}
+										placeholder={shownAreaComb}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, {
 												area: val,
@@ -2864,11 +2858,7 @@ const Inspector = () => {
 										<LengthInput
 											id={`Dh_comb_${selectedNode.id}`}
 											label=""
-											value={
-												userSetDhComb
-													? selectedNode.data.Dh
-													: (inheritedDhComb ?? circularDhComb)
-											}
+											value={userSetDhComb ? selectedNode.data.Dh : null}
 											placeholder={inheritedDhComb ?? circularDhComb}
 											onChange={(val) =>
 												updateNodeData(selectedNode.id, {
@@ -2998,8 +2988,8 @@ const Inspector = () => {
 									<AreaInput
 										id={`area_mom_${selectedNode.id}`}
 										label="Area"
-										value={shownAreaMom}
-										placeholder={shownAreaMom.toFixed(5)}
+										value={userSetAreaMom ? selectedNode.data.area : null}
+										placeholder={shownAreaMom}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, {
 												area: val,
@@ -3034,11 +3024,7 @@ const Inspector = () => {
 										<LengthInput
 											id={`Dh_mom_${selectedNode.id}`}
 											label=""
-											value={
-												userSetDhMom
-													? selectedNode.data.Dh
-													: (inheritedDhMom ?? circularDh)
-											}
+											value={userSetDhMom ? selectedNode.data.Dh : null}
 											placeholder={inheritedDhMom ?? circularDh}
 											onChange={(val) =>
 												updateNodeData(selectedNode.id, {
