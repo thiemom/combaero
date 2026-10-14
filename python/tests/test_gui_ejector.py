@@ -45,7 +45,8 @@ def test_ejector_data_defaults():
     assert d.recovery_efficiency == 1.0
     assert d.throat_area > 0.0
     assert d.nozzle_exit_area > d.throat_area
-    assert d.mixing_area > d.nozzle_exit_area
+    # None = inherit A_3 from the outlet pipe, else the element default (#559).
+    assert d.mixing_area is None
     assert d.initial_guess == {}
 
 
@@ -323,3 +324,95 @@ def test_ejector_element_m_dot_reports_total_throughflow():
     assert er.m_dot > 0.0
     assert er.m_dot == pytest.approx(d["m_dot_outlet"], rel=1e-9)
     assert er.m_dot == pytest.approx(d["m_dot_primary"] + d["m_dot_secondary"], rel=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Mixing-area (A_3) inheritance with the outlet pipe, both directions (#559).
+# ---------------------------------------------------------------------------
+
+
+def _ejector_with_outlet_pipe(base: dict, mixing: float | None, pipe_d: float | None) -> dict:
+    """Replace the outlet MCN of a reference schema by a channel ch_o."""
+    g = base
+    next(n for n in g["nodes"] if n["id"] == "ej1")["data"]["mixing_area"] = mixing
+    g["nodes"] = [n for n in g["nodes"] if n["id"] != "mc_o"]
+    g["nodes"].append(_node("ch_o", "channel", {"L": 0.1, "D": pipe_d}, x=450))
+    g["edges"] = [e for e in g["edges"] if e["id"] not in ("e5", "e6")]
+    g["edges"] += [
+        _edge("e5", "ej1", "ch_o", src_handle="port-outlet-source"),
+        _edge("e6", "ch_o", "pb_o"),
+    ]
+    return g
+
+
+def _preview(g: dict):
+    from gui.backend.resolve_preview import resolve_preview
+
+    return resolve_preview(build_network_from_schema(NetworkGraphSchema(**g)))
+
+
+def test_outlet_pipe_inherits_the_ejector_mixing_area():
+    rep = _preview(_ejector_with_outlet_pipe(_solvable_ejector_schema(), _MIXING, None))
+    d = rep["ch_o"].fields["diameter"]
+    assert rep["ch_o"].status == "resolved"
+    assert d.value == pytest.approx((4 * _MIXING / 3.141592653589793) ** 0.5, rel=1e-12)
+    assert d.source == "EjectorElement 'ej1'"
+    assert rep["ej1"].fields["mixing_area"].source == "user"
+
+
+def test_ejector_inherits_its_mixing_area_from_the_outlet_pipe():
+    pipe_d = 0.04
+    g = _ejector_with_outlet_pipe(_solvable_ejector_schema(), None, pipe_d)
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    from gui.backend.resolve_preview import resolve_preview
+
+    m = resolve_preview(net)["ej1"].fields["mixing_area"]
+    a3 = 3.141592653589793 / 4 * pipe_d**2
+    assert m.value == pytest.approx(a3, rel=1e-12)
+    assert m.source == "channel 'ch_o'"
+    e = net.elements["ej1"]
+    # All three port faces follow: nozzle exit, suction annulus, mixing duct.
+    assert e.port_areas == pytest.approx([_NOZZLE_EXIT, a3 - _NOZZLE_EXIT, a3])
+
+
+def test_ejector_without_outlet_pipe_uses_the_default_mixing_area():
+    from combaero.network.ejector_element import DEFAULT_EJECTOR_MIXING_AREA
+
+    g = _solvable_ejector_schema()
+    next(n for n in g["nodes"] if n["id"] == "ej1")["data"]["mixing_area"] = None
+    m = _preview(g)["ej1"].fields["mixing_area"]
+    assert m.value == DEFAULT_EJECTOR_MIXING_AREA
+    assert m.source == "default"
+
+
+def test_outlet_pipe_narrower_than_the_nozzle_exit_is_refused():
+    rep = _preview(_ejector_with_outlet_pipe(_solvable_ejector_schema(), None, 0.008))
+    assert rep["ej1"].status == "unresolved"
+    assert "nozzle_exit_area" in rep["ej1"].reason
+
+
+def test_warmstart_seeds_an_outlet_port_behind_a_pipe():
+    """A pipe on the outlet makes the port an auto-inserted MCN with no canvas
+    edges; the warm-start must still trace to the outlet boundary."""
+    g = _ejector_with_outlet_pipe(_solvable_ejector_schema(), _MIXING, None)
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    port = "__tee_jct__ej1_outlet"
+    assert net.nodes[port].initial_guess.get(f"{port}.Pt") == 40000.0
+
+
+def test_jet_pump_with_an_outlet_pipe_converges():
+    """Regression: with the outlet seed missing, the jet pump behind an outlet
+    pipe stalled (it converged only with a bare MCN outlet)."""
+    g = _ejector_with_outlet_pipe(_jetpump_ejector_schema(), _MIXING, None)
+    df = NetworkRunner.from_dict(g).solve(timeout=120.0).to_dataframe()
+    row = df[df["id"] == "ej1"]
+    assert bool(row["success"].iloc[0])
+    assert float(row["omega"].iloc[0]) > 3.0
+
+
+def test_cleared_throat_and_nozzle_exit_mean_the_default():
+    """The Inspector shows an unset throat / nozzle exit as its default; a
+    cleared field arrives as null and must build with that default, not fail."""
+    d = EjectorData(throat_area=None, nozzle_exit_area=None)
+    assert d.throat_area == EjectorData.model_fields["throat_area"].default
+    assert d.nozzle_exit_area == EjectorData.model_fields["nozzle_exit_area"].default

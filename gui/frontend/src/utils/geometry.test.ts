@@ -37,6 +37,27 @@ describe("geometryView", () => {
 		expect(v.source).toBe("user");
 	});
 
+	it("holds only the entered quantity as a value; the computed one is a placeholder", () => {
+		// An area entered as 60 mm^2 must not print D as 8.740387444736633.
+		const v = geometryView({
+			stores: "A",
+			userValue: 6e-5,
+			inherited: { value: 3.14e-5, source: "default" },
+			inheritable: false,
+		});
+		expect(v.valueA).toBe(6e-5);
+		expect(v.valueD).toBeNull();
+		expect(v.D).toBeCloseTo(diameterFromArea(6e-5), 15);
+		// Inherited: neither is a value.
+		const w = geometryView({
+			stores: "D",
+			userValue: null,
+			inherited: { value: 0.1, source: "channel 'ch'" },
+		});
+		expect(w.valueD).toBeNull();
+		expect(w.valueA).toBeNull();
+	});
+
 	it("a Dh override alone also opts the face out", () => {
 		const v = geometryView({
 			stores: "D",

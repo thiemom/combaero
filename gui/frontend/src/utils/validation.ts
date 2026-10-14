@@ -115,16 +115,20 @@ export function validateNetwork(nodes: Node[]): string[] {
 		if (node.type === "ejector") {
 			// Mirrors EjectorElement.__init__ validation (see
 			// python/combaero/network/ejector_element.py).
-			const At = node.data.throat_area ?? 0;
-			const Ap1 = node.data.nozzle_exit_area ?? 0;
-			const A3 = node.data.mixing_area ?? 0;
+			// Unset = the default (shown greyed in the Inspector, applied by the
+			// backend schema), not 0.
+			const At = node.data.throat_area ?? 3.14e-5;
+			const Ap1 = node.data.nozzle_exit_area ?? 1.0e-4;
+			// mixing_area null = inherited from the outlet pipe; the backend checks
+			// the inherited value.
+			const A3 = node.data.mixing_area;
 			const eta = node.data.recovery_efficiency ?? 1;
 			if (At <= 0) errors.push(`${node.id}: Ejector throat_area must be > 0`);
 			if (Ap1 <= At)
 				errors.push(
 					`${node.id}: Ejector nozzle_exit_area must exceed throat_area`,
 				);
-			if (A3 <= Ap1)
+			if (A3 != null && A3 <= Ap1)
 				errors.push(
 					`${node.id}: Ejector mixing_area must exceed nozzle_exit_area`,
 				);

@@ -36,6 +36,11 @@ export interface GeometryView {
 	D: number | null;
 	A: number | null;
 	Dh: number | null;
+	// What the D and A inputs hold as a VALUE: only the quantity the user
+	// entered. Its computed counterpart and anything inherited are shown as
+	// rounded placeholders, so they never read as typed input.
+	valueD: number | null;
+	valueA: number | null;
 	// The user set D/A (bold), and/or Dh.
 	userSet: boolean;
 	userSetDh: boolean;
@@ -89,6 +94,8 @@ export function geometryView(g: GeometryInputs): GeometryView {
 		canInherit,
 		D,
 		A,
+		valueD: userSet && g.stores === "D" ? D : null,
+		valueA: userSet && g.stores === "A" ? A : null,
 		Dh,
 		userSet,
 		userSetDh,

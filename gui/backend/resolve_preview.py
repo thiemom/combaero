@@ -36,6 +36,7 @@ from combaero.network.components import (
     PressureLossElement,
     TeeJunctionElement,
 )
+from combaero.network.ejector_element import EjectorElement
 
 if TYPE_CHECKING:
     from combaero.network.graph import FlowNetwork
@@ -102,6 +103,14 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
         }
     if isinstance(item, TeeJunctionElement):
         return {"F_C": FieldResolution(_f(item, "F_C"), _s(item, "_area_source"))}
+    if isinstance(item, EjectorElement):
+        # Throat and nozzle exit are internal geometry (always the user's or the
+        # schema default); only the mixing duct A_3 inherits, from the outlet pipe.
+        return {
+            "throat_area": FieldResolution(_f(item, "throat_area"), "user"),
+            "nozzle_exit_area": FieldResolution(_f(item, "nozzle_exit_area"), "user"),
+            "mixing_area": FieldResolution(_f(item, "mixing_area"), _s(item, "_mixing_source")),
+        }
     if isinstance(item, MultiPortChamberBase):
         sources = getattr(item, "_port_area_sources", None) or [""] * item.N
         areas = getattr(item, "port_areas", None) or [None] * item.N
