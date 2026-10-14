@@ -174,3 +174,25 @@ def test_resolve_preview_sync_formats_for_the_api() -> None:
     assert out["items"]["chan"]["status"] == "resolved"
     assert out["items"]["chan"]["fields"]["diameter"]["value"] == 0.1
     assert out["items"]["chan"]["fields"]["diameter"]["source"] == "user"
+
+
+def test_tee_reports_the_builder_resolved_sources() -> None:
+    """A GUI tee's areas are resolved in graph_builder and handed to the
+    element as explicit port areas; the preview must report where they really
+    came from, not "user"."""
+    from test_gui_mpce_tee import _mpce_with_channels_schema, _three_plenum_mpce_schema
+
+    rep = resolve_preview(build_network_from_schema(_mpce_with_channels_schema("branch")))
+    assert rep["mpce"].fields["F_C"].source == "channel 'ch_com'"
+    assert rep["mpce"].fields["F_branch"].source == "channel 'ch_bra'"
+
+    rep = resolve_preview(
+        build_network_from_schema(_mpce_with_channels_schema("branch", F_C_override=0.02))
+    )
+    assert rep["mpce"].fields["F_C"].source == "user"
+    assert rep["mpce"].fields["F_C"].value == 0.02
+
+    # No channels at all: F_C falls back to the default, F_branch from psi.
+    rep = resolve_preview(build_network_from_schema(_three_plenum_mpce_schema("branch")))
+    assert rep["mpce"].fields["F_C"].source == "default"
+    assert rep["mpce"].fields["F_branch"].source == "derived from F_C / psi"

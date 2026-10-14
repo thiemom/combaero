@@ -2,6 +2,11 @@ import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
+import {
+	inheritedField,
+	inheritedNote,
+	unresolvedReason,
+} from "../utils/inheritance";
 import { nodeTypeLabel } from "../utils/nodeUtils";
 import {
 	BASIC_STATE_KEYS,
@@ -33,6 +38,7 @@ const Inspector = () => {
 		displaySettings,
 		solverSettings,
 		solveResults,
+		previewItems,
 	} = useStore();
 
 	const validationErrors = validateNetwork(nodes);
@@ -440,118 +446,36 @@ const Inspector = () => {
 
 				{selectedNode.type === "channel" &&
 					(() => {
-						const upstreamEdge = edges.find(
-							(e) => e.target === selectedNode.id && !e.data?.type,
-						);
-						const downstreamEdge = edges.find(
-							(e) => e.source === selectedNode.id && !e.data?.type,
-						);
-						const upstreamNode = upstreamEdge
-							? nodes.find((n) => n.id === upstreamEdge.source)
-							: undefined;
-						const downstreamNode = downstreamEdge
-							? nodes.find((n) => n.id === downstreamEdge.target)
-							: undefined;
-						// Returns {d, dh} to propagate both circular-equivalent diameter
-						// and hydraulic diameter through chains. channel: dh = Dh ?? D.
-						// area_change: dh = D_h (if set) ?? sqrt(4F/pi). Tees: dh = d.
-						const walkGeometry = (
-							n: typeof upstreamNode,
-							edge: typeof upstreamEdge,
-							side: "upstream" | "downstream",
-							depth = 0,
-						): { d: number; dh: number } | undefined => {
-							if (!n || depth > 20) return undefined;
-							if (n.type === "channel") {
-								const d = n.data.D as number | null | undefined;
-								const dh = n.data.Dh as number | null | undefined;
-								if (d != null) return { d, dh: dh ?? d };
-								const hopEdge =
-									side === "upstream"
-										? edges.find((e) => e.target === n.id && !e.data?.type)
-										: edges.find((e) => e.source === n.id && !e.data?.type);
-								const hopNode = hopEdge
-									? nodes.find(
-											(nn) =>
-												nn.id ===
-												(side === "upstream" ? hopEdge.source : hopEdge.target),
-										)
-									: undefined;
-								return walkGeometry(hopNode, hopEdge, side, depth + 1);
-							}
-							if (n.type === "area_change") {
-								const dhAc = n.data.D_h as number | null | undefined;
-								const f =
-									side === "upstream"
-										? (n.data.F1 as number | null | undefined)
-										: (n.data.F0 as number | null | undefined);
-								if (f != null) {
-									const d = Math.sqrt((4 * f) / Math.PI);
-									return { d, dh: dhAc != null && dhAc > 0 ? dhAc : d };
-								}
-								return undefined;
-							}
-							if (n.type === "mpce_tee") {
-								const handle =
-									side === "upstream" ? edge?.sourceHandle : edge?.targetHandle;
-								const isBranch =
-									side === "upstream"
-										? handle === "port-branch-source"
-										: handle === "port-branch-target";
-								let d: number | undefined;
-								if (isBranch) {
-									const fb = n.data.F_branch as number | null | undefined;
-									const fc = n.data.F_C as number | null | undefined;
-									const psi = (n.data.psi as number | undefined) ?? 1.0;
-									const fBranch =
-										fb != null ? fb : fc != null ? fc / psi : undefined;
-									d =
-										fBranch != null
-											? Math.sqrt((4 * fBranch) / Math.PI)
-											: undefined;
-								} else {
-									const fc = n.data.F_C as number | null | undefined;
-									d = fc != null ? Math.sqrt((4 * fc) / Math.PI) : undefined;
-								}
-								return d != null ? { d, dh: d } : undefined;
-							}
-							return undefined;
-						};
-						const inheritedGeomUp = walkGeometry(
-							upstreamNode,
-							upstreamEdge,
-							"upstream",
-						);
-						const inheritedGeomDown = walkGeometry(
-							downstreamNode,
-							downstreamEdge,
-							"downstream",
-						);
-						const inheritedD = inheritedGeomUp?.d ?? inheritedGeomDown?.d;
-						const inheritedDh = inheritedGeomUp?.dh ?? inheritedGeomDown?.dh;
-						const inheritSide =
-							inheritedGeomUp != null
-								? "upstream"
-								: inheritedGeomDown != null
-									? "downstream"
-									: undefined;
-						const inheritSourceId =
-							inheritSide === "upstream"
-								? upstreamNode?.id
-								: downstreamNode?.id;
+						// Inheritance comes from the solver's own resolve pass
+						// (/resolve_preview, #559), not a frontend graph walk, so the
+						// value shown is the value the solve will use.
 						const userSetD =
 							selectedNode.data.D !== null && selectedNode.data.D !== undefined;
 						const userSetDh =
 							selectedNode.data.Dh !== null &&
 							selectedNode.data.Dh !== undefined;
-						const effectiveD = userSetD
-							? selectedNode.data.D
-							: (inheritedD ?? 0.1);
-						// True when the upstream source provides a non-circular Dh
-						const dhIsNonCircular =
-							inheritedDh != null &&
-							(inheritedD == null ||
-								Math.abs(inheritedDh - inheritedD) > 1e-10);
+						const geomD = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"diameter",
+						);
+						// The inherited D (only meaningful while D is unset). Undefined
+						// while the preview loads or when nothing can be inherited.
+						const inheritedD = userSetD
+							? undefined
+							: (geomD?.value ?? undefined);
+						const inheritNote = inheritedNote(geomD?.source);
+						const unresolved = userSetD
+							? undefined
+							: unresolvedReason(previewItems, selectedNode.id);
+						const effectiveD: number | undefined = userSetD
+							? (selectedNode.data.D as number)
+							: inheritedD;
+						// The solver sets Dh = D whenever Dh is unset (it never inherits a
+						// non-circular Dh), so the unset Dh is computed locally, exactly.
+						const shownDh: number | null = userSetDh
+							? (selectedNode.data.Dh as number)
+							: (effectiveD ?? null);
 						return (
 							<>
 								<LengthInput
@@ -582,17 +506,30 @@ const Inspector = () => {
 									<LengthInput
 										id={`D_${selectedNode.id}`}
 										label=""
-										value={userSetD ? selectedNode.data.D : (inheritedD ?? 0.1)}
-										placeholder={inheritedD ?? 0.1}
+										value={
+											userSetD ? selectedNode.data.D : (inheritedD ?? null)
+										}
+										placeholder={inheritedD ?? "set D"}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { D: val })
 										}
 										onClear={() => updateNodeData(selectedNode.id, { D: null })}
+										inputClassName={
+											userSetD ? "font-semibold" : "text-gray-400"
+										}
 									/>
-									{!userSetD && inheritedD != null && (
+									{!userSetD && inheritedD != null && inheritNote && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from {inheritSide} ({inheritSourceId}). Edit to
-											override.
+											{inheritNote}. Edit to override.
+										</p>
+									)}
+									{unresolved && (
+										<p
+											className="text-[9px] text-amber-700 -mt-1"
+											title={unresolved}
+										>
+											Nothing to inherit a diameter from — set D for this
+											channel.
 										</p>
 									)}
 								</div>
@@ -609,21 +546,15 @@ const Inspector = () => {
 													updateNodeData(selectedNode.id, { Dh: null })
 												}
 											>
-												{dhIsNonCircular
-													? "Reset to inherited"
-													: "Reset to circular"}
+												Reset to circular
 											</button>
 										)}
 									</div>
 									<LengthInput
 										id={`Dh_${selectedNode.id}`}
 										label=""
-										value={
-											userSetDh
-												? selectedNode.data.Dh
-												: (inheritedDh ?? effectiveD)
-										}
-										placeholder={inheritedDh ?? effectiveD}
+										value={shownDh}
+										placeholder={effectiveD ?? "= D"}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { Dh: val })
 										}
@@ -634,13 +565,7 @@ const Inspector = () => {
 											userSetDh ? "font-semibold" : "text-gray-400"
 										}
 									/>
-									{!userSetDh && dhIsNonCircular && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited non-circular Dh from {inheritSide}. Edit to
-											override.
-										</p>
-									)}
-									{!userSetDh && !dhIsNonCircular && (
+									{!userSetDh && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
 											Dh = D (circular). Override for non-circular ducts.
 										</p>
@@ -1385,79 +1310,33 @@ const Inspector = () => {
 
 				{selectedNode.type === "area_change" &&
 					(() => {
-						const upstreamEdge = edges.find(
-							(e) => e.target === selectedNode.id && !e.data?.type,
-						);
-						const downstreamEdge = edges.find(
-							(e) => e.source === selectedNode.id && !e.data?.type,
-						);
-						const upstreamNode = upstreamEdge
-							? nodes.find((n) => n.id === upstreamEdge.source)
-							: undefined;
-						const downstreamNode = downstreamEdge
-							? nodes.find((n) => n.id === downstreamEdge.target)
-							: undefined;
-						const areaFromD = (d: number | null | undefined) =>
-							d != null ? (Math.PI / 4) * d * d : undefined;
-						const walkArea = (
-							nodeId: string,
-							dir: "upstream" | "downstream",
-							depth = 0,
-						): number | undefined => {
-							if (depth > 20) return undefined;
-							const e =
-								dir === "upstream"
-									? edges.find((ee) => ee.target === nodeId && !ee.data?.type)
-									: edges.find((ee) => ee.source === nodeId && !ee.data?.type);
-							const n = e
-								? nodes.find(
-										(nn) =>
-											nn.id === (dir === "upstream" ? e.source : e.target),
-									)
-								: undefined;
-							if (!n) return undefined;
-							if (n.type === "channel") {
-								const d = n.data.D as number | null | undefined;
-								if (d != null) return areaFromD(d);
-								return walkArea(n.id, dir, depth + 1);
-							}
-							// For area_change: walking upstream reads its exit face (F1);
-							// walking downstream reads its entry face (F0).
-							if (n.type === "area_change") {
-								const f = (dir === "upstream" ? n.data.F1 : n.data.F0) as
-									| number
-									| null
-									| undefined;
-								if (f != null && f > 0) return f;
-								return walkArea(n.id, dir, depth + 1);
-							}
-							if (n.type === "mpce_tee") {
-								const fc = n.data.F_C as number | null | undefined;
-								if (fc != null && fc > 0) return fc;
-							}
-							const a = n.data?.area as number | null | undefined;
-							return a != null && a > 0 ? a : undefined;
-						};
-						const inheritedF0: number | undefined = walkArea(
-							selectedNode.id,
-							"upstream",
-						);
-						const inheritedF1: number | undefined = walkArea(
-							selectedNode.id,
-							"downstream",
-						);
+						// Face areas come from the solver's resolve pass
+						// (/resolve_preview, #559): F0 from the upstream side, F1 from
+						// the downstream side, exactly as the solve will use them.
 						const userSetF0 =
 							selectedNode.data.F0 !== null &&
 							selectedNode.data.F0 !== undefined;
 						const userSetF1 =
 							selectedNode.data.F1 !== null &&
 							selectedNode.data.F1 !== undefined;
-						const effectiveF0 = userSetF0
-							? selectedNode.data.F0
-							: (inheritedF0 ?? 0.01);
-						const effectiveF1 = userSetF1
-							? selectedNode.data.F1
-							: (inheritedF1 ?? 0.02);
+						const geomF0 = inheritedField(previewItems, selectedNode.id, "F0");
+						const geomF1 = inheritedField(previewItems, selectedNode.id, "F1");
+						const inheritedF0 = userSetF0
+							? undefined
+							: (geomF0?.value ?? undefined);
+						const inheritedF1 = userSetF1
+							? undefined
+							: (geomF1?.value ?? undefined);
+						const f0Note = inheritedNote(geomF0?.source);
+						const f1Note = inheritedNote(geomF1?.source);
+						// An area change refuses when a face has nothing to inherit from.
+						const unresolved = unresolvedReason(previewItems, selectedNode.id);
+						const effectiveF0: number | undefined = userSetF0
+							? (selectedNode.data.F0 as number)
+							: inheritedF0;
+						const effectiveF1: number | undefined = userSetF1
+							? (selectedNode.data.F1 as number)
+							: inheritedF1;
 						return (
 							<>
 								<div className="flex flex-col gap-2">
@@ -1498,9 +1377,9 @@ const Inspector = () => {
 									<AreaInput
 										id={`F0_${selectedNode.id}`}
 										label=""
-										value={effectiveF0}
+										value={effectiveF0 ?? null}
 										placeholder={
-											inheritedF0 != null ? inheritedF0.toFixed(5) : "0.01"
+											inheritedF0 != null ? inheritedF0.toFixed(5) : "set F0"
 										}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F0: val })
@@ -1512,10 +1391,17 @@ const Inspector = () => {
 											userSetF0 ? "font-semibold" : "text-gray-400"
 										}
 									/>
-									{!userSetF0 && inheritedF0 != null && (
+									{!userSetF0 && inheritedF0 != null && f0Note && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from upstream ({upstreamNode?.id}). Edit to
-											override.
+											{f0Note}. Edit to override.
+										</p>
+									)}
+									{!userSetF0 && inheritedF0 == null && unresolved && (
+										<p
+											className="text-[9px] text-amber-700 -mt-1"
+											title={unresolved}
+										>
+											Nothing upstream to inherit F0 from — set it.
 										</p>
 									)}
 								</div>
@@ -1540,9 +1426,9 @@ const Inspector = () => {
 									<AreaInput
 										id={`F1_${selectedNode.id}`}
 										label=""
-										value={effectiveF1}
+										value={effectiveF1 ?? null}
 										placeholder={
-											inheritedF1 != null ? inheritedF1.toFixed(5) : "0.02"
+											inheritedF1 != null ? inheritedF1.toFixed(5) : "set F1"
 										}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F1: val })
@@ -1554,15 +1440,25 @@ const Inspector = () => {
 											userSetF1 ? "font-semibold" : "text-gray-400"
 										}
 									/>
-									{!userSetF1 && inheritedF1 != null && (
+									{!userSetF1 && inheritedF1 != null && f1Note && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from downstream ({downstreamNode?.id}). Edit to
-											override.
+											{f1Note}. Edit to override.
+										</p>
+									)}
+									{!userSetF1 && inheritedF1 == null && unresolved && (
+										<p
+											className="text-[9px] text-amber-700 -mt-1"
+											title={unresolved}
+										>
+											Nothing downstream to inherit F1 from — set it.
 										</p>
 									)}
 								</div>
 
 								{(() => {
+									// Only once both faces are known (set, or resolved by the
+									// solver); an unresolved face has no ratio to show.
+									if (effectiveF0 == null || effectiveF1 == null) return null;
 									const ratio =
 										effectiveF0 > 0 ? effectiveF1 / effectiveF0 : null;
 									const d0 = Math.sqrt((4 * effectiveF0) / Math.PI);
@@ -1642,13 +1538,20 @@ const Inspector = () => {
 											}
 										/>
 										<p className="text-[9px] text-gray-400 italic">
-											Defaults to circular diameter:{" "}
-											{(
-												Math.sqrt(
-													(4 * Math.min(effectiveF0, effectiveF1)) / Math.PI,
-												) * (unitPreferences.length === "mm" ? 1000 : 1)
-											).toFixed(2)}{" "}
-											{unitPreferences.length}
+											{effectiveF0 != null && effectiveF1 != null ? (
+												<>
+													Defaults to circular diameter:{" "}
+													{(
+														Math.sqrt(
+															(4 * Math.min(effectiveF0, effectiveF1)) /
+																Math.PI,
+														) * (unitPreferences.length === "mm" ? 1000 : 1)
+													).toFixed(2)}{" "}
+													{unitPreferences.length}
+												</>
+											) : (
+												"Defaults to the circular diameter of the smaller face."
+											)}
 										</p>
 									</div>
 								)}
@@ -1663,110 +1566,39 @@ const Inspector = () => {
 						const flowDirection = selectedNode.data.flow_direction ?? "branch";
 						const isMerge = flowDirection === "merge";
 
-						// Port-channel detection. For "branch" (separating): common is
-						// incoming, straight+branch are outgoing. For "merge" (joining):
-						// common is outgoing, straight+branch are incoming.
-						const findPortChannel = (portName: string) => {
-							const isOutgoing =
-								(isMerge && portName === "common") ||
-								(!isMerge && portName !== "common");
-							let neighbour: (typeof nodes)[0] | undefined;
-							if (isOutgoing) {
-								const edge = edges.find(
-									(e) =>
-										e.source === selectedNode.id &&
-										e.sourceHandle === `port-${portName}-source` &&
-										!e.data?.type,
-								);
-								neighbour = edge
-									? nodes.find((n) => n.id === edge.target)
-									: undefined;
-							} else {
-								const edge = edges.find(
-									(e) =>
-										e.target === selectedNode.id &&
-										e.targetHandle === `port-${portName}-target` &&
-										!e.data?.type,
-								);
-								neighbour = edge
-									? nodes.find((n) => n.id === edge.source)
-									: undefined;
-							}
-							if (neighbour?.type === "channel") return neighbour;
-							// Neighbour is a plenum/boundary; look one hop further
-							if (isOutgoing) {
-								return nodes.find(
-									(n) =>
-										n.type === "channel" &&
-										edges.some(
-											(e) =>
-												e.source === neighbour?.id &&
-												e.target === n.id &&
-												!e.data?.type,
-										),
-								);
-							}
-							return nodes.find(
-								(n) =>
-									n.type === "channel" &&
-									edges.some(
-										(e) =>
-											e.target === neighbour?.id &&
-											e.source === n.id &&
-											!e.data?.type,
-									),
-							);
-						};
-
-						const walkChD = (
-							ch: (typeof nodes)[0] | undefined,
-							isOutgoing: boolean,
-							depth = 0,
-						): number | undefined => {
-							if (!ch || depth > 20) return undefined;
-							const d = ch.data.D as number | null | undefined;
-							if (d != null) return d;
-							const e = isOutgoing
-								? edges.find((ee) => ee.source === ch.id && !ee.data?.type)
-								: edges.find((ee) => ee.target === ch.id && !ee.data?.type);
-							if (!e) return undefined;
-							const next = nodes.find(
-								(n) => n.id === (isOutgoing ? e.target : e.source),
-							);
-							if (!next) return undefined;
-							if (next.type === "channel")
-								return walkChD(next, isOutgoing, depth + 1);
-							return undefined;
-						};
-
-						const portD = (portName: string) => {
-							const isOutgoing =
-								(isMerge && portName === "common") ||
-								(!isMerge && portName !== "common");
-							return walkChD(findPortChannel(portName), isOutgoing);
-						};
-
-						const commonCh = findPortChannel("common");
-						const straightCh = findPortChannel("straight");
-
-						const areaFromD = (d: number | null | undefined) =>
-							d != null ? (Math.PI / 4) * d * d : undefined;
-
-						const inheritedFC: number | undefined =
-							areaFromD(portD("common")) ?? areaFromD(portD("straight"));
-						const inheritedFBranch: number | undefined = areaFromD(
-							portD("branch"),
-						);
-
+						// The tee's areas are resolved by the backend builder
+						// (_resolve_tee_areas) and reported by /resolve_preview (#559)
+						// with their real source: a channel connected directly to the
+						// port, the 0.01 m^2 default, or F_branch derived from F_C / psi.
 						const userSetFC = selectedNode.data.F_C != null;
 						const userSetFBranch = selectedNode.data.F_branch != null;
+						const geomFC = inheritedField(previewItems, selectedNode.id, "F_C");
+						const geomFBranch = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"F_branch",
+						);
+						const inheritedFC = userSetFC
+							? undefined
+							: (geomFC?.value ?? undefined);
+						const inheritedFBranch = userSetFBranch
+							? undefined
+							: (geomFBranch?.value ?? undefined);
+						const fcNote = inheritedNote(geomFC?.source);
+						const fBranchNote = inheritedNote(geomFBranch?.source);
+						const fcIsDefault = !userSetFC && geomFC?.source === "default";
 
+						// A tee always resolves (it has fallbacks), so these are always
+						// numbers in the solve. Until the preview arrives, show the
+						// builder's own fallbacks (F_C 0.01 m^2, F_branch = F_C / psi).
 						const effectiveFC: number = userSetFC
 							? (selectedNode.data.F_C as number)
 							: (inheritedFC ?? 0.01);
 						const effectiveFBranch: number = userSetFBranch
 							? (selectedNode.data.F_branch as number)
-							: (inheritedFBranch ?? effectiveFC);
+							: (inheritedFBranch ??
+								effectiveFC /
+									Math.max((selectedNode.data.psi as number) ?? 1.0, 1e-12));
 						const psi =
 							effectiveFBranch > 0 ? effectiveFC / effectiveFBranch : null;
 						// Constant-K: a blank K shows (and solves with) Bassett's pair
@@ -2048,9 +1880,7 @@ const Inspector = () => {
 										id={`F_C_mpce_${selectedNode.id}`}
 										label=""
 										value={effectiveFC}
-										placeholder={
-											inheritedFC != null ? inheritedFC.toFixed(5) : "0.01"
-										}
+										placeholder={effectiveFC.toFixed(5)}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F_C: val })
 										}
@@ -2061,11 +1891,15 @@ const Inspector = () => {
 											userSetFC ? "font-semibold" : "text-gray-400"
 										}
 									/>
-									{!userSetFC && inheritedFC != null && (
+									{!userSetFC && fcNote && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from{" "}
-											{commonCh?.id ?? straightCh?.id ?? "connected channel"}.
-											Edit to override.
+											{fcNote}. Edit to override.
+										</p>
+									)}
+									{fcIsDefault && (
+										<p className="text-[9px] text-amber-700 -mt-1">
+											No channel connected directly to the common or straight
+											port — using the 0.01 m² default. Set F_C.
 										</p>
 									)}
 								</div>
@@ -2115,13 +1949,7 @@ const Inspector = () => {
 										id={`F_branch_mpce_${selectedNode.id}`}
 										label=""
 										value={effectiveFBranch}
-										placeholder={
-											inheritedFBranch != null
-												? inheritedFBranch.toFixed(5)
-												: inheritedFC != null
-													? inheritedFC.toFixed(5)
-													: "0.01"
-										}
+										placeholder={effectiveFBranch.toFixed(5)}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { F_branch: val })
 										}
@@ -2132,6 +1960,11 @@ const Inspector = () => {
 											userSetFBranch ? "font-semibold" : "text-gray-400"
 										}
 									/>
+									{!userSetFBranch && fBranchNote && (
+										<p className="text-[9px] text-gray-400 italic -mt-1">
+											{fBranchNote}. Edit to override.
+										</p>
+									)}
 								</div>
 
 								{/* Derived ratio summary */}
@@ -2544,38 +2377,33 @@ const Inspector = () => {
 
 				{selectedNode.type === "discrete_loss" &&
 					(() => {
-						// Compute default area from upstream node or channel element
+						// Upstream neighbour, used below for the theta auto-default.
 						const upstreamEdge = edges.find(
 							(e) => e.target === selectedNode.id && !e.data?.type,
 						);
 						const upstreamNode = upstreamEdge
 							? nodes.find((n) => n.id === upstreamEdge.source)
 							: undefined;
-						// Walk one more hop upstream to reach a channel when there is an
-						// auto-inserted junction node between the channel and this element.
-						const upstreamChannelNode =
-							upstreamNode?.type === "channel"
-								? upstreamNode
-								: (() => {
-										if (!upstreamNode) return undefined;
-										const hopEdge = edges.find(
-											(e) => e.target === upstreamNode.id && !e.data?.type,
-										);
-										const hopNode = hopEdge
-											? nodes.find((n) => n.id === hopEdge.source)
-											: undefined;
-										return hopNode?.type === "channel" ? hopNode : undefined;
-									})();
-						const inheritedArea: number | undefined =
-							upstreamNode?.data?.area && upstreamNode.data.area > 0
-								? upstreamNode.data.area
-								: upstreamChannelNode?.data?.D != null
-									? (Math.PI / 4) * upstreamChannelNode.data.D ** 2
-									: undefined;
 
+						// The reference area comes from the solver's resolve pass
+						// (/resolve_preview, #559): nearest channel, then any area-bearing
+						// neighbour, else the 0.1 m^2 chamber default.
 						const userSetArea =
 							selectedNode.data.area !== null &&
 							selectedNode.data.area !== undefined;
+						const geomArea = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"area",
+						);
+						const inheritedArea = userSetArea
+							? undefined
+							: (geomArea?.value ?? undefined);
+						const areaNote = inheritedNote(geomArea?.source);
+						const areaIsDefault =
+							!userSetArea && geomArea?.source === "default";
+						// A discrete loss always resolves (it falls back to the 0.1 m^2
+						// chamber default), so until the preview arrives show that.
 						const displayArea: number = userSetArea
 							? selectedNode.data.area
 							: (inheritedArea ?? 0.1);
@@ -2705,22 +2533,17 @@ const Inspector = () => {
 												? "text-gray-900 font-semibold"
 												: "text-gray-400"
 										}`}
-										placeholder={
-											inheritedArea != null
-												? `${inheritedArea.toFixed(4)} (from upstream)`
-												: "0.1"
-										}
+										placeholder={displayArea.toFixed(4)}
 									/>
-									{!userSetArea && inheritedArea != null && (
+									{!userSetArea && areaNote && (
 										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Inherited from upstream (
-											{upstreamChannelNode?.id ?? upstreamNode?.id}). Edit to
-											override.
+											{areaNote}. Edit to override.
 										</p>
 									)}
-									{!userSetArea && inheritedArea == null && (
-										<p className="text-[9px] text-gray-400 italic -mt-1">
-											Connect an upstream channel or node to auto-discover area.
+									{areaIsDefault && (
+										<p className="text-[9px] text-amber-700 -mt-1">
+											No neighbour with a known area — using the 0.1 m² default.
+											Connect a channel or set the area.
 										</p>
 									)}
 									{areaWarning && (
@@ -2942,55 +2765,41 @@ const Inspector = () => {
 
 				{selectedNode.type === "combustor" &&
 					(() => {
-						const upstreamEdge = edges.find(
-							(e) => e.target === selectedNode.id && !e.data?.type,
-						);
-						const upstreamNode = upstreamEdge
-							? nodes.find((n) => n.id === upstreamEdge.source)
-							: undefined;
-						const walkChannelD = (
-							nodeId: string,
-							depth = 0,
-						): number | undefined => {
-							if (depth > 20) return undefined;
-							const e = edges.find(
-								(ee) => ee.target === nodeId && !ee.data?.type,
-							);
-							const n = e ? nodes.find((nn) => nn.id === e.source) : undefined;
-							if (!n) return undefined;
-							if (n.type === "channel") {
-								const d = n.data.D as number | null | undefined;
-								const dh = n.data.Dh as number | null | undefined;
-								if (d != null) return dh ?? d;
-								return walkChannelD(n.id, depth + 1);
-							}
-							if (n.type === "area_change") {
-								const dhAc = n.data.D_h as number | null | undefined;
-								if (dhAc != null && dhAc > 0) return dhAc;
-								const f = n.data.F1 as number | null | undefined;
-								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
-								return walkChannelD(n.id, depth + 1);
-							}
-							if (n.type === "mpce_tee") {
-								const fc = n.data.F_C as number | null | undefined;
-								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
-							}
-							return (
-								(n.data?.Dh as number | undefined) ??
-								(n.data?.area != null
-									? Math.sqrt((4 * n.data.area) / Math.PI)
-									: undefined)
-							);
-						};
-						const inheritedDhComb: number | undefined = walkChannelD(
-							selectedNode.id,
-						);
+						// Area and Dh come from the solver's resolve pass
+						// (/resolve_preview, #559): Dh from the nearest upstream channel,
+						// area derived from it (or inferred from a neighbour), else the
+						// 0.1 m^2 chamber default.
 						const userSetDhComb =
 							selectedNode.data.Dh !== null &&
 							selectedNode.data.Dh !== undefined;
-						const circularDhComb = Math.sqrt(
-							(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
+						const userSetAreaComb =
+							selectedNode.data.area !== null &&
+							selectedNode.data.area !== undefined;
+						const geomAreaComb = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"area",
 						);
+						const geomDhComb = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"Dh",
+						);
+						const inheritedAreaComb = userSetAreaComb
+							? undefined
+							: (geomAreaComb?.value ?? undefined);
+						const inheritedDhComb = userSetDhComb
+							? undefined
+							: (geomDhComb?.value ?? undefined);
+						const combNote = inheritedNote(geomAreaComb?.source);
+						const combIsDefault =
+							!userSetAreaComb && geomAreaComb?.source === "default";
+						// The chamber always resolves (it defaults), so until the preview
+						// arrives show the 0.1 m^2 default.
+						const shownAreaComb: number = userSetAreaComb
+							? (selectedNode.data.area as number)
+							: (inheritedAreaComb ?? 0.1);
+						const circularDhComb = Math.sqrt((4 * shownAreaComb) / Math.PI);
 						return (
 							<div className="flex flex-col gap-4">
 								<div className="flex flex-col gap-2">
@@ -3019,11 +2828,18 @@ const Inspector = () => {
 									<AreaInput
 										id={`area_comb_${selectedNode.id}`}
 										label="Area"
-										value={selectedNode.data.area ?? 0.1}
+										value={shownAreaComb}
+										placeholder={shownAreaComb.toFixed(5)}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, {
 												area: val,
 											})
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { area: null })
+										}
+										inputClassName={
+											userSetAreaComb ? "font-semibold" : "text-gray-400"
 										}
 									/>
 									<div className="flex flex-col gap-1">
@@ -3068,9 +2884,15 @@ const Inspector = () => {
 												userSetDhComb ? "font-semibold" : "text-gray-400"
 											}
 										/>
-										{!userSetDhComb && inheritedDhComb != null && (
+										{!userSetDhComb && inheritedDhComb != null && combNote && (
 											<p className="text-[9px] text-gray-400 italic -mt-1">
-												Inherited from upstream ({upstreamNode?.id}).
+												{combNote}.
+											</p>
+										)}
+										{combIsDefault && (
+											<p className="text-[9px] text-amber-700 -mt-1">
+												Nothing upstream to size the combustor from — using the
+												0.1 m² default. Set the area or Dh.
 											</p>
 										)}
 										{!userSetDhComb && inheritedDhComb == null && (
@@ -3137,66 +2959,57 @@ const Inspector = () => {
 
 				{selectedNode.type === "momentum_chamber" &&
 					(() => {
-						const upstreamEdge = edges.find(
-							(e) => e.target === selectedNode.id && !e.data?.type,
-						);
-						const upstreamNode = upstreamEdge
-							? nodes.find((n) => n.id === upstreamEdge.source)
-							: undefined;
-						const walkChannelD = (
-							nodeId: string,
-							depth = 0,
-						): number | undefined => {
-							if (depth > 20) return undefined;
-							const e = edges.find(
-								(ee) => ee.target === nodeId && !ee.data?.type,
-							);
-							const n = e ? nodes.find((nn) => nn.id === e.source) : undefined;
-							if (!n) return undefined;
-							if (n.type === "channel") {
-								const d = n.data.D as number | null | undefined;
-								const dh = n.data.Dh as number | null | undefined;
-								if (d != null) return dh ?? d;
-								return walkChannelD(n.id, depth + 1);
-							}
-							if (n.type === "area_change") {
-								const dhAc = n.data.D_h as number | null | undefined;
-								if (dhAc != null && dhAc > 0) return dhAc;
-								const f = n.data.F1 as number | null | undefined;
-								if (f != null && f > 0) return Math.sqrt((4 * f) / Math.PI);
-								return walkChannelD(n.id, depth + 1);
-							}
-							if (n.type === "mpce_tee") {
-								const fc = n.data.F_C as number | null | undefined;
-								if (fc != null && fc > 0) return Math.sqrt((4 * fc) / Math.PI);
-							}
-							return (
-								(n.data?.Dh as number | undefined) ??
-								(n.data?.area != null
-									? Math.sqrt((4 * n.data.area) / Math.PI)
-									: undefined)
-							);
-						};
-						const inheritedDhMom: number | undefined = walkChannelD(
-							selectedNode.id,
-						);
+						// Area and Dh come from the solver's resolve pass
+						// (/resolve_preview, #559): a merge chamber takes its main
+						// inlet's area; otherwise Dh from the nearest upstream channel and
+						// the area from it (or a neighbour), else the 0.1 m^2 default.
 						const userSetDhMom =
 							selectedNode.data.Dh !== null &&
 							selectedNode.data.Dh !== undefined;
-						const circularDh = Math.sqrt(
-							(4 * (selectedNode.data.area ?? 0.1)) / Math.PI,
+						const userSetAreaMom =
+							selectedNode.data.area !== null &&
+							selectedNode.data.area !== undefined;
+						const geomAreaMom = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"area",
 						);
+						const geomDhMom = inheritedField(
+							previewItems,
+							selectedNode.id,
+							"Dh",
+						);
+						const inheritedAreaMom = userSetAreaMom
+							? undefined
+							: (geomAreaMom?.value ?? undefined);
+						const inheritedDhMom = userSetDhMom
+							? undefined
+							: (geomDhMom?.value ?? undefined);
+						const momNote = inheritedNote(geomAreaMom?.source);
+						const momIsDefault =
+							!userSetAreaMom && geomAreaMom?.source === "default";
+						const shownAreaMom: number = userSetAreaMom
+							? (selectedNode.data.area as number)
+							: (inheritedAreaMom ?? 0.1);
+						const circularDh = Math.sqrt((4 * shownAreaMom) / Math.PI);
 						return (
 							<div className="flex flex-col gap-4">
 								<div className="grid grid-cols-2 gap-2 pb-2">
 									<AreaInput
 										id={`area_mom_${selectedNode.id}`}
 										label="Area"
-										value={selectedNode.data.area ?? 0.1}
+										value={shownAreaMom}
+										placeholder={shownAreaMom.toFixed(5)}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, {
 												area: val,
 											})
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, { area: null })
+										}
+										inputClassName={
+											userSetAreaMom ? "font-semibold" : "text-gray-400"
 										}
 									/>
 									<div className="flex flex-col gap-1">
@@ -3241,9 +3054,15 @@ const Inspector = () => {
 												userSetDhMom ? "font-semibold" : "text-gray-400"
 											}
 										/>
-										{!userSetDhMom && inheritedDhMom != null && (
+										{!userSetDhMom && inheritedDhMom != null && momNote && (
 											<p className="text-[9px] text-gray-400 italic -mt-1">
-												Inherited from upstream ({upstreamNode?.id}).
+												{momNote}.
+											</p>
+										)}
+										{momIsDefault && (
+											<p className="text-[9px] text-amber-700 -mt-1">
+												Nothing upstream to size the chamber from — using the
+												0.1 m² default. Set the area or Dh.
 											</p>
 										)}
 										{!userSetDhMom && inheritedDhMom == null && (

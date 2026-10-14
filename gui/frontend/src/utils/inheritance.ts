@@ -40,10 +40,21 @@ export function unresolvedReason(
 }
 
 /**
- * A human label for an inherited-from note. Empty for a user-set or defaulted
- * value (which the UI styles differently), or when there is no source.
+ * The note shown under an inherited value, as a complete phrase. Sources come
+ * in three shapes -- "channel 'x'" (or "<Element> 'x'", "node 'x'"),
+ * "inherited from x", and "derived from ..." -- so the phrase is built per
+ * shape rather than by a fixed "Inherited from {source}" template, which would
+ * read "Inherited from inherited from x".
+ *
+ * Empty for a user-set or defaulted value (styled differently), or no source.
  */
-export function inheritedSourceLabel(source: string | undefined): string {
+export function inheritedNote(source: string | undefined): string {
 	if (!source || source === "user" || source === "default") return "";
-	return source; // e.g. "channel 'ch_u'" / "inherited from ch_u"
+	if (
+		source.startsWith("inherited from ") ||
+		source.startsWith("derived from ")
+	) {
+		return source.charAt(0).toUpperCase() + source.slice(1);
+	}
+	return `Inherited from ${source}`;
 }

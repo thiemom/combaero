@@ -4,7 +4,9 @@ import NumericInput from "./NumericInput";
 
 interface AreaInputProps {
 	label: string;
-	value: number;
+	// null/undefined = no value (e.g. an inherited area the solver cannot
+	// resolve yet): shows the placeholder rather than a coerced 0.
+	value?: number | null;
 	onChange: (val: number) => void;
 	id?: string;
 	placeholder?: string;
@@ -36,7 +38,11 @@ const AreaInput: React.FC<AreaInputProps> = ({
 			<div className="flex gap-1">
 				<NumericInput
 					id={id}
-					value={value * displayScale}
+					value={
+						value !== undefined && value !== null
+							? value * displayScale
+							: undefined
+					}
 					onChange={(v) => onChange(v / displayScale)}
 					onClear={onClear}
 					className={`min-w-0 w-full p-1.5 border rounded text-xs bg-stone-50 focus:bg-white focus:ring-1 focus:ring-orange-500 outline-none${inputClassName ? ` ${inputClassName}` : ""}`}

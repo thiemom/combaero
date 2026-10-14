@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PreviewItem } from "../api";
 import {
 	inheritedField,
-	inheritedSourceLabel,
+	inheritedNote,
 	type PreviewItems,
 	unresolvedReason,
 } from "./inheritance";
@@ -48,15 +48,23 @@ describe("unresolvedReason", () => {
 	});
 });
 
-describe("inheritedSourceLabel", () => {
-	it("labels inherited sources and blanks user/default/empty", () => {
-		expect(inheritedSourceLabel("channel 'ch_u'")).toBe("channel 'ch_u'");
-		expect(inheritedSourceLabel("inherited from ch_u")).toBe(
-			"inherited from ch_u",
+describe("inheritedNote", () => {
+	it("phrases each source shape so it reads correctly", () => {
+		expect(inheritedNote("channel 'ch_u'")).toBe(
+			"Inherited from channel 'ch_u'",
 		);
-		expect(inheritedSourceLabel("user")).toBe("");
-		expect(inheritedSourceLabel("default")).toBe("");
-		expect(inheritedSourceLabel("")).toBe("");
-		expect(inheritedSourceLabel(undefined)).toBe("");
+		expect(inheritedNote("node 'p1'")).toBe("Inherited from node 'p1'");
+		// Already a phrase: capitalized, not wrapped ("Inherited from inherited ...").
+		expect(inheritedNote("inherited from ch_u")).toBe("Inherited from ch_u");
+		expect(inheritedNote("derived from F_C / psi")).toBe(
+			"Derived from F_C / psi",
+		);
+	});
+
+	it("is empty for user-set, defaulted, or missing sources", () => {
+		expect(inheritedNote("user")).toBe("");
+		expect(inheritedNote("default")).toBe("");
+		expect(inheritedNote("")).toBe("");
+		expect(inheritedNote(undefined)).toBe("");
 	});
 });
