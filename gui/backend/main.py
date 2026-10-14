@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 import combaero as cb
 from combaero.network import NetworkSolver
 
+from . import second_law_view
 from .graph_builder import build_network_from_schema
 from .messages import humanize
 from .runner import NetworkResult, _build_result_objects, _schema_maps
@@ -142,11 +143,12 @@ async def solve(schema: NetworkGraphSchema):
     hard_timeout = soft_timeout + 10.0
     try:
         # Offload CPU-bound C++ solver to a worker thread
-        result, node_results, element_results, edge_results, _, diag = await asyncio.wait_for(
+        result, node_results, element_results, edge_results, net, diag = await asyncio.wait_for(
             asyncio.to_thread(_solve_sync, schema),
             timeout=hard_timeout,
         )
 
+        gui_ids = {n.id for n in schema.nodes}
         return SolveResponse(
             success=result.get("__success__", False),
             message=humanize(result.get("__message__", "Solve completed"), schema),
@@ -158,6 +160,8 @@ async def solve(schema: NetworkGraphSchema):
             worst_residuals=diag.get("worst_residuals", []),
             solver_settings_used=diag.get("solver_settings_used", {}),
             lm_started_at_eval=diag.get("lm_started_at_eval"),
+            second_law_failures=second_law_view.failures(result, net, gui_ids),
+            ledger=second_law_view.ledger(result, net, gui_ids),
         )
     except TimeoutError:
         raise HTTPException(

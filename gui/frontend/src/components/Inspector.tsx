@@ -8,6 +8,7 @@ import {
 	QUANTITY_CATALOGUE,
 	TRANSPORT_KEYS,
 } from "../utils/quantities";
+import { describeElement, failuresFor } from "../utils/secondLaw";
 import { bassettDesignK } from "../utils/teeK";
 import { validateNetwork } from "../utils/validation";
 import AreaInput from "./AreaInput";
@@ -31,6 +32,7 @@ const Inspector = () => {
 		exportNetworkResults,
 		displaySettings,
 		solverSettings,
+		solveResults,
 	} = useStore();
 
 	const validationErrors = validateNetwork(nodes);
@@ -316,6 +318,35 @@ const Inspector = () => {
 						disabled
 					/>
 				</div>
+				{/* Second law (#545): this node's control volume -- or a hidden
+				    element it owns, such as a tee's port step -- destroys entropy:
+				    a passive element creating total pressure. Reported only. */}
+				{failuresFor(selectedNode.id, solveResults?.second_law_failures)
+					.length > 0 && (
+					<div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-800">
+						<div className="font-bold uppercase mb-0.5">
+							Second law: total pressure created
+						</div>
+						{failuresFor(
+							selectedNode.id,
+							solveResults?.second_law_failures,
+						).map((f) => (
+							<div key={f.element_id} className="font-mono">
+								{describeElement(f)}: σ/(R ṁ) = {f.sigma_norm.toExponential(2)}
+							</div>
+						))}
+						<div className="italic text-amber-700 mt-0.5">
+							In the solved state total pressure rises across{" "}
+							{failuresFor(selectedNode.id, solveResults?.second_law_failures)
+								.length > 1
+								? "these"
+								: "it"}{" "}
+							without work or cooling to pay for it, which no passive element
+							can do. Usually a modelling gap (an area step or loss left out);
+							the solve is not rejected for it.
+						</div>
+					</div>
+				)}
 				{selectedNode.type === "plenum" && (
 					<InitialGuessEditor node={selectedNode} />
 				)}

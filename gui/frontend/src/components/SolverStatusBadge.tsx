@@ -2,11 +2,39 @@ import { CheckCircle, X, XCircle } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import useStore from "../store/useStore";
+import { balanceIsOpen, type Ledger } from "../utils/secondLaw";
+import BalanceModal from "./BalanceModal";
 import ConvergenceChart from "./ConvergenceChart";
+
+/** One line on the second law and the balance (#545); report only. */
+const BalanceLine: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
+	const { solveResults } = useStore();
+	const ledger = solveResults?.ledger as Ledger | undefined;
+	if (!ledger || ledger.m_dot_in === undefined) return null;
+	const n = solveResults?.second_law_failures?.length ?? 0;
+	const open = balanceIsOpen(ledger);
+	const warn = n > 0 || open;
+	const text = [
+		n > 0 ? `${n} element${n > 1 ? "s" : ""} create total pressure` : null,
+		open ? "balance does not close" : null,
+	]
+		.filter(Boolean)
+		.join("; ");
+	return (
+		<button
+			type="button"
+			onClick={onOpen}
+			className={`text-[10px] underline text-left mt-0.5 ${warn ? "text-amber-700 hover:text-amber-900" : "opacity-70 hover:opacity-100"}`}
+		>
+			{warn ? `Second law: ${text}` : "View balance"}
+		</button>
+	);
+};
 
 const SolverStatusBadge: React.FC = () => {
 	const { solveResults, dismissSolveStatus, solverSettings } = useStore();
 	const [showChart, setShowChart] = useState(false);
+	const [showBalance, setShowBalance] = useState(false);
 
 	if (!solveResults) return null;
 
@@ -55,6 +83,7 @@ const SolverStatusBadge: React.FC = () => {
 								View convergence
 							</button>
 						)}
+						<BalanceLine onOpen={() => setShowBalance(true)} />
 					</div>
 					<button
 						type="button"
@@ -71,6 +100,13 @@ const SolverStatusBadge: React.FC = () => {
 						worstResiduals={solveResults.worst_residuals}
 						lmStartedAt={solveResults.lm_started_at_eval}
 						onClose={() => setShowChart(false)}
+					/>
+				)}
+				{showBalance && solveResults.ledger?.m_dot_in !== undefined && (
+					<BalanceModal
+						ledger={solveResults.ledger as Ledger}
+						failures={solveResults.second_law_failures ?? []}
+						onClose={() => setShowBalance(false)}
 					/>
 				)}
 			</>
@@ -118,6 +154,9 @@ const SolverStatusBadge: React.FC = () => {
 						</button>
 					</div>
 				)}
+				<div className="px-4 pb-2">
+					<BalanceLine onOpen={() => setShowBalance(true)} />
+				</div>
 			</div>
 			{showChart && (
 				<ConvergenceChart
@@ -125,6 +164,13 @@ const SolverStatusBadge: React.FC = () => {
 					worstResiduals={solveResults.worst_residuals}
 					lmStartedAt={solveResults.lm_started_at_eval}
 					onClose={() => setShowChart(false)}
+				/>
+			)}
+			{showBalance && solveResults.ledger?.m_dot_in !== undefined && (
+				<BalanceModal
+					ledger={solveResults.ledger as Ledger}
+					failures={solveResults.second_law_failures ?? []}
+					onClose={() => setShowBalance(false)}
 				/>
 			)}
 		</>

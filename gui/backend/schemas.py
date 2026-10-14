@@ -650,6 +650,15 @@ class WorstResidual(BaseModel):
     residual: float
 
 
+class SecondLawFlag(BaseModel):
+    """An element whose control volume destroys entropy (#545), on the canvas."""
+
+    element_id: str
+    owner_id: str
+    sigma_norm: float
+    sigma_norm_high: float
+
+
 class SolveResponse(BaseModel):
     success: bool
     message: str = ""
@@ -661,3 +670,9 @@ class SolveResponse(BaseModel):
     worst_residuals: list[WorstResidual] = []
     solver_settings_used: dict = {}
     lm_started_at_eval: int | None = None
+    #: Report only (#545): elements that fail the second-law check, each
+    #: attributed to the canvas node that owns it.
+    second_law_failures: list[SecondLawFlag] = []
+    #: Mass and energy over the network's control volume (empty if the root
+    #: finder did not converge).
+    ledger: dict = {}
