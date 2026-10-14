@@ -487,7 +487,7 @@ def _trace_boundary(
                     continue
                 seen.add(other)
                 node = nodes_map.get(other)
-                if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+                if node is not None and node.is_flow_boundary:
                     return node
                 nxt.append(other)
         frontier = nxt

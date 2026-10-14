@@ -993,7 +993,7 @@ class NetworkSolver:
         queue = []
         # Boundaries are starting points
         for nid, node in self.network.nodes.items():
-            if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+            if node.is_flow_boundary:
                 queue.append(nid)
                 visited.add(nid)
 
@@ -1437,12 +1437,7 @@ class NetworkSolver:
             ]
 
             # Boundaries with NO inflow are pure sources
-            if (
-                isinstance(node, (PressureBoundary, MassFlowBoundary))
-                and not up_elems
-                and not rev_in
-                and not jct_in
-            ):
+            if node.is_flow_boundary and not up_elems and not rev_in and not jct_in:
                 T, Y, _ = node.compute_derived_state([])
                 self._derived_states[nid] = (T, Y, None)
                 if not with_relay:
@@ -1536,9 +1531,7 @@ class NetworkSolver:
                     Y=node.Y if node.Y is not None else self._default_Y,
                 )
                 stream_info.append((inj, None, nid, {}))
-            no_inflow = not stream_info and not isinstance(
-                node, (PressureBoundary, MassFlowBoundary)
-            )
+            no_inflow = not stream_info and not node.is_flow_boundary
             up_states = [s for s, _, _, _ in stream_info]
 
             # Wall Coupling: evaluate walls BEFORE compute_derived_state
@@ -1966,10 +1959,7 @@ class NetworkSolver:
         floors as ``_get_node_state``.
         """
         state = self._get_node_state(node, x)
-        if (
-            isinstance(node, (PressureBoundary, MassFlowBoundary))
-            or node.id in self._derived_states
-        ):
+        if node.is_flow_boundary or node.id in self._derived_states:
             return state
         self._lagged_read = True
         if node.id in self._prev_derived_states:
@@ -3687,9 +3677,7 @@ class NetworkSolver:
                     for tgt, q_in in ((tgt_a, -float(wall_res.Q)), (tgt_b, float(wall_res.Q))):
                         if tgt in self._wall_ebs:
                             continue
-                        if isinstance(
-                            self.network.nodes[tgt], (PressureBoundary, MassFlowBoundary)
-                        ):
+                        if self.network.nodes[tgt].is_flow_boundary:
                             q_to_boundary += q_in
                             key = f"{tgt}.Q_wall_out"
                         else:

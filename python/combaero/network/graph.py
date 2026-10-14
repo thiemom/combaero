@@ -199,11 +199,7 @@ class FlowNetwork:
             upstream = self._upstream_of_node[node_id]
             downstream = self._downstream_of_node[node_id]
             connected = upstream + downstream
-            is_boundary = type(node).__name__ in (
-                "PressureBoundary",
-                "MassFlowBoundary",
-                "WallNode",
-            )
+            is_boundary = node.is_boundary
 
             if not connected:
                 raise ValueError(

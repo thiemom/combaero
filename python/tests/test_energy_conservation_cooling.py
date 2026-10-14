@@ -42,7 +42,7 @@ Y_AIR = cb.mole_to_mass(X_AIR)
 
 def _balance(net: FlowNetwork, s: NetworkSolver, r: dict, with_boundary_heat: bool = True):
     """(out - in, in) enthalpy flow [W] across the network's boundary."""
-    bnd = {n for n, o in net.nodes.items() if isinstance(o, (PressureBoundary, MassFlowBoundary))}
+    bnd = {n for n, o in net.nodes.items() if o.is_flow_boundary}
 
     def h(node: str) -> float:
         T = net.nodes[node].Tt if node in bnd else s._derived_states[node][0]
