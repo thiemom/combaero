@@ -4,6 +4,7 @@ import useStore from "../store/useStore";
 import {
 	balanceIsOpen,
 	describeElement,
+	displayName,
 	type Ledger,
 	type SecondLawFlag,
 } from "../utils/secondLaw";
@@ -20,10 +21,7 @@ const BalanceModal: React.FC<{
 	onClose: () => void;
 }> = ({ ledger, failures, onClose }) => {
 	const { nodes } = useStore();
-	const name = (id: string) => {
-		const n = nodes.find((x) => x.id === id);
-		return (n?.data?.label as string | undefined) || id;
-	};
+	const name = (id: string) => displayName(id, nodes);
 	const kW = (w: number) => (w / 1000).toFixed(3);
 	const open = balanceIsOpen(ledger);
 
@@ -33,7 +31,7 @@ const BalanceModal: React.FC<{
 				role="dialog"
 				aria-modal="true"
 				aria-label="Network balance"
-				className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-[560px] max-w-[95vw] max-h-[85vh] overflow-y-auto"
+				className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-[680px] max-w-[95vw] max-h-[85vh] overflow-y-auto"
 				onKeyDown={(e) => e.key === "Escape" && onClose()}
 			>
 				<div className="flex items-center justify-between mb-3">
@@ -50,29 +48,49 @@ const BalanceModal: React.FC<{
 					</button>
 				</div>
 
-				<table className="w-full text-xs font-mono mb-3">
-					<thead>
-						<tr className="text-left text-gray-500 border-b">
-							<th className="py-1 font-semibold">Boundary</th>
-							<th className="py-1 font-semibold">via</th>
-							<th className="py-1 font-semibold text-right">ṁ in [kg/s]</th>
-							<th className="py-1 font-semibold text-right">H in [kW]</th>
-						</tr>
-					</thead>
-					<tbody>
-						{ledger.streams.map((s) => (
-							<tr
-								key={`${s.node}-${s.via}`}
-								className="border-b border-gray-100"
-							>
-								<td className="py-0.5">{name(s.node)}</td>
-								<td className="py-0.5">{name(s.via_owner)}</td>
-								<td className="py-0.5 text-right">{s.m_dot_in.toFixed(5)}</td>
-								<td className="py-0.5 text-right">{kW(s.H_in)}</td>
+				<div className="overflow-x-auto mb-3">
+					<table className="w-full table-fixed text-xs font-mono">
+						<colgroup>
+							<col className="w-[34%]" />
+							<col className="w-[34%]" />
+							<col className="w-[16%]" />
+							<col className="w-[16%]" />
+						</colgroup>
+						<thead>
+							<tr className="text-left text-gray-500 border-b">
+								<th className="py-1 pr-2 font-semibold">Boundary</th>
+								<th className="py-1 pr-2 font-semibold">via</th>
+								<th className="py-1 font-semibold text-right whitespace-nowrap">
+									ṁ in [kg/s]
+								</th>
+								<th className="py-1 font-semibold text-right whitespace-nowrap">
+									H in [kW]
+								</th>
 							</tr>
-						))}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{ledger.streams.map((s) => (
+								<tr
+									key={`${s.node}-${s.via}`}
+									className="border-b border-gray-100 align-top"
+								>
+									<td className="py-0.5 pr-2 break-words">{name(s.node)}</td>
+									<td className="py-0.5 pr-2 break-words">
+										{s.direct
+											? `direct to ${name(s.via_owner)}`
+											: name(s.via_owner)}
+									</td>
+									<td className="py-0.5 text-right whitespace-nowrap">
+										{s.m_dot_in.toFixed(5)}
+									</td>
+									<td className="py-0.5 text-right whitespace-nowrap">
+										{kW(s.H_in)}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
 
 				<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs font-mono mb-3">
 					<span className="text-gray-500">Heat given</span>

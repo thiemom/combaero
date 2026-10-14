@@ -8,6 +8,8 @@
  * - the ledger: mass and energy entering and leaving the network.
  */
 
+import { nodeTypeLabel } from "./nodeUtils";
+
 export interface SecondLawFlag {
 	element_id: string;
 	owner_id: string;
@@ -19,6 +21,8 @@ export interface LedgerStream {
 	node: string;
 	via: string;
 	via_owner: string;
+	/** wired node-to-node: via_owner is the node at the edge's far end */
+	direct?: boolean;
 	m_dot_in: number;
 	H_in: number;
 }
@@ -35,6 +39,21 @@ export interface Ledger {
 	Q_withheld: number;
 	energy_closure: number;
 	energy_closure_rel: number;
+}
+
+/**
+ * What the canvas calls a node: its label, else its kind with the end of its
+ * id, so two unlabelled boundaries stay apart without a 20-digit id.
+ */
+export function displayName(
+	id: string,
+	nodes: { id: string; type?: string; data?: { label?: string } }[],
+): string {
+	const n = nodes.find((x) => x.id === id);
+	if (!n) return id;
+	if (n.data?.label) return n.data.label;
+	const kind = nodeTypeLabel(n.type);
+	return kind ? `${kind} ${id.slice(-4)}` : id;
 }
 
 /** Relative closure above which the balance is reported as open. */

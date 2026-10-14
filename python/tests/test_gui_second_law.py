@@ -24,6 +24,7 @@ from gui.backend.second_law_view import owner_of
         (f"__tee_step__{TEE}_straight", TEE),  # a tee's port step
         ("ln__s0", "ln"),  # a composite's sub-element
         ("orphan__x", "orphan__x"),  # no canvas owner: itself
+        ("__auto_link__ch_main__ln", "ln"),  # a drawn node-to-node edge
     ],
 )
 def test_each_verdict_belongs_to_a_node_on_the_canvas(element_id: str, owner: str) -> None:
@@ -44,9 +45,11 @@ def test_a_working_network_reports_its_balance_and_no_failures() -> None:
     assert abs(res.ledger["energy_closure_rel"]) < 1e-6
     assert abs(res.ledger["mass_closure_rel"]) < 1e-6
     assert res.element_results["ch_main"].model_dump()["second_law"] == "pass"
-    # the inlet's stream is attributed to the channel the user drew
+    # the inlet is wired straight to a plenum: the stream names that plenum,
+    # not the builder's link between them
     inlet = [row for row in res.ledger["streams"] if row["node"] == "mfb"]
     assert inlet and inlet[0]["m_dot_in"] == pytest.approx(0.1)
+    assert inlet[0]["via_owner"] == "plenum" and inlet[0]["direct"] is True
 
 
 def test_a_failing_hidden_step_is_flagged_on_its_tee(monkeypatch) -> None:

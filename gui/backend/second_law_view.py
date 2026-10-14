@@ -13,13 +13,31 @@ from typing import Any
 
 from .schemas import SecondLawFlag
 
+AUTO_LINK = "__auto_link__"
+
+
+def _auto_link_ends(element_id: str) -> tuple[str, str] | None:
+    """(source, target) of the lossless link the builder puts on a drawn
+    node-to-node edge, ``__auto_link__<source>__<target>``."""
+    if not element_id.startswith(AUTO_LINK):
+        return None
+    ends = element_id[len(AUTO_LINK) :].split("__")
+    return (ends[0], ends[-1]) if len(ends) >= 2 else None
+
 
 def owner_of(element_id: str, gui_ids: set[str], tee_steps: dict[str, tuple]) -> str:
-    """The canvas node an element belongs to (itself when the user drew it)."""
+    """The canvas node an element belongs to (itself when the user drew it).
+
+    A drawn node-to-node edge has no element of its own on the canvas; its
+    link belongs to the node it delivers to.
+    """
     if element_id in gui_ids:
         return element_id
     if element_id in tee_steps:
         return str(tee_steps[element_id][0])
+    ends = _auto_link_ends(element_id)
+    if ends:
+        return ends[1]
     head = element_id.split("__", 1)[0]
     return head if head in gui_ids else element_id
 
@@ -58,8 +76,14 @@ def ledger(result: dict[str, Any], net: Any, gui_ids: set[str]) -> dict[str, Any
     if not raw:
         return {}
     tee_steps = getattr(net, "_gui_tee_steps", {}) or {}
-    streams = [
-        {**row, "via_owner": owner_of(str(row["via"]), gui_ids, tee_steps)}
-        for row in raw.get("streams", [])
-    ]
+    streams = []
+    for row in raw.get("streams", []):
+        via = str(row["via"])
+        ends = _auto_link_ends(via)
+        if ends:
+            # a direct edge: name the node at its far end
+            far = ends[1] if row["node"] == ends[0] else ends[0]
+            streams.append({**row, "via_owner": far, "direct": True})
+        else:
+            streams.append({**row, "via_owner": owner_of(via, gui_ids, tee_steps)})
     return {**raw, "streams": streams}

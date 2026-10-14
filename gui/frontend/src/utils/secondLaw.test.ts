@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	balanceIsOpen,
 	describeElement,
+	displayName,
 	failuresFor,
 	type Ledger,
 } from "./secondLaw";
@@ -48,5 +49,14 @@ describe("second law (#545)", () => {
 		expect(balanceIsOpen(ledger(0, 2e-6))).toBe(true);
 		expect(balanceIsOpen(ledger(-2e-6, 0))).toBe(true);
 		expect(balanceIsOpen(undefined)).toBe(false);
+	});
+	it("names a node by its label, else its kind and the end of its id", () => {
+		const nodes = [
+			{ id: "node_1791967900397", type: "mass_boundary", data: {} },
+			{ id: "node_2", type: "plenum", data: { label: "Supply" } },
+		];
+		expect(displayName("node_1791967900397", nodes)).toBe("mass boundary 0397");
+		expect(displayName("node_2", nodes)).toBe("Supply");
+		expect(displayName("gone", nodes)).toBe("gone");
 	});
 });
