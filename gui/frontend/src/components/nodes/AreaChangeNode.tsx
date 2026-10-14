@@ -6,6 +6,8 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import useStore from "../../store/useStore";
+import { inheritedField } from "../../utils/inheritance";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
@@ -20,9 +22,16 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 		updateNodeInternals(id);
 	}, [id, rotation, updateNodeInternals]);
 
-	const f0 = data.F0 ?? 0.01;
-	const f1 = data.F1 ?? 0.02;
-	const isExpansion = f1 > f0;
+	// Unset faces are inherited: show the solver's resolved areas (#559), not
+	// placeholders (the old 0.01 / 0.02 always read "F1/F0: 2.00").
+	const previewItems = useStore((s) => s.previewItems);
+	const f0: number | null =
+		data.F0 ?? inheritedField(previewItems, id, "F0")?.value ?? null;
+	const f1: number | null =
+		data.F1 ?? inheritedField(previewItems, id, "F1")?.value ?? null;
+	const ratio: number | null =
+		data.result?.ratio ?? (f0 && f1 ? f1 / f0 : null);
+	const isExpansion = ratio == null || ratio >= 1;
 	const Icon = isExpansion ? Maximize2 : Minimize2;
 
 	return (
@@ -58,7 +67,7 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 					{data.label ? data.label : "Area Change"}
 				</div>
 				<div className="flex flex-row gap-1 text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
-					<div>F₁/F₀: {(data.result?.ratio ?? f1 / f0).toFixed(2)}</div>
+					<div>F₁/F₀: {ratio != null ? ratio.toFixed(2) : "—"}</div>
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>

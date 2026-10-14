@@ -361,6 +361,11 @@ def _channel_id_at_tee_port(edge, tee_id: str) -> str:
     return edge.target if edge.source == tee_id else edge.source
 
 
+#: Common-arm area [m^2] of a tee with no channel on its common or straight
+#: port and no user F_C (reported as "default"; the GUI mirrors it).
+DEFAULT_TEE_F_C = 0.01
+
+
 def _resolve_tee_areas_with_sources(
     schema_edges,
     schema_nodes,
@@ -396,7 +401,7 @@ def _resolve_tee_areas_with_sources(
                 F_C_source = f"channel '{_channel_id_at_tee_port(hit[0], tee_id)}'"
                 break
     if F_C is None:
-        F_C = 0.01  # ultimate default for a fully disconnected tee
+        F_C = DEFAULT_TEE_F_C
         F_C_source = "default"
 
     F_branch = F_branch_explicit

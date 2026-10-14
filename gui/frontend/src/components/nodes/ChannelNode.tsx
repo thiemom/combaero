@@ -6,6 +6,8 @@ import {
 	Position,
 	useUpdateNodeInternals,
 } from "reactflow";
+import useStore from "../../store/useStore";
+import { inheritedField } from "../../utils/inheritance";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
@@ -14,6 +16,12 @@ const ChannelNode = ({ id, data, selected }: NodeProps) => {
 	const isSolved = !!data.result;
 	const updateNodeInternals = useUpdateNodeInternals();
 	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
+	// An unset D is inherited: show the solver's value greyed (#559).
+	const previewItems = useStore((s) => s.previewItems);
+	const inheritedD =
+		data.D == null
+			? inheritedField(previewItems, id, "diameter")?.value
+			: undefined;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation triggers handle re-measurement
 	useEffect(() => {
@@ -48,7 +56,16 @@ const ChannelNode = ({ id, data, selected }: NodeProps) => {
 					{data.label ? data.label : "Channel"}
 				</span>
 				<span className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
-					L:{data.L} D:{data.D}
+					L:{data.L} D:
+					{data.D != null ? (
+						data.D
+					) : inheritedD != null ? (
+						<span className="text-gray-400">
+							{Number(inheritedD.toPrecision(3))}
+						</span>
+					) : (
+						<span className="text-amber-600">?</span>
+					)}
 				</span>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>
