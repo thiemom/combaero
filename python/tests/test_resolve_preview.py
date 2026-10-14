@@ -278,3 +278,24 @@ def test_orifice_reports_pipe_diameter_and_beta() -> None:
     assert f["diameter"].source == "default"
     assert f["pipe_diameter"].value is None
     assert f["beta"].value == 0.0
+
+
+def test_audit_sources_discrete_loss_area_and_channel_dh() -> None:
+    """Closing-audit findings (#559): a discrete loss that takes its area from
+    the upstream channel names it (it reported no source), and a channel's
+    unset Dh is the circular Dh = D, not "user"."""
+    from combaero.network import ConstantFractionLoss, PressureLossElement
+
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=1.05e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PlenumNode("p"))
+    net.add_node(PressureBoundary("out", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    net.add_element(ChannelElement("ch", "in", "p", length=1.0, diameter=0.1))
+    net.add_element(PressureLossElement("dl", "p", "out", correlation=ConstantFractionLoss(0.01)))
+
+    rep = resolve_preview(net)
+    assert rep["dl"].fields["area"].source == "channel 'ch'"
+    assert rep["ch"].fields["Dh"].source == "derived from D (circular)"
+
+    net.add_element(ChannelElement("ch2", "p", "out", length=1.0, diameter=0.1, Dh=0.05))
+    assert resolve_preview(net)["ch2"].fields["Dh"].source == "user"
