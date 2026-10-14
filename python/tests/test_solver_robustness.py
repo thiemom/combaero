@@ -1,8 +1,11 @@
+import warnings
+
 import numpy as np
 import pytest
 
 import combaero as cb
 from combaero.network import (
+    ChannelElement,
     CombustorNode,
     FlowNetwork,
     MassFlowBoundary,
@@ -462,3 +465,38 @@ def test_no_negative_Y_ever():
         y_name = f"comb.Y[{i}]"
         if y_name in sol:
             assert sol[y_name] >= 0.0, f"Final solution has negative Y[{i}]: {sol[y_name]}"
+
+
+def _channel_between_boundaries(p_in: float, p_out: float) -> FlowNetwork:
+    """PB -> Channel -> PB. With equal boundary pressures the only solution is
+    zero flow, and the default non-zero flow seed stalls on the flat dP/dm at
+    m=0 -- the GUI 'no pressure difference' bug."""
+    Y = list(cb.mole_to_mass(cb.species.dry_air()))
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("in", Pt=p_in, Tt=300.0, Y=Y))
+    g.add_node(PressureBoundary("out", Pt=p_out, Tt=300.0, Y=Y))
+    g.add_element(ChannelElement("ch", "in", "out", length=1.0, diameter=0.1, roughness=1e-5))
+    return g
+
+
+def test_no_driving_potential_converges_to_zero_flow() -> None:
+    """Equal boundary pressures: the zero-flow fallback finds the valid m=0
+    solution instead of stalling and returning the best (non-zero) iterate."""
+    g = _channel_between_boundaries(1.01e5, 1.01e5)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = NetworkSolver(g).solve(timeout=20)
+    assert r["__success__"], r.get("__message__")
+    assert abs(r["ch.m_dot"]) < 1e-6
+    assert "zero flow" in str(r.get("__message__"))
+
+
+def test_pressure_difference_still_gives_non_zero_flow() -> None:
+    """The fallback never forces zero flow: a real pressure difference drives
+    a non-zero flow, reached by the normal path."""
+    g = _channel_between_boundaries(1.20e5, 1.01e5)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = NetworkSolver(g).solve(timeout=20)
+    assert r["__success__"], r.get("__message__")
+    assert abs(r["ch.m_dot"]) > 1e-3
