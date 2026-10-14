@@ -73,11 +73,20 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
     Only covers the items that inherit/derive geometry; anything else returns an
     empty dict and is reported as trivially resolved.
     """
+    # Builder-resolved geometry (a GUI tee's F_C / F_branch are resolved in
+    # graph_builder and handed to the element as explicit port areas, so the
+    # element itself would report "user"). The builder records the real source.
+    preview_fields = getattr(item, "_preview_fields", None)
+    if preview_fields:
+        return {
+            name: FieldResolution(float(value) if value is not None else None, str(source))
+            for name, (value, source) in preview_fields.items()
+        }
     # Nodes.
     if isinstance(item, (MomentumChamberNode, CombustorNode)):
         return {
             "area": FieldResolution(_f(item, "area"), _s(item, "_area_source")),
-            "Dh": FieldResolution(_f(item, "Dh"), _s(item, "_area_source")),
+            "Dh": FieldResolution(_f(item, "Dh"), _s(item, "_Dh_source")),
         }
     # Elements. Order matters: Effusion/Impingement plates subclass Orifice but
     # take their geometry from construction, so they are not inheriting items.

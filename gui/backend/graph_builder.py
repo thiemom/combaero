@@ -356,6 +356,68 @@ def _channel_at_tee_port(
     return None
 
 
+def _channel_id_at_tee_port(edge, tee_id: str) -> str:
+    """The channel at the far end of a tee-port edge."""
+    return edge.target if edge.source == tee_id else edge.source
+
+
+def _resolve_tee_areas_with_sources(
+    schema_edges,
+    schema_nodes,
+    tee_id: str,
+    F_C_explicit: float | None,
+    F_branch_explicit: float | None,
+    psi_fallback: float,
+) -> tuple[float, float, float, str, str]:
+    """Resolve (F_C, F_branch, psi) for a 3-port tee, with each area's source.
+
+    Precedence:
+      1. Explicit user-set value (non-null) wins.            -> "user"
+      2. Channel D at the connected port (auto-inherited).   -> "channel '<id>'"
+      3. Fallback: F_C=0.01 m^2                              -> "default";
+         F_branch derived from psi_fallback                  -> "derived from F_C / psi"
+
+    The tee's areas are resolved HERE, in the builder, and handed to the
+    element as explicit port areas -- so the element itself would report them
+    all as "user". The sources returned here are the real provenance, attached
+    to the element for ``resolve_preview`` (#559).
+
+    Returns (F_C, F_branch, psi, F_C_source, F_branch_source).
+    """
+    F_C = F_C_explicit
+    F_C_source = "user" if F_C is not None else ""
+    if F_C is None:
+        # Try common port first, then straight (both are F_C in Bassett/Idelchik
+        # geometry where F_s = F_c by definition).
+        for port in ("common", "straight"):
+            hit = _channel_at_tee_port(schema_edges, schema_nodes, tee_id, port)
+            if hit is not None:
+                F_C = _math.pi / 4.0 * hit[1] * hit[1]
+                F_C_source = f"channel '{_channel_id_at_tee_port(hit[0], tee_id)}'"
+                break
+    if F_C is None:
+        F_C = 0.01  # ultimate default for a fully disconnected tee
+        F_C_source = "default"
+
+    F_branch = F_branch_explicit
+    F_branch_source = "user" if F_branch is not None else ""
+    if F_branch is None:
+        hit = _channel_at_tee_port(schema_edges, schema_nodes, tee_id, "branch")
+        if hit is not None:
+            F_branch = _math.pi / 4.0 * hit[1] * hit[1]
+            F_branch_source = f"channel '{_channel_id_at_tee_port(hit[0], tee_id)}'"
+
+    if F_branch is not None and F_branch > 0.0:
+        psi = F_C / F_branch
+    else:
+        # No branch channel; use stored psi to derive F_branch
+        psi = max(float(psi_fallback), 1e-12)
+        F_branch = F_C / psi
+        F_branch_source = "derived from F_C / psi"
+
+    return F_C, F_branch, psi, F_C_source, F_branch_source
+
+
 def _resolve_tee_areas(
     schema_edges,
     schema_nodes,
@@ -366,38 +428,12 @@ def _resolve_tee_areas(
 ) -> tuple[float, float, float]:
     """Resolve (F_C, F_branch, psi) for a 3-port tee, applying inheritance.
 
-    Precedence:
-      1. Explicit user-set value (non-null) wins.
-      2. Channel D at the connected port (auto-inherited).
-      3. Fallback: F_C=0.01 m^2, F_branch derived from psi_fallback.
-
-    Returns (F_C, F_branch, psi) all resolved to concrete floats.
+    See ``_resolve_tee_areas_with_sources`` for the precedence; this returns
+    just the three resolved floats.
     """
-    F_C = F_C_explicit
-    if F_C is None:
-        # Try common port first, then straight (both are F_C in Bassett/Idelchik
-        # geometry where F_s = F_c by definition).
-        for port in ("common", "straight"):
-            d = _channel_D_at_tee_port(schema_edges, schema_nodes, tee_id, port)
-            if d is not None:
-                F_C = _math.pi / 4.0 * d * d
-                break
-    if F_C is None:
-        F_C = 0.01  # ultimate default for a fully disconnected tee
-
-    F_branch = F_branch_explicit
-    if F_branch is None:
-        d = _channel_D_at_tee_port(schema_edges, schema_nodes, tee_id, "branch")
-        if d is not None:
-            F_branch = _math.pi / 4.0 * d * d
-
-    if F_branch is not None and F_branch > 0.0:
-        psi = F_C / F_branch
-    else:
-        # No branch channel; use stored psi to derive F_branch
-        psi = max(float(psi_fallback), 1e-12)
-        F_branch = F_C / psi
-
+    F_C, F_branch, psi, _, _ = _resolve_tee_areas_with_sources(
+        schema_edges, schema_nodes, tee_id, F_C_explicit, F_branch_explicit, psi_fallback
+    )
     return F_C, F_branch, psi
 
 
@@ -840,7 +876,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         if elem_type == "mpce_tee":
             _md = MPCETeeData(**elem_data)
             # Resolve areas with inheritance precedence (see _resolve_tee_areas).
-            _F_C, _A_branch, _psi = _resolve_tee_areas(
+            _F_C, _A_branch, _psi, _F_C_src, _A_branch_src = _resolve_tee_areas_with_sources(
                 schema.edges,
                 schema.nodes,
                 elem_id,
@@ -937,6 +973,13 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             _mpce.initial_guess = _expand_initial_guess(_md.initial_guess, elem_id)
             if not _mpce.initial_guess:
                 _mpce.initial_guess = _guess_from_prior_result(elem_data, elem_id)
+            # The element sees these areas as explicit port areas ("user"); the
+            # builder knows where they really came from. resolve_preview reports
+            # these in place of the per-port sources (#559).
+            _mpce._preview_fields = {
+                "F_C": (_F_C, _F_C_src),
+                "F_branch": (_A_branch, _A_branch_src),
+            }
             net.add_element(_mpce)
             continue
 

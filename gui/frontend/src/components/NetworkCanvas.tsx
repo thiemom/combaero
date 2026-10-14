@@ -140,13 +140,15 @@ const NetworkCanvas = () => {
 				data = {
 					...data,
 					method: "complete",
-					area: 0.1,
+					// area null: the chamber inherits it from a neighbour (or the 0.1 m^2
+					// default), shown greyed; a value here would count as user-set.
+					area: null,
 					Nu_multiplier: 1.0,
 				} as any;
 			} else if (type === "momentum_chamber") {
 				data = {
 					...data,
-					area: 0.1,
+					area: null,
 					Nu_multiplier: 1.0,
 					f_multiplier: 1.0,
 				} as any;
