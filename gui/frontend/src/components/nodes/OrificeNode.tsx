@@ -30,7 +30,7 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 						: "border-stone-300"
 			}`}
 			style={{
-				width: 120,
+				width: 140,
 				height: 48,
 				transform: `rotate(${rotation}deg)`,
 				transformOrigin: "center center",
@@ -41,13 +41,13 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="flex flex-col items-start flex-1 min-w-0"
+				className="flex flex-col items-start flex-1 min-w-0 overflow-hidden"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap truncate max-w-full">
 					{data.label ? data.label : "Orifice"}
 				</div>
-				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
+				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					Cd: {(data.result?.Cd ?? data.Cd ?? 0.6).toFixed(3)}
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}

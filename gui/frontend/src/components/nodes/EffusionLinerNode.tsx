@@ -56,10 +56,10 @@ const EffusionLinerNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="flex flex-col items-start flex-1 min-w-0"
+				className="flex flex-col items-start flex-1 min-w-0 overflow-hidden"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap truncate max-w-full">
 					{data.label ? data.label : "Effusion Liner"}
 				</div>
 				<div className="text-[9px] font-mono whitespace-nowrap text-gray-500">

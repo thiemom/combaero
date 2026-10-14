@@ -51,13 +51,13 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="flex flex-col items-start flex-1 min-w-0"
+				className="flex flex-col items-start flex-1 min-w-0 overflow-hidden"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap truncate max-w-full">
 					{data.label ? data.label : "Area Change"}
 				</div>
-				<div className="flex flex-row gap-1 text-[9px] font-mono text-gray-500 whitespace-nowrap">
+				<div className="flex flex-row gap-1 text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					<div>F₁/F₀: {(data.result?.ratio ?? f1 / f0).toFixed(2)}</div>
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}

@@ -21,11 +21,11 @@ const VortexNode = ({ data, selected }: NodeProps) => {
 				<Tornado size={16} className="text-violet-500" />
 			</div>
 
-			<div className="flex flex-col items-start flex-1 min-w-0">
-				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
+			<div className="flex flex-col items-start flex-1 min-w-0 overflow-hidden">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap truncate max-w-full">
 					{data.label ? data.label : "Vortex"}
 				</div>
-				<div className="text-[9px] font-mono text-violet-500 whitespace-nowrap">
+				<div className="text-[9px] font-mono text-violet-500 whitespace-nowrap truncate max-w-full">
 					{hasLocalRpm ? `${data.omega_rpm} rpm` : "global rpm"}
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}

@@ -37,11 +37,11 @@ const PressureBoundaryNode = ({ id, data, selected }: NodeProps) => {
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
 				{data.label && (
-					<span className="text-[10px] font-bold text-gray-500 uppercase whitespace-nowrap">
+					<span className="text-[10px] font-bold text-gray-500 uppercase whitespace-nowrap truncate max-w-full">
 						{data.label}
 					</span>
 				)}
-				<div className="text-[10px] text-gray-500 font-mono whitespace-nowrap">
+				<div className="text-[10px] text-gray-500 font-mono whitespace-nowrap truncate max-w-full">
 					{(data.Pt / 1e5).toFixed(2)} bar
 				</div>
 			</div>

@@ -32,7 +32,7 @@ const ImpingementArrayNode = ({ id, data, selected }: NodeProps) => {
 						: "border-stone-300"
 			}`}
 			style={{
-				width: 150,
+				width: 172,
 				height: 48,
 				transform: `rotate(${rotation}deg)`,
 				transformOrigin: "center center",
@@ -43,13 +43,13 @@ const ImpingementArrayNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="flex flex-col items-start flex-1 min-w-0"
+				className="flex flex-col items-start flex-1 min-w-0 overflow-hidden"
 				style={{ transform: `rotate(${textRotation}deg)` }}
 			>
-				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap truncate max-w-full">
 					{data.label ? data.label : "Impingement"}
 				</div>
-				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
+				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					{data.n_rows ?? 10} rows, d{" "}
 					{((data.d_jet ?? 0.00254) * 1000).toFixed(2)} mm
 				</div>
