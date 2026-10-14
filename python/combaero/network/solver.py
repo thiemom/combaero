@@ -2390,12 +2390,27 @@ class NetworkSolver:
             lambda_steps=lambda_steps,
             auto_retry=auto_retry,
         )
-        if (
-            sol.get("__success__", False)
-            or not auto_retry
-            or x0 is not None
-            or not (self.network.thermal_coupling_enabled and self.network.walls)
-        ):
+        if sol.get("__success__", False) or not auto_retry or x0 is not None:
+            return sol
+        # Zero-flow fallback: a network whose only solution is zero flow -- equal
+        # boundary pressures, nothing imposing a flow -- stalls because dP/dm -> 0
+        # at m=0, so the default non-zero flow seed cannot descend to it. Seeding
+        # the flows at zero lands on it directly. Gated to networks with no
+        # pressure driving potential so it adds no attempt to ordinary failed
+        # solves, and accepted only if it genuinely converges, so it never
+        # invents a zero-flow answer for a network that actually carries flow.
+        if self._no_pressure_driving_potential():
+            zsol = self._zero_flow_retry(
+                method=method,
+                timeout=timeout,
+                t0=_t0,
+                options=options,
+                use_jac=use_jac,
+                primary=sol,
+            )
+            if zsol is not None:
+                return zsol
+        if not (self.network.thermal_coupling_enabled and self.network.walls):
             return sol
         remaining = None
         if timeout is not None:
@@ -2446,6 +2461,76 @@ class NetworkSolver:
         if set(by_name) != set(self.unknown_names):
             return None
         return np.array([by_name[k] for k in self.unknown_names], dtype=float)
+
+    def _no_pressure_driving_potential(self) -> bool:
+        """True when the boundaries cannot drive flow by a pressure difference:
+        every ``PressureBoundary`` is at the same total pressure and no
+        ``MassFlowBoundary`` imposes a flow. A heat source can still drive flow,
+        so the zero-flow retry this gates stays self-validating (accepted only
+        on convergence); this only keeps that retry off ordinary failed solves
+        that plainly have a driving potential."""
+        pressures: list[float] = []
+        for node in self.network.nodes.values():
+            if isinstance(node, MassFlowBoundary) and abs(float(node.m_dot)) > 0.0:
+                return False
+            if isinstance(node, PressureBoundary):
+                pressures.append(float(node.Pt))
+        if not pressures:
+            return False
+        lo, hi = min(pressures), max(pressures)
+        return (hi - lo) <= 1e-6 * max(abs(hi), abs(lo), 1.0)
+
+    def _zero_flow_seed(self) -> np.ndarray | None:
+        """The default initial guess with every flow unknown set to zero.
+
+        ``None`` if the network has no flow unknowns (nothing to seed)."""
+        x0 = np.array(self._build_x0(), dtype=float)
+        touched = False
+        for i, name in enumerate(self.unknown_names):
+            if name.endswith(".m_dot"):
+                x0[i] = 0.0
+                touched = True
+        return x0 if touched else None
+
+    def _zero_flow_retry(
+        self,
+        method: str,
+        timeout: float | None,
+        t0: float,
+        options: dict[str, Any] | None,
+        use_jac: bool,
+        primary: dict[str, float],
+    ) -> dict[str, float] | None:
+        """Retry a failed cold solve from an all-zero-flow seed.
+
+        Returns the retry only if it genuinely converges (so a network that
+        actually carries flow, where zero flow leaves a non-zero residual, is
+        never reported as zero flow); otherwise ``None`` and the primary's
+        diagnostics are restored. Cheap: on the zero-flow solution it lands in a
+        step or two, and on any other network it fails fast."""
+        seed = self._zero_flow_seed()
+        if seed is None:
+            return None
+        remaining = None
+        if timeout is not None:
+            # A couple of seconds is plenty to confirm |F|=0 at the seed; grant
+            # that floor even if the primary used the budget (the backend's hard
+            # deadline has its own buffer on top).
+            remaining = max(timeout - (time.time() - t0), 2.0)
+        primary_diag = getattr(self, "_diagnostic_data", None)
+        retry = self._solve_impl(
+            method=method, timeout=remaining, options=options, use_jac=use_jac, x0=seed
+        )
+        if retry.get("__success__", False):
+            primary_msg = str(primary.get("__message__", "")).strip()
+            retry["__message__"] = (
+                "Converged to zero flow after the initial attempt failed "
+                f"({primary_msg[:120]}): the network has no net driving potential."
+            )
+            return retry
+        if primary_diag is not None:
+            self._diagnostic_data = primary_diag
+        return None
 
     def _solve_flow_retries(
         self,

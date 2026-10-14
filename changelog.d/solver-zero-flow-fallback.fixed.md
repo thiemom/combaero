@@ -1,0 +1,3 @@
+- **A network with no pressure difference now solves to zero flow.**
+  - Before: two boundaries at equal total pressure (any network whose only solution is zero flow) failed to converge -- the default non-zero flow seed stalled on the flat `dP/dm` at `m=0` -- and the solver returned a wandering best iterate. In the GUI this surfaced as a bare "Solver: Failed".
+  - Now: when the boundaries have no pressure driving potential, a failed cold solve is retried once from a zero-flow seed and accepted only if it genuinely converges, so the valid `m=0` solution is returned. A real pressure difference or an imposed mass flow is unaffected, and the retry never forces zero flow on a network that actually carries flow.
