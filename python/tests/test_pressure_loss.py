@@ -352,7 +352,7 @@ class TestPressureLossElementDiagnostics:
         assert not missing, f"Missing diagnostic keys: {sorted(missing)}"
         # All values finite floats (except ref_location)
         for k, v in diag.items():
-            if k == "ref_location":
+            if k in ("ref_location", "area_source"):
                 assert isinstance(v, str)
             else:
                 assert isinstance(v, float), f"{k} is not float: {v!r}"
