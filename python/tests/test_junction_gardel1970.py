@@ -52,7 +52,7 @@ def test_pooled_scores_sit_where_they_were_measured() -> None:
     cells, taps = g.score()
     stats = g.pooled(cells)
     assert stats["ideal"][0] == 1426
-    assert taps == 18
+    assert taps == 16  # 18 before two label glyphs were removed from Fig. 14 (2026-10-13)
     # 2026-10-12: ideal 0.550 (+0.535), Bassett 0.214 (+0.115), shipped 0.219 (+0.113).
     assert stats["ideal"][1] == pytest.approx(0.550, abs=0.01)
     assert stats["bassett"][1] == pytest.approx(0.214, abs=0.01)
@@ -71,3 +71,30 @@ def test_the_score_moves_when_a_model_does(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(g, "model_losses", shifted)
     moved = g.pooled(g.score()[0])["bassett"]
     assert moved[2] - base[2] == pytest.approx(0.3, abs=1e-9)
+
+
+def test_curve_scores_sit_where_they_were_measured() -> None:
+    cells, taps = g.score(g.load_curves())
+    one = {k: v for k, v in cells.items() if k[4] == ""}
+    two = {k: v for k, v in cells.items() if k[4] != ""}
+    stats = g.pooled(one)
+    assert stats["ideal"][0] == 13000
+    assert sum(len(v) for v in two.values()) == 400  # mode 3 at 90/0.44, states A and B
+    assert taps == 268
+    # 2026-10-13: ideal 0.801 (+0.794), Bassett 0.397 (+0.330), shipped 0.395 (+0.321).
+    assert stats["ideal"][1] == pytest.approx(0.801, abs=0.01)
+    assert stats["bassett"][1] == pytest.approx(0.397, abs=0.01)
+    assert stats["shipped"][1] == pytest.approx(0.395, abs=0.01)
+
+
+@pytest.mark.parametrize(
+    "fig,shape", [("12", "90/1/0"), ("13", "90/1/0.2"), ("14", "90/0.69/0"), ("15", "135/1/0")]
+)
+def test_curves_and_points_agree_where_a_shape_has_both(fig: str, shape: str) -> None:
+    # The curves are drawn through these points (Figs 21, 24, 26): every model's
+    # bias must come out the same on both, or the curve tracing or its loader is
+    # off. Measured spread 2026-10-13: at most 0.045 (135/1/0, shipped).
+    points = g.pooled(g.score()[0], lambda c: c[0] == fig)
+    curves = g.pooled(g.score(g.load_curves())[0], lambda c: c[1] == shape and c[4] == "")
+    for m in g.MODELS:
+        assert curves[m][2] == pytest.approx(points[m][2], abs=0.06), m

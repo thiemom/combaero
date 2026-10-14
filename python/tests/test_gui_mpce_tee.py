@@ -562,3 +562,27 @@ def test_ideal_momentum_runner_loss_factor_lowers_the_branch_loss() -> None:
 
     k1, k5 = k_branch(1.0), k_branch(0.5)
     assert 0.0 < k5 < k1
+
+
+@pytest.mark.parametrize("model", ["ideal_momentum", "mynard", "constant_k"])
+@pytest.mark.parametrize("D_straight,expected", [(0.1, 0), (0.05, 1)])
+def test_port_area_step_to_the_connected_channel_is_reported(
+    model: str, D_straight: float, expected: int
+) -> None:
+    """The straight port takes the main area F_C (F_s = F_c), whatever channel
+    is attached. A narrower straight channel leaves an area step that no
+    element models; the ideal tee's static coupling then creates total
+    pressure there (#536). The diagnostics report it, for every model."""
+    from types import SimpleNamespace
+
+    schema = _mpce_with_channels_schema("branch", D_straight=D_straight)
+    node = next(n for n in schema.nodes if n.id == "mpce")
+    node.data["junction_model"] = model
+    net = build_network_from_schema(schema)
+    net.resolve_all_topology()
+    e = _get_element(net, "mpce")
+    states = [SimpleNamespace(P=1.0e5, T=300.0) for _ in range(e.N)]
+    diag = e.diagnostics(states, 1.0e5, None)  # no flows: the port bookkeeping only
+    assert diag["port_area_mismatch"] == expected
+    assert diag["port_1_area_ratio"] == pytest.approx((D_straight / 0.1) ** 2)
+    assert diag["port_2_area_ratio"] == pytest.approx(1.0)
