@@ -1,0 +1,3 @@
+- **Second-law entropy check tightened to 1e-8 (#545).**
+  - The per-element internal-entropy tolerance `SIGMA_TOL` drops from 1e-6 to 1e-8, so the report now flags a manufactured total pressure down to the sub-ppm level -- 100x more sensitive than before.
+  - Kept global, not per element: a sweep of 238 element instances (the suite's networks plus 50 random junctions) found nothing dipping below zero -- the smallest real loss was 1.5e-5 (an iterative junction) -- so no per-element floor was warranted, and 1e-8 keeps a ~10x margin over the ~1e-9 solver round-off.

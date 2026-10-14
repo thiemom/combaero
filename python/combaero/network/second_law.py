@@ -66,9 +66,16 @@ import numpy as np
 
 import combaero as cb
 
-#: Below this, sigma_norm counts as negative: well above the 1e-9 round-off a
-#: lossless connection shows, and below any loss the elements model (#545).
-SIGMA_TOL = 1e-6
+#: Below this, sigma_norm counts as negative. Chosen from a sweep of 238 element
+#: instances across the suite's networks plus 50 random junctions: the most
+#: negative best-case sigma_norm_high seen was 0 (a lossless connection sits
+#: exactly at 0) and the smallest real loss was 1.5e-5 (an iterative junction),
+#: so nothing came within three orders of magnitude of this bound from below.
+#: 1e-8 is 100x tighter than the former 1e-6 -- it now catches a sub-ppm
+#: manufactured total pressure -- while keeping a ~10x margin over the ~1e-9
+#: solver round-off. Global, not per element: no element class showed a noise
+#: floor that would need a looser per-element bound (#545).
+SIGMA_TOL = 1e-8
 
 
 @dataclass
