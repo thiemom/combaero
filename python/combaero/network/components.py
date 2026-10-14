@@ -1966,7 +1966,7 @@ class MomentumChamberNode(NetworkNode):
         velocity = m_dot_total / (rho * self.area)
         return float(cb.mach_number(velocity, state.T, state.X))
 
-    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
+    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:
         cs = cb.complete_state(state.T, state.P, state.X)
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
@@ -2010,6 +2010,8 @@ class MomentumChamberNode(NetworkNode):
             "Nu": nu_val,
             "htc": htc_val,
             "T_aw": t_aw_val,
+            "area": float(self.area or 0.0),
+            "area_source": self._area_source,
         }
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -2367,7 +2369,7 @@ class CombustorNode(NetworkNode):
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         return res, jac
 
-    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
+    def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:
         if state.P <= 0 or state.T <= 0:
             return {}
         cs = cb.complete_state(state.T, state.P, state.X)
@@ -2425,6 +2427,8 @@ class CombustorNode(NetworkNode):
             "T_aw": t_aw_val,
             "phi": phi,
             "theta": theta,
+            "area": float(self.area or 0.0),
+            "area_source": self._area_source,
         }
 
     def htc_and_T(self, state: NetworkMixtureState):
@@ -4714,7 +4718,7 @@ class PressureLossElement(NetworkElement):
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
-    ) -> dict[str, float]:
+    ) -> dict[str, float | str]:
         if state_in.P <= 0 or state_in.T <= 0 or state_out.P <= 0 or state_out.T <= 0:
             return {}
 
@@ -4748,12 +4752,14 @@ class PressureLossElement(NetworkElement):
         )
         mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 and v_out > 0 else 0.0
 
-        diag: dict[str, float] = {
+        diag: dict[str, float | str] = {
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
             "xi": float(xi),
             "theta": float(ctx.theta),
+            "area": float(area or 0.0),
+            "area_source": self._area_source,
         }
 
         if self.has_convective_surface:
@@ -4823,6 +4829,9 @@ class ChannelElement(NetworkElement):
         self.Dh: float | None = Dh if Dh is not None else diameter
         self.roughness = roughness
         self.area: float | None = math.pi * (diameter / 2) ** 2 if diameter is not None else None
+        # Provenance of the diameter/area: "user" when given, else the
+        # _infer_flow_area source string once resolved (issue #559).
+        self._area_source = "user" if diameter is not None else ""
 
         self.regime = regime
         self.friction_model = friction_model
@@ -5283,6 +5292,8 @@ class ChannelElement(NetworkElement):
             **ref,
             **duct,
             "Dh": float(self.Dh or self.diameter or 0.0),
+            "diameter": float(self.diameter or 0.0),
+            "area_source": self._area_source,
             "Nu": float(Nu),
             "htc": float(htc),
             "T_aw": float(T_aw),
@@ -5404,9 +5415,10 @@ class ChannelElement(NetworkElement):
         # Inherit diameter from the nearest geometry source. The channel's
         # area sets its friction and Mach behaviour, so a defaulted diameter
         # silently rewrites the flow; unresolvable is an error (issue #262).
-        area, _source = _infer_flow_area(graph, [self.from_node, self.to_node], exclude=self)
+        area, source = _infer_flow_area(graph, [self.from_node, self.to_node], exclude=self)
         if area is not None:
             self.diameter = math.sqrt(4.0 * area / math.pi)
+            self._area_source = source
         if self.diameter is None:
             if getattr(self, "_topo_pass", 0) >= 1:
                 raise _unresolved_area_error(self, "diameter", [self.from_node, self.to_node])
@@ -5805,7 +5817,7 @@ class AreaChangeElement(NetworkElement):
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
-    ) -> dict[str, float]:
+    ) -> dict[str, float | str]:
         try:
             cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         except Exception:
@@ -5871,6 +5883,10 @@ class AreaChangeElement(NetworkElement):
             "area_ratio": float(area_ratio),
             "zeta": float(zeta),
             "mach_loss_ref": float(mach_loss_ref),
+            "F0": float(f0),
+            "F1": float(f1),
+            "F0_source": self._F0_source,
+            "F1_source": self._F1_source,
         }
 
 
@@ -5920,6 +5936,9 @@ class TeeJunctionElement(NetworkElement):
         self.branch_node = branch_node
         self.theta = theta
         self.F_C: float | None = F_C
+        # Provenance of F_C: "user" when given, else set during resolve_topology
+        # (channel / branch channel / _infer_flow_area source) (issue #559).
+        self._area_source = "user" if F_C is not None else ""
         self._F_branch: float | None = (
             F_branch  # resolved branch area; psi derived from F_C/_F_branch
         )
@@ -5972,6 +5991,7 @@ class TeeJunctionElement(NetworkElement):
                         continue
                     if isinstance(e, ChannelElement) and e.diameter is not None:
                         self.F_C = math.pi * (e.diameter / 2.0) ** 2
+                        self._area_source = f"channel '{e.id}'"
                         found_fc = True
                         break
                 if found_fc:
@@ -5988,17 +6008,19 @@ class TeeJunctionElement(NetworkElement):
                         if self._F_branch is None:
                             self._F_branch = f_b
                         self.F_C = f_b * self.psi
+                        self._area_source = f"branch channel '{e.id}'"
                         found_fc = True
                         break
             if not found_fc:
                 # Widen to any area-bearing neighbour before giving up: the
                 # common/straight arms may be fed by a chamber or an area
                 # change rather than a channel (issue #262).
-                area, _source = _infer_flow_area(
+                area, source = _infer_flow_area(
                     graph, [self.common_node, self.straight_node], exclude=self
                 )
                 if area is not None:
                     self.F_C = area
+                    self._area_source = source
                     found_fc = True
             if not found_fc:
                 # F_C sets every loss reference in the junction closure, so a
@@ -6151,7 +6173,7 @@ class TeeJunctionElement(NetworkElement):
         state_com: NetworkMixtureState,
         state_straight: NetworkMixtureState,
         state_branch: NetworkMixtureState,
-    ) -> dict[str, float]:
+    ) -> dict[str, float | str]:
         m_com = state_com.m_dot
         m_branch = state_branch.m_dot
         if self.tee_type == "merging":
@@ -6191,6 +6213,8 @@ class TeeJunctionElement(NetworkElement):
             "K_straight": float(res.K_straight),
             "K_branch": float(res.K_branch),
             "correlation_extrapolated": 1.0 if is_extrapolated else 0.0,
+            "F_C": float(self.F_C or 0.0),
+            "area_source": self._area_source,
         }
 
 
