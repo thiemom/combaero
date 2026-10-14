@@ -22,7 +22,7 @@ validation/junction/
   scorecard.py                 # records -> metrics + scorecards
   random_robustness.py         # convergence on RANDOM physical BCs, no dataset
   mynard_fidelity.py           # the kernel against Mynard 2015's own figures
-  gardel1970_score.py          # closures against Gardel 1970's raw points (cross-source)
+  gardel1970_score.py          # closures against Gardel 1970's points and curves (cross-source)
   digitise_mynard2015.py       # colour extraction of those figures
 ```
 
@@ -166,9 +166,66 @@ MAE (bias), 2026-10-12.
   bassett_cv`) is not used: at 90 deg it drops the opening wall term that his
   corrected K11/K12 keep, which moves K by 0.15-0.25.
 
+### The smoothed curves: all 33 shapes
+
+The same script then scores the authors' curves (`curves_phi1.csv`,
+`curves_phi_lt1.csv`; Figs 18-27). They cover every shape: delta 45-135,
+phi 1/0.69/0.44, rho 0/0.1/0.2. They are scored at the 0.02 steps in q.
+Curves are drawn through the data, so they carry no scatter and no point
+counts. They are reported on their own and never pooled with the points.
+
+- **Mode 3 at 90/0.44** has two flow states, the hysteresis branches. These
+  are reported per state and left out of the pooled lines.
+- **Do the curves reproduce the points?** Where a shape has both (Figs 12-15),
+  each model's bias on the curve matches its bias on the points to within
+  0.045.
+
+| | n | ideal | Bassett | shipped |
+|---|---|---|---|---|
+| phi 1, rho 0 | 2800 | 0.445 (+0.436) | 0.155 (+0.064) | 0.150 (+0.061) |
+| phi 1, rho 0.1 | 2800 | 0.554 (+0.549) | 0.221 (+0.176) | 0.203 (+0.173) |
+| phi 1, rho 0.2 | 2800 | 0.641 (+0.635) | 0.293 (+0.262) | 0.279 (+0.260) |
+| phi 0.69, rho 0 | 1200 | 0.657 (+0.649) | 0.260 (+0.134) | 0.270 (+0.118) |
+| phi 0.69, rho 0.2 | 1200 | 0.994 (+0.990) | 0.510 (+0.474) | 0.498 (+0.458) |
+| phi 0.44, rho 0 | 1100 | 1.369 (+1.361) | 0.744 (+0.605) | 0.792 (+0.576) |
+| phi 0.44, rho 0.2 | 1100 | 2.118 (+2.112) | 1.405 (+1.355) | 1.428 (+1.327) |
+| all, one curve per case | 13000 | 0.801 (+0.794) | 0.397 (+0.330) | 0.395 (+0.321) |
+
+MAE (bias), 2026-10-13.
+
+- **Sharp edges at phi = 1** (21 shapes) confirm the points: Bassett and the
+  shipped tee are level (0.15) with a small positive bias, and the ideal tee
+  sits about 0.44 high. Across delta 45-135 at phi = 1 (all rho pooled) the
+  MAE varies by at most 0.03 for Bassett and the shipped tee and 0.06 for
+  the ideal tee: the branch angle is not where they miss.
+- **The fillet costs every model about the same.** No model represents rho,
+  and a rounded edge loses less, so the bias grows with rho at each phi:
+  +0.06 -> +0.17 -> +0.26 at phi = 1 for Bassett and the shipped tee.
+- **A smaller branch is where the models fail.**
+  - At phi = 0.44 with sharp edges, all three over-predict by +0.6 (Bassett,
+    shipped) and +1.4 (ideal).
+  - Mode 4, both mains into the branch, carries most of it: +1.6 on h_ba and
+    h_yb for Bassett and the shipped tee alike, against +0.05-0.07 at phi = 1.
+    That is about a third of the branch's own dynamic head (h = 5.2 at
+    phi = 0.44 on Gardel's main-pipe head).
+  - Mode 3 follows at +0.36 to +0.87.
+  - Mode 2's straight inlet (h_ya) is the one series predicted low, by -0.34
+    (Bassett) and -0.46 (shipped). It continues the psi = 1.45 joining
+    finding above, and the miss grows with psi.
+- **Hysteresis states, mode 3 at 90/0.44.** Bassett tracks state A (bias
+  -0.07 at rho 0, +0.08 at rho 0.2) better than state B (+0.14, +0.32), and so
+  does the shipped tee. The figure does not say which state is approached
+  from which side, so this does not pick one.
+
+Like the points, this is accuracy on another rig, not a target: nothing here
+was tuned. A closure change for psi > 1.45 would need its own validation data,
+not these curves.
+
 `python/tests/test_junction_gardel1970.py` pins the plumbing (mode 1 equals
 his K5/K6, the kernel equals the vector Borda loss, the h-to-loss signs at the
-table ends), the pooled numbers, and a falsification of the metric.
+table ends), the pooled numbers for the points and the curves, the
+curve-vs-points agreement on the four shared shapes, and a falsification of
+the metric. Swapping two curve series in the loader fails five of them.
 
 ## Endpoints
 
