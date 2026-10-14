@@ -435,3 +435,93 @@ def test_area_change_validation() -> None:
     ac_bad_dh = cb.network.AreaChangeElement("ac1", "n1", "n2", F0=0.01, F1=0.02, D_h=-1.0)
     with pytest.raises(ValueError, match="invalid Hydraulic Diameter"):
         ac_bad_dh.validate()
+
+
+# ---------------------------------------------------------------------------
+# Network coupling: the step loses stagnation pressure into a chamber (#541)
+# ---------------------------------------------------------------------------
+_F_BIG = 0.25 * np.pi * 0.1**2
+_F_SMALL = 0.25 * np.pi * 0.05**2
+
+
+def _step_into_chamber(F0: float, F1: float, model_type: str = "sharp"):
+    """mfb -> chamber(F0) -> area change -> chamber(F1) -> channel -> boundary.
+
+    Both chambers keep their dynamic head (Pt = P + q), as the node the GUI
+    inserts between two elements does.
+    """
+    from combaero.network import (
+        AreaChangeElement,
+        ChannelElement,
+        FlowNetwork,
+        LosslessConnectionElement,
+        MassFlowBoundary,
+        MomentumChamberNode,
+        NetworkSolver,
+        PressureBoundary,
+    )
+
+    Y = list(cb.mole_to_mass(cb.species.dry_air()))
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("mfb", m_dot=0.06, Tt=300.0, Y=Y))
+    net.add_node(MomentumChamberNode("up", area=F0))
+    net.add_node(MomentumChamberNode("down", area=F1))
+    net.add_node(PressureBoundary("pb", Pt=101325.0, Tt=300.0, Y=Y))
+    net.add_element(LosslessConnectionElement("feed", "mfb", "up"))
+    net.add_element(
+        AreaChangeElement("step", "up", "down", F0=F0, F1=F1, model_type=model_type, length=0.05)
+    )
+    D1 = float(np.sqrt(4.0 * F1 / np.pi))
+    net.add_element(ChannelElement("duct", "down", "pb", length=0.5, diameter=D1))
+    return NetworkSolver(net)
+
+
+@pytest.mark.parametrize(
+    ("F0", "F1", "model_type"),
+    [
+        (_F_BIG, _F_SMALL, "sharp"),
+        (_F_SMALL, _F_BIG, "sharp"),
+        (_F_BIG, _F_SMALL, "conical"),
+        (_F_SMALL, _F_BIG, "conical"),
+    ],
+    ids=["sharp-contraction", "sharp-expansion", "conical-contraction", "conical-expansion"],
+)
+def test_step_into_a_chamber_loses_exactly_its_loss(F0: float, F1: float, model_type: str) -> None:
+    """Pt drops across the step by the element's own loss, never rises.
+
+    The element used to set the downstream STATIC pressure to Pt_up - loss,
+    so a chamber downstream (Pt = P + q) gained its dynamic head: on a 0.1 ->
+    0.05 m contraction at 0.06 kg/s, Pt rose by ~250 Pa across a loss element.
+    """
+    sol = _step_into_chamber(F0, F1, model_type).solve()
+    assert sol["__success__"], sol["__message__"]
+    q_down = sol["down.Pt"] - sol["down.P"]
+    assert q_down > 10.0  # the chamber really carries a dynamic head
+    step = sol["__element_diag__"]["step"]
+    loss = sol["up.Pt"] - sol["down.Pt"]
+    assert loss > 0.0
+    # The drop is the element's own stagnation loss (dP_static is that loss,
+    # evaluated at the diagnostic's reference density), with no q_down in it.
+    assert loss == pytest.approx(step["dP_static"], rel=0.01)
+
+
+def test_step_into_a_chamber_jacobian_matches_fd() -> None:
+    """Global analytic Jacobian vs FD with the stagnation-coupled row.
+
+    Row-scaled (each entry as J_ij |x_j| against its row's largest term), with
+    a 1e-6 relative step: at 1e-7 the m_dot columns (x ~ 0.06) sit in FD
+    round-off, which read 1.1e-4 on Linux CI against 2.7e-6 at this step.
+    """
+    from scipy.optimize._numdiff import approx_derivative
+
+    solver = _step_into_chamber(_F_BIG, _F_SMALL)
+    sol = solver.solve()
+    assert sol["__success__"]
+    x = np.array([sol[n] for n in solver.unknown_names], dtype=float)
+    _, jac = solver._residuals_and_jacobian(x)
+    jac = jac.toarray()
+    step = np.maximum(np.abs(x) * 1e-6, 1e-10)
+    fd = approx_derivative(lambda v: solver._residuals(v), x, method="3-point", abs_step=step)
+    row_scale = np.abs(fd * x).max(axis=1, keepdims=True) + 1e-300
+    err = np.abs(jac - fd) * np.abs(x) / row_scale
+    assert err.max() < 1e-6, err.max()

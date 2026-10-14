@@ -1,0 +1,5 @@
+- **`AreaChangeElement` couples stagnation to stagnation pressure (#541).**
+  - **Before:** it set the downstream static pressure to `Pt_up - loss`. A `MomentumChamberNode` downstream (Pt = P + q) then gained its dynamic head across the step, so Pt rose across a loss element. This node is the one the GUI inserts between two elements.
+    - Example: a 0.1 -> 0.05 m sharp step at 0.06 kg/s raised Pt by about 250 Pa.
+  - **Now:** Pt drops by exactly the element's own loss, as with `ChannelElement` (#175).
+  - **Unchanged:** networks with a plenum or boundary downstream.

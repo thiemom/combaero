@@ -5686,7 +5686,14 @@ class AreaChangeElement(NetworkElement):
                 m_scale=1e-4,
             )
 
-        res = [state_in.Pt - state_out.P - res_cpp.dP_calc]
+        # dP_calc is the stagnation-pressure LOSS (zeta * q_small), so the
+        # element couples stagnation to stagnation, as ChannelElement does
+        # (#175). Coupling the downstream STATIC pressure instead let a
+        # MomentumChamberNode downstream (Pt = P + q) add its dynamic head as a
+        # free total-pressure gain across the step -- in the GUI, every area
+        # change followed by a channel raised Pt (#541). For a plenum or
+        # boundary downstream Pt == P and the two forms are identical.
+        res = [state_in.Pt - state_out.Pt - res_cpp.dP_calc]
 
         upstream_id = self.from_node
         downstream_id = self.to_node
@@ -5697,7 +5704,7 @@ class AreaChangeElement(NetworkElement):
                 f"{upstream_id}.Pt": 1.0,
                 f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
                 f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
-                f"{downstream_id}.P": -1.0,
+                f"{downstream_id}.Pt": -1.0,
             }
         }
         for i, val in enumerate(res_cpp.d_dP_dY_up):
