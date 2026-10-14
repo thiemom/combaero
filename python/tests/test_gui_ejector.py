@@ -436,3 +436,43 @@ def test_boundary_wired_straight_to_a_port_resolves():
     port = "__tee_jct__ej1_secondary"
     assert net.elements["ej1"].secondary_node == port
     assert net.nodes[port].initial_guess.get(f"{port}.Pt") == 22850.0
+
+
+# ---------------------------------------------------------------------------
+# Double-choked ejector behind an outlet pipe (#567): port-chain flow seeding.
+# ---------------------------------------------------------------------------
+
+_A3_PIPE_D = (4 * _MIXING / 3.141592653589793) ** 0.5  # pipe with area A_3
+
+
+def _critical_omega_bare_outlet() -> float:
+    df = NetworkRunner.from_dict(_solvable_ejector_schema()).solve(timeout=120.0).to_dataframe()
+    return float(df[df["id"] == "ej1"]["omega"].iloc[0])
+
+
+def test_warmstart_seeds_port_chain_flows_in_the_critical_regime():
+    """The cold start used the generic flow defaults (28 kg/s on the outlet
+    pipe for a ~0.07 kg/s ejector). The warm-start now seeds each port chain
+    from the closed-form operating point: mp, omega*mp, (1+omega)*mp."""
+    g = _ejector_with_outlet_pipe(_solvable_ejector_schema(), _MIXING, 2**0.5 * _A3_PIPE_D)
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    seeded = net.elements["ch_o"].initial_guess["ch_o.m_dot"]
+    assert seeded == pytest.approx(0.0739, rel=0.15)
+    # An A_3 inherited from the outlet pipe no longer skips the P_jct seed.
+    g = _ejector_with_outlet_pipe(_solvable_ejector_schema(), None, 2**0.5 * _A3_PIPE_D)
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    assert net.elements["ej1"].initial_guess.get("ej1.P_jct", 0.0) > 0.0
+
+
+@pytest.mark.parametrize("area_factor", [2.0, 5.0])
+def test_double_choked_ejector_behind_an_outlet_pipe_converges_to_the_critical_root(area_factor):
+    """With A_3 fixed, an outlet pipe wider than the mixing duct must leave the
+    critical entrainment ratio unchanged. Before the flow seed the 2x case did
+    not converge and the 5x case "converged" to a wrong root (omega 0.29)."""
+    g = _ejector_with_outlet_pipe(
+        _solvable_ejector_schema(), _MIXING, area_factor**0.5 * _A3_PIPE_D
+    )
+    df = NetworkRunner.from_dict(g).solve(timeout=120.0).to_dataframe()
+    row = df[df["id"] == "ej1"]
+    assert bool(row["success"].iloc[0])
+    assert float(row["omega"].iloc[0]) == pytest.approx(_critical_omega_bare_outlet(), rel=1e-6)
