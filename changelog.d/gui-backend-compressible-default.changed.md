@@ -1,0 +1,5 @@
+- **One regime default for scripts and the GUI (#585).** Every element constructor that takes a `regime`, the GUI backend's `SolverSettings.global_regime` and the GUI store now share `combaero.network.components.DEFAULT_REGIME`, and a test keeps them equal.
+  - It is **incompressible** for now: with compressible as the default, 60 tests failed to converge.
+  - **GUI:** a newly drawn network starts incompressible; before, the store defaulted to compressible. Saved networks keep their saved setting, and Solver Settings switches it.
+  - The backend fell back to incompressible already, so headless runs are unchanged.
+  - The switch to compressible is tracked in #585, with its acceptance test.

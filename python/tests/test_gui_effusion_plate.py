@@ -58,13 +58,29 @@ def test_the_node_builds_andrews_plate_c_by_default() -> None:
     assert net.nodes["ch"].main_inlet == "duct"
 
 
+def _liner_in(regime: str) -> dict:
+    g = _liner()
+    g["solver_settings"] = {"global_regime": regime}
+    return g
+
+
 def test_the_default_liner_solves_with_a_chamber_gas_side() -> None:
-    result = NetworkRunner.from_dict(_liner()).solve(timeout=120.0)
+    # Incompressible: the compressible solve of this liner stalls (#585).
+    result = NetworkRunner.from_dict(_liner_in("incompressible")).solve(timeout=120.0)
     r = result._element_results["eff"].model_dump()
     assert r["success"]
     assert r["gas_side_chamber"] == 1.0
     assert 600.0 < r["T_wall_cold"] <= r["T_wall_hot"] < r["T_gas"]
     assert 0.0 < r["eta_overall"] < 1.0
+
+
+@pytest.mark.xfail(strict=True, reason="#585: compressible default liner stalls")
+def test_the_default_liner_solves_in_the_gui_default_regime() -> None:
+    """Compressible is the default to come (#585). At M ~ 0.04 it should agree
+    with the incompressible solve, and today it stalls (#585; its first two
+    causes were fixed in #587, #582)."""
+    result = NetworkRunner.from_dict(_liner_in("compressible")).solve(timeout=120.0)
+    assert result._element_results["eff"].model_dump()["success"]
 
 
 def test_a_plenum_discharge_uses_the_imposed_flux() -> None:

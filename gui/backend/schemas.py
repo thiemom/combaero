@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from combaero.network.components import DEFAULT_REGIME
+
 
 class SmoothModelData(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -549,7 +551,11 @@ class ThermalWallData(BaseModel):
 
 class SolverSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    global_regime: Literal["incompressible", "compressible"] = "incompressible"
+    # The library-wide default (combaero.network.components.DEFAULT_REGIME),
+    # which the frontend store mirrors; test_regime_default_sync.py keeps the
+    # three equal. A payload without solver settings -- headless runs, tests,
+    # older clients -- gets the same physics as a freshly drawn GUI network.
+    global_regime: Literal["incompressible", "compressible"] = DEFAULT_REGIME
     init_strategy: Literal[
         "default",
         "analytical_pt_prop",

@@ -407,12 +407,20 @@ def test_warmstart_seeds_an_outlet_port_behind_a_pipe():
 
 def test_jet_pump_with_an_outlet_pipe_converges():
     """Regression: with the outlet seed missing, the jet pump behind an outlet
-    pipe stalled (it converged only with a bare MCN outlet)."""
-    g = _ejector_with_outlet_pipe(_jetpump_ejector_schema(), _MIXING, None)
-    df = NetworkRunner.from_dict(g).solve(timeout=120.0).to_dataframe()
-    row = df[df["id"] == "ej1"]
-    assert bool(row["success"].iloc[0])
-    assert float(row["omega"].iloc[0]) > 3.0
+    pipe stalled (it converged only with a bare MCN outlet).
+
+    Omega depends on the pipe's regime because the two end differently at the
+    pressure sink: an incompressible pipe ends Pt-to-Pt (omega 5.58), a
+    compressible one discharges at the sink pressure and loses its exit head,
+    ~180 Pa of a jet pump's few-hundred-Pa budget (omega 2.23). Bare outlet:
+    6.62 in both."""
+    for regime, lo, hi in (("incompressible", 5.0, 6.0), ("compressible", 2.0, 2.5)):
+        g = _ejector_with_outlet_pipe(_jetpump_ejector_schema(), _MIXING, None)
+        g["solver_settings"] = {"global_regime": regime}
+        df = NetworkRunner.from_dict(g).solve(timeout=120.0).to_dataframe()
+        row = df[df["id"] == "ej1"]
+        assert bool(row["success"].iloc[0]), regime
+        assert lo < float(row["omega"].iloc[0]) < hi, regime
 
 
 def test_cleared_throat_and_nozzle_exit_mean_the_default():
