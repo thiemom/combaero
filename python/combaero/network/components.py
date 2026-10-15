@@ -1184,6 +1184,14 @@ class NetworkMixtureState:
         return cp / cv if cv > 0 else 1.4
 
 
+#: Flow regime every element defaults to when none is given. It is the GUI's
+#: default too (gui/backend/schemas.py SolverSettings.global_regime and the
+#: frontend store), and test_regime_default_sync.py keeps the three equal: a
+#: script and a drawing of the same network must solve the same physics.
+#: Incompressible until the compressible path converges as reliably (#585):
+#: with this set to "compressible", 60 tests failed to converge (2026-10-15).
+DEFAULT_REGIME: Literal["incompressible", "compressible"] = "incompressible"
+
 #: Nominal cross-section for a chamber-like node whose area could not be
 #: inferred and which nothing in the network measures against. It is a
 #: bookkeeping placeholder, not a geometry: components for which the area IS
@@ -2626,7 +2634,7 @@ class OrificeElement(NetworkElement):
         to_node: str,
         Cd: float = 0.6,
         diameter: float | None = None,
-        regime: Literal["incompressible", "compressible"] = "incompressible",
+        regime: Literal["incompressible", "compressible"] = DEFAULT_REGIME,
         correlation: str = "ReaderHarrisGallagher",
         plate_thickness: float = 0.0,
         edge_radius: float = 0.0,
@@ -5051,7 +5059,7 @@ class ChannelElement(NetworkElement):
         diameter: float | None = None,
         Dh: float | None = None,
         roughness: float = 1e-5,
-        regime: CompressibilityLiteral = "incompressible",
+        regime: CompressibilityLiteral = DEFAULT_REGIME,
         friction_model: FrictionModelLiteral = "haaland",
         htc_model: HeatTransferModelLiteral = "none",
         t_hot: float | None = None,
@@ -5744,7 +5752,7 @@ class CrossflowSegmentElement(ChannelElement):
         area: float,
         Dh: float | None = None,
         roughness: float = 0.0,
-        regime: CompressibilityLiteral = "incompressible",
+        regime: CompressibilityLiteral = DEFAULT_REGIME,
         friction_model: FrictionModelLiteral = "haaland",
         from_kappa: float | None = None,
         to_kappa: float | None = None,
@@ -5897,7 +5905,7 @@ class ImpingementCrossflowElement(CrossflowSegmentElement):
         height: float,
         span: float,
         roughness: float = 0.0,
-        regime: CompressibilityLiteral = "incompressible",
+        regime: CompressibilityLiteral = DEFAULT_REGIME,
         friction_model: FrictionModelLiteral = "haaland",
     ) -> None:
         if length <= 0.0 or height <= 0.0 or span <= 0.0:
