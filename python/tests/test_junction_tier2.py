@@ -146,20 +146,25 @@ def test_wang_is_declared_cross_source():
 
 
 def test_wang_cross_source_accuracy(wang):
-    """CROSS-SOURCE. Measured 2026-10-10: 188 of 200 points scored, MAE 0.131.
+    """CROSS-SOURCE. Measured 2026-10-15: 190 of 200 points scored, MAE 0.127.
 
-    - Interior (0 < q < 1): 116 points, MAE 0.108.
+    - Interior (0 < q < 1): 116 points, MAE 0.097.
     - Endpoints: the q = 0 / 1 curves, scored at their one-sided limit (#272;
-      network_runner._ENDPOINT_EPS). 72 points, MAE 0.170.
-    - By area ratio: 0.107 / 0.111 / 0.195 at a = 1 / 1.56 / 2.44.
+      network_runner._ENDPOINT_EPS). 74 points, MAE 0.173.
+    - By area ratio: 0.099 / 0.115 / 0.186 at a = 1 / 1.56 / 2.44.
     - Worst: K_23 at q = 1, where the straight inlet is dead and all the flow
-      comes through the lateral (bias -0.33 over 16 points). That is a
+      comes through the lateral (bias -0.30 over 17 points). That is a
       limitation of the model there, not a reason to drop the curve.
 
-    Unscored: 8 endpoint points and 4 interior points, all at a = 2.44 and
-    above M 0.49. They are coverage, not error.
+    Unscored: 6 endpoint points and 4 interior points, all at a = 2.44 and
+    above M 0.39. They are coverage, not error.
+
+    History: 188 scored, MAE 0.131, until #576 put the port chambers' static
+    state (not their stagnation T) under both the port closure and the
+    junction's momentum rows. Fixing the chamber alone scored 0.194, rising
+    with Mach to 0.288 above M 0.45.
     """
-    assert len(wang) >= 188
+    assert len(wang) >= 190
     assert _mae(wang) < 0.145
     assert _mae([r for r in wang if not r.endpoint_limit]) < 0.12
     by_area = {a: _mae([r for r in wang if r.psi == a]) for a in (1.0, 1.56, 2.44)}
@@ -169,9 +174,11 @@ def test_wang_cross_source_accuracy(wang):
 
 
 def test_wang_error_does_not_grow_with_mach(wang):
-    """The compressible part of the claim. MAE by Mach band, measured:
-    0.124 below 0.15, 0.165, 0.115, 0.128 above 0.45 -- flat. An
-    incompressible reference head would add ~9% of K at M 0.6."""
+    """The compressible part of the claim. MAE by Mach band, measured
+    2026-10-15 (#576): 0.127 below 0.15, 0.129 between, 0.124 above 0.45 --
+    flat. An incompressible reference head would add ~9% of K at M 0.6, and
+    reading the port chambers' stagnation T as static (the pre-#576 port
+    closure with the junction rows) raised the top band to 0.288."""
     lowest = _mae([r for r in wang if _mach_bin(r.mach) == "M<0.15"])
     highest = _mae([r for r in wang if _mach_bin(r.mach) == "M>0.45"])
     assert highest < lowest + 0.04

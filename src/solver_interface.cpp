@@ -1429,12 +1429,74 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
   return res;
 }
 
+namespace {
+// Static state of a chamber from its STAGNATION temperature T0, static P and
+// mass flux G = |m_dot| / A (issue #576). Energy: h(T0) = h(T) + v^2 / 2 with
+// v = G / rho(T, P) = G R T / P, i.e.
+//   f(T) = h(T0) - h(T) - (G R T / P)^2 / 2 = 0.
+// f is strictly decreasing (f' = -cp - G^2 R^2 T / P^2) and f(T0) <= 0, so
+// the root is unique and lies in (0, T0]; with cp rising in T, f is concave
+// and Newton from T0 approaches it monotonically from above. The root exists
+// at any G -- subsonic or supersonic -- so the closure itself no longer caps
+// the flow; the choking limit comes out of P0(P) at fixed G as it should.
+//
+// Returns T and the ln(P0 / P) of the isentropic stagnation state, with their
+// partial derivatives with respect to T0, P and G (closed form, chain rule
+// through the implicit f).
+struct ChamberStaticState {
+  double T;
+  double dT_dT0, dT_dP, dT_dG;
+  double lnP0P;
+  double dln_dT0, dln_dP, dln_dG;
+  double M;
+};
+
+ChamberStaticState chamber_static_state(double T0, double P, double G,
+                                        const std::vector<double> &X) {
+  const double R = combaero::specific_gas_constant(X);
+  const double h0 = combaero::h_mass(T0, X);
+  const double k = (G * R / P) * (G * R / P);  // v^2 = k T^2
+  double T = T0;
+  for (int it = 0; it < 100; ++it) {
+    const double f = h0 - combaero::h_mass(T, X) - 0.5 * k * T * T;
+    const double fT = -combaero::cp_mass(T, X) - k * T;
+    const double step = f / fT;
+    T -= step;
+    if (std::abs(step) <= 1e-13 * T0) {
+      break;
+    }
+  }
+  ChamberStaticState s{};
+  s.T = T;
+  const double cp_T = combaero::cp_mass(T, X);
+  const double cp_T0 = combaero::cp_mass(T0, X);
+  const double fT = -cp_T - k * T;
+  // df/dx for x = T0, P, G; dT/dx = -(df/dx) / fT.
+  s.dT_dT0 = -cp_T0 / fT;
+  s.dT_dP = -(k * T * T / P) / fT;
+  s.dT_dG = (G > 0.0) ? -(-k * T * T / G) / fT : 0.0;
+  // ln(P0 / P) = (s(T0) - s(T)) / R at a common pressure; ds/dT = cp / T.
+  constexpr double P_REF = 101325.0;
+  const double mw_kg = combaero::mwmix(X) / 1000.0;
+  s.lnP0P = (combaero::s(T0, X, P_REF, P_REF) - combaero::s(T, X, P_REF, P_REF)) /
+            (mw_kg * R);
+  const double dln_dTs = -cp_T / (R * T);
+  s.dln_dT0 = cp_T0 / (R * T0) + dln_dTs * s.dT_dT0;
+  s.dln_dP = dln_dTs * s.dT_dP;
+  s.dln_dG = dln_dTs * s.dT_dG;
+  const double a = combaero::speed_of_sound(T, X);
+  s.M = (a > 1e-9) ? G * R * T / (P * a) : 0.0;
+  return s;
+}
+}  // namespace
+
 MomentumChamberResult momentum_chamber_residual_and_jacobian(
-    double P, double P_total, double m_dot, double T,
+    double P, double P_total, double m_dot, double T0,
     const std::vector<double> &Y, double area) {
-  // Momentum chamber: P_total = P_static + 0.5 * rho * v^2
-  // where v = m_dot / (rho * A)
-  // Residual: P_total - P_static - 0.5 * rho * v^2 = 0
+  // Momentum chamber: P_total = P0(P, T, M), the isentropic stagnation
+  // pressure of the chamber's static state. The node carries the MIXED
+  // STAGNATION temperature T0 (its inflows mix as (m, Tt, Pt, Y) streams), so
+  // the static T is solved here from h(T0) = h(T) + v^2 / 2 (#576).
 
   // Soft normalization to handle edge cases (all-zero Y)
   std::vector<double> Y_safe = Y;
@@ -1454,100 +1516,61 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   }
 
   const std::vector<double> X = combaero::mass_to_mole(combaero::normalize_fractions(Y_safe));
-  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T, P, X);
-
-  // Velocity from mass flow
-  double v = m_dot / (rho * area);
 
   MomentumChamberResult res;
 
-  // Compressible stagnation closure: Pt = P0(P, T, M), from entropy
-  // conservation s(T0, P0) = s(T, P) with variable cp, rather than the
-  // incompressible Pt = P + 0.5*rho*v^2.
+  // Compressible stagnation closure (issue #357): Pt = P * exp((s(T0) -
+  // s(T)) / R), entropy conservation with variable cp, rather than the
+  // incompressible Pt = P + 0.5*rho*v^2, which under-predicts the stagnation
+  // rise without bound past sonic.
   //
-  // The incompressible form UNDER-predicts the stagnation rise, and it does so
-  // without bound past sonic -- 0.2% at M = 0.33 but 11% at M = 1.0 and 34% at
-  // M = 1.4 -- so a station driven transonic gets a closure that is both wrong
-  // and unable to say so. Measured on the network this was found in, the
-  // correct relation is also 1.8 - 2.4x steeper in dPt/dM through the
-  // transonic region, which pushes Newton back out of that territory on
-  // physics rather than on a hand-tuned penalty. See issue #357.
+  // Until #576 the node's T0 was used here AS the static T: rho, a and M all
+  // came from T0, so the static state was too hot by T0 / T = 1 + (g-1)/2 M^2.
+  // At fixed Pt that capped the mass flux at 92% of choked (peak at M 0.913),
+  // and Newton stalled on any chamber asked to pass more. Solving the static
+  // T from the energy equation removes the cap.
   //
-  // The stagnation rise does not depend on flow direction, so the Mach number
-  // is taken on |v| and the sign is carried back into d(res)/d(m_dot); this
-  // keeps the residual even in m_dot exactly as 0.5*rho*v^2 was.
-  const double a_sound = combaero::speed_of_sound(T, X);
-  const double M_mag = (a_sound > 1e-9) ? std::abs(v) / a_sound : 0.0;
-
-  auto [P0, dP0_dM] = P0_from_static_and_jacobian_M(P, T, M_mag, X);
+  // The stagnation rise does not depend on flow direction: the mass flux is
+  // taken as |m_dot| / A and the sign is carried back into d(res)/d(m_dot),
+  // keeping the residual even in m_dot.
+  const double G = (area > 1e-12) ? std::abs(m_dot) / area : 0.0;
+  const ChamberStaticState st = chamber_static_state(T0, P, G, X);
+  const double P0 = P * std::exp(st.lnP0P);
+  const double sgn = (m_dot >= 0.0) ? 1.0 : -1.0;
 
   res.residual = P_total - P0;
-
-  // d(res)/d(P_total) = 1
   res.d_res_dP_total = 1.0;
+  res.T_static = st.T;
+  res.M = st.M;
+  // Static density, ideal gas: rho = P / (R T), T = T(T0, P, G).
+  const double R_gas = combaero::specific_gas_constant(X);
+  const double rho = P / (R_gas * st.T);
+  res.rho_static = rho;
+  res.drho_dP = rho / P - (rho / st.T) * st.dT_dP;
+  res.drho_dT = -(rho / st.T) * st.dT_dT0;
+  res.drho_dmdot = (area > 1e-12) ? -(rho / st.T) * st.dT_dG * sgn / area : 0.0;
+  res.d_res_dP = -(P0 / P + P0 * st.dln_dP);
+  res.d_res_dmdot = (area > 1e-12) ? -P0 * st.dln_dG * sgn / area : 0.0;
+  res.d_res_dT = -P0 * st.dln_dT0;
 
-  // P0 = P * exp((s(T0) - s(T)) / R) at fixed (M, T, X), so dP0/dP = P0/P.
-  // M also moves with P through rho: M = |m_dot| / (rho * A * a), hence
-  // dM/dP = -(M / rho) * drho/dP.
-  const double dP0_dP_direct = (P > 1e-9) ? P0 / P : 1.0;
-  const double dM_dP = (rho > 1e-12) ? -(M_mag / rho) * drho_dP : 0.0;
-  res.d_res_dP = -(dP0_dP_direct + dP0_dM * dM_dP);
-
-  // dM/d(m_dot) = sign(m_dot) / (rho * A * a); the sign restores the even
-  // dependence the magnitude discarded.
-  const double dM_dmdot_mag =
-      (rho > 1e-12 && area > 1e-12 && a_sound > 1e-9)
-          ? 1.0 / (rho * area * a_sound)
-          : 0.0;
-  const double sgn = (m_dot >= 0.0) ? 1.0 : -1.0;
-  res.d_res_dmdot = -dP0_dM * dM_dmdot_mag * sgn;
-
-  // d(res)/dT. T enters P0 three ways -- through T0, through a(T) in the Mach
-  // number, and through s(T) in the entropy balance -- and also through rho in
-  // the velocity. Hand-deriving that chain invites a silent sign error, so it
-  // is taken as a central difference on the residual itself, which is what
-  // channel_compressible_mdot_and_jacobian already does for its own T and P
-  // sensitivities.
-  //
-  // This is safe here in a way it was NOT for the Fanno march (#356): the
-  // entropy solve underlying P0_from_static is smooth through M = 1 -- a local
-  // difference tracks its analytic dP0/dM to a flat 0.9995 across the sonic
-  // point, with no staircase -- so there is no inner discretisation for the
-  // difference to pick up. It stays inside C++; the Python API still receives
-  // a derivative rather than computing one.
-  {
-    const double hT = std::max(1e-4, std::abs(T) * 1e-6);
-    auto res_at = [&](double T_probe) -> double {
-      auto [rho_p, drho_dT_p, drho_dP_p] = density_and_jacobians(T_probe, P, X);
-      (void)drho_dT_p;
-      (void)drho_dP_p;
-      const double v_p = m_dot / (rho_p * area);
-      const double a_p = combaero::speed_of_sound(T_probe, X);
-      const double M_p = (a_p > 1e-9) ? std::abs(v_p) / a_p : 0.0;
-      return P_total - P0_from_static(P, T_probe, M_p, X);
-    };
-    res.d_res_dT = (res_at(T + hT) - res_at(T - hT)) / (2.0 * hT);
-  }
-
-  // d(res)/dY_k, the same way and for the same reason. The node's port flows
-  // can mix gases of different molar mass, and the relay only reaches this
-  // row through these entries; without them a hot CO2 / air merge left the
-  // row 7.6e-5 off on the network Jacobian check (#517).
+  // d(res)/dY_k as a central difference on the residual: Y moves R, h, cp and
+  // s together and the relay only reaches this row through these entries;
+  // without them a hot CO2 / air merge left the row 7.6e-5 off on the network
+  // Jacobian check (#517). The inner static-T solve converges to 1e-13 T0, so
+  // the difference does not pick up solver noise.
   res.d_res_dY.assign(Y.size(), 0.0);
+  res.drho_dY.assign(Y.size(), 0.0);
   if (sum_Y >= eps) {
-    auto res_at_Y = [&](const std::vector<double> &Y_probe) -> double {
+    // (residual, rho_static) at a probe composition.
+    auto at_Y = [&](const std::vector<double> &Y_probe) -> std::pair<double, double> {
       const std::vector<double> X_p =
           combaero::mass_to_mole(combaero::normalize_fractions(Y_probe));
-      const double rho_p = std::get<0>(density_and_jacobians(T, P, X_p));
-      const double v_p = m_dot / (rho_p * area);
-      const double a_p = combaero::speed_of_sound(T, X_p);
-      const double M_p = (a_p > 1e-9) ? std::abs(v_p) / a_p : 0.0;
-      return P_total - P0_from_static(P, T, M_p, X_p);
+      const ChamberStaticState sp = chamber_static_state(T0, P, G, X_p);
+      return {P_total - P * std::exp(sp.lnP0P),
+              P / (combaero::specific_gas_constant(X_p) * sp.T)};
     };
-    // Step from a study on a CO2 / air node: the difference is converged to
-    // 1e-6 (relative) at 1e-4 and 1e-3, and drifts by up to 2e-3 at 1e-7 --
-    // P0 comes from an inner entropy solve whose tolerance a tiny step
-    // amplifies (the closed-form T path does not have that problem).
+    // Step from a study on a CO2 / air node: converged to 1e-6 (relative)
+    // at 1e-4 and 1e-3.
     const double hY = 1e-4 * sum_Y;
     for (std::size_t k = 0; k < Y.size(); ++k) {
       if (!(Y[k] > 0.0)) {
@@ -1556,11 +1579,15 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
       std::vector<double> Y_p = Y;
       std::vector<double> Y_m = Y;
       Y_p[k] += hY;
+      const auto [r_p, rho_p] = at_Y(Y_p);
       if (Y[k] > hY) {
         Y_m[k] -= hY;
-        res.d_res_dY[k] = (res_at_Y(Y_p) - res_at_Y(Y_m)) / (2.0 * hY);
+        const auto [r_m, rho_m] = at_Y(Y_m);
+        res.d_res_dY[k] = (r_p - r_m) / (2.0 * hY);
+        res.drho_dY[k] = (rho_p - rho_m) / (2.0 * hY);
       } else {
-        res.d_res_dY[k] = (res_at_Y(Y_p) - res.residual) / hY;
+        res.d_res_dY[k] = (r_p - res.residual) / hY;
+        res.drho_dY[k] = (rho_p - rho) / hY;
       }
     }
   }

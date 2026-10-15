@@ -29,23 +29,17 @@ flow).
 from __future__ import annotations
 
 import math
-from functools import cache
 
-import combaero as cb
 from combaero import _core
 from combaero.network.components import (
     MultiPortChamberBase,
     NetworkMixtureState,
 )
+from combaero.network.mpce_element import _add_density_columns
 
 #: Mirrors ``kIdealMaxPorts`` in include/ideal_junction.h; the kernel refuses
 #: more ports, so the element refuses them at construction instead of mid-solve.
 IDEAL_MAX_PORTS: int = 6
-
-
-@cache
-def _species_molar_mass(k: int) -> float:
-    return float(cb.species_molar_mass(k))
 
 
 class IdealMomentumTeeElement(MultiPortChamberBase):
@@ -156,12 +150,15 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         if any(f != 1.0 for f in self.loss_factor):
             geom.loss_factor = list(self.loss_factor)
         p_static = [float(s.P) for s in states]
-        rho = [float(s.density()) for s in states]
+        # The port chambers' STATIC density, the state their own closure
+        # solved (#576); drho_dp includes the static-T shift with P.
+        dens = self.port_densities(states)
+        rho = [r for r, _ in dens]
         # outer_mdot: the connecting elements' own flows; port flow = sign * outer.
         outer = [float(m) * float(s) for m, s in zip(port_mdots, self._port_signs, strict=True)]
         drho_dp = [
-            r / p if p > 0.0 and with_density_derivative else 0.0
-            for r, p in zip(rho, p_static, strict=True)
+            float(d.get(f"{self.port_nodes[i]}.P", 0.0)) if with_density_derivative else 0.0
+            for i, (_, d) in enumerate(dens)
         ]
         return _core.ideal_junction_residuals_and_jacobian(
             p_static, rho, drho_dp, outer, float(p_jn), geom
@@ -202,7 +199,7 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         kernel: object,
         jac: dict[int, dict[str, float]],
     ) -> None:
-        """d(row)/d(port T) and d(row)/d(port Y[k]) through the port density.
+        """d(row)/d(port T, Y[k], flows) through the port density.
 
         A port node's T and Y are not unknowns: the solver derives them by
         mixing and relays a ``{port}.T`` / ``{port}.Y[k]`` entry through that
@@ -212,35 +209,16 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
 
         d(row)/d(rho_i) comes from the kernel without assuming its row form:
         a second call with d(rho)/dP = 0 leaves only the explicit P column, and
-        the difference is d(row)/d(rho_i) * rho_i/P_i. Ideal gas then gives
-        d(rho)/dT = -rho/T and d(rho)/dY_k = -rho W/W_k (W the mixture molar
-        mass).
+        the difference is d(row)/d(rho_i) * drho_dp[i]. The port chamber's
+        static density then brings its own columns (#576): see
+        ``mpce_element._add_density_columns``.
         """
-        N = self.N
         explicit = self._kernel(states, P_jct, port_mdots, with_density_derivative=False)
-        for i in range(N):
-            P_i, T_i = float(states[i].P), float(getattr(states[i], "T", 0.0) or 0.0)
-            if not (P_i > 0.0 and T_i > 0.0):
-                continue
-            rho_i = float(states[i].density())
-            drho_dp = rho_i / P_i
-            W = float(cb.mwmix(states[i].X))
-            Y = list(states[i].Y)
-            for row in range(N + 1):
-                d_rho = (
-                    float(kernel.jacobian[row][i]) - float(explicit.jacobian[row][i])
-                ) / drho_dp
-                if d_rho == 0.0:
-                    continue
-                entries = jac[row]
-                name_T = f"{self.port_nodes[i]}.T"
-                entries[name_T] = entries.get(name_T, 0.0) - d_rho * rho_i / T_i
-                for k, y in enumerate(Y):
-                    if y <= 0.0:
-                        continue
-                    name_Y = f"{self.port_nodes[i]}.Y[{k}]"
-                    W_k = _species_molar_mass(k)
-                    entries[name_Y] = entries.get(name_Y, 0.0) - d_rho * rho_i * W / W_k
+        dens = self.port_densities(states)
+        drho_dp = [float(d.get(f"{self.port_nodes[i]}.P", 0.0)) for i, (_, d) in enumerate(dens)]
+        _add_density_columns(
+            jac, dens, self.port_nodes, kernel.jacobian, explicit.jacobian, drho_dp
+        )
 
     def seed_P_jct(self, pt_common: float, m_common: float, rho: float, common_i: int) -> float:
         """Initial ``p_jn`` from the common port's guessed Pt and flow.

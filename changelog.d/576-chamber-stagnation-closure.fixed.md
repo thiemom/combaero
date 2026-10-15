@@ -1,0 +1,6 @@
+- **A `MomentumChamberNode` closes on its static state (#576).** The node's `T` is the mixed stagnation temperature.
+  - **Before:** the closure used that T as the static T for density, sound speed and Mach. At fixed Pt this capped a chamber at 92 % of the choked mass flux (peak at M 0.913), and Newton stalled on any chamber asked to carry more, such as an ejector outlet pipe of about the mixing-duct area (#567).
+  - **Now:** the static T is solved from `h(T0) = h(T) + v^2/2`, and the closure passes up to the true choked flux. Its Jacobian is closed form.
+  - **Junction ports (tee, Mynard junction, ideal tee, constant-K tee) use the same static density**, so a port's momentum rows and its node's Pt describe the same flow. Fixing only the chamber raised the Wang 2014 cross-source junction error from 0.131 to 0.194 and made it grow with Mach. Fixing both lowers it to 0.127, flat in Mach.
+  - **Reporting:** a chamber's `mach`, `rho`, `a`, `velocity` and `Re` come from the static state, and `T_static` is new.
+  - Remaining consumers that still read the chamber's T as static are tracked in #578.

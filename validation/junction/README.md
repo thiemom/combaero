@@ -241,13 +241,17 @@ every endpoint cell's bias moves <= 0.03 between 1e-3 and 1e-4.
 
 ## Tier 2 (finite Mach, #272)
 
-- **Wang 2014 is the Tier-2 source.** Cross-source: 188 of 200 points, MAE
-  0.131 (interior 0.108, the q = 0 / 1 curves 0.170), flat with Mach (0.124
-  below M 0.15, 0.128 above 0.45), worst at area ratio 2.44 (0.195) and at
-  K_23 with a dead straight inlet (q = 1, bias -0.33). Wang states no
+- **Wang 2014 is the Tier-2 source.** Cross-source: 190 of 200 points, MAE
+  0.127 (interior 0.097, the q = 0 / 1 curves 0.173), flat with Mach (0.127
+  below M 0.15, 0.124 above 0.45), worst at area ratio 2.44 (0.186) and at
+  K_23 with a dead straight inlet (q = 1, bias -0.30). Wang states no
   uncertainty, so there is no band to be within;
   `python/tests/test_junction_tier2.py` pins regression floors and a
-  falsification. The 12 unscored points are all at a = 2.44 above M 0.49.
+  falsification. The 10 unscored points are all at a = 2.44 above M 0.39.
+  - Measured 2026-10-15, after #576 gave the port chambers' closure and the
+    junction's momentum rows the same static state. Before it: 188 points,
+    MAE 0.131. With only the chamber fixed: 0.194, rising to 0.288 above
+    M 0.45. The kernel-level alpha record above was not re-run.
 - **Perez-Garcia 2010 is not a validation source for the closure.** Its K_hat
   (Eq 41) depends only on the two branch Mach numbers; a junction with NO loss
   reproduces its Table 1 within U95 in 57 of 72 cells, every one at

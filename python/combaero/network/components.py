@@ -1978,14 +1978,65 @@ class MomentumChamberNode(NetworkNode):
         if self.area <= 0 or m_dot_total <= 1e-12:
             return 0.0
 
-        rho = state.density()
-        velocity = m_dot_total / (rho * self.area)
-        return float(cb.mach_number(velocity, state.T, state.X))
+        # state.T is the chamber's stagnation T; the closure solves the static
+        # state, and its Mach is the one the residual used (#576).
+        return float(
+            _solver_tools.momentum_chamber_residual_and_jacobian(
+                state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
+            ).M
+        )
+
+    def static_density(self, state: NetworkMixtureState) -> tuple[float, dict[str, float]]:
+        """Static density of the chamber and d(rho)/d(name), for elements that
+        read this chamber as a junction PORT (#576).
+
+        ``state.T`` is the chamber's stagnation T0; ``state.density()`` would
+        evaluate rho at T0 and so disagree with this chamber's own closure,
+        which solves the static T from (T0, P, |m_dot| / A). A junction's
+        momentum rows must use the same static state, or the port's Pt and
+        the junction's impulse describe two different flows (Wang 2014 MAE
+        0.13 -> 0.19, rising with Mach, with only the chamber side fixed).
+
+        Keys: ``{id}.P`` (an unknown), ``{id}.T`` / ``{id}.Y[k]`` (relayed by
+        the solver) and the upstream flow unknowns that set this chamber's
+        through-flow (the chain the chamber's own residual uses). With no area
+        the chamber has no velocity: rho(T0, P) with the ideal-gas columns.
+        """
+        if not self.area > 0.0:
+            rho = float(state.density())
+            d0: dict[str, float] = {f"{self.id}.P": rho / state.P, f"{self.id}.T": -rho / state.T}
+            W = float(cb.mwmix(state.X))
+            for k, y in enumerate(state.Y):
+                if y > 0.0:
+                    d0[f"{self.id}.Y[{k}]"] = -rho * W / float(cb.species_molar_mass(k))
+            return rho, d0
+        m_dot_total = getattr(self, "_total_m_dot", 0.0)
+        r = _solver_tools.momentum_chamber_residual_and_jacobian(
+            state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
+        )
+        d: dict[str, float] = {f"{self.id}.P": r.drho_dP, f"{self.id}.T": r.drho_dT}
+        for k, v in enumerate(r.drho_dY):
+            if v != 0.0:
+                d[f"{self.id}.Y[{k}]"] = v
+        if r.drho_dmdot != 0.0:
+            for var, coeff in getattr(self, "_upstream_m_dot_jac", {}).items():
+                if coeff != 0.0:
+                    d[var] = d.get(var, 0.0) + r.drho_dmdot * coeff
+        return float(r.rho_static), d
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:
-        cs = cb.complete_state(state.T, state.P, state.X)
-
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
+        # Properties at the STATIC state the closure solved; state.T is the
+        # chamber's stagnation T (#576).
+        T_static = float(state.T)
+        if self.area > 0:
+            T_static = float(
+                _solver_tools.momentum_chamber_residual_and_jacobian(
+                    state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
+                ).T_static
+            )
+        cs = cb.complete_state(T_static, state.P, state.X)
+
         rho = cs.thermo.rho
         u = (abs(m_dot_total)) / ((rho) * (self.area)) if rho > 0 and self.area > 0 else 0.0
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
@@ -2006,6 +2057,7 @@ class MomentumChamberNode(NetworkNode):
         return {
             "Tt": float(Tt),
             "Pt": float(Pt),
+            "T_static": T_static,
             "h": cs.thermo.h,
             "s": cs.thermo.s,
             "u": cs.thermo.u,
@@ -6493,9 +6545,41 @@ class MultiPortChamberBase(NetworkElement):
                 jac[global_idx] = jac.get(global_idx, 0.0) + coeff
         return jac
 
+    def port_densities(self, states: list[Any]) -> list[tuple[float, dict[str, float]]]:
+        """Per port: (static density, d(rho)/d(name)) for the momentum rows.
+
+        From each port chamber's own closure (``MomentumChamberNode.
+        static_density``), so the junction and the port node agree on the
+        port's static state (#576). A state stand-in without a temperature or
+        composition (unit tests) keeps its ``density()`` with d(rho)/dP =
+        rho/P; one with them but no resolved port node gets the ideal-gas
+        columns at its own T.
+        """
+        nodes = getattr(self, "_port_node_objs", None) or []
+        out: list[tuple[float, dict[str, float]]] = []
+        for i, st in enumerate(states):
+            port = self.port_nodes[i]
+            T = float(getattr(st, "T", 0.0) or 0.0)
+            X = getattr(st, "X", None)
+            P = float(st.P)
+            if i < len(nodes) and T > 0.0 and X is not None and P > 0.0:
+                out.append(nodes[i].static_density(st))
+                continue
+            rho = float(st.density())
+            d: dict[str, float] = {f"{port}.P": rho / P if P > 0.0 else 0.0}
+            if T > 0.0 and X is not None:
+                d[f"{port}.T"] = -rho / T
+                W = float(cb.mwmix(X))
+                for k, y in enumerate(st.Y):
+                    if y > 0.0:
+                        d[f"{port}.Y[{k}]"] = -rho * W / float(cb.species_molar_mass(k))
+            out.append((rho, d))
+        return out
+
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         # 1. For each port: locate the (unique) connecting element on the
         #    OUTSIDE of the port-MCN and determine the orientation sign.
+        self._port_node_objs: list[MomentumChamberNode] = []
         for i, port_id in enumerate(self.port_nodes):
             port_node = graph.nodes.get(port_id)
             if port_node is None:
@@ -6509,6 +6593,7 @@ class MultiPortChamberBase(NetworkElement):
                     f"must be a MomentumChamberNode, got "
                     f"'{type(port_node).__name__}'."
                 )
+            self._port_node_objs.append(port_node)
             # Mark the port-MCN so the solver skips its mass row.
             port_node._is_junction_port = True
             port_node._junction_id = self.id

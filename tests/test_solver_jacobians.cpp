@@ -387,23 +387,47 @@ TEST(SolverJacobianTest, MomentumChamberDerivatives) {
                              res.d_res_dmdot, fd_dmdot);
   EXPECT_NEAR(res.d_res_dmdot, fd_dmdot, std::abs(fd_dmdot) * 1e-8 + 1e-12);
 
-  // Verify the residual is the COMPRESSIBLE closure: P_total - P0(P, T, M),
+  // Verify the residual is the COMPRESSIBLE closure: P_total - P0(P, Ts, M),
   // the isentropic stagnation state from entropy conservation with variable
   // cp. It used to be P_total - P - 0.5*rho*v^2, which under-predicts the
   // stagnation rise -- 0.2% at M = 0.33 but 11% at M = 1.0 and 34% at M = 1.4
   // -- and does so without bound past sonic, so a station driven transonic got
   // a closure that was both wrong and unable to say so. See issue #357.
+  //
+  // T is the chamber's STAGNATION temperature (#576): the static Ts solves
+  // h(T) = h(Ts) + v^2 / 2 with v = m_dot / (rho(Ts, P) A).
   std::vector<double> X = mass_to_mole(normalize_fractions(Y));
-  double rho = density(T, P, X);
+  const double Ts = res.T_static;
+  EXPECT_LT(Ts, T);
+  double rho = density(Ts, P, X);
   double v = m_dot / (rho * area);
-  double M = std::abs(v) / speed_of_sound(T, X);
-  double expected_residual = P_total - P0_from_static(P, T, M, X);
+  EXPECT_NEAR(h_mass(T, X) - h_mass(Ts, X), 0.5 * v * v, 1e-8 * 0.5 * v * v);
+  double M = std::abs(v) / speed_of_sound(Ts, X);
+  EXPECT_NEAR(res.M, M, 1e-10);
+  EXPECT_NEAR(res.rho_static, rho, 1e-12 * rho);
+  double expected_residual = P_total - P0_from_static(P, Ts, M, X);
   EXPECT_NEAR(res.residual, expected_residual, 1e-6);
 
   // The incompressible form is the limit it reduces to, not an equal: the
   // stagnation rise must exceed 0.5*rho*v^2 at any finite Mach.
   double q_incompressible = 0.5 * rho * v * v;
-  EXPECT_GT(P0_from_static(P, T, M, X) - P, q_incompressible);
+  EXPECT_GT(P0_from_static(P, Ts, M, X) - P, q_incompressible);
+
+  // Static-density sensitivities against central differences.
+  const double hP = P * 1e-6;
+  const double fd_rho_P =
+      (momentum_chamber_residual_and_jacobian(P + hP, P_total, m_dot, T, Y, area).rho_static -
+       momentum_chamber_residual_and_jacobian(P - hP, P_total, m_dot, T, Y, area).rho_static) /
+      (2.0 * hP);
+  EXPECT_NEAR(res.drho_dP, fd_rho_P, std::abs(fd_rho_P) * 1e-6);
+  const double hT = T * 1e-6;
+  const double fd_rho_T =
+      (momentum_chamber_residual_and_jacobian(P, P_total, m_dot, T + hT, Y, area).rho_static -
+       momentum_chamber_residual_and_jacobian(P, P_total, m_dot, T - hT, Y, area).rho_static) /
+      (2.0 * hT);
+  EXPECT_NEAR(res.drho_dT, fd_rho_T, std::abs(fd_rho_T) * 1e-6);
+  const double fd_rho_m = (res_mdot_p.rho_static - res_mdot_m.rho_static) / (2.0 * eps_mdot);
+  EXPECT_NEAR(res.drho_dmdot, fd_rho_m, std::abs(fd_rho_m) * 1e-5 + 1e-12);
 }
 
 TEST(SolverJacobianTest, AdiabaticTCompleteDerivatives) {

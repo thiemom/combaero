@@ -14,6 +14,7 @@ import math
 
 import numpy as np
 import pytest
+from _chamber_static import chamber_isentropic_rise, chamber_static_density
 from scipy.optimize._numdiff import approx_derivative
 
 import combaero as cb
@@ -122,19 +123,17 @@ def _q_com(sol: dict, m_key: str, p_key: str) -> float:
 
     ConstantKTeeElement references K to whatever its port MomentumChamberNodes
     call dynamic head, and those close on the isentropic stagnation state
-    rather than on 0.5*rho*u^2 (issue #357). K is tabulated as dPt/q_dyn, so
-    the reference has to follow the ports. The incompressible form is the
+    rather than on 0.5*rho*u^2 (issue #357), of the STATIC state the chamber's
+    stagnation T implies (#576). K is tabulated as dPt/q_dyn, so the
+    reference has to follow the ports. The incompressible form is the
     low-Mach limit this reduces to, kept below as the cross-check.
     """
     X_air = list(cb.mass_to_mole(_DRY_AIR_Y))
-    T = 300.0
+    T0 = 300.0
     P = sol[p_key]
-    rho = float(cb.density(T, P, X_air))
     m = sol[m_key]
-    g = float(cb.isentropic_expansion_coefficient(T, X_air))
-    # M^2 = rho*u^2/(g*P) for an ideal gas (a^2 = g*P/rho).
-    m2 = (m * m) / (rho * _A * _A * g * P)
-    q = P * ((1.0 + 0.5 * (g - 1.0) * m2) ** (g / (g - 1.0)) - 1.0)
+    q = chamber_isentropic_rise(P, T0, m, _A, X_air)
+    rho = chamber_static_density(P, T0, m, _A, X_air)
     assert q > m * m / (2.0 * rho * _A * _A), (
         "the compressible rise must exceed the incompressible one at M > 0"
     )
