@@ -480,15 +480,19 @@ def _channel_between_boundaries(p_in: float, p_out: float) -> FlowNetwork:
 
 
 def test_no_driving_potential_converges_to_zero_flow() -> None:
-    """Equal boundary pressures: the zero-flow fallback finds the valid m=0
-    solution instead of stalling and returning the best (non-zero) iterate."""
+    """Equal boundary pressures: the valid m=0 solution, not a stall.
+
+    The stall this was written for (#558) was hybr REACHING the exact root
+    (|F| = 0) and then failing MINPACK's progress test there (0/0 reduction
+    ratio). The zero-flow fallback rescued it; since #582 an exact root is
+    accepted on the main path, so this case no longer reaches the fallback,
+    which stays for stalls at a non-zero |F|."""
     g = _channel_between_boundaries(1.01e5, 1.01e5)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         r = NetworkSolver(g).solve(timeout=20)
     assert r["__success__"], r.get("__message__")
     assert abs(r["ch.m_dot"]) < 1e-6
-    assert "zero flow" in str(r.get("__message__"))
 
 
 def test_pressure_difference_still_gives_non_zero_flow() -> None:

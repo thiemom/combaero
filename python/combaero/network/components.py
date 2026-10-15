@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import math
 import sys
 import warnings
@@ -2974,6 +2975,17 @@ class OrificeElement(NetworkElement):
         m_dot = state_in.m_dot
         effective_cd = self._effective_Cd(state_in, state_out, flows)
 
+        # A discharge-hole Cd rises with the hole Reynolds number, which is
+        # linear in the flow. Evaluated at the solver's iterate, the row
+        # m - Cd(Re(m)) K is non-monotone in m -- slope +1 below the table's
+        # Re floor, NEGATIVE while Cd climbs (IdelchikThick: 0.37 at Re 25 to
+        # 0.86 at Re 1000), then rising to the root -- and |F| has a local
+        # minimum at the floor that traps Newton (#582). So the element solves
+        # its own consistency, m* = Cd(Re(m*)) K, and the row is m - m*(x):
+        # linear in m, same root, same physics.
+        if self._cd_follows_own_flow():
+            return self._self_consistent_residuals(state_in, state_out, flows, effective_cd)
+
         if self.regime == "compressible":
             res_cpp = _solver_tools.orifice_compressible_residuals_and_jacobian(
                 m_dot,
@@ -3040,6 +3052,122 @@ class OrificeElement(NetworkElement):
                 jac[0][name] = jac[0].get(name, 0.0) - scale * dcd
 
         return res, jac
+
+    def _cd_follows_own_flow(self) -> bool:
+        """True when Cd moves with this element's own flow through a hole
+        Reynolds number with an analytic derivative: the discharge-hole
+        family on a correlation. The ISO metering family also reads Re_D but
+        carries no dCd/dRe (its documented gap), so it keeps the iterate form.
+        """
+        return (
+            self.use_correlation
+            and self._orifice_geom is not None
+            and _DISCHARGE_SELECTORS.get(self.correlation) is not None
+        )
+
+    def _flow_calc(
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        cd: float,
+    ) -> Any:
+        """C++ (m_calc, d m_calc/d x) at a given Cd; m_calc is linear in Cd."""
+        if self.regime == "compressible":
+            return _solver_tools.orifice_compressible_residuals_and_jacobian(
+                state_in.m_dot,
+                state_in.Pt,
+                state_in.Tt,
+                state_in.Y,
+                state_out.P,
+                cd,
+                self.area,
+                getattr(self, "beta", 0.0),
+            )
+        _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+        return _solver_tools.orifice_residuals_and_jacobian(
+            state_in.m_dot,
+            state_in.Pt,
+            state_out.P if _p_ref_outlet else state_in.P,
+            state_in.T,
+            state_in.Y,
+            state_out.P,
+            cd,
+            self.area,
+            beta=getattr(self, "beta", 0.0),
+        )
+
+    def _self_consistent_residuals(
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None,
+        cd_iterate: float,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """Row m - m*(x), with m* = Cd(Re(m*)) K(x) solved here (#582).
+
+        K = m_calc / Cd from C++ (m_calc is linear in Cd). Newton on the
+        magnitude a = |m*|: g(a) = a - Cd(a) |K|, g' = 1 - |K| dCd/da. At the
+        root |K| dCd/da = dlnCd/dlnRe, ~0.2 at its steepest, so g' > 0 and
+        the solve is well posed. Sensitivities by the implicit function:
+          dm*/dx = (dm_calc/dx|_Cd + K dCd/dx) / (1 - K dCd/dm).
+        """
+        m_dot = float(state_in.m_dot)
+        cd0 = max(cd_iterate, 1e-4)
+        K = float(self._flow_calc(state_in, state_out, cd0).m_dot_calc) / cd0
+        sgn = 1.0 if K >= 0.0 else -1.0
+        aK = abs(K)
+        probe = copy.copy(state_in)
+        m_key = f"{self.id}.m_dot"
+
+        def cd_and_slope(a: float) -> tuple[float, float]:
+            probe.m_dot = a
+            cd = self._effective_Cd(probe, state_out, flows)
+            slope = self._dCd_dnames(probe, state_out, flows).get(m_key, 0.0) if a > 0 else 0.0
+            return cd, slope
+
+        a = aK * cd0
+        for _ in range(50):
+            cd, slope = cd_and_slope(a)
+            g = a - cd * aK
+            gp = 1.0 - aK * slope
+            # Newton; off the consistent root (|K| dCd/da < 0.2 there) g' can
+            # vanish, where the contracting fixed-point step is used instead.
+            step_to = cd * aK if gp <= 0.1 else a - g / gp
+            step_to = max(step_to, 0.0)
+            done = abs(step_to - a) <= 1e-13 * max(a, 1e-30)
+            a = step_to
+            if done:
+                break
+        cd_star, cd_m = cd_and_slope(a)
+        probe.m_dot = sgn * a
+        res_cpp = self._flow_calc(probe, state_out, cd_star)
+        m_star = float(res_cpp.m_dot_calc)
+        denom = 1.0 - aK * cd_m
+
+        partial = {
+            f"{self.from_node}.Pt": res_cpp.d_mdot_dP_total_up,
+            f"{self.from_node}.T": res_cpp.d_mdot_dT_up,
+        }
+        if self.regime != "compressible" and (
+            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+        ):
+            partial[f"{self.to_node}.P"] = (
+                res_cpp.d_mdot_dP_static_down + res_cpp.d_mdot_dP_static_up
+            )
+        else:
+            partial[f"{self.from_node}.P"] = res_cpp.d_mdot_dP_static_up
+            partial[f"{self.to_node}.P"] = res_cpp.d_mdot_dP_static_down
+        for i, val in enumerate(res_cpp.d_mdot_dY_up):
+            partial[f"{self.from_node}.Y[{i}]"] = val
+        # Cd's other dependencies (a duct-fed hole's U1/Vi), at m*.
+        for name, dcd in self._dCd_dnames(probe, state_out, flows).items():
+            if name != m_key:
+                partial[name] = partial.get(name, 0.0) + K * dcd
+
+        row: dict[str, float] = {m_key: 1.0}
+        for name, d in partial.items():
+            row[name] = row.get(name, 0.0) - d / denom
+        return [m_dot - m_star], {0: row}
 
     def n_equations(self) -> int:
         return 1
