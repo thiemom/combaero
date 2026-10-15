@@ -2363,6 +2363,16 @@ class NetworkSolver:
         seeded retry the remainder (at least 30%). Compressible tee
         networks are best given 90-120 s total.
 
+        The mirror case: a network INCOMPRESSIBLE throughout (every
+        two-regime element incompressible) whose cold solve fails is retried
+        from a compressible warm start -- the same network solved with those
+        elements compressible, whose root it shares at low Mach (#588). Its
+        mass-flow residual forms converge from cold starts where the
+        pressure-drop forms stall (a jet pump behind an incompressible pipe:
+        zero entrainment from every cold seed, the physical root in a few
+        steps from the compressible one). Same budget split; the strategy is
+        reported as ``compressible_warmstart``.
+
         Pass ``init_strategy='outletref_warmstart'`` to run the proxy
         seed directly as the primary initialization (no cold attempt
         first) -- useful on networks known to stall the cold path.
@@ -2544,13 +2554,21 @@ class NetworkSolver:
         lambda_steps: list[float] | None,
         auto_retry: bool,
     ) -> dict[str, float]:
-        """The cold solve with its outlet-referenced auto-retry (see solve)."""
+        """The cold solve with its warm-start auto-retry (see solve).
+
+        A network with compressible elements retries from the incompressible
+        proxy; one that is incompressible throughout retries from the
+        compressible proxy (#588) -- the same root at low Mach, reached from
+        the other side.
+        """
+        has_compressible = bool(self._compressible_element_overrides())
+        all_incompressible = not has_compressible and bool(self._incompressible_element_ids())
         retry_applicable = (
             auto_retry
             and x0 is None
             and init_strategy in ("default", "analytical_pt_prop")
             and any(isinstance(e, MultiPortChamberBase) for e in self.network.elements.values())
-            and bool(self._compressible_element_overrides())
+            and (has_compressible or all_incompressible)
         )
         if not retry_applicable:
             return self._solve_impl(
@@ -2583,8 +2601,12 @@ class NetworkSolver:
         primary_msg = str(sol.get("__message__", "")).strip()
         warnings.warn(
             f"Cold '{init_strategy}' solve failed (|F|={primary_norm:.3e}); "
-            "auto-retrying from an outlet-referenced incompressible warm "
-            "start. Pass auto_retry=False to disable.",
+            + (
+                "auto-retrying from a compressible warm start"
+                if all_incompressible
+                else "auto-retrying from an outlet-referenced incompressible warm start"
+            )
+            + ". Pass auto_retry=False to disable.",
             RuntimeWarning,
             stacklevel=3,
         )
@@ -2593,8 +2615,20 @@ class NetworkSolver:
         # 16 kg/s 20 bar 5-tee net), so give it up to 60 s / 30% of budget.
         proxy_timeout = 60.0 if timeout is None else max(min(0.3 * timeout, 60.0), 10.0)
         _primary_diag = getattr(self, "_diagnostic_data", None)
-        seed_x0 = self._outlet_ref_incompressible_seed(use_jac=use_jac, timeout=proxy_timeout)
-        _seed_kind = "outlet-referenced"
+        if all_incompressible:
+            seed_x0 = self._compressible_seed(use_jac=use_jac, timeout=proxy_timeout)
+            if seed_x0 is None:
+                if _primary_diag is not None:
+                    self._diagnostic_data = _primary_diag
+                sol["__message__"] = (
+                    f"{primary_msg} [compressible warm-start auto-retry "
+                    "skipped: the compressible proxy solve did not converge]"
+                )
+                return sol
+            _seed_kind = "compressible"
+        else:
+            seed_x0 = self._outlet_ref_incompressible_seed(use_jac=use_jac, timeout=proxy_timeout)
+            _seed_kind = "outlet-referenced"
         if seed_x0 is None:
             # The outlet-referenced system is stiffer and can time out where
             # the classic inlet-referenced proxy solves in a handful of
@@ -2634,14 +2668,19 @@ class NetworkSolver:
             _ssu = _diag.get("solver_settings_used")
             if isinstance(_ssu, dict):
                 _ssu["init_strategy"] = (
-                    "outletref_warmstart"
+                    "compressible_warmstart"
+                    if _seed_kind == "compressible"
+                    else "outletref_warmstart"
                     if _seed_kind.startswith("outlet")
                     else "inletref_warmstart"
                 )
                 _ssu["auto_retry"] = True
         if retry_sol.get("__success__", False):
+            proxy = (
+                "compressible" if _seed_kind == "compressible" else f"{_seed_kind} incompressible"
+            )
             retry_sol["__message__"] = (
-                f"Converged via {_seed_kind} incompressible warm-start "
+                f"Converged via {proxy} warm-start "
                 f"auto-retry after the '{init_strategy}' attempt failed "
                 f"({primary_msg[:120]})."
             )
@@ -2671,6 +2710,60 @@ class NetworkSolver:
             )
             return sol
         return retry_sol
+
+    def _incompressible_element_ids(self) -> list[str]:
+        """Elements running the incompressible form of a two-regime closure."""
+        return [
+            eid
+            for eid, e in self.network.elements.items()
+            if getattr(e, "regime", None) == "incompressible"
+        ]
+
+    def _compressible_seed(self, use_jac: bool = True, timeout: float = 30.0) -> np.ndarray | None:
+        """Solve the network with its incompressible elements compressible.
+
+        The mirror of the incompressible proxy, for a network that is
+        incompressible throughout: at low Mach the two regimes share their
+        root to O(Ma^2) (#588), so the compressible solution is a near-root
+        of the incompressible system -- and its mass-flow residual forms
+        converge from cold starts where the pressure-drop forms stall (a jet
+        pump behind an incompressible pipe sat at zero entrainment from every
+        cold seed, and converged in a few steps from the compressible root).
+        Returns the solution vector, or ``None`` when the proxy fails.
+        """
+        ids = self._incompressible_element_ids()
+        if not ids:
+            return None
+        seed: np.ndarray | None = None
+        try:
+            for eid in ids:
+                self.network.elements[eid].regime = "compressible"
+            self.network.resolve_all_topology()
+            # Started as a plain compressible solve would be (cold-start
+            # auto-upgrades included): that is the solve known to converge.
+            proxy_sol = self._solve_impl(
+                method="hybr",
+                timeout=timeout,
+                use_jac=use_jac,
+                x0=None,
+                init_strategy="default",
+            )
+            if bool(proxy_sol.get("__success__", False)):
+                candidate = getattr(self, "_last_x", None)
+                if candidate is not None:
+                    seed = np.asarray(candidate, dtype=float)
+        except Exception as e:
+            warnings.warn(
+                f"Compressible proxy solve raised; skipping warm-start auto-retry: {e}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            seed = None
+        finally:
+            for eid in ids:
+                self.network.elements[eid].regime = "incompressible"
+            self.network.resolve_all_topology()
+        return seed
 
     def _outlet_ref_incompressible_seed(
         self,
