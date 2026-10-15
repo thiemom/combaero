@@ -362,7 +362,7 @@ The plate IS the wall the coolant passes through, so it owns it: no
 
 | Discharge into | Gas side |
 |---|---|
-| `MomentumChamberNode` (flow) | the chamber's own surface correlation is the unblown `h_gas_unblown` (so the chamber's surface model IS the baseline); its velocity gives `blowing_ratio`; `gas_augmentation` (the caller's, 1.0) scales h. `T_gas` is the approaching MAIN stream when the chamber has one -- its own state is the mixed outlet, diluted by the effused coolant |
+| `MomentumChamberNode` (flow) | the chamber's own surface correlation is the unblown `h_gas_unblown` (so the chamber's surface model IS the baseline); which baseline that is, and where, is reported beside it as `h_gas_unblown_model` (e.g. `SmoothModel(gnielinski)`, fully developed) and `h_gas_unblown_Re` / `_Pr` / `_Nu` (#476); its velocity gives `blowing_ratio`; `gas_augmentation` (the caller's, 1.0) scales h. `T_gas` is the approaching MAIN stream when the chamber has one -- its own state is the mixed outlet, diluted by the effused coolant |
 | a plenum (state, no flow) | the imposed `gas_heat_flux` [W/m^2], 0 by default (adiabatic) |
 
 ```python

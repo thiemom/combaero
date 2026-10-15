@@ -1029,6 +1029,17 @@ const Inspector = () => {
 									Gas Side
 								</div>
 								{num("gas_augmentation", "Gas h Augmentation (user)", 1.0)}
+								{d.result?.h_gas_unblown_model && (
+									<p className="text-[9px] italic text-gray-400 -mt-1">
+										Multiplies the chamber's own h₀ ={" "}
+										{Number(d.result.h_gas_unblown).toFixed(1)} W/m²K:{" "}
+										{d.result.h_gas_unblown_model} at Re{" "}
+										{Number(d.result.h_gas_unblown_Re).toExponential(2)}, Pr{" "}
+										{Number(d.result.h_gas_unblown_Pr).toFixed(3)}. An
+										augmentation from the literature only carries over against
+										the same baseline.
+									</p>
+								)}
 								<div className="flex flex-col gap-1">
 									<label className="text-xs font-bold text-gray-500 uppercase">
 										Film
