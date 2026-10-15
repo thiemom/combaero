@@ -785,6 +785,8 @@ bookkeeping keys. Five of them say what happened:
 | `__second_law_failures__` | `list[str]` | ids whose verdict is `"fail"` |
 | `__second_law_walls__` | `dict[str, dict]` | per ThermalWall, the wall as its own control volume (#551): `verdict`, `sigma_wall` [W/K] = the entropy the heat carries into side B's stream minus what it took from side A's, each integrated along that stream's own temperature path; `sigma_wall_norm` (over the mean \|S\| of the two sides) and its band `_low`/`_high`. Negative when heat runs from the stream that is colder on average. A necessary condition only (end temperatures can cross while the path means do not). **Report only.** |
 | `__second_law_wall_failures__` | `list[str]` | wall ids whose verdict is `"fail"` |
+| `__incompressible_validity__` | `dict[str, dict]` | per element on an incompressible closure: `verdict` (`"ok"`, `"warn"`, `"not_checked"` with a `reason`), its highest internal `mach` and the `limit`. **Report only** (#588). |
+| `__incompressible_warnings__` | `list[str]` | ids whose verdict is `"warn"` |
 | `__ledger__` | `dict` | mass and energy over the network's control volume: `streams` (one row per crossing, `m_dot_in` > 0 entering), `m_dot_in/out`, `H_in/out`, `Q_given`, `Q_wall_out`, `Q_withheld`, `mass_closure(_rel)`, `energy_closure(_rel)`. Empty when the root finder did not converge. |
 
 **Second law per element (#545).** Each element's control volume must not
@@ -802,6 +804,26 @@ linear Mach path and bracketed by constant-Mach paths at either end; a
 volume (a segment's momentum spans half of each station). The legacy
 `TeeJunctionElement` is not checked. Each element's `sigma_norm` also appears
 in its diagnostics.
+
+**Incompressible validity (#588).** Each element running an incompressible
+closure is checked against one Mach limit, `solver.incompressible_mach_limit`
+(default `combaero.network.compressibility.INCOMPRESSIBLE_MACH_LIMIT = 0.2`),
+at its own highest internal Mach: an orifice's jet (`mach_throat`), a
+channel's higher end (`mach_in`, `mach_out`); an element declares which in
+`validity_mach_keys`. The incompressible closures are the low-Mach limits of
+the compressible ones, drifting as Ma^2: measured at the same flow, a channel's
+drop is 4.0% off at Ma 0.2 (13% at 0.4), an orifice's 2.9% at a jet Ma of 0.2
+(5% at 0.26). The limit is a rule of thumb, not a guarantee; the solution and
+`__success__` are unchanged.
+
+```python
+solver = NetworkSolver(net)
+solver.incompressible_mach_limit = 0.3   # default 0.2
+r = solver.solve()
+for eid in r["__incompressible_warnings__"]:
+    v = r["__incompressible_validity__"][eid]
+    print(eid, v["mach"], ">", v["limit"])
+```
 
 `__success__` is False in two quite different situations, and reading it alone
 cannot tell them apart: Newton never got there, or Newton got there and a
