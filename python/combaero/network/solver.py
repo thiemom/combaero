@@ -3329,6 +3329,7 @@ class NetworkSolver:
 
         # Solve with timing
         _RESIDUAL_TOL = 1e-3
+        _EXACT_ROOT_TOL = 1e-12
         solve_start_time = time.time()
         outcome: SolveOutcome = SolveOutcome.NOT_CONVERGED
         try:
@@ -3343,6 +3344,18 @@ class NetworkSolver:
             outcome = SolveOutcome.CONVERGED if success else _classify_solver_message(message)
             # Efficiently use tracked norm instead of re-evaluating
             final_norm = float(best_res_norm)
+            # MINPACK's progress test misfires at an EXACT root: once |F| is 0
+            # (or within rounding of it) its actual/predicted reduction ratio
+            # is 0/0 and hybr reports "not making good progress" from the
+            # root itself. A residual at machine level IS the solution (#582:
+            # a row linear in its own unknown reaches |F| = 1e-19 in one step).
+            if not success and final_norm <= _EXACT_ROOT_TOL:
+                success = True
+                outcome = SolveOutcome.CONVERGED
+                message = (
+                    f"Converged (|F|={final_norm:.1e}; {method} stopped on its "
+                    f"progress test at the root)."
+                )
             # Guard against methods (e.g. lm) that report success at a
             # non-zero local minimum of ||F||^2.
             if success and final_norm > _RESIDUAL_TOL:
@@ -3411,9 +3424,13 @@ class NetworkSolver:
                 # leaves hybr near-singular at low Mach; its "best iterate" is
                 # often a worse LM starting point than the original x0. Restart
                 # LM from x0 in that case to avoid getting trapped in hybr's
-                # poor basin. For tee / compressible networks the existing
-                # warm-start-from-hybr path is fine.
-                _lm_x0_scaled = x0_scaled if (_has_mpce or _has_merge) else best_x * inv_D_x
+                # poor basin. For tee / compressible networks -- and merge
+                # chambers, which this used to restart too -- the warm start
+                # from hybr is better: on the GUI-default effusion liner hybr
+                # stopped at |F| ~ 1e-2 with an exact Jacobian and a full
+                # Newton step still cutting |F| by a third, and the cold LM
+                # restart threw that away (#582).
+                _lm_x0_scaled = x0_scaled if _has_mpce else best_x * inv_D_x
                 try:
                     root(
                         residuals_wrapper,

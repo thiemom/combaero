@@ -1,0 +1,5 @@
+- **Effusion plates and discharge-hole orifices no longer trap the solver at low flow (#582).**
+  - **Cause:** the hole Cd rises steeply with the hole Reynolds number (IdelchikThick: 0.37 at Re 25, 0.86 at Re 1000). Evaluated at the solver's current flow, the element's row was non-monotone, and |F| had a false minimum at the table's Re floor. The GUI-default effusion liner stalled there in the compressible regime.
+  - **Now:** the element solves its own Cd–Re consistency, m* = Cd(Re(m*)) K, and its row is m - m*. Same root and same physics; the row is linear in the element's flow.
+  - **Solver:** a residual at machine precision (|F| <= 1e-12) is accepted as converged even when MINPACK's progress test misfires at the exact root.
+  - **Solver:** the Levenberg-Marquardt fallback on merge-chamber networks starts from hybr's best iterate instead of the cold start.
