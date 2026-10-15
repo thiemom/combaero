@@ -810,7 +810,9 @@ closure is checked against one Mach limit, `solver.incompressible_mach_limit`
 (default `combaero.network.compressibility.INCOMPRESSIBLE_MACH_LIMIT = 0.2`),
 at its own highest internal Mach: an orifice's jet (`mach_throat`), a
 channel's higher end (`mach_in`, `mach_out`); an element declares which in
-`validity_mach_keys`. The incompressible closures are the low-Mach limits of
+`validity_mach_keys`. A momentum chamber on its incompressible closure is
+judged at its own `mach` and listed by its node id; the GUI attributes an
+inserted port chamber to its junction. The incompressible closures are the low-Mach limits of
 the compressible ones, drifting as Ma^2: measured at the same flow, a channel's
 drop is 4.0% off at Ma 0.2 (13% at 0.4), an orifice's 2.9% at a jet Ma of 0.2
 (5% at 0.26). The limit is a rule of thumb, not a guarantee; the solution and

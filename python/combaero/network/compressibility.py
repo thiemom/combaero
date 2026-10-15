@@ -19,7 +19,8 @@ a gas, and the application stays the user's call. The tolerance can be set.
 
 Which Mach. The element's own highest INTERNAL one, named by its
 ``validity_mach_keys``: an orifice's jet (vena contracta), a channel's
-higher end. Port Mach can be low while the jet is not.
+higher end. Port Mach can be low while the jet is not. A momentum chamber
+running its incompressible closure is judged at its own Mach (#588).
 """
 
 from __future__ import annotations
@@ -31,15 +32,38 @@ INCOMPRESSIBLE_MACH_LIMIT = 0.2
 
 
 def validity_verdicts(
-    network: Any, element_diag: dict[str, dict[str, Any]], mach_limit: float
+    network: Any,
+    element_diag: dict[str, dict[str, Any]],
+    mach_limit: float,
+    node_mach: dict[str, float | None] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Per incompressible element: its Mach, the limit and a verdict.
+    """Per incompressible element or chamber: its Mach, the limit, a verdict.
 
     ``"warn"`` above the limit, ``"ok"`` at or below it, ``"not_checked"``
-    (with the reason) when the element reports no Mach -- never a silent pass.
+    (with the reason) when no Mach is reported -- never a silent pass.
     Elements on a compressible closure, or with none, are left out.
+
+    Nodes with a regime (momentum chambers, #588) are judged at their own
+    Mach, ``node_mach[id]`` -- the velocity their closure used.
     """
     out: dict[str, dict[str, Any]] = {}
+    for nid, node in network.nodes.items():
+        if getattr(node, "regime", None) != "incompressible":
+            continue
+        m = (node_mach or {}).get(nid)
+        if m is None:
+            out[nid] = {
+                "verdict": "not_checked",
+                "reason": "no Mach reported (no solved state)",
+                "limit": mach_limit,
+            }
+            continue
+        mach = abs(float(m))
+        out[nid] = {
+            "verdict": "warn" if mach > mach_limit else "ok",
+            "mach": mach,
+            "limit": mach_limit,
+        }
     for eid, element in network.elements.items():
         if getattr(element, "regime", None) != "incompressible":
             continue

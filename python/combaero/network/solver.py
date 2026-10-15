@@ -3971,6 +3971,7 @@ class NetworkSolver:
                 self.network,
                 sol_dict.get("__element_diag__") or {},
                 float(self.incompressible_mach_limit),
+                {nid: sol_dict.get(f"{nid}.mach") for nid in self.network.nodes},
             )
         sol_dict["__incompressible_validity__"] = validity
         sol_dict["__incompressible_warnings__"] = sorted(

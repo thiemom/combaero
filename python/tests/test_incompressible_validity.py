@@ -93,3 +93,30 @@ def test_the_limit_is_a_setting() -> None:
     r = _solve("channel", 0.3, limit=0.5)
     v = r["__incompressible_validity__"]["el"]
     assert v["verdict"] == "ok" and v["limit"] == 0.5
+
+
+@pytest.mark.parametrize(
+    ("regime", "reported"), [("incompressible", True), ("compressible", False)]
+)
+def test_an_incompressible_chamber_is_judged_at_its_own_mach(regime: str, reported: bool) -> None:
+    """A momentum chamber on its incompressible closure (#588) joins the
+    report, at the Mach its closure used; a compressible one does not."""
+    from combaero.network import MomentumChamberNode
+
+    net = FlowNetwork()
+    net.add_node(MassFlowBoundary("inlet", m_dot=0.5, Tt=T_IN))
+    net.add_node(MomentumChamberNode("ch", area=2e-3, regime=regime))
+    net.add_node(PressureBoundary("outlet", Pt=P_OUT, Tt=T_IN))
+    net.add_element(OrificeElement("o1", "inlet", "ch", Cd=0.6, diameter=0.06, correlation="fixed"))
+    net.add_element(
+        OrificeElement("o2", "ch", "outlet", Cd=0.6, diameter=0.06, correlation="fixed")
+    )
+    r = NetworkSolver(net).solve()
+    assert r["__success__"], r["__message__"]
+    assert r["ch.mach"] > 0.2
+    if reported:
+        v = r["__incompressible_validity__"]["ch"]
+        assert v["verdict"] == "warn" and v["mach"] == pytest.approx(r["ch.mach"])
+        assert "ch" in r["__incompressible_warnings__"]
+    else:
+        assert "ch" not in r["__incompressible_validity__"]

@@ -14,6 +14,7 @@ from typing import Any
 from .schemas import SecondLawFlag
 
 AUTO_LINK = "__auto_link__"
+TEE_PORT = "__tee_jct__"
 
 
 def _auto_link_ends(element_id: str) -> tuple[str, str] | None:
@@ -38,6 +39,11 @@ def owner_of(element_id: str, gui_ids: set[str], tee_steps: dict[str, tuple]) ->
     ends = _auto_link_ends(element_id)
     if ends:
         return ends[1]
+    if element_id.startswith(TEE_PORT):
+        # A junction's inserted port chamber, __tee_jct__<junction>_<port>.
+        junction = element_id[len(TEE_PORT) :].rsplit("_", 1)[0]
+        if junction in gui_ids:
+            return junction
     head = element_id.split("__", 1)[0]
     return head if head in gui_ids else element_id
 

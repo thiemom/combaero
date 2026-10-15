@@ -25,6 +25,7 @@ from gui.backend.second_law_view import owner_of
         ("ln__s0", "ln"),  # a composite's sub-element
         ("orphan__x", "orphan__x"),  # no canvas owner: itself
         ("__auto_link__ch_main__ln", "ln"),  # a drawn node-to-node edge
+        (f"__tee_jct__{TEE}_straight", TEE),  # a junction's inserted port chamber
     ],
 )
 def test_each_verdict_belongs_to_a_node_on_the_canvas(element_id: str, owner: str) -> None:
