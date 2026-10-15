@@ -1157,6 +1157,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 nozzle_exit_area=_ed.nozzle_exit_area,
                 mixing_area=_ed.mixing_area,
                 recovery_efficiency=_ed.recovery_efficiency,
+                # The network's regime (#588): incompressible is Sanger's
+                # jet pump, lossless apart from mixing.
+                regime=schema.solver_settings.global_regime,
             )
             _ejector.initial_guess = _expand_initial_guess(_ed.initial_guess, elem_id)
             if not _ejector.initial_guess:
@@ -1430,8 +1433,12 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
 
     # Ejector warm-starts: port pressures, P_jct and the port-chain flows from
     # the ejector's closed-form physics (only where the user gave no guess).
+    # The seeds invert CHOKED flow: compressible ejectors only. The
+    # incompressible jet pump has no choke and starts from the solver's own
+    # propagation (#588).
     for _ej, _ej_ports in _ejector_seeds:
-        _seed_ejector_warmstart(net, _ej, _ej_ports, schema.edges, nodes_map)
+        if _ej.regime == "compressible":
+            _seed_ejector_warmstart(net, _ej, _ej_ports, schema.edges, nodes_map)
 
     # Result assembly reports each array under its GUI id (runner.py).
     net._gui_arrays = gui_arrays

@@ -1192,7 +1192,23 @@ ejector = EjectorElement(
     mixing_area=8.0e-4,       # mixing section A_3 [m^2], > nozzle_exit_area; None = inherit
                               # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA)
     recovery_efficiency=1.0,  # multiplies the lossless mixed stagnation pressure; not fitted to data
+    regime="compressible",    # default DEFAULT_REGIME (incompressible until #585), see below
 )
+# regime="incompressible" (#588): the ejector's low-Mach limit, Sanger's 1-D jet
+# pump (NASA TN D-4445, 1968, App. B) with each stream at its own constant density
+# -- no choking, no critical regime; the flow follows the pressure ratio. Same
+# owned unknown (P_py, the mixing-plane static) and four rows: nozzle and suction
+# Bernoulli with losses, mass, and the constant-area mixing-duct momentum to an
+# outlet Pt = recovery_efficiency * (p4 + (1 - k_diffuser) q4). Loss coefficients
+# k_nozzle, k_suction (default: the compressible closure's own nozzle efficiencies
+# as K = 1/eta - 1, 0.053 / 0.176, so both regimes agree at low Mach), k_throat,
+# k_diffuser (default 0). It reproduces Sanger's Eq. 11 to machine precision; with
+# his calibrated K's his theory scores 9.3% on his own Table II (D-4759). The
+# compressible ejector reduces to it as Ma^2 (gap 0.1% at a jet Ma of 0.03, equal
+# and unequal stream temperatures). Its diagnostics report omega, Sanger's head
+# ratio N = (Pt_o - Pt_s)/(Pt_p - Pt_o), efficiency M N, and mach_jet, which the
+# incompressible validity report (#592) judges: a gas ejector of any real drive
+# runs its jet past Ma 0.2 and is flagged.
 # Solved unknowns: the three port mass flows + ej1.P_jct, the single owned scalar,
 # repurposed as the mixing-plane static pressure P_py. Four residual rows: primary
 # C-D nozzle (choked or unchoked), blended entrainment, mass conservation, and a

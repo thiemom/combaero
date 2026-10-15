@@ -825,6 +825,18 @@ JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
                        const std::vector<double>& X);
 ```
 
+```cpp
+// Incompressible jet pump (#588), the ejector's low-Mach limit: Sanger 1968
+// (NASA TN D-4445 App. B) with each stream at its own specific volume v = 1/rho.
+// Rows R0..R3 (nozzle, suction, mass, outlet) and their Jacobian over
+// (mp, ms, mo, Pt_p, v_p, Pt_s, v_s, Pt_o, p3); p4, q4 at the mixing-duct exit.
+EjectorJetPumpIncompressibleResult ejector_jetpump_incompressible_residuals_and_jacobian(
+    double mp, double ms, double mo, double pt_p, double v_p, double pt_s,
+    double v_s, double pt_o, double p3, double area_nozzle_exit,
+    double area_secondary, double area_mixing, double k_nozzle,
+    double k_suction, double k_throat, double k_diffuser, double recovery);
+```
+
 ### Wall Coupling
 ```cpp
 WallCouplingResult wall_coupling_and_jacobian(
