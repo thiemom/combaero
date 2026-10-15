@@ -524,6 +524,25 @@ class NetworkSolver:
                     visited.add(from_id)
                     queue.append(from_id)
 
+        # The walk follows the DECLARED directions, so an element declared
+        # against its flow walks a node out of the physical range: a plenum
+        # between 1 and 2 bar boundaries, wired 1 bar -> p -> 2 bar, was
+        # guessed at 0.5 bar, below both, where every element feeds it and
+        # Newton stalls (#554). Driven by pressure boundaries alone, a passive
+        # interior node lies within their range, so the guess is clamped
+        # there. Not when a mass-flow boundary or an ejector can push a node
+        # outside it.
+        if len(seed_pressures) >= 2 and not any(
+            isinstance(n, MassFlowBoundary) for n in self.network.nodes.values()
+        ):
+            from .ejector_element import EjectorElement
+
+            if not any(isinstance(e, EjectorElement) for e in self.network.elements.values()):
+                lo, hi = min(seed_pressures), max(seed_pressures)
+                for nid in p_guess:
+                    if not isinstance(self.network.nodes[nid], PressureBoundary):
+                        p_guess[nid] = min(max(p_guess[nid], lo), hi)
+
         # WallNode dead-ends carry no flow, so the correct pressure equals the
         # upstream node pressure (no friction drop).  Override the BFS estimate.
         for nid, node in self.network.nodes.items():
