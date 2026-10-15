@@ -965,6 +965,12 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
 - **A discrete loss (`PressureLossElement`) follows the flow** (#550).
   - "In" is the upstream node of the flow as it runs, and the correlation sees `|m_dot|`.
   - Through zero flow the forward and reverse forms blend over `FLOW_REVERSAL_M_SCALE` (1e-4 kg/s), as the area change does.
+- **Orifices and incompressible channels read their upstream side along the flow** (#554), so an element's declared direction is only a sign convention:
+  - **Orifices:** the kernel is evaluated from the node the flow comes from: its stagnation state, its density, and the velocity of approach of the pipe on its side (`beta`, or `beta_reverse` from the to-node's pipe).
+    - The direction comes from the pressures, blended through equal Pt over `ORIFICE_REVERSAL_P_SCALE` (0.1 Pa).
+    - An orifice into a dead end (no flow boundary beyond its to-node) is never reversed: every root has zero flow there.
+  - **Incompressible channels:** the friction and exit-head density is the upstream node's along the flow, blended through zero flow over `FLOW_REVERSAL_M_SCALE`.
+  - **Cold start:** on networks driven by pressure boundaries alone, the cold-start pressure guess of an interior node is clamped to the boundaries' range.
   - A fraction loss (`ConstantFractionLoss`, `LinearThetaFractionLoss`) takes an optional design flow `m_ref` [kg/s]: at and above it the loss is exactly the fraction; below it the loss scales with the dynamic head (`1 - (1 - r^2)^3`, `r = |m_dot|/m_ref`, C2) and vanishes at zero flow.
   - Set `m_ref` wherever the flow may run low or reverse. A constant fraction holds a pressure difference at zero flow, and a reversing flow cannot be carried through it.
 - **A `MomentumChamberNode`'s `T` is its stagnation temperature** (#576). Its inflows mix as `(m, Tt, Pt, Y)` streams. The closure solves the static T from `h(T0) = h(T) + v^2/2`, `v = m_dot / (rho(T, P) A)`, and closes `Pt = P exp((s(T0) - s(T)) / R)`.

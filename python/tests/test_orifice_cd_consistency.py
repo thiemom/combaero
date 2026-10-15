@@ -48,7 +48,7 @@ def test_the_flow_it_returns_is_self_consistent() -> None:
     st_out = s._get_node_state(g.nodes["ch"], np.array([m_star]))
     st_in.m_dot = m_star
     cd = el._effective_Cd(st_in, st_out)
-    m_calc = el._flow_calc(st_in, st_out, cd).m_dot_calc
+    m_calc = el._flow_and_partials(st_in, st_out, cd)[0]
     assert m_calc == pytest.approx(m_star, rel=1e-10)
 
 

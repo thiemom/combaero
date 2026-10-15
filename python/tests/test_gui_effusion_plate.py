@@ -74,13 +74,17 @@ def test_the_default_liner_solves_with_a_chamber_gas_side() -> None:
     assert 0.0 < r["eta_overall"] < 1.0
 
 
-@pytest.mark.xfail(strict=True, reason="#585: compressible default liner stalls")
 def test_the_default_liner_solves_in_the_gui_default_regime() -> None:
-    """Compressible is the default to come (#585). At M ~ 0.04 it should agree
-    with the incompressible solve, and today it stalls (#585; its first two
-    causes were fixed in #587, #582)."""
-    result = NetworkRunner.from_dict(_liner_in("compressible")).solve(timeout=120.0)
-    assert result._element_results["eff"].model_dump()["success"]
+    """Compressible is the default to come (#585). At M ~ 0.04 it agrees with
+    the incompressible solve: measured 4e-6 apart in the plate flow. It used to
+    stall; its causes were fixed in #582, #587 and #554 (orifices read the
+    upstream side along the flow)."""
+    comp = NetworkRunner.from_dict(_liner_in("compressible")).solve(timeout=120.0)
+    inc = NetworkRunner.from_dict(_liner_in("incompressible")).solve(timeout=120.0)
+    r_c = comp._element_results["eff"].model_dump()
+    r_i = inc._element_results["eff"].model_dump()
+    assert r_c["success"] and r_i["success"]
+    assert r_c["m_dot"] == pytest.approx(r_i["m_dot"], rel=1e-4)
 
 
 def test_a_plenum_discharge_uses_the_imposed_flux() -> None:

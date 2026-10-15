@@ -11,6 +11,12 @@ from combaero.network import (
     PressureBoundary,
 )
 
+# The network below has no root by construction (x^2 + 1 = 0). scipy's
+# Broyden update divides by the change in its iterates, which stagnate on it,
+# and warns once per iteration: hundreds of lines that say nothing about the
+# timeouts these tests check.
+pytestmark = pytest.mark.filterwarnings("ignore:invalid value encountered in divide:RuntimeWarning")
+
 
 class DivergentNode(NetworkNode):
     """A node that has an unsolvable residual equation: x^2 + 1 = 0"""

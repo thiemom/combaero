@@ -1221,15 +1221,32 @@ DEFAULT_ORIFICE_BORE = 0.08
 FLOW_REVERSAL_M_SCALE = 1e-4
 
 
-def _flow_blend(m_dot: float) -> tuple[float, float]:
-    """(w, dw/dm): the forward weight of a directional loss, 1 for m >> scale."""
-    x = m_dot / FLOW_REVERSAL_M_SCALE
+#: Pressure [Pa] over which an orifice blends its forward and reverse forms,
+#: logistic in (Pt_from - Pt_to) / scale (#554). Outside ~30 scales -- 3 Pa --
+#: either form holds alone, so an orifice with any real drop is unchanged.
+ORIFICE_REVERSAL_P_SCALE = 0.1
+
+
+def _pressure_blend(dpt: float) -> tuple[float, float]:
+    """(w, dw/d(dpt)): the forward weight of an orifice, 1 for Pt_from >> Pt_to."""
+    x = dpt / ORIFICE_REVERSAL_P_SCALE
     if x > 30.0:
         return 1.0, 0.0
     if x < -30.0:
         return 0.0, 0.0
     w = 1.0 / (1.0 + math.exp(-x))
-    return w, w * (1.0 - w) / FLOW_REVERSAL_M_SCALE
+    return w, w * (1.0 - w) / ORIFICE_REVERSAL_P_SCALE
+
+
+def _flow_blend(m_dot: float, scale: float = FLOW_REVERSAL_M_SCALE) -> tuple[float, float]:
+    """(w, dw/dm): the forward weight of a directional loss, 1 for m >> scale."""
+    x = m_dot / scale
+    if x > 30.0:
+        return 1.0, 0.0
+    if x < -30.0:
+        return 0.0, 0.0
+    w = 1.0 / (1.0 + math.exp(-x))
+    return w, w * (1.0 - w) / scale
 
 
 # ---------------------------------------------------------------------------
@@ -2710,6 +2727,8 @@ class OrificeElement(NetworkElement):
         self._orifice_geom: object | None = None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        self._to_node_obj = graph.nodes.get(self.to_node)
+        self._to_side_closed = self._side_is_closed(graph, self.to_node)
         # Evaluate both sides of the node for geometry discovery
         upstream_elements = graph.get_upstream_elements(self.from_node)
         downstream_elements = graph.get_downstream_elements(self.to_node)
@@ -2744,6 +2763,18 @@ class OrificeElement(NetworkElement):
         d_bore = math.sqrt(4.0 * self.area / math.pi)
         self.beta = 0.0
         self._orifice_geom = None
+
+        # Reversed flow approaches from the to-node's side (#554): the single
+        # pipe there, declared either way, sets the velocity of approach.
+        self.beta_reverse = 0.0
+        to_pipes = [
+            e
+            for e in graph.get_upstream_elements(self.to_node)
+            + graph.get_downstream_elements(self.to_node)
+            if isinstance(e, ChannelElement) and e.id != self.id
+        ]
+        if len(to_pipes) == 1 and to_pipes[0].diameter and d_bore < to_pipes[0].diameter:
+            self.beta_reverse = d_bore / to_pipes[0].diameter
 
         if self.upstream_diameter and self.upstream_diameter > 0:
             if d_bore < self.upstream_diameter:
@@ -3023,68 +3054,19 @@ class OrificeElement(NetworkElement):
         if self._cd_follows_own_flow():
             return self._self_consistent_residuals(state_in, state_out, flows, effective_cd)
 
-        if self.regime == "compressible":
-            res_cpp = _solver_tools.orifice_compressible_residuals_and_jacobian(
-                m_dot,
-                state_in.Pt,
-                state_in.Tt,
-                state_in.Y,
-                state_out.P,
-                effective_cd,
-                self.area,
-                getattr(self, "beta", 0.0),
-            )
-        else:
-            # Use incompressible Bernoulli formulation. The density
-            # reference is the upstream static by default; the solver's
-            # compressible-seed proxy switches it to the downstream static
-            # (_incompressible_p_ref = "outlet"), which tracks the
-            # compressible solution far better on blow-down networks
-            # (6-7x closer junction pressures on the 2026-07-05 outlet-ref
-            # seed experiment, tmp/outlet_ref_seed_experiment.py).
-            _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-            res_cpp = _solver_tools.orifice_residuals_and_jacobian(
-                m_dot,
-                state_in.Pt,
-                state_out.P if _p_ref_outlet else state_in.P,
-                state_in.T,
-                state_in.Y,
-                state_out.P,
-                effective_cd,
-                self.area,
-                beta=getattr(self, "beta", 0.0),
-            )
-
-        res = [m_dot - res_cpp.m_dot_calc]
+        m_calc, partials = self._flow_and_partials(state_in, state_out, effective_cd)
+        res = [m_dot - m_calc]
 
         # Assemble Jacobian with respect to all node and element unknowns
-        jac = {
-            0: {
-                f"{self.id}.m_dot": 1.0,
-                f"{self.from_node}.Pt": -res_cpp.d_mdot_dP_total_up,
-                f"{self.from_node}.T": -res_cpp.d_mdot_dT_up,
-            }
-        }
-        if self.regime != "compressible" and (
-            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-        ):
-            # Density evaluated at the downstream static: its sensitivity
-            # moves onto the downstream node's P.
-            jac[0][f"{self.to_node}.P"] = -(
-                res_cpp.d_mdot_dP_static_down + res_cpp.d_mdot_dP_static_up
-            )
-        else:
-            jac[0][f"{self.from_node}.P"] = -res_cpp.d_mdot_dP_static_up
-            jac[0][f"{self.to_node}.P"] = -res_cpp.d_mdot_dP_static_down
-        # Add species sensitivities
-        for i, val in enumerate(res_cpp.d_mdot_dY_up):
-            jac[0][f"{self.from_node}.Y[{i}]"] = -val
+        jac: dict[int, dict[str, float]] = {0: {f"{self.id}.m_dot": 1.0}}
+        for name, d in partials.items():
+            jac[0][name] = jac[0].get(name, 0.0) - d
 
         # m_calc is proportional to Cd, and a discharge-hole Cd moves with the
         # flow (Re_hole) and, duct-fed, with the crossflow (U1/Vi):
         # d(m_calc)/d(x) += (m_calc/Cd) dCd/dx.
         if effective_cd > 0.0:
-            scale = res_cpp.m_dot_calc / effective_cd
+            scale = m_calc / effective_cd
             for name, dcd in self._dCd_dnames(state_in, state_out, flows).items():
                 jac[0][name] = jac[0].get(name, 0.0) - scale * dcd
 
@@ -3102,36 +3084,134 @@ class OrificeElement(NetworkElement):
             and _DISCHARGE_SELECTORS.get(self.correlation) is not None
         )
 
-    def _flow_calc(
+    def _side_is_closed(self, graph: "FlowNetwork", start: str) -> bool:
+        """True when the network beyond ``start`` (not crossing back through
+        this element) holds no flow boundary: a dead end, closed by walls.
+
+        Every root then carries zero flow through this element, so it never
+        has to read that side as a source (#554). Reading it anyway made a
+        dead-end orifice depend on a stagnant node's temperature, which runs
+        like Q/m to the clamp as the flow vanishes, and Newton stalled.
+        """
+        seen = {start}
+        todo = [start]
+        while todo:
+            nid = todo.pop()
+            node = graph.nodes.get(nid)
+            if node is None or getattr(node, "is_flow_boundary", False):
+                return False
+            for elem in graph.get_upstream_elements(nid) + graph.get_downstream_elements(nid):
+                if elem is self:
+                    continue
+                for other in set(elem.all_source_nodes()) | set(elem.all_sink_nodes()):
+                    if other not in seen:
+                        seen.add(other)
+                        todo.append(other)
+        return True
+
+    def _kernel_from(
+        self,
+        src: "NetworkMixtureState",
+        dst: "NetworkMixtureState",
+        src_id: str,
+        dst_id: str,
+        cd: float,
+    ) -> tuple[float, dict[str, float]]:
+        """C++ (m_calc, d m_calc / d name) for flow from ``src`` into ``dst``.
+
+        The kernels take the upstream node's stagnation state and the
+        downstream static pressure; ``m_calc`` is linear in Cd. The
+        incompressible density reference is the upstream static by default;
+        the solver's compressible-seed proxy switches it to the downstream
+        static (_incompressible_p_ref = "outlet"), which tracks the
+        compressible solution far better on blow-down networks (6-7x closer
+        junction pressures, tmp/outlet_ref_seed_experiment.py).
+        """
+        # The velocity of approach is the upstream pipe's along the flow.
+        beta = (
+            getattr(self, "beta", 0.0)
+            if src_id == self.from_node
+            else getattr(self, "beta_reverse", 0.0)
+        )
+        if self.regime == "compressible":
+            r = _solver_tools.orifice_compressible_residuals_and_jacobian(
+                src.m_dot, src.Pt, src.Tt, src.Y, dst.P, cd, self.area, beta
+            )
+        else:
+            _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+            r = _solver_tools.orifice_residuals_and_jacobian(
+                src.m_dot,
+                src.Pt,
+                dst.P if _p_ref_outlet else src.P,
+                src.T,
+                src.Y,
+                dst.P,
+                cd,
+                self.area,
+                beta=beta,
+            )
+        d: dict[str, float] = {
+            f"{src_id}.Pt": float(r.d_mdot_dP_total_up),
+            f"{src_id}.T": float(r.d_mdot_dT_up),
+        }
+        if self.regime != "compressible" and (
+            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+        ):
+            # Density at the downstream static: its sensitivity moves there.
+            d[f"{dst_id}.P"] = float(r.d_mdot_dP_static_down + r.d_mdot_dP_static_up)
+        else:
+            d[f"{src_id}.P"] = float(r.d_mdot_dP_static_up)
+            d[f"{dst_id}.P"] = d.get(f"{dst_id}.P", 0.0) + float(r.d_mdot_dP_static_down)
+        for i, val in enumerate(r.d_mdot_dY_up):
+            if val != 0.0:
+                d[f"{src_id}.Y[{i}]"] = float(val)
+        return float(r.m_dot_calc), d
+
+    def _flow_and_partials(
         self,
         state_in: "NetworkMixtureState",
         state_out: "NetworkMixtureState",
         cd: float,
-    ) -> Any:
-        """C++ (m_calc, d m_calc/d x) at a given Cd; m_calc is linear in Cd."""
-        if self.regime == "compressible":
-            return _solver_tools.orifice_compressible_residuals_and_jacobian(
-                state_in.m_dot,
-                state_in.Pt,
-                state_in.Tt,
-                state_in.Y,
-                state_out.P,
-                cd,
-                self.area,
-                getattr(self, "beta", 0.0),
-            )
-        _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-        return _solver_tools.orifice_residuals_and_jacobian(
-            state_in.m_dot,
-            state_in.Pt,
-            state_out.P if _p_ref_outlet else state_in.P,
-            state_in.T,
-            state_in.Y,
-            state_out.P,
-            cd,
-            self.area,
-            beta=getattr(self, "beta", 0.0),
-        )
+    ) -> tuple[float, dict[str, float]]:
+        """Signed m_calc (positive from -> to) and its partials, FOLLOWING THE FLOW.
+
+        The kernels read the upstream node: its stagnation state drives, its
+        density (incompressible) or (Pt, Tt) (compressible) sets the flow,
+        against the downstream static. A reversed orifice used to keep reading
+        its declared inlet -- the wrong side's density and drive -- and in the
+        compressible regime the kernel swapped a static for a stagnation
+        pressure, so it did not converge at all (#554). Forward and reverse
+        forms are blended through equal Pt over ORIFICE_REVERSAL_P_SCALE:
+        the direction comes from the pressures, so m_calc does not depend on
+        m (a flow-based choice jumped m_calc between the two forms as m
+        crossed zero at fixed pressures, and hybr stalled on it). Outside
+        ~3 Pa either form holds alone, so a forward orifice is evaluated
+        exactly as before. An orifice into a dead end (no flow boundary beyond its
+        to-node, see _side_is_closed) is never reversed: every root has zero
+        flow there.
+        """
+        # Into a dead end (no flow boundary beyond, a WallNode included) every
+        # root has zero flow here: the forward form alone is exact there.
+        if getattr(self, "_to_side_closed", False):
+            return self._kernel_from(state_in, state_out, self.from_node, self.to_node, cd)
+        # A node without a physical state (no positive P and T) is no source.
+        if not (float(state_out.P) > 0.0 and float(state_out.T) > 0.0):
+            return self._kernel_from(state_in, state_out, self.from_node, self.to_node, cd)
+        w, dw = _pressure_blend(float(state_in.Pt) - float(state_out.Pt))
+        if w == 1.0:
+            return self._kernel_from(state_in, state_out, self.from_node, self.to_node, cd)
+        m_r, d_r = self._kernel_from(state_out, state_in, self.to_node, self.from_node, cd)
+        m_r, d_r = -m_r, {k: -v for k, v in d_r.items()}
+        if w == 0.0:
+            return m_r, d_r
+        m_f, d_f = self._kernel_from(state_in, state_out, self.from_node, self.to_node, cd)
+        out: dict[str, float] = {}
+        for k in set(d_f) | set(d_r):
+            out[k] = w * d_f.get(k, 0.0) + (1.0 - w) * d_r.get(k, 0.0)
+        g = (m_f - m_r) * dw
+        out[f"{self.from_node}.Pt"] = out.get(f"{self.from_node}.Pt", 0.0) + g
+        out[f"{self.to_node}.Pt"] = out.get(f"{self.to_node}.Pt", 0.0) - g
+        return w * m_f + (1.0 - w) * m_r, out
 
     def _self_consistent_residuals(
         self,
@@ -3150,7 +3230,7 @@ class OrificeElement(NetworkElement):
         """
         m_dot = float(state_in.m_dot)
         cd0 = max(cd_iterate, 1e-4)
-        K = float(self._flow_calc(state_in, state_out, cd0).m_dot_calc) / cd0
+        K = self._flow_and_partials(state_in, state_out, cd0)[0] / cd0
         sgn = 1.0 if K >= 0.0 else -1.0
         aK = abs(K)
         probe = copy.copy(state_in)
@@ -3177,25 +3257,8 @@ class OrificeElement(NetworkElement):
                 break
         cd_star, cd_m = cd_and_slope(a)
         probe.m_dot = sgn * a
-        res_cpp = self._flow_calc(probe, state_out, cd_star)
-        m_star = float(res_cpp.m_dot_calc)
+        m_star, partial = self._flow_and_partials(probe, state_out, cd_star)
         denom = 1.0 - aK * cd_m
-
-        partial = {
-            f"{self.from_node}.Pt": res_cpp.d_mdot_dP_total_up,
-            f"{self.from_node}.T": res_cpp.d_mdot_dT_up,
-        }
-        if self.regime != "compressible" and (
-            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-        ):
-            partial[f"{self.to_node}.P"] = (
-                res_cpp.d_mdot_dP_static_down + res_cpp.d_mdot_dP_static_up
-            )
-        else:
-            partial[f"{self.from_node}.P"] = res_cpp.d_mdot_dP_static_up
-            partial[f"{self.to_node}.P"] = res_cpp.d_mdot_dP_static_down
-        for i, val in enumerate(res_cpp.d_mdot_dY_up):
-            partial[f"{self.from_node}.Y[{i}]"] = val
         # Cd's other dependencies (a duct-fed hole's U1/Vi), at m*.
         for name, dcd in self._dCd_dnames(probe, state_out, flows).items():
             if name != m_key:
@@ -3219,17 +3282,19 @@ class OrificeElement(NetworkElement):
             return {}
         cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
-        # Throat Mach: use isentropic pressure ratio from total inlet to static outlet
+        # Throat Mach: isentropic pressure ratio from the UPSTREAM total to the
+        # downstream static -- upstream along the flow, which may run against
+        # the declared direction (#554).
         gamma = cs.thermo.gamma
         pr_crit = (2.0 / (gamma + 1.0)) ** (gamma / (gamma - 1.0))
-        p_ratio_throat = state_out.P / state_in.Pt if state_in.Pt > 0 else 1.0
-        mach_throat = (
-            1.0
-            if p_ratio_throat <= pr_crit
-            else float(
-                cb.mach_from_pressure_ratio(state_in.Tt, state_in.Pt, state_out.P, state_in.X)
-            )
-        )
+        up, dn = (state_out, state_in) if state_out.Pt > state_in.Pt else (state_in, state_out)
+        p_ratio_throat = dn.P / up.Pt if up.Pt > 0 else 1.0
+        if p_ratio_throat >= 1.0:
+            mach_throat = 0.0
+        elif p_ratio_throat <= pr_crit:
+            mach_throat = 1.0
+        else:
+            mach_throat = float(cb.mach_from_pressure_ratio(up.Tt, up.Pt, dn.P, up.X))
 
         # Physical velocity / Mach at the geometric bore (not Cd-adjusted)
         Dh = math.sqrt(4.0 * self.area / math.pi) if self.area > 0 else 0.0
@@ -5497,57 +5562,95 @@ class ChannelElement(NetworkElement):
             # compressible form (#360): lost where the flow discharges into a
             # pressure boundary taking it at its static pressure. Without it
             # the two regimes disagreed by O(1), not O(Ma^2), at Ma -> 0 (#588).
-            _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-            res_cpp = _solver_tools.channel_residuals_and_jacobian(
-                m_dot,
-                state_in.Pt,
-                state_out.P if _p_ref_outlet else state_in.P,
-                state_in.T,
-                state_in.Y,
-                state_out.P,
-                self.length,
-                self.diameter,
-                self.roughness,
-                self.friction_model,
-                f_mult,
-                self._exit_head_lost(m_dot),
+            return self._incompressible_residuals(state_in, state_out, f_mult)
+
+    def _incompressible_drop(
+        self,
+        src: NetworkMixtureState,
+        dst: NetworkMixtureState,
+        src_id: str,
+        dst_id: str,
+        m_dot: float,
+        f_mult: float,
+    ) -> tuple[float, float, dict[str, float]]:
+        """(dP, d dP/dm, {name: d dP/d name}) with ``src`` as the upstream node.
+
+        Darcy-Weisbach at the upstream static density (the downstream static
+        under the solver's compressible-seed proxy, _incompressible_p_ref =
+        "outlet"), plus the exit head where the flow discharges into a static
+        sink (#360, #588). dP is odd in m_dot.
+        """
+        p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+        r = _solver_tools.channel_residuals_and_jacobian(
+            m_dot,
+            src.Pt,
+            dst.P if p_ref_outlet else src.P,
+            src.T,
+            src.Y,
+            dst.P,
+            self.length,
+            self.diameter,
+            self.roughness,
+            self.friction_model,
+            f_mult,
+            self._exit_head_lost(m_dot),
+        )
+        d: dict[str, float] = {f"{src_id}.T": float(r.d_dP_dT_up)}
+        d[f"{dst_id if p_ref_outlet else src_id}.P"] = float(r.d_dP_dP_static_up)
+        for i, val in enumerate(r.d_dP_dY_up):
+            if val != 0.0:
+                d[f"{src_id}.Y[{i}]"] = float(val)
+        return float(r.dP_calc), float(r.d_dP_d_mdot), d
+
+    def _incompressible_residuals(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        f_mult: float,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """Pt_from - Pt_to = dP(m), the drop FOLLOWING THE FLOW (#554).
+
+        The density (and composition, temperature) is the upstream node's
+        along the flow, which for a reversed channel is the declared outlet;
+        reading the declared inlet regardless made a reversed duct pass the
+        wrong flow. Forward and reverse forms blend through zero flow over
+        FLOW_REVERSAL_M_SCALE, as the area change and the pressure loss do.
+
+        A channel connects stagnation pressures: Pt_up - Pt_down = dP_friction
+        (+ q_exit at a static sink). The static-vs-stagnation distinction lives
+        in the node closures (PlenumNode: Pt = P; MomentumChamberNode: Pt = P +
+        0.5 rho v^2); referencing the downstream static instead would let an
+        inline chamber leak its dynamic head as a free pressure gain.
+        """
+        m_dot = state_in.m_dot
+        w, dw = _flow_blend(m_dot)
+        if w == 1.0:
+            dP, dP_dm, dd = self._incompressible_drop(
+                state_in, state_out, self.from_node, self.to_node, m_dot, f_mult
             )
-
-        # Residual of P-node unknowns matching channel drop.
-        # C++ returns dP_calc = friction stagnation-pressure loss, plus the
-        # exit head where it is lost (the downstream static pressure is not an
-        # input). A channel therefore connects stagnation pressures:
-        # Pt_up - Pt_down = dP_friction (+ q_exit at a static sink). The
-        # static-vs-stagnation distinction lives entirely in the node
-        # constitutive relation (PlenumNode: Pt = P; MomentumChamberNode:
-        # Pt = P + 0.5*rho*v^2). Referencing the downstream node's static P
-        # instead would let an inline MomentumChamberNode leak its dynamic head
-        # q_N = Pt - P as a free pressure gain across the junction. For every
-        # plenum- or boundary-terminated channel Pt == P, so this is identical
-        # to the previous static-face coupling.
-        res = [state_in.Pt - state_out.Pt - res_cpp.dP_calc]
-
-        upstream_id = self.from_node
-        downstream_id = self.to_node
-
-        jac = {
-            0: {
-                f"{self.id}.m_dot": -res_cpp.d_dP_d_mdot,
-                f"{upstream_id}.Pt": 1.0,
-                f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
-                f"{downstream_id}.Pt": -1.0,
-            }
-        }
-        if getattr(self, "_incompressible_p_ref", "inlet") == "outlet":
-            # Density evaluated at the downstream static: the friction-loss
-            # pressure sensitivity moves onto the downstream node's P.
-            jac[0][f"{downstream_id}.P"] = -res_cpp.d_dP_dP_static_up
+        elif w == 0.0:
+            dP, dP_dm, dd = self._incompressible_drop(
+                state_out, state_in, self.to_node, self.from_node, m_dot, f_mult
+            )
         else:
-            jac[0][f"{upstream_id}.P"] = -res_cpp.d_dP_dP_static_up
-        for i, val in enumerate(res_cpp.d_dP_dY_up):
-            jac[0][f"{upstream_id}.Y[{i}]"] = -val
-
-        return res, jac
+            f_dP, f_dm, f_d = self._incompressible_drop(
+                state_in, state_out, self.from_node, self.to_node, m_dot, f_mult
+            )
+            r_dP, r_dm, r_d = self._incompressible_drop(
+                state_out, state_in, self.to_node, self.from_node, m_dot, f_mult
+            )
+            dP = w * f_dP + (1.0 - w) * r_dP
+            dP_dm = w * f_dm + (1.0 - w) * r_dm + dw * (f_dP - r_dP)
+            dd = {k: w * f_d.get(k, 0.0) + (1.0 - w) * r_d.get(k, 0.0) for k in set(f_d) | set(r_d)}
+        res = [state_in.Pt - state_out.Pt - dP]
+        row: dict[str, float] = {
+            f"{self.id}.m_dot": -dP_dm,
+            f"{self.from_node}.Pt": 1.0,
+            f"{self.to_node}.Pt": -1.0,
+        }
+        for k, v in dd.items():
+            row[k] = row.get(k, 0.0) - v
+        return res, {0: row}
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
