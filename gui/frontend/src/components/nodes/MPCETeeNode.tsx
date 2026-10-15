@@ -1,4 +1,3 @@
-import { GitMerge } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 // Port colours: blue = input arm, green = output arm (matches handle triangle colours).
 const portColor = (isInput: boolean) => (isInput ? "#3b82f6" : "#22c55e");
@@ -56,7 +56,7 @@ const MPCETeeNode = ({ id, data, selected }: NodeProps) => {
 						: "bg-rose-50 border-rose-200 text-rose-500"
 				}`}
 			>
-				<GitMerge size={16} />
+				<NodeIcon type="mpce_tee" size={16} />
 			</div>
 
 			<div

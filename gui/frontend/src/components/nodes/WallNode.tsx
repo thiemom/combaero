@@ -1,4 +1,3 @@
-import { Square } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -7,6 +6,7 @@ import {
 	useUpdateNodeInternals,
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
+import NodeIcon from "../NodeIcon";
 
 const WallNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -30,7 +30,7 @@ const WallNode = ({ id, data, selected }: NodeProps) => {
 				transformOrigin: "center center",
 			}}
 		>
-			<Square size={20} className="text-stone-600 shrink-0 fill-stone-600" />
+			<NodeIcon type="wall" size={20} className="shrink-0" />
 
 			<div
 				className="flex flex-col items-start"

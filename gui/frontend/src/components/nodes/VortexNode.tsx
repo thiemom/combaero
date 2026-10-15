@@ -1,6 +1,6 @@
-import { Tornado } from "lucide-react";
 import { Handle, type NodeProps, Position } from "reactflow";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 const VortexNode = ({ data, selected }: NodeProps) => {
 	const isSolved = !!data.result;
@@ -18,7 +18,7 @@ const VortexNode = ({ data, selected }: NodeProps) => {
 			style={{ width: 140, height: 56 }}
 		>
 			<div className="flex items-center justify-center p-1 bg-violet-50 border border-violet-200 rounded shrink-0">
-				<Tornado size={16} className="text-violet-500" />
+				<NodeIcon type="vortex" size={16} />
 			</div>
 
 			<div className="flex flex-col items-start flex-1 min-w-0 overflow-hidden">

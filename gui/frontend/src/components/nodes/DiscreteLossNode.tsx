@@ -1,4 +1,3 @@
-import { Activity } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -45,11 +45,7 @@ const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center p-1 bg-stone-100 rounded shrink-0">
-				<Activity
-					size={14}
-					className="text-stone-600"
-					style={{ transform: "rotate(90deg)" }}
-				/>
+				<NodeIcon type="discrete_loss" size={14} />
 			</div>
 
 			<div

@@ -1,5 +1,5 @@
-import { Link } from "lucide-react";
 import { Handle, Position } from "reactflow";
+import NodeIcon from "../NodeIcon";
 
 const LosslessNode = ({ data }: { data: any }) => {
 	const isSolved = !!data.result;
@@ -10,7 +10,7 @@ const LosslessNode = ({ data }: { data: any }) => {
 			style={{ minWidth: "120px" }}
 		>
 			<div className="flex flex-col items-center justify-center p-1 bg-white rounded border border-stone-200">
-				<Link size={14} className="text-slate-500" />
+				<NodeIcon type="lossless_connection" size={14} />
 			</div>
 
 			<div className="flex flex-col">

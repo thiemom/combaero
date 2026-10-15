@@ -1,4 +1,3 @@
-import { Database } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 const PlenumNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -37,7 +37,7 @@ const PlenumNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center rounded-full w-8 h-8 bg-amber-100 p-1.5 shrink-0">
-				<Database size={16} className="text-amber-600" />
+				<NodeIcon type="plenum" size={16} />
 			</div>
 
 			<div

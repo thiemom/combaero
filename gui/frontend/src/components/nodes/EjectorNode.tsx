@@ -1,4 +1,3 @@
-import { Wind } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 // Port colours: blue = inlet, green = outlet (matches handle triangle colours).
 const INLET = "#3b82f6";
@@ -53,7 +53,7 @@ const EjectorNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center p-1 rounded border shrink-0 bg-sky-50 border-sky-200 text-sky-500">
-				<Wind size={16} />
+				<NodeIcon type="ejector" size={16} />
 			</div>
 
 			<div
