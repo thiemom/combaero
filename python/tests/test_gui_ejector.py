@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from combaero.network.components import MultiPortChamberBase
+from combaero.network.components import MomentumChamberNode, MultiPortChamberBase
 from combaero.network.ejector_element import EjectorElement
 from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.runner import NetworkRunner
@@ -64,9 +64,9 @@ def test_ejector_data_ignores_unknown_keys():
 
 
 def _three_plenum_ejector_schema() -> NetworkGraphSchema:
-    """Three plena on the ejector's ports (primary/secondary inlets, outlet).
-    Plena connect directly to the port handles, so no auto-MCN is inserted and
-    the port node ids are exactly the plenum ids -- easy to assert."""
+    """Three plena wired straight to the ejector's ports (primary/secondary
+    inlets, outlet). Each port gets an auto-inserted MomentumChamberNode joined
+    to its plenum by a lossless link (a plenum cannot be the port node)."""
     return NetworkGraphSchema(
         nodes=[
             _node("p_pri", "plenum", {}),
@@ -96,11 +96,16 @@ def test_ejector_dispatch_builds_element_with_correct_ports():
     e = net.elements["ej1"]
     assert isinstance(e, EjectorElement)
     assert isinstance(e, MultiPortChamberBase)
-    assert e.primary_node == "p_pri"
-    assert e.secondary_node == "p_sec"
-    assert e.outlet_node == "p_out"
-    assert e.inlet_nodes == ["p_pri", "p_sec"]
-    assert e.outlet_nodes == ["p_out"]
+    assert e.primary_node == "__tee_jct__ej1_primary"
+    assert e.secondary_node == "__tee_jct__ej1_secondary"
+    assert e.outlet_node == "__tee_jct__ej1_outlet"
+    for port in ("primary", "secondary", "outlet"):
+        assert isinstance(net.nodes[f"__tee_jct__ej1_{port}"], MomentumChamberNode)
+    # Flow follows the canvas edge: plenum -> port on inlets, port -> plenum out.
+    assert "__auto_link__p_pri____tee_jct__ej1_primary" in net.elements
+    assert "__auto_link__p_sec____tee_jct__ej1_secondary" in net.elements
+    assert "__auto_link____tee_jct__ej1_outlet__p_out" in net.elements
+    net.resolve_all_topology()  # a plenum on a port used to be refused here
     assert e.throat_area == _THROAT
     assert e.nozzle_exit_area == _NOZZLE_EXIT
     assert e.mixing_area == _MIXING
@@ -416,3 +421,18 @@ def test_cleared_throat_and_nozzle_exit_mean_the_default():
     d = EjectorData(throat_area=None, nozzle_exit_area=None)
     assert d.throat_area == EjectorData.model_fields["throat_area"].default
     assert d.nozzle_exit_area == EjectorData.model_fields["nozzle_exit_area"].default
+
+
+def test_boundary_wired_straight_to_a_port_resolves():
+    """A pressure boundary on the suction port (no channel, no chamber) gets a
+    port node + lossless link instead of failing 'must be a
+    MomentumChamberNode'; the warm-start still traces to the boundary."""
+    g = _solvable_ejector_schema()
+    g["nodes"] = [n for n in g["nodes"] if n["id"] != "mc_s"]
+    g["edges"] = [e for e in g["edges"] if e["id"] not in ("e3", "e4")]
+    g["edges"].append(_edge("e4", "pb_s", "ej1", tgt_handle="port-secondary-target"))
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    net.resolve_all_topology()
+    port = "__tee_jct__ej1_secondary"
+    assert net.elements["ej1"].secondary_node == port
+    assert net.nodes[port].initial_guess.get(f"{port}.Pt") == 22850.0
