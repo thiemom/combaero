@@ -225,6 +225,9 @@ def _solvable_ejector_schema() -> dict:
             _edge("e5", "ej1", "mc_o", src_handle="port-outlet-source"),
             _edge("e6", "mc_o", "pb_o"),
         ],
+        # The compressible ejector (Huang / Kracik & Dvorak) is the subject;
+        # the library default is incompressible until #585 (#588).
+        "solver_settings": {"global_regime": "compressible"},
     }
 
 
@@ -289,6 +292,9 @@ def _jetpump_ejector_schema() -> dict:
             _edge("e5", "ej1", "mc_o", src_handle="port-outlet-source"),
             _edge("e6", "mc_o", "pb_o"),
         ],
+        # The compressible ejector (Huang / Kracik & Dvorak) is the subject;
+        # the library default is incompressible until #585 (#588).
+        "solver_settings": {"global_regime": "compressible"},
     }
 
 

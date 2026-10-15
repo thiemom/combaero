@@ -580,4 +580,43 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   return out;
 }
 
+EjectorJetPumpIncompressibleResult ejector_jetpump_incompressible_residuals_and_jacobian(
+    double mp, double ms, double mo, double pt_p, double v_p, double pt_s,
+    double v_s, double pt_o, double p3, double area_nozzle_exit,
+    double area_secondary, double area_mixing, double k_nozzle,
+    double k_suction, double k_throat, double k_diffuser, double recovery) {
+  using D = DualN<9>;
+  const D Mp = D::seed(mp, 0), Ms = D::seed(ms, 1), Mo = D::seed(mo, 2);
+  const D Ptp = D::seed(pt_p, 3), Vp = D::seed(v_p, 4);
+  const D Pts = D::seed(pt_s, 5), Vs = D::seed(v_s, 6);
+  const D Pto = D::seed(pt_o, 7), P3 = D::seed(p3, 8);
+  const double Ae = area_nozzle_exit, As = area_secondary, A3 = area_mixing;
+
+  // m|m| as m * m * sgn(m): exact derivative 2|m|, C1 through zero.
+  auto msq = [](const D &m) { return m * m * (m.v >= 0.0 ? 1.0 : -1.0); };
+  const D Mt = Mp + Ms;
+  const double sgn_t = (Mt.v >= 0.0) ? 1.0 : -1.0;
+  // mt|mt| v_m = |mt| (mp v_p + ms v_s)
+  const D flux_t = Mt * sgn_t * (Mp * Vp + Ms * Vs);
+
+  const D R0 = Ptp - P3 - (1.0 + k_nozzle) * 0.5 * Vp * msq(Mp) / (Ae * Ae);
+  const D R1 = Pts - P3 - (1.0 + k_suction) * 0.5 * Vs * msq(Ms) / (As * As);
+  const D R2 = Mo - Mp - Ms;
+  const D q4 = 0.5 * flux_t / (A3 * A3);
+  const D p4 = P3 + (Vp * msq(Mp) / Ae + Vs * msq(Ms) / As - flux_t / A3) / A3 - k_throat * q4;
+  const D R3 = Pto - recovery * (p4 + (1.0 - k_diffuser) * q4);
+
+  EjectorJetPumpIncompressibleResult out;
+  const D rows[4] = {R0, R1, R2, R3};
+  for (int r = 0; r < 4; ++r) {
+    out.residuals[r] = rows[r].v;
+    for (int k = 0; k < 9; ++k) {
+      out.jacobian[r][k] = rows[r].d[k];
+    }
+  }
+  out.p4 = p4.v;
+  out.q4 = q4.v;
+  return out;
+}
+
 } // namespace combaero::solver

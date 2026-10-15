@@ -279,4 +279,46 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
     double recovery_efficiency, double eps_frac, double s_choke_lo,
     double s_choke_hi, double s_sub_lo, double s_sub_hi);
 
+// ---------------------------------------------------------------------------
+// Incompressible jet pump (#588)
+// ---------------------------------------------------------------------------
+//
+// The low-Mach limit of the ejector, for a network solved incompressibly:
+// Sanger's conventional one-dimensional jet-pump theory (NASA TN D-4445,
+// 1968, Appendix B, Eqs. 1-13), with each stream at its own constant density
+// (specific volume v = 1/rho). Same owned unknown as the compressible element
+// (p3 = the mixing-plane static pressure, at the nozzle exit and the suction
+// annulus) and the same four rows:
+//
+//   R0 = Pt_p - p3 - (1 + K_nozzle)  v_p mp|mp| / (2 A_e^2)     nozzle
+//   R1 = Pt_s - p3 - (1 + K_suction) v_s ms|ms| / (2 A_s^2)     suction
+//   R2 = mo - mp - ms                                           mass
+//   R3 = Pt_o - recovery (p4 + (1 - K_diffuser) q4)             outlet
+//
+// with the constant-area mixing duct A_3 (momentum, mixing complete):
+//   p4 = p3 + [v_p mp|mp| / A_e + v_s ms|ms| / A_s - |mt| (mp v_p + ms v_s) / A_3] / A_3
+//           - K_throat q4,     q4 = |mt| (mp v_p + ms v_s) / (2 A_3^2)
+// mt = mp + ms; the mixed stream's specific volume is volume-additive,
+// v_m = (mp v_p + ms v_s) / mt, so mt|mt| v_m = |mt| (mp v_p + ms v_s): no
+// division at zero flow. At equal densities this is exactly Sanger's Eq. 11
+// (P5 = Pt_o, P2 = Pt_s); the K's are his component losses (default 0) and
+// `recovery` multiplies the outlet stagnation pressure as the compressible
+// element's does, so matched losses compare like for like. No choking, no
+// critical regime: the flow follows the pressure ratio.
+//
+// Seeds (jacobian columns): 0 mp, 1 ms, 2 mo, 3 Pt_p, 4 v_p, 5 Pt_s, 6 v_s,
+// 7 Pt_o, 8 p3. Rows R0, R1, R3 are pressures; R2 is a mass flow.
+struct EjectorJetPumpIncompressibleResult {
+  std::array<double, 4> residuals;
+  std::array<std::array<double, 9>, 4> jacobian;
+  double p4 = 0.0;  // mixing-duct exit static [Pa]
+  double q4 = 0.0;  // mixing-duct exit dynamic head [Pa]
+};
+
+EjectorJetPumpIncompressibleResult ejector_jetpump_incompressible_residuals_and_jacobian(
+    double mp, double ms, double mo, double pt_p, double v_p, double pt_s,
+    double v_s, double pt_o, double p3, double area_nozzle_exit,
+    double area_secondary, double area_mixing, double k_nozzle,
+    double k_suction, double k_throat, double k_diffuser, double recovery);
+
 } // namespace combaero::solver

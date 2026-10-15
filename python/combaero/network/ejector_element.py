@@ -111,6 +111,8 @@ import combaero as cb
 from combaero import _solver_tools
 from combaero.network._ejector_huang1999 import ETA_P, ETA_S, EjectorGeometry
 from combaero.network.components import (
+    DEFAULT_REGIME,
+    CompressibilityLiteral,
     MomentumChamberNode,
     MultiPortChamberBase,
     NetworkMixtureState,
@@ -159,6 +161,10 @@ class EjectorElement(MultiPortChamberBase):
     # not obey, and the cold reference network then fails to converge.
     seeds_ports_by_pressure_split: bool = False
 
+    # The incompressible validity report (#588) judges the primary jet: an
+    # ejector's ports can be slow while its jet is not.
+    validity_mach_keys = ("mach_jet",)
+
     def __init__(
         self,
         id: str,
@@ -169,6 +175,11 @@ class EjectorElement(MultiPortChamberBase):
         nozzle_exit_area: float,
         mixing_area: float | None = None,
         recovery_efficiency: float = 1.0,
+        regime: CompressibilityLiteral = DEFAULT_REGIME,
+        k_nozzle: float | None = None,
+        k_suction: float | None = None,
+        k_throat: float = 0.0,
+        k_diffuser: float = 0.0,
     ):
         """Build an ejector.
 
@@ -191,7 +202,26 @@ class EjectorElement(MultiPortChamberBase):
                 pressure to give the critical back pressure P_c*. Defaults
                 to 1.0 (no artificial loss); see this module's and
                 ``_ejector_huang1999``'s docstrings for why that default is
-                not fitted to any reference dataset.
+                not fitted to any reference dataset. The incompressible
+                closure applies it the same way, to the outlet's stagnation
+                pressure.
+            regime: ``"compressible"`` (the closures above) or
+                ``"incompressible"``: the low-Mach limit, Sanger's 1-D jet
+                pump (NASA TN D-4445, 1968), each stream at its own constant
+                density, no choking and no critical regime (#588). Default
+                ``DEFAULT_REGIME``, like every element.
+            k_nozzle, k_suction, k_throat, k_diffuser: Sanger's component
+                loss coefficients (K_p, K_s, K_t, K_d), on the nozzle-exit,
+                suction-annulus and mixing-duct dynamic heads; incompressible
+                regime only. ``None`` (the nozzle and suction defaults) takes
+                the compressible closure's own nozzle efficiencies, Huang's
+                ETA_P = 0.95 and ETA_S = 0.85, as K = 1/eta - 1 (an efficiency
+                on kinetic energy IS a loss coefficient: Pt - p = rho V^2 /
+                (2 eta)), so both regimes agree at low Mach out of the box.
+                The throat and diffuser default to 0, as the compressible
+                mixing has no friction and ``recovery_efficiency`` covers the
+                outlet. Sanger calibrated 0.008-0.036 / 0.09-0.14 /
+                0.076-0.0985 / 0.079-0.102 on his water jet pumps.
         """
         # Validate geometry BEFORE super().__init__ so the port-face areas
         # passed below are guaranteed positive.
@@ -214,6 +244,18 @@ class EjectorElement(MultiPortChamberBase):
                 f"EjectorElement '{id}': recovery_efficiency must be positive, "
                 f"got {recovery_efficiency}."
             )
+        if k_nozzle is None:
+            k_nozzle = 1.0 / ETA_P - 1.0
+        if k_suction is None:
+            k_suction = 1.0 / ETA_S - 1.0
+        for name, k in (
+            ("k_nozzle", k_nozzle),
+            ("k_suction", k_suction),
+            ("k_throat", k_throat),
+            ("k_diffuser", k_diffuser),
+        ):
+            if k < 0.0:
+                raise ValueError(f"EjectorElement '{id}': {name} must be >= 0, got {k}.")
         # Port-face areas from the ejector's OWN geometry (ordered
         # inlet_nodes + outlet_nodes = [primary, secondary, outlet]). Unlike a
         # generic tee, the ejector always knows these, so it supplies them
@@ -254,6 +296,11 @@ class EjectorElement(MultiPortChamberBase):
         #: "<Element> '<id>'" (the outlet pipe), or "default".
         self._mixing_source = "user" if mixing_area is not None else ""
         self.recovery_efficiency = float(recovery_efficiency)
+        self.regime = regime
+        self.k_nozzle = float(k_nozzle)
+        self.k_suction = float(k_suction)
+        self.k_throat = float(k_throat)
+        self.k_diffuser = float(k_diffuser)
 
     def area_facing(self, node_id: str) -> float | None:
         """The flow area this ejector presents at ``node_id``: the mixing duct
@@ -347,6 +394,9 @@ class EjectorElement(MultiPortChamberBase):
         the OPPOSITE pattern from the base class's own impulse-CV rows.
         See the module docstring's residual design section and
         RESIDUAL-ROW-SCALING (NetworkSolver._build_residual_scales)."""
+        if self.regime == "incompressible":
+            # Nozzle and suction rows are pressure balances there (#588).
+            return ["p", "p", "mdot", "p"]
         return ["mdot", "mdot", "mdot", "p"]
 
     # smootherstep window for s_choke, on mp / choked_mass_flow(Pt_p): s = 0
@@ -366,6 +416,8 @@ class EjectorElement(MultiPortChamberBase):
         P_jct: float,
         port_mdots: list[float],
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        if self.regime == "incompressible":
+            return self._incompressible_residuals(states, P_jct, port_mdots)
         primary, secondary, outlet = states
 
         # gamma/r_gas: frozen coefficients (see module docstring). Recomputed
@@ -447,6 +499,70 @@ class EjectorElement(MultiPortChamberBase):
             jac[row] = cols
         return (list(rj.residuals), jac)
 
+    def _incompressible_residuals(
+        self,
+        states: list[NetworkMixtureState],
+        P_jct: float,
+        port_mdots: list[float],
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """Sanger's jet pump (#588): C++ assembles the four rows and their
+        Jacobian over (mp, ms, mo, Pt_p, v_p, Pt_s, v_s, Pt_o, p3); here the
+        port densities (each port chamber's own closure, as every junction
+        reads them) are chained into the v columns."""
+        primary, secondary, outlet = states
+        dens = self.port_densities(states)
+        rho_p, drho_p = dens[0]
+        rho_s, drho_s = dens[1]
+        rj = _solver_tools.ejector_jetpump_incompressible_residuals_and_jacobian(
+            -float(port_mdots[0]),
+            -float(port_mdots[1]),
+            float(port_mdots[2]),
+            float(primary.Pt),
+            1.0 / rho_p,
+            float(secondary.Pt),
+            1.0 / rho_s,
+            float(outlet.Pt),
+            float(P_jct),
+            self.nozzle_exit_area,
+            self.mixing_area - self.nozzle_exit_area,
+            self.mixing_area,
+            self.k_nozzle,
+            self.k_suction,
+            self.k_throat,
+            self.k_diffuser,
+            self.recovery_efficiency,
+        )
+        flow_cols: list[tuple[int, str, float]] = [
+            (0, f"{self._port_element_ids[0]}.m_dot", -self._port_signs[0]),
+            (1, f"{self._port_element_ids[1]}.m_dot", -self._port_signs[1]),
+            (2, f"{self._port_element_ids[2]}.m_dot", self._port_signs[2]),
+            (3, f"{self.primary_node}.Pt", 1.0),
+            (5, f"{self.secondary_node}.Pt", 1.0),
+            (7, f"{self.outlet_node}.Pt", 1.0),
+            (8, f"{self.id}.P_jct", 1.0),
+        ]
+        # d(v)/d(name) = -d(rho)/d(name) / rho^2
+        v_cols = [
+            (4, {k: -d / (rho_p * rho_p) for k, d in drho_p.items()}),
+            (6, {k: -d / (rho_s * rho_s) for k, d in drho_s.items()}),
+        ]
+        jac: dict[int, dict[str, float]] = {}
+        for row in range(4):
+            grad = rj.jacobian[row]
+            cols: dict[str, float] = {}
+            for seed, name, coeff in flow_cols:
+                g = grad[seed]
+                if g != 0.0:
+                    cols[name] = cols.get(name, 0.0) + coeff * g
+            for seed, chain in v_cols:
+                g = grad[seed]
+                if g == 0.0:
+                    continue
+                for name, dv in chain.items():
+                    cols[name] = cols.get(name, 0.0) + g * dv
+            jac[row] = cols
+        return list(rj.residuals), jac
+
     def verify_solution_consistent(
         self,
         sol: dict[str, float],
@@ -470,6 +586,8 @@ class EjectorElement(MultiPortChamberBase):
         """
         diag = super().diagnostics(states, P_jct, port_mdots)
         primary, secondary, outlet = states
+        if self.regime == "incompressible":
+            return self._incompressible_diagnostics(diag, states, P_jct, port_mdots)
 
         gamma = choke_plane_gamma(secondary.Tt, secondary.X)
         r_gas = float(cb.specific_gas_constant(secondary.X))
@@ -516,6 +634,40 @@ class EjectorElement(MultiPortChamberBase):
         else:
             diag["omega"] = self._critical_omega(primary, secondary, gamma)
             diag["p_c_star_pa"] = self._critical_back_pressure(primary, secondary, gamma, r_gas)
+        return diag
+
+    def _incompressible_diagnostics(
+        self,
+        diag: dict[str, float],
+        states: list[NetworkMixtureState],
+        P_jct: float,
+        port_mdots: list[float] | None,
+    ) -> dict[str, float]:
+        """Jet-pump outputs (#588): flows, entrainment ratio, Sanger's head
+        ratio N = (Pt_o - Pt_s) / (Pt_p - Pt_o), efficiency M N, and the primary
+        jet's Mach for the validity report. No choking quantities: the
+        incompressible jet pump has none."""
+        primary, secondary, outlet = states
+        diag["regime_incompressible"] = 1.0
+        diag["critical_mode"] = 0.0
+        diag["outlet_pt_pa"] = float(outlet.Pt)
+        diag["p_py_pa"] = float(P_jct)
+        if port_mdots is None or len(port_mdots) != self.N:
+            return diag
+        mp, ms = -float(port_mdots[0]), -float(port_mdots[1])
+        diag["m_dot_primary"] = mp
+        diag["m_dot_secondary"] = ms
+        diag["m_dot_outlet"] = float(port_mdots[2])
+        diag["omega"] = ms / mp if mp != 0.0 else float("nan")
+        rho_p = self.port_densities(states)[0][0]
+        a_p = float(cb.speed_of_sound(primary.T, primary.X))
+        diag["mach_jet"] = abs(mp) / (rho_p * self.nozzle_exit_area) / a_p if a_p > 0 else 0.0
+        drive = float(primary.Pt) - float(outlet.Pt)
+        if drive != 0.0:
+            N = (float(outlet.Pt) - float(secondary.Pt)) / drive
+            diag["head_ratio_N"] = N
+            if mp != 0.0:
+                diag["efficiency"] = (ms / mp) * N
         return diag
 
     def _critical_omega(

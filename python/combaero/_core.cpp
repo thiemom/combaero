@@ -1587,6 +1587,28 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Whole-element 4-row ejector (f, J) across all three operating regimes.\n\n"
       "Returns: EjectorElementResidualJacobian (residuals[4] + jacobian[4][9])");
 
+  py::class_<solver::EjectorJetPumpIncompressibleResult>(
+      m, "EjectorJetPumpIncompressibleResult",
+      "Incompressible jet-pump residuals (#588): `residuals` [R0..R3], "
+      "`jacobian`[row][seed] over (mp, ms, mo, Pt_p, v_p, Pt_s, v_s, Pt_o, p3), "
+      "and the mixing-duct exit p4, q4.")
+      .def_readonly("residuals", &solver::EjectorJetPumpIncompressibleResult::residuals)
+      .def_readonly("jacobian", &solver::EjectorJetPumpIncompressibleResult::jacobian)
+      .def_readonly("p4", &solver::EjectorJetPumpIncompressibleResult::p4)
+      .def_readonly("q4", &solver::EjectorJetPumpIncompressibleResult::q4);
+
+  m.def("ejector_jetpump_incompressible_residuals_and_jacobian",
+        &solver::ejector_jetpump_incompressible_residuals_and_jacobian, py::arg("mp"),
+        py::arg("ms"), py::arg("mo"), py::arg("pt_p"), py::arg("v_p"), py::arg("pt_s"),
+        py::arg("v_s"), py::arg("pt_o"), py::arg("p3"), py::arg("area_nozzle_exit"),
+        py::arg("area_secondary"), py::arg("area_mixing"), py::arg("k_nozzle") = 0.0,
+        py::arg("k_suction") = 0.0, py::arg("k_throat") = 0.0, py::arg("k_diffuser") = 0.0,
+        py::arg("recovery") = 1.0,
+        "Incompressible jet pump (#588): Sanger's 1-D theory (NASA TN D-4445,\n"
+        "App. B) with each stream at its own constant density, the low-Mach\n"
+        "limit of the ejector. Same four rows and owned unknown p3 as the\n"
+        "compressible element; v = 1/rho.");
+
   // Area change elements
   py::class_<combaero::AreaChangeResult>(
       m, "AreaChangeResult",

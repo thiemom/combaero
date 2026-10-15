@@ -55,6 +55,9 @@ def _element(**overrides) -> EjectorElement:
         "throat_area": _THROAT_AREA,
         "nozzle_exit_area": _NOZZLE_EXIT_AREA,
         "mixing_area": _MIXING_AREA,
+        # The compressible closures are the subject (#588: the library
+        # default is incompressible until #585).
+        "regime": "compressible",
     }
     kwargs.update(overrides)
     return EjectorElement(**kwargs)
@@ -444,6 +447,7 @@ def _build_network() -> FlowNetwork:
         throat_area=_THROAT_AREA,
         nozzle_exit_area=_NOZZLE_EXIT_AREA,
         mixing_area=_MIXING_AREA,
+        regime="compressible",
     )
     ej1.initial_guess = {"ej1.P_jct": op["pc"]}
     net.add_element(ej1)
