@@ -165,6 +165,33 @@ double T_adiabatic_wall_mach(double T_static, double M,
 // r = Pr^(1/3) for turbulent, Pr^(1/2) for laminar
 double recovery_factor(double Pr, bool turbulent = true);
 
+// -------------------------------------------------------------
+// Static state of a duct station from stagnation T0 and mass flux (#576)
+// -------------------------------------------------------------
+// Static state of a chamber from its STAGNATION temperature T0, static P and
+// mass flux G = |m_dot| / A (issue #576). Energy: h(T0) = h(T) + v^2 / 2 with
+// v = G / rho(T, P) = G R T / P, i.e.
+//   f(T) = h(T0) - h(T) - (G R T / P)^2 / 2 = 0.
+// f is strictly decreasing (f' = -cp - G^2 R^2 T / P^2) and f(T0) <= 0, so
+// the root is unique and lies in (0, T0]; with cp rising in T, f is concave
+// and Newton from T0 approaches it monotonically from above. The root exists
+// at any G -- subsonic or supersonic -- so the closure itself no longer caps
+// the flow; the choking limit comes out of P0(P) at fixed G as it should.
+//
+// Returns T and the ln(P0 / P) of the isentropic stagnation state, with their
+// partial derivatives with respect to T0, P and G (closed form, chain rule
+// through the implicit f).
+struct ChamberStaticState {
+  double T;
+  double dT_dT0, dT_dP, dT_dG;
+  double lnP0P;
+  double dln_dT0, dln_dP, dln_dG;
+  double M;
+};
+
+ChamberStaticState chamber_static_state(double T0, double P, double G,
+                                        const std::vector<double>& X);
+
 } // namespace combaero
 
 #endif // STAGNATION_H

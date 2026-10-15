@@ -1,0 +1,5 @@
+- **Merge-chamber face, chamber heat transfer and effusion gas side read a chamber's static state (#578).** Follows #576: a `MomentumChamberNode` carries its stagnation T.
+  - **Merge face:** `chamber_merge_face_state` took the chamber's T and the main stream's T as static. It now solves the face's static state from the impulse and energy equations together, and the outlet's from the chamber's own static-state solve. Its sensitivities are analytic; the temperature columns were central differences before. On a compressible liner (outlet M > 0.3), the old face missed the exact momentum balance by 1.95 N.
+  - **Chamber heat transfer:** the correlation sees the static T, and the velocity from the static density.
+  - **Effusion plate:** its gas-side density on a chamber is the chamber's static density.
+  - **C++:** `chamber_static_state` is now public in `stagnation.h`.

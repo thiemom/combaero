@@ -270,6 +270,17 @@ std::tuple<double, double> stagnation_from_static(
     double T, double P, double v,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
+
+// Static state of a duct station from stagnation T0, static P and mass flux
+// G = |m_dot|/A (#576): T from h(T0) = h(T) + (G R T / P)^2 / 2 (unique root),
+// ln(P0/P) = (s(T0) - s(T))/R, Mach, and partials in T0, P and G.
+struct ChamberStaticState {
+    double T, dT_dT0, dT_dP, dT_dG;
+    double lnP0P, dln_dT0, dln_dP, dln_dG;
+    double M;
+};
+ChamberStaticState chamber_static_state(double T0, double P, double G,
+                                        const std::vector<double>& X);
 ```
 
 ---
@@ -788,10 +799,12 @@ CrossflowRatio crossflow_velocity_ratio(double m_a, double m_b, double P, double
                                         double area);
 
 // Merge chamber (#471): the main-inlet face from the impulse balance
-//   P_f + m_main^2 R T_main / (P_f A^2) = P + m_out^2/(rho A^2) - J/A
-// (subsonic root, closed form); Pt_face = P0_from_static(P_f, T_main, M_f),
-// the chamber's own entropy-based stagnation closure. `choked` flags a face
-// that cannot carry the impulse subsonically.
+//   P_f + m_main^2 R T_f / (P_f A^2) = P + m_out^2/(rho A^2) - J/A
+// with T and T_main STAGNATION temperatures (#578): the face's static T_f
+// solves h(T_main) = h(T_f) + u_f^2/2, the outlet's comes from
+// chamber_static_state. Subsonic root; Pt_face = P_f exp((s(T_main) -
+// s(T_f))/R). Sensitivities analytic. `choked` flags a face that cannot
+// carry the impulse subsonically.
 struct MergeFaceState {
     double P_face, Pt_face, M_face; bool choked;
     double dPf_dm_main, dPf_dm_out, dPf_dJ, dPf_dP, dPf_dT, dPf_dT_main;

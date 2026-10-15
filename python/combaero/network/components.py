@@ -1819,14 +1819,26 @@ class MomentumChamberNode(NetworkNode):
 
         T_hot = self.t_hot if self.t_hot is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        rho, _ = _safe_rho(state.density())
-        u = m_dot_total / (rho * self.area) if self.area > 0 else 1.0
+        # The correlation takes the BULK STATIC state; state.T is the
+        # chamber's stagnation T, so use the static state its closure solved
+        # (#578). T_aw then sits between T_static and T0 by the recovery
+        # factor, as it should.
+        T_static = float(state.T)
+        if self.area > 0:
+            r = _solver_tools.momentum_chamber_residual_and_jacobian(
+                state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
+            )
+            T_static = float(r.T_static)
+            rho, _ = _safe_rho(float(r.rho_static))
+            u = m_dot_total / (rho * self.area)
+        else:
+            u = 1.0
 
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
         length = self.length if self.length is not None else diameter
 
         return self.surface.htc_and_T(
-            T=state.T,
+            T=T_static,
             P=state.P,
             X=state.X,
             velocity=u,
@@ -1925,7 +1937,7 @@ class MomentumChamberNode(NetworkNode):
         main_T_key = None
         if main_state is not None:
             m_main = float(main_state.m_dot)
-            T_main = float(main_state.T)
+            T_main = float(main_state.Tt)  # stagnation: the face solves its static T (#578)
             X_main = main_state.X
         else:
             # Reversed (or idle) main: chamber fluid leaves through the face.
@@ -3121,7 +3133,8 @@ def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, floa
     gas = node.htc_and_T(state)
     if gas is None:
         return None
-    rho_g, _ = _safe_rho(cb.density(state.T, state.P, state.X))
+    # The chamber's static density (#578): state.T is its stagnation T.
+    rho_g, _ = _safe_rho(node.static_density(state)[0])
     T_gas, from_main = float(gas.T_aw), False
     if node.main_inlet is not None and node.has_side_streams():
         for eid, st, _names in getattr(node, "_inflows", []):

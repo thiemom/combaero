@@ -56,93 +56,126 @@ StationHalfDrop channel_entry_drop(double m, double P, double T,
   return out;
 }
 
-namespace {
-struct FaceCore {
-  double P_f, Pt_f, M_f;
-  bool choked;
-  // analytic partials of P_f wrt Pi and c, and of Pt_f wrt P_f and m_main
-  double dPf_dPi, dPf_dc, dPt_dPf, dPt_dm;
-};
-
-FaceCore face_core(double m_main, double T_main, const std::vector<double>& X_main,
-                   double m_out, double P, double T, const std::vector<double>& X,
-                   double J, double A, double* dPi_dP_out, double* dPi_dmout_out,
-                   double* c_out) {
-  const double rho = density(T, P, X);
-  const double Pi = P + m_out * std::abs(m_out) / (rho * A * A) - J / A;
-  const double RT = specific_gas_constant(X_main) * T_main;
-  const double c = m_main * m_main * RT / (A * A);
-  const double D_raw = Pi * Pi - 4.0 * c;
-  const double D_min = MERGE_DISCRIMINANT_FLOOR * Pi * Pi;
-  const bool choked = D_raw < D_min;
-  const double sD = std::sqrt(std::max(D_raw, D_min));
-  FaceCore f{};
-  f.choked = choked;
-  f.P_f = 0.5 * (Pi + sD);
-  // Held at the floor, the root no longer moves with c; with Pi it moves as
-  // the floored discriminant does.
-  f.dPf_dPi = choked ? 0.5 * (1.0 + std::sqrt(MERGE_DISCRIMINANT_FLOOR))
-                     : 0.5 * (1.0 + Pi / sD);
-  f.dPf_dc = choked ? 0.0 : -1.0 / sD;
-  const double a = speed_of_sound(T_main, X_main);
-  const double u = std::abs(m_main) * RT / (f.P_f * A);
-  f.M_f = a > 0.0 ? u / a : 0.0;
-  auto [P0, dP0_dM] = solver::P0_from_static_and_jacobian_M(f.P_f, T_main, f.M_f, X_main);
-  f.Pt_f = P0;
-  // P0 = P exp(...) at fixed (M, T): dP0/dP_f = P0/P_f, and M ~ 1/P_f.
-  f.dPt_dPf = P0 / f.P_f + dP0_dM * (-f.M_f / f.P_f);
-  const double sgn = m_main >= 0.0 ? 1.0 : -1.0;
-  f.dPt_dm = (a > 0.0 && f.P_f > 0.0) ? dP0_dM * sgn * RT / (f.P_f * A * a) : 0.0;
-  // Ideal gas: drho/dP = rho/P at fixed T.
-  if (dPi_dP_out) *dPi_dP_out = 1.0 - m_out * std::abs(m_out) / (rho * A * A) / P;
-  if (dPi_dmout_out) *dPi_dmout_out = 2.0 * std::abs(m_out) / (rho * A * A);
-  if (c_out) *c_out = c;
-  return f;
-}
-}  // namespace
-
-MergeFaceState chamber_merge_face_state(double m_main, double T_main,
+MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
                                         const std::vector<double>& X_main,
-                                        double m_out, double P, double T,
+                                        double m_out, double P, double T0,
                                         const std::vector<double>& X,
                                         double side_momentum, double area) {
-  if (!(area > 0.0) || !(P > 0.0) || !(T > 0.0) || !(T_main > 0.0)) {
+  if (!(area > 0.0) || !(P > 0.0) || !(T0 > 0.0) || !(T0_main > 0.0)) {
     throw std::invalid_argument(
         "chamber_merge_face_state: area, P, T and T_main must be positive");
   }
-  double dPi_dP = 0.0, dPi_dmout = 0.0, c = 0.0;
-  const FaceCore f = face_core(m_main, T_main, X_main, m_out, P, T, X,
-                               side_momentum, area, &dPi_dP, &dPi_dmout, &c);
+  const double A = area;
+  const double J = side_momentum;
+
+  // Chamber (outlet) side: static T from the chamber's stagnation T0 and the
+  // outlet mass flux (#578), the same solve as the chamber's own closure.
+  const double R = specific_gas_constant(X);
+  const double s_out = m_out >= 0.0 ? 1.0 : -1.0;
+  const ChamberStaticState cs = chamber_static_state(T0, P, std::abs(m_out) / A, X);
+  // Outlet momentum flux per area, m|m| / (rho A^2) = m|m| R Ts / (P A^2).
+  const double q = m_out * std::abs(m_out) * R * cs.T / (P * A * A);
+  const double Pi = P + q - J / A;
+  const double dPi_dP = 1.0 + q * (cs.dT_dP / cs.T - 1.0 / P);
+  const double dPi_dmout =
+      2.0 * std::abs(m_out) * R * cs.T / (P * A * A) + q * (cs.dT_dG * s_out / A) / cs.T;
+  const double dPi_dT0 = q * cs.dT_dT0 / cs.T;
+  const double dPi_dJ = -1.0 / A;
+
+  // Main face: static (P_f, T_f) from the impulse and the main stream's
+  // stagnation T0_main (#578; T_main was read as static before):
+  //   F1 = P_f + c T_f / P_f - Pi = 0,   c = m_main^2 R_m / A^2
+  //   F2 = T_f - Ts(T0_main, P_f, |m_main| / A) = 0
+  // Fixed point from T_f = T0_main: the quadratic in P_f on its subsonic
+  // root, then the static T at that pressure. Contracts on the subsonic
+  // branch (the face Mach is well below 1 wherever the quadratic has a root).
+  const double Rm = specific_gas_constant(X_main);
+  const double c = m_main * m_main * Rm / (A * A);
+  const double Gm = std::abs(m_main) / A;
+  double T_f = T0_main;
+  double P_f = Pi;
+  bool choked = false;
+  ChamberStaticState fs{};
+  for (int it = 0; it < 100; ++it) {
+    const double D_raw = Pi * Pi - 4.0 * c * T_f;
+    const double D_min = MERGE_DISCRIMINANT_FLOOR * Pi * Pi;
+    choked = D_raw < D_min;
+    P_f = 0.5 * (Pi + std::sqrt(std::max(D_raw, D_min)));
+    fs = chamber_static_state(T0_main, P_f, Gm, X_main);
+    const double dT = fs.T - T_f;
+    T_f = fs.T;
+    if (std::abs(dT) <= 1e-12 * T0_main) {
+      break;
+    }
+  }
   MergeFaceState out;
-  out.P_face = f.P_f;
-  out.Pt_face = f.Pt_f;
-  out.M_face = f.M_f;
-  out.choked = f.choked;
+  out.P_face = P_f;
+  out.choked = choked;
+  const double a_f = speed_of_sound(T_f, X_main);
+  const double u_f = Gm * Rm * T_f / P_f;
+  out.M_face = a_f > 0.0 ? u_f / a_f : 0.0;
+  // Pt_f = P_f exp((s(T0_main) - s(T_f)) / R_m), consistent with the main
+  // stream's own stagnation state; the entropy difference is the integrated
+  // one from the static-state solve (no cancellation, #579).
+  const double Pt_f = P_f * std::exp(fs.lnP0P);
+  out.Pt_face = Pt_f;
 
-  // P_f(Pi, c): Pi carries P, m_out and J; c carries m_main.
-  const double dc_dmm = 2.0 * c / (m_main != 0.0 ? m_main : 1.0);
-  out.dPf_dP = f.dPf_dPi * dPi_dP;
-  out.dPf_dm_out = f.dPf_dPi * dPi_dmout;
-  out.dPf_dJ = f.dPf_dPi * (-1.0 / area);
-  out.dPf_dm_main = m_main != 0.0 ? f.dPf_dc * dc_dmm : 0.0;
-  out.dPtf_dP = f.dPt_dPf * out.dPf_dP;
-  out.dPtf_dm_out = f.dPt_dPf * out.dPf_dm_out;
-  out.dPtf_dJ = f.dPt_dPf * out.dPf_dJ;
-  out.dPtf_dm_main = f.dPt_dPf * out.dPf_dm_main + f.dPt_dm;
-
-  // Temperatures: central differences of the whole (smooth) evaluation.
-  auto eval = [&](double Tm, double Tc) {
-    return face_core(m_main, Tm, X_main, m_out, P, Tc, X, side_momentum, area,
-                     nullptr, nullptr, nullptr);
+  // Sensitivities of (P_f, T_f) by the implicit function theorem on
+  // (F1, F2); with the discriminant floored, P_f follows Pi alone.
+  // M = [[F1_Pf, F1_Tf], [F2_Pf, 1]].
+  double dPf_dPi, dPf_dc, dPf_dT0m, dPf_dGm;
+  if (choked) {
+    dPf_dPi = 0.5 * (1.0 + std::sqrt(MERGE_DISCRIMINANT_FLOOR));
+    dPf_dc = dPf_dT0m = dPf_dGm = 0.0;
+  } else {
+    const double F1_Pf = 1.0 - c * T_f / (P_f * P_f);
+    const double F1_Tf = c / P_f;
+    const double F2_Pf = -fs.dT_dP;
+    const double det = F1_Pf - F1_Tf * F2_Pf;
+    // d(P_f) = -(F1_x - F1_Tf * F2_x) / det for an input x with partials
+    // (F1_x, F2_x); F2 has unit T_f coefficient.
+    auto dPf = [&](double F1_x, double F2_x) { return -(F1_x - F1_Tf * F2_x) / det; };
+    dPf_dPi = dPf(-1.0, 0.0);
+    dPf_dc = dPf(T_f / P_f, 0.0);
+    dPf_dT0m = dPf(0.0, -fs.dT_dT0);
+    dPf_dGm = dPf(0.0, -fs.dT_dG);
+  }
+  // T_f = Ts(T0_main, P_f, Gm): its total derivative per input follows P_f.
+  const double dTf_dPf = fs.dT_dP;
+  const double cp_f = cp_mass(T_f, X_main);
+  const double cp_0 = cp_mass(T0_main, X_main);
+  // dPt_f = (Pt_f / P_f) dP_f + Pt_f dL, dL = -cp_f/(R T_f) dT_f + cp_0/(R T0) dT0.
+  auto dPt = [&](double dPf_dx, double dTf_dx, double dT0m_dx) {
+    return (Pt_f / P_f) * dPf_dx +
+           Pt_f * (-cp_f / (Rm * T_f) * dTf_dx + cp_0 / (Rm * T0_main) * dT0m_dx);
   };
-  const double hm = std::max(1e-4, T_main * T_STEP_REL);
-  const FaceCore mp = eval(T_main + hm, T), mm = eval(T_main - hm, T);
-  out.dPf_dT_main = (mp.P_f - mm.P_f) / (2.0 * hm);
-  out.dPtf_dT_main = (mp.Pt_f - mm.Pt_f) / (2.0 * hm);
-  const double hc = std::max(1e-4, T * T_STEP_REL);
-  const FaceCore cp = eval(T_main, T + hc), cm = eval(T_main, T - hc);
-  out.dPf_dT = (cp.P_f - cm.P_f) / (2.0 * hc);
-  out.dPtf_dT = (cp.Pt_f - cm.Pt_f) / (2.0 * hc);
+
+  const double sgn_m = m_main >= 0.0 ? 1.0 : -1.0;
+  const double dc_dmm = 2.0 * m_main * Rm / (A * A);
+  const double dGm_dmm = sgn_m / A;
+
+  // Inputs that reach the face only through Pi.
+  auto through_Pi = [&](double dPi_dx, double& dPf_out, double& dPt_out) {
+    dPf_out = dPf_dPi * dPi_dx;
+    dPt_out = dPt(dPf_out, dTf_dPf * dPf_out, 0.0);
+  };
+  through_Pi(dPi_dP, out.dPf_dP, out.dPtf_dP);
+  through_Pi(dPi_dmout, out.dPf_dm_out, out.dPtf_dm_out);
+  through_Pi(dPi_dJ, out.dPf_dJ, out.dPtf_dJ);
+  through_Pi(dPi_dT0, out.dPf_dT, out.dPtf_dT);
+
+  // m_main: through c and through the face mass flux Gm.
+  out.dPf_dm_main = dPf_dc * dc_dmm + dPf_dGm * dGm_dmm;
+  {
+    const double dTf = dTf_dPf * out.dPf_dm_main + fs.dT_dG * dGm_dmm;
+    out.dPtf_dm_main = dPt(out.dPf_dm_main, dTf, 0.0);
+  }
+  // T0_main: through T_f (F2) and through s(T0_main) in Pt_f.
+  out.dPf_dT_main = dPf_dT0m;
+  {
+    const double dTf = dTf_dPf * dPf_dT0m + fs.dT_dT0;
+    out.dPtf_dT_main = dPt(dPf_dT0m, dTf, 1.0);
+  }
   return out;
 }
 
