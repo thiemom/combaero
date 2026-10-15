@@ -1,5 +1,6 @@
 #include "area_change.h"
 #include "composition.h"
+#include "math_constants.h"
 #include "solver_interface.h"
 #include "stagnation.h"
 #include "thermo.h"
@@ -283,6 +284,74 @@ TEST(SolverJacobianTest, PipeDerivatives) {
         roughness, model);
     double fd_dYi = (res_Y_p.dP_calc - res.dP_calc) / eps_Y;
     EXPECT_NEAR(res.d_dP_dY_up[i], fd_dYi, std::abs(fd_dYi) * 1e-2 + 1e-8);
+  }
+}
+
+// exit_head_lost (#588): the drop gains m|m| / (2 rho A^2), rho the upstream
+// static density, and every derivative carries the term. Both flow directions:
+// the head is odd in m, its slope even.
+TEST(SolverJacobianTest, PipeDerivativesExitHeadLost) {
+  std::size_t ns = num_species();
+  std::vector<double> Y(ns, 0.0);
+  for (size_t i = 0; i < ns; ++i) {
+    if (species_name(i) == "N2")
+      Y[i] = 0.77;
+    else if (species_name(i) == "O2")
+      Y[i] = 0.23;
+  }
+  const double P_total_up = 200000.0;
+  const double P_static_up = 190000.0;
+  const double T_up = 300.0;
+  const double P_static_down = 180000.0;
+  const double L = 1.0;
+  const double D = 0.05;
+  const double roughness = 1e-5;
+  const std::string model = "haaland";
+  auto eval = [&](double m, double P, double T, const std::vector<double> &Yv,
+                  bool lost) {
+    return channel_residuals_and_jacobian(m, P_total_up, P, T, Yv,
+                                          P_static_down, L, D, roughness,
+                                          model, 1.0, lost);
+  };
+
+  for (double m_dot : {0.5, -0.5}) {
+    PipeResult base = eval(m_dot, P_static_up, T_up, Y, false);
+    PipeResult res = eval(m_dot, P_static_up, T_up, Y, true);
+
+    const std::vector<double> X =
+        combaero::mass_to_mole(combaero::normalize_fractions(Y));
+    const double rho = combaero::density(T_up, P_static_up, X);
+    const double area = 0.25 * M_PI * D * D;
+    const double q = 0.5 * m_dot * std::abs(m_dot) / (rho * area * area);
+    EXPECT_NEAR(res.dP_calc - base.dP_calc, q, std::abs(q) * 1e-12);
+
+    const double eps_m = 1e-4;
+    const double fd_m = (eval(m_dot + eps_m, P_static_up, T_up, Y, true).dP_calc -
+                         eval(m_dot - eps_m, P_static_up, T_up, Y, true).dP_calc) /
+                        (2.0 * eps_m);
+    EXPECT_NEAR(res.d_dP_d_mdot, fd_m, std::abs(fd_m) * 1e-7);
+
+    const double eps_P = 1.0;
+    const double fd_P = (eval(m_dot, P_static_up + eps_P, T_up, Y, true).dP_calc -
+                         eval(m_dot, P_static_up - eps_P, T_up, Y, true).dP_calc) /
+                        (2.0 * eps_P);
+    EXPECT_NEAR(res.d_dP_dP_static_up, fd_P, std::abs(fd_P) * 1e-6);
+
+    const double eps_T = 0.1;
+    const double fd_T = (eval(m_dot, P_static_up, T_up + eps_T, Y, true).dP_calc -
+                         eval(m_dot, P_static_up, T_up - eps_T, Y, true).dP_calc) /
+                        (2.0 * eps_T);
+    EXPECT_NEAR(res.d_dP_dT_up, fd_T, std::abs(fd_T) * 1e-6);
+
+    const double eps_Y = 1e-6;
+    for (size_t i = 0; i < ns; ++i) {
+      std::vector<double> Y_p = Y;
+      Y_p[i] += eps_Y;
+      const double fd_Y =
+          (eval(m_dot, P_static_up, T_up, Y_p, true).dP_calc - res.dP_calc) /
+          eps_Y;
+      EXPECT_NEAR(res.d_dP_dY_up[i], fd_Y, std::abs(fd_Y) * 1e-2 + 1e-8);
+    }
   }
 }
 

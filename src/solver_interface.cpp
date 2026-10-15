@@ -1348,7 +1348,8 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
                                        double P_static_down, double L, double D,
                                        double roughness,
                                        const std::string &friction_model,
-                                       double f_multiplier) {
+                                       double f_multiplier,
+                                       bool exit_head_lost) {
   (void)P_total_up;
   (void)P_static_down;
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
@@ -1424,6 +1425,21 @@ ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
     f_plus *= f_multiplier;
     double dP_plus = f_plus * (L / D) * (0.5 * rho_plus * v_plus * std::abs(v_plus));
     res.d_dP_dY_up[i] = (dP_plus - dP_calc) / eps_Y;
+    if (exit_head_lost) {
+      // q = m|m| / (2 rho A^2) depends on Y only through rho.
+      res.d_dP_dY_up[i] += 0.5 * m_dot * abs_m / (area * area) *
+                           (1.0 / rho_plus - 1.0 / rho) / eps_Y;
+    }
+  }
+
+  if (exit_head_lost) {
+    // Exit dynamic head, lost at a stagnant sink (#588). Odd in m like the
+    // friction drop; its slope |m| / (rho A^2) is even.
+    const double q_exit = 0.5 * m_dot * abs_m / (rho * area * area);
+    res.dP_calc += q_exit;
+    res.d_dP_d_mdot += abs_m / (rho * area * area);
+    res.d_dP_dP_static_up += -q_exit / rho * drho_dP;
+    res.d_dP_dT_up += -q_exit / rho * drho_dT;
   }
 
   return res;

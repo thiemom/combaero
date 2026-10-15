@@ -5210,8 +5210,11 @@ class ChannelElement(NetworkElement):
         coeff = f * (self.length / dh) / (2.0 * rho * area * area)
         dP = coeff * m_dot * abs(m_dot)
         d_dP_d_mdot = 2.0 * coeff * abs(m_dot)
-        # dP = K * mdot|mdot| / rho for K independent of rho, so
-        # d(dP)/d(rho) = -dP/rho.
+        q_exit, dq_dmdot = self._exit_head(m_dot, rho, area)
+        dP += q_exit
+        d_dP_d_mdot += dq_dmdot
+        # dP = K * mdot|mdot| / rho for K independent of rho (the exit head
+        # too), so d(dP)/d(rho) = -dP/rho.
         d_dP_drho = -dP / rho if rho > 0.0 else 0.0
         d_dP_dT = d_dP_drho * drho_dT
         d_dP_dP_static = d_dP_drho * drho_dP
@@ -5282,8 +5285,13 @@ class ChannelElement(NetworkElement):
         dP = coeff * f * m_dot * abs(m_dot)
         dRe_dmdot = D / (a_min * mu) if mu > 0.0 else 0.0
         d_dP_d_mdot = coeff * (2.0 * abs(m_dot) * f + m_dot * abs(m_dot) * df_dRe * dRe_dmdot)
+        # The exit head at the channel's own area, not the pins' A_min.
+        q_exit, dq_dmdot = self._exit_head(m_dot, rho, area)
+        dP += q_exit
+        d_dP_d_mdot += dq_dmdot
 
-        # Through rho (dP ~ 1/rho at fixed f) and through mu in Re.
+        # Through rho (dP ~ 1/rho at fixed f, the exit head too) and through
+        # mu in Re (the pin friction only).
         d_dP_drho = -dP / rho if rho > 0.0 else 0.0
         d_dP_dmu = coeff * m_dot * abs(m_dot) * df_dRe * (-Re / mu) if mu > 0.0 else 0.0
         d_dP_dT = d_dP_drho * drho_dT + d_dP_dmu * dmu_dT
@@ -5312,6 +5320,20 @@ class ChannelElement(NetworkElement):
         ):
             return "mdot"
         return "p"
+
+    def _exit_head(self, m_dot: float, rho: float, area: float) -> tuple[float, float]:
+        """(q, dq/dm_dot) of the exit dynamic head this duct loses, else zeros.
+
+        q = m|m| / (2 rho A^2): lost where the flow discharges into a pressure
+        boundary taking it at its static pressure (#360), as the compressible
+        Fanno form and the plain incompressible path do (#588). Odd in m, its
+        slope even; it scales as 1/rho, so a caller's d(dP)/d(rho) = -dP/rho
+        stays exact with q included.
+        """
+        if area <= 0.0 or rho <= 0.0 or not self._exit_head_lost(m_dot):
+            return 0.0, 0.0
+        inv = 1.0 / (rho * area * area)
+        return 0.5 * m_dot * abs(m_dot) * inv, abs(m_dot) * inv
 
     def _exit_head_lost(self, m_dot: float) -> bool:
         """Whether this channel's exit dynamic head is lost where it discharges.
@@ -5446,6 +5468,10 @@ class ChannelElement(NetworkElement):
             # reference: upstream static by default, downstream static when
             # the solver's compressible-seed proxy sets
             # _incompressible_p_ref = "outlet" (see OrificeElement).
+            # The exit dynamic head follows the same sink coupling as the
+            # compressible form (#360): lost where the flow discharges into a
+            # pressure boundary taking it at its static pressure. Without it
+            # the two regimes disagreed by O(1), not O(Ma^2), at Ma -> 0 (#588).
             _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
             res_cpp = _solver_tools.channel_residuals_and_jacobian(
                 m_dot,
@@ -5459,12 +5485,14 @@ class ChannelElement(NetworkElement):
                 self.roughness,
                 self.friction_model,
                 f_mult,
+                self._exit_head_lost(m_dot),
             )
 
         # Residual of P-node unknowns matching channel drop.
-        # C++ returns dP_calc = friction stagnation-pressure loss only (the
-        # downstream static pressure is not an input). A channel therefore
-        # connects stagnation pressures: Pt_up - Pt_down = dP_friction. The
+        # C++ returns dP_calc = friction stagnation-pressure loss, plus the
+        # exit head where it is lost (the downstream static pressure is not an
+        # input). A channel therefore connects stagnation pressures:
+        # Pt_up - Pt_down = dP_friction (+ q_exit at a static sink). The
         # static-vs-stagnation distinction lives entirely in the node
         # constitutive relation (PlenumNode: Pt = P; MomentumChamberNode:
         # Pt = P + 0.5*rho*v^2). Referencing the downstream node's static P
@@ -5862,6 +5890,16 @@ class CrossflowSegmentElement(ChannelElement):
             )
             terms.append((r, self.to_node, "a", self.to_node, self._next))
         return terms
+
+    def _exit_head_lost(self, m_dot: float) -> bool:
+        """Never on top of the segment's own convention.
+
+        Station nodes hold the channel's STATIC pressure, so an exit with no
+        to-station already discharges at static continuity: the dynamic head
+        is lost by construction. ChannelElement's exit head at a pressure
+        boundary would charge it a second time (#588).
+        """
+        return False
 
     def _momentum_drop_value(self, state_in, state_out, flows) -> float:
         return float(sum(t[0].dP for t in self._momentum_terms(state_in, state_out, flows)))

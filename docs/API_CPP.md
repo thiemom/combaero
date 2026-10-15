@@ -1290,11 +1290,13 @@ OrificeResult orifice_residuals_and_jacobian(
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta = 0.0);
 
-// Channel flow with Darcy friction
+// Channel flow with Darcy friction; exit_head_lost adds the exit dynamic
+// head m|m| / (2 rho A^2), dissipated at a stagnant sink (#588)
 ChannelResult channel_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up, double P_static_down, double L, double D,
-    double roughness, const std::string& friction_model = "haaland");
+    double roughness, const std::string& friction_model,
+    double f_multiplier = 1.0, bool exit_head_lost = false);
 
 // Flow restriction (K-factor)
 ChannelResult restriction_residuals_and_jacobian(

@@ -62,7 +62,10 @@ def test_network_solver_simple_orifice():
 def test_network_solver_simple_channel():
     """
     Scenario A (part 2): Simple PressureBoundary -> Channel -> PressureBoundary.
-    Verifies exact Darcy-Weisbach flow scaling.
+    Verifies exact Darcy-Weisbach flow scaling, plus the exit dynamic head the
+    duct loses discharging into the outlet boundary (#588) -- as the
+    compressible form does; an incompressible duct that kept it disagreed
+    with the compressible one by O(1) at any Mach.
     """
     graph = FlowNetwork()
 
@@ -104,7 +107,7 @@ def test_network_solver_simple_channel():
 
     f, _ = cb._solver_tools.friction_and_jacobian("haaland", Re, 1e-5 / 0.05).result
 
-    dP_analytical = f * (10.0 / 0.05) * 0.5 * rho * v**2
+    dP_analytical = (f * (10.0 / 0.05) + 1.0) * 0.5 * rho * v**2
     dP_actual = inlet.Pt - outlet.Pt
 
     assert dP_analytical == pytest.approx(dP_actual, rel=1e-4)

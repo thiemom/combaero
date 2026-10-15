@@ -142,13 +142,21 @@ std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
                                                        double K);
 
 // Full channel evaluation with all derivatives.
+//
+// dP_calc is the stagnation-pressure drop: Darcy friction
+// f (L/D) m|m| / (2 rho A^2), plus, when exit_head_lost, the exit dynamic head
+// m|m| / (2 rho A^2) -- a duct discharging into a stagnant sink (a pressure
+// boundary taking outflow at its static pressure) dissipates its exit velocity
+// head, exactly as the compressible Fanno form does (#588). rho is the
+// upstream static density, the same constant density the friction term uses.
 ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
                                              double P_static_up, double T_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double L,
                                              double D, double roughness,
                                              const std::string &friction_model,
-                                             double f_multiplier = 1.0);
+                                             double f_multiplier = 1.0,
+                                             bool exit_head_lost = false);
 
 
 

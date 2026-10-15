@@ -1273,7 +1273,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
-        py::arg("f_multiplier") = 1.0);
+        py::arg("f_multiplier") = 1.0, py::arg("exit_head_lost") = false);
 
   // Compressible flow elements
   m.def("orifice_compressible_mdot_and_jacobian",

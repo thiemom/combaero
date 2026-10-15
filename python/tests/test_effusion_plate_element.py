@@ -322,10 +322,12 @@ class TestChannelByComposition:
 
         Channel friction plus the mass being bled off drops the coolant
         pressure along the wall, so upstream panels see more drive even when
-        the gas pressure is perfectly uniform. Measured here: 114.2 kPa at the
-        first node against 104.0 at the last, and the first panel passes ~1.9x
+        the gas pressure is perfectly uniform. Measured here: 115.6 kPa at the
+        first node against 109.4 at the last, and the first panel passes ~1.3x
         what the last one does. This is the coolant-side counterpart of van de
         Noort's migration, and it is invisible to a single homogenised panel.
+        (Before #588 the channel's last segment kept its exit head at the dump
+        and the ratio read ~1.9x: the lost head lifts the whole channel.)
         """
         n = 4
         g, panels = self._build(n, [1.00e5] * n)
@@ -335,10 +337,10 @@ class TestChannelByComposition:
         flows = [sol[f"{p}.m_dot"] for p in panels]
         drives = [sol[f"{p}.dP_drive"] for p in panels]
 
-        # Monotone decreasing in both, and a factor approaching two end to end.
+        # Monotone decreasing in both, and a ~1.3x factor end to end.
         assert all(a > b for a, b in zip(drives, drives[1:], strict=False)), drives
         assert all(a > b for a, b in zip(flows, flows[1:], strict=False)), flows
-        assert flows[0] / flows[-1] > 1.5
+        assert flows[0] / flows[-1] > 1.25
 
     def test_a_falling_external_pressure_evens_the_wall_out(self):
         """A falling gas pressure works AGAINST the coolant-side drop.
@@ -362,9 +364,10 @@ class TestChannelByComposition:
             shares = [x / sum(f) for x in f]
             return max(shares) - min(shares)
 
+        # Measured: spread 0.070 flat, 0.018 graded.
         assert spread(sol_grad) < 0.5 * spread(sol_flat)
         # Still not uniform: the compensation is partial, not exact.
-        assert spread(sol_grad) > 0.02
+        assert spread(sol_grad) > 0.01
 
 
 class TestInternalHeatTransfer:

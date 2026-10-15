@@ -39,7 +39,8 @@ rollout to rejection once the check has proven itself.
 Control volumes
 ---------------
 * A two-port element. The stream enters at its upstream node's state and
-  leaves at the downstream node's total pressure, with the upstream
+  leaves at the downstream node's total pressure (a merge chamber's main
+  inlet: at the chamber's main face, which is what it delivers), with the upstream
   composition and the enthalpy its walls added (the solver deposits wall
   heat on the downstream node, so the node's own temperature is a mix).
 * A multi-port junction. Each port's stream at its port node's state.
@@ -58,6 +59,7 @@ Not checked: elements without a solved flow, the legacy
 
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import dataclass, field
 from typing import Any
@@ -206,6 +208,28 @@ class SecondLawReport:
             )
         return T
 
+    def _outlet_Pt(self, eid: str, dn: str, m: float, forward: bool) -> float:
+        """Total pressure the element delivers at its outlet node.
+
+        A merge chamber's declared main inlet arrives at the chamber's main
+        FACE, not at its mixed outlet state (#471): the side jets can lift the
+        chamber's Pt above the main duct's own inlet Pt without the duct
+        manufacturing anything, so closing the duct's control volume at the
+        chamber Pt would charge it with the jets' momentum. The face is the
+        one the solver hands the element (NetworkSolver._main_face).
+        """
+        node = self.net.nodes[dn]
+        st = self._state(dn)
+        if (
+            forward
+            and getattr(node, "main_inlet", None) == eid
+            and getattr(node, "has_side_streams", lambda: False)()
+        ):
+            face_in = copy.copy(st)
+            face_in.m_dot = m
+            return float(node.main_face_state(face_in, m_main=m)[1])
+        return float(st.Pt)
+
     # -- control volumes ---------------------------------------------------
 
     def _two_port(self, eid: str, element: Any) -> _Volume | str:
@@ -227,7 +251,7 @@ class SecondLawReport:
         inflow = self._stream_at(up, m)
         Q = self._wall_heat_into(eid)
         Tt_out = self._heated(inflow, Q)
-        outflow = _Stream(m, Tt_out, float(self._state(dn).Pt), inflow.Y)
+        outflow = _Stream(m, Tt_out, self._outlet_Pt(eid, dn, m, forward), inflow.Y)
         cv = _Volume([inflow], [outflow])
         if Q:
             M_in, M_out = self._element_mach(eid, up, dn, forward)

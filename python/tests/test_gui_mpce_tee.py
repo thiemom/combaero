@@ -456,10 +456,9 @@ def _ideal_runner_row(pt_branch: float):
             n["type"], n["data"] = "pressure_boundary", {"Pt": pt_branch, "Tt": 300.0}
         elif n["id"] == "mpce":
             n["data"]["junction_model"] = "ideal_momentum"
-    # Incompressible channels end Pt-to-Pt at a pressure sink; compressible
-    # ones discharge at the sink's pressure and lose their exit head. With
-    # both sinks at 1 bar, whether the jet entrains through the branch turns
-    # on that convention, so it is pinned: these tests are about reporting.
+    # Both regimes lose a channel's exit head at a pressure sink (#588) and
+    # agree here to 0.3%; the regime is pinned only to keep the test
+    # deterministic. These tests are about reporting.
     schema["solver_settings"]["global_regime"] = "incompressible"
     df = NetworkRunner.from_dict(schema).solve(timeout=60.0).to_dataframe()
     row = df[df["id"] == "mpce"].iloc[0]
@@ -480,16 +479,21 @@ def test_ideal_momentum_runner_dividing_tee_reports_split_coefficients() -> None
 
 
 def test_ideal_momentum_runner_entrainment_is_reported_as_reversal() -> None:
-    """Both sinks at 1 bar: the common jet's static pressure sits below the
-    branch boundary, so it DRAWS flow in through the branch (a jet pump) and
-    the tee runs as a merge. The flows keep their geometric names, signed in
-    the wired direction; split coefficients are not reported under a split's
-    names for a state that is not a split."""
-    row = _ideal_runner_row(pt_branch=1.0e5)
+    """Branch sink 0.5 kPa above the straight one: the common jet's static
+    pressure sits below the branch boundary, so it DRAWS flow in through the
+    branch (a jet pump) and the tee runs as a merge. The flows keep their
+    geometric names, signed in the wired direction; split coefficients are not
+    reported under a split's names for a state that is not a split.
+
+    Measured: branch flow -0.036 kg/s, p_jn 100.29 kPa. With both sinks at
+    1 bar the straight leg's exit head (lost at its sink since #588) holds the
+    junction just high enough that the jet no longer entrains (+0.009)."""
+    pt_branch = 1.005e5
+    row = _ideal_runner_row(pt_branch=pt_branch)
     assert row["m_dot_branch"] < 0.0
     assert row["n_reversed_ports"] == 1
     assert row["m_dot_straight"] == pytest.approx(row["m_dot_com"] - row["m_dot_branch"])
-    assert row["p_jn"] < 1.0e5  # below the branch boundary: what draws it in
+    assert row["p_jn"] < pt_branch  # below the branch boundary: what draws it in
     for key in ("K_straight", "K_branch", "mass_flow_ratio"):
         assert key not in row or row[key] != row[key], key  # absent or NaN
 
