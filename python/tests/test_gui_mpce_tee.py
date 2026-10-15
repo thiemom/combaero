@@ -456,6 +456,11 @@ def _ideal_runner_row(pt_branch: float):
             n["type"], n["data"] = "pressure_boundary", {"Pt": pt_branch, "Tt": 300.0}
         elif n["id"] == "mpce":
             n["data"]["junction_model"] = "ideal_momentum"
+    # Incompressible channels end Pt-to-Pt at a pressure sink; compressible
+    # ones discharge at the sink's pressure and lose their exit head. With
+    # both sinks at 1 bar, whether the jet entrains through the branch turns
+    # on that convention, so it is pinned: these tests are about reporting.
+    schema["solver_settings"]["global_regime"] = "incompressible"
     df = NetworkRunner.from_dict(schema).solve(timeout=60.0).to_dataframe()
     row = df[df["id"] == "mpce"].iloc[0]
     assert bool(row["success"]), "ideal tee GUI solve did not converge"
