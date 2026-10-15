@@ -62,6 +62,8 @@ inline constexpr Entry function_units[] = {
     {"ds_dT", "T: K, X: mol/mol", "J/(mol*K^2)"},
     {"dcp_dT", "T: K, X: mol/mol", "J/(mol*K^2)"},
     {"dcp_R_dT", "species_idx: -, T: K", "1/K"},
+    {"set_thermo_model", "name: -", "-"},
+    {"thermo_model", "-", "- ('nasa9' or 'nasa9_c2')"},
 
     // -------------------------------------------------------------------------
     // thermo.h - Mixture Properties (Mass/Other Basis)

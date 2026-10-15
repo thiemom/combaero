@@ -86,17 +86,19 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Molar Basis)
 
-| Function   | Input Units                        | Output Unit |
-|------------|------------------------------------|-------------|
-| `cp`       | T: K, X: mol/mol                   | J/(mol*K)   |
-| `cv`       | T: K, X: mol/mol                   | J/(mol*K)   |
-| `h`        | T: K, X: mol/mol                   | J/mol       |
-| `u`        | T: K, X: mol/mol                   | J/mol       |
-| `s`        | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(mol*K)   |
-| `dh_dT`    | T: K, X: mol/mol                   | J/(mol*K)   |
-| `ds_dT`    | T: K, X: mol/mol                   | J/(mol*K^2) |
-| `dcp_dT`   | T: K, X: mol/mol                   | J/(mol*K^2) |
-| `dcp_R_dT` | species_idx: -, T: K               | 1/K         |
+| Function           | Input Units                        | Output Unit               |
+|--------------------|------------------------------------|---------------------------|
+| `cp`               | T: K, X: mol/mol                   | J/(mol*K)                 |
+| `cv`               | T: K, X: mol/mol                   | J/(mol*K)                 |
+| `h`                | T: K, X: mol/mol                   | J/mol                     |
+| `u`                | T: K, X: mol/mol                   | J/mol                     |
+| `s`                | T: K, X: mol/mol, P: Pa, P_ref: Pa | J/(mol*K)                 |
+| `dh_dT`            | T: K, X: mol/mol                   | J/(mol*K)                 |
+| `ds_dT`            | T: K, X: mol/mol                   | J/(mol*K^2)               |
+| `dcp_dT`           | T: K, X: mol/mol                   | J/(mol*K^2)               |
+| `dcp_R_dT`         | species_idx: -, T: K               | 1/K                       |
+| `set_thermo_model` | name: -                            | -                         |
+| `thermo_model`     | -                                  | - ('nasa9' or 'nasa9_c2') |
 
 #### Mixture Properties (Mass/Other Basis)
 

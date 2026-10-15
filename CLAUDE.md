@@ -9,7 +9,7 @@
 ## Hard Rules
 - **Virtual environment only:** use `uv run` and `uv pip`. Never install into system Python or use global `pip`.
 - **Never bypass pre-commit hooks** or CI checks. All code must pass cleanly before pushing.
-- **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`, `include/collision_integral_data.h`). Use the scripts below.
+- **No manual edits to auto-generated files** (`docs/UNITS.md`, `include/thermo_transport_data.h`, `include/collision_integral_data.h`, `include/thermo_c2_refit_data.h`). Use the scripts below.
 - **API sync is mandatory:** adding/removing/changing any function or property requires updating `include/units_data.h` and the relevant API reference ([docs/API_CPP.md](docs/API_CPP.md) or [docs/API_PYTHON.md](docs/API_PYTHON.md)) in the same commit.
 - **CHANGELOG is mandatory -- as a fragment, never an edit to `CHANGELOG.md`:** every user-visible change adds `changelog.d/<id>.<category>.md` in the same commit (`<id>` = issue/PR number or a slug; `<category>` = added / changed / deprecated / removed / fixed / security / documentation; contents = [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) bullets). See [changelog.d/README.md](changelog.d/README.md). Editing `[Unreleased]` directly made every pair of open PRs conflict. `uv run scripts/changelog.py check` validates (pre-commit hook); `preview` shows the release section.
 - **Documentation Hygiene:** Active references (API, build, workflow, schemas) live in `docs/`; historical feature reports and design records go to `docs/archive/`. Keep core guides high-signal — a doc points at the file that owns a fact rather than transcribing it.
@@ -62,6 +62,7 @@ uv run scripts/changelog.py check           # validate changelog.d/ fragments (r
 | `docs/UNITS.md` | `include/units_data.h` | `uv run scripts/generate_units_md.py` |
 | `include/thermo_transport_data.h` | `thermo_data_generator/` | see `thermo_data_generator/README.md` |
 | `include/collision_integral_data.h` | `thermo_data_generator/collision_integrals.py` | `uv run python thermo_data_generator/collision_integrals.py` (repo root, main env) |
+| `include/thermo_c2_refit_data.h` | `thermo_data_generator/generate_c2_refit.py` (reads `thermo_transport_data.h`) | `uv run python thermo_data_generator/generate_c2_refit.py` (repo root; rerun after regenerating the thermo header) |
 
 ## Git Workflow
 - **Branch protection on `main`:** never push directly to `main`. Always work on a feature/fix branch and open a PR (`feature-branch → main`).

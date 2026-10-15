@@ -106,8 +106,14 @@ class TestNASA9Polynomials:
             max_deviations[species] = max_dev
             print(f"  Maximum deviation: {max_dev * 100:.6f}%")
 
-            # Assert < 0.01% deviation (numerical precision)
-            assert max_dev < 0.0001, f"{species} Cp/R deviation {max_dev * 100:.4f}% exceeds 0.01%"
+            # Assert < 0.01% deviation (numerical precision). On the C2 re-fit
+            # (#549) Cantera's NASA-9 stays the reference and the bound is the
+            # re-fit's stated one: cp within 1e-3 inside the join windows
+            # (measured worst 4.8e-4, AR at 6000 K), identical outside them.
+            tol = 0.0001 if cb.thermo_model() == "nasa9" else 0.001
+            assert max_dev < tol, (
+                f"{species} Cp/R deviation {max_dev * 100:.4f}% exceeds {tol * 100:.2f}%"
+            )
 
         print(f"\n{'=' * 80}")
         print("Summary: Cp/R Evaluation")

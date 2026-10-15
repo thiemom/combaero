@@ -98,6 +98,12 @@ uv run generate_thermo_data.py \
 `--check-names --strict` exits non-zero if any species is missing a common name
 entry in `common_names.h` — catches Step 3 omissions before the build.
 
+Then regenerate the C2 bridges of the NASA-9 joins (#549) from the new header:
+
+```bash
+uv run python thermo_data_generator/generate_c2_refit.py   # from the repo root
+```
+
 ### Step 5 — Rebuild the C++ extension
 
 ```bash
@@ -143,6 +149,7 @@ counts or lists in tests, Python bindings, or the GUI.
 |--------|---------|
 | `extract_species_data.py` | Extracts thermo + transport from YAML and/or CEA, merges multiple sources |
 | `generate_thermo_data.py` | Generates `thermo_transport_data.h` from merged JSON |
+| `generate_c2_refit.py` | Generates `include/thermo_c2_refit_data.h`, the C2 bridges of the NASA-9 joins (#549), from the coefficients already in `thermo_transport_data.h`. Rerun after regenerating that header. |
 
 ### Legacy (deprecated)
 
