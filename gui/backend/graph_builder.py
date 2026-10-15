@@ -582,8 +582,9 @@ def _seed_ejector_warmstart(
         EjectorGeometry,
         choked_mass_flow,
         critical_back_pressure,
+        entrainment_ratio,
     )
-    from combaero.network.ejector_element import choke_plane_gamma
+    from combaero.network.ejector_element import DEFAULT_EJECTOR_MIXING_AREA, choke_plane_gamma
 
     primary_id, secondary_id, outlet_id = port_ids
     pb = _trace_boundary(primary_id, ejector.id, edges, nodes_map)
@@ -644,6 +645,16 @@ def _seed_ejector_warmstart(
     _seed_node(secondary_id, p_e)
     _seed_node(outlet_id, p_o)
 
+    # Geometry for the closed forms. An unset mixing area resolves (later, in
+    # resolve_topology) from the outlet pipe, else the default; use the same
+    # value here, or every seed below silently fails on area_ratio_mix.
+    a3 = ejector.mixing_area
+    if a3 is None:
+        a3 = ejector._outlet_pipe_area(net)[0] or DEFAULT_EJECTOR_MIXING_AREA
+    geom = EjectorGeometry(
+        ejector.nozzle_exit_area / ejector.throat_area, float(a3) / ejector.throat_area
+    )
+
     # Seed the owned unknown P_jct (repurposed as the mixing-plane pressure
     # P_py). In the jet-pump regime it sits just below the back pressure; in
     # the critical regime the diagnostic critical back pressure P_c* is the
@@ -653,7 +664,6 @@ def _seed_ejector_warmstart(
         p_jct_seed = 0.99 * p_o
     elif p_g and p_e:
         try:
-            geom = EjectorGeometry(ejector.area_ratio_nozzle, ejector.area_ratio_mix)
             p_jct_seed = float(
                 critical_back_pressure(
                     p_g, t_g, p_e, t_e, geom, gamma, r_gas, ejector.recovery_efficiency
@@ -666,6 +676,70 @@ def _seed_ejector_warmstart(
         if not any(k.endswith(".P_jct") for k in guess):
             guess[f"{ejector.id}.P_jct"] = p_jct_seed
             ejector.initial_guess = guess
+
+    # Seed the flows on each port's element chain (#567). Left to the generic
+    # defaults (tens of kg/s for a ~0.1 kg/s ejector) a channel on a port
+    # sends the cold Newton start to Mach-20 port states it never returns
+    # from; seeded with the closed-form operating point it converges.
+    mp: float | None = None
+    if isinstance(pb, MassFlowBoundary):
+        mp = float(pb.m_dot)
+    elif p_g:
+        mp = float(choked_mass_flow(p_g, t_g, ejector.throat_area, gamma, r_gas, eta=ETA_P))
+    # Critical regime only. In the jet-pump regime the seed sits at p_g = p_o
+    # (no drive), where the closed form returns omega ~ 0 and a zero-entrainment
+    # seed parks Newton at that state; the solver's own mass-flow propagation
+    # from the primary's mass boundary already converges those cases.
+    if jetpump_seed:
+        return
+    omega: float | None = None
+    if mp and p_g and p_e:
+        try:
+            omega = float(entrainment_ratio(p_g, t_g, p_e, t_e, geom, gamma).omega)
+        except Exception:
+            omega = None
+    if omega is not None and not (0.0 < omega < 50.0):
+        omega = None  # an out-of-envelope closed form is no seed
+    if mp:
+        _seed_port_chain_flows(net, ejector, primary_id, mp, inflow=True)
+        if omega is not None:
+            _seed_port_chain_flows(net, ejector, secondary_id, omega * mp, inflow=True)
+            _seed_port_chain_flows(net, ejector, outlet_id, (1.0 + omega) * mp, inflow=False)
+
+
+def _seed_port_chain_flows(
+    net: FlowNetwork, junction: object, port_id: str, flow: float, inflow: bool
+) -> None:
+    """Seed ``<id>.m_dot`` on the linear chain of two-port elements running
+    outward from a junction port to its boundary, signed by each element's
+    orientation (flow towards the port on an inlet, away on an outlet). Stops
+    at a branch, a multi-port element or a boundary; never overrides a guess
+    the user gave."""
+    node_id, prev = port_id, junction
+    for _ in range(32):
+        around = net.get_upstream_elements(node_id) + net.get_downstream_elements(node_id)
+        elems = [e for e in around if e is not prev and e is not junction]
+        if len(elems) != 1:
+            return
+        elem = elems[0]
+        frm, to = getattr(elem, "from_node", None), getattr(elem, "to_node", None)
+        if node_id not in (frm, to) or frm is None or to is None:
+            return
+        # Walking outward from the port: an element pointing back at the port
+        # carries +flow on an inlet chain, one pointing away carries -flow.
+        points_to_port = to == node_id
+        signed = flow if points_to_port == inflow else -flow
+        unk = f"{elem.id}.m_dot"
+        if unk in elem.unknowns():
+            guess = dict(getattr(elem, "initial_guess", {}) or {})
+            if unk not in guess:
+                guess[unk] = signed
+                elem.initial_guess = guess
+        node_id = frm if to == node_id else to
+        node = net.nodes.get(node_id)
+        if node is None or getattr(node, "is_flow_boundary", False):
+            return
+        prev = elem
 
 
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
@@ -779,6 +853,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     # For direct element<->tee-port connections we auto-insert a PlenumNode so that
     # users don't need to manually place a plenum on every tee arm.
     edge_junction_map: dict[tuple[str, str], str] = {}
+    _ejector_seeds: list[tuple[EjectorElement, tuple[str, str, str]]] = []
     tee_port_node_map: dict[tuple[str, str], str] = {}  # (junction_id, port) -> node_id
     # (from_node, to_node) lossless links joining a directly-wired plenum or
     # boundary to the port node inserted for it.
@@ -1086,12 +1161,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if not _ejector.initial_guess:
                 _ejector.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(_ejector)
-            # Warm-start the port MCN pressures + P_jct from the feeding
-            # boundaries so this stiff double-choked element converges cold
-            # (only fills in guesses the user did not provide).
-            _seed_ejector_warmstart(
-                net, _ejector, (_primary, _secondary, _outlet), schema.edges, nodes_map
-            )
+            # Warm-started once the whole network exists (end of the build):
+            # the flow seed walks each port's element chain, and an inherited
+            # A_3 needs the outlet pipe, which may be built after the ejector.
+            _ejector_seeds.append((_ejector, (_primary, _secondary, _outlet)))
             continue
 
         # Effusion liner (#471): three named ports, expanded into N stations.
@@ -1350,6 +1423,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         link_id = f"__auto_link__{src}__{dst}"
         if link_id not in net.elements:
             net.add_element(LosslessConnectionElement(link_id, from_node=src, to_node=dst))
+
+    # Ejector warm-starts: port pressures, P_jct and the port-chain flows from
+    # the ejector's closed-form physics (only where the user gave no guess).
+    for _ej, _ej_ports in _ejector_seeds:
+        _seed_ejector_warmstart(net, _ej, _ej_ports, schema.edges, nodes_map)
 
     # Result assembly reports each array under its GUI id (runner.py).
     net._gui_arrays = gui_arrays
