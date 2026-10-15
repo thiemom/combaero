@@ -17,11 +17,15 @@ def verify_material_scaling() -> None:
         net = FlowNetwork()
 
         # Nodes
-        net.add_node(PressureBoundary("hot_in", Pt=2e6, Tt=T_hot))
+        # 0.2 bar across 10 mm ducts: Ma ~0.15, inside the incompressible
+        # channels' validity. The former 10 bar drive ran them past Mach 1 and
+        # put the wall ABOVE the hot gas (1055 K against 1000 K), a recovery
+        # temperature no incompressible duct can produce (#588).
+        net.add_node(PressureBoundary("hot_in", Pt=1.02e6, Tt=T_hot))
         net.add_node(PlenumNode("hot_p"))
         net.add_node(PressureBoundary("hot_out", Pt=1e6, Tt=T_hot))
 
-        net.add_node(PressureBoundary("cold_in", Pt=2e6, Tt=300.0))
+        net.add_node(PressureBoundary("cold_in", Pt=1.02e6, Tt=300.0))
         net.add_node(PlenumNode("cold_p"))
         net.add_node(PressureBoundary("cold_out", Pt=1e6, Tt=300.0))
 
@@ -90,7 +94,10 @@ def verify_material_scaling() -> None:
         f"Conductivity should increase with temperature for Inconel 718: k(300)={k_300:.3f}, k(1000)={k_1000:.3f}"
     )
     assert 10.0 <= k_300 <= 15.0, f"Expected k ~ 11.5 at 300K, got {k_300:.3f}"
-    assert 18.0 <= k_1000 <= 30.0, f"Expected k ~ 20-25 with 1000K boundary, got {k_1000:.3f}"
+    # Between 1000 K gas and 300 K coolant the layer settles near 640 K (hot
+    # face ~690 K). cb.k_inconel718 gives 16.8 W/mK there (11.8 at 300 K,
+    # 22.0 at 1000 K).
+    assert 15.0 <= k_1000 <= 20.0, f"Expected k ~ 17 at a ~640 K layer, got {k_1000:.3f}"
 
     print("Success: Material conductivity scaled correctly!")
 
