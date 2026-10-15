@@ -202,9 +202,20 @@ struct EjectorJetPumpDischargeJacobian {
 // omega. The R3 (outlet-pin) building block for the operating-regime element;
 // 1:1 with _mixed_flow_stagnation in _ejector_huang1999.py fed jet-pump
 // lambdas. r_gas cancels (lambda/q are dimensionless), so it is not an input.
+//
+// eta_primary / eta_secondary (#588): the nozzles' kinetic-energy
+// efficiencies, the same ones the element's flux rows carry (sqrt(eta) on
+// the isentropic flux). Each stream reaches the mixing plane at the velocity
+// its lossy nozzle delivers, lambda = sqrt(eta) lambda_is, and at the
+// stagnation pressure consistent with that velocity at P_py,
+// p0 = P_py / pi(lambda) = p_supply pi(lambda_is) / pi(lambda) -- below the
+// supply by exactly the nozzle loss. Mixing isentropic velocities instead
+// handed the nozzle losses back: at zero drive the jet pump held a flow with
+// zero entropy generation. 1 (the default) is the isentropic form, unchanged.
 EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
     double p_g, double t_g, double p_e, double t_e, double p_py, double omega,
-    double gamma, double recovery_efficiency);
+    double gamma, double recovery_efficiency, double eta_primary = 1.0,
+    double eta_secondary = 1.0);
 
 struct EjectorEntrainmentJacobian {
   EjectorEntrainmentResult value;

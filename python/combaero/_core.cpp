@@ -1517,7 +1517,10 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         &solver::ejector_jetpump_discharge_and_jacobian, py::arg("p_g"),
         py::arg("t_g"), py::arg("p_e"), py::arg("t_e"), py::arg("p_py"),
         py::arg("omega"), py::arg("gamma"), py::arg("recovery_efficiency"),
-        "Jet-pump mixed-flow discharge stagnation with analytic Jacobian.\n\n"
+        py::arg("eta_primary") = 1.0, py::arg("eta_secondary") = 1.0,
+        "Jet-pump mixed-flow discharge stagnation with analytic Jacobian.\n"
+        "eta_primary / eta_secondary: the nozzles' kinetic-energy efficiencies;\n"
+        "each stream mixes at sqrt(eta) of its isentropic velocity (#588).\n\n"
         "Returns: EjectorJetPumpDischargeJacobian (p03 + dp03_d{p_g,t_g,p_e,t_e,p_py,omega})");
 
   m.def(

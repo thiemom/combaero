@@ -155,6 +155,40 @@ TEST(EjectorJacobians, JetPumpDischargeValueAndJacobian) {
   }
 }
 
+// The nozzles' efficiencies in the mixing (#588): each stream mixes at the
+// velocity its lossy nozzle delivers. At zero drive (both supplies at the same
+// Pt and T) the isentropic mixing returned the supply Pt exactly -- the nozzle
+// losses handed back -- while the lossy streams must arrive below it. And the
+// partials stay analytic.
+TEST(EjectorJacobians, JetPumpDischargeChargesTheNozzleLosses) {
+  const double P = 101325.0, T = 300.0, ppy = 100207.0, om = 7.0, g = 1.4;
+  const double lossless = ejector_jetpump_discharge_and_jacobian(P, T, P, T, ppy, om, g, 1.0).p03;
+  EXPECT_NEAR(lossless, P, 1e-6);
+  const double lossy =
+      ejector_jetpump_discharge_and_jacobian(P, T, P, T, ppy, om, g, 1.0, 0.95, 0.85).p03;
+  EXPECT_LT(lossy, P - 50.0);  // ~1.1 kPa of head behind it: a real loss
+
+  auto val = [&](const double* a) {
+    return ejector_jetpump_discharge_and_jacobian(a[0], a[1], a[2], a[3], a[4], a[5], g, 0.9,
+                                                  0.95, 0.85)
+        .p03;
+  };
+  const double c[6] = {110000.0, 320.0, 100000.0, 300.0, 95000.0, 1.5};
+  const auto j = ejector_jetpump_discharge_and_jacobian(c[0], c[1], c[2], c[3], c[4], c[5], g,
+                                                        0.9, 0.95, 0.85);
+  const double an[6] = {j.dp03_dp_g, j.dp03_dt_g, j.dp03_dp_e,
+                        j.dp03_dt_e, j.dp03_dp_py, j.dp03_domega};
+  for (int k = 0; k < 6; ++k) {
+    double a[6], b[6];
+    for (int m = 0; m < 6; ++m) a[m] = b[m] = c[m];
+    const double h = 1e-6 * c[k];
+    a[k] += h;
+    b[k] -= h;
+    const double cd = (val(a) - val(b)) / (2 * h);
+    EXPECT_NEAR(an[k], cd, 1e-5 * std::abs(cd) + 1e-5) << "seed " << k;
+  }
+}
+
 TEST(EjectorJacobians, CDNozzleExitStaticImplicitDerivatives) {
   // Inverse of the C-D nozzle: analytic implicit-function partials
   // (m_dot, p0, t0) vs central difference of the bisection value. Also checks

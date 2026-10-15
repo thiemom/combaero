@@ -213,6 +213,21 @@ same primary-choke smooth indicator that R0 already exposes -- to be finalized
 during implementation; the guiding constraint is a single C1 residual, one
 solve, no discrete regime detection.)
 
+**Nozzle efficiencies in the jet-pump mixing (#588, 2026-10-15).** The
+element's flux rows carry Huang's nozzle efficiencies (sqrt(eta) on the
+isentropic flux: eta_p 0.95, eta_s 0.85), but the jet-pump mixing used to take
+each stream's ISENTROPIC velocity from its supply Pt to P_py. It so mixed more
+momentum than the flows carried and handed the nozzle losses back: with suction
+and outlet at the same pressure the device held omega 6.62 with the primary at
+exactly that pressure and zero entropy generation. Each stream now mixes at the
+velocity its nozzle delivers, lambda = sqrt(eta) lambda_is, at the stagnation
+pressure consistent with it at P_py, p0 = P_py / pi(lambda). The same case now
+needs ~580 Pa of primary drive (omega 4.71, sigma_norm 1.0e-3), within 0.15% of
+the incompressible jet pump (Sanger) with K = 1/eta - 1. The Python reference
+`jet_pump_entrainment_ratio` is isentropic in BOTH its flux and its mixing
+(eta = 1 throughout), so it was consistent and its golden data stand; the
+critical (double-choked) path is separate code and unchanged.
+
 ### 3.4 `verify_solution_consistent` changes
 
 Today it rejects `outlet.Pt > P_c*` outright (treats every subcritical point as
