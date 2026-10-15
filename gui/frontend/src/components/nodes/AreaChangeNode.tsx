@@ -8,6 +8,7 @@ import {
 } from "reactflow";
 import useStore from "../../store/useStore";
 import { inheritedField } from "../../utils/inheritance";
+import { iconClass } from "../../utils/nodeAppearance";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 
@@ -54,7 +55,9 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 				<Icon
 					size={12}
 					className={
-						data.model_type === "conical" ? "text-purple-500" : "text-blue-500"
+						data.model_type === "conical"
+							? "text-purple-500"
+							: iconClass("area_change")
 					}
 				/>
 			</div>

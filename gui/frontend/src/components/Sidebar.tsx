@@ -1,28 +1,10 @@
-import {
-	Activity,
-	ArrowRight,
-	ChevronRight,
-	Crosshair,
-	Database,
-	Flame,
-	Grip,
-	Link,
-	LogIn,
-	LogOut,
-	Maximize2,
-	Save,
-	ShowerHead,
-	Split,
-	Square,
-	Tornado,
-	Upload,
-	Wind,
-} from "lucide-react";
+import { Save, Upload } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { checkContinuationAvailable } from "../api";
 import useStore from "../store/useStore";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import NodeIcon from "./NodeIcon";
 import NumericInput from "./NumericInput";
 
 const Sidebar = () => {
@@ -169,7 +151,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "mass_boundary")}
 				draggable
 			>
-				<LogIn size={18} className="text-orange-500" />
+				<NodeIcon type="mass_boundary" size={18} />
 				<span>Mass Boundary</span>
 			</button>
 
@@ -179,7 +161,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "plenum")}
 				draggable
 			>
-				<Database size={18} className="text-stone-500" />
+				<NodeIcon type="plenum" size={18} />
 				<span>Plenum</span>
 			</button>
 
@@ -189,7 +171,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "pressure_boundary")}
 				draggable
 			>
-				<LogOut size={18} className="text-blue-500" />
+				<NodeIcon type="pressure_boundary" size={18} />
 				<span>Pressure Boundary</span>
 			</button>
 
@@ -199,7 +181,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "wall")}
 				draggable
 			>
-				<Square size={18} className="text-stone-600 fill-stone-600" />
+				<NodeIcon type="wall" size={18} />
 				<span>Wall</span>
 			</button>
 
@@ -209,7 +191,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "combustor")}
 				draggable
 			>
-				<Flame size={18} className="text-red-500" />
+				<NodeIcon type="combustor" size={18} />
 				<span>Combustor</span>
 			</button>
 
@@ -219,7 +201,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "momentum_chamber")}
 				draggable
 			>
-				<Wind size={18} className="text-indigo-500" />
+				<NodeIcon type="momentum_chamber" size={18} />
 				<span>Momentum Chamber</span>
 			</button>
 
@@ -244,7 +226,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "channel")}
 				draggable
 			>
-				<ArrowRight size={18} className="text-stone-500" />
+				<NodeIcon type="channel" size={18} />
 				<span>Channel</span>
 			</button>
 
@@ -254,7 +236,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "orifice")}
 				draggable
 			>
-				<ChevronRight size={18} className="text-orange-400" />
+				<NodeIcon type="orifice" size={18} />
 				<span>Orifice</span>
 			</button>
 
@@ -265,7 +247,7 @@ const Sidebar = () => {
 				draggable
 				title="Jet plate impinging on a target; spent air exits down the gap (Florschuetz 1981)"
 			>
-				<ShowerHead size={18} className="text-orange-400" />
+				<NodeIcon type="impingement_array" size={18} />
 				<span>Impingement Array</span>
 			</button>
 
@@ -276,7 +258,7 @@ const Sidebar = () => {
 				draggable
 				title="Plenum-fed effusion/film plate; owns its wall. Discharge into a momentum chamber (gas flow) or a plenum (imposed heat flux)."
 			>
-				<Grip size={18} className="text-orange-400" />
+				<NodeIcon type="effusion_plate" size={18} />
 				<span>Effusion Plate</span>
 			</button>
 
@@ -287,7 +269,7 @@ const Sidebar = () => {
 				draggable
 				title="Backside coolant duct whose wall bleeds through effusion holes into the gas. Ports: coolant in, coolant out, discharge (to a chamber's s handle)."
 			>
-				<Grip size={18} className="text-orange-500" />
+				<NodeIcon type="effusion_liner" size={18} />
 				<span>Effusion Liner</span>
 			</button>
 
@@ -297,7 +279,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "area_change")}
 				draggable
 			>
-				<Maximize2 size={18} className="text-blue-500" />
+				<NodeIcon type="area_change" size={18} />
 				<span>Area Change</span>
 			</button>
 
@@ -307,7 +289,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "discrete_loss")}
 				draggable
 			>
-				<Activity size={18} className="text-purple-500" />
+				<NodeIcon type="discrete_loss" size={18} />
 				<span>Discrete Loss</span>
 			</button>
 
@@ -317,7 +299,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "lossless_connection")}
 				draggable
 			>
-				<Link size={18} className="text-slate-400" />
+				<NodeIcon type="lossless_connection" size={18} />
 				<span>Lossless Connection</span>
 			</button>
 
@@ -327,7 +309,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "mpce_tee")}
 				draggable
 			>
-				<Split size={18} className="text-indigo-500" />
+				<NodeIcon type="mpce_tee" size={18} />
 				<span>Tee</span>
 			</button>
 
@@ -337,7 +319,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "ejector")}
 				draggable
 			>
-				<Wind size={18} className="text-sky-500" />
+				<NodeIcon type="ejector" size={18} />
 				<span>Ejector</span>
 			</button>
 
@@ -347,7 +329,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "vortex")}
 				draggable
 			>
-				<Tornado size={18} className="text-violet-500" />
+				<NodeIcon type="vortex" size={18} />
 				<span>Vortex</span>
 			</button>
 
@@ -361,7 +343,7 @@ const Sidebar = () => {
 				onDragStart={(event) => onDragStart(event, "probe")}
 				draggable
 			>
-				<Crosshair size={18} className="text-blue-400" />
+				<NodeIcon type="probe" size={18} />
 				<span>Probe</span>
 			</button>
 

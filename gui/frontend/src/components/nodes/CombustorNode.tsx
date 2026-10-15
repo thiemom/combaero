@@ -1,4 +1,3 @@
-import { Flame } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 const CombustorNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -37,7 +37,7 @@ const CombustorNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center rounded-full w-8 h-8 bg-red-100 p-1.5 shrink-0">
-				<Flame size={16} className="text-red-600" />
+				<NodeIcon type="combustor" size={16} />
 			</div>
 
 			<div

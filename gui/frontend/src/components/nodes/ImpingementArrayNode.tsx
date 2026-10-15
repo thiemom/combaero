@@ -1,4 +1,3 @@
-import { ShowerHead } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 // Impingement array, channel exit (#465): ONE configuration. The backend
 // expands it into the row chain and reports the rows back under this id.
@@ -39,7 +39,7 @@ const ImpingementArrayNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center p-1 bg-white rounded border border-stone-200 shrink-0">
-				<ShowerHead size={12} className="text-orange-400" />
+				<NodeIcon type="impingement_array" size={12} />
 			</div>
 
 			<div

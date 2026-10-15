@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 const OrificeNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -37,7 +37,7 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center p-1 bg-white rounded border border-stone-200 shrink-0">
-				<ChevronRight size={12} className="text-orange-400" />
+				<NodeIcon type="orifice" size={12} />
 			</div>
 
 			<div

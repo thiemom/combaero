@@ -1,4 +1,3 @@
-import { Grip } from "lucide-react";
 import { useEffect } from "react";
 import {
 	Handle,
@@ -8,6 +7,7 @@ import {
 } from "reactflow";
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
+import NodeIcon from "../NodeIcon";
 
 // Effusion / film plate (#471): plenum-fed, owns its wall. The node it
 // discharges into decides the gas side, so it has no thermal handles.
@@ -39,7 +39,7 @@ const EffusionPlateNode = ({ id, data, selected }: NodeProps) => {
 			}}
 		>
 			<div className="flex items-center justify-center p-1 bg-white rounded border border-stone-200 shrink-0">
-				<Grip size={12} className="text-orange-400" />
+				<NodeIcon type="effusion_plate" size={12} />
 			</div>
 
 			<div

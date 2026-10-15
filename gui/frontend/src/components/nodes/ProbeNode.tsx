@@ -1,9 +1,9 @@
 import { memo, useMemo } from "react";
 import { Handle, Position } from "reactflow";
 import useStore from "../../store/useStore";
-
 import { nodeTypeLabel } from "../../utils/nodeUtils";
 import { QUANTITY_CATALOGUE } from "../../utils/quantities";
+import NodeIcon from "../NodeIcon";
 
 function resolveQuantity(result: any, key: string): number | undefined {
 	if (!result) return undefined;
@@ -82,7 +82,7 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 		>
 			{/* Header */}
 			<div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1">
-				<span className="text-[9px] text-blue-400 font-bold">⊙</span>
+				<NodeIcon type="probe" size={10} />
 				<span className="text-[10px] font-bold text-stone-700 truncate">
 					{label}
 				</span>
