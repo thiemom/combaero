@@ -501,24 +501,42 @@ MixerResult combustor_residuals_and_jacobians(
     const std::vector<Stream> &streams, double P, double Q, double fraction,
     const PressureLossCorrelation &pressure_loss, bool use_equilibrium = false);
 
-// Momentum chamber residual: P_total = P_static + 0.5 * rho * v^2
-// where v = m_dot / (rho * A)
-// Returns residual and Jacobian entries for P, P_total, and m_dot
+// Momentum chamber residual: P_total = P0(P, T_static), the isentropic
+// stagnation pressure of the chamber's static state. T is the chamber's
+// STAGNATION temperature T0 (#576); the static T is solved inside from
+// h(T0) = h(T) + v^2 / 2, v = m_dot / (rho(T, P) * A).
+// Returns residual and Jacobian entries for P, P_total, m_dot, T0 and Y.
 struct MomentumChamberResult {
   double residual;
   double d_res_dP;
   double d_res_dP_total;
   double d_res_dmdot;
-  // Temperature sensitivity. The incompressible closure this replaced touched
-  // T only through rho, weakly enough that the assembled Jacobian tolerated
-  // its absence; the stagnation closure also depends on T through T0, a(T)
-  // and s(T), and leaving it out costs ~1.6e-4 on the network Jacobian check.
+  // Sensitivity to the stagnation temperature T0 (the argument T): through
+  // the static T it implies and through s(T0). Closed form (#576).
   double d_res_dT;
   // Composition sensitivity, per species mass fraction (Y is normalised
   // inside, so any mass-conserving direction of the relay is exact). Y
   // enters through rho, a and s. Zero for species absent at the node: no
   // stream carries them, so the relay never moves them.
   std::vector<double> d_res_dY;
+  // The static state the closure solved for (#576): static T [K] and Mach
+  // number [-] from (T0, P, |m_dot| / A). Reporting reads these so the Mach
+  // it shows is the one the residual used.
+  double T_static = 0.0;
+  double M = 0.0;
+  // Static density rho(T_static, P) and its sensitivities to the closure's
+  // inputs, for elements that read the chamber as a port (junction kernels):
+  // their momentum rows must see the same static state as this row.
+  // Isentropic dynamic head P0 - P, computed as P expm1(ln(P0/P)) rather
+  // than as a difference of two pressures (one ULP of P0 would otherwise
+  // be its noise floor). Its partials are the residual's, negated, with
+  // d/dP shifted by one: dq/dP = -d_res_dP - 1.
+  double q_dyn = 0.0;
+  double rho_static = 0.0;
+  double drho_dP = 0.0;
+  double drho_dT = 0.0;     // d/dT0
+  double drho_dmdot = 0.0;
+  std::vector<double> drho_dY;
 };
 
 MomentumChamberResult momentum_chamber_residual_and_jacobian(

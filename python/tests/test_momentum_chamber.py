@@ -193,3 +193,133 @@ def test_momentum_chamber_with_heat_exchange():
         f"  T_in = {T_inlet:.1f} K → T_chamber = {T_chamber:.1f} K (ΔT = {T_chamber - T_inlet:.1f} K)"
     )
     print(f"  Pt = P + q_dynamic: {Pt:.1f} = {P:.1f} + {q_dynamic:.1f} Pa")
+
+
+# ---------------------------------------------------------------------------
+# The node's T is the STAGNATION temperature (#576)
+# ---------------------------------------------------------------------------
+
+_X_AIR = list(cb.species.dry_air())
+_Y_AIR = list(cb.mole_to_mass(_X_AIR))
+
+
+def _closure(P: float, Pt: float, m: float, T0: float, Y: list[float], A: float):
+    from combaero import _solver_tools
+
+    return _solver_tools.momentum_chamber_residual_and_jacobian(P, Pt, m, T0, Y, A)
+
+
+@pytest.mark.parametrize("M", [0.3, 0.8, 1.0, 1.5])
+def test_closure_holds_at_an_exact_stagnation_state(M: float) -> None:
+    """Build a flow at Mach M from (Pt, T0) with the library's own isentropic
+    relations; the closure, fed T0 as the node carries it, must close on it.
+    With T0 read as static (before #576) the residual was -0.1% of Pt at M 0.3
+    and -12% at M 1.0."""
+    T0, Pt, A = 600.0, 3.0e5, 2.0e-3
+    T = cb.T_from_stagnation(T0, M, _X_AIR)
+    P = cb.P_from_stagnation(Pt, T0, M, _X_AIR)
+    m = cb.density(T, P, _X_AIR) * M * cb.speed_of_sound(T, _X_AIR) * A
+    r = _closure(P, Pt, m, T0, _Y_AIR, A)
+    assert r.residual == pytest.approx(0.0, abs=1e-9 * Pt)
+    assert r.T_static == pytest.approx(T, rel=1e-9)
+    mach = r.M
+    assert mach == pytest.approx(M, rel=1e-8)
+    assert r.rho_static == pytest.approx(cb.density(T, P, _X_AIR), rel=1e-9)
+    # The dynamic head, returned without cancellation against P.
+    assert r.q_dyn == pytest.approx(Pt - r.residual - P, rel=1e-12)
+
+
+def test_closure_passes_the_true_choked_flux() -> None:
+    """At fixed (Pt, T0) the largest mass flux the closure admits, over the
+    static pressure, is the choked flux rho* a* A. T0 read as static capped
+    it at 92.0% (peak at M 0.913), and Newton stalled on any chamber asked to
+    carry more -- an ejector outlet pipe of about A_3 (#567)."""
+    from scipy.optimize import brentq
+
+    T0, Pt, A = 300.0, 2.0e5, 1.0e-3
+
+    def m_at(P: float) -> float:
+        f = lambda m: _closure(P, Pt, m, T0, _Y_AIR, A).residual  # noqa: E731
+        return brentq(f, 0.0, 10.0, xtol=1e-13)
+
+    T_star = cb.T_from_stagnation(T0, 1.0, _X_AIR)
+    P_star = cb.P_from_stagnation(Pt, T0, 1.0, _X_AIR)
+    m_star = cb.density(T_star, P_star, _X_AIR) * cb.speed_of_sound(T_star, _X_AIR) * A
+    peak = max(m_at(P_star * s) for s in (0.97, 0.99, 1.0, 1.01, 1.03))
+    assert peak == pytest.approx(m_star, rel=1e-6)
+    assert m_at(P_star) == pytest.approx(m_star, rel=1e-9)
+
+
+@pytest.mark.parametrize("M", [0.05, 0.5, 0.95, 1.4])
+@pytest.mark.parametrize("sign", [1.0, -1.0])
+def test_closure_jacobian_matches_central_differences(M: float, sign: float) -> None:
+    """Residual and static-density sensitivities in P, m_dot, T0 and Y, on a
+    CO2 / air mix (Y moves R, h and s)."""
+    T0, Pt, A = 900.0, 3.0e5, 2.0e-3
+    X = [0.0] * len(_X_AIR)
+    for k, x in enumerate(_X_AIR):
+        X[k] = 0.9 * x
+    X[cb.species_index_from_name("CO2")] += 0.1
+    Y = list(cb.mole_to_mass(X))
+    T = cb.T_from_stagnation(T0, M, X)
+    P = cb.P_from_stagnation(Pt, T0, M, X) * 0.98
+    m = sign * cb.density(T, P, X) * M * cb.speed_of_sound(T, X) * A
+    r = _closure(P, Pt, m, T0, Y, A)
+
+    def cd(f, x: float, h: float) -> float:
+        return (f(x + h) - f(x - h)) / (2.0 * h)
+
+    def both(**kw):
+        a = {"P": P, "m": m, "T0": T0, "Y": Y} | kw
+        rr = _closure(a["P"], Pt, a["m"], a["T0"], a["Y"], A)
+        return rr.residual, rr.rho_static
+
+    for k, (an_r, an_rho, f, x, h) in {
+        "P": (r.d_res_dP, r.drho_dP, lambda v: both(P=v), P, P * 1e-6),
+        "m": (r.d_res_dmdot, r.drho_dmdot, lambda v: both(m=v), m, abs(m) * 1e-6),
+        "T0": (r.d_res_dT, r.drho_dT, lambda v: both(T0=v), T0, T0 * 1e-6),
+    }.items():
+        fd_r = cd(lambda v, f=f: f(v)[0], x, h)
+        fd_rho = cd(lambda v, f=f: f(v)[1], x, h)
+        assert an_r == pytest.approx(fd_r, rel=2e-5, abs=1e-9 * Pt / abs(x)), k
+        assert an_rho == pytest.approx(fd_rho, rel=2e-5, abs=1e-12), k
+
+    k_co2 = cb.species_index_from_name("CO2")
+    h_Y = 1e-4
+    Yp, Ym = list(Y), list(Y)
+    Yp[k_co2] += h_Y
+    Ym[k_co2] -= h_Y
+    fd_r = (both(Y=Yp)[0] - both(Y=Ym)[0]) / (2 * h_Y)
+    fd_rho = (both(Y=Yp)[1] - both(Y=Ym)[1]) / (2 * h_Y)
+    assert r.d_res_dY[k_co2] == pytest.approx(fd_r, rel=1e-6)
+    assert r.drho_dY[k_co2] == pytest.approx(fd_rho, rel=1e-6)
+
+
+def test_node_reports_the_static_state_its_closure_used() -> None:
+    """mach, rho and T_static of a solved chamber come from the static state,
+    not from its stagnation T."""
+    graph = FlowNetwork()
+    graph.add_node(MassFlowBoundary("inlet", m_dot=0.5, Tt=600.0, Y=cb.species.dry_air_mass()))
+    chamber = MomentumChamberNode("chamber", area=3e-3)
+    graph.add_node(chamber)
+    graph.add_node(PressureBoundary("outlet", Pt=101325.0))
+    graph.add_element(
+        OrificeElement("orf1", "inlet", "chamber", Cd=0.6, diameter=0.04, correlation="fixed")
+    )
+    graph.add_element(
+        OrificeElement("orf2", "chamber", "outlet", Cd=0.6, diameter=0.04, correlation="fixed")
+    )
+    solver = NetworkSolver(graph)
+    sol = solver.solve()
+    assert sol["__success__"]
+    T0 = sol["chamber.T"]
+    P = sol["chamber.P"]
+    T_static = sol["chamber.T_static"]
+    v = 0.5 / (sol["chamber.rho"] * chamber.area)
+    # Energy: h(T0) = h(T) + v^2 / 2, at the reported static state.
+    assert cb.h_mass(T0, _X_AIR) - cb.h_mass(T_static, _X_AIR) == pytest.approx(
+        0.5 * v * v, rel=1e-8
+    )
+    assert sol["chamber.rho"] == pytest.approx(cb.density(T_static, P, _X_AIR), rel=1e-9)
+    assert sol["chamber.mach"] == pytest.approx(v / cb.speed_of_sound(T_static, _X_AIR), rel=1e-8)
+    assert sol["chamber.mach"] > 0.2

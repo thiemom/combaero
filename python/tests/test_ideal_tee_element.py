@@ -558,13 +558,27 @@ def test_invalid_loss_factor_is_refused(f) -> None:
         _branch_net(loss_factor=f)
 
 
-def test_lossless_split_is_refused_by_the_energy_check() -> None:
-    """f = 0 removes a split's only loss as written at low Mach (rho u^2/2),
-    but the port nodes' Pt is isentropic, larger by ~M^2/4 of the head. So a
-    "lossless" split creates flow work of that size, and the energy check
-    refuses it: measured -3.2e-4 of the supplied flow's head at port Mach
-    0.034, where M^2/4 = 2.9e-4. Any f above ~M^2/4 dissipates (0.05 is
-    tested above); a merge keeps its mixing loss and converges at f = 0."""
-    sol = NetworkSolver(_branch_net(theta=60.0, loss_factor=0.0)).solve(timeout=60.0)
-    assert not sol["__success__"]
-    assert "unphysical" in sol["__message__"]
+def test_lossless_split_is_dissipative_only_at_order_mach_squared() -> None:
+    """f = 0 removes a split's only loss as written at low Mach (rho u^2/2):
+    it conserves the INCOMPRESSIBLE Pt. The port nodes' Pt is isentropic,
+    larger by ~M^2/4 of each port's head, and the supplier's head is the
+    largest, so scored on the ports' Pt the split loses a little: measured
+    1.4e-4 of the supplied flow's head at port Mach 0.033 (M^2/4 = 2.7e-4).
+
+    Before #576 the kernel read each port's density at the chamber's
+    STAGNATION T, inflating the receivers' heads; the same split then created
+    flow work (-3.2e-4) and the energy check refused it. With the port's
+    static density on both sides it converges and passes."""
+    net = _branch_net(theta=60.0, loss_factor=0.0)
+    sol = NetworkSolver(net).solve(timeout=60.0)
+    assert sol["__success__"], sol.get("__message__")
+    el = net.elements["jct"]
+    out = sum(
+        float(el._port_signs[i])
+        * sol[f"{el._port_element_ids[i]}.m_dot"]
+        * sol[f"{el.port_nodes[i]}.Pt"]
+        for i in range(el.N)
+    )
+    head = sol["mc_com.Pt"] - sol["mc_com.P"]
+    loss = -out / (sol["ch_in.m_dot"] * head)
+    assert 0.0 < loss < 3e-4

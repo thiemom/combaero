@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 import pytest
+from _chamber_static import chamber_isentropic_rise, chamber_static_density
 
 import combaero as cb
 from combaero.heat_transfer import ConvectiveSurface, SmoothModel
@@ -732,21 +733,23 @@ def test_mpce_collector_port_carries_dynamic_head():
     assert m_out == pytest.approx(0.4, abs=1e-4)
     assert node._total_m_dot == pytest.approx(m_out, rel=1e-6)
 
-    T_com, _, _ = solver._derived_states["mc_com"]
+    T0_com, _, _ = solver._derived_states["mc_com"]
     P_com = sol["mc_com.P"]
-    X = cb.species.dry_air()
-    rho = cb.density(T_com, P_com, X)
+    X = list(cb.species.dry_air())
     A = node.area
+    rho = chamber_static_density(P_com, T0_com, m_out, A, X)
     u = m_out / (rho * A)
 
     # MomentumChamberNode closes on the isentropic stagnation state, not on
-    # 0.5*rho*u^2. The two agree to a fraction of a percent at low Mach but
-    # diverge as the square of it -- this collector runs near M = 0.85, where
-    # the incompressible form is ~20% low. Expect the compressible rise, and
-    # keep the incompressible value alongside it as the limit it reduces to.
-    M = u / cb.speed_of_sound(T_com, X)
-    q_expected = cb.P0_from_static(P_com, T_com, M, X) - P_com
+    # 0.5*rho*u^2, of the STATIC state its stagnation T implies (#576). The
+    # two agree to a fraction of a percent at low Mach but diverge as the
+    # square of it -- this collector runs near M = 0.5, where the
+    # incompressible form is ~6% low. Expect the compressible rise, and keep
+    # the incompressible value alongside it as the limit it reduces to.
+    q_expected = chamber_isentropic_rise(P_com, T0_com, m_out, A, X)
     q_incompressible = 0.5 * rho * u * u
+    T_static = P_com / (rho * float(cb.specific_gas_constant(X)))
+    M = u / float(cb.speed_of_sound(T_static, X))
 
     q_solved = sol["mc_com.Pt"] - P_com
     assert q_solved > 1e3, "collector dynamic head must not degenerate to zero"
@@ -939,11 +942,16 @@ def test_mfb_driven_mpce_network_keeps_plain_default_init():
     soft-barrier penalty region (|F(x0)| ~ 1e6 observed on a real
     5-tee GUI network) while the plain cold start converges.
     """
-    net = _mpce_mfb_merge_network()
-    solver = NetworkSolver(net)
-    sol = solver.solve(timeout=30.0)
+    solver = NetworkSolver(_mpce_mfb_merge_network())
+    solver.solve(timeout=30.0, auto_retry=False)
     used = solver._diagnostic_data["solver_settings_used"]["init_strategy"]
     assert used == "default"
+    # Since #576 the plain cold start of this network no longer converges on
+    # its own: at the cold guess the cold channel sits at Pt = P with flow, a
+    # singular Jacobian (main shares it); with the port chambers' corrected
+    # static state the iterate leaves it differently. The outlet-referenced
+    # auto-retry -- never analytical_pt_prop -- converges.
+    sol = NetworkSolver(_mpce_mfb_merge_network()).solve(timeout=30.0)
     assert sol["__success__"], sol.get("__message__")
 
 

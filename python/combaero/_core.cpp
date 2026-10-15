@@ -1252,7 +1252,15 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
                     &solver::MomentumChamberResult::d_res_dP_total)
       .def_readonly("d_res_dmdot", &solver::MomentumChamberResult::d_res_dmdot)
       .def_readonly("d_res_dT", &solver::MomentumChamberResult::d_res_dT)
-      .def_readonly("d_res_dY", &solver::MomentumChamberResult::d_res_dY);
+      .def_readonly("d_res_dY", &solver::MomentumChamberResult::d_res_dY)
+      .def_readonly("T_static", &solver::MomentumChamberResult::T_static)
+      .def_readonly("M", &solver::MomentumChamberResult::M)
+      .def_readonly("q_dyn", &solver::MomentumChamberResult::q_dyn)
+      .def_readonly("rho_static", &solver::MomentumChamberResult::rho_static)
+      .def_readonly("drho_dP", &solver::MomentumChamberResult::drho_dP)
+      .def_readonly("drho_dT", &solver::MomentumChamberResult::drho_dT)
+      .def_readonly("drho_dmdot", &solver::MomentumChamberResult::drho_dmdot)
+      .def_readonly("drho_dY", &solver::MomentumChamberResult::drho_dY);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
@@ -1287,7 +1295,9 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         &solver::momentum_chamber_residual_and_jacobian, py::arg("P"),
         py::arg("P_total"), py::arg("m_dot"), py::arg("T"), py::arg("Y"),
         py::arg("area"),
-        "Momentum chamber residual: P_total = P + 0.5*rho*v^2");
+        "Momentum chamber residual: P_total = P0(P, T_static); T is the "
+        "chamber stagnation temperature T0, the static T is solved inside "
+        "(#576)");
 
   // --- Momentum-CV junction: whole-element (f, J) -------------------------
   py::class_<solver::MpceGeometry>(

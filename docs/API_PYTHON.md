@@ -922,6 +922,11 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
   - Through zero flow the forward and reverse forms blend over `FLOW_REVERSAL_M_SCALE` (1e-4 kg/s), as the area change does.
   - A fraction loss (`ConstantFractionLoss`, `LinearThetaFractionLoss`) takes an optional design flow `m_ref` [kg/s]: at and above it the loss is exactly the fraction; below it the loss scales with the dynamic head (`1 - (1 - r^2)^3`, `r = |m_dot|/m_ref`, C2) and vanishes at zero flow.
   - Set `m_ref` wherever the flow may run low or reverse. A constant fraction holds a pressure difference at zero flow, and a reversing flow cannot be carried through it.
+- **A `MomentumChamberNode`'s `T` is its stagnation temperature** (#576). Its inflows mix as `(m, Tt, Pt, Y)` streams. The closure solves the static T from `h(T0) = h(T) + v^2/2`, `v = m_dot / (rho(T, P) A)`, and closes `Pt = P exp((s(T0) - s(T)) / R)`.
+  - The node's `mach` and its reported properties (`rho`, `a`, `velocity`, `Re`, plus a new `T_static`) come from that static state.
+  - `MomentumChamberNode.static_density(state)` returns `(rho, {name: d rho / d name})`. Junction elements (`MultiPortChamberBase.port_densities`) take their port densities from it, so a port's momentum rows and its node's Pt describe the same flow.
+  - The chamber now passes up to the true choked flux. Before, T0 read as static capped it at 92 % of choked.
+  - Not yet static: the merge-chamber face state, the chamber's heat-transfer correlation inputs, and elements reading a chamber as their upstream static state (#578).
 
 #### Merge chamber: main inlet plus side streams (#471)
 

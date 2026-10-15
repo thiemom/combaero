@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from _chamber_static import chamber_isentropic_rise, chamber_static_density
 
 import combaero as cb
 from combaero.network.components import NetworkMixtureState
@@ -252,22 +253,20 @@ def test_the_residual_matches_the_documented_closed_form(direction):
     sign = 1.0 if direction == "branch" else -1.0
 
     states = _states(_BASE_P, _BASE_PT, _BASE_T)
-    rho = float(states[common].density())
     area = float(element.port_areas[common])
     m_common = element._port_signs[common] * _OUTER[common]
 
     # q_dyn_com is the common port's isentropic stagnation rise, which is what
-    # its port MomentumChamberNode also calls dynamic head. It was the
+    # its port MomentumChamberNode also calls dynamic head (#357), of the
+    # STATIC state the port's stagnation T implies (#576). It was the
     # incompressible m^2/(2*rho*A^2); the two agree to ~0.006% at this
-    # operating point and diverge as the square of Mach, so the change is
-    # invisible here but not at a transonic port. K is tabulated as
-    # dPt/q_dyn, so the reference has to follow the ports. See issue #357.
+    # operating point and diverge as the square of Mach. K is tabulated as
+    # dPt/q_dyn, so the reference has to follow the ports.
     P_c = float(states[common].P)
     T_c = float(states[common].T)
-    X_c = states[common].X
-    g_c = float(cb.isentropic_expansion_coefficient(T_c, X_c))
-    m2 = (m_common * m_common) / (rho * area * area * g_c * P_c)
-    q_dyn = P_c * ((1.0 + 0.5 * (g_c - 1.0) * m2) ** (g_c / (g_c - 1.0)) - 1.0)
+    X_c = list(states[common].X)
+    q_dyn = chamber_isentropic_rise(P_c, T_c, m_common, area, X_c)
+    rho = chamber_static_density(P_c, T_c, m_common, area, X_c)
 
     q_incompressible = m_common * m_common / (2.0 * rho * area * area)
     assert q_dyn > q_incompressible, (
@@ -282,8 +281,10 @@ def test_the_residual_matches_the_documented_closed_form(direction):
     expected.append(sum(element._port_signs[i] * _OUTER[i] for i in range(3)))
 
     actual = _residual(element)
+    # rel 1e-10, not 1e-12: the reference is now two iterative solves (the
+    # energy equation bracketed, then the library's P0), not a closed form.
     for row in range(4):
-        assert actual[row] == pytest.approx(expected[row], rel=1e-12, abs=1e-9), (
+        assert actual[row] == pytest.approx(expected[row], rel=1e-10, abs=1e-9), (
             f"{direction} row {row}: {actual[row]:.6f} against {expected[row]:.6f}"
         )
 

@@ -235,7 +235,8 @@ def test_endpoints_are_scored_at_their_one_sided_limit():
     assert len(records) == 173
     assert all(r.endpoint_limit for r in records)
     scored = [r for r in records if r.error is not None]
-    # Idelchik's and Bassett's all solve; 8 of Wang's 80 (a = 2.44, M > 0.49) do not.
-    assert len(scored) == 165
+    # Idelchik's and Bassett's all solve; 6 of Wang's 80 (a = 2.44, M > 0.49)
+    # do not (8 before the port chambers' static state was corrected, #576).
+    assert len(scored) == 167
     assert all(r.K_measured_at_q_converged == r.K_measured for r in scored)
     assert all(abs(r.q_converged - min(max(r.q, 0.0), 1.0)) <= 1.01 * _ENDPOINT_EPS for r in scored)
