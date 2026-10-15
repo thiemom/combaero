@@ -474,6 +474,7 @@ const Inspector = () => {
 										onChange: (v) => updateNodeData(selectedNode.id, { Dh: v }),
 									}}
 									missingHint="Nothing to inherit a diameter from — set D or A for this channel."
+									defaultHint="Nothing to inherit a diameter from — the 0.1 m default is used. Connect a sized neighbour, or untick Inherit to set D or A."
 								/>
 								<div className="flex flex-col gap-2">
 									<label className="text-xs font-bold text-gray-500 uppercase">

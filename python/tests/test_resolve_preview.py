@@ -299,3 +299,79 @@ def test_audit_sources_discrete_loss_area_and_channel_dh() -> None:
 
     net.add_element(ChannelElement("ch2", "p", "out", length=1.0, diameter=0.1, Dh=0.05))
     assert resolve_preview(net)["ch2"].fields["Dh"].source == "user"
+
+
+# ---------------------------------------------------------------------------
+# #570: a dropped channel inherits D, with a marked default as the fallback
+# ---------------------------------------------------------------------------
+
+
+def _two_channel_graph(d_first: float | None, d_second: float | None) -> dict:
+    g = _channel_graph()
+    g["nodes"][2]["data"]["D"] = d_first
+    g["nodes"].append(
+        {
+            "id": "chan2",
+            "type": "channel",
+            "data": {"id": "chan2", "L": 1.0, "D": d_second},
+            "position": {"x": 150, "y": 50},
+        }
+    )
+    g["edges"][1]["target"] = "chan2"
+    g["edges"].append(
+        {
+            "id": "e3",
+            "source": "chan2",
+            "sourceHandle": "flow-source",
+            "target": "pb_out",
+            "targetHandle": "flow-target",
+            "data": {},
+        }
+    )
+    return g
+
+
+def test_gui_channel_chain_with_no_diameter_takes_the_marked_default() -> None:
+    """Nothing to inherit from: the first channel takes the 0.1 m default
+    (source "default", not "user"), the next inherits it, and it solves."""
+    from combaero.network.components import DEFAULT_CHANNEL_DIAMETER
+    from gui.backend.runner import NetworkRunner
+
+    g = _two_channel_graph(None, None)
+    out = resolve_preview(build_network_from_schema(NetworkGraphSchema(**g)))
+    sources = sorted(out[c].fields["diameter"].source for c in ("chan", "chan2"))
+    assert out["chan"].fields["diameter"].value == DEFAULT_CHANNEL_DIAMETER
+    assert out["chan2"].fields["diameter"].value == DEFAULT_CHANNEL_DIAMETER
+    assert "default" in sources
+    assert all(s != "user" for s in sources)
+    assert all(out[c].status == "resolved" for c in ("chan", "chan2"))
+    df = NetworkRunner.from_dict(g).solve(timeout=60.0).to_dataframe()
+    assert bool(df["success"].iloc[0])
+
+
+def test_gui_channel_inherits_a_neighbour_before_the_default() -> None:
+    """A sized neighbour wins: the unset channel inherits 0.05, not 0.1."""
+    out = resolve_preview(
+        build_network_from_schema(NetworkGraphSchema(**_two_channel_graph(0.05, None)))
+    )
+    assert out["chan2"].fields["diameter"].value == 0.05
+    assert out["chan2"].fields["diameter"].source != "default"
+
+
+def test_python_channel_without_opt_in_still_refuses() -> None:
+    """The fallback is the GUI's opt-in; the Python API keeps #262's refusal."""
+    import pytest
+
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("a", Pt=2e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PressureBoundary("b", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    net.add_element(ChannelElement("ch", "a", "b", length=1.0))
+    with pytest.raises(ValueError, match="diameter"):
+        net.resolve_all_topology()
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("a", Pt=2e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PressureBoundary("b", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    net.add_element(ChannelElement("ch", "a", "b", length=1.0, default_diameter=0.07))
+    net.resolve_all_topology()
+    assert net.elements["ch"].diameter == 0.07
+    assert net.elements["ch"]._area_source == "default"

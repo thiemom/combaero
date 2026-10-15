@@ -1192,7 +1192,7 @@ What happens when nothing can be inferred depends on what the area means:
 | Component | Parameter | Unresolvable |
 |---|---|---|
 | `AreaChangeElement` | `F0`, `F1` | **raises** |
-| `ChannelElement` | `diameter` | **raises** |
+| `ChannelElement` | `diameter` | **raises**; with `default_diameter=` set (the GUI passes `DEFAULT_CHANNEL_DIAMETER` = 0.1 m, #570), that default, reported as `area_source = "default"` |
 | `TeeJunctionElement` | `F_C` | **raises** |
 | `BorderCarnotLossElement` | `area` | **raises** |
 | `MomentumChamberNode` | `area` | nominal default |

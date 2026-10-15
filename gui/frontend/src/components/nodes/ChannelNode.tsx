@@ -16,12 +16,13 @@ const ChannelNode = ({ id, data, selected }: NodeProps) => {
 	const isSolved = !!data.result;
 	const updateNodeInternals = useUpdateNodeInternals();
 	const textRotation = rotation === 90 || rotation === 180 ? 180 : 0;
-	// An unset D is inherited: show the solver's value greyed (#559).
+	// An unset D is inherited: show the solver's value greyed (#559), or
+	// amber when nothing could be inherited and the default stands (#570).
 	const previewItems = useStore((s) => s.previewItems);
-	const inheritedD =
-		data.D == null
-			? inheritedField(previewItems, id, "diameter")?.value
-			: undefined;
+	const dField =
+		data.D == null ? inheritedField(previewItems, id, "diameter") : undefined;
+	const inheritedD = dField?.value;
+	const isDefaultD = dField?.source === "default";
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: rotation triggers handle re-measurement
 	useEffect(() => {
@@ -60,7 +61,7 @@ const ChannelNode = ({ id, data, selected }: NodeProps) => {
 					{data.D != null ? (
 						data.D
 					) : inheritedD != null ? (
-						<span className="text-gray-400">
+						<span className={isDefaultD ? "text-amber-600" : "text-gray-400"}>
 							{Number(inheritedD.toPrecision(3))}
 						</span>
 					) : (

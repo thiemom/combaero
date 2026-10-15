@@ -1200,6 +1200,13 @@ DEFAULT_REGIME: Literal["incompressible", "compressible"] = "incompressible"
 #: ``area_source = "default"`` in its diagnostics (issue #262).
 DEFAULT_CHAMBER_AREA = 0.1
 
+#: Diameter [m] a ChannelElement falls back to when it opts in
+#: (``default_diameter``) and neither its own diameter nor any neighbour's
+#: area is known (#570). The GUI opts in for every channel whose D is unset;
+#: the Python API does not, so a script keeps #262's refusal. Reported as
+#: ``area_source = "default"``.
+DEFAULT_CHANNEL_DIAMETER = 0.1
+
 #: Bore diameter [m] an orifice falls back to when the user set neither its
 #: diameter nor its area. Unlike a chamber area, a bore IS the physics -- it
 #: should be set explicitly -- but an orifice is a restriction, not a channel
@@ -5064,10 +5071,18 @@ class ChannelElement(NetworkElement):
         htc_model: HeatTransferModelLiteral = "none",
         t_hot: float | None = None,
         surface: ConvectiveSurface | None = None,
+        default_diameter: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
         self.length = length
         self.diameter: float | None = diameter
+        #: Opt-in fallback [m] for a diameter that is neither set nor
+        #: inferable (#570). None (the default) keeps the refusal of #262: the
+        #: diameter sets friction and Mach, so a guessed value changes the
+        #: flow. The GUI opts in with DEFAULT_CHANNEL_DIAMETER so that a
+        #: freshly dropped chain of inheriting channels solves; the result is
+        #: reported as ``area_source = "default"``, never as a user value.
+        self.default_diameter = default_diameter
         # Dh: user-specified hydraulic diameter (for non-circular ducts).
         # None until resolved: defaults to diameter (circular assumption).
         self.Dh: float | None = Dh if Dh is not None else diameter
@@ -5668,10 +5683,14 @@ class ChannelElement(NetworkElement):
             self._area_source = source
         if self.diameter is None:
             if getattr(self, "_topo_pass", 0) >= 1:
-                raise _unresolved_area_error(self, "diameter", [self.from_node, self.to_node])
-            # Defer: an upstream tee may not have resolved F_C yet this pass.
-            self._topo_pass = 1
-            return
+                if self.default_diameter is None:
+                    raise _unresolved_area_error(self, "diameter", [self.from_node, self.to_node])
+                self.diameter = float(self.default_diameter)
+                self._area_source = "default"
+            else:
+                # Defer: an upstream tee may not have resolved F_C yet this pass.
+                self._topo_pass = 1
+                return
         self.area = math.pi * (self.diameter / 2) ** 2
         if self.Dh is None:
             self.Dh = self.diameter
