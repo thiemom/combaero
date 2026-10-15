@@ -14,19 +14,19 @@ const LosslessNode = ({ data }: { data: any }) => {
 			</div>
 
 			<div className="flex flex-col">
-				<div className="text-[10px] font-bold text-gray-400 uppercase leading-none">
+				<div className="text-[10px] font-bold uppercase leading-none whitespace-nowrap">
 					Lossless
 				</div>
-				<div className="text-xs font-semibold truncate max-w-[80px]">
-					Connection
+				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap">
+					connection
 				</div>
 			</div>
 
 			<div className="absolute -left-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-blue-500">
-				in
+				i
 			</div>
-			<div className="absolute -right-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-amber-500">
-				out
+			<div className="absolute -right-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-green-500">
+				o
 			</div>
 
 			<Handle

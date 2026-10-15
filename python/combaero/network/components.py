@@ -4464,6 +4464,7 @@ class PressureLossElement(NetworkElement):
             for elem in graph.get_upstream_elements(self.from_node):
                 if isinstance(elem, ChannelElement) and elem.diameter is not None:
                     self.area = math.pi / 4.0 * elem.diameter**2
+                    self._area_source = f"channel '{elem.id}'"
                     break
             if self.area is None:
                 # Widen to any area-bearing neighbour (a combustor or momentum
@@ -4874,6 +4875,9 @@ class ChannelElement(NetworkElement):
         # Provenance of the diameter/area: "user" when given, else the
         # _infer_flow_area source string once resolved (issue #559).
         self._area_source = "user" if diameter is not None else ""
+        #: Dh provenance (#559): "user" for a non-circular override, else it is
+        #: the circular Dh = D (whatever D's own source).
+        self._Dh_source = "user" if Dh is not None else "derived from D (circular)"
 
         self.regime = regime
         self.friction_model = friction_model
