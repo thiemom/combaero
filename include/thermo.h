@@ -34,6 +34,23 @@ std::size_t num_species();
 double species_molar_mass(std::size_t idx);
 double species_molar_mass_from_name(const std::string& name);
 
+// Which species thermo every function below evaluates (#549).
+//   NASA9    : the NASA-9 polynomials as published (the default). C0 in cp at
+//              the interval joins (1000 K; 6000 K for N2, O2, AR, CO2, CO,
+//              H2) but not C1: dcp/dT jumps 1-4 % at 1000 K (H2 20 %) and up
+//              to 93 % at 6000 K, so every Jacobian using it steps there.
+//   NASA9_C2 : the same polynomials with each join bridged, inside
+//              |T - T_join| < 0.05 T_join, by a degree-7 cp/R that is C2 with
+//              them at both window edges and whose h and s rises across the
+//              window equal NASA-9's. Identical to NASA9 outside the windows
+//              (h and s included); inside, cp within 1e-4 at 1000 K (5e-4 at
+//              6000 K), h within 1e-5 cp T, s within 3e-5 R. Bridges are
+//              generated (include/thermo_c2_refit_data.h).
+// Process-wide; thread-safe to read. Switch before solving, not during.
+enum class ThermoModel { NASA9, NASA9_C2 };
+void set_thermo_model(ThermoModel model);
+ThermoModel thermo_model();
+
 // NASA polynomial evaluations (dimensionless)
 double cp_R(std::size_t species_idx, double T);
 // d(cp/R)/dT of one species [1/K]; 0 below the 10 K clamp cp_R applies.

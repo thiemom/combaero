@@ -2107,6 +2107,30 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
   m.def("dcp_R_dT", &dcp_R_dT, py::arg("species_idx"), py::arg("T"),
         "d(cp/R)/dT of one species [1/K].");
   m.def(
+      "set_thermo_model",
+      [](const std::string& name) {
+        if (name == "nasa9") {
+          set_thermo_model(ThermoModel::NASA9);
+        } else if (name == "nasa9_c2") {
+          set_thermo_model(ThermoModel::NASA9_C2);
+        } else {
+          throw std::invalid_argument(
+              "set_thermo_model: expected 'nasa9' or 'nasa9_c2', got '" + name + "'");
+        }
+      },
+      py::arg("name"),
+      "Select the species thermo every property evaluates (#549): 'nasa9'\n"
+      "(the published polynomials, the default) or 'nasa9_c2' (each interval\n"
+      "join bridged by a C2 cp; h and s identical to NASA-9 outside the\n"
+      "|T - T_join| < 0.05 T_join windows). Process-wide.");
+  m.def(
+      "thermo_model",
+      []() {
+        return thermo_model() == ThermoModel::NASA9_C2 ? std::string("nasa9_c2")
+                                                       : std::string("nasa9");
+      },
+      "The species thermo in use: 'nasa9' or 'nasa9_c2' (#549).");
+  m.def(
       "viscosity",
       [](double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {

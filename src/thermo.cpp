@@ -1,9 +1,13 @@
 #include "../include/thermo.h"
 #include "../include/composition.h"
 #include "../include/humidair.h"
+#include "../include/thermo_c2_refit_data.h"
 #include "../include/thermo_transport_data.h"
 #include "../include/transport.h"
+#include <array>
+#include <atomic>
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
 #include <vector>
 
@@ -65,6 +69,112 @@ const NASA9_Interval& get_interval(std::size_t species_idx, double T) {
     if (T < nasa.intervals.front().T_min) return nasa.intervals.front();
     return nasa.intervals.back();
 }
+
+// --- the C2 re-fit (#549) ----------------------------------------------------
+
+std::atomic<int> g_thermo_model{static_cast<int>(ThermoModel::NASA9)};
+
+// The bridge covering T for this species, or nullptr (NASA9 model, or T
+// outside every window).
+const C2Bridge* active_bridge(std::size_t species_idx, double T) {
+  if (g_thermo_model.load(std::memory_order_relaxed) !=
+      static_cast<int>(ThermoModel::NASA9_C2)) {
+    return nullptr;
+  }
+  for (const auto& b : c2_bridges[species_idx]) {
+    if (std::abs(T - b.T_join) < b.half_width) {
+      return &b;
+    }
+  }
+  return nullptr;
+}
+
+double bridge_poly(const C2Bridge& b, double t) {
+  double acc = 0.0;
+  for (std::size_t k = b.c.size(); k-- > 0;) {
+    acc = acc * t + b.c[k];
+  }
+  return acc;
+}
+
+double bridge_poly_dt(const C2Bridge& b, double t) {
+  double acc = 0.0;
+  for (std::size_t k = b.c.size(); k-- > 1;) {
+    acc = acc * t + static_cast<double>(k) * b.c[k];
+  }
+  return acc;
+}
+
+// Antiderivative in t of the bridge polynomial.
+double bridge_poly_int(const C2Bridge& b, double t) {
+  double acc = 0.0;
+  for (std::size_t k = b.c.size(); k-- > 0;) {
+    acc = acc * t + b.c[k] / static_cast<double>(k + 1);
+  }
+  return acc * t;
+}
+
+// The NASA-9 interval that ends at the bridge's join (its left side).
+const NASA9_Interval& left_interval(std::size_t species_idx, double T_join) {
+  for (const auto& iv : nasa_coeffs[species_idx].intervals) {
+    if (iv.T_max == T_join) {
+      return iv;
+    }
+  }
+  return nasa_coeffs[species_idx].intervals.front();
+}
+
+// NASA-9 H/R [K] and S/R of one interval (the published closed forms).
+double nasa_H_R(const std::array<double, 10>& a, double T) {
+  return -a[0] / T + a[1] * std::log(T) + a[2] * T + a[3] * T * T / 2.0 +
+         a[4] * T * T * T / 3.0 + a[5] * T * T * T * T / 4.0 +
+         a[6] * T * T * T * T * T / 5.0 + a[8];
+}
+
+double nasa_S_R(const std::array<double, 10>& a, double T) {
+  return -a[0] / (2.0 * T * T) - a[1] / T + a[2] * std::log(T) + a[3] * T +
+         a[4] * T * T / 2.0 + a[5] * T * T * T / 3.0 +
+         a[6] * T * T * T * T / 4.0 + a[9];
+}
+
+// H/R [K] inside a bridge: NASA-9 at the window's left edge plus the
+// bridge's integral of cp/R dT, closed form.
+double bridge_H_R(std::size_t species_idx, const C2Bridge& b, double T) {
+  const double w = b.half_width;
+  const double t = (T - b.T_join) / w;
+  const auto& L = left_interval(species_idx, b.T_join).coeffs;
+  return nasa_H_R(L, b.T_join - w) +
+         w * (bridge_poly_int(b, t) - bridge_poly_int(b, -1.0));
+}
+
+// S/R inside a bridge: NASA-9 at the left edge plus the integral of cp/(R T)
+// dT over [-1, t], by 8-point Gauss-Legendre. The integrand is a polynomial
+// over (T_join/w + t), analytic with its pole at t = -20: the rule is exact
+// to rounding.
+double bridge_S_R(std::size_t species_idx, const C2Bridge& b, double T) {
+  static const double xg[4] = {0.1834346424956498, 0.5255324099163290,
+                               0.7966664774136267, 0.9602898564975363};
+  static const double wg[4] = {0.3626837833783620, 0.3137066458778873,
+                               0.2223810344533745, 0.1012285362903763};
+  const double w = b.half_width;
+  const double t = (T - b.T_join) / w;
+  const double c = 0.5 * (t - 1.0), r = 0.5 * (t + 1.0);
+  auto f = [&](double tau) { return bridge_poly(b, tau) / (b.T_join + w * tau); };
+  double acc = 0.0;
+  for (int i = 0; i < 4; ++i) {
+    acc += wg[i] * (f(c - r * xg[i]) + f(c + r * xg[i]));
+  }
+  const auto& L = left_interval(species_idx, b.T_join).coeffs;
+  return nasa_S_R(L, b.T_join - w) + w * r * acc;
+}
+}  // namespace
+
+void set_thermo_model(ThermoModel model) {
+  g_thermo_model.store(static_cast<int>(model), std::memory_order_relaxed);
+}
+
+ThermoModel thermo_model() {
+  return static_cast<ThermoModel>(g_thermo_model.load(std::memory_order_relaxed));
 }
 
 double cp_R(std::size_t species_idx, double T) {
@@ -72,6 +182,9 @@ double cp_R(std::size_t species_idx, double T) {
     throw std::out_of_range("cp_R: species index out of bounds");
   }
   double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
+  if (const C2Bridge* b = active_bridge(species_idx, T)) {
+    return bridge_poly(*b, (T - b->T_join) / b->half_width);
+  }
   const auto& a = interval.coeffs;
   // Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
   return a[0]/(T*T) + a[1]/T + a[2] + a[3]*T + a[4]*T*T + a[5]*T*T*T + a[6]*T*T*T*T;
@@ -82,6 +195,9 @@ double h_RT(std::size_t species_idx, double T) {
     throw std::out_of_range("h_RT: species index out of bounds");
   }
   double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
+  if (const C2Bridge* b = active_bridge(species_idx, T)) {
+    return bridge_H_R(species_idx, *b, T) / T;
+  }
   const auto& a = interval.coeffs;
   // H/RT = -a1/T^2 + a2*ln(T)/T + a3 + a4*T/2 + a5*T^2/3 + a6*T^3/4 + a7*T^4/5 + b1/T
   return -a[0]/(T*T) + a[1]*std::log(T)/T + a[2] + a[3]*T/2.0 + a[4]*T*T/3.0 +
@@ -93,6 +209,9 @@ double s_R(std::size_t species_idx, double T) {
     throw std::out_of_range("s_R: species index out of bounds");
   }
   double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
+  if (const C2Bridge* b = active_bridge(species_idx, T)) {
+    return bridge_S_R(species_idx, *b, T);
+  }
   const auto& a = interval.coeffs;
   // S/R = -a1/(2*T^2) - a2/T + a3*ln(T) + a4*T + a5*T^2/2 + a6*T^3/3 + a7*T^4/4 + a9
   return -a[0]/(2.0*T*T) - a[1]/T + a[2]*std::log(T) + a[3]*T + a[4]*T*T/2.0 +
@@ -284,6 +403,9 @@ double dcp_R_dT(std::size_t species_idx, double T) {
   if (T < 10.0) {
     return 0.0;  // cp_R holds its 10 K value below the clamp
   }
+  if (const C2Bridge* b = active_bridge(species_idx, T)) {
+    return bridge_poly_dt(*b, (T - b->T_join) / b->half_width) / b->half_width;
+  }
   const auto& a = get_interval(species_idx, T).coeffs;
   // d(Cp/R)/dT = -2*a1/T^3 - a2/T^2 + a4 + 2*a5*T + 3*a6*T^2 + 4*a7*T^3
   return -2.0*a[0]/(T*T*T) - a[1]/(T*T) + a[3] + 2.0*a[4]*T +
@@ -293,6 +415,11 @@ double dcp_R_dT(std::size_t species_idx, double T) {
 double dcp_dT(double T, const std::vector<double> &X) {
   double dcp_mix = 0.0;
   for (std::size_t i = 0; i < X.size(); ++i) {
+    if (const C2Bridge* b = active_bridge(i, T)) {
+      dcp_mix += X[i] * thermo::R_GAS *
+                 bridge_poly_dt(*b, (T - b->T_join) / b->half_width) / b->half_width;
+      continue;
+    }
     const auto& a = get_interval(i, T).coeffs;
     double dcp_R = -2.0*a[0]/(T*T*T) - a[1]/(T*T) + a[3] + 2.0*a[4]*T +
                    3.0*a[5]*T*T + 4.0*a[6]*T*T*T;
