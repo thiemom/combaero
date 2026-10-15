@@ -1017,14 +1017,15 @@ class ConstantKTeeElement(MultiPortChamberElement):
         # every other port's row, which breaks the one-Pt-per-row structure of
         # the assembled Jacobian. Here the dependency set is unchanged -- P, T,
         # Y and m_dot of the common port. The closure's residual is Pt - P0,
-        # so q = Pt - r - P and its derivatives are the closure's, negated
-        # (Pt cancels).
+        # so q = P0 - P and its derivatives are the closure's, negated, with
+        # d/dP shifted by one.
         dq_dY: dict[int, float] = {}
         if P_c > 0.0 and T_c > 0.0 and A_c > 0.0:
             r = _solver_tools.momentum_chamber_residual_and_jacobian(
                 P_c, float(states[common].Pt), m_c, T_c, list(states[common].Y), A_c
             )
-            q_dyn = float(states[common].Pt) - float(r.residual) - P_c
+            # P expm1(ln(P0/P)): no cancellation against P (#579 on Linux).
+            q_dyn = float(r.q_dyn)
             dq_dm = -float(r.d_res_dmdot)
             dq_dP = -float(r.d_res_dP) - 1.0
             dq_dT = -float(r.d_res_dT)

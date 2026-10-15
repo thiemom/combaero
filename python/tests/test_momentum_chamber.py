@@ -225,6 +225,8 @@ def test_closure_holds_at_an_exact_stagnation_state(M: float) -> None:
     mach = r.M
     assert mach == pytest.approx(M, rel=1e-8)
     assert r.rho_static == pytest.approx(cb.density(T, P, _X_AIR), rel=1e-9)
+    # The dynamic head, returned without cancellation against P.
+    assert r.q_dyn == pytest.approx(Pt - r.residual - P, rel=1e-12)
 
 
 def test_closure_passes_the_true_choked_flux() -> None:

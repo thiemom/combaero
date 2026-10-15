@@ -1255,6 +1255,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("d_res_dY", &solver::MomentumChamberResult::d_res_dY)
       .def_readonly("T_static", &solver::MomentumChamberResult::T_static)
       .def_readonly("M", &solver::MomentumChamberResult::M)
+      .def_readonly("q_dyn", &solver::MomentumChamberResult::q_dyn)
       .def_readonly("rho_static", &solver::MomentumChamberResult::rho_static)
       .def_readonly("drho_dP", &solver::MomentumChamberResult::drho_dP)
       .def_readonly("drho_dT", &solver::MomentumChamberResult::drho_dT)

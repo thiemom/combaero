@@ -1451,14 +1451,49 @@ struct ChamberStaticState {
   double M;
 };
 
+// Integral of f over [a, b] by 8-point Gauss-Legendre, split at the
+// NASA-9 range boundaries (1000 K, 6000 K) where cp has a small jump (#549).
+// Used for h(T0) - h(T) and s(T0) - s(T) at the SAME composition: the direct
+// differences cancel ~4 significant digits near T0 and left ~1e-9 Pa of noise
+// in P0, which finite-difference Jacobian checks with small steps read as
+// derivative errors (#579 on Linux).
+template <class F>
+double gl8_split(F f, double a, double b) {
+  static const double xg[4] = {0.1834346424956498, 0.5255324099163290,
+                               0.7966664774136267, 0.9602898564975363};
+  static const double wg[4] = {0.3626837833783620, 0.3137066458778873,
+                               0.2223810344533745, 0.1012285362903763};
+  auto seg = [&](double lo, double hi) {
+    const double c = 0.5 * (lo + hi), r = 0.5 * (hi - lo);
+    double acc = 0.0;
+    for (int i = 0; i < 4; ++i) {
+      acc += wg[i] * (f(c - r * xg[i]) + f(c + r * xg[i]));
+    }
+    return acc * r;
+  };
+  const double sign = b >= a ? 1.0 : -1.0;
+  double lo = std::min(a, b), hi = std::max(a, b);
+  double total = 0.0;
+  for (double bp : {1000.0, 6000.0}) {
+    if (lo < bp && bp < hi) {
+      total += seg(lo, bp);
+      lo = bp;
+    }
+  }
+  total += seg(lo, hi);
+  return sign * total;
+}
+
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double> &X) {
   const double R = combaero::specific_gas_constant(X);
-  const double h0 = combaero::h_mass(T0, X);
   const double k = (G * R / P) * (G * R / P);  // v^2 = k T^2
+  auto cp_of = [&](double t) { return combaero::cp_mass(t, X); };
+  auto cp_over_T = [&](double t) { return combaero::cp_mass(t, X) / t; };
+  // f(T) = [h(T0) - h(T)] - k T^2 / 2, the enthalpy difference integrated.
   double T = T0;
   for (int it = 0; it < 100; ++it) {
-    const double f = h0 - combaero::h_mass(T, X) - 0.5 * k * T * T;
+    const double f = gl8_split(cp_of, T, T0) - 0.5 * k * T * T;
     const double fT = -combaero::cp_mass(T, X) - k * T;
     const double step = f / fT;
     T -= step;
@@ -1475,11 +1510,8 @@ ChamberStaticState chamber_static_state(double T0, double P, double G,
   s.dT_dT0 = -cp_T0 / fT;
   s.dT_dP = -(k * T * T / P) / fT;
   s.dT_dG = (G > 0.0) ? -(-k * T * T / G) / fT : 0.0;
-  // ln(P0 / P) = (s(T0) - s(T)) / R at a common pressure; ds/dT = cp / T.
-  constexpr double P_REF = 101325.0;
-  const double mw_kg = combaero::mwmix(X) / 1000.0;
-  s.lnP0P = (combaero::s(T0, X, P_REF, P_REF) - combaero::s(T, X, P_REF, P_REF)) /
-            (mw_kg * R);
+  // ln(P0 / P) = (s(T0) - s(T)) / R = (1/R) integral of cp / T.
+  s.lnP0P = gl8_split(cp_over_T, T, T0) / R;
   const double dln_dTs = -cp_T / (R * T);
   s.dln_dT0 = cp_T0 / (R * T0) + dln_dTs * s.dT_dT0;
   s.dln_dP = dln_dTs * s.dT_dP;
@@ -1541,6 +1573,7 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   res.residual = P_total - P0;
   res.d_res_dP_total = 1.0;
   res.T_static = st.T;
+  res.q_dyn = P * std::expm1(st.lnP0P);
   res.M = st.M;
   // Static density, ideal gas: rho = P / (R T), T = T(T0, P, G).
   const double R_gas = combaero::specific_gas_constant(X);

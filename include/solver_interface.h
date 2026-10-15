@@ -527,6 +527,11 @@ struct MomentumChamberResult {
   // Static density rho(T_static, P) and its sensitivities to the closure's
   // inputs, for elements that read the chamber as a port (junction kernels):
   // their momentum rows must see the same static state as this row.
+  // Isentropic dynamic head P0 - P, computed as P expm1(ln(P0/P)) rather
+  // than as a difference of two pressures (one ULP of P0 would otherwise
+  // be its noise floor). Its partials are the residual's, negated, with
+  // d/dP shifted by one: dq/dP = -d_res_dP - 1.
+  double q_dyn = 0.0;
   double rho_static = 0.0;
   double drho_dP = 0.0;
   double drho_dT = 0.0;     // d/dT0
