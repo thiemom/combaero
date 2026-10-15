@@ -1021,8 +1021,21 @@ class ConstantKTeeElement(MultiPortChamberElement):
         # d/dP shifted by one.
         dq_dY: dict[int, float] = {}
         if P_c > 0.0 and T_c > 0.0 and A_c > 0.0:
+            # In the port chamber's own regime (#588): its low-Mach limit
+            # q = (m/A)^2 / (2 rho) on an incompressible network.
+            port_objs = getattr(self, "_port_node_objs", None) or []
+            incompressible = (
+                common < len(port_objs)
+                and getattr(port_objs[common], "regime", "compressible") == "incompressible"
+            )
             r = _solver_tools.momentum_chamber_residual_and_jacobian(
-                P_c, float(states[common].Pt), m_c, T_c, list(states[common].Y), A_c
+                P_c,
+                float(states[common].Pt),
+                m_c,
+                T_c,
+                list(states[common].Y),
+                A_c,
+                incompressible,
             )
             # P expm1(ln(P0/P)): no cancellation against P (#579 on Linux).
             q_dyn = float(r.q_dyn)

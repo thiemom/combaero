@@ -409,6 +409,65 @@ TEST(SolverJacobianTest, OrificeCompressibleDerivatives) {
   EXPECT_NEAR(res.d_mdot_dT_up, fd_dT, std::abs(fd_dT) * 1e-8 + 1e-12);
 }
 
+// The incompressible closure (#588): T_static = T0, Pt = P + G^2 / (2 rho),
+// every derivative against a central difference, both flow directions; and
+// the low-Mach limit of the compressible closure, gap ~ M^2.
+TEST(SolverJacobianTest, MomentumChamberIncompressibleDerivativesAndLimit) {
+  std::size_t ns = num_species();
+  std::vector<double> Y(ns, 0.0);
+  Y[species_index_from_name("N2")] = 0.767;
+  Y[species_index_from_name("O2")] = 0.233;
+  const double P = 101325.0, Pt = 105000.0, T = 600.0, area = 0.01;
+  auto f = [&](double P_, double Pt_, double m_, double T_, const std::vector<double> &Y_) {
+    return momentum_chamber_residual_and_jacobian(P_, Pt_, m_, T_, Y_, area, true);
+  };
+  for (double m : {0.5, -0.5}) {
+    const auto r = f(P, Pt, m, T, Y);
+    EXPECT_DOUBLE_EQ(r.T_static, T);
+    const double fdP = (f(P + 1, Pt, m, T, Y).residual - f(P - 1, Pt, m, T, Y).residual) / 2;
+    const double fdPt = (f(P, Pt + 1, m, T, Y).residual - f(P, Pt - 1, m, T, Y).residual) / 2;
+    const double hm = 1e-5;
+    const double fdm =
+        (f(P, Pt, m + hm, T, Y).residual - f(P, Pt, m - hm, T, Y).residual) / (2 * hm);
+    const double fdT =
+        (f(P, Pt, m, T + 1e-3, Y).residual - f(P, Pt, m, T - 1e-3, Y).residual) / 2e-3;
+    EXPECT_NEAR(r.d_res_dP, fdP, 1e-8 * std::abs(fdP));
+    EXPECT_NEAR(r.d_res_dP_total, fdPt, 1e-12);
+    EXPECT_NEAR(r.d_res_dmdot, fdm, 1e-7 * std::abs(fdm));
+    EXPECT_NEAR(r.d_res_dT, fdT, 1e-7 * std::abs(fdT));
+    const double fdrP =
+        (f(P + 1, Pt, m, T, Y).rho_static - f(P - 1, Pt, m, T, Y).rho_static) / 2;
+    EXPECT_NEAR(r.drho_dP, fdrP, 1e-8 * std::abs(fdrP));
+    for (std::size_t k = 0; k < ns; ++k) {
+      if (!(Y[k] > 0.0)) {
+        continue;
+      }
+      std::vector<double> Yp = Y, Ym = Y;
+      Yp[k] += 1e-5;
+      Ym[k] -= 1e-5;
+      const double fdY = (f(P, Pt, m, T, Yp).residual - f(P, Pt, m, T, Ym).residual) / 2e-5;
+      EXPECT_NEAR(r.d_res_dY[k], fdY, 1e-4 * std::abs(fdY) + 1e-9) << k;
+    }
+  }
+  // Low-Mach limit of the compressible closure: the dynamic heads agree to
+  // O(M^2), the gap quartering as M halves.
+  const std::vector<double> X = combaero::mass_to_mole(combaero::normalize_fractions(Y));
+  const double rho = combaero::density(T, P, X);
+  const double a = combaero::speed_of_sound(T, X);
+  double prev = 0.0;
+  for (double M : {0.1, 0.05, 0.025}) {
+    const double m = M * a * rho * area;
+    const auto ri = momentum_chamber_residual_and_jacobian(P, P, m, T, Y, area, true);
+    const auto rc = momentum_chamber_residual_and_jacobian(P, P, m, T, Y, area);
+    const double rel = (ri.q_dyn - rc.q_dyn) / rc.q_dyn;
+    if (prev != 0.0) {
+      EXPECT_NEAR(prev / rel, 4.0, 0.1) << M;
+    }
+    prev = rel;
+  }
+  EXPECT_LT(std::abs(prev), 1e-4);
+}
+
 TEST(SolverJacobianTest, MomentumChamberDerivatives) {
   // Test momentum chamber residual: P_total = P + 0.5 * rho * v^2
   std::size_t ns = num_species();

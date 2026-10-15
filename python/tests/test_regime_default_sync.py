@@ -53,4 +53,4 @@ def test_every_element_regime_default_matches() -> None:
             continue
         checked.append(name)
         assert param.default == DEFAULT_REGIME, f"{name}.regime defaults to {param.default!r}"
-    assert {"ChannelElement", "OrificeElement"} <= set(checked)
+    assert {"ChannelElement", "OrificeElement", "MomentumChamberNode"} <= set(checked)

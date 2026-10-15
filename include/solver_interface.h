@@ -547,9 +547,14 @@ struct MomentumChamberResult {
   std::vector<double> drho_dY;
 };
 
+// incompressible (#588): the low-Mach limit of the same closure, for a
+// network solved incompressibly. The static state IS the stagnation one
+// (T_static = T0, rho = P / (R T0)) and Pt = P + (|m_dot| / A)^2 / (2 rho):
+// no sonic limit, so no fold for a neighbour to drive the chamber onto. It
+// agrees with the compressible closure to O(Ma^2).
 MomentumChamberResult momentum_chamber_residual_and_jacobian(
     double P, double P_total, double m_dot, double T,
-    const std::vector<double> &Y, double area);
+    const std::vector<double> &Y, double area, bool incompressible = false);
 
 // -----------------------------------------------------------------------------
 // Border-Carnot turning loss: a two-port in-line loss,

@@ -724,6 +724,11 @@ def test_mpce_collector_port_carries_dynamic_head():
     (tens of kPa at these conditions) vanished from the bookkeeping.
     """
     net = _mpce_mfb_merge_network()
+    # The compressible closure is the subject: its ports follow the
+    # library's default regime otherwise (#588).
+    for n in net.nodes.values():
+        if isinstance(n, MomentumChamberNode):
+            n.regime = "compressible"
     solver = NetworkSolver(net)
     sol = solver.solve(timeout=120.0)
     assert sol["__final_norm__"] < 1e-3

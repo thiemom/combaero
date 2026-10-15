@@ -568,8 +568,13 @@ def test_lossless_split_is_dissipative_only_at_order_mach_squared() -> None:
     Before #576 the kernel read each port's density at the chamber's
     STAGNATION T, inflating the receivers' heads; the same split then created
     flow work (-3.2e-4) and the energy check refused it. With the port's
-    static density on both sides it converges and passes."""
+    static density on both sides it converges and passes.
+
+    The ports are pinned compressible: the M^2/4 excess IS the subject."""
     net = _branch_net(theta=60.0, loss_factor=0.0)
+    for node in net.nodes.values():
+        if isinstance(node, MomentumChamberNode):
+            node.regime = "compressible"
     sol = NetworkSolver(net).solve(timeout=60.0)
     assert sol["__success__"], sol.get("__message__")
     el = net.elements["jct"]
@@ -582,3 +587,18 @@ def test_lossless_split_is_dissipative_only_at_order_mach_squared() -> None:
     head = sol["mc_com.Pt"] - sol["mc_com.P"]
     loss = -out / (sol["ch_in.m_dot"] * head)
     assert 0.0 < loss < 3e-4
+
+
+def test_lossless_split_with_incompressible_ports_is_consistent() -> None:
+    """The same f = 0 split on incompressible ports (#588). Its ports differ in
+    density by ~1e-3, so mass-weighted Pt is not what the closure conserves:
+    scored that way the split gained 1.1e-7 and the energy check refused an
+    exact, dissipative root. Scored volumetrically, as the closure's guarantee
+    is stated, it dissipates (1.5e-4 of the heads) and passes."""
+    net = _branch_net(theta=60.0, loss_factor=0.0)
+    for node in net.nodes.values():
+        if isinstance(node, MomentumChamberNode):
+            node.regime = "incompressible"
+    sol = NetworkSolver(net).solve(timeout=60.0, auto_retry=False)
+    assert sol["__converged__"], sol.get("__message__")
+    assert sol["__consistent__"] is True, sol.get("__message__")

@@ -175,7 +175,8 @@ def build(case: Case, model: Model = "mynard", loss_factor: float = 1.0) -> Flow
         ("port_str", case.area),
         ("port_bra", a_bra),
     ):
-        net.add_node(MomentumChamberNode(pid, area=area))
+        # Compressible ports, as this harness always ran them (#588).
+        net.add_node(MomentumChamberNode(pid, area=area, regime="compressible"))
 
     if case.joining:
         if case.drive == "imposed_flows":

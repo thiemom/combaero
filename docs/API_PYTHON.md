@@ -810,7 +810,9 @@ closure is checked against one Mach limit, `solver.incompressible_mach_limit`
 (default `combaero.network.compressibility.INCOMPRESSIBLE_MACH_LIMIT = 0.2`),
 at its own highest internal Mach: an orifice's jet (`mach_throat`), a
 channel's higher end (`mach_in`, `mach_out`); an element declares which in
-`validity_mach_keys`. The incompressible closures are the low-Mach limits of
+`validity_mach_keys`. A momentum chamber on its incompressible closure is
+judged at its own `mach` and listed by its node id; the GUI attributes an
+inserted port chamber to its junction. The incompressible closures are the low-Mach limits of
 the compressible ones, drifting as Ma^2: measured at the same flow, a channel's
 drop is 4.0% off at Ma 0.2 (13% at 0.4), an orifice's 2.9% at a jet Ma of 0.2
 (5% at 0.26). The limit is a rule of thumb, not a guarantee; the solution and
@@ -954,6 +956,12 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
   - The merge-chamber face state (`cb.chamber_merge_face_state`) takes both temperatures as stagnation and solves the face's and the outlet's static states; its sensitivities are analytic (#578).
   - The chamber's heat-transfer correlation, and an effusion plate's gas-side density, use the chamber's static state (#578).
   - Still read as static: an incompressible `ChannelElement` or a `BorderCarnotLossElement` whose upstream node is a chamber, and the legacy `TeeJunctionElement` (#578).
+- **A `MomentumChamberNode` has a `regime`** (#588), default `DEFAULT_REGIME` like the elements; the GUI gives every chamber (drawn, or inserted at a junction port, an edge or a merge) the network's global regime.
+  - `"compressible"`: the closure above.
+  - `"incompressible"`: its low-Mach limit. The static state is the stagnation one (`T_static = T0`, `rho = P / (R T0)`) and `Pt = P + (m/A)^2 / (2 rho)`: no sonic limit, so an incompressible network keeps none hidden in its chambers. The merge face takes both densities at the chamber pressure, `P_face = P + m_out^2/(rho A^2) - J/A - m_main^2/(rho_main A^2)`, linear with nothing to choke.
+  - Both agree with the compressible forms to O(Ma^2): 0.25% of the head at Ma 0.2, the gap quartering as Ma halves.
+  - A junction's reference head (`MultiPortChamberElement`'s constant K) follows its port chamber's regime.
+  - A script that validates the compressible closure must ask for it: `MomentumChamberNode(..., regime="compressible")`.
 
 #### Merge chamber: main inlet plus side streams (#471)
 

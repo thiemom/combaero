@@ -1740,8 +1740,14 @@ class MomentumChamberNode(NetworkNode):
         t_hot: float | None = None,
         Dh: float | None = None,
         main_inlet: str | None = None,
+        regime: CompressibilityLiteral = DEFAULT_REGIME,
     ):
         super().__init__(id)
+        # Which closure (#588): the compressible stagnation closure (#357,
+        # #576) or its low-Mach limit, Pt = P + (m/A)^2 / (2 rho) at
+        # T_static = T0 -- the network's regime, so that an incompressible
+        # network has no sonic limit hidden in its chambers.
+        self.regime = regime
         # MERGE CHAMBER (#471). With main_inlet declared the chamber accepts
         # further inflows as SIDE STREAMS, still one outlet. Its axis is the
         # outlet direction; the main stream arrives along it, each side stream
@@ -1833,6 +1839,19 @@ class MomentumChamberNode(NetworkNode):
 
         return mix_res.T_mix, mix_res.Y_mix, mix_res
 
+    def _closure(self, state: NetworkMixtureState, m_dot: float | None = None) -> Any:
+        """The chamber closure at ``state`` in this chamber's regime (#588)."""
+        m = float(getattr(self, "_total_m_dot", 0.0)) if m_dot is None else m_dot
+        return _solver_tools.momentum_chamber_residual_and_jacobian(
+            state.P,
+            state.Pt,
+            m,
+            state.T,
+            state.Y,
+            self.area,
+            self.regime == "incompressible",
+        )
+
     def htc_and_T(self, state: NetworkMixtureState):
         """Compute heat transfer coefficient for the momentum chamber."""
         if self.surface.area == 0.0:
@@ -1846,9 +1865,7 @@ class MomentumChamberNode(NetworkNode):
         # factor, as it should.
         T_static = float(state.T)
         if self.area > 0:
-            r = _solver_tools.momentum_chamber_residual_and_jacobian(
-                state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
-            )
+            r = self._closure(state, m_dot_total)
             T_static = float(r.T_static)
             rho, _ = _safe_rho(float(r.rho_static))
             u = m_dot_total / (rho * self.area)
@@ -1878,9 +1895,7 @@ class MomentumChamberNode(NetworkNode):
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
 
         # Use C++ function for residual and analytical Jacobian
-        result = _solver_tools.momentum_chamber_residual_and_jacobian(
-            state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
-        )
+        result = self._closure(state, m_dot_total)
 
         res = [result.residual]
         jac: dict[int, dict[str, float]] = {
@@ -1972,7 +1987,16 @@ class MomentumChamberNode(NetworkNode):
             )
             main_T_key = f"{self.id}.T"
         r = cb.chamber_merge_face_state(
-            m_main, T_main, X_main, m_out, state.P, state.T, state.X, S, self.area
+            m_main,
+            T_main,
+            X_main,
+            m_out,
+            state.P,
+            state.T,
+            state.X,
+            S,
+            self.area,
+            self.regime == "incompressible",
         )
         self._face_choked = bool(r.choked)
         main_src = elems[self.main_inlet].from_node if self.main_inlet in elems else None
@@ -2013,11 +2037,7 @@ class MomentumChamberNode(NetworkNode):
 
         # state.T is the chamber's stagnation T; the closure solves the static
         # state, and its Mach is the one the residual used (#576).
-        return float(
-            _solver_tools.momentum_chamber_residual_and_jacobian(
-                state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
-            ).M
-        )
+        return float(self._closure(state, m_dot_total).M)
 
     def static_density(self, state: NetworkMixtureState) -> tuple[float, dict[str, float]]:
         """Static density of the chamber and d(rho)/d(name), for elements that
@@ -2044,9 +2064,7 @@ class MomentumChamberNode(NetworkNode):
                     d0[f"{self.id}.Y[{k}]"] = -rho * W / float(cb.species_molar_mass(k))
             return rho, d0
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        r = _solver_tools.momentum_chamber_residual_and_jacobian(
-            state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
-        )
+        r = self._closure(state, m_dot_total)
         d: dict[str, float] = {f"{self.id}.P": r.drho_dP, f"{self.id}.T": r.drho_dT}
         for k, v in enumerate(r.drho_dY):
             if v != 0.0:
@@ -2063,11 +2081,7 @@ class MomentumChamberNode(NetworkNode):
         # chamber's stagnation T (#576).
         T_static = float(state.T)
         if self.area > 0:
-            T_static = float(
-                _solver_tools.momentum_chamber_residual_and_jacobian(
-                    state.P, state.Pt, m_dot_total, state.T, state.Y, self.area
-                ).T_static
-            )
+            T_static = float(self._closure(state, m_dot_total).T_static)
         cs = cb.complete_state(T_static, state.P, state.X)
 
         rho = cs.thermo.rho

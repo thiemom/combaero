@@ -32,8 +32,8 @@ def test_a_flag_is_attributed_to_its_canvas_node(monkeypatch) -> None:
     and the solve still succeeds -- a report, not a rejection."""
     original = compressibility.validity_verdicts
 
-    def with_a_warning(network, diag, limit):
-        out = original(network, diag, limit)
+    def with_a_warning(network, diag, limit, node_mach=None):
+        out = original(network, diag, limit, node_mach)
         out["ch_main"] = {"verdict": "warn", "mach": 0.31, "limit": limit}
         return out
 
