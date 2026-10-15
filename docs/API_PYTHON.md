@@ -852,7 +852,10 @@ solver = NetworkSolver(graph)
 # primary strategy, for networks known to stall the cold path.
 # auto_retry (default True): failed cold solves on compressible
 # MPCE networks are retried once from an outlet-referenced
-# incompressible warm start (densities at the downstream static).
+# incompressible warm start (densities at the downstream static);
+# on MPCE networks incompressible throughout, from a compressible
+# warm start (same root at low Mach, #588; reported as
+# "compressible_warmstart").
 # The primary attempt gets 40% of `timeout`, the retry the rest.
 # A cold solve of a network with walls that still fails is then
 # retried from the same network solved WITHOUT its walls -- the

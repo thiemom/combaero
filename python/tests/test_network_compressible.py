@@ -1310,21 +1310,62 @@ def test_auto_retry_optout_returns_primary_failure():
     assert len(calls) == 1
 
 
-def test_auto_retry_skipped_on_incompressible_networks():
-    """The retry proxy re-solves in the incompressible regime, which is a
-    no-op for already-incompressible networks -- no retry there."""
+def test_auto_retry_on_incompressible_networks_uses_a_compressible_seed():
+    """An incompressible-throughout network retries from the compressible
+    proxy (#588); when that proxy fails too, the primary failure is returned
+    and says the retry was skipped."""
     net = _mfb_branch_tee_orifice_network(0.2, "incompressible")
     solver = NetworkSolver(net)
+    calls: list[dict] = []
+    regimes_seen: list[set[str]] = []
+
+    def fake_impl(**kwargs):
+        calls.append(kwargs)
+        regimes_seen.append({getattr(e, "regime", "") for e in net.elements.values()})
+        return {"__success__": False, "__message__": "forced failure", "__final_norm__": 1e3}
+
+    solver._solve_impl = fake_impl
+    with pytest.warns(RuntimeWarning, match="compressible warm start"):
+        sol = solver.solve(timeout=30.0)
+    assert not sol["__success__"]
+    assert len(calls) == 2  # primary + compressible proxy; no seeded retry
+    assert "compressible" in regimes_seen[1] and "incompressible" not in regimes_seen[1]
+    assert "compressible warm-start auto-retry skipped" in sol["__message__"]
+    # The network is handed back in its own regime.
+    assert {e.regime for e in net.elements.values() if hasattr(e, "regime")} == {"incompressible"}
+
+
+def test_compressible_seed_rescues_an_incompressible_cold_failure():
+    """The seeded retry converges to the INCOMPRESSIBLE root -- the
+    compressible solution is only the starting point."""
+    reference = NetworkSolver(_mfb_branch_tee_orifice_network(0.2, "incompressible")).solve(
+        auto_retry=False
+    )
+    assert reference["__success__"]
+
+    net = _mfb_branch_tee_orifice_network(0.2, "incompressible")
+    solver = NetworkSolver(net)
+    real_impl = solver._solve_impl
     calls: list[dict] = []
 
     def fake_impl(**kwargs):
         calls.append(kwargs)
-        return {"__success__": False, "__message__": "forced failure", "__final_norm__": 1e3}
+        if len(calls) == 1:
+            return {"__success__": False, "__message__": "forced failure", "__final_norm__": 1e3}
+        return real_impl(**kwargs)
 
     solver._solve_impl = fake_impl
-    sol = solver.solve(timeout=30.0)
-    assert not sol["__success__"]
-    assert len(calls) == 1
+    with pytest.warns(RuntimeWarning, match="compressible warm start"):
+        sol = solver.solve(timeout=120.0)
+    assert sol["__success__"], sol.get("__message__")
+    assert len(calls) == 3  # forced primary + compressible proxy + seeded retry
+    assert calls[2].get("x0") is not None
+    ssu = solver._diagnostic_data["solver_settings_used"]
+    assert ssu["init_strategy"] == "compressible_warmstart"
+    assert ssu["auto_retry"] is True
+    assert "compressible warm-start" in sol["__message__"]
+    for name in solver.unknown_names:
+        assert sol[name] == pytest.approx(reference[name], rel=1e-6, abs=1e-9), name
 
 
 def test_outlet_ref_proxy_seed_tracks_compressible_root_better_than_inlet():
