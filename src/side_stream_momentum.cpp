@@ -60,10 +60,41 @@ MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
                                         const std::vector<double>& X_main,
                                         double m_out, double P, double T0,
                                         const std::vector<double>& X,
-                                        double side_momentum, double area) {
+                                        double side_momentum, double area,
+                                        bool incompressible) {
   if (!(area > 0.0) || !(P > 0.0) || !(T0 > 0.0) || !(T0_main > 0.0)) {
     throw std::invalid_argument(
         "chamber_merge_face_state: area, P, T and T_main must be positive");
+  }
+
+  if (incompressible) {
+    // Low-Mach limit (#588): rho = P / (R T0) for both streams, at the
+    // chamber pressure. Linear in P_f; every sensitivity is closed form.
+    MergeFaceState out;
+    const double R = specific_gas_constant(X);
+    const double Rm = specific_gas_constant(X_main);
+    const double A2 = area * area;
+    const double a = m_main * m_main / A2;  // main impulse factor
+    const double b = m_out * m_out / A2;    // outlet impulse factor
+    const double vm = Rm * T0_main / P;     // 1 / rho_main
+    const double vo = R * T0 / P;           // 1 / rho
+    out.P_face = P + b * vo - side_momentum / area - a * vm;
+    out.Pt_face = out.P_face + 0.5 * a * vm;
+    out.M_face = std::abs(m_main) * vm / area / speed_of_sound(T0_main, X_main);
+    out.choked = false;
+    out.dPf_dm_main = -2.0 * m_main * vm / A2;
+    out.dPf_dm_out = 2.0 * m_out * vo / A2;
+    out.dPf_dJ = -1.0 / area;
+    out.dPf_dP = 1.0 - b * vo / P + a * vm / P;
+    out.dPf_dT = b * R / P;
+    out.dPf_dT_main = -a * Rm / P;
+    out.dPtf_dm_main = -m_main * vm / A2;
+    out.dPtf_dm_out = out.dPf_dm_out;
+    out.dPtf_dJ = out.dPf_dJ;
+    out.dPtf_dP = 1.0 - b * vo / P + 0.5 * a * vm / P;
+    out.dPtf_dT = out.dPf_dT;
+    out.dPtf_dT_main = -0.5 * a * Rm / P;
+    return out;
   }
   const double A = area;
   const double J = side_momentum;

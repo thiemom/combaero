@@ -810,10 +810,12 @@ struct MergeFaceState {
     double dPf_dm_main, dPf_dm_out, dPf_dJ, dPf_dP, dPf_dT, dPf_dT_main;
     double dPtf_dm_main, dPtf_dm_out, dPtf_dJ, dPtf_dP, dPtf_dT, dPtf_dT_main;
 };
+// incompressible (#588): the low-Mach limit, densities at the chamber P and
+// the stagnation temperatures; linear in P_face, nothing to choke.
 MergeFaceState chamber_merge_face_state(
     double m_main, double T_main, const std::vector<double>& X_main,
     double m_out, double P, double T, const std::vector<double>& X,
-    double side_momentum, double area);
+    double side_momentum, double area, bool incompressible = false);
 
 // Streamwise jet impulse per unit cos(theta), J = m w: isentropic velocity to
 // P (variable cp), or choked: w = u* + (P* - P)/(rho* u*). C1 across choking;

@@ -777,13 +777,15 @@ PYBIND11_MODULE(_core, m) {
   m.def("chamber_merge_face_state", &combaero::chamber_merge_face_state,
         py::arg("m_main"), py::arg("T_main"), py::arg("X_main"), py::arg("m_out"),
         py::arg("P"), py::arg("T"), py::arg("X"), py::arg("side_momentum"),
-        py::arg("area"),
+        py::arg("area"), py::arg("incompressible") = false,
         "Main-inlet face of a merge chamber from the exact (compressible)\n"
         "impulse balance over a constant-area control volume: face static P\n"
         "on the subsonic root of the ideal-gas quadratic, face Pt from the\n"
         "same entropy-based stagnation closure as the chamber. P, T: the\n"
         "chamber (outlet) state; T_main: the main stream's static T;\n"
-        "side_momentum: sum of the side streams' streamwise impulse.");
+        "side_momentum: sum of the side streams' streamwise impulse.\n"
+        "incompressible: the low-Mach limit, densities at the chamber P and\n"
+        "the stagnation temperatures; linear in P_face, no choking (#588).");
 
   py::class_<combaero::JetImpulse>(m, "JetImpulse")
       .def_readonly("J", &combaero::JetImpulse::J)
@@ -1294,10 +1296,11 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
   m.def("momentum_chamber_residual_and_jacobian",
         &solver::momentum_chamber_residual_and_jacobian, py::arg("P"),
         py::arg("P_total"), py::arg("m_dot"), py::arg("T"), py::arg("Y"),
-        py::arg("area"),
+        py::arg("area"), py::arg("incompressible") = false,
         "Momentum chamber residual: P_total = P0(P, T_static); T is the "
         "chamber stagnation temperature T0, the static T is solved inside "
-        "(#576)");
+        "(#576). incompressible: the low-Mach limit, T_static = T0 and "
+        "P_total = P + (m/A)^2 / (2 rho) (#588).");
 
   // --- Momentum-CV junction: whole-element (f, J) -------------------------
   py::class_<solver::MpceGeometry>(

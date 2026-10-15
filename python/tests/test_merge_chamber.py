@@ -78,19 +78,24 @@ def test_the_solution_satisfies_the_control_volume_momentum_balance(angle: float
     P, T = r["ch.P"], s._derived_states["ch"][0]
     A = ch.area
     m_main, m_out = d["duct"]["m_dot"], d["tail"]["m_dot"]
-    # T is the chamber's STAGNATION T: densities at the static states (#578).
-    rho = chamber_static_density(P, T, m_out, A, list(X_AIR))
     P_face = d["duct"]["P_out"]  # the main inlet reports the face it sees
+    if ch.regime == "incompressible":
+        # The low-Mach limit (#588): both densities at the chamber pressure
+        # and the stagnation temperatures.
+        rho = float(cb.density(T, P, X_AIR))
+        rho_face = float(cb.density(1200.0, P, X_AIR))
+    else:
+        # T is the chamber's STAGNATION T: densities at the static states
+        # (#578); the main face at its own static density (the main stream's
+        # 1200 K stagnation T at the face pressure and mass flux).
+        rho = chamber_static_density(P, T, m_out, A, list(X_AIR))
+        rho_face = chamber_static_density(P_face, 1200.0, m_main, A, list(X_AIR))
     eff = s.network.elements["eff"]
     supply = NetworkMixtureState(
         T=600.0, P=1.03e5, Pt=1.03e5, Tt=600.0, m_dot=d["eff"]["m_dot"], Y=Y_AIR
     )
     chamber = NetworkMixtureState(T=T, P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
     S, _ = eff.injection_momentum(supply, chamber)
-    # Exact impulse: the main face at its own static density (the main
-    # stream's 1200 K stagnation T at the face pressure and mass flux), the
-    # outlet at the chamber's.
-    rho_face = chamber_static_density(P_face, 1200.0, m_main, A, list(X_AIR))
     lhs = P_face * A + m_main**2 / (rho_face * A) + S
     rhs = P * A + m_out**2 / (rho * A)
     # Relative to the momentum fluxes, not to P A, which would hide an error.
@@ -192,7 +197,7 @@ def test_a_compressible_liner_balances_the_exact_impulse() -> None:
     g.add_node(_pb("gas_in", 1.25e5, 1200.0))
     g.add_node(_pb("exit", 1.0e5, 1200.0))
     g.add_node(_pb("cool", 1.35e5, 600.0))
-    g.add_node(MomentumChamberNode("ch", main_inlet="duct"))
+    g.add_node(MomentumChamberNode("ch", main_inlet="duct", regime="compressible"))
     for eid, a, b in (("duct", "gas_in", "ch"), ("tail", "ch", "exit")):
         g.add_element(
             ChannelElement(

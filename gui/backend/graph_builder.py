@@ -1512,4 +1512,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             net.thermal_coupling_enabled = True
 
+    # Every momentum chamber -- drawn, or inserted at a junction port, an edge
+    # junction or a merge -- runs the network's regime (#588): an
+    # incompressible network keeps no sonic limit hidden in its chambers.
+    for node in net.nodes.values():
+        if isinstance(node, MomentumChamberNode):
+            node.regime = schema.solver_settings.global_regime
+
     return net

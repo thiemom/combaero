@@ -300,7 +300,7 @@ def test_node_reports_the_static_state_its_closure_used() -> None:
     not from its stagnation T."""
     graph = FlowNetwork()
     graph.add_node(MassFlowBoundary("inlet", m_dot=0.5, Tt=600.0, Y=cb.species.dry_air_mass()))
-    chamber = MomentumChamberNode("chamber", area=3e-3)
+    chamber = MomentumChamberNode("chamber", area=3e-3, regime="compressible")
     graph.add_node(chamber)
     graph.add_node(PressureBoundary("outlet", Pt=101325.0))
     graph.add_element(
@@ -323,3 +323,28 @@ def test_node_reports_the_static_state_its_closure_used() -> None:
     assert sol["chamber.rho"] == pytest.approx(cb.density(T_static, P, _X_AIR), rel=1e-9)
     assert sol["chamber.mach"] == pytest.approx(v / cb.speed_of_sound(T_static, _X_AIR), rel=1e-8)
     assert sol["chamber.mach"] > 0.2
+
+
+def test_an_incompressible_chamber_reports_its_low_mach_state() -> None:
+    """The incompressible closure (#588): the static state IS the stagnation
+    one and Pt = P + v^2 rho / 2 at rho(P, T0) -- no static-T drop, no sonic
+    limit. The node reports exactly the state its residual used."""
+    graph = FlowNetwork()
+    graph.add_node(MassFlowBoundary("inlet", m_dot=0.5, Tt=600.0, Y=cb.species.dry_air_mass()))
+    chamber = MomentumChamberNode("chamber", area=3e-3, regime="incompressible")
+    graph.add_node(chamber)
+    graph.add_node(PressureBoundary("outlet", Pt=101325.0))
+    graph.add_element(
+        OrificeElement("orf1", "inlet", "chamber", Cd=0.6, diameter=0.04, correlation="fixed")
+    )
+    graph.add_element(
+        OrificeElement("orf2", "chamber", "outlet", Cd=0.6, diameter=0.04, correlation="fixed")
+    )
+    sol = NetworkSolver(graph).solve()
+    assert sol["__success__"]
+    T0, P, Pt = sol["chamber.T"], sol["chamber.P"], sol["chamber.Pt"]
+    rho = float(cb.density(T0, P, _X_AIR))
+    v = 0.5 / (rho * chamber.area)
+    assert sol["chamber.T_static"] == pytest.approx(T0, rel=1e-12)
+    assert sol["chamber.rho"] == pytest.approx(rho, rel=1e-9)
+    assert Pt - P == pytest.approx(0.5 * rho * v * v, rel=1e-9)

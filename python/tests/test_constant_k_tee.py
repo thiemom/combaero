@@ -14,7 +14,7 @@ import math
 
 import numpy as np
 import pytest
-from _chamber_static import chamber_isentropic_rise, chamber_static_density
+from _chamber_static import chamber_isentropic_rise
 from scipy.optimize._numdiff import approx_derivative
 
 import combaero as cb
@@ -119,24 +119,23 @@ def _merge_net(K_straight: float, K_branch: float) -> FlowNetwork:
 
 
 def _q_com(sol: dict, m_key: str, p_key: str) -> float:
-    """The common port's reference head: its isentropic stagnation rise.
+    """The common port's reference head, in the ports' regime.
 
     ConstantKTeeElement references K to whatever its port MomentumChamberNodes
-    call dynamic head, and those close on the isentropic stagnation state
-    rather than on 0.5*rho*u^2 (issue #357), of the STATIC state the chamber's
-    stagnation T implies (#576). K is tabulated as dPt/q_dyn, so the
-    reference has to follow the ports. The incompressible form is the
-    low-Mach limit this reduces to, kept below as the cross-check.
+    call dynamic head. These networks are incompressible throughout, and the
+    ports follow (#588): q = m^2 / (2 rho A^2) at rho(P, T0). The compressible
+    ports close on the isentropic stagnation rise instead (#357, #576), which
+    this reduces to as M -> 0 -- kept below as the cross-check.
     """
     X_air = list(cb.mass_to_mole(_DRY_AIR_Y))
     T0 = 300.0
     P = sol[p_key]
     m = sol[m_key]
-    q = chamber_isentropic_rise(P, T0, m, _A, X_air)
-    rho = chamber_static_density(P, T0, m, _A, X_air)
-    assert q > m * m / (2.0 * rho * _A * _A), (
-        "the compressible rise must exceed the incompressible one at M > 0"
-    )
+    rho = float(cb.density(T0, P, X_air))
+    q = m * m / (2.0 * rho * _A * _A)
+    q_isentropic = chamber_isentropic_rise(P, T0, m, _A, X_air)
+    assert q_isentropic > q, "the compressible rise must exceed its low-Mach limit at M > 0"
+    assert q_isentropic == pytest.approx(q, rel=0.02)
     return q
 
 

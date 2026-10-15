@@ -106,11 +106,19 @@ struct MergeFaceState {
   double dPtf_dP = 0.0, dPtf_dT = 0.0, dPtf_dT_main = 0.0;
 };
 
+//
+// incompressible (#588): the low-Mach limit. Both densities are taken at the
+// chamber pressure and the stagnation temperatures (rho = P / (R T0)), so the
+// impulse is linear in P_f and there is no root to choose and nothing to
+// choke:
+//   P_f  = P + m_out^2 / (rho A^2) - J / A - m_main^2 / (rho_main A^2)
+//   Pt_f = P_f + m_main^2 / (2 rho_main A^2)
 MergeFaceState chamber_merge_face_state(double m_main, double T_main,
                                         const std::vector<double>& X_main,
                                         double m_out, double P, double T,
                                         const std::vector<double>& X,
-                                        double side_momentum, double area);
+                                        double side_momentum, double area,
+                                        bool incompressible = false);
 
 // Streamwise impulse of a jet discharged from stagnation (Pt, Tt) into static
 // P, per unit cos(theta): J = m w.

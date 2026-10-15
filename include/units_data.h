@@ -345,7 +345,7 @@ inline constexpr Entry function_units[] = {
     {"SENSIBLE_ENTHALPY_REF_T", "-", "K"},
     {"chamber_merge_face_state",
      "m_main: kg/s, T_main: K, X_main: -, m_out: kg/s, P: Pa, T: K, X: -, "
-     "side_momentum: N, area: m^2",
+     "side_momentum: N, area: m^2, incompressible: -",
      "MergeFaceState"},
     {"MergeFaceState::P_face", "Pa", "Pa"},
     {"MergeFaceState::Pt_face", "Pa", "Pa"},

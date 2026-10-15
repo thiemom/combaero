@@ -1450,7 +1450,7 @@ using combaero::chamber_static_state;
 
 MomentumChamberResult momentum_chamber_residual_and_jacobian(
     double P, double P_total, double m_dot, double T0,
-    const std::vector<double> &Y, double area) {
+    const std::vector<double> &Y, double area, bool incompressible) {
   // Momentum chamber: P_total = P0(P, T, M), the isentropic stagnation
   // pressure of the chamber's static state. The node carries the MIXED
   // STAGNATION temperature T0 (its inflows mix as (m, Tt, Pt, Y) streams), so
@@ -1476,6 +1476,58 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   const std::vector<double> X = combaero::mass_to_mole(combaero::normalize_fractions(Y_safe));
 
   MomentumChamberResult res;
+
+  if (incompressible) {
+    // Low-Mach limit (#588): T_static = T0, rho = P / (R T0), and
+    // Pt = P + q with q = G^2 / (2 rho), G = |m_dot| / A. Even in m_dot like
+    // the compressible form; q scales as T0 / P through 1 / rho.
+    const double G = (area > 1e-12) ? std::abs(m_dot) / area : 0.0;
+    const double sgn = (m_dot >= 0.0) ? 1.0 : -1.0;
+    const double R_gas = combaero::specific_gas_constant(X);
+    const double rho = P / (R_gas * T0);
+    const double q = 0.5 * G * G / rho;
+    res.residual = P_total - P - q;
+    res.d_res_dP_total = 1.0;
+    res.d_res_dP = -1.0 + q / P;
+    res.d_res_dT = -q / T0;
+    res.d_res_dmdot = (area > 1e-12) ? -(G / rho) * sgn / area : 0.0;
+    res.T_static = T0;
+    res.q_dyn = q;
+    res.M = (G / rho) / combaero::speed_of_sound(T0, X);
+    res.rho_static = rho;
+    res.drho_dP = rho / P;
+    res.drho_dT = -rho / T0;
+    res.drho_dmdot = 0.0;
+    // Y moves R alone here: q ~ R and rho ~ 1 / R, by a central difference
+    // on R as the compressible branch does on its full closure.
+    res.d_res_dY.assign(Y.size(), 0.0);
+    res.drho_dY.assign(Y.size(), 0.0);
+    if (sum_Y >= eps) {
+      const double hY = 1e-4 * sum_Y;
+      auto R_at = [&](const std::vector<double> &Y_probe) {
+        return combaero::specific_gas_constant(
+            combaero::mass_to_mole(combaero::normalize_fractions(Y_probe)));
+      };
+      for (std::size_t k = 0; k < Y.size(); ++k) {
+        if (!(Y[k] > 0.0)) {
+          continue;
+        }
+        std::vector<double> Y_p = Y;
+        Y_p[k] += hY;
+        double dR = 0.0;
+        if (Y[k] > hY) {
+          std::vector<double> Y_m = Y;
+          Y_m[k] -= hY;
+          dR = (R_at(Y_p) - R_at(Y_m)) / (2.0 * hY);
+        } else {
+          dR = (R_at(Y_p) - R_gas) / hY;
+        }
+        res.d_res_dY[k] = -q / R_gas * dR;
+        res.drho_dY[k] = -rho / R_gas * dR;
+      }
+    }
+    return res;
+  }
 
   // Compressible stagnation closure (issue #357): Pt = P * exp((s(T0) -
   // s(T)) / R), entropy conservation with variable cp, rather than the

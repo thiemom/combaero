@@ -154,6 +154,8 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         # solved (#576); drho_dp includes the static-T shift with P.
         dens = self.port_densities(states)
         rho = [r for r, _ in dens]
+        # For the energy check: the densities the rows used (#588).
+        self._last_port_rho = list(rho)
         # outer_mdot: the connecting elements' own flows; port flow = sign * outer.
         outer = [float(m) * float(s) for m, s in zip(port_mdots, self._port_signs, strict=True)]
         drho_dp = [
@@ -251,8 +253,16 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         ``sum_in m_k |v_k|^2/2 - M |V|^2/2 + sum_out m_j |v_j - V|^2/2 >= 0``
         (Jensen on the mass-weighted mean, plus a sum of squares). What this
         guards is the SOLVE: a stalled state reported as converged, or a
-        future change to the rows. Pt is used mass-weighted, as the other
-        junctions do, because the solution dict carries no density.
+        future change to the rows.
+
+        Measured as the closure's guarantee is stated: volumetrically,
+        ``sum f_k (Pt_k - p_jn) / rho_k``, with the port densities the rows
+        used. Mass-weighted Pt (the fallback, when no densities are cached) is
+        not conserved by a lossless split whose ports differ in density: with
+        incompressible ports the f = 0 split sits exactly at zero dissipation
+        and their 1e-3 density spread put mass-weighted Pt 1.1e-7 POSITIVE,
+        refused at 1e-9 (#588). The scale stays the mass-weighted Pt's, so
+        the bound is no looser.
         """
         flows: list[float] = []
         pts: list[float] = []
@@ -263,8 +273,14 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
                 return True
             flows.append(float(self._port_signs[i]) * float(sol[m_key]))
             pts.append(float(sol[pt_key]))
-        net_outflow_of_energy = sum(f * pt for f, pt in zip(flows, pts, strict=True))
         scale = sum(abs(f) for f in flows) * max(abs(pt) for pt in pts)
+        rho = getattr(self, "_last_port_rho", None)
+        p_jn = sol.get(f"{self.id}.P_jct")
+        if rho is not None and len(rho) == self.N and p_jn is not None and min(rho) > 0.0:
+            p_jn = float(p_jn)
+            net_outflow = sum(f * (pt - p_jn) / r for f, pt, r in zip(flows, pts, rho, strict=True))
+            return net_outflow <= energy_rel_tol * scale / min(rho)
+        net_outflow_of_energy = sum(f * pt for f, pt in zip(flows, pts, strict=True))
         return net_outflow_of_energy <= energy_rel_tol * scale
 
     def diagnostics(

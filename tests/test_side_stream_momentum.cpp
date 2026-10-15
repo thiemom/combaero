@@ -101,6 +101,65 @@ TEST(ChamberMergeFace, DerivativesMatchCentralDifferences) {
   }
 }
 
+// ---- incompressible face (#588) ---------------------------------------------
+
+TEST(ChamberMergeFaceIncompressible, IsTheImpulseAtChamberPressureDensities) {
+  const auto X = air();
+  const double mm = 0.8, mo = 0.95, J = 12.0, P = 1.6e5, T = 1040.0, Tm = 1150.0;
+  const double A = 0.01;
+  const auto r = chamber_merge_face_state(mm, Tm, X, mo, P, T, X, J, A, true);
+  const double rho = combaero::density(T, P, X);
+  const double rho_m = combaero::density(Tm, P, X);
+  const double Pf = P + mo * mo / (rho * A * A) - J / A - mm * mm / (rho_m * A * A);
+  EXPECT_NEAR(r.P_face, Pf, 1e-9 * P);
+  EXPECT_NEAR(r.Pt_face - r.P_face, 0.5 * mm * mm / (rho_m * A * A), 1e-9 * P);
+  EXPECT_FALSE(r.choked);
+}
+
+TEST(ChamberMergeFaceIncompressible, ApproachesTheCompressibleFaceAsMachSquared) {
+  const auto X = air();
+  const double P = 1.0e5, T = 600.0, A = 0.01;
+  const double rho = combaero::density(T, P, X);
+  const double a = combaero::speed_of_sound(T, X);
+  double prev = 0.0;
+  for (double M : {0.1, 0.05, 0.025}) {
+    const double mo = M * a * rho * A, mm = 0.8 * mo;
+    const auto ci = chamber_merge_face_state(mm, T, X, mo, P, T, X, 0.0, A, true);
+    const auto cc = chamber_merge_face_state(mm, T, X, mo, P, T, X, 0.0, A);
+    const double rel = (ci.Pt_face - cc.Pt_face) / (cc.Pt_face - P);
+    if (prev != 0.0) {
+      EXPECT_NEAR(prev / rel, 4.0, 0.2) << M;
+    }
+    prev = rel;
+  }
+  EXPECT_LT(std::abs(prev), 1e-4);
+}
+
+TEST(ChamberMergeFaceIncompressible, DerivativesMatchCentralDifferences) {
+  const auto X = air();
+  const double mm = 0.8, mo = 0.95, J = 12.0, P = 1.6e5, T = 1040.0, Tm = 1150.0;
+  const double A = 0.01;
+  const auto r = chamber_merge_face_state(mm, Tm, X, mo, P, T, X, J, A, true);
+  auto f = [&](const double* v) {
+    return chamber_merge_face_state(v[0], v[1], X, v[2], v[3], v[4], X, v[5], A, true);
+  };
+  const double dPf[6] = {r.dPf_dm_main, r.dPf_dT_main, r.dPf_dm_out, r.dPf_dP, r.dPf_dT, r.dPf_dJ};
+  const double dPtf[6] = {r.dPtf_dm_main, r.dPtf_dT_main, r.dPtf_dm_out,
+                          r.dPtf_dP,      r.dPtf_dT,      r.dPtf_dJ};
+  const double h[6] = {1e-6, 1e-3, 1e-6, 1.0, 1e-3, 1e-4};
+  for (int k = 0; k < 6; ++k) {
+    double up[6] = {mm, Tm, mo, P, T, J}, dn[6] = {mm, Tm, mo, P, T, J};
+    up[k] += h[k];
+    dn[k] -= h[k];
+    const auto a = f(up);
+    const auto b = f(dn);
+    const double fdP = (a.P_face - b.P_face) / (2 * h[k]);
+    const double fdPt = (a.Pt_face - b.Pt_face) / (2 * h[k]);
+    EXPECT_NEAR(dPf[k], fdP, 1e-6 * std::abs(fdP) + 1e-8) << k;
+    EXPECT_NEAR(dPtf[k], fdPt, 1e-6 * std::abs(fdPt) + 1e-8) << k;
+  }
+}
+
 TEST(ChamberMergeFace, AnImpulseThatCannotBeCarriedSubsonicallyIsFlagged) {
   const auto X = air();
   // Side jets pushing harder than the main stream's impulse can absorb: the
