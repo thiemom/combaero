@@ -42,3 +42,17 @@ def test_a_flag_is_attributed_to_its_canvas_node(monkeypatch) -> None:
     assert res.success
     flags = [(f.element_id, f.owner_id, f.mach, f.limit) for f in res.incompressible_warnings]
     assert flags == [("ch_main", "ch_main", 0.31, 0.2)]
+
+
+def test_the_limit_is_a_gui_setting() -> None:
+    """solver_settings.incompressible_mach_limit reaches the solver; unset,
+    the library default (0.2) applies."""
+    schema = NetworkGraphSchema.model_validate(_schema("mynard", 0.05))
+    schema.solver_settings.global_regime = "incompressible"
+    schema.solver_settings.incompressible_mach_limit = 0.05
+    res = asyncio.run(solve(schema))
+    row = res.element_results["ch_main"].model_dump()
+    assert row["incompressible_mach_limit"] == pytest.approx(0.05)
+    assert _solve().element_results["ch_main"].model_dump()[
+        "incompressible_mach_limit"
+    ] == pytest.approx(0.2)

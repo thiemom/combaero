@@ -72,6 +72,8 @@ export interface RFState {
 		omega_rpm: number | null;
 		Nu_multiplier: number | null;
 		f_multiplier: number | null;
+		/** Mach above which an incompressible element is flagged (#588); null = 0.2. */
+		incompressible_mach_limit: number | null;
 		ambient_T: number | null;
 		ambient_P: number | null;
 		ambient_RH: number | null;
@@ -323,6 +325,7 @@ const useStore = create<RFState>((set, get) => ({
 		omega_rpm: null,
 		Nu_multiplier: null,
 		f_multiplier: null,
+		incompressible_mach_limit: null,
 		ambient_T: null,
 		ambient_P: null,
 		ambient_RH: null,
