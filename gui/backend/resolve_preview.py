@@ -94,7 +94,7 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
     if isinstance(item, ChannelElement):
         return {
             "diameter": FieldResolution(_f(item, "diameter"), _s(item, "_area_source")),
-            "Dh": FieldResolution(_f(item, "Dh"), _s(item, "_area_source")),
+            "Dh": FieldResolution(_f(item, "Dh"), _s(item, "_Dh_source")),
         }
     if isinstance(item, AreaChangeElement):
         return {
