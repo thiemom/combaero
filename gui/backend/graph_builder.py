@@ -31,6 +31,7 @@ from combaero.network import (
     WallLayer,
     WallNode,
 )
+from combaero.network.components import DEFAULT_CHANNEL_DIAMETER
 from combaero.network.ejector_element import EjectorElement
 from combaero.network.ideal_tee_element import IdealMomentumTeeElement
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
@@ -1247,6 +1248,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 length=data.L,
                 diameter=data.D,
                 Dh=data.Dh,
+                # Unset D inherits; with nothing to inherit from, a marked
+                # default keeps a freshly dropped chain solvable (#570).
+                default_diameter=DEFAULT_CHANNEL_DIAMETER,
                 roughness=data.roughness,
                 friction_model=data.friction_model,
                 surface=ConvectiveSurface(

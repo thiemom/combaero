@@ -59,7 +59,9 @@ const NetworkCanvas = () => {
 				data = {
 					...data,
 					L: 1.0,
-					D: 0.1,
+					// Unset: inherits from its neighbours, else the marked 0.1 m
+					// default (#570).
+					D: null,
 					roughness: 1e-5,
 					Nu_multiplier: 1.0,
 					f_multiplier: 1.0,
