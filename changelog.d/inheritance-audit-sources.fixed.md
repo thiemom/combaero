@@ -1,0 +1,1 @@
+- **Inheritance labels from the closing audit (#559).** A discrete loss that takes its area from the upstream channel now says so (it showed no source); a channel's unset `Dh` is reported as the circular `Dh = D` rather than "user". Labels only; resolved values are unchanged.
