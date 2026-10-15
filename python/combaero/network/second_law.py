@@ -393,6 +393,74 @@ class SecondLawReport:
                 record([eid], lambda eid=eid, element=element: self._two_port(eid, element), None)
         return out
 
+    def _wall_side_entropy(self, eid: str, Q_in: float) -> tuple[float, float, float]:
+        """Entropy [W/K] the heat ``Q_in`` brings into element ``eid``'s stream,
+        integrated along the stream's own temperature path (lin, low, high)."""
+        element = self.net.elements.get(eid)
+        if element is None:
+            raise ValueError(f"'{eid}' is a node, not a flowing element")
+        n_walls = sum(1 for w in self.net.walls.values() if eid in (w.element_a, w.element_b))
+        if n_walls > 1:
+            raise ValueError(f"'{eid}' carries {n_walls} walls; their heat paths are shared")
+        m = self._flow(eid)
+        if m is None or abs(m) < cb.MIXER_HEAT_MDOT_FLOOR:
+            raise ValueError(f"'{eid}' has no solved flow")
+        up, dn = (
+            (element.from_node, element.to_node)
+            if m >= 0.0
+            else (element.to_node, element.from_node)
+        )
+        inflow = self._stream_at(up, abs(m))
+        Tt_out = self._heated(inflow, Q_in)
+        M_in, M_out = self._element_mach(eid, up, dn, up == element.from_node)
+        return self._heat_entropy(abs(m), inflow.Tt, Tt_out, inflow.Y, M_in, M_out)
+
+    def wall_verdicts(self) -> dict[str, dict[str, Any]]:
+        """Each ThermalWall as its own control volume (#551).
+
+        The heat leaves side A's stream and enters side B's, each at that
+        stream's own temperature along its path, so the wall generates
+        ``sigma_wall = S_A + S_B`` [W/K] with ``S = integral dQ / T`` (negative
+        on the side giving heat). It is negative when heat runs from the
+        stream that is colder on average to the hotter one -- a wall model
+        with no capacity limit can do that (a hot stream cooled below the cold
+        stream's inlet). Evaluating it at the temperatures the wall model sees
+        instead would be vacuous: ``Q = U (T_A - T_B)`` makes ``Q (1/T_B -
+        1/T_A)`` non-negative by construction.
+
+        A necessary condition, not a sufficient one: the path means can stay
+        ordered while the end temperatures cross. ``sigma_wall_norm`` is
+        ``sigma_wall`` over the mean ``|S|`` of the two sides. A REPORT only.
+        """
+        out: dict[str, dict[str, Any]] = {}
+        for wid, wall in self.net.walls.items():
+            Q = self.sol.get(f"{wid}.Q")
+            if Q is None:
+                out[wid] = {"verdict": "not_checked", "reason": "no heat solved for this wall"}
+                continue
+            try:
+                # Q > 0 runs A -> B.
+                S_a = self._wall_side_entropy(wall.element_a, -float(Q))
+                S_b = self._wall_side_entropy(wall.element_b, float(Q))
+            except (ValueError, RuntimeError) as exc:
+                out[wid] = {"verdict": "not_checked", "reason": f"cannot be evaluated: {exc}"}
+                continue
+            scale = 0.5 * (abs(S_a[0]) + abs(S_b[0]))
+            if scale <= 0.0:
+                out[wid] = {"verdict": "pass", "sigma_wall": 0.0, "sigma_wall_norm": 0.0}
+                continue
+            sigma = S_a[0] + S_b[0]
+            # The most favourable paths: the largest entropy on both sides.
+            sigma_high = S_a[2] + S_b[2]
+            out[wid] = {
+                "verdict": "pass" if sigma_high / scale >= -SIGMA_TOL else "fail",
+                "sigma_wall": sigma,
+                "sigma_wall_norm": sigma / scale,
+                "sigma_wall_norm_low": (S_a[1] + S_b[1]) / scale,
+                "sigma_wall_norm_high": sigma_high / scale,
+            }
+        return out
+
     def ledger(self) -> dict[str, Any]:
         """Mass and energy over the network's control volume."""
         rows: list[dict[str, Any]] = []

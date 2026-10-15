@@ -296,3 +296,72 @@ def test_heat_beyond_the_streams_enthalpy_is_refused_by_name() -> None:
     report = SecondLawReport.__new__(SecondLawReport)
     with pytest.raises(ValueError, match="more than the stream's enthalpy"):
         report._heated(_Stream(0.005, 1600.0, 2e5, Y_AIR), -18000.0)
+
+
+# --- each ThermalWall as its own control volume (#551) -----------------------
+
+
+def _hot_cold_wall(D, L, area_factor, Tt_hot, Tt_cold, pr, layer) -> FlowNetwork:
+    """A hot and a cold compressible channel coupled by a conductive wall --
+    the #551 stress topology (tmp/stress/gen.py hot_cold_*), parameters fixed."""
+    from combaero.network import MomentumChamberNode
+
+    g = FlowNetwork()
+    P = 3e5
+    g.add_node(PressureBoundary("hi", Pt=P, Tt=Tt_hot, Y=Y_AIR))
+    g.add_node(PressureBoundary("ci", Pt=P, Tt=Tt_cold, Y=Y_AIR))
+    g.add_node(PressureBoundary("ho", Pt=P * pr, Tt=300.0, Y=Y_AIR))
+    g.add_node(PressureBoundary("co", Pt=P * pr, Tt=300.0, Y=Y_AIR))
+    g.add_node(MomentumChamberNode("hm", area=math.pi * D * D / 4))
+    g.add_node(MomentumChamberNode("cm", area=math.pi * D * D / 4))
+    area = math.pi * D * L * area_factor
+    for s in ("h", "c"):
+        g.add_element(
+            ChannelElement(
+                f"{s}ch",
+                f"{s}i",
+                f"{s}m",
+                length=L,
+                diameter=D,
+                roughness=0.0,
+                regime="compressible",
+                surface=ConvectiveSurface(area=area),
+            )
+        )
+        g.add_element(
+            ChannelElement(
+                f"{s}x",
+                f"{s}m",
+                f"{s}o",
+                length=0.02,
+                diameter=D,
+                roughness=0.0,
+                regime="compressible",
+            )
+        )
+    g.add_wall(ThermalWall(id="w", element_a="hch", element_b="cch", layers=[WallLayer(*layer)]))
+    return g
+
+
+def test_wall_check_fails_a_hot_stream_cooled_below_the_cold_inlet():
+    """#551 seed 23: the solve succeeds but the uncapped wall cools the
+    1600 K stream to ~300 K against a 400 K cold inlet. Heat then runs from the
+    stream that is colder on average, so the wall's own entropy generation is
+    negative even on the most favourable Mach path."""
+    r = _solve(_hot_cold_wall(0.006, 0.2, 5.0, 1600.0, 400.0, 0.7, (0.0005, 200.0)), timeout=20.0)
+    assert r["__success__"]
+    w = r["__second_law_walls__"]["w"]
+    assert w["verdict"] == "fail"
+    assert w["sigma_wall_norm_high"] < -SIGMA_TOL
+    assert r["__second_law_wall_failures__"] == ["w"]
+
+
+def test_wall_check_passes_a_physical_heat_exchange():
+    """A modest wall (1400 K / 300 K streams, 2 mm at k = 10): heat runs hot to
+    cold and the wall generates entropy."""
+    r = _solve(_hot_cold_wall(0.012, 1.0, 1.0, 1400.0, 300.0, 0.75, (0.002, 10.0)), timeout=20.0)
+    assert r["__success__"]
+    w = r["__second_law_walls__"]["w"]
+    assert w["verdict"] == "pass"
+    assert w["sigma_wall"] > 0.0
+    assert r["__second_law_wall_failures__"] == []

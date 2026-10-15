@@ -783,6 +783,8 @@ bookkeeping keys. Five of them say what happened:
 | `__worst_residuals__` | `list[dict]` | the rows carrying the residual, largest first |
 | `__second_law__` | `dict[str, dict]` | per element: `verdict` (`"pass"`, `"fail"`, `"not_checked"` with a `reason`), `sigma` [W/K], `sigma_norm` [-] and its band `sigma_norm_low`/`_high`; chain members carry their `group`. **Report only** (#545): it never changes `__success__`. |
 | `__second_law_failures__` | `list[str]` | ids whose verdict is `"fail"` |
+| `__second_law_walls__` | `dict[str, dict]` | per ThermalWall, the wall as its own control volume (#551): `verdict`, `sigma_wall` [W/K] = the entropy the heat carries into side B's stream minus what it took from side A's, each integrated along that stream's own temperature path; `sigma_wall_norm` (over the mean \|S\| of the two sides) and its band `_low`/`_high`. Negative when heat runs from the stream that is colder on average. A necessary condition only (end temperatures can cross while the path means do not). **Report only.** |
+| `__second_law_wall_failures__` | `list[str]` | wall ids whose verdict is `"fail"` |
 | `__ledger__` | `dict` | mass and energy over the network's control volume: `streams` (one row per crossing, `m_dot_in` > 0 entering), `m_dot_in/out`, `H_in/out`, `Q_given`, `Q_wall_out`, `Q_withheld`, `mass_closure(_rel)`, `energy_closure(_rel)`. Empty when the root finder did not converge. |
 
 **Second law per element (#545).** Each element's control volume must not

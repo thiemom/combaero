@@ -3815,12 +3815,14 @@ class NetworkSolver:
         # has proven itself. Evaluated where the root finder converged; a
         # diverged iterate has no balance worth reporting.
         verdicts: dict[str, dict[str, Any]] = {}
+        wall_verdicts: dict[str, dict[str, Any]] = {}
         ledger: dict[str, Any] = {}
         if converged:
             from .second_law import SecondLawReport
 
             report = SecondLawReport(self, final_x, sol_dict)
             verdicts = report.element_verdicts()
+            wall_verdicts = report.wall_verdicts()
             try:
                 ledger = report.ledger()
             except (ValueError, RuntimeError) as exc:
@@ -3835,6 +3837,12 @@ class NetworkSolver:
         sol_dict["__second_law__"] = verdicts
         sol_dict["__second_law_failures__"] = sorted(
             eid for eid, v in verdicts.items() if v["verdict"] == "fail"
+        )
+        # Each ThermalWall as its own control volume (#551), kept apart from the
+        # per-element verdicts the GUI attributes to canvas elements.
+        sol_dict["__second_law_walls__"] = wall_verdicts
+        sol_dict["__second_law_wall_failures__"] = sorted(
+            wid for wid, v in wall_verdicts.items() if v["verdict"] == "fail"
         )
         sol_dict["__ledger__"] = ledger
 
