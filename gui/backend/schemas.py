@@ -472,6 +472,12 @@ class EjectorData(BaseModel):
     # Multiplies the lossless mixed stagnation pressure to give the critical
     # back pressure P_c*. 1.0 = no artificial loss (not fitted to data).
     recovery_efficiency: float = 1.0
+    # Incompressible regime only (#588): Sanger's loss coefficients. None on the
+    # nozzle / suction = the compressible nozzle efficiencies as K = 1/eta - 1.
+    k_nozzle: float | None = Field(default=None, ge=0.0)
+    k_suction: float | None = Field(default=None, ge=0.0)
+    k_throat: float | None = Field(default=None, ge=0.0)
+    k_diffuser: float | None = Field(default=None, ge=0.0)
     initial_guess: dict[str, float] = Field(default_factory=dict)
 
     @field_validator("throat_area", "nozzle_exit_area", mode="before")
@@ -584,6 +590,10 @@ class SolverSettings(BaseModel):
     f_multiplier: float | None = (
         None  # global friction scale; stacks multiplicatively with per-element
     )
+    # Mach above which an element on an incompressible closure is reported
+    # outside its validity (#588, report only). None = the library default,
+    # combaero.network.compressibility.INCOMPRESSIBLE_MACH_LIMIT (0.2).
+    incompressible_mach_limit: float | None = Field(default=None, gt=0.0)
     ambient_T: float | None = None  # ISO 2314: 288.15 K; overrides per-node value when humid_air
     ambient_P: float | None = None  # ISO 2314: 101325 Pa; overrides per-node value when humid_air
     ambient_RH: float | None = (

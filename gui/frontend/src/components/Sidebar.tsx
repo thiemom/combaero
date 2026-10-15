@@ -373,6 +373,27 @@ const Sidebar = () => {
 				</div>
 				<div className="flex flex-col gap-1">
 					<label className="text-[10px] font-bold text-gray-400 uppercase">
+						Incompressible Mach Limit
+					</label>
+					<NumericInput
+						className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200"
+						value={solverSettings.incompressible_mach_limit ?? null}
+						onChange={(val) =>
+							updateSolverSettings({ incompressible_mach_limit: val })
+						}
+						onClear={() =>
+							updateSolverSettings({ incompressible_mach_limit: null })
+						}
+						min={0}
+						placeholder="0.2"
+					/>
+					<span className="text-[9px] text-stone-400">
+						Flags elements running incompressible above this Mach (report only;
+						~4% error on a channel at 0.2)
+					</span>
+				</div>
+				<div className="flex flex-col gap-1">
+					<label className="text-[10px] font-bold text-gray-400 uppercase">
 						Init Strategy
 					</label>
 					<select

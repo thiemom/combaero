@@ -1160,6 +1160,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 # The network's regime (#588): incompressible is Sanger's
                 # jet pump, lossless apart from mixing.
                 regime=schema.solver_settings.global_regime,
+                k_nozzle=_ed.k_nozzle,
+                k_suction=_ed.k_suction,
+                k_throat=_ed.k_throat or 0.0,
+                k_diffuser=_ed.k_diffuser or 0.0,
             )
             _ejector.initial_guess = _expand_initial_guess(_ed.initial_guess, elem_id)
             if not _ejector.initial_guess:

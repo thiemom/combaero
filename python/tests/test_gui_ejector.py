@@ -529,3 +529,23 @@ def test_a_lossy_jet_pump_needs_drive_and_generates_entropy():
     sl = raw["__second_law__"]["ej1"]
     assert sl["verdict"] == "pass"
     assert sl["sigma_norm"] > 1e-4
+
+
+def test_the_jet_pump_losses_reach_the_element():
+    """Sanger's K's from the Inspector (#588); blank nozzle / suction = the
+    compressible nozzle efficiencies as K = 1/eta - 1."""
+    from combaero.network._ejector_huang1999 import ETA_P, ETA_S
+
+    g = _jetpump_ejector_schema()
+    g["solver_settings"] = {"global_regime": "incompressible"}
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    ej = net.elements["ej1"]
+    assert ej.regime == "incompressible"
+    assert ej.k_nozzle == pytest.approx(1.0 / ETA_P - 1.0)
+    assert ej.k_suction == pytest.approx(1.0 / ETA_S - 1.0)
+    assert ej.k_throat == 0.0 and ej.k_diffuser == 0.0
+
+    data = next(n for n in g["nodes"] if n["id"] == "ej1")["data"]
+    data.update(k_nozzle=0.008, k_suction=0.09, k_throat=0.076, k_diffuser=0.079)
+    ej = build_network_from_schema(NetworkGraphSchema(**g)).elements["ej1"]
+    assert (ej.k_nozzle, ej.k_suction, ej.k_throat, ej.k_diffuser) == (0.008, 0.09, 0.076, 0.079)

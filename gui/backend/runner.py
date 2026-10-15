@@ -569,6 +569,8 @@ class NetworkRunner:
 
         net = build_network_from_schema(schema)
         solver = NetworkSolver(net)
+        if schema.solver_settings.incompressible_mach_limit is not None:
+            solver.incompressible_mach_limit = schema.solver_settings.incompressible_mach_limit
         x0_array: np.ndarray | None = None
         if _x0 is not None:
             x0_array = np.asarray(_x0)

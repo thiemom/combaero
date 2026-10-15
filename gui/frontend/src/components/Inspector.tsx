@@ -2154,6 +2154,48 @@ const Inspector = () => {
 								Multiplies mixed stagnation P to give P_c*; 1.0 = no loss
 							</span>
 						</div>
+						{solverSettings.global_regime === "incompressible" && (
+							<div className="flex flex-col gap-1 rounded border border-stone-200 p-2">
+								<div className="text-[10px] font-bold text-gray-500 uppercase">
+									Jet-pump losses (incompressible)
+								</div>
+								<span className="text-[9px] text-stone-400">
+									Sanger&apos;s K on each dynamic head. Empty nozzle / suction =
+									the compressible nozzle efficiencies (K = 1/η − 1), so both
+									regimes agree at low Mach.
+								</span>
+								{(
+									[
+										["k_nozzle", "K nozzle", "0.053"],
+										["k_suction", "K suction", "0.176"],
+										["k_throat", "K throat", "0"],
+										["k_diffuser", "K diffuser", "0"],
+									] as const
+								).map(([key, label, ph]) => (
+									<div key={key} className="flex items-center gap-2">
+										<label
+											htmlFor={`${key}_${selectedNode.id}`}
+											className="text-[10px] text-gray-500 w-20 shrink-0"
+										>
+											{label}
+										</label>
+										<NumericInput
+											id={`${key}_${selectedNode.id}`}
+											className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1 min-w-0"
+											value={selectedNode.data[key] ?? null}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { [key]: val })
+											}
+											onClear={() =>
+												updateNodeData(selectedNode.id, { [key]: null })
+											}
+											min={0}
+											placeholder={ph}
+										/>
+									</div>
+								))}
+							</div>
+						)}
 						{selectedNode.data.result && (
 							<div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-xs">
 								<div className="font-bold uppercase text-stone-400 mb-1 text-[9px]">
@@ -2165,15 +2207,39 @@ const Inspector = () => {
 										{(selectedNode.data.result.omega ?? 0).toFixed(4)}
 									</span>
 								</div>
-								<div className="flex justify-between">
-									<span className="text-stone-500">P_c*</span>
-									<span className="font-mono font-bold">
-										{(
-											(selectedNode.data.result.p_c_star_pa ?? 0) / 1000
-										).toFixed(2)}{" "}
-										kPa
-									</span>
-								</div>
+								{selectedNode.data.result.p_c_star_pa != null && (
+									<div className="flex justify-between">
+										<span className="text-stone-500">P_c*</span>
+										<span className="font-mono font-bold">
+											{(selectedNode.data.result.p_c_star_pa / 1000).toFixed(2)}{" "}
+											kPa
+										</span>
+									</div>
+								)}
+								{selectedNode.data.result.head_ratio_N != null && (
+									<div className="flex justify-between">
+										<span className="text-stone-500">Head ratio N</span>
+										<span className="font-mono font-bold">
+											{selectedNode.data.result.head_ratio_N.toFixed(4)}
+										</span>
+									</div>
+								)}
+								{selectedNode.data.result.efficiency != null && (
+									<div className="flex justify-between">
+										<span className="text-stone-500">Efficiency M·N</span>
+										<span className="font-mono font-bold">
+											{(selectedNode.data.result.efficiency * 100).toFixed(1)} %
+										</span>
+									</div>
+								)}
+								{selectedNode.data.result.mach_jet != null && (
+									<div className="flex justify-between">
+										<span className="text-stone-500">Jet Mach</span>
+										<span className="font-mono font-bold">
+											{selectedNode.data.result.mach_jet.toFixed(3)}
+										</span>
+									</div>
+								)}
 							</div>
 						)}
 					</div>
