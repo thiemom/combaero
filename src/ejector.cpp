@@ -139,7 +139,8 @@ EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
 
 EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
     double p_g_val, double t_g_val, double p_e_val, double t_e_val,
-    double p_py_val, double omega_val, double gamma, double recovery_efficiency) {
+    double p_py_val, double omega_val, double gamma, double recovery_efficiency,
+    double eta_primary, double eta_secondary) {
   // Seeds: 0=p_g, 1=t_g, 2=p_e, 3=t_e, 4=p_py, 5=omega.
   using D = DualN<6>;
   D p_g = D::seed(p_g_val, 0);
@@ -168,8 +169,24 @@ EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
     const D r = dpos_floor(p_py / p0, kRatioFloor);
     return dsqrt(dpos_floor((gp1 / gm1) * (1.0 - dpow(r, k)), kLambdaSqFloor));
   };
-  D lambda1 = lambda_of(p_g);
-  D lambda2 = lambda_of(p_e);
+  // The velocities the nozzles deliver (#588): lambda = sqrt(eta) lambda_is,
+  // each stream at the stagnation pressure that velocity implies at P_py,
+  // p0 = p_supply pi(lambda_is) / pi(lambda) (= P_py / pi(lambda) in the
+  // domain; = p_supply exactly at eta = 1, floors included).
+  const double kpi = gamma / gm1;
+  auto pi_of = [&](const D& lam) {
+    return dpow(dpos_floor(1.0 - (gm1 / gp1) * lam * lam, kRatioFloor), kpi);
+  };
+  const D lambda1_is = lambda_of(p_g);
+  const D lambda2_is = lambda_of(p_e);
+  D lambda1 = std::sqrt(eta_primary) * lambda1_is;
+  D lambda2 = std::sqrt(eta_secondary) * lambda2_is;
+  if (eta_primary != 1.0) {
+    p_g = p_g * pi_of(lambda1_is) / pi_of(lambda1);
+  }
+  if (eta_secondary != 1.0) {
+    p_e = p_e * pi_of(lambda2_is) / pi_of(lambda2);
+  }
   gam = dpos_floor(gam, kRatioFloor);
   D theta21 = t_e / t_g;
 
@@ -528,7 +545,8 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
     ms_sec = ejector_chain<9>(
         sec.mdot, {{sec.dmdot_dp0, p_e}, {sec.dmdot_dt0, t_e}, {sec.dmdot_dp_py, p_py}});
     auto jp = ejector_jetpump_discharge_and_jacobian(
-        p_g_v, t_g_v, p_e_v, t_e_v, p_py_v, omega_eff.v, gamma, 1.0);
+        p_g_v, t_g_v, p_e_v, t_e_v, p_py_v, omega_eff.v, gamma, 1.0, eta_primary,
+        eta_secondary);
     p03_jet = ejector_chain<9>(jp.p03,
                                {{jp.dp03_dp_g, p_g},
                                 {jp.dp03_dt_g, t_g},

@@ -308,7 +308,10 @@ def test_ejector_runner_solves_unchoked_jet_pump_regime():
     assert mp == pytest.approx(0.0051, rel=1e-3)
     assert ms > 0.0  # entrained flow is drawn in (positive suction)
     omega = float(row["omega"].iloc[0])
-    assert 5.0 < omega < 9.0, f"expected jet-pump omega ~ 7, got {omega}"
+    # ~4.7: the nozzles' losses (Huang's eta 0.95 / 0.85) now cost drive. The
+    # mixing used to take isentropic velocities and so handed those losses
+    # back -- omega 6.62 at zero drive with zero entropy generation (#588).
+    assert 4.0 < omega < 5.5, f"expected jet-pump omega ~ 4.7, got {omega}"
     # Unchoked regime, not the double-choked artifact.
     assert float(row["s_choke"].iloc[0]) == pytest.approx(0.0, abs=1e-6)
     assert float(row["critical_mode"].iloc[0]) == 0.0
@@ -503,3 +506,20 @@ def test_outlet_port_chamber_takes_a3_when_the_pipe_inherits_it():
     net = build_network_from_schema(NetworkGraphSchema(**g))
     net.resolve_all_topology()
     assert net.nodes["__tee_jct__ej1_outlet"].area == pytest.approx(3.141592653589793 * 0.02**2)
+
+
+def test_a_lossy_jet_pump_needs_drive_and_generates_entropy():
+    """Suction and outlet at the same 1 atm, primary mass-fed: the nozzles'
+    losses (Huang's eta 0.95 / 0.85) must be paid by a primary drive, and the
+    element must generate entropy. The mixing used to take isentropic
+    velocities: it handed the losses back, held omega 6.62 with the primary
+    at exactly 1 atm and sigma = 0 (#588). Measured now: ~580 Pa of drive,
+    sigma_norm ~1e-3."""
+    runner = NetworkRunner.from_dict(_jetpump_ejector_schema())
+    res = runner.solve(timeout=120.0)
+    raw = res._raw
+    assert raw["__success__"], raw["__message__"]
+    assert raw["mc_p.Pt"] - 101325.0 > 300.0
+    sl = raw["__second_law__"]["ej1"]
+    assert sl["verdict"] == "pass"
+    assert sl["sigma_norm"] > 1e-4
