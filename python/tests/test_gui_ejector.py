@@ -476,3 +476,22 @@ def test_double_choked_ejector_behind_an_outlet_pipe_converges_to_the_critical_r
     row = df[df["id"] == "ej1"]
     assert bool(row["success"].iloc[0])
     assert float(row["omega"].iloc[0]) == pytest.approx(_critical_omega_bare_outlet(), rel=1e-6)
+
+
+def test_outlet_port_chamber_takes_a3_when_the_pipe_inherits_it():
+    """With both A_3 and the outlet pipe's D left to inherit, the pipe is
+    still unsized when the (auto) outlet port chamber resolves. Its area
+    search used to hop across the ejector to the primary inlet chamber and
+    size the outlet port at 0.05 m^2, running it as a near-plenum."""
+    g = _ejector_with_outlet_pipe(_solvable_ejector_schema(), None, None)
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    net.resolve_all_topology()
+    port = net.nodes["__tee_jct__ej1_outlet"]
+    a3 = net.elements["ej1"].mixing_area
+    assert port.area == pytest.approx(a3, rel=1e-12)
+    assert "ej1" in port._area_source
+    # An explicitly sized pipe keeps sizing the port chamber.
+    g = _ejector_with_outlet_pipe(_solvable_ejector_schema(), _MIXING, 0.04)
+    net = build_network_from_schema(NetworkGraphSchema(**g))
+    net.resolve_all_topology()
+    assert net.nodes["__tee_jct__ej1_outlet"].area == pytest.approx(3.141592653589793 * 0.02**2)

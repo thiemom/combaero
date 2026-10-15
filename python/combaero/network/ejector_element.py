@@ -111,6 +111,7 @@ import combaero as cb
 from combaero import _solver_tools
 from combaero.network._ejector_huang1999 import ETA_P, ETA_S, EjectorGeometry
 from combaero.network.components import (
+    MomentumChamberNode,
     MultiPortChamberBase,
     NetworkMixtureState,
     _element_area_facing,
@@ -280,7 +281,33 @@ class EjectorElement(MultiPortChamberBase):
             a3, ap1 = self.mixing_area, self.nozzle_exit_area
             self.port_areas = [ap1, a3 - ap1, a3]
             self._port_area_sources = ["user", self._mixing_source, self._mixing_source]
+        self._size_outlet_port_node(graph)
         super().resolve_topology(graph)
+
+    def _size_outlet_port_node(self, graph: Any) -> None:
+        """An auto-sized outlet port chamber takes A_3 unless a pipe sized it.
+
+        Nodes resolve before elements, so an outlet pipe whose D is itself
+        inherited from this ejector is still unsized when the port chamber
+        looks for an area. The chamber's search then hopped across the ejector
+        to ANOTHER port's chamber -- in the GUI default, the 0.05 m^2 primary
+        inlet chamber -- and the outlet ran as a near-plenum. The outlet port
+        face is the mixing-duct exit, so A_3 is its area; a chamber sized by an
+        explicit outlet pipe (source "channel ...") keeps the pipe's area.
+        """
+        node = graph.nodes.get(self.outlet_node)
+        if not isinstance(node, MomentumChamberNode) or not getattr(node, "_auto_area", False):
+            return
+        if str(getattr(node, "_area_source", "")).startswith("channel"):
+            return
+        if self.mixing_area is None:
+            return
+        source = f"EjectorElement '{self.id}' (A_3)"
+        node.area = float(self.mixing_area)
+        node.Dh = 2.0 * math.sqrt(node.area / math.pi)
+        node.surface.area = node.area
+        node._area_source = source
+        node._Dh_source = source
 
     def _outlet_pipe_area(self, graph: Any) -> tuple[float | None, str]:
         """The area of the element on the outside of the outlet port, unless
