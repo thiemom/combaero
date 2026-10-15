@@ -680,6 +680,15 @@ class SecondLawFlag(BaseModel):
     sigma_norm_high: float
 
 
+class IncompressibleFlag(BaseModel):
+    """An element on an incompressible closure above the Mach limit (#588)."""
+
+    element_id: str
+    owner_id: str
+    mach: float
+    limit: float
+
+
 class SolveResponse(BaseModel):
     success: bool
     message: str = ""
@@ -694,6 +703,9 @@ class SolveResponse(BaseModel):
     #: Report only (#545): elements that fail the second-law check, each
     #: attributed to the canvas node that owns it.
     second_law_failures: list[SecondLawFlag] = []
+    #: Report only (#588): elements on an incompressible closure running above
+    #: the solver's Mach limit, each attributed to its canvas node.
+    incompressible_warnings: list[IncompressibleFlag] = []
     #: Mass and energy over the network's control volume (empty if the root
     #: finder did not converge).
     ledger: dict = {}

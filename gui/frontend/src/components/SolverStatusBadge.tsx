@@ -2,6 +2,7 @@ import { CheckCircle, X, XCircle } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import useStore from "../store/useStore";
+import { summary } from "../utils/incompressible";
 import { balanceIsOpen, type Ledger } from "../utils/secondLaw";
 import BalanceModal from "./BalanceModal";
 import ConvergenceChart from "./ConvergenceChart";
@@ -39,6 +40,7 @@ const SolverStatusBadge: React.FC = () => {
 	if (!solveResults) return null;
 
 	const isSuccess = solveResults.success;
+	const incompressibleNote = summary(solveResults.incompressible_warnings);
 	const message =
 		solveResults.message ||
 		(isSuccess ? "Solve completed" : "Failed to converge");
@@ -84,6 +86,14 @@ const SolverStatusBadge: React.FC = () => {
 							</button>
 						)}
 						<BalanceLine onOpen={() => setShowBalance(true)} />
+						{incompressibleNote && (
+							<span
+								className="text-[10px] text-amber-700 mt-0.5"
+								title="Report only: the solution is unchanged. Above this Mach the incompressible closures drift from the compressible result (about 4% on a channel at Ma 0.2). A rule of thumb, not a guarantee -- the application stays your call."
+							>
+								{incompressibleNote}
+							</span>
+						)}
 					</div>
 					<button
 						type="button"

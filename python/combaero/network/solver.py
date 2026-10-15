@@ -336,6 +336,11 @@ class NetworkSolver:
         # init_strategy branches (e.g. analytical_pt_prop) and cleared
         # once the solve returns.
         self._init_overrides: dict[str, float] = {}
+        # Mach above which an element on an incompressible closure is
+        # reported outside its validity (#588; report only).
+        from .compressibility import INCOMPRESSIBLE_MACH_LIMIT
+
+        self.incompressible_mach_limit: float = INCOMPRESSIBLE_MACH_LIMIT
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -3955,6 +3960,22 @@ class NetworkSolver:
             wid for wid, v in wall_verdicts.items() if v["verdict"] == "fail"
         )
         sol_dict["__ledger__"] = ledger
+
+        # Incompressible validity (#588): each element on an incompressible
+        # closure against one Mach limit. REPORTED only, like the second law.
+        validity: dict[str, dict[str, Any]] = {}
+        if converged:
+            from .compressibility import validity_verdicts
+
+            validity = validity_verdicts(
+                self.network,
+                sol_dict.get("__element_diag__") or {},
+                float(self.incompressible_mach_limit),
+            )
+        sol_dict["__incompressible_validity__"] = validity
+        sol_dict["__incompressible_warnings__"] = sorted(
+            eid for eid, v in validity.items() if v["verdict"] == "warn"
+        )
 
         sol_dict["__complete_states__"] = self.extract_complete_states(sol_dict)
         sol_dict["__success__"] = success

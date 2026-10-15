@@ -1580,6 +1580,11 @@ class LazyJacobian(MutableMapping):
 
 
 class NetworkElement(ABC):
+    #: Diagnostics keys holding the element's highest internal Mach numbers,
+    #: for the incompressible validity report (#588). Empty: the element has
+    #: no incompressible closure, or does not report one.
+    validity_mach_keys: tuple[str, ...] = ()
+
     def __init__(self, id: str, from_node: str, to_node: str):
         self.id = id
         self.from_node = from_node
@@ -2633,6 +2638,9 @@ class OrificeElement(NetworkElement):
     the hole velocity and there is no beta. They are not interchangeable, and
     there is deliberately no 'Auto' arm choosing between them from geometry.
     """
+
+    # The jet: its vena-contracta Mach from the pressure ratio, not the bore's.
+    validity_mach_keys = ("mach_throat",)
 
     def __init__(
         self,
@@ -5069,6 +5077,9 @@ class ChannelElement(NetworkElement):
         approximated; ``test_channel_element_jacobian_fd.py`` pins this as a
         strict xfail carrying the magnitude.
     """
+
+    # The duct at both ends; the higher one decides.
+    validity_mach_keys = ("mach_in", "mach_out")
 
     def __init__(
         self,

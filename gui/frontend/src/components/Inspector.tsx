@@ -2,6 +2,7 @@ import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
+import { warningsFor } from "../utils/incompressible";
 import { inheritedField, inheritedNote } from "../utils/inheritance";
 import { nodeTypeLabel } from "../utils/nodeUtils";
 import {
@@ -347,6 +348,32 @@ const Inspector = () => {
 							without work or cooling to pay for it, which no passive element
 							can do. Usually a modelling gap (an area step or loss left out);
 							the solve is not rejected for it.
+						</div>
+					</div>
+				)}
+				{/* Incompressible validity (#588): an element on an incompressible
+				    closure running above the Mach limit. Reported only. */}
+				{warningsFor(selectedNode.id, solveResults?.incompressible_warnings)
+					.length > 0 && (
+					<div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-800">
+						<div className="font-bold uppercase mb-0.5">
+							Outside incompressible validity
+						</div>
+						{warningsFor(
+							selectedNode.id,
+							solveResults?.incompressible_warnings,
+						).map((f) => (
+							<div key={f.element_id} className="font-mono">
+								{f.element_id === selectedNode.id
+									? "this element"
+									: f.element_id}
+								: Ma = {f.mach.toFixed(3)} &gt; {f.limit}
+							</div>
+						))}
+						<div className="italic text-amber-700 mt-0.5">
+							An incompressible closure here drifts from the compressible result
+							as Ma² (about 4% on a channel at Ma 0.2, 13% at 0.4). The solve is
+							not rejected; set the regime to compressible where it matters.
 						</div>
 					</div>
 				)}

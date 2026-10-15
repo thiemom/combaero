@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { IncompressibleFlag } from "./utils/incompressible";
 import type { Ledger, SecondLawFlag } from "./utils/secondLaw";
 
 const API_BASE_URL = "";
@@ -38,6 +39,7 @@ export interface SolveResponse {
 	solver_settings_used?: Record<string, unknown>;
 	lm_started_at_eval?: number | null;
 	second_law_failures?: SecondLawFlag[];
+	incompressible_warnings?: IncompressibleFlag[];
 	ledger?: Ledger | Record<string, never>;
 }
 

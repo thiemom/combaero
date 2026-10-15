@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 import combaero as cb
 from combaero.network import NetworkSolver
 
-from . import second_law_view
+from . import second_law_view, validity_view
 from .graph_builder import build_network_from_schema
 from .messages import humanize
 from .resolve_preview import resolve_preview
@@ -162,6 +162,7 @@ async def solve(schema: NetworkGraphSchema):
             solver_settings_used=diag.get("solver_settings_used", {}),
             lm_started_at_eval=diag.get("lm_started_at_eval"),
             second_law_failures=second_law_view.failures(result, net, gui_ids),
+            incompressible_warnings=validity_view.warnings(result, net, gui_ids),
             ledger=second_law_view.ledger(result, net, gui_ids),
         )
     except TimeoutError:
