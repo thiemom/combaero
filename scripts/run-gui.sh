@@ -44,7 +44,9 @@ sleep 2
 echo "Starting Frontend (Vite)..."
 echo "NOTE: If this fails, run 'pnpm install' in gui/frontend first."
 cd gui/frontend
-pnpm run dev --port 5173 --host
+# Loopback only: a bare --host binds 0.0.0.0, which exposes the dev server on
+# the LAN and is refused under a sandboxed shell (#321).
+pnpm run dev --port 5173 --host 127.0.0.1
 
 # The script will wait here until Vite is stopped (Ctrl+C)
 # Cleanup is handled by the trap
