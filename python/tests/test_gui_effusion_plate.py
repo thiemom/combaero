@@ -65,7 +65,7 @@ def _liner_in(regime: str) -> dict:
 
 
 def test_the_default_liner_solves_with_a_chamber_gas_side() -> None:
-    # Incompressible: the compressible solve of this liner stalls (#582).
+    # Incompressible: the compressible solve of this liner stalls (#585).
     result = NetworkRunner.from_dict(_liner_in("incompressible")).solve(timeout=120.0)
     r = result._element_results["eff"].model_dump()
     assert r["success"]
@@ -74,10 +74,11 @@ def test_the_default_liner_solves_with_a_chamber_gas_side() -> None:
     assert 0.0 < r["eta_overall"] < 1.0
 
 
-@pytest.mark.xfail(strict=True, reason="#582: compressible default liner stalls")
+@pytest.mark.xfail(strict=True, reason="#585: compressible default liner stalls")
 def test_the_default_liner_solves_in_the_gui_default_regime() -> None:
-    """The GUI sends compressible by default; at M ~ 0.04 it should agree
-    with the incompressible solve, and today it stalls (#582)."""
+    """Compressible is the default to come (#585). At M ~ 0.04 it should agree
+    with the incompressible solve, and today it stalls (#585; its first two
+    causes were fixed in #587, #582)."""
     result = NetworkRunner.from_dict(_liner_in("compressible")).solve(timeout=120.0)
     assert result._element_results["eff"].model_dump()["success"]
 
