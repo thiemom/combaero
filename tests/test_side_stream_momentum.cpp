@@ -30,9 +30,13 @@ TEST(ChamberMergeFace, NoSideStreamsIsTheChamberItself) {
   const double m = 0.5, P = 2.0e5, T = 900.0, A = 0.005;
   const auto r = chamber_merge_face_state(m, T, X, m, P, T, X, 0.0, A);
   EXPECT_NEAR(r.P_face, P, 1e-9 * P);
-  const double rho = combaero::density(T, P, X);
-  const double M = m / (rho * A) / combaero::speed_of_sound(T, X);
-  EXPECT_NEAR(r.Pt_face, combaero::P0_from_static(P, T, M, X), 1e-6 * P);
+  // T is a stagnation temperature (#578): the face's static state is the
+  // chamber's, from the same energy solve.
+  const auto st = combaero::chamber_static_state(T, P, m / A, X);
+  const double rho = combaero::density(st.T, P, X);
+  const double M = m / (rho * A) / combaero::speed_of_sound(st.T, X);
+  EXPECT_NEAR(r.Pt_face, combaero::P0_from_static(P, st.T, M, X), 1e-6 * P);
+  EXPECT_NEAR(r.M_face, M, 1e-9);
   EXPECT_FALSE(r.choked);
 }
 
@@ -42,8 +46,15 @@ TEST(ChamberMergeFace, TheImpulseBalanceHoldsAtTheFaceDensity) {
   const double mm = 1.0, mo = 1.15, J = 25.0, P = 1.5e5, T = 1100.0, Tm = 1200.0;
   const double A = 0.01;
   const auto r = chamber_merge_face_state(mm, Tm, X, mo, P, T, X, J, A);
-  const double rho_f = combaero::density(Tm, r.P_face, X);
-  const double rho = combaero::density(T, P, X);
+  // Both temperatures are stagnation (#578): densities at the static states.
+  const double Tf = combaero::chamber_static_state(Tm, r.P_face, mm / A, X).T;
+  const double Ts = combaero::chamber_static_state(T, P, mo / A, X).T;
+  const double rho_f = combaero::density(Tf, r.P_face, X);
+  const double rho = combaero::density(Ts, P, X);
+  // Energy at the face: h(T0_main) = h(T_f) + u_f^2 / 2.
+  const double u_f = mm / (rho_f * A);
+  EXPECT_NEAR(combaero::h_mass(Tm, X) - combaero::h_mass(Tf, X), 0.5 * u_f * u_f,
+              1e-8 * 0.5 * u_f * u_f);
   const double lhs = r.P_face * A + mm * mm / (rho_f * A) + J;
   const double rhs = P * A + mo * mo / (rho * A);
   EXPECT_NEAR(lhs, rhs, 1e-9 * rhs);
@@ -61,7 +72,9 @@ TEST(ChamberMergeFace, LowMachIsTheIncompressibleMerge) {
 
 TEST(ChamberMergeFace, DerivativesMatchCentralDifferences) {
   const auto X = air();
-  const double mm = 0.8, mo = 0.95, J = 12.0, P = 1.6e5, T = 1000.0, Tm = 1150.0;
+  // T = 1000 K would straddle the NASA-polynomial breakpoint, where h(T)
+  // jumps slightly (#549) and a central difference picks the jump up.
+  const double mm = 0.8, mo = 0.95, J = 12.0, P = 1.6e5, T = 1040.0, Tm = 1150.0;
   const double A = 0.01;
   const auto r = chamber_merge_face_state(mm, Tm, X, mo, P, T, X, J, A);
   auto f = [&](double a, double b, double c, double d, double e2, double g) {

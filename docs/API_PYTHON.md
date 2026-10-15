@@ -926,7 +926,9 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
   - The node's `mach` and its reported properties (`rho`, `a`, `velocity`, `Re`, plus a new `T_static`) come from that static state.
   - `MomentumChamberNode.static_density(state)` returns `(rho, {name: d rho / d name})`. Junction elements (`MultiPortChamberBase.port_densities`) take their port densities from it, so a port's momentum rows and its node's Pt describe the same flow.
   - The chamber now passes up to the true choked flux. Before, T0 read as static capped it at 92 % of choked.
-  - Not yet static: the merge-chamber face state, the chamber's heat-transfer correlation inputs, and elements reading a chamber as their upstream static state (#578).
+  - The merge-chamber face state (`cb.chamber_merge_face_state`) takes both temperatures as stagnation and solves the face's and the outlet's static states; its sensitivities are analytic (#578).
+  - The chamber's heat-transfer correlation, and an effusion plate's gas-side density, use the chamber's static state (#578).
+  - Still read as static: an incompressible `ChannelElement` or a `BorderCarnotLossElement` whose upstream node is a chamber, and the legacy `TeeJunctionElement` (#578).
 
 #### Merge chamber: main inlet plus side streams (#471)
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from _chamber_static import chamber_static_density, chamber_static_T
 from scipy.optimize._numdiff import approx_derivative
 
 import combaero as cb
@@ -75,9 +76,10 @@ def test_the_solution_satisfies_the_control_volume_momentum_balance(angle: float
     d = r["__element_diag__"]
     ch = s.network.nodes["ch"]
     P, T = r["ch.P"], s._derived_states["ch"][0]
-    rho = cb.density(T, P, X_AIR)
     A = ch.area
     m_main, m_out = d["duct"]["m_dot"], d["tail"]["m_dot"]
+    # T is the chamber's STAGNATION T: densities at the static states (#578).
+    rho = chamber_static_density(P, T, m_out, A, list(X_AIR))
     P_face = d["duct"]["P_out"]  # the main inlet reports the face it sees
     eff = s.network.elements["eff"]
     supply = NetworkMixtureState(
@@ -85,9 +87,10 @@ def test_the_solution_satisfies_the_control_volume_momentum_balance(angle: float
     )
     chamber = NetworkMixtureState(T=T, P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
     S, _ = eff.injection_momentum(supply, chamber)
-    # Exact impulse: the main face at its own density (the main stream's T
-    # at the face pressure), the outlet at the chamber's.
-    rho_face = cb.density(1200.0, P_face, X_AIR)
+    # Exact impulse: the main face at its own static density (the main
+    # stream's 1200 K stagnation T at the face pressure and mass flux), the
+    # outlet at the chamber's.
+    rho_face = chamber_static_density(P_face, 1200.0, m_main, A, list(X_AIR))
     lhs = P_face * A + m_main**2 / (rho_face * A) + S
     rhs = P * A + m_out**2 / (rho * A)
     # Relative to the momentum fluxes, not to P A, which would hide an error.
@@ -212,12 +215,13 @@ def test_a_compressible_liner_balances_the_exact_impulse() -> None:
     d = r["__element_diag__"]
     ch = s.network.nodes["ch"]
     P, T = r["ch.P"], s._derived_states["ch"][0]
-    rho = cb.density(T, P, X_AIR)
     A = ch.area
     m_main, m_out = d["duct"]["m_dot"], d["tail"]["m_dot"]
-    assert m_out / (rho * A) / cb.speed_of_sound(T, X_AIR) > 0.3
+    rho = chamber_static_density(P, T, m_out, A, list(X_AIR))
+    T_static = chamber_static_T(P, T, m_out, A, list(X_AIR))
+    assert m_out / (rho * A) / cb.speed_of_sound(T_static, X_AIR) > 0.3
     P_face = d["duct"]["P_out"]
-    rho_face = cb.density(1200.0, P_face, X_AIR)
+    rho_face = chamber_static_density(P_face, 1200.0, m_main, A, list(X_AIR))
     supply = NetworkMixtureState(
         T=600.0, P=1.35e5, Pt=1.35e5, Tt=600.0, m_dot=d["eff"]["m_dot"], Y=Y_AIR
     )

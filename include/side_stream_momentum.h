@@ -74,15 +74,18 @@ StationHalfDrop channel_entry_drop(double m, double P, double T,
 // ---------------------------------------------------------------
 //
 // Constant-area control volume of area A, axis = the outlet direction. The
-// chamber node carries the outlet state (P, T static, as its own stagnation
-// closure takes it). The main stream arrives along the axis at the MAIN FACE,
-// whose static temperature is the main stream's T_main. Impulse:
+// chamber node carries the outlet state: static P and the STAGNATION T (#578);
+// the outlet's static T comes from chamber_static_state, as in the chamber's
+// own closure (#576). The main stream arrives along the axis at the MAIN FACE
+// with stagnation T_main; the face's static (P_f, T_f) solve
 //
-//   P_f + m_main^2 R T_main / (P_f A^2) = P + m_out^2 / (rho A^2) - J / A
+//   P_f + m_main^2 R T_f / (P_f A^2) = P + m_out^2 / (rho A^2) - J / A
+//   h(T_main) = h(T_f) + u_f^2 / 2,   u_f = m_main R T_f / (P_f A)
 //
-// a quadratic in the face static pressure P_f for an ideal gas, solved in
-// closed form on its SUBSONIC root. Pt_face = P0_from_static(P_f, T_main,
-// M_f), the same entropy-based closure as the chamber itself (#357). No
+// by fixed point (the impulse quadratic on its SUBSONIC root, then the energy
+// solve), with analytic sensitivities from the implicit function theorem.
+// Pt_face = P_f exp((s(T_main) - s(T_f)) / R), the same entropy-based closure
+// as the chamber itself (#357). No
 // loss coefficient: the stagnation-pressure loss of mixing follows from
 // momentum; transverse momentum is reacted by the walls. With no side streams
 // (m_out = m_main, J = 0, T = T_main) the face IS the chamber.
@@ -95,9 +98,8 @@ struct MergeFaceState {
   double Pt_face = 0.0;  // [Pa]
   double M_face = 0.0;   // [-]
   bool choked = false;
-  // d/d(m_main, m_out, J, P, T, T_main). Flows and pressures analytic; the
-  // two temperatures by central difference inside C++, as the chamber's own
-  // stagnation closure does (smooth, no inner discretisation).
+  // d/d(m_main, m_out, J, P, T, T_main), all analytic (implicit function
+  // theorem through the static-state solves, #578).
   double dPf_dm_main = 0.0, dPf_dm_out = 0.0, dPf_dJ = 0.0;
   double dPf_dP = 0.0, dPf_dT = 0.0, dPf_dT_main = 0.0;
   double dPtf_dm_main = 0.0, dPtf_dm_out = 0.0, dPtf_dJ = 0.0;

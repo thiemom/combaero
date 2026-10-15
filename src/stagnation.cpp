@@ -267,4 +267,77 @@ std::tuple<double, double> stagnation_from_static(
     return {Tt, Pt};
 }
 
+namespace {
+// Integral of f over [a, b] by 8-point Gauss-Legendre, split at the
+// NASA-9 range boundaries (1000 K, 6000 K) where cp has a small jump (#549).
+// Used for h(T0) - h(T) and s(T0) - s(T) at the SAME composition: the direct
+// differences cancel ~4 significant digits near T0 and left ~1e-9 Pa of noise
+// in P0, which finite-difference Jacobian checks with small steps read as
+// derivative errors (#579 on Linux).
+template <class F>
+double gl8_split(F f, double a, double b) {
+  static const double xg[4] = {0.1834346424956498, 0.5255324099163290,
+                               0.7966664774136267, 0.9602898564975363};
+  static const double wg[4] = {0.3626837833783620, 0.3137066458778873,
+                               0.2223810344533745, 0.1012285362903763};
+  auto seg = [&](double lo, double hi) {
+    const double c = 0.5 * (lo + hi), r = 0.5 * (hi - lo);
+    double acc = 0.0;
+    for (int i = 0; i < 4; ++i) {
+      acc += wg[i] * (f(c - r * xg[i]) + f(c + r * xg[i]));
+    }
+    return acc * r;
+  };
+  const double sign = b >= a ? 1.0 : -1.0;
+  double lo = std::min(a, b), hi = std::max(a, b);
+  double total = 0.0;
+  for (double bp : {1000.0, 6000.0}) {
+    if (lo < bp && bp < hi) {
+      total += seg(lo, bp);
+      lo = bp;
+    }
+  }
+  total += seg(lo, hi);
+  return sign * total;
+}
+
+}  // namespace
+
+ChamberStaticState chamber_static_state(double T0, double P, double G,
+                                        const std::vector<double> &X) {
+  const double R = specific_gas_constant(X);
+  const double k = (G * R / P) * (G * R / P);  // v^2 = k T^2
+  auto cp_of = [&](double t) { return cp_mass(t, X); };
+  auto cp_over_T = [&](double t) { return cp_mass(t, X) / t; };
+  // f(T) = [h(T0) - h(T)] - k T^2 / 2, the enthalpy difference integrated.
+  double T = T0;
+  for (int it = 0; it < 100; ++it) {
+    const double f = gl8_split(cp_of, T, T0) - 0.5 * k * T * T;
+    const double fT = -cp_mass(T, X) - k * T;
+    const double step = f / fT;
+    T -= step;
+    if (std::abs(step) <= 1e-13 * T0) {
+      break;
+    }
+  }
+  ChamberStaticState out{};
+  out.T = T;
+  const double cp_T = cp_mass(T, X);
+  const double cp_T0 = cp_mass(T0, X);
+  const double fT = -cp_T - k * T;
+  // df/dx for x = T0, P, G; dT/dx = -(df/dx) / fT.
+  out.dT_dT0 = -cp_T0 / fT;
+  out.dT_dP = -(k * T * T / P) / fT;
+  out.dT_dG = (G > 0.0) ? -(-k * T * T / G) / fT : 0.0;
+  // ln(P0 / P) = (s(T0) - s(T)) / R = (1/R) integral of cp / T.
+  out.lnP0P = gl8_split(cp_over_T, T, T0) / R;
+  const double dln_dTs = -cp_T / (R * T);
+  out.dln_dT0 = cp_T0 / (R * T0) + dln_dTs * out.dT_dT0;
+  out.dln_dP = dln_dTs * out.dT_dP;
+  out.dln_dG = dln_dTs * out.dT_dG;
+  const double a = speed_of_sound(T, X);
+  out.M = (a > 1e-9) ? G * R * T / (P * a) : 0.0;
+  return out;
+}
+
 } // namespace combaero
