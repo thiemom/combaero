@@ -120,8 +120,13 @@ def test_a_deferred_jacobian_is_only_given_for_its_own_point() -> None:
 
 
 def test_a_solve_assembles_far_fewer_jacobians_than_it_evaluates() -> None:
-    """hybr wants J at the start and on restarts, not every evaluation."""
-    s = NetworkSolver(tia._net(tia._array(8), hot=True))
+    """hybr wants J at the start and on restarts, not every evaluation.
+
+    One cold hybr solve, pinned incompressible: the count is about J reuse.
+    Compressible, this network's cold solve sits on a knife edge (#605) and
+    the default path's retry count follows the wall-clock stall detector,
+    so the ratio moved with the machine (27 vs 80 / 3 on Linux CI)."""
+    s = NetworkSolver(tsr._hot_array(8, 1.02e5, "incompressible"))
     calls = {"F": 0, "relay": 0}
     evaluate, propagate = s._residuals_and_jacobian, s._propagate_states
 
@@ -135,9 +140,6 @@ def test_a_solve_assembles_far_fewer_jacobians_than_it_evaluates() -> None:
 
     s._residuals_and_jacobian = counting_evaluate
     s._propagate_states = counting_propagate
-    # The default solve path: compressible, this network's cold solve sits on
-    # a knife edge (a 1e-14 change in h flips it into the #605 stall), and the
-    # count is about J reuse, not about which start converges.
-    r = s.solve()
+    r = s.solve(auto_retry=False)
     assert r["__success__"]
-    assert calls["relay"] < calls["F"] / 3
+    assert calls["relay"] < calls["F"] / 3, calls
