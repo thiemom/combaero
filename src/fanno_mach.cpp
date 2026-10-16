@@ -566,7 +566,8 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
   // geometrically until it holds a sign change; without one the bracket is
   // grown down from Me = 1 by halving.
   auto f = [&](double Me) { return psi(Me, pb.P, pb.Pt0, pb.Tt0, pb); };
-  double lo, hi, f_lo, f_hi;
+  double lo = 0.0, hi = 0.0, f_lo = 0.0, f_hi = 0.0;
+  bool bracketed = false;
   if (pb.Me_guess > 0.0 && pb.Me_guess < 1.0) {
     double w = 0.01;
     lo = pb.Me_guess * (1.0 - w);
@@ -587,7 +588,13 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
         f_hi = f(hi);
       }
     }
-  } else {
+    bracketed = f_lo > 0.0 && f_hi <= 0.0;
+  }
+  // No guess, or a guess the widening could not bracket: it stops at about
+  // 3.6x the guess, so a root above that was never enclosed and Brent ran on
+  // an interval without a sign change. A short duct warm-started at M 0.01
+  // then returned the same flux for every drive (#585).
+  if (!bracketed) {
     hi = 1.0;
     f_hi = choked_test;
     lo = 0.5;
