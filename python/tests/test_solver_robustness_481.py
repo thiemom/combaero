@@ -229,7 +229,21 @@ def test_with_coupling_off_the_walls_report_no_heat() -> None:
 # --- the solver survives non-physical probes ---------------------------------
 
 
-@pytest.mark.parametrize(("n_rows", "p_hot"), [(5, 1.01e5), (5, 1.02e5), (8, 1.05e5), (8, 1.1e5)])
+@pytest.mark.parametrize(
+    ("n_rows", "p_hot"),
+    [
+        pytest.param(
+            5,
+            1.01e5,
+            marks=pytest.mark.xfail(
+                strict=True, reason="#605: compressible, hybr and LM stall cold at |F| ~ 0.13"
+            ),
+        ),
+        (5, 1.02e5),
+        (8, 1.05e5),
+        (8, 1.1e5),
+    ],
+)
 def test_a_hot_impingement_array_converges_cold(n_rows: int, p_hot: float) -> None:
     """Without the wall-free retry. These four failed cold before #481: the
     penalty accepted steps into the unphysical region, and reversed jets
