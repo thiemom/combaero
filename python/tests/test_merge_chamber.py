@@ -131,8 +131,12 @@ def test_global_jacobian_matches_finite_differences(correlation: str) -> None:
     x = np.array(r["__x_solution__"], dtype=float)
     _, jac = s._residuals_and_jacobian(x)
     jac = jac.toarray()
+    # Flows step 1e-5, pressures and temperatures 1e-7: a compressible
+    # channel's residual repeats only to ~1e-12 (its Fanno iteration is
+    # warm-started), which a 1e-7 flow step differences into 5e-4 of noise.
+    rel = np.array([1e-5 if n.endswith(".m_dot") else 1e-7 for n in s.unknown_names])
     fd = approx_derivative(
-        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-7, 1e-10)
+        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * rel, 1e-10)
     )
     mask = np.abs(fd) > 1e-3
     assert (np.abs(jac - fd)[mask] / np.abs(fd[mask])).max() < 1e-4

@@ -50,7 +50,7 @@ def _branch_net(K_straight: float, K_branch: float, m_in: float = 0.3) -> FlowNe
     net.add_node(PressureBoundary("pb_str", Pt=1.9e5, Tt=300.0, Y=Y))
     net.add_node(PressureBoundary("pb_bra", Pt=1.9e5, Tt=300.0, Y=Y))
     for nid in ("mc_com", "mc_str", "mc_bra"):
-        net.add_node(MomentumChamberNode(nid, area=_A))
+        net.add_node(MomentumChamberNode(nid, area=_A, regime="incompressible"))
     net.add_element(
         ChannelElement(
             "ch_in", "mfb_in", "mc_com", length=0.5, diameter=_D, regime="incompressible"
@@ -88,7 +88,7 @@ def _merge_net(K_straight: float, K_branch: float) -> FlowNetwork:
     net.add_node(MassFlowBoundary("mfb_bra", m_dot=0.12, Tt=300.0, Y=Y))
     net.add_node(PressureBoundary("pb_out", Pt=1.9e5, Tt=300.0, Y=Y))
     for nid in ("mc_com", "mc_str", "mc_bra"):
-        net.add_node(MomentumChamberNode(nid, area=_A))
+        net.add_node(MomentumChamberNode(nid, area=_A, regime="incompressible"))
     net.add_element(
         ChannelElement(
             "ch_str", "mfb_str", "mc_str", length=0.5, diameter=_D, regime="incompressible"
