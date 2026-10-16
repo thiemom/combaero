@@ -54,6 +54,26 @@ double get_global_thermo_T_min() {
 // Set to 2/3 of global TMIN to provide large cushion (e.g., 200K for TMIN=300K)
 const double THERMO_T_MIN = get_global_thermo_T_min();
 const double T_SMOOTH_FLOOR_LIMIT = THERMO_T_MIN * 0.67;
+
+// T from a mixed specific enthalpy, for the network's mixing nodes. Below
+// T_SMOOTH_FLOOR_LIMIT it continues linearly with the floor's cp (C1 there)
+// instead of inverting: a solver probe or starting point can withdraw more
+// heat than a stream holds, a target no positive T reaches, and the inverse
+// raises for it (#552 item 3, #607), which aborted the whole solve. The
+// network clamps the node to [200, 5000] K, reports it in __T_clamped__ and
+// zeroes its T sensitivities, so the continuation only has to exist.
+// The temperature properties are evaluated at T_eval = max(T, floor).
+double T_from_h_mass_floored(double h_mass, const std::vector<double>& X, double T_guess,
+                             double& T_eval) {
+  const double T_f = T_SMOOTH_FLOOR_LIMIT;
+  const double h_f = combaero::h_mass(T_f, X);
+  if (h_mass >= h_f) {
+    T_eval = combaero::calc_T_from_h_mass(h_mass, X, T_guess);
+    return T_eval;
+  }
+  T_eval = T_f;
+  return T_f + (h_mass - h_f) / combaero::cp_mass(T_f, X);
+}
 } // anonymous namespace
 
 // -----------------------------------------------------------------------------
@@ -779,7 +799,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   double T_guess = 300.0;
   if (n_streams > 0)
     T_guess = streams[0].T;
-  double T_mix = combaero::calc_T_from_h_mass(h_mix, X_mix, T_guess);
+  double T_eval = 0.0;
+  double T_mix = T_from_h_mass_floored(h_mix, X_mix, T_guess, T_eval);
 
   MixerResult res;
   res.T_mix = T_mix;
@@ -793,9 +814,9 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   std::vector<double> hk_mix(n_species, 0.0);
   for (std::size_t k = 0; k < n_species; ++k) {
     hk_mix[k] =
-        J_per_mol_to_J_per_kg(combaero::h_species(k, T_mix), combaero::species_molar_mass(k));
+        J_per_mol_to_J_per_kg(combaero::h_species(k, T_eval), combaero::species_molar_mass(k));
     double cpk_mix =
-        J_per_mol_to_J_per_kg(combaero::cp_species(k, T_mix), combaero::species_molar_mass(k));
+        J_per_mol_to_J_per_kg(combaero::cp_species(k, T_eval), combaero::species_molar_mass(k));
     cp_mix += Y_mix[k] * cpk_mix;
   }
 
@@ -935,8 +956,9 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
-    T_out = combaero::calc_T_from_h_mass(h_ad + delta_h, X_b, T_ad);
-    cp_out = combaero::cp_mass(T_out, X_b);
+    double T_out_eval = 0.0;
+    T_out = T_from_h_mass_floored(h_ad + delta_h, X_b, T_ad, T_out_eval);
+    cp_out = combaero::cp_mass(T_out_eval, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
     dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
@@ -1095,8 +1117,9 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
-    T_out = combaero::calc_T_from_h_mass(h_ad + delta_h, X_b, T_ad);
-    cp_out = combaero::cp_mass(T_out, X_b);
+    double T_out_eval = 0.0;
+    T_out = T_from_h_mass_floored(h_ad + delta_h, X_b, T_ad, T_out_eval);
+    cp_out = combaero::cp_mass(T_out_eval, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
     dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }

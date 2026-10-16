@@ -1,0 +1,3 @@
+- **A converged root whose network balance does not close is reported INCONSISTENT** (#552). The `__ledger__` relative mass or energy closure must stay within `combaero.network.second_law.LEDGER_CLOSURE_TOL` = 1e-6; the suite's accepted solves close to 4.2e-8 and 1.1e-7.
+- **Withdrawing more heat than a stream holds no longer aborts the solve** (#552). The mixer raised from the T(h) inverse at the starting point; it now continues below the solver floor, and the node is reported on the temperature clamp.
+- **A compressible orifice fed at Tt <= 200 K flows** (#552). The isentropic solvers held the static T at 200 K, the old end of the thermo data, which zeroed the flow and gave a spurious zero-flow root. They now go down to `thermo::T_FLOOR`.
