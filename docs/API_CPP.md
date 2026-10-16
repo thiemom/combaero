@@ -350,6 +350,8 @@ struct FannoSolution {
 
 ### Solvers
 ```cpp
+// The isentropic static T may fall to thermo::T_FLOOR (it was held at
+// 200 K, which zeroed the flow from a stagnation state at or below 200 K, #552).
 CompressibleFlowSolution nozzle_flow(double T0, double P0, double P_back,
                                      double A_eff, const std::vector<double>& X,
                                      double tol = 1e-8, std::size_t max_iter = 50);
@@ -1639,7 +1641,12 @@ square.
 
 ### Mixing and Combustion Components
 ```cpp
-// Stream mixing with optional heat transfer
+// Stream mixing with optional heat transfer. A mixed enthalpy below the
+// solver floor (0.67 x the lowest NASA-9 T_min, 134 K) continues linearly
+// with the floor's cp instead of inverting (C1 there), so a heat withdrawal
+// past what the streams hold returns a T, not an error (#552); the network
+// clamps such a node and reports it in __T_clamped__. The combustor forms do
+// the same for their post-combustion heat shift.
 MixerResult mixer_from_streams_and_jacobians(
     const std::vector<Stream>& streams, double Q = 0.0, double fraction = 0.0);
 

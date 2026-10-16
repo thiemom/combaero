@@ -78,6 +78,15 @@ import combaero as cb
 #: floor that would need a looser per-element bound (#545).
 SIGMA_TOL = 1e-8
 
+#: Above this relative mass or energy closure of the network's control volume,
+#: a converged solve is demoted to INCONSISTENT (#552). Over the suite's
+#: 25 147 accepted solves the worst closures were 4.2e-8 (mass) and 1.1e-7
+#: (energy); the roots #552 found accepted were open by 4e-3 to 8e-3 in mass
+#: (an LM fallback) and 2e-5 in energy (a stale reversed state). Both
+#: reproducers converge closed on today's solver; this is the guard that would
+#: have refused them.
+LEDGER_CLOSURE_TOL = 1e-6
+
 
 @dataclass
 class _Stream:

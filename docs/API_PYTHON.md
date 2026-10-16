@@ -819,7 +819,7 @@ bookkeeping keys. Five of them say what happened:
 | `__second_law_wall_failures__` | `list[str]` | wall ids whose verdict is `"fail"` |
 | `__incompressible_validity__` | `dict[str, dict]` | per element on an incompressible closure: `verdict` (`"ok"`, `"warn"`, `"not_checked"` with a `reason`), its highest internal `mach` and the `limit`. **Report only** (#588). |
 | `__incompressible_warnings__` | `list[str]` | ids whose verdict is `"warn"` |
-| `__ledger__` | `dict` | mass and energy over the network's control volume: `streams` (one row per crossing, `m_dot_in` > 0 entering), `m_dot_in/out`, `H_in/out`, `Q_given`, `Q_wall_out`, `Q_withheld`, `mass_closure(_rel)`, `energy_closure(_rel)`. Empty when the root finder did not converge. |
+| `__ledger__` | `dict` | mass and energy over the network's control volume: `streams` (one row per crossing, `m_dot_in` > 0 entering), `m_dot_in/out`, `H_in/out`, `Q_given`, `Q_wall_out`, `Q_withheld`, `mass_closure(_rel)`, `energy_closure(_rel)`. Empty when the root finder did not converge. A converged root with either relative closure above `combaero.network.second_law.LEDGER_CLOSURE_TOL = 1e-6` is reported INCONSISTENT (`__success__` False, #552); the suite's accepted solves close to 4.2e-8 (mass) and 1.1e-7 (energy). |
 
 **Second law per element (#545).** Each element's control volume must not
 destroy entropy: `sigma = sum_out m s - sum_in m s - integral dQ/T >= 0`, with
@@ -832,7 +832,7 @@ cooling may raise it (Rayleigh); the heat term allows exactly that. Inside an
 element only its end Mach numbers are known, so the heat is evaluated along a
 linear Mach path and bracketed by constant-Mach paths at either end; a
 `"fail"` holds even for the most favourable one (`sigma_norm_high <
--SIGMA_TOL`, `SIGMA_TOL = 1e-6`). A chain of crossflow segments is one control
+-SIGMA_TOL`, `SIGMA_TOL = 1e-8`). A chain of crossflow segments is one control
 volume (a segment's momentum spans half of each station). The legacy
 `TeeJunctionElement` is not checked. Each element's `sigma_norm` also appears
 in its diagnostics.

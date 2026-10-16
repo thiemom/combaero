@@ -23,8 +23,12 @@ double solve_T_isentropic(double P, double s0, double T_init,
                           double tol, std::size_t max_iter) {
     double T = T_init;
 
-    // Clamp temperature bounds to valid thermo data range
-    constexpr double T_MIN = 200.0;
+    // Clamp temperature bounds to the thermo's range. The floor was 200 K,
+    // the end of the NASA-9 data: an expansion from Tt <= 200 K then could not
+    // cool, dh <= 0, and the orifice kernel returned zero flow under any drive
+    // -- a spurious root wherever a node sat on the network's 200 K clamp
+    // (#552). Since #606 the species thermo has bounded tails to T_FLOOR.
+    constexpr double T_MIN = thermo::T_FLOOR;
     constexpr double T_MAX = 6000.0;
 
     for (std::size_t it = 0; it < max_iter; ++it) {
@@ -407,7 +411,7 @@ double solve_T_from_energy(
     double tol = 1e-8, std::size_t max_iter = 50)
 {
     double T = T_guess;
-    constexpr double T_MIN = 200.0;
+    constexpr double T_MIN = thermo::T_FLOOR;  // see solve_T_isentropic
     constexpr double T_MAX = 6000.0;
     double mw_g = mw_kg * 1000.0;  // g/mol for enthalpy conversion
 
@@ -1057,7 +1061,7 @@ namespace {
     double tol, std::size_t max_iter)
 {
     double T = T_guess;
-    constexpr double T_MIN = 200.0;
+    constexpr double T_MIN = thermo::T_FLOOR;  // see solve_T_isentropic
     constexpr double T_MAX = 6000.0;
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {

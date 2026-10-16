@@ -4013,6 +4013,30 @@ class NetworkSolver:
         )
         sol_dict["__ledger__"] = ledger
 
+        # A root whose control volume does not close in mass or energy is not
+        # a solution of the network, whatever |F| says (#552). Unlike the
+        # second law above, this one demotes: the bound sits 9x above the
+        # worst closure of any accepted solve in the suite.
+        if success and ledger and "error" not in ledger:
+            from .second_law import LEDGER_CLOSURE_TOL
+
+            _rel = {kind: ledger.get(f"{kind}_closure_rel") for kind in ("mass", "energy")}
+            _open = {
+                kind: float(v)
+                for kind, v in _rel.items()
+                if v is not None and not abs(float(v)) <= LEDGER_CLOSURE_TOL  # NaN is open
+            }
+            if _open:
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                message = (
+                    "Converged to a root whose network balance does not close: "
+                    + ", ".join(f"{k} {v:+.2e} relative" for k, v in _open.items())
+                    + f" (bound {LEDGER_CLOSURE_TOL:.0e}). See __ledger__."
+                )
+                warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
+
         # Incompressible validity (#588): each element on an incompressible
         # closure against one Mach limit. REPORTED only, like the second law.
         validity: dict[str, dict[str, Any]] = {}
