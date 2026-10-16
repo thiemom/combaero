@@ -66,7 +66,7 @@ def test_their_rows_get_the_pressure_scale(monkeypatch: pytest.MonkeyPatch) -> N
     ref_p, ref_m = s._reference_scales(x0)
     n_p = int(np.sum(s._build_residual_scales(x0) == ref_p))
     for cls in (comp.PressureLossElement, comp.AreaChangeElement):
-        monkeypatch.delattr(cls, "residual_scale_kind")
+        monkeypatch.setattr(cls, "residual_scale_kind", "mdot")  # the old default
     D_old = s._build_residual_scales(x0)
     assert int(np.sum(D_old == ref_p)) == n_p - 2
     assert ref_p / ref_m > 1e5  # what the misfiling cost, here

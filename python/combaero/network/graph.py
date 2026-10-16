@@ -165,8 +165,13 @@ class FlowNetwork:
             )
 
         # Per-element specific validation
+        from .components import declared_row_kinds
+
         for _, elem in self.elements.items():
             elem.validate()
+            # RESIDUAL-ROW-SCALING: the units of every residual row are
+            # declared, where the residual is defined (raises TypeError).
+            declared_row_kinds(elem)
 
         # PressureLossElement ambiguity: both endpoints have has_theta=True and no
         # explicit theta_source override.  Requires user disambiguation.
