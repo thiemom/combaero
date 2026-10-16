@@ -1,4 +1,3 @@
-import contextlib
 import copy
 import math
 import sys
@@ -999,14 +998,25 @@ class WallLayer:
     conductivity: float
     material: str = "custom"
 
+    def __post_init__(self) -> None:
+        # An unknown name used to be swallowed at every evaluation, so a typo
+        # silently kept the layer's manual conductivity.
+        if self.material.lower() not in ("generic", "custom") and (
+            self.material not in cb.list_materials()
+        ):
+            raise ValueError(
+                f"WallLayer: unknown material {self.material!r}; expected one of "
+                f"{cb.list_materials()} or 'custom'."
+            )
+
     def update_conductivity(self, T: float) -> None:
         """Update conductivity based on temperature if a database material is selected."""
 
         # 'generic' is legacy, 'custom' is new name for manual input
         if self.material.lower() not in ("generic", "custom"):
-            with contextlib.suppress(RuntimeError, ValueError):
-                # The C++ binding handles T-clamping and k-clamping internally
-                self.conductivity = cb.get_material_conductivity(self.material, T)
+            # The binding clamps T to the material's valid range and k > 0, so
+            # a known material does not raise at any T.
+            self.conductivity = cb.get_material_conductivity(self.material, T)
 
     @property
     def r_val(self) -> float:

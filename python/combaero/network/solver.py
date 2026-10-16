@@ -1,5 +1,7 @@
 import math
+import os
 import time
+import traceback
 import warnings
 from enum import StrEnum
 from typing import Any, Literal
@@ -61,6 +63,25 @@ class SolveOutcome(StrEnum):
     NOT_CONVERGED = "not_converged"
     #: Nothing to solve: the network is empty or fully constrained.
     NO_UNKNOWNS = "no_unknowns"
+
+
+#: Environment switch for the starting-point safety net: any value but "" or
+#: "0" makes ``NetworkSolver.raise_internal_errors`` default to True, so a
+#: numerical exception at the starting point raises instead of returning an
+#: ERROR result. The test suite sets it (python/tests/conftest.py) so the net
+#: can never hide a bug there; a stress harness can set it to stop at the first
+#: finding, or leave it off and read ``__caught_exceptions__``.
+SOLVER_STRICT_ENV = "COMBAERO_SOLVER_STRICT"
+
+#: Exceptions a physical-but-extreme state can raise from the property and
+#: closure layer (C++ std::runtime_error -> RuntimeError, std::invalid_argument
+#: -> ValueError). TypeError, AttributeError, KeyError, IndexError are code
+#: bugs, never states: they always raise.
+_STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
+
+#: At most this many exceptions keep their full record per solve; the rest are
+#: counted (``__caught_exception_count__``).
+_MAX_CAUGHT_RECORDS = 50
 
 
 def _classify_solver_message(message: str) -> SolveOutcome:
@@ -320,6 +341,14 @@ class NetworkSolver:
 
     def __init__(self, network: FlowNetwork):
         self.network = network
+        # The starting-point safety net: None follows SOLVER_STRICT_ENV.
+        self.raise_internal_errors: bool | None = None
+        # Every exception the solve caught (start, rejected probes), with
+        # where it was raised; returned as __caught_exceptions__.
+        self._caught_exceptions: list[dict[str, Any]] = []
+        self._caught_count = 0
+        self._eval_where = ""
+        self._eval_phase = "start"
         self.unknown_names: list[str] = []
         # Mapping from node/element ID to index in the flattened x array
         self._unknown_indices: dict[str, list[int]] = {}
@@ -1439,6 +1468,7 @@ class NetworkSolver:
         has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
 
         for nid in order:
+            self._eval_where = f"node '{nid}'"
             node = self.network.nodes[nid]
             done.add(nid)
             current[0] = nid
@@ -2111,6 +2141,7 @@ class NetworkSolver:
         # Pure Pressure-Flow: Propagate states forward first. The relay
         # (state sensitivities) only for an immediate assembly; a deferred one
         # rebuilds it at the same x if J is asked for.
+        self._eval_where = ""
         relay = self._propagate_states(x, with_relay=compute_jacobian)
 
         res = []
@@ -2121,6 +2152,7 @@ class NetworkSolver:
 
         # 1. Node Residuals
         for node_id, node in self.network.nodes.items():
+            self._eval_where = f"node '{node_id}'"
             if isinstance(node, PressureBoundary):
                 continue
 
@@ -2180,6 +2212,7 @@ class NetworkSolver:
         from .components import MultiPortChamberBase, TeeJunctionElement
 
         for elem_id, element in self.network.elements.items():
+            self._eval_where = f"element '{elem_id}'"
             start_res_idx = len(res)
 
             m_indices = self._unknown_indices.get(elem_id)
@@ -2345,6 +2378,60 @@ class NetworkSolver:
         res, _ = self._residuals_and_jacobian(x, compute_jacobian=False)
         return res
 
+    def _strict(self) -> bool:
+        """Whether the starting-point safety net re-raises (see SOLVER_STRICT_ENV)."""
+        if self.raise_internal_errors is not None:
+            return bool(self.raise_internal_errors)
+        return os.environ.get(SOLVER_STRICT_ENV, "") not in ("", "0")
+
+    def _record_exception(self, exc: BaseException, phase: str | None = None) -> None:
+        """Keep a caught exception for ``__caught_exceptions__``: the phase
+        (``start``: the attempt's first point; ``probe``: a trial point the
+        root finder then rejected), the node or element being evaluated, the
+        type, the message and the innermost frames."""
+        self._caught_count += 1
+        if len(self._caught_exceptions) >= _MAX_CAUGHT_RECORDS:
+            return
+        frames = traceback.extract_tb(exc.__traceback__)[-3:]
+        self._caught_exceptions.append(
+            {
+                "phase": phase or self._eval_phase,
+                "where": self._eval_where,
+                "type": type(exc).__name__,
+                "message": str(exc)[:500],
+                "frames": [f"{f.filename.rsplit('/', 1)[-1]}:{f.lineno} {f.name}" for f in frames],
+            }
+        )
+
+    def _failed_start_result(self, x0_use: np.ndarray, exc: BaseException) -> dict[str, Any]:
+        """The result of an attempt whose starting point could not be
+        evaluated: not converged, outcome ERROR, nothing derived. The retries
+        in ``solve`` then try their other starts."""
+        where = f" at {self._eval_where}" if self._eval_where else ""
+        return {
+            "__success__": False,
+            "__message__": (
+                f"The starting point could not be evaluated{where}: "
+                f"{type(exc).__name__}: {str(exc)[:300]}"
+            ),
+            "__iterations__": 0,
+            "__converged__": False,
+            "__consistent__": None,
+            "__inconsistent_elements__": [],
+            "__T_clamped__": [],
+            "__outcome__": SolveOutcome.ERROR,
+            "__final_norm__": float("inf"),
+            "__worst_residuals__": [],
+            "__unknown_names__": list(self.unknown_names),
+            "__x_solution__": list(x0_use),
+        }
+
+    def _with_caught(self, sol: dict[str, Any]) -> dict[str, Any]:
+        """``sol`` with this solve's caught-exception record attached."""
+        sol["__caught_exceptions__"] = list(self._caught_exceptions)
+        sol["__caught_exception_count__"] = self._caught_count
+        return sol
+
     def solve(
         self,
         method: str = "hybr",
@@ -2415,7 +2502,22 @@ class NetworkSolver:
         leaves a node heated with almost nothing to carry the heat. The
         wall-less flows are a start on the right side of that (#471:
         impingement array under a hot duct, 6/9 cold vs 9/9 seeded).
+
+        A numerical exception while evaluating an attempt's STARTING point
+        (a property or closure refusing a physical-but-extreme state) does not
+        abort the solve: that attempt ends with outcome ERROR and the retries
+        above try their other starts. Exceptions at trial points the root
+        finder then rejects were already caught. Every caught exception is
+        returned in ``__caught_exceptions__`` (phase, the node or element
+        being evaluated, type, message, innermost frames; at most 50, all
+        counted in ``__caught_exception_count__``). Set
+        ``raise_internal_errors = True`` on the solver, or the environment
+        variable ``COMBAERO_SOLVER_STRICT=1``, to make the starting point raise
+        as it used to (the test suite runs strict). Code bugs (TypeError,
+        AttributeError, KeyError, IndexError) always raise.
         """
+        self._caught_exceptions = []
+        self._caught_count = 0
         _t0 = time.time()
         sol = self._solve_flow_retries(
             method=method,
@@ -2429,7 +2531,7 @@ class NetworkSolver:
             auto_retry=auto_retry,
         )
         if sol.get("__success__", False) or not auto_retry or x0 is not None:
-            return sol
+            return self._with_caught(sol)
         # Zero-flow fallback: a network whose only solution is zero flow -- equal
         # boundary pressures, nothing imposing a flow -- stalls because dP/dm -> 0
         # at m=0, so the default non-zero flow seed cannot descend to it. Seeding
@@ -2447,17 +2549,17 @@ class NetworkSolver:
                 primary=sol,
             )
             if zsol is not None:
-                return zsol
+                return self._with_caught(zsol)
         if not (self.network.thermal_coupling_enabled and self.network.walls):
-            return sol
+            return self._with_caught(sol)
         remaining = None
         if timeout is not None:
             remaining = timeout - (time.time() - _t0)
             if remaining <= 0.0:
-                return sol
+                return self._with_caught(sol)
         seed = self._wall_free_seed(method=method, timeout=remaining, use_jac=use_jac)
         if seed is None:
-            return sol
+            return self._with_caught(sol)
         _primary_diag = getattr(self, "_diagnostic_data", None)
         if timeout is not None:
             remaining = max(timeout - (time.time() - _t0), 0.0)
@@ -2470,14 +2572,14 @@ class NetworkSolver:
                 "Converged from the wall-free flow solution after the cold "
                 f"attempt failed ({primary_msg[:120]})."
             )
-            return retry
+            return self._with_caught(retry)
         r_norm, p_norm = retry.get("__final_norm__"), sol.get("__final_norm__")
         if r_norm is not None and p_norm is not None and float(r_norm) < float(p_norm):
-            return retry
+            return self._with_caught(retry)
         if _primary_diag is not None:
             self._diagnostic_data = _primary_diag
         sol["__message__"] = f"{primary_msg} [wall-free warm-start retry also failed]"
-        return sol
+        return self._with_caught(sol)
 
     def _wall_free_seed(
         self, method: str, timeout: float | None, use_jac: bool
@@ -2488,11 +2590,16 @@ class NetworkSolver:
         net.thermal_coupling_enabled = False
         try:
             seed_solver = NetworkSolver(net)
+            seed_solver.raise_internal_errors = self.raise_internal_errors
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 r = seed_solver.solve(method=method, timeout=timeout, use_jac=use_jac)
         finally:
             net.thermal_coupling_enabled = True
+        for rec in r.get("__caught_exceptions__", []):
+            if len(self._caught_exceptions) < _MAX_CAUGHT_RECORDS:
+                self._caught_exceptions.append({**rec, "phase": f"wall_free_seed:{rec['phase']}"})
+        self._caught_count += int(r.get("__caught_exception_count__", 0))
         if not r.get("__success__", False):
             return None
         by_name = dict(zip(seed_solver.unknown_names, r["__x_solution__"], strict=True))
@@ -3221,8 +3328,28 @@ class NetworkSolver:
         # first residual/scaling pass by ensuring the first residual evaluation
         # triggers the propagation internally.
 
-        # Dimension check
-        res0 = self._residuals(x0_use)
+        # Dimension check. The starting point is the one evaluation the root
+        # finder's penalty does not cover: an exception here used to abort the
+        # whole solve, retries included (#552: the mixer's T(h) inverse
+        # refusing a heat withdrawal larger than the stream holds).
+        self._eval_phase = "start"
+        try:
+            res0 = self._residuals(x0_use)
+        except _STATE_EXCEPTIONS as exc:
+            self._record_exception(exc)
+            if self._strict():
+                raise
+            warnings.warn(
+                f"NetworkSolver: the starting point could not be evaluated"
+                f"{' at ' + self._eval_where if self._eval_where else ''} "
+                f"({type(exc).__name__}: {str(exc)[:200]}); this attempt ends "
+                "with outcome ERROR.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return self._failed_start_result(x0_use, exc)
+        finally:
+            self._eval_phase = "probe"
         if len(x0_use) != len(res0):
             raise ValueError(f"System not square: {len(x0_use)} unknowns vs {len(res0)} equations.")
 
@@ -3417,6 +3544,7 @@ class NetworkSolver:
                 raise
             except Exception as e:
                 last_exception = e
+                self._record_exception(e, "probe")
                 # Return a large penalty residual so the trust-region
                 # solver can shrink its step instead of terminating.
                 # Warn once so developers can trace unexpected failures.
@@ -3462,6 +3590,20 @@ class NetworkSolver:
                     res, jac = self._residuals_and_jacobian(x_real)
                     f_scaled = res * inv_D_f
                 if not np.all(np.isfinite(jac.data)) or not np.all(np.isfinite(f_scaled)):
+                    # Name the rows and columns: the last element evaluated
+                    # is not where a non-finite entry came from.
+                    coo = jac.tocoo()
+                    bad = ~np.isfinite(coo.data)
+                    rows = sorted(
+                        set(coo.row[bad].tolist())
+                        | set(np.flatnonzero(~np.isfinite(f_scaled)).tolist())
+                    )
+                    cols = sorted(set(coo.col[bad].tolist()))
+                    names = self.unknown_names
+                    self._eval_where = (
+                        f"Jacobian rows {[names[i] for i in rows[:4]]} "
+                        f"cols {[names[j] for j in cols[:4]]}"
+                    )
                     raise FloatingPointError("non-finite Jacobian at a solver iterate")
                 # J_scaled = diag(inv_D_f) @ J @ diag(D_x)
                 jac_scaled = (inv_D_f[:, None] * jac.toarray()) * D_x[None, :]
@@ -3472,9 +3614,10 @@ class NetworkSolver:
                 return jac_scaled
             except SolverTimeoutError:
                 raise
-            except Exception:
+            except Exception as e:
                 # A point the model refuses: the last physical Jacobian, as
                 # for the rejected-probe residual above.
+                self._record_exception(e, "probe_jacobian")
                 return last_ok[1] if last_ok[1] is not None else np.eye(len(x_scaled))
 
         # Solve with timing

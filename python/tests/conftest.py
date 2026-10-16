@@ -23,6 +23,12 @@ def pytest_configure(config: pytest.Config) -> None:
 
     from combaero.network import solver as solver_mod
 
+    # The suite runs the solver strict: a numerical exception at a starting
+    # point raises instead of becoming an ERROR result, so the safety net can
+    # never hide a bug here. COMBAERO_SOLVER_STRICT=0 in the environment runs
+    # it as users see it; the net's own tests switch it per solver.
+    os.environ.setdefault(solver_mod.SOLVER_STRICT_ENV, "1")
+
     original = solver_mod.NetworkSolver.solve
     if getattr(original, "_closure_checked", False):
         return
