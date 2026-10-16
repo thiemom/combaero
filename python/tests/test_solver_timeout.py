@@ -58,12 +58,59 @@ def test_solver_timeout_trigger():
     assert solution["orf.m_dot"] == pytest.approx(seeded["orf.m_dot"])
 
 
+def test_the_warm_start_retry_stays_inside_the_timeout():
+    """A network without a junction keeps its whole budget for the cold
+    attempt, and the retry gets only what is left: none after a timeout. The
+    proxy's 10 s floor once ran after a 0.1 s budget had expired (#585)."""
+    graph = FlowNetwork()
+    graph.add_node(PressureBoundary("inlet", Pt=200000, Tt=300))
+    graph.add_node(PressureBoundary("outlet", Pt=100000, Tt=300))
+    graph.add_element(
+        OrificeElement(
+            "orf",
+            "inlet",
+            "outlet",
+            Cd=0.6,
+            diameter=0.035682,
+            correlation="fixed",
+            regime="compressible",
+        )
+    )
+    solver = NetworkSolver(graph)
+    original_raj = solver._residuals_and_jacobian
+    calls = [0]
+
+    def slow_raj(x, **kwargs):
+        calls[0] += 1
+        time.sleep(0.2)
+        return original_raj(x, **kwargs)
+
+    solver._residuals_and_jacobian = slow_raj
+    with pytest.warns(UserWarning, match="Solver timed out"):
+        solution = solver.solve(timeout=0.1)
+    assert not solution["__success__"]
+    # The cold attempt's 3 evaluations; the proxy and the seeded retry after
+    # it took 9 in all.
+    assert calls[0] <= 4
+
+
 def test_solver_maxfev_limit():
     """Verify solver respects maxfev for hybr method."""
     graph = FlowNetwork()
     inlet = PressureBoundary("inlet", Pt=500000, Tt=300)
     outlet = PressureBoundary("outlet", Pt=100000, Tt=300)
-    orf = OrificeElement("orf", "inlet", "outlet", Cd=0.6, diameter=0.112838, correlation="fixed")
+    # Incompressible: its pressure-drop row is nonlinear in the flow. The
+    # compressible row m - m_calc is linear in it, so one evaluation
+    # converges and maxfev=1 cannot force a failure.
+    orf = OrificeElement(
+        "orf",
+        "inlet",
+        "outlet",
+        Cd=0.6,
+        diameter=0.112838,
+        correlation="fixed",
+        regime="incompressible",
+    )
 
     graph.add_node(inlet)
     graph.add_node(outlet)
