@@ -4711,6 +4711,11 @@ class PressureLossElement(NetworkElement):
     :meth:`FlowNetwork.validate`.
     """
 
+    #: RESIDUAL-ROW-SCALING: the row is Pt_dn - Pt_up (1 - xi), in Pa. It was
+    #: filed as a mass-flow row by default, weighting it ref_p/ref_mdot
+    #: (1e5-1e9) too heavily; LM then traded every pressure for it (#614).
+    residual_scale_kind = "p"
+
     def __init__(
         self,
         id: str,
@@ -6208,6 +6213,11 @@ class AreaChangeElement(NetworkElement):
     Area change element applying pressure drop for sharp or conical area changes.
     """
 
+    #: RESIDUAL-ROW-SCALING: the row is Pt_in - Pt_out - dP_calc, in Pa. It was
+    #: filed as a mass-flow row by default, weighting it ref_p/ref_mdot
+    #: (1e5-1e9) too heavily; LM then traded every pressure for it (#614).
+    residual_scale_kind = "p"
+
     def __init__(
         self,
         id: str,
@@ -7182,6 +7192,11 @@ class BorderCarnotLossElement(NetworkElement):
     data forces it (PDF Section 3.3, deferred).
     """
 
+    #: RESIDUAL-ROW-SCALING: the row is Pt_in - Pt_out - dP_loss, in Pa. It was
+    #: filed as a mass-flow row by default, weighting it ref_p/ref_mdot
+    #: (1e5-1e9) too heavily; LM then traded every pressure for it (#614).
+    residual_scale_kind = "p"
+
     def __init__(
         self,
         id: str,
@@ -7278,6 +7293,11 @@ class VortexElement(NetworkElement):
                 - vatistas_delta_p(r_in,  rho, Gamma, r_c, n)
     where rho is taken from the upstream node state.
     """
+
+    #: RESIDUAL-ROW-SCALING: the row is Pt_out - Pt_in - dp_rise, in Pa. It was
+    #: filed as a mass-flow row by default, weighting it ref_p/ref_mdot
+    #: (1e5-1e9) too heavily; LM then traded every pressure for it (#614).
+    residual_scale_kind = "p"
 
     def __init__(
         self,

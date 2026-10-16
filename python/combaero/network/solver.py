@@ -267,7 +267,9 @@ class NetworkSolver:
             when the row pattern differs (EjectorElement overrides it);
           * any element whose units depend on its configuration: a
             ``residual_scale_kind`` property (ChannelElement: "mdot" when
-            compressible, "p" otherwise);
+            compressible, "p" otherwise) or class attribute (PressureLoss,
+            AreaChange, BorderCarnotLoss, Vortex: "p" -- all four were filed
+            "mdot" by the default below until #614, 1e5-1e9 too heavy);
           * everything else by class: ChannelElement, LosslessConnection and
             TeeJunction "p"; other elements "mdot".
         Changing an element's residual form means changing its declared kind
