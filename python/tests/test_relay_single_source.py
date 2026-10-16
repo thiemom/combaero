@@ -35,8 +35,12 @@ def _max_rel_jacobian_error(net: FlowNetwork) -> float:
     assert r["__success__"], r.get("__message__")
     x = np.array(r["__x_solution__"], dtype=float)
     _, jac = s._residuals_and_jacobian(x)
+    # Step 1e-6: at 1e-7 the smallest entries (~6e-3) are round-off bound --
+    # the FD drifts from J as the step shrinks (4.7e-6 at 1e-5, 2.9e-4 at 1e-7
+    # locally, 1.1e-3 on Linux, 1e-2 at 1e-8). At 1e-6 the clean case measures
+    # 6e-5 and a 0.5% error in its smallest entry still reads 5e-3 (#612).
     fd = approx_derivative(
-        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-7, 1e-10)
+        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-6, 1e-10)
     )
     mask = np.abs(fd) > 1e-6
     return float((np.abs(jac.toarray() - fd)[mask] / np.abs(fd[mask])).max())
