@@ -1,0 +1,5 @@
+- **Compressible crossflow and impingement chains solve their momentum balance (#585).**
+  - A compressible `CrossflowSegmentElement` (and so `ImpingementCrossflowElement` and the `EffusionLiner` backside) subtracted its station momentum drop, a pressure, from the channel's mass-flow residual. The row mixed Pa with kg/s.
+  - In a reservoir-bleed-outlet network at 1 kPa drive, the bleed station reversed and both segments passed about 1/50 of the incompressible flow, with a 1 um segment holding 1 kPa.
+  - The station drop now shifts the Fanno discharge target, so Pt_in drives against Pt_out + dP_momentum. The two regimes now agree to 4e-4 at Ma 0.12, and the gap falls as Ma^2.
+  - The default regime is incompressible, so only networks that select `regime="compressible"` change.

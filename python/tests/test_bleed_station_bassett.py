@@ -90,14 +90,13 @@ def test_scored_against_bassett_fig7c() -> None:
     assert np.abs(hi).mean() < 0.025
 
 
-def test_a_solved_bleed_network_satisfies_bassett() -> None:
-    """Reservoir -> duct -> bleed station -> duct -> outlet, near-frictionless
-    and nearly isothermal: the outlet static must sit below the reservoir by
-    exactly the entry dynamic head plus Bassett's station drop at the SOLVED
-    split -- computed here from K5 alone, independently of the C++ station."""
-    A = 1e-3
+def _bleed_net(
+    regime: str, drive: float = 1.0e3, length: float = 1e-6, A: float = 1e-3
+) -> FlowNetwork:
+    """Reservoir -> duct -> bleed station -> duct -> outlet, the bleed to a
+    sink as far below the outlet as the reservoir is above it."""
     g = FlowNetwork()
-    for n, pt in (("in", 1.010e5), ("out", 1.000e5), ("lat", 0.990e5)):
+    for n, pt in (("in", 1.0e5 + drive), ("out", 1.0e5), ("lat", 1.0e5 - drive)):
         b = PressureBoundary(n)
         b.Pt, b.Tt, b.Y = pt, 300.0, Y_AIR
         g.add_node(b)
@@ -105,16 +104,38 @@ def test_a_solved_bleed_network_satisfies_bassett() -> None:
     kappa = cb.STATION_KAPPA_BLEED_BASSETT
     g.add_element(
         CrossflowSegmentElement(
-            "s0", "in", "b", length=1e-6, area=A, entry_K=0.0, to_kappa=kappa, next_seg="s1"
+            "s0",
+            "in",
+            "b",
+            length=length,
+            area=A,
+            entry_K=0.0,
+            to_kappa=kappa,
+            next_seg="s1",
+            regime=regime,
         )
     )
     g.add_element(
         CrossflowSegmentElement(
-            "s1", "b", "out", length=1e-6, area=A, from_kappa=kappa, prev_seg="s0"
+            "s1", "b", "out", length=length, area=A, from_kappa=kappa, prev_seg="s0", regime=regime
         )
     )
-    g.add_element(OrificeElement("bleed", "b", "lat", diameter=0.01, Cd=0.6, correlation="fixed"))
-    r = NetworkSolver(g).solve()
+    g.add_element(
+        OrificeElement(
+            "bleed", "b", "lat", diameter=0.01, Cd=0.6, correlation="fixed", regime=regime
+        )
+    )
+    return g
+
+
+def test_a_solved_bleed_network_satisfies_bassett() -> None:
+    """Near-frictionless and nearly isothermal: the outlet static must sit
+    below the reservoir by exactly the entry dynamic head plus Bassett's
+    station drop at the SOLVED split -- computed here from K5 alone,
+    independently of the C++ station. Incompressible: the check below holds
+    the density constant."""
+    A = 1e-3
+    r = NetworkSolver(_bleed_net("incompressible", A=A)).solve()
     assert r["__success__"], r.get("__message__")
     d = r["__element_diag__"]
     m_a, m_b = d["s0"]["m_dot"], d["s1"]["m_dot"]
@@ -128,3 +149,49 @@ def test_a_solved_bleed_network_satisfies_bassett() -> None:
     # The outlet dumps (static continuity).
     assert P_b == pytest.approx(1.000e5, abs=2e-3 * (qa + qb))
     assert math.isfinite(r["b.P"])
+
+
+def _split(regime: str, drive: float) -> tuple[float, float]:
+    r = NetworkSolver(_bleed_net(regime, drive=drive, length=0.05)).solve()
+    assert r["__success__"], r.get("__message__")
+    return r["s0.m_dot"], r["s1.m_dot"]
+
+
+def test_the_compressible_station_is_the_incompressible_one_at_low_mach() -> None:
+    """The compressible segment row is a MASS FLOW (#481); the station drop is
+    a pressure, and was once subtracted from that row: a 1 um segment then
+    held 1 kPa at zero flow, the bleed reversed, and the flows came out 50x
+    too small. Now the drop shifts the Fanno target, and the two regimes part
+    as Ma^2: quartering the drive (Ma 0.12 -> 0.06) quarters the gap.
+
+    A real segment length: with a near-frictionless one the friction drive
+    sits inside the Fanno flux's 1 Pa regularisation, an absolute offset that
+    does not shrink with Mach."""
+    gaps = []
+    for drive in (1.0e3, 250.0):
+        (ci, di), (cc, dc) = _split("incompressible", drive), _split("compressible", drive)
+        assert cc > 0.0 and dc > 0.0 and dc < cc  # forward, and the bleed takes its share
+        gaps.append(max(abs(cc - ci) / ci, abs(dc - di) / di))
+    assert gaps[0] < 0.12**2
+    assert 3.0 < gaps[0] / gaps[1] < 5.0
+
+
+def test_the_compressible_station_jacobian_matches_finite_differences() -> None:
+    """Own flow, the neighbour segment's flow (through the station), and the
+    station node's pressure, all through the shifted Fanno target."""
+    from scipy.optimize._numdiff import approx_derivative
+
+    s = NetworkSolver(_bleed_net("compressible", length=0.05))
+    r = s.solve()
+    assert r["__success__"], r.get("__message__")
+    x = np.array(r["__x_solution__"], dtype=float)
+    J = s._residuals_and_jacobian(x)[1].toarray()
+    # Flows step 1e-5, pressures 1e-7: the Fanno iteration is warm-started,
+    # so a residual repeats only to ~1e-12.
+    rel = np.array([1e-5 if n.endswith(".m_dot") else 1e-7 for n in s.unknown_names])
+    fd = approx_derivative(
+        s._residuals, x, method="3-point", abs_step=np.maximum(np.abs(x) * rel, 1e-10)
+    )
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    scale = np.maximum(np.max(np.abs(fd * cols), axis=1, keepdims=True), 1e-300)
+    assert float(np.max(np.abs((J - fd) * cols) / scale)) < 1e-5
