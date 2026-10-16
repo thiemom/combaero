@@ -229,29 +229,45 @@ def test_with_coupling_off_the_walls_report_no_heat() -> None:
 # --- the solver survives non-physical probes ---------------------------------
 
 
-@pytest.mark.parametrize(
-    ("n_rows", "p_hot"),
-    [
-        pytest.param(
-            5,
-            1.01e5,
-            marks=pytest.mark.xfail(
-                strict=True, reason="#605: compressible, hybr and LM stall cold at |F| ~ 0.13"
-            ),
-        ),
-        (5, 1.02e5),
-        (8, 1.05e5),
-        (8, 1.1e5),
-    ],
-)
-def test_a_hot_impingement_array_converges_cold(n_rows: int, p_hot: float) -> None:
-    """Without the wall-free retry. These four failed cold before #481: the
-    penalty accepted steps into the unphysical region, and reversed jets
-    mixed as negative mass parked the chambers at 1500-3100 K."""
+_HOT_ARRAYS = [(5, 1.01e5), (5, 1.02e5), (8, 1.05e5), (8, 1.1e5)]
+
+
+def _hot_array(n_rows: int, p_hot: float, regime: str) -> FlowNetwork:
     g = array_cases._net(array_cases._array(n_rows), hot=True)
     g.nodes["hot_in"].Pt = p_hot
+    for item in list(g.elements.values()) + list(g.nodes.values()):
+        if hasattr(item, "regime"):
+            item.regime = regime
+    return g
+
+
+@pytest.mark.parametrize(("n_rows", "p_hot"), _HOT_ARRAYS)
+def test_a_hot_impingement_array_converges_cold(n_rows: int, p_hot: float) -> None:
+    """Without any retry. These four failed cold before #481: the penalty
+    accepted steps into the unphysical region, and reversed jets mixed as
+    negative mass parked the chambers at 1500-3100 K. Pinned incompressible:
+    its pressure-drop rows are linear in the chamber pressures, which is what
+    this cold guarantee rests on (see the compressible test below)."""
+    g = _hot_array(n_rows, p_hot, "incompressible")
     s = NetworkSolver(g)
     r = s.solve(auto_retry=False)
+    assert r["__success__"], r["__message__"]
+    assert all(s._derived_states[f"ia__c{i}"][0] < 1200.0 for i in range(1, n_rows + 1))
+
+
+@pytest.mark.parametrize(("n_rows", "p_hot"), _HOT_ARRAYS)
+def test_a_hot_impingement_array_converges_compressible(n_rows: int, p_hot: float) -> None:
+    """The same arrays compressible, on the default solve path (#605). Their
+    cold attempt alone is not guaranteed: the crossflow segments drive their
+    friction with a few Pa (the station momentum takes the rest of the drop),
+    where the Fanno mass-flow row goes as sqrt(drive), and the wall heat
+    changes node as a jet reverses. 5 rows at 1.01 bar stalls cold at |F| ~
+    0.13, and which cases do is not ordered by the drive. The incompressible
+    warm-start retry (#603) is the designed recovery; it must reach the
+    physical root, the chambers well below the hot gas."""
+    g = _hot_array(n_rows, p_hot, "compressible")
+    s = NetworkSolver(g)
+    r = s.solve()
     assert r["__success__"], r["__message__"]
     assert all(s._derived_states[f"ia__c{i}"][0] < 1200.0 for i in range(1, n_rows + 1))
 
