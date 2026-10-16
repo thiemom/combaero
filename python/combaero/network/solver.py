@@ -2368,9 +2368,8 @@ class NetworkSolver:
         Returns a dictionary mapping unknown names to their solved values.
 
         For cold solves (``x0=None``, ``init_strategy`` 'default' or
-        'analytical_pt_prop') on COMPRESSIBLE networks containing a
-        ``MultiPortChamberBase``, a failed solve is automatically
-        retried once from an outlet-referenced incompressible warm
+        'analytical_pt_prop') on COMPRESSIBLE networks, a failed solve is
+        automatically retried once from an outlet-referenced incompressible warm
         start (disable via ``auto_retry=False``): the network is
         re-solved in the incompressible regime with element densities
         evaluated at the DOWNSTREAM static pressure, and that solution
@@ -2382,10 +2381,15 @@ class NetworkSolver:
         evals/30 s; the seed even converges cases where the
         inlet-referenced seed fails -- 2026-07-05 outlet-ref seed
         experiment, tmp/outlet_ref_seed_experiment.py). When a
-        ``timeout`` is given and the retry is applicable, the primary
-        attempt gets 40% of the budget, the proxy at most 25%, and the
-        seeded retry the remainder (at least 30%). Compressible tee
-        networks are best given 90-120 s total.
+        ``timeout`` is given and the network holds a
+        ``MultiPortChamberBase``, the primary attempt gets 40% of the
+        budget, the proxy at most 25%, and the seeded retry the remainder
+        (at least 30%). Compressible tee networks are best given 90-120 s
+        total. Any other network keeps the whole budget for its cold
+        attempt and retries only in the time left, the proxy taking at most
+        half of it. Until #585 the retry was limited to junction networks; a
+        duct-fed effusion liner, whose cold compressible solve stalls, is
+        seeded to its root in one pass from the incompressible one.
 
         The mirror case: a network INCOMPRESSIBLE throughout (every
         two-regime element incompressible) whose cold solve fails is retried
@@ -2394,7 +2398,7 @@ class NetworkSolver:
         mass-flow residual forms converge from cold starts where the
         pressure-drop forms stall (a jet pump behind an incompressible pipe:
         zero entrainment from every cold seed, the physical root in a few
-        steps from the compressible one). Same budget split; the strategy is
+        steps from the compressible one). Same budget rules; the strategy is
         reported as ``compressible_warmstart``.
 
         Pass ``init_strategy='outletref_warmstart'`` to run the proxy
@@ -2591,7 +2595,6 @@ class NetworkSolver:
             auto_retry
             and x0 is None
             and init_strategy in ("default", "analytical_pt_prop")
-            and any(isinstance(e, MultiPortChamberBase) for e in self.network.elements.values())
             and (has_compressible or all_incompressible)
         )
         if not retry_applicable:
@@ -2607,19 +2610,43 @@ class NetworkSolver:
             )
 
         _t0 = time.time()
-        primary_timeout = 0.4 * timeout if timeout is not None else None
-        sol = self._solve_impl(
-            method=method,
-            timeout=primary_timeout,
-            options=options,
-            use_jac=use_jac,
-            x0=None,
-            init_strategy=init_strategy,
-            warmstart_maxfev=warmstart_maxfev,
-            lambda_steps=lambda_steps,
+        # Junction (MultiPortChamberBase) networks reserve budget for the
+        # retry up front: their cold path has slow pockets the seeded retry
+        # rescues (see solve). Any other network keeps its whole budget for
+        # the cold attempt, which is what converges it nearly always, and
+        # retries only in the time left (#585).
+        split_budget = any(
+            isinstance(e, MultiPortChamberBase) for e in self.network.elements.values()
         )
-        if sol.get("__success__", False):
+        primary_timeout = 0.4 * timeout if timeout is not None and split_budget else timeout
+        # The cold attempt's warnings are held back: its "did not converge"
+        # is not the outcome when the seeded retry runs (a coupled combustor
+        # liner warned on every operating point the retry then converged).
+        with warnings.catch_warnings(record=True) as primary_warnings:
+            warnings.simplefilter("always")
+            sol = self._solve_impl(
+                method=method,
+                timeout=primary_timeout,
+                options=options,
+                use_jac=use_jac,
+                x0=None,
+                init_strategy=init_strategy,
+                warmstart_maxfev=warmstart_maxfev,
+                lambda_steps=lambda_steps,
+            )
+
+        def replay(retrying: bool) -> dict[str, float]:
+            for w in primary_warnings:
+                if retrying and "did not converge" in str(w.message):
+                    continue
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
             return sol
+
+        if sol.get("__success__", False):
+            return replay(retrying=False)
+        left = None if timeout is None else timeout - (time.time() - _t0)
+        if not split_budget and left is not None and left <= 0.0:
+            return replay(retrying=False)
 
         primary_norm = sol.get("__final_norm__")
         primary_msg = str(sol.get("__message__", "")).strip()
@@ -2638,6 +2665,8 @@ class NetworkSolver:
         # seconds even for the incompressible proxy (observed 35 s on a
         # 16 kg/s 20 bar 5-tee net), so give it up to 60 s / 30% of budget.
         proxy_timeout = 60.0 if timeout is None else max(min(0.3 * timeout, 60.0), 10.0)
+        if not split_budget and left is not None:
+            proxy_timeout = min(proxy_timeout, 0.5 * left)
         _primary_diag = getattr(self, "_diagnostic_data", None)
         if all_incompressible:
             seed_x0 = self._compressible_seed(use_jac=use_jac, timeout=proxy_timeout)
@@ -2648,7 +2677,7 @@ class NetworkSolver:
                     f"{primary_msg} [compressible warm-start auto-retry "
                     "skipped: the compressible proxy solve did not converge]"
                 )
-                return sol
+                return replay(retrying=False)
             _seed_kind = "compressible"
         else:
             seed_x0 = self._outlet_ref_incompressible_seed(use_jac=use_jac, timeout=proxy_timeout)
@@ -2672,11 +2701,15 @@ class NetworkSolver:
                 "skipped: neither the outlet- nor the inlet-referenced "
                 "proxy solve converged]"
             )
-            return sol
+            return replay(retrying=False)
 
         remaining = None
         if timeout is not None:
-            remaining = max(timeout - (time.time() - _t0), 0.3 * timeout)
+            # The proxy took at most half of what was left, so the seeded
+            # retry keeps at least the other half.
+            floor = 0.3 * timeout if split_budget else 0.0
+            remaining = max(timeout - (time.time() - _t0), floor)
+        replay(retrying=True)
         retry_sol = self._solve_impl(
             method=method,
             timeout=remaining,

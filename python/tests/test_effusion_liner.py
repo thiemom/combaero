@@ -10,6 +10,7 @@ coupling between them, and the Jacobian.
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 import pytest
@@ -166,13 +167,17 @@ def test_global_jacobian_matches_finite_differences() -> None:
     """Above McGreehan-Schotsch's Re floor (1e4), where the correlation's own
     derivative is the value's: exact, including the crossflow chain into the
     neighbour segments and the stations' momentum."""
-    s, r = _solve(_net(_liner(3), p_in=1.12e5, p_out=1.11e5))
-    d = r["__element_diag__"]
-    for i in (1, 2, 3):
-        T, P = s._derived_states[f"ln__b{i}"][0], r[f"ln__b{i}.P"]
-        st = NetworkMixtureState(T=T, P=P, Pt=P, Tt=T, m_dot=d[f"ln__p{i}"]["m_dot"], Y=Y_AIR)
-        assert s.network.elements[f"ln__p{i}"]._hole_reynolds(st) > 1.0e4
+    # Below the floor the derivative is deliberately the slope AT the floor
+    # while the value is held (src/orifice.cpp), so the check must sit above
+    # it, judged on the state the element itself reads. At 1.12 bar the
+    # compressible panel 1 read Re = 9815; 1.14 bar clears it in both regimes.
+    s, r = _solve(_net(_liner(3), p_in=1.14e5, p_out=1.13e5))
     x = np.array(r["__x_solution__"], dtype=float)
+    for i in (1, 2, 3):
+        panel = s.network.elements[f"ln__p{i}"]
+        st = s._get_node_state(s.network.nodes[panel.from_node], x)
+        st.m_dot = r[f"ln__p{i}.m_dot"]
+        assert panel._hole_reynolds(st) > 1.05e4
     _, jac = s._residuals_and_jacobian(x)
     fd = approx_derivative(
         lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-6, 1e-9)
@@ -201,3 +206,25 @@ def test_a_duct_fed_panel_must_use_the_crossflow_correlation() -> None:
     p.resolve_topology(g)
     with pytest.raises(ValueError, match="McGreehanSchotsch"):
         p.validate()
+
+
+def test_a_compressible_liner_converges_from_cold() -> None:
+    """Its cold compressible solve stalls (|F| ~ 1.5 at hybr's last step); the
+    incompressible warm start seeds the root in one pass. That retry was
+    limited to junction networks, so this liner, which has none, failed
+    (#585). The cold attempt's own "did not converge" is not the outcome and
+    is no longer reported."""
+    g = _net(_liner())
+    for item in list(g.elements.values()) + list(g.nodes.values()):
+        if hasattr(item, "regime"):
+            item.regime = "compressible"
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        r = NetworkSolver(g).solve()
+    assert r["__success__"], r.get("__message__")
+    assert not [w for w in caught if "did not converge" in str(w.message)]
+    # The same liner incompressible: the two part by O(Ma^2), Ma ~ 0.1 here.
+    ri = NetworkSolver(_net(_liner())).solve()
+    for i in range(1, 5):
+        k = f"ln__p{i}.m_dot"
+        assert r[k] == pytest.approx(ri[k], rel=0.03)
