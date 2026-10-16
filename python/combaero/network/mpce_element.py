@@ -147,6 +147,12 @@ class MultiPortChamberElement(MultiPortChamberBase):
         on observed joining flow.
     """
 
+    def row_scale_kinds(self) -> list[str]:
+        """RESIDUAL-ROW-SCALING: the base pattern -- N impulse rows (Pa),
+        then the sum-mass row (kg/s). Confirmed against the Jacobian at
+        converged solves (row-kind classifier)."""
+        return super().row_scale_kinds()
+
     jacobian_method: str = "sympy"
 
     # Soft-barrier penalty scale used when ``strict=False`` and the observed
@@ -905,6 +911,12 @@ class ConstantKTeeElement(MultiPortChamberElement):
     (tmp/mpce_audit_v2_runner.py ConstantKTee, 2026-07-04: 28/32
     converged in 4-14 evaluations).
     """
+
+    def row_scale_kinds(self) -> list[str]:
+        """RESIDUAL-ROW-SCALING: the base pattern -- N impulse rows (Pa),
+        then the sum-mass row (kg/s). Confirmed against the Jacobian at
+        converged solves (row-kind classifier)."""
+        return super().row_scale_kinds()
 
     def __init__(
         self,

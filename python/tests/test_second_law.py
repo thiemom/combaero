@@ -200,6 +200,8 @@ class _Pre541AreaChange(AreaChangeElement):
     """#541 as it was: the loss coupled to the downstream STATIC pressure, so
     a downstream chamber's dynamic head appeared as free total pressure."""
 
+    residual_scale_kind = "p"  # still a pressure balance, Pa
+
     def residuals(self, state_in, state_out):
         res, jac = super().residuals(state_in, state_out)
         res[0] += state_out.Pt - state_out.P

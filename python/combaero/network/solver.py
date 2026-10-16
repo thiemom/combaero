@@ -263,15 +263,16 @@ class NetworkSolver:
         Who declares what (in residual-row order):
           * nodes: their own rows "p", then the mass-conservation row "mdot"
             (skipped for junction ports);
-          * MultiPortChamberBase subclasses: row_scale_kinds() -- REQUIRED
-            when the row pattern differs (EjectorElement overrides it);
-          * any element whose units depend on its configuration: a
-            ``residual_scale_kind`` property (ChannelElement: "mdot" when
-            compressible, "p" otherwise) or class attribute (PressureLoss,
-            AreaChange, BorderCarnotLoss, Vortex: "p" -- all four were filed
-            "mdot" by the default below until #614, 1e5-1e9 too heavy);
-          * everything else by class: ChannelElement, LosslessConnection and
-            TeeJunction "p"; other elements "mdot".
+          * junctions (MultiPortChamberBase): row_scale_kinds(), one per row;
+          * every other element: ``residual_scale_kind``, a class attribute,
+            or a property when the units follow the configuration
+            (ChannelElement: "mdot" when compressible, "p" otherwise).
+        There is NO default. ``declared_row_kinds`` (components.py) raises at
+        network validation unless the kind is declared on the class that
+        defines ``residuals`` or a subclass of it, so a subclass that rewrites
+        its residual must re-declare its units. Until then a silent "mdot"
+        default filed PressureLoss, AreaChange, BorderCarnotLoss and Vortex
+        rows (all Pa) 1e5-1e9 too heavily (#614).
         Changing an element's residual form means changing its declared kind
         in the same commit.
 
@@ -298,7 +299,7 @@ class NetworkSolver:
             if not getattr(node, "_is_junction_port", False):
                 scales.append(ref_mdot)
 
-        from .components import MultiPortChamberBase, TeeJunctionElement
+        from .components import declared_row_kinds
 
         _row_scale_kind_map = {"p": ref_p, "mdot": ref_mdot}
         for element in self.network.elements.values():
@@ -319,25 +320,11 @@ class NetworkSolver:
             # silently reintroduces the same class of stall, hence
             # row_scale_kinds() being a real per-subclass override point
             # rather than a hard-coded N-then-1 pattern.
-            if isinstance(element, MultiPortChamberBase):
-                scales.extend(_row_scale_kind_map[k] for k in element.row_scale_kinds())
-                continue
-            # RESIDUAL-ROW-SCALING: an element whose residual's units depend
-            # on its configuration declares them (residual_scale_kind); see
-            # this method's docstring.
-            kind = getattr(element, "residual_scale_kind", None)
-            if kind is not None:
-                elem_scale = _row_scale_kind_map[kind]
-            else:
-                elem_scale = (
-                    ref_p
-                    if isinstance(
-                        element,
-                        (ChannelElement, LosslessConnectionElement, TeeJunctionElement),
-                    )
-                    else ref_mdot
-                )
-            scales.extend([elem_scale] * element.n_equations())
+            # RESIDUAL-ROW-SCALING: every element declares its rows' units
+            # (row_scale_kinds() for a junction, residual_scale_kind
+            # otherwise); there is no default to fall back on (see this
+            # method's docstring and declared_row_kinds).
+            scales.extend(_row_scale_kind_map[k] for k in declared_row_kinds(element))
 
         return np.asarray(scales, dtype=float)
 

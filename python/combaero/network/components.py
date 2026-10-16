@@ -1237,6 +1237,51 @@ FLOW_REVERSAL_M_SCALE = 1e-4
 ORIFICE_REVERSAL_P_SCALE = 0.1
 
 
+_ROW_KINDS = ("p", "mdot")
+
+
+def _defining_class(cls: type, attr: str) -> type | None:
+    return next((k for k in cls.__mro__ if attr in k.__dict__), None)
+
+
+def declared_row_kinds(element: "NetworkElement") -> list[str]:
+    """The element's residual row kinds, one per row (RESIDUAL-ROW-SCALING).
+
+    Raises TypeError unless the units are declared where the residual is:
+    ``residual_scale_kind`` (``row_scale_kinds()`` for a junction) must be
+    defined on the class that defines ``residuals`` or on a subclass of it.
+    A subclass that rewrites its residual therefore cannot inherit its
+    parent's units unseen; it re-declares them, if only to confirm them.
+    """
+    cls = type(element)
+    junction = isinstance(element, MultiPortChamberBase)
+    attr = "row_scale_kinds" if junction else "residual_scale_kind"
+    res_owner = _defining_class(cls, "residuals")
+    kind_owner = _defining_class(cls, attr)
+    if (
+        kind_owner is None
+        or kind_owner is NetworkElement
+        or not (res_owner is not None and issubclass(kind_owner, res_owner))
+    ):
+        raise TypeError(
+            f"{cls.__name__} ({element.id!r}): declare the units of its residual rows "
+            f"with {attr} on {res_owner.__name__ if res_owner else cls.__name__} or a "
+            f"subclass (found on {kind_owner.__name__ if kind_owner else 'none'}); "
+            "see RESIDUAL-ROW-SCALING in NetworkSolver._build_residual_scales."
+        )
+    kinds = (
+        list(element.row_scale_kinds())
+        if junction
+        else [element.residual_scale_kind] * element.n_equations()
+    )
+    bad = [k for k in kinds if k not in _ROW_KINDS]
+    if bad:
+        raise TypeError(
+            f"{cls.__name__} ({element.id!r}): row kinds must be 'p' or 'mdot', got {bad}"
+        )
+    return kinds
+
+
 def _pressure_blend(dpt: float) -> tuple[float, float]:
     """(w, dw/d(dpt)): the forward weight of an orifice, 1 for Pt_from >> Pt_to."""
     x = dpt / ORIFICE_REVERSAL_P_SCALE
@@ -1611,6 +1656,16 @@ class NetworkElement(ABC):
     #: for the incompressible validity report (#588). Empty: the element has
     #: no incompressible closure, or does not report one.
     validity_mach_keys: tuple[str, ...] = ()
+
+    #: Units of the residual rows, "p" (Pa) or "mdot" (kg/s), for the solver's
+    #: row scaling (RESIDUAL-ROW-SCALING, see NetworkSolver._build_residual_scales).
+    #: REQUIRED, with no default: declare it on the class that defines
+    #: ``residuals`` (a class attribute, or a property when the units follow
+    #: the configuration). Junctions declare ``row_scale_kinds()`` instead.
+    #: ``declared_row_kinds`` enforces both at network validation: a silent
+    #: "mdot" default misfiled pressure rows 1e5-1e9 too heavily three times
+    #: (MPCE impulse rows, the compressible channel #481, four Pa elements #614).
+    residual_scale_kind: str | None = None
 
     def __init__(self, id: str, from_node: str, to_node: str):
         self.id = id
@@ -2679,6 +2734,9 @@ class OrificeElement(NetworkElement):
     the hole velocity and there is no beta. They are not interchangeable, and
     there is deliberately no 'Auto' arm choosing between them from geometry.
     """
+
+    #: RESIDUAL-ROW-SCALING: m - m_calc, kg/s (every orifice-family closure).
+    residual_scale_kind = "mdot"
 
     # The jet: its vena-contracta Mach from the pressure ratio, not the bore's.
     validity_mach_keys = ("mach_throat",)
@@ -4162,6 +4220,9 @@ class ImpingementPlateElement(OrificeElement):
         The user's rig-matching knob. 1.0 unless they set it.
     """
 
+    #: RESIDUAL-ROW-SCALING: its residual is the orifice's, m - m_calc, kg/s.
+    residual_scale_kind = "mdot"
+
     # htc_and_T's dh_dmdot comes from C++ in the signed jet flow (#481).
     _htc_dmdot_is_signed = True
 
@@ -4571,6 +4632,9 @@ class LosslessConnectionElement(NetworkElement):
     Inherently preserves total pressure: Pt_in = Pt_out.
     Does not require geometric parameters.
     """
+
+    #: RESIDUAL-ROW-SCALING: a total-pressure equality, Pa.
+    residual_scale_kind = "p"
 
     def __init__(self, id: str, from_node: str, to_node: str):
         super().__init__(id, from_node, to_node)
@@ -5950,6 +6014,13 @@ class CrossflowSegmentElement(ChannelElement):
     incompressible balance as Ma -> 0 (#585).
     """
 
+    @property
+    def residual_scale_kind(self) -> str:
+        """RESIDUAL-ROW-SCALING: the segment branches its residual on the
+        channel's regime rule (m - m_calc compressible, a pressure drop
+        otherwise), so its units are the channel's."""
+        return ChannelElement.residual_scale_kind.fget(self)
+
     def __init__(
         self,
         id: str,
@@ -6430,6 +6501,9 @@ class TeeJunctionElement(NetworkElement):
     Bassett 2001 derives K5/K11 (straight-arm coefficients) under the assumption
     F_straight = F_C; the straight-arm area is therefore not a free parameter.
     """
+
+    #: RESIDUAL-ROW-SCALING: total-pressure balances, Pa (both rows).
+    residual_scale_kind = "p"
 
     def __init__(
         self,

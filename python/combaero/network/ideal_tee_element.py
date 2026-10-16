@@ -88,6 +88,12 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
     carries the turning loss.
     """
 
+    def row_scale_kinds(self) -> list[str]:
+        """RESIDUAL-ROW-SCALING: the base pattern -- N impulse rows (Pa),
+        then the sum-mass row (kg/s). Confirmed against the Jacobian at
+        converged solves (row-kind classifier)."""
+        return super().row_scale_kinds()
+
     def __init__(
         self,
         id: str,

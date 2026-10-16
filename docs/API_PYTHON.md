@@ -1050,6 +1050,9 @@ panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
   its flow handle is the main inlet.
 
 ### Network Elements
+
+**Writing or subclassing an element.** Every element declares the units of its residual rows for the solver's row scaling: `residual_scale_kind = "p"` (Pa) or `"mdot"` (kg/s), a class attribute or a property; a junction (`MultiPortChamberBase`) declares `row_scale_kinds()`, one per row. There is no default. `FlowNetwork.validate()` raises `TypeError` unless the declaration sits on the class that defines `residuals` or a subclass of it, so a subclass that rewrites `residuals` re-declares its units. A wrong kind weights the row 1e5-1e9 wrong in the norm the root finder minimises (RESIDUAL-ROW-SCALING in `NetworkSolver._build_residual_scales`).
+
 ```python
 from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
