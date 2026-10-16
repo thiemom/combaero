@@ -76,7 +76,7 @@ const NASA9_Interval& get_interval(std::size_t species_idx, double T) {
 
 // --- the C2 re-fit (#549) ----------------------------------------------------
 
-std::atomic<int> g_thermo_model{static_cast<int>(ThermoModel::NASA9)};
+std::atomic<int> g_thermo_model{static_cast<int>(ThermoModel::NASA9_C2)};
 
 // The bridge covering T for this species, or nullptr (NASA9 model, or T
 // outside every window).

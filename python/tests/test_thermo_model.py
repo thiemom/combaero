@@ -16,12 +16,18 @@ AIR = cb.species.dry_air()
 
 @pytest.fixture
 def restore_model():
-    yield
+    """Start on the published NASA-9 and leave the model as it was found, so
+    no test changes the thermo of the tests after it on the same worker."""
+    before = cb.thermo_model()
     cb.set_thermo_model("nasa9")
+    yield
+    cb.set_thermo_model(before)
 
 
-def test_the_default_is_nasa9() -> None:
-    assert cb.thermo_model() == "nasa9"
+def test_the_default_is_the_c2_refit() -> None:
+    """The solver's thermo since #549's step 3: C2 at every join, identical to
+    NASA-9 outside the bridge windows, bounded tails past the data (#606)."""
+    assert cb.thermo_model() == "nasa9_c2"
 
 
 def test_the_switch_round_trips(restore_model) -> None:
@@ -34,7 +40,7 @@ def test_the_switch_round_trips(restore_model) -> None:
 def test_an_unknown_model_is_refused(restore_model) -> None:
     with pytest.raises(ValueError, match="nasa9_c2"):
         cb.set_thermo_model("nasa7")
-    assert cb.thermo_model() == "nasa9"
+    assert cb.thermo_model() == "nasa9"  # unchanged by the refused call
 
 
 @pytest.mark.parametrize("T", [300.0, 900.0, 1100.0, 2500.0])

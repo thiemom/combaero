@@ -20,8 +20,11 @@ using combaero::ThermoModel;
 namespace {
 
 struct ModelGuard {
-  explicit ModelGuard(ThermoModel m) { combaero::set_thermo_model(m); }
-  ~ModelGuard() { combaero::set_thermo_model(ThermoModel::NASA9); }
+  explicit ModelGuard(ThermoModel m) : before(combaero::thermo_model()) {
+    combaero::set_thermo_model(m);
+  }
+  ~ModelGuard() { combaero::set_thermo_model(before); }
+  ThermoModel before;
 };
 
 const ThermoModel kModels[] = {ThermoModel::NASA9, ThermoModel::NASA9_C2};

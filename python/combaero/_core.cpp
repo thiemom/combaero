@@ -2119,10 +2119,10 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         }
       },
       py::arg("name"),
-      "Select the species thermo every property evaluates (#549): 'nasa9'\n"
-      "(the published polynomials, the default) or 'nasa9_c2' (each interval\n"
-      "join bridged by a C2 cp; h and s identical to NASA-9 outside the\n"
-      "|T - T_join| < 0.05 T_join windows). Process-wide.");
+      "Select the species thermo every property evaluates (#549): 'nasa9_c2'\n"
+      "(the default: each interval join bridged by a C2 cp; h and s identical\n"
+      "to NASA-9 outside the |T - T_join| < 0.05 T_join windows) or 'nasa9'\n"
+      "(the published polynomials). Process-wide.");
   m.def(
       "thermo_model",
       []() {

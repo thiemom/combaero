@@ -173,14 +173,14 @@ Omega22Result omega22_and_derivative(double T_star, double delta_star);
 double dcp_R_dT(std::size_t species_idx, double T);
 
 // thermo.h: which species thermo every property evaluates (#549).
-// NASA9 (default): the published NASA-9 polynomials, C0 in cp at the interval
+// NASA9: the published NASA-9 polynomials, C0 in cp at the interval
 // joins but not C1 (dcp/dT jumps 0.15-100 % at 1000 K, up to 48 % at 6000 K).
 // NASA9_C2: each join bridged inside |T - T_join| < 0.05 T_join by a degree-7
 // cp/R, C2 with NASA-9 at both window edges, its h and s rises across the
 // window equal to NASA-9's. Identical to NASA-9 outside the windows; inside,
 // cp within 4.8e-4, h within 1.1e-5 cp T, s within 3.1e-5 R. The bridges are
 // generated (thermo_data_generator/generate_c2_refit.py ->
-// include/thermo_c2_refit_data.h). Process-wide.
+// include/thermo_c2_refit_data.h). NASA9_C2 is the default (#549). Process-wide.
 enum class ThermoModel { NASA9, NASA9_C2 };
 void set_thermo_model(ThermoModel model);
 ThermoModel thermo_model();
