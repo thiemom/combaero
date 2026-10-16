@@ -177,7 +177,9 @@ TEST(ThermoTails, EnthalpyAndEntropyAreTheIntegralsOfCpOnTheTails) {
 }
 
 // Recovers T from h, s and u from a 300 K guess, inside the data and far
-// outside it, for every pure species and a burnt mixture.
+// outside it, for every pure species and a burnt mixture -- including ON the
+// interval joins, where the published h and s step slightly and a target can
+// have no exact root (only Linux and Windows CI hit it at 1000 K).
 TEST(ThermoTails, TheInversesRecoverTAnywhere) {
   std::vector<std::vector<double>> Xs;
   for (std::size_t i = 0; i < combaero::num_species(); ++i) {
@@ -193,7 +195,7 @@ TEST(ThermoTails, TheInversesRecoverTAnywhere) {
   for (ThermoModel m : kModels) {
     ModelGuard g(m);
     for (const auto& X : Xs) {
-      for (double T : {20.0, 120.0, 199.0, 300.0, 1000.0, 2500.0, 6500.0, 9000.0, 30000.0, 60000.0}) {
+      for (double T : {20.0, 120.0, 199.0, 300.0, 1000.0, 2500.0, 6000.0, 6500.0, 9000.0, 20000.0, 30000.0, 60000.0}) {
         EXPECT_NEAR(combaero::calc_T_from_h(combaero::h(T, X), X, 300.0), T, 1e-6 * T) << T;
         EXPECT_NEAR(combaero::calc_T_from_s(combaero::s(T, X, P), P, X, 300.0), T, 1e-6 * T) << T;
         EXPECT_NEAR(combaero::calc_T_from_u(combaero::u(T, X), X, 300.0), T, 1e-6 * T) << T;

@@ -363,11 +363,15 @@ double solve_increasing_T(FDF&& f_df, double T_guess, double tol,
     } else {
       T_new = std::max(T_new, 0.25 * T);
     }
-    // Converged only on a small NEWTON step: its result is accurate to far
-    // below tol, so the inverse is smooth in its target (a bisection
-    // midpoint is only within tol, which finite differences see), and a
-    // clamped step shrinking toward 0 K is a target no T reaches.
-    if (have_lo && have_hi && hi - lo <= 4.0 * std::numeric_limits<double>::epsilon() * hi) {
+    // Converged on a small NEWTON step: its result is accurate to far below
+    // tol, so the inverse is smooth in its target (a bisection midpoint is
+    // only within tol, which finite differences see), and a clamped step
+    // shrinking toward 0 K is a target no T reaches. Or on a bracket
+    // narrower than tol: the published NASA-9 h and s step slightly at the
+    // interval joins (H/R up to 5e-3 K, S/R up to 4e-7 at 6000 K), so a
+    // target on a join can have no exact root for Newton to land on.
+    if (have_lo && have_hi &&
+        hi - lo <= std::max(tol, 4.0 * std::numeric_limits<double>::epsilon() * hi)) {
       return T_new;
     }
     if (T_new == T_newton && std::abs(T_new - T) < tol) {
