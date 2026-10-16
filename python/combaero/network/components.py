@@ -5929,6 +5929,10 @@ class CrossflowSegmentElement(ChannelElement):
 
     FRICTION follows ``ChannelElement``: Darcy-Weisbach on the
     equivalent-area diameter (the C++ channel's circular convention, #463).
+
+    COMPRESSIBLE, the friction is the Fanno flow and the station drop shifts
+    its discharge target: Pt_in drives against Pt_out + dP_momentum, the
+    incompressible balance as Ma -> 0 (#585).
     """
 
     def __init__(
@@ -6038,6 +6042,8 @@ class CrossflowSegmentElement(ChannelElement):
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None = None,
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        if self.residual_scale_kind == "mdot":
+            return self._compressible_station_residuals(state_in, state_out, flows)
         res, jac = super().residuals(state_in, state_out)
         row = jac[0]
         own = f"{self.id}.m_dot"
@@ -6053,6 +6059,51 @@ class CrossflowSegmentElement(ChannelElement):
             for key, d in ((f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)):
                 row[key] = row.get(key, 0.0) - d
         return res, jac
+
+    def _compressible_station_residuals(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None,
+    ) -> tuple[list[float], "LazyJacobian"]:
+        """m - m_calc, the station momentum drop shifting the Fanno target.
+
+        The compressible channel row is a MASS FLOW (#481); the station terms
+        are pressures. Subtracting them from that row, as the incompressible
+        form does, mixed kg/s with Pa and solved a meaningless equation: a
+        1 um bleed segment held 1 kPa at zero flow. Instead the friction
+        drives from Pt_in to Pt_out + dP_momentum, so as Ma -> 0 the row is
+        the incompressible Pt_in - Pt_out = dP_friction + dP_momentum.
+        """
+        f_mult = self.surface.f_multiplier if self.surface else 1.0
+        terms = self._momentum_terms(state_in, state_out, flows)
+        target = copy.copy(state_out)
+        target.Pt = state_out.Pt + sum(t[0].dP for t in terms)
+        m_calc, _, _ = self._compressible_flow(state_in, target, f_mult, derivatives=False)
+
+        def jacobian() -> dict[int, dict[str, float]]:
+            _, derivs, _ = self._compressible_flow(state_in, target, f_mult)
+            own = f"{self.id}.m_dot"
+            row: dict[str, float] = {own: 1.0}
+            for name, d in derivs.items():
+                row[name] = row.get(name, 0.0) - d
+            # d m_calc / d dP_momentum: the shift enters as to_node's Pt.
+            k = derivs.get(f"{self.to_node}.Pt", 0.0)
+            for r, node, own_side, nb_node, nb in terms:
+                d_own = r.d_dm_a if own_side == "a" else r.d_dm_b
+                row[own] -= k * d_own
+                if nb is not None:
+                    d_nb = r.d_dm_b if own_side == "a" else r.d_dm_a
+                    names = nb.unknowns()
+                    for local, coeff in nb.flow_jac_at_node(
+                        nb_node, list(range(len(names)))
+                    ).items():
+                        row[names[local]] = row.get(names[local], 0.0) - k * d_nb * coeff
+                for key, d in ((f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)):
+                    row[key] = row.get(key, 0.0) - k * d
+            return {0: row}
+
+        return [state_in.m_dot - m_calc], LazyJacobian(jacobian)
 
     def htc_and_T(self, state: NetworkMixtureState, flows: dict[str, float] | None = None):
         return super().htc_and_T(state)
