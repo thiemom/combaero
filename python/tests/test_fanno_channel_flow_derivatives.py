@@ -209,3 +209,34 @@ def test_without_derivatives_the_flow_is_the_same(P_target: float) -> None:
     assert bare.choked == full.choked and bare.M_exit == pytest.approx(full.M_exit, rel=1e-12)
     if P_target != PT - 0.5:
         assert bare.dG_dPt0 == 0.0 and bare.dG_dTt0 == 0.0
+
+
+@pytest.mark.parametrize("length", [0.0127, 1.0], ids=["short", "long"])
+@pytest.mark.parametrize("drive", [5.0, 29.0, 400.0, 2.0e4])
+def test_the_flow_does_not_depend_on_the_warm_start(length: float, drive: float) -> None:
+    """The exit-Mach guess only seeds the bracket. A guess far below the root
+    could not be widened past ~3.6x itself, so Brent ran without a sign change
+    and returned the bracket's end: a short duct warm-started at M 0.01 gave
+    G = 13.5 for every drive from 5 to 400 Pa (#585)."""
+    X = MIXES["air"]
+
+    def g(guess: float) -> float:
+        return cb.fanno_channel_flow(
+            1.0e5,
+            300.0,
+            X,
+            1.0e5 - drive,
+            True,
+            length,
+            0.028,
+            0.0,
+            "haaland",
+            1.0,
+            guess,
+            [],
+            False,
+        ).G
+
+    cold = g(-1.0)
+    for guess in (1e-4, 0.01, 0.1, 0.5, 0.99):
+        assert g(guess) == pytest.approx(cold, rel=1e-9), guess
