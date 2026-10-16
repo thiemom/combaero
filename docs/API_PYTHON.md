@@ -101,6 +101,18 @@ most 4.8e-4 (1e-4 at 1000 K), h by 1.1e-5 cp T, s by 3.1e-5 R. The setting is
 process-wide; switch before building and solving a network, not during. The
 default stays NASA-9 until the re-fit is adopted (#549).
 
+### Beyond the Data (#606)
+The data runs from 200 K to 20 000 K (N2, O2, AR, CO2, CO, H2) or 6000 K (H2O,
+NH3, CH4, the alkanes), CEA's own ranges. Past either end, under both models,
+cp/R fades C2 from the end interval to a constant: over 0.25 T_lo (200 -> 150
+K) below and 0.1 T_hi above (6000 -> 6600 K, 20 000 -> 22 000 K), h and s its
+exact integrals. cp stays positive and h, s, u monotone at every T, for the
+solvers and the inverses -- not physics (no dissociation, no condensation).
+Before, the end polynomials ran on: cp/R -25 for CH4 at 50 K, -241 for H2O at
+20 000 K. `calc_T_from_h/_s/_u` (and their `_mass` and `sv` forms) raise
+`RuntimeError` for a target no positive T reaches instead of returning the last
+iterate.
+
 
 ---
 

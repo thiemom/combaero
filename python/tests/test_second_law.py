@@ -289,8 +289,8 @@ def test_a_control_volume_that_cannot_be_evaluated_is_not_checked(monkeypatch) -
 
 
 def test_heat_beyond_the_streams_enthalpy_is_refused_by_name() -> None:
-    """calc_T_from_h_mass returns a huge negative T below its range instead
-    of raising; the check refuses it with the heat and the stream named."""
+    """calc_T_from_h_mass raises for an enthalpy no positive T reaches (#606);
+    the check refuses it with the heat and the stream named."""
     from combaero.network.second_law import SecondLawReport, _Stream
 
     report = SecondLawReport.__new__(SecondLawReport)

@@ -18,6 +18,20 @@ constexpr double BOLTZMANN = 1.380649e-23;
 // Avogadro's number [1/mol]
 constexpr double AVOGADRO = 6.02214076e23;
 
+// Species thermo beyond its NASA-9 data (#606). Past each end of a species'
+// data (T_lo = 200 K; T_hi = 6000 or 20000 K) cp/R leaves the end interval's
+// polynomial on the quartic that matches its value, slope and curvature there
+// and levels off (zero slope and curvature) after a fade of TAIL_FRACTION_LOW
+// T_lo below and TAIL_FRACTION_HIGH T_hi above; beyond that cp is constant.
+// h and s are its exact integrals. This keeps cp positive and h, s monotone
+// at every T for the solvers and the inverses; it is not physics (no
+// dissociation above the data, no condensation below it).
+constexpr double TAIL_FRACTION_LOW = 0.25;
+constexpr double TAIL_FRACTION_HIGH = 0.1;
+// s_R and h_RT hold their value at this T below it (ln T, 1/T); cp_R and the
+// dimensional h are defined at every T.
+constexpr double T_FLOOR = 10.0;
+
 } // namespace combaero::thermo
 
 namespace combaero {
@@ -51,9 +65,10 @@ enum class ThermoModel { NASA9, NASA9_C2 };
 void set_thermo_model(ThermoModel model);
 ThermoModel thermo_model();
 
-// NASA polynomial evaluations (dimensionless)
+// NASA polynomial evaluations (dimensionless), with the tails beyond the data
+// (thermo::TAIL_FRACTION_LOW/HIGH) under either model.
 double cp_R(std::size_t species_idx, double T);
-// d(cp/R)/dT of one species [1/K]; 0 below the 10 K clamp cp_R applies.
+// d(cp/R)/dT of one species [1/K]; 0 on the constant tails.
 double dcp_R_dT(std::size_t species_idx, double T);
 double h_RT(std::size_t species_idx, double T);
 double s_R(std::size_t species_idx, double T);
@@ -98,7 +113,11 @@ double ds_dT(double T, const std::vector<double>& X);
 double dcp_dT(double T, const std::vector<double>& X);
 double dg_over_RT_dT(double T, const std::vector<double>& X);
 
-// Inverse calculations (solving for temperature)
+// Inverse calculations (solving for temperature). h, s, u and the sv form are
+// strictly increasing in T at every T (the tails keep cp > 0), so each has one
+// root: safeguarded Newton (factor-4 steps until bracketed, then bisection
+// when a step leaves the bracket). They throw std::runtime_error if they do
+// not converge in max_iter, rather than return the last iterate.
 double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);

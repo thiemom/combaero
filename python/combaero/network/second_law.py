@@ -60,7 +60,6 @@ Not checked: elements without a solved flow, the legacy
 from __future__ import annotations
 
 import copy
-import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -198,15 +197,15 @@ class SecondLawReport:
             return inflow.Tt
         X = _X(inflow.Y)
         h = float(cb.h_mass(inflow.Tt, X)) + Q / inflow.m
-        T = float(cb.calc_T_from_h_mass(h, X, inflow.Tt))
-        # The inverse does not refuse an enthalpy below its range: it returned
-        # -2.4e25 K for a wall taking 3.5 MJ/kg from a stream holding 1.45.
-        if not (math.isfinite(T) and T > 0.0):
+        # An enthalpy no positive T reaches (a wall taking 3.5 MJ/kg from a
+        # stream holding 1.45): the inverse raises (#606).
+        try:
+            return float(cb.calc_T_from_h_mass(h, X, inflow.Tt))
+        except RuntimeError as err:
             raise ValueError(
                 f"the heat ({Q:.4g} W) takes more than the stream's enthalpy "
                 f"({inflow.m:.4g} kg/s at {inflow.Tt:.1f} K)"
-            )
-        return T
+            ) from err
 
     def _outlet_Pt(self, eid: str, dn: str, m: float, forward: bool) -> float:
         """Total pressure the element delivers at its outlet node.

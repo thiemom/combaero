@@ -4,11 +4,15 @@
 #include "../include/thermo_c2_refit_data.h"
 #include "../include/thermo_transport_data.h"
 #include "../include/transport.h"
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace combaero {
@@ -167,6 +171,214 @@ double bridge_S_R(std::size_t species_idx, const C2Bridge& b, double T) {
   const auto& L = left_interval(species_idx, b.T_join).coeffs;
   return nasa_S_R(L, b.T_join - w) + w * r * acc;
 }
+
+// --- the tails beyond the data (#606) ----------------------------------------
+
+// One end's tail. t = (T - T0) / w >= 0 on its side (w < 0 below the data);
+// cp/R = p(t) on t < 1, the quartic C2 with NASA-9 at T0 and with p' = p'' = 0
+// at t = 1, and cp_inf = p(1) beyond.
+struct Tail {
+  double T0 = 0.0;
+  double w = 0.0;
+  std::array<double, 5> c{};  // p(t), ascending powers
+  double H0 = 0.0;            // H/R [K] and S/R of the data at T0
+  double S0 = 0.0;
+  double cp_inf = 0.0;
+  double T_end = 0.0;  // T0 + w, where the fade ends
+  double H_end = 0.0;
+  double S_end = 0.0;
+  // p(t) = (t - t_pole) Q(t) + r with t_pole = -T0 / w (T = 0): S/R in closed
+  // form, since cp/(R T) dT = (Q(t) + r / (t - t_pole)) dt.
+  std::array<double, 4> Q{};
+  double r = 0.0;
+};
+
+struct SpeciesTails {
+  Tail lo;
+  Tail hi;
+  double T_lo = 0.0;  // the data's own range
+  double T_hi = 0.0;
+};
+
+double tail_p(const Tail& tl, double t) {
+  double acc = 0.0;
+  for (std::size_t k = tl.c.size(); k-- > 0;) {
+    acc = acc * t + tl.c[k];
+  }
+  return acc;
+}
+
+double tail_p_dt(const Tail& tl, double t) {
+  double acc = 0.0;
+  for (std::size_t k = tl.c.size(); k-- > 1;) {
+    acc = acc * t + static_cast<double>(k) * tl.c[k];
+  }
+  return acc;
+}
+
+// Integral of p over [0, t].
+double tail_p_int(const Tail& tl, double t) {
+  double acc = 0.0;
+  for (std::size_t k = tl.c.size(); k-- > 0;) {
+    acc = acc * t + tl.c[k] / static_cast<double>(k + 1);
+  }
+  return acc * t;
+}
+
+// Integral of Q over [0, t].
+double tail_Q_int(const Tail& tl, double t) {
+  double acc = 0.0;
+  for (std::size_t k = tl.Q.size(); k-- > 0;) {
+    acc = acc * t + tl.Q[k] / static_cast<double>(k + 1);
+  }
+  return acc * t;
+}
+
+double tail_H_R(const Tail& tl, double T) {
+  const double t = (T - tl.T0) / tl.w;
+  if (t >= 1.0) {
+    return tl.H_end + tl.cp_inf * (T - tl.T_end);
+  }
+  return tl.H0 + tl.w * tail_p_int(tl, t);
+}
+
+double tail_S_R(const Tail& tl, double T) {
+  const double t = (T - tl.T0) / tl.w;
+  if (t >= 1.0) {
+    return tl.S_end + tl.cp_inf * std::log(T / tl.T_end);
+  }
+  return tl.S0 + tail_Q_int(tl, t) + tl.r * std::log(T / tl.T0);
+}
+
+Tail make_tail(const std::array<double, 10>& a, double T0, double w) {
+  const double T = T0;
+  const double cp = a[0] / (T * T) + a[1] / T + a[2] + a[3] * T + a[4] * T * T +
+                    a[5] * T * T * T + a[6] * T * T * T * T;
+  const double d1 = -2.0 * a[0] / (T * T * T) - a[1] / (T * T) + a[3] + 2.0 * a[4] * T +
+                    3.0 * a[5] * T * T + 4.0 * a[6] * T * T * T;
+  const double d2 = 6.0 * a[0] / (T * T * T * T) + 2.0 * a[1] / (T * T * T) + 2.0 * a[4] +
+                    6.0 * a[5] * T + 12.0 * a[6] * T * T;
+  Tail tl;
+  tl.T0 = T0;
+  tl.w = w;
+  const double c0 = cp;
+  const double c1 = w * d1;
+  const double c2 = 0.5 * w * w * d2;
+  // p'(1) = c1 + 2 c2 + 3 c3 + 4 c4 = 0 and p''(1) = 2 c2 + 6 c3 + 12 c4 = 0.
+  const double c4 = 0.5 * (c1 + c2);
+  const double c3 = -(3.0 * c1 + 4.0 * c2) / 3.0;
+  tl.c = {c0, c1, c2, c3, c4};
+  tl.cp_inf = tail_p(tl, 1.0);
+  tl.H0 = nasa_H_R(a, T0);
+  tl.S0 = nasa_S_R(a, T0);
+  // Synthetic division of p by (t - t_pole).
+  const double tp = -T0 / w;
+  tl.Q[3] = c4;
+  tl.Q[2] = c3 + tp * tl.Q[3];
+  tl.Q[1] = c2 + tp * tl.Q[2];
+  tl.Q[0] = c1 + tp * tl.Q[1];
+  tl.r = c0 + tp * tl.Q[0];
+  tl.T_end = T0 + w;
+  tl.H_end = tl.H0 + w * tail_p_int(tl, 1.0);
+  tl.S_end = tl.S0 + tail_Q_int(tl, 1.0) + tl.r * std::log(tl.T_end / T0);
+  return tl;
+}
+
+const std::vector<SpeciesTails>& species_tails() {
+  static const std::vector<SpeciesTails> tails = [] {
+    std::vector<SpeciesTails> out;
+    out.reserve(nasa_coeffs.size());
+    for (const auto& nasa : nasa_coeffs) {
+      const auto& first = nasa.intervals.front();
+      const auto& last = nasa.intervals.back();
+      SpeciesTails st;
+      st.T_lo = first.T_min;
+      st.T_hi = last.T_max;
+      st.lo = make_tail(first.coeffs, first.T_min,
+                        -thermo::TAIL_FRACTION_LOW * first.T_min);
+      st.hi = make_tail(last.coeffs, last.T_max, thermo::TAIL_FRACTION_HIGH * last.T_max);
+      out.push_back(st);
+    }
+    return out;
+  }();
+  return tails;
+}
+
+// The tail covering T for this species, or nullptr inside the data.
+const Tail* active_tail(std::size_t species_idx, double T) {
+  const SpeciesTails& st = species_tails()[species_idx];
+  if (T < st.T_lo) {
+    return &st.lo;
+  }
+  if (T > st.T_hi) {
+    return &st.hi;
+  }
+  return nullptr;
+}
+
+// H/R [K] of one species at any T (the tails are linear in T beyond the fade).
+double species_H_R(std::size_t species_idx, double T) {
+  if (const Tail* tl = active_tail(species_idx, T)) {
+    return tail_H_R(*tl, T);
+  }
+  if (const C2Bridge* b = active_bridge(species_idx, T)) {
+    return bridge_H_R(species_idx, *b, T);
+  }
+  return nasa_H_R(get_interval(species_idx, T).coeffs, T);
+}
+
+// Newton on a function increasing in T (h, s, u: their slopes cp, cp/T, cv
+// are positive at every T with the tails), safeguarded: steps within a factor
+// 4 until the root is bracketed, bisection when Newton leaves the bracket.
+// Throws if it does not converge, rather than returning a wrong T.
+template <class FDF>
+double solve_increasing_T(FDF&& f_df, double T_guess, double tol,
+                          std::size_t max_iter, const char* name) {
+  double T = (std::isfinite(T_guess) && T_guess > 0.0) ? T_guess : 300.0;
+  double lo = 0.0;
+  double hi = 0.0;
+  bool have_lo = false;
+  bool have_hi = false;
+  for (std::size_t i = 0; i < max_iter; ++i) {
+    const auto [f, df] = f_df(T);
+    if (f == 0.0) {
+      return T;
+    }
+    if (f > 0.0) {
+      hi = T;
+      have_hi = true;
+    } else {
+      lo = T;
+      have_lo = true;
+    }
+    const double T_newton = (df > 0.0 && std::isfinite(df)) ? T - f / df
+                                                              : (f > 0.0 ? 0.25 * T : 4.0 * T);
+    double T_new = T_newton;
+    if (have_lo && have_hi) {
+      if (!(T_new >= lo && T_new <= hi)) {
+        T_new = 0.5 * (lo + hi);
+      }
+    } else if (have_lo) {
+      T_new = std::min(T_new, 4.0 * T);
+    } else {
+      T_new = std::max(T_new, 0.25 * T);
+    }
+    // Converged only on a small NEWTON step: its result is accurate to far
+    // below tol, so the inverse is smooth in its target (a bisection
+    // midpoint is only within tol, which finite differences see), and a
+    // clamped step shrinking toward 0 K is a target no T reaches.
+    if (have_lo && have_hi && hi - lo <= 4.0 * std::numeric_limits<double>::epsilon() * hi) {
+      return T_new;
+    }
+    if (T_new == T_newton && std::abs(T_new - T) < tol) {
+      return T_new;
+    }
+    T = T_new;
+  }
+  throw std::runtime_error(std::string(name) + ": no convergence in " +
+                           std::to_string(max_iter) + " iterations (last T = " +
+                           std::to_string(T) + " K)");
+}
 }  // namespace
 
 void set_thermo_model(ThermoModel model) {
@@ -181,11 +393,14 @@ double cp_R(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("cp_R: species index out of bounds");
   }
-  double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
+  if (const Tail* tl = active_tail(species_idx, T)) {
+    const double t = (T - tl->T0) / tl->w;
+    return t >= 1.0 ? tl->cp_inf : tail_p(*tl, t);
+  }
   if (const C2Bridge* b = active_bridge(species_idx, T)) {
     return bridge_poly(*b, (T - b->T_join) / b->half_width);
   }
-  const auto& a = interval.coeffs;
+  const auto& a = get_interval(species_idx, T).coeffs;
   // Cp/R = a1/T^2 + a2/T + a3 + a4*T + a5*T^2 + a6*T^3 + a7*T^4
   return a[0]/(T*T) + a[1]/T + a[2] + a[3]*T + a[4]*T*T + a[5]*T*T*T + a[6]*T*T*T*T;
 }
@@ -194,28 +409,24 @@ double h_RT(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("h_RT: species index out of bounds");
   }
-  double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
-  if (const C2Bridge* b = active_bridge(species_idx, T)) {
-    return bridge_H_R(species_idx, *b, T) / T;
-  }
-  const auto& a = interval.coeffs;
-  // H/RT = -a1/T^2 + a2*ln(T)/T + a3 + a4*T/2 + a5*T^2/3 + a6*T^3/4 + a7*T^4/5 + b1/T
-  return -a[0]/(T*T) + a[1]*std::log(T)/T + a[2] + a[3]*T/2.0 + a[4]*T*T/3.0 +
-         a[5]*T*T*T/4.0 + a[6]*T*T*T*T/5.0 + a[8]/T;
+  T = std::max(T, thermo::T_FLOOR);
+  return species_H_R(species_idx, T) / T;
 }
 
 double s_R(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("s_R: species index out of bounds");
   }
-  double T_clamped = std::max(T, 10.0); const auto& interval = get_interval(species_idx, T_clamped); T = T_clamped;
+  T = std::max(T, thermo::T_FLOOR);
+  if (const Tail* tl = active_tail(species_idx, T)) {
+    return tail_S_R(*tl, T);
+  }
   if (const C2Bridge* b = active_bridge(species_idx, T)) {
     return bridge_S_R(species_idx, *b, T);
   }
-  const auto& a = interval.coeffs;
+  const auto& a = get_interval(species_idx, T).coeffs;
   // S/R = -a1/(2*T^2) - a2/T + a3*ln(T) + a4*T + a5*T^2/2 + a6*T^3/3 + a7*T^4/4 + a9
-  return -a[0]/(2.0*T*T) - a[1]/T + a[2]*std::log(T) + a[3]*T + a[4]*T*T/2.0 +
-         a[5]*T*T*T/3.0 + a[6]*T*T*T*T/4.0 + a[9];
+  return nasa_S_R(a, T);
 }
 
 double g_over_RT(std::size_t species_idx, double T) {
@@ -231,7 +442,10 @@ double cp_species(std::size_t species_idx, double T) {
 }
 
 double h_species(std::size_t species_idx, double T) {
-  return h_RT(species_idx, T) * thermo::R_GAS * T;
+  if (species_idx >= species_names.size()) {
+    throw std::out_of_range("h_species: species index out of bounds");
+  }
+  return species_H_R(species_idx, T) * thermo::R_GAS;
 }
 
 double s_species(std::size_t species_idx, double T) {
@@ -400,8 +614,9 @@ double dcp_R_dT(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("dcp_R_dT: species index out of bounds");
   }
-  if (T < 10.0) {
-    return 0.0;  // cp_R holds its 10 K value below the clamp
+  if (const Tail* tl = active_tail(species_idx, T)) {
+    const double t = (T - tl->T0) / tl->w;
+    return t >= 1.0 ? 0.0 : tail_p_dt(*tl, t) / tl->w;
   }
   if (const C2Bridge* b = active_bridge(species_idx, T)) {
     return bridge_poly_dt(*b, (T - b->T_join) / b->half_width) / b->half_width;
@@ -415,15 +630,7 @@ double dcp_R_dT(std::size_t species_idx, double T) {
 double dcp_dT(double T, const std::vector<double> &X) {
   double dcp_mix = 0.0;
   for (std::size_t i = 0; i < X.size(); ++i) {
-    if (const C2Bridge* b = active_bridge(i, T)) {
-      dcp_mix += X[i] * thermo::R_GAS *
-                 bridge_poly_dt(*b, (T - b->T_join) / b->half_width) / b->half_width;
-      continue;
-    }
-    const auto& a = get_interval(i, T).coeffs;
-    double dcp_R = -2.0*a[0]/(T*T*T) - a[1]/(T*T) + a[3] + 2.0*a[4]*T +
-                   3.0*a[5]*T*T + 4.0*a[6]*T*T*T;
-    dcp_mix += X[i] * dcp_R * thermo::R_GAS;
+    dcp_mix += X[i] * dcp_R_dT(i, T) * thermo::R_GAS;
   }
   return dcp_mix;
 }
@@ -437,29 +644,15 @@ double dg_over_RT_dT(double T, const std::vector<double> &X) {
 // -------------------------------------------------------------
 
 double calc_T_from_h(double h_target, const std::vector<double> &X, double T_guess, double tol, std::size_t max_iter) {
-  double T = T_guess;
-  for (std::size_t i = 0; i < max_iter; ++i) {
-    double f = h(T, X) - h_target;
-    double df = cp(T, X);
-    double dT = f / df;
-    T -= dT;
-    if (std::abs(dT) < tol)
-      return T;
-  }
-  return T;
+  return solve_increasing_T(
+      [&](double T) { return std::make_pair(h(T, X) - h_target, cp(T, X)); }, T_guess,
+      tol, max_iter, "calc_T_from_h");
 }
 
 double calc_T_from_s(double s_target, double P, const std::vector<double> &X, double T_guess, double tol, std::size_t max_iter) {
-  double T = T_guess;
-  for (std::size_t i = 0; i < max_iter; ++i) {
-    double f = s(T, X, P) - s_target;
-    double df = cp(T, X) / T;
-    double dT = f / df;
-    T -= dT;
-    if (std::abs(dT) < tol)
-      return T;
-  }
-  return T;
+  return solve_increasing_T(
+      [&](double T) { return std::make_pair(s(T, X, P) - s_target, cp(T, X) / T); },
+      T_guess, tol, max_iter, "calc_T_from_s");
 }
 
 double calc_T_from_cp(double cp_target, const std::vector<double> &X,
@@ -488,16 +681,9 @@ double calc_T_from_cp(double cp_target, const std::vector<double> &X,
 }
 
 double calc_T_from_u(double u_target, const std::vector<double> &X, double T_guess, double tol, std::size_t max_iter) {
-  double T = T_guess;
-  for (std::size_t i = 0; i < max_iter; ++i) {
-    double f = u(T, X) - u_target;
-    double df = cv(T, X);
-    double dT = f / df;
-    T -= dT;
-    if (std::abs(dT) < tol)
-      return T;
-  }
-  return T;
+  return solve_increasing_T(
+      [&](double T) { return std::make_pair(u(T, X) - u_target, cv(T, X)); }, T_guess,
+      tol, max_iter, "calc_T_from_u");
 }
 
 double calc_T_from_h_mass(double h_mass_target, const std::vector<double> &X, double T_guess, double tol, std::size_t max_iter) {
@@ -513,19 +699,15 @@ double calc_T_from_u_mass(double u_mass_target, const std::vector<double> &X, do
 }
 
 double calc_T_from_sv_mass(double s_mass_target, double v_mass_target, const std::vector<double>& X, double T_guess, double tol, std::size_t max_iter) {
-  double T = T_guess;
-  double mw_kg = mwmix(X) / 1000.0;
-  for (std::size_t i = 0; i < max_iter; ++i) {
-    double rho = 1.0 / v_mass_target;
-    double P = (rho * thermo::R_GAS * T) / mw_kg;
-    double f = s_mass(T, X, P) - s_mass_target;
-    // ds/dT = cp/T - R/P * dP/dT = cp/T - R/P * (rho R / mw) = cp/T - R/P * (P/T) = cp/T - R/T = cv/T
-    double df = cv_mass(T, X) / T;
-    double dT = f / df;
-    T -= dT;
-    if (std::abs(dT) < tol) return T;
-  }
-  return T;
+  const double mw_kg = mwmix(X) / 1000.0;
+  const double rho = 1.0 / v_mass_target;
+  // ds/dT at fixed v = cp/T - R/P dP/dT = cv/T.
+  return solve_increasing_T(
+      [&](double T) {
+        const double P = (rho * thermo::R_GAS * T) / mw_kg;
+        return std::make_pair(s_mass(T, X, P) - s_mass_target, cv_mass(T, X) / T);
+      },
+      T_guess, tol, max_iter, "calc_T_from_sv_mass");
 }
 
 double calc_T_from_sh_mass([[maybe_unused]] double s_mass_target, double h_mass_target, const std::vector<double>& X, double T_guess, double tol, std::size_t max_iter) {
