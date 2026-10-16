@@ -1,5 +1,6 @@
-"""Collision integral Omega*(2,2): exact Lennard-Jones nodes, tabulated slopes,
-C1 cubic Hermite interpolation, analytic transport derivatives (#485).
+"""Collision integral Omega*(2,2): exact Lennard-Jones nodes, tabulated slopes
+and curvatures, C2 quintic Hermite interpolation (#611), analytic transport
+derivatives (#485).
 
 The delta* = 0 column comes from quadrature of the classical collision
 integrals (thermo_data_generator/collision_integrals.py). It is checked here
@@ -105,6 +106,35 @@ def test_the_interpolant_is_c1_at_every_node(delta: float) -> None:
         lo = _core.omega22_and_derivative(t * (1 - 1e-9), delta).domega_dTstar
         hi = _core.omega22_and_derivative(t * (1 + 1e-9), delta).domega_dTstar
         assert hi == pytest.approx(lo, rel=1e-6)
+
+
+@pytest.mark.parametrize("delta", [0.0, 0.25, 0.6, 1.0, 1.7, 2.5])
+def test_the_interpolant_is_c2_at_every_node(delta: float) -> None:
+    """d2 Omega*/dT*2 is the same on both sides of a node, the end nodes
+    included (#611: the cubic Hermite stepped it 0.1-10% on the delta* = 0
+    column). The polar columns were already C2 -- a cubic Hermite through a
+    natural spline's slopes is that spline -- and must stay so. One-sided
+    differences of the analytic slope; they agree to 3.5e-5 when C2."""
+
+    def d(x: float) -> float:
+        return _core.omega22_and_derivative(x, delta).domega_dTstar
+
+    for t in [0.1, 0.2] + NODES:
+        h = 1e-5 * t
+        lo = (d(t) - d(t - h)) / h
+        hi = (d(t + h) - d(t)) / h
+        assert abs(hi - lo) < 1e-3 * max(abs(lo), abs(hi)), t
+
+
+@pytest.mark.parametrize("species, T0", [("H2", 355.0), ("CH4", 178.0), ("O2", 189.5)])
+def test_the_conductivity_slope_has_no_kink_at_the_cv_vib_clamp(species: str, T0: float) -> None:
+    """cv_vib = max(0, cp/R - 5/2 - cv_rot/R) is a C2 smooth positive part
+    (#611); the hard clamp stepped dk/dT by 4.3% (H2), 4.0% (CH4) and 1.6%
+    (O2) where the raw value crosses zero, inside these +-5 K windows."""
+    X = _mix({species: 1.0})
+    T = np.linspace(T0 - 5.0, T0 + 5.0, 2001)
+    g = np.array([cb.transport_and_dT(t, 1e5, X).dk_dT for t in T])
+    assert np.max(np.abs(np.diff(g)) / np.abs(g[:-1])) < 1e-3
 
 
 @pytest.mark.parametrize("delta", [0.0, 0.25, 1.0, 2.5])

@@ -165,7 +165,7 @@ double reynolds_from_state(double rho, double v, double L, double mu);
 struct TransportDerivatives { double mu, dmu_dT, k, dk_dT; };
 TransportDerivatives transport_and_dT(double T, double P, const std::vector<double>& X);
 
-// Omega*(2,2) and dOmega*/dT* (C1 cubic Hermite, see Transport Model below).
+// Omega*(2,2) and dOmega*/dT* (C2 quintic Hermite, see Transport Model below).
 struct Omega22Result { double omega, domega_dTstar; };
 Omega22Result omega22_and_derivative(double T_star, double delta_star);
 
@@ -190,24 +190,30 @@ ThermoModel thermo_model();
 
 Viscosity uses Chapman-Enskog kinetic theory with the Omega*(2,2) collision
 integral from `include/collision_integral_data.h` (41 T* x 8 delta*, generated
-by `thermo_data_generator/collision_integrals.py`), interpolated by cubic
-Hermite in (ln T*, ln Omega*) with TABULATED node slopes -- C1 in T, so
-dmu/dT and dk/dT are continuous and analytic -- and linearly in delta*
-(constant per species). Mixture viscosity uses the Wilke mixing rule.
+by `thermo_data_generator/collision_integrals.py`), interpolated by quintic
+Hermite in (ln T*, ln Omega*) with TABULATED node slopes and curvatures -- C2
+in T, so dmu/dT and dk/dT are analytic and themselves continuously
+differentiable (#611; the C1 cubic Hermite of #485 stepped d2mu/dT2 by
+0.1-10% at every node) -- and linearly in delta* (constant per species). Mixture viscosity uses the Wilke mixing rule.
 
-- **delta* = 0** (Lennard-Jones): values and slopes from quadrature of the
+- **delta* = 0** (Lennard-Jones): values, slopes and curvatures from quadrature of the
   classical collision integrals; agrees with Kim & Monroe (2014) to <= 1e-4
   from T* = 0.3 to 400, between nodes included. The Monchick-Mason column it
   replaces was off by up to 0.6% at the nodes, and linear interpolation in raw
   T* added up to 2.7% between them (#485).
 - **delta* > 0** (Stockmayer, polar species H2O, NH3, CO): Monchick-Mason
   values scaled by the delta* = 0 column's exact/tabulated ratio, slopes
-  estimated by a natural cubic spline. No exact polar reference is computed.
+  and curvatures from a natural cubic spline (so the interpolant is that
+  spline). No exact polar reference is computed.
 - Outside T* 0.1-400: continued linearly in (ln T*, ln Omega*) with the end
-  slope (C1).
+  slope; the end curvature is set to zero, so the join is C2.
 
 Thermal conductivity uses the Mason-Monchick modified Eucken formula with
 Parker Z_rot temperature correction, matching the Cantera GasTransport model.
+Its vibrational heat capacity cv_vib = max(0, cp/R - 5/2 - cv_rot/R) is
+clamped by a C2 smooth positive part, exact outside |x| < 0.002
+(`CV_VIB_SMOOTH_HALF_WIDTH`, in units of R); the hard clamp stepped dk/dT by
+up to 4% (H2 355 K, CH4 178 K, O2 189 K; #611).
 
 Species transport parameters are stored in `transport_props` (thermo_transport_data.h):
 

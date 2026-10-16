@@ -2096,14 +2096,15 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         return transport_and_dT(T, P, X);
       },
       py::arg("T"), py::arg("P"), py::arg("X"),
-      "Mixture viscosity and thermal conductivity with analytic d/dT (C1 in T).");
+      "Mixture viscosity and thermal conductivity with analytic d/dT (C2 in T).");
   py::class_<Omega22Result>(m, "Omega22Result")
       .def_readonly("omega", &Omega22Result::omega)
       .def_readonly("domega_dTstar", &Omega22Result::domega_dTstar);
   m.def("omega22_and_derivative", &omega22_and_derivative, py::arg("T_star"),
         py::arg("delta_star"),
-        "Reduced collision integral Omega*(2,2) and dOmega*/dT*: cubic Hermite in\n"
-        "(ln T*, ln Omega*) with tabulated slopes; delta* = 0 exact Lennard-Jones.");
+        "Reduced collision integral Omega*(2,2) and dOmega*/dT*: quintic Hermite\n"
+        "in (ln T*, ln Omega*) with tabulated slopes and curvatures (C2);\n"
+        "delta* = 0 exact Lennard-Jones.");
   m.def("dcp_R_dT", &dcp_R_dT, py::arg("species_idx"), py::arg("T"),
         "d(cp/R)/dT of one species [1/K].");
   m.def(

@@ -468,8 +468,13 @@ def q2_star(E: float) -> float:
     return 3.0 * (val + tail)
 
 
-def omega22_exact(T_nodes: list[float], workers: int = 8) -> tuple[np.ndarray, np.ndarray]:
-    """(Omega*(2,2), dOmega*/dT*) at each T*, from Q2* on an energy grid."""
+def omega22_exact(
+    T_nodes: list[float], workers: int = 8
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(Omega*(2,2), dOmega*/dT*, d2Omega*/dT*2) at each T*, from Q2* on an
+    energy grid. With In = int x^n exp(-x) Q2*(T x) dx, so that
+    dIn/dT = (I(n+1) - (n+1) In) / T: Om = I3/6, Om' = (I4 - 4 I3)/(6 T),
+    Om'' = (20 I3 - 10 I4 + I5)/(6 T^2)."""
     E = np.unique(np.concatenate([np.geomspace(1e-4, 1e4, 480), np.linspace(0.6, 1.0, 81)]))
     with Pool(workers) as p:
         Q = np.array(p.map(q2_star, E, chunksize=4))
@@ -478,16 +483,19 @@ def omega22_exact(T_nodes: list[float], workers: int = 8) -> tuple[np.ndarray, n
     def qf(e):
         return np.exp(s(np.log(e)))
 
-    om, dom = [], []
+    om, dom, d2om = [], [], []
     for T in T_nodes:
         lo, hi = math.log(1e-4 / T), math.log(min(1e4 / T, 60.0))
         f3 = lambda lx, T=T: math.exp(4 * lx - math.exp(lx)) * qf(T * math.exp(lx))  # noqa: E731
         f4 = lambda lx, T=T: math.exp(5 * lx - math.exp(lx)) * qf(T * math.exp(lx))  # noqa: E731
         I3 = integrate.quad(f3, lo, hi, limit=400, epsabs=0, epsrel=1e-11)[0]
+        f5 = lambda lx, T=T: math.exp(6 * lx - math.exp(lx)) * qf(T * math.exp(lx))  # noqa: E731
         I4 = integrate.quad(f4, lo, hi, limit=400, epsabs=0, epsrel=1e-11)[0]
+        I5 = integrate.quad(f5, lo, hi, limit=400, epsabs=0, epsrel=1e-11)[0]
         om.append(I3 / 6.0)
         dom.append((-4.0 * I3 + I4) / (6.0 * T))
-    return np.array(om), np.array(dom)
+        d2om.append((20.0 * I3 - 10.0 * I4 + I5) / (6.0 * T * T))
+    return np.array(om), np.array(dom), np.array(d2om)
 
 
 # Grid extension beyond Monchick-Mason's T* = 100, so hydrogen (eps 38 K)
@@ -496,10 +504,11 @@ def omega22_exact(T_nodes: list[float], workers: int = 8) -> tuple[np.ndarray, n
 T_EXTRA = [150.0, 200.0, 300.0, 400.0]
 
 
-def build_tables() -> tuple[np.ndarray, np.ndarray, list[float]]:
-    """(Omega table, d ln Omega / d ln T* table, T* axis), row-major [T*][delta*].
+def build_tables() -> tuple[np.ndarray, np.ndarray, np.ndarray, list[float]]:
+    """(Omega table, d ln Omega / d ln T* table, d2 ln Omega / d (ln T*)^2
+    table, T* axis), row-major [T*][delta*].
 
-    delta* = 0: exact quadrature, values and slopes.
+    delta* = 0: exact quadrature, values, slopes and curvatures.
     delta* > 0: Monchick-Mason scaled by the delta* = 0 column's exact/MM
     ratio at the same T*. Their table carries the SAME error as its LJ
     column wherever the dipole contribution is small -- at T* = 100 every
@@ -509,11 +518,17 @@ def build_tables() -> tuple[np.ndarray, np.ndarray, list[float]]:
     dipole matters, the ratio is an assumption, but it changes values by at
     most 0.13% there. Beyond T* = 100 the polar columns are the exact LJ value
     times their (~1) ratio to it at T* = 100.
+
+    The curvatures make the quintic Hermite in src/transport.cpp C2 (#611).
+    For the polar columns they are the natural spline's, so there the
+    interpolant IS that spline. Both end nodes get zero curvature in every
+    column: beyond them the table continues as a power law (zero curvature in
+    log-log), and the joins stay C2.
     """
     axis = T_STAR + T_EXTRA
     T = np.array(axis)
     mm = np.array(MM_OMEGA22).reshape(37, 8)
-    om0, dom0 = omega22_exact(axis)
+    om0, dom0, d2om0 = omega22_exact(axis)
     km_dev = max(
         abs(o / kim_monroe_omega22(t) - 1) for t, o in zip(T, om0, strict=True) if 0.3 <= t <= 400
     )
@@ -526,15 +541,23 @@ def build_tables() -> tuple[np.ndarray, np.ndarray, list[float]]:
         table[:37, c] = mm[:, c] * ratio
         table[37:, c] = om0[37:] * (mm[36, c] / mm[36, 0])
     slopes = np.zeros_like(table)
+    curv = np.zeros_like(table)
     slopes[:, 0] = T * dom0 / om0
+    # d2 ln Om / d(ln T)^2 = T Om'/Om + T^2 Om''/Om - (T Om'/Om)^2
+    curv[:, 0] = slopes[:, 0] + T * T * d2om0 / om0 - slopes[:, 0] ** 2
     lx = np.log(T)
     for c in range(1, 8):
         spl = interpolate.CubicSpline(lx, np.log(table[:, c]), bc_type="natural")
         slopes[:, c] = spl(lx, 1)
-    return table, slopes, axis
+        curv[:, c] = spl(lx, 2)
+    curv[0, :] = 0.0
+    curv[-1, :] = 0.0
+    return table, slopes, curv, axis
 
 
-def write_header(table: np.ndarray, slopes: np.ndarray, axis: list[float]) -> None:
+def write_header(
+    table: np.ndarray, slopes: np.ndarray, curv: np.ndarray, axis: list[float]
+) -> None:
     def rows(a: np.ndarray) -> str:
         return "\n".join("    " + ", ".join(f"{v:.10g}" for v in r) + "," for r in a)
 
@@ -544,16 +567,20 @@ def write_header(table: np.ndarray, slopes: np.ndarray, axis: list[float]) -> No
 // Regenerate with (repository root):
 //   uv run python thermo_data_generator/collision_integrals.py
 //
-// Reduced collision integral Omega*(2,2)(T*, delta*) and its logarithmic slope
-// d ln Omega* / d ln T* on the Monchick-Mason grid, for cubic Hermite
-// interpolation in (ln T*, ln Omega*) (src/transport.cpp).
+// Reduced collision integral Omega*(2,2)(T*, delta*), its logarithmic slope
+// d ln Omega* / d ln T* and curvature d2 ln Omega* / d (ln T*)^2 on the
+// Monchick-Mason grid, for C2 quintic Hermite interpolation in
+// (ln T*, ln Omega*) (src/transport.cpp).
 //
 // delta* = 0: computed by quadrature of the Lennard-Jones (12-6) collision
-//   integrals, values AND slopes; agrees with Kim & Monroe (2014) to <= 1e-4.
+//   integrals, values, slopes AND curvatures; agrees with Kim & Monroe (2014)
+//   to <= 1e-4.
 // delta* > 0: Monchick & Mason (1961), as transcribed by Cantera, scaled by
 //   the delta* = 0 column's exact/tabulated ratio (consistent columns; exact
-//   where the dipole contribution vanishes); slopes ESTIMATED with a natural
-//   cubic spline in (ln T*, ln Omega*).
+//   where the dipole contribution vanishes); slopes and curvatures ESTIMATED
+//   with a natural cubic spline in (ln T*, ln Omega*).
+// Curvature is zero at both end nodes, where the power-law continuation
+// starts (C2 there too).
 // T* grid: Monchick-Mason's 0.1-100 plus 150, 200, 300, 400 (exact LJ).
 
 namespace combaero::collision {{
@@ -576,11 +603,16 @@ constexpr double kDlnOmega22DlnT[kNumTStar * kNumDelta] = {{
 {rows(slopes)}
 }};
 
+// d2 ln Omega*(2,2) / d (ln T*)^2, row-major [T*][delta*].
+constexpr double kD2lnOmega22DlnT2[kNumTStar * kNumDelta] = {{
+{rows(curv)}
+}};
+
 }}  // namespace combaero::collision
 """)
 
 
 if __name__ == "__main__":
-    t, s, axis = build_tables()
-    write_header(t, s, axis)
+    t, s, c, axis = build_tables()
+    write_header(t, s, c, axis)
     print(f"Wrote {OUT}")

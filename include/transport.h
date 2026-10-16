@@ -10,13 +10,19 @@ namespace combaero {
 double linear_interp(double x, const std::vector<double>& x_values, const std::vector<double>& y_values);
 double omega22(double T_star, double delta_star);
 
-// Omega*(2,2) and dOmega*/dT*: cubic Hermite in (ln T*, ln Omega*) with
-// tabulated node values and slopes (C1); see src/transport.cpp.
+// Omega*(2,2) and dOmega*/dT*: quintic Hermite in (ln T*, ln Omega*) with
+// tabulated node values, slopes and curvatures (C2); see src/transport.cpp.
 struct Omega22Result {
     double omega = 0.0;
     double domega_dTstar = 0.0;
 };
 Omega22Result omega22_and_derivative(double T_star, double delta_star);
+
+// Half-width, in units of R, of the C2 smoothing of the Eucken vibrational
+// heat capacity cv_vib = max(0, cp/R - 5/2 - cv_rot/R) (#611). Outside
+// |x| < w it is max(0, x) exactly; inside, its value differs by at most
+// 0.156 w (at x = 0).
+constexpr double CV_VIB_SMOOTH_HALF_WIDTH = 0.002;
 
 // Mixture viscosity and thermal conductivity with analytic d/dT.
 struct TransportDerivatives {
