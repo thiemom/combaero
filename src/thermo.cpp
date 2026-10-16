@@ -328,9 +328,12 @@ double species_H_R(std::size_t species_idx, double T) {
 }
 
 // Newton on a function increasing in T (h, s, u: their slopes cp, cp/T, cv
-// are positive at every T with the tails), safeguarded: steps within a factor
-// 4 until the root is bracketed, bisection when Newton leaves the bracket.
-// Throws if it does not converge, rather than returning a wrong T.
+// are positive at every T with the tails), safeguarded as rtsafe (Numerical
+// Recipes): steps within a factor 4 until the root is bracketed, then
+// bisection whenever Newton leaves the bracket or fails to halve the step
+// before it -- which breaks the 2-cycle a step in h or s at an interval join
+// can trap Newton in. Throws if it does not converge, rather than returning a
+// wrong T.
 template <class FDF>
 double solve_increasing_T(FDF&& f_df, double T_guess, double tol,
                           std::size_t max_iter, const char* name) {
@@ -339,6 +342,7 @@ double solve_increasing_T(FDF&& f_df, double T_guess, double tol,
   double hi = 0.0;
   bool have_lo = false;
   bool have_hi = false;
+  double dx_old = std::numeric_limits<double>::infinity();
   for (std::size_t i = 0; i < max_iter; ++i) {
     const auto [f, df] = f_df(T);
     if (f == 0.0) {
@@ -355,7 +359,7 @@ double solve_increasing_T(FDF&& f_df, double T_guess, double tol,
                                                               : (f > 0.0 ? 0.25 * T : 4.0 * T);
     double T_new = T_newton;
     if (have_lo && have_hi) {
-      if (!(T_new >= lo && T_new <= hi)) {
+      if (!(T_new >= lo && T_new <= hi) || std::abs(T_new - T) > 0.5 * dx_old) {
         T_new = 0.5 * (lo + hi);
       }
     } else if (have_lo) {
@@ -377,6 +381,7 @@ double solve_increasing_T(FDF&& f_df, double T_guess, double tol,
     if (T_new == T_newton && std::abs(T_new - T) < tol) {
       return T_new;
     }
+    dx_old = std::abs(T_new - T);
     T = T_new;
   }
   throw std::runtime_error(std::string(name) + ": no convergence in " +

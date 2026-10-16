@@ -204,6 +204,28 @@ TEST(ThermoTails, TheInversesRecoverTAnywhere) {
   }
 }
 
+// NASA-9 is C0 at its joins only to its printed coefficients: h and s step
+// there by up to H/R 5e-3 K and S/R 4e-7. A target inside such a step has no
+// root; Newton alone 2-cycles across the join (steps of ~2e-6 K, above tol),
+// which is how Linux and Windows CI first failed. The inverse must still
+// return a T at the join.
+TEST(ThermoTails, TheInversesSettleOnAJoinWhoseStepTheyCannotResolve) {
+  ModelGuard g(ThermoModel::NASA9);
+  const double P = 1.0e5;
+  for (std::size_t i = 0; i < combaero::num_species(); ++i) {
+    const auto X = pure(i);
+    const auto& ivs = combaero::nasa_coeffs[i].intervals;
+    for (std::size_t k = 0; k + 1 < ivs.size(); ++k) {
+      const double Tj = ivs[k].T_max;
+      const double Tr = std::nextafter(Tj, 1e30);  // the right interval's side
+      const double h_mid = 0.5 * (combaero::h(Tj, X) + combaero::h(Tr, X));
+      const double s_mid = 0.5 * (combaero::s(Tj, X, P) + combaero::s(Tr, X, P));
+      EXPECT_NEAR(combaero::calc_T_from_h(h_mid, X, 300.0), Tj, 1e-2) << i << " " << Tj;
+      EXPECT_NEAR(combaero::calc_T_from_s(s_mid, P, X, 300.0), Tj, 1e-2) << i << " " << Tj;
+    }
+  }
+}
+
 // An h no positive T reaches (below h at 0 K on the constant tail) is a
 // failure the caller hears about, not a silently wrong T.
 TEST(ThermoTails, AnUnreachableTargetThrows) {
