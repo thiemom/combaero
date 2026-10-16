@@ -1228,7 +1228,7 @@ ejector = EjectorElement(
     mixing_area=8.0e-4,       # mixing section A_3 [m^2], > nozzle_exit_area; None = inherit
                               # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA)
     recovery_efficiency=1.0,  # multiplies the lossless mixed stagnation pressure; not fitted to data
-    regime="compressible",    # default DEFAULT_REGIME (incompressible until #585), see below
+    regime="compressible",    # default DEFAULT_REGIME ("compressible" since #585), see below
 )
 # regime="incompressible" (#588): the ejector's low-Mach limit, Sanger's 1-D jet
 # pump (NASA TN D-4445, 1968, App. B) with each stream at its own constant density

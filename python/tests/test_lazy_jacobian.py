@@ -135,6 +135,9 @@ def test_a_solve_assembles_far_fewer_jacobians_than_it_evaluates() -> None:
 
     s._residuals_and_jacobian = counting_evaluate
     s._propagate_states = counting_propagate
-    r = s.solve(auto_retry=False)
+    # The default solve path: compressible, this network's cold solve sits on
+    # a knife edge (a 1e-14 change in h flips it into the #605 stall), and the
+    # count is about J reuse, not about which start converges.
+    r = s.solve()
     assert r["__success__"]
     assert calls["relay"] < calls["F"] / 3

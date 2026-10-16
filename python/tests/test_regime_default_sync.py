@@ -20,11 +20,10 @@ from gui.backend.schemas import SolverSettings
 _STORE = Path(__file__).resolve().parents[2] / "gui" / "frontend" / "src" / "store" / "useStore.ts"
 
 
-def test_the_default_is_incompressible_until_585() -> None:
-    """Compressible is the goal, but with it as the default 60 tests failed
-    to converge (2026-10-15). Flip this, and DEFAULT_REGIME, when #585's
-    acceptance test passes."""
-    assert DEFAULT_REGIME == "incompressible"
+def test_the_default_is_compressible() -> None:
+    """Compressible since #585, once the suite converged under it (#601-#604):
+    incompressible flow is its low-Mach limit."""
+    assert DEFAULT_REGIME == "compressible"
 
 
 def test_gui_backend_default_matches() -> None:

@@ -1188,9 +1188,9 @@ class NetworkMixtureState:
 #: default too (gui/backend/schemas.py SolverSettings.global_regime and the
 #: frontend store), and test_regime_default_sync.py keeps the three equal: a
 #: script and a drawing of the same network must solve the same physics.
-#: Incompressible until the compressible path converges as reliably (#585):
-#: with this set to "compressible", 60 tests failed to converge (2026-10-15).
-DEFAULT_REGIME: Literal["incompressible", "compressible"] = "incompressible"
+#: Compressible since #585: incompressible flow is its low-Mach limit, so the
+#: default no longer has to be chosen per network.
+DEFAULT_REGIME: Literal["incompressible", "compressible"] = "compressible"
 
 #: Nominal cross-section for a chamber-like node whose area could not be
 #: inferred and which nothing in the network measures against. It is a

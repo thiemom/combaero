@@ -318,7 +318,7 @@ const useStore = create<RFState>((set, get) => ({
 	solverSettings: {
 		// Mirrors combaero.network.components.DEFAULT_REGIME; kept equal by
 		// python/tests/test_regime_default_sync.py (#585).
-		global_regime: "incompressible",
+		global_regime: "compressible",
 		init_strategy: "default",
 		method: "hybr",
 		timeout: 30,
