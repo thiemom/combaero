@@ -50,6 +50,10 @@ def _channel(surface_key: str) -> ChannelElement:
         diameter=0.025,
         roughness=1e-5,
         surface=SURFACES[surface_key](),
+        # The pressure-drop form these columns and the f_multiplier check
+        # read; the compressible row is a mass flow (#481), checked in
+        # test_channel_compressible_flow.py.
+        regime="incompressible",
     )
 
 

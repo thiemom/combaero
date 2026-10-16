@@ -39,7 +39,17 @@ def test_network_solver_simple_orifice():
     outlet.Tt = 300.0
     outlet.Y = inlet.Y
 
-    orf = OrificeElement("orf_1", "inlet", "outlet", Cd=0.6, diameter=0.079788, correlation="fixed")
+    # The incompressible orifice equation is what the analytic check below
+    # solves for.
+    orf = OrificeElement(
+        "orf_1",
+        "inlet",
+        "outlet",
+        Cd=0.6,
+        diameter=0.079788,
+        correlation="fixed",
+        regime="incompressible",
+    )
 
     graph.add_node(inlet)
     graph.add_node(outlet)
@@ -87,6 +97,8 @@ def test_network_solver_simple_channel():
         diameter=0.05,
         roughness=1e-5,
         friction_model="haaland",
+        # Darcy-Weisbach at constant density is the analytic check below.
+        regime="incompressible",
     )
 
     graph.add_node(inlet)

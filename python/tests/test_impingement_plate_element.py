@@ -210,8 +210,9 @@ def test_segment_residual_jacobian_matches_central_differences() -> None:
         assert row[f"{src}.m_dot"] == pytest.approx((r(fl=up) - r(fl=dn)) / (2 * e), rel=1e-6)
     # The helper moves a plenum's P and Pt together (Pt = P), so the finite
     # difference sees the channel's -1 on Pt plus the momentum's density term
-    # on P.
-    h = 1.0
+    # on P. A 0.01 Pa step: the compressible row inverts the segment's small
+    # friction drop, so 1 Pa already truncates at 9e-6.
+    h = 0.01
     fd_out = (r(P_out=0.99e5 + h) - r(P_out=0.99e5 - h)) / (2 * h)
     assert row["c3.P"] + row["c3.Pt"] == pytest.approx(fd_out, rel=1e-6)
     assert row["c3.P"] != 0.0
@@ -311,7 +312,15 @@ def test_global_jacobian_carries_the_neighbour_flow_sensitivity() -> None:
     res = solver.solve()
     assert res["__success__"], res.get("__message__")
     x = np.array(res["__x_solution__"], dtype=float)
-    step = np.maximum(np.abs(x) * 1e-7, 1e-10)
+    # Flows step 1e-5, pressures and temperatures 1e-7. A compressible
+    # channel's residual repeats only to ~1e-12 (its Fanno iteration is
+    # warm-started from the last call), which at 1e-7 on a flow differences
+    # into spurious entries that grow as 1/step (x1's row against p3.m_dot:
+    # 1e-5 at 1e-6, 0.024 at 1e-8) and moves the pure-relay entry below by
+    # 1.4e-3 at 1e-6, 7e-5 at 1e-5. A pressure step of 1e-5 (1 Pa) is in
+    # turn large against a segment's friction drop: 22% truncation on c1.Pt.
+    rel = np.array([1e-5 if n.endswith(".m_dot") else 1e-7 for n in solver.unknown_names])
+    step = np.maximum(np.abs(x) * rel, 1e-10)
     fd = approx_derivative(lambda v: solver._residuals(v), x, method="3-point", abs_step=step)
     with_relay = solver._residuals_and_jacobian(x)[1].toarray()
     solver._relay_flow_inputs = lambda *a, **k: None

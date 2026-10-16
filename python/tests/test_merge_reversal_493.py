@@ -57,11 +57,15 @@ def test_the_jacobian_holds_with_the_main_reversed(liner: tuple, frac: float) ->
     xp = x.copy()
     xp[j] = frac * x[j]
     _, J = s._residuals_and_jacobian(xp)
+    # Flows step 1e-5, pressures and temperatures 1e-7: a compressible
+    # channel's residual repeats only to ~1e-12 (its Fanno iteration is
+    # warm-started), which a 1e-6 flow step differences into 3e-6 of noise.
+    rel = np.array([1e-5 if n.endswith(".m_dot") else 1e-7 for n in s.unknown_names])
     fd = approx_derivative(
         lambda v: s._residuals_and_jacobian(v, compute_jacobian=False)[0],
         xp,
         method="3-point",
-        abs_step=np.maximum(np.abs(xp) * 1e-6, 1e-9),
+        abs_step=np.maximum(np.abs(xp) * rel, 1e-9),
     )
     # RESIDUAL-ROW-SCALING: compare J_ij |x_j| (see _build_residual_scales).
     cols = np.maximum(np.abs(xp), 1e-12)[None, :]

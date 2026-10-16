@@ -266,7 +266,8 @@ def test_the_residual_row_is_scaled_as_a_mass_flow() -> None:
     """Mis-scaled by ref_p it stalled a GUI tee network (697 evaluations)."""
     c = ChannelElement("c", "a", "b", length=L, diameter=D, regime="compressible")
     assert c.residual_scale_kind == "mdot"
-    assert ChannelElement("i", "a", "b", length=L, diameter=D).residual_scale_kind == "p"
+    i = ChannelElement("i", "a", "b", length=L, diameter=D, regime="incompressible")
+    assert i.residual_scale_kind == "p"
 
 
 def test_the_spatial_profile_starts_at_the_ducts_inlet_static_state() -> None:

@@ -303,12 +303,15 @@ def test_node_reports_the_static_state_its_closure_used() -> None:
     chamber = MomentumChamberNode("chamber", area=3e-3, regime="compressible")
     graph.add_node(chamber)
     graph.add_node(PressureBoundary("outlet", Pt=101325.0))
-    graph.add_element(
-        OrificeElement("orf1", "inlet", "chamber", Cd=0.6, diameter=0.04, correlation="fixed")
-    )
-    graph.add_element(
-        OrificeElement("orf2", "chamber", "outlet", Cd=0.6, diameter=0.04, correlation="fixed")
-    )
+    # Incompressible orifices put the chamber above Mach 0.2, where the
+    # static and stagnation states are told apart; compressible ones pass
+    # the same flow at a higher chamber pressure, Mach 0.15.
+    for eid, a, b in (("orf1", "inlet", "chamber"), ("orf2", "chamber", "outlet")):
+        graph.add_element(
+            OrificeElement(
+                eid, a, b, Cd=0.6, diameter=0.04, correlation="fixed", regime="incompressible"
+            )
+        )
     solver = NetworkSolver(graph)
     sol = solver.solve()
     assert sol["__success__"]
