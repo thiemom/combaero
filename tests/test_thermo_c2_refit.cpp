@@ -20,10 +20,13 @@ using combaero::ThermoModel;
 
 namespace {
 
-// Restores the default model however a test exits.
+// Restores the model it found however a test exits.
 struct ModelGuard {
-  explicit ModelGuard(ThermoModel m) { combaero::set_thermo_model(m); }
-  ~ModelGuard() { combaero::set_thermo_model(ThermoModel::NASA9); }
+  explicit ModelGuard(ThermoModel m) : before(combaero::thermo_model()) {
+    combaero::set_thermo_model(m);
+  }
+  ~ModelGuard() { combaero::set_thermo_model(before); }
+  ThermoModel before;
 };
 
 double H_R(std::size_t i, double T) { return combaero::h_RT(i, T) * T; }
@@ -63,8 +66,8 @@ Jumps measure_jumps() {
 
 }  // namespace
 
-TEST(ThermoC2Refit, DefaultIsTheOriginalNasa9) {
-  EXPECT_EQ(combaero::thermo_model(), ThermoModel::NASA9);
+TEST(ThermoC2Refit, DefaultIsTheRefit) {
+  EXPECT_EQ(combaero::thermo_model(), ThermoModel::NASA9_C2);
 }
 
 TEST(ThermoC2Refit, DcpDtIsContinuousAtEveryJoinOnlyInTheRefit) {

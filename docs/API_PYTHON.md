@@ -86,9 +86,9 @@ idx = cb.species_index_from_name("H2O")
 
 ### Species Thermo Model (#549)
 ```python
-cb.thermo_model()               # "nasa9" (default): the published NASA-9 polynomials
-cb.set_thermo_model("nasa9_c2")  # each interval join bridged by a C2 cp
-cb.set_thermo_model("nasa9")
+cb.thermo_model()               # "nasa9_c2" (default): each interval join bridged by a C2 cp
+cb.set_thermo_model("nasa9")     # the published NASA-9 polynomials
+cb.set_thermo_model("nasa9_c2")
 ```
 NASA-9 is C0 in cp at its interval joins (1000 K; 6000 K for N2, O2, AR, CO2,
 CO, H2) but not C1: dcp/dT jumps there, 0.15-100 % at 1000 K and up to 48 % at
@@ -99,7 +99,9 @@ equal NASA-9's: everything is identical to NASA-9 outside the windows (formation
 enthalpies, absolute entropies, 298.15 K reference), and inside cp moves by at
 most 4.8e-4 (1e-4 at 1000 K), h by 1.1e-5 cp T, s by 3.1e-5 R. The setting is
 process-wide; switch before building and solving a network, not during. The
-default stays NASA-9 until the re-fit is adopted (#549).
+re-fit is the default (#549): with it the full suite passes and converges in
+the same evaluations, so `"nasa9"` stays for comparison against the published
+data.
 
 ### Beyond the Data (#606)
 The data runs from 200 K to 20 000 K (N2, O2, AR, CO2, CO, H2) or 6000 K (H2O,
