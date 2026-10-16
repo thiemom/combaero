@@ -84,6 +84,24 @@ double calc_T_from_s_mass(double s_mass_target, double P, const std::vector<doub
 double calc_T_from_u_mass(double u_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 ```
 
+h, s, u and the sv form are strictly increasing in T at every T (the thermo
+tails below keep cp > 0), so each inverse has one root: safeguarded Newton
+(factor-4 steps until bracketed, bisection when a step leaves the bracket,
+converged only on a Newton step). They throw `std::runtime_error` when they do
+not converge -- a target no positive T reaches -- rather than return the last
+iterate (#606). `calc_T_from_cp` is unchanged.
+
+### Species Thermo Beyond the Data (#606)
+Every species' NASA-9 data starts at 200 K and ends at 20 000 K (N2, O2, AR,
+CO2, CO, H2) or 6000 K (H2O, NH3, CH4, the alkanes): CEA's own ranges. Past
+either end, under both thermo models, cp/R leaves the end interval on the
+quartic that matches its value, slope and curvature there (C2) and levels off
+over `thermo::TAIL_FRACTION_LOW` (0.25) T_lo below and
+`thermo::TAIL_FRACTION_HIGH` (0.1) T_hi above; beyond that cp is constant. h
+and s are its exact integrals. Solver plumbing, not physics: no dissociation
+above the data, no condensation below. Below `thermo::T_FLOOR` (10 K) s_R and
+h_RT hold their value.
+
 ### Complete State Functions
 ```cpp
 struct AirProperties { /* air properties at once */ };
