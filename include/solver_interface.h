@@ -59,8 +59,9 @@ struct MixerResult {
   double P_total_mix;
   std::vector<double> Y_mix;
   double dT_mix_d_delta_h = 0.0;
-  // dT_mix/dQ [K/W] = dT_mix_d_delta_h / m_eff, with m_eff the flow Q is
-  // spread over (|m| above kMixerHeatMdotFloor, a C1 parabola below). A
+  // dT_mix/dQ [K/W] = dT_mix_d_delta_h * phi, with phi = delta_h / Q the
+  // heat per unit flow (mixer_heat_per_unit_flow: 1/|m| above
+  // kMixerHeatMdotFloor, fading to 0 at zero flow below it). A
   // caller relaying a heat input (a wall) needs this, not 1/(cp sum m),
   // which was wrong below the floor and for a zero or negative total (#481).
   double dT_mix_dQ = 0.0;
@@ -430,15 +431,25 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
 // -----------------------------------------------------------------------------
 
 
-// Below this total flow [kg/s] the heat Q is spread over a C1 floor
-// m_eff = (m^2 + m0^2)/(2 m0) >= m0/2 instead of |m|, keeping Q/m finite as
-// the flow vanishes. At or above it Q/m is exact, so the heat a node is given
-// is the heat it receives (energy conservation; the previous
-// sqrt(m^2 + 1e-6) lost 5e-5 of Q at 0.1 kg/s and 11% at 2 g/s). 1 mg/s: below
-// any flow a real network carries, so only a stagnant node (a dead end) is
-// floored; the solver reports what it withholds there as {node}.Q_withheld.
+// Below this total flow [kg/s] a mixing node takes up only part of the heat Q
+// it is given (mixer_heat_per_unit_flow). At or above it Q/m is exact, so the
+// heat a node is given is the heat it receives (energy conservation; the
+// previous sqrt(m^2 + 1e-6) lost 5e-5 of Q at 0.1 kg/s and 11% at 2 g/s).
+// 1 mg/s: below any flow a real network carries, so only a stagnant node (a
+// dead end) withholds any; the solver reports it as {node}.Q_withheld.
 // Convergence measured the same at 2e-3 and 1e-6 (#481).
 constexpr double kMixerHeatMdotFloor = 1e-6;
+
+// The enthalpy rise per unit heat, phi = delta_h / Q [1/(kg/s)], a mixing node
+// applies at total flow mdot_tot, and d(phi)/d(mdot_tot). 1/|m| at or above
+// kMixerHeatMdotFloor m0; below it phi = (4 u^2 - 3 u^3) / m0, u = |m| / m0,
+// so the heat taken up, Q |m| phi = Q (4 u^3 - 3 u^4), fades C1 from all of Q
+// at m0 to none at zero flow (phi <= 1.053 / m0, smooth through m = 0). A
+// stagnant node therefore holds the temperature of what reaches it, not
+// Q / m0 above it: the C1 floor m_eff = (m^2 + m0^2) / (2 m0) this replaced
+// put 100 W into a dead end at 1e5 K at the solution, which a [200, 5000] K
+// node clamp hid (#626).
+std::tuple<double, double> mixer_heat_per_unit_flow(double mdot_tot);
 
 // Reference temperature [K] of the sensible enthalpy h(T) - h(T_ref) that an
 // EnergyBoundary 'fraction' scales (at the stream's own composition).

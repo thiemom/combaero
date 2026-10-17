@@ -26,53 +26,33 @@
 namespace combaero {
 namespace solver {
 
-namespace {
-// Flow Q is divided by in the mixers, and its derivative w.r.t. the total
-// flow: |m| at or above kMixerHeatMdotFloor, a C1 parabola below it.
-std::pair<double, double> heat_flow_divisor(double mdot_tot) {
+std::tuple<double, double> mixer_heat_per_unit_flow(double mdot_tot) {
   const double m0 = kMixerHeatMdotFloor;
   const double a = std::abs(mdot_tot);
+  const double sgn = mdot_tot >= 0.0 ? 1.0 : -1.0;
   if (a >= m0) {
-    return {a, mdot_tot >= 0.0 ? 1.0 : -1.0};
+    return {1.0 / a, -sgn / (a * a)};
   }
-  return {(mdot_tot * mdot_tot + m0 * m0) / (2.0 * m0), mdot_tot / m0};
+  const double u = a / m0;
+  return {(4.0 * u * u - 3.0 * u * u * u) / m0, sgn * (8.0 * u - 9.0 * u * u) / (m0 * m0)};
 }
 
-// Get global minimum temperature across all species from NASA9 thermo data
-// Used to derive smooth floor limits for finite difference calculations
-double get_global_thermo_T_min() {
-  double T_min = std::numeric_limits<double>::max();
-  for (const auto& nasa : nasa_coeffs) {
-    if (!nasa.intervals.empty()) {
-      T_min = std::min(T_min, nasa.intervals.front().T_min);
-    }
-  }
-  return T_min;
-}
+namespace {
 
-// Smooth floor limit for temperature finite differences
-// Set to 2/3 of global TMIN to provide large cushion (e.g., 200K for TMIN=300K)
-const double THERMO_T_MIN = get_global_thermo_T_min();
-const double T_SMOOTH_FLOOR_LIMIT = THERMO_T_MIN * 0.67;
-
-// T from a mixed specific enthalpy, for the network's mixing nodes. Below
-// T_SMOOTH_FLOOR_LIMIT it continues linearly with the floor's cp (C1 there)
-// instead of inverting: a solver probe or starting point can withdraw more
-// heat than a stream holds, a target no positive T reaches, and the inverse
-// raises for it (#552 item 3, #607), which aborted the whole solve. The
-// network clamps the node to [200, 5000] K, reports it in __T_clamped__ and
-// zeroes its T sensitivities, so the continuation only has to exist.
-// The temperature properties are evaluated at T_eval = max(T, floor).
-double T_from_h_mass_floored(double h_mass, const std::vector<double>& X, double T_guess,
-                             double& T_eval) {
-  const double T_f = T_SMOOTH_FLOOR_LIMIT;
-  const double h_f = combaero::h_mass(T_f, X);
-  if (h_mass >= h_f) {
-    T_eval = combaero::calc_T_from_h_mass(h_mass, X, T_guess);
-    return T_eval;
+// T from a mixed specific enthalpy, for the network's mixing nodes. The gas is
+// ideal down to 0 K (the thermo's low tail, #626), so above h(0 K) this is the
+// exact inverse. Below it -- a solver probe or starting point that withdraws
+// more heat than the stream holds -- no T > 0 exists, and the inverse would
+// raise and abort the solve (#552 item 3, #607): T continues on h's own line
+// through 0 K (cp is constant there, so h and cp at the returned T are the
+// continuation's own, C1 with the inverse). The network reports a node at
+// T <= 0 as holding no gas state.
+double T_from_h_mass_continued(double h_mass, const std::vector<double>& X, double T_guess) {
+  const double h_0 = combaero::h_mass(0.0, X);
+  if (h_mass > h_0) {
+    return combaero::calc_T_from_h_mass(h_mass, X, T_guess);
   }
-  T_eval = T_f;
-  return T_f + (h_mass - h_f) / combaero::cp_mass(T_f, X);
+  return (h_mass - h_0) / combaero::cp_mass(0.0, X);
 }
 } // anonymous namespace
 
@@ -571,7 +551,7 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
   // probe unphysical (T<=0, P<=0) intermediates during Newton steps.
   // Clamping keeps residuals finite with correct gradient direction so
   // the trust-region can step back toward physical territory.
-  T_in = std::max(T_in, T_SMOOTH_FLOOR_LIMIT);
+  T_in = std::max(T_in, thermo::T_FLOOR);
   P = std::max(P, 100.0);
 
   State in_state;
@@ -583,8 +563,8 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
   // Jacobian wrt T_in via Central Finite Difference with smooth floor
   double dT_eps = std::max(1e-3, T_in * 1e-4);
 
-  // Smooth floor to avoid thermo data limits
-  const double T_limit = T_SMOOTH_FLOOR_LIMIT;
+  // Smooth floor at thermo::T_FLOOR (the gas is ideal to 0 K below the data)
+  const double T_limit = thermo::T_FLOOR;
   constexpr double delta_T = 1e-3;
   double T_target_minus = T_in - dT_eps;
   double diff_T = T_target_minus - T_limit;
@@ -608,7 +588,7 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
 std::tuple<double, double, double, std::vector<double>>
 adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
                                        const std::vector<double> &X_in) {
-  T_in = std::max(T_in, T_SMOOTH_FLOOR_LIMIT);
+  T_in = std::max(T_in, thermo::T_FLOOR);
   P = std::max(P, 100.0);
 
   State in_state;
@@ -622,8 +602,8 @@ adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
   double dT_eps = std::max(1e-3, T_in * 1e-4);
   double dP_eps = std::max(1.0, P * 1e-4);
 
-  // wrt T_in: smooth floor to avoid thermo data limits
-  const double T_limit = T_SMOOTH_FLOOR_LIMIT;
+  // wrt T_in: smooth floor at thermo::T_FLOOR
+  const double T_limit = thermo::T_FLOOR;
   constexpr double delta_T = 1e-3;
   double T_target_minus = T_in - dT_eps;
   double diff_T = T_target_minus - T_limit;
@@ -771,8 +751,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   double h_mix_base = (mdot_tot > 0.0) ? (H_tot / mdot_tot)
                                         : (n_streams > 0 ? h_stream[0] : 0.0);
 
-  // Heat is spread over the actual flow, floored only near zero flow.
-  const auto [mdot_eff, dmdot_eff] = heat_flow_divisor(mdot_tot);
+  // Heat per unit flow: Q / |m|, fading out only near zero flow.
+  const auto [phi_Q, dphi_Q] = mixer_heat_per_unit_flow(mdot_tot);
 
   std::vector<double> normalized_Y_mix = combaero::normalize_fractions(Y_mix);
 
@@ -787,8 +767,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
     h_ref += normalized_Y_mix[k] * href_k[k];
   }
 
-  // Apply energy transfer: delta_h = Q/mdot_eff + fraction * (h_mix_base - h_ref)
-  double delta_h = Q / mdot_eff + fraction * (h_mix_base - h_ref);
+  // Apply energy transfer: delta_h = Q phi + fraction * (h_mix_base - h_ref)
+  double delta_h = Q * phi_Q + fraction * (h_mix_base - h_ref);
 
   double h_mix = h_mix_base + delta_h;
   double P_total_mix = (mdot_tot > 0.0)
@@ -799,8 +779,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   double T_guess = 300.0;
   if (n_streams > 0)
     T_guess = streams[0].T;
-  double T_eval = 0.0;
-  double T_mix = T_from_h_mass_floored(h_mix, X_mix, T_guess, T_eval);
+  const double T_mix = T_from_h_mass_continued(h_mix, X_mix, T_guess);
+  const double T_eval = T_mix;
 
   MixerResult res;
   res.T_mix = T_mix;
@@ -822,7 +802,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
 
   // Store dT/d(delta_h) for reference (not directly used in Jacobians)
   res.dT_mix_d_delta_h = (cp_mix > 0.0) ? (1.0 / cp_mix) : 0.0;
-  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h * phi_Q;
 
   for (std::size_t i = 0; i < n_streams; ++i) {
     StreamJacobian &dT_jac = res.dT_mix_d_stream[i];
@@ -859,8 +839,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
       }
       double dh_mix_dmdot = ((1.0 + fraction) * h_diff - fraction * ref_sum) / mdot_tot;
 
-      // Q contribution: d(Q/mdot_eff)/d(mdot_i) = -Q * mdot_eff' / mdot_eff^2
-      double dh_Q_dmdot = -Q * dmdot_eff / (mdot_eff * mdot_eff);
+      // Q contribution: d(Q phi)/d(mdot_i) = Q phi'
+      double dh_Q_dmdot = Q * dphi_Q;
 
       dT_jac.d_mdot = (dh_mix_dmdot + dh_Q_dmdot - y_sum / mdot_tot) / cp_mix;
 
@@ -929,12 +909,12 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
-  // Heat is spread over the actual flow, floored only near zero flow.
-  const double mdot_eff = heat_flow_divisor(mdot_tot).first;
+  // Heat per unit flow: Q / |m|, fading out only near zero flow.
+  const double phi_Q = std::get<0>(mixer_heat_per_unit_flow(mdot_tot));
 
   // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
   // and the burnt composition are known (#481).
-  double delta_h = Q / mdot_eff;
+  double delta_h = Q * phi_Q;
   (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
@@ -956,9 +936,8 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
-    double T_out_eval = 0.0;
-    T_out = T_from_h_mass_floored(h_ad + delta_h, X_b, T_ad, T_out_eval);
-    cp_out = combaero::cp_mass(T_out_eval, X_b);
+    T_out = T_from_h_mass_continued(h_ad + delta_h, X_b, T_ad);
+    cp_out = combaero::cp_mass(T_out, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
     dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
@@ -1000,7 +979,7 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
-  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h * phi_Q;
   res.dT_mix_d_stream.resize(n_streams);
   res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
@@ -1090,12 +1069,12 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   }
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
-  // Heat is spread over the actual flow, floored only near zero flow.
-  const double mdot_eff = heat_flow_divisor(mdot_tot).first;
+  // Heat per unit flow: Q / |m|, fading out only near zero flow.
+  const double phi_Q = std::get<0>(mixer_heat_per_unit_flow(mdot_tot));
 
   // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
   // and the burnt composition are known (#481).
-  double delta_h = Q / mdot_eff;
+  double delta_h = Q * phi_Q;
   (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
@@ -1117,9 +1096,8 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   }
   if (std::abs(delta_h) > 0.0) {
     double h_ad = combaero::h_mass(T_ad, X_b);
-    double T_out_eval = 0.0;
-    T_out = T_from_h_mass_floored(h_ad + delta_h, X_b, T_ad, T_out_eval);
-    cp_out = combaero::cp_mass(T_out_eval, X_b);
+    T_out = T_from_h_mass_continued(h_ad + delta_h, X_b, T_ad);
+    cp_out = combaero::cp_mass(T_out, X_b);
     double cp_ad = combaero::cp_mass(T_ad, X_b);
     dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
@@ -1170,7 +1148,7 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   res.P_total_mix = mix.P_total_mix;
   res.Y_mix = Y_b;
   res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
-  res.dT_mix_dQ = res.dT_mix_d_delta_h / mdot_eff;
+  res.dT_mix_dQ = res.dT_mix_d_delta_h * phi_Q;
   res.dT_mix_d_stream.resize(n_streams);
   res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));

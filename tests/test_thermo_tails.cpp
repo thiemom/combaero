@@ -89,22 +89,24 @@ TEST(ThermoTails, TheDataIsNasa9OverThePinnedRanges) {
 
 // cp > 0 and finite at every T, and on the tails between its value at the
 // data end and its constant: never the polynomial's runaway (cp/R -25 for
-// CH4 at 50 K, -241 for H2O at 20 000 K before #606).
+// CH4 at 50 K, -241 for H2O at 20 000 K before #606). Below the data to
+// within 0.1: the fade matches NASA-9's slope at 200 K, which for a
+// near-rigid species (O2, CH4, H2) carries it up to 0.1 past both ends.
 TEST(ThermoTails, CpIsPositiveAndBoundedAtEveryT) {
   for (ThermoModel m : kModels) {
     ModelGuard g(m);
     for (std::size_t i = 0; i < combaero::num_species(); ++i) {
       const double cp_lo = combaero::cp_R(i, T_lo(i));
       const double cp_hi = combaero::cp_R(i, T_hi(i));
-      const double cp_lo_inf = combaero::cp_R(i, 1.0);
+      const double cp_lo_inf = combaero::cp_R(i, 0.0);
       const double cp_hi_inf = combaero::cp_R(i, 1e5);
       for (double T : sweep()) {
         const double cp = combaero::cp_R(i, T);
         ASSERT_TRUE(std::isfinite(cp)) << i << " " << T;
         EXPECT_GT(cp, 2.0) << i << " " << T;
         if (T < T_lo(i)) {
-          EXPECT_GE(cp, std::min(cp_lo, cp_lo_inf) - 1e-12) << i << " " << T;
-          EXPECT_LE(cp, std::max(cp_lo, cp_lo_inf) + 1e-12) << i << " " << T;
+          EXPECT_GE(cp, std::min(cp_lo, cp_lo_inf) - 0.1) << i << " " << T;
+          EXPECT_LE(cp, std::max(cp_lo, cp_lo_inf) + 0.1) << i << " " << T;
         } else if (T > T_hi(i)) {
           EXPECT_GE(cp, std::min(cp_hi, cp_hi_inf) - 1e-12) << i << " " << T;
           EXPECT_LE(cp, std::max(cp_hi, cp_hi_inf) + 1e-12) << i << " " << T;
@@ -118,12 +120,10 @@ TEST(ThermoTails, CpIsPositiveAndBoundedAtEveryT) {
 // continuous, d2cp/dT2 continuous to its one-sided difference's truncation.
 TEST(ThermoTails, TheTailsJoinTheDataC2) {
   using combaero::thermo::TAIL_FRACTION_HIGH;
-  using combaero::thermo::TAIL_FRACTION_LOW;
   for (ThermoModel m : kModels) {
     ModelGuard g(m);
     for (std::size_t i = 0; i < combaero::num_species(); ++i) {
-      const double edges[] = {T_lo(i), T_lo(i) * (1.0 - TAIL_FRACTION_LOW), T_hi(i),
-                              T_hi(i) * (1.0 + TAIL_FRACTION_HIGH)};
+      const double edges[] = {T_lo(i), T_hi(i), T_hi(i) * (1.0 + TAIL_FRACTION_HIGH)};
       for (double E : edges) {
         const double e = 1e-9 * E;
         const double cp = combaero::cp_R(i, E);
@@ -229,10 +229,36 @@ TEST(ThermoTails, TheInversesSettleOnAJoinWhoseStepTheyCannotResolve) {
   }
 }
 
-// An h no positive T reaches (below h at 0 K on the constant tail) is a
-// failure the caller hears about, not a silently wrong T.
+// Below the data the gas is ideal to 0 K: cp/R reaches the rigid-rotor value
+// of the molecule's geometry there, level (zero slope), and h is finite, so
+// the inverse resolves T down to a few K.
+TEST(ThermoTails, BelowTheDataTheGasIsAnIdealRigidRotorAtZeroKelvin) {
+  struct Pin {
+    const char* name;
+    double cp_R_0;
+  };
+  const Pin pins[] = {{"AR", 2.5}, {"N2", 3.5},  {"CO2", 3.5}, {"H2", 2.5},
+                      {"H2O", 4.0}, {"CH4", 4.0}, {"NC7H16", 4.0}};
+  for (ThermoModel m : kModels) {
+    ModelGuard g(m);
+    for (const Pin& p : pins) {
+      const std::size_t i = combaero::species_index_from_name(p.name);
+      EXPECT_NEAR(combaero::cp_R(i, 0.0), p.cp_R_0, 1e-12) << p.name;
+      EXPECT_NEAR(combaero::cp_R(i, 1e-3), p.cp_R_0, 1e-9) << p.name;
+      EXPECT_NEAR(combaero::dcp_R_dT(i, 1e-3), 0.0, 1e-9) << p.name;
+      const auto X = pure(i);
+      EXPECT_TRUE(std::isfinite(combaero::h(0.0, X))) << p.name;
+      for (double T : {2.0, 5.0, 50.0}) {
+        EXPECT_NEAR(combaero::calc_T_from_h(combaero::h(T, X), X, 300.0), T, 1e-6) << p.name;
+      }
+    }
+  }
+}
+
+// An h no positive T reaches (below h at 0 K) is a failure the caller hears
+// about, not a silently wrong T.
 TEST(ThermoTails, AnUnreachableTargetThrows) {
   const auto X = pure(combaero::species_index_from_name("N2"));
-  const double h_unreachable = combaero::h(1.0, X) - 1e6;
+  const double h_unreachable = combaero::h(0.0, X) - 1.0;
   EXPECT_THROW(combaero::calc_T_from_h(h_unreachable, X, 300.0), std::runtime_error);
 }

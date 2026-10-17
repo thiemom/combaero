@@ -659,6 +659,12 @@ PYBIND11_MODULE(_core, m) {
   m.attr("STATION_KAPPA_BLEED_BASSETT") = combaero::STATION_KAPPA_BLEED_BASSETT;
   m.attr("WALL_HTC_KNEE") = combaero::WALL_HTC_KNEE;
   m.attr("MIXER_HEAT_MDOT_FLOOR") = combaero::solver::kMixerHeatMdotFloor;
+  m.def("mixer_heat_per_unit_flow", &combaero::solver::mixer_heat_per_unit_flow,
+        py::arg("mdot_tot"),
+        "(phi, dphi/dmdot): the enthalpy rise per unit heat a mixing node\n"
+        "applies at total flow mdot_tot. 1/|m| at or above\n"
+        "MIXER_HEAT_MDOT_FLOOR; below it the heat taken up, Q |m| phi, fades\n"
+        "C1 to none at zero flow.");
   m.attr("SENSIBLE_ENTHALPY_REF_T") = combaero::solver::kSensibleEnthalpyRefT;
   py::class_<combaero::StationHalfDrop>(m, "StationHalfDrop")
       .def_readonly("dP", &combaero::StationHalfDrop::dP)

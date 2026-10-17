@@ -175,12 +175,14 @@ double bridge_S_R(std::size_t species_idx, const C2Bridge& b, double T) {
 // --- the tails beyond the data (#606) ----------------------------------------
 
 // One end's tail. t = (T - T0) / w >= 0 on its side (w < 0 below the data);
-// cp/R = p(t) on t < 1, the quartic C2 with NASA-9 at T0 and with p' = p'' = 0
-// at t = 1, and cp_inf = p(1) beyond.
+// cp/R = p(t) on t < 1, C2 with NASA-9 at T0 and with p' = p'' = 0 at t = 1,
+// and cp_inf = p(1) beyond. Below the data w = -T0 (t = 1 is 0 K) and p is the
+// quintic that also takes p(1) to the rigid-rotor value; above it the quartic
+// (c5 = 0) that levels off wherever it reaches.
 struct Tail {
   double T0 = 0.0;
   double w = 0.0;
-  std::array<double, 5> c{};  // p(t), ascending powers
+  std::array<double, 6> c{};  // p(t), ascending powers
   double H0 = 0.0;            // H/R [K] and S/R of the data at T0
   double S0 = 0.0;
   double cp_inf = 0.0;
@@ -189,7 +191,7 @@ struct Tail {
   double S_end = 0.0;
   // p(t) = (t - t_pole) Q(t) + r with t_pole = -T0 / w (T = 0): S/R in closed
   // form, since cp/(R T) dT = (Q(t) + r / (t - t_pole)) dt.
-  std::array<double, 4> Q{};
+  std::array<double, 5> Q{};
   double r = 0.0;
 };
 
@@ -242,6 +244,8 @@ double tail_H_R(const Tail& tl, double T) {
   return tl.H0 + tl.w * tail_p_int(tl, t);
 }
 
+// T > 0 (s_R holds T >= T_FLOOR), so the low tail, whose fade ends at 0 K, is
+// always on t < 1.
 double tail_S_R(const Tail& tl, double T) {
   const double t = (T - tl.T0) / tl.w;
   if (t >= 1.0) {
@@ -250,7 +254,9 @@ double tail_S_R(const Tail& tl, double T) {
   return tl.S0 + tail_Q_int(tl, t) + tl.r * std::log(T / tl.T0);
 }
 
-Tail make_tail(const std::array<double, 10>& a, double T0, double w) {
+// cp_end: the value p(1) the fade must reach (the quintic), or NaN to let the
+// quartic level off where it does.
+Tail make_tail(const std::array<double, 10>& a, double T0, double w, double cp_end) {
   const double T = T0;
   const double cp = a[0] / (T * T) + a[1] / T + a[2] + a[3] * T + a[4] * T * T +
                     a[5] * T * T * T + a[6] * T * T * T * T;
@@ -264,39 +270,73 @@ Tail make_tail(const std::array<double, 10>& a, double T0, double w) {
   const double c0 = cp;
   const double c1 = w * d1;
   const double c2 = 0.5 * w * w * d2;
-  // p'(1) = c1 + 2 c2 + 3 c3 + 4 c4 = 0 and p''(1) = 2 c2 + 6 c3 + 12 c4 = 0.
-  const double c4 = 0.5 * (c1 + c2);
-  const double c3 = -(3.0 * c1 + 4.0 * c2) / 3.0;
-  tl.c = {c0, c1, c2, c3, c4};
+  double c3 = 0.0;
+  double c4 = 0.0;
+  double c5 = 0.0;
+  if (std::isnan(cp_end)) {
+    // p'(1) = c1 + 2 c2 + 3 c3 + 4 c4 = 0 and p''(1) = 2 c2 + 6 c3 + 12 c4 = 0.
+    c4 = 0.5 * (c1 + c2);
+    c3 = -(3.0 * c1 + 4.0 * c2) / 3.0;
+  } else {
+    // And p(1) = cp_end: c3 + c4 + c5 = A, 3 c3 + 4 c4 + 5 c5 = B,
+    // 6 c3 + 12 c4 + 20 c5 = C.
+    const double A = cp_end - c0 - c1 - c2;
+    const double B = -(c1 + 2.0 * c2);
+    const double C = -2.0 * c2;
+    c5 = 0.5 * (C + 12.0 * A - 6.0 * B);
+    c4 = B - 3.0 * A - 2.0 * c5;
+    c3 = A - c4 - c5;
+  }
+  tl.c = {c0, c1, c2, c3, c4, c5};
   tl.cp_inf = tail_p(tl, 1.0);
   tl.H0 = nasa_H_R(a, T0);
   tl.S0 = nasa_S_R(a, T0);
   // Synthetic division of p by (t - t_pole).
   const double tp = -T0 / w;
-  tl.Q[3] = c4;
+  tl.Q[4] = c5;
+  tl.Q[3] = c4 + tp * tl.Q[4];
   tl.Q[2] = c3 + tp * tl.Q[3];
   tl.Q[1] = c2 + tp * tl.Q[2];
   tl.Q[0] = c1 + tp * tl.Q[1];
   tl.r = c0 + tp * tl.Q[0];
   tl.T_end = T0 + w;
   tl.H_end = tl.H0 + w * tail_p_int(tl, 1.0);
-  tl.S_end = tl.S0 + tail_Q_int(tl, 1.0) + tl.r * std::log(tl.T_end / T0);
+  // At 0 K (the low tail) s has no end value; tail_S_R never needs it there.
+  tl.S_end = tl.T_end > 0.0
+                 ? tl.S0 + tail_Q_int(tl, 1.0) + tl.r * std::log(tl.T_end / T0)
+                 : -std::numeric_limits<double>::infinity();
   return tl;
+}
+
+// cp/R at 0 K: see thermo::CP_R_RIGID_* (H2's rotation freezes in the fade).
+double cp_R_rigid_rotor(std::size_t species_idx) {
+  if (species_names[species_idx] == "H2") {
+    return thermo::CP_R_RIGID_ATOM;
+  }
+  switch (transport_props[species_idx].geometry) {
+    case MolecularGeometry::Atom:
+      return thermo::CP_R_RIGID_ATOM;
+    case MolecularGeometry::Linear:
+      return thermo::CP_R_RIGID_LINEAR;
+    case MolecularGeometry::Nonlinear:
+      return thermo::CP_R_RIGID_NONLINEAR;
+  }
+  return thermo::CP_R_RIGID_NONLINEAR;
 }
 
 const std::vector<SpeciesTails>& species_tails() {
   static const std::vector<SpeciesTails> tails = [] {
     std::vector<SpeciesTails> out;
     out.reserve(nasa_coeffs.size());
-    for (const auto& nasa : nasa_coeffs) {
-      const auto& first = nasa.intervals.front();
-      const auto& last = nasa.intervals.back();
+    for (std::size_t i = 0; i < nasa_coeffs.size(); ++i) {
+      const auto& first = nasa_coeffs[i].intervals.front();
+      const auto& last = nasa_coeffs[i].intervals.back();
       SpeciesTails st;
       st.T_lo = first.T_min;
       st.T_hi = last.T_max;
-      st.lo = make_tail(first.coeffs, first.T_min,
-                        -thermo::TAIL_FRACTION_LOW * first.T_min);
-      st.hi = make_tail(last.coeffs, last.T_max, thermo::TAIL_FRACTION_HIGH * last.T_max);
+      st.lo = make_tail(first.coeffs, first.T_min, -first.T_min, cp_R_rigid_rotor(i));
+      st.hi = make_tail(last.coeffs, last.T_max, thermo::TAIL_FRACTION_HIGH * last.T_max,
+                        std::numeric_limits<double>::quiet_NaN());
       out.push_back(st);
     }
     return out;
