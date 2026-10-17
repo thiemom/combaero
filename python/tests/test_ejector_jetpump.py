@@ -243,6 +243,60 @@ def test_cd_nozzle_is_c1_across_the_choke_threshold() -> None:
         assert abs(slopes[i + 1] - slopes[i]) < 5.0e-7  # bounded curvature, no kink
 
 
+def test_cd_nozzle_passes_reverse_flow_above_the_supply() -> None:
+    """#619: with the exit static above the supply the nozzle passes REVERSE
+    flow, strictly decreasing in P_py and continuous at P_py = p0. The former
+    zero exit flux was flat there, so zero flow at any P_py above both
+    supplies closed the ejector rows (a spurious root at P_py ~ 1e13 Pa)."""
+    A_t, A_e, g, R, Tt, p0 = 3.14e-5, 1.0e-4, 1.40, 287.0, 300.0, 101325.0
+    ps = [p0 * f for f in (0.99, 0.999, 1.0, 1.001, 1.01, 1.1, 2.0, 1e3)]
+    mdots = [cd_nozzle_mass_flow(p0, Tt, p, A_t, A_e, g, R) for p in ps]
+    assert all(mdots[i + 1] < mdots[i] for i in range(len(mdots) - 1))
+    assert all(m < 0.0 for m, p in zip(mdots, ps, strict=True) if p > p0)
+    below = cd_nozzle_mass_flow(p0, Tt, p0 * (1 - 1e-12), A_t, A_e, g, R)
+    above = cd_nozzle_mass_flow(p0, Tt, p0 * (1 + 1e-12), A_t, A_e, g, R)
+    cap = choked_mass_flow(p0, Tt, A_t, g, R)
+    assert abs(above - below) < 1e-4 * cap  # continuous through P_py = p0
+    # far above: the reverse flow chokes at the throat from the P_py side
+    assert mdots[-1] == pytest.approx(-choked_mass_flow(ps[-1], Tt, A_t, g, R), rel=2e-3)
+
+
+def test_cd_nozzle_stays_choked_at_deep_expansion() -> None:
+    """#619: below the critical ratio the supersonic-exit flux falls with M;
+    evaluated there it dipped under the choked cap (r < 0.16 at A_e/A_t =
+    1.5), a non-monotone R0 and a second spurious branch at low P_py. The
+    flow must stay at the cap for every exit static below choking."""
+    A_t, g, R, Tt, p0 = 3.14e-5, 1.40, 287.0, 300.0, 3.0e5
+    for A_e in (1.5 * A_t, 3.18 * A_t):
+        cap = choked_mass_flow(p0, Tt, A_t, g, R)
+        ps = [p0 * f for f in (0.4, 0.2, 0.1, 0.03, 0.01, 1e-4)]
+        mdots = [cd_nozzle_mass_flow(p0, Tt, p, A_t, A_e, g, R) for p in ps]
+        assert all(m == pytest.approx(cap, rel=2e-3) for m in mdots)
+        assert all(mdots[i + 1] >= mdots[i] - 1e-15 for i in range(len(mdots) - 1))
+
+
+def test_cd_nozzle_reverse_branch_matches_the_cpp_closure_and_its_jacobian() -> None:
+    """The C++ value and DualN Jacobian follow the Python reference on the
+    reverse branch (the element is assembled from the C++ one)."""
+    from combaero import _solver_tools
+
+    A_t, A_e, g, R, Tt, p0, eta, eps = 3.14e-5, 1.0e-4, 1.40, 287.0, 300.0, 101325.0, 0.95, 1e-3
+    for p in (p0 * 1.002, p0 * 1.05, p0 * 3.0, p0 * 0.05):
+        ref = cd_nozzle_mass_flow(p0, Tt, p, A_t, A_e, g, R, eta, eps)
+        j = _solver_tools.ejector_cd_nozzle_mass_flow_and_jacobian(
+            p0, Tt, p, A_t, A_e, g, R, eta, eps
+        )
+        assert j.mdot == pytest.approx(ref, rel=1e-12)
+        for k, (dx, d) in enumerate(((p0, j.dmdot_dp0), (Tt, j.dmdot_dt0), (p, j.dmdot_dp_py))):
+            h = 1e-6 * dx
+            args = [p0, Tt, p]
+            args[k] += h
+            hi = cd_nozzle_mass_flow(args[0], args[1], args[2], A_t, A_e, g, R, eta, eps)
+            args[k] -= 2 * h
+            lo = cd_nozzle_mass_flow(args[0], args[1], args[2], A_t, A_e, g, R, eta, eps)
+            assert d == pytest.approx((hi - lo) / (2 * h), rel=1e-5, abs=1e-12)
+
+
 def test_cd_nozzle_exit_static_round_trips() -> None:
     """cd_nozzle_exit_static inverts cd_nozzle_mass_flow: feeding the exit
     static back through the nozzle must recover the input mass flow (the

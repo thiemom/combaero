@@ -56,7 +56,12 @@ is ejector physics instead of impulse-CV physics. With ``s = s_choke``:
 nozzle relations R0/R1 share, so making it free keeps BOTH live and lets the
 downstream back pressure select the operating regime. ``R0``'s C-D nozzle
 smooth-mins the subsonic-flux and sonic-cap branches, so it is choked or
-unchoked automatically as ``P_py`` moves. ``discharge = recovery * (s*P_c* +
+unchoked automatically as ``P_py`` moves. It is strictly monotone in ``P_py`` over the
+whole line (#619): the exit Mach is held at 1 below the critical ratio (the
+supersonic-exit flux used to dip under the cap at deep expansion), and above
+the supply the nozzle passes REVERSE flow, so zero flow pins ``P_py`` to the
+supply instead of leaving it free (zero flow at any ``P_py`` above both
+supplies used to close every row: a spurious root at ~1e13 Pa). ``discharge = recovery * (s*P_c* +
 (1-s)*P03_jetpump)`` blends the critical and jet-pump mixing closures; each is
 evaluated ONLY where its weight is nonzero (the critical closures return NaN
 for an unchoked primary, and ``0 * NaN = NaN`` would otherwise poison the
