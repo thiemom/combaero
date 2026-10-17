@@ -50,6 +50,24 @@ double friction_serghides(double Re, double e_D);
 double friction_colebrook(double Re, double e_D, double tol = 1e-10,
                           int max_iter = 20);
 
+// Laminar-turbulent blend of the network friction kernels
+// (friction_and_jacobian_{haaland,serghides,colebrook}): f = (1 - w) 64/Re +
+// w f_turb, w = (1 + tanh((Re - blend_center) / blend_width)) / 2.
+// The laminar branch is Hagen-Poiseuille, f Re = 64, and carries its own
+// floor, re_floor, far below any flow a solve meets, so the drop stays linear
+// in m down to essentially zero flow. The turbulent fits keep the larger
+// turbulent_re_floor, which only guards their log at Re = 0 (w ~ 0 there).
+// It used to floor the laminar branch too: f saturated at 1 below Re ~ 64, so
+// the drop went as m^2 with zero slope at zero flow, and a junction port that
+// had to reverse stalled there (the stress ideal_nport family).
+namespace laminar_friction {
+constexpr double f_re = 64.0;          // Hagen-Poiseuille f Re, circular duct
+constexpr double re_floor = 1e-6;      // laminar-branch floor
+constexpr double turbulent_re_floor = 64.0;
+constexpr double blend_center = 2300.0;
+constexpr double blend_width = 400.0;
+} // namespace laminar_friction
+
 // Petukhov correlation (1970) - smooth channels only
 // f = (coeff_a * ln(Re) - coeff_b)^(-2)
 // Valid for 3000 < Re < 5x10^6
