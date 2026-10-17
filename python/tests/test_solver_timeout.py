@@ -223,12 +223,24 @@ def test_stall_detector_catches_a_dead_plateau_near_tolerance():
     assert not _stall_detected(short, window=5.0, min_rel=0.10, tol=1e-3, far_factor=100.0)
 
 
-def test_stall_detector_spares_a_crawl_near_tolerance():
-    """Below the gate, any improvement at all is a crawl, not a stall."""
+def test_stall_detector_spares_real_progress_near_tolerance():
+    """Below the gate, a trace still gaining 5% or more over three windows
+    is converging, not stalled."""
     from combaero.network.solver import _stall_detected
 
-    trace = _trace([(0.5 * i, 7.18e-2 * (1.0 - 1e-4 * i)) for i in range(120)])
+    trace = _trace([(0.5 * i, 7.18e-2 * 0.995**i) for i in range(120)])  # ~14% per 15 s
     assert not _stall_detected(trace, window=5.0, min_rel=0.10, tol=1e-3, far_factor=100.0)
+
+
+def test_stall_detector_catches_a_crawl_near_tolerance():
+    """Below the gate, a crawl is a stall too (#636): the 5-row hot impingement
+    array crept 0.5% every 3 s at |F| ~ 0.075 (1.7% per 15 s) for 200 s of LM
+    before the warm-start retry solved it in 0.3 s. Converging LM near a root
+    is quadratic, orders of magnitude faster."""
+    from combaero.network.solver import _stall_detected
+
+    trace = _trace([(0.5 * i, 7.18e-2 * (1.0 - 5e-4 * i)) for i in range(120)])  # 1.5% per 15 s
+    assert _stall_detected(trace, window=5.0, min_rel=0.10, tol=1e-3, far_factor=100.0)
 
 
 def test_stall_detector_grace_period():

@@ -192,6 +192,30 @@ struct ChamberStaticState {
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
 
+// -------------------------------------------------------------
+// Static state at a duct's inlet from the STAGNATION state (T0, P0) it is
+// fed from and its mass flux G = |m_dot| / A (#636): the isentropic
+// acceleration from rest, i.e. chamber_static_state at the static P whose
+// isentropic stagnation pressure is P0,
+//   L(ln P) = ln(P0 / P)|isentropic(T0, P, G) - ln(P0 / P) = 0.
+// L is monotone on the subsonic branch [P*, P0], P* the sonic pressure, so a
+// bracketed Newton finds the unique subsonic root. A G above the choked
+// mass flux has no subsonic state: the sonic state at P* is returned, with
+// choked = true and no G dependence. A heat-transfer correlation needs this
+// state: a plenum's T is the stagnation T, and reading it as the duct's
+// static T put T_aw above T0 by about (1 + r) (T0 - T).
+// Partials with respect to T0, P0 and G, by the implicit function theorem.
+struct DuctStaticState {
+  double T, P, rho, M;
+  double dT_dT0, dT_dP0, dT_dG;
+  double dP_dT0, dP_dP0, dP_dG;
+  double drho_dT0, drho_dP0, drho_dG;
+  bool choked;
+};
+
+DuctStaticState duct_static_state(double T0, double P0, double G,
+                                  const std::vector<double>& X);
+
 } // namespace combaero
 
 #endif // STAGNATION_H
