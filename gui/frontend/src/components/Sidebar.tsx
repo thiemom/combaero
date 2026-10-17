@@ -1,7 +1,8 @@
-import { Save, Upload } from "lucide-react";
+import { Save, Trash2, Upload } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { checkContinuationAvailable } from "../api";
+import { clearAutosave } from "../store/autosave";
 import useStore from "../store/useStore";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import NodeIcon from "./NodeIcon";
@@ -14,6 +15,9 @@ const Sidebar = () => {
 	const {
 		saveNetwork,
 		loadNetwork,
+		clearNetwork,
+		restoredNote,
+		setRestoredNote,
 		solverSettings,
 		updateSolverSettings,
 		unitPreferences,
@@ -64,6 +68,24 @@ const Sidebar = () => {
 
 	const onSave = () => saveNetwork(filename.trim() || "network");
 
+	// Clear (#596): empty the canvas and delete the autosaved copy, so a
+	// deliberate clear stays cleared across a reload.
+	const onClear = () => {
+		if (
+			!window.confirm(
+				"Clear the canvas? Unsaved work is lost; Save first to keep it.",
+			)
+		) {
+			return;
+		}
+		clearNetwork();
+		try {
+			clearAutosave(window.localStorage);
+		} catch {
+			// storage blocked: nothing was saved
+		}
+	};
+
 	const onDragStart = (event: React.DragEvent, nodeType: string) => {
 		event.dataTransfer.setData("application/reactflow", nodeType);
 		event.dataTransfer.effectAllowed = "move";
@@ -83,6 +105,7 @@ const Sidebar = () => {
 				try {
 					const json = JSON.parse(e.target?.result as string);
 					loadNetwork(json);
+					setRestoredNote(null);
 				} catch (error) {
 					console.error("Failed to parse network JSON:", error);
 					alert("Invalid network file");
@@ -115,6 +138,15 @@ const Sidebar = () => {
 					<Upload size={16} className="text-emerald-600" />
 					<span>Load</span>
 				</button>
+				<button
+					type="button"
+					onClick={onClear}
+					title="Clear the canvas and the autosaved copy"
+					aria-label="Clear the canvas"
+					className="flex items-center justify-center p-2 border rounded hover:bg-stone-50 transition-colors text-sm bg-white"
+				>
+					<Trash2 size={16} className="text-rose-600" />
+				</button>
 				<input
 					type="file"
 					ref={fileInputRef}
@@ -123,6 +155,20 @@ const Sidebar = () => {
 					accept=".json"
 				/>
 			</div>
+
+			{restoredNote && (
+				<div className="flex items-start justify-between gap-2 text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded p-2">
+					<span>{restoredNote}</span>
+					<button
+						type="button"
+						onClick={() => setRestoredNote(null)}
+						aria-label="Dismiss"
+						className="text-sky-600 hover:text-sky-900 leading-none"
+					>
+						×
+					</button>
+				</div>
+			)}
 
 			<div className="flex flex-col gap-1">
 				<label className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">

@@ -6,6 +6,7 @@ import { isBackendReachable, solveNetwork } from "./api";
 import Inspector from "./components/Inspector";
 import NetworkCanvas from "./components/NetworkCanvas";
 import Sidebar from "./components/Sidebar";
+import { readAutosave, restoredNote, startAutosave } from "./store/autosave";
 import useStore from "./store/useStore";
 import { solveErrorMessage } from "./utils/solveError";
 import { validateNetwork } from "./utils/validation";
@@ -22,6 +23,24 @@ const App = () => {
 		refreshPreview,
 	} = useStore();
 	const [isSolving, setIsSolving] = useState(false);
+
+	// Auto-save (#596): restore the last session once, through loadNetwork
+	// (which drops stale results and migrates old settings, like opening a
+	// saved file), then write every change to localStorage, debounced.
+	useEffect(() => {
+		let storage: Storage | null = null;
+		try {
+			storage = window.localStorage;
+		} catch {
+			return; // storage blocked: the editor works without it
+		}
+		const saved = readAutosave(storage);
+		if (saved && useStore.getState().nodes.length === 0) {
+			useStore.getState().loadNetwork(saved);
+			useStore.getState().setRestoredNote(restoredNote(saved.savedAt));
+		}
+		return startAutosave(useStore, storage);
+	}, []);
 
 	// Keep the geometry-inheritance preview (#559) fresh as the graph changes,
 	// debounced so a drag or a burst of edits triggers one resolve, not many.

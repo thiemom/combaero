@@ -156,3 +156,21 @@ describe("loadNetwork legacy migration", () => {
 		);
 	});
 });
+
+describe("clearNetwork (#596)", () => {
+	it("empties the canvas and keeps the solver settings", () => {
+		useStore.setState({
+			nodes: [nodeWithResult("n1")],
+			edges: [edgeWithResult("e1", "n1", "n2")],
+			restoredNote: "Restored your last session.",
+		});
+		const settings = useStore.getState().solverSettings;
+		useStore.getState().clearNetwork();
+		const s = useStore.getState();
+		expect(s.nodes).toEqual([]);
+		expect(s.edges).toEqual([]);
+		expect(s.solveResults).toBeNull();
+		expect(s.restoredNote).toBeNull();
+		expect(s.solverSettings).toBe(settings);
+	});
+});

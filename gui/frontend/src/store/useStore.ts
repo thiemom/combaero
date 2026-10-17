@@ -92,6 +92,12 @@ export interface RFState {
 	saveNetwork: (filename?: string) => void | Promise<void>;
 	loadNetwork: (data: any) => void;
 	dismissSolveStatus: () => void;
+	// Empties the canvas (#596): no nodes, edges or results. Solver settings
+	// and unit preferences stay; the autosaved copy is the caller's to clear.
+	clearNetwork: () => void;
+	// When the canvas was restored from the autosave (#596), the note shown.
+	restoredNote: string | null;
+	setRestoredNote: (note: string | null) => void;
 	isExporting: boolean;
 	exportNetworkResults: () => Promise<void>;
 }
@@ -451,6 +457,19 @@ const useStore = create<RFState>((set, get) => ({
 			});
 		}
 	},
+
+	clearNetwork: () => {
+		set({
+			nodes: [],
+			edges: [],
+			solveResults: null,
+			previewItems: {},
+			restoredNote: null,
+		});
+	},
+
+	restoredNote: null,
+	setRestoredNote: (note: string | null) => set({ restoredNote: note }),
 
 	dismissSolveStatus: () => {
 		set({ solveResults: null });
