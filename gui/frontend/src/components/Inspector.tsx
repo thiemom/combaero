@@ -13,6 +13,13 @@ import {
 import { describeElement, failuresFor } from "../utils/secondLaw";
 import { bassettDesignK } from "../utils/teeK";
 import { validateNetwork } from "../utils/validation";
+import {
+	designArrangement,
+	orientationGlyph,
+	orientationOf,
+	sideRun,
+	solvedArrangement,
+} from "../utils/wallArrangement";
 import AreaInput from "./AreaInput";
 import CompositionEditor from "./CompositionEditor";
 import GeometryFields from "./GeometryFields";
@@ -3023,6 +3030,68 @@ const Inspector = () => {
 					/>
 				</div>
 
+				{(() => {
+					const arrayTypes = ["impingement_array", "effusion_liner"];
+					const onArray = [selectedEdge.source, selectedEdge.target].some(
+						(nid) =>
+							arrayTypes.includes(nodes.find((n) => n.id === nid)?.type ?? ""),
+					);
+					const orientation = orientationOf(selectedEdge.data);
+					const runs = [selectedEdge.source, selectedEdge.target].map((nid) =>
+						sideRun(nid, nodes, edges),
+					);
+					const runText = (r: (typeof runs)[number]) =>
+						`${r.from ?? "?"} → ${r.to ?? "?"}`;
+					return (
+						<div className="flex flex-col gap-1 border-t pt-4">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Orientation
+							</label>
+							{onArray ? (
+								<p className="text-[10px] text-gray-500 leading-snug">
+									An array's row walls exchange with the rows they face; the
+									wall has no orientation to declare.
+								</p>
+							) : (
+								<>
+									<select
+										aria-label="Wall orientation"
+										value={orientation}
+										onChange={(e) =>
+											updateEdgeData(selectedEdge.id, {
+												orientation: e.target.value,
+											})
+										}
+										className="p-1.5 border rounded text-xs bg-white w-full border-stone-200 outline-none focus:ring-1 focus:ring-orange-500"
+									>
+										<option value="aligned">
+											{orientationGlyph("aligned")} Aligned: both sides run the
+											same way along the wall
+										</option>
+										<option value="opposed">
+											{orientationGlyph("opposed")} Opposed: the sides run
+											opposite ways
+										</option>
+									</select>
+									<div className="text-[10px] text-gray-500 font-mono leading-snug">
+										<div>
+											A {runs[0].label}: {runText(runs[0])}
+										</div>
+										<div>
+											B {runs[1].label}: {runText(runs[1])}
+										</div>
+									</div>
+									<p className="text-[10px] text-gray-500 leading-snug">
+										Forward flow on both sides runs{" "}
+										{designArrangement(orientation)} flow. A reversed side flips
+										it; the solve follows the flow signs.
+									</p>
+								</>
+							)}
+						</div>
+					);
+				})()}
+
 				<div className="border-t pt-4">
 					<WallLayersEditor
 						layers={
@@ -3130,6 +3199,20 @@ const Inspector = () => {
 									{selectedEdge.data.result.Q?.toLocaleString()} W
 								</span>
 							</div>
+							{solvedArrangement(selectedEdge.data.result) && (
+								<div className="flex justify-between items-center">
+									<span className="text-[10px] text-stone-500 font-bold uppercase">
+										Arrangement
+									</span>
+									<span className="font-mono text-xs font-black">
+										{solvedArrangement(selectedEdge.data.result)}
+										{selectedEdge.data.result.NTU != null &&
+											` · NTU ${Number(selectedEdge.data.result.NTU).toPrecision(3)}`}
+										{selectedEdge.data.result.effectiveness != null &&
+											` · ε ${Number(selectedEdge.data.result.effectiveness).toFixed(3)}`}
+									</span>
+								</div>
+							)}
 							<div className="flex justify-between items-center">
 								<span className="text-[10px] text-stone-500 font-bold uppercase">
 									Hot Side Wall Temp

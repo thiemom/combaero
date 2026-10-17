@@ -1,6 +1,11 @@
 import type { EdgeProps } from "reactflow";
 import { EdgeLabelRenderer, getBezierPath } from "reactflow";
 import useStore from "../store/useStore";
+import {
+	orientationGlyph,
+	orientationOf,
+	solvedArrangement,
+} from "../utils/wallArrangement";
 
 const ARROW_COLOR = "#ff9800";
 const MARKER_SIZE = 6;
@@ -201,7 +206,24 @@ export default function ThermalEdge({
 							{data.label}
 						</span>
 					)}
-					<span style={{ fontWeight: 700 }}>{labelText}</span>
+					<span style={{ fontWeight: 700 }}>
+						<span
+							title={`${orientationOf(data)} wall${
+								solvedArrangement(data?.result)
+									? `, solved ${solvedArrangement(data?.result)} flow`
+									: ""
+							}`}
+							style={{ marginRight: 4 }}
+						>
+							{orientationGlyph(orientationOf(data))}
+						</span>
+						{labelText}
+					</span>
+					{solvedArrangement(data?.result) && (
+						<span className="text-[9px] text-gray-500 leading-none">
+							{solvedArrangement(data?.result)}
+						</span>
+					)}
 					<div
 						style={{
 							display: "flex",
