@@ -109,6 +109,7 @@ input, so its d/dt_e central-difference targets also hold gamma fixed).
 
 from __future__ import annotations
 
+import contextlib
 import math
 from typing import Any
 
@@ -306,6 +307,9 @@ class EjectorElement(MultiPortChamberBase):
         self.k_suction = float(k_suction)
         self.k_throat = float(k_throat)
         self.k_diffuser = float(k_diffuser)
+        #: Warm-start values this element wrote (see seed_warm_start), keyed
+        #: by (holder id, unknown); a guess the user gave is never in here.
+        self._auto_seeds: dict[tuple[str, str], float] = {}
 
     def area_facing(self, node_id: str) -> float | None:
         """The flow area this ejector presents at ``node_id``: the mixing duct
@@ -335,6 +339,204 @@ class EjectorElement(MultiPortChamberBase):
             self._port_area_sources = ["user", self._mixing_source, self._mixing_source]
         self._size_outlet_port_node(graph)
         super().resolve_topology(graph)
+        self.seed_warm_start(graph)
+
+    def seed_warm_start(self, graph: Any) -> None:
+        """Seed the cold start from the ejector's own closed-form physics.
+
+        The stiff compressible solve needs it: from the generic cold start
+        (P_jct at the highest boundary pressure, i.e. the primary nozzle's
+        zero-flow point) 2 of 22 stress draws converge, against 9 of 22
+        seeded (#619). Each port is traced to its boundary through the
+        network; the port chambers' P/Pt, ``P_jct`` (= P_c* critical, just
+        below the back pressure in the jet-pump case) and the port-chain
+        flows are seeded where the user gave no guess. Runs on every
+        ``resolve_topology``: it first withdraws the seeds it wrote last
+        time, so a re-solve with new boundary values is seeded afresh, and
+        seeds nothing in the incompressible regime, whose ``P_jct`` means
+        something else (the solver's incompressible proxy flips it there).
+        Best-effort: a closed form that refuses leaves that seed unset.
+        Moved from the GUI backend, so API-built networks get it too.
+        """
+        for (holder_id, key), value in self._auto_seeds.items():
+            holder = graph.nodes.get(holder_id) or graph.elements.get(holder_id)
+            guess = dict(getattr(holder, "initial_guess", {}) or {}) if holder else {}
+            if guess.get(key) == value:
+                del guess[key]
+                holder.initial_guess = guess
+        self._auto_seeds = {}
+        if self.regime != "compressible":
+            return
+        with contextlib.suppress(Exception):  # a seed, never a failure
+            self._seed_from_closed_forms(graph)
+
+    def _seed(self, holder: Any, key: str, value: float) -> None:
+        guess = dict(getattr(holder, "initial_guess", {}) or {})
+        if key in guess:
+            return
+        guess[key] = float(value)
+        holder.initial_guess = guess
+        self._auto_seeds[(holder.id, key)] = float(value)
+
+    def _port_boundary(self, graph: Any, port_id: str, max_hops: int = 8) -> Any:
+        """The first flow boundary reached walking outward from a port, never
+        through this ejector; None if there is none within ``max_hops``."""
+        from combaero.network.components import MassFlowBoundary, PressureBoundary
+
+        seen, frontier = {port_id}, [port_id]
+        for _ in range(max_hops):
+            nxt: list[str] = []
+            for nid in frontier:
+                for elem in graph.get_upstream_elements(nid) + graph.get_downstream_elements(nid):
+                    if elem is self:
+                        continue
+                    for other in (getattr(elem, "from_node", None), getattr(elem, "to_node", None)):
+                        if other is None or other in seen:
+                            continue
+                        seen.add(other)
+                        node = graph.nodes.get(other)
+                        if isinstance(node, (PressureBoundary, MassFlowBoundary)):
+                            return node
+                        nxt.append(other)
+            frontier = nxt
+        return None
+
+    def _seed_port_chain_flows(self, graph: Any, port_id: str, flow: float, inflow: bool) -> None:
+        """``<id>.m_dot`` on the linear chain of two-port elements running
+        outward from a port to its boundary, signed by each element's
+        orientation (towards the port on an inlet, away on an outlet). Stops
+        at a branch, a multi-port element or a boundary."""
+        from combaero.network.components import MassFlowBoundary, PressureBoundary
+
+        node_id, prev = port_id, self
+        for _ in range(32):
+            around = graph.get_upstream_elements(node_id) + graph.get_downstream_elements(node_id)
+            elems = [e for e in around if e is not prev and e is not self]
+            if len(elems) != 1:
+                return
+            elem = elems[0]
+            frm, to = getattr(elem, "from_node", None), getattr(elem, "to_node", None)
+            if node_id not in (frm, to) or frm is None or to is None:
+                return
+            signed = flow if (to == node_id) == inflow else -flow
+            unk = f"{elem.id}.m_dot"
+            if unk in elem.unknowns():
+                self._seed(elem, unk, signed)
+            node_id = frm if to == node_id else to
+            if isinstance(graph.nodes.get(node_id), (PressureBoundary, MassFlowBoundary)):
+                return
+            prev = elem
+
+    def _seed_from_closed_forms(self, graph: Any) -> None:
+        from combaero.network._ejector_huang1999 import (
+            choked_mass_flow,
+            critical_back_pressure,
+            entrainment_ratio,
+        )
+        from combaero.network.components import MassFlowBoundary, PressureBoundary
+
+        pb = self._port_boundary(graph, self.primary_node)
+        sb = self._port_boundary(graph, self.secondary_node)
+        ob = self._port_boundary(graph, self.outlet_node)
+
+        # Nominal air properties for the SEED only (exact gamma/R not needed).
+        X = cb.species.dry_air()
+        t_g = float(getattr(pb, "Tt", 440.0))
+        t_e = float(getattr(sb, "Tt", 280.0))
+        try:
+            gamma = choke_plane_gamma(t_e, X)
+        except Exception:  # noqa: BLE001
+            gamma = 1.4
+        r_gas = float(cb.specific_gas_constant(X))
+
+        # Primary stagnation: direct for a pressure boundary; inverse choked
+        # flow for a mass boundary (m_dot is linear in p0).
+        p_g = None
+        if isinstance(pb, PressureBoundary):
+            p_g = float(pb.Pt)
+        elif isinstance(pb, MassFlowBoundary):
+            unit = choked_mass_flow(1.0, t_g, self.throat_area, gamma, r_gas, eta=ETA_P)
+            if unit > 0.0:
+                p_g = float(pb.m_dot) / unit
+        p_e = float(sb.Pt) if isinstance(sb, PressureBoundary) else None
+        p_o = float(ob.Pt) if isinstance(ob, PressureBoundary) else None
+
+        # A mass-driven primary whose choked-inverse Pt is below the back
+        # pressure cannot choke: the physical branch is the subsonic jet pump,
+        # primary Pt floating to ~the back pressure, P_py just below it. The
+        # choked-inverse seed there parks Newton in the spurious double-choked
+        # basin (Pt_primary < Pb), from which it stalls.
+        jetpump = (
+            isinstance(pb, MassFlowBoundary) and p_g is not None and p_o is not None and p_g < p_o
+        )
+        if jetpump:
+            p_g = p_o
+
+        for port_id, value in (
+            (self.primary_node, p_g),
+            (self.secondary_node, p_e),
+            (self.outlet_node, p_o),
+        ):
+            node = graph.nodes.get(port_id)
+            if node is None or value is None or value <= 0.0:
+                continue
+            existing = getattr(node, "initial_guess", {}) or {}
+            if any(
+                k.endswith((".P", ".Pt")) for k in existing if (port_id, k) not in self._auto_seeds
+            ):
+                continue  # the user seeded this port
+            self._seed(node, f"{port_id}.P", value)
+            self._seed(node, f"{port_id}.Pt", value)
+
+        # An inherited A_3 resolves in resolve_topology, from the outlet pipe;
+        # a seed taken before that (the GUI seeds at build) uses the same
+        # value, or every closed form below would fail on area_ratio_mix.
+        a3 = self.mixing_area
+        if a3 is None:
+            a3 = self._outlet_pipe_area(graph)[0] or DEFAULT_EJECTOR_MIXING_AREA
+        geom = EjectorGeometry(self.area_ratio_nozzle, float(a3) / self.throat_area)
+        p_jct = None
+        if jetpump and p_o is not None:
+            p_jct = 0.99 * p_o
+        elif p_g and p_e:
+            try:
+                p_jct = float(
+                    critical_back_pressure(
+                        p_g, t_g, p_e, t_e, geom, gamma, r_gas, self.recovery_efficiency
+                    ).p_c_pa
+                )
+            except Exception:  # noqa: BLE001
+                p_jct = None
+        if p_jct is not None and p_jct > 0.0:
+            self._seed(self, f"{self.id}.P_jct", p_jct)
+
+        # Port-chain flows (#567): left to the generic defaults (tens of kg/s
+        # for a ~0.1 kg/s ejector) a channel on a port sends the cold start to
+        # Mach-20 port states. Critical regime only: at the jet-pump seed
+        # (p_g = p_o, no drive) the closed form gives omega ~ 0 and a
+        # zero-entrainment seed parks Newton there.
+        if jetpump:
+            return
+        mp = None
+        if isinstance(pb, MassFlowBoundary):
+            mp = float(pb.m_dot)
+        elif p_g:
+            mp = float(choked_mass_flow(p_g, t_g, self.throat_area, gamma, r_gas, eta=ETA_P))
+        omega = None
+        if mp and p_g and p_e:
+            try:
+                omega = float(entrainment_ratio(p_g, t_g, p_e, t_e, geom, gamma).omega)
+            except Exception:  # noqa: BLE001
+                omega = None
+        if omega is not None and not (0.0 < omega < 50.0):
+            omega = None  # an out-of-envelope closed form is no seed
+        if mp:
+            self._seed_port_chain_flows(graph, self.primary_node, mp, inflow=True)
+            if omega is not None:
+                self._seed_port_chain_flows(graph, self.secondary_node, omega * mp, inflow=True)
+                self._seed_port_chain_flows(
+                    graph, self.outlet_node, (1.0 + omega) * mp, inflow=False
+                )
 
     def _size_outlet_port_node(self, graph: Any) -> None:
         """An auto-sized outlet port chamber takes A_3 unless a pipe sized it.

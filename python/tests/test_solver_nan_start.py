@@ -43,21 +43,29 @@ def _ejector_net() -> FlowNetwork:
         ("co", "mo", "bo", 1.0),
     ):
         g.add_element(ChannelElement(eid, a, b, length=L, diameter=D, regime="incompressible"))
-    g.add_element(
-        EjectorElement(
-            id="ej",
-            primary_node="mp",
-            secondary_node="ms",
-            outlet_node="mo",
-            throat_area=3.14e-5,
-            nozzle_exit_area=4.675e-5,
-            mixing_area=3.069e-4,
-            regime="compressible",
-        )
+    ej = EjectorElement(
+        id="ej",
+        primary_node="mp",
+        secondary_node="ms",
+        outlet_node="mo",
+        throat_area=3.14e-5,
+        nozzle_exit_area=4.675e-5,
+        mixing_area=3.069e-4,
+        regime="compressible",
     )
+    g.add_element(ej)
     return g
 
 
+@pytest.fixture
+def no_ejector_warm_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With its own warm start (EjectorElement.seed_warm_start) this cold
+    solve converges; the NaN path needs the cold attempt to fail and the
+    incompressible proxy to seed the retry, so the seed is switched off."""
+    monkeypatch.setattr(EjectorElement, "seed_warm_start", lambda self, graph: None)
+
+
+@pytest.mark.usefixtures("no_ejector_warm_start")
 def test_a_nan_start_is_not_reported_converged() -> None:
     s = NetworkSolver(_ejector_net())
     s.raise_internal_errors = False
@@ -74,6 +82,7 @@ def test_a_nan_start_is_not_reported_converged() -> None:
     )
 
 
+@pytest.mark.usefixtures("no_ejector_warm_start")
 def test_a_strict_solve_raises_on_a_nan_start() -> None:
     s = NetworkSolver(_ejector_net())
     s.raise_internal_errors = True

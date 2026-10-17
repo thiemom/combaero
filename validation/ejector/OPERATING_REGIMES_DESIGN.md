@@ -509,7 +509,8 @@ before the guard.
 primary at its choked-inverse Pt; when that is BELOW the outlet back pressure
 the primary cannot choke, so it now seeds `Pt_p = outlet.Pt` (jet-pump branch)
 and `P_jct = 0.99*outlet.Pt` instead of the choked-inverse / `P_c*` seed. Cold
-Newton lands in the jet-pump basin directly (`graph_builder._seed_ejector_warmstart`).
+Newton lands in the jet-pump basin directly (now `EjectorElement.seed_warm_start`, moved
+from the GUI backend so API-built networks get it too).
 
 **Verified:** element Jacobian matches FD at the jet-pump root (the earlier
 `d(R3)/d(mc_p.Pt) = NaN` gone; the lone residual `e4.m_dot R3` "mismatch" is FD
@@ -566,8 +567,10 @@ Still open:
   choked ejector with its outlet between P_c* and P_b0 has no root. The
   sec 8.1 omega_sub droop exists in `_ejector_huang1999` but is not wired
   into the element.
-* **Warm start:** the physics warm start lives in the GUI backend
-  (`graph_builder._seed_ejector_warmstart`), so API-built networks start cold.
+* **Warm start:** the physics warm start lived in the GUI backend, so API-built
+  networks started cold (2 of 22 stress draws). It is now
+  `EjectorElement.seed_warm_start`, run at every `resolve_topology`: 8 of 22,
+  every critical draw.
 
 ## 7. References
 
