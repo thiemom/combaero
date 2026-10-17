@@ -210,6 +210,27 @@ def test_stall_detector_ignores_slow_grind_near_tolerance():
     assert not _stall_detected(trace, window=5.0, min_rel=0.10, tol=1e-3, far_factor=100.0)
 
 
+def test_stall_detector_catches_a_dead_plateau_near_tolerance():
+    """#626: a cold attempt's LM fallback parked at |F| = 0.0718, under the
+    100x-tol gate, with not one better point in 175 s; a crawl is spared,
+    a plateau that never improves over three windows is not."""
+    from combaero.network.solver import _STALL_DEAD_WINDOWS, _stall_detected
+
+    t_dead = _STALL_DEAD_WINDOWS * 5.0
+    trace = _trace([(0.5 * i, 7.18e-2) for i in range(int(2 * t_dead / 0.5))])
+    assert _stall_detected(trace, window=5.0, min_rel=0.10, tol=1e-3, far_factor=100.0)
+    short = _trace([(0.5 * i, 7.18e-2) for i in range(int(t_dead / 0.5) - 1)])
+    assert not _stall_detected(short, window=5.0, min_rel=0.10, tol=1e-3, far_factor=100.0)
+
+
+def test_stall_detector_spares_a_crawl_near_tolerance():
+    """Below the gate, any improvement at all is a crawl, not a stall."""
+    from combaero.network.solver import _stall_detected
+
+    trace = _trace([(0.5 * i, 7.18e-2 * (1.0 - 1e-4 * i)) for i in range(120)])
+    assert not _stall_detected(trace, window=5.0, min_rel=0.10, tol=1e-3, far_factor=100.0)
+
+
 def test_stall_detector_grace_period():
     """Histories shorter than the window never stall."""
     from combaero.network.solver import _stall_detected

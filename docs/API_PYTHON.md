@@ -810,7 +810,8 @@ bookkeeping keys. Five of them say what happened:
 | `__converged__` | `bool` | the root finder reached the residual tolerance, whatever the consistency checks then said |
 | `__consistent__` | `bool \| None` | the elements' own physical-consistency verdict. **`None` means not checked** -- either the solve never converged, or no element in this network has a verifier. It is not a pass. |
 | `__inconsistent_elements__` | `list[str]` | ids of the elements that rejected the solution |
-| `__T_clamped__` | `list[str]` | nodes with flow whose temperature sits on the [200, 5000] K clamp at the solution. The clamp discards energy, so the solve is reported INCONSISTENT (`__success__` False). |
+| `__T_clamped__` | `list[str]` | nodes with flow whose temperature is at or below 0 K at the solution: more heat out than the stream holds as a gas (the thermo is an ideal gas down to 0 K). Reported INCONSISTENT (`__success__` False). The name is kept from the [200, 5000] K node clamp this replaced (#626). |
+| `__heat_faded__` | `list[str]` | heated nodes at a root inside the heat fade below `MIXER_HEAT_MDOT_FLOOR`, taking up part of their heat: neither flowing nor stagnant, a root the fade makes. Reported INCONSISTENT. |
 | `__outcome__` | `SolveOutcome` | why it ended, in one machine-readable value |
 | `__worst_residuals__` | `list[dict]` | the rows carrying the residual, largest first |
 | `__second_law__` | `dict[str, dict]` | per element: `verdict` (`"pass"`, `"fail"`, `"not_checked"` with a `reason`), `sigma` [W/K], `sigma_norm` [-] and its band `sigma_norm_low`/`_high`; chain members carry their `group`. **Report only** (#545): it never changes `__success__`. |
@@ -965,9 +966,12 @@ loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enth
   products'. It is not a fraction of absolute enthalpy, which includes
   formation enthalpy (#481). The heat it applied is reported as
   `{node}.Q_fraction` [W].
-- **`Q`** is spread over the node's real inflow. Only a stagnant node (below
-  `cb.MIXER_HEAT_MDOT_FLOOR` = 1 mg/s) cannot take it; what it withholds is
-  reported as `{node}.Q_withheld` [W], as is wall heat aimed at a `WallNode`.
+- **`Q`** is spread over the node's real inflow. Only a near-stagnant node
+  (below `cb.MIXER_HEAT_MDOT_FLOOR` = 1 mg/s) takes up less, fading C1 to none
+  at zero flow (`cb.mixer_heat_per_unit_flow(m)` returns the enthalpy rise per
+  unit heat and its derivative), so a dead end holds the temperature of what
+  reaches it; what it withholds is reported as `{node}.Q_withheld` [W], as is
+  wall heat aimed at a `WallNode`.
 - **A `MassFlowBoundary` between elements** is an injection: its `m_dot`
   joins the node at its own `Tt` and `Y`.
 - **Where the network ends** is a property of the node class, read by graph

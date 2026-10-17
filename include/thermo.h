@@ -20,14 +20,27 @@ constexpr double AVOGADRO = 6.02214076e23;
 
 // Species thermo beyond its NASA-9 data (#606). Past each end of a species'
 // data (T_lo = 200 K; T_hi = 6000 or 20000 K) cp/R leaves the end interval's
-// polynomial on the quartic that matches its value, slope and curvature there
-// and levels off (zero slope and curvature) after a fade of TAIL_FRACTION_LOW
-// T_lo below and TAIL_FRACTION_HIGH T_hi above; beyond that cp is constant.
-// h and s are its exact integrals. This keeps cp positive and h, s monotone
-// at every T for the solvers and the inverses; it is not physics (no
-// dissociation above the data, no condensation below it).
-constexpr double TAIL_FRACTION_LOW = 0.25;
+// polynomial C2 (value, slope and curvature matched) and levels off (zero
+// slope and curvature) at the end of a fade; h and s are its exact integrals,
+// so cp stays positive and h, s monotone at every T for the solvers and the
+// inverses.
+//   Below the data the gas is ideal down to 0 K: over the whole [0, T_lo] the
+//   quintic fades cp/R to the rigid-rotor value, translation plus fully
+//   excited rotation (5/2 for an atom, 7/2 linear, 4 nonlinear), as the
+//   vibrations freeze out -- translation alone (5/2) for H2, whose rotation
+//   freezes inside the fade (Theta_rot = 85 K; H2O's largest, the next, is
+//   40 K). h(0 K) is finite, so a stream's enthalpy has a floor: less is more
+//   heat out than it holds, at no T. Not modelled: condensation (a real
+//   stream liquefies well above 0 K).
+//   Above the data the quartic levels off after a fade of TAIL_FRACTION_HIGH
+//   T_hi at whatever constant it reaches; not physics (no dissociation).
 constexpr double TAIL_FRACTION_HIGH = 0.1;
+// cp/R of an ideal gas with translation and rotation fully excited and the
+// vibrations frozen: the low tail's value at 0 K (CP_R_RIGID_ATOM, translation
+// alone, also for H2).
+constexpr double CP_R_RIGID_ATOM = 2.5;
+constexpr double CP_R_RIGID_LINEAR = 3.5;
+constexpr double CP_R_RIGID_NONLINEAR = 4.0;
 // s_R and h_RT hold their value at this T below it (ln T, 1/T); cp_R and the
 // dimensional h are defined at every T.
 constexpr double T_FLOOR = 10.0;

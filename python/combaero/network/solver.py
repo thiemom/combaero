@@ -140,6 +140,18 @@ class SolverStallError(SolverTimeoutError):
 _STALL_WINDOW_S = 5.0
 _STALL_MIN_REL_IMPROVEMENT = 0.10
 _STALL_FAR_FACTOR = 100.0
+# Below the far gate a crawl is not a stall, but a DEAD plateau is: the best
+# |F| not improved at all over this many windows. The 5-row hot impingement
+# array (#605) parks LM at |F| = 0.0718, just under the gate, with not one
+# better point in 175 s; it was only caught when its plateau happened to sit
+# at 0.138, above it. Faster thermo moved it below (#626).
+_STALL_DEAD_WINDOWS = 3
+# A heated node's share of its heat taken up (cb.mixer_heat_per_unit_flow) is
+# 1 at or above MIXER_HEAT_MDOT_FLOOR and 0 when stagnant. A root strictly
+# between, by more than this, sits in the fade below the floor: one the fade
+# made (in a driven net, the hotter the node the less it flows), not the
+# network's. A dead end's root takes up < 1e-12 of its heat (#626).
+_HEAT_FADE_TOL = 1e-6
 
 
 def _stall_detected(
@@ -159,12 +171,23 @@ def _stall_detected(
     with best_norm non-increasing. Stall = the newest best norm is still
     far above tolerance (``> far_factor * tol``) and improved by less
     than ``min_rel`` relative to the best norm from ``window`` seconds
-    ago. Histories shorter than the window never stall (grace period).
+    ago; or, nearer the root, it has not improved AT ALL over
+    ``_STALL_DEAD_WINDOWS`` windows (a dead plateau, not a crawl).
+    Histories shorter than the window never stall (grace period).
     """
     if not samples:
         return False
     t_now, best_now = samples[-1]
-    if best_now <= far_factor * tol or t_now < window:
+    if t_now < window:
+        return False
+    if best_now <= far_factor * tol:
+        # Near the root: only a dead plateau, no improvement at all.
+        t_dead = t_now - _STALL_DEAD_WINDOWS * window
+        if t_dead < 0.0:
+            return False
+        for tv, bv in reversed(samples):
+            if tv <= t_dead:
+                return bv <= best_now
         return False
     best_then = None
     for tv, bv in reversed(samples):
@@ -456,6 +479,9 @@ class NetworkSolver:
         self._n_species: int = len(self._default_Y)
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
+        # Nodes whose T(h) was at or below 0 K in the last propagation: less
+        # enthalpy than the stream holds at 0 K, no gas state.
+        self._T_no_gas: set[str] = set()
         # Optional initial-guess overrides keyed by unknown name; consulted
         # by _build_x0 after user-provided initial_guess dicts and before
         # the topological p_guess / mdot_guess propagators. Populated by
@@ -1498,6 +1524,7 @@ class NetworkSolver:
             self._lagged_read = False
             self._relay_borrowed: set[str] = set()
             self._derived_states = {}
+            self._T_no_gas: set[str] = set()
             prev_relay = relay
             relay = self._propagate_pass(x, order, reversed_ids, with_relay, prev_relay)
             if not self._lagged_read:
@@ -1705,8 +1732,16 @@ class NetworkSolver:
                 node._inflows = []
                 node._upstream_m_dot_jac = {}
                 node._upstream_element_ids = []
-            T_clamped = not (200.0 < float(T) < 5000.0)
-            T = min(max(float(T), 200.0), 5000.0)
+            # No clamp: the node carries its T(h) as is. The gas is ideal down
+            # to 0 K (the thermo's low tail); at or below it T is the mixer's
+            # continuation on h's line, derivatives consistent with it: the
+            # stream holds less enthalpy than at 0 K, no gas state, which the
+            # post-solve check reports. A [200, 5000] K clamp here used to
+            # flatten T (zero sensitivity), discard the energy, and flag a node
+            # fed by a clamped one or not by the last bit.
+            T = float(T)
+            if not T > 0.0:
+                self._T_no_gas.add(nid)
             self._derived_states[nid] = (T, Y, mix_res)
 
             # Store wall coupling debug info on the node
@@ -1932,13 +1967,6 @@ class NetworkSolver:
                                 idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
                             nr["T"] += dT_mix_dQ * sign * wall_result.dQ_dT_aw_b * dTaw_dP_b
-
-            # On the [200, 5000] K clamp the derived T is flat: its relayed
-            # sensitivities are zero, not the mixer's (#481 C4). Downstream
-            # nodes chain from this, so it is cleared before they are reached.
-            if T_clamped:
-                for pkg in relay[nid].values():
-                    pkg["T"] = 0.0
 
             # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])
@@ -2204,7 +2232,7 @@ class NetworkSolver:
 
         # P1-4: Clamp fractions to [0, 1] before creating state to avoid NaNs in thermo conversion
         Y_raw = state_dict["Y"]
-        Y_safe = [max(1e-12, min(1.0, float(yi))) for yi in Y_raw]
+        Y_safe = [max(0.0, min(1.0, float(yi))) for yi in Y_raw]
         y_sum = sum(Y_safe)
         if y_sum > 0:
             Y_safe = [yi / y_sum for yi in Y_safe]
@@ -2215,8 +2243,8 @@ class NetworkSolver:
         return NetworkMixtureState(
             P_safe,
             float(state_dict["Pt"]),
-            min(max(float(state_dict["T"]), 200.0), 5000.0),
-            min(max(float(state_dict["Tt"]), 200.0), 5000.0),
+            float(state_dict["T"]),
+            float(state_dict["Tt"]),
             float(state_dict["m_dot"]),
             Y_safe,
         )
@@ -2516,6 +2544,7 @@ class NetworkSolver:
             "__consistent__": None,
             "__inconsistent_elements__": [],
             "__T_clamped__": [],
+            "__heat_faded__": [],
             "__outcome__": SolveOutcome.ERROR,
             "__final_norm__": float("inf"),
             "__worst_residuals__": [],
@@ -3961,19 +3990,22 @@ class NetworkSolver:
                         "connected element's is the usual cause."
                     )
 
-        # A node's derived T held at the [200, 5000] K clamp discards the
-        # energy that would have taken its FLOW past (190 kW in a heated
-        # plenum): the residuals can close there while energy does not. Not
-        # admissible (#481 C4), and reported, not silently accepted. A
-        # stagnant node on the clamp carries no enthalpy anywhere -- its heat
-        # is reported as Q_withheld -- so only a node with inflow counts.
+        # A node at T(h) <= 0 K had more heat taken out than its flow holds at
+        # 0 K (the gas is ideal down to it): the residuals can close on the
+        # continuation while the state is not a gas. Not admissible, and
+        # reported, not silently accepted (#481 C4; ``__T_clamped__`` keeps its
+        # name). A stagnant node carries no enthalpy anywhere -- its heat is
+        # reported as Q_withheld -- so only a node with inflow counts. Until
+        # this, a [200, 5000] K clamp discarded the energy instead; a node
+        # heated past 5000 K is now simply hot (the thermo's tails carry it),
+        # energy conserved.
         _T_clamped: list[str] = []
         if success:
             self._propagate_states(final_x, with_relay=False)
             _T_clamped = [
                 nid
-                for nid, (T_n, _, _) in self._derived_states.items()
-                if not 200.0 < float(T_n) < 5000.0
+                for nid in self._derived_states
+                if nid in self._T_no_gas
                 and sum(m for m, _, _ in self._node_inflows(nid, final_x))
                 >= cb.MIXER_HEAT_MDOT_FLOOR
             ]
@@ -3982,9 +4014,38 @@ class NetworkSolver:
                 consistent = False
                 outcome = SolveOutcome.INCONSISTENT
                 message = (
-                    f"Converged with node temperature(s) on the [200, 5000] K clamp at "
-                    f"{_T_clamped}: the clamp discards energy, so the balance does not "
-                    "close. Check heat inputs against the flow they heat."
+                    f"Converged with node temperature(s) at or below 0 K at "
+                    f"{_T_clamped}: more heat out than the stream holds as a gas. "
+                    "Check heat inputs against the flow they heat."
+                )
+
+        # A heated node at a root inside the heat fade below
+        # MIXER_HEAT_MDOT_FLOOR: neither flowing (all its heat taken up) nor
+        # stagnant (none). In a driven net heating a stream past ~1e5 K makes
+        # it flow less, until the fade, which takes up less heat the less it
+        # flows, offers a second, spurious root (100 kW into 1 mg/s of air
+        # under a 10 kPa drive: 5.8e7 K, 10 kW withheld).
+        _heat_faded: list[str] = []
+        if success:
+            for nid, node in self.network.nodes.items():
+                q_given = sum(float(eb.Q) for eb in getattr(node, "energy_boundaries", None) or [])
+                if q_given == 0.0:
+                    continue
+                m_in = sum(m for m, _, _ in self._node_inflows(nid, final_x))
+                phi, _ = cb.mixer_heat_per_unit_flow(m_in)
+                taken = m_in * phi
+                if _HEAT_FADE_TOL < taken < 1.0 - _HEAT_FADE_TOL:
+                    _heat_faded.append(nid)
+            if _heat_faded:
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                message = (
+                    f"Converged with heated node(s) {_heat_faded} taking up only part of "
+                    f"their heat: their flow is below MIXER_HEAT_MDOT_FLOOR "
+                    f"({cb.MIXER_HEAT_MDOT_FLOOR:g} kg/s) but not stagnant, a root the "
+                    "fade of the heat makes, not the network's. Check heat inputs "
+                    "against the flow they heat."
                 )
 
         if not success:
@@ -4055,14 +4116,25 @@ class NetworkSolver:
             for i, xi in enumerate(X):
                 sol_dict[f"{nid}.X[{i}]"] = float(xi)
 
-            # Node-specific diagnostics (e.g. mach, transport/thermo properties)
+            # Node-specific diagnostics (e.g. mach, transport/thermo properties).
+            # A node at or below 0 K has no thermodynamic state to report:
+            # flagged, not evaluated. Any other node a failed solve leaves
+            # unevaluable reports nothing, as the elements below do; on a
+            # successful solve that is a bug and raises.
             node = self.network.nodes[nid]
+            if nid in self._T_no_gas:
+                sol_dict[f"{nid}.no_gas_state"] = 1.0
+                continue
             state = self._get_node_state(node, final_x)
-            sol_dict[f"{nid}.mach"] = node.mach(state)
-            if hasattr(node, "diagnostics"):
-                diag = node.diagnostics(state)
-                for key, val in diag.items():
-                    sol_dict[f"{nid}.{key}"] = val
+            try:
+                sol_dict[f"{nid}.mach"] = node.mach(state)
+                if hasattr(node, "diagnostics"):
+                    diag = node.diagnostics(state)
+                    for key, val in diag.items():
+                        sol_dict[f"{nid}.{key}"] = val
+            except (ValueError, RuntimeError):
+                if success:
+                    raise
 
         # Element-specific diagnostics (e.g. throat Mach, P-ratio)
         from .components import (
@@ -4209,8 +4281,9 @@ class NetworkSolver:
                 sol_dict[f"{wid}.T_interface"] = list(wall._last_profile or [])
 
         # Heat an energy boundary gives a node that the node does not take up:
-        # Q is spread over max(flow, a 1 mg/s floor), so only a stagnant node
-        # withholds any (#481). And the heat a 'fraction' boundary applied.
+        # below a 1 mg/s floor the heat taken up fades to none at zero flow
+        # (cb.mixer_heat_per_unit_flow), so only a stagnant node withholds any
+        # (#481). And the heat a 'fraction' boundary applied.
         for nid, node in self.network.nodes.items():
             ebs = getattr(node, "energy_boundaries", None) or []
             if not ebs:
@@ -4220,9 +4293,8 @@ class NetworkSolver:
             inflows = self._node_inflows(nid, final_x)
             m_in = sum(m for m, _, _ in inflows)
             if q_given != 0.0:
-                m0 = cb.MIXER_HEAT_MDOT_FLOOR
-                m_eff = abs(m_in) if abs(m_in) >= m0 else (m_in * m_in + m0 * m0) / (2.0 * m0)
-                withheld = q_given * (1.0 - m_in / m_eff)
+                phi, _ = cb.mixer_heat_per_unit_flow(m_in)
+                withheld = q_given * (1.0 - m_in * phi)
                 if withheld != 0.0:
                     sol_dict[f"{nid}.Q_withheld"] = (
                         sol_dict.get(f"{nid}.Q_withheld", 0.0) + withheld
@@ -4326,6 +4398,7 @@ class NetworkSolver:
         sol_dict["__consistent__"] = consistent
         sol_dict["__inconsistent_elements__"] = list(_bad_junctions)
         sol_dict["__T_clamped__"] = list(_T_clamped)
+        sol_dict["__heat_faded__"] = list(_heat_faded)
         sol_dict["__outcome__"] = outcome
         # The rows carrying the residual, largest first. Already computed for
         # the diagnostic payload; a failed solve is far easier to read with

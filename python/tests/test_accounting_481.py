@@ -193,7 +193,57 @@ def test_heat_given_to_a_stagnant_node_is_reported_as_withheld() -> None:
     assert r["__success__"]
     assert abs(r["e3.m_dot"]) < 1e-9
     assert r["dead.Q_withheld"] == pytest.approx(100.0, rel=1e-6)
+    # It holds the temperature of what reaches it: the C1 floor this replaced
+    # spread the 100 W over 0.5 mg/s, 1e5 K, which a [200, 5000] K clamp hid.
+    assert r["dead.T"] == pytest.approx(r["p.T"], abs=1e-3)
     _assert_closed(s, r)
+
+
+@pytest.mark.parametrize("m", [0.0, 1e-9, 3e-7, 8e-7, 1e-6, 1e-4, -5e-7, -1e-4])
+def test_the_heat_taken_up_fades_c1_from_the_floor_to_none_at_zero_flow(m: float) -> None:
+    """phi = 1/|m| at or above the floor; below it the share taken up,
+    |m| phi = 4 u^3 - 3 u^4 (u = |m| / m0), runs 0 -> 1 with zero slope at
+    both ends, and dphi/dm is phi's derivative (analytic vs central FD)."""
+    m0 = cb.MIXER_HEAT_MDOT_FLOOR
+    phi, dphi = cb.mixer_heat_per_unit_flow(m)
+    u = abs(m) / m0
+    if u >= 1.0:
+        assert phi == pytest.approx(1.0 / abs(m), rel=1e-15)
+    else:
+        assert abs(m) * phi == pytest.approx(4 * u**3 - 3 * u**4, abs=1e-15)
+        assert phi <= 1.06 / m0
+    h = 1e-12
+    fd = (cb.mixer_heat_per_unit_flow(m + h)[0] - cb.mixer_heat_per_unit_flow(m - h)[0]) / (2 * h)
+    # (rel 1e-5: at m0 itself the difference straddles a curvature step)
+    assert dphi == pytest.approx(fd, rel=1e-5, abs=1e-6 / m0**2)
+    # C1 at the floor itself
+    lo = cb.mixer_heat_per_unit_flow(m0 * (1 - 1e-9))
+    hi = cb.mixer_heat_per_unit_flow(m0 * (1 + 1e-9))
+    assert lo[0] == pytest.approx(hi[0], rel=1e-8) and lo[1] == pytest.approx(hi[1], rel=1e-6)
+
+
+def test_a_root_inside_the_heat_fade_is_refused_and_the_retry_finds_the_real_one() -> None:
+    """100 kW into a driven chain: the real root flows 0.25 g/s at ~2e5 K.
+    From the cold start LM lands at 0.86 mg/s instead, inside the fade below
+    the floor, where the node takes up 90% of its heat -- a root the fade
+    makes. It is refused by name; the warm-start retry finds the real one."""
+    g = FlowNetwork()
+    g.add_node(_pb("a", 1.1e5, 300.0))
+    g.add_node(_pb("b", 1.0e5, 300.0))
+    p = PlenumNode("p")
+    p.add_energy_boundary(EnergyBoundary("heat", Q=1e5))
+    g.add_node(p)
+    g.add_node(PlenumNode("q"))
+    for eid, a, b in (("o1", "a", "p"), ("o2", "p", "q"), ("o3", "q", "b")):
+        g.add_element(OrificeElement(eid, a, b, Cd=0.8, diameter=0.01, correlation="fixed"))
+    with pytest.warns(UserWarning, match="taking up only part"):
+        r = NetworkSolver(g).solve(auto_retry=False)
+    assert r["__converged__"] and not r["__success__"]
+    assert r["__outcome__"] == "inconsistent"
+    assert r["__heat_faded__"] == ["p"]
+    r = NetworkSolver(g).solve()
+    assert r["__success__"] and r["__heat_faded__"] == []
+    assert r["o1.m_dot"] > 1e-4
 
 
 def test_the_dead_fuel_boundary_api_is_gone() -> None:

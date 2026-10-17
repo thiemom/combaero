@@ -68,8 +68,7 @@ double T0_from_static_v(double T, double v, const std::vector<double>& X,
     // F(T0) = h(T0) - h0 = 0,  dF/dT0 = cp(T0)
     double T0 = T + 0.5 * v * v / cp_mass_at(T, X);  // ideal-gas initial guess
 
-    constexpr double T_MIN = 200.0;
-    constexpr double T_MAX = 6000.0;
+    constexpr double T_MIN = thermo::T_FLOOR;  // as compressible.cpp solve_T_isentropic
 
     for (std::size_t it = 0; it < max_iter; ++it) {
         double F = h_mass_at(T0, X) - h0;
@@ -83,7 +82,7 @@ double T0_from_static_v(double T, double v, const std::vector<double>& X,
             dT = (dT > 0.0) ? max_step : -max_step;
         }
         T0 += dT;
-        T0 = std::max(T_MIN, std::min(T0, T_MAX));
+        T0 = std::max(T0, T_MIN);
 
         if (std::abs(dT) < tol * (1.0 + std::abs(T0))) {
             return T0;
@@ -120,8 +119,7 @@ double T_from_stagnation(double T0, double M, const std::vector<double>& X,
     // da/dT = (1/(2a)) * d(gamma*R*T)/dT  -- approximate as a/(2T) for ideal gas
     double T = T0 / (1.0 + 0.2 * M * M);  // calorically perfect gas initial guess
 
-    constexpr double T_MIN = 200.0;
-    constexpr double T_MAX = 6000.0;
+    constexpr double T_MIN = thermo::T_FLOOR;  // as compressible.cpp solve_T_isentropic
 
     for (std::size_t it = 0; it < max_iter; ++it) {
         double a_val = speed_of_sound(T, X);
@@ -138,7 +136,7 @@ double T_from_stagnation(double T0, double M, const std::vector<double>& X,
             dT = (dT > 0.0) ? max_step : -max_step;
         }
         T += dT;
-        T = std::max(T_MIN, std::min(T, T_MAX));
+        T = std::max(T, T_MIN);
 
         if (std::abs(dT) < tol * (1.0 + std::abs(T))) {
             return T;

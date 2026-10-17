@@ -23,13 +23,14 @@ double solve_T_isentropic(double P, double s0, double T_init,
                           double tol, std::size_t max_iter) {
     double T = T_init;
 
-    // Clamp temperature bounds to the thermo's range. The floor was 200 K,
-    // the end of the NASA-9 data: an expansion from Tt <= 200 K then could not
-    // cool, dh <= 0, and the orifice kernel returned zero flow under any drive
-    // -- a spurious root wherever a node sat on the network's 200 K clamp
-    // (#552). Since #606 the species thermo has bounded tails to T_FLOOR.
+    // The iterate is held at or above T_FLOOR (where s_R is held), with no
+    // upper bound: the steps are limited to half of T, so T stays positive,
+    // and h and s are monotone at every T. The floor was 200 K, the end of the
+    // NASA-9 data: an expansion from Tt <= 200 K then could not cool, dh <= 0,
+    // and the orifice kernel returned zero flow under any drive (#552). A
+    // 6000 K cap held every static T of a hotter stream there, so an orifice
+    // read a 6872 K plenum's density at 6000 K and passed 3.6x its flow (#626).
     constexpr double T_MIN = thermo::T_FLOOR;
-    constexpr double T_MAX = 6000.0;
 
     for (std::size_t it = 0; it < max_iter; ++it) {
         double s_curr = s_mass(T, X, P);
@@ -51,7 +52,7 @@ double solve_T_isentropic(double P, double s0, double T_init,
         T += dT;
 
         // Clamp temperature to reasonable bounds
-        T = std::max(T_MIN, std::min(T, T_MAX));
+        T = std::max(T, T_MIN);
 
         if (std::abs(dT) < tol * (1.0 + std::abs(T))) {
             return T;
@@ -412,7 +413,6 @@ double solve_T_from_energy(
 {
     double T = T_guess;
     constexpr double T_MIN = thermo::T_FLOOR;  // see solve_T_isentropic
-    constexpr double T_MAX = 6000.0;
     double mw_g = mw_kg * 1000.0;  // g/mol for enthalpy conversion
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
@@ -451,7 +451,7 @@ double solve_T_from_energy(
         }
 
         T += dT;
-        T = std::clamp(T, T_MIN, T_MAX);
+        T = std::max(T, T_MIN);
 
         if (std::abs(dT) < tol * T) {
             break;
@@ -1062,7 +1062,6 @@ namespace {
 {
     double T = T_guess;
     constexpr double T_MIN = thermo::T_FLOOR;  // see solve_T_isentropic
-    constexpr double T_MAX = 6000.0;
 
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Density from ideal gas: rho = P * mw_kg / (R * T)
@@ -1098,7 +1097,7 @@ namespace {
         }
 
         T += dT;
-        T = std::clamp(T, T_MIN, T_MAX);
+        T = std::max(T, T_MIN);
 
         if (std::abs(dT) < tol * T) {
             T_out = T;
@@ -1399,8 +1398,8 @@ NozzleSolution nozzle_quasi1d(
             T += dT;
             P += dP;
 
-            // Keep in valid range
-            T = std::clamp(T, 150.0, T0);
+            // Keep in range: positive (the gas is ideal to 0 K) and below T0
+            T = std::clamp(T, thermo::T_FLOOR, T0);
             P = std::clamp(P, 100.0, P0);
         }
 

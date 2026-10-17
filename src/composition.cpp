@@ -10,9 +10,14 @@
 namespace combaero {
 
 std::vector<double> normalize_fractions(const std::vector<double>& fractions) {
+    // Negatives (a solver iterate's round-off) clamp to 0; an absent species
+    // stays exactly 0. The former 1e-15 floor invented a trace of every
+    // species in every mixed stream, which every mixture sum then evaluated
+    // (dry air: 15 species instead of 4), for no protection: the logs of a
+    // fraction are guarded where they are taken (s(), the equilibrium Q's).
     std::vector<double> clamped = fractions;
     for (double& value : clamped) {
-        if (value < 1.0e-15) value = 1.0e-15;
+        if (value < 0.0) value = 0.0;
     }
 
     double sum = std::accumulate(clamped.begin(), clamped.end(), 0.0);

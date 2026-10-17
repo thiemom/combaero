@@ -38,7 +38,7 @@ This document provides the technical reference for the CombAero C++ library. For
 double mwmix(const std::vector<double>& X);
 std::vector<double> mole_to_mass(const std::vector<double>& X);
 std::vector<double> mass_to_mole(const std::vector<double>& Y);
-std::vector<double> normalize_fractions(const std::vector<double>& X);
+std::vector<double> normalize_fractions(const std::vector<double>& X);  // negatives -> 0, then sum to 1; absent species stay 0
 std::vector<double> convert_to_dry_fractions(const std::vector<double>& X);
 ```
 
@@ -94,13 +94,23 @@ iterate (#606). `calc_T_from_cp` is unchanged.
 ### Species Thermo Beyond the Data (#606)
 Every species' NASA-9 data starts at 200 K and ends at 20 000 K (N2, O2, AR,
 CO2, CO, H2) or 6000 K (H2O, NH3, CH4, the alkanes): CEA's own ranges. Past
-either end, under both thermo models, cp/R leaves the end interval on the
-quartic that matches its value, slope and curvature there (C2) and levels off
-over `thermo::TAIL_FRACTION_LOW` (0.25) T_lo below and
-`thermo::TAIL_FRACTION_HIGH` (0.1) T_hi above; beyond that cp is constant. h
-and s are its exact integrals. Solver plumbing, not physics: no dissociation
-above the data, no condensation below. Below `thermo::T_FLOOR` (10 K) s_R and
-h_RT hold their value.
+either end, under both thermo models, cp/R leaves the end interval C2 (value,
+slope and curvature matched) and levels off; h and s are its exact integrals.
+
+- **Below the data the gas is ideal down to 0 K** (#626): over the whole
+  [0, 200 K] a quintic fades cp/R to the rigid-rotor value at 0 K,
+  translation plus fully excited rotation (`thermo::CP_R_RIGID_ATOM` 5/2,
+  `_LINEAR` 7/2, `_NONLINEAR` 4), as the vibrations freeze out. H2 goes to
+  5/2: its rotation freezes inside the fade (Theta_rot = 85 K). The heavy
+  alkanes fall monotonically (n-heptane 15.4 -> 4); a near-rigid species
+  carries NASA-9's slope at 200 K up to 0.1 past either end (CH4 dips to 3.95
+  at 120 K). h(0 K) is finite, so an enthalpy below it is reached by no T: the
+  inverses throw. Not modelled: condensation.
+- **Above the data** the quartic levels off after `thermo::TAIL_FRACTION_HIGH`
+  (0.1) T_hi at the constant it reaches. Solver plumbing, not physics: no
+  dissociation.
+
+Below `thermo::T_FLOOR` (10 K) s_R and h_RT hold their value (ln T, 1/T).
 
 ### Complete State Functions
 ```cpp
@@ -351,7 +361,9 @@ struct FannoSolution {
 ### Solvers
 ```cpp
 // The isentropic static T may fall to thermo::T_FLOOR (it was held at
-// 200 K, which zeroed the flow from a stagnation state at or below 200 K, #552).
+// 200 K, which zeroed the flow from a stagnation state at or below 200 K, #552)
+// and has no upper bound (a 6000 K cap read a hotter stream's density at
+// 6000 K, #626); likewise the stagnation conversions (stagnation.h).
 CompressibleFlowSolution nozzle_flow(double T0, double P0, double P_back,
                                      double A_eff, const std::vector<double>& X,
                                      double tol = 1e-8, std::size_t max_iter = 50);
@@ -1641,12 +1653,12 @@ square.
 
 ### Mixing and Combustion Components
 ```cpp
-// Stream mixing with optional heat transfer. A mixed enthalpy below the
-// solver floor (0.67 x the lowest NASA-9 T_min, 134 K) continues linearly
-// with the floor's cp instead of inverting (C1 there), so a heat withdrawal
-// past what the streams hold returns a T, not an error (#552); the network
-// clamps such a node and reports it in __T_clamped__. The combustor forms do
-// the same for their post-combustion heat shift.
+// Stream mixing with optional heat transfer. T is the exact inverse of the
+// mixed enthalpy down to 0 K (the gas is ideal there); below h(0 K), a heat
+// withdrawal past what the streams hold, T continues on h's line through
+// 0 K (C1) instead of raising (#552), and the network reports a node at
+// T <= 0 in __T_clamped__. The combustor forms do the same for their
+// post-combustion heat shift.
 MixerResult mixer_from_streams_and_jacobians(
     const std::vector<Stream>& streams, double Q = 0.0, double fraction = 0.0);
 
@@ -1674,9 +1686,11 @@ double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
                          double M_out = 0.0);
 
 // All three add Q as Q / m_tot exactly (energy-conserving) for total flows of
-// at least kMixerHeatMdotFloor = 1e-6 kg/s; below it Q / m_eff with the C1
-// floor m_eff = (m^2 + m0^2) / (2 m0) >= 1e-3 keeps the heat finite as the
-// flow vanishes.
+// at least kMixerHeatMdotFloor = 1e-6 kg/s; below it Q phi(m) with
+// (phi, dphi/dm) = mixer_heat_per_unit_flow(m): the heat taken up,
+// Q (4 u^3 - 3 u^4) with u = |m| / m0, fades C1 to none at zero flow, so a
+// stagnant node holds the temperature of what reaches it.
+std::tuple<double, double> mixer_heat_per_unit_flow(double mdot_tot);
 
 // Combined combustion with analytical pressure loss
 ChamberResult combustor_residuals_and_jacobians(

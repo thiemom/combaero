@@ -255,20 +255,22 @@ def test_the_ledger_counts_an_injection_at_its_own_state() -> None:
     assert abs(led["energy_closure_rel"]) < 1e-9
 
 
-def test_the_ledger_shows_heat_the_temperature_clamp_discarded() -> None:
-    """A plenum held at the 5000 K clamp throws ~190 kW away; the solver
-    already refuses it, and the ledger shows the gap."""
+def test_the_ledger_closes_on_a_plenum_heated_past_the_old_clamp() -> None:
+    """100 kW into ~0.5 g/s: 1.2e5 K. A [200, 5000] K clamp threw ~190 kW of
+    200 away here and the ledger showed the gap; without it the energy is
+    conserved (#626)."""
     g = FlowNetwork()
     g.add_node(PressureBoundary("a", Pt=1.1e5, Tt=300.0, Y=Y_AIR))
     g.add_node(PressureBoundary("b", Pt=1.0e5, Tt=300.0, Y=Y_AIR))
     p = PlenumNode("p")
-    p.add_energy_boundary(EnergyBoundary(id="heat", Q=2e5))
+    p.add_energy_boundary(EnergyBoundary(id="heat", Q=1e5))
     g.add_node(p)
     g.add_element(OrificeElement("o1", "a", "p", Cd=0.8, diameter=0.01, correlation="fixed"))
     g.add_element(OrificeElement("o2", "p", "b", Cd=0.8, diameter=0.01, correlation="fixed"))
     r = _solve(g, auto_retry=False)
-    assert r["__converged__"] and not r["__success__"]
-    assert r["__ledger__"]["energy_closure"] > 1e5
+    assert r["__success__"]
+    assert r["p.T"] > 1e5
+    assert abs(r["__ledger__"]["energy_closure_rel"]) < 1e-12
 
 
 # --- the report never takes the solve down ---------------------------------
