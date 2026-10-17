@@ -48,9 +48,13 @@ and the entrained stream at the mixing-chamber entrance), and the row content
 is ejector physics instead of impulse-CV physics. With ``s = s_choke``:
 
     R0 = mp - cd_nozzle(Pt_p, P_py, A_t, A_e)      (primary C-D nozzle)
-    R1 = ms - [s*omega_crit*mp + (1-s)*ms_sec]     (blended entrainment)
+    R1 = ms - [s*omega_ch*mp + (1-s)*ms_sec]       (blended entrainment)
     R2 = mdot_out - mp - ms                        (mass conservation)
     R3 = [w_pin*Pt_outlet + (1-w_pin)*P_py] - recovery*discharge
+
+``omega_ch`` is the choked entrainment: omega_crit up to P_c*, then the
+Tier-1 subcritical droop, linear in the outlet Pt down to 0 at the dead-head
+P_b0 (#619; the sec 8.1 closure, which the element did not use before).
 
 ``P_py`` is a genuine Newton unknown (not derived): it is the quantity the two
 nozzle relations R0/R1 share, so making it free keeps BOTH live and lets the
@@ -68,18 +72,27 @@ for an unchoked primary, and ``0 * NaN = NaN`` would otherwise poison the
 Jacobian -- safe because smootherstep is flat at ``s in {0, 1}``).
 
 ``R3`` closes the system differently per regime via
-``w_pin = 1 - s*(1 - s_sub)`` (the weight on the outlet-pin form):
+``w_pin = 1 - s*(1 - s_b0)`` (the weight on the outlet-pin form; ``s_b0`` is
+the smootherstep of ``Pt_outlet / (recovery*P_b0)`` over [0.98, 1.02]):
 
-  * jet pump (s=0) and subcritical droop (s=1, s_sub=1): ``w_pin = 1`` ->
-    ``Pt_outlet = recovery*discharge``. The outlet is what the ejector sets;
-    the downstream boundary then forces ``P_py`` through this pin, and R0/R1
-    set the primary Pt and entrainment. This pin is what excludes the spurious
-    double-choked root (primary Pt below the back pressure) that a
-    back-pressure-independent closure would otherwise admit.
-  * critical (s=1, outlet below ``P_c*``, s_sub=0): ``w_pin = 0`` ->
-    ``P_py = recovery*P_c*`` (a diagnostic) and the outlet floats FREE, set by
-    the downstream network. Pinning it here would over-constrain the fixed
-    outlet boundary (``Pt_outlet < P_c*`` legitimately).
+  * jet pump (s=0): ``w_pin = 1`` -> ``Pt_outlet = recovery*discharge``. The
+    outlet is what the ejector sets; the downstream boundary then forces
+    ``P_py`` through this pin, and R0/R1 set the primary Pt and entrainment.
+  * choked, outlet below the dead-head ``P_b0`` (critical AND subcritical,
+    s=1, s_b0=0): ``w_pin = 0`` -> ``P_py = recovery*P_c*`` (a diagnostic) and
+    the outlet floats FREE, set by the downstream network, the entrainment
+    following it along the droop above ``P_c*``.
+  * choked, outlet above ``P_b0`` (s=1, s_b0=1): ``w_pin = 1`` ->
+    ``Pt_outlet = recovery*P_b0``. This pin excludes the spurious double-choked
+    root (primary Pt below the back pressure), which can only occur above
+    ``P_b0`` since ``P_b0 < Pt_primary``. Until #619 it switched in at ``P_c*``
+    instead, which also pinned every subcritical outlet below its boundary:
+    a choked ejector between ``P_c*`` and ``P_b0`` had no root.
+
+A collapsed droop window (``P_b0`` within 0.1-1% of ``P_c*``, the unchoked
+``M_py < 1`` corner) fades back to the plateau-and-pin-at-``P_c*`` form
+continuously, since ``P_b0`` depends on Newton unknowns. Beyond ``P_b0`` (the
+ejector cannot hold the back pressure: backflow) is outside the model.
 
 ``verify_solution_consistent`` now returns True unconditionally: every regime
 is modeled, so there is no longer a subcritical design point to demote.
@@ -610,9 +623,9 @@ class EjectorElement(MultiPortChamberBase):
     # when clearly unchoked (jet pump), 1 exactly at the primary-choke threshold.
     _S_CHOKE_LO = 0.90
     _S_CHOKE_HI = 0.999
-    # s_sub window on outlet.Pt / (recovery * P_c*): 0 (critical, outlet free)
-    # below the recovered critical back pressure, 1 (subcritical, outlet pinned)
-    # above it. Centred on 1 with a narrow band for a sharp-but-smooth handover.
+    # Handover band, centred on 1, for two smootherstep windows on outlet.Pt:
+    # over recovery * P_c* (s_sub: the plateau omega_crit -> the subcritical
+    # droop) and over recovery * P_b0 (s_b0: outlet free -> pinned, #619).
     _S_SUB_LO = 0.98
     _S_SUB_HI = 1.02
     _EPS_FRAC = 1.0e-3  # C-D nozzle / secondary-flux smooth-min rounding
@@ -835,6 +848,9 @@ class EjectorElement(MultiPortChamberBase):
                 p_c_star = self._critical_back_pressure(primary, secondary, gamma, r_gas)
                 diag["omega_critical"] = omega_c
                 diag["p_c_star_pa"] = p_c_star
+                # Upper anchor of the subcritical droop (#619): omega falls
+                # linearly from omega_critical at P_c* to 0 here.
+                diag["p_b0_pa"] = self._dead_head_back_pressure(primary, secondary, gamma, r_gas)
                 if s_choke >= 0.5 and math.isfinite(p_c_star) and float(outlet.Pt) <= p_c_star:
                     critical_mode = 1.0
             diag["critical_mode"] = critical_mode
@@ -890,6 +906,27 @@ class EjectorElement(MultiPortChamberBase):
                 self.area_ratio_mix,
                 gamma,
             ).value.omega
+        )
+
+    def _dead_head_back_pressure(
+        self,
+        primary: NetworkMixtureState,
+        secondary: NetworkMixtureState,
+        gamma: float,
+        r_gas: float,
+    ) -> float:
+        return float(
+            _solver_tools.ejector_dead_head_back_pressure_and_jacobian(
+                primary.Pt,
+                primary.Tt,
+                secondary.Pt,
+                secondary.Tt,
+                self.area_ratio_nozzle,
+                self.area_ratio_mix,
+                gamma,
+                r_gas,
+                self.recovery_efficiency,
+            ).value.p_c_pa
         )
 
     def _critical_back_pressure(

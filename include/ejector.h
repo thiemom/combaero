@@ -242,6 +242,17 @@ EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
     const EjectorGeometry& geom, double gamma, double r_gas,
     double recovery_efficiency);
 
+// Dead-head back pressure P_b0 (Phase 1A, OPERATING_REGIMES_DESIGN.md sec 8.1):
+// the highest back pressure a choked ejector holds with NO entrainment, the
+// upper anchor of the subcritical droop. The SAME mixing closure as P_c*,
+// mixed at omega = 0 (one shared chain); 1:1 with dead_head_back_pressure in
+// _ejector_huang1999.py. The result struct's p_c_pa field carries P_b0
+// (recovered), its p_mixed_stagnation_pa the lossless p03 at omega = 0.
+EjectorCriticalPressureJacobian ejector_dead_head_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e,
+    const EjectorGeometry& geom, double gamma, double r_gas,
+    double recovery_efficiency);
+
 // -----------------------------------------------------------------------------
 // Whole-element (f, J): the 4-row operating-regime residual system.
 //

@@ -393,9 +393,16 @@ EjectorEntrainmentResult ejector_entrainment_ratio(double p_g, double t_g, doubl
   return ejector_entrainment_ratio_and_jacobian(p_g, t_g, p_e, t_e, geom, gamma).value;
 }
 
-EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
+namespace {
+
+// Kracik & Dvorak's mixing closure from the critical y-y state, mixed at the
+// critical entrainment ratio (P_c*) or at zero entrainment (the dead-head
+// P_b0, their gam = 0): ONE chain, so the two anchors of the subcritical droop
+// cannot drift apart (1:1 with _yy_lambda_state + _mixed_flow_stagnation).
+EjectorCriticalPressureJacobian mixed_stagnation_from_yy(
     double p_g_val, double t_g_val, double p_e_val, double t_e_val,
-    const EjectorGeometry& geom, double gamma, double r_gas, double recovery_efficiency) {
+    const EjectorGeometry& geom, double gamma, double r_gas, double recovery_efficiency,
+    bool dead_head) {
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
   double g_over_gm1 = gamma / gm1;
@@ -436,7 +443,7 @@ EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
   Dual4 lambda2 = v_sy / c2_star; // == 1 identically (M_sy = 1); kept computed for value parity
 
   Dual4 theta21 = t_e / t_g;
-  Dual4 gam = omega;
+  Dual4 gam = dead_head ? Dual4::constant(0.0) : omega;
 
   Dual4 z1 = lambda1 + 1.0 / lambda1;
   Dual4 z2 = lambda2 + 1.0 / lambda2;
@@ -468,6 +475,22 @@ EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
   };
   return {value, recovery_efficiency * p03.dpg, recovery_efficiency * p03.dtg,
           recovery_efficiency * p03.dpe, recovery_efficiency * p03.dte};
+}
+
+} // namespace
+
+EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom,
+    double gamma, double r_gas, double recovery_efficiency) {
+  return mixed_stagnation_from_yy(p_g, t_g, p_e, t_e, geom, gamma, r_gas, recovery_efficiency,
+                                  false);
+}
+
+EjectorCriticalPressureJacobian ejector_dead_head_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom,
+    double gamma, double r_gas, double recovery_efficiency) {
+  return mixed_stagnation_from_yy(p_g, t_g, p_e, t_e, geom, gamma, r_gas, recovery_efficiency,
+                                  true);
 }
 
 EjectorCriticalPressureResult ejector_critical_back_pressure(
@@ -512,6 +535,10 @@ DualN<N> ejector_smootherstep(const DualN<N>& t, double lo, double hi) {
   double dval = 30.0 * x.v * x.v * (x.v - 1.0) * (x.v - 1.0);
   return ejector_chain<N>(val, {{dval, x}});
 }
+
+// The subcritical droop fades in over (P_b0 - P_c*)/P_c* in [lo, hi].
+constexpr double kDroopWindowLo = 1e-3;
+constexpr double kDroopWindowHi = 1e-2;
 
 } // namespace
 
@@ -566,6 +593,12 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   D omega_crit = D::constant(0.0);
   D p03_crit = D::constant(0.0);
   D s_sub = D::constant(1.0);
+  // Subcritical droop (Phase 1A, #619): between P_c* and the dead-head P_b0
+  // the choked ejector's entrainment falls linearly to 0 (omega_choked) and the
+  // outlet floats; the outlet pin switches in at P_b0 (s_b0), not at P_c*.
+  D omega_choked = D::constant(0.0);
+  D p03_dead = D::constant(0.0);
+  D s_b0 = D::constant(1.0);
   if (crit_active) {
     auto entr = ejector_entrainment_ratio_and_jacobian(p_g_v, t_g_v, p_e_v, t_e_v, geom, gamma);
     omega_crit = ejector_chain<9>(entr.value.omega,
@@ -581,6 +614,35 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
                                  {pc.dpc_dp_e, p_e},
                                  {pc.dpc_dt_e, t_e}});
     s_sub = ejector_smootherstep<9>(p_out / (recovery_efficiency * p03_crit), s_sub_lo, s_sub_hi);
+
+    // The droop needs a window P_b0 > P_c*; it collapses in the M_py < 1
+    // corner (an unchoked primary, the jet pump's). d fades the droop out
+    // there, back to the plateau-and-pin-at-P_c* form, continuously: P_b0
+    // depends on Newton unknowns, so a hard switch would be a jump in F.
+    auto pb = ejector_dead_head_back_pressure_and_jacobian(p_g_v, t_g_v, p_e_v, t_e_v, geom,
+                                                          gamma, r_gas, 1.0);
+    D p03_b0 = ejector_chain<9>(pb.value.p_mixed_stagnation_pa,
+                                {{pb.dpc_dp_g, p_g},
+                                 {pb.dpc_dt_g, t_g},
+                                 {pb.dpc_dp_e, p_e},
+                                 {pb.dpc_dt_e, t_e}});
+    D window = (p03_b0 - p03_crit) / p03_crit;
+    D d = ejector_smootherstep<9>(window, kDroopWindowLo, kDroopWindowHi);
+    D s_b0_live = D::constant(0.0);
+    D omega_sub = omega_crit;
+    if (d.v > 0.0) {
+      // Tier-1 chord (P_c*, omega_crit) -> (P_b0, 0) in the outlet Pt;
+      // window >= kDroopWindowLo keeps the division bounded.
+      omega_sub = omega_crit * (recovery_efficiency * p03_b0 - p_out) /
+                  (recovery_efficiency * (p03_b0 - p03_crit));
+      s_b0_live = ejector_smootherstep<9>(p_out / (recovery_efficiency * p03_b0), s_sub_lo,
+                                          s_sub_hi);
+    }
+    // Plateau below P_c* exactly (s_sub = 0), the chord above it: critical
+    // results are unchanged, unlike a smooth-min, which shaves omega_crit.
+    omega_choked = omega_crit + d * s_sub * (omega_sub - omega_crit);
+    s_b0 = d * s_b0_live + (1.0 - d) * s_sub;
+    p03_dead = d * p03_b0 + (1.0 - d) * p03_crit;
   }
 
   D ms_sec = D::constant(0.0);
@@ -604,7 +666,7 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   }
 
   // R1: blended entrainment  ms = s*omega_crit*mp + (1-s)*ms_sec.
-  D ms_model = s * omega_crit * mp + (1.0 - s) * ms_sec;
+  D ms_model = s * omega_choked * mp + (1.0 - s) * ms_sec;
   D r1 = ms - ms_model;
 
   // R2: mass conservation.
@@ -613,8 +675,13 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   // R3: regime-dependent closure of the owned unknown (see ejector_element.py
   // for the w_pin table). discharge = recovery * blend(P_c*, P03_jet) by
   // s_choke; w_pin = 1 - s*(1 - s_sub) is the weight on the outlet-pin form.
-  D discharge = recovery_efficiency * (s * p03_crit + (1.0 - s) * p03_jet);
-  D w_pin = 1.0 - s * (1.0 - s_sub);
+  // Choked: P_py = recovery*P_c* (a diagnostic) while the outlet floats,
+  // below P_b0; the outlet pinned at recovery*P_b0 above it, which excludes
+  // the spurious double-choked root (Pt_primary below the back pressure is
+  // only possible above P_b0, since P_b0 < Pt_primary).
+  D discharge = recovery_efficiency *
+                (s * ((1.0 - s_b0) * p03_crit + s_b0 * p03_dead) + (1.0 - s) * p03_jet);
+  D w_pin = 1.0 - s * (1.0 - s_b0);
   D lhs = w_pin * p_out + (1.0 - w_pin) * p_py;
   D r3 = lhs - discharge;
 
