@@ -1268,6 +1268,14 @@ ejector = EjectorElement(
 # omega = ms/mp, a critical_mode flag, and (in critical mode) p_c_star_pa.
 # verify_solution_consistent(sol) returns True unconditionally now that every
 # regime is modeled.
+# Warm start: a compressible ejector seeds its own cold start at every
+# resolve_topology (ejector.seed_warm_start(graph); the solver calls it): each
+# port traced to its boundary, port chamber P/Pt, P_jct (= P_c*, or just below
+# the back pressure for a mass-driven primary that cannot choke) and the port
+# chains' flows from the closed forms, only where you gave no initial_guess.
+# It replaces its own seeds on a re-solve and seeds nothing incompressible.
+# Choked SUBCRITICAL operation (outlet between P_c* and the dead-head P_b0) has
+# no root yet: the element keeps omega_crit there (see the design doc, #619).
 ```
 
 ### Flow-Area Inference
