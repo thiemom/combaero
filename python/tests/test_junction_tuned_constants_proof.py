@@ -21,6 +21,10 @@ import pytest
 from validation.junction.models.mpce_network import MPCENetwork
 from validation.junction.network_runner import run_network
 
+# Over 20 s on one worker: runs in CI's parallel slow job (see
+# validation-tests.yml), still before every merge.
+pytestmark = pytest.mark.slow
+
 
 def _errors(alpha: float, eta: float, paper: str, K_ids: set[str]) -> dict[tuple, float]:
     """K_extracted - K_measured per scored record, keyed by its cell and point.

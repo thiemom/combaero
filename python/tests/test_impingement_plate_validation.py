@@ -49,6 +49,11 @@ CD = cb.FLORSCHUETZ_1981_DEFAULT_CD
 Y_AIR = cb.mole_to_mass(cb.species.dry_air())
 
 
+# Over 20 s on one worker: runs in CI's parallel slow job (see
+# validation-tests.yml), still before every merge.
+pytestmark = pytest.mark.slow
+
+
 class _FrictionOnlySegment(ImpingementCrossflowElement):
     """The segment with its stations switched off: friction only, the way a
     plain ChannelElement would carry the crossflow."""

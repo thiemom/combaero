@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       source: ${{ steps.filter.outputs.source }}
+      cpp: ${{ steps.filter.outputs.cpp }}
       gui: ${{ steps.filter.outputs.gui }}
       documentation: ${{ steps.filter.outputs.documentation }}
     steps:
@@ -53,6 +54,23 @@ jobs:
               - 'ruff.toml'
               - 'Makefile'
               - 'uv.lock'
+            # What the native C++ builds read: the 3-OS ctest matrix and
+            # MinGW compile only these. A Python-only change cannot break
+            # them, so they skip it (about 9 runner-minutes). The MSVC
+            # Python extension job stays on `source`: it is the only job
+            # that has caught a dev-only dependency leaking into
+            # `import combaero` (sympy, from a module-scope import), and a
+            # leak can come from any python/ change.
+            cpp:
+              - 'src/**'
+              - 'include/**'
+              - 'tests/**'
+              - 'examples/**/*.cpp'
+              # Three C++ tests include golden-data headers from here.
+              - 'validation/**/*.h'
+              - 'CMakeLists.txt'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/toolchain-mingw.cmake'
             gui:
               - 'gui/**'
               - 'biome.json'
@@ -123,7 +141,7 @@ jobs:
   build-and-test:
     name: Build & Test C++ (${{ matrix.os }}, ${{ matrix.build_type }})
     needs: [changes, lint]
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.cpp == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -183,7 +201,7 @@ jobs:
   build-mingw:
     name: Build MinGW
     needs: [changes, lint]
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.cpp == 'true'
     runs-on: windows-latest
 
     steps:
@@ -209,7 +227,10 @@ jobs:
 
   build-python-windows:
     name: Build Python Extension (Windows/MSVC)
-    needs: [changes, lint]
+    # Not gated on lint: this is the longest CI job (4-7 min), and waiting
+    # for lint added 2 min to every PR's wall time. The status check still
+    # requires both.
+    needs: changes
     if: needs.changes.outputs.source == 'true'
     runs-on: windows-latest
     steps:
@@ -242,6 +263,7 @@ jobs:
         shell: bash
         run: |
           source_changed="${{ needs.changes.outputs.source }}"
+          cpp_changed="${{ needs.changes.outputs.cpp }}"
           gui_changed="${{ needs.changes.outputs.gui }}"
           lint_result="${{ needs.lint.result }}"
           lint_gui_result="${{ needs.lint-gui.result }}"
@@ -250,6 +272,7 @@ jobs:
           build_python_windows_result="${{ needs.build-python-windows.result }}"
 
           echo "source_changed=${source_changed}"
+          echo "cpp_changed=${cpp_changed}"
           echo "gui_changed=${gui_changed}"
           echo "lint_result=${lint_result}"
           echo "lint_gui_result=${lint_gui_result}"
@@ -258,8 +281,17 @@ jobs:
           echo "build_python_windows_result=${build_python_windows_result}"
 
           if [[ "${source_changed}" == "true" ]]; then
-            if [[ "${lint_result}" != "success" || "${build_result}" != "success" || "${mingw_result}" != "success" || "${build_python_windows_result}" != "success" ]]; then
+            if [[ "${lint_result}" != "success" || "${build_python_windows_result}" != "success" ]]; then
               echo "One or more source-related jobs failed or were cancelled."
+              exit 1
+            fi
+          fi
+
+          # Skipped is a pass only when no C++ input changed: the native
+          # builds must have RUN and succeeded whenever cpp_changed is true.
+          if [[ "${cpp_changed}" == "true" ]]; then
+            if [[ "${build_result}" != "success" || "${mingw_result}" != "success" ]]; then
+              echo "One or more native C++ build jobs failed or were cancelled."
               exit 1
             fi
           fi
