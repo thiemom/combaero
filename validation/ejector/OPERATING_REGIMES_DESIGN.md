@@ -562,11 +562,19 @@ Fix:
   most 4e-7.
 
 Still open:
-* **Choked subcritical:** at `s = 1, s_sub = 1`, R1 keeps omega_crit and R3
-  pins the outlet port at recovery*P_c*. `P_py` then has no equation, and a
-  choked ejector with its outlet between P_c* and P_b0 has no root. The
-  sec 8.1 omega_sub droop exists in `_ejector_huang1999` but is not wired
-  into the element.
+* **Choked subcritical (fixed, #619 follow-up):** at `s = 1, s_sub = 1`, R1
+  kept omega_crit and R3 pinned the outlet port at recovery*P_c*, below the
+  outlet boundary, so a choked ejector with its outlet between P_c* and P_b0
+  had no root. Fix:
+  * **R1:** the element now carries the sec 8.1 droop. Choked entrainment is
+    omega_crit + s_sub (omega_sub - omega_crit), with omega_sub the Tier-1
+    chord to (P_b0, 0). It is a smootherstep blend, not the reference's
+    smooth-min, so critical results are unchanged exactly.
+  * **R3:** its pin switches at P_b0 (s_b0) instead of P_c*.
+  * **P_b0 in C++:** `ejector_dead_head_back_pressure_and_jacobian`, sharing
+    one chain with P_c*.
+  * **Measured:** cold stress draws converge 22 of 22, against 8 before. Each
+    solved omega equals the reference closure at the port states to 1e-11.
 * **Warm start:** the physics warm start lived in the GUI backend, so API-built
   networks started cold (2 of 22 stress draws). It is now
   `EjectorElement.seed_warm_start`, run at every `resolve_topology`: 8 of 22,

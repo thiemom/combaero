@@ -1552,6 +1552,23 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Critical back pressure P_c* with analytic Jacobian.\n\n"
       "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
 
+  m.def(
+      "ejector_dead_head_back_pressure_and_jacobian",
+      [](double p_g, double t_g, double p_e, double t_e,
+         double area_ratio_nozzle, double area_ratio_mix, double gamma,
+         double r_gas, double recovery_efficiency) {
+        return solver::ejector_dead_head_back_pressure_and_jacobian(
+            p_g, t_g, p_e, t_e,
+            solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix}, gamma,
+            r_gas, recovery_efficiency);
+      },
+      py::arg("p_g"), py::arg("t_g"), py::arg("p_e"), py::arg("t_e"),
+      py::arg("area_ratio_nozzle"), py::arg("area_ratio_mix"), py::arg("gamma"),
+      py::arg("r_gas"), py::arg("recovery_efficiency"),
+      "Dead-head back pressure P_b0 (the mixing closure at zero entrainment)\n"
+      "with analytic Jacobian; value.p_c_pa carries P_b0.\n\n"
+      "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
+
   py::class_<solver::EjectorElementResidualJacobian>(
       m, "EjectorElementResidualJacobian",
       "4-row ejector element residual system + Jacobian. `residuals` is [R0, "

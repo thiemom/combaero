@@ -58,6 +58,25 @@ TEST(EjectorJacobians, CriticalBackPressureMatchesCentralDifferenceForAllCases) 
   }
 }
 
+TEST(EjectorJacobians, DeadHeadBackPressureMatchesCentralDifferenceForAllCases) {
+  for (const auto& c : kHuangCases) {
+    EjectorGeometry geom{c.area_ratio_nozzle, c.area_ratio_mix};
+    EjectorCriticalPressureJacobian jac = ejector_dead_head_back_pressure_and_jacobian(
+        c.p_g_pa, c.t_g_k, c.p_e_pa, c.t_e_k, geom, c.gamma, c.r_gas, c.recovery_efficiency);
+
+    expect_jacobian_close(jac.dpc_dp_g, c.dpb0_dp_g, "dpb0_dp_g", c.id);
+    // At zero entrainment p03 = p_g q(lambda1)/q(lambda3) and lambda1 = v/c*,
+    // both ~sqrt(t_g): dP_b0/dt_g is exactly 0. The golden central difference
+    // is its noise (~5e-7 Pa/K against a natural scale P_b0/t_g ~ 300 Pa/K), so
+    // compare on that scale.
+    const double scale_t = c.p_b0_pa / c.t_g_k;
+    EXPECT_NEAR(jac.dpc_dt_g, c.dpb0_dt_g, 1e-8 * scale_t) << "dpb0_dt_g for case " << c.id;
+    EXPECT_NEAR(jac.dpc_dt_g, 0.0, 1e-10 * scale_t) << "dpb0_dt_g not ~0 for case " << c.id;
+    expect_jacobian_close(jac.dpc_dp_e, c.dpb0_dp_e, "dpb0_dp_e", c.id);
+    expect_jacobian_close(jac.dpc_dt_e, c.dpb0_dt_e, "dpb0_dt_e", c.id);
+  }
+}
+
 TEST(EjectorJacobians, ChokedMassFlowMatchesCentralDifference) {
   // huang1999_reference_data.h has no column for choked_mass_flow (the
   // reference model never needed the absolute mass flow, only the ratio
@@ -251,6 +270,11 @@ TEST(EjectorJacobians, ElementResidualsMatchCentralDifference) {
       {"jetpump2", {0.0040, 0.022, 0.0260, 130000.0, 310.0, 101325.0, 292.0, 101000.0, 98500.0}},
       // Double-choked critical regime (s_choke -> 1, outlet < P_c* -> s_sub 0).
       {"critical", {0.44, 0.13, 0.57, 700000.0, 440.0, 22850.0, 280.0, 40000.0, 100000.0}},
+      // Choked subcritical (#619): outlet between P_c* = 58.0 kPa and the
+      // dead-head P_b0 = 175.9 kPa -> the omega_sub droop, outlet free.
+      {"subcritical", {0.44, 0.20, 0.64, 700000.0, 440.0, 22850.0, 280.0, 100000.0, 60000.0}},
+      // Choked, outlet beyond P_b0 -> the outlet pin at recovery * P_b0.
+      {"beyond_pb0", {0.44, 0.05, 0.49, 700000.0, 440.0, 22850.0, 280.0, 200000.0, 60000.0}},
   };
 
   auto resid = [&](const double u[9], int row) {

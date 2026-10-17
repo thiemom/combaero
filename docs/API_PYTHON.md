@@ -1259,9 +1259,9 @@ ejector = EjectorElement(
 # C-D nozzle (choked or unchoked), blended entrainment, mass conservation, and a
 # regime-dependent outlet/discharge closure. The regime is picked smoothly by two
 # smootherstep weights (s_choke on mp/mdot_choked, s_sub on outlet.Pt/P_c*): in
-# critical mode the outlet floats free below P_c* and P_jct is the diagnostic
-# recovered stagnation; in the subcritical/jet-pump regimes the outlet is pinned
-# to the ejector's discharge and P_py floats. Working fluid: combaero's real-fluid
+# choked mode the outlet floats free below P_b0 and P_jct is the diagnostic
+# recovered P_c*; in the jet-pump regime (and choked beyond P_b0) the outlet is
+# pinned to the ejector's discharge and P_py floats. Working fluid: combaero's real-fluid
 # EOS (combustion/air species only, no halocarbon refrigerants); gamma/R evaluated
 # live at the entrained-flow choking plane. The whole 4-row (f, J) is assembled in
 # C++ (full analytic Jacobian, no FD fallback). diagnostics() reports the actual
@@ -1274,8 +1274,11 @@ ejector = EjectorElement(
 # the back pressure for a mass-driven primary that cannot choke) and the port
 # chains' flows from the closed forms, only where you gave no initial_guess.
 # It replaces its own seeds on a re-solve and seeds nothing incompressible.
-# Choked SUBCRITICAL operation (outlet between P_c* and the dead-head P_b0) has
-# no root yet: the element keeps omega_crit there (see the design doc, #619).
+# Choked SUBCRITICAL operation (#619): between P_c* and the dead-head P_b0 (the
+# same mixing closure at zero entrainment) the entrainment droops linearly from
+# omega_crit to 0 (Tier-1, design doc sec 8.1) and the outlet floats; the outlet
+# pin switches in at P_b0. diagnostics() reports p_b0_pa next to p_c_star_pa.
+# Beyond P_b0 (backflow) is outside the model.
 ```
 
 ### Flow-Area Inference

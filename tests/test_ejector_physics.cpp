@@ -56,6 +56,20 @@ TEST(EjectorPhysics, CriticalBackPressureMatchesReferenceForAllCases) {
   }
 }
 
+TEST(EjectorPhysics, DeadHeadBackPressureMatchesReferenceForAllCases) {
+  // P_b0: the same mixing closure as P_c* at zero entrainment (Phase 1A).
+  for (const auto& c : kHuangCases) {
+    EjectorGeometry geom{c.area_ratio_nozzle, c.area_ratio_mix};
+    EjectorCriticalPressureResult res =
+        ejector_dead_head_back_pressure_and_jacobian(c.p_g_pa, c.t_g_k, c.p_e_pa, c.t_e_k, geom,
+                                                     c.gamma, c.r_gas, c.recovery_efficiency)
+            .value;
+    expect_close(res.p_c_pa, c.p_b0_pa, 1e-9, "p_b0_pa", c.id);
+    expect_close(res.lambda_mixed, c.lambda_dead_head, 1e-9, "lambda_dead_head", c.id);
+    EXPECT_GT(res.p_c_pa, c.p_c_pa) << "P_b0 must exceed P_c* for case " << c.id;
+  }
+}
+
 TEST(EjectorPhysics, ChokedMassFlowScalesLinearlyWithPressureAndArea) {
   // Sanity check independent of the reference table (choked_mass_flow has
   // no dedicated reference column): mdot = C * p0 * area / sqrt(t0).
