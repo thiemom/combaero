@@ -3437,6 +3437,21 @@ class NetworkSolver:
         self._eval_phase = "start"
         try:
             res0 = self._residuals(x0_use)
+            if not np.all(np.isfinite(res0)):
+                # A NaN start raised nothing and was then reported converged:
+                # |F| = NaN fails every "<" in the best-iterate tracking and
+                # the "> tol" success guard alike. Seen on an ejector seeded
+                # from its incompressible proxy, whose P_jct (-4e4 Pa) means
+                # something else in the compressible form (stress sweep,
+                # 2026-10-17).
+                bad = np.flatnonzero(~np.isfinite(res0))
+                try:
+                    kinds = self._row_kinds(x0_use)
+                    owners = sorted({kinds[i][0] for i in bad if i < len(kinds)})
+                except Exception:  # noqa: BLE001 -- naming only
+                    owners = []
+                self._eval_where = f"rows of {', '.join(owners[:4])}" if owners else ""
+                raise FloatingPointError(f"non-finite residual in {len(bad)} row(s) at the start")
         except _STATE_EXCEPTIONS as exc:
             self._record_exception(exc)
             if self._strict():
@@ -3752,8 +3767,9 @@ class NetworkSolver:
                     f"progress test at the root)."
                 )
             # Guard against methods (e.g. lm) that report success at a
-            # non-zero local minimum of ||F||^2.
-            if success and final_norm > _RESIDUAL_TOL:
+            # non-zero local minimum of ||F||^2. Written NaN-safe: a NaN
+            # norm is not a converged one.
+            if success and not final_norm <= _RESIDUAL_TOL:
                 success = False
                 outcome = SolveOutcome.RESIDUAL_TOO_LARGE
                 message = (
