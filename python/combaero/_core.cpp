@@ -5712,6 +5712,10 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
            "Orifice Reynolds number (based on d)");
 
   // Cd correlation functions
+  m.def("Cd_sharp_thin_plate_and_dRe", &Cd_sharp_thin_plate_and_dRe, py::arg("geom"),
+        py::arg("state"),
+        "(Cd, dCd/dRe_D) for the sharp thin-plate orifice (ISO 5167-2,\n"
+        "Reader-Harris/Gallagher): the analytic Re_D derivative.");
   m.def("Cd_sharp_thin_plate", &Cd_sharp_thin_plate, py::arg("geom"),
         py::arg("state"),
         "Discharge coefficient for sharp thin-plate orifice (ISO 5167-2).\n\n"

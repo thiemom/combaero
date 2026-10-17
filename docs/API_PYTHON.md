@@ -224,6 +224,7 @@ print(f"Specific impulse: {thrust.specific_impulse} s")
 ```python
 # Normed metering orifice (ISO 5167 family, a function of beta = d/D)
 Cd = cb.Cd_sharp_thin_plate(geom, state)
+Cd, dCd_dRe = cb.Cd_sharp_thin_plate_and_dRe(geom, state)  # analytic Re_D derivative
 
 # Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
 # geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.

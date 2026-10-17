@@ -1012,6 +1012,10 @@ enum class MeteringCdCorrelation {
 };
 
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
+// (Cd, dCd/dRe_D), analytic; 0 below the Re_D floor and above the 1.5 cap.
+// The network orifice's flow column uses it (dRe_D/dm = Re_D/|m|).
+std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
+                                                       const OrificeState& state);
 
 // Fixed Cd from an explicit value. make_correlation(MeteringCdCorrelation::Constant)
 // can only return the default, so this is how a chosen constant is pinned.

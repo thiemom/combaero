@@ -170,6 +170,13 @@ enum class DischargeCdCorrelation {
 // Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
 
+// The same Cd and its exact derivative in Re_D (the Re-correction, the
+// small-bore and the A-dependent tap terms); 0 below the Re_D floor of 1 and
+// above the 1.5 cap. For the network orifice's Jacobian: the metering Cd
+// moves with the flow through Re_D, a column the row used to miss.
+std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
+                                                       const OrificeState& state);
+
 
 // -------------------------------------------------------------
 // Individual correlation implementations

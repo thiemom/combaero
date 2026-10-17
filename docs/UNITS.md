@@ -250,6 +250,7 @@ All functions use consistent units to avoid conversion errors.
 | Function                                     | Input Units                                            | Output Unit             |
 |----------------------------------------------|--------------------------------------------------------|-------------------------|
 | `Cd_sharp_thin_plate`                        | OrificeGeometry, OrificeState                          | - (Cd)                  |
+| `Cd_sharp_thin_plate_and_dRe`                | OrificeGeometry, OrificeState                          | - (Cd), - (dCd/dRe_D)   |
 | `Cd`                                         | OrificeGeometry, OrificeState                          | - (Cd)                  |
 | `mcgreehan_schotsch_1988_cd`                 | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: - | - (Cd)                  |
 | `mcgreehan_schotsch_1988_cd_and_derivatives` | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -         | - (Cd, dCd/dRe, dCd/du) |
