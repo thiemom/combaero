@@ -465,10 +465,16 @@ double s_species(std::size_t species_idx, double T) {
 // Mixture property evaluation
 // -------------------------------------------------------------
 
+// The mixture sums skip absent species (X[i] == 0): their term is an exact
+// +-0.0, so the result is bit-identical, and a mixture usually carries a few
+// of the species (dry air 4 of 15; transport already skipped them). The Fanno
+// channel kernel evaluates these ~10^4 times per call.
 double cp(double T, const std::vector<double> &X) {
   double cp_mix = 0.0;
   for (std::size_t i = 0; i < X.size(); ++i) {
-    cp_mix += X[i] * cp_species(i, T);
+    if (X[i] != 0.0) {
+      cp_mix += X[i] * cp_species(i, T);
+    }
   }
   return cp_mix;
 }
@@ -476,7 +482,9 @@ double cp(double T, const std::vector<double> &X) {
 double h(double T, const std::vector<double> &X) {
   double h_mix = 0.0;
   for (std::size_t i = 0; i < X.size(); ++i) {
-    h_mix += X[i] * h_species(i, T);
+    if (X[i] != 0.0) {
+      h_mix += X[i] * h_species(i, T);
+    }
   }
   return h_mix;
 }
@@ -512,7 +520,9 @@ double specific_gas_constant(const std::vector<double> &X) {
 }
 
 double isentropic_expansion_coefficient(double T, const std::vector<double> &X) {
-  return cp(T, X) / cv(T, X);
+  // cv = cp - R_GAS (cv above): one mixture sum, the same value twice.
+  const double c = cp(T, X);
+  return c / (c - thermo::R_GAS);
 }
 
 double speed_of_sound(double T, const std::vector<double> &X) {
@@ -639,7 +649,9 @@ double dcp_R_dT(std::size_t species_idx, double T) {
 double dcp_dT(double T, const std::vector<double> &X) {
   double dcp_mix = 0.0;
   for (std::size_t i = 0; i < X.size(); ++i) {
-    dcp_mix += X[i] * dcp_R_dT(i, T) * thermo::R_GAS;
+    if (X[i] != 0.0) {
+      dcp_mix += X[i] * dcp_R_dT(i, T) * thermo::R_GAS;
+    }
   }
   return dcp_mix;
 }

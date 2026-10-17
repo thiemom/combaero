@@ -38,7 +38,7 @@ This document provides the technical reference for the CombAero C++ library. For
 double mwmix(const std::vector<double>& X);
 std::vector<double> mole_to_mass(const std::vector<double>& X);
 std::vector<double> mass_to_mole(const std::vector<double>& Y);
-std::vector<double> normalize_fractions(const std::vector<double>& X);
+std::vector<double> normalize_fractions(const std::vector<double>& X);  // negatives -> 0, then sum to 1; absent species stay 0
 std::vector<double> convert_to_dry_fractions(const std::vector<double>& X);
 ```
 

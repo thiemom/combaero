@@ -140,6 +140,12 @@ class SolverStallError(SolverTimeoutError):
 _STALL_WINDOW_S = 5.0
 _STALL_MIN_REL_IMPROVEMENT = 0.10
 _STALL_FAR_FACTOR = 100.0
+# Below the far gate a crawl is not a stall, but a DEAD plateau is: the best
+# |F| not improved at all over this many windows. The 5-row hot impingement
+# array (#605) parks LM at |F| = 0.0718, just under the gate, with not one
+# better point in 175 s; it was only caught when its plateau happened to sit
+# at 0.138, above it. Faster thermo moved it below (#626).
+_STALL_DEAD_WINDOWS = 3
 
 
 def _stall_detected(
@@ -159,12 +165,23 @@ def _stall_detected(
     with best_norm non-increasing. Stall = the newest best norm is still
     far above tolerance (``> far_factor * tol``) and improved by less
     than ``min_rel`` relative to the best norm from ``window`` seconds
-    ago. Histories shorter than the window never stall (grace period).
+    ago; or, nearer the root, it has not improved AT ALL over
+    ``_STALL_DEAD_WINDOWS`` windows (a dead plateau, not a crawl).
+    Histories shorter than the window never stall (grace period).
     """
     if not samples:
         return False
     t_now, best_now = samples[-1]
-    if best_now <= far_factor * tol or t_now < window:
+    if t_now < window:
+        return False
+    if best_now <= far_factor * tol:
+        # Near the root: only a dead plateau, no improvement at all.
+        t_dead = t_now - _STALL_DEAD_WINDOWS * window
+        if t_dead < 0.0:
+            return False
+        for tv, bv in reversed(samples):
+            if tv <= t_dead:
+                return bv <= best_now
         return False
     best_then = None
     for tv, bv in reversed(samples):
@@ -456,6 +473,8 @@ class NetworkSolver:
         self._n_species: int = len(self._default_Y)
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
+        # Nodes whose raw T(h) fell outside [200, 5000] K in the last propagation.
+        self._T_on_clamp: set[str] = set()
         # Optional initial-guess overrides keyed by unknown name; consulted
         # by _build_x0 after user-provided initial_guess dicts and before
         # the topological p_guess / mdot_guess propagators. Populated by
@@ -1498,6 +1517,7 @@ class NetworkSolver:
             self._lagged_read = False
             self._relay_borrowed: set[str] = set()
             self._derived_states = {}
+            self._T_on_clamp: set[str] = set()
             prev_relay = relay
             relay = self._propagate_pass(x, order, reversed_ids, with_relay, prev_relay)
             if not self._lagged_read:
@@ -1705,8 +1725,17 @@ class NetworkSolver:
                 node._inflows = []
                 node._upstream_m_dot_jac = {}
                 node._upstream_element_ids = []
-            T_clamped = not (200.0 < float(T) < 5000.0)
-            T = min(max(float(T), 200.0), 5000.0)
+            # On the clamp means the node's own energy did not fit: its raw
+            # T(h) lies outside [200, 5000] K beyond rounding. A node fed only
+            # by a clamped one sits AT the bound (T(h(200 K)) = 200 K to an
+            # ulp) and discards nothing; testing the clamped value flagged it
+            # or not by the last bit, once the trace species the composition
+            # floors added were gone.
+            T_raw = float(T)
+            T_clamped = not (200.0 * (1.0 - 1e-9) < T_raw < 5000.0 * (1.0 + 1e-9))
+            if T_clamped:
+                self._T_on_clamp.add(nid)
+            T = min(max(T_raw, 200.0), 5000.0)
             self._derived_states[nid] = (T, Y, mix_res)
 
             # Store wall coupling debug info on the node
@@ -2204,7 +2233,7 @@ class NetworkSolver:
 
         # P1-4: Clamp fractions to [0, 1] before creating state to avoid NaNs in thermo conversion
         Y_raw = state_dict["Y"]
-        Y_safe = [max(1e-12, min(1.0, float(yi))) for yi in Y_raw]
+        Y_safe = [max(0.0, min(1.0, float(yi))) for yi in Y_raw]
         y_sum = sum(Y_safe)
         if y_sum > 0:
             Y_safe = [yi / y_sum for yi in Y_safe]
@@ -3972,8 +4001,8 @@ class NetworkSolver:
             self._propagate_states(final_x, with_relay=False)
             _T_clamped = [
                 nid
-                for nid, (T_n, _, _) in self._derived_states.items()
-                if not 200.0 < float(T_n) < 5000.0
+                for nid in self._derived_states
+                if nid in self._T_on_clamp
                 and sum(m for m, _, _ in self._node_inflows(nid, final_x))
                 >= cb.MIXER_HEAT_MDOT_FLOOR
             ]

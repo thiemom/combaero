@@ -1158,8 +1158,11 @@ class NetworkMixtureState:
         try:
             return self._X  # type: ignore[return-value]
         except AttributeError:
-            # Defensive guard against unphysical intermediate solver states
-            Y_safe = [max(1e-12, min(1.0, float(yi))) for yi in self.Y]
+            # Defensive guard against unphysical intermediate solver states:
+            # clamp to [0, 1]. Not to a 1e-12 floor, which put a trace of
+            # every species into every state and made every property call
+            # evaluate all 15 (see normalize_fractions).
+            Y_safe = [max(0.0, min(1.0, float(yi))) for yi in self.Y]
             y_sum = sum(Y_safe)
             if y_sum > 0:
                 Y_safe = [yi / y_sum for yi in Y_safe]
