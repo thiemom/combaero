@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       source: ${{ steps.filter.outputs.source }}
+      gui_backend: ${{ steps.filter.outputs.gui_backend }}
       gui: ${{ steps.filter.outputs.gui }}
       documentation: ${{ steps.filter.outputs.documentation }}
     steps:
@@ -55,6 +56,12 @@ jobs:
               - '.python-version'
               - 'Makefile'
               - 'uv.lock'
+            # python/tests holds the GUI backend's tests (test_gui_*), so a
+            # backend-only change must run the Python unit job too. Without
+            # this a gui/backend PR ran no Python test at all.
+            gui_backend:
+              - 'gui/backend/**'
+              - 'gui/pyproject.toml'
             gui:
               - 'gui/**'
             documentation:
@@ -124,9 +131,15 @@ jobs:
           path: cantera_validation_tests/test_summary.txt
 
   python-unit-tests:
-    name: Test Python Unit
+    # Two halves of one suite, run in parallel on separate runners: the
+    # modules marked `slow` (over 20 s on one worker) and the rest. The
+    # markers partition the suite exactly, both halves are required by the
+    # status check, and both run on every PR -- nothing is skipped before a
+    # merge. One job held them on 4 workers, where --dist loadscope keeps a
+    # module on one worker, so the few heavy modules set its wall time.
+    name: Test Python Unit (${{ matrix.tier }})
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.gui_backend == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -134,6 +147,7 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
         python-version: [ '3.12' ]
+        tier: [ 'not slow', 'slow' ]
 
     steps:
       - name: Checkout
@@ -155,7 +169,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          uv run pytest -n auto --dist loadscope -q --tb=short --durations=25
+          uv run pytest -m "${{ matrix.tier }}" -n auto --dist loadscope -q --tb=short --durations=25
 
   examples-smoke:
     name: Examples Smoke (run, not import)
@@ -233,6 +247,7 @@ jobs:
         run: |
           source_changed="${{ needs.changes.outputs.source }}"
           gui_changed="${{ needs.changes.outputs.gui }}"
+          gui_backend_changed="${{ needs.changes.outputs.gui_backend }}"
           cantera_result="${{ needs.cantera-validation.result }}"
           py_unit_result="${{ needs.python-unit-tests.result }}"
           examples_result="${{ needs.examples-smoke.result }}"
@@ -240,6 +255,7 @@ jobs:
 
           echo "source_changed=${source_changed}"
           echo "gui_changed=${gui_changed}"
+          echo "gui_backend_changed=${gui_backend_changed}"
           echo "cantera_result=${cantera_result}"
           echo "py_unit_result=${py_unit_result}"
           echo "examples_result=${examples_result}"
@@ -256,6 +272,13 @@ jobs:
               echo "One or more source validation jobs failed or were cancelled."
               exit 1
             fi
+          fi
+
+          # A backend-only change runs (only) the Python unit job: it must
+          # have run, not been skipped.
+          if [[ "${gui_backend_changed}" == "true" && "${py_unit_result}" != "success" ]]; then
+            echo "Python unit tests (GUI backend) failed, were cancelled or did not run."
+            exit 1
           fi
 
           if [[ "${gui_changed}" == "true" ]]; then

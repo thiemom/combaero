@@ -14,6 +14,10 @@ from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.runner import NetworkRunner
 from gui.backend.schemas import ImpingementArrayData, NetworkGraphSchema, OrificeData
 
+# Over 20 s on one worker: runs in CI's parallel slow job (see
+# validation-tests.yml), still before every merge.
+pytestmark = pytest.mark.slow
+
 
 def _node(nid, ntype, data):
     return {"id": nid, "type": ntype, "position": {"x": 0, "y": 0}, "data": data}

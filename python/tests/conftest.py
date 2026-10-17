@@ -19,6 +19,9 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "no_closure_check: skip the global energy/mass closure assertion"
     )
+    config.addinivalue_line(
+        "markers", "slow: a module over 20 s on one worker; CI runs these in a parallel job"
+    )
     from _closure_check import closure
 
     from combaero.network import solver as solver_mod

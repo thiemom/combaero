@@ -30,6 +30,11 @@ from combaero.network.solver import RowKindMismatchError
 Y = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
+# Over 20 s on one worker: runs in CI's parallel slow job (see
+# validation-tests.yml), still before every merge.
+pytestmark = pytest.mark.slow
+
+
 class _LossFiledAsFlow(PressureLossElement):
     residual_scale_kind = "mdot"  # wrong: the residual is a Pt balance in Pa
 

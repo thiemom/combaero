@@ -17,6 +17,10 @@ from validation.junction.network_runner import (
 )
 from validation.junction.schema import load_dataset
 
+# Over 20 s on one worker: runs in CI's parallel slow job (see
+# validation-tests.yml), still before every merge.
+pytestmark = pytest.mark.slow
+
 
 def test_tee_network_adapter_evaluates_K6_case():
     """Tee adapter converges at a known mid-range K6 case (psi=1, theta=90, q=0.5)."""

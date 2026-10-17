@@ -34,6 +34,11 @@ Y_AIR = cb.mole_to_mass(cb.species.dry_air())
 X_AIR = cb.species.dry_air()
 
 
+# Over 20 s on one worker: runs in CI's parallel slow job (see
+# validation-tests.yml), still before every merge.
+pytestmark = pytest.mark.slow
+
+
 def _pb(name: str, Pt: float, Tt: float) -> PressureBoundary:
     b = PressureBoundary(name)
     b.Pt, b.Tt, b.Y = Pt, Tt, Y_AIR
