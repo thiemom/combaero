@@ -30,6 +30,10 @@ trap cleanup SIGINT SIGTERM
 
 echo "Starting CombAero GUI..."
 
+# 0. Rebuild the C++ extension if a pull changed it, and refuse to start a
+# backend that cannot import (an editable install keeps Python live, not C++).
+./scripts/ensure-gui-build.sh
+
 # 1. Start FastAPI Backend in background
 echo "Starting Backend (FastAPI)..."
 export PYTHONPATH="$PYTHONPATH:$PROJECT_ROOT"
