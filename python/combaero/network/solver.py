@@ -83,6 +83,18 @@ _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 #: counted (``__caught_exception_count__``).
 _MAX_CAUGHT_RECORDS = 50
 
+#: RESIDUAL-ROW-SCALING check (``NetworkSolver.check_row_kinds``): a row's
+#: units are those of the unknown family carrying a coefficient in this band.
+#: The suite's 132k converged rows: every Pa row has a +-1 or +-(1 - xi) on a
+#: pressure, every kg/s row a +-1 on a flow; a misfiled row shows the other.
+_ROW_KIND_UNIT_LO = 0.5
+_ROW_KIND_UNIT_HI = 2.0
+
+
+class RowKindMismatchError(TypeError):
+    """A residual row's declared units disagree with its Jacobian
+    (RESIDUAL-ROW-SCALING). A code bug, raised by strict solves only."""
+
 
 def _classify_solver_message(message: str) -> SolveOutcome:
     """The one place SciPy's free-text failure message is interpreted."""
@@ -274,7 +286,11 @@ class NetworkSolver:
         default filed PressureLoss, AreaChange, BorderCarnotLoss and Vortex
         rows (all Pa) 1e5-1e9 too heavily (#614).
         Changing an element's residual form means changing its declared kind
-        in the same commit.
+        in the same commit. A strict solve (the test suite) then checks every
+        declaration against the Jacobian at the converged solution
+        (``check_row_kinds``) and raises ``RowKindMismatchError`` on a
+        misfiled row: with #616 reverted, 52 suite tests fail naming the
+        element, where the suite had passed with the bug in place.
 
         Testing Jacobians against finite differences has the same trap: a row
         mixes kg/s and Pa columns, so compare J_ij |x_j| (scaled variables),
@@ -282,26 +298,36 @@ class NetworkSolver:
         error in a Pa column next to d/dm = 1 (#481).
         """
         ref_p, ref_mdot = self._reference_scales(x0_use)
+        _row_scale_kind_map = {"p": ref_p, "mdot": ref_mdot}
+        return np.asarray(
+            [_row_scale_kind_map[kind] for _owner, kind in self._row_kinds(x0_use)], dtype=float
+        )
 
-        scales: list[float] = []
+    def _row_kinds(self, x: np.ndarray) -> list[tuple[str, str]]:
+        """(owner, declared kind) per residual row, in residual-row order.
 
-        for _node_id, node in self.network.nodes.items():
+        RESIDUAL-ROW-SCALING: the one list both the row scales and the
+        strict-mode check (``check_row_kinds``) read, so the check tests
+        exactly the units the solver weights by.
+        """
+        rows: list[tuple[str, str]] = []
+
+        for node_id, node in self.network.nodes.items():
             if isinstance(node, PressureBoundary):
                 continue
 
-            state = self._get_node_state(node, x0_use)
+            state = self._get_node_state(node, x)
             node_res, _ = node.residuals(state)
-            scales.extend([ref_p] * len(node_res))
+            rows.extend((f"node '{node_id}'", "p") for _ in node_res)
 
             # Node mass conservation equation appended in _residuals_and_jacobian,
             # unless the node is a junction port (then the MultiPortChamberBase's
             # sum-mass residual covers conservation; mass row is skipped).
             if not getattr(node, "_is_junction_port", False):
-                scales.append(ref_mdot)
+                rows.append((f"node '{node_id}' mass", "mdot"))
 
         from .components import declared_row_kinds
 
-        _row_scale_kind_map = {"p": ref_p, "mdot": ref_mdot}
         for element in self.network.elements.values():
             # MultiPortChamberBase's rows are a MIX of pressure- and
             # mass-flow-magnitude residuals, and which row is which depends
@@ -324,9 +350,84 @@ class NetworkSolver:
             # (row_scale_kinds() for a junction, residual_scale_kind
             # otherwise); there is no default to fall back on (see this
             # method's docstring and declared_row_kinds).
-            scales.extend(_row_scale_kind_map[k] for k in declared_row_kinds(element))
+            label = f"{type(element).__name__} '{element.id}'"
+            rows.extend((label, k) for k in declared_row_kinds(element))
 
-        return np.asarray(scales, dtype=float)
+        return rows
+
+    def check_row_kinds(self, x: np.ndarray) -> list[dict[str, Any]]:
+        """Each residual row's declared units against its Jacobian at ``x``.
+
+        RESIDUAL-ROW-SCALING. A pressure row (Pa) has a coefficient of order
+        one on some pressure unknown (+-1, +-(1 - xi)); a mass-flow row (kg/s)
+        on some flow unknown. Per row, ``measured`` is the family with a
+        coefficient within a factor of 2 of 1, when exactly one has one.
+        ``verdict``:
+          * ``agree`` / ``DISAGREE``: measured equals / differs from declared;
+          * ``unclear``: both or neither family has such a coefficient;
+          * ``untestable``: the row has no pressure or no flow unknown.
+        Only DISAGREE is evidence of a misfiled row; the strict solve
+        (``raise_internal_errors`` / COMBAERO_SOLVER_STRICT) raises
+        ``RowKindMismatchError`` on it at every converged solution. Evaluate
+        at a converged ``x``: far from a root a coefficient can be off by
+        orders of magnitude. Pressure unknowns are named ``.P``, ``.Pt`` or
+        ``.P_*``; flow unknowns ``.m_dot*``.
+        """
+        x = np.asarray(x, dtype=float)
+        _, J = self._residuals_and_jacobian(x)
+        J = J.tocsr()
+        rows = self._row_kinds(x)
+        if len(rows) != J.shape[0]:
+            raise RowKindMismatchError(
+                f"{len(rows)} declared row kinds for {J.shape[0]} residual rows"
+            )
+        last = [name.rsplit(".", 1)[-1] for name in self.unknown_names]
+        is_p = [s in ("P", "Pt") or s.startswith("P_") for s in last]
+        is_m = [s.startswith("m_dot") for s in last]
+        report: list[dict[str, Any]] = []
+        for i, (owner, declared) in enumerate(rows):
+            lo, hi = J.indptr[i], J.indptr[i + 1]
+            has_p = has_m = p_unit = m_unit = False
+            for j, v in zip(J.indices[lo:hi], J.data[lo:hi], strict=True):
+                unit = _ROW_KIND_UNIT_LO <= abs(v) <= _ROW_KIND_UNIT_HI
+                if is_p[j]:
+                    has_p, p_unit = True, p_unit or unit
+                elif is_m[j]:
+                    has_m, m_unit = True, m_unit or unit
+            measured = "p" if p_unit and not m_unit else "mdot" if m_unit and not p_unit else None
+            if measured is not None:
+                verdict = "agree" if measured == declared else "DISAGREE"
+            else:
+                verdict = "unclear" if has_p and has_m else "untestable"
+            report.append(
+                {
+                    "row": i,
+                    "owner": owner,
+                    "declared": declared,
+                    "measured": measured,
+                    "verdict": verdict,
+                }
+            )
+        return report
+
+    def _assert_row_kinds(self, sol: dict[str, Any]) -> None:
+        """Strict mode: raise if a converged solution shows a misfiled row."""
+        if not (self._strict() and sol.get("__converged__") and "__x_solution__" in sol):
+            return
+        x = np.asarray(sol["__x_solution__"], dtype=float)
+        if len(x) != len(self.unknown_names):
+            return
+        bad = [r for r in self.check_row_kinds(x) if r["verdict"] == "DISAGREE"]
+        if bad:
+            lines = "; ".join(
+                f"row {r['row']} of {r['owner']}: declared {r['declared']!r}, "
+                f"Jacobian says {r['measured']!r}"
+                for r in bad[:10]
+            )
+            raise RowKindMismatchError(
+                f"RESIDUAL-ROW-SCALING: {len(bad)} row(s) filed under the wrong units "
+                f"({lines}). Fix the element's residual_scale_kind / row_scale_kinds."
+            )
 
     def __init__(self, network: FlowNetwork):
         self.network = network
@@ -2416,7 +2517,9 @@ class NetworkSolver:
         }
 
     def _with_caught(self, sol: dict[str, Any]) -> dict[str, Any]:
-        """``sol`` with this solve's caught-exception record attached."""
+        """``sol`` with this solve's caught-exception record attached; in
+        strict mode, after checking its row kinds (``check_row_kinds``)."""
+        self._assert_row_kinds(sol)
         sol["__caught_exceptions__"] = list(self._caught_exceptions)
         sol["__caught_exception_count__"] = self._caught_count
         return sol
@@ -2503,7 +2606,10 @@ class NetworkSolver:
         ``raise_internal_errors = True`` on the solver, or the environment
         variable ``COMBAERO_SOLVER_STRICT=1``, to make the starting point raise
         as it used to (the test suite runs strict). Code bugs (TypeError,
-        AttributeError, KeyError, IndexError) always raise.
+        AttributeError, KeyError, IndexError) always raise. A strict solve
+        also checks each converged solution's residual rows against their
+        declared units and raises ``RowKindMismatchError`` on a misfiled one
+        (``check_row_kinds``; RESIDUAL-ROW-SCALING).
         """
         self._caught_exceptions = []
         self._caught_count = 0
