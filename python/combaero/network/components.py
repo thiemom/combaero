@@ -2750,6 +2750,11 @@ _DISCHARGE_SELECTORS = {
 }
 
 
+# Below this Cd an orifice kernel is evaluated at Cd = 1 and scaled: the
+# kernels are linear in Cd and refuse A_eff <= 0 (OrificeElement._kernel_from).
+_KERNEL_CD_MIN = 1e-12
+
+
 class OrificeElement(NetworkElement):
     """
     Orifice flow element with incompressible or compressible formulation.
@@ -3246,6 +3251,14 @@ class OrificeElement(NetworkElement):
             if src_id == self.from_node
             else getattr(self, "beta_reverse", 0.0)
         )
+        # Both kernels are exactly linear in Cd (A_eff = Cd E A). A crossflow
+        # Cd underflows to exactly 0 where the hole's pressure drop vanishes
+        # (U1/Vi -> inf in McGreehan-Schotsch's exp(-Rv^n)), and the kernels
+        # refuse A_eff <= 0: evaluate at Cd = 1 there and scale, which is
+        # exact, so a trace Cd gives a trace flow instead of an exception.
+        if cd < _KERNEL_CD_MIN:
+            m1, d1 = self._kernel_from(src, dst, src_id, dst_id, 1.0)
+            return m1 * cd, {k: v * cd for k, v in d1.items()}
         if self.regime == "compressible":
             r = _solver_tools.orifice_compressible_residuals_and_jacobian(
                 src.m_dot, src.Pt, src.Tt, src.Y, dst.P, cd, self.area, beta
@@ -5142,14 +5155,18 @@ class PressureLossElement(NetworkElement):
             for k, y in enumerate(Y_in):
                 if not y > 0.0:
                     continue
-                h = min(1e-6, 0.5 * y)
+                # Central where y can take the step down, forward above a
+                # trace species: a central step shrunk to 0.5 y underflowed
+                # to zero at a denormal y (5e-324) and divided by it.
+                h = 1e-6
+                signs = (1.0, -1.0) if y >= 2.0 * h else (1.0, 0.0)
                 xi_pm = []
-                for sgn in (1.0, -1.0):
+                for sgn in signs:
                     Yk = list(Y_in)
                     Yk[k] += sgn * h
                     ctx.X_in = list(cb.mass_to_mole(Yk))
                     xi_pm.append(self.correlation(ctx)[0])
-                d = (xi_pm[0] - xi_pm[1]) / (2.0 * h)
+                d = (xi_pm[0] - xi_pm[1]) / ((signs[0] - signs[1]) * h)
                 if d != 0.0:
                     jac[0][f"{up_id}.Y[{k}]"] = state_in.Pt * d
         finally:
