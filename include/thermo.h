@@ -5,6 +5,7 @@
 #include "composition.h"
 #include <cstddef>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace combaero::thermo {
@@ -106,6 +107,12 @@ double speed_of_sound(double T, const std::vector<double>& X);
 
 // Mass-specific thermodynamic properties
 double cp_mass(double T, const std::vector<double>& X);
+// Secant cp over [T1, T2], (h(T1) - h(T2)) / (T1 - T2) [J/(kg K)], and its
+// partials in T1 and T2; cp at T1 in the limit T2 -> T1. A stream's capacity
+// rate over a span it may cross: the variable-property C of an epsilon-NTU
+// exchange, which makes C_min (T_hot - T_cold) its exact maximum heat (#627).
+std::tuple<double, double, double> cp_secant_mass_and_jacobian(double T1, double T2,
+                                                               const std::vector<double>& X);
 double cv_mass(double T, const std::vector<double>& X);
 double h_mass(double T, const std::vector<double>& X);
 double s_mass(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);

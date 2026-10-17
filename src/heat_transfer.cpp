@@ -1215,4 +1215,125 @@ WallCouplingResult wall_coupling_and_jacobian(
   return result;
 }
 
+namespace {
+// g(x) = (1 - e^-x) / x and its slope as g', x g' and x^2 g' (x >= 0): the
+// last two stay finite as x -> inf (0 and -1) where g' alone underflows.
+struct ExchangeG {
+  double g;
+  double gp;
+  double xgp;
+  double x2gp;
+};
+
+ExchangeG exchange_g(double x) {
+  if (!std::isfinite(x)) {
+    return {0.0, 0.0, 0.0, -1.0};
+  }
+  if (x < 1e-4) {
+    const double g = 1.0 - x / 2.0 + x * x / 6.0;
+    const double gp = -0.5 + x / 3.0 - x * x / 8.0;
+    return {g, gp, x * gp, x * x * gp};
+  }
+  const double em = std::exp(-x);
+  const double g = -std::expm1(-x) / x;
+  return {g, (em - g) / x, em - g, x * (em - g)};
+}
+
+// (UA w)^2 g'(x) with x = UA D, w <= ... any inverse capacity: directly where
+// x is small (D may vanish), as (w / D)^2 x^2 g'(x) where it is not (g' may
+// underflow).
+double scaled_gp(double UA, double w, double D, const ExchangeG& gv, double x) {
+  if (x < 1.0) {
+    const double t = UA * w;
+    return t * t * gv.gp;
+  }
+  const double r = w / D;
+  return r * r * gv.x2gp;
+}
+
+// K = Q / dT [W/K] and its partials in UA, C_a, C_b.
+struct ExchangeK {
+  double K;
+  double dK_dUA;
+  double dK_dCa;
+  double dK_dCb;
+};
+
+ExchangeK exchange_conductance(double UA, double C_a, double C_b, bool counterflow) {
+  if (!(UA > 0.0)) {
+    return {0.0, 1.0, 0.0, 0.0};
+  }
+  // A stream that does not flow takes no heat: Q -> C dT as C -> 0.
+  if (C_a <= 0.0 && C_b <= 0.0) {
+    return {0.0, 0.0, 0.5, 0.5};
+  }
+  if (C_a <= 0.0) {
+    return {0.0, 0.0, 1.0, 0.0};
+  }
+  if (C_b <= 0.0) {
+    return {0.0, 0.0, 0.0, 1.0};
+  }
+  const double w_a = std::isinf(C_a) ? 0.0 : 1.0 / C_a;
+  const double w_b = std::isinf(C_b) ? 0.0 : 1.0 / C_b;
+  if (w_a == 0.0 && w_b == 0.0) {
+    return {UA, 1.0, 0.0, 0.0};  // two reservoirs: NTU = 0
+  }
+  if (!counterflow) {
+    const double S = w_a + w_b;
+    const double x = UA * S;
+    const ExchangeG gv = exchange_g(x);
+    const double fa = w_a / S;
+    const double fb = w_b / S;
+    return {UA * gv.g, gv.g + gv.xgp, -fa * fa * gv.x2gp, -fb * fb * gv.x2gp};
+  }
+  // Counterflow, symmetric in A and B: evaluated with w_hi >= w_lo (the
+  // smaller capacity rate on 'hi') so that x >= 0.
+  const bool a_hi = w_a >= w_b;
+  const double w_hi = a_hi ? w_a : w_b;
+  const double w_lo = a_hi ? w_b : w_a;
+  const double D = w_hi - w_lo;
+  const double x = UA * D;
+  const ExchangeG gv = exchange_g(x);
+  const double G = UA * gv.g;
+  const double den = 1.0 + G * w_lo;
+  const double K = G / den;
+  const double dK_dG = 1.0 / (den * den);
+  const double dK_dUA = dK_dG * (gv.g + gv.xgp);
+  const double dK_dC_hi = -dK_dG * scaled_gp(UA, w_hi, D, gv, x);
+  const double Gw = G * w_lo;
+  const double dK_dC_lo = dK_dG * scaled_gp(UA, w_lo, D, gv, x) + Gw * Gw * dK_dG;
+  return {K, dK_dUA, a_hi ? dK_dC_hi : dK_dC_lo, a_hi ? dK_dC_lo : dK_dC_hi};
+}
+}  // namespace
+
+WallCouplingResult wall_exchange_and_jacobian(
+    double h_a, double T_aw_a, double C_a,
+    double h_b, double T_aw_b, double C_b,
+    const std::vector<double> &t_over_k_layers,
+    double A,
+    double R_fouling,
+    bool counterflow) {
+  // UA and its h derivatives: the linear coupling at a unit difference.
+  const WallCouplingResult unit =
+      wall_coupling_and_jacobian(h_a, 1.0, h_b, 0.0, t_over_k_layers, A, R_fouling);
+  const double UA = unit.Q;
+  // The surface temperature as the linear coupling places it at the inlets.
+  WallCouplingResult result =
+      wall_coupling_and_jacobian(h_a, T_aw_a, h_b, T_aw_b, t_over_k_layers, A, R_fouling);
+
+  const ExchangeK k = exchange_conductance(UA, C_a, C_b, counterflow);
+  const double dT = T_aw_a - T_aw_b;
+  result.Q = k.K * dT;
+  result.dQ_dT_aw_a = k.K;
+  result.dQ_dT_aw_b = -k.K;
+  result.dQ_dh_a = dT * k.dK_dUA * unit.dQ_dh_a;
+  result.dQ_dh_b = dT * k.dK_dUA * unit.dQ_dh_b;
+  result.dQ_dC_a = dT * k.dK_dCa;
+  result.dQ_dC_b = dT * k.dK_dCb;
+  result.UA = UA;
+  const double C_min = std::min(C_a, C_b);
+  result.effectiveness = (C_min > 0.0 && std::isfinite(C_min)) ? k.K / C_min : 0.0;
+  return result;
+}
+
 } // namespace combaero

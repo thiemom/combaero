@@ -1229,6 +1229,28 @@ class NetworkSolver:
             self._wall_ebs[nid] = eb
             node.add_energy_boundary(eb)
 
+    def _wall_capacity(
+        self, eid: str, state: NetworkMixtureState, T_other: float
+    ) -> tuple[float, float, float, float, float]:
+        """(C, dC/dm, dC/dT_own, dC/dT_other, flow sign) of one wall side.
+
+        C = |m| cp [W/K] of the stream feeding it, cp the secant over the span
+        from its own inlet T to the other side's (cb.cp_secant_mass_and_jacobian):
+        the variable-property capacity, so C_min dT is the exact maximum heat
+        and the weaker stream at most reaches the other's inlet T. cp at its
+        own inlet let a 1600 K stream's high cp overstate what it gives up and
+        the parallel outlets cross by 43 K. dC/dm w.r.t. the element's own flow
+        unknown; the T partials w.r.t. the two feed nodes' T. A node side is a
+        well-mixed reservoir: C = inf (#627)."""
+        if eid in self.network.nodes:
+            return math.inf, 0.0, 0.0, 0.0, 1.0
+        m = float(state.m_dot)
+        X = list(cb.mass_to_mole(list(state.Y)))
+        cp, dcp_own, dcp_other = cb.cp_secant_mass_and_jacobian(float(state.Tt), float(T_other), X)
+        sign = -1.0 if m < 0.0 else 1.0
+        a = abs(m)
+        return a * cp, sign * cp, a * dcp_own, a * dcp_other, sign
+
     def _evaluate_walls_for_node(
         self,
         nid: str,
@@ -1308,9 +1330,25 @@ class NetworkSolver:
                 h_b = ch_result_b.h
                 T_aw_b = ch_result_b.T_aw
 
-                # Call multi-layer coupling logic
+                # The streams' exchange (epsilon-NTU): their capacity rates and
+                # whether they run counter along the wall, from the flow signs
+                # and the declared orientation (#627).
+                C_a, dCa_dm, dCa_dTa, dCa_dTb, sign_a = self._wall_capacity(
+                    elem_a_id, state_a, float(state_b.Tt)
+                )
+                C_b, dCb_dm, dCb_dTb, dCb_dTa, sign_b = self._wall_capacity(
+                    elem_b_id, state_b, float(state_a.Tt)
+                )
                 wall_result = wall.compute_coupling(
-                    h_a, T_aw_a, obj_a.surface.area, h_b, T_aw_b, obj_b.surface.area
+                    h_a,
+                    T_aw_a,
+                    obj_a.surface.area,
+                    h_b,
+                    T_aw_b,
+                    obj_b.surface.area,
+                    C_a,
+                    C_b,
+                    wall.is_counterflow(sign_a, sign_b),
                 )
 
                 # Convention: Q > 0 means heat flows A->B
@@ -1327,6 +1365,7 @@ class NetworkSolver:
                         is_side_a,
                         ch_result_a,
                         ch_result_b,
+                        (dCa_dm, dCa_dTa, dCa_dTb, dCb_dm, dCb_dTb, dCb_dTa),
                     )
                 )
                 processed_walls.add(wall.id)
@@ -1757,6 +1796,7 @@ class NetworkSolver:
                     is_side_a,
                     ch_a,
                     ch_b,
+                    _caps,
                 ) in wall_contributions:
                     # dQ_inject/dQ_wall = -1 if is_side_a, +1 otherwise
                     dT_dQ_signed = -dT_mix_dQ if is_side_a else dT_mix_dQ
@@ -1858,6 +1898,7 @@ class NetworkSolver:
                         is_side_a,
                         ch_a,
                         ch_b,
+                        (dCa_dm, dCa_dTa, dCa_dTb, dCb_dm, dCb_dTb, dCb_dTa),
                     ) in wall_contributions:
                         sign = -1.0 if is_side_a else 1.0
 
@@ -1875,6 +1916,8 @@ class NetworkSolver:
                                 * (
                                     wall_result.dQ_dT_aw_a * ch_a.dT_aw_dT
                                     + wall_result.dQ_dh_a * ch_a.dh_dT
+                                    + wall_result.dQ_dC_a * dCa_dTa
+                                    + wall_result.dQ_dC_b * dCb_dTa
                                 )
                             )
                             for idx, sens_up in up(from_a).items():
@@ -1896,6 +1939,8 @@ class NetworkSolver:
                                     + wall_result.dQ_dT_aw_a * ch_a.dT_aw_dmdot
                                 )
                             )
+                            # The capacity rate |m| cp (signed in the unknown)
+                            factor_mdot_a += dT_mix_dQ * sign * wall_result.dQ_dC_a * dCa_dm
                             nr = relay[nid].setdefault(
                                 idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
@@ -1929,6 +1974,8 @@ class NetworkSolver:
                                 * (
                                     wall_result.dQ_dT_aw_b * ch_b.dT_aw_dT
                                     + wall_result.dQ_dh_b * ch_b.dh_dT
+                                    + wall_result.dQ_dC_b * dCb_dTb
+                                    + wall_result.dQ_dC_a * dCa_dTb
                                 )
                             )
                             for idx, sens_up in up(from_b).items():
@@ -1949,6 +1996,8 @@ class NetworkSolver:
                                     + wall_result.dQ_dT_aw_b * ch_b.dT_aw_dmdot
                                 )
                             )
+                            # The capacity rate |m| cp (signed in the unknown)
+                            factor_mdot_b += dT_mix_dQ * sign * wall_result.dQ_dC_b * dCb_dm
                             nr = relay[nid].setdefault(
                                 idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
@@ -3852,8 +3901,12 @@ class NetworkSolver:
         # ill-conditioned Newton step that causes hybr to bounce near a
         # choked solution without making progress.  Start from the best
         # iterate hybr found; restore the full timeout so LM gets the
-        # remaining 35% of the budget.
-        if not success and _has_compressible:
+        # remaining 35% of the budget. Also for ANY network where hybr
+        # reported success at a non-root (its xtol test on a Broyden-updated
+        # Jacobian): an 8-row impingement array with the epsilon-NTU wall heat
+        # stopped there at |F| = 1.7e-3, where LM from its best iterate reaches
+        # 3e-11 (#627). Only a failed solve gets the extra phase.
+        if not success and (_has_compressible or outcome == SolveOutcome.RESIDUAL_TOO_LARGE):
             _elapsed = time.perf_counter() - start_time
             _remaining = (timeout - _elapsed) if timeout is not None else None
             if _remaining is None or _remaining > 2.0:
@@ -4238,7 +4291,14 @@ class NetworkSolver:
             )
 
             if ch_result_a and ch_result_b:
-                # Call multi-layer coupling logic (same as in residual evaluation)
+                # The same exchange as in the residual evaluation (#627)
+                C_a, _, _, _, sign_a = self._wall_capacity(
+                    wall.element_a, state_a, float(state_b.Tt)
+                )
+                C_b, _, _, _, sign_b = self._wall_capacity(
+                    wall.element_b, state_b, float(state_a.Tt)
+                )
+                counterflow = wall.is_counterflow(sign_a, sign_b)
                 wall_res = wall.compute_coupling(
                     ch_result_a.h,
                     ch_result_a.T_aw,
@@ -4246,10 +4306,22 @@ class NetworkSolver:
                     ch_result_b.h,
                     ch_result_b.T_aw,
                     obj_b.surface.area,
+                    C_a,
+                    C_b,
+                    counterflow,
                 )
 
                 sol_dict[f"{wid}.Q"] = float(wall_res.Q)
                 sol_dict[f"{wid}.T_hot"] = float(wall_res.T_hot)
+                # The exchange: UA, NTU on the smaller capacity rate, and the
+                # effectiveness Q / (C_min dT) (0 between two reservoirs).
+                C_min = min(C_a, C_b)
+                sol_dict[f"{wid}.UA"] = float(wall_res.UA)
+                sol_dict[f"{wid}.NTU"] = (
+                    float(wall_res.UA) / C_min if 0.0 < C_min < math.inf else 0.0
+                )
+                sol_dict[f"{wid}.effectiveness"] = float(wall_res.effectiveness)
+                sol_dict[f"{wid}.counterflow"] = float(counterflow)
 
                 # Heat injected into a node that cannot take it -- a boundary,
                 # whose state is fixed -- leaves the network with the stream

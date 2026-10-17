@@ -64,6 +64,10 @@ double s(double T, const std::vector<double>& X, double P, double P_ref = 101325
 ### Thermodynamic Properties (Mass Basis)
 ```cpp
 double cp_mass(double T, const std::vector<double>& X);
+// Secant cp over [T1, T2] and its partials in T1, T2 (cp(T1) as T2 -> T1):
+// the variable-property capacity rate of an epsilon-NTU wall exchange (#627).
+std::tuple<double, double, double> cp_secant_mass_and_jacobian(
+    double T1, double T2, const std::vector<double>& X);
 double cv_mass(double T, const std::vector<double>& X);
 double h_mass(double T, const std::vector<double>& X);
 double u_mass(double T, const std::vector<double>& X);
@@ -900,6 +904,19 @@ WallCouplingResult wall_coupling_and_jacobian(
 // positive floor knee^2/(2 knee - h), so a correlation driven to h <= 0 at a
 // solver iterate still gives a finite wall. dQ/dh is the slope of the
 // floored value.
+
+// What the network uses (#627): the heat two streams exchange, the
+// epsilon-NTU integral along the wall, Q = eps(NTU, C_r) C_min (T_aw_a -
+// T_aw_b) at the inlets. The linear form above is its NTU -> 0 limit.
+// C = |m| cp [W/K]; +inf for a node side (a reservoir). counterflow follows
+// from the flow signs and ThermalWall.orientation. Finite at C = 0
+// (Q -> C dT), C = inf and C_a = C_b; adds dQ_dC_a, dQ_dC_b, UA and
+// effectiveness to the result.
+WallCouplingResult wall_exchange_and_jacobian(
+    double h_a, double T_aw_a, double C_a,
+    double h_b, double T_aw_b, double C_b,
+    const std::vector<double>& t_over_k_layers, double A,
+    double R_fouling, bool counterflow);
 ```
 
 ### Data Structures

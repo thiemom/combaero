@@ -276,6 +276,7 @@ try:
         film_effectiveness_baldauf_2002_and_derivatives,
         cp,
         cp_mass,
+        cp_secant_mass_and_jacobian,
         critical_pressure_ratio,
         cv,
         cv_mass,
@@ -1104,6 +1105,7 @@ __all__ = [
     # Core Constants
     "cp",
     "cp_mass",
+    "cp_secant_mass_and_jacobian",
     "h",
     "h_mass",
     "s",

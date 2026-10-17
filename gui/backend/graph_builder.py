@@ -1284,6 +1284,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     layers=layers,
                     contact_area=data.area,
                     R_fouling=data.R_fouling,
+                    orientation=data.orientation,
                 )
             )
             net.thermal_coupling_enabled = True

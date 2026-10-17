@@ -2025,6 +2025,17 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Returns: speed of sound [m/s]");
 
   m.def(
+      "cp_secant_mass_and_jacobian",
+      [](double T1, double T2,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        return cp_secant_mass_and_jacobian(T1, T2, to_vec(X_arr));
+      },
+      py::arg("T1"), py::arg("T2"), py::arg("X"),
+      "Secant cp over [T1, T2], (h(T1) - h(T2)) / (T1 - T2) [J/(kg*K)], and\n"
+      "its partials in T1 and T2 (cp(T1) in the limit T2 -> T1). The capacity\n"
+      "rate of an epsilon-NTU wall exchange (#627).");
+
+  m.def(
       "cp_mass",
       [](double T,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
@@ -7005,6 +7016,16 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
                     "Jacobian: dQ/dT_aw_a [W/K]")
       .def_readonly("dQ_dT_aw_b", &WallCouplingResult::dQ_dT_aw_b,
                     "Jacobian: dQ/dT_aw_b [W/K]")
+      .def_readonly("dQ_dC_a", &WallCouplingResult::dQ_dC_a,
+                    "Jacobian: dQ/dC_a [K] (wall_exchange_and_jacobian; 0 for the "
+                    "linear coupling)")
+      .def_readonly("dQ_dC_b", &WallCouplingResult::dQ_dC_b,
+                    "Jacobian: dQ/dC_b [K] (wall_exchange_and_jacobian)")
+      .def_readonly("UA", &WallCouplingResult::UA,
+                    "Overall conductance [W/K] (wall_exchange_and_jacobian)")
+      .def_readonly("effectiveness", &WallCouplingResult::effectiveness,
+                    "Q / (C_min dT) [-] (wall_exchange_and_jacobian; 0 without "
+                    "a finite C_min)")
       .def("__repr__",
            [](const WallCouplingResult &r) {
              auto fmt = [](double v) {
@@ -7051,6 +7072,18 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "  A              : effective heat transfer area [m^2]\n"
         "  R_fouling      : additional fouling resistance [m^2*K/W]\n\n"
         "Returns: WallCouplingResult with Q and analytical Jacobians");
+
+  m.def("wall_exchange_and_jacobian", &wall_exchange_and_jacobian, py::arg("h_a"),
+        py::arg("T_aw_a"), py::arg("C_a"), py::arg("h_b"), py::arg("T_aw_b"),
+        py::arg("C_b"), py::arg("t_over_k_layers"), py::arg("A"),
+        py::arg("R_fouling") = 0.0, py::arg("counterflow") = false,
+        "Heat two streams exchange through a wall, epsilon-NTU (#627).\n\n"
+        "Q = eps(NTU, C_r) C_min (T_aw_a - T_aw_b), T_aw at each stream's inlet.\n"
+        "  C_a, C_b    : capacity rates |m| cp [W/K]; inf for a node side "
+        "(a reservoir)\n"
+        "  counterflow : the streams run opposite ways along the wall\n\n"
+        "Returns: WallCouplingResult with Q and analytic Jacobians, including\n"
+        "dQ_dC_a and dQ_dC_b.");
 
   // -----------------------------------------------------------------
   // channel_smooth

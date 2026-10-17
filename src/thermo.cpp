@@ -583,6 +583,18 @@ double cv_mass(double T, const std::vector<double> &X) {
   return cv(T, X) / (mwmix(X) / 1000.0);
 }
 
+std::tuple<double, double, double> cp_secant_mass_and_jacobian(double T1, double T2,
+                                                               const std::vector<double> &X) {
+  const double d = T1 - T2;
+  if (std::abs(d) <= 1e-6 * std::max(std::abs(T1), 1.0)) {
+    // cp(T1) + cp'(T1) d / 2 + O(d^2): the partials are cp' / 2 each.
+    const double half = 0.5 * dcp_dT(0.5 * (T1 + T2), X) / (mwmix(X) / 1000.0);
+    return {cp_mass(0.5 * (T1 + T2), X), half, half};
+  }
+  const double c = (h_mass(T1, X) - h_mass(T2, X)) / d;
+  return {c, (cp_mass(T1, X) - c) / d, (c - cp_mass(T2, X)) / d};
+}
+
 double h_mass(double T, const std::vector<double> &X) {
   return h(T, X) / (mwmix(X) / 1000.0);
 }
