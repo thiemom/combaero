@@ -541,6 +541,34 @@ chain-rule over the same closures; and it is FD-checked directly in
 `units_data.h` / `API_*.md` entry is required (consistent with the other
 ejector closures).
 
+**Addendum (#619): the C-D nozzle is monotone in `P_py` over the whole line.**
+A cold-start stress sweep found two spurious branches in R0/R1's
+`cd_nozzle` closure:
+* Above the supply its exit flux was 0, flat in `P_py`, so zero flow at any
+  `P_py` above both supplies held R0-R2. R3's jet-pump pin, kept finite
+  there by the #481 floors, then crossed zero at some huge `P_py`. Result:
+  9 of 11 "converged" compressible draws sat at `P_py ~ 1e13` Pa, all flows 0,
+  `__success__` and consistent.
+* Below the critical ratio the supersonic-exit flux falls with M. Evaluated
+  there it dipped under the choked cap (r < 0.16 at A_e/A_t = 1.5), so R0 was
+  non-monotone at low `P_py`.
+
+Fix:
+* Above the supply the nozzle passes reverse flow (the same closure from
+  `P_py` into `p0`, continuous at r = 1).
+* The exit Mach is held at 1 below the critical ratio. This is C1, since
+  flux'(1) = 0, and it moved the converged suite states' primary flow by at
+  most 4e-7.
+
+Still open:
+* **Choked subcritical:** at `s = 1, s_sub = 1`, R1 keeps omega_crit and R3
+  pins the outlet port at recovery*P_c*. `P_py` then has no equation, and a
+  choked ejector with its outlet between P_c* and P_b0 has no root. The
+  sec 8.1 omega_sub droop exists in `_ejector_huang1999` but is not wired
+  into the element.
+* **Warm start:** the physics warm start lives in the GUI backend
+  (`graph_builder._seed_ejector_warmstart`), so API-built networks start cold.
+
 ## 7. References
 
 - Huang, Chang, Wang, Petrenko (1999), *A 1-D analysis of ejector performance*,

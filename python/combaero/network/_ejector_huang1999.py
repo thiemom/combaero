@@ -276,7 +276,22 @@ def cd_nozzle_mass_flow(
 
     Parameters mirror `choked_mass_flow` plus `p_static_down` (the exit/mixing
     static pressure P_py) and `area_exit` (nozzle exit area A_p1).
+
+    Above the supply (``p_static_down > p0``) the nozzle passes REVERSE flow:
+    the same closure from ``p_static_down`` back into ``p0``, shifted by the
+    smooth-min's r = 1 value so the flow is continuous there (#619). The former
+    zero exit flux was flat in P_py, which let zero flow at any P_py above both
+    supplies close the ejector rows -- a spurious root at P_py ~ 1e13 Pa.
     """
+    if p_static_down > p0:
+        cap0 = choked_mass_flow(p0, t0, area_throat, gamma, r_gas, eta)
+        offset = math.sqrt(cap0 * cap0 + (eps_frac * cap0) ** 2) - cap0
+        return (
+            -cd_nozzle_mass_flow(
+                p_static_down, t0, p0, area_throat, area_exit, gamma, r_gas, eta, eps_frac
+            )
+            - offset
+        )
     cap = choked_mass_flow(p0, t0, area_throat, gamma, r_gas, eta)
     r = p_static_down / p0
     if r >= 1.0:
@@ -285,6 +300,10 @@ def cd_nozzle_mass_flow(
         gm1 = gamma - 1.0
         gp1 = gamma + 1.0
         mach = math.sqrt(2.0 / gm1 * (r ** (-gm1 / gamma) - 1.0))
+        # Below the critical ratio the throat is choked: hold the exit flux at
+        # its sonic maximum (C1, flux'(M = 1) = 0). The supersonic-exit flux
+        # falls with M and dipped under the cap at deep expansion (#619).
+        mach = min(mach, 1.0)
         flux = mach * (1.0 + 0.5 * gm1 * mach * mach) ** (-gp1 / (2.0 * gm1))
         exit_flux = (
             area_exit * p0 / math.sqrt(t0) * math.sqrt(gamma / r_gas) * flux * math.sqrt(eta)
