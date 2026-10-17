@@ -540,6 +540,13 @@ double friction_petukhov_clamped(double Re);
 double friction_petukhov_clamped_dRe(double Re);
 ```
 
+The functions above are the turbulent fits on their own. The network kernels
+`solver::friction_and_jacobian(model, Re, e_D)` ("haaland", "serghides",
+"colebrook") blend them with Hagen-Poiseuille, `f = (1 - w) 64/Re + w f_turb`
+with `w = (1 + tanh((Re - 2300)/400))/2` (`laminar_friction` in friction.h).
+The laminar branch carries its own floor of Re 1e-6, so a channel's drop stays
+linear in its flow down to essentially zero flow.
+
 ---
 
 ## Heat Transfer Correlations (heat_transfer.h)

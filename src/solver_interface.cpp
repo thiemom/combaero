@@ -197,6 +197,23 @@ nusselt_and_jacobian_petukhov(double Re, double Pr, double f) {
   return {{Nu, dNu_dRe}, CorrelationValidity::VALID, ""};
 }
 
+// (f, df/dRe) of the laminar-turbulent blend (friction.h, laminar_friction).
+// The laminar branch is Hagen-Poiseuille with its own negligible floor, so
+// f Re = 64 and the drop is linear in m down to essentially zero flow.
+static std::tuple<double, double> blend_laminar(double Re, double f_turb, double df_turb_dRe) {
+  using namespace laminar_friction;
+  const double Re_l = std::sqrt(Re * Re + re_floor * re_floor);
+  const double dRe_l_dRe = Re / Re_l;
+  const double f_lam = f_re / Re_l;
+  const double df_lam_dRe = (-f_re / (Re_l * Re_l)) * dRe_l_dRe;
+  const double t = std::tanh((Re_l - blend_center) / blend_width);
+  const double w = 0.5 * (1.0 + t);
+  const double dw_dRe = 0.5 * (1.0 - t * t) / blend_width * dRe_l_dRe;
+  const double f = (1.0 - w) * f_lam + w * f_turb;
+  const double df = (1.0 - w) * df_lam_dRe + w * df_turb_dRe + dw_dRe * (f_turb - f_lam);
+  return {f, df};
+}
+
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_haaland(double Re, double e_D) {
   // Explicit Haaland equation approximation of friction factor f (Darcy)
@@ -204,7 +221,7 @@ friction_and_jacobian_haaland(double Re, double e_D) {
   // coeff_reynolds/Re )
 
   // Regularized Re to avoid singularity at Re=0 and sync with base friction evaluation
-  const double re_eps = 64.0;
+  const double re_eps = laminar_friction::turbulent_re_floor;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Isolate core logarithmic argument
@@ -224,33 +241,18 @@ friction_and_jacobian_haaland(double Re, double e_D) {
   double darg_dRe = darg_dRe_eff * dRe_eff_dRe;
   double dU_dRe = dU_darg * darg_dRe;
 
-  // Laminar branch
-  double f_lam = 64.0 / Re_eff;
-  double df_lam_dRe = (-64.0 / (Re_eff * Re_eff)) * dRe_eff_dRe;
-
   // Turbulent branch (Haaland)
   double f_turb = 1.0 / (inv_sqrt_f * inv_sqrt_f);
   double df_turb_dU = -2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f);
   double df_turb_dRe = df_turb_dU * dU_dRe;
 
-  // Blending function
-  double w_arg = (Re_eff - 2300.0) / 400.0;
-  double w = 0.5 * (1.0 + std::tanh(w_arg));
-  double dw_dRe_eff = 0.5 * (1.0 - std::tanh(w_arg) * std::tanh(w_arg)) / 400.0;
-  double dw_dRe = dw_dRe_eff * dRe_eff_dRe;
-
-  // Blended friction
-  double f = (1.0 - w) * f_lam + w * f_turb;
-
-  // Blended Jacobian (Product Rule)
-  double jacobian = (1.0 - w) * df_lam_dRe + w * df_turb_dRe + dw_dRe * (f_turb - f_lam);
-
+  const auto [f, jacobian] = blend_laminar(Re, f_turb, df_turb_dRe);
   return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_serghides(double Re, double e_D) {
-  const double re_eps = 64.0;
+  const double re_eps = laminar_friction::turbulent_re_floor;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Serghides Steffensen form: 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
@@ -304,32 +306,17 @@ friction_and_jacobian_serghides(double Re, double e_D) {
         dA_dRe - (2.0 * BmA * d_BmA_dRe * denom - BmA * BmA * d_denom_dRe) /
                      (denom * denom);
   }
-  // Laminar branch
-  double f_lam = 64.0 / Re_eff;
-  double df_lam_dRe = (-64.0 / (Re_eff * Re_eff)) * dRe_eff_dRe;
-
   // Turbulent branch (Serghides)
   double f_turb = 1.0 / (inv_sqrt_f * inv_sqrt_f);
   double df_turb_dRe = (-2.0 / (inv_sqrt_f * inv_sqrt_f * inv_sqrt_f)) * d_inv_sqrt_f_dRe;
 
-  // Blending function
-  double w_arg = (Re_eff - 2300.0) / 400.0;
-  double w = 0.5 * (1.0 + std::tanh(w_arg));
-  double dw_dRe_eff = 0.5 * (1.0 - std::tanh(w_arg) * std::tanh(w_arg)) / 400.0;
-  double dw_dRe = dw_dRe_eff * dRe_eff_dRe;
-
-  // Blended friction
-  double f = (1.0 - w) * f_lam + w * f_turb;
-
-  // Blended Jacobian (Product Rule)
-  double jacobian = (1.0 - w) * df_lam_dRe + w * df_turb_dRe + dw_dRe * (f_turb - f_lam);
-
+  const auto [f, jacobian] = blend_laminar(Re, f_turb, df_turb_dRe);
   return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>
 friction_and_jacobian_colebrook(double Re, double e_D) {
-  const double re_eps = 64.0;
+  const double re_eps = laminar_friction::turbulent_re_floor;
   double Re_eff = std::sqrt(Re * Re + re_eps * re_eps);
 
   // Colebrook converges internally; use Serghides as starting guess.
@@ -354,9 +341,12 @@ friction_and_jacobian_colebrook(double Re, double e_D) {
   // dF/dRe_eff = 2/(ln10 * arg) * (-t_BC * x / Re_eff^2)
   double dF_dRe_eff = (-2.0 / (ln10 * arg)) * (serghides::coeff_reynolds_BC * x / (Re_eff * Re_eff));
   double dx_dRe = -(dF_dRe_eff * (Re / Re_eff)) / dF_dx;
-  double jacobian = (-2.0 / (x * x * x)) * dx_dRe;
+  double df_turb_dRe = (-2.0 / (x * x * x)) * dx_dRe;
 
-  return {{f_val, jacobian}, CorrelationValidity::VALID, ""};
+  // Colebrook had no laminar branch at all: 63% low at Re 200, 54% high at
+  // Re 2000 against Hagen-Poiseuille. Blended like Haaland and Serghides.
+  const auto [f, jacobian] = blend_laminar(Re, f_val, df_turb_dRe);
+  return {{f, jacobian}, CorrelationValidity::VALID, ""};
 }
 
 CorrelationResult<std::tuple<double, double>>
