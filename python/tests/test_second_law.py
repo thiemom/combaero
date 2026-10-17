@@ -305,9 +305,13 @@ def test_heat_beyond_the_streams_enthalpy_is_refused_by_name() -> None:
 # --- each ThermalWall as its own control volume (#551) -----------------------
 
 
-def _hot_cold_wall(D, L, area_factor, Tt_hot, Tt_cold, pr, layer) -> FlowNetwork:
+def _hot_cold_wall(
+    D, L, area_factor, Tt_hot, Tt_cold, pr, layer, cold_backwards: bool = False
+) -> FlowNetwork:
     """A hot and a cold compressible channel coupled by a conductive wall --
-    the #551 stress topology (tmp/stress/gen.py hot_cold_*), parameters fixed."""
+    the #551 stress topology (tmp/stress/gen.py hot_cold_*), parameters fixed.
+    ``cold_backwards`` declares the cold chain co -> cm -> ci, so its flows
+    are negative (#627)."""
     from combaero.network import MomentumChamberNode
 
     g = FlowNetwork()
@@ -320,11 +324,11 @@ def _hot_cold_wall(D, L, area_factor, Tt_hot, Tt_cold, pr, layer) -> FlowNetwork
     g.add_node(MomentumChamberNode("cm", area=math.pi * D * D / 4))
     area = math.pi * D * L * area_factor
     for s in ("h", "c"):
+        ends = (f"{s}m", f"{s}i") if (s == "c" and cold_backwards) else (f"{s}i", f"{s}m")
         g.add_element(
             ChannelElement(
                 f"{s}ch",
-                f"{s}i",
-                f"{s}m",
+                *ends,
                 length=L,
                 diameter=D,
                 roughness=0.0,
@@ -332,11 +336,11 @@ def _hot_cold_wall(D, L, area_factor, Tt_hot, Tt_cold, pr, layer) -> FlowNetwork
                 surface=ConvectiveSurface(area=area),
             )
         )
+        x_ends = (f"{s}o", f"{s}m") if (s == "c" and cold_backwards) else (f"{s}m", f"{s}o")
         g.add_element(
             ChannelElement(
                 f"{s}x",
-                f"{s}m",
-                f"{s}o",
+                *x_ends,
                 length=0.02,
                 diameter=D,
                 roughness=0.0,
@@ -347,17 +351,20 @@ def _hot_cold_wall(D, L, area_factor, Tt_hot, Tt_cold, pr, layer) -> FlowNetwork
     return g
 
 
-def test_wall_check_fails_a_hot_stream_cooled_below_the_cold_inlet():
-    """#551 seed 23: the solve succeeds but the uncapped wall cools the
-    1600 K stream to ~300 K against a 400 K cold inlet. Heat then runs from the
-    stream that is colder on average, so the wall's own entropy generation is
-    negative even on the most favourable Mach path."""
+def test_the_wall_no_longer_cools_a_hot_stream_below_the_cold_inlet():
+    """#551 seed 23. The linear wall U A dT_in (the small-NTU limit) moved
+    more heat than the streams hold at NTU ~ 1: it cooled the 1600 K stream
+    to 298 K against a 400 K cold inlet, and the wall's entropy generation was
+    negative on every Mach path. The epsilon-NTU exchange (#627) bounds it: in
+    parallel flow both outlets stay between the inlets, and the wall passes."""
     r = _solve(_hot_cold_wall(0.006, 0.2, 5.0, 1600.0, 400.0, 0.7, (0.0005, 200.0)), timeout=20.0)
     assert r["__success__"]
+    assert r["w.counterflow"] == 0.0 and 0.9 < r["w.NTU"] < 1.5
+    assert 400.0 < r["cm.Tt"] < r["hm.Tt"] < 1600.0
     w = r["__second_law_walls__"]["w"]
-    assert w["verdict"] == "fail"
-    assert w["sigma_wall_norm_high"] < -SIGMA_TOL
-    assert r["__second_law_wall_failures__"] == ["w"]
+    assert w["verdict"] == "pass"
+    assert w["sigma_wall"] > 0.0
+    assert r["__second_law_wall_failures__"] == []
 
 
 def test_wall_check_passes_a_physical_heat_exchange():

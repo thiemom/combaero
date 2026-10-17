@@ -646,6 +646,11 @@ struct WallCouplingResult {
   double dQ_dh_b = 0.0;      // ∂Q/∂h_b [W·m²·K/W]
   double dQ_dT_aw_a = 0.0;   // ∂Q/∂T_aw_a [W/K]
   double dQ_dT_aw_b = 0.0;   // ∂Q/∂T_aw_b [W/K]
+  // wall_exchange_and_jacobian only (0 for the linear coupling):
+  double dQ_dC_a = 0.0;      // ∂Q/∂C_a [K]
+  double dQ_dC_b = 0.0;      // ∂Q/∂C_b [K]
+  double UA = 0.0;           // overall conductance [W/K]
+  double effectiveness = 0.0;  // Q / (C_min dT) [-] (0 when C_min dT = 0)
 };
 
 // Wall coupling uses h as given at or above this [W/(m^2 K)]; below it a C1,
@@ -682,6 +687,33 @@ WallCouplingResult wall_coupling_and_jacobian(
     const std::vector<double> &t_over_k_layers,
     double A,
     double R_fouling = 0.0);
+
+// Heat two streams exchange through a wall (#627): the epsilon-NTU integral
+// of C_a dT_a/dx = -U'(T_a - T_b) (and B's mirror) along the wall, at
+// constant U and cp, Q = eps(NTU, C_r) C_min (T_aw_a - T_aw_b) with T_aw at
+// each stream's INLET. The linear wall_coupling_and_jacobian is its small-NTU
+// limit; it moved more heat than the streams hold at NTU of order 1 and kept
+// a finite Q as one stream stopped, so an outlet crossed the other's inlet.
+//   C_a, C_b   : capacity rates |m| cp [W/K], >= 0; +inf for a side that is
+//                a node (well mixed: a reservoir at its T, C_r = 0).
+//   counterflow: the two streams run opposite ways along the wall; else
+//                parallel. The caller derives it from the flow signs and the
+//                wall's declared orientation, so it flips as a flow reverses
+//                -- continuously, since a reversing flow passes C = 0, where
+//                Q = 0 and both forms meet.
+// Both forms are written symmetric in A and B, without min/max, and stay
+// finite at C = 0 (Q -> C dT), C = inf and C_a = C_b:
+//   parallel     Q = dT UA g(UA (1/C_a + 1/C_b))
+//   counterflow  Q = dT G / (1 + G / C_max),  G = UA g(UA (1/C_min - 1/C_max))
+// with g(x) = (1 - e^-x) / x. Derivatives analytic; Q and its T_aw, h
+// derivatives are the linear coupling's at NTU -> 0.
+WallCouplingResult wall_exchange_and_jacobian(
+    double h_a, double T_aw_a, double C_a,
+    double h_b, double T_aw_b, double C_b,
+    const std::vector<double> &t_over_k_layers,
+    double A,
+    double R_fouling,
+    bool counterflow);
 
 // -------------------------------------------------------------
 // High-level channel functions — each returns a ChannelResult

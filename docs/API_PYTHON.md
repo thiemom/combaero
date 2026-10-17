@@ -663,25 +663,45 @@ pins = ConvectiveSurface(
 )
 ```
 
-#### WallConnection
+#### ThermalWall
 Thermal coupling between two network elements through a shared wall.
 
 ```python
-from combaero.heat_transfer import WallConnection
+from combaero.network import ThermalWall, WallLayer
 
 # Couple hot and cold channels through a wall
-wall = WallConnection(
+wall = ThermalWall(
     id="coupling_wall",
     element_a="hot_channel",      # First element ID
     element_b="cold_channel",     # Second element ID
-    wall_thickness=0.002,      # Wall thickness [m]
-    wall_conductivity=25.0,    # Wall thermal conductivity [W/(m·K)]
-    contact_area=None          # Optional: override surface area
+    layers=[WallLayer(thickness=0.002, conductivity=25.0)],
+    contact_area=None,            # Optional: override surface area
+    orientation="aligned",        # both from_nodes at the same end of the wall
 )
 
 # Add to network
 network.add_wall(wall)
 ```
+
+**The heat is the two streams' exchange (#627)**: the epsilon-NTU integral
+along the wall, `Q = eps(NTU, C_r) C_min (T_aw,a - T_aw,b)` at each stream's
+inlet, with `NTU = UA / C_min` and `C = |m| cp` (cp the secant over the inlet
+span, `cb.cp_secant_mass_and_jacobian`, so `C_min dT` is the exact maximum).
+It never exceeds what the weaker stream can take, and a stream that stops
+takes none. A node side is a well-mixed reservoir (`C = inf`). The linear
+`U A dT` it replaced is its small-NTU limit; it moved up to 2.3x the heat at
+NTU ~ 1 and drove a stalled stream below 0 K.
+
+- **The arrangement is not declared, it follows.** `orientation` is geometry:
+  `"aligned"` (the default) puts both elements' `from_node` at the same end of
+  the wall, `"opposed"` at opposite ends. With the flow signs it decides
+  parallel or counter flow, so a flow that reverses flips the arrangement --
+  continuously, since it passes zero flow, where both forms meet.
+- **Model limit:** one lumped exchanger at constant (secant) cp. Over a wide
+  span at high NTU the parallel outlets can cross by a little (20 K in a
+  1300 K span at NTU 5.4); segment the wall for more.
+- **Reported:** `{wall}.UA` [W/K], `{wall}.NTU`, `{wall}.effectiveness`
+  (`Q / (C_min dT)`), `{wall}.counterflow` (1.0 or 0.0).
 
 Each side's heat goes into that element's `to_node` (or the node itself when
 the wall names a node). A **boundary** cannot take it -- its state is fixed --

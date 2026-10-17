@@ -74,6 +74,8 @@ inline constexpr Entry function_units[] = {
     {"isentropic_expansion_coefficient", "T: K, X: mol/mol", "- (gamma)"},
     {"speed_of_sound", "T: K, X: mol/mol", "m/s"},
     {"cp_mass", "T: K, X: mol/mol", "J/(kg*K)"},
+    {"cp_secant_mass_and_jacobian", "T1: K, T2: K, X: mol/mol",
+     "cp: J/(kg*K), dcp_dT1: J/(kg*K^2), dcp_dT2: J/(kg*K^2)"},
     {"cv_mass", "T: K, X: mol/mol", "J/(kg*K)"},
     {"h_mass", "T: K, X: mol/mol", "J/kg"},
     {"s_mass", "T: K, X: mol/mol, P: Pa, P_ref: Pa", "J/(kg*K)"},

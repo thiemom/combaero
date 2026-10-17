@@ -57,6 +57,7 @@ pressure_loss_and_jacobian = _core.pressure_loss_and_jacobian
 viscosity_and_jacobians = _core.viscosity_and_jacobians
 wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
 wall_coupling_and_jacobian_multilayer = _core.wall_coupling_and_jacobian_multilayer
+wall_exchange_and_jacobian = _core.wall_exchange_and_jacobian
 
 __all__ = [
     "P0_from_static_and_jacobian_M",
@@ -103,4 +104,5 @@ __all__ = [
     "viscosity_and_jacobians",
     "wall_coupling_and_jacobian",
     "wall_coupling_and_jacobian_multilayer",
+    "wall_exchange_and_jacobian",
 ]

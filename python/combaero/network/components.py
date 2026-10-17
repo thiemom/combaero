@@ -1044,6 +1044,17 @@ class ThermalWall:
         Override effective area [m^2]. If None, uses min(A_conv_a, A_conv_b).
     R_fouling : float
         Additional fouling resistance [m^2*K/W] (applied to cold side).
+    orientation : {"aligned", "opposed"}
+        How the two elements lie along the wall, as declared (from_node ->
+        to_node): "aligned" puts both from_nodes at the same end. Geometry, not
+        an arrangement: with the flow signs it decides whether the streams run
+        parallel or counter along the wall, so the arrangement follows a flow
+        that reverses (#627). Irrelevant for a node side, which is well mixed.
+
+    The heat is the two streams' exchange, the epsilon-NTU integral along the
+    wall at each stream's inlet temperature (``wall_exchange_and_jacobian``):
+    bounded by C_min (T_hot,in - T_cold,in), and none into a stream that does
+    not flow. The linear U A dT it replaced is its small-NTU limit.
     """
 
     id: str
@@ -1052,9 +1063,22 @@ class ThermalWall:
     layers: list[WallLayer] = field(default_factory=list)
     contact_area: float | None = None
     R_fouling: float = 0.0
+    orientation: Literal["aligned", "opposed"] = "aligned"
 
     # Internal cache for temperature-dependent property iteration
     _last_profile: list[float] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.orientation not in ("aligned", "opposed"):
+            raise ValueError(
+                f"ThermalWall '{self.id}': orientation must be 'aligned' or 'opposed', "
+                f"not {self.orientation!r}"
+            )
+
+    def is_counterflow(self, sign_a: float, sign_b: float) -> bool:
+        """Whether streams of these flow signs (along each element's declared
+        from -> to) run opposite ways along the wall."""
+        return (sign_a * sign_b < 0.0) != (self.orientation == "opposed")
 
     def compute_coupling(
         self,
@@ -1064,6 +1088,9 @@ class ThermalWall:
         h_b: float,
         T_aw_b: float,
         A_conv_b: float,
+        C_a: float = math.inf,
+        C_b: float = math.inf,
+        counterflow: bool = False,
     ) -> cb.WallCouplingResult:
         """Compute heat transfer rate and wall temperature using analytical Jacobians.
 
@@ -1072,9 +1099,15 @@ class ThermalWall:
         h_a, h_b : float
             Convective HTCs on sides A and B [W/(m^2*K)].
         T_aw_a, T_aw_b : float
-            Adiabatic wall temperatures on sides A and B [K].
+            Adiabatic wall temperatures on sides A and B [K], at each stream's
+            inlet.
         A_conv_a, A_conv_b : float
             Convective areas on both sides [m^2].
+        C_a, C_b : float
+            Capacity rates |m| cp [W/K]; inf (the default) for a node side, a
+            reservoir. Two reservoirs give the linear U A dT.
+        counterflow : bool
+            The streams run opposite ways along the wall (``is_counterflow``).
 
         Returns
         -------
@@ -1115,8 +1148,17 @@ class ThermalWall:
                 if change < 1e-12:
                     break
 
-        res = _solver_tools.wall_coupling_and_jacobian_multilayer(
-            h_a, T_aw_a, h_b, T_aw_b, t_over_k_layers, A_eff, self.R_fouling
+        res = _solver_tools.wall_exchange_and_jacobian(
+            h_a,
+            T_aw_a,
+            C_a,
+            h_b,
+            T_aw_b,
+            C_b,
+            t_over_k_layers,
+            A_eff,
+            self.R_fouling,
+            counterflow,
         )
         self._last_profile = prof
         return res

@@ -540,6 +540,9 @@ class ThermalWallData(BaseModel):
     layers: list[WallLayerData] | None = None
     area: float | None = 0.05
     R_fouling: float = 0.0
+    # How the two elements lie along the wall, from_node -> to_node: with the
+    # flow signs it decides parallel or counter flow (ThermalWall, #627).
+    orientation: Literal["aligned", "opposed"] = "aligned"
 
     @model_validator(mode="before")
     @classmethod
