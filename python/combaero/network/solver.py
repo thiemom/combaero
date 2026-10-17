@@ -84,11 +84,16 @@ _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 _MAX_CAUGHT_RECORDS = 50
 
 #: RESIDUAL-ROW-SCALING check (``NetworkSolver.check_row_kinds``): a row's
-#: units are those of the unknown family carrying a coefficient in this band.
-#: The suite's 132k converged rows: every Pa row has a +-1 or +-(1 - xi) on a
-#: pressure, every kg/s row a +-1 on a flow; a misfiled row shows the other.
-_ROW_KIND_UNIT_LO = 0.5
-_ROW_KIND_UNIT_HI = 2.0
+#: units are those of the unknown family carrying an EXACT unit coefficient,
+#: | |J_ij| - 1 | <= this. A residual written X - f(...) carries +-1 on its
+#: own unknown (a Pa row on a pressure, a kg/s row on a flow). The first
+#: rule, any coefficient in [0.5, 2], took a coincidental gain for one: a
+#: 1 um compressible crossflow segment's kg/s row has dm/dPt ~ 1.7 kg/(s Pa)
+#: and no flow coefficient near 1, and read as Pa. Exact, on 349k suite rows
+#: and 5.5k stress rows (tmp/band_sum.py): 0 false DISAGREE at any tolerance
+#: from 1e-1 to 1e-9, and more rows decided than the band (unclear 2.5k ->
+#: 0.5k on the suite).
+_ROW_KIND_UNIT_TOL = 1e-3
 
 
 class RowKindMismatchError(TypeError):
@@ -289,7 +294,7 @@ class NetworkSolver:
         in the same commit. A strict solve (the test suite) then checks every
         declaration against the Jacobian at the converged solution
         (``check_row_kinds``) and raises ``RowKindMismatchError`` on a
-        misfiled row: with #616 reverted, 52 suite tests fail naming the
+        misfiled row: with #616 reverted, 51 suite tests fail naming the
         element, where the suite had passed with the bug in place.
 
         Testing Jacobians against finite differences has the same trap: a row
@@ -358,10 +363,12 @@ class NetworkSolver:
     def check_row_kinds(self, x: np.ndarray) -> list[dict[str, Any]]:
         """Each residual row's declared units against its Jacobian at ``x``.
 
-        RESIDUAL-ROW-SCALING. A pressure row (Pa) has a coefficient of order
-        one on some pressure unknown (+-1, +-(1 - xi)); a mass-flow row (kg/s)
-        on some flow unknown. Per row, ``measured`` is the family with a
-        coefficient within a factor of 2 of 1, when exactly one has one.
+        RESIDUAL-ROW-SCALING. A pressure row (Pa) written X - f(...) has a
+        coefficient of exactly +-1 on some pressure unknown; a mass-flow row
+        (kg/s) on some flow unknown. Per row, ``measured`` is the family with
+        a coefficient within ``_ROW_KIND_UNIT_TOL`` (1e-3) of unit magnitude,
+        when exactly one has one (a gain that only happens to be near 1, such
+        as dm/dPt of a very short segment, is not exact).
         ``verdict``:
           * ``agree`` / ``DISAGREE``: measured equals / differs from declared;
           * ``unclear``: both or neither family has such a coefficient;
@@ -389,7 +396,7 @@ class NetworkSolver:
             lo, hi = J.indptr[i], J.indptr[i + 1]
             has_p = has_m = p_unit = m_unit = False
             for j, v in zip(J.indices[lo:hi], J.data[lo:hi], strict=True):
-                unit = _ROW_KIND_UNIT_LO <= abs(v) <= _ROW_KIND_UNIT_HI
+                unit = abs(abs(v) - 1.0) <= _ROW_KIND_UNIT_TOL
                 if is_p[j]:
                     has_p, p_unit = True, p_unit or unit
                 elif is_m[j]:

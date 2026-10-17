@@ -15,6 +15,7 @@ import pytest
 import combaero as cb
 from combaero.network import (
     AreaChangeElement,
+    CrossflowSegmentElement,
     FlowNetwork,
     NetworkSolver,
     OrificeElement,
@@ -122,3 +123,74 @@ def test_the_check_reads_the_same_kinds_the_scales_do() -> None:
     ref_p, ref_m = s._reference_scales(x)
     expected = [ref_p if kind == "p" else ref_m for _owner, kind in s._row_kinds(x)]
     np.testing.assert_array_equal(s._build_residual_scales(x), expected)
+
+
+def _bleed_station(d_lat: float) -> FlowNetwork:
+    """A compressible bleed station on two 1 um crossflow segments: their
+    kg/s rows carry dm/dPt ~ 1.7 kg/(s Pa) and no flow coefficient near 1."""
+    g = FlowNetwork()
+    for name, Pt in (("in", 5.01e5), ("out", 5.0e5), ("lat", 4.99e5)):
+        bnd = PressureBoundary(name)
+        bnd.Pt, bnd.Tt, bnd.Y = Pt, 300.0, Y
+        g.add_node(bnd)
+    g.add_node(PlenumNode("b"))
+    kappa = cb.STATION_KAPPA_BLEED_BASSETT
+    g.add_element(
+        CrossflowSegmentElement(
+            "s0",
+            "in",
+            "b",
+            length=1e-6,
+            area=1e-3,
+            entry_K=0.0,
+            to_kappa=kappa,
+            next_seg="s1",
+            regime="compressible",
+        )
+    )
+    g.add_element(
+        CrossflowSegmentElement(
+            "s1",
+            "b",
+            "out",
+            length=1e-6,
+            area=1e-3,
+            from_kappa=kappa,
+            prev_seg="s0",
+            regime="compressible",
+        )
+    )
+    g.add_element(
+        OrificeElement(
+            "bleed", "b", "lat", diameter=d_lat, Cd=0.6, correlation="fixed", regime="compressible"
+        )
+    )
+    return g
+
+
+def test_a_gain_near_one_is_not_a_unit_coefficient() -> None:
+    """The first rule (any coefficient in [0.5, 2]) read these kg/s rows as
+    Pa and a strict solve raised on a correct network (stress sweep,
+    2026-10-17). Unit coefficients must be exact."""
+    band_flags = 0
+    for d_lat in (0.005, 0.01, 0.03):
+        s = NetworkSolver(_bleed_station(d_lat))
+        s.raise_internal_errors = True
+        r = s.solve()  # raised RowKindMismatchError under the band rule
+        assert r["__converged__"]
+        report = s.check_row_kinds(np.array(r["__x_solution__"]))
+        assert not [rec for rec in report if rec["verdict"] == "DISAGREE"]
+        _, J = s._residuals_and_jacobian(np.array(r["__x_solution__"]))
+        J = J.tocsr()
+        names = s.unknown_names
+        for rec in report:
+            if not rec["owner"].startswith("CrossflowSegmentElement"):
+                continue
+            row = J.getrow(rec["row"])
+            in_band = {
+                names[j].rsplit(".", 1)[-1].startswith("m_dot"): True
+                for j, v in zip(row.indices, row.data, strict=True)
+                if 0.5 <= abs(v) <= 2.0
+            }
+            band_flags += in_band == {False: True}  # only a pressure in band
+    assert band_flags > 0, "the fixture no longer exercises the trap"
