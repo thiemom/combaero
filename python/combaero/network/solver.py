@@ -1443,6 +1443,47 @@ class NetworkSolver:
             out[eid] = (flows, [int(i) for i in idxs])
         return out
 
+    def _declared_direction_hints(self, x: np.ndarray) -> str:
+        """Why a failed solve may have no root: a junction with a declared
+        flow_direction (MultiPortChamberElement, ConstantKTeeElement) whose
+        best iterate holds a port at zero or against that direction. Such a
+        junction does not reverse a port, so an operating point that needs it
+        has no root; the stress tee3 draws that stalled all solve with
+        IdealMomentumTeeElement, with that port reversed.
+        """
+        from .components import MultiPortChamberBase
+
+        hints = []
+        for eid, e in self.network.elements.items():
+            direction = getattr(e, "flow_direction", None)
+            if not isinstance(e, MultiPortChamberBase) or direction not in ("branch", "merge"):
+                continue
+            idx_map = getattr(e, "_port_outer_mdot_idx", None) or {}
+            idxs = [idx_map.get(oid) for oid in e._port_element_ids]
+            if any(i is None for i in idxs):
+                continue
+            # Positive out of the junction, as in _reversed_junctions.
+            flows = [float(sg) * float(x[i]) for sg, i in zip(e._port_signs, idxs, strict=True)]
+            scale = max(abs(f) for f in flows)
+            if not scale > 0.0:
+                continue
+            inlets = set(e.inlet_nodes)
+            bad = [
+                node
+                for node, f in zip(e.port_nodes, flows, strict=True)
+                if ((f > -1e-3 * scale) if node in inlets else (f < 1e-3 * scale))
+            ]
+            if bad:
+                hints.append(
+                    f"{type(e).__name__} '{eid}' (flow_direction='{direction}') holds "
+                    f"port(s) {bad} at zero or against its declared direction at the "
+                    "best iterate: a declared-direction junction does not reverse a "
+                    "port, so this operating point may have no root for it. Check the "
+                    "boundary pressures, change flow_direction, or use "
+                    "IdealMomentumTeeElement, which reverses ports."
+                )
+        return " ".join(hints)
+
     def _junction_streams(
         self, elem: Any, nid: str, flows: list[float], idxs: list[int]
     ) -> list[tuple[str, float, dict[int, float]]]:
@@ -4111,6 +4152,12 @@ class NetworkSolver:
                 )
 
         if not success:
+            try:
+                _hint = self._declared_direction_hints(final_x)
+            except Exception:  # noqa: BLE001 -- a diagnostic never breaks a solve
+                _hint = ""
+            if _hint:
+                message = f"{message} {_hint}"
             warnings.warn(
                 f"NetworkSolver did not converge: {message} "
                 f"(|F|={final_norm:.3e}). "
