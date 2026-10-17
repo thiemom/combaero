@@ -54,6 +54,7 @@ cd build && ctest                           # C++ tests
 uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 uv run scripts/changelog.py check           # validate changelog.d/ fragments (release: ... release x.y.z)
 ./scripts/test-pypi-wheel.sh                # verify combaero-gui wheel before PyPI publish
+uv run python scripts/stress/run.py --out tmp/stress/x.jsonl   # cold stress sweep; summarize.py --compare for A/B (scripts/README.md)
 ```
 
 ## Auto-Generated Files

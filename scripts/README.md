@@ -55,6 +55,47 @@ Regenerate `docs/UNITS.md` from `include/units_data.h`.
 uv run scripts/generate_units_md.py
 ```
 
+## Stress Testing
+
+### stress/ (run.py, summarize.py, networks.py)
+
+Solve randomly drawn networks COLD, over and past the ranges the test suite
+exercises, and record what happened. The suite builds each element near its
+validated operating points; these sweeps found what it could not:
+- a spurious zero-flow ejector root reported as converged (#619);
+- a NaN start reported as converged (#621);
+- misfiled residual rows (#614, and a false positive in the row-kind check, #620);
+- a choked ejector regime with no root (#624).
+
+```bash
+uv run python scripts/stress/run.py --out tmp/stress/after.jsonl                  # all families, seeds 0:40
+uv run python scripts/stress/run.py --families ejector,tee3 --seeds 0:100 --jobs 8 --out tmp/stress/x.jsonl
+uv run python scripts/stress/run.py --strict ...                                   # raise at the first finding
+uv run python scripts/stress/summarize.py tmp/stress/after.jsonl --compare tmp/stress/before.jsonl
+```
+
+- **Families:** `networks.FAMILIES` holds 12:
+  - layered random networks of the basic elements;
+  - wall-coupled hot/cold channels;
+  - junctions (MPCE, constant-K, ideal, legacy tee);
+  - ejectors;
+  - impingement arrays;
+  - effusion plates and liners;
+  - pin-fin channels;
+  - bleed stations;
+  - series of vortex/connection elements.
+- **Per solve, the runner records:**
+  - the outcome;
+  - the caught-exception log;
+  - anything that escaped `solve()`;
+  - the second-law verdicts and ledger;
+  - the `check_row_kinds` verdict at the solution.
+- **Reproducible seeds:** a (family, seed) pair rebuilds the same network, so a finding is a repro. Keep each generator's draw order when editing it.
+- **A failure is a finding to triage, not automatically a bug.** Some draws have no root by construction.
+- **A "converged" result is not yet a physical one.** Look at implausible internal states as well.
+- **Timeouts are wall-clock,** so for an A/B comparison run both sides with the same `--jobs`.
+- **When to run:** after any change to a residual form, a closure's continuation, or the solver's start/retry logic.
+
 ## Testing Scripts
 
 ### test-pypi-wheel.sh
