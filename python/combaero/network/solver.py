@@ -1414,8 +1414,10 @@ class NetworkSolver:
         node as a negative inflow, which cancels the real inflow from the
         reversed outer element: the node saw no flow and its Pt fell to P
         (0 Pa against a 711 Pa head, #517). Junctions listed here are fed by
-        the sign of their port flows instead -- see _junction_streams. Fully
-        forward junctions are not listed, so their propagation is unchanged.
+        the sign of their port flows instead -- see _junction_streams. A
+        junction with several inlets AND several outlets is always listed
+        (flow_at_node credits each outlet with the whole throughput); other
+        fully forward junctions are not, so their propagation is unchanged.
         """
         from .components import MultiPortChamberBase
 
@@ -1428,7 +1430,14 @@ class NetworkSolver:
             if any(i is None for i in idxs):
                 continue
             outer = [float(x[i]) for i in idxs]
-            if all(m >= 0.0 for m in outer):
+            # Several inlets AND several outlets are always fed by the port
+            # flows: flow_at_node gives each sink every source's own flow,
+            # right for a merge (one outlet) but crediting EACH outlet with
+            # the whole throughput here -- an outlet chamber's velocity head
+            # at the total flow, and a 10 kPa jump in its closure as its own
+            # port flow crossed zero (the stress ideal_nport family).
+            several_each = len(e.inlet_nodes) >= 2 and len(e.outlet_nodes) >= 2
+            if all(m >= 0.0 for m in outer) and not several_each:
                 continue
             flows = [float(s) * m for s, m in zip(e._port_signs, outer, strict=True)]
             out[eid] = (flows, [int(i) for i in idxs])
