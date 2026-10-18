@@ -914,6 +914,7 @@ inline constexpr Entry function_units[] = {
     // orifice.h - Discharge Coefficients
     // -------------------------------------------------------------------------
     {"Cd_sharp_thin_plate", "OrificeGeometry, OrificeState", "- (Cd)"},
+    {"Cd_sharp_thin_plate_and_dRe", "OrificeGeometry, OrificeState", "- (Cd), - (dCd/dRe_D)"},
     {"Cd", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"mcgreehan_schotsch_1988_cd",
      "Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: -", "- (Cd)"},

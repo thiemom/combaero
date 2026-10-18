@@ -3201,9 +3201,11 @@ class OrificeElement(NetworkElement):
         U1/Vi. 'fixed' has none, and the normed metering correlations keep
         their documented gap.
         """
-        selector = _DISCHARGE_SELECTORS.get(self.correlation)
-        if selector is None or self._orifice_geom is None or not self.use_correlation:
+        if self._orifice_geom is None or not self.use_correlation:
             return {}
+        selector = _DISCHARGE_SELECTORS.get(self.correlation)
+        if selector is None:
+            return self._metering_dCd_dnames(state_in)
         u1_vi, du = self._supply_crossflow(state_in, state_out, flows)
         Re = self._hole_reynolds(state_in)
         _, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
@@ -3216,6 +3218,34 @@ class OrificeElement(NetworkElement):
         for name, d in du.items():
             out[name] = out.get(name, 0.0) + float(dCd_dU) * d
         return out
+
+    def _metering_dCd_dnames(self, state_in: "NetworkMixtureState") -> dict[str, float]:
+        """d(Cd)/d(own m_dot) of the ISO metering family, through the pipe
+        Reynolds number Re_D = 4 |m| / (pi D mu), linear in the flow. The
+        row's flow column missed it: 1% off on a 2 cm orifice at 1600 K. Held
+        fixed where _effective_Cd holds Re_D (no upstream pipe, |m| <= 1e-12).
+        """
+        D_up = self._orifice_geom.D
+        m = float(state_in.m_dot)
+        if not (D_up > 0.0) or abs(m) <= 1e-12:
+            return {}
+        mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+        mu = mu if mu > 0.0 else 1.8e-5
+        Re = 4.0 * abs(m) / (math.pi * D_up * mu)
+        b = self._orifice_geom.beta
+        if self.correlation == "ReaderHarrisGallagher":
+            st = cb.OrificeState()
+            st.Re_D = Re
+            dCd_dRe = float(cb.Cd_sharp_thin_plate_and_dRe(self._orifice_geom, st)[1])
+        elif self.correlation == "Stolz":
+            dCd_dRe = -0.7 * 0.000521 * math.pow(1e6 * b / Re, 0.7) / Re if Re >= 1.0 else 0.0
+        elif self.correlation == "Miller":
+            dCd_dRe = (
+                -0.75 * 91.71 * math.pow(b, 2.5) * math.pow(Re, -0.75) / Re if Re >= 1.0 else 0.0
+            )
+        else:
+            return {}
+        return {f"{self.id}.m_dot": dCd_dRe * Re / abs(m) * (1.0 if m > 0 else -1.0)}
 
     def _cd_in_range(self, state_in: "NetworkMixtureState") -> bool:
         """Is the discharge-hole Cd inside its source's Re and l/d range?

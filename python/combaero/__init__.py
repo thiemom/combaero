@@ -172,6 +172,7 @@ try:
         CanAnnularGeometry,
         Cd_from_zeta,
         Cd_sharp_thin_plate,
+        Cd_sharp_thin_plate_and_dRe,
         MeteringCdCorrelation,
         DischargeCdCorrelation,
         DischargeHoleGeometry,
@@ -813,6 +814,7 @@ except (ModuleNotFoundError, ImportError) as e:
     CorrelationValidity = _core.CorrelationValidity
     CorrelationResult = _core.CorrelationResult
     Cd_sharp_thin_plate = _core.Cd_sharp_thin_plate
+    Cd_sharp_thin_plate_and_dRe = _core.Cd_sharp_thin_plate_and_dRe
     discharge_cd = _core.discharge_cd
     discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     discharge_cd_in_range = _core.discharge_cd_in_range
@@ -1413,6 +1415,7 @@ __all__ = [
     "CorrelationValidity",
     "CorrelationResult",
     "Cd_sharp_thin_plate",
+    "Cd_sharp_thin_plate_and_dRe",
     "discharge_cd",
     "discharge_cd_and_derivatives",
     "discharge_cd_in_range",

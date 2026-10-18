@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 
 // -------------------------------------------------------------
@@ -385,6 +386,34 @@ double Cd_from_K(double K, double beta) {
 // -------------------------------------------------------------
 // Main Cd functions (free functions)
 // -------------------------------------------------------------
+
+std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
+                                                       const OrificeState& state) {
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("Invalid orifice geometry");
+    }
+    using namespace orifice::reader_harris;
+    const double Cd = orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
+    if (state.Re_D < 1.0 || Cd >= 1.5) {
+        return {Cd, 0.0};  // the floor and the cap hold Cd fixed
+    }
+    // d/dRe of each Re-dependent term of Cd_ReaderHarrisGallagher.
+    const double Re = state.Re_D;
+    const double b = std::min(geom.beta(), 0.98);
+    const double b4 = b * b * b * b;
+    const double L1 = flange_mm / (geom.D * 1000.0);
+    const double A = std::pow(A_coef * b / Re, A_exp);
+    const double dA = -A_exp * A / Re;
+    const double t3 = C3 * std::pow(re_scale * b / Re, C3_exp);
+    const double X = std::pow(re_scale / Re, C4_re);
+    const double dX = -C4_re * X / Re;
+    const double tap = (C5a + C5b * std::exp(-C5_exp1 * L1) - C5c * std::exp(-C5_exp2 * L1)) *
+                       b4 / (1.0 - b4);
+    const double dCd = -C3_exp * t3 / Re +
+                       std::pow(b, C4_beta) * (C4b * dA * X + (C4a + C4b * A) * dX) -
+                       tap * C5_A_coef * dA;
+    return {Cd, dCd};
+}
 
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state) {
     if (!geom.is_valid()) {
