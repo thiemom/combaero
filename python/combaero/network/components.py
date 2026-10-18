@@ -6444,31 +6444,37 @@ class ChannelElement(NetworkElement):
 
         h_res = self.htc_and_T(state_in)
         surface_diag: dict[str, float] = {}
+        enhanced = self.surface is not None and isinstance(
+            self.surface.model, (RibbedModel, PinFinModel)
+        )
         if h_res is not None:
-            Nu, htc, T_aw, f = h_res.Nu, h_res.h, h_res.T_aw, h_res.f
+            Nu, htc, T_aw = h_res.Nu, h_res.h, h_res.T_aw
             # The surface correlation's own Re (jet Re_j for impingement, pin
             # Re_D for pin fins) and whether it is outside its validity box.
             surface_diag["Re_surface"] = float(h_res.Re)
             surface_diag["surface_extrapolated"] = float(
                 bool(getattr(h_res, "extrapolated", False))
             )
+            # The heat-transfer correlation's own f, at its own Re (the duct's
+            # static state, #636). It drives the pressure drop only on an
+            # enhanced (ribbed, pin-fin) surface, whose residual uses it.
+            surface_diag["f_surface"] = float(h_res.f)
         else:
             Nu, htc, T_aw = 0.0, 0.0, state_in.T
+        if enhanced and h_res is not None:
+            f = h_res.f
+        else:
+            # Report the friction factor the residual actually uses: C++'s
+            # laminar-turbulent blend at the inlet Re, Poiseuille 64/Re with
+            # its own re_floor, times the user's f multiplier (#634). Every
+            # channel carries a convective surface, so this used to report
+            # the heat-transfer correlation's f at ITS Re (16% apart at Re
+            # 70), and its old floor sqrt(Re^2 + 64^2) gave f = 1 at Re = 0
+            # where the row uses 64/Re.
             dh_diag = self.Dh or self.diameter or 1.0
             e_D = self.roughness / dh_diag if dh_diag > 0 else 0.0
-            # Apply the same Re floor used by the C++ friction correlations
-            # (Re_eff = sqrt(Re^2 + 64^2)) so f stays finite at near-zero flow.
-            re_eff = math.sqrt(re_in * re_in + 64.0 * 64.0)
-            if re_eff < 2300:
-                # Poiseuille, the physical law, not a choice of correlation.
-                f = 64.0 / re_eff
-            else:
-                # Report the correlation the residual actually uses. This
-                # branch used to hardcode Haaland (rough) or Petukhov (smooth)
-                # regardless of friction_model, so a channel set to petukhov
-                # reported a friction factor 7.5% away from the one driving
-                # its own pressure drop.
-                f = cb._core.friction_and_jacobian(self.friction_model, re_eff, e_D).result[0]
+            f_mult = self.surface.f_multiplier if self.surface else 1.0
+            f = f_mult * cb._core.friction_and_jacobian(self.friction_model, re_in, e_D).result[0]
 
         duct: dict[str, float] = {}
         if self.regime == "compressible":
