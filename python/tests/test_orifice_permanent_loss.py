@@ -278,14 +278,159 @@ def test_a_reversed_orifice_recovers_into_the_pipe_it_flows_into() -> None:
     assert r["b.Pt"] - r["a.Pt"] == pytest.approx(_k_by_hand(0.6, 0.6) * dp, rel=1e-4)
 
 
+_HOLES = cb.DischargeCdCorrelation
+# (correlation, its C++ selector, geometry as a fraction of the bore)
+_HOLE_CASES = [
+    ("IdelchikBeveled", _HOLES.Idelchik1966Beveled, {"bevel_depth": 0.04}),
+    ("IdelchikRounded", _HOLES.Idelchik1966Rounded, {"edge_radius": 0.04}),
+    ("IdelchikRounded", _HOLES.Idelchik1966Rounded, {"edge_radius": 0.16}),
+]
+
+
+def _hole_between_pipes(
+    correlation: str, geom: dict[str, float], beta: float, D_pipe: float = D
+) -> FlowNetwork:
+    """pipe -> plenum -> hole -> plenum -> pipe, incompressible like
+    Idelchik's Section IV."""
+    d = beta * D_pipe
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("hi", Pt=1.05e5, Tt=300.0))
+    g.add_node(PlenumNode("a"))
+    g.add_node(PlenumNode("b"))
+    g.add_node(PressureBoundary("ho", Pt=1.0e5, Tt=300.0))
+    reg = "incompressible"
+    g.add_element(ChannelElement("p1", "hi", "a", length=0.05, diameter=D_pipe, regime=reg))
+    g.add_element(
+        OrificeElement(
+            "o",
+            "a",
+            "b",
+            diameter=d,
+            correlation=correlation,
+            regime=reg,
+            **{k: v * d for k, v in geom.items()},
+        )
+    )
+    g.add_element(ChannelElement("p2", "b", "ho", length=0.05, diameter=D_pipe, regime=reg))
+    return g
+
+
+def _hole(d: float, geom: dict[str, float]) -> cb.DischargeHoleGeometry:
+    h = cb.DischargeHoleGeometry(
+        d=d, L=geom.get("plate_thickness", 0.0) * d, r=geom.get("edge_radius", 0.0) * d
+    )
+    h.bevel = geom.get("bevel_depth", 0.0) * d
+    return h
+
+
+def _zeta_w1(r: dict, D_pipe: float) -> float:
+    """The solved permanent loss on the approach pipe's velocity head, at its
+    own static density (#651)."""
+    rho = cb.density(300.0, r["o.P_approach"], cb.species.dry_air())
+    w1 = r["o.m_dot"] / (rho * math.pi * D_pipe * D_pipe / 4.0)
+    return (r["a.Pt"] - r["b.Pt"]) / (0.5 * rho * w1 * w1)
+
+
+@pytest.mark.parametrize(("correlation", "selector", "geom"), _HOLE_CASES)
+@pytest.mark.parametrize("beta", [0.3, 0.5, 0.7])
+def test_a_hole_between_pipes_charges_idelchiks_in_pipe_loss(
+    correlation: str, selector: object, geom: dict[str, float], beta: float
+) -> None:
+    """Between pipes a discharge hole loses Idelchik's in-pipe zeta1 (4-15,
+    4-16), not its whole jet head: the plenum Cd carried into the pipe through
+    the recovery row (#645). Beveled and rounded have no Re term, so the
+    comparison is direct. It used to be 16-20% low in flow at beta 0.5."""
+    _, r = _solve(_hole_between_pipes(correlation, geom, beta))
+    expected = cb.discharge_pipe_zeta(selector, _hole(beta * D, geom), beta)
+    # The old behaviour was 50-160% off in zeta.
+    assert _zeta_w1(r, D) == pytest.approx(expected, rel=2e-3)
+
+
+@pytest.mark.parametrize("ld", [0.0, 1.0])
+@pytest.mark.parametrize("beta", [0.3, 0.5, 0.7])
+def test_a_thick_hole_between_pipes_is_idelchiks_at_high_re(ld: float, beta: float) -> None:
+    """The thick hole's wall Cd keeps its Re dependence; at Re >= 1e6, where
+    diagram 4-17/4-18a reach their high-Re value, the in-pipe loss is 4-14's."""
+    D_pipe = 1.0
+    _, r = _solve(_hole_between_pipes("IdelchikThick", {"plate_thickness": ld}, beta, D_pipe))
+    hole = _hole(beta * D_pipe, {"plate_thickness": ld})
+    expected = cb.discharge_pipe_zeta(_HOLES.Idelchik1966Thick, hole, beta)
+    # Exact for the short hole. With length, the wall Cd's friction is the
+    # smooth-pipe lam(Re) (0.012 here) where 4-14's table is computed at
+    # lam = 0.02: 0.5-0.8% less loss at l/d 1, and only that.
+    assert _zeta_w1(r, D_pipe) == pytest.approx(expected, rel=1e-4 if ld == 0.0 else 1e-2)
+    if ld > 0.0:
+        assert _zeta_w1(r, D_pipe) < expected
+
+
 @pytest.mark.parametrize("correlation", ["IdelchikThick", "McGreehanSchotsch", "Lichtarowicz"])
-def test_the_discharge_hole_family_does_not_recover_yet(correlation: str) -> None:
-    """Their Cds are plenum-measured; the in-pipe forms (Idelchik 4-13..4-16)
-    are #645's second step."""
+def test_a_hole_recovers_and_reports_its_in_pipe_cd_factor(correlation: str) -> None:
+    """Every discharge-hole correlation recovers into the far pipe, with the
+    in-pipe factor of its own approach pipe in each direction."""
     g = _between_pipes(PlenumNode, 0.5, "incompressible", correlation)
     o = g.elements["o"]
-    o.plate_thickness = 0.1
+    o.plate_thickness = 0.02
     g.resolve_all_topology()
+    assert o._recovery_fwd and o._recovery_rev
+    sel = {
+        "IdelchikThick": _HOLES.Idelchik1966Thick,
+        "McGreehanSchotsch": _HOLES.McGreehanSchotsch1988,
+        "Lichtarowicz": _HOLES.Lichtarowicz1965,
+    }[correlation]
+    R = cb.discharge_pipe_cd_ratio(sel, o._discharge_hole(), 0.5)
+    assert R != 1.0
+    assert o._pipe_cd_ratio_fwd == R
+    assert o._pipe_cd_ratio_rev == R
+
+
+def test_a_reversed_hole_takes_the_factor_of_the_pipe_it_flows_from() -> None:
+    """Reversed, the approach is the to-node's pipe (#554): its beta sets the
+    hole's in-pipe factor, which the diagnostics report along the flow."""
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("hi", Pt=1.0e5, Tt=300.0))
+    g.add_node(PlenumNode("a"))
+    g.add_node(PlenumNode("b"))
+    g.add_node(PressureBoundary("ho", Pt=1.05e5, Tt=300.0))
+    reg = "incompressible"
+    g.add_element(ChannelElement("p1", "hi", "a", length=0.05, diameter=0.1, regime=reg))
+    g.add_element(
+        OrificeElement(
+            "o",
+            "a",
+            "b",
+            diameter=0.05,
+            correlation="IdelchikRounded",
+            edge_radius=0.002,
+            regime=reg,
+        )
+    )
+    g.add_element(ChannelElement("p2", "b", "ho", length=0.05, diameter=0.07, regime=reg))
+    _, r = _solve(g)
+    assert r["o.m_dot"] < 0.0
+    hole = g.elements["o"]._discharge_hole()
+    R_rev = cb.discharge_pipe_cd_ratio(_HOLES.Idelchik1966Rounded, hole, 0.05 / 0.07)
+    assert r["o.Cd_pipe_ratio"] == pytest.approx(R_rev, rel=1e-14)
+    assert R_rev != pytest.approx(
+        cb.discharge_pipe_cd_ratio(_HOLES.Idelchik1966Rounded, hole, 0.5), rel=1e-3
+    )
+    # And the row charges it: the loss on the reverse approach pipe's head is
+    # 4-16's zeta1 at that pipe's beta.
+    rho = cb.density(300.0, r["o.P_approach"], cb.species.dry_air())
+    w1 = abs(r["o.m_dot"]) / (rho * math.pi * 0.07**2 / 4.0)
+    zeta = (r["b.Pt"] - r["a.Pt"]) / (0.5 * rho * w1 * w1)
+    expected = cb.discharge_pipe_zeta(_HOLES.Idelchik1966Rounded, hole, 0.05 / 0.07)
+    assert zeta == pytest.approx(expected, rel=2e-3)
+
+
+def test_a_plenum_fed_hole_keeps_its_wall_cd() -> None:
+    """No approach pipe: no factor, no recovery -- the plenum Cd as before."""
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("hi", Pt=1.05e5, Tt=300.0))
+    g.add_node(PressureBoundary("ho", Pt=1.0e5, Tt=300.0))
+    g.add_element(OrificeElement("o", "hi", "ho", diameter=0.01, correlation="IdelchikThick"))
+    g.resolve_all_topology()
+    o = g.elements["o"]
+    assert o._pipe_cd_ratio_fwd == 1.0 and o._pipe_cd_ratio_rev == 1.0
     assert not o._recovery_fwd and not o._recovery_rev
 
 
@@ -296,13 +441,16 @@ def test_tap_must_be_named() -> None:
 
 @pytest.mark.parametrize("regime", ["incompressible", "compressible"])
 @pytest.mark.parametrize("node_cls", [PlenumNode, MomentumChamberNode])
-@pytest.mark.parametrize("correlation", ["fixed", "ReaderHarrisGallagher"])
+@pytest.mark.parametrize(
+    "correlation", ["fixed", "ReaderHarrisGallagher", "IdelchikThick", "IdelchikRounded"]
+)
 def test_the_recovering_rows_jacobian_is_exact(
     regime: str, node_cls: type, correlation: str
 ) -> None:
     """Every column of the orifice row against central differences, in the
     J_ij |x_j| metric: the tap pressure's Pt and P columns and, with
-    Reader-Harris/Gallagher, dk/dC through the flow column."""
+    Reader-Harris/Gallagher, dk/dC through the flow column. A discharge hole
+    adds its Re-dependent Cd times the in-pipe factor (#645)."""
     s, r = _solve(_between_pipes(node_cls, 0.7, regime, correlation))
     x = np.array(r["__x_solution__"])
     _, J = s._residuals_and_jacobian(x)

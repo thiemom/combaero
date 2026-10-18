@@ -1,0 +1,3 @@
+- `discharge_pipe_zeta(correlation, hole, beta)`: Idelchik (1966) diagrams 4-13..4-16, the permanent loss of a discharge hole as an orifice in a straight pipe, on the pipe velocity head. Its zeta' and tau come from the wall diagrams' own tables.
+- `discharge_pipe_cd_ratio(correlation, hole, beta)`: the factor that carries a plenum-measured Cd into the pipe through ISO 5167-2's recovery relation. It tends to 1 as beta tends to 0.
+- `OrificeElement` diagnostics report `Cd_pipe_ratio` along the flow.

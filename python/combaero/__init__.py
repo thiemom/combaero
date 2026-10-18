@@ -376,6 +376,8 @@ try:
         discharge_cd,
         discharge_cd_and_derivatives,
         discharge_cd_in_range,
+        discharge_pipe_cd_ratio,
+        discharge_pipe_zeta,
         mcgreehan_schotsch_1988_cd,
         mcgreehan_schotsch_1988_cd_and_derivatives,
         mcgreehan_schotsch_1988_crossflow_cd,
@@ -829,6 +831,8 @@ except (ModuleNotFoundError, ImportError) as e:
     discharge_cd = _core.discharge_cd
     discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     discharge_cd_in_range = _core.discharge_cd_in_range
+    discharge_pipe_cd_ratio = _core.discharge_pipe_cd_ratio
+    discharge_pipe_zeta = _core.discharge_pipe_zeta
     mcgreehan_schotsch_1988_cd = _core.mcgreehan_schotsch_1988_cd
     mcgreehan_schotsch_1988_cd_and_derivatives = _core.mcgreehan_schotsch_1988_cd_and_derivatives
     mcgreehan_schotsch_1988_crossflow_cd = _core.mcgreehan_schotsch_1988_crossflow_cd
@@ -1435,6 +1439,8 @@ __all__ = [
     "discharge_cd",
     "discharge_cd_and_derivatives",
     "discharge_cd_in_range",
+    "discharge_pipe_cd_ratio",
+    "discharge_pipe_zeta",
     "mcgreehan_schotsch_1988_cd",
     "mcgreehan_schotsch_1988_cd_and_derivatives",
     "mcgreehan_schotsch_1988_crossflow_cd",

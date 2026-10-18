@@ -1376,3 +1376,98 @@ TEST(VelocityOfApproach, IsIsoFactorInsideAndOneOutside) {
     EXPECT_EQ(velocity_of_approach_factor(1.5), 1.0);
     EXPECT_EQ(velocity_of_approach_factor(-0.2), 1.0);
 }
+
+namespace {
+
+DischargeHoleGeometry pipe_hole(double L_d, double r_d, double bevel_d) {
+    DischargeHoleGeometry h;
+    h.d = 0.01;
+    h.L = L_d * h.d;
+    h.r = r_d * h.d;
+    h.bevel = bevel_d * h.d;
+    return h;
+}
+
+// Worst relative error of discharge_pipe_zeta against a printed row, n <= 0.8.
+double worst_vs_row(DischargeCdCorrelation id, const DischargeHoleGeometry& h,
+                    const std::vector<double>& n, const std::vector<double>& zeta) {
+    double worst = 0.0;
+    for (std::size_t i = 0; i < n.size(); ++i) {
+        if (n[i] > 0.8) {
+            continue;
+        }
+        const double e = discharge_pipe_zeta(id, h, std::sqrt(n[i])) / zeta[i] - 1.0;
+        worst = std::max(worst, std::abs(e));
+    }
+    return worst;
+}
+
+}  // namespace
+
+// Idelchik (1966) diagrams 4-14..4-16, Re >= 1e4-1e5, read at 400 dpi.
+// zeta' and tau come from the wall tables (4-18), not the printed columns
+// beside these rows; 4.2% is the measured worst over every row below.
+TEST(DischargePipe, ZetaReproducesIdelchiksInPipeTables) {
+    using C = DischargeCdCorrelation;
+    const std::vector<double> n14 = {0.02, 0.04, 0.06, 0.08, 0.10, 0.15, 0.20, 0.25,
+                                     0.30, 0.40, 0.50, 0.60, 0.70, 0.80};
+    const std::vector<double> n16 = {0.02, 0.04, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60,
+                                     0.70, 0.80};
+    struct Row {
+        C id;
+        DischargeHoleGeometry h;
+        const std::vector<double>* n;
+        std::vector<double> zeta;
+    };
+    const std::vector<Row> rows = {
+        {C::Idelchik1966Thick, pipe_hole(0.0, 0.0, 0.0), &n14,
+         {7000, 1670, 730, 400, 245, 96.0, 51.5, 30.0, 18.2, 8.25, 4.00, 2.00, 0.97, 0.42}},
+        {C::Idelchik1966Thick, pipe_hole(1.0, 0.0, 0.0), &n14,
+         {4260, 1030, 443, 240, 149, 60.0, 31.0, 17.8, 11.1, 5.00, 2.40, 1.20, 0.61, 0.29}},
+        {C::Idelchik1966Thick, pipe_hole(3.0, 0.0, 0.0), &n14,
+         {3765, 913, 392, 214, 132, 53.5, 27.5, 15.9, 10.0, 4.50, 2.24, 1.17, 0.61, 0.31}},
+        {C::Idelchik1966Beveled, pipe_hole(0.0, 0.0, 0.04), &n14,
+         {6130, 1480, 636, 345, 214, 86.5, 44.2, 25.6, 15.8, 7.00, 3.36, 1.67, 0.80, 0.34}},
+        {C::Idelchik1966Beveled, pipe_hole(0.0, 0.0, 0.16), &n14,
+         {4460, 1080, 462, 251, 154, 62.0, 31.6, 18.1, 11.2, 4.80, 2.28, 1.10, 0.50, 0.20}},
+        {C::Idelchik1966Rounded, pipe_hole(0.0, 0.04, 0.0), &n16,
+         {5510, 1330, 192, 39.0, 14.1, 6.19, 3.00, 1.45, 0.70, 0.29}},
+        {C::Idelchik1966Rounded, pipe_hole(0.0, 0.16, 0.0), &n16,
+         {3320, 797, 113, 23.0, 7.90, 3.40, 1.60, 0.70, 0.32, 0.12}},
+    };
+    for (const Row& row : rows) {
+        EXPECT_LT(worst_vs_row(row.id, row.h, *row.n, row.zeta), 0.042);
+    }
+}
+
+TEST(DischargePipe, RatioCarriesTheLossThroughIsosRecoveryRelation) {
+    // C_pipe = R c0, c0 = 1/sqrt(zeta at n = 0): ISO's permanent loss with
+    // that C is the in-pipe zeta (the network's recovery row then charges it).
+    using C = DischargeCdCorrelation;
+    for (C id : {C::Idelchik1966Sharp, C::Idelchik1966Thick, C::Idelchik1966Rounded,
+                 C::Lichtarowicz1965}) {
+        const DischargeHoleGeometry h = pipe_hole(2.0, 0.04, 0.0);
+        const double tiny = 1e-4;
+        // zeta1 n^2 at n = 1e-8: the hole-velocity loss of the wall limit.
+        const double z00 = tiny * tiny * tiny * tiny * discharge_pipe_zeta(id, h, tiny);
+        for (double beta : {0.2, 0.5, 0.7, 0.85}) {
+            const double c = discharge_pipe_cd_ratio(id, h, beta) / std::sqrt(z00);
+            const double k = std::get<0>(permanent_loss_ratio_and_dC(beta, c));
+            const double b4 = std::pow(beta, 4.0);
+            EXPECT_NEAR(k * (1.0 - b4) / (c * c * b4) / discharge_pipe_zeta(id, h, beta), 1.0,
+                        1e-6);
+        }
+    }
+}
+
+TEST(DischargePipe, RatioIsOneWithoutAPipe) {
+    using C = DischargeCdCorrelation;
+    const DischargeHoleGeometry h = pipe_hole(1.0, 0.0, 0.0);
+    EXPECT_EQ(discharge_pipe_cd_ratio(C::Idelchik1966Thick, h, 0.0), 1.0);
+    EXPECT_EQ(discharge_pipe_cd_ratio(C::Idelchik1966Thick, h, 1.0), 1.0);
+    EXPECT_EQ(discharge_pipe_cd_ratio(C::Constant, h, 0.5), 1.0);
+    // Continuous with the plenum Cd as the pipe grows.
+    EXPECT_NEAR(discharge_pipe_cd_ratio(C::Idelchik1966Thick, h, 1e-3), 1.0, 1e-6);
+    EXPECT_THROW(discharge_pipe_zeta(C::Idelchik1966Thick, h, 0.0), std::invalid_argument);
+    EXPECT_THROW(discharge_pipe_zeta(C::Constant, h, 0.5), std::invalid_argument);
+}

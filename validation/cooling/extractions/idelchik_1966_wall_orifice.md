@@ -231,12 +231,59 @@ derived 22 years and one iron curtain apart. Pinned by
 `AgreesWithMcGreehanSchotschAcrossTheSharedRange`, which would notice a
 regression on either side.
 
+## In a straight pipe (4-13..4-16), #645
+
+**Status: IMPLEMENTED 2026-10-18** as C++ `discharge_pipe_zeta` and
+`discharge_pipe_cd_ratio`, used by `OrificeElement` between pipes. **No
+digitising was needed after all:** diagram 4-14 tabulates `tau(l/Dh)` in its
+first column (4-11's graph is only the finer form of it).
+
+All four diagrams have one structure, `zeta1 = DH / (rho w1^2 / 2)` on the PIPE
+velocity, with `n = F0/F1` and `m = 1 - n`:
+
+| diagram | page (PDF) | form |
+|---|---|---|
+| 4-13 sharp | 145 | `zeta1 n^2 = [m + 0.707 sqrt(m)]^2` |
+| 4-14 thick | 146 | `zeta1 n^2 = (0.5 + tau sqrt(m)) m + m^2 + lam l/Dh` |
+| 4-15 beveled | 147 | `zeta1 n^2 = [m + sqrt(zeta' m)]^2`, `zeta'(l/Dh)` |
+| 4-16 rounded | 148 | the same, `zeta'(r/Dh)` |
+
+At `n -> 0` each one reduces to the wall diagram's `zeta` (4-17/4-18). So
+`zeta' = (sqrt(zeta_wall) - 1)^2` and `tau = zeta'_wall - 1.5` are taken FROM
+the wall tables already in `orifice.h`, rather than from the printed columns
+beside the in-pipe tables.
+
+**The printed columns disagree with the zeta tables beside them, and the
+wall tables do not.** 4-16's `zeta'` at `r/Dh = 0.16` is printed as 0.06.
+Backing `zeta'` out of that row's own `zeta` at `n = 0.02` gives 0.030, and the
+wall table (4-18c, 1.38) gives 0.031. Results against every printed in-pipe
+row for `n <= 0.8` (C++ `DischargePipe.ZetaReproducesIdelchiksInPipeTables`):
+
+| source of zeta' / tau | worst row |
+|---|---|
+| printed in-pipe columns | +24.8% (4-16, r/Dh 0.16) |
+| wall tables (shipped) | 4.1% (4-13 sharp, from Idelchik's own 2.85 vs 2.914) |
+
+**How the network uses it.** The plenum-measured `Cd` is carried into the
+pipe as `C_pipe = Cd_wall(Re, hole) R(beta)`. `R = C_eq(beta) / C_eq(0)`, where
+`C_eq` solves ISO 5167-2's permanent-loss relation
+`k(C) (1 - beta^4) / (C^2 beta^4) = zeta1` for C.
+- **What that gives:** the recovery row added for metering plates in #650 then
+  charges Idelchik's in-pipe loss, `R -> 1` as the pipe grows, and the wall Cd
+  keeps its Re and crossflow dependence.
+- **Measured** (`python/tests/test_orifice_permanent_loss.py`): beveled and
+  rounded within 0.2% of `zeta1`; the thick hole exact at Re >= 1e6 for
+  `l/d = 0`.
+- **The one known gap:** with length, the wall Cd uses smooth-pipe `lam(Re)`
+  (0.012 there) where 4-14's table uses 0.02, giving 0.5-0.8% less loss at
+  `l/d = 1`.
+
+McGreehan-Schotsch and Lichtarowicz take 4-14's thick shape at their `L/d`.
+M-S's edge radius is not in that shape: Idelchik has no in-pipe diagram that
+combines length and rounding.
+
 ## What is NOT covered
 
-- **The in-a-pipe family (4-13..4-16).** Diagram 4-16 carries a full 8x21
-  `zeta(r/Dh, F0/F1)` table, but 4-14's thick-edged branch needs `tau(l/Dh)`
-  off diagram 4-11 (p.143), which is a **graph, not a table** and is the one
-  piece here that needs digitising. Not started.
 - **Low-Re for beveled and rounded.** Diagram 4-18 gives the low-Re branch
   only for sharp (4-17) and thick (4-18a). The beveled and rounded curves are
   stated for `Re >= 1e5`; below that the value is held rather than borrowed

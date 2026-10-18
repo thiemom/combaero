@@ -1569,6 +1569,8 @@ inline constexpr Entry function_units[] = {
     {"DischargeHoleState::U1_over_Vi", "-", "-"},
     {"discharge_cd", "correlation: -, hole: m, flow: -, Cd_constant: -", "- (Cd)"},
     {"discharge_cd_in_range", "correlation: -, hole: m, flow: -", "- (bool)"},
+    {"discharge_pipe_zeta", "correlation: -, hole: m, beta: -", "-"},
+    {"discharge_pipe_cd_ratio", "correlation: -, hole: m, beta: -", "-"},
     {"discharge_cd_and_derivatives",
      "correlation: -, hole: m, flow: -, Cd_constant: -",
      "- (Cd), - (dCd/dRe), - (dCd/d(U1/Vi))"},

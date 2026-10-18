@@ -1166,6 +1166,105 @@ bool discharge_cd_in_range(DischargeCdCorrelation id,
 }
 
 // -------------------------------------------------------------
+// Discharge hole as an orifice in a straight pipe (#645)
+// -------------------------------------------------------------
+
+namespace {
+
+// zeta1 n^2: the in-pipe loss on the HOLE velocity head (w0 = w1 / n).
+// zeta' and tau come from the wall tables (see orifice::idelchik), so n = 0
+// returns the wall hole's high-Re zeta exactly.
+double pipe_zeta0(DischargeCdCorrelation id, const DischargeHoleGeometry& hole, double n) {
+    namespace I = orifice::idelchik;
+    const double m = 1.0 - n;
+    const auto edge = [m](double zeta_wall) {
+        const double s = std::sqrt(zeta_wall) - 1.0;
+        const double a = m + s * std::sqrt(m);
+        return a * a;
+    };
+    switch (id) {
+        case DischargeCdCorrelation::Idelchik1966Sharp:
+            return edge(I::zeta_sharp);
+        case DischargeCdCorrelation::Idelchik1966Beveled:
+            return edge(pchip(I::beveled_l_over_d, I::beveled_zeta, I::beveled_n,
+                              hole.bevel_over_d())
+                            .value);
+        case DischargeCdCorrelation::Idelchik1966Rounded:
+            return edge(pchip(I::rounded_r_over_d, I::rounded_zeta, I::rounded_n,
+                              hole.r_over_d())
+                            .value);
+        case DischargeCdCorrelation::Idelchik1966Thick:
+        case DischargeCdCorrelation::Lichtarowicz1965:
+        case DischargeCdCorrelation::McGreehanSchotsch1988: {
+            const double ld = hole.L_over_d();
+            const double tau =
+                pchip(I::thick_l_over_d, I::thick_zeta, I::thick_n, ld).value
+                - I::pipe_thick_wall_offset;
+            return (I::pipe_thick_inlet + tau * std::sqrt(m)) * m + m * m
+                 + I::pipe_thick_lambda * ld;
+        }
+        case DischargeCdCorrelation::Constant:
+            break;
+    }
+    throw std::invalid_argument("discharge_pipe_zeta: a Constant Cd has no hole geometry");
+}
+
+// C solving k(C) (1 - beta^4) / C^2 = z0. The left side falls strictly in C
+// (k and 1/C^2 both do), so a bracketed Newton converges from any start.
+double pipe_equivalent_c(double beta, double z0) {
+    const double b4 = std::pow(beta, 4.0);
+    const auto g = [beta, b4, z0](double c, double& dg) {
+        const auto [k, dk] = permanent_loss_ratio_and_dC(beta, c);
+        dg = (1.0 - b4) * (dk / (c * c) - 2.0 * k / (c * c * c));
+        return k * (1.0 - b4) / (c * c) - z0;
+    };
+    double lo = 1e-6;
+    double hi = 1e3;
+    double c = 1.0 / std::sqrt(z0);
+    c = std::min(std::max(c, lo), hi);
+    for (int i = 0; i < 100; ++i) {
+        double dg = 0.0;
+        const double f = g(c, dg);
+        if (f > 0.0) {
+            lo = c;
+        } else {
+            hi = c;
+        }
+        double next = (dg < 0.0) ? c - f / dg : 0.5 * (lo + hi);
+        if (!(next > lo && next < hi)) {
+            next = 0.5 * (lo + hi);
+        }
+        if (std::abs(next - c) <= 1e-14 * c) {
+            return next;
+        }
+        c = next;
+    }
+    return c;
+}
+
+} // namespace
+
+double discharge_pipe_zeta(DischargeCdCorrelation id, const DischargeHoleGeometry& hole,
+                           double beta) {
+    if (!(beta > 0.0 && beta < 1.0)) {
+        throw std::invalid_argument("discharge_pipe_zeta: needs 0 < beta < 1");
+    }
+    const double n = beta * beta;
+    return pipe_zeta0(id, hole, n) / (n * n);
+}
+
+double discharge_pipe_cd_ratio(DischargeCdCorrelation id, const DischargeHoleGeometry& hole,
+                               double beta) {
+    if (!(beta > 0.0 && beta < 1.0) || id == DischargeCdCorrelation::Constant) {
+        return 1.0;
+    }
+    const double z0 = pipe_zeta0(id, hole, beta * beta);
+    // beta -> 0: k -> 1 and the relation is C^2 = 1 / z0.
+    const double c0 = 1.0 / std::sqrt(pipe_zeta0(id, hole, 0.0));
+    return pipe_equivalent_c(beta, z0) / c0;
+}
+
+// -------------------------------------------------------------
 // Flow calculations
 // -------------------------------------------------------------
 

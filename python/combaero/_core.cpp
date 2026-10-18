@@ -6007,6 +6007,18 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "fitted or tabulated on: Re, and the l/d (or bevel, r/d) axis of its\n"
         "source. A flag to report, never a selector; discharge_cd still\n"
         "returns a value outside it.");
+  m.def("discharge_pipe_zeta", &discharge_pipe_zeta, py::arg("correlation"), py::arg("hole"),
+        py::arg("beta"),
+        "Idelchik (1966) diagrams 4-13..4-16: the hole's permanent loss as an\n"
+        "orifice in a straight pipe, zeta1 = DH / (rho w1^2 / 2), referenced to\n"
+        "the PIPE velocity. High-Re, incompressible. Raises ValueError outside\n"
+        "0 < beta < 1 and for Constant.");
+  m.def("discharge_pipe_cd_ratio", &discharge_pipe_cd_ratio, py::arg("correlation"),
+        py::arg("hole"), py::arg("beta"),
+        "R with C_pipe = Cd_wall R: carries a plenum-measured discharge Cd into a\n"
+        "pipe through ISO 5167-2's permanent-loss relation, so the network's\n"
+        "recovery row gives discharge_pipe_zeta. R -> 1 as beta -> 0. Geometry\n"
+        "only. 1 outside 0 < beta < 1 and for Constant.");
 
   m.def(
       "discharge_cd_and_derivatives",

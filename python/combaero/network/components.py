@@ -3024,6 +3024,10 @@ class OrificeElement(NetworkElement):
         # in resolve_topology. Subclasses that skip it never recover.
         self._recovery_fwd = False
         self._recovery_rev = False
+        # A discharge-hole Cd carried into the approach pipe, per direction
+        # (#645): C_pipe = Cd_wall R. 1 without a pipe; set in resolve_topology.
+        self._pipe_cd_ratio_fwd = 1.0
+        self._pipe_cd_ratio_rev = 1.0
         # OrificeGeometry built in resolve_topology
         self._orifice_geom: object | None = None
 
@@ -3104,14 +3108,13 @@ class OrificeElement(NetworkElement):
         # Pressure recovery (#645), per flow direction: the approach pipe sets
         # beta, and a single wider pipe on the far side recovers the jet's
         # pressure, so the row charges ISO's permanent loss. A plain node
-        # beyond (no pipe) takes the jet's head as lost. The metering family
-        # and 'fixed' only: the discharge-hole Cds are plenum-measured.
+        # beyond (no pipe) takes the jet's head as lost. Every correlation:
+        # a discharge-hole Cd enters through its in-pipe C below.
         def _recovers(pipes: list[ChannelElement]) -> bool:
             return len(pipes) == 1 and bool(pipes[0].diameter) and d_bore < pipes[0].diameter
 
-        metering_like = self.correlation == "fixed" or self.correlation in _METERING_SELECTORS
-        self._recovery_fwd = metering_like and self.beta > 0.0 and _recovers(to_pipes)
-        self._recovery_rev = metering_like and self.beta_reverse > 0.0 and _recovers(from_pipes)
+        self._recovery_fwd = self.beta > 0.0 and _recovers(to_pipes)
+        self._recovery_rev = self.beta_reverse > 0.0 and _recovers(from_pipes)
 
         if self.use_correlation:
             # Build geometry descriptor for Cd correlation.
@@ -3130,6 +3133,22 @@ class OrificeElement(NetworkElement):
             geom.r = self.edge_radius
             geom.tap = _NETWORK_TAP
             self._orifice_geom = geom
+
+        # A discharge-hole Cd is plenum-measured (Idelchik's wall, M-S,
+        # Lichtarowicz): in a pipe it becomes the vena-contracta C that gives
+        # Idelchik's in-pipe loss (4-13..4-16) through the recovery row,
+        # C_pipe = Cd_wall R(beta), R -> 1 as the pipe grows (#645). It used
+        # to take E on the plenum Cd and lose the whole jet head: 16-20% low
+        # flow at beta 0.5 between pipes.
+        self._pipe_cd_ratio_fwd = 1.0
+        self._pipe_cd_ratio_rev = 1.0
+        selector = _DISCHARGE_SELECTORS.get(self.correlation)
+        if self.use_correlation and selector is not None:
+            hole = self._discharge_hole()
+            self._pipe_cd_ratio_fwd = float(cb.discharge_pipe_cd_ratio(selector, hole, self.beta))
+            self._pipe_cd_ratio_rev = float(
+                cb.discharge_pipe_cd_ratio(selector, hole, self.beta_reverse)
+            )
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -3505,6 +3524,10 @@ class OrificeElement(NetworkElement):
         beta = getattr(self, "beta", 0.0) if forward else getattr(self, "beta_reverse", 0.0)
         recovers = getattr(self, "_recovery_fwd" if forward else "_recovery_rev", False)
         compressible = self.regime == "compressible"
+        # A discharge-hole Cd in its approach pipe (#645): a constant factor,
+        # so d(m)/d(Cd_wall) = R d(m)/d(C_pipe).
+        ratio = getattr(self, "_pipe_cd_ratio_fwd" if forward else "_pipe_cd_ratio_rev", 1.0)
+        cd = cd * ratio
         # Both kernels are exactly linear in Cd (A_eff = Cd E A). A crossflow
         # Cd underflows to exactly 0 where the hole's pressure drop vanishes
         # (U1/Vi -> inf in McGreehan-Schotsch's exp(-Rv^n)), and the kernels
@@ -3578,7 +3601,7 @@ class OrificeElement(NetworkElement):
                 d[key] = d.get(key, 0.0) + float(val)
         if scale != 1.0:
             d = {k: v * scale for k, v in d.items()}
-        d[_DM_DCD] = dm_dcd
+        d[_DM_DCD] = dm_dcd * ratio
         return float(r.m_dot_calc) * scale, d
 
     def _approach_static(
@@ -3873,13 +3896,17 @@ class OrificeElement(NetworkElement):
         up, dn = (state_in, state_out) if forward else (state_out, state_in)
         beta = self.beta if forward else getattr(self, "beta_reverse", 0.0)
         recovers = self._recovery_fwd if forward else self._recovery_rev
+        ratio = getattr(self, "_pipe_cd_ratio_fwd" if forward else "_pipe_cd_ratio_rev", 1.0)
         out: dict[str, float | str] = {
             "tap": self.tap,
             "pressure_recovery": float(recovers),
             # The approach along the flow: beta (above) is the declared one.
             "beta_flow": float(beta),
             "E": float(cb.velocity_of_approach_factor(beta)),
+            # C_pipe / Cd: a discharge-hole Cd carried into its pipe (#645).
+            "Cd_pipe_ratio": float(ratio),
         }
+        cd = cd * ratio
         up_id = self.from_node if forward else self.to_node
         p1 = self._approach_static(up, up_id, forward, beta)[0]
         if 0.0 < beta < 1.0:
