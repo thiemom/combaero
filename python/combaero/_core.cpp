@@ -793,6 +793,27 @@ PYBIND11_MODULE(_core, m) {
         "incompressible: the low-Mach limit, densities at the chamber P and\n"
         "the stagnation temperatures; linear in P_face, no choking (#588).");
 
+  py::class_<combaero::DuctStaticState>(m, "DuctStaticState")
+      .def_readonly("T", &combaero::DuctStaticState::T)
+      .def_readonly("P", &combaero::DuctStaticState::P)
+      .def_readonly("rho", &combaero::DuctStaticState::rho)
+      .def_readonly("M", &combaero::DuctStaticState::M)
+      .def_readonly("dT_dT0", &combaero::DuctStaticState::dT_dT0)
+      .def_readonly("dT_dP0", &combaero::DuctStaticState::dT_dP0)
+      .def_readonly("dT_dG", &combaero::DuctStaticState::dT_dG)
+      .def_readonly("dP_dT0", &combaero::DuctStaticState::dP_dT0)
+      .def_readonly("dP_dP0", &combaero::DuctStaticState::dP_dP0)
+      .def_readonly("dP_dG", &combaero::DuctStaticState::dP_dG)
+      .def_readonly("drho_dT0", &combaero::DuctStaticState::drho_dT0)
+      .def_readonly("drho_dP0", &combaero::DuctStaticState::drho_dP0)
+      .def_readonly("drho_dG", &combaero::DuctStaticState::drho_dG)
+      .def_readonly("choked", &combaero::DuctStaticState::choked);
+  m.def("duct_static_state", &combaero::duct_static_state, py::arg("T0"), py::arg("P0"),
+        py::arg("G"), py::arg("X"),
+        "Static state at a duct inlet fed from stagnation (T0, P0) at mass flux\n"
+        "G = |m_dot| / A: the isentropic subsonic root, or the sonic state when G\n"
+        "exceeds the choked flux (choked = True). Partials in T0, P0, G (#636).");
+
   py::class_<combaero::JetImpulse>(m, "JetImpulse")
       .def_readonly("J", &combaero::JetImpulse::J)
       .def_readonly("dJ_dm", &combaero::JetImpulse::dJ_dm)
@@ -5712,6 +5733,10 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
            "Orifice Reynolds number (based on d)");
 
   // Cd correlation functions
+  m.def("Cd_sharp_thin_plate_and_dRe", &Cd_sharp_thin_plate_and_dRe, py::arg("geom"),
+        py::arg("state"),
+        "(Cd, dCd/dRe_D) for the sharp thin-plate orifice (ISO 5167-2,\n"
+        "Reader-Harris/Gallagher): the analytic Re_D derivative.");
   m.def("Cd_sharp_thin_plate", &Cd_sharp_thin_plate, py::arg("geom"),
         py::arg("state"),
         "Discharge coefficient for sharp thin-plate orifice (ISO 5167-2).\n\n"

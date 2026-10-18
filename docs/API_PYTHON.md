@@ -184,6 +184,16 @@ G = cb.mass_flux_isentropic(T0=300, P0=2e5, P=1.5e5, X=air)
 L_max = cb.fanno_max_length(T_in=300, P_in=2e5, u_in=50, D=0.05, f=0.02, X=air)
 ```
 
+A duct's inlet static state from the stagnation state feeding it and its mass
+flux (#636), with partials in T0, P0 and G; the sonic state above the choked
+flux (`choked`). Network ducts evaluate their heat transfer here, so their
+T_aw lies between the static and the stagnation temperature:
+
+```python
+s = cb.duct_static_state(T0=1600, P0=2e5, G=150.0, X=air)
+s.T, s.P, s.rho, s.M, s.choked, s.dT_dT0, s.dP_dG
+```
+
 ### Fanno flow in Mach number
 Integrated in M rather than x: the state is algebraic in M at fixed mass flux,
 so the duct length is a smooth integral that vanishes at sonic -- exact L*,
@@ -224,6 +234,7 @@ print(f"Specific impulse: {thrust.specific_impulse} s")
 ```python
 # Normed metering orifice (ISO 5167 family, a function of beta = d/D)
 Cd = cb.Cd_sharp_thin_plate(geom, state)
+Cd, dCd_dRe = cb.Cd_sharp_thin_plate_and_dRe(geom, state)  # analytic Re_D derivative
 
 # Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
 # geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.

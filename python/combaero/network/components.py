@@ -975,6 +975,90 @@ class ConvectiveSurface:
         return result
 
 
+class _DuctHtc:
+    """A surface result evaluated at a duct's own static state, its partials
+    chained onto what the solver differentiates: the feed node's stagnation
+    T and Pt, and the element's flow (#636). Every other attribute is the
+    surface result's."""
+
+    __slots__ = (
+        "_r",
+        "dh_dT",
+        "dh_dmdot",
+        "dh_dPt",
+        "dT_aw_dT",
+        "dT_aw_dmdot",
+        "dT_aw_dP",
+        "dT_aw_dPt",
+    )
+
+    def __init__(self, r: Any, s: "cb.DuctStaticState", area: float) -> None:
+        self._r = r
+        # The surface's partials are at fixed m, in the static (T, P) it was
+        # given; T_s and P_s move with T0, P0 and G = |m| / A.
+        dh_dT, dTaw_dT = float(r.dh_dT), float(r.dT_aw_dT)
+        dTaw_dP = float(getattr(r, "dT_aw_dP", 0.0))
+        self.dh_dT = dh_dT * s.dT_dT0
+        self.dh_dmdot = float(r.dh_dmdot) + dh_dT * s.dT_dG / area
+        self.dh_dPt = dh_dT * s.dT_dP0
+        self.dT_aw_dT = dTaw_dT * s.dT_dT0 + dTaw_dP * s.dP_dT0
+        self.dT_aw_dmdot = float(r.dT_aw_dmdot) + (dTaw_dT * s.dT_dG + dTaw_dP * s.dP_dG) / area
+        self.dT_aw_dPt = dTaw_dT * s.dT_dP0 + dTaw_dP * s.dP_dP0
+        if s.choked:
+            # The sonic state does not move with the flow.
+            self.dh_dmdot = 0.0
+            self.dT_aw_dmdot = 0.0
+        # The static P is the duct's, a function of the feed's Pt: the feed
+        # node's own static P does not enter.
+        self.dT_aw_dP = 0.0
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._r, name)
+
+    def __dir__(self) -> list[str]:
+        # The pass-through fields too (dP, q and their partials, unchained:
+        # no solver path reads them from a heat-transfer result).
+        return sorted(set(dir(self._r)) | set(self.__slots__))
+
+
+def _duct_htc(
+    surface: "ConvectiveSurface",
+    state: "NetworkMixtureState",
+    area: float,
+    diameter: float,
+    length: float,
+    T_hot: float = math.nan,
+) -> "_DuctHtc | None":
+    """The surface correlation at a duct's inlet static state (#636).
+
+    ``state`` is the feed node's: its T and Pt are stagnation values (a
+    plenum's gas is at rest; a chamber's T is its stagnation T, #578). The
+    duct's static state comes from them and the mass flux by the isentropic
+    acceleration (C++ ``duct_static_state``). Handing the node's T to the
+    correlation as static put T_aw above the stagnation temperature, by
+    about (1 + r)(Tt - T): 2.6 K at Mach 0.1, 22 K at 0.3, 51 K at 0.5 for a
+    1600 K stream.
+    """
+    G = abs(float(state.m_dot)) / area
+    s = cb.duct_static_state(float(state.Tt), float(state.Pt), G, state.X)
+    # Past choke (a solver iterate beyond the duct's capacity) the state is
+    # the sonic one and so is the velocity: G / rho at the iterate's G sent
+    # T_aw, and the heat, without bound (53 caught mixer failures in the
+    # stress sweep, 43% of one network's duct evaluations past choke).
+    velocity = cb.speed_of_sound(s.T, state.X) if s.choked else G / s.rho
+    r = surface.htc_and_T(
+        T=s.T,
+        P=s.P,
+        X=state.X,
+        velocity=velocity,
+        diameter=diameter,
+        length=length,
+        T_hot=T_hot,
+        flow_area=area,
+    )
+    return None if r is None else _DuctHtc(r, s, area)
+
+
 # ============================================================================
 # WallConnection (Phase 4/5)
 # ============================================================================
@@ -3117,9 +3201,11 @@ class OrificeElement(NetworkElement):
         U1/Vi. 'fixed' has none, and the normed metering correlations keep
         their documented gap.
         """
-        selector = _DISCHARGE_SELECTORS.get(self.correlation)
-        if selector is None or self._orifice_geom is None or not self.use_correlation:
+        if self._orifice_geom is None or not self.use_correlation:
             return {}
+        selector = _DISCHARGE_SELECTORS.get(self.correlation)
+        if selector is None:
+            return self._metering_dCd_dnames(state_in)
         u1_vi, du = self._supply_crossflow(state_in, state_out, flows)
         Re = self._hole_reynolds(state_in)
         _, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
@@ -3132,6 +3218,34 @@ class OrificeElement(NetworkElement):
         for name, d in du.items():
             out[name] = out.get(name, 0.0) + float(dCd_dU) * d
         return out
+
+    def _metering_dCd_dnames(self, state_in: "NetworkMixtureState") -> dict[str, float]:
+        """d(Cd)/d(own m_dot) of the ISO metering family, through the pipe
+        Reynolds number Re_D = 4 |m| / (pi D mu), linear in the flow. The
+        row's flow column missed it: 1% off on a 2 cm orifice at 1600 K. Held
+        fixed where _effective_Cd holds Re_D (no upstream pipe, |m| <= 1e-12).
+        """
+        D_up = self._orifice_geom.D
+        m = float(state_in.m_dot)
+        if not (D_up > 0.0) or abs(m) <= 1e-12:
+            return {}
+        mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+        mu = mu if mu > 0.0 else 1.8e-5
+        Re = 4.0 * abs(m) / (math.pi * D_up * mu)
+        b = self._orifice_geom.beta
+        if self.correlation == "ReaderHarrisGallagher":
+            st = cb.OrificeState()
+            st.Re_D = Re
+            dCd_dRe = float(cb.Cd_sharp_thin_plate_and_dRe(self._orifice_geom, st)[1])
+        elif self.correlation == "Stolz":
+            dCd_dRe = -0.7 * 0.000521 * math.pow(1e6 * b / Re, 0.7) / Re if Re >= 1.0 else 0.0
+        elif self.correlation == "Miller":
+            dCd_dRe = (
+                -0.75 * 91.71 * math.pow(b, 2.5) * math.pow(Re, -0.75) / Re if Re >= 1.0 else 0.0
+            )
+        else:
+            return {}
+        return {f"{self.id}.m_dot": dCd_dRe * Re / abs(m) * (1.0 if m > 0 else -1.0)}
 
     def _cd_in_range(self, state_in: "NetworkMixtureState") -> bool:
         """Is the discharge-hole Cd inside its source's Re and l/d range?
@@ -4875,21 +4989,11 @@ class PressureLossElement(NetworkElement):
         if self.surface.area == 0.0 or not self.area or self.area <= 0.0:
             return None
 
-        rho, _ = _safe_rho(state.density())
-        velocity = abs(state.m_dot) / (rho * self.area) if self.area > 0 else 0.0
         diameter = math.sqrt(4.0 * self.area / math.pi)
         length = diameter  # Short duct approximation: L/D = 1
 
-        return self.surface.htc_and_T(
-            T=state.T,
-            P=state.P,
-            X=state.X,
-            velocity=velocity,
-            diameter=diameter,
-            length=length,
-            T_hot=math.nan,
-            flow_area=self.area,
-        )
+        # At the duct's own static state, not the feed node's (#636).
+        return _duct_htc(self.surface, state, self.area, diameter, length)
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
@@ -5956,21 +6060,12 @@ class ChannelElement(NetworkElement):
         if self.surface.area == 0.0:
             return None
 
-        rho, _ = _safe_rho(state.density())
-        u = abs(state.m_dot) / (rho * self.area) if self.area > 0 else 1.0
-
         # Use nan for T_hot if not specified (matches C++ default)
         T_hot = self.t_hot if self.t_hot is not None else math.nan
 
-        return self.surface.htc_and_T(
-            T=state.T,
-            P=state.P,
-            X=state.X,
-            velocity=u,
-            diameter=self.Dh or self.diameter,
-            length=self.length,
-            T_hot=T_hot,
-            flow_area=self.area,
+        # At the duct's own static state, not the feed node's (#636).
+        return _duct_htc(
+            self.surface, state, self.area, self.Dh or self.diameter, self.length, T_hot
         )
 
     def n_equations(self) -> int:
