@@ -1239,15 +1239,18 @@ def _mk_state(P: float, Pt: float, m_dot: float = 0.1) -> "object":
 def test_outlet_ref_channel_moves_density_sensitivity_downstream():
     """With _incompressible_p_ref='outlet' the incompressible channel
     evaluates density at the downstream static, so the friction-loss
-    pressure sensitivity must land on the downstream node's P (and the
-    default inlet reference must be unchanged)."""
+    pressure sensitivity must land on the downstream node's P. The default
+    reference is the duct's own inlet static state (#651), the node's (Pt,
+    T) at the duct's flux, so it lands on the upstream Pt, not the node's P."""
     ch = ChannelElement("ch", "up", "dn", length=1.0, diameter=0.05, regime="incompressible")
     s_in = _mk_state(P=1.5e5, Pt=1.51e5)
     s_out = _mk_state(P=1.2e5, Pt=1.21e5)
 
     _, jac_default = ch.residuals(s_in, s_out)
-    assert "up.P" in jac_default[0]
+    assert "up.P" not in jac_default[0]
     assert "dn.P" not in jac_default[0]
+    # Pt_up - Pt_dn - dP: the density's share moves the Pt column off 1.
+    assert jac_default[0]["up.Pt"] != pytest.approx(1.0, abs=1e-9)
 
     ch._incompressible_p_ref = "outlet"
     res_out, jac_outlet = ch.residuals(s_in, s_out)

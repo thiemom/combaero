@@ -1472,3 +1472,32 @@ TEST(OrificeTapPressure, DerivativesAreExactAndTheFloorIsCompressibleOnly) {
   EXPECT_FALSE(i.floored);
   EXPECT_LT(i.p_tap, 0.0);
 }
+
+// The static state of an orifice's approach pipe (#651): both closures'
+// derivatives against central differences, and the momentum chamber's own
+// residual zero at the returned pressure.
+TEST(ApproachStatic, DerivativesAreExactAndItIsTheChambersState) {
+  std::vector<double> Y(combaero::num_species(), 0.0);
+  Y[combaero::species_index_from_name("N2")] = 0.767;
+  Y[combaero::species_index_from_name("O2")] = 0.233;
+  const double x0[3] = {1.5e5, 350.0, 120.0};
+  for (bool inc : {true, false}) {
+    auto P = [&](const double *x) { return approach_static_pressure(x[0], x[1], x[2], Y, inc).P; };
+    const auto a = approach_static_pressure(x0[0], x0[1], x0[2], Y, inc);
+    EXPECT_FALSE(a.choked);
+    const double analytic[3] = {a.dP_dPt, a.dP_dTt, a.dP_dG};
+    for (int i = 0; i < 3; ++i) {
+      double up[3], dn[3];
+      std::copy(x0, x0 + 3, up);
+      std::copy(x0, x0 + 3, dn);
+      const double h = 1e-6 * x0[i];
+      up[i] += h;
+      dn[i] -= h;
+      const double fd = (P(up) - P(dn)) / (2.0 * h);
+      EXPECT_NEAR(analytic[i], fd, 1e-6 * std::abs(fd)) << inc << " " << i;
+    }
+    const double A = 0.01;
+    const auto r = momentum_chamber_residual_and_jacobian(a.P, x0[0], x0[2] * A, x0[1], Y, A, inc);
+    EXPECT_NEAR(r.residual, 0.0, 1e-7 * x0[0]) << inc;
+  }
+}

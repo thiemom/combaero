@@ -3074,8 +3074,12 @@ class OrificeElement(NetworkElement):
             + graph.get_downstream_elements(self.to_node)
             if isinstance(e, ChannelElement) and e.id != self.id
         ]
+        # The reverse approach pipe's diameter: its static state is the
+        # orifice's p1 in reverse (#651).
+        self._reverse_pipe_diameter = None
         if len(to_pipes) == 1 and to_pipes[0].diameter and d_bore < to_pipes[0].diameter:
             self.beta_reverse = d_bore / to_pipes[0].diameter
+            self._reverse_pipe_diameter = to_pipes[0].diameter
         from_pipes = [
             e
             for e in graph.get_upstream_elements(self.from_node)
@@ -3405,6 +3409,13 @@ class OrificeElement(NetworkElement):
         # minimum at the floor that traps Newton (#582). So the element solves
         # its own consistency, m* = Cd(Re(m*)) K, and the row is m - m*(x):
         # linear in m, same root, same physics.
+        # With a velocity of approach the drive p1 = p(Pt, G = |m| / A_pipe)
+        # reads the flow too (#651), and at the iterate's m the forward kernel
+        # ran BACKWARDS wherever 0 < Pt - p2 < q_pipe: the row's slope in Pt
+        # flipped and Newton walked away from the root. Solved out the same
+        # way, m* = m_calc(m*, x) has the sign of the stagnation drive.
+        if self._approach_reads_flow():
+            return self._flow_consistent_residuals(state_in, state_out, flows, effective_cd)
         if self._cd_follows_own_flow():
             return self._self_consistent_residuals(state_in, state_out, flows, effective_cd)
 
@@ -3499,27 +3510,29 @@ class OrificeElement(NetworkElement):
         # exact, so a trace Cd gives a trace flow instead of an exception.
         cd_k = cd if cd >= _KERNEL_CD_MIN else 1.0
         scale = cd / cd_k
+        # With a velocity of approach the kernels drive from the upstream
+        # STATIC pressure (approach_from_static), since E carries the approach
+        # head. That static state is the approach PIPE's (#651): from the
+        # node's stagnation state at the pipe's mass flux, so a PlenumNode
+        # (P = Pt) and a MomentumChamberNode give the same flow.
+        p1, dp1 = self._approach_static(src, src_id, forward, beta)
         p_down = dst.P
         tap = None
         if recovers:
             tap = _solver_tools.orifice_tap_pressure_and_jacobian(
-                src.P, src.Pt, dst.Pt, beta, max(cd, _KERNEL_CD_MIN), compressible
+                p1, src.Pt, dst.Pt, beta, max(cd, _KERNEL_CD_MIN), compressible
             )
             p_down = float(tap.p_tap)
-        # With a velocity of approach (beta > 0) the kernels drive from the
-        # upstream STATIC pressure, since E carries the approach head; without
-        # one, from the stagnation pressure. The rule is C++'s
-        # (approach_from_static); both pressures are passed.
         if compressible:
             r = _solver_tools.orifice_compressible_residuals_and_jacobian(
-                src.m_dot, src.Pt, src.P, src.Tt, src.Y, p_down, cd_k, self.area, beta
+                src.m_dot, src.Pt, p1, src.Tt, src.Y, p_down, cd_k, self.area, beta
             )
         else:
             _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
             r = _solver_tools.orifice_residuals_and_jacobian(
                 src.m_dot,
                 src.Pt,
-                src.P,
+                p1,
                 src.T,
                 src.Y,
                 p_down,
@@ -3535,31 +3548,72 @@ class OrificeElement(NetworkElement):
             f"{src_id}.T": float(r.d_mdot_dT_up),
             f"{dst_id}.P": float(r.d_mdot_dP_rho_ref) + (0.0 if tap else g),
         }
-        # Outlet-referenced and plenum-fed, the flow does not read the source
-        # static at all: leave the column out rather than carry a zero.
-        if r.d_mdot_dP_static_up != 0.0:
-            d[f"{src_id}.P"] = float(r.d_mdot_dP_static_up)
+        # d(m_calc)/d(p1): the kernel's own column and, between pipes, the tap
+        # pressure's through g. Spread over p1's dependencies below.
+        dm_dp1 = float(r.d_mdot_dP_static_up)
         dm_dcd = float(r.m_dot_calc) / cd_k
         if tap is not None:
-            # p_tap(P_static_up, Pt_up, Pt_down, C): its columns through g.
+            dm_dp1 += g * float(tap.d_dP_static_up)
+            # p_tap(p1, Pt_up, Pt_down, C): its other columns through g.
             for name, dp in (
-                (f"{src_id}.P", tap.d_dP_static_up),
                 (f"{src_id}.Pt", tap.d_dP_total_up),
                 (f"{dst_id}.Pt", tap.d_dP_total_down),
             ):
                 if dp != 0.0:
                     d[name] = d.get(name, 0.0) + g * float(dp)
             dm_dcd += scale * g * float(tap.d_dC)
+        # Outlet-referenced and plenum-fed, the flow does not read the source
+        # static at all: leave the column out rather than carry a zero.
+        if dm_dp1 != 0.0:
+            for name, dp in dp1.items():
+                d[name] = d.get(name, 0.0) + dm_dp1 * dp
         if tap is not None and d[f"{dst_id}.P"] == 0.0:
             # The tap pressure reads the far node's Pt, not its static.
             del d[f"{dst_id}.P"]
         for i, val in enumerate(r.d_mdot_dY_up):
             if val != 0.0:
-                d[f"{src_id}.Y[{i}]"] = float(val)
+                key = f"{src_id}.Y[{i}]"
+                d[key] = d.get(key, 0.0) + float(val)
         if scale != 1.0:
             d = {k: v * scale for k, v in d.items()}
         d[_DM_DCD] = dm_dcd
         return float(r.m_dot_calc) * scale, d
+
+    def _approach_static(
+        self,
+        src: "NetworkMixtureState",
+        src_id: str,
+        forward: bool,
+        beta: float,
+    ) -> tuple[float, dict[str, float]]:
+        """The upstream static pressure the kernels drive from, and its
+        derivatives by name (#651).
+
+        With E (0 < beta < 1) it is the approach pipe's: C++'s
+        approach_static_pressure from the node's (Pt, Tt) at G = |m| / A_pipe,
+        so the node's own static pressure no longer matters. A PlenumNode
+        reports P = Pt by definition, which gave the orifice p1 and rho1 a
+        dynamic head too high (1.5% flow at beta 0.7, pipe Mach 0.18).
+        Without E the node's static is returned (the kernels then read Pt).
+        """
+        D = self.upstream_diameter if forward else getattr(self, "_reverse_pipe_diameter", None)
+        if not (0.0 < beta < 1.0) or not D:
+            return float(src.P), {f"{src_id}.P": 1.0}
+        A = math.pi * D * D / 4.0
+        m = float(src.m_dot)
+        a = _solver_tools.approach_static_pressure(
+            float(src.Pt), float(src.Tt), abs(m) / A, src.Y, self.regime != "compressible"
+        )
+        sgn = 1.0 if m >= 0.0 else -1.0
+        out = {
+            f"{src_id}.Pt": float(a.dP_dPt),
+            f"{src_id}.T": float(a.dP_dTt),
+            f"{self.id}.m_dot": float(a.dP_dG) * sgn / A,
+        }
+        for i, val in enumerate(a.dP_dY):
+            if val != 0.0:
+                out[f"{src_id}.Y[{i}]"] = float(val)
+        return float(a.P), out
 
     def _flow_and_partials(
         self,
@@ -3666,6 +3720,73 @@ class OrificeElement(NetworkElement):
             row[name] = row.get(name, 0.0) - d / denom
         return [m_dot - m_star], {0: row}
 
+    def _approach_reads_flow(self) -> bool:
+        """Does m_calc read this element's own flow through the approach
+        pipe's static state (#651)? With E and a pipe, in either direction."""
+        fwd = 0.0 < self.beta < 1.0 and bool(self.upstream_diameter)
+        rev = 0.0 < getattr(self, "beta_reverse", 0.0) < 1.0 and bool(
+            getattr(self, "_reverse_pipe_diameter", None)
+        )
+        return fwd or rev
+
+    def _flow_consistent_residuals(
+        self,
+        state_in: "NetworkMixtureState",
+        state_out: "NetworkMixtureState",
+        flows: dict[str, float] | None,
+        cd_iterate: float,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        """Row m - m*(x), with m* = m_calc(m*, x) solved here (#651).
+
+        m_calc reads the element's own flow through the approach pipe's static
+        state, p1 = p(Pt, |m| / A_pipe), and, for the discharge-hole family,
+        through Cd(Re(m)) as in _self_consistent_residuals (#582). Newton on
+        h(a) = a - m_calc(a): the approach makes d(m_calc)/da <= 0, so h' >= 1
+        from it; where a rising Cd pulls h' below 0.1 the contracting
+        fixed-point step is taken instead. A metering Cd stays at the
+        iterate (its documented form), so its m column is carried through.
+        Sensitivities by the implicit function:
+          dm*/dx = d(m_calc)/dx|_m / (1 - d(m_calc)/dm).
+        """
+        m_key = f"{self.id}.m_dot"
+        own_cd = self._cd_follows_own_flow()
+        p_in, p_out = copy.copy(state_in), copy.copy(state_out)
+
+        def evaluate(
+            a: float,
+        ) -> tuple[float, float, dict[str, float], float, dict[str, float]]:
+            p_in.m_dot = a
+            p_out.m_dot = a
+            cd = self._effective_Cd(p_in, p_out, flows) if own_cd else cd_iterate
+            m, part = self._flow_and_partials(p_in, p_out, cd)
+            dm_dcd = part.pop(_DM_DCD, 0.0)
+            dcd = self._dCd_dnames(p_in, p_out, flows) if (own_cd and cd > 0.0) else {}
+            slope = part.get(m_key, 0.0) + dm_dcd * dcd.get(m_key, 0.0)
+            return m, slope, part, dm_dcd, dcd
+
+        a = evaluate(float(state_in.m_dot))[0]
+        for _ in range(60):
+            m, slope, _, _, _ = evaluate(a)
+            hp = 1.0 - slope
+            a_new = m if hp <= 0.1 else a - (a - m) / hp
+            done = abs(a_new - a) <= 1e-13 * max(abs(a_new), 1e-30)
+            a = a_new
+            if done:
+                break
+        m_star, slope, part, dm_dcd, dcd = evaluate(a)
+        hp = 1.0 - slope
+        part.pop(m_key, None)
+        if own_cd:
+            cd_cols = {k: v for k, v in dcd.items() if k != m_key}
+        else:
+            cd_cols = self._dCd_dnames(state_in, state_out, flows) if cd_iterate > 0.0 else {}
+        row: dict[str, float] = {m_key: 1.0}
+        for name, d in part.items():
+            row[name] = row.get(name, 0.0) - d / hp
+        for name, dc in cd_cols.items():
+            row[name] = row.get(name, 0.0) - dm_dcd * dc / hp
+        return [float(state_in.m_dot) - m_star], {0: row}
+
     def n_equations(self) -> int:
         return 1
 
@@ -3749,10 +3870,15 @@ class OrificeElement(NetworkElement):
         beta = self.beta if forward else getattr(self, "beta_reverse", 0.0)
         recovers = self._recovery_fwd if forward else self._recovery_rev
         out: dict[str, float | str] = {"tap": self.tap, "pressure_recovery": float(recovers)}
-        p_up = float(up.P) if 0.0 < beta < 1.0 else float(up.Pt)
+        up_id = self.from_node if forward else self.to_node
+        p1 = self._approach_static(up, up_id, forward, beta)[0]
+        if 0.0 < beta < 1.0:
+            # The approach pipe's static pressure the row drives from (#651).
+            out["P_approach"] = p1
+        p_up = p1 if 0.0 < beta < 1.0 else float(up.Pt)
         if recovers and cd > 0.0:
             t = _solver_tools.orifice_tap_pressure_and_jacobian(
-                float(up.P), float(up.Pt), float(dn.Pt), beta, cd, self.regime == "compressible"
+                p1, float(up.Pt), float(dn.Pt), beta, cd, self.regime == "compressible"
             )
             dp_net = p_up - float(t.p_tap)
             out["dp_permanent"] = float(up.Pt) - float(dn.Pt)
@@ -6036,10 +6162,28 @@ class ChannelElement(NetworkElement):
         sink (#360, #588). dP is odd in m_dot.
         """
         p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
+        if p_ref_outlet:
+            p_rho, dp_rho, dp_rho_dm = dst.P, {f"{dst_id}.P": 1.0}, 0.0
+        else:
+            # The duct's own inlet static state (#651): the node's (Pt, T) at
+            # the duct's mass flux. A PlenumNode reports P = Pt by definition,
+            # so its static read the duct's density a dynamic head high (3% in
+            # friction at Mach 0.18). A node with the duct's area already
+            # carries this state.
+            A = math.pi * self.diameter * self.diameter / 4.0
+            a = _solver_tools.approach_static_pressure(
+                float(src.Pt), float(src.T), abs(m_dot) / A, src.Y, True
+            )
+            p_rho = float(a.P)
+            dp_rho = {f"{src_id}.Pt": float(a.dP_dPt), f"{src_id}.T": float(a.dP_dTt)}
+            for i, val in enumerate(a.dP_dY):
+                if val != 0.0:
+                    dp_rho[f"{src_id}.Y[{i}]"] = float(val)
+            dp_rho_dm = float(a.dP_dG) * (1.0 if m_dot >= 0.0 else -1.0) / A
         r = _solver_tools.channel_residuals_and_jacobian(
             m_dot,
             src.Pt,
-            dst.P if p_ref_outlet else src.P,
+            p_rho,
             src.T,
             src.Y,
             dst.P,
@@ -6050,12 +6194,14 @@ class ChannelElement(NetworkElement):
             f_mult,
             self._exit_head_lost(m_dot),
         )
+        g = float(r.d_dP_dP_static_up)
         d: dict[str, float] = {f"{src_id}.T": float(r.d_dP_dT_up)}
-        d[f"{dst_id if p_ref_outlet else src_id}.P"] = float(r.d_dP_dP_static_up)
         for i, val in enumerate(r.d_dP_dY_up):
             if val != 0.0:
                 d[f"{src_id}.Y[{i}]"] = float(val)
-        return float(r.dP_calc), float(r.d_dP_d_mdot), d
+        for name, dp in dp_rho.items():
+            d[name] = d.get(name, 0.0) + g * dp
+        return float(r.dP_calc), float(r.d_dP_d_mdot) + g * dp_rho_dm, d
 
     def _incompressible_residuals(
         self,

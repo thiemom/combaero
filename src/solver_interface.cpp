@@ -1845,6 +1845,56 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   return res;
 }
 
+ApproachStatic approach_static_pressure(double P_total, double T_total, double G,
+                                        const std::vector<double>& Y,
+                                        bool incompressible) {
+  auto X_of = [](const std::vector<double>& Yv) {
+    return combaero::mass_to_mole(combaero::normalize_fractions(Yv));
+  };
+  // P and its (Pt, Tt, G) derivatives at one composition.
+  auto eval = [&](const std::vector<double>& X, ApproachStatic& out) {
+    if (incompressible) {
+      const double R = combaero::specific_gas_constant(X);
+      const double c = 2.0 * G * G * R * T_total;
+      const double disc = P_total * P_total - c;
+      out.choked = !(disc > 0.0);
+      if (out.choked) {
+        out.P = 0.5 * P_total;
+        out.dP_dPt = 0.5;
+        out.dP_dTt = 0.0;
+        out.dP_dG = 0.0;
+        return;
+      }
+      const double r = std::sqrt(disc);
+      out.P = 0.5 * (P_total + r);
+      out.dP_dPt = 0.5 * (1.0 + P_total / r);
+      out.dP_dTt = -0.5 * (G * G * R) / r;
+      out.dP_dG = -(G * R * T_total) / r;
+      return;
+    }
+    const auto st = combaero::duct_static_state(T_total, P_total, G, X);
+    out.P = st.P;
+    out.dP_dPt = st.dP_dP0;
+    out.dP_dTt = st.dP_dT0;
+    out.dP_dG = st.dP_dG;
+    out.choked = st.choked;
+  };
+  ApproachStatic out{};
+  eval(X_of(Y), out);
+  // Composition moves R (and, compressible, cp): a forward difference, as
+  // the orifice kernels take their Y columns.
+  out.dP_dY.assign(Y.size(), 0.0);
+  const double eps_Y = 1e-6;
+  for (std::size_t i = 0; i < Y.size(); ++i) {
+    std::vector<double> Y_plus = Y;
+    Y_plus[i] += eps_Y;
+    ApproachStatic probe{};
+    eval(X_of(Y_plus), probe);
+    out.dP_dY[i] = (probe.P - out.P) / eps_Y;
+  }
+  return out;
+}
+
 OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
                                                      double P_total_up,
                                                      double P_total_down,

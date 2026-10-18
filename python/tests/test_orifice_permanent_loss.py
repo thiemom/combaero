@@ -118,6 +118,12 @@ def test_the_range_flag_is_isos_pressure_ratio() -> None:
 # --- the network row ---------------------------------------------------------
 
 
+def _node(node_cls: type, nid: str, regime: str) -> object:
+    """A node in the network's regime: a MomentumChamberNode closes Pt(P)
+    compressibly by default, which an incompressible network would not."""
+    return node_cls(nid, regime=regime) if node_cls is MomentumChamberNode else node_cls(nid)
+
+
 def _between_pipes(
     node_cls: type,
     beta: float,
@@ -128,12 +134,12 @@ def _between_pipes(
 ) -> FlowNetwork:
     g = FlowNetwork()
     g.add_node(PressureBoundary("hi", Pt=1.2e5, Tt=300.0))
-    g.add_node(node_cls("a"))
+    g.add_node(_node(node_cls, "a", regime))
     g.add_node(PressureBoundary("ho", Pt=1.0e5, Tt=300.0))
     g.add_element(ChannelElement("p1", "hi", "a", length=0.5, diameter=D, regime=regime))
     to = "b" if downstream_pipe else "ho"
     if downstream_pipe:
-        g.add_node(node_cls("b"))
+        g.add_node(_node(node_cls, "b", regime))
     g.add_element(
         OrificeElement(
             "o", "a", to, Cd=0.6, diameter=beta * D, regime=regime, correlation=correlation, tap=tap
@@ -154,8 +160,9 @@ def _solve(g: FlowNetwork) -> tuple[NetworkSolver, dict]:
 
 
 def _iso_dp(r: dict, beta: float, C: float) -> float:
-    """ISO's tapping differential for the solved flow: (m / (C E A))^2 / (2 rho1)."""
-    rho = cb.density(300.0, r["a.P"], cb.species.dry_air())
+    """ISO's tapping differential for the solved flow: (m / (C E A))^2 / (2 rho1),
+    with rho1 at the approach pipe's static pressure (#651)."""
+    rho = cb.density(300.0, r["o.P_approach"], cb.species.dry_air())
     E = 1.0 / math.sqrt(1.0 - beta**4)
     A = math.pi * (beta * D) ** 2 / 4.0
     return (r["o.m_dot"] / (C * E * A)) ** 2 / (2.0 * rho)
@@ -184,30 +191,25 @@ def test_into_a_node_with_no_pipe_the_tapping_differential_is_lost(beta: float) 
         _between_pipes(PlenumNode, beta, "incompressible", "fixed", downstream_pipe=False)
     )
     assert r["o.pressure_recovery"] == 0.0
-    assert _iso_dp(r, beta, 0.6) == pytest.approx(r["a.P"] - 1.0e5, rel=1e-4)
+    assert _iso_dp(r, beta, 0.6) == pytest.approx(r["o.P_approach"] - 1.0e5, rel=1e-4)
 
 
 @pytest.mark.parametrize("regime", ["incompressible", "compressible"])
 @pytest.mark.parametrize("beta", [0.5, 0.7])
-def test_the_node_type_moves_the_flow_only_through_the_density(regime: str, beta: float) -> None:
-    """The user draws pipe -> orifice -> pipe. The orifice's loss does not
-    depend on the node type; what remains is the density a node offers. A
-    PlenumNode has no velocity, so its static pressure is the pipe's
-    stagnation pressure and its density is q/P too high: m ~ sqrt(rho dw),
-    1.5% at beta 0.7, where the pipe runs at Mach 0.2. Incompressible this is
-    exact. Compressible, the nozzle starts from the chamber's static state;
-    it used to pair the static P with the stagnation T, which left the
-    chamber's flow sqrt(T_s/Tt) low (residual 0.065% at beta 0.5, 0.56% at
-    0.7). Now 0.006% at beta 0.5, and 0.22% at beta 0.7, where p_tap/p1 is
-    below ISO's 0.75 (recovery_in_range False) and the nozzle's expansion
-    differs from the incompressible density argument. tmp/probe_pl_comp_T.py."""
+def test_the_node_type_does_not_move_the_flow(regime: str, beta: float) -> None:
+    """The user draws pipe -> orifice -> pipe; the node type in between must
+    not decide the flow (#651). The orifice takes p1 and rho1 from the
+    approach pipe, not from the node: a PlenumNode reports P = Pt by
+    definition, which read them a dynamic head too high, 1.5% flow at beta
+    0.7 (pipe Mach 0.18). Its momentum-chamber twin has the pipe's area, so
+    both nodes now reduce to the same pipe state."""
     _, rp = _solve(_between_pipes(PlenumNode, beta, regime, "fixed"))
     _, rc = _solve(_between_pipes(MomentumChamberNode, beta, regime, "fixed"))
-    dw_p, dw_c = rp["a.Pt"] - rp["b.Pt"], rc["a.Pt"] - rc["b.Pt"]
-    expected = math.sqrt((rc["a.P"] / rp["a.P"]) * (dw_c / dw_p))
-    tols = {"incompressible": {0.5: 1e-4, 0.7: 1e-4}, "compressible": {0.5: 2e-4, 0.7: 3e-3}}
-    tol = tols[regime][beta]
-    assert rc["o.m_dot"] / rp["o.m_dot"] == pytest.approx(expected, rel=tol)
+    # The solves' own tolerance; the defect was 1.5e-2.
+    assert rc["o.m_dot"] == pytest.approx(rp["o.m_dot"], rel=1e-6)
+    assert rc["o.P_approach"] == pytest.approx(rp["o.P_approach"], rel=1e-6)
+    # And the chamber's own static pressure is that pipe state.
+    assert rc["a.P"] == pytest.approx(rc["o.P_approach"], rel=1e-9)
 
 
 @pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz"])
@@ -269,7 +271,7 @@ def test_a_reversed_orifice_recovers_into_the_pipe_it_flows_into() -> None:
     g.add_element(ChannelElement("p2", "b", "ho", length=0.5, diameter=D, regime="incompressible"))
     _, r = _solve(g)
     assert r["o.m_dot"] < 0.0
-    rho = cb.density(300.0, r["b.P"], cb.species.dry_air())
+    rho = cb.density(300.0, r["o.P_approach"], cb.species.dry_air())
     E = 1.0 / math.sqrt(1.0 - 0.6**4)
     A = math.pi * 0.06**2 / 4.0
     dp = (r["o.m_dot"] / (0.6 * E * A)) ** 2 / (2.0 * rho)

@@ -793,6 +793,7 @@ All functions use consistent units to avoid conversion errors.
 |-----------------------------------------------|------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
 | `orifice_compressible_mdot_and_jacobian`      | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                 | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
 | `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: - | OrificeResult                               |
+| `approach_static_pressure`                    | P_total: Pa, T_total: K, G: kg/(m^2*s), Y: kg/kg, incompressible: bool                                           | ApproachStatic                              |
 | `orifice_tap_pressure_and_jacobian`           | P_static_up: Pa, P_total_up: Pa, P_total_down: Pa, beta: -, C: -, compressible: bool                             | OrificeTapPressure                          |
 
 ### geometry.h - Geometric Utilities
@@ -1470,6 +1471,12 @@ All functions use consistent units to avoid conversion errors.
 | `OrificeFlowResult::mdot`                       | -                                                | kg/s                                  |
 | `OrificeFlowResult::rho_corrected`              | -                                                | kg/m³                                 |
 | `OrificeFlowResult::v`                          | -                                                | m/s                                   |
+| `ApproachStatic::P`                             | -                                                | Pa                                    |
+| `ApproachStatic::dP_dPt`                        | -                                                | -                                     |
+| `ApproachStatic::dP_dTt`                        | -                                                | Pa/K                                  |
+| `ApproachStatic::dP_dG`                         | -                                                | Pa/(kg/(m^2*s))                       |
+| `ApproachStatic::dP_dY`                         | -                                                | Pa                                    |
+| `ApproachStatic::choked`                        | -                                                | - (bool)                              |
 | `OrificeTapPressure::p_tap`                     | -                                                | Pa                                    |
 | `OrificeTapPressure::loss_ratio`                | -                                                | -                                     |
 | `OrificeTapPressure::d_dP_static_up`            | -                                                | -                                     |
