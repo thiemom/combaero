@@ -248,6 +248,20 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 // Pt = P + G^2 R Tt / (2 P), whose subsonic root is
 // P = [Pt + sqrt(Pt^2 - 2 G^2 R Tt)] / 2; past its maximum flux it holds
 // P = Pt / 2 (choked = true, derivatives of that branch).
+// The sonic static pressure P* of a chamber at stagnation T0 and mass flux G
+// (#637): the floor its static pressure cannot go below while it discharges
+// into a reservoir (combaero::sonic_static_state). dP_dY by a forward
+// difference, as approach_static_pressure.
+struct SonicStatic {
+  double P;
+  double T;
+  double dP_dT0;
+  double dP_dG;
+  std::vector<double> dP_dY;
+};
+
+SonicStatic sonic_static_pressure(double T0, double G, const std::vector<double>& Y);
+
 struct ApproachStatic {
   double P;
   double dP_dPt;

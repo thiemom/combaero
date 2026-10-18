@@ -21,6 +21,7 @@ from combaero.network import (
     OrificeElement,
     PinFinModel,
     PlenumNode,
+    PortDischargeElement,
     PressureBoundary,
     PressureLossElement,
     RibbedModel,
@@ -1198,7 +1199,15 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     for src, dst in port_node_links:
         link_id = f"__auto_link__{src}__{dst}"
         if link_id not in net.elements:
-            net.add_element(LosslessConnectionElement(link_id, from_node=src, to_node=dst))
+            # A port chamber discharging into a pressure boundary loses its
+            # jet head there and, choked, leaves under-expanded (#637): a
+            # Pt-equal link made the reservoir recover the whole head, which
+            # has no root once a critical-mode ejector's outlet is sonic.
+            if isinstance(nodes_map.get(dst), PressureBoundary):
+                link = PortDischargeElement(link_id, from_node=src, to_node=dst)
+            else:
+                link = LosslessConnectionElement(link_id, from_node=src, to_node=dst)
+            net.add_element(link)
 
     # Ejector warm-starts: port pressures, P_jct and the port-chain flows from
     # the ejector's closed-form physics (only where the user gave no guess).

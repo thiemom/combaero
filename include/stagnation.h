@@ -193,6 +193,24 @@ ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
 
 // -------------------------------------------------------------
+// The SONIC static state of a flow at stagnation temperature T0 and mass flux
+// G (#637): T* from h(T0) - h(T*) = a(T*)^2 / 2 (variable cp, a^2 = gamma R T),
+// and the static pressure at which G is sonic, P* = G sqrt(R T* / gamma*)
+// (rho* a* = G with rho* = P* / (R T*)). A chamber of that flux cannot sit below P*: a
+// duct discharging into a reservoir below it leaves choked, under-expanded,
+// at P*. Derivatives in T0 and G are closed form (implicit function on T*).
+// G = 0 gives P* = 0.
+struct SonicStaticState {
+  double T;
+  double P;
+  double dT_dT0;
+  double dP_dT0;
+  double dP_dG;
+};
+
+SonicStaticState sonic_static_state(double T0, double G, const std::vector<double>& X);
+
+// -------------------------------------------------------------
 // Static state at a duct's inlet from the STAGNATION state (T0, P0) it is
 // fed from and its mass flux G = |m_dot| / A (#636): the isentropic
 // acceleration from rest, i.e. chamber_static_state at the static P whose

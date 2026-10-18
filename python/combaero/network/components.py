@@ -1413,6 +1413,11 @@ FLOW_REVERSAL_M_SCALE = 1e-4
 #: either form holds alone, so an orifice with any real drop is unchanged.
 ORIFICE_REVERSAL_P_SCALE = 0.1
 
+#: Relative width of the smooth max(P_boundary, P*) a port discharge holds
+#: its chamber at (#637): sqrt(dP^2 + (w P_b)^2). The value moves by at most
+#: w P_b / 2 (5 Pa at 1 bar), and only where the exit is exactly at choke.
+PORT_DISCHARGE_CHOKE_BLEND = 1e-4
+
 
 _ROW_KINDS = ("p", "mdot")
 
@@ -5240,6 +5245,129 @@ class LosslessConnectionElement(NetworkElement):
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_in),
             **ref,
         }
+
+    def n_equations(self) -> int:
+        return 1
+
+
+class PortDischargeElement(NetworkElement):
+    """A junction port's momentum chamber discharging into a PressureBoundary.
+
+    The link the GUI inserts where a junction port (ejector, tee) is wired
+    straight to a boundary (#637). A LosslessConnectionElement held the
+    chamber's TOTAL pressure at the boundary's, i.e. made the reservoir
+    recover the jet's whole head: no root once the chamber is sonic, which is
+    exactly a critical-mode ejector's outlet. What the jet does instead (#360's
+    exit-head rule for a channel):
+
+    - **out of the chamber, subsonic:** its STATIC pressure is the boundary's
+      and the dynamic head is lost;
+    - **out of the chamber, choked:** it leaves under-expanded, at the sonic
+      static pressure P* of its flux (C++ sonic_static_pressure), above the
+      boundary's: P_chamber = max(P_boundary, P*), smoothed over
+      PORT_DISCHARGE_CHOKE_BLEND;
+    - **into the chamber:** the boundary is a stagnation source, Pt equal.
+
+    A boundary with coupling="total" keeps the Pt equality both ways. The two
+    directions blend in the link's flow over FLOW_REVERSAL_M_SCALE, where they
+    differ only by the chamber's dynamic head, which vanishes with the flow.
+    An incompressible chamber has no sonic limit, so no floor.
+    """
+
+    #: RESIDUAL-ROW-SCALING: a pressure equality, Pa.
+    residual_scale_kind = "p"
+
+    def __init__(self, id: str, from_node: str, to_node: str):
+        super().__init__(id, from_node, to_node)
+        self.area: float | None = None
+        self.diameter: float | None = None
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        self._chamber = graph.nodes.get(self.from_node)
+        self._boundary = graph.nodes.get(self.to_node)
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
+    def _outflow_row(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> tuple[float, dict[str, float], float]:
+        """(residual, Jacobian, P*) of the discharge out of the chamber."""
+        c, b = self.from_node, self.to_node
+        boundary = getattr(self, "_boundary", None)
+        static = boundary is not None and getattr(boundary, "exit_head_lost", None) is not None
+        if not (static and boundary.exit_head_lost(True)):
+            return float(state_in.Pt - state_out.Pt), {f"{c}.Pt": 1.0, f"{b}.Pt": -1.0}, 0.0
+        P_b = float(state_out.Pt)
+        chamber = getattr(self, "_chamber", None)
+        A = float(getattr(chamber, "area", 0.0) or 0.0)
+        compressible = getattr(chamber, "regime", "compressible") == "compressible"
+        if not (compressible and A > 0.0):
+            return float(state_in.P) - P_b, {f"{c}.P": 1.0, f"{b}.Pt": -1.0}, 0.0
+        m = float(state_in.m_dot)
+        s = _solver_tools.sonic_static_pressure(float(state_in.T), abs(m) / A, state_in.Y)
+        P_star = float(s.P)
+        eps = PORT_DISCHARGE_CHOKE_BLEND * P_b
+        d = P_star - P_b
+        root = math.sqrt(d * d + eps * eps)
+        floor = 0.5 * (P_b + P_star + root)
+        w_star = 0.5 * (1.0 + d / root)  # d floor / d P*
+        jac = {
+            f"{c}.P": 1.0,
+            f"{b}.Pt": -(1.0 - w_star),
+            f"{self.id}.m_dot": -w_star * float(s.dP_dG) * (1.0 if m >= 0.0 else -1.0) / A,
+            # T and Y are relayed through the chamber's propagation chain,
+            # as the chamber's own closure row does.
+            f"{c}.T": -w_star * float(s.dP_dT0),
+        }
+        for k, dy in enumerate(s.dP_dY):
+            if dy != 0.0:
+                jac[f"{c}.Y[{k}]"] = -w_star * float(dy)
+        return float(state_in.P) - floor, jac, P_star
+
+    def residuals(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        c, b = self.from_node, self.to_node
+        r_in, j_in = float(state_in.Pt - state_out.Pt), {f"{c}.Pt": 1.0, f"{b}.Pt": -1.0}
+        # The branch follows the FLOW, this row's own unknown. A blend in Pt
+        # (the orifice's, whose flow is computed from the pressures) admits a
+        # spurious root here: inflow from the boundary with the chamber's
+        # static pinned to it and its Pt above it.
+        m_name = f"{self.id}.m_dot"
+        w, dw = _flow_blend(float(state_in.m_dot))
+        if w == 0.0:
+            return [r_in], {0: j_in}
+        r_out, j_out, _ = self._outflow_row(state_in, state_out)
+        if w == 1.0:
+            return [r_out], {0: j_out}
+        jac: dict[str, float] = {}
+        for k in set(j_in) | set(j_out):
+            jac[k] = w * j_out.get(k, 0.0) + (1.0 - w) * j_in.get(k, 0.0)
+        jac[m_name] = jac.get(m_name, 0.0) + (r_out - r_in) * dw
+        return [w * r_out + (1.0 - w) * r_in], {0: jac}
+
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float | str]:
+        if state_in.P <= 0 or state_in.T <= 0:
+            return {}
+        _, _, P_star = self._outflow_row(state_in, state_out)
+        chamber = getattr(self, "_chamber", None)
+        mach = 0.0
+        if chamber is not None and float(getattr(chamber, "area", 0.0) or 0.0) > 0.0:
+            # The chamber's own Mach: the face this link discharges.
+            mach = float(chamber._closure(state_in, float(state_in.m_dot)).M)
+        out: dict[str, float | str] = {
+            "m_dot": float(state_in.m_dot),
+            **_element_pressure_block(state_in, state_out, mach_in=mach, mach_out=mach),
+        }
+        if P_star > 0.0:
+            # The sonic static pressure of the chamber's flux, and whether the
+            # discharge is choked (under-expanded into the boundary).
+            out["P_sonic"] = P_star
+            out["exit_choked"] = float(P_star > float(state_out.Pt))
+        return out
 
     def n_equations(self) -> int:
         return 1
