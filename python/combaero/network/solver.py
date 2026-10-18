@@ -146,6 +146,12 @@ _STALL_FAR_FACTOR = 100.0
 # better point in 175 s; it was only caught when its plateau happened to sit
 # at 0.138, above it. Faster thermo moved it below (#626).
 _STALL_DEAD_WINDOWS = 3
+# ... and a CRAWL is: under this relative improvement across those windows.
+# With the duct heat transfer at the duct's static state (#636) the same array
+# no longer parks dead but creeps, 0.5% every 3 s at |F| ~ 0.075 (1.7% per
+# 15 s), for 200 s of LM before the warm-start retry solved it in 0.3 s. LM
+# converging near a root is quadratic, orders of magnitude faster than this.
+_STALL_NEAR_MIN_REL = 0.05
 # A heated node's share of its heat taken up (cb.mixer_heat_per_unit_flow) is
 # 1 at or above MIXER_HEAT_MDOT_FLOOR and 0 when stagnant. A root strictly
 # between, by more than this, sits in the fade below the floor: one the fade
@@ -171,8 +177,9 @@ def _stall_detected(
     with best_norm non-increasing. Stall = the newest best norm is still
     far above tolerance (``> far_factor * tol``) and improved by less
     than ``min_rel`` relative to the best norm from ``window`` seconds
-    ago; or, nearer the root, it has not improved AT ALL over
-    ``_STALL_DEAD_WINDOWS`` windows (a dead plateau, not a crawl).
+    ago; or, nearer the root, it has improved by less than
+    ``_STALL_NEAR_MIN_REL`` over ``_STALL_DEAD_WINDOWS`` windows (a dead
+    plateau or a crawl).
     Histories shorter than the window never stall (grace period).
     """
     if not samples:
@@ -181,13 +188,13 @@ def _stall_detected(
     if t_now < window:
         return False
     if best_now <= far_factor * tol:
-        # Near the root: only a dead plateau, no improvement at all.
+        # Near the root: a dead plateau or a crawl over several windows.
         t_dead = t_now - _STALL_DEAD_WINDOWS * window
         if t_dead < 0.0:
             return False
         for tv, bv in reversed(samples):
             if tv <= t_dead:
-                return bv <= best_now
+                return bv <= 0.0 or (bv - best_now) / bv < _STALL_NEAR_MIN_REL
         return False
     best_then = None
     for tv, bv in reversed(samples):
@@ -1969,6 +1976,17 @@ class NetworkSolver:
                                 idx_P_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
                             nr["T"] += dT_mix_dQ * sign * wall_result.dQ_dT_aw_a * dTaw_dP_a
+                        # A duct's T_aw moves with its feed's Pt instead (#636).
+                        idx_Pt_a = self._name_to_index.get(f"{from_a}.Pt")
+                        # and so does its h, through the duct's static T.
+                        dQ_dPt_a = wall_result.dQ_dT_aw_a * getattr(
+                            ch_a, "dT_aw_dPt", 0.0
+                        ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dPt", 0.0)
+                        if idx_Pt_a is not None and dQ_dPt_a != 0.0:
+                            nr = relay[nid].setdefault(
+                                idx_Pt_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
+                            )
+                            nr["T"] += dT_mix_dQ * sign * dQ_dPt_a
 
                         # Side B contributions
                         obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
@@ -2025,6 +2043,17 @@ class NetworkSolver:
                                 idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
                             nr["T"] += dT_mix_dQ * sign * wall_result.dQ_dT_aw_b * dTaw_dP_b
+                        # A duct's T_aw moves with its feed's Pt instead (#636).
+                        idx_Pt_b = self._name_to_index.get(f"{from_b}.Pt")
+                        # and so does its h, through the duct's static T.
+                        dQ_dPt_b = wall_result.dQ_dT_aw_b * getattr(
+                            ch_b, "dT_aw_dPt", 0.0
+                        ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dPt", 0.0)
+                        if idx_Pt_b is not None and dQ_dPt_b != 0.0:
+                            nr = relay[nid].setdefault(
+                                idx_Pt_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
+                            )
+                            nr["T"] += dT_mix_dQ * sign * dQ_dPt_b
 
             # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])

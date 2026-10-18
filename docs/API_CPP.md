@@ -332,6 +332,23 @@ struct ChamberStaticState {
 };
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
+
+// Static state at a duct inlet fed from stagnation (T0, P0) at mass flux G
+// (#636): chamber_static_state at the static P whose isentropic stagnation
+// pressure is P0 (bracketed Newton on the subsonic branch [P*, P0]). Above
+// the choked flux: the sonic state, choked = true, no G dependence. T0 and P0
+// are floored at thermo::T_FLOOR / thermo::P_FLOOR (partials 0 there). The
+// network's duct heat transfer is evaluated at this state, not at the feed
+// node's (stagnation) T.
+struct DuctStaticState {
+    double T, P, rho, M;
+    double dT_dT0, dT_dP0, dT_dG;
+    double dP_dT0, dP_dP0, dP_dG;
+    double drho_dT0, drho_dP0, drho_dG;
+    bool choked;
+};
+DuctStaticState duct_static_state(double T0, double P0, double G,
+                                  const std::vector<double>& X);
 ```
 
 ---

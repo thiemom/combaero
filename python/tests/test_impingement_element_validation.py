@@ -47,7 +47,9 @@ def _fig5() -> list[tuple[float, float, float, float]]:
     return out
 
 
-def _element_nu(xn_d: float, yn_d: float, z_d: float, Re_j: float = 1.0e4) -> float:
+def _element_nu(
+    xn_d: float, yn_d: float, z_d: float, Re_j: float = 1.0e4, with_flow: bool = False
+) -> float | tuple[float, float, float]:
     """One element = row 1 of a span-wide array, carrying that row's jet flow."""
     mu = cb.complete_state(T, P, X_AIR).transport.mu
     k = cb.complete_state(T, P, X_AIR).transport.k
@@ -72,7 +74,8 @@ def _element_nu(xn_d: float, yn_d: float, z_d: float, Re_j: float = 1.0e4) -> fl
         t_hot=400.0,
     )
     state = NetworkMixtureState(T=T, P=P, Pt=P, Tt=T, m_dot=m_dot, Y=Y_AIR)
-    return el.htc_and_T(state).h * D_JET / k
+    nu = el.htc_and_T(state).h * D_JET / k
+    return (nu, m_dot, el.area) if with_flow else nu
 
 
 def test_fig5_is_all_there() -> None:
@@ -88,13 +91,23 @@ def test_the_element_reproduces_fig5_like_the_correlation_does() -> None:
 
 
 def test_the_element_equals_the_correlation_at_the_papers_re_j() -> None:
-    """The element adds bookkeeping, not physics: at the paper's Re_j it must
-    return the correlation's Nu exactly (row 1, Gc/Gj = 0)."""
+    """The element adds bookkeeping, not physics: at its own state it must
+    return the correlation's Nu exactly (row 1, Gc/Gj = 0).
+
+    Its own state is the crossflow duct's static state (#636), slightly below
+    the feed's T, so Re_j, Pr and k are taken there: Re_j is then 1e4 to a
+    few 1e-5, and the identity holds to 1e-9 as before."""
     s = cb.florschuetz_1981_inline()
-    Pr = cb.complete_state(T, P, X_AIR).transport.Pr
     for xn, yn, z, _ in _fig5():
-        nu = cb.jet_array_impingement_nu(s, 1.0e4, 0.0, Pr, xn, yn, z).Nu
-        assert _element_nu(xn, yn, z) == pytest.approx(nu, rel=1e-9)
+        el_nu, m_dot, area = _element_nu(xn, yn, z, with_flow=True)
+        st = cb.duct_static_state(T, P, m_dot / area, X_AIR)
+        tr = cb.complete_state(st.T, st.P, X_AIR).transport
+        n_holes = SPAN / (yn * D_JET)
+        Re_j = 4.0 * (m_dot / n_holes) / (math.pi * D_JET * tr.mu)
+        nu = cb.jet_array_impingement_nu(s, Re_j, 0.0, tr.Pr, xn, yn, z).Nu
+        # Nu = h d / k at the element's k, as _element_nu does at the feed's.
+        k_feed = cb.complete_state(T, P, X_AIR).transport.k
+        assert el_nu * k_feed / tr.k == pytest.approx(nu, rel=1e-9)
 
 
 def test_the_answer_does_not_depend_on_the_arbitrary_span() -> None:

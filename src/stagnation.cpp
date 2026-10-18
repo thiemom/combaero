@@ -3,6 +3,7 @@
 
 #include "../include/stagnation.h"
 #include "../include/composition.h"
+#include "../include/compressible.h"
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include <cmath>
@@ -335,6 +336,99 @@ ChamberStaticState chamber_static_state(double T0, double P, double G,
   out.dln_dG = dln_dTs * out.dT_dG;
   const double a = speed_of_sound(T, X);
   out.M = (a > 1e-9) ? G * R * T / (P * a) : 0.0;
+  return out;
+}
+
+DuctStaticState duct_static_state(double T0, double P0, double G,
+                                  const std::vector<double> &X) {
+  // An unphysical iterate is evaluated at the floors, finite; the partials
+  // in a floored argument are then zero.
+  const bool T0_floored = !(T0 > thermo::T_FLOOR);
+  const bool P0_floored = !(P0 > thermo::P_FLOOR);
+  T0 = T0_floored ? thermo::T_FLOOR : T0;
+  P0 = P0_floored ? thermo::P_FLOOR : P0;
+  const double R = specific_gas_constant(X);
+  const double lnP0 = std::log(P0);
+  G = std::abs(G);
+  // L(u) = lnP0P(T0, e^u, G) + u - ln P0, increasing in u on [ln P*, ln P0].
+  auto eval = [&](double u, ChamberStaticState &cs) {
+    cs = chamber_static_state(T0, std::exp(u), G, X);
+    return cs.lnP0P + u - lnP0;
+  };
+  DuctStaticState out{};
+  ChamberStaticState cs{};
+  const double P_star = critical_pressure_ratio(T0, P0, X) * P0;
+  double u_lo = std::log(P_star);
+  double u_hi = lnP0;
+  if (eval(u_lo, cs) > 0.0) {
+    // Beyond choke: the sonic state, at the choked flux.
+    const double G_star = mass_flux_isentropic(T0, P0, P_star, X);
+    cs = chamber_static_state(T0, P_star, G_star, X);
+    out.T = cs.T;
+    out.P = P_star;
+    out.rho = P_star / (R * cs.T);
+    out.M = cs.M;
+    out.choked = true;
+    const double r = P_star / P0;
+    out.dP_dP0 = r;
+    out.dT_dT0 = cs.dT_dT0;
+    out.dT_dP0 = cs.dT_dP * r;
+    out.drho_dT0 = -out.rho * out.dT_dT0 / out.T;
+    out.drho_dP0 = out.rho * (out.dP_dP0 / out.P - out.dT_dP0 / out.T);
+    if (T0_floored) {
+      out.dT_dT0 = out.dP_dT0 = out.drho_dT0 = 0.0;
+    }
+    if (P0_floored) {
+      out.dT_dP0 = out.dP_dP0 = out.drho_dP0 = 0.0;
+    }
+    return out;
+  }
+  double u = u_hi;
+  double L = eval(u, cs);
+  for (int it = 0; it < 100 && L != 0.0; ++it) {
+    if (L > 0.0) {
+      u_hi = u;
+    } else {
+      u_lo = u;
+    }
+    const double dL = 1.0 + std::exp(u) * cs.dln_dP;
+    double u_new = (dL > 0.0) ? u - L / dL : 0.5 * (u_lo + u_hi);
+    if (!(u_new > u_lo && u_new < u_hi)) {
+      u_new = 0.5 * (u_lo + u_hi);
+    }
+    const bool done = std::abs(u_new - u) <= 1e-15 * std::abs(lnP0) + 1e-15;
+    u = u_new;
+    L = eval(u, cs);
+    if (done) {
+      break;
+    }
+  }
+  const double P = std::exp(u);
+  const double dL_du = 1.0 + P * cs.dln_dP;
+  // du/dx = -(dL/dx) / (dL/du); dL/dT0 = dln_dT0, dL/dP0 = -1/P0, dL/dG = dln_dG.
+  const double du_dT0 = -cs.dln_dT0 / dL_du;
+  const double du_dP0 = (1.0 / P0) / dL_du;
+  const double du_dG = -cs.dln_dG / dL_du;
+  out.P = P;
+  out.T = cs.T;
+  out.rho = P / (R * cs.T);
+  out.M = cs.M;
+  out.choked = false;
+  out.dP_dT0 = P * du_dT0;
+  out.dP_dP0 = P * du_dP0;
+  out.dP_dG = P * du_dG;
+  out.dT_dT0 = cs.dT_dT0 + cs.dT_dP * out.dP_dT0;
+  out.dT_dP0 = cs.dT_dP * out.dP_dP0;
+  out.dT_dG = cs.dT_dG + cs.dT_dP * out.dP_dG;
+  out.drho_dT0 = out.rho * (out.dP_dT0 / P - out.dT_dT0 / out.T);
+  out.drho_dP0 = out.rho * (out.dP_dP0 / P - out.dT_dP0 / out.T);
+  out.drho_dG = out.rho * (out.dP_dG / P - out.dT_dG / out.T);
+  if (T0_floored) {
+    out.dT_dT0 = out.dP_dT0 = out.drho_dT0 = 0.0;
+  }
+  if (P0_floored) {
+    out.dT_dP0 = out.dP_dP0 = out.drho_dP0 = 0.0;
+  }
   return out;
 }
 

@@ -45,6 +45,9 @@ constexpr double CP_R_RIGID_NONLINEAR = 4.0;
 // s_R and h_RT hold their value at this T below it (ln T, 1/T); cp_R and the
 // dimensional h are defined at every T.
 constexpr double T_FLOOR = 10.0;
+// Pressure floor of the duct-state kernels [Pa]: an unphysical solver
+// iterate (P <= 0) is evaluated there, finite, instead of returning NaN.
+constexpr double P_FLOOR = 1.0;
 
 } // namespace combaero::thermo
 
