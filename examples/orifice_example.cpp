@@ -12,7 +12,7 @@ using namespace combaero;
 // Orifice Example
 //
 // Demonstrates:
-// 1. Cd correlations: Reader-Harris/Gallagher, Stolz, Miller (sharp thin-plate)
+// 1. Cd correlations: Reader-Harris/Gallagher (flange and corner taps), Stolz
 // 2. Thick-plate and rounded-entry corrections
 // 3. Iterative Cd-Re solver (solve_orifice_mdot)
 // 4. Full orifice_flow bundle (OrificeFlowResult)
@@ -39,11 +39,11 @@ int main()
     std::cout << "Pipe D=" << D_pipe * 1e3 << " mm\n\n";
     std::cout << std::setw(8)  << "beta"
               << std::setw(10) << "Re_D"
-              << std::setw(12) << "RHG"
+              << std::setw(12) << "RHG flange"
+              << std::setw(12) << "RHG corner"
               << std::setw(10) << "Stolz"
-              << std::setw(10) << "Miller"
               << "\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << std::string(52, '-') << "\n";
 
     for (double beta : {0.3, 0.5, 0.65, 0.75}) {
         for (double Re_D : {1.0e4, 1.0e5, 1.0e6}) {
@@ -58,14 +58,15 @@ int main()
             state.mu   = 1.8e-5;
 
             const double cd_rhg   = orifice::Cd_ReaderHarrisGallagher(beta, Re_D, D_pipe);
+            const double cd_rhg_c = orifice::Cd_ReaderHarrisGallagher(beta, Re_D, D_pipe,
+                                                                      OrificeTap::Corner);
             const double cd_stolz = orifice::Cd_Stolz(beta, Re_D);
-            const double cd_miller = orifice::Cd_Miller(beta, Re_D);
 
             std::cout << std::setw(8)  << beta
                       << std::setw(10) << static_cast<int>(Re_D)
                       << std::setw(12) << cd_rhg
+                      << std::setw(12) << cd_rhg_c
                       << std::setw(10) << cd_stolz
-                      << std::setw(10) << cd_miller
                       << "\n";
         }
     }

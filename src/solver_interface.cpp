@@ -1307,22 +1307,32 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
                                              double P_static_up, double T_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double Cd,
-                                             double area, double beta) {
+                                             double area, double beta,
+                                             double P_rho_ref) {
   (void)m_dot;
-  double dP = P_total_up - P_static_down;
+  // The drive follows approach_from_static: with E applied the approach head
+  // is E's, so the drive is the upstream STATIC pressure (ISO's tapping
+  // differential); without it, the upstream stagnation pressure.
+  const bool from_static = approach_from_static(beta);
+  const double dP = (from_static ? P_static_up : P_total_up) - P_static_down;
+  // Density reference: the upstream static unless the caller names another.
+  const bool own_rho_ref = P_rho_ref > 0.0;
+  const double P_rho = own_rho_ref ? P_rho_ref : P_static_up;
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
-  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_static_up, X_up);
+  auto [rho, drho_dT, drho_dP] = density_and_jacobians(T_up, P_rho, X_up);
 
   // Get mass flow and analytical Jacobians from low-level function
   auto [mdot_calc, dmdot_ddP, dmdot_drho] = orifice_mdot_and_jacobian(dP, rho, Cd, area, beta);
 
   OrificeResult res;
   res.m_dot_calc = mdot_calc;
-  res.d_mdot_dP_total_up = dmdot_ddP;
+  res.d_mdot_dP_total_up = from_static ? 0.0 : dmdot_ddP;
   res.d_mdot_dP_static_down = -dmdot_ddP;
 
-  // Chain rule: d(mdot)/d(P_static_up) = d(mdot)/d(rho) * d(rho)/d(P)
-  res.d_mdot_dP_static_up = dmdot_drho * drho_dP;
+  // Chain rule: d(mdot)/d(P_rho) = d(mdot)/d(rho) * d(rho)/d(P)
+  const double d_rho_term = dmdot_drho * drho_dP;
+  res.d_mdot_dP_static_up = (from_static ? dmdot_ddP : 0.0) + (own_rho_ref ? 0.0 : d_rho_term);
+  res.d_mdot_dP_rho_ref = own_rho_ref ? d_rho_term : 0.0;
   res.d_mdot_dT_up = dmdot_drho * drho_dT;
 
   // Analytical Y derivatives via chain rule: d(mdot)/d(Y[i]) = d(mdot)/d(rho) * d(rho)/d(Y[i])
@@ -1333,7 +1343,7 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
     std::vector<double> Y_plus = Y_up;
     Y_plus[i] += eps_Y;
     auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
-    double rho_plus = std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
+    double rho_plus = std::get<0>(density_and_jacobians(T_up, P_rho, X_plus));
     double drho_dY = (rho_plus - rho) / eps_Y;
     res.d_mdot_dY_up[i] = dmdot_drho * drho_dY;
   }
@@ -1766,22 +1776,28 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
 }
 
 OrificeResult orifice_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up,
+    double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta) {
 
   (void)m_dot;  // Not used in compressible orifice (computed from pressures)
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
 
+  // The same rule as the incompressible kernel: with E applied the approach
+  // head is E's, so the nozzle expands from the upstream STATIC pressure.
+  const bool from_static = approach_from_static(beta);
+  const double P0 = from_static ? P_static_up : P_total_up;
+
   // Get mass flow and Jacobians from low-level function
   auto [mdot_calc, dmdot_dP0, dmdot_dP_back, dmdot_dT0] =
-      orifice_compressible_mdot_and_jacobian(T_up, P_total_up, P_static_down, X_up, Cd, area, beta);
+      orifice_compressible_mdot_and_jacobian(T_up, P0, P_static_down, X_up, Cd, area, beta);
 
   OrificeResult res;
   res.m_dot_calc = mdot_calc;
-  res.d_mdot_dP_total_up = dmdot_dP0;
+  res.d_mdot_dP_total_up = from_static ? 0.0 : dmdot_dP0;
   res.d_mdot_dP_static_down = dmdot_dP_back;
-  res.d_mdot_dP_static_up = 0.0;  // Compressible model uses total pressure, not static
+  res.d_mdot_dP_static_up = from_static ? dmdot_dP0 : 0.0;
+  res.d_mdot_dP_rho_ref = 0.0;
   res.d_mdot_dT_up = dmdot_dT0;
 
   // Compute d(mdot)/d(Y[i]) using finite differences
@@ -1792,7 +1808,7 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     Y_plus[i] += eps_Y;
     auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
     auto [mdot_plus, dummy1, dummy2, dummy3] =
-        orifice_compressible_mdot_and_jacobian(T_up, P_total_up, P_static_down, X_plus, Cd, area, beta);
+        orifice_compressible_mdot_and_jacobian(T_up, P0, P_static_down, X_plus, Cd, area, beta);
     res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
   }
 

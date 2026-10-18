@@ -2865,6 +2865,14 @@ class CombustorNode(NetworkNode):
 
 # The discharge-hole family: a hole in a wall, no pipe, no beta. 'fixed' and
 # the ISO 5167 metering correlations are deliberately not in this map.
+# The normed metering family (ISO 5167): Cd and dCd/dRe_D from C++'s
+# metering_cd_and_dRe, so no metering formula lives here. Miller was removed:
+# no published source matched the formula it carried.
+_METERING_SELECTORS = {
+    "ReaderHarrisGallagher": cb.MeteringCdCorrelation.ReaderHarrisGallagher,
+    "Stolz": cb.MeteringCdCorrelation.Stolz,
+}
+
 _DISCHARGE_SELECTORS = {
     "IdelchikThick": cb.DischargeCdCorrelation.Idelchik1966Thick,
     "IdelchikBeveled": cb.DischargeCdCorrelation.Idelchik1966Beveled,
@@ -2888,22 +2896,25 @@ class OrificeElement(NetworkElement):
 
     The discharge coefficient Cd is determined by the 'correlation' parameter:
       - 'fixed': Uses the user-supplied Cd value directly.
-      - 'ReaderHarrisGallagher': Sharp thin-plate (ISO 5167-2 / RHG).
-      - 'Stolz': ISO 5167:1980 (Corner taps).
-      - 'Miller': Miller (1996) simplified correlation.
+      - 'ReaderHarrisGallagher': Sharp thin-plate (ISO 5167-2:2003 / RHG).
+      - 'Stolz': ISO 5167:1980.
       - 'IdelchikThick': Deep hole in a wall, Idelchik diagram 4-18a
         (requires plate_thickness). Valid Re 25 to 1e6.
       - 'IdelchikBeveled': Beveled-edge hole, diagram 4-18b
         (requires bevel_depth).
       - 'IdelchikRounded': Rounded-edge hole, diagram 4-18c
         (requires edge_radius).
-      - 'McGreehanSchotsch': Cooling hole with inlet crossflow (1988).
+      - 'McGreehanSchotsch': Long cooling hole (1988). Plenum-fed here, so
+        its inlet-crossflow term sees U1/Vi = 0; only EffusionPlateElement's
+        duct-fed panels feed it a crossflow.
       - 'Lichtarowicz': LONG orifice, Lichtarowicz, Duggins and Markland
         (1965), l/d 2-10 and Re 10 to 2e4 (requires plate_thickness).
         Refused below l/d = 1.5, where the source reports hysteresis.
 
-    The first four are NORMED metering correlations: Cd is referenced to the
-    tapping differential and is a function of beta = d/D. The last five are
+    The first two are NORMED metering correlations: Cd is referenced to the
+    tapping differential and is a function of beta = d/D. Both are evaluated
+    at flange taps: the tap choice is a measurement convention and must not
+    move the solved flow (#645). The last five are
     DISCHARGE correlations for a hole in a wall, where zeta is referenced to
     the hole velocity and there is no beta. They are not interchangeable, and
     there is deliberately no 'Auto' arm choosing between them from geometry.
@@ -2950,6 +2961,13 @@ class OrificeElement(NetworkElement):
         # set to "default" in resolve_topology (issue #559).
         self._area_source = "user" if (diameter is not None or area is not None) else ""
 
+        if correlation == "Miller":
+            raise ValueError(
+                f"OrificeElement {id!r}: the 'Miller' correlation was removed. "
+                "No published source matched its formula (and the network's "
+                "'Miller' had been computing Stolz). Use 'Stolz' or "
+                "'ReaderHarrisGallagher'."
+            )
         self.Cd = Cd
         self.regime = regime
         self.correlation = correlation
@@ -3111,30 +3129,9 @@ class OrificeElement(NetworkElement):
         Re_hole = self._hole_reynolds(state_in)
 
         # Correlation selection logic
-        if self.correlation == "ReaderHarrisGallagher":
-            return float(cb.Cd_sharp_thin_plate(self._orifice_geom, flow_state))
-        elif self.correlation == "Stolz":
-            b = self._orifice_geom.beta
-            b2 = b * b
-            b8 = b2 * b2 * b2 * b2
-            cd = (
-                0.5961
-                + 0.0261 * b2
-                - 0.216 * b8
-                + 0.000521 * math.pow(1e6 * b / max(flow_state.Re_D, 1.0), 0.7)
-            )
-            return float(cd)
-        elif self.correlation == "Miller":
-            b = self._orifice_geom.beta
-            b2 = b * b
-            b8 = b2 * b2 * b2 * b2
-            cd = (
-                0.5959
-                + 0.0312 * math.pow(b, 2.1)
-                - 0.184 * b8
-                + 91.71 * math.pow(b, 2.5) * math.pow(max(flow_state.Re_D, 1.0), -0.75)
-            )
-            return float(cd)
+        metering = _METERING_SELECTORS.get(self.correlation)
+        if metering is not None:
+            return float(cb.metering_cd_and_dRe(metering, self._orifice_geom, flow_state.Re_D)[0])
         elif self.correlation in _DISCHARGE_SELECTORS:
             # The discharge-hole family: a hole in a wall, not a plate in a
             # pipe, so DischargeHoleGeometry and no pipe diameter -- the
@@ -3156,7 +3153,7 @@ class OrificeElement(NetworkElement):
                 "The 'Auto' arm was removed: it picked a correlation from the "
                 "geometry behind the caller's back, which is how a "
                 "rounded-entry request came back as Stolz. Name one of "
-                "'fixed', 'ReaderHarrisGallagher', 'Stolz', 'Miller', "
+                "'fixed', 'ReaderHarrisGallagher', 'Stolz', "
                 "'IdelchikThick', 'IdelchikBeveled', 'IdelchikRounded', "
                 "'McGreehanSchotsch', 'Lichtarowicz'."
             )
@@ -3292,19 +3289,10 @@ class OrificeElement(NetworkElement):
         mu_fallback = not mu > 0.0
         mu = 1.8e-5 if mu_fallback else mu
         Re = 4.0 * abs(m) / (math.pi * D_up * mu)
-        b = self._orifice_geom.beta
-        if self.correlation == "ReaderHarrisGallagher":
-            st = cb.OrificeState()
-            st.Re_D = Re
-            dCd_dRe = float(cb.Cd_sharp_thin_plate_and_dRe(self._orifice_geom, st)[1])
-        elif self.correlation == "Stolz":
-            dCd_dRe = -0.7 * 0.000521 * math.pow(1e6 * b / Re, 0.7) / Re if Re >= 1.0 else 0.0
-        elif self.correlation == "Miller":
-            dCd_dRe = (
-                -0.75 * 91.71 * math.pow(b, 2.5) * math.pow(Re, -0.75) / Re if Re >= 1.0 else 0.0
-            )
-        else:
+        metering = _METERING_SELECTORS.get(self.correlation)
+        if metering is None:
             return {}
+        dCd_dRe = float(cb.metering_cd_and_dRe(metering, self._orifice_geom, Re)[1])
         out = {f"{self.id}.m_dot": dCd_dRe * Re / abs(m) * (1.0 if m > 0 else -1.0)}
         if not mu_fallback:
             for name, d in self._re_viscosity_dnames(state_in, Re).items():
@@ -3312,12 +3300,22 @@ class OrificeElement(NetworkElement):
         return out
 
     def _cd_in_range(self, state_in: "NetworkMixtureState") -> bool:
-        """Is the discharge-hole Cd inside its source's Re and l/d range?
+        """Is the Cd inside its source's stated range?
 
         A flag for diagnostics, never a selector. True for 'fixed' (the value
-        is the caller's) and for the normed metering family, whose ranges are
-        ISO 5167's and are not checked here.
+        is the caller's). The normed metering family asks C++'s
+        metering_cd_in_range at the pipe Reynolds number (ISO 5167-2:2003
+        5.3.1 for Reader-Harris/Gallagher; Stolz's 1980 limits are not
+        encoded). A plenum-fed metering plate reads False: it has no pipe.
         """
+        metering = _METERING_SELECTORS.get(self.correlation)
+        if metering is not None and self._orifice_geom is not None:
+            D_up = self._orifice_geom.D
+            mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+            m = abs(float(state_in.m_dot))
+            Re_D = 4.0 * m / (math.pi * D_up * mu) if (mu > 0.0 and D_up > 0.0) else 0.0
+            in_pipe = bool(self.upstream_diameter)
+            return in_pipe and bool(cb.metering_cd_in_range(metering, self._orifice_geom, Re_D))
         selector = _DISCHARGE_SELECTORS.get(self.correlation)
         if selector is None or self._orifice_geom is None:
             return True
@@ -3437,35 +3435,38 @@ class OrificeElement(NetworkElement):
         if cd < _KERNEL_CD_MIN:
             m1, d1 = self._kernel_from(src, dst, src_id, dst_id, 1.0)
             return m1 * cd, {k: v * cd for k, v in d1.items()}
+        # With a velocity of approach (beta > 0) the kernels drive from the
+        # upstream STATIC pressure, since E carries the approach head; without
+        # one, from the stagnation pressure. The rule is C++'s
+        # (approach_from_static); both pressures are passed.
         if self.regime == "compressible":
             r = _solver_tools.orifice_compressible_residuals_and_jacobian(
-                src.m_dot, src.Pt, src.Tt, src.Y, dst.P, cd, self.area, beta
+                src.m_dot, src.Pt, src.P, src.Tt, src.Y, dst.P, cd, self.area, beta
             )
         else:
             _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
             r = _solver_tools.orifice_residuals_and_jacobian(
                 src.m_dot,
                 src.Pt,
-                dst.P if _p_ref_outlet else src.P,
+                src.P,
                 src.T,
                 src.Y,
                 dst.P,
                 cd,
                 self.area,
                 beta=beta,
+                # Density at the downstream static: its sensitivity moves there.
+                P_rho_ref=dst.P if _p_ref_outlet else -1.0,
             )
         d: dict[str, float] = {
             f"{src_id}.Pt": float(r.d_mdot_dP_total_up),
             f"{src_id}.T": float(r.d_mdot_dT_up),
+            f"{dst_id}.P": float(r.d_mdot_dP_static_down + r.d_mdot_dP_rho_ref),
         }
-        if self.regime != "compressible" and (
-            getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
-        ):
-            # Density at the downstream static: its sensitivity moves there.
-            d[f"{dst_id}.P"] = float(r.d_mdot_dP_static_down + r.d_mdot_dP_static_up)
-        else:
+        # Outlet-referenced and plenum-fed, the flow does not read the source
+        # static at all: leave the column out rather than carry a zero.
+        if r.d_mdot_dP_static_up != 0.0:
             d[f"{src_id}.P"] = float(r.d_mdot_dP_static_up)
-            d[f"{dst_id}.P"] = d.get(f"{dst_id}.P", 0.0) + float(r.d_mdot_dP_static_down)
         for i, val in enumerate(r.d_mdot_dY_up):
             if val != 0.0:
                 d[f"{src_id}.Y[{i}]"] = float(val)
@@ -3993,7 +3994,7 @@ class EffusionPlateElement(OrificeElement):
 
     def validate(self) -> None:
         super().validate()
-        if self.correlation in ("ReaderHarrisGallagher", "Stolz", "Miller"):
+        if self.correlation in _METERING_SELECTORS:
             raise ValueError(
                 f"EffusionPlateElement {self.id!r}: {self.correlation!r} is a "
                 "NORMED metering correlation for a standardised plate in a "
@@ -4606,7 +4607,7 @@ class ImpingementPlateElement(OrificeElement):
 
     def validate(self) -> None:
         super().validate()
-        if self.correlation in ("ReaderHarrisGallagher", "Stolz", "Miller"):
+        if self.correlation in _METERING_SELECTORS:
             raise ValueError(
                 f"ImpingementPlateElement {self.id!r}: {self.correlation!r} is a "
                 "metering correlation for a plate in a pipe; a jet plate has no "

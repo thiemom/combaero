@@ -38,7 +38,7 @@ def _network(corr: str, regime: str) -> FlowNetwork:
 
 
 @pytest.mark.parametrize(
-    "corr", ["ReaderHarrisGallagher", "Stolz", "Miller", "IdelchikThick", "McGreehanSchotsch"]
+    "corr", ["ReaderHarrisGallagher", "Stolz", "IdelchikThick", "McGreehanSchotsch"]
 )
 @pytest.mark.parametrize("regime", ["compressible", "incompressible"])
 def test_a_reynolds_dependent_cd_has_its_temperature_column(corr: str, regime: str) -> None:

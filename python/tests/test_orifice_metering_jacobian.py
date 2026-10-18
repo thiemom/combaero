@@ -1,6 +1,6 @@
 """The metering orifice's own flow column carries dCd/dm (through Re_D).
 
-ReaderHarrisGallagher (the default), Stolz and Miller read the pipe Reynolds
+ReaderHarrisGallagher (the default) and Stolz read the pipe Reynolds
 number Re_D = 4 |m| / (pi D mu), so the row m - Cd(Re_D(m)) K has slope
 1 - K dCd/dm. The Jacobian gave 1: 1.0% off on a 2 cm orifice at 1600 K,
 found by the FD check behind #636's tests.
@@ -53,7 +53,7 @@ def _net(regime: str, correlation: str) -> FlowNetwork:
 
 
 @pytest.mark.parametrize("regime", ["compressible", "incompressible"])
-@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz", "Miller"])
+@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz"])
 def test_the_orifice_rows_flow_column_is_exact(regime: str, correlation: str) -> None:
     s = NetworkSolver(_net(regime, correlation))
     with warnings.catch_warnings():
@@ -76,5 +76,7 @@ def test_the_orifice_rows_flow_column_is_exact(regime: str, correlation: str) ->
         e[j] = h
         fd = (F(x + e)[i] - F(x - e)[i]) / (2 * h)
         assert J[i, j] == pytest.approx(fd, rel=1e-7), (eid, correlation, regime)
-        if correlation != "Miller":  # Miller's Re term is cut off at high Re
-            assert abs(J[i, j] - 1.0) > 1e-4  # the column really carries dCd/dm
+        # The column really carries dCd/dm. Stolz's Re term (0.0029 b^2.5
+        # (1e6/Re)^0.75) is the weaker one: |J - 1| ~ 7e-5 here; a missing
+        # derivative gives exactly 0.
+        assert abs(J[i, j] - 1.0) > 1e-5

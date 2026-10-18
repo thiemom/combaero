@@ -1258,6 +1258,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
                     &solver::OrificeResult::d_mdot_dP_static_down)
       .def_readonly("d_mdot_dP_static_up",
                     &solver::OrificeResult::d_mdot_dP_static_up)
+      .def_readonly("d_mdot_dP_rho_ref", &solver::OrificeResult::d_mdot_dP_rho_ref)
       .def_readonly("d_mdot_dT_up", &solver::OrificeResult::d_mdot_dT_up)
       .def_readonly("d_mdot_dY_up", &solver::OrificeResult::d_mdot_dY_up);
 
@@ -1299,7 +1300,11 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
         py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
-        py::arg("area"), py::arg("beta") = 0.0);
+        py::arg("area"), py::arg("beta") = 0.0, py::arg("P_rho_ref") = -1.0,
+        "Incompressible orifice with all derivatives. With E applied\n"
+        "(0 < beta < 1) the drive is P_static_up - P_static_down, else\n"
+        "P_total_up - P_static_down. Density at P_static_up, or at P_rho_ref\n"
+        "when > 0 (its derivative is then d_mdot_dP_rho_ref).");
 
   m.def("channel_residuals_and_jacobian",
         &solver::channel_residuals_and_jacobian, py::arg("m_dot"),
@@ -1318,10 +1323,12 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("orifice_compressible_residuals_and_jacobian",
         &solver::orifice_compressible_residuals_and_jacobian, py::arg("m_dot"),
-        py::arg("P_total_up"), py::arg("T_up"), py::arg("Y_up"),
-        py::arg("P_static_down"), py::arg("Cd"), py::arg("area"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"), py::arg("area"),
         py::arg("beta") = 0.0,
-        "Compressible orifice for network solver with all derivatives.");
+        "Compressible orifice for network solver with all derivatives. With E\n"
+        "applied (0 < beta < 1) the nozzle expands from P_static_up, else from\n"
+        "P_total_up.");
 
 
   m.def("momentum_chamber_residual_and_jacobian",
@@ -4945,6 +4952,15 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def("volume", &Tube::volume, "Volume [m³]")
       .def("perimeter", &Tube::perimeter, "Circumference [m]");
 
+  py::enum_<OrificeTap>(
+      m, "OrificeTap",
+      "Pressure taps of a metering orifice (ISO 5167-2:2003, 5.3.2.1). A\n"
+      "measurement choice: it fixes which pressure difference C refers to,\n"
+      "not what the plate does to the flow.")
+      .value("Corner", OrificeTap::Corner, "L1 = L2' = 0")
+      .value("D_D2", OrificeTap::D_D2, "D and D/2 taps: L1 = 1, L2' = 0.47")
+      .value("Flange", OrificeTap::Flange, "L1 = L2' = 25.4 mm / D (the default)");
+
   // MeteringCdCorrelation enum (early binding for default arguments)
   py::enum_<MeteringCdCorrelation>(
       m, "MeteringCdCorrelation",
@@ -4954,7 +4970,6 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .value("ReaderHarrisGallagher", MeteringCdCorrelation::ReaderHarrisGallagher,
              "ISO 5167-2 / ASME MFC-3M")
       .value("Stolz", MeteringCdCorrelation::Stolz, "ISO 5167:1980 (older)")
-      .value("Miller", MeteringCdCorrelation::Miller, "Miller (1996) simplified")
       .value("Constant", MeteringCdCorrelation::Constant,
              "Fixed Cd, 0.61 (orifice::defaults::metering_cd)")
       .value("UserFunction", MeteringCdCorrelation::UserFunction,
@@ -5706,6 +5721,8 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def(py::init<>())
       .def_readwrite("d", &OrificeGeometry::d, "Orifice bore diameter [m]")
       .def_readwrite("D", &OrificeGeometry::D, "Channel diameter [m]")
+      .def_readwrite("tap", &OrificeGeometry::tap,
+                     "Pressure taps the metering Cd refers to (default Flange)")
       .def_readwrite("t", &OrificeGeometry::t, "Plate thickness [m]")
       .def_readwrite("r", &OrificeGeometry::r, "Inlet edge radius [m]")
       .def_readwrite("bevel", &OrificeGeometry::bevel, "Bevel angle [rad]")
@@ -5744,8 +5761,19 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
   m.def("Cd_sharp_thin_plate", &Cd_sharp_thin_plate, py::arg("geom"),
         py::arg("state"),
         "Discharge coefficient for sharp thin-plate orifice (ISO 5167-2).\n\n"
-        "Uses Reader-Harris/Gallagher correlation.\n"
-        "Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm");
+        "Uses Reader-Harris/Gallagher at the taps geom.tap, with the\n"
+        "small-pipe term below D = 71.12 mm. Range: metering_cd_in_range.");
+  m.def("metering_cd_and_dRe", &metering_cd_and_dRe, py::arg("correlation"),
+        py::arg("geom"), py::arg("Re_D"),
+        "(Cd, dCd/dRe_D) of a metering correlation at the taps geom.tap.\n\n"
+        "ReaderHarrisGallagher (ISO 5167-2:2003) or Stolz (ISO 5167:1980).\n"
+        "Constant and UserFunction raise ValueError: their Cd is the caller's.");
+  m.def("metering_cd_in_range", &metering_cd_in_range, py::arg("correlation"),
+        py::arg("geom"), py::arg("Re_D"),
+        "Is the plate inside the correlation's stated range? A diagnostic,\n"
+        "never a selector. ReaderHarrisGallagher: ISO 5167-2:2003 5.3.1 (d,\n"
+        "D, beta and the tap-dependent Re_D floor). Stolz: always True, its\n"
+        "1980 limits are not encoded.");
 
 
 

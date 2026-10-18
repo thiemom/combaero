@@ -590,8 +590,8 @@ inline constexpr Entry function_units[] = {
      "T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -",
      "tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K))"},
     {"orifice_compressible_residuals_and_jacobian",
-     "m_dot: kg/s, P_total_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, "
-     "Cd: -, area: m^2, beta: -",
+     "m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, T_up: K, Y_up: kg/kg, "
+     "P_static_down: Pa, Cd: -, area: m^2, beta: -",
      "OrificeResult"},
 
     // -------------------------------------------------------------------------
@@ -915,6 +915,9 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     {"Cd_sharp_thin_plate", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"Cd_sharp_thin_plate_and_dRe", "OrificeGeometry, OrificeState", "- (Cd), - (dCd/dRe_D)"},
+    {"metering_cd_and_dRe", "correlation: -, geom: OrificeGeometry, Re_D: -",
+     "- (Cd), - (dCd/dRe_D)"},
+    {"metering_cd_in_range", "correlation: -, geom: OrificeGeometry, Re_D: -", "- (bool)"},
     {"Cd", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"mcgreehan_schotsch_1988_cd",
      "Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: -", "- (Cd)"},
@@ -1518,13 +1521,18 @@ inline constexpr Entry function_units[] = {
     {"OrificeGeometry::r_over_d", "-", "-"},
     {"OrificeGeometry::t", "-", "m"},
     {"OrificeGeometry::t_over_d", "-", "-"},
+    {"OrificeGeometry::tap", "-", "-"},
+    {"OrificeTap::Corner", "-", "-"},
+    {"OrificeTap::D_D2", "-", "-"},
+    {"OrificeTap::Flange", "-", "-"},
+    {"OrificeTap::name", "-", "-"},
+    {"OrificeTap::value", "-", "-"},
     {"OrificeState::Re_D", "-", "-"},
     {"OrificeState::Re_d", "-", "-"},
     {"OrificeState::dP", "-", "Pa"},
     {"OrificeState::mu", "-", "Pa·s"},
     {"OrificeState::rho", "-", "kg/m³"},
     {"MeteringCdCorrelation::Constant", "-", "-"},
-    {"MeteringCdCorrelation::Miller", "-", "-"},
     {"MeteringCdCorrelation::ReaderHarrisGallagher", "-", "-"},
     {"MeteringCdCorrelation::Stolz", "-", "-"},
     {"MeteringCdCorrelation::name", "-", "-"},

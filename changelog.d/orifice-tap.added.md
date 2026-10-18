@@ -1,0 +1,4 @@
+- **Pressure taps for the metering orifice correlations.** `OrificeGeometry.tap` (`OrificeTap.Corner`, `D_D2` or `Flange`, the default) selects the ISO 5167-2:2003 tap positions for Reader-Harris/Gallagher and Stolz.
+  - **What it changes:** the tap is a measurement convention. It changes which pressure difference C refers to, not what the plate does to the flow, so the network element always evaluates flange taps and its flow never depends on the tap.
+  - **New functions:** `metering_cd_and_dRe(correlation, geom, Re_D)` returns (Cd, dCd/dRe_D). `metering_cd_in_range(...)` flags ISO 5167-2's d, D, beta and Reynolds limits, and the orifice's `Cd_in_range` diagnostic now uses it.
+  - **Stolz's tap default:** Stolz through `make_correlation` / `solve_orifice_mdot` now honours `geom.tap`. Before, it was always corner taps; at the flange default, Cd moves by about +0.0005 at beta 0.5 in a 100 mm pipe.

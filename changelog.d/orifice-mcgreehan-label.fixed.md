@@ -1,0 +1,1 @@
+- **The orifice's McGreehan-Schotsch option no longer claims a crossflow.** A plain `OrificeElement` is plenum-fed, so the correlation's inlet-crossflow term always sees U1/Vi = 0. The GUI option read "Cooling Hole with Crossflow" and now reads "plenum-fed", like the plate elements. Only `EffusionPlateElement`'s duct-fed panels feed it a crossflow.

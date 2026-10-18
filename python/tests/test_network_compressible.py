@@ -1122,9 +1122,15 @@ def test_certified_merge_root_passes_direction_verification():
     solver = NetworkSolver(net)
     sol = solver.solve(timeout=30.0)
     assert sol["__success__"], sol.get("__message__")
-    # Certified ground truth from the inverse-design generator.
-    assert abs(sol["ch_str.m_dot"] - 0.25761378909667976) < 5e-3
-    assert abs(sol["ch_bra.m_dot"] - 0.21294516374058128) < 5e-3
+    # The inverse-design generator certified (0.2576, 0.2129) with the
+    # pre-#645 orifice kernel, which drove orf_out (beta 0.82, behind a
+    # MomentumChamberNode) from n2_com's stagnation pressure AND applied E,
+    # counting the approach head twice. With the static drive the same
+    # fixture's genuine root is below; both feeds still flow forward, which is
+    # what this test verifies.
+    assert sol["ch_str.m_dot"] > 0.0 and sol["ch_bra.m_dot"] > 0.0
+    assert abs(sol["ch_str.m_dot"] - 0.24465400571627866) < 5e-3
+    assert abs(sol["ch_bra.m_dot"] - 0.18019627392692603) < 5e-3
 
 
 def _mfb_branch_tee_orifice_network(m_dot: float, regime: str) -> FlowNetwork:

@@ -233,8 +233,11 @@ print(f"Specific impulse: {thrust.specific_impulse} s")
 ### Discharge Coefficient Correlations
 ```python
 # Normed metering orifice (ISO 5167 family, a function of beta = d/D)
-Cd = cb.Cd_sharp_thin_plate(geom, state)
+geom.tap = cb.OrificeTap.Corner  # Corner, D_D2 or Flange (default)
+Cd = cb.Cd_sharp_thin_plate(geom, state)  # Reader-Harris/Gallagher at geom.tap
 Cd, dCd_dRe = cb.Cd_sharp_thin_plate_and_dRe(geom, state)  # analytic Re_D derivative
+Cd, dCd_dRe = cb.metering_cd_and_dRe(cb.MeteringCdCorrelation.Stolz, geom, Re_D)
+ok = cb.metering_cd_in_range(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom, Re_D)
 
 # Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
 # geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.

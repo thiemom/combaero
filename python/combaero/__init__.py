@@ -174,6 +174,9 @@ try:
         Cd_sharp_thin_plate,
         Cd_sharp_thin_plate_and_dRe,
         MeteringCdCorrelation,
+        OrificeTap,
+        metering_cd_and_dRe,
+        metering_cd_in_range,
         DischargeCdCorrelation,
         DischargeHoleGeometry,
         DischargeHoleState,
@@ -808,6 +811,7 @@ except (ModuleNotFoundError, ImportError) as e:
     OrificeGeometry = _core.OrificeGeometry
     OrificeState = _core.OrificeState
     MeteringCdCorrelation = _core.MeteringCdCorrelation
+    OrificeTap = _core.OrificeTap
     DischargeCdCorrelation = _core.DischargeCdCorrelation
     DischargeHoleGeometry = _core.DischargeHoleGeometry
     DischargeHoleState = _core.DischargeHoleState
@@ -815,6 +819,8 @@ except (ModuleNotFoundError, ImportError) as e:
     CorrelationResult = _core.CorrelationResult
     Cd_sharp_thin_plate = _core.Cd_sharp_thin_plate
     Cd_sharp_thin_plate_and_dRe = _core.Cd_sharp_thin_plate_and_dRe
+    metering_cd_and_dRe = _core.metering_cd_and_dRe
+    metering_cd_in_range = _core.metering_cd_in_range
     discharge_cd = _core.discharge_cd
     discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     discharge_cd_in_range = _core.discharge_cd_in_range
@@ -1409,6 +1415,7 @@ __all__ = [
     "OrificeGeometry",
     "OrificeState",
     "MeteringCdCorrelation",
+    "OrificeTap",
     "DischargeCdCorrelation",
     "DischargeHoleGeometry",
     "DischargeHoleState",
@@ -1416,6 +1423,8 @@ __all__ = [
     "CorrelationResult",
     "Cd_sharp_thin_plate",
     "Cd_sharp_thin_plate_and_dRe",
+    "metering_cd_and_dRe",
+    "metering_cd_in_range",
     "discharge_cd",
     "discharge_cd_and_derivatives",
     "discharge_cd_in_range",

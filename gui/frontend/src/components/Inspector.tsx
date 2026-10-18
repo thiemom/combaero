@@ -727,8 +727,7 @@ const Inspector = () => {
 										<option value="ReaderHarrisGallagher">
 											Reader-Harris/Gallagher (Sharp)
 										</option>
-										<option value="Stolz">Stolz (Corner Taps)</option>
-										<option value="Miller">Miller (Simplified)</option>
+										<option value="Stolz">Stolz (ISO 5167:1980)</option>
 										<option value="IdelchikThick">
 											Deep Hole in Wall (Idelchik 4-18a)
 										</option>
@@ -739,7 +738,7 @@ const Inspector = () => {
 											Rounded Hole in Wall (Idelchik 4-18c)
 										</option>
 										<option value="McGreehanSchotsch">
-											Cooling Hole with Crossflow (M-S 1988)
+											Cooling Hole (M-S 1988, plenum-fed)
 										</option>
 										<option value="Lichtarowicz">
 											Long Orifice, l/d 2-10 (Lichtarowicz 1965)

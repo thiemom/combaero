@@ -130,7 +130,7 @@ class TestCorrelationSelection:
     def test_normed_metering_correlations_are_refused(self):
         """A panel has no pipe and no beta, so an ISO 5167 correlation is not
         merely inaccurate here -- it is undefined."""
-        for bad in ("ReaderHarrisGallagher", "Stolz", "Miller"):
+        for bad in ("ReaderHarrisGallagher", "Stolz"):
             e = EffusionPlateElement("p", "c", "g", panel_area=1.0, correlation=bad, **ANDREWS_B)
             with pytest.raises(ValueError, match="NORMED metering correlation"):
                 e.validate()

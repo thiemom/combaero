@@ -174,19 +174,43 @@ TEST(SolverJacobianTest, OrificeDerivatives) {
   auto res_down_p =
       orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y,
                                      P_static_down + eps, Cd, area, beta);
-  double fd_dP_static_down = (res_down_p.m_dot_calc - res.m_dot_calc) / eps;
+  auto res_down_m =
+      orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y,
+                                     P_static_down - eps, Cd, area, beta);
+  double fd_dP_static_down = (res_down_p.m_dot_calc - res_down_m.m_dot_calc) / (2.0 * eps);
   report_jacobian_difference("OrificeDerivatives", "d_mdot_dP_static_down",
                              res.d_mdot_dP_static_down, fd_dP_static_down);
   EXPECT_NEAR(res.d_mdot_dP_static_down, fd_dP_static_down, 1e-10);
 
-  // d_mdot_dP_static_up (via density)
+  // d_mdot_dP_static_up: with beta > 0 the drive (approach_from_static) plus
+  // the density, so the stagnation column above is exactly zero.
   auto res_up_p =
       orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up + eps, T_up,
                                      Y, P_static_down, Cd, area, beta);
-  double fd_dP_static_up = (res_up_p.m_dot_calc - res.m_dot_calc) / eps;
+  auto res_up_m =
+      orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up - eps, T_up,
+                                     Y, P_static_down, Cd, area, beta);
+  double fd_dP_static_up = (res_up_p.m_dot_calc - res_up_m.m_dot_calc) / (2.0 * eps);
   report_jacobian_difference("OrificeDerivatives", "d_mdot_dP_static_up",
                              res.d_mdot_dP_static_up, fd_dP_static_up);
-  EXPECT_NEAR(res.d_mdot_dP_static_up, fd_dP_static_up, 1e-12);
+  EXPECT_NEAR(res.d_mdot_dP_static_up, fd_dP_static_up,
+              std::abs(fd_dP_static_up) * 1e-7 + 1e-12);
+  EXPECT_EQ(res.d_mdot_dP_total_up, 0.0);
+
+  // A named density reference takes the density column with it.
+  const double P_rho = 185000.0;
+  const OrificeResult rr = orifice_residuals_and_jacobian(
+      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, Cd, area, beta, P_rho);
+  const double fd_dP_rho =
+      (orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y,
+                                      P_static_down, Cd, area, beta, P_rho + eps)
+           .m_dot_calc -
+       orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up, T_up, Y,
+                                      P_static_down, Cd, area, beta, P_rho - eps)
+           .m_dot_calc) /
+      (2.0 * eps);
+  EXPECT_NEAR(rr.d_mdot_dP_rho_ref, fd_dP_rho, std::abs(fd_dP_rho) * 1e-7 + 1e-14);
+  EXPECT_GT(std::abs(rr.d_mdot_dP_rho_ref), 0.0);
 
   // d_mdot_dT_up
   double eps_T = 1e-4;
@@ -365,48 +389,57 @@ TEST(SolverJacobianTest, OrificeCompressibleDerivatives) {
       Y[i] = 0.23;
   }
 
-  double m_dot = 0.30;
-  double P_total_up = 200000.0;
-  double T_up = 300.0;
-  double P_static_down = 150000.0;
-  double Cd = 0.65;
-  double area = 1e-4;
-  double beta = 0.5;
+  const double m_dot = 0.30;
+  const double P_total_up = 200000.0;
+  const double P_static_up = 190000.0;  // a flowing node: Pt > P
+  const double T_up = 300.0;
+  const double P_static_down = 150000.0;
+  const double Cd = 0.65;
+  const double area = 1e-4;
 
-  OrificeResult res = orifice_compressible_residuals_and_jacobian(
-      m_dot, P_total_up, T_up, Y, P_static_down, Cd, area, beta);
+  // beta = 0 drives from the stagnation pressure, beta = 0.5 from the static
+  // one (approach_from_static); each column must match its difference, and
+  // the column the rule does not use must be exactly zero.
+  for (const double beta : {0.0, 0.5}) {
+    auto f = [&](double pt, double ps, double t, double pb) {
+      return orifice_compressible_residuals_and_jacobian(m_dot, pt, ps, t, Y, pb, Cd,
+                                                         area, beta);
+    };
+    const OrificeResult res = f(P_total_up, P_static_up, T_up, P_static_down);
 
-  double eps_P = 1.0;
-  auto res_P0_p = orifice_compressible_residuals_and_jacobian(
-      m_dot, P_total_up + eps_P, T_up, Y, P_static_down, Cd, area, beta);
-  auto res_P0_m = orifice_compressible_residuals_and_jacobian(
-      m_dot, P_total_up - eps_P, T_up, Y, P_static_down, Cd, area, beta);
-  double fd_dP0 = (res_P0_p.m_dot_calc - res_P0_m.m_dot_calc) / (2.0 * eps_P);
-  report_jacobian_difference("OrificeCompressibleDerivatives",
-                             "d_mdot_dP_total_up", res.d_mdot_dP_total_up,
-                             fd_dP0);
-  EXPECT_NEAR(res.d_mdot_dP_total_up, fd_dP0, std::abs(fd_dP0) * 1e-8 + 1e-12);
+    const double eps_P = 1.0;
+    const double fd_dPt = (f(P_total_up + eps_P, P_static_up, T_up, P_static_down).m_dot_calc -
+                           f(P_total_up - eps_P, P_static_up, T_up, P_static_down).m_dot_calc) /
+                          (2.0 * eps_P);
+    const double fd_dPs = (f(P_total_up, P_static_up + eps_P, T_up, P_static_down).m_dot_calc -
+                           f(P_total_up, P_static_up - eps_P, T_up, P_static_down).m_dot_calc) /
+                          (2.0 * eps_P);
+    report_jacobian_difference("OrificeCompressibleDerivatives", "d_mdot_dP_total_up",
+                               res.d_mdot_dP_total_up, fd_dPt);
+    EXPECT_NEAR(res.d_mdot_dP_total_up, fd_dPt, std::abs(fd_dPt) * 1e-8 + 1e-12);
+    EXPECT_NEAR(res.d_mdot_dP_static_up, fd_dPs, std::abs(fd_dPs) * 1e-8 + 1e-12);
+    if (beta > 0.0) {
+      EXPECT_EQ(res.d_mdot_dP_total_up, 0.0);
+      EXPECT_GT(std::abs(res.d_mdot_dP_static_up), 0.0);
+    } else {
+      EXPECT_EQ(res.d_mdot_dP_static_up, 0.0);
+    }
 
-  auto res_Pb_p = orifice_compressible_residuals_and_jacobian(
-      m_dot, P_total_up, T_up, Y, P_static_down + eps_P, Cd, area, beta);
-  auto res_Pb_m = orifice_compressible_residuals_and_jacobian(
-      m_dot, P_total_up, T_up, Y, P_static_down - eps_P, Cd, area, beta);
-  double fd_dPb = (res_Pb_p.m_dot_calc - res_Pb_m.m_dot_calc) / (2.0 * eps_P);
-  report_jacobian_difference("OrificeCompressibleDerivatives",
-                             "d_mdot_dP_static_down", res.d_mdot_dP_static_down,
-                             fd_dPb);
-  EXPECT_NEAR(res.d_mdot_dP_static_down, fd_dPb,
-              std::abs(fd_dPb) * 1e-7 + 1e-12);
+    const double fd_dPb = (f(P_total_up, P_static_up, T_up, P_static_down + eps_P).m_dot_calc -
+                           f(P_total_up, P_static_up, T_up, P_static_down - eps_P).m_dot_calc) /
+                          (2.0 * eps_P);
+    report_jacobian_difference("OrificeCompressibleDerivatives", "d_mdot_dP_static_down",
+                               res.d_mdot_dP_static_down, fd_dPb);
+    EXPECT_NEAR(res.d_mdot_dP_static_down, fd_dPb, std::abs(fd_dPb) * 1e-7 + 1e-12);
 
-  double eps_T = 1e-3;
-  auto res_T_p = orifice_compressible_residuals_and_jacobian(
-      m_dot, P_total_up, T_up + eps_T, Y, P_static_down, Cd, area, beta);
-  auto res_T_m = orifice_compressible_residuals_and_jacobian(
-      m_dot, P_total_up, T_up - eps_T, Y, P_static_down, Cd, area, beta);
-  double fd_dT = (res_T_p.m_dot_calc - res_T_m.m_dot_calc) / (2.0 * eps_T);
-  report_jacobian_difference("OrificeCompressibleDerivatives", "d_mdot_dT_up",
-                             res.d_mdot_dT_up, fd_dT);
-  EXPECT_NEAR(res.d_mdot_dT_up, fd_dT, std::abs(fd_dT) * 1e-8 + 1e-12);
+    const double eps_T = 1e-3;
+    const double fd_dT = (f(P_total_up, P_static_up, T_up + eps_T, P_static_down).m_dot_calc -
+                          f(P_total_up, P_static_up, T_up - eps_T, P_static_down).m_dot_calc) /
+                         (2.0 * eps_T);
+    report_jacobian_difference("OrificeCompressibleDerivatives", "d_mdot_dT_up",
+                               res.d_mdot_dT_up, fd_dT);
+    EXPECT_NEAR(res.d_mdot_dT_up, fd_dT, std::abs(fd_dT) * 1e-8 + 1e-12);
+  }
 }
 
 // The incompressible closure (#588): T_static = T0, Pt = P + G^2 / (2 rho),
