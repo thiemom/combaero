@@ -240,6 +240,7 @@ Cd, dCd_dRe = cb.metering_cd_and_dRe(cb.MeteringCdCorrelation.Stolz, geom, Re_D)
 ok = cb.metering_cd_in_range(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom, Re_D)
 # ISO 5167-2 permanent loss / tapping differential between pipes, and dk/dC
 k, dk_dC = cb.permanent_loss_ratio_and_dC(beta, Cd)
+E = cb.velocity_of_approach_factor(beta)  # 1/sqrt(1-beta^4); 1 outside 0<beta<1
 
 # Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
 # geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.

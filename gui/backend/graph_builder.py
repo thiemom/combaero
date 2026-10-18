@@ -1050,6 +1050,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 correlation=data.correlation,
                 plate_thickness=data.plate_thickness,
                 edge_radius=data.edge_radius,
+                bevel_depth=data.bevel_depth,
+                tap=data.tap,
             )
             regime = (
                 data.regime if data.regime != "default" else schema.solver_settings.global_regime

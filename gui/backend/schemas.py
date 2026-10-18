@@ -270,6 +270,9 @@ class OrificeData(BaseModel):
     plate_thickness: float = 0.0  # t [m], the hole length for a wall orifice
     edge_radius: float = 0.0  # r [m]
     bevel_depth: float = 0.0  # bevel depth along the hole axis [m]
+    # The pressure taps whose differential is REPORTED (dp_tap). Measurement
+    # only: the solved flow never depends on it (#649/#645).
+    tap: Literal["Corner", "Flange", "D_D2"] = "Flange"
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None

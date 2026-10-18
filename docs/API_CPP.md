@@ -1052,6 +1052,9 @@ bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
 // and dk/dC. Derived for vena-contracta (D-D/2) taps. Throws outside
 // 0 < beta < 1 or C <= 0.
 std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C);
+// ISO 5167-1 velocity-of-approach factor E = 1 / sqrt(1 - beta^4); 1 outside
+// 0 < beta < 1 (no approach pipe, or bore >= pipe).
+double velocity_of_approach_factor(double beta);
 
 // Fixed Cd from an explicit value. make_correlation(MeteringCdCorrelation::Constant)
 // can only return the default, so this is how a chosen constant is pinned.

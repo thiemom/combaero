@@ -631,11 +631,33 @@ const Inspector = () => {
 							geomPipe?.value != null && geomPipe.value > 0
 								? geomPipe.value
 								: null;
-						const beta =
-							pipeD != null && boreDiameter < pipeD
-								? boreDiameter / pipeD
+						// beta and E come from the solver's resolve pass, E from the
+						// same C++ factor the kernels use; beta = 0 means no
+						// correction. Reversed flow approaches through the to-node's
+						// single pipe (#554).
+						const field = (name: string) =>
+							inheritedField(previewItems, selectedNode.id, name);
+						const positive = (v: number | null | undefined) =>
+							v != null && v > 0 ? v : null;
+						const beta = positive(field("beta")?.value);
+						const E = beta != null ? (field("E")?.value ?? null) : null;
+						const geomPipeRev = field("pipe_diameter_reverse");
+						const pipeDRev = positive(geomPipeRev?.value);
+						const betaRev = positive(field("beta_reverse")?.value);
+						const ERev =
+							betaRev != null ? (field("E_reverse")?.value ?? null) : null;
+						const res = selectedNode.data.result ?? {};
+						const q = (key: string) => {
+							const v = res[key];
+							const spec = QUANTITY_CATALOGUE[key];
+							return typeof v === "number" && Number.isFinite(v) && spec
+								? `${spec.format(v)} ${spec.unit === "—" ? "" : spec.unit}`.trim()
 								: null;
-						const E = beta != null ? 1.0 / Math.sqrt(1 - beta ** 4) : null;
+						};
+						const metering =
+							(selectedNode.data.correlation || "ReaderHarrisGallagher") ===
+								"ReaderHarrisGallagher" ||
+							selectedNode.data.correlation === "Stolz";
 						const lu = unitPreferences.length === "mm" ? 1000 : 1;
 						const boreVsPipe =
 							pipeD == null
@@ -694,6 +716,29 @@ const Inspector = () => {
 											No single upstream channel: no velocity-of-approach
 											correction (β = 0).
 										</span>
+									)}
+									{betaRev != null && pipeDRev != null && (
+										<>
+											<div className="flex justify-between mt-1">
+												<span className="text-stone-400">
+													Pipe D (reverse flow)
+												</span>
+												<span className="font-mono">
+													{`${(pipeDRev * lu).toFixed(unitPreferences.length === "mm" ? 1 : 4)} ${unitPreferences.length}`}
+												</span>
+											</div>
+											{geomPipeRev?.source && (
+												<span className="text-[9px] italic text-stone-400">
+													{inheritedNote(geomPipeRev.source)}.
+												</span>
+											)}
+											<div className="flex justify-between">
+												<span className="text-stone-400">β, E (reverse)</span>
+												<span className="font-mono">
+													{betaRev.toFixed(4)}, {ERev?.toFixed(4) ?? "—"}
+												</span>
+											</div>
+										</>
 									)}
 								</div>
 								{boreVsPipe === "equal" && (
@@ -782,6 +827,71 @@ const Inspector = () => {
 											updateNodeData(selectedNode.id, { bevel_depth: val })
 										}
 									/>
+								)}
+
+								{metering && (
+									<div className="flex flex-col gap-1">
+										<label
+											htmlFor={`tap_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Pressure Taps (reported)
+										</label>
+										<select
+											id={`tap_${selectedNode.id}`}
+											className="p-2 border rounded bg-white text-xs border-stone-200"
+											value={selectedNode.data.tap || "Flange"}
+											onChange={(e) =>
+												updateNodeData(selectedNode.id, { tap: e.target.value })
+											}
+										>
+											<option value="Flange">Flange (25.4 mm)</option>
+											<option value="Corner">Corner</option>
+											<option value="D_D2">D and D/2</option>
+										</select>
+										<span className="text-[9px] italic text-stone-400">
+											Picks the differential reported as dp at taps. The flow
+											does not depend on it: the network evaluates the plate at
+											D and D/2 taps.
+										</span>
+									</div>
+								)}
+
+								{/* Solved approach state, tap differential and permanent loss */}
+								{(q("dp_tap") || q("P_approach")) && (
+									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
+										{(
+											[
+												["P_approach", "p1 (approach pipe static)"],
+												[
+													"dp_tap",
+													`dp at ${String(res.tap ?? "Flange").replace("D_D2", "D-D/2")} taps`,
+												],
+												["dp_permanent", "dp permanent"],
+												["loss_ratio", "Permanent / tap dp"],
+												["E", "E (along the flow)"],
+											] as const
+										).map(([key, label]) => {
+											const v = q(key);
+											return v == null ? null : (
+												<div key={key} className="flex justify-between">
+													<span className="text-stone-400">{label}</span>
+													<span className="font-mono">{v}</span>
+												</div>
+											);
+										})}
+										{res.pressure_recovery === 0 && q("dp_tap") && (
+											<span className="text-[9px] italic text-stone-400">
+												No pipe recovery downstream: the jet's head is lost.
+											</span>
+										)}
+									</div>
+								)}
+								{res.recovery_in_range === 0 && (
+									<p className="text-[9px] text-amber-700">
+										Tap pressure below 0.75 p1: outside ISO 5167's
+										incompressible permanent-loss relation.
+									</p>
 								)}
 
 								{/* Calculated Result (for correlation models) */}

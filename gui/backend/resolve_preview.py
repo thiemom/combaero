@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import combaero as cb
 from combaero.network.components import (
     AreaChangeElement,
     ChannelElement,
@@ -126,13 +127,25 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
         # The bore never inherits (it is the restriction); the upstream pipe's
         # diameter does, and sets beta = d / D for the velocity-of-approach
         # factor. beta = 0 means no correction: no single upstream channel, or a
-        # bore >= the pipe (the GUI warns on the latter).
+        # bore >= the pipe (the GUI warns on the latter). Reversed flow
+        # approaches through the to-node's single pipe (#554). E comes from the
+        # C++ factor the kernels use, never re-derived in the frontend.
+        beta = _f(item, "beta") or 0.0
+        beta_rev = _f(item, "beta_reverse") or 0.0
         return {
             "diameter": FieldResolution(_f(item, "diameter"), _s(item, "_area_source")),
             "pipe_diameter": FieldResolution(
                 _f(item, "upstream_diameter"), _s(item, "_upstream_source")
             ),
-            "beta": FieldResolution(_f(item, "beta"), "derived from bore / pipe D"),
+            "beta": FieldResolution(beta, "derived from bore / pipe D"),
+            "E": FieldResolution(float(cb.velocity_of_approach_factor(beta)), "derived from beta"),
+            "pipe_diameter_reverse": FieldResolution(
+                _f(item, "_reverse_pipe_diameter"), _s(item, "_reverse_pipe_source")
+            ),
+            "beta_reverse": FieldResolution(beta_rev, "derived from bore / pipe D"),
+            "E_reverse": FieldResolution(
+                float(cb.velocity_of_approach_factor(beta_rev)), "derived from beta"
+            ),
         }
     return {}
 

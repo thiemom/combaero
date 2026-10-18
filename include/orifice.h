@@ -222,6 +222,11 @@ bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
 // (std::invalid_argument).
 std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C);
 
+// ISO 5167-1 velocity-of-approach factor E = 1 / sqrt(1 - beta^4). Returns 1
+// outside 0 < beta < 1, the network's convention for "no correction": no
+// single approach pipe (beta = 0), or a bore at least as wide as the pipe.
+double velocity_of_approach_factor(double beta);
+
 
 // -------------------------------------------------------------
 // Individual correlation implementations

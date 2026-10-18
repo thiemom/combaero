@@ -1,0 +1,1 @@
+- GUI: an orifice's bevel depth (Idelchik 4-18b) now reaches the solver. The builder dropped it, so a beveled hole drawn in the GUI was always solved at zero bevel depth.

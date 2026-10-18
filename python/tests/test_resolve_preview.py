@@ -8,6 +8,10 @@ flag "you must set this" before Solve rather than as a bare failure).
 
 from __future__ import annotations
 
+import math
+
+import pytest
+
 import combaero as cb
 from combaero.network import (
     AreaChangeElement,
@@ -268,6 +272,12 @@ def test_orifice_reports_pipe_diameter_and_beta() -> None:
     assert f["pipe_diameter"].value == 0.1
     assert f["pipe_diameter"].source == "channel 'ch_inh'"
     assert abs(f["beta"].value - 0.5) < 1e-12
+    # E from the kernels' C++ factor, so the GUI never re-derives it.
+    assert f["E"].value == pytest.approx(1.0 / math.sqrt(1.0 - 0.5**4), rel=1e-14)
+    # A plain boundary on the far side: reversed flow has no approach pipe.
+    assert f["beta_reverse"].value == 0.0
+    assert f["E_reverse"].value == 1.0
+    assert f["pipe_diameter_reverse"].value is None
 
     # No bore given: the default bore, marked as such.
     net2 = FlowNetwork()
@@ -278,6 +288,28 @@ def test_orifice_reports_pipe_diameter_and_beta() -> None:
     assert f["diameter"].source == "default"
     assert f["pipe_diameter"].value is None
     assert f["beta"].value == 0.0
+    assert f["E"].value == 1.0
+
+
+def test_orifice_reports_the_reverse_approach_pipe() -> None:
+    """Reversed flow approaches through the to-node's single pipe (#554); the
+    preview names it, so the Inspector can show both approaches."""
+    from combaero.network import OrificeElement
+
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=2e5, Tt=300.0, Y=Y_AIR))
+    net.add_node(PlenumNode("p1"))
+    net.add_node(PlenumNode("p2"))
+    net.add_node(PressureBoundary("out", Pt=1e5, Tt=300.0, Y=Y_AIR))
+    net.add_element(ChannelElement("ch_u", "in", "p1", length=1.0, diameter=0.1))
+    net.add_element(OrificeElement("ori", "p1", "p2", diameter=0.05))
+    net.add_element(ChannelElement("ch_d", "p2", "out", length=1.0, diameter=0.08))
+
+    f = resolve_preview(net)["ori"].fields
+    assert f["pipe_diameter_reverse"].value == 0.08
+    assert f["pipe_diameter_reverse"].source == "channel 'ch_d'"
+    assert f["beta_reverse"].value == pytest.approx(0.625, rel=1e-14)
+    assert f["E_reverse"].value == pytest.approx(1.0 / math.sqrt(1.0 - 0.625**4), rel=1e-14)
 
 
 def test_audit_sources_discrete_loss_area_and_channel_dh() -> None:

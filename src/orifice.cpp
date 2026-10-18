@@ -473,6 +473,14 @@ std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C) {
     return {k, dk};
 }
 
+double velocity_of_approach_factor(double beta) {
+    if (!(beta > 0.0 && beta < 1.0)) {
+        return 1.0;
+    }
+    const double b2 = beta * beta;
+    return 1.0 / std::sqrt(1.0 - b2 * b2);
+}
+
 // -------------------------------------------------------------
 // Correlation classes
 // -------------------------------------------------------------
@@ -1167,7 +1175,7 @@ double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP,
         throw std::invalid_argument("orifice_mdot: invalid parameters");
     }
     const double beta = geom.beta();
-    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    const double E = velocity_of_approach_factor(beta);
     return Cd * E * epsilon * geom.area() * std::sqrt(2.0 * rho * dP);
 }
 
@@ -1180,7 +1188,7 @@ double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot,
     // Solve for dP: dP = (mdot / (Cd * E * epsilon * A))^2 / (2 * rho)
     const double A = geom.area();
     const double beta = geom.beta();
-    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    const double E = velocity_of_approach_factor(beta);
     const double term = mdot / (Cd * E * epsilon * A);
     return term * term / (2.0 * rho);
 }
@@ -1191,7 +1199,7 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
         throw std::invalid_argument("orifice_Cd_from_measurement: invalid parameters");
     }
     const double beta = geom.beta();
-    const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+    const double E = velocity_of_approach_factor(beta);
     double A = geom.area();
     return mdot / (E * A * std::sqrt(2.0 * rho * dP));
 }
@@ -1273,7 +1281,7 @@ double solve_orifice_mdot(
         }
 
         // Calculate velocity-of-approach factor (E)
-        const double E = 1.0 / std::sqrt(1.0 - std::pow(beta, 4.0));
+        const double E = velocity_of_approach_factor(beta);
 
         // Calculate new mass flow rate using current Cd, E, and epsilon
         const double mdot_new = Cd * E * epsilon * area * std::sqrt(2.0 * rho * dP);
