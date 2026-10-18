@@ -543,6 +543,12 @@ struct MomentumChamberResult {
   // it shows is the one the residual used.
   double T_static = 0.0;
   double M = 0.0;
+  // Partials of T_static w.r.t. the closure's inputs P, T0 and m_dot (signed:
+  // T_static is even in m_dot), for a wall correlation evaluated at the
+  // chamber's static T. The incompressible limit has T_static = T0.
+  double dT_static_dP = 0.0;
+  double dT_static_dT = 0.0; // d/dT0
+  double dT_static_dmdot = 0.0;
   // Static density rho(T_static, P) and its sensitivities to the closure's
   // inputs, for elements that read the chamber as a port (junction kernels):
   // their momentum rows must see the same static state as this row.

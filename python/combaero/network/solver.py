@@ -1962,7 +1962,6 @@ class NetworkSolver:
                         # Side A contributions
                         obj_a = self.network.elements.get(ea_id) or self.network.nodes.get(ea_id)
                         from_a = self._flow_ends(obj_a, x)[0]
-                        m_indices_a = self._unknown_indices.get(ea_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_a
                         if from_a in relay:
@@ -1984,8 +1983,7 @@ class NetworkSolver:
                                 nr["T"] += factor_T_a * sens_up["T"]
 
                         # Mass-flow coupling: dT_node/dmdot_a (direct)
-                        if m_indices_a:
-                            idx_mdot_a = m_indices_a[0]
+                        for idx_mdot_a, dm_a in self._htc_flow_columns(ea_id):
                             # dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot
                             factor_mdot_a = (
                                 dT_mix_dQ
@@ -2001,7 +1999,7 @@ class NetworkSolver:
                             nr = relay[nid].setdefault(
                                 idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
-                            nr["T"] += factor_mdot_a
+                            nr["T"] += factor_mdot_a * dm_a
 
                         # Neighbour flows the side-A htc reads (#465)
                         self._relay_flow_inputs(
@@ -2010,13 +2008,16 @@ class NetworkSolver:
 
                         # Pressure coupling (#496): the side's T_aw moves with its feed
                         # node's static P at fixed flow (v ~ 1/rho); h does not.
+                        # A momentum chamber's h does too, through its static T.
                         idx_P_a = self._name_to_index.get(f"{from_a}.P")
-                        dTaw_dP_a = getattr(ch_a, "dT_aw_dP", 0.0)
-                        if idx_P_a is not None and dTaw_dP_a != 0.0:
+                        dQ_dP_a = wall_result.dQ_dT_aw_a * getattr(
+                            ch_a, "dT_aw_dP", 0.0
+                        ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dP", 0.0)
+                        if idx_P_a is not None and dQ_dP_a != 0.0:
                             nr = relay[nid].setdefault(
                                 idx_P_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
-                            nr["T"] += dT_mix_dQ * sign * wall_result.dQ_dT_aw_a * dTaw_dP_a
+                            nr["T"] += dT_mix_dQ * sign * dQ_dP_a
                         # A duct's T_aw moves with its feed's Pt instead (#636).
                         idx_Pt_a = self._name_to_index.get(f"{from_a}.Pt")
                         # and so does its h, through the duct's static T.
@@ -2032,7 +2033,6 @@ class NetworkSolver:
                         # Side B contributions
                         obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
                         from_b = self._flow_ends(obj_b, x)[0]
-                        m_indices_b = self._unknown_indices.get(eb_id, [])
 
                         # Temperature coupling: dT_node/dT_upstream_b
                         if from_b in relay:
@@ -2053,8 +2053,7 @@ class NetworkSolver:
                                 nr["T"] += factor_T_b * sens_up["T"]
 
                         # Mass-flow coupling: dT_node/dmdot_b (direct)
-                        if m_indices_b:
-                            idx_mdot_b = m_indices_b[0]
+                        for idx_mdot_b, dm_b in self._htc_flow_columns(eb_id):
                             factor_mdot_b = (
                                 dT_mix_dQ
                                 * sign
@@ -2069,7 +2068,7 @@ class NetworkSolver:
                             nr = relay[nid].setdefault(
                                 idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
-                            nr["T"] += factor_mdot_b
+                            nr["T"] += factor_mdot_b * dm_b
 
                         self._relay_flow_inputs(
                             relay[nid], obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b
@@ -2077,13 +2076,16 @@ class NetworkSolver:
 
                         # Pressure coupling (#496): the side's T_aw moves with its feed
                         # node's static P at fixed flow (v ~ 1/rho); h does not.
+                        # A momentum chamber's h does too, through its static T.
                         idx_P_b = self._name_to_index.get(f"{from_b}.P")
-                        dTaw_dP_b = getattr(ch_b, "dT_aw_dP", 0.0)
-                        if idx_P_b is not None and dTaw_dP_b != 0.0:
+                        dQ_dP_b = wall_result.dQ_dT_aw_b * getattr(
+                            ch_b, "dT_aw_dP", 0.0
+                        ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dP", 0.0)
+                        if idx_P_b is not None and dQ_dP_b != 0.0:
                             nr = relay[nid].setdefault(
                                 idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
                             )
-                            nr["T"] += dT_mix_dQ * sign * wall_result.dQ_dT_aw_b * dTaw_dP_b
+                            nr["T"] += dT_mix_dQ * sign * dQ_dP_b
                         # A duct's T_aw moves with its feed's Pt instead (#636).
                         idx_Pt_b = self._name_to_index.get(f"{from_b}.Pt")
                         # and so does its h, through the duct's static T.
@@ -2228,6 +2230,24 @@ class NetworkSolver:
             return 1.0
         i = self._two_port_mdot_indices().get(getattr(obj, "id", None))
         return -1.0 if i is not None and x[i] < 0.0 else 1.0
+
+    def _htc_flow_columns(self, obj_id: str) -> list[tuple[int, float]]:
+        """(unknown index, d(flow the htc reads)/d(unknown)) of a wall side.
+
+        An element's htc reads its own flow, its first unknown. A node's reads
+        its throughput, the sum of its inflows: its first unknown is its own
+        P, which took the node's dh_dmdot until a walled combustor or chamber
+        node showed a Jacobian off by its whole flow column.
+        """
+        if obj_id in self.network.nodes:
+            jac = getattr(self.network.nodes[obj_id], "_upstream_m_dot_jac", None) or {}
+            return [
+                (self._name_to_index[name], float(c))
+                for name, c in jac.items()
+                if name in self._name_to_index
+            ]
+        ind = self._unknown_indices.get(obj_id, [])
+        return [(ind[0], 1.0)] if ind else []
 
     def _htc_and_T(self, obj: Any, state: NetworkMixtureState, x: np.ndarray) -> Any:
         flows = self._network_flows(obj, x)
