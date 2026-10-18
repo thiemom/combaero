@@ -420,8 +420,32 @@ TEST(SolverJacobianTest, OrificeCompressibleDerivatives) {
     EXPECT_NEAR(res.d_mdot_dP_total_up, fd_dPt, std::abs(fd_dPt) * 1e-8 + 1e-12);
     EXPECT_NEAR(res.d_mdot_dP_static_up, fd_dPs, std::abs(fd_dPs) * 1e-8 + 1e-12);
     if (beta > 0.0) {
-      EXPECT_EQ(res.d_mdot_dP_total_up, 0.0);
-      EXPECT_GT(std::abs(res.d_mdot_dP_static_up), 0.0);
+      // The drive is the static pressure; Pt only sets the static
+      // temperature on the isentrope (#645): a small, nonzero column (a
+      // higher Pt at fixed P means a colder, denser jet).
+      EXPECT_GT(res.d_mdot_dP_total_up, 0.0);
+      EXPECT_LT(res.d_mdot_dP_total_up, 0.1 * std::abs(res.d_mdot_dP_static_up));
+      // Behind a node with no velocity (P = Pt) the static state is the
+      // stagnation state: T1 = T_up to the bit.
+      const OrificeResult plenum = f(P_static_up, P_static_up, T_up, P_static_down);
+      const auto X = combaero::mass_to_mole(combaero::normalize_fractions(Y));
+      const double m_nozzle = std::get<0>(orifice_compressible_mdot_and_jacobian(
+          T_up, P_static_up, P_static_down, X, Cd, area, beta));
+      EXPECT_EQ(plenum.m_dot_calc, m_nozzle);
+      // Its Pt column is not zero: the isentrope still moves T1 with Pt.
+      EXPECT_GT(plenum.d_mdot_dP_total_up, 0.0);
+      const double fd_pl_Pt = (f(P_static_up + eps_P, P_static_up, T_up, P_static_down).m_dot_calc -
+                               f(P_static_up - eps_P, P_static_up, T_up, P_static_down).m_dot_calc) /
+                              (2.0 * eps_P);
+      const double fd_pl_Ps = (f(P_static_up, P_static_up + eps_P, T_up, P_static_down).m_dot_calc -
+                               f(P_static_up, P_static_up - eps_P, T_up, P_static_down).m_dot_calc) /
+                              (2.0 * eps_P);
+      EXPECT_NEAR(plenum.d_mdot_dP_total_up, fd_pl_Pt, std::abs(fd_pl_Pt) * 1e-6 + 1e-12);
+      EXPECT_NEAR(plenum.d_mdot_dP_static_up, fd_pl_Ps, std::abs(fd_pl_Ps) * 1e-6 + 1e-12);
+      // With velocity the nozzle starts from the static T: the flow is the
+      // nozzle's at T1 < T_up, so higher than at T_up.
+      EXPECT_GT(res.m_dot_calc, std::get<0>(orifice_compressible_mdot_and_jacobian(
+                                    T_up, P_static_up, P_static_down, X, Cd, area, beta)));
     } else {
       EXPECT_EQ(res.d_mdot_dP_static_up, 0.0);
     }

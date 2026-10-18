@@ -195,16 +195,17 @@ def test_the_node_type_moves_the_flow_only_through_the_density(regime: str, beta
     PlenumNode has no velocity, so its static pressure is the pipe's
     stagnation pressure and its density is q/P too high: m ~ sqrt(rho dw),
     1.5% at beta 0.7, where the pipe runs at Mach 0.2. Incompressible this is
-    exact. Compressible, the nozzle starts from the chamber's static P but
-    its stagnation T, so the chamber's flow is sqrt(T_s/Tt) low: 0.06% at
-    beta 0.5 (residual 0.065%), 0.3% of the 0.56% at beta 0.7, where p_tap/p1
-    is below ISO's 0.75 (recovery_in_range False) and the rest is the
-    nozzle's expansion. tmp/probe_pl_comp_T.py."""
+    exact. Compressible, the nozzle starts from the chamber's static state;
+    it used to pair the static P with the stagnation T, which left the
+    chamber's flow sqrt(T_s/Tt) low (residual 0.065% at beta 0.5, 0.56% at
+    0.7). Now 0.006% at beta 0.5, and 0.22% at beta 0.7, where p_tap/p1 is
+    below ISO's 0.75 (recovery_in_range False) and the nozzle's expansion
+    differs from the incompressible density argument. tmp/probe_pl_comp_T.py."""
     _, rp = _solve(_between_pipes(PlenumNode, beta, regime, "fixed"))
     _, rc = _solve(_between_pipes(MomentumChamberNode, beta, regime, "fixed"))
     dw_p, dw_c = rp["a.Pt"] - rp["b.Pt"], rc["a.Pt"] - rc["b.Pt"]
     expected = math.sqrt((rc["a.P"] / rp["a.P"]) * (dw_c / dw_p))
-    tols = {"incompressible": {0.5: 1e-4, 0.7: 1e-4}, "compressible": {0.5: 1e-3, 0.7: 7e-3}}
+    tols = {"incompressible": {0.5: 1e-4, 0.7: 1e-4}, "compressible": {0.5: 2e-4, 0.7: 3e-3}}
     tol = tols[regime][beta]
     assert rc["o.m_dot"] / rp["o.m_dot"] == pytest.approx(expected, rel=tol)
 

@@ -217,7 +217,10 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
     double Cd, double area, double beta);
 
 // Full compressible orifice evaluation with all derivatives for network solver.
-// The nozzle expands from the upstream pressure approach_from_static picks.
+// T_up is the upstream STAGNATION temperature. The nozzle expands from the
+// upstream state approach_from_static picks: without E from (T_up,
+// P_total_up); with E from the upstream static state, P_static_up at the
+// temperature on the isentrope through (T_up, P_total_up) (#645).
 OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up,

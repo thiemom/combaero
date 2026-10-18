@@ -1785,21 +1785,50 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   const std::vector<double> X_up = combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
 
   // The same rule as the incompressible kernel: with E applied the approach
-  // head is E's, so the nozzle expands from the upstream STATIC pressure.
+  // head is E's, so the nozzle expands from the upstream STATIC state, the
+  // compressible form of ISO's rho1 at the upstream tap. The static
+  // temperature lies on the isentrope through (T_up, P_total_up): pairing
+  // the static pressure with the stagnation temperature made the flow
+  // sqrt(T1/Tt) low behind a node with velocity, 0.3% at pipe Mach 0.18
+  // (#645). Where P_static_up = P_total_up (a plenum) T1 = T_up exactly.
   const bool from_static = approach_from_static(beta);
   const double P0 = from_static ? P_static_up : P_total_up;
+  // Tight: the Jacobian tests check this column to 1e-7.
+  const double static_T_tol = 1e-10;
+  auto static_T = [&](const std::vector<double>& X) {
+    if (!from_static || P_static_up == P_total_up) {
+      return T_up;
+    }
+    return combaero::calc_T_from_s(combaero::s(T_up, X, P_total_up), P_static_up, X, T_up,
+                                   static_T_tol);
+  };
+  const double T1 = static_T(X_up);
+  // Along the isentrope, ds = cp/T dT - R/P dP = 0 at both ends:
+  //   dT1/dTt = (cp(Tt)/Tt) / (cp(T1)/T1), dT1/dPt = -(R/Pt) / (cp(T1)/T1),
+  //   dT1/dP1 = (R/P1) / (cp(T1)/T1).
+  double dT1_dTt = 1.0;
+  double dT1_dPt = 0.0;
+  double dT1_dP1 = 0.0;
+  // Applied at P_static_up = P_total_up too: only the value coincides there,
+  // and a plenum perturbs its P and Pt unknowns separately.
+  if (from_static) {
+    const double c1 = combaero::cp(T1, X_up) / T1;
+    dT1_dTt = (combaero::cp(T_up, X_up) / T_up) / c1;
+    dT1_dPt = -(combaero::thermo::R_GAS / P_total_up) / c1;
+    dT1_dP1 = (combaero::thermo::R_GAS / P_static_up) / c1;
+  }
 
   // Get mass flow and Jacobians from low-level function
   auto [mdot_calc, dmdot_dP0, dmdot_dP_back, dmdot_dT0] =
-      orifice_compressible_mdot_and_jacobian(T_up, P0, P_static_down, X_up, Cd, area, beta);
+      orifice_compressible_mdot_and_jacobian(T1, P0, P_static_down, X_up, Cd, area, beta);
 
   OrificeResult res;
   res.m_dot_calc = mdot_calc;
-  res.d_mdot_dP_total_up = from_static ? 0.0 : dmdot_dP0;
+  res.d_mdot_dP_total_up = from_static ? dmdot_dT0 * dT1_dPt : dmdot_dP0;
   res.d_mdot_dP_static_down = dmdot_dP_back;
-  res.d_mdot_dP_static_up = from_static ? dmdot_dP0 : 0.0;
+  res.d_mdot_dP_static_up = from_static ? dmdot_dP0 + dmdot_dT0 * dT1_dP1 : 0.0;
   res.d_mdot_dP_rho_ref = 0.0;
-  res.d_mdot_dT_up = dmdot_dT0;
+  res.d_mdot_dT_up = dmdot_dT0 * dT1_dTt;
 
   // Compute d(mdot)/d(Y[i]) using finite differences
   res.d_mdot_dY_up.resize(Y_up.size(), 0.0);
@@ -1808,8 +1837,8 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     std::vector<double> Y_plus = Y_up;
     Y_plus[i] += eps_Y;
     auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
-    auto [mdot_plus, dummy1, dummy2, dummy3] =
-        orifice_compressible_mdot_and_jacobian(T_up, P0, P_static_down, X_plus, Cd, area, beta);
+    auto [mdot_plus, dummy1, dummy2, dummy3] = orifice_compressible_mdot_and_jacobian(
+        static_T(X_plus), P0, P_static_down, X_plus, Cd, area, beta);
     res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
   }
 
