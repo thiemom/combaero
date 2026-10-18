@@ -1,8 +1,9 @@
-import { Save, Upload } from "lucide-react";
+import { Eraser, Save, Upload } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { checkContinuationAvailable } from "../api";
 import useStore from "../store/useStore";
+import { clearAutosave } from "../utils/autosave";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import NodeIcon from "./NodeIcon";
 import NumericInput from "./NumericInput";
@@ -20,8 +21,32 @@ const Sidebar = () => {
 		setRotSpeedUnit,
 		nodes,
 		setNodes,
+		setEdges,
+		dismissSolveStatus,
 		solveResults,
 	} = useStore();
+
+	// Clear (#596): empties the canvas and deletes the autosaved copy. Two
+	// clicks instead of a browser confirm() dialog, which behaves differently
+	// across browsers and blocks the page; the second click must come within
+	// a few seconds.
+	const [confirmClear, setConfirmClear] = useState(false);
+	useEffect(() => {
+		if (!confirmClear) return;
+		const t = setTimeout(() => setConfirmClear(false), 4000);
+		return () => clearTimeout(t);
+	}, [confirmClear]);
+	const onClear = () => {
+		if (!confirmClear) {
+			setConfirmClear(true);
+			return;
+		}
+		setConfirmClear(false);
+		setNodes([]);
+		setEdges([]);
+		dismissSolveStatus();
+		clearAutosave();
+	};
 
 	const [isContinuationAvailable, setIsContinuationAvailable] = useState(false);
 
@@ -114,6 +139,19 @@ const Sidebar = () => {
 				>
 					<Upload size={16} className="text-emerald-600" />
 					<span>Load</span>
+				</button>
+				<button
+					type="button"
+					onClick={onClear}
+					title="Empty the canvas and delete the autosaved copy"
+					className={`flex items-center justify-center gap-1 p-2 border rounded transition-colors text-sm ${
+						confirmClear
+							? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+							: "bg-white hover:bg-stone-50"
+					}`}
+				>
+					<Eraser size={16} className={confirmClear ? "" : "text-red-600"} />
+					{confirmClear && <span>Sure?</span>}
 				</button>
 				<input
 					type="file"

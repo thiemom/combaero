@@ -7,6 +7,7 @@ import Inspector from "./components/Inspector";
 import NetworkCanvas from "./components/NetworkCanvas";
 import Sidebar from "./components/Sidebar";
 import useStore from "./store/useStore";
+import { readAutosave, startAutosave } from "./utils/autosave";
 import { solveErrorMessage } from "./utils/solveError";
 import { validateNetwork } from "./utils/validation";
 
@@ -22,6 +23,32 @@ const App = () => {
 		refreshPreview,
 	} = useStore();
 	const [isSolving, setIsSolving] = useState(false);
+	// When the canvas came back from the autosave (#596), so the restored
+	// network is never mistaken for a fresh start.
+	const [restoredAt, setRestoredAt] = useState<string | null>(null);
+
+	// Restore the last session once, then keep it saved. Only into an empty
+	// canvas: StrictMode runs this twice in development, and a restore must
+	// never overwrite work.
+	useEffect(() => {
+		const store = useStore.getState();
+		if (store.nodes.length === 0 && store.edges.length === 0) {
+			const rec = readAutosave();
+			if (rec) {
+				store.loadNetwork(rec);
+				const t = new Date(rec.savedAt);
+				setRestoredAt(
+					Number.isNaN(t.getTime())
+						? "earlier"
+						: t.toLocaleString([], {
+								dateStyle: "short",
+								timeStyle: "short",
+							}),
+				);
+			}
+		}
+		return startAutosave(useStore);
+	}, []);
 
 	// Keep the geometry-inheritance preview (#559) fresh as the graph changes,
 	// debounced so a drag or a burst of edits triggers one resolve, not many.
@@ -148,6 +175,23 @@ const App = () => {
 					</button>
 				</div>
 			</header>
+
+			{restoredAt && (
+				<div className="flex items-center justify-between gap-4 px-6 py-1 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
+					<span>
+						Restored your last session (autosaved {restoredAt}). Use Clear in
+						the sidebar to start empty.
+					</span>
+					<button
+						type="button"
+						onClick={() => setRestoredAt(null)}
+						className="px-2 rounded hover:bg-amber-100"
+						aria-label="Dismiss restore note"
+					>
+						×
+					</button>
+				</div>
+			)}
 
 			{/* Main Content */}
 			<div className="flex flex-grow overflow-hidden" ref={reactFlowWrapper}>
