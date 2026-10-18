@@ -80,7 +80,7 @@ def test_the_compressible_orifice_flows_from_a_stagnation_state_below_200_k(Tt: 
 
     def mdot(T: float) -> float:
         return _solver_tools.orifice_compressible_residuals_and_jacobian(
-            0.0, 1.06e5, T, Y, 1.0e5, 0.8, area, 0.0
+            0.0, 1.06e5, 1.06e5, T, Y, 1.0e5, 0.8, area, 0.0
         ).m_dot_calc
 
     m = mdot(Tt)
@@ -123,7 +123,7 @@ def test_the_compressible_orifice_reads_a_stagnation_state_above_6000_k(Tt: floa
 
     def mdot(T: float) -> float:
         return _solver_tools.orifice_compressible_residuals_and_jacobian(
-            0.0, 1.06e5, T, Y, 1.0e5, 0.8, area, 0.0
+            0.0, 1.06e5, 1.06e5, T, Y, 1.0e5, 0.8, area, 0.0
         ).m_dot_calc
 
     # low Mach: within 2% of the 1/sqrt(Tt) scaling from 4000 K (gamma moves)

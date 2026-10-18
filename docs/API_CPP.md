@@ -1002,8 +1002,14 @@ enum class OrificeType {
     SharpThinPlate, ThickPlate, RoundedEntry, Conical, QuarterCircle, UserDefined
 };
 
+// Pressure taps (ISO 5167-2:2003 5.3.2.1). A measurement choice: it fixes
+// what C is referenced to, not what the plate does to the flow.
+enum class OrificeTap { Corner, D_D2, Flange };
+
 struct OrificeGeometry {
-    double d, D, t, r, bevel;
+    double d, D;
+    OrificeTap tap = OrificeTap::Flange;
+    double t, r, bevel;
 
     double beta() const;          // Diameter ratio d/D [-]
     double area() const;          // Orifice area [m²]
@@ -1024,15 +1030,23 @@ struct OrificeState {
 // NORMED measurement orifice: a standardised plate in a pipe, Cd referenced
 // to the TAPPING differential, every member a function of beta = d/D.
 enum class MeteringCdCorrelation {
-    ReaderHarrisGallagher, Stolz, Miller,   // ISO 5167 family
+    ReaderHarrisGallagher, Stolz,   // ISO 5167-2:2003 and ISO 5167:1980
     Constant, UserFunction
 };
 
+// Reader-Harris/Gallagher at geom.tap, with the small-pipe term below 71.12 mm.
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
 // (Cd, dCd/dRe_D), analytic; 0 below the Re_D floor and above the 1.5 cap.
 // The network orifice's flow column uses it (dRe_D/dm = Re_D/|m|).
 std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
                                                        const OrificeState& state);
+// (Cd, dCd/dRe_D) of ReaderHarrisGallagher or Stolz at geom.tap; the network
+// element's only metering entry point. Constant/UserFunction throw.
+std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
+                                               const OrificeGeometry& geom, double Re_D);
+// ISO 5167-2:2003 5.3.1 range (Reader-Harris/Gallagher); Stolz returns true.
+bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
+                          double Re_D);
 
 // Fixed Cd from an explicit value. make_correlation(MeteringCdCorrelation::Constant)
 // can only return the default, so this is how a chosen constant is pinned.
@@ -1394,11 +1408,18 @@ struct AdiabaticResult {
 
 ### Incompressible Flow Components
 ```cpp
-// Orifice flow with discharge coefficient
+// With a velocity of approach (0 < beta < 1, approach_from_static) the drive
+// is P_static_up - P_static_down: E = 1/sqrt(1 - beta^4) already carries the
+// approach head. Without one it is P_total_up - P_static_down. Both kernels
+// follow the rule.
+inline bool approach_from_static(double beta);
+
+// Orifice flow with discharge coefficient. Density at P_static_up, or at
+// P_rho_ref when > 0 (its derivative is then d_mdot_dP_rho_ref).
 OrificeResult orifice_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
-    double area, double beta = 0.0);
+    double area, double beta = 0.0, double P_rho_ref = -1.0);
 
 // Channel flow with Darcy friction; exit_head_lost adds the exit dynamic
 // head m|m| / (2 rho A^2), dissipated at a stagnant sink (#588)
@@ -1422,9 +1443,11 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
     double Cd, double area, double beta);
 
 // Full compressible orifice evaluation for network solver
+// The nozzle expands from the pressure approach_from_static picks.
 OrificeResult orifice_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up, const std::vector<double>& Y_up,
-    double P_static_down, double Cd, double area, double beta);
+    double m_dot, double P_total_up, double P_static_up, double T_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd,
+    double area, double beta);
 
 // The compressible channel's network residual is m - m_calc with m_calc from
 // fanno_channel_flow (fanno_mach.h): mass flow a duct passes from its feeding

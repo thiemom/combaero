@@ -47,7 +47,7 @@ Elements are defined by edges in the graph but carry their own physical paramete
 #### Orifice Element (`orifice`)
 - `diameter`: Orifice diameter [m]
 - `Cd`: Discharge coefficient (if using "fixed" correlation)
-- `correlation`: "ReaderHarrisGallagher", "Stolz", "Miller", "ThickPlate", "RoundedEntry", or "fixed".
+- `correlation`: "ReaderHarrisGallagher", "Stolz", "IdelchikThick", "IdelchikBeveled", "IdelchikRounded", "McGreehanSchotsch", "Lichtarowicz", or "fixed".
 - `regime`: "default", "incompressible", or "compressible".
 
 #### Channel Element (`channel`)

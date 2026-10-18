@@ -85,6 +85,7 @@ struct OrificeResult {
   double d_mdot_dP_total_up;
   double d_mdot_dP_static_down;
   double d_mdot_dP_static_up;
+  double d_mdot_dP_rho_ref = 0.0;  // density reference named by P_rho_ref
   double d_mdot_dT_up;
   std::vector<double> d_mdot_dY_up;
 };
@@ -121,12 +122,24 @@ std::tuple<double, double, double> orifice_mdot_and_jacobian(double dP, double r
                                                               double Cd, double area,
                                                               double beta);
 
-// Full orifice evaluation with all derivatives.
+// Does the orifice drive from the upstream STATIC pressure? True when the
+// velocity-of-approach factor E = 1/sqrt(1 - beta^4) applies (0 < beta < 1):
+// E already carries the approach velocity head, so driving from the upstream
+// stagnation pressure as well counted it twice -- +6.2% flow at beta = 0.7
+// behind a momentum chamber. Without E (beta = 0, a plenum-fed orifice) the
+// drive is the upstream stagnation pressure. Behind a plenum node, where
+// Pt = P, both rules give the same flow.
+inline bool approach_from_static(double beta) { return beta > 0.0 && beta < 1.0; }
+
+// Full orifice evaluation with all derivatives. The drive pressure follows
+// approach_from_static. The density is evaluated at P_static_up, or at
+// P_rho_ref when that is > 0 (its derivative then goes to d_mdot_dP_rho_ref).
 OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
                                              double P_static_up, double T_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double Cd,
-                                             double area, double beta);
+                                             double area, double beta,
+                                             double P_rho_ref = -1.0);
 
 // Calculate Pressure Drop and its derivative with respect to velocity.
 //
@@ -204,8 +217,9 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
     double Cd, double area, double beta);
 
 // Full compressible orifice evaluation with all derivatives for network solver.
+// The nozzle expands from the upstream pressure approach_from_static picks.
 OrificeResult orifice_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double T_up,
+    double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 

@@ -260,7 +260,6 @@ class OrificeData(BaseModel):
     correlation: Literal[
         "ReaderHarrisGallagher",
         "Stolz",
-        "Miller",
         "IdelchikThick",
         "IdelchikBeveled",
         "IdelchikRounded",
@@ -274,6 +273,20 @@ class OrificeData(BaseModel):
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def refuse_removed_miller(cls, data: dict) -> dict:
+        # A file saved before the removal names a correlation that no longer
+        # exists. Say which one and what to pick, rather than a bare Literal
+        # mismatch; silently swapping in Stolz would change the result.
+        if isinstance(data, dict) and data.get("correlation") == "Miller":
+            raise ValueError(
+                "The 'Miller' orifice correlation was removed: no published "
+                "source matched its formula. Pick 'Stolz' or "
+                "'ReaderHarrisGallagher' for this orifice."
+            )
+        return data
 
     @model_validator(mode="before")
     @classmethod

@@ -108,7 +108,6 @@ class TestSolveOrificeMdot:
         correlations = [
             cb.MeteringCdCorrelation.ReaderHarrisGallagher,
             cb.MeteringCdCorrelation.Stolz,
-            cb.MeteringCdCorrelation.Miller,
         ]
 
         results = {}

@@ -67,89 +67,108 @@ namespace orifice {
 inline double clamp_beta(double b) { return std::min(b, 0.98); }
 inline double clamp_Cd(double c) { return std::min(c, 1.5); }
 
-// Reader-Harris/Gallagher (1998) correlation
-// ISO 5167-2:2003, also ASME MFC-3M
-// Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000 (preferably >= 10000)
-//            D >= 50 mm, d >= 12.5 mm
-double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D) {
-    // Ensure minimum Reynolds number
-    if (Re_D < 1.0) Re_D = 1.0;
+std::tuple<double, double> tap_positions(OrificeTap tap, double D) {
+    switch (tap) {
+        case OrificeTap::Corner:
+            return {0.0, 0.0};
+        case OrificeTap::D_D2:
+            return {taps::dd2_L1, taps::dd2_L2};
+        case OrificeTap::Flange: {
+            if (!(D > 0.0)) {
+                throw std::invalid_argument(
+                    "Flange taps need the pipe diameter: L1 = 25.4 mm / D");
+            }
+            const double L = taps::inch_mm / (D * 1000.0);
+            return {L, L};
+        }
+    }
+    throw std::invalid_argument("unknown OrificeTap");
+}
 
-    // Limit beta to 0.98 for correlation stability (ISO valid to 0.75)
-    // d ~ D is handled separately or via smooth cap to prevent division by zero
-    const double beta_corr = std::min(beta, 0.98);
-    const double b2 = beta_corr * beta_corr;
+namespace {
+
+// Reader-Harris/Gallagher, ISO 5167-2:2003 Eq. (4), and its exact d/dRe_D.
+// Below the Re_D floor of 1 the value is held and the derivative is 0.
+std::tuple<double, double> rhg_and_dRe(double beta, double Re_D, double D,
+                                       OrificeTap tap) {
+    namespace R = reader_harris;
+    const bool floored = Re_D < 1.0;
+    const double Re = floored ? 1.0 : Re_D;
+
+    // beta is held at 0.98 for stability near d -> D; ISO's range ends at
+    // 0.75 (metering_cd_in_range says so).
+    const double b = clamp_beta(beta);
+    const double b2 = b * b;
     const double b4 = b2 * b2;
     const double b8 = b4 * b4;
 
-    // Convert D to mm for the correlation
+    const auto [L1, L2] = tap_positions(tap, D);
+    const double M2 = 2.0 * L2 / (1.0 - b);
+
+    const double A = std::pow(R::A_coef * b / Re, R::A_exp);
+    const double dA = -R::A_exp * A / Re;
+
+    // Re terms: 0.000521 (1e6 b / Re)^0.7 + (0.0188 + 0.0063 A) b^3.5 (1e6 / Re)^0.3
+    const double t3 = R::C3 * std::pow(R::re_scale * b / Re, R::C3_exp);
+    const double X = std::pow(R::re_scale / Re, R::C4_re);
+    const double dX = -R::C4_re * X / Re;
+    const double b35 = std::pow(b, R::C4_beta);
+
+    // Upstream tap: (0.043 + 0.080 e^-10L1 - 0.123 e^-7L1)(1 - 0.11 A) b^4/(1 - b^4)
+    const double up = (R::C5a + R::C5b * std::exp(-R::C5_exp1 * L1) -
+                       R::C5c * std::exp(-R::C5_exp2 * L1)) *
+                      b4 / (1.0 - b4);
+
+    double C = R::C0 + R::C1 * b2 - R::C2 * b8 + t3 +
+               (R::C4a + R::C4b * A) * b35 * X + up * (1.0 - R::C5_A_coef * A) -
+               R::C6 * (M2 - R::C6_M_coef * std::pow(M2, R::C6_M_exp)) *
+                   std::pow(b, R::C6_beta);
+
+    // Small pipes, D < 71.12 mm: + 0.011 (0.75 - beta)(2.8 - D/25.4).
     const double D_mm = D * 1000.0;
-
-    // Flange tap geometry
-    const double L1 = reader_harris::flange_mm / D_mm;
-    const double L2 = reader_harris::flange_mm / D_mm;
-
-    // A parameter (small-bore correction)
-    const double A = std::pow(reader_harris::A_coef * beta_corr / Re_D, reader_harris::A_exp);
-
-    // M2 parameter (downstream tap correction)
-    const double M2 = 2.0 * L2 / (1.0 - beta_corr);
-
-    // Base coefficient
-    double C = reader_harris::C0
-             + reader_harris::C1 * b2
-             - reader_harris::C2 * b8;
-
-    // Reynolds number term
-    C += reader_harris::C3 * std::pow(reader_harris::re_scale * beta_corr / Re_D, reader_harris::C3_exp);
-
-    // Small-bore correction
-    C += (reader_harris::C4a + reader_harris::C4b * A) * std::pow(beta_corr, reader_harris::C4_beta) * std::pow(reader_harris::re_scale / Re_D, reader_harris::C4_re);
-
-    // Upstream tap term
-    const double exp_term1 = std::exp(-reader_harris::C5_exp1 * L1);
-    const double exp_term2 = std::exp(-reader_harris::C5_exp2 * L1);
-    C += (reader_harris::C5a + reader_harris::C5b * exp_term1 - reader_harris::C5c * exp_term2)
-       * (1.0 - reader_harris::C5_A_coef * A) * b4 / (1.0 - b4);
-
-    // Downstream tap term
-    C -= reader_harris::C6 * (M2 - 0.8 * std::pow(M2, reader_harris::C6_M_exp)) * std::pow(beta_corr, reader_harris::C6_beta);
-
-    // Final smooth cap (physical orifices rarely exceed 1.0;
-    // numerical stability capped at 1.5 to allow lossless bypass recovery)
-    return std::min(C, 1.5);
-}
-
-// Stolz (1978) correlation - older ISO 5167
-double Cd_Stolz(double beta, double Re_D) {
-    if (Re_D < 1.0) Re_D = 1.0;
-    const double b = clamp_beta(beta);
-
-    // Stolz equation (corner taps)
-    // C = 0.5959 + 0.0312*beta^2.1 - 0.184*beta^8 + 91.71*beta^2.5/Re_D^0.75
-    double C = stolz::C0
-             + stolz::C1 * std::pow(b, stolz::C1_exp)
-             - stolz::C2 * std::pow(b, stolz::C2_exp)
-             + stolz::C3 * std::pow(b, stolz::C3_beta) / std::pow(Re_D, stolz::C3_re);
-
-    return clamp_Cd(C);
-}
-
-// Miller (1996) simplified correlation
-double Cd_Miller(double beta, double Re_D) {
-    if (Re_D < 1.0) Re_D = 1.0;
-    const double b = clamp_beta(beta);
-
-    // Simplified form: C ≈ 0.596 + 0.031*beta^2 for high Re
-    const double b2 = b * b;
-    double C = miller::C0 + miller::C1 * b2;
-
-    // Reynolds number correction (approximate)
-    if (Re_D < miller::re_cutoff) {
-        C += miller::C2 * std::pow(b, miller::C2_beta_exp) / std::pow(Re_D, miller::C2_re_exp);
+    if (D_mm > 0.0 && D_mm < R::small_pipe_D_mm) {
+        C += R::small_pipe_coef * (R::small_pipe_beta - b) *
+             (R::small_pipe_D_in - D_mm / taps::inch_mm);
     }
 
-    return clamp_Cd(C);
+    const double dC = -R::C3_exp * t3 / Re + b35 * (R::C4b * dA * X + (R::C4a + R::C4b * A) * dX) -
+                      up * R::C5_A_coef * dA;
+    // The 1.5 cap (a numerical bound for lossless bypass recovery) holds Cd.
+    if (C >= 1.5) {
+        return {1.5, 0.0};
+    }
+    return {C, floored ? 0.0 : dC};
+}
+
+// Stolz, ISO 5167:1980, and its exact d/dRe_D.
+std::tuple<double, double> stolz_and_dRe(double beta, double Re_D, double D,
+                                         OrificeTap tap) {
+    namespace S = stolz;
+    const bool floored = Re_D < 1.0;
+    const double Re = floored ? 1.0 : Re_D;
+    const double b = clamp_beta(beta);
+    const double b4 = std::pow(b, 4.0);
+
+    const auto [L1, L2] = tap_positions(tap, D);
+    const double up = (L1 >= S::L1_sat) ? S::C4_sat : S::C4 * L1;
+
+    const double t3 = S::C3 * std::pow(b, S::C3_beta) / std::pow(Re, S::C3_re);
+    const double C = S::C0 + S::C1 * std::pow(b, S::C1_exp) - S::C2 * std::pow(b, S::C2_exp) +
+                     t3 + up * b4 / (1.0 - b4) - S::C5 * L2 * std::pow(b, S::C5_beta);
+    if (C >= 1.5) {
+        return {1.5, 0.0};
+    }
+    return {C, floored ? 0.0 : -S::C3_re * t3 / Re};
+}
+
+} // namespace
+
+double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D, OrificeTap tap) {
+    return std::get<0>(rhg_and_dRe(beta, Re_D, D, tap));
+}
+
+double Cd_Stolz(double beta, double Re_D, double D, OrificeTap tap) {
+    return std::get<0>(stolz_and_dRe(beta, Re_D, D, tap));
 }
 
 // Convert between Cd and loss coefficient K
@@ -389,37 +408,53 @@ double Cd_from_K(double K, double beta) {
 
 std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
                                                        const OrificeState& state) {
-    if (!geom.is_valid()) {
-        throw std::invalid_argument("Invalid orifice geometry");
-    }
-    using namespace orifice::reader_harris;
-    const double Cd = orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
-    if (state.Re_D < 1.0 || Cd >= 1.5) {
-        return {Cd, 0.0};  // the floor and the cap hold Cd fixed
-    }
-    // d/dRe of each Re-dependent term of Cd_ReaderHarrisGallagher.
-    const double Re = state.Re_D;
-    const double b = std::min(geom.beta(), 0.98);
-    const double b4 = b * b * b * b;
-    const double L1 = flange_mm / (geom.D * 1000.0);
-    const double A = std::pow(A_coef * b / Re, A_exp);
-    const double dA = -A_exp * A / Re;
-    const double t3 = C3 * std::pow(re_scale * b / Re, C3_exp);
-    const double X = std::pow(re_scale / Re, C4_re);
-    const double dX = -C4_re * X / Re;
-    const double tap = (C5a + C5b * std::exp(-C5_exp1 * L1) - C5c * std::exp(-C5_exp2 * L1)) *
-                       b4 / (1.0 - b4);
-    const double dCd = -C3_exp * t3 / Re +
-                       std::pow(b, C4_beta) * (C4b * dA * X + (C4a + C4b * A) * dX) -
-                       tap * C5_A_coef * dA;
-    return {Cd, dCd};
+    return metering_cd_and_dRe(MeteringCdCorrelation::ReaderHarrisGallagher, geom, state.Re_D);
 }
 
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state) {
+    return std::get<0>(Cd_sharp_thin_plate_and_dRe(geom, state));
+}
+
+std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
+                                               const OrificeGeometry& geom,
+                                               double Re_D) {
     if (!geom.is_valid()) {
         throw std::invalid_argument("Invalid orifice geometry");
     }
-    return orifice::Cd_ReaderHarrisGallagher(geom.beta(), state.Re_D, geom.D);
+    switch (id) {
+        case MeteringCdCorrelation::ReaderHarrisGallagher:
+            return orifice::rhg_and_dRe(geom.beta(), Re_D, geom.D, geom.tap);
+        case MeteringCdCorrelation::Stolz:
+            return orifice::stolz_and_dRe(geom.beta(), Re_D, geom.D, geom.tap);
+        case MeteringCdCorrelation::Constant:
+        case MeteringCdCorrelation::UserFunction:
+            break;
+    }
+    throw std::invalid_argument(
+        "metering_cd_and_dRe: only ReaderHarrisGallagher and Stolz carry a "
+        "formula; a Constant or UserFunction Cd belongs to the caller");
+}
+
+bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
+                          double Re_D) {
+    namespace R = orifice::reader_harris;
+    if (id != MeteringCdCorrelation::ReaderHarrisGallagher) {
+        return true;  // Stolz: ISO 5167:1980's limits are not encoded
+    }
+    if (!geom.is_valid()) {
+        return false;
+    }
+    const double d_mm = geom.d * 1000.0;
+    const double D_mm = geom.D * 1000.0;
+    const double b = geom.beta();
+    if (d_mm < R::range_d_min_mm || D_mm < R::range_D_min_mm || D_mm > R::range_D_max_mm ||
+        b < R::range_beta_min || b > R::range_beta_max || Re_D < R::range_re_min) {
+        return false;
+    }
+    if (geom.tap == OrificeTap::Flange) {
+        return Re_D >= R::range_re_flange * b * b * D_mm;
+    }
+    return b <= R::range_beta_split || Re_D >= R::range_re_beta2 * b * b;
 }
 
 // -------------------------------------------------------------
@@ -439,17 +474,9 @@ public:
 class StolzCorrelation : public OrificeCorrelationBase {
 public:
     double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
-        return orifice::Cd_Stolz(geom.beta(), state.Re_D);
+        return std::get<0>(metering_cd_and_dRe(MeteringCdCorrelation::Stolz, geom, state.Re_D));
     }
     std::string name() const override { return "Stolz (ISO 5167:1980)"; }
-};
-
-class MillerCorrelation : public OrificeCorrelationBase {
-public:
-    double Cd(const OrificeGeometry& geom, const OrificeState& state) const override {
-        return orifice::Cd_Miller(geom.beta(), state.Re_D);
-    }
-    std::string name() const override { return "Miller (1996)"; }
 };
 
 class ConstantCdCorrelation : public OrificeCorrelationBase {
@@ -1010,8 +1037,6 @@ std::unique_ptr<OrificeCorrelationBase> make_correlation(MeteringCdCorrelation i
             return std::make_unique<ReaderHarrisGallagherCorrelation>();
         case MeteringCdCorrelation::Stolz:
             return std::make_unique<StolzCorrelation>();
-        case MeteringCdCorrelation::Miller:
-            return std::make_unique<MillerCorrelation>();
         case MeteringCdCorrelation::Constant:
             return std::make_unique<ConstantCdCorrelation>();
         case MeteringCdCorrelation::UserFunction:

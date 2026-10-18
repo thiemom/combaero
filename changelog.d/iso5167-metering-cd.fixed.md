@@ -1,0 +1,3 @@
+- **ISO 5167 metering Cd: small pipes, and the network's 'Stolz'.**
+  - **Small pipes:** Reader-Harris/Gallagher now adds ISO 5167-2:2003's small-pipe term, +0.011 (0.75 - beta)(2.8 - D/25.4), below D = 71.12 mm. A beta-0.5 plate in a 50 mm pipe reads Cd 0.0023 higher.
+  - **The network's 'Stolz':** the network `OrificeElement` computed 'Stolz' as a four-term Reader-Harris/Gallagher typed out in Python, with no Reynolds term from Stolz and no tap terms. It now evaluates the real ISO 5167:1980 Stolz equation in C++, through `metering_cd_and_dRe`, so no metering formula is left in Python.

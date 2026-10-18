@@ -64,9 +64,24 @@ enum class OrificeType {
     UserDefined       // Custom correlation
 };
 
+// Pressure-tap arrangement of a metering orifice (ISO 5167-2:2003, 5.3.2.1).
+//
+// A MEASUREMENT choice, not physics: it fixes which pressure difference C is
+// referenced to, i.e. what a meter at those taps reads. It does not change
+// what the plate does to the flow -- the permanent loss is the same plate
+// whichever taps report it (#645).
+enum class OrificeTap {
+    Corner,  // L1 = L2' = 0
+    D_D2,    // D and D/2 taps: L1 = 1, L2' = 0.47
+    Flange   // L1 = L2' = 25.4 mm / D
+};
+
 struct OrificeGeometry {
     double d = 0.0;       // Orifice bore diameter [m]
     double D = 0.0;       // Pipe diameter [m]
+    // Taps the metering correlations reference C to. Flange is the default,
+    // and was the only arrangement before the tap became selectable.
+    OrificeTap tap = OrificeTap::Flange;
     double t = 0.0;       // Plate thickness [m] (for thick plate)
     double r = 0.0;       // Inlet edge radius [m] (for rounded entry)
     double bevel = 0.0;   // Bevel angle [rad] (for conical)
@@ -110,9 +125,8 @@ struct OrificeState {
 // and Idelchik gives the complete zeta directly, with no ISO base needed.
 enum class MeteringCdCorrelation {
     // Sharp thin-plate correlations
-    ReaderHarrisGallagher,  // ISO 5167-2 / ASME MFC-3M (most accurate)
+    ReaderHarrisGallagher,  // ISO 5167-2:2003 / ASME MFC-3M (most accurate)
     Stolz,                  // ISO 5167:1980 (older, simpler)
-    Miller,                 // Miller (1996) - simplified
 
     // Special
     Constant,               // Fixed Cd value (for testing/simple cases)
@@ -166,16 +180,35 @@ enum class DischargeCdCorrelation {
 // Cd computation - free functions (simple interface)
 // -------------------------------------------------------------
 
-// Sharp thin-plate orifice (ISO 5167-2, Reader-Harris/Gallagher)
-// Valid for: 0.1 <= beta <= 0.75, Re_D >= 5000, D >= 50mm
+// Sharp thin-plate orifice (ISO 5167-2, Reader-Harris/Gallagher), at the
+// taps geom.tap. ISO's range is in metering_cd_in_range.
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
 
 // The same Cd and its exact derivative in Re_D (the Re-correction, the
-// small-bore and the A-dependent tap terms); 0 below the Re_D floor of 1 and
-// above the 1.5 cap. For the network orifice's Jacobian: the metering Cd
-// moves with the flow through Re_D, a column the row used to miss.
+// A-dependent and the tap terms); 0 below the Re_D floor of 1 and above the
+// 1.5 cap. For the network orifice's Jacobian: the metering Cd moves with the
+// flow through Re_D, a column the row used to miss.
 std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
                                                        const OrificeState& state);
+
+// (Cd, dCd/dRe_D) of a NORMED metering correlation at the taps geom.tap: the
+// one entry point the network element calls, so no metering formula lives in
+// Python. ReaderHarrisGallagher and Stolz only; Constant and UserFunction
+// carry no formula of their own and are refused (std::invalid_argument).
+std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
+                                               const OrificeGeometry& geom,
+                                               double Re_D);
+
+// Is the plate inside the correlation's stated range? A diagnostic flag,
+// never a selector or a refusal.
+//   ReaderHarrisGallagher, ISO 5167-2:2003 5.3.1: d >= 12.5 mm,
+//     50 <= D <= 1000 mm, 0.1 <= beta <= 0.75, and
+//       corner / D-D/2 taps: Re_D >= 5000 (beta <= 0.56),
+//                            Re_D >= 16000 beta^2 (beta > 0.56);
+//       flange taps:         Re_D >= 5000 and Re_D >= 170 beta^2 D[mm].
+//   Stolz: ISO 5167:1980's limits are not encoded, so this returns true.
+bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
+                          double Re_D);
 
 
 // -------------------------------------------------------------
@@ -197,33 +230,58 @@ constexpr double metering_cd = 0.61;
 constexpr double discharge_cd = 0.60;
 } // namespace defaults
 
-// Reader-Harris/Gallagher (1998) - ISO 5167-2 flange-tap constants
+// Tap positions of ISO 5167-2:2003, 5.3.2.1, as L1 = l1/D and L2' = l2'/D.
+namespace taps {
+constexpr double inch_mm  = 25.4;  // flange taps sit 1 inch from the faces [mm]
+constexpr double dd2_L1   = 1.0;   // D and D/2 taps, upstream
+constexpr double dd2_L2   = 0.47;  // D and D/2 taps, downstream (ISO's L2')
+} // namespace taps
+
+// Reader-Harris/Gallagher (1998) - ISO 5167-2:2003 Eq. (4)
 namespace reader_harris {
 constexpr double C0        = 0.5961;   // base coefficient
 constexpr double C1        = 0.0261;   // beta^2 term
 constexpr double C2        = 0.216;    // beta^8 term
 constexpr double C3        = 0.000521; // Re-correction coefficient
 constexpr double C3_exp    = 0.7;      // Re-correction exponent
-constexpr double C4a       = 0.0188;   // small-bore base
-constexpr double C4b       = 0.0063;   // small-bore A coefficient
-constexpr double C4_beta   = 3.5;      // small-bore beta exponent
-constexpr double C4_re     = 0.3;      // small-bore Re exponent
-constexpr double C5a       = 0.043;    // tap term base
-constexpr double C5b       = 0.080;    // tap term exp1 coefficient
-constexpr double C5c       = 0.123;    // tap term exp2 coefficient
+constexpr double C4a       = 0.0188;   // second Re term, base
+constexpr double C4b       = 0.0063;   // second Re term, A coefficient
+constexpr double C4_beta   = 3.5;      // second Re term, beta exponent
+constexpr double C4_re     = 0.3;      // second Re term, Re exponent
+constexpr double C5a       = 0.043;    // upstream tap term base
+constexpr double C5b       = 0.080;    // upstream tap term exp1 coefficient
+constexpr double C5c       = 0.123;    // upstream tap term exp2 coefficient
 constexpr double C5_exp1   = 10.0;     // exp(-10*L1) coefficient
 constexpr double C5_exp2   = 7.0;      // exp(-7*L1) coefficient
 constexpr double C5_A_coef = 0.11;     // (1 - 0.11*A) factor
 constexpr double C6        = 0.031;    // downstream tap coefficient
+constexpr double C6_M_coef = 0.8;      // (M2' - 0.8 M2'^1.1)
 constexpr double C6_M_exp  = 1.1;      // M2^1.1 exponent
 constexpr double C6_beta   = 1.3;      // beta^1.3 exponent
-constexpr double A_coef    = 19000.0;  // small-bore A parameter coefficient
-constexpr double A_exp     = 0.8;      // small-bore A parameter exponent
-constexpr double flange_mm = 25.4;     // flange tap distance [mm]
+constexpr double A_coef    = 19000.0;  // A = (19000 beta / Re_D)^0.8
+constexpr double A_exp     = 0.8;
 constexpr double re_scale  = 1.0e6;    // 10^6 * beta / Re scaling
+// Pipes below 71.12 mm (2.8 in) add 0.011 (0.75 - beta) (2.8 - D/25.4).
+constexpr double small_pipe_D_mm  = 71.12;
+constexpr double small_pipe_coef  = 0.011;
+constexpr double small_pipe_beta  = 0.75;
+constexpr double small_pipe_D_in  = 2.8;
+// Range, ISO 5167-2:2003 5.3.1
+constexpr double range_d_min_mm   = 12.5;
+constexpr double range_D_min_mm   = 50.0;
+constexpr double range_D_max_mm   = 1000.0;
+constexpr double range_beta_min   = 0.1;
+constexpr double range_beta_max   = 0.75;
+constexpr double range_re_min     = 5000.0;
+constexpr double range_beta_split = 0.56;     // corner, D-D/2: above, 16000 beta^2
+constexpr double range_re_beta2   = 16000.0;
+constexpr double range_re_flange  = 170.0;    // flange: Re_D >= 170 beta^2 D[mm]
 } // namespace reader_harris
 
-// Stolz (1978) - ISO 5167:1980 corner taps
+// Stolz (1978) - ISO 5167:1980:
+// C = 0.5959 + 0.0312 b^2.1 - 0.184 b^8 + 0.0029 b^2.5 (1e6/Re_D)^0.75
+//     + 0.09 L1 b^4/(1 - b^4) - 0.0337 L2' b^3,
+// where 0.09 L1 is replaced by 0.039 once L1 >= 0.4333. C3 = 0.0029 * 1e6^0.75.
 namespace stolz {
 constexpr double C0      = 0.5959;
 constexpr double C1      = 0.0312;
@@ -233,17 +291,12 @@ constexpr double C2_exp  = 8.0;
 constexpr double C3      = 91.71;
 constexpr double C3_beta = 2.5;
 constexpr double C3_re   = 0.75;
+constexpr double C4      = 0.09;     // upstream tap: C4 L1 b^4 / (1 - b^4)
+constexpr double C4_sat  = 0.039;    // ... with C4 L1 held at this for L1 >= L1_sat
+constexpr double L1_sat  = 0.4333;
+constexpr double C5      = 0.0337;   // downstream tap: C5 L2' b^3
+constexpr double C5_beta = 3.0;
 } // namespace stolz
-
-// Miller (1996) simplified
-namespace miller {
-constexpr double C0          = 0.596;
-constexpr double C1          = 0.031;
-constexpr double C2          = 0.5;    // Re-correction coefficient
-constexpr double C2_beta_exp = 2.5;
-constexpr double C2_re_exp   = 0.5;
-constexpr double re_cutoff   = 1.0e6;
-} // namespace miller
 
 // Thickness correction (Idelchik model)
 namespace thickness {
@@ -684,15 +737,18 @@ double expansion_factor(double cd, double S, double gamma,
                         double eps = x_smooth_eps);
 } // namespace mcgreehan_schotsch
 
-// Reader-Harris/Gallagher (1998) - ISO 5167-2
-// The standard correlation for sharp-edged orifices
-double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D);
+// (L1, L2') of a tap arrangement in a pipe of diameter D [m].
+std::tuple<double, double> tap_positions(OrificeTap tap, double D);
 
-// Stolz (1978) - older ISO 5167 correlation
-double Cd_Stolz(double beta, double Re_D);
+// Reader-Harris/Gallagher (1998) - ISO 5167-2:2003 Eq. (4), with the
+// small-pipe term for D < 71.12 mm. The standard correlation for sharp-edged
+// orifices.
+double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D,
+                                OrificeTap tap = OrificeTap::Flange);
 
-// Miller (1996) - simplified correlation
-double Cd_Miller(double beta, double Re_D);
+// Stolz (1978) - ISO 5167:1980. Corner taps by default, which need no D.
+double Cd_Stolz(double beta, double Re_D, double D = 0.0,
+                OrificeTap tap = OrificeTap::Corner);
 
 // McGreehan and Schotsch (1988) - the full chain, Eqs. (8) through (17).
 // Convenience wrapper over orifice::mcgreehan_schotsch::cd; see that
