@@ -1457,6 +1457,15 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta);
 
+// The static pressure of an orifice's (or incompressible channel's) approach
+// pipe (#651): the flow at mass flux G from stagnation (Pt, Tt), with its
+// derivatives. Compressible: duct_static_state. Incompressible: the
+// momentum chamber's low-Mach closure Pt = P + G^2 R Tt / (2 P), root
+// [Pt + sqrt(Pt^2 - 2 G^2 R Tt)] / 2; past its maximum flux P = Pt / 2, choked.
+ApproachStatic approach_static_pressure(double P_total, double T_total, double G,
+                                        const std::vector<double>& Y,
+                                        bool incompressible);
+
 // An orifice between pipes (#645): the tap pressure the kernels expand to,
 // from the recovered (stagnation) drop between the two pipes' nodes,
 //   p_tap = P_static_up - (P_total_up - P_total_down) / k(beta, C),

@@ -54,6 +54,7 @@ orifice_compressible_residuals_and_jacobian = _core.orifice_compressible_residua
 orifice_mdot_and_jacobian = _core.orifice_mdot_and_jacobian
 orifice_residuals_and_jacobian = _core.orifice_residuals_and_jacobian
 orifice_tap_pressure_and_jacobian = _core.orifice_tap_pressure_and_jacobian
+approach_static_pressure = _core.approach_static_pressure
 pressure_loss_and_jacobian = _core.pressure_loss_and_jacobian
 viscosity_and_jacobians = _core.viscosity_and_jacobians
 wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
@@ -102,6 +103,7 @@ __all__ = [
     "orifice_mdot_and_jacobian",
     "orifice_residuals_and_jacobian",
     "orifice_tap_pressure_and_jacobian",
+    "approach_static_pressure",
     "pressure_loss_and_jacobian",
     "viscosity_and_jacobians",
     "wall_coupling_and_jacobian",

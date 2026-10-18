@@ -1330,6 +1330,20 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "applied (0 < beta < 1) the nozzle expands from P_static_up, else from\n"
         "P_total_up.");
 
+  py::class_<solver::ApproachStatic>(
+      m, "ApproachStatic", "Static pressure of an orifice's approach pipe (#651)")
+      .def_readonly("P", &solver::ApproachStatic::P)
+      .def_readonly("dP_dPt", &solver::ApproachStatic::dP_dPt)
+      .def_readonly("dP_dTt", &solver::ApproachStatic::dP_dTt)
+      .def_readonly("dP_dG", &solver::ApproachStatic::dP_dG)
+      .def_readonly("dP_dY", &solver::ApproachStatic::dP_dY)
+      .def_readonly("choked", &solver::ApproachStatic::choked);
+  m.def("approach_static_pressure", &solver::approach_static_pressure,
+        py::arg("P_total"), py::arg("T_total"), py::arg("G"), py::arg("Y"),
+        py::arg("incompressible"),
+        "Static pressure of the flow at mass flux G from stagnation (Pt, Tt):\n"
+        "duct_static_state compressible, Pt = P + G^2 R Tt / (2 P)\n"
+        "incompressible. The approach state of an orifice with E (#651).");
   py::class_<solver::OrificeTapPressure>(
       m, "OrificeTapPressure",
       "Downstream tap pressure of an orifice plate between pipes (#645)")

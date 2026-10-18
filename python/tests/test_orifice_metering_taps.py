@@ -202,9 +202,11 @@ def test_a_pipe_fed_orifice_flows_iso_from_its_static_taps(node_cls: type, beta:
     head again."""
     r = _solve(_pipe_orifice_sink(node_cls, beta, "incompressible", "fixed"))
     d = beta * 0.1
-    rho = cb.density(300.0, r["a.P"], cb.species.dry_air())
+    # p1 and rho1 are the approach pipe's static state (#651).
+    p1 = r["o.P_approach"]
+    rho = cb.density(300.0, p1, cb.species.dry_air())
     E = 1.0 / math.sqrt(1.0 - beta**4)
-    m_iso = 0.6 * E * math.pi * d * d / 4 * math.sqrt(2.0 * rho * (r["a.P"] - 1.0e5))
+    m_iso = 0.6 * E * math.pi * d * d / 4 * math.sqrt(2.0 * rho * (p1 - 1.0e5))
     # 1e-4: the network's air vs species.dry_air; the defect was 1.2-6%.
     assert r["o.m_dot"] == pytest.approx(m_iso, rel=1e-4)
 

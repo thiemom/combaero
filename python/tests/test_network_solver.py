@@ -110,10 +110,16 @@ def test_network_solver_simple_channel():
 
     m_dot_solved = solution["channel_1.m_dot"]
 
-    # Analytical verification
-    rho = cb.density(inlet.Tt, inlet.Pt, cb.mass_to_mole(inlet.Y))
-    mu = cb.viscosity(inlet.Tt, inlet.Pt, cb.mass_to_mole(inlet.Y))
+    # Analytical verification. The density is the duct's inlet static state
+    # (#651): the boundary's (Pt, T) at the duct's flux G, from the
+    # low-Mach closure Pt = P + G^2 R T / (2 P).
+    X = cb.mass_to_mole(inlet.Y)
     A = math.pi * (0.05 / 2) ** 2
+    G = m_dot_solved / A
+    R = inlet.Pt / (cb.density(inlet.Tt, inlet.Pt, X) * inlet.Tt)
+    P1 = 0.5 * (inlet.Pt + math.sqrt(inlet.Pt**2 - 2.0 * G * G * R * inlet.Tt))
+    rho = cb.density(inlet.Tt, P1, X)
+    mu = cb.viscosity(inlet.Tt, P1, X)
     v = m_dot_solved / (rho * A)
     Re = max(4.0 * m_dot_solved / (math.pi * 0.05 * mu), 1.0)
 

@@ -238,6 +238,29 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 // incompressible map has no floor. ISO's relation is incompressible:
 // p_tap / P_static_up < ORIFICE_RECOVERY_MIN_PRESSURE_RATIO is outside it
 // (in_range false), ISO 5167-2's own expansibility limit.
+// The static pressure an orifice's approach pipe carries (#651): the flow at
+// mass flux G = |m| / A_pipe from the upstream node's stagnation state (Pt,
+// Tt). With E applied the orifice drives from this, not from its node's own
+// static pressure, so a PlenumNode (P = Pt by definition) and a
+// MomentumChamberNode give the same flow, and beta, E and p1 all refer to the
+// same pipe. Compressible: duct_static_state (entropy and energy, as the
+// momentum chamber's closure). Incompressible: the chamber's low-Mach form
+// Pt = P + G^2 R Tt / (2 P), whose subsonic root is
+// P = [Pt + sqrt(Pt^2 - 2 G^2 R Tt)] / 2; past its maximum flux it holds
+// P = Pt / 2 (choked = true, derivatives of that branch).
+struct ApproachStatic {
+  double P;
+  double dP_dPt;
+  double dP_dTt;
+  double dP_dG;
+  std::vector<double> dP_dY;
+  bool choked;
+};
+
+ApproachStatic approach_static_pressure(double P_total, double T_total, double G,
+                                        const std::vector<double>& Y,
+                                        bool incompressible);
+
 inline constexpr double ORIFICE_TAP_PRESSURE_FLOOR = 0.1;
 inline constexpr double ORIFICE_RECOVERY_MIN_PRESSURE_RATIO = 0.75;
 
