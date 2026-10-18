@@ -1105,7 +1105,7 @@ panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
 ```python
 from combaero.network import (
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
-    LosslessConnectionElement, DiameterDischargeCoefficientConnectionElement,
+    LosslessConnectionElement, PortDischargeElement, DiameterDischargeCoefficientConnectionElement,
     TeeJunctionElement, VortexElement, EffusionPlateElement,
 )
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
@@ -1139,6 +1139,12 @@ panel = EffusionPlateElement(
 # Connection elements
 effective_area = EffectiveAreaConnectionElement("ea", "node3", "node4", diameter=0.015958)
 lossless = LosslessConnectionElement("lossless", "node4", "node5")
+# A momentum chamber discharging into a PressureBoundary (#637): static
+# coupling (the chamber's static P is the boundary's, its head lost) and,
+# choked, under-expanded at the sonic static pressure of its flux. Inflow and
+# a coupling="total" boundary keep Pt equal. The GUI inserts it where a
+# junction port is wired straight to a boundary.
+discharge = PortDischargeElement("discharge", "chamber", "outlet_boundary")
 area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "node6", diameter=0.011284, Cd=0.7)
 
 # Three-port tee junction (Unified0D compressible model, Mynard & Valen-Sendstad 2015)

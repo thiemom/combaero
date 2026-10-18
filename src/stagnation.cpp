@@ -339,6 +339,50 @@ ChamberStaticState chamber_static_state(double T0, double P, double G,
   return out;
 }
 
+SonicStaticState sonic_static_state(double T0, double G,
+                                    const std::vector<double> &X) {
+  const double R = specific_gas_constant(X);
+  const double mw_g = mwmix(X);  // g/mol
+  // cp, gamma and their T derivatives on the mass basis.
+  auto cp_m = [&](double t) { return cp_mass(t, X); };
+  auto gamma_and_d = [&](double t, double &dg) {
+    const double c = cp_mass(t, X);
+    const double dc = J_per_mol_to_J_per_kg(dcp_dT(t, X), mw_g);
+    const double cv = c - R;
+    dg = -R * dc / (cv * cv);
+    return c / cv;
+  };
+  // F(T) = [h(T0) - h(T)] - a(T)^2 / 2, a^2 = gamma R T; F falls in T.
+  double dg0 = 0.0;
+  const double g0 = gamma_and_d(T0, dg0);
+  double T = 2.0 * T0 / (g0 + 1.0);
+  double dFdT = -1.0;
+  for (int it = 0; it < 100; ++it) {
+    double dg = 0.0;
+    const double g = gamma_and_d(T, dg);
+    const double F = gl8_split(cp_m, T, T0) - 0.5 * g * R * T;
+    dFdT = -cp_mass(T, X) - 0.5 * R * (g + T * dg);
+    const double step = F / dFdT;
+    T -= step;
+    if (std::abs(step) <= 1e-13 * T0) {
+      break;
+    }
+  }
+  double dg = 0.0;
+  const double g = gamma_and_d(T, dg);
+  dFdT = -cp_mass(T, X) - 0.5 * R * (g + T * dg);
+  SonicStaticState out{};
+  out.T = T;
+  out.dT_dT0 = cp_mass(T0, X) / -dFdT;
+  const double Gabs = std::abs(G);
+  out.P = Gabs * std::sqrt(R * T / g);
+  // d ln P* / d T* = 1/(2 T*) - gamma'/(2 gamma).
+  const double dlnP_dT = 0.5 / T - 0.5 * dg / g;
+  out.dP_dT0 = out.P * dlnP_dT * out.dT_dT0;
+  out.dP_dG = (Gabs > 0.0) ? out.P / Gabs * (G >= 0.0 ? 1.0 : -1.0) : std::sqrt(R * T / g);
+  return out;
+}
+
 DuctStaticState duct_static_state(double T0, double P0, double G,
                                   const std::vector<double> &X) {
   // An unphysical iterate is evaluated at the floors, finite; the partials

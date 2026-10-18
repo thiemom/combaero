@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "compressible.h"
@@ -317,4 +318,25 @@ TEST(CrossflowRatio, VanishingDriveStaysFinite) {
   const auto r = combaero::crossflow_velocity_ratio(0.3, 0.3, 1.0e5, 300.0, X, 1.0e5, 1e-3);
   EXPECT_TRUE(std::isfinite(r.U1_over_Vi));
   EXPECT_NEAR(r.Vi, combaero::CROSSFLOW_VI_FLOOR, 1e-12);
+}
+
+// ---- sonic static state (#637) ------------------------------------------------
+
+TEST(SonicStaticState, TheFluxIsSonicThereAndTheDerivativesAreExact) {
+  const auto X = air();
+  for (const auto& [T0, G] : std::vector<std::pair<double, double>>{
+           {300.0, 250.0}, {1600.0, 80.0}, {900.0, 1.0}}) {
+    const auto s = combaero::sonic_static_state(T0, G, X);
+    // At P* the chamber's own closure reads Mach 1.
+    EXPECT_NEAR(combaero::chamber_static_state(T0, s.P, G, X).M, 1.0, 1e-10);
+    const double hT = 1e-4 * T0;
+    const double hG = 1e-5 * G;
+    const double fdT = (combaero::sonic_static_state(T0 + hT, G, X).P -
+                        combaero::sonic_static_state(T0 - hT, G, X).P) / (2.0 * hT);
+    const double fdG = (combaero::sonic_static_state(T0, G + hG, X).P -
+                        combaero::sonic_static_state(T0, G - hG, X).P) / (2.0 * hG);
+    EXPECT_NEAR(s.dP_dT0 / fdT, 1.0, 1e-7);
+    EXPECT_NEAR(s.dP_dG / fdG, 1.0, 1e-7);
+  }
+  EXPECT_EQ(combaero::sonic_static_state(300.0, 0.0, X).P, 0.0);
 }

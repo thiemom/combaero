@@ -333,6 +333,13 @@ struct ChamberStaticState {
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
 
+// The SONIC static state of flux G at stagnation T0 (#637): T* from
+// h(T0) - h(T*) = a*^2 / 2, P* = G sqrt(R T* / gamma*), with dT*/dT0,
+// dP*/dT0 and dP*/dG. A chamber discharging into a reservoir cannot sit
+// below P*.
+struct SonicStaticState { double T, P, dT_dT0, dP_dT0, dP_dG; };
+SonicStaticState sonic_static_state(double T0, double G, const std::vector<double>& X);
+
 // Static state at a duct inlet fed from stagnation (T0, P0) at mass flux G
 // (#636): chamber_static_state at the static P whose isentropic stagnation
 // pressure is P0 (bracketed Newton on the subsonic branch [P*, P0]). Above
@@ -1467,6 +1474,11 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta);
+
+// The sonic static pressure P* = G sqrt(R T* / gamma*) of a chamber at
+// stagnation T0 and mass flux G (#637), T* from h(T0) - h(T*) = a*^2 / 2: the
+// floor of a junction port's chamber discharging into a pressure boundary.
+SonicStatic sonic_static_pressure(double T0, double G, const std::vector<double>& Y);
 
 // The static pressure of an orifice's (or incompressible channel's) approach
 // pipe (#651): the flow at mass flux G from stagnation (Pt, Tt), with its

@@ -1837,6 +1837,26 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   return res;
 }
 
+SonicStatic sonic_static_pressure(double T0, double G, const std::vector<double>& Y) {
+  auto X_of = [](const std::vector<double>& Yv) {
+    return combaero::mass_to_mole(combaero::normalize_fractions(Yv));
+  };
+  const auto st = combaero::sonic_static_state(T0, G, X_of(Y));
+  SonicStatic out{};
+  out.P = st.P;
+  out.T = st.T;
+  out.dP_dT0 = st.dP_dT0;
+  out.dP_dG = st.dP_dG;
+  out.dP_dY.assign(Y.size(), 0.0);
+  const double eps_Y = 1e-6;
+  for (std::size_t i = 0; i < Y.size(); ++i) {
+    std::vector<double> Y_plus = Y;
+    Y_plus[i] += eps_Y;
+    out.dP_dY[i] = (combaero::sonic_static_state(T0, G, X_of(Y_plus)).P - out.P) / eps_Y;
+  }
+  return out;
+}
+
 ApproachStatic approach_static_pressure(double P_total, double T_total, double G,
                                         const std::vector<double>& Y,
                                         bool incompressible) {

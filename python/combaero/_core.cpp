@@ -1330,6 +1330,18 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "applied (0 < beta < 1) the nozzle expands from P_static_up, else from\n"
         "P_total_up.");
 
+  py::class_<solver::SonicStatic>(
+      m, "SonicStatic", "Sonic static state of a chamber's mass flux (#637)")
+      .def_readonly("P", &solver::SonicStatic::P)
+      .def_readonly("T", &solver::SonicStatic::T)
+      .def_readonly("dP_dT0", &solver::SonicStatic::dP_dT0)
+      .def_readonly("dP_dG", &solver::SonicStatic::dP_dG)
+      .def_readonly("dP_dY", &solver::SonicStatic::dP_dY);
+  m.def("sonic_static_pressure", &solver::sonic_static_pressure, py::arg("T0"), py::arg("G"),
+        py::arg("Y"),
+        "Static pressure P* at which mass flux G is sonic for stagnation T0\n"
+        "(variable cp): the floor of a chamber discharging into a reservoir\n"
+        "(#637). P* = G sqrt(R T* / gamma*).");
   py::class_<solver::ApproachStatic>(
       m, "ApproachStatic", "Static pressure of an orifice's approach pipe (#651)")
       .def_readonly("P", &solver::ApproachStatic::P)
