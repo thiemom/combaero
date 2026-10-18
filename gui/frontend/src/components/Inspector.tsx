@@ -358,6 +358,28 @@ const Inspector = () => {
 						</div>
 					</div>
 				)}
+				{/* Rayleigh omission (#551): a wall-heated compressible channel whose
+				    momentum leaves out the heating's total-pressure change. */}
+				{selectedNode.data.result?.rayleigh_omitted === 1 && (
+					<div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-800">
+						<div className="font-bold uppercase mb-0.5">
+							Heating not in the momentum
+						</div>
+						<div className="font-mono">
+							omitted ΔPt ≈{" "}
+							{(
+								(selectedNode.data.result.rayleigh_omitted_frac ?? 0) * 100
+							).toFixed(1)}
+							% of inlet Pt
+						</div>
+						<div className="italic text-amber-700 mt-0.5">
+							The compressible duct is solved as adiabatic friction flow; its
+							wall heat raises the outlet temperature but not its momentum.
+							Heating costs total pressure (cooling gains it) as Ma²: this is
+							the first-order Rayleigh estimate. The solve is not rejected.
+						</div>
+					</div>
+				)}
 				{/* Incompressible validity (#588): an element on an incompressible
 				    closure running above the Mach limit. Reported only. */}
 				{warningsFor(selectedNode.id, solveResults?.incompressible_warnings)
