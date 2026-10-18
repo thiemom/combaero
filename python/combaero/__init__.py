@@ -177,6 +177,7 @@ try:
         OrificeTap,
         metering_cd_and_dRe,
         metering_cd_in_range,
+        permanent_loss_ratio_and_dC,
         DischargeCdCorrelation,
         DischargeHoleGeometry,
         DischargeHoleState,
@@ -199,6 +200,7 @@ try:
         OrificeGeometry,
         OrificeState,
         OrificeResult,
+        OrificeTapPressure,
         ChannelSolverResult,
         MixtureState,
         MomentumChamberResult,
@@ -821,6 +823,7 @@ except (ModuleNotFoundError, ImportError) as e:
     Cd_sharp_thin_plate_and_dRe = _core.Cd_sharp_thin_plate_and_dRe
     metering_cd_and_dRe = _core.metering_cd_and_dRe
     metering_cd_in_range = _core.metering_cd_in_range
+    permanent_loss_ratio_and_dC = _core.permanent_loss_ratio_and_dC
     discharge_cd = _core.discharge_cd
     discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     discharge_cd_in_range = _core.discharge_cd_in_range
@@ -1425,6 +1428,7 @@ __all__ = [
     "Cd_sharp_thin_plate_and_dRe",
     "metering_cd_and_dRe",
     "metering_cd_in_range",
+    "permanent_loss_ratio_and_dC",
     "discharge_cd",
     "discharge_cd_and_derivatives",
     "discharge_cd_in_range",
@@ -1486,6 +1490,7 @@ __all__ = [
     "heat_entropy_flux",
     "MomentumChamberResult",
     "OrificeResult",
+    "OrificeTapPressure",
     "P0_from_static",
     "P_from_stagnation",
     "Registry",

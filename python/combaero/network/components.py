@@ -2886,6 +2886,26 @@ _DISCHARGE_SELECTORS = {
 # kernels are linear in Cd and refuse A_eff <= 0 (OrificeElement._kernel_from).
 _KERNEL_CD_MIN = 1e-12
 
+# The taps the network's metering Cd is evaluated at. ISO 5167-2's
+# permanent-loss relation (permanent_loss_ratio_and_dC) is Bernoulli to the
+# vena contracta plus a momentum balance after it, so its tapping
+# differential is the undisturbed-to-vena-contracta one, which D-D/2 taps
+# measure. With corner taps' C the same relation books up to 6% more loss at
+# beta 0.75 (tmp/probe_tap_invariance.py, #645). The tap is measurement, so
+# the element's own `tap` only picks the differential it reports.
+_NETWORK_TAP = cb.OrificeTap.D_D2
+
+_TAPS = {
+    "Corner": cb.OrificeTap.Corner,
+    "D_D2": cb.OrificeTap.D_D2,
+    "Flange": cb.OrificeTap.Flange,
+}
+
+# Partials key carrying d(m_calc)/d(Cd) through _kernel_from and
+# _flow_and_partials. Between pipes m_calc is no longer linear in Cd: the
+# permanent-loss ratio k(beta, C) moves the tap pressure too (#645).
+_DM_DCD = "__dm_dCd__"
+
 
 class OrificeElement(NetworkElement):
     """
@@ -2913,8 +2933,19 @@ class OrificeElement(NetworkElement):
 
     The first two are NORMED metering correlations: Cd is referenced to the
     tapping differential and is a function of beta = d/D. Both are evaluated
-    at flange taps: the tap choice is a measurement convention and must not
-    move the solved flow (#645). The last five are
+    at D-D/2 taps, the ones ISO's permanent-loss relation is derived for: the
+    tap choice is a measurement convention and must not move the solved flow
+    (#645), so ``tap`` only selects the differential reported as ``dp_tap``.
+
+    Between pipes (a pipe on the side the flow comes from sets beta, and a
+    pipe on the side it goes to recovers the pressure) a metering or 'fixed'
+    orifice charges ISO 5167-2's PERMANENT loss, not the tapping
+    differential: the row's drop is the stagnation difference between the
+    two nodes, mapped to the tap pressure through k(beta, C)
+    (orifice_tap_pressure_and_jacobian). Discharging into a node with no
+    pipe beyond it, the jet's head is lost there and the drop is the tapping
+    differential. The discharge-hole family keeps that form in a pipe too,
+    until its in-pipe diagrams land. The last five are
     DISCHARGE correlations for a hole in a wall, where zeta is referenced to
     the hole velocity and there is no beta. They are not interchangeable, and
     there is deliberately no 'Auto' arm choosing between them from geometry.
@@ -2940,8 +2971,14 @@ class OrificeElement(NetworkElement):
         bevel_depth: float = 0.0,
         area: float | None = None,
         injection_angle_deg: float = 90.0,
+        tap: str = "Flange",
     ):
         super().__init__(id, from_node, to_node)
+        if tap not in _TAPS:
+            raise ValueError(f"OrificeElement {id!r}: tap {tap!r} is not one of {sorted(_TAPS)}.")
+        # The taps whose differential diagnostics() reports as dp_tap. Never
+        # the solved flow: that is evaluated at _NETWORK_TAP (#645).
+        self.tap = tap
         # Angle of the discharged jet to the axis of a merge chamber it feeds
         # as a side stream (#471). 90 = normal injection, no axial momentum.
         self.injection_angle_deg = float(injection_angle_deg)
@@ -2983,6 +3020,10 @@ class OrificeElement(NetworkElement):
         # Velocity-of-approach ratio; recomputed in resolve_topology. Initialized
         # here so diagnostics() is safe before resolve runs.
         self.beta = 0.0
+        # Pressure recovery into a downstream pipe, per direction (#645); set
+        # in resolve_topology. Subclasses that skip it never recover.
+        self._recovery_fwd = False
+        self._recovery_rev = False
         # OrificeGeometry built in resolve_topology
         self._orifice_geom: object | None = None
 
@@ -3035,6 +3076,12 @@ class OrificeElement(NetworkElement):
         ]
         if len(to_pipes) == 1 and to_pipes[0].diameter and d_bore < to_pipes[0].diameter:
             self.beta_reverse = d_bore / to_pipes[0].diameter
+        from_pipes = [
+            e
+            for e in graph.get_upstream_elements(self.from_node)
+            + graph.get_downstream_elements(self.from_node)
+            if isinstance(e, ChannelElement) and e.id != self.id
+        ]
 
         if self.upstream_diameter and self.upstream_diameter > 0:
             if d_bore < self.upstream_diameter:
@@ -3047,6 +3094,18 @@ class OrificeElement(NetworkElement):
                     f"Skipping velocity-of-approach correction (E=1).",
                     stacklevel=2,
                 )
+
+        # Pressure recovery (#645), per flow direction: the approach pipe sets
+        # beta, and a single wider pipe on the far side recovers the jet's
+        # pressure, so the row charges ISO's permanent loss. A plain node
+        # beyond (no pipe) takes the jet's head as lost. The metering family
+        # and 'fixed' only: the discharge-hole Cds are plenum-measured.
+        def _recovers(pipes: list[ChannelElement]) -> bool:
+            return len(pipes) == 1 and bool(pipes[0].diameter) and d_bore < pipes[0].diameter
+
+        metering_like = self.correlation == "fixed" or self.correlation in _METERING_SELECTORS
+        self._recovery_fwd = metering_like and self.beta > 0.0 and _recovers(to_pipes)
+        self._recovery_rev = metering_like and self.beta_reverse > 0.0 and _recovers(from_pipes)
 
         if self.use_correlation:
             # Build geometry descriptor for Cd correlation.
@@ -3063,6 +3122,7 @@ class OrificeElement(NetworkElement):
             geom.D = D_up
             geom.t = self.plate_thickness
             geom.r = self.edge_radius
+            geom.tap = _NETWORK_TAP
             self._orifice_geom = geom
 
     def unknowns(self) -> list[str]:
@@ -3349,6 +3409,7 @@ class OrificeElement(NetworkElement):
             return self._self_consistent_residuals(state_in, state_out, flows, effective_cd)
 
         m_calc, partials = self._flow_and_partials(state_in, state_out, effective_cd)
+        dm_dcd = partials.pop(_DM_DCD, 0.0)
         res = [m_dot - m_calc]
 
         # Assemble Jacobian with respect to all node and element unknowns
@@ -3356,13 +3417,12 @@ class OrificeElement(NetworkElement):
         for name, d in partials.items():
             jac[0][name] = jac[0].get(name, 0.0) - d
 
-        # m_calc is proportional to Cd, and a discharge-hole Cd moves with the
-        # flow (Re_hole) and, duct-fed, with the crossflow (U1/Vi):
-        # d(m_calc)/d(x) += (m_calc/Cd) dCd/dx.
+        # The Cd moves with the flow (Re) and, duct-fed, with the crossflow
+        # (U1/Vi): d(m_calc)/d(x) += d(m_calc)/d(Cd) dCd/dx. That is m_calc/Cd
+        # where m_calc is linear in Cd; between pipes k(beta, C) adds to it.
         if effective_cd > 0.0:
-            scale = m_calc / effective_cd
             for name, dcd in self._dCd_dnames(state_in, state_out, flows).items():
-                jac[0][name] = jac[0].get(name, 0.0) - scale * dcd
+                jac[0][name] = jac[0].get(name, 0.0) - dm_dcd * dcd
 
         return res, jac
 
@@ -3414,34 +3474,45 @@ class OrificeElement(NetworkElement):
         """C++ (m_calc, d m_calc / d name) for flow from ``src`` into ``dst``.
 
         The kernels take the upstream node's stagnation state and the
-        downstream static pressure; ``m_calc`` is linear in Cd. The
-        incompressible density reference is the upstream static by default;
-        the solver's compressible-seed proxy switches it to the downstream
-        static (_incompressible_p_ref = "outlet"), which tracks the
-        compressible solution far better on blow-down networks (6-7x closer
-        junction pressures, tmp/outlet_ref_seed_experiment.py).
+        downstream static pressure. The incompressible density reference is
+        the upstream static by default; the solver's compressible-seed proxy
+        switches it to the downstream static (_incompressible_p_ref =
+        "outlet"), which tracks the compressible solution far better on
+        blow-down networks (6-7x closer junction pressures,
+        tmp/outlet_ref_seed_experiment.py).
+
+        Into a recovering pipe (#645) the kernels expand to the TAP pressure
+        that the nodes' stagnation difference implies through ISO's
+        permanent-loss ratio, not to the downstream node's static. m_calc is
+        then no longer linear in Cd; d(m_calc)/d(Cd) rides along under
+        _DM_DCD.
         """
         # The velocity of approach is the upstream pipe's along the flow.
-        beta = (
-            getattr(self, "beta", 0.0)
-            if src_id == self.from_node
-            else getattr(self, "beta_reverse", 0.0)
-        )
+        forward = src_id == self.from_node
+        beta = getattr(self, "beta", 0.0) if forward else getattr(self, "beta_reverse", 0.0)
+        recovers = getattr(self, "_recovery_fwd" if forward else "_recovery_rev", False)
+        compressible = self.regime == "compressible"
         # Both kernels are exactly linear in Cd (A_eff = Cd E A). A crossflow
         # Cd underflows to exactly 0 where the hole's pressure drop vanishes
         # (U1/Vi -> inf in McGreehan-Schotsch's exp(-Rv^n)), and the kernels
         # refuse A_eff <= 0: evaluate at Cd = 1 there and scale, which is
         # exact, so a trace Cd gives a trace flow instead of an exception.
-        if cd < _KERNEL_CD_MIN:
-            m1, d1 = self._kernel_from(src, dst, src_id, dst_id, 1.0)
-            return m1 * cd, {k: v * cd for k, v in d1.items()}
+        cd_k = cd if cd >= _KERNEL_CD_MIN else 1.0
+        scale = cd / cd_k
+        p_down = dst.P
+        tap = None
+        if recovers:
+            tap = _solver_tools.orifice_tap_pressure_and_jacobian(
+                src.P, src.Pt, dst.Pt, beta, max(cd, _KERNEL_CD_MIN), compressible
+            )
+            p_down = float(tap.p_tap)
         # With a velocity of approach (beta > 0) the kernels drive from the
         # upstream STATIC pressure, since E carries the approach head; without
         # one, from the stagnation pressure. The rule is C++'s
         # (approach_from_static); both pressures are passed.
-        if self.regime == "compressible":
+        if compressible:
             r = _solver_tools.orifice_compressible_residuals_and_jacobian(
-                src.m_dot, src.Pt, src.P, src.Tt, src.Y, dst.P, cd, self.area, beta
+                src.m_dot, src.Pt, src.P, src.Tt, src.Y, p_down, cd_k, self.area, beta
             )
         else:
             _p_ref_outlet = getattr(self, "_incompressible_p_ref", "inlet") == "outlet"
@@ -3451,26 +3522,44 @@ class OrificeElement(NetworkElement):
                 src.P,
                 src.T,
                 src.Y,
-                dst.P,
-                cd,
+                p_down,
+                cd_k,
                 self.area,
                 beta=beta,
                 # Density at the downstream static: its sensitivity moves there.
                 P_rho_ref=dst.P if _p_ref_outlet else -1.0,
             )
+        g = float(r.d_mdot_dP_static_down)
         d: dict[str, float] = {
             f"{src_id}.Pt": float(r.d_mdot_dP_total_up),
             f"{src_id}.T": float(r.d_mdot_dT_up),
-            f"{dst_id}.P": float(r.d_mdot_dP_static_down + r.d_mdot_dP_rho_ref),
+            f"{dst_id}.P": float(r.d_mdot_dP_rho_ref) + (0.0 if tap else g),
         }
         # Outlet-referenced and plenum-fed, the flow does not read the source
         # static at all: leave the column out rather than carry a zero.
         if r.d_mdot_dP_static_up != 0.0:
             d[f"{src_id}.P"] = float(r.d_mdot_dP_static_up)
+        dm_dcd = float(r.m_dot_calc) / cd_k
+        if tap is not None:
+            # p_tap(P_static_up, Pt_up, Pt_down, C): its columns through g.
+            for name, dp in (
+                (f"{src_id}.P", tap.d_dP_static_up),
+                (f"{src_id}.Pt", tap.d_dP_total_up),
+                (f"{dst_id}.Pt", tap.d_dP_total_down),
+            ):
+                if dp != 0.0:
+                    d[name] = d.get(name, 0.0) + g * float(dp)
+            dm_dcd += scale * g * float(tap.d_dC)
+        if tap is not None and d[f"{dst_id}.P"] == 0.0:
+            # The tap pressure reads the far node's Pt, not its static.
+            del d[f"{dst_id}.P"]
         for i, val in enumerate(r.d_mdot_dY_up):
             if val != 0.0:
                 d[f"{src_id}.Y[{i}]"] = float(val)
-        return float(r.m_dot_calc), d
+        if scale != 1.0:
+            d = {k: v * scale for k, v in d.items()}
+        d[_DM_DCD] = dm_dcd
+        return float(r.m_dot_calc) * scale, d
 
     def _flow_and_partials(
         self,
@@ -3563,6 +3652,9 @@ class OrificeElement(NetworkElement):
         cd_star, cd_m = cd_and_slope(a)
         probe.m_dot = sgn * a
         m_star, partial = self._flow_and_partials(probe, state_out, cd_star)
+        # Linear in Cd here: the discharge-hole family never recovers (#645),
+        # so K above is exact and d(m)/d(Cd) = K.
+        partial.pop(_DM_DCD, None)
         denom = 1.0 - aK * cd_m
         # Cd's other dependencies (a duct-fed hole's U1/Vi), at m*.
         for name, dcd in self._dCd_dnames(probe, state_out, flows).items():
@@ -3621,18 +3713,71 @@ class OrificeElement(NetworkElement):
         except Exception:
             mach_out = 0.0
 
+        cd = float(self._effective_Cd(state_in, state_out, flows))
         return {
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
             "mach_throat": float(mach_throat),
-            "Cd": float(self._effective_Cd(state_in, state_out, flows)),
+            "Cd": cd,
             "is_correlation": float(self.use_correlation),
             "Cd_in_range": float(self._cd_in_range(state_in)),
             "diameter": float(self.diameter or 0.0),
             "beta": float(self.beta),
             "area_source": self._area_source,
+            **self._tap_diagnostics(state_in, state_out, cd),
         }
+
+    def _tap_diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        cd: float,
+    ) -> dict[str, float | str]:
+        """What a meter at ``self.tap`` reads, and the loss the row charged.
+
+        dp_tap is the tapping differential at the element's ``tap``. The row
+        works at _NETWORK_TAP, so for a metering correlation the reported one
+        is scaled by (C_network / C_tap)^2 at the same flow. Between pipes
+        (#645) dp_permanent is the stagnation drop the row charged and
+        loss_ratio = dp_permanent / dp_tap at the network taps;
+        recovery_in_range is False where p_tap/p1 < 0.75, outside ISO's
+        incompressible relation.
+        """
+        forward = not (state_out.Pt > state_in.Pt)
+        up, dn = (state_in, state_out) if forward else (state_out, state_in)
+        beta = self.beta if forward else getattr(self, "beta_reverse", 0.0)
+        recovers = self._recovery_fwd if forward else self._recovery_rev
+        out: dict[str, float | str] = {"tap": self.tap, "pressure_recovery": float(recovers)}
+        p_up = float(up.P) if 0.0 < beta < 1.0 else float(up.Pt)
+        if recovers and cd > 0.0:
+            t = _solver_tools.orifice_tap_pressure_and_jacobian(
+                float(up.P), float(up.Pt), float(dn.Pt), beta, cd, self.regime == "compressible"
+            )
+            dp_net = p_up - float(t.p_tap)
+            out["dp_permanent"] = float(up.Pt) - float(dn.Pt)
+            out["loss_ratio"] = float(t.loss_ratio)
+            out["recovery_in_range"] = float(t.in_range)
+        else:
+            dp_net = p_up - float(dn.P)
+        metering = _METERING_SELECTORS.get(self.correlation)
+        if (
+            metering is not None
+            and self._orifice_geom is not None
+            and _TAPS[self.tap] != _NETWORK_TAP
+        ):
+            g = self._orifice_geom
+            at_tap = cb.OrificeGeometry()
+            at_tap.d, at_tap.D, at_tap.t, at_tap.r = g.d, g.D, g.t, g.r
+            at_tap.tap = _TAPS[self.tap]
+            mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+            m = abs(float(state_in.m_dot))
+            Re_D = 4.0 * m / (math.pi * g.D * mu) if (mu > 0.0 and m > 1e-12) else 1e4
+            c_net = float(cb.metering_cd_and_dRe(metering, g, Re_D)[0])
+            c_tap = float(cb.metering_cd_and_dRe(metering, at_tap, Re_D)[0])
+            dp_net *= (c_net / c_tap) ** 2
+        out["dp_tap"] = dp_net
+        return out
 
 
 def _effusion_wall(

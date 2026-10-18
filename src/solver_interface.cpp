@@ -15,6 +15,7 @@
 #include "../include/stagnation.h"
 #include "../include/thermo.h"
 #include "../include/math_constants.h"
+#include "../include/orifice.h"
 #include "../include/thermo_transport_data.h"
 
 #include <algorithm>
@@ -1813,6 +1814,34 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   }
 
   return res;
+}
+
+OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
+                                                     double P_total_up,
+                                                     double P_total_down,
+                                                     double beta, double C,
+                                                     bool compressible) {
+  auto [k, dk_dC] = permanent_loss_ratio_and_dC(beta, C);
+  const double dw = P_total_up - P_total_down;
+  OrificeTapPressure out{};
+  out.loss_ratio = k;
+  out.p_tap = P_static_up - dw / k;
+  out.d_dP_static_up = 1.0;
+  out.d_dP_total_up = -1.0 / k;
+  out.d_dP_total_down = 1.0 / k;
+  out.d_dC = dw * dk_dC / (k * k);
+  const double p_floor = ORIFICE_TAP_PRESSURE_FLOOR * P_static_up;
+  out.floored = compressible && out.p_tap < p_floor;
+  if (out.floored) {
+    out.p_tap = p_floor;
+    out.d_dP_static_up = ORIFICE_TAP_PRESSURE_FLOOR;
+    out.d_dP_total_up = 0.0;
+    out.d_dP_total_down = 0.0;
+    out.d_dC = 0.0;
+  }
+  out.in_range = P_static_up > 0.0 &&
+                 out.p_tap >= ORIFICE_RECOVERY_MIN_PRESSURE_RATIO * P_static_up;
+  return out;
 }
 
 // -----------------------------------------------------------------------------

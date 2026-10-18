@@ -4,6 +4,7 @@
 #include "solver_interface.h"
 #include "stagnation.h"
 #include "thermo.h"
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -1414,3 +1415,36 @@ public:
 // Register the environment
 ::testing::Environment *const jacobian_env =
     ::testing::AddGlobalTestEnvironment(new JacobianTestEnvironment());
+
+// An orifice between pipes (#645): the tap pressure from the recovered drop,
+// every derivative against central differences, and the compressible floor.
+TEST(OrificeTapPressure, DerivativesAreExactAndTheFloorIsCompressibleOnly) {
+  const double x0[5] = {1.15e5, 1.17e5, 1.05e5, 0.6, 0.61};
+  auto eval = [](const double *x, bool c) {
+    return orifice_tap_pressure_and_jacobian(x[0], x[1], x[2], x[3], x[4], c);
+  };
+  for (bool comp : {false, true}) {
+    const auto t = eval(x0, comp);
+    EXPECT_FALSE(t.floored);
+    const double analytic[5] = {t.d_dP_static_up, t.d_dP_total_up, t.d_dP_total_down,
+                                0.0, t.d_dC};
+    for (int i : {0, 1, 2, 4}) {
+      double up[5], dn[5];
+      std::copy(x0, x0 + 5, up);
+      std::copy(x0, x0 + 5, dn);
+      const double h = 1e-6 * std::abs(x0[i]);
+      up[i] += h;
+      dn[i] -= h;
+      const double fd = (eval(up, comp).p_tap - eval(dn, comp).p_tap) / (2.0 * h);
+      EXPECT_NEAR(analytic[i], fd, 1e-6 * std::max(1.0, std::abs(fd))) << i;
+    }
+  }
+  // A drop the incompressible relation maps below zero.
+  const auto c = orifice_tap_pressure_and_jacobian(1e5, 1e5, 0.4e5, 0.7, 0.61, true);
+  const auto i = orifice_tap_pressure_and_jacobian(1e5, 1e5, 0.4e5, 0.7, 0.61, false);
+  EXPECT_TRUE(c.floored);
+  EXPECT_DOUBLE_EQ(c.p_tap, ORIFICE_TAP_PRESSURE_FLOOR * 1e5);
+  EXPECT_EQ(c.d_dC, 0.0);
+  EXPECT_FALSE(i.floored);
+  EXPECT_LT(i.p_tap, 0.0);
+}

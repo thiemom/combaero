@@ -17,7 +17,7 @@ import pytest
 
 import combaero as cb
 from combaero.network import NetworkSolver, OrificeElement
-from combaero.network.components import NetworkMixtureState
+from combaero.network.components import _DM_DCD, NetworkMixtureState
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "stress"))
 from networks import FAMILIES  # noqa: E402
@@ -34,14 +34,19 @@ def _states() -> tuple[NetworkMixtureState, NetworkMixtureState]:
 @pytest.mark.parametrize("regime", ["incompressible", "compressible"])
 def test_a_vanishing_cd_is_a_vanishing_flow_not_an_exception(regime: str) -> None:
     """The kernels are linear in Cd, so a trace Cd is the Cd = 1 flow scaled,
-    to the last bit; Cd = 0 is zero flow with zero partials."""
+    to the last bit; Cd = 0 is zero flow with zero partials. d(m)/d(Cd)
+    (_DM_DCD) is the Cd = 1 flow throughout: the slope, not a partial that
+    scales."""
     o = OrificeElement("o", "a", "b", Cd=0.6, area=1e-3, regime=regime)
     up, dn = _states()
     m1, d1 = o._kernel_from(up, dn, "a", "b", 1.0)
+    assert d1.pop(_DM_DCD) == m1
     m0, d0 = o._kernel_from(up, dn, "a", "b", 0.0)
+    assert d0.pop(_DM_DCD) == m1
     assert m0 == 0.0 and all(v == 0.0 for v in d0.values())
     cd = 1e-13
     m, d = o._kernel_from(up, dn, "a", "b", cd)
+    assert d.pop(_DM_DCD) == m1
     assert m == m1 * cd
     assert d == {k: v * cd for k, v in d1.items()}
     # Above the threshold the kernel itself runs, and agrees with the scaling.

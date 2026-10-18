@@ -166,20 +166,22 @@ def test_miller_is_gone() -> None:
         OrificeElement("o", "a", "b", diameter=0.02, correlation="Miller")
 
 
-def _pipe_orifice_pipe(node_cls: type, beta: float, regime: str, correlation: str) -> FlowNetwork:
+def _pipe_orifice_sink(node_cls: type, beta: float, regime: str, correlation: str) -> FlowNetwork:
+    """pipe -> a -> orifice -> sink. No pipe beyond the orifice, so no
+    pressure recovery (#645): the row is ISO's flow equation on the tapping
+    differential, the case this file's drive rule is about. Between pipes
+    see test_orifice_permanent_loss.py."""
     D = 0.1
     g = FlowNetwork()
     g.add_node(PressureBoundary("hi", Pt=1.2e5, Tt=300.0))
     g.add_node(node_cls("a"))
-    g.add_node(node_cls("b"))
     g.add_node(PressureBoundary("ho", Pt=1.0e5, Tt=300.0))
     g.add_element(ChannelElement("p1", "hi", "a", length=0.5, diameter=D, regime=regime))
     g.add_element(
         OrificeElement(
-            "o", "a", "b", Cd=0.6, diameter=beta * D, regime=regime, correlation=correlation
+            "o", "a", "ho", Cd=0.6, diameter=beta * D, regime=regime, correlation=correlation
         )
     )
-    g.add_element(ChannelElement("p2", "b", "ho", length=0.5, diameter=D, regime=regime))
     return g
 
 
@@ -194,42 +196,17 @@ def _solve(g: FlowNetwork) -> dict:
 @pytest.mark.parametrize("node_cls", [PlenumNode, MomentumChamberNode])
 @pytest.mark.parametrize("beta", [0.3, 0.5, 0.7])
 def test_a_pipe_fed_orifice_flows_iso_from_its_static_taps(node_cls: type, beta: float) -> None:
-    """m = Cd E A sqrt(2 rho (p_a - p_b)) behind either node. Behind a
-    MomentumChamberNode (Pt > P) the flow was 1.2% high at beta 0.5 and 6.2%
-    high at beta 0.7: the stagnation drive counted the approach head again."""
-    r = _solve(_pipe_orifice_pipe(node_cls, beta, "incompressible", "fixed"))
+    """m = Cd E A sqrt(2 rho (p_a - p_sink)) behind either node. Behind a
+    MomentumChamberNode (Pt > P) the flow was high (1.2% at beta 0.5 and 6.2%
+    at beta 0.7 between pipes): the stagnation drive counted the approach
+    head again."""
+    r = _solve(_pipe_orifice_sink(node_cls, beta, "incompressible", "fixed"))
     d = beta * 0.1
     rho = cb.density(300.0, r["a.P"], cb.species.dry_air())
     E = 1.0 / math.sqrt(1.0 - beta**4)
-    m_iso = 0.6 * E * math.pi * d * d / 4 * math.sqrt(2.0 * rho * (r["a.P"] - r["b.P"]))
+    m_iso = 0.6 * E * math.pi * d * d / 4 * math.sqrt(2.0 * rho * (r["a.P"] - 1.0e5))
     # 1e-4: the network's air vs species.dry_air; the defect was 1.2-6%.
     assert r["o.m_dot"] == pytest.approx(m_iso, rel=1e-4)
-
-
-@pytest.mark.parametrize("regime", ["incompressible", "compressible"])
-@pytest.mark.parametrize("beta", [0.5, 0.7])
-def test_the_node_type_does_not_change_the_flow(regime: str, beta: float) -> None:
-    """The user draws pipe -> orifice -> pipe; whether the nodes carry the
-    pipe's velocity head must not decide the flow."""
-    m_plenum = _solve(_pipe_orifice_pipe(PlenumNode, beta, regime, "fixed"))["o.m_dot"]
-    m_chamber = _solve(_pipe_orifice_pipe(MomentumChamberNode, beta, regime, "fixed"))["o.m_dot"]
-    assert m_chamber == pytest.approx(m_plenum, rel=5e-3)
-
-
-@pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz"])
-def test_the_network_metering_cd_is_cpps(correlation: str) -> None:
-    """No metering formula in Python: the element's Cd is metering_cd_and_dRe
-    at its pipe Reynolds number, flange taps."""
-    g = _pipe_orifice_pipe(PlenumNode, 0.5, "incompressible", correlation)
-    r = _solve(g)
-    elem = g.elements["o"]
-    mu = cb.transport_state(300.0, r["a.P"], cb.species.dry_air()).mu
-    Re_D = 4.0 * r["o.m_dot"] / (math.pi * 0.1 * mu)
-    cd_cpp = cb.metering_cd_and_dRe(getattr(M, correlation), elem._orifice_geom, Re_D)[0]
-    rho = cb.density(300.0, r["a.P"], cb.species.dry_air())
-    E = 1.0 / math.sqrt(1.0 - 0.5**4)
-    m = cd_cpp * E * math.pi * 0.05**2 / 4 * math.sqrt(2.0 * rho * (r["a.P"] - r["b.P"]))
-    assert r["o.m_dot"] == pytest.approx(m, rel=1e-4)
 
 
 def test_a_saved_gui_file_naming_miller_says_what_to_pick() -> None:

@@ -457,6 +457,22 @@ bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
     return b <= R::range_beta_split || Re_D >= R::range_re_beta2 * b * b;
 }
 
+std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C) {
+    if (!(beta > 0.0 && beta < 1.0) || !(C > 0.0)) {
+        throw std::invalid_argument(
+            "permanent_loss_ratio_and_dC: needs 0 < beta < 1 and C > 0");
+    }
+    const double b2 = beta * beta;
+    const double b4 = b2 * b2;
+    const double s = std::sqrt(1.0 - b4 * (1.0 - C * C));
+    const double a = C * b2;
+    const double k = (s - a) / (s + a);
+    // dk/dC = 2 (a s' - s a') / (s + a)^2, with s' = beta^4 C / s, a' = beta^2.
+    const double ds = b4 * C / s;
+    const double dk = 2.0 * (a * ds - s * b2) / ((s + a) * (s + a));
+    return {k, dk};
+}
+
 // -------------------------------------------------------------
 // Correlation classes
 // -------------------------------------------------------------

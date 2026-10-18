@@ -1330,6 +1330,25 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "applied (0 < beta < 1) the nozzle expands from P_static_up, else from\n"
         "P_total_up.");
 
+  py::class_<solver::OrificeTapPressure>(
+      m, "OrificeTapPressure",
+      "Downstream tap pressure of an orifice plate between pipes (#645)")
+      .def_readonly("p_tap", &solver::OrificeTapPressure::p_tap)
+      .def_readonly("loss_ratio", &solver::OrificeTapPressure::loss_ratio)
+      .def_readonly("d_dP_static_up", &solver::OrificeTapPressure::d_dP_static_up)
+      .def_readonly("d_dP_total_up", &solver::OrificeTapPressure::d_dP_total_up)
+      .def_readonly("d_dP_total_down", &solver::OrificeTapPressure::d_dP_total_down)
+      .def_readonly("d_dC", &solver::OrificeTapPressure::d_dC)
+      .def_readonly("floored", &solver::OrificeTapPressure::floored)
+      .def_readonly("in_range", &solver::OrificeTapPressure::in_range);
+  m.def("orifice_tap_pressure_and_jacobian", &solver::orifice_tap_pressure_and_jacobian,
+        py::arg("P_static_up"), py::arg("P_total_up"), py::arg("P_total_down"),
+        py::arg("beta"), py::arg("C"), py::arg("compressible"),
+        "p_tap = P_static_up - (P_total_up - P_total_down) / k(beta, C): the\n"
+        "tap pressure that a recovered drop between two pipes implies, with\n"
+        "its derivatives. k is ISO 5167-2's permanent-loss ratio.\n"
+        "Compressible, p_tap is floored below any critical ratio.");
+
 
   m.def("momentum_chamber_residual_and_jacobian",
         &solver::momentum_chamber_residual_and_jacobian, py::arg("P"),
@@ -5774,6 +5793,13 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "never a selector. ReaderHarrisGallagher: ISO 5167-2:2003 5.3.1 (d,\n"
         "D, beta and the tap-dependent Re_D floor). Stolz: always True, its\n"
         "1980 limits are not encoded.");
+  m.def("permanent_loss_ratio_and_dC", &permanent_loss_ratio_and_dC, py::arg("beta"),
+        py::arg("C"),
+        "(k, dk/dC): ISO 5167-2:2003 5.4.1's permanent loss of an orifice\n"
+        "plate between pipes over its tapping differential,\n"
+        "k = [s - C b^2] / [s + C b^2], s = sqrt(1 - b^4 (1 - C^2)).\n"
+        "Derived for vena-contracta (D-D/2) taps. Raises ValueError outside\n"
+        "0 < beta < 1 or C <= 0.");
 
 
 
