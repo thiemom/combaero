@@ -900,7 +900,7 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
   // Heat per unit flow: Q / |m|, fading out only near zero flow.
-  const double phi_Q = std::get<0>(mixer_heat_per_unit_flow(mdot_tot));
+  const auto [phi_Q, dphi_Q] = mixer_heat_per_unit_flow(mdot_tot);
 
   // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
   // and the burnt composition are known (#481).
@@ -997,6 +997,10 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 
     dT_stream.d_mdot =
         compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+    // Q is spread over the throughput: d(Q phi)/dm_i = Q phi', a pure
+    // enthalpy shift of the products. Missing, a combustor carrying wall heat
+    // had dT/dm = 0 where the difference gave 1658 K per kg/s.
+    dT_stream.d_mdot += res.dT_mix_d_delta_h * Q * dphi_Q;
     dT_stream.d_T = compute_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
     dT_stream.d_P_total =
         compute_chain(mix.dT_mix_d_stream[i].d_P_total, dY_mix_dP_total);
@@ -1060,7 +1064,7 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   double h_mix_base = (mdot_tot > 1e-12) ? (H_tot / mdot_tot) : 0.0;
 
   // Heat per unit flow: Q / |m|, fading out only near zero flow.
-  const double phi_Q = std::get<0>(mixer_heat_per_unit_flow(mdot_tot));
+  const auto [phi_Q, dphi_Q] = mixer_heat_per_unit_flow(mdot_tot);
 
   // Q now; 'fraction' of the PRODUCTS' sensible enthalpy below, once T_ad
   // and the burnt composition are known (#481).
@@ -1166,6 +1170,10 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
 
     dT_stream.d_mdot =
         compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+    // Q is spread over the throughput: d(Q phi)/dm_i = Q phi', a pure
+    // enthalpy shift of the products. Missing, a combustor carrying wall heat
+    // had dT/dm = 0 where the difference gave 1658 K per kg/s.
+    dT_stream.d_mdot += res.dT_mix_d_delta_h * Q * dphi_Q;
     dT_stream.d_T = compute_chain(mix.dT_mix_d_stream[i].d_T, dY_mix_dT);
     dT_stream.d_P_total =
         compute_chain(mix.dT_mix_d_stream[i].d_P_total, dY_mix_dP_total);
@@ -1483,6 +1491,7 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
     res.d_res_dT = -q / T0;
     res.d_res_dmdot = (area > 1e-12) ? -(G / rho) * sgn / area : 0.0;
     res.T_static = T0;
+    res.dT_static_dT = 1.0;
     res.q_dyn = q;
     res.M = (G / rho) / combaero::speed_of_sound(T0, X);
     res.rho_static = rho;
@@ -1542,6 +1551,9 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   res.residual = P_total - P0;
   res.d_res_dP_total = 1.0;
   res.T_static = st.T;
+  res.dT_static_dP = st.dT_dP;
+  res.dT_static_dT = st.dT_dT0;
+  res.dT_static_dmdot = (area > 1e-12) ? st.dT_dG * sgn / area : 0.0;
   res.q_dyn = P * std::expm1(st.lnP0P);
   res.M = st.M;
   // Static density, ideal gas: rho = P / (R T), T = T(T0, P, G).
