@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "../include/orifice.h"
 #include <cmath>
+#include <stdexcept>
 
 // Test fixture for orifice tests
 class OrificeTest : public ::testing::Test {
@@ -1336,4 +1337,31 @@ TEST(DischargeCdInRange, FlagsEachSourcesOwnEnvelope) {
                                        wall_hole(1e-3, 1e-3, 0.0, 0.0), wall_flow(5.0e3)));
     EXPECT_TRUE(discharge_cd_in_range(C::Constant, wall_hole(1e-3, 9e-3, 0.0, 0.0),
                                       wall_flow(1.0)));
+}
+
+// -------------------------------------------------------------
+// ISO 5167-2 permanent pressure loss (#645)
+// -------------------------------------------------------------
+
+TEST(PermanentLoss, RatioIsIsosLongFormWithAnExactCDerivative) {
+    for (double b : {0.1, 0.3, 0.5, 0.7, 0.75}) {
+        for (double C : {0.6, 0.62, 0.8}) {
+            auto k_of = [b](double c) {
+                const double s = std::sqrt(1.0 - std::pow(b, 4) * (1.0 - c * c));
+                return (s - c * b * b) / (s + c * b * b);
+            };
+            auto [k, dk] = permanent_loss_ratio_and_dC(b, C);
+            EXPECT_NEAR(k, k_of(C), 1e-14) << b << " " << C;
+            const double h = 1e-6;
+            EXPECT_NEAR(dk, (k_of(C + h) - k_of(C - h)) / (2.0 * h), 1e-8) << b << " " << C;
+            EXPECT_GT(k, 0.0);
+            EXPECT_LT(k, 1.0);
+        }
+    }
+}
+
+TEST(PermanentLoss, RefusesOutsideItsDomain) {
+    EXPECT_THROW(permanent_loss_ratio_and_dC(0.0, 0.6), std::invalid_argument);
+    EXPECT_THROW(permanent_loss_ratio_and_dC(1.0, 0.6), std::invalid_argument);
+    EXPECT_THROW(permanent_loss_ratio_and_dC(0.5, 0.0), std::invalid_argument);
 }

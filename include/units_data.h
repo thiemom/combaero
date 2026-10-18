@@ -593,6 +593,10 @@ inline constexpr Entry function_units[] = {
      "m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, T_up: K, Y_up: kg/kg, "
      "P_static_down: Pa, Cd: -, area: m^2, beta: -",
      "OrificeResult"},
+    {"orifice_tap_pressure_and_jacobian",
+     "P_static_up: Pa, P_total_up: Pa, P_total_down: Pa, beta: -, C: -, "
+     "compressible: bool",
+     "OrificeTapPressure"},
 
     // -------------------------------------------------------------------------
     // geometry.h - Geometric Utilities
@@ -918,6 +922,7 @@ inline constexpr Entry function_units[] = {
     {"metering_cd_and_dRe", "correlation: -, geom: OrificeGeometry, Re_D: -",
      "- (Cd), - (dCd/dRe_D)"},
     {"metering_cd_in_range", "correlation: -, geom: OrificeGeometry, Re_D: -", "- (bool)"},
+    {"permanent_loss_ratio_and_dC", "beta: -, C: -", "tuple(-, -)"},
     {"Cd", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"mcgreehan_schotsch_1988_cd",
      "Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: -", "- (Cd)"},
@@ -1575,6 +1580,14 @@ inline constexpr Entry function_units[] = {
     {"OrificeFlowResult::mdot", "-", "kg/s"},
     {"OrificeFlowResult::rho_corrected", "-", "kg/m³"},
     {"OrificeFlowResult::v", "-", "m/s"},
+    {"OrificeTapPressure::p_tap", "-", "Pa"},
+    {"OrificeTapPressure::loss_ratio", "-", "-"},
+    {"OrificeTapPressure::d_dP_static_up", "-", "-"},
+    {"OrificeTapPressure::d_dP_total_up", "-", "-"},
+    {"OrificeTapPressure::d_dP_total_down", "-", "-"},
+    {"OrificeTapPressure::d_dC", "-", "Pa"},
+    {"OrificeTapPressure::floored", "-", "- (bool)"},
+    {"OrificeTapPressure::in_range", "-", "- (bool)"},
     {"orifice_flow_state", "-", "-"},
     // --- Base class / metadata properties ---
     {"FlowSolution::Cd", "-", "-"},

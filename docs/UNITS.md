@@ -253,6 +253,7 @@ All functions use consistent units to avoid conversion errors.
 | `Cd_sharp_thin_plate_and_dRe`                | OrificeGeometry, OrificeState                          | - (Cd), - (dCd/dRe_D)   |
 | `metering_cd_and_dRe`                        | correlation: -, geom: OrificeGeometry, Re_D: -         | - (Cd), - (dCd/dRe_D)   |
 | `metering_cd_in_range`                       | correlation: -, geom: OrificeGeometry, Re_D: -         | - (bool)                |
+| `permanent_loss_ratio_and_dC`                | beta: -, C: -                                          | tuple(-, -)             |
 | `Cd`                                         | OrificeGeometry, OrificeState                          | - (Cd)                  |
 | `mcgreehan_schotsch_1988_cd`                 | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: - | - (Cd)                  |
 | `mcgreehan_schotsch_1988_cd_and_derivatives` | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -         | - (Cd, dCd/dRe, dCd/du) |
@@ -792,6 +793,7 @@ All functions use consistent units to avoid conversion errors.
 |-----------------------------------------------|------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
 | `orifice_compressible_mdot_and_jacobian`      | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                 | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
 | `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: - | OrificeResult                               |
+| `orifice_tap_pressure_and_jacobian`           | P_static_up: Pa, P_total_up: Pa, P_total_down: Pa, beta: -, C: -, compressible: bool                             | OrificeTapPressure                          |
 
 ### geometry.h - Geometric Utilities
 
@@ -1468,6 +1470,14 @@ All functions use consistent units to avoid conversion errors.
 | `OrificeFlowResult::mdot`                       | -                                                | kg/s                                  |
 | `OrificeFlowResult::rho_corrected`              | -                                                | kg/m³                                 |
 | `OrificeFlowResult::v`                          | -                                                | m/s                                   |
+| `OrificeTapPressure::p_tap`                     | -                                                | Pa                                    |
+| `OrificeTapPressure::loss_ratio`                | -                                                | -                                     |
+| `OrificeTapPressure::d_dP_static_up`            | -                                                | -                                     |
+| `OrificeTapPressure::d_dP_total_up`             | -                                                | -                                     |
+| `OrificeTapPressure::d_dP_total_down`           | -                                                | -                                     |
+| `OrificeTapPressure::d_dC`                      | -                                                | Pa                                    |
+| `OrificeTapPressure::floored`                   | -                                                | - (bool)                              |
+| `OrificeTapPressure::in_range`                  | -                                                | - (bool)                              |
 | `orifice_flow_state`                            | -                                                | -                                     |
 | `FlowSolution::Cd`                              | -                                                | -                                     |
 | `FlowSolution::L_choke`                         | -                                                | m                                     |

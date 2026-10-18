@@ -4,6 +4,7 @@
 #include "solver_interface.h"
 #include "stagnation.h"
 #include "thermo.h"
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -419,8 +420,32 @@ TEST(SolverJacobianTest, OrificeCompressibleDerivatives) {
     EXPECT_NEAR(res.d_mdot_dP_total_up, fd_dPt, std::abs(fd_dPt) * 1e-8 + 1e-12);
     EXPECT_NEAR(res.d_mdot_dP_static_up, fd_dPs, std::abs(fd_dPs) * 1e-8 + 1e-12);
     if (beta > 0.0) {
-      EXPECT_EQ(res.d_mdot_dP_total_up, 0.0);
-      EXPECT_GT(std::abs(res.d_mdot_dP_static_up), 0.0);
+      // The drive is the static pressure; Pt only sets the static
+      // temperature on the isentrope (#645): a small, nonzero column (a
+      // higher Pt at fixed P means a colder, denser jet).
+      EXPECT_GT(res.d_mdot_dP_total_up, 0.0);
+      EXPECT_LT(res.d_mdot_dP_total_up, 0.1 * std::abs(res.d_mdot_dP_static_up));
+      // Behind a node with no velocity (P = Pt) the static state is the
+      // stagnation state: T1 = T_up to the bit.
+      const OrificeResult plenum = f(P_static_up, P_static_up, T_up, P_static_down);
+      const auto X = combaero::mass_to_mole(combaero::normalize_fractions(Y));
+      const double m_nozzle = std::get<0>(orifice_compressible_mdot_and_jacobian(
+          T_up, P_static_up, P_static_down, X, Cd, area, beta));
+      EXPECT_EQ(plenum.m_dot_calc, m_nozzle);
+      // Its Pt column is not zero: the isentrope still moves T1 with Pt.
+      EXPECT_GT(plenum.d_mdot_dP_total_up, 0.0);
+      const double fd_pl_Pt = (f(P_static_up + eps_P, P_static_up, T_up, P_static_down).m_dot_calc -
+                               f(P_static_up - eps_P, P_static_up, T_up, P_static_down).m_dot_calc) /
+                              (2.0 * eps_P);
+      const double fd_pl_Ps = (f(P_static_up, P_static_up + eps_P, T_up, P_static_down).m_dot_calc -
+                               f(P_static_up, P_static_up - eps_P, T_up, P_static_down).m_dot_calc) /
+                              (2.0 * eps_P);
+      EXPECT_NEAR(plenum.d_mdot_dP_total_up, fd_pl_Pt, std::abs(fd_pl_Pt) * 1e-6 + 1e-12);
+      EXPECT_NEAR(plenum.d_mdot_dP_static_up, fd_pl_Ps, std::abs(fd_pl_Ps) * 1e-6 + 1e-12);
+      // With velocity the nozzle starts from the static T: the flow is the
+      // nozzle's at T1 < T_up, so higher than at T_up.
+      EXPECT_GT(res.m_dot_calc, std::get<0>(orifice_compressible_mdot_and_jacobian(
+                                    T_up, P_static_up, P_static_down, X, Cd, area, beta)));
     } else {
       EXPECT_EQ(res.d_mdot_dP_static_up, 0.0);
     }
@@ -1414,3 +1439,36 @@ public:
 // Register the environment
 ::testing::Environment *const jacobian_env =
     ::testing::AddGlobalTestEnvironment(new JacobianTestEnvironment());
+
+// An orifice between pipes (#645): the tap pressure from the recovered drop,
+// every derivative against central differences, and the compressible floor.
+TEST(OrificeTapPressure, DerivativesAreExactAndTheFloorIsCompressibleOnly) {
+  const double x0[5] = {1.15e5, 1.17e5, 1.05e5, 0.6, 0.61};
+  auto eval = [](const double *x, bool c) {
+    return orifice_tap_pressure_and_jacobian(x[0], x[1], x[2], x[3], x[4], c);
+  };
+  for (bool comp : {false, true}) {
+    const auto t = eval(x0, comp);
+    EXPECT_FALSE(t.floored);
+    const double analytic[5] = {t.d_dP_static_up, t.d_dP_total_up, t.d_dP_total_down,
+                                0.0, t.d_dC};
+    for (int i : {0, 1, 2, 4}) {
+      double up[5], dn[5];
+      std::copy(x0, x0 + 5, up);
+      std::copy(x0, x0 + 5, dn);
+      const double h = 1e-6 * std::abs(x0[i]);
+      up[i] += h;
+      dn[i] -= h;
+      const double fd = (eval(up, comp).p_tap - eval(dn, comp).p_tap) / (2.0 * h);
+      EXPECT_NEAR(analytic[i], fd, 1e-6 * std::max(1.0, std::abs(fd))) << i;
+    }
+  }
+  // A drop the incompressible relation maps below zero.
+  const auto c = orifice_tap_pressure_and_jacobian(1e5, 1e5, 0.4e5, 0.7, 0.61, true);
+  const auto i = orifice_tap_pressure_and_jacobian(1e5, 1e5, 0.4e5, 0.7, 0.61, false);
+  EXPECT_TRUE(c.floored);
+  EXPECT_DOUBLE_EQ(c.p_tap, ORIFICE_TAP_PRESSURE_FLOOR * 1e5);
+  EXPECT_EQ(c.d_dC, 0.0);
+  EXPECT_FALSE(i.floored);
+  EXPECT_LT(i.p_tap, 0.0);
+}

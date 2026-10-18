@@ -1047,6 +1047,11 @@ std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
 // ISO 5167-2:2003 5.3.1 range (Reader-Harris/Gallagher); Stolz returns true.
 bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D);
+// ISO 5167-2:2003 5.4.1: permanent loss / tapping differential of a plate
+// between equal pipes, k = [s - C b^2] / [s + C b^2], s = sqrt(1 - b^4 (1 - C^2)),
+// and dk/dC. Derived for vena-contracta (D-D/2) taps. Throws outside
+// 0 < beta < 1 or C <= 0.
+std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C);
 
 // Fixed Cd from an explicit value. make_correlation(MeteringCdCorrelation::Constant)
 // can only return the default, so this is how a chosen constant is pinned.
@@ -1442,12 +1447,27 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
     double T0, double P0, double P_back, const std::vector<double>& X,
     double Cd, double area, double beta);
 
-// Full compressible orifice evaluation for network solver
-// The nozzle expands from the pressure approach_from_static picks.
+// Full compressible orifice evaluation for network solver. T_up is the
+// upstream stagnation temperature. The nozzle expands from the state
+// approach_from_static picks: (T_up, P_total_up) without E; with E the
+// upstream static state, P_static_up at the isentrope's temperature through
+// (T_up, P_total_up).
 OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta);
+
+// An orifice between pipes (#645): the tap pressure the kernels expand to,
+// from the recovered (stagnation) drop between the two pipes' nodes,
+//   p_tap = P_static_up - (P_total_up - P_total_down) / k(beta, C),
+// with its derivatives (d_dC through k). Compressible, floored at
+// ORIFICE_TAP_PRESSURE_FLOOR * P_static_up (0.1, below any critical ratio);
+// in_range is p_tap / P_static_up >= ORIFICE_RECOVERY_MIN_PRESSURE_RATIO (0.75).
+OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
+                                                     double P_total_up,
+                                                     double P_total_down,
+                                                     double beta, double C,
+                                                     bool compressible);
 
 // The compressible channel's network residual is m - m_calc with m_calc from
 // fanno_channel_flow (fanno_mach.h): mass flow a duct passes from its feeding

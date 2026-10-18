@@ -210,6 +210,18 @@ std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
 bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D);
 
+// ISO 5167-2:2003 5.4.1 permanent pressure loss of an orifice plate between
+// pipes, as a fraction of the tapping differential, and its derivative in C:
+//   k = dw / dp = [s - C beta^2] / [s + C beta^2],  s = sqrt(1 - beta^4 (1 - C^2)).
+// dw is the loss between the undisturbed pipe upstream and the fully
+// recovered pipe downstream (equal diameters). The relation is Bernoulli to
+// the vena contracta and a momentum balance after it, so its dp is the
+// undisturbed-to-vena-contracta differential: D-D/2 taps measure that, and
+// with corner taps' C the loss differs by up to 6% at beta 0.75 (#645).
+// Incompressible, like the derivation. Refuses beta outside (0, 1) and C <= 0
+// (std::invalid_argument).
+std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C);
+
 
 // -------------------------------------------------------------
 // Individual correlation implementations

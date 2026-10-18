@@ -217,11 +217,46 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
     double Cd, double area, double beta);
 
 // Full compressible orifice evaluation with all derivatives for network solver.
-// The nozzle expands from the upstream pressure approach_from_static picks.
+// T_up is the upstream STAGNATION temperature. The nozzle expands from the
+// upstream state approach_from_static picks: without E from (T_up,
+// P_total_up); with E from the upstream static state, P_static_up at the
+// temperature on the isentrope through (T_up, P_total_up) (#645).
 OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double T_up,
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
+
+// An orifice plate between pipes recovers pressure downstream of its vena
+// contracta (#645). The network row sees the RECOVERED drop, the stagnation
+// difference between the two pipes' nodes, while C is referenced to the
+// tapping differential dp = dw / k (k: permanent_loss_ratio_and_dC). This
+// maps the recovered drop to the downstream TAP pressure the kernels expand
+// to:
+//   p_tap = P_static_up - (P_total_up - P_total_down) / k(beta, C).
+// Compressible, p_tap is held at ORIFICE_TAP_PRESSURE_FLOOR P_static_up,
+// below any critical ratio, so the choked nozzle reads it as choked; the
+// incompressible map has no floor. ISO's relation is incompressible:
+// p_tap / P_static_up < ORIFICE_RECOVERY_MIN_PRESSURE_RATIO is outside it
+// (in_range false), ISO 5167-2's own expansibility limit.
+inline constexpr double ORIFICE_TAP_PRESSURE_FLOOR = 0.1;
+inline constexpr double ORIFICE_RECOVERY_MIN_PRESSURE_RATIO = 0.75;
+
+struct OrificeTapPressure {
+  double p_tap;
+  double loss_ratio;        // k = dw / dp
+  double d_dP_static_up;
+  double d_dP_total_up;
+  double d_dP_total_down;
+  double d_dC;              // through k(C)
+  bool floored;
+  bool in_range;
+};
+
+OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
+                                                     double P_total_up,
+                                                     double P_total_down,
+                                                     double beta, double C,
+                                                     bool compressible);
 
 // -----------------------------------------------------------------------------
 // 2. Heat Transfer Components
