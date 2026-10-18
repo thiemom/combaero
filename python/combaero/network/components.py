@@ -3255,8 +3255,27 @@ class OrificeElement(NetworkElement):
         m = float(state_in.m_dot)
         if abs(m) > 1e-12:
             out[f"{self.id}.m_dot"] = float(dCd_dRe) * Re / abs(m) * (1.0 if m > 0 else -1.0)
+            if self._orifice_geom.d > 0.0:
+                for name, d in self._re_viscosity_dnames(state_in, Re).items():
+                    out[name] = out.get(name, 0.0) + float(dCd_dRe) * d
         for name, d in du.items():
             out[name] = out.get(name, 0.0) + float(dCd_dU) * d
+        return out
+
+    def _re_viscosity_dnames(self, state_in: "NetworkMixtureState", Re: float) -> dict[str, float]:
+        """d(Re)/d(upstream T, P) through mu: Re ~ |m| / mu, so
+        dRe/dx = -Re dmu/dx / mu. The Cd's temperature column, missing until
+        a heated plenum feeding a Re-dependent orifice showed its row 1e-3 off
+        in the column that moves the plenum's T. Empty where Re used the mu
+        fallback."""
+        mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
+            state_in.T, state_in.P, list(state_in.X)
+        )
+        if not mu > 0.0:
+            return {}
+        out = {f"{self.from_node}.T": -Re * float(dmu_dT) / mu}
+        if dmu_dP != 0.0:
+            out[f"{self.from_node}.P"] = -Re * float(dmu_dP) / mu
         return out
 
     def _metering_dCd_dnames(self, state_in: "NetworkMixtureState") -> dict[str, float]:
@@ -3270,7 +3289,8 @@ class OrificeElement(NetworkElement):
         if not (D_up > 0.0) or abs(m) <= 1e-12:
             return {}
         mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
-        mu = mu if mu > 0.0 else 1.8e-5
+        mu_fallback = not mu > 0.0
+        mu = 1.8e-5 if mu_fallback else mu
         Re = 4.0 * abs(m) / (math.pi * D_up * mu)
         b = self._orifice_geom.beta
         if self.correlation == "ReaderHarrisGallagher":
@@ -3285,7 +3305,11 @@ class OrificeElement(NetworkElement):
             )
         else:
             return {}
-        return {f"{self.id}.m_dot": dCd_dRe * Re / abs(m) * (1.0 if m > 0 else -1.0)}
+        out = {f"{self.id}.m_dot": dCd_dRe * Re / abs(m) * (1.0 if m > 0 else -1.0)}
+        if not mu_fallback:
+            for name, d in self._re_viscosity_dnames(state_in, Re).items():
+                out[name] = out.get(name, 0.0) + dCd_dRe * d
+        return out
 
     def _cd_in_range(self, state_in: "NetworkMixtureState") -> bool:
         """Is the discharge-hole Cd inside its source's Re and l/d range?
