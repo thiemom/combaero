@@ -1059,6 +1059,54 @@ def _duct_htc(
     return None if r is None else _DuctHtc(r, s, area)
 
 
+class _ChamberHtc:
+    """A surface result evaluated at a momentum chamber's static state, its
+    partials chained onto the node's own T0 and static P and its throughput:
+    the closure's T_static moves with all three. Every other attribute is
+    the surface result's."""
+
+    __slots__ = ("_r", "dh_dT", "dh_dmdot", "dh_dP", "dT_aw_dT", "dT_aw_dmdot", "dT_aw_dP")
+
+    def __init__(self, r: Any, c: Any) -> None:
+        self._r = r
+        dh_dT, dTaw_dT = float(r.dh_dT), float(r.dT_aw_dT)
+        self.dh_dT = dh_dT * c.dT_static_dT
+        self.dh_dmdot = float(r.dh_dmdot) + dh_dT * c.dT_static_dmdot
+        self.dh_dP = dh_dT * c.dT_static_dP
+        self.dT_aw_dT = dTaw_dT * c.dT_static_dT
+        self.dT_aw_dmdot = float(r.dT_aw_dmdot) + dTaw_dT * c.dT_static_dmdot
+        self.dT_aw_dP = float(getattr(r, "dT_aw_dP", 0.0)) + dTaw_dT * c.dT_static_dP
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._r, name)
+
+    def __dir__(self) -> list[str]:
+        return sorted(set(dir(self._r)) | set(self.__slots__))
+
+
+def _summed_inflow_jac(
+    upstream_states: list["NetworkMixtureState"],
+) -> tuple[list[str], dict[str, float]]:
+    """(upstream element ids, d(total inflow)/d(unknown name)) of a node.
+
+    Each upstream state carries d(its flow into the node)/d(unknown) as
+    ``_m_dot_jac_names``; a multi-source element (tee) hands the node one
+    state per source, so its entries are counted once per element.
+    """
+    ids: list[str] = []
+    jac: dict[str, float] = {}
+    seen: set[str] = set()
+    for s in upstream_states:
+        if hasattr(s, "_element_id"):
+            ids.append(s._element_id)
+            eid = s._element_id
+            if eid not in seen and hasattr(s, "_m_dot_jac_names"):
+                seen.add(eid)
+                for var, coeff in s._m_dot_jac_names.items():
+                    jac[var] = jac.get(var, 0.0) + coeff
+    return ids, jac
+
+
 # ============================================================================
 # WallConnection (Phase 4/5)
 # ============================================================================
@@ -2012,23 +2060,8 @@ class MomentumChamberNode(NetworkNode):
         # Store total mass flow for use in residuals
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
 
-        # Build named m_dot Jacobian: {var_name: d(m_total)/d(var)}.
-        # flow_jac_at_node(nid) from the solver already gives d(flow_into_nid)/d(each unknown),
-        # stored on each upstream state as _m_dot_jac_names. Accumulate across elements,
-        # deduplicating by element_id so multi-source elements (tee) are not double-counted.
-        self._upstream_element_ids = []
-        self._upstream_m_dot_jac: dict[str, float] = {}
-        _seen_elem_ids: set[str] = set()
-        for s in upstream_states:
-            if hasattr(s, "_element_id"):
-                self._upstream_element_ids.append(s._element_id)
-                eid = s._element_id
-                if eid not in _seen_elem_ids and hasattr(s, "_m_dot_jac_names"):
-                    _seen_elem_ids.add(eid)
-                    for var, coeff in s._m_dot_jac_names.items():
-                        self._upstream_m_dot_jac[var] = (
-                            self._upstream_m_dot_jac.get(var, 0.0) + coeff
-                        )
+        # Named m_dot Jacobian: {var_name: d(m_total)/d(var)}.
+        self._upstream_element_ids, self._upstream_m_dot_jac = _summed_inflow_jac(upstream_states)
 
         # Merge chamber: keep each inflow's supply state for the main-face
         # offset, which needs the chamber's own state (main_face_offset).
@@ -2075,10 +2108,11 @@ class MomentumChamberNode(NetworkNode):
         # (#578). T_aw then sits between T_static and T0 by the recovery
         # factor, as it should.
         T_static = float(state.T)
+        c = None
         if self.area > 0:
-            r = self._closure(state, m_dot_total)
-            T_static = float(r.T_static)
-            rho, _ = _safe_rho(float(r.rho_static))
+            c = self._closure(state, m_dot_total)
+            T_static = float(c.T_static)
+            rho, _ = _safe_rho(float(c.rho_static))
             u = m_dot_total / (rho * self.area)
         else:
             u = 1.0
@@ -2086,7 +2120,7 @@ class MomentumChamberNode(NetworkNode):
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
         length = self.length if self.length is not None else diameter
 
-        return self.surface.htc_and_T(
+        r = self.surface.htc_and_T(
             T=T_static,
             P=state.P,
             X=state.X,
@@ -2096,6 +2130,9 @@ class MomentumChamberNode(NetworkNode):
             T_hot=T_hot,
             flow_area=self.area,
         )
+        # The partials are at the static T; T_static moves with the node's T0,
+        # its P and its throughput.
+        return None if r is None or c is None else _ChamberHtc(r, c)
 
     def residuals(
         self, state: NetworkMixtureState
@@ -2651,10 +2688,9 @@ class CombustorNode(NetworkNode):
             for s in upstream_states
         ]
 
-        # Store upstream element IDs for momentum-chamber Jacobian (d_res_dmdot entries)
-        self._upstream_element_ids = [
-            s._element_id for s in upstream_states if hasattr(s, "_element_id")
-        ]
+        # Upstream element ids, and d(throughput)/d(unknown) for the wall
+        # relay of the node's own htc, which reads the throughput.
+        self._upstream_element_ids, self._upstream_m_dot_jac = _summed_inflow_jac(upstream_states)
 
         if not upstream_states:
             # Default fallback
@@ -2770,23 +2806,27 @@ class CombustorNode(NetworkNode):
             return None
 
         T_hot = self.t_hot if self.t_hot is not None else math.nan
-        m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        rho, _ = _safe_rho(state.density())
-        u = m_dot_total / (rho * self.area) if self.area > 0 else 1.0
-
         diameter = self.Dh if self.Dh is not None else 0.01
         length = 0.1  # Combustors are modelled as a single zone
-
-        return self.surface.htc_and_T(
-            T=state.T,
-            P=state.P,
-            X=state.X,
-            velocity=u,
-            diameter=diameter,
-            length=length,
-            T_hot=T_hot,
-            flow_area=self.area,
-        )
+        if not self.area > 0:
+            return self.surface.htc_and_T(
+                T=state.T,
+                P=state.P,
+                X=state.X,
+                velocity=1.0,
+                diameter=diameter,
+                length=length,
+                T_hot=T_hot,
+                flow_area=self.area,
+            )
+        # The node's T and Pt are stagnation values (its closure is Pt = P);
+        # the gas sweeping the wall at m / (rho A) is at the static state that
+        # flux implies, as in a plenum-fed duct. Handing the stagnation T to
+        # the correlation as static put T_aw above Tt: +4.7 K at Mach 0.15,
+        # +46 K at Mach 0.49 for a 1430 K stream.
+        s = copy.copy(state)
+        s.m_dot = float(getattr(self, "_total_m_dot", 0.0))
+        return _duct_htc(self.surface, s, self.area, diameter, length, T_hot)
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         self.upstream_elements = graph.get_upstream_elements(self.id)
