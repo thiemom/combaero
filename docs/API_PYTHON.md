@@ -255,6 +255,12 @@ Cd, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
 
 # Inside the source's own Re and l/d range? A flag, never a selector.
 cb.discharge_cd_in_range(cb.DischargeCdCorrelation.Lichtarowicz1965, hole, flow)
+
+# The same hole as an orifice in a straight pipe (Idelchik 4-13..4-16):
+# permanent loss on the pipe velocity head, and the Cd factor the network
+# applies between pipes (C_pipe = Cd_wall * R, R -> 1 as beta -> 0)
+zeta1 = cb.discharge_pipe_zeta(cb.DischargeCdCorrelation.Idelchik1966Thick, hole, 0.5)
+R = cb.discharge_pipe_cd_ratio(cb.DischargeCdCorrelation.Idelchik1966Thick, hole, 0.5)
 ```
 
 There is deliberately no auto-selection from geometry: it is how a

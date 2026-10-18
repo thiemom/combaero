@@ -70,6 +70,11 @@ export const QUANTITY_CATALOGUE: Record<
 	beta: { label: "β (declared)", unit: "—", format: (v) => v.toFixed(4) },
 	beta_flow: { label: "β (flow)", unit: "—", format: (v) => v.toFixed(4) },
 	E: { label: "E (approach)", unit: "—", format: (v) => v.toFixed(4) },
+	Cd_pipe_ratio: {
+		label: "Cd factor in pipe",
+		unit: "—",
+		format: (v) => v.toFixed(4),
+	},
 	P_approach: {
 		label: "p1 (approach pipe)",
 		unit: "bar",

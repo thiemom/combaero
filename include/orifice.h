@@ -433,6 +433,26 @@ constexpr double rounded_zeta[rounded_n] = {
 // numbers; the term is worth ~2% of zeta at l/Dh = 2.
 constexpr double default_roughness_over_d = 0.0;
 
+// Orifice in a straight pipe, F1 = F2 (diagrams 4-13..4-16, Re >= 1e4-1e5).
+// zeta1 = DH / (rho w1^2 / 2) is referenced to the PIPE velocity and is the
+// permanent loss; n = F0/F1 = beta^2, m = 1 - n.
+//   4-13/15/16 sharp, beveled, rounded:  zeta1 n^2 = [m + sqrt(zeta' m)]^2
+//   4-14 thick:  zeta1 n^2 = (0.5 + tau sqrt(m)) m + m^2 + lam l/Dh
+// At n -> 0 each is the wall diagram's zeta (4-17/4-18), so zeta' and tau are
+// taken FROM those tables: zeta' = (sqrt(zeta_wall) - 1)^2 and tau =
+// zeta'_wall - 1.5. That reproduces 4-14..4-16's own zeta tables within 3.7%
+// for n <= 0.8. Their printed zeta'/tau columns do worse where they disagree
+// with the zeta tables beside them: 4-16's zeta' at r/Dh 0.16 (0.06) misses
+// its own row by 25%; the wall table's 0.031 is within 3.4%.
+// "At lam = 0.02 the values of zeta are completely determined from the
+// curves" (4-14): the lam its table is computed at. Geometry only here, so
+// the in-pipe ratio carries no Re.
+constexpr double pipe_thick_lambda = 0.02;
+// 4-14's inlet term and the Borda-Carnot 1 that, with tau, make up the wall
+// hole's zeta' at n = 0.
+constexpr double pipe_thick_inlet = 0.5;
+constexpr double pipe_thick_wall_offset = 1.5;
+
 } // namespace idelchik
 
 // -------------------------------------------------------------
@@ -918,6 +938,33 @@ std::unique_ptr<DischargeCorrelationBase> make_discharge_correlation(
 bool discharge_cd_in_range(DischargeCdCorrelation id,
                            const DischargeHoleGeometry& hole,
                            const DischargeHoleState& flow);
+
+// Idelchik (1966) permanent loss of a discharge hole as an orifice in a
+// straight pipe, zeta1 = DH / (rho w1^2 / 2), PIPE-velocity referenced
+// (diagrams 4-13..4-16, see orifice::idelchik). The hole's geometry picks the
+// diagram:
+//   Idelchik1966Sharp                       4-13
+//   Idelchik1966Thick, Lichtarowicz1965,
+//   McGreehanSchotsch1988                   4-14 at L/d (M-S's edge radius
+//                                           is not in the in-pipe shape)
+//   Idelchik1966Beveled                     4-15 at bevel/d
+//   Idelchik1966Rounded                     4-16 at r/d
+// High-Re, incompressible, like the source. Throws std::invalid_argument
+// outside 0 < beta < 1 and for Constant (no geometry).
+double discharge_pipe_zeta(DischargeCdCorrelation id, const DischargeHoleGeometry& hole,
+                           double beta);
+
+// The factor R that carries a plenum-measured discharge Cd into a pipe of
+// diameter ratio beta (#645): C_pipe = Cd_wall(Re, hole) R(beta). C_eq(beta)
+// solves ISO 5167-2's permanent-loss relation k(C)(1 - beta^4)/(C^2 beta^4)
+// = discharge_pipe_zeta, i.e. it is the vena-contracta C that gives the
+// source's in-pipe loss through the network's recovery row; R = C_eq(beta) /
+// C_eq(0), so R -> 1 as the pipe grows and the Cd stays the plenum one. The
+// wall Cd keeps its Re and crossflow dependence; Idelchik gives the in-pipe
+// beta shape at high Re only. Geometry only: no state, no Jacobian. Returns
+// 1 outside 0 < beta < 1 and for Constant.
+double discharge_pipe_cd_ratio(DischargeCdCorrelation id, const DischargeHoleGeometry& hole,
+                               double beta);
 
 // Fixed-Cd discharge correlation from an explicit value. This is the way to
 // pin a measured or literature Cd; make_discharge_correlation(Constant) can

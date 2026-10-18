@@ -1,0 +1,5 @@
+- **A discharge-hole orifice between pipes loses Idelchik's in-pipe loss (#645).** This covers `IdelchikThick`/`Beveled`/`Rounded`, `McGreehanSchotsch` and `Lichtarowicz` between pipes. Before, their plenum-measured Cd took the velocity-of-approach factor E and the whole jet head was lost, so the flow came out 2-7% low at beta 0.3, 16-20% low at 0.5 and 34-38% low at 0.7.
+  - **What changed:** the Cd is carried into the pipe as `Cd_wall * R(beta)`, and the jet now recovers into the far pipe like a metering plate's.
+  - **Fidelity:** the loss matches Idelchik's diagrams 4-14..4-16 within 4.2% for beta <= 0.89.
+  - **Unchanged:** plenum-fed holes, and the plate elements.
+- GUI: the orifice Inspector shows a discharge hole's Cd factor in its pipe when it differs from 1.

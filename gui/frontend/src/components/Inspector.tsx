@@ -870,10 +870,14 @@ const Inspector = () => {
 												["dp_permanent", "dp permanent"],
 												["loss_ratio", "Permanent / tap dp"],
 												["E", "E (along the flow)"],
+												["Cd_pipe_ratio", "Hole Cd factor in pipe"],
 											] as const
 										).map(([key, label]) => {
 											const v = q(key);
-											return v == null ? null : (
+											// The hole factor only means something off 1 (#645).
+											const hidden =
+												key === "Cd_pipe_ratio" && res.Cd_pipe_ratio === 1;
+											return v == null || hidden ? null : (
 												<div key={key} className="flex justify-between">
 													<span className="text-stone-400">{label}</span>
 													<span className="font-mono">{v}</span>

@@ -1109,6 +1109,14 @@ std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(do
 // report, never a selector: Cd is still returned outside it.
 bool discharge_cd_in_range(DischargeCdCorrelation id,
                            const DischargeHoleGeometry&, const DischargeHoleState&);
+
+// The hole as an orifice in a straight pipe (Idelchik 4-13..4-16): permanent
+// loss on the PIPE velocity head, and the factor R with C_pipe = Cd_wall R
+// that gives it through ISO 5167-2's recovery relation (R -> 1 as beta -> 0).
+// Geometry only; R = 1 outside 0 < beta < 1 and for Constant.
+double discharge_pipe_zeta(DischargeCdCorrelation id, const DischargeHoleGeometry&, double beta);
+double discharge_pipe_cd_ratio(DischargeCdCorrelation id, const DischargeHoleGeometry&,
+                               double beta);
 ```
 
 For the Idelchik members `zeta` is referenced to the hole velocity and carries
