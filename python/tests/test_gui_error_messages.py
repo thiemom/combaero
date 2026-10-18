@@ -100,3 +100,29 @@ def test_solve_route_reports_a_miswired_tee_in_canvas_terms() -> None:
     assert "__tee_jct__" not in detail, detail
     assert "Tee port branch (b)" in detail, detail
     assert "flow direction (merge / branch)" in detail, detail
+
+
+def test_the_declared_direction_hint_names_the_inspector_choices() -> None:
+    """#640's hint names solver classes and attributes; the GUI user picks
+    them in the Tee Inspector as a "Junction Model" and a "Flow Direction"."""
+    msg = (
+        "MultiPortChamberElement 'tee1' (flow_direction='merge') holds port(s) "
+        "['__tee_jct__tee1_branch'] at zero or against its declared direction at "
+        "the best iterate: a declared-direction junction does not reverse a port, "
+        "so this operating point may have no root for it. Check the boundary "
+        "pressures, change flow_direction, or use IdealMomentumTeeElement, which "
+        "reverses ports."
+    )
+    out = humanize(msg, _schema(("tee1", "mpce_tee", {"label": "T1"})))
+    assert '"Ideal momentum (parameter-free)" junction model' in out
+    assert '"Momentum CV (Mynard)"' in out
+    assert 'Flow Direction "Merge"' in out
+    assert "change the tee's Flow Direction" in out
+    assert "T1 (Tee) port branch (b)" in out
+    for internal in (
+        "IdealMomentumTeeElement",
+        "MultiPortChamberElement",
+        "flow_direction",
+        "__tee_jct__",
+    ):
+        assert internal not in out

@@ -36,6 +36,20 @@ KIND_NAME = {
     "pressure_boundary": "Pressure Boundary",
 }
 
+#: solver class name -> what the Tee Inspector's "Junction Model" select calls it
+MODEL_NAME = {
+    "IdealMomentumTeeElement": 'the "Ideal momentum (parameter-free)" junction model',
+    "MultiPortChamberElement": 'Tee (junction model "Momentum CV (Mynard)")',
+    "ConstantKTeeElement": 'Tee (junction model "Constant K (handbook)")',
+}
+
+#: solver attribute wording -> the Inspector field it is set by
+FIELD_NAME = (
+    ("(flow_direction='merge')", '(Flow Direction "Merge")'),
+    ("(flow_direction='branch')", '(Flow Direction "Branch")'),
+    ("change flow_direction", "change the tee's Flow Direction"),
+)
+
 _PORT_ID = re.compile(r"__tee_(jct|step)__(.+?)_(" + "|".join(PORT_TAG) + r")(?:__node)?\b")
 
 HINTS = (
@@ -77,5 +91,11 @@ def humanize(message: str, schema: NetworkGraphSchema) -> str:
         quoted = f"'{node.id}'"
         if quoted in out:
             out = out.replace(quoted, f"'{node.id}' [{node_name(schema, node.id)}]")
+    # The declared-direction hint (#640) names solver classes and attributes;
+    # a GUI user picks those in the Tee Inspector under other names.
+    for cls, name in MODEL_NAME.items():
+        out = out.replace(cls, name)
+    for raw, shown in FIELD_NAME:
+        out = out.replace(raw, shown)
     hints = [hint for trigger, hint in HINTS if trigger in out]
     return "\n".join([out, *hints])
