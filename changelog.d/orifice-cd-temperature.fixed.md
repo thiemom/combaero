@@ -1,0 +1,1 @@
+- An orifice whose discharge coefficient reads a Reynolds number (the ISO metering correlations and the discharge-hole family) now carries the coefficient's dependence on the upstream temperature, through the viscosity, in its solver Jacobian. Behind a heated plenum the row was 1e-3 off; solved results do not change.
