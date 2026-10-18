@@ -1365,3 +1365,14 @@ TEST(PermanentLoss, RefusesOutsideItsDomain) {
     EXPECT_THROW(permanent_loss_ratio_and_dC(1.0, 0.6), std::invalid_argument);
     EXPECT_THROW(permanent_loss_ratio_and_dC(0.5, 0.0), std::invalid_argument);
 }
+
+TEST(VelocityOfApproach, IsIsoFactorInsideAndOneOutside) {
+    const double b = 0.6;
+    EXPECT_NEAR(velocity_of_approach_factor(b), 1.0 / std::sqrt(1.0 - b * b * b * b), 1e-15);
+    // No approach pipe (beta = 0), or a bore at least as wide as the pipe:
+    // the network applies no correction rather than NaN or inf.
+    EXPECT_EQ(velocity_of_approach_factor(0.0), 1.0);
+    EXPECT_EQ(velocity_of_approach_factor(1.0), 1.0);
+    EXPECT_EQ(velocity_of_approach_factor(1.5), 1.0);
+    EXPECT_EQ(velocity_of_approach_factor(-0.2), 1.0);
+}

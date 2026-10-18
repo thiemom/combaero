@@ -3077,9 +3077,11 @@ class OrificeElement(NetworkElement):
         # The reverse approach pipe's diameter: its static state is the
         # orifice's p1 in reverse (#651).
         self._reverse_pipe_diameter = None
+        self._reverse_pipe_source = ""
         if len(to_pipes) == 1 and to_pipes[0].diameter and d_bore < to_pipes[0].diameter:
             self.beta_reverse = d_bore / to_pipes[0].diameter
             self._reverse_pipe_diameter = to_pipes[0].diameter
+            self._reverse_pipe_source = f"channel '{to_pipes[0].id}'"
         from_pipes = [
             e
             for e in graph.get_upstream_elements(self.from_node)
@@ -3857,7 +3859,9 @@ class OrificeElement(NetworkElement):
     ) -> dict[str, float | str]:
         """What a meter at ``self.tap`` reads, and the loss the row charged.
 
-        dp_tap is the tapping differential at the element's ``tap``. The row
+        beta_flow and E are the velocity of approach along the flow, which
+        reverses with it (#554). dp_tap is the tapping differential at the
+        element's ``tap``. The row
         works at _NETWORK_TAP, so for a metering correlation the reported one
         is scaled by (C_network / C_tap)^2 at the same flow. Between pipes
         (#645) dp_permanent is the stagnation drop the row charged and
@@ -3869,7 +3873,13 @@ class OrificeElement(NetworkElement):
         up, dn = (state_in, state_out) if forward else (state_out, state_in)
         beta = self.beta if forward else getattr(self, "beta_reverse", 0.0)
         recovers = self._recovery_fwd if forward else self._recovery_rev
-        out: dict[str, float | str] = {"tap": self.tap, "pressure_recovery": float(recovers)}
+        out: dict[str, float | str] = {
+            "tap": self.tap,
+            "pressure_recovery": float(recovers),
+            # The approach along the flow: beta (above) is the declared one.
+            "beta_flow": float(beta),
+            "E": float(cb.velocity_of_approach_factor(beta)),
+        }
         up_id = self.from_node if forward else self.to_node
         p1 = self._approach_static(up, up_id, forward, beta)[0]
         if 0.0 < beta < 1.0:

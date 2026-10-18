@@ -67,11 +67,7 @@ std::tuple<double, double, double> orifice_mdot_and_jacobian(double dP, double r
   // Regularized orifice equation: mdot = Cd * E * A * f_reg(dP, rho)
   // where E = 1/sqrt(1 - beta^4) is the velocity-of-approach factor.
   // We use a smooth sqrt to avoid the infinite gradient at dP = 0.
-  double E = 1.0;
-  if (beta > 0.0 && beta < 1.0) {
-    double b2 = beta * beta;
-    E = 1.0 / std::sqrt(1.0 - b2 * b2);
-  }
+  const double E = velocity_of_approach_factor(beta);
 
   /// Smooth clamp: rho_eff ~ max(rho, L)
   constexpr double L = 1e-9;
@@ -1692,11 +1688,7 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
     double Cd, double area, double beta) {
 
   // Compute effective area with velocity-of-approach factor
-  double E = 1.0;
-  if (beta > 0.0 && beta < 1.0) {
-    double b2 = beta * beta;
-    E = 1.0 / std::sqrt(1.0 - b2 * b2);
-  }
+  const double E = velocity_of_approach_factor(beta);
   double A_eff = Cd * E * area;
 
   // Handle reverse flow (P_back > P0)

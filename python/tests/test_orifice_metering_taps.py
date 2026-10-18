@@ -219,3 +219,61 @@ def test_a_saved_gui_file_naming_miller_says_what_to_pick() -> None:
     with pytest.raises(ValidationError, match="Pick 'Stolz' or 'ReaderHarrisGallagher'"):
         OrificeData(correlation="Miller")
     assert OrificeData(correlation="Stolz").correlation == "Stolz"
+
+
+def _gui_orifice(data: dict) -> OrificeElement:
+    from gui.backend.graph_builder import build_network_from_schema
+    from gui.backend.schemas import NetworkGraphSchema
+
+    def node(i: str, t: str, d: dict, x: int) -> dict:
+        return {"id": i, "type": t, "data": {"id": i, **d}, "position": {"x": x, "y": 0}}
+
+    def edge(i: str, s: str, t: str) -> dict:
+        return {
+            "id": i,
+            "source": s,
+            "sourceHandle": "flow-source",
+            "target": t,
+            "targetHandle": "flow-target",
+            "data": {},
+        }
+
+    graph = {
+        "nodes": [
+            node("pb_in", "pressure_boundary", {"Pt": 2e5, "Tt": 300}, 0),
+            node("ori", "orifice", {"diameter": 0.01, **data}, 100),
+            node("pb_out", "pressure_boundary", {"Pt": 1e5, "Tt": 300}, 200),
+        ],
+        "edges": [edge("e1", "pb_in", "ori"), edge("e2", "ori", "pb_out")],
+    }
+    net = build_network_from_schema(NetworkGraphSchema(**graph))
+    return net.elements["ori"]
+
+
+def test_the_gui_passes_the_tap_and_the_bevel_depth() -> None:
+    """The GUI's tap picks the reported differential, and its bevel depth
+    reaches IdelchikBeveled (it was dropped by the builder before)."""
+    o = _gui_orifice({"correlation": "ReaderHarrisGallagher", "tap": "Corner"})
+    assert o.tap == "Corner"
+    assert _gui_orifice({}).tap == "Flange"
+    o = _gui_orifice({"correlation": "IdelchikBeveled", "bevel_depth": 0.002})
+    assert o.bevel_depth == 0.002
+
+
+def test_diagnostics_report_the_approach_along_the_flow() -> None:
+    """beta stays the declared approach; beta_flow and E follow the flow, so a
+    reversed orifice reports the to-node pipe's (#554)."""
+    D_up, D_dn, d = 0.1, 0.08, 0.05
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("hi", Pt=1.0e5, Tt=300.0))
+    g.add_node(PlenumNode("a"))
+    g.add_node(PlenumNode("b"))
+    g.add_node(PressureBoundary("ho", Pt=1.2e5, Tt=300.0))
+    g.add_element(ChannelElement("p1", "hi", "a", length=0.5, diameter=D_up))
+    g.add_element(OrificeElement("o", "a", "b", Cd=0.6, diameter=d, correlation="fixed"))
+    g.add_element(ChannelElement("p2", "b", "ho", length=0.5, diameter=D_dn))
+    r = _solve(g)
+    assert r["o.m_dot"] < 0.0
+    assert r["o.beta"] == pytest.approx(d / D_up, rel=1e-14)
+    assert r["o.beta_flow"] == pytest.approx(d / D_dn, rel=1e-14)
+    assert r["o.E"] == pytest.approx(cb.velocity_of_approach_factor(d / D_dn), rel=1e-14)

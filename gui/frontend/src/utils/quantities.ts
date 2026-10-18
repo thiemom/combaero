@@ -66,6 +66,40 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => (v > 0 ? "yes" : "no"),
 	},
+	// Orifice velocity of approach and ISO 5167 taps (#649/#645/#651)
+	beta: { label: "β (declared)", unit: "—", format: (v) => v.toFixed(4) },
+	beta_flow: { label: "β (flow)", unit: "—", format: (v) => v.toFixed(4) },
+	E: { label: "E (approach)", unit: "—", format: (v) => v.toFixed(4) },
+	P_approach: {
+		label: "p1 (approach pipe)",
+		unit: "bar",
+		format: (v) => (v / 1e5).toFixed(4),
+	},
+	dp_tap: {
+		label: "dp at taps",
+		unit: "bar",
+		format: (v) => (v / 1e5).toFixed(4),
+	},
+	dp_permanent: {
+		label: "dp permanent",
+		unit: "bar",
+		format: (v) => (v / 1e5).toFixed(4),
+	},
+	loss_ratio: {
+		label: "Permanent / tap dp",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	pressure_recovery: {
+		label: "Pressure recovery",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
+	recovery_in_range: {
+		label: "Recovery in ISO range",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
 	// Effusion plate wall (#471)
 	T_wall_hot: { label: "T wall (hot)", unit: "K", format: (v) => v.toFixed(0) },
 	T_wall_cold: {

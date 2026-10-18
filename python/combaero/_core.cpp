@@ -5814,6 +5814,10 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "k = [s - C b^2] / [s + C b^2], s = sqrt(1 - b^4 (1 - C^2)).\n"
         "Derived for vena-contracta (D-D/2) taps. Raises ValueError outside\n"
         "0 < beta < 1 or C <= 0.");
+  m.def("velocity_of_approach_factor", &velocity_of_approach_factor, py::arg("beta"),
+        "ISO 5167-1 velocity-of-approach factor E = 1 / sqrt(1 - beta^4).\n"
+        "Returns 1 outside 0 < beta < 1 (no approach pipe, or a bore at\n"
+        "least as wide as the pipe): the network's no-correction convention.");
 
 
 
