@@ -65,5 +65,6 @@ def test_a_failing_hidden_step_is_flagged_on_its_tee(monkeypatch) -> None:
     monkeypatch.setattr(second_law.SecondLawReport, "element_verdicts", with_a_failure)
     res = _solve()
     assert [(f.element_id, f.owner_id) for f in res.second_law_failures] == [(step, TEE)]
-    # report only
-    assert res.success
+    # the solve is refused (#598), and the flag still names the tee
+    assert not res.success
+    assert "second law" in res.message

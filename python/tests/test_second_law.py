@@ -1,6 +1,6 @@
 """Second-law check per element and the control-volume ledger (#545).
 
-Every converged solve now reports, REPORT ONLY:
+Every converged solve reports:
 
 * ``__second_law__``: per element, the internal entropy generation of its
   control volume (``sigma_norm``; for an adiabatic two-port exactly
@@ -8,6 +8,9 @@ Every converged solve now reports, REPORT ONLY:
   reason.
 * ``__ledger__``: mass and energy over the network's control volume, from
   the flow boundaries, the heat given, and the heat leaving or withheld.
+
+Both demote the solve when they fail: the ledger since #552, an element's
+second law since #598.
 
 The networks are the suite's own, one per element kind; the broken element
 is #541's area change, which coupled the downstream static pressure and so
@@ -224,8 +227,10 @@ def test_the_541_area_change_is_caught_at_that_element_only() -> None:
     assert r["down.Pt"] > r["up.Pt"]  # the defect: total pressure rose across a loss
     assert r["__second_law_failures__"] == ["step"]
     assert r["__second_law__"]["step"]["sigma_norm_high"] < -SIGMA_TOL
-    # report only: the solve's verdict is untouched
-    assert r["__success__"] is True
+    # the root is refused, and the message names the element (#598)
+    assert r["__success__"] is False
+    assert r["__outcome__"] == "inconsistent"
+    assert "second law" in r["__message__"] and "step" in r["__message__"]
 
 
 # --- the ledger ---------------------------------------------------------------

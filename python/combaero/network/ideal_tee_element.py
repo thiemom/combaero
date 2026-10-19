@@ -79,7 +79,9 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
     split (one supplier) there is no mixing, so f scales the whole loss --
     and f -> 0 meets the energy check: the loss is written at low Mach
     (rho u^2/2) while the port Pt is isentropic, ~M^2/4 of the head larger,
-    so a split below f ~ M^2/4 creates flow work and is refused. The
+    so a split below f ~ M^2/4 creates flow work and is refused (by the
+    solver's second-law check, #598; this class's own volumetric check
+    sits at exactly zero there and passes it). The
     factor is the user's rig-matching knob, like ``f_multiplier``: the scored
     closure is f = 1 (dividing bias on Bassett 2001, K straight +0.26, K branch
     +0.23), and the harness reports, never recommends, other values.
