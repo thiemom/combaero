@@ -95,6 +95,8 @@ def _solve_sync(schema: NetworkGraphSchema):
     global _continuation_state
     net = build_network_from_schema(schema)
     solver = NetworkSolver(net)
+    # Interactive solves take the Newton-homotopy last retry (#642).
+    solver.homotopy_retry = True
     if schema.solver_settings.incompressible_mach_limit is not None:
         solver.incompressible_mach_limit = schema.solver_settings.incompressible_mach_limit
     x0 = None
