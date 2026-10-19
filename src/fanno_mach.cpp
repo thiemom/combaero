@@ -1074,9 +1074,11 @@ FannoChannelFlow rayleigh_raw_flow(const RayleighProblem& pb) {
   // differences of the fixed march (smooth in every argument):
   //   unchoked  E(G; Pt0, Tt0, Tt_exit, Y) - P_target = 0, E the exit pressure
   //   choked    the choke relation of its mode (see ChokeMode).
-  // Relative steps 1e-5: at 1 Pa of drive on 2 bar the excess moves ~2e-5 Pa
-  // per step against ~1e-10 Pa of inlet-solve rounding.
-  const double hr = 1e-5;
+  // Relative steps 1e-4 (truncation ~1e-8): the march rounds at ~1e-15 of P,
+  // which a 1e-5 step amplified to ~1e-7 in every derivative at low drive --
+  // enough to make them depend on the warm start (a deferred Jacobian then
+  // differed from the eager one). At 1e-4 that is <= 1e-8.
+  const double hr = 1e-4;
   auto rel = [&](double Gx, double Pt0x, double Tt0x, double Ttex, const std::vector<double>& Xx) {
     const RayleighDuct d = pb.duct(Gx, Tt0x, Ttex, &Xx);
     if (choked) {
