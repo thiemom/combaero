@@ -118,11 +118,14 @@ baked into `PC_STAR_PA_BY_TC_STAR_C`.
 | `data/huang1999_tables.py` | Digitized Tables 3 & 4 (theory column) + baked gamma and P_c* targets. |
 | `data/generate_gamma.py` | Regenerate gamma from CoolProp (**needs CoolProp**). |
 | `data/generate_reference.py` | Emit the golden JSON + C++ header (no CoolProp). |
+| `data/huang_pc_real_gas.py` | Huang's original P_c* chain, ideal gas vs the R141b EOS (**needs CoolProp**; not a test). |
 | `data/huang1999_reference.json` | Canonical golden fixture (inputs, outputs, Jacobian, theory). |
 | `data/huang1999_reference_data.h` | Same data as a `constexpr` array for ctests. |
 | `data/henry2007_fig5.py` | Henry 2007 Fig. 5, measured air characteristic, and the rig's geometry. |
 | `data/akbarnejad2025_tables.py` | Akbarnejad & Ziabasharhagh 2025 Tables 1-3, steam CFD rows. |
-| `anchor_scorecard.py` | Cross-source accuracy of omega, P_c*, P_b0 on both (run it to print the table). |
+| `data/chen2013_figs.py` | Chen et al. 2013 Figs. 5a and 7a: Chen's model curves and the measured points (Hemidi/Henry rig; Chen's rectangular rig, with error bars). |
+| `anchor_scorecard.py` | Cross-source accuracy of omega, P_c*, P_b0 on all three rigs (run it to print the table). |
+| `printed_chain_check.py` | Huang's printed P_c* chain and single-change hypotheses against Huang's and Chen's own numbers; Chen's printed subcritical branch against his droop. |
 
 The Python regression test lives at `python/tests/test_ejector_huang.py` and
 consumes the JSON fixture directly.
@@ -179,6 +182,35 @@ momentum treatment itself as the leading suspect: reproducing the target
 needed `phi_m` ~ 0.90-0.95, above Huang's own stated calibrated range
 (0.80-0.84), even for rows where `phi_m` sat well inside that range.
 
+**Real-fluid properties are ruled out too** (`data/huang_pc_real_gas.py`).
+Huang's working fluid is R141b, and his primary is far from ideal (saturated
+vapour at 0.40-0.60 MPa, Z = 0.87-0.90). The script runs his chain on the
+CoolProp R141b EOS: real-gas velocities, mixing enthalpy, a Rankine-Hugoniot
+shock solved on the EOS, and an isentropic diffuser on the EOS. P_c* against
+the measured-`T_c*` target, all 31 rows:
+
+| Chain | mean | range |
+|---|---|---|
+| ideal gas, constant gamma | -22.7% | -29.3..-16.1% |
+| EOS mixing, shock and diffuser (y-y pressure and omega from the ideal chain) | -24.1% | -31.0..-17.0% |
+| EOS throughout (also the choke pressure and both mass fluxes) | -22.9% | -29.7..-16.2% |
+
+- **Real gas moves P_c* by at most 1.5 points, and not toward the target.**
+  Mixing, the shock and the diffuser all sit at 20-150 kPa, where R141b is
+  close to ideal. The non-ideal primary inlet enters mainly through the
+  primary mass flux, which shifts omega rather than the pressure recovery.
+- **The fully real-gas omega lands 6% below Huang's theory omega**
+  (-2..-14%), while the ideal chain reproduces it to 0.8%. So Huang computed
+  with ideal-gas relations, as his assumption 1 states, and the miss is in
+  the chain as printed rather than in its properties.
+- **The script is not flat:** with `phi_m` forced to 0.93 the EOS chain
+  lands at -7..+4%, the same response as the ideal chain.
+- **The R141b vapour line is slightly wet here.** On the EOS, the
+  saturated-vapour line has a negative slope at 8-12 C, against the paper's
+  statement that R141b is a dry fluid. An equilibrium isentrope reaches
+  quality 0.985-0.994 by the y-y plane, so the script holds the vapour
+  metastable. A 1% liquid fraction cannot move P_c* by 23%.
+
 Four independent models/reformulations were then implemented against the
 same y-y starting state and tested against all 31 rows:
 
@@ -231,7 +263,7 @@ one dataset. `test_ejector_huang.py` checks P_c* by regression, by trend
 
 Everything above is the critical closure against Huang's own theory columns,
 for R141b. `anchor_scorecard.py` runs the closures, as the network element
-takes them (γ and R at the choke plane, `recovery_efficiency` = 1), on two
+takes them (γ and R at the choke plane, `recovery_efficiency` = 1), on three
 rigs that are not their sources. It is **accuracy, labelled cross-source**:
 a miss is the model's limitation.
 
@@ -239,6 +271,7 @@ a miss is the model's limitation.
 |---|---|---|---|---|---|---|
 | Henry 2007, air, P1 absolute | measured | 5.30 | +11 to +22% | +20 to +31% | **+78 to +83%** | 1.80-1.82 / 1.21-1.32 |
 | Henry 2007, air, P1 gauge | measured | 5.30 | −8 to −11% | +34 to +45% | **+93 to +108%** | 1.76-1.82 / 1.21-1.32 |
+| Chen 2013 rectangular, air, P_p absolute | measured | 4.46 | +13 to +16% | +14 to +21% | **+62 to +68%** | 1.66-1.70 / 1.15-1.24 |
 | Akbarnejad 2025 E1, steam | CFD | 5.44 | −4 to +43% | +38 to +63% | **+86 to +135%** | 1.44-1.74 / 1.06-1.21 |
 | Akbarnejad 2025 E2, steam | CFD | 33.3 | −18 to −22% | +18 to +21% | **+257 to +274%** | 3.17-3.37 / 1.06-1.07 |
 
@@ -246,10 +279,11 @@ a miss is the model's limitation.
   - It is Kracik & Dvorak's mixing at ω = 0: lossless, and independent of A_3/A_t by construction.
   - So the linear droop's far end runs about twice above every rig's breakdown, and 3.7 times above it at A_3/A_t = 33.
   - Over the window the straight line therefore keeps too much entrainment. The roots the second law refuses (#598) are this: stress draws at A_3/A_t of 15 to 33, deep in the droop, entraining more than the primary jet can drive.
-- **P_c* lands 18-63% high.** That is above the reference, as a lossless closure must be, and about where Huang's own rows put it (+6% mean, 13% max).
+- **P_c* lands 14-63% high.** That is above the reference, as a lossless closure must be, and about where Huang's own rows put it (+6% mean, 13% max).
 - **Henry's droop shape is still linear** (R² ≥ 0.94, `test_ejector_subcritical.py`). The chord's anchor is the error, not its shape.
 - **Caveats:**
-  - Henry's ω depends on whether P1 is gauge or absolute: the paper's "effective pressure" most likely means gauge, and both are shown.
+  - Henry's ω depends on whether P1 is gauge or absolute, so both are shown. The efficiency-free test (ratios of plateau ω across P1, which cancel every efficiency coefficient) reads it as **gauge**: ratio RMS 0.018 against 0.048 for absolute. The same test reads Chen's rectangular rig as absolute (0.010 against 0.038). Both are pinned in `test_ejector_chen2013.py`.
+  - Chen's rectangular rig: the knee is the midpoint between the last plateau point and the first droop point. The curves stop at ω 0.13-0.45, so its breakdown is the last two points extrapolated to ω = 0.
   - The CFD's stream temperatures are assumed saturated, because the paper does not print them. ω follows that assumption, and P_b0/P_c* hardly does.
 
 **A candidate dead-head, not adopted yet.** `candidate_dead_head` in
@@ -259,10 +293,86 @@ suction annulus A_3 − A_p1 sits at the secondary pressure P_e. Mass, momentum
 and energy over A_3 then give a subsonic exit. This is Keenan & Neumann's
 zero-secondary-flow constant-area mixer: no fitted constant, and A_3/A_t
 enters.
-- **P_b0 accuracy:** 3-39% high on every row against today's 78-274%. Henry absolute is +3-4%, and E2 at A_3/A_t = 33 is +12-14%.
+- **P_b0 accuracy:** 3-39% high on every row against today's 62-274%. Henry absolute is +3-4%, and E2 at A_3/A_t = 33 is +12-14%.
+- **On a rig added after its form was fixed** (Chen's rectangular rig): +3 to +5% on all five curves.
 - **The catch:** against today's P_c*, which is 18-63% high, its window P_b0/P_c* is only 0.98-1.06, where the rigs show 1.06-1.32. Adopted alone, it would make the droop vanish, and invert it on some rows.
-- **Next:** score P_c* alternatives the same way, and adopt the two together once the window comes out positive on the rigs.
+- **Paired with a P_c* that is not lossless** (Huang's printed chain, next paragraph), the window comes out positive on every rig.
 - **Variant tried and set aside:** the primary core at the y-y state, with the annulus at P_py. It fell 12-24% below the breakdown and below P_c*.
+
+**The candidate pair: Huang's printed P_c* chain with the sudden-expansion
+P_b0.** The scorecard's "cand" columns, also not in the model. The printed
+chain (`printed_chain_check.printed_chain`) adds Huang's φ_m mixing loss and
+normal shock, so it lands below the lossless closure:
+- **P_c\*:** −18 to +1% on the measured rigs and −19 to +17% on the CFD, against +14 to +63% today.
+- **Window P_b0/P_c\*:** 1.37-1.65 everywhere, so the droop never collapses or inverts. That includes A_3/A_t = 33, where today's window is 3.2-3.4.
+- **Whole measured curve** (the element's plateau and straight chord against every measured point, RMS over the plateau): 12-23% on all 11 measured curves, against 29-59% today.
+- **The catch** is fidelity: as printed, the chain does not reproduce its authors' own numbers (next section). Adopting it is a separate, stress-tested change.
+
+### Why the printed chain misses its authors' own numbers
+
+Huang's original chain (his Eqs. 9-18 with φ_m, Eq. 19) is the best P_c* on
+every independent rig (the candidate pair, above), but as printed it does not reproduce the
+numbers its authors computed with it. Two authors, the same chain:
+
+- **Huang 1999.** His theory A_3/A_t is what his code solved to hit each row's
+  measured T_c*. Run forward at that area, the printed chain lands **−22.7%**
+  (−29..−16%). Run in his design direction (P_c* in, A_3/A_t out) it misses
+  his A_3/A_t by −38%.
+- **Chen 2013** (`data/chen2013_figs.py`). Chen runs the same chain, same
+  coefficients, on two air rigs. His model's ω we reproduce to +1-2%
+  (Eqs. 1-8, `test_ejector_chen2013.py`), but its P_c* (the plateau end of his
+  curves) sits **8-18% above** the printed chain on all 8 curves.
+- **Effective φ_m.** Both authors behave as if φ_m were about 0.88-0.91
+  (Chen, all 8 curves) or 0.90-0.95 (Huang), against the printed 0.80-0.84.
+
+These are model-against-model comparisons: each author's code took the same
+inputs we do, so no rig bias (gauge readings, thermocouple error) can enter.
+`printed_chain_check.py` tests single changes their codes could have made:
+
+| One change to the printed chain | Huang, 31 rows (row std) | Chen, 8 curves (in his bracket) |
+|---|---|---|
+| none (as printed) | −22.7% (3.0%) | −12.7% (0/8) |
+| φ_m as a kinetic-energy efficiency (√φ_m) | −5.2% (3.4%) | +3.9% (2/8) |
+| φ_m on the primary stream only | −17.9% (4.6%) | −2.6% (2/8) |
+| φ_m on the slip velocity only | +8.5% (2.6%) | +17.7% (0/8) |
+| mixed T from static enthalpies | −15.7% (2.6%) | −2.1% (3/8) |
+| shock at the primary-core Mach | +71% (22%) | +109% (0/8) |
+| no shock, isentropic recovery from the mix | −9.1% (5.7%) | −11.9% (0/8) |
+| incompressible diffuser | −24.2% (2.6%) | −18.0% (0/8) |
+| diffuser exponent inverted | −37.9% (1.7%) | −43.3% (0/8) |
+| M_3 read as M_3² (Eq. 17) | −32.1% (2.4%) | −22.7% (0/8) |
+| a_py at the stagnation T_g (static/total slip) | +1.3% (3.0%) | +44% (0/8) |
+| a_sy at the stagnation T_e | −22.1% (3.1%) | −7.8% (0/8) |
+| V_py from the nozzle-exit state | −31.2% (5.3%) | −17.3% (0/8) |
+| a_m at the mixed stagnation T | −30.9% (3.9%) | −26.4% (0/8) |
+
+- **The test for a real explanation:** it should bring the mean to zero AND collapse the row-to-row scatter to table rounding (about 0.5%). Two authors with their own codes could have made different slips, so a hypothesis need not fit both.
+  - The closest for Huang alone is the sound speed at the stagnation T_g: mean +1.3%, but the scatter is unchanged at 3.0%.
+  - The closest for Chen alone is the mixed temperature from static enthalpies: −2.1%, 3 of 8 inside his bracket.
+  - Neither collapses the scatter, so each is a coincidental shift of the mean, not the explanation.
+- **Unit slips inside their codes are excluded too** (`printed_chain_check.py`):
+  - **A pressure offset** (gauge read as absolute, a "+1 bar" approximation, 0.1 MPa against 1 atm) would shift P_c* by a constant. The authors sit +0.25 ± 0.07 bar (Huang) and +0.19 ± 0.06 bar (Chen) above the printed chain: not constant, and nowhere near 1 bar.
+  - **A gauge P_p used only in the nozzle-exit relation** moves P_c* the wrong way (−26.5% Huang, −18% Chen).
+  - **Temperature units.** The chain gives the identical P_c* in K and in °R, since only Mach numbers and T_e/T_g enter it. °C or °F would scale ω by about 3× through T_g/T_e, and Huang's ω matches ours to 0.8%.
+- **Already ruled out:**
+  - γ (above);
+  - an equation-transcription error (each equation checked against the PDF);
+  - real-fluid R141b (`data/huang_pc_real_gas.py`, above);
+  - an inconsistent property set. Neither paper states the state at which C_p and γ were taken (Huang: "constant properties"; Chen: "computed by the NIST database"). Taking both at the generator, evaporator or condenser saturated-vapour state moves Huang by at most 3 points (−19.7 to −22.0%; `huang_pc_real_gas.py`). Air is ideal at these conditions, so properties cannot explain Chen's gap at all.
+- **Not ruled out:** an unprinted step in their codes. Only the authors could
+  confirm one.
+- **Huang's gap is about twice Chen's,** but no γ-dependent change found so
+  far explains the difference.
+
+**Chen's subcritical branch fails its fidelity check too.** As printed (the
+entrained flow unchokes, P_sy rises until the chain's back pressure equals
+P_c), it gives a droop much shallower than Chen's own plotted one: ω +0.1 to
++0.2 high one or two points into the droop (`printed_chain_check.py`, second
+table). So it is not a candidate for the droop.
+
+**Measurement-side checks (model against rig).** These matter for accuracy, not for the fidelity gap above:
+- **Pressure reading.** Huang's pressures are absolute: each printed P_g and P_e matches its printed saturation temperature to 0.1 K. Henry's are gauge and Chen's rectangular rig is absolute (ratio test, above).
+- **Suction loss.** On Chen's rectangular rig, one suction pressure of about 0.91 bar (−10%) reproduces all five measured plateaus. That would fit a constant loss in the secondary's metering run (an ISO 5167 orifice) at the roughly constant ṁ_s. A lower η_s fits the plateaus equally well; the two separate only on P_c*, which a lower P_s lowers and η_s barely moves.
 
 ### Validated envelope
 
@@ -272,7 +382,8 @@ result is extrapolation, and nothing in the element flags it.
 | Closure | Scored against | Range |
 |---|---|---|
 | critical ω, P_c* (fidelity) | Huang 1999 theory columns (R141b, γ ≈ 1.11) | A_p1/A_t 2.9-3.3, A_3/A_t 6.6-10.9, P_g/P_e 8.5-15.1, ω 0.16-0.86 |
-| critical ω, P_c*, P_b0 (accuracy) | Henry 2007 (air, measured), Akbarnejad 2025 (steam, CFD) | A_3/A_t 5.3-5.4 and 33; P_p/P_s 4-35; ω 0.19-1.4; table above |
+| critical ω, P_c*, P_b0 (accuracy) | Henry 2007 and Chen 2013 rectangular (air, measured), Akbarnejad 2025 (steam, CFD) | A_3/A_t 4.5-5.4 and 33; P_p/P_s 3-35; ω 0.19-1.4; table above |
+| critical ω, P_c* (second author's own model) | Chen 2013 model curves (air) | A_3/A_t 4.5 and 5.3; ω reproduced, P_c* not (above) |
 | droop shape (linear) | Henry 2007 (air, measured) | P_p/P_s about 4-7, one geometry |
 | jet pump (incompressible) | Sanger, NASA TN D-4759 / D-4445 (water) | A_p1/A_3 0.066 and 0.197 |
 | unchoked jet pump (compressible) | analytic low-Mach limit only | no measured data |
