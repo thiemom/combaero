@@ -731,7 +731,7 @@ class SolveResponse(BaseModel):
     worst_residuals: list[WorstResidual] = []
     solver_settings_used: dict = {}
     lm_started_at_eval: int | None = None
-    #: Report only (#545): elements that fail the second-law check, each
+    #: Elements that fail the second-law check (#545), each
     #: attributed to the canvas node that owns it.
     second_law_failures: list[SecondLawFlag] = []
     #: Report only (#588): elements on an incompressible closure running above

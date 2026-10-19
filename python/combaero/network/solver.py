@@ -4691,9 +4691,8 @@ class NetworkSolver:
                 sol_dict[f"{nid}.Q_fraction"] = frac * (H - m_in * h_ref)
 
         # Second law per element and the network's control-volume ledger
-        # (#545). REPORTED only: nothing is demoted on either until the check
-        # has proven itself. Evaluated where the root finder converged; a
-        # diverged iterate has no balance worth reporting.
+        # (#545). Both demote, below. Evaluated where the root finder
+        # converged; a diverged iterate has no balance worth reporting.
         verdicts: dict[str, dict[str, Any]] = {}
         wall_verdicts: dict[str, dict[str, Any]] = {}
         ledger: dict[str, Any] = {}
@@ -4727,9 +4726,8 @@ class NetworkSolver:
         sol_dict["__ledger__"] = ledger
 
         # A root whose control volume does not close in mass or energy is not
-        # a solution of the network, whatever |F| says (#552). Unlike the
-        # second law above, this one demotes: the bound sits 9x above the
-        # worst closure of any accepted solve in the suite.
+        # a solution of the network, whatever |F| says (#552). The bound sits
+        # 9x above the worst closure of any accepted solve in the suite.
         if success and ledger and "error" not in ledger:
             from .second_law import LEDGER_CLOSURE_TOL
 
@@ -4750,8 +4748,41 @@ class NetworkSolver:
                 )
                 warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
 
+        # A root on which some element destroys entropy -- manufactures flow
+        # work on its most favourable heat path -- is not a physical answer
+        # (#598). Demoted like an open ledger. On the stress sweep at the
+        # switch, the roots this newly refuses were an ejector entraining more
+        # power than its primary jet carries and a lossless (loss_factor = 0)
+        # ideal-tee split at Mach, both outside their models. The walls' own
+        # check stays a report: it was not part of that audit.
+        # Not inside the adiabatic first stage of a heated-channel solve
+        # (_solve_rayleigh_staged): its root leaves the heat out of the
+        # momentum on purpose -- the very sigma < 0 of #551 -- and is only the
+        # seed of the exact stage, which is judged in full. Refusing it sent
+        # that stage through the whole retry chain (a grid example 3.5 -> 14 s).
+        _seed_stage = any(
+            getattr(el, "_rayleigh_suspended", False) for el in self.network.elements.values()
+        )
+        _sigma_bad = list(sol_dict["__second_law_failures__"])
+        if success and _sigma_bad and not _seed_stage:
+            from .second_law import SIGMA_TOL
+
+            success = False
+            consistent = False
+            outcome = SolveOutcome.INCONSISTENT
+            _worst_sigma = {
+                eid: float(verdicts[eid].get("sigma_norm_high", float("nan"))) for eid in _sigma_bad
+            }
+            message = (
+                "Converged to a root that violates the second law at "
+                + ", ".join(f"{eid} (sigma_norm_high {s:+.2e})" for eid, s in _worst_sigma.items())
+                + f": the element creates flow work (bound -{SIGMA_TOL:.0e}). "
+                "See __second_law__."
+            )
+            warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
+
         # Incompressible validity (#588): each element on an incompressible
-        # closure against one Mach limit. REPORTED only, like the second law.
+        # closure against one Mach limit. REPORTED only.
         validity: dict[str, dict[str, Any]] = {}
         if converged:
             from .compressibility import validity_verdicts

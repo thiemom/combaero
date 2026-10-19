@@ -24,7 +24,9 @@ Every converged solve is checked twice after the fact:
   (R sum_in m)`` is dimensionless; for a two-port it is ``-ln(Pt_out /
   Pt_in)``. A verdict is ``"pass"``, ``"fail"`` (``sigma_norm_high <
   -SIGMA_TOL``: even the most favourable path destroys entropy) or
-  ``"not_checked"`` with the reason -- never a silent pass.
+  ``"not_checked"`` with the reason -- never a silent pass. A stream on the
+  incompressible closure widens the band by that closure's resolution,
+  order M^4 (``sigma_norm_resolution``; see ``_sigma``).
 
 * **The network: mass and energy close over its control volume.** The
   streams crossing at the flow boundaries (``NetworkNode.is_flow_boundary``),
@@ -33,8 +35,9 @@ Every converged solve is checked twice after the fact:
   stagnant node cannot take). Enthalpy is absolute (formation included), so a
   combustor closes the balance as it is.
 
-Both are REPORTS in this release: nothing is demoted. See #545 for the
-rollout to rejection once the check has proven itself.
+Both demote a converged solve that fails them to INCONSISTENT: the ledger
+since #552, an element's verdict since #598. A ThermalWall's own check
+(``wall_verdicts``) stays a report.
 
 Control volumes
 ---------------
@@ -94,6 +97,9 @@ class _Stream:
     Tt: float
     Pt: float
     Y: Any
+    #: (Pt - P) / P of the node whose Pt the stream carries when that node is
+    #: on the incompressible closure, else 0 (see ``_sigma``, #598).
+    x_inc: float = 0.0
 
 
 @dataclass
@@ -124,12 +130,34 @@ def _sigma(cv: _Volume) -> dict[str, float]:
     # Less heat entropy, more generation: the least favourable path is S_high.
     best = cb.entropy_generation(s_in, s_out, S_low) if cv.heat else central
     worst = cb.entropy_generation(s_in, s_out, S_high) if cv.heat else central
-    return {
+    # THE INCOMPRESSIBLE CLOSURE'S RESOLUTION (#598). sigma_norm carries
+    # -m ln(Pt) per stream over sum_in m. A stream on the incompressible
+    # closure has its energy as (Pt - p_ref) / rho_i, each port at its own
+    # constant density, where the gas has R T ln(Pt / p_ref): the two differ
+    # by x_i |P_i - p_ref| / P + x_i^2 / 2 in ln(Pt), x = (Pt - P) / P its
+    # head. With the static spread inside a control volume taken as at most
+    # its largest head, each stream is resolved to x_i (x_max + x_i / 2).
+    # Order gamma^2 M^4 / 4: an element lossless in its own model (an ideal
+    # tee's loss_factor = 0 split) sits on the bound, and measured on that
+    # split at port Mach 0.033 the gap was -3.0e-7 against a bound of
+    # 1.1e-6. Zero on a compressible node.
+    m_in = sum(st.m for st in cv.inflows)
+    every = cv.inflows + cv.outflows
+    x_max = max((st.x_inc for st in every), default=0.0)
+    res = (
+        sum(st.m * st.x_inc * (x_max + 0.5 * st.x_inc) for st in every) / m_in
+        if m_in > 0.0
+        else 0.0
+    )
+    out = {
         "sigma": float(central.sigma),
         "sigma_norm": float(central.sigma_norm),
-        "sigma_norm_low": float(worst.sigma_norm),
-        "sigma_norm_high": float(best.sigma_norm),
+        "sigma_norm_low": float(worst.sigma_norm) - res,
+        "sigma_norm_high": float(best.sigma_norm) + res,
     }
+    if res:
+        out["sigma_norm_resolution"] = res
+    return out
 
 
 class SecondLawReport:
@@ -196,9 +224,27 @@ class SecondLawReport:
         b = float(cb.heat_entropy_flux(m, T0_in, T0_out, Y, M_out, M_out))
         return lin, min(a, b, lin), max(a, b, lin)
 
-    def _stream_at(self, nid: str, m: float, Pt: float | None = None) -> _Stream:
+    def _incompressible_head(self, nid: str) -> float:
+        """(Pt - P) / P at a node on the incompressible closure, else 0 (#598)."""
+        if getattr(self.net.nodes[nid], "regime", None) != "incompressible":
+            return 0.0
         st = self._state(nid)
-        return _Stream(m, float(st.Tt), float(st.Pt if Pt is None else Pt), st.Y)
+        P, Pt = float(st.P), float(st.Pt)
+        return max(Pt - P, 0.0) / P if P > 0.0 else 0.0
+
+    def _stream_at(
+        self, nid: str, m: float, Pt: float | None = None, pt_node: str | None = None
+    ) -> _Stream:
+        """The stream at ``nid``'s state; its Pt from ``Pt`` (taken at node
+        ``pt_node``) when given."""
+        st = self._state(nid)
+        return _Stream(
+            m,
+            float(st.Tt),
+            float(st.Pt if Pt is None else Pt),
+            st.Y,
+            self._incompressible_head(nid if Pt is None else (pt_node or nid)),
+        )
 
     def _heated(self, inflow: _Stream, Q: float) -> float:
         """Total temperature after ``Q`` [W] is added to ``inflow``."""
@@ -259,7 +305,13 @@ class SecondLawReport:
         inflow = self._stream_at(up, m)
         Q = self._wall_heat_into(eid)
         Tt_out = self._heated(inflow, Q)
-        outflow = _Stream(m, Tt_out, self._outlet_Pt(eid, dn, m, forward), inflow.Y)
+        outflow = _Stream(
+            m,
+            Tt_out,
+            self._outlet_Pt(eid, dn, m, forward),
+            inflow.Y,
+            self._incompressible_head(dn),
+        )
         cv = _Volume([inflow], [outflow])
         if Q:
             M_in, M_out = self._element_mach(eid, up, dn, forward)
@@ -302,7 +354,7 @@ class SecondLawReport:
                 far = outside[0]
                 into_chain = (m >= 0.0) == (element.from_node == far)
                 st_node = far if into_chain else touches[0]
-                stream = self._stream_at(st_node, abs(m), Pt=self._state(far).Pt)
+                stream = self._stream_at(st_node, abs(m), Pt=self._state(far).Pt, pt_node=far)
                 if not into_chain:
                     # its wall heat lands on the far node: add it on the way out
                     Q = self._wall_heat_into(eid)
@@ -320,7 +372,10 @@ class SecondLawReport:
                 into_chain = (m >= 0.0) == (element.to_node == station)
                 src = element.from_node if m >= 0.0 else element.to_node
                 stream = self._stream_at(
-                    src if into_chain else station, abs(m), Pt=self._state(station).Pt
+                    src if into_chain else station,
+                    abs(m),
+                    Pt=self._state(station).Pt,
+                    pt_node=station,
                 )
             if stream.m:
                 (cv.inflows if into_chain else cv.outflows).append(stream)

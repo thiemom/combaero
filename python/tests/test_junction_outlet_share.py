@@ -36,9 +36,15 @@ def _solve(seed: int) -> tuple:
 @pytest.mark.parametrize("seed", [11, 13])
 def test_each_outlet_chamber_carries_its_own_flow(seed: int) -> None:
     """Seeds 11 (2+4) and 13 (2+3), fully forward at the root: every outlet
-    chamber's flow is its own outlet channel's, and they sum to the inlets'."""
+    chamber's flow is its own outlet channel's, and they sum to the inlets'.
+
+    Judged on the converged root: seed 13 draws loss_factor = 0, a lossless
+    split at port Mach ~0.3 that creates flow work, and the second-law check
+    refuses it (#598). Its port flows are this test's subject all the same."""
     net, s, r = _solve(seed)
-    assert r["__success__"], r["__message__"]
+    assert r["__converged__"], r["__message__"]
+    if seed == 13:
+        assert not r["__success__"] and "second law" in r["__message__"]
     s._residuals_and_jacobian(np.array(r["__x_solution__"]), compute_jacobian=False)
     outs = sorted(n for n in net.nodes if n.startswith("po"))
     assert len(outs) >= 2

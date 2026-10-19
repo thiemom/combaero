@@ -7,7 +7,7 @@ import { balanceIsOpen, type Ledger } from "../utils/secondLaw";
 import BalanceModal from "./BalanceModal";
 import ConvergenceChart from "./ConvergenceChart";
 
-/** One line on the second law and the balance (#545); report only. */
+/** One line on the second law and the balance (#545). A failing element or an open balance also fails the solve (#598, #552). */
 const BalanceLine: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
 	const { solveResults } = useStore();
 	const ledger = solveResults?.ledger as Ledger | undefined;

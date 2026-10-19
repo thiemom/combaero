@@ -248,3 +248,29 @@ def test_a_cold_solve_goes_through_the_adiabatic_momentum_solution() -> None:
         assert staged[f"{name}.m_dot"] == pytest.approx(r[f"{name}.m_dot"], rel=1e-9)
     # Nothing is left suspended.
     assert not any(getattr(el, "_rayleigh_suspended", False) for el in s.network.elements.values())
+
+
+def test_the_adiabatic_seed_stage_is_not_refused_by_the_second_law() -> None:
+    """Its root leaves the heat out of the momentum on purpose -- the sigma < 0
+    of #551 -- and only seeds the exact stage. Refused (#598), that stage ran
+    the whole retry chain: a grid example went 3.5 -> 14 s. The exact stage
+    is judged in full. Hotcold seed 18: its adiabatic heated duct failed the
+    second law in the #598 audit."""
+    s = NetworkSolver(FAMILIES["hotcold"](18)[0])
+    seeds: list[dict] = []
+    inner = s.solve
+
+    def spy(*args, **kw):
+        r = inner(*args, **kw)
+        if s._in_rayleigh_stage and "x0" not in kw:
+            seeds.append(r)
+        return r
+
+    s.solve = spy
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = s.solve(timeout=60)
+    assert r["__success__"] and "adiabatic-momentum" in r["__message__"]
+    assert seeds and seeds[0]["__success__"]
+    assert seeds[0]["__second_law_failures__"]  # reported, not applied
+    assert r["__second_law_failures__"] == []
