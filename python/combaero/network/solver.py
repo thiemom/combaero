@@ -2779,6 +2779,14 @@ class NetworkSolver:
         wall-less flows are a start on the right side of that (#471:
         impingement array under a hot duct, 6/9 cold vs 9/9 seeded).
 
+        A cold solve of a network with channels carrying their wall heat in
+        the momentum (Fanno-Rayleigh, #551) runs in two stages: those channels
+        adiabatic first (this whole chain, 60% of the budget), then the exact
+        problem from that root; the plain cold chain runs only if that fails.
+        Cold, the guess's node temperatures put extreme heating or cooling into
+        their first iterates (an impingement crossflow chain: 23 s cold, 4.7 s
+        staged).
+
         A numerical exception while evaluating an attempt's STARTING point
         (a property or closure refusing a physical-but-extreme state) does not
         abort the solve: that attempt ends with outcome ERROR and the retries
@@ -2795,6 +2803,19 @@ class NetworkSolver:
         declared units and raises ``RowKindMismatchError`` on a misfiled one
         (``check_row_kinds``; RESIDUAL-ROW-SCALING).
         """
+        kw: dict[str, Any] = {
+            "method": method,
+            "timeout": timeout,
+            "options": options,
+            "use_jac": use_jac,
+            "init_strategy": init_strategy,
+            "warmstart_maxfev": warmstart_maxfev,
+            "lambda_steps": lambda_steps,
+        }
+        if x0 is None and auto_retry and not getattr(self, "_in_rayleigh_stage", False):
+            heated = self._rayleigh_heated_elements()
+            if heated:
+                return self._solve_rayleigh_staged(heated, kw)
         self._caught_exceptions = []
         self._caught_count = 0
         _t0 = time.time()
@@ -2859,6 +2880,52 @@ class NetworkSolver:
             self._diagnostic_data = _primary_diag
         sol["__message__"] = f"{primary_msg} [wall-free warm-start retry also failed]"
         return self._with_caught(sol)
+
+    def _rayleigh_heated_elements(self) -> list[Any]:
+        """Channels that carry their wall heat in the momentum (#551)."""
+        self.network.resolve_all_topology()
+        return [el for el in self.network.elements.values() if getattr(el, "_rayleigh_ends", None)]
+
+    def _solve_rayleigh_staged(self, heated: list[Any], kw: dict[str, Any]) -> dict[str, Any]:
+        """Cold solve of a network with Fanno-Rayleigh channels, in two stages
+        (#551): first with their heat left out of the momentum (adiabatic
+        Fanno, the full retry chain), then the exact problem from that root.
+
+        Cold, a guess's node temperatures put extreme heating or cooling into
+        every heated duct's first iterates, and an impingement crossflow chain
+        stalled for 22 s; from the adiabatic root, whose flows differ by the
+        O(M^2) Rayleigh change only, it converged in 0.7 s. If the exact stage
+        fails, the plain cold chain runs in the time left.
+        """
+        t0 = time.time()
+        timeout = kw.get("timeout")
+        self._in_rayleigh_stage = True
+        try:
+            for el in heated:
+                el._rayleigh_suspended = True
+            seed = self.solve(**{**kw, "timeout": None if timeout is None else 0.6 * timeout})
+        finally:
+            for el in heated:
+                el._rayleigh_suspended = False
+            self._in_rayleigh_stage = False
+
+        def left() -> float | None:
+            return None if timeout is None else max(timeout - (time.time() - t0), 1.0)
+
+        if seed.get("__success__", False) and seed.get("__x_solution__") is not None:
+            sol = self.solve(**{**kw, "timeout": left()}, x0=np.asarray(seed["__x_solution__"]))
+            if sol.get("__success__", False):
+                sol["__message__"] = (
+                    f"{str(sol.get('__message__', '')).strip()} [from the adiabatic-momentum "
+                    "solution: heated channels solved without, then with, their heat in "
+                    "the momentum]"
+                )
+                return sol
+        self._in_rayleigh_stage = True
+        try:
+            return self.solve(**{**kw, "timeout": left()})
+        finally:
+            self._in_rayleigh_stage = False
 
     def _wall_free_seed(
         self, method: str, timeout: float | None, use_jac: bool

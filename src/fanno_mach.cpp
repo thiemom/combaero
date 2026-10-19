@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace combaero {
@@ -581,7 +582,7 @@ FannoChannelFlow raw_flow(const FlowProblem& pb) {
     f_lo = f(lo);
     f_hi = f(hi);
     while ((f_lo <= 0.0 || f_hi > 0.0) && w < 1.0) {
-      w *= 4.0;
+      w *= 8.0;
       if (f_lo <= 0.0) {
         hi = lo;
         f_hi = f_lo;
@@ -992,8 +993,20 @@ FannoChannelFlow rayleigh_raw_flow(const RayleighProblem& pb) {
   // H(log G): the exit-pressure excess while the duct carries G subsonically,
   // and -Pt0 (1e-12 - zeta_min) once it chokes, so a sign change brackets
   // the unchoked root or the choke itself.
+  // The last few marches, by flux: the subsonic checks and the final state
+  // re-read fluxes F has just marched (a pure cache: same G, same march).
+  std::array<std::pair<double, MarchEnd>, 4> memo{};
+  std::size_t memo_n = 0;
   auto march_at = [&](double G) {
-    return march_zeta(pb.duct(G, pb.Tt0, pb.Tt_exit, &X), pb.Pt0);
+    for (std::size_t i = 0; i < std::min(memo_n, memo.size()); ++i) {
+      if (memo[i].first == G) {
+        return memo[i].second;
+      }
+    }
+    const MarchEnd m = march_zeta(pb.duct(G, pb.Tt0, pb.Tt_exit, &X), pb.Pt0);
+    memo[memo_n % memo.size()] = {G, m};
+    ++memo_n;
+    return m;
   };
   auto F = [&](double logG) {
     const double G = std::exp(logG);
@@ -1008,14 +1021,15 @@ FannoChannelFlow rayleigh_raw_flow(const RayleighProblem& pb) {
   ChokeMode mode = ChokeMode::kExit;
   double G = 0.0;
   bool done = false;
-  // A warm start: a tight bracket around the previous flux, widened.
+  // A warm start: a tight bracket around the previous flux, widened. A
+  // Newton iterate's flux is usually within 0.1% of the last one.
   if (pb.G_guess > 0.0 && pb.G_guess < G_max && pb.P > 0.0) {
-    double w = 0.01;
+    double w = 1e-3;
     double lo = std::log(pb.G_guess * (1.0 - w));
     double hi = std::log(std::min(G_max * (1.0 - 1e-12), pb.G_guess * (1.0 + w)));
     double f_lo = F(lo), f_hi = F(hi);
     while ((f_lo <= 0.0 || f_hi > 0.0) && w < 1.0) {
-      w *= 4.0;
+      w *= 8.0;
       if (f_lo <= 0.0) {
         hi = lo;
         f_hi = f_lo;

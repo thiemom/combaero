@@ -230,3 +230,21 @@ def test_the_impingement_crossflow_segments_solve_at_their_wetted_area() -> None
     for i in range(6):
         assert d[f"g{i}"]["heat_area_exceeds_wetted"] == 0.0
     assert r["__second_law_failures__"] == []
+
+
+def test_a_cold_solve_goes_through_the_adiabatic_momentum_solution() -> None:
+    """Cold, the heated channels are first solved adiabatic and the exact
+    problem then from that root; it is the root an unstaged exact solve
+    finds."""
+    s, staged = _solve(_pair())
+    assert "adiabatic-momentum" in staged["__message__"]
+    plain = NetworkSolver(_pair())
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = plain.solve(timeout=60, auto_retry=False)
+    assert r["__success__"], r["__message__"]
+    assert "adiabatic-momentum" not in r["__message__"]
+    for name in ("hot", "cold"):
+        assert staged[f"{name}.m_dot"] == pytest.approx(r[f"{name}.m_dot"], rel=1e-9)
+    # Nothing is left suspended.
+    assert not any(getattr(el, "_rayleigh_suspended", False) for el in s.network.elements.values())

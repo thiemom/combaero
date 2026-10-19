@@ -6245,7 +6245,11 @@ class ChannelElement(NetworkElement):
         # Wall heat in the momentum (#551): Tt rises linearly from the
         # feeding node's to the receiving node's, where that node's Tt is this
         # duct's exit Tt (see resolve_topology).
-        heated = dst_id in getattr(self, "_rayleigh_ends", ()) and float(dst.Tt) > 0.0
+        heated = (
+            dst_id in getattr(self, "_rayleigh_ends", ())
+            and float(dst.Tt) > 0.0
+            and not getattr(self, "_rayleigh_suspended", False)
+        )
         if heated:
             flow = cb.fanno_rayleigh_channel_flow(
                 src.Pt,

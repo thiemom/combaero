@@ -9,3 +9,4 @@
 - **A smooth-wall channel whose heat-transfer area exceeds its friction-wetted area (4 A L / Dh) by over 10% is flagged** (`heat_area_ratio`, `heat_area_exceeds_wetted`, and an Inspector note).
   - **Why:** heat over surface the friction never sees breaks Reynolds analogy. In a compressible duct a cooling gain can then outgrow the friction, and at a fixed exit Tt no flow matches a pressure drop.
   - **Where it showed up:** the stress harness's impingement crossflow segments carried 3.9x (the plate's width on a round duct). They now use their wetted area, which changes that family's draws.
+- **A cold solve of a network with heat-carrying compressible channels runs in two stages:** those channels adiabatic first, then the exact problem from that root. The plain cold chain runs only if that fails. An impingement crossflow chain went from 23 s to 4.7 s.
