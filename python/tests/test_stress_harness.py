@@ -32,3 +32,23 @@ def test_a_seed_is_reproducible() -> None:
         a, b = build(3)[0], build(3)[0]
         assert sorted(a.elements) == sorted(b.elements), family
         assert sorted(a.nodes) == sorted(b.nodes), family
+
+
+def test_ejector_draws_stay_inside_their_operating_range() -> None:
+    """Incompressible ejector draws put the outlet below the jet pump's
+    shut-off head (#619), dPt_o = 2 (Pt_p - Pt_s) b (1 - b/2), b = A_e/A_3,
+    and every port chamber is in the draw's regime (it used to default to
+    compressible)."""
+    seen = 0
+    for seed in range(40):
+        net, tags = FAMILIES["ejector"](seed)
+        regime = tags[1]
+        assert {net.nodes[n].regime for n in ("mp", "ms", "mo")} == {regime}
+        if regime != "incompressible":
+            continue
+        seen += 1
+        ej = net.elements["ej"]
+        b = ej.nozzle_exit_area / ej.mixing_area
+        Pp, Ps, Po = (net.nodes[n].Pt for n in ("bp", "bs", "bo"))
+        assert Ps < Po < Ps + 2.0 * (Pp - Ps) * b * (1.0 - 0.5 * b)
+    assert seen > 5
