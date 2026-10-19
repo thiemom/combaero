@@ -751,6 +751,7 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dG_dPt0", &combaero::FannoChannelFlow::dG_dPt0)
       .def_readonly("dG_dTt0", &combaero::FannoChannelFlow::dG_dTt0)
       .def_readonly("dG_dP_target", &combaero::FannoChannelFlow::dG_dP_target)
+      .def_readonly("dG_dTt_exit", &combaero::FannoChannelFlow::dG_dTt_exit)
       .def_readonly("dG_ddir", &combaero::FannoChannelFlow::dG_ddir);
   m.attr("FANNO_FLOW_DRIVE_FLOOR") = combaero::kFannoFlowDriveFloor;
   m.def("fanno_channel_flow", &combaero::fanno_channel_flow, py::arg("Pt0"), py::arg("Tt0"),
@@ -762,6 +763,33 @@ PYBIND11_MODULE(_core, m) {
         "Mass flux a duct passes from (Pt0, Tt0) against P_target (matched to the exit\n"
         "stagnation pressure if exit_total, else the exit static), with derivatives.\n"
         "Saturates at the choked flux; 0 at or below zero drive.");
+
+  py::class_<combaero::FannoRayleighMarch>(m, "FannoRayleighMarch")
+      .def_readonly("M_in", &combaero::FannoRayleighMarch::M_in)
+      .def_readonly("M_exit", &combaero::FannoRayleighMarch::M_exit)
+      .def_readonly("zeta_min", &combaero::FannoRayleighMarch::zeta_min)
+      .def_readonly("zeta_peak", &combaero::FannoRayleighMarch::zeta_peak)
+      .def_readonly("P_exit", &combaero::FannoRayleighMarch::P_exit)
+      .def_readonly("Pt_exit", &combaero::FannoRayleighMarch::Pt_exit)
+      .def_readonly("T_exit", &combaero::FannoRayleighMarch::T_exit);
+  m.def("fanno_rayleigh_march", &combaero::fanno_rayleigh_march, py::arg("G"), py::arg("Pt0"),
+        py::arg("Tt0"), py::arg("Tt_exit"), py::arg("X"), py::arg("L"), py::arg("D"),
+        py::arg("roughness"), py::arg("friction_model"), py::arg("f_multiplier") = 1.0,
+        "March a duct with friction and a linear Tt rise from Tt0 to Tt_exit at mass flux G\n"
+        "(Fanno-Rayleigh, #551): inlet/exit Mach, exit P/Pt/T, zeta_min <= 0 when choked.");
+  m.def("fanno_rayleigh_choked_mass_flux", &combaero::fanno_rayleigh_choked_mass_flux,
+        py::arg("Pt0"), py::arg("Tt0"), py::arg("Tt_exit"), py::arg("X"), py::arg("L"),
+        py::arg("D"), py::arg("roughness"), py::arg("friction_model"),
+        py::arg("f_multiplier") = 1.0,
+        "Mass flux [kg/(m^2 s)] at which a duct with friction and heat chokes.");
+  m.def("fanno_rayleigh_channel_flow", &combaero::fanno_rayleigh_channel_flow, py::arg("Pt0"),
+        py::arg("Tt0"), py::arg("Tt_exit"), py::arg("X"), py::arg("P_target"),
+        py::arg("exit_total"), py::arg("L"), py::arg("D"), py::arg("roughness"),
+        py::arg("friction_model"), py::arg("f_multiplier") = 1.0, py::arg("G_guess") = -1.0,
+        py::arg("dY_directions") = std::vector<std::vector<double>>{},
+        py::arg("with_derivatives") = true,
+        "fanno_channel_flow with the stagnation temperature rising linearly from Tt0 to\n"
+        "Tt_exit along the duct (Fanno-Rayleigh, #551); adds dG_dTt_exit.");
 
   py::class_<combaero::MergeFaceState>(m, "MergeFaceState")
       .def_readonly("P_face", &combaero::MergeFaceState::P_face)

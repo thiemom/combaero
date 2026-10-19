@@ -519,6 +519,48 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
                                     bool with_derivatives = true);
 ```
 
+### Fanno-Rayleigh: friction and heat (`fanno_mach.h`, #551)
+
+The same duct with Tt rising linearly from `Tt0` to `Tt_exit`. Exactly, for a
+thermally perfect gas, `P_M + G u_M = -G a cv (1 - M^2) / (k M^2)` with
+`k = cp(T) + M^2 a da/dT`, so momentum gives `dM/dx` with a heat term; heat
+moves M either way, so the march is in x, of `theta = M^2 - M^4/2`
+(`(1 - zeta)/2`, `zeta = (1 - M^2)^2`), regular at sonic and full relative
+precision at low Mach. Fixed RK4, 32 steps graded toward the exit.
+
+The choked flux is set by where the duct goes sonic: at its **exit** (a
+backward march from M = 1 at L meets the isentropic inlet -- smooth), at an
+interior **throat** (cooling decelerates the flow after a sonic point; its
+derivatives re-solve the choke), or at its **inlet**. Checked against the
+Fanno kernel at zero heat (<= 1e-7 in G) and Rayleigh algebra at zero
+friction (<= 1e-8 in exit Mach). About 8 ms per warm call with derivatives,
+~3-5x the adiabatic kernel.
+
+```cpp
+FannoRayleighMarch fanno_rayleigh_march(double G, double Pt0, double Tt0, double Tt_exit,
+                                        const std::vector<double>& X, double L, double D,
+                                        double roughness, const std::string& friction_model,
+                                        double f_multiplier = 1.0);
+// {M_in, M_exit, zeta_min (<= 0: choked), zeta_peak, P_exit, Pt_exit, T_exit}
+double fanno_rayleigh_choked_mass_flux(double Pt0, double Tt0, double Tt_exit, ...);
+// fanno_channel_flow's contract plus dG_dTt_exit; G_guess warm-starts the root.
+FannoChannelFlow fanno_rayleigh_channel_flow(double Pt0, double Tt0, double Tt_exit,
+                                             const std::vector<double>& X, double P_target,
+                                             bool exit_total, double L, double D,
+                                             double roughness, const std::string& friction_model,
+                                             double f_multiplier = 1.0, double G_guess = -1.0,
+                                             const std::vector<std::vector<double>>& dY_directions = {},
+                                             bool with_derivatives = true);
+```
+
+The flux is the root on the branch continuous from zero flow, 0 at or below
+zero drive. Limit: a cooled duct's Rayleigh gain can outgrow its friction --
+not under Reynolds analogy (NTU ~ f L/2D keeps it below half), but in a short
+duct with entrance-enhanced heat transfer and fully developed friction (an
+impingement crossflow segment, L/D 1.3). At a fixed Tt_exit its exit Pt then
+rises with flow and no flow matches a pressure drop; developing-flow friction
+is the consistent closure.
+
 ### Rocket Nozzle Thrust
 ```cpp
 struct ThrustResult {

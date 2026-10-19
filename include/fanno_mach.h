@@ -114,6 +114,7 @@ struct FannoChannelFlow {
   double dG_dPt0 = 0.0;        // [kg/(m^2 s Pa)]
   double dG_dTt0 = 0.0;        // [kg/(m^2 s K)]
   double dG_dP_target = 0.0;   // [kg/(m^2 s Pa)], 0 when choked
+  double dG_dTt_exit = 0.0;    // [kg/(m^2 s K)]; 0 from the adiabatic kernel
   // dG/ds [kg/(m^2 s)] along each of dY_directions (Y -> Y + s v, X
   // renormalised); empty when none are passed. Chained by a network element
   // through an orthonormal basis of its feeding node's dY/dx (see
@@ -139,5 +140,70 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
                                     // only -- the derivative fields are not
                                     // computed (a residual-only evaluation).
                                     bool with_derivatives = true);
+
+// ---------------------------------------------------------------------------
+// Fanno-Rayleigh: friction AND heat transfer (#551)
+//
+// The same constant-area duct with its stagnation temperature changing from
+// Tt0 at the inlet to Tt_exit at the exit, linearly in x (a uniform wall heat
+// flux per unit length). With Tt(x) the station state is still algebraic in
+// (M, Tt), and momentum dP + G du = -(f / 2D) G u dx gives, for a thermally
+// perfect gas (cp(T)), exactly
+//
+//   P_M  + G u_M  = -G a cv (1 - M^2) / (k M^2),   k = cp(T) + M^2 a da/dT
+//   P_Tt + G u_Tt =  G T_Tt [R / u + M (da/dT) (1 - 1 / (gamma M^2))],
+//                    T_Tt = cp(Tt) / k
+//
+// so  dM/dx = k M^2 [f u / 2D + C dTt/dx] / (a cv (1 - M^2)),  C the bracket
+// above times T_Tt. Heat moves M either way (cooling can stall it), so x is
+// the independent variable, and the state marched is zeta = (1 - M^2)^2:
+//
+//   dzeta/dx = -4 k M^3 [f u / 2D + C dTt/dx] / (a cv),
+//
+// regular at M = 1. The flow chokes where zeta reaches 0 (friction or thermal
+// choking, at the exit or at an interior throat). At Tt_exit = Tt0 it is the
+// Fanno flow above, to the march's accuracy (~1e-9, not bit-exact).
+//
+// The flux is the root on the branch continuous from zero flow (the first
+// fall of the exit-pressure excess as G rises), and 0 at or below zero
+// drive. A cooled duct's Rayleigh total-pressure gain can outgrow its
+// friction: with Reynolds-analogy heat transfer (NTU ~ f L / 2D) it stays
+// below half the friction loss, but a SHORT duct with entrance-enhanced heat
+// transfer and fully developed friction breaks that (an impingement
+// crossflow segment, L/D 1.3: gain 0.019 velocity heads against friction
+// 0.015-0.025). At a fixed Tt_exit such a duct's exit Pt rises with its flow,
+// no flow matches a pressure drop, and the duct is reported choked at its
+// choke flux. Developing-flow friction is the consistent closure for it.
+
+struct FannoRayleighMarch {
+  double M_in = 0.0;       // inlet Mach
+  double M_exit = 0.0;     // exit Mach (1 where zeta <= 0)
+  double zeta_min = 1.0;   // smallest (1 - M^2)^2 along the duct; <= 0: choked
+  double zeta_peak = 1.0;  // zeta at the smoothed interior peak (= zeta_min without one)
+  double P_exit = 0.0;     // exit static pressure [Pa]
+  double Pt_exit = 0.0;    // exit stagnation pressure [Pa]
+  double T_exit = 0.0;     // exit static temperature [K]
+};
+
+// March a duct at mass flux G from an isentropic inlet at (Pt0, Tt0) with the
+// stagnation temperature rising linearly to Tt_exit.
+FannoRayleighMarch fanno_rayleigh_march(double G, double Pt0, double Tt0, double Tt_exit,
+                                        const std::vector<double>& X, double L, double D,
+                                        double roughness, const std::string& friction_model,
+                                        double f_multiplier = 1.0);
+
+// The mass flux at which the heated (or cooled) duct chokes [kg/(m^2 s)].
+double fanno_rayleigh_choked_mass_flux(double Pt0, double Tt0, double Tt_exit,
+                                       const std::vector<double>& X, double L, double D,
+                                       double roughness, const std::string& friction_model,
+                                       double f_multiplier = 1.0);
+
+// fanno_channel_flow with heat: same contract and fields, plus dG_dTt_exit.
+// G_guess (the previous flux, if any) only warm-starts the root.
+FannoChannelFlow fanno_rayleigh_channel_flow(
+    double Pt0, double Tt0, double Tt_exit, const std::vector<double>& X, double P_target,
+    bool exit_total, double L, double D, double roughness, const std::string& friction_model,
+    double f_multiplier = 1.0, double G_guess = -1.0,
+    const std::vector<std::vector<double>>& dY_directions = {}, bool with_derivatives = true);
 
 }  // namespace combaero
