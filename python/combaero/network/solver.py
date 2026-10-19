@@ -4755,8 +4755,16 @@ class NetworkSolver:
         # power than its primary jet carries and a lossless (loss_factor = 0)
         # ideal-tee split at Mach, both outside their models. The walls' own
         # check stays a report: it was not part of that audit.
+        # Not inside the adiabatic first stage of a heated-channel solve
+        # (_solve_rayleigh_staged): its root leaves the heat out of the
+        # momentum on purpose -- the very sigma < 0 of #551 -- and is only the
+        # seed of the exact stage, which is judged in full. Refusing it sent
+        # that stage through the whole retry chain (a grid example 3.5 -> 14 s).
+        _seed_stage = any(
+            getattr(el, "_rayleigh_suspended", False) for el in self.network.elements.values()
+        )
         _sigma_bad = list(sol_dict["__second_law_failures__"])
-        if success and _sigma_bad:
+        if success and _sigma_bad and not _seed_stage:
             from .second_law import SIGMA_TOL
 
             success = False
