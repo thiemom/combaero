@@ -542,6 +542,19 @@ inline constexpr Entry function_units[] = {
      "Pt: Pa, Tt: K, X: mol/mol, L: m, D: m, roughness: m, friction_model: str, "
      "f_multiplier: -",
      "kg/(m^2*s)"},
+    {"fanno_rayleigh_march",
+     "G: kg/(m^2*s), Pt0: Pa, Tt0: K, Tt_exit: K, X: mol/mol, L: m, D: m, "
+     "roughness: m, friction_model: str, f_multiplier: -",
+     "FannoRayleighMarch"},
+    {"fanno_rayleigh_choked_mass_flux",
+     "Pt0: Pa, Tt0: K, Tt_exit: K, X: mol/mol, L: m, D: m, roughness: m, "
+     "friction_model: str, f_multiplier: -",
+     "kg/(m^2*s)"},
+    {"fanno_rayleigh_channel_flow",
+     "Pt0: Pa, Tt0: K, Tt_exit: K, X: mol/mol, P_target: Pa, exit_total: bool, L: m, D: m, "
+     "roughness: m, friction_model: str, f_multiplier: -, G_guess: kg/(m^2*s), "
+     "dY_directions: kg/kg, with_derivatives: bool",
+     "FannoChannelFlow"},
 
     // -------------------------------------------------------------------------
     // compressible.h - Thrust
@@ -1414,7 +1427,15 @@ inline constexpr Entry function_units[] = {
     {"FannoChannelFlow::dG_dPt0", "-", "kg/(m^2*s*Pa)"},
     {"FannoChannelFlow::dG_dTt0", "-", "kg/(m^2*s*K)"},
     {"FannoChannelFlow::dG_dP_target", "-", "kg/(m^2*s*Pa)"},
+    {"FannoChannelFlow::dG_dTt_exit", "-", "kg/(m^2*s*K)"},
     {"FannoChannelFlow::dG_ddir", "-", "kg/(m^2*s)"},
+    {"FannoRayleighMarch::M_in", "-", "-"},
+    {"FannoRayleighMarch::M_exit", "-", "-"},
+    {"FannoRayleighMarch::zeta_min", "-", "-"},
+    {"FannoRayleighMarch::zeta_peak", "-", "-"},
+    {"FannoRayleighMarch::P_exit", "-", "Pa"},
+    {"FannoRayleighMarch::Pt_exit", "-", "Pa"},
+    {"FannoRayleighMarch::T_exit", "-", "K"},
     {"FANNO_FLOW_DRIVE_FLOOR", "-", "Pa"},
     {"solve_A_eff_from_mdot", "-", "-"},
     {"solve_P_back_from_mdot", "-", "-"},

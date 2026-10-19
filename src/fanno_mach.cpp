@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -36,7 +37,7 @@ double sound_speed_sq_dT(double T, const std::vector<double>& X) {
 // Static temperature at Mach M from the stagnation temperature:
 // h(T) + M^2 a(T)^2 / 2 = h(Tt). F(T) rises with T, F(Tt) >= 0, so a
 // safeguarded Newton on [T_lo, Tt] cannot leave the physical branch.
-double static_T(double Tt, double M, const std::vector<double>& X) {
+double static_T(double Tt, double M, const std::vector<double>& X, double T_guess = -1.0) {
   const double h0 = h_mass(Tt, X);
   const double R = specific_gas_constant(X);
   auto F = [&](double T) {
@@ -48,9 +49,14 @@ double static_T(double Tt, double M, const std::vector<double>& X) {
   if (M <= 0.0) {
     return Tt;
   }
-  // Ideal-gas guess at constant gamma, then Newton with the bracket.
-  const double g = isentropic_expansion_coefficient(Tt, X);
-  double T = Tt / (1.0 + 0.5 * (g - 1.0) * M * M);
+  // Ideal-gas guess at constant gamma (or the caller's, from a neighbouring
+  // station), then Newton with the bracket. The root does not depend on the
+  // start, to the 1e-14 the loop converges to.
+  double T = T_guess;
+  if (!(T > lo && T < hi)) {
+    const double g = isentropic_expansion_coefficient(Tt, X);
+    T = Tt / (1.0 + 0.5 * (g - 1.0) * M * M);
+  }
   for (int it = 0; it < 100; ++it) {
     const double f = F(T);
     if (f > 0.0) {
@@ -737,6 +743,466 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   out.dG_dP_target = -at.G * dh / kFannoFlowDriveFloor;
   out.dG_dPt0 = at.G * dh / kFannoFlowDriveFloor + h * (at.dG_dPt0 + at.dG_dP_target);
   out.dG_dTt0 = h * at.dG_dTt0;
+  for (double& d : out.dG_ddir) {
+    d *= h;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Fanno-Rayleigh (#551). See fanno_mach.h for the relations.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Fixed RK4 march on a mesh graded toward the exit, x_i = L (1 - (1 - i/N)^p):
+// a FIXED rule, so the march is a smooth function of its arguments and the
+// differenced Jacobians below carry no step-pattern noise. The grading is
+// for a near-sonic exit, where the integrand -- a function of
+// M^2 = 1 - sqrt(zeta) -- has an infinite zeta-slope and RK4 drops order.
+//
+// The state marched is theta = (1 - zeta) / 2 = M^2 - M^4 / 2, not zeta
+// itself: the same regular slope at sonic, but it carries M^2 to full
+// RELATIVE precision at low Mach, where zeta ~ 1 - 2 M^2 lost the friction
+// drop to rounding (2.7e-5 in G at 1.5 Pa of drive on 2 bar).
+constexpr int kRayleighSteps = 32;
+constexpr double kRayleighGrading = 3.0;
+
+struct RayleighDuct {
+  double G, Tt0, Tt_exit, L, D, rough, fmult;
+  const std::vector<double>* X;
+  const std::string* model;
+  // The march's last static T: the next stage's Newton start (a cost, not a
+  // result: see static_T).
+  mutable double T_hint = -1.0;
+};
+
+// M^2 from theta without cancellation; theta >= 1/2 (a probe past sonic) is
+// evaluated at M = 1, so the march -- and the choke test -- continue
+// smoothly through it.
+double mach2_of_theta(double theta) {
+  return 2.0 * theta / (1.0 + std::sqrt(std::max(1.0 - 2.0 * theta, 0.0)));
+}
+
+// dtheta/dx at (theta, Tt) = -(1/2) dzeta/dx.
+double rayleigh_dtheta_dx(double theta, double Tt, double dTt_dx, const RayleighDuct& d) {
+  const std::vector<double>& X = *d.X;
+  const double M2 = std::min(mach2_of_theta(theta), 1.0);
+  if (!(M2 > 0.0)) {
+    return 0.0;
+  }
+  const double M = std::sqrt(M2);
+  const double T = static_T(Tt, M, X, d.T_hint);
+  d.T_hint = T;
+  const double R = specific_gas_constant(X);
+  const double a2 = sound_speed_sq(T, X);
+  const double a = std::sqrt(a2);
+  const double da2 = sound_speed_sq_dT(T, X);
+  const double a_T = 0.5 * da2 / a;
+  const double cpT = cp_mass(T, X);
+  const double cv = cpT - R;
+  const double k = cpT + 0.5 * M2 * da2;
+  const double u = M * a;
+  double f = d.fmult;
+  if (*d.model != "fixed") {
+    const double P = d.G * R * T / u;
+    f = friction(d.G * d.D / viscosity(T, P, X), d.rough / d.D, *d.model, d.fmult);
+  }
+  const double gamma = cpT / cv;
+  const double C = cp_mass(Tt, X) / k * (R / u + M * a_T * (1.0 - 1.0 / (gamma * M2)));
+  return 2.0 * k * M2 * M * (f * u / (2.0 * d.D) + C * dTt_dx) / (a * cv);
+}
+
+struct MarchEnd {
+  double M_in = 0.0;
+  double theta_exit = 0.0;
+  double zeta_min = 1.0;  // 1 - 2 max(theta): <= 0 once the duct chokes
+  bool max_inside = false;  // max(theta) at a node before the exit
+  // zeta at the parabola's vertex through the three nodes around an inside
+  // peak: the throat's choke relation. The node maximum itself jumps as the
+  // peak moves between nodes, which put 0.6-36% into its derivatives.
+  double zeta_peak = 1.0;
+};
+
+MarchEnd march_zeta(const RayleighDuct& d, double Pt0) {
+  MarchEnd out;
+  out.M_in = fanno_inlet_mach(Pt0, d.Tt0, d.G, *d.X);
+  const double M2_in = out.M_in * out.M_in;
+  double theta = M2_in - 0.5 * M2_in * M2_in;
+  double tmax = theta;
+  int imax = 0;
+  std::array<double, kRayleighSteps + 1> th{};
+  th[0] = theta;
+  const double dTt_dx = (d.Tt_exit - d.Tt0) / d.L;
+  auto x_at = [&](int i) {
+    const double s = 1.0 - static_cast<double>(i) / kRayleighSteps;
+    return d.L * (1.0 - std::pow(s, kRayleighGrading));
+  };
+  auto Tt_at = [&](double x) { return d.Tt0 + dTt_dx * x; };
+  for (int i = 0; i < kRayleighSteps; ++i) {
+    const double x0 = x_at(i);
+    const double h = x_at(i + 1) - x0;
+    const double k1 = rayleigh_dtheta_dx(theta, Tt_at(x0), dTt_dx, d);
+    const double k2 = rayleigh_dtheta_dx(theta + 0.5 * h * k1, Tt_at(x0 + 0.5 * h), dTt_dx, d);
+    const double k3 = rayleigh_dtheta_dx(theta + 0.5 * h * k2, Tt_at(x0 + 0.5 * h), dTt_dx, d);
+    const double k4 = rayleigh_dtheta_dx(theta + h * k3, Tt_at(x0 + h), dTt_dx, d);
+    theta += h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+    th[i + 1] = theta;
+    if (theta > tmax) {
+      tmax = theta;
+      imax = i + 1;
+    }
+  }
+  out.theta_exit = theta;
+  out.zeta_min = 1.0 - 2.0 * tmax;
+  out.max_inside = imax < kRayleighSteps;
+  out.zeta_peak = out.zeta_min;
+  if (out.max_inside && imax > 0) {
+    // Lagrange parabola through (x, theta) at imax - 1, imax, imax + 1.
+    const double x0 = x_at(imax - 1), x1 = x_at(imax), x2 = x_at(imax + 1);
+    const double y0 = th[imax - 1], y1 = th[imax], y2 = th[imax + 1];
+    const double d01 = (y1 - y0) / (x1 - x0), d12 = (y2 - y1) / (x2 - x1);
+    const double c2 = (d12 - d01) / (x2 - x0);
+    if (c2 < 0.0) {
+      const double c1 = d01 - c2 * (x0 + x1);
+      const double xv = -c1 / (2.0 * c2);
+      const double yv = y0 + d01 * (xv - x0) + c2 * (xv - x0) * (xv - x1);
+      out.zeta_peak = 1.0 - 2.0 * yv;
+    }
+  }
+  return out;
+}
+
+double exit_mach(const MarchEnd& m) { return std::sqrt(std::min(mach2_of_theta(m.theta_exit), 1.0)); }
+
+// Exit pressure (static, or stagnation if exit_total) of the march at G.
+double rayleigh_exit_pressure(const RayleighDuct& d, const MarchEnd& m, bool exit_total) {
+  return d.G * exit_per_flux(exit_mach(m), d.Tt_exit, *d.X, exit_total);
+}
+
+struct RayleighProblem {
+  double Pt0, Tt0, Tt_exit, P, L, D, rough, fmult;
+  const std::vector<double>* X;
+  const std::string* model;
+  bool exit_total;
+  double G_guess;
+  const std::vector<std::vector<double>>* dirs;
+  bool with_derivatives;
+
+  RayleighDuct duct(double G, double Tt0x, double Tt_ex, const std::vector<double>* Xx) const {
+    return RayleighDuct{G, Tt0x, Tt_ex, L, D, rough, fmult, Xx, model};
+  }
+};
+
+// theta at the inlet of the trajectory that is sonic exactly at the exit,
+// marched BACKWARD from theta = 1/2 at x = L. Going upstream theta only falls
+// (dtheta/dx > 0 at a reachable sonic exit), so no stage ever leaves the
+// subsonic branch: smooth in every argument, unlike a forward march probed
+// past sonic, whose clamped stages put kinks into every difference (3e-4 to
+// 36% errors in the choked derivatives).
+double back_theta_inlet(const RayleighDuct& d) {
+  double theta = 0.5;
+  const double dTt_dx = (d.Tt_exit - d.Tt0) / d.L;
+  auto x_at = [&](int i) {
+    const double s = 1.0 - static_cast<double>(i) / kRayleighSteps;
+    return d.L * (1.0 - std::pow(s, kRayleighGrading));
+  };
+  auto Tt_at = [&](double x) { return d.Tt0 + dTt_dx * x; };
+  for (int i = kRayleighSteps; i > 0; --i) {
+    const double x0 = x_at(i);
+    const double h = x_at(i - 1) - x0;
+    const double k1 = rayleigh_dtheta_dx(theta, Tt_at(x0), dTt_dx, d);
+    const double k2 = rayleigh_dtheta_dx(theta + 0.5 * h * k1, Tt_at(x0 + 0.5 * h), dTt_dx, d);
+    const double k3 = rayleigh_dtheta_dx(theta + 0.5 * h * k2, Tt_at(x0 + 0.5 * h), dTt_dx, d);
+    const double k4 = rayleigh_dtheta_dx(theta + h * k3, Tt_at(x0 + h), dTt_dx, d);
+    theta += h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+  }
+  return theta;
+}
+
+double inlet_theta(double Pt0, double Tt0, double G, const std::vector<double>& X) {
+  const double M = fanno_inlet_mach(Pt0, Tt0, G, X);
+  return M * M - 0.5 * M * M * M * M;
+}
+
+// Where the duct chokes, which sets the relation that defines the choked flux:
+//   kInlet   G is the inlet's own sonic flux (cooling keeps a sonic inlet
+//            subsonic downstream)
+//   kExit    Psi = theta_back(0) - theta_inlet(G) = 0: sonic exactly at L
+//   kThroat  zeta_min = 0 inside the duct (cooling after an interior sonic
+//            point), from the forward march
+enum class ChokeMode : std::uint8_t { kInlet, kExit, kThroat };
+
+struct Choke {
+  double G = 0.0;
+  ChokeMode mode = ChokeMode::kExit;
+};
+
+double choke_relation(ChokeMode mode, double G, double Pt0, const RayleighDuct& d) {
+  const std::vector<double>& X = *d.X;
+  switch (mode) {
+    case ChokeMode::kInlet:
+      return G - fanno_sonic_mass_flux(Pt0, d.Tt0, X);
+    case ChokeMode::kExit:
+      return back_theta_inlet(d) - inlet_theta(Pt0, d.Tt0, G, X);
+    case ChokeMode::kThroat:
+      return march_zeta(d, Pt0).zeta_peak;
+  }
+  return 0.0;
+}
+
+Choke choked_flux(const RayleighProblem& pb, double Pt0, double Tt0, double Tt_ex,
+                  const std::vector<double>& X) {
+  const double G_max = fanno_sonic_mass_flux(Pt0, Tt0, X);
+  const double hi = std::log(G_max * (1.0 - 1e-12));
+  auto duct_at = [&](double logG) { return pb.duct(std::exp(logG), Tt0, Tt_ex, &X); };
+  if (march_zeta(duct_at(hi), Pt0).zeta_min >= 0.0) {
+    return Choke{G_max, ChokeMode::kInlet};
+  }
+  auto solve = [&](ChokeMode mode) {
+    auto fn = [&](double logG) { return choke_relation(mode, std::exp(logG), Pt0, duct_at(logG)); };
+    const double f_hi = fn(hi);
+    double lo = hi - 1.0;
+    double f_lo = fn(lo);
+    while (f_lo <= 0.0 && lo > hi - 60.0) {
+      lo -= 2.0;
+      f_lo = fn(lo);
+    }
+    return std::exp(brent(fn, lo, hi, f_lo, f_hi, 1e-14));
+  };
+  // A sonic exit is reachable only where friction and heat still accelerate
+  // the flow at M = 1 (dtheta/dx > 0 there).
+  const RayleighDuct d_hi = duct_at(hi);
+  if (rayleigh_dtheta_dx(0.5, Tt_ex, (Tt_ex - Tt0) / pb.L, d_hi) > 0.0) {
+    const double Ge = solve(ChokeMode::kExit);
+    // At that flux the forward march must peak AT the exit; a peak inside
+    // that already reaches sonic is a throat. (Its value alone cannot tell:
+    // near sonic the forward march's own error is ~1e-5 in zeta.)
+    const MarchEnd me = march_zeta(pb.duct(Ge, Tt0, Tt_ex, &X), Pt0);
+    if (!(me.max_inside && me.zeta_min < 0.0)) {
+      return Choke{Ge, ChokeMode::kExit};
+    }
+  }
+  return Choke{solve(ChokeMode::kThroat), ChokeMode::kThroat};
+}
+
+FannoChannelFlow rayleigh_raw_flow(const RayleighProblem& pb) {
+  const std::vector<double>& X = *pb.X;
+  FannoChannelFlow out;
+  // H(log G): the exit-pressure excess while the duct carries G subsonically,
+  // and -Pt0 (1e-12 - zeta_min) once it chokes, so a sign change brackets
+  // the unchoked root or the choke itself.
+  auto march_at = [&](double G) {
+    return march_zeta(pb.duct(G, pb.Tt0, pb.Tt_exit, &X), pb.Pt0);
+  };
+  auto F = [&](double logG) {
+    const double G = std::exp(logG);
+    const MarchEnd m = march_at(G);
+    if (m.zeta_min <= 0.0) {
+      return pb.Pt0 * (m.zeta_min - 1e-12);
+    }
+    return rayleigh_exit_pressure(pb.duct(G, pb.Tt0, pb.Tt_exit, &X), m, pb.exit_total) - pb.P;
+  };
+  const double G_max = fanno_sonic_mass_flux(pb.Pt0, pb.Tt0, X);
+  bool choked = false;
+  ChokeMode mode = ChokeMode::kExit;
+  double G = 0.0;
+  bool done = false;
+  // A warm start: a tight bracket around the previous flux, widened.
+  if (pb.G_guess > 0.0 && pb.G_guess < G_max && pb.P > 0.0) {
+    double w = 0.01;
+    double lo = std::log(pb.G_guess * (1.0 - w));
+    double hi = std::log(std::min(G_max * (1.0 - 1e-12), pb.G_guess * (1.0 + w)));
+    double f_lo = F(lo), f_hi = F(hi);
+    while ((f_lo <= 0.0 || f_hi > 0.0) && w < 1.0) {
+      w *= 4.0;
+      if (f_lo <= 0.0) {
+        hi = lo;
+        f_hi = f_lo;
+        lo = std::log(pb.G_guess * std::max(1.0 - w, 1e-6));
+        f_lo = F(lo);
+      } else {
+        lo = hi;
+        f_lo = f_hi;
+        hi = std::log(std::min(G_max * (1.0 - 1e-12), pb.G_guess * (1.0 + w)));
+        f_hi = F(hi);
+      }
+    }
+    // Only a bracket whose upper end is itself unchoked holds a plain root;
+    // one that straddles the choke goes the cold way below.
+    if (f_lo > 0.0 && f_hi <= 0.0 && march_at(std::exp(hi)).zeta_min > 0.0) {
+      G = std::exp(brent(F, lo, hi, f_lo, f_hi, 1e-13));
+      done = true;
+    }
+  }
+  if (!done) {
+    const Choke ck = choked_flux(pb, pb.Pt0, pb.Tt0, pb.Tt_exit, X);
+    mode = ck.mode;
+    const double Gc = ck.G;
+    const MarchEnd mc = march_at(Gc);
+    const double Fc =
+        (pb.P > 0.0)
+            ? rayleigh_exit_pressure(pb.duct(Gc, pb.Tt0, pb.Tt_exit, &X), mc, pb.exit_total) - pb.P
+            : 1.0;
+    if (Fc >= 0.0) {
+      choked = true;
+      G = Gc;
+    } else {
+      // The unchoked root below the choke: the excess is drive > 0 as G -> 0.
+      double hi = std::log(Gc) - 1e-12;
+      double f_hi = F(hi);
+      double lo = hi - 0.7;
+      double f_lo = F(lo);
+      while (f_lo <= 0.0 && lo > hi - 60.0) {
+        hi = lo;
+        f_hi = f_lo;
+        lo -= 0.7;
+        f_lo = F(lo);
+      }
+      G = std::exp(brent(F, lo, hi, f_lo, f_hi, 1e-13));
+    }
+  }
+  const MarchEnd m = march_at(G);
+  out.G = G;
+  out.choked = choked;
+  out.M_in = m.M_in;
+  out.M_exit = choked ? 1.0 : exit_mach(m);
+  if (!pb.with_derivatives) {
+    return out;
+  }
+  // Implicit derivatives of the defining relation, its partials central
+  // differences of the fixed march (smooth in every argument):
+  //   unchoked  E(G; Pt0, Tt0, Tt_exit, Y) - P_target = 0, E the exit pressure
+  //   choked    the choke relation of its mode (see ChokeMode).
+  // Relative steps 1e-5: at 1 Pa of drive on 2 bar the excess moves ~2e-5 Pa
+  // per step against ~1e-10 Pa of inlet-solve rounding.
+  const double hr = 1e-5;
+  auto rel = [&](double Gx, double Pt0x, double Tt0x, double Ttex, const std::vector<double>& Xx) {
+    const RayleighDuct d = pb.duct(Gx, Tt0x, Ttex, &Xx);
+    if (choked) {
+      return choke_relation(mode, Gx, Pt0x, d);
+    }
+    return rayleigh_exit_pressure(d, march_zeta(d, Pt0x), pb.exit_total);
+  };
+  auto cd = [&](auto&& g, double x0) {
+    const double h = hr * std::abs(x0);
+    return (g(x0 + h) - g(x0 - h)) / (2.0 * h);
+  };
+  if (choked && mode == ChokeMode::kThroat) {
+    // A throat's relation goes as (G* - G)^(2/3) -- infinite slope at the
+    // choke, and clamped past it -- so it cannot be differentiated
+    // implicitly (1-36% errors). G* itself is smooth: re-solve it. Costly
+    // (two choke solves per argument), but only a cooled duct with an
+    // interior sonic point takes this branch.
+    auto Gs = [&](double Pt0x, double Tt0x, double Ttex, const std::vector<double>& Xx) {
+      return choked_flux(pb, Pt0x, Tt0x, Ttex, Xx).G;
+    };
+    const double ht = 1e-4;
+    auto cdt = [&](auto&& g, double x0) {
+      const double h = ht * std::abs(x0);
+      return (g(x0 + h) - g(x0 - h)) / (2.0 * h);
+    };
+    out.dG_dPt0 = cdt([&](double v) { return Gs(v, pb.Tt0, pb.Tt_exit, X); }, pb.Pt0);
+    out.dG_dTt0 = cdt([&](double v) { return Gs(pb.Pt0, v, pb.Tt_exit, X); }, pb.Tt0);
+    out.dG_dTt_exit = cdt([&](double v) { return Gs(pb.Pt0, pb.Tt0, v, X); }, pb.Tt_exit);
+    out.dG_dP_target = 0.0;
+    if (!pb.dirs->empty()) {
+      out.dG_ddir = d_ddir(X, *pb.dirs, [&](const std::vector<double>& Xk) {
+        return Gs(pb.Pt0, pb.Tt0, pb.Tt_exit, Xk);
+      });
+    }
+    return out;
+  }
+  const double R_G = cd([&](double v) { return rel(v, pb.Pt0, pb.Tt0, pb.Tt_exit, X); }, G);
+  const double R_Pt = cd([&](double v) { return rel(G, v, pb.Tt0, pb.Tt_exit, X); }, pb.Pt0);
+  const double R_T0 = cd([&](double v) { return rel(G, pb.Pt0, v, pb.Tt_exit, X); }, pb.Tt0);
+  const double R_Te = cd([&](double v) { return rel(G, pb.Pt0, pb.Tt0, v, X); }, pb.Tt_exit);
+  out.dG_dPt0 = -R_Pt / R_G;
+  out.dG_dTt0 = -R_T0 / R_G;
+  out.dG_dTt_exit = -R_Te / R_G;
+  out.dG_dP_target = choked ? 0.0 : 1.0 / R_G;
+  if (pb.dirs->empty()) {
+    return out;
+  }
+  const auto R_v = d_ddir(X, *pb.dirs, [&](const std::vector<double>& Xk) {
+    return rel(G, pb.Pt0, pb.Tt0, pb.Tt_exit, Xk);
+  });
+  out.dG_ddir.assign(R_v.size(), 0.0);
+  for (std::size_t i = 0; i < R_v.size(); ++i) {
+    out.dG_ddir[i] = -R_v[i] / R_G;
+  }
+  return out;
+}
+
+}  // namespace
+
+FannoRayleighMarch fanno_rayleigh_march(double G, double Pt0, double Tt0, double Tt_exit,
+                                        const std::vector<double>& X, double L, double D,
+                                        double roughness, const std::string& friction_model,
+                                        double f_multiplier) {
+  check_duct(L, D);
+  if (!(G > 0.0) || !(Pt0 > 0.0) || !(Tt0 > 0.0) || !(Tt_exit > 0.0)) {
+    throw std::invalid_argument("fanno_rayleigh_march: G, Pt0, Tt0 and Tt_exit must be positive");
+  }
+  const RayleighDuct d{G, Tt0, Tt_exit, L, D, roughness, f_multiplier, &X, &friction_model};
+  const MarchEnd m = march_zeta(d, Pt0);
+  FannoRayleighMarch out;
+  out.M_in = m.M_in;
+  out.zeta_min = m.zeta_min;
+  out.zeta_peak = m.zeta_peak;
+  out.M_exit = exit_mach(m);
+  const FannoMachState s = fanno_state_at_mach(G, Tt_exit, out.M_exit, X);
+  out.P_exit = s.P;
+  out.T_exit = s.T;
+  out.Pt_exit = G * exit_per_flux(out.M_exit, Tt_exit, X, true);
+  return out;
+}
+
+double fanno_rayleigh_choked_mass_flux(double Pt0, double Tt0, double Tt_exit,
+                                       const std::vector<double>& X, double L, double D,
+                                       double roughness, const std::string& friction_model,
+                                       double f_multiplier) {
+  check_duct(L, D);
+  static const std::vector<std::vector<double>> kNone;
+  const RayleighProblem pb{Pt0, Tt0, Tt_exit, 0.0, L, D, roughness, f_multiplier, &X,
+                           &friction_model, false, -1.0, &kNone, false};
+  return choked_flux(pb, Pt0, Tt0, Tt_exit, X).G;
+}
+
+FannoChannelFlow fanno_rayleigh_channel_flow(
+    double Pt0, double Tt0, double Tt_exit, const std::vector<double>& X, double P_target,
+    bool exit_total, double L, double D, double roughness, const std::string& friction_model,
+    double f_multiplier, double G_guess, const std::vector<std::vector<double>>& dY_directions,
+    bool with_derivatives) {
+  check_duct(L, D);
+  FannoChannelFlow out;
+  const double drive = Pt0 - P_target;
+  static const std::vector<std::vector<double>> kNoDirections;
+  const std::vector<std::vector<double>>& dirs = with_derivatives ? dY_directions : kNoDirections;
+  if (!(drive > 0.0) || !(Pt0 > 0.0) || !(Tt0 > 0.0) || !(Tt_exit > 0.0)) {
+    out.dG_ddir.assign(dirs.size(), 0.0);
+    return out;
+  }
+  RayleighProblem pb{Pt0, Tt0, Tt_exit, P_target, L, D, roughness, f_multiplier, &X,
+                     &friction_model, exit_total, G_guess, &dirs, with_derivatives};
+  if (drive >= kFannoFlowDriveFloor) {
+    return rayleigh_raw_flow(pb);
+  }
+  // Below the floor: the same C1 odd-cubic blend as fanno_channel_flow.
+  pb.P = Pt0 - kFannoFlowDriveFloor;
+  pb.with_derivatives = true;
+  const FannoChannelFlow at = rayleigh_raw_flow(pb);
+  const double sigma =
+      (at.G > 0.0) ? std::clamp(-at.dG_dP_target * kFannoFlowDriveFloor / at.G, 0.0, 2.9) : 0.5;
+  const double t = drive / kFannoFlowDriveFloor;
+  const double h = 0.5 * (3.0 - sigma) * t + 0.5 * (sigma - 1.0) * t * t * t;
+  const double dh = 0.5 * (3.0 - sigma) + 1.5 * (sigma - 1.0) * t * t;
+  out = at;
+  out.G = at.G * h;
+  out.dG_dP_target = -at.G * dh / kFannoFlowDriveFloor;
+  out.dG_dPt0 = at.G * dh / kFannoFlowDriveFloor + h * (at.dG_dPt0 + at.dG_dP_target);
+  out.dG_dTt0 = h * at.dG_dTt0;
+  out.dG_dTt_exit = h * at.dG_dTt_exit;
   for (double& d : out.dG_ddir) {
     d *= h;
   }
