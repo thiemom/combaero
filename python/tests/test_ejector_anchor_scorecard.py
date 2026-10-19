@@ -44,3 +44,15 @@ def test_the_critical_anchor_is_high_but_far_closer(rows) -> None:
     for r in rows:
         assert 0.15 < r.pc_err < 0.65, (r.source, r.case)
         assert r.pc_err < r.pb0_err
+
+
+def test_the_sudden_expansion_candidate_lands_near_every_breakdown(rows) -> None:
+    """The candidate dead-head (not in the model): the primary's nozzle exit
+    into the mixing tube, the dead-headed suction annulus at P_e. It is 3-39%
+    high on every row (today's anchor: 78-274%). Its window P_b0 / P_c* is
+    0.98-1.06, because P_c* itself is high: the README's reason not to adopt
+    it alone."""
+    for r in rows:
+        assert 0.0 < r.pb0_candidate_err < 0.40, (r.source, r.case)
+        assert r.pb0_candidate_err < r.pb0_err / 2.0
+        assert 0.95 < r.pb0_candidate / r.pc_model < 1.08

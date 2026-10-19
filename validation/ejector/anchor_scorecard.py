@@ -18,6 +18,15 @@ The rigs:
   CFD (not measured). E1 has A_3/A_t = 5.44; E2 has 33.3, the range where the
   #598 stress draws were refused. Stream temperatures are assumed saturated.
 
+A CANDIDATE anchor is scored beside them, and it is not in the model:
+``candidate_dead_head``. It treats the dead-head as a sudden expansion: the
+primary leaves the nozzle (M_p1, P_p1 on A_p1) into the mixing tube, the
+dead-headed suction annulus A_3 - A_p1 sits at the secondary pressure P_e,
+and mass, momentum and energy over A_3 give a subsonic exit, recovered
+losslessly. This is Keenan & Neumann's zero-secondary-flow constant-area
+mixer. It has no fitted constant, and it depends on A_3/A_t, which today's
+anchor does not. See the README for why it is not adopted yet.
+
 This is ACCURACY, not fidelity: neither rig belongs to Huang or to Kracik &
 Dvorak, so a miss is the model's limitation, not an implementation bug
 (docs/VALIDATION_POLICY.md). Nothing is fitted. ``recovery_efficiency`` stays
@@ -28,6 +37,7 @@ Run: ``uv run python validation/ejector/anchor_scorecard.py``
 
 from __future__ import annotations
 
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +48,7 @@ if __package__ in (None, ""):
 import combaero as cb
 from combaero.network._ejector_huang1999 import (
     EjectorGeometry,
+    _mach_from_area_ratio_supersonic,
     critical_back_pressure,
     dead_head_back_pressure,
     entrainment_ratio,
@@ -64,6 +75,7 @@ class AnchorRow:
     pc_ref: float
     pb0_model: float
     pb0_ref: float
+    pb0_candidate: float  # candidate_dead_head, not in the model
 
     @property
     def omega_err(self) -> float:
@@ -76,6 +88,10 @@ class AnchorRow:
     @property
     def pb0_err(self) -> float:
         return self.pb0_model / self.pb0_ref - 1.0
+
+    @property
+    def pb0_candidate_err(self) -> float:
+        return self.pb0_candidate / self.pb0_ref - 1.0
 
     @property
     def window_model(self) -> float:
@@ -98,14 +114,46 @@ def _gas(x: list[float], t_e: float) -> tuple[float, float]:
     return choke_plane_gamma(t_e, x), float(cb.specific_gas_constant(x))
 
 
+def candidate_dead_head(
+    p_g: float, t_g: float, p_e: float, geom: EjectorGeometry, gamma: float, r_gas: float
+) -> float:
+    """CANDIDATE P_b0 [Pa], not in the model: the zero-entrainment sudden
+    expansion over A_3 (see the module docstring). Areas in units of A_t."""
+    g = gamma
+    m_p1 = _mach_from_area_ratio_supersonic(geom.area_ratio_nozzle, g)
+    p_p1 = p_g / (1.0 + 0.5 * (g - 1.0) * m_p1 * m_p1) ** (g / (g - 1.0))
+    a1, a3 = geom.area_ratio_nozzle, geom.area_ratio_mix
+    # choked primary through the unit throat
+    m = p_g * math.sqrt(g / (r_gas * t_g)) * (2.0 / (g + 1.0)) ** ((g + 1.0) / (2.0 * (g - 1.0)))
+    impulse = p_p1 * a1 * (1.0 + g * m_p1 * m_p1) + p_e * (a3 - a1)
+
+    def per_mass(mach: float) -> float:
+        t = t_g / (1.0 + 0.5 * (g - 1.0) * mach * mach)
+        return (1.0 + g * mach * mach) / (mach * math.sqrt(g / (r_gas * t)))
+
+    target = impulse / m
+    if target <= per_mass(1.0):
+        mach = 1.0  # no subsonic exit: the mixed flow chokes
+    else:
+        lo, hi = 1e-9, 1.0
+        for _ in range(200):
+            mid = 0.5 * (lo + hi)
+            lo, hi = (mid, hi) if per_mass(mid) > target else (lo, mid)
+        mach = 0.5 * (lo + hi)
+    t3 = t_g / (1.0 + 0.5 * (g - 1.0) * mach * mach)
+    p3 = m * math.sqrt(r_gas * t3 / g) / (a3 * mach)
+    return p3 * (1.0 + 0.5 * (g - 1.0) * mach * mach) ** (g / (g - 1.0))
+
+
 def _model(
     p_g: float, t_g: float, p_e: float, t_e: float, geom: EjectorGeometry, x: list[float]
-) -> tuple[float, float, float]:
+) -> tuple[float, float, float, float]:
     gamma, r = _gas(x, t_e)
     omega = entrainment_ratio(p_g, t_g, p_e, t_e, geom, gamma).omega
     pc = critical_back_pressure(p_g, t_g, p_e, t_e, geom, gamma, r).p_c_pa
     pb0 = dead_head_back_pressure(p_g, t_g, p_e, t_e, geom, gamma, r).p_b0_pa
-    return omega, pc, pb0
+    cand = candidate_dead_head(p_g, t_g, p_e, geom, gamma, r)
+    return omega, pc, pb0, cand
 
 
 def henry_rows() -> list[AnchorRow]:
@@ -117,7 +165,7 @@ def henry_rows() -> list[AnchorRow]:
         offset = ATM_PA if reading == "gauge" else 0.0
         for bar in henry.PRIMARY_PRESSURES_BAR:
             a = henry.FIG5_ANCHORS[bar]
-            om, pc, pb0 = _model(bar * 1e5 + offset, HENRY_T_K, ATM_PA, HENRY_T_K, geom, x)
+            om, pc, pb0, cand = _model(bar * 1e5 + offset, HENRY_T_K, ATM_PA, HENRY_T_K, geom, x)
             rows.append(
                 AnchorRow(
                     source=f"Henry 2007 (air, P1 {reading})",
@@ -130,6 +178,7 @@ def henry_rows() -> list[AnchorRow]:
                     pc_ref=a["pb_knee"] * ATM_PA,
                     pb0_model=pb0,
                     pb0_ref=a["pb_breakdown"] * ATM_PA,
+                    pb0_candidate=cand,
                 )
             )
     return rows
@@ -143,7 +192,7 @@ def akbarnejad_rows() -> list[AnchorRow]:
         geom = _geometry(*akb.GEOMETRY_MM[ej])
         tp = akb.T_SAT_C[pp] + 273.15
         ts = akb.T_SAT_C[ps] + 273.15
-        om, pc, pb0 = _model(pp * 1e3, tp, ps * 1e3, ts, geom, x)
+        om, pc, pb0, cand = _model(pp * 1e3, tp, ps * 1e3, ts, geom, x)
         rows.append(
             AnchorRow(
                 source=f"Akbarnejad 2025 {ej} (steam)",
@@ -156,6 +205,7 @@ def akbarnejad_rows() -> list[AnchorRow]:
                 pc_ref=pc_ref * 1e3,
                 pb0_model=pb0,
                 pb0_ref=pb_ref * 1e3,
+                pb0_candidate=cand,
             )
         )
     return rows
@@ -169,13 +219,15 @@ def report(rows: list[AnchorRow]) -> str:
     lines = [
         "CROSS-SOURCE ACCURACY -- ejector anchors (neither rig is a source of the closures)",
         f"{'source':34s} {'kind':8s} {'case':16s} {'A3/At':>6s} "
-        f"{'omega':>7s} {'P_c*':>7s} {'P_b0':>7s} {'Pb0/Pc* model':>14s} {'ref':>5s}",
+        f"{'omega':>7s} {'P_c*':>7s} {'P_b0':>7s} {'Pb0/Pc* model':>14s} {'ref':>5s}"
+        f" | {'candidate P_b0':>14s} {'its Pb0/Pc*':>11s}",
     ]
     for r in rows:
         lines.append(
             f"{r.source:34s} {r.kind:8s} {r.case:16s} {r.area_ratio_mix:6.2f} "
             f"{100 * r.omega_err:+6.0f}% {100 * r.pc_err:+6.0f}% {100 * r.pb0_err:+6.0f}% "
             f"{r.window_model:14.2f} {r.window_ref:5.2f}"
+            f" | {100 * r.pb0_candidate_err:+13.0f}% {r.pb0_candidate / r.pc_model:11.2f}"
         )
     return "\n".join(lines)
 

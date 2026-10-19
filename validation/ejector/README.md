@@ -252,6 +252,18 @@ a miss is the model's limitation.
   - Henry's ω depends on whether P1 is gauge or absolute: the paper's "effective pressure" most likely means gauge, and both are shown.
   - The CFD's stream temperatures are assumed saturated, because the paper does not print them. ω follows that assumption, and P_b0/P_c* hardly does.
 
+**A candidate dead-head, not adopted yet.** `candidate_dead_head` in
+`anchor_scorecard.py` treats ω = 0 as a sudden expansion. The primary leaves
+the nozzle (M_p1, P_p1 on A_p1) into the mixing tube, and the dead-headed
+suction annulus A_3 − A_p1 sits at the secondary pressure P_e. Mass, momentum
+and energy over A_3 then give a subsonic exit. This is Keenan & Neumann's
+zero-secondary-flow constant-area mixer: no fitted constant, and A_3/A_t
+enters.
+- **P_b0 accuracy:** 3-39% high on every row against today's 78-274%. Henry absolute is +3-4%, and E2 at A_3/A_t = 33 is +12-14%.
+- **The catch:** against today's P_c*, which is 18-63% high, its window P_b0/P_c* is only 0.98-1.06, where the rigs show 1.06-1.32. Adopted alone, it would make the droop vanish, and invert it on some rows.
+- **Next:** score P_c* alternatives the same way, and adopt the two together once the window comes out positive on the rigs.
+- **Variant tried and set aside:** the primary core at the y-y state, with the annulus at P_py. It fell 12-24% below the breakdown and below P_c*.
+
 ### Validated envelope
 
 Where each closure has been scored, and against what. Outside these ranges a
