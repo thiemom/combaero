@@ -142,6 +142,11 @@ from combaero.network.components import (
 #: from the outlet pipe (#559). Matches the GUI's historical default.
 DEFAULT_EJECTOR_MIXING_AREA = 8.0e-4
 
+#: Reverse flow at a port, relative to the largest port flow, beyond which a
+#: converged root is rejected as outside the model (#619). Exactly at shut-off
+#: the suction flow is zero to solver precision, about 1e-10 relative.
+EJECTOR_REVERSE_FLOW_TOL = 1e-6
+
 
 def _real_gamma(t: float, x: Any) -> float:
     """Ideal-gas-like gamma = cp/cv from combaero's own EOS at temperature
@@ -786,14 +791,35 @@ class EjectorElement(MultiPortChamberBase):
     def verify_solution_consistent(
         self,
         sol: dict[str, float],
-        rel_tol: float = 1e-3,
+        rel_tol: float = EJECTOR_REVERSE_FLOW_TOL,
     ) -> bool:
-        """No post-solve demotion. The element now models the critical,
-        subcritical, and unchoked-primary (jet-pump) regimes in one C1 residual
-        system, so a converged root is physical by construction (the old
-        ``outlet.Pt <= P_c*`` check demoted valid subcritical/jet-pump points
-        and is dropped -- see OPERATING_REGIMES_DESIGN.md sec 6b)."""
-        return True
+        """Reject a root the model was not derived for (#619).
+
+        The element models the critical, subcritical and unchoked-primary
+        (jet-pump) regimes in one C1 residual system; the old ``outlet.Pt <=
+        P_c*`` check demoted valid subcritical/jet-pump points and stays
+        dropped (OPERATING_REGIMES_DESIGN.md sec 6b). But every one of those
+        regimes has its streams going forward: primary and suction INTO the
+        mixing plane, the mixed stream OUT of the outlet. Past the jet pump's
+        shut-off head the suction would reverse, and the rows' C1 continuation
+        there has roots no ejector produces: seed 36 of the stress family
+        "converged" at omega = -169 with 0.47 kg/s entering the 1.7 bar
+        outlet, climbing to a 4 bar mixing plane and leaving through the 1 bar
+        suction. So a root with any port flowing backwards, beyond ``rel_tol``
+        of the largest port flow, is not reported as a solution. Missing keys
+        mean True, as for the junction verifiers.
+        """
+        flows: list[float] = []
+        for i in range(self.N):
+            elem_id = self._port_element_ids[i]
+            key = f"{elem_id}.m_dot"
+            if not elem_id or key not in sol:
+                return True
+            # Junction convention: positive = OUT of the mixing plane.
+            flows.append(float(self._port_signs[i]) * float(sol[key]))
+        m_primary_in, m_suction_in, m_outlet_out = -flows[0], -flows[1], flows[2]
+        tol = rel_tol * max(abs(f) for f in flows)
+        return m_primary_in >= -tol and m_suction_in >= -tol and m_outlet_out >= -tol
 
     def diagnostics(
         self,
