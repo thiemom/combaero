@@ -229,10 +229,27 @@ struct DuctStaticState {
   double dP_dT0, dP_dP0, dP_dG;
   double drho_dT0, drho_dP0, drho_dG;
   bool choked;
+  // The mass flux the state was evaluated at, and its partials: G itself
+  // (dGeff_dG = 1) from duct_static_state; the bent flux from
+  // duct_htc_static_state.
+  double G_eff, dGeff_dT0, dGeff_dP0, dGeff_dG;
 };
 
 DuctStaticState duct_static_state(double T0, double P0, double G,
                                   const std::vector<double>& X);
+
+// The duct state a heat-transfer correlation reads (#551): duct_static_state
+// at G_eff, which is G itself up to (1 - 2w) G* and bends C1 onto (1 - w) G*
+// above it (w = kDuctHtcSonicMargin, G* the sonic flux), so M stays below
+// ~0.97. At G* the isentropic dM/dG is infinite and the plain state has a
+// kink there; a duct choked at its INLET -- possible once cooling is in the
+// momentum (Fanno-Rayleigh) -- sits exactly on it, and its wall coupling then
+// could not converge. Below (1 - 2w) G* it is duct_static_state exactly.
+// The partials include G_eff's dependence on (T0, P0) through G*.
+constexpr double kDuctHtcSonicMargin = 1e-3;
+
+DuctStaticState duct_htc_static_state(double T0, double P0, double G,
+                                      const std::vector<double>& X);
 
 } // namespace combaero
 

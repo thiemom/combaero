@@ -413,6 +413,8 @@ DuctStaticState duct_static_state(double T0, double P0, double G,
     out.rho = P_star / (R * cs.T);
     out.M = cs.M;
     out.choked = true;
+    out.G_eff = G;
+    out.dGeff_dG = 1.0;
     const double r = P_star / P0;
     out.dP_dP0 = r;
     out.dT_dT0 = cs.dT_dT0;
@@ -467,6 +469,8 @@ DuctStaticState duct_static_state(double T0, double P0, double G,
   out.drho_dT0 = out.rho * (out.dP_dT0 / P - out.dT_dT0 / out.T);
   out.drho_dP0 = out.rho * (out.dP_dP0 / P - out.dT_dP0 / out.T);
   out.drho_dG = out.rho * (out.dP_dG / P - out.dT_dG / out.T);
+  out.G_eff = G;
+  out.dGeff_dG = 1.0;
   if (T0_floored) {
     out.dT_dT0 = out.dP_dT0 = out.drho_dT0 = 0.0;
   }
@@ -474,6 +478,54 @@ DuctStaticState duct_static_state(double T0, double P0, double G,
     out.dT_dP0 = out.dP_dP0 = out.drho_dP0 = 0.0;
   }
   return out;
+}
+
+DuctStaticState duct_htc_static_state(double T0, double P0, double G,
+                                      const std::vector<double> &X) {
+  G = std::abs(G);
+  if (!(T0 > thermo::T_FLOOR) || !(P0 > thermo::P_FLOOR)) {
+    return duct_static_state(T0, P0, G, X);
+  }
+  auto sonic_flux = [&](double T, double P) {
+    return mass_flux_isentropic(T, P, critical_pressure_ratio(T, P, X) * P, X);
+  };
+  const double Gs = sonic_flux(T0, P0);
+  const double w = kDuctHtcSonicMargin;
+  const double a = 1.0 - 2.0 * w;
+  const double g = G / Gs;
+  if (g <= a) {
+    return duct_static_state(T0, P0, G, X);
+  }
+  // g_eff = g - (g - a)^2 / (4 w) on [a, 1]: value and slope meet g at a and
+  // the cap 1 - w (slope 0) at 1.
+  double ge = 1.0 - w;
+  double dge = 0.0;
+  if (g < 1.0) {
+    ge = g - (g - a) * (g - a) / (4.0 * w);
+    dge = 1.0 - (g - a) / (2.0 * w);
+  }
+  DuctStaticState s = duct_static_state(T0, P0, ge * Gs, X);
+  // G_eff = Gs(T0, P0) ge(G / Gs): d/dG = dge, d/dGs = ge - g dge. The sonic
+  // flux is proportional to P0 at fixed T0 (ideal gas: P*/P0 depends on T0
+  // only); its T0 slope is differenced (smooth, step 1e-6).
+  const double hT = 1e-6 * T0;
+  const double dGs_dT0 = (sonic_flux(T0 + hT, P0) - sonic_flux(T0 - hT, P0)) / (2.0 * hT);
+  const double dGs_dP0 = Gs / P0;
+  const double dGe_dGs = ge - g * dge;
+  s.G_eff = ge * Gs;
+  s.dGeff_dG = dge;
+  s.dGeff_dT0 = dGe_dGs * dGs_dT0;
+  s.dGeff_dP0 = dGe_dGs * dGs_dP0;
+  // Chain the state's G partials through G_eff.
+  auto chain = [&](double &d_T0, double &d_P0, double &d_G) {
+    d_T0 += d_G * s.dGeff_dT0;
+    d_P0 += d_G * s.dGeff_dP0;
+    d_G *= s.dGeff_dG;
+  };
+  chain(s.dT_dT0, s.dT_dP0, s.dT_dG);
+  chain(s.dP_dT0, s.dP_dP0, s.dP_dG);
+  chain(s.drho_dT0, s.drho_dP0, s.drho_dG);
+  return s;
 }
 
 } // namespace combaero

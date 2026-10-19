@@ -77,6 +77,21 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => (v > 0 ? "yes" : "no"),
 	},
+	heat_area_ratio: {
+		label: "Heat area / wetted area",
+		unit: "—",
+		format: (v) => v.toFixed(2),
+	},
+	heat_area_exceeds_wetted: {
+		label: "Heat area beyond wetted",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
+	rayleigh_in_momentum: {
+		label: "Heating in momentum",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes (Fanno-Rayleigh)" : "no"),
+	},
 	// Orifice velocity of approach and ISO 5167 taps (#649/#645/#651)
 	beta: { label: "β (declared)", unit: "—", format: (v) => v.toFixed(4) },
 	beta_flow: { label: "β (flow)", unit: "—", format: (v) => v.toFixed(4) },

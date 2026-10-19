@@ -1,0 +1,12 @@
+- **A wall-heated compressible channel carries its heat in the momentum (#551).** It used to be adiabatic Fanno flow, whose wall heat only raised the receiving node's Tt. That omitted the Rayleigh change: heating costs total pressure, cooling gains it.
+  - **Now:** where the receiving node is a plenum or chamber fed by this duct alone (no wall of its own), the duct uses `fanno_rayleigh_channel_flow`, with that node's Tt as its exit Tt.
+  - **Second law:** the four stress hot/cold pairs that failed it now pass.
+  - **Into a node that mixes other streams, or a boundary:** the duct stays adiabatic and keeps the "Heating not in the momentum" flag (#660). The Inspector text now says why.
+  - **Results change for walled compressible ducts:** heated ducts pass less flow, cooled ducts more. A strongly cooled duct can now choke at its inlet.
+- **The duct heat-transfer state is smooth through choke.** `duct_htc_static_state` is the new state the wall's htc reads. It equals `duct_static_state` below 99.8% of the sonic flux, then bends C1 onto 99.9% of it (M below ~0.97).
+  - **Why:** a duct choked at its inlet sat exactly where the isentropic state's slope in G is infinite, and its wall coupling could not converge.
+  - **New fields:** `DuctStaticState` gains `G_eff` and its partials.
+- **A smooth-wall channel whose heat-transfer area exceeds its friction-wetted area (4 A L / Dh) by over 10% is flagged** (`heat_area_ratio`, `heat_area_exceeds_wetted`, and an Inspector note).
+  - **Why:** heat over surface the friction never sees breaks Reynolds analogy. In a compressible duct a cooling gain can then outgrow the friction, and at a fixed exit Tt no flow matches a pressure drop.
+  - **Where it showed up:** the stress harness's impingement crossflow segments carried 3.9x (the plate's width on a round duct). They now use their wetted area, which changes that family's draws.
+- **A cold solve of a network with heat-carrying compressible channels runs in two stages:** those channels adiabatic first, then the exact problem from that root. The plain cold chain runs only if that fails. An impingement crossflow chain went from 23 s to 4.7 s.
