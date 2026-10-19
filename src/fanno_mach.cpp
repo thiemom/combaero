@@ -1044,22 +1044,45 @@ FannoChannelFlow rayleigh_raw_flow(const RayleighProblem& pb) {
         (pb.P > 0.0)
             ? rayleigh_exit_pressure(pb.duct(Gc, pb.Tt0, pb.Tt_exit, &X), mc, pb.exit_total) - pb.P
             : 1.0;
-    if (Fc >= 0.0) {
-      choked = true;
-      G = Gc;
-    } else {
-      // The unchoked root below the choke: the excess is drive > 0 as G -> 0.
-      double hi = std::log(Gc) - 1e-12;
-      double f_hi = F(hi);
-      double lo = hi - 0.7;
-      double f_lo = F(lo);
-      while (f_lo <= 0.0 && lo > hi - 60.0) {
-        hi = lo;
-        f_hi = f_lo;
-        lo -= 0.7;
-        f_lo = F(lo);
+    // The root on the branch continuous from zero flow: the FIRST fall of
+    // the excess through zero, scanned up from low flux. The excess need not
+    // be monotone: near choke a cooled duct's Rayleigh gain can outgrow its
+    // friction (a short duct, entrance-enhanced heat transfer and fully
+    // developed f: 0.76 of it on a 1.27-diameter impingement crossflow
+    // segment), so it rises again toward the choke. Taking the choke whenever
+    // the excess was still positive there, or the root nearest the choke,
+    // jumped that duct to its sonic flux at a few Pa of drive. Only with no
+    // fall below the choke does the duct choke.
+    const double top = std::log(Gc) - 1e-12;
+    double lo = top - 7.0;
+    double f_lo = F(lo);
+    while (f_lo <= 0.0 && lo > top - 60.0) {
+      lo -= 7.0;
+      f_lo = F(lo);
+    }
+    // A fall counts only at a flux the march carries subsonically: at the
+    // choke itself the march's own error can read as choked, and F encodes
+    // that as negative too (it put Brent onto the choke, reported unchoked).
+    bool found = false;
+    double hi = lo, f_hi = f_lo;
+    while (hi < top) {
+      lo = hi;
+      f_lo = f_hi;
+      hi = std::min(top, lo + std::log(2.0));
+      if (!(march_at(std::exp(hi)).zeta_min > 0.0)) {
+        break;
       }
+      f_hi = F(hi);
+      if (f_lo > 0.0 && f_hi <= 0.0) {
+        found = true;
+        break;
+      }
+    }
+    if (found) {
       G = std::exp(brent(F, lo, hi, f_lo, f_hi, 1e-13));
+    } else {
+      choked = Fc >= 0.0 || pb.P <= 0.0;
+      G = Gc;
     }
   }
   const MarchEnd m = march_at(G);

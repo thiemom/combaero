@@ -164,11 +164,16 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
 // choking, at the exit or at an interior throat). At Tt_exit = Tt0 it is the
 // Fanno flow above, to the march's accuracy (~1e-9, not bit-exact).
 //
-// Limit: like fanno_channel_flow the flux is 0 at or below zero drive. A
-// cooled duct whose Rayleigh total-pressure gain beats its friction would
-// flow against a small adverse drive; with Reynolds-analogy heat transfer
-// (NTU ~ f L / 2D) the gain stays below half the friction loss, so this
-// needs a heat-transfer multiplier far above the friction one.
+// The flux is the root on the branch continuous from zero flow (the first
+// fall of the exit-pressure excess as G rises), and 0 at or below zero
+// drive. A cooled duct's Rayleigh total-pressure gain can outgrow its
+// friction: with Reynolds-analogy heat transfer (NTU ~ f L / 2D) it stays
+// below half the friction loss, but a SHORT duct with entrance-enhanced heat
+// transfer and fully developed friction breaks that (an impingement
+// crossflow segment, L/D 1.3: gain 0.019 velocity heads against friction
+// 0.015-0.025). At a fixed Tt_exit such a duct's exit Pt rises with its flow,
+// no flow matches a pressure drop, and the duct is reported choked at its
+// choke flux. Developing-flow friction is the consistent closure for it.
 
 struct FannoRayleighMarch {
   double M_in = 0.0;       // inlet Mach

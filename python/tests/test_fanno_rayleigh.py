@@ -166,3 +166,23 @@ def test_a_vacuum_back_pressure_chokes() -> None:
     Gc = cb.fanno_rayleigh_choked_mass_flux(PT, TT, 800.0, X, L, D, 0.0, "haaland", 1.0)
     assert pytest.approx(Gc, rel=1e-12) == r.G
     assert math.isfinite(r.dG_dTt_exit)
+
+
+def test_a_pump_like_cooled_duct_takes_the_root_continuous_from_zero_flow() -> None:
+    """A short, cooled duct (an impingement crossflow segment, L/D 1.27, Tt
+    889 -> 873 K at 10 bar): its Rayleigh gain outgrows its fully developed
+    friction near choke, so the exit-pressure excess dips and rises again.
+    At a small drive both a low root and the choke exist; the flux is the
+    low one (the choke was taken before). Past the dip there is no fall at
+    all and the duct reports choked: the documented limit, which
+    developing-flow friction is to remove."""
+    Pt0, Tt0, Tte, Ls, Ds = 1.0196e6, 889.07, 872.59, 0.0254, 0.02
+    Gc = cb.fanno_rayleigh_choked_mass_flux(Pt0, Tt0, Tte, X, Ls, Ds, 0.0, "haaland")
+    near_choke = cb.fanno_rayleigh_march(0.999 * Gc, Pt0, Tt0, Tte, X, Ls, Ds, 0.0, "haaland")
+    low = cb.fanno_rayleigh_channel_flow(Pt0, Tt0, Tte, X, Pt0 - 10.0, True, Ls, Ds, 0.0, "haaland")
+    assert near_choke.Pt_exit > Pt0 - 10.0  # the excess is positive again near choke
+    assert not low.choked and 0.1 * Gc > low.G
+    beyond = cb.fanno_rayleigh_channel_flow(
+        Pt0, Tt0, Tte, X, Pt0 - 30.0, True, Ls, Ds, 0.0, "haaland"
+    )
+    assert beyond.choked and pytest.approx(Gc, rel=1e-12) == beyond.G

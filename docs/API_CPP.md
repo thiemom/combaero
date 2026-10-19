@@ -553,10 +553,13 @@ FannoChannelFlow fanno_rayleigh_channel_flow(double Pt0, double Tt0, double Tt_e
                                              bool with_derivatives = true);
 ```
 
-Limit: the flux is 0 at or below zero drive. A cooled duct whose Rayleigh
-gain beats its friction would flow against a small adverse drive; with
-Reynolds-analogy heat transfer (NTU ~ f L/2D) the gain stays below half the
-friction loss.
+The flux is the root on the branch continuous from zero flow, 0 at or below
+zero drive. Limit: a cooled duct's Rayleigh gain can outgrow its friction --
+not under Reynolds analogy (NTU ~ f L/2D keeps it below half), but in a short
+duct with entrance-enhanced heat transfer and fully developed friction (an
+impingement crossflow segment, L/D 1.3). At a fixed Tt_exit its exit Pt then
+rises with flow and no flow matches a pressure drop; developing-flow friction
+is the consistent closure.
 
 ### Rocket Nozzle Thrust
 ```cpp
