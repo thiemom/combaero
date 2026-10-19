@@ -77,6 +77,11 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => (v > 0 ? "yes" : "no"),
 	},
+	rayleigh_in_momentum: {
+		label: "Heating in momentum",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes (Fanno-Rayleigh)" : "no"),
+	},
 	// Orifice velocity of approach and ISO 5167 taps (#649/#645/#651)
 	beta: { label: "β (declared)", unit: "—", format: (v) => v.toFixed(4) },
 	beta_flow: { label: "β (flow)", unit: "—", format: (v) => v.toFixed(4) },

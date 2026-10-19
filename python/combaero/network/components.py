@@ -998,16 +998,16 @@ class _DuctHtc:
         # given; T_s and P_s move with T0, P0 and G = |m| / A.
         dh_dT, dTaw_dT = float(r.dh_dT), float(r.dT_aw_dT)
         dTaw_dP = float(getattr(r, "dT_aw_dP", 0.0))
-        self.dh_dT = dh_dT * s.dT_dT0
-        self.dh_dmdot = float(r.dh_dmdot) + dh_dT * s.dT_dG / area
-        self.dh_dPt = dh_dT * s.dT_dP0
-        self.dT_aw_dT = dTaw_dT * s.dT_dT0 + dTaw_dP * s.dP_dT0
-        self.dT_aw_dmdot = float(r.dT_aw_dmdot) + (dTaw_dT * s.dT_dG + dTaw_dP * s.dP_dG) / area
-        self.dT_aw_dPt = dTaw_dT * s.dT_dP0 + dTaw_dP * s.dP_dP0
-        if s.choked:
-            # The sonic state does not move with the flow.
-            self.dh_dmdot = 0.0
-            self.dT_aw_dmdot = 0.0
+        # The surface's own flow partials are per unit of the flow it was
+        # handed, area * G_eff, which moves with the true flow (dGeff_dG) and,
+        # near choke, with T0 and P0 through the sonic flux (#551).
+        dh_m, dTaw_m = float(r.dh_dmdot), float(r.dT_aw_dmdot)
+        self.dh_dT = dh_dT * s.dT_dT0 + dh_m * area * s.dGeff_dT0
+        self.dh_dmdot = dh_m * s.dGeff_dG + dh_dT * s.dT_dG / area
+        self.dh_dPt = dh_dT * s.dT_dP0 + dh_m * area * s.dGeff_dP0
+        self.dT_aw_dT = dTaw_dT * s.dT_dT0 + dTaw_dP * s.dP_dT0 + dTaw_m * area * s.dGeff_dT0
+        self.dT_aw_dmdot = dTaw_m * s.dGeff_dG + (dTaw_dT * s.dT_dG + dTaw_dP * s.dP_dG) / area
+        self.dT_aw_dPt = dTaw_dT * s.dT_dP0 + dTaw_dP * s.dP_dP0 + dTaw_m * area * s.dGeff_dP0
         # The static P is the duct's, a function of the feed's Pt: the feed
         # node's own static P does not enter.
         self.dT_aw_dP = 0.0
@@ -1040,12 +1040,16 @@ def _duct_htc(
     1600 K stream.
     """
     G = abs(float(state.m_dot)) / area
-    s = cb.duct_static_state(float(state.Tt), float(state.Pt), G, state.X)
-    # Past choke (a solver iterate beyond the duct's capacity) the state is
-    # the sonic one and so is the velocity: G / rho at the iterate's G sent
-    # T_aw, and the heat, without bound (53 caught mixer failures in the
-    # stress sweep, 43% of one network's duct evaluations past choke).
-    velocity = cb.speed_of_sound(s.T, state.X) if s.choked else G / s.rho
+    # The flux bent C1 just below the sonic one (#551): a duct choked at its
+    # inlet sits at the sonic flux, where the isentropic state has an
+    # infinite slope in G and the wall coupling could not converge. Below
+    # 99.8% of the sonic flux this is the plain duct state.
+    s = cb.duct_htc_static_state(float(state.Tt), float(state.Pt), G, state.X)
+    # Past choke (a solver iterate beyond the duct's capacity) the velocity
+    # is the bent flux's too: G / rho at the iterate's G sent T_aw, and the
+    # heat, without bound (53 caught mixer failures in the stress sweep, 43%
+    # of one network's duct evaluations past choke).
+    velocity = s.G_eff / s.rho
     r = surface.htc_and_T(
         T=s.T,
         P=s.P,
@@ -6230,24 +6234,49 @@ class ChannelElement(NetworkElement):
             dirs = [[float(j == k) for j in range(n_sp)] for k, y in enumerate(src.Y) if y > 0.0]
         else:
             dirs = known.get(src_id, [])
-        flow = cb.fanno_channel_flow(
-            src.Pt,
-            src.Tt,
-            src.X,
-            dst.Pt,
-            not lost,
-            self.length,
-            self.diameter,
-            self.roughness,
-            self.friction_model,
-            f_mult,
-            getattr(self, "_last_M_exit", -1.0),
-            [list(v) for v in dirs],
-            derivatives,
-        )
-        # Warm start only: the flow does not depend on it.
-        if not flow.choked:
-            self._last_M_exit = float(flow.M_exit)
+        # Wall heat in the momentum (#551): Tt rises linearly from the
+        # feeding node's to the receiving node's, where that node's Tt is this
+        # duct's exit Tt (see resolve_topology).
+        heated = dst_id in getattr(self, "_rayleigh_ends", ()) and float(dst.Tt) > 0.0
+        if heated:
+            flow = cb.fanno_rayleigh_channel_flow(
+                src.Pt,
+                src.Tt,
+                dst.Tt,
+                src.X,
+                dst.Pt,
+                not lost,
+                self.length,
+                self.diameter,
+                self.roughness,
+                self.friction_model,
+                f_mult,
+                getattr(self, "_last_G", -1.0),
+                [list(v) for v in dirs],
+                derivatives,
+            )
+            # Warm start only: the flow does not depend on it.
+            if not flow.choked:
+                self._last_G = float(flow.G)
+        else:
+            flow = cb.fanno_channel_flow(
+                src.Pt,
+                src.Tt,
+                src.X,
+                dst.Pt,
+                not lost,
+                self.length,
+                self.diameter,
+                self.roughness,
+                self.friction_model,
+                f_mult,
+                getattr(self, "_last_M_exit", -1.0),
+                [list(v) for v in dirs],
+                derivatives,
+            )
+            # Warm start only: the flow does not depend on it.
+            if not flow.choked:
+                self._last_M_exit = float(flow.M_exit)
         sign = 1.0 if forward else -1.0
         if not derivatives:
             return sign * A * flow.G, {}, flow
@@ -6256,6 +6285,8 @@ class ChannelElement(NetworkElement):
             f"{src_id}.T": sign * A * flow.dG_dTt0,
             f"{dst_id}.Pt": sign * A * flow.dG_dP_target,
         }
+        if heated:
+            derivs[f"{dst_id}.T"] = sign * A * flow.dG_dTt_exit
         # Composition of the feeding node: the directional derivatives
         # projected back onto species, g = sum_i (dG/dv_i) v_i, chained by the
         # solver with dY/dx from its mixing relay.
@@ -6495,7 +6526,12 @@ class ChannelElement(NetworkElement):
                 "M_exit_duct": float(flow.M_exit),
             }
             if getattr(self, "_wall_heated", False):
-                duct.update(self._rayleigh_omission(state_in, state_out, flow, ref))
+                into = self.to_node if float(state_in.m_dot) >= 0.0 else self.from_node
+                if into in getattr(self, "_rayleigh_ends", ()):
+                    # The heat is in the momentum: nothing omitted (#551).
+                    duct["rayleigh_in_momentum"] = 1.0
+                else:
+                    duct.update(self._rayleigh_omission(state_in, state_out, flow, ref))
         return {
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
@@ -6641,9 +6677,27 @@ class ChannelElement(NetworkElement):
         self._upstream_node = graph.nodes.get(self.from_node)
         # A side of a ThermalWall: its heat is deposited on the node the flow
         # goes into, so the end nodes' Tt ratio is this duct's heating (#551).
-        self._wall_heated = any(
-            self.id in (w.element_a, w.element_b) for w in getattr(graph, "walls", {}).values()
-        )
+        walls = list(getattr(graph, "walls", {}).values())
+        self._wall_heated = any(self.id in (w.element_a, w.element_b) for w in walls)
+        # The ends whose Tt IS this duct's exit Tt when the flow goes into
+        # them: a plenum or chamber with this duct and one other connection,
+        # and no wall of its own -- it mixes nothing else and receives only
+        # this duct's heat. There the Fanno-Rayleigh kernel carries the heat
+        # in the momentum (#551). Into any other node (a boundary, a node
+        # mixing several streams) the duct stays adiabatic Fanno and its
+        # omission stays flagged.
+        self._rayleigh_ends: set[str] = set()
+        if self._wall_heated:
+            on_walls = {e for w in walls for e in (w.element_a, w.element_b)}
+            for nid in (self.from_node, self.to_node):
+                node = graph.nodes.get(nid)
+                if not isinstance(node, (PlenumNode, MomentumChamberNode)) or nid in on_walls:
+                    continue
+                n_conn = len(graph.get_upstream_elements(nid)) + len(
+                    graph.get_downstream_elements(nid)
+                )
+                if n_conn == 2:
+                    self._rayleigh_ends.add(nid)
         if self.diameter is not None:
             self._fill_convective_area()
             return

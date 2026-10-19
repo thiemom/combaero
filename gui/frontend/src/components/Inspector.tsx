@@ -373,10 +373,14 @@ const Inspector = () => {
 							% of inlet Pt
 						</div>
 						<div className="italic text-amber-700 mt-0.5">
-							The compressible duct is solved as adiabatic friction flow; its
-							wall heat raises the outlet temperature but not its momentum.
-							Heating costs total pressure (cooling gains it) as Ma²: this is
-							the first-order Rayleigh estimate. The solve is not rejected.
+							This duct discharges into a node that also mixes other streams (or
+							into a boundary), so that node's temperature is not the duct's
+							exit temperature. The duct is then solved as adiabatic friction
+							flow: its wall heat raises the outlet temperature but not its
+							momentum. Heating costs total pressure (cooling gains it) as Ma²:
+							this is the first-order Rayleigh estimate. Give the duct its own
+							outlet plenum to carry the heat in its momentum. The solve is not
+							rejected.
 						</div>
 					</div>
 				)}

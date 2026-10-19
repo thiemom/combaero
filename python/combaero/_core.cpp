@@ -835,12 +835,22 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("drho_dT0", &combaero::DuctStaticState::drho_dT0)
       .def_readonly("drho_dP0", &combaero::DuctStaticState::drho_dP0)
       .def_readonly("drho_dG", &combaero::DuctStaticState::drho_dG)
-      .def_readonly("choked", &combaero::DuctStaticState::choked);
+      .def_readonly("choked", &combaero::DuctStaticState::choked)
+      .def_readonly("G_eff", &combaero::DuctStaticState::G_eff)
+      .def_readonly("dGeff_dT0", &combaero::DuctStaticState::dGeff_dT0)
+      .def_readonly("dGeff_dP0", &combaero::DuctStaticState::dGeff_dP0)
+      .def_readonly("dGeff_dG", &combaero::DuctStaticState::dGeff_dG);
   m.def("duct_static_state", &combaero::duct_static_state, py::arg("T0"), py::arg("P0"),
         py::arg("G"), py::arg("X"),
         "Static state at a duct inlet fed from stagnation (T0, P0) at mass flux\n"
         "G = |m_dot| / A: the isentropic subsonic root, or the sonic state when G\n"
         "exceeds the choked flux (choked = True). Partials in T0, P0, G (#636).");
+  m.attr("DUCT_HTC_SONIC_MARGIN") = combaero::kDuctHtcSonicMargin;
+  m.def("duct_htc_static_state", &combaero::duct_htc_static_state, py::arg("T0"), py::arg("P0"),
+        py::arg("G"), py::arg("X"),
+        "The duct state a heat-transfer correlation reads: duct_static_state at a\n"
+        "flux bent C1 below the sonic one (G itself below (1 - 2w) G*, capped at\n"
+        "(1 - w) G*, w = DUCT_HTC_SONIC_MARGIN), so it is smooth through choke (#551).");
 
   py::class_<combaero::JetImpulse>(m, "JetImpulse")
       .def_readonly("J", &combaero::JetImpulse::J)

@@ -1,0 +1,8 @@
+- **A wall-heated compressible channel carries its heat in the momentum (#551).** It used to be adiabatic Fanno flow, whose wall heat only raised the receiving node's Tt. That omitted the Rayleigh change: heating costs total pressure, cooling gains it.
+  - **Now:** where the receiving node is a plenum or chamber fed by this duct alone (no wall of its own), the duct uses `fanno_rayleigh_channel_flow`, with that node's Tt as its exit Tt.
+  - **Second law:** the four stress hot/cold pairs that failed it now pass.
+  - **Into a node that mixes other streams, or a boundary:** the duct stays adiabatic and keeps the "Heating not in the momentum" flag (#660). The Inspector text now says why.
+  - **Results change for walled compressible ducts:** heated ducts pass less flow, cooled ducts more. A strongly cooled duct can now choke at its inlet.
+- **The duct heat-transfer state is smooth through choke.** `duct_htc_static_state` is the new state the wall's htc reads. It equals `duct_static_state` below 99.8% of the sonic flux, then bends C1 onto 99.9% of it (M below ~0.97).
+  - **Why:** a duct choked at its inlet sat exactly where the isentropic state's slope in G is infinite, and its wall coupling could not converge.
+  - **New fields:** `DuctStaticState` gains `G_eff` and its partials.
