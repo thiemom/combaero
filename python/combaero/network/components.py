@@ -1418,6 +1418,11 @@ ORIFICE_REVERSAL_P_SCALE = 0.1
 #: w P_b / 2 (5 Pa at 1 bar), and only where the exit is exactly at choke.
 PORT_DISCHARGE_CHOKE_BLEND = 1e-4
 
+#: Omitted Rayleigh total-pressure change, relative to the inlet Pt, above
+#: which a wall-heated compressible channel is flagged (#551): the momentum
+#: kernel is adiabatic Fanno flow, so heating's cost is not in the solve.
+RAYLEIGH_OMISSION_FLAG = 1e-3
+
 
 _ROW_KINDS = ("p", "mdot")
 
@@ -6489,6 +6494,8 @@ class ChannelElement(NetworkElement):
                 "M_in_duct": float(flow.M_in),
                 "M_exit_duct": float(flow.M_exit),
             }
+            if getattr(self, "_wall_heated", False):
+                duct.update(self._rayleigh_omission(state_in, state_out, flow, ref))
         return {
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
@@ -6502,6 +6509,35 @@ class ChannelElement(NetworkElement):
             "T_aw": float(T_aw),
             "f": float(f),
             **surface_diag,
+        }
+
+    def _rayleigh_omission(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flow: Any,
+        ref: dict[str, float],
+    ) -> dict[str, float]:
+        """The total-pressure cost of the wall heat this duct's momentum leaves
+        out (#551), as a flag: the compressible kernel is Fanno flow at the
+        INLET Tt, and the heat only raises the downstream node's Tt. To first
+        order in the heating, Rayleigh flow loses
+        dPt / Pt = (gamma M^2 / 2) ln(Tt_exit / Tt_in), here with M^2 the mean
+        of the duct's inlet and exit values; cooling gains it. O(M^2): it
+        matters at high Mach with strong heating (0.06 of Pt at M 0.25-0.73 and
+        Tt ratio 2.3-4), not in a low-Mach heat exchanger."""
+        m = float(state_in.m_dot)
+        up, dn = (state_in, state_out) if m >= 0.0 else (state_out, state_in)
+        if not (float(up.Tt) > 0.0 and float(dn.Tt) > 0.0):
+            return {}
+        gamma = float(ref.get("gamma_ref", 1.4))
+        m2 = 0.5 * (float(flow.M_in) ** 2 + float(flow.M_exit) ** 2)
+        frac = 0.5 * gamma * m2 * math.log(float(dn.Tt) / float(up.Tt))
+        return {
+            "rayleigh_omitted_frac": frac,
+            "rayleigh_dPt_omitted": frac * float(up.Pt),
+            # Flagged above RAYLEIGH_OMISSION_FLAG of the inlet Pt.
+            "rayleigh_omitted": float(abs(frac) > RAYLEIGH_OMISSION_FLAG),
         }
 
     def get_spatial_profile(
@@ -6603,6 +6639,11 @@ class ChannelElement(NetworkElement):
         # the early return so it is set even when the diameter is explicit.
         self._downstream_node = graph.nodes.get(self.to_node)
         self._upstream_node = graph.nodes.get(self.from_node)
+        # A side of a ThermalWall: its heat is deposited on the node the flow
+        # goes into, so the end nodes' Tt ratio is this duct's heating (#551).
+        self._wall_heated = any(
+            self.id in (w.element_a, w.element_b) for w in getattr(graph, "walls", {}).values()
+        )
         if self.diameter is not None:
             self._fill_convective_area()
             return

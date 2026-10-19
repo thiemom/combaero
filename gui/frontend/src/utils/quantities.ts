@@ -66,6 +66,17 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => (v > 0 ? "yes" : "no"),
 	},
+	// Rayleigh omission of a wall-heated compressible channel (#551)
+	rayleigh_omitted_frac: {
+		label: "Heating dPt omitted",
+		unit: "% Pt",
+		format: (v) => (v * 100).toFixed(2),
+	},
+	rayleigh_omitted: {
+		label: "Heating not in momentum",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
 	// Orifice velocity of approach and ISO 5167 taps (#649/#645/#651)
 	beta: { label: "β (declared)", unit: "—", format: (v) => v.toFixed(4) },
 	beta_flow: { label: "β (flow)", unit: "—", format: (v) => v.toFixed(4) },
