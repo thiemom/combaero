@@ -131,3 +131,14 @@ FIG5_ANCHORS: dict[int, dict[str, float]] = {
 }
 
 PRIMARY_PRESSURES_BAR: tuple[int, ...] = (4, 5, 6)
+
+#: The rig (paper Fig. 6 text): primary nozzle throat d*, nozzle exit d and
+#: mixing throat D* [mm]. The secondary pipe is open to the atmosphere, so
+#: P2^0 is atmospheric. Both supply pressures are measured as static and
+#: taken as total (velocities of a few m/s).
+GEOMETRY_MM: dict[str, float] = {"d_throat": 3.3, "d_exit": 4.5, "D_mix": 7.6}
+
+#: P1 is read with "effective pressure" transducers, which most likely
+#: means GAUGE (French "pression effective"); the figure legend just says
+#: "P1 = 4 bar". Both readings are scored, and the two bracket the result.
+P1_READINGS: tuple[str, ...] = ("absolute", "gauge")

@@ -190,9 +190,10 @@ def test_henry_fig5_droop_is_near_linear(p1_bar: int) -> None:
         4 bar: R^2 0.992, max residual 3.8% | 5 bar: 0.989, 3.3% |
         6 bar: 0.939, 8.5% (mildly concave -- the documented Tier-2 trigger,
         OPERATING_REGIMES_DESIGN.md sec 3.2).
-    This validates the linear SHAPE only; the chord's slope/offset (anchored at
-    the model's P_c* and P_b0) needs absolute-pressure data (Akbarnejad 2025) to
-    validate separately -- eyeballing the knee here would conflate the two."""
+    This validates the linear SHAPE only. The chord's anchors (the model's P_c*
+    and P_b0) are scored separately, cross-source, in
+    validation/ejector/anchor_scorecard.py: P_b0 runs 78-274% above the rigs'
+    breakdown. Eyeballing the knee here would conflate the two."""
     pts = FIG5_OMEGA_VS_PB[p1_bar]
     anch = FIG5_ANCHORS[p1_bar]
     knee_x, plateau = anch["pb_knee"], anch["omega_plateau"]
