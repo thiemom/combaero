@@ -79,6 +79,13 @@ SOLVER_STRICT_ENV = "COMBAERO_SOLVER_STRICT"
 #: bugs, never states: they always raise.
 _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 
+#: Default wall-clock budget [s] (``NetworkSolver.homotopy_budget``) of the
+#: Newton-homotopy last retry (#642), within the
+#: caller's timeout. Inside the solver its stress rescues took 1.2-4.2 s; every
+#: solve that does not converge pays it -- unbounded, a junction scorecard with
+#: expected failures went from 8 s to 106 s (10 s: 87 s).
+NEWTON_HOMOTOPY_BUDGET = 5.0
+
 #: At most this many exceptions keep their full record per solve; the rest are
 #: counted (``__caught_exception_count__``).
 _MAX_CAUGHT_RECORDS = 50
@@ -500,6 +507,15 @@ class NetworkSolver:
         from .compressibility import INCOMPRESSIBLE_MACH_LIMIT
 
         self.incompressible_mach_limit: float = INCOMPRESSIBLE_MACH_LIMIT
+        # Opt-in last retry of a cold solve that did not converge: a Newton
+        # homotopy from the cold guess (#642). Off by default -- every
+        # non-converging solve pays up to its budget -- and turned on by the
+        # GUI backend and the stress harness. homotopy_budget [s] caps it within
+        # the caller's timeout; None gives it all the time the timeout leaves
+        # (the GUI: the user's max solve time is the only limit), or
+        # NEWTON_HOMOTOPY_BUDGET when there is no timeout either.
+        self.homotopy_retry: bool = False
+        self.homotopy_budget: float | None = NEWTON_HOMOTOPY_BUDGET
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -2598,9 +2614,15 @@ class NetworkSolver:
 
         if compute_jacobian:
             self._deferred_jacobian = None
-            return np.array(res, dtype=float), assemble()
+            return self._offset(np.array(res, dtype=float)), assemble()
         self._deferred_jacobian = (x.copy(), assemble)
-        return np.array(res, dtype=float), None
+        return self._offset(np.array(res, dtype=float)), None
+
+    def _offset(self, res: np.ndarray) -> np.ndarray:
+        """The residual less the Newton homotopy's offset (1 - lam) F(x0), if one
+        is active (#642); the Jacobian is the same."""
+        off = getattr(self, "_homotopy_offset", None)
+        return res if off is None else res - off
 
     @staticmethod
     def _composition_directions(relay: dict[str, Any], x: np.ndarray) -> dict[str, list[Any]]:
@@ -2803,6 +2825,32 @@ class NetworkSolver:
         declared units and raises ``RowKindMismatchError`` on a misfiled one
         (``check_row_kinds``; RESIDUAL-ROW-SCALING).
         """
+        if (
+            self.homotopy_retry
+            and x0 is None
+            and auto_retry
+            and not getattr(self, "_in_homotopy", False)
+        ):
+            _h0 = time.time()
+            self._in_homotopy = True
+            try:
+                sol = self.solve(
+                    method=method,
+                    timeout=timeout,
+                    options=options,
+                    use_jac=use_jac,
+                    init_strategy=init_strategy,
+                    warmstart_maxfev=warmstart_maxfev,
+                    lambda_steps=lambda_steps,
+                )
+            finally:
+                self._in_homotopy = False
+            # Only a solve that did not converge: a root the checks rejected
+            # (an unphysical junction root, an open ledger) is a different
+            # failure, and a homotopy from the same guess tends to find it again.
+            if sol.get("__success__", False) or sol.get("__converged__", False):
+                return sol
+            return self._newton_homotopy_retry(sol, method, timeout, options, use_jac, _h0)
         kw: dict[str, Any] = {
             "method": method,
             "timeout": timeout,
@@ -2926,6 +2974,94 @@ class NetworkSolver:
             return self.solve(**{**kw, "timeout": left()})
         finally:
             self._in_rayleigh_stage = False
+
+    def _newton_homotopy_retry(
+        self,
+        failed: dict[str, Any],
+        method: str,
+        timeout: float | None,
+        options: dict[str, Any] | None,
+        use_jac: bool,
+        t0: float,
+    ) -> dict[str, Any]:
+        """Last retry of a failed cold solve (#642): a Newton homotopy from the
+        cold guess x0, H(x, lam) = F(x) - (1 - lam) F(x0).
+
+        At lam = 0 the guess itself is the root -- a state WITH flow, unlike a
+        ramp of the boundary pressures, which starts at zero drive and had no
+        solution to start from in 13 of 23 failed random draws. lam rises
+        adaptively (doubling after a solved step, halving after a failed one,
+        down to 1/128), each step warm-started from the last; the lam = 1 step
+        is a plain solve with every physical check. It rescued 9 of those 23
+        draws (the pressure ramp 7). It cannot help where the Jacobian at x0
+        is itself singular -- the solve then stalls at lam ~ 0, and it stops
+        once no step from the guess has succeeded down to 1/16. It runs for at
+        most ``homotopy_budget`` seconds within the caller's time left (default
+        NEWTON_HOMOTOPY_BUDGET; None: all of the time left).
+        """
+        left0 = None if timeout is None else timeout - (time.time() - t0)
+        if left0 is not None and left0 < 1.0:
+            return failed
+        cap = self.homotopy_budget
+        if left0 is None:
+            budget = NEWTON_HOMOTOPY_BUDGET if cap is None else cap
+        else:
+            budget = left0 if cap is None else min(left0, cap)
+        h_t0 = time.time()
+        try:
+            x0 = self._build_x0()
+            F0 = np.asarray(self._residuals(x0), dtype=float).copy()
+        except _STATE_EXCEPTIONS:
+            return failed
+        if not np.all(np.isfinite(F0)):
+            return failed
+        x, lam_ok, step = x0, 0.0, 0.25
+        # A failed homotopy leaves the solver as the cold solve left it: its
+        # last iterate and diagnostics describe the attempt that is returned.
+        saved = {k: getattr(self, k) for k in ("_last_x", "_diagnostic_data") if hasattr(self, k)}
+        self._in_homotopy = True
+        try:
+            while step >= 1.0 / 128:
+                left = budget - (time.time() - h_t0)
+                # No step at all from the guess: its Jacobian is singular
+                # there, which no homotopy can fix.
+                if left < 0.5 or (lam_ok == 0.0 and step < 1.0 / 16):
+                    break
+                lam = min(1.0, lam_ok + step)
+                self._homotopy_offset = None if lam >= 1.0 else (1.0 - lam) * F0
+                try:
+                    r = self._solve_flow_retries(
+                        method=method,
+                        timeout=left,
+                        options=options,
+                        use_jac=use_jac,
+                        x0=x,
+                        init_strategy="default",
+                        warmstart_maxfev=150,
+                        lambda_steps=None,
+                        auto_retry=False,
+                    )
+                except _STATE_EXCEPTIONS:
+                    r = {}
+                ok = bool(r.get("__success__") if lam >= 1.0 else r.get("__converged__"))
+                if ok and r.get("__x_solution__") is not None:
+                    x, lam_ok = np.asarray(r["__x_solution__"], dtype=float), lam
+                    if lam >= 1.0:
+                        r["__message__"] = (
+                            f"{str(r.get('__message__', '')).strip()} [Newton homotopy from "
+                            "the cold guess after the cold solve and its retries failed: "
+                            f"{str(failed.get('__message__', '')).strip()[:120]}]"
+                        )
+                        return self._with_caught(r)
+                    step = min(2.0 * step, 0.5)
+                else:
+                    step *= 0.5
+        finally:
+            self._homotopy_offset = None
+            self._in_homotopy = False
+        for k, v in saved.items():
+            setattr(self, k, v)
+        return failed
 
     def _wall_free_seed(
         self, method: str, timeout: float | None, use_jac: bool

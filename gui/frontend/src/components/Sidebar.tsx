@@ -493,6 +493,10 @@ const Sidebar = () => {
 						min={0}
 						placeholder="None"
 					/>
+					<span className="text-[9px] text-stone-400">
+						The solve, its retries and the last homotopy retry all run within
+						this. A network that cannot be solved reports after it runs out.
+					</span>
 				</div>
 
 				<div className="border-t border-stone-200 pt-2 flex flex-col gap-2">
