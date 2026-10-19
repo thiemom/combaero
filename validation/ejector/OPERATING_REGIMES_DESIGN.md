@@ -275,7 +275,10 @@ needed (unlike the R141b critical fixture):
   E1 temperature sweep) with numeric **tables of both critical and breakdown
   back pressures** across ~7 primary/secondary combinations -- directly
   digitizable anchor values for `P_c*` and `P_b0` without curve tracing. The
-  anchor-pressure cross-check. *(Not yet digitized -- add when Phase 1 lands.)*
+  anchor-pressure cross-check. *(Digitized as `data/akbarnejad2025_tables.py`;
+  they are CFD, steam. Scored with Henry in `anchor_scorecard.py`: P_b0 runs
+  78-274% above every rig's breakdown, see README "Cross-source accuracy of
+  the anchors".)*
 
 Use these as **validation, not calibration**: check the model's droop shape and
 `P_c*`/`P_b0` anchors against them (trend + loose relative tolerance, in the
@@ -634,9 +637,10 @@ derivative jump would break the single-Newton-solve requirement (sec 3.5).
 near-linear-droop assumption is cross-checked against measured AIR data, Henry
 et al. 2007 HEFAT2007 Fig. 5 (`henry2007_fig5.py`): a least-squares line through
 each curve's droop fits with R^2 0.992 / 0.989 / 0.939 (4/5/6 bar). Absolute
-anchor placement (P_c*, P_b0) is NOT validated here -- that needs Akbarnejad &
-Ziabasharhagh 2025's numeric tables (not yet digitized); Henry validates the
-*shape* only.
+anchor placement (P_c*, P_b0) is NOT validated here; Henry validates the
+*shape* only. The anchors were scored later, cross-source, on Henry's rig
+and on Akbarnejad & Ziabasharhagh 2025's CFD (`anchor_scorecard.py`): P_b0
+runs 78-274% high, growing with A_3/A_t, which it does not depend on.
 
 **Invariant preserved.** P_e < P_c* < P_b0 < P_g on all 31 rows; the omega -> 0
 limit is exact (at A_3/A_t = A_py/A_t, `critical_back_pressure` == P_b0); the

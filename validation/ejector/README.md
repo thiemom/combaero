@@ -28,8 +28,15 @@ recreating a CoolProp environment**.
   Optimal Ejector and Parametric Study of Ejector Efficiency" (MIT/GWU/KFUPM).
   Independent corroboration of the same momentum-retaining, shock-free mixing
   pattern as Kracik & Dvorak (evaluated, not adopted -- see Accuracy below).
-- `../../docs/ejector/Bartosiewicz_ejector_2004.pdf` — independent air-ejector
-  CFD + experiment (validation cross-check target; not a model source).
+- `../../docs/ejector/Bartosiewicz_ejector_2004.pdf` — Henry, Leclaire, Hemidi,
+  Seynhaeve, Bartosiewicz, HEFAT2007: independent air-ejector CFD + experiment
+  (validation cross-check target; not a model source). Its measured Fig. 5 is
+  `data/henry2007_fig5.py`, with the rig's geometry.
+- `../../docs/ejector/Theoretical Model for Predicting Performance of a Gas
+  Ejector.pdf` — S. Akbarnejad, M. Ziabasharhagh, Thermal Engineering 72(1)
+  (2025). Steam-ejector CFD (Tables 1-3, `data/akbarnejad2025_tables.py`), a
+  cross-check target. Its own model is a scaling law from a reference curve
+  of the same ejector, so it gives no geometry-only anchor to adopt.
 
 ## Model scope
 
@@ -113,6 +120,9 @@ baked into `PC_STAR_PA_BY_TC_STAR_C`.
 | `data/generate_reference.py` | Emit the golden JSON + C++ header (no CoolProp). |
 | `data/huang1999_reference.json` | Canonical golden fixture (inputs, outputs, Jacobian, theory). |
 | `data/huang1999_reference_data.h` | Same data as a `constexpr` array for ctests. |
+| `data/henry2007_fig5.py` | Henry 2007 Fig. 5, measured air characteristic, and the rig's geometry. |
+| `data/akbarnejad2025_tables.py` | Akbarnejad & Ziabasharhagh 2025 Tables 1-3, steam CFD rows. |
+| `anchor_scorecard.py` | Cross-source accuracy of omega, P_c*, P_b0 on both (run it to print the table). |
 
 The Python regression test lives at `python/tests/test_ejector_huang.py` and
 consumes the JSON fixture directly.
@@ -216,6 +226,60 @@ one dataset. `test_ejector_huang.py` checks P_c* by regression, by trend
 (monotonicity in `A_3/A_t`, and `P_e < P_c* < P_g`), and now also by a real
 (if loose) physics tolerance against `paper_theory.p_c_pa` (`pc_rel_tol` =
 15%, comfortably above the observed 13.2% max).
+
+### Cross-source accuracy of the anchors
+
+Everything above is the critical closure against Huang's own theory columns,
+for R141b. `anchor_scorecard.py` runs the closures, as the network element
+takes them (γ and R at the choke plane, `recovery_efficiency` = 1), on two
+rigs that are not their sources. It is **accuracy, labelled cross-source**:
+a miss is the model's limitation.
+
+| Rig | Kind | A_3/A_t | ω | P_c* | **P_b0** | P_b0/P_c*: model / rig |
+|---|---|---|---|---|---|---|
+| Henry 2007, air, P1 absolute | measured | 5.30 | +11 to +22% | +20 to +31% | **+78 to +83%** | 1.80-1.82 / 1.21-1.32 |
+| Henry 2007, air, P1 gauge | measured | 5.30 | −8 to −11% | +34 to +45% | **+93 to +108%** | 1.76-1.82 / 1.21-1.32 |
+| Akbarnejad 2025 E1, steam | CFD | 5.44 | −4 to +43% | +38 to +63% | **+86 to +135%** | 1.44-1.74 / 1.06-1.21 |
+| Akbarnejad 2025 E2, steam | CFD | 33.3 | −18 to −22% | +18 to +21% | **+257 to +274%** | 3.17-3.37 / 1.06-1.07 |
+
+- **The dead-head anchor P_b0 is the weak point.**
+  - It is Kracik & Dvorak's mixing at ω = 0: lossless, and independent of A_3/A_t by construction.
+  - So the linear droop's far end runs about twice above every rig's breakdown, and 3.7 times above it at A_3/A_t = 33.
+  - Over the window the straight line therefore keeps too much entrainment. The roots the second law refuses (#598) are this: stress draws at A_3/A_t of 15 to 33, deep in the droop, entraining more than the primary jet can drive.
+- **P_c* lands 18-63% high.** That is above the reference, as a lossless closure must be, and about where Huang's own rows put it (+6% mean, 13% max).
+- **Henry's droop shape is still linear** (R² ≥ 0.94, `test_ejector_subcritical.py`). The chord's anchor is the error, not its shape.
+- **Caveats:**
+  - Henry's ω depends on whether P1 is gauge or absolute: the paper's "effective pressure" most likely means gauge, and both are shown.
+  - The CFD's stream temperatures are assumed saturated, because the paper does not print them. ω follows that assumption, and P_b0/P_c* hardly does.
+
+**A candidate dead-head, not adopted yet.** `candidate_dead_head` in
+`anchor_scorecard.py` treats ω = 0 as a sudden expansion. The primary leaves
+the nozzle (M_p1, P_p1 on A_p1) into the mixing tube, and the dead-headed
+suction annulus A_3 − A_p1 sits at the secondary pressure P_e. Mass, momentum
+and energy over A_3 then give a subsonic exit. This is Keenan & Neumann's
+zero-secondary-flow constant-area mixer: no fitted constant, and A_3/A_t
+enters.
+- **P_b0 accuracy:** 3-39% high on every row against today's 78-274%. Henry absolute is +3-4%, and E2 at A_3/A_t = 33 is +12-14%.
+- **The catch:** against today's P_c*, which is 18-63% high, its window P_b0/P_c* is only 0.98-1.06, where the rigs show 1.06-1.32. Adopted alone, it would make the droop vanish, and invert it on some rows.
+- **Next:** score P_c* alternatives the same way, and adopt the two together once the window comes out positive on the rigs.
+- **Variant tried and set aside:** the primary core at the y-y state, with the annulus at P_py. It fell 12-24% below the breakdown and below P_c*.
+
+### Validated envelope
+
+Where each closure has been scored, and against what. Outside these ranges a
+result is extrapolation, and nothing in the element flags it.
+
+| Closure | Scored against | Range |
+|---|---|---|
+| critical ω, P_c* (fidelity) | Huang 1999 theory columns (R141b, γ ≈ 1.11) | A_p1/A_t 2.9-3.3, A_3/A_t 6.6-10.9, P_g/P_e 8.5-15.1, ω 0.16-0.86 |
+| critical ω, P_c*, P_b0 (accuracy) | Henry 2007 (air, measured), Akbarnejad 2025 (steam, CFD) | A_3/A_t 5.3-5.4 and 33; P_p/P_s 4-35; ω 0.19-1.4; table above |
+| droop shape (linear) | Henry 2007 (air, measured) | P_p/P_s about 4-7, one geometry |
+| jet pump (incompressible) | Sanger, NASA TN D-4759 / D-4445 (water) | A_p1/A_3 0.066 and 0.197 |
+| unchoked jet pump (compressible) | analytic low-Mach limit only | no measured data |
+
+Back-flow (outlet above P_b0) is outside the model. The element refuses a
+converged root with a reversed port (#619) and one that violates the second
+law (#598).
 
 ## Roadmap
 
