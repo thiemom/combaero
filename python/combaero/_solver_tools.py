@@ -29,6 +29,13 @@ ejector_choked_mass_flow_and_jacobian = _core.ejector_choked_mass_flow_and_jacob
 ejector_critical_back_pressure_and_jacobian = _core.ejector_critical_back_pressure_and_jacobian
 ejector_dead_head_back_pressure_and_jacobian = _core.ejector_dead_head_back_pressure_and_jacobian
 ejector_element_residuals_and_jacobian = _core.ejector_element_residuals_and_jacobian
+ejector_huang_critical_back_pressure_and_jacobian = (
+    _core.ejector_huang_critical_back_pressure_and_jacobian
+)
+ejector_huang_mixing_coefficient = _core.ejector_huang_mixing_coefficient
+ejector_sudden_expansion_dead_head_and_jacobian = (
+    _core.ejector_sudden_expansion_dead_head_and_jacobian
+)
 ejector_jetpump_incompressible_residuals_and_jacobian = (
     _core.ejector_jetpump_incompressible_residuals_and_jacobian
 )

@@ -4,6 +4,8 @@
 #include <pybind11/stl.h>
 #include <limits>
 #include <optional>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "acoustics.h"
@@ -1690,6 +1692,44 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "with analytic Jacobian; value.p_c_pa carries P_b0.\n\n"
       "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
 
+  m.def("ejector_huang_mixing_coefficient", &solver::ejector_huang_mixing_coefficient,
+        py::arg("area_ratio_mix"),
+        "phi_m of Huang 1999 Eq. 19: the mixing-loss coefficient, stepped in A_3/A_t.");
+
+  m.def(
+      "ejector_huang_critical_back_pressure_and_jacobian",
+      [](double p_g, double t_g, double p_e, double t_e,
+         double area_ratio_nozzle, double area_ratio_mix, double gamma,
+         double r_gas, double recovery_efficiency) {
+        return solver::ejector_huang_critical_back_pressure_and_jacobian(
+            p_g, t_g, p_e, t_e,
+            solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix}, gamma,
+            r_gas, recovery_efficiency);
+      },
+      py::arg("p_g"), py::arg("t_g"), py::arg("p_e"), py::arg("t_e"),
+      py::arg("area_ratio_nozzle"), py::arg("area_ratio_mix"), py::arg("gamma"),
+      py::arg("r_gas"), py::arg("recovery_efficiency"),
+      "Critical back pressure P_c* by Huang 1999's printed chain (phi_m mixing,\n"
+      "normal shock, isentropic diffuser) with analytic Jacobian.\n\n"
+      "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
+
+  m.def(
+      "ejector_sudden_expansion_dead_head_and_jacobian",
+      [](double p_g, double t_g, double p_e, double t_e,
+         double area_ratio_nozzle, double area_ratio_mix, double gamma,
+         double r_gas, double recovery_efficiency) {
+        return solver::ejector_sudden_expansion_dead_head_and_jacobian(
+            p_g, t_g, p_e, t_e,
+            solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix}, gamma,
+            r_gas, recovery_efficiency);
+      },
+      py::arg("p_g"), py::arg("t_g"), py::arg("p_e"), py::arg("t_e"),
+      py::arg("area_ratio_nozzle"), py::arg("area_ratio_mix"), py::arg("gamma"),
+      py::arg("r_gas"), py::arg("recovery_efficiency"),
+      "Dead-head back pressure P_b0 as a sudden expansion over A_3 (zero\n"
+      "secondary flow) with analytic Jacobian; value.p_c_pa carries P_b0.\n\n"
+      "Returns: EjectorCriticalPressureJacobian (value + dpc_d{p_g,t_g,p_e,t_e})");
+
   py::class_<solver::EjectorElementResidualJacobian>(
       m, "EjectorElementResidualJacobian",
       "4-row ejector element residual system + Jacobian. `residuals` is [R0, "
@@ -1706,13 +1746,24 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
          double area_nozzle_exit, double area_secondary, double gamma,
          double r_gas, double eta_primary, double eta_secondary,
          double recovery_efficiency, double eps_frac, double s_choke_lo,
-         double s_choke_hi, double s_sub_lo, double s_sub_hi) {
+         double s_choke_hi, double s_sub_lo, double s_sub_hi,
+         const std::string& anchor_closure) {
+        solver::EjectorAnchorClosure closure;
+        if (anchor_closure == "kracik_dvorak") {
+          closure = solver::EjectorAnchorClosure::kracik_dvorak;
+        } else if (anchor_closure == "huang1999") {
+          closure = solver::EjectorAnchorClosure::huang1999;
+        } else {
+          throw std::invalid_argument("ejector_element_residuals_and_jacobian: anchor_closure "
+                                      "must be 'kracik_dvorak' or 'huang1999', got '" +
+                                      anchor_closure + "'");
+        }
         return solver::ejector_element_residuals_and_jacobian(
             mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out, p_py,
             solver::EjectorGeometry{area_ratio_nozzle, area_ratio_mix},
             area_throat, area_nozzle_exit, area_secondary, gamma, r_gas,
             eta_primary, eta_secondary, recovery_efficiency, eps_frac,
-            s_choke_lo, s_choke_hi, s_sub_lo, s_sub_hi);
+            s_choke_lo, s_choke_hi, s_sub_lo, s_sub_hi, closure);
       },
       py::arg("mp"), py::arg("ms"), py::arg("mdot_out"), py::arg("p_g"),
       py::arg("t_g"), py::arg("p_e"), py::arg("t_e"), py::arg("p_out"),
@@ -1722,7 +1773,10 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       py::arg("eta_primary"), py::arg("eta_secondary"),
       py::arg("recovery_efficiency"), py::arg("eps_frac"), py::arg("s_choke_lo"),
       py::arg("s_choke_hi"), py::arg("s_sub_lo"), py::arg("s_sub_hi"),
-      "Whole-element 4-row ejector (f, J) across all three operating regimes.\n\n"
+      py::arg("anchor_closure") = "kracik_dvorak",
+      "Whole-element 4-row ejector (f, J) across all three operating regimes.\n"
+      "anchor_closure: 'kracik_dvorak' (default) or 'huang1999', the (P_c*, P_b0)\n"
+      "pair of the plateau end and the droop's far end.\n\n"
       "Returns: EjectorElementResidualJacobian (residuals[4] + jacobian[4][9])");
 
   py::class_<solver::EjectorJetPumpIncompressibleResult>(

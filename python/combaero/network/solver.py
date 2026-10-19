@@ -1505,6 +1505,15 @@ class NetworkSolver:
                     "boundary pressures, change flow_direction, or use "
                     "IdealMomentumTeeElement, which reverses ports."
                 )
+        # Elements that can tell from their boundaries alone that the
+        # operating point is outside their model (an ejector's outlet above
+        # its dead head).
+        for e in self.network.elements.values():
+            hint = getattr(e, "no_root_hint", None)
+            if callable(hint):
+                text = hint(self.network)
+                if text:
+                    hints.append(text)
         return " ".join(hints)
 
     def _junction_streams(

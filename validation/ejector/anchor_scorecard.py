@@ -24,16 +24,17 @@ The rigs:
   CFD (not measured). E1 has A_3/A_t = 5.44; E2 has 33.3, the range where the
   #598 stress draws were refused. Stream temperatures are assumed saturated.
 
-A CANDIDATE anchor is scored beside them, and it is not in the model:
-``candidate_dead_head``. It treats the dead-head as a sudden expansion: the
-primary leaves the nozzle (M_p1, P_p1 on A_p1) into the mixing tube, the
-dead-headed suction annulus A_3 - A_p1 sits at the secondary pressure P_e,
-and mass, momentum and energy over A_3 give a subsonic exit, recovered
-losslessly. This is Keenan & Neumann's zero-secondary-flow constant-area
-mixer. It has no fitted constant, and it depends on A_3/A_t, which today's
-anchor does not. See the README for why it is not adopted yet.
+Two anchor pairs are scored, the two ``EjectorElement.anchor_closure`` takes:
 
-This is ACCURACY, not fidelity: neither rig belongs to Huang or to Kracik &
+* ``"kracik_dvorak"`` (the "model" columns): Kracik & Dvorak's lossless
+  mixing, at the critical entrainment (P_c*) and at zero entrainment (P_b0).
+* ``"huang1999"`` (the "cand" columns): Huang 1999's printed P_c* chain
+  (``huang_critical_back_pressure``: phi_m mixing, normal shock, isentropic
+  diffuser) and the sudden-expansion dead head (``sudden_expansion_dead_head``:
+  Keenan & Neumann's zero-secondary-flow mixer over A_3). No fitted constant;
+  A_3/A_t enters the dead head, which the lossless P_b0 ignores.
+
+This is ACCURACY, not fidelity: no rig belongs to Huang or to Kracik &
 Dvorak, so a miss is the model's limitation, not an implementation bug
 (docs/VALIDATION_POLICY.md). Nothing is fitted. ``recovery_efficiency`` stays
 at its unfitted 1.0; matching a rig is the user's job.
@@ -54,16 +55,16 @@ if __package__ in (None, ""):
 import combaero as cb
 from combaero.network._ejector_huang1999 import (
     EjectorGeometry,
-    _mach_from_area_ratio_supersonic,
     critical_back_pressure,
     dead_head_back_pressure,
     entrainment_ratio,
+    huang_critical_back_pressure,
+    sudden_expansion_dead_head,
 )
 from combaero.network.ejector_element import choke_plane_gamma
 from validation.ejector.data import akbarnejad2025_tables as akb
 from validation.ejector.data import chen2013_figs as chen
 from validation.ejector.data import henry2007_fig5 as henry
-from validation.ejector.printed_chain_check import printed_chain
 
 ATM_PA = 101325.0
 #: Henry's laboratory: both streams at room temperature (PT100-measured,
@@ -85,8 +86,8 @@ class AnchorRow:
     pc_ref: float
     pb0_model: float
     pb0_ref: float
-    pb0_candidate: float  # candidate_dead_head, not in the model
-    pc_candidate: float  # Huang's printed chain (printed_chain_check), not in the model
+    pb0_candidate: float  # sudden_expansion_dead_head (anchor_closure="huang1999")
+    pc_candidate: float  # huang_critical_back_pressure (anchor_closure="huang1999")
     #: Whole measured curve omega(P_b), RMS as a fraction of the plateau, for the
     #: model's linear droop and for the candidate pair (None for CFD rows,
     #: which give only the two anchors).
@@ -134,37 +135,6 @@ def _gas(x: list[float], t_e: float) -> tuple[float, float]:
     return choke_plane_gamma(t_e, x), float(cb.specific_gas_constant(x))
 
 
-def candidate_dead_head(
-    p_g: float, t_g: float, p_e: float, geom: EjectorGeometry, gamma: float, r_gas: float
-) -> float:
-    """CANDIDATE P_b0 [Pa], not in the model: the zero-entrainment sudden
-    expansion over A_3 (see the module docstring). Areas in units of A_t."""
-    g = gamma
-    m_p1 = _mach_from_area_ratio_supersonic(geom.area_ratio_nozzle, g)
-    p_p1 = p_g / (1.0 + 0.5 * (g - 1.0) * m_p1 * m_p1) ** (g / (g - 1.0))
-    a1, a3 = geom.area_ratio_nozzle, geom.area_ratio_mix
-    # choked primary through the unit throat
-    m = p_g * math.sqrt(g / (r_gas * t_g)) * (2.0 / (g + 1.0)) ** ((g + 1.0) / (2.0 * (g - 1.0)))
-    impulse = p_p1 * a1 * (1.0 + g * m_p1 * m_p1) + p_e * (a3 - a1)
-
-    def per_mass(mach: float) -> float:
-        t = t_g / (1.0 + 0.5 * (g - 1.0) * mach * mach)
-        return (1.0 + g * mach * mach) / (mach * math.sqrt(g / (r_gas * t)))
-
-    target = impulse / m
-    if target <= per_mass(1.0):
-        mach = 1.0  # no subsonic exit: the mixed flow chokes
-    else:
-        lo, hi = 1e-9, 1.0
-        for _ in range(200):
-            mid = 0.5 * (lo + hi)
-            lo, hi = (mid, hi) if per_mass(mid) > target else (lo, mid)
-        mach = 0.5 * (lo + hi)
-    t3 = t_g / (1.0 + 0.5 * (g - 1.0) * mach * mach)
-    p3 = m * math.sqrt(r_gas * t3 / g) / (a3 * mach)
-    return p3 * (1.0 + 0.5 * (g - 1.0) * mach * mach) ** (g / (g - 1.0))
-
-
 def _model(
     p_g: float, t_g: float, p_e: float, t_e: float, geom: EjectorGeometry, x: list[float]
 ) -> tuple[float, float, float, float]:
@@ -172,8 +142,8 @@ def _model(
     omega = entrainment_ratio(p_g, t_g, p_e, t_e, geom, gamma).omega
     pc = critical_back_pressure(p_g, t_g, p_e, t_e, geom, gamma, r).p_c_pa
     pb0 = dead_head_back_pressure(p_g, t_g, p_e, t_e, geom, gamma, r).p_b0_pa
-    cand = candidate_dead_head(p_g, t_g, p_e, geom, gamma, r)
-    pc_cand = printed_chain(p_g, t_g, p_e, t_e, geom, gamma, r)
+    cand = sudden_expansion_dead_head(p_g, t_g, p_e, t_e, geom, gamma, r).p_b0_pa
+    pc_cand = huang_critical_back_pressure(p_g, t_g, p_e, t_e, geom, gamma, r).p_c_pa
     return omega, pc, pb0, cand, pc_cand
 
 

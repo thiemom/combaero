@@ -390,3 +390,100 @@ TEST(EjectorJacobians, SmootherstepBandIsExercisedAndItsDerivativeIsCorrect) {
     }
   }
 }
+
+// -----------------------------------------------------------------------------
+// The "huang1999" anchor closures: Huang's printed P_c* chain and the
+// sudden-expansion dead head (validation/ejector/README.md). No golden central
+// differences are baked for them, so the difference is taken here.
+// -----------------------------------------------------------------------------
+namespace {
+
+using AnchorFn = EjectorCriticalPressureJacobian (*)(double, double, double, double,
+                                                     const EjectorGeometry&, double, double,
+                                                     double);
+
+void expect_anchor_jacobian(AnchorFn fn, const char* name) {
+  for (const auto& c : kHuangCases) {
+    const EjectorGeometry geom{c.area_ratio_nozzle, c.area_ratio_mix};
+    const double x0[4] = {c.p_g_pa, c.t_g_k, c.p_e_pa, c.t_e_k};
+    auto at = [&](const double x[4]) {
+      return fn(x[0], x[1], x[2], x[3], geom, c.gamma, c.r_gas, 1.0).value.p_c_pa;
+    };
+    const auto jac = fn(x0[0], x0[1], x0[2], x0[3], geom, c.gamma, c.r_gas, 1.0);
+    const double analytic[4] = {jac.dpc_dp_g, jac.dpc_dt_g, jac.dpc_dp_e, jac.dpc_dt_e};
+    for (int i = 0; i < 4; ++i) {
+      double a[4], b[4];
+      for (int m = 0; m < 4; ++m) a[m] = b[m] = x0[m];
+      const double h = 1e-6 * std::abs(x0[i]);
+      a[i] += h;
+      b[i] -= h;
+      const double cd = (at(a) - at(b)) / (2.0 * h);
+      // J_i |x_i| against the value (the residual-row-scaling metric).
+      EXPECT_NEAR(analytic[i] * x0[i], cd * x0[i], 1e-6 * jac.value.p_c_pa)
+          << name << " d/dx[" << i << "] for case " << c.id;
+    }
+  }
+}
+
+} // namespace
+
+TEST(EjectorJacobians, HuangCriticalBackPressureMatchesCentralDifferenceForAllCases) {
+  expect_anchor_jacobian(&ejector_huang_critical_back_pressure_and_jacobian, "huang P_c*");
+}
+
+TEST(EjectorJacobians, SuddenExpansionDeadHeadMatchesCentralDifferenceForAllCases) {
+  expect_anchor_jacobian(&ejector_sudden_expansion_dead_head_and_jacobian, "sudden-expansion P_b0");
+}
+
+TEST(EjectorPhysics, SuddenExpansionDeadHeadIsANormalShockWithNoAnnulus) {
+  // A_3 = A_p1: no suction annulus, so the sudden expansion is a normal shock
+  // at the nozzle-exit Mach and P_b0 the stagnation pressure behind it.
+  const double g = 1.4, arn = 1.86, p_g = 5.0e5;
+  const auto res = ejector_sudden_expansion_dead_head_and_jacobian(
+      p_g, 293.15, 101325.0, 293.15, EjectorGeometry{arn, arn}, g, 287.05, 1.0);
+  const double m1 = ejector_mach_from_area_ratio_supersonic(arn, g);
+  const double m1s = m1 * m1;
+  const double p02_p01 = std::pow((g + 1) * m1s / ((g - 1) * m1s + 2), g / (g - 1)) *
+                         std::pow((g + 1) / (2 * g * m1s - (g - 1)), 1 / (g - 1));
+  EXPECT_NEAR(res.value.p_c_pa, p_g * p02_p01, 1e-9 * p_g);
+}
+
+TEST(EjectorJacobians, ElementResidualsMatchCentralDifferenceWithHuangAnchors) {
+  // The element above, with the (P_c*, P_b0) pair switched: plateau, droop and
+  // the pin above P_b0 (P_c* ~ 37 kPa, P_b0 ~ 59 kPa at this supply).
+  const double A_t = 3.14e-5, A_e = 1.0e-4, A_mix = 8.0e-4, A_s = A_mix - A_e;
+  const EjectorGeometry geom{A_e / A_t, A_mix / A_t};
+  const double R = 287.0, ep = 0.95, es = 0.85, rec = 1.0, eps = 1e-3, g = 1.4;
+  const double sc_lo = 0.90, sc_hi = 0.999, ss_lo = 0.98, ss_hi = 1.02;
+  const auto huang = EjectorAnchorClosure::huang1999;
+  struct Case {
+    const char* id;
+    double u[9];
+  };
+  const Case cases[] = {
+      {"critical", {0.44, 0.13, 0.57, 700000.0, 440.0, 22850.0, 280.0, 30000.0, 100000.0}},
+      {"subcritical", {0.44, 0.20, 0.64, 700000.0, 440.0, 22850.0, 280.0, 52000.0, 60000.0}},
+      {"beyond_pb0", {0.44, 0.05, 0.49, 700000.0, 440.0, 22850.0, 280.0, 100000.0, 60000.0}},
+  };
+  auto rj_at = [&](const double u[9]) {
+    return ejector_element_residuals_and_jacobian(u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7],
+                                                  u[8], geom, A_t, A_e, A_s, g, R, ep, es, rec,
+                                                  eps, sc_lo, sc_hi, ss_lo, ss_hi, huang);
+  };
+  for (const auto& c : cases) {
+    const auto rj = rj_at(c.u);
+    for (int row = 0; row < 4; ++row) {
+      for (int k = 0; k < 9; ++k) {
+        double a[9], b[9];
+        for (int m = 0; m < 9; ++m) a[m] = b[m] = c.u[m];
+        const double h = 1e-6 * std::abs(c.u[k]);
+        a[k] += h;
+        b[k] -= h;
+        const double cd = (rj_at(a).residuals[row] - rj_at(b).residuals[row]) / (2 * h);
+        const double floor = 1e-6 * std::abs(rj.residuals[row]) + 1e-7;
+        EXPECT_NEAR(rj.jacobian[row][k], cd, 1e-5 * std::abs(cd) + floor)
+            << "case " << c.id << " row " << row << " seed " << k;
+      }
+    }
+  }
+}

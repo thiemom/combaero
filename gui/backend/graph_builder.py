@@ -921,6 +921,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 nozzle_exit_area=_ed.nozzle_exit_area,
                 mixing_area=_ed.mixing_area,
                 recovery_efficiency=_ed.recovery_efficiency,
+                anchor_closure=_ed.anchor_closure,
                 # The network's regime (#588): incompressible is Sanger's
                 # jet pump, lossless apart from mixing.
                 regime=schema.solver_settings.global_regime,

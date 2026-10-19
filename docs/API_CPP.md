@@ -954,6 +954,29 @@ JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
 ```
 
 ```cpp
+// Ejector operating anchors (P_c*, P_b0): the end of the critical plateau and
+// the far end of the subcritical droop. Two closure families, selected as a
+// pair by ejector_element_residuals_and_jacobian's anchor_closure argument:
+enum class EjectorAnchorClosure : int { kracik_dvorak = 0, huang1999 = 1 };
+// huang1999: P_c* by Huang 1999's printed chain (phi_m mixing, Eq. 19; normal
+// shock; isentropic diffuser), C2 through a sonic mixed flow; and P_b0 by the
+// sudden expansion over A_3 (zero secondary flow, closed-form subsonic exit).
+// Both (value, d/d{p_g, t_g, p_e, t_e}); value.p_c_pa carries the anchor.
+double ejector_huang_mixing_coefficient(double area_ratio_mix);
+EjectorCriticalPressureJacobian ejector_huang_critical_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom,
+    double gamma, double r_gas, double recovery_efficiency);
+EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom,
+    double gamma, double r_gas, double recovery_efficiency);
+// The whole element (4 rows, Jacobian over its nine unknowns) takes the pair
+// as its last argument, default kracik_dvorak.
+EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
+    /* ... flows, port states, geometry, gamma, r_gas, efficiencies, blend
+       windows ... */, EjectorAnchorClosure anchor_closure = EjectorAnchorClosure::kracik_dvorak);
+```
+
+```cpp
 // Incompressible jet pump (#588), the ejector's low-Mach limit: Sanger 1968
 // (NASA TN D-4445 App. B) with each stream at its own specific volume v = 1/rho.
 // Rows R0..R3 (nozzle, suction, mass, outlet) and their Jacobian over

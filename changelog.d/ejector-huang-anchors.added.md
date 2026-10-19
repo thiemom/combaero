@@ -1,0 +1,5 @@
+- `EjectorElement(anchor_closure="huang1999")` selects a second pair of operating anchors: Huang 1999's printed P_c* chain (φ_m mixing, normal shock, isentropic diffuser) with a sudden-expansion dead head. On the measured air rigs it halves the error of the whole entrainment curve (12-23% RMS against 29-48%), and no stress root it returns breaks the second law.
+  - The default stays `"kracik_dvorak"`.
+  - The Python reference and analytic C++ Jacobians are `huang_critical_back_pressure`, `sudden_expansion_dead_head`, `ejector_huang_critical_back_pressure_and_jacobian`, `ejector_sudden_expansion_dead_head_and_jacobian` and `ejector_huang_mixing_coefficient`.
+  - The GUI Inspector shows it as "Back-Pressure Anchors".
+- A failed solve whose ejector outlet lies above the dead-head back pressure now says so in the solver message: a real ejector backflows there, which the model does not cover.

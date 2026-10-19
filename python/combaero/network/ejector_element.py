@@ -128,7 +128,7 @@ from typing import Any
 
 import combaero as cb
 from combaero import _solver_tools
-from combaero.network._ejector_huang1999 import ETA_P, ETA_S, EjectorGeometry
+from combaero.network._ejector_huang1999 import ANCHOR_CLOSURES, ETA_P, ETA_S, EjectorGeometry
 from combaero.network.components import (
     DEFAULT_REGIME,
     CompressibilityLiteral,
@@ -204,6 +204,7 @@ class EjectorElement(MultiPortChamberBase):
         k_suction: float | None = None,
         k_throat: float = 0.0,
         k_diffuser: float = 0.0,
+        anchor_closure: str = "kracik_dvorak",
     ):
         """Build an ejector.
 
@@ -246,6 +247,14 @@ class EjectorElement(MultiPortChamberBase):
                 mixing has no friction and ``recovery_efficiency`` covers the
                 outlet. Sanger calibrated 0.008-0.036 / 0.09-0.14 /
                 0.076-0.0985 / 0.079-0.102 on his water jet pumps.
+            anchor_closure: The (P_c*, P_b0) pair that ends the critical
+                plateau and the subcritical droop; compressible regime only.
+                ``"kracik_dvorak"`` (default): Kracik & Dvorak's lossless
+                mixing, at the critical entrainment and at zero entrainment.
+                ``"huang1999"``: Huang 1999's printed chain (phi_m mixing,
+                normal shock, isentropic diffuser) and the sudden-expansion
+                dead head. Cross-source scores of both, and the printed
+                chain's fidelity gap, are in validation/ejector/README.md.
         """
         # Validate geometry BEFORE super().__init__ so the port-face areas
         # passed below are guaranteed positive.
@@ -262,6 +271,11 @@ class EjectorElement(MultiPortChamberBase):
                 f"EjectorElement '{id}': mixing_area ({mixing_area}) must exceed "
                 f"nozzle_exit_area ({nozzle_exit_area}) -- the constant-area section "
                 f"must leave room for the entrained flow."
+            )
+        if anchor_closure not in ANCHOR_CLOSURES:
+            raise ValueError(
+                f"EjectorElement '{id}': anchor_closure must be one of "
+                f"{ANCHOR_CLOSURES}, got {anchor_closure!r}."
             )
         if recovery_efficiency <= 0.0:
             raise ValueError(
@@ -320,6 +334,7 @@ class EjectorElement(MultiPortChamberBase):
         #: "<Element> '<id>'" (the outlet pipe), or "default".
         self._mixing_source = "user" if mixing_area is not None else ""
         self.recovery_efficiency = float(recovery_efficiency)
+        self.anchor_closure = anchor_closure
         self.regime = regime
         self.k_nozzle = float(k_nozzle)
         self.k_suction = float(k_suction)
@@ -396,6 +411,59 @@ class EjectorElement(MultiPortChamberBase):
         holder.initial_guess = guess
         self._auto_seeds[(holder.id, key)] = float(value)
 
+    def no_root_hint(self, graph: Any) -> str:
+        """Why a failed solve may have no root here: the outlet boundary above
+        the dead-head back pressure P_b0 the supply boundaries give. Above it a
+        real ejector backflows (the suction turns outward), a regime this model
+        does not cover (#619), so a network that needs it has no forward-flow
+        root. Evaluated at the boundary states, so it needs no solved point.
+        "" when the ports are not all pressure boundaries, or for the
+        incompressible jet pump (no dead head)."""
+        from combaero.network.components import PressureBoundary
+
+        if self.regime != "compressible":
+            return ""
+        pb, sb, ob = (
+            self._port_boundary(graph, n)
+            for n in (self.primary_node, self.secondary_node, self.outlet_node)
+        )
+        if not all(isinstance(b, PressureBoundary) for b in (pb, sb, ob)):
+            return ""
+        a3 = self.mixing_area
+        if a3 is None:
+            a3 = self._outlet_pipe_area(graph)[0] or DEFAULT_EJECTOR_MIXING_AREA
+        try:
+            x = list(cb.mass_to_mole(list(sb.Y)))
+            gamma = choke_plane_gamma(float(sb.Tt), x)
+            r_gas = float(cb.specific_gas_constant(x))
+            closure = (
+                _solver_tools.ejector_sudden_expansion_dead_head_and_jacobian
+                if self.anchor_closure == "huang1999"
+                else _solver_tools.ejector_dead_head_back_pressure_and_jacobian
+            )
+            p_b0 = closure(
+                float(pb.Pt),
+                float(pb.Tt),
+                float(sb.Pt),
+                float(sb.Tt),
+                self.area_ratio_nozzle,
+                float(a3) / self.throat_area,
+                gamma,
+                r_gas,
+                self.recovery_efficiency,
+            ).value.p_c_pa
+        except Exception:  # noqa: BLE001 -- a diagnostic never breaks a solve
+            return ""
+        if not float(ob.Pt) > p_b0:
+            return ""
+        return (
+            f"EjectorElement '{self.id}': the outlet boundary ({float(ob.Pt) / 1e5:.4g} bar) is "
+            f"above the dead-head back pressure P_b0 = {p_b0 / 1e5:.4g} bar that its supplies "
+            f"give (anchor_closure='{self.anchor_closure}'). A real ejector backflows there, "
+            "the suction turning outward, which this model does not cover: lower the outlet "
+            "pressure or raise the primary supply."
+        )
+
     def _port_boundary(self, graph: Any, port_id: str, max_hops: int = 8) -> Any:
         """The first flow boundary reached walking outward from a port, never
         through this ejector; None if there is none within ``max_hops``."""
@@ -450,6 +518,7 @@ class EjectorElement(MultiPortChamberBase):
             choked_mass_flow,
             critical_back_pressure,
             entrainment_ratio,
+            huang_critical_back_pressure,
         )
         from combaero.network.components import MassFlowBoundary, PressureBoundary
 
@@ -519,9 +588,11 @@ class EjectorElement(MultiPortChamberBase):
         elif p_g and p_e:
             try:
                 p_jct = float(
-                    critical_back_pressure(
-                        p_g, t_g, p_e, t_e, geom, gamma, r_gas, self.recovery_efficiency
-                    ).p_c_pa
+                    (
+                        huang_critical_back_pressure
+                        if self.anchor_closure == "huang1999"
+                        else critical_back_pressure
+                    )(p_g, t_g, p_e, t_e, geom, gamma, r_gas, self.recovery_efficiency).p_c_pa
                 )
             except Exception:  # noqa: BLE001
                 p_jct = None
@@ -697,6 +768,7 @@ class EjectorElement(MultiPortChamberBase):
             self._S_CHOKE_HI,
             self._S_SUB_LO,
             self._S_SUB_HI,
+            anchor_closure=self.anchor_closure,
         )
 
         # Map the 9 Jacobian seeds (in the C++ unknown order) to solver columns.
@@ -941,8 +1013,13 @@ class EjectorElement(MultiPortChamberBase):
         gamma: float,
         r_gas: float,
     ) -> float:
+        closure = (
+            _solver_tools.ejector_sudden_expansion_dead_head_and_jacobian
+            if self.anchor_closure == "huang1999"
+            else _solver_tools.ejector_dead_head_back_pressure_and_jacobian
+        )
         return float(
-            _solver_tools.ejector_dead_head_back_pressure_and_jacobian(
+            closure(
                 primary.Pt,
                 primary.Tt,
                 secondary.Pt,
@@ -962,8 +1039,13 @@ class EjectorElement(MultiPortChamberBase):
         gamma: float,
         r_gas: float,
     ) -> float:
+        closure = (
+            _solver_tools.ejector_huang_critical_back_pressure_and_jacobian
+            if self.anchor_closure == "huang1999"
+            else _solver_tools.ejector_critical_back_pressure_and_jacobian
+        )
         return float(
-            _solver_tools.ejector_critical_back_pressure_and_jacobian(
+            closure(
                 primary.Pt,
                 primary.Tt,
                 secondary.Pt,

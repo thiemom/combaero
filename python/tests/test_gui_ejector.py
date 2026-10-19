@@ -50,6 +50,22 @@ def test_ejector_data_defaults():
     assert d.initial_guess == {}
 
 
+def test_ejector_anchor_closure_reaches_the_element():
+    """The Inspector's back-pressure anchors select the element's
+    anchor_closure; the default stays Kracik & Dvorak, and an unknown value
+    is refused by the schema."""
+    assert EjectorData().anchor_closure == "kracik_dvorak"
+    schema = _three_plenum_ejector_schema()
+    for n in schema.nodes:
+        if n.type == "ejector":
+            n.data["anchor_closure"] = "huang1999"
+    net = build_network_from_schema(schema)
+    (e,) = (el for el in net.elements.values() if isinstance(el, EjectorElement))
+    assert e.anchor_closure == "huang1999"
+    with pytest.raises(ValueError):
+        EjectorData(anchor_closure="lossless")
+
+
 def test_ejector_data_ignores_unknown_keys():
     # extra="ignore" so stray GUI fields (e.g. a stale param) do not crash.
     d = EjectorData(throat_area=2e-5, bogus_field=123, label="ej")

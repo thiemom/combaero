@@ -2364,6 +2364,37 @@ const Inspector = () => {
 								Multiplies mixed stagnation P to give P_c*; 1.0 = no loss
 							</span>
 						</div>
+						{solverSettings.global_regime !== "incompressible" && (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`anchor_closure_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									Back-Pressure Anchors
+								</label>
+								<select
+									id={`anchor_closure_${selectedNode.id}`}
+									className="p-1 border rounded bg-white text-xs h-7"
+									value={selectedNode.data.anchor_closure || "kracik_dvorak"}
+									onChange={(e) =>
+										updateNodeData(selectedNode.id, {
+											anchor_closure: e.target.value,
+										})
+									}
+								>
+									<option value="kracik_dvorak">
+										Kracik &amp; Dvorak (lossless mixing, default)
+									</option>
+									<option value="huang1999">
+										Huang 1999 + sudden-expansion dead head
+									</option>
+								</select>
+								<span className="text-[9px] text-stone-400">
+									P_c* and the dead head P_b0 that end the plateau and the
+									droop. Huang's pair scores 2-3x closer on measured air rigs.
+								</span>
+							</div>
+						)}
 						{solverSettings.global_regime === "incompressible" && (
 							<div className="flex flex-col gap-1 rounded border border-stone-200 p-2">
 								<div className="text-[10px] font-bold text-gray-500 uppercase">
