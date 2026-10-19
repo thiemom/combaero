@@ -509,11 +509,13 @@ class EjectorData(BaseModel):
 class VortexData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     label: str | None = None
-    r_c: float = 0.02  # vortex core radius [m]
-    r_out: float = 0.10  # outer radius where pressure is evaluated [m]
-    r_in: float = 0.0  # inner radius (0 = on-axis)
+    # A free vortex (#661): Pt and Tt conserved, r * V_theta carried from
+    # r_in to r_out. Files saved before #661 also carry r_c and n (the old
+    # Vatistas core); extra="ignore" drops them, and the GUI notes the change.
+    r_out: float = 0.10  # outlet radius [m]
+    r_in: float = 0.05  # inlet radius [m]; 0 = on-axis, no angular momentum
     omega_rpm: float | None = None  # shaft speed [rpm]; None = use global solver setting
-    n: float = 2.0  # Vatistas shape parameter (>= 1, default n=2)
+    v_theta_in: float | None = None  # inlet swirl [m/s]; None = solid body, omega * r_in
     initial_guess: dict[str, float] = Field(default_factory=dict)
 
 

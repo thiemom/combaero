@@ -847,8 +847,10 @@ def series(seed: int) -> tuple[FlowNetwork, list[str]]:
                 omega_rpm=r.choice([500.0, 3000.0, 15000.0]),
                 r_out=r.choice([0.05, 0.1, 0.3]),
                 r_in=r.choice([0.0, 0.03]),
-                n=r.choice([1.0, 2.0, 4.0]),
             )
+            # The retired Vatistas n (#661), still drawn so every later draw
+            # in the seed keeps its value.
+            r.choice([1.0, 2.0, 4.0])
         elif k == "ea":
             el = EffectiveAreaConnectionElement(f"e{i}", x, y, r.choice([1e-5, 1e-3, 2e-2]))
         elif k == "dcd":

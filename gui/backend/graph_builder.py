@@ -1171,11 +1171,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 elem_id,
                 from_node=source_id,
                 to_node=target_id,
-                r_c=data.r_c,
                 r_out=data.r_out,
                 r_in=data.r_in,
                 omega_rpm=float(omega),
-                n=data.n,
+                v_theta_in=data.v_theta_in,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             if not elem.initial_guess:

@@ -2170,40 +2170,73 @@ const Inspector = () => {
 								</select>
 							</div>
 						</div>
+						{(selectedNode.data.r_c != null || selectedNode.data.n != null) && (
+							<div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-800 flex flex-col gap-1">
+								<div className="font-bold">Vortex model changed (#661)</div>
+								<div>
+									Saved with the old model, which added a Vatistas pressure rise
+									to the total pressure without any work input. It is now a free
+									vortex: total pressure and temperature are conserved, and only
+									the static pressure redistributes with radius. Results differ
+									from the saved ones. Core radius and shape n are no longer
+									used.
+								</div>
+								<button
+									type="button"
+									className="self-start rounded border border-amber-300 bg-white px-2 py-0.5 text-[10px] hover:bg-amber-100"
+									onClick={() =>
+										updateNodeData(
+											selectedNode.id,
+											{ r_c: undefined, n: undefined },
+											true,
+										)
+									}
+								>
+									Dismiss
+								</button>
+							</div>
+						)}
 						<LengthInput
-							id={`r_c_${selectedNode.id}`}
-							label="Core Radius r_c"
-							value={selectedNode.data.r_c ?? 0.02}
-							onChange={(val) => updateNodeData(selectedNode.id, { r_c: val })}
+							id={`r_in_${selectedNode.id}`}
+							label="Inlet Radius r_in"
+							value={selectedNode.data.r_in ?? 0.05}
+							onChange={(val) => updateNodeData(selectedNode.id, { r_in: val })}
 						/>
 						<LengthInput
 							id={`r_out_${selectedNode.id}`}
-							label="Outer Radius r_out"
+							label="Outlet Radius r_out"
 							value={selectedNode.data.r_out ?? 0.1}
 							onChange={(val) =>
 								updateNodeData(selectedNode.id, { r_out: val })
 							}
 						/>
-						<LengthInput
-							id={`r_in_${selectedNode.id}`}
-							label="Inner Radius r_in"
-							value={selectedNode.data.r_in ?? 0.0}
-							onChange={(val) => updateNodeData(selectedNode.id, { r_in: val })}
-						/>
 						<div className="flex flex-col gap-1">
 							<label className="text-xs font-bold text-gray-500 uppercase">
-								Shape Parameter n
+								Inlet Swirl V<sub>θ</sub> at r_in [m/s]
 							</label>
 							<NumericInput
-								id={`n_${selectedNode.id}`}
+								id={`v_theta_in_${selectedNode.id}`}
 								className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200"
-								value={selectedNode.data.n ?? 2.0}
-								onChange={(val) => updateNodeData(selectedNode.id, { n: val })}
-								min={1}
-								placeholder="2.0"
+								value={selectedNode.data.v_theta_in ?? null}
+								onChange={(val) =>
+									updateNodeData(selectedNode.id, { v_theta_in: val })
+								}
+								onClear={() =>
+									updateNodeData(selectedNode.id, { v_theta_in: null })
+								}
+								placeholder={`solid body ω·r_in: ${(
+									(((selectedNode.data.omega_rpm ??
+										solverSettings.omega_rpm ??
+										0) *
+										2 *
+										Math.PI) /
+										60) *
+										(selectedNode.data.r_in ?? 0.05)
+								).toFixed(1)}`}
 							/>
 							<span className="text-[9px] text-stone-400">
-								Vatistas n ≥ 1, default n=2
+								Free vortex: r·V<sub>θ</sub> conserved, total pressure and
+								temperature unchanged.
 							</span>
 						</div>
 						{selectedNode.data.result && (
@@ -2212,14 +2245,25 @@ const Inspector = () => {
 									Result
 								</div>
 								<div className="flex justify-between">
-									<span className="text-stone-500">ΔP vortex</span>
+									<span className="text-stone-500">
+										V<sub>θ</sub> in → out
+									</span>
 									<span className="font-mono font-bold">
-										{((selectedNode.data.result.dP_vortex ?? 0) / 1000).toFixed(
-											2,
-										)}{" "}
-										kPa
+										{(selectedNode.data.result.v_theta_in ?? 0).toFixed(1)} →{" "}
+										{(selectedNode.data.result.v_theta_out ?? 0).toFixed(1)} m/s
 									</span>
 								</div>
+								{selectedNode.data.result.dP_swirl_static != null && (
+									<div className="flex justify-between">
+										<span className="text-stone-500">ΔP static (swirl)</span>
+										<span className="font-mono font-bold">
+											{(
+												selectedNode.data.result.dP_swirl_static / 1000
+											).toFixed(2)}{" "}
+											kPa
+										</span>
+									</div>
+								)}
 								<div className="flex justify-between">
 									<span className="text-stone-500">ṁ</span>
 									<span className="font-mono font-bold">
