@@ -79,7 +79,8 @@ SOLVER_STRICT_ENV = "COMBAERO_SOLVER_STRICT"
 #: bugs, never states: they always raise.
 _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 
-#: Wall-clock budget [s] of the Newton-homotopy last retry (#642), within the
+#: Default wall-clock budget [s] (``NetworkSolver.homotopy_budget``) of the
+#: Newton-homotopy last retry (#642), within the
 #: caller's timeout. Inside the solver its stress rescues took 1.2-4.2 s; every
 #: solve that does not converge pays it -- unbounded, a junction scorecard with
 #: expected failures went from 8 s to 106 s (10 s: 87 s).
@@ -507,10 +508,14 @@ class NetworkSolver:
 
         self.incompressible_mach_limit: float = INCOMPRESSIBLE_MACH_LIMIT
         # Opt-in last retry of a cold solve that did not converge: a Newton
-        # homotopy from the cold guess (#642; NEWTON_HOMOTOPY_BUDGET). Off by
-        # default -- every non-converging solve pays up to its budget -- and
-        # turned on by the GUI backend and the stress harness.
+        # homotopy from the cold guess (#642). Off by default -- every
+        # non-converging solve pays up to its budget -- and turned on by the
+        # GUI backend and the stress harness. homotopy_budget [s] caps it within
+        # the caller's timeout; None gives it all the time the timeout leaves
+        # (the GUI: the user's max solve time is the only limit), or
+        # NEWTON_HOMOTOPY_BUDGET when there is no timeout either.
         self.homotopy_retry: bool = False
+        self.homotopy_budget: float | None = NEWTON_HOMOTOPY_BUDGET
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -2991,12 +2996,17 @@ class NetworkSolver:
         draws (the pressure ramp 7). It cannot help where the Jacobian at x0
         is itself singular -- the solve then stalls at lam ~ 0, and it stops
         once no step from the guess has succeeded down to 1/16. It runs for at
-        most NEWTON_HOMOTOPY_BUDGET seconds, within the caller's time left.
+        most ``homotopy_budget`` seconds within the caller's time left (default
+        NEWTON_HOMOTOPY_BUDGET; None: all of the time left).
         """
         left0 = None if timeout is None else timeout - (time.time() - t0)
         if left0 is not None and left0 < 1.0:
             return failed
-        budget = NEWTON_HOMOTOPY_BUDGET if left0 is None else min(left0, NEWTON_HOMOTOPY_BUDGET)
+        cap = self.homotopy_budget
+        if left0 is None:
+            budget = NEWTON_HOMOTOPY_BUDGET if cap is None else cap
+        else:
+            budget = left0 if cap is None else min(left0, cap)
         h_t0 = time.time()
         try:
             x0 = self._build_x0()

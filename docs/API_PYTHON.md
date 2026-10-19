@@ -869,7 +869,7 @@ bookkeeping keys. Five of them say what happened:
 
 **Newton-homotopy last retry (#642), opt-in.** `solver.homotopy_retry = True` (the GUI backend and the stress harness set it) gives a cold solve that did not converge one more try:
 - **The homotopy:** H(x, λ) = F(x) − (1 − λ) F(x0), from the cold guess x0, which solves it at λ = 0. λ rises adaptively, each step warm-started from the last, and the λ = 1 step is a plain solve with every check.
-- **Budget and limits:** at most `NEWTON_HOMOTOPY_BUDGET` = 5 s within the caller's timeout. It does not run for a root the checks rejected (`__converged__` true), and it stops when no step from the guess succeeds, the case of a singular Jacobian at x0.
+- **Budget and limits:** at most `solver.homotopy_budget` seconds within the caller's timeout (default `NEWTON_HOMOTOPY_BUDGET` = 5 s; `None` gives it all the time the timeout leaves, which the GUI uses so the user's max solve time is the only limit). It does not run for a root the checks rejected (`__converged__` true), and it stops when no step from the guess succeeds, the case of a singular Jacobian at x0.
 - **What it gives:** 3 of the 23 stress random draws that failed every other start now solve within their 20 s.
 - **Why it is off by default:** every non-converging solve pays its budget. A junction scorecard with expected failures went from 8 s to 50 s.
 

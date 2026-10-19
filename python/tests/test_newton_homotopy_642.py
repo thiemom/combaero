@@ -74,3 +74,30 @@ def test_a_cold_solve_that_succeeds_never_enters_it() -> None:
         r = s.solve()
     assert r["__success__"] and "homotopy" not in r["__message__"]
     assert getattr(s, "_homotopy_offset", None) is None
+
+
+def test_its_budget_is_the_callers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """homotopy_budget caps it within the timeout; None (the GUI) gives it all
+    the time the timeout leaves."""
+    g, _ = FAMILIES["random"](17)
+    s = NetworkSolver(g)
+    s.homotopy_retry = True
+    seen: list[float] = []
+    real = s._solve_flow_retries
+
+    def spy(**kw):
+        if getattr(s, "_homotopy_offset", None) is not None:
+            seen.append(kw["timeout"])
+        return real(**kw)
+
+    monkeypatch.setattr(s, "_solve_flow_retries", spy)
+    for budget, ceiling in ((1.0, 1.0), (None, 40.0)):
+        s.homotopy_budget = budget
+        seen.clear()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            s.solve(timeout=40.0)
+        assert seen and max(seen) <= ceiling
+    # None really is more than the default cap: the first step gets the rest
+    # of the 40 s, not 5.
+    assert max(seen) > solver_mod.NEWTON_HOMOTOPY_BUDGET
