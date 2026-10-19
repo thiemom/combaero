@@ -6,3 +6,6 @@
 - **The duct heat-transfer state is smooth through choke.** `duct_htc_static_state` is the new state the wall's htc reads. It equals `duct_static_state` below 99.8% of the sonic flux, then bends C1 onto 99.9% of it (M below ~0.97).
   - **Why:** a duct choked at its inlet sat exactly where the isentropic state's slope in G is infinite, and its wall coupling could not converge.
   - **New fields:** `DuctStaticState` gains `G_eff` and its partials.
+- **A smooth-wall channel whose heat-transfer area exceeds its friction-wetted area (4 A L / Dh) by over 10% is flagged** (`heat_area_ratio`, `heat_area_exceeds_wetted`, and an Inspector note).
+  - **Why:** heat over surface the friction never sees breaks Reynolds analogy. In a compressible duct a cooling gain can then outgrow the friction, and at a fixed exit Tt no flow matches a pressure drop.
+  - **Where it showed up:** the stress harness's impingement crossflow segments carried 3.9x (the plate's width on a round duct). They now use their wetted area, which changes that family's draws.

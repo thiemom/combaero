@@ -77,6 +77,16 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => (v > 0 ? "yes" : "no"),
 	},
+	heat_area_ratio: {
+		label: "Heat area / wetted area",
+		unit: "—",
+		format: (v) => v.toFixed(2),
+	},
+	heat_area_exceeds_wetted: {
+		label: "Heat area beyond wetted",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
 	rayleigh_in_momentum: {
 		label: "Heating in momentum",
 		unit: "—",

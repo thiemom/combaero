@@ -660,7 +660,10 @@ def impingement(seed: int) -> tuple[FlowNetwork, list[str]]:
                     length=xn * D,
                     diameter=0.02,
                     roughness=0.0,
-                    surface=ConvectiveSurface(area=xn * D * span),
+                    # The duct's own wetted area: the plate's width here
+                    # (xn D span, 3.9x) gave it heat over surface its friction
+                    # never sees, a cooling-driven pump (#551).
+                    surface=ConvectiveSurface(area=math.pi * 0.02 * xn * D),
                 )
             )
             g.add_wall(

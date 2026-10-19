@@ -200,3 +200,33 @@ def test_its_partials_match_differences(g: float) -> None:
             + [getattr(s, f"dGeff_d{name}")]
         )
         np.testing.assert_allclose(got, fd, rtol=2e-5, atol=1e-9 * np.abs(fd).max(), err_msg=name)
+
+
+# --- heat area beyond the friction-wetted area ---------------------------------
+
+
+def test_a_smooth_wall_with_heat_area_beyond_its_wetted_area_is_flagged() -> None:
+    """Heat over surface the friction never sees breaks Reynolds analogy; the
+    stress harness's crossflow segments carried 3.9x and became cooling-driven
+    pumps. At its own wetted area a duct is not flagged."""
+    g = _pair()
+    _, r = _solve(g)
+    d = r["__element_diag__"]
+    assert d["hot"]["heat_area_ratio"] == pytest.approx(1.0, rel=1e-12)
+    assert d["hot"]["heat_area_exceeds_wetted"] == 0.0
+    g = _pair()
+    g.elements["cold"].surface.area *= 3.9
+    _, r = _solve(g)
+    assert r["__element_diag__"]["cold"]["heat_area_ratio"] == pytest.approx(3.9, rel=1e-12)
+    assert r["__element_diag__"]["cold"]["heat_area_exceeds_wetted"] == 1.0
+
+
+def test_the_impingement_crossflow_segments_solve_at_their_wetted_area() -> None:
+    """Impingement seed 29: six short wall-coupled crossflow segments in
+    series, each carrying its heat in the momentum."""
+    g, _ = FAMILIES["impingement"](29)
+    _, r = _solve(g)
+    d = r["__element_diag__"]
+    for i in range(6):
+        assert d[f"g{i}"]["heat_area_exceeds_wetted"] == 0.0
+    assert r["__second_law_failures__"] == []

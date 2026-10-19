@@ -1427,6 +1427,14 @@ PORT_DISCHARGE_CHOKE_BLEND = 1e-4
 #: kernel is adiabatic Fanno flow, so heating's cost is not in the solve.
 RAYLEIGH_OMISSION_FLAG = 1e-3
 
+#: Ratio of a smooth-wall channel's heat-transfer area to its friction-wetted
+#: area 4 A L / Dh above which the channel is flagged (#551): heat then flows
+#: over surface its friction never sees, which breaks Reynolds analogy -- in a
+#: compressible duct a cooling gain can then outgrow the friction, making the
+#: duct a pump at fixed exit Tt. A stress-harness crossflow segment carried
+#: 3.9x (the plate's width on a round duct) and could not be solved.
+HEAT_AREA_EXCESS_FLAG = 1.1
+
 
 _ROW_KINDS = ("p", "mdot")
 
@@ -6532,6 +6540,15 @@ class ChannelElement(NetworkElement):
                     duct["rayleigh_in_momentum"] = 1.0
                 else:
                     duct.update(self._rayleigh_omission(state_in, state_out, flow, ref))
+        # Heat-transfer area beyond the friction-wetted area (#551). Ribbed and
+        # pin-fin surfaces carry their own friction, so only a smooth wall.
+        if self.surface is not None and isinstance(self.surface.model, SmoothModel):
+            dh_w = self.Dh or self.diameter
+            if dh_w and self.area and self.length:
+                wetted = 4.0 * self.area * self.length / dh_w
+                ratio = float(self.surface.area) / wetted
+                duct["heat_area_ratio"] = ratio
+                duct["heat_area_exceeds_wetted"] = float(ratio > HEAT_AREA_EXCESS_FLAG)
         return {
             "m_dot": float(state_in.m_dot),
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),

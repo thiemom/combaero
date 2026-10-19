@@ -384,6 +384,26 @@ const Inspector = () => {
 						</div>
 					</div>
 				)}
+				{/* Heat-transfer area beyond the friction-wetted area (#551). */}
+				{selectedNode.data.result?.heat_area_exceeds_wetted === 1 && (
+					<div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-800">
+						<div className="font-bold uppercase mb-0.5">
+							Heat area beyond the wetted wall
+						</div>
+						<div className="font-mono">
+							heat area ={" "}
+							{(selectedNode.data.result.heat_area_ratio ?? 0).toFixed(2)} × the
+							duct's wetted area
+						</div>
+						<div className="italic text-amber-700 mt-0.5">
+							Heat flows over surface the duct's friction never sees, so heat
+							transfer and pressure loss disagree. In a compressible duct a
+							cooling gain can then outgrow the friction and the solve may fail.
+							Use the duct's own wetted area, or a ribbed or pin-fin surface
+							that carries its own friction.
+						</div>
+					</div>
+				)}
 				{/* Incompressible validity (#588): an element on an incompressible
 				    closure running above the Mach limit. Reported only. */}
 				{warningsFor(selectedNode.id, solveResults?.incompressible_warnings)
