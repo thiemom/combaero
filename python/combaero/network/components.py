@@ -8075,25 +8075,46 @@ class BorderCarnotLossElement(NetworkElement):
 
 
 # ---------------------------------------------------------------------------
-# Vortex element: rotating-cavity centrifugal pressure rise (Vatistas 1991)
+# Vortex element: free-vortex swirl redistribution (#661)
 # ---------------------------------------------------------------------------
+
+
+def _swirl_static_pressure(Pt: float, Tt: float, v: float, X: list[float]) -> tuple[float, float]:
+    """(static P [Pa], swirl Mach [-]) of a stream at stagnation (Pt, Tt)
+    moving at speed v: h = h_t - v^2/2, then isentropic from the stagnation
+    state. Variable cp throughout, from C++."""
+    if v == 0.0:
+        return Pt, 0.0
+    h = cb.h_mass(Tt, X) - 0.5 * v * v
+    T = cb.calc_T_from_h_mass(h, X, Tt)
+    M = abs(v) / cb.speed_of_sound(T, X)
+    return float(cb.P_from_stagnation(Pt, Tt, M, X)), float(M)
 
 
 class VortexElement(NetworkElement):
     """
-    Models the centrifugal pressure rise of a rotating cavity or disc
-    using the Vatistas (1991) n-vortex model.
+    Free-vortex swirl redistribution between an inlet radius r_in and an
+    outlet radius r_out (#661).
 
-    The shaft angular velocity omega drives a vortex whose circulation is
-    Gamma = 2*pi * r_c^2 * omega * 2^(1/n), i.e. the core rotates as solid
-    body at omega.  The pressure rise from r_in to r_out follows from
-    integrating the centripetal acceleration:
-        dP_rise = vatistas_delta_p(r_out, rho, Gamma, r_c, n)
-                - vatistas_delta_p(r_in,  rho, Gamma, r_c, n)
-    where rho is taken from the upstream node state.
+    No work is done on the gas: total pressure and total temperature are
+    conserved, and the angular momentum r * V_theta is carried from r_in to
+    r_out, so V_theta_out = V_theta_in * r_in / r_out. What changes is the
+    static pressure: swirl kinetic energy turns into static pressure going
+    outward and back again going inward. That static state is reported in the
+    diagnostics; it is not a network unknown.
+
+    The inlet swirl V_theta_in [m/s] is the user's; it defaults to solid-body
+    rotation at the shaft speed, omega * r_in.
+
+    Until #661 this element added the static radial-equilibrium rise of a
+    Vatistas n-vortex to the TOTAL pressure at constant Tt: neither a free
+    vortex (no Pt change) nor rotor work (Tt rises with Pt), and it destroyed
+    entropy for every omega > 0. Its core radius ``r_c`` and shape ``n`` are
+    accepted, ignored, and deprecated (removed in 0.8.0); the Vatistas
+    functions themselves (``cb.vatistas_*``) are unchanged.
     """
 
-    #: RESIDUAL-ROW-SCALING: the row is Pt_out - Pt_in - dp_rise, in Pa. It was
+    #: RESIDUAL-ROW-SCALING: the row is Pt_out - Pt_in, in Pa. It was
     #: filed as a mass-flow row by default, weighting it ref_p/ref_mdot
     #: (1e5-1e9) too heavily; LM then traded every pressure for it (#614).
     residual_scale_kind = "p"
@@ -8103,42 +8124,43 @@ class VortexElement(NetworkElement):
         id: str,
         from_node: str,
         to_node: str,
-        r_c: float = 0.02,
+        *,
         r_out: float = 0.10,
-        r_in: float = 0.0,
+        r_in: float = 0.05,
         omega_rpm: float = 0.0,
-        n: float = 2.0,
+        v_theta_in: float | None = None,
+        r_c: float | None = None,
+        n: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
-        if n < 1.0:
-            raise ValueError(f"Vatistas shape parameter n must be >= 1; got {n}")
-        if r_c <= 0.0:
-            raise ValueError(f"Core radius r_c must be > 0; got {r_c}")
+        if r_c is not None or n is not None:
+            warnings.warn(
+                "VortexElement's r_c and n are ignored and will be removed in 0.8.0: "
+                "the element is a free vortex (#661), which has no Vatistas core.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if r_out <= 0.0:
-            raise ValueError(f"Outer radius r_out must be > 0; got {r_out}")
+            raise ValueError(f"Outlet radius r_out must be > 0; got {r_out}")
         if r_in < 0.0:
-            raise ValueError(f"Inner radius r_in must be >= 0; got {r_in}")
-        self.r_c = float(r_c)
+            raise ValueError(f"Inlet radius r_in must be >= 0; got {r_in}")
+        if r_in == 0.0 and v_theta_in:
+            raise ValueError(
+                "Swirl at r_in = 0 carries no angular momentum: give r_in > 0 "
+                f"for v_theta_in = {v_theta_in} m/s"
+            )
         self.r_out = float(r_out)
         self.r_in = float(r_in)
         self.omega_rpm = float(omega_rpm)
-        self.n = float(n)
+        self.v_theta_in = None if v_theta_in is None else float(v_theta_in)
 
-    def _gamma(self) -> float:
-        """Circulation [m^2/s] from shaft speed assuming solid-body vortex core."""
-        omega = self.omega_rpm * 2.0 * math.pi / 60.0
-        return 2.0 * math.pi * self.r_c**2 * omega * 2.0 ** (1.0 / self.n)
-
-    def _dp_rise(self, rho: float) -> float:
-        """Total pressure rise [Pa] at inlet density rho."""
-        gamma = self._gamma()
-        if gamma == 0.0:
-            return 0.0
-        dp_out = cb.vatistas_delta_p(self.r_out, rho, gamma, self.r_c, self.n)
-        dp_in = (
-            cb.vatistas_delta_p(self.r_in, rho, gamma, self.r_c, self.n) if self.r_in > 0.0 else 0.0
-        )
-        return dp_out - dp_in
+    def swirl(self) -> tuple[float, float]:
+        """(V_theta at r_in, V_theta at r_out) [m/s]; r * V_theta is conserved."""
+        if self.v_theta_in is not None:
+            v_in = self.v_theta_in
+        else:
+            v_in = self.omega_rpm * 2.0 * math.pi / 60.0 * self.r_in
+        return v_in, v_in * self.r_in / self.r_out
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass
@@ -8152,40 +8174,40 @@ class VortexElement(NetworkElement):
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        rho_raw = state_in.density()
-        rho, d_rho_safe = _safe_rho(rho_raw)
-        dp_rise = self._dp_rise(rho)
-
-        res = [state_out.Pt - state_in.Pt - dp_rise]
-
-        # d(dp_rise)/d(rho) = dp_rise / rho  (dP scales linearly with rho)
-        # d(rho)/d(P)  ~  rho / P  for ideal gas
-        # d(rho)/d(T)  ~ -rho / T  for ideal gas
-        dp_drho = (dp_rise / rho) * d_rho_safe if rho > 0 else 0.0
-        drho_dP = rho / state_in.P if state_in.P > 0 else 0.0
-        drho_dT = -rho / state_in.T if state_in.T > 0 else 0.0
-
+        res = [state_out.Pt - state_in.Pt]
         jac: dict[int, dict[str, float]] = {
-            0: {
-                f"{self.to_node}.Pt": 1.0,
-                f"{self.from_node}.Pt": -1.0,
-                f"{self.from_node}.P": -dp_drho * drho_dP,
-                f"{self.from_node}.T": -dp_drho * drho_dT,
-            }
+            0: {f"{self.to_node}.Pt": 1.0, f"{self.from_node}.Pt": -1.0}
         }
         return res, jac
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float]:
-        if state_in.P <= 0 or state_in.T <= 0:
-            return {}
-        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
-        rho = cs_in.thermo.rho
-        dp_rise = self._dp_rise(rho)
-        return {
+        out: dict[str, float] = {
             "m_dot": float(state_in.m_dot),
             "omega_rpm": float(self.omega_rpm),
-            "dP_vortex": float(dp_rise),
             **_element_pressure_block(state_in, state_out, mach_in=0.0, mach_out=0.0),
         }
+        v_in, v_out = self.swirl()
+        out["v_theta_in"] = float(v_in)
+        out["v_theta_out"] = float(v_out)
+        # The stagnation state is the same at both radii; read it upstream.
+        up = state_in if float(state_in.m_dot) >= 0.0 else state_out
+        if not (up.Pt > 0.0 and up.Tt > 0.0):
+            return out
+        try:
+            p_in, m_in = _swirl_static_pressure(up.Pt, up.Tt, v_in, up.X)
+            p_out, m_out = _swirl_static_pressure(up.Pt, up.Tt, v_out, up.X)
+        except (RuntimeError, ValueError):
+            # The swirl's kinetic energy exceeds the stream's enthalpy.
+            return out
+        out.update(
+            {
+                "P_swirl_in": p_in,
+                "P_swirl_out": p_out,
+                "dP_swirl_static": p_out - p_in,
+                "M_theta_in": m_in,
+                "M_theta_out": m_out,
+            }
+        )
+        return out

@@ -1265,20 +1265,22 @@ jct_tuned = IdealMomentumTeeElement(
     inlet_angles_deg=[0.0], outlet_angles_deg=[0.0, 90.0], loss_factor=0.8,
 )
 
-# Rotating cavity / disc-pump pressure rise (Vatistas n-vortex model)
+# Free-vortex swirl redistribution from r_in to r_out (#661); keyword-only
 vortex = VortexElement(
     "vortex", "node_in", "node_out",
-    r_c=0.02,       # vortex core radius [m]
-    r_out=0.10,     # outer evaluation radius [m]
-    r_in=0.0,       # inner evaluation radius [m] (0 = on-axis)
-    omega_rpm=3000, # shaft speed [rpm]
-    n=2.0,          # Vatistas shape parameter (>= 1, default n=2)
+    r_in=0.05,        # inlet radius [m] (0 = on-axis: no angular momentum)
+    r_out=0.10,       # outlet radius [m]; r_out < r_in is inward flow
+    omega_rpm=3000,   # shaft speed [rpm]; sets the default inlet swirl
+    v_theta_in=None,  # inlet swirl [m/s]; None = solid body, omega * r_in
 )
-# Residual: Pt_out - Pt_in - dP_vortex = 0
-# dP_vortex = vatistas_delta_p(r_out, ...) - vatistas_delta_p(r_in, ...)
-# Gamma is derived from omega so that V_theta(r_c) = omega * r_c exactly (solid-body core).
-# Diagnostics include: m_dot, omega_rpm, dP_vortex [Pa], Pt_in, Pt_out.
-# If omega_rpm=0 the element is lossless (transparent); r_in=0 omits the on-axis term.
+# Residual: Pt_out - Pt_in = 0 (no work: Pt and Tt conserved).
+# r * V_theta is conserved, so V_theta_out = V_theta_in * r_in / r_out; the
+# swirl's dynamic head turns into static pressure outward (and back inward).
+# Diagnostics: m_dot, omega_rpm, v_theta_in/out [m/s], P_swirl_in/out [Pa]
+# (static at each radius, isentropic from the stagnation state),
+# dP_swirl_static [Pa], M_theta_in/out, Pt_in, Pt_out.
+# r_c and n (the pre-#661 Vatistas core) are accepted, ignored and deprecated
+# (removed in 0.8.0); the cb.vatistas_* functions below are unchanged.
 
 # Supersonic ejector across all operating regimes -- critical (double-choked),
 # subcritical droop, and unchoked-primary subsonic jet pump -- in one C1 residual
