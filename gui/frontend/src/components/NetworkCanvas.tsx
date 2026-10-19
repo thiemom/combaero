@@ -175,11 +175,10 @@ const NetworkCanvas = () => {
 			} else if (type === "vortex") {
 				data = {
 					...data,
-					r_c: 0.02,
 					r_out: 0.1,
-					r_in: 0.0,
+					r_in: 0.05,
 					omega_rpm: null,
-					n: 2.0,
+					v_theta_in: null,
 				} as any;
 			}
 
