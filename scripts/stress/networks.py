@@ -535,11 +535,16 @@ def ejector(seed: int) -> tuple[FlowNetwork, list[str]]:
     else:
         Pp = r.choice([2e5, 4e5])
         Ps = 1e5
-        Po = Ps + (Pp - Ps) * r.uniform(0.02, 0.3)
+        # Inside the jet pump's operating range (#619): below its shut-off
+        # head, Sanger's rows at zero suction flow with no losses,
+        # dPt_o = 2 (Pt_p - Pt_s) b (1 - b/2), b = A_e / A_3. Above it the
+        # suction reverses, which the model was not derived for.
+        b = Ae / Am
+        Po = Ps + 2.0 * (Pp - Ps) * b * (1.0 - 0.5 * b) * r.uniform(0.05, 0.8)
     for nid, p, tt in (("bp", Pp, r.choice([300.0, 440.0])), ("bs", Ps, 280.0), ("bo", Po, 300.0)):
         _pb(g, nid, p, tt)
     for nid, p in (("mp", Pp), ("ms", Ps), ("mo", Po)):
-        mc = MomentumChamberNode(nid, area=A)
+        mc = MomentumChamberNode(nid, area=A, regime=regime)
         mc.initial_guess = {f"{nid}.P": p, f"{nid}.Pt": p}
         g.add_node(mc)
     for eid, a, b in (("cp", "bp", "mp"), ("cs", "bs", "ms"), ("co", "mo", "bo")):
