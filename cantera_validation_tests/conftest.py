@@ -1,4 +1,55 @@
+import os
+import secrets
+import zlib
+
+import numpy as np
 import pytest
+
+# Random states are drawn fresh each run: that is how test_property_SH caught
+# Cantera's own argon weight (#680), on a draw no fixed seed had made. The
+# seed is printed in the header and on every failure; --seed N (or
+# COMBAERO_TEST_SEED=N) replays the run, and each test's draw depends only on
+# the seed and its own id, so one failing test reruns on its own.
+SEED_ENV = "COMBAERO_TEST_SEED"
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--seed",
+        type=int,
+        default=None,
+        help=f"seed for the random states (default: fresh, or ${SEED_ENV})",
+    )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    seed = config.getoption("--seed")
+    if seed is None:
+        env = os.environ.get(SEED_ENV)
+        seed = int(env) if env else secrets.randbelow(2**32)
+    config._combaero_seed = seed
+    # xdist workers start after this and inherit the environment: one seed
+    # for the whole run, the one the header shows.
+    os.environ[SEED_ENV] = str(seed)
+
+
+def pytest_report_header(config: pytest.Config) -> str:
+    return f"random seed: {config._combaero_seed} (replay: --seed {config._combaero_seed})"
+
+
+@pytest.fixture(autouse=True)
+def _seeded_random(request: pytest.FixtureRequest) -> None:
+    seed = request.config._combaero_seed
+    np.random.seed((seed ^ zlib.crc32(request.node.nodeid.encode())) % 2**32)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
+    outcome = yield
+    rep = outcome.get_result()
+    if rep.failed:
+        seed = item.config._combaero_seed
+        rep.sections.append(("random seed", f"replay {item.nodeid} with --seed {seed}"))
 
 
 @pytest.fixture(scope="session")

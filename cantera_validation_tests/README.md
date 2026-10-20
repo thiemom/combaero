@@ -45,6 +45,15 @@ Parallel execution (using pytest-xdist):
 uv run --project cantera_validation_tests pytest -n auto
 ```
 
+Random states are drawn fresh each run (that is how the argon molar-mass
+mismatch of #680 surfaced). The seed is printed in the header and on every
+failure; replay a run, or one failing test, with it:
+
+```bash
+uv run --project cantera_validation_tests pytest --seed 12345
+COMBAERO_TEST_SEED=12345 uv run --project cantera_validation_tests pytest
+```
+
 Running with coverage:
 
 ```bash

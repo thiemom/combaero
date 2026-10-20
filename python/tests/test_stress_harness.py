@@ -22,6 +22,7 @@ from networks import FAMILIES  # noqa: E402
 def test_every_family_builds_valid_networks(family: str) -> None:
     for seed in range(5):
         net, tags = FAMILIES[family](seed)
+        net.resolve_all_topology()  # as the solver does; theta sources resolve here
         net.validate()
         assert net.elements and tags
 
@@ -52,3 +53,25 @@ def test_ejector_draws_stay_inside_their_operating_range() -> None:
         Pp, Ps, Po = (net.nodes[n].Pt for n in ("bp", "bs", "bo"))
         assert Ps < Po < Ps + 2.0 * (Pp - Ps) * b * (1.0 - 0.5 * b)
     assert seen > 5
+
+
+@pytest.mark.parametrize("seed", [3329152591, 3329152610])
+def test_a_loss_between_two_combustors_names_its_theta_source(seed: int) -> None:
+    """Fresh seeds drew a PressureLossElement between two combustors, which
+    the network refuses without a theta_source (the 0:40 regression set never
+    drew one); the generator names the upstream node."""
+    net, _ = FAMILIES["random"](seed)
+    net.resolve_all_topology()
+    net.validate()
+
+
+def test_fresh_seeds_are_n_consecutive_from_a_printed_offset(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from run import _seeds
+
+    assert _seeds("0:40") == range(0, 40)
+    assert _seeds("7") == range(7)
+    fresh = _seeds("random:5")
+    assert len(fresh) == 5
+    assert f"--seeds {fresh.start}:{fresh.stop}" in capsys.readouterr().err
