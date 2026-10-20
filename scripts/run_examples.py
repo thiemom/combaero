@@ -18,16 +18,7 @@ class ExampleResult(TypedDict):
 # real signal instead of a permanently red check nobody reads. An entry here is
 # tracked debt, not a dismissal: each one names the issue that owns it, and the
 # entry comes out the moment the example runs again.
-KNOWN_BROKEN: dict[str, str] = {
-    "combustor_pressure_loss_example.py": (
-        "CombustorNode lost its pressure_loss= callback; the example exists to "
-        "demonstrate that capability, so it needs rewriting, not renaming (#351)"
-    ),
-    "network_runner_bc_swap.py": (
-        "builds a merging MomentumChamberNode topology that FlowNetwork.validate "
-        "now rejects; needs rebuilding on a MultiPortChamberBase junction (#351)"
-    ),
-}
+KNOWN_BROKEN: dict[str, str] = {}
 
 
 def run_example(example_path: Path, timeout: int = 120) -> ExampleResult:
