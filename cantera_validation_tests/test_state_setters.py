@@ -201,3 +201,18 @@ def test_property_DP(gas, i):
     cb_state.DP = (target_rho, P)
 
     assert_state_equal(gas, cb_state, tol=1e-3)
+
+
+def test_every_species_has_combaeros_molar_mass(gas):
+    """The harness compares like with like: each species' molar mass in the
+    Cantera file is CombAero's. Left to Cantera's own element table, Ar came
+    out 39.95 against CombAero's 39.948, an argon-rich random state differed
+    by up to 1.2e-3 R in s_mass, and test_property_SH failed now and then on
+    its 1e-3 pressure tolerance."""
+    for i, name in enumerate(CB_SPECIES):
+        if name not in gas.species_names:
+            continue
+        X = [0.0] * len(CB_SPECIES)
+        X[i] = 1.0
+        mw_ct = gas.molecular_weights[gas.species_index(name)]
+        assert mw_ct == pytest.approx(cb.mwmix(X), rel=1e-12), name
