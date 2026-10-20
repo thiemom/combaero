@@ -35,6 +35,7 @@ def seen(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
             {
                 "homotopy_retry": self.homotopy_retry,
                 "homotopy_budget": self.homotopy_budget,
+                "bc_ramp_retry": self.bc_ramp_retry,
                 "incompressible_mach_limit": self.incompressible_mach_limit,
             }
         )
@@ -53,6 +54,7 @@ def _schema() -> dict[str, Any]:
 _EXPECTED = {
     "homotopy_retry": True,
     "homotopy_budget": None,
+    "bc_ramp_retry": True,
     "incompressible_mach_limit": _MACH_LIMIT,
 }
 
