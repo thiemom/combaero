@@ -896,6 +896,10 @@ linear Mach path and bracketed by constant-Mach paths at either end; a
 volume (a segment's momentum spans half of each station). The legacy
 `TeeJunctionElement` is not checked. Each element's `sigma_norm` also appears
 in its diagnostics.
+A failing verdict demotes the solve to INCONSISTENT (#598). An element whose
+own closure explains the failure says why through `second_law_hint(sol) -> str`,
+appended to `__message__`: `IdealMomentumTeeElement` names a `loss_factor`
+below ~M^2/4 at its port Mach, where its low-Mach loss form creates flow work.
 
 **Incompressible validity (#588).** Each element running an incompressible
 closure is checked against one Mach limit, `solver.incompressible_mach_limit`
