@@ -321,6 +321,8 @@ const useStore = create<RFState>((set, get) => ({
 		global_regime: "compressible",
 		init_strategy: "default",
 		method: "hybr",
+		// Mirrors gui/backend/schemas.py DEFAULT_SOLVE_TIMEOUT; kept equal by
+		// python/tests/test_solve_timeout_default_sync.py.
 		timeout: 30,
 		omega_rpm: null,
 		Nu_multiplier: null,

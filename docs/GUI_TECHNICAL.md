@@ -74,7 +74,7 @@ Diagnostics returned on solve include `omega` (entrainment ratio),
   "global_regime": "incompressible" | "compressible",
   "init_strategy": "default" | "incompressible_warmstart" | "homotopy",
   "method": "hybr" | "lm" | "broyden1" | ...,
-  "timeout": 180.0
+  "timeout": 30.0
 }
 ```
 
