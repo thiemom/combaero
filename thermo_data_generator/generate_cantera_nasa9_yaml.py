@@ -76,11 +76,17 @@ def create_cantera_yaml(
         if species_upper in SPECIES_COMPOSITION:
             elements.update(SPECIES_COMPOSITION[species_upper].keys())
 
+    # Every element is declared with CombAero's own atomic mass. Left to its
+    # built-in table, Cantera gives Ar 39.95 (IUPAC abridged) where CombAero
+    # has 39.948 (the NASA-9 value): an argon-rich state then differs by up to
+    # 1.2e-3 R in s_mass, and the s-h state-setter check failed on it.
+    element_defs = [{"symbol": el, "atomic-weight": ATOMIC_MASSES[el]} for el in sorted(elements)]
+
     # Create phase definition
     phase_data = {
         "name": "gas",
         "thermo": "ideal-gas",
-        "elements": sorted(elements),
+        "elements": [{"elements": sorted(elements)}],
         "species": species_list,
         "state": {"T": 300.0, "P": 101325.0},
     }
@@ -148,6 +154,7 @@ def create_cantera_yaml(
         "generator": "generate_cantera_nasa9_yaml.py",
         "cantera-version": "3.0.0",
         "date": "2026-02-10",
+        "elements": element_defs,
         "phases": [phase_data],
         "species": species_data,
     }
