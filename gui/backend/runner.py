@@ -30,7 +30,6 @@ from typing import Any
 import pandas as pd
 
 import combaero as cb
-from combaero.network import NetworkSolver
 
 from .graph_builder import build_network_from_schema
 from .schemas import (
@@ -41,6 +40,7 @@ from .schemas import (
     StateResult,
 )
 from .second_law_view import element_fields
+from .solver_setup import make_solver
 from .units import label_with_unit
 from .validity_view import element_fields as validity_fields
 
@@ -575,9 +575,7 @@ class NetworkRunner:
             self._apply_overrides(schema, overrides)
 
         net = build_network_from_schema(schema)
-        solver = NetworkSolver(net)
-        if schema.solver_settings.incompressible_mach_limit is not None:
-            solver.incompressible_mach_limit = schema.solver_settings.incompressible_mach_limit
+        solver = make_solver(net, schema)
         x0_array: np.ndarray | None = None
         if _x0 is not None:
             x0_array = np.asarray(_x0)

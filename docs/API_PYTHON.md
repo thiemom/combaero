@@ -867,7 +867,7 @@ bookkeeping keys. Five of them say what happened:
 | `__caught_exceptions__` | `list[dict]` | every exception the solve caught instead of raising, at most 50: `phase` (`start`: an attempt's starting point; `probe` / `probe_jacobian`: a trial point the root finder rejected; a `wall_free_seed:` prefix for the wall-free seed solve), `where` (the node or element being evaluated, or the non-finite Jacobian rows and columns), `type`, `message`, `frames` (innermost three). Empty on a clean solve. |
 | `__caught_exception_count__` | `int` | all caught exceptions, including those beyond the 50 kept |
 
-**Newton-homotopy last retry (#642), opt-in.** `solver.homotopy_retry = True` (the GUI backend and the stress harness set it) gives a cold solve that did not converge one more try:
+**Newton-homotopy last retry (#642), opt-in.** `solver.homotopy_retry = True` (the GUI backend, `NetworkRunner` and the stress harness set it) gives a cold solve that did not converge one more try:
 - **The homotopy:** H(x, λ) = F(x) − (1 − λ) F(x0), from the cold guess x0, which solves it at λ = 0. λ rises adaptively, each step warm-started from the last, and the λ = 1 step is a plain solve with every check.
 - **Budget and limits:** at most `solver.homotopy_budget` seconds within the caller's timeout (default `NEWTON_HOMOTOPY_BUDGET` = 5 s; `None` gives it all the time the timeout leaves, which the GUI uses so the user's max solve time is the only limit). It does not run for a root the checks rejected (`__converged__` true), and it stops when no step from the guess succeeds, the case of a singular Jacobian at x0.
 - **What it gives:** 3 of the 23 stress random draws that failed every other start now solve within their 20 s.
@@ -1649,6 +1649,10 @@ dPbar = vortex.delta_P_bar(r=0.1)        # normalised [0, 1)
 
 `NetworkRunner` loads a network saved from the GUI and runs it from Python
 scripts or Jupyter notebooks — no web server required.
+It configures the solver exactly as the GUI does (`gui/backend/solver_setup.py`):
+the Newton-homotopy last retry on, bounded only by the solve's timeout
+(default 30 s, `DEFAULT_SOLVE_TIMEOUT`), and the drawing's incompressible Mach
+limit. A saved drawing solves the same from a script as on the canvas.
 
 ### Loading a network
 

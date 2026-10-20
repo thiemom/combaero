@@ -1,0 +1,1 @@
+- **`NetworkRunner` solves a saved drawing the way the GUI does.** The GUI's solve and export routes turn on the Newton-homotopy last retry (#642), but `NetworkRunner.solve` and `.sweep` did not, so a script could fail on a network the canvas converged. All three now build their solver through `gui/backend/solver_setup.py`.
