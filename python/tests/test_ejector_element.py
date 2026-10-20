@@ -58,6 +58,10 @@ def _element(**overrides) -> EjectorElement:
         # The compressible closures are the subject (#588: the library
         # default is incompressible until #585).
         "regime": "compressible",
+        # K&D's anchors: these fixtures place the outlet inside its critical window;
+        # huang1999 (the default) has its own tests (test_ejector_huang_anchors.py,
+        # test_ejector_anchor_closure_element.py, test_ejector_subcritical_element.py).
+        "anchor_closure": "kracik_dvorak",
     }
     kwargs.update(overrides)
     return EjectorElement(**kwargs)
@@ -448,6 +452,10 @@ def _build_network() -> FlowNetwork:
         nozzle_exit_area=_NOZZLE_EXIT_AREA,
         mixing_area=_MIXING_AREA,
         regime="compressible",
+        # K&D's anchors: these fixtures place the outlet inside its critical window;
+        # huang1999 (the default) has its own tests (test_ejector_huang_anchors.py,
+        # test_ejector_anchor_closure_element.py, test_ejector_subcritical_element.py).
+        anchor_closure="kracik_dvorak",
     )
     ej1.initial_guess = {"ej1.P_jct": op["pc"]}
     net.add_element(ej1)

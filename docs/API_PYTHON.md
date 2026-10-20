@@ -1296,8 +1296,8 @@ vortex = VortexElement(
 
 # Supersonic ejector across all operating regimes -- critical (double-choked),
 # subcritical droop, and unchoked-primary subsonic jet pump -- in one C1 residual
-# system (Huang 1999 entrainment ratio + Kracik & Dvorak 2016 mixing closure;
-# see validation/ejector/README.md and OPERATING_REGIMES_DESIGN.md).
+# system (Huang 1999 entrainment ratio; anchors by anchor_closure, Huang 1999 by
+# default or Kracik & Dvorak 2016; see validation/ejector/README.md and OPERATING_REGIMES_DESIGN.md).
 from combaero.network.ejector_element import EjectorElement
 ejector = EjectorElement(
     "ej1", primary_node="mc_primary", secondary_node="mc_secondary", outlet_node="mc_outlet",
@@ -1307,9 +1307,10 @@ ejector = EjectorElement(
                               # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA)
     recovery_efficiency=1.0,  # multiplies the lossless mixed stagnation pressure; not fitted to data
     regime="compressible",    # default DEFAULT_REGIME ("compressible" since #585), see below
-    anchor_closure="kracik_dvorak",  # the (P_c*, P_b0) pair; or "huang1999": Huang's printed
-                              # P_c* chain + the sudden-expansion dead head (2-3x lower
-                              # curve error cross-source; validation/ejector/README.md)
+    anchor_closure="huang1999",  # the (P_c*, P_b0) pair (default): Huang's printed P_c*
+                              # chain + the sudden-expansion dead head, 2-3x lower curve
+                              # error cross-source; or "kracik_dvorak", the lossless pair
+                              # (the only one up to 0.6.0; validation/ejector/README.md)
 )
 # On a failed solve whose outlet boundary sits above the dead head P_b0, the
 # solver's message says so: a real ejector backflows there, outside the model.

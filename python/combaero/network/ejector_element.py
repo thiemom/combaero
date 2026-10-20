@@ -4,8 +4,9 @@ topology (``MultiPortChamberBase``).
 Ports: ``primary_node`` (motive, high-pressure inlet), ``secondary_node``
 (suction/entrained inlet), ``outlet_node``. Reuses the validated closed-form
 physics in ``combaero.network._ejector_huang1999`` (Huang 1999's entrainment
-ratio, Eqs. 1-8; Kracik & Dvorak 2016's mixing closure for the critical back
-pressure, their Eqs. 7-13) -- see that module's docstring and
+ratio, Eqs. 1-8; the (P_c*, P_b0) anchors by ``anchor_closure``: Huang's
+printed P_c* chain with a sudden-expansion dead head by default, or Kracik &
+Dvorak 2016's lossless mixing, their Eqs. 7-13) -- see that module's docstring and
 ``validation/ejector/README.md`` for the full derivation, paper references,
 and the accuracy comparison against three alternative closures that were
 also evaluated.
@@ -204,7 +205,7 @@ class EjectorElement(MultiPortChamberBase):
         k_suction: float | None = None,
         k_throat: float = 0.0,
         k_diffuser: float = 0.0,
-        anchor_closure: str = "kracik_dvorak",
+        anchor_closure: str = "huang1999",
     ):
         """Build an ejector.
 
@@ -249,12 +250,13 @@ class EjectorElement(MultiPortChamberBase):
                 0.076-0.0985 / 0.079-0.102 on his water jet pumps.
             anchor_closure: The (P_c*, P_b0) pair that ends the critical
                 plateau and the subcritical droop; compressible regime only.
-                ``"kracik_dvorak"`` (default): Kracik & Dvorak's lossless
-                mixing, at the critical entrainment and at zero entrainment.
-                ``"huang1999"``: Huang 1999's printed chain (phi_m mixing,
-                normal shock, isentropic diffuser) and the sudden-expansion
-                dead head. Cross-source scores of both, and the printed
-                chain's fidelity gap, are in validation/ejector/README.md.
+                ``"huang1999"`` (default): Huang 1999's printed chain (phi_m
+                mixing, normal shock, isentropic diffuser) and the
+                sudden-expansion dead head.
+                ``"kracik_dvorak"``: Kracik & Dvorak's lossless mixing, at the
+                critical entrainment and at zero entrainment (the only
+                closure up to 0.6.0). Cross-source scores of both, and the
+                printed chain's fidelity gap, are in validation/ejector/README.md.
         """
         # Validate geometry BEFORE super().__init__ so the port-face areas
         # passed below are guaranteed positive.
@@ -410,6 +412,18 @@ class EjectorElement(MultiPortChamberBase):
         guess[key] = float(value)
         holder.initial_guess = guess
         self._auto_seeds[(holder.id, key)] = float(value)
+
+    def compressible_proxy_overrides(self) -> dict[str, Any]:
+        """Attributes the solver sets while this incompressible element runs
+        compressible in its warm-start proxy (``_compressible_seed``).
+
+        The proxy only seeds the incompressible solve, which uses no anchors,
+        so it takes the lossless pair: its wider droop window keeps a forward
+        root where the Huang dead head has none. On the stress family's 191
+        incompressible ejectors that proxy converges 24 times against 1, and
+        the family's time falls 51 -> 40 s with the same 190 solved.
+        """
+        return {"anchor_closure": "kracik_dvorak"}
 
     def no_root_hint(self, graph: Any) -> str:
         """Why a failed solve may have no root here: the outlet boundary above

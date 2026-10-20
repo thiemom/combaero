@@ -491,7 +491,7 @@ class EjectorData(BaseModel):
     # The (P_c*, P_b0) pair ending the plateau and the droop (compressible):
     # Kracik & Dvorak's lossless mixing, or Huang 1999's printed chain with the
     # sudden-expansion dead head (validation/ejector/README.md).
-    anchor_closure: Literal["kracik_dvorak", "huang1999"] = "kracik_dvorak"
+    anchor_closure: Literal["kracik_dvorak", "huang1999"] = "huang1999"
     # Incompressible regime only (#588): Sanger's loss coefficients. None on the
     # nozzle / suction = the compressible nozzle efficiencies as K = 1/eta - 1.
     k_nozzle: float | None = Field(default=None, ge=0.0)

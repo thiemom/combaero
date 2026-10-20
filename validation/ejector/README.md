@@ -51,9 +51,12 @@ unchoked primary), `dead_head_back_pressure` + `subcritical_entrainment_ratio`
 + `blended_entrainment_ratio` (the subcritical droop), and
 `jet_pump_entrainment_ratio` (the unchoked subsonic jet pump).
 
-It also implements the critical back pressure P_c* (`critical_back_pressure`),
-using Kracik & Dvorak's mixing closure (their Eqs. 7-13) rather than Huang's
-original Eqs. 9-18: mass, momentum and energy are solved together directly
+It also implements a critical back pressure P_c* (`critical_back_pressure`)
+using Kracik & Dvorak's mixing closure. Since the element's default became
+`anchor_closure="huang1999"`, that is the selectable alternative; the default
+P_c* is Huang's printed chain (`huang_critical_back_pressure`, see "Cross-source
+accuracy of the anchors" below). Kracik & Dvorak's closure (their Eqs. 7-13)
+works differently from Huang's original Eqs. 9-18: mass, momentum and energy are solved together directly
 from the y-y state to the fully-mixed, subsonic state -- no separate loss
 coefficient on momentum, no explicit shock model; the conjugate subsonic root
 of the same conservation laws plays the shock's role. A `recovery_efficiency`
@@ -126,6 +129,8 @@ baked into `PC_STAR_PA_BY_TC_STAR_C`.
 | `data/chen2013_figs.py` | Chen et al. 2013 Figs. 5a and 7a: Chen's model curves and the measured points (Hemidi/Henry rig; Chen's rectangular rig, with error bars). |
 | `anchor_scorecard.py` | Cross-source accuracy of omega, P_c*, P_b0 on all three rigs (run it to print the table). |
 | `printed_chain_check.py` | Huang's printed P_c* chain and single-change hypotheses against Huang's and Chen's own numbers; Chen's printed subcritical branch against his droop. |
+| `bouhanguel2011_regime_check.py` | Bouhanguel et al. 2011: which anchor pair agrees with the observed flow regime, with P2 bracketed by the measured U. |
+| `data/lucas2012_choke_check.py` | Lucas & Koehler 2012 transcritical CO2: ideal-gas vs two-phase choke against the measured driving flow (**needs CoolProp**; not a test). |
 
 The Python regression test lives at `python/tests/test_ejector_huang.py` and
 consumes the JSON fixture directly.
@@ -248,7 +253,11 @@ never consumes a given area ratio, only inlet conditions), not a
 given-geometry forward analysis like this one, and the paper says so
 directly. Dropping momentum is not the right direction for this use case.
 
-**Adopted: Kracik & Dvorak's closure**, with `recovery_efficiency` defaulting
+**Adopted then: Kracik & Dvorak's closure.** It is no longer the element's
+default: on the independent rigs below, Huang's printed chain is the better
+P_c* despite its fidelity gap on Huang's own rows, and it took over as
+`anchor_closure="huang1999"`. Kracik & Dvorak's closure was adopted with
+`recovery_efficiency` defaulting
 to **1.0** (no artificial loss) rather than a value fitted to this dataset --
 fitting `phi_m` or `recovery_efficiency` against Huang's own 31 rows would be
 exactly the "never fit against measurements" trap this project avoids
@@ -308,15 +317,25 @@ normal shock, so it lands below the lossless closure:
 - **Whole measured curve** (the element's plateau and straight chord against every measured point, RMS over the plateau): 12-23% on all 11 measured curves, against 29-59% today.
 - **The catch** is fidelity: as printed, the chain does not reproduce its authors' own numbers (next section).
 
-**Selectable in the element: `EjectorElement(anchor_closure="huang1999")`**
+**The element's default: `EjectorElement(anchor_closure="huang1999")`**
 (`huang_critical_back_pressure` and `sudden_expansion_dead_head`, with analytic
-Jacobians in C++; the default stays `"kracik_dvorak"`):
+Jacobians in C++). `"kracik_dvorak"`, the only pair up to 0.6.0, stays
+selectable:
 - **Network level.** Every measured back pressure of both measured air rigs solves with either pair (91 of 91). The curve RMS over the plateau drops from 29-48% to 12-23% on all eight curves (`test_ejector_anchor_closure_element.py`).
+- **Regime, a fourth lab** (Bouhanguel 2011, below): only Huang's P_c* agrees with the regimes the authors saw without an edge-case reading.
 - **Stress family `ejector`, seeds 0-400.** Run A (`kracik_dvorak`) against run B (`huang1999`), same seeds and jobs:
   - **Second law.** Run A converges 52 roots that the second law refuses (#598: σ < 0 at the ejector, an entrainment the primary cannot drive). Run B has none.
-  - **Solved draws:** 347 → 301. Every draw lost (98, the 52 above included) has its outlet 2-107% above the new dead head, where a real ejector backflows and the model does not reach. On the measured rigs that dead head sits 3-5% above the breakdown. The failed solve now says so: the solver's message names the dead head (`EjectorElement.no_root_hint`).
+  - **Successful solves:** 347 → 277. Run B loses 122 draws:
+    - 98 do not converge;
+    - 24 converge to a root with the suction flowing backwards (ω < 0), which #619 refuses.
+    - The 98 and 23 of the 24 have their outlet boundary 2-107% above the new dead head, where a real ejector backflows and the model does not reach. The 24th sits on the dead head (ω = −0.004), its outlet pipe's loss putting the port just above it.
+    - On the measured rigs that dead head sits 3-5% above the breakdown. The solver's message names it (`EjectorElement.no_root_hint`).
   - **Gained draws:** none.
-  - **Time.** The median is unchanged (10 ms) and p90 improves (450 → 300 ms). Incompressible ejectors do not use the anchors, but their compressible warm-start proxy does: their outcomes are unchanged (0 of 191), and their tail is slower, 37 → 48 s in total.
+  - **Time.** The median is unchanged (10 ms) and p90 improves (450 → 300 ms).
+- **Incompressible ejectors** use no anchors, but their compressible warm-start proxy (`NetworkSolver._compressible_seed`) does.
+  - Under Huang's narrower window that proxy converged on 1 of the 61 incompressible draws that call it, against 24 under K&D, and the family took 51 s instead of 40 s.
+  - So the proxy runs with K&D's window (`EjectorElement.compressible_proxy_overrides`): 24 proxy solves converge again, the family takes 40 s again, and the same 190 of 191 solve.
+  - **Set aside:** skipping the proxy and leaning on the Newton-homotopy retry also solves 190 of 191, in 11 s. But that retry is opt-in (the GUI and the stress harness turn it on). With it off, the proxy is what rescues them: 154 of 191 solve with it, 130 without.
 
 ### Why the printed chain misses its authors' own numbers
 
@@ -384,6 +403,29 @@ table). So it is not a candidate for the droop.
 - **Pressure reading.** Huang's pressures are absolute: each printed P_g and P_e matches its printed saturation temperature to 0.1 K. Henry's are gauge and Chen's rectangular rig is absolute (ratio test, above).
 - **Suction loss.** On Chen's rectangular rig, one suction pressure of about 0.91 bar (−10%) reproduces all five measured plateaus. That would fit a constant loss in the secondary's metering run (an ISO 5167 orifice) at the roughly constant ṁ_s. A lower η_s fits the plateaus equally well; the two separate only on P_c*, which a lower P_s lowers and η_s barely moves.
 
+### Other sources reviewed
+
+None of these has a back-pressure sweep at fixed motive and suction
+pressures, the only kind of data that scores the anchors directly. What each
+does give:
+
+- **Bouhanguel, Desevaux & Gavignet 2011** (Int J Refrig 34:1633; air; d* 8, d 12, D 24 or 16 mm, discharging to atmosphere). Laser-sheet visualisation, so the data are regime statements plus two entrainment ratios. `bouhanguel2011_regime_check.py`, accuracy, cross-source:
+  - **What it states:** A_3/A_t = 9 runs with the secondary *not* choked at P1 = 4-6 bar (subcritical at the atmospheric outlet), while A_3/A_t = 4 chokes at 5.5 bar. It also gives U = 0.47 and 0.50 at P1 = 5 and 4.5 bar.
+  - **How P2 is bracketed:** P2 is not printed (a valve throttles the ambient intake, so P2 ≤ Pa). A measured U bounds it from below, because a point that is not choked lies on or below the plateau at its own P2.
+  - **Huang:** fits both A_3/A_t = 9 points over wide P2 windows, with P1 read as absolute or as gauge.
+  - **K&D, gauge reading:** contradicts "not choked" at both points.
+  - **K&D, absolute reading:** fits P1 = 4.5 bar only if U is at least 73% of the plateau, and P1 = 5 bar only if U is at least 99.9% of it (a 0.04% window in P2).
+  - **A = 4:** both pairs call it choked.
+  - **A model limit, not scored:** the measured unmixed length reaches 9.2 D at high P1, longer than the 8.3 D tube. Mixing is not complete inside it, while the 1-D model assumes it is.
+- **Lucas & Koehler 2012** (Int J Refrig 35:1595; transcritical CO₂ ejector cycle). It is **outside the element's scope**:
+  - the motive flow is supercritical CO₂ at 73-103 bar and 500-700 kg/m³, flashing to two phases in a converging nozzle;
+  - the ideal-gas choke is 34-51% below the measured driving flow, against +2 to +8% for an equilibrium two-phase choke on the CoolProp EOS (`data/lucas2012_choke_check.py`; Fig. 5 read by eye);
+  - the outlet pressure is set by the cycle, so no plateau end or breakdown is measured.
+- **Liao 2008** (PhD dissertation, Texas A&M). **No usable data:**
+  - its one measured set holds suction and outlet at atmosphere and varies only the supply pressure, through a converging orifice primary;
+  - its entrainment ratio is defined as (ṁ_p + ṁ_s)/ṁ_p, and the data are plotted only;
+  - its 1-D models are never compared with measurements.
+
 ### Validated envelope
 
 Where each closure has been scored, and against what. Outside these ranges a
@@ -395,6 +437,7 @@ result is extrapolation, and nothing in the element flags it.
 | critical ω, P_c*, P_b0 (accuracy) | Henry 2007 and Chen 2013 rectangular (air, measured), Akbarnejad 2025 (steam, CFD) | A_3/A_t 4.5-5.4 and 33; P_p/P_s 3-35; ω 0.19-1.4; table above |
 | P_c*, P_b0 of `anchor_closure="huang1999"` (accuracy) | Henry 2007 and Chen 2013 rectangular (air, measured), Akbarnejad 2025 (steam, CFD) | as the row above; P_c* −19 to +17%, P_b0 +3 to +39%, curve RMS 12-23% |
 | critical ω, P_c* (second author's own model) | Chen 2013 model curves (air) | A_3/A_t 4.5 and 5.3; ω reproduced, P_c* not (above) |
+| regime at a fixed outlet, both pairs (accuracy) | Bouhanguel 2011 (air, visualisation) | A_p1/A_t 2.25, A_3/A_t 4 and 9, P1 4.5-5.5 bar; only Huang's P_c* fits without an edge-case reading |
 | droop shape (linear) | Henry 2007 (air, measured) | P_p/P_s about 4-7, one geometry |
 | jet pump (incompressible) | Sanger, NASA TN D-4759 / D-4445 (water) | A_p1/A_3 0.066 and 0.197 |
 | unchoked jet pump (compressible) | analytic low-Mach limit only | no measured data |
@@ -403,11 +446,16 @@ Back-flow (outlet above P_b0) is outside the model. The element refuses a
 converged root with a reversed port (#619) and one that violates the second
 law (#598).
 
+Also outside it, and not flagged by the element:
+- **A dense or flashing motive fluid**, such as transcritical CO₂. The ideal-gas choke is 34-51% low there (Lucas 2012, above).
+- **A mixing tube too short to finish mixing.** The 1-D chain assumes a fully mixed exit, but Bouhanguel 2011 measured the unmixed core reaching 9.2 D.
+
 ## Roadmap
 
 1. ~~Add the P_c* / critical-back-pressure chain to the reference model.~~
-   Done -- see Accuracy above; uses Kracik & Dvorak's closure, not Huang's
-   original Eqs. 9-18.
+   Done -- see Accuracy above. Kracik & Dvorak's closure first; Huang's
+   original Eqs. 9-18 (`anchor_closure="huang1999"`) are the default since
+   the cross-source scoring.
 2. ~~Draft the production 3-port `EjectorElement` (primary-in, secondary-in,
    outlet) in `python/combaero/network/`, real-fluid thermo, analytic `(f, J)`.~~
    Done (PR #252).

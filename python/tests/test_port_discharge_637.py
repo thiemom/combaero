@@ -176,7 +176,15 @@ def _ejector_into(p_out: float) -> dict:
             _node(
                 "ej",
                 "ejector",
-                {"throat_area": 3.14e-5, "nozzle_exit_area": 1e-4, "recovery_efficiency": 1},
+                {
+                    "throat_area": 3.14e-5,
+                    "nozzle_exit_area": 1e-4,
+                    "recovery_efficiency": 1,
+                    # K&D's anchors (P_c* ~1.2 bar): the critical-mode test
+                    # below places its outlets in that window; the default
+                    # huang1999 pair is tested in test_ejector_huang_anchors.py.
+                    "anchor_closure": "kracik_dvorak",
+                },
                 200,
             ),
             _node("po", "pressure_boundary", {"Pt": p_out, "Tt": 300}, 400),

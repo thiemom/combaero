@@ -121,3 +121,28 @@ def test_a_failed_solve_with_the_outlet_above_the_dead_head_says_so() -> None:
         r = NetworkSolver(g).solve(timeout=30.0)
     assert not r["__success__"]
     assert "above the dead-head back pressure" in r["__message__"]
+
+
+def test_the_compressible_warm_start_proxy_takes_the_lossless_window() -> None:
+    """An incompressible ejector uses no anchors, but its compressible
+    warm-start proxy does: the proxy runs with kracik_dvorak (whose wider
+    window keeps a forward root where the Huang dead head has none), and the
+    element gets its own closure and regime back afterwards."""
+    g = _network(5e5, ATM, 1e-5, 2e-5, 6e-5, 0.03, "huang1999")
+    ej = g.elements["ej"]
+    ej.regime = "incompressible"
+    g.resolve_all_topology()
+    s = NetworkSolver(g)
+    seen = []
+    inner = s._solve_impl
+
+    def spy(*args, **kwargs):
+        seen.append((ej.regime, ej.anchor_closure))
+        return inner(*args, **kwargs)
+
+    s._solve_impl = spy
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        s._compressible_seed(timeout=10.0)
+    assert seen == [("compressible", "kracik_dvorak")]
+    assert (ej.regime, ej.anchor_closure) == ("incompressible", "huang1999")

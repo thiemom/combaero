@@ -3390,9 +3390,17 @@ class NetworkSolver:
         if not ids:
             return None
         seed: np.ndarray | None = None
+        # Each element may ask for proxy-only settings (the ejector takes its
+        # wider anchor window); restored with the regime below.
+        saved: list[tuple[Any, str, Any]] = []
         try:
             for eid in ids:
-                self.network.elements[eid].regime = "compressible"
+                el = self.network.elements[eid]
+                overrides = getattr(el, "compressible_proxy_overrides", None)
+                for attr, value in (overrides() if callable(overrides) else {}).items():
+                    saved.append((el, attr, getattr(el, attr)))
+                    setattr(el, attr, value)
+                el.regime = "compressible"
             self.network.resolve_all_topology()
             # Started as a plain compressible solve would be (cold-start
             # auto-upgrades included): that is the solve known to converge.
@@ -3417,6 +3425,8 @@ class NetworkSolver:
         finally:
             for eid in ids:
                 self.network.elements[eid].regime = "incompressible"
+            for el, attr, value in saved:
+                setattr(el, attr, value)
             self.network.resolve_all_topology()
         return seed
 

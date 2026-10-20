@@ -1773,9 +1773,9 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       py::arg("eta_primary"), py::arg("eta_secondary"),
       py::arg("recovery_efficiency"), py::arg("eps_frac"), py::arg("s_choke_lo"),
       py::arg("s_choke_hi"), py::arg("s_sub_lo"), py::arg("s_sub_hi"),
-      py::arg("anchor_closure") = "kracik_dvorak",
+      py::arg("anchor_closure") = "huang1999",
       "Whole-element 4-row ejector (f, J) across all three operating regimes.\n"
-      "anchor_closure: 'kracik_dvorak' (default) or 'huang1999', the (P_c*, P_b0)\n"
+      "anchor_closure: 'huang1999' (default) or 'kracik_dvorak', the (P_c*, P_b0)\n"
       "pair of the plateau end and the droop's far end.\n\n"
       "Returns: EjectorElementResidualJacobian (residuals[4] + jacobian[4][9])");
 
