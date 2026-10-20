@@ -359,7 +359,8 @@ const Inspector = () => {
 					</div>
 				)}
 				{/* Rayleigh omission (#551): a wall-heated compressible channel whose
-				    momentum leaves out the heating's total-pressure change. */}
+				    momentum leaves out the heating's total-pressure change -- since
+				    #672 only where no exit state can be formed. */}
 				{selectedNode.data.result?.rayleigh_omitted === 1 && (
 					<div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] leading-snug text-amber-800">
 						<div className="font-bold uppercase mb-0.5">
@@ -373,13 +374,11 @@ const Inspector = () => {
 							% of inlet Pt
 						</div>
 						<div className="italic text-amber-700 mt-0.5">
-							This duct discharges into a node that also mixes other streams (or
-							into a boundary), so that node's temperature is not the duct's
-							exit temperature. The duct is then solved as adiabatic friction
-							flow: its wall heat raises the outlet temperature but not its
-							momentum. Heating costs total pressure (cooling gains it) as Ma²:
-							this is the first-order Rayleigh estimate. Give the duct its own
-							outlet plenum to carry the heat in its momentum. The solve is not
+							No flow enters this duct's receiving node at this point, so its
+							exit state could not be formed and the duct is solved as adiabatic
+							friction flow: its wall heat raises the outlet temperature but not
+							its momentum. Heating costs total pressure (cooling gains it) as
+							Ma²: this is the first-order Rayleigh estimate. The solve is not
 							rejected.
 						</div>
 					</div>

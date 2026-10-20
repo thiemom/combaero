@@ -4,8 +4,9 @@ The compressible channel was adiabatic Fanno flow: a wall's heat only raised
 the downstream node's Tt, so the duct omitted the Rayleigh change (#660
 flagged it). Where the duct's receiving node is fed by this duct alone, that
 node's Tt IS the duct's exit Tt, and the duct now uses the Fanno-Rayleigh
-kernel with it. Into a node that mixes other streams (or a boundary) the duct
-stays adiabatic and keeps the flag.
+kernel with it. Into a node that mixes other streams, or a boundary, the
+solver forms the duct's own exit state from its stream and its own wall heat
+(#672), and the duct uses that.
 
 Heat moves a duct's choke: cooling can now carry it to the feed's full sonic
 flux, choked at its inlet, where the wall's htc state (the duct's inlet
@@ -29,6 +30,7 @@ from combaero.network import (
     ChannelElement,
     ConvectiveSurface,
     FlowNetwork,
+    LosslessConnectionElement,
     MassFlowBoundary,
     NetworkSolver,
     OrificeElement,
@@ -54,9 +56,14 @@ def _solve(g: FlowNetwork) -> tuple[NetworkSolver, dict]:
     return s, r
 
 
-def _pair(mix_into_cold: bool = False) -> FlowNetwork:
+def _pair(
+    mix_into_cold: bool = False, cold_exit_plenum: bool = False, warm_bleed: bool = False
+) -> FlowNetwork:
     """A hot and a cold compressible duct on one wall, each into its own
-    plenum; with mix_into_cold a second stream also feeds the cold plenum."""
+    plenum; with mix_into_cold a second stream also feeds the cold plenum.
+    With cold_exit_plenum the cold duct discharges into a plenum of its own,
+    joined losslessly to the cold plenum. With warm_bleed a 600 K stream
+    drawn by pressure also feeds the cold plenum, so its T moves with x."""
     g = FlowNetwork()
     g.add_node(PressureBoundary("hot_in", Pt=3.0e5, Tt=1200.0, Y=Y_AIR))
     g.add_node(PressureBoundary("cold_in", Pt=3.0e5, Tt=400.0, Y=Y_AIR))
@@ -64,12 +71,15 @@ def _pair(mix_into_cold: bool = False) -> FlowNetwork:
         g.add_node(PressureBoundary(n, Pt=1.0e5, Tt=300.0, Y=Y_AIR))
     for n in ("hot_p", "cold_p"):
         g.add_node(PlenumNode(n))
+    if cold_exit_plenum:
+        g.add_node(PlenumNode("cold_x"))
+        g.add_element(LosslessConnectionElement("cold_link", "cold_x", "cold_p"))
     for name in ("hot", "cold"):
         g.add_element(
             ChannelElement(
                 name,
                 f"{name}_in",
-                f"{name}_p",
+                "cold_x" if (name == "cold" and cold_exit_plenum) else f"{name}_p",
                 length=0.4,
                 diameter=0.01,
                 roughness=0.0,
@@ -81,6 +91,11 @@ def _pair(mix_into_cold: bool = False) -> FlowNetwork:
             OrificeElement(
                 f"{name}_o", f"{name}_p", f"{name}_out", Cd=0.8, diameter=0.012, correlation="fixed"
             )
+        )
+    if warm_bleed:
+        g.add_node(PressureBoundary("bleed2", Pt=2.8e5, Tt=600.0, Y=Y_AIR))
+        g.add_element(
+            OrificeElement("b2_o", "bleed2", "cold_p", Cd=0.8, diameter=0.004, correlation="fixed")
         )
     if mix_into_cold:
         g.add_node(MassFlowBoundary("bleed", m_dot=0.005, Tt=300.0, Y=Y_AIR))
@@ -132,12 +147,38 @@ def test_the_global_jacobian_matches_finite_differences() -> None:
     assert float(np.max(np.abs(Js - fds) / scale)) < 1e-4
 
 
-def test_into_a_mixing_node_the_duct_stays_adiabatic_and_flagged() -> None:
-    _, r = _solve(_pair(mix_into_cold=True))
+def test_into_a_mixing_node_the_duct_derives_its_own_exit_state() -> None:
+    """#672: the cold plenum also takes a bleed, so its Tt is not the cold
+    duct's exit Tt. The solver now forms that exit state from the duct's own
+    stream and wall heat. The answer is the one the explicit outlet plenum
+    gives, where the exact path of #551 applies by construction."""
+    s, r = _solve(_pair(mix_into_cold=True))
     d = r["__element_diag__"]
     assert d["hot"]["rayleigh_in_momentum"] == 1.0
-    assert "rayleigh_in_momentum" not in d["cold"]
-    assert "rayleigh_omitted_frac" in d["cold"]
+    assert d["cold"]["rayleigh_in_momentum"] == 1.0
+    assert "rayleigh_omitted" not in d["cold"]
+    exit_T = s.network.elements["cold"]._rayleigh_exit[1]
+    _, ref = _solve(_pair(mix_into_cold=True, cold_exit_plenum=True))
+    assert exit_T == pytest.approx(ref["cold_x.T"], rel=1e-6)
+    for key in ("cold.m_dot", "hot.m_dot", "cold_p.T", "hot_p.T"):
+        assert r[key] == pytest.approx(ref[key], rel=1e-6), key
+    # The heat is in the momentum: without it the flow differs.
+    assert exit_T > r["cold_in.T"] + 1.0
+
+
+def test_into_a_mixing_node_the_global_jacobian_matches_finite_differences() -> None:
+    """The exit state's derivatives chain through the wall's heat (both
+    streams' htc, the capacity rates) by the same relay as a node's."""
+    s, r = _solve(_pair(mix_into_cold=True))
+    x = np.array(r["__x_solution__"])
+    _, J = s._residuals_and_jacobian(x)
+    fd = approx_derivative(
+        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-6, 1e-9)
+    )
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    Js, fds = J.toarray() * cols, fd * cols
+    scale = np.maximum(np.max(np.abs(fds), axis=1, keepdims=True), 1e-300)
+    assert float(np.max(np.abs(Js - fds) / scale)) < 1e-4
 
 
 @pytest.mark.parametrize("seed", [10, 18, 26, 29])
@@ -274,3 +315,100 @@ def test_the_adiabatic_seed_stage_is_not_refused_by_the_second_law() -> None:
     assert seeds and seeds[0]["__success__"]
     assert seeds[0]["__second_law_failures__"]  # reported, not applied
     assert r["__second_law_failures__"] == []
+
+
+def _pair_into_boundaries() -> FlowNetwork:
+    """A hot and a cold compressible duct on one wall, each straight into a
+    pressure boundary: the heat lands on the boundary (Q_wall_out)."""
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("hot_in", Pt=3.0e5, Tt=1200.0, Y=Y_AIR))
+    g.add_node(PressureBoundary("cold_in", Pt=3.0e5, Tt=400.0, Y=Y_AIR))
+    for n in ("hot_out", "cold_out"):
+        g.add_node(PressureBoundary(n, Pt=2.0e5, Tt=300.0, Y=Y_AIR))
+    for name in ("hot", "cold"):
+        g.add_element(
+            ChannelElement(
+                name,
+                f"{name}_in",
+                f"{name}_out",
+                length=0.4,
+                diameter=0.01,
+                roughness=0.0,
+                regime="compressible",
+                surface=ConvectiveSurface(area=math.pi * 0.01 * 0.4),
+            )
+        )
+    g.add_wall(
+        ThermalWall(id="w", element_a="hot", element_b="cold", layers=[WallLayer(0.001, 25.0)])
+    )
+    return g
+
+
+def test_into_a_boundary_the_duct_carries_its_heat_and_its_jacobian_holds() -> None:
+    """#672: a boundary's Tt is fixed, never the duct's exit Tt; the duct's
+    own exit state carries the heat instead."""
+    s, r = _solve(_pair_into_boundaries())
+    d = r["__element_diag__"]
+    for name in ("hot", "cold"):
+        assert d[name]["rayleigh_in_momentum"] == 1.0
+    T_hot, T_cold = (s.network.elements[n]._rayleigh_exit[1] for n in ("hot", "cold"))
+    assert T_hot < 1200.0 - 1.0 and T_cold > 400.0 + 1.0
+    assert r["__second_law_failures__"] == []
+    x = np.array(r["__x_solution__"])
+    _, J = s._residuals_and_jacobian(x)
+    fd = approx_derivative(
+        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-6, 1e-9)
+    )
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    Js, fds = J.toarray() * cols, fd * cols
+    scale = np.maximum(np.max(np.abs(fds), axis=1, keepdims=True), 1e-300)
+    assert float(np.max(np.abs(Js - fds) / scale)) < 1e-4
+
+
+def test_across_a_flow_sign_and_pt_mismatch_the_rise_is_carried_and_differentiated() -> None:
+    """An iterate whose cold duct flow is reversed while its Pt still falls
+    forward: the exit state sits at the duct's inlet by flow sign, and the
+    kernel takes the duct's own temperature rise instead of dropping to
+    adiabatic. Its Jacobian still matches finite differences there."""
+    s, r = _solve(_pair(mix_into_cold=True, warm_bleed=True))
+    x = np.array(r["__x_solution__"])
+    i = s.unknown_names.index("cold.m_dot")
+    x[i] = -0.3 * x[i]
+    s._residuals(x)
+    cold = s.network.elements["cold"]
+    assert cold._rayleigh_exit[0] == "cold_in"  # by flow sign
+    st_in = s._get_node_state(s.network.nodes["cold_in"], x)
+    st_out = s._get_node_state(s.network.nodes["cold_p"], x)
+    state = cold._rayleigh_exit_state("cold_p", st_out, "cold_in", st_in)
+    assert state is not None and len(state[1]) == 3
+    _, J = s._residuals_and_jacobian(x)
+    fd = approx_derivative(
+        lambda v: s._residuals(v), x, method="3-point", abs_step=np.maximum(np.abs(x) * 1e-6, 1e-9)
+    )
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    Js, fds = J.toarray() * cols, fd * cols
+    scale = np.maximum(np.max(np.abs(fds), axis=1, keepdims=True), 1e-300)
+    assert float(np.max(np.abs(Js - fds) / scale)) < 1e-4
+
+
+def test_a_staged_solve_restores_each_ducts_own_suspension() -> None:
+    """A solve nested inside stage 1 (the wall-free seed solves the same
+    elements) used to clear every duct's suspension on its way out, so the
+    outer adiabatic stage carried the heat again (#672). The flag a duct had
+    before a staged solve is the flag it has after."""
+    g = _pair()
+    s = NetworkSolver(g)
+    heated = s._rayleigh_heated_elements()
+    assert heated
+    for el in heated:
+        el._rayleigh_suspended = True
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        s._solve_rayleigh_staged(heated, {"timeout": 30.0})
+    assert all(el._rayleigh_suspended for el in heated)
+
+
+def test_with_thermal_coupling_off_nothing_is_staged() -> None:
+    g = _pair()
+    g.thermal_coupling_enabled = False
+    assert NetworkSolver(g)._rayleigh_heated_elements() == []

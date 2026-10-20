@@ -1138,11 +1138,15 @@ channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05,
 # "M_in_duct", "M_exit_duct". Where the feeding node mixes gases, its Jacobian
 # carries d/dY along the directions that composition moves in (#489).
 # On a ThermalWall (#551) the duct carries its heat in the momentum
-# (fanno_rayleigh_channel_flow, Tt linear from the feeding node's to the
-# receiving node's) when the receiving node is a plenum or chamber fed by this
-# duct alone, with no wall of its own; diagnostics "rayleigh_in_momentum" = 1.
-# Into any other node it stays adiabatic Fanno flow and reports the omitted
-# first-order Rayleigh change ("rayleigh_omitted_frac", flag "rayleigh_omitted").
+# (fanno_rayleigh_channel_flow, Tt linear from the feeding node's to the duct's
+# exit Tt); diagnostics "rayleigh_in_momentum" = 1. Into a plenum or chamber fed
+# by this duct alone, with no wall of its own, the exit Tt is that node's. Into
+# any other node (one mixing other streams, one with its own wall, a boundary)
+# the solver forms the duct's own exit state from its stream and its own wall
+# heat, through the same mixer and relay as a node (#672). Only where no flow
+# enters the receiving node does the duct fall back to adiabatic Fanno flow,
+# reporting the omitted first-order Rayleigh change ("rayleigh_omitted_frac",
+# flag "rayleigh_omitted").
 
 # Effusion (multi-perforated) wall panel. Geometry is given the way a plate
 # is designed -- pitch, hole diameter, wall thickness, inclination -- and the
