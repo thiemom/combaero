@@ -89,25 +89,26 @@ def test_total_pressure_created_above_the_resolution_is_refused(gain: float) -> 
 
 
 def test_a_refused_lossless_split_at_mach_names_its_loss_factor() -> None:
-    """At port Mach 0.27 a loss_factor = 0 split creates flow work (its loss
+    """At port Mach ~0.2 a loss_factor = 0 split creates flow work (its loss
     is written at low Mach, ~M^2/4 short), and sigma refuses it; the message
     says so, not just a sigma value. At f = 1 the same flow is accepted."""
     from test_ideal_tee_element import _branch_net
 
     def solve(f: float, x0: list[float] | None = None) -> dict:
-        net = _branch_net(m_in=0.4, theta=60.0, regime="compressible", loss_factor=f)
+        net = _branch_net(m_in=0.3, theta=60.0, regime="compressible", loss_factor=f)
         for node in net.nodes.values():
             if isinstance(node, MomentumChamberNode):
                 node.regime = "compressible"
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return NetworkSolver(net).solve(timeout=60.0, auto_retry=False, x0=x0)
+            # The f = 1 root with the usual retries; the f = 0 one from it alone.
+            return NetworkSolver(net).solve(timeout=60.0, auto_retry=x0 is None, x0=x0)
 
     accepted = solve(1.0)
     assert accepted["__success__"], accepted["__message__"]
-    # From the f = 1 root the f = 0 root is a short Newton walk: which root a
-    # cold start reaches is platform-dependent (it did not converge on Linux
-    # CI), the refusal of this one is not.
+    # From the f = 1 root the f = 0 root is a short Newton walk. A cold start
+    # at this Mach is platform-dependent without its retries (Linux CI did not
+    # converge either solve); the refusal of the root is not.
     refused = solve(0.0, x0=accepted["__x_solution__"])
     assert refused["__converged__"] and not refused["__success__"], refused["__message__"]
     assert refused["__second_law__"]["jct"]["verdict"] == "fail"
