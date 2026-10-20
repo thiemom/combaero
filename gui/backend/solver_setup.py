@@ -15,6 +15,8 @@ def make_solver(net: FlowNetwork, schema: NetworkGraphSchema) -> NetworkSolver:
     # time: whatever the cold solve and its retries leave of it.
     solver.homotopy_retry = True
     solver.homotopy_budget = None
+    # Then continuation in the boundary conditions, in the time left (#642).
+    solver.bc_ramp_retry = True
     if schema.solver_settings.incompressible_mach_limit is not None:
         solver.incompressible_mach_limit = schema.solver_settings.incompressible_mach_limit
     return solver

@@ -1,0 +1,3 @@
+- **Continuation in the boundary conditions, after the Newton homotopy (#642).** `NetworkSolver.bc_ramp_retry` (opt-in; the GUI, `NetworkRunner` and the stress harness turn it on) gives a cold solve that the homotopy did not rescue one more try. Every boundary is ramped from its gentle end, where every pressure boundary sits at the mean of their Pt and every flow and heat boundary at zero, up to its own value, each step warm-started from the last root.
+  - On the stress random draws the homotopy left unsolved, it rescues 3 of 21 (in 13-46 s).
+  - Raise the max solve time for networks that need it.

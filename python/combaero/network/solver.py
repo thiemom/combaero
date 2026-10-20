@@ -86,6 +86,18 @@ _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 #: expected failures went from 8 s to 106 s (10 s: 87 s).
 NEWTON_HOMOTOPY_BUDGET = 5.0
 
+#: Boundary-condition ramp retry (#642, ``NetworkSolver.bc_ramp_retry``): the
+#: gentle end it first solves cold, halved down to BC_RAMP_LAM_MIN until one
+#: does, and its solve cap. On the stress random draws the homotopy left
+#: unsolved it rescued 3 of 21 in 6-12 solves (15-34 s).
+BC_RAMP_LAM0 = 0.05
+BC_RAMP_LAM_MIN = 1.0e-3
+BC_RAMP_MAX_SOLVES = 40
+
+#: Element attributes that only warm-start a kernel's own inner solve (the
+#: Fanno and Fanno-Rayleigh march). A retry that starts cold drops them.
+_KERNEL_WARM_STARTS = ("_last_G", "_last_M_exit")
+
 #: At most this many exceptions keep their full record per solve; the rest are
 #: counted (``__caught_exception_count__``).
 _MAX_CAUGHT_RECORDS = 50
@@ -516,6 +528,13 @@ class NetworkSolver:
         # NEWTON_HOMOTOPY_BUDGET when there is no timeout either.
         self.homotopy_retry: bool = False
         self.homotopy_budget: float | None = NEWTON_HOMOTOPY_BUDGET
+        # Opt-in retry after the homotopy: continuation in the boundary
+        # conditions (#642). Every pressure boundary moves from the mean of
+        # their Pt to its own, every flow and heat boundary from zero to its
+        # own, each step warm-started from the last. It runs in the time the
+        # timeout leaves; the GUI, NetworkRunner and the stress harness turn
+        # it on.
+        self.bc_ramp_retry: bool = False
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -2835,10 +2854,11 @@ class NetworkSolver:
         (``check_row_kinds``; RESIDUAL-ROW-SCALING).
         """
         if (
-            self.homotopy_retry
+            (self.homotopy_retry or self.bc_ramp_retry)
             and x0 is None
             and auto_retry
             and not getattr(self, "_in_homotopy", False)
+            and not getattr(self, "_in_bc_ramp", False)
         ):
             _h0 = time.time()
             self._in_homotopy = True
@@ -2859,7 +2879,21 @@ class NetworkSolver:
             # failure, and a homotopy from the same guess tends to find it again.
             if sol.get("__success__", False) or sol.get("__converged__", False):
                 return sol
-            return self._newton_homotopy_retry(sol, method, timeout, options, use_jac, _h0)
+            if self.homotopy_retry:
+                # With the ramp to follow, an uncapped homotopy takes half of
+                # the time left, not all of it.
+                cap = self.homotopy_budget
+                if cap is None and self.bc_ramp_retry and timeout is not None:
+                    self.homotopy_budget = 0.5 * max(timeout - (time.time() - _h0), 0.0)
+                try:
+                    sol = self._newton_homotopy_retry(sol, method, timeout, options, use_jac, _h0)
+                finally:
+                    self.homotopy_budget = cap
+                if sol.get("__success__", False):
+                    return sol
+            if self.bc_ramp_retry:
+                return self._bc_ramp_retry(sol, method, timeout, options, use_jac, _h0)
+            return sol
         kw: dict[str, Any] = {
             "method": method,
             "timeout": timeout,
@@ -2983,6 +3017,124 @@ class NetworkSolver:
             return self.solve(**{**kw, "timeout": left()})
         finally:
             self._in_rayleigh_stage = False
+
+    def _bc_ramp_retry(
+        self,
+        failed: dict[str, Any],
+        method: str,
+        timeout: float | None,
+        options: dict[str, Any] | None,
+        use_jac: bool,
+        t0: float,
+    ) -> dict[str, Any]:
+        """Last retry of a failed cold solve (#642): continuation in the
+        boundary conditions. At lam every PressureBoundary sits at
+        Pm + lam (Pt - Pm), Pm the mean of their Pt, and every
+        MassFlowBoundary m_dot and user EnergyBoundary Q / fraction at lam
+        times its own. The gentle end (BC_RAMP_LAM0, halved down to
+        BC_RAMP_LAM_MIN until it solves) is solved cold with the usual
+        retries; lam then rises, each solve warm-started from the last root,
+        the step doubling after a solve (at most 0.5) and halving after a
+        failure. The lam = 1 solve is a plain warm solve with every physical
+        check. The boundaries are restored whatever happens.
+
+        Complementary to the Newton homotopy: that one starts from the cold
+        guess, a state with flow; this one from a network with almost no
+        drive, which is easy for some networks and is itself the hard
+        near-zero-drive regime for others (15 of the 21 random draws it did
+        not rescue have no gentle end that solves).
+        """
+        pbs = [n for n in self.network.nodes.values() if isinstance(n, PressureBoundary)]
+        mfbs = [n for n in self.network.nodes.values() if isinstance(n, MassFlowBoundary)]
+        wall_ebs = {id(eb) for eb in getattr(self, "_wall_ebs", {}).values()}
+        ebs = [
+            eb
+            for n in self.network.nodes.values()
+            for eb in (getattr(n, "energy_boundaries", None) or [])
+            if id(eb) not in wall_ebs
+        ]
+        if not pbs and not mfbs:
+            return failed
+        pt0 = [float(n.Pt) for n in pbs]
+        m0 = [float(n.m_dot) for n in mfbs]
+        q0 = [(float(eb.Q), float(eb.fraction)) for eb in ebs]
+        pm = float(np.mean(pt0)) if pt0 else 0.0
+
+        def set_lam(lam: float) -> None:
+            for n, pt in zip(pbs, pt0, strict=True):
+                n.Pt = pt if lam >= 1.0 else pm + lam * (pt - pm)
+            for n, m in zip(mfbs, m0, strict=True):
+                n.m_dot = m if lam >= 1.0 else lam * m
+            for eb, (q, f) in zip(ebs, q0, strict=True):
+                eb.Q, eb.fraction = (q, f) if lam >= 1.0 else (lam * q, lam * f)
+
+        def left() -> float | None:
+            return None if timeout is None else timeout - (time.time() - t0)
+
+        saved = {k: getattr(self, k) for k in ("_last_x", "_diagnostic_data") if hasattr(self, k)}
+        x: np.ndarray | None = None
+        lam_ok, lam, step, solves = 0.0, BC_RAMP_LAM0, BC_RAMP_LAM0, 0
+        self._in_bc_ramp = True
+        try:
+            while solves < BC_RAMP_MAX_SOLVES:
+                remaining = left()
+                if remaining is not None and remaining < 0.5:
+                    break
+                set_lam(lam)
+                if x is None:
+                    # A cold start inherits nothing from the failed attempts:
+                    # the Fanno kernels' warm-start guesses left by them kept
+                    # a stress draw's gentle end from solving (random 34,
+                    # rescued once they are dropped).
+                    for el in self.network.elements.values():
+                        for k in _KERNEL_WARM_STARTS:
+                            if k in vars(el):
+                                delattr(el, k)
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        r = (
+                            self.solve(
+                                method=method, timeout=remaining, options=options, use_jac=use_jac
+                            )
+                            if x is None
+                            else self.solve(
+                                method=method,
+                                timeout=remaining,
+                                options=options,
+                                use_jac=use_jac,
+                                x0=x,
+                            )
+                        )
+                except _STATE_EXCEPTIONS:
+                    r = {}
+                solves += 1
+                if r.get("__success__", False) and r.get("__x_solution__") is not None:
+                    x, lam_ok = np.asarray(r["__x_solution__"], dtype=float), lam
+                    if lam >= 1.0:
+                        r["__message__"] = (
+                            f"{str(r.get('__message__', '')).strip()} [boundary-condition "
+                            f"ramp in {solves} solves after the cold solve and its retries "
+                            f"failed: {str(failed.get('__message__', '')).strip()[:120]}]"
+                        )
+                        return r
+                    step = min(2.0 * step, 0.5)
+                    lam = min(1.0, lam + step)
+                elif x is None:
+                    lam *= 0.5  # an even gentler cold start
+                    if lam < BC_RAMP_LAM_MIN:
+                        break
+                else:
+                    step *= 0.5
+                    if step < BC_RAMP_LAM_MIN:
+                        break
+                    lam = lam_ok + step
+        finally:
+            set_lam(1.0)
+            self._in_bc_ramp = False
+        for k, v in saved.items():
+            setattr(self, k, v)
+        return failed
 
     def _newton_homotopy_retry(
         self,

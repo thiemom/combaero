@@ -52,8 +52,10 @@ def run_one(task: tuple[str, int, float, bool]) -> dict[str, Any]:
         rec["classes"] = sorted({type(e).__name__ for e in net.elements.values()})
         solver = NetworkSolver(net)
         solver.raise_internal_errors = strict
-        # As the GUI solves: with the Newton-homotopy last retry (#642).
+        # As the GUI solves: with the Newton-homotopy and boundary-condition
+        # ramp retries (#642).
         solver.homotopy_retry = True
+        solver.bc_ramp_retry = True
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             r = solver.solve(timeout=timeout)
