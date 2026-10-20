@@ -1427,6 +1427,11 @@ PORT_DISCHARGE_CHOKE_BLEND = 1e-4
 #: kernel is adiabatic Fanno flow, so heating's cost is not in the solve.
 RAYLEIGH_OMISSION_FLAG = 1e-3
 
+#: Relay key prefix of a wall-heated duct's own exit state (#672): its stream
+#: and its own wall heat, mixed alone where the node it feeds also takes other
+#: streams or heat. No "." in it: the Jacobian splits keys at the first dot.
+RAYLEIGH_EXIT_PREFIX = "__rayleigh_exit__"
+
 #: Ratio of a smooth-wall channel's heat-transfer area to its friction-wetted
 #: area 4 A L / Dh above which the channel is flagged (#551): heat then flows
 #: over surface its friction never sees, which breaks Reynolds analogy -- in a
@@ -6242,19 +6247,20 @@ class ChannelElement(NetworkElement):
             dirs = [[float(j == k) for j in range(n_sp)] for k, y in enumerate(src.Y) if y > 0.0]
         else:
             dirs = known.get(src_id, [])
-        # Wall heat in the momentum (#551): Tt rises linearly from the
-        # feeding node's to the receiving node's, where that node's Tt is this
-        # duct's exit Tt (see resolve_topology).
-        heated = (
-            dst_id in getattr(self, "_rayleigh_ends", ())
-            and float(dst.Tt) > 0.0
-            and not getattr(self, "_rayleigh_suspended", False)
+        # Wall heat in the momentum (#551, #672): Tt rises linearly from the
+        # feeding node's to this duct's exit Tt.
+        exit_state = (
+            None
+            if getattr(self, "_rayleigh_suspended", False)
+            else self._rayleigh_exit_state(dst_id, dst, src_id, src)
         )
+        heated = exit_state is not None
         if heated:
+            exit_Tt, exit_keys = exit_state
             flow = cb.fanno_rayleigh_channel_flow(
                 src.Pt,
                 src.Tt,
-                dst.Tt,
+                exit_Tt,
                 src.X,
                 dst.Pt,
                 not lost,
@@ -6298,7 +6304,8 @@ class ChannelElement(NetworkElement):
             f"{dst_id}.Pt": sign * A * flow.dG_dP_target,
         }
         if heated:
-            derivs[f"{dst_id}.T"] = sign * A * flow.dG_dTt_exit
+            for key, coeff in exit_keys:
+                derivs[key] = derivs.get(key, 0.0) + sign * A * flow.dG_dTt_exit * coeff
         # Composition of the feeding node: the directional derivatives
         # projected back onto species, g = sum_i (dG/dv_i) v_i, chained by the
         # solver with dY/dx from its mixing relay.
@@ -6539,8 +6546,13 @@ class ChannelElement(NetworkElement):
             }
             if getattr(self, "_wall_heated", False):
                 into = self.to_node if float(state_in.m_dot) >= 0.0 else self.from_node
-                if into in getattr(self, "_rayleigh_ends", ()):
-                    # The heat is in the momentum: nothing omitted (#551).
+                into_state, from_id, from_state = (
+                    (state_out, self.from_node, state_in)
+                    if into == self.to_node
+                    else (state_in, self.to_node, state_out)
+                )
+                if self._rayleigh_exit_state(into, into_state, from_id, from_state) is not None:
+                    # The heat is in the momentum: nothing omitted (#551, #672).
                     duct["rayleigh_in_momentum"] = 1.0
                 else:
                     duct.update(self._rayleigh_omission(state_in, state_out, flow, ref))
@@ -6567,6 +6579,48 @@ class ChannelElement(NetworkElement):
             "f": float(f),
             **surface_diag,
         }
+
+    def _rayleigh_exit_state(
+        self,
+        dst_id: str,
+        dst: NetworkMixtureState,
+        src_id: str,
+        src: NetworkMixtureState,
+    ) -> tuple[float, list[tuple[str, float]]] | None:
+        """This wall-heated duct's exit Tt into ``dst_id``, with the relay keys
+        its derivatives chain through (key, coefficient), or ``None``
+        (adiabatic Fanno).
+
+        Into a plenum or chamber fed by this duct alone, with no wall of its
+        own, that node's Tt IS the exit Tt (#551). Into any other node (one
+        mixing other streams, one with its own wall, a boundary) the solver
+        derives the exit state from this duct's stream and its own wall heat
+        alone, through the same mixer and relay (#672): ``_rayleigh_exit`` =
+        (node the flow enters, exit Tt, node it comes from), keyed
+        ``RAYLEIGH_EXIT_PREFIX + id``. The solver sets it where the flow goes
+        in by its SIGN; the kernel's exit is the lower-Pt end. Where the two
+        disagree (an iterate on its way through reversal) the duct's own
+        temperature rise is applied to the kernel's source, Tt_src + (Tt_exit
+        - Tt_from): without it the duct dropped to adiabatic there, a jump
+        in its residual that cost a stress draw its cold solve.
+        """
+        if dst_id in getattr(self, "_rayleigh_ends", ()):
+            return (float(dst.Tt), [(f"{dst_id}.T", 1.0)]) if float(dst.Tt) > 0.0 else None
+        if dst_id not in getattr(self, "_rayleigh_mix_ends", ()):
+            return None
+        rx = getattr(self, "_rayleigh_exit", None)
+        if rx is None or not rx[1] > 0.0:
+            return None
+        key = f"{RAYLEIGH_EXIT_PREFIX}{self.id}.T"
+        if rx[0] == dst_id:
+            return float(rx[1]), [(key, 1.0)]
+        # Flow sign and Pt disagree: rx[0] is this kernel's source, rx[2] its exit.
+        if rx[0] != src_id or rx[2] != dst_id:
+            return None
+        exit_Tt = float(src.Tt) + float(rx[1]) - float(dst.Tt)
+        if not exit_Tt > 0.0:
+            return None
+        return exit_Tt, [(key, 1.0), (f"{dst_id}.T", -1.0), (f"{src_id}.T", 1.0)]
 
     def _rayleigh_omission(
         self,
@@ -6703,10 +6757,10 @@ class ChannelElement(NetworkElement):
         # The ends whose Tt IS this duct's exit Tt when the flow goes into
         # them: a plenum or chamber with this duct and one other connection,
         # and no wall of its own -- it mixes nothing else and receives only
-        # this duct's heat. There the Fanno-Rayleigh kernel carries the heat
-        # in the momentum (#551). Into any other node (a boundary, a node
-        # mixing several streams) the duct stays adiabatic Fanno and its
-        # omission stays flagged.
+        # this duct's heat (#551). At any other end (a boundary, a node mixing
+        # several streams or heat) the solver forms the duct's own exit state
+        # (_rayleigh_exit_state, #672). Either way the Fanno-Rayleigh kernel
+        # carries the heat in the momentum.
         self._rayleigh_ends: set[str] = set()
         if self._wall_heated:
             on_walls = {e for w in walls for e in (w.element_a, w.element_b)}
@@ -6719,6 +6773,12 @@ class ChannelElement(NetworkElement):
                 )
                 if n_conn == 2:
                     self._rayleigh_ends.add(nid)
+            # Every other end: the solver derives this duct's own exit state
+            # there (#672).
+            self._rayleigh_mix_ends = {self.from_node, self.to_node} - self._rayleigh_ends
+        else:
+            self._rayleigh_mix_ends = set()
+        self._rayleigh_exit = None
         if self.diameter is not None:
             self._fill_convective_area()
             return

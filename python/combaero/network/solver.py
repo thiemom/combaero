@@ -11,8 +11,10 @@ import scipy.sparse as sp
 from scipy.optimize import root
 
 import combaero as cb
+from combaero import _solver_tools
 
 from .components import (
+    RAYLEIGH_EXIT_PREFIX,
     ChannelElement,
     CombustorNode,
     EnergyBoundary,
@@ -1703,6 +1705,222 @@ class NetworkSolver:
                         return False
         return True
 
+    def _relay_mix(
+        self,
+        out: dict,
+        nid: str,
+        stream_info: list[tuple],
+        mix_res: Any,
+        wall_contributions: list[tuple],
+        x: np.ndarray,
+        relay: dict,
+        up: Any,
+    ) -> None:
+        """Chain one mixer's sensitivities into ``out`` (relay[node] layout):
+        its streams (by flow into ``nid`` and through each stream's source
+        node) and the wall heat it takes. Used for every node, and for a
+        heated duct's exit state (its own stream and its own wall heat, #672).
+        """
+        n_species = self._n_species
+        # Iterate over stream_info (one entry per upstream stream, including
+        # multiple entries for multi-port elements like TeeJunctionElement).
+        for i, (_, elem, src_nid, coeffs) in enumerate(stream_info):
+            if elem is None:
+                continue  # a fixed injection: nothing to relay
+            t_jac = mix_res.dT_mix_d_stream[i]
+            pt_jac = mix_res.dP_total_mix_d_stream[i]
+            # dY_mix_d_stream is indexed by [species][stream]
+            y_jacs = [mix_res.dY_mix_d_stream[k][i] for k in range(n_species)]
+
+            # 1. Direct dependency on upstream mass flow (if it's a solver unknown)
+            m_indices = self._unknown_indices.get(elem.id)
+            if m_indices:
+                # flow_jac_at_node maps each unknown index to its coefficient
+                # in d(stream_i.m_dot)/d(x). For 2-port: {idx: 1.0}. For tee:
+                # may involve 2 unknowns (m_dot_com and m_dot_branch).
+                # The stream's flow is the one INTO this node for a
+                # single-source element (flow_at_node(nid), as set in
+                # stream_info above), so its derivative must be taken at
+                # nid too. Taking it at src_nid gave a branching tee's
+                # straight sink d/d(m_com) only and dropped the -1 on
+                # m_branch.
+                jac_node = nid if len(elem.all_source_nodes()) == 1 else src_nid
+                flow_jac = (
+                    coeffs if coeffs is not None else elem.flow_jac_at_node(jac_node, m_indices)
+                )
+                for idx, coeff in flow_jac.items():
+                    node_relay = out.setdefault(
+                        idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
+                    )
+                    node_relay["T"] += t_jac.d_mdot * coeff
+                    node_relay["Pt_mix"] += pt_jac.d_mdot * coeff
+                    for k in range(n_species):
+                        node_relay["Y"][k] += y_jacs[k].d_mdot * coeff
+
+            # 2. Recursive dependency on upstream P/T/Y via src_nid relay
+            if src_nid in relay:
+                for idx, sens_up in up(src_nid).items():
+                    node_relay = out.setdefault(
+                        idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
+                    )
+                    # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
+                    node_relay["T"] += t_jac.d_T * sens_up["T"]
+                    # Note: stagnation Pt doesn't usually have T/Y dependency, but we relay it if present
+                    node_relay["T"] += t_jac.d_P_total * sens_up.get("Pt", 0.0)
+                    node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
+
+                    # dP_total_mix/dx
+                    node_relay["Pt_mix"] += pt_jac.d_T * sens_up["T"]
+                    node_relay["Pt_mix"] += pt_jac.d_P_total * sens_up.get("Pt", 0.0)
+                    node_relay["Pt_mix"] += np.dot(pt_jac.d_Y, sens_up["Y"])
+
+                    # dY_k/dx
+                    for k in range(n_species):
+                        node_relay["Y"][k] += y_jacs[k].d_T * sens_up["T"]
+                        node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up.get("Pt", 0.0)
+                        node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
+
+        # Wall coupling relay extension: dT_node/dx += dT_mix/dQ * dQ/dx
+        # Full chain rule with channel Jacobians:
+        #   dQ/dmdot = dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot + (side B terms)
+        #   dQ/dT    = dQ/dh_a * dh_a/dT    + dQ/dT_aw_a * dT_aw_a/dT    + (side B terms)
+        if wall_contributions:
+            # Wall Q is a heat rate [W]: dT/dQ = (1/cp) / m_eff, m_eff
+            # the flow the mixer spreads Q over (dT_mix_dQ, exact also
+            # below kMixerHeatMdotFloor and for a non-positive total).
+            dT_mix_dQ = mix_res.dT_mix_dQ
+            for (
+                _wall,
+                _Qi,
+                wall_result,
+                ea_id,
+                eb_id,
+                is_side_a,
+                ch_a,
+                ch_b,
+                (dCa_dm, dCa_dTa, dCa_dTb, dCb_dm, dCb_dTb, dCb_dTa),
+            ) in wall_contributions:
+                sign = -1.0 if is_side_a else 1.0
+
+                # Side A contributions
+                obj_a = self.network.elements.get(ea_id) or self.network.nodes.get(ea_id)
+                from_a = self._flow_ends(obj_a, x)[0]
+
+                # Temperature coupling: dT_node/dT_upstream_a
+                if from_a in relay:
+                    # dQ/dT_aw_a * dT_aw_a/dT + dQ/dh_a * dh_a/dT
+                    factor_T_a = (
+                        dT_mix_dQ
+                        * sign
+                        * (
+                            wall_result.dQ_dT_aw_a * ch_a.dT_aw_dT
+                            + wall_result.dQ_dh_a * ch_a.dh_dT
+                            + wall_result.dQ_dC_a * dCa_dTa
+                            + wall_result.dQ_dC_b * dCb_dTa
+                        )
+                    )
+                    for idx, sens_up in up(from_a).items():
+                        nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                        nr["T"] += factor_T_a * sens_up["T"]
+
+                # Mass-flow coupling: dT_node/dmdot_a (direct)
+                for idx_mdot_a, dm_a in self._htc_flow_columns(ea_id):
+                    # dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot
+                    factor_mdot_a = (
+                        dT_mix_dQ
+                        * sign
+                        * self._htc_mdot_sign(obj_a, x)
+                        * (
+                            wall_result.dQ_dh_a * ch_a.dh_dmdot
+                            + wall_result.dQ_dT_aw_a * ch_a.dT_aw_dmdot
+                        )
+                    )
+                    # The capacity rate |m| cp (signed in the unknown)
+                    factor_mdot_a += dT_mix_dQ * sign * wall_result.dQ_dC_a * dCa_dm
+                    nr = out.setdefault(idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += factor_mdot_a * dm_a
+
+                # Neighbour flows the side-A htc reads (#465)
+                self._relay_flow_inputs(out, obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dh_a)
+
+                # Pressure coupling (#496): the side's T_aw moves with its feed
+                # node's static P at fixed flow (v ~ 1/rho); h does not.
+                # A momentum chamber's h does too, through its static T.
+                idx_P_a = self._name_to_index.get(f"{from_a}.P")
+                dQ_dP_a = wall_result.dQ_dT_aw_a * getattr(
+                    ch_a, "dT_aw_dP", 0.0
+                ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dP", 0.0)
+                if idx_P_a is not None and dQ_dP_a != 0.0:
+                    nr = out.setdefault(idx_P_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += dT_mix_dQ * sign * dQ_dP_a
+                # A duct's T_aw moves with its feed's Pt instead (#636).
+                idx_Pt_a = self._name_to_index.get(f"{from_a}.Pt")
+                # and so does its h, through the duct's static T.
+                dQ_dPt_a = wall_result.dQ_dT_aw_a * getattr(
+                    ch_a, "dT_aw_dPt", 0.0
+                ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dPt", 0.0)
+                if idx_Pt_a is not None and dQ_dPt_a != 0.0:
+                    nr = out.setdefault(idx_Pt_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += dT_mix_dQ * sign * dQ_dPt_a
+
+                # Side B contributions
+                obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
+                from_b = self._flow_ends(obj_b, x)[0]
+
+                # Temperature coupling: dT_node/dT_upstream_b
+                if from_b in relay:
+                    factor_T_b = (
+                        dT_mix_dQ
+                        * sign
+                        * (
+                            wall_result.dQ_dT_aw_b * ch_b.dT_aw_dT
+                            + wall_result.dQ_dh_b * ch_b.dh_dT
+                            + wall_result.dQ_dC_b * dCb_dTb
+                            + wall_result.dQ_dC_a * dCa_dTb
+                        )
+                    )
+                    for idx, sens_up in up(from_b).items():
+                        nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                        nr["T"] += factor_T_b * sens_up["T"]
+
+                # Mass-flow coupling: dT_node/dmdot_b (direct)
+                for idx_mdot_b, dm_b in self._htc_flow_columns(eb_id):
+                    factor_mdot_b = (
+                        dT_mix_dQ
+                        * sign
+                        * self._htc_mdot_sign(obj_b, x)
+                        * (
+                            wall_result.dQ_dh_b * ch_b.dh_dmdot
+                            + wall_result.dQ_dT_aw_b * ch_b.dT_aw_dmdot
+                        )
+                    )
+                    # The capacity rate |m| cp (signed in the unknown)
+                    factor_mdot_b += dT_mix_dQ * sign * wall_result.dQ_dC_b * dCb_dm
+                    nr = out.setdefault(idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += factor_mdot_b * dm_b
+
+                self._relay_flow_inputs(out, obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b)
+
+                # Pressure coupling (#496): the side's T_aw moves with its feed
+                # node's static P at fixed flow (v ~ 1/rho); h does not.
+                # A momentum chamber's h does too, through its static T.
+                idx_P_b = self._name_to_index.get(f"{from_b}.P")
+                dQ_dP_b = wall_result.dQ_dT_aw_b * getattr(
+                    ch_b, "dT_aw_dP", 0.0
+                ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dP", 0.0)
+                if idx_P_b is not None and dQ_dP_b != 0.0:
+                    nr = out.setdefault(idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += dT_mix_dQ * sign * dQ_dP_b
+                # A duct's T_aw moves with its feed's Pt instead (#636).
+                idx_Pt_b = self._name_to_index.get(f"{from_b}.Pt")
+                # and so does its h, through the duct's static T.
+                dQ_dPt_b = wall_result.dQ_dT_aw_b * getattr(
+                    ch_b, "dT_aw_dPt", 0.0
+                ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dPt", 0.0)
+                if idx_Pt_b is not None and dQ_dPt_b != 0.0:
+                    nr = out.setdefault(idx_Pt_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += dT_mix_dQ * sign * dQ_dPt_b
+
     def _propagate_pass(
         self,
         x: np.ndarray,
@@ -1730,6 +1948,11 @@ class NetworkSolver:
             return prev_relay.get(n, {})
 
         has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
+        # Each pass derives the heated ducts' exit states afresh (#672): one
+        # that no node takes this pass (no flow into it) reads as adiabatic.
+        for el in self.network.elements.values():
+            if getattr(el, "_rayleigh_mix_ends", None):
+                el._rayleigh_exit = None
 
         for nid in order:
             self._eval_where = f"node '{nid}'"
@@ -1884,6 +2107,35 @@ class NetworkSolver:
                 self._T_no_gas.add(nid)
             self._derived_states[nid] = (T, Y, mix_res)
 
+            # A wall-heated duct into a node whose T is not its exit Tt (the
+            # node mixes other streams or heat, or is a boundary): its own exit
+            # state, from its stream and its own wall heat alone, through the
+            # same mixer and relay as a node (#672). The duct reads it for its
+            # Fanno-Rayleigh momentum.
+            for s_up, elem, src_nid, coeffs in stream_info:
+                if elem is None or nid not in getattr(elem, "_rayleigh_mix_ends", ()):
+                    continue
+                own = [wc for wc in wall_contributions if (wc[3] if wc[5] else wc[4]) == elem.id]
+                exit_mix = _solver_tools.mixer_from_streams_and_jacobians(
+                    [cb.MassStream(s_up.m_dot, s_up.Tt, s_up.Pt, s_up.Y)],
+                    Q=sum(float(wc[1]) for wc in own),
+                    fraction=0.0,
+                )
+                elem._rayleigh_exit = (nid, float(exit_mix.T_mix), src_nid)
+                if with_relay:
+                    key = f"{RAYLEIGH_EXIT_PREFIX}{elem.id}"
+                    relay[key] = {}
+                    self._relay_mix(
+                        relay[key],
+                        nid,
+                        [(s_up, elem, src_nid, coeffs)],
+                        exit_mix,
+                        own,
+                        x,
+                        relay,
+                        up,
+                    )
+
             # Store wall coupling debug info on the node
             if wall_contributions:
                 dT_mix_dQ = mix_res.dT_mix_dQ if mix_res else 0.0
@@ -1920,227 +2172,9 @@ class NetworkSolver:
 
             # Sensitivity Relay (Chain-Rule)
             if mix_res:
-                n_species = self._n_species
-                # Iterate over stream_info (one entry per upstream stream, including
-                # multiple entries for multi-port elements like TeeJunctionElement).
-                for i, (_, elem, src_nid, coeffs) in enumerate(stream_info):
-                    if elem is None:
-                        continue  # a fixed injection: nothing to relay
-                    t_jac = mix_res.dT_mix_d_stream[i]
-                    pt_jac = mix_res.dP_total_mix_d_stream[i]
-                    # dY_mix_d_stream is indexed by [species][stream]
-                    y_jacs = [mix_res.dY_mix_d_stream[k][i] for k in range(n_species)]
-
-                    # 1. Direct dependency on upstream mass flow (if it's a solver unknown)
-                    m_indices = self._unknown_indices.get(elem.id)
-                    if m_indices:
-                        # flow_jac_at_node maps each unknown index to its coefficient
-                        # in d(stream_i.m_dot)/d(x). For 2-port: {idx: 1.0}. For tee:
-                        # may involve 2 unknowns (m_dot_com and m_dot_branch).
-                        # The stream's flow is the one INTO this node for a
-                        # single-source element (flow_at_node(nid), as set in
-                        # stream_info above), so its derivative must be taken at
-                        # nid too. Taking it at src_nid gave a branching tee's
-                        # straight sink d/d(m_com) only and dropped the -1 on
-                        # m_branch.
-                        jac_node = nid if len(elem.all_source_nodes()) == 1 else src_nid
-                        flow_jac = (
-                            coeffs
-                            if coeffs is not None
-                            else elem.flow_jac_at_node(jac_node, m_indices)
-                        )
-                        for idx, coeff in flow_jac.items():
-                            node_relay = relay[nid].setdefault(
-                                idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
-                            )
-                            node_relay["T"] += t_jac.d_mdot * coeff
-                            node_relay["Pt_mix"] += pt_jac.d_mdot * coeff
-                            for k in range(n_species):
-                                node_relay["Y"][k] += y_jacs[k].d_mdot * coeff
-
-                    # 2. Recursive dependency on upstream P/T/Y via src_nid relay
-                    if src_nid in relay:
-                        for idx, sens_up in up(src_nid).items():
-                            node_relay = relay[nid].setdefault(
-                                idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
-                            )
-                            # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
-                            node_relay["T"] += t_jac.d_T * sens_up["T"]
-                            # Note: stagnation Pt doesn't usually have T/Y dependency, but we relay it if present
-                            node_relay["T"] += t_jac.d_P_total * sens_up.get("Pt", 0.0)
-                            node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
-
-                            # dP_total_mix/dx
-                            node_relay["Pt_mix"] += pt_jac.d_T * sens_up["T"]
-                            node_relay["Pt_mix"] += pt_jac.d_P_total * sens_up.get("Pt", 0.0)
-                            node_relay["Pt_mix"] += np.dot(pt_jac.d_Y, sens_up["Y"])
-
-                            # dY_k/dx
-                            for k in range(n_species):
-                                node_relay["Y"][k] += y_jacs[k].d_T * sens_up["T"]
-                                node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up.get("Pt", 0.0)
-                                node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
-
-                # Wall coupling relay extension: dT_node/dx += dT_mix/dQ * dQ/dx
-                # Full chain rule with channel Jacobians:
-                #   dQ/dmdot = dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot + (side B terms)
-                #   dQ/dT    = dQ/dh_a * dh_a/dT    + dQ/dT_aw_a * dT_aw_a/dT    + (side B terms)
-                if wall_contributions:
-                    # Wall Q is a heat rate [W]: dT/dQ = (1/cp) / m_eff, m_eff
-                    # the flow the mixer spreads Q over (dT_mix_dQ, exact also
-                    # below kMixerHeatMdotFloor and for a non-positive total).
-                    dT_mix_dQ = mix_res.dT_mix_dQ
-                    for (
-                        _wall,
-                        _Qi,
-                        wall_result,
-                        ea_id,
-                        eb_id,
-                        is_side_a,
-                        ch_a,
-                        ch_b,
-                        (dCa_dm, dCa_dTa, dCa_dTb, dCb_dm, dCb_dTb, dCb_dTa),
-                    ) in wall_contributions:
-                        sign = -1.0 if is_side_a else 1.0
-
-                        # Side A contributions
-                        obj_a = self.network.elements.get(ea_id) or self.network.nodes.get(ea_id)
-                        from_a = self._flow_ends(obj_a, x)[0]
-
-                        # Temperature coupling: dT_node/dT_upstream_a
-                        if from_a in relay:
-                            # dQ/dT_aw_a * dT_aw_a/dT + dQ/dh_a * dh_a/dT
-                            factor_T_a = (
-                                dT_mix_dQ
-                                * sign
-                                * (
-                                    wall_result.dQ_dT_aw_a * ch_a.dT_aw_dT
-                                    + wall_result.dQ_dh_a * ch_a.dh_dT
-                                    + wall_result.dQ_dC_a * dCa_dTa
-                                    + wall_result.dQ_dC_b * dCb_dTa
-                                )
-                            )
-                            for idx, sens_up in up(from_a).items():
-                                nr = relay[nid].setdefault(
-                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                                )
-                                nr["T"] += factor_T_a * sens_up["T"]
-
-                        # Mass-flow coupling: dT_node/dmdot_a (direct)
-                        for idx_mdot_a, dm_a in self._htc_flow_columns(ea_id):
-                            # dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot
-                            factor_mdot_a = (
-                                dT_mix_dQ
-                                * sign
-                                * self._htc_mdot_sign(obj_a, x)
-                                * (
-                                    wall_result.dQ_dh_a * ch_a.dh_dmdot
-                                    + wall_result.dQ_dT_aw_a * ch_a.dT_aw_dmdot
-                                )
-                            )
-                            # The capacity rate |m| cp (signed in the unknown)
-                            factor_mdot_a += dT_mix_dQ * sign * wall_result.dQ_dC_a * dCa_dm
-                            nr = relay[nid].setdefault(
-                                idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                            )
-                            nr["T"] += factor_mdot_a * dm_a
-
-                        # Neighbour flows the side-A htc reads (#465)
-                        self._relay_flow_inputs(
-                            relay[nid], obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dh_a
-                        )
-
-                        # Pressure coupling (#496): the side's T_aw moves with its feed
-                        # node's static P at fixed flow (v ~ 1/rho); h does not.
-                        # A momentum chamber's h does too, through its static T.
-                        idx_P_a = self._name_to_index.get(f"{from_a}.P")
-                        dQ_dP_a = wall_result.dQ_dT_aw_a * getattr(
-                            ch_a, "dT_aw_dP", 0.0
-                        ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dP", 0.0)
-                        if idx_P_a is not None and dQ_dP_a != 0.0:
-                            nr = relay[nid].setdefault(
-                                idx_P_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                            )
-                            nr["T"] += dT_mix_dQ * sign * dQ_dP_a
-                        # A duct's T_aw moves with its feed's Pt instead (#636).
-                        idx_Pt_a = self._name_to_index.get(f"{from_a}.Pt")
-                        # and so does its h, through the duct's static T.
-                        dQ_dPt_a = wall_result.dQ_dT_aw_a * getattr(
-                            ch_a, "dT_aw_dPt", 0.0
-                        ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dPt", 0.0)
-                        if idx_Pt_a is not None and dQ_dPt_a != 0.0:
-                            nr = relay[nid].setdefault(
-                                idx_Pt_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                            )
-                            nr["T"] += dT_mix_dQ * sign * dQ_dPt_a
-
-                        # Side B contributions
-                        obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
-                        from_b = self._flow_ends(obj_b, x)[0]
-
-                        # Temperature coupling: dT_node/dT_upstream_b
-                        if from_b in relay:
-                            factor_T_b = (
-                                dT_mix_dQ
-                                * sign
-                                * (
-                                    wall_result.dQ_dT_aw_b * ch_b.dT_aw_dT
-                                    + wall_result.dQ_dh_b * ch_b.dh_dT
-                                    + wall_result.dQ_dC_b * dCb_dTb
-                                    + wall_result.dQ_dC_a * dCa_dTb
-                                )
-                            )
-                            for idx, sens_up in up(from_b).items():
-                                nr = relay[nid].setdefault(
-                                    idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                                )
-                                nr["T"] += factor_T_b * sens_up["T"]
-
-                        # Mass-flow coupling: dT_node/dmdot_b (direct)
-                        for idx_mdot_b, dm_b in self._htc_flow_columns(eb_id):
-                            factor_mdot_b = (
-                                dT_mix_dQ
-                                * sign
-                                * self._htc_mdot_sign(obj_b, x)
-                                * (
-                                    wall_result.dQ_dh_b * ch_b.dh_dmdot
-                                    + wall_result.dQ_dT_aw_b * ch_b.dT_aw_dmdot
-                                )
-                            )
-                            # The capacity rate |m| cp (signed in the unknown)
-                            factor_mdot_b += dT_mix_dQ * sign * wall_result.dQ_dC_b * dCb_dm
-                            nr = relay[nid].setdefault(
-                                idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                            )
-                            nr["T"] += factor_mdot_b * dm_b
-
-                        self._relay_flow_inputs(
-                            relay[nid], obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b
-                        )
-
-                        # Pressure coupling (#496): the side's T_aw moves with its feed
-                        # node's static P at fixed flow (v ~ 1/rho); h does not.
-                        # A momentum chamber's h does too, through its static T.
-                        idx_P_b = self._name_to_index.get(f"{from_b}.P")
-                        dQ_dP_b = wall_result.dQ_dT_aw_b * getattr(
-                            ch_b, "dT_aw_dP", 0.0
-                        ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dP", 0.0)
-                        if idx_P_b is not None and dQ_dP_b != 0.0:
-                            nr = relay[nid].setdefault(
-                                idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                            )
-                            nr["T"] += dT_mix_dQ * sign * dQ_dP_b
-                        # A duct's T_aw moves with its feed's Pt instead (#636).
-                        idx_Pt_b = self._name_to_index.get(f"{from_b}.Pt")
-                        # and so does its h, through the duct's static T.
-                        dQ_dPt_b = wall_result.dQ_dT_aw_b * getattr(
-                            ch_b, "dT_aw_dPt", 0.0
-                        ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dPt", 0.0)
-                        if idx_Pt_b is not None and dQ_dPt_b != 0.0:
-                            nr = relay[nid].setdefault(
-                                idx_Pt_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0}
-                            )
-                            nr["T"] += dT_mix_dQ * sign * dQ_dPt_b
+                self._relay_mix(
+                    relay[nid], nid, stream_info, mix_res, wall_contributions, x, relay, up
+                )
 
             # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])
@@ -2973,8 +3007,15 @@ class NetworkSolver:
         return self._with_caught(sol)
 
     def _rayleigh_heated_elements(self) -> list[Any]:
-        """Channels that carry their wall heat in the momentum (#551)."""
+        """Channels whose cold solve is staged (#551): those that carry their
+        wall heat into a node of their own. A duct whose exit state the solver
+        derives (#672) is not: staging gives the adiabatic stage 60% of the
+        budget, and a stress draw whose cold solve needed 17 s then lost it.
+        None with thermal coupling off: no wall moves heat (the wall-free seed
+        of a staged solve runs with it off)."""
         self.network.resolve_all_topology()
+        if not self.network.thermal_coupling_enabled:
+            return []
         return [el for el in self.network.elements.values() if getattr(el, "_rayleigh_ends", None)]
 
     def _solve_rayleigh_staged(self, heated: list[Any], kw: dict[str, Any]) -> dict[str, Any]:
@@ -2991,13 +3032,17 @@ class NetworkSolver:
         t0 = time.time()
         timeout = kw.get("timeout")
         self._in_rayleigh_stage = True
+        # Restore each duct's own flag, never clear it: a solve nested inside
+        # stage 1 (the wall-free seed solves the same elements) used to switch
+        # the heat back on under the outer stage (#672).
+        was = [getattr(el, "_rayleigh_suspended", False) for el in heated]
         try:
             for el in heated:
                 el._rayleigh_suspended = True
             seed = self.solve(**{**kw, "timeout": None if timeout is None else 0.6 * timeout})
         finally:
-            for el in heated:
-                el._rayleigh_suspended = False
+            for el, flag in zip(heated, was, strict=True):
+                el._rayleigh_suspended = flag
             self._in_rayleigh_stage = False
 
         def left() -> float | None:

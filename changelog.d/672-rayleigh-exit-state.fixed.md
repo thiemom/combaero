@@ -1,0 +1,5 @@
+- **A wall-heated compressible channel carries its heat in the momentum wherever it discharges (#672).**
+  - #551 did this only into a plenum or chamber fed by the duct alone. Into a node that mixes other streams or heat, or into a boundary, the duct stayed adiabatic Fanno flow and the "Heating not in the momentum" flag was raised.
+  - The solver now forms the duct's own exit state from its stream and its own wall heat, through the same mixer and Jacobian relay as a node, and the Fanno-Rayleigh kernel uses it.
+  - The answer equals the explicit-outlet-plenum workaround to 1e-6. The flag remains only as a fallback, where no flow enters the receiving node.
+- **A staged cold solve no longer switches the heat back on under its own adiabatic stage.** A solve nested inside stage 1 (the wall-free seed) cleared every duct's suspension on its way out. The staged solve now restores each duct's own flag, and nothing is staged with thermal coupling off.

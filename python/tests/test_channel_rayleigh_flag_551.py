@@ -1,12 +1,13 @@
-"""A wall-heated compressible channel flags the heating its momentum omits (#551).
+"""A wall-heated compressible channel's heat is in its momentum wherever it
+discharges (#551, #672), and the omission flag is only a fallback.
 
-Where the duct discharges into a node fed by it alone, its heat is in the
-momentum (Fanno-Rayleigh, test_channel_fanno_rayleigh_551.py). Into a node
-that also mixes other streams, that node's Tt is not the duct's exit Tt and
-the duct stays adiabatic Fanno flow at its inlet Tt. To first order Rayleigh
-flow loses dPt / Pt = (gamma M^2 / 2) ln(Tt_exit / Tt_in) (cooling gains it),
-which the diagnostics then report and the Inspector flags above 0.1% of the
-inlet Pt.
+Into a node fed by it alone, that node's Tt is the duct's exit Tt (#551). Into
+a node that also mixes other streams, or a boundary, the solver forms the
+duct's own exit state from its stream and its own wall heat (#672). Where no
+exit state can be formed (no flow into the receiving node), the duct is solved
+as adiabatic Fanno flow at its inlet Tt. The diagnostic then reports the
+first-order Rayleigh change, dPt / Pt = (gamma M^2 / 2) ln(Tt_exit / Tt_in)
+(cooling gains it), and the Inspector flags it above 0.1% of the inlet Pt.
 """
 
 from __future__ import annotations
@@ -84,18 +85,37 @@ def _mixing_pair() -> FlowNetwork:
     return g
 
 
-def test_a_heated_and_a_cooled_duct_into_mixing_nodes_report_their_omission() -> None:
-    """The heated side omits a loss, the cooled side a gain; the estimate is
-    the first-order formula on the duct's own Mach numbers and end Tt."""
+def test_a_heated_and_a_cooled_duct_into_mixing_nodes_carry_their_heat() -> None:
+    """#672: neither plenum's Tt is a duct's exit Tt, and both ducts still
+    carry their heat in the momentum; nothing is flagged."""
     r = _solve(_mixing_pair())
     d = r["__element_diag__"]
-    assert d["cold"]["rayleigh_omitted_frac"] > 1e-3
-    assert d["hot"]["rayleigh_omitted_frac"] < -1e-3
-    assert d["cold"]["rayleigh_omitted"] == 1.0 and d["hot"]["rayleigh_omitted"] == 1.0
-    assert "rayleigh_in_momentum" not in d["cold"]
-    m2 = 0.5 * (d["cold"]["M_in_duct"] ** 2 + d["cold"]["M_exit_duct"] ** 2)
-    expected = 0.5 * d["cold"]["gamma_ref"] * m2 * math.log(r["cold_p.T"] / 350.0)
-    assert d["cold"]["rayleigh_omitted_frac"] == pytest.approx(expected, rel=1e-9)
+    for side in ("hot", "cold"):
+        assert d[side]["rayleigh_in_momentum"] == 1.0
+        assert "rayleigh_omitted" not in d[side]
+    assert r["__second_law_failures__"] == []
+
+
+def test_the_fallback_estimate_is_the_first_order_rayleigh_formula() -> None:
+    """Where no exit state exists the duct reports the omitted change: the
+    heated side a loss, the cooled side a gain, on its own Mach numbers."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        s = NetworkSolver(_mixing_pair())
+        r = s.solve(timeout=30)
+    assert r["__success__"], r["__message__"]
+    for side, sign in (("cold", 1.0), ("hot", -1.0)):
+        el = s.network.elements[side]
+        st_in = s._get_node_state(s.network.nodes[f"{side}_in"], s._last_x)
+        st_out = s._get_node_state(s.network.nodes[f"{side}_p"], s._last_x)
+        st_in.m_dot = r[f"{side}.m_dot"]
+        _, _, flow = el._compressible_flow(st_in, st_out, 1.0, derivatives=False)
+        ref = {"gamma_ref": 1.4}
+        est = el._rayleigh_omission(st_in, st_out, flow, ref)
+        m2 = 0.5 * (float(flow.M_in) ** 2 + float(flow.M_exit) ** 2)
+        expected = 0.5 * ref["gamma_ref"] * m2 * math.log(float(st_out.Tt) / float(st_in.Tt))
+        assert est["rayleigh_omitted_frac"] == pytest.approx(expected, rel=1e-12)
+        assert sign * est["rayleigh_omitted_frac"] > 1e-3
 
 
 def test_a_duct_without_a_wall_reports_nothing() -> None:
