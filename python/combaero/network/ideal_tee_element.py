@@ -29,6 +29,7 @@ flow).
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from combaero import _core
 from combaero.network.components import (
@@ -290,6 +291,25 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
             return net_outflow <= energy_rel_tol * scale / min(rho)
         net_outflow_of_energy = sum(f * pt for f, pt in zip(flows, pts, strict=True))
         return net_outflow_of_energy <= energy_rel_tol * scale
+
+    def second_law_hint(self, sol: dict[str, Any]) -> str:
+        """Why the solver's second-law check refused this junction, when the
+        loss factor is the cause: below 1, a receiver's loss is written at low
+        Mach (rho u^2/2) while its Pt is isentropic, ~M^2/4 of the head
+        larger, so a split below f ~ M^2/4 creates flow work (see LOSS
+        FACTOR). "" when every factor is at least 1, where the closure
+        dissipates by construction and the cause is elsewhere."""
+        f_min = min(self.loss_factor)
+        if f_min >= 1.0:
+            return ""
+        machs = [float(sol.get(f"{nid}.mach", 0.0)) for nid in self.port_nodes]
+        m_max = max(machs) if machs else 0.0
+        return (
+            f"IdealMomentumTeeElement '{self.id}': loss_factor {f_min:g} is below "
+            f"~M^2/4 = {m_max * m_max / 4.0:.3g} at port Mach {m_max:.2f}. Its loss is "
+            "written at low Mach, so a factor that small creates flow work here; "
+            "raise loss_factor (1.0 is the parameter-free closure)."
+        )
 
     def diagnostics(
         self,

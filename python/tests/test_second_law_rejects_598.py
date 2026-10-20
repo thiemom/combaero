@@ -86,3 +86,25 @@ def test_total_pressure_created_above_the_resolution_is_refused(gain: float) -> 
     assert not sol["__success__"]
     assert sol["__outcome__"] == "inconsistent"
     assert "second law" in sol["__message__"]
+
+
+def test_a_refused_lossless_split_at_mach_names_its_loss_factor() -> None:
+    """At port Mach 0.27 a loss_factor = 0 split creates flow work (its loss
+    is written at low Mach, ~M^2/4 short), and sigma refuses it; the message
+    says so, not just a sigma value. At f = 1 the same flow is accepted."""
+    from test_ideal_tee_element import _branch_net
+
+    def solve(f: float) -> dict:
+        net = _branch_net(m_in=0.4, theta=60.0, regime="compressible", loss_factor=f)
+        for node in net.nodes.values():
+            if isinstance(node, MomentumChamberNode):
+                node.regime = "compressible"
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return NetworkSolver(net).solve(timeout=60.0)
+
+    refused = solve(0.0)
+    assert refused["__converged__"] and not refused["__success__"]
+    assert refused["__second_law__"]["jct"]["verdict"] == "fail"
+    assert "loss_factor 0 is below ~M^2/4" in refused["__message__"]
+    assert solve(1.0)["__success__"]

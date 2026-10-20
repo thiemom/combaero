@@ -4950,6 +4950,13 @@ class NetworkSolver:
                 + f": the element creates flow work (bound -{SIGMA_TOL:.0e}). "
                 "See __second_law__."
             )
+            # An element that knows why its own closure creates flow work at
+            # this root names the cause (an ideal tee below f ~ M^2/4).
+            for eid in _sigma_bad:
+                hint = getattr(self.network.elements.get(eid), "second_law_hint", None)
+                text = hint(sol_dict) if callable(hint) else ""
+                if text:
+                    message = f"{message} {text}"
             warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
 
         # Incompressible validity (#588): each element on an incompressible
