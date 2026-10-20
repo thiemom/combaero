@@ -1,0 +1,5 @@
+- A compressible `EjectorElement` now uses the `"huang1999"` operating anchors by default, in place of Kracik & Dvorak's lossless pair: a lower critical back pressure P_c* and a dead head P_b0 3-5% above the measured breakdowns, where the old one ran 62-274% above.
+  - Results change for every compressible ejector: the entrainment plateau ends at a lower outlet pressure, and the droop falls to zero much sooner.
+  - An outlet above the new dead head has no forward-flow root, so some networks that solved before now fail. The solver's message names the dead head.
+  - Pass `anchor_closure="kracik_dvorak"` (GUI: "Back-Pressure Anchors") for the old pair.
+  - Incompressible ejectors are unchanged. Their compressible warm-start proxy keeps the old pair's wider window, which converges more often and only seeds the solve.

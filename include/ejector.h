@@ -342,7 +342,7 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
     double gamma, double r_gas, double eta_primary, double eta_secondary,
     double recovery_efficiency, double eps_frac, double s_choke_lo,
     double s_choke_hi, double s_sub_lo, double s_sub_hi,
-    EjectorAnchorClosure anchor_closure = EjectorAnchorClosure::kracik_dvorak);
+    EjectorAnchorClosure anchor_closure = EjectorAnchorClosure::huang1999);
 
 // ---------------------------------------------------------------------------
 // Incompressible jet pump (#588)

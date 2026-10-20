@@ -1,0 +1,5 @@
+- The ejector validation notes cover three more sources:
+  - Bouhanguel et al. 2011: an air ejector's observed flow regimes, which only the new default P_c* matches without an edge-case reading (`validation/ejector/bouhanguel2011_regime_check.py`);
+  - Lucas & Koehler 2012: transcritical CO2, outside the ideal-gas element, whose choke is 34-51% below the measured motive flow;
+  - Liao 2008: no data with a back-pressure sweep.
+- The validated envelope now also lists two limits: a dense or flashing motive fluid, and a mixing tube too short to finish mixing.

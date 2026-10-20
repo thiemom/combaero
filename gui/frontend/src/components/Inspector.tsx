@@ -2375,23 +2375,24 @@ const Inspector = () => {
 								<select
 									id={`anchor_closure_${selectedNode.id}`}
 									className="p-1 border rounded bg-white text-xs h-7"
-									value={selectedNode.data.anchor_closure || "kracik_dvorak"}
+									value={selectedNode.data.anchor_closure || "huang1999"}
 									onChange={(e) =>
 										updateNodeData(selectedNode.id, {
 											anchor_closure: e.target.value,
 										})
 									}
 								>
-									<option value="kracik_dvorak">
-										Kracik &amp; Dvorak (lossless mixing, default)
-									</option>
 									<option value="huang1999">
-										Huang 1999 + sudden-expansion dead head
+										Huang 1999 + sudden-expansion dead head (default)
+									</option>
+									<option value="kracik_dvorak">
+										Kracik &amp; Dvorak (lossless mixing)
 									</option>
 								</select>
 								<span className="text-[9px] text-stone-400">
 									P_c* and the dead head P_b0 that end the plateau and the
-									droop. Huang's pair scores 2-3x closer on measured air rigs.
+									droop. Huang's pair scores 2-3x closer on measured air rigs;
+									K&amp;D's lossless pair is kept for comparison.
 								</span>
 							</div>
 						)}

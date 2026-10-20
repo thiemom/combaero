@@ -970,10 +970,10 @@ EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian(
     double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom,
     double gamma, double r_gas, double recovery_efficiency);
 // The whole element (4 rows, Jacobian over its nine unknowns) takes the pair
-// as its last argument, default kracik_dvorak.
+// as its last argument, default huang1999.
 EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
     /* ... flows, port states, geometry, gamma, r_gas, efficiencies, blend
-       windows ... */, EjectorAnchorClosure anchor_closure = EjectorAnchorClosure::kracik_dvorak);
+       windows ... */, EjectorAnchorClosure anchor_closure = EjectorAnchorClosure::huang1999);
 ```
 
 ```cpp

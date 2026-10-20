@@ -52,16 +52,16 @@ def test_ejector_data_defaults():
 
 def test_ejector_anchor_closure_reaches_the_element():
     """The Inspector's back-pressure anchors select the element's
-    anchor_closure; the default stays Kracik & Dvorak, and an unknown value
-    is refused by the schema."""
-    assert EjectorData().anchor_closure == "kracik_dvorak"
+    anchor_closure; the default is Huang 1999, and an unknown value is refused
+    by the schema."""
+    assert EjectorData().anchor_closure == "huang1999"
     schema = _three_plenum_ejector_schema()
     for n in schema.nodes:
         if n.type == "ejector":
-            n.data["anchor_closure"] = "huang1999"
+            n.data["anchor_closure"] = "kracik_dvorak"
     net = build_network_from_schema(schema)
     (e,) = (el for el in net.elements.values() if isinstance(el, EjectorElement))
-    assert e.anchor_closure == "huang1999"
+    assert e.anchor_closure == "kracik_dvorak"
     with pytest.raises(ValueError):
         EjectorData(anchor_closure="lossless")
 
@@ -218,7 +218,9 @@ def _solvable_ejector_schema() -> dict:
         "nodes": [
             _node("pb_p", "pressure_boundary", {"Pt": 7e5, "Tt": 440.0}),
             _node("pb_s", "pressure_boundary", {"Pt": 22850.0, "Tt": 280.0}, y=200),
-            _node("pb_o", "pressure_boundary", {"Pt": 40000.0, "Tt": 300.0}, x=600),
+            # 30 kPa: below P_c* of both anchor pairs (huang1999 ~37 kPa,
+            # kracik_dvorak ~58 kPa), so the ejector is double-choked.
+            _node("pb_o", "pressure_boundary", {"Pt": 30000.0, "Tt": 300.0}, x=600),
             _node("mc_p", "momentum_chamber", {"area": 0.05}, x=150),
             _node("mc_s", "momentum_chamber", {"area": 0.05}, x=150, y=200),
             _node("mc_o", "momentum_chamber", {"area": 0.05}, x=450),
@@ -254,7 +256,7 @@ def test_ejector_warmstart_seeds_port_pressures():
     net = build_network_from_schema(NetworkGraphSchema(**_solvable_ejector_schema()))
     assert net.nodes["mc_p"].initial_guess.get("mc_p.Pt") == 7e5
     assert net.nodes["mc_s"].initial_guess.get("mc_s.Pt") == 22850.0
-    assert net.nodes["mc_o"].initial_guess.get("mc_o.Pt") == 40000.0
+    assert net.nodes["mc_o"].initial_guess.get("mc_o.Pt") == 30000.0
     # P_jct (== P_c*) seeded on the element from the ejector's own physics.
     assert net.elements["ej1"].initial_guess.get("ej1.P_jct", 0.0) > 0.0
 
@@ -427,7 +429,7 @@ def test_warmstart_seeds_an_outlet_port_behind_a_pipe():
     g = _ejector_with_outlet_pipe(_solvable_ejector_schema(), _MIXING, None)
     net = build_network_from_schema(NetworkGraphSchema(**g))
     port = "__tee_jct__ej1_outlet"
-    assert net.nodes[port].initial_guess.get(f"{port}.Pt") == 40000.0
+    assert net.nodes[port].initial_guess.get(f"{port}.Pt") == 30000.0
 
 
 def test_jet_pump_with_an_outlet_pipe_converges():
