@@ -33,7 +33,13 @@ import combaero as cb
 from combaero.network import NetworkSolver
 
 from .graph_builder import build_network_from_schema
-from .schemas import ElementResult, NetworkGraphSchema, NodeResult, StateResult
+from .schemas import (
+    DEFAULT_SOLVE_TIMEOUT,
+    ElementResult,
+    NetworkGraphSchema,
+    NodeResult,
+    StateResult,
+)
 from .second_law_view import element_fields
 from .units import label_with_unit
 from .validity_view import element_fields as validity_fields
@@ -537,7 +543,7 @@ class NetworkRunner:
         overrides: dict[str, Any] | None = None,
         method: str = "hybr",
         init_strategy: str = "default",
-        timeout: float | None = 180.0,
+        timeout: float | None = DEFAULT_SOLVE_TIMEOUT,
         _x0: Any = None,
     ) -> NetworkResult:
         """Solve the network, optionally patching boundary conditions.
@@ -554,7 +560,8 @@ class NetworkRunner:
             init_strategy: Solver initialisation strategy
                 (``"default"``, ``"incompressible_warmstart"``,
                 ``"homotopy"``).
-            timeout: Per-solve soft timeout in seconds.
+            timeout: Per-solve soft timeout in seconds (default
+                ``DEFAULT_SOLVE_TIMEOUT``, 30 s, as in the GUI; ``None``: no limit).
             _x0: Internal — solver solution vector from a prior solve used
                 as the initial guess (passed by ``sweep`` for continuation).
 
@@ -608,7 +615,7 @@ class NetworkRunner:
         metrics: list[str] | None = None,
         method: str = "hybr",
         init_strategy: str = "default",
-        timeout: float | None = 180.0,
+        timeout: float | None = DEFAULT_SOLVE_TIMEOUT,
     ) -> pd.DataFrame:
         """Run a parametric sweep over rows of ``params``.
 
@@ -630,7 +637,8 @@ class NetworkRunner:
 
             method: scipy root-finding method forwarded to the solver.
             init_strategy: Solver initialisation strategy.
-            timeout: Per-solve timeout in seconds.
+            timeout: Per-solve timeout in seconds (default
+                ``DEFAULT_SOLVE_TIMEOUT``, 30 s, as in the GUI; ``None``: no limit).
 
         Returns:
             DataFrame with one or more rows per parameter combination.

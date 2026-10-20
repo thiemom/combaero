@@ -580,6 +580,13 @@ class ThermalWallData(BaseModel):
         return data
 
 
+# Max solve time [s] when a request names none, for the GUI and NetworkRunner
+# alike. The frontend store's solverSettings.timeout mirrors it; kept equal by
+# python/tests/test_solve_timeout_default_sync.py. None in a request still
+# means no limit.
+DEFAULT_SOLVE_TIMEOUT = 30.0
+
+
 class SolverSettings(BaseModel):
     model_config = ConfigDict(extra="ignore")
     # The library-wide default (combaero.network.components.DEFAULT_REGIME),
@@ -607,7 +614,7 @@ class SolverSettings(BaseModel):
         "krylov",
         "df-sane",
     ] = "hybr"
-    timeout: float | None = 180.0
+    timeout: float | None = DEFAULT_SOLVE_TIMEOUT
     omega_rpm: float | None = None  # global shaft speed [rpm]; None = disabled
     Nu_multiplier: float | None = (
         None  # global heat-transfer scale; stacks multiplicatively with per-element
