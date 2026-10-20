@@ -648,7 +648,6 @@
       },
       "data": {
         "id": "node_1778699118729",
-        "area": 0.1,
         "Nu_multiplier": 1,
         "f_multiplier": 1,
         "rotation": 180,
@@ -892,7 +891,7 @@
       "source": "node_1778699104469",
       "sourceHandle": "flow-source",
       "target": "node_1778699118729",
-      "targetHandle": "flow-target",
+      "targetHandle": "side-target",
       "id": "edge_1778699139800",
       "type": "default",
       "data": {}

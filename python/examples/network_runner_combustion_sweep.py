@@ -73,6 +73,11 @@ def main() -> None:
     phi_solved = sweep_df["combustor.phi"].values
     T_exit = sweep_df["combustor.T"].values
     converged = sweep_df["success"].values
+    print(f"  Converged: {converged.sum()}/{len(converged)}")
+    if not converged.any():
+        # A sweep catches each row's exception, so a network that no longer
+        # builds would otherwise exit cleanly with an empty plot.
+        raise SystemExit("no sweep point converged")
 
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.plot(phi_solved[converged], T_exit[converged], "o-", label="converged")
