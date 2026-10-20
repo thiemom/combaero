@@ -101,7 +101,7 @@ def test_a_refused_lossless_split_at_mach_names_its_loss_factor() -> None:
                 node.regime = "compressible"
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return NetworkSolver(net).solve(timeout=60.0)
+            return NetworkSolver(net).solve(timeout=60.0, auto_retry=False)
 
     refused = solve(0.0)
     assert refused["__converged__"] and not refused["__success__"]
