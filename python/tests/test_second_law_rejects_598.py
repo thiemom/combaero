@@ -94,17 +94,21 @@ def test_a_refused_lossless_split_at_mach_names_its_loss_factor() -> None:
     says so, not just a sigma value. At f = 1 the same flow is accepted."""
     from test_ideal_tee_element import _branch_net
 
-    def solve(f: float) -> dict:
+    def solve(f: float, x0: list[float] | None = None) -> dict:
         net = _branch_net(m_in=0.4, theta=60.0, regime="compressible", loss_factor=f)
         for node in net.nodes.values():
             if isinstance(node, MomentumChamberNode):
                 node.regime = "compressible"
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return NetworkSolver(net).solve(timeout=60.0, auto_retry=False)
+            return NetworkSolver(net).solve(timeout=60.0, auto_retry=False, x0=x0)
 
-    refused = solve(0.0)
-    assert refused["__converged__"] and not refused["__success__"]
+    accepted = solve(1.0)
+    assert accepted["__success__"], accepted["__message__"]
+    # From the f = 1 root the f = 0 root is a short Newton walk: which root a
+    # cold start reaches is platform-dependent (it did not converge on Linux
+    # CI), the refusal of this one is not.
+    refused = solve(0.0, x0=accepted["__x_solution__"])
+    assert refused["__converged__"] and not refused["__success__"], refused["__message__"]
     assert refused["__second_law__"]["jct"]["verdict"] == "fail"
     assert "loss_factor 0 is below ~M^2/4" in refused["__message__"]
-    assert solve(1.0)["__success__"]
