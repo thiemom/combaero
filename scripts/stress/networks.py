@@ -182,8 +182,16 @@ class _Layered:
             )
             self.tags.append("area_change")
         elif kind == "loss":
+            # Between two combustors the network refuses an undeclared theta
+            # source, whatever the correlation; name the upstream one. No
+            # draw, so no seed changes.
+            both_theta = getattr(na, "has_theta", False) and getattr(nb, "has_theta", False)
             e = PressureLossElement(
-                eid, a, b, correlation=ConstantFractionLoss(xi=r.choice([0.01, 0.05, 0.2]))
+                eid,
+                a,
+                b,
+                correlation=ConstantFractionLoss(xi=r.choice([0.01, 0.05, 0.2])),
+                theta_source=a if both_theta else None,
             )
         else:
             e = LosslessConnectionElement(eid, a, b)
