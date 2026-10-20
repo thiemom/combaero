@@ -2,6 +2,7 @@
 
     uv run python scripts/stress/run.py --out tmp/stress/after.jsonl
     uv run python scripts/stress/run.py --families ejector,tee3 --seeds 0:100 --jobs 8 --out ...
+    uv run python scripts/stress/run.py --seeds random:40 --out ...   # fresh seeds, range printed
     uv run python scripts/stress/summarize.py tmp/stress/after.jsonl --compare tmp/stress/before.jsonl
 
 Per solve: converged/success/outcome, the caught-exception log
@@ -23,6 +24,7 @@ import collections
 import json
 import math
 import multiprocessing as mp
+import secrets
 import sys
 import time
 import traceback
@@ -88,7 +90,18 @@ def run_one(task: tuple[str, int, float, bool]) -> dict[str, Any]:
 
 
 def _seeds(spec: str) -> range:
+    """'lo:hi', a count, or 'random:N': N seeds from a fresh offset.
+
+    The fixed seeds are the regression set; fresh ones explore. They found
+    what 0:40 never drew (a generator refusal, an f=0 n-port with no solve;
+    #642). The range is printed, and each record carries its seed, so a
+    finding stays a repro.
+    """
     lo, _, hi = spec.partition(":")
+    if lo == "random":
+        lo = str(secrets.randbelow(2**32))
+        hi = str(int(lo) + int(hi or 40))
+        print(f"fresh seeds {lo}:{hi} (rerun with --seeds {lo}:{hi})", file=sys.stderr)
     return range(int(lo), int(hi)) if hi else range(int(lo))
 
 
@@ -97,7 +110,11 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p.add_argument("--families", default="all", help=f"comma list or 'all' ({', '.join(FAMILIES)})")
-    p.add_argument("--seeds", default="0:40", help="'lo:hi' or a count (default 0:40)")
+    p.add_argument(
+        "--seeds",
+        default="0:40",
+        help="'lo:hi', a count, or 'random:N' for N fresh seeds (default 0:40)",
+    )
     p.add_argument("--jobs", type=int, default=4, help="worker processes (default 4)")
     p.add_argument("--timeout", type=float, default=20.0, help="per-solve timeout [s] (default 20)")
     p.add_argument("--strict", action="store_true", help="raise at the first finding (suite mode)")

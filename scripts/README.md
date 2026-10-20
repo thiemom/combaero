@@ -70,6 +70,7 @@ validated operating points; these sweeps found what it could not:
 ```bash
 uv run python scripts/stress/run.py --out tmp/stress/after.jsonl                  # all families, seeds 0:40
 uv run python scripts/stress/run.py --families ejector,tee3 --seeds 0:100 --jobs 8 --out tmp/stress/x.jsonl
+uv run python scripts/stress/run.py --seeds random:40 --out tmp/stress/fresh.jsonl  # 40 fresh seeds; the range is printed
 uv run python scripts/stress/run.py --strict ...                                   # raise at the first finding
 uv run python scripts/stress/summarize.py tmp/stress/after.jsonl --compare tmp/stress/before.jsonl
 ```
@@ -91,6 +92,7 @@ uv run python scripts/stress/summarize.py tmp/stress/after.jsonl --compare tmp/s
   - the second-law verdicts and ledger;
   - the `check_row_kinds` verdict at the solution.
 - **Reproducible seeds:** a (family, seed) pair rebuilds the same network, so a finding is a repro. Keep each generator's draw order when editing it.
+- **Fixed vs fresh seeds:** 0:40 is the regression set, for A/B comparison. `random:N` explores: on its first runs it found a generator refusal and an f=0 n-port draw that 0:40 never made (#642). Its records carry their seeds, so a fresh finding is as reproducible as a fixed one. Don't compare a fresh run against a fixed baseline.
 - **A failure is a finding to triage, not automatically a bug.** Some draws have no root by construction.
 - **A "converged" result is not yet a physical one.** Look at implausible internal states as well.
 - **Timeouts are wall-clock,** so for an A/B comparison run both sides with the same `--jobs`.
