@@ -306,7 +306,17 @@ normal shock, so it lands below the lossless closure:
 - **P_c\*:** −18 to +1% on the measured rigs and −19 to +17% on the CFD, against +14 to +63% today.
 - **Window P_b0/P_c\*:** 1.37-1.65 everywhere, so the droop never collapses or inverts. That includes A_3/A_t = 33, where today's window is 3.2-3.4.
 - **Whole measured curve** (the element's plateau and straight chord against every measured point, RMS over the plateau): 12-23% on all 11 measured curves, against 29-59% today.
-- **The catch** is fidelity: as printed, the chain does not reproduce its authors' own numbers (next section). Adopting it is a separate, stress-tested change.
+- **The catch** is fidelity: as printed, the chain does not reproduce its authors' own numbers (next section).
+
+**Selectable in the element: `EjectorElement(anchor_closure="huang1999")`**
+(`huang_critical_back_pressure` and `sudden_expansion_dead_head`, with analytic
+Jacobians in C++; the default stays `"kracik_dvorak"`):
+- **Network level.** Every measured back pressure of both measured air rigs solves with either pair (91 of 91). The curve RMS over the plateau drops from 29-48% to 12-23% on all eight curves (`test_ejector_anchor_closure_element.py`).
+- **Stress family `ejector`, seeds 0-400.** Run A (`kracik_dvorak`) against run B (`huang1999`), same seeds and jobs:
+  - **Second law.** Run A converges 52 roots that the second law refuses (#598: σ < 0 at the ejector, an entrainment the primary cannot drive). Run B has none.
+  - **Solved draws:** 347 → 301. Every draw lost (98, the 52 above included) has its outlet 2-107% above the new dead head, where a real ejector backflows and the model does not reach. On the measured rigs that dead head sits 3-5% above the breakdown. The failed solve now says so: the solver's message names the dead head (`EjectorElement.no_root_hint`).
+  - **Gained draws:** none.
+  - **Time.** The median is unchanged (10 ms) and p90 improves (450 → 300 ms). Incompressible ejectors do not use the anchors, but their compressible warm-start proxy does: their outcomes are unchanged (0 of 191), and their tail is slower, 37 → 48 s in total.
 
 ### Why the printed chain misses its authors' own numbers
 
@@ -383,6 +393,7 @@ result is extrapolation, and nothing in the element flags it.
 |---|---|---|
 | critical ω, P_c* (fidelity) | Huang 1999 theory columns (R141b, γ ≈ 1.11) | A_p1/A_t 2.9-3.3, A_3/A_t 6.6-10.9, P_g/P_e 8.5-15.1, ω 0.16-0.86 |
 | critical ω, P_c*, P_b0 (accuracy) | Henry 2007 and Chen 2013 rectangular (air, measured), Akbarnejad 2025 (steam, CFD) | A_3/A_t 4.5-5.4 and 33; P_p/P_s 3-35; ω 0.19-1.4; table above |
+| P_c*, P_b0 of `anchor_closure="huang1999"` (accuracy) | Henry 2007 and Chen 2013 rectangular (air, measured), Akbarnejad 2025 (steam, CFD) | as the row above; P_c* −19 to +17%, P_b0 +3 to +39%, curve RMS 12-23% |
 | critical ω, P_c* (second author's own model) | Chen 2013 model curves (air) | A_3/A_t 4.5 and 5.3; ω reproduced, P_c* not (above) |
 | droop shape (linear) | Henry 2007 (air, measured) | P_p/P_s about 4-7, one geometry |
 | jet pump (incompressible) | Sanger, NASA TN D-4759 / D-4445 (water) | A_p1/A_3 0.066 and 0.197 |

@@ -65,6 +65,18 @@ namespace ejector {
 constexpr double eta_p = 0.95; // primary-nozzle isentropic efficiency (Huang 1999, Section 4)
 constexpr double eta_s = 0.85; // entrained-flow isentropic efficiency
 constexpr double phi_p = 0.88; // primary-core area-loss coefficient at section y-y (Eq. 5)
+// Mixing-loss coefficient phi_m on the momentum balance (Huang 1999 Eq. 19),
+// stepped in A_3/A_t: phi_m_large above the upper area ratio, phi_m_small
+// below the lower one, phi_m_mid between (inclusive).
+constexpr double phi_m_large = 0.80;
+constexpr double phi_m_mid = 0.82;
+constexpr double phi_m_small = 0.84;
+constexpr double phi_m_upper_area_ratio = 8.3;
+constexpr double phi_m_lower_area_ratio = 6.9;
+// C1 floor on the sudden-expansion dead head's discriminant: at or below it the
+// mixed flow chokes (M_3 = 1). Same value as _DEAD_HEAD_DISCRIMINANT_FLOOR in
+// _ejector_huang1999.py.
+constexpr double dead_head_discriminant_floor = 1e-12;
 } // namespace ejector
 
 namespace combaero::solver {
@@ -253,6 +265,47 @@ EjectorCriticalPressureJacobian ejector_dead_head_back_pressure_and_jacobian(
     const EjectorGeometry& geom, double gamma, double r_gas,
     double recovery_efficiency);
 
+// The operating-anchor closures (P_c*, P_b0) the whole element can take; 1:1
+// with ANCHOR_CLOSURES in _ejector_huang1999.py. The pair always changes
+// together, so the droop window P_b0/P_c* is one closure family's.
+enum class EjectorAnchorClosure : int {
+  kracik_dvorak = 0, // ejector_critical_back_pressure + ejector_dead_head_back_pressure
+  huang1999 = 1,     // ejector_huang_critical_back_pressure + ejector_sudden_expansion_dead_head
+};
+
+// phi_m of Huang 1999 Eq. 19 (Chen 2013 Eq. 28) for a mixing area ratio.
+double ejector_huang_mixing_coefficient(double area_ratio_mix);
+
+// Critical back pressure P_c* by Huang 1999's own chain, as printed: from the
+// critical y-y state, constant-pressure mixing with phi_m (Eq. 11), energy
+// (Eq. 12), a normal shock in the mixed flow (Eqs. 16-17), an isentropic
+// diffuser (Eq. 18). 1:1 with huang_critical_back_pressure in
+// _ejector_huang1999.py, where its fidelity gap and cross-source accuracy are
+// recorded. C2 through M_m = 1 (a normal shock's loss is O((M - 1)^3)).
+// Result fields: p_c_pa = recovery * P_c*, p_mixed_stagnation_pa = P_c*,
+// temp_mixed_stagnation_k = the mixed stagnation T, lambda/mach_mixed = the
+// post-shock state.
+//
+// Method: Analytical Chain Rule (Dual4, same M_p1 treatment as
+// ejector_entrainment_ratio).
+EjectorCriticalPressureJacobian ejector_huang_critical_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom, double gamma,
+    double r_gas, double recovery_efficiency);
+
+// Zero-entrainment back pressure P_b0 as a sudden expansion over A_3 (Keenan &
+// Neumann's zero-secondary-flow constant-area mixer): the choked primary
+// leaves the nozzle into the mixing tube, the dead-headed suction annulus at
+// P_e, mass/momentum/energy over A_3 to a subsonic exit, recovered
+// isentropically. The exit Mach is the closed-form subsonic root of a
+// quadratic in M^2 (floored C1 at the choked exit). 1:1 with
+// sudden_expansion_dead_head in _ejector_huang1999.py. t_e does not enter
+// (zero partial). Result fields as ejector_dead_head_back_pressure_and_jacobian.
+//
+// Method: Analytical Chain Rule (Dual4).
+EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom, double gamma,
+    double r_gas, double recovery_efficiency);
+
 // -----------------------------------------------------------------------------
 // Whole-element (f, J): the 4-row operating-regime residual system.
 //
@@ -288,7 +341,8 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
     double area_throat, double area_nozzle_exit, double area_secondary,
     double gamma, double r_gas, double eta_primary, double eta_secondary,
     double recovery_efficiency, double eps_frac, double s_choke_lo,
-    double s_choke_hi, double s_sub_lo, double s_sub_hi);
+    double s_choke_hi, double s_sub_lo, double s_sub_hi,
+    EjectorAnchorClosure anchor_closure = EjectorAnchorClosure::kracik_dvorak);
 
 // ---------------------------------------------------------------------------
 // Incompressible jet pump (#588)

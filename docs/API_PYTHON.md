@@ -1307,7 +1307,12 @@ ejector = EjectorElement(
                               # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA)
     recovery_efficiency=1.0,  # multiplies the lossless mixed stagnation pressure; not fitted to data
     regime="compressible",    # default DEFAULT_REGIME ("compressible" since #585), see below
+    anchor_closure="kracik_dvorak",  # the (P_c*, P_b0) pair; or "huang1999": Huang's printed
+                              # P_c* chain + the sudden-expansion dead head (2-3x lower
+                              # curve error cross-source; validation/ejector/README.md)
 )
+# On a failed solve whose outlet boundary sits above the dead head P_b0, the
+# solver's message says so: a real ejector backflows there, outside the model.
 # regime="incompressible" (#588): the ejector's low-Mach limit, Sanger's 1-D jet
 # pump (NASA TN D-4445, 1968, App. B) with each stream at its own constant density
 # -- no choking, no critical regime; the flow follows the pressure ratio. Same

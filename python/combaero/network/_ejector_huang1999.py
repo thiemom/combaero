@@ -62,6 +62,13 @@ jet-pump and ejector branches meet continuously at the primary-choke threshold.
 Validated to reduce to the lossless incompressible jet-pump closed form (Sanger,
 NASA TN D-4445) as Mach -> 0.
 
+A second anchor pair is selectable (``ANCHOR_CLOSURES``, the element's
+``anchor_closure``): `huang_critical_back_pressure` (Huang's own printed chain,
+Eqs. 9-18) with `sudden_expansion_dead_head` (Keenan & Neumann's
+zero-secondary-flow mixer). Cross-source it scores 2-3x closer on measured air
+rigs; as printed, the chain does not reproduce Huang's or Chen's own numbers
+(validation/ejector/README.md).
+
 Still out of scope of THIS closed form: back-flow (P_b beyond the forward-flow
 window, omega < 0) -- see the design note.
 """
@@ -655,6 +662,151 @@ def dead_head_back_pressure(
         p_b0_stagnation_pa=p03,
         lambda_mixed=lambda3,
         mach_mixed=mach3,
+        recovery_efficiency=recovery_efficiency,
+    )
+
+
+#: The two operating-anchor closures an EjectorElement can take (P_c*, P_b0):
+#:   "kracik_dvorak": `critical_back_pressure` + `dead_head_back_pressure`
+#:       (lossless mixing; 14-63% high on P_c* and 62-274% on P_b0
+#:       cross-source, validation/ejector/README.md);
+#:   "huang1999": `huang_critical_back_pressure` + `sudden_expansion_dead_head`.
+ANCHOR_CLOSURES = ("kracik_dvorak", "huang1999")
+
+
+def huang_mixing_coefficient(area_ratio_mix: float) -> float:
+    """phi_m, Huang 1999 Eq. 19: the mixing-loss coefficient on the momentum
+    balance, stepped in A_3/A_t (calibrated by Huang on R141b, A_3/A_t
+    6.4-10.9; Chen 2013 Eq. 28 uses the same)."""
+    if area_ratio_mix > 8.3:
+        return 0.80
+    return 0.82 if area_ratio_mix >= 6.9 else 0.84
+
+
+def _mixed_stagnation_temperature(t_g: float, t_e: float, omega: float) -> float:
+    return (t_g + omega * t_e) / (1.0 + omega)
+
+
+def huang_critical_back_pressure(
+    p_g: float,
+    t_g: float,
+    p_e: float,
+    t_e: float,
+    geom: EjectorGeometry,
+    gamma: float,
+    r_gas: float,
+    recovery_efficiency: float = 1.0,
+) -> CriticalPressureResult:
+    """Critical back pressure P_c* by Huang 1999's own chain, as printed.
+
+    From the critical y-y state (`entrainment_ratio`): constant-pressure mixing
+    at P_py with the loss coefficient phi_m (Eq. 11, `huang_mixing_coefficient`),
+    energy (Eq. 12), a normal shock in the mixed flow (Eqs. 16-17) and an
+    isentropic diffuser (Eq. 18).
+
+    Fidelity and accuracy are recorded in validation/ejector/README.md: as
+    printed, this chain lands 16-29% below Huang's own computed P_c* and 8-18%
+    below Chen 2013's, for reasons not found (fourteen hypotheses tested). On
+    rigs that are not its source it is the best P_c* scored (-19 to +17%
+    cross-source, against +14 to +63% for `critical_back_pressure`).
+
+    The shock branch is C2 through M_m = 1: the stagnation-pressure loss of a
+    normal shock is O((M - 1)^3), so the supersonic and subsonic forms meet
+    with equal value, slope and curvature.
+    """
+    g = gamma
+    gm1 = g - 1.0
+    entr = entrainment_ratio(p_g, t_g, p_e, t_e, geom, g)
+    om, mach_py, p_py = entr.omega, entr.mach_hypothetical_throat, entr.p_mixing_pa
+    t_py = t_g / (1.0 + 0.5 * gm1 * mach_py * mach_py)
+    t_sy = t_e * 2.0 / (g + 1.0)
+    v_py = mach_py * math.sqrt(g * r_gas * t_py)
+    v_sy = math.sqrt(g * r_gas * t_sy)  # M_sy = 1
+    v_m = huang_mixing_coefficient(geom.area_ratio_mix) * (v_py + om * v_sy) / (1.0 + om)
+    cp = g * r_gas / gm1
+    t03 = _mixed_stagnation_temperature(t_g, t_e, om)
+    t_m = t03 - 0.5 * v_m * v_m / cp
+    mach_m_sq = v_m * v_m / (g * r_gas * t_m)
+    if mach_m_sq > 1.0:
+        p3 = p_py * (1.0 + 2.0 * g / (g + 1.0) * (mach_m_sq - 1.0))
+        mach3_sq = (1.0 + 0.5 * gm1 * mach_m_sq) / (g * mach_m_sq - 0.5 * gm1)
+    else:
+        p3, mach3_sq = p_py, mach_m_sq
+    p_c = p3 * (1.0 + 0.5 * gm1 * mach3_sq) ** (g / gm1)
+    lambda3 = math.sqrt((g + 1.0) * mach3_sq / (2.0 + gm1 * mach3_sq))
+    return CriticalPressureResult(
+        p_c_pa=recovery_efficiency * p_c,
+        p_mixed_stagnation_pa=p_c,
+        temp_mixed_stagnation_k=t03,
+        lambda_mixed=lambda3,
+        mach_mixed=math.sqrt(mach3_sq),
+        recovery_efficiency=recovery_efficiency,
+    )
+
+
+#: C1 floor on the dead-head discriminant: at or below it the mixed flow chokes
+#: (M_3 = 1); see `sudden_expansion_dead_head`.
+_DEAD_HEAD_DISCRIMINANT_FLOOR = 1e-12
+
+
+def sudden_expansion_dead_head(
+    p_g: float,
+    t_g: float,
+    p_e: float,
+    t_e: float,
+    geom: EjectorGeometry,
+    gamma: float,
+    r_gas: float,
+    recovery_efficiency: float = 1.0,
+) -> DeadHeadResult:
+    """Zero-entrainment back pressure P_b0 as a sudden expansion over A_3.
+
+    Keenan & Neumann's zero-secondary-flow constant-area mixer: the choked
+    primary leaves the nozzle (M_p1, P_p1 on A_p1) into the mixing tube, the
+    dead-headed suction annulus A_3 - A_p1 sits at the secondary pressure P_e,
+    and mass, momentum and energy over A_3 give the subsonic exit, recovered
+    isentropically. No fitted constant, and A_3/A_t enters (the Kracik &
+    Dvorak dead head, `dead_head_back_pressure`, is independent of it).
+    Cross-source it lands 3-39% above the measured or CFD breakdown, and 3-5%
+    on the rig added after its form was fixed (validation/ejector/README.md).
+
+    The exit Mach follows in closed form. With the impulse per mass flow
+    I/m = sqrt(R T_g / gamma) Phi and k = (gamma - 1)/2,
+
+        Phi = (1 + gamma M^2) / (M sqrt(1 + k M^2)),
+
+    squared, is a quadratic in X = M^2:
+    (k Phi^2 - gamma^2) X^2 + (Phi^2 - 2 gamma) X - 1 = 0, whose subsonic root
+    is X = 2 / (B + sqrt(D)), B = Phi^2 - 2 gamma, D = B^2 + 4 (k Phi^2 -
+    gamma^2). D = 0 is the choked exit (X = 1); below it no subsonic exit
+    exists, and D is floored C1 so the exit chokes continuously. ``t_e`` does
+    not enter: the secondary is dead-headed.
+    """
+    del t_e
+    g = gamma
+    gm1 = g - 1.0
+    k = 0.5 * gm1
+    a1, a3 = geom.area_ratio_nozzle, geom.area_ratio_mix
+    m_p1 = _mach_from_area_ratio_supersonic(a1, g)
+    p_p1 = p_g / (1.0 + k * m_p1 * m_p1) ** (g / gm1)
+    # Choked primary mass flow per unit throat area (isentropic).
+    m = p_g * math.sqrt(g / (r_gas * t_g)) * (2.0 / (g + 1.0)) ** ((g + 1.0) / (2.0 * gm1))
+    impulse = p_p1 * a1 * (1.0 + g * m_p1 * m_p1) + p_e * (a3 - a1)
+    phi = impulse / (m * math.sqrt(r_gas * t_g / g))
+    b = phi * phi - 2.0 * g
+    d = b * b + 4.0 * (k * phi * phi - g * g)
+    eps = _DEAD_HEAD_DISCRIMINANT_FLOOR
+    if d < eps:
+        d = eps * eps / (2.0 * eps - d)
+    x = 2.0 / (b + math.sqrt(d))
+    t3 = t_g / (1.0 + k * x)
+    p3 = m * math.sqrt(r_gas * t3 / g) / (a3 * math.sqrt(x))
+    p_b0 = p3 * (1.0 + k * x) ** (g / gm1)
+    return DeadHeadResult(
+        p_b0_pa=recovery_efficiency * p_b0,
+        p_b0_stagnation_pa=p_b0,
+        lambda_mixed=math.sqrt((g + 1.0) * x / (2.0 + gm1 * x)),
+        mach_mixed=math.sqrt(x),
         recovery_efficiency=recovery_efficiency,
     )
 
