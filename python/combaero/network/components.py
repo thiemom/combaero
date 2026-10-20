@@ -1923,6 +1923,14 @@ class NetworkElement(ABC):
         """d(mass_flow_at_node)/d(solver_unknown): {global_index: coefficient}."""
         return {indices[0]: 1.0}
 
+    def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
+        """START GUESS ONLY: K in dPt ~ K m|m| [Pa s^2/kg^2], an incompressible
+        estimate at the reference density, for the solver's resistance-network
+        cold start (``NetworkSolver._resistance_network_guess``). Never used in
+        a residual. None (the default): no estimate, and a network holding the
+        element keeps the propagated start."""
+        return None
+
     def validate(self) -> None:
         """Perform element-specific validation checks.
         Should raise ValueError with a clear message if validation fails.
@@ -3057,6 +3065,13 @@ class OrificeElement(NetworkElement):
         self._pipe_cd_ratio_rev = 1.0
         # OrificeGeometry built in resolve_topology
         self._orifice_geom: object | None = None
+
+    def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
+        """Start guess: m = Cd A sqrt(2 rho dP); a correlation's Cd is
+        approximated by the user value."""
+        if not self.area:
+            return None
+        return 1.0 / (2.0 * rho * (self.Cd * self.area) ** 2)
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         self._to_node_obj = graph.nodes.get(self.to_node)
@@ -5213,6 +5228,11 @@ class LosslessConnectionElement(NetworkElement):
         self.area: float | None = None
         self.diameter: float | None = None
 
+    def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
+        """Start guess: no loss; zero, which the seed raises to a small
+        fraction of the network's smallest resistance."""
+        return 0.0
+
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         pass  # Zero-loss elements do not need upstream geometry
 
@@ -5520,6 +5540,21 @@ class PressureLossElement(NetworkElement):
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
+
+    def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
+        """Start guess from the shipped correlations: a fraction loss xi P at
+        its design flow (or the reference flow), a head loss zeta q at its
+        area. Any other callable: no estimate."""
+        c = self.correlation
+        xi = getattr(c, "xi", getattr(c, "xi0", None))
+        if xi is not None:
+            m = getattr(c, "m_ref", None) or m_ref
+            return float(xi) * P_ref / (m * m)
+        zeta = getattr(c, "zeta", getattr(c, "zeta0", None))
+        area = getattr(c, "area", None)
+        if zeta is not None and area:
+            return float(zeta) / (2.0 * rho * area * area)
+        return None
 
     def n_equations(self) -> int:
         return 1
@@ -5890,6 +5925,11 @@ class PressureLossElement(NetworkElement):
                 diag["f"] = float(h_res.f)
 
         return diag
+
+
+# START GUESS ONLY: the turbulent friction factor of a duct's seed
+# resistance (ChannelElement._seed_resistance); the residual computes its own.
+SEED_FRICTION_FACTOR = 0.02
 
 
 class ChannelElement(NetworkElement):
@@ -6742,6 +6782,14 @@ class ChannelElement(NetworkElement):
             self.surface, state, self.area, self.Dh or self.diameter, self.length, T_hot
         )
 
+    def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
+        """Start guess: a turbulent friction factor and one exit head."""
+        dh = self.Dh or self.diameter
+        if not dh or not self.area or not self.length:
+            return None
+        f = SEED_FRICTION_FACTOR * getattr(self.surface, "f_multiplier", 1.0)
+        return (f * self.length / dh + 1.0) / (2.0 * rho * self.area**2)
+
     def n_equations(self) -> int:
         return 1
 
@@ -7172,6 +7220,13 @@ class AreaChangeElement(NetworkElement):
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
+
+    def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
+        """Start guess: a Borda-Carnot head at the smaller area."""
+        if not self.F0 or not self.F1:
+            return None
+        a, b = sorted((self.F0, self.F1))
+        return (1.0 - a / b) ** 2 / (2.0 * rho * a * a)
 
     def n_equations(self) -> int:
         return 1

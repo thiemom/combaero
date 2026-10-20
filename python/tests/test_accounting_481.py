@@ -226,7 +226,8 @@ def test_a_root_inside_the_heat_fade_is_refused_and_the_retry_finds_the_real_one
     """100 kW into a driven chain: the real root flows 0.25 g/s at ~2e5 K.
     From the cold start LM lands at 0.86 mg/s instead, inside the fade below
     the floor, where the node takes up 90% of its heat -- a root the fade
-    makes. It is refused by name; the warm-start retry finds the real one."""
+    makes. It is refused by name; the warm-start retry finds the real one.
+    The resistance-network seed (the default) starts on the real one."""
     g = FlowNetwork()
     g.add_node(_pb("a", 1.1e5, 300.0))
     g.add_node(_pb("b", 1.0e5, 300.0))
@@ -236,14 +237,18 @@ def test_a_root_inside_the_heat_fade_is_refused_and_the_retry_finds_the_real_one
     g.add_node(PlenumNode("q"))
     for eid, a, b in (("o1", "a", "p"), ("o2", "p", "q"), ("o3", "q", "b")):
         g.add_element(OrificeElement(eid, a, b, Cd=0.8, diameter=0.01, correlation="fixed"))
+    s = NetworkSolver(g)
+    s.resistance_seed = False
     with pytest.warns(UserWarning, match="taking up only part"):
-        r = NetworkSolver(g).solve(auto_retry=False)
+        r = s.solve(auto_retry=False)
     assert r["__converged__"] and not r["__success__"]
     assert r["__outcome__"] == "inconsistent"
     assert r["__heat_faded__"] == ["p"]
     r = NetworkSolver(g).solve()
     assert r["__success__"] and r["__heat_faded__"] == []
     assert r["o1.m_dot"] > 1e-4
+    r = NetworkSolver(g).solve(auto_retry=False)
+    assert r["__success__"] and r["o1.m_dot"] > 1e-4
 
 
 def test_the_dead_fuel_boundary_api_is_gone() -> None:
