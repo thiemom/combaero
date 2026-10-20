@@ -879,6 +879,8 @@ double crossflow_to_jet_ratio_at_x(double yn_d, double z_d, double C_D,
                                    double x_over_xn);
 double crossflow_to_jet_ratio_at_row(double yn_d, double z_d, double C_D,
                                      int row);  // row 1 is exactly 0
+// Incompressible; measured range channel P/P0 >= 0.72 (NASA CR-3630 Table D.1:
+// RMS 3.4% there, as the compressible network chain). Below ~0.7: extrapolation (#474).
 
 // One row from NETWORK flows (#465): the generic core of a jet-plate row.
 // Gc/Gj = (m_crossflow/m_jet)(pi/4)/((yn/d)(z/d)), Re_j = 4 m_jet/(n pi d mu).
