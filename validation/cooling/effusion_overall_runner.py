@@ -39,14 +39,14 @@ SO WHAT THE MEASUREMENT SAYS, BOTH WAYS:
 
   * Offered at the smooth-duct `h_g`, the film is refused. The admissible
     `eta_f` is negative at all 66 of plate B's points and reaches at most
-    +0.105 on plate C, against 0.27 to 0.58 from Baldauf over ten rows.
+    +0.090 on plate C, against 0.27 to 0.58 from Baldauf over ten rows.
   * Admitted with a matching augmentation, it is consistent: the same
-    measurement then demands `F = h_f/h_0` of 1.6 to 4.3.
+    measurement then demands `F = h_f/h_0` of 1.6 to 4.7.
 
 THE ABSOLUTE LEVEL IS CONFOUNDED AND THE RATIO IS NOT. The test plate
 sits only `x/D_h = 1.5` into the duct, deep in the entry region where
 Dittus-Boelter's fully developed value understates `h_0`; a standard
-entry correction raises it 1.75x and brings plate C's F to 0.9-1.6,
+entry correction raises it 1.76x and brings plate C's F to 0.9-1.9,
 ordinary film-cooling augmentation. That factor divides out of every B/C
 ratio, which is why the finding is stated as a ratio:
 
@@ -339,7 +339,8 @@ def implied_gas_side_h(
     NO assumption about the rig's gas side -- which is why the B/C
     comparison is stated in terms of it. With Baldauf's own film it
     returns the augmented coefficient the measurement then requires,
-    F = 1.6 to 4.7 times the smooth duct.
+    F = 1.6 to 4.7 times the smooth duct (the per-plate table is in
+    extractions/andrews_effusion_overall_eta.md).
 
     Returns None where the measurement is at or below the film's own
     effectiveness, which the two-temperature form cannot represent.

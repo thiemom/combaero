@@ -15,9 +15,10 @@ rather than a disagreement, and this project has now hit it three times:
     Taking one for the other scores -60% instead of -10%; it was caught
     by reading both nomenclatures by hand (#430).
   * **A gas-side `h` is meaningless without its unblown baseline.** The
-    augmentation Andrews' Fig. 10 requires is 3.1-4.3 against a fully
-    developed Dittus-Boelter and 1.6-2.5 against the same duct
-    entry-corrected -- a factor of 1.75 from the baseline alone (#431).
+    augmentation Andrews' Fig. 10 requires (plate B, with Baldauf's film)
+    is 2.7-4.7 against a fully developed Dittus-Boelter and 1.5-2.7 against
+    the same duct entry-corrected -- a factor of 1.76 from the baseline
+    alone (#431; table in extractions/andrews_effusion_overall_eta.md, #476).
 
 THE SHAPE OF THE FIX. A measured series declares what its y quantity is
 referenced to; a correlation set declares what it produces; scoring either

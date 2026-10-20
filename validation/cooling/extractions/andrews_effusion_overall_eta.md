@@ -101,8 +101,8 @@ next reader at the wrong fix.
 
 | | offered alone at the smooth-duct h_0 | admitted with its augmentation |
 |---|---|---|
-| plate B | 0 of 66 points admit any; max -0.147 | needs `F = h_f/h_0` 2.8 to 4.3 |
-| plate C | 13 of 72 admit some, all `G < 0.45`; max +0.105 | needs `F` 1.6 to 3.1 |
+| plate B | 0 of 66 points admit any; max -0.170 | needs `F = h_f/h_0` 2.7 to 4.7 |
+| plate C | 10 of 72 admit some, all `G < 0.24`; max +0.090 | needs `F` 1.6 to 3.3 |
 
 against 0.27 to 0.58 from Baldauf superposed over the plate's ten rows.
 Only the PAIR is identifiable from one eta curve, so the caller supplies
@@ -118,8 +118,26 @@ closure is right in general.
 
 The test plate sits only `x/D_h = 1.5` into the duct, deep in the entry
 region, where Dittus-Boelter's fully developed value understates `h_0`. A
-standard entry correction raises it 1.75x -- 46 to 81 W/m2K -- and brings
-plate C's required `F` to 0.9-1.6, ordinary film-cooling augmentation.
+standard entry correction raises it 1.76x -- 46.6 to 82.0 W/m2K -- and
+brings plate C's required `F` to 0.9-1.9, ordinary film-cooling augmentation.
+
+### The augmentation each plate requires, against each baseline (#476)
+
+`F = h_f / h_0` from `implied_gas_side_h`, every point; recomputed 2026-10-20 on
+main dfae3de; the ranges quoted before were stale. This table owns these numbers; the element
+docstring, `docs/API_PYTHON.md` and `conventions.py` point here.
+
+| plate | film admitted | n | vs Dittus-Boelter (46.6 W/m2K) | vs entry-corrected (82.0 W/m2K) |
+|---|---|---|---|---|
+| B | none | 66 | 1.33-2.71 | 0.76-1.54 |
+| B | Baldauf, Sellers over 10 rows | 66 | 2.69-4.68 | 1.53-2.66 |
+| C | none | 72 | 0.82-1.36 | 0.47-0.77 |
+| C | Baldauf, Sellers over 10 rows | 72 | 1.57-3.30 | 0.89-1.88 |
+
+A third baseline, the turbulent flat-plate boundary layer at the panel's
+streamwise position that published `h_f/h_0` ratios use, is not offered: it
+needs an input the element does not have (the panel's x along the liner), and
+#476 closed without it.
 
 Not applied: the runner reports the rig as the paper describes it.
 Recorded so the absolute `F` values are not over-read. It divides out of
