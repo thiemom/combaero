@@ -357,14 +357,17 @@ class MultiPortChamberElement(MultiPortChamberBase):
 
         SCOPE. This is the model's own dissipation identity, not a general
         entropy statement: it says the flow-weighted sum of the closure's loss
-        terms may not be net negative. Where the port total temperatures differ
-        the true entropy production also carries a mixing term, which is
-        positive and is not counted here -- so on a non-isothermal junction the
-        check is conservative in the wrong direction and could in principle
-        reject a solution whose full entropy budget is fine. The junction is
-        documented for low Mach and the validation fixtures are isothermal, so
-        that case does not arise today; revisit it if the element is ever used
-        across a large temperature difference.
+        terms may not be net negative. It is NOT replaced by the solver's
+        second-law check (sigma, #598), and must not be: where the port total
+        temperatures differ, sigma also carries the thermal mixing term, which
+        is positive and can mask a gain in mechanical energy that no passive
+        junction can make. A tee merging 900 K and 1200 K streams with a 0.1%
+        volumetric energy gain passes sigma at +0.063 (stress tee3 seed 116).
+        Where the ports are isothermal the two agree: on the 2026-10-20 audit
+        every verdict of this check matched sigma's (23,601 on the suite, 86
+        correctly directed stress roots). The two are complementary: sigma is
+        the general necessary condition, and this is the junction's stronger
+        one.
 
         Missing keys mean True: incomplete solution dicts are not policed, the
         same convention v1 uses.
