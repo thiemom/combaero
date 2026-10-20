@@ -8,7 +8,6 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 import combaero as cb
-from combaero.network import NetworkSolver
 
 from . import second_law_view, validity_view
 from .graph_builder import build_network_from_schema
@@ -19,6 +18,7 @@ from .schemas import (
     NetworkGraphSchema,
     SolveResponse,
 )
+from .solver_setup import make_solver
 
 _FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
@@ -94,14 +94,7 @@ def _solve_sync(schema: NetworkGraphSchema):
     """
     global _continuation_state
     net = build_network_from_schema(schema)
-    solver = NetworkSolver(net)
-    # Interactive solves take the Newton-homotopy last retry (#642), bounded
-    # only by the user's max solve time: whatever the cold solve and its
-    # retries leave of it.
-    solver.homotopy_retry = True
-    solver.homotopy_budget = None
-    if schema.solver_settings.incompressible_mach_limit is not None:
-        solver.incompressible_mach_limit = schema.solver_settings.incompressible_mach_limit
+    solver = make_solver(net, schema)
     x0 = None
     if schema.solver_settings.init_strategy == "continuation" and _continuation_state:
         # Check topology fingerprint
