@@ -2380,6 +2380,8 @@ cb.crossflow_to_jet_ratio_at_row(yn_d=8.0, z_d=2.0, C_D=cb.FLORSCHUETZ_1981_DEFA
 
 It depends on `(yn/d)(z/d)` only, not `xn/d` -- the source states the flow
 distribution is independent of streamwise hole spacing and hole pattern.
+
+**Pressure range (#474).** The model is incompressible. Its measured range, NASA CR-3630 Table D.1, reaches a channel pressure of 0.72 of the jet plenum's. Over that range it matches the measured distributions (rows 2-10, 11 geometries) with bias -0.0% and RMS 3.4%, the same as the compressible network chain (-0.6%, 3.4%). Below about 0.7 the two part by 4-11% and no data decide between them, so treat it as extrapolation there. The heat-transfer correlation itself held within 16% up to jet Mach ~1 on the data the paper excluded for compressibility.
 `FLORSCHUETZ_1981_DEFAULT_CD` (0.79) is the paper's own recommended default
 absent a measured value, and remains the default. To predict `C_D` from the
 plate's own geometry instead, pass `mcgreehan_schotsch_1988_cd` (see above);

@@ -196,6 +196,17 @@ JetArrayImpingementResult jet_array_impingement_nu(
 // of the streamwise hole spacing and hole pattern". See
 // han_impingement.md's "The Gc/Gj closed form" section for the full
 // derivation and why xn/d drops out.
+//
+// PRESSURE RANGE (#474). The model is incompressible (NASA CR-3373's
+// conclusion 1); the data behind it were reduced compressibly, row by row.
+// Against the measured zero-initial-crossflow distributions of NASA CR-3630
+// Table D.1 (11 B-size geometries, row-10 channel P/P0 down to 0.72, P0 the
+// jet plenum pressure), Gc/Gj rows 2-10 score bias -0.0%, RMS 3.4%, the same
+// as the compressible network chain (-0.6%, 3.4%). Below P/P0 ~0.7 the two
+// part by 4-11% (jet throat Mach 0.65-1) with no data to arbitrate: that is
+// extrapolation. The A-size data the paper excluded for compressibility still
+// met its HEAT-TRANSFER correlation within 16% (95% of 140 points) up to jet
+// Mach ~1, so the range note is on the flow distribution, not on Nu.
 
 // Gc/Gj at continuous streamwise position x/xn (x measured from the
 // upstream end of the channel, in units of the streamwise hole spacing).
