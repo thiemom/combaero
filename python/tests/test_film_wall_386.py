@@ -19,6 +19,7 @@ import combaero as cb
 from combaero.network import (
     ChannelElement,
     ConvectiveSurface,
+    EffusionPlateElement,
     FilmCoolingElement,
     FlowNetwork,
     MassFlowBoundary,
@@ -113,11 +114,13 @@ def _net(
     span: tuple[float, float] = (0.0, 0.05),
     n_rows: int = 2,
     mixed_supply: bool = False,
+    panel: dict | None = None,
 ) -> FlowNetwork:
     """Hot gas through a plenum the film discharges into, then a walled duct
     whose backside is a cold duct. ``mixed_supply`` feeds the holes from a
     plenum mixing two coolant streams, so the coolant temperature is an
-    unknown the wall's Jacobian must reach."""
+    unknown the wall's Jacobian must reach. ``panel`` makes the provider an
+    EffusionPlateElement with those keywords instead of film holes."""
     g = FlowNetwork()
     g.add_node(PressureBoundary("hot_in", Pt=2.2e5, Tt=1500.0, Y=Y_AIR))
     g.add_node(PressureBoundary("out", Pt=2.0e5, Tt=300.0, Y=Y_AIR))
@@ -140,19 +143,22 @@ def _net(
         g.add_node(PressureBoundary("cool", Pt=cool_pt, Tt=700.0, Y=Y_AIR))
         supply = "cool"
     g.add_element(OrificeElement("hin", "hot_in", "g", Cd=0.8, diameter=0.06, correlation="fixed"))
-    g.add_element(
-        FilmCoolingElement(
-            "film",
-            supply,
-            "g",
-            hole_diameter=1e-3,
-            holes_per_row=30,
-            wall_thickness=2e-3,
-            n_rows=n_rows,
-            row_pitch=0.01 if n_rows > 1 else None,
-            **(holes or SHAPED),
+    if panel is not None:
+        g.add_element(EffusionPlateElement("film", supply, "g", **panel))
+    else:
+        g.add_element(
+            FilmCoolingElement(
+                "film",
+                supply,
+                "g",
+                hole_diameter=1e-3,
+                holes_per_row=30,
+                wall_thickness=2e-3,
+                n_rows=n_rows,
+                row_pitch=0.01 if n_rows > 1 else None,
+                **(holes or SHAPED),
+            )
         )
-    )
     area = np.pi * 0.08 * 0.1
     g.add_element(
         ChannelElement(
@@ -346,3 +352,55 @@ def test_shaped_holes_need_their_exit_geometry() -> None:
             wall_thickness=2e-3,
             hole_type="shaped",
         )
+
+
+# --- an effusion panel as the provider (#386 B2) ---------------------------
+
+# 3 rows of 0.8 mm holes at 30 deg on a 6 mm square pitch.
+PANEL = {
+    "hole_diameter": 0.8e-3,
+    "wall_thickness": 2e-3,
+    "pitch": 6e-3,
+    "panel_length": 0.018,
+    "panel_width": 0.18,
+    "angle_deg": 30.0,
+}
+
+
+def test_an_effusion_panel_covers_the_wall_downstream_with_its_film() -> None:
+    """The panel's rows, Baldauf each and Sellers over them, read past its
+    last row: the same C++ span average at the panel's own geometry."""
+    _, bare = _solve(_net(film=False, panel=PANEL))
+    _, r = _solve(_net(panel=PANEL))
+    D = PANEL["hole_diameter"]
+    ref = cb.film_span_average_baldauf_2002(
+        3,
+        6e-3 / D,
+        0.0,
+        0.05 / D,
+        r["w.film_blowing_ratio"],
+        r["w.film_density_ratio"],
+        30.0,
+        6e-3 / D,
+        0.05,
+    )
+    assert r["w.eta_film"] == pytest.approx(ref.eta, rel=1e-12)
+    T_aw = r["w.T_aw_unfilmed"]
+    assert r["w.T_aw_a"] == pytest.approx(T_aw - ref.eta * (T_aw - r["w.T_coolant_film"]))
+    assert r["w.Q"] < bare["w.Q"]
+
+
+def test_the_panel_film_jacobian_reaches_the_coolant_flow_and_temperature() -> None:
+    g = _net(mixed_supply=True, panel=PANEL)
+    s, r = _solve(g)
+    x = np.array(r["__x_solution__"])
+    assert _jac_err(s, x) < 1e-5
+    s._relay_film = lambda *a, **k: None
+    assert _jac_err(s, x) > 1e-5
+
+
+def test_a_panel_without_its_length_cannot_cover_a_wall() -> None:
+    no_length = {k: v for k, v in PANEL.items() if k not in ("panel_length", "panel_width")}
+    g = _net(film=False, panel={**no_length, "panel_area": 0.018 * 0.18})
+    with pytest.raises(ValueError, match="needs panel_length"):
+        g.add_wall(ThermalWall(id="w2", element_a="hot", element_b="cold", film="film"))

@@ -86,8 +86,11 @@ class FlowNetwork:
             if provider is None or not hasattr(provider, "film_span_average"):
                 raise ValueError(
                     f"Wall '{wall.id}': film {wall.film!r} is not a film provider "
-                    "(a FilmCoolingElement)."
+                    "(a FilmCoolingElement or EffusionPlateElement)."
                 )
+            error = getattr(provider, "film_provider_error", lambda: None)()
+            if error is not None:
+                raise ValueError(f"Wall '{wall.id}': film {wall.film!r}: {error}.")
             side = wall.film_side_id
             if side in (provider.id, provider.from_node):
                 raise ValueError(
