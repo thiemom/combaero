@@ -368,6 +368,37 @@ class EffusionPlateData(BaseModel):
     label: str | None = None
 
 
+class FilmCoolingData(BaseModel):
+    """Film-cooling holes (#386): coolant from the upstream node into the gas,
+    and a film PROVIDER. It owns no wall: a thermal wall on the gas duct
+    downstream names it (``film``) and that side's driving temperature
+    becomes T_aw - eta (T_aw - T_coolant).
+
+    Defaults are Colban et al.'s Eq. (19) at Gritsch et al.'s configuration
+    B, the geometry it is scored on (#686): laidback fan-shaped, AR 3.5,
+    P/D 6, t/P 0.49, 30 deg, Tu 4%. The 1 mm metering diameter only sets the
+    scale; the correlation is in P/D, t/P and x/D.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    hole_type: Literal["shaped", "cylindrical"] = "shaped"
+    hole_diameter: float = Field(default=1.0e-3, gt=0.0)
+    holes_per_row: int = Field(default=20, ge=1)
+    lateral_pitch: float = Field(default=6.0e-3, gt=0.0)
+    n_rows: int = Field(default=1, ge=1)
+    row_pitch: float | None = Field(default=None, gt=0.0)
+    wall_thickness: float = Field(default=3.0e-3, gt=0.0)
+    angle_deg: float = Field(default=30.0, gt=0.0, le=90.0)
+    area_ratio: float = Field(default=3.5, ge=1.0)
+    breakout_width: float = Field(default=2.94e-3, gt=0.0)
+    turbulence_intensity: float = Field(default=0.04, gt=0.0)
+    correlation: Literal["IdelchikThick", "Lichtarowicz", "McGreehanSchotsch", "fixed"] = (
+        "IdelchikThick"
+    )
+    Cd: float = 0.6
+    label: str | None = None
+
+
 class ImpingementArrayData(BaseModel):
     """Impingement array, channel exit (#465): ONE configuration.
 
@@ -565,6 +596,13 @@ class ThermalWallData(BaseModel):
     # How the two elements lie along the wall, from_node -> to_node: with the
     # flow signs it decides parallel or counter flow (ThermalWall, #627).
     orientation: Literal["aligned", "opposed"] = "aligned"
+    # A film covering one side (#386): the id of a film_cooling or
+    # effusion_plate node, the side it covers, and the wall's span [m]
+    # downstream of that provider's last row.
+    film: str | None = None
+    film_side: Literal["a", "b"] = "a"
+    film_start: float = Field(default=0.0, ge=0.0)
+    film_end: float | None = Field(default=None, ge=0.0)
 
     @model_validator(mode="before")
     @classmethod

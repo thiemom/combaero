@@ -303,6 +303,17 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "film_cooling")}
+				draggable
+				title="Rows of film-cooling holes, coolant into the gas. Owns no wall: a thermal wall on the gas duct downstream names it as its film."
+			>
+				<NodeIcon type="film_cooling" size={18} />
+				<span>Film Cooling Holes</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "effusion_liner")}
 				draggable
 				title="Backside coolant duct whose wall bleeds through effusion holes into the gas. Ports: coolant in, coolant out, discharge (to a chamber's s handle)."

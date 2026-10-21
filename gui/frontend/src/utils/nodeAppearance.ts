@@ -27,6 +27,7 @@ import {
 	Square,
 	Tally2,
 	Tornado,
+	Waves,
 	Wind,
 } from "lucide-react";
 
@@ -49,6 +50,7 @@ export const NODE_APPEARANCE = {
 	orifice: { icon: Tally2, colour: "text-orange-500" },
 	impingement_array: { icon: ShowerHead, colour: "text-orange-500" },
 	effusion_plate: { icon: Grip, colour: "text-orange-500" },
+	film_cooling: { icon: Waves, colour: "text-orange-500" },
 	effusion_liner: { icon: Columns4, colour: "text-orange-500" },
 	area_change: { icon: Maximize2, colour: "text-blue-500" },
 	discrete_loss: { icon: Activity, colour: "text-purple-500" },

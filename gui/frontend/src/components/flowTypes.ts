@@ -6,6 +6,7 @@ import DiscreteLossNode from "./nodes/DiscreteLossNode";
 import EffusionLinerNode from "./nodes/EffusionLinerNode";
 import EffusionPlateNode from "./nodes/EffusionPlateNode";
 import EjectorNode from "./nodes/EjectorNode";
+import FilmCoolingNode from "./nodes/FilmCoolingNode";
 import ImpingementArrayNode from "./nodes/ImpingementArrayNode";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
@@ -27,6 +28,7 @@ export const nodeTypes = {
 	orifice: OrificeNode,
 	impingement_array: ImpingementArrayNode,
 	effusion_plate: EffusionPlateNode,
+	film_cooling: FilmCoolingNode,
 	effusion_liner: EffusionLinerNode,
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,

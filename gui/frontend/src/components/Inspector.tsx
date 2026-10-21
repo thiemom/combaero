@@ -1288,6 +1288,105 @@ const Inspector = () => {
 						);
 					})()}
 
+				{selectedNode.type === "film_cooling" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const num = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const len = (key: string, label: string, fallback: number) => (
+							<LengthInput
+								id={`${key}_${selectedNode.id}`}
+								label={label}
+								value={d[key] ?? fallback}
+								onChange={(val) => set({ [key]: val })}
+							/>
+						);
+						const shaped = (d.hole_type ?? "shaped") === "shaped";
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									Film-cooling holes: coolant from the inlet into the gas. They
+									own no wall. Select this node as the Film of a thermal wall on
+									the gas duct downstream; that side's driving temperature then
+									follows the film.
+								</div>
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Type
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.hole_type || "shaped"}
+										onChange={(e) => set({ hole_type: e.target.value })}
+									>
+										<option value="shaped">Shaped (Colban 2011)</option>
+										<option value="cylindrical">
+											Cylindrical (Baldauf 2002)
+										</option>
+									</select>
+								</div>
+								{len(
+									"hole_diameter",
+									shaped ? "Metering Diameter" : "Hole Diameter",
+									1.0e-3,
+								)}
+								{num("holes_per_row", "Holes per Row", 20)}
+								{len("lateral_pitch", "Lateral Pitch", 6.0e-3)}
+								{num("n_rows", "Rows", 1)}
+								{(d.n_rows ?? 1) > 1 && len("row_pitch", "Row Pitch", 0.01)}
+								{len("wall_thickness", "Wall Thickness", 3.0e-3)}
+								{num("angle_deg", "Hole Angle to Surface [deg]", 30)}
+								{shaped ? (
+									<>
+										{num("area_ratio", "Area Ratio A_exit/A_inlet", 3.5)}
+										{len("breakout_width", "Breakout Width t", 2.94e-3)}
+									</>
+								) : (
+									num("turbulence_intensity", "Turbulence Intensity", 0.04)
+								)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Hole Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.correlation || "IdelchikThick"}
+										onChange={(e) => set({ correlation: e.target.value })}
+									>
+										<option value="IdelchikThick">
+											Deep Hole in Wall (Idelchik 4-18a)
+										</option>
+										<option value="Lichtarowicz">
+											Long Orifice, l/d 2-10 (Lichtarowicz 1965)
+										</option>
+										<option value="McGreehanSchotsch">
+											Cooling Hole (M-S 1988, plenum-fed)
+										</option>
+										<option value="fixed">Manual / Fixed Value</option>
+									</select>
+								</div>
+								{d.correlation === "fixed" && num("Cd", "Fixed Cd Value", 0.6)}
+							</>
+						);
+					})()}
+
 				{selectedNode.type === "impingement_array" &&
 					(() => {
 						const d = selectedNode.data;
@@ -3320,6 +3419,114 @@ const Inspector = () => {
 										{designArrangement(orientation)} flow. A reversed side flips
 										it; the solve follows the flow signs.
 									</p>
+								</>
+							)}
+						</div>
+					);
+				})()}
+
+				{(() => {
+					// A film covering one side (#386): the holes upstream on the
+					// gas path, named here; that side's T_aw becomes
+					// T_aw - eta (T_aw - T_coolant).
+					const providers = nodes.filter(
+						(n) => n.type === "film_cooling" || n.type === "effusion_plate",
+					);
+					const d = selectedEdge.data;
+					const r = d.result;
+					const sideLabel = (nid: string) => {
+						const n = nodes.find((m) => m.id === nid);
+						return n?.data?.label || nid;
+					};
+					return (
+						<div className="flex flex-col gap-2 border-t pt-4">
+							<label className="text-xs font-bold text-gray-500 uppercase">
+								Film
+							</label>
+							<select
+								aria-label="Wall film"
+								value={d.film ?? ""}
+								onChange={(e) =>
+									updateEdgeData(selectedEdge.id, {
+										film: e.target.value || null,
+									})
+								}
+								className="p-1.5 border rounded text-xs bg-white w-full border-stone-200 outline-none focus:ring-1 focus:ring-orange-500"
+							>
+								<option value="">None</option>
+								{providers.map((n) => (
+									<option key={n.id} value={n.id}>
+										{n.data?.label || n.id} ({nodeTypeLabel(n.type ?? "")})
+									</option>
+								))}
+							</select>
+							{providers.length === 0 && (
+								<p className="text-[10px] text-gray-500 leading-snug">
+									Add Film Cooling Holes (or an Effusion Plate with a panel
+									length) upstream on the gas path to cover this wall.
+								</p>
+							)}
+							{d.film && (
+								<>
+									<select
+										aria-label="Film side"
+										value={d.film_side ?? "a"}
+										onChange={(e) =>
+											updateEdgeData(selectedEdge.id, {
+												film_side: e.target.value,
+											})
+										}
+										className="p-1.5 border rounded text-xs bg-white w-full border-stone-200 outline-none focus:ring-1 focus:ring-orange-500"
+									>
+										<option value="a">
+											Covers side A: {sideLabel(selectedEdge.source)}
+										</option>
+										<option value="b">
+											Covers side B: {sideLabel(selectedEdge.target)}
+										</option>
+									</select>
+									<LengthInput
+										id={`film_start_${selectedEdge.id}`}
+										label="Wall Starts After Last Row"
+										value={d.film_start ?? 0}
+										onChange={(val) =>
+											updateEdgeData(selectedEdge.id, { film_start: val })
+										}
+									/>
+									<LengthInput
+										id={`film_end_${selectedEdge.id}`}
+										label="Wall Ends After Last Row"
+										value={d.film_end ?? d.film_start ?? 0}
+										onChange={(val) =>
+											updateEdgeData(selectedEdge.id, { film_end: val })
+										}
+									/>
+									<p className="text-[10px] text-gray-500 leading-snug">
+										The covered side must be the gas duct downstream of the
+										holes. Only its driving temperature changes; its h and
+										stream stay its own. Not scored as a coupled wall.
+									</p>
+									{r?.eta_film != null && (
+										<div className="flex flex-col gap-0.5 bg-blue-50/50 p-2 rounded border border-blue-100/50 text-[10px] font-mono">
+											<span>η film: {Number(r.eta_film).toFixed(3)}</span>
+											<span>
+												T_aw: {Number(r.T_aw_unfilmed).toFixed(0)} →{" "}
+												{Number(
+													d.film_side === "b" ? r.T_aw_b : r.T_aw_a,
+												).toFixed(0)}{" "}
+												K (coolant {Number(r.T_coolant_film).toFixed(0)} K)
+											</span>
+											<span>
+												M: {Number(r.film_blowing_ratio).toFixed(2)} · DR:{" "}
+												{Number(r.film_density_ratio).toFixed(2)}
+											</span>
+											{r.film_extrapolated > 0 && (
+												<span className="text-amber-600">
+													Outside the film correlation's fitted range
+												</span>
+											)}
+										</div>
+									)}
 								</>
 							)}
 						</div>
