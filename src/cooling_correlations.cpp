@@ -546,6 +546,117 @@ FilmSpanAverage film_span_average_baldauf_2002(
       });
 }
 
+FilmSpanAverageGroups film_span_average_baldauf_2002_groups(
+    const std::vector<int> &n_rows, double row_pitch_over_D,
+    double x_start_over_D, double x_end_over_D, const std::vector<double> &M,
+    const std::vector<double> &density_ratio, double alpha_deg,
+    double s_over_D, double Tu) {
+  const char *name = "film_span_average_baldauf_2002_groups";
+  const std::size_t G = n_rows.size();
+  if (G == 0 || M.size() != G || density_ratio.size() != G) {
+    throw std::invalid_argument(std::string(name) +
+                                ": one n_rows, M and density_ratio per group");
+  }
+  int total_rows = 0;
+  for (int n : n_rows) {
+    if (n < 1) {
+      throw std::invalid_argument(std::string(name) + ": every group needs n_rows >= 1");
+    }
+    total_rows += n;
+  }
+  if (total_rows > 1 && !(row_pitch_over_D > 0.0)) {
+    throw std::invalid_argument(std::string(name) + ": row_pitch_over_D > 0");
+  }
+  const double x0 = x_start_over_D, x1 = x_end_over_D;
+  if (!(x0 >= 0.0) || !(x1 >= x0)) {
+    throw std::invalid_argument(std::string(name) +
+                                ": the span needs 0 <= x_start_over_D <= x_end_over_D");
+  }
+  // Group of each row, row 0 the LAST (most downstream).
+  std::vector<std::size_t> group_of(static_cast<std::size_t>(total_rows));
+  {
+    std::size_t j = 0;
+    for (std::size_t g = G; g-- > 0;) {
+      for (int r = 0; r < n_rows[g]; ++r) {
+        group_of[j++] = g;
+      }
+    }
+  }
+  FilmSpanAverageGroups out;
+  out.weight.assign(G, 0.0);
+  out.deta_dM.assign(G, 0.0);
+  out.deta_dP.assign(G, 0.0);
+  out.d_weight_dM.assign(G, std::vector<double>(G, 0.0));
+  out.d_weight_dP.assign(G, std::vector<double>(G, 0.0));
+
+  // One point x, accumulated into the outputs with quadrature weight w.
+  // D = prod over the rows downstream of j of (1 - eta_k), carried upstream
+  // with its gradient in every group's M and P.
+  std::vector<double> dD_dM(G), dD_dP(G);
+  const auto add = [&](double x, double w) {
+    double D = 1.0;
+    std::fill(dD_dM.begin(), dD_dM.end(), 0.0);
+    std::fill(dD_dP.begin(), dD_dP.end(), 0.0);
+    for (int j = 0; j < total_rows; ++j) {
+      const std::size_t g = group_of[static_cast<std::size_t>(j)];
+      CorrelationStatus status = CorrelationStatus::Valid;
+      const auto [e, e_dM, e_dP] = film_effectiveness_baldauf_2002_and_derivatives(
+          x + j * row_pitch_over_D, M[g], density_ratio[g], alpha_deg, s_over_D, Tu,
+          &status);
+      if (status != CorrelationStatus::Valid) {
+        out.extrapolated = true;
+      }
+      // W_j = e D: into its group's weight.
+      out.weight[g] += w * e * D;
+      for (std::size_t h = 0; h < G; ++h) {
+        out.d_weight_dM[g][h] += w * e * dD_dM[h];
+        out.d_weight_dP[g][h] += w * e * dD_dP[h];
+      }
+      out.d_weight_dM[g][g] += w * e_dM * D;
+      out.d_weight_dP[g][g] += w * e_dP * D;
+      // D <- D (1 - e).
+      for (std::size_t h = 0; h < G; ++h) {
+        dD_dM[h] *= (1.0 - e);
+        dD_dP[h] *= (1.0 - e);
+      }
+      dD_dM[g] -= D * e_dM;
+      dD_dP[g] -= D * e_dP;
+      D *= (1.0 - e);
+    }
+    // eta = 1 - D over all rows.
+    out.eta += w * (1.0 - D);
+    for (std::size_t h = 0; h < G; ++h) {
+      out.deta_dM[h] -= w * dD_dM[h];
+      out.deta_dP[h] -= w * dD_dP[h];
+    }
+  };
+  if (x1 == x0) {
+    add(x0, 1.0);
+    return out;
+  }
+  // The same composite Gauss-Legendre in ln(1 + x) as film_span_average_impl.
+  static constexpr double node[8] = {-0.9602898564975363, -0.7966664774136267,
+                                     -0.5255324099163290, -0.1834346424956498,
+                                     0.1834346424956498,  0.5255324099163290,
+                                     0.7966664774136267,  0.9602898564975363};
+  static constexpr double weight[8] = {0.1012285362903763, 0.2223810344533745,
+                                       0.3137066458778873, 0.3626837833783620,
+                                       0.3626837833783620, 0.3137066458778873,
+                                       0.2223810344533745, 0.1012285362903763};
+  constexpr int panels = 16;
+  const double u0 = std::log1p(x0), u1 = std::log1p(x1);
+  const double hu = (u1 - u0) / panels;
+  const double span = x1 - x0;
+  for (int p = 0; p < panels; ++p) {
+    const double mid = u0 + (p + 0.5) * hu;
+    for (int q = 0; q < 8; ++q) {
+      const double u = mid + 0.5 * hu * node[q];
+      add(std::expm1(u), 0.5 * hu * weight[q] * std::exp(u) / span);
+    }
+  }
+  return out;
+}
+
 FilmSpanAverage film_span_average_colban_2011(
     int n_rows, double row_pitch_over_D, double x_start_over_D,
     double x_end_over_D, double M, double area_ratio, double P_over_D,

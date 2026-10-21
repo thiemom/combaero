@@ -334,6 +334,9 @@ class EffusionLinerData(BaseModel):
     gas_augmentation: float = Field(default=1.0, gt=0.0)
     turbulence_intensity: float = Field(default=0.05, gt=0.0)
     gas_heat_flux: float = 0.0
+    # Which way the hot gas runs past the panels, for the film the liner lays
+    # on a wall downstream (#695).
+    film_direction: Literal["with_coolant", "against_coolant"] = "with_coolant"
     label: str | None = None
 
 

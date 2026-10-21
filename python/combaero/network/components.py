@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, MutableMapping
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import combaero as cb
 from combaero import _solver_tools
@@ -4964,20 +4964,75 @@ class FilmCoolingElement(OrificeElement):
         return base
 
 
+class FilmSource(NamedTuple):
+    """One coolant stream of a film provider (#386, #695): the element that
+    carries it, the node that supplies it, and its metering hole area [m^2]."""
+
+    element_id: str
+    supply_node: str
+    hole_area: float
+
+
+@dataclass
+class _FilmGroups:
+    """A single-source provider's FilmSpanAverage in the grouped layout of
+    cb.FilmSpanAverageGroups: one group whose weight is eta."""
+
+    eta: float
+    weight: list[float]
+    deta_dM: list[float]
+    deta_dP: list[float]
+    d_weight_dM: list[list[float]]
+    d_weight_dP: list[list[float]]
+    extrapolated: bool
+
+
+def film_sources(provider: Any) -> list[FilmSource]:
+    """A film provider's coolant streams: its own ``film_sources()``, or the
+    single element it is (its flow, supply node and hole area)."""
+    own = getattr(provider, "film_sources", None)
+    if own is not None:
+        return list(own())
+    return [FilmSource(provider.id, provider.from_node, float(provider.total_hole_area))]
+
+
+def film_discharge_node(provider: Any) -> str | None:
+    """The one node every source of the provider discharges into, or None."""
+    own = getattr(provider, "film_discharge_node", None)
+    if own is not None:
+        return own()
+    return provider.to_node
+
+
+def film_groups(
+    provider: Any, x_start: float, x_end: float, M: list[float], density_ratio: list[float]
+) -> Any:
+    """The provider's film over the span, one group per source: its own
+    ``film_span_average_groups``, or its ``film_span_average`` as one group."""
+    own = getattr(provider, "film_span_average_groups", None)
+    if own is not None:
+        return own(x_start, x_end, M, density_ratio)
+    f = provider.film_span_average(x_start, x_end, M[0], density_ratio[0])
+    eta, dM, dP = float(f.eta), float(f.deta_dM), float(f.deta_dP)
+    return _FilmGroups(eta, [eta], [dM], [dP], [[dM]], [[dP]], bool(f.extrapolated))
+
+
 class _FilmedHtc:
     """A wall side's surface result under a film (#386): T_aw replaced by
 
-        T_aw,f = T_ref - eta (T_ref - T_c),   eta = eta(M, DR)
+        T_aw,f = T_ref (1 - eta) + sum_g w_g T_c,g,   sum_g w_g = eta,
+
+    one term per coolant source g (an effusion liner's panels, #695; a single
+    source gives T_ref - eta (T_ref - T_c)). eta and w_g depend on every
+    source's M_g = G_jet,g / G_gas and DR_g = (W_c,g / W_g)(T_g / T_c,g).
 
     T_ref is the side's own T_aw, shifted by ``T_shift`` = T_inf - T_mix to
     the undiluted gas when the solver has it (#694): eta is defined against
-    the gas before the coolant mixed in. M = G_jet / G_gas and DR =
-    (W_c / W_g)(T_g / T_c). Partials are chained onto the side's own T, flow,
-    P and Pt (scaled by 1 - eta, plus eta's dependence on the gas flow and
-    T); the provider's flow, the coolant temperature and the undiluted gas
-    temperature come back as ``dT_aw_dfilm_mdot``, ``dT_aw_dT_coolant`` and
-    ``dT_aw_dT_inf`` for the solver to relay onto those unknowns. h and the
-    rest are the side's.
+    the gas before the coolant mixed in. Partials are chained onto the side's
+    own T, flow, P and Pt; each source's flow and coolant temperature come
+    back as the lists ``dT_aw_dfilm_mdot`` and ``dT_aw_dT_coolant``, and the
+    undiluted gas temperature as ``dT_aw_dT_inf``, for the solver to relay.
+    h and the rest are the side's.
     """
 
     __slots__ = (
@@ -4996,31 +5051,46 @@ class _FilmedHtc:
     def __init__(
         self,
         r: Any,
-        eta: float,
-        deta_dmg: float,
-        deta_dTg: float,
-        deta_dmc: float,
-        deta_dTc: float,
-        T_c: float,
+        groups: Any,
+        M: list[float],
+        DR: list[float],
+        T_c: list[float],
+        m_c: list[float],
+        m_gas: float,
+        T_g: float,
         film: dict[str, float],
         T_shift: float | None = None,
-        deta_dTinf: float = 0.0,
     ) -> None:
         self._r = r
         # With the undiluted gas, T_ref no longer moves with the side's own
         # (mixed) T: its d/dT_mix of 1 is taken off and goes to T_inf.
         undiluted = T_shift is not None
         T_ref = float(r.T_aw) + (T_shift if undiluted else 0.0)
-        dT = T_ref - T_c
-        self.T_aw = T_ref - eta * dT
+        eta = float(groups.eta)
+        w = [float(v) for v in groups.weight]
+        n = len(w)
         k = 1.0 - eta
-        self.dT_aw_dT = k * (float(r.dT_aw_dT) - float(undiluted)) - dT * deta_dTg
-        self.dT_aw_dT_inf = (k - dT * deta_dTinf) if undiluted else 0.0
-        self.dT_aw_dmdot = k * float(r.dT_aw_dmdot) - dT * deta_dmg
+        self.T_aw = T_ref * k + sum(w[g] * T_c[g] for g in range(n))
+        # dT_aw / d(M_h), d(DR_h) at fixed T_ref and T_c.
+        a_M = [
+            -T_ref * float(groups.deta_dM[h])
+            + sum(T_c[g] * float(groups.d_weight_dM[g][h]) for g in range(n))
+            for h in range(n)
+        ]
+        a_P = [
+            -T_ref * float(groups.deta_dP[h])
+            + sum(T_c[g] * float(groups.d_weight_dP[g][h]) for g in range(n))
+            for h in range(n)
+        ]
+        # The gas temperature in DR: the side's own T, or T_inf when undiluted.
+        d_gas_T = sum(a_P[h] * DR[h] / T_g for h in range(n))
+        self.dT_aw_dT = k * (float(r.dT_aw_dT) - float(undiluted)) + (0.0 if undiluted else d_gas_T)
+        self.dT_aw_dT_inf = (k + d_gas_T) if undiluted else 0.0
+        self.dT_aw_dmdot = k * float(r.dT_aw_dmdot) - sum(a_M[h] * M[h] / m_gas for h in range(n))
         self.dT_aw_dP = k * float(getattr(r, "dT_aw_dP", 0.0))
         self.dT_aw_dPt = k * float(getattr(r, "dT_aw_dPt", 0.0))
-        self.dT_aw_dfilm_mdot = -dT * deta_dmc
-        self.dT_aw_dT_coolant = eta - dT * deta_dTc
+        self.dT_aw_dfilm_mdot = [a_M[h] * M[h] / m_c[h] for h in range(n)]
+        self.dT_aw_dT_coolant = [w[h] - a_P[h] * DR[h] / T_c[h] for h in range(n)]
         self.film = film
 
     def __getattr__(self, name: str) -> Any:
@@ -5035,8 +5105,7 @@ def film_on_wall_side(
     side: Any,
     r: Any,
     gas_state: "NetworkMixtureState",
-    coolant_state: "NetworkMixtureState",
-    m_coolant: float,
+    coolant: list[tuple["NetworkMixtureState", float]],
     m_gas: float,
     x_start: float,
     x_end: float,
@@ -5046,9 +5115,9 @@ def film_on_wall_side(
 
     ``side`` is the wall's gas-side object: an element with a flow ``area``
     (a duct) or a MomentumChamberNode. ``m_gas`` is the flow its htc reads
-    (the duct's own, the chamber's throughput), ``m_coolant`` the provider's
-    signed flow and ``coolant_state`` its supply node. No forward coolant
-    flow, no film: r comes back unchanged.
+    (the duct's own, the chamber's throughput). ``coolant`` is, per source of
+    ``film_sources(provider)``, its supply node's state and its signed flow.
+    A source without forward flow means no film: r comes back unchanged.
 
     ``gas_inf`` is (Tt, Y) of the gas the holes discharge into before their
     coolant mixed in (#694), when the side is fed by that node. eta is
@@ -5060,14 +5129,14 @@ def film_on_wall_side(
     both correlations either way.
     """
     area = float(getattr(side, "area", 0.0) or 0.0)
-    mc, mg = float(m_coolant), abs(float(m_gas))
-    if r is None or mc <= 0.0 or mg <= 0.0 or area <= 0.0:
+    mg = abs(float(m_gas))
+    m_c = [float(m) for _, m in coolant]
+    if r is None or mg <= 0.0 or area <= 0.0 or not m_c or min(m_c) <= 0.0:
         return r
-    G_jet = mc / provider.total_hole_area
+    sources = film_sources(provider)
     G_gas = mg / area
-    M = G_jet / G_gas
-    T_c = float(coolant_state.Tt)
-    W_c = float(cb.mwmix(coolant_state.X))
+    M = [m / src.hole_area / G_gas for m, src in zip(m_c, sources, strict=True)]
+    T_c = [float(st.Tt) for st, _ in coolant]
     if gas_inf is None:
         T_g = float(gas_state.T)
         W_g = float(cb.mwmix(gas_state.X))
@@ -5076,31 +5145,28 @@ def film_on_wall_side(
         T_g = float(gas_inf[0])
         W_g = float(cb.mwmix(cb.mass_to_mole(list(gas_inf[1]))))
         T_shift = T_g - float(gas_state.Tt)
-    DR = (W_c / W_g) * (T_g / T_c)
-    f = provider.film_span_average(x_start, x_end, M, DR)
+    DR = [
+        float(cb.mwmix(st.X)) / W_g * (T_g / Tc) for (st, _), Tc in zip(coolant, T_c, strict=True)
+    ]
+    f = film_groups(provider, x_start, x_end, M, DR)
     eta = float(f.eta)
+    m_tot = sum(m_c)
     film = {
         "eta_film": eta,
-        "film_blowing_ratio": M,
-        "film_density_ratio": DR,
+        # Flow-weighted over the sources (one source: its own).
+        "film_blowing_ratio": sum(m * v for m, v in zip(m_c, M, strict=True)) / m_tot,
+        "film_density_ratio": sum(m * v for m, v in zip(m_c, DR, strict=True)) / m_tot,
         "film_extrapolated": float(bool(f.extrapolated)),
-        "T_coolant_film": T_c,
+        # The coolant temperature the film carries: sum w_g T_c,g / eta.
+        "T_coolant_film": (
+            sum(float(wg) * Tc for wg, Tc in zip(f.weight, T_c, strict=True)) / eta
+            if eta > 0.0
+            else sum(m * Tc for m, Tc in zip(m_c, T_c, strict=True)) / m_tot
+        ),
         "T_aw_unfilmed": float(r.T_aw) + (T_shift or 0.0),
         "film_gas_undiluted": float(T_shift is not None),
     }
-    deta_dT = float(f.deta_dP) * DR / T_g
-    return _FilmedHtc(
-        r,
-        eta,
-        deta_dmg=-float(f.deta_dM) * M / mg,
-        deta_dTg=0.0 if T_shift is not None else deta_dT,
-        deta_dmc=float(f.deta_dM) * M / mc,
-        deta_dTc=-float(f.deta_dP) * DR / T_c,
-        T_c=T_c,
-        film=film,
-        T_shift=T_shift,
-        deta_dTinf=deta_dT if T_shift is not None else 0.0,
-    )
+    return _FilmedHtc(r, f, M, DR, T_c, m_c, mg, T_g, film, T_shift)
 
 
 @dataclass

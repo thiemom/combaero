@@ -647,3 +647,71 @@ TEST(FilmSpanAverage, RefusesASpanUpstreamOfTheLastRow) {
                                                    30.0, 1.7),
                  std::invalid_argument);
 }
+
+// Grouped rows (#695): an effusion liner's panels, each at its own M, P, T_c.
+namespace {
+cc::FilmSpanAverageGroups groups3(const std::vector<double> &M, const std::vector<double> &P) {
+    return cc::film_span_average_baldauf_2002_groups({2, 3, 2}, 12.0, 0.0, 40.0, M, P, 30.0,
+                                                     7.0, 0.05);
+}
+}  // namespace
+
+TEST(FilmSpanAverageGroups, OneGroupIsTheUngroupedSpanAverage) {
+    const auto one = cc::film_span_average_baldauf_2002(6, 12.0, 0.0, 40.0, 1.2, 1.6, 30.0,
+                                                        7.0, 0.05);
+    const auto g = cc::film_span_average_baldauf_2002_groups({6}, 12.0, 0.0, 40.0, {1.2},
+                                                             {1.6}, 30.0, 7.0, 0.05);
+    EXPECT_NEAR(g.eta, one.eta, 1e-14);
+    EXPECT_NEAR(g.weight[0], one.eta, 1e-14);
+    EXPECT_NEAR(g.deta_dM[0], one.deta_dM, 1e-14);
+    EXPECT_NEAR(g.d_weight_dP[0][0], one.deta_dP, 1e-14);
+}
+
+TEST(FilmSpanAverageGroups, EqualGroupsAreSellersOverAllTheRows) {
+    const auto one = cc::film_span_average_baldauf_2002(7, 12.0, 0.0, 40.0, 1.2, 1.6, 30.0,
+                                                        7.0, 0.05);
+    const auto g = groups3({1.2, 1.2, 1.2}, {1.6, 1.6, 1.6});
+    EXPECT_NEAR(g.eta, one.eta, 1e-14);
+    double dM = 0.0;
+    for (double d : g.deta_dM) {
+        dM += d;
+    }
+    EXPECT_NEAR(dM, one.deta_dM, 1e-13);
+}
+
+TEST(FilmSpanAverageGroups, TheWeightsSumToEtaAndTheLastGroupWeighsMost) {
+    const auto g = groups3({1.0, 1.0, 1.0}, {1.6, 1.6, 1.6});
+    EXPECT_NEAR(g.weight[0] + g.weight[1] + g.weight[2], g.eta, 1e-14);
+    // Same rows and M: the group nearest the wall is the least attenuated.
+    EXPECT_GT(g.weight[2] / 2.0, g.weight[0] / 2.0);
+}
+
+TEST(FilmSpanAverageGroups, DerivativesAgreeWithFiniteDifferences) {
+    const std::vector<double> M{0.8, 1.3, 2.0}, P{1.4, 1.6, 1.9};
+    const auto g = groups3(M, P);
+    const double h = 1e-6;
+    for (std::size_t k = 0; k < 3; ++k) {
+        auto Mp = M, Mm = M, Pp = P, Pm = P;
+        Mp[k] += h;
+        Mm[k] -= h;
+        Pp[k] += h;
+        Pm[k] -= h;
+        const auto a = groups3(Mp, P), b = groups3(Mm, P);
+        const auto c = groups3(M, Pp), d = groups3(M, Pm);
+        EXPECT_NEAR(g.deta_dM[k], (a.eta - b.eta) / (2 * h), 1e-8);
+        EXPECT_NEAR(g.deta_dP[k], (c.eta - d.eta) / (2 * h), 1e-8);
+        for (std::size_t j = 0; j < 3; ++j) {
+            EXPECT_NEAR(g.d_weight_dM[j][k], (a.weight[j] - b.weight[j]) / (2 * h), 1e-8);
+            EXPECT_NEAR(g.d_weight_dP[j][k], (c.weight[j] - d.weight[j]) / (2 * h), 1e-8);
+        }
+    }
+}
+
+TEST(FilmSpanAverageGroups, RefusesMismatchedGroups) {
+    EXPECT_THROW(cc::film_span_average_baldauf_2002_groups({2, 2}, 12.0, 0.0, 4.0, {1.0},
+                                                           {1.6, 1.6}, 30.0, 7.0, 0.05),
+                 std::invalid_argument);
+    EXPECT_THROW(cc::film_span_average_baldauf_2002_groups({2, 0}, 12.0, 0.0, 4.0, {1.0, 1.0},
+                                                           {1.6, 1.6}, 30.0, 7.0, 0.05),
+                 std::invalid_argument);
+}

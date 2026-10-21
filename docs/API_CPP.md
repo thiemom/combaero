@@ -1419,6 +1419,22 @@ FilmSpanAverage film_span_average_colban_2011(int n_rows, double row_pitch_over_
                                               double t_over_P, double alpha_deg,
                                               double density_ratio);  // deta_dP = 0
 
+// Rows in GROUPS (an effusion liner's panels, #695), upstream first, each at
+// its own M, density ratio and coolant temperature, layered row by row:
+// T_aw,bar = T_ref (1 - eta) + sum_g weight[g] T_c,g, sum_g weight[g] = eta
+// (Sellers when the T_c,g are equal). d_weight_dM[g][h] = d weight[g]/d M_h.
+struct FilmSpanAverageGroups {
+  double eta;
+  std::vector<double> weight, deta_dM, deta_dP;
+  std::vector<std::vector<double>> d_weight_dM, d_weight_dP;
+  bool extrapolated;
+};
+FilmSpanAverageGroups film_span_average_baldauf_2002_groups(
+    const std::vector<int>& n_rows, double row_pitch_over_D, double x_start_over_D,
+    double x_end_over_D, const std::vector<double>& M,
+    const std::vector<double>& density_ratio, double alpha_deg, double s_over_D,
+    double Tu);
+
 // Gao Eq. (5): the published FORM of alpha. a and b are REQUIRED -- the
 // published values 12 and 0.9465 (gao_a_case1/b_case1) do not transfer:
 // alpha >= b for every r, so they cannot reach the 0.69-0.85 a tighter

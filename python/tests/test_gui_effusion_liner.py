@@ -93,3 +93,40 @@ def test_a_channel_feeds_the_liner_through_a_plenum() -> None:
     assert isinstance(net.nodes[entry], PlenumNode)
     result = NetworkRunner.from_dict(_schema(feed_channel=True)).solve(timeout=120.0)
     assert result._element_results["ln"].success
+
+
+def test_a_wall_downstream_can_take_the_liners_film() -> None:
+    """#695: a thermal wall on the duct the chamber feeds names the liner as
+    its film; the liner's panels are one provider, read against the gas
+    before their coolant mixed in."""
+    sch = _schema()
+    sch["nodes"] += [
+        _node("cold_in", "pressure_boundary", {"Pt": 1.02e5, "Tt": 400.0}),
+        _node("cold_out", "pressure_boundary", {"Pt": 1.0e5, "Tt": 400.0}),
+        _node("cold", "channel", {"L": 0.2, "D": 0.04}),
+    ]
+    wall = {
+        "type": "thermal",
+        "thickness": 0.001,
+        "conductivity": 20.0,
+        "area": 0.05,
+        "film": "ln",
+        "film_side": "a",
+        "film_start": 0.0,
+        "film_end": 0.05,
+    }
+    sch["edges"] += [
+        _edge("c1", "cold_in", "cold"),
+        _edge("c2", "cold", "cold_out"),
+        {"id": "w", "source": "tail", "target": "cold", "data": wall},
+    ]
+    net = build_network_from_schema(NetworkGraphSchema(**sch))
+    assert net.film_provider("ln") is not None
+    result = NetworkRunner.from_dict(sch).solve(timeout=120.0)
+    assert result.success, result.message
+    r = result._edge_results["w"]
+    assert 0.0 < r["eta_film"] < 1.0
+    assert r["film_gas_undiluted"] == 1.0
+    assert r["T_aw_a"] == pytest.approx(
+        r["T_aw_unfilmed"] - r["eta_film"] * (r["T_aw_unfilmed"] - r["T_coolant_film"])
+    )

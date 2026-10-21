@@ -28,7 +28,9 @@ from .components import (
     PlenumNode,
     PressureBoundary,
     WallNode,
+    film_discharge_node,
     film_on_wall_side,
+    film_sources,
 )
 from .graph import FlowNetwork
 
@@ -2503,13 +2505,15 @@ class NetworkSolver:
         """{node: film providers discharging into it} for the walls' films
         whose node only mixes (a plenum or momentum chamber, #694). A
         combustor's or a boundary's state is not its inflows mixed, so no
-        undiluted gas is taken there: the film reads the side's own state."""
+        undiluted gas is taken there: the film reads the side's own state. A
+        provider whose sources discharge into different nodes (a liner with a
+        gas node per station, #695) has none either."""
         out: dict[str, list[str]] = {}
         for wall in self.network.walls.values():
             if wall.film is None:
                 continue
-            to_node = self.network.elements[wall.film].to_node
-            node = self.network.nodes.get(to_node)
+            to_node = film_discharge_node(self.network.film_provider(wall.film))
+            node = self.network.nodes.get(to_node) if to_node is not None else None
             if isinstance(node, PlenumNode | MomentumChamberNode):
                 pids = out.setdefault(to_node, [])
                 if wall.film not in pids:
@@ -2526,12 +2530,13 @@ class NetworkSolver:
         up: Any,
         with_relay: bool,
     ) -> bool:
-        """Mix ``nid``'s inflows except provider ``pid``'s into the undiluted
-        gas its film sees (#694), with the node's energy boundaries and the
-        same mixer and relay as the node; wall heat into the node is not
-        included. False (nothing stored) when the holes do not deliver into
-        nid now or nothing else does."""
-        others = [st for st in stream_info if st[1] is None or st[1].id != pid]
+        """Mix ``nid``'s inflows except provider ``pid``'s (every one of its
+        sources) into the undiluted gas its film sees (#694), with the node's
+        energy boundaries and the same mixer and relay as the node; wall heat
+        into the node is not included. False (nothing stored) when the holes
+        do not deliver into nid now or nothing else does."""
+        own = {src.element_id for src in film_sources(self.network.film_provider(pid))}
+        others = [st for st in stream_info if st[1] is None or st[1].id not in own]
         if len(others) == len(stream_info) or not others:
             return False
         if sum(float(st[0].m_dot) for st in others) <= 0.0:
@@ -2553,7 +2558,8 @@ class NetworkSolver:
     def _film_inf(self, provider: Any, obj: Any, x: np.ndarray, lagged: bool) -> Any:
         """(T, Y) of the undiluted gas the film on ``obj`` sees, or None when
         ``obj`` is not fed by the node the holes discharge into (#694)."""
-        if self._flow_ends(obj, x)[0] != provider.to_node:
+        to_node = film_discharge_node(provider)
+        if to_node is None or self._flow_ends(obj, x)[0] != to_node:
             return None
         key = f"{FILM_INF_PREFIX}{provider.id}"
         if key in self._film_inf_states:
@@ -2575,21 +2581,24 @@ class NetworkSolver:
         this side (#386). Every place that reads a wall side goes through
         here, so the residual, the relay and the reported values agree.
 
-        The film reads the provider's flow and its supply node's temperature;
-        ``lagged`` reads that node as the propagation does (a back-edge gives
+        The film reads each source's flow and its supply node's temperature;
+        ``lagged`` reads those nodes as the propagation does (a back-edge gives
         the previous pass's state).
         """
         r = self._htc_and_T(obj, state, x) if obj.has_convective_surface else None
         if r is None or wall.film is None or wall.film_side_id != obj.id:
             return r
-        provider = self.network.elements[wall.film]
-        ind = self._unknown_indices.get(provider.id, [])
-        if not ind:
-            return r
-        node = self.network.nodes[provider.from_node]
-        c_state = (
-            self._get_node_state_with_prev(node, x) if lagged else self._get_node_state(node, x)
-        )
+        provider = self.network.film_provider(wall.film)
+        coolant = []
+        for src in film_sources(provider):
+            ind = self._unknown_indices.get(src.element_id, [])
+            if not ind:
+                return r
+            node = self.network.nodes[src.supply_node]
+            c_state = (
+                self._get_node_state_with_prev(node, x) if lagged else self._get_node_state(node, x)
+            )
+            coolant.append((c_state, float(x[ind[0]])))
         m_gas = (
             float(getattr(obj, "_total_m_dot", 0.0))
             if obj.id in self.network.nodes
@@ -2600,8 +2609,7 @@ class NetworkSolver:
             obj,
             r,
             state,
-            c_state,
-            float(x[ind[0]]),
+            coolant,
             m_gas,
             wall.film_start,
             wall.film_end,
@@ -2611,22 +2619,23 @@ class NetworkSolver:
     def _relay_film(
         self, out: dict, wall: Any, ch: Any, factor: float, relay: dict, up: Any
     ) -> None:
-        """Relay a filmed side's T_aw onto the provider's flow and its supply
-        node's temperature (#386). ``factor`` is dT_node/dT_aw of that side."""
-        d_m = getattr(ch, "dT_aw_dfilm_mdot", None)
-        if d_m is None or factor == 0.0:
+        """Relay a filmed side's T_aw onto each source's flow and its supply
+        node's temperature (#386, #695). ``factor`` is dT_node/dT_aw of that
+        side."""
+        d_ms = getattr(ch, "dT_aw_dfilm_mdot", None)
+        if d_ms is None or factor == 0.0:
             return
-        provider = self.network.elements[wall.film]
-        ind = self._unknown_indices.get(provider.id, [])
+        provider = self.network.film_provider(wall.film)
         n_species = self._n_species
-        if ind and d_m != 0.0:
-            nr = out.setdefault(ind[0], {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
-            nr["T"] += factor * d_m
-        d_T = float(ch.dT_aw_dT_coolant)
-        if provider.from_node in relay and d_T != 0.0:
-            for idx, sens_up in up(provider.from_node).items():
-                nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
-                nr["T"] += factor * d_T * sens_up["T"]
+        for src, d_m, d_T in zip(film_sources(provider), d_ms, ch.dT_aw_dT_coolant, strict=True):
+            ind = self._unknown_indices.get(src.element_id, [])
+            if ind and d_m != 0.0:
+                nr = out.setdefault(ind[0], {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                nr["T"] += factor * d_m
+            if src.supply_node in relay and d_T != 0.0:
+                for idx, sens_up in up(src.supply_node).items():
+                    nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += factor * d_T * sens_up["T"]
         # The undiluted gas temperature (#694), through its own mix's relay.
         d_inf = float(getattr(ch, "dT_aw_dT_inf", 0.0))
         if d_inf != 0.0:

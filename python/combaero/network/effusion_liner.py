@@ -27,6 +27,15 @@ station into the gas node::
 
 Ids are namespaced under the liner's id: ``{id}__b{i}``, ``{id}__s{i}``,
 ``{id}__p{i}``.
+
+**A film provider (#695).** The liner registers its panels' film on the
+network under its own id, so a ThermalWall downstream on the gas path can
+name it (``film=<liner id>``). Each panel is one group of rows (Baldauf per
+row, ``pitch_x`` apart, as ``EffusionPlateElement.film_span_average``) at
+its own blowing ratio, density ratio and coolant temperature, layered row by
+row along the gas path (``cb.film_span_average_baldauf_2002_groups``).
+``film_direction`` says which way the gas runs past the panels: with the
+coolant (station 1 upstream on the gas side) or against it.
 """
 
 from __future__ import annotations
@@ -37,7 +46,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import combaero as cb
 
-from .components import CrossflowSegmentElement, EffusionPlateElement, PlenumNode
+from .components import CrossflowSegmentElement, EffusionPlateElement, FilmSource, PlenumNode
 
 if TYPE_CHECKING:
     from .graph import FlowNetwork
@@ -71,6 +80,10 @@ class EffusionLiner:
     wall_conductivity, gas_film, gas_augmentation, turbulence_intensity,
     gas_heat_flux, internal_Nu_multiplier, edge_radius :
         As ``EffusionPlateElement``.
+    film_direction : {"with_coolant", "against_coolant"}
+        Which way the hot gas runs past the panels, for the film the liner
+        lays on a wall downstream (#695): with the backside coolant (station
+        1 is upstream on the gas side too) or against it.
     """
 
     id: str
@@ -92,6 +105,7 @@ class EffusionLiner:
     turbulence_intensity: float = 0.05
     gas_heat_flux: float = 0.0
     internal_Nu_multiplier: float = 1.0
+    film_direction: Literal["with_coolant", "against_coolant"] = "with_coolant"
 
     def __post_init__(self) -> None:
         if int(self.n_segments) != self.n_segments or self.n_segments < 1:
@@ -99,6 +113,11 @@ class EffusionLiner:
         for name in ("length", "width", "duct_height"):
             if getattr(self, name) <= 0.0:
                 raise ValueError(f"EffusionLiner {self.id!r}: {name} must be positive")
+        if self.film_direction not in ("with_coolant", "against_coolant"):
+            raise ValueError(
+                f"EffusionLiner {self.id!r}: film_direction must be "
+                "'with_coolant' or 'against_coolant'"
+            )
 
     @property
     def duct_area(self) -> float:
@@ -188,6 +207,8 @@ class EffusionLiner:
                     crossflow_area=A,
                 )
             )
+        panels = [net.elements[self.panel_id(i)] for i in range(1, n + 1)]
+        net.film_providers[self.id] = LinerFilm(self, panels)
 
     def summarize(self, element_diag: dict[str, dict[str, Any]]) -> dict[str, Any]:
         """The liner's own diagnostics from its stations' (``__element_diag__``)."""
@@ -226,3 +247,52 @@ class EffusionLiner:
         out["rows_Cd"] = [float(p["Cd"]) for p in panels]
         out["rows_P_backside"] = [float(p["P_in"]) for p in panels]
         return out
+
+
+class LinerFilm:
+    """An EffusionLiner's panels as ONE film provider (#695): what a
+    ThermalWall's ``film=<liner id>`` reads. Built by ``EffusionLiner.add_to``.
+
+    Sources and groups run upstream first ON THE GAS SIDE (``film_direction``).
+    Each panel is a group of ``round(panel_length / pitch_x)`` rows, ``pitch_x``
+    apart across panel boundaries too; x is measured downstream of the LAST
+    row of the most downstream panel.
+    """
+
+    def __init__(self, liner: EffusionLiner, panels: list[EffusionPlateElement]) -> None:
+        self.id = liner.id
+        self._liner = liner
+        self._panels = panels if liner.film_direction == "with_coolant" else panels[::-1]
+
+    def film_sources(self) -> list[FilmSource]:
+        return [FilmSource(p.id, p.from_node, float(p.total_hole_area)) for p in self._panels]
+
+    def film_discharge_node(self) -> str | None:
+        """The gas node, when every panel discharges into the same one."""
+        nodes = {p.to_node for p in self._panels}
+        return nodes.pop() if len(nodes) == 1 else None
+
+    def film_provider_error(self) -> str | None:
+        return None
+
+    def rows_per_panel(self) -> int:
+        lv = self._liner
+        return max(1, round(lv.length / lv.n_segments / lv.pitch_x))
+
+    def film_span_average_groups(
+        self, x_start: float, x_end: float, M: list[float], density_ratio: list[float]
+    ) -> Any:
+        """The film over [x_start, x_end] [m] downstream of the last row."""
+        lv = self._liner
+        D = lv.hole_diameter
+        return cb.film_span_average_baldauf_2002_groups(
+            [self.rows_per_panel()] * len(self._panels),
+            lv.pitch_x / D,
+            x_start / D,
+            x_end / D,
+            list(M),
+            list(density_ratio),
+            lv.angle_deg,
+            lv.pitch_y / D,
+            lv.turbulence_intensity,
+        )

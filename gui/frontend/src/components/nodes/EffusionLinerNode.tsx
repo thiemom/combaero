@@ -8,6 +8,7 @@ import {
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 import NodeIcon from "../NodeIcon";
+import { FilmHandle } from "./FilmHandle";
 
 // Port colours: blue = inlet, green = outlet (matches handle triangle colours).
 const INLET = "#3b82f6";
@@ -18,6 +19,8 @@ const OUTLET = "#22c55e";
 //   coolant in  -> left  (target)
 //   coolant out -> right (source)
 //   discharge   -> top   (source), into the gas: a chamber's "s" handle
+//   film        -> bottom: dragged onto a wall downstream, its panels' film
+//                  covers that wall (#695)
 // The backend expands it into N stations (bleed + duct-fed panel).
 const EffusionLinerNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
@@ -111,6 +114,7 @@ const EffusionLinerNode = ({ id, data, selected }: NodeProps) => {
 				id="port-discharge-source"
 				title="Effusion discharge into the gas (a chamber's s handle)"
 			/>
+			<FilmHandle rotation={rotation} />
 		</div>
 	);
 };

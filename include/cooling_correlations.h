@@ -488,6 +488,46 @@ FilmSpanAverage film_span_average_colban_2011(
     double x_end_over_D, double M, double area_ratio, double P_over_D,
     double t_over_P, double alpha_deg, double density_ratio);
 
+// Film from rows in GROUPS, each with its own blowing ratio, density ratio
+// and coolant temperature: an effusion liner's panels along one duct (#695).
+// Groups are listed upstream first; group g holds n_rows[g] rows, and every
+// row (across groups) is row_pitch_over_D from the next. x is measured
+// downstream of the LAST row of the LAST group, as above.
+//
+// With per-row coolant temperatures, superposition is a sequence of layers:
+// past row j the adiabatic wall sits at (1 - eta_j) T_before + eta_j T_c,j.
+// Unrolled from the mainstream T_ref:
+//
+//   T_aw(x) = T_ref prod_j (1 - eta_j) + sum_j W_j T_c,j,
+//   W_j     = eta_j prod_{k downstream of j} (1 - eta_k),
+//
+// Sellers exactly when every T_c,j is equal (sum_j W_j = 1 - prod(1 - eta)).
+// Averaged over the span:
+//
+//   T_aw,bar = T_ref (1 - eta_bar) + sum_g weight[g] T_c,g,
+//   sum_g weight[g] = eta_bar.
+//
+// d_weight_dM[g][h] = d weight[g] / d M_h (likewise d_weight_dP for the
+// density ratio, deta_dM[h] / deta_dP[h] for eta_bar). Same quadrature as
+// film_span_average_*: exact derivatives for it.
+struct FilmSpanAverageGroups {
+  double eta = 0.0;
+  std::vector<double> weight;
+  std::vector<double> deta_dM;
+  std::vector<double> deta_dP;
+  std::vector<std::vector<double>> d_weight_dM;
+  std::vector<std::vector<double>> d_weight_dP;
+  bool extrapolated = false;
+};
+
+// Cylindrical holes, Baldauf (2002) per row; M[g] and density_ratio[g] per
+// group, the hole geometry (alpha, s/D, Tu) shared.
+FilmSpanAverageGroups film_span_average_baldauf_2002_groups(
+    const std::vector<int> &n_rows, double row_pitch_over_D,
+    double x_start_over_D, double x_end_over_D, const std::vector<double> &M,
+    const std::vector<double> &density_ratio, double alpha_deg,
+    double s_over_D, double Tu);
+
 // -------------------------------------------------------------
 // Effusion plate INTERNAL heat transfer
 // -------------------------------------------------------------
