@@ -115,12 +115,17 @@ def _net(
     n_rows: int = 2,
     mixed_supply: bool = False,
     panel: dict | None = None,
+    hot_mix: bool = False,
+    discharge: str = "g",
 ) -> FlowNetwork:
     """Hot gas through a plenum the film discharges into, then a walled duct
     whose backside is a cold duct. ``mixed_supply`` feeds the holes from a
     plenum mixing two coolant streams, so the coolant temperature is an
     unknown the wall's Jacobian must reach. ``panel`` makes the provider an
-    EffusionPlateElement with those keywords instead of film holes."""
+    EffusionPlateElement with those keywords instead of film holes.
+    ``hot_mix`` adds a second, cooler hot-gas inflow into "g", so the
+    undiluted gas the film sees is itself a mix of unknown flows (#694);
+    ``discharge`` is the node the film's holes discharge into."""
     g = FlowNetwork()
     g.add_node(PressureBoundary("hot_in", Pt=2.2e5, Tt=1500.0, Y=Y_AIR))
     g.add_node(PressureBoundary("out", Pt=2.0e5, Tt=300.0, Y=Y_AIR))
@@ -143,14 +148,19 @@ def _net(
         g.add_node(PressureBoundary("cool", Pt=cool_pt, Tt=700.0, Y=Y_AIR))
         supply = "cool"
     g.add_element(OrificeElement("hin", "hot_in", "g", Cd=0.8, diameter=0.06, correlation="fixed"))
+    if hot_mix:
+        g.add_node(PressureBoundary("hot2", Pt=2.15e5, Tt=1100.0, Y=Y_AIR))
+        g.add_element(
+            OrificeElement("hin2", "hot2", "g", Cd=0.8, diameter=0.03, correlation="fixed")
+        )
     if panel is not None:
-        g.add_element(EffusionPlateElement("film", supply, "g", **panel))
+        g.add_element(EffusionPlateElement("film", supply, discharge, **panel))
     else:
         g.add_element(
             FilmCoolingElement(
                 "film",
                 supply,
-                "g",
+                discharge,
                 hole_diameter=1e-3,
                 holes_per_row=30,
                 wall_thickness=2e-3,
@@ -307,6 +317,7 @@ def test_the_jacobian_reaches_the_coolant_flow_and_temperature() -> None:
             stub = type("Stub", (), {})()
             stub.dT_aw_dfilm_mdot = ch.dT_aw_dfilm_mdot
             stub.dT_aw_dT_coolant = ch.dT_aw_dT_coolant
+            stub.dT_aw_dT_inf = ch.dT_aw_dT_inf
             setattr(stub, attr, 0.0)
             full(out, wall, stub, factor, relay_, up)
 
@@ -387,7 +398,13 @@ def test_an_effusion_panel_covers_the_wall_downstream_with_its_film() -> None:
     assert r["w.eta_film"] == pytest.approx(ref.eta, rel=1e-12)
     T_aw = r["w.T_aw_unfilmed"]
     assert r["w.T_aw_a"] == pytest.approx(T_aw - ref.eta * (T_aw - r["w.T_coolant_film"]))
-    assert r["w.Q"] < bare["w.Q"]
+    # The film is read against the gas before the panel's coolant mixed in
+    # (#694), so it cools the wall below THAT gas. At this blowing ratio
+    # (M ~ 3.4, jets lifted off) eta ~ 0.016 is below the coolant's mixed-in
+    # share (~0.031), so the wall ends HOTTER than the unfilmed run, which
+    # assumes the coolant fully mixed: the conservative side of #694.
+    assert r["w.film_gas_undiluted"] == 1.0
+    assert bare["w.T_aw_a"] < r["w.T_aw_a"] < T_aw
 
 
 def test_the_panel_film_jacobian_reaches_the_coolant_flow_and_temperature() -> None:
@@ -404,3 +421,64 @@ def test_a_panel_without_its_length_cannot_cover_a_wall() -> None:
     g = _net(film=False, panel={**no_length, "panel_area": 0.018 * 0.18})
     with pytest.raises(ValueError, match="needs panel_length"):
         g.add_wall(ThermalWall(id="w2", element_a="hot", element_b="cold", film="film"))
+
+
+# --- the undiluted gas the film is read against (#694) ---------------------
+
+
+def _own_T_aw(s: NetworkSolver, g: FlowNetwork, r: dict) -> tuple[float, float]:
+    """The covered duct's own T_aw at the solution (the mixed gas), and its
+    feed node's mixed T."""
+    x = np.array(r["__x_solution__"])
+    state = s._get_node_state(g.nodes["g"], x)
+    state.m_dot = r["__element_diag__"]["hot"]["m_dot"]
+    return float(g.elements["hot"].htc_and_T(state).T_aw), float(state.Tt)
+
+
+def test_the_film_reads_the_gas_before_its_coolant_mixed_in() -> None:
+    """The holes discharge into "g", whose other inflow is the 1500 K gas:
+    T_aw is shifted from the mixed gas to it, and DR takes it."""
+    g = _net()
+    s, r = _solve(g)
+    own, T_mix = _own_T_aw(s, g, r)
+    assert r["w.film_gas_undiluted"] == 1.0
+    assert T_mix < 1500.0 - 10.0
+    assert r["w.T_aw_unfilmed"] == pytest.approx(own + 1500.0 - T_mix, rel=1e-12)
+    T_c = r["w.T_coolant_film"]
+    assert r["w.film_density_ratio"] == pytest.approx(1500.0 / T_c, rel=1e-9)
+
+
+def test_a_side_not_fed_by_the_discharge_node_reads_its_own_state() -> None:
+    """Holes discharging elsewhere ("hp", downstream of the duct): the duct's
+    gas does not hold their coolant, and the film reads its own state."""
+    g = _net(discharge="hp")
+    s, r = _solve(g)
+    own, _ = _own_T_aw(s, g, r)
+    assert r["w.film_gas_undiluted"] == 0.0
+    assert r["w.T_aw_unfilmed"] == pytest.approx(own, rel=1e-12)
+
+
+def test_the_jacobian_reaches_the_undiluted_gas() -> None:
+    """With two hot inflows into "g", T_inf is a mix of unknown flows; its
+    relay is part of the Jacobian, and dropping it fails the check."""
+    g = _net(mixed_supply=True, hot_mix=True)
+    s, r = _solve(g)
+    assert r["w.film_gas_undiluted"] == 1.0
+    x = np.array(r["__x_solution__"])
+    assert _jac_err(s, x) < 1e-5
+    assert _jac_err(s, x * (1.0 + 0.03 * np.sin(np.arange(len(x)) + 1.0))) < 1e-5
+
+    full = s._relay_film
+
+    def without_inf(out, wall, ch, factor, relay_, up):
+        if not hasattr(ch, "film"):
+            return
+        stub = type("Stub", (), {})()
+        stub.dT_aw_dfilm_mdot = ch.dT_aw_dfilm_mdot
+        stub.dT_aw_dT_coolant = ch.dT_aw_dT_coolant
+        stub.dT_aw_dT_inf = 0.0
+        full(out, wall, stub, factor, relay_, up)
+
+    s._relay_film = without_inf
+    assert _jac_err(s, x) > 1e-5
+    s._relay_film = full

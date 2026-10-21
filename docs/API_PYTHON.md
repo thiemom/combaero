@@ -845,19 +845,29 @@ net.add_wall(ThermalWall(
 - **Blowing ratio** is the metering mass flux over the duct's gas mass flux;
   **density ratio** is `(W_c/W_g)(T_g/T_c)` at a common static pressure.
   No forward coolant flow, no film.
-- **Jacobian:** T_aw,f reaches the provider's flow and its supply node's
-  temperature, both relayed analytically.
+- **Jacobian:** T_aw,f reaches the provider's flow, its supply node's
+  temperature and the undiluted gas temperature (below), all relayed
+  analytically.
 - **Reported:** `{wall}.eta_film`, `{wall}.film_blowing_ratio`,
   `{wall}.film_density_ratio`, `{wall}.film_extrapolated` (the kernel's
-  envelope), `{wall}.T_coolant_film`, `{wall}.T_aw_unfilmed`, and on every
-  wall `{wall}.T_aw_a` / `{wall}.T_aw_b`.
+  envelope), `{wall}.T_coolant_film`, `{wall}.T_aw_unfilmed` (the T_aw the
+  film is read against), `{wall}.film_gas_undiluted` (1 when that is the
+  undiluted gas), and on every wall `{wall}.T_aw_a` / `{wall}.T_aw_b`.
 - **Not scored as a coupled wall.** Each kernel is checked on its own
   author's data; no source we hold measures a heated wall downstream of a
   film row.
-- **The gas temperature is the duct's**, i.e. that of its feed node. Where
-  the holes discharge into the same node, it is already diluted by the
-  coolant, which makes T_aw,f slightly low (by about `(1 - eta)` times the
-  dilution).
+- **The gas is the gas before the coolant mixed in (#694).** Baldauf and
+  Colban define `eta = (T_inf - T_aw)/(T_inf - T_c)` with T_inf the
+  mainstream before injection. When the covered side is fed by the node the
+  holes discharge into (a plenum or momentum chamber), T_inf is that node's
+  other inflows mixed without the holes' stream (its energy boundaries
+  included, wall heat into it not): the side's T_aw shifts by
+  `T_inf - T_mix` and DR takes T_inf. Otherwise (a combustor, a boundary, a
+  side further downstream) the side's own state stands in, flagged by
+  `film_gas_undiluted = 0`. Mixing-out further downstream in a confined
+  duct is outside both correlations: where `eta` falls below the coolant's
+  mixed-in share, a filmed wall reads HOTTER than the same wall unfilmed
+  (which assumes the coolant fully mixed) -- the conservative side.
 
 #### Element Integration
 Elements with convective surfaces support heat transfer calculations.

@@ -4967,14 +4967,17 @@ class FilmCoolingElement(OrificeElement):
 class _FilmedHtc:
     """A wall side's surface result under a film (#386): T_aw replaced by
 
-        T_aw,f = T_aw - eta (T_aw - T_c),   eta = eta(M, DR)
+        T_aw,f = T_ref - eta (T_ref - T_c),   eta = eta(M, DR)
 
-    M = G_jet / G_gas and DR = (W_c / W_g)(T_g / T_c). Partials are chained
-    onto the side's own T, flow, P and Pt (scaled by 1 - eta, plus eta's
-    dependence on the gas flow and T); the provider's flow and coolant
-    temperature come back as ``dT_aw_dfilm_mdot`` and ``dT_aw_dT_coolant``
-    for the solver to relay onto those unknowns. h and the rest are the
-    side's.
+    T_ref is the side's own T_aw, shifted by ``T_shift`` = T_inf - T_mix to
+    the undiluted gas when the solver has it (#694): eta is defined against
+    the gas before the coolant mixed in. M = G_jet / G_gas and DR =
+    (W_c / W_g)(T_g / T_c). Partials are chained onto the side's own T, flow,
+    P and Pt (scaled by 1 - eta, plus eta's dependence on the gas flow and
+    T); the provider's flow, the coolant temperature and the undiluted gas
+    temperature come back as ``dT_aw_dfilm_mdot``, ``dT_aw_dT_coolant`` and
+    ``dT_aw_dT_inf`` for the solver to relay onto those unknowns. h and the
+    rest are the side's.
     """
 
     __slots__ = (
@@ -4986,6 +4989,7 @@ class _FilmedHtc:
         "dT_aw_dPt",
         "dT_aw_dfilm_mdot",
         "dT_aw_dT_coolant",
+        "dT_aw_dT_inf",
         "film",
     )
 
@@ -4999,13 +5003,19 @@ class _FilmedHtc:
         deta_dTc: float,
         T_c: float,
         film: dict[str, float],
+        T_shift: float | None = None,
+        deta_dTinf: float = 0.0,
     ) -> None:
         self._r = r
-        T_aw = float(r.T_aw)
-        dT = T_aw - T_c
-        self.T_aw = T_aw - eta * dT
+        # With the undiluted gas, T_ref no longer moves with the side's own
+        # (mixed) T: its d/dT_mix of 1 is taken off and goes to T_inf.
+        undiluted = T_shift is not None
+        T_ref = float(r.T_aw) + (T_shift if undiluted else 0.0)
+        dT = T_ref - T_c
+        self.T_aw = T_ref - eta * dT
         k = 1.0 - eta
-        self.dT_aw_dT = k * float(r.dT_aw_dT) - dT * deta_dTg
+        self.dT_aw_dT = k * (float(r.dT_aw_dT) - float(undiluted)) - dT * deta_dTg
+        self.dT_aw_dT_inf = (k - dT * deta_dTinf) if undiluted else 0.0
         self.dT_aw_dmdot = k * float(r.dT_aw_dmdot) - dT * deta_dmg
         self.dT_aw_dP = k * float(getattr(r, "dT_aw_dP", 0.0))
         self.dT_aw_dPt = k * float(getattr(r, "dT_aw_dPt", 0.0))
@@ -5030,6 +5040,7 @@ def film_on_wall_side(
     m_gas: float,
     x_start: float,
     x_end: float,
+    gas_inf: tuple[float, list[float]] | None = None,
 ) -> Any:
     """A wall side's surface result ``r`` under ``provider``'s film (#386).
 
@@ -5038,6 +5049,15 @@ def film_on_wall_side(
     (the duct's own, the chamber's throughput), ``m_coolant`` the provider's
     signed flow and ``coolant_state`` its supply node. No forward coolant
     flow, no film: r comes back unchanged.
+
+    ``gas_inf`` is (Tt, Y) of the gas the holes discharge into before their
+    coolant mixed in (#694), when the side is fed by that node. eta is
+    defined against it (Baldauf 2002, Colban 2011: eta = (T_inf - T_aw) /
+    (T_inf - T_c)), so T_aw shifts by T_inf - T_mix and DR takes the
+    undiluted gas. Without it the side's own, mixed state stands in; that
+    reads the wall cooler by (1 - eta) times the mixed-in coolant's share of
+    T_inf - T_c. Mixing-out far downstream in a confined duct is outside
+    both correlations either way.
     """
     area = float(getattr(side, "area", 0.0) or 0.0)
     mc, mg = float(m_coolant), abs(float(m_gas))
@@ -5047,9 +5067,15 @@ def film_on_wall_side(
     G_gas = mg / area
     M = G_jet / G_gas
     T_c = float(coolant_state.Tt)
-    T_g = float(gas_state.T)
     W_c = float(cb.mwmix(coolant_state.X))
-    W_g = float(cb.mwmix(gas_state.X))
+    if gas_inf is None:
+        T_g = float(gas_state.T)
+        W_g = float(cb.mwmix(gas_state.X))
+        T_shift = None
+    else:
+        T_g = float(gas_inf[0])
+        W_g = float(cb.mwmix(cb.mass_to_mole(list(gas_inf[1]))))
+        T_shift = T_g - float(gas_state.Tt)
     DR = (W_c / W_g) * (T_g / T_c)
     f = provider.film_span_average(x_start, x_end, M, DR)
     eta = float(f.eta)
@@ -5059,17 +5085,21 @@ def film_on_wall_side(
         "film_density_ratio": DR,
         "film_extrapolated": float(bool(f.extrapolated)),
         "T_coolant_film": T_c,
-        "T_aw_unfilmed": float(r.T_aw),
+        "T_aw_unfilmed": float(r.T_aw) + (T_shift or 0.0),
+        "film_gas_undiluted": float(T_shift is not None),
     }
+    deta_dT = float(f.deta_dP) * DR / T_g
     return _FilmedHtc(
         r,
         eta,
         deta_dmg=-float(f.deta_dM) * M / mg,
-        deta_dTg=float(f.deta_dP) * DR / T_g,
+        deta_dTg=0.0 if T_shift is not None else deta_dT,
         deta_dmc=float(f.deta_dM) * M / mc,
         deta_dTc=-float(f.deta_dP) * DR / T_c,
         T_c=T_c,
         film=film,
+        T_shift=T_shift,
+        deta_dTinf=deta_dT if T_shift is not None else 0.0,
     )
 
 
