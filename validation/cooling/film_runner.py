@@ -35,6 +35,7 @@ from functools import lru_cache
 
 import combaero as cb
 
+from validation.cooling import shaped_film_runner
 from validation.cooling.schema import Point, SeriesMetadata, load_points
 
 # Mainstream turbulence intensity. Andrei et al. do not state one, and it is a
@@ -90,6 +91,9 @@ def owns(series: SeriesMetadata) -> bool:
     Explicit predicate, because `run_series` returns reason-carrying records
     for series it cannot score, which makes truthiness useless for dispatch.
     """
+    # Shaped-hole series are Colban's (shaped_film_runner), not Baldauf's.
+    if shaped_film_runner.owns(series):
+        return False
     return series.x_axis in X_AXES and series.y_axis == "eta_adiabatic"
 
 

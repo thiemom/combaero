@@ -135,6 +135,24 @@ CHECKS: tuple[FidelityCheck, ...] = (
         "meets it immediately",
         "ctest:BaldaufTable4.EquationThirtyOneContradictsThePapersOwnTable",
     ),
+    # --- Colban, Thole and Bogard 2011 -----------------------------------
+    FidelityCheck(
+        "colban_2011_shaped",
+        "the Eq. (19) line the authors draw through Gritsch configuration B",
+        "Colban et al. (2011) Fig. 6 (M = 0.5) and Fig. 7 (M = 2.5)",
+        "within 0.003 in eta at 28 stations, about one pixel -- Table 3's "
+        "coefficients and Eq. (18)'s xi transcribed as the authors evaluate "
+        "them; a 1.1% change in C3 fails it",
+        "python/tests/test_colban_film.py::"
+        "test_reproduces_the_eq19_line_the_paper_draws",
+    ),
+    FidelityCheck(
+        "colban_2011_shaped",
+        "Eq. (12), eta = t/P at the breakout, which Eq. (19) must reduce to",
+        "Colban et al. (2011) Eqs. (12) and (19)",
+        "exact, and d eta/dM = 0 there",
+        "ctest:ColbanFilmEffectiveness.AtTheBreakoutItIsTheCoverageRatio",
+    ),
     # --- Han 1988 ---------------------------------------------------------
     FidelityCheck(
         "han_1988_orthogonal",

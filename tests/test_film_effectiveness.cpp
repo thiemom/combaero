@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -472,4 +473,117 @@ TEST(BaldaufTable4, EquationThirtyOneContradictsThePapersOwnTable) {
     // which is what rules out a typo in the table's b_1 alone.
     EXPECT_NEAR(0.54778731 / B::b0_table4_at_table3,
                 1.0 / (1.0 + std::pow(T3_M, -3.0)), 1e-7);
+}
+
+// ---------------------------------------------------------------------------
+// Colban, Thole and Bogard (2011), shaped holes. Ground truth is the Eq. 19
+// line the paper DRAWS in its Figs. 6 and 7 (Gritsch configuration B: AR 3.5,
+// P/D 6, t/P 0.49), read off the 300 ppi figure -- not the code's output.
+// See validation/cooling/extractions/colban_2011_shaped_film.md.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr double CB_AR = 3.5;
+constexpr double CB_PD = 6.0;
+constexpr double CB_TP = 0.49;
+
+double colban(double x_over_D, double M) {
+    combaero::CorrelationStatus status;
+    return cc::film_effectiveness_colban_2011(x_over_D, M, CB_AR, CB_PD, CB_TP,
+                                              30.0, 1.7, &status);
+}
+
+}  // namespace
+
+TEST(ColbanFilmEffectiveness, ReproducesTheEquationNineteenLineThePaperDraws) {
+    // (x/D, eta) read off the thick Eq. 19 line. One pixel is 0.0013 in
+    // Fig. 7 and 0.0008 in Fig. 6; Fig. 6 below x/D 10 is crossed by the
+    // Eq. 20/23 lines and is not read.
+    struct Reading {
+        double M, x, eta;
+    };
+    const Reading readings[] = {
+        {2.5, 3.0, 0.4250},  {2.5, 5.0, 0.3951},  {2.5, 10.0, 0.3385},
+        {2.5, 20.0, 0.2715}, {2.5, 30.0, 0.2278}, {2.5, 45.0, 0.1855},
+        {0.5, 10.0, 0.1325}, {0.5, 20.0, 0.0812}, {0.5, 30.0, 0.0593},
+        {0.5, 45.0, 0.0436},
+    };
+    for (const auto& r : readings) {
+        EXPECT_NEAR(colban(r.x, r.M), r.eta, 0.003)
+            << "M = " << r.M << ", x/D = " << r.x;
+    }
+}
+
+TEST(ColbanFilmEffectiveness, AtTheBreakoutItIsTheCoverageRatio) {
+    // Eq. (12): the adiabatic mixing limit, built into Eq. (19)'s form.
+    for (double M : {0.2, 1.0, 2.5}) {
+        EXPECT_DOUBLE_EQ(colban(0.0, M), CB_TP);
+    }
+    const auto [eta, d_dM] = cc::film_effectiveness_colban_2011_and_derivatives(
+        0.0, 1.0, CB_AR, CB_PD, CB_TP, 30.0, 1.7);
+    EXPECT_DOUBLE_EQ(eta, CB_TP);
+    EXPECT_EQ(d_dM, 0.0);
+}
+
+TEST(ColbanFilmEffectiveness, RisesWithBlowingButLessThanProportionally) {
+    // Sections 3.1 and 4: no lift-off for shaped holes in the fitted range,
+    // so eta rises with M; the M^C2 term (C2 < 0) weakens the rise.
+    double prev = 0.0;
+    for (double M : {0.25, 0.5, 1.0, 1.5, 2.0, 2.5}) {
+        const double e = colban(20.0, M);
+        EXPECT_GT(e, prev) << "M = " << M;
+        prev = e;
+    }
+    EXPECT_LT(colban(20.0, 2.0) / colban(20.0, 1.0), 2.0);
+}
+
+TEST(ColbanFilmEffectiveness, AnalyticDerivativeAgreesWithFiniteDifferences) {
+    for (double x : {0.5, 5.0, 40.0}) {
+        for (double M : {0.3, 1.0, 2.4}) {
+            combaero::CorrelationStatus status;
+            const auto [eta, d_dM] =
+                cc::film_effectiveness_colban_2011_and_derivatives(
+                    x, M, CB_AR, CB_PD, CB_TP, 30.0, 1.7, &status);
+            const double h = 1e-6 * M;
+            const double fd = (colban(x, M + h) - colban(x, M - h)) / (2.0 * h);
+            EXPECT_NEAR(d_dM, fd, 1e-7 * std::max(1.0, std::abs(fd)))
+                << "x/D = " << x << ", M = " << M;
+            EXPECT_DOUBLE_EQ(eta, colban(x, M));
+        }
+    }
+}
+
+TEST(ColbanFilmEffectiveness, TableFourLimitsAreReportedNotEnforced) {
+    using combaero::CorrelationStatus;
+    const auto status_of = [](double M, double AR, double PD, double tP,
+                              double alpha, double DR) {
+        CorrelationStatus s = CorrelationStatus::Valid;
+        cc::film_effectiveness_colban_2011(10.0, M, AR, PD, tP, alpha, DR, &s);
+        return s;
+    };
+    // Gritsch configuration B at both blowing ratios the paper plots.
+    EXPECT_EQ(status_of(0.5, 3.5, 6.0, 0.49, 30.0, 1.7), CorrelationStatus::Valid);
+    EXPECT_EQ(status_of(2.5, 3.5, 6.0, 0.49, 30.0, 1.7), CorrelationStatus::Valid);
+    // Each bound on its own.
+    EXPECT_EQ(status_of(3.0, 3.5, 6.0, 0.49, 30.0, 1.7), CorrelationStatus::Extrapolated);
+    EXPECT_EQ(status_of(1.0, 3.5, 6.0, 0.75, 30.0, 1.7), CorrelationStatus::Extrapolated);
+    // AR/(M P/D) = 3.5/(0.25*6) = 2.3, the adjacent-jet regime.
+    EXPECT_EQ(status_of(0.25, 3.5, 6.0, 0.49, 30.0, 1.7), CorrelationStatus::Extrapolated);
+    EXPECT_EQ(status_of(1.0, 3.5, 6.0, 0.49, 45.0, 1.7), CorrelationStatus::Extrapolated);
+    EXPECT_EQ(status_of(1.0, 3.5, 6.0, 0.49, 30.0, 1.0), CorrelationStatus::Extrapolated);
+    EXPECT_EQ(status_of(1.0, 1.0, 6.0, 0.49, 30.0, 1.7), CorrelationStatus::Extrapolated);
+    // The angle and density ratio flag but do not change the value.
+    EXPECT_DOUBLE_EQ(
+        cc::film_effectiveness_colban_2011(10.0, 1.0, 3.5, 6.0, 0.49, 45.0, 1.0, nullptr),
+        colban(10.0, 1.0));
+}
+
+TEST(ColbanFilmEffectiveness, RefusesInputsTheCorrelationCannotRepresent) {
+    EXPECT_THROW(colban(-1.0, 1.0), std::invalid_argument);
+    EXPECT_THROW(colban(1.0, 0.0), std::invalid_argument);
+    EXPECT_THROW(cc::film_effectiveness_colban_2011(1.0, 1.0, 0.8, 6.0, 0.49, 30.0, 1.7),
+                 std::invalid_argument);
+    EXPECT_THROW(cc::film_effectiveness_colban_2011(1.0, 1.0, 3.5, 6.0, 1.2, 30.0, 1.7),
+                 std::invalid_argument);
 }

@@ -932,6 +932,8 @@ All functions use consistent units to avoid conversion errors.
 | `equivalent_blowing_ratio`                        | M_baseline: -, area_baseline: m^2, area_equivalent: m^2                                                         | - (M)                             |
 | `film_effectiveness_baldauf_2002`                 | x_over_D: -, M: -, P: -, alpha_deg: deg, s_over_D: -, Tu: -                                                     | - (eta)                           |
 | `film_effectiveness_baldauf_2002_and_derivatives` | x_over_D: -, M: -, P: -, alpha_deg: deg, s_over_D: -, Tu: -                                                     | - (eta), - (deta/dM), - (deta/dP) |
+| `film_effectiveness_colban_2011`                  | x_over_D: -, M: -, area_ratio: -, P_over_D: -, t_over_P: -, alpha_deg: deg, density_ratio: -                    | - (eta)                           |
+| `film_effectiveness_colban_2011_and_derivatives`  | x_over_D: -, M: -, area_ratio: -, P_over_D: -, t_over_P: -, alpha_deg: deg, density_ratio: -                    | - (eta), - (deta/dM)              |
 | `cooled_wall_heat_flux`                           | T_hot: K, T_coolant: K, h_hot: W/(m^2*K), h_coolant: W/(m^2*K), eta: -, t_wall: m, k_wall: W/(m*K)              | W/m^2                             |
 | `heat_flux_from_T_at_edge`                        | T_measured: K, edge_idx, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), t_over_k: m^2*K/W                       | W/m^2                             |
 | `heat_flux_from_T_at_depth`                       | T_measured: K, depth: m, T_hot: K, T_cold: K, h_hot, h_cold: W/(m^2*K), thicknesses: m, conductivities: W/(m*K) | W/m^2                             |

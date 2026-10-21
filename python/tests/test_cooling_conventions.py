@@ -93,8 +93,8 @@ def test_the_whole_dataset_resolves(dataset) -> None:
     # +4 #402, +1 #435, -2 fig4.51 Gbar 45par/45crs resolved as duplicates of
     # G, +3 Taslim & Spring square-channel friction (#403 item 2), +1 fig4.53
     # 60 deg V on its own shape (#434), +7 Taslim & Spring Nu series on
-    # their ratio sets (#444)
-    assert len(statuses[C.STATUS_DIRECT]) == 114
+    # their ratio sets (#444), +2 Colban 2011 Figs. 6-7 shaped-hole film (#386)
+    assert len(statuses[C.STATUS_DIRECT]) == 116
     assert sorted(statuses[C.STATUS_CONVERTED]) == [
         "rohde1969/fig10_rd0_triangles",
         "rohde1969/fig10_rd0p195_squares",

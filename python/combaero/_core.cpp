@@ -6717,6 +6717,48 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "forward-mode dual numbers over the same equation chain the value\n"
         "uses, so the two cannot drift apart.");
 
+  m.def("film_effectiveness_colban_2011",
+        [](double x_over_D, double M, double area_ratio, double P_over_D,
+           double t_over_P, double alpha_deg, double density_ratio) {
+          return combaero::cooling::film_effectiveness_colban_2011(
+              x_over_D, M, area_ratio, P_over_D, t_over_P, alpha_deg,
+              density_ratio, nullptr);
+        },
+        py::arg("x_over_D"), py::arg("M"), py::arg("area_ratio"),
+        py::arg("P_over_D"), py::arg("t_over_P"), py::arg("alpha_deg") = 30.0,
+        py::arg("density_ratio") = 1.7,
+        "Laterally averaged adiabatic film-cooling effectiveness downstream\n"
+        "of ONE row of SHAPED (fan or laidback fan) holes, Eq. (19).\n\n"
+        "Colban, Thole & Bogard (2011), ASME J. Turbomachinery 133,\n"
+        "011002. eta = 1/(P/t + C1 M^C2 xi^C3), xi = (4/pi)(x/D)(P/D)/(M AR);\n"
+        "eta = t/P at the breakout. Same eta convention as\n"
+        "adiabatic_wall_temperature().\n\n"
+        "Parameters:\n"
+        "  x_over_D      : distance downstream of the breakout, in METERING\n"
+        "                  diameters, >= 0\n"
+        "  M             : blowing ratio at the metering section, 0.2 to 2.5\n"
+        "  area_ratio    : A_exit/A_inlet, >= 1 (2.5 to 4.7 fitted)\n"
+        "  P_over_D      : lateral pitch / metering diameter (4 to 8 fitted)\n"
+        "  t_over_P      : breakout width / pitch, 0.31 to 0.65\n"
+        "  alpha_deg     : surface angle [deg]; range check only, fitted at 30\n"
+        "  density_ratio : rho_jet/rho_ext; range check only, 1.7 to 2.0\n\n"
+        "Outside Table 4's limits (or the fitted angle, density ratio, AR\n"
+        "and P/D spans) it warns and extrapolates.\n\n"
+        "Returns: laterally averaged eta [-]");
+
+  m.def("film_effectiveness_colban_2011_and_derivatives",
+        [](double x_over_D, double M, double area_ratio, double P_over_D,
+           double t_over_P, double alpha_deg, double density_ratio) {
+          return combaero::cooling::film_effectiveness_colban_2011_and_derivatives(
+              x_over_D, M, area_ratio, P_over_D, t_over_P, alpha_deg,
+              density_ratio, nullptr);
+        },
+        py::arg("x_over_D"), py::arg("M"), py::arg("area_ratio"),
+        py::arg("P_over_D"), py::arg("t_over_P"), py::arg("alpha_deg") = 30.0,
+        py::arg("density_ratio") = 1.7,
+        "Solver-facing (f, J) form: (eta, d eta/dM). M is the only input a\n"
+        "network solve varies; the derivative is closed form.");
+
   m.def("cooled_wall_heat_flux", &combaero::cooling::cooled_wall_heat_flux,
         py::arg("T_hot"), py::arg("T_coolant"), py::arg("h_hot"),
         py::arg("h_coolant"), py::arg("eta"), py::arg("t_wall"),

@@ -115,6 +115,7 @@ def run_dataset(dataset) -> list[Record]:
         jet_array_runner,
         orifice_runner,
         ratio_runner,
+        shaped_film_runner,
     )
     from validation.cooling.runner import run_series as rib_run
 
@@ -122,6 +123,9 @@ def run_dataset(dataset) -> list[Record]:
         (jet_array_runner.owns, jet_array_runner.run_series),
         (ratio_runner.owns, ratio_runner.run_series),
         (orifice_runner.owns, orifice_runner.run_series),
+        # Before film_runner, which claims every x_over_D / eta_adiabatic
+        # series as cylindrical-hole Baldauf + Sellers.
+        (shaped_film_runner.owns, shaped_film_runner.run_series),
         (film_runner.owns, film_runner.run_series),
         (effusion_internal_runner.owns, effusion_internal_runner.run_series),
         (effusion_overall_runner.owns, effusion_overall_runner.run_series),
@@ -179,6 +183,10 @@ SET_ORIGIN: dict[str, str] = {
     # as CROSS-SOURCE. Matching on the bare author name would have matched
     # the 1988 source and reported fidelity, overstating the claim.
     "andrews_1986_effusion_internal": "86-GT-225",
+    # The scored points are Gritsch et al. (2005), reprinted in Colban's Figs.
+    # 6-7 and among the data Eq. (19) was fitted on -- the correlation's own
+    # data, so fidelity (on its fitting set, which the record says).
+    "colban_2011_shaped": "colban2011",
 }
 
 # Taslim & Spring (1987) ratio sets (#444): their own paper's data.

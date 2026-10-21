@@ -1304,6 +1304,35 @@ Table 4** by 36% in `b_0`. Under 5% effect below `M ~ 0.5`, up to 50% at
 `M = 2.5`. See
 `validation/cooling/extractions/baldauf_2002_film_effectiveness.md`.
 
+### Film cooling: Colban, Thole and Bogard (2011), shaped holes
+
+Laterally averaged adiabatic effectiveness downstream of one row of
+**shaped** (fan or laidback fan) holes, Eq. (19):
+
+```cpp
+// eta = 1 / (P/t + C1 M^C2 xi^C3),  xi = (4/pi)(x/D)(P/D)/(M AR)
+double film_effectiveness_colban_2011(
+    double x_over_D, double M, double area_ratio, double P_over_D,
+    double t_over_P, double alpha_deg, double density_ratio,
+    CorrelationStatus *status = nullptr);
+
+// Solver-facing (f, J): (eta, d eta/dM), closed form.
+std::tuple<double, double> film_effectiveness_colban_2011_and_derivatives(
+    double x_over_D, double M, double area_ratio, double P_over_D,
+    double t_over_P, double alpha_deg, double density_ratio,
+    CorrelationStatus *status = nullptr);
+```
+
+`D` is the metering diameter, `M` the metering-section blowing ratio,
+`area_ratio = A_exit/A_inlet`, `t_over_P` breakout width over pitch. At
+`x/D = 0` it returns `t/P`, Eq. (12)'s mixing limit, built into the form.
+Coefficients and limits live in `colban2011::` (Table 3, Table 4, and the
+fitted spans of Table 1). `alpha_deg` and `density_ratio` are range-checked
+only: the fit never varied them (30 deg, DR 1.7-2.0), which is why they are
+absent from the equation, not because they do not matter. Same
+reported-not-enforced contract as Baldauf. See
+`validation/cooling/extractions/colban_2011_shaped_film.md`.
+
 ### Effusion plate internal heat transfer
 
 Andrews 86-GT-225. A coolant hole cools its wall in two places and the
