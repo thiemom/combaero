@@ -546,9 +546,11 @@ the pair is consistent rather than half-right.
 
 **Mind what `h_gas_unblown` is measured against.** An augmentation ratio
 is meaningless without its baseline. For Andrews 88-GT-290's rig the
-required `gas_augmentation` is 3.1-4.3 against a fully developed
-Dittus-Boelter and 1.6-2.5 against the same duct with a thermal-entry
-correction -- a factor of 1.75 from that choice alone. Published
+required `gas_augmentation` (plate B, with Baldauf's film) is 2.7-4.7
+against a fully developed Dittus-Boelter and 1.5-2.7 against the same duct
+with a thermal-entry correction -- a factor of 1.76 from that choice alone.
+Both plates, both baselines, with and without the film:
+`validation/cooling/extractions/andrews_effusion_overall_eta.md` (#476). Published
 film-cooling ratios are usually referenced to a flat-plate turbulent
 boundary layer at the same x, a third baseline again.
 
