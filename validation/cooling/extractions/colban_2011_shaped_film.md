@@ -1,26 +1,39 @@
 # Extraction: Colban, Thole and Bogard (2011), shaped-hole film effectiveness
 
-**Status: IMPLEMENTED 2026-10-21, REVIEW PENDING** as
+**Status: IMPLEMENTED and REVIEWED 2026-10-21** as
 `combaero::cooling::film_effectiveness_colban_2011` (#386). One closed-form
 equation and three coefficients; the implementation lands on the line the
-authors draw within about a pixel. The gate is a human sign-off on the items
-below.
+authors draw within about a pixel. Signed off by the user on the items
+below, with their answers.
 
-## For the reviewer
+## Review questions and answers
 
 1. **Is `D` the metering diameter?** The nomenclature says "D = hole throat
    diameter" and Section 4 substitutes `A_in = pi/4 D^2`, so D is the inlet
    (metering) bore and M is referenced to the metering velocity (Eq. 7).
    The implementation and docstrings say so. *Turns on it:* a caller using
    the exit width would shift xi by the area ratio, a factor of 2.5-4.7.
+   **Reviewer: yes** -- Fig. 2 sketches D as the metering diameter too.
 2. **Should alpha and density ratio be inputs at all?** They do not enter
    Eq. (19). They are taken only to flag extrapolation, because every data
    set was at 30 deg and DR 1.7-2.0 (Sections 3.4, 3.8). The alternative --
    leaving them out -- would let a DR = 1 lab case read as in-domain.
+   **Reviewer:** neither is absent from the physics, only from the form.
+   - alpha is carried by the hole geometry it produces: the breakout length
+     and so t and AR.
+   - Density ratio enters through the blowing ratio, M = DR * VR.
+   - The authors present Eq. (19) as general on that basis. Flagging
+     outside the fitted 30 deg and DR 1.7-2.0 is fine, but read the flag as
+     "outside the fitting data", not "invalid" -- the authors appear to
+     accept use beyond it.
+
+   **Decision:** both stay range-check inputs; the flag is information and
+   changes no value.
 3. **Fidelity basis.** The scored points are Gritsch et al. (2005), one of
    the four studies Eq. (19) was fitted on, with Colban a co-author. The
    scorecard labels them fidelity, which is right by the policy (the
    correlation's own data) but optimistic: it is fit quality, not prediction.
+   **Reviewer: agreed.**
 
 ## What I still need sent
 
@@ -105,8 +118,10 @@ near-hole conduction error (Section 7).
   shows the cylindrical correlation an order of magnitude low at M = 2.5.
   A caller chooses the hole type; nothing switches between them.
 - **No DR, alpha or Tu dependence invented.** The fit never varied them, so
-  they flag extrapolation and change nothing. Revisit if a shaped-hole
-  source with DR or angle variation is added.
+  they flag extrapolation and change nothing. alpha acts through the
+  geometry (t, AR) and DR through M, which is why the authors call the form
+  general. Revisit if a shaped-hole source with DR or angle variation is
+  added.
 - **Only M carries a derivative.** Geometry is fixed per element and DR is
   absent from the equation.
 
@@ -114,4 +129,5 @@ near-hole conduction error (Section 7).
 
 - 2026-10-21: extracted from the PDF text layer and the page at 400 dpi;
   Table 3 and Table 4 read in both; Eq. (1) checked on the page image. Implemented with the figure check above.
-  Awaiting sign-off.
+- 2026-10-21: signed off by the user. Answers are under "Review questions
+  and answers"; the Fig. 6/7 redraws were judged well drawn.
