@@ -1,0 +1,3 @@
+- **GUI: Film Cooling Holes node and a thermal wall's Film (#386).**
+  - The node is the holes, shaped (Colban) or cylindrical (Baldauf). It defaults to Colban's Gritsch configuration B, the geometry the correlation is scored on.
+  - A thermal wall edge picks a film provider (film holes, or an effusion plate), the side it covers and the wall's span after the last row. Its results show η, T_aw before and after the film, M, the density ratio, and whether the film is outside its correlation's fitted range.

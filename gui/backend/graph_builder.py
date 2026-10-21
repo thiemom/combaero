@@ -9,6 +9,7 @@ from combaero.network import (
     ConvectiveSurface,
     EffusionLiner,
     EffusionPlateElement,
+    FilmCoolingElement,
     FlowNetwork,
     ImpingementArray,
     ImpingementModel,
@@ -48,6 +49,7 @@ from .schemas import (
     EffusionLinerData,
     EffusionPlateData,
     EjectorData,
+    FilmCoolingData,
     ImpingementArrayData,
     ImpingementModelData,
     LinearThetaFractionLossData,
@@ -1086,6 +1088,28 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 gas_heat_flux=data.gas_heat_flux,
             )
             net.add_element(elem)
+        elif elem_type == "film_cooling":
+            data = FilmCoolingData(**elem_data)
+            shaped = data.hole_type == "shaped"
+            elem = FilmCoolingElement(
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                hole_diameter=data.hole_diameter,
+                holes_per_row=data.holes_per_row,
+                lateral_pitch=data.lateral_pitch,
+                wall_thickness=data.wall_thickness,
+                n_rows=data.n_rows,
+                row_pitch=data.row_pitch if data.n_rows > 1 else None,
+                angle_deg=data.angle_deg,
+                hole_type=data.hole_type,
+                area_ratio=data.area_ratio if shaped else None,
+                breakout_width=data.breakout_width if shaped else None,
+                turbulence_intensity=data.turbulence_intensity,
+                correlation=data.correlation,
+                Cd=data.Cd,
+            )
+            net.add_element(elem)
         elif elem_type == "impingement_array":
             data = ImpingementArrayData(**elem_data)
             arr = ImpingementArray(
@@ -1296,6 +1320,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     contact_area=data.area,
                     R_fouling=data.R_fouling,
                     orientation=data.orientation,
+                    film=data.film or None,
+                    film_side=data.film_side,
+                    film_start=data.film_start,
+                    film_end=data.film_end,
                 )
             )
             net.thermal_coupling_enabled = True

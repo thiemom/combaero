@@ -89,6 +89,24 @@ const NetworkCanvas = () => {
 					turbulence_intensity: 0.05,
 					gas_heat_flux: 0.0,
 				} as any;
+			} else if (type === "film_cooling") {
+				// Colban Eq. (19) at Gritsch configuration B, the geometry it is
+				// scored on (#386): a working example, not invented typical values.
+				data = {
+					...data,
+					hole_type: "shaped",
+					hole_diameter: 1.0e-3,
+					holes_per_row: 20,
+					lateral_pitch: 6.0e-3,
+					n_rows: 1,
+					wall_thickness: 3.0e-3,
+					angle_deg: 30.0,
+					area_ratio: 3.5,
+					breakout_width: 2.94e-3,
+					turbulence_intensity: 0.04,
+					correlation: "IdelchikThick",
+					Cd: 0.6,
+				} as any;
 			} else if (type === "effusion_plate") {
 				// Andrews et al.'s plate C, the geometry the closure is scored
 				// on (#471): a working example, not invented typical values.
