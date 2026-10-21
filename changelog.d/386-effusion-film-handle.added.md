@@ -1,0 +1,1 @@
+- GUI: the Effusion Plate carries the same "f" film handle as Film Cooling Holes, at the same place (6 o'clock): drag it onto a thermal wall's label box to cover that wall with the plate's film (#386).

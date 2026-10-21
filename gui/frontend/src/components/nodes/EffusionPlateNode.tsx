@@ -8,9 +8,11 @@ import {
 import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 import NodeIcon from "../NodeIcon";
+import { FilmHandle } from "./FilmHandle";
 
 // Effusion / film plate (#471): plenum-fed, owns its wall. The node it
-// discharges into decides the gas side, so it has no thermal handles.
+// discharges into decides the gas side, so it has no thermal handles. Its
+// film can also cover a wall downstream (#386): the "f" handle.
 const EffusionPlateNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
@@ -83,6 +85,7 @@ const EffusionPlateNode = ({ id, data, selected }: NodeProps) => {
 				style={handleStyle(Position.Right, rotation)}
 				id="flow-source"
 			/>
+			<FilmHandle rotation={rotation} />
 		</div>
 	);
 };

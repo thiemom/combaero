@@ -3469,7 +3469,7 @@ const Inspector = () => {
 								<p className="text-[10px] text-gray-500 leading-snug">
 									Add Film Cooling Holes (or an Effusion Plate with a panel
 									length) upstream on the gas path to cover this wall. Dragging
-									from the holes' "f" handle onto this wall's label sets it too.
+									from their "f" handle onto this wall's label sets it too.
 								</p>
 							)}
 							{d.film && (
