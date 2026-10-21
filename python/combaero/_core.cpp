@@ -6562,6 +6562,31 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "The alternative closure Andrews 88-GT-290 refuses offered alone --\n"
         "select it explicitly; extrapolated flags Baldauf's envelope.");
 
+  py::class_<combaero::cooling::FilmSpanAverage>(m, "FilmSpanAverage")
+      .def_readonly("eta", &combaero::cooling::FilmSpanAverage::eta)
+      .def_readonly("deta_dM", &combaero::cooling::FilmSpanAverage::deta_dM)
+      .def_readonly("deta_dP", &combaero::cooling::FilmSpanAverage::deta_dP)
+      .def_readonly("extrapolated", &combaero::cooling::FilmSpanAverage::extrapolated);
+  m.def("film_span_average_baldauf_2002",
+        &combaero::cooling::film_span_average_baldauf_2002, py::arg("n_rows"),
+        py::arg("row_pitch_over_D"), py::arg("x_start_over_D"),
+        py::arg("x_end_over_D"), py::arg("M"), py::arg("density_ratio"),
+        py::arg("alpha_deg"), py::arg("s_over_D"), py::arg("Tu"),
+        "Film a downstream wall sees from rows of CYLINDRICAL holes: Baldauf\n"
+        "(2002) per row, Sellers-superposed, averaged over [x_start, x_end]\n"
+        "downstream of the last row (in D). Returns eta, d eta/dM, d eta/dP\n"
+        "(density ratio) and Baldauf's envelope flag.");
+  m.def("film_span_average_colban_2011",
+        &combaero::cooling::film_span_average_colban_2011, py::arg("n_rows"),
+        py::arg("row_pitch_over_D"), py::arg("x_start_over_D"),
+        py::arg("x_end_over_D"), py::arg("M"), py::arg("area_ratio"),
+        py::arg("P_over_D"), py::arg("t_over_P"), py::arg("alpha_deg") = 30.0,
+        py::arg("density_ratio") = 1.7,
+        "Film a downstream wall sees from rows of SHAPED holes: Colban (2011)\n"
+        "per row, Sellers-superposed, averaged over [x_start, x_end] downstream\n"
+        "of the last breakout (in metering D). deta_dP is 0: Eq. (19) has no\n"
+        "density ratio.");
+
   m.def("film_superposition_sellers",
         &combaero::cooling::film_superposition_sellers, py::arg("eta_rows"),
         "Sellers superposition of per-row film effectiveness:\n"

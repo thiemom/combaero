@@ -451,6 +451,43 @@ EffusionPanelFilm effusion_panel_film_effectiveness(int n_rows,
                                                     double density_ratio,
                                                     double alpha_deg, double Tu);
 
+// Film a downstream wall sees: the laterally averaged adiabatic
+// effectiveness of n_rows rows of holes, Sellers-superposed, then averaged
+// over the wall's streamwise span [x_start_over_D, x_end_over_D]. Both are
+// measured downstream of the LAST row, in hole diameters; row j (0 = last)
+// sits a further j * row_pitch_over_D upstream:
+//
+//   eta(x)  = 1 - prod_j (1 - eta_row(x + j row_pitch))
+//   eta_bar = 1/(x_end - x_start) int eta(x) dx
+//
+// x_start == x_end is the point value. The span integral is fixed composite
+// Gauss-Legendre in ln(1 + x/D), where the near-hole decay is steep -- a
+// quadrature, not a finite difference, so the derivatives are exact for it.
+//
+// This is what a ThermalWall's `film` reads (#386): the per-row kernels are
+// the published ones, and the superposition and averaging add no fitted
+// constant. Sellers is known to overestimate as the row count grows (see
+// film_superposition_sellers above).
+struct FilmSpanAverage {
+  double eta = 0.0;      // eta_bar [-]
+  double deta_dM = 0.0;  // d eta_bar / d M
+  double deta_dP = 0.0;  // d eta_bar / d density ratio (0 for Colban)
+  bool extrapolated = false;
+};
+
+// Cylindrical holes: Baldauf (2002) per row. s_over_D is the lateral pitch.
+FilmSpanAverage film_span_average_baldauf_2002(
+    int n_rows, double row_pitch_over_D, double x_start_over_D,
+    double x_end_over_D, double M, double density_ratio, double alpha_deg,
+    double s_over_D, double Tu);
+
+// Shaped holes: Colban (2011) per row. D is the METERING diameter and x is
+// measured from the breakout, as in film_effectiveness_colban_2011.
+FilmSpanAverage film_span_average_colban_2011(
+    int n_rows, double row_pitch_over_D, double x_start_over_D,
+    double x_end_over_D, double M, double area_ratio, double P_over_D,
+    double t_over_P, double alpha_deg, double density_ratio);
+
 // -------------------------------------------------------------
 // Effusion plate INTERNAL heat transfer
 // -------------------------------------------------------------

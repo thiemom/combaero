@@ -1,0 +1,7 @@
+- **`FilmCoolingElement` and `ThermalWall(film=...)`: a film-cooled wall downstream of the holes (#386).**
+  - The element is the holes: an orifice of `n_rows * holes_per_row` holes from the coolant supply into the gas, using Colban (2011) for shaped holes or Baldauf (2002) for cylindrical ones. It owns no wall.
+  - A wall on the gas duct downstream names it with `film=`. That side's adiabatic wall temperature becomes `T_aw - eta_bar (T_aw - T_coolant)`, averaged over the wall's span (`film_start`, `film_end` from the last row). Its h, stream and heat booking are unchanged.
+  - The Jacobian reaches the film's flow and the coolant temperature analytically.
+  - The coupled wall is not scored; each kernel is checked on its own author's data.
+- **`film_span_average_baldauf_2002` / `film_span_average_colban_2011`:** rows combined by Sellers superposition and averaged over a streamwise span, with exact derivatives in M and density ratio.
+- **Every wall now reports `{wall}.T_aw_a` and `{wall}.T_aw_b`.**

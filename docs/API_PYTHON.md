@@ -399,6 +399,23 @@ Figs. 6-7 data (Gritsch configuration B, which it was fitted on) it scores
 3.6% RMS at `M = 0.5` and 12.1% at `M = 2.5`. See
 `validation/cooling/extractions/colban_2011_shaped_film.md`.
 
+#### Film a downstream wall sees (#386)
+
+```python
+f = cb.film_span_average_colban_2011(n_rows=2, row_pitch_over_D=10.0,
+        x_start_over_D=0.0, x_end_over_D=50.0, M=1.0,
+        area_ratio=3.5, P_over_D=6.0, t_over_P=0.5)
+f = cb.film_span_average_baldauf_2002(2, 10.0, 0.0, 50.0, M=1.0,
+        density_ratio=1.8, alpha_deg=30.0, s_over_D=3.0, Tu=0.05)
+f.eta, f.deta_dM, f.deta_dP, f.extrapolated
+```
+
+Rows Sellers-superposed, then averaged over `[x_start, x_end]` measured
+from the LAST row (in D); `x_start == x_end` is the point value. The span
+integral is fixed composite Gauss-Legendre in `ln(1 + x/D)`, so the
+derivatives are exact for it (`deta_dP` is 0 for Colban). This is what
+`ThermalWall(film=...)` reads.
+
 #### Effusion plate internal heat transfer
 
 ```python
@@ -789,6 +806,52 @@ every cooling configuration).
 
 Every converged solve in the test suite is also checked for this balance
 (`python/tests/conftest.py`, `_closure_check.py`).
+
+##### A film on one side (#386)
+
+Film holes are a `FilmCoolingElement`: an orifice of `n_rows * holes_per_row`
+holes from the coolant supply into the gas, and a film PROVIDER. It owns no
+wall and is not a wall side -- the surface it cools lies downstream on the
+gas path. The wall on that gas duct names it:
+
+```python
+from combaero.network import FilmCoolingElement
+
+net.add_element(FilmCoolingElement(
+    "film", "coolant", "gas", hole_diameter=1e-3,   # METERING D for shaped
+    holes_per_row=30, lateral_pitch=6e-3, wall_thickness=2e-3,
+    n_rows=2, row_pitch=0.01, angle_deg=30.0,
+    hole_type="shaped", area_ratio=3.5, breakout_width=3e-3,  # Colban
+    # hole_type="cylindrical", turbulence_intensity=0.05      # Baldauf
+))
+net.add_wall(ThermalWall(
+    id="liner", element_a="hot_duct", element_b="backside",
+    layers=[WallLayer(0.002, 25.0)],
+    film="film", film_side="a",          # the gas duct downstream of the holes
+    film_start=0.0, film_end=0.05,       # [m] downstream of the LAST row
+))
+```
+
+- **Only the driving temperature changes.** The covered side's T_aw becomes
+  `T_aw - eta_bar (T_aw - T_coolant)`; its h, stream capacity and heat
+  booking stay the duct's. `eta_bar` is `cb.film_span_average_*` over the
+  wall's span: the hole type's kernel per row, Sellers over the rows.
+- **Blowing ratio** is the metering mass flux over the duct's gas mass flux;
+  **density ratio** is `(W_c/W_g)(T_g/T_c)` at a common static pressure.
+  No forward coolant flow, no film.
+- **Jacobian:** T_aw,f reaches the provider's flow and its supply node's
+  temperature, both relayed analytically.
+- **Reported:** `{wall}.eta_film`, `{wall}.film_blowing_ratio`,
+  `{wall}.film_density_ratio`, `{wall}.film_extrapolated` (the kernel's
+  envelope), `{wall}.T_coolant_film`, `{wall}.T_aw_unfilmed`, and on every
+  wall `{wall}.T_aw_a` / `{wall}.T_aw_b`.
+- **Not scored as a coupled wall.** Each kernel is checked on its own
+  author's data; no source we hold measures a heated wall downstream of a
+  film row.
+- **The gas temperature is the duct's**, i.e. that of its feed node. Where
+  the holes discharge into the same node, it is already diluted by the
+  coolant, which makes T_aw,f slightly low (by about `(1 - eta)` times the
+  dilution).
 
 #### Element Integration
 Elements with convective surfaces support heat transfer calculations.

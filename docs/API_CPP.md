@@ -1404,6 +1404,21 @@ EffusionPanelFilm effusion_panel_film_effectiveness(int n_rows, double pitch_x_o
                                                     double density_ratio,
                                                     double alpha_deg, double Tu);
 
+// Film a DOWNSTREAM wall sees (#386): n_rows rows Sellers-superposed, averaged
+// over [x_start, x_end] measured from the last row (in D); x_start == x_end is
+// the point value. Fixed composite Gauss-Legendre in ln(1 + x/D); exact
+// derivatives. Read by ThermalWall(film=...).
+struct FilmSpanAverage { double eta, deta_dM, deta_dP; bool extrapolated; };
+FilmSpanAverage film_span_average_baldauf_2002(int n_rows, double row_pitch_over_D,
+                                               double x_start_over_D, double x_end_over_D,
+                                               double M, double density_ratio,
+                                               double alpha_deg, double s_over_D, double Tu);
+FilmSpanAverage film_span_average_colban_2011(int n_rows, double row_pitch_over_D,
+                                              double x_start_over_D, double x_end_over_D,
+                                              double M, double area_ratio, double P_over_D,
+                                              double t_over_P, double alpha_deg,
+                                              double density_ratio);  // deta_dP = 0
+
 // Gao Eq. (5): the published FORM of alpha. a and b are REQUIRED -- the
 // published values 12 and 0.9465 (gao_a_case1/b_case1) do not transfer:
 // alpha >= b for every r, so they cannot reach the 0.69-0.85 a tighter
