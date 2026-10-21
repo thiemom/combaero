@@ -32,6 +32,10 @@ from .components import (
 )
 from .graph import FlowNetwork
 
+# Relay key of the gas a film's holes discharge into, before their coolant
+# mixes in (#694): FILM_INF_PREFIX + provider id.
+FILM_INF_PREFIX = "__film_inf__"
+
 
 class SolverTimeoutError(Exception):
     """Raised when the solver exceeds the specified wall-clock timeout."""
@@ -528,6 +532,11 @@ class NetworkSolver:
         self._n_species: int = len(self._default_Y)
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
+        # The undiluted gas each film provider discharges into (#694), keyed
+        # FILM_INF_PREFIX + provider id: (T, Y), with the previous pass's for
+        # a back-edge read, as for the nodes.
+        self._film_inf_states: dict[str, tuple[float, list[float]]] = {}
+        self._prev_film_inf_states: dict[str, tuple[float, list[float]]] = {}
         # Nodes whose T(h) was at or below 0 K in the last propagation: less
         # enthalpy than the stream holds at 0 K, no gas state.
         self._T_no_gas: set[str] = set()
@@ -1790,6 +1799,7 @@ class NetworkSolver:
         d(row)/d(cooling flow) in a two-wall series network (#481).
         """
         self._prev_derived_states = getattr(self, "_derived_states", {})
+        self._prev_film_inf_states = self._film_inf_states
         reversed_ids = self._reversed_elements(x)
         self._rev_junctions = self._reversed_junctions(x)
         order = (
@@ -1802,6 +1812,7 @@ class NetworkSolver:
             self._lagged_read = False
             self._relay_borrowed: set[str] = set()
             self._derived_states = {}
+            self._film_inf_states = {}
             self._T_no_gas: set[str] = set()
             prev_relay = relay
             relay = self._propagate_pass(x, order, reversed_ids, with_relay, prev_relay)
@@ -1812,7 +1823,12 @@ class NetworkSolver:
                 prev = self._prev_derived_states.get(n)
                 T_prev = float(prev[0]) if prev is not None else 0.0
                 change = max(change, abs(float(T) - T_prev) / max(abs(float(T)), 1.0))
+            for k, (T, _) in self._film_inf_states.items():
+                prev_f = self._prev_film_inf_states.get(k)
+                T_prev = float(prev_f[0]) if prev_f is not None else 0.0
+                change = max(change, abs(float(T) - T_prev) / max(abs(float(T)), 1.0))
             self._prev_derived_states = self._derived_states
+            self._prev_film_inf_states = self._film_inf_states
             # The relay is at its fixed point when every sensitivity a pass
             # BORROWED from the previous one (read ahead of order, or a node
             # through its own walls) equals what this pass computed for it.
@@ -2091,6 +2107,7 @@ class NetworkSolver:
             return prev_relay.get(n, {})
 
         has_walls = self.network.thermal_coupling_enabled and bool(self.network.walls)
+        film_discharges = self._film_discharges() if has_walls else {}
         # Each pass derives the heated ducts' exit states afresh (#672): one
         # that no node takes this pass (no flow into it) reads as adiabatic.
         for el in self.network.elements.values():
@@ -2215,6 +2232,12 @@ class NetworkSolver:
                     Y=node.Y if node.Y is not None else self._default_Y,
                 )
                 stream_info.append((inj, None, nid, {}))
+            # The gas a film's holes discharge into, before their coolant
+            # mixes in (#694): the T_inf the film's eta is defined against.
+            for pid in film_discharges.get(nid, ()):
+                if self._film_unmix(nid, pid, stream_info, x, relay, up, with_relay):
+                    done.add(f"{FILM_INF_PREFIX}{pid}")
+
             no_inflow = not stream_info and not node.is_flow_boundary
             up_states = [s for s, _, _, _ in stream_info]
 
@@ -2476,6 +2499,70 @@ class NetworkSolver:
             return obj.htc_and_T(state)
         return obj.htc_and_T(state, flows=flows)
 
+    def _film_discharges(self) -> dict[str, list[str]]:
+        """{node: film providers discharging into it} for the walls' films
+        whose node only mixes (a plenum or momentum chamber, #694). A
+        combustor's or a boundary's state is not its inflows mixed, so no
+        undiluted gas is taken there: the film reads the side's own state."""
+        out: dict[str, list[str]] = {}
+        for wall in self.network.walls.values():
+            if wall.film is None:
+                continue
+            to_node = self.network.elements[wall.film].to_node
+            node = self.network.nodes.get(to_node)
+            if isinstance(node, PlenumNode | MomentumChamberNode):
+                pids = out.setdefault(to_node, [])
+                if wall.film not in pids:
+                    pids.append(wall.film)
+        return out
+
+    def _film_unmix(
+        self,
+        nid: str,
+        pid: str,
+        stream_info: list[tuple],
+        x: np.ndarray,
+        relay: dict,
+        up: Any,
+        with_relay: bool,
+    ) -> bool:
+        """Mix ``nid``'s inflows except provider ``pid``'s into the undiluted
+        gas its film sees (#694), with the node's energy boundaries and the
+        same mixer and relay as the node; wall heat into the node is not
+        included. False (nothing stored) when the holes do not deliver into
+        nid now or nothing else does."""
+        others = [st for st in stream_info if st[1] is None or st[1].id != pid]
+        if len(others) == len(stream_info) or not others:
+            return False
+        if sum(float(st[0].m_dot) for st in others) <= 0.0:
+            return False
+        node = self.network.nodes[nid]
+        ebs = getattr(node, "energy_boundaries", [])
+        mix = _solver_tools.mixer_from_streams_and_jacobians(
+            [cb.MassStream(st.m_dot, st.Tt, st.Pt, st.Y) for st, _, _, _ in others],
+            Q=sum(eb.Q for eb in ebs),
+            fraction=sum(eb.fraction for eb in ebs),
+        )
+        key = f"{FILM_INF_PREFIX}{pid}"
+        self._film_inf_states[key] = (float(mix.T_mix), list(mix.Y_mix))
+        if with_relay:
+            relay[key] = {}
+            self._relay_mix(relay[key], nid, others, mix, [], x, relay, up)
+        return True
+
+    def _film_inf(self, provider: Any, obj: Any, x: np.ndarray, lagged: bool) -> Any:
+        """(T, Y) of the undiluted gas the film on ``obj`` sees, or None when
+        ``obj`` is not fed by the node the holes discharge into (#694)."""
+        if self._flow_ends(obj, x)[0] != provider.to_node:
+            return None
+        key = f"{FILM_INF_PREFIX}{provider.id}"
+        if key in self._film_inf_states:
+            return self._film_inf_states[key]
+        if lagged and key in self._prev_film_inf_states:
+            self._lagged_read = True
+            return self._prev_film_inf_states[key]
+        return None
+
     def _wall_side_htc(
         self,
         wall: Any,
@@ -2518,6 +2605,7 @@ class NetworkSolver:
             m_gas,
             wall.film_start,
             wall.film_end,
+            gas_inf=self._film_inf(provider, obj, x, lagged),
         )
 
     def _relay_film(
@@ -2539,6 +2627,12 @@ class NetworkSolver:
             for idx, sens_up in up(provider.from_node).items():
                 nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                 nr["T"] += factor * d_T * sens_up["T"]
+        # The undiluted gas temperature (#694), through its own mix's relay.
+        d_inf = float(getattr(ch, "dT_aw_dT_inf", 0.0))
+        if d_inf != 0.0:
+            for idx, sens_up in up(f"{FILM_INF_PREFIX}{provider.id}").items():
+                nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                nr["T"] += factor * d_inf * sens_up["T"]
 
     def _relay_flow_inputs(self, node_relay: dict, obj: Any, ch: Any, dT_dh: float) -> None:
         """Relay ``dh_dsources`` onto the neighbours' flow unknowns.
