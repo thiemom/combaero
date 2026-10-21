@@ -1,6 +1,11 @@
 import type { EdgeProps } from "reactflow";
-import { EdgeLabelRenderer, getBezierPath } from "reactflow";
+import {
+	EdgeLabelRenderer,
+	getBezierPath,
+	useStore as useFlowStore,
+} from "reactflow";
 import useStore from "../store/useStore";
+import { FILM_COLOR, filmDuctId } from "../utils/filmLink";
 import {
 	orientationGlyph,
 	orientationOf,
@@ -28,7 +33,10 @@ export default function ThermalEdge({
 	sourcePosition,
 	targetPosition,
 	style = {},
+	source,
+	target,
 	data,
+	selected,
 }: EdgeProps) {
 	const { unitPreferences } = useStore();
 	const unit = unitPreferences.length;
@@ -42,6 +50,29 @@ export default function ThermalEdge({
 		targetY,
 		targetPosition,
 	});
+
+	// The film this wall holds (#386): a link from the holes to the wall's
+	// label box, drawn only while the wall or the holes are selected so a
+	// network with many films stays readable.
+	const filmNode = useFlowStore((s) =>
+		data?.film ? s.nodeInternals.get(data.film) : undefined,
+	);
+	const filmDuct = useFlowStore((s) =>
+		data?.film
+			? s.nodeInternals.get(filmDuctId({ source, target }, data.film_side))
+			: undefined,
+	);
+	let filmLink: { d: string; x0: number; y0: number } | null = null;
+	if (filmNode && (selected || filmNode.selected)) {
+		const p = filmNode.positionAbsolute ?? filmNode.position;
+		const x0 = p.x + (filmNode.width ?? 140) / 2;
+		const y0 = p.y + (filmNode.height ?? 48) / 2;
+		// It ends at the label point and runs under the label box, so it stops
+		// visually at the box edge; a gentle bow keeps it off flow edges.
+		const mx = (x0 + labelX) / 2 - (labelY - y0) * 0.2;
+		const my = (y0 + labelY) / 2 + (labelX - x0) * 0.2;
+		filmLink = { d: `M ${x0} ${y0} Q ${mx} ${my} ${labelX} ${labelY}`, x0, y0 };
+	}
 
 	const Q: number | undefined = data?.result?.Q;
 	const flowsForward = Q === undefined || Q >= 0;
@@ -164,6 +195,19 @@ export default function ThermalEdge({
 					/>
 				</marker>
 			</defs>
+			{filmLink && (
+				<g style={{ pointerEvents: "none" }} opacity={0.9}>
+					<path
+						d={filmLink.d}
+						fill="none"
+						stroke={FILM_COLOR}
+						strokeWidth={1.25}
+						strokeDasharray="2,3"
+						strokeLinecap="round"
+					/>
+					<circle cx={filmLink.x0} cy={filmLink.y0} r={2.5} fill={FILM_COLOR} />
+				</g>
+			)}
 			{/* Transparent wider path for hit-testing */}
 			<path
 				style={{ stroke: "transparent", strokeWidth: 10, fill: "none" }}
@@ -200,6 +244,7 @@ export default function ThermalEdge({
 						pointerEvents: "all",
 					}}
 					className="nodrag nopan flex flex-col items-center shadow-sm"
+					data-film-wall={id}
 				>
 					{data?.label && data?.show_label && (
 						<span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-none mb-1">
@@ -219,6 +264,17 @@ export default function ThermalEdge({
 						</span>
 						{labelText}
 					</span>
+					{data?.film && filmNode && (
+						<span
+							className="text-[9px] leading-none font-bold"
+							style={{ color: FILM_COLOR }}
+							title={`Film from ${filmNode.data?.label || data.film} covers ${
+								filmDuct?.data?.label || filmDuct?.id || "?"
+							}`}
+						>
+							film
+						</span>
+					)}
 					{solvedArrangement(data?.result) && (
 						<span className="text-[9px] text-gray-500 leading-none">
 							{solvedArrangement(data?.result)}
