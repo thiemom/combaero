@@ -1,0 +1,4 @@
+- **The ejector kernel is scored on a refrigerant rig:** Eames et al. 2013, an R245fa chiller with two mixing ducts on one nozzle (`validation/ejector/eames2013_check.py`).
+  - Measured critical pressure: Huang's printed chain (the default) is 14% low and Kracik & Dvorak 20% high, and the two bracket every point.
+  - The larger duct moves both closures by 10-22 points. The miss is geometry in the shared front end, not the mixing closure.
+  - The entrainment ratio is scored against the COP the authors themselves doubt, with that doubt recorded.

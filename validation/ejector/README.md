@@ -37,6 +37,12 @@ recreating a CoolProp environment**.
   (2025). Steam-ejector CFD (Tables 1-3, `data/akbarnejad2025_tables.py`), a
   cross-check target. Its own model is a scaling law from a reference curve
   of the same ejector, so it gives no geometry-only anchor to adopt.
+- I.W. Eames, A. Milazzo, D. Paganini, M. Livi, "The design, manufacture and
+  testing of a jet-pump chiller for air conditioning and industrial
+  application", *Applied Thermal Engineering* 58 (2013) 234-240,
+  DOI: 10.1016/j.applthermaleng.2013.04.028. R245fa chiller, measured (not
+  committed). Fig. 8 and Table 1 are `data/eames2013_fig8.py`, a cross-check
+  target.
 
 ## Model scope
 
@@ -127,6 +133,9 @@ baked into `PC_STAR_PA_BY_TC_STAR_C`.
 | `data/henry2007_fig5.py` | Henry 2007 Fig. 5, measured air characteristic, and the rig's geometry. |
 | `data/akbarnejad2025_tables.py` | Akbarnejad & Ziabasharhagh 2025 Tables 1-3, steam CFD rows. |
 | `data/chen2013_figs.py` | Chen et al. 2013 Figs. 5a and 7a: Chen's model curves and the measured points (Hemidi/Henry rig; Chen's rectangular rig, with error bars). |
+| `data/eames2013_fig8.py` | Eames et al. 2013 Fig. 8 and Table 1: R245fa chiller, two ducts on one nozzle, measured T_c* and COP, the authors' design point; R245fa properties baked. |
+| `data/generate_eames2013.py` | Regenerate those baked R245fa values (**needs CoolProp**). |
+| `eames2013_check.py` | Cross-source accuracy of ω and both P_c* closures on that rig. |
 | `anchor_scorecard.py` | Cross-source accuracy of omega, P_c*, P_b0 on all three rigs (run it to print the table). |
 | `printed_chain_check.py` | Huang's printed P_c* chain and single-change hypotheses against Huang's and Chen's own numbers; Chen's printed subcritical branch against his droop. |
 | `bouhanguel2011_regime_check.py` | Bouhanguel et al. 2011: which anchor pair agrees with the observed flow regime, with P2 bracketed by the measured U. |
@@ -403,6 +412,38 @@ table). So it is not a candidate for the droop.
 - **Pressure reading.** Huang's pressures are absolute: each printed P_g and P_e matches its printed saturation temperature to 0.1 K. Henry's are gauge and Chen's rectangular rig is absolute (ratio test, above).
 - **Suction loss.** On Chen's rectangular rig, one suction pressure of about 0.91 bar (−10%) reproduces all five measured plateaus. That would fit a constant loss in the secondary's metering run (an ISO 5167 orifice) at the roughly constant ṁ_s. A lower η_s fits the plateaus equally well; the two separate only on P_c*, which a lower P_s lowers and η_s barely moves.
 
+### A refrigerant rig: Eames 2013 (R245fa)
+
+`eames2013_check.py` scores the kernel on a fourth lab: Eames, Milazzo,
+Paganini & Livi 2013 (`data/eames2013_fig8.py`, Fig. 8 digitised and checked by
+the user). It is **accuracy, labelled cross-source**, and it is the only
+refrigerant rig scored.
+- **The rig:** a 40 kW R245fa chiller with two mixing ducts, A_3/A_t 8.6 (A) and 13.2 (B), fitted to ONE primary nozzle.
+- **The data:** ten critical points, giving the measured T_c* (a pressure) and the plateau COP.
+- **The paper has no nozzle exit diameter. That does not matter:** ω and both P_c* closures are exactly independent of A_p1/A_t.
+
+| Ejector | A_3/A_t | P_c\* Huang chain (default) | P_c\* K&D | ω / ω(COP) |
+|---|---|---|---|---|
+| A | 8.6 | −5 to −12% (bias −8.9%) | +30 to +34% (+31.1%) | 1.4-1.9 |
+| B | 13.2 | −14 to −24% (bias −19.5%) | +3 to +15% (+8.9%) | 1.8-3.3 |
+| all | | bias −14.2%, RMS 15.4% | bias +20.0%, RMS 23.1% | 2.0 |
+
+- **The two closures bracket every measured P_c\*.** Huang's chain is low on all ten points and closer on average. That is the same pattern as on the air rigs.
+- **Geometry, not the closure.** Going from duct A to duct B with the same nozzle, BOTH closures drop by 10-22 points, and the ω overprediction grows.
+  - The closures share only Huang's Eqs. 1-8 (the y-y state and ω), so the effect sits in that front end.
+  - The perturbation confirms the duct drives it: with B scored at A's ratio, the shift reverses.
+  - **Candidates:**
+    - the entrained flow filling all of A_3 − A_py at y-y;
+    - the nozzle's position and exit area, which the kernel cannot see (the paper's Fig. 5 moves COP by 30-45% over ±4-6 mm of NXP);
+    - mixing length (B's diffuser throat sits 32 mm further downstream).
+  - The other rigs show no clean trend with A_3/A_t. Their errors (table above) are confounded by fluid and conditions, and only this rig changes the duct alone.
+- **ω against the COP is scored, with the authors' doubt attached.**
+  - The model is 1.4-3.3× the ω the plotted COP implies.
+  - The authors doubt that COP: chilled-water fluctuations and a small evaporator ΔT. Their own 1-D code is also about 2× their measurement (0.31 against 0.15).
+  - So this column carries their stated uncertainty, not a measurement band.
+  - The COP-to-ω conversion itself checks out: their code's COP 0.31 maps to ω 0.45 through the CoolProp enthalpies, against the 0.44 they print.
+- **Model against model:** at their design point (106/39/4 °C) the kernel gives ω 0.11 on ejector A, the duct their code designed, against the code's 0.44. Their code is a different front end, not Huang's.
+
 ### Other sources reviewed
 
 None of these has a back-pressure sweep at fixed motive and suction
@@ -437,6 +478,7 @@ result is extrapolation, and nothing in the element flags it.
 | critical ω, P_c*, P_b0 (accuracy) | Henry 2007 and Chen 2013 rectangular (air, measured), Akbarnejad 2025 (steam, CFD) | A_3/A_t 4.5-5.4 and 33; P_p/P_s 3-35; ω 0.19-1.4; table above |
 | P_c*, P_b0 of `anchor_closure="huang1999"` (accuracy) | Henry 2007 and Chen 2013 rectangular (air, measured), Akbarnejad 2025 (steam, CFD) | as the row above; P_c* −19 to +17%, P_b0 +3 to +39%, curve RMS 12-23% |
 | critical ω, P_c* (second author's own model) | Chen 2013 model curves (air) | A_3/A_t 4.5 and 5.3; ω reproduced, P_c* not (above) |
+| critical ω, P_c* of both pairs (accuracy) | Eames 2013 (R245fa, measured T_c*; COP doubted by the authors) | A_3/A_t 8.6 and 13.2, P_g/P_e 15-19, T_c* 32-37 °C; P_c* Huang −24 to −5%, K&D +3 to +34% |
 | regime at a fixed outlet, both pairs (accuracy) | Bouhanguel 2011 (air, visualisation) | A_p1/A_t 2.25, A_3/A_t 4 and 9, P1 4.5-5.5 bar; only Huang's P_c* fits without an edge-case reading |
 | droop shape (linear) | Henry 2007 (air, measured) | P_p/P_s about 4-7, one geometry |
 | jet pump (incompressible) | Sanger, NASA TN D-4759 / D-4445 (water) | A_p1/A_3 0.066 and 0.197 |
