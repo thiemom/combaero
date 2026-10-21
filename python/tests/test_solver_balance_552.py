@@ -55,14 +55,32 @@ def test_cooling_a_stream_below_zero_enthalpy_is_refused_not_raised() -> None:
     """20 kW out of ~6 g/s of 300 K air: no admissible root. main raised
     RuntimeError from calc_T_from_h at the starting point; after that was
     caught, it converged to zero flow under a 10 kPa drive (item 3). The root
-    it reaches now is below 0 K at p, and refused by name (#626)."""
+    it reaches now is below 0 K at p, and refused by name (#626).
+
+    WHICH refusal depends on the starting point, because there is no root to
+    find: from the resistance-network seed (#682) Linux lands on the
+    heat-fade root and macOS on this one. Pinned to the uniform start so the
+    named below-0 K refusal stays tested; the seeded start is held to
+    "refused, never raised" by the next test."""
     s = NetworkSolver(_cooled_chain(-2e4))
+    s.resistance_seed = False
     with pytest.warns(UserWarning, match="at or below 0 K"):
         r = s.solve(auto_retry=False)
     assert r["__converged__"] and not r["__success__"]
     assert r["__outcome__"] == "inconsistent"
     assert "p" in r["__T_clamped__"]
     assert r["p.no_gas_state"] == 1.0
+
+
+@pytest.mark.no_closure_check  # the clamp discards energy: that is the point
+def test_seeded_start_still_refuses_the_inadmissible_cooling() -> None:
+    """From the default resistance seed: refused under SOME name, never a
+    success and never an exception -- the contract #552 is about."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = NetworkSolver(_cooled_chain(-2e4)).solve(auto_retry=False)
+    assert not r["__success__"]
+    assert r["__outcome__"] not in ("converged", "error")
 
 
 def test_admissible_cooling_still_solves() -> None:
