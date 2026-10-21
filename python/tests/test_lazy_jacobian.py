@@ -125,8 +125,11 @@ def test_a_solve_assembles_far_fewer_jacobians_than_it_evaluates() -> None:
     One cold hybr solve, pinned incompressible: the count is about J reuse.
     Compressible, this network's cold solve sits on a knife edge (#605) and
     the default path's retry count follows the wall-clock stall detector,
-    so the ratio moved with the machine (27 vs 80 / 3 on Linux CI)."""
+    so the ratio moved with the machine (27 vs 80 / 3 on Linux CI). From the
+    resistance-network seed it converges in 12 evaluations, too few to show
+    the reuse; pinned to the propagated start."""
     s = NetworkSolver(tsr._hot_array(8, 1.02e5, "incompressible"))
+    s.resistance_seed = False
     calls = {"F": 0, "relay": 0}
     evaluate, propagate = s._residuals_and_jacobian, s._propagate_states
 

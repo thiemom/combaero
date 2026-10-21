@@ -41,8 +41,10 @@ def test_mass_boundary_sink_convergence() -> None:
             if not k.startswith("__"):
                 print(f"  {k}: {v}")
 
-    # $|F| \approx 10^{-12}$ is physically solved for this topology.
-    assert (result.get("__final_norm__") or 1.0) < 1e-10
+    # Physically solved. From the propagated start hybr stopped at |F| 2.7e-12;
+    # from the resistance-network seed, already near the root, it stops
+    # sooner, at 1.2e-10 (outlet P differs by 6e-10 relative).
+    assert (result.get("__final_norm__") or 1.0) < 1e-9
 
     # Mass flow in channel should match boundary sink setting (0.5 kg/s)
     m_dot_chan = result.get("chan.m_dot")

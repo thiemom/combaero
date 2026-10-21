@@ -5,7 +5,9 @@ state with flow -- and lam walks to 1, each step warm-started from the last.
 Opt-in (``NetworkSolver.homotopy_retry``; the GUI backend and the stress
 harness turn it on): every solve that does not converge pays its budget.
 Stress random draws 17, 25 and 33 failed every other start within 20 s and
-now solve.
+now solve. They are pinned to the propagated cold start
+(``resistance_seed = False``): from the resistance-network seed, 17 solves
+cold and never reaches the homotopy.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from networks import FAMILIES  # noqa: E402
 
 def _solve(g: FlowNetwork, **kw) -> dict:
     s = NetworkSolver(g)
+    s.resistance_seed = False
     s.homotopy_retry = True
     kw.setdefault("timeout", 60)
     with warnings.catch_warnings():
@@ -52,6 +55,7 @@ def test_without_the_retry_that_draw_fails() -> None:
     """Off by default: every non-converging solve would pay its budget."""
     g, _ = FAMILIES["random"](17)
     s = NetworkSolver(g)
+    s.resistance_seed = False
     assert s.homotopy_retry is False
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -81,6 +85,7 @@ def test_its_budget_is_the_callers(monkeypatch: pytest.MonkeyPatch) -> None:
     the time the timeout leaves."""
     g, _ = FAMILIES["random"](17)
     s = NetworkSolver(g)
+    s.resistance_seed = False
     s.homotopy_retry = True
     seen: list[float] = []
     real = s._solve_flow_retries

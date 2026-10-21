@@ -879,6 +879,18 @@ bookkeeping keys. Five of them say what happened:
 - **Budget:** with the ramp on, an uncapped homotopy (`homotopy_budget = None`) takes half of the time left instead of all of it.
 - **What it gives:** it rescues 3 of the 21 stress random draws the homotopy left unsolved (31, 34, 35), in 13-46 s. In the 20 s harness that is random 34, plus legacy_tee 15. Draws that still fail now use more of their budget.
 
+**Resistance-network cold start, on by default.** `solver.resistance_seed = True` replaces the cold start's node pressures and element flows with the root of the network as quadratic resistances:
+- **The network:** each element is dPt = K m|m|, with K its incompressible start-guess estimate (`_seed_resistance`) at the reference density. Pressure boundaries are fixed, a `MassFlowBoundary` injects its m_dot (a sink draws it), and every other node conserves mass.
+- **Why it always has a start:** the network is monotone, so it has exactly one solution, found by damped fixed-point iteration on the conductances (`SEED_MAX_ITER`, `SEED_RELAX`, `SEED_MDOT_FLOOR`; a lossless connection gets `SEED_LOSSLESS_FRACTION` of the smallest K).
+- **The gate:** it applies when every element offers an estimate (orifice, channel, pressure loss with a shipped correlation, area change, lossless connection) and every node is a plenum, momentum chamber, combustor, wall or boundary. Any other network (junctions, ejectors, plates, ...) keeps the propagated start unchanged.
+- **Why:** the propagated start sets each node's pressure from its neighbours one element at a time. In a large network of resistances decades apart, it leaves a duct carrying MPa at the guessed flow. 48 of 160 stress random draws stalled there even made incompressible and adiabatic.
+- **What it gives** (stress harness, 20 s, `--jobs 4`):
+  - `random`: 67 -> 113 of 160 converged, in about half the total time;
+  - `hotcold` / `hotcold_mild`: about 4x faster;
+  - `impingement`: 4 of 80 draws, slower from it, cross the 20 s budget (all converge at 60 s).
+
+  It is a start guess only; it never enters a residual.
+
 **Starting-point safety net.** The root finder always rejected a trial point whose evaluation raised (a penalty residual); the starting point was the one evaluation it did not cover, so a property refusing a physical-but-extreme state there aborted `solve()`, retries included. Now a `RuntimeError`, `ValueError` or `ArithmeticError` at an attempt's starting point ends that attempt with outcome `ERROR` (a `RuntimeWarning` names where), and the retries try their other starts. A starting point whose residual is non-finite counts as one that could not be evaluated (`FloatingPointError`, naming the rows' owners); it used to be reported converged, since a NaN norm passes no comparison. Code bugs (`TypeError`, `AttributeError`, `KeyError`, `IndexError`) always raise. Strict mode raises as before: `solver.raise_internal_errors = True`, or the environment variable `COMBAERO_SOLVER_STRICT=1` when the attribute is left `None` (the test suite runs strict, `python/tests/conftest.py`). For a stress or discovery run, either go strict to stop at the first finding, or leave it lenient and collect `__caught_exceptions__` across the solves: it also lists the rejected probes, which strict mode does not change.
 
 **Second law per element (#545).** Each element's control volume must not

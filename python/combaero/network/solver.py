@@ -20,10 +20,12 @@ from .components import (
     EnergyBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
+    MomentumChamberNode,
     MultiPortChamberBase,
     NetworkMixtureState,
     NetworkNode,
     OrificeElement,
+    PlenumNode,
     PressureBoundary,
     WallNode,
 )
@@ -99,6 +101,24 @@ BC_RAMP_MAX_SOLVES = 40
 #: Element attributes that only warm-start a kernel's own inner solve (the
 #: Fanno and Fanno-Rayleigh march). A retry that starts cold drops them.
 _KERNEL_WARM_STARTS = ("_last_G", "_last_M_exit")
+
+#: Resistance-network cold start (``NetworkSolver.resistance_seed``): the
+#: damped fixed-point iteration's cap and relaxation, the flow floor [kg/s]
+#: that keeps a zero-flow element's conductance finite, and the fraction of
+#: the network's smallest resistance a lossless connection gets. On 160
+#: stress random draws it took the cold path from 67 to 110 converged.
+SEED_MAX_ITER = 200
+SEED_RELAX = 0.5
+SEED_MDOT_FLOOR = 1.0e-4
+SEED_LOSSLESS_FRACTION = 1.0e-2
+_SEED_NODE_TYPES = (
+    PlenumNode,
+    MomentumChamberNode,
+    CombustorNode,
+    PressureBoundary,
+    MassFlowBoundary,
+    WallNode,
+)
 
 #: At most this many exceptions keep their full record per solve; the rest are
 #: counted (``__caught_exception_count__``).
@@ -537,6 +557,10 @@ class NetworkSolver:
         # timeout leaves; the GUI, NetworkRunner and the stress harness turn
         # it on.
         self.bc_ramp_retry: bool = False
+        # Cold start from a quadratic-resistance network solve (dPt = K m|m|,
+        # mass conserved), where every element offers a seed resistance
+        # (``_seed_resistance``); other networks keep the propagated start.
+        self.resistance_seed: bool = True
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -1030,6 +1054,116 @@ class NetworkSolver:
         total = sum(shares)
         return {i: s / total for i, s in zip(others, shares, strict=True)}
 
+    def _resistance_network_guess(
+        self, ref: dict[str, Any]
+    ) -> tuple[dict[str, float], dict[str, float]] | None:
+        """Node pressures and element flows of the network as quadratic
+        resistances, for the cold start.
+
+        Each element is dPt = K m|m| with K its incompressible
+        ``_seed_resistance`` at the reference density; pressure boundaries are
+        fixed, mass-flow boundaries inject (a sink draws) their m_dot, every
+        other node conserves mass. A monotone network, so it has one solution;
+        damped Picard on the conductances G = 1 / (K |m|) finds it. The
+        propagated start sets a node's pressure from its neighbours one element
+        at a time, and in a large network of resistances decades apart it
+        leaves a duct carrying MPa at the guessed flow -- where 48 of 160
+        stress random draws stalled even incompressible and adiabatic.
+
+        None when an element offers no resistance, a node is of a type the
+        mass balance here does not cover, or there is no pressure boundary.
+        """
+        net = self.network
+        if not all(isinstance(n, _SEED_NODE_TYPES) for n in net.nodes.values()):
+            return None
+        fixed = {
+            nid: float(n.Pt) for nid, n in net.nodes.items() if isinstance(n, PressureBoundary)
+        }
+        if not fixed:
+            return None
+        walls = {nid for nid, n in net.nodes.items() if isinstance(n, WallNode)}
+        els = [
+            e for e in net.elements.values() if e.from_node not in walls and e.to_node not in walls
+        ]
+        if not els:
+            return None
+        P_ref = float(np.mean(list(fixed.values())))
+        X_ref = list(cb.mass_to_mole(ref["Y"]))
+        rho = float(cb.density(ref["T"], P_ref, X_ref))
+        m_ref = max(float(ref["m_dot"]), SEED_MDOT_FLOOR)
+        K_list = []
+        for e in els:
+            k = e._seed_resistance(rho, P_ref, m_ref)
+            if k is None or not math.isfinite(k) or k < 0.0:
+                return None
+            K_list.append(k)
+        K = np.array(K_list)
+        if not np.any(K > 0.0):
+            return None
+        K[K == 0.0] = SEED_LOSSLESS_FRACTION * K[K > 0.0].min()
+
+        free = [nid for nid in net.nodes if nid not in fixed and nid not in walls]
+        if not free:
+            return None
+        idx = {nid: i for i, nid in enumerate(free)}
+        inj = np.zeros(len(free))
+        for nid in free:
+            node = net.nodes[nid]
+            if isinstance(node, MassFlowBoundary):
+                sink = net.get_upstream_elements(nid) and not net.get_downstream_elements(nid)
+                inj[idx[nid]] += -float(node.m_dot) if sink else float(node.m_dot)
+        a_ix = [idx.get(e.from_node) for e in els]
+        b_ix = [idx.get(e.to_node) for e in els]
+        a_fix = np.array([fixed.get(e.from_node, 0.0) for e in els])
+        b_fix = np.array([fixed.get(e.to_node, 0.0) for e in els])
+
+        m = np.full(len(els), m_ref)
+        p = np.full(len(free), P_ref)
+        for _ in range(SEED_MAX_ITER):
+            G = 1.0 / (K * (np.abs(m) + SEED_MDOT_FLOOR))
+            L = np.zeros((len(free), len(free)))
+            b = inj.copy()
+            for k, g in enumerate(G):
+                i, j = a_ix[k], b_ix[k]
+                if i is not None:
+                    L[i, i] += g
+                    if j is not None:
+                        L[i, j] -= g
+                    else:
+                        b[i] += g * b_fix[k]
+                if j is not None:
+                    L[j, j] += g
+                    if i is not None:
+                        L[j, i] -= g
+                    else:
+                        b[j] += g * a_fix[k]
+            # A free node no element reaches (or one only through walls)
+            # keeps the reference pressure.
+            diag = np.diag(L).copy()
+            lone = diag == 0.0
+            L[lone, lone] = 1.0
+            b[lone] = P_ref
+            try:
+                p = np.linalg.solve(L, b)
+            except np.linalg.LinAlgError:
+                return None
+            pa = np.array([p[i] if i is not None else a_fix[k] for k, i in enumerate(a_ix)])
+            pb = np.array([p[j] if j is not None else b_fix[k] for k, j in enumerate(b_ix)])
+            m_new = G * (pa - pb)
+            if not np.all(np.isfinite(m_new)):
+                return None
+            done = np.max(np.abs(m_new - m)) <= 1e-6 * (np.max(np.abs(m_new)) + SEED_MDOT_FLOOR)
+            m = SEED_RELAX * m + (1.0 - SEED_RELAX) * m_new
+            if done:
+                m = m_new
+                break
+        # An imposed flow past what the resistances pass at the drawn
+        # pressures can put a node below zero; the start stays positive.
+        p_floor = 0.5 * min(fixed.values())
+        p_map = {nid: max(float(p[idx[nid]]), p_floor) for nid in free}
+        m_map = {e.id: float(mi) for e, mi in zip(els, m, strict=True)}
+        return p_map, m_map
+
     def _build_x0(self) -> np.ndarray:
         """
         Constructs the initial guess vector by gathering all unknowns.
@@ -1050,6 +1184,11 @@ class NetworkSolver:
         ref = self._infer_reference_state()
         p_guess = self._propagate_pressure_guess(ref)
         mdot_guess = self._propagate_mdot_guess(ref)
+        if self.resistance_seed:
+            seeded = self._resistance_network_guess(ref)
+            if seeded is not None:
+                p_guess.update(seeded[0])
+                mdot_guess.update(seeded[1])
 
         # Bernoulli-based initial guess for TeeJunctionElement unknowns.
         # The generic mdot_guess propagator seeds from ref["m_dot"]=0.1 (arbitrary

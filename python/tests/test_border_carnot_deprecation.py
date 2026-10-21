@@ -61,7 +61,9 @@ def _solve(kind: str, orifice_scale: float) -> tuple[float, float]:
     net.add_element(
         OrificeElement("o", "mid", "snk", Cd=0.8, diameter=diameter, regime="compressible")
     )
-    sol = NetworkSolver(net).solve()
+    # Tight: the deprecated element offers no seed resistance and starts
+    # elsewhere; the comparison is of the models, not of where hybr stops.
+    sol = NetworkSolver(net).solve(options={"xtol": 1e-13})
     assert sol["__success__"]
     return sol["x.m_dot"], 2.0e5 - sol["mid.Pt"]
 
