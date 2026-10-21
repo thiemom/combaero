@@ -460,6 +460,107 @@ EffusionPanelFilm effusion_panel_film_effectiveness(int n_rows,
   return out;
 }
 
+namespace {
+
+// eta_row(x) -> (eta, d eta/dM, d eta/dP), at x in diameters from that row.
+template <typename RowFn>
+FilmSpanAverage film_span_average_impl(const char *name, int n_rows,
+                                       double row_pitch_over_D, double x0,
+                                       double x1, RowFn row) {
+  if (n_rows < 1 || (n_rows > 1 && !(row_pitch_over_D > 0.0))) {
+    throw std::invalid_argument(std::string(name) +
+                                ": n_rows >= 1, and row_pitch_over_D > 0 for more than one row");
+  }
+  if (!(x0 >= 0.0) || !(x1 >= x0)) {
+    throw std::invalid_argument(std::string(name) +
+                                ": the span needs 0 <= x_start_over_D <= x_end_over_D");
+  }
+  FilmSpanAverage out;
+  // One point x: Sellers over the rows, with its gradient chained onto M, P.
+  const auto at = [&](double x, double &e, double &dM, double &dP) {
+    double remaining = 1.0, sum_dM = 0.0, sum_dP = 0.0;
+    for (int j = 0; j < n_rows; ++j) {
+      CorrelationStatus status = CorrelationStatus::Valid;
+      const auto [ej, ej_dM, ej_dP] = row(x + j * row_pitch_over_D, &status);
+      if (status != CorrelationStatus::Valid) {
+        out.extrapolated = true;
+      }
+      // d/d theta of 1 - prod(1 - e_j): prod_{k != j}(1 - e_k) de_j. Carried
+      // as remaining' = remaining_prev' (1 - e_j) - remaining_prev e_j'.
+      sum_dM = sum_dM * (1.0 - ej) + remaining * ej_dM;
+      sum_dP = sum_dP * (1.0 - ej) + remaining * ej_dP;
+      remaining *= (1.0 - ej);
+    }
+    e = 1.0 - remaining;
+    dM = sum_dM;
+    dP = sum_dP;
+  };
+  if (x1 == x0) {
+    at(x0, out.eta, out.deta_dM, out.deta_dP);
+    return out;
+  }
+  // Composite 8-point Gauss-Legendre in u = ln(1 + x): x = e^u - 1, dx = e^u du.
+  static constexpr double node[8] = {-0.9602898564975363, -0.7966664774136267,
+                                     -0.5255324099163290, -0.1834346424956498,
+                                     0.1834346424956498,  0.5255324099163290,
+                                     0.7966664774136267,  0.9602898564975363};
+  static constexpr double weight[8] = {0.1012285362903763, 0.2223810344533745,
+                                       0.3137066458778873, 0.3626837833783620,
+                                       0.3626837833783620, 0.3137066458778873,
+                                       0.2223810344533745, 0.1012285362903763};
+  constexpr int panels = 16;
+  const double u0 = std::log1p(x0), u1 = std::log1p(x1);
+  const double hu = (u1 - u0) / panels;
+  double sum = 0.0, sum_dM = 0.0, sum_dP = 0.0;
+  for (int p = 0; p < panels; ++p) {
+    const double mid = u0 + (p + 0.5) * hu;
+    for (int q = 0; q < 8; ++q) {
+      const double u = mid + 0.5 * hu * node[q];
+      const double w = 0.5 * hu * weight[q] * std::exp(u);
+      double e = 0.0, dM = 0.0, dP = 0.0;
+      at(std::expm1(u), e, dM, dP);
+      sum += w * e;
+      sum_dM += w * dM;
+      sum_dP += w * dP;
+    }
+  }
+  const double span = x1 - x0;
+  out.eta = sum / span;
+  out.deta_dM = sum_dM / span;
+  out.deta_dP = sum_dP / span;
+  return out;
+}
+
+}  // anonymous namespace
+
+FilmSpanAverage film_span_average_baldauf_2002(
+    int n_rows, double row_pitch_over_D, double x_start_over_D,
+    double x_end_over_D, double M, double density_ratio, double alpha_deg,
+    double s_over_D, double Tu) {
+  return film_span_average_impl(
+      "film_span_average_baldauf_2002", n_rows, row_pitch_over_D,
+      x_start_over_D, x_end_over_D,
+      [&](double x, CorrelationStatus *status) {
+        return film_effectiveness_baldauf_2002_and_derivatives(
+            x, M, density_ratio, alpha_deg, s_over_D, Tu, status);
+      });
+}
+
+FilmSpanAverage film_span_average_colban_2011(
+    int n_rows, double row_pitch_over_D, double x_start_over_D,
+    double x_end_over_D, double M, double area_ratio, double P_over_D,
+    double t_over_P, double alpha_deg, double density_ratio) {
+  return film_span_average_impl(
+      "film_span_average_colban_2011", n_rows, row_pitch_over_D,
+      x_start_over_D, x_end_over_D,
+      [&](double x, CorrelationStatus *status) {
+        const auto [e, dM] = film_effectiveness_colban_2011_and_derivatives(
+            x, M, area_ratio, P_over_D, t_over_P, alpha_deg, density_ratio,
+            status);
+        return std::tuple<double, double, double>{e, dM, 0.0};
+      });
+}
+
 double film_superposition_sellers(const std::vector<double>& eta_rows) {
     check_rows(eta_rows);
     double remaining = 1.0;

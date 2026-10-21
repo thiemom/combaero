@@ -1186,6 +1186,18 @@ class ThermalWall:
         an arrangement: with the flow signs it decides whether the streams run
         parallel or counter along the wall, so the arrangement follows a flow
         that reverses (#627). Irrelevant for a node side, which is well mixed.
+    film : str | None
+        Id of a film provider (a FilmCoolingElement) whose film covers this
+        wall (#386). The ``film_side`` side's adiabatic wall temperature
+        becomes ``T_aw - eta_bar (T_aw - T_coolant)``; its h, stream and heat
+        booking stay its own. That side must be the gas duct downstream of
+        the holes (an element with a flow area) or a MomentumChamberNode.
+    film_side : {"a", "b"}
+        The side the film covers.
+    film_start, film_end : float
+        The wall's span along the gas path [m], measured downstream of the
+        provider's LAST row; eta_bar is the film averaged over it.
+        ``film_end`` defaults to ``film_start`` (the point value).
 
     The heat is the two streams' exchange, the epsilon-NTU integral along the
     wall at each stream's inlet temperature (``wall_exchange_and_jacobian``):
@@ -1200,6 +1212,10 @@ class ThermalWall:
     contact_area: float | None = None
     R_fouling: float = 0.0
     orientation: Literal["aligned", "opposed"] = "aligned"
+    film: str | None = None
+    film_side: Literal["a", "b"] = "a"
+    film_start: float = 0.0
+    film_end: float | None = None
 
     # Internal cache for temperature-dependent property iteration
     _last_profile: list[float] | None = field(default=None, init=False, repr=False)
@@ -1210,6 +1226,23 @@ class ThermalWall:
                 f"ThermalWall '{self.id}': orientation must be 'aligned' or 'opposed', "
                 f"not {self.orientation!r}"
             )
+        if self.film is not None:
+            if self.film_side not in ("a", "b"):
+                raise ValueError(f"ThermalWall '{self.id}': film_side must be 'a' or 'b'")
+            if self.film_end is None:
+                self.film_end = self.film_start
+            if not 0.0 <= self.film_start <= self.film_end:
+                raise ValueError(
+                    f"ThermalWall '{self.id}': the film span needs "
+                    "0 <= film_start <= film_end [m, downstream of the last row]"
+                )
+
+    @property
+    def film_side_id(self) -> str | None:
+        """The wall endpoint the film covers, or None without a film."""
+        if self.film is None:
+            return None
+        return self.element_a if self.film_side == "a" else self.element_b
 
     def is_counterflow(self, sign_a: float, sign_b: float) -> bool:
         """Whether streams of these flow signs (along each element's declared
@@ -4705,6 +4738,301 @@ class EffusionPlateElement(OrificeElement):
         out.update(self.wall_heat_transfer(state_in, state_out))
         out.update(base)
         return out
+
+
+class FilmCoolingElement(OrificeElement):
+    """Rows of film-cooling holes: coolant from `from_node` into the gas at `to_node`.
+
+    The holes are an orifice (the flow) and a FILM PROVIDER (the film). The
+    element owns no wall and is not a wall side: the surface the film cools
+    lies downstream along the gas path, so a ThermalWall on the gas duct
+    there names it with ``film=`` and its gas-side adiabatic wall
+    temperature becomes
+
+        T_aw,f = T_aw,gas - eta_bar (T_aw,gas - T_coolant)
+
+    with eta_bar the film over the wall's span (#386). That wall's h, stream
+    and heat booking stay the duct's.
+
+    FILM, by hole type:
+
+    * ``"cylindrical"``: Baldauf (2002) per row (`s/D` from
+      ``lateral_pitch``, `Tu` from ``turbulence_intensity``).
+    * ``"shaped"``: Colban (2011) Eq. 19 per row. ``hole_diameter`` is the
+      METERING diameter; ``area_ratio`` is A_exit/A_inlet and
+      ``breakout_width`` the hole's exit width t.
+
+    Rows superpose by Sellers, ``row_pitch`` apart; a wall's span is measured
+    from the LAST row. The blowing ratio is the metering mass flux over the
+    gas duct's, the density ratio is taken at a common static pressure.
+    Neither kernel was fitted on a heated wall downstream of a film row: the
+    coupled wall temperature is a composition of published pieces, not a
+    scored prediction.
+
+    FLOW: an orifice of n_rows * holes_per_row holes in parallel, each of
+    the drilled length ``wall_thickness / sin(angle_deg)``, plenum-fed.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        hole_diameter: float,
+        holes_per_row: int,
+        lateral_pitch: float,
+        wall_thickness: float,
+        n_rows: int = 1,
+        row_pitch: float | None = None,
+        angle_deg: float = 30.0,
+        hole_type: Literal["cylindrical", "shaped"] = "cylindrical",
+        area_ratio: float | None = None,
+        breakout_width: float | None = None,
+        turbulence_intensity: float = 0.05,
+        correlation: str = "IdelchikThick",
+        Cd: float = 0.6,
+        edge_radius: float = 0.0,
+    ) -> None:
+        name = f"FilmCoolingElement {id!r}"
+        if hole_diameter <= 0.0 or lateral_pitch <= 0.0 or wall_thickness <= 0.0:
+            raise ValueError(
+                f"{name}: hole_diameter, lateral_pitch and wall_thickness must be positive"
+            )
+        if holes_per_row < 1 or n_rows < 1:
+            raise ValueError(f"{name}: holes_per_row and n_rows must be at least 1")
+        if n_rows > 1 and not (row_pitch and row_pitch > 0.0):
+            raise ValueError(f"{name}: more than one row needs a positive row_pitch")
+        if not 0.0 < angle_deg <= 90.0:
+            raise ValueError(f"{name}: angle_deg is the hole angle to the SURFACE, in (0, 90]")
+        if hole_type not in ("cylindrical", "shaped"):
+            raise ValueError(f"{name}: hole_type is 'cylindrical' or 'shaped'")
+        if hole_type == "shaped":
+            if area_ratio is None or breakout_width is None:
+                raise ValueError(
+                    f"{name}: shaped holes need area_ratio (A_exit/A_inlet) and "
+                    "breakout_width (Colban's t)"
+                )
+            if area_ratio < 1.0 or not 0.0 < breakout_width <= lateral_pitch:
+                raise ValueError(
+                    f"{name}: area_ratio must be >= 1 and breakout_width in (0, lateral_pitch]"
+                )
+        if turbulence_intensity <= 0.0:
+            raise ValueError(f"{name}: turbulence_intensity must be positive")
+
+        self.hole_diameter = float(hole_diameter)
+        self.holes_per_row = int(holes_per_row)
+        self.n_rows = int(n_rows)
+        self.n_holes = self.n_rows * self.holes_per_row
+        self.lateral_pitch = float(lateral_pitch)
+        self.row_pitch = float(row_pitch) if row_pitch else 0.0
+        self.wall_thickness = float(wall_thickness)
+        self.angle_deg = float(angle_deg)
+        self.hole_type = hole_type
+        self.area_ratio = area_ratio
+        self.breakout_width = breakout_width
+        self.turbulence_intensity = float(turbulence_intensity)
+        self.hole_length = self.wall_thickness / math.sin(math.radians(angle_deg))
+        hole_area = math.pi * self.hole_diameter**2 / 4.0
+        self.total_hole_area = self.n_holes * hole_area
+
+        super().__init__(
+            id,
+            from_node,
+            to_node,
+            Cd=Cd,
+            area=self.total_hole_area,
+            correlation=correlation,
+            plate_thickness=self.hole_length,
+            edge_radius=edge_radius,
+        )
+        self.equivalent_bore = self.diameter
+        # Into a merge chamber the jets enter at the hole angle to the gas axis.
+        self.injection_angle_deg = float(angle_deg)
+
+    def _hole_count(self) -> float:
+        return float(self.n_holes)
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """A wall's holes: no pipe, hence no beta; the correlations see one hole."""
+        self._orifice_geom = cb.OrificeGeometry()
+        self._orifice_geom.d = self.hole_diameter
+        self._orifice_geom.D = 0.0
+        self._orifice_geom.t = self.hole_length
+        self._orifice_geom.r = self.edge_radius
+        self.beta = 0.0
+
+    def validate(self) -> None:
+        super().validate()
+        if self.correlation in _METERING_SELECTORS:
+            raise ValueError(
+                f"FilmCoolingElement {self.id!r}: {self.correlation!r} is a NORMED "
+                "metering correlation for a plate in a pipe; film holes have no "
+                "pipe and no beta. Use 'IdelchikThick', 'McGreehanSchotsch' or 'fixed'."
+            )
+
+    def film_span_average(
+        self, x_start: float, x_end: float, M: float, density_ratio: float
+    ) -> Any:
+        """The film over [x_start, x_end] [m] downstream of the last row.
+
+        Returns C++'s FilmSpanAverage: eta_bar, d eta_bar/dM, d eta_bar/d
+        density ratio, and the kernel's envelope flag.
+        """
+        D = self.hole_diameter
+        pitch = self.row_pitch / D
+        if self.hole_type == "shaped":
+            return cb.film_span_average_colban_2011(
+                self.n_rows,
+                pitch,
+                x_start / D,
+                x_end / D,
+                M,
+                float(self.area_ratio),
+                self.lateral_pitch / D,
+                float(self.breakout_width) / self.lateral_pitch,
+                self.angle_deg,
+                density_ratio,
+            )
+        return cb.film_span_average_baldauf_2002(
+            self.n_rows,
+            pitch,
+            x_start / D,
+            x_end / D,
+            M,
+            density_ratio,
+            self.angle_deg,
+            self.lateral_pitch / D,
+            self.turbulence_intensity,
+        )
+
+    def diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float]:
+        base = super().diagnostics(state_in, state_out, flows)
+        dP_drive = state_in.Pt - state_out.P
+        base.update(
+            {
+                "n_holes": float(self.n_holes),
+                "hole_length": float(self.hole_length),
+                "L_over_d": float(self.hole_length / self.hole_diameter),
+                "G_jet": float(abs(state_in.m_dot) / self.total_hole_area),
+                "dP_drive": float(dP_drive),
+                "is_ingesting": float(dP_drive <= 0.0),
+            }
+        )
+        return base
+
+
+class _FilmedHtc:
+    """A wall side's surface result under a film (#386): T_aw replaced by
+
+        T_aw,f = T_aw - eta (T_aw - T_c),   eta = eta(M, DR)
+
+    M = G_jet / G_gas and DR = (W_c / W_g)(T_g / T_c). Partials are chained
+    onto the side's own T, flow, P and Pt (scaled by 1 - eta, plus eta's
+    dependence on the gas flow and T); the provider's flow and coolant
+    temperature come back as ``dT_aw_dfilm_mdot`` and ``dT_aw_dT_coolant``
+    for the solver to relay onto those unknowns. h and the rest are the
+    side's.
+    """
+
+    __slots__ = (
+        "_r",
+        "T_aw",
+        "dT_aw_dT",
+        "dT_aw_dmdot",
+        "dT_aw_dP",
+        "dT_aw_dPt",
+        "dT_aw_dfilm_mdot",
+        "dT_aw_dT_coolant",
+        "film",
+    )
+
+    def __init__(
+        self,
+        r: Any,
+        eta: float,
+        deta_dmg: float,
+        deta_dTg: float,
+        deta_dmc: float,
+        deta_dTc: float,
+        T_c: float,
+        film: dict[str, float],
+    ) -> None:
+        self._r = r
+        T_aw = float(r.T_aw)
+        dT = T_aw - T_c
+        self.T_aw = T_aw - eta * dT
+        k = 1.0 - eta
+        self.dT_aw_dT = k * float(r.dT_aw_dT) - dT * deta_dTg
+        self.dT_aw_dmdot = k * float(r.dT_aw_dmdot) - dT * deta_dmg
+        self.dT_aw_dP = k * float(getattr(r, "dT_aw_dP", 0.0))
+        self.dT_aw_dPt = k * float(getattr(r, "dT_aw_dPt", 0.0))
+        self.dT_aw_dfilm_mdot = -dT * deta_dmc
+        self.dT_aw_dT_coolant = eta - dT * deta_dTc
+        self.film = film
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._r, name)
+
+    def __dir__(self) -> list[str]:
+        return sorted(set(dir(self._r)) | set(self.__slots__))
+
+
+def film_on_wall_side(
+    provider: Any,
+    side: Any,
+    r: Any,
+    gas_state: "NetworkMixtureState",
+    coolant_state: "NetworkMixtureState",
+    m_coolant: float,
+    m_gas: float,
+    x_start: float,
+    x_end: float,
+) -> Any:
+    """A wall side's surface result ``r`` under ``provider``'s film (#386).
+
+    ``side`` is the wall's gas-side object: an element with a flow ``area``
+    (a duct) or a MomentumChamberNode. ``m_gas`` is the flow its htc reads
+    (the duct's own, the chamber's throughput), ``m_coolant`` the provider's
+    signed flow and ``coolant_state`` its supply node. No forward coolant
+    flow, no film: r comes back unchanged.
+    """
+    area = float(getattr(side, "area", 0.0) or 0.0)
+    mc, mg = float(m_coolant), abs(float(m_gas))
+    if r is None or mc <= 0.0 or mg <= 0.0 or area <= 0.0:
+        return r
+    G_jet = mc / provider.total_hole_area
+    G_gas = mg / area
+    M = G_jet / G_gas
+    T_c = float(coolant_state.Tt)
+    T_g = float(gas_state.T)
+    W_c = float(cb.mwmix(coolant_state.X))
+    W_g = float(cb.mwmix(gas_state.X))
+    DR = (W_c / W_g) * (T_g / T_c)
+    f = provider.film_span_average(x_start, x_end, M, DR)
+    eta = float(f.eta)
+    film = {
+        "eta_film": eta,
+        "film_blowing_ratio": M,
+        "film_density_ratio": DR,
+        "film_extrapolated": float(bool(f.extrapolated)),
+        "T_coolant_film": T_c,
+        "T_aw_unfilmed": float(r.T_aw),
+    }
+    return _FilmedHtc(
+        r,
+        eta,
+        deta_dmg=-float(f.deta_dM) * M / mg,
+        deta_dTg=float(f.deta_dP) * DR / T_g,
+        deta_dmc=float(f.deta_dM) * M / mc,
+        deta_dTc=-float(f.deta_dP) * DR / T_c,
+        T_c=T_c,
+        film=film,
+    )
 
 
 @dataclass

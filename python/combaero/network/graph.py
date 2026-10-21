@@ -81,6 +81,20 @@ class FlowNetwork:
         if wall.element_b not in self.elements and wall.element_b not in self.nodes:
             raise ValueError(f"Unknown element_b/node_b '{wall.element_b}' for wall '{wall.id}'.")
 
+        if wall.film is not None:
+            provider = self.elements.get(wall.film)
+            if provider is None or not hasattr(provider, "film_span_average"):
+                raise ValueError(
+                    f"Wall '{wall.id}': film {wall.film!r} is not a film provider "
+                    "(a FilmCoolingElement)."
+                )
+            side = wall.film_side_id
+            if side in (provider.id, provider.from_node):
+                raise ValueError(
+                    f"Wall '{wall.id}': the film covers the GAS side downstream of "
+                    f"the holes; {side!r} is the provider or its coolant supply (#386)."
+                )
+
         self.walls[wall.id] = wall
 
     def get_upstream_elements(self, node_id: str) -> list[NetworkElement]:

@@ -28,6 +28,7 @@ from .components import (
     PlenumNode,
     PressureBoundary,
     WallNode,
+    film_on_wall_side,
 )
 from .graph import FlowNetwork
 
@@ -1497,13 +1498,9 @@ class NetworkSolver:
                 if m_indices_b:
                     state_b.m_dot = x[m_indices_b[0]]
 
-            # Call htc_and_T() on both objects
-            ch_result_a = (
-                self._htc_and_T(obj_a, state_a, x) if obj_a.has_convective_surface else None
-            )
-            ch_result_b = (
-                self._htc_and_T(obj_b, state_b, x) if obj_b.has_convective_surface else None
-            )
+            # Call htc_and_T() on both objects, a film applied to its side (#386)
+            ch_result_a = self._wall_side_htc(wall, obj_a, state_a, x)
+            ch_result_b = self._wall_side_htc(wall, obj_b, state_b, x)
 
             # Only proceed if both elements have heat transfer surfaces
             if ch_result_a is not None and ch_result_b is not None:
@@ -1981,6 +1978,10 @@ class NetworkSolver:
 
                 # Neighbour flows the side-A htc reads (#465)
                 self._relay_flow_inputs(out, obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dh_a)
+                # The film's provider flow and coolant temperature (#386)
+                self._relay_film(
+                    out, _wall, ch_a, dT_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
+                )
 
                 # Pressure coupling (#496): the side's T_aw moves with its feed
                 # node's static P at fixed flow (v ~ 1/rho); h does not.
@@ -2039,6 +2040,9 @@ class NetworkSolver:
                     nr["T"] += factor_mdot_b * dm_b
 
                 self._relay_flow_inputs(out, obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b)
+                self._relay_film(
+                    out, _wall, ch_b, dT_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
+                )
 
                 # Pressure coupling (#496): the side's T_aw moves with its feed
                 # node's static P at fixed flow (v ~ 1/rho); h does not.
@@ -2471,6 +2475,70 @@ class NetworkSolver:
         if flows is None:
             return obj.htc_and_T(state)
         return obj.htc_and_T(state, flows=flows)
+
+    def _wall_side_htc(
+        self,
+        wall: Any,
+        obj: Any,
+        state: NetworkMixtureState,
+        x: np.ndarray,
+        lagged: bool = True,
+    ) -> Any:
+        """A wall side's surface result, under the wall's film if it covers
+        this side (#386). Every place that reads a wall side goes through
+        here, so the residual, the relay and the reported values agree.
+
+        The film reads the provider's flow and its supply node's temperature;
+        ``lagged`` reads that node as the propagation does (a back-edge gives
+        the previous pass's state).
+        """
+        r = self._htc_and_T(obj, state, x) if obj.has_convective_surface else None
+        if r is None or wall.film is None or wall.film_side_id != obj.id:
+            return r
+        provider = self.network.elements[wall.film]
+        ind = self._unknown_indices.get(provider.id, [])
+        if not ind:
+            return r
+        node = self.network.nodes[provider.from_node]
+        c_state = (
+            self._get_node_state_with_prev(node, x) if lagged else self._get_node_state(node, x)
+        )
+        m_gas = (
+            float(getattr(obj, "_total_m_dot", 0.0))
+            if obj.id in self.network.nodes
+            else float(state.m_dot)
+        )
+        return film_on_wall_side(
+            provider,
+            obj,
+            r,
+            state,
+            c_state,
+            float(x[ind[0]]),
+            m_gas,
+            wall.film_start,
+            wall.film_end,
+        )
+
+    def _relay_film(
+        self, out: dict, wall: Any, ch: Any, factor: float, relay: dict, up: Any
+    ) -> None:
+        """Relay a filmed side's T_aw onto the provider's flow and its supply
+        node's temperature (#386). ``factor`` is dT_node/dT_aw of that side."""
+        d_m = getattr(ch, "dT_aw_dfilm_mdot", None)
+        if d_m is None or factor == 0.0:
+            return
+        provider = self.network.elements[wall.film]
+        ind = self._unknown_indices.get(provider.id, [])
+        n_species = self._n_species
+        if ind and d_m != 0.0:
+            nr = out.setdefault(ind[0], {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+            nr["T"] += factor * d_m
+        d_T = float(ch.dT_aw_dT_coolant)
+        if provider.from_node in relay and d_T != 0.0:
+            for idx, sens_up in up(provider.from_node).items():
+                nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                nr["T"] += factor * d_T * sens_up["T"]
 
     def _relay_flow_inputs(self, node_relay: dict, obj: Any, ch: Any, dT_dh: float) -> None:
         """Relay ``dh_dsources`` onto the neighbours' flow unknowns.
@@ -4946,12 +5014,8 @@ class NetworkSolver:
                 if m_indices_b:
                     state_b.m_dot = final_x[m_indices_b[0]]
 
-            ch_result_a = (
-                self._htc_and_T(obj_a, state_a, final_x) if obj_a.has_convective_surface else None
-            )
-            ch_result_b = (
-                self._htc_and_T(obj_b, state_b, final_x) if obj_b.has_convective_surface else None
-            )
+            ch_result_a = self._wall_side_htc(wall, obj_a, state_a, final_x, lagged=False)
+            ch_result_b = self._wall_side_htc(wall, obj_b, state_b, final_x, lagged=False)
 
             if ch_result_a and ch_result_b:
                 # The same exchange as in the residual evaluation (#627)
@@ -5009,6 +5073,12 @@ class NetworkSolver:
                 sol_dict[f"{wid}.Q_to_boundary"] = q_to_boundary
                 sol_dict[f"{wid}.h_a"] = float(ch_result_a.h)
                 sol_dict[f"{wid}.h_b"] = float(ch_result_b.h)
+                sol_dict[f"{wid}.T_aw_a"] = float(ch_result_a.T_aw)
+                sol_dict[f"{wid}.T_aw_b"] = float(ch_result_b.T_aw)
+                # The film on its side (#386): eta_bar, M, DR, envelope flag.
+                for ch in (ch_result_a, ch_result_b):
+                    for key, val in (getattr(ch, "film", None) or {}).items():
+                        sol_dict[f"{wid}.{key}"] = float(val)
 
                 # Temperature profile [K], side A to side B: the one
                 # compute_coupling just placed for these inputs (k(T) at its

@@ -14,6 +14,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 
 namespace cc = combaero::cooling;
 namespace B = combaero::cooling::baldauf2002;
@@ -585,5 +586,64 @@ TEST(ColbanFilmEffectiveness, RefusesInputsTheCorrelationCannotRepresent) {
     EXPECT_THROW(cc::film_effectiveness_colban_2011(1.0, 1.0, 0.8, 6.0, 0.49, 30.0, 1.7),
                  std::invalid_argument);
     EXPECT_THROW(cc::film_effectiveness_colban_2011(1.0, 1.0, 3.5, 6.0, 1.2, 30.0, 1.7),
+                 std::invalid_argument);
+}
+
+// -------------------------------------------------------------
+// Film span average (#386): what a ThermalWall(film=...) reads
+// -------------------------------------------------------------
+
+TEST(FilmSpanAverage, APointSpanIsSellersOverTheRows) {
+    std::vector<double> rows;
+    for (int j = 0; j < 3; ++j) {
+        rows.push_back(cc::film_effectiveness_colban_2011(4.0 + 10.0 * j, 0.8, 3.5, 6.0,
+                                                          0.5, 30.0, 1.7, nullptr));
+    }
+    const auto f = cc::film_span_average_colban_2011(3, 10.0, 4.0, 4.0, 0.8, 3.5, 6.0,
+                                                     0.5, 30.0, 1.7);
+    EXPECT_NEAR(f.eta, cc::film_superposition_sellers(rows), 1e-15);
+    EXPECT_EQ(f.deta_dP, 0.0);
+}
+
+TEST(FilmSpanAverage, OneShapedRowAtItsBreakoutIsTheCoverageRatio) {
+    const auto f = cc::film_span_average_colban_2011(1, 0.0, 0.0, 0.0, 1.0, 3.5, 6.0,
+                                                     0.5, 30.0, 1.7);
+    EXPECT_DOUBLE_EQ(f.eta, 0.5);
+}
+
+TEST(FilmSpanAverage, AveragingOverALongerSpanLowersIt) {
+    const auto near = cc::film_span_average_baldauf_2002(2, 10.0, 1.0, 10.0, 0.8, 1.8,
+                                                         30.0, 3.0, 0.05);
+    const auto far = cc::film_span_average_baldauf_2002(2, 10.0, 1.0, 100.0, 0.8, 1.8,
+                                                        30.0, 3.0, 0.05);
+    EXPECT_GT(near.eta, far.eta);
+    EXPECT_GT(far.eta, 0.0);
+}
+
+TEST(FilmSpanAverage, DerivativesAgreeWithFiniteDifferences) {
+    const double h = 1e-6;
+    const auto b = [](double M, double P) {
+        return cc::film_span_average_baldauf_2002(3, 10.0, 2.0, 50.0, M, P, 30.0, 3.0, 0.05);
+    };
+    const auto c = [](double M) {
+        return cc::film_span_average_colban_2011(3, 10.0, 2.0, 50.0, M, 3.5, 6.0, 0.5,
+                                                 30.0, 1.7);
+    };
+    const auto rb = b(0.8, 1.8);
+    EXPECT_NEAR(rb.deta_dM, (b(0.8 + h, 1.8).eta - b(0.8 - h, 1.8).eta) / (2 * h),
+                1e-7 * std::abs(rb.deta_dM));
+    EXPECT_NEAR(rb.deta_dP, (b(0.8, 1.8 + h).eta - b(0.8, 1.8 - h).eta) / (2 * h),
+                1e-6 * std::abs(rb.deta_dP));
+    const auto rc = c(0.8);
+    EXPECT_NEAR(rc.deta_dM, (c(0.8 + h).eta - c(0.8 - h).eta) / (2 * h),
+                1e-7 * std::abs(rc.deta_dM));
+}
+
+TEST(FilmSpanAverage, RefusesASpanUpstreamOfTheLastRow) {
+    EXPECT_THROW(cc::film_span_average_colban_2011(1, 0.0, 5.0, 2.0, 1.0, 3.5, 6.0, 0.5,
+                                                   30.0, 1.7),
+                 std::invalid_argument);
+    EXPECT_THROW(cc::film_span_average_colban_2011(2, 0.0, 0.0, 2.0, 1.0, 3.5, 6.0, 0.5,
+                                                   30.0, 1.7),
                  std::invalid_argument);
 }
