@@ -2,6 +2,7 @@ import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
+import { defaultFilmSide } from "../utils/filmLink";
 import { warningsFor } from "../utils/incompressible";
 import { inheritedField, inheritedNote } from "../utils/inheritance";
 import { nodeTypeLabel } from "../utils/nodeUtils";
@@ -3446,11 +3447,15 @@ const Inspector = () => {
 							<select
 								aria-label="Wall film"
 								value={d.film ?? ""}
-								onChange={(e) =>
+								onChange={(e) => {
+									const film = e.target.value || null;
 									updateEdgeData(selectedEdge.id, {
-										film: e.target.value || null,
-									})
-								}
+										film,
+										...(film && {
+											film_side: defaultFilmSide(selectedEdge, film, edges),
+										}),
+									});
+								}}
 								className="p-1.5 border rounded text-xs bg-white w-full border-stone-200 outline-none focus:ring-1 focus:ring-orange-500"
 							>
 								<option value="">None</option>
@@ -3463,7 +3468,8 @@ const Inspector = () => {
 							{providers.length === 0 && (
 								<p className="text-[10px] text-gray-500 leading-snug">
 									Add Film Cooling Holes (or an Effusion Plate with a panel
-									length) upstream on the gas path to cover this wall.
+									length) upstream on the gas path to cover this wall. Dragging
+									from the holes' "f" handle onto this wall's label sets it too.
 								</p>
 							)}
 							{d.film && (
@@ -3479,10 +3485,10 @@ const Inspector = () => {
 										className="p-1.5 border rounded text-xs bg-white w-full border-stone-200 outline-none focus:ring-1 focus:ring-orange-500"
 									>
 										<option value="a">
-											Covers side A: {sideLabel(selectedEdge.source)}
+											Covers {sideLabel(selectedEdge.source)}
 										</option>
 										<option value="b">
-											Covers side B: {sideLabel(selectedEdge.target)}
+											Covers {sideLabel(selectedEdge.target)}
 										</option>
 									</select>
 									<LengthInput

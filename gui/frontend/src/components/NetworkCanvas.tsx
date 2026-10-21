@@ -1,19 +1,30 @@
 import ReactFlow, {
 	Background,
+	type Connection,
 	Controls,
 	MiniMap,
+	type OnConnectStartParams,
 	useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useCopyPaste } from "../hooks/useCopyPaste";
 import useStore, { stripResults } from "../store/useStore";
+import { defaultFilmSide, FILM_HANDLE } from "../utils/filmLink";
 import { edgeTypes, nodeTypes } from "./flowTypes";
 import SolverStatusBadge from "./SolverStatusBadge";
 
 const NetworkCanvas = () => {
-	const { nodes, edges, setNodes, onNodesChange, onEdgesChange, onConnect } =
-		useStore();
+	const {
+		nodes,
+		edges,
+		setNodes,
+		setEdges,
+		onNodesChange,
+		onEdgesChange,
+		onConnect,
+		updateEdgeData,
+	} = useStore();
 	useCopyPaste();
 	const { screenToFlowPosition } = useReactFlow();
 
@@ -214,6 +225,49 @@ const NetworkCanvas = () => {
 		[nodes, setNodes, screenToFlowPosition],
 	);
 
+	// A film (#386): a drag from the holes' film handle that ends on a thermal
+	// wall's label box names the holes as that wall's film and selects the
+	// wall, so the link and the Inspector's Film section show at once.
+	const filmDrag = useRef<string | null>(null);
+	const onConnectStart = useCallback(
+		(_: unknown, { nodeId, handleId }: OnConnectStartParams) => {
+			filmDrag.current = handleId === FILM_HANDLE ? nodeId : null;
+		},
+		[],
+	);
+	const onConnectEnd = useCallback(
+		(event: MouseEvent | TouchEvent) => {
+			const holes = filmDrag.current;
+			filmDrag.current = null;
+			if (!holes) return;
+			const pt = "changedTouches" in event ? event.changedTouches[0] : event;
+			const wallId = document
+				.elementFromPoint(pt.clientX, pt.clientY)
+				?.closest("[data-film-wall]")
+				?.getAttribute("data-film-wall");
+			const wall = edges.find((e) => e.id === wallId);
+			if (!wall) return;
+			updateEdgeData(wall.id, {
+				film: holes,
+				film_side: defaultFilmSide(wall, holes, edges),
+			});
+			setNodes(
+				useStore.getState().nodes.map((n) => ({ ...n, selected: false })),
+			);
+			setEdges(
+				useStore
+					.getState()
+					.edges.map((e) => ({ ...e, selected: e.id === wall.id })),
+			);
+		},
+		[edges, updateEdgeData, setNodes, setEdges],
+	);
+	const isValidConnection = useCallback(
+		(c: Connection) =>
+			c.sourceHandle !== FILM_HANDLE && c.targetHandle !== FILM_HANDLE,
+		[],
+	);
+
 	return (
 		<main
 			className="flex-grow h-full bg-stone-50 relative"
@@ -227,6 +281,9 @@ const NetworkCanvas = () => {
 				onNodesChange={onNodesChange}
 				onEdgesChange={onEdgesChange}
 				onConnect={onConnect}
+				onConnectStart={onConnectStart}
+				onConnectEnd={onConnectEnd}
+				isValidConnection={isValidConnection}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
 				fitView
