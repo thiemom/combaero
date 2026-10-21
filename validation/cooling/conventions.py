@@ -115,6 +115,7 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     ("florschuetz1981", "Nu_over_Nu1"): "Nu_over_Nu1",
     ("andrei2014", "eta_adiabatic"): "eta_adiabatic",
     ("murray2018", "eta_adiabatic"): "eta_adiabatic",
+    ("colban2011", "eta_adiabatic"): "eta_adiabatic",
     ("andrews1988", "eta_overall"): "eta_overall",
     # The pair that cost -60% when confused. Same lab, same figure number.
     ("andrews1986", "h_hole_length"): "h_hole_internal_area",
@@ -138,6 +139,7 @@ SET_PRODUCES: dict[str, str] = {
     "mcgreehan_schotsch_1988_cd": "Cd_static",
     "mcgreehan_schotsch_1988_crossflow_cd": "Cd_static",
     "baldauf_2002_sellers": "eta_adiabatic",
+    "colban_2011_shaped": "eta_adiabatic",
     # One set, two quantities: it produces an internal h, and the overall
     # eta runner builds a network result from it. Declared on the quantity
     # the runner actually compares, which `resolve` is told per series.

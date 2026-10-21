@@ -201,6 +201,98 @@ std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivativ
     double b_0_override = std::numeric_limits<double>::quiet_NaN());
 
 // -------------------------------------------------------------
+// Colban, Thole and Bogard (2011) - shaped-hole film effectiveness
+// -------------------------------------------------------------
+//
+// Colban, W.F., Thole, K.A. and Bogard, D. (2011). "A Film-Cooling
+// Correlation for Shaped Holes on a Flat-Plate Surface." ASME J.
+// Turbomachinery 133(1), 011002. DOI 10.1115/1.4002064.
+// docs/heat_transfer/film/2011-Colban-JT-1fygyl9.pdf (gitignored).
+//
+// One row of FAN-SHAPED or LAIDBACK FAN-SHAPED holes on a flat plate.
+// Baldauf above is for cylindrical holes; the two are not interchangeable,
+// and the paper's own Fig. 7 is the reason: at M = 2.5 Baldauf's
+// cylindrical correlation predicts eta ~ 0.04 where the shaped-hole data
+// sit at 0.15-0.5, because a cylindrical jet has lifted off and a shaped
+// one has not.
+//
+// Eq. (19), with xi from Eq. (18):
+//
+//   eta = 1 / (P/t + C1 M^C2 xi^C3)
+//   xi  = (4/pi) (x/D) (P/D) / (M AR)
+//
+// D is the METERING (inlet) diameter, M is referenced to the metering
+// velocity (Eq. 7), AR = A_exit/A_inlet (Eq. 13), t is the hole breakout
+// width and P the lateral pitch. At x/D = 0 the correlation returns t/P,
+// the adiabatic mixing limit of Eq. (12) -- a boundary condition built into
+// the form, not fitted.
+//
+// eta is the laterally averaged (T_aw - T_jet)/(T_inf - T_jet) of Eqs. (1)
+// and (2): the cooled fraction of the driving difference, the same quantity
+// as Baldauf's and as adiabatic_wall_temperature() consumes.
+//
+// FITTED, NOT DERIVED. C1-C3 are a linear regression over 57 data sets from
+// four studies (Table 1), all at alpha = 30 deg, DR 1.7-2.0, Tu 0.2-4% and
+// external Mach 0.3. Density ratio, surface angle and turbulence are absent
+// from Eq. (19) BECAUSE the data never varied them, not because they do not
+// matter -- so they are range-checked here even though they do not enter
+// the value. See validation/cooling/extractions/colban_2011_shaped_film.md.
+namespace colban2011 {
+
+// Table 3, Eq. (19).
+constexpr double C1 = 0.1721;
+constexpr double C2 = -0.2664;
+constexpr double C3 = 0.8749;
+
+// Table 4: the validity limits the paper derives from where its own fit
+// keeps R^2 > 0.7. The third is the paper's "coverage intensity", the
+// combination it found most limiting -- AR / (M P/D) above 1.17 is where
+// adjacent jets interact.
+constexpr double M_min = 0.2, M_max = 2.5;
+constexpr double t_over_P_min = 0.31, t_over_P_max = 0.65;
+constexpr double coverage_intensity_min = 0.17, coverage_intensity_max = 1.17;
+
+// The fitting data's span (Section 5, Table 1). Not stated as limits by the
+// paper, but nothing outside them was fitted.
+constexpr double AR_min = 2.5, AR_max = 4.7;
+constexpr double P_over_D_min = 4.0, P_over_D_max = 8.0;
+// Every data set was at 30 deg (Section 3.4) and density ratio 1.7-2.0
+// (Section 3.8); neither enters Eq. (19).
+constexpr double alpha_deg_fitted = 30.0;
+constexpr double density_ratio_min = 1.7, density_ratio_max = 2.0;
+
+} // namespace colban2011
+
+// Laterally averaged adiabatic film-cooling effectiveness downstream of one
+// row of shaped (fan or laidback fan) holes.
+//
+// Parameters:
+//   x_over_D      : distance downstream of the hole breakout, in METERING
+//                   diameters, >= 0
+//   M             : blowing ratio at the metering section [-], 0.2 to 2.5
+//   area_ratio    : A_exit / A_inlet [-], >= 1 (2.5 to 4.7 fitted)
+//   P_over_D      : lateral pitch / metering diameter [-] (4 to 8 fitted)
+//   t_over_P      : coverage ratio, breakout width / pitch [-], 0.31 to 0.65
+//   alpha_deg     : surface angle [deg] -- range check only, fitted at 30
+//   density_ratio : rho_jet / rho_ext [-] -- range check only, 1.7 to 2.0
+//
+// Returns: laterally averaged eta [-].
+double film_effectiveness_colban_2011(double x_over_D, double M,
+                                      double area_ratio, double P_over_D,
+                                      double t_over_P, double alpha_deg,
+                                      double density_ratio,
+                                      CorrelationStatus *status = nullptr);
+
+// Solver-facing (f, J): (eta, d eta/dM). M is the only input a network
+// solve varies -- geometry is fixed per element, and the density ratio does
+// not enter Eq. (19). Closed form: M enters as M^(C2 - C3) once xi is
+// substituted, so the derivative is exact.
+std::tuple<double, double> film_effectiveness_colban_2011_and_derivatives(
+    double x_over_D, double M, double area_ratio, double P_over_D,
+    double t_over_P, double alpha_deg, double density_ratio,
+    CorrelationStatus *status = nullptr);
+
+// -------------------------------------------------------------
 // Multi-row film superposition
 // -------------------------------------------------------------
 //

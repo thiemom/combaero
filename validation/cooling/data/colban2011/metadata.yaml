@@ -1,0 +1,185 @@
+# Colban, Thole and Bogard (2011) Figures 6 and 7 -- laterally averaged
+# adiabatic effectiveness downstream of one row of laidback fan-shaped holes,
+# Gritsch et al. (2005) configuration B, with the paper's own Eq. (19) drawn
+# through it.
+#
+# WHY THIS SOURCE. #386 needs a shaped-hole eta; Baldauf (2002) is for
+# cylindrical holes and the paper's Fig. 7 shows what that costs: Baldauf
+# predicts ~0.04 at M = 2.5 where these data sit at 0.15-0.5.
+#
+# WHOSE DATA. The points are Gritsch, Colban, Schar and Dobbeling (2005) --
+# Colban is a co-author -- and they are among the 57 data sets Eq. (19) was
+# FITTED on (Table 1, ref. [8]). So scoring them is the correlation on its
+# own fitting data: a FIDELITY basis, and an optimistic one. It says nothing
+# about another rig.
+#
+# GEOMETRY (Figs. 6-7 captions, Table 1 row 7, Section 5.4): AR 3.5, P/D 6.0,
+# t/P 0.49, laidback fan-shaped, alpha 30 deg, DR 1.7, Tu 4%, Ma_ext 0.3.
+# Both panels are inside Table 4's limits: AR/(M P/D) is 1.167 at M = 0.5
+# (the limit is 1.17) and 0.233 at M = 2.5.
+#
+# DIGITISATION. The figures are 300 ppi raster images (pdfimages), rendered
+# at 400 dpi. The plot frame was located from its full-length axis lines;
+# open circles were found by a ring-and-clear-interior test (15 and 17,
+# matching the counts on the page by eye); the overlay of picks and ticks
+# was inspected before committing. One pixel is 0.0008 in eta on Fig. 6 and
+# 0.0013 on Fig. 7. The scans stay gitignored; only coordinates are here.
+#
+# THE DRAWN Eq. 19 LINE. `*_eq19_line_*` are the centre of the thick line
+# at fixed stations, read raw (median over +-0.15 x/D) and independent of
+# combaero's implementation. They are `kind: correlation`, `scores: null`:
+# an implementation reference, pinned by
+# python/tests/test_film_effectiveness.py, never scored as data. Fig. 6
+# below x/D 10 is crossed by the Eq. 20 and 23 lines and is not read.
+
+paper:
+  name: colban2011
+  citation: >-
+    Colban, W.F., Thole, K.A. and Bogard, D. (2011). "A Film-Cooling
+    Correlation for Shaped Holes on a Flat-Plate Surface." ASME J.
+    Turbomachinery 133(1), 011002. DOI 10.1115/1.4002064.
+  secondary: false
+
+files:
+  - path: fig6_eta_gritsch_M0p5.csv
+    after: >-
+      Gritsch, M., Colban, W., Schar, H. and Dobbeling, K. (2005). ASME J.
+      Turbomach. 127, 718-725
+    page: 7
+    item: "Figure 6, open circles"
+    series: "Gritsch configuration B, M = 0.5, laterally averaged eta"
+    figure: "6"
+    panel: single
+    geometry: {M: 0.5, area_ratio: 3.5, P_over_D: 6.0, t_over_P: 0.49,
+               angle_deg: 30.0, density_ratio: 1.7}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      15 circles, matching the page. The X/D = 2.15 point sits at 0.291,
+      below t/P = 0.49, consistent with Eq. (12) being an upper bound at
+      this blowing. `uncertainty` is null: neither Colban nor this figure
+      states a measurement band, and one derived from the model's error
+      would be circular.
+    scores: colban_2011_shaped
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 10, 20, 30, 40, 50]
+      x_multiplier: 1.0
+      y_ticks: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: 15
+      plot_x_limits: [0, 50]
+      plot_y_limits: [0, 0.6]
+
+  - path: fig7_eta_gritsch_M2p5.csv
+    after: >-
+      Gritsch, M., Colban, W., Schar, H. and Dobbeling, K. (2005). ASME J.
+      Turbomach. 127, 718-725
+    page: 7
+    item: "Figure 7, open circles"
+    series: "Gritsch configuration B, M = 2.5, laterally averaged eta"
+    figure: "7"
+    panel: single
+    geometry: {M: 2.5, area_ratio: 3.5, P_over_D: 6.0, t_over_P: 0.49,
+               angle_deg: 30.0, density_ratio: 1.7}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      17 circles, matching the page. The X/D = 2.15 point reads 0.514,
+      ABOVE t/P = 0.49 -- the near-hole conduction error the paper itself
+      names in Section 7 ("the data show higher eta values near the hole
+      exit ... conduction errors"). Kept as printed.
+    scores: colban_2011_shaped
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 10, 20, 30, 40, 50]
+      x_multiplier: 1.0
+      y_ticks: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: 17
+      plot_x_limits: [0, 50]
+      plot_y_limits: [0, 1.0]
+
+  # -- the paper's OWN Eq. (19), as drawn -----------------------------------
+  - path: fig6_eq19_line_M0p5.csv
+    after: null
+    page: 7
+    item: "Figure 6, thick solid line"
+    series: "Eq. (19) as drawn by the authors, M = 0.5, configuration B"
+    figure: "6"
+    panel: single
+    geometry: {M: 0.5, area_ratio: 3.5, P_over_D: 6.0, t_over_P: 0.49,
+               angle_deg: 30.0, density_ratio: 1.7}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      combaero's film_effectiveness_colban_2011 lands on this line within
+      about one pixel at every station -- the transcription check for
+      Table 3's coefficients and Eq. (18)'s xi.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 10, 20, 30, 40, 50]
+      x_multiplier: 1.0
+      y_ticks: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: null
+      plot_x_limits: [0, 50]
+      plot_y_limits: [0, 0.6]
+
+  - path: fig7_eq19_line_M2p5.csv
+    after: null
+    page: 7
+    item: "Figure 7, thick solid line"
+    series: "Eq. (19) as drawn by the authors, M = 2.5, configuration B"
+    figure: "7"
+    panel: single
+    geometry: {M: 2.5, area_ratio: 3.5, P_over_D: 6.0, t_over_P: 0.49,
+               angle_deg: 30.0, density_ratio: 1.7}
+    alpha_deg: 30.0
+    x_axis: x_over_D
+    x_scale: 1.0
+    y_axis: eta_adiabatic
+    kind: correlation
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      As Figure 6's line; this panel is read from x/D 3, where Fig. 7's
+      line is clear of the others.
+    scores: null
+    verification:
+      x_axis_type: linear
+      y_axis_type: linear
+      x_ticks: [0, 10, 20, 30, 40, 50]
+      x_multiplier: 1.0
+      y_ticks: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+      printed_curve: null
+      monotonic: decreasing
+      expected_points: null
+      plot_x_limits: [0, 50]
+      plot_y_limits: [0, 1.0]

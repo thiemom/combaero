@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -279,6 +280,114 @@ std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivativ
     const D r = baldauf_eta_impl<D>(x_over_D, dM, dP, alpha_deg, s_over_D, Tu,
                                     b_0_override);
     return {r.v, r.d[0], r.d[1]};
+}
+
+// -------------------------------------------------------------
+// Colban, Thole and Bogard (2011) - shaped-hole film effectiveness
+// -------------------------------------------------------------
+
+namespace {
+
+void check_colban_inputs(double x_over_D, double M, double AR, double PD,
+                         double tP, double alpha_deg, double DR) {
+    if (x_over_D < 0.0) {
+        throw std::invalid_argument(
+            "film_effectiveness_colban_2011: x/D must be >= 0; the "
+            "correlation starts at the hole breakout");
+    }
+    if (M <= 0.0 || PD <= 0.0 || DR <= 0.0) {
+        throw std::invalid_argument(
+            "film_effectiveness_colban_2011: M, P/D and density_ratio must "
+            "be positive");
+    }
+    if (AR < 1.0) {
+        throw std::invalid_argument(
+            "film_effectiveness_colban_2011: area_ratio is A_exit/A_inlet of "
+            "a DIFFUSING hole and must be >= 1");
+    }
+    if (tP <= 0.0 || tP > 1.0) {
+        throw std::invalid_argument(
+            "film_effectiveness_colban_2011: t/P is breakout width over "
+            "pitch and must lie in (0, 1]");
+    }
+    if (alpha_deg <= 0.0 || alpha_deg > 90.0) {
+        throw std::invalid_argument(
+            "film_effectiveness_colban_2011: alpha_deg is the angle to the "
+            "SURFACE and must lie in (0, 90]");
+    }
+}
+
+// Same contract as Baldauf's check_range: a caller passing `status` takes
+// the flag and no warning is emitted.
+void check_colban_range(double M, double AR, double PD, double tP,
+                        double alpha_deg, double DR,
+                        CorrelationStatus *status) {
+    bool extrapolated = false;
+    const auto flag = [&](bool outside, const char *name, double value,
+                          double lo, double hi) {
+        if (!outside) {
+            return;
+        }
+        extrapolated = true;
+        if (!status) {
+            warn("film_effectiveness_colban_2011: " + std::string(name) +
+                 " = " + std::to_string(value) + " is outside the fitted range ["
+                 + std::to_string(lo) + ", " + std::to_string(hi) +
+                 "]. Extrapolating; check results.");
+        }
+    };
+    using namespace colban2011;
+    const double ci = AR / (M * PD);
+    flag(M < M_min || M > M_max, "M", M, M_min, M_max);
+    flag(tP < t_over_P_min || tP > t_over_P_max, "t_over_P", tP,
+         t_over_P_min, t_over_P_max);
+    flag(ci < coverage_intensity_min || ci > coverage_intensity_max,
+         "AR/(M P/D)", ci, coverage_intensity_min, coverage_intensity_max);
+    flag(AR < AR_min || AR > AR_max, "area_ratio", AR, AR_min, AR_max);
+    flag(PD < P_over_D_min || PD > P_over_D_max, "P_over_D", PD,
+         P_over_D_min, P_over_D_max);
+    // A single fitted angle: anything else is extrapolation. The tolerance
+    // only absorbs a caller's round-off.
+    flag(std::abs(alpha_deg - alpha_deg_fitted) > 1e-9, "alpha_deg",
+         alpha_deg, alpha_deg_fitted, alpha_deg_fitted);
+    flag(DR < density_ratio_min || DR > density_ratio_max, "density_ratio",
+         DR, density_ratio_min, density_ratio_max);
+    if (status) {
+        *status = extrapolated ? CorrelationStatus::Extrapolated
+                               : CorrelationStatus::Valid;
+    }
+}
+
+}  // anonymous namespace
+
+std::tuple<double, double> film_effectiveness_colban_2011_and_derivatives(
+    double x_over_D, double M, double area_ratio, double P_over_D,
+    double t_over_P, double alpha_deg, double density_ratio,
+    CorrelationStatus *status) {
+    check_colban_inputs(x_over_D, M, area_ratio, P_over_D, t_over_P,
+                        alpha_deg, density_ratio);
+    check_colban_range(M, area_ratio, P_over_D, t_over_P, alpha_deg,
+                       density_ratio, status);
+    using namespace colban2011;
+    // Substituting Eq. (18) into Eq. (19): C1 M^C2 xi^C3 = K M^(C2 - C3),
+    // K = C1 ((4/pi) (x/D) (P/D) / AR)^C3. K = 0 at the breakout, where
+    // eta = t/P and does not depend on M.
+    const double K =
+        C1 * std::pow(4.0 / M_PI * x_over_D * P_over_D / area_ratio, C3);
+    const double decay = K * std::pow(M, C2 - C3);
+    const double eta = 1.0 / (1.0 / t_over_P + decay);
+    const double d_decay_dM = (C2 - C3) * decay / M;
+    return {eta, -eta * eta * d_decay_dM};
+}
+
+double film_effectiveness_colban_2011(double x_over_D, double M,
+                                      double area_ratio, double P_over_D,
+                                      double t_over_P, double alpha_deg,
+                                      double density_ratio,
+                                      CorrelationStatus *status) {
+    return std::get<0>(film_effectiveness_colban_2011_and_derivatives(
+        x_over_D, M, area_ratio, P_over_D, t_over_P, alpha_deg, density_ratio,
+        status));
 }
 
 // -------------------------------------------------------------

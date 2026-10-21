@@ -102,7 +102,7 @@ def test_the_counts_are_what_the_registry_says(dataset) -> None:
     assert counts["andrews_1986_effusion_internal"] == 7
     assert counts["baldauf_2002_sellers"] == 2
     assert counts["han_1988_orthogonal"] >= 1
-    assert sum(1 for c in fidelity.CHECKS) == 10
+    assert sum(1 for c in fidelity.CHECKS) == 12
 
 
 def test_a_check_whose_result_is_a_contradiction_still_counts() -> None:

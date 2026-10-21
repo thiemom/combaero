@@ -368,6 +368,37 @@ with cb.suppress_warnings():          # or set_warning_handler to collect them
 # unsuppressed, that call reports M, P and s_over_D as extrapolated
 ```
 
+#### Film cooling: Colban, Thole and Bogard (2011), shaped holes
+
+Laterally averaged adiabatic effectiveness downstream of one row of
+**shaped** (fan or laidback fan) holes. Baldauf above is for cylindrical
+holes; they are not interchangeable -- at `M = 2.5` a cylindrical jet has
+lifted off and a shaped one has not, and the paper's Fig. 7 has Baldauf
+near 0.04 where the shaped-hole data run 0.15-0.5.
+
+```python
+eta = cb.film_effectiveness_colban_2011(
+    x_over_D=10.0, M=1.5, area_ratio=3.5, P_over_D=6.0, t_over_P=0.49
+)  # alpha_deg=30.0, density_ratio=1.7 by default
+
+# Solver form: (eta, deta/dM), closed form
+eta, deta_dM = cb.film_effectiveness_colban_2011_and_derivatives(
+    10.0, 1.5, 3.5, 6.0, 0.49
+)
+```
+
+`D` is the **metering** (inlet) diameter and `M` is referenced to the
+metering velocity; `area_ratio = A_exit/A_inlet`, `t_over_P` is breakout
+width over pitch. `eta = t/P` at the breakout (Eq. 12). `alpha_deg` and
+`density_ratio` do not enter Eq. (19) -- every data set was at 30 deg and
+DR 1.7-2.0 -- so they only drive the range check.
+
+Limits (Table 4, warned not enforced): `M` 0.2-2.5, `t/P` 0.31-0.65,
+`AR/(M P/D)` 0.17-1.17; fitted spans `AR` 2.5-4.7, `P/D` 4-8. On its own
+Figs. 6-7 data (Gritsch configuration B, which it was fitted on) it scores
+3.6% RMS at `M = 0.5` and 12.1% at `M = 2.5`. See
+`validation/cooling/extractions/colban_2011_shaped_film.md`.
+
 #### Effusion plate internal heat transfer
 
 ```python
