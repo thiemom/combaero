@@ -832,6 +832,12 @@ net.add_wall(ThermalWall(
 ))
 ```
 
+- **An effusion panel is a provider too** (`film="<panel id>"`, needs
+  `panel_length`): its rows, Baldauf each `pitch_x` apart and Sellers over
+  them, read past its LAST row. Naming it selects that film whatever the
+  panel's own `gas_film` says. A full-coverage panel usually runs outside
+  Baldauf's s/D and M envelope (`film_extrapolated`), and at high M Baldauf
+  has the jets lifted off, so the film it carries downstream is small.
 - **Only the driving temperature changes.** The covered side's T_aw becomes
   `T_aw - eta_bar (T_aw - T_coolant)`; its h, stream capacity and heat
   booking stay the duct's. `eta_bar` is `cb.film_span_average_*` over the

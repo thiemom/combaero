@@ -1,0 +1,3 @@
+- **An effusion panel's film now covers the wall downstream of it (#386).** `ThermalWall(film="<panel id>")` accepts an `EffusionPlateElement` with `panel_length`.
+  - Its rows are combined as on the panel's own wall: Baldauf (2002) for each row and Sellers superposition over them. The result is then read past the last row, averaged over the wall's span.
+  - The panel's own wall is unchanged.

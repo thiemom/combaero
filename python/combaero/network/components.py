@@ -1187,7 +1187,8 @@ class ThermalWall:
         parallel or counter along the wall, so the arrangement follows a flow
         that reverses (#627). Irrelevant for a node side, which is well mixed.
     film : str | None
-        Id of a film provider (a FilmCoolingElement) whose film covers this
+        Id of a film provider (a FilmCoolingElement, or an
+        EffusionPlateElement with panel_length) whose film covers this
         wall (#386). The ``film_side`` side's adiabatic wall temperature
         becomes ``T_aw - eta_bar (T_aw - T_coolant)``; its h, stream and heat
         booking stay its own. That side must be the gas duct downstream of
@@ -4582,6 +4583,43 @@ class EffusionPlateElement(OrificeElement):
             }
         )
         return out
+
+    def film_provider_error(self) -> str | None:
+        """Why this panel cannot cover a downstream wall, or None (#386)."""
+        if self.panel_length is None:
+            return (
+                "an effusion panel's film needs panel_length, to count the hole rows it builds over"
+            )
+        return None
+
+    def film_span_average(
+        self, x_start: float, x_end: float, M: float, density_ratio: float
+    ) -> Any:
+        """The panel's film over [x_start, x_end] [m] downstream of its last row.
+
+        A FILM PROVIDER like FilmCoolingElement (#386): Baldauf (2002) per row,
+        the rows ``pitch_x`` apart, Sellers over them -- the same pieces as the
+        panel's own ``gas_film='baldauf_sellers'``, read past the panel instead
+        of averaged over it. Naming the panel as a wall's ``film`` selects it,
+        whatever ``gas_film`` says for the panel's own wall. Sellers
+        overestimates as rows accumulate, and a full-coverage panel is usually
+        outside Baldauf's s/D and M envelope: ``extrapolated`` says so.
+        """
+        error = self.film_provider_error()
+        if error is not None:
+            raise ValueError(f"EffusionPlateElement {self.id!r}: {error}")
+        D = self.hole_diameter
+        return cb.film_span_average_baldauf_2002(
+            max(1, round(self.panel_length / self.pitch_x)),
+            self.pitch_x / D,
+            x_start / D,
+            x_end / D,
+            M,
+            density_ratio,
+            self.angle_deg,
+            self.pitch_y / D,
+            self.turbulence_intensity,
+        )
 
     def wall_heat_transfer(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
