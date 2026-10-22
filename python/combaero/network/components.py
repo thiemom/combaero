@@ -5226,9 +5226,14 @@ class ImpingementPlateElement(OrificeElement):
     element exposes that as ``dh_dsources`` and the solver relays it into the
     Jacobian.
 
-    An INITIAL crossflow (flow entering upstream of row 1) is representable
-    but outside the source: Florschuetz et al. (1981) had none. ``Gc/Gj``
-    beyond 0.8 is flagged by the set's own range check.
+    An INITIAL crossflow (flow entering upstream of row 1, #467) enters
+    through an ``ImpingementCrossflowElement(bypass_inlet=True)`` and counts
+    in ``m_c`` like any other. The flow distribution is checked against
+    Florschuetz, Metzger and Su (1982, NASA CR-3630) Table D.1. The heat
+    transfer stays Florschuetz et al. (1981), who had none, at the local
+    Gc/Gj -- CR-3630's own usage -- and only for a bypass at the jet
+    temperature: ``h`` is referenced to the supply. ``Gc/Gj`` beyond 0.8 is
+    flagged by the set's own range check.
 
     THE TARGET. ``surface.area`` is the target footprint of the holes,
     ``n_holes * xn * yn``. ``T_aw`` is the supply plenum temperature, which
@@ -5383,7 +5388,10 @@ class ImpingementPlateElement(OrificeElement):
         * spent air leaving through the target or between the jets (#468):
           the row's node must drain through one ImpingementCrossflowElement;
         * an external, bypass crossflow (#467): every stream feeding the
-          crossflow chain upstream must be another row's jets;
+          crossflow chain upstream must be another row's jets, unless it
+          enters through a segment declared ``bypass_inlet`` -- the initial
+          crossflow of Florschuetz, Metzger and Su (1982), stated, not
+          inferred from what happens to be wired;
         * two plates merging at one node would read each other's jets as
           crossflow.
         """
@@ -5395,7 +5403,7 @@ class ImpingementPlateElement(OrificeElement):
                 "target (impingement-effusion/film) or between the jets is a "
                 "different configuration with no model yet (#468)."
             )
-        node, seen = self.to_node, set()
+        node, seen, via = self.to_node, set(), None
         while node not in seen:
             seen.add(node)
             inflow = [e for e in graph.get_upstream_elements(node) if e.id != self.id]
@@ -5406,16 +5414,23 @@ class ImpingementPlateElement(OrificeElement):
                     f"node {node!r} has more than one plate merging; each row "
                     "needs its own crossflow node."
                 )
+            if via is not None and via.bypass_inlet and plates:
+                return (
+                    f"the bypass inlet {via.id!r} starts at {node!r}, where a "
+                    "jet row also discharges; the bypass enters the gap's "
+                    "upstream end, ahead of row 1."
+                )
             other = [e for e in inflow if e not in plates and e not in segments]
-            if other:
+            if other and not (via is not None and via.bypass_inlet):
                 return (
                     f"crossflow node {node!r} is fed by {other[0].id!r}, which is "
-                    "not a jet row: an external or bypass crossflow is a "
-                    "different configuration with no model yet (#467)."
+                    "not a jet row. An initial (bypass) crossflow enters through "
+                    "a segment declared bypass_inlet=True (#467)."
                 )
             if not segments:
                 break
-            node = segments[0].from_node
+            via = segments[0]
+            node = via.from_node
         return None
 
     def validate(self) -> None:
@@ -7600,6 +7615,23 @@ class ImpingementCrossflowElement(CrossflowSegmentElement):
     whole merge downstream instead over-fed the downstream rows (Gc/Gj at row
     10 of Florschuetz's strongest-crossflow geometry 13% below Eq. 8, against
     a few percent centred).
+
+    BYPASS INLET (#467). ``bypass_inlet=True`` makes this the lead-in from
+    the gap's upstream end to row 1, carrying an initial crossflow. Its
+    ``from_node`` has no jets, and what arrives there decides the physics:
+
+    * another impingement gap's last segment (arrays in series): the stream
+      continues with its momentum, a station with nothing injected. The two
+      gaps must have the same cross-section;
+    * anything else: the segment accelerates the bypass from ``from_node``'s
+      TOTAL pressure, ``entry_K`` the entry loss. A feed channel keeps its Pt
+      into a plenum or a momentum chamber alike, so its dynamic head arrives
+      with it: 0 for a bypass arriving along a duct, 0.5 for an abrupt
+      sharp-edged entry from a large plenum.
+
+    Florschuetz, Metzger and Su (1982, NASA CR-3630) delivered the initial
+    crossflow fully developed, with its momentum, after 16 to 95 hydraulic
+    diameters: the first case, or a chamber fed by a long enough duct.
     """
 
     def __init__(
@@ -7613,11 +7645,15 @@ class ImpingementCrossflowElement(CrossflowSegmentElement):
         roughness: float = 0.0,
         regime: CompressibilityLiteral = DEFAULT_REGIME,
         friction_model: FrictionModelLiteral = "haaland",
+        bypass_inlet: bool = False,
+        entry_K: float = 0.0,
     ) -> None:
         if length <= 0.0 or height <= 0.0 or span <= 0.0:
             raise ValueError(
                 "ImpingementCrossflowElement: length, height and span must be positive"
             )
+        if entry_K < 0.0:
+            raise ValueError("ImpingementCrossflowElement: entry_K must be non-negative")
         super().__init__(
             id,
             from_node,
@@ -7628,11 +7664,15 @@ class ImpingementCrossflowElement(CrossflowSegmentElement):
             roughness=roughness,
             regime=regime,
             friction_model=friction_model,
-            from_kappa=cb.STATION_KAPPA_MERGE_NORMAL,
+            from_kappa=None if bypass_inlet else cb.STATION_KAPPA_MERGE_NORMAL,
             to_kappa=cb.STATION_KAPPA_MERGE_NORMAL,
+            entry_K=entry_K if bypass_inlet else None,
         )
         self.height = height
         self.span = span
+        self.bypass_inlet = bool(bypass_inlet)
+        self.bypass_entry_K = float(entry_K)
+        self._inlet_error: str | None = None
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         prev = [
@@ -7647,7 +7687,25 @@ class ImpingementCrossflowElement(CrossflowSegmentElement):
         ]
         self.prev_seg = prev[0].id if prev else None
         self.next_seg = nxt[0].id if nxt else None
+        self._inlet_error = None
+        if self.bypass_inlet:
+            # Continuing an upstream gap: a station with nothing injected, so
+            # the arriving stream keeps its momentum. Otherwise a reservoir.
+            continues = bool(prev)
+            self.from_kappa = cb.STATION_KAPPA_MERGE_NORMAL if continues else None
+            self.entry_K = None if continues else self.bypass_entry_K
+            if continues and abs(prev[0].area / self.area - 1.0) > 1e-9:
+                self._inlet_error = (
+                    f"it continues {prev[0].id!r}, whose gap cross-section differs "
+                    f"({prev[0].area:.4g} vs {self.area:.4g} m^2). Gaps in series "
+                    "must match; join different gaps through an area change."
+                )
         super().resolve_topology(graph)
+
+    def validate(self) -> None:
+        super().validate()
+        if self._inlet_error:
+            raise ValueError(f"ImpingementCrossflowElement {self.id!r}: {self._inlet_error}")
 
 
 class AreaChangeElement(NetworkElement):
