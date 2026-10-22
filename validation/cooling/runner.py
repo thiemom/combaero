@@ -10,6 +10,7 @@ mode #333 exists to prevent.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 
 import combaero as cb
@@ -104,6 +105,10 @@ class Record:
     extrapolated: bool
     re_used: float | None
     reason: str | None = None  # why there is no prediction
+    # The set that made `predicted`. A series may be scored by several
+    # (`also_scores`); each set's records stay separate all the way to the
+    # report, so nothing averages or picks between them.
+    scored_by: str | None = None
 
     @property
     def rel_error(self) -> float | None:
@@ -438,7 +443,9 @@ def _at_f_ratio(
 
 
 def run_series(
-    series: SeriesMetadata, points: list[Point] | None = None
+    series: SeriesMetadata,
+    points: list[Point] | None = None,
+    set_name: str | None = None,
 ) -> list[Record]:
     """Evaluate one series. Unscored series yield records with no prediction.
 
@@ -446,11 +453,23 @@ def run_series(
     what it predicts at abscissae the digitisation could not pick -- see
     `recovery.py` -- so the recovered bounds are checked against the same
     chain as everything else rather than a second implementation of it.
+
+    `set_name` scores with another set than `series.scores` -- one of its
+    `also_scores`, or a candidate `eligible_sets` is testing.
     """
     if points is None:
         points = load_points(series)
+    set_name = set_name or series.scores
+    return [
+        dataclasses.replace(r, scored_by=set_name)
+        for r in _run_series(series, points, set_name)
+    ]
 
-    if series.scores is None:
+
+def _run_series(
+    series: SeriesMetadata, points: list[Point], set_name: str | None
+) -> list[Record]:
+    if set_name is None:
         return [
             Record(series, p.x, p.y, None, False, None, "not scored by any set")
             for p in points
@@ -507,7 +526,7 @@ def run_series(
             for p in points
         ]
 
-    rib_set = SETS[series.scores]()
+    rib_set = SETS[set_name]()
 
     gbar_block = _gbar_reason(series)
     if gbar_block is not None:
@@ -556,7 +575,7 @@ def run_series(
         geom.alpha_deg = float(series.alpha_deg)
 
     if series.x_axis == "Re_Dh" and series.y_axis == "Nu_ratio_KP":
-        return _nu_ratio_vs_re(series, rib_set, geom, points)
+        return _nu_ratio_vs_re(series, rib_set, set_name, geom, points)
 
     if series.x_axis == "Re_Dh":
         # Measured passage friction against Re directly: no e+ bisection and
@@ -641,6 +660,7 @@ def run_series(
 def _nu_ratio_vs_re(
     series: SeriesMetadata,
     rib_set: "cb.RibCorrelationSet",
+    set_name: str,
     geom: cb.RibGeometry,
     points: list[Point],
 ) -> list[Record]:
@@ -656,7 +676,7 @@ def _nu_ratio_vs_re(
     """
     from validation.cooling import conventions
 
-    resolution = conventions.resolve(series, series.scores)
+    resolution = conventions.resolve(series, set_name)
     if resolution.status != conventions.STATUS_CONVERTED or resolution.conversion is None:
         return [
             Record(
@@ -679,8 +699,42 @@ def _nu_ratio_vs_re(
     return records
 
 
+def sets_for(series: SeriesMetadata) -> tuple[str, ...]:
+    """Every set a series is scored by: `scores`, then `also_scores`."""
+    if series.scores is None:
+        return ()
+    return (series.scores, *series.also_scores)
+
+
+def eligible_sets(series: SeriesMetadata) -> tuple[str, ...]:
+    """Every rib set this harness CAN score the series with.
+
+    Derived by rule, never chosen: the set binds the series' rib shape and
+    angle, its output resolves against the series' measured quantity, and
+    the runner returns at least one prediction. A series scored by more
+    than one set must list exactly these, so the choice of which sets to
+    show cannot be made after seeing their scores.
+    """
+    from validation.cooling import conventions
+
+    out = []
+    for name in SETS:
+        if not conventions.resolve(series, name).scorable:
+            continue
+        try:
+            records = run_series(series, set_name=name)
+        except ValueError:
+            # _assert_geometry_free: the set binds geometry the series
+            # does not record -- not scorable, so not eligible.
+            continue
+        if any(r.predicted is not None for r in records):
+            out.append(name)
+    return tuple(sorted(out))
+
+
 def run_all(dataset: list[SeriesMetadata]) -> list[Record]:
     out: list[Record] = []
     for series in dataset:
-        out.extend(run_series(series))
+        for name in sets_for(series) or (None,):
+            out.extend(run_series(series, set_name=name))
     return out

@@ -1137,7 +1137,7 @@ def test_cr4396_scores_the_han_sets_cross_source_on_a_common_basis(dataset, reco
         ("6.1", "han_1988_orthogonal", 0.09, 0.15),
         ("6.2", "han_park_1988_angled", 0.15, 0.22),
     ):
-        rs = _cr4396(records, figure)
+        rs = [r for r in _cr4396(records, figure) if r.scored_by == set_name]
         assert len(rs) == 24
         assert {r.series.scores for r in rs} == {set_name}
         assert basis_of(rs[0].series, set_name) == "accuracy"
@@ -1174,3 +1174,100 @@ def test_cr4396_on_the_raw_kays_perkins_basis_would_read_as_agreement(dataset) -
     fair = [r.rel_error for r in honest]
     assert abs(sum(raw) / len(raw)) < 0.05
     assert sum(fair) / len(fair) > 0.10
+
+
+# Every set the harness can score CR-4396 with, and what each reads. Recorded
+# when multi-set scoring landed; a change here is a change in what the report
+# shows a designer choosing between them.
+CR4396_SETS = {
+    "6.1": {
+        "han_1988_orthogonal": (24, 0, 0.121),
+        "han_zhang_lee_1991_90": (24, 0, 0.052),
+    },
+    "6.2": {
+        "han_1989_narrow_channel": (24, 0, 0.071),
+        "han_park_1988_angled": (24, 0, 0.184),
+        "han_zhang_lee_1991_45par": (24, 0, -0.016),
+        "rallabandi_2009_high_re": (24, 12, 0.050),
+    },
+}
+
+
+def test_cr4396_is_scored_by_every_eligible_set_and_no_fewer(dataset, records) -> None:
+    """Several sets on one series is honest only if the list was not chosen.
+
+    `eligible_sets` derives it by rule -- shape and angle bind, the quantity
+    resolves, a prediction comes back -- and the declared `scores` +
+    `also_scores` must equal it. Leaving off han_park_1988_angled, the set
+    that reads worst here (+18%), fails this test; so would adding a set the
+    rule rejects.
+    """
+    from validation.cooling.runner import eligible_sets, sets_for
+
+    johnson = [s for s in dataset if s.source.name == "johnson1993"]
+    assert len(johnson) == 12
+    for s in johnson:
+        assert set(sets_for(s)) == set(eligible_sets(s)), s.label
+        assert set(sets_for(s)) == set(CR4396_SETS[s.figure]), s.label
+
+    # Falsified: the same series with the worst set dropped is caught.
+    s = next(s for s in johnson if s.figure == "6.2")
+    worst_dropped = dataclasses.replace(
+        s,
+        scores="rallabandi_2009_high_re",
+        also_scores=("han_1989_narrow_channel", "han_zhang_lee_1991_45par"),
+    )
+    assert set(sets_for(worst_dropped)) != set(eligible_sets(worst_dropped))
+
+    for figure, sets in CR4396_SETS.items():
+        for set_name, (n, n_in, bias) in sets.items():
+            rs = [r for r in _cr4396(records, figure) if r.scored_by == set_name]
+            assert len(rs) == n, set_name
+            assert sum(not r.extrapolated for r in rs) == n_in, set_name
+            got = sum(r.rel_error for r in rs) / len(rs)
+            assert got == pytest.approx(bias, abs=0.005), f"{set_name}: {got:+.3f}"
+
+
+def test_several_sets_are_reported_side_by_side_never_ranked(dataset, records) -> None:
+    """One row per set; none picked, none pooled with another."""
+    from validation.cooling.runner import SETS
+    from validation.cooling.scorecard import (
+        SET_LAB,
+        build,
+        multi_set_rows,
+        pool,
+        render_multi_set,
+    )
+
+    johnson = [s for s in dataset if s.source.name == "johnson1993"]
+    cells = build([r for r in records if r.series.source.name == "johnson1993"], dataset)
+    rows = multi_set_rows(cells)
+    assert len(rows) == 12
+    for series, sets in rows.items():
+        names = [name for name, _, _ in sets]
+        assert names == sorted(names), "ordered by name, never by score"
+        figure = next(s.figure for s in johnson if s.label == series)
+        assert set(names) == set(CR4396_SETS[figure])
+
+    text = "\n".join(render_multi_set(cells))
+    assert "han_park_1988_angled" in text  # the worst-reading set is shown
+    assert "best" not in text.lower()
+    assert "NOT independent corroboration" in text
+
+    # Pooling one series across sets would be a best-of by averaging.
+    with pytest.raises(ValueError, match="spans sets"):
+        pool(records, "johnson1993/fig6.2_leading_segB")
+
+    # Every rib set states its lab, so the independence note cannot go
+    # silent for a set nobody labelled.
+    assert set(SETS) <= set(SET_LAB)
+
+
+def test_only_the_rib_runner_scores_one_series_with_several_sets(dataset) -> None:
+    """A specialist runner would silently use `scores` alone and report it as
+    though it were the only eligible set."""
+    from validation.cooling.scorecard import run_dataset
+
+    film = next(s for s in dataset if s.scores == "baldauf_2002_sellers")
+    with pytest.raises(ValueError, match="only supported by the rib runner"):
+        run_dataset([dataclasses.replace(film, also_scores=("colban_2011_shaped",))])

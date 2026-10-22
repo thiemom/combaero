@@ -88,25 +88,35 @@ both walls, four Re: 48 points.
 
 ## Score (cross-source accuracy, on the Dittus-Boelter basis)
 
-Every point is outside both Han sets' e/D validity (0.1 against
-0.047-0.078), so every point is flagged extrapolated.
+Every eligible rib set scores every series, each on its own row
+(`also_scores`, docs/VALIDATION_POLICY.md). Eligibility is derived by rule
+in `runner.eligible_sets` and pinned by
+`test_cr4396_is_scored_by_every_eligible_set_and_no_fewer`, so the list was
+not chosen after seeing the numbers. Sets are listed by name, not by score.
 
-| figure | set | n | bias | MAE | within +-6% |
+| figure | set | n | in its box | bias (all) | bias (in box) |
 |---|---|---|---|---|---|
-| 6.1 normal | `han_1988_orthogonal` | 24 | +12.1% | 12.1% | 3/24 |
-| 6.2 skewed 45 deg | `han_park_1988_angled` | 24 | +18.4% | 18.4% | 0/24 |
+| 6.1 normal | `han_1988_orthogonal` | 24 | 0 | +12.1% | - |
+| 6.1 normal | `han_zhang_lee_1991_90` | 24 | 0 | +5.2% | - |
+| 6.2 skewed 45 deg | `han_1989_narrow_channel` | 24 | 0 | +7.1% | - |
+| 6.2 skewed 45 deg | `han_park_1988_angled` | 24 | 0 | +18.4% | - |
+| 6.2 skewed 45 deg | `han_zhang_lee_1991_45par` | 24 | 0 | -1.6% | - |
+| 6.2 skewed 45 deg | `rallabandi_2009_high_re` | 24 | 12 | +5.0% | -0.6% |
 
-By wall: 6.1 leading +16.4%, trailing +7.7%; 6.2 leading +17.0%, trailing
-+19.7%. By Re the bias is flat: 6.1 runs +9.8 to +15.0%, 6.2 runs +15.2 to
-+20.3%. So the miss is a level offset, not a Re trend.
+Only Rallabandi's box (e/D 0.1-0.18, 45 deg, Re >= 30k) covers any of the
+rig; its 12 in-box points are Re 50k and 75k (MAE 3.9%). Every other set
+is outside on e/D (0.1 against 0.047-0.078, or HZL's single tested
+0.0625). The spread across sets is the number a designer inherits by
+picking one: 7 points on the normal trips, 20 on the skewed.
 
-**Not scored, recorded:** `rallabandi_2009_high_re` (Texas A&M, high Re).
-Its envelope is e/D 0.1-0.18, P/e 5-10, 45 deg, Re >= 30k, so it is the
-only shipped set whose validity actually covers the skewed rig. On Fig.
-6.2 it gives bias +5.0% and MAE 7.3% over all 24 points. On the 12
-in-envelope points (Re 50k and 75k) it gives -0.6% and 3.9%. A series
-scores one set in this harness, and the issue scoped the Han R/G sets, so
-this is a side measurement rather than a scorecard row.
+**Not independent of each other.** All six sets are Han's laboratory at
+Texas A&M (#403 item 2). That they bracket CR-4396 is not six confirmations;
+CR-4396 is the only independent lab here.
+
+For the two original sets, by wall: 6.1 leading +16.4%, trailing +7.7%;
+6.2 leading +17.0%, trailing +19.7%. By Re the bias is flat: 6.1 runs +9.8
+to +15.0%, 6.2 runs +15.2 to +20.3%. So the miss is a level offset, not a
+Re trend.
 
 ## Not modelled
 
