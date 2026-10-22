@@ -102,6 +102,7 @@ files:
     confidence: band
     uncertainty: 0.068
     scores: han_park_1988_angled
+    also_scores: [han_1988_orthogonal, han_1989_narrow_channel, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -146,6 +147,7 @@ files:
     confidence: band
     uncertainty: 0.066
     scores: han_park_1988_angled
+    also_scores: [han_1988_orthogonal, han_1989_narrow_channel, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -188,6 +190,7 @@ files:
     confidence: band
     uncertainty: 0.068
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -229,6 +232,7 @@ files:
     confidence: band
     uncertainty: 0.066
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -268,6 +272,7 @@ files:
     confidence: band
     uncertainty: 0.068
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel, han_zhang_lee_1991_60par]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -309,6 +314,7 @@ files:
     confidence: band
     uncertainty: 0.066
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel, han_zhang_lee_1991_60par]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -348,6 +354,7 @@ files:
     confidence: band
     uncertainty: 0.068
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel, han_zhang_lee_1991_45par, rallabandi_2009_high_re]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -389,6 +396,7 @@ files:
     confidence: band
     uncertainty: 0.066
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel, han_zhang_lee_1991_45par, rallabandi_2009_high_re]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -428,6 +436,7 @@ files:
     confidence: band
     uncertainty: 0.068
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -469,6 +478,7 @@ files:
     confidence: band
     uncertainty: 0.066
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel]
     verification:
       x_axis_type: log
       y_axis_type: log

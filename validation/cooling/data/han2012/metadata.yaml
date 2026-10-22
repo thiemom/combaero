@@ -72,6 +72,7 @@ files:
       monotonic: increasing
       expected_points: 7
     scores: han_1988_orthogonal
+    also_scores: [han_zhang_lee_1991_90]
 
   - path: fig4.54_90deg_continuous_Gbar_data.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
@@ -107,6 +108,7 @@ files:
       # dashed line; count them on the page.
       expected_points: null
     scores: han_1988_orthogonal
+    also_scores: [han_zhang_lee_1991_90]
 
   - path: fig4.54_45deg_vbroken_Gbar_data.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
@@ -303,6 +305,7 @@ files:
       # this CSV pools them all. Count the marks on the page.
       expected_points: null
     scores: rallabandi_2009_high_re
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_45par]
 
   # -- Figure 4.53: Nu ratio against friction ratio -----------------------
   #
@@ -368,6 +371,7 @@ files:
       monotonic: null
       expected_points: null
     scores: han_1988_orthogonal
+    also_scores: [han_zhang_lee_1991_90]
 
   - path: fig4.53_60deg_vcontinuous_Nu_ratio.csv
     after: "Han, J.C. and Zhang, Y.M. (1992). IJHMT 35(2), 513."
@@ -556,6 +560,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -610,6 +615,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -652,6 +658,7 @@ files:
       Residual: this file holds two marks near e+ 80 (79.2 and 80.8) where
       the class has one run. One is a neighbouring class or a double-pick.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -706,6 +713,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -761,6 +769,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -815,6 +824,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -869,6 +879,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -923,6 +934,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -977,6 +989,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1031,6 +1044,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1085,6 +1099,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1139,6 +1154,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1210,6 +1226,7 @@ files:
       the label.
 
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1264,6 +1281,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1319,6 +1337,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1373,6 +1392,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1428,6 +1448,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1482,6 +1503,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1536,6 +1558,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1590,6 +1613,7 @@ files:
 
       Scoring uses the pooled cloud, not this label.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1766,6 +1790,7 @@ files:
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
     scores: han_1988_orthogonal
+    also_scores: [han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1802,6 +1827,7 @@ files:
       with the other panel's same-class marks to under 1% (same runs,
       same e+), and G < G_bar as the physics requires.
     scores: han_1988_orthogonal
+    also_scores: [han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1850,6 +1876,7 @@ files:
       -- silently stale until han_park_1988_angled existed to score it
       correctly.
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel, han_zhang_lee_1991_60par]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -1898,6 +1925,7 @@ files:
       -- silently stale until han_park_1988_angled existed to score it
       correctly.
     scores: han_park_1988_angled
+    also_scores: [han_zhang_lee_1991_60par]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2155,6 +2183,7 @@ files:
       twin is the duplicate. Printed G_bar/G is ~1.15, above 1 as it
       must be. See extractions/han_zhang_lee_1991_jht.md.
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel, han_zhang_lee_1991_45par, rallabandi_2009_high_re]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -2800,6 +2829,7 @@ files:
       to geometries. Pooling is forced; the coefficient is therefore a
       mixture and only the exponent is testable.
     scores: han_park_1988_angled
+    also_scores: [han_1989_narrow_channel]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -3050,6 +3080,7 @@ files:
       whose R is this project's own fit to the drawn correlation line (no
       printed equation exists at W/H < 1).
     scores: han_1989_narrow_channel
+    also_scores: [han_1988_orthogonal, han_park_1988_angled, han_zhang_lee_1991_45par, han_zhang_lee_1991_60par, han_zhang_lee_1991_90, rallabandi_2009_high_re]
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -3086,6 +3117,7 @@ files:
       han_park_1988_angled's valid_WH=[1,4]; scored by
       han_1989_narrow_channel instead (#402).
     scores: han_1989_narrow_channel
+    also_scores: [han_1988_orthogonal, han_park_1988_angled, han_zhang_lee_1991_45par, han_zhang_lee_1991_60par, han_zhang_lee_1991_90, rallabandi_2009_high_re]
     verification:
       x_axis_type: linear
       y_axis_type: linear
@@ -3272,6 +3304,7 @@ files:
       constant between alpha=90 and off-axis, so the angles are not
       separable on this axis to begin with.
     scores: han_1989_narrow_channel
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -3306,6 +3339,7 @@ files:
       han_1989_narrow_channel instead (#402), at alpha=90 deg uniformly --
       same pooled-angle reasoning as fig4.48_G_WH0.5.csv.
     scores: han_1989_narrow_channel
+    also_scores: [han_park_1988_angled]
     verification:
       x_axis_type: log
       y_axis_type: log
