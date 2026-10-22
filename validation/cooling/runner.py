@@ -210,7 +210,8 @@ def _probe_geometry(rib_set: "cb.RibCorrelationSet") -> cb.RibGeometry:
 
 
 def _mid(rng: "cb.RibRange", fallback: float) -> float:
-    return 0.5 * (rng.lo + rng.hi) if rng.hi > rng.lo else fallback
+    # Same rule as RibRange::bounded(): hi == lo is one tested value.
+    return 0.5 * (rng.lo + rng.hi) if rng.hi > 0.0 and rng.hi >= rng.lo else fallback
 
 
 def _gbar_reason(series: SeriesMetadata) -> str | None:

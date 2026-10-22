@@ -59,9 +59,9 @@ ValueSlope baseline_law(const RatioBaseline &b, double x, double pr) {
 
 bool outside(const RibRange &r, double v) {
   if (!r.bounded()) {
-    return r.lo > 0.0 && v < r.lo;
+    return r.lo > 0.0 && v < r.lo * (1.0 - RibRange::rel_tol);
   }
-  return v < r.lo || v > r.hi;
+  return v < r.lo * (1.0 - RibRange::rel_tol) || v > r.hi * (1.0 + RibRange::rel_tol);
 }
 
 // C1 smoothstep weight in ln x over [x_lo, x_hi]: 0 at and below x_lo, 1 at

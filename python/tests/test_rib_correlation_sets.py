@@ -120,6 +120,24 @@ def test_validity_warns_rather_than_refusing() -> None:
     assert math.isfinite(r.St_r) and r.St_r > 0.0
 
 
+def test_a_single_tested_value_is_a_closed_range() -> None:
+    """Han, Zhang and Lee (1991) tested e/D 0.0625 only: valid_eD is the point
+    {0.0625, 0.0625}. bounded() once tested hi > lo, read the point as a
+    half-open range, and never flagged anything above it -- NASA CR-4396's
+    e/D 0.1 scored as in-domain. Rounding at the third figure stays inside."""
+    hzl = _core.han_zhang_lee_1991(_core.RibShape.Parallel, 45.0)
+    g = _core.RibGeometry(e_D=0.0625, p_e=10.0, W_H=1.0, alpha_deg=45.0)
+    assert not _core.evaluate_rib(hzl, g, 3e4).extrapolated
+
+    for name, value in (("e_D", 0.1), ("p_e", 12.0), ("W_H", 1.5), ("alpha_deg", 60.0)):
+        probe = _core.RibGeometry(e_D=0.0625, p_e=10.0, W_H=1.0, alpha_deg=45.0)
+        setattr(probe, name, value)
+        assert _core.evaluate_rib(hzl, probe, 3e4).extrapolated, name
+
+    g.e_D = 0.0627  # 0.3% above: quoted precision, not another rig
+    assert not _core.evaluate_rib(hzl, g, 3e4).extrapolated
+
+
 def test_malformed_sets_are_rejected_at_the_boundary() -> None:
     """Bad PARAMETERS are a mistake and fail loudly -- the opposite treatment
     from a bad operating point, which is guarded silently."""

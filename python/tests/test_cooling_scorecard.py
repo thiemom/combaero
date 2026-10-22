@@ -184,24 +184,21 @@ def test_lau_independently_confirms_han_G(cells) -> None:
     n, n_scored = _pooled(cells, "lau1990/fig_table2_90deg_G")
     assert n_scored == 9
 
-    # ONE of the nine is out of Han's declared box, and it is the top e+
-    # point: reaching e+ = 636 at this geometry needs a Reynolds number
-    # above Han's stated 60000 ceiling. The split reports it separately
-    # rather than folding it into the agreement (#389).
+    # All nine are inside Han's declared box. The top point, e+ = 636, maps
+    # to Re 60024 at this geometry: 0.04% over Han's stated 60000 ceiling,
+    # which is that ceiling quoted to its own precision rather than a higher
+    # Reynolds number. It was split out as out-of-domain until bounds were
+    # read with RibRange::rel_tol.
     in_domain = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_G")
-    out_domain = next(
-        c for c in cells if c.label == f"lau1990/fig_table2_90deg_G  {OUT_OF_DOMAIN_MARK}"
-    )
-    assert in_domain.n_scored == 8 and out_domain.n_scored == 1
+    assert in_domain.n_scored == 9
     assert in_domain.domain == "in-domain"
-    assert out_domain.domain == "out-of-domain"
+    assert not any(c.label == f"lau1990/fig_table2_90deg_G  {OUT_OF_DOMAIN_MARK}" for c in cells)
 
-    for c in (in_domain, out_domain):
-        assert c.rmse < 0.03, f"agreement degraded to {c.rmse:.4f} ({c.label})"
-        assert abs(c.bias) < 0.02
-        # Every point inside Lau's own stated +/-5.8% Stanton uncertainty
-        # -- a MEASUREMENT band from the source, not a model-derived one.
-        assert c.within == 1.0
+    assert in_domain.rmse < 0.03, f"agreement degraded to {in_domain.rmse:.4f}"
+    assert abs(in_domain.bias) < 0.02
+    # Every point inside Lau's own stated +/-5.8% Stanton uncertainty
+    # -- a MEASUREMENT band from the source, not a model-derived one.
+    assert in_domain.within == 1.0
 
 
 def test_lau_R_is_scored_now_that_an_absolute_R_branch_exists(cells) -> None:
@@ -237,21 +234,14 @@ def test_lau_Gbar_independently_confirms_hans_1p2_factor(cells) -> None:
 
     # Two labs' wall-averaging ratios differ by 3-4% (Lau 1.235-1.251 against
     # Han's constant 1.200), so this confirms the relationship without
-    # reproducing it exactly. Pinned as a band, not a point -- and on the
-    # IN-DOMAIN points, because the ninth sits outside Han's Reynolds
-    # ceiling and is reported separately (#389).
+    # reproducing it exactly. Pinned as a band, not a point. All nine are
+    # in-domain: the top one sits on Han's Reynolds ceiling (Re 60024 against
+    # 60000), see test_lau_independently_confirms_han_G.
     c = next(c for c in cells if c.label == "lau1990/fig_table2_90deg_Gbar")
-    assert c.n_scored == 8
+    assert c.n_scored == 9
     assert 0.02 < c.rmse < 0.06, f"RMSE {c.rmse:.3f} outside the recorded band"
     assert c.bias < 0.0, "Han's 1.2 should sit below Lau's ratio, not above"
     assert c.within >= 0.85
-
-    # The out-of-domain point confirms the same relationship, which is
-    # worth saying: extrapolating past the declared box did not break it.
-    out = next(
-        c for c in cells if c.label == f"lau1990/fig_table2_90deg_Gbar  {OUT_OF_DOMAIN_MARK}"
-    )
-    assert out.n_scored == 1 and out.bias < 0.0
 
 
 def test_gbar_series_score_at_every_angle_and_are_labelled_accuracy(dataset, cells) -> None:
