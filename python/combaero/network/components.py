@@ -7385,7 +7385,8 @@ class CrossflowSegmentElement(ChannelElement):
       leaving it is ``next_seg``'s.
     * ``entry_K``: ``from_node`` is a reservoir; the segment carries the
       entry acceleration ``(1 + K_in) m^2/(2 rho A^2)`` at the duct (to-node)
-      density instead of a from-station.
+      density instead of a from-station. Reversed, the duct discharges into
+      the reservoir at static continuity, the same as an exit: no term.
     * an exit into a plenum (no to-station) loses the dynamic head: static
       continuity, as any Pt-coupled channel into a plenum.
 

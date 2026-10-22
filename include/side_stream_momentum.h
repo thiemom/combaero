@@ -63,8 +63,12 @@ StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
                                   double kappa);
 
 // Entry from a reservoir (Pt) into a duct, static at the entry node:
-//   dP = (1 + K_in) m|m| / (2 rho A^2)
+//   dP = (1 + K_in) max(m, 0)^2 / (2 rho A^2)
 // the dynamic head plus the entry loss (K_in = 0.5 sharp, ~0 well rounded).
+// Reversed (m < 0) the duct discharges INTO the reservoir: static continuity,
+// the dynamic head lost, the segment's own convention at an exit into a
+// plenum. So 0, not the mirrored m|m| that charged the outflow (1 + K_in)
+// dynamic heads of static drop (#705). C1 through m = 0.
 StationHalfDrop channel_entry_drop(double m, double P, double T,
                                    const std::vector<double>& X, double area,
                                    double K_in);

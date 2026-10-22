@@ -47,9 +47,12 @@ StationHalfDrop channel_entry_drop(double m, double P, double T,
   }
   auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
   const double k = 0.5 * (1.0 + K_in) / (rho * area * area);
+  // Only an entering flow accelerates out of the reservoir; a reversed one
+  // discharges into it at static continuity (see the header).
+  const double m_in = std::max(m, 0.0);
   StationHalfDrop out;
-  out.dP = m * std::abs(m) * k;
-  out.d_dm_a = 2.0 * std::abs(m) * k;  // the entering flow is "m_a"
+  out.dP = m_in * m_in * k;
+  out.d_dm_a = 2.0 * m_in * k;  // the entering flow is "m_a"
   const double d_drho = -out.dP / rho;
   out.d_dP = d_drho * drho_dP;
   out.d_dT = d_drho * drho_dT;
