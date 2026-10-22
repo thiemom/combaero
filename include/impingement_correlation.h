@@ -38,11 +38,13 @@ namespace cooling {
 // An advisory range. Outside it the evaluator warns; it never refuses,
 // mirroring RibRange in rib_correlation.h -- a duplicate of that tiny struct
 // rather than a shared dependency between the two correlation families,
-// which stay independent by design.
+// which stay independent by design. Same bounded() rule: hi == 0 is open,
+// hi == lo is a single tested value and closed.
 struct ImpingementRange {
   double lo = 0.0;
   double hi = 0.0;
-  bool bounded() const { return hi > lo; }
+  static constexpr double rel_tol = 5.0e-3;  // as RibRange::rel_tol
+  bool bounded() const { return hi > 0.0 && hi >= lo; }
 };
 
 // ---------------------------------------------------------------

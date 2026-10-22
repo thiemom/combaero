@@ -382,9 +382,9 @@ double softmin_floor(double x, double floor_value) {
 bool outside(const RibRange &r, double v) {
   if (!r.bounded()) {
     // A half-open range: lo set, hi unset.
-    return r.lo > 0.0 && v < r.lo;
+    return r.lo > 0.0 && v < r.lo * (1.0 - RibRange::rel_tol);
   }
-  return v < r.lo || v > r.hi;
+  return v < r.lo * (1.0 - RibRange::rel_tol) || v > r.hi * (1.0 + RibRange::rel_tol);
 }
 
 // True for an angle within floating-point noise of exactly 90 degrees.

@@ -45,9 +45,9 @@ double geometric_power_fit(const JetArrayGeometricFit &fit, double xn_d,
 
 bool outside(const ImpingementRange &r, double v) {
   if (!r.bounded()) {
-    return r.lo > 0.0 && v < r.lo;
+    return r.lo > 0.0 && v < r.lo * (1.0 - ImpingementRange::rel_tol);
   }
-  return v < r.lo || v > r.hi;
+  return v < r.lo * (1.0 - ImpingementRange::rel_tol) || v > r.hi * (1.0 + ImpingementRange::rel_tol);
 }
 
 // beta = C_D * sqrt(2) * (pi/4) / [(yn/d)(z/d)], Florschuetz's own flow

@@ -72,10 +72,20 @@ struct RibTerm {
 // An advisory range. Outside it the evaluator warns; it never refuses, because
 // a user supplying their own coefficients knows their own hardware and a band
 // belongs to the source's rig rather than to theirs.
+//
+// hi == 0 means no upper bound (a half-open range, or no range at all when lo
+// is 0 too). A single tested value is a CLOSED range with hi == lo: Han, Zhang
+// and Lee (1991) tested e/D 0.0625 only, so e/D 0.1 is outside it. Testing
+// hi > lo here read every point range as half-open and never flagged a value
+// above the point.
 struct RibRange {
   double lo = 0.0;
   double hi = 0.0;
-  bool bounded() const { return hi > lo; }
+  // Geometry is quoted to three significant figures (Taslim AR 3.5: W/H
+  // 0.286 against the set's 1/3.5), so a bound is read with this relative
+  // slack. Without it a point range flags its own paper's data.
+  static constexpr double rel_tol = 5.0e-3;
+  bool bounded() const { return hi > 0.0 && hi >= lo; }
 };
 
 // WHERE AN ACCURACY FIGURE CAME FROM, and it decides what may be done with
