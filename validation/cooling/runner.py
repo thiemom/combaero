@@ -84,6 +84,10 @@ SMOOTH_NU_COEF, SMOOTH_NU_RE_EXP, SMOOTH_NU_PR_EXP = 0.023, 0.8, 0.4
 # Bracket for the Re bisection. Deliberately far wider than any set's
 # stated validity: a series may sit outside it, and reporting that as
 # extrapolated is the point rather than something to avoid.
+# What the Re_Dh path predicts: passage friction (Taslim & Spring) and the
+# ribbed-wall Nu ratio on a smooth-tube reference (CR-4396, #452).
+RE_PATH_Y_AXES = ("f_fanning_passage", "Nu_ratio_KP")
+
 RE_LO = 1.0e3
 RE_HI = 1.0e8
 BISECT_STEPS = 200
@@ -457,8 +461,11 @@ def run_series(
         ]
     if series.x_axis == "Re_Dh":
         refusal = None
-        if series.y_axis != "f_fanning_passage":
-            refusal = f"the Re_Dh path only predicts f_fanning_passage, not {series.y_axis}"
+        if series.y_axis not in RE_PATH_Y_AXES:
+            refusal = (
+                f"the Re_Dh path only predicts {', '.join(RE_PATH_Y_AXES)}, "
+                f"not {series.y_axis}"
+            )
         elif not series.geometry:
             refusal = "friction depends on e/D and W/H; no rig geometry recorded"
         elif series.geometry.get("turbulated_walls", 2) != 2:
@@ -547,6 +554,9 @@ def run_series(
     if series.alpha_deg is not None:
         geom.alpha_deg = float(series.alpha_deg)
 
+    if series.x_axis == "Re_Dh" and series.y_axis == "Nu_ratio_KP":
+        return _nu_ratio_vs_re(series, rib_set, geom, points)
+
     if series.x_axis == "Re_Dh":
         # Measured passage friction against Re directly: no e+ bisection and
         # no R conversion on the measured side. Comparing in f, not R, keeps
@@ -624,6 +634,47 @@ def run_series(
             )
             continue
         records.append(Record(series, p.x, p.y, predicted, extrapolated, re))
+    return records
+
+
+def _nu_ratio_vs_re(
+    series: SeriesMetadata,
+    rib_set: "cb.RibCorrelationSet",
+    geom: cb.RibGeometry,
+    points: list[Point],
+) -> list[Record]:
+    """Ribbed-wall Nu ratio against Re, on the Dittus-Boelter basis.
+
+    The prediction is the chain's own ribbed-wall Nusselt number, St_r Re Pr
+    at the set's Pr, over 0.023 Re^0.8 Pr^0.4 -- what _performance_ratios
+    calls Nu_ratio. The MEASURED side is on whatever smooth reference its
+    source used (CR-4396: Kays and Perkins), so it goes through the
+    conversion conventions.py registers, never a constant written here. A
+    series that declared the DB basis directly would have the conversion
+    applied twice, so that is refused.
+    """
+    from validation.cooling import conventions
+
+    resolution = conventions.resolve(series, series.scores)
+    if resolution.status != conventions.STATUS_CONVERTED or resolution.conversion is None:
+        return [
+            Record(
+                series, p.x, p.y, None, False, None,
+                f"Nu_ratio_KP needs a registered conversion to the set's basis; "
+                f"got {resolution.status}: {resolution.detail}",
+            )
+            for p in points
+        ]
+    to_db = resolution.conversion.factor()
+    pr = rib_set.valid_Pr
+    records = []
+    for p in points:
+        res = cb.evaluate_rib(rib_set, geom, p.x)
+        nu_db = SMOOTH_NU_COEF * p.x**SMOOTH_NU_RE_EXP * pr**SMOOTH_NU_PR_EXP
+        predicted = res.St_r * p.x * pr / nu_db
+        records.append(
+            Record(series, p.x, p.y * to_db, predicted, res.extrapolated, p.x)
+        )
     return records
 
 

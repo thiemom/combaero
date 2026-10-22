@@ -1,0 +1,568 @@
+# Johnson, B.V., Wagner, J.H. and Steuber, G.D. (1993). NASA CR-4396 Vol. II,
+# "Effects of Rotation on Coolant Passage Heat Transfer, Volume II -- Coolant
+# Passages With Trips Normal and Skewed to the Flow". Pratt & Whitney / UTRC,
+# contract NAS3-23691. On disk: docs/heat_transfer/CR4396/19940011518.pdf.
+#
+# AN INDEPENDENT LAB. Every other rib-Nu source in this dataset traces to
+# Texas A&M (Han's or Lau's laboratory, #403 item 2). This one is Pratt &
+# Whitney's rotating heat-transfer facility, so it is CROSS-SOURCE for every
+# set it scores: ACCURACY, never fidelity (docs/VALIDATION_POLICY.md). The
+# harness reports it and does not tune to it (#452).
+#
+# WHAT IS COMMITTED. Figures 6.1 (normal trips) and 6.2 (45 deg skewed
+# trips), stationary, PDF pages 48-49. Only the first leg's segments B-D on
+# the leading and trailing walls: past X/d 3 (no trips on the guard element
+# A), before the first turn, which the report calls the cleanest region. The
+# turns and later legs carry a turn and secondary-flow history no shipped
+# correlation models. 2 figures x 2 walls x 3 segments x 4 Re = 48 points,
+# one CSV per (figure, wall, segment) with Re on x.
+#
+# THE RIG (report Sec. 3, p. 9-21):
+#   * square passage, W/H = 1; trips on the leading and trailing walls only,
+#     the side walls smooth -- two opposite turbulated walls, as in Han's rigs
+#   * e/d = 0.1, P/e = 10, trips STAGGERED on the opposite walls
+#   * trips CURVILINEAR (rounded, cast-style), not Han's square-edged ribs
+#   * skewed model: 45 deg, both walls' trips parallel in projection (Fig. 3.5:
+#     the leading-wall dashed and trailing-wall solid lines run the same way,
+#     interleaved), i.e. Han's "parallel" arrangement
+#   * all four copper walls heated, constant wall temperature, inlet
+#     (Tw-Tb)/Tw = 0.13; properties at the film temperature (Tw+Tb)/2
+#   * h on the PROJECTED area; true area 1.11x (normal), 1.15x (skewed)
+# None of these differences is modelled, which is why this is accuracy.
+#
+# THE ORDINATE IS NOT HAN'S. Nu/Nu_inf with Nu_inf = 0.0176 Re^0.8, Kays and
+# Perkins (1973) for a smooth tube at constant wall temperature, "with a
+# Prandtl number equal to 0.72" (report p. 18). The shipped sets' Nu ratio is
+# on Dittus-Boelter, 0.023 Re^0.8 Pr^0.4. y_axis Nu_ratio_KP declares this;
+# validation/cooling/conventions.py registers the conversion
+# Nu_inf/Nu_DB = 0.0176/(0.023 * 0.72^0.4) = 0.873, and the runner refuses
+# rather than compare the two bases directly (#444 criterion 6).
+#
+# THE ABSCISSA IS THE LEGEND, NOT A READ COORDINATE. The figure plots
+# Nu/Nu_inf against S/d with the four Re overplotted per segment. Re here is
+# each symbol's nominal value ("approximately", report p. 36): square
+# 12,500 (test 302), circle 25,000 (301), triangle 50,000 (303), diamond
+# 75,000 (304). Only y was digitised.
+#
+# MEASUREMENT BAND. Kline-McClintock: +-6% at the model inlet rising to
+# +-30% at the exit for the stationary baseline; repeat tests agreed within
+# about half that (report p. 18-19). The first leg is the inlet end, so
+# `uncertainty: 0.06` is the report's own inlet figure -- a lower bound for
+# segment D, and NOT derived from any model's error on these points.
+#
+# DIGITISATION (#452). 400 dpi render of PDF pages 48-49.
+#   * Log y axis calibrated per panel on the printed ticks (6..1, and .8..4
+#     where legible); worst tick residual 1.5 px = 0.4% in Nu/Nu_inf. The
+#     Nu/Nu_inf = 2 gridline falls on its calibrated value.
+#   * Squares from their flat top edge (+19.5 px to centre); diamonds from
+#     their bottom tip (-30 px to centre). Both cross-checked against an
+#     outline-template match, agreeing within 4 px except at two points.
+#   * The 30 px tip-to-centre offset was measured directly on the one plot
+#     diamond whose upper outline is clean (Fig. 6.2 leading wall, segment R,
+#     outside the scored range; same symbol, same plot): top tip
+#     row 1597, widest row 1627, the lower half mirroring the upper within
+#     1 px. 1 px is 0.26% in Nu/Nu_inf on these axes.
+#   * Circles and triangles from the template match only. A triangle's
+#     position is its bounding-box centre; if the plotter centred triangles
+#     on the centroid instead, the triangles read ~1.8% high.
+#   * Nine points were flagged (two template/anchor disagreements, seven
+#     weak template matches, mostly Fig. 6.2 triangles inside other outlines)
+#     and checked by the user on a scan overlay, 2026-10-22: all confirmed.
+#   * Overplotted: four symbols per segment share a ~60 px cluster. Any
+#     score on these points is an upper bound on the read error's effect,
+#     resting on 48 points of which 24 (squares, diamonds) are edge-anchored.
+#
+# EXPECTED SHAPE, from the report's own text (p. 36): Nu/Nu_inf
+# Re-independent at 50k-75k; 25k within ~10%; 12.5k 10-15% higher (normal)
+# and 10-20% higher (skewed).
+
+paper:
+  name: johnson1993
+  citation: >-
+    Johnson, B.V., Wagner, J.H. and Steuber, G.D. (1993). "Effects of
+    Rotation on Coolant Passage Heat Transfer, Volume II -- Coolant Passages
+    With Trips Normal and Skewed to the Flow." NASA Contractor Report 4396
+    Vol. II, contract NAS3-23691, Pratt & Whitney.
+  secondary: false
+
+files:
+  - path: fig6.1_leading_segB.csv
+    after: null
+    page: 48
+    item: "Figure 6.1"
+    series: >-
+      Nu/Nu_inf, normal (90 deg) trips, leading wall, first-leg segment B,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.1"
+    panel: leading
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    rib_shape: transverse
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.1_leading_segC.csv
+    after: null
+    page: 48
+    item: "Figure 6.1"
+    series: >-
+      Nu/Nu_inf, normal (90 deg) trips, leading wall, first-leg segment C,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.1"
+    panel: leading
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    rib_shape: transverse
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.1_leading_segD.csv
+    after: null
+    page: 48
+    item: "Figure 6.1"
+    series: >-
+      Nu/Nu_inf, normal (90 deg) trips, leading wall, first-leg segment D,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.1"
+    panel: leading
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    rib_shape: transverse
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.1_trailing_segB.csv
+    after: null
+    page: 48
+    item: "Figure 6.1"
+    series: >-
+      Nu/Nu_inf, normal (90 deg) trips, trailing wall, first-leg segment B,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.1"
+    panel: trailing
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    rib_shape: transverse
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.1_trailing_segC.csv
+    after: null
+    page: 48
+    item: "Figure 6.1"
+    series: >-
+      Nu/Nu_inf, normal (90 deg) trips, trailing wall, first-leg segment C,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.1"
+    panel: trailing
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    rib_shape: transverse
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.1_trailing_segD.csv
+    after: null
+    page: 48
+    item: "Figure 6.1"
+    series: >-
+      Nu/Nu_inf, normal (90 deg) trips, trailing wall, first-leg segment D,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.1"
+    panel: trailing
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 90.0
+    rib_shape: transverse
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_1988_orthogonal
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.2_leading_segB.csv
+    after: null
+    page: 49
+    item: "Figure 6.2"
+    series: >-
+      Nu/Nu_inf, skewed (45 deg) trips, leading wall, first-leg segment B,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.2"
+    panel: leading
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 45.0
+    rib_shape: parallel
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.2_leading_segC.csv
+    after: null
+    page: 49
+    item: "Figure 6.2"
+    series: >-
+      Nu/Nu_inf, skewed (45 deg) trips, leading wall, first-leg segment C,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.2"
+    panel: leading
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 45.0
+    rib_shape: parallel
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.2_leading_segD.csv
+    after: null
+    page: 49
+    item: "Figure 6.2"
+    series: >-
+      Nu/Nu_inf, skewed (45 deg) trips, leading wall, first-leg segment D,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.2"
+    panel: leading
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 45.0
+    rib_shape: parallel
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.2_trailing_segB.csv
+    after: null
+    page: 49
+    item: "Figure 6.2"
+    series: >-
+      Nu/Nu_inf, skewed (45 deg) trips, trailing wall, first-leg segment B,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.2"
+    panel: trailing
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 45.0
+    rib_shape: parallel
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.2_trailing_segC.csv
+    after: null
+    page: 49
+    item: "Figure 6.2"
+    series: >-
+      Nu/Nu_inf, skewed (45 deg) trips, trailing wall, first-leg segment C,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.2"
+    panel: trailing
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 45.0
+    rib_shape: parallel
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]
+  - path: fig6.2_trailing_segD.csv
+    after: null
+    page: 49
+    item: "Figure 6.2"
+    series: >-
+      Nu/Nu_inf, skewed (45 deg) trips, trailing wall, first-leg segment D,
+      stationary, Re 12,500 / 25,000 / 50,000 / 75,000 (tests 302 / 301 /
+      303 / 304).
+    figure: "6.2"
+    panel: trailing
+    geometry:
+      e_D: 0.1
+      p_e: 10.0
+      W_H: 1.0
+      turbulated_walls: 2
+    alpha_deg: 45.0
+    rib_shape: parallel
+    x_axis: Re_Dh
+    y_axis: Nu_ratio_KP
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: 0.06
+    cross_check: >-
+      Abscissa is each symbol's nominal Re from the legend, not a read
+      coordinate; the ordinate is read on the log axis (worst tick residual
+      1.5 px, 0.4%). Overplotted cluster of four symbols -- see the header
+      for how each symbol class was located and the user's review.
+      CROSS-SOURCE (Pratt & Whitney / UTRC, not Texas A&M): accuracy, never
+      fidelity.
+    scores: han_park_1988_angled
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      x_ticks: null
+      y_ticks: [0.4, 0.6, 0.8, 1, 2, 4, 6]
+      expected_points: 4
+      slope_unreliable: false
+      plot_x_limits: [10000, 100000]
+      plot_y_limits: [1.5, 4.5]

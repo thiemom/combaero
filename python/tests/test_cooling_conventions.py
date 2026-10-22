@@ -95,11 +95,21 @@ def test_the_whole_dataset_resolves(dataset) -> None:
     # 60 deg V on its own shape (#434), +7 Taslim & Spring Nu series on
     # their ratio sets (#444), +2 Colban 2011 Figs. 6-7 shaped-hole film (#386)
     assert len(statuses[C.STATUS_DIRECT]) == 116
-    assert sorted(statuses[C.STATUS_CONVERTED]) == [
-        "rohde1969/fig10_rd0_triangles",
-        "rohde1969/fig10_rd0p195_squares",
-        "rohde1969/fig10_rd0p488_circles",
+    # +12 CR-4396 Figs. 6.1/6.2, Kays-Perkins to Dittus-Boelter (#452).
+    cr4396 = [
+        f"johnson1993/fig{fig}_{wall}_seg{seg}"
+        for fig in ("6.1", "6.2")
+        for wall in ("leading", "trailing")
+        for seg in "BCD"
     ]
+    assert sorted(statuses[C.STATUS_CONVERTED]) == sorted(
+        [
+            *cr4396,
+            "rohde1969/fig10_rd0_triangles",
+            "rohde1969/fig10_rd0p195_squares",
+            "rohde1969/fig10_rd0p488_circles",
+        ]
+    )
 
 
 def test_rohde_is_the_acceptance_case(dataset) -> None:

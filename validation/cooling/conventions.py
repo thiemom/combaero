@@ -70,6 +70,16 @@ CONVENTION_NOTES: dict[str, str] = {
         "Eqs. 2/4). Not the four-sided f: 1.8x apart at e/D 0.0625. Nu is "
         "averaged over X/D 0-20 including the entrance region"
     ),
+    "Nu_ratio_ribbed_DB": (
+        "RIBBED-wall Nu over Dittus-Boelter 0.023 Re^0.8 Pr^0.4 at the same "
+        "Re, against Re itself (no friction axis)"
+    ),
+    "Nu_ratio_ribbed_KP": (
+        "RIBBED-wall Nu over Kays and Perkins' smooth-tube constant-wall-"
+        "temperature Nu_inf = 0.0176 Re^0.8, a Colburn form with Pr fixed "
+        "at 0.72 (NASA CR-4396 Vol. II, p. 18). NOT Dittus-Boelter: 0.873 "
+        "of it"
+    ),
     # Jet impingement
     "Nu_over_Nu1": "row Nusselt divided by the first-row value, same correlation",
     # Film and effusion
@@ -121,6 +131,8 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     # The pair that cost -60% when confused. Same lab, same figure number.
     ("andrews1986", "h_hole_length"): "h_hole_internal_area",
     ("andrews1988", "h_internal"): "h_plate_approach_area",
+    # NASA CR-4396 Vol. II, Figs. 6.1/6.2 (#452): Kays and Perkins, not DB.
+    ("johnson1993", "Nu_ratio_KP"): "Nu_ratio_ribbed_KP",
 }
 
 # A series whose convention differs from the rest of its source's. None yet;
@@ -153,13 +165,15 @@ SET_PRODUCES: dict[str, str] = {
 SET_ALSO_PRODUCES: dict[str, tuple[str, ...]] = {
     # The rib sets produce R as well as G, in several normalisations the
     # runner selects between; and G_bar through Han's published 1.2.
+    # Nu_ratio_ribbed_DB is St_r Re Pr over Dittus-Boelter at the set's own
+    # Pr -- the ribbed-wall Nu the chain already computes.
     "han_1988_orthogonal": (
         "R_ribbed_wall", "R_normalised_pe", "G_four_wall", "f_channel_two_ribbed",
-        "Nu_ratio_ribbed_DB_vs_fbar",
+        "Nu_ratio_ribbed_DB_vs_fbar", "Nu_ratio_ribbed_DB",
     ),
     "han_park_1988_angled": (
         "R_ribbed_wall", "R_normalised_pe", "R_normalised_angled",
-        "G_four_wall",
+        "G_four_wall", "Nu_ratio_ribbed_DB",
     ),
     "rallabandi_2009_high_re": ("R_ribbed_wall", "R_normalised_pe"),
     # Fig. 4.48's R panel plots raw R (no (p/e/10)^0.35 normalisation unlike
@@ -187,6 +201,13 @@ for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee"
     SET_ALSO_PRODUCES[f"han_zhang_lee_1991_{_tag}"] = (
         "R_ribbed_wall", "G_four_wall", "Nu_ratio_ribbed_DB_vs_fbar",
     )
+
+
+# Kays and Perkins (1973) smooth tube at constant wall temperature, as
+# CR-4396 Vol. II prints it: Nu_inf = 0.0176 Re^0.8, "with a Prandtl number
+# equal to 0.72" (p. 18).
+KAYS_PERKINS_COEF = 0.0176
+KAYS_PERKINS_PR = 0.72
 
 
 @dataclass(frozen=True)
@@ -223,6 +244,20 @@ CONVERSIONS: dict[tuple[str, str], Conversion] = {
         "andrews_effusion_internal_h.md.",
         applied_by="validation.cooling.effusion_internal_runner.predict",
         factor=None,  # needs the series geometry; the runner owns it
+    ),
+    # CR-4396's smooth-tube reference -> Dittus-Boelter. Both are Re^0.8, so
+    # the ratio is a constant; the Pr is the source's own declared 0.72,
+    # because 0.0176 IS Kays and Perkins evaluated there. Multiplying a
+    # measured Nu/Nu_KP by it gives Nu/Nu_DB. It carries the assumption every
+    # Nu-ratio comparison does: the ribbed and smooth Nu share Pr^0.4, so a
+    # ratio at Pr 0.72 meets the set's at its own 0.70 (1.1% if it did not).
+    ("Nu_ratio_ribbed_KP", "Nu_ratio_ribbed_DB"): Conversion(
+        derivation="Nu/Nu_DB = (Nu/Nu_KP) * 0.0176 / (0.023 * 0.72^0.4) = "
+        "0.873 (Nu/Nu_KP). Both references are Re^0.8; Pr 0.72 is CR-4396's "
+        "own (Vol. II p. 18). Definition, not a fit. See "
+        "extractions/johnson_1993_cr4396.md.",
+        applied_by="validation.cooling.runner.run_series",
+        factor=lambda: KAYS_PERKINS_COEF / (0.023 * KAYS_PERKINS_PR**0.4),
     ),
 }
 
@@ -324,11 +359,14 @@ def resolve(series, set_name: str | None) -> Resolution:
             STATUS_INCOMPATIBLE, f"{produced} vs {measured}: {why}"
         )
 
-    conversion = CONVERSIONS.get((measured, produced))
-    if conversion is not None:
-        return Resolution(
-            STATUS_CONVERTED, f"{measured} -> {produced}", conversion
-        )
+    # To the set's primary quantity, or to any other it also produces: a rib
+    # set's Nu ratio is not its primary G, but it is still its output.
+    for target in (produced, *SET_ALSO_PRODUCES.get(set_name, ())):
+        conversion = CONVERSIONS.get((measured, target))
+        if conversion is not None:
+            return Resolution(
+                STATUS_CONVERTED, f"{measured} -> {target}", conversion
+            )
 
     return Resolution(
         STATUS_UNREGISTERED,
