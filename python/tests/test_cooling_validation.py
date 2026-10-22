@@ -694,6 +694,34 @@ def test_taslim_square_channel_friction_is_scored_against_han(records) -> None:
     assert -0.20 < bias < -0.10, f"recorded at -14.9% when #403 item 2 closed, now {bias:+.1%}"
 
 
+TASLIM_OTHER_AR = (
+    "taslim_spring1987/fig11_ar_0.5_solid_hex_2_sides_eDh_0.250",
+    "taslim_spring1987/fig11_ar_0.5_solid_square_2_sides_eDh_0.125",
+    "taslim_spring1987/fig11_ar_3.5_solid_tri_down_2_sides_eDh_0.053",
+    "taslim_spring1987/fig11_ar_3.5_solid_tri_left_2_sides_eDh_0.107",
+    "taslim_spring1987/fig11_ar_3.5_solid_tri_right_2_sides_eDh_0.161",
+)
+
+
+def test_taslim_friction_is_scored_at_every_aspect_ratio(records) -> None:
+    """Not only the square channel that reads best. AR 3.5 (Han W/H 0.286,
+    below his 1-4) is the only independent check of Han's friction in a
+    narrow channel, and Han reads 34-44% low there, as recorded when these
+    were first scored."""
+    rows = {}
+    for r in records:
+        if r.series.label in TASLIM_OTHER_AR:
+            rows.setdefault(r.series.label, []).append(r)
+    assert set(rows) == set(TASLIM_OTHER_AR)
+    for label, rs in rows.items():
+        assert all(r.predicted is not None for r in rs), label
+        assert all(r.extrapolated for r in rs), f"{label}: outside Han's domain"
+        assert {r.scored_by for r in rs} == {"han_1988_orthogonal"}, label
+    narrow = [r for label, rs in rows.items() if "_ar_3.5_" in label for r in rs]
+    bias = sum(r.rel_error for r in narrow) / len(narrow)
+    assert -0.45 < bias < -0.30, f"AR 3.5 recorded at about -38%, now {bias:+.1%}"
+
+
 def test_taslim_friction_is_compared_as_fbar_not_four_sided_f() -> None:
     """The convention trap, falsified rather than asserted.
 
@@ -1304,6 +1332,39 @@ def test_every_scored_rib_series_lists_every_eligible_set(dataset) -> None:
             f"{s.label}: declared {sorted(sets_for(s))}, eligible {sorted(eligible_sets(s))}"
         )
     assert checked >= 75
+
+
+# Measured series a set COULD score but that are deliberately not scored,
+# each with its recorded reason. Anything else with an eligible set must be
+# scored: an unscored series is otherwise a choice made after the fact.
+RECORDED_UNSCORED = {
+    "han2012/fig4.51_Gbar_45par": "carries the G marks a second time (#403 item 1)",
+    "han2012/fig4.51_Gbar_45crs": "carries the G marks a second time (#403 item 1)",
+    "han2012/fig4.48_R_errorbar_WH1_ref3": "a published correlation's own scatter band",
+    "han2012/fig4.48_G_errorbar_WH1_ref3": "a published correlation's own scatter band",
+}
+
+
+def test_no_measured_rib_series_is_left_unscored_without_a_reason(dataset) -> None:
+    """The other half of the CR-4396 rule. Taslim's two-wall AR 0.5 and 3.5
+    friction sat unscored under a note #443 had already made stale, while
+    the AR 1.0 series beside them were scored -- the omitted ones read
+    25-45% worse. A printed correlation curve is not a measurement and is
+    exempt by kind."""
+    from validation.cooling.runner import eligible_sets
+    from validation.cooling.scorecard import rib_owned
+
+    found = set()
+    for s in dataset:
+        if s.scores is not None or s.kind != "measured" or not rib_owned(s):
+            continue
+        if not eligible_sets(s):
+            continue
+        found.add(s.label)
+        assert s.label in RECORDED_UNSCORED, (
+            f"{s.label}: unscored, but {list(eligible_sets(s))} can score it"
+        )
+    assert found == set(RECORDED_UNSCORED), "a recorded exemption no longer applies"
 
 
 def test_eligibility_needs_a_known_angle_and_a_declared_quantity(dataset, monkeypatch) -> None:
