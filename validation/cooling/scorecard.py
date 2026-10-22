@@ -118,6 +118,7 @@ def run_dataset(dataset) -> list[Record]:
         shaped_film_runner,
     )
     from validation.cooling.runner import run_series as rib_run
+    from validation.cooling.runner import sets_for
 
     specialists = (
         (jet_array_runner.owns, jet_array_runner.run_series),
@@ -135,12 +136,21 @@ def run_dataset(dataset) -> list[Record]:
     for series in dataset:
         for owns, run in specialists:
             if owns(series):
+                if series.also_scores:
+                    # Only the rib runner scores one series with several
+                    # sets. Dropping the others silently would report one
+                    # set as though it were the only one eligible.
+                    raise ValueError(
+                        f"{series.label}: also_scores is only supported by "
+                        "the rib runner"
+                    )
                 out.extend(run(series))
                 break
         else:
             # The rib runner is the fallback and reports why, rather than
             # dropping a series no specialist wanted.
-            out.extend(rib_run(series))
+            for name in sets_for(series) or (None,):
+                out.extend(rib_run(series, set_name=name))
     return out
 
 
@@ -198,6 +208,22 @@ for _ar, _ed in ((0.5, 0.125), (0.5, 0.250), (1.0, 0.083), (1.0, 0.167),
 # same paper, whose Fig. 12 figure 4.51 reprints.
 for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee", "45lam"):
     SET_ORIGIN[f"han_zhang_lee_1991_{_tag}"] = "ASME J. Heat Transfer 113, 590"
+
+# Which LAB each rib set comes from. Two sets from one lab agreeing is not
+# two labs agreeing: they share a rig family, a data-reduction convention
+# and often the data itself. Every shipped rib set is Han's laboratory at
+# Texas A&M (#403 item 2), so where several score one series the report
+# says their agreement is not independent corroboration -- only the
+# measured series, from another lab, is. Required for every set in the
+# rib runner's registry (test_every_rib_set_names_its_lab).
+SET_LAB: dict[str, str] = {
+    "han_1988_orthogonal": "Texas A&M (Han)",
+    "han_park_1988_angled": "Texas A&M (Han)",
+    "han_1989_narrow_channel": "Texas A&M (Han)",
+    "rallabandi_2009_high_re": "Texas A&M (Han)",
+}
+for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee", "45lam"):
+    SET_LAB[f"han_zhang_lee_1991_{_tag}"] = "Texas A&M (Han)"
 
 # Matching on the citation widens the haystack, so a citation that NAMES
 # another paper could claim a false fidelity. Bounded by
@@ -266,7 +292,7 @@ def sampling_of(series, dataset) -> str:
     return "unknown" if shares else "complete"
 
 
-def score_recovered(series, dataset) -> tuple[int, float]:
+def score_recovered(series, dataset, set_name: str | None = None) -> tuple[int, float]:
     """Check the set against runs the digitisation could not pick.
 
     Returns (count, fraction the prediction lands inside the bound).
@@ -287,7 +313,7 @@ def score_recovered(series, dataset) -> tuple[int, float]:
     if not bounds:
         return 0, float("nan")
     probes = [Point(x=b.x, y=(b.lo + b.hi) / 2.0) for b in bounds]
-    records = run_series(series, probes)
+    records = run_series(series, probes, set_name)
     checked = [
         (b, r.predicted)
         for b, r in zip(bounds, records, strict=True)
@@ -312,7 +338,13 @@ def build(records: list[Record], dataset=None) -> list[Cell]:
         # per velocity-head-ratio band, because pooling them would mix a
         # near-exact comparison with one dominated by a conversion factor.
         group = getattr(r, "group", None)
-        label = r.series.label + (f"  [{group}]" if group else "")
+        label = r.series.label
+        if r.series.also_scores:
+            # One row per set. The set rides on the label so two sets'
+            # rows never merge, and it goes before any group so `rollup`
+            # still finds the group after "  [".
+            label += f"  @{r.scored_by}"
+        label += f"  [{group}]" if group else ""
         # And the harness splits every series by the set's own validity box.
         # `extrapolated` already flags each point; until now it was only
         # counted in a column, which made it a number rather than a
@@ -357,7 +389,9 @@ def build(records: list[Record], dataset=None) -> list[Cell]:
         if dataset is not None:
             cell.basis = basis_of(series, cell.scored_by)
             cell.sampling = sampling_of(series, dataset)
-            cell.n_bounded, cell.held = score_recovered(series, dataset)
+            cell.n_bounded, cell.held = score_recovered(
+                series, dataset, cell.scored_by
+            )
         if errs:
             cell.mae = sum(abs(e) for e in errs) / len(errs)
             cell.rmse = math.sqrt(sum(e * e for e in errs) / len(errs))
@@ -385,6 +419,12 @@ def pool(records: list[Record], prefix: str) -> tuple:
     """
     errs = [r.rel_error for r in records
             if r.series.label.startswith(prefix) and r.rel_error is not None]
+    sets = {getattr(r, "scored_by", None) for r in records
+            if r.series.label.startswith(prefix) and r.rel_error is not None}
+    if len(sets) > 1:
+        # A pool across sets is a best-of in disguise: it averages one
+        # set's misses with another's hits into a number neither earns.
+        raise ValueError(f"pool {prefix!r} spans sets {sorted(map(str, sets))}")
     if not errs:
         return (0, float("nan"), float("nan"), float("nan"), float("nan"))
     within = [r for r in records
@@ -570,6 +610,77 @@ def render_set_accuracy(set_names) -> list[str]:
     return out
 
 
+def multi_set_rows(cells: list[Cell]) -> dict[str, list[tuple[str, Cell | None, Cell | None]]]:
+    """Series scored by more than one set: per series, per set, the
+    in-domain and out-of-domain cells. Sets in name order -- never by score."""
+    out: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(lambda: [None, None]))
+    for c in cells:
+        if "  @" not in c.label or c.scored_by is None:
+            continue
+        series = c.label.split("  @")[0]
+        out[series][c.scored_by][0 if c.domain == "in-domain" else 1] = c
+    return {
+        series: [(name, *by_set[name]) for name in sorted(by_set)]
+        for series, by_set in sorted(out.items())
+    }
+
+
+def _merged(cs: list[Cell | None]) -> tuple[int, float]:
+    """Scored points and bias over the cells given, weighted by points."""
+    cs = [c for c in cs if c is not None and c.n_scored]
+    n = sum(c.n_scored for c in cs)
+    return n, (sum(c.bias * c.n_scored for c in cs) / n if n else float("nan"))
+
+
+def render_multi_set(cells: list[Cell]) -> list[str]:
+    """Every eligible set on every series that has more than one.
+
+    The sets are listed in name order and none is marked best; the spread
+    between them is reported as what it is -- the model-form uncertainty a
+    designer inherits by choosing one. Eligibility is derived by rule
+    (runner.eligible_sets), so this list cannot have been trimmed to the
+    sets that score well.
+    """
+    rows = multi_set_rows(cells)
+    if not rows:
+        return []
+    out = [
+        "Series scored by several sets (every eligible set, in name order; "
+        "none is ranked, none is picked):",
+        f"  {'series / set':<52} {'all':>4} {'bias':>7}   {'in':>3} {'bias':>7}  lab",
+    ]
+    one_lab: set[str] = set()
+    for series, sets in rows.items():
+        out.append(f"  {series}")
+        biases, labs = [], set()
+        for name, inside, outside in sets:
+            n_all, b_all = _merged([inside, outside])
+            n_in, b_in = _merged([inside])
+            lab = SET_LAB.get(name, "unknown")
+            labs.add(lab)
+            if n_all:
+                biases.append(b_all)
+            out.append(
+                f"    {name:<50} {n_all:>4} {_pct(b_all)}   {n_in:>3} {_pct(b_in)}  {lab}"
+            )
+        if len(biases) > 1:
+            out.append(
+                f"    spread of bias across sets: {_pct(min(biases)).strip()} to "
+                f"{_pct(max(biases)).strip()} -- the cost of choosing one"
+            )
+        if len(labs) == 1:
+            one_lab |= labs
+    out.append(
+        "  all = every scored point; in = inside that set's own validity box."
+    )
+    for lab in sorted(one_lab - {"unknown"}):
+        out.append(
+            f"  Where every set is {lab}, the sets agreeing with each other is "
+            "NOT independent corroboration: only the measured series is."
+        )
+    return out
+
+
 def render(
     cells: list[Cell], pools: dict | None = None, dataset=None
 ) -> str:
@@ -630,6 +741,10 @@ def render(
                 "  must not be judged on conditions its authors never "
                 "claimed -- not because extrapolating is always worse."
             )
+        multi = render_multi_set(cells)
+        if multi:
+            lines.append("")
+            lines.extend(multi)
         lines.append("")
         lines.extend(fidelity.render(dataset))
         lines.append("")

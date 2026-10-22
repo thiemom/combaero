@@ -175,10 +175,12 @@ SET_ALSO_PRODUCES: dict[str, tuple[str, ...]] = {
         "R_ribbed_wall", "R_normalised_pe", "R_normalised_angled",
         "G_four_wall", "Nu_ratio_ribbed_DB",
     ),
-    "rallabandi_2009_high_re": ("R_ribbed_wall", "R_normalised_pe"),
+    "rallabandi_2009_high_re": (
+        "R_ribbed_wall", "R_normalised_pe", "Nu_ratio_ribbed_DB",
+    ),
     # Fig. 4.48's R panel plots raw R (no (p/e/10)^0.35 normalisation unlike
     # figures 4.46/4.47), so this set needs no R_normalised_* entry.
-    "han_1989_narrow_channel": ("R_ribbed_wall",),
+    "han_1989_narrow_channel": ("R_ribbed_wall", "Nu_ratio_ribbed_DB"),
     # The effusion set's overall-eta closure is a network result built from
     # the same internal h -- an OUTPUT of the set, not a conversion of it.
     "andrews_1986_effusion_internal": (
@@ -200,6 +202,7 @@ for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee"
     SET_PRODUCES[f"han_zhang_lee_1991_{_tag}"] = "G_ribbed_wall"
     SET_ALSO_PRODUCES[f"han_zhang_lee_1991_{_tag}"] = (
         "R_ribbed_wall", "G_four_wall", "Nu_ratio_ribbed_DB_vs_fbar",
+        "Nu_ratio_ribbed_DB",
     )
 
 

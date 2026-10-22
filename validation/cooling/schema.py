@@ -72,6 +72,11 @@ class SeriesMetadata:
     # the page independently of where the digitiser put the points. See
     # validation/cooling/verify.py.
     verification: dict | None = None
+    # Further sets that score this series, each reported on its own row and
+    # never ranked against `scores` or each other. Declared, but not chosen:
+    # the list must be EVERY eligible set, which a test derives by rule, so
+    # an unflattering set cannot be left off (see conventions.eligible_sets).
+    also_scores: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -141,6 +146,7 @@ def load_dataset(root: Path | None = None) -> list[SeriesMetadata]:
                     scores=entry.get("scores"),
                     rib_shape=entry.get("rib_shape"),
                     verification=entry.get("verification"),
+                    also_scores=tuple(entry.get("also_scores") or ()),
                 )
             )
     return out

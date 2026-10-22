@@ -68,6 +68,14 @@ must never look the same on a scorecard.
   `G_bar = 1.2 G` looks the same shape and is NOT registered: it is a
   published constant whose measured ratio spans 1.096-1.413, so it is
   applied as the source's own correlation with its cost measured.
+- **A series may be scored by several sets, but never by a chosen few.**
+  `also_scores` must list EVERY set `runner.eligible_sets` derives by rule
+  (shape and angle bind, the quantity resolves, a prediction comes back),
+  so a set cannot be left off because it reads badly. Each set gets its own
+  row; the report lists them in name order, ranks none, and pools none with
+  another (`scorecard.pool` refuses). The spread between them is reported as
+  what it is -- the model-form uncertainty of choosing one -- and where all
+  of them come from one lab their agreement is labelled as not independent.
 - **Fidelity needs completely-sampled data to mean anything.** See below.
 
 ## The trap: sampling completeness cuts across both
