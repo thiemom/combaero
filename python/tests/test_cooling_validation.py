@@ -1110,3 +1110,67 @@ def test_rib_angle_reaches_the_correlation_on_the_eplus_path() -> None:
         f"alpha={series.alpha_deg} value ({at_declared.G:.3f}); it matches "
         f"alpha=90 ({at_ninety.G:.3f}), so the rib angle is being dropped"
     )
+
+
+def _cr4396(records, figure: str) -> list[Record]:
+    return [
+        r for r in records if r.series.source.name == "johnson1993" and r.series.figure == figure
+    ]
+
+
+def test_cr4396_scores_the_han_sets_cross_source_on_a_common_basis(dataset, records) -> None:
+    """#452: an independent lab (Pratt & Whitney), so ACCURACY, never fidelity.
+
+    Both Han sets over-predict CR-4396's cast-style, staggered trips by a
+    flat level: +12% on the normal trips, +18% on the 45 deg skewed ones,
+    with no Re trend. e/d 0.1 is above both sets' 0.047-0.078, so every
+    point is out of domain. Bounds are the values recorded when #452 was
+    scored, wide enough for a re-digitisation, far too narrow to absorb
+    the 14.6% the basis conversion moves them.
+    """
+    from validation.cooling.conventions import CONVERSIONS
+    from validation.cooling.scorecard import basis_of
+
+    to_db = CONVERSIONS[("Nu_ratio_ribbed_KP", "Nu_ratio_ribbed_DB")].factor()
+    assert to_db == pytest.approx(0.0176 / (0.023 * 0.72**0.4))
+    for figure, set_name, lo, hi in (
+        ("6.1", "han_1988_orthogonal", 0.09, 0.15),
+        ("6.2", "han_park_1988_angled", 0.15, 0.22),
+    ):
+        rs = _cr4396(records, figure)
+        assert len(rs) == 24
+        assert {r.series.scores for r in rs} == {set_name}
+        assert basis_of(rs[0].series, set_name) == "accuracy"
+        assert all(r.predicted is not None and r.extrapolated for r in rs)
+        for r in rs:
+            digitised = next(p.y for p in load_points(r.series) if p.x == r.x)
+            assert r.measured == pytest.approx(digitised * to_db)
+        bias = sum(r.rel_error for r in rs) / len(rs)
+        assert lo < bias < hi, f"{figure}: recorded +12.1% / +18.4% in #452, now {bias:+.1%}"
+
+
+def test_cr4396_on_the_raw_kays_perkins_basis_would_read_as_agreement(dataset) -> None:
+    """The conversion falsified, not asserted.
+
+    Declared as though its ordinate were already Dittus-Boelter, a CR-4396
+    series must be REFUSED, not scored -- and the number it would have
+    produced is the trap: Han within a few percent, where the common basis
+    says 12-18% high.
+    """
+    from validation.cooling import conventions
+
+    series = _series(dataset, "fig6.1_leading_segB")
+    honest = run_series(series)
+    try:
+        conventions.SERIES_OVERRIDE[series.label] = "Nu_ratio_ribbed_DB"
+        refused = run_series(series)
+    finally:
+        conventions.SERIES_OVERRIDE.pop(series.label, None)
+    assert all(r.predicted is None for r in refused)
+    assert "registered conversion" in (refused[0].reason or "")
+
+    to_db = conventions.CONVERSIONS[("Nu_ratio_ribbed_KP", "Nu_ratio_ribbed_DB")].factor()
+    raw = [r.predicted / (r.measured / to_db) - 1.0 for r in honest]
+    fair = [r.rel_error for r in honest]
+    assert abs(sum(raw) / len(raw)) < 0.05
+    assert sum(fair) / len(fair) > 0.10

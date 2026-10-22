@@ -77,6 +77,8 @@ AXIS_NAMES = {
     "R_normalised": "R / (P/e/10)^0.35",
     "f_ratio": "f / f_0",
     "Nu_ratio": "Nu_r / Nu_0",
+    # Kays and Perkins, NOT Dittus-Boelter: 0.873 of it at Pr 0.72.
+    "Nu_ratio_KP": "Nu / Nu_inf, Nu_inf = 0.0176 Re^0.8 (Kays & Perkins)",
     "G_coolant": "G [kg/s/m2], coolant per unit plate area",
     # The two h conventions spelled out, because a bare "h" on an axis is
     # exactly how 86-GT-225's h_m and 88-GT-290's h get confused.
