@@ -201,12 +201,34 @@ Taslim's ~13% BELOW, so the independent lab does not side with either --
 see `lau_1990_v_ribs.md` L2. The rib cross-section shape is not stated in
 the paper, and nor is a measurement uncertainty.
 
-The rest of this source stays unscored, for the reasons below: the Nusselt
-series, the non-square friction series (whose `R` conversion carries the
-aspect-ratio term) and all one-side-turbulated series (refused by the
-runner: Han's decomposition is for two ribbed walls).
+## Every aspect ratio SCORED (2026-10-22)
 
-## Committed UNSCORED, deliberately (the rest)
+The AR 0.5 and 3.5 two-side friction series had stayed unscored under the
+note below, which #443 had already made stale: the comparison is made in
+`f`, so the aspect-ratio term inside Han's `R` never touches the measured
+side. W/H enters only through the set's own four-sided `f` (evaluated at the
+rig's W/H) and Han's `fbar` inverse, the same path as AR 1.0. By the
+CR-4396 rule they are scored by every eligible set -- here only
+`han_1988_orthogonal`. Leaving them out kept only the square channel, which
+reads best.
+
+| Taslim AR (Han W/H) | `e/D_H` | n | Han `fbar` vs measured |
+|---|---|---|---|
+| 0.5 (2.0) | 0.250 | 4 | -11.7% |
+| 0.5 (2.0) | 0.125 | 11 | +12.6% |
+| 3.5 (0.286) | 0.053 | 8 | -34.6% |
+| 3.5 (0.286) | 0.107 | 7 | -34.3% |
+| 3.5 (0.286) | 0.161 | 8 | -43.7% |
+
+All out of domain: AR 0.5's `e/D` is above Han's band; AR 3.5's W/H 0.286 is
+below Han's 1-4. AR 3.5 is the only independent-lab check of Han's friction
+in a narrow channel, and it reads ~38% low. Accuracy, cross-source.
+
+Still unscored: the one-side-turbulated series (refused by the runner: Han's
+decomposition is for two ribbed walls). The Nusselt series are scored by
+this source's own ratio sets (#444).
+
+## The original UNSCORED note (superseded for friction)
 
 This source publishes a passage-average **Fanning** friction factor
 (`f = dP D_H g_c / 2 L rho V^2`) and a turbulated-surface Nusselt number.

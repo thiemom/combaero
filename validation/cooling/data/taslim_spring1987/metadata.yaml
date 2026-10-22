@@ -29,15 +29,18 @@
 # no Taslim configuration reaches Han's 0.047-0.078 band at a square channel;
 # AR 1.0 bottoms out at 0.083.
 #
-# WHY IT IS COMMITTED UNSCORED. The quantities here are the passage-average
-# Fanning friction factor and the turbulated-surface Nusselt number. combaero's
-# rib sets produce R and G, the law-of-the-wall roughness functions. Getting
-# from one to the other needs this source's OWN decomposition -- Han, Ou, Park
-# and Lei (1989) Eq. (5)-(9), whose R carries an aspect-ratio term INSIDE the
-# logarithm and is therefore not the same R the shipped sets produce. Scoring
-# it without declaring that conversion is the category error #389/#433 exist to
-# refuse. The runner work belongs with #402 and #403; the data is committed now
-# because it is verified and because it was expensive to produce.
+# WHAT IS SCORED, AND BY WHAT. The quantities here are the passage-average
+# Fanning friction factor and the turbulated-surface Nusselt number, not the
+# law-of-the-wall R and G. Going through R would need this source's OWN
+# decomposition -- Han, Ou, Park and Lei (1989) Eq. (5)-(9), whose R carries an
+# aspect-ratio term INSIDE the logarithm -- so nothing on the measured side
+# does. Instead (#443) the friction is compared on a Re_Dh path with Han's
+# measured passage-average fbar, the same definition (conventions.py:
+# f_fanning_passage -> f_channel_two_ribbed). Every two-wall fig11 series is
+# scored by han_1988_orthogonal, the one set eligible by rule; all of it is
+# out of Han's domain and labelled accuracy. The one-wall series stay
+# unscored: no shipped set models a single ribbed wall. fig4/fig5 Nu are
+# scored by this source's own taslim_spring_1987_* sets.
 #
 # ============================================================================
 # VERIFICATION -- five figures, each cross-checking at least one other
@@ -155,7 +158,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 0.5 = Han W/H 2.0, one wall(s) turbulated, e/D_H 0.250. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 0.5 = Han W/H 2.0, one wall(s) turbulated, e/D_H 0.250. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -193,7 +196,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 0.5 = Han W/H 2.0, one wall(s) turbulated, e/D_H 0.125. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 0.5 = Han W/H 2.0, one wall(s) turbulated, e/D_H 0.125. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -231,8 +234,8 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.250. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.250. Scored by han_1988_orthogonal, the one set eligible by rule, on the same Re_Dh fbar path as the AR 1.0 series (#443). W/H 2.0 is inside Han's 1-4, but e/D_H is above Han's 0.047-0.078 band, so every row is out of domain -- an accuracy measurement from an independent lab, labelled.
+    scores: han_1988_orthogonal
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -274,8 +277,8 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.125. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 0.5 = Han W/H 2.0, two wall(s) turbulated, e/D_H 0.125. Scored by han_1988_orthogonal, the one set eligible by rule, on the same Re_Dh fbar path as the AR 1.0 series (#443). W/H 2.0 is inside Han's 1-4, but e/D_H is above Han's 0.047-0.078 band, so every row is out of domain -- an accuracy measurement from an independent lab, labelled.
+    scores: han_1988_orthogonal
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -312,7 +315,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.083. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.083. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -350,7 +353,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.250. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.250. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -388,7 +391,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.167. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 1.0 = Han W/H 1.0, one wall(s) turbulated, e/D_H 0.167. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -573,7 +576,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.053. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.053. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -616,7 +619,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.107. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.107. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -654,7 +657,7 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.161. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
+      Taslim AR 3.5 = Han W/H 0.286, one wall(s) turbulated, e/D_H 0.161. Unscored because no shipped set models ribs on ONE wall: the rib sets are fitted to two opposite ribbed walls, and the Re_Dh friction path refuses a one-side series rather than score it as two-sided (Han's f decomposition assumes two opposite ribbed walls). The quantity itself is declared (f_fanning_passage -> f_channel_two_ribbed).
     scores: null
     verification:
       x_axis_type: log
@@ -692,8 +695,8 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.053. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.053. Scored by han_1988_orthogonal, the one set eligible by rule, on the same Re_Dh fbar path as the AR 1.0 series (#443). W/H 0.286 is below Han's 1-4 (and e/D_H above his band except at 0.053), so every row is out of domain -- an accuracy measurement from an independent lab, labelled, and the only independent check of Han's friction in a narrow channel.
+    scores: han_1988_orthogonal
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -730,8 +733,8 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.107. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.107. Scored by han_1988_orthogonal, the one set eligible by rule, on the same Re_Dh fbar path as the AR 1.0 series (#443). W/H 0.286 is below Han's 1-4 (and e/D_H above his band except at 0.053), so every row is out of domain -- an accuracy measurement from an independent lab, labelled, and the only independent check of Han's friction in a narrow channel.
+    scores: han_1988_orthogonal
     verification:
       x_axis_type: log
       y_axis_type: log
@@ -768,8 +771,8 @@ files:
     confidence: band
     uncertainty: null
     cross_check: >-
-      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.161. Committed UNSCORED: this source publishes a passage-average Fanning friction factor and a turbulated-surface Nusselt number, not the law-of-the-wall R and G the shipped sets produce. The conversion needs this family's own decomposition and must be declared before it is applied -- see the header and #402/#403.
-    scores: null
+      Taslim AR 3.5 = Han W/H 0.286, two wall(s) turbulated, e/D_H 0.161. Scored by han_1988_orthogonal, the one set eligible by rule, on the same Re_Dh fbar path as the AR 1.0 series (#443). W/H 0.286 is below Han's 1-4 (and e/D_H above his band except at 0.053), so every row is out of domain -- an accuracy measurement from an independent lab, labelled, and the only independent check of Han's friction in a narrow channel.
+    scores: han_1988_orthogonal
     verification:
       x_axis_type: log
       y_axis_type: log
