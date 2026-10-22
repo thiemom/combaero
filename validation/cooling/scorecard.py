@@ -90,12 +90,46 @@ class Cell:
     # envelope, and `han_1988_orthogonal`'s largest row is 52 of 98. One
     # number over both says nothing about either (#389).
     domain: str = "in-domain"
+    # The series this row belongs to, and whether several sets score it --
+    # which is how the several-sets section finds its rows, without
+    # parsing labels.
+    series_label: str = ""
+    multi_set: bool = False
     n_bounded: int = 0  # runs recovered as interval observations
     held: float = float("nan")  # fraction of those the prediction lands inside
 
     @property
     def unsupported(self) -> bool:
         return self.n_scored == 0
+
+
+def _specialists() -> tuple:
+    from validation.cooling import (
+        effusion_internal_runner,
+        effusion_overall_runner,
+        film_runner,
+        jet_array_runner,
+        orifice_runner,
+        ratio_runner,
+        shaped_film_runner,
+    )
+
+    return (
+        (jet_array_runner.owns, jet_array_runner.run_series),
+        (ratio_runner.owns, ratio_runner.run_series),
+        (orifice_runner.owns, orifice_runner.run_series),
+        # Before film_runner, which claims every x_over_D / eta_adiabatic
+        # series as cylindrical-hole Baldauf + Sellers.
+        (shaped_film_runner.owns, shaped_film_runner.run_series),
+        (film_runner.owns, film_runner.run_series),
+        (effusion_internal_runner.owns, effusion_internal_runner.run_series),
+        (effusion_overall_runner.owns, effusion_overall_runner.run_series),
+    )
+
+
+def rib_owned(series) -> bool:
+    """True when no specialist claims the series, so the rib runner scores it."""
+    return not any(owns(series) for owns, _ in _specialists())
 
 
 def run_dataset(dataset) -> list[Record]:
@@ -108,30 +142,10 @@ def run_dataset(dataset) -> list[Record]:
     first version's bug: the jet-array runner claimed the orifice series and
     reported them unscored.
     """
-    from validation.cooling import (
-        effusion_internal_runner,
-        effusion_overall_runner,
-        film_runner,
-        jet_array_runner,
-        orifice_runner,
-        ratio_runner,
-        shaped_film_runner,
-    )
     from validation.cooling.runner import run_series as rib_run
     from validation.cooling.runner import sets_for
 
-    specialists = (
-        (jet_array_runner.owns, jet_array_runner.run_series),
-        (ratio_runner.owns, ratio_runner.run_series),
-        (orifice_runner.owns, orifice_runner.run_series),
-        # Before film_runner, which claims every x_over_D / eta_adiabatic
-        # series as cylindrical-hole Baldauf + Sellers.
-        (shaped_film_runner.owns, shaped_film_runner.run_series),
-        (film_runner.owns, film_runner.run_series),
-        (effusion_internal_runner.owns, effusion_internal_runner.run_series),
-        (effusion_overall_runner.owns, effusion_overall_runner.run_series),
-    )
-
+    specialists = _specialists()
     out: list[Record] = []
     for series in dataset:
         for owns, run in specialists:
@@ -209,6 +223,19 @@ for _ar, _ed in ((0.5, 0.125), (0.5, 0.250), (1.0, 0.083), (1.0, 0.167),
 for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee", "45lam"):
     SET_ORIGIN[f"han_zhang_lee_1991_{_tag}"] = "ASME J. Heat Transfer 113, 590"
 
+# Two sets keyed to ONE citation: the book credits figures 4.47 and 4.48 both
+# to IJHMT 31(1), 183, but han_park_1988_angled is fitted to figure 4.47
+# (square channel, angled ribs) and han_1989_narrow_channel to figure 4.48
+# (narrow channels). While each scored only its own figure the shared key
+# was harmless. Scored by every eligible set, each would read the OTHER's
+# figure as "fidelity" -- claiming a miss on data the correlation was never
+# fitted to is our transcription bug. So within that source, fidelity is
+# the set's own figure only.
+SET_OWN_FIGURES: dict[str, tuple[str, frozenset[str]]] = {
+    "han_park_1988_angled": ("han2012", frozenset({"4.47"})),
+    "han_1989_narrow_channel": ("han2012", frozenset({"4.48"})),
+}
+
 # Which LAB each rib set comes from. Two sets from one lab agreeing is not
 # two labs agreeing: they share a rig family, a data-reduction convention
 # and often the data itself. Every shipped rib set is Han's laboratory at
@@ -241,6 +268,9 @@ def basis_of(series, set_name: str | None) -> str:
     origin = SET_ORIGIN.get(set_name or "")
     if origin is None:
         return "unknown"
+    own = SET_OWN_FIGURES.get(set_name or "")
+    if own is not None and series.source.name == own[0] and series.figure not in own[1]:
+        return "accuracy"
     haystack = (
         f"{series.after or ''} {series.source.name} {series.source.citation}"
     ).lower()
@@ -339,11 +369,15 @@ def build(records: list[Record], dataset=None) -> list[Cell]:
         # near-exact comparison with one dominated by a conversion factor.
         group = getattr(r, "group", None)
         label = r.series.label
-        if r.series.also_scores:
-            # One row per set. The set rides on the label so two sets'
+        scored_by = getattr(r, "scored_by", None)
+        if scored_by is not None and scored_by != r.series.scores:
+            # One row per set. An ADDED set rides on the label so two sets'
             # rows never merge, and it goes before any group so `rollup`
-            # still finds the group after "  [".
-            label += f"  @{r.scored_by}"
+            # still finds the group after "  [". The series' own `scores`
+            # set keeps the bare label: it is the pairing by provenance
+            # (the set's own paper, or the one its issue scoped), not one
+            # picked by score, and its rows stay as they were.
+            label += f"  @{scored_by}"
         label += f"  [{group}]" if group else ""
         # And the harness splits every series by the set's own validity box.
         # `extrapolated` already flags each point; until now it was only
@@ -364,6 +398,8 @@ def build(records: list[Record], dataset=None) -> list[Cell]:
             # the per-series listing without a column nothing else needs.
             label=label
             + (f"  {OUT_OF_DOMAIN_MARK}" if domain == "out-of-domain" else ""),
+            series_label=series.label,
+            multi_set=bool(series.also_scores),
             domain=domain,
             kind=series.kind,
             scored_by=getattr(rs[0], "scored_by", None) or series.scores,
@@ -417,19 +453,23 @@ def pool(records: list[Record], prefix: str) -> tuple:
     land on one curve anyway, so pooling costs nothing and removes a
     dependence on labels that cannot be fully trusted.
     """
-    errs = [r.rel_error for r in records
-            if r.series.label.startswith(prefix) and r.rel_error is not None]
-    sets = {getattr(r, "scored_by", None) for r in records
-            if r.series.label.startswith(prefix) and r.rel_error is not None}
+    # Each series' own `scores` set only. The other sets' records for the
+    # same series are a different question, answered on their own rows.
+    records = [
+        r for r in records
+        if r.series.label.startswith(prefix)
+        and r.rel_error is not None
+        and getattr(r, "scored_by", r.series.scores) == r.series.scores
+    ]
+    sets = {r.series.scores for r in records}
     if len(sets) > 1:
         # A pool across sets is a best-of in disguise: it averages one
         # set's misses with another's hits into a number neither earns.
         raise ValueError(f"pool {prefix!r} spans sets {sorted(map(str, sets))}")
+    errs = [r.rel_error for r in records]
     if not errs:
         return (0, float("nan"), float("nan"), float("nan"), float("nan"))
-    within = [r for r in records
-              if r.series.label.startswith(prefix) and r.rel_error is not None
-              and r.within_uncertainty]
+    within = [r for r in records if r.within_uncertainty]
     mean = sum(errs) / len(errs)
     return (
         len(errs),
@@ -615,10 +655,9 @@ def multi_set_rows(cells: list[Cell]) -> dict[str, list[tuple[str, Cell | None, 
     in-domain and out-of-domain cells. Sets in name order -- never by score."""
     out: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(lambda: [None, None]))
     for c in cells:
-        if "  @" not in c.label or c.scored_by is None:
+        if not c.multi_set or c.scored_by is None:
             continue
-        series = c.label.split("  @")[0]
-        out[series][c.scored_by][0 if c.domain == "in-domain" else 1] = c
+        out[c.series_label][c.scored_by][0 if c.domain == "in-domain" else 1] = c
     return {
         series: [(name, *by_set[name]) for name in sorted(by_set)]
         for series, by_set in sorted(out.items())

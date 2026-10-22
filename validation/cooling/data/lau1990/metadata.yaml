@@ -104,6 +104,7 @@ files:
     confidence: exact
     uncertainty: 0.058
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       x_ticks: [100, 200, 400, 640]
@@ -144,6 +145,7 @@ files:
     confidence: exact
     uncertainty: 0.058
     scores: han_1988_orthogonal
+    also_scores: [han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       x_ticks: [100, 200, 400, 640]
@@ -195,6 +197,7 @@ files:
     # `uncertainty` is the friction figure (+/-10.9%), since R is built from
     # the friction factor.
     scores: han_1988_orthogonal
+    also_scores: [han_1989_narrow_channel, han_park_1988_angled, han_zhang_lee_1991_90]
     verification:
       x_axis_type: log
       x_ticks: [100, 200, 400, 640]

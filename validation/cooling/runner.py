@@ -710,16 +710,28 @@ def eligible_sets(series: SeriesMetadata) -> tuple[str, ...]:
     """Every rib set this harness CAN score the series with.
 
     Derived by rule, never chosen: the set binds the series' rib shape and
-    angle, its output resolves against the series' measured quantity, and
-    the runner returns at least one prediction. A series scored by more
-    than one set must list exactly these, so the choice of which sets to
-    show cannot be made after seeing their scores.
+    angle, its output MATCHES the series' measured quantity (directly or by
+    a registered conversion -- an undeclared convention is scorable for the
+    series' own set but qualifies no other), and the runner returns at
+    least one prediction. A set validated at one rib angle does not qualify
+    for a series that does not say its angle: figure 4.47 pools 30-90 deg,
+    and a 90 deg set would score it as though every rib were transverse.
+
+    Every scored rib series must list exactly these, so the choice of which
+    sets to show cannot be made after seeing their scores.
     """
     from validation.cooling import conventions
 
+    accepted = (conventions.STATUS_DIRECT, conventions.STATUS_CONVERTED)
+    angle_known = series.alpha_deg is not None or series.x_axis == "alpha_deg"
     out = []
     for name in SETS:
+        if name != series.scores and conventions.resolve(series, name).status not in accepted:
+            continue
         if not conventions.resolve(series, name).scorable:
+            continue
+        alpha = SETS[name]().valid_alpha
+        if not angle_known and alpha.hi > 0.0 and alpha.hi == alpha.lo:
             continue
         try:
             records = run_series(series, set_name=name)

@@ -69,9 +69,15 @@ must never look the same on a scorecard.
   published constant whose measured ratio spans 1.096-1.413, so it is
   applied as the source's own correlation with its cost measured.
 - **A series may be scored by several sets, but never by a chosen few.**
-  `also_scores` must list EVERY set `runner.eligible_sets` derives by rule
-  (shape and angle bind, the quantity resolves, a prediction comes back),
-  so a set cannot be left off because it reads badly. Each set gets its own
+  Every scored rib series' `scores` + `also_scores` must equal what
+  `runner.eligible_sets` derives by rule (shape and angle bind, the
+  quantity matches directly or by a registered conversion, a single-angle
+  set needs a stated angle, a prediction comes back), so a set cannot be
+  left off because it reads badly. `scores` keeps the bare row label as
+  the provenance pairing; added sets read `series  @set`. `scores: null`
+  remains a recorded decision (printed correlation curves, resolved
+  mislabels), not an omission. Two sets sharing a citation are fidelity
+  only on their own figure (`scorecard.SET_OWN_FIGURES`). Each set gets its own
   row; the report lists them in name order, ranks none, and pools none with
   another (`scorecard.pool` refuses). The spread between them is reported as
   what it is -- the model-form uncertainty of choosing one -- and where all

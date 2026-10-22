@@ -780,7 +780,12 @@ def test_figure_453_90deg_scores_on_the_performance_curve(records) -> None:
     The chain's recovered Re landing inside that range is a check the
     borrowed geometry and the fbar convention could have failed.
     """
-    rows = [r for r in records if r.series.label == "han2012/fig4.53_90deg_continuous_Nu_ratio"]
+    rows = [
+        r
+        for r in records
+        if r.series.label == "han2012/fig4.53_90deg_continuous_Nu_ratio"
+        and r.scored_by == r.series.scores
+    ]
     assert len(rows) == 5
     assert all(r.predicted is not None for r in rows), [r.reason for r in rows]
     assert all(15_000 <= r.re_used <= 80_000 for r in rows), [r.re_used for r in rows]
@@ -949,7 +954,12 @@ def test_han_park_1988_angled_confirmed_independently_by_figure_451(
 
     cells = {c.label: c for c in build(records)}
     scored_parallel = [
-        c for name, c in cells.items() if "par" in name and "4.51" in name and not c.unsupported
+        c
+        for name, c in cells.items()
+        if "par" in name
+        and "4.51" in name
+        and not c.unsupported
+        and c.scored_by == "han_park_1988_angled"
     ]
     assert scored_parallel, "no figure 4.51 parallel class scored"
 
@@ -1254,9 +1264,12 @@ def test_several_sets_are_reported_side_by_side_never_ranked(dataset, records) -
     assert "best" not in text.lower()
     assert "NOT independent corroboration" in text
 
-    # Pooling one series across sets would be a best-of by averaging.
+    # A pool takes each series' own set and never mixes two: one series
+    # pools to its 4 own-set points, not 16; Figs. 6.1 and 6.2 together
+    # (two own sets) refuse.
+    assert pool(records, "johnson1993/fig6.2_leading_segB")[0] == 4
     with pytest.raises(ValueError, match="spans sets"):
-        pool(records, "johnson1993/fig6.2_leading_segB")
+        pool(records, "johnson1993/fig6")
 
     # Every rib set states its lab, so the independence note cannot go
     # silent for a set nobody labelled.
@@ -1271,3 +1284,73 @@ def test_only_the_rib_runner_scores_one_series_with_several_sets(dataset) -> Non
     film = next(s for s in dataset if s.scores == "baldauf_2002_sellers")
     with pytest.raises(ValueError, match="only supported by the rib runner"):
         run_dataset([dataclasses.replace(film, also_scores=("colban_2011_shaped",))])
+
+
+def test_every_scored_rib_series_lists_every_eligible_set(dataset) -> None:
+    """The CR-4396 rule, everywhere the rib runner scores. A series whose
+    `scores` is set must be scored by every set `eligible_sets` derives --
+    so no series shows only the set that flatters it. `scores: null` stays a
+    recorded decision (a printed correlation curve, a resolved mislabel),
+    not an omission this test could judge."""
+    from validation.cooling.runner import eligible_sets, sets_for
+    from validation.cooling.scorecard import rib_owned
+
+    checked = 0
+    for s in dataset:
+        if s.scores is None or not rib_owned(s):
+            continue
+        checked += 1
+        assert set(sets_for(s)) == set(eligible_sets(s)), (
+            f"{s.label}: declared {sorted(sets_for(s))}, eligible {sorted(eligible_sets(s))}"
+        )
+    assert checked >= 75
+
+
+def test_eligibility_needs_a_known_angle_and_a_declared_quantity(dataset, monkeypatch) -> None:
+    """Two ways a set can LOOK scorable and not be.
+
+    A single-angle set does not qualify for a cloud that does not state its
+    angle: figure 4.47's G pools 30-90 deg, and han_1988_orthogonal (90 deg
+    only) would score it as all-transverse. And an undeclared measurement
+    convention lets a series' own set score it, but qualifies no other.
+    """
+    from validation.cooling.runner import eligible_sets
+
+    pooled = next(s for s in dataset if s.label == "han2012/fig4.47_G_vs_eplus")
+    assert pooled.alpha_deg is None
+    got = eligible_sets(pooled)
+    assert "han_park_1988_angled" in got
+    for single_angle in ("han_1988_orthogonal", "rallabandi_2009_high_re", "han_zhang_lee_1991_90"):
+        assert single_angle not in got
+    # Falsified: the same series with its angle stated admits the 90 deg set.
+    assert "han_1988_orthogonal" in eligible_sets(dataclasses.replace(pooled, alpha_deg=90.0))
+
+    from validation.cooling import conventions
+
+    monkeypatch.setattr(conventions, "series_convention", lambda series: None)
+    assert conventions.resolve(pooled, "han_1989_narrow_channel").status == (
+        conventions.STATUS_UNDECLARED
+    )
+    assert eligible_sets(pooled) == ("han_park_1988_angled",)
+
+
+def test_a_set_scoring_another_sets_figure_is_accuracy(dataset) -> None:
+    """Figures 4.47 and 4.48 share one book citation but are two sets' own
+    data. Once every eligible set scores both, the shared key would call
+    han_park_1988_angled on the narrow-channel figure "fidelity" -- a miss
+    claimed as our transcription bug on data that set was never fitted to.
+    Reprints of a set's own paper stay fidelity: figure 4.51 is Han, Zhang
+    and Lee (1991) Fig. 12."""
+    from validation.cooling.scorecard import basis_of
+
+    def first(figure: str):
+        return next(
+            s for s in dataset if s.source.name == "han2012" and s.figure == figure and s.scores
+        )
+
+    assert basis_of(first("4.47"), "han_park_1988_angled") == "fidelity"
+    assert basis_of(first("4.48"), "han_1989_narrow_channel") == "fidelity"
+    assert basis_of(first("4.48"), "han_park_1988_angled") == "accuracy"
+    assert basis_of(first("4.47"), "han_1989_narrow_channel") == "accuracy"
+    g45 = next(s for s in dataset if s.label == "han2012/fig4.51_G_45par")
+    assert basis_of(g45, "han_zhang_lee_1991_45par") == "fidelity"
