@@ -8,6 +8,7 @@
 interface EdgeLike {
 	source: string;
 	target: string;
+	sourceHandle?: string | null;
 	data?: { type?: string } | null;
 }
 
@@ -28,9 +29,16 @@ export function defaultFilmSide(
 	providerId: string,
 	edges: EdgeLike[],
 ): "a" | "b" {
+	// An effusion liner's coolant-out port feeds its backside duct onwards,
+	// not the gas its film lies in (#695).
 	const outlets = new Set(
 		edges
-			.filter((e) => isFlow(e) && e.source === providerId)
+			.filter(
+				(e) =>
+					isFlow(e) &&
+					e.source === providerId &&
+					!e.sourceHandle?.includes("coolantout"),
+			)
 			.map((e) => e.target),
 	);
 	const fed = (duct: string): boolean =>

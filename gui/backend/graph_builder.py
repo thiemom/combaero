@@ -976,6 +976,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 gas_augmentation=_ld.gas_augmentation,
                 turbulence_intensity=_ld.turbulence_intensity,
                 gas_heat_flux=_ld.gas_heat_flux,
+                film_direction=_ld.film_direction,
             )
             liner.add_to(net, _ends[0], _ends[1], _ends[2])
             gui_arrays[elem_id] = liner

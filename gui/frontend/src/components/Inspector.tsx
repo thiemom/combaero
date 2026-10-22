@@ -1078,6 +1078,29 @@ const Inspector = () => {
 									</select>
 								</div>
 								{num("gas_heat_flux", "Imposed Heat Flux [W/m²] (plenum)", 0)}
+								<div className="flex flex-col gap-1">
+									<label
+										htmlFor={`film_direction_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Gas Flow Past the Panels
+									</label>
+									<select
+										id={`film_direction_${selectedNode.id}`}
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.film_direction || "with_coolant"}
+										onChange={(e) => set({ film_direction: e.target.value })}
+									>
+										<option value="with_coolant">
+											With the coolant (station 1 upstream)
+										</option>
+										<option value="against_coolant">Against the coolant</option>
+									</select>
+									<p className="text-[10px] text-gray-500 leading-snug">
+										Orders the panels for the film this liner lays on a wall
+										downstream (drag its "f" handle onto that wall).
+									</p>
+								</div>
 								{rows && rows.length > 0 && (
 									<div className="flex flex-col gap-1 mt-2">
 										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
@@ -3431,7 +3454,10 @@ const Inspector = () => {
 					// gas path, named here; that side's T_aw becomes
 					// T_aw - eta (T_aw - T_coolant).
 					const providers = nodes.filter(
-						(n) => n.type === "film_cooling" || n.type === "effusion_plate",
+						(n) =>
+							n.type === "film_cooling" ||
+							n.type === "effusion_plate" ||
+							n.type === "effusion_liner",
 					);
 					const d = selectedEdge.data;
 					const r = d.result;
@@ -3468,8 +3494,9 @@ const Inspector = () => {
 							{providers.length === 0 && (
 								<p className="text-[10px] text-gray-500 leading-snug">
 									Add Film Cooling Holes (or an Effusion Plate with a panel
-									length) upstream on the gas path to cover this wall. Dragging
-									from their "f" handle onto this wall's label sets it too.
+									length, or an Effusion Liner) upstream on the gas path to
+									cover this wall. Dragging from their "f" handle onto this
+									wall's label sets it too.
 								</p>
 							)}
 							{d.film && (

@@ -6576,6 +6576,24 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "(2002) per row, Sellers-superposed, averaged over [x_start, x_end]\n"
         "downstream of the last row (in D). Returns eta, d eta/dM, d eta/dP\n"
         "(density ratio) and Baldauf's envelope flag.");
+  py::class_<combaero::cooling::FilmSpanAverageGroups>(m, "FilmSpanAverageGroups")
+      .def_readonly("eta", &combaero::cooling::FilmSpanAverageGroups::eta)
+      .def_readonly("weight", &combaero::cooling::FilmSpanAverageGroups::weight)
+      .def_readonly("deta_dM", &combaero::cooling::FilmSpanAverageGroups::deta_dM)
+      .def_readonly("deta_dP", &combaero::cooling::FilmSpanAverageGroups::deta_dP)
+      .def_readonly("d_weight_dM", &combaero::cooling::FilmSpanAverageGroups::d_weight_dM)
+      .def_readonly("d_weight_dP", &combaero::cooling::FilmSpanAverageGroups::d_weight_dP)
+      .def_readonly("extrapolated", &combaero::cooling::FilmSpanAverageGroups::extrapolated);
+  m.def("film_span_average_baldauf_2002_groups",
+        &combaero::cooling::film_span_average_baldauf_2002_groups, py::arg("n_rows"),
+        py::arg("row_pitch_over_D"), py::arg("x_start_over_D"),
+        py::arg("x_end_over_D"), py::arg("M"), py::arg("density_ratio"),
+        py::arg("alpha_deg"), py::arg("s_over_D"), py::arg("Tu"),
+        "Film a downstream wall sees from GROUPS of cylindrical-hole rows (an\n"
+        "effusion liner's panels, upstream first), each group at its own M and\n"
+        "density ratio: Baldauf (2002) per row, layered row by row so each\n"
+        "group keeps its own coolant temperature. T_aw,bar = T_ref (1 - eta)\n"
+        "+ sum_g weight[g] T_c,g; derivatives per group.");
   m.def("film_span_average_colban_2011",
         &combaero::cooling::film_span_average_colban_2011, py::arg("n_rows"),
         py::arg("row_pitch_over_D"), py::arg("x_start_over_D"),

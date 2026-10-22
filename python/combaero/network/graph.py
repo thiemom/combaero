@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from .components import NetworkElement, NetworkNode, ThermalWall
@@ -19,6 +19,9 @@ class FlowNetwork:
 
         # Thermal coupling walls dictionary
         self.walls: dict[str, ThermalWall] = {}
+        # Film providers that are not one element (#695): an EffusionLiner
+        # registers its panels' film here under its own id.
+        self.film_providers: dict[str, Any] = {}
         self.thermal_coupling_enabled: bool = True
 
         # Directed graph mapping: node_id -> list of element_ids
@@ -82,23 +85,36 @@ class FlowNetwork:
             raise ValueError(f"Unknown element_b/node_b '{wall.element_b}' for wall '{wall.id}'.")
 
         if wall.film is not None:
-            provider = self.elements.get(wall.film)
-            if provider is None or not hasattr(provider, "film_span_average"):
+            provider = self.film_provider(wall.film)
+            if provider is None:
                 raise ValueError(
                     f"Wall '{wall.id}': film {wall.film!r} is not a film provider "
-                    "(a FilmCoolingElement or EffusionPlateElement)."
+                    "(a FilmCoolingElement, EffusionPlateElement or EffusionLiner)."
                 )
             error = getattr(provider, "film_provider_error", lambda: None)()
             if error is not None:
                 raise ValueError(f"Wall '{wall.id}': film {wall.film!r}: {error}.")
+            from .components import film_sources  # deferred, as the imports above
+
             side = wall.film_side_id
-            if side in (provider.id, provider.from_node):
+            own = {provider.id}
+            for src in film_sources(provider):
+                own |= {src.element_id, src.supply_node}
+            if side in own:
                 raise ValueError(
                     f"Wall '{wall.id}': the film covers the GAS side downstream of "
                     f"the holes; {side!r} is the provider or its coolant supply (#386)."
                 )
 
         self.walls[wall.id] = wall
+
+    def film_provider(self, film_id: str) -> Any:
+        """The film provider ``film_id`` names: an element with a film span
+        average, or one registered in ``film_providers``; None otherwise."""
+        el = self.elements.get(film_id)
+        if el is not None and hasattr(el, "film_span_average"):
+            return el
+        return self.film_providers.get(film_id)
 
     def get_upstream_elements(self, node_id: str) -> list[NetworkElement]:
         """Return all elements feeding into the specified node."""

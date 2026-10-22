@@ -38,6 +38,30 @@ describe("defaultFilmSide", () => {
 	});
 });
 
+describe("defaultFilmSide for an effusion liner", () => {
+	it("follows its discharge, not its coolant-out port", () => {
+		const edges = [
+			{
+				source: "ln",
+				target: "cout",
+				sourceHandle: "port-coolantout-source",
+				data: {},
+			},
+			{ source: "cout", target: "back", data: {} },
+			{
+				source: "ln",
+				target: "ch",
+				sourceHandle: "port-discharge-source",
+				data: {},
+			},
+			{ source: "ch", target: "tail", data: {} },
+		];
+		expect(
+			defaultFilmSide({ source: "back", target: "tail" }, "ln", edges),
+		).toBe("b");
+	});
+});
+
 describe("filmDuctId", () => {
 	it("maps the stored side to the wall edge's ends", () => {
 		const w = { source: "x", target: "y" };

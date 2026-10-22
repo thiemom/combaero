@@ -805,6 +805,17 @@ inline constexpr Entry function_units[] = {
      "n_rows: -, row_pitch_over_D: -, x_start_over_D: -, x_end_over_D: -, M: -, "
      "area_ratio: -, P_over_D: -, t_over_P: -, alpha_deg: deg, density_ratio: -",
      "FilmSpanAverage"},
+    {"film_span_average_baldauf_2002_groups",
+     "n_rows: -, row_pitch_over_D: -, x_start_over_D: -, x_end_over_D: -, M: -, "
+     "density_ratio: -, alpha_deg: deg, s_over_D: -, Tu: -",
+     "FilmSpanAverageGroups"},
+    {"FilmSpanAverageGroups::eta", "-", "-"},
+    {"FilmSpanAverageGroups::weight", "-", "-"},
+    {"FilmSpanAverageGroups::deta_dM", "-", "-"},
+    {"FilmSpanAverageGroups::deta_dP", "-", "-"},
+    {"FilmSpanAverageGroups::d_weight_dM", "-", "-"},
+    {"FilmSpanAverageGroups::d_weight_dP", "-", "-"},
+    {"FilmSpanAverageGroups::extrapolated", "-", "-"},
     {"FilmSpanAverage::eta", "-", "-"},
     {"FilmSpanAverage::deta_dM", "-", "-"},
     {"FilmSpanAverage::deta_dP", "-", "-"},

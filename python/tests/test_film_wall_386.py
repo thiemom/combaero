@@ -271,7 +271,9 @@ def test_no_forward_coolant_flow_no_film() -> None:
     from combaero.network.components import film_on_wall_side
 
     for m_c in (0.0, -1e-3):
-        out = film_on_wall_side(g.elements["film"], hot, base, state, state, m_c, 0.25, 0.0, 0.05)
+        out = film_on_wall_side(
+            g.elements["film"], hot, base, state, [(state, m_c)], 0.25, 0.0, 0.05
+        )
         assert out is base
 
 
@@ -318,7 +320,8 @@ def test_the_jacobian_reaches_the_coolant_flow_and_temperature() -> None:
             stub.dT_aw_dfilm_mdot = ch.dT_aw_dfilm_mdot
             stub.dT_aw_dT_coolant = ch.dT_aw_dT_coolant
             stub.dT_aw_dT_inf = ch.dT_aw_dT_inf
-            setattr(stub, attr, 0.0)
+            old = getattr(stub, attr)
+            setattr(stub, attr, [0.0] * len(old) if isinstance(old, list) else 0.0)
             full(out, wall, stub, factor, relay_, up)
 
         return relay

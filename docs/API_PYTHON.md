@@ -416,6 +416,20 @@ integral is fixed composite Gauss-Legendre in `ln(1 + x/D)`, so the
 derivatives are exact for it (`deta_dP` is 0 for Colban). This is what
 `ThermalWall(film=...)` reads.
 
+```python
+g = cb.film_span_average_baldauf_2002_groups([2, 3, 2], 12.0, 0.0, 40.0,
+        M=[0.8, 1.3, 2.0], density_ratio=[1.4, 1.6, 1.9],
+        alpha_deg=30.0, s_over_D=7.0, Tu=0.05)
+g.eta, g.weight, g.deta_dM, g.d_weight_dM    # per group (upstream first)
+```
+
+Rows in groups (an effusion liner's panels, #695), each at its own M,
+density ratio and coolant temperature, layered row by row: past row j the
+wall sits at `(1 - eta_j) T_before + eta_j T_c,j`, so
+`T_aw = T_ref (1 - eta) + sum_g weight[g] T_c,g` with `sum(weight) = eta`
+(Sellers when every T_c is the same). One group is
+`film_span_average_baldauf_2002` exactly.
+
 #### Effusion plate internal heat transfer
 
 ```python
@@ -527,6 +541,14 @@ liner.summarize(res["__element_diag__"])   # bleed, U1/Vi, Cd, P_backside, T_wal
   plenum-fed correlation (`coolant_ht_plenum_assumed`), and the stations
   bleed through holes far smaller than the duct, beyond Bassett's measured
   psi = 1-3 (`station_psi_beyond_bassett`).
+- **A film provider (#695).** `add_to` registers the panels' film on the
+  network under the liner's id, so a wall downstream on the gas path can
+  name it: `ThermalWall(..., film="ln")`. Each panel is a group of
+  `round(panel_length / pitch_x)` Baldauf rows at its own M, DR and coolant
+  temperature (`film_span_average_baldauf_2002_groups`).
+  `film_direction="with_coolant"` (default) puts station 1 upstream on the gas
+  side; `"against_coolant"` reverses the panels. The undiluted gas (#694)
+  excludes every panel's stream when all discharge into one node.
 
 ##### Overall effectiveness, as an output
 
@@ -838,6 +860,11 @@ net.add_wall(ThermalWall(
   panel's own `gas_film` says. A full-coverage panel usually runs outside
   Baldauf's s/D and M envelope (`film_extrapolated`), and at high M Baldauf
   has the jets lifted off, so the film it carries downstream is small.
+- **An effusion liner is a provider too** (`film="<liner id>"`, #695): its
+  panels, one group each, see the liner's section above. Each panel's flow
+  and station temperature reach the Jacobian; `{wall}.T_coolant_film` is the
+  film's weighted coolant temperature and `{wall}.film_blowing_ratio` /
+  `film_density_ratio` the flow-weighted means.
 - **Only the driving temperature changes.** The covered side's T_aw becomes
   `T_aw - eta_bar (T_aw - T_coolant)`; its h, stream capacity and heat
   booking stay the duct's. `eta_bar` is `cb.film_span_average_*` over the
