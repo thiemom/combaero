@@ -105,9 +105,8 @@ def _solve(key: Key, with_bypass: bool = True) -> tuple[list[float], list[float]
         net.add_node(MassFlowBoundary("feed", m_dot=m_c, Tt=T0, Y=Y_AIR))
         bypass = "feed"
     arr.add_to(net, "supply", "exit", bypass=bypass)
-    # The outlet-referenced warm start: 0.5 s a case where the cold start
-    # fails first and retries (5-30 s). Same root either way.
-    res = NetworkSolver(net).solve(init_strategy="outletref_warmstart")
+    # The default start is warm for impingement networks (#706).
+    res = NetworkSolver(net).solve()
     assert res["__success__"], f"{key}: {res.get('__message__')}"
     diag = res["__element_diag__"]
     m = [diag[arr.plate_id(i)]["m_dot"] for i in range(1, N_ROWS + 1)]
