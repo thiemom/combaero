@@ -1,24 +1,28 @@
 # NASA CR-3630 (Florschuetz, Metzger and Su, 1982) -- initial crossflow, flow distribution
 
-**Status: UNCONFIRMED (transcribed 2026-10-22, #467).** Source:
+**Status: IMPLEMENTED and REVIEWED 2026-10-23** as the CR-3630 flow check of
+`ImpingementArray(bypass=...)` (#467, #705). Signed off by the user after
+checking every Table D.1 page against the scans: no errors found. Source:
 `docs/heat_transfer/flohrshuetz/NASA_CR-3630_Florschuetz_Metzger_Su_1982_initial_crossflow.pdf`
 (gitignored), Appendix D, Table D.1, printed pp. 137-148 (PDF pp. 149-160).
 Data: `data/florschuetz_metzger_su1982/table_d1_flow.csv`.
 
-## For the reviewer
+## Review questions and answers
 
-1. **Spot-check two pages against the CSV.** I checked B(10,4,1) (PDF p. 156)
-   and B(5,8,1) (p. 153) visually, digit by digit. Every other page rests on
-   the text layer plus the two identities below. *What turns on it:* the
-   validation thresholds in `test_impingement_bypass_validation.py`.
+1. **The transcription.** All 11 pages (42 tests) were checked by the user
+   against the page scans, side by side with the CSV: no errors. Before that
+   I had checked B(10,4,1) (PDF p. 156) and B(5,8,1) (p. 153) digit by digit,
+   and every page rests on the two identities below.
 2. **Channel width 18.29 cm.** Inferred, not printed as such: Table 3.1 gives
    18 holes across the channel at yn/d 4, d 0.254 cm, and every plate's
    count gives the same width. Only Re_j -> m_j depends on it, not the split.
+   Stands as documented.
 3. **Initial crossflow temperature.** Table D.1 gives only T0 (jet plenum).
    The runs are taken as isothermal (bypass at T0); I did not find the
    flow tests' bypass temperature stated. *What turns on it:* the bypass
    density, so its momentum, in proportion to any temperature difference.
-   The heat-transfer tests (Table D.2) are not used here.
+   The heat-transfer tests (Table D.2) are not used here. Stands as
+   documented.
 
 ## What the table prints
 
@@ -72,3 +76,5 @@ the case count).
 
 - 2026-10-22: transcribed from the text layer; two pages checked visually;
   closure identity added after the check failed on B(5,8,1).
+- 2026-10-23: signed off by the user; all 11 pages checked against the scans,
+  no errors.
