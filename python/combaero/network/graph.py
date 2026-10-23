@@ -206,6 +206,22 @@ class FlowNetwork:
             # declared, where the residual is defined (raises TypeError).
             declared_row_kinds(elem)
 
+        # A wall exchanges heat between two convective surfaces. A side without
+        # one (a PlenumNode; a combustor or chamber with no surface area) gave
+        # no heat and no error: the wall was silently inert. Checked here, after topology,
+        # since a surface's area can be resolved from the geometry.
+        if self.thermal_coupling_enabled:
+            for wid, wall in self.walls.items():
+                for side in (wall.element_a, wall.element_b):
+                    obj = self.elements.get(side) or self.nodes.get(side)
+                    if obj is not None and not obj.has_convective_surface:
+                        raise ValueError(
+                            f"FlowNetwork validation failed: wall {wid!r} side {side!r} "
+                            f"({type(obj).__name__}) has no convective surface, so the "
+                            "wall would exchange no heat. Wall a channel, or a combustor "
+                            "or momentum chamber with a surface area, or remove the wall."
+                        )
+
         # PressureLossElement ambiguity: both endpoints have has_theta=True and no
         # explicit theta_source override.  Requires user disambiguation.
         for eid, elem in self.elements.items():

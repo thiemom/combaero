@@ -1,0 +1,1 @@
+- A `ThermalWall` with a side that has no convective surface (a `PlenumNode`, or a combustor or momentum chamber with no surface area) now fails validation, naming the side. Before, it exchanged no heat and raised nothing: the wall was silently inert.
