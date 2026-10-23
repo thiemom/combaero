@@ -104,3 +104,67 @@ def test_one_thermal_edge_heats_every_row_and_reports_as_one() -> None:
 
 def test_orifice_offers_lichtarowicz() -> None:
     assert OrificeData(correlation="Lichtarowicz").correlation == "Lichtarowicz"
+
+
+def _bypass_schema(feed: str) -> dict:
+    """The default array with its "b" handle wired. ``feed``: 'channel' (a
+    duct from a pressure boundary), 'boundary' (wired straight in) or
+    'array' (an upstream array's exit, the gap continuing)."""
+    s = _schema()
+    if feed == "array":
+        s["nodes"].append(_node("up", "impingement_array", {"n_rows": 4}))
+        s["edges"] += [
+            _edge("u1", "supply", "up"),
+            _edge("u2", "up", "arr"),
+        ]
+        s["edges"][-1]["targetHandle"] = "port-bypass-target"
+        return s
+    s["nodes"].append(_node("bsrc", "pressure_boundary", {"Pt": 1.032e5, "Tt": 300.0}))
+    if feed == "channel":
+        s["nodes"].append(_node("bduct", "channel", {"L": 0.1, "D": 0.02}))
+        s["edges"] += [_edge("b0", "bsrc", "bduct"), _edge("b1", "bduct", "arr")]
+    else:
+        s["edges"].append(_edge("b1", "bsrc", "arr"))
+    s["edges"][-1]["targetHandle"] = "port-bypass-target"
+    return s
+
+
+def test_an_unwired_bypass_handle_is_the_closed_end() -> None:
+    net = build_network_from_schema(NetworkGraphSchema(**_schema()))
+    assert "arr__x0" not in net.elements
+
+
+@pytest.mark.parametrize("feed", ["channel", "boundary", "array"])
+def test_the_bypass_handle_adds_the_lead_in(feed: str) -> None:
+    """#467: the "b" handle is a second inflow that does not count as the
+    supply. The lead-in joins whatever feeds it to row 1's node."""
+    net = build_network_from_schema(NetworkGraphSchema(**_bypass_schema(feed)))
+    x0 = net.elements["arr__x0"]
+    assert isinstance(x0, ImpingementCrossflowElement) and x0.bypass_inlet
+    assert x0.to_node == "arr__c1"
+    assert net.elements["arr__p1"].from_node == "supply"
+    if feed == "boundary":
+        assert x0.from_node == "bsrc"
+    else:
+        assert isinstance(net.nodes[x0.from_node], PlenumNode)
+    if feed == "array":
+        assert net.elements["up__x4"].to_node == x0.from_node
+
+
+@pytest.mark.parametrize("feed", ["channel", "array"])
+def test_a_wired_bypass_solves_and_reports(feed: str) -> None:
+    result = NetworkRunner.from_dict(_bypass_schema(feed)).solve(timeout=120.0)
+    d = result._element_results["arr"].model_dump()
+    assert result._element_results["arr"].success
+    assert d["m_dot_bypass"] > 0.0
+    assert d["rows_Gc_Gj"][0] > 0.0  # row 1 now sees a crossflow
+    assert d["heat_transfer_outside_source"] == 0.0
+
+
+def test_two_bypass_links_are_refused() -> None:
+    s = _bypass_schema("boundary")
+    s["nodes"].append(_node("bsrc2", "pressure_boundary", {"Pt": 1.032e5, "Tt": 300.0}))
+    s["edges"].append(_edge("b2", "bsrc2", "arr"))
+    s["edges"][-1]["targetHandle"] = "port-bypass-target"
+    with pytest.raises(ValueError, match="two bypass links"):
+        build_network_from_schema(NetworkGraphSchema(**s))

@@ -60,6 +60,32 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => v.toFixed(3),
 	},
+	// Impingement array with an initial (bypass) crossflow (#467)
+	m_dot_bypass: {
+		label: "Bypass ṁ",
+		unit: "kg/s",
+		format: (v) => v.toFixed(4),
+	},
+	bypass_to_jet_flow: {
+		label: "Bypass / jets",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
+	bypass_Tt_minus_supply: {
+		label: "Bypass Tt - supply",
+		unit: "K",
+		format: (v) => v.toFixed(1),
+	},
+	heat_transfer_outside_source: {
+		label: "h outside source",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
+	bypass_reversed: {
+		label: "Bypass reversed",
+		unit: "—",
+		format: (v) => (v > 0 ? "yes" : "no"),
+	},
 	n_holes: { label: "Holes", unit: "—", format: (v) => v.toFixed(0) },
 	Cd_in_range: {
 		label: "Cd in range",

@@ -2251,9 +2251,41 @@ beyond Florschuetz's isothermal model (1.88 vs 1.61 on a 10-row (5,4,2) array
 against 1200 K gas) -- the direction is physical; the isothermal source cannot
 score it.
 
-A bypass crossflow (#467) and spent air leaving through the target (#468) are
-different configurations, with their own elements to come. The building
-blocks below are public for hand-built networks, one pair per spanwise row:
+**Initial (bypass) crossflow (#467).** A stream entering the gap's upstream
+end, ahead of row 1, is declared by passing its node:
+
+```python
+arr = ImpingementArray("ia", ..., bypass_length=None, bypass_entry_K=0.0)
+arr.add_to(net, supply="supply", exit="exit", bypass="byp")   # adds ia__x0: byp -> ia__c1
+```
+
+- The lead-in `ia__x0` is an `ImpingementCrossflowElement(bypass_inlet=True)`,
+  `bypass_length` long (None: `xn/2`, where Florschuetz, Metzger and Su's
+  array begins). Row 1's `Gc/Gj` is then the bypass over its jets.
+- **What feeds it decides the physics.** Another array's last gap segment
+  (arrays in series, `a.add_to(..., exit="joint")`,
+  `b.add_to(..., bypass="joint")`): the stream continues with its
+  momentum, and the gaps must match. Anything else: the bypass is
+  accelerated from the node's total pressure, so a feed duct's dynamic head
+  arrives with it, through a plenum or a momentum chamber alike;
+  `bypass_entry_K` (0.5) is for an abrupt entry from a large plenum.
+- **Flow split checked against the authors' own data**, NASA CR-3630
+  Table D.1: 42 tests, 11 geometries, mc/mj 0 to 1
+  (`python/tests/test_impingement_bypass_validation.py`). Worst row per
+  test in Gj/Gj_mean: z/d 2-3 median 0.021, max 0.100; z/d 1 up to 0.27,
+  where the authors' own constant-Cd model misses by up to 1.2 (the hole Cd
+  falls with crossflow there, and wall shear matters). P/P0 mean error
+  0.007.
+- **Heat transfer:** Florschuetz et al. (1981) at the local Gc/Gj, which is
+  CR-3630's own usage, with `h` referenced to the supply. That holds for a
+  bypass at the jet temperature only. The summary reports `m_dot_bypass`,
+  `bypass_to_jet_flow` and `bypass_Tt_minus_supply`, and sets
+  `heat_transfer_outside_source` past 1 K: a hotter bypass needs CR-3936's
+  eta_r, not built yet.
+
+Spent air leaving through the target (#468) is a different configuration,
+with its own element to come. The building blocks below are public for
+hand-built networks, one pair per spanwise row:
 
 ```python
 from combaero.network import ImpingementCrossflowElement, ImpingementPlateElement
@@ -2315,6 +2347,10 @@ difference and the supply stays uniform.** That puts Gc/Gj at twice Eq. 8 on
 Florschuetz's strongest-crossflow geometry. The term is C++'s
 `cb.station_half_drop` with `kappa = 0`, each station at the density of its
 own node (see `CrossflowSegmentElement` below).
+`bypass_inlet=True, entry_K=0.0` makes it the lead-in of an initial
+crossflow (#467): a station with nothing injected when another gap's segment
+arrives at its `from_node` (the stream continues; the cross-sections must
+match), otherwise an entry from that node's total pressure.
 
 #### Crossflow segments: merge and bleed stations (#471)
 
@@ -2355,7 +2391,8 @@ first = CrossflowSegmentElement("s0", "plenum", "b1", length=0.01, area=4e-3,
 **One configuration only.** These elements cover spent air leaving down the
 crossflow channel. A hand-wired network describing a different
 configuration is refused at set-up, naming it:
-- a bypass or initial crossflow feeding the chain (#467);
+- a stream feeding the chain that is neither a jet row nor a segment
+  declared `bypass_inlet=True` (#467);
 - spent air leaving through the target, impingement-effusion or film (#468);
 - two plates merging at one node.
 

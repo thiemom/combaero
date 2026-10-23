@@ -1438,14 +1438,42 @@ const Inspector = () => {
 							</div>
 						);
 						const rows: number[] | undefined = d.result?.rows_Nu;
+						const hasBypass = edges.some(
+							(e) =>
+								e.target === selectedNode.id &&
+								e.targetHandle === "port-bypass-target",
+						);
 						return (
 							<>
 								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
 									Jet plate fed from the upstream node, impinging on a target;
 									the spent air leaves down the gap to the downstream node
 									(Florschuetz, Truman and Metzger 1981). Gc/Gj comes from the
-									solved crossflow. A bypass crossflow (#467) or spent air
-									leaving through the target (#468) are different elements.
+									solved crossflow. Spent air leaving through the target (#468)
+									is a different element.
+								</div>
+								<div
+									className={`text-[10px] p-2 rounded border ${
+										hasBypass
+											? "text-purple-700 bg-purple-50 border-purple-200"
+											: "text-gray-500 bg-stone-50 border-stone-200"
+									}`}
+								>
+									{hasBypass ? (
+										<>
+											<b>Bypass wired (b):</b> an initial crossflow enters the
+											gap ahead of row 1 (#467). Flow split checked against
+											Florschuetz, Metzger and Su (1982, NASA CR-3630). From
+											another array's exit the gap continues with its momentum.
+											h is referenced to the jet supply: valid for a bypass at
+											the jet temperature only, flagged otherwise.
+										</>
+									) : (
+										<>
+											<b>Upstream end closed.</b> Wire the "b" handle for an
+											initial (bypass) crossflow (#467).
+										</>
+									)}
 								</div>
 								{ratio("n_rows", "Rows", 10)}
 								<LengthInput
@@ -1509,6 +1537,22 @@ const Inspector = () => {
 								{(d.correlation || "fixed") === "fixed" &&
 									ratio("Cd", "Fixed Cd Value", 0.79)}
 								{ratio("Nu_multiplier", "Nu Multiplier (rig matching)", 1.0)}
+								{hasBypass && (
+									<>
+										<LengthInput
+											id={`bypass_length_${selectedNode.id}`}
+											label="Bypass Lead-in to Row 1"
+											value={d.bypass_length ?? 0.5 * (d.xn_d ?? 5.0) * dJet}
+											onChange={(val) => set({ bypass_length: val })}
+										/>
+										{ratio("bypass_entry_K", "Bypass Entry K", 0.0)}
+										<div className="text-[9px] text-gray-400 -mt-1">
+											0 for a bypass arriving along a duct, 0.5 for an abrupt
+											sharp-edged entry from a large plenum. Unused when the gap
+											continues another array's.
+										</div>
+									</>
+								)}
 								{rows && rows.length > 0 && (
 									<div className="flex flex-col gap-1 mt-2">
 										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">

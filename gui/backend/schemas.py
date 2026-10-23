@@ -426,6 +426,11 @@ class ImpingementArrayData(BaseModel):
     Cd: float = 0.79  # Florschuetz's own default, cb.FLORSCHUETZ_1981_DEFAULT_CD
     Nu_multiplier: float = Field(default=1.0, gt=0.0)
     roughness: float = Field(default=0.0, ge=0.0)
+    # Initial (bypass) crossflow (#467), used only when the bypass handle is
+    # wired: the lead-in to row 1 (None = xn/2, where CR-3630's array begins)
+    # and the entry loss on the gap's dynamic head (0 along a duct).
+    bypass_length: float | None = Field(default=None, gt=0.0)
+    bypass_entry_K: float = Field(default=0.0, ge=0.0)
     label: str | None = None
 
 

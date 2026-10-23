@@ -146,6 +146,12 @@ UNIT_MAP: dict[str, str] = {
     "Nu_mean": "-",
     "htc_mean": "W/m²/K",
     "jet_flow_nonuniformity": "-",
+    # --- Impingement array bypass (#467) ---
+    "m_dot_bypass": "kg/s",
+    "bypass_to_jet_flow": "-",
+    "bypass_Tt_minus_supply": "K",
+    "heat_transfer_outside_source": "-",
+    "bypass_reversed": "-",
     "f": "-",
     "Cd": "-",
     "phi": "-",

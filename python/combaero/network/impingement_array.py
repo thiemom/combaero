@@ -2,9 +2,10 @@
 
 The configuration Florschuetz, Truman and Metzger (1981) measured: a jet
 plate fed from a supply plenum, impinging on a target, the spent air leaving
-in ONE direction down the gap between them. That is all this models. A bypass
-crossflow (#467) and spent air leaving through the target (#468) are
-different configurations and get their own elements.
+in ONE direction down the gap between them. Optionally an initial (bypass)
+crossflow enters the gap's upstream end (#467): Florschuetz, Metzger and Su
+(1982, NASA CR-3630). Spent air leaving through the target (#468) is a
+different configuration and gets its own element.
 
 ``ImpingementArray`` is the configuration, not a network element: it adds the
 rows to a network, one ``ImpingementPlateElement`` and one
@@ -16,6 +17,12 @@ so the solver sees nothing new. Ids are namespaced under the array's own id::
          {id}__p1           {id}__p2           {id}__pN
              |                  |                  |
          {id}__c1 --{id}__x1-- {id}__c2 -- ... -- {id}__cN --{id}__xN-- exit
+
+With a bypass the closed end becomes an inlet, ``bypass --{id}__x0-- {id}__c1``
+(see ``ImpingementCrossflowElement``'s ``bypass_inlet``): wired from another
+array's exit the gap continues with its momentum; from any other node the
+bypass is accelerated from that node's total pressure, so a feed duct's
+dynamic head arrives with it.
 
 ``add_wall`` distributes one thermal wall to the hot side across the rows,
 and ``summarize`` collects the per-row diagnostics under the array's id.
@@ -39,6 +46,10 @@ from .components import (
 if TYPE_CHECKING:
     from .graph import FlowNetwork
 
+# A bypass this much hotter or colder than the supply is outside the heat
+# transfer's reference temperature (see ImpingementArray.summarize).
+BYPASS_DT_TOL_K = 1.0
+
 
 @dataclass
 class ImpingementArray:
@@ -55,6 +66,13 @@ class ImpingementArray:
         As ``ImpingementPlateElement``; every row shares them.
     roughness : float
         Of the target and jet plate in the gap, for the crossflow friction.
+    bypass_length : float or None
+        Lead-in from the bypass inlet to row 1 [m]. None: ``xn/2``, where
+        CR-3630's array begins (half a pitch ahead of row 1).
+    bypass_entry_K : float
+        Entry loss into the gap, on its dynamic head: 0 for a bypass arriving
+        along a duct, 0.5 for an abrupt sharp-edged entry from a large
+        plenum. Unused when the gap continues an upstream array's.
     """
 
     id: str
@@ -70,11 +88,18 @@ class ImpingementArray:
     Cd: float = cb.FLORSCHUETZ_1981_DEFAULT_CD
     Nu_multiplier: float = 1.0
     roughness: float = 0.0
+    bypass_length: float | None = None
+    bypass_entry_K: float = 0.0
+    _bypass: str | None = field(default=None, init=False, repr=False)
     _rows: list[tuple[str, str, str]] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if int(self.n_rows) != self.n_rows or self.n_rows < 1:
             raise ValueError(f"ImpingementArray {self.id!r}: n_rows must be a positive integer")
+        if self.bypass_length is not None and self.bypass_length <= 0.0:
+            raise ValueError(f"ImpingementArray {self.id!r}: bypass_length must be positive")
+        if self.bypass_entry_K < 0.0:
+            raise ValueError(f"ImpingementArray {self.id!r}: bypass_entry_K must be non-negative")
 
     def plate_id(self, row: int) -> str:
         return f"{self.id}__p{row}"
@@ -85,12 +110,35 @@ class ImpingementArray:
     def node_id(self, row: int) -> str:
         return f"{self.id}__c{row}"
 
-    def add_to(self, net: FlowNetwork, supply: str, exit: str) -> None:
-        """Add the rows between ``supply`` (the jet plenum) and ``exit``."""
+    def add_to(self, net: FlowNetwork, supply: str, exit: str, bypass: str | None = None) -> None:
+        """Add the rows between ``supply`` (the jet plenum) and ``exit``.
+
+        ``bypass``, when given, is the node an initial crossflow enters the
+        gap from; None is the closed upstream end of Florschuetz et al. (1981).
+        """
         n = int(self.n_rows)
         for i in range(1, n + 1):
             net.add_node(PlenumNode(self.node_id(i)))
         self._rows = []
+        self._bypass = bypass
+        if bypass is not None:
+            net.add_element(
+                ImpingementCrossflowElement(
+                    self.segment_id(0),
+                    bypass,
+                    self.node_id(1),
+                    length=(
+                        self.bypass_length
+                        if self.bypass_length is not None
+                        else 0.5 * self.xn_d * self.d_jet
+                    ),
+                    height=self.z_d * self.d_jet,
+                    span=self.span,
+                    roughness=self.roughness,
+                    bypass_inlet=True,
+                    entry_K=self.bypass_entry_K,
+                )
+            )
         for i in range(1, n + 1):
             to = self.node_id(i + 1) if i < n else exit
             net.add_element(
@@ -192,4 +240,20 @@ class ImpingementArray:
         }
         for key in ("m_dot", "Re_j", "Gc_Gj", "Nu", "htc"):
             out[f"rows_{key}"] = [float(p[key]) for p in plates]
+        if self._bypass is not None:
+            lead = element_diag[self.segment_id(0)]
+            m_c = float(lead["m_dot"])
+            dT = float(lead["Tt_in"]) - float(plates[0]["Tt_in"])
+            out["m_dot_bypass"] = m_c
+            out["bypass_to_jet_flow"] = m_c / m_total if m_total > 0.0 else float("inf")
+            out["bypass_Tt_minus_supply"] = dT
+            # h is referenced to the supply (Florschuetz 1981, CR-3630's flow
+            # tests): a bypass at another temperature needs CR-3936's eta_r,
+            # not built yet. 1 K is above solver noise, not a physical band.
+            out["heat_transfer_outside_source"] = float(abs(dT) > BYPASS_DT_TOL_K)
+            # The gap draining back out of the inlet is outside CR-3630, and
+            # the lead-in's entry term is mirrored there (channel_entry_drop's
+            # m|m|): it charges the outflow (1 + K) q of static drop where a
+            # dump into a plenum keeps static pressure. Reported, not hidden.
+            out["bypass_reversed"] = float(m_c < 0.0)
         return out

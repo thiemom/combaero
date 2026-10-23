@@ -77,6 +77,10 @@ from .schemas import (
 #: step the builder leaves out is never one that diagnostic reports.
 TEE_PORT_STEP_TOL = MultiPortChamberBase.PORT_AREA_MISMATCH_TOL
 
+#: The impingement array's bypass handle (#467): an initial crossflow into the
+#: gap's upstream end. Must match ImpingementArrayNode.tsx.
+ARRAY_BYPASS_HANDLE = "port-bypass-target"
+
 
 def build_pressure_loss(data, area: float = 0.1):
     """Converts PressureLossData schema to a pressure-loss callable."""
@@ -602,6 +606,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     # N plates (supply) or collect the last crossflow segment (exit), which a
     # MomentumChamberNode junction cannot represent, so element-to-array links
     # get a PlenumNode instead -- the jet supply plenum the source assumes.
+    # A link on an array's bypass handle gets a PlenumNode too: the lead-in
+    # accelerates the bypass from that node's total pressure, which a feed
+    # channel keeps into a plenum, and an upstream array's last gap segment
+    # continues through it with its momentum (#467).
     array_ids = {node.id for node in element_nodes if node.type == "impingement_array"}
     gui_arrays: dict[str, ImpingementArray] = {}
     # Junction elements with named handle ports (common/straight/branch for
@@ -984,11 +992,27 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
 
         source_id = None
         target_id = None
+        bypass_id = None
         incoming_count = 0
         outgoing_count = 0
 
         for edge in schema.edges:
             if edge.data and edge.data.get("type") == "thermal":
+                continue
+            if (
+                edge.target == elem_id
+                and elem_type == "impingement_array"
+                and edge.targetHandle == ARRAY_BYPASS_HANDLE
+            ):
+                # Initial (bypass) crossflow into the gap's upstream end
+                # (#467): declared by wiring this handle. Unwired, the end is
+                # closed (#465).
+                if bypass_id is not None:
+                    raise ValueError(f"Impingement array '{elem_id}' has two bypass links.")
+                if edge.source in nodes_map:
+                    bypass_id = edge.source
+                elif edge.source in element_ids:
+                    bypass_id = edge_junction_map.get((edge.source, elem_id))
                 continue
             if edge.target == elem_id:
                 incoming_count += 1
@@ -1127,8 +1151,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 Cd=data.Cd,
                 Nu_multiplier=data.Nu_multiplier * (schema.solver_settings.Nu_multiplier or 1.0),
                 roughness=data.roughness,
+                bypass_length=data.bypass_length,
+                bypass_entry_K=data.bypass_entry_K,
             )
-            arr.add_to(net, source_id, target_id)
+            arr.add_to(net, source_id, target_id, bypass=bypass_id)
             gui_arrays[elem_id] = arr
         elif elem_type == "area_change":
             data = AreaChangeData(**elem_data)

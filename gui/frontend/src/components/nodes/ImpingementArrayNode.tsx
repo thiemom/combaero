@@ -11,6 +11,8 @@ import NodeIcon from "../NodeIcon";
 
 // Impingement array, channel exit (#465): ONE configuration. The backend
 // expands it into the row chain and reports the rows back under this id.
+// The "b" handle at the upstream end takes an initial (bypass) crossflow
+// (#467); unwired, that end of the gap is closed.
 const ImpingementArrayNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
@@ -57,10 +59,16 @@ const ImpingementArrayNode = ({ id, data, selected }: NodeProps) => {
 			</div>
 
 			<div
-				className="absolute -left-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-blue-500"
-				style={{ transform: `rotate(${-rotation}deg)` }}
+				className="absolute -left-3 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-blue-500"
+				style={{ top: "calc(35% - 4px)", transform: `rotate(${-rotation}deg)` }}
 			>
 				i
+			</div>
+			<div
+				className="absolute -left-3 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-purple-500"
+				style={{ top: "calc(80% - 4px)", transform: `rotate(${-rotation}deg)` }}
+			>
+				b
 			</div>
 			<div
 				className="absolute -right-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-green-500"
@@ -84,8 +92,22 @@ const ImpingementArrayNode = ({ id, data, selected }: NodeProps) => {
 			<Handle
 				type="target"
 				position={rotPos(Position.Left, rotation)}
-				style={handleStyle(Position.Left, rotation)}
+				style={{
+					...handleStyle(Position.Left, rotation),
+					top: "calc(35% - 6px)",
+				}}
 				id="flow-target"
+				title="Jet supply plenum"
+			/>
+			<Handle
+				type="target"
+				position={rotPos(Position.Left, rotation)}
+				style={{
+					...handleStyle(Position.Left, rotation),
+					top: "calc(80% - 6px)",
+				}}
+				id="port-bypass-target"
+				title="Bypass (initial crossflow) into the gap's upstream end; unwired = closed end"
 			/>
 			<Handle
 				type="source"
