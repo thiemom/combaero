@@ -590,7 +590,8 @@ double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
 // product mass fractions. Computes all exact analytical Jacobians w.r.t
 // upstream conditions.
 // Q [W]: absolute heat transfer rate (positive = heating)
-// fraction [-]: relative to total enthalpy flow (positive = heating)
+// fraction [-]: of the products' sensible enthalpy at T_ad, h(T_ad) -
+// h(kSensibleEnthalpyRefT) (#481) (positive = heating)
 MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
     const std::vector<Stream> &streams, double P, double Q = 0.0, double fraction = 0.0);
 
@@ -598,7 +599,7 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 // outputting the theoretical adiabatic flame temperature and product mass
 // fractions. Computes all exact analytical Jacobians w.r.t upstream conditions.
 // Q [W]: absolute heat transfer rate (positive = heating)
-// fraction [-]: relative to total enthalpy flow (positive = heating)
+// fraction [-]: of the products' sensible enthalpy at T_ad (#481)
 MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream> &streams, double P, double Q = 0.0, double fraction = 0.0);
 // Full combustor evaluation including pressure loss analytical chain rule.

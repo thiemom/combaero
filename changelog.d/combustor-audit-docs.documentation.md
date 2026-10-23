@@ -1,0 +1,7 @@
+- Combustor docs brought in line with the code (found by a combustor audit):
+  - The "Network Nodes" example now runs. It had unknown constructor keywords on every node, and a `MomentumBoundary` that does not exist.
+  - The (f, J) interface example now names the real `combaero._solver_tools` signatures.
+  - API_CPP gives the combustor functions' real `MixerResult` signatures.
+  - `EnergyBoundary(fraction=...)` is documented as a fraction of the sensible enthalpy, and of the products' on a combustor (#481), as the code has done since.
+  - The combustion smoothing comments state the actual constants.
+  - A failed equivalence-ratio diagnostic now raises a `RuntimeWarning` instead of printing `DEBUG:` to stderr.

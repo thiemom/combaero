@@ -325,15 +325,15 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
   // Smooth approximations are used at two kinks to ensure well-behaved
   // Jacobians for the global network solver:
   //
-  // 1. Phi=0 (no fuel): A softplus ramp is applied to n_O2_required_total with
-  //    k=30, giving a transition width of ~0.15 in Phi units. This is
-  //    acceptable since no meaningful combustion occurs below Phi~0.2 in
-  //    practice.
+  // 1. Phi=0 (no fuel): A softplus ramp is applied to n_O2_required_total
+  //    with k = SMOOTHING_K_PHI0.
   //
-  // 2. Phi=1 (stoichiometric): A softmin is applied to the burn fraction f with
-  //    k=200, giving a tight transition width of ~0.01 in Phi units. Higher
-  //    stiffness is warranted here since stoichiometric is a real operating
-  //    point where accuracy matters.
+  // 2. Phi=1 (stoichiometric): A softmin is applied to the burn fraction f
+  //    with k = SMOOTHING_K_PHI1.
+  //
+  // Both are 20000 (combustion.h): transitions of order 1/k, about 1e-4 in
+  // Phi, so the smoothing is invisible in T_ad. A finite difference wider
+  // than that across Phi = 1 is not a derivative of it (#716).
   // -----------------------------------------------------------------
 
   if (smooth_phi0) {
