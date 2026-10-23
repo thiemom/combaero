@@ -1,0 +1,1 @@
+- GUI: a thermal wall's box can be dragged off whatever its auto placement put it under. The offset is saved with the wall and follows it when its nodes move; double-click the box to reset it. Moving it keeps the solved results. Wall boxes now draw above unselected nodes, and a selected node still comes to the front.

@@ -23,6 +23,13 @@ body {
 	min-height: 100vh;
 }
 
+/* Edge labels (a thermal wall's box) above unselected nodes, so auto
+   placement cannot hide one behind a node; a selected node (z-index 1000)
+   still comes to the front. */
+.react-flow__edgelabel-renderer {
+	z-index: 5;
+}
+
 /* React Flow overrides for Tailwind compatibility */
 .react-flow__node {
 	border-radius: 0;

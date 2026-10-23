@@ -1,3 +1,5 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useState } from "react";
 import type { EdgeProps } from "reactflow";
 import {
 	EdgeLabelRenderer,
@@ -6,6 +8,11 @@ import {
 } from "reactflow";
 import useStore from "../store/useStore";
 import { FILM_COLOR, filmDuctId } from "../utils/filmLink";
+import {
+	draggedOffset,
+	type LabelOffset,
+	labelPosition,
+} from "../utils/labelOffset";
 import {
 	orientationGlyph,
 	orientationOf,
@@ -38,7 +45,7 @@ export default function ThermalEdge({
 	data,
 	selected,
 }: EdgeProps) {
-	const { unitPreferences } = useStore();
+	const { unitPreferences, updateEdgeData } = useStore();
 	const unit = unitPreferences.length;
 	const scale = unit === "mm" ? 1000 : 1;
 
@@ -50,6 +57,57 @@ export default function ThermalEdge({
 		targetY,
 		targetPosition,
 	});
+
+	// Drag the box off whatever auto placement put it under; the offset is
+	// saved with the wall (data.label_offset), double-click resets it.
+	const zoom = useFlowStore((s) => s.transform[2]);
+	const [dragOffset, setDragOffset] = useState<LabelOffset | null>(null);
+	const press = useRef<{
+		x: number;
+		y: number;
+		start: LabelOffset;
+		last: LabelOffset | null;
+	} | null>(null);
+	const [boxX, boxY] = labelPosition(
+		labelX,
+		labelY,
+		dragOffset ?? data?.label_offset,
+	);
+	const onBoxPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+		if (e.button !== 0) return;
+		e.stopPropagation();
+		e.currentTarget.setPointerCapture(e.pointerId);
+		press.current = {
+			x: e.clientX,
+			y: e.clientY,
+			start: data?.label_offset ?? { dx: 0, dy: 0 },
+			last: null,
+		};
+	};
+	const onBoxPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+		const p = press.current;
+		if (!p) return;
+		const next = draggedOffset(p.start, e.clientX - p.x, e.clientY - p.y, zoom);
+		if (!next) return;
+		p.last = next;
+		setDragOffset(next);
+	};
+	const onBoxPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+		const p = press.current;
+		press.current = null;
+		if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+			e.currentTarget.releasePointerCapture(e.pointerId);
+		}
+		if (p?.last) {
+			// A move is layout, not physics: keep the solved results.
+			updateEdgeData(id, { label_offset: p.last }, true);
+		}
+		setDragOffset(null);
+	};
+	const onBoxDoubleClick = () => {
+		if (data?.label_offset)
+			updateEdgeData(id, { label_offset: undefined }, true);
+	};
 
 	// The film this wall holds (#386): a link from the holes to the wall's
 	// label box, drawn only while the wall or the holes are selected so a
@@ -69,9 +127,9 @@ export default function ThermalEdge({
 		const y0 = p.y + (filmNode.height ?? 48) / 2;
 		// It ends at the label point and runs under the label box, so it stops
 		// visually at the box edge; a gentle bow keeps it off flow edges.
-		const mx = (x0 + labelX) / 2 - (labelY - y0) * 0.2;
-		const my = (y0 + labelY) / 2 + (labelX - x0) * 0.2;
-		filmLink = { d: `M ${x0} ${y0} Q ${mx} ${my} ${labelX} ${labelY}`, x0, y0 };
+		const mx = (x0 + boxX) / 2 - (boxY - y0) * 0.2;
+		const my = (y0 + boxY) / 2 + (boxX - x0) * 0.2;
+		filmLink = { d: `M ${x0} ${y0} Q ${mx} ${my} ${boxX} ${boxY}`, x0, y0 };
 	}
 
 	const Q: number | undefined = data?.result?.Q;
@@ -231,10 +289,11 @@ export default function ThermalEdge({
 				markerStart={!flowsForward ? `url(#${markerIdReverse})` : undefined}
 			/>
 			<EdgeLabelRenderer>
+				{/* biome-ignore lint/a11y/noStaticElementInteractions: a pointer drag of a canvas label, like a node drag; layout has no keyboard path in React Flow either */}
 				<div
 					style={{
 						position: "absolute",
-						transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+						transform: `translate(-50%, -50%) translate(${boxX}px,${boxY}px)`,
 						background: "#fff",
 						padding: "2px 6px",
 						borderRadius: "4px",
@@ -242,9 +301,17 @@ export default function ThermalEdge({
 						color: ARROW_COLOR,
 						border: `2px solid ${ARROW_COLOR}`,
 						pointerEvents: "all",
+						cursor: dragOffset ? "grabbing" : "grab",
+						touchAction: "none",
 					}}
 					className="nodrag nopan flex flex-col items-center shadow-sm"
 					data-film-wall={id}
+					title="Drag to move; double-click to reset"
+					onPointerDown={onBoxPointerDown}
+					onPointerMove={onBoxPointerMove}
+					onPointerUp={onBoxPointerUp}
+					onPointerCancel={onBoxPointerUp}
+					onDoubleClick={onBoxDoubleClick}
 				>
 					{data?.label && data?.show_label && (
 						<span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-none mb-1">
