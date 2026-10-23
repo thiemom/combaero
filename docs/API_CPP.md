@@ -891,12 +891,30 @@ struct JetRowHeatTransfer {
     double dh_dm_jet;        // analytic, includes the Gc/Gj ~ 1/m_jet term
     double dh_dm_crossflow;  // analytic
     bool extrapolated;
+    double eta_r;                // impingement_eta_r at this Gc/Gj
+    double deta_r_dm_jet, deta_r_dm_crossflow;  // analytic, through Gc/Gj
+    bool eta_r_extrapolated;
 };
 double jet_row_gc_gj_per_flow_ratio(double yn_d, double z_d);
 JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet& set,
                                          const JetRowGeometry& geom,
                                          double m_jet, double m_crossflow,
                                          double mu, double k, double Pr);
+
+// Crossflow temperature influence factor (#467), CR-3936 Eq. 2.11:
+// eta_r = (T_ref,r - T_j)/(T_m,n - T_j). FITTED (the source publishes no
+// correlation) to its Appendix A, 39 inline tests:
+//   eta_r = X^n/(1+X^n), X = a (Gc/Gj)(z/d)^r
+// RMSE 0.079 in-sample, 0.083 leave-one-geometry-out. 0 at Gc/Gj <= 0 (C1:
+// n > 1), -> 1 as the crossflow dominates. extrapolated: xn/d outside 5-10,
+// yn/d 4-8, z/d 1-3, or Gc/Gj > 4.44 (rel_tol 5e-3). Staggered arrays and
+// the source's eta_r > 1 are outside the form.
+constexpr double FLORSCHUETZ_SU_1985_ETA_A = 2.042;
+constexpr double FLORSCHUETZ_SU_1985_ETA_R = 1.073;
+constexpr double FLORSCHUETZ_SU_1985_ETA_N = 1.368;
+struct ImpingementEtaR { double eta, deta_dGc_Gj; bool extrapolated; };
+ImpingementEtaR impingement_eta_r(double Gc_Gj, double xn_d, double yn_d,
+                                  double z_d);
 ```
 
 ### Side-Stream Momentum (`side_stream_momentum.h`)

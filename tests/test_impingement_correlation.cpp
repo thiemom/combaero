@@ -340,3 +340,83 @@ TEST(JetRowHeatTransfer, NoJetFlowMeansNoCrossflowRatio) {
                                                         0.0, 1.85e-5, 0.026, 0.71),
                std::invalid_argument);
 }
+
+// impingement_eta_r (#467): the closure fitted to CR-3936 Appendix A.
+TEST(ImpingementEtaR, RunsFromTheJetsToTheCrossflow) {
+  using combaero::cooling::impingement_eta_r;
+  EXPECT_EQ(impingement_eta_r(0.0, 5.0, 4.0, 2.0).eta, 0.0);
+  EXPECT_EQ(impingement_eta_r(-0.3, 5.0, 4.0, 2.0).eta, 0.0);
+  EXPECT_GT(impingement_eta_r(1e3, 5.0, 4.0, 2.0).eta, 0.999);
+  double prev = 0.0;
+  for (double G = 0.05; G < 5.0; G += 0.05) {
+    const double e = impingement_eta_r(G, 5.0, 4.0, 2.0).eta;
+    EXPECT_GT(e, prev) << G;
+    EXPECT_LT(e, 1.0) << G;
+    prev = e;
+  }
+  // A taller channel reaches the crossflow sooner (CR-3936 conclusion 3):
+  // eta_r = 0.9 near Gc/Gj 2.4 at z/d 1 and 0.75 at z/d 3.
+  EXPECT_NEAR(impingement_eta_r(2.44, 5.0, 4.0, 1.0).eta, 0.9, 0.005);
+  EXPECT_NEAR(impingement_eta_r(0.75, 5.0, 4.0, 3.0).eta, 0.9, 0.005);
+}
+
+TEST(ImpingementEtaR, SlopeMatchesCentralDifferencesAndIsC1AtZero) {
+  using combaero::cooling::impingement_eta_r;
+  for (double z : {1.0, 2.0, 3.0}) {
+    for (double G : {0.05, 0.3, 1.0, 3.0}) {
+      const double e = 1e-7;
+      const double fd = (impingement_eta_r(G + e, 10.0, 8.0, z).eta -
+                         impingement_eta_r(G - e, 10.0, 8.0, z).eta) /
+                        (2 * e);
+      EXPECT_NEAR(impingement_eta_r(G, 10.0, 8.0, z).deta_dGc_Gj, fd,
+                  std::abs(fd) * 1e-6)
+          << z << " " << G;
+    }
+  }
+  // n > 1: value and slope both vanish into Gc/Gj = 0 from above, the
+  // slope as G^(n-1) (slowly: n - 1 = 0.368), so the closure is C1 there.
+  const auto slope = [](double G) {
+    return impingement_eta_r(G, 5.0, 4.0, 2.0).deta_dGc_Gj;
+  };
+  const double n = combaero::cooling::FLORSCHUETZ_SU_1985_ETA_N;
+  EXPECT_NEAR(slope(1e-12) / slope(1e-9), std::pow(1e-3, n - 1.0), 1e-9);
+  EXPECT_LT(slope(1e-12), 1e-3);
+  EXPECT_EQ(slope(0.0), 0.0);
+}
+
+TEST(ImpingementEtaR, FlagsOutsideTheInlineData) {
+  using combaero::cooling::impingement_eta_r;
+  EXPECT_FALSE(impingement_eta_r(1.0, 5.0, 4.0, 1.0).extrapolated);
+  EXPECT_FALSE(impingement_eta_r(4.4, 10.0, 8.0, 3.0).extrapolated);
+  EXPECT_TRUE(impingement_eta_r(1.0, 5.0, 4.0, 4.0).extrapolated);
+  EXPECT_TRUE(impingement_eta_r(1.0, 15.0, 4.0, 2.0).extrapolated);
+  EXPECT_TRUE(impingement_eta_r(1.0, 5.0, 12.0, 2.0).extrapolated);
+  EXPECT_TRUE(impingement_eta_r(6.0, 5.0, 4.0, 2.0).extrapolated);
+}
+
+TEST(JetRowHeatTransfer, EtaRFlowDerivativesMatchCentralDifferences) {
+  combaero::cooling::JetRowGeometry g;
+  g.d = 0.00254;
+  g.xn_d = 5.0;
+  g.yn_d = 4.0;
+  g.z_d = 2.0;
+  g.n_holes = 12.0;
+  const double mu = 1.85e-5, k = 0.026, Pr = 0.71;
+  const auto set = florschuetz_1981_inline();
+  for (double mc : {0.002, 0.02}) {
+    const double mj = 0.005, e = 1e-9;
+    const auto r = combaero::cooling::jet_row_heat_transfer(set, g, mj, mc, mu, k, Pr);
+    EXPECT_NEAR(r.eta_r,
+                combaero::cooling::impingement_eta_r(r.Gc_Gj, 5.0, 4.0, 2.0).eta,
+                1e-15);
+    auto eta = [&](double a, double b) {
+      return combaero::cooling::jet_row_heat_transfer(set, g, a, b, mu, k, Pr).eta_r;
+    };
+    const double fd_j = (eta(mj + e, mc) - eta(mj - e, mc)) / (2 * e);
+    const double fd_c = (eta(mj, mc + e) - eta(mj, mc - e)) / (2 * e);
+    EXPECT_NEAR(r.deta_r_dm_jet, fd_j, std::abs(fd_j) * 1e-5) << mc;
+    EXPECT_NEAR(r.deta_r_dm_crossflow, fd_c, std::abs(fd_c) * 1e-5) << mc;
+    EXPECT_LT(r.deta_r_dm_jet, 0.0);
+    EXPECT_GT(r.deta_r_dm_crossflow, 0.0);
+  }
+}
