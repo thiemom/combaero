@@ -204,8 +204,8 @@ def test_bad_bypass_parameters_are_refused() -> None:
 
 def test_a_reversed_bypass_is_flagged() -> None:
     """Feed pressure below the gap: the gap drains back out of the inlet.
-    Outside CR-3630, and the lead-in's entry term is mirrored there; the
-    Jacobian stays exact (m|m| is C1), but the summary says it happened."""
+    Outside CR-3630: the lead-in then discharges at static continuity (the
+    entry term is inflow only, C1 through zero); the summary says it happened."""
     net = FlowNetwork()
     net.add_node(_pb("supply", 1.03e5))
     net.add_node(_pb("exit", 1.0e5))
@@ -296,7 +296,7 @@ def _jacobian_error(
         "chamber",  # entry from a node's total pressure, bypass flow fixed
         "pressure",  # entry, the bypass flow an unknown
         "series",  # the continuation station
-        "reversed",  # the gap draining back out: m|m| through zero
+        "reversed",  # the gap draining back out: the entry term off
     ],
 )
 def test_the_jacobian_is_analytic_and_complete(case: str, regime: str) -> None:

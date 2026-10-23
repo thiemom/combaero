@@ -251,9 +251,9 @@ class ImpingementArray:
             # tests): a bypass at another temperature needs CR-3936's eta_r,
             # not built yet. 1 K is above solver noise, not a physical band.
             out["heat_transfer_outside_source"] = float(abs(dT) > BYPASS_DT_TOL_K)
-            # The gap draining back out of the inlet is outside CR-3630, and
-            # the lead-in's entry term is mirrored there (channel_entry_drop's
-            # m|m|): it charges the outflow (1 + K) q of static drop where a
-            # dump into a plenum keeps static pressure. Reported, not hidden.
+            # The gap draining back out of the inlet is outside CR-3630: the
+            # lead-in then discharges at static continuity (channel_entry_drop
+            # is inflow only), a dump nothing in the data checks. Reported,
+            # not hidden.
             out["bypass_reversed"] = float(m_c < 0.0)
         return out

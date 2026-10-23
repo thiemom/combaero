@@ -195,3 +195,37 @@ def test_the_compressible_station_jacobian_matches_finite_differences() -> None:
     cols = np.maximum(np.abs(x), 1e-12)[None, :]
     scale = np.maximum(np.max(np.abs(fd * cols), axis=1, keepdims=True), 1e-300)
     assert float(np.max(np.abs((J - fd) * cols) / scale)) < 1e-5
+
+
+def _entry_segment(entry_K: float, p_res: float, p_duct: float, regime: str) -> float:
+    """Reservoir --[segment, entry_K]--> plenum boundary; the solved flow."""
+    g = FlowNetwork()
+    for n, pt in (("res", p_res), ("duct", p_duct)):
+        b = PressureBoundary(n)
+        b.Pt, b.Tt, b.Y = pt, 300.0, Y_AIR
+        g.add_node(b)
+    g.add_element(
+        CrossflowSegmentElement(
+            "s", "res", "duct", length=0.05, area=1e-3, entry_K=entry_K, regime=regime
+        )
+    )
+    res = NetworkSolver(g).solve()
+    assert res["__success__"], res.get("__message__")
+    return float(res["s.m_dot"])
+
+
+@pytest.mark.parametrize("regime", ["incompressible", "compressible"])
+def test_the_entry_loss_applies_to_inflow_only(regime: str) -> None:
+    """Into the duct, the reservoir pays the acceleration and the entry
+    loss, so K throttles the flow. Reversed, the duct discharges into the
+    reservoir at static continuity -- an exit, the segment's own convention
+    -- so K must not matter. The mirrored m|m| form charged the outflow
+    (1 + K) dynamic heads instead (#705)."""
+    fwd = [_entry_segment(k, 1.01e5, 1.0e5, regime) for k in (0.0, 0.5)]
+    rev = [_entry_segment(k, 1.0e5, 1.01e5, regime) for k in (0.0, 0.5)]
+    assert fwd[0] > fwd[1] > 0.0
+    assert rev[0] < 0.0
+    assert rev[1] == pytest.approx(rev[0], rel=1e-9)
+    # Reversed, only friction holds the flow back: it runs faster than the
+    # forward flow, which pays the entry acceleration besides.
+    assert abs(rev[0]) > fwd[0]

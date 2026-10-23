@@ -282,6 +282,23 @@ TEST(ChannelEntryDrop, IsTheDynamicHeadPlusTheEntryLoss) {
   EXPECT_NEAR(r.d_dm_a, fd, 1e-6 * fd);
 }
 
+TEST(ChannelEntryDrop, AReversedFlowDischargesAtStaticContinuity) {
+  // Out of the duct into the reservoir: no acceleration to pay, and the
+  // dynamic head is lost -- not the mirrored entry (#705).
+  const auto X = air();
+  const double P = 1.0e5, T = 300.0, A = 1e-3;
+  const auto r = combaero::channel_entry_drop(-0.05, P, T, X, A, 0.5);
+  EXPECT_EQ(r.dP, 0.0);
+  EXPECT_EQ(r.d_dm_a, 0.0);
+  EXPECT_EQ(r.d_dP, 0.0);
+  EXPECT_EQ(r.d_dT, 0.0);
+  // C1 through zero: value and slope both vanish from either side.
+  const double e = 1e-9;
+  const double slope = combaero::channel_entry_drop(0.05, P, T, X, A, 0.5).d_dm_a;
+  EXPECT_NEAR(combaero::channel_entry_drop(e, P, T, X, A, 0.5).d_dm_a, 0.0, 1e-6 * slope);
+  EXPECT_EQ(combaero::channel_entry_drop(0.0, P, T, X, A, 0.5).dP, 0.0);
+}
+
 // ---- supply-side crossflow ratio (#471) ------------------------------------
 
 TEST(CrossflowRatio, IsTheMeanDuctVelocityOverTheStaticIdealJet) {

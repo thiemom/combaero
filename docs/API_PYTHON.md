@@ -2381,7 +2381,9 @@ first = CrossflowSegmentElement("s0", "plenum", "b1", length=0.01, area=4e-3,
   Station nodes must be `PlenumNode`s (Pt = P).
 - **Ends are explicit.** `prev_seg`/`next_seg` name the neighbour segments;
   `entry_K` makes `from_node` a reservoir; a segment into a plenum with no
-  `to_kappa` dumps its dynamic head (static continuity).
+  `to_kappa` dumps its dynamic head (static continuity). A reversed flow
+  through an `entry_K` end is such an exit too: the entry term applies to
+  inflow only.
 - **Bleed scored on Bassett's own measured K5** (Fig. 7c, 43 points): MAE
   0.039 in K overall, 0.021 at q >= 0.6 (the few-percent bleed of an effusion
   station). Bassett measured psi = 1-3; a station bleeding through holes far
