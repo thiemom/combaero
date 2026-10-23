@@ -1,0 +1,1 @@
+- GUI: a thermal wall whose box was moved now draws its arrow through the box (node -> box -> node) as one smooth curve, so the box stays visibly attached to its wall. An unmoved wall keeps React Flow's own curve.
