@@ -120,6 +120,76 @@ def test_a_combustor_loss_is_a_fraction_of_its_products_sensible_heat() -> None:
     assert _sensible(r1.T_mix, Xb) == pytest.approx(0.95 * _sensible(r0.T_mix, Xb), rel=1e-9)
 
 
+@pytest.mark.parametrize("method", ["complete", "equilibrium"])
+@pytest.mark.parametrize(("Q", "fraction"), [(-2e5, 0.0), (2e5, 0.0), (0.0, -0.05)])
+def test_the_combustor_heat_shift_jacobian_holds(method: str, Q: float, fraction: float) -> None:
+    """A post-combustion heat shift (Q or 'fraction') moves T_out through the
+    burnt composition at fixed h_out as well as through T_ad: dT_out = [(1+f)
+    cp_ad dT_ad + sum_j w_j dYb_j]/cp_out. Without the second term dT/dm_fuel
+    was off by 110 K/(kg/s) at Q = -2e5 W and 21 at f = -0.05 (complete)."""
+    Yf = [0.0] * len(Y_AIR)
+    Yf[I_CH4] = 1.0
+    fn = (
+        _solver_tools.adiabatic_T_complete_and_jacobian_T_from_streams
+        if method == "complete"
+        else _solver_tools.adiabatic_T_equilibrium_and_jacobians_from_streams
+    )
+
+    def burn(m_air: float, m_fuel: float):
+        st = [cb.MassStream(m_air, 700.0, 2e5, Y_AIR), cb.MassStream(m_fuel, 300.0, 2e5, Yf)]
+        return fn(st, 2e5, Q, fraction)
+
+    m_air, m_fuel, e = 1.0, 0.03, 1e-6
+    r = burn(m_air, m_fuel)
+    fd_air = (burn(m_air + e, m_fuel).T_mix - burn(m_air - e, m_fuel).T_mix) / (2 * e)
+    fd_fuel = (burn(m_air, m_fuel + e).T_mix - burn(m_air, m_fuel - e).T_mix) / (2 * e)
+    # complete: the composition derivatives are forward differences inside
+    # (eps 1e-6), measured 7e-6 of the slope; equilibrium's (eps 1e-4) 2e-3.
+    tol = 3e-5 if method == "complete" else 5e-3
+    assert r.dT_mix_d_stream[0].d_mdot == pytest.approx(fd_air, rel=tol)
+    assert r.dT_mix_d_stream[1].d_mdot == pytest.approx(fd_fuel, rel=tol)
+
+
+def _burner(fraction: float) -> tuple[FlowNetwork, str]:
+    from combaero.network import CombustorNode
+
+    net = FlowNetwork()
+    net.add_node(_pb("air", 2.0e5, 700.0))
+    fuel = PressureBoundary("fuel")
+    Yf = [0.0] * len(Y_AIR)
+    Yf[I_CH4] = 1.0
+    fuel.Pt, fuel.Tt, fuel.Y = 2.05e5, 300.0, Yf
+    net.add_node(fuel)
+    net.add_node(_pb("out", 1.0e5, 300.0))
+    comb = CombustorNode("comb", method="complete")
+    comb.add_energy_boundary(EnergyBoundary("eb", fraction=fraction))
+    net.add_node(comb)
+    net.add_element(_orifice("oa", "air", "comb", 0.04))
+    net.add_element(_orifice("of", "fuel", "comb", 0.004))
+    net.add_element(_orifice("on", "comb", "out", 0.06))
+    return net, "comb"
+
+
+def test_a_combustor_fraction_loss_closes_the_ledger() -> None:
+    """The heat a 'fraction' boundary takes from a combustor is reported as
+    {node}.Q_fraction, the products' sensible heat at T_ad times f. It was
+    never written for a combustor, so the ledger saw an unexplained 6.4%
+    energy imbalance and demoted a correct root."""
+    net, nid = _burner(-0.05)
+    s = NetworkSolver(net)
+    r = s.solve()
+    assert r["__success__"], r.get("__message__")
+    assert abs(r["__ledger__"]["energy_closure_rel"]) < 1e-12
+    comb = net.nodes[nid]
+    X_b = cb.mass_to_mole(list(comb._last_mix_res.Y_mix))
+    T_out = float(comb._last_mix_res.T_mix)
+    m = float(comb._total_m_dot)
+    # h_out - h_ref = (1 + f)(h_ad - h_ref): the heat is f m (h_ad - h_ref)
+    expected = -0.05 * m * _sensible(T_out, X_b) / 0.95
+    assert r[f"{nid}.Q_fraction"] == pytest.approx(expected, rel=1e-9)
+    assert expected < -1e3
+
+
 # --- the mixer's Jacobian with heat and 'fraction' ---------------------------
 
 
