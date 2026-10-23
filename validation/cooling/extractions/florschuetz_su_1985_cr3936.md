@@ -1,9 +1,10 @@
 # NASA CR-3936 (Florschuetz and Su, 1985) -- crossflow temperature influence factor eta_r
 
-**Status: CONFIRMED 2026-10-23** (#467): signed off by the user after a
+**Status: IMPLEMENTED 2026-10-23** as `combaero::cooling::impingement_eta_r`
+and the reference temperature of `ImpingementPlateElement` with a bypass
+(#467 PR 2). CONFIRMED 2026-10-23: signed off by the user after a
 page-by-page check against the scans, every patched cell plus random rows,
-columns and single values, about 90% of the table. No errors found. The
-closure is agreed and not yet implemented (#467 PR 2). Source:
+columns and single values, about 90% of the table. No errors found. Source:
 `docs/heat_transfer/flohrshuetz/NASA_CR-3936_Florschuetz_Su_1985_crossflow_temperature.pdf`
 (gitignored), Appendix A, "Tabular Results in Terms of Individual Spanwise
 Row Parameters", printed pp. 133-148 (PDF pp. 145-160).
@@ -144,3 +145,9 @@ Accuracy on another rig is unknown: no second source exists.
   not of equal height.
 - 2026-10-23: signed off by the user: every patched cell checked, then random
   rows, columns and values, about 90% of the table. No errors.
+- 2026-10-23: implemented, with the user's choice of how the reference
+  applies: to the bypass's share of the crossflow only (T_aw = T_j + eta_r
+  phi_0 (T_0 - T_j)), since the wall's self-heating of the spent air is
+  already inside Florschuetz's (1981) supply-referenced h. Constants rounded
+  to 4 figures: a 2.042, r 1.073, n 1.368 (in-sample RMSE 0.079, bias
+  -0.009).

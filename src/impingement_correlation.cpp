@@ -263,6 +263,43 @@ JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet &set,
   } else {
     out.dh_dm_jet = scale * jet.dNu_dRe_j * dRe_dm;
   }
+  const auto eta =
+      impingement_eta_r(out.Gc_Gj, geom.xn_d, geom.yn_d, geom.z_d);
+  out.eta_r = eta.eta;
+  out.eta_r_extrapolated = eta.extrapolated;
+  if (has_jet) {
+    out.deta_r_dm_jet = -eta.deta_dGc_Gj * out.Gc_Gj / m_jet;
+    out.deta_r_dm_crossflow = eta.deta_dGc_Gj * c / m_jet;
+  }
+  return out;
+}
+
+ImpingementEtaR impingement_eta_r(double Gc_Gj, double xn_d, double yn_d,
+                                  double z_d) {
+  if (!(z_d > 0.0) || !std::isfinite(z_d) || !std::isfinite(Gc_Gj)) {
+    throw std::invalid_argument(
+        "impingement_eta_r: z_d must be positive and Gc_Gj finite");
+  }
+  using R = ImpingementEtaRRange;
+  const auto outside = [](double v, double lo, double hi) {
+    return v < lo * (1.0 - R::rel_tol) || v > hi * (1.0 + R::rel_tol);
+  };
+  ImpingementEtaR out;
+  out.extrapolated = outside(xn_d, R::xn_d_min, R::xn_d_max) ||
+                     outside(yn_d, R::yn_d_min, R::yn_d_max) ||
+                     outside(z_d, R::z_d_min, R::z_d_max) ||
+                     Gc_Gj > R::Gc_Gj_max * (1.0 + R::rel_tol);
+  if (!(Gc_Gj > 0.0)) {
+    return out;  // no crossflow approaching: the jets set the temperature
+  }
+  const double n = FLORSCHUETZ_SU_1985_ETA_N;
+  const double X =
+      FLORSCHUETZ_SU_1985_ETA_A * Gc_Gj * std::pow(z_d, FLORSCHUETZ_SU_1985_ETA_R);
+  const double Xn = std::pow(X, n);
+  const double denom = 1.0 + Xn;
+  out.eta = Xn / denom;
+  // d/dG [X^n/(1+X^n)] = n X^n / (G (1+X^n)^2), X proportional to G.
+  out.deta_dGc_Gj = n * Xn / (Gc_Gj * denom * denom);
   return out;
 }
 

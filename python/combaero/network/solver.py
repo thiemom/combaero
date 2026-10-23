@@ -2000,6 +2000,10 @@ class NetworkSolver:
                 self._relay_film(
                     out, _wall, ch_a, dT_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
                 )
+                # A reference temperature on neighbours' flows and T (#467)
+                self._relay_reference_inputs(
+                    out, obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
+                )
 
                 # Pressure coupling (#496): the side's T_aw moves with its feed
                 # node's static P at fixed flow (v ~ 1/rho); h does not.
@@ -2060,6 +2064,10 @@ class NetworkSolver:
                 self._relay_flow_inputs(out, obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b)
                 self._relay_film(
                     out, _wall, ch_b, dT_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
+                )
+                # A reference temperature on neighbours' flows and T (#467)
+                self._relay_reference_inputs(
+                    out, obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
                 )
 
                 # Pressure coupling (#496): the side's T_aw moves with its feed
@@ -2495,11 +2503,41 @@ class NetworkSolver:
         ind = self._unknown_indices.get(obj_id, [])
         return [(ind[0], 1.0)] if ind else []
 
-    def _htc_and_T(self, obj: Any, state: NetworkMixtureState, x: np.ndarray) -> Any:
+    def _htc_and_T(
+        self, obj: Any, state: NetworkMixtureState, x: np.ndarray, lagged: bool = True
+    ) -> Any:
         flows = self._network_flows(obj, x)
+        temps = self._network_temperatures(obj, x, lagged)
         if flows is None:
             return obj.htc_and_T(state)
-        return obj.htc_and_T(state, flows=flows)
+        if temps is None:
+            return obj.htc_and_T(state, flows=flows)
+        return obj.htc_and_T(state, flows=flows, temperatures=temps)
+
+    def _network_temperatures(
+        self, obj: Any, x: np.ndarray, lagged: bool = True
+    ) -> dict[str, float] | None:
+        """Node temperatures an element's htc reads, or None if it reads none.
+
+        Opt-in, like ``network_flow_inputs``: an element that defines
+        ``network_temperature_inputs()`` -- node ids -- gets each node's total
+        temperature as ``temperatures=``. ImpingementPlateElement reads its
+        bypass node's (#467). ``lagged`` reads a node not yet derived this
+        pass from the previous one, as the wall reads do; the T_aw
+        sensitivity comes back as ``dT_aw_dT_nodes``, relayed by
+        ``_relay_reference_inputs``.
+        """
+        inputs = getattr(obj, "network_temperature_inputs", None)
+        if inputs is None:
+            return None
+        out: dict[str, float] = {}
+        for nid in inputs():
+            node = self.network.nodes[nid]
+            st = (
+                self._get_node_state_with_prev(node, x) if lagged else self._get_node_state(node, x)
+            )
+            out[nid] = float(st.Tt)
+        return out
 
     def _film_discharges(self) -> dict[str, list[str]]:
         """{node: film providers discharging into it} for the walls' films
@@ -2585,7 +2623,7 @@ class NetworkSolver:
         ``lagged`` reads those nodes as the propagation does (a back-edge gives
         the previous pass's state).
         """
-        r = self._htc_and_T(obj, state, x) if obj.has_convective_surface else None
+        r = self._htc_and_T(obj, state, x, lagged) if obj.has_convective_surface else None
         if r is None or wall.film is None or wall.film_side_id != obj.id:
             return r
         provider = self.network.film_provider(wall.film)
@@ -2642,6 +2680,35 @@ class NetworkSolver:
             for idx, sens_up in up(f"{FILM_INF_PREFIX}{provider.id}").items():
                 nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                 nr["T"] += factor * d_inf * sens_up["T"]
+
+    def _relay_reference_inputs(
+        self, out: dict, obj: Any, ch: Any, factor: float, relay: dict, up: Any
+    ) -> None:
+        """Relay a side's T_aw onto the neighbour flows (``dT_aw_dsources``)
+        and node temperatures (``dT_aw_dT_nodes``) it reads (#467): an
+        impingement row's reference temperature moves with its bypass share
+        and the bypass temperature. ``factor`` is dT_node/dT_aw of that side.
+        """
+        if factor == 0.0:
+            return
+        n_species = self._n_species
+        d_src = getattr(ch, "dT_aw_dsources", None)
+        inputs = getattr(obj, "network_flow_inputs", None)
+        if d_src and inputs is not None:
+            for eid, node_id in inputs():
+                indices = self._unknown_indices.get(eid, [])
+                if not indices or eid not in d_src:
+                    continue
+                elem = self.network.elements[eid]
+                for col, coeff in elem.flow_jac_at_node(node_id, indices).items():
+                    nr = out.setdefault(col, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                    nr["T"] += factor * d_src[eid] * coeff
+        for nid, d_T in (getattr(ch, "dT_aw_dT_nodes", None) or {}).items():
+            if nid not in relay or d_T == 0.0:
+                continue
+            for idx, sens_up in up(nid).items():
+                nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
+                nr["T"] += factor * d_T * sens_up["T"]
 
     def _relay_flow_inputs(self, node_relay: dict, obj: Any, ch: Any, dT_dh: float) -> None:
         """Relay ``dh_dsources`` onto the neighbours' flow unknowns.
@@ -5100,10 +5167,15 @@ class NetworkSolver:
                         state_out.m_dot = m_solved
                     self._main_face(element, self.network.nodes[element.to_node], state_out)
                     flows = self._network_flows(element, final_x)
+                    temps = self._network_temperatures(element, final_x, lagged=False)
                     if flows is None:
                         diag = element.diagnostics(state_in, state_out)
-                    else:
+                    elif temps is None:
                         diag = element.diagnostics(state_in, state_out, flows=flows)
+                    else:
+                        diag = element.diagnostics(
+                            state_in, state_out, flows=flows, temperatures=temps
+                        )
             except (ValueError, RuntimeError):
                 # A failed solve can end on a state no element can evaluate
                 # (a negative pressure from a diverging iterate). Raising here

@@ -644,7 +644,33 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dh_dm_crossflow",
                     &combaero::cooling::JetRowHeatTransfer::dh_dm_crossflow)
       .def_readonly("extrapolated",
-                    &combaero::cooling::JetRowHeatTransfer::extrapolated);
+                    &combaero::cooling::JetRowHeatTransfer::extrapolated)
+      .def_readonly("eta_r", &combaero::cooling::JetRowHeatTransfer::eta_r)
+      .def_readonly("deta_r_dm_jet",
+                    &combaero::cooling::JetRowHeatTransfer::deta_r_dm_jet)
+      .def_readonly("deta_r_dm_crossflow",
+                    &combaero::cooling::JetRowHeatTransfer::deta_r_dm_crossflow)
+      .def_readonly("eta_r_extrapolated",
+                    &combaero::cooling::JetRowHeatTransfer::eta_r_extrapolated);
+  py::class_<combaero::cooling::ImpingementEtaR>(m, "ImpingementEtaR")
+      .def_readonly("eta", &combaero::cooling::ImpingementEtaR::eta)
+      .def_readonly("deta_dGc_Gj",
+                    &combaero::cooling::ImpingementEtaR::deta_dGc_Gj)
+      .def_readonly("extrapolated",
+                    &combaero::cooling::ImpingementEtaR::extrapolated);
+  m.attr("FLORSCHUETZ_SU_1985_ETA_A") =
+      combaero::cooling::FLORSCHUETZ_SU_1985_ETA_A;
+  m.attr("FLORSCHUETZ_SU_1985_ETA_R") =
+      combaero::cooling::FLORSCHUETZ_SU_1985_ETA_R;
+  m.attr("FLORSCHUETZ_SU_1985_ETA_N") =
+      combaero::cooling::FLORSCHUETZ_SU_1985_ETA_N;
+  m.def("impingement_eta_r", &combaero::cooling::impingement_eta_r,
+        py::arg("Gc_Gj"), py::arg("xn_d"), py::arg("yn_d"), py::arg("z_d"),
+        "Crossflow temperature influence factor of one jet row, fitted to\n"
+        "Florschuetz and Su (1985) NASA CR-3936 Appendix A (inline arrays):\n"
+        "eta_r = X^n/(1+X^n), X = a (Gc/Gj)(z/d)^r, with d(eta)/d(Gc/Gj).\n"
+        "A FITTED closure (the source publishes none); extrapolated flags\n"
+        "geometry or Gc/Gj outside the inline data.");
   m.def("jet_row_gc_gj_per_flow_ratio",
         &combaero::cooling::jet_row_gc_gj_per_flow_ratio, py::arg("yn_d"),
         py::arg("z_d"),

@@ -5198,6 +5198,13 @@ class _ImpingementPlateResult:
     dT_aw_dmdot: float = 0.0
     dT_aw_dT: float = 1.0
     dh_dsources: dict[str, float] = field(default_factory=dict)
+    # T_aw is the CR-3936 reference temperature (#467): it moves with the
+    # neighbours' flows (the bypass share, Gc/Gj) and the bypass temperature.
+    dT_aw_dsources: dict[str, float] = field(default_factory=dict)
+    dT_aw_dT_nodes: dict[str, float] = field(default_factory=dict)
+    eta_r: float = 0.0
+    bypass_fraction: float = 0.0
+    eta_r_extrapolated: bool = False
 
 
 class ImpingementPlateElement(OrificeElement):
@@ -5238,15 +5245,27 @@ class ImpingementPlateElement(OrificeElement):
     in ``m_c`` like any other. The flow distribution is checked against
     Florschuetz, Metzger and Su (1982, NASA CR-3630) Table D.1. The heat
     transfer stays Florschuetz et al. (1981), who had none, at the local
-    Gc/Gj -- CR-3630's own usage -- and only for a bypass at the jet
-    temperature: ``h`` is referenced to the supply. ``Gc/Gj`` beyond 0.8 is
+    Gc/Gj -- CR-3630's own usage. A bypass at ANOTHER temperature moves the
+    target's reference temperature (Florschuetz and Su 1985, NASA CR-3936,
+    Eq. 2.11; see "THE TARGET" below). ``Gc/Gj`` beyond 0.8 is
     flagged by the set's own range check.
 
     THE TARGET. ``surface.area`` is the target footprint of the holes,
-    ``n_holes * xn * yn``. ``T_aw`` is the supply plenum temperature, which
-    is Florschuetz's own reference temperature for h (plenum-fed, so static
-    and total coincide). The heat leaves the wall into ``to_node``: the
-    spent air carries it downstream.
+    ``n_holes * xn * yn``. ``T_aw`` is the reference temperature for h:
+
+        T_aw = T_j + eta_r(Gc/Gj, z/d) phi_0 (T_0 - T_j)
+
+    T_j the supply (Florschuetz's own reference, plenum-fed so static and
+    total coincide), T_0 the bypass node's temperature, phi_0 the bypass
+    share of the crossflow approaching this row (its lead-in flow over m_c),
+    eta_r ``cb.impingement_eta_r``: a closure FITTED to CR-3936 Appendix A
+    (the source publishes none). Only the bypass's share: the wall's own
+    heating of the spent air is already inside Florschuetz's h, whose tests
+    had no initial crossflow, so counting it again would double it. With no
+    bypass, or one at T_j, T_aw is T_j exactly. ``eta_r_extrapolated`` in
+    the diagnostics flags geometry or Gc/Gj outside the inline data; a
+    staggered array is outside it too (the summary says so). The heat
+    leaves the wall into ``to_node``: the spent air carries it downstream.
 
     DISCHARGE COEFFICIENT. Default ``'fixed'`` at Florschuetz's own 0.79
     (measured 0.73-0.85 across their plates). The hole Cd does not depend on
@@ -5259,8 +5278,9 @@ class ImpingementPlateElement(OrificeElement):
 
     NOT MODELLED. The temperature sensitivity of the correlation's
     properties (``dh_dT`` is 0, the same documented gap the channel
-    impingement path has), the crossflow's own temperature (Florschuetz
-    referenced h to the plenum), and the jet plate's own heat pick-up.
+    impingement path has), the self-heated crossflow's temperature beyond
+    what Florschuetz's plenum-referenced h holds (only a bypass's share
+    moves T_aw), and the jet plate's own heat pick-up.
 
     Parameters
     ----------
@@ -5363,6 +5383,10 @@ class ImpingementPlateElement(OrificeElement):
             d=d_jet, xn_d=xn_d, yn_d=yn_d, z_d=z_d, n_holes=float(n_holes)
         )
         self._crossflow_sources: list[str] = []
+        # The bypass lead-in upstream of this row, and the node it starts at.
+        self._bypass_segment: str | None = None
+        self._bypass_node: str | None = None
+        self._bypass_outlet: str | None = None
 
     @property
     def has_convective_surface(self) -> bool:
@@ -5384,6 +5408,27 @@ class ImpingementPlateElement(OrificeElement):
             e.id for e in graph.get_upstream_elements(self.to_node) if e.id != self.id
         ]
         self._topology_error = self._configuration_error(graph)
+        seg = self._find_bypass(graph)
+        self._bypass_segment = seg.id if seg is not None else None
+        self._bypass_node = seg.from_node if seg is not None else None
+        self._bypass_outlet = seg.to_node if seg is not None else None
+
+    def _find_bypass(self, graph: "FlowNetwork") -> "ImpingementCrossflowElement | None":
+        """The bypass_inlet segment up the crossflow chain, if any."""
+        node, seen = self.to_node, set()
+        while node not in seen:
+            seen.add(node)
+            segments = [
+                e
+                for e in graph.get_upstream_elements(node)
+                if isinstance(e, ImpingementCrossflowElement)
+            ]
+            if not segments:
+                return None
+            if segments[0].bypass_inlet:
+                return segments[0]
+            node = segments[0].from_node
+        return None
 
     def _configuration_error(self, graph: "FlowNetwork") -> str | None:
         """Why this wiring is not the configuration the model covers, or None.
@@ -5458,8 +5503,16 @@ class ImpingementPlateElement(OrificeElement):
 
     def network_flow_inputs(self) -> list[tuple[str, str]]:
         """(element id, node id) of every flow ``htc_and_T`` reads besides its
-        own: the crossflow sources, each read at ``to_node``."""
-        return [(eid, self.to_node) for eid in self._crossflow_sources]
+        own: the crossflow sources, each read at ``to_node``, and the bypass
+        lead-in at its outlet (the bypass share of the crossflow, #467)."""
+        out = [(eid, self.to_node) for eid in self._crossflow_sources]
+        if self._bypass_segment is not None and self._bypass_segment not in self._crossflow_sources:
+            out.append((self._bypass_segment, self._bypass_outlet))
+        return out
+
+    def network_temperature_inputs(self) -> list[str]:
+        """Nodes whose total temperature ``htc_and_T`` reads: the bypass's."""
+        return [self._bypass_node] if self._bypass_node is not None else []
 
     def residuals(
         self,
@@ -5472,14 +5525,20 @@ class ImpingementPlateElement(OrificeElement):
         return super().residuals(state_in, state_out)
 
     def htc_and_T(
-        self, state: NetworkMixtureState, flows: dict[str, float] | None = None
+        self,
+        state: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+        temperatures: dict[str, float] | None = None,
     ) -> _ImpingementPlateResult:
-        """Target-side h from this row's jets and the network's crossflow.
+        """Target-side h from this row's jets and the network's crossflow,
+        and the reference temperature with any bypass.
 
         ``state`` is the supply (``from_node``) state with ``m_dot`` set to
         this element's flow; ``flows`` maps each crossflow source to its flow
-        into ``to_node``. Without ``flows`` the row sees no crossflow. The
-        physics and both flow derivatives are C++'s ``jet_row_heat_transfer``.
+        into ``to_node`` (and the bypass lead-in to its outlet flow);
+        ``temperatures`` the bypass node to its total temperature. Without
+        ``flows`` the row sees no crossflow. The physics and its flow
+        derivatives are C++'s ``jet_row_heat_transfer``.
         """
         flows = flows or {}
         cs = cb.complete_state(state.T, state.P, state.X)
@@ -5489,16 +5548,43 @@ class ImpingementPlateElement(OrificeElement):
             self.correlation_set, self._row_geometry, float(state.m_dot), m_c, tr.mu, tr.k, tr.Pr
         )
         mult = self.Nu_multiplier
+        T_j = float(state.T)
+        # CR-3936's reference temperature, on the bypass's share only (see
+        # the class docstring): T_aw = T_j + eta_r phi_0 (T_0 - T_j).
+        T_0 = T_j
+        if self._bypass_node is not None and temperatures:
+            T_0 = float(temperatures.get(self._bypass_node, T_j))
+        m_b = float(flows.get(self._bypass_segment, 0.0)) if self._bypass_segment else 0.0
+        dT0 = T_0 - T_j
+        has_share = m_b > 0.0 and m_c > 0.0
+        phi = m_b / m_c if has_share else 0.0
+        eta = float(row.eta_r)
+        dT_aw_dsources: dict[str, float] = {}
+        if has_share and dT0 != 0.0:
+            # d/dm_s of eta(G) m_b / m_c over every crossflow source s, and
+            # d/dm_b on the bypass lead-in (one and the same at row 1).
+            d_src = (row.deta_r_dm_crossflow * phi - eta * m_b / (m_c * m_c)) * dT0
+            dT_aw_dsources = dict.fromkeys(self._crossflow_sources, d_src)
+            dT_aw_dsources[self._bypass_segment] = (
+                dT_aw_dsources.get(self._bypass_segment, 0.0) + eta / m_c * dT0
+            )
         return _ImpingementPlateResult(
             h=row.h * mult,
             Nu=row.Nu,
             Re=row.Re_j,
             Pr=tr.Pr,
-            T_aw=float(state.T),
+            T_aw=T_j + eta * phi * dT0,
             Gc_Gj=row.Gc_Gj,
             extrapolated=bool(row.extrapolated),
             dh_dmdot=row.dh_dm_jet * mult,
             dh_dsources=dict.fromkeys(self._crossflow_sources, row.dh_dm_crossflow * mult),
+            dT_aw_dmdot=row.deta_r_dm_jet * phi * dT0,
+            dT_aw_dT=1.0 - eta * phi,
+            dT_aw_dsources=dT_aw_dsources,
+            dT_aw_dT_nodes=({self._bypass_node: eta * phi} if has_share else {}),
+            eta_r=eta,
+            bypass_fraction=phi,
+            eta_r_extrapolated=bool(row.eta_r_extrapolated),
         )
 
     def diagnostics(
@@ -5506,11 +5592,12 @@ class ImpingementPlateElement(OrificeElement):
         state_in: NetworkMixtureState,
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None = None,
+        temperatures: dict[str, float] | None = None,
     ) -> dict[str, float]:
         base = super().diagnostics(state_in, state_out)
         if not base:
             return base
-        r = self.htc_and_T(state_in, flows=flows)
+        r = self.htc_and_T(state_in, flows=flows, temperatures=temperatures)
         out = {
             "n_holes": float(self.n_holes),
             "Re_j": float(r.Re),
@@ -5519,6 +5606,9 @@ class ImpingementPlateElement(OrificeElement):
             "T_aw": float(r.T_aw),
             "Gc_Gj": float(r.Gc_Gj),
             "surface_extrapolated": float(r.extrapolated),
+            "eta_r": float(r.eta_r),
+            "bypass_fraction": float(r.bypass_fraction),
+            "eta_r_extrapolated": float(r.eta_r_extrapolated),
         }
         if self.row is not None:
             # Florschuetz's uniform-supply Eq. 8 at this row, for comparison.

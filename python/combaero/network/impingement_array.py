@@ -46,8 +46,9 @@ from .components import (
 if TYPE_CHECKING:
     from .graph import FlowNetwork
 
-# A bypass this much hotter or colder than the supply is outside the heat
-# transfer's reference temperature (see ImpingementArray.summarize).
+# A bypass this much hotter or colder than the supply moves the target's
+# reference temperature (CR-3936's eta_r, see ImpingementPlateElement); below
+# it the reference is the supply's to solver noise (see summarize).
 BYPASS_DT_TOL_K = 1.0
 
 
@@ -238,7 +239,7 @@ class ImpingementArray:
                 else float("inf")
             ),
         }
-        for key in ("m_dot", "Re_j", "Gc_Gj", "Nu", "htc"):
+        for key in ("m_dot", "Re_j", "Gc_Gj", "Nu", "htc", "T_aw", "eta_r", "bypass_fraction"):
             out[f"rows_{key}"] = [float(p[key]) for p in plates]
         if self._bypass is not None:
             lead = element_diag[self.segment_id(0)]
@@ -247,10 +248,13 @@ class ImpingementArray:
             out["m_dot_bypass"] = m_c
             out["bypass_to_jet_flow"] = m_c / m_total if m_total > 0.0 else float("inf")
             out["bypass_Tt_minus_supply"] = dT
-            # h is referenced to the supply (Florschuetz 1981, CR-3630's flow
-            # tests): a bypass at another temperature needs CR-3936's eta_r,
-            # not built yet. 1 K is above solver noise, not a physical band.
-            out["heat_transfer_outside_source"] = float(abs(dT) > BYPASS_DT_TOL_K)
+            # A bypass at another temperature moves each row's reference
+            # temperature through CR-3936's eta_r: a closure fitted to its
+            # INLINE data. Outside that data -- a staggered array, or a row
+            # whose geometry or Gc/Gj the data do not cover -- it is
+            # extrapolated. 1 K is above solver noise, not a physical band.
+            outside = self.pattern != "inline" or any(p["eta_r_extrapolated"] for p in plates)
+            out["heat_transfer_outside_source"] = float(abs(dT) > BYPASS_DT_TOL_K and outside)
             # The gap draining back out of the inlet is outside CR-3630: the
             # lead-in then discharges at static continuity (channel_entry_drop
             # is inflow only), a dump nothing in the data checks. Reported,

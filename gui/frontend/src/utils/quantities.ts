@@ -77,7 +77,7 @@ export const QUANTITY_CATALOGUE: Record<
 		format: (v) => v.toFixed(1),
 	},
 	heat_transfer_outside_source: {
-		label: "h outside source",
+		label: "eta_r outside data",
 		unit: "—",
 		format: (v) => (v > 0 ? "yes" : "no"),
 	},

@@ -2281,11 +2281,17 @@ arr.add_to(net, supply="supply", exit="exit", bypass="byp")   # adds ia__x0: byp
   falls with crossflow there, and wall shear matters). P/P0 mean error
   0.007.
 - **Heat transfer:** Florschuetz et al. (1981) at the local Gc/Gj, which is
-  CR-3630's own usage, with `h` referenced to the supply. That holds for a
-  bypass at the jet temperature only. The summary reports `m_dot_bypass`,
-  `bypass_to_jet_flow` and `bypass_Tt_minus_supply`, and sets
-  `heat_transfer_outside_source` past 1 K: a hotter bypass needs CR-3936's
-  eta_r, not built yet.
+  CR-3630's own usage. A bypass at another temperature moves each row's
+  reference temperature (Florschuetz and Su 1985, NASA CR-3936):
+  `T_aw = T_j + eta_r phi_0 (T_0 - T_j)`, with `phi_0` the bypass share of
+  the crossflow approaching the row and `eta_r` from `cb.impingement_eta_r`,
+  a closure fitted to CR-3936's inline data (RMSE 0.083 in eta_r leaving
+  one geometry out). Only the bypass's share: the wall's own heating of the
+  spent air is inside Florschuetz's h already. The summary reports
+  `m_dot_bypass`, `bypass_to_jet_flow`, `bypass_Tt_minus_supply` and the
+  rows' `T_aw`, `eta_r` and `bypass_fraction`, and sets
+  `heat_transfer_outside_source` when a bypass more than 1 K off the
+  supply meets a staggered array or a row outside the inline data.
 
 Spent air leaving through the target (#468) is a different configuration,
 with its own element to come. The building blocks below are public for
@@ -2327,7 +2333,11 @@ where `m_j` is the plate's own flow and `m_c` every other inflow to its
 of different geometry or a bleed therefore shows up in the heat transfer.
 `h` depends on a neighbour's flow, so the element returns `dh_dsources` and
 the solver relays it into the Jacobian (the `network_flow_inputs()` opt-in).
-`T_aw` is the supply plenum temperature, Florschuetz's own reference.
+`T_aw` is the supply plenum temperature, Florschuetz's own reference, moved
+by a bypass at another temperature through CR-3936's eta_r (see
+`ImpingementArray` above): the element reads the bypass node's temperature
+(`network_temperature_inputs()`) and the lead-in's flow, and returns
+`dT_aw_dsources` / `dT_aw_dT_nodes` for the solver to relay.
 The physics is C++'s `cb.jet_row_heat_transfer(set, cb.JetRowGeometry(...),
 m_jet, m_crossflow, mu, k, Pr)`, which returns `h` and its analytic
 derivatives with respect to both flows; the element only decides which flows
@@ -2336,10 +2346,15 @@ are crossflow.
   alternatives `'IdelchikThick'`, `'Lichtarowicz'` (long hole, l/d 2-10)
   and `'McGreehanSchotsch'` (supply-side `U1/Vi = 0`, never Gc/Gj).
   `Cd_in_range` reports whether the plate is inside the chosen source's range.
-- Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `htc`, `T_aw`,
-  `surface_extrapolated`, and `Gc_Gj_closed_form` (Eq. 8) when `row` is given.
+- Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `htc`, `T_aw`, `eta_r`,
+  `bypass_fraction`, `eta_r_extrapolated`, `surface_extrapolated`, and
+  `Gc_Gj_closed_form` (Eq. 8) when `row` is given.
+- `cb.impingement_eta_r(Gc_Gj, xn_d, yn_d, z_d)` returns `eta`,
+  `deta_dGc_Gj` and `extrapolated`; the constants are
+  `cb.FLORSCHUETZ_SU_1985_ETA_A/R/N`.
 - Not modelled: the temperature sensitivity of the correlation's properties
-  (`dh_dT = 0`) and the crossflow's own temperature.
+  (`dh_dT = 0`) and the self-heated crossflow's own temperature beyond what
+  Florschuetz's h holds.
 
 **`ImpingementCrossflowElement`** is a `ChannelElement` (area `height *
 span`) plus the momentum the jets cost: they enter with no streamwise

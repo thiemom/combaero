@@ -182,17 +182,17 @@ def test_an_undeclared_inflow_is_still_refused() -> None:
         NetworkSolver(net).solve()
 
 
-def test_the_bypass_temperature_is_flagged_not_hidden() -> None:
-    """h stays referenced to the supply (CR-3630's flow tests ran the bypass
-    at the jet temperature). A hotter bypass needs CR-3936's eta_r, which is
-    not built: the summary says so instead of reporting h as in-source."""
+def test_a_bypass_temperature_inside_the_data_is_not_flagged() -> None:
+    """A hotter bypass moves each row's reference temperature through
+    CR-3936's eta_r (test_impingement_eta_r.py); inside the inline data that
+    is in-source, so nothing is flagged."""
     net, arr = _with_bypass(0.004)
     s = arr.summarize(_solve(net)["__element_diag__"])
     assert s["heat_transfer_outside_source"] == 0.0
     net, arr = _with_bypass(0.004, Tt=400.0)
     s = arr.summarize(_solve(net)["__element_diag__"])
     assert s["bypass_Tt_minus_supply"] == pytest.approx(100.0, abs=1.0)
-    assert s["heat_transfer_outside_source"] == 1.0
+    assert s["heat_transfer_outside_source"] == 0.0
 
 
 def test_bad_bypass_parameters_are_refused() -> None:

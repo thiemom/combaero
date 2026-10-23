@@ -119,3 +119,49 @@ def test_eta_r_spans_what_the_authors_describe() -> None:
     assert min(eta) > 0.3 and max(eta) < 1.5
     over = [r for r in rows if r["eta_r"] > 1.0]
     assert over and min(r["Gc_Gj"] for r in over) > 0.5
+
+
+def _closure_errors(pattern: str) -> tuple[list[float], list[float]]:
+    """(cb.impingement_eta_r - printed eta_r) per unique point, and the
+    printed eta_r, for one hole pattern."""
+    import combaero as cb
+
+    err, eta = [], []
+    for (xn, yn, z, pat, _page, _re, _mc), rows in _tests().items():
+        if pat != pattern or rows[0]["repeat_of_page"]:
+            continue
+        for r in rows:
+            e = cb.impingement_eta_r(r["Gc_Gj"], xn, yn, z)
+            assert not e.extrapolated  # the closure's envelope is this data's
+            err.append(e.eta - r["eta_r"])
+            eta.append(r["eta_r"])
+    return err, eta
+
+
+def _rms(v: list[float]) -> float:
+    return math.sqrt(sum(x * x for x in v) / len(v))
+
+
+def test_the_fitted_closure_on_its_own_data() -> None:
+    """FITTED, not fidelity: CR-3936 publishes no correlation, so the
+    closure was fitted to these 363 inline points (39 tests). This is how
+    well it fits, measured 2026-10-23: RMSE 0.079, bias -0.009; 0.069 on
+    the 331 points the bounded form can reach (eta_r <= 1). Leaving one
+    geometry out at a time it scored 0.083 (the extraction record)."""
+    err, eta = _closure_errors("I")
+    assert len(err) == 363
+    assert _rms(err) < 0.080
+    assert abs(sum(err) / len(err)) < 0.010
+    inside = [e for e, y in zip(err, eta, strict=True) if y <= 1.0]
+    assert len(inside) == 331
+    assert _rms(inside) < 0.070
+
+
+def test_staggered_arrays_are_outside_it() -> None:
+    """The two staggered geometries, never fitted: RMSE 0.21, bias -0.13,
+    the miss mostly in their eta_r > 1 points (0.084 where eta_r <= 1). The
+    array summary flags a hot bypass on a staggered array for this."""
+    err, eta = _closure_errors("S")
+    assert len(err) == 51
+    assert 0.15 < _rms(err) < 0.25
+    assert sum(err) / len(err) < -0.10

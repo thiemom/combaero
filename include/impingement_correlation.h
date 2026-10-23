@@ -260,6 +260,13 @@ struct JetRowHeatTransfer {
   double dh_dm_jet = 0.0;        // [W/(m^2 K)/(kg/s)], includes Gc/Gj ~ 1/m_jet
   double dh_dm_crossflow = 0.0;  // [W/(m^2 K)/(kg/s)]
   bool extrapolated = false;
+  // Crossflow temperature influence factor at this Gc/Gj (Florschuetz and
+  // Su 1985, see impingement_eta_r) and its derivatives with respect to both
+  // flows, through Gc/Gj.
+  double eta_r = 0.0;                 // [-]
+  double deta_r_dm_jet = 0.0;         // [1/(kg/s)]
+  double deta_r_dm_crossflow = 0.0;   // [1/(kg/s)]
+  bool eta_r_extrapolated = false;
 };
 
 // (pi/4) / ((yn/d)(z/d)): Gc/Gj per unit m_crossflow/m_jet.
@@ -273,6 +280,47 @@ JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet &set,
                                          double mu, double k, double Pr);
 
 constexpr double JET_ROW_MDOT_FLOOR = 1e-12;  // [kg/s]
+
+// ---------------------------------------------------------------
+// Crossflow temperature influence factor eta_r (#467)
+// ---------------------------------------------------------------
+//
+// Florschuetz and Su (1985), NASA CR-3936, Eq. (2.11) at a recovery factor
+// of 1: eta_r = (T_ref,r - T_j)/(T_m,n - T_j), T_ref,r the target temperature
+// for zero regional heat flux opposite row n, T_m,n the crossflow's
+// mixed-mean total temperature approaching it. CR-3936 publishes no
+// correlation for it; this closure is OURS, FITTED to its Appendix A
+// (florschuetz_su_1985_cr3936.md, signed off 2026-10-23):
+//
+//   eta_r = X^n / (1 + X^n),   X = a (Gc/Gj) (z/d)^r
+//
+// least squares on all 39 inline tests (363 rows): RMSE 0.079 in eta_r;
+// leave-one-geometry-out 0.083. 0 as Gc/Gj -> 0 (the jets dominate), 1 as
+// Gc/Gj -> infinity (the crossflow does), monotonic between: the authors'
+// own limits. Gc/Gj <= 0 gives 0; with n > 1 the value and slope are C1
+// there. The source's eta_r > 1 (crossflow controlling the surface, 12% of
+// points) is outside this bounded form, as are staggered arrays.
+struct ImpingementEtaR {
+  double eta = 0.0;           // [-]
+  double deta_dGc_Gj = 0.0;   // [-]
+  bool extrapolated = false;  // outside the inline data's envelope
+};
+
+constexpr double FLORSCHUETZ_SU_1985_ETA_A = 2.042;  // [-]
+constexpr double FLORSCHUETZ_SU_1985_ETA_R = 1.073;  // exponent on z/d [-]
+constexpr double FLORSCHUETZ_SU_1985_ETA_N = 1.368;  // [-]
+
+// The inline data's envelope (Appendix A): geometry and crossflow ratio.
+struct ImpingementEtaRRange {
+  static constexpr double xn_d_min = 5.0, xn_d_max = 10.0;
+  static constexpr double yn_d_min = 4.0, yn_d_max = 8.0;
+  static constexpr double z_d_min = 1.0, z_d_max = 3.0;
+  static constexpr double Gc_Gj_max = 4.44;
+  static constexpr double rel_tol = 5.0e-3;  // as RibRange::rel_tol
+};
+
+ImpingementEtaR impingement_eta_r(double Gc_Gj, double xn_d, double yn_d,
+                                  double z_d);
 
 void validate_single_jet_set(const SingleJetImpingementSet &set);
 void validate_jet_array_set(const JetArrayCorrelationSet &set);
