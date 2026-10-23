@@ -12,6 +12,7 @@ import {
 	draggedOffset,
 	type LabelOffset,
 	labelPosition,
+	pathThroughBox,
 } from "../utils/labelOffset";
 import {
 	orientationGlyph,
@@ -68,11 +69,22 @@ export default function ThermalEdge({
 		start: LabelOffset;
 		last: LabelOffset | null;
 	} | null>(null);
-	const [boxX, boxY] = labelPosition(
-		labelX,
-		labelY,
-		dragOffset ?? data?.label_offset,
-	);
+	const offset: LabelOffset | undefined = dragOffset ?? data?.label_offset;
+	const [boxX, boxY] = labelPosition(labelX, labelY, offset);
+	// A moved box keeps the arrow attached: node -> box -> node. Unmoved, the
+	// wall is React Flow's own bezier, as before.
+	const wallPath = offset
+		? pathThroughBox(
+				sourceX,
+				sourceY,
+				sourcePosition,
+				targetX,
+				targetY,
+				targetPosition,
+				boxX,
+				boxY,
+			)
+		: edgePath;
 	const onBoxPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
 		if (e.button !== 0) return;
 		e.stopPropagation();
@@ -270,7 +282,7 @@ export default function ThermalEdge({
 			<path
 				style={{ stroke: "transparent", strokeWidth: 10, fill: "none" }}
 				className="react-flow__edge-path"
-				d={edgePath}
+				d={wallPath}
 			/>
 			{/* Visible dashed path with data-driven arrowhead */}
 			<path
@@ -284,7 +296,7 @@ export default function ThermalEdge({
 					fill: "none",
 				}}
 				className="react-flow__edge-path"
-				d={edgePath}
+				d={wallPath}
 				markerEnd={flowsForward ? `url(#${markerId})` : undefined}
 				markerStart={!flowsForward ? `url(#${markerIdReverse})` : undefined}
 			/>
