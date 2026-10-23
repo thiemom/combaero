@@ -1905,6 +1905,13 @@ class NetworkElement(ABC):
     #: (MPCE impulse rows, the compressible channel #481, four Pa elements #614).
     residual_scale_kind: str | None = None
 
+    #: Start a compressible ``"default"`` solve from the outlet-referenced
+    #: incompressible proxy instead of cold, falling back to the cold path if
+    #: that fails (#706). Declared only where it was measured to pay: a chain
+    #: of compressible momentum stations converges slowly from the cold
+    #: start, which conditions those coupled rows poorly.
+    prefers_warm_start: bool = False
+
     def __init__(self, id: str, from_node: str, to_node: str):
         self.id = id
         self.from_node = from_node
@@ -7634,6 +7641,11 @@ class ImpingementCrossflowElement(CrossflowSegmentElement):
     crossflow fully developed, with its momentum, after 16 to 95 hydraulic
     diameters: the first case, or a chamber fed by a long enough duct.
     """
+
+    # A 10-row (5,4,2) array cold: 24 residual evaluations, 1.4 s; from the
+    # outlet-referenced proxy: 16, 0.5 s. With an initial crossflow (#467)
+    # 97-145 cold against 16-17 warm (#706).
+    prefers_warm_start = True
 
     def __init__(
         self,

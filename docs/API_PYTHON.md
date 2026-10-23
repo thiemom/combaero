@@ -1121,6 +1121,10 @@ solver = NetworkSolver(graph)
 # proxy (densities at the downstream static) and warm-starts the
 # compressible solve from it directly -- the auto-retry's seed as a
 # primary strategy, for networks known to stall the cold path.
+# "default" also starts there (falling back to the cold path, auto-retry
+# and all, if it fails) when an element declares prefers_warm_start;
+# ImpingementCrossflowElement does: impingement stress family 37/40 ->
+# 40/40 converged, 167 s -> 33 s, same roots (#706).
 # auto_retry (default True): failed cold solves on compressible
 # MPCE networks are retried once from an outlet-referenced
 # incompressible warm start (densities at the downstream static);

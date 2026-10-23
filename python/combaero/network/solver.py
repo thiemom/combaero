@@ -3715,6 +3715,35 @@ class NetworkSolver:
             )
 
         _t0 = time.time()
+        if (
+            init_strategy == "default"
+            and has_compressible
+            and any(getattr(e, "prefers_warm_start", False) for e in self.network.elements.values())
+        ):
+            # Elements that converge slowly from the cold start declare it
+            # (#706): try the outlet-referenced warm start first, and fall
+            # back to the cold path below, with its own auto-retry, only if
+            # it fails. Its warnings are held back the same way.
+            warm_timeout = None if timeout is None else 0.5 * timeout
+            with warnings.catch_warnings(record=True) as warm_warnings:
+                warnings.simplefilter("always")
+                warm = self._solve_impl(
+                    method=method,
+                    timeout=warm_timeout,
+                    options=options,
+                    use_jac=use_jac,
+                    x0=None,
+                    init_strategy="outletref_warmstart",
+                    warmstart_maxfev=warmstart_maxfev,
+                    lambda_steps=lambda_steps,
+                )
+            if warm.get("__success__", False):
+                for w in warm_warnings:
+                    warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+                return warm
+            if timeout is not None:
+                timeout = max(timeout - (time.time() - _t0), 0.0)
+            _t0 = time.time()
         # Junction (MultiPortChamberBase) networks reserve budget for the
         # retry up front: their cold path has slow pockets the seeded retry
         # rescues (see solve). Any other network keeps its whole budget for
