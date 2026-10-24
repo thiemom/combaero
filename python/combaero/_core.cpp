@@ -4883,9 +4883,12 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       m, "CombustionMethod",
       "Product model for combustion_state / combustion_state_from_streams.\n\n"
       "  Complete    : complete combustion to CO2 + H2O (fast, default)\n"
-      "  Equilibrium : complete combustion + reforming + WGS equilibrium\n"
-      "                (slower, physically correct for rich or high-T "
-      "conditions)")
+      "  Equilibrium : PARTIAL equilibrium -- complete combustion, then\n"
+      "                reforming + water-gas shift among CO, H2, CO2, H2O\n"
+      "                and the fuel. No dissociation (no O, OH, H, NO):\n"
+      "                identical to Complete when lean, cooler when rich.\n"
+      "                By design: a combustor rarely reaches full\n"
+      "                equilibrium, least of all for NO.")
       .value("Complete", CombustionMethod::Complete)
       .value("Equilibrium", CombustionMethod::Equilibrium)
       .export_values();
