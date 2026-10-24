@@ -52,36 +52,46 @@ segment x/L = -0.25 ... 1.05 the Nusselt number NU and ETA.
 - **Review page** (scans beside the CSV, the patched cell highlighted):
   https://claude.ai/artifact/7zbTbGYpnD4LCHwazwit9F
 
-## Previews, not gates (2026-10-23, exploratory, not committed as tests)
+## Scored (2026-10-24, cross-source)
 
-These are cross-source: same lab, but a different study from CR-3936, which
-the closure was fitted to. They are accuracy, not fidelity.
+`python/tests/test_impingement_d2_validation.py`. Cross-source: same lab,
+different studies from the ones the closures were fitted to (eta_r to
+CR-3936, h to Florschuetz 1981). Accuracy, not fidelity.
 
-- **The bypass reference temperature (#713, option B):** the model's
-  T_aw - T_j = eta_r(Gc/Gj, z/d) phi_0 (T_0 - T_j) predicts exactly this
-  table's ETA as eta_r phi_0. Per row, from the matched D.1 flows, over 28
-  inline tests and 279 points with initial crossflow:
+The rig is solved end to end at each test's own Re_j and mc/mj, with the
+bypass 20 K above the jets. ETA is read from the plate's T_aw. B(10,4,2) has
+no D.1 test (no P0) and is left out: 40 tests, 400 rows.
+
+- **The bypass reference temperature (#713, option B):** T_aw - T_j =
+  eta_r(Gc/Gj, z/d) phi_0 (T_0 - T_j), over 300 rows with initial crossflow.
 
   | prediction | bias | RMSE |
   |---|---|---|
-  | **eta_r phi_0 (as built)** | **+0.024** | **0.077** |
-  | phi_0 alone (eta_r = 1) | +0.177 | 0.219 |
-  | none (eta = 0) | -0.439 | 0.507 |
+  | **eta_r phi_0, end to end** | **+0.013** | **0.078** |
+  | eta_r phi_0 at D.1's measured flows (279 matched rows) | +0.024 | 0.077 |
+  | phi_0 alone (eta_r = 1) | | 0.208 |
+  | none (eta = 0) | | 0.517 |
 
-  By row, the bias runs from -0.07 at row 1 to +0.07 at row 10.
+  By row, the bias runs from -0.09 at row 1 to +0.06 at row 10.
 
-- **Florschuetz (1981) h with initial crossflow,** at each row's Re_j and
-  D.1 Gc/Gj, against NU:
+  End to end, it first scored 0.163. B(5,4,1) at mc/mj 0.5 and 1.0 starves
+  its first rows, and the network ran them slightly reversed, where eta_r
+  then dropped to 0. That was fixed in #728: eta_r is taken at the crossflow
+  over |m_jet|.
+
+- **Florschuetz (1981) Nu,** at the network's own Re_j and Gc/Gj
+  (Nu_model / Nu - 1):
 
   | subset | n | bias | RMS |
   |---|---|---|---|
-  | no initial crossflow | 100 | +4.7% | 7.7% |
-  | with initial crossflow | 279 | -10.0% | 25.5% |
-  | Gc/Gj <= 0.8 | 282 | -1.4% | 17.0% |
-  | Gc/Gj > 0.8 (flagged out of range already) | 97 | -19.7% | 32.9% |
+  | no initial crossflow | 100 | +5.8% | 8.4% |
+  | with it, inside the correlation's range | 195 | -2.7% | 21.5% |
+  | with it, flagged outside (`surface_extrapolated`) | 105 | -16.9% | 34.9% |
+  | of which starved rows (jet reversed or Gc/Gj > 4.44) | 8 | -93.8% | 93.9% |
 
-  This is the under-prediction CR-3936 expects where the crossflow
-  dominates (Nu rising toward channel flow, its conclusion 6).
+  The miss outside the range is the under-prediction CR-3936 expects where
+  the crossflow dominates (Nu rising toward channel flow, its conclusion 6).
+  The jet correlation has no channel-flow floor; that is the open #467 item.
 
 ## Review log
 
@@ -89,3 +99,5 @@ the closure was fitted to. They are accuracy, not fidelity.
   header read off the page images; the NU-bar identity holds for all 48
   tests.
 - 2026-10-24: signed off by the user; no errors found.
+- 2026-10-24: scored end to end (the previews replaced); found and fixed the
+  reversed-jet eta_r (#728).
