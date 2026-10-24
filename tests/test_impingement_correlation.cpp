@@ -420,3 +420,35 @@ TEST(JetRowHeatTransfer, EtaRFlowDerivativesMatchCentralDifferences) {
     EXPECT_GT(r.deta_r_dm_crossflow, 0.0);
   }
 }
+
+TEST(JetRowHeatTransfer, AStarvedOrReversedJetIsCrossflowControlled) {
+  // eta_r -> 1 from both sides of zero jet flow (the signed Gc/Gj sent a
+  // reversed jet to 0), flagged, and its partials still match differences.
+  combaero::cooling::JetRowGeometry g;
+  g.d = 0.00254;
+  g.xn_d = 5.0;
+  g.yn_d = 4.0;
+  g.z_d = 1.0;
+  g.n_holes = 18.0;
+  const double mu = 1.85e-5, k = 0.026, Pr = 0.71, mc = 0.01;
+  const auto set = florschuetz_1981_inline();
+  auto row = [&](double mj, double m_c) {
+    return combaero::cooling::jet_row_heat_transfer(set, g, mj, m_c, mu, k, Pr);
+  };
+  for (double mj : {1e-4, -1e-4}) {
+    const auto r = row(mj, mc);
+    EXPECT_GT(r.eta_r, 0.99) << mj;
+    EXPECT_TRUE(r.eta_r_extrapolated) << mj;
+    EXPECT_NEAR(r.eta_r, row(-mj, mc).eta_r, 1e-15) << mj;
+    const double e = 1e-10;
+    const double fd_j = (row(mj + e, mc).eta_r - row(mj - e, mc).eta_r) / (2 * e);
+    const double fd_c = (row(mj, mc + e).eta_r - row(mj, mc - e).eta_r) / (2 * e);
+    EXPECT_NEAR(r.deta_r_dm_jet, fd_j, std::abs(fd_j) * 1e-5) << mj;
+    EXPECT_NEAR(r.deta_r_dm_crossflow, fd_c, std::abs(fd_c) * 1e-5) << mj;
+  }
+  EXPECT_EQ(row(0.0, mc).eta_r, 1.0);
+  EXPECT_TRUE(row(0.0, mc).eta_r_extrapolated);
+  // No crossflow approaching (or a reversed one): the jets set it.
+  EXPECT_EQ(row(-1e-4, 0.0).eta_r, 0.0);
+  EXPECT_EQ(row(1e-3, -mc).eta_r, 0.0);
+}

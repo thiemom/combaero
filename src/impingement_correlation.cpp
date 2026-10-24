@@ -263,13 +263,24 @@ JetRowHeatTransfer jet_row_heat_transfer(const JetArrayCorrelationSet &set,
   } else {
     out.dh_dm_jet = scale * jet.dNu_dRe_j * dRe_dm;
   }
-  const auto eta =
-      impingement_eta_r(out.Gc_Gj, geom.xn_d, geom.yn_d, geom.z_d);
+  // eta_r on the crossflow over the jet's MAGNITUDE: a starved or reversed
+  // jet row is crossflow-controlled, eta_r -> 1 from either side of m_jet = 0.
+  // The signed ratio sent a reversed jet to eta_r = 0 (T_aw = T_j), a jump of
+  // the whole bypass share across zero jet flow, unflagged (CR-3630 D.2,
+  // B(5,4,1) at mc/mj 0.5 and 1.0: the first rows starve).
+  const double gc_eta = has_jet ? c * m_crossflow / std::abs(m_jet) : 0.0;
+  if (!has_jet && m_crossflow > 0.0) {
+    out.eta_r = 1.0;  // the closure's Gc/Gj -> infinity limit, zero slope
+    out.eta_r_extrapolated = true;
+    return out;
+  }
+  const auto eta = impingement_eta_r(gc_eta, geom.xn_d, geom.yn_d, geom.z_d);
   out.eta_r = eta.eta;
   out.eta_r_extrapolated = eta.extrapolated;
   if (has_jet) {
-    out.deta_r_dm_jet = -eta.deta_dGc_Gj * out.Gc_Gj / m_jet;
-    out.deta_r_dm_crossflow = eta.deta_dGc_Gj * c / m_jet;
+    // d(c m_c / |m_jet|)/dm_jet = -gc_eta / m_jet.
+    out.deta_r_dm_jet = -eta.deta_dGc_Gj * gc_eta / m_jet;
+    out.deta_r_dm_crossflow = eta.deta_dGc_Gj * c / std::abs(m_jet);
   }
   return out;
 }

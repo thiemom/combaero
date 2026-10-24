@@ -260,9 +260,11 @@ struct JetRowHeatTransfer {
   double dh_dm_jet = 0.0;        // [W/(m^2 K)/(kg/s)], includes Gc/Gj ~ 1/m_jet
   double dh_dm_crossflow = 0.0;  // [W/(m^2 K)/(kg/s)]
   bool extrapolated = false;
-  // Crossflow temperature influence factor at this Gc/Gj (Florschuetz and
-  // Su 1985, see impingement_eta_r) and its derivatives with respect to both
-  // flows, through Gc/Gj.
+  // Crossflow temperature influence factor (Florschuetz and Su 1985, see
+  // impingement_eta_r) at c m_crossflow / |m_jet|, and its derivatives with
+  // respect to both flows. A starved or reversed jet row is crossflow-
+  // controlled: eta_r -> 1 from either side of m_jet = 0 (flagged, past the
+  // data's Gc/Gj), where the signed Gc_Gj above would give 0.
   double eta_r = 0.0;                 // [-]
   double deta_r_dm_jet = 0.0;         // [1/(kg/s)]
   double deta_r_dm_crossflow = 0.0;   // [1/(kg/s)]
