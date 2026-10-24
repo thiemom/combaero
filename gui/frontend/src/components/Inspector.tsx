@@ -3029,9 +3029,16 @@ const Inspector = () => {
 											})
 										}
 									>
-										<option value="complete">Complete (Fast)</option>
-										<option value="equilibrium">Chemical Equilibrium</option>
+										<option value="complete">Complete (CO2 + H2O)</option>
+										<option value="equilibrium">
+											Partial equilibrium (CO/H2 shift)
+										</option>
 									</select>
+									<p className="text-[10px] text-gray-500 leading-snug">
+										{(selectedNode.data.method || "complete") === "complete"
+											? "All fuel burns to CO2 and H2O. Fast; the default."
+											: "Complete combustion, then reforming and water-gas shift among CO, H2, CO2 and H2O. No dissociation (no O, OH or NO): the same as Complete when lean, cooler when rich. Usually closer to a real combustor than full equilibrium, which it rarely reaches."}
+									</p>
 								</div>
 
 								<GeometryFields

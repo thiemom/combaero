@@ -264,10 +264,20 @@ struct EquilibriumResult {
 // Selects the product model used by combustion_state /
 // combustion_state_from_streams.
 //   Complete    : complete combustion to CO2 + H2O (fast, default)
-//   Equilibrium : complete combustion followed by reforming + WGS equilibrium
-//                 (slower, physically correct for rich or high-T conditions)
-// Designed for extension: a future WGS-only or full-Gibbs option can be added
-// here.
+//   Equilibrium : PARTIAL equilibrium -- complete combustion followed by
+//                 reforming + water-gas shift among CO, H2, CO2, H2O and the
+//                 fuel (slower).
+//
+// DECISION: "Equilibrium" is partial by design. The species set has no O, OH,
+// H or NO, so there is no dissociation. Lean it equals Complete (within 0.5 K,
+// CH4/air at 600 K, 20 bar); rich it is cooler (-56 K at phi 1.1, -292 K at
+// phi 1.6) because the leftover fuel reforms to CO + H2. Near stoichiometric
+// it is hotter than full Gibbs equilibrium, which dissociates (Cantera
+// GRI-3.0 HP, CH4/air 700 K, 2 bar: +17 K at phi 0.6, +188 K at phi 1.0,
+// +22 K at phi 1.3; #718), and T does not depend on P. A real
+// combustor rarely reaches full equilibrium in its residence time, least of
+// all for NO, so this is usually the closer of the two. A full-Gibbs option
+// would be a third value here, not a change to this one.
 enum class CombustionMethod {
   Complete,
   Equilibrium,

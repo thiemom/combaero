@@ -2692,6 +2692,15 @@ class CombustorNode(NetworkNode):
     the selected CombustionMethodLiteral.
     Automatically handles mixing when multiple upstream connections exist.
 
+    ``method``:
+      - ``"complete"`` (default): complete combustion to CO2 + H2O.
+      - ``"equilibrium"``: PARTIAL equilibrium -- complete combustion, then
+        reforming + water-gas shift among CO, H2, CO2, H2O and the fuel. No
+        dissociation (no O, OH, H, NO), by design: identical to "complete"
+        when lean, cooler when rich. A combustor rarely reaches full
+        equilibrium in its residence time, least of all for NO. See
+        ``CombustionMethod`` in include/state.h for the decision record.
+
     Pressure loss is **not** a property of the combustor node.  Attach a
     :class:`PressureLossElement` on an adjacent edge (upstream diffuser or
     downstream liner exit) to apply combustor pressure loss; theta-aware
