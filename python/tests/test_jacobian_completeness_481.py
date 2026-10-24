@@ -105,3 +105,69 @@ def test_the_mixer_reports_its_own_heat_sensitivity(m: float) -> None:
     assert mix(1e-4).dT_mix_dQ == pytest.approx(fd, rel=1e-6)
     phi, _ = cb.mixer_heat_per_unit_flow(m)
     assert mix(1e-4).dT_mix_dQ == pytest.approx(mix(1e-4).dT_mix_d_delta_h * phi, rel=1e-12)
+
+
+def _premixed_and_dilution_network(corr: object) -> FlowNetwork:
+    """A premix plenum (air + CH4, its Y moving with the flow split) and a hot
+    dilution stream both feed the combustor, so T_unburned depends on a
+    stream's COMPOSITION, not only its flow and Tt (#718)."""
+    from combaero.network import CombustorNode, PressureLossElement
+
+    g = FlowNetwork()
+    for name, Pt, Tt, Y in (
+        ("air", 1.6e5, 600.0, cb.species.dry_air_mass()),
+        ("fuel", 1.6e5, 300.0, cb.species.pure_species("CH4")),
+        ("dil", 1.6e5, 800.0, cb.species.dry_air_mass()),
+        ("out", 1.0e5, 300.0, cb.species.dry_air_mass()),
+    ):
+        bnd = PressureBoundary(name)
+        bnd.Pt, bnd.Tt, bnd.Y = Pt, Tt, list(Y)
+        g.add_node(bnd)
+    g.add_node(PlenumNode("premix"))
+    g.add_node(CombustorNode("comb", method="complete"))
+    g.add_node(PlenumNode("post"))
+    for eid, a, b, d in (
+        ("o_air", "air", "premix", 0.03),
+        ("o_fuel", "fuel", "premix", 0.004),
+        ("o_pre", "premix", "comb", 0.04),
+        ("o_dil", "dil", "comb", 0.02),
+        ("nozzle", "post", "out", 0.05),
+    ):
+        g.add_element(OrificeElement(eid, a, b, Cd=0.8, diameter=d, correlation="fixed"))
+    g.add_element(PressureLossElement("loss", "comb", "post", correlation=corr))
+    return g
+
+
+@pytest.mark.parametrize(
+    "corr",
+    [LinearThetaFractionLoss(k=0.01, xi0=0.02), LinearThetaHeadLoss(k=1.0, zeta0=3.0, area=0.05)],
+    ids=["fraction", "head"],
+)
+def test_the_unburned_temperature_is_the_enthalpy_mix(corr: object) -> None:
+    """T_unburned is the enthalpy-mixed reactant temperature, the one the C++
+    combustor context defines theta with (#718); it was a mass-weighted Tt.
+    Its Jacobian carries the inflows' composition through "{node}.Y[k]"."""
+    g = _premixed_and_dilution_network(corr)
+    s = NetworkSolver(g)
+    r = s.solve()
+    assert r["__success__"]
+    comb = g.nodes["comb"]
+    # The enthalpy balance, independently of the mixer: the inflows' total
+    # enthalpy is the mixture's at T_unburned.
+    n = cb.num_species()
+    m_pre, m_dil = r["o_pre.m_dot"], r["o_dil.m_dot"]
+    Y_pre = [r[f"premix.Y[{k}]"] for k in range(n)]
+    Y_dil = list(cb.species.dry_air_mass())
+    P = r["comb.P"]
+
+    def h(T: float, Y: list[float]) -> float:
+        return cb.thermo_state(T, P, list(cb.mass_to_mole(Y))).h
+
+    M = m_pre + m_dil
+    Y_mix = [(m_pre * a + m_dil * b) / M for a, b in zip(Y_pre, Y_dil, strict=True)]
+    h_in = (m_pre * h(r["premix.T"], Y_pre) + m_dil * h(800.0, Y_dil)) / M
+    assert h(comb._T_unburned, Y_mix) == pytest.approx(h_in, rel=1e-9, abs=1e-3)
+    # The mass-weighted Tt it replaced misses that balance.
+    T_mass = (m_pre * r["premix.T"] + m_dil * 800.0) / M
+    assert abs(T_mass - comb._T_unburned) > 0.3
+    assert _jac_err(s, np.array(r["__x_solution__"])) < 2e-5
