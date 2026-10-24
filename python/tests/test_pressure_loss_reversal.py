@@ -32,7 +32,6 @@ from combaero.network.pressure_loss import (
     ConstantFractionLoss,
     ConstantHeadLoss,
     LinearThetaFractionLoss,
-    _low_flow_factor,
 )
 
 Y = list(cb.species.dry_air_mass())
@@ -122,6 +121,11 @@ def _ctx(m: float):
     from types import SimpleNamespace
 
     return SimpleNamespace(mdot_total=m, theta=0.5)
+
+
+def _low_flow_factor(ctx: object, m_ref: float | None) -> float:
+    """g(|m|/m_ref), read through the C++ fraction loss with xi0 = 1."""
+    return ConstantFractionLoss(xi=1.0, m_ref=m_ref)(ctx)[0]
 
 
 def test_the_low_flow_factor_is_one_at_design_and_c2_there() -> None:
