@@ -4,7 +4,7 @@ crossflow temperature, Eq. 5.3), transcribed from the text layer (#467).
 The extraction record is
 validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630_table_d2.md.
 These tests check the transcription against the table's own identities;
-scoring against it comes once the extraction is signed off.
+the score against it is test_impingement_d2_validation.py.
 """
 
 from __future__ import annotations
