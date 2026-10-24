@@ -6330,9 +6330,9 @@ class PressureLossElement(NetworkElement):
             parts.append((1.0 - w, -r_r, j_rev))
         res = [sum(wt * r for wt, r, _ in parts)]
 
-        # The Jacobian is differenced (one or two correlation calls per
-        # variable and per species present), so it is computed only when the
-        # solver reads it (LazyJacobian, #489).
+        # The Jacobian is analytic for a built-in correlation and differenced
+        # for a user callable (one or two calls per variable and species), so
+        # it is computed only when the solver reads it (LazyJacobian, #489).
         def jacobian() -> dict[int, dict[str, float]]:
             out: dict[str, float] = {}
             for wt, _, row in parts:
@@ -6371,10 +6371,19 @@ class PressureLossElement(NetworkElement):
         if self._theta_source_resolved is not None and dxi_dtheta != 0.0 and ctx.T_in > 0:
             jac[0][f"{self._theta_source_resolved}.T"] = state_in.Pt * dxi_dtheta / ctx.T_in
 
-        # ----- FD-based Jacobian for correlation dependencies not captured
-        # analytically (e.g. zeta-based xi depends on mdot, P_in, T_in via rho).
-        # One extra correlation call per variable; cheap and robust.
+        # ----- The other dependences: m_dot, P_in, T_in, composition. A
+        # built-in correlation returns them analytically from C++ (evaluate,
+        # #718); a user callable (the loss-map prototype) is differenced.
+        evaluate = getattr(self.correlation, "evaluate", None)
+        partials = evaluate(ctx, list(state_in.Y)) if evaluate is not None else None
+
         def _dxi_dvar(attr: str, val: float, step_scale: float) -> float:
+            if partials is not None:
+                return {
+                    "mdot_total": partials.dxi_dmdot,
+                    "P_in": partials.dxi_dP_in,
+                    "T_in": partials.dxi_dT_in,
+                }[attr]
             eps = step_scale if val == 0.0 else max(abs(val) * 1e-6, step_scale)
             saved = getattr(ctx, attr)
             try:
@@ -6406,11 +6415,16 @@ class PressureLossElement(NetworkElement):
         elif graph is not None and ctx.T_in > 0:
             self._add_unburned_jacobian(jac[0], graph, ctx, state_in.Pt, dxi_dtheta, _dxi_dvar)
 
-        # Composition of the inlet state (a head loss's density): per species
-        # present, other mass fractions fixed, relayed as "{node}.Y[k]". A
-        # combustor's burned composition moves with its fuel flow; this column
-        # was missing (#481 C1).
+        # Composition of the inlet state (a head loss's density): per species,
+        # other mass fractions fixed, relayed as "{node}.Y[k]". A combustor's
+        # burned composition moves with its fuel flow; this column was
+        # missing (#481 C1).
         Y_in = list(state_in.Y)
+        if partials is not None:
+            for k, d in enumerate(partials.dxi_dY):
+                if d != 0.0 and Y_in[k] > 0.0:
+                    jac[0][f"{up_id}.Y[{k}]"] = state_in.Pt * d
+            return jac
         X_saved = ctx.X_in
         try:
             for k, y in enumerate(Y_in):

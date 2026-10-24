@@ -495,3 +495,35 @@ class TestPressureLossElementWallCoupling:
         T_cold_mid = solver._derived_states["cold_mid"][0]
         assert T_hot_mid < 800.0, f"Hot-side should cool: T_hot_mid={T_hot_mid:.1f} K"
         assert T_cold_mid > 400.0, f"Cold-side should heat: T_cold_mid={T_cold_mid:.1f} K"
+
+
+def test_builtin_losses_evaluate_in_cpp_with_their_partials() -> None:
+    """evaluate() is the C++ value with every partial (#718); calling the
+    class gives the same (xi, dxi/dtheta). A context with only X (no Y) is
+    converted, so a head loss reads the same density either way."""
+    from types import SimpleNamespace
+
+    import combaero as cb
+    from combaero.network.pressure_loss import (
+        ConstantFractionLoss,
+        ConstantHeadLoss,
+        LinearThetaFractionLoss,
+        LinearThetaHeadLoss,
+    )
+
+    Y = list(cb.species.dry_air_mass())
+    ctx = SimpleNamespace(
+        theta=1.2, mdot_total=0.4, T_in=700.0, P_in=2e5, X_in=list(cb.mass_to_mole(Y))
+    )
+    for corr in (
+        ConstantFractionLoss(xi=0.03, m_ref=0.5),
+        LinearThetaFractionLoss(k=0.01, xi0=0.02, m_ref=0.5),
+        ConstantHeadLoss(zeta=4.0, area=0.05),
+        LinearThetaHeadLoss(k=1.0, zeta0=3.0, area=0.05),
+    ):
+        r = corr.evaluate(ctx, Y)
+        assert isinstance(r, cb.CombustorLossResult)
+        assert corr(ctx) == pytest.approx((r.xi, r.dxi_dtheta), rel=1e-12)
+        assert corr.evaluate(ctx).xi == pytest.approx(r.xi, rel=1e-12)
+        # Below the design flow / for a head loss the flow partial is live.
+        assert r.dxi_dmdot > 0.0

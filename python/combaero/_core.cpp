@@ -12,6 +12,7 @@
 #include "area_change.h"
 #include "can_annular_solvers.h"
 #include "combustion.h"
+#include "combustor_loss.h"
 #include "common_names.h"
 #include "compressible.h"
 #include "cooling_correlations.h"
@@ -4935,6 +4936,26 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       const std::vector<double> &, const std::vector<double> &, double, double,
       double, const std::string &, CombustionMethod, bool, bool, double,
       double);
+  py::class_<combaero::CombustorLossResult>(m, "CombustorLossResult")
+      .def_readonly("xi", &combaero::CombustorLossResult::xi)
+      .def_readonly("dxi_dtheta", &combaero::CombustorLossResult::dxi_dtheta)
+      .def_readonly("dxi_dmdot", &combaero::CombustorLossResult::dxi_dmdot)
+      .def_readonly("dxi_dT_in", &combaero::CombustorLossResult::dxi_dT_in)
+      .def_readonly("dxi_dP_in", &combaero::CombustorLossResult::dxi_dP_in)
+      .def_readonly("dxi_dY", &combaero::CombustorLossResult::dxi_dY);
+  m.def("combustor_fraction_loss", &combaero::combustor_fraction_loss,
+        py::arg("theta"), py::arg("mdot"), py::arg("k"), py::arg("xi0"),
+        py::arg("m_ref"),
+        "Fractional combustor total-pressure loss xi = (k theta + xi0)\n"
+        "g(|mdot|/m_ref), g = 1 - (1 - r^2)^3 below the design flow (m_ref\n"
+        "<= 0: no fade), with its partials in theta and mdot.");
+  m.def("combustor_head_loss", &combaero::combustor_head_loss, py::arg("theta"),
+        py::arg("mdot"), py::arg("T_in"), py::arg("P_in"), py::arg("Y_in"),
+        py::arg("k"), py::arg("zeta0"), py::arg("area"),
+        "Combustor head loss as a fraction of P_in: xi = (k theta + zeta0)\n"
+        "0.5 rho v^2 / P_in, v = mdot/(rho area), ideal-gas rho at\n"
+        "(T_in, P_in, Y_in), with its partials in theta, mdot, T_in, P_in\n"
+        "and each inlet mass fraction Y_k (the others held fixed).");
   m.def("combustion_state",
         static_cast<CombustionStateBaseFn>(&combustion_state),
         py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),
