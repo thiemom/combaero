@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { exportResults, resolvePreview } from "../api";
 import { discoverFields } from "../utils/diagnostics";
 import type { PreviewItems } from "../utils/inheritance";
+import { dropSurfacelessWalls } from "../utils/thermalSides";
 
 // Stored per-node/edge results warm-start the next solve (backend
 // graph_builder). A structural edit (add/remove node or edge, new
@@ -91,6 +92,9 @@ export interface RFState {
 	setRotSpeedUnit: (unit: "rpm" | "Hz") => void;
 	saveNetwork: (filename?: string) => void | Promise<void>;
 	loadNetwork: (data: any) => void;
+	// What a load had to change in the file, shown once above the canvas.
+	loadNotice: string | null;
+	dismissLoadNotice: () => void;
 	dismissSolveStatus: () => void;
 	isExporting: boolean;
 	exportNetworkResults: () => Promise<void>;
@@ -100,6 +104,7 @@ const useStore = create<RFState>((set, get) => ({
 	nodes: [],
 	edges: [],
 	solveResults: null,
+	loadNotice: null,
 	isExporting: false,
 	previewItems: {},
 
@@ -439,23 +444,37 @@ const useStore = create<RFState>((set, get) => ({
 			if (loadedSettings.init_strategy === "incompressible_warmstart") {
 				loadedSettings.init_strategy = "outletref_warmstart";
 			}
+			// A wall on a node with no convective surface (#720): the solver
+			// refuses it and the node has no handle to draw it from.
+			const { edges: keptEdges, dropped } = dropSurfacelessWalls(
+				data.nodes,
+				data.edges,
+			);
 			set({
 				nodes: data.nodes.map((n: any) => ({
 					...n,
 					data: { ...n.data, result: undefined },
 				})),
-				edges: data.edges.map((e: any) => ({
+				edges: keptEdges.map((e: any) => ({
 					...e,
 					data: e.data ? { ...e.data, result: undefined } : e.data,
 				})),
 				solverSettings: loadedSettings,
 				solveResults: null,
+				loadNotice:
+					dropped.length > 0
+						? `Removed ${dropped.length} thermal wall(s) on an orifice, area change, plenum or hole element (${dropped.join(", ")}): it has no surface to exchange heat. Wall a channel, loss element or chamber instead.`
+						: null,
 			});
 		}
 	},
 
 	dismissSolveStatus: () => {
 		set({ solveResults: null });
+	},
+
+	dismissLoadNotice: () => {
+		set({ loadNotice: null });
 	},
 
 	exportNetworkResults: async () => {

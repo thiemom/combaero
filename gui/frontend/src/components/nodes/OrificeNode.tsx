@@ -9,6 +9,7 @@ import { handleStyle, rotPos } from "../../utils/nodeUtils";
 import { NodeDiagRows } from "../NodeDiagRows";
 import NodeIcon from "../NodeIcon";
 
+// A restriction, not a surface: no thermal handles (#720).
 const OrificeNode = ({ id, data, selected }: NodeProps) => {
 	const rotation = data.rotation || 0;
 	const isSolved = !!data.result;
@@ -89,18 +90,6 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 				position={rotPos(Position.Right, rotation)}
 				style={handleStyle(Position.Right, rotation)}
 				id="flow-source"
-			/>
-			<Handle
-				type="target"
-				position={rotPos(Position.Top, rotation)}
-				style={handleStyle(Position.Top, rotation)}
-				id="thermal-target"
-			/>
-			<Handle
-				type="source"
-				position={rotPos(Position.Bottom, rotation)}
-				style={handleStyle(Position.Bottom, rotation)}
-				id="thermal-source"
 			/>
 		</div>
 	);

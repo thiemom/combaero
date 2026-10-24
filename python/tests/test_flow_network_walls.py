@@ -243,3 +243,67 @@ def test_from_dict_default_thermal_coupling():
 
     network = FlowNetwork.from_dict(data)
     assert network.thermal_coupling_enabled is True  # Default value
+
+
+def _walled(a_surface: bool, b_kind: str) -> FlowNetwork:
+    from combaero.network import ConvectiveSurface
+
+    network = FlowNetwork()
+    network.add_node(PressureBoundary("pb", Pt=2e5, Tt=300))
+    network.add_node(PressureBoundary("out", Pt=1e5, Tt=300))
+    network.add_node(PlenumNode("plenum"))
+    kw = {"surface": ConvectiveSurface()} if a_surface else {}
+    network.add_element(
+        ChannelElement("a", "pb", "plenum", length=1.0, diameter=0.05, roughness=1e-5, **kw)
+    )
+    network.add_element(
+        ChannelElement(
+            "b",
+            "plenum",
+            "out",
+            length=1.0,
+            diameter=0.05,
+            roughness=1e-5,
+            surface=ConvectiveSurface(),
+        )
+    )
+    side_b = "plenum" if b_kind == "plenum" else "b"
+    network.add_wall(
+        ThermalWall(id="w", element_a="a", element_b=side_b, layers=[WallLayer(0.002, 25.0)])
+    )
+    network.resolve_all_topology()
+    return network
+
+
+def test_a_wall_needs_a_convective_surface_on_both_sides() -> None:
+    """A side without one exchanged no heat and raised nothing: the wall
+    was silently inert (found with a wall on a PlenumNode). Validation now
+    names the side."""
+    _walled(a_surface=True, b_kind="channel").validate()
+    with pytest.raises(
+        ValueError, match="side 'plenum' \\(PlenumNode\\) has no convective surface"
+    ):
+        _walled(a_surface=True, b_kind="plenum").validate()
+    # A channel always has one: a default surface on its own geometry.
+    _walled(a_surface=False, b_kind="channel").validate()
+
+
+def test_an_uncoupled_network_does_not_check_its_walls() -> None:
+    """With thermal coupling off the walls are not evaluated at all."""
+    network = _walled(a_surface=True, b_kind="plenum")
+    network.thermal_coupling_enabled = False
+    network.validate()
+
+
+def test_restrictions_and_plates_are_not_wall_sides() -> None:
+    """An orifice is a restriction, not a surface. An effusion plate owns its
+    wall, and its bore is already in it: Andrews' throat term sits on
+    pi d L_hole and grows with L/d, so a ThermalWall on the plate would count
+    the bore twice. Both stay off the wall-side list."""
+    from combaero.network import EffusionPlateElement, OrificeElement
+
+    assert not OrificeElement("o", "a", "b", Cd=0.6, area=1e-4).has_convective_surface
+    plate = EffusionPlateElement(
+        "e", "a", "b", hole_diameter=0.5e-3, wall_thickness=2e-3, pitch=4e-3, panel_area=1e-2
+    )
+    assert not plate.has_convective_surface
