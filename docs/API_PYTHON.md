@@ -1154,25 +1154,24 @@ results = solver.solve(method="hybr", init_strategy="homotopy")
 ```python
 from combaero.network import (
     PressureBoundary, MassFlowBoundary, WallNode, PlenumNode,
-    CombustorNode, MomentumChamberNode, MomentumBoundary, EnergyBoundary
+    CombustorNode, MomentumChamberNode, EnergyBoundary
 )
 
 # Boundary conditions
-inlet = PressureBoundary("inlet", P_total=2e5, T_total=300)
-outlet = PressureBoundary("outlet", P_total=1e5, T_total=300)
-mass_in = MassFlowBoundary("mass_in", m_dot=0.1, T_total=400, Y=air)
-mom_in = MomentumBoundary("mom_in", P_total=2e5, T_total=300, area=1e-4)
+inlet = PressureBoundary("inlet", Pt=2e5, Tt=300, Y=air)
+outlet = PressureBoundary("outlet", Pt=1e5, Tt=300, Y=air)
+mass_in = MassFlowBoundary("mass_in", m_dot=0.1, Tt=400, Y=air)
 
 # Closed-end boundary (zero mass flow)
 # Typical use: symmetry plane of a ring manifold, or any dead-end branch.
 wall = WallNode("wall")
 
-# Internal nodes
-junction = PlenumNode("junction", P=1.5e5, T=350, Y=air)
-combustor = CombustorNode("combustor", P=2e5, T=1800, Y=products)
-momentum = MomentumChamberNode("momentum", P=2e5, T=1800, Y=products, regime="compressible")
-energy = EnergyBoundary("energy", Q=50000)  # Heat addition [W]
-loss = EnergyBoundary("loss", fraction=-0.05)  # removes 5% of the SENSIBLE enthalpy
+# Internal nodes: their P, T and Y are solved (or derived), not given
+junction = PlenumNode("junction")
+combustor = CombustorNode("combustor", method="complete")  # or "equilibrium"
+momentum = MomentumChamberNode("momentum", area=0.01, regime="compressible")
+combustor.add_energy_boundary(EnergyBoundary("energy", Q=50000))  # heat addition [W]
+combustor.add_energy_boundary(EnergyBoundary("loss", fraction=-0.05))  # -5% of the SENSIBLE enthalpy
 ```
 
 - **`fraction`** scales the inflow's sensible enthalpy, `h(T) - h(298.15 K)`
@@ -1660,15 +1659,19 @@ print(f"Static density: {node_state.density()} kg/m³")
 ### Advanced (f, J) Interface
 High-accuracy analytical Jacobians are available for performance-critical solver loops.
 ```python
-# Exact residuals and derivatives wrt (P_tot, P_static, T, Y)
-res_ori = cb.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, Cd, area)
-res_chan = cb.channel_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, L, D, roughness, correlation,
+# Exact residuals and derivatives wrt (P_tot, P_static, T, Y); internal
+# (combaero._solver_tools), used by the network elements
+from combaero import _solver_tools as st
+res_ori = st.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, Cd, area)
+res_chan = st.channel_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, L, D, roughness, correlation,
                                              f_multiplier=1.0, exit_head_lost=False)  # True adds the exit head (#588)
-res_comb = cb.combustor_residuals_and_jacobians(m_dot, P_tot, P_stat, T, Y, Q_comb, method, smooth, pressure_loss_func)
-res_plen = cb.plenum_residuals_and_jacobian(m_dot_vec, P_target, T_target, Y_target)
+# Mix and burn streams (cb.MassStream), Q [W] and 'fraction' after combustion
+res_comb = st.combustor_residuals_and_jacobians(streams, P, Q=0.0, fraction=0.0,
+                                                pressure_loss=loss, use_equilibrium=False)
 ```
 
-Combustor results return mapping specific to `(m_dot, P_total, T, Y)` state vectors.
+The combustor returns a `MixerResult`: the products' `T_mix`, `Y_mix` and
+`P_total_mix`, with their derivatives per stream (`dT_mix_d_stream` etc.).
 
 ### Tee Junction Interface
 

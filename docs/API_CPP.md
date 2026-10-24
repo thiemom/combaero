@@ -1927,12 +1927,13 @@ square.
 MixerResult mixer_from_streams_and_jacobians(
     const std::vector<Stream>& streams, double Q = 0.0, double fraction = 0.0);
 
-// Adiabatic complete combustion
-AdiabaticResult adiabatic_T_complete_and_jacobian_T_from_streams(
+// Complete combustion of mixed streams, then a heat shift: Q [W] and
+// 'fraction' of the PRODUCTS' sensible enthalpy at T_ad (#481)
+MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
     const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
 
-// Adiabatic equilibrium combustion
-AdiabaticResult adiabatic_T_equilibrium_and_jacobians_from_streams(
+// The same with reforming + water-gas-shift equilibrium of the products
+MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     const std::vector<Stream>& streams, double P, double Q = 0.0, double fraction = 0.0);
 
 // Second law of a control volume (#545). Streams at their stagnation state
@@ -1957,10 +1958,8 @@ double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
 // stagnant node holds the temperature of what reaches it.
 std::tuple<double, double> mixer_heat_per_unit_flow(double mdot_tot);
 
-// Combined combustion with analytical pressure loss
-ChamberResult combustor_residuals_and_jacobians(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
-    const std::vector<double>& Y_up, double Q_comb,
-    CombustionMethod method, bool smooth,
-    const PressureLossCorrelation& pressure_loss);
+// Combustion of mixed streams with a pressure-loss correlation
+MixerResult combustor_residuals_and_jacobians(
+    const std::vector<Stream>& streams, double P, double Q, double fraction,
+    const PressureLossCorrelation& pressure_loss, bool use_equilibrium = false);
 ```

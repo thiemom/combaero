@@ -1,6 +1,5 @@
 import copy
 import math
-import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, MutableMapping
@@ -1341,12 +1340,15 @@ class EnergyBoundary:
                 Q < 0 / fraction < 0 means heat **out of** the fluid (cooling).
 
     Two additive modes:
-      - Q [W]: absolute heat transfer rate
-      - fraction [-]: relative to total enthalpy flow (H_tot = sum(mdot_i * h_i))
-        e.g. fraction=-0.05 means 5% enthalpy loss
+      - Q [W]: absolute heat transfer rate, spread over the node's inflow
+      - fraction [-]: of the inflow's SENSIBLE enthalpy, h(T) - h(298.15 K)
+        at its own composition (cb.SENSIBLE_ENTHALPY_REF_T); on a combustor,
+        of the products' at T_ad. Not of absolute enthalpy, which includes
+        formation enthalpy (#481). fraction=-0.05 removes 5% of it.
 
-    Both can be set simultaneously; effective Q = Q + fraction * H_tot.
-    C++ functions handle the conversion to delta_h and all Jacobian corrections.
+    Both can be set simultaneously. The heat a fraction applied is reported
+    as {node}.Q_fraction [W]. C++ handles the conversion to delta_h and all
+    Jacobian corrections.
     """
 
     def __init__(self, id: str, Q: float = 0.0, fraction: float = 0.0) -> None:
@@ -2685,7 +2687,7 @@ def _zero_loss(ctx: object) -> tuple[float, float]:
 
 class CombustorNode(NetworkNode):
     """
-    Combustion chamber adding energy (and optionally mass) to the flow.
+    Combustion chamber adding the heat of reaction to the flow it mixes.
     Evaluates adiabatic combustion using the C++ core backend based on
     the selected CombustionMethodLiteral.
     Automatically handles mixing when multiple upstream connections exist.
@@ -2840,7 +2842,11 @@ class CombustorNode(NetworkNode):
         try:
             phi = float(cb.equivalence_ratio(state.X))
         except Exception as e:
-            print(f"DEBUG: CombustorNode.diagnostics phi calculation failed: {e}", file=sys.stderr)
+            warnings.warn(
+                f"CombustorNode {self.id!r}: equivalence ratio not evaluated ({e})",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             phi = 0.0
 
         T_u = getattr(self, "_T_unburned", state.Tt)
