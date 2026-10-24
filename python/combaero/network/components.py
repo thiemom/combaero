@@ -8004,7 +8004,7 @@ class AreaChangeElement(NetworkElement):
         rho_in = cs_in.thermo.rho
         a_in = cs_in.thermo.a
 
-        # Inlet velocity / Mach (at larger section F0)
+        # Inlet velocity / Mach, at the inlet face F0 (either size)
         v_in = (m_dot_abs) / ((rho_in) * (f0)) if f0 > 0 and rho_in > 0 else 0.0
         mach_in = v_in / a_in if a_in > 0 else 0.0
 
@@ -8024,23 +8024,28 @@ class AreaChangeElement(NetworkElement):
         except Exception:
             mach_out = 0.0
 
-        # Physics result for dP_static
+        # The loss the residual solved: Mach 0, as residuals() passes it. The
+        # kernels' k1 = 1 + 0.35 M^2 is never applied in the network, so
+        # reporting it here made zeta and dP_static disagree with the solved
+        # Pt drop wherever M_small > 0 (+9% at M 0.5).
         if self.model_type == "sharp":
             res = cb.sharp_area_change(
-                m_dot, rho_in, cs_in.transport.mu, f0, f1, Mach=mach_loss_ref, D_h=self.D_h or 0.0
+                m_dot, rho_in, cs_in.transport.mu, f0, f1, Mach=0.0, D_h=self.D_h or 0.0
             )
         else:
             res = cb.conical_area_change(
-                m_dot, rho_in, cs_in.transport.mu, f0, f1, self.length, Mach=mach_loss_ref
+                m_dot, rho_in, cs_in.transport.mu, f0, f1, self.length, Mach=0.0
             )
 
         dP_static = abs(res.dP)
         q_small = 0.5 * rho_in * v_loss_ref**2
         zeta = dP_static / q_small if q_small > 1e-6 else 0.0
 
-        Dh_in = self.D_h or math.sqrt(4.0 * f0 / math.pi)
+        # The section the loss is referenced to, and its Re: the smaller one,
+        # as the kernels take it. F0 is the LARGER face of a contraction.
+        Dh_small = self.D_h or math.sqrt(4.0 * f_small / math.pi)
         ref = _element_reference_block(
-            cs_in, m_dot=m_dot, area=f0, Dh=Dh_in, location="small_section"
+            cs_in, m_dot=m_dot, area=f_small, Dh=Dh_small, location="small_section"
         )
 
         return {
