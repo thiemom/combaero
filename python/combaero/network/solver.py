@@ -5318,6 +5318,20 @@ class NetworkSolver:
                 X_mix = cb.mass_to_mole(list(Y_mix / m_in))
                 h_ref = float(cb.h_mass(cb.SENSIBLE_ENTHALPY_REF_T, X_mix))
                 sol_dict[f"{nid}.Q_fraction"] = frac * (H - m_in * h_ref)
+            elif frac != 0.0 and isinstance(node, CombustorNode) and m_in > 0.0:
+                # On a combustor the fraction is of the PRODUCTS' sensible
+                # enthalpy at T_ad (#481): h_out - h_ref = (1+f)(h_ad - h_ref)
+                # + Q phi, so the heat it applied is f m (h_out - h_ref - Q
+                # phi)/(1+f) from the solved products. Unreported, the ledger
+                # saw an unexplained imbalance and demoted the root.
+                st = self._get_node_state(node, final_x)
+                X_b = list(st.X)
+                h_out = float(cb.h_mass(float(st.T), X_b))
+                h_ref = float(cb.h_mass(cb.SENSIBLE_ENTHALPY_REF_T, X_b))
+                phi, _ = cb.mixer_heat_per_unit_flow(m_in)
+                sol_dict[f"{nid}.Q_fraction"] = (
+                    frac * m_in * (h_out - h_ref - q_given * phi) / (1.0 + frac)
+                )
 
         # Second law per element and the network's control-volume ledger
         # (#545). Both demote, below. Evaluated where the root finder

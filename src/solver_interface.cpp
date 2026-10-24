@@ -928,6 +928,23 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
     double cp_ad = combaero::cp_mass(T_ad, X_b);
     dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
+  // The heat shift also moves T_out through the burnt composition at fixed
+  // h_out: d(h_out) = (1+f) d(h_ad) - f d(h_ref) with h = sum Y_j h_j(T), so
+  //   dT_out = [(1+f) cp_ad dT_ad + sum_j w_j dYb_j] / cp_out,
+  //   w_j = (1+f) h_j(T_ad) - f h_j(T_ref) - h_j(T_out)   [J/kg].
+  // Zero without a shift (T_out = T_ad, f = 0).
+  std::vector<double> w_shift(n_species, 0.0);
+  if (std::abs(delta_h) > 0.0 && cp_out > 0.0) {
+    for (std::size_t j = 0; j < n_species; ++j) {
+      const double Mj = combaero::species_molar_mass(j);
+      const double h_ad_j = J_per_mol_to_J_per_kg(combaero::h_species(j, T_ad), Mj);
+      const double h_ref_j =
+          J_per_mol_to_J_per_kg(combaero::h_species(j, kSensibleEnthalpyRefT), Mj);
+      const double h_out_j = J_per_mol_to_J_per_kg(combaero::h_species(j, T_out), Mj);
+      w_shift[j] = ((1.0 + fraction) * h_ad_j - fraction * h_ref_j - h_out_j) / cp_out;
+    }
+  }
+  const double T_ad_base = T_ad;  // the composition differences are of T_ad
   T_ad = T_out;
 
   std::size_t n_streams = streams.size();
@@ -947,7 +964,7 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
     std::vector<double> X_b_p = std::get<2>(cp_res);
     std::vector<double> Y_b_p = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p));
 
-    dT_ad_dY_mix[k] = (T_ad_p - T_ad) / eps_Y;
+    dT_ad_dY_mix[k] = (T_ad_p - T_ad_base) / eps_Y;
     for (std::size_t j = 0; j < n_species; ++j) {
       dYb_dY_mix[j][k] = (Y_b_p[j] - Y_b[j]) / eps_Y;
     }
@@ -955,10 +972,17 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 
   std::vector<double> dYb_dT_mix(n_species, 0.0);
 
-  // Scale adiabatic derivatives by dT_out/dT_ad for post-combustion shift
+  // Scale adiabatic derivatives by dT_out/dT_ad for post-combustion shift,
+  // plus the burnt-composition term (w_shift above).
   dT_ad_dT_mix *= dT_out_dT_ad;
+  for (std::size_t j = 0; j < n_species; ++j) {
+    dT_ad_dT_mix += w_shift[j] * dYb_dT_mix[j];
+  }
   for (std::size_t k = 0; k < n_species; ++k) {
     dT_ad_dY_mix[k] *= dT_out_dT_ad;
+    for (std::size_t j = 0; j < n_species; ++j) {
+      dT_ad_dY_mix[k] += w_shift[j] * dYb_dY_mix[j][k];
+    }
   }
 
   MixerResult res;
@@ -1092,6 +1116,23 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     double cp_ad = combaero::cp_mass(T_ad, X_b);
     dT_out_dT_ad = (1.0 + fraction) * cp_ad / cp_out;
   }
+  // The heat shift also moves T_out through the burnt composition at fixed
+  // h_out: d(h_out) = (1+f) d(h_ad) - f d(h_ref) with h = sum Y_j h_j(T), so
+  //   dT_out = [(1+f) cp_ad dT_ad + sum_j w_j dYb_j] / cp_out,
+  //   w_j = (1+f) h_j(T_ad) - f h_j(T_ref) - h_j(T_out)   [J/kg].
+  // Zero without a shift (T_out = T_ad, f = 0).
+  std::vector<double> w_shift(n_species, 0.0);
+  if (std::abs(delta_h) > 0.0 && cp_out > 0.0) {
+    for (std::size_t j = 0; j < n_species; ++j) {
+      const double Mj = combaero::species_molar_mass(j);
+      const double h_ad_j = J_per_mol_to_J_per_kg(combaero::h_species(j, T_ad), Mj);
+      const double h_ref_j =
+          J_per_mol_to_J_per_kg(combaero::h_species(j, kSensibleEnthalpyRefT), Mj);
+      const double h_out_j = J_per_mol_to_J_per_kg(combaero::h_species(j, T_out), Mj);
+      w_shift[j] = ((1.0 + fraction) * h_ad_j - fraction * h_ref_j - h_out_j) / cp_out;
+    }
+  }
+  const double T_ad_base = T_ad;  // the composition differences are of T_ad
   T_ad = T_out;
 
   std::size_t n_streams = streams.size();
@@ -1113,7 +1154,7 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     std::vector<double> X_b_p = std::get<3>(eq_p_res);
     std::vector<double> Y_b_p = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p));
 
-    dT_ad_dY_mix[k] = (T_ad_p - T_ad) / eps_Y;
+    dT_ad_dY_mix[k] = (T_ad_p - T_ad_base) / eps_Y;
     for (std::size_t j = 0; j < n_species; ++j) {
       dYb_dY_mix[j][k] = (Y_b_p[j] - Y_b[j]) / eps_Y;
     }
@@ -1128,10 +1169,17 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     dYb_dT_mix[j] = (Y_b_p_T[j] - Y_b[j]) / eps_T;
   }
 
-  // Scale adiabatic derivatives by dT_out/dT_ad for post-combustion shift
+  // Scale adiabatic derivatives by dT_out/dT_ad for post-combustion shift,
+  // plus the burnt-composition term (w_shift above).
   dT_ad_dT_mix *= dT_out_dT_ad;
+  for (std::size_t j = 0; j < n_species; ++j) {
+    dT_ad_dT_mix += w_shift[j] * dYb_dT_mix[j];
+  }
   for (std::size_t k = 0; k < n_species; ++k) {
     dT_ad_dY_mix[k] *= dT_out_dT_ad;
+    for (std::size_t j = 0; j < n_species; ++j) {
+      dT_ad_dY_mix[k] += w_shift[j] * dYb_dY_mix[j][k];
+    }
   }
 
   MixerResult res;
