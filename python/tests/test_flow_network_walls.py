@@ -293,3 +293,17 @@ def test_an_uncoupled_network_does_not_check_its_walls() -> None:
     network = _walled(a_surface=True, b_kind="plenum")
     network.thermal_coupling_enabled = False
     network.validate()
+
+
+def test_restrictions_and_plates_are_not_wall_sides() -> None:
+    """An orifice is a restriction, not a surface. An effusion plate owns its
+    wall, and its bore is already in it: Andrews' throat term sits on
+    pi d L_hole and grows with L/d, so a ThermalWall on the plate would count
+    the bore twice. Both stay off the wall-side list."""
+    from combaero.network import EffusionPlateElement, OrificeElement
+
+    assert not OrificeElement("o", "a", "b", Cd=0.6, area=1e-4).has_convective_surface
+    plate = EffusionPlateElement(
+        "e", "a", "b", hole_diameter=0.5e-3, wall_thickness=2e-3, pitch=4e-3, panel_area=1e-2
+    )
+    assert not plate.has_convective_surface

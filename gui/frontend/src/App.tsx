@@ -21,6 +21,8 @@ const App = () => {
 		isExporting,
 		exportNetworkResults,
 		refreshPreview,
+		loadNotice,
+		dismissLoadNotice,
 	} = useStore();
 	const [isSolving, setIsSolving] = useState(false);
 	// When the canvas came back from the autosave (#596), so the restored
@@ -187,6 +189,20 @@ const App = () => {
 						onClick={() => setRestoredAt(null)}
 						className="px-2 rounded hover:bg-amber-100"
 						aria-label="Dismiss restore note"
+					>
+						×
+					</button>
+				</div>
+			)}
+
+			{loadNotice && (
+				<div className="flex items-center justify-between gap-4 px-6 py-1 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
+					<span>{loadNotice}</span>
+					<button
+						type="button"
+						onClick={dismissLoadNotice}
+						className="px-2 rounded hover:bg-amber-100"
+						aria-label="Dismiss load note"
 					>
 						×
 					</button>

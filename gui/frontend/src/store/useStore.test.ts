@@ -156,3 +156,41 @@ describe("loadNetwork legacy migration", () => {
 		);
 	});
 });
+
+describe("loadNetwork drops walls on surfaceless nodes (#720)", () => {
+	const settings = () => useStore.getState().solverSettings;
+	const node = (id: string, type: string): Node => ({
+		id,
+		type,
+		position: { x: 0, y: 0 },
+		data: { label: id },
+	});
+
+	it("removes the wall and says so", () => {
+		useStore.getState().loadNetwork({
+			nodes: [node("ch", "channel"), node("or", "orifice")],
+			edges: [
+				{ id: "w1", source: "or", target: "ch", data: { type: "thermal" } },
+				{ id: "f1", source: "ch", target: "or" },
+			],
+			solverSettings: settings(),
+		});
+		const { edges, loadNotice } = useStore.getState();
+		expect(edges.map((e) => e.id)).toEqual(["f1"]);
+		expect(loadNotice).toContain("w1");
+		useStore.getState().dismissLoadNotice();
+		expect(useStore.getState().loadNotice).toBeNull();
+	});
+
+	it("leaves a clean file without a notice", () => {
+		useStore.getState().loadNetwork({
+			nodes: [node("ch", "channel"), node("ch2", "channel")],
+			edges: [
+				{ id: "w1", source: "ch", target: "ch2", data: { type: "thermal" } },
+			],
+			solverSettings: settings(),
+		});
+		expect(useStore.getState().edges.map((e) => e.id)).toEqual(["w1"]);
+		expect(useStore.getState().loadNotice).toBeNull();
+	});
+});
