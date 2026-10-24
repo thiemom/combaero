@@ -13,9 +13,22 @@ Two families of correlations are provided:
 
 All callables return ``(loss_value, d_loss_value_d_theta)`` where
 ``loss_value`` is the *fractional* total-pressure loss (dimensionless)
-consumed by ``P_out = P_in * (1 - loss_value)`` in the C++ solver.
-The derivative enables exact analytical Jacobians through
-``combustor_residuals_and_jacobians``.
+consumed by ``P_out = P_in * (1 - loss_value)``.
+
+WHERE THE LOSS IS EVALUATED. A ``PressureLossElement`` on the combustor's
+inlet or outlet edge calls the correlation in Python. Its Jacobian takes the
+returned ``d_loss/d_theta`` analytically. Every other dependence (m_dot, P_in,
+T_in, composition) is a central difference over correlation calls. The C++
+``combustor_residuals_and_jacobians`` also accepts a loss callable, but
+``CombustorNode`` passes it a zero loss, so that chain does not run in a
+network.
+
+PYTHON BY DESIGN, FOR NOW (#718). The interface is a prototype for
+user-supplied loss maps, e.g. a scipy interpolant built from rig data.
+Combustors are described by their temperature rise (theta) and their fuel
+splits, and a user-friendly input for the splits is not yet designed. Until
+it is, the callable stays an arbitrary Python object, and the differences
+are what let it be one.
 
 Theta = T_ad / T_in - 1  (dimensionless temperature-rise ratio).
 """
@@ -108,8 +121,8 @@ class LinearThetaFractionLoss:
 
     Notes
     -----
-    Returns the analytical derivative ``d(dP/P)/dTheta = k``, enabling
-    exact chain-rule Jacobians in the C++ solver without finite-differencing.
+    Returns the analytical derivative ``d(dP/P)/dTheta = k``, which the
+    ``PressureLossElement`` Jacobian uses directly for its theta column.
     """
 
     k: float = 0.5
