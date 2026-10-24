@@ -276,7 +276,9 @@ struct EquilibriumResult {
 // GRI-3.0 HP, CH4/air 700 K, 2 bar: +17 K at phi 0.6, +188 K at phi 1.0,
 // +22 K at phi 1.3; #718), and T does not depend on P. A real
 // combustor rarely reaches full equilibrium in its residence time, least of
-// all for NO, so this is usually the closer of the two. A full-Gibbs option
+// all for NO: its NO stays far below equilibrium, and equilibrium NO
+// formation is endothermic, so including it would remove heat the real
+// flame keeps. This is usually the closer of the two. A full-Gibbs option
 // would be a third value here, not a change to this one.
 enum class CombustionMethod {
   Complete,

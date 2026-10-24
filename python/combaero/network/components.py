@@ -2698,7 +2698,9 @@ class CombustorNode(NetworkNode):
         reforming + water-gas shift among CO, H2, CO2, H2O and the fuel. No
         dissociation (no O, OH, H, NO), by design: identical to "complete"
         when lean, cooler when rich. A combustor rarely reaches full
-        equilibrium in its residence time, least of all for NO. See
+        equilibrium in its residence time, least of all for NO (whose
+        endothermic equilibrium formation would remove heat the real flame
+        keeps). See
         ``CombustionMethod`` in include/state.h for the decision record.
 
     Pressure loss is **not** a property of the combustor node.  Attach a
