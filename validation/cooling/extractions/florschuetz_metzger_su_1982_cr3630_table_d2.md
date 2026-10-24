@@ -1,15 +1,17 @@
 # NASA CR-3630 (Florschuetz, Metzger and Su, 1982) -- initial crossflow, heat transfer
 
-**Status: UNCONFIRMED (transcribed 2026-10-23, #467).** Source:
+**Status: REVIEWED 2026-10-24 (#467).** Signed off by the user after
+checking the pages against the scans: no errors found. Source:
 `docs/heat_transfer/flohrshuetz/NASA_CR-3630_Florschuetz_Metzger_Su_1982_initial_crossflow.pdf`
 (gitignored), Appendix D, Table D.2, "Heat transfer data", printed pp. 150-161
 (PDF pp. 162-173). Data: `data/florschuetz_metzger_su1982/table_d2_heat_transfer.csv`.
 The flow side of the same report (Table D.1) is a separate, signed-off record
 (`florschuetz_metzger_su_1982_cr3630.md`).
 
-## For the reviewer
+## Review questions and answers
 
-1. **Spot-check the pages against the CSV.** Every test's printed NU-bar
+1. **The transcription.** Checked by the user against the scans, no
+   errors (2026-10-24). What the check rested on: every test's printed NU-bar
    matched the mean of its ten in-array NU (the self-check below), so a
    misread tens or units digit in Nu would have shown. ETA has a weaker
    check: 1.00 upstream of the array. One cell was read off the image
@@ -17,7 +19,8 @@ The flow side of the same report (Table D.1) is a separate, signed-off record
    header (p165, B(5,8,1)I; the text layer lost it). *What turns on it:* a
    cross-source check of the eta_r reference temperature (#713) and of
    Florschuetz's h with initial crossflow.
-2. **Matching D.2 tests to D.1 flows.** D.2 prints no Gc/Gj, so a score
+2. **Matching D.2 tests to D.1 flows (an assumption, not confirmed by
+   the report).** D.2 prints no Gc/Gj, so a score
    reads the row flows from the D.1 test of the same geometry and nearest
    mc/mj (within 0.05). Are these the same runs? The mc/mj and Re_j agree to
    two figures; I did not find it stated.
@@ -85,3 +88,4 @@ the closure was fitted to. They are accuracy, not fidelity.
 - 2026-10-23: transcribed from the text layer per page; one cell and one
   header read off the page images; the NU-bar identity holds for all 48
   tests.
+- 2026-10-24: signed off by the user; no errors found.
