@@ -2759,23 +2759,30 @@ class CombustorNode(NetworkNode):
 
         # Store total mass flow and unburned temperature for use in diagnostics
         self._total_m_dot = sum(s.m_dot for s in upstream_states) if upstream_states else 1.0
-        self._T_unburned = (
-            sum(s.m_dot * s.Tt for s in upstream_states) / self._total_m_dot
-            if self._total_m_dot > 0
-            else 300.0
-        )
-        # The streams behind T_unburned, for its Jacobian in a theta-sourced
-        # PressureLossElement: (m, Tt, {unknown: dm/d(unknown)}, source node).
-        # T_u = sum(m Tt) / M is not a relayed node property (#481 C1).
-        self._unburned_streams = [
-            (
-                float(s.m_dot),
-                float(s.Tt),
-                dict(getattr(s, "_m_dot_jac_names", {})),
-                getattr(s, "_src_node", None),
+        # T_unburned is the ENTHALPY-mixed reactant temperature (#718), the
+        # same mix the C++ combustor context defines theta with; a mass-weighted
+        # Tt read ~4% off in theta for air at 700 K with CH4 at 300 K.
+        self._T_unburned = 300.0
+        self._unburned_streams = []
+        if upstream_states and self._total_m_dot > 0:
+            mix_u = _solver_tools.mixer_from_streams_and_jacobians(
+                [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
             )
-            for s in upstream_states
-        ]
+            self._T_unburned = float(mix_u.T_mix)
+            # The streams behind T_unburned, for its Jacobian in a theta-sourced
+            # PressureLossElement: ({unknown: dm/d(unknown)}, source node,
+            # dT_u/dm, dT_u/dTt, dT_u/dY). T_u is not a relayed node property
+            # (#481 C1).
+            self._unburned_streams = [
+                (
+                    dict(getattr(s, "_m_dot_jac_names", {})),
+                    getattr(s, "_src_node", None),
+                    float(d.d_mdot),
+                    float(d.d_T),
+                    list(d.d_Y),
+                )
+                for s, d in zip(upstream_states, mix_u.dT_mix_d_stream, strict=True)
+            ]
 
         # Upstream element ids, and d(throughput)/d(unknown) for the wall
         # relay of the node's own htc, which reads the throughput.
@@ -6441,26 +6448,30 @@ class PressureLossElement(NetworkElement):
 
         T_u enters twice: theta = T_b/T_u - 1 (d theta/dT_u = -T_b/T_u^2) and
         as the correlation's reference temperature ctx.T_in (a head loss's
-        density). T_u = sum(m_i Tt_i)/M over the source's inflows, so
-        dT_u = sum((Tt_i - T_u)/M dm_i + m_i/M dTt_i): the flows' unknowns
-        directly, each Tt_i through its node's relayed "{src}.T". It was
+        density). T_u is the enthalpy mix of the source's inflows (#718), so
+        dT_u = sum(dT_u/dm_i dm_i + dT_u/dTt_i dTt_i + dT_u/dY_i . dY_i), the
+        partials from the C++ mixer: the flows' unknowns directly, each Tt_i
+        and Y_i through its node's relayed "{src}.T" and "{src}.Y[k]". It was
         missing: d/d(fuel flow) read 0 against 95 by differences.
         """
         src = graph.nodes[self._theta_source_resolved]
         streams = getattr(src, "_unburned_streams", None)
-        M = sum(m for m, _, _, _ in streams) if streams else 0.0
-        if not streams or M <= 0.0:
+        if not streams:
             return
         T_u, T_b = ctx.T_in, ctx.T_ad
         dres_dTu = Pt_in * (dxi_dtheta * (-T_b / (T_u * T_u)) + dxi_dvar("T_in", T_u, 0.01))
         if dres_dTu == 0.0:
             return
-        for m, Tt, names, src_node in streams:
+        for names, src_node, dTu_dm, dTu_dTt, dTu_dY in streams:
             for var, coeff in names.items():
-                row[var] = row.get(var, 0.0) + dres_dTu * (Tt - T_u) / M * coeff
+                row[var] = row.get(var, 0.0) + dres_dTu * dTu_dm * coeff
             if src_node is not None:
                 key = f"{src_node}.T"
-                row[key] = row.get(key, 0.0) + dres_dTu * m / M
+                row[key] = row.get(key, 0.0) + dres_dTu * dTu_dTt
+                for k, d in enumerate(dTu_dY):
+                    if d != 0.0:
+                        key = f"{src_node}.Y[{k}]"
+                        row[key] = row.get(key, 0.0) + dres_dTu * d
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
