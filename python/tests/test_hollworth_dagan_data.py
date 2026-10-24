@@ -6,8 +6,8 @@ validation/cooling/extractions/hollworth_dagan_1980_vented_target.md.
 
 These tests check the digitisation against channels it was not read from:
 the printed Table 2, the paper's stated staggered-over-edge-vented gains, and
-the two figures against each other. Scoring against the data comes once the
-extraction is signed off.
+the two figures against each other. The extraction is signed off (2026-10-24);
+scoring comes with the #468 closure.
 """
 
 from __future__ import annotations

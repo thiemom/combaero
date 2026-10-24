@@ -1,7 +1,7 @@
 # Hollworth & Dagan (1980) -- jet arrays venting through the target, average heat transfer
 
-**Status: UNCONFIRMED (digitised 2026-10-24, #468).** Nothing scores against
-it until the user signs it off. Source: B. R. Hollworth and L. Dagan, "Arrays
+**Status: REVIEWED 2026-10-24 (#468).** Signed off by the user against the
+overlays. Source: B. R. Hollworth and L. Dagan, "Arrays
 of Impinging Jets with Spent Fluid Removal through Vent Holes on the Target
 Surface, Part 1: Average Heat Transfer", ASME J. Eng. Power 102 (1980) 994-999
 (80-GT-42). Part 2 (local heat transfer, 80-GT-43) is screened but not
@@ -9,18 +9,22 @@ extracted. Both PDFs are local only (gitignored), in
 `docs/heat_transfer/hollworth/`.
 Data: `data/hollworth_dagan1980/`.
 
-## For the reviewer
+## Review questions and answers
 
-1. **Check the overlays** on the review page
+1. **The overlays** on the review page
    (https://claude.ai/artifact/2h5JRhCfCN9vtxaSRvYGL1): the calibrated frame and ticks,
    one cross per standoff station at the cluster centre, and a bar for the
    range the cluster's symbol centres span.
    *What turns on it:* the vented-target coolant-side closure for #468,
    C(X, Z) = 100 Nu/(Re^0.8 Pr^0.33).
+   *Answer (user, 2026-10-24):* reviewed, looks good.
 2. **X = 15, Z = 1 (Fig. 8)** is the one scattered station. The
    inverted triangle (Re 20000) sits well below the triangle and square, so the
    centre (1.238) carries a wide range (1.12-1.37). Should it be one station,
    or the clean pair plus a separate point?
+   *Answer (user, 2026-10-24):* one station, as it is. A split would cost a
+   little fidelity resolution, but its points would average back to this
+   centre, and a single station is unlikely ever to matter.
 3. **Per-symbol values were not read.** The station centre is what the paper's
    own collapse (Eq. 7, Re^0.8) makes the closure value. A per-Re re-digitise
    would be needed to test the exponent; see "What it rests on".
@@ -111,3 +115,4 @@ Each check uses a channel the values were not read from
     out before reading its clusters.
   - Three independent channels agree (Table 2, the cross-figure check, the
     stated gains).
+- 2026-10-24: signed off by the user; X = 15, Z = 1 kept as one station.
