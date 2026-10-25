@@ -20,4 +20,12 @@ std::vector<double> convert_to_dry_fractions(const std::vector<double>& mole_fra
 // Calculate mixture molecular weight [g/mol].
 double mwmix(const std::vector<double>& X);
 
+// A gradient in the mole fractions, g_X[k] = dg/dX_k, as the gradient in the
+// mass fractions at the mixture X (#717). The step keeps sum X = 1:
+//   dX_i/dY_k = (delta_ik - X_i) MW / W_k,
+// so dg/dY_k = (g_X[k] - sum_i X_i g_X[i]) MW / W_k. Any extension of g off
+// the simplex gives the same result (its normal component cancels).
+std::vector<double> mole_gradient_to_mass(const std::vector<double>& X,
+                                          const std::vector<double>& g_X);
+
 } // namespace combaero

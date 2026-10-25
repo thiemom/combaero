@@ -251,6 +251,22 @@ constexpr double kDuctHtcSonicMargin = 1e-3;
 DuctStaticState duct_htc_static_state(double T0, double P0, double G,
                                       const std::vector<double>& X);
 
+// duct_htc_static_state's gradients in the MASS fractions at fixed T0, P0
+// and G (#717): the static T, P, rho and the bent flux G_eff. The isentropic
+// energy and entropy balances,
+//   f = h(T0) - h(T) - (G R T / P)^2 / 2 = 0,
+//   L = [sum_j X_j (s_j(T0) - s_j(T))] / R_u - ln(P0 / P) = 0,
+// differentiated in X at the root (implicit function theorem; h, R and the
+// species s_j are closed form). Near choke G_eff = ge(G / G*) G* also moves
+// with G*(X), differenced like its T0 slope (smooth there). Zero for a
+// floored T0 or P0.
+struct DuctStaticStateDY {
+  std::vector<double> dT_dY, dP_dY, drho_dY, dGeff_dY;
+};
+
+DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
+                                           const std::vector<double>& X);
+
 } // namespace combaero
 
 #endif // STAGNATION_H

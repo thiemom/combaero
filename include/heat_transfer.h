@@ -633,6 +633,12 @@ struct ChannelResult {
   double dq_dmdot = 0.0;     // ∂q/∂ṁ  [W·s/(m²·kg)]
   double dq_dT = 0.0;        // ∂q/∂T  [W/(m²·K)]
   double dq_dT_hot = 0.0;   // ∂q/∂T_hot [W/(m²·K)]  (= -h when T_hot finite)
+  // Gradients in the MASS fractions at fixed mdot, T and P (#717): the
+  // transport properties, cp, rho and the recovery factor move with the
+  // composition. Filled by channel_smooth; EMPTY for a correlation that does
+  // not provide them (read as zero).
+  std::vector<double> dh_dY{};     // [W/(m^2*K)] per species
+  std::vector<double> dT_aw_dY{};  // [K] per species
 };
 
 // -------------------------------------------------------------

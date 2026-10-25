@@ -111,6 +111,7 @@ All functions use consistent units to avoid conversion errors.
 | `speed_of_sound`                   | T: K, X: mol/mol                                                                                                         | m/s                                                    |
 | `cp_mass`                          | T: K, X: mol/mol                                                                                                         | J/(kg*K)                                               |
 | `cp_secant_mass_and_jacobian`      | T1: K, T2: K, X: mol/mol                                                                                                 | cp: J/(kg*K), dcp_dT1: J/(kg*K^2), dcp_dT2: J/(kg*K^2) |
+| `cp_secant_mass_dY`                | T1: K, T2: K, X: mol/mol                                                                                                 | J/(kg*K) (per species)                                 |
 | `cv_mass`                          | T: K, X: mol/mol                                                                                                         | J/(kg*K)                                               |
 | `h_mass`                           | T: K, X: mol/mol                                                                                                         | J/kg                                                   |
 | `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                                                                                       | J/(kg*K)                                               |
@@ -726,6 +727,11 @@ All functions use consistent units to avoid conversion errors.
 | `DuctStaticState::dGeff_dG`                     | -                                                                                                                              | -                               |
 | `duct_htc_static_state`                         | T0: K, P0: Pa, G: kg/(m^2*s), X: mol/mol                                                                                       | DuctStaticState                 |
 | `DUCT_HTC_SONIC_MARGIN`                         | -                                                                                                                              | -                               |
+| `duct_htc_static_state_dY`                      | T0: K, P0: Pa, G: kg/(m^2*s), X: mol/mol                                                                                       | DuctStaticStateDY               |
+| `DuctStaticStateDY::dT_dY`                      | K (per species)                                                                                                                | K (per species)                 |
+| `DuctStaticStateDY::dP_dY`                      | Pa (per species)                                                                                                               | Pa (per species)                |
+| `DuctStaticStateDY::drho_dY`                    | kg/m^3 (per species)                                                                                                           | kg/m^3 (per species)            |
+| `DuctStaticStateDY::dGeff_dY`                   | kg/(m^2*s) (per species)                                                                                                       | kg/(m^2*s) (per species)        |
 | `chamber_merge_face_state`                      | m_main: kg/s, T_main: K, X_main: -, m_out: kg/s, P: Pa, T: K, X: -, side_momentum: N, area: m^2, incompressible: -             | MergeFaceState                  |
 | `MergeFaceState::P_face`                        | Pa                                                                                                                             | Pa                              |
 | `MergeFaceState::Pt_face`                       | Pa                                                                                                                             | Pa                              |
@@ -1093,6 +1099,8 @@ All functions use consistent units to avoid conversion errors.
 | `ChannelResult::dq_dmdot`      | -           | W*s/(m^2*kg)            |
 | `ChannelResult::dq_dT`         | -           | W/(m^2*K)               |
 | `ChannelResult::dq_dT_hot`     | -           | W/(m^2*K)               |
+| `ChannelResult::dh_dY`         | -           | W/(m^2*K) (per species) |
+| `ChannelResult::dT_aw_dY`      | -           | K (per species)         |
 
 ### heat_transfer.h - Channel flow functions (HTC + pressure drop)
 

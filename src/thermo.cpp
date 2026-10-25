@@ -595,6 +595,21 @@ std::tuple<double, double, double> cp_secant_mass_and_jacobian(double T1, double
   return {c, (cp_mass(T1, X) - c) / d, (c - cp_mass(T2, X)) / d};
 }
 
+std::vector<double> cp_secant_mass_dY(double T1, double T2, const std::vector<double> &X) {
+  const double d = T1 - T2;
+  const bool limit = std::abs(d) <= 1e-6 * std::max(std::abs(T1), 1.0);
+  const double c = std::get<0>(cp_secant_mass_and_jacobian(T1, T2, X));
+  const double MW = mwmix(X) / 1000.0;  // kg/mol
+  std::vector<double> g(X.size(), 0.0);
+  for (std::size_t j = 0; j < X.size(); ++j) {
+    // The species' own molar secant; the mixture's is sum X_j c_j / MW.
+    const double cj = limit ? cp_species(j, 0.5 * (T1 + T2))
+                            : (h_species(j, T1) - h_species(j, T2)) / d;
+    g[j] = (cj - c * species_molar_mass(j) / 1000.0) / MW;
+  }
+  return mole_gradient_to_mass(X, g);
+}
+
 double h_mass(double T, const std::vector<double> &X) {
   return h(T, X) / (mwmix(X) / 1000.0);
 }

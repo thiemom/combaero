@@ -528,4 +528,95 @@ DuctStaticState duct_htc_static_state(double T0, double P0, double G,
   return s;
 }
 
+DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
+                                           const std::vector<double> &X) {
+  const std::size_t n = X.size();
+  DuctStaticStateDY out;
+  out.dT_dY.assign(n, 0.0);
+  out.dP_dY.assign(n, 0.0);
+  out.drho_dY.assign(n, 0.0);
+  out.dGeff_dY.assign(n, 0.0);
+  G = std::abs(G);
+  if (!(T0 > thermo::T_FLOOR) || !(P0 > thermo::P_FLOOR)) {
+    return out;
+  }
+  const DuctStaticState s = duct_htc_static_state(T0, P0, G, X);
+  // The raw state at G_eff: its own G partials, before the bend's chain.
+  const DuctStaticState raw = duct_static_state(T0, P0, s.G_eff, X);
+  const double T = s.T;
+  const double P = s.P;
+  const double R = specific_gas_constant(X);
+  const double MW = mwmix(X) / 1000.0;  // kg/mol
+  const double Ru = R * MW;
+  const double cpT = cp_mass(T, X);
+  const double v = s.G_eff * R * T / P;
+  const double kk = (s.G_eff * R / P) * (s.G_eff * R / P);
+  // Mass-specific enthalpy drop, molar species terms over MW.
+  double dH = 0.0;
+  for (std::size_t j = 0; j < n; ++j) {
+    dH += X[j] * (h_species(j, T0) - h_species(j, T));
+  }
+  dH /= MW;
+  // Jacobian in (T, u = ln P): f_T, f_u; L_T, L_u = 1.
+  const double fT = -cpT - kk * T;
+  const double fu = kk * T * T;
+  const double LT = -cpT / (R * T);
+  const double det = fT - fu * LT;
+  std::vector<double> dT_dX(n, 0.0), du_dX(n, 0.0), drho_dX(n, 0.0);
+  for (std::size_t j = 0; j < n; ++j) {
+    const double W = species_molar_mass(j) / 1000.0;
+    // dR/dX_j = -R W/MW enters f through -(v^2 / R) dR.
+    const double fX = (h_species(j, T0) - h_species(j, T) - dH * W) / MW + v * v * W / MW;
+    const double LX = (s_species(j, T0) - s_species(j, T)) / Ru;
+    dT_dX[j] = -(fX - fu * LX) / det;
+    du_dX[j] = -(fT * LX - LT * fX) / det;
+  }
+  // The bent flux near choke: G_eff = ge G* with G*(T0, P0, X).
+  const double w = kDuctHtcSonicMargin;
+  const double a = 1.0 - 2.0 * w;
+  auto sonic_flux = [&](const std::vector<double> &Xv) {
+    return mass_flux_isentropic(T0, P0, critical_pressure_ratio(T0, P0, Xv) * P0, Xv);
+  };
+  const double Gs = sonic_flux(X);
+  const double g = G / Gs;
+  std::vector<double> dGe_dX(n, 0.0);
+  if (g > a) {
+    double ge = 1.0 - w;
+    double dge = 0.0;
+    if (g < 1.0) {
+      ge = g - (g - a) * (g - a) / (4.0 * w);
+      dge = 1.0 - (g - a) / (2.0 * w);
+    }
+    const double dGe_dGs = ge - g * dge;
+    for (std::size_t j = 0; j < n; ++j) {
+      // One-sided off an absent species, as it enters.
+      const double hX = 1e-6;
+      std::vector<double> Xp = X, Xm = X;
+      Xp[j] += hX;
+      double dGs = 0.0;
+      if (X[j] > hX) {
+        Xm[j] -= hX;
+        dGs = (sonic_flux(Xp) - sonic_flux(Xm)) / (2.0 * hX);
+      } else {
+        dGs = (sonic_flux(Xp) - Gs) / hX;
+      }
+      dGe_dX[j] = dGe_dGs * dGs;
+      dT_dX[j] += raw.dT_dG * dGe_dX[j];
+      du_dX[j] += raw.dP_dG / P * dGe_dX[j];
+    }
+  }
+  std::vector<double> dP_dX(n, 0.0);
+  for (std::size_t j = 0; j < n; ++j) {
+    const double W = species_molar_mass(j) / 1000.0;
+    dP_dX[j] = P * du_dX[j];
+    // rho = P MW / (R_u T)
+    drho_dX[j] = s.rho * (du_dX[j] - dT_dX[j] / T + W / MW);
+  }
+  out.dT_dY = mole_gradient_to_mass(X, dT_dX);
+  out.dP_dY = mole_gradient_to_mass(X, dP_dX);
+  out.drho_dY = mole_gradient_to_mass(X, drho_dX);
+  out.dGeff_dY = mole_gradient_to_mass(X, dGe_dX);
+  return out;
+}
+
 } // namespace combaero

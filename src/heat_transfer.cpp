@@ -1,5 +1,6 @@
 #include "../include/heat_transfer.h"
 #include "../include/cooling_correlations.h" // rib_*, dimple_*, pin_fin_*, impingement_*
+#include "../include/composition.h"   // mwmix, mole_gradient_to_mass
 #include "../include/correlation_status.h"
 #include "../include/friction.h"       // friction_petukhov, friction_colebrook
 #include "../include/math_constants.h" // M_PI cross-platform
@@ -1132,6 +1133,29 @@ channel_smooth(double T, double P, const std::vector<double> &X,
     result.dT_aw_dT = (T_aw_plus - T_aw_minus) / (2.0 * eps_T_aw);
     // At fixed mdot, v ~ 1/rho ~ 1/P (ideal gas): T_aw - T ~ 1/P^2 (#496).
     result.dT_aw_dP = (P > 0.0) ? -2.0 * (T_aw - T) / P : 0.0;
+
+    // Composition (#717), at fixed mdot, T and P. Re = mdot D/(A mu) moves
+    // with mu alone; Pr = cp mu/k; h = Nu k/D; T_aw - T = r v^2/(2 cp) with
+    // r = Pr^(1/3) and v = mdot/(rho A), rho ~ MW. Mole-fraction partials
+    // (cp and MW taken linear in X), then mapped to mass fractions.
+    {
+      const auto tx = transport_and_dX(T, P, X);
+      const std::size_t n = X.size();
+      const double MW = mwmix(X) / 1000.0;  // kg/mol
+      const double rise = T_aw - T;
+      std::vector<double> dh_dX(n, 0.0);
+      std::vector<double> dTaw_dX(n, 0.0);
+      for (std::size_t j = 0; j < n; ++j) {
+        const double W = species_molar_mass(j) / 1000.0;
+        const double dcp = (cp_species(j, T) - cp_mass_val * W) / MW;
+        const double dRe = -Re * tx.dmu_dX[j] / mu;
+        const double dPr = Pr * (dcp / cp_mass_val + tx.dmu_dX[j] / mu - tx.dk_dX[j] / k);
+        dh_dX[j] = (k * (dNu_dRe * dRe + dNu_dPr * dPr) + Nu * tx.dk_dX[j]) / diameter;
+        dTaw_dX[j] = rise * (dPr / (3.0 * Pr) - 2.0 * W / MW - dcp / cp_mass_val);
+      }
+      result.dh_dY = mole_gradient_to_mass(X, dh_dX);
+      result.dT_aw_dY = mole_gradient_to_mass(X, dTaw_dX);
+    }
 
     if (std::isfinite(T_hot)) {
       double dT_diff = result.T_aw - T_hot;
