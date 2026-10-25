@@ -9001,11 +9001,6 @@ class MultiPortChamberBase(NetworkElement):
         removal of this class's residual. ``MultiPortChamberElement.diagnostics``
         calls it through ``super()`` and adds its closure quantities on top.
         """
-        """DEPRECATED, removal in 0.6.0 -- see ``_warn_v1_junction_model``.
-        Note that ``MultiPortChamberElement.diagnostics`` delegates here via ``super()``,
-        which is why the warning is guarded on the exact type rather than on
-        ``isinstance``.
-        """
         diag: dict[str, float | str] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
         port_area_sources = getattr(self, "_port_area_sources", None) or [""] * self.N
         for i in range(self.N):

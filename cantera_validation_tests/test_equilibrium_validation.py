@@ -460,7 +460,8 @@ class TestReformingEquilibrium:
         T, P = 1200.0, 101325.0
 
         result_ref = cb.reforming_equilibrium(T, X, P)
-        result_smr = cb.smr_wgs_equilibrium(T, X, P)
+        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+            result_smr = cb.smr_wgs_equilibrium(T, X, P)
 
         print("\nreforming_equilibrium vs smr_wgs_equilibrium (CH4 only):")
         for sp in ["CH4", "H2O", "CO", "CO2", "H2"]:

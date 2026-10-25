@@ -392,7 +392,7 @@ class TestInternalHeatTransfer:
         return EffusionPlateElement("panel", "cool", "gas", panel_area=panel_area, **geom)
 
     def _state(self, elem, G, T=300.0):
-        return self._State(T, 101325.0, cb.standard_dry_air_composition(), G * elem.panel_area)
+        return self._State(T, 101325.0, cb.species.dry_air(), G * elem.panel_area)
 
     def test_matches_the_runner_that_was_scored_against_figure_eight(self):
         """Two independent paths to the same coefficient must agree.
@@ -519,7 +519,7 @@ class TestInternalHeatTransfer:
         # It must describe the flow the solver actually found rather than a
         # default: rebuild Re from the reported mass flow.
         elem = net.elements["panel"]
-        mu = cb.transport_state(300.0, 120e3, cb.standard_dry_air_composition()).mu
+        mu = cb.transport_state(300.0, 120e3, cb.species.dry_air()).mu
         assert diag["Re_hole"] == pytest.approx(
             4.0 * (m_dot / elem.n_holes) / (math.pi * elem.hole_diameter * mu),
             rel=0.05,
@@ -588,7 +588,7 @@ class TestOverallEffectiveness:
 
     def _panel(self, geom, G):
         e = EffusionPlateElement("p", "c", "g", panel_area=1.0, **geom)
-        state = self._State(295.0, 101325.0, cb.standard_dry_air_composition(), G * e.panel_area)
+        state = self._State(295.0, 101325.0, cb.species.dry_air(), G * e.panel_area)
         return e, state
 
     def test_eta_is_the_two_resistance_result_and_nothing_more(self):
@@ -725,7 +725,7 @@ class TestTheKnobsThatCloseTheDocumentedGap:
 
     def _panel(self, G, **kw):
         e = EffusionPlateElement("p", "c", "g", panel_area=1.0, **self.ANDREWS_B, **kw)
-        return e, self._State(self.T_COOLANT, 101325.0, cb.standard_dry_air_composition(), G)
+        return e, self._State(self.T_COOLANT, 101325.0, cb.species.dry_air(), G)
 
     def _measured(self, G):
         import sys

@@ -1056,6 +1056,44 @@ def suppress_warnings() -> _Generator[None, None, None]:
             set_warning_handler(None)
 
 
+# ---------------------------------------------------------------------------
+# Deprecated names: each warns and names its removal release
+# ---------------------------------------------------------------------------
+import functools as _functools
+import warnings as _warnings
+from collections.abc import Callable as _Callable
+from typing import Any as _Any
+
+#: The release that removes every name deprecated in 0.7.0.
+_DEPRECATION_REMOVAL = "0.8.0"
+
+
+def _deprecated(fn: _Callable[..., _Any], name: str, replacement: str) -> _Callable[..., _Any]:
+    @_functools.wraps(fn)
+    def wrapper(*args: _Any, **kwargs: _Any) -> _Any:
+        _warnings.warn(
+            f"{name} is deprecated and will be removed in {_DEPRECATION_REMOVAL}: use {replacement}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+standard_dry_air_composition = _deprecated(
+    standard_dry_air_composition, "standard_dry_air_composition", "species.dry_air()"
+)
+smr_wgs_equilibrium = _deprecated(
+    smr_wgs_equilibrium, "smr_wgs_equilibrium", "reforming_equilibrium"
+)
+smr_wgs_equilibrium_adiabatic = _deprecated(
+    smr_wgs_equilibrium_adiabatic,
+    "smr_wgs_equilibrium_adiabatic",
+    "reforming_equilibrium_adiabatic",
+)
+
+
 __all__ = [
     "AccuracyProvenance",
     "RibCorrelationSet",

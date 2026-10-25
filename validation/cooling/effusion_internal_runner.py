@@ -136,7 +136,7 @@ def predict(
         return None
     D, X, L = geom
 
-    air = cb.standard_dry_air_composition()
+    air = cb.species.dry_air()
     k = cb.thermal_conductivity(T, ASSUMED_P, air)
     mu = cb.viscosity(T, ASSUMED_P, air)
     pr = cb.prandtl(T, ASSUMED_P, air)

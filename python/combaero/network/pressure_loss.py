@@ -252,8 +252,24 @@ class LinearThetaHeadLoss:
 
 
 # ---------------------------------------------------------------------------
-# Backward-compatible aliases (deprecated names kept for existing scripts)
+# Deprecated aliases: warn on access, removed in 0.8.0
 # ---------------------------------------------------------------------------
 
-ConstantLoss = ConstantFractionLoss
-LinearThetaLoss = LinearThetaFractionLoss
+_DEPRECATED_ALIASES = {
+    "ConstantLoss": "ConstantFractionLoss",
+    "LinearThetaLoss": "LinearThetaFractionLoss",
+}
+
+
+def __getattr__(name: str) -> type:
+    if name in _DEPRECATED_ALIASES:
+        import warnings
+
+        new = _DEPRECATED_ALIASES[name]
+        warnings.warn(
+            f"{name} is deprecated and will be removed in 0.8.0: use {new}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[new]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -142,7 +142,8 @@ class TestSmrWgsEquilibrium:
         X[sp.indices["CO2"]] = 0.08
         X[sp.indices["N2"]] = 0.70
 
-        result = ca.smr_wgs_equilibrium(2000.0, X)
+        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+            result = ca.smr_wgs_equilibrium(2000.0, X)
 
         # CH4 should be reformed
         assert result.state.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
@@ -160,7 +161,8 @@ class TestSmrWgsEquilibrium:
         X[sp.indices["N2"]] = 0.70
 
         T_in = 2200.0
-        result = ca.smr_wgs_equilibrium_adiabatic(T_in, X)
+        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+            result = ca.smr_wgs_equilibrium_adiabatic(T_in, X)
 
         # Temperature should decrease
         assert T_in > result.state.T
@@ -173,7 +175,8 @@ class TestSmrWgsEquilibrium:
         X[sp.indices["CO2"]] = 0.05
         X[sp.indices["N2"]] = 0.70
 
-        result = ca.smr_wgs_equilibrium(2000.0, X)
+        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+            result = ca.smr_wgs_equilibrium(2000.0, X)
 
         # Should still work (WGS only)
         assert pytest.approx(2000.0, rel=1e-6) == result.state.T

@@ -189,7 +189,7 @@ def gas_side() -> dict[str, float]:
     facility, not a combaero model -- reported so a reader can substitute
     their own, and never chosen to improve the score.
     """
-    air = cb.standard_dry_air_composition()
+    air = cb.species.dry_air()
     area = DUCT_H_M * DUCT_W_M
     perimeter = 2.0 * (DUCT_H_M + DUCT_W_M)
     d_h = 4.0 * area / perimeter
@@ -218,7 +218,7 @@ def internal_h(series: SeriesMetadata, G: float) -> float | None:
     if geom is None or G <= 0.0:
         return None
     D, X, L = geom
-    air = cb.standard_dry_air_composition()
+    air = cb.species.dry_air()
     k = cb.thermal_conductivity(T_COOLANT, P_AMBIENT, air)
     mu = cb.viscosity(T_COOLANT, P_AMBIENT, air)
     pr = cb.prandtl(T_COOLANT, P_AMBIENT, air)

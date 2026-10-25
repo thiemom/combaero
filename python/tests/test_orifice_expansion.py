@@ -31,7 +31,7 @@ CD = 0.80
 
 @pytest.fixture(scope="module")
 def air():
-    return cb.standard_dry_air_composition()
+    return cb.species.dry_air()
 
 
 def test_nozzle_form_reproduces_the_isentropic_solve(air) -> None:

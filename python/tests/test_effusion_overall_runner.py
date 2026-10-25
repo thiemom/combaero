@@ -561,16 +561,12 @@ def test_the_runner_does_not_reimplement_the_correlation(plates) -> None:
             4.0
             * 0.5
             * (15.24e-3) ** 2
-            / (
-                math.pi
-                * 3.27e-3
-                * cb.viscosity(er.T_COOLANT, er.P_AMBIENT, cb.standard_dry_air_composition())
-            ),
-            cb.prandtl(er.T_COOLANT, er.P_AMBIENT, cb.standard_dry_air_composition()),
+            / (math.pi * 3.27e-3 * cb.viscosity(er.T_COOLANT, er.P_AMBIENT, cb.species.dry_air())),
+            cb.prandtl(er.T_COOLANT, er.P_AMBIENT, cb.species.dry_air()),
             15.24 / 6.3,
             6.3 / 3.27,
         )
-        * cb.thermal_conductivity(er.T_COOLANT, er.P_AMBIENT, cb.standard_dry_air_composition())
+        * cb.thermal_conductivity(er.T_COOLANT, er.P_AMBIENT, cb.species.dry_air())
         / 3.27e-3
         * (math.pi * 3.27e-3 * 6.3e-3)
         / ((15.24e-3) ** 2 - math.pi * (3.27e-3) ** 2 / 4.0)
