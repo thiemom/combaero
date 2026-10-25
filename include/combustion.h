@@ -1,11 +1,10 @@
-#ifndef COMBUSTION_H
-#define COMBUSTION_H
+#pragma once
 
-#include <string>
-#include <vector>
-#include <tuple>
-#include <functional>
 #include <cstddef>
+#include <functional>
+#include <string>
+#include <tuple>
+#include <vector>
 
 #include "state.h"
 
@@ -212,5 +211,3 @@ CombustionState combustion_state_from_streams(
     double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
 
 } // namespace combaero
-
-#endif // COMBUSTION_H

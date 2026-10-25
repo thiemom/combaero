@@ -265,31 +265,78 @@ struct Transport_Props {
 ## Combustion (combustion.h)
 
 > [!NOTE]
-> Combustion functions assume complete combustion to CO₂ and H₂O unless equilibrium is invoked.
-> `smooth=True` enables a sigmoid-based transition at Phi=0 for better Jacobian stability.
+> Complete combustion: every C/H fuel burns to CO2 + H2O(g) (fuel N to N2),
+> no dissociation. Rich, all fuels burn the same fraction f = X_O2 / n_req
+> (= 1/phi) and the rest passes through unburnt; no CO or H2 is formed (use
+> `combustion_equilibrium` for that). `include/combustion.h` is the full list.
+>
+> Smoothing (`smooth_phi0`, `smooth_phi1`, k0 = k1 = 20000): `smooth_phi1`
+> replaces min(1, r) with a softmin about 1/k1 wide at phi = 1;
+> `smooth_phi0` replaces the O2 demand a with a softplus shifted to 0 at
+> a = 0, so n_req = a - ln2/k0 away from zero fuel: 3.5e-5 mol O2 per mol
+> of mixture stays unburnt at EVERY lean phi (about -0.3 to -0.6 K on T_ad,
+> tested < 1 K) and half the fuel burns as phi -> 0.
 
 ### Stoichiometry & Equivalence Ratio
 ```cpp
-double oxygen_required_per_mol_fuel(std::size_t fuel_index);
-double oxygen_required_per_kg_fuel(std::size_t fuel_index);
+double oxygen_required_per_mol_fuel(std::size_t fuel_index);   // mol O2/mol, x + y/4 - z/2 (>= 0)
+double oxygen_required_per_kg_fuel(std::size_t fuel_index);    // kg O2/kg
+double oxygen_required_per_mol_mixture(const std::vector<double>& X);
+double oxygen_required_per_kg_mixture(const std::vector<double>& X);
+double dryair_required_per_mol_fuel(std::size_t fuel_index);   // and _per_kg_fuel, _per_*_mixture
 
+// Elemental phi = (2 n_C + n_H / 2) / n_O over ALL atoms of the mixture
+// (CO2/H2O count, so a burnt mixture keeps its phi; dry air reads 0.0019 from
+// its CO2). 0 without C/H; 1e9 without O.
+double equivalence_ratio(const std::vector<double>& X);
+double equivalence_ratio_mass(const std::vector<double>& Y);
+
+// Two-stream phi = (F/O) / (F/O)_st, (F/O)_st from the fuel stream's O2 demand
+// and the oxidizer stream's O2 (O2 in the fuel stream, fuel in the oxidizer
+// stream are not counted).
 double equivalence_ratio_mole(const std::vector<double>& X_mix,
                               const std::vector<double>& X_fuel,
                               const std::vector<double>& X_ox);
 double equivalence_ratio_mass(const std::vector<double>& Y_mix,
                               const std::vector<double>& Y_fuel,
                               const std::vector<double>& Y_ox);
+std::vector<double> set_equivalence_ratio_mole(double phi, const std::vector<double>& X_fuel,
+                                               const std::vector<double>& X_ox);  // phi > 0, finite
+std::vector<double> set_equivalence_ratio_mass(double phi, const std::vector<double>& Y_fuel,
+                                               const std::vector<double>& Y_ox);
 
-double fuel_lhv_molar(const std::vector<double>& X_fuel, double T_ref = 298.15);
-double fuel_lhv_mass(const std::vector<double>& X_fuel, double T_ref = 298.15);
+// Bilger mixture fraction (two-stream, mass basis)
+double bilger_beta(const std::vector<double>& Y);
+double bilger_mixture_fraction(const std::vector<double>& Y, const std::vector<double>& Y_F,
+                               const std::vector<double>& Y_O);   // clamped to [0, 1]
+double bilger_mixture_fraction_from_moles(const std::vector<double>& X,
+                                          const std::vector<double>& X_F,
+                                          const std::vector<double>& X_O);
+double bilger_stoich_mixture_fraction_mass(const std::vector<double>& Y_F,
+                                           const std::vector<double>& Y_O);
+double bilger_Z_from_equivalence_ratio_mass(double phi, const std::vector<double>& Y_F,
+                                            const std::vector<double>& Y_O);
+double equivalence_ratio_from_bilger_Z_mass(double Z, const std::vector<double>& Y_F,
+                                            const std::vector<double>& Y_O);
+
+// LHV, H2O as vapour [J/mol fuel mixture], [J/kg fuel mixture]
+double fuel_lhv_molar(const std::vector<double>& X_fuel, double reference_temperature = 298.15);
+double fuel_lhv_mass(const std::vector<double>& X_fuel, double reference_temperature = 298.15);
 ```
 
 ### Complete Combustion Solvers
 ```cpp
-// All solvers accept an optional 'smooth' parameter for Jacobian smoothness
-State complete_combustion(const State& in, bool smooth = false);
-State complete_combustion_isothermal(const State& in, bool smooth = false);
-std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X);
+// T, P finite and > 0, X finite (std::invalid_argument otherwise).
+State complete_combustion(const State& in, bool smooth_phi0 = false, bool smooth_phi1 = false,
+                          double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
+State complete_combustion_isothermal(const State& in, bool smooth_phi0 = false,
+                                     bool smooth_phi1 = false, double k0 = SMOOTHING_K_PHI0,
+                                     double k1 = SMOOTHING_K_PHI1);
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X,
+                                                   bool smooth_phi0 = false, bool smooth_phi1 = false,
+                                                   double k0 = SMOOTHING_K_PHI0,
+                                                   double k1 = SMOOTHING_K_PHI1);
+// ... and an overload with `double& fuel_burn_fraction` after X.
 
 // The same products with the analytic Jacobian dX_b/dX (#716): one
 // implementation with the value. Smoothed, the phi = 1 softmin applies at
@@ -298,14 +345,37 @@ struct CompleteCombustionJacobian { std::vector<double> X_b; std::vector<std::ve
 CompleteCombustionJacobian complete_combustion_products_and_jacobian(
     const std::vector<double>& X, bool smooth_phi0 = true, bool smooth_phi1 = true,
     double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
+```
+
+### Streams and CombustionState
+```cpp
+Stream set_fuel_stream_for_phi(double phi, const Stream& fuel, const Stream& oxidizer);
+// Brent inverse solvers on complete combustion (targets finite; out-of-range -> invalid_argument):
+// set_{fuel,oxidizer}_stream_for_{Tad,O2,O2_dry,CO2,CO2_dry}(target, fuel, oxidizer, tol, max_iter[, lean, phi_max])
+
+// Products at T_ad; fuel_burn_fraction = min(1, 1/phi) for Complete.
+// _from_streams: T and P of mix({fuel, ox}) (the lowest inlet P), phi from the mass flows.
+CombustionState combustion_state(const std::vector<double>& X_fuel, const std::vector<double>& X_ox,
+                                 double phi, double T_reactants, double P,
+                                 const std::string& fuel_name = "",
+                                 CombustionMethod method = CombustionMethod::Complete,
+                                 bool smooth_phi0 = false, bool smooth_phi1 = false,
+                                 double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
+CombustionState combustion_state_from_streams(const Stream& fuel_stream, const Stream& ox_stream,
+                                              const std::string& fuel_name = "",
+                                              CombustionMethod method = CombustionMethod::Complete,
+                                              bool smooth_phi0 = false, bool smooth_phi1 = false,
+                                              double k0 = SMOOTHING_K_PHI0,
+                                              double k1 = SMOOTHING_K_PHI1);
+// Both also take a PressureLossCorrelation after `method`: P_out = P (1 - xi(ctx)).
 
 struct PressureLossContext {
-    double m_dot;
-    double P;
-    double T;
-    const std::vector<double>& Y;
+    const State& state_in;                  // inlet T, P, X
+    double phi, T_ad;
+    const std::vector<double>& X_products;
     const std::vector<double>& Y_products;
-    double theta;
+    double theta;                           // T_ad / T_in - 1
+    double mdot_fuel, mdot_air, mdot_total; // 0 in the phi-based call
 };
 
 using PressureLossCorrelation = std::function<std::tuple<double, double>(const PressureLossContext &)>;

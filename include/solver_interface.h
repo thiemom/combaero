@@ -481,7 +481,8 @@ P0_from_static_and_jacobian_M(double P, double T, double M,
 
 // Calculate Adiabatic Flame Temperature (Complete Combustion) and its
 // derivative wrt inlet temperature.
-// Method: Central Finite Difference tightly bracketed.
+// Method: analytic (#716), dT_ad/dT_in = cp(T_in, X_in) (MW_b/MW_in) / cp(T_ad, X_b);
+// smoothed at phi = 0 and phi = 1 (complete_combustion_products_and_jacobian).
 // Inputs:
 //   T_in : Inlet temperature [K]
 //   P    : Pressure [Pa]
@@ -497,7 +498,7 @@ adiabatic_T_complete_and_jacobian_T(double T_in, double P,
 
 // Calculate Adiabatic Flame Temperature (Equilibrium Combustion) and its
 // derivatives wrt inlet temperature and pressure.
-// Method: Central Finite Difference tightly bracketed.
+// Method: analytic (#716), implicit in the equilibrium extents and the adiabatic root.
 // Inputs:
 //   T_in : Inlet temperature [K]
 //   P    : Pressure [Pa]
