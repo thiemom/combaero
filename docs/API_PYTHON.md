@@ -194,6 +194,14 @@ s = cb.duct_static_state(T0=1600, P0=2e5, G=150.0, X=air)
 s.T, s.P, s.rho, s.M, s.choked, s.dT_dT0, s.dP_dG
 ```
 
+Its composition gradients (#717), one entry per species in the MASS
+fractions, at fixed T0, P0 and G, for the wall relay behind a combustor:
+
+```python
+d = cb.duct_htc_static_state_dY(T0=1600, P0=2e5, G=150.0, X=air)
+d.dT_dY, d.dP_dY, d.drho_dY, d.dGeff_dY
+```
+
 ### Fanno flow in Mach number
 Integrated in M rather than x: the state is algebraic in M at fixed mass flux,
 so the duct length is a smooth integral that vanishes at sonic -- exact L*,
@@ -810,7 +818,9 @@ network.add_wall(wall)
 **The heat is the two streams' exchange (#627)**: the epsilon-NTU integral
 along the wall, `Q = eps(NTU, C_r) C_min (T_aw,a - T_aw,b)` at each stream's
 inlet, with `NTU = UA / C_min` and `C = |m| cp` (cp the secant over the inlet
-span, `cb.cp_secant_mass_and_jacobian`, so `C_min dT` is the exact maximum).
+span, `cb.cp_secant_mass_and_jacobian`, so `C_min dT` is the exact maximum). Behind a combustor the side's composition moves with the unknowns too:
+`ChannelResult.dh_dY` and `dT_aw_dY` (smooth channels) and
+`cb.cp_secant_mass_dY` carry h, T_aw and C to the relay (#717).
 It never exceeds what the weaker stream can take, and a stream that stops
 takes none. A node side is a well-mixed reservoir (`C = inf`). The linear
 `U A dT` it replaced is its small-NTU limit; it moved up to 2.3x the heat at

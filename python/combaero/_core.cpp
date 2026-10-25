@@ -882,6 +882,18 @@ PYBIND11_MODULE(_core, m) {
         "flux bent C1 below the sonic one (G itself below (1 - 2w) G*, capped at\n"
         "(1 - w) G*, w = DUCT_HTC_SONIC_MARGIN), so it is smooth through choke (#551).");
 
+  py::class_<combaero::DuctStaticStateDY>(m, "DuctStaticStateDY")
+      .def_readonly("dT_dY", &combaero::DuctStaticStateDY::dT_dY)
+      .def_readonly("dP_dY", &combaero::DuctStaticStateDY::dP_dY)
+      .def_readonly("drho_dY", &combaero::DuctStaticStateDY::drho_dY)
+      .def_readonly("dGeff_dY", &combaero::DuctStaticStateDY::dGeff_dY);
+  m.def("duct_htc_static_state_dY", &combaero::duct_htc_static_state_dY, py::arg("T0"),
+        py::arg("P0"), py::arg("G"), py::arg("X"),
+        "duct_htc_static_state's gradients in the MASS fractions at fixed T0, P0\n"
+        "and G (#717): dT_dY, dP_dY, drho_dY and the bent flux's dGeff_dY, one\n"
+        "entry per species. Implicit-function derivatives of the isentropic\n"
+        "energy and entropy balances.");
+
   py::class_<combaero::JetImpulse>(m, "JetImpulse")
       .def_readonly("J", &combaero::JetImpulse::J)
       .def_readonly("dJ_dm", &combaero::JetImpulse::dJ_dm)
@@ -2311,6 +2323,17 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Secant cp over [T1, T2], (h(T1) - h(T2)) / (T1 - T2) [J/(kg*K)], and\n"
       "its partials in T1 and T2 (cp(T1) in the limit T2 -> T1). The capacity\n"
       "rate of an epsilon-NTU wall exchange (#627).");
+
+  m.def(
+      "cp_secant_mass_dY",
+      [](double T1, double T2,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        return cp_secant_mass_dY(T1, T2, to_vec(X_arr));
+      },
+      py::arg("T1"), py::arg("T2"), py::arg("X"),
+      "The secant cp's gradient in the MASS fractions [J/(kg*K)], one entry\n"
+      "per species: a wall side's capacity rate |m| cp moves with its\n"
+      "composition (#717).");
 
   m.def(
       "cp_mass",
@@ -7480,6 +7503,12 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
                     "Jacobian: dq/dT [W/(m^2*K)]")
       .def_readonly("dq_dT_hot", &ChannelResult::dq_dT_hot,
                     "Jacobian: dq/dT_hot [W/(m^2*K)]")
+      .def_readonly("dh_dY", &ChannelResult::dh_dY,
+                    "Jacobian: dh/dY [W/(m^2*K)] per species (mass fractions) at fixed\n"
+                    "mdot, T, P (#717); empty for a correlation that does not provide it")
+      .def_readonly("dT_aw_dY", &ChannelResult::dT_aw_dY,
+                    "Jacobian: dT_aw/dY [K] per species (mass fractions) at fixed\n"
+                    "mdot, T, P (#717); empty for a correlation that does not provide it")
       .def("__repr__", [](const ChannelResult &r) {
         auto fmt = [](double v) {
           if (std::isnan(v))
