@@ -151,6 +151,19 @@ versions agree at its head) and squash-merged at exactly the verified commit.
 Fails when a tool pinned in several files (biome: package.json, biome.json,
 pre-commit, ci.yml) disagrees. `--ref REF` checks a git ref, e.g. a PR head.
 
+### dependency_floors.py
+Prints every runtime requirement of combaero and combaero-gui (core
+dependencies, the `examples`/`generator` extras, the GUI). The nightly
+`dependency-floors` job installs them with `--resolution lowest-direct` and
+runs the fast suite and the examples. Dependabot only ever moves the top of a
+range. `--check` fails on a requirement with no lower bound, which
+lowest-direct would resolve to the first release ever published. A floor is
+the lowest version with no known advisory that passes the suite.
+```bash
+uv run scripts/dependency_floors.py --check
+uv run scripts/dependency_floors.py > floors.in && uv pip install --resolution lowest-direct -r floors.in
+```
+
 ## Quick Reference
 
 | Task | Command |

@@ -13,6 +13,7 @@ import warnings
 
 import numpy as np
 import pytest
+from scipy.integrate import trapezoid
 from scipy.optimize._numdiff import approx_derivative
 
 import combaero as cb
@@ -72,8 +73,8 @@ def test_the_span_average_is_the_integral(n: int, x0: float, x1: float) -> None:
     """Against a dense trapezoid, graded towards the steep near-hole end."""
     xs = np.concatenate([[x0], x0 + (x1 - x0) * np.geomspace(1e-7, 1.0, 200001)])
     xb = np.maximum(xs, 1e-9)  # Baldauf is defined for x > 0
-    ref_b = np.trapezoid([_sellers_baldauf(x, n, 10.0, 0.8, 1.8) for x in xb], xs) / (x1 - x0)
-    ref_c = np.trapezoid([_sellers_colban(x, n, 10.0, 0.8) for x in xs], xs) / (x1 - x0)
+    ref_b = trapezoid([_sellers_baldauf(x, n, 10.0, 0.8, 1.8) for x in xb], xs) / (x1 - x0)
+    ref_c = trapezoid([_sellers_colban(x, n, 10.0, 0.8) for x in xs], xs) / (x1 - x0)
     b = cb.film_span_average_baldauf_2002(n, 10.0, x0, x1, 0.8, 1.8, 30.0, 3.0, 0.05)
     c = cb.film_span_average_colban_2011(n, 10.0, x0, x1, 0.8, 3.5, 6.0, 0.5)
     assert b.eta == pytest.approx(ref_b, rel=1e-7)
