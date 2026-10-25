@@ -2,6 +2,7 @@
 #define STAGNATION_H
 
 #include <cstddef>
+#include <tuple>
 #include <vector>
 
 namespace combaero {

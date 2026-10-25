@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstddef>
 #include <functional>
+#include <string>
 #include <utility>
 
 // -------------------------------------------------------------
@@ -67,23 +68,28 @@ CompressibleFlowSolution nozzle_flow(
 // Inverse problems: solve for unknown given mass flow
 // -------------------------------------------------------------
 
-// Find effective area for given mass flow rate.
-// Throws if mdot_target exceeds choked mass flow.
+// Find effective area for given mass flow rate (any mdot_target > 0 is
+// reachable: above choke the area just carries the choked flux).
+// Throws std::invalid_argument for non-positive T0, P0, P_back or
+// mdot_target, std::runtime_error when P_back >= P0 (no forward flow).
 double solve_A_eff_from_mdot(
     double T0, double P0, double P_back, double mdot_target,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
 // Find back pressure for given mass flow rate.
-// Returns the subsonic solution (P_back > P_critical).
-// Throws if mdot_target exceeds choked mass flow.
+// Returns the subsonic solution (P_back > P_critical), P_critical itself at
+// the choked flow. Throws std::runtime_error if mdot_target exceeds the
+// choked mass flow, std::invalid_argument for non-positive T0, P0, A_eff or
+// mdot_target.
 double solve_P_back_from_mdot(
     double T0, double P0, double A_eff, double mdot_target,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
-// Find stagnation pressure for given mass flow rate.
-// Throws if no solution exists.
+// Find stagnation pressure for given mass flow rate (root in (P_back, inf)).
+// Throws std::invalid_argument for non-positive T0, P_back, A_eff or
+// mdot_target, std::runtime_error if no P0 up to 1e14 P_back reaches it.
 double solve_P0_from_mdot(
     double T0, double P_back, double A_eff, double mdot_target,
     const std::vector<double>& X,
@@ -348,7 +354,11 @@ FannoSolution fanno_channel_rough(
 
 
 // Compute maximum channel length before choking (L*) for given inlet conditions.
-// Returns the length at which M would reach 1.0.
+// Returns the length at which M reaches 1.0 (constant Darcy f, adiabatic,
+// thermally perfect), integrated in Mach by fanno_length_between
+// (fanno_mach.h); 0 for a sonic or supersonic inlet. tol and max_iter are
+// unused (kept for the signature). Throws std::invalid_argument for
+// non-positive T_in, P_in, u_in, D or f (L* is infinite at u_in = 0 or f = 0).
 double fanno_max_length(
     double T_in, double P_in, double u_in,
     double D, double f,
