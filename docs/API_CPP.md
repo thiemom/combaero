@@ -10,6 +10,7 @@ This document provides the technical reference for the CombAero C++ library. For
 - [Stagnation / Static Conversions (stagnation.h)](#stagnation--static-conversions-stagnationh)
 - [Compressible Flow (compressible.h)](#compressible-flow-compressibleh)
 - [Incompressible Flow (incompressible.h)](#incompressible-flow-incompressibleh)
+- [Area Change (area_change.h)](#area-change-area_changeh)
 - [Friction Factor Correlations (friction.h)](#friction-factor-correlations-frictionh)
 - [Heat Transfer Correlations (heat_transfer.h)](#heat-transfer-correlations-heat_transferh)
   - [Nusselt Numbers](#nusselt-numbers)
@@ -178,6 +179,10 @@ double reynolds_from_state(double rho, double v, double L, double mu);
 // integral interpolation, the modified Eucken factors and both mixing rules).
 struct TransportDerivatives { double mu, dmu_dT, k, dk_dT; };
 TransportDerivatives transport_and_dT(double T, double P, const std::vector<double>& X);
+
+// d mu_mix / dX_k at fixed T, analytic (Wilke), per species, X unnormalised
+// (chain with a dX/dY that keeps sum X = 1); one-sided for an absent species.
+std::vector<double> viscosity_dX(double T, double P, const std::vector<double>& X);
 
 // Omega*(2,2) and dOmega*/dT* (C2 quintic Hermite, see Transport Model below).
 struct Omega22Result { double omega, domega_dTstar; };
@@ -612,6 +617,70 @@ ThrustResult nozzle_thrust(double T0, double P0, double P_design, double P_amb,
 double bernoulli_P2(double P1, double v1, double v2, double rho, double dz = 0.0);
 double orifice_mdot(double P1, double P2, double A, double Cd, double rho);
 double channel_dP(double v, double L, double D, double f, double rho);
+```
+
+---
+
+## Area Change (area_change.h)
+
+Sudden and conical expansions and contractions (#731). The closures are
+Idelchik's (1966; diagrams 4-1, 3-9, 5-2, transcribed in
+`validation/area_change/`), every zeta on the small section's dynamic head
+and Re there; n is the small area over the large one. Mach enters through the
+control volume the closures come from: an expansion is the compressible
+Borda-Carnot step times the table's ratio to it, a contraction a vena
+contracta (Cc = 1 / (1 + sqrt(zeta_c))) re-expanding by the same step. The
+header documents the interpolation, its monotonicity regularisation and the
+drive floor; the measurements are in `python/tests/test_area_change.py`.
+
+```cpp
+struct ZetaAndSlope { double zeta, dzeta_dRe; };
+ZetaAndSlope sudden_expansion_zeta(double Re, double area_ratio);  // 4-1, C1 in Re
+double sharp_contraction_zeta(double area_ratio);                  // 3-9: 0.5 (1 - n)
+double conical_diffuser_zeta(double full_angle_deg, double area_ratio);  // 5-2
+double conical_nozzle_zeta(double half_angle_rad, double area_ratio);    // not sourced
+
+struct BordaCarnotStep { double M2, pt_ratio, dpt_dM1, dpt_dgamma; };
+BordaCarnotStep compressible_borda_carnot(double M1, double area_ratio, double gamma);
+
+// Loss at a given flow (diagnostics), fed from the stagnation state upstream.
+struct AreaChangeLoss { double dPt, zeta, mach, Re; bool expansion, choked; };
+AreaChangeLoss area_change_loss(double m_dot_abs, double Pt0, double Tt0,
+                                const std::vector<double>& Y, double F_in, double F_out,
+                                const std::string& model, double length, double D_h,
+                                bool incompressible);
+
+// Flow at a given drive Pt0 - Pt_target (odd in it), saturating at the sonic
+// flow, with analytic partials (dm_dY per species).
+struct AreaChangeFlow {
+    double m_dot; bool choked; double mach, Re, zeta;
+    double dm_dPt0, dm_dTt0, dm_dPt_target;
+    std::vector<double> dm_dY;
+};
+AreaChangeFlow area_change_flow(double Pt0, double Tt0, const std::vector<double>& Y,
+                                double Pt_target, double F_in, double F_out,
+                                const std::string& model, double length, double D_h,
+                                bool incompressible, bool with_derivatives = true);
+
+// The network element's flow from node a (face F_a) to node b: each direction
+// fed from its own upstream node, the two blended C1 through zero drive.
+struct AreaChangeElementFlow {
+    double m_dot; bool choked; double mach, Re, zeta;
+    double dm_dPt_a, dm_dTt_a, dm_dPt_b, dm_dTt_b;
+    std::vector<double> dm_dY_a, dm_dY_b;
+};
+AreaChangeElementFlow area_change_element_flow(
+    double Pt_a, double Tt_a, const std::vector<double>& Y_a,
+    double Pt_b, double Tt_b, const std::vector<double>& Y_b,
+    double F_a, double F_b, const std::string& model, double length, double D_h,
+    bool incompressible, bool with_derivatives = true);
+
+// Incompressible kernels at a given density (standalone): dP and its partials.
+struct AreaChangeResult { double dP, dS_dm, dS_drho, dS_dmu; };
+AreaChangeResult sharp_area_change(double m_dot, double rho, double mu, double F0, double F1,
+                                   double m_scale = 1e-4, double D_h = 0.0);
+AreaChangeResult conical_area_change(double m_dot, double rho, double mu, double F0, double F1,
+                                     double length, double m_scale = 1e-4);
 ```
 
 ---

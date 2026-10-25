@@ -220,7 +220,10 @@ try:
         MixtureState,
         MomentumChamberResult,
         AreaChangeResult,
-        AreaChangeElementResult,
+        AreaChangeLoss,
+        AreaChangeFlow,
+        AreaChangeElementFlow,
+        BordaCarnotStep,
         State,
         Stream,
         Registry,
@@ -540,6 +543,14 @@ try:
         v_from_h0,
         sharp_area_change,
         conical_area_change,
+        sudden_expansion_zeta,
+        sharp_contraction_zeta,
+        conical_diffuser_zeta,
+        conical_nozzle_zeta,
+        compressible_borda_carnot,
+        area_change_loss,
+        area_change_flow,
+        area_change_element_flow,
         # Channel/circular functions
         htc_circular_channel,
         nusselt_circular_channel,
@@ -687,8 +698,18 @@ except (ModuleNotFoundError, ImportError) as e:
     sharp_area_change = _core.sharp_area_change
     conical_area_change = _core.conical_area_change
     AreaChangeResult = _core.AreaChangeResult
-
-    AreaChangeElementResult = _core.AreaChangeElementResult
+    AreaChangeLoss = _core.AreaChangeLoss
+    AreaChangeFlow = _core.AreaChangeFlow
+    BordaCarnotStep = _core.BordaCarnotStep
+    sudden_expansion_zeta = _core.sudden_expansion_zeta
+    sharp_contraction_zeta = _core.sharp_contraction_zeta
+    conical_diffuser_zeta = _core.conical_diffuser_zeta
+    conical_nozzle_zeta = _core.conical_nozzle_zeta
+    compressible_borda_carnot = _core.compressible_borda_carnot
+    area_change_loss = _core.area_change_loss
+    area_change_flow = _core.area_change_flow
+    area_change_element_flow = _core.area_change_element_flow
+    AreaChangeElementFlow = _core.AreaChangeElementFlow
     # Compressible flow
     CompressibleFlowSolution = _core.CompressibleFlowSolution
     NozzleStation = _core.NozzleStation
@@ -891,8 +912,18 @@ except (ModuleNotFoundError, ImportError) as e:
     sharp_area_change = _core.sharp_area_change
     conical_area_change = _core.conical_area_change
     AreaChangeResult = _core.AreaChangeResult
-
-    AreaChangeElementResult = _core.AreaChangeElementResult
+    AreaChangeLoss = _core.AreaChangeLoss
+    AreaChangeFlow = _core.AreaChangeFlow
+    BordaCarnotStep = _core.BordaCarnotStep
+    sudden_expansion_zeta = _core.sudden_expansion_zeta
+    sharp_contraction_zeta = _core.sharp_contraction_zeta
+    conical_diffuser_zeta = _core.conical_diffuser_zeta
+    conical_nozzle_zeta = _core.conical_nozzle_zeta
+    compressible_borda_carnot = _core.compressible_borda_carnot
+    area_change_loss = _core.area_change_loss
+    area_change_flow = _core.area_change_flow
+    area_change_element_flow = _core.area_change_element_flow
+    AreaChangeElementFlow = _core.AreaChangeElementFlow
 
 # Terminology aliases - always available
 try:
@@ -1513,7 +1544,18 @@ __all__ = [
     "sharp_area_change",
     "conical_area_change",
     "AreaChangeResult",
-    "AreaChangeElementResult",
+    "AreaChangeLoss",
+    "AreaChangeFlow",
+    "BordaCarnotStep",
+    "sudden_expansion_zeta",
+    "sharp_contraction_zeta",
+    "conical_diffuser_zeta",
+    "conical_nozzle_zeta",
+    "compressible_borda_carnot",
+    "area_change_loss",
+    "area_change_flow",
+    "area_change_element_flow",
+    "AreaChangeElementFlow",
     # Vatistas n-vortex model
     "vatistas_v0_bar",
     "vatistas_dv0_bar_drbar",

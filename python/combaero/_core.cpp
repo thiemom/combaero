@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "acoustics.h"
@@ -1828,59 +1829,130 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "limit of the ejector. Same four rows and owned unknown p3 as the\n"
         "compressible element; v = 1/rho.");
 
-  // Area change elements
+  // Area change (#731): Idelchik closures and the compressible element kernel.
+  m.def("sudden_expansion_zeta",
+        [](double Re, double area_ratio) {
+          const auto z = combaero::sudden_expansion_zeta(Re, area_ratio);
+          return std::make_tuple(z.zeta, z.dzeta_dRe);
+        },
+        py::arg("Re"), py::arg("area_ratio"),
+        "Sudden expansion loss coefficient, Idelchik (1966) diagram 4-1, on the\n"
+        "small section's dynamic head: 26/Re below Re 8, a C1 interpolation of\n"
+        "the printed table to Re 3500, Borda-Carnot (1 - n)^2 above.\n"
+        "Returns (zeta, dzeta_dRe).");
+
+  m.def("sharp_contraction_zeta", &combaero::sharp_contraction_zeta, py::arg("area_ratio"),
+        "Sharp contraction loss coefficient 0.5 (1 - n), Idelchik (1966) diagram\n"
+        "3-9, on the small section's dynamic head.");
+
+  m.def("conical_diffuser_zeta", &combaero::conical_diffuser_zeta,
+        py::arg("full_angle_deg"), py::arg("area_ratio"),
+        "Conical diffuser expansion loss zeta_exp, Idelchik (1966) diagram 5-2\n"
+        "(bilinear through the printed table), on the small section's dynamic\n"
+        "head. full_angle_deg is the included angle; friction not included.");
+
+  m.def("conical_nozzle_zeta", &combaero::conical_nozzle_zeta,
+        py::arg("half_angle_rad"), py::arg("area_ratio"),
+        "Conical nozzle loss coefficient C_con (1 - n), C_con = 0.04 +\n"
+        "0.46 sin(theta)^1.5. Not sourced.");
+
+  py::class_<combaero::BordaCarnotStep>(m, "BordaCarnotStep",
+                                        "Compressible Borda-Carnot step")
+      .def_readonly("M2", &combaero::BordaCarnotStep::M2)
+      .def_readonly("pt_ratio", &combaero::BordaCarnotStep::pt_ratio)
+      .def_readonly("dpt_dM1", &combaero::BordaCarnotStep::dpt_dM1)
+      .def_readonly("dpt_dgamma", &combaero::BordaCarnotStep::dpt_dgamma);
+
+  m.def("compressible_borda_carnot", &combaero::compressible_borda_carnot,
+        py::arg("M1"), py::arg("area_ratio"), py::arg("gamma"),
+        "Sudden expansion from M1 by area ratio n (small/large), calorically\n"
+        "perfect gas: mass, momentum (base pressure on the whole large face) and\n"
+        "total enthalpy conserved. Returns BordaCarnotStep (M2, Pt2/Pt1 and its\n"
+        "partials in M1 and gamma).");
+
+  py::class_<combaero::AreaChangeLoss>(m, "AreaChangeLoss",
+                                       "Area change loss at a given flow")
+      .def_readonly("dPt", &combaero::AreaChangeLoss::dPt)
+      .def_readonly("zeta", &combaero::AreaChangeLoss::zeta)
+      .def_readonly("mach", &combaero::AreaChangeLoss::mach)
+      .def_readonly("Re", &combaero::AreaChangeLoss::Re)
+      .def_readonly("expansion", &combaero::AreaChangeLoss::expansion)
+      .def_readonly("choked", &combaero::AreaChangeLoss::choked);
+
+  m.def("area_change_loss", &combaero::area_change_loss,
+        py::arg("m_dot_abs"), py::arg("Pt0"), py::arg("Tt0"), py::arg("Y"),
+        py::arg("F_in"), py::arg("F_out"), py::arg("model") = "sharp",
+        py::arg("length") = 0.0, py::arg("D_h") = 0.0, py::arg("incompressible") = false,
+        "Stagnation-pressure loss of an area change from F_in to F_out at a given\n"
+        "flow, fed from (Pt0, Tt0, Y). model 'sharp' or 'conical' (length sets\n"
+        "the cone). Returns AreaChangeLoss.");
+
+  py::class_<combaero::AreaChangeFlow>(m, "AreaChangeFlow",
+                                       "Area change flow at a given drive")
+      .def_readonly("m_dot", &combaero::AreaChangeFlow::m_dot)
+      .def_readonly("choked", &combaero::AreaChangeFlow::choked)
+      .def_readonly("mach", &combaero::AreaChangeFlow::mach)
+      .def_readonly("Re", &combaero::AreaChangeFlow::Re)
+      .def_readonly("zeta", &combaero::AreaChangeFlow::zeta)
+      .def_readonly("dm_dPt0", &combaero::AreaChangeFlow::dm_dPt0)
+      .def_readonly("dm_dTt0", &combaero::AreaChangeFlow::dm_dTt0)
+      .def_readonly("dm_dPt_target", &combaero::AreaChangeFlow::dm_dPt_target)
+      .def_readonly("dm_dY", &combaero::AreaChangeFlow::dm_dY);
+
+  m.def("area_change_flow", &combaero::area_change_flow,
+        py::arg("Pt0"), py::arg("Tt0"), py::arg("Y"), py::arg("Pt_target"),
+        py::arg("F_in"), py::arg("F_out"), py::arg("model") = "sharp",
+        py::arg("length") = 0.0, py::arg("D_h") = 0.0, py::arg("incompressible") = false,
+        py::arg("with_derivatives") = true,
+        "Mass flow of an area change from F_in to F_out whose loss is the drive\n"
+        "Pt0 - Pt_target (odd in it), saturating at the sonic flow, with its\n"
+        "analytic partials. Returns AreaChangeFlow.");
+
+  py::class_<combaero::AreaChangeElementFlow>(m, "AreaChangeElementFlow",
+                                              "Area change element flow between two nodes")
+      .def_readonly("m_dot", &combaero::AreaChangeElementFlow::m_dot)
+      .def_readonly("choked", &combaero::AreaChangeElementFlow::choked)
+      .def_readonly("mach", &combaero::AreaChangeElementFlow::mach)
+      .def_readonly("Re", &combaero::AreaChangeElementFlow::Re)
+      .def_readonly("zeta", &combaero::AreaChangeElementFlow::zeta)
+      .def_readonly("dm_dPt_a", &combaero::AreaChangeElementFlow::dm_dPt_a)
+      .def_readonly("dm_dTt_a", &combaero::AreaChangeElementFlow::dm_dTt_a)
+      .def_readonly("dm_dPt_b", &combaero::AreaChangeElementFlow::dm_dPt_b)
+      .def_readonly("dm_dTt_b", &combaero::AreaChangeElementFlow::dm_dTt_b)
+      .def_readonly("dm_dY_a", &combaero::AreaChangeElementFlow::dm_dY_a)
+      .def_readonly("dm_dY_b", &combaero::AreaChangeElementFlow::dm_dY_b);
+
+  m.def("area_change_element_flow", &combaero::area_change_element_flow,
+        py::arg("Pt_a"), py::arg("Tt_a"), py::arg("Y_a"), py::arg("Pt_b"), py::arg("Tt_b"),
+        py::arg("Y_b"), py::arg("F_a"), py::arg("F_b"), py::arg("model") = "sharp",
+        py::arg("length") = 0.0, py::arg("D_h") = 0.0, py::arg("incompressible") = false,
+        py::arg("with_derivatives") = true,
+        "The area change element's flow from node a (face F_a) to node b, both\n"
+        "directions blended C1 through zero drive. Returns AreaChangeElementFlow.");
+
   py::class_<combaero::AreaChangeResult>(
       m, "AreaChangeResult",
       "Result of sharp_area_change: dP and Jacobian partials")
       .def_readonly("dP", &combaero::AreaChangeResult::dP)
       .def_readonly("dS_dm", &combaero::AreaChangeResult::dS_dm)
       .def_readonly("dS_drho", &combaero::AreaChangeResult::dS_drho)
-      .def_readonly("dS_dmu", &combaero::AreaChangeResult::dS_dmu)
-      .def_readonly("mach_clamped", &combaero::AreaChangeResult::mach_clamped);
+      .def_readonly("dS_dmu", &combaero::AreaChangeResult::dS_dmu);
 
   m.def("sharp_area_change", &combaero::sharp_area_change,
         py::arg("m_dot"), py::arg("rho"), py::arg("mu"),
-        py::arg("F0"), py::arg("F1"),
-        py::arg("Mach") = 0.0, py::arg("m_scale") = 1e-4,
+        py::arg("F0"), py::arg("F1"), py::arg("m_scale") = 1e-4,
         py::arg("D_h") = 0.0,
-        "Sharp-edge area change: pressure drop and Jacobian partials.\n\n"
+        "Sharp-edge area change at a given density (incompressible): pressure\n"
+        "drop and Jacobian partials, the Idelchik closures above.\n\n"
         "D_h overrides the circular hydraulic diameter when > 0.\n"
         "Returns AreaChangeResult with dP, dS_dm, dS_drho, dS_dmu.");
 
   m.def("conical_area_change", &combaero::conical_area_change,
         py::arg("m_dot"), py::arg("rho"), py::arg("mu"),
-        py::arg("F0"), py::arg("F1"), py::arg("length"),
-        py::arg("Mach") = 0.0, py::arg("m_scale") = 1e-4,
-        "Conical (gradual) area change: pressure drop and Jacobian partials.\n\n"
+        py::arg("F0"), py::arg("F1"), py::arg("length"), py::arg("m_scale") = 1e-4,
+        "Conical area change at a given density (incompressible): pressure drop\n"
+        "and Jacobian partials.\n\n"
         "Returns AreaChangeResult with dP, dS_dm, dS_drho, dS_dmu.");
-
-  py::class_<solver::AreaChangeElementResult>(
-      m, "AreaChangeElementResult",
-      "Result of area_change_residuals_and_jacobian for network solver")
-      .def(py::init<>())
-      .def_readonly("dP_calc", &solver::AreaChangeElementResult::dP_calc)
-      .def_readonly("d_dP_d_mdot", &solver::AreaChangeElementResult::d_dP_d_mdot)
-      .def_readonly("d_dP_dP_static_up",
-                    &solver::AreaChangeElementResult::d_dP_dP_static_up)
-      .def_readonly("d_dP_dT_up", &solver::AreaChangeElementResult::d_dP_dT_up)
-      .def_readonly("d_dP_dY_up", &solver::AreaChangeElementResult::d_dP_dY_up)
-      .def_readonly("mach_clamped", &solver::AreaChangeElementResult::mach_clamped);
-
-  m.def("area_change_residuals_and_jacobian",
-        &solver::area_change_residuals_and_jacobian,
-        py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
-        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"),
-        py::arg("F0"), py::arg("F1"), py::arg("m_scale") = 1e-4,
-        py::arg("D_h") = 0.0,
-        "Network-level sharp-edge area change with all derivatives.");
-
-  m.def("conical_area_change_residuals_and_jacobian",
-        &solver::conical_area_change_residuals_and_jacobian,
-        py::arg("m_dot"), py::arg("P_total_up"), py::arg("P_static_up"),
-        py::arg("T_up"), py::arg("Y_up"), py::arg("P_static_down"),
-        py::arg("F0"), py::arg("F1"), py::arg("length"),
-        py::arg("m_scale") = 1e-4,
-        "Network-level conical area change with all derivatives.");
 
   // Tee junction (Bassett 2001)
   py::class_<solver::TeeJunctionResult>(

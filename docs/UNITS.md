@@ -145,6 +145,7 @@ All functions use consistent units to avoid conversion errors.
 | Function                       | Input Units                           | Output Unit          |
 |--------------------------------|---------------------------------------|----------------------|
 | `viscosity`                    | T: K, P: Pa, X: mol/mol               | Pa*s                 |
+| `viscosity_dX`                 | T: K, P: Pa, X: mol/mol               | Pa*s (per species)   |
 | `transport_and_dT`             | T: K, P: Pa, X: mol/mol               | TransportDerivatives |
 | `TransportDerivatives::mu`     | -                                     | Pa*s                 |
 | `TransportDerivatives::dmu_dT` | -                                     | Pa*s/K               |
@@ -839,12 +840,20 @@ All functions use consistent units to avoid conversion errors.
 | `hydraulic_diameter_rect`    | a: m, b: m             | m            |
 | `hydraulic_diameter_annulus` | D_outer: m, D_inner: m | m            |
 
-### area_change.h - Area Change Elements
+### area_change.h - Area Change Elements (Idelchik 1966, #731)
 
-| Function              | Input Units                                                                             | Output Unit                                                                                  |
-|-----------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-| `sharp_area_change`   | m_dot: kg/s, rho: kg/m^3, mu: Pa*s, F0: m^2, F1: m^2, Mach: -, m_scale: kg/s, D_h: m    | AreaChangeResult (dP: Pa, dS_dm: Pa*s/kg, dS_drho: Pa*m^3/kg, dS_dmu: -, mach_clamped: bool) |
-| `conical_area_change` | m_dot: kg/s, rho: kg/m^3, mu: Pa*s, F0: m^2, F1: m^2, length: m, Mach: -, m_scale: kg/s | AreaChangeResult (dP: Pa, dS_dm: Pa*s/kg, dS_drho: Pa*m^3/kg, dS_dmu: -, mach_clamped: bool) |
+| Function                    | Input Units                                                                                                                                         | Output Unit                                                                                                                                                                                |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `sudden_expansion_zeta`     | Re: -, area_ratio: -                                                                                                                                | tuple (zeta: -, dzeta_dRe: -)                                                                                                                                                              |
+| `sharp_contraction_zeta`    | area_ratio: -                                                                                                                                       | -                                                                                                                                                                                          |
+| `conical_diffuser_zeta`     | full_angle_deg: deg, area_ratio: -                                                                                                                  | -                                                                                                                                                                                          |
+| `conical_nozzle_zeta`       | half_angle_rad: rad, area_ratio: -                                                                                                                  | -                                                                                                                                                                                          |
+| `compressible_borda_carnot` | M1: -, area_ratio: -, gamma: -                                                                                                                      | BordaCarnotStep (M2: -, pt_ratio: -, dpt_dM1: -, dpt_dgamma: -)                                                                                                                            |
+| `area_change_loss`          | m_dot_abs: kg/s, Pt0: Pa, Tt0: K, Y: -, F_in: m^2, F_out: m^2, model: -, length: m, D_h: m, incompressible: bool                                    | AreaChangeLoss (dPt: Pa, zeta: -, mach: -, Re: -, expansion: bool, choked: bool)                                                                                                           |
+| `area_change_flow`          | Pt0: Pa, Tt0: K, Y: -, Pt_target: Pa, F_in: m^2, F_out: m^2, model: -, length: m, D_h: m, incompressible: bool, with_derivatives: bool              | AreaChangeFlow (m_dot: kg/s, choked: bool, mach: -, Re: -, zeta: -, dm_dPt0: kg/(s*Pa), dm_dTt0: kg/(s*K), dm_dPt_target: kg/(s*Pa), dm_dY: kg/s)                                          |
+| `area_change_element_flow`  | Pt_a: Pa, Tt_a: K, Y_a: -, Pt_b: Pa, Tt_b: K, Y_b: -, F_a: m^2, F_b: m^2, model: -, length: m, D_h: m, incompressible: bool, with_derivatives: bool | AreaChangeElementFlow (m_dot: kg/s, choked: bool, mach: -, Re: -, zeta: -, dm_dPt_a: kg/(s*Pa), dm_dTt_a: kg/(s*K), dm_dPt_b: kg/(s*Pa), dm_dTt_b: kg/(s*K), dm_dY_a: kg/s, dm_dY_b: kg/s) |
+| `sharp_area_change`         | m_dot: kg/s, rho: kg/m^3, mu: Pa*s, F0: m^2, F1: m^2, m_scale: kg/s, D_h: m                                                                         | AreaChangeResult (dP: Pa, dS_dm: Pa*s/kg, dS_drho: Pa*m^3/kg, dS_dmu: Pa/(Pa*s))                                                                                                           |
+| `conical_area_change`       | m_dot: kg/s, rho: kg/m^3, mu: Pa*s, F0: m^2, F1: m^2, length: m, m_scale: kg/s                                                                      | AreaChangeResult (dP: Pa, dS_dm: Pa*s/kg, dS_drho: Pa*m^3/kg, dS_dmu: Pa/(Pa*s))                                                                                                           |
 
 ### tee_junction.h + solver_interface.h - Tee Junction Elements
 

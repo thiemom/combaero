@@ -171,16 +171,16 @@ class _Layered:
             if hm:
                 self.tags.append("high_mach_channel")
         elif kind == "area":
-            e = AreaChangeElement(
-                eid,
-                a,
-                b,
-                F0=na.area,
-                F1=nb.area,
-                model_type=r.choice(["sharp", "conical"]),
-                length=0.05,
-            )
-            self.tags.append("area_change")
+            model = r.choice(["sharp", "conical"])
+            if na.area == nb.area:
+                # Equal faces are no area change, and the element refuses them
+                # (#731): a lossless joint, after the same draw.
+                e = LosslessConnectionElement(eid, a, b)
+            else:
+                e = AreaChangeElement(
+                    eid, a, b, F0=na.area, F1=nb.area, model_type=model, length=0.05
+                )
+                self.tags.append("area_change")
         elif kind == "loss":
             # Between two combustors the network refuses an undeclared theta
             # source, whatever the correlation; name the upstream one. No

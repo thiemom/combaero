@@ -7855,13 +7855,27 @@ class ImpingementCrossflowElement(CrossflowSegmentElement):
 
 class AreaChangeElement(NetworkElement):
     """
-    Area change element applying pressure drop for sharp or conical area changes.
+    Area change between two ducts: a sharp or conical expansion or contraction.
+
+    The closures are Idelchik's (1966; diagrams 4-1, 3-9, 5-2), carried to Mach
+    by their control volume, in C++ (``area_change.h``, #731): an expansion is
+    the compressible Borda-Carnot step times the table's ratio to it (the low-Re
+    factor of 4-1, the cone's phi of 5-2); a contraction is a vena contracta
+    re-expanding by the same step, which chokes. ``regime="incompressible"``
+    runs their M -> 0 limit.
+
+    The residual is in mass-flow form, m - m_calc(Pt_from, Pt_to, ...), as the
+    compressible channel and orifice are (#481): the flow the drive supports
+    rises monotonically with it and saturates at the sonic flow, so it exists for
+    every state. Each direction is fed from its own upstream node, and the two
+    are blended C1 through zero drive (``area_change_element_flow``).
     """
 
-    #: RESIDUAL-ROW-SCALING: the row is Pt_in - Pt_out - dP_calc, in Pa. It was
-    #: filed as a mass-flow row by default, weighting it ref_p/ref_mdot
-    #: (1e5-1e9) too heavily; LM then traded every pressure for it (#614).
-    residual_scale_kind = "p"
+    #: RESIDUAL-ROW-SCALING: m_dot - m_calc, in kg/s (#731; it was a Pa row).
+    residual_scale_kind = "mdot"
+    #: Incompressible validity (#588): the closure's own Mach -- the small
+    #: section's for an expansion, the vena contracta's for a contraction.
+    validity_mach_keys = ("mach_loss_ref",)
 
     def __init__(
         self,
@@ -7873,6 +7887,7 @@ class AreaChangeElement(NetworkElement):
         model_type: Literal["sharp", "conical"] = "sharp",
         length: float | None = None,
         D_h: float | None = 0.0,
+        regime: Literal["compressible", "incompressible"] = "compressible",
     ):
         super().__init__(id, from_node, to_node)
         self.F0: float | None = F0
@@ -7880,6 +7895,7 @@ class AreaChangeElement(NetworkElement):
         self.model_type = model_type
         self.length = length if length is not None else 0.0
         self.D_h = D_h
+        self.regime = regime
         # Where a resolved area came from, for diagnostics (issue #262).
         self._F0_source = "user" if F0 is not None else ""
         self._F1_source = "user" if F1 is not None else ""
@@ -7920,144 +7936,124 @@ class AreaChangeElement(NetworkElement):
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Downstream Area F1={self.F1}. Must be > 0."
             )
+        if self.F0 == self.F1:
+            raise ValueError(
+                f"AreaChangeElement '{self.id}' has F0 == F1 = {self.F0}: no area change, and no "
+                "loss to set the flow. Use a LosslessConnectionElement."
+            )
         if self.D_h is not None and self.D_h < 0:
             raise ValueError(
                 f"AreaChangeElement '{self.id}' has invalid Hydraulic Diameter D_h={self.D_h}. Must be >= 0."
             )
+        if self.model_type == "conical" and not self.length > 0.0:
+            raise ValueError(
+                f"AreaChangeElement '{self.id}' is conical: it needs length > 0 "
+                f"(got {self.length})."
+            )
+
+    def _flow(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        derivatives: bool,
+    ) -> Any:
+        return cb.area_change_element_flow(
+            float(state_in.Pt),
+            float(state_in.Tt),
+            state_in.Y,
+            float(state_out.Pt),
+            float(state_out.Tt),
+            state_out.Y,
+            float(self.F0),
+            float(self.F1),
+            self.model_type,
+            float(self.length),
+            float(self.D_h or 0.0),
+            self.regime == "incompressible",
+            derivatives,
+        )
 
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
-    ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        m_dot = state_in.m_dot
+    ) -> tuple[list[float], LazyJacobian]:
+        # The loss couples stagnation to stagnation, as ChannelElement does
+        # (#175, #541): for a plenum or boundary downstream Pt == P.
+        m_calc = float(self._flow(state_in, state_out, derivatives=False).m_dot)
 
-        if self.model_type == "sharp":
-            res_cpp = _solver_tools.area_change_residuals_and_jacobian(
-                m_dot=m_dot,
-                P_total_up=state_in.Pt,
-                P_static_up=state_in.P,
-                T_up=state_in.T,
-                Y_up=state_in.Y,
-                P_static_down=state_out.P,
-                F0=self.F0,
-                F1=self.F1,
-                m_scale=FLOW_REVERSAL_M_SCALE,
-                D_h=self.D_h or 0.0,
-            )
-        else:
-            res_cpp = _solver_tools.conical_area_change_residuals_and_jacobian(
-                m_dot=m_dot,
-                P_total_up=state_in.Pt,
-                P_static_up=state_in.P,
-                T_up=state_in.T,
-                Y_up=state_in.Y,
-                P_static_down=state_out.P,
-                F0=self.F0,
-                F1=self.F1,
-                length=self.length,
-                m_scale=FLOW_REVERSAL_M_SCALE,
-            )
-
-        # dP_calc is the stagnation-pressure LOSS (zeta * q_small), so the
-        # element couples stagnation to stagnation, as ChannelElement does
-        # (#175). Coupling the downstream STATIC pressure instead let a
-        # MomentumChamberNode downstream (Pt = P + q) add its dynamic head as a
-        # free total-pressure gain across the step -- in the GUI, every area
-        # change followed by a channel raised Pt (#541). For a plenum or
-        # boundary downstream Pt == P and the two forms are identical.
-        res = [state_in.Pt - state_out.Pt - res_cpp.dP_calc]
-
-        upstream_id = self.from_node
-        downstream_id = self.to_node
-
-        jac = {
-            0: {
-                f"{self.id}.m_dot": -res_cpp.d_dP_d_mdot,
-                f"{upstream_id}.Pt": 1.0,
-                f"{upstream_id}.P": -res_cpp.d_dP_dP_static_up,
-                f"{upstream_id}.T": -res_cpp.d_dP_dT_up,
-                f"{downstream_id}.Pt": -1.0,
+        def jacobian() -> dict[int, dict[str, float]]:
+            f = self._flow(state_in, state_out, derivatives=True)
+            a, b = self.from_node, self.to_node
+            jac: dict[str, float] = {
+                f"{self.id}.m_dot": 1.0,
+                f"{a}.Pt": -float(f.dm_dPt_a),
+                f"{b}.Pt": -float(f.dm_dPt_b),
+                f"{a}.T": -float(f.dm_dTt_a),
+                f"{b}.T": -float(f.dm_dTt_b),
             }
-        }
-        for i, val in enumerate(res_cpp.d_dP_dY_up):
-            jac[0][f"{upstream_id}.Y[{i}]"] = -val
+            for node, grad in ((a, f.dm_dY_a), (b, f.dm_dY_b)):
+                for i, val in enumerate(grad):
+                    if val != 0.0:
+                        jac[f"{node}.Y[{i}]"] = -float(val)
+            return {0: jac}
 
-        return res, jac
+        return [state_in.m_dot - m_calc], LazyJacobian(jacobian)
 
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
+        f0 = float(self.F0)
+        f1 = float(self.F1)
+        f_small = min(f0, f1)
+        m_dot = float(state_in.m_dot)
+        # The upwind node feeds the closure, and the face it enters by.
+        up, F_in, F_out = (state_in, f0, f1) if m_dot >= 0.0 else (state_out, f1, f0)
         try:
             cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+            loss = cb.area_change_loss(
+                abs(m_dot),
+                float(up.Pt),
+                float(up.Tt),
+                up.Y,
+                F_in,
+                F_out,
+                self.model_type,
+                float(self.length),
+                float(self.D_h or 0.0),
+                self.regime == "incompressible",
+            )
         except Exception:
-            return {
-                "dP_static": 0.0,
-                "area_ratio": self.F1 / self.F0 if self.F0 > 0 else 0.0,
-            }
-
-        f0 = self.F0
-        f1 = self.F1
-        f_small = min(f0, f1)
-        area_ratio = f1 / f0 if f0 > 0 else 0.0
-        m_dot = state_in.m_dot
-        m_dot_abs = abs(m_dot)
-
-        rho_in = cs_in.thermo.rho
+            return {"dPt_loss": 0.0, "area_ratio": f1 / f0}
         a_in = cs_in.thermo.a
-
-        # Inlet velocity / Mach, at the inlet face F0 (either size)
-        v_in = (m_dot_abs) / ((rho_in) * (f0)) if f0 > 0 and rho_in > 0 else 0.0
+        rho_in = cs_in.thermo.rho
+        v_in = abs(m_dot) / (rho_in * f0) if rho_in > 0 else 0.0
         mach_in = v_in / a_in if a_in > 0 else 0.0
-
-        # Mach at the smaller section - used for loss coefficient lookup
-        v_loss_ref = (m_dot_abs) / ((rho_in) * (f_small)) if f_small > 0 and rho_in > 0 else 0.0
-        mach_loss_ref = v_loss_ref / a_in if a_in > 0 else 0.0
-
-        # Outlet Mach (use outlet state for accuracy)
         try:
             cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
-            v_out = (
-                (m_dot_abs) / ((cs_out.thermo.rho) * (f1))
-                if f1 > 0 and cs_out.thermo.rho > 0
-                else 0.0
-            )
+            v_out = abs(m_dot) / (cs_out.thermo.rho * f1) if cs_out.thermo.rho > 0 else 0.0
             mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 else 0.0
         except Exception:
             mach_out = 0.0
-
-        # The loss the residual solved: Mach 0, as residuals() passes it. The
-        # kernels' k1 = 1 + 0.35 M^2 is never applied in the network, so
-        # reporting it here made zeta and dP_static disagree with the solved
-        # Pt drop wherever M_small > 0 (+9% at M 0.5).
-        if self.model_type == "sharp":
-            res = cb.sharp_area_change(
-                m_dot, rho_in, cs_in.transport.mu, f0, f1, Mach=0.0, D_h=self.D_h or 0.0
-            )
-        else:
-            res = cb.conical_area_change(
-                m_dot, rho_in, cs_in.transport.mu, f0, f1, self.length, Mach=0.0
-            )
-
-        dP_static = abs(res.dP)
-        q_small = 0.5 * rho_in * v_loss_ref**2
-        zeta = dP_static / q_small if q_small > 1e-6 else 0.0
-
-        # The section the loss is referenced to, and its Re: the smaller one,
-        # as the kernels take it. F0 is the LARGER face of a contraction.
+        # The section the loss is referenced to, and its Re: the smaller one.
         Dh_small = self.D_h or math.sqrt(4.0 * f_small / math.pi)
         ref = _element_reference_block(
             cs_in, m_dot=m_dot, area=f_small, Dh=Dh_small, location="small_section"
         )
-
         return {
-            "m_dot": float(m_dot),
+            "m_dot": m_dot,
             **_element_pressure_block(state_in, state_out, mach_in=mach_in, mach_out=mach_out),
             **ref,
-            "dP_static": float(dP_static),
-            "area_ratio": float(area_ratio),
-            "zeta": float(zeta),
-            "mach_loss_ref": float(mach_loss_ref),
-            "F0": float(f0),
-            "F1": float(f1),
+            # The closure's stagnation-pressure loss at the solved flow (>= 0),
+            # on the upwind node's state; zeta is it over the small section's
+            # static dynamic head, as Idelchik defines it.
+            "dPt_loss": float(loss.dPt),
+            "area_ratio": f1 / f0,
+            "zeta": float(loss.zeta),
+            "mach_loss_ref": float(loss.mach),
+            "Re_small": float(loss.Re),
+            "expansion": float(loss.expansion),
+            "choked": float(loss.choked),
+            "F0": f0,
+            "F1": f1,
             "F0_source": self._F0_source,
             "F1_source": self._F1_source,
         }

@@ -746,6 +746,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 step = AreaChangeElement(
                     step_id, side_id, port_node, F0=A_ch, F1=A_port, model_type="sharp"
                 )
+            step.regime = schema.solver_settings.global_regime
             net.add_element(step)
             edge_junction_map[key] = side_id
             tee_steps[step_id] = (tee_node.id, port, A_ch / A_port)
@@ -1167,6 +1168,9 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 model_type=data.model_type,
                 length=data.length,
                 D_h=data.D_h,
+                # The network's regime (#588): the closure's M -> 0 limit when
+                # incompressible (#731).
+                regime=schema.solver_settings.global_regime,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
             if not elem.initial_guess:

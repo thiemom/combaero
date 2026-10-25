@@ -48,18 +48,23 @@ formula, zeta = 0.5 (1 - F0/F1), Re > 1e4, is exactly the code's. Diagrams
   checked by eye, and failed on F0/F1 0.075 (0.88 printed, 0.856 Borda). The
   page confirms 0.88, so the bound was widened to the measured range.
 
-## Preview, not a gate (2026-10-24)
+## Scored (2026-10-25, #731)
 
-This is fidelity: the code cites these diagrams. Against the transcription:
+Fidelity: the code now implements these diagrams (`include/area_change.h`),
+and `python/tests/test_area_change.py` scores every printed cell.
 
-- **Sharp expansion, 10 < Re < 3.5e3:** 72 cells, bias -50%, RMS 55%. Above
-  3.5e3 the code's alpha = 1 + 2.73/(Re+10)^0.4 adds alpha - 1 to Borda-Carnot
-  (+0.069 at Re 1e4, a loss of 0.069 dynamic heads even at F0 = F1).
-- **Conical diffuser:** model/Idelchik median 3.0x at alpha <= 10 deg, 1.55x at
-  12-30 deg, 0.84x at >= 40 deg (capped at Borda-Carnot).
+- **Sudden expansion, 4-1:** 75 of the 78 part-2 cells exact. Three move:
+  - n 0.6 and 0.5 at Re 2000, lowered to 0.41 (printed 0.50) and 0.61 (0.65), so the loss rises with the flow. The printed n 0.6 column falls between Re 2000 and 3000, which would give one pressure drop two flows;
+  - n 0.3 at Re 3500, printed 0.50 for Borda-Carnot's 0.49.
+  Part 1 is Borda-Carnot exactly, and below Re 8 the law is 26/Re.
+- **Conical diffuser, 5-2:** all 154 cells exact (bilinear through the table).
+- **Before (2026-10-24, the replaced closures):**
+  - expansion, 10 < Re < 3.5e3: 72 cells, bias -50%, RMS 55%; above 3.5e3, alpha - 1 added to Borda-Carnot (+0.069 at Re 1e4, even at F0 = F1);
+  - diffuser: model/Idelchik median 3.0x at alpha <= 10 deg, 1.55x at 12-30 deg, 0.84x at >= 40 deg.
 
 ## Review log
 
 - 2026-10-24: transcribed from the page images; the three data tests pass.
 - 2026-10-25: the user checked the three tables against the pages and signed
   them off.
+- 2026-10-25: the closures implemented and scored (#731, above).

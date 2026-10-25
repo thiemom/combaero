@@ -1,8 +1,9 @@
 """RESIDUAL-ROW-SCALING (#614): elements whose residual is a pressure in Pa
 must be scaled as pressure rows.
 
-PressureLossElement, AreaChangeElement, BorderCarnotLossElement and
-VortexElement all write a total-pressure balance, but the default in
+PressureLossElement, BorderCarnotLossElement and VortexElement write a
+total-pressure balance (as AreaChangeElement did until #731 made its row a
+mass flow), but the default in
 ``_build_residual_scales`` filed them as mass-flow rows: weighted
 ref_p / ref_mdot (1e5-1e9) too heavily in the norm hybr/LM minimise. On a
 stress network the LM fallback then walked every pressure to -4e14 Pa to
@@ -32,11 +33,14 @@ from combaero.network.pressure_loss import ConstantFractionLoss
 Y = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
-@pytest.mark.parametrize(
-    "cls", [PressureLossElement, AreaChangeElement, BorderCarnotLossElement, VortexElement]
-)
+@pytest.mark.parametrize("cls", [PressureLossElement, BorderCarnotLossElement, VortexElement])
 def test_a_pressure_balance_element_declares_pressure_rows(cls: type) -> None:
     assert cls.residual_scale_kind == "p"
+
+
+def test_the_area_change_row_is_a_mass_flow() -> None:
+    """m - m_calc since #731: its row is in kg/s."""
+    assert AreaChangeElement.residual_scale_kind == "mdot"
 
 
 def _net() -> FlowNetwork:
@@ -57,16 +61,15 @@ def _net() -> FlowNetwork:
 
 
 def test_their_rows_get_the_pressure_scale(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The loss and the area change each add one ref_p row; with the old
-    default they were two more ref_mdot rows."""
+    """The loss adds one ref_p row; with the old default it was one more
+    ref_mdot row. (The area change's row is a mass flow since #731.)"""
     s = NetworkSolver(_net())
     r = s.solve()
     assert r["__success__"]
     x0 = np.array(r["__x_solution__"])
     ref_p, ref_m = s._reference_scales(x0)
     n_p = int(np.sum(s._build_residual_scales(x0) == ref_p))
-    for cls in (comp.PressureLossElement, comp.AreaChangeElement):
-        monkeypatch.setattr(cls, "residual_scale_kind", "mdot")  # the old default
+    monkeypatch.setattr(comp.PressureLossElement, "residual_scale_kind", "mdot")  # old default
     D_old = s._build_residual_scales(x0)
-    assert int(np.sum(D_old == ref_p)) == n_p - 2
+    assert int(np.sum(D_old == ref_p)) == n_p - 1
     assert ref_p / ref_m > 1e5  # what the misfiling cost, here

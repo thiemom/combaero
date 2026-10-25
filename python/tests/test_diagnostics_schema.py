@@ -109,7 +109,8 @@ def test_area_change_element_diagnostics():
     assert diag["ref_location"] == "small_section"
     assert "mach_loss_ref" in diag
     assert "area_ratio" in diag
-    assert "dP_static" in diag
+    assert "dPt_loss" in diag
+    assert "dP_static" not in diag  # Renamed to dPt_loss: a stagnation-pressure loss
     assert "zeta" in diag
     assert "mach_small" not in diag  # Renamed to mach_loss_ref
     assert "ratio" not in diag  # Renamed to area_ratio
