@@ -29,6 +29,7 @@ jobs:
       pytests: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.pytests == 'true' }}
       examples: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.examples == 'true' }}
       gui: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.gui == 'true' }}
+      floors: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.floors == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -102,6 +103,13 @@ jobs:
               - '.github/workflows/validation-tests.yml'
             gui:
               - 'gui/**'
+              - '.github/workflows/validation-tests.yml'
+            # The declared dependency floors: a PR that moves one must pass at
+            # the new floor, not only at the locked (newest) versions.
+            floors:
+              - 'pyproject.toml'
+              - 'gui/pyproject.toml'
+              - 'scripts/dependency_floors.py'
               - '.github/workflows/validation-tests.yml'
 
   cantera-validation:
@@ -241,6 +249,63 @@ jobs:
           MPLBACKEND: Agg
         run: uv run scripts/run_examples.py
 
+  dependency-floors:
+    # Dependabot keeps uv.lock at the newest releases, so every other job
+    # tests the TOP of each declared range. This one tests the bottom: every
+    # runtime dependency of combaero and combaero-gui at its declared floor
+    # (scripts/dependency_floors.py, installed with --resolution
+    # lowest-direct; transitive dependencies resolve normally), then the fast
+    # suite and the examples. A floor that no longer installs or passes is a
+    # promise the packages cannot keep; raise it rather than skip it.
+    name: Dependency Floors (lowest-direct)
+    needs: changes
+    if: needs.changes.outputs.floors == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Install dependencies (locked)
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0.dev0"
+        run: uv sync --all-extras --all-groups
+
+      - name: Every runtime dependency declares a floor
+        run: uv run --no-sync scripts/dependency_floors.py --check
+
+      - name: Move the runtime dependencies down to their floors
+        run: |
+          uv run --no-sync scripts/dependency_floors.py > "$RUNNER_TEMP/floors.in"
+          # Compile to exact pins first: `uv pip install --resolution
+          # lowest-direct` keeps an already-satisfied newer version in place.
+          uv pip compile --python-version 3.12 --resolution lowest-direct --no-header \
+            "$RUNNER_TEMP/floors.in" -o "$RUNNER_TEMP/floors.txt"
+          uv pip install -r "$RUNNER_TEMP/floors.txt"
+
+      - name: Every runtime dependency is installed at its floor
+        run: uv run --no-sync scripts/dependency_floors.py --verify
+
+      # --no-sync throughout: a plain `uv run` would sync the lock back to the
+      # newest versions and test those instead.
+      - name: Run the fast Python suite at the floors
+        working-directory: python/tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: uv run --no-sync pytest -m "not slow" -n auto --dist loadscope -q --tb=short
+
+      - name: Run every example at the floors
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          MPLBACKEND: Agg
+        run: uv run --no-sync scripts/run_examples.py
+
   frontend-validation:
     name: Frontend Validation (Node 24 LTS)
     needs: changes
@@ -275,7 +340,7 @@ jobs:
     name: Validation Tests / status-check
     # Every job must be listed here: the ruleset requires only this one, so a
     # job missing from `needs` is not enforced.
-    needs: [changes, cantera-validation, python-unit-tests, examples-smoke, frontend-validation]
+    needs: [changes, cantera-validation, python-unit-tests, examples-smoke, dependency-floors, frontend-validation]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -299,4 +364,5 @@ jobs:
           require "${{ needs.changes.outputs.pytests }}" "${{ needs.python-unit-tests.result }}" "python-unit-tests"
           require "${{ needs.changes.outputs.examples }}" "${{ needs.examples-smoke.result }}" "examples-smoke"
           require "${{ needs.changes.outputs.gui }}" "${{ needs.frontend-validation.result }}" "frontend-validation"
+          require "${{ needs.changes.outputs.floors }}" "${{ needs.dependency-floors.result }}" "dependency-floors"
           exit $fail

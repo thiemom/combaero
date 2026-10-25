@@ -256,10 +256,10 @@ dev = [
 requires-dist = [
     { name = "combaero-gui", marker = "extra == 'gui'", editable = "gui" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.8" },
-    { name = "numpy", specifier = ">=1.24" },
+    { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", marker = "extra == 'generator'", specifier = ">=2.2.3" },
     { name = "pyyaml", marker = "extra == 'generator'", specifier = ">=6.0.2" },
-    { name = "scipy", specifier = ">=1.10" },
+    { name = "scipy", specifier = ">=1.15" },
     { name = "sympy", specifier = ">=1.14.0" },
 ]
 provides-extras = ["examples", "generator", "gui"]
@@ -282,18 +282,22 @@ source = { editable = "gui" }
 dependencies = [
     { name = "combaero" },
     { name = "fastapi" },
+    { name = "h11" },
     { name = "pandas" },
     { name = "pydantic" },
+    { name = "starlette" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "combaero", editable = "." },
-    { name = "fastapi" },
-    { name = "pandas" },
-    { name = "pydantic" },
-    { name = "uvicorn" },
+    { name = "fastapi", specifier = ">=0.133.0" },
+    { name = "h11", specifier = ">=0.16.0" },
+    { name = "pandas", specifier = ">=2.2.3" },
+    { name = "pydantic", specifier = ">=2.7.0" },
+    { name = "starlette", specifier = ">=1.3.1" },
+    { name = "uvicorn", specifier = ">=0.30.0" },
 ]
 provides-extras = ["gui"]
 
@@ -1575,15 +1579,15 @@ wheels = [
 
 [[package]]
 name = "starlette"
-version = "0.49.3"
+version = "1.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/de/1a/608df0b10b53b0beb96a37854ee05864d182ddd4b1156a22f1ad3860425a/starlette-0.49.3.tar.gz", hash = "sha256:1c14546f299b5901a1ea0e34410575bc33bbd741377a10484a54445588d00284", size = 2655031, upload-time = "2025-11-01T15:12:26.13Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/bb/3d8757f21e9a53d9035c9eb039a777047139a16bfdbedfc7a58241c3d914/starlette-1.10.0.tar.gz", hash = "sha256:b8399098d4c1e3522734f7235dc79b1fc967f96cf139c81e0fa30479e0685f9b", size = 2734356, upload-time = "2026-10-24T15:04:12.342Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/e0/021c772d6a662f43b63044ab481dc6ac7592447605b5b35a957785363122/starlette-0.49.3-py3-none-any.whl", hash = "sha256:b579b99715fdc2980cf88c8ec96d3bf1ce16f5a8051a7c2b84ef9b1cdecaea2f", size = 74340, upload-time = "2025-11-01T15:12:24.387Z" },
+    { url = "https://files.pythonhosted.org/packages/88/2e/947cfe02def9371c07cd5bf5b6b61c829e9aecb9904db02a66cfafbc1eec/starlette-1.10.0-py3-none-any.whl", hash = "sha256:478c0ab3b4ced6e82719849c118fa406f0278a3499c1a898cd15cd31bdc38ce4", size = 80571, upload-time = "2026-10-24T15:04:10.371Z" },
 ]
 
 [[package]]

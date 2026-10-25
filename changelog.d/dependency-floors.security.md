@@ -1,0 +1,6 @@
+- **combaero-gui declares floors for its web stack.** Before this, `fastapi`, `uvicorn`, `pydantic` and `pandas` had no lower bound. An environment that already had an older FastAPI or Starlette kept it, including versions with published advisories. The new floors clear every known advisory (OSV, checked 2026-10-25):
+  - `starlette>=1.3.1`: Host and path poisoning, form-limit bypass, HTTP method dispatch, and StaticFiles SSRF on Windows (CVE-2026-48710/48817/48818/54282/54283). Starlette is a transitive dependency, declared directly so that the floor binds.
+  - `h11>=0.16.0`: malformed chunked bodies (CVE-2025-43859).
+  - `fastapi>=0.133.0`: the first release that allows Starlette 1.x.
+  - `pydantic>=2.7.0`, `uvicorn>=0.30.0`, `pandas>=2.2.3`.
+  - The development lock moves Starlette from 0.49.3, which was affected, to 1.10.0.

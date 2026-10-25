@@ -26,6 +26,7 @@ Energy balance (per kg air):
 import matplotlib.pyplot as plt
 import numpy as np
 from plot_utils import show_or_save
+from scipy.integrate import trapezoid
 
 import combaero as cb
 
@@ -33,7 +34,7 @@ import combaero as cb
 def dh_same_X(T_a: float, T_b: float, X: list, n: int = 300) -> float:
     """Isobaric enthalpy change [J/kg] via cp_mass integral (same composition)."""
     Ts = np.linspace(T_a, T_b, n)
-    return float(np.trapezoid([cb.cp_mass(T, X) for T in Ts], Ts))
+    return float(trapezoid([cb.cp_mass(T, X) for T in Ts], Ts))
 
 
 def isentropic_T(T_start: float, P_start: float, P_end: float, X: list) -> float:

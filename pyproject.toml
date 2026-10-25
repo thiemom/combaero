@@ -23,8 +23,12 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-    "numpy>=1.24",
-    "scipy>=1.10",
+    # Floors are the lowest versions that install on the supported Python and
+    # pass the suite (numpy 1.24/1.25 and scipy 1.10 have no cp312 wheels; scipy
+    # < 1.15 stalls one junction solve at a different point). The nightly
+    # dependency-floors job tests them: scripts/dependency_floors.py.
+    "numpy>=1.26",
+    "scipy>=1.15",
     "sympy>=1.14.0",
 ]
 
