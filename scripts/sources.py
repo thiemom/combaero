@@ -53,6 +53,7 @@ TOPICS = {
     "rib",
     "dimple",
     "channel",
+    "jet_mixing",
     "junction",
     "tee",
     "ejector",

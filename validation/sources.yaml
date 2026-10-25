@@ -1804,6 +1804,99 @@ documents:
   records: [validation/cooling/extractions/han_ribbed.md]
   notes: Issue/volume number recorded as 15(1) in han_ribbed.md; the PDF shows Vol. 15 pp. 180-184 only.
     Sequel to Webb_Eckert_Goldstein_1971_IJHMT_14_pp601-617.pdf.
+- file: docs/jet_mixing/Holdeman_1996_NASA_TM-107185_multiple_jets_confined_crossflow_cylindrical.pdf
+  citation: Holdeman, J. D., Liscinsky, D. S., Oechsle, V. L., Samuelsen, G. S., Smith, C. E. (1996). Mixing
+    of multiple jets with a confined subsonic crossflow in a cylindrical duct. NASA TM-107185 / ASME 96-GT-482.
+  id: NASA TM-107185; ASME 96-GT-482 (NTRS 19960023955)
+  topic:
+  - jet_mixing
+  - combustion
+  content: Summary of the NASA-supported experimental and computational jet-in-crossflow mixing program for
+    a row of jets in a cylindrical (can) duct; rectangular-duct results recalled. Prints the scaling C = (S/H)
+    sqrt(J) and the optimum number of orifices in a can, Eq. (6) n = pi sqrt(2J)/C; momentum-flux ratio J and
+    orifice count dominate, penetration similar when n ~ sqrt(J). Mixture-fraction distributions and area-weighted
+    variances PLOTTED; reacting results and NOx tie-in summarised.
+  status: screened
+  verdict: 'The anchor document of the topic: the design rules (J, C, optimum n) in one place, with references
+    to the data reports. combaero has no jet-mixing / dilution model and no issue yet; a jet-in-crossflow element
+    is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 twice (the NASA file and a CORE-repository copy with a cover page; the CORE copy
+    was deleted). Author list from the TM cover; check against p. 1.
+- file: docs/jet_mixing/Holdeman_Clisset_Moder_2011_NASA_TM-2011-215980_spreadsheet_opposed_slanted_slots.pdf
+  citation: 'Holdeman, J. D., Clisset, J. R., Moder, J. P. (2011). Spreadsheet calculation of jets in crossflow:
+    opposed rows of slots slanted at 45 deg. NASA/TM-2011-215980.'
+  id: NASA/TM-2011-215980 (NTRS 20120011165)
+  topic:
+  - jet_mixing
+  - combustion
+  content: 'Extends the NASA empirical jet-in-crossflow model (Excel spreadsheet of TM-2005-213137, as posted
+    with TM-2010-216100) to opposed rows of 45 deg slanted slots; fixes the lateral-translation function. Nomenclature
+    defines A_J/A_M, C = (S/H) sqrt(J), Cd. Conclusion: parallel staggered slanted slots mix best at any downstream
+    distance.'
+  status: screened
+  verdict: 'An extension; the empirical model itself is documented in TM-2005-213137 (on the wanted list).
+    combaero has no jet-mixing / dilution model and no issue yet; a jet-in-crossflow element is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/20120011165_2012010834.pdf.
+- file: docs/jet_mixing/Kroll_Sowa_Samuelsen_1993_NASA_TM-105984_round_jets_heated_crossflow_can.pdf
+  citation: Kroll, J. T., Sowa, W. A., Samuelsen, G. S. (1993). Optimization of circular orifice jets mixing
+    into a heated cross flow in a cylindrical duct. NASA TM-105984 / AIAA-93-0249.
+  id: NASA TM-105984; AIAA-93-0249 (NTRS 19930006170)
+  topic:
+  - jet_mixing
+  - combustion
+  content: Non-reacting temperature measurements downstream of a row of cold round jets into a heated cross
+    stream in a can (R 1.5 in), varying the number of orifices (Table 1 module configurations) at J 25 and
+    80 (MR 2.2, Cd 0.80 assumed); area-weighted standard deviation of mixture fraction as the mixedness metric;
+    optimum mixing when the mean trajectory lies near the mid-radius.
+  status: screened
+  verdict: 'A data report behind TM-107185''s can results (optimum orifice count vs J). combaero has no jet-mixing
+    / dilution model and no issue yet; a jet-in-crossflow element is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/19930006170.pdf.
+- file: docs/jet_mixing/Leong_Samuelsen_1995_NASA_TM-106975_jet_mixing_reacting_crossflow.pdf
+  citation: Leong, M. Y., Samuelsen, G. S. (1995). Jet mixing in a reacting cylindrical crossflow. NASA TM-106975
+    / AIAA-95-3109.
+  id: NASA TM-106975; AIAA-95-3109 (NTRS 19950024432)
+  topic:
+  - jet_mixing
+  - combustion
+  content: Air jets into fuel-rich propane products (RQL quick-mix), modules of 8, 9, 10 and 12 round holes
+    at J 57 and MR 2.5; O2, CO2, CO and HC profiles upstream, in and downstream of the orifice plane; the 12-hole
+    module mixes best.
+  status: screened
+  verdict: 'Reacting counterpart of Kroll et al.; species profiles only. combaero has no jet-mixing / dilution
+    model and no issue yet; a jet-in-crossflow element is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/19950024432.pdf.
+- file: docs/jet_mixing/Salewski_2006_PhD_Lund_LES_jets_sprays_crossflow.pdf
+  citation: Salewski, M. (2006). LES of jets and sprays injected into crossflow. Doctoral thesis (compilation),
+    Fluid Mechanics, Lund Institute of Technology.
+  topic:
+  - jet_mixing
+  content: LES (with Lagrangian particle tracking for sprays) of single jets and sprays in crossflow; compilation
+    thesis of the author's papers.
+  status: screened
+  verdict: CFD only, single-jet physics (counter-rotating vortex pair, spray dispersion); no correlation or
+    measured data a 1-D network could use. Background only.
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/thesis.pdf (120 pp.).
 - file: docs/junction/a-unified-method-for-estimating-pressure-losses-at-vascular-3elbvn7sno.pdf
   citation: Mynard, J. P., Valen-Sendstad, K. (?). A unified method for estimating pressure losses at
     vascular junctions. Int. J. Numer. Meth. Biomed. Engng. ?, 1-24.
@@ -2286,3 +2379,11 @@ wanted:
   question: Where the film reference temperature moves from the undiluted T_inf (used now) towards the mixed
     T.
   where: '?'
+- citation: Holdeman, J. D., Smith, T. D., Clisset, J. R., Lear, W. E. (2005). A spreadsheet for the mixing
+    of a row of jets with a confined crossflow. NASA/TM-2005-213137.
+  checked: false
+  issues: []
+  priority: later
+  question: The NASA empirical jet-in-crossflow mixing model itself (equations behind the spreadsheet that
+    TM-2011-215980 extends) -- the closure a 1-D dilution-mixing element would be built on.
+  where: NTRS (public).
