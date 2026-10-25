@@ -6969,6 +6969,36 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "Solver-facing (f, J) form: (eta, d eta/dM). M is the only input a\n"
         "network solve varies; the derivative is closed form.");
 
+  m.def("slot_film_effectiveness_marek_tacina_1975",
+        [](double x_over_S, double M, double Tu, double C_m_multiplier) {
+          return combaero::cooling::slot_film_effectiveness_marek_tacina_1975(
+              x_over_S, M, Tu, C_m_multiplier, nullptr);
+        },
+        py::arg("x_over_S"), py::arg("M"), py::arg("Tu"),
+        py::arg("C_m_multiplier") = 1.0,
+        "Film-cooling effectiveness downstream of a 2-D SLOT (a liner's\n"
+        "cooling ring), Juhasz-Marek mixing with C_m from turbulence.\n\n"
+        "Marek & Tacina (1975), NASA TN D-7958, Eqs. (4) and (5):\n"
+        "eta = 1/(1 + C_m x/(M S)), C_m = 0.25 Tu/100. eta = 1 at the lip.\n"
+        "Same eta convention as adiabatic_wall_temperature().\n\n"
+        "Parameters:\n"
+        "  x_over_S       : distance downstream of the slot lip / slot height, >= 0\n"
+        "  M              : blowing ratio rho_s U_s/(rho_H U_H), > 0\n"
+        "  Tu             : axial free-stream turbulence intensity [%] (7 to 35 run)\n"
+        "  C_m_multiplier : the user's rig-matching factor on C_m (1 = the\n"
+        "                   report's line; its band is 0.4 to 1.6). Never scored.\n\n"
+        "Outside the run's Tu, M or x/S span it warns and extrapolates.\n\n"
+        "Returns: eta [-]");
+
+  m.def("slot_film_effectiveness_marek_tacina_1975_and_derivatives",
+        [](double x_over_S, double M, double Tu, double C_m_multiplier) {
+          return combaero::cooling::slot_film_effectiveness_marek_tacina_1975_and_derivatives(
+              x_over_S, M, Tu, C_m_multiplier, nullptr);
+        },
+        py::arg("x_over_S"), py::arg("M"), py::arg("Tu"),
+        py::arg("C_m_multiplier") = 1.0,
+        "Solver-facing (f, J) form: (eta, d eta/dM). Closed form.");
+
   m.def("cooled_wall_heat_flux", &combaero::cooling::cooled_wall_heat_flux,
         py::arg("T_hot"), py::arg("T_coolant"), py::arg("h_hot"),
         py::arg("h_coolant"), py::arg("eta"), py::arg("t_wall"),

@@ -715,3 +715,39 @@ TEST(FilmSpanAverageGroups, RefusesMismatchedGroups) {
                                                            {1.6, 1.6}, 30.0, 7.0, 0.05),
                  std::invalid_argument);
 }
+
+// ---------------------------------------------------------------------------
+// Marek and Tacina (1975), 2-D slot, NASA TN D-7958 Eqs. (4) and (5).
+// Table I fidelity lives in python/tests/test_slot_film.py.
+// ---------------------------------------------------------------------------
+
+TEST(SlotFilmMarekTacina, IsEquationFourWithEquationFive) {
+    combaero::CorrelationStatus status;
+    const double eta =
+        cc::slot_film_effectiveness_marek_tacina_1975(15.0, 1.2, 14.0, 1.0, &status);
+    EXPECT_DOUBLE_EQ(eta, 1.0 / (1.0 + 0.0025 * 14.0 * 15.0 / 1.2));
+    EXPECT_EQ(status, combaero::CorrelationStatus::Valid);
+    EXPECT_DOUBLE_EQ(
+        cc::slot_film_effectiveness_marek_tacina_1975(0.0, 1.2, 14.0, 1.0, &status), 1.0);
+}
+
+TEST(SlotFilmMarekTacina, AnalyticDerivativeAgreesWithFiniteDifferences) {
+    combaero::CorrelationStatus status;
+    const double M = 0.9;
+    const auto [eta, d] = cc::slot_film_effectiveness_marek_tacina_1975_and_derivatives(
+        20.0, M, 23.0, 1.0, &status);
+    const double h = 1e-6;
+    const double fd = (cc::slot_film_effectiveness_marek_tacina_1975(20.0, M + h, 23.0, 1.0, &status) -
+                       cc::slot_film_effectiveness_marek_tacina_1975(20.0, M - h, 23.0, 1.0, &status)) /
+                      (2.0 * h);
+    EXPECT_GT(eta, 0.0);
+    EXPECT_NEAR(d, fd, 1e-7 * std::abs(fd));
+}
+
+TEST(SlotFilmMarekTacina, OutsideTheRunIsReportedNotEnforced) {
+    combaero::CorrelationStatus status;
+    cc::slot_film_effectiveness_marek_tacina_1975(10.0, 1.0, 50.0, 1.0, &status);
+    EXPECT_EQ(status, combaero::CorrelationStatus::Extrapolated);
+    EXPECT_THROW(cc::slot_film_effectiveness_marek_tacina_1975(10.0, -1.0, 14.0, 1.0, &status),
+                 std::invalid_argument);
+}

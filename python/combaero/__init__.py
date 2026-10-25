@@ -306,6 +306,8 @@ try:
         film_effectiveness_baldauf_2002_and_derivatives,
         film_effectiveness_colban_2011,
         film_effectiveness_colban_2011_and_derivatives,
+        slot_film_effectiveness_marek_tacina_1975,
+        slot_film_effectiveness_marek_tacina_1975_and_derivatives,
         cp,
         cp_mass,
         cp_secant_mass_and_jacobian,
@@ -1323,6 +1325,8 @@ __all__ = [
     "film_effectiveness_baldauf_2002_and_derivatives",
     "film_effectiveness_colban_2011",
     "film_effectiveness_colban_2011_and_derivatives",
+    "slot_film_effectiveness_marek_tacina_1975",
+    "slot_film_effectiveness_marek_tacina_1975_and_derivatives",
     # Channel flow (HTC + pressure drop)
     "ChannelResult",
     "channel_smooth",
