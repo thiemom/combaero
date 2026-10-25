@@ -1,0 +1,1 @@
+- A source register, `validation/sources.yaml`, with one entry per local reference document (126): citation, content, what it was read for, the verdict, and the issues, records and code that use it. `scripts/sources.py` searches it, lists by status or topic, and checks it (schema; unregistered local documents).
