@@ -156,3 +156,83 @@ if __name__ == "__main__":
     print("✅ Pressure dependence test completed")
 
     print("\\n🎉 All combustion Jacobian tests completed!")
+
+
+# --- #716: the composition derivatives are analytic --------------------------
+
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+
+import combaero as _cb  # noqa: E402
+from combaero import _solver_tools as _st  # noqa: E402
+
+_Y_AIR = list(_cb.mole_to_mass(_cb.species.dry_air()))
+_Y_CH4 = [0.0] * len(_Y_AIR)
+_Y_CH4[_cb.species_index_from_name("CH4")] = 1.0
+_X_AIR = _cb.species.dry_air()
+_M_ST = _X_AIR[_cb.species_index_from_name("O2")] / 2 * 16.043 / _cb.mwmix(_X_AIR)
+
+
+@pytest.mark.parametrize("method", ["complete", "equilibrium"])
+@pytest.mark.parametrize("phi", [0.6, 0.9, 1.0, 1.0002, 1.3, 1.6])
+def test_the_combustor_derivatives_match_central_differences(method: str, phi: float) -> None:
+    """dT and dY_products in each stream's flow and temperature, against
+    central differences (#716). The forward differences inside C++ were 123%
+    off across the phi = 1 softmin (complete) and up to 5-12% (equilibrium,
+    whose reforming Newton also stalled off its root near complete
+    reforming). Measured 2026-10-25: every entry within 7e-7."""
+    fn = (
+        _st.adiabatic_T_complete_and_jacobian_T_from_streams
+        if method == "complete"
+        else _st.adiabatic_T_equilibrium_and_jacobians_from_streams
+    )
+
+    def burn(ma: float, mf: float, Ta: float = 700.0):
+        s = [_cb.MassStream(ma, Ta, 2e5, _Y_AIR), _cb.MassStream(mf, 300.0, 2e5, _Y_CH4)]
+        return fn(s, 2e5, 0.0, 0.0)
+
+    mf = phi * _M_ST
+    r = burn(1.0, mf)
+    # Inside the complete model's phi = 1 softmin (about 1e-4 wide in phi, 6e-6
+    # kg/s of fuel here) the slope swings from +24000 to -7000 K/(kg/s): a step
+    # that resolves it is 1e-9.
+    in_band = method == "complete" and abs(phi - 1.0) < 1e-3
+    h, hT = (1e-9 if in_band else 1e-7), 1e-3
+    ico = _cb.species_index_from_name("CO" if method == "equilibrium" else "CO2")
+    checks = [
+        (r.dT_mix_d_stream[1].d_mdot, lambda d: burn(1.0, mf + d).T_mix, h),
+        (r.dT_mix_d_stream[0].d_mdot, lambda d: burn(1.0 + d, mf).T_mix, h),
+        (r.dT_mix_d_stream[0].d_T, lambda d: burn(1.0, mf, 700.0 + d).T_mix, hT),
+        (r.dY_mix_d_stream[ico][1].d_mdot, lambda d: burn(1.0, mf + d).Y_mix[ico], h),
+        (r.dY_mix_d_stream[ico][0].d_T, lambda d: burn(1.0, mf, 700.0 + d).Y_mix[ico], hT),
+    ]
+    for an, f, step in checks:
+        fd = (f(step) - f(-step)) / (2 * step)
+        assert an == pytest.approx(fd, rel=2e-6, abs=1e-9 * max(1.0, abs(fd))), (an, fd)
+
+
+def test_the_complete_products_jacobian_is_exact_and_conserves_atoms() -> None:
+    """dX_b/dX against central differences through phi = 1, and the oxygen
+    atoms balance inside the smoothing band (O2 left = X_O2 - f n_req)."""
+    names = [_cb.species_name(i) for i in range(_cb.num_species())]
+    X = np.array(_X_AIR)
+    iO2, iC, iN2 = names.index("O2"), names.index("CH4"), names.index("N2")
+    v = np.zeros(len(names))
+    v[iC], v[iN2] = 1.0, -1.0
+    for phi in (0.9, 0.99995, 1.0, 1.00005, 1.1):
+        xf = X[iO2] / 2 * phi
+        X0 = X / (1 + xf)
+        X0[iC] += xf / (1 + xf)
+        cj = _cb.complete_combustion_products_and_jacobian(X0)
+        h = 1e-9
+
+        def f(d: float, X0: np.ndarray = X0) -> np.ndarray:
+            return np.array(_cb.complete_combustion_products_and_jacobian(X0 + d * v).X_b)
+
+        fd = (f(h) - f(-h)) / (2 * h)
+        assert np.abs(np.array(cj.dXb_dX) @ v - fd).max() < 1e-6 * np.abs(fd).max(), phi
+        Xb = np.array(cj.X_b)
+        o_atoms = {"O2": 2, "CO2": 2, "H2O": 1}
+        o_in = sum(X0[names.index(k)] * w for k, w in o_atoms.items()) / X0[iN2]
+        o_out = sum(Xb[names.index(k)] * w for k, w in o_atoms.items()) / Xb[iN2]
+        assert o_out == pytest.approx(o_in, rel=1e-12), phi

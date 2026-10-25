@@ -3921,6 +3921,42 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Returns EquilibriumResult with equilibrium temperature and "
       "composition.");
 
+  // Analytic Jacobians of combustion (#716).
+  py::class_<combaero::CompleteCombustionJacobian>(m, "CompleteCombustionJacobian",
+                                                   "Complete combustion products and dX_b/dX")
+      .def_readonly("X_b", &combaero::CompleteCombustionJacobian::X_b)
+      .def_readonly("dXb_dX", &combaero::CompleteCombustionJacobian::dXb_dX);
+  m.def(
+      "complete_combustion_products_and_jacobian",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr, bool smooth_phi0,
+         bool smooth_phi1, double k0, double k1) {
+        return combaero::complete_combustion_products_and_jacobian(to_vec(X_arr), smooth_phi0,
+                                                                   smooth_phi1, k0, k1);
+      },
+      py::arg("X"), py::arg("smooth_phi0") = true, py::arg("smooth_phi1") = true,
+      py::arg("k0") = combaero::SMOOTHING_K_PHI0, py::arg("k1") = combaero::SMOOTHING_K_PHI1,
+      "Complete combustion to CO2 and H2O with the analytic Jacobian of the\n"
+      "product mole fractions in the reactant ones, dXb_dX[j][k].");
+  py::class_<combaero::EquilibriumJacobian>(m, "EquilibriumJacobian",
+                                            "Combustion equilibrium with analytic derivatives")
+      .def_readonly("state", &combaero::EquilibriumJacobian::state)
+      .def_readonly("dT_dT_in", &combaero::EquilibriumJacobian::dT_dT_in)
+      .def_readonly("dT_dP", &combaero::EquilibriumJacobian::dT_dP)
+      .def_readonly("dT_dX", &combaero::EquilibriumJacobian::dT_dX)
+      .def_readonly("dXout_dX", &combaero::EquilibriumJacobian::dXout_dX)
+      .def_readonly("dXout_dT_in", &combaero::EquilibriumJacobian::dXout_dT_in)
+      .def_readonly("dXout_dP", &combaero::EquilibriumJacobian::dXout_dP);
+  m.def(
+      "combustion_equilibrium_and_jacobian",
+      [make_state](double T, py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+                   double P, bool smooth, double k0) {
+        return combaero::combustion_equilibrium_and_jacobian(make_state(T, P, X_arr), smooth, k0);
+      },
+      py::arg("T"), py::arg("X"), py::arg("P") = 101325.0, py::arg("smooth") = true,
+      py::arg("k0") = combaero::SMOOTHING_K_PHI0,
+      "combustion_equilibrium with analytic derivatives of T and the product\n"
+      "mole fractions in the reactant T, P and X (implicit in the extents).");
+
   // Combustion + Equilibrium (convenience function)
   m.def(
       "combustion_equilibrium",

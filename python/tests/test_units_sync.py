@@ -51,6 +51,8 @@ IGNORE_LIST = {
     "AreaChangeLoss",
     "AreaChangeFlow",
     "AreaChangeElementFlow",
+    "CompleteCombustionJacobian",
+    "EquilibriumJacobian",
     "BordaCarnotStep",
     "TeeJunctionResult",
     "BranchInput",

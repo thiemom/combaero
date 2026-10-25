@@ -551,6 +551,10 @@ try:
         area_change_loss,
         area_change_flow,
         area_change_element_flow,
+        complete_combustion_products_and_jacobian,
+        combustion_equilibrium_and_jacobian,
+        CompleteCombustionJacobian,
+        EquilibriumJacobian,
         # Channel/circular functions
         htc_circular_channel,
         nusselt_circular_channel,
@@ -709,6 +713,10 @@ except (ModuleNotFoundError, ImportError) as e:
     area_change_loss = _core.area_change_loss
     area_change_flow = _core.area_change_flow
     area_change_element_flow = _core.area_change_element_flow
+    complete_combustion_products_and_jacobian = _core.complete_combustion_products_and_jacobian
+    combustion_equilibrium_and_jacobian = _core.combustion_equilibrium_and_jacobian
+    CompleteCombustionJacobian = _core.CompleteCombustionJacobian
+    EquilibriumJacobian = _core.EquilibriumJacobian
     AreaChangeElementFlow = _core.AreaChangeElementFlow
     # Compressible flow
     CompressibleFlowSolution = _core.CompressibleFlowSolution
@@ -923,6 +931,10 @@ except (ModuleNotFoundError, ImportError) as e:
     area_change_loss = _core.area_change_loss
     area_change_flow = _core.area_change_flow
     area_change_element_flow = _core.area_change_element_flow
+    complete_combustion_products_and_jacobian = _core.complete_combustion_products_and_jacobian
+    combustion_equilibrium_and_jacobian = _core.combustion_equilibrium_and_jacobian
+    CompleteCombustionJacobian = _core.CompleteCombustionJacobian
+    EquilibriumJacobian = _core.EquilibriumJacobian
     AreaChangeElementFlow = _core.AreaChangeElementFlow
 
 # Terminology aliases - always available
@@ -1555,6 +1567,10 @@ __all__ = [
     "area_change_loss",
     "area_change_flow",
     "area_change_element_flow",
+    "complete_combustion_products_and_jacobian",
+    "combustion_equilibrium_and_jacobian",
+    "CompleteCombustionJacobian",
+    "EquilibriumJacobian",
     "AreaChangeElementFlow",
     # Vatistas n-vortex model
     "vatistas_v0_bar",

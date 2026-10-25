@@ -530,101 +530,81 @@ P0_from_static_and_jacobian_M(double P, double T, double M,
 // 6. Combustion Interfaces
 // -----------------------------------------------------------------------------
 
+namespace {
+
+// Complete combustion at constant enthalpy with analytic derivatives (#716):
+// h(T_ad, X_b) = h(T_in, X_in) MW_b / MW_in (molar h, mass conserved), so
+//   dT_ad/dT_in = cp(T_in, X_in) (MW_b / MW_in) / cp(T_ad, X_b),
+//   dT_ad/dX_k  = -[sum_j h_j(T_ad) dXb_jk - d(h_in MW_b / MW_in)/dX_k] / cp_b,
+// with dXb/dX from complete_combustion_products_and_jacobian. X is taken
+// unnormalised (chain with a dX keeping sum X = 1).
+struct CompleteAdiabatic {
+  double T_ad = 0.0;
+  std::vector<double> X_b;
+  double dT_dTin = 0.0;
+  std::vector<double> dT_dX;
+  std::vector<std::vector<double>> dXb_dX;
+};
+
+CompleteAdiabatic complete_adiabatic(double T_in, double P, const std::vector<double> &X_in) {
+  // Clamp to a safe physical floor instead of throwing: the solver may probe
+  // unphysical intermediates; below the floor T_in has no effect.
+  const bool clamped = T_in < thermo::T_FLOOR;
+  T_in = std::max(T_in, thermo::T_FLOOR);
+  P = std::max(P, 100.0);
+  const std::size_t ns = X_in.size();
+  CompleteAdiabatic out;
+  const CompleteCombustionJacobian pj = combaero::complete_combustion_products_and_jacobian(X_in);
+  out.X_b = pj.X_b;
+  out.dXb_dX = pj.dXb_dX;
+  State in_state;
+  in_state.set_TPX(T_in, P, X_in);
+  out.T_ad = combaero::complete_combustion(in_state, true, true).T;
+
+  const double mw_in = combaero::mwmix(X_in);
+  const double mw_b = combaero::mwmix(out.X_b);
+  const double h_in = combaero::h(T_in, X_in);
+  const double cp_b = combaero::cp(out.T_ad, out.X_b);
+  out.dT_dTin = clamped ? 0.0 : combaero::cp(T_in, X_in) * (mw_b / mw_in) / cp_b;
+  std::vector<double> h_ad(ns), W(ns);
+  for (std::size_t j = 0; j < ns; ++j) {
+    h_ad[j] = combaero::h_species(j, out.T_ad);
+    W[j] = combaero::species_molar_mass(j);
+  }
+  out.dT_dX.assign(ns, 0.0);
+  for (std::size_t k = 0; k < ns; ++k) {
+    double dhb = 0.0, dmwb = 0.0;
+    for (std::size_t j = 0; j < ns; ++j) {
+      dhb += h_ad[j] * out.dXb_dX[j][k];
+      dmwb += W[j] * out.dXb_dX[j][k];
+    }
+    const double dtarget = combaero::h_species(k, T_in) * mw_b / mw_in + h_in * dmwb / mw_in -
+                           h_in * mw_b * W[k] / (mw_in * mw_in);
+    out.dT_dX[k] = -(dhb - dtarget) / cp_b;
+  }
+  return out;
+}
+
+}  // namespace
+
 std::tuple<double, double, std::vector<double>>
 adiabatic_T_complete_and_jacobian_T(double T_in, double P,
                                      const std::vector<double> &X_in) {
-  // Clamp to safe physical floor instead of throwing: the solver may
-  // probe unphysical (T<=0, P<=0) intermediates during Newton steps.
-  // Clamping keeps residuals finite with correct gradient direction so
-  // the trust-region can step back toward physical territory.
-  T_in = std::max(T_in, thermo::T_FLOOR);
-  P = std::max(P, 100.0);
-
-  State in_state;
-  in_state.set_TPX(T_in, P, X_in);
-  State out_state = combaero::complete_combustion(in_state, true, true);
-  double T_ad = out_state.T;
-  std::vector<double> X_products = out_state.X;
-
-  // Jacobian wrt T_in via Central Finite Difference with smooth floor
-  double dT_eps = std::max(1e-3, T_in * 1e-4);
-
-  // Smooth floor at thermo::T_FLOOR (the gas is ideal to 0 K below the data)
-  const double T_limit = thermo::T_FLOOR;
-  constexpr double delta_T = 1e-3;
-  double T_target_minus = T_in - dT_eps;
-  double diff_T = T_target_minus - T_limit;
-  double sq_dist_T = std::sqrt(diff_T * diff_T + delta_T);
-  double T_minus = 0.5 * (T_target_minus + T_limit + sq_dist_T);
-  double T_plus = T_in + dT_eps;
-  double actual_dT = T_plus - T_minus;
-
-  State in_plus, in_minus;
-  in_plus.set_TPX(T_plus, P, X_in);
-  in_minus.set_TPX(T_minus, P, X_in);
-
-  double T_ad_plus = combaero::complete_combustion(in_plus, true, true).T;
-  double T_ad_minus = combaero::complete_combustion(in_minus, true, true).T;
-
-  double dT_ad_dT_in = (T_ad_plus - T_ad_minus) / actual_dT;
-
-  return {T_ad, dT_ad_dT_in, X_products};
+  const CompleteAdiabatic c = complete_adiabatic(T_in, P, X_in);
+  return {c.T_ad, c.dT_dTin, c.X_b};
 }
 
 std::tuple<double, double, double, std::vector<double>>
 adiabatic_T_equilibrium_and_jacobians(double T_in, double P,
                                        const std::vector<double> &X_in) {
+  const bool clamped = T_in < thermo::T_FLOOR;
   T_in = std::max(T_in, thermo::T_FLOOR);
   P = std::max(P, 100.0);
-
   State in_state;
   in_state.set_TPX(T_in, P, X_in);
-  // Combustion Equilibrium
-  EquilibriumResult eq_res = combaero::combustion_equilibrium(in_state);
-  double T_ad = eq_res.state.T;
-  std::vector<double> X_products = eq_res.state.X;
-
-  // Jacobians via Central Finite Difference with smooth floor clamping
-  double dT_eps = std::max(1e-3, T_in * 1e-4);
-  double dP_eps = std::max(1.0, P * 1e-4);
-
-  // wrt T_in: smooth floor at thermo::T_FLOOR
-  const double T_limit = thermo::T_FLOOR;
-  constexpr double delta_T = 1e-3;
-  double T_target_minus = T_in - dT_eps;
-  double diff_T = T_target_minus - T_limit;
-  double sq_dist_T = std::sqrt(diff_T * diff_T + delta_T);
-  double T_minus = 0.5 * (T_target_minus + T_limit + sq_dist_T);
-  double T_plus = T_in + dT_eps;
-  double actual_dT = T_plus - T_minus;
-
-  State in_T_plus, in_T_minus;
-  in_T_plus.set_TPX(T_plus, P, X_in);
-  in_T_minus.set_TPX(T_minus, P, X_in);
-
-  double T_ad_T_plus = combaero::combustion_equilibrium(in_T_plus).state.T;
-  double T_ad_T_minus = combaero::combustion_equilibrium(in_T_minus).state.T;
-  double dT_ad_dT_in = (T_ad_T_plus - T_ad_T_minus) / actual_dT;
-
-  // wrt P: smooth floor to avoid negative pressure
-  constexpr double P_limit = 1.0;
-  constexpr double delta_P = 1e-3;
-  double P_target_minus = P - dP_eps;
-  double diff_P = P_target_minus - P_limit;
-  double sq_dist_P = std::sqrt(diff_P * diff_P + delta_P);
-  double P_minus = 0.5 * (P_target_minus + P_limit + sq_dist_P);
-  double P_plus = P + dP_eps;
-  double actual_dP = P_plus - P_minus;
-
-  State in_P_plus, in_P_minus;
-  in_P_plus.set_TPX(T_in, P_plus, X_in);
-  in_P_minus.set_TPX(T_in, P_minus, X_in);
-
-  double T_ad_P_plus = combaero::combustion_equilibrium(in_P_plus).state.T;
-  double T_ad_P_minus = combaero::combustion_equilibrium(in_P_minus).state.T;
-  double dT_ad_dP = (T_ad_P_plus - T_ad_P_minus) / actual_dP;
-
-  return {T_ad, dT_ad_dT_in, dT_ad_dP, X_products};
+  // Analytic (#716): implicit in the equilibrium extents and the adiabatic root.
+  const EquilibriumJacobian ej = combaero::combustion_equilibrium_and_jacobian(in_state);
+  return {ej.state.T, clamped ? 0.0 : ej.dT_dT_in, ej.dT_dP, ej.state.X};
 }
 
 // -----------------------------------------------------------------------------
@@ -904,11 +884,10 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
-  auto complete_res =
-      adiabatic_T_complete_and_jacobian_T(mix.T_mix, P, X_mix);
-  double T_ad = std::get<0>(complete_res);
-  double dT_ad_dT_mix = std::get<1>(complete_res);
-  std::vector<double> X_b = std::get<2>(complete_res);
+  const CompleteAdiabatic cad = complete_adiabatic(mix.T_mix, P, X_mix);
+  double T_ad = cad.T_ad;
+  double dT_ad_dT_mix = cad.dT_dTin;
+  std::vector<double> X_b = cad.X_b;
   std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
   // Post-combustion enthalpy shift: h_out = h_ad + Q/m + f (h_ad - h_ref_b),
@@ -948,24 +927,44 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
 
   std::size_t n_streams = streams.size();
 
+  (void)T_ad_base;
+  // Analytic (#716): X_mix(Y_mix) and Y_b(X_b) chained around dX_b/dX_mix.
+  //   dX_i/dY_m = (delta_im - X_i) / (W_m S),  S = sum_l Y_l / W_l;
+  //   dY_j/dX_l = (delta_jl W_j - Y_j W_l) / MW_b.
   std::vector<double> dT_ad_dY_mix(n_species, 0.0);
   std::vector<std::vector<double>> dYb_dY_mix(
       n_species, std::vector<double>(n_species, 0.0));
-  const double eps_Y = 1e-6;
-
-  for (std::size_t k = 0; k < n_species; ++k) {
-    std::vector<double> Y_p = mix.Y_mix;
-    Y_p[k] += eps_Y;
-    std::vector<double> X_p = combaero::mass_to_mole(combaero::normalize_fractions(Y_p));
-    auto cp_res =
-        adiabatic_T_complete_and_jacobian_T(mix.T_mix, P, X_p);
-    double T_ad_p = std::get<0>(cp_res);
-    std::vector<double> X_b_p = std::get<2>(cp_res);
-    std::vector<double> Y_b_p = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p));
-
-    dT_ad_dY_mix[k] = (T_ad_p - T_ad_base) / eps_Y;
-    for (std::size_t j = 0; j < n_species; ++j) {
-      dYb_dY_mix[j][k] = (Y_b_p[j] - Y_b[j]) / eps_Y;
+  {
+    std::vector<double> W(n_species);
+    double S = 0.0;
+    const std::vector<double> Ym = combaero::normalize_fractions(mix.Y_mix);
+    for (std::size_t m = 0; m < n_species; ++m) {
+      W[m] = combaero::species_molar_mass(m);
+      S += Ym[m] / W[m];
+    }
+    const double mw_b = combaero::mwmix(X_b);
+    // dXb/dY_m = sum_k dXb/dX_k dX_k/dY_m, then to Y_b.
+    for (std::size_t m = 0; m < n_species; ++m) {
+      std::vector<double> dX(n_species);
+      for (std::size_t i = 0; i < n_species; ++i) {
+        dX[i] = (((i == m) ? 1.0 : 0.0) - X_mix[i]) / (W[m] * S);
+      }
+      double dT = 0.0;
+      std::vector<double> dXb(n_species, 0.0);
+      for (std::size_t k = 0; k < n_species; ++k) {
+        dT += cad.dT_dX[k] * dX[k];
+        for (std::size_t l = 0; l < n_species; ++l) {
+          dXb[l] += cad.dXb_dX[l][k] * dX[k];
+        }
+      }
+      dT_ad_dY_mix[m] = dT;
+      double wdx = 0.0;
+      for (std::size_t l = 0; l < n_species; ++l) {
+        wdx += W[l] * dXb[l];
+      }
+      for (std::size_t j = 0; j < n_species; ++j) {
+        dYb_dY_mix[j][m] = (W[j] * dXb[j] - Y_b[j] * wdx) / mw_b;
+      }
     }
   }
 
@@ -1092,11 +1091,13 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
-  auto eq_base_res =
-      adiabatic_T_equilibrium_and_jacobians(mix.T_mix, P, X_mix);
-  double T_ad = std::get<0>(eq_base_res);
-  double dT_ad_dT_mix = std::get<1>(eq_base_res);
-  std::vector<double> X_b = std::get<3>(eq_base_res);
+  const bool T_clamped = mix.T_mix < thermo::T_FLOOR;
+  State eq_in;
+  eq_in.set_TPX(std::max(mix.T_mix, thermo::T_FLOOR), std::max(P, 100.0), X_mix);
+  const EquilibriumJacobian ej = combaero::combustion_equilibrium_and_jacobian(eq_in);
+  double T_ad = ej.state.T;
+  double dT_ad_dT_mix = T_clamped ? 0.0 : ej.dT_dT_in;
+  std::vector<double> X_b = ej.state.X;
   std::vector<double> Y_b = combaero::mole_to_mass(combaero::normalize_fractions(X_b));
 
   // Post-combustion enthalpy shift: h_out = h_ad + Q/m + f (h_ad - h_ref_b),
@@ -1136,36 +1137,46 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
 
   std::size_t n_streams = streams.size();
 
+  (void)T_ad_base;
+  // Analytic (#716): X_mix(Y_mix) and Y_b(X_b) chained around the
+  // equilibrium's dX_out/dX and dX_out/dT_in.
+  //   dX_i/dY_m = (delta_im - X_i) / (W_m S),  S = sum_l Y_l / W_l;
+  //   dY_j/dX_l = (delta_jl W_j - Y_j W_l) / MW_b.
   std::vector<double> dT_ad_dY_mix(n_species, 0.0);
   std::vector<std::vector<double>> dYb_dY_mix(
       n_species, std::vector<double>(n_species, 0.0));
   std::vector<double> dYb_dT_mix(n_species, 0.0);
-  const double eps_Y = 1e-4;
-  const double eps_T = 2.0;
-
-  for (std::size_t k = 0; k < n_species; ++k) {
-    std::vector<double> Y_p = mix.Y_mix;
-    Y_p[k] += eps_Y;
-    std::vector<double> X_p = combaero::mass_to_mole(combaero::normalize_fractions(Y_p));
-    auto eq_p_res =
-        adiabatic_T_equilibrium_and_jacobians(mix.T_mix, P, X_p);
-    double T_ad_p = std::get<0>(eq_p_res);
-    std::vector<double> X_b_p = std::get<3>(eq_p_res);
-    std::vector<double> Y_b_p = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p));
-
-    dT_ad_dY_mix[k] = (T_ad_p - T_ad_base) / eps_Y;
-    for (std::size_t j = 0; j < n_species; ++j) {
-      dYb_dY_mix[j][k] = (Y_b_p[j] - Y_b[j]) / eps_Y;
+  {
+    std::vector<double> W(n_species);
+    double S = 0.0;
+    const std::vector<double> Ym = combaero::normalize_fractions(mix.Y_mix);
+    for (std::size_t m = 0; m < n_species; ++m) {
+      W[m] = combaero::species_molar_mass(m);
+      S += Ym[m] / W[m];
     }
-  }
-
-  // dY_b/dT_mix: equilibrium products shift with inlet enthalpy/temperature
-  auto eq_T_res =
-      adiabatic_T_equilibrium_and_jacobians(mix.T_mix + eps_T, P, X_mix);
-  std::vector<double> X_b_p_T = std::get<3>(eq_T_res);
-  std::vector<double> Y_b_p_T = combaero::mole_to_mass(combaero::normalize_fractions(X_b_p_T));
-  for (std::size_t j = 0; j < n_species; ++j) {
-    dYb_dT_mix[j] = (Y_b_p_T[j] - Y_b[j]) / eps_T;
+    const double mw_b = combaero::mwmix(X_b);
+    auto to_Y = [&](const std::vector<double> &dXb, std::size_t j) {
+      double wdx = 0.0;
+      for (std::size_t l = 0; l < n_species; ++l) wdx += W[l] * dXb[l];
+      return (W[j] * dXb[j] - Y_b[j] * wdx) / mw_b;
+    };
+    for (std::size_t m = 0; m < n_species; ++m) {
+      std::vector<double> dX(n_species);
+      for (std::size_t i = 0; i < n_species; ++i) {
+        dX[i] = (((i == m) ? 1.0 : 0.0) - X_mix[i]) / (W[m] * S);
+      }
+      double dT = 0.0;
+      std::vector<double> dXb(n_species, 0.0);
+      for (std::size_t k = 0; k < n_species; ++k) {
+        dT += ej.dT_dX[k] * dX[k];
+        for (std::size_t l = 0; l < n_species; ++l) dXb[l] += ej.dXout_dX[l][k] * dX[k];
+      }
+      dT_ad_dY_mix[m] = dT;
+      for (std::size_t j = 0; j < n_species; ++j) dYb_dY_mix[j][m] = to_Y(dXb, j);
+    }
+    if (!T_clamped) {
+      for (std::size_t j = 0; j < n_species; ++j) dYb_dT_mix[j] = to_Y(ej.dXout_dT_in, j);
+    }
   }
 
   // Scale adiabatic derivatives by dT_out/dT_ad for post-combustion shift,

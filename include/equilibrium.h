@@ -2,6 +2,7 @@
 #define EQUILIBRIUM_H
 
 #include "state.h"
+#include <vector>
 #include "combustion.h"
 
 namespace combaero {
@@ -34,6 +35,24 @@ EquilibriumResult reforming_equilibrium_adiabatic(const State &in);
 EquilibriumResult combustion_equilibrium(const State &reactants,
                                          bool smooth_phi0 = true,
                                          double k0 = SMOOTHING_K_PHI0);
+
+// combustion_equilibrium with analytic derivatives (#716): implicit in each
+// stage's extent (reforming per hydrocarbon, WGS) and in the adiabatic root,
+// chained through complete_combustion_products_and_jacobian. X is taken
+// unnormalised (chain with a dX that keeps sum X = 1). An extent on a bound
+// takes the bound's derivative.
+struct EquilibriumJacobian {
+    State state;                                // as combustion_equilibrium
+    double dT_dT_in = 0.0;
+    double dT_dP = 0.0;
+    std::vector<double> dT_dX;                  // [reactant k]
+    std::vector<std::vector<double>> dXout_dX;  // [product j][reactant k]
+    std::vector<double> dXout_dT_in;
+    std::vector<double> dXout_dP;
+};
+EquilibriumJacobian combustion_equilibrium_and_jacobian(const State &reactants,
+                                                        bool smooth_phi0 = true,
+                                                        double k0 = SMOOTHING_K_PHI0);
 
 } // namespace combaero
 

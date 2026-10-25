@@ -1,0 +1,6 @@
+- **Combustion composition derivatives are analytic (#716).**
+  - **Complete combustion:** the products' Jacobian comes from the same code as their value (`complete_combustion_products_and_jacobian`), and T_ad's from the enthalpy balance. The forward difference inside C++ (eps 1e-6) read dT/dm_fuel 123% off at the phi = 1 softmin.
+  - **Equilibrium:** implicit in each stage's extent and in the adiabatic root (`combustion_equilibrium_and_jacobian`). The forward differences (eps 1e-4 in Y, 2 K in T) were 4e-4 to 1e-3 off, and up to 12% in the product CO.
+  - **Measured:** every combustor derivative within 7e-7 of central differences, phi 0.6-1.6.
+- **The reforming equilibrium reaches its root near complete reforming (#716).** Its Newton took a finite-difference slope with an absolute step of 1e-8 mol, larger than the hydrocarbon left, and stalled off the root (a residual of -35 in ln Q at phi 0.9). It now uses the analytic slope inside a bracket. Only sub-ppm species move; T_ad is unchanged to 0.01 K.
+- **Smoothed complete combustion conserves atoms inside its phi = 1 band (#716).** The O2 left is X_O2 - f n_req at every r, and the softmin applies on both sides of r = 1. Values move by at most about ln(2)/k (3.5e-5 of the fuel), within 1e-3 of phi = 1.
