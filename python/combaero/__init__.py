@@ -544,7 +544,7 @@ try:
         sharp_area_change,
         conical_area_change,
         sudden_expansion_zeta,
-        sharp_contraction_zeta,
+        sudden_contraction_zeta,
         conical_diffuser_zeta,
         conical_nozzle_zeta,
         compressible_borda_carnot,
@@ -702,7 +702,7 @@ except (ModuleNotFoundError, ImportError) as e:
     AreaChangeFlow = _core.AreaChangeFlow
     BordaCarnotStep = _core.BordaCarnotStep
     sudden_expansion_zeta = _core.sudden_expansion_zeta
-    sharp_contraction_zeta = _core.sharp_contraction_zeta
+    sudden_contraction_zeta = _core.sudden_contraction_zeta
     conical_diffuser_zeta = _core.conical_diffuser_zeta
     conical_nozzle_zeta = _core.conical_nozzle_zeta
     compressible_borda_carnot = _core.compressible_borda_carnot
@@ -916,7 +916,7 @@ except (ModuleNotFoundError, ImportError) as e:
     AreaChangeFlow = _core.AreaChangeFlow
     BordaCarnotStep = _core.BordaCarnotStep
     sudden_expansion_zeta = _core.sudden_expansion_zeta
-    sharp_contraction_zeta = _core.sharp_contraction_zeta
+    sudden_contraction_zeta = _core.sudden_contraction_zeta
     conical_diffuser_zeta = _core.conical_diffuser_zeta
     conical_nozzle_zeta = _core.conical_nozzle_zeta
     compressible_borda_carnot = _core.compressible_borda_carnot
@@ -1548,7 +1548,7 @@ __all__ = [
     "AreaChangeFlow",
     "BordaCarnotStep",
     "sudden_expansion_zeta",
-    "sharp_contraction_zeta",
+    "sudden_contraction_zeta",
     "conical_diffuser_zeta",
     "conical_nozzle_zeta",
     "compressible_borda_carnot",

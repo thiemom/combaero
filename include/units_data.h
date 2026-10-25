@@ -661,9 +661,10 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     {"sudden_expansion_zeta", "Re: -, area_ratio: -",
      "tuple (zeta: -, dzeta_dRe: -)"},
-    {"sharp_contraction_zeta", "area_ratio: -", "-"},
+    {"sudden_contraction_zeta", "Re: -, area_ratio: -",
+     "tuple (zeta: -, dzeta_dRe: -)"},
     {"conical_diffuser_zeta", "full_angle_deg: deg, area_ratio: -", "-"},
-    {"conical_nozzle_zeta", "half_angle_rad: rad, area_ratio: -", "-"},
+    {"conical_nozzle_zeta", "full_angle_deg: deg, length_over_D: -, area_ratio: -", "-"},
     {"compressible_borda_carnot", "M1: -, area_ratio: -, gamma: -",
      "BordaCarnotStep (M2: -, pt_ratio: -, dpt_dM1: -, dpt_dgamma: -)"},
     {"area_change_loss",

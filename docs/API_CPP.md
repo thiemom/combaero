@@ -624,7 +624,7 @@ double channel_dP(double v, double L, double D, double f, double rho);
 ## Area Change (area_change.h)
 
 Sudden and conical expansions and contractions (#731). The closures are
-Idelchik's (1966; diagrams 4-1, 3-9, 5-2, transcribed in
+Idelchik's (1966; diagrams 4-1, 3-6/3-7, 3-9, 3-10, 5-2, transcribed in
 `validation/area_change/`), every zeta on the small section's dynamic head
 and Re there; n is the small area over the large one. Mach enters through the
 control volume the closures come from: an expansion is the compressible
@@ -636,9 +636,10 @@ drive floor; the measurements are in `python/tests/test_area_change.py`.
 ```cpp
 struct ZetaAndSlope { double zeta, dzeta_dRe; };
 ZetaAndSlope sudden_expansion_zeta(double Re, double area_ratio);  // 4-1, C1 in Re
-double sharp_contraction_zeta(double area_ratio);                  // 3-9: 0.5 (1 - n)
+ZetaAndSlope sudden_contraction_zeta(double Re, double area_ratio);  // 3-10, 3-9, C1 in Re
 double conical_diffuser_zeta(double full_angle_deg, double area_ratio);  // 5-2
-double conical_nozzle_zeta(double half_angle_rad, double area_ratio);    // not sourced
+double conical_nozzle_zeta(double full_angle_deg, double length_over_D,
+                           double area_ratio);                // 3-7 with 3-6
 
 struct BordaCarnotStep { double M2, pt_ratio, dpt_dM1, dpt_dgamma; };
 BordaCarnotStep compressible_borda_carnot(double M1, double area_ratio, double gamma);

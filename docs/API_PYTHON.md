@@ -1533,9 +1533,9 @@ is a sudden or conical expansion or contraction from face `F0` to `F1` (#731).
 
 - **Closures: Idelchik (1966),** transcribed in `validation/area_change/` and scored on every printed cell (`python/tests/test_area_change.py`):
   - sudden expansion, diagram 4-1: `cb.sudden_expansion_zeta(Re, n)` returns `(zeta, dzeta_dRe)`. It is 26/Re below Re 8, a C1 interpolation of the printed table to Re 3500, and Borda-Carnot `(1 - n)^2` above. Three of the 78 printed cells move: two to keep the loss rising with the flow (n 0.6 and 0.5 at Re 2000), and one rounded Borda-Carnot value;
-  - sharp contraction, diagram 3-9: `0.5 (1 - n)`;
+  - sharp contraction, diagrams 3-10 and 3-9: `cb.sudden_contraction_zeta(Re, n)`: 27/Re below Re 8, Karev's table (every printed cell) to Re 1e4, `0.5 (1 - n)` above;
   - conical diffuser, diagram 5-2: `cb.conical_diffuser_zeta(full_angle_deg, n)`, exact at every printed cell. Friction is not included;
-  - the conical nozzle `C_con (1 - n)` is **not sourced** (no Idelchik diagram transcribed).
+  - conical contraction, diagram 3-7: `cb.conical_nozzle_zeta(full_angle_deg, l/D, n)` = zeta' (1 - n), zeta' from diagram 3-6 (exact at every printed cell). Friction is not included.
 - **Mach.** The tables are incompressible; the element carries them by their control volume.
   - An expansion is the compressible Borda-Carnot step (`cb.compressible_borda_carnot`) times the table's ratio to it. At n 0.8 and M 0.62 that is 1.62x Borda-Carnot.
   - A contraction is a vena contracta re-expanding by the same step. It chokes, and the element's flow then stays at the sonic flow.

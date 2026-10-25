@@ -54,8 +54,18 @@ Not transcribed:
 - **3-10:** the last column is 0.5 (1 - n) to two decimals, Re 10 prints
   5.00 at every ratio, and at every Re a larger ratio loses no more.
 
+## Scored (2026-10-25, #731)
+
+The closures implement these diagrams (`include/area_change.h`), and
+`python/tests/test_area_change.py` scores every printed cell:
+
+- **3-10:** all 78 cells used are exact. Column 14 is the high-Re 0.5 (1 - n) anchor; column 13 is not used.
+- **3-6 through 3-7:** all 54 cells exact.
+- **Monotone without regularisation:** every 3-10 secant exponent of zeta Re^2 is 0.95 or more, and the interpolation's smallest local exponent is 0.857.
+
 ## Review log
 
 - 2026-10-25: transcribed from the page images; the two data tests pass.
 - 2026-10-25: the user checked both tables against the pages and signed them
   off, the high-Re reading of 3-10's last column included.
+- 2026-10-25: the closures implemented and scored (#731, above).
