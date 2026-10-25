@@ -66,15 +66,19 @@ template <int N> DualN<N> lift(double f, double slope, const DualN<N>& a) {
 
 // --- Idelchik (1966) diagram 4-1, sudden expansion at low Re -----------------
 
-constexpr std::size_t kExpCols = 6;
-constexpr std::size_t kExpKnots = 14;  // the laminar knot at Re 8 + 13 printed
-constexpr std::array<double, kExpCols> kExpN = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6};
-constexpr std::array<double, kExpKnots> kExpRe = {8.0,   10.0,  15.0,   20.0,   30.0,
-                                                  40.0,  50.0,  100.0,  200.0,  500.0,
-                                                  1000.0, 2000.0, 3000.0, 3500.0};
-// As printed, Re 10 ... 3500. The 3500 column is Borda-Carnot rounded to two
-// decimals (0.50 for 0.49 at n 0.3); the knot takes (1 - n)^2 exactly.
-constexpr double kExpZeta[kExpCols][kExpKnots - 1] = {
+// Both low-Re tables print 6 area ratios (0.1 ... 0.6) and, with the laminar
+// knot at Re 8, 14 Reynolds numbers.
+constexpr std::size_t kCols = 6;
+constexpr std::size_t kKnots = 14;
+constexpr std::array<double, kCols> kTableN = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6};
+
+// Diagram 4-1, sudden expansion: as printed, Re 10 ... 3500. The 3500 column
+// is Borda-Carnot rounded to two decimals (0.50 for 0.49 at n 0.3); the knot
+// takes (1 - n)^2 exactly.
+constexpr std::array<double, kKnots> kExpRe = {8.0,    10.0,   15.0,   20.0,  30.0,
+                                               40.0,   50.0,   100.0,  200.0, 500.0,
+                                               1000.0, 2000.0, 3000.0, 3500.0};
+constexpr double kExpZeta[kCols][kKnots - 1] = {
     {3.10, 3.20, 3.00, 2.40, 2.15, 1.95, 1.70, 1.65, 1.70, 2.00, 1.60, 1.00, 0.81},
     {3.10, 3.20, 2.80, 2.20, 1.85, 1.65, 1.40, 1.30, 1.30, 1.60, 1.25, 0.70, 0.64},
     {3.10, 3.10, 2.60, 2.00, 1.60, 1.40, 1.20, 1.10, 1.10, 1.30, 0.95, 0.60, 0.50},
@@ -83,42 +87,74 @@ constexpr double kExpZeta[kExpCols][kExpKnots - 1] = {
     {3.10, 2.70, 2.15, 1.55, 1.25, 1.05, 0.80, 0.60, 0.40, 0.60, 0.50, 0.20, 0.16},
 };
 
-// One column as a cubic Hermite of y = ln(zeta Re^2) in x = ln Re.
-struct HermiteColumn {
-    std::array<double, kExpKnots> x{};
-    std::array<double, kExpKnots> y{};
-    std::array<double, kExpKnots> d{};
+// Diagram 3-10 (Karev), sudden contraction: as printed, Re 10 ... 1e4. Of the
+// two columns headed 10^4 the last is 3-9's 0.5 (1 - n), the knot here, taken
+// exactly; the other (0.50 at n 0.1 against 0.45, equal elsewhere) is not used.
+constexpr std::array<double, kKnots> kConRe = {8.0,    10.0,   20.0,   30.0,   40.0,
+                                               50.0,   100.0,  200.0,  500.0,  1000.0,
+                                               2000.0, 4000.0, 5000.0, 10000.0};
+constexpr double kConZeta[kCols][kKnots - 1] = {
+    {5.00, 3.20, 2.40, 2.00, 1.80, 1.30, 1.04, 0.82, 0.64, 0.50, 0.80, 0.75, 0.45},
+    {5.00, 3.10, 2.30, 1.84, 1.62, 1.20, 0.95, 0.70, 0.50, 0.40, 0.60, 0.60, 0.40},
+    {5.00, 2.95, 2.15, 1.70, 1.50, 1.10, 0.85, 0.60, 0.44, 0.30, 0.55, 0.55, 0.35},
+    {5.00, 2.80, 2.00, 1.60, 1.40, 1.00, 0.78, 0.50, 0.35, 0.25, 0.45, 0.50, 0.30},
+    {5.00, 2.70, 1.80, 1.46, 1.30, 0.90, 0.65, 0.42, 0.30, 0.20, 0.40, 0.42, 0.25},
+    {5.00, 2.60, 1.70, 1.35, 1.20, 0.80, 0.56, 0.35, 0.24, 0.15, 0.35, 0.35, 0.20},
 };
 
-HermiteColumn build_column(std::size_t c) {
+enum class LowRe { Expansion, Contraction };
+
+const std::array<double, kKnots>& table_re(LowRe t) {
+    return t == LowRe::Expansion ? kExpRe : kConRe;
+}
+double table_laminar(LowRe t) {
+    return t == LowRe::Expansion ? EXPANSION_LAMINAR_COEFF : CONTRACTION_LAMINAR_COEFF;
+}
+// The high-Re zeta the table closes on: Borda-Carnot, or 3-9's 0.5 (1 - n).
+double table_high(LowRe t, double n) {
+    return t == LowRe::Expansion ? (1.0 - n) * (1.0 - n) : 0.5 * (1.0 - n);
+}
+double table_printed(LowRe t, std::size_t c, std::size_t i) {
+    return t == LowRe::Expansion ? kExpZeta[c][i] : kConZeta[c][i];
+}
+
+// One column as a cubic Hermite of y = ln(zeta Re^2) in x = ln Re.
+struct HermiteColumn {
+    std::array<double, kKnots> x{};
+    std::array<double, kKnots> y{};
+    std::array<double, kKnots> d{};
+};
+
+HermiteColumn build_column(LowRe t, std::size_t c) {
     HermiteColumn h;
-    const double n = kExpN[c];
-    for (std::size_t i = 0; i < kExpKnots; ++i) {
-        const double Re = kExpRe[i];
+    const double n = kTableN[c];
+    const auto& re = table_re(t);
+    for (std::size_t i = 0; i < kKnots; ++i) {
         double zeta = 0.0;
         if (i == 0) {
-            zeta = EXPANSION_LAMINAR_COEFF / Re;
-        } else if (i == kExpKnots - 1) {
-            zeta = (1.0 - n) * (1.0 - n);
+            zeta = table_laminar(t) / re[i];
+        } else if (i == kKnots - 1) {
+            zeta = table_high(t, n);
         } else {
-            zeta = kExpZeta[c][i - 1];
+            zeta = table_printed(t, c, i - 1);
         }
-        h.x[i] = std::log(Re);
-        h.y[i] = std::log(zeta * Re * Re);
+        h.x[i] = std::log(re[i]);
+        h.y[i] = std::log(zeta * re[i] * re[i]);
     }
-    // Every secant exponent at least EXPANSION_MIN_SECANT_EXPONENT, working
-    // back from the Borda-Carnot anchor: a knot above that line is lowered.
-    for (std::size_t i = kExpKnots - 1; i-- > 0;) {
-        const double cap = h.y[i + 1] - EXPANSION_MIN_SECANT_EXPONENT * (h.x[i + 1] - h.x[i]);
+    // Every secant exponent at least LOW_RE_MIN_SECANT_EXPONENT, working back
+    // from the high-Re anchor: a knot above that line is lowered (4-1 only;
+    // every 3-10 secant is above it).
+    for (std::size_t i = kKnots - 1; i-- > 0;) {
+        const double cap = h.y[i + 1] - LOW_RE_MIN_SECANT_EXPONENT * (h.x[i + 1] - h.x[i]);
         h.y[i] = std::min(h.y[i], cap);
     }
-    std::array<double, kExpKnots - 1> sec{};
-    for (std::size_t i = 0; i + 1 < kExpKnots; ++i) {
+    std::array<double, kKnots - 1> sec{};
+    for (std::size_t i = 0; i + 1 < kKnots; ++i) {
         sec[i] = (h.y[i + 1] - h.y[i]) / (h.x[i + 1] - h.x[i]);
     }
-    h.d[0] = 1.0;              // the laminar law, zeta Re^2 ~ Re
-    h.d[kExpKnots - 1] = 2.0;  // Borda-Carnot, zeta Re^2 ~ Re^2
-    for (std::size_t i = 1; i + 1 < kExpKnots; ++i) {
+    h.d[0] = 1.0;           // the laminar law, zeta Re^2 ~ Re
+    h.d[kKnots - 1] = 2.0;  // the high-Re constant zeta, zeta Re^2 ~ Re^2
+    for (std::size_t i = 1; i + 1 < kKnots; ++i) {
         const double a = sec[i - 1];
         const double b = sec[i];
         h.d[i] = (a > 0.0 && b > 0.0) ? 2.0 * a * b / (a + b) : 0.0;
@@ -126,51 +162,54 @@ HermiteColumn build_column(std::size_t c) {
     return h;
 }
 
-const std::array<HermiteColumn, kExpCols>& expansion_columns() {
-    static const std::array<HermiteColumn, kExpCols> cols = [] {
-        std::array<HermiteColumn, kExpCols> out;
-        for (std::size_t c = 0; c < kExpCols; ++c) {
-            out[c] = build_column(c);
+const std::array<HermiteColumn, kCols>& table_columns(LowRe t) {
+    auto build = [](LowRe tt) {
+        std::array<HermiteColumn, kCols> out;
+        for (std::size_t c = 0; c < kCols; ++c) {
+            out[c] = build_column(tt, c);
         }
         return out;
-    }();
-    return cols;
+    };
+    static const std::array<HermiteColumn, kCols> exp_cols = build(LowRe::Expansion);
+    static const std::array<HermiteColumn, kCols> con_cols = build(LowRe::Contraction);
+    return t == LowRe::Expansion ? exp_cols : con_cols;
 }
 
-// A column's ratio to Borda-Carnot, R = zeta / (1 - n_c)^2, with dR/dRe and
-// d2R/dRe2 (the second for the drive floor's exponent, area_change_flow).
+// A column's ratio to its high-Re zeta, R = zeta / zeta_high(n_c), with dR/dRe
+// and d2R/dRe2 (the second for the drive floor's exponent, area_change_flow).
 struct Ratio {
     double R = 1.0;
     double dR = 0.0;
     double d2R = 0.0;
 };
 
-Ratio column_ratio(double Re, std::size_t c) {
-    const double b = (1.0 - kExpN[c]) * (1.0 - kExpN[c]);
-    if (Re >= EXPANSION_RE_TURBULENT) {
+Ratio column_ratio(LowRe t, double Re, std::size_t c) {
+    const double b = table_high(t, kTableN[c]);
+    const auto& re = table_re(t);
+    if (Re >= re.back()) {
         return {1.0, 0.0, 0.0};
     }
-    if (Re <= EXPANSION_RE_LAMINAR) {
-        const double R = EXPANSION_LAMINAR_COEFF / (Re * b);
+    if (Re <= re.front()) {
+        const double R = table_laminar(t) / (Re * b);
         return {R, -R / Re, 2.0 * R / (Re * Re)};
     }
-    const HermiteColumn& h = expansion_columns()[c];
+    const HermiteColumn& h = table_columns(t)[c];
     const double x = std::log(Re);
     std::size_t i = 0;
-    while (i + 2 < kExpKnots && x > h.x[i + 1]) {
+    while (i + 2 < kKnots && x > h.x[i + 1]) {
         ++i;
     }
     const double w = h.x[i + 1] - h.x[i];
-    const double t = (x - h.x[i]) / w;
-    const double t2 = t * t;
-    const double t3 = t2 * t;
-    const double y = (2.0 * t3 - 3.0 * t2 + 1.0) * h.y[i] + (t3 - 2.0 * t2 + t) * w * h.d[i] +
-                     (-2.0 * t3 + 3.0 * t2) * h.y[i + 1] + (t3 - t2) * w * h.d[i + 1];
-    const double dy = ((6.0 * t2 - 6.0 * t) * h.y[i] + (3.0 * t2 - 4.0 * t + 1.0) * w * h.d[i] +
-                       (-6.0 * t2 + 6.0 * t) * h.y[i + 1] + (3.0 * t2 - 2.0 * t) * w * h.d[i + 1]) /
+    const double u = (x - h.x[i]) / w;
+    const double u2 = u * u;
+    const double u3 = u2 * u;
+    const double y = (2.0 * u3 - 3.0 * u2 + 1.0) * h.y[i] + (u3 - 2.0 * u2 + u) * w * h.d[i] +
+                     (-2.0 * u3 + 3.0 * u2) * h.y[i + 1] + (u3 - u2) * w * h.d[i + 1];
+    const double dy = ((6.0 * u2 - 6.0 * u) * h.y[i] + (3.0 * u2 - 4.0 * u + 1.0) * w * h.d[i] +
+                       (-6.0 * u2 + 6.0 * u) * h.y[i + 1] + (3.0 * u2 - 2.0 * u) * w * h.d[i + 1]) /
                       w;
-    const double d2y = ((12.0 * t - 6.0) * h.y[i] + (6.0 * t - 4.0) * w * h.d[i] +
-                        (-12.0 * t + 6.0) * h.y[i + 1] + (6.0 * t - 2.0) * w * h.d[i + 1]) /
+    const double d2y = ((12.0 * u - 6.0) * h.y[i] + (6.0 * u - 4.0) * w * h.d[i] +
+                        (-12.0 * u + 6.0) * h.y[i + 1] + (6.0 * u - 2.0) * w * h.d[i + 1]) /
                        (w * w);
     // R(x) = exp(y - 2x) / b, x = ln Re.
     const double R = std::exp(y - 2.0 * x) / b;
@@ -179,35 +218,35 @@ Ratio column_ratio(double Re, std::size_t c) {
     return {R, R_x / Re, (R_xx - R_x) / (Re * Re)};
 }
 
-// The ratio to Borda-Carnot at area ratio n: linear in n between printed
-// columns, the edge column's outside them.
-Ratio expansion_ratio3(double Re, double n) {
-    if (n <= kExpN.front()) {
-        return column_ratio(Re, 0);
+// The ratio at area ratio n: linear in n between printed columns, the edge
+// column's outside them.
+Ratio table_ratio3(LowRe t, double Re, double n) {
+    if (n <= kTableN.front()) {
+        return column_ratio(t, Re, 0);
     }
-    if (n >= kExpN.back()) {
-        return column_ratio(Re, kExpCols - 1);
+    if (n >= kTableN.back()) {
+        return column_ratio(t, Re, kCols - 1);
     }
     std::size_t j = 0;
-    while (j + 2 < kExpCols && n > kExpN[j + 1]) {
+    while (j + 2 < kCols && n > kTableN[j + 1]) {
         ++j;
     }
-    const double w = (n - kExpN[j]) / (kExpN[j + 1] - kExpN[j]);
-    const Ratio a = column_ratio(Re, j);
-    const Ratio b = column_ratio(Re, j + 1);
+    const double w = (n - kTableN[j]) / (kTableN[j + 1] - kTableN[j]);
+    const Ratio a = column_ratio(t, Re, j);
+    const Ratio b = column_ratio(t, Re, j + 1);
     return {(1.0 - w) * a.R + w * b.R, (1.0 - w) * a.dR + w * b.dR,
             (1.0 - w) * a.d2R + w * b.d2R};
 }
 
-ZetaAndSlope expansion_ratio(double Re, double n) {
-    const Ratio r = expansion_ratio3(Re, n);
+ZetaAndSlope table_ratio(LowRe t, double Re, double n) {
+    const Ratio r = table_ratio3(t, Re, n);
     return {r.R, r.dR};
 }
 
 // The incompressible loss's exponent in Re, e = d ln(zeta Re^2) / d ln Re,
 // and de/dRe: the flow then goes as drive^(1/e).
-std::pair<double, double> expansion_exponent(double Re, double n) {
-    const Ratio r = expansion_ratio3(Re, n);
+std::pair<double, double> table_exponent(LowRe t, double Re, double n) {
+    const Ratio r = table_ratio3(t, Re, n);
     const double e = 2.0 + Re * r.dR / r.R;
     const double de = r.dR / r.R + Re * r.d2R / r.R - Re * r.dR * r.dR / (r.R * r.R);
     return {e, de};
@@ -271,6 +310,42 @@ double cone_phi(double alpha, double n) {
     return (1.0 - w) * cone_phi_row(j, alpha) + w * cone_phi_row(j + 1, alpha);
 }
 
+// --- Idelchik (1966) diagram 3-6, conical converging bellmouth with end wall ---
+
+constexpr std::size_t kNozAngles = 9;
+constexpr std::size_t kNozLengths = 6;
+constexpr std::array<double, kNozAngles> kNozAlpha = {0.0,  10.0,  20.0,  30.0, 40.0,
+                                                      60.0, 100.0, 140.0, 180.0};
+constexpr std::array<double, kNozLengths> kNozLD = {0.025, 0.05, 0.075, 0.10, 0.15, 0.60};
+constexpr double kNozZeta[kNozLengths][kNozAngles] = {
+    {0.50, 0.47, 0.45, 0.43, 0.41, 0.40, 0.42, 0.45, 0.50},
+    {0.50, 0.45, 0.41, 0.36, 0.33, 0.30, 0.35, 0.42, 0.50},
+    {0.50, 0.42, 0.35, 0.30, 0.26, 0.23, 0.30, 0.40, 0.50},
+    {0.50, 0.39, 0.32, 0.25, 0.22, 0.18, 0.27, 0.38, 0.50},
+    {0.50, 0.37, 0.27, 0.20, 0.16, 0.15, 0.25, 0.37, 0.50},
+    {0.50, 0.27, 0.18, 0.13, 0.11, 0.12, 0.23, 0.36, 0.50},
+};
+
+// zeta'(alpha, l/D): bilinear, l/D held at the table's ends.
+double nozzle_prime(double alpha, double lD) {
+    alpha = std::clamp(alpha, 0.0, 180.0);
+    lD = std::clamp(lD, kNozLD.front(), kNozLD.back());
+    std::size_t i = 0;
+    while (i + 2 < kNozAngles && alpha > kNozAlpha[i + 1]) {
+        ++i;
+    }
+    std::size_t j = 0;
+    while (j + 2 < kNozLengths && lD > kNozLD[j + 1]) {
+        ++j;
+    }
+    const double wa = (alpha - kNozAlpha[i]) / (kNozAlpha[i + 1] - kNozAlpha[i]);
+    const double wl = (lD - kNozLD[j]) / (kNozLD[j + 1] - kNozLD[j]);
+    auto row = [&](std::size_t r) {
+        return (1.0 - wa) * kNozZeta[r][i] + wa * kNozZeta[r][i + 1];
+    };
+    return (1.0 - wl) * row(j) + wl * row(j + 1);
+}
+
 // --- compressible Borda-Carnot, on any scalar ---------------------------------
 
 template <class S> struct BordaCarnotT {
@@ -300,12 +375,14 @@ template <class S> BordaCarnotT<S> borda_carnot_t(const S& M1, double n, const S
 
 struct Branch {
     bool expansion = true;
-    bool sharp = true;   // sharp expansion: the Re-dependent 4-1 ratio
+    bool sharp = true;
+    bool low_re = false; // sharp: the low-Re table's ratio (4-1 or 3-10)
+    LowRe table = LowRe::Expansion;
     double n = 1.0;      // small / large
     double step = 1.0;   // area ratio of the Borda-Carnot step: n, or Cc
     double Cc = 1.0;     // contraction: vena contracta over the small section
     double phi = 1.0;    // conical expansion: 5-2's ratio to Borda-Carnot
-    double zeta_inc = 0.0;  // incompressible zeta at Re >= 3500 / any Re
+    double zeta_inc = 0.0;  // incompressible high-Re zeta (the low-Re table closes on it)
     double F_small = 0.0;
     double D = 0.0;      // Re length
     double floor = 0.0;  // drive floor [Pa]: zeta_inc times AREA_CHANGE_HEAD_FLOOR
@@ -329,6 +406,8 @@ Branch make_branch(double F_in, double F_out, const std::string& model, double l
     }
     b.expansion = F_in < F_out;
     b.sharp = model == "sharp";
+    b.low_re = b.sharp;
+    b.table = b.expansion ? LowRe::Expansion : LowRe::Contraction;
     b.D = (D_h > 0.0) ? D_h : std::sqrt(4.0 * b.F_small / M_PI);
     if (b.expansion) {
         b.step = b.n;
@@ -343,13 +422,15 @@ Branch make_branch(double F_in, double F_out, const std::string& model, double l
         b.zeta_inc = b.phi * (1.0 - b.n) * (1.0 - b.n);
     } else {
         if (b.sharp) {
-            b.zeta_inc = sharp_contraction_zeta(b.n);
+            b.zeta_inc = 0.5 * (1.0 - b.n);
         } else {
             if (!(length > 0.0)) {
                 throw std::invalid_argument("area_change: a conical model needs length > 0");
             }
+            const double D_small = std::sqrt(4.0 * b.F_small / M_PI);
             const double dr = std::sqrt(F_large / M_PI) - std::sqrt(b.F_small / M_PI);
-            b.zeta_inc = conical_nozzle_zeta(std::atan2(dr, length), b.n);
+            const double alpha = 2.0 * std::atan2(dr, length) * 180.0 / M_PI;
+            b.zeta_inc = nozzle_prime(alpha, length / D_small) * (1.0 - b.n);
         }
         b.Cc = 1.0 / (1.0 + std::sqrt(b.zeta_inc));
         b.step = b.Cc;
@@ -430,14 +511,17 @@ EvalT<S> eval_compressible(const S& M, const S& Pt0, const S& Tt0, const S& g, c
     S Re = 0.0 * M;
     const double Pa = value_of(Pt0) * std::exp(-value_of(g) / (value_of(g) - 1.0) * value_of(lnX));
     double q_small = 0.0;
+    if (b.low_re) {
+        // The low-Re table's ratio at the small section's Re (mu at the
+        // closure's station temperature).
+        const S Ta = Tt0 / exp_(lnX);
+        Re = G_small * b.D / mu_at(Ta, gas);
+        const ZetaAndSlope r = table_ratio(b.table, value_of(Re), b.n);
+        loss = loss * lift(r.zeta, r.dzeta_dRe, Re);
+    }
     if (b.expansion) {
         q_small = 0.5 * value_of(g) * Pa * value_of(Msq);
-        if (b.sharp) {
-            const S Ta = Tt0 / exp_(lnX);
-            Re = G_small * b.D / mu_at(Ta, gas);
-            const ZetaAndSlope r = expansion_ratio(value_of(Re), b.n);
-            loss = loss * lift(r.zeta, r.dzeta_dRe, Re);
-        } else {
+        if (!b.sharp) {
             loss = loss * b.phi;
         }
     } else {
@@ -456,10 +540,10 @@ EvalT<S> eval_incompressible(const S& G, const S& Pt0, const S& Tt0, const S& g,
     const S q = G * G / (2.0 * rho);
     S zeta = b.zeta_inc + 0.0 * G;
     S Re = 0.0 * G;
-    if (b.expansion && b.sharp) {
+    if (b.low_re) {
         Re = G * b.D / mu_at(Tt0, gas);
-        const ZetaAndSlope r = expansion_ratio(value_of(Re), b.n);
-        zeta = lift(r.zeta, r.dzeta_dRe, Re) * ((1.0 - b.n) * (1.0 - b.n));
+        const ZetaAndSlope r = table_ratio(b.table, value_of(Re), b.n);
+        zeta = lift(r.zeta, r.dzeta_dRe, Re) * b.zeta_inc;
     }
     const double a0 = std::sqrt(value_of(g) * value_of(Rg) * value_of(Tt0));
     const double Ga = value_of(G) / (b.expansion ? 1.0 : b.Cc);
@@ -608,13 +692,18 @@ ZetaAndSlope sudden_expansion_zeta(double Re, double area_ratio) {
         throw std::invalid_argument("sudden_expansion_zeta: Re must be positive");
     }
     const double b = (1.0 - area_ratio) * (1.0 - area_ratio);
-    const ZetaAndSlope r = expansion_ratio(Re, area_ratio);
+    const ZetaAndSlope r = table_ratio(LowRe::Expansion, Re, area_ratio);
     return {r.zeta * b, r.dzeta_dRe * b};
 }
 
-double sharp_contraction_zeta(double area_ratio) {
-    check_area_ratio(area_ratio, "sharp_contraction_zeta");
-    return 0.5 * (1.0 - area_ratio);
+ZetaAndSlope sudden_contraction_zeta(double Re, double area_ratio) {
+    check_area_ratio(area_ratio, "sudden_contraction_zeta");
+    if (!(Re > 0.0)) {
+        throw std::invalid_argument("sudden_contraction_zeta: Re must be positive");
+    }
+    const double b = 0.5 * (1.0 - area_ratio);
+    const ZetaAndSlope r = table_ratio(LowRe::Contraction, Re, area_ratio);
+    return {r.zeta * b, r.dzeta_dRe * b};
 }
 
 double conical_diffuser_zeta(double full_angle_deg, double area_ratio) {
@@ -625,10 +714,12 @@ double conical_diffuser_zeta(double full_angle_deg, double area_ratio) {
     return cone_phi(full_angle_deg, area_ratio) * (1.0 - area_ratio) * (1.0 - area_ratio);
 }
 
-double conical_nozzle_zeta(double half_angle_rad, double area_ratio) {
+double conical_nozzle_zeta(double full_angle_deg, double length_over_D, double area_ratio) {
     check_area_ratio(area_ratio, "conical_nozzle_zeta");
-    const double s = std::sin(std::clamp(half_angle_rad, 0.0, 0.5 * M_PI));
-    return (0.04 + 0.46 * std::pow(s, 1.5)) * (1.0 - area_ratio);
+    if (!(full_angle_deg >= 0.0) || !(length_over_D >= 0.0)) {
+        throw std::invalid_argument("conical_nozzle_zeta: angle and length must be >= 0");
+    }
+    return nozzle_prime(full_angle_deg, length_over_D) * (1.0 - area_ratio);
 }
 
 BordaCarnotStep compressible_borda_carnot(double M1, double area_ratio, double gamma) {
@@ -702,7 +793,7 @@ AreaChangeLoss area_change_loss(double m_dot_abs, double Pt0, double Tt0,
     out.dPt = e.loss;
     out.mach = e.mach;
     out.zeta = (e.q_small > 0.0) ? e.loss / e.q_small : 0.0;
-    out.Re = (b.expansion && b.sharp)
+    out.Re = b.low_re
                  ? e.Re
                  : G * b.D / viscosity(Tt0, gas.P, gas.X);
     return out;
@@ -742,8 +833,8 @@ AreaChangeFlow area_change_flow(double Pt0, double Tt0, const std::vector<double
                                     true);
         double sigma = 0.5;
         double dsig_dRe = 0.0;
-        if (b.expansion && b.sharp) {
-            const auto [e, de] = expansion_exponent(at.Re, b.n);
+        if (b.low_re) {
+            const auto [e, de] = table_exponent(b.table, at.Re, b.n);
             sigma = 1.0 / e;
             dsig_dRe = -de / (e * e);
         }
@@ -890,7 +981,7 @@ inline std::pair<double, double> sigmoid(double x) {
 // dP = zeta m |m| / (2 rho F_small^2).
 AreaChangeResult blend_kernel(double m_dot, double rho, double mu, double F0, double F1,
                               double m_scale, double D_small, double zeta_exp, double dzeta_exp_dRe,
-                              double zeta_con, double Re) {
+                              double zeta_con, double dzeta_con_dRe, double Re) {
     const double F_small = std::min(F0, F1);
     const double m_abs = smooth_abs(m_dot);
     const bool fwd_exp = F0 <= F1;
@@ -903,11 +994,13 @@ AreaChangeResult blend_kernel(double m_dot, double rho, double mu, double F0, do
     const double dm_abs_dm = m_dot / m_abs;
     const double dRe_dm = D_small / (mu * F_small + kEps) * dm_abs_dm;
     const double w_exp = fwd_exp ? w : 1.0 - w;
-    const double dzeta_dm = (zeta_fwd - zeta_rev) * dw_dx / m_scale + w_exp * dzeta_exp_dRe * dRe_dm;
+    // d zeta_eff / dRe at fixed direction weight.
+    const double dzeta_dRe = w_exp * dzeta_exp_dRe + (1.0 - w_exp) * dzeta_con_dRe;
+    const double dzeta_dm = (zeta_fwd - zeta_rev) * dw_dx / m_scale + dzeta_dRe * dRe_dm;
     const double dS_dm = K * (zeta_eff * (m_abs + m_dot * dm_abs_dm) + dzeta_dm * m_dot * m_abs);
     const double dS_drho = (std::abs(rho) > kEps) ? -dP / rho : 0.0;
     const double dRe_dmu = (std::abs(mu) > kEps) ? -Re / mu : 0.0;
-    const double dS_dmu = K * w_exp * dzeta_exp_dRe * dRe_dmu * m_dot * m_abs;
+    const double dS_dmu = K * dzeta_dRe * dRe_dmu * m_dot * m_abs;
     return {dP, dS_dm, dS_drho, dS_dmu};
 }
 
@@ -922,9 +1015,10 @@ AreaChangeResult sharp_area_change(double m_dot, double rho, double mu, double F
     const double n = F_small / std::max(std::max(F0, F1), kEps);
     const double D_small = (D_h > 0.0) ? D_h : std::sqrt(std::max(4.0 * F_small / M_PI, 0.0));
     const double Re = smooth_abs(m_dot) * D_small / (mu * F_small + kEps);
-    const ZetaAndSlope z = sudden_expansion_zeta(Re, n);
-    return blend_kernel(m_dot, rho, mu, F0, F1, m_scale, D_small, z.zeta, z.dzeta_dRe,
-                        sharp_contraction_zeta(n), Re);
+    const ZetaAndSlope e = sudden_expansion_zeta(Re, n);
+    const ZetaAndSlope c = sudden_contraction_zeta(Re, n);
+    return blend_kernel(m_dot, rho, mu, F0, F1, m_scale, D_small, e.zeta, e.dzeta_dRe, c.zeta,
+                        c.dzeta_dRe, Re);
 }
 
 AreaChangeResult conical_area_change(double m_dot, double rho, double mu, double F0, double F1,
@@ -938,8 +1032,10 @@ AreaChangeResult conical_area_change(double m_dot, double rho, double mu, double
     const double dr = std::sqrt(F_large / M_PI) - std::sqrt(F_small / M_PI);
     const double theta = std::atan2(dr, std::max(length, kEps));
     const double zeta_exp = conical_diffuser_zeta(2.0 * theta * 180.0 / M_PI, n);
-    const double zeta_con = conical_nozzle_zeta(theta, n);
-    return blend_kernel(m_dot, rho, mu, F0, F1, m_scale, 1.0, zeta_exp, 0.0, zeta_con, 0.0);
+    const double D_small = std::sqrt(4.0 * F_small / M_PI);
+    const double zeta_con =
+        conical_nozzle_zeta(2.0 * theta * 180.0 / M_PI, std::max(length, kEps) / D_small, n);
+    return blend_kernel(m_dot, rho, mu, F0, F1, m_scale, 1.0, zeta_exp, 0.0, zeta_con, 0.0, 0.0);
 }
 
 }  // namespace combaero

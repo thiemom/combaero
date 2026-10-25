@@ -68,9 +68,36 @@ def test_conical_diffuser_matches_diagram_5_2() -> None:
     assert n_cells == 154
 
 
-def test_sharp_contraction_is_diagram_3_9() -> None:
-    for n in (0.05, 0.3, 0.7):
-        assert cb.sharp_contraction_zeta(n) == pytest.approx(0.5 * (1 - n))
+def test_sudden_contraction_matches_diagrams_3_10_and_3_9() -> None:
+    """Every printed cell of 3-10 (Karev), 6 ratios by 13 Reynolds numbers,
+    exactly: the last printed column is 3-9's 0.5 (1 - n). Of the two columns
+    headed 10^4 the other is not used; it differs at n 0.1 only (0.50 against
+    0.45). Above Re 1e4: 0.5 (1 - n). Below Re 8: 27/Re."""
+    rows = list(csv.DictReader((IDELCHIK / "diag3-10_sudden_contraction_low_re.csv").open()))
+    n_cells = 0
+    for r in rows:
+        n, Re, zeta = float(r["F0_F1"]), float(r["Re"]), float(r["zeta"])
+        if r["column"] == "13":
+            continue
+        assert cb.sudden_contraction_zeta(Re, n)[0] == pytest.approx(zeta, abs=1e-12), (n, Re)
+        n_cells += 1
+    assert n_cells == 78
+    for n in (0.0001, 0.3, 0.9):
+        for Re in (1e4, 1e6):
+            assert cb.sudden_contraction_zeta(Re, n)[0] == pytest.approx(0.5 * (1 - n), rel=1e-14)
+    for Re in (0.5, 7.9):
+        for n in (0.1, 0.6):
+            assert cb.sudden_contraction_zeta(Re, n)[0] == pytest.approx(27.0 / Re, rel=1e-14)
+
+
+def test_conical_nozzle_matches_diagrams_3_7_and_3_6() -> None:
+    """zeta' (1 - n) with zeta' at every printed cell of 3-6 exactly."""
+    rows = list(csv.DictReader((IDELCHIK / "diag3-6_conical_bellmouth_end_wall.csv").open()))
+    assert len(rows) == 54
+    for r in rows:
+        a, lD, zp = float(r["alpha_deg"]), float(r["l_Dh"]), float(r["zeta_prime"])
+        for n in (0.0, 0.25):
+            assert cb.conical_nozzle_zeta(a, lD, n) == pytest.approx(zp * (1 - n), abs=1e-12)
 
 
 # ---------------------------------------------------------------------------
@@ -78,10 +105,31 @@ def test_sharp_contraction_is_diagram_3_9() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _exponent(Re: float, n: float) -> float:
+def _exponent(Re: float, n: float, f=cb.sudden_expansion_zeta) -> float:
     """d ln(zeta Re^2) / d ln Re: the loss's exponent in the flow."""
-    z, dz = cb.sudden_expansion_zeta(Re, n)
+    z, dz = f(Re, n)
     return 2.0 + Re * dz / z
+
+
+def test_the_contraction_loss_rises_with_the_flow_everywhere() -> None:
+    """3-10 needs no regularisation: every printed secant exponent is 0.95 or
+    more. Measured 2026-10-25: the smallest local exponent of the
+    interpolation is 0.857."""
+    worst = min(
+        _exponent(Re, n, cb.sudden_contraction_zeta)
+        for n in (0.01, 0.1, 0.15, 0.3, 0.5, 0.6, 0.8, 0.99)
+        for Re in np.geomspace(1.0, 2e4, 6000)
+    )
+    assert 0.8 < worst < 0.9, worst
+
+
+@pytest.mark.parametrize("n", [0.1, 0.35, 0.6, 0.8])
+def test_the_contraction_zeta_is_c1_in_re(n: float) -> None:
+    for Re0 in (8.0, 10.0, 20.0, 100.0, 2000.0, 4000.0, 5000.0, 1e4):
+        lo = cb.sudden_contraction_zeta(Re0 * (1 - 1e-10), n)
+        hi = cb.sudden_contraction_zeta(Re0 * (1 + 1e-10), n)
+        assert hi[0] == pytest.approx(lo[0], rel=1e-8), Re0
+        assert hi[1] == pytest.approx(lo[1], rel=1e-6, abs=1e-12), Re0
 
 
 def test_the_expansion_loss_rises_with_the_flow_everywhere() -> None:
@@ -221,6 +269,7 @@ _CASES = {
     "conical diffuser": {"F_in": 1e-3, "F_out": 4e-3, "model": "conical", "length": 0.05},
     "conical nozzle": {"F_in": 4e-3, "F_out": 1e-3, "model": "conical", "length": 0.05},
     "small expansion (low Re)": {"F_in": 7.85e-7, "F_out": 3.14e-6, "model": "sharp"},
+    "small contraction (low Re)": {"F_in": 3.14e-6, "F_out": 7.85e-7, "model": "sharp"},
 }
 
 
@@ -242,7 +291,7 @@ def test_the_flow_rises_with_the_drive_and_saturates(case: str, incompressible: 
     assert np.all(slope[~choked] > 0.0)
     if incompressible:
         assert not choked.any()
-    elif case != "small expansion (low Re)":
+    elif "low Re" not in case:
         assert choked.any()
         assert np.all(np.diff(mdot[choked]) == 0.0)
         # C1 into the saturation: the slope just below choke is near zero.
@@ -408,7 +457,7 @@ def test_area_change_exports() -> None:
         "sharp_area_change",
         "conical_area_change",
         "sudden_expansion_zeta",
-        "sharp_contraction_zeta",
+        "sudden_contraction_zeta",
         "conical_diffuser_zeta",
         "conical_nozzle_zeta",
         "compressible_borda_carnot",

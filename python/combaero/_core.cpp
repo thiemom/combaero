@@ -1841,9 +1841,16 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "the printed table to Re 3500, Borda-Carnot (1 - n)^2 above.\n"
         "Returns (zeta, dzeta_dRe).");
 
-  m.def("sharp_contraction_zeta", &combaero::sharp_contraction_zeta, py::arg("area_ratio"),
-        "Sharp contraction loss coefficient 0.5 (1 - n), Idelchik (1966) diagram\n"
-        "3-9, on the small section's dynamic head.");
+  m.def("sudden_contraction_zeta",
+        [](double Re, double area_ratio) {
+          const auto z = combaero::sudden_contraction_zeta(Re, area_ratio);
+          return std::make_tuple(z.zeta, z.dzeta_dRe);
+        },
+        py::arg("Re"), py::arg("area_ratio"),
+        "Sudden contraction loss coefficient, Idelchik (1966) diagrams 3-10 and\n"
+        "3-9, on the small section's dynamic head: 27/Re below Re 8, a C1\n"
+        "interpolation of Karev's table to Re 1e4, 0.5 (1 - n) above.\n"
+        "Returns (zeta, dzeta_dRe).");
 
   m.def("conical_diffuser_zeta", &combaero::conical_diffuser_zeta,
         py::arg("full_angle_deg"), py::arg("area_ratio"),
@@ -1852,9 +1859,11 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "head. full_angle_deg is the included angle; friction not included.");
 
   m.def("conical_nozzle_zeta", &combaero::conical_nozzle_zeta,
-        py::arg("half_angle_rad"), py::arg("area_ratio"),
-        "Conical nozzle loss coefficient C_con (1 - n), C_con = 0.04 +\n"
-        "0.46 sin(theta)^1.5. Not sourced.");
+        py::arg("full_angle_deg"), py::arg("length_over_D"), py::arg("area_ratio"),
+        "Conical contraction loss coefficient zeta' (1 - n), Idelchik (1966)\n"
+        "diagram 3-7, zeta'(full angle, l/D) from diagram 3-6 (bilinear through\n"
+        "the printed table); l is the cone's axial length, D the small diameter.\n"
+        "Re > 1e4; friction not included.");
 
   py::class_<combaero::BordaCarnotStep>(m, "BordaCarnotStep",
                                         "Compressible Borda-Carnot step")

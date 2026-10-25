@@ -1091,6 +1091,8 @@ TEST(AreaChangeFlowTest, DerivativesMatchCentralDifferences) {
       {"expansion near zero drive", 1e5, 300.0, 1e-5, 1e-4, 4e-4, "sharp", 0.0, false, 4e-6},
       {"expansion reversed (odd)", 2e5, 300.0, -0.5, F_s, 4 * F_s, "sharp", 0.0, false},
       {"contraction", 2e5, 300.0, 5e3, 4e-3, 1e-3, "sharp", 0.0, false},
+      {"contraction Re ~100", 2e5, 300.0, 1.0, 4 * F_s, F_s, "sharp", 0.0, false},
+      {"contraction Re ~5000", 2e5, 300.0, 300.0, 4 * F_s, F_s, "sharp", 0.0, false},
       {"contraction below floor", 2e5, 300.0, 0.4, 4e-3, 1e-3, "sharp", 0.0, false},
       {"contraction choked", 2e5, 300.0, 1e5, 4e-3, 1e-3, "sharp", 0.0, false},
       {"conical diffuser", 2e5, 300.0, 3e3, 1e-3, 4e-3, "conical", 0.05, false},

@@ -14,6 +14,10 @@
 //   diagram 4-1  sudden expansion: Borda-Carnot (1 - n)^2 for Re >= 3.5e3,
 //                zeta(Re, n) tabulated for 10 < Re < 3.5e3, 26/Re for Re < 8;
 //   diagram 3-9  sharp contraction: 0.5 (1 - n), Re > 1e4;
+//   diagram 3-10 sharp contraction, Re < 1e4 (Karev): zeta(Re, n) tabulated,
+//                27/Re for Re < 8;
+//   diagram 3-7  conical contraction: zeta' (1 - n), zeta'(l/D, full angle)
+//                from diagram 3-6 (friction separate);
 //   diagram 5-2  conical diffuser: zeta_exp(full angle, n) = phi (1 - n)^2.
 //
 // n is always the small area over the large one, in [0, 1]; every zeta is on
@@ -29,8 +33,10 @@
 //               factor of 4-1, or phi of 5-2).
 //   contraction a vena contracta of area Cc F_small re-expanding to F_small by
 //               the same compressible Borda-Carnot step, with
-//               Cc = 1 / (1 + sqrt(zeta_c)), so its incompressible limit is
-//               the table's zeta_c exactly. It chokes at the vena contracta.
+//               Cc = 1 / (1 + sqrt(zeta_c)), zeta_c the high-Re zeta (3-9 or
+//               3-7), so its incompressible limit is that zeta exactly; times
+//               3-10's low-Re ratio for a sharp one. It chokes at the vena
+//               contracta.
 //
 // Both reduce to the tables as M -> 0. The gas is calorically perfect across
 // the step, at gamma(Tt): within 0.2% of the thermally perfect control volume
@@ -38,14 +44,18 @@
 
 namespace combaero {
 
-// Diagram 4-1's laminar and turbulent bounds on Re (small section).
-constexpr double EXPANSION_RE_LAMINAR = 8.0;       // below: zeta = 26 / Re
-constexpr double EXPANSION_RE_TURBULENT = 3500.0;  // above: Borda-Carnot
-constexpr double EXPANSION_LAMINAR_COEFF = 26.0;   // zeta Re, Re < 8
+// The low-Re tables' bounds on Re (small section). Below Re 8 both pages give
+// a laminar zeta = A / Re; above the last column the high-Re zeta holds.
+constexpr double LOW_RE_LAMINAR = 8.0;
+constexpr double EXPANSION_LAMINAR_COEFF = 26.0;     // 4-1
+constexpr double EXPANSION_RE_TURBULENT = 3500.0;    // 4-1: Borda-Carnot above
+constexpr double CONTRACTION_LAMINAR_COEFF = 27.0;   // 3-10
+constexpr double CONTRACTION_RE_TURBULENT = 1.0e4;   // 3-10: 0.5 (1 - n) above
 
-// The loss exponent d ln(zeta Re^2) / d ln Re that the 4-1 interpolation keeps
-// between two table columns at least (see sudden_expansion_zeta).
-constexpr double EXPANSION_MIN_SECANT_EXPONENT = 0.25;
+// The loss exponent d ln(zeta Re^2) / d ln Re that a low-Re interpolation
+// keeps between two table columns at least (see sudden_expansion_zeta). Every
+// 3-10 secant is above it already (0.95 at least).
+constexpr double LOW_RE_MIN_SECANT_EXPONENT = 0.25;
 
 // Small-section dynamic head [Pa] that sets a branch's drive floor: the floor
 // is the incompressible loss there, zeta_inc * AREA_CHANGE_HEAD_FLOOR (about
@@ -76,7 +86,7 @@ struct ZetaAndSlope {
 // solver's: a falling stretch would give one pressure drop two flows. The
 // printed n = 0.6 column falls between Re 2000 and 3000 (secant exponent
 // -0.26), so a knot is lowered until every secant exponent is at least
-// EXPANSION_MIN_SECANT_EXPONENT, working back from the Borda-Carnot anchor:
+// LOW_RE_MIN_SECANT_EXPONENT, working back from the Borda-Carnot anchor:
 // zeta(2000) at n 0.6 is 0.41 (printed 0.50) and at n 0.5 0.61 (printed
 // 0.65). Every other printed value is matched; the Re 3500 column, printed
 // to two decimals, is Borda-Carnot exactly. The smallest local exponent left
@@ -89,8 +99,16 @@ struct ZetaAndSlope {
 // at Re < 8 zeta is within 1% of 26/Re (the page's n-independent law).
 ZetaAndSlope sudden_expansion_zeta(double Re, double area_ratio);
 
-// Sharp contraction, diagram 3-9: 0.5 (1 - n).
-double sharp_contraction_zeta(double area_ratio);
+// Sudden (sharp) contraction, on the small section's dynamic head:
+//
+//   Re <= 8      27 / Re (3-10, laminar);
+//   Re >= 1e4    0.5 (1 - n) (3-9, Weisbach);
+//   in between   3-10 (Karev), interpolated as sudden_expansion_zeta. Every
+//                printed value is matched: no secant needs lowering.
+//
+// The ratio to 0.5 (1 - n) is linear in n between the printed columns and the
+// edge column's is held outside them, as for the expansion.
+ZetaAndSlope sudden_contraction_zeta(double Re, double area_ratio);
 
 // Conical diffuser, diagram 5-2: zeta_exp(alpha, n), alpha the FULL included
 // angle [deg], bilinear in (alpha, n) through the printed table (exact at
@@ -99,10 +117,13 @@ double sharp_contraction_zeta(double area_ratio);
 // Friction is not included (the table's zeta_fr is separate).
 double conical_diffuser_zeta(double full_angle_deg, double area_ratio);
 
-// Conical nozzle: C_con (1 - n), C_con = 0.04 + 0.46 sin(theta)^1.5, theta the
-// half angle [rad]. NOT sourced (no Idelchik diagram transcribed yet): from
-// 0.04 for a gradual nozzle to Weisbach's 0.5 at theta = pi/2.
-double conical_nozzle_zeta(double half_angle_rad, double area_ratio);
+// Conical contraction (nozzle), diagram 3-7: zeta' (1 - n), zeta'(l/D, alpha)
+// from diagram 3-6 (conical converging bellmouth with end wall), alpha the
+// FULL included angle [deg] and l / D the cone's axial length over the small
+// diameter. Bilinear in (alpha, l/D) through the printed table (exact at every
+// printed cell); l/D is held at the table's ends (0.025, 0.6). Both angle ends
+// are the sharp edge, zeta' = 0.5 (3-9). Re > 1e4; friction not included.
+double conical_nozzle_zeta(double full_angle_deg, double length_over_D, double area_ratio);
 
 // Compressible Borda-Carnot step from area F1 to F2 = F1 / n, calorically
 // perfect gas: with X = 1 + (gamma - 1) M^2 / 2,
