@@ -4,8 +4,7 @@ Henry, Leclaire, Hemidi, Seynhaeve, Bartosiewicz (2007), "Analysis of
 Supersonic Ejector Operation: Experimental Validation and Two-Phase Aspects",
 5th International Conference on Heat Transfer, Fluid Mechanics and
 Thermodynamics (HEFAT2007), Sun City, South Africa, paper HF1. Source PDF:
-docs/ejector/Bartosiewicz_ejector_2004.pdf (filename predates the confirmed
-citation; the paper itself is HEFAT2007, Bartosiewicz corresponding author).
+docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf.
 
 Figure 5, "Ejector characteristics - Experimental results", is the measured
 ejector characteristic for an **air** ejector: entrainment ratio omega versus
@@ -40,7 +39,7 @@ Trends across the three curves (all physically expected, and reproduced here):
 Digitization provenance and cross-check
 ---------------------------------------
 Points were traced from the figure by hand (source: user, 2026-08-29) and
-cross-checked against docs/ejector/bartosiewicz_fig5.png. Verdict: faithful.
+cross-checked against docs/ejector/henry2007_fig5.png. Verdict: faithful.
 Plateau values, knee locations, and breakdown endpoints all match the printed
 figure to within trace error. The three breakdown endpoints
 (1.587, 0.052) / (1.829, 0.073) / (2.047, 0.041) and the three plateaus

@@ -1,0 +1,2390 @@
+# Source register: every local reference document under docs/ (gitignored,
+# copyright) -- what it is, what it holds, what it was read for, the verdict,
+# and where the repo uses it. One place to answer "do we already have this?",
+# "what did we conclude?" and "what else covers this?".
+#
+#   uv run scripts/sources.py find <terms>      search every field
+#   uv run scripts/sources.py list --status unscreened
+#   uv run scripts/sources.py list --wanted            documents we lack, by priority
+#   uv run scripts/sources.py check             schema + unregistered local docs
+#   uv run scripts/sources.py new docs/x.pdf    stub entry for a new document
+#
+# A new document gets an entry when it is screened; a verdict, issue or record
+# is added here in the same PR that makes it. `read_for` lists the QUESTIONS a
+# document was examined for -- a document read for one question can answer
+# another (88-GT-290 was screened for overall effectiveness and later found to
+# settle part of the #468 Re exponent).
+#
+# status: implemented (a shipped closure is built from it), fidelity (scored on
+# its own data), accuracy (cross-source set), extracted (data in the repo, not
+# scored), screened (verdict recorded, not used), unscreened.
+# Citations are taken from the document itself; "?" marks what it does not show.
+#
+# Built 2026-10-25 from the documents, the extraction records, the issues and
+# the project memory.
+
+documents:
+- file: docs/ejector/19680008095.pdf
+  citation: Sanger, N. L. (1968). Noncavitating performance of two low-area-ratio water jet pumps having
+    throat lengths of 7.25 diameters. NASA TN D-4445, Lewis Research Center, March 1968.
+  id: NASA TN D-4445 (NTRS 19680008095)
+  topic: [ejector]
+  content: Water jet pumps, area ratios 0.066 and 0.197, throat 7.25 d_t. Conventional 1-D jet-pump theory
+    printed (Eq 11 head rise, Eq 13 N, Eq 14 eta, Eqs 19-25 component losses with K_p, K_s, K_t, K_d);
+    the measured performance is plotted only.
+  status: implemented
+  verdict: 'Source of the shipped incompressible jet-pump closure (ejector regime=''incompressible'',
+    #588) and of the Mach->0 limit the compressible closure must reduce to. Fidelity numbers come from
+    the companion TN D-4759 Table II (docs/ejector/19680022488.pdf), 9.3% mean error.'
+  read_for: ['#588 incompressible ejector closure', Mach->0 limit of the compressible ejector, lossless
+      overprediction (~1.4x) of the jet-pump relation]
+  issues: [268, 588, 593, 594, 595, 597]
+  records: [validation/ejector/OPERATING_REGIMES_DESIGN.md, python/tests/test_ejector_jetpump.py, python/tests/test_ejector_incompressible.py]
+  code: ['include/ejector.h: Sanger jet pump (Eq 11)', 'python/combaero/network/ejector_element.py: regime
+      incompressible']
+  notes: Filename is the NTRS accession number. Companion TN D-4759 (NTRS 19680022488) holds the tabulated
+    fidelity points.
+- file: docs/ejector/19680022488.pdf
+  citation: Sanger, N. L. (1968). Noncavitating and cavitating performance of two low-area-ratio water
+    jet pumps with throat lengths of 5.66 diameters. NASA TN D-4759, Lewis Research Center.
+  id: NASA TN D-4759 (NTRS 19680022488)
+  topic: [ejector]
+  content: The D-4445 pumps (area ratios 0.066 and 0.197, throat 1.35 in) with the throat cut to 5.66 d_t;
+    noncavitating and cavitating performance vs nozzle spacing. Table II TABULATES the head rise at the
+    fully inserted nozzle (s/d_t = 0, 15 psia secondary inlet), 12 points; Appendix B gives the separately
+    calibrated K_s (0.09 / 0.14), K_t (0.076) and K_d (0.079). Peak efficiencies 31.3% / 37.6%.
+  status: fidelity
+  verdict: 'The fidelity set of the shipped incompressible jet pump (#588): Sanger''s Eq. 11 with his
+    own Appendix B losses scores 9.3% on his own Table II. Table II and the Appendix B coefficients in
+    test_ejector_incompressible.py were checked against the report on 2026-10-25: all 12 rows and the
+    four coefficients match.'
+  read_for: ['#588 fidelity of the incompressible jet pump (Table II, Appendix B)']
+  issues: [588]
+  records: [python/tests/test_ejector_incompressible.py, validation/ejector/README.md]
+  notes: Fetched from NTRS 2026-10-25 (it was cited as the fidelity source but not held). Filename is
+    the NTRS accession number. The cavitation data (figures) are not used.
+- file: docs/ejector/art_10.1007_s40430-025-05536-7.pdf
+  citation: Akbarnejad, S., Ziabasharhagh, M. (2025). A novel 1D model for the analysis of double-choked
+    ejectors validated by CFD simulations. J. Braz. Soc. Mech. Sci. Eng. 47, 253.
+  id: DOI 10.1007/s40430-025-05536-7
+  topic: [ejector]
+  content: Steam ejector; CFD shows traditional 1-D momentum balance and over-expansion assumptions are
+    inaccurate; proposes a 1-D model for double-choked operation that drops the momentum equation and
+    imposes sonic flow in the constant-area section. Critical back pressure 93 kPa predicted vs 88 kPa
+    CFD.
+  status: screened
+  verdict: 'Evaluated as a P_c* mixing closure and not adopted: 32-60% error on Huang''s rows, worse than
+    Huang''s own chain. Useful only as CFD confirmation that a naive mixing-region momentum balance is
+    unreliable.'
+  read_for: [ejector P_c* mixing closure choice (#252)]
+  issues: [252]
+  records: [validation/ejector/README.md, validation/ejector/models/huang1999.py]
+  notes: Not the same paper as 'Theoretical Model for Predicting Performance of a Gas Ejector.pdf' (Thermal
+    Engineering 2025, same authors), which is the one whose tables are digitised.
+- file: docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf
+  citation: 'Henry, F., Leclaire, S., Hemidi, A., Seynhaeve, J.-M., Bartosiewicz, Y. (2007). Analysis
+    of supersonic ejector operation: experimental validation and two-phase aspects. HEFAT2007, 5th Int.
+    Conf. on Heat Transfer, Fluid Mechanics and Thermodynamics, Sun City, South Africa, paper HF1.'
+  id: HEFAT2007 paper HF1
+  topic: [ejector]
+  content: Air supersonic ejector, in-house experiment plus CFD (k-epsilon within 10% on entrainment);
+    first two-phase attempt. Measured entrainment characteristic (Fig. 5) plotted only; rig geometry given.
+  status: accuracy
+  verdict: 'Cross-source accuracy set for the ejector anchors (P_c*, P_b0) and the subcritical droop shape:
+    Huang chain and K&D bracket it. Pressure reading (gauge vs absolute) is ambiguous; the efficiency-free
+    ratio test reads it as gauge.'
+  read_for: [subcritical droop shape (Tier-1 linear chord), P_c* and P_b0 anchor accuracy (#667), gauge
+      vs absolute P1]
+  issues: [263, 265, 622, 667, 668, 669]
+  records: [validation/ejector/data/henry2007_fig5.py, validation/ejector/anchor_scorecard.py, validation/ejector/README.md]
+  notes: Renamed 2026-10-25 from Bartosiewicz_ejector_2004.pdf (the name predated the confirmed citation).
+    The Fig. 5 scan and traces are henry2007_fig5.png and henry2007_fig5_p=4/5/6bar.
+- file: docs/ejector/Bouhanguel2011_flow_visualization_air_ejector.pdf
+  citation: Bouhanguel, A., Desevaux, P., Gavignet, E. (2011). Flow visualization in supersonic ejectors
+    using laser tomography techniques. Int. J. Refrigeration 34, 1633-1640.
+  topic: [ejector]
+  content: Air ejector (d* 8, d 12, D 24 or 16 mm) discharging to atmosphere; laser-sheet visualisation
+    of shock structure, instabilities and mixing; flow regime statements, non-mixing length, two entrainment
+    ratios. Mostly qualitative images.
+  status: accuracy
+  verdict: 'Regime-level cross-source check: only Huang''s P_c* agrees with the observed choked/not-choked
+    regimes without an edge-case reading. Also documents the measured unmixed length (9.2 D) exceeding
+    the tube, a model limit.'
+  read_for: [ejector anchor pair regime check (#670), mixing-length limit of the 1-D model]
+  issues: [670]
+  records: [validation/ejector/bouhanguel2011_regime_check.py, python/tests/test_ejector_bouhanguel2011.py,
+    validation/ejector/README.md]
+- file: docs/ejector/Chen2013_1D_model_critical_subcritical.pdf
+  citation: Chen, W., Liu, M., Chong, D., Yan, J., Little, A. B., Bartosiewicz, Y. (2013). A 1D model
+    to predict ejector performance at critical and sub-critical operational regimes. Int. J. Refrigeration
+    36, 1750-1761.
+  topic: [ejector]
+  content: 1-D ejector model for critical and subcritical modes with constant-pressure mixing; verified
+    against four experimental sets (different fluids and geometries), incl. the Hemidi/Henry air rig and
+    Chen's rectangular air rig. Model equations printed; data plotted (Figs 5a, 7a, with error bars).
+  status: accuracy
+  verdict: A third measured rig (rectangular air ejector) for cross-source P_c*/P_b0 accuracy, plus a
+    check of Huang's printed chain on Chen's own numbers. Chen's printed subcritical branch fails its
+    own fidelity check (droop much shallower than his plot).
+  read_for: ['#668 third measured rig', printed P_c* chain fidelity, subcritical branch]
+  issues: [668, 669]
+  records: [validation/ejector/data/chen2013_figs.py, validation/ejector/printed_chain_check.py, python/tests/test_ejector_chen2013.py,
+    validation/ejector/README.md]
+- file: docs/ejector/Development_of_an_Analytical_Method_for.pdf
+  citation: Kracik, J., Dvorak, V. (2016). Development of an analytical method for predicting flow in
+    a supersonic air ejector. EPJ Web of Conferences 114, 02059.
+  id: DOI 10.1051/epjconf/201611402059
+  topic: [ejector]
+  content: Analytical model of an air ejector with twelve peripheral supersonic nozzles; constant-pressure
+    mixing, isentropic first pass then stagnation-pressure corrections from Fluent CFD; aerodynamic functions
+    q(lambda), z(lambda). Equations printed (Eqs 7-13).
+  status: implemented
+  verdict: 'Source of the shipped kracik_dvorak P_c* mixing closure (the default until Huang''s chain
+    took over in #670; still selectable). Best on Huang''s rows (6.2%/13.2%) but lossless, so it lands
+    high on independent rigs.'
+  read_for: [ejector P_c* mixing closure (#252), jet-pump mixed-flow discharge, anchor_closure default
+      (#670)]
+  issues: [252, 253, 261, 265, 268, 594, 667, 669, 670, 687, 698]
+  records: [validation/ejector/README.md, validation/ejector/models/huang1999.py, validation/ejector/anchor_scorecard.py]
+  code: ['include/ejector.h: Kracik & Dvorak Eq 9 q(lambda), ejector_critical_back_pressure', python/combaero/network/_ejector_huang1999.py]
+- file: docs/ejector/Ejectors_for_Efficient_Refrigeration.pdf
+  citation: 'Grazzini, G., Milazzo, A., Mazzelli, F. (2018). Ejectors for Efficient Refrigeration: Design,
+    Applications and Computational Fluid Dynamics. Springer International Publishing.'
+  id: ISBN 978-3-319-75243-3
+  topic: [ejector, review]
+  content: 'Monograph (192 pp.) on ejector refrigeration: 1-D design, CRMC diffusers, the Florence R245fa
+    chiller, CFD. Table 5.3 gives the third-duct geometry; Fig. 5.15 the authors'' CFD nozzle comparison.'
+  status: screened
+  verdict: Used as corroboration of the Florence rig's third-duct geometry and the authors' CFD nozzle
+    effect; not a data source in its own right (the scored data come from Mazzelli & Milazzo 2015).
+  read_for: ['#697 third-duct geometry (Table 5.3)', nozzle exit effect (Fig. 5.15)]
+  issues: [697]
+  records: [validation/ejector/data/mazzelli2015_tables.py, validation/ejector/data/eames2013_fig8.py]
+  notes: No text layer on the cover pages; citation from the copyright page.
+- file: docs/ejector/Galndo;Gl;Dolz - Numercal Optmzaton of an Ejector for Waste Heat Recovery Used to
+    Cool Down the I....pdf
+  citation: Galindo, J., Gil, A., Dolz, V., Ponce-Mora, A. (2020). Numerical optimization of an ejector
+    for waste heat recovery used to cool down the intake air in an internal combustion engine. J. Thermal
+    Science and Engineering Applications 12(5), 1-13.
+  id: DOI 10.1115/1.4046906
+  topic: [ejector]
+  content: CFD (real-gas R1234yf) optimisation of a jet-ejector for an IC-engine intake-cooling refrigeration
+    cycle; fitted subcritical and breakdown performance surface. Author accepted manuscript (RiuNet).
+  status: screened
+  verdict: 'Methodology reference only: richest fitted subcritical/breakdown surface, but R1234yf is outside
+    combaero''s air/combustion EOS, so not a fixture. Also noted as a lead for a working-fluid generalisation
+    factor.'
+  read_for: [subcritical/breakdown droop data (#263), working-fluid generalisation (ejector design memory)]
+  issues: [263]
+  records: [validation/ejector/OPERATING_REGIMES_DESIGN.md]
+- file: docs/ejector/Huang_1d_analysis_ejector.pdf
+  citation: Huang, B. J., Chang, J. M., Wang, C. P., Petrenko, V. A. (1999). A 1-D analysis of ejector
+    performance. Int. J. Refrigeration 22, 354-364.
+  topic: [ejector]
+  content: 1-D critical-mode ejector model (constant-pressure mixing, choked secondary at a hypothetical
+    throat), Eqs 1-19 printed; 11 ejectors tested with R141b; efficiencies eta_p, eta_s, phi_p, phi_m
+    fitted. Tables 3-4 printed (test vs theory, 31 rows).
+  status: implemented
+  verdict: 'The shipped ejector kernel: entrainment ratio from Eqs 1-8 and, since #670, the default P_c*
+    from the printed chain (anchor_closure=''huang1999''). Fidelity on its own 31 rows: omega to 0.8%,
+    but the printed P_c* chain has an unexplained ~-23% own-row gap.'
+  read_for: [EjectorElement critical mode (#252), C++ port with analytic Jacobians (#253), printed P_c*
+      chain fidelity, anchor default (#669/#670)]
+  issues: [252, 253, 254, 261, 265, 588, 622, 669, 670, 687, 698]
+  records: [validation/ejector/models/huang1999.py, validation/ejector/data/huang1999_tables.py, validation/ejector/data/huang1999_reference.json,
+    validation/ejector/data/huang1999_reference_data.h, validation/ejector/printed_chain_check.py]
+  code: ['include/ejector.h: Huang 1999 Eqs 1-8, Eq 19', python/combaero/network/_ejector_huang1999.py]
+- file: docs/ejector/Liao2008_gas_ejector_dissertation.pdf
+  citation: Liao, C. (2008). Gas ejector modeling for design and analysis. PhD dissertation, Texas A&M
+    University.
+  topic: [ejector]
+  content: '269-page dissertation: 1-D gas ejector models and one measured set (suction and outlet at
+    atmosphere, supply pressure varied, converging-orifice primary). Entrainment defined as (m_p + m_s)/m_p;
+    data plotted only.'
+  status: screened
+  verdict: 'No usable data: the single measured set lacks a back-pressure sweep, uses a non-standard entrainment
+    definition and is plotted only, and its models are never compared with measurements.'
+  read_for: [ejector anchor data with a back-pressure sweep (#670)]
+  issues: [670]
+  records: [validation/ejector/README.md]
+- file: docs/ejector/Lienhard_One dimensional.pdf
+  citation: McGovern, R. K., Bulusu, K. V., Antar, M. A., Lienhard V, J. H. (?). One-dimensional model
+    of an optimal ejector and parametric study of ejector efficiency. ? (conference paper; venue and year
+    not printed on the first pages).
+  topic: [ejector]
+  content: 1-D model of an ejector of optimal geometry with choked entrained flow and perfectly expanded
+    motive nozzle; reversible entrainment-ratio efficiency versus compression and driving pressure ratios.
+    Equations printed; parametric results plotted.
+  status: screened
+  verdict: 'Evaluated as a zero-loss, shock-free P_c* closure: 9.0%/16.0% on Huang''s rows, beaten by
+    Kracik & Dvorak; not adopted. Its reversible-efficiency definition was noted for a future efficiency
+    metric.'
+  read_for: [ejector P_c* mixing closure (#252), ejector efficiency definition]
+  issues: [252]
+  records: [validation/ejector/README.md, validation/ejector/models/huang1999.py]
+- file: docs/ejector/Lucas2012_CO2_ejector_cycle.pdf
+  citation: Lucas, C., Koehler, J. (2012). Experimental investigation of the COP improvement of a refrigeration
+    cycle by use of an ejector. Int. J. Refrigeration 35, 1595-1603.
+  topic: [ejector]
+  content: Transcritical CO2 (R744) ejector vs expansion-valve cycle on one rig; ejector efficiency up
+    to 22%, entrainment ratio and pressure recovery; COP +17%. Data plotted.
+  status: screened
+  verdict: 'Outside the element''s scope: supercritical, flashing two-phase motive flow; the ideal-gas
+    choke is 34-51% below the measured driving flow, and the outlet is set by the cycle so no anchors
+    are measured. Documents a declared model limit.'
+  read_for: [ejector anchor data (#670), ideal-gas choke vs two-phase motive flow]
+  issues: [670]
+  records: [validation/ejector/data/lucas2012_choke_check.py, validation/ejector/README.md]
+- file: docs/ejector/MazzelliMilazzo2015_IJR_preprint.pdf
+  citation: Mazzelli, F., Milazzo, A. (2015). Performance analysis of a supersonic ejector cycle working
+    with R245fa. Int. J. Refrigeration 49, 79-92.
+  id: DOI 10.1016/j.ijrefrig.2014.09.020
+  topic: [ejector]
+  content: 'Florence R245fa ejector chiller, third duct (A_3/A_t 9.72): measured primary and secondary
+    flows with 95% bands, back-pressure sweeps at T_g 89-90 C (Tables 3-4 printed); CFD tuned with 20
+    um sand-grain roughness.'
+  status: accuracy
+  verdict: 'Cross-source accuracy with a measurement band: omega -25 to -30% (0/5 in band), P_c* Huang
+    -18% and K&D +13% bracketing the measured T_c*. The paper''s CFD is tuned and is not scored against.'
+  read_for: ['#697 third-duct omega with a measured band', P_c* bracket, primary choke]
+  issues: [697, 698]
+  records: [validation/ejector/data/mazzelli2015_tables.py, validation/ejector/mazzelli2015_check.py,
+    python/tests/test_ejector_mazzelli2015.py]
+  notes: Accepted-manuscript (FLORE repository) version.
+- file: docs/ejector/Theoretical Model for Predicting Performance of a Gas Ejector.pdf
+  citation: Akbarnejad, S., Ziabasharhagh, M. (2025). Development of a theoretical model for predicting
+    performance of a gas ejector in different boundary conditions and working fluids. Thermal Engineering
+    72(1), 8-16.
+  id: DOI 10.1134/S0040601524700526
+  topic: [ejector]
+  content: 'Steam/gas ejector: scaling-law model from a reference curve of the same ejector; ANSYS Fluent
+    CFD for four ejectors with numeric critical and breakdown back-pressure tables (Tables 1-3 printed).'
+  status: accuracy
+  verdict: Its CFD tables (E1, E2 steam) are a cross-source P_c*/P_b0 check (labelled CFD, not measured).
+    Its own model is a scaling law needing a reference curve, so it offers no geometry-only anchor.
+  read_for: ['P_c*/P_b0 anchors (#263, #667)']
+  issues: [263, 265, 667]
+  records: [validation/ejector/data/akbarnejad2025_tables.py, validation/ejector/anchor_scorecard.py,
+    python/tests/test_ejector_anchor_scorecard.py]
+- file: docs/ejector/Theoretical_and_Experimental_Activity_on_Ejector_R.pdf
+  citation: Milazzo, A., Rocchetti, A., Eames, I. W. (2014). Theoretical and experimental activity on
+    ejector refrigeration. Energy Procedia 45, 1245-1254 (ATI2013).
+  topic: [ejector]
+  content: 'Overview of Florence ejector refrigeration work: CRMC diffuser design, 40 kW R245fa prototype,
+    successive ejector designs, measured COP and CFD comparison.'
+  status: accuracy
+  verdict: 'Supplies the third design''s original-nozzle operating point (T_g 100 C, COP 0.23), scored
+    cross-source in #698 (omega reads 25% low). Otherwise background for the Florence rig.'
+  read_for: ['#697 third-duct original nozzle point']
+  issues: [697, 698]
+  records: [validation/ejector/data/mazzelli2015_tables.py]
+- file: docs/heat_transfer/ALKHAMIS-THESIS.pdf
+  citation: Alkhamis, N. Y. (2009). Heat transfer and pressure drop measurement for square channels with
+    V-shape ribs at high Reynolds numbers. M.S. thesis, Texas A&M University.
+  topic: [rib]
+  content: 'M.S. thesis (33 pp in this PDF) behind Alkhamis, Rallabandi & Han (2011): square channel,
+    V-shaped ribs, high Re; reports Nu and f (drops the R/G formalism); literature review quotes Taslim''s
+    blockage range.'
+  status: screened
+  verdict: 'Does not help the rib-provenance disputes: e/D >= 0.1 (high blockage) and Nu/f rather than
+    R/G. Same Texas A&M lab as the shipped Han sets, so never an independent check.'
+  read_for: ['rib source provenance: independent-lab or tabulated R/G data']
+  issues: []
+  records: []
+  notes: Thesis version of Alkhamis_2011_JHT_133_111901_vshaped.pdf. Verdict recorded in memory project_rib_source_provenance.md
+    only.
+- file: docs/heat_transfer/Alkhamis_2011_JHT_133_111901_vshaped.pdf
+  citation: Alkhamis, N. Y., Rallabandi, A. P., Han, J.-C. (2011). Heat transfer and pressure drop correlations
+    for square channels with V-shaped ribs at high Reynolds numbers. ASME J. Heat Transfer 133(11), 111901.
+  id: doi:10.1115/1.4004207
+  topic: [rib]
+  content: Scanned (British Library on-demand copy, no text layer). Square channel, 45 deg V-shaped ribs
+    on two walls, Re 30,000-400,000, e/D 0.1-0.18, P/e 5-10; PRINTS R and G roughness-function correlations
+    (Eqs. 18/19) in Re, e/D, P/e.
+  status: screened
+  verdict: 'High-blockage (e/D >= 0.1) V-rib correlation; its (e/D)^-0.08 corroborated a data-driven estimate
+    in the high-Re rib work but it is NOT the Fig. 4.193 45 deg angled-rib source. Possible later V-rib
+    set; would score Han Fig. 4.51''s V classes out of domain, so not needed for #434.'
+  read_for: ['#341 source of Han Fig. 4.193 high-Re correlation (wrong paper)', '#434 rib shape (V-rib)
+      set']
+  issues: [341, 434]
+  records: [validation/cooling/extractions/han_ribbed_high_re.md]
+  notes: Arrived misnamed as Rallabandi_2009.pdf and again as film/518.pdf (byte-identical, per han_ribbed_high_re.md
+    2026-10-01); renamed to this name. Same Texas A&M group as ALKHAMIS-THESIS.pdf (the thesis behind
+    it).
+- file: docs/heat_transfer/ALZAHRANI-DISSERTATION-2023.pdf
+  citation: Alzahrani, Y. S. M. (2023). A parametric study for jet impingement heat transfer enhancement
+    using different roughness elements. Ph.D. dissertation, Texas A&M University.
+  topic: [impingement, pin_fin, rib]
+  content: 'Experiments (steady-state copper plate) plus Fluent CFD in a rectangular impingement channel
+    with pin-fins, strip-fins or W-shaped ribs on the target: Re_jet 10k-70k, z/d 3 and 6, fin H/d 1.5
+    and 2.75, W-rib P/e 18/9/6; heat transfer, crossflow and discharge coefficients. 117 pp; tables not
+    checked.'
+  status: unscreened
+  verdict: unscreened; (guess) roughened-target impingement with crossflow is a new geometry outside the
+    shipped Florschuetz smooth-target scope; could inform a target-roughness augmentation or C_D under
+    crossflow, but fails the plug-a-gap test unless such an element is planned.
+  read_for: []
+  issues: []
+  records: []
+- file: docs/heat_transfer/CR4396/19910021175.pdf
+  citation: 'Hajek, T. J., Wagner, J. H., Johnson, B. V., Higgins, A. W., Steuber, G. D. (1991). Effects
+    of rotation on coolant passage heat transfer, Volume I: Coolant passages with smooth walls. NASA Contractor
+    Report 4396, Vol. I, contract NAS3-23691, Pratt & Whitney. 140 pp.'
+  id: NASA CR-4396 Vol. I
+  topic: [channel]
+  content: Smooth-wall rotating multi-pass coolant passage heat transfer (Pratt & Whitney/UTRC), rotation
+    number, density ratio and buoyancy effects; companion of Vol. II (trips). Not read in detail.
+  status: unscreened
+  verdict: unscreened; (guess) rotation effects are outside combaero's stationary channel models; at most
+    its stationary smooth-wall baseline could cross-check the smooth-duct reference (Nu_inf) that Vol.
+    II's ratios are normalised by.
+  read_for: []
+  issues: []
+  records: []
+  notes: Vol. I of the report whose Vol. II (CR4396/19940011518.pdf) is scored. NTRS accession 19910021175.
+- file: docs/heat_transfer/CR4396/19940011518.pdf
+  citation: 'Johnson, B. V., Wagner, J. H., Steuber, G. D. (1993). Effects of rotation on coolant passage
+    heat transfer, Volume II: Coolant passages with trips normal and skewed to the flow. NASA Contractor
+    Report 4396, Vol. II, contract NAS3-23691, Pratt & Whitney. 124 pp.'
+  id: NASA CR-4396 Vol. II
+  topic: [rib]
+  content: Rotating and stationary multi-pass square passage with staggered trips normal and skewed to
+    the flow (UTRC rig, e/D 0.1); Nu reported as Nu/Nu_inf with Nu_inf = 0.0176 Re^0.8 at Pr 0.72 (Kays-Perkins,
+    p. 18 -- printed); stationary data only PLOTTED (Figs. 6.1/6.2, log y, 4 Re overplotted); no ribbed
+    friction.
+  status: accuracy
+  verdict: 'First rib Nusselt data from a lab outside Texas A&M: scores the Han R/G sets cross-source
+    (accuracy, never fidelity), Han +12%/+18% high on its cast-style staggered trips after the Kays-Perkins
+    -> Dittus-Boelter conversion. Not a closure source (no friction, e/D outside the ratio sets).'
+  read_for: ['#452 independent-lab check of the Han R/G sets', '#403 item 2 independent lab', '#444 ratio-form
+      (Nu/Nu0) sets']
+  issues: [403, 434, 444, 452, 700, 702, 703]
+  records: [validation/cooling/extractions/johnson_1993_cr4396.md, validation/cooling/data/johnson1993/metadata.yaml]
+  code: ['validation/cooling/conventions.py: Kays-Perkins to Dittus-Boelter conversion (0.873)']
+  notes: A text-identical copy at docs/heat_transfer/19940011518.pdf was deleted 2026-10-25.
+- file: docs/heat_transfer/dimples/045312_1_online.pdf
+  citation: Wang, F., Chen, L., Liu, K., Tang, H., Ren, Y. (2022). Heat transfer and flow friction characteristics
+    of dimple-type heat exchanger in axial piston pump. AIP Advances 12, 045312.
+  id: doi:10.1063/5.0087958
+  topic: [dimple]
+  content: Numerical (CFD) study of a dimple-type heat exchanger for an axial piston pump; Nu and friction
+    trends vs dimple parameters, plotted only.
+  status: screened
+  verdict: 'Rejected on #336 screen (2026-10-22): CFD, piston-pump heat exchanger, not a dimpled cooling-channel
+    wall. Not a scoring or design source.'
+  read_for: ['#336 dimple re-add source screen']
+  issues: [336]
+  records: []
+  notes: 'Dimples declared out of scope until measured air data with varying depth arrive (user decision
+    2026-10-23 on #336).'
+- file: docs/heat_transfer/dimples/1-s2.0-S0017931024014674-main.pdf
+  citation: Alrefaey, K., Khaled, O., Swift, J., Kempers, R. (2025). Experimental investigation of the
+    thermal-hydraulic performance of hook-shaped fins and dimples. International Journal of Heat and Mass
+    Transfer 240, 126640.
+  topic: [dimple]
+  content: Measured Nu and f for proprietary GRIPMetal hook-fin + dimple sheets cooled by WATER in a rectangular
+    channel, tip clearance varied, Re 600-12,000; results plotted.
+  status: screened
+  verdict: 'Rejected on #336 screen: liquid coolant, proprietary hook-fin sheet rather than a dimpled
+    channel wall. No use for gas-turbine dimple sets.'
+  read_for: ['#336 dimple re-add source screen']
+  issues: [336]
+  records: []
+- file: docs/heat_transfer/dimples/applsci-09-02900.pdf
+  citation: Jing, Q., Xie, Y., Zhang, D. (2019). Effects of channel outlet configuration and dimple/protrusion
+    arrangement on the blade trailing edge cooling performance. Applied Sciences 9, 2900.
+  id: doi:10.3390/app9142900
+  topic: [dimple]
+  content: 'CFD of trapezoidal trailing-edge cooling channels with lateral extraction slots: five outlet
+    configurations x three dimple/protrusion arrangements; results plotted.'
+  status: screened
+  verdict: 'Rejected for scoring on #336: CFD and configuration-specific. The #336 close comment kept
+    it only as a possible CFD interpolation aid if a measured depth set is ever built.'
+  read_for: ['#336 dimple re-add source screen']
+  issues: [336]
+  records: []
+- file: docs/heat_transfer/dimples/applsci-12-12965-v2.pdf
+  citation: Wang, Z., Wang, Y., Zhang, J., Li, S., Xu, Y. (2022). Numerical simulation of heat transfer
+    performance of a dimpled tubular heat exchanger. Applied Sciences 12, 12965.
+  id: doi:10.3390/app122412965
+  topic: [dimple]
+  content: CFD of a tube-in-shell heat exchanger with dimpled inner tube (concave outside, protrusion
+    inside), dimple size 10-15 mm; Nu enhancement and resistance plotted.
+  status: screened
+  verdict: 'Rejected on #336 screen: CFD of a dimpled tube heat exchanger, not a cooling channel. No use
+    here.'
+  read_for: ['#336 dimple re-add source screen']
+  issues: [336]
+  records: []
+- file: docs/heat_transfer/dimples/v003t09a080-97-gt-437.pdf
+  citation: Chyu, M. K., Yu, Y., Ding, H., Downs, J. P., Soechting, F. O. (1997). Concavity enhanced heat
+    transfer in an internal cooling passage. ASME Turbo Expo, Orlando, paper 97-GT-437.
+  id: ASME 97-GT-437
+  topic: [dimple]
+  content: Measured (transient liquid crystal, air) Nu on hemispheric and tear-drop concavity arrays,
+    D 19.1 mm, depth 4.8 mm (delta/D 0.25), S/D 1 staggered, 14 rows; H/delta 1.33/4/8, one or two dimpled
+    walls, Re_Dh 1e4-5.2e4. Nu/Nu0 about 2.5, f about half of ribs; area-averaged Nu/Nu0 and f in Figs.
+    5-7 only (plotted).
+  status: screened
+  verdict: The only usable measured dimple source on disk, and the one the removed pre-rebuild code cited.
+    Fixed depth and spacing, so it cannot support a depth/spacing model; at most a single-geometry chyu_1997_hemispheric
+    set. User chose to wait for Mahmood 2001 / Burgess 2003.
+  read_for: ['#336 dimple re-add source screen', '#336 single-geometry set vs depth set decision']
+  issues: [336, 330]
+  records: []
+  notes: Figs. 5-7 not digitised. Dimples out of scope until further data (user, 2026-10-23).
+- file: docs/heat_transfer/energies-14-00039-v2.pdf
+  citation: Ekkad, S. V., Singh, P. (2021). Detailed heat transfer measurements for rotating turbulent
+    flows in gas turbine systems. Energies 14, 39.
+  id: doi:10.3390/en14010039
+  topic: [review]
+  content: 'MDPI review (26 pp) of detailed measurement techniques (transient liquid crystal, IR, PSP)
+    and test facilities for rotating internal and external turbine heat transfer and film effectiveness.
+    Review: no new correlation or tabulated data expected.'
+  status: unscreened
+  verdict: unscreened; (guess) a techniques review with no closure or tabulated data; plugs no gap, useful
+    at most as a pointer to rotating-rig primaries.
+  read_for: []
+  issues: []
+  records: []
+- file: docs/heat_transfer/film/1-s2.0-S1876610214001489-main.pdf
+  citation: 'Andrei, L., Andreini, A., Bianchini, C., Caciolli, G., Facchini, B., Mazzei, L., Picchi,
+    A., Turrini, F. (2014). Effusion cooling plates for combustor liners: experimental and numerical investigations
+    on the effect of density ratio. Energy Procedia 45, 1402-1411.'
+  id: doi:10.1016/j.egypro.2014.01.147
+  topic: [effusion, film]
+  content: PSP adiabatic effectiveness of an 18-row effusion plate (d 1.5 mm, 30 deg, s_x/d 9.15, s_z/d
+    7.37) at BR 1/2/3 and DR 1.0/1.5, plus RANS with an anisotropic k-omega SST correction. Data only
+    PLOTTED (Figs 4-5, vector polylines).
+  status: accuracy
+  verdict: 'Cross-source accuracy set for Baldauf + Sellers superposition (film_runner set baldauf_2002_sellers,
+    MAE 45.5%, error changes sign with BR). Never fidelity: every curve is outside Baldauf''s envelope
+    (s/D 7.37).'
+  read_for: ['#387 external film closure for effusion', '#420 Baldauf+Sellers scoring', Gao alpha fit
+      (ruled out on this family)]
+  issues: [386, 387, 389, 410, 412, 413, 419, 420, 421, 424, 425]
+  records: [validation/cooling/data/andrei2014/metadata.yaml, validation/cooling/extractions/effusion_plate_flow.md]
+  code: ['tests/test_film_effectiveness.cpp: AndreiTwentyFourteenRigIsOutsideTheEnvelope', validation/cooling/film_runner.py]
+  notes: 'Curves extracted exactly from the PDF vector stream, not digitised. Memory: project_andrei2014_is_extrapolation.md,
+    project_film_effusion_thermal.md.'
+- file: docs/heat_transfer/film/14_Pa_129.pdf
+  citation: Celano, M. P., Silvestri, S., Kirchberger, C., Schlieben, G., Suslov, D. I., Haidn, O. J.
+    (2016). Gaseous film cooling investigation in a model single element GCH4-GOX combustion chamber.
+    Trans. JSASS Aerospace Tech. Japan 14(ists30), Pa_129-Pa_137.
+  topic: [film, combustion]
+  content: 'Rocket model combustor (methane/GOX, capacitively cooled copper liner): film cooling efficiency
+    from liner thermocouples vs blowing rate, chamber pressure and film applicator geometry. Results PLOTTED.'
+  status: screened
+  verdict: 'Rocket-combustor film cooling: not turbine/combustor-liner geometry or conditions; #386 says
+    it must not be used as a gas-turbine validation source without saying so. No use found.'
+  read_for: ['#386 film element source inventory']
+  issues: [386]
+  records: []
+  notes: 'Inventory-level screening only (#386 comments 1 and 3: ''Different application -- read with
+    care'').'
+- file: docs/heat_transfer/film/19670008176.pdf
+  citation: Lucas, J. G., Golladay, R. L. (1967). Gaseous-film cooling of a rocket motor with injection
+    near the throat. NASA TN D-3836, Lewis Research Center.
+  id: NASA TN D-3836
+  topic: [film, combustion]
+  content: Rocket motor with gaseous film injected near the throat; wall temperatures/film effectiveness
+    downstream. NASA TN era, may carry tabulated data (not checked).
+  status: screened
+  verdict: 'Rocket application; #386 flags it as ''read with care'', possibly worth a look for tabulated
+    appendices, but not a gas-turbine validation source. Unused.'
+  read_for: ['#386 film element source inventory']
+  issues: [386]
+  records: []
+  notes: 'Identified by file name in #386 comment 1. Inventory-level screening only.'
+- file: docs/heat_transfer/film/2006-Colban-JT-1j1ca3g.pdf
+  citation: Colban, W., Gratton, A., Thole, K. A., Haendler, M. (2006). Heat transfer and film-cooling
+    measurements on a stator vane with fan-shaped cooling holes. ASME J. Turbomach. 128(?), ?.
+  id: doi:10.1115/1.2098789; ASME GT2005-68258
+  topic: [film]
+  content: 'Scaled-up two-passage vane cascade with contoured endwall: heat transfer coefficients and
+    adiabatic effectiveness for fan-shaped hole rows on pressure and suction sides, with/without showerhead.
+    PLOTTED.'
+  status: screened
+  verdict: 'Named in #386 as a candidate validation source on a real vane for Colban 2011 (same group,
+    so cross-source only in geometry). Vane curvature makes it a poor flat-plate check; never extracted
+    or scored.'
+  read_for: ['#386 shaped-hole film validation candidate']
+  issues: [386]
+  records: []
+  notes: 'Title-level triage in #386 comment 3; no evidence it was read in depth.'
+- file: docs/heat_transfer/film/2011-Colban-JT-1fygyl9.pdf
+  citation: Colban, W. F., Thole, K. A., Bogard, D. (2011). A film-cooling correlation for shaped holes
+    on a flat-plate surface. ASME J. Turbomach. 133(1), 011002.
+  id: doi:10.1115/1.4002064
+  topic: [film]
+  content: Physics-based empirical correlation (Eq. 19) for laterally averaged adiabatic effectiveness
+    downstream of a row of shaped holes vs blowing ratio, coverage ratio, area ratio, pitch; coefficients
+    PRINTED; Figs 6-7 PLOT the fitting data (Gritsch et al. 2005).
+  status: implemented
+  verdict: Shaped-hole film kernel for FilmCoolingElement (#386). Scored as fidelity on its own fitting
+    data (optimistic, stated as such); says nothing about another rig.
+  read_for: ['#386 shaped-hole film effectiveness']
+  issues: [386, 686, 688, 689, 714]
+  records: [validation/cooling/extractions/colban_2011_shaped_film.md, validation/cooling/data/colban2011/metadata.yaml]
+  code: ['include/cooling_correlations.h: film_effectiveness_colban_2011, film_effectiveness_colban_2011_and_derivatives']
+- file: docs/heat_transfer/film/601_1_Cho_2001.pdf
+  citation: Cho, H. H., Rhee, D. H. (2001). Local heat/mass transfer measurement on the effusion plate
+    in impingement/effusion cooling systems. ASME J. Turbomach. 123(3), 601-608.
+  id: doi:10.1115/1.1344904; ASME 2000-GT-252
+  topic: [impingement, effusion]
+  content: Naphthalene sublimation Sh on the effusion (vented target) plate under impingement, one vent
+    per jet, d 15 mm, P/d 6, H/d 0.33-10, Re 5000-12000; staggered vs shifted. Table 2 (Sh_avg vs H/d)
+    and Eq. 4 Sh = 0.562 Re^0.558 PRINTED; maps plotted.
+  status: screened
+  verdict: 'Second, cross-source vented-target study for #468: accuracy only, closure stays Hollworth
+    & Dagan. Its Re exponent 0.558 (3-point fit, ill-conditioned) conflicts with H&D 0.8; looks tied to
+    H/d = 1.'
+  read_for: ['#468 vented-target closure', '#468 Re exponent']
+  issues: [468]
+  records: []
+  notes: 'Same study as JAKO200027542986867.pdf (Korean version, same Table 2 digits). Mentioned in validation/cooling/extractions/hollworth_dagan_1980_vented_target.md.
+    Memory: project_impingement_effusion_sources_468.md. End page 608 from #468 (p.1 shows only 601).'
+- file: docs/heat_transfer/film/686_1_Baldauf_Film_2002.pdf
+  citation: Baldauf, S., Scheurlen, M., Schulz, A., Wittig, S. (2002). Correlation of film-cooling effectiveness
+    from thermographic measurements at enginelike conditions. ASME J. Turbomach. 124(4), 686-698.
+  id: doi:10.1115/1.1504443; ASME 2002-GT-30180
+  topic: [film]
+  content: IR-thermography adiabatic effectiveness downstream of a row of cylindrical holes; independent
+    variation of M, DR, Tu, ejection angle, s/D; modular correlation with coefficient table (Table 4)
+    PRINTED, envelope stated.
+  status: implemented
+  verdict: Single-row cylindrical-hole film kernel with analytic (f, J) (#412) used by film and effusion
+    elements. Fidelity unreachable (author data not in repo); on effusion arrays it fails cross-source
+    (andrei2014) through lift-off. Eq. 31 b_0 discrepancy vs Table 4 still open.
+  read_for: ['#386 film effectiveness', '#387 effusion external side', '#419 envelope reporting']
+  issues: [338, 339, 386, 389, 412, 419, 420, 689, 690, 694, 695, 699]
+  records: [validation/cooling/extractions/baldauf_2002_film_effectiveness.md]
+  code: ['include/cooling_correlations.h: film_effectiveness_baldauf_2002, film_effectiveness_baldauf_2002_and_derivatives']
+  notes: 'p.1 text layer shows Baldauf, Scheurlen, Wittig and 686, Vol. 124, Oct 2002; Schulz, title and
+    end page 698 from the repo record (title page is partly image). Web page copy next to it: ''Correlation
+    of Film-Cooling Effectiveness From Thermographic Measurements at Enginelike Conditions |.html''.'
+- file: docs/heat_transfer/film/A_Low_Order_Flow_Network_Model_for_Doubl.pdf
+  citation: van de Noort, M., Ireland, P. (2022). A low order flow network model for double-wall effusion
+    cooling systems. Int. J. Turbomach. Propuls. Power 7(1), 5.
+  id: doi:10.3390/ijtpp7010005
+  topic: [effusion, impingement, pin_fin]
+  content: Low-order flow network for NGV double-wall effusion (impingement + pin-fin + effusion), coolant
+    migration and hot-gas ingestion (CMF), validated against experiments with mainstream pressure gradients.
+    Equations PRINTED (incl. Eq. 8 beta correction).
+  status: screened
+  verdict: 'Design reference for EffusionPlateElement (#410) and the duct-fed effusion liner (#479): panel
+    discretisation, migration, CMF > 0.5 ingestion; its approach-velocity correction deliberately not
+    applied. No closure taken from it.'
+  read_for: ['#387 element shape', '#410 effusion plate flow side', '#479 effusion liner']
+  issues: [386, 387, 410, 479]
+  records: [validation/cooling/extractions/effusion_plate_flow.md]
+  code: ['python/combaero/network/components.py: EffusionPlateElement docstring']
+- file: docs/heat_transfer/film/AGARDAG328.pdf
+  citation: Hirsch, C. (ed.) (1993). Advanced methods for cascade testing. AGARDograph 328, AGARD, Neuilly-sur-Seine.
+  id: AGARD-AG-328
+  topic: [other]
+  content: Agardograph on cascade test methods and measurement techniques (about 200 pages); only incidental
+    film-cooling content.
+  status: screened
+  verdict: 'Probably off-target: cascade test methods, about twelve mentions of film cooling; no cooling
+    correlation. Only of interest for a measurement technique.'
+  read_for: ['#386/#387 source inventory']
+  issues: [386, 387]
+  records: []
+  notes: '#468 mentions AGARD CP-527 (a different AGARD volume), not this file.'
+- file: docs/heat_transfer/film/Andrews_88-GT-290.pdf
+  citation: 'Andrews, G. E., Asere, A. A., Hussain, C. I., Mkpadi, M. C., Nazari, A. (1988). Impingement/effusion
+    cooling: overall wall heat transfer. ASME 88-GT-290, Gas Turbine and Aeroengine Congress, Amsterdam.'
+  id: ASME 88-GT-290
+  topic: [impingement, effusion]
+  content: Transient-method overall heat transfer in impingement/effusion walls (Leeds plates A/B/C, 8
+    mm gap, square arrays), effusion-alone vs impingement/effusion, overall cooling effectiveness; Table
+    1 geometry PRINTED; h vs G (Fig. 8) and effectiveness (Fig. 10) PLOTTED; Re exponent 0.72 printed
+    on figure axes.
+  status: accuracy
+  verdict: 'Cross-source accuracy data for the effusion internal h (86-GT-225 correlations vs 1988 rig)
+    and the overall-effectiveness output; also the 1-vent-per-jet Re exponent 0.72 for #468. Whole-wall
+    h, so it cannot isolate the coolant side.'
+  read_for: ['#387 overall effectiveness output', '#476 augmentation', '#468 overall effectiveness', '#468
+      Re exponent 0.72', '#410 plate geometry (Table 1)']
+  issues: [386, 387, 410, 427, 428, 430, 431, 433, 468, 475, 476, 487, 684, 690]
+  records: [validation/cooling/data/andrews1988/metadata.yaml, validation/cooling/extractions/andrews_effusion_overall_eta.md,
+    validation/cooling/extractions/effusion_plate_flow.md]
+  notes: 'A byte-identical copy, Impingement_Effusion_Cooling_Overall_Wal.pdf, was deleted 2026-10-25. Local digitised
+    folder andrews_88-GT-290_fig10_data/ (renamed 2026-10-25 from andrews_86-GT-290_fig10_data/; the CSVs
+    inside keep their andrews_86-GT-290_ prefix) and andrews_88-GT-290_fig_10.png. Title from the repo record
+    (not in p.1 text layer). Local only (gitignored).'
+- file: docs/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
+  citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
+    experimental and computational methods for modelling multiple row effusion cooling performance. Int.
+    J. Turbomach. Propuls. Power 3(1), 4.
+  id: doi:10.3390/ijtpp3010004
+  topic: [effusion, film]
+  content: Flat-plate effusion arrays at two pitches (3.0D, 5.75D), PSP spanwise-averaged effectiveness
+    vs blowing, plus CFD and the authors' own Sellers superposition of a single-hole CFD result. PLOTTED
+    (Fig. 6 digitised).
+  status: accuracy
+  verdict: Cross-source accuracy set (murray2018) for Baldauf + Sellers; separates superposition error
+    from per-row closure error. Shows Gao's alpha is the wrong knob for this family.
+  read_for: ['#387 effusion external side', '#421/#425 superposition vs closure split', Gao alpha fit]
+  issues: [386, 387, 412, 413, 421, 424, 425, 426, 429]
+  records: [validation/cooling/data/murray2018/metadata.yaml, validation/cooling/extractions/murray_ireland_2018_effusion_superposition.md,
+    validation/cooling/extractions/gao_alpha_fit_on_murray.md]
+  notes: 'Local digitised folder murray_2018_fig6_data/ and murray_2018_fig6.png next to the PDFs. Local
+    only (gitignored): docs/heat_transfer/film/murray_2018_fig6_data/.'
+- file: docs/heat_transfer/film/Effusion_Cooling_In_Gas_Turbine_Combusti.pdf
+  citation: 'Yellu Kumar, K. R., Qayoum, A., Saleem, S., Qayoum, F. (2020). Effusion cooling in gas turbine
+    combustion chambers - a comprehensive review. IOP Conf. Ser.: Mater. Sci. Eng. 804, 012003.'
+  id: doi:10.1088/1757-899X/804/1/012003
+  topic: [effusion, review]
+  content: Literature review of geometric and flow parameter effects on effusion adiabatic effectiveness.
+    No new data.
+  status: screened
+  verdict: 'Orientation only: good for finding primaries, not a correlation or data source.'
+  read_for: ['#387 source inventory']
+  issues: [386, 387]
+  records: []
+- file: docs/heat_transfer/film/FLOW_AND_HEAT_TRANSFER_IN_A_RIB-ROUGHENED_TRAILING.pdf
+  citation: Xue, F., Taslim, M. E. (2019). Flow and heat transfer in a rib-roughened trailing-edge cooling
+    channel with crossover impingement. Int. J. Gas Turbine, Propulsion and Power Systems 10(1), ?.
+  topic: [rib, impingement]
+  content: CFD (k-epsilon, realizable k-epsilon, k-omega SST) of a trapezoidal trailing-edge channel fed
+    by eleven racetrack crossover jets, four rib angles, two exit arrangements, compared with test data.
+  status: unscreened
+  verdict: 'unscreened; (guess) CFD of a crossover-impingement ribbed trailing-edge cavity: no closure,
+    out of the flat-plate/square-channel scope; at most a geometry-specific accuracy check.'
+  read_for: []
+  issues: []
+  records: []
+  notes: Rib/impingement paper filed under film/.
+- file: docs/heat_transfer/film/han_1991_590_vol_113.pdf
+  citation: Han, J. C., Zhang, Y. M., Lee, C. P. (1991). Augmented heat transfer in square channels with
+    parallel, crossed, and V-shaped angled ribs. ASME J. Heat Transfer 113(3), 590-596.
+  topic: [rib]
+  content: Square channel, two opposite in-line ribbed walls, e/D 0.0625, P/e 10, Re 15000-90000, nine
+    rib configurations (90, 60/45 parallel, crossed, V, Lambda); Table 2 PRINTED (54 cells), local distributions
+    plotted.
+  status: implemented
+  verdict: Primary behind Han's figure 4.51; Table 2 confirmed and implemented as han_zhang_lee_1991(shape,
+    alpha_deg) (#434).
+  read_for: ['#434 angled/V rib sets', '#333 rib provenance']
+  issues: [333, 434, 441, 445, 702, 703]
+  records: [validation/cooling/extractions/han_zhang_lee_1991_jht.md]
+  code: ['include/rib_correlation.h: han_zhang_lee_1991']
+  notes: Rib paper filed under film/ by mistake (the record says so). Not the conference twin of 91-GT-3.
+- file: docs/heat_transfer/film/Heat-Transfer-and-Friction-Studies-in-a-Tilted-and-Rib-Roughened-Trailing-Edge-Cooling-Cavity-With-and-Without-the-Trailing-Edge-Cooling-Holes.pdf
+  citation: Taslim, M. E., Halabi, J. S. (2014). Heat transfer and friction studies in a tilted and rib-roughened
+    trailing-edge cooling cavity with and without the trailing-edge cooling holes. Int. J. Rotating Machinery
+    2014, 710450 (14 pp.).
+  id: doi:10.1155/2014/710450
+  topic: [rib]
+  content: Measured and CFD heat transfer and friction in a trapezoidal, 22-deg tilted trailing-edge cavity
+    with tapered ribs, with and without 22 trailing-edge ejection holes.
+  status: screened
+  verdict: 'Independent (Northeastern) lab but trapezoidal tilted cavity with ejection holes, not a square
+    channel: cannot arbitrate #403 item 2 (square-channel ribbed friction).'
+  read_for: ['#403 item 2 independent rib friction source']
+  issues: [403]
+  records: []
+  notes: Rib paper filed under film/.
+- file: docs/heat_transfer/film/Jackowski_2021_Energies_14_4843_impingement_effusion_double_wall.pdf
+  citation: 'Jackowski, T., Elfner, M., Bauer, H.-J. (2021). Experimental study of impingement effusion-cooled
+    double-wall combustor liners: thermal analysis. Energies 14(16), 4843.'
+  id: doi:10.3390/en14164843
+  topic: [impingement, effusion]
+  content: 'KIT double-wall liner: impingement D 4 mm onto a 7-7-7 laidback fan-shaped effusion plate,
+    H 3/5/7D, two alignments, M 1/2/3; cavity-side Nu_D (Figs A1/A2) and overall effectiveness phi(y/D)
+    (Figs 5/6) PLOTTED; no correlation.'
+  status: screened
+  verdict: 'Accuracy-only source for #468 vented-target coolant-side Nu (no correlation, so never fidelity);
+    unusable for a Re exponent (FE-inverse, std 30-70%). Not yet digitised.'
+  read_for: ['#468 vented-target closure', '#468 Re exponent']
+  issues: [468]
+  records: []
+  notes: 'Memory: reference_impingement_sources_2026_10_20.md. Jackowski 2016 (network model) cited in
+    docs/archive/REVIEW_NETWORK_GUI.md is a different paper.'
+- file: docs/heat_transfer/film/JAKO200027542986867.pdf
+  citation: Rhee, D. H., Cho, H. H. (2000). Heat transfer characteristics on effusion plate in impingement/effusion
+    cooling for combustor (in Korean). Trans. KSME B 24(3), 435-442.
+  topic: [impingement, effusion]
+  content: Korean text, English abstract/captions. Naphthalene Sh on the effusion plate, d 15 mm, P/d
+    6, H/d 0.33-10, Re 5000-12000, staggered vs shifted; Table 2 Sh_avg PRINTED.
+  status: screened
+  verdict: 'Korean version of Cho & Rhee 2001 (same rig, same Table 2 digits): not a separate source;
+    counts as the same cross-source family for #468.'
+  read_for: ['#468 vented-target closure']
+  issues: [468]
+  records: []
+  notes: 'No text layer (scan). Same study as 601_1_Cho_2001.pdf. The local summary .md (written before
+    the #468 comment) says the equivalence could not be confirmed; #468 comment of 2026-10-25 and memory
+    later confirm it from Table 2 digits. Local only (gitignored): docs/heat_transfer/film/rhee_cho_2000_KSME_B_24_3_effusion_plate_heat_transfer.md.'
+- file: docs/heat_transfer/film/JAKO200211920878407.pdf
+  citation: Choi, J. H., Rhee, D. H., Cho, H. H. (2002). The effects of impingement hole arrangements
+    on heat transfer of an impingement/effusion cooling system (in Korean). Trans. KSME B 26(1), 101-109.
+  topic: [impingement, effusion]
+  content: Korean text, English abstract/captions. Naphthalene Sh on the effusion plate for staggered,
+    square and hexagonal jet arrays (A_e/A_i 2.25, 0.75, 1.125), H/D 1-6, Re_D 10000 on the effusion hole;
+    Sh_avg vs H/D PLOTTED (Fig. 9, about 12 clean points), no correlation.
+  status: screened
+  verdict: 'The only local data that varies vent/jet area ratio (gap left by Hollworth & Dagan) for #468;
+    single Re, accuracy only, not digitised.'
+  read_for: ['#468 vent/jet area ratio dependence']
+  issues: [468]
+  records: []
+  notes: 'No text layer (scan). Local Claude-written summary .md next to the PDF (not cross-checked).
+    Local only (gitignored): docs/heat_transfer/film/choi_rhee_cho_2002_KSME_B_26_1_impingement_hole_arrangement.md.'
+- file: docs/heat_transfer/film/Jet Impingement Heat Transfer Ch06-P020039.pdf
+  citation: 'Zuckerman, N., Lior, N. (2006). Jet impingement heat transfer: physics, correlations, and
+    numerical modeling. Advances in Heat Transfer 39, 565-631.'
+  id: doi:10.1016/S0065-2717(06)39006-5
+  topic: [impingement, review]
+  content: Review of impinging-jet physics, empirical correlations (appendix pp. 610-618, solid targets
+    only) and turbulence-model performance.
+  status: screened
+  verdict: 'No vented-target closure; its Florschuetz entry is a secondary copy of what #465 implements
+    (some decimals lost). Context only for #468.'
+  read_for: ['#468 vented-target closure']
+  issues: [468]
+  records: []
+  notes: 'Page range from the #468 comment (pp. 565-631); p.1 shows only Vol. 39.'
+- file: docs/heat_transfer/film/Kim_Lee_2017_JKSAS_45_4_supersonic_slot_film_Mach3.pdf
+  citation: Kim, M., Lee, D. M. (2017). An experimental study of film cooling characteristics at supersonic
+    free stream conditions (in Korean). J. Korean Society for Aeronautical and Space Sciences 45(4), 342-348.
+  id: doi:10.5139/JKSAS.2017.45.4.342
+  topic:
+  - film
+  content: Tangential slot film (converging nozzle, exit 110 mm x 1.0 mm, behind a backward-facing step) on
+    a 30 deg wedge in a Mach 3.0 free jet (P0 16.9 bar, T0 450/644 K), air on air, angle of attack 0 to -20
+    deg; IR thermography on PEEK, 40 s runs. Table 1 TABULATES blowing ratio F (0.30-1.35) and coolant flow
+    for 17 runs, Table 3 the free-stream mass flux; film efficiency at x = 100 mm (Fig. 11) and film core length
+    (Fig. 12) PLOTTED.
+  status: screened
+  verdict: 'Not usable for #714 (2026-10-25): supersonic external aero-heating, far outside the D-7958 kernel''s
+    subsonic combustor envelope; eta (Eq. 3) uses the measured wall temperature at the slot exit instead of
+    the coolant temperature, on a transient non-adiabatic PEEK wall; x/S 100 vs D-7958''s 33.8. No supersonic
+    film model in combaero.'
+  read_for:
+  - '#714 slot film data'
+  issues:
+  - 714
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/An Experimental Study of Film Cooling Characteristics at Supersonic
+    Free Stream Conditions.pdf. Agency for Defense Development (IR window cooling).
+- file: docs/heat_transfer/film/Modelling_and_Simulation_of_Effusion_Cooling-A_Rev.pdf
+  citation: Xia, H., Chen, X., Ellis, C. D. (2024). Modelling and simulation of effusion cooling - a review
+    of recent progress. Energies 17, 4480.
+  id: doi:10.3390/en17174480
+  topic: [effusion, review]
+  content: Review of empirical, RANS, LES/DES and ML-aided modelling of effusion cooling; no new data.
+  status: screened
+  verdict: 'Used as an argument, not a source: its objection that single-hole models fail for compact
+    effusion arrays motivated Baldauf (row correlation) and explains the #420 negative result.'
+  read_for: ['#412 choice of film correlation', '#420 interpretation']
+  issues: [412, 420]
+  records: []
+  notes: Cited in docs/archive/REVIEW_NETWORK_GUI.md and CHANGELOG.md; memory project_film_effusion_thermal.md.
+- file: docs/heat_transfer/film/oct23/19710020365.pdf
+  citation: Juhasz, A. J., Marek, C. J. (1971). Combustor liner film cooling in the presence of high free-stream
+    turbulence. NASA TN D-6360, Lewis Research Center.
+  id: NASA TN D-6360
+  topic: [film, combustion]
+  content: Original Juhasz-Marek turbulent-mixing slot-film correlation (Eqs. 7-8, C_m 0.15 in a combustor,
+    0.01 tunnel); Table III about 190 points over 10 slot geometries, Tu 10-20% PRINTED. T_H not measured.
+  status: screened
+  verdict: Origin of the slot-film model form (and the cp ratio the kernel omits); cross-source (same
+    lab, different study) directional check for the C_m(Tu) closure, limited by the T_H caveat. Not scored.
+  read_for: ['#714 slot film kernel', '#714 Tu closure cross-source']
+  issues: [714, 738, 742]
+  records: []
+  code: ['include/cooling_correlations.h: slot_film_effectiveness_marek_tacina_1975 comment (cp ratio)']
+  notes: No text layer on p.1 (scan). Summarised by NASA Tech Brief B72-10326 (oct23/19720000325.pdf).
+- file: docs/heat_transfer/film/oct23/19720000325.pdf
+  citation: NASA Lewis Research Center (1972). Turbulent mixing film cooling correlation. NASA Tech Brief
+    B72-10326, December 1972.
+  id: NASA Tech Brief B72-10326
+  topic: [film, combustion]
+  content: One-to-two page announcement of the Juhasz-Marek turbulent-mixing film cooling correlation
+    for combustor slot films. No data.
+  status: screened
+  verdict: 'Skipped for #714: a summary of TN D-6360, nothing beyond it.'
+  read_for: ['#714 slot film sources']
+  issues: [714]
+  records: []
+  notes: Duplicate content of D-6360 (oct23/19710020365.pdf).
+- file: docs/heat_transfer/film/oct23/19730008203.pdf
+  citation: Marek, C. J., Juhasz, A. J. (1973). Simultaneous film and convection cooling of a plate inserted
+    in the exhaust stream of a gas turbine combustor. NASA TN D-7156, Lewis Research Center.
+  id: NASA TN D-7156
+  topic: [film, combustion]
+  content: Film plus back-side convection on one plate in combustor exhaust; Table II 62 runs x 10 thermocouples
+    PRINTED; best-fit C_m 0.03; authors' combined model off by up to 30%.
+  status: screened
+  verdict: 'Network-level validation case (film + coolant channel + wall) for #714 once the element exists;
+    not a kernel source.'
+  read_for: ['#714 network validation case']
+  issues: [714, 742]
+  records: []
+- file: docs/heat_transfer/film/oct23/19750017021.pdf
+  citation: Marek, C. J., Tacina, R. R. (1975). Effect of free-stream turbulence on film cooling. NASA
+    TN D-7958, Lewis Research Center.
+  id: NASA TN D-7958
+  topic: [film, combustion]
+  content: Slot film with measured free-stream turbulence (blockage plates, Tu 7-35%), M 0.41-1.87, x/S
+    up to 34; Table I (about 140 points) PRINTED; Eq. 5 C_m = (0.25 +- 0.15) Tu/100.
+  status: implemented
+  verdict: 'Source of the slot-film kernel (#742) eta = 1/(1 + C_m x/(M S)), C_m from Eq. 5; scored as
+    fidelity on its own Table I (#738: authors'' per-blockage C_m 136/140 within +-30%, Eq. 5 RMS 0.070).'
+  read_for: ['#714 slot film kernel', '#714 C_m(Tu) closure']
+  issues: [714, 738, 742]
+  records: [validation/cooling/extractions/marek_tacina_1975_d7958.md, validation/cooling/data/marek_tacina1975/]
+  code: ['include/cooling_correlations.h: slot_film_effectiveness_marek_tacina_1975, slot_film_effectiveness_marek_tacina_1975_and_derivatives', 'include/cooling_correlations.h: slot_film_span_average_marek_tacina_1975',
+    'python/combaero/network/components.py: SlotFilmElement (#749)']
+  notes: Also fidelity-scored (validation/cooling/fidelity.py); 'implemented' chosen as the higher status.
+    No text layer on p.1 (scan). Element design and Tu closure (stage 2) pending.
+- file: docs/heat_transfer/film/oct23/19770014416.pdf
+  citation: Rousar, D. C., Ewen, R. L. (1977). Combustion effects on film cooling. NASA CR-135052, Aerojet
+    Liquid Rocket Co., Sacramento.
+  id: NASA CR-135052
+  topic: [film, combustion]
+  content: H2/O2 rocket chamber film cooling with combustion effects; the velocity-ratio function is given
+    only as a plot.
+  status: screened
+  verdict: 'Skipped for #714: rocket H2/O2 chamber, key function only plotted; not a gas-turbine slot-film
+    source.'
+  read_for: ['#714 slot film sources']
+  issues: [714]
+  records: []
+- file: docs/heat_transfer/film/oct23/20170001731.pdf
+  citation: Eldridge, J. I., Shyam, V., Wroblewski, A. C., Zhu, D., Cuy, M. D., Wolfe, D. E. (2016). Cooling
+    effectiveness measurements for air film cooling of thermal barrier coated surfaces in a burner rig
+    environment using phosphor thermometry. AIAA Aviation 2016, Washington, D.C. (presentation slides,
+    NTRS 20170001731).
+  topic: [film]
+  content: 'Slide deck: combined TBC + air film overall cooling effectiveness maps measured by phosphor
+    thermometry in a burner rig. No tabulated numbers.'
+  status: screened
+  verdict: 'Skipped for #714: overall phi maps only, no numbers.'
+  read_for: ['#714 slot film sources']
+  issues: [714]
+  records: []
+- file: docs/heat_transfer/film/oct23/Double Wall Cooling Of An Effusion Plate With Simultaneous Cross.pdf
+  citation: Click, A. (2018). Double wall cooling of an effusion plate with simultaneous cross flow and
+    impingement jet array internal cooling. Honors Capstone Projects and Theses 253, University of Alabama
+    in Huntsville.
+  topic: [impingement, effusion]
+  content: Impingement-effusion with cavity crossflow (Ligrani group, Solar Turbines), D_i 8.3 mm, H/D_i
+    about 10.7, Re_j 2410-5120; cold-side Nu PLOTTED only (Figs 19-21), no table; Fig. 21 copies Vanga
+    et al. GT2018-77036.
+  status: screened
+  verdict: 'No vented-target closure for #468; at most a cross-source accuracy check far outside the Florschuetz
+    H/D range. Fetch GT2018-77036 rather than digitise the thesis copy.'
+  read_for: ['#468 vented-target closure']
+  issues: [468]
+  records: []
+  notes: Thesis copies figure data from Vanga et al. GT2018-77036. Its reference list (p. 43) led to Cho
+    & Rhee 2001.
+- file: docs/heat_transfer/film/Overall Effectiveness Superposition Theory for a Film Cooled Lead.pdf
+  citation: Hopkins, B. W. (2023). Overall effectiveness superposition theory for a film cooled leading
+    edge. MS thesis AFIT-ENY-MS-23-M-276, Air Force Institute of Technology (Theses and Dissertations
+    7021).
+  id: AFIT-ENY-MS-23-M-276
+  topic: [film]
+  content: Thesis on superposition of overall (not adiabatic) effectiveness for a film-cooled leading
+    edge.
+  status: screened
+  verdict: 'Named in #386 as the second superposition treatment, in overall-effectiveness terms; relevant
+    only to overall-eta consumers. Not used; Gao 2025 was taken instead.'
+  read_for: ['#386 multi-row superposition']
+  issues: [386]
+  records: []
+  notes: Inventory-level screening (#386 comment 3).
+- file: docs/heat_transfer/film/processes-13-00143-v2.pdf
+  citation: Gao, Z., Qiu, T., Liu, P., Ding, S., Li, Z., Cheng, R., Yuan, Q. (2025). A study on the film
+    superposition method for the multi-row film cooling of the turbine outer ring. Processes 13, 143.
+  id: doi:10.3390/pr13010143
+  topic: [film, effusion]
+  content: Sellers superposition with Gao's per-row alpha correction (Eqs. 1-11; a = 12, b = 0.9465 PRINTED
+    in 4.3.1); measured over-prediction of Sellers vs row count.
+  status: implemented
+  verdict: Source of film_superposition_sellers / film_superposition_corrected (#413). (a, b) rig-specific,
+    kept as required inputs.
+  read_for: ['#386/#387 multi-row superposition', '#426 Gao coefficients']
+  issues: [386, 413, 420, 421, 425, 426]
+  records: [validation/cooling/extractions/film_superposition.md, validation/cooling/extractions/gao_alpha_fit_on_murray.md]
+  code: ['include/cooling_correlations.h: film_superposition_sellers, film_superposition_corrected']
+  notes: A byte-identical copy, A_Study_on_the_Film_Superposition_Method_for_the_M.pdf, was deleted 2026-10-25;
+    this is the file name the code cites.
+- file: docs/heat_transfer/film/Taslim_Spring_1987_AIAA-87-2009_turbulated_passages_aspect_ratio.pdf
+  citation: 'Taslim, M. E., Spring, S. D. (1987). Friction factors and heat transfer coefficients in turbulated
+    cooling passages of different aspect ratios, Part I: experimental results. AIAA-87-2009, 23rd Joint
+    Propulsion Conference, San Diego.'
+  id: AIAA-87-2009; doi:10.2514/6.1987-2009
+  topic: [rib]
+  content: 90-deg in-line turbulators on two opposite walls, P/e 10, aspect ratios 0.5/1.0/3.5, several
+    e/D_H; Nu ~ Re^0.6 and Re-independent passage f stated; coefficients only PLOTTED (Figs 9, 11 digitised).
+  status: implemented
+  verdict: 'First non-Texas A&M rib source: taslim_spring_1987 rib-ratio sets (fitted from digitised markers);
+    fidelity on own data and cross-source accuracy against han_1988_orthogonal.'
+  read_for: ['#403/#444 independent rib source', '#452 aspect-ratio rib friction']
+  issues: [339, 437, 439, 443, 444, 447, 451, 452, 701, 704]
+  records: [validation/cooling/extractions/taslim_spring_1987_aspect_ratio.md, validation/cooling/data/taslim_spring1987/metadata.yaml]
+  code: ['include/rib_ratio_correlation.h: taslim_spring_1987']
+  notes: 'Renamed 2026-10-25 from taslim-spring-2012-friction-factors-...-aspect.pdf (the 2012 was likely
+    a repository upload date). Rib paper filed under film/. Local digitised folder taslim_spring_1987_data/
+    (renamed from taslim-spring-2012_data/; the CSVs inside keep their taslim-spring-2012_ prefix) with SEALED
+    prediction files; AIAA-87-2009_quality_sample.png. Local only (gitignored).'
+- file: docs/heat_transfer/film/The Review of Studies on Heat Transfer in Impinging Jet.pdf
+  citation: Hong, S. K., Cho, H. H. (2005). The review of studies on heat transfer in impinging jet. Int.
+    J. Air-Conditioning and Refrigeration 13(4), 196-205.
+  topic: [impingement, review]
+  content: Review of single and multiple submerged impinging jets, combined techniques (ribs, pin fins,
+    dimples, effusion holes) and turbulence models. No correlation table.
+  status: screened
+  verdict: 'Context only for #468: qualitative; confirms the Cho group''s effusion work is at a single
+    Re 10000.'
+  read_for: ['#468 vented-target closure']
+  issues: []
+  records: []
+  notes: 'No text layer (scan). Screening recorded only in memory project_impingement_effusion_sources_468.md
+    (2026-10-25); not found in #468 comments.'
+- file: docs/heat_transfer/film/V004T09A022-86-GT-225.pdf
+  citation: 'Andrews, G. E., Alikhanizadeh, M., Asere, A. A., Hussain, C. I., Khoshkbar Azari, M. S.,
+    Mkpadi, M. C. (1986). Small diameter film cooling holes: wall convective heat transfer. ASME 86-GT-225.'
+  id: ASME 86-GT-225
+  topic: [effusion]
+  content: Overall internal heat transfer of metal plates with many 90-deg film holes (hole approach surface
+    + throat), compared with short-tube data; curve-fits of Sparrow approach and Mills short-hole correlations
+    (Eqs. 12-19) PRINTED; h vs G (Figs 8, 10) PLOTTED.
+  status: implemented
+  verdict: 'Source of the effusion internal Nusselt chain (approach + throat, #431); fidelity on its own
+    Fig. 10 (andrews1986), cross-source on the 1988 rig.'
+  read_for: ['#387 effusion internal side', '#476 augmentation', '#468 coolant-side h']
+  issues: [386, 387, 427, 428, 429, 430, 431, 433, 468, 475, 720]
+  records: [validation/cooling/extractions/andrews_effusion_internal_h.md, validation/cooling/data/andrews1986/metadata.yaml]
+  code: ['include/cooling_correlations.h: namespace andrews1986, effusion_approach_nusselt, effusion_throat_nusselt,
+      effusion_internal_nusselt']
+  notes: 'Local digitised folders andrews_1986_fig8_data/, andrews_1986_fig10_data/ and PNG crops (andrews_86-GT-225_fig_8_pp6.png,
+    _fig10_pp6.png). Local only (gitignored): docs/heat_transfer/film/andrews_1986_fig8_data/, docs/heat_transfer/film/andrews_1986_fig10_data/.'
+- file: docs/heat_transfer/film/v004t09a045-95-gt-274.pdf
+  citation: Andrews, G. E., Khalifa, I. M., Asere, A. A., Bazdidi-Tehrani, F. (1995). Full coverage effusion
+    film cooling with inclined holes. ASME 95-GT-274.
+  id: ASME 95-GT-274
+  topic: [effusion, film]
+  content: 15-row laser-drilled effusion wall, N 9688 m^-2, X/D 11 (and 4.5), DR 2.5; overall and adiabatic
+    cooling effectiveness for 30, 90 and 150 deg hole inclination.
+  status: screened
+  verdict: 'Named in #387 as the external-side companion of 86-GT-225 (same group); a candidate effusion
+    adiabatic/overall effectiveness set at engine-like DR, never extracted or scored.'
+  read_for: ['#387 effusion external side']
+  issues: [386, 387]
+  records: []
+  notes: Inventory-level screening only.
+- file: docs/heat_transfer/flohrshuetz/flohrshuetz_isoda_1982.pdf
+  citation: Florschuetz, L. W., Isoda, Y. (1982). Flow distributions and discharge coefficient effects
+    for jet array impingement with initial crossflow. ASME Paper 82-GT-156.
+  id: ASME 82-GT-156
+  topic: [impingement]
+  content: 'Inline jet arrays with an initial crossflow entering the channel upstream: measured streamwise
+    jet/crossflow distributions and jet-plate discharge coefficients as a function of crossflow-to-jet
+    velocity ratio; 1-D flow model. Measured data largely tabulated in NASA CR-3630 Table D.1.'
+  status: screened
+  verdict: Conference paper for the flow half of CR-3630; useful as the authors' statement of the 1-D
+    incompressible model and C_D with crossflow. The repo works from CR-3630's tables instead, so it is
+    a cross-reference, not a data source.
+  read_for: ['#474 Eq. 8 compressibility (garbled word = ''incompressible'')', '#467 flow-distribution
+      fidelity reference']
+  issues: [467, 474]
+  records: []
+  notes: Same study as NASA CR-3630 (flow part).
+- file: docs/heat_transfer/flohrshuetz/flohrshuetz_truman_metzger_1981.pdf
+  citation: Florschuetz, L. W., Truman, C. R., Metzger, D. E. (1981). Streamwise flow and heat transfer
+    distributions for jet array impingement with crossflow. ASME J. Heat Transfer 103, 337-342.
+  topic: [impingement]
+  content: 'Inline and staggered 2-D jet arrays with spent air exiting in one direction (minimum crossflow):
+    row-resolved Nu correlated on Re_j and Gc/Gj with geometry (xn/d 5-15, yn/d 4-8, z/d 1-3), Re_j 2,500-70,000.
+    PRINTS Eq. (8) Gc/Gj closed form and Eq. (10a/b)/Table 2 Nu coefficients; Nu/Nu1 scatter only PLOTTED
+    (Fig. 6, 9 panels).'
+  status: implemented
+  verdict: The source of the shipped jet-array kernels (florschuetz_1981_inline/staggered and the Eq.
+    8 Gc/Gj closed form), used by ImpingementArray/ImpingementPlateElement. Fig. 6 digitised and scored
+    as fidelity (inline 3.7%/9.6% bias/RMS); staggered unvalidated against scatter.
+  read_for: ['#337 jet-array correlation re-add', '#380 Fig. 6 fidelity', '#465 impingement array element',
+    '#474 Eq. 8 pressure range']
+  issues: [337, 380, 465, 467, 474, 481]
+  records: [validation/cooling/extractions/han_impingement.md, validation/cooling/data/florschuetz1981/metadata.yaml]
+  code: ['include/impingement_correlation.h: florschuetz_1981_inline, florschuetz_1981_staggered, FLORSCHUETZ_1981_DEFAULT_CD,
+      crossflow_to_jet_ratio_at_row (Eq. 8)']
+  notes: Journal version of NASA CR-3373. Local-only digitising folder docs/heat_transfer/flohrshuetz/fig6_data/
+    (rc_XX_* CSVs) plus page-*.png, page4_ultra-4.png, row*_*.png, flohrshuetz_truman_1981_fig_{3,5,6,7}.png
+    and d154_*.png scans next to it (the user's own paper copy; scans gitignored).
+- file: docs/heat_transfer/flohrshuetz/Hussain_2021_Energies_14_6458_jet_impingement_review.pdf
+  citation: 'Hussain, L., Khan, M. M., Masud, M., Ahmed, F., Rehman, Z., Amanowicz, L., Rajski, K. (2021).
+    Heat transfer augmentation through different jet impingement techniques: a state-of-the-art review.
+    Energies 14, 6458.'
+  id: doi:10.3390/en14206458
+  topic: [impingement, review]
+  content: Broad review of impingement augmentation (target shapes/roughness, nozzle shapes, nanofluids,
+    PCMs). No effusion, crossflow or correlation content.
+  status: screened
+  verdict: 'Plugs no gap: no effusion, crossflow or correlation; dimple-style content is out of scope
+    (#336). Do not use as a source.'
+  read_for: ['#468 impingement-effusion sources (2026-10-20 batch)']
+  issues: []
+  records: []
+  notes: Verdict recorded in memory reference_impingement_sources_2026_10_20.md only. CC BY 4.0. Misfiled
+    under flohrshuetz/ (not a Florschuetz paper).
+- file: docs/heat_transfer/flohrshuetz/NASA_CR-3373_Florschuetz_Metzger_Truman_1981_jet_array_crossflow.pdf
+  citation: Florschuetz, L. W., Metzger, D. E., Truman, C. R. (1981). Jet array impingement with crossflow
+    -- correlation of streamwise resolved flow and heat transfer distributions. NASA Contractor Report
+    3373, grant NSG-3075, Arizona State University. January 1981.
+  id: NASA CR-3373
+  topic: [impingement]
+  content: 'Full report behind Florschuetz, Truman & Metzger (1981 JHT): flow model, Nu correlation (Eq.
+    5.1), A-size compressible/choked cases excluded from the fit (95% of 140 points still within 16%).
+    Conclusion (1): 1-D incompressible momentum-flux model. 61 pp.'
+  status: screened
+  verdict: 'Read for the compressibility range of Eq. 8: establishes the model is incompressible and that
+    the heat-transfer correlation holds to jet Mach ~1; cited in the shipped header comment. The kernel
+    itself is built from the journal paper, not this report.'
+  read_for: ['#474 Eq. 8 compressibility and pressure range', '#467 base report']
+  issues: [467, 474, 683]
+  records: []
+  code: ['include/impingement_correlation.h: PRESSURE RANGE (#474) comment cites conclusion 1']
+  notes: Same study as flohrshuetz_truman_metzger_1981.pdf (journal version). Fetched from NTRS 2026-10-20.
+- file: docs/heat_transfer/flohrshuetz/NASA_CR-3630_Florschuetz_Metzger_Su_1982_initial_crossflow.pdf
+  citation: Florschuetz, L. W., Metzger, D. E., Su, C. C., Isoda, Y., Tseng, H. H. (1982). Jet array impingement
+    flow distributions and heat transfer characteristics -- effects of initial crossflow and nonuniform
+    array geometry. NASA Contractor Report 3630, grant NSG-3075, Arizona State University. November 1982.
+  id: NASA CR-3630
+  topic: [impingement]
+  content: 'Inline jet arrays with an initial (bypass) crossflow, 11 B-size geometries, 10 rows. PRINTED:
+    Table D.1 per-row P/P0, Gj/Gj_mean, Gc/Gj (42 tests, P/P0 down to 0.70); Table D.2 per-segment Nu
+    and ETA (referenced to entrance crossflow temperature); Table 3.1 C_D; Table 4.1 C_D with crossflow.
+    183 pp.'
+  status: fidelity
+  verdict: 'The authors'' own data for the bypass configuration: Table D.1 scores the network''s flow
+    split (Eq. 8 incompressible bias -0.0%, RMS 3.4%) and Table D.2 the array heat transfer (#730), both
+    fidelity; it also fixes the documented Eq. 8 range (P/P0 >= ~0.7). No new closure: heat transfer stays
+    Florschuetz 1981 at local Gc/Gj.'
+  read_for: ['#474 Eq. 8 pressure range', '#467 bypass flow distribution', '#467 bypass heat transfer
+      (D.2)', '#713 eta_r reference temperature', '#729 starved/reversed rows']
+  issues: [467, 474, 683, 705, 706, 709, 721, 728, 729, 730, 734]
+  records: [validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630.md, validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630_table_d2.md,
+    validation/cooling/data/florschuetz_metzger_su1982/]
+  code: ['python/combaero/network/impingement_array.py: bypass configuration (docstring cites CR-3630)',
+    'python/combaero/network/components.py: ImpingementPlateElement/ImpingementCrossflowElement bypass_inlet
+      docstrings']
+  notes: 'Journal versions: Florschuetz, Metzger & Su (1984) JHT 106 (per #467); conference version NTRS_19850002659
+    and Florschuetz & Isoda 82-GT-156.'
+- file: docs/heat_transfer/flohrshuetz/NASA_CR-3936_Florschuetz_Su_1985_crossflow_temperature.pdf
+  citation: Florschuetz, L. W., Su, C. C. (1985). Heat transfer characteristics within an array of impinging
+    jets -- effects of crossflow temperature relative to jet temperature. NASA Contractor Report 3936,
+    grant NSG-3075. October 1985.
+  id: NASA CR-3936
+  topic: [impingement]
+  content: 'Jet arrays with a heated/cooled initial crossflow, inline and staggered: row-resolved Nu_r
+    and crossflow temperature influence factor eta_r (Eq. 2.11). PRINTED: Appendix A per-row Nu_r, eta_r,
+    Re_j, Gc/Gj (39 inline tests, 363 rows); no eta_r correlation. Uncertainty only as unequal error bars
+    on Figs. 6.9-6.20. 179 pp.'
+  status: implemented
+  verdict: Basis of the shipped eta_r closure (our fit X^n/(1+X^n), X = a (Gc/Gj)(z/d)^r, fitted to Appendix
+    A; RMSE 0.079, LOGO 0.083) and of the bypass reference temperature T_aw. The closure is ours, labelled
+    fitted, not the authors'.
+  read_for: ['#467 bypass at another temperature (eta_r)', '#713 eta_r closure form']
+  issues: [467, 705, 710, 713]
+  records: [validation/cooling/extractions/florschuetz_su_1985_cr3936.md, validation/cooling/data/florschuetz_su1985/appendix_a_row.csv]
+  code: ['include/impingement_correlation.h: impingement_eta_r, FLORSCHUETZ_SU_1985_ETA_A/R/N', 'src/impingement_correlation.cpp:
+      eta_r on |m_jet|']
+  notes: 'Journal version Florschuetz & Su (1987) JHT 109 (per #467). Conference summary: NTRS_19860002044.
+    Open: digitise the Fig. 6.9-6.20 error bars for a measurement band.'
+- file: docs/heat_transfer/flohrshuetz/NTRS_19850002659_Florschuetz_Metzger_1982_initial_crossflow_conf.pdf
+  citation: Florschuetz, L. W., Metzger, D. E. (?). Jet array impingement flow distributions and heat
+    transfer characteristics -- effects of initial crossflow and nonuniform array geometry. NASA conference
+    publication, NTRS 19850002659, ?, 13 pp.
+  id: NTRS 19850002659
+  topic: [impingement]
+  content: 13-page summary of the CR-3630 work (initial crossflow and nonuniform array geometry), 'reported
+    in detail in two previously published NASA reports'. Summary only.
+  status: unscreened
+  verdict: unscreened; (guess) a conference digest of CR-3630, adds nothing the tabulated report lacks;
+    filed only for completeness.
+  read_for: []
+  issues: [467]
+  records: []
+  notes: 'Same study as NASA CR-3630. Listed as ''also filed'' in a #467 comment, no verdict. Year 1982
+    is from the file name only; the PDF''s first page shows none.'
+- file: docs/heat_transfer/flohrshuetz/NTRS_19860002044_Florschuetz_Metzger_1983_jet_array_HT_conf.pdf
+  citation: Florschuetz, L. W., Metzger, D. E. (?). Jet array impingement heat transfer [title partly
+    garbled in scan] . NASA conference publication, NTRS 19860002044, ?, 12 pp.
+  id: NTRS 19860002044
+  topic: [impingement]
+  content: 12-page scanned summary on jet arrays with an initial crossflow at a different temperature
+    from the jets (effect of crossflow temperature on target heat flux), i.e. the CR-3936 work. Summary
+    only.
+  status: unscreened
+  verdict: unscreened; (guess) a conference digest of CR-3936; the tabulated report is already implemented,
+    so this adds nothing.
+  read_for: []
+  issues: [467]
+  records: []
+  notes: 'Same study as NASA CR-3936. Listed as ''also filed'' in a #467 comment, no verdict. Year 1983
+    is from the file name only.'
+- file: docs/heat_transfer/flohrshuetz/Untuc_2023_ApplSci_13_11260_jet_array_protrusions_CFD.pdf
+  citation: Untuc, A. H., Unverdi, S. O. (2023). Heat transfer enhancement by mitigating the adverse effects
+    of crossflow in a multi-jet impingement cooling system in hexagonal configuration by coaxial cylindrical
+    protrusion-guide vane pairs. Applied Sciences 13, 11260.
+  id: doi:10.3390/app132011260
+  topic: [impingement]
+  content: RANS CFD of 7 hexagonally arranged jets impinging on cylindrical protrusions with coaxial guide
+    vanes. CFD only, new geometry.
+  status: screened
+  verdict: 'Plugs no gap: a novel geometry with CFD only, no measured data or correlation for the shipped
+    configurations.'
+  read_for: ['#468 impingement-effusion sources (2026-10-20 batch)']
+  issues: []
+  records: []
+  notes: Verdict recorded in memory reference_impingement_sources_2026_10_20.md only. CC BY 4.0. Misfiled
+    under flohrshuetz/ (not a Florschuetz paper).
+- file: docs/heat_transfer/han/Gas_Turbine_Heat_Transfer_and_Cooling_Te.pdf
+  citation: Han, J.-C., Dutta, S., Ekkad, S. (2013). Gas turbine heat transfer and cooling technology,
+    2nd edition. CRC Press / Taylor & Francis, Boca Raton.
+  id: ISBN 978-1-4665-6490-9 (eBook)
+  topic: [review, rib, pin_fin, impingement]
+  content: '865-page handbook. Sec. 4.2 rib-turbulated cooling: R/G correlations Eqs. 4.14-4.19 printed,
+    Figs. 4.46-4.55 data plotted; Sec. 4.3 pin fins: Table 4.7 (Chyu 1998 a Re^b) printed, Figs. 4.130-4.151
+    plotted; impingement Sec. 4.1 / Fig. 4.193.'
+  status: implemented
+  verdict: Primary carrier for the shipped rib sets (han_1988_orthogonal, han_park_1988_angled, han_1989_narrow_channel),
+    the chyu_1998 pin-fin Nu sets (Table 4.7) and the han2012 fidelity data. Citations inside the book
+    are sometimes wrong (Fig. 4.134 cites Brigham & VanFossen wrongly); check against the original before
+    relying on an attribution.
+  read_for: ['#334 rib re-add', '#333 scored rib harness', '#369 Fig. 4.47 digitisation', '#401 G_bar
+      = 1.2 G', '#402 narrow-channel Eq. 4.19', '#335 pin-fin Table 4.7 and friction figures', Fig. 4.46
+      grant/box provenance (NAG3-311 vs NAS3-24227)]
+  issues: [333, 334, 335, 339, 369, 374, 393, 401, 402, 439, 441, 442]
+  records: [validation/cooling/data/han2012/metadata.yaml, validation/cooling/cards/han2012/, validation/cooling/extractions/han_ribbed.md,
+    validation/cooling/extractions/han_ribbed_high_re.md, validation/cooling/extractions/han_impingement.md,
+    validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/rib_correlation.h: han_1988_orthogonal, han_park_1988_angled, han_1989_narrow_channel',
+    'include/pin_fin_correlation.h: chyu_1998_nu, chyu_1998_inline_over_staggered', 'include/impingement_correlation.h:
+      cites Han, Dutta and Ekkad']
+  notes: 'Copyright 2013, version date 2012; the repo cites it as 2012. Local-only working material beside
+    it in docs/heat_transfer/han/: fig4.46/4.47/4.48/4.51/4.53/4.54/4.193 *_data folders, page PNGs of
+    equations and figures, han_ribs.md and han_impingement.md (text extractions), clarification_4_sided_f_han.md.
+    Fig. 4.46 and 4.51 are scored with fidelity on Han''s own data in han2012.'
+- file: docs/heat_transfer/han/han_91_GT_3.pdf
+  citation: Han, J. C., Zhang, Y. M., Lee, C. P. (1991). Influence of surface heat flux ratio on heat
+    transfer augmentation in square channels with parallel, crossed and V-shaped angled ribs. ASME paper
+    91-GT-3.
+  id: ASME 91-GT-3
+  topic: [rib]
+  content: Square channel, L/D 20, e/D 0.0625, P/e 10, two opposite in-line ribbed walls, six ribbed-to-smooth
+    wall heat flux ratios, Re 15,000-80,000. Table 3 PRINTS R, G and G_bar = a (e+)^b per rib orientation
+    and heating case; local Nu plotted.
+  status: extracted
+  verdict: Table 3 transcribed and two-channel verified as evidence about Han's G_bar/G constant (pooled
+    with Lau and CR-3837 it showed 1.10-1.41, rig-level spread). Not a scored series and not a set source;
+    han_zhang_lee_1991 is built from the JHT companion.
+  read_for: ['#401 G_bar/G ratio', '#403 dispute 2 (rib-shape classes)', '#434 rib shape', '#444 ratio
+      sets']
+  issues: [333, 392, 401, 403, 434, 444]
+  records: [validation/cooling/extractions/han_zhang_lee_91gt3_table3.md, validation/cooling/extractions/han_ribbed.md]
+  notes: NOT the conference twin of Han, Zhang & Lee 1991 JHT 113, 590 (that PDF is misfiled at docs/heat_transfer/film/han_1991_590_vol_113.pdf);
+    91-GT-3 is the heat-flux-ratio companion. Cited in validation/cooling/runner.py comments.
+- file: docs/heat_transfer/han/Han_Ou_Park_Lei_1989_IJHMT_32_1619_narrow.pdf
+  citation: Han, J. C., Ou, S., Park, J. S., Lei, C. K. (1989). Augmented heat transfer in rectangular
+    channels of narrow aspect ratios with rib turbulators. International Journal of Heat and Mass Transfer
+    32(9), 1619-1630.
+  topic: [rib]
+  content: Two opposite ribbed walls, W/H 1/2 and 1/4, rib angles 90/60/45/30 deg, Re 10,000-60,000; local
+    Nu and friction. Semi-empirical R and G correlations PRINTED (Eq. 8 R, +/-6%; Eq. 10 G, +/-8%), with
+    an aspect-ratio term inside the R definition (Eq. 5).
+  status: implemented
+  verdict: 'Source of han_1989_narrow_channel (shipped via the book''s Eq. 4.19 / Fig. 4.48). The paper
+    itself was read on #402: it prints R (Eq. 8) and author-stated bands, and Eq. 8 at W/H 1 lands within
+    3.1% of Han 1988. Its R convention differs from the square-channel R and must be declared, not aliased.'
+  read_for: ['#402 narrow-channel R and G closure', '#402 author-stated accuracy band', Taslim AR 3.5
+      cross-source decomposition (Eqs. 5-9)]
+  issues: [402, 439, 393, 436, 437]
+  records: [validation/cooling/extractions/han_ribbed.md, validation/cooling/extractions/taslim_spring_1987_aspect_ratio.md,
+    validation/cooling/data/han2012/metadata.yaml]
+  code: ['include/rib_correlation.h: han_1989_narrow_channel', 'src/rib_correlation.cpp: han_1989_narrow_channel']
+  notes: 'Renamed 2026-10-01 from han_park_lei_1989.pdf (dropped an author). The header comment still
+    says R has ''NO PRINTED EQUATION'' and ships a project fit to Fig. 4.48a, while #402 found Eq. 8 in
+    this paper; worth checking whether the shipped R was updated. OPEN GAP: the shipped set still uses
+    this project''s fit to the book''s Fig. 4.48a, and include/rib_correlation.h says R has no printed
+    equation; #402 found Eq. 8 here and closed with the three-regime W/H exponent rework not done.'
+- file: docs/heat_transfer/han/Han_Park_1988_IJHMT_31_183_angled.pdf
+  citation: Han, J. C., Park, J. S. (1988). Developing heat transfer in rectangular channels with rib
+    turbulators. International Journal of Heat and Mass Transfer 31(1), 183-195.
+  topic: [rib]
+  content: Developing flow in short rectangular channels (L/D 10 and 15), two opposite ribbed walls, rib
+    angle 30-90 deg, W/H 1-4, Re 10,000-60,000; local Nu distributions and friction, plotted, with R/G
+    correlation.
+  status: implemented
+  verdict: Original paper behind han_park_1988_angled (Eq. 4.17/4.18, alpha 30-90, W/H 1-4) and Fig. 4.47
+    / Fig. 4.43 data. The set was extracted through the book; no record shows the coefficients cross-checked
+    against this PDF.
+  read_for: ['#374 angled-rib set', '#369 Fig. 4.47 digitisation', han_ribbed.md item 23 (Fig. 4.46 vs
+      4.47 are different papers)]
+  issues: [334, 369, 374, 402, 434]
+  records: [validation/cooling/extractions/han_ribbed.md, validation/cooling/data/han2012/metadata.yaml]
+  code: ['include/rib_correlation.h: han_park_1988_angled', 'src/rib_correlation.cpp: han_park_1988_angled']
+  notes: Renamed 2026-10-01 from han/han_park_1998.pdf (year off by a decade). Also the acknowledgement
+    that names grant NAS3-24227 (link to NASA CR-4015).
+- file: docs/heat_transfer/hollworth/393_1_Hollworth_1980_part_II.pdf
+  citation: 'Hollworth, B. R., Lehmann, G., Rosiczkowski, J. (1983). Arrays of impinging jets with spent
+    fluid removal through vent holes on the target surface, Part 2: Local heat transfer. ASME J. Eng.
+    Power 105, 393-402.'
+  topic: [impingement, effusion]
+  content: Local heat transfer maps (Figs. 6-9) and flow visualisation for jet arrays venting through
+    a perforated target, plus an approximate zonal boundary-layer model (wall jet). No tabulated values.
+  status: screened
+  verdict: 'Physics, not a closure: shows the staggered advantage comes from venting suppressing spent-fluid
+    recirculation, not suction near vents, and gives a laminar-zone local Re exponent ~0.5; useful for
+    the Re-exponent argument, not for data.'
+  read_for: ['#468 vented-target closure physics', '#468 Re exponent (laminar/turbulent split)']
+  issues: [468]
+  records: []
+  notes: 'File name says 1980 and the extraction record / first #468 comment call it Hollworth & Dagan
+    Part II (80-GT-43), but the PDF itself is Hollworth, Lehmann & Rosiczkowski, J. Eng. Power 105 (April
+    1983) 393-402; a later #468 comment cites it correctly. Companion of 994_1_Hollworth_1980_part_I.pdf.'
+- file: docs/heat_transfer/hollworth/994_1_Hollworth_1980_part_I.pdf
+  citation: 'Hollworth, B. R., Dagan, L. (1980). Arrays of impinging jets with spent fluid removal through
+    vent holes on the target surface, Part 1: Average heat transfer. ASME J. Eng. Power 102(4), 994-999.'
+  id: ASME 80-GT-42
+  topic: [impingement, effusion]
+  content: Square jet arrays on a target vented through holes of jet diameter at half the jet pitch (4
+    vents per jet), inline and staggered, X = 5-20, Z = 1-X, Re_j 3000-35000, h +-4% avg. PRINTS Eq. 7
+    Nu = f(X,Z) Re^0.8 Pr^1/3 and Table 2 Nu_inline/Nu_staggered; f(X,Z) only PLOTTED (Fig. 8 staggered,
+    Fig. 6 at X = 10, Re symbols overplotted).
+  status: extracted
+  verdict: 'The closure candidate for the vented-target (impingement-effusion) coolant side: Fig. 6/8
+    stations and Table 2 extracted and signed off; not yet scored or shipped. Fixed vent geometry (vent/jet
+    area ratio 4), so other vent patterns are extrapolation; Re exponent 0.8 conflicts with Cho & Rhee''s
+    0.558 (kept 0.8).'
+  read_for: ['#468 vented-target closure C(X,Z)', '#468 Re exponent']
+  issues: [468, 726]
+  records: [validation/cooling/extractions/hollworth_dagan_1980_vented_target.md, validation/cooling/data/hollworth_dagan1980/]
+  notes: 'Fig. 8 overplots ~5 Re per Z, so any fidelity score on it is an upper bound resting on ~5-6
+    clean stations per X. Data test: python/tests/test_hollworth_dagan_data.py.'
+- file: docs/heat_transfer/impingement/Chougule_Parishwad_Nadgire_2013_WCECS_multijet_pinfin_heatsink_effusion_slots.pdf
+  citation: 'Chougule, N. K., Parishwad, G. V., Nadgire, A. R. (2013). Numerical investigation of multijet
+    air impingement on pin fin heat sink with effusion slots. Proc. World Congress on Engineering and
+    Computer Science (WCECS 2013) Vol. II, San Francisco, pp. 935-939.'
+  id: ISBN 978-988-19253-1-2
+  topic: [impingement, pin_fin]
+  content: 'Electronics cooling: 3x3/5x5/10x10 round-jet arrays onto a 60 x 60 mm aluminium pin-fin heat
+    sink, spent air leaving through slots in the NOZZLE plate; CFX SST CFD, Re 11,000-49,000, fin H/d
+    3-5, 30 W. Table 1 lists 9 measured Nu_avg (4x4 sink, d_p 5 mm, H/d 3/4/5, Re 18,896/25,116/31,049)
+    beside CFD (CFD 11-15% high).'
+  status: screened
+  verdict: 'Not usable (2026-10-25). The 9 measured points cannot be scored: Nu = hL/k with L undefined;
+    Re is said to use sqrt(jet area) but the nomenclature says jet diameter; Table 2 repeats Table 1''s
+    two columns digit for digit relabelled "minimum crossflow" / "effusion slot", so what the "experimental"
+    column measured is ambiguous; no slot geometry. Configuration (jet-cooled pin-fin heat sink venting
+    through the jet plate) matches neither #468 (target-vented walls) nor #335 (channel pin fins).'
+  read_for: ['#468 impingement-effusion data', '#335 pin-fin data']
+  issues: [335, 468]
+  records: []
+  notes: Arrived as docs/new/WCECS2013_pp935-939.pdf. Cites Rhee, Yoon & Cho 2003 (now registered).
+- file: docs/heat_transfer/impingement/Rachdi_2025_SciRep_15_3023_slot_jet_array_CFD.pdf
+  citation: 'Rachdi, Z., Hnaien, N., Eladeb, A., Alshammari, B. M., Kolsi, L., Dhahri, H. (2025). CFD analysis
+    of heat transfer enhancement in impinging jet array by varying number of jets and spacing. Scientific
+    Reports 15, 3023.'
+  id: doi:10.1038/s41598-025-86360-w
+  topic: [impingement]
+  content: '2-D RANS (standard k-omega, Fluent) of arrays of SLOT jets (w 3.175 mm), N 5-11, spacing S
+    = s/w 1-4, H 2-8, one Re (5500), isothermal plate; Eq. 22 mean-Nu correlation. The only measured data
+    are Gardon & Akfirat (1966) slot-jet results used for validation (Fig. 3 stagnation Nu vs H, plate
+    pressure).'
+  status: screened
+  verdict: 'Not useful (2026-10-25): CFD only at a single Re; Eq. 22 (Nu = 67.41 H^1.09 N^0.41 S^-0.14)
+    has a POSITIVE H exponent although its own text and Fig. 10 show Nu falling with H; mean Nu over
+    a fixed 80w plate makes the N dependence a coverage artefact. No slot-jet impingement model or open
+    issue needs it. If slot jets are ever wanted, go to Gardon & Akfirat 1966 directly.'
+  read_for: [impingement jet array data]
+  issues: []
+  records: []
+  notes: Arrived as docs/new/41598_2025_Article_86360.pdf. Data not public (on request).
+- file: docs/heat_transfer/impingement/Rhee_Yoon_Cho_2003_IJHMT_46_1049_array_jets_effusion_in_injection_plate.pdf
+  citation: 'Rhee, D.-H., Yoon, P.-H., Cho, H. H. (2003). Local heat/mass transfer and flow characteristics
+    of array impinging jets with effusion holes ejecting spent air. Int. J. Heat Mass Transfer 46, 1049-1061.'
+  id: doi:10.1016/S0017-9310(02)00363-0
+  topic: [impingement, effusion]
+  content: 'Naphthalene sublimation on a SOLID target under a 5-row inline round-jet array (d 10 mm contracted
+    nozzles, l/d 2, X/d = Y/d 6), Re_d 10,000 only, H/d 0.5-10. Two exits for the spent air: (a) one-end
+    crossflow between side walls (maximum crossflow) and (b) 25 effusion holes (D 15 mm) in the INJECTION
+    plate, no crossflow. Spanwise-averaged Sh along x (Fig. 11) and overall-averaged Sh vs H/d (Fig. 12)
+    PLOTTED; Table 1 test-section pressure drop. Nu = 0.624 Sh (Eq. 5, Pr 0.71, Sc 2.28, exponent 0.4);
+    uncertainty 6.2% on Sh (95%). FLUENT RSM flow fields for illustration only.'
+  status: screened
+  verdict: 'Not a #468 source: the vents are in the jet plate, not the target, so it gives no vented-target
+    points (the wanted-list entry said otherwise). Useful instead as a CROSS-SOURCE accuracy check of the
+    Florschuetz jet-array kernels (jet_array_runner) on case (a): inline, X/d = Y/d 6, Re 10,000, H/d 1
+    and 2 inside the Florschuetz z/d 1-3 box, naphthalene rather than heated plates, different lab. Caveats
+    for scoring: thick orifices in the feed tubes force EQUAL jet flows (run the runner with a uniform
+    distribution, not the plenum-fed one), and contracted nozzles rather than sharp orifices. Not digitised.'
+  read_for: ['#468 vented-target accuracy points', 'Florschuetz jet-array cross-source check']
+  issues: [468]
+  records: []
+  notes: Arrived as docs/new/1-s2.0-S0017931002003630-main.pdf, 2026-10-25 (was on the wanted list). Case
+    (b), jet-plate venting, matches Huber & Viskanta 1994 (J. Heat Transfer 116, 570) -- not modelled in
+    combaero.
+- file: docs/heat_transfer/impingement/Choi_Rhee_Cho_2001_KSME_spring_D_impingement_hole_arrangement_conf.pdf
+  citation: Choi, J. H., Rhee, D. H., Cho, H. H. (2001). The effects of impingement hole size on heat transfer
+    of an impingement/effusion cooling system (in Korean; the Korean title says hole arrangement). Proc. KSME
+    2001 Spring Annual Meeting D, pp. 489-496 (KSME 01S479).
+  id: KSME 01S479
+  topic:
+  - impingement
+  - effusion
+  content: Staggered (d 10 and 15 mm), square and hexagonal jet arrays over an effusion plate, H/D 1-6, Re_D
+    10,000; local Sh (Figs. 8, 10) and average Sh vs H/D (Fig. 9) PLOTTED.
+  status: screened
+  verdict: 'Conference version of Choi, Rhee & Cho 2002 (film/JAKO200211920878407.pdf): the same Figs. 9 and
+    10. Use the journal paper; this adds nothing.'
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Cho_2006_KSME_B_30_12_impingement_effusion_circular_guide.pdf
+  citation: Hong, S. K., Cho, H. H. (2006). Heat/mass transfer for impingement/effusion cooling system with
+    circular guide (in Korean). Trans. KSME B 30(12), 1147-1154.
+  topic:
+  - impingement
+  - effusion
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter;
+    initial crossflow M 0.5-1.5 with a circular guide around each injection hole; 26-30% higher averaged Sh
+    at M 1.5.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Cho_2007_JFluidMach_10_3_rotating_impingement_effusion.pdf
+  citation: Hong, S. K., Cho, H. H. (2007). Heat/mass transfer characteristics for variation of injection hole
+    in rotating impingement/effusion cooling system (in Korean). J. Fluid Machinery 10(3), 25-32.
+  topic:
+  - impingement
+  - effusion
+  content: Rotating impingement/effusion (Coriolis), three injection-hole sizes/counts, Re 3,330 on the effusion
+    hole, naphthalene sublimation.
+  status: screened
+  verdict: Rotating; Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Rhee_Cho_2005_JFluidMach_8_4_impingement_effusion_rectangular_fins.pdf
+  citation: Hong, S. K., Rhee, D. H., Cho, H. H. (2005). Heat/mass transfer characteristics in impingement/effusion
+    cooling system with rectangular fins for combustor liner cooling (in Korean). J. Fluid Machinery 8(4),
+    39-47.
+  topic:
+  - impingement
+  - effusion
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter,
+    H/d 2; initial crossflow M 0.5-1.5 with rectangular fins between the plates; CFD flow fields.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Rhee_Cho_2005_KSME_B_29_7_impingement_effusion_pin_fins_crossflow.pdf
+  citation: Hong, S. K., Rhee, D. H., Cho, H. H. (2005). Heat/mass transfer on effusion plate with circular
+    pin fins for impingement/effusion cooling system with initial crossflow (in Korean). Trans. KSME B 29(7),
+    828-836.
+  topic:
+  - impingement
+  - effusion
+  - pin_fin
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter;
+    initial crossflow M 0.5-1.5, five circular pin-fin arrangements in the cavity; 16-22% higher overall Sh
+    at M 1.5.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Nam_Rhee_Choi_Cho_2003_KSME_spring_impingement_effusion_crossflow.pdf
+  citation: Nam, Y. W., Rhee, D. H., Choi, J. H., Cho, H. H. (2003). Effect of crossflow on heat (mass) transfer
+    of an impingement/effusion cooling system (in Korean). Proc. KSME 2003 Spring Annual Meeting, pp. 2219-2226.
+  topic:
+  - impingement
+  - effusion
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter,
+    d = D 10 mm, pitch 6d, H/d 2; initial crossflow M = Q_c/Q_i 0.2-2. Fig. 8 PLOTS the overall-averaged Sh
+    on the effusion plate vs M (7 points, log axes) with the no-crossflow level, array jets with crossflow
+    (no vents) and crossflow alone.
+  status: screened
+  verdict: 'The one local source of vented-target data WITH initial crossflow: overall Sh falls from about
+    85 (M <= 0.5, equal to no crossflow) to about 60 at M 2. Accuracy candidate if #468 gains a crossflow term;
+    the shipped model has none. Single Re, one geometry. The journal version (Rhee, Choi & Cho 2003, J. Turbomach.
+    125, 74) is on the wanted list and should be preferred. Not digitised.'
+  read_for:
+  - '#468 vented-target data'
+  - '#468 crossflow in the double-wall cavity'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search. Some text layer (3 kB), mostly Korean.
+- file: docs/heat_transfer/impingement/Rhee_Nam_Cho_2004_KSME_B_28_3_impingement_effusion_ribs_crossflow.pdf
+  citation: Rhee, D. H., Nam, Y. W., Cho, H. H. (2004). Heat/mass transfer characteristics on rib-roughened
+    surface for impingement/effusion cooling system with initial crossflow (in Korean). Trans. KSME B 28(3),
+    338-348.
+  topic:
+  - impingement
+  - effusion
+  - rib
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter,
+    H/d 2; 3 mm square ribs (90 deg transverse, 45 deg angled) on the effusion plate, initial crossflow; ribs
+    give about 10% higher average Sh at high blowing ratio.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/NASA_CR-3837_1984.pdf
+  citation: Han, J. C., Park, J. S., Lei, C. K. (1984). Heat transfer and pressure drop in blade cooling
+    channels with turbulence promoters. NASA Contractor Report 3837, grant NAG3-311. November 1984.
+  id: NASA CR-3837
+  topic: [rib]
+  content: Square duct, e/D 0.063, P/e 10 and 20, rib angles 90-15 deg, two entrance conditions. PRINTS
+    every run in Appendix 7.3 (Re, Nu(R), Nu(S), Nu(AV), e+, f/f0, R_bar, G_bar); 164 pp.
+  status: accuracy
+  verdict: 'Tabulated primary from Han''s own lab but a different contract/rig/blockage, so ACCURACY (same
+    lab, different study) for han_park_1988_angled and the other Han sets: Eq. 4.17 R confirmed, Eq. 4.18
+    G reads low (-0.8% to -19.9%). The Nu(R)/Nu(S) split is unique.'
+  read_for: ['#391 tabulated primary rib source', '#398 rib-angle drop', '#403 independent check (not
+      independent: same lab)']
+  issues: [389, 391, 393, 398, 399, 401, 403]
+  records: [validation/cooling/extractions/han_park_lei_1984_cr3837.md, validation/cooling/data/han_park_lei1984/metadata.yaml]
+  notes: Journal version Han, Park & Lei (1985) J. Eng. Gas Turbines Power 107, 628-635. Worked example
+    in docs/VALIDATION_POLICY.md.
+- file: docs/heat_transfer/NASA_CR-4015_1986.pdf
+  citation: Han, J. C., Park, J. S., Ibrahim, M. Y. (1986). Measurement of heat transfer and pressure
+    drop in rectangular channels with turbulence promoters. NASA Contractor Report 4015 (AVSCOM TR 86-C-25),
+    contract NAS3-24227. September 1986.
+  id: NASA CR-4015
+  topic: [rib]
+  content: Rectangular channels W/H 1/2/4, e/D 0.047-0.078, P/e 10-20, 5 rib angles. PRINTS every run
+    (7.2 pressure drop p. 88, 7.3 local and average heat transfer p. 95, Nu(R1..R3)/Nu(S1..S3)); text
+    layer unusable, image reading needed. 205 pp.
+  status: screened
+  verdict: Closed the Han Fig. 4.46 class-label dispute (the 0.047/10/2 class) by matching run headers
+    to digitised marks; not itself transcribed or scored. A strong candidate tabulated primary (4 aspect
+    ratios x 5 angles), but same Texas A&M lab, so accuracy at best.
+  read_for: ['#393/#395 Fig. 4.46 class-label dispute', '#403 rib source provenance']
+  issues: [339, 393, 395, 403]
+  records: [validation/cooling/data/han2012/metadata.yaml]
+  notes: Used only as cross_check evidence for han2012 class labels (runs 22/23/26 quoted). NTRS accession
+    19870007570.
+- file: docs/heat_transfer/pin_fin/Armstrong_Winstanley_1988_JTurbomach_110_94.pdf
+  citation: Armstrong, J., Winstanley, D. (1988). A review of staggered array pin fin heat transfer for
+    turbine cooling applications. ASME Journal of Turbomachinery 110(1), 94-103.
+  id: ASME 87-GT-201
+  topic: [pin_fin, review]
+  content: 'Review of staggered short-pin array Nu and f: local and array-averaged data, H/D and spacing
+    effects, converging channels. PRINTS Metzger 1986 Nu (Eq. 2), Metzger 1982b f (Eqs. 20-21), VanFossen,
+    Faulkner, geometry converters (Eqs. 8, 10, 13) and fin efficiency (Eqs. 14-16); parity plot Fig. 7
+    and row curve Fig. 3 plotted.'
+  status: implemented
+  verdict: 'Backbone of the pin-fin rebuild: canonical basis (Re on A_min, per-row f), converters, fin
+    model, and the printed Metzger Nu and f the shipped sets use. Staggered only; Fig. 3 row curve and
+    Fig. 7 parity points still to digitise.'
+  read_for: ['#335 GO decision for staggered short pins', '#335 canonical Re/Nu/f basis', '#335 friction
+      misattribution in removed #332 code']
+  issues: [335, 455, 457]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: metzger_1986_staggered_nu, metzger_1982_staggered_friction, geometry
+      converters, fin efficiency']
+  notes: Text layer unreliable; equations read from page images.
+- file: docs/heat_transfer/pin_fin/Chyu_1990_JHT_112_926_fillet.pdf
+  citation: Chyu, M. K. (1990). Heat transfer and pressure drop for short pin-fin arrays with pin-endwall
+    fillet. ASME Journal of Heat Transfer 112, 926-932.
+  topic: [pin_fin]
+  content: Naphthalene sublimation, inline and staggered 7-row arrays, H/D 1, S/D = X/D 2.5, straight
+    and spool (fillet) pins, Re 5e3-3e4. Table 2 PRINTS Nu/Pr^0.4 = A Re^B per array/pin; friction f =
+    2 dp/(rho Umax^2 N) only in Fig. 6 (plotted).
+  status: implemented
+  verdict: Source of chyu_1990_nu, chyu_1990_friction (the only inline friction in hand, one geometry)
+    and the fillet modifier. Fig. 6 digitised and user-confirmed; staggered f sits 16-25% below Metzger
+    1982b, reported not reconciled.
+  read_for: ['#335 inline friction', '#335 fillet modifier', '#335 Re basis']
+  issues: [335, 458]
+  records: [validation/cooling/data/chyu1990/metadata.yaml, validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: chyu_1990_nu, chyu_1990_friction, chyu_1990_fillet_over_straight']
+  notes: 'Fig. 6 points are unscored on purpose (the friction set was fitted to them); staggered series
+    is a cross-source check for #335 PR C.'
+- file: docs/heat_transfer/pin_fin/Lawson_Thrift_Thole_Kohli_2011_IJHMT_54.pdf
+  citation: Lawson, S. A., Thrift, A. A., Thole, K. A., Kohli, A. (2011). Heat transfer from multiple
+    row arrays of low aspect ratio pin fins. International Journal of Heat and Mass Transfer 54, 4099-4109.
+  topic: [pin_fin]
+  content: Penn State / P&W, staggered arrays H/d 1, S1/d 2 and 4, S2/d 1.73 and 3.46, Re_d on U_max;
+    array Nu and f plotted (Figs. 15-16), stated bands Nu 8%, Re 2.5-4%. No closed-form correlation; f
+    definition not stated.
+  status: screened
+  verdict: Clean cross-source accuracy dataset for Metzger Nu (by eye 5-14%) and evidence of a real spanwise
+    friction effect (with Damerow). Not yet digitised or scored; f needs its definition (Lawson MS thesis)
+    before use.
+  read_for: ['#335 cross-source accuracy of Metzger Nu and f', '#335 spanwise friction effect']
+  issues: [335]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: comments only (Re basis, Metzger accuracy note)']
+  notes: 'Earlier mis-cited on #335 as ''Lawson, Thrift, Wright & Thole''; file renamed. Figs. 15/16 (~40
+    clean points) on the digitising list for #335 PR C.'
+- file: docs/heat_transfer/pin_fin/Lyall_2006_MS_thesis_VirginiaTech_single_row.pdf
+  citation: Lyall, M. E. (2006). Heat transfer from low aspect ratio pin fins. MS thesis, Virginia Polytechnic
+    Institute and State University, Blacksburg.
+  topic: [pin_fin]
+  content: 'Own data: single row of pins, H/d 1, S/d 2/4/8, Re 5,000-30,000, pin and endwall Nu. Table
+    2-1 PRINTS a literature table of geometries and correlations (Chyu 1998, Metzger 1982a, Chyu 1990,
+    Yeh & Chyu).'
+  status: screened
+  verdict: Own single-row data is not a scoring source for array sets. Table 2-1 supplied the Chyu 1998
+    geometry (S/d = X/d 2.5, H/d 1) used as the chyu_1998 validity box and explained the removed 'inline
+    0.092' as a staggered Metzger coefficient.
+  read_for: ['#335 Chyu 1998 geometry', '#335 origin of removed inline 0.092', '#335 Lawson f definition
+      hint']
+  issues: [335, 455]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: chyu_1998_nu (validity geometry from Table 2-1)']
+  notes: Open access, VTechWorks handle 10919/33470. Supplies a box, not coefficients, hence screened
+    rather than implemented.
+- file: docs/heat_transfer/pin_fin/NASA_CR-120882_Faulkner_1971_Book1.pdf
+  citation: 'Faulkner, F. E. (1971). Analytical investigation of chord size and cooling methods on turbine
+    blade cooling requirements, Book 1: Sections 1 through 8 and Appendixes A through I. NASA CR-120882
+    (AiResearch 71-7487).'
+  id: NASA CR-120882
+  topic: [pin_fin]
+  content: AiResearch contractor report. Appendix D PRINTS the generalised pin-bank correlation Eq. D-2
+    (Nu_Dh with exp geometry term, C2 = 3.094), fitted to Grimison tube banks and Kays & London PF-4 (H/D
+    ~7.7); one-geometry cold-flow pin friction curve in Sec. 3.
+  status: screened
+  verdict: 'Long-pin set only: the pin-height term rests on a single heat-exchanger surface, so it under-predicts
+    short turbine pins. Declared not carried in the shipped sets; a possible later long-pin set.'
+  read_for: ['#335 long-pin correlation and its validity box']
+  issues: [335, 455]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: listed under not-carried (long pins)']
+  notes: NTRS 19730009082. OCR misreads C2 as 5.094; read from images.
+- file: docs/heat_transfer/pin_fin/NASA_CR-120882_Faulkner_1971_Book2.pdf
+  citation: 'Faulkner, F. E. (1971). Analytical investigation of chord size and cooling methods on turbine
+    blade cooling requirements, Book 2: Appendixes J through M. NASA CR-120882 (AiResearch 71-7487).'
+  id: NASA CR-120882
+  topic: [pin_fin, other]
+  content: 'Second volume of the same report: appendixes J-M (content not examined).'
+  status: unscreened
+  verdict: unscreened; (guess) blade-cooling design appendixes of the same study; low value beyond Book
+    1's Appendix D.
+  read_for: []
+  issues: []
+  records: []
+  notes: Same report as Book 1; all recorded use (#335) is Book 1 Appendix D.
+- file: docs/heat_transfer/pin_fin/NASA_CR-120883_Damerow_1972.pdf
+  citation: Damerow, W. P., Murtaugh, J. P., Burggraf, F. (1972). Experimental and analytical investigation
+    of the coolant flow characteristics in cooled turbine airfoils. NASA CR-120883 (GE R72AEG165).
+  id: NASA CR-120883
+  topic: [pin_fin, impingement, orifice]
+  content: GE cold-flow tests. Pin-fin friction PRINTED as Eq. 18 f = 2.06 (X_T/D)^-1.1 Re^-0.16 (definition
+    Eq. 10, total pressure, N-1 rows), staggered X_T/D 4.24-7.07, Z/D 2-4, 10 rows; data Figs. 27/28.
+    Also impingement and feeder-tube discharge coefficients and a 27-point composite airfoil network case
+    (Table I).
+  status: implemented
+  verdict: Source of damerow_1972_staggered_friction, the wide-transverse-spacing friction set (agrees
+    with Metzger 2-6% at Re <= 1e4 in overlap). Its fidelity is checkable on its own Figs. 27/28 (not
+    yet done). The Table I airfoil network is a candidate end-to-end network validation case.
+  read_for: ['#335 friction third lab', '#335 friction definition (the 1.8x error)', '#460 impingement
+      jet flow']
+  issues: [335, 455, 460]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: damerow_1972_staggered_friction']
+- file: docs/heat_transfer/pin_fin/NASA_TM-81696_VanFossen.pdf
+  citation: VanFossen, G. J. (1981). Heat transfer coefficients for staggered arrays of short pin fins.
+    NASA TM-81696 (prepared for the 26th ASME Gas Turbine Conference, Houston, March 1981).
+  id: NASA TM-81696
+  topic: [pin_fin]
+  content: NASA Lewis, staggered equilateral arrays, 4 rows, H/D 0.5 (S/D 2) and 2 (S/D 4), copper/wood/angled
+    pins, Re_D' 300-6e4. PRINTS Eq. 16 Nu_D' = 0.153 Re_D'^0.685 (D' = 4V/S basis) and the Eq. 9 fin model;
+    data in Fig. 9 only (overplotted letters). No friction.
+  status: implemented
+  verdict: Source of vanfossen_1982_staggered_nu (D' basis, with exact converter). Metzger 1986 and VanFossen
+    agree within 1-6% after conversion. Fidelity would rest on the Fig. 9 scatter band, not yet digitised.
+  read_for: ['#335 alternative Nu set', '#335 D'' basis converter', '#335 fin model (Eq. 9)']
+  issues: [335, 455]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: vanfossen_1982_staggered_nu']
+  notes: 'Journal version J. Eng. Power 104 (1982), 268. A byte-identical copy, pin_fin/NTRS_19810004791_VanFossen_1981_staggered_short_pin_fins.pdf, was deleted 2026-10-25.'
+- file: docs/heat_transfer/pin_fin/NASA_TM-83005_Brigham_VanFossen_1983.pdf
+  citation: Brigham, B. A., Van Fossen, G. J. (1983). Length to diameter ratio and row number effects
+    in short pin fin heat transfer. NASA TM-83005 (prepared for the 28th ASME Gas Turbine Conference,
+    Phoenix, March 1983).
+  id: NASA TM-83005
+  topic: [pin_fin]
+  content: NASA Lewis rig, staggered short pins, L/D 0.5-4 and row-number effects; Figs. 4-7 plot Nu vs
+    Re_D' with Metzger (converted) and Morishita data. No tables.
+  status: screened
+  verdict: Showed Han's Fig. 4.134 citation is wrong and that Metzger's H/D 1 data fall on VanFossen's
+    D' line (Fig. 6). Cross-source accuracy points (Figs. 5/6) and the ~5% measurement band; not digitised
+    or scored.
+  read_for: ['#335 H/D effect on short pins', '#335 Han Fig. 4.134 citation', '#335 measurement band']
+  issues: [335]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: cited in the vanfossen_1982_staggered_nu comment (supporting
+      evidence only)']
+  notes: 'Journal version J. Eng. Gas Turbines Power 106 (1984), 241. A byte-identical misnamed copy, pin_fin/NTRS_19830006160_Simoneau_VanFossen_1982_LD_row_effects.pdf,
+    was deleted 2026-10-25.'
+- file: docs/heat_transfer/pin_fin/NASA_TM-83801_Brigham_1984_convergence.pdf
+  citation: Brigham, B. A. (1984). The effect of channel convergence on heat transfer in a passage with
+    short pin fins. NASA TM-83801.
+  id: NASA TM-83801
+  topic: [pin_fin]
+  content: Same NASA Lewis rig, 4 staggered rows, 2:1 area convergence via sidewalls (H/D 2 fixed) or
+    endwalls (H/D 2 -> 1), plus flat-plate controls; array-averaged Nu plotted, Table I dimensions only.
+  status: screened
+  verdict: 'Low value: converging channels are declared out of scope; the convergence mechanism is unresolved
+    between Brigham, Armstrong & Winstanley and Metzger. Flat-plate runs are a rig check only.'
+  read_for: ['#335 channel convergence scope']
+  issues: [335]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  code: ['include/pin_fin_correlation.h: listed under not-carried (convergence)']
+  notes: NTRS 19850001996.
+- file: docs/heat_transfer/pin_fin/NTRS-19820011619_Simoneau_VanFossen_1982.pdf
+  citation: Simoneau, R. J., Van Fossen, G. J., Jr. (1982). Effect of location in an array on heat transfer
+    to a cylinder in crossflow. NASA TM-82797 (prepared for the 3rd Joint Thermophysics, Fluids, Plasma
+    and Heat Transfer Conference, St. Louis, June 1982).
+  id: NASA TM-82797
+  topic: [pin_fin]
+  content: Microfiche scan, no text layer. Heat transfer to one instrumented cylinder (pin surface only)
+    at different depths in an array, with hot-wire turbulence; Re exponent about 0.58 at low Re. Figures
+    only; authors give no correlation.
+  status: screened
+  verdict: 'Low value, not a scoring source. Supports the review''s row-effect numbers and is the origin
+    of the ''average channel velocity'' argument that Armstrong & Winstanley reject; the removed #332
+    code misattributed its friction to it.'
+  read_for: ['#335 row effects', '#335 Re velocity basis', '#335 removed-code friction attribution']
+  issues: [335, 332]
+  records: []
+  notes: 'NTRS 19820011619; journal version J. Heat Transfer 106 (1984), 42 per #335 (not shown in the
+    document). Partly illegible.'
+- file: docs/heat_transfer/pin_fin/Oda_Takeishi_2009_JTST_4_507_liner_ribs.pdf
+  citation: Oda, Y., Takeishi, K., Motoda, Y., Sugimoto, S., Miyake, Y. (2009). Heat transfer characteristics
+    of pin-fin arrays with ribs to cool combustor liners. Journal of Thermal Science and Technology 4(4),
+    507-517.
+  id: doi:10.1299/jtst.4.507
+  topic: [pin_fin, rib]
+  content: Osaka Univ. / MHI naphthalene endwall Nu, 6 staggered rows, H/d 3.5 and 2.08, with/without
+    oblique ribs between pins, Re_d (mean velocity) 1,000-10,000; friction from RANS only (Table 2). No
+    correlations; Nu plotted.
+  status: screened
+  verdict: 'Not a scoring source (endwall-only, narrow channel, ribbed cases, computed friction). Useful
+    context: confirms combustor-liner backside pin fins at larger H/d, and row development fully developed
+    after row 4.'
+  read_for: ['#335 combustor-liner pin fins', '#335 row development']
+  issues: [335]
+  records: []
+- file: docs/heat_transfer/pin_fin/Uzol_Camci_JHT_preprint_circular_elliptical.pdf
+  citation: Uzol, O., Camci, C. (?). Endwall heat transfer, total pressure loss and wake flow field characteristics
+    of circular and elliptical pin fin arrays. Preprint submitted to ASME Journal of Heat Transfer; journal
+    volume/pages ?.
+  topic: [pin_fin]
+  content: Penn State (Camci) endwall LCT, wake total pressure and PIV; 2 staggered rows, H/D 1.5, S/D
+    = X/D 2, Re_D (U_max) 18,000-86,000; circular, standard elliptical and NACA fins. Table 1 PRINTS Nu_D
+    = a Re^b for these plus a shape compilation; friction Eq. 9 did not render.
+  status: screened
+  verdict: Independent check of Metzger Nu up to Re 86k (about -10% constant offset after 2-row correction),
+    read but not scored. Friction unusable until the definition is confirmed from the journal version;
+    Table 1 is a starting map for shaped pins.
+  read_for: ['#335 cross-source accuracy of Metzger Nu at high Re', '#335 shaped-pin extension']
+  issues: [335]
+  records: [validation/cooling/extractions/pin_fin_sources.md]
+  notes: Year not printed in the preprint; Lyall 2006 dates it 2005.
+- file: docs/heat_transfer/pin_fin/Xu_Zhang_Duan_Lei_Wu_2021_Crystals_11_977_pin_shapes.pdf
+  citation: Xu, J., Zhang, K., Duan, J., Lei, J., Wu, J. (2021). Systematic comparison on convective heat
+    transfer characteristics of several pin fins for turbine cooling. Crystals 11, 977.
+  id: doi:10.3390/cryst11080977
+  topic: [pin_fin]
+  content: Xi'an Jiaotong steady TLC, endwall only, nine pin shapes, staggered 4 rows, H/D 3, S/D 2, X/D
+    4.5, pins short of full span, Re_Dh (mean inlet) 1e4-6e4; Nu/Nu0 and f/f0 plotted, no correlations
+    or tables.
+  status: screened
+  verdict: Not usable for the circular-pin sets (endwall only, partial-span pins, 4 rows, friction conversion
+    underdetermined). Possible single-lab shape multiplier (Figs. 12b/13b) for a later shaped-pin extension.
+  read_for: ['#335 circular-pin scoring', '#335 shaped-pin multiplier']
+  issues: [335]
+  records: []
+- file: docs/heat_transfer/RALLABANDI-DISSERTATION.pdf
+  citation: Rallabandi, A. P. (2010). Parametric study of turbine blade internal cooling and film cooling.
+    Ph.D. dissertation, Texas A&M University.
+  topic: [rib, film, pin_fin]
+  content: '153 pp: high-Re rib-turbulated channels (behind the 2009 JHT paper), film cooling by PSP mass-transfer
+    analogy on a flat plate and HP blade (M, DR, upstream step, Strouhal), pin-fins with slot ejection
+    under rotation.'
+  status: screened
+  verdict: 'Not useful for the rib disputes (e/D >= 0.1, same lab). Recorded as available for #386 film
+    (M/DR dependence) and #335 pin fins, but never assessed for either.'
+  read_for: [rib source provenance, '#386 film-cooling inputs (availability only)']
+  issues: [386]
+  records: []
+  notes: Thesis version of Rallabandi_2009_JHT_131_071703_angled.pdf.
+- file: docs/heat_transfer/Rallabandi_2009_JHT_131_071703_angled.pdf
+  citation: Rallabandi, A. P., Yang, H., Han, J.-C. (2009). Heat transfer and pressure drop correlations
+    for square channels with 45 deg ribs at high Reynolds numbers. ASME J. Heat Transfer 131(7), 071703.
+  id: doi:10.1115/1.3090818
+  topic: [rib]
+  content: Square channel, 45 deg sharp-edged ribs on two walls, Re 30,000-400,000, varying e/D and P/e.
+    PRINTS R and G correlations (Eqs. 17/18; Eq. 18 has (e/D)^0.014 where Han's textbook figure lost a
+    decimal) and reproduces Han's Eqs. 4.15/4.16.
+  status: implemented
+  verdict: Source of the shipped rallabandi_2009_high_re rib set (sharp 45 deg ribs only); fidelity 5.1%
+    MAE on 33 own points. Resolved the textbook's missing decimal.
+  read_for: ['#341 high-Re rib extraction', '#373 implement rallabandi_2009_high_re', '#334 ribbed re-add']
+  issues: [333, 334, 339, 341, 373, 389]
+  records: [validation/cooling/extractions/han_ribbed_high_re.md]
+  code: ['include/rib_correlation.h: rallabandi_2009_high_re']
+  notes: 'Dissertation version: RALLABANDI-DISSERTATION.pdf.'
+- file: docs/heat_transfer/ribs_lau_1990.pdf
+  citation: Lau, S. C., Kukreja, R. T., McMillin, R. D. (1990). Effects of V-shaped rib arrays on turbulent
+    heat transfer and friction of fully developed flow in a square channel. Int. J. Heat Mass Transfer
+    ?(?), 1605-?.
+  topic: [rib]
+  content: Square channel, two opposite walls with V-shaped ribs at 45/60/90/120/135 deg, fully developed;
+    PRINTS Table 2 roughness functions R, G, G_bar as closed forms (42 numbers), plus Nu and f plotted.
+  status: accuracy
+  verdict: 'First rib source outside Han''s own papers (but same Texas A&M department): its 90 deg baseline
+    scores han_1988_orthogonal and the other Han sets cross-source; V cases transcribed but held back
+    on modelling (no set expresses V shape). Lau''s R sits ~12.6% above Han''s 3.2 (dispute L2, unsettled).'
+  read_for: ['#385 first independent rib source', '#392 G_bar is a wall average', '#403 item 2']
+  issues: [385, 390, 392, 394, 403]
+  records: [validation/cooling/extractions/lau_1990_v_ribs.md, validation/cooling/data/lau1990/metadata.yaml]
+  notes: Volume and end page not printed in the PDF text; the extraction record gives IJHMT 34(7), 1605-1616.
+- file: docs/heat_transfer/Webb_Eckert_Goldstein_1971_IJHMT_14_pp601-617.pdf
+  citation: Webb, R. L., Eckert, E. R. G., Goldstein, R. J. (1971). Heat transfer and friction in tubes
+    with repeated-rib roughness. Int. J. Heat Mass Transfer 14, 601-617.
+  topic: [rib]
+  content: 'Circular tubes with repeated-rib roughness, e/D 0.01-0.04, p/e 10-40, Pr 0.71-37.6: law-of-the-wall
+    friction (R) and heat-momentum analogy (G) correlations; correlations printed, data plotted.'
+  status: unscreened
+  verdict: unscreened; (guess) the full paper behind the 1972 short communication whose Eq. (2) Prandtl
+    normalisation the repo uses; the origin of the R/G formalism, but circular tubes only, so a provenance
+    reference rather than a scoring set.
+  read_for: []
+  issues: []
+  records: []
+  notes: Parent of Webb_Eckert_Goldstein_1972_IJHMT_15_pp180-184 (which generalises it). Note the repo
+    cites the 1972 paper, never this 1971 one.
+- file: docs/heat_transfer/Webb_Eckert_Goldstein_1972_IJHMT_15_pp180-184_0017931072901792.pdf
+  citation: Webb, R. L., Eckert, E. R. G., Goldstein, R. J. (1972). Generalized heat transfer and friction
+    correlations for tubes with repeated-rib roughness. Int. J. Heat Mass Transfer 15, 180-184.
+  id: doi:10.1016/0017-9310(72)90179-2
+  topic: [rib]
+  content: Short communication generalising the 1971 rib-roughness correlations; PRINTS Eq. (2) g_bar
+    = G Pr^(-0.57).
+  status: screened
+  verdict: 'Gives the Prandtl basis for Han''s G_bar: 3.7/0.703^0.57 = 4.523 reproduces Fig. 4.46''s dashed
+    line, resolving han_ribbed.md items 10 and 25. A convention reference, not a correlation set.'
+  read_for: ['han_ribbed.md items 10/25: G_bar Prandtl normalisation']
+  issues: []
+  records: [validation/cooling/extractions/han_ribbed.md]
+  notes: Issue/volume number recorded as 15(1) in han_ribbed.md; the PDF shows Vol. 15 pp. 180-184 only.
+    Sequel to Webb_Eckert_Goldstein_1971_IJHMT_14_pp601-617.pdf.
+- file: docs/jet_mixing/Holdeman_1996_NASA_TM-107185_multiple_jets_confined_crossflow_cylindrical.pdf
+  citation: Holdeman, J. D., Liscinsky, D. S., Oechsle, V. L., Samuelsen, G. S., Smith, C. E. (1996). Mixing
+    of multiple jets with a confined subsonic crossflow in a cylindrical duct. NASA TM-107185 / ASME 96-GT-482.
+  id: NASA TM-107185; ASME 96-GT-482 (NTRS 19960023955)
+  topic:
+  - jet_mixing
+  - combustion
+  content: Summary of the NASA-supported experimental and computational jet-in-crossflow mixing program for
+    a row of jets in a cylindrical (can) duct; rectangular-duct results recalled. Prints the scaling C = (S/H)
+    sqrt(J) and the optimum number of orifices in a can, Eq. (6) n = pi sqrt(2J)/C; momentum-flux ratio J and
+    orifice count dominate, penetration similar when n ~ sqrt(J). Mixture-fraction distributions and area-weighted
+    variances PLOTTED; reacting results and NOx tie-in summarised.
+  status: screened
+  verdict: 'The anchor document of the topic: the design rules (J, C, optimum n) in one place, with references
+    to the data reports. combaero has no jet-mixing / dilution model and no issue yet; a jet-in-crossflow element
+    is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 twice (the NASA file and a CORE-repository copy with a cover page; the CORE copy
+    was deleted). Author list from the TM cover; check against p. 1.
+- file: docs/jet_mixing/Holdeman_Clisset_Moder_2011_NASA_TM-2011-215980_spreadsheet_opposed_slanted_slots.pdf
+  citation: 'Holdeman, J. D., Clisset, J. R., Moder, J. P. (2011). Spreadsheet calculation of jets in crossflow:
+    opposed rows of slots slanted at 45 deg. NASA/TM-2011-215980.'
+  id: NASA/TM-2011-215980 (NTRS 20120011165)
+  topic:
+  - jet_mixing
+  - combustion
+  content: 'Extends the NASA empirical jet-in-crossflow model (Excel spreadsheet of TM-2005-213137, as posted
+    with TM-2010-216100) to opposed rows of 45 deg slanted slots; fixes the lateral-translation function. Nomenclature
+    defines A_J/A_M, C = (S/H) sqrt(J), Cd. Conclusion: parallel staggered slanted slots mix best at any downstream
+    distance.'
+  status: screened
+  verdict: 'An extension; the empirical model itself is documented in TM-2005-213137 (on the wanted list).
+    combaero has no jet-mixing / dilution model and no issue yet; a jet-in-crossflow element is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/20120011165_2012010834.pdf.
+- file: docs/jet_mixing/Kroll_Sowa_Samuelsen_1993_NASA_TM-105984_round_jets_heated_crossflow_can.pdf
+  citation: Kroll, J. T., Sowa, W. A., Samuelsen, G. S. (1993). Optimization of circular orifice jets mixing
+    into a heated cross flow in a cylindrical duct. NASA TM-105984 / AIAA-93-0249.
+  id: NASA TM-105984; AIAA-93-0249 (NTRS 19930006170)
+  topic:
+  - jet_mixing
+  - combustion
+  content: Non-reacting temperature measurements downstream of a row of cold round jets into a heated cross
+    stream in a can (R 1.5 in), varying the number of orifices (Table 1 module configurations) at J 25 and
+    80 (MR 2.2, Cd 0.80 assumed); area-weighted standard deviation of mixture fraction as the mixedness metric;
+    optimum mixing when the mean trajectory lies near the mid-radius.
+  status: screened
+  verdict: 'A data report behind TM-107185''s can results (optimum orifice count vs J). combaero has no jet-mixing
+    / dilution model and no issue yet; a jet-in-crossflow element is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/19930006170.pdf.
+- file: docs/jet_mixing/Leong_Samuelsen_1995_NASA_TM-106975_jet_mixing_reacting_crossflow.pdf
+  citation: Leong, M. Y., Samuelsen, G. S. (1995). Jet mixing in a reacting cylindrical crossflow. NASA TM-106975
+    / AIAA-95-3109.
+  id: NASA TM-106975; AIAA-95-3109 (NTRS 19950024432)
+  topic:
+  - jet_mixing
+  - combustion
+  content: Air jets into fuel-rich propane products (RQL quick-mix), modules of 8, 9, 10 and 12 round holes
+    at J 57 and MR 2.5; O2, CO2, CO and HC profiles upstream, in and downstream of the orifice plane; the 12-hole
+    module mixes best.
+  status: screened
+  verdict: 'Reacting counterpart of Kroll et al.; species profiles only. combaero has no jet-mixing / dilution
+    model and no issue yet; a jet-in-crossflow element is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/19950024432.pdf.
+- file: docs/jet_mixing/Salewski_2006_PhD_Lund_LES_jets_sprays_crossflow.pdf
+  citation: Salewski, M. (2006). LES of jets and sprays injected into crossflow. Doctoral thesis (compilation),
+    Fluid Mechanics, Lund Institute of Technology.
+  topic:
+  - jet_mixing
+  content: LES (with Lagrangian particle tracking for sprays) of single jets and sprays in crossflow; compilation
+    thesis of the author's papers.
+  status: screened
+  verdict: CFD only, single-jet physics (counter-rotating vortex pair, spray dispersion); no correlation or
+    measured data a 1-D network could use. Background only.
+  read_for:
+  - jet-in-crossflow mixing (new topic)
+  issues: []
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/thesis.pdf (120 pp.).
+- file: docs/junction/a-unified-method-for-estimating-pressure-losses-at-vascular-3elbvn7sno.pdf
+  citation: Mynard, J. P., Valen-Sendstad, K. (?). A unified method for estimating pressure losses at
+    vascular junctions. Int. J. Numer. Meth. Biomed. Engng. ?, 1-24.
+  id: DOI 10.1002/cnm (full DOI not printed)
+  topic: [junction, tee]
+  content: 'Unified0D: extends Bassett''s control-volume junction method to any number of branches at
+    any angle and flow regime via a pseudo-supplier branch, with an empirical energy-transfer factor;
+    validated against laminar CFD (Ref3D) over 31 figure panels.'
+  status: implemented
+  verdict: The shipped tee closure (Mynard kernel, C++ on dual numbers). Fidelity is scored on the paper's
+    own figures (632 cases); its fitted transfer factor was replaced by the dividing-streamline recovery,
+    and joining alpha is tuned (Idelchik).
+  read_for: [MPCE-v2 junction closure (#191/#192), C++ port (#271), fidelity on own figures (#506)]
+  issues: [172, 191, 192, 234, 271, 272, 296, 307, 308, 311, 506]
+  records: [validation/junction/mynard_fidelity.py, validation/junction/digitise_mynard2015.py, validation/junction/data/mynard2015/,
+    validation/junction/data/mynard_reference_data.h]
+  code: [include/mynard_junction.h, include/mpce_junction.h, python/combaero/network/_mynard2010.py]
+  notes: Preprint in the journal template; the header shows the template year 2010 and a placeholder DOI.
+    The repo cites it as Mynard 2015 (module name keeps 'mynard2010').
+- file: docs/junction/bassett.pdf
+  citation: 'Bassett, M. D., Winterbone, D. E., Pearson, R. J. (2001). Calculation of steady flow pressure
+    loss coefficients for pipe junctions. Proc. IMechE Part C: J. Mechanical Engineering Science 215(8),
+    861-?.'
+  id: DOI 10.1177/095440620121500801
+  topic: [junction, tee]
+  content: 1-D control-volume model for steady loss coefficients of multi-pipe junctions; six flow types,
+    12 K forms for a tee at arbitrary angle and area ratio, with the Hager 3/4 effective-angle law. Equations
+    printed (Table 2, Eqs 33-37); measured comparisons only plotted (Figs 5-11).
+  status: implemented
+  verdict: The basis of the shipped junction closures (bound K forms, bleed kappa 0.75, the control volume
+    under Mynard's Unified0D). Its digitised figures are a 'selected'-role dataset, not independent accuracy.
+  read_for: [tee K forms (12 K), '#272 K_straight / Tier-1 M->0 gap', joining alpha, bleed stations (#471),
+    Gardel 1970 comparison model]
+  issues: [177, 183, 186, 188, 271, 272, 276, 295, 301, 311, 478, 479, 508, 533]
+  records: [validation/junction/data/bassett2001/, validation/junction/models/bassett2001.py, validation/junction/README.md]
+  code: ['include/side_stream_momentum.h: STATION_KAPPA_BLEED_BASSETT', 'include/solver_interface.h: Tee
+      Junction Elements (Bassett 2001)']
+  notes: A byte-identical copy at docs/bassett/bassett.pdf was deleted 2026-10-25.
+- file: docs/junction/compressible_junction_model.pdf
+  citation: '? (2026). Compressible extension of the Unified0D/Bassett T-junction model for 1D network
+    solvers. Working notes, 27 May 2026.'
+  topic: [junction, tee]
+  content: 'Project working notes, first version: compressible K to O(M^2), O(M^4) CV system, residuals
+    and Jacobian, C++ fragments.'
+  status: unscreened
+  verdict: unscreened; (guess) superseded first draft of v3; no independent value.
+  read_for: []
+  issues: []
+  records: []
+  notes: Internal design note, not literature. Superseded by v2 and v3.
+- file: docs/junction/compressible_junction_model_v2.pdf
+  citation: '? (2026). Compressible extension of the Unified0D/Bassett T-junction model for 1D network
+    solvers (v2, corrected). Working notes, 29 May 2026.'
+  topic: [junction, tee]
+  content: 'Project working notes: closed compressible loss coefficient K(lambda, psi, phi, M) to O(M^2),
+    a fully compressible CV system to O(M^4), residuals and analytical Jacobian for an n-branch node,
+    C++ fragments.'
+  status: unscreened
+  verdict: unscreened; (guess) superseded intermediate draft of v3, which is the version the C++ port
+    design cites.
+  read_for: []
+  issues: []
+  records: []
+  notes: Internal design note, not literature. Superseded by compressible_junction_model_v3.pdf (same
+    date).
+- file: docs/junction/compressible_junction_model_v3.pdf
+  citation: '? (2026). Compressible extension of the Unified0D/Bassett T-junction model for 1D network
+    solvers (v3, branching-tee residual structure). Working notes, 29 May 2026.'
+  topic: [junction, tee]
+  content: 'Project working notes (20 pp.): O(M^2) compressible K, O(M^4) CV system, n+1 residual set
+    with full analytical Jacobian tables for pseudodatum and branch primitives, C++ pseudodatum/kernel
+    fragments, atan2/abs non-analyticity fix.'
+  status: screened
+  verdict: Used as the written port design for moving the Mynard/MPCE-v2 junction to C++ (#271); the momentum-CV
+    guide later demoted its K-based tee to an incompressible-limit reference. Not cited by shipped code
+    directly.
+  read_for: ['#271 C++ port of MPCE-v2 (sec 5, 8-9)']
+  issues: [271, 281]
+  records: [validation/junction/MPCE_CPP_PORT_DESIGN.md]
+  notes: Internal design note, not literature. Latest of three versions.
+- file: docs/junction/gardel1957_part1.pdf
+  citation: Gardel, A. (1957). Les pertes de charges dans les ecoulements au travers de branchements en
+    te. Bulletin technique de la Suisse romande 83(9), ?.
+  id: DOI 10.5169/seals-62781
+  topic: [junction, tee]
+  content: Part 1 of Gardel's 1957 tee-junction loss study (water); loss coefficients for joining/dividing
+    flows.
+  status: screened
+  verdict: Superseded by Gardel & Rechsteiner 1970, whose authors discount the 1957 series (ill-defined
+    fillets). Its values survive only as the comparison rows ('G') transcribed inside gardel1970/tables_EFG.csv;
+    not scored separately.
+  read_for: ['#532 junction data at psi > 1']
+  issues: [532]
+  records: [validation/junction/data/gardel1970/README.md]
+  notes: Only part 1 is in docs/.
+- file: docs/junction/gardel_1970.pdf
+  citation: Gardel, A., Rechsteiner, G. F. (1970). Les pertes de charge dans les branchements en Te des
+    conduites de section circulaire. Bulletin technique de la Suisse romande 96(25), 363-391.
+  id: DOI 10.5169/seals-70882
+  topic: [junction, tee]
+  content: EPFL water campaign, D = 150 mm, 33 tee shapes (delta 45-135 deg, phi 1/0.69/0.44, fillet r/D
+    0-0.2), four flow modes, >6000 cases. Tables E-G printed; raw points in Figs 12-15; smoothed curves
+    Figs 18-27.
+  status: accuracy
+  verdict: 'Cross-source accuracy set at psi > 1, scored at kernel level (water): ideal tee, Bassett and
+    the shipped tee; Bassett and the shipped tee are level (MAE 0.21 vs 0.22). Set no constant.'
+  read_for: [joining/dividing data at psi > 1 (#505 follow-up), closure comparison ideal/Bassett/shipped]
+  issues: [532, 533, 534, 535, 537, 538]
+  records: [validation/junction/data/gardel1970/, validation/junction/gardel1970_score.py, python/tests/test_junction_gardel1970.py]
+- file: docs/junction/hager1984.pdf
+  citation: 'Hager, W. H. (1984). An approximate treatment of flow in branches and bends. Proc. IMechE
+    Part C: J. Mechanical Engineering Science 198(1), 63-?.'
+  id: DOI 10.1243/PIME_PROC_1984_198_088_02
+  topic: [junction, tee]
+  content: Approximate momentum treatment of equal-area branches and bends; introduces the (3/4) delta
+    effective-angle correction; xi_t (Eq 8) and xi_l (Eq 19) printed; measured comparisons plotted (Fig
+    4).
+  status: implemented
+  verdict: Source of the shipped HAGER_FRACTION = 0.75 effective-angle law used by the junction kernels;
+    its figures form a 'selected'-role dataset with Bassett. Equal-area only (psi = 1).
+  read_for: [3/4 angle law, '#272 Tier-1 M->0 disagreement', dividing-streamline recovery (#296)]
+  issues: [177, 187, 272, 273, 296, 300, 502, 505]
+  records: [validation/junction/data/hager1984/, validation/junction/models/hager1984.py]
+  code: ['include/multi_port_chamber.h: HAGER_FRACTION', 'include/tee_junction.h: Hager 3/4 factor']
+- file: docs/junction/Idelchik.pdf
+  citation: 'Idel''chik, I. E. (1966). Handbook of Hydraulic Resistance: Coefficients of Local Resistance
+    and of Friction. Israel Program for Scientific Translations, Jerusalem (translated from the 1960 Russian
+    edition, Gosenergoizdat, Moscow-Leningrad), for the U.S. AEC and NSF.'
+  id: AEC-tr-6630
+  topic: [junction, tee, orifice, area_change, channel, review]
+  content: 'Whole handbook (526 pp., 1st English ed.): diagrams and tables for friction, contractions
+    (3-x), sudden expansion (4-1), orifices (4-9..4-18), diffusers (5-x), tees (7-x). Many coefficients
+    tabulated; some only as curves.'
+  status: implemented
+  verdict: 'Shipped closures: area change (diagrams 4-1, 3-6/3-7, 3-9, 3-10, 5-2; #731), wall-orifice
+    Cd and in-pipe loss (4-17/4-18; #409/#654), diverging-branch Eq 7-6 in the ideal tee; the junction
+    joining alpha = 0.2 is tuned on its 7-x tables. Read tables from 400 dpi renders, never the text layer.'
+  read_for: [area change closures (#731/#733/#736), wall orifice Cd (#409), orifice in-pipe loss (#645/#654),
+    'junction joining alpha (#197, #283-#285)', ideal tee split loss (#517)]
+  issues: [197, 271, 272, 282, 283, 284, 285, 409, 410, 517, 645, 654, 731, 733, 736]
+  records: [validation/junction/data/idelchik1966/, validation/cooling/extractions/idelchik_1966_wall_orifice.md,
+    validation/area_change/extractions/idelchik_1966_area_change.md, validation/area_change/extractions/idelchik_1966_contraction.md,
+    validation/area_change/data/]
+  code: ['include/area_change.h: diagrams 4-1, 3-7, 3-9, 3-10, 5-2', 'include/orifice.h: DischargeCdCorrelation::Idelchik1966*',
+    'include/ideal_junction.h: Eq 7-6']
+  notes: Filed under junction/ for historical reasons but covers the whole handbook. Diagrams 4-9..4-16
+    (conduit-to-conduit and in-pipe orifices) not implemented; diagram 4-11 tau left.
+- file: docs/junction/momentum cv implementation guide.pdf
+  citation: '? (?). Momentum-CV junction element for combaero -- implementation guide. Project design
+    note.'
+  topic: [junction, tee]
+  content: 'Specification of a momentum control-volume junction: junction owns one scalar P_jct, per-port
+    impulse-function residuals plus a global mass residual, geometry only; empirical losses as separate
+    per-port loss elements.'
+  status: implemented
+  verdict: The design spec for the shipped momentum-CV junction (MultiPortChamberElement / momentum chambers).
+    It is a project note, not a literature source; its 'impulse function on every port' statement was
+    found inexact for the straight port (#272).
+  read_for: ['#177 momentum-CV junction design', '#272 straight-port residual']
+  issues: [177, 272]
+  records: []
+  code: ['include/multi_port_chamber.h: sanctioned successor to the K-closure tee', 'python/combaero/network/components.py:
+      momentum-CV junction machinery']
+  notes: Internal design note; supersedes the K-based tee closure in compressible_junction_model_v3.pdf.
+- file: "docs/junction/Perez-Garci\u0301a-2010.pdf"
+  citation: Perez-Garcia, J., Sanmiguel-Rojas, E., Viedma, A. (?). New coefficient to characterize energy
+    losses in compressible flow at T-junctions. ? (accepted manuscript; journal and year not printed on
+    the first pages).
+  topic: [junction, tee]
+  content: CFD of adiabatic compressible flow at a 90 deg T-junction; proposes a linking coefficient K_hat
+    (Eq 41) correlated with q and M3*; Table 1 regression parameters printed.
+  status: extracted
+  verdict: 'Not a validation source: K_hat depends only on the two branch Mach numbers, and a loss-free
+    junction reproduces Table 1 within U95 in 57 of 72 cells. Table 1 was re-transcribed and the vacuity
+    is pinned by a test.'
+  read_for: ['#272 Tier 2 compressible check', K_hat as a scoring metric]
+  issues: [183, 272, 502, 505]
+  records: [validation/junction/data/perez_garcia2010/, validation/junction/models/perez_garcia2010.py]
+  notes: Filename gives 2010; the document shows no year.
+- file: docs/junction/stigler_2010.pdf
+  citation: 'Stigler, J. (2010). T-part as an element of the pipe-line system. The introduction of the
+    mathematical model of the fluid flow in T-part for the arbitrary angle of the adjacent branch. IOP
+    Conf. Ser.: Earth Environ. Sci. 12, 012102.'
+  id: DOI 10.1088/1755-1315/12/1/012102
+  topic: [junction, tee]
+  content: Theoretical model of flow in a T-junction at arbitrary branch angle; no measurements.
+  status: screened
+  verdict: 'Excluded from the junction dataset: theory only, no data.'
+  read_for: [junction validation dataset (#183)]
+  issues: [183, 272, 300]
+  records: [validation/junction/README.md]
+  notes: A byte-identical copy at docs/bassett/stigler_2010.pdf was deleted 2026-10-25.
+- file: docs/junction/tb1283/OBJ.pdf
+  citation: Blaisdell, F. W., Manson, P. W. (1963). Loss of energy at sharp-edged pipe junctions in water
+    conveyance systems. USDA Agricultural Research Service, Technical Bulletin No. 1283, August 1963.
+  id: USDA Tech. Bull. 1283
+  topic: [junction, tee]
+  content: '5-year St. Anthony Falls test program: converging-junction theory, 55 (theta, Ad/Ab) sharp-edged
+    junctions, Table 12 summary of test data (zeta_u, zeta_b vs Qb/Qd, printed pp. 131-145), design tables
+    and curves.'
+  status: implemented
+  verdict: Their merge theory (Eqs 12/19) is the ideal momentum tee's merge limit; Table 12 (1880 centre-lateral
+    rows) is a pre-registered cross-source score of the joining closures, showing zeta_u and zeta_b want
+    different alphas.
+  read_for: ['#508 joining alpha on Table 12', '#517 ideal momentum tee baseline']
+  issues: [508, 509, 517, 518, 522, 528]
+  records: [validation/junction/data/blaisdell_manson1963/table12_centre.csv, validation/junction/data/blaisdell_manson1963/PREREGISTRATION.md,
+    validation/junction/bm1963_score.py]
+  code: ['include/ideal_junction.h: merge = Blaisdell & Manson''s theory', python/combaero/network/ideal_tee_element.py]
+  notes: The 600 dpi scan used as the primary read for Table 12. Same work as tb1283/tb1283.pdf. The one-page HathiTrust PDF of p. 145 (uva-x030348647-149-...pdf) was deleted 2026-10-25; the HathiTrust page TIFFs (uva.x030348647-seq_*.tif) remain.
+- file: docs/junction/tb1283/tb1283.pdf
+  citation: Blaisdell, F. W., Manson, P. W. (1963). Loss of energy at sharp-edged pipe junctions in water
+    conveyance systems. USDA Agricultural Research Service, Technical Bulletin No. 1283.
+  id: USDA Tech. Bull. 1283
+  topic: [junction, tee]
+  content: Second full scan of TB 1283 (microfilm copy with resolution test charts, 168 pp., no usable
+    text layer).
+  status: implemented
+  verdict: Duplicate scan of the same bulletin; the work itself is implemented (ideal tee merge theory)
+    and scored (Table 12). This copy is at most a secondary read.
+  read_for: ['#508 Table 12 transcription']
+  issues: [508]
+  records: [validation/junction/data/blaisdell_manson1963/README.md]
+  notes: Duplicate (different scan) of tb1283/OBJ.pdf; the Table 12 README names OBJ.pdf and HathiTrust
+    TIFFs as its reads, not this file explicitly.
+- file: docs/junction/torregrosa-2017-07-00480.pdf
+  citation: 'Torregrosa, A. J., Broatch, A., Garcia-Cuevas, L. M., Hernandez, M. (2017). A study of the
+    transient response of duct junctions: measurements and gas-dynamic modeling with a staggered mesh
+    finite volume approach. Appl. Sci. 7, 480.'
+  id: DOI 10.3390/app7050480
+  topic: [junction, acoustics]
+  content: 'Junctions characterised as multi-ports: measured pressure-pulse transmission/reflection across
+    duct junctions, compared with a staggered-mesh FV model and a pressure-loss junction model.'
+  status: screened
+  verdict: 'Excluded from the steady junction dataset: unsteady wave transmission/reflection, not steady
+    K. Possible acoustic-tier dataset later.'
+  read_for: [junction validation dataset (#183)]
+  issues: [183, 272, 300]
+  records: [validation/junction/README.md]
+- file: docs/junction/wang-et-al-2014-an-experimental-study-of-compressible-combining-flow-at-45-t-junctions.pdf
+  citation: 'Wang, W., Lu, Z., Deng, K., Qu, S. (2015). An experimental study of compressible combining
+    flow at 45 T-junctions. Proc. IMechE Part C: J. Mechanical Engineering Science 229(9), 1600-1610.'
+  id: DOI 10.1177/0954406214546678
+  topic: [junction, tee]
+  content: Air, combining flow at 45 deg tees, three lateral/main area ratios (1, 1.56, 2.44), M3 0.1-0.6,
+    full q range; total-pressure loss coefficients K13/K23. Tables 1-2 printed; data plotted (Figs 10-12).
+  status: accuracy
+  verdict: The junction's Tier-2 compressible test, scored cross-source in the network runner (190 of
+    200 points, MAE 0.127); the only junction source that set no constant. States no measurement band.
+    Spent for the alpha question.
+  read_for: ['#271/#272 compressible Tier 2', joining alpha record (#509), ideal tee pre-registration
+      (#522)]
+  issues: [183, 187, 271, 272, 300, 502, 505, 509, 517, 522, 579]
+  records: [validation/junction/data/wang2014/, validation/junction/models/wang2014.py, validation/junction/network_runner.py]
+  notes: Online 2014 (filename), issue 2015 (vol. 229).
+- file: docs/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
+  citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
+    3rd ed. CRC Press, Boca Raton.'
+  id: ISBN 978-1-4200-8605-8 (ebook)
+  topic: [combustion, film, review]
+  content: 'Textbook (560 pp., no text layer): combustor design, diffusers, liner aerodynamics and pressure
+    loss, wall cooling, heat transfer, emissions.'
+  status: unscreened
+  verdict: unscreened; (guess) combustor liner pressure loss, hole Cd and slot-film cooling chapters are
+    the likely relevant parts.
+  read_for: []
+  issues: []
+  records: []
+  notes: A byte-identical copy at docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf was deleted 2026-10-25.
+- file: docs/orifices/lichtarowicz-et-al-1965-discharge-coefficients-for-incompressible-non-cavitating-flow-through-long-orifices.pdf
+  citation: Lichtarowicz, A., Duggins, R. K., Markland, E. (1965). Discharge coefficients for incompressible
+    non-cavitating flow through long orifices. J. Mechanical Engineering Science 7(2), 210-219.
+  topic: [orifice]
+  content: Collected and new data for parallel-bore orifices, l/d up to 10, Re from about 1 to 1e5; simple
+    empirical Cd(Re, l/d) expressions printed for design.
+  status: implemented
+  verdict: Shipped as DischargeCdCorrelation::Lichtarowicz1965, the low-Re long-orifice Cd (Re 10 to 2e4,
+    l/d 2-10), below McGreehan-Schotsch's Re floor. Default L = 0 is infeasible (needs l/d >= ~1.5).
+  read_for: ['#411 low-Re long-orifice Cd', orifice permanent loss (#645), impingement plate Cd (#465)]
+  issues: [409, 411, 466, 470, 645, 649, 650, 654]
+  records: [validation/cooling/extractions/lichtarowicz_1965_long_orifice.md, python/tests/test_orifice_lichtarowicz.py]
+  code: ['include/orifice.h: namespace lichtarowicz, Lichtarowicz1965']
+- file: docs/orifices/mcgreehan_schotsch_1988.pdf
+  citation: McGreehan, W. F., Schotsch, M. J. (1988). Flow characteristics of long orifices with rotation
+    and corner radiusing. ASME J. Turbomachinery 110(2), 213-217.
+  id: ASME 87-GT-162
+  topic: [orifice]
+  content: 'Composite discharge-coefficient chain for arbitrary orifices: Re baseline, inlet corner radius
+    r/d, length L/d, relative tangential velocity U1/Vi, expansion factor Y; Eqs (4)-(17) printed; compiled
+    data (incl. Rohde) plotted (Figs 4-6).'
+  status: implemented
+  verdict: Shipped as orifice::mcgreehan_schotsch (Cd chain, Y factor, analytic (f,J)) for plenum-fed
+    bleed/film/effusion holes. Fig. 6 Rohde series is scored; baseline runs 3-12% above Rohde's measured
+    basic values. Floored at Re 1e4.
+  read_for: ['#375 jet-plate Cd', '#382 expansion factor Y', '#383 analytic (f,J) and U1/Vi singularity',
+    '#645 permanent loss']
+  issues: [339, 375, 381, 382, 383, 384, 406, 409, 465, 645, 649]
+  records: [validation/cooling/extractions/orifice_discharge_coefficient.md, validation/cooling/data/mcgreehan_schotsch1988/]
+  code: ['include/orifice.h: orifice::mcgreehan_schotsch, McGreehanSchotsch1988']
+- file: docs/orifices/Rohde_NASA_TN_D-5467.pdf
+  citation: Rohde, J. E., Richards, H. T., Metger, G. W. (1969). Discharge coefficients for thick plate
+    orifices with approach flow perpendicular and inclined to the orifice axis. NASA TN D-5467, Lewis
+    Research Center, October 1969.
+  id: NASA TN D-5467
+  topic: [orifice]
+  content: 'Thick-plate orifices with crossflow approach (perpendicular and inclined): Cd vs velocity-head
+    ratio per duct Mach number, inlet corner radius r/d 0-0.488. Charts only, chart-lookup procedure,
+    no correlation.'
+  status: accuracy
+  verdict: Cross-source accuracy set for the McGreehan-Schotsch crossflow and corner-radius terms (Fig.
+    10 digitised); also supplies validity statements. No correlation to implement.
+  read_for: ['#375 jet-plate Cd crossflow validity', McGreehan-Schotsch U1/Vi term accuracy]
+  issues: [333, 339, 375, 381, 382, 388, 389, 433]
+  records: [validation/cooling/data/rohde1969/, validation/cooling/data/mcgreehan_schotsch1988/fig6_rohde_td0p51.csv,
+    validation/cooling/extractions/orifice_discharge_coefficient.md, python/tests/test_orifice_validation.py]
+- file: docs/orifices/wu_burton_schoenau_2002_orifces.pdf
+  citation: Wu, D., Burton, R., Schoenau, G. (2002). An empirical discharge coefficient model for orifice
+    flow. Int. J. Fluid Power 3(3), 13-18.
+  topic: [orifice]
+  content: Closed-form Cd(Re) valid to Re -> 0 for hydraulic valve orifices, coefficients fitted per orifice
+    type (Table 1, Eq 15 printed), non-iterative flow evaluation.
+  status: screened
+  verdict: 'Deferred (decision D7 in the orifice extraction): the form reaches Re -> 0 but its constants
+    are fitted to valves (Merritt''s sharp-edged curve, spool valve), so they do not transfer to gas-turbine
+    holes without new data.'
+  read_for: ['#375 low-Re Cd extension (item I5)']
+  issues: [381, 384]
+  records: [validation/cooling/extractions/orifice_discharge_coefficient.md]
+  code: ['src/orifice.cpp: comment, deliberately not implemented']
+- file: docs/vatistas/vatistas_doi_10.1007_BF00198434.pdf
+  citation: Vatistas, G. H., Kozel, V., Mih, W. C. (1991). A simpler model for concentrated vortices.
+    Experiments in Fluids 11, 73-76.
+  id: DOI 10.1007/BF00198434
+  topic: [vortex]
+  content: Algebraic n-vortex model for tangential velocity, radial velocity and static pressure of concentrated
+    vortices (n = 2 best fit); measured profiles plotted (Figs 1b, 2a, 2b).
+  status: implemented
+  verdict: 'Shipped as the Vatistas n-vortex kernel with analytic derivatives and checked against its
+    own digitised figures. Since #661 the VortexElement is a free vortex and its r_c/n inputs are deprecated
+    (removal in 0.8.0), so the kernel no longer drives the element''s physics.'
+  read_for: ['#150 Vatistas kernel', '#151 VortexElement', '#661 free vortex rewrite']
+  issues: [150, 151, 598, 661, 662]
+  records: [python/tests/test_vatistas_validation.py, python/tests/data/vatistas/]
+  code: [include/vatistas.h, src/vatistas.cpp, python/combaero/vortex.py]
+  notes: PDF page 1 begins with the end of the preceding article (Mao & Hanratty) in the same issue.
+
+# Documents we do NOT hold that would settle an open question. When one is
+# obtained, its entry moves up into `documents` with a file and a status.
+# `citation` here is as recalled unless `checked` is true; confirm it from
+# the document. priority: now (blocks or settles an open item) or later
+# (only when that work resumes).
+wanted:
+- citation: 'Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I., Nazari, A., Wu, J. (1990).
+    Impingement/effusion cooling: the influence of the number of impingement holes and pressure loss on the
+    heat-transfer coefficient. J. Turbomachinery 112(3), 467-476.'
+  checked: false
+  issues:
+  - 468
+  priority: now
+  question: The impingement Re exponent against the jet-to-vent ratio -- the one variable that could reconcile
+    Cho & Rhee's 0.56 with Hollworth & Dagan's 0.80 (88-GT-290 gives 0.72).
+  where: ASME journal; AGARD CP-527 paper 30 is an alternative.
+- citation: Roach, P. E. (1987). The generation of nearly isotropic turbulence by means of grids. Int. J. Heat
+    Fluid Flow 8(2), 82-92.
+  checked: false
+  issues:
+  - 714
+  priority: now
+  question: Turbulence decay behind grids and perforated plates vs solidity and x/b -- the link a Tu-from-loss
+    closure needs to be tested on D-7958's blockage plates (measured Tu 7/14/23/35%) without guessing the k
+    ~ c K q constant.
+  where: Elsevier journal.
+- citation: Laws, E. M., Livesey, J. L. (1978). Flow through screens. Annu. Rev. Fluid Mech. 10, 247-266.
+  checked: false
+  issues:
+  - 714
+  priority: later
+  question: Review companion to Roach 1987 -- screen loss coefficients and the turbulence they generate.
+  where: Annual Reviews.
+- citation: Rhee, D. H., Choi, J. H., Cho, H. H. (2003). Flow and heat (mass) transfer characteristics in an
+    impingement/effusion cooling system with crossflow. J. Turbomachinery 125(1), 74-82.
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: 'Journal version of Nam et al. 2003 (local, Korean conference paper): vented-target Sh vs initial
+    crossflow ratio, for a #468 crossflow term.'
+  where: ASME journal.
+- citation: Cho, H. H., Rhee, D. H., Goldstein, R. J. (2008). Effects of hole arrangements on local heat/mass
+    transfer for impingement/effusion cooling with small hole spacing. J. Turbomachinery 130, 041003.
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: Cross-source accuracy at small hole spacing (Cho group).
+  where: ASME journal.
+- citation: Jung, E. Y., Choi, S. M., Kim, ? (2024). ? (impingement/effusion, title not recalled).
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: A recent cross-source set, if it varies Re (the Cho group's effusion work is at Re 10,000 only).
+  where: '?'
+- citation: Vanga, S., et al. (2018). ? ASME GT2018-77036.
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: The original of the Click 2018 thesis Fig. 21 (impingement-effusion with crossflow); far outside
+    the Florschuetz H/D range, so accuracy only.
+  where: ASME Turbo Expo proceedings.
+- citation: Gillespie, D. R. H., Byerley, A. R., Ireland, P. T., Wang, Z., Jones, T. V., Kohler, S. T. (1996).
+    Detailed measurements of local heat transfer coefficient in the entrance to normal and inclined film cooling
+    holes. J. Turbomachinery 118, 285-290.
+  checked: false
+  issues: []
+  priority: later
+  question: Coolant-side heat transfer at an effusion hole inlet with crossflow (effusion configurations PR4;
+    no open issue).
+  where: ASME journal.
+- citation: Byerley, A. R., Jones, T. V., Ireland, P. T. (1992). Internal cooling passage heat transfer near
+    the entrance to a film cooling hole. ASME 92-GT-241.
+  checked: false
+  issues: []
+  priority: later
+  question: As Gillespie 1996 (effusion configurations PR4).
+  where: ASME Turbo Expo proceedings.
+- citation: Metzger, D. E., ? (1979). ? (effusion/film hole inlet heat transfer; co-author recalled as Cordoro).
+  checked: false
+  issues: []
+  priority: later
+  question: As Gillespie 1996 (effusion configurations PR4).
+  where: '?'
+- citation: 'Chyu, M. K., Hsing, Y. C., Shih, T. I.-P., Natarajan, V. (1999). Heat transfer contributions of
+    pins and endwall in pin-fin arrays: effects of thermal boundary condition modeling. J. Turbomachinery 121,
+    257-263.'
+  checked: false
+  issues:
+  - 335
+  priority: later
+  question: Inline pin arrays (now refused as out of box) and the pin/endwall split.
+  where: ASME journal.
+- citation: Arora, S. C., Abdel-Messeh, W. (1983). Pressure drop and heat transfer characteristics of circular
+    and oblong low aspect ratio pin fins. ASME 83-GT-123.
+  checked: false
+  issues:
+  - 335
+  priority: later
+  question: Short-pin friction and Nu from a non-NASA rig.
+  where: ASME Turbo Expo proceedings.
+- citation: Lawson, S. A. (2007?). ? MS thesis, Penn State University (about 107 pp.).
+  checked: false
+  issues:
+  - 335
+  priority: later
+  question: The friction-factor definition and per-geometry fits behind Lawson, Thrift, Thole & Kohli 2011
+    (local).
+  where: Penn State ETDA (unreachable from here; needs a browser).
+- citation: Eames, I. W., Ablwaifa, A. E., Petrenko, V. (2007). Results of an experimental study of an advanced
+    jet-pump refrigerator operating with R245fa. Applied Thermal Engineering 27, 2833-2840.
+  checked: false
+  issues: []
+  priority: later
+  question: A second R245fa rig with geometry and measured omega -- tests the shared front end (Eqs. 1-8) that
+    moved both closures 10-22 points from Eames 2013's duct A to B.
+  where: Elsevier journal.
+- citation: Scott, D., Aidoun, Z., Ouzzane, M. (2011). An experimental investigation of an ejector for validating
+    numerical simulations. Int. J. Refrigeration 34, 1717-1723.
+  checked: false
+  issues: []
+  priority: later
+  question: As Eames 2007; written for CFD validation, so geometry and operating points are likely given.
+  where: Elsevier journal.
+- citation: '? (no candidate known): film effectiveness measured in a CONFINED duct, far enough downstream
+    that the coolant mixes into the core.'
+  checked: false
+  issues:
+  - 694
+  priority: later
+  question: Where the film reference temperature moves from the undiluted T_inf (used now) towards the mixed
+    T.
+  where: '?'
+- citation: Holdeman, J. D., Smith, T. D., Clisset, J. R., Lear, W. E. (2005). A spreadsheet for the mixing
+    of a row of jets with a confined crossflow. NASA/TM-2005-213137.
+  checked: false
+  issues: []
+  priority: later
+  question: The NASA empirical jet-in-crossflow mixing model itself (equations behind the spreadsheet that
+    TM-2011-215980 extends) -- the closure a 1-D dilution-mixing element would be built on.
+  where: NTRS (public).

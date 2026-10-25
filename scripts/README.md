@@ -2,6 +2,27 @@
 
 Utility scripts for code quality, documentation generation, and testing.
 
+## Source register
+
+### sources.py
+
+The register of every local reference document (`validation/sources.yaml`;
+the PDFs under `docs/` are gitignored): citation, content, the questions it
+was read for, the verdict, and where the repo uses it.
+
+```bash
+uv run scripts/sources.py find impingement effusion   # entries matching ALL terms
+uv run scripts/sources.py list --status unscreened
+uv run scripts/sources.py list --topic film --long
+uv run scripts/sources.py list --wanted [--priority now]   # documents we lack, the question each settles
+uv run scripts/sources.py check --docs ../../docs     # schema; unregistered local documents
+uv run scripts/sources.py new docs/x/paper.pdf        # stub entry to fill in
+```
+
+`python/tests/test_source_register.py` keeps the register valid in CI (the
+documents themselves are not there, so CI checks the schema and that every
+record and code path it names exists).
+
 ## Code Quality Scripts
 
 ### check-source-style.sh

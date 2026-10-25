@@ -28,7 +28,7 @@ recreating a CoolProp environment**.
   Optimal Ejector and Parametric Study of Ejector Efficiency" (MIT/GWU/KFUPM).
   Independent corroboration of the same momentum-retaining, shock-free mixing
   pattern as Kracik & Dvorak (evaluated, not adopted -- see Accuracy below).
-- `../../docs/ejector/Bartosiewicz_ejector_2004.pdf` — Henry, Leclaire, Hemidi,
+- `../../docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf` — Henry, Leclaire, Hemidi,
   Seynhaeve, Bartosiewicz, HEFAT2007: independent air-ejector CFD + experiment
   (validation cross-check target; not a model source). Its measured Fig. 5 is
   `data/henry2007_fig5.py`, with the rig's geometry.

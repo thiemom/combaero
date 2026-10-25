@@ -4,9 +4,11 @@
 overlays. Source: B. R. Hollworth and L. Dagan, "Arrays
 of Impinging Jets with Spent Fluid Removal through Vent Holes on the Target
 Surface, Part 1: Average Heat Transfer", ASME J. Eng. Power 102 (1980) 994-999
-(80-GT-42). Part 2 (local heat transfer, 80-GT-43) is screened but not
-extracted. Both PDFs are local only (gitignored), in
-`docs/heat_transfer/hollworth/`.
+(80-GT-42). Part 2 (local heat transfer) is screened but not extracted;
+it is by Hollworth, Lehmann and Rosiczkowski, ASME J. Eng. Power 105 (1983)
+393-402, not Hollworth and Dagan (corrected 2026-10-25, from the PDF; the
+local file is `393_1_Hollworth_1980_part_II.pdf`). Both PDFs are local only
+(gitignored), in `docs/heat_transfer/hollworth/`; see `validation/sources.yaml`.
 Data: `data/hollworth_dagan1980/`.
 
 ## Review questions and answers

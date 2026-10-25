@@ -15,6 +15,7 @@
 - **Documentation Hygiene:** Active references (API, build, workflow, schemas) live in `docs/`; historical feature reports and design records go to `docs/archive/`. Keep core guides high-signal — a doc points at the file that owns a fact rather than transcribing it.
 - **Unit sync test:** every exported Python symbol needs a `units_data.h` entry, or an `IGNORE_LIST` entry in `python/tests/test_units_sync.py`.
 - **Solver (f, J) rule:** solver-facing calculations must expose a C++ PyBind11 API returning `std::tuple<double, double>` (value, derivative). Analytical derivatives via chain rule; no finite differences exposed to Python.
+- **Source register:** every reference document under `docs/` (gitignored) has an entry in `validation/sources.yaml` -- citation, content, what it was read for, verdict, and the issues/records/code that use it. Search it before screening or fetching a paper (`scripts/sources.py find`); its `wanted` list holds documents we lack and the question each would settle (`list --wanted`), and an obtained one moves into `documents`; a PR that screens, extracts or implements a source updates its entry; `scripts/sources.py check --docs <main checkout>/docs` lists unregistered documents.
 - **Validation policy — fidelity, accuracy and tuning are three questions, never one number.** See [docs/VALIDATION_POLICY.md](docs/VALIDATION_POLICY.md).
   - **Fidelity** (does the implementation mirror the paper?) is judged **only on the author's own data**. A miss is our bug.
   - **Accuracy** (what will it do on another rig?) is judged **cross-source and must be labelled cross-source** in the report, not just in a doc beside it. A miss is the model's limitation. Same lab, different study counts as cross-source.
@@ -55,6 +56,7 @@ uv run scripts/generate_units_md.py         # regenerate docs/UNITS.md
 uv run scripts/changelog.py check           # validate changelog.d/ fragments (release: ... release x.y.z)
 ./scripts/test-pypi-wheel.sh                # verify combaero-gui wheel before PyPI publish
 uv run python scripts/stress/run.py --out tmp/stress/x.jsonl   # cold stress sweep; summarize.py --compare for A/B (scripts/README.md)
+uv run scripts/sources.py find <terms>      # source register (validation/sources.yaml): do we have it, what was concluded
 ```
 
 ## Auto-Generated Files
