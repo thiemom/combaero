@@ -278,6 +278,14 @@ State complete_combustion(const State& in, bool smooth = false);
 State complete_combustion_isothermal(const State& in, bool smooth = false);
 std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double>& X);
 
+// The same products with the analytic Jacobian dX_b/dX (#716): one
+// implementation with the value. Smoothed, the phi = 1 softmin applies at
+// every r and the O2 left is X_O2 - f n_req, so the band conserves atoms.
+struct CompleteCombustionJacobian { std::vector<double> X_b; std::vector<std::vector<double>> dXb_dX; };
+CompleteCombustionJacobian complete_combustion_products_and_jacobian(
+    const std::vector<double>& X, bool smooth_phi0 = true, bool smooth_phi1 = true,
+    double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
+
 struct PressureLossContext {
     double m_dot;
     double P;
@@ -320,6 +328,16 @@ CombustorLossResult combustor_head_loss(double theta, double mdot, double T_in, 
 ```cpp
 // Combustion equilibrium (T, P constant)
 State combustion_equilibrium(const State& in, bool smooth = false);
+
+// With analytic derivatives (#716): implicit in each stage's extent (reforming
+// per hydrocarbon, WGS) and in the adiabatic root; a bound extent takes the
+// bound's derivative.
+struct EquilibriumJacobian {
+    State state; double dT_dT_in, dT_dP; std::vector<double> dT_dX;
+    std::vector<std::vector<double>> dXout_dX; std::vector<double> dXout_dT_in, dXout_dP;
+};
+EquilibriumJacobian combustion_equilibrium_and_jacobian(const State& in, bool smooth_phi0 = true,
+                                                        double k0 = SMOOTHING_K_PHI0);
 
 // Shift and reforming reactions
 State wgs_equilibrium(const State& in);

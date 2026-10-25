@@ -284,159 +284,212 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
                                         smooth_phi1, k0, k1);
 }
 
-std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
-                                                   double &fuel_burn_fraction,
-                                                   bool smooth_phi0,
-                                                   bool smooth_phi1, double k0,
-                                                   double k1) {
+namespace {
+
+// Complete combustion to CO2 and H2O on a 1 mol reactant basis, with the
+// analytic Jacobian of the product mole fractions in the reactant ones
+// (#716). One implementation for the value and its derivative:
+//
+//   a      = sum_i nu_i X_i, the O2 the fuels need (nu_i > 0 for C/H species);
+//   n_req  = a, or (smooth_phi0) the softplus (1/k0)[ln(1 + e^(k0 a)) - ln 2],
+//            so the heat release is smooth at zero fuel; s = n_req / a;
+//   r      = X_O2 / n_req;
+//   f      = min(1, r), or (smooth_phi1) its softmin -ln(e^-k1 + e^(-k1 r))/k1
+//            at every r: a transition about 1/k1 wide at Phi = 1;
+//   fuels burn the fraction f s; O2 left: X_O2 - f n_req (>= 0, as f <= r),
+//   which conserves the atoms inside the smoothing band too.
+struct CompleteCombustionCore {
+  std::vector<double> X_b;
+  double burn_fraction = 0.0;
+  std::vector<std::vector<double>> dXb_dX;  // [product j][reactant k]
+};
+
+CompleteCombustionCore complete_combustion_core(const std::vector<double> &X,
+                                                bool smooth_phi0, bool smooth_phi1,
+                                                double k0, double k1, bool with_jacobian) {
   const double tol_sum = 1.0e-5;
   const double tol = 1.0e-12;
-
-  double sum = std::accumulate(X.begin(), X.end(), 0.0);
+  const double sum = std::accumulate(X.begin(), X.end(), 0.0);
   if (std::abs(sum - 1.0) > tol_sum) {
     throw std::runtime_error("Mole fractions must sum to 1.0");
   }
-
   if (X.size() != molecular_structures.size()) {
     throw std::runtime_error("Mixture size does not match number of species");
   }
-
-  // 1 mol of mixture as basis
-  std::vector<double> n = X;
-
+  const std::size_t ns = X.size();
   const std::size_t idx_O2 = species_index.at("O2");
   const std::size_t idx_CO2 = species_index.at("CO2");
   const std::size_t idx_H2O = species_index.at("H2O");
   const std::size_t idx_N2 = species_index.at("N2");
 
-  double n_O2_available = n[idx_O2];
-  if (n_O2_available <= tol) {
-    // No oxygen --> no combustion
-    fuel_burn_fraction = 0.0;
-    return X;
+  CompleteCombustionCore out;
+  auto unchanged = [&]() {
+    out.X_b = X;
+    out.burn_fraction = 0.0;
+    if (with_jacobian) {
+      out.dXb_dX.assign(ns, std::vector<double>(ns, 0.0));
+      for (std::size_t j = 0; j < ns; ++j) {
+        out.dXb_dX[j][j] = 1.0;
+      }
+    }
+    return out;
+  };
+
+  std::vector<double> nu(ns, 0.0);
+  double a = 0.0;
+  for (std::size_t i = 0; i < ns; ++i) {
+    const auto &sp = molecular_structures[i];
+    if (sp.C > 0 || sp.H > 0) {
+      nu[i] = oxygen_required_per_mol_fuel(i);
+    }
+    if (X[i] > 0.0) {
+      a += nu[i] * X[i];
+    }
+  }
+  const double X_O2 = X[idx_O2];
+  if (X_O2 <= tol) {
+    return unchanged();  // no oxygen, no combustion
   }
 
-  // Total O2 needed to fully burn all fuels in this mixture (1 mol basis)
-  double n_O2_required_actual = oxygen_required_per_mol_mixture(X);
-  double n_O2_required_total = n_O2_required_actual;
-  double fuel_scaling = 1.0;
-
-  // -----------------------------------------------------------------
-  // Smooth approximations are used at two kinks to ensure well-behaved
-  // Jacobians for the global network solver:
-  //
-  // 1. Phi=0 (no fuel): A softplus ramp is applied to n_O2_required_total
-  //    with k = SMOOTHING_K_PHI0.
-  //
-  // 2. Phi=1 (stoichiometric): A softmin is applied to the burn fraction f
-  //    with k = SMOOTHING_K_PHI1.
-  //
-  // Both are 20000 (combustion.h): transitions of order 1/k, about 1e-4 in
-  // Phi, so the smoothing is invisible in T_ad. A finite difference wider
-  // than that across Phi = 1 is not a derivative of it (#716).
-  // -----------------------------------------------------------------
-
+  // n_req(a) and its slope.
+  double n_req = a;
+  double dnreq_da = 1.0;
   if (smooth_phi0) {
-    // -----------------------------------------------------------------
-    // Phi=0 kink smoothing: eta_eff = std::max(0.0,
-    // (1/k)*[ln(1+exp(k*eta))-ln(2)]) This makes heat release smooth at zero
-    // fuel (n_O2_required = 0).
-    // -----------------------------------------------------------------
-    const double k_low = k0;
-    if (n_O2_required_actual * k_low > 100.0) {
-      // Linear regime to avoid exp overflow
-      n_O2_required_total = n_O2_required_actual - std::log(2.0) / k_low;
+    if (a * k0 > 100.0) {
+      n_req = a - std::log(2.0) / k0;
+      dnreq_da = 1.0;
     } else {
-      n_O2_required_total =
-          (1.0 / k_low) *
-          (std::log(1.0 + std::exp(k_low * n_O2_required_actual)) -
-           std::log(2.0));
+      n_req = (std::log1p(std::exp(k0 * a)) - std::log(2.0)) / k0;
+      dnreq_da = 1.0 / (1.0 + std::exp(-k0 * a));
     }
-    n_O2_required_total = std::max(0.0, n_O2_required_total);
-
-    // Compute scaling factor to apply the smoothed heat release to increments.
-    // If n_O2_required_actual is zero, fuel_scaling is 0 (smoothly approach 0).
-    if (n_O2_required_actual > 1e-18) {
-      fuel_scaling = n_O2_required_total / n_O2_required_actual;
-    } else {
-      fuel_scaling = 0.0;
-    }
-  } else {
-    if (n_O2_required_total <= tol) {
-      // No fuel --> nothing to burn
-      fuel_burn_fraction = 0.0;
-      return X;
-    }
+    n_req = std::max(0.0, n_req);
+  } else if (n_req <= tol) {
+    return unchanged();  // no fuel
+  }
+  double s = 0.0;
+  double ds_da = 0.0;
+  if (a > 1e-18) {
+    s = n_req / a;
+    ds_da = (dnreq_da * a - n_req) / (a * a);
   }
 
-  // Fraction of fuel that can burn:
-  // f = min(1.0, O2_available / O2_required_total)
+  // f(r) and its slope.
+  const double n_den = std::max(1e-15, n_req);
+  const double r = X_O2 / n_den;
   double f = 1.0;
-  double r = n_O2_available / std::max(1e-15, n_O2_required_total);
+  double df_dr = 0.0;
   if (smooth_phi1) {
-    if (r < 1.0 + 10.0 * tol) {
-      const double k = k1;
-      // Robust softmin(1, r) = -log(exp(-k) + exp(-k*r))/k
-      // Using log(exp(x) + exp(y)) = max(x, y) + log(1 + exp(-|x-y|))
-      double x = -k;
-      double y = -k * r;
-      double max_val = (x > y) ? x : y;
-      f = -(max_val + std::log(1.0 + std::exp(-std::abs(x - y)))) / k;
-    }
-  } else {
-    if (n_O2_available + tol < n_O2_required_total) {
-      f = n_O2_available / n_O2_required_total;
-    }
+    const double x = -k1;
+    const double y = -k1 * r;
+    const double mx = (x > y) ? x : y;
+    f = -(mx + std::log1p(std::exp(-std::abs(x - y)))) / k1;
+    // df/dr = 1 / (1 + e^(k1 (r - 1))), evaluated without overflow.
+    const double z = k1 * (r - 1.0);
+    df_dr = (z > 0.0) ? std::exp(-z) / (1.0 + std::exp(-z)) : 1.0 / (1.0 + std::exp(z));
+  } else if (r < 1.0) {
+    f = r;
+    df_dr = 1.0;
   }
-  fuel_burn_fraction = f * fuel_scaling;
+  const double f_eff = f * s;
+  out.burn_fraction = f_eff;
 
-  // Perform combustion: subtract fuels and O2, add CO2, H2O, N2
-  double delta_CO2 = 0.0;
-  double delta_H2O = 0.0;
-  double delta_N2 = 0.0;
-
-  double f_eff = f * fuel_scaling;
-
-  // Loop over species and burn a fraction f of every O2-consuming fuel
-  for (size_t i = 0; i < n.size(); ++i) {
-    if (n[i] <= 0.0)
+  // Products (moles, 1 mol reactant basis).
+  std::vector<double> n = X;
+  double d_CO2 = 0.0, d_H2O = 0.0, d_N2 = 0.0;
+  for (std::size_t i = 0; i < ns; ++i) {
+    if (nu[i] <= 0.0 || X[i] <= 0.0) {
       continue;
-
-    // Only treat species that actually require O2 (CO2/H2O have requirement=0)
-    double nu_O2 = oxygen_required_per_mol_fuel(i);
-    if (nu_O2 <= 0.0)
-      continue;
-
-    const Molecular_Structure &sp = molecular_structures[i];
-
-    double n_fuel_initial = n[i];
-    double n_fuel_reacted = f_eff * n_fuel_initial;
-    double n_fuel_remaining = n_fuel_initial - n_fuel_reacted;
-
-    n[i] = n_fuel_remaining;
-
-    // C_x H_y O_z N_w + ... -> x CO2 + (y/2) H2O + (w/2) N2
-    delta_CO2 += static_cast<double>(sp.C) * n_fuel_reacted;
-    delta_H2O += 0.5 * static_cast<double>(sp.H) * n_fuel_reacted;
-    delta_N2 += 0.5 * static_cast<double>(sp.N) * n_fuel_reacted;
+    }
+    const auto &sp = molecular_structures[i];
+    n[i] = X[i] * (1.0 - f_eff);
+    d_CO2 += static_cast<double>(sp.C) * f_eff * X[i];
+    d_H2O += 0.5 * static_cast<double>(sp.H) * f_eff * X[i];
+    d_N2 += 0.5 * static_cast<double>(sp.N) * f_eff * X[i];
+  }
+  const double O2_left = X_O2 - f * n_req;
+  n[idx_O2] = std::max(0.0, O2_left);
+  n[idx_CO2] += d_CO2;
+  n[idx_H2O] += d_H2O;
+  n[idx_N2] += d_N2;
+  double N = 0.0;
+  for (double v : n) {
+    N += v;
+  }
+  out.X_b.resize(ns);
+  for (std::size_t j = 0; j < ns; ++j) {
+    out.X_b[j] = n[j] / N;
+  }
+  if (!with_jacobian) {
+    return out;
   }
 
-  // Consume O2: fully if O2-limited, partially if fuel-limited
-  if (f >= 1.0 - tol) {
-    n[idx_O2] -= n_O2_required_total;
-    if (n[idx_O2] < 0.0)
-      n[idx_O2] = 0.0; // numeric safety
-  } else {
-    n[idx_O2] = 0.0; // all available O2 consumed
+  // dn/dX_k. a depends on X_k through nu_k; r through X_O2 and n_req.
+  //   df/dX_k = df_dr (delta_k,O2 / n_req - r dnreq_da nu_k / n_req)
+  //   df_eff/dX_k = df/dX_k s + f ds_da nu_k
+  std::vector<std::vector<double>> dn(ns, std::vector<double>(ns, 0.0));
+  for (std::size_t k = 0; k < ns; ++k) {
+    const double dnreq = dnreq_da * nu[k];
+    const double dr = ((k == idx_O2) ? 1.0 : 0.0) / n_den - (n_req > 1e-15 ? r * dnreq / n_den : 0.0);
+    const double df = df_dr * dr;
+    const double dfeff = df * s + f * ds_da * nu[k];
+    for (std::size_t i = 0; i < ns; ++i) {
+      if (nu[i] <= 0.0) {
+        continue;
+      }
+      // n_i = X_i (1 - f_eff), and its products, for every fuel (an absent
+      // one enters with the one-sided derivative).
+      const double xi = std::max(X[i], 0.0);
+      const double dn_i = ((i == k) ? (1.0 - f_eff) : 0.0) - xi * dfeff;
+      dn[i][k] += dn_i;
+      const auto &sp = molecular_structures[i];
+      const double dburn = ((i == k) ? f_eff : 0.0) + xi * dfeff;
+      dn[idx_CO2][k] += static_cast<double>(sp.C) * dburn;
+      dn[idx_H2O][k] += 0.5 * static_cast<double>(sp.H) * dburn;
+      dn[idx_N2][k] += 0.5 * static_cast<double>(sp.N) * dburn;
+    }
+    // Non-fuel species pass through (O2 handled below).
+    if (nu[k] <= 0.0 && k != idx_O2) {
+      dn[k][k] += 1.0;
+    }
+    // O2 left = X_O2 - f n_req.
+    if (O2_left > 0.0) {
+      dn[idx_O2][k] = ((k == idx_O2) ? 1.0 : 0.0) - df * n_req - f * dnreq;
+    } else {
+      dn[idx_O2][k] = 0.0;
+    }
   }
+  // X_b = n / N.
+  out.dXb_dX.assign(ns, std::vector<double>(ns, 0.0));
+  for (std::size_t k = 0; k < ns; ++k) {
+    double dN = 0.0;
+    for (std::size_t j = 0; j < ns; ++j) {
+      dN += dn[j][k];
+    }
+    for (std::size_t j = 0; j < ns; ++j) {
+      out.dXb_dX[j][k] = (dn[j][k] - out.X_b[j] * dN) / N;
+    }
+  }
+  return out;
+}
 
-  // Add products
-  n[idx_CO2] += delta_CO2;
-  n[idx_H2O] += delta_H2O;
-  n[idx_N2] += delta_N2;
+}  // namespace
 
-  // Back to mole fractions
-  return normalize_fractions(n);
+std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
+                                                   double &fuel_burn_fraction,
+                                                   bool smooth_phi0,
+                                                   bool smooth_phi1, double k0,
+                                                   double k1) {
+  CompleteCombustionCore c = complete_combustion_core(X, smooth_phi0, smooth_phi1, k0, k1, false);
+  fuel_burn_fraction = c.burn_fraction;
+  return c.X_b;
+}
+
+CompleteCombustionJacobian complete_combustion_products_and_jacobian(const std::vector<double> &X,
+                                                                     bool smooth_phi0,
+                                                                     bool smooth_phi1, double k0,
+                                                                     double k1) {
+  CompleteCombustionCore c = complete_combustion_core(X, smooth_phi0, smooth_phi1, k0, k1, true);
+  return {c.X_b, c.dXb_dX};
 }
 
 // This function is now redundant as it's merged into the other overload with default arguments,

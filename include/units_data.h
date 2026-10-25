@@ -1068,6 +1068,12 @@ inline constexpr Entry function_units[] = {
     {"oxygen_required_per_mol_fuel", "-", "mol O2/mol fuel"},
     {"oxygen_required_per_kg_fuel", "-", "mol O2/kg fuel"},
     {"oxygen_required_per_mol_mixture", "X: mol/mol", "mol O2/mol mix"},
+    {"complete_combustion_products_and_jacobian",
+     "X: mol/mol, smooth_phi0: bool, smooth_phi1: bool, k0: -, k1: -",
+     "CompleteCombustionJacobian (X_b: mol/mol, dXb_dX: -)"},
+    {"combustion_equilibrium_and_jacobian", "T: K, X: mol/mol, P: Pa, smooth: bool, k0: -",
+     "EquilibriumJacobian (state, dT_dT_in: -, dT_dP: K/Pa, dT_dX: K, dXout_dX: -, "
+     "dXout_dT_in: 1/K, dXout_dP: 1/Pa)"},
     {"oxygen_required_per_kg_mixture", "X: mol/mol", "mol O2/kg mix"},
     {"fuel_lhv_molar", "X_fuel: mol/mol, reference_temperature: K",
      "J/mol fuel"},

@@ -143,9 +143,10 @@ def test_the_combustor_heat_shift_jacobian_holds(method: str, Q: float, fraction
     r = burn(m_air, m_fuel)
     fd_air = (burn(m_air + e, m_fuel).T_mix - burn(m_air - e, m_fuel).T_mix) / (2 * e)
     fd_fuel = (burn(m_air, m_fuel + e).T_mix - burn(m_air, m_fuel - e).T_mix) / (2 * e)
-    # complete: the composition derivatives are forward differences inside
-    # (eps 1e-6), measured 7e-6 of the slope; equilibrium's (eps 1e-4) 2e-3.
-    tol = 3e-5 if method == "complete" else 5e-3
+    # The composition derivatives are analytic since #716 (they were forward
+    # differences inside: 7e-6 complete, 2e-3 equilibrium). The rest is the
+    # central difference's own error at e = 1e-6.
+    tol = 2e-6
     assert r.dT_mix_d_stream[0].d_mdot == pytest.approx(fd_air, rel=tol)
     assert r.dT_mix_d_stream[1].d_mdot == pytest.approx(fd_fuel, rel=tol)
 

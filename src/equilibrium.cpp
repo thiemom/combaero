@@ -667,79 +667,57 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
   // Bounds: xi in [0, min(n0[hc], n0[H2O]/n_C)]
   double xi_max = std::min(n0[i_hc], n0[cfg.i_H2O] / n_C);
 
-  // Newton iteration
-  double xi = std::min(0.001, xi_max * 0.1); // Initial guess
-  const double tol = 1e-10;
-
-  for (int it = 0; it < 50; ++it) {
-    // Current composition
-    double n_hc = n0[i_hc] - xi;
-    double n_H2O = n0[cfg.i_H2O] - n_C * xi;
-    double n_CO = n0[cfg.i_CO] + n_C * xi;
-    double n_H2 = n0[cfg.i_H2] + (n_C + 0.5 * n_H) * xi;
-
-    // Total moles
-    double nt = 0.0;
-    for (double v : n0)
-      nt += v;
-    nt += delta_n * xi;
-
-    const double tiny = 1e-15;
-    double y_hc = std::max(n_hc / nt, tiny);
-    double y_H2O = std::max(n_H2O / nt, tiny);
-    double y_CO = std::max(n_CO / nt, tiny);
-    double y_H2 = std::max(n_H2 / nt, tiny);
-
-    // Reaction quotient Q
-    // Q = (y_CO^n * y_H2^(n+m/2)) / (y_hc * y_H2O^n) * (P/P0)^delta_n
-    double lnQ = n_C * std::log(y_CO) + (n_C + 0.5 * n_H) * std::log(y_H2) -
-                 std::log(y_hc) - n_C * std::log(y_H2O) +
-                 delta_n * std::log(P / P0);
-
-    double F = lnQ - lnKp;
-
-    if (std::abs(F) < tol) {
-      return std::max(0.0, std::min(xi, xi_max));
-    }
-
-    // Numerical derivative
-    double eps = 1e-8;
-    double xi_p = xi + eps;
-
-    double n_hc_p = n0[i_hc] - xi_p;
-    double n_H2O_p = n0[cfg.i_H2O] - n_C * xi_p;
-    double n_CO_p = n0[cfg.i_CO] + n_C * xi_p;
-    double n_H2_p = n0[cfg.i_H2] + (n_C + 0.5 * n_H) * xi_p;
-    double nt_p = nt + delta_n * eps;
-
-    double y_hc_p = std::max(n_hc_p / nt_p, tiny);
-    double y_H2O_p = std::max(n_H2O_p / nt_p, tiny);
-    double y_CO_p = std::max(n_CO_p / nt_p, tiny);
-    double y_H2_p = std::max(n_H2_p / nt_p, tiny);
-
-    double lnQ_p = n_C * std::log(y_CO_p) +
-                   (n_C + 0.5 * n_H) * std::log(y_H2_p) - std::log(y_hc_p) -
-                   n_C * std::log(y_H2O_p) + delta_n * std::log(P / P0);
-
-    double dF = (lnQ_p - lnKp - F) / eps;
-
-    if (std::abs(dF) < 1e-20)
+  // Safeguarded Newton on F(xi) = ln Q - ln Kp over (0, xi_max), with the
+  // analytic slope (#716)
+  //   dF/dxi = nC^2/n_CO + m^2/n_H2 + 1/n_hc + nC^2/n_H2O - dn^2/n_t,  m = nC + nH/2,
+  // and bisection where a step leaves the bracket. F rises from -inf (no CO or
+  // H2 yet) or below to +inf as the hydrocarbon or the steam runs out, so the
+  // root is bracketed. The former finite-difference slope used an absolute
+  // step of 1e-8 mol: near complete reforming (1e-11 mol left) it stepped past
+  // the hydrocarbon and stalled off the root.
+  const double m_H2 = n_C + 0.5 * n_H;
+  double nt0 = 0.0;
+  for (double v : n0)
+    nt0 += v;
+  auto eval = [&](double xi, double &dF) {
+    const double n_hc = n0[i_hc] - xi;
+    const double n_H2O = n0[cfg.i_H2O] - n_C * xi;
+    const double n_CO = n0[cfg.i_CO] + n_C * xi;
+    const double n_H2 = n0[cfg.i_H2] + m_H2 * xi;
+    const double nt = nt0 + delta_n * xi;
+    const double lnQ = n_C * std::log(n_CO) + m_H2 * std::log(n_H2) - std::log(n_hc) -
+                       n_C * std::log(n_H2O) - delta_n * std::log(nt) +
+                       delta_n * std::log(P / P0);
+    dF = n_C * n_C / n_CO + m_H2 * m_H2 / n_H2 + 1.0 / n_hc + n_C * n_C / n_H2O -
+         delta_n * delta_n / nt;
+    return lnQ - lnKp;
+  };
+  double lo = 0.0;
+  double hi = xi_max;
+  double xi = 0.5 * xi_max;
+  for (int it = 0; it < 200; ++it) {
+    double dF = 0.0;
+    const double F = eval(xi, dF);
+    if (!std::isfinite(F)) {
       break;
-
-    double dxi = -F / dF;
-
-    // Damped update with bounds
-    double lambda = 1.0;
-    for (int ls = 0; ls < 10; ++ls) {
-      double xi_new = xi + lambda * dxi;
-      if (xi_new >= 0.0 && xi_new <= xi_max) {
-        xi = xi_new;
-        break;
-      }
-      lambda *= 0.5;
     }
+    if (std::abs(F) < 1e-12) {
+      return xi;
+    }
+    if (F > 0.0) {
+      hi = xi;
+    } else {
+      lo = xi;
+    }
+    double xi_new = (dF > 0.0 && std::isfinite(dF)) ? xi - F / dF : 0.5 * (lo + hi);
+    if (!(xi_new > lo && xi_new < hi)) {
+      xi_new = 0.5 * (lo + hi);
+    }
+    if (hi - lo <= 1e-15 * xi_max) {
+      return xi_new;
+    }
+    xi = xi_new;
   }
-
   return std::max(0.0, std::min(xi, xi_max));
 }
 
@@ -893,4 +871,253 @@ EquilibriumResult combustion_equilibrium(const State &in, bool smooth_phi0, doub
   return EquilibriumResult{result.state, in.T, result.state.T - in.T,
                            result.converged};
 }
+
+// -------------------------------------------------------------
+// Combustion + equilibrium with analytic derivatives (#716)
+// -------------------------------------------------------------
+
+namespace {
+
+// A forward-mode dual with a runtime number of partials: the solver's inputs
+// (here the burned moles n0, T, P) plus one slot for the extent being
+// differentiated implicitly.
+struct DV {
+  double v = 0.0;
+  std::vector<double> d;
+};
+DV dv_const(double v, std::size_t N) { return DV{v, std::vector<double>(N, 0.0)}; }
+DV dv_seed(double v, std::size_t N, std::size_t i) {
+  DV r = dv_const(v, N);
+  r.d[i] = 1.0;
+  return r;
+}
+DV operator+(const DV &a, const DV &b) {
+  DV r{a.v + b.v, a.d};
+  for (std::size_t i = 0; i < r.d.size(); ++i) r.d[i] += b.d[i];
+  return r;
+}
+DV operator-(const DV &a, const DV &b) {
+  DV r{a.v - b.v, a.d};
+  for (std::size_t i = 0; i < r.d.size(); ++i) r.d[i] -= b.d[i];
+  return r;
+}
+DV operator*(double c, const DV &a) {
+  DV r{c * a.v, a.d};
+  for (double &x : r.d) x *= c;
+  return r;
+}
+DV operator*(const DV &a, const DV &b) {
+  DV r{a.v * b.v, std::vector<double>(a.d.size())};
+  for (std::size_t i = 0; i < r.d.size(); ++i) r.d[i] = a.d[i] * b.v + a.v * b.d[i];
+  return r;
+}
+DV operator/(const DV &a, const DV &b) {
+  DV r{a.v / b.v, std::vector<double>(a.d.size())};
+  for (std::size_t i = 0; i < r.d.size(); ++i) r.d[i] = (a.d[i] * b.v - a.v * b.d[i]) / (b.v * b.v);
+  return r;
+}
+DV dv_log(const DV &a) {
+  DV r{std::log(a.v), a.d};
+  for (double &x : r.d) x /= a.v;
+  return r;
+}
+// f(a) with slope s, lifted.
+DV dv_lift(double f, double s, const DV &a) {
+  DV r{f, a.d};
+  for (double &x : r.d) x *= s;
+  return r;
+}
+DV dv_min(const DV &a, const DV &b) { return (a.v <= b.v) ? a : b; }
+
+// An extent that the value path solved for: its implicit derivative where it
+// is interior, the bound's where it sits on one. resid(xi) is the stage's
+// residual with xi seeded in slot ix.
+template <typename Resid>
+DV implicit_extent(double xi, const DV &lo, const DV &hi, std::size_t ix, Resid &&resid) {
+  const double span = std::max(hi.v - lo.v, 1e-300);
+  if (xi >= hi.v - 1e-12 * span) {
+    return hi;
+  }
+  if (xi <= lo.v + 1e-12 * span) {
+    return lo;
+  }
+  const DV f = resid(dv_seed(xi, lo.d.size(), ix));
+  DV out = dv_const(xi, lo.d.size());
+  const double f_xi = f.d[ix];
+  if (std::abs(f_xi) > 0.0) {
+    for (std::size_t q = 0; q < out.d.size(); ++q) {
+      if (q != ix) out.d[q] = -f.d[q] / f_xi;
+    }
+  }
+  return out;
+}
+
+// d(g/RT)/dT = -h/(R T^2) = -h_RT / T.
+DV g_over_RT_dv(std::size_t i, const DV &T) {
+  return dv_lift(g_over_RT(i, T.v), -h_RT(i, T.v) / T.v, T);
+}
+
+}  // namespace
+
+EquilibriumJacobian combustion_equilibrium_and_jacobian(const State &in, bool smooth_phi0,
+                                                        double k0) {
+  const std::size_t ns = in.X.size();
+  const std::size_t iT = ns, iP = ns + 1, ix = ns + 2, N = ns + 3;
+  EquilibriumJacobian out;
+  const EquilibriumResult res = combustion_equilibrium(in, smooth_phi0, k0);
+  out.state = res.state;
+  const double T_ad = res.state.T;
+  const double P = in.P;
+
+  // Stage 1: complete combustion (phi = 1 unsmoothed, as the value path).
+  const CompleteCombustionJacobian cj =
+      complete_combustion_products_and_jacobian(in.X, smooth_phi0, false, k0, SMOOTHING_K_PHI1);
+  const std::vector<double> &n0 = cj.X_b;
+
+  // Stage 2: the same reforming + WGS sequence at T_ad, on duals.
+  const DV T = dv_seed(T_ad, N, iT);
+  const DV Pd = dv_seed(P, N, iP);
+  const double P0 = 101325.0;
+  std::vector<DV> n(ns);
+  for (std::size_t j = 0; j < ns; ++j) n[j] = dv_seed(n0[j], N, j);
+  auto values = [&]() {
+    std::vector<double> v(ns);
+    for (std::size_t j = 0; j < ns; ++j) v[j] = n[j].v;
+    return v;
+  };
+  auto total = [&]() {
+    DV t = dv_const(0.0, N);
+    for (const DV &x : n) t = t + x;
+    return t;
+  };
+  const ReformingConfig cfg = make_reforming_config();
+  // As reforming_equilibrium_adiabatic: reform if the BURNED state has any
+  // hydrocarbon, else WGS alone.
+  bool has_hc = false;
+  for (std::size_t i_hc : cfg.hc_indices) {
+    if (n0[i_hc] > 1e-10) has_hc = true;
+  }
+  if (has_hc) {
+    for (std::size_t k = 0; k < cfg.hc_indices.size(); ++k) {
+      const std::size_t i_hc = cfg.hc_indices[k];
+      const int nC = cfg.hc_C[k];
+      const int nH = cfg.hc_H[k];
+      const std::vector<double> nv = values();
+      const double xi = solve_reforming_isothermal(nv, T_ad, P, i_hc, nC, nH, cfg);
+      DV xi_d = dv_const(0.0, N);
+      if (!(nv[i_hc] < 1e-12 || nv[cfg.i_H2O] < 1e-12 * nC) && xi > 0.0) {
+        const DV hi = dv_min(n[i_hc], (1.0 / nC) * n[cfg.i_H2O]);
+        const double dn = nC + 0.5 * nH - 1.0;
+        auto resid = [&](const DV &x) {
+          const DV nt = total() + dn * x;
+          const DV y_hc = (n[i_hc] - x) / nt;
+          const DV y_h2o = (n[cfg.i_H2O] - static_cast<double>(nC) * x) / nt;
+          const DV y_co = (n[cfg.i_CO] + static_cast<double>(nC) * x) / nt;
+          const DV y_h2 = (n[cfg.i_H2] + (nC + 0.5 * nH) * x) / nt;
+          const DV lnQ = static_cast<double>(nC) * dv_log(y_co) + (nC + 0.5 * nH) * dv_log(y_h2) -
+                         dv_log(y_hc) - static_cast<double>(nC) * dv_log(y_h2o) +
+                         dn * dv_log((1.0 / P0) * Pd);
+          const DV dg = static_cast<double>(nC) * g_over_RT_dv(cfg.i_CO, T) +
+                        (nC + 0.5 * nH) * g_over_RT_dv(cfg.i_H2, T) - g_over_RT_dv(i_hc, T) -
+                        static_cast<double>(nC) * g_over_RT_dv(cfg.i_H2O, T);
+          return lnQ + dg;  // lnQ - lnKp, lnKp = -dg
+        };
+        xi_d = implicit_extent(xi, dv_const(0.0, N), hi, ix, resid);
+      }
+      n[i_hc] = n[i_hc] - xi_d;
+      n[cfg.i_H2O] = n[cfg.i_H2O] - static_cast<double>(nC) * xi_d;
+      n[cfg.i_CO] = n[cfg.i_CO] + static_cast<double>(nC) * xi_d;
+      n[cfg.i_H2] = n[cfg.i_H2] + (nC + 0.5 * nH) * xi_d;
+    }
+  }
+  {
+    const WgsConfig w = make_wgs_config();
+    const std::vector<double> nv = values();
+    const double lo_v = std::max(-nv[w.i_CO2], -nv[w.i_H2]);
+    const double hi_v = std::min(nv[w.i_CO], nv[w.i_H2O]);
+    if (hi_v > lo_v + 1e-15) {
+      WgsIsothermalFun F{nv, T_ad, w};
+      const double xi = newton_damped(F, 0.0, lo_v, hi_v, 40);
+      const DV lo = (-nv[w.i_CO2] >= -nv[w.i_H2]) ? dv_const(0.0, N) - n[w.i_CO2]
+                                                  : dv_const(0.0, N) - n[w.i_H2];
+      const DV hi = dv_min(n[w.i_CO], n[w.i_H2O]);
+      auto resid = [&](const DV &x) {
+        const DV y_co2 = n[w.i_CO2] + x;
+        const DV y_h2 = n[w.i_H2] + x;
+        const DV y_co = n[w.i_CO] - x;
+        const DV y_h2o = n[w.i_H2O] - x;
+        const DV dg = g_over_RT_dv(w.i_CO2, T) + g_over_RT_dv(w.i_H2, T) -
+                      g_over_RT_dv(w.i_CO, T) - g_over_RT_dv(w.i_H2O, T);
+        // ln Q - ln Kp; WGS keeps the moles, so nt cancels in Q.
+        return dv_log(y_co2) + dv_log(y_h2) - dv_log(y_co) - dv_log(y_h2o) + dg;
+      };
+      const DV xi_d = implicit_extent(xi, lo, hi, ix, resid);
+      n[w.i_CO] = n[w.i_CO] - xi_d;
+      n[w.i_H2O] = n[w.i_H2O] - xi_d;
+      n[w.i_CO2] = n[w.i_CO2] + xi_d;
+      n[w.i_H2] = n[w.i_H2] + xi_d;
+    }
+  }
+
+  // Stage 3: the adiabatic root F(T) = h(T, X_out)/MW_out - H_in = 0.
+  const DV nt = total();
+  DV h_mol = dv_const(0.0, N);
+  DV mw = dv_const(0.0, N);
+  for (std::size_t j = 0; j < ns; ++j) {
+    const DV hj = dv_lift(h_species(j, T_ad), cp_species(j, T_ad), T);
+    h_mol = h_mol + n[j] * hj;
+    mw = mw + species_molar_mass(j) * n[j];
+  }
+  const DV H_mass = h_mol / mw;  // n/nt cancels in h/MW
+  (void)nt;
+  const double F_T = H_mass.d[iT];
+  const double mw_in = mwmix(in.X);
+  const double h_in = h(in.T, in.X);
+  const double H_in = h_in / mw_in;
+
+  out.dT_dT_in = cp(in.T, in.X) / mw_in / F_T;
+  out.dT_dP = -H_mass.d[iP] / F_T;
+  out.dT_dX.assign(ns, 0.0);
+  for (std::size_t k = 0; k < ns; ++k) {
+    double dF = 0.0;
+    for (std::size_t j = 0; j < ns; ++j) dF += H_mass.d[j] * cj.dXb_dX[j][k];
+    const double dH = (h_species(k, in.T) - H_in * species_molar_mass(k)) / mw_in;
+    out.dT_dX[k] = (dH - dF) / F_T;
+  }
+
+  // Product mole fractions: n_out(n0, T, P), T = T_ad(X, T_in, P).
+  std::vector<double> nvals(ns);
+  double ntv = 0.0;
+  for (std::size_t j = 0; j < ns; ++j) {
+    nvals[j] = n[j].v;
+    ntv += n[j].v;
+  }
+  auto dX_from_dn = [&](const std::vector<double> &dn) {
+    double dN = 0.0;
+    for (double x : dn) dN += x;
+    std::vector<double> dX(ns);
+    for (std::size_t j = 0; j < ns; ++j) dX[j] = (dn[j] - nvals[j] / ntv * dN) / ntv;
+    return dX;
+  };
+  out.dXout_dX.assign(ns, std::vector<double>(ns, 0.0));
+  for (std::size_t k = 0; k < ns; ++k) {
+    std::vector<double> dn(ns, 0.0);
+    for (std::size_t j = 0; j < ns; ++j) {
+      double v = n[j].d[iT] * out.dT_dX[k];
+      for (std::size_t l = 0; l < ns; ++l) v += n[j].d[l] * cj.dXb_dX[l][k];
+      dn[j] = v;
+    }
+    const auto dX = dX_from_dn(dn);
+    for (std::size_t j = 0; j < ns; ++j) out.dXout_dX[j][k] = dX[j];
+  }
+  std::vector<double> dn_T(ns), dn_P(ns);
+  for (std::size_t j = 0; j < ns; ++j) {
+    dn_T[j] = n[j].d[iT] * out.dT_dT_in;
+    dn_P[j] = n[j].d[iT] * out.dT_dP + n[j].d[iP];
+  }
+  out.dXout_dT_in = dX_from_dn(dn_T);
+  out.dXout_dP = dX_from_dn(dn_P);
+  return out;
+}
+
 } // namespace combaero

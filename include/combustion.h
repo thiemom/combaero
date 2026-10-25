@@ -101,6 +101,19 @@ std::vector<double> complete_combustion_to_CO2_H2O(const std::vector<double> &X,
                                                    double k0 = SMOOTHING_K_PHI0,
                                                    double k1 = SMOOTHING_K_PHI1);
 
+// The same products with the analytic Jacobian of their mole fractions in the
+// reactant ones, dXb_dX[j][k] = d X_b,j / d X_k (X taken unnormalised: chain it
+// with a dX that keeps sum X = 1). One implementation with the value above
+// (#716): the softmin at Phi = 1 is applied at every r, and the O2 left is
+// X_O2 - f n_req, so the smoothing band conserves atoms and is smooth.
+struct CompleteCombustionJacobian {
+    std::vector<double> X_b;
+    std::vector<std::vector<double>> dXb_dX;  // [product j][reactant k]
+};
+CompleteCombustionJacobian complete_combustion_products_and_jacobian(
+    const std::vector<double> &X, bool smooth_phi0 = true, bool smooth_phi1 = true,
+    double k0 = SMOOTHING_K_PHI0, double k1 = SMOOTHING_K_PHI1);
+
 // Mixture fraction (Bilger) utilities
 double bilger_beta(const std::vector<double> &Y);
 double bilger_mixture_fraction(const std::vector<double> &Y,
