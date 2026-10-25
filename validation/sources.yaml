@@ -1308,6 +1308,135 @@ documents:
   notes: Arrived as docs/new/1-s2.0-S0017931002003630-main.pdf, 2026-10-25 (was on the wanted list). Case
     (b), jet-plate venting, matches Huber & Viskanta 1994 (J. Heat Transfer 116, 570) -- not modelled in
     combaero.
+- file: docs/heat_transfer/impingement/Choi_Rhee_Cho_2001_KSME_spring_D_impingement_hole_arrangement_conf.pdf
+  citation: Choi, J. H., Rhee, D. H., Cho, H. H. (2001). The effects of impingement hole size on heat transfer
+    of an impingement/effusion cooling system (in Korean; the Korean title says hole arrangement). Proc. KSME
+    2001 Spring Annual Meeting D, pp. 489-496 (KSME 01S479).
+  id: KSME 01S479
+  topic:
+  - impingement
+  - effusion
+  content: Staggered (d 10 and 15 mm), square and hexagonal jet arrays over an effusion plate, H/D 1-6, Re_D
+    10,000; local Sh (Figs. 8, 10) and average Sh vs H/D (Fig. 9) PLOTTED.
+  status: screened
+  verdict: 'Conference version of Choi, Rhee & Cho 2002 (film/JAKO200211920878407.pdf): the same Figs. 9 and
+    10. Use the journal paper; this adds nothing.'
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Cho_2006_KSME_B_30_12_impingement_effusion_circular_guide.pdf
+  citation: Hong, S. K., Cho, H. H. (2006). Heat/mass transfer for impingement/effusion cooling system with
+    circular guide (in Korean). Trans. KSME B 30(12), 1147-1154.
+  topic:
+  - impingement
+  - effusion
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter;
+    initial crossflow M 0.5-1.5 with a circular guide around each injection hole; 26-30% higher averaged Sh
+    at M 1.5.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Cho_2007_JFluidMach_10_3_rotating_impingement_effusion.pdf
+  citation: Hong, S. K., Cho, H. H. (2007). Heat/mass transfer characteristics for variation of injection hole
+    in rotating impingement/effusion cooling system (in Korean). J. Fluid Machinery 10(3), 25-32.
+  topic:
+  - impingement
+  - effusion
+  content: Rotating impingement/effusion (Coriolis), three injection-hole sizes/counts, Re 3,330 on the effusion
+    hole, naphthalene sublimation.
+  status: screened
+  verdict: Rotating; Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Rhee_Cho_2005_JFluidMach_8_4_impingement_effusion_rectangular_fins.pdf
+  citation: Hong, S. K., Rhee, D. H., Cho, H. H. (2005). Heat/mass transfer characteristics in impingement/effusion
+    cooling system with rectangular fins for combustor liner cooling (in Korean). J. Fluid Machinery 8(4),
+    39-47.
+  topic:
+  - impingement
+  - effusion
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter,
+    H/d 2; initial crossflow M 0.5-1.5 with rectangular fins between the plates; CFD flow fields.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Hong_Rhee_Cho_2005_KSME_B_29_7_impingement_effusion_pin_fins_crossflow.pdf
+  citation: Hong, S. K., Rhee, D. H., Cho, H. H. (2005). Heat/mass transfer on effusion plate with circular
+    pin fins for impingement/effusion cooling system with initial crossflow (in Korean). Trans. KSME B 29(7),
+    828-836.
+  topic:
+  - impingement
+  - effusion
+  - pin_fin
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter;
+    initial crossflow M 0.5-1.5, five circular pin-fin arrangements in the cavity; 16-22% higher overall Sh
+    at M 1.5.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
+- file: docs/heat_transfer/impingement/Nam_Rhee_Choi_Cho_2003_KSME_spring_impingement_effusion_crossflow.pdf
+  citation: Nam, Y. W., Rhee, D. H., Choi, J. H., Cho, H. H. (2003). Effect of crossflow on heat (mass) transfer
+    of an impingement/effusion cooling system (in Korean). Proc. KSME 2003 Spring Annual Meeting, pp. 2219-2226.
+  topic:
+  - impingement
+  - effusion
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter,
+    d = D 10 mm, pitch 6d, H/d 2; initial crossflow M = Q_c/Q_i 0.2-2. Fig. 8 PLOTS the overall-averaged Sh
+    on the effusion plate vs M (7 points, log axes) with the no-crossflow level, array jets with crossflow
+    (no vents) and crossflow alone.
+  status: screened
+  verdict: 'The one local source of vented-target data WITH initial crossflow: overall Sh falls from about
+    85 (M <= 0.5, equal to no crossflow) to about 60 at M 2. Accuracy candidate if #468 gains a crossflow term;
+    the shipped model has none. Single Re, one geometry. The journal version (Rhee, Choi & Cho 2003, J. Turbomach.
+    125, 74) is on the wanted list and should be preferred. Not digitised.'
+  read_for:
+  - '#468 vented-target data'
+  - '#468 crossflow in the double-wall cavity'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search. Some text layer (3 kB), mostly Korean.
+- file: docs/heat_transfer/impingement/Rhee_Nam_Cho_2004_KSME_B_28_3_impingement_effusion_ribs_crossflow.pdf
+  citation: Rhee, D. H., Nam, Y. W., Cho, H. H. (2004). Heat/mass transfer characteristics on rib-roughened
+    surface for impingement/effusion cooling system with initial crossflow (in Korean). Trans. KSME B 28(3),
+    338-348.
+  topic:
+  - impingement
+  - effusion
+  - rib
+  content: Yonsei naphthalene-sublimation rig, two perforated plates (staggered), Re_d 10,000 on the hole diameter,
+    H/d 2; 3 mm square ribs (90 deg transverse, 45 deg angled) on the effusion plate, initial crossflow; ribs
+    give about 10% higher average Sh at high blowing ratio.
+  status: screened
+  verdict: Configuration not modelled in combaero (no element for it, no open issue); not digitised.
+  read_for:
+  - '#468 vented-target data'
+  issues:
+  - 468
+  records: []
+  notes: Arrived 2026-10-25 from a koreascience.kr search.
 - file: docs/heat_transfer/NASA_CR-3837_1984.pdf
   citation: Han, J. C., Park, J. S., Lei, C. K. (1984). Heat transfer and pressure drop in blade cooling
     channels with turbulence promoters. NASA Contractor Report 3837, grant NAG3-311. November 1984.
@@ -2031,6 +2160,15 @@ wanted:
   priority: later
   question: Review companion to Roach 1987 -- screen loss coefficients and the turbulence they generate.
   where: Annual Reviews.
+- citation: Rhee, D. H., Choi, J. H., Cho, H. H. (2003). Flow and heat (mass) transfer characteristics in an
+    impingement/effusion cooling system with crossflow. J. Turbomachinery 125(1), 74-82.
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: 'Journal version of Nam et al. 2003 (local, Korean conference paper): vented-target Sh vs initial
+    crossflow ratio, for a #468 crossflow term.'
+  where: ASME journal.
 - citation: Cho, H. H., Rhee, D. H., Goldstein, R. J. (2008). Effects of hole arrangements on local heat/mass
     transfer for impingement/effusion cooling with small hole spacing. J. Turbomachinery 130, 041003.
   checked: false
