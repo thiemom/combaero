@@ -5,9 +5,16 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # The backstop for a path filter that misses a dependency: every job runs
+  # on a push to main, nightly and on demand -- only a pull request is
+  # filtered.
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Keyed on the event too: the nightly run must not cancel a push to main.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -18,49 +25,63 @@ jobs:
     name: Detect Changed Paths
     runs-on: ubuntu-latest
     outputs:
-      source: ${{ steps.filter.outputs.source }}
-      cpp: ${{ steps.filter.outputs.cpp }}
-      gui: ${{ steps.filter.outputs.gui }}
-      documentation: ${{ steps.filter.outputs.documentation }}
+      lint: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.lint == 'true' }}
+      pkg: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.pkg == 'true' }}
+      cpp: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.cpp == 'true' }}
+      gui: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.gui == 'true' }}
+      workflows: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.workflows == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Detect source vs documentation changes
+      # Only a pull request is filtered; a push to main, the nightly run and
+      # a manual dispatch run everything.
+      - name: Full or filtered
+        id: mode
+        run: echo "full=${{ github.event_name != 'pull_request' }}" >> "$GITHUB_OUTPUT"
+
+      # Each filter names what its job READS, so a change runs exactly the
+      # jobs it can break. Pinned by SHA: this step decides which checks run.
+      - name: Detect changed paths
         id: filter
-        uses: dorny/paths-filter@v4
+        if: steps.mode.outputs.full != 'true'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # v4.0.3
         with:
           filters: |
-            source:
+            # check-source-style.sh scans src/include/examples/tests;
+            # check-python-style.sh every .py. A superset of `cpp`, which
+            # the native builds wait on.
+            lint:
               - 'src/**'
               - 'include/**'
-              - 'python/**'
-              - 'tests/**'
-              # validation/ holds BOTH the scored dataset and the runners
-              # that consume it -- scorecard.py, conventions.py, fidelity.py
-              # and the per-physics runners are code, and they live here
-              # rather than under python/. Without this line a change to
-              # either skips every test job and the status-check passes
-              # vacuously, which is how PR #437 merged with 10 of 14 checks
-              # skipped. The tests that read validation/cooling/data/** are
-              # exactly the ones a dataset change can break.
-              - 'validation/**'
-              - 'scripts/**'
               - 'examples/**'
-              - '.github/workflows/**'
+              - 'tests/**'
+              - 'validation/**/*.h'
+              - '**/*.py'
+              - 'CMakeLists.txt'
+              - 'ruff.toml'
+              - 'pyproject.toml'
+              - 'scripts/check-source-style.sh'
+              - 'scripts/check-python-style.sh'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/toolchain-mingw.cmake'
+            # The importable package, what the MSVC extension build and its
+            # import smoke test read. It is the only job that has caught a
+            # dev-only dependency leaking into `import combaero` (sympy,
+            # from a module-scope import), and such a leak can only come
+            # from the package itself or its dependency pins.
+            pkg:
+              - 'python/combaero/**'
+              - 'python/tests/test_import.py'
+              - 'src/**'
+              - 'include/**'
               - 'CMakeLists.txt'
               - 'pyproject.toml'
-              - '.pre-commit-config.yaml'
-              - 'ruff.toml'
-              - 'Makefile'
               - 'uv.lock'
+              - '.python-version'
+              - '.github/workflows/ci.yml'
             # What the native C++ builds read: the 3-OS ctest matrix and
-            # MinGW compile only these. A Python-only change cannot break
-            # them, so they skip it (about 9 runner-minutes). The MSVC
-            # Python extension job stays on `source`: it is the only job
-            # that has caught a dev-only dependency leaking into
-            # `import combaero` (sympy, from a module-scope import), and a
-            # leak can come from any python/ change.
+            # MinGW compile only these.
             cpp:
               - 'src/**'
               - 'include/**'
@@ -77,15 +98,58 @@ jobs:
               - '.pre-commit-config.yaml'
               - '.github/workflows/ci.yml'
               - 'scripts/check_version_sync.py'
-            documentation:
-              - 'docs/**'
-              - 'README.md'
-              - '**/*.md'
+            # Any workflow file: actionlint. A change to publish*.yml or
+            # claude*.yml runs only that (it used to run every Python job).
+            workflows:
+              - '.github/workflows/**'
+
+  # Repository-wide consistency, on every pull request whatever it touches:
+  # a docs- or changelog-only change ran no check at all before.
+  meta:
+    name: Changelog, UNITS.md and version sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Changelog fragments
+        run: uv run --no-project scripts/changelog.py check
+
+      - name: docs/UNITS.md is generated from include/units_data.h
+        run: |
+          uv run --no-project scripts/generate_units_md.py
+          git diff --exit-code docs/UNITS.md
+
+      - name: Pinned tool versions agree
+        run: uv run --no-project scripts/check_version_sync.py
+
+  actionlint:
+    name: Lint workflows (actionlint)
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.12'
+
+      - name: actionlint
+        run: uvx --from actionlint-py==1.7.7.23 actionlint
 
   lint:
     name: Lint & Style Checks
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.lint == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -231,7 +295,7 @@ jobs:
     # for lint added 2 min to every PR's wall time. The status check still
     # requires both.
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.pkg == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -255,53 +319,32 @@ jobs:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
     # "CI / status-check". Ruleset matching is strict and relies on exact string equality.
     name: CI / status-check
-    needs: [changes, lint, lint-gui, build-and-test, build-mingw, build-python-windows]
+    # Every job must be listed here: the ruleset requires only this one, so a
+    # job missing from `needs` is not enforced.
+    needs: [changes, meta, actionlint, lint, lint-gui, build-and-test, build-mingw, build-python-windows]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Evaluate CI outcomes
         shell: bash
         run: |
-          source_changed="${{ needs.changes.outputs.source }}"
-          cpp_changed="${{ needs.changes.outputs.cpp }}"
-          gui_changed="${{ needs.changes.outputs.gui }}"
-          lint_result="${{ needs.lint.result }}"
-          lint_gui_result="${{ needs.lint-gui.result }}"
-          build_result="${{ needs.build-and-test.result }}"
-          mingw_result="${{ needs.build-mingw.result }}"
-          build_python_windows_result="${{ needs.build-python-windows.result }}"
-
-          echo "source_changed=${source_changed}"
-          echo "cpp_changed=${cpp_changed}"
-          echo "gui_changed=${gui_changed}"
-          echo "lint_result=${lint_result}"
-          echo "lint_gui_result=${lint_gui_result}"
-          echo "build_result=${build_result}"
-          echo "mingw_result=${mingw_result}"
-          echo "build_python_windows_result=${build_python_windows_result}"
-
-          if [[ "${source_changed}" == "true" ]]; then
-            if [[ "${lint_result}" != "success" || "${build_python_windows_result}" != "success" ]]; then
-              echo "One or more source-related jobs failed or were cancelled."
-              exit 1
+          fail=0
+          # require <filter output> <job result> <name>: when the job's
+          # filter fired it must have RUN and succeeded -- skipped is a pass
+          # only when nothing it reads changed.
+          require() {
+            echo "$3: changed=$1 result=$2"
+            if [[ "$1" == "true" && "$2" != "success" ]]; then
+              echo "::error::$3 did not succeed ($2)"
+              fail=1
             fi
-          fi
-
-          # Skipped is a pass only when no C++ input changed: the native
-          # builds must have RUN and succeeded whenever cpp_changed is true.
-          if [[ "${cpp_changed}" == "true" ]]; then
-            if [[ "${build_result}" != "success" || "${mingw_result}" != "success" ]]; then
-              echo "One or more native C++ build jobs failed or were cancelled."
-              exit 1
-            fi
-          fi
-
-          if [[ "${gui_changed}" == "true" ]]; then
-            if [[ "${lint_gui_result}" != "success" ]]; then
-              echo "GUI lint job failed or was cancelled."
-              exit 1
-            fi
-          fi
-
-          echo "All required checks passed."
-          exit 0
+          }
+          require true "${{ needs.changes.result }}" "changes"
+          require true "${{ needs.meta.result }}" "meta"
+          require "${{ needs.changes.outputs.workflows }}" "${{ needs.actionlint.result }}" "actionlint"
+          require "${{ needs.changes.outputs.lint }}" "${{ needs.lint.result }}" "lint"
+          require "${{ needs.changes.outputs.gui }}" "${{ needs.lint-gui.result }}" "lint-gui"
+          require "${{ needs.changes.outputs.cpp }}" "${{ needs.build-and-test.result }}" "build-and-test"
+          require "${{ needs.changes.outputs.cpp }}" "${{ needs.build-mingw.result }}" "build-mingw"
+          require "${{ needs.changes.outputs.pkg }}" "${{ needs.build-python-windows.result }}" "build-python-windows"
+          exit $fail
