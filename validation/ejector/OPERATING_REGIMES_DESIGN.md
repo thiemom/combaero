@@ -262,8 +262,7 @@ Two in-repo, air-fluid sources cover the plateau -> knee (`P_c*`) -> droop ->
 breakdown (`P_b0`) structure directly, so no refrigerant EOS / CoolProp is
 needed (unlike the R141b critical fixture):
 
-- **Henry et al. (2007), HEFAT2007** (`../../docs/ejector/Bartosiewicz_ejector_2004.pdf`;
-  filename predates the confirmed citation). Fig. 5 is the measured air-ejector
+- **Henry et al. (2007), HEFAT2007** (`../../docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf`). Fig. 5 is the measured air-ejector
   characteristic `omega(Pb/P2^0)` at three primary pressures (4/5/6 bar), each
   showing the full plateau -> droop -> near-breakdown shape, with a reported
   CFD-vs-experiment deviation < 10%. **Digitized and committed** as
@@ -594,8 +593,8 @@ Still open:
 - Henry, Leclaire, Hemidi, Seynhaeve, Bartosiewicz (2007), *Analysis of
   Supersonic Ejector Operation: Experimental Validation and Two-Phase Aspects*,
   HEFAT2007, Sun City, paper HF1 -- air-ejector experiment + CFD; Fig. 5 is the
-  subcritical-droop validation target. `../../docs/ejector/Bartosiewicz_ejector_2004.pdf`
-  (filename predates the confirmed citation). Digitized:
+  subcritical-droop validation target. `../../docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf`.
+  Digitized:
   `validation/ejector/data/henry2007_fig5.py`.
 - Akbarnejad, Ziabasharhagh (2025), *Theoretical Model for Predicting
   Performance of a Gas Ejector*, Thermal Engineering 72(1) -- air runs with

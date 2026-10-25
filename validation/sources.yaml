@@ -60,7 +60,7 @@
   records: [validation/ejector/README.md, validation/ejector/models/huang1999.py]
   notes: Not the same paper as 'Theoretical Model for Predicting Performance of a Gas Ejector.pdf' (Thermal
     Engineering 2025, same authors), which is the one whose tables are digitised.
-- file: docs/ejector/Bartosiewicz_ejector_2004.pdf
+- file: docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf
   citation: 'Henry, F., Leclaire, S., Hemidi, A., Seynhaeve, J.-M., Bartosiewicz, Y. (2007). Analysis
     of supersonic ejector operation: experimental validation and two-phase aspects. HEFAT2007, 5th Int.
     Conf. on Heat Transfer, Fluid Mechanics and Thermodynamics, Sun City, South Africa, paper HF1.'
@@ -76,8 +76,8 @@
       vs absolute P1]
   issues: [263, 265, 622, 667, 668, 669]
   records: [validation/ejector/data/henry2007_fig5.py, validation/ejector/anchor_scorecard.py, validation/ejector/README.md]
-  notes: Filename says 2004 but the document is the HEFAT2007 paper (OPERATING_REGIMES_DESIGN.md notes
-    the filename predates the confirmed citation).
+  notes: Renamed 2026-10-25 from Bartosiewicz_ejector_2004.pdf (the name predated the confirmed citation).
+    The Fig. 5 scan and traces are henry2007_fig5.png and henry2007_fig5_p=4/5/6bar.
 - file: docs/ejector/Bouhanguel2011_flow_visualization_air_ejector.pdf
   citation: Bouhanguel, A., Desevaux, P., Gavignet, E. (2011). Flow visualization in supersonic ejectors
     using laser tomography techniques. Int. J. Refrigeration 34, 1633-1640.
@@ -591,8 +591,9 @@
   records: [validation/cooling/data/andrews1988/metadata.yaml, validation/cooling/extractions/andrews_effusion_overall_eta.md,
     validation/cooling/extractions/effusion_plate_flow.md]
   notes: 'A byte-identical copy, Impingement_Effusion_Cooling_Overall_Wal.pdf, was deleted 2026-10-25. Local digitised
-    folder andrews_86-GT-290_fig10_data/ (misnamed ''86'', it is 88-GT-290 Fig. 10) and andrews_88-GT-290_fig_10.png.
-    Title from the repo record (not in p.1 text layer). Local only (gitignored): docs/heat_transfer/film/andrews_86-GT-290_fig10_data/.'
+    folder andrews_88-GT-290_fig10_data/ (renamed 2026-10-25 from andrews_86-GT-290_fig10_data/; the CSVs
+    inside keep their andrews_86-GT-290_ prefix) and andrews_88-GT-290_fig_10.png. Title from the repo record
+    (not in p.1 text layer). Local only (gitignored).'
 - file: docs/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
   citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
     experimental and computational methods for modelling multiple row effusion cooling performance. Int.
@@ -869,7 +870,7 @@
   code: ['include/cooling_correlations.h: film_superposition_sellers, film_superposition_corrected']
   notes: A byte-identical copy, A_Study_on_the_Film_Superposition_Method_for_the_M.pdf, was deleted 2026-10-25;
     this is the file name the code cites.
-- file: docs/heat_transfer/film/taslim-spring-2012-friction-factors-and-heat-transfer-coefficients-in-turbulated-cooling-passages-of-different-aspect.pdf
+- file: docs/heat_transfer/film/Taslim_Spring_1987_AIAA-87-2009_turbulated_passages_aspect_ratio.pdf
   citation: 'Taslim, M. E., Spring, S. D. (1987). Friction factors and heat transfer coefficients in turbulated
     cooling passages of different aspect ratios, Part I: experimental results. AIAA-87-2009, 23rd Joint
     Propulsion Conference, San Diego.'
@@ -884,9 +885,10 @@
   issues: [339, 437, 439, 443, 444, 447, 451, 452, 701, 704]
   records: [validation/cooling/extractions/taslim_spring_1987_aspect_ratio.md, validation/cooling/data/taslim_spring1987/metadata.yaml]
   code: ['include/rib_ratio_correlation.h: taslim_spring_1987']
-  notes: 'File name says 2012 but the document is the 1987 AIAA paper (2012 is likely a repository upload
-    date). Rib paper filed under film/. Local digitised folder taslim-spring-2012_data/ with SEALED prediction
-    files; AIAA-87-2009_quality_sample.png. Local only (gitignored): docs/heat_transfer/film/taslim-spring-2012_data/.'
+  notes: 'Renamed 2026-10-25 from taslim-spring-2012-friction-factors-...-aspect.pdf (the 2012 was likely
+    a repository upload date). Rib paper filed under film/. Local digitised folder taslim_spring_1987_data/
+    (renamed from taslim-spring-2012_data/; the CSVs inside keep their taslim-spring-2012_ prefix) with SEALED
+    prediction files; AIAA-87-2009_quality_sample.png. Local only (gitignored).'
 - file: docs/heat_transfer/film/The Review of Studies on Heat Transfer in Impinging Jet.pdf
   citation: Hong, S. K., Cho, H. H. (2005). The review of studies on heat transfer in impinging jet. Int.
     J. Air-Conditioning and Refrigeration 13(4), 196-205.
@@ -1536,7 +1538,7 @@
   issues: [385, 390, 392, 394, 403]
   records: [validation/cooling/extractions/lau_1990_v_ribs.md, validation/cooling/data/lau1990/metadata.yaml]
   notes: Volume and end page not printed in the PDF text; the extraction record gives IJHMT 34(7), 1605-1616.
-- file: docs/heat_transfer/web_eckert_goldstein.pdf
+- file: docs/heat_transfer/Webb_Eckert_Goldstein_1971_IJHMT_14_pp601-617.pdf
   citation: Webb, R. L., Eckert, E. R. G., Goldstein, R. J. (1971). Heat transfer and friction in tubes
     with repeated-rib roughness. Int. J. Heat Mass Transfer 14, 601-617.
   topic: [rib]
@@ -1565,7 +1567,7 @@
   issues: []
   records: [validation/cooling/extractions/han_ribbed.md]
   notes: Issue/volume number recorded as 15(1) in han_ribbed.md; the PDF shows Vol. 15 pp. 180-184 only.
-    Sequel to web_eckert_goldstein.pdf (1971).
+    Sequel to Webb_Eckert_Goldstein_1971_IJHMT_14_pp601-617.pdf.
 - file: docs/junction/a-unified-method-for-estimating-pressure-losses-at-vascular-3elbvn7sno.pdf
   citation: Mynard, J. P., Valen-Sendstad, K. (?). A unified method for estimating pressure losses at
     vascular junctions. Int. J. Numer. Meth. Biomed. Engng. ?, 1-24.
@@ -1775,7 +1777,7 @@
   records: [validation/junction/data/blaisdell_manson1963/table12_centre.csv, validation/junction/data/blaisdell_manson1963/PREREGISTRATION.md,
     validation/junction/bm1963_score.py]
   code: ['include/ideal_junction.h: merge = Blaisdell & Manson''s theory', python/combaero/network/ideal_tee_element.py]
-  notes: The 600 dpi scan used as the primary read for Table 12. Same work as tb1283/tb1283.pdf and tb1283/uva-...pdf.
+  notes: The 600 dpi scan used as the primary read for Table 12. Same work as tb1283/tb1283.pdf. The one-page HathiTrust PDF of p. 145 (uva-x030348647-149-...pdf) was deleted 2026-10-25; the HathiTrust page TIFFs (uva.x030348647-seq_*.tif) remain.
 - file: docs/junction/tb1283/tb1283.pdf
   citation: Blaisdell, F. W., Manson, P. W. (1963). Loss of energy at sharp-edged pipe junctions in water
     conveyance systems. USDA Agricultural Research Service, Technical Bulletin No. 1283.
@@ -1791,19 +1793,6 @@
   records: [validation/junction/data/blaisdell_manson1963/README.md]
   notes: Duplicate (different scan) of tb1283/OBJ.pdf; the Table 12 README names OBJ.pdf and HathiTrust
     TIFFs as its reads, not this file explicitly.
-- file: docs/junction/tb1283/uva-x030348647-149-1791659507.pdf
-  citation: Blaisdell, F. W., Manson, P. W. (1963). Loss of energy at sharp-edged pipe junctions in water
-    conveyance systems. USDA Technical Bulletin No. 1283, Table 12 (printed p. 145 only).
-  id: USDA Tech. Bull. 1283
-  topic: [junction, tee]
-  content: Single page (printed p. 145) of Table 12, 'Summary of test data -- Continued', from a University
-    of Virginia library copy (HathiTrust).
-  status: implemented
-  verdict: One-page extract of the bulletin used in the Table 12 cross-reading; no content beyond OBJ.pdf.
-  read_for: ['#508 Table 12 transcription']
-  issues: [508]
-  records: [validation/junction/data/blaisdell_manson1963/README.md]
-  notes: Partial duplicate of tb1283/OBJ.pdf (one page).
 - file: docs/junction/torregrosa-2017-07-00480.pdf
   citation: 'Torregrosa, A. J., Broatch, A., Garcia-Cuevas, L. M., Hernandez, M. (2017). A study of the
     transient response of duct junctions: measurements and gas-dynamic modeling with a staggered mesh
