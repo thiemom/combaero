@@ -4,10 +4,24 @@ Diagnostic utilities for NetworkSolver analysis and visualization.
 
 import json
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
-import matplotlib.pyplot as plt
 import numpy as np
+
+
+def _pyplot() -> ModuleType:
+    """matplotlib is the optional `examples` extra, not a dependency: import
+    it only when a plot is drawn, so the JSON report and the summary work
+    without it."""
+    try:
+        import matplotlib.pyplot as plt
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "combaero.network.diagnostics: plotting needs matplotlib, which is "
+            "not installed. Install it with `pip install combaero[examples]`."
+        ) from e
+    return plt
 
 
 def export_diagnostic_report(report: dict[str, Any], filepath: str | Path) -> None:
@@ -162,6 +176,7 @@ def create_heatmap(data: np.ndarray, title: str, filepath: Path, shape: tuple[in
         filepath: Output file path
         shape: Grid shape (rows, cols)
     """
+    plt = _pyplot()
     fig, ax = plt.subplots(figsize=(10, 8))
 
     # Create heatmap
