@@ -1,0 +1,1 @@
+- `SlotFilmElement`: a 2-D film slot (a combustor liner's cooling ring) as a film provider for a downstream wall. Film: Marek & Tacina (1975), C_m from the free-stream turbulence (default 14%, the D-7958 case Eq. 5 fits best), with a user `C_m_multiplier`. Plus `slot_film_span_average_marek_tacina_1975`, the span average a wall sees (#714).

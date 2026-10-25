@@ -89,7 +89,7 @@ class FlowNetwork:
             if provider is None:
                 raise ValueError(
                     f"Wall '{wall.id}': film {wall.film!r} is not a film provider "
-                    "(a FilmCoolingElement, EffusionPlateElement or EffusionLiner)."
+                    "(a FilmCoolingElement, SlotFilmElement, EffusionPlateElement or EffusionLiner)."
                 )
             error = getattr(provider, "film_provider_error", lambda: None)()
             if error is not None:

@@ -5090,6 +5090,137 @@ class FilmCoolingElement(OrificeElement):
         return base
 
 
+# The default free-stream turbulence of a slot film [%] (#714): D-7958's 52%
+# blockage plate (axial Tu 14%), where Eq. (5)'s line fits that report's own
+# Table I best (bias +0.017 in eta), inside the 10-20% Juhasz and Marek
+# (1971, TN D-6360) measured in a combustor. A working example, not a
+# universal value: a liner's Tu comes from what is upstream of it.
+SLOT_FILM_DEFAULT_TU = 14.0
+
+
+class SlotFilmElement(OrificeElement):
+    """A 2-D film slot (a combustor liner's cooling ring): coolant from
+    `from_node` into the gas at `to_node` through a continuous slot of height
+    ``slot_height`` across ``span``.
+
+    FILM: Marek and Tacina (1975), NASA TN D-7958, eta = 1/(1 + C_m x/(M S))
+    with C_m = 0.25 Tu/100 (Eqs. 4-5), ``turbulence_intensity`` the axial
+    free-stream Tu in percent and ``C_m_multiplier`` the user's rig-matching
+    factor (never scored). As for FilmCoolingElement, the element owns no
+    wall: a ThermalWall on the gas duct downstream names it with ``film=``,
+    and that wall's span is measured from the slot lip. The blowing ratio is
+    the slot's mass flux over the gas duct's. Every D-7958 test was
+    co-flowing film.
+
+    FLOW: an orifice of the slot's area, ``lip_thickness`` long. The
+    discharge correlations are for round holes; the slot enters as its
+    hydraulic diameter 2 S W/(S + W), and as the number of such holes that
+    carries its area, so the hole Reynolds number is the slot's own. A
+    measured slot Cd is better given with correlation='fixed'.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        slot_height: float,
+        span: float,
+        lip_thickness: float,
+        turbulence_intensity: float = SLOT_FILM_DEFAULT_TU,
+        C_m_multiplier: float = 1.0,
+        correlation: str = "IdelchikThick",
+        Cd: float = 0.6,
+        edge_radius: float = 0.0,
+    ) -> None:
+        name = f"SlotFilmElement {id!r}"
+        if slot_height <= 0.0 or span <= 0.0 or lip_thickness <= 0.0:
+            raise ValueError(f"{name}: slot_height, span and lip_thickness must be positive")
+        if slot_height > span:
+            raise ValueError(f"{name}: a slot is wider than it is high (span >= slot_height)")
+        if turbulence_intensity < 0.0:
+            raise ValueError(f"{name}: turbulence_intensity is the axial Tu in PERCENT, >= 0")
+        if C_m_multiplier <= 0.0:
+            raise ValueError(f"{name}: C_m_multiplier must be positive")
+        self.slot_height = float(slot_height)
+        self.span = float(span)
+        self.lip_thickness = float(lip_thickness)
+        self.turbulence_intensity = float(turbulence_intensity)
+        self.C_m_multiplier = float(C_m_multiplier)
+        self.total_hole_area = self.slot_height * self.span
+        self.hydraulic_diameter = (
+            2.0 * self.slot_height * self.span / (self.slot_height + self.span)
+        )
+        super().__init__(
+            id,
+            from_node,
+            to_node,
+            Cd=Cd,
+            area=self.total_hole_area,
+            correlation=correlation,
+            plate_thickness=self.lip_thickness,
+            edge_radius=edge_radius,
+        )
+        self.equivalent_bore = self.hydraulic_diameter
+        # Into a merge chamber the film enters along the gas axis.
+        self.injection_angle_deg = 0.0
+
+    def _hole_count(self) -> float:
+        # Holes of the hydraulic diameter that carry the slot's area: the
+        # hole Reynolds number 4 m/(pi Dh mu) per hole is the slot's m Dh/(A mu).
+        return self.total_hole_area / (math.pi * self.hydraulic_diameter**2 / 4.0)
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """A slot in a wall: no pipe, hence no beta; the correlations see the
+        hydraulic diameter."""
+        self._orifice_geom = cb.OrificeGeometry()
+        self._orifice_geom.d = self.hydraulic_diameter
+        self._orifice_geom.D = 0.0
+        self._orifice_geom.t = self.lip_thickness
+        self._orifice_geom.r = self.edge_radius
+        self.beta = 0.0
+
+    def validate(self) -> None:
+        super().validate()
+        if self.correlation in _METERING_SELECTORS:
+            raise ValueError(
+                f"SlotFilmElement {self.id!r}: {self.correlation!r} is a NORMED "
+                "metering correlation for a plate in a pipe; a film slot has no "
+                "pipe and no beta. Use 'IdelchikThick', 'McGreehanSchotsch' or 'fixed'."
+            )
+
+    def film_span_average(
+        self, x_start: float, x_end: float, M: float, density_ratio: float
+    ) -> Any:
+        """The film over [x_start, x_end] [m] downstream of the slot lip:
+        C++'s FilmSpanAverage (eta_bar, d eta_bar/dM, 0 for the density ratio,
+        which Eq. (4) does not contain, and the kernel's envelope flag)."""
+        S = self.slot_height
+        return cb.slot_film_span_average_marek_tacina_1975(
+            x_start / S, x_end / S, M, self.turbulence_intensity, self.C_m_multiplier
+        )
+
+    def diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float]:
+        base = super().diagnostics(state_in, state_out, flows)
+        dP_drive = state_in.Pt - state_out.P
+        base.update(
+            {
+                "slot_height": float(self.slot_height),
+                "hydraulic_diameter": float(self.hydraulic_diameter),
+                "G_slot": float(abs(state_in.m_dot) / self.total_hole_area),
+                "turbulence_intensity": float(self.turbulence_intensity),
+                "dP_drive": float(dP_drive),
+                "is_ingesting": float(dP_drive <= 0.0),
+            }
+        )
+        return base
+
+
 class FilmSource(NamedTuple):
     """One coolant stream of a film provider (#386, #695): the element that
     carries it, the node that supplies it, and its metering hole area [m^2]."""

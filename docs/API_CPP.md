@@ -1604,6 +1604,11 @@ FilmSpanAverage film_span_average_colban_2011(int n_rows, double row_pitch_over_
                                               double M, double area_ratio, double P_over_D,
                                               double t_over_P, double alpha_deg,
                                               double density_ratio);  // deta_dP = 0
+// One 2-D slot, Marek & Tacina (1975); x from the slot lip in slot heights.
+FilmSpanAverage slot_film_span_average_marek_tacina_1975(double x_start_over_S,
+                                                         double x_end_over_S, double M,
+                                                         double Tu,
+                                                         double C_m_multiplier = 1.0);  // deta_dP = 0
 
 // Rows in GROUPS (an effusion liner's panels, #695), upstream first, each at
 // its own M, density ratio and coolant temperature, layered row by row:

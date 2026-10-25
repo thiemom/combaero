@@ -445,6 +445,7 @@ f = cb.film_span_average_colban_2011(n_rows=2, row_pitch_over_D=10.0,
         area_ratio=3.5, P_over_D=6.0, t_over_P=0.5)
 f = cb.film_span_average_baldauf_2002(2, 10.0, 0.0, 50.0, M=1.0,
         density_ratio=1.8, alpha_deg=30.0, s_over_D=3.0, Tu=0.05)
+f = cb.slot_film_span_average_marek_tacina_1975(0.0, 30.0, M=1.0, Tu=14.0)  # x in slot heights
 f.eta, f.deta_dM, f.deta_dP, f.extrapolated
 ```
 
@@ -894,6 +895,22 @@ net.add_wall(ThermalWall(
 ))
 ```
 
+- **A film slot is a provider too** (`SlotFilmElement`, #714): a continuous
+  slot of `slot_height` across `span`, as in a combustor liner's cooling
+  ring. Film: Marek & Tacina (1975), `eta = 1/(1 + C_m x/(M S))` with
+  `C_m = 0.25 Tu/100`; the wall's span is measured from the slot lip.
+  `turbulence_intensity` is the axial free-stream Tu in PERCENT, default 14
+  (`SLOT_FILM_DEFAULT_TU`: D-7958's 52% blockage case, where Eq. 5 fits that
+  report best, inside D-6360's combustor 10-20%) -- a working example; a
+  liner's Tu comes from what is upstream of it. `C_m_multiplier` is the
+  user's rig-matching factor, never scored. Flow: an orifice of the slot's
+  area, `lip_thickness` long, its discharge correlation fed the hydraulic
+  diameter `2SW/(S+W)` (give a measured Cd with `correlation="fixed"`).
+
+  ```python
+  net.add_element(SlotFilmElement("ring", "annulus", "gas",
+      slot_height=2e-3, span=0.25, lip_thickness=1e-3, turbulence_intensity=14.0))
+  ```
 - **An effusion panel is a provider too** (`film="<panel id>"`, needs
   `panel_length`): its rows, Baldauf each `pitch_x` apart and Sellers over
   them, read past its LAST row. Naming it selects that film whatever the

@@ -710,6 +710,18 @@ FilmSpanAverageGroups film_span_average_baldauf_2002_groups(
   return out;
 }
 
+FilmSpanAverage slot_film_span_average_marek_tacina_1975(
+    double x_start_over_S, double x_end_over_S, double M, double Tu,
+    double C_m_multiplier) {
+  return film_span_average_impl(
+      "slot_film_span_average_marek_tacina_1975", 1, 0.0, x_start_over_S,
+      x_end_over_S, [&](double x, CorrelationStatus *status) {
+        const auto [e, dM] = slot_film_effectiveness_marek_tacina_1975_and_derivatives(
+            x, M, Tu, C_m_multiplier, status);
+        return std::tuple<double, double, double>{e, dM, 0.0};
+      });
+}
+
 FilmSpanAverage film_span_average_colban_2011(
     int n_rows, double row_pitch_over_D, double x_start_over_D,
     double x_end_over_D, double M, double area_ratio, double P_over_D,
