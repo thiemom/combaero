@@ -559,6 +559,13 @@ FilmSpanAverage film_span_average_colban_2011(
     double x_end_over_D, double M, double area_ratio, double P_over_D,
     double t_over_P, double alpha_deg, double density_ratio);
 
+// 2-D slot: Marek and Tacina (1975), D-7958 Eqs. (4)-(5). S is the slot
+// height and x is measured from the slot lip; one slot, no superposition.
+// deta_dP is 0: the density ratio does not enter Eq. (4).
+FilmSpanAverage slot_film_span_average_marek_tacina_1975(
+    double x_start_over_S, double x_end_over_S, double M, double Tu,
+    double C_m_multiplier = 1.0);
+
 // Film from rows in GROUPS, each with its own blowing ratio, density ratio
 // and coolant temperature: an effusion liner's panels along one duct (#695).
 // Groups are listed upstream first; group g holds n_rows[g] rows, and every

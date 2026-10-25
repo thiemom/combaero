@@ -6801,6 +6801,14 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "of the last breakout (in metering D). deta_dP is 0: Eq. (19) has no\n"
         "density ratio.");
 
+  m.def("slot_film_span_average_marek_tacina_1975",
+        &combaero::cooling::slot_film_span_average_marek_tacina_1975,
+        py::arg("x_start_over_S"), py::arg("x_end_over_S"), py::arg("M"),
+        py::arg("Tu"), py::arg("C_m_multiplier") = 1.0,
+        "Film a downstream wall sees from a 2-D SLOT: Marek & Tacina (1975)\n"
+        "Eqs. (4)-(5), averaged over [x_start, x_end] downstream of the slot\n"
+        "lip (in slot heights S). deta_dP is 0: Eq. (4) has no density ratio.");
+
   m.def("film_superposition_sellers",
         &combaero::cooling::film_superposition_sellers, py::arg("eta_rows"),
         "Sellers superposition of per-row film effectiveness:\n"
