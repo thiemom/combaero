@@ -636,6 +636,9 @@ struct MomentumChamberResult {
   double dT_static_dP = 0.0;
   double dT_static_dT = 0.0; // d/dT0
   double dT_static_dmdot = 0.0;
+  // ... and w.r.t. the mass fractions (#743), per species; zero in the
+  // incompressible limit and for species absent at the node.
+  std::vector<double> dT_static_dY;
   // Static density rho(T_static, P) and its sensitivities to the closure's
   // inputs, for elements that read the chamber as a port (junction kernels):
   // their momentum rows must see the same static state as this row.

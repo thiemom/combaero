@@ -391,6 +391,12 @@ struct ChamberStaticState {
 };
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
+// Its mole-fraction gradients at fixed T0, P, G (#743): dT_dX, dlnP0P_dX
+// (map with mole_gradient_to_mass). Implicit function theorem on the energy
+// balance; closed-form species h, s and R.
+struct ChamberStaticStateDX { std::vector<double> dT_dX, dlnP0P_dX; };
+ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+                                            const std::vector<double>& X);
 
 // The SONIC static state of flux G at stagnation T0 (#637): T* from
 // h(T0) - h(T*) = a*^2 / 2, P* = G sqrt(R T* / gamma*), with dT*/dT0,
@@ -1088,6 +1094,8 @@ struct MergeFaceState {
     double P_face, Pt_face, M_face; bool choked;
     double dPf_dm_main, dPf_dm_out, dPf_dJ, dPf_dP, dPf_dT, dPf_dT_main;
     double dPtf_dm_main, dPtf_dm_out, dPtf_dJ, dPtf_dP, dPtf_dT, dPtf_dT_main;
+    // Mass-fraction gradients of the chamber gas and the main stream (#743).
+    std::vector<double> dPf_dY, dPf_dY_main, dPtf_dY, dPtf_dY_main;
 };
 // incompressible (#588): the low-Mach limit, densities at the chamber P and
 // the stagnation temperatures; linear in P_face, nothing to choke.

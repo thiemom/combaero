@@ -837,7 +837,11 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dPtf_dJ", &combaero::MergeFaceState::dPtf_dJ)
       .def_readonly("dPtf_dP", &combaero::MergeFaceState::dPtf_dP)
       .def_readonly("dPtf_dT", &combaero::MergeFaceState::dPtf_dT)
-      .def_readonly("dPtf_dT_main", &combaero::MergeFaceState::dPtf_dT_main);
+      .def_readonly("dPtf_dT_main", &combaero::MergeFaceState::dPtf_dT_main)
+      .def_readonly("dPf_dY", &combaero::MergeFaceState::dPf_dY)
+      .def_readonly("dPf_dY_main", &combaero::MergeFaceState::dPf_dY_main)
+      .def_readonly("dPtf_dY", &combaero::MergeFaceState::dPtf_dY)
+      .def_readonly("dPtf_dY_main", &combaero::MergeFaceState::dPtf_dY_main);
   m.def("chamber_merge_face_state", &combaero::chamber_merge_face_state,
         py::arg("m_main"), py::arg("T_main"), py::arg("X_main"), py::arg("m_out"),
         py::arg("P"), py::arg("T"), py::arg("X"), py::arg("side_momentum"),
@@ -1375,7 +1379,8 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("drho_dP", &solver::MomentumChamberResult::drho_dP)
       .def_readonly("drho_dT", &solver::MomentumChamberResult::drho_dT)
       .def_readonly("drho_dmdot", &solver::MomentumChamberResult::drho_dmdot)
-      .def_readonly("drho_dY", &solver::MomentumChamberResult::drho_dY);
+      .def_readonly("drho_dY", &solver::MomentumChamberResult::drho_dY)
+      .def_readonly("dT_static_dY", &solver::MomentumChamberResult::dT_static_dY);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),

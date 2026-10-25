@@ -192,6 +192,16 @@ struct ChamberStaticState {
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
 
+// chamber_static_state's gradients in the MOLE fractions at fixed T0, P and
+// G (#743), X unnormalised (map with mole_gradient_to_mass): the static T from
+// f = h(T0) - h(T) - (G R T / P)^2 / 2 = 0 by the implicit function theorem,
+// and ln(P0 / P) = sum_j X_j (s_j(T0) - s_j(T)) / R_u at that T.
+struct ChamberStaticStateDX {
+  std::vector<double> dT_dX, dlnP0P_dX;
+};
+ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+                                            const std::vector<double>& X);
+
 // -------------------------------------------------------------
 // The SONIC static state of a flow at stagnation temperature T0 and mass flux
 // G (#637): T* from h(T0) - h(T*) = a(T*)^2 / 2 (variable cp, a^2 = gamma R T),

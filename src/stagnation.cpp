@@ -339,6 +339,36 @@ ChamberStaticState chamber_static_state(double T0, double P, double G,
   return out;
 }
 
+ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+                                            const std::vector<double> &X) {
+  const std::size_t n = X.size();
+  ChamberStaticStateDX out;
+  out.dT_dX.assign(n, 0.0);
+  out.dlnP0P_dX.assign(n, 0.0);
+  const ChamberStaticState cs = chamber_static_state(T0, P, G, X);
+  const double T = cs.T;
+  const double R = specific_gas_constant(X);
+  const double MW = mwmix(X) / 1000.0;  // kg/mol
+  const double Ru = R * MW;
+  const double cpT = cp_mass(T, X);
+  const double v = G * R * T / P;
+  const double fT = -cpT - (G * R / P) * (G * R / P) * T;
+  double dH = 0.0;
+  for (std::size_t j = 0; j < n; ++j) {
+    dH += X[j] * (h_species(j, T0) - h_species(j, T));
+  }
+  dH /= MW;
+  for (std::size_t j = 0; j < n; ++j) {
+    const double W = species_molar_mass(j) / 1000.0;
+    // h_mass difference and R = R_u / MW both move with X_j.
+    const double fX = (h_species(j, T0) - h_species(j, T) - dH * W) / MW + v * v * W / MW;
+    out.dT_dX[j] = -fX / fT;
+    out.dlnP0P_dX[j] =
+        (s_species(j, T0) - s_species(j, T)) / Ru - cpT / (R * T) * out.dT_dX[j];
+  }
+  return out;
+}
+
 SonicStaticState sonic_static_state(double T0, double G,
                                     const std::vector<double> &X) {
   const double R = specific_gas_constant(X);
