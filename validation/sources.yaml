@@ -838,7 +838,8 @@ documents:
   read_for: ['#714 slot film kernel', '#714 C_m(Tu) closure']
   issues: [714, 738, 742]
   records: [validation/cooling/extractions/marek_tacina_1975_d7958.md, validation/cooling/data/marek_tacina1975/]
-  code: ['include/cooling_correlations.h: slot_film_effectiveness_marek_tacina_1975, slot_film_effectiveness_marek_tacina_1975_and_derivatives']
+  code: ['include/cooling_correlations.h: slot_film_effectiveness_marek_tacina_1975, slot_film_effectiveness_marek_tacina_1975_and_derivatives', 'include/cooling_correlations.h: slot_film_span_average_marek_tacina_1975',
+    'python/combaero/network/components.py: SlotFilmElement (#749)']
   notes: Also fidelity-scored (validation/cooling/fidelity.py); 'implemented' chosen as the higher status.
     No text layer on p.1 (scan). Element design and Tu closure (stage 2) pending.
 - file: docs/heat_transfer/film/oct23/19770014416.pdf
