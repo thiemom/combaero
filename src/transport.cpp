@@ -373,6 +373,45 @@ double wilke_viscosity_dT(const std::vector<double>& X, const std::vector<double
     return out;
 }
 
+// d mu_mix / dx_k at fixed T for Wilke's rule, x unnormalised:
+//   d mu_mix / dx_k = mu_k / D_k - sum_i x_i mu_i phi_ik / D_i^2.
+// For a species absent from the mixture (x_k = 0) this is the one-sided
+// derivative as it enters: D_k is its row over the species present.
+std::vector<double> wilke_viscosity_dX(const std::vector<double>& X,
+                                       const std::vector<double>& mu)
+{
+    const std::size_t N = X.size();
+    auto phi = [&](std::size_t i, std::size_t j) {
+        if (i == j) {
+            return 1.0;
+        }
+        const double M_i = molar_masses[i];
+        const double M_j = molar_masses[j];
+        const double a_ij = 1.0 / std::sqrt(8.0) / std::sqrt(1.0 + M_i / M_j);
+        const double g = 1.0 + std::sqrt(mu[i] / mu[j]) * std::pow(M_j / M_i, 0.25);
+        return a_ij * g * g;
+    };
+    std::vector<double> D(N, 0.0);
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = 0; j < N; ++j) {
+            if (X[j] > 0.0) {
+                D[i] += X[j] * phi(i, j);
+            }
+        }
+    }
+    std::vector<double> out(N, 0.0);
+    for (std::size_t k = 0; k < N; ++k) {
+        double s = (D[k] > 0.0) ? mu[k] / D[k] : 0.0;
+        for (std::size_t i = 0; i < N; ++i) {
+            if (X[i] > 0.0) {
+                s -= X[i] * mu[i] * phi(i, k) / (D[i] * D[i]);
+            }
+        }
+        out[k] = s;
+    }
+    return out;
+}
+
 // d k_mix / dT for k_mix = (sum x_i k_i + 1 / sum x_i/k_i) / 2.
 double mixture_conductivity_dT(const std::vector<double>& X, const std::vector<double>& k,
                                const std::vector<double>& dk)
@@ -388,6 +427,15 @@ double mixture_conductivity_dT(const std::vector<double>& X, const std::vector<d
 }
 
 }  // namespace
+
+std::vector<double> viscosity_dX(double T, double P, const std::vector<double>& X)
+{
+    (void)P;
+    if (X.size() != species_names.size()) {
+        throw std::invalid_argument("viscosity_dX: Mole fraction vector size does not match number of species");
+    }
+    return wilke_viscosity_dX(X, pure_species_transport(T, X).mu);
+}
 
 // Viscosity and thermal conductivity with their analytic temperature
 // derivatives (chain through the collision-integral interpolation, the

@@ -1199,7 +1199,7 @@ combustor.add_energy_boundary(EnergyBoundary("loss", fraction=-0.05))  # -5% of 
   is still a flow boundary.
 - **A discrete loss (`PressureLossElement`) follows the flow** (#550).
   - "In" is the upstream node of the flow as it runs, and the correlation sees `|m_dot|`.
-  - Through zero flow the forward and reverse forms blend over `FLOW_REVERSAL_M_SCALE` (1e-4 kg/s), as the area change does.
+  - Through zero flow the forward and reverse forms blend over `FLOW_REVERSAL_M_SCALE` (1e-4 kg/s).
 - **Orifices and incompressible channels read their upstream side along the flow** (#554), so an element's declared direction is only a sign convention:
   - **Orifices:** the kernel is evaluated from the node the flow comes from: its stagnation state, its density, and the velocity of approach of the pipe on its side (`beta`, or `beta_reverse` from the to-node's pipe).
     - The direction comes from the pressures, blended through equal Pt over `ORIFICE_REVERSAL_P_SCALE` (0.1 Pa).
@@ -1525,6 +1525,33 @@ ejector = EjectorElement(
 # pin switches in at P_b0. diagnostics() reports p_b0_pa next to p_c_star_pa.
 # Beyond P_b0 (backflow) is outside the model.
 ```
+
+### Area Change
+
+`AreaChangeElement(id, from_node, to_node, F0=None, F1=None, model_type="sharp" | "conical", length=None, D_h=0.0, regime="compressible")`
+is a sudden or conical expansion or contraction from face `F0` to `F1` (#731).
+
+- **Closures: Idelchik (1966),** transcribed in `validation/area_change/` and scored on every printed cell (`python/tests/test_area_change.py`):
+  - sudden expansion, diagram 4-1: `cb.sudden_expansion_zeta(Re, n)` returns `(zeta, dzeta_dRe)`. It is 26/Re below Re 8, a C1 interpolation of the printed table to Re 3500, and Borda-Carnot `(1 - n)^2` above. Three of the 78 printed cells move: two to keep the loss rising with the flow (n 0.6 and 0.5 at Re 2000), and one rounded Borda-Carnot value;
+  - sharp contraction, diagram 3-9: `0.5 (1 - n)`;
+  - conical diffuser, diagram 5-2: `cb.conical_diffuser_zeta(full_angle_deg, n)`, exact at every printed cell. Friction is not included;
+  - the conical nozzle `C_con (1 - n)` is **not sourced** (no Idelchik diagram transcribed).
+- **Mach.** The tables are incompressible; the element carries them by their control volume.
+  - An expansion is the compressible Borda-Carnot step (`cb.compressible_borda_carnot`) times the table's ratio to it. At n 0.8 and M 0.62 that is 1.62x Borda-Carnot.
+  - A contraction is a vena contracta re-expanding by the same step. It chokes, and the element's flow then stays at the sonic flow.
+  - `regime="incompressible"` is the M -> 0 limit.
+  - The gas is calorically perfect across the step, at gamma(Tt): within 0.2% of the thermally perfect control volume to M 0.65 at 1500 K.
+- **Residual: mass flow,** `m - m_calc(Pt_from, Pt_to, ...)`, as the compressible channel's and orifice's.
+  - The flow rises monotonically with the drive and saturates at the sonic flow.
+  - Each direction is fed from its own upstream node (reversed flow reads the `to_node`). The two are blended C1 through zero drive.
+  - Below a branch's drive floor (zeta times 2 Pa of head) the flow is a C1 odd blend with a finite slope at zero.
+  - Every partial is analytic, composition included (`cb.area_change_element_flow`).
+- **Equal areas are refused** (no area change, no loss to set the flow): use a `LosslessConnectionElement`.
+- **Diagnostics** (upwind node's state):
+  - `dPt_loss`: the closure's stagnation loss (formerly `dP_static`);
+  - `zeta`: on the small section's static head;
+  - `mach_loss_ref`: the small section's Mach for an expansion, the vena contracta's for a contraction;
+  - `Re_small`, `expansion` and `choked`.
 
 ### Flow-Area Inference
 

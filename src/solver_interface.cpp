@@ -1,5 +1,4 @@
 #include "../include/solver_interface.h"
-#include "../include/area_change.h"
 #include "../include/multi_port_chamber.h"
 #include "../include/tee_junction.h"
 #include "../include/composition.h"
@@ -1981,105 +1980,6 @@ OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
   out.in_range = P_static_up > 0.0 &&
                  out.p_tap >= ORIFICE_RECOVERY_MIN_PRESSURE_RATIO * P_static_up;
   return out;
-}
-
-// -----------------------------------------------------------------------------
-// Area Change Elements
-// -----------------------------------------------------------------------------
-
-AreaChangeElementResult area_change_residuals_and_jacobian(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
-    const std::vector<double>& Y_up, double P_static_down,
-    double F0, double F1, double m_scale, double D_h) {
-
-  (void)P_total_up;
-  (void)P_static_down;
-  const std::vector<double> X_up =
-      combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
-  auto [rho, drho_dT, drho_dP] =
-      density_and_jacobians(T_up, P_static_up, X_up);
-  auto [mu, dmu_dT, dmu_dP] =
-      viscosity_and_jacobians(T_up, P_static_up, X_up);
-
-  // Core physics evaluation
-  auto core = combaero::sharp_area_change(m_dot, rho, mu, F0, F1, 0.0, m_scale, D_h);
-
-  AreaChangeElementResult res;
-  res.dP_calc = core.dP;
-  res.d_dP_d_mdot = core.dS_dm;
-  res.mach_clamped = core.mach_clamped;
-
-  // Chain rule: d(dP)/dX = d(dP)/drho * drho/dX + d(dP)/dmu * dmu/dX
-  res.d_dP_dP_static_up = core.dS_drho * drho_dP + core.dS_dmu * dmu_dP;
-  res.d_dP_dT_up = core.dS_drho * drho_dT + core.dS_dmu * dmu_dT;
-
-  // d(dP)/dY[i] via finite differences on rho(Y)
-  res.d_dP_dY_up.resize(Y_up.size(), 0.0);
-  const double eps_Y = 1e-6;
-  for (std::size_t i = 0; i < Y_up.size(); ++i) {
-    std::vector<double> Y_plus = Y_up;
-    Y_plus[i] += eps_Y;
-    auto X_plus =
-        combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
-    double rho_plus =
-        std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
-    double mu_plus =
-        std::get<0>(viscosity_and_jacobians(T_up, P_static_up, X_plus));
-    auto core_plus =
-        combaero::sharp_area_change(m_dot, rho_plus, mu_plus, F0, F1, 0.0, m_scale, D_h);
-    res.d_dP_dY_up[i] = (core_plus.dP - core.dP) / eps_Y;
-  }
-
-  return res;
-}
-
-AreaChangeElementResult conical_area_change_residuals_and_jacobian(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
-    const std::vector<double>& Y_up, double P_static_down,
-    double F0, double F1, double length, double m_scale) {
-
-  (void)P_total_up;
-  (void)P_static_down;
-  const std::vector<double> X_up =
-      combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
-  auto [rho, drho_dT, drho_dP] =
-      density_and_jacobians(T_up, P_static_up, X_up);
-  auto [mu, dmu_dT, dmu_dP] =
-      viscosity_and_jacobians(T_up, P_static_up, X_up);
-
-  // Core physics evaluation
-  auto core = combaero::conical_area_change(m_dot, rho, mu, F0, F1, length,
-                                            0.0, m_scale);
-
-  AreaChangeElementResult res;
-  res.dP_calc = core.dP;
-  res.d_dP_d_mdot = core.dS_dm;
-  res.mach_clamped = core.mach_clamped;
-
-  // Chain rule: d(dP)/dX = d(dP)/drho * drho/dX + d(dP)/dmu * dmu/dX
-  // (dS_dmu is 0 for conical, but we include the terms for generality)
-  res.d_dP_dP_static_up = core.dS_drho * drho_dP + core.dS_dmu * dmu_dP;
-  res.d_dP_dT_up = core.dS_drho * drho_dT + core.dS_dmu * dmu_dT;
-
-  // d(dP)/dY[i] via finite differences on rho(Y) and mu(Y)
-  res.d_dP_dY_up.resize(Y_up.size(), 0.0);
-  const double eps_Y = 1e-6;
-  for (std::size_t i = 0; i < Y_up.size(); ++i) {
-    std::vector<double> Y_plus = Y_up;
-    Y_plus[i] += eps_Y;
-    auto X_plus =
-        combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
-    double rho_plus =
-        std::get<0>(density_and_jacobians(T_up, P_static_up, X_plus));
-    double mu_plus =
-        std::get<0>(viscosity_and_jacobians(T_up, P_static_up, X_plus));
-    auto core_plus = combaero::conical_area_change(m_dot, rho_plus, mu_plus,
-                                                   F0, F1, length, 0.0,
-                                                   m_scale);
-    res.d_dP_dY_up[i] = (core_plus.dP - core.dP) / eps_Y;
-  }
-
-  return res;
 }
 
 // -----------------------------------------------------------------------------

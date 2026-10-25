@@ -9,7 +9,8 @@ Field naming conventions
 - Element thermo/transport properties use a _ref suffix (evaluated at the
   inlet node state) so it is unambiguous which state the value refers to.
 - Node stagnation quantities use Tt / Pt (not Tt / Pt).
-- Mach at the smaller cross-section of an area change: mach_loss_ref.
+- Mach where an area change's loss is set: mach_loss_ref (the small section
+  of an expansion, the vena contracta of a contraction).
 - Area ratio of an area change: area_ratio.
 """
 
@@ -158,7 +159,14 @@ _SPECS: dict[str, DiagnosticSpec] = {
         required=(*ELEMENT_UNIVERSAL_FIELDS, "f", "Dh", *HEAT_TRANSFER_FIELDS),
     ),
     "AreaChangeElement": DiagnosticSpec(
-        required=(*ELEMENT_UNIVERSAL_FIELDS, "zeta", "area_ratio", "mach_loss_ref"),
+        required=(
+            *ELEMENT_UNIVERSAL_FIELDS,
+            "zeta",
+            "area_ratio",
+            "mach_loss_ref",
+            "dPt_loss",
+            "choked",
+        ),
     ),
     "LosslessConnectionElement": DiagnosticSpec(
         required=LOSSLESS_ELEMENT_FIELDS,

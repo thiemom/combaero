@@ -1,0 +1,2 @@
+- **A reversed area change is fed from the node the flow comes from (#731).** It read `from_node`'s state in both directions.
+- **Area change composition derivatives are analytic (#731).** They were finite differences inside C++: gamma, R and the Wilke viscosity are now chained to the mass fractions.

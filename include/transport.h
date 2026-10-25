@@ -33,6 +33,12 @@ struct TransportDerivatives {
 };
 TransportDerivatives transport_and_dT(double T, double P, const std::vector<double>& X);
 
+// d mu_mix / dX_k [Pa*s] at fixed T, analytic (Wilke's rule), for each
+// species, the mole fractions taken unnormalised: chain it with dX/dY along a
+// direction that keeps sum X = 1. For an absent species it is the one-sided
+// derivative as that species enters.
+std::vector<double> viscosity_dX(double T, double P, const std::vector<double>& X);
+
 // Transport properties
 double viscosity(double T, double P, const std::vector<double>& X);
 double thermal_conductivity(double T, double P, const std::vector<double>& X);

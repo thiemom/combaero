@@ -1,239 +1,945 @@
 #include "area_change.h"
 
+#include "composition.h"
+#include "dual_number.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
+#include "thermo.h"
+#include "transport.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace combaero {
 
 namespace {
 
-// Division-safe absolute value with smooth gradient through zero.
-// m_abs = sqrt(m^2 + eps)  -- never exactly zero, always differentiable.
-inline double smooth_abs(double m, double eps = 1e-12) {
-    return std::sqrt(m * m + eps);
+using solver::DualN;
+
+constexpr double kEps = 1e-12;
+
+// --- scalar helpers shared by double and DualN -------------------------------
+
+inline double sqrt_(double a) { return std::sqrt(a); }
+inline double exp_(double a) { return std::exp(a); }
+inline double log1p_(double a) { return std::log1p(a); }
+inline double expm1_(double a) { return std::expm1(a); }
+
+template <int N> DualN<N> sqrt_(const DualN<N>& a) { return solver::dsqrt(a); }
+template <int N> DualN<N> exp_(const DualN<N>& a) { return solver::dexp(a); }
+template <int N> DualN<N> log1p_(const DualN<N>& a) {
+    DualN<N> r;
+    r.v = std::log1p(a.v);
+    const double c = 1.0 / (1.0 + a.v);
+    for (int i = 0; i < N; ++i) r.d[i] = c * a.d[i];
+    return r;
+}
+template <int N> DualN<N> expm1_(const DualN<N>& a) {
+    DualN<N> r;
+    r.v = std::expm1(a.v);
+    const double c = std::exp(a.v);
+    for (int i = 0; i < N; ++i) r.d[i] = c * a.d[i];
+    return r;
 }
 
-// d(smooth_abs)/dm = m / sqrt(m^2 + eps)
-inline double smooth_abs_deriv(double m, double m_abs) {
-    return m / m_abs;
+inline double value_of(double a) { return a; }
+template <int N> double value_of(const DualN<N>& a) { return a.v; }
+
+// A function of one variable with its slope, lifted onto S: f(a) with
+// df = slope da.
+inline double lift(double f, double slope, double a) {
+    (void)slope;
+    (void)a;
+    return f;
+}
+template <int N> DualN<N> lift(double f, double slope, const DualN<N>& a) {
+    DualN<N> r;
+    r.v = f;
+    for (int i = 0; i < N; ++i) r.d[i] = slope * a.d[i];
+    return r;
 }
 
-// Logistic sigmoid:  sigma(x) = 1 / (1 + exp(-x))
-// Returns (w, dw/dx) for x = m_dot / m_scale.
-inline std::pair<double, double> sigmoid(double x) {
-    // Clamp to avoid overflow in exp for large |x|.
-    if (x > 30.0) return {1.0, 0.0};
-    if (x < -30.0) return {0.0, 0.0};
-    double e = std::exp(-x);
-    double w = 1.0 / (1.0 + e);
-    double dw = w * (1.0 - w);  // sigmoid derivative
-    return {w, dw};
-}
+// --- Idelchik (1966) diagram 4-1, sudden expansion at low Re -----------------
 
-// Compressibility correction factor k1 = 1 + 0.35 * M_eff^2.
-//
-// M_eff is min(|Mach|, MACH_CLAMP).  The correction is calibrated for
-// M < MACH_ACCURACY_LIMIT; above that it extrapolates but remains bounded,
-// preventing unbounded k1 growth from destabilising the Newton solver when
-// non-converged iterates produce unphysical Mach numbers.
-//
-// clamped is set true when the raw |Mach| exceeds MACH_CLAMP so the caller
-// can propagate the diagnostic through AreaChangeResult::mach_clamped.
-struct MachCorrection {
-    double k1;
-    bool   clamped;
+constexpr std::size_t kExpCols = 6;
+constexpr std::size_t kExpKnots = 14;  // the laminar knot at Re 8 + 13 printed
+constexpr std::array<double, kExpCols> kExpN = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6};
+constexpr std::array<double, kExpKnots> kExpRe = {8.0,   10.0,  15.0,   20.0,   30.0,
+                                                  40.0,  50.0,  100.0,  200.0,  500.0,
+                                                  1000.0, 2000.0, 3000.0, 3500.0};
+// As printed, Re 10 ... 3500. The 3500 column is Borda-Carnot rounded to two
+// decimals (0.50 for 0.49 at n 0.3); the knot takes (1 - n)^2 exactly.
+constexpr double kExpZeta[kExpCols][kExpKnots - 1] = {
+    {3.10, 3.20, 3.00, 2.40, 2.15, 1.95, 1.70, 1.65, 1.70, 2.00, 1.60, 1.00, 0.81},
+    {3.10, 3.20, 2.80, 2.20, 1.85, 1.65, 1.40, 1.30, 1.30, 1.60, 1.25, 0.70, 0.64},
+    {3.10, 3.10, 2.60, 2.00, 1.60, 1.40, 1.20, 1.10, 1.10, 1.30, 0.95, 0.60, 0.50},
+    {3.10, 3.00, 2.40, 1.80, 1.50, 1.30, 1.10, 1.00, 0.85, 1.05, 0.80, 0.40, 0.36},
+    {3.10, 2.80, 2.30, 1.65, 1.35, 1.15, 0.90, 0.75, 0.65, 0.90, 0.65, 0.30, 0.25},
+    {3.10, 2.70, 2.15, 1.55, 1.25, 1.05, 0.80, 0.60, 0.40, 0.60, 0.50, 0.20, 0.16},
 };
 
-inline MachCorrection mach_k1(double Mach) {
-    double M_abs    = std::abs(Mach);
-    bool   clamped  = M_abs > MACH_CLAMP;
-    double M_eff    = clamped ? MACH_CLAMP : M_abs;
-    return {1.0 + 0.35 * M_eff * M_eff, clamped};
+// One column as a cubic Hermite of y = ln(zeta Re^2) in x = ln Re.
+struct HermiteColumn {
+    std::array<double, kExpKnots> x{};
+    std::array<double, kExpKnots> y{};
+    std::array<double, kExpKnots> d{};
+};
+
+HermiteColumn build_column(std::size_t c) {
+    HermiteColumn h;
+    const double n = kExpN[c];
+    for (std::size_t i = 0; i < kExpKnots; ++i) {
+        const double Re = kExpRe[i];
+        double zeta = 0.0;
+        if (i == 0) {
+            zeta = EXPANSION_LAMINAR_COEFF / Re;
+        } else if (i == kExpKnots - 1) {
+            zeta = (1.0 - n) * (1.0 - n);
+        } else {
+            zeta = kExpZeta[c][i - 1];
+        }
+        h.x[i] = std::log(Re);
+        h.y[i] = std::log(zeta * Re * Re);
+    }
+    // Every secant exponent at least EXPANSION_MIN_SECANT_EXPONENT, working
+    // back from the Borda-Carnot anchor: a knot above that line is lowered.
+    for (std::size_t i = kExpKnots - 1; i-- > 0;) {
+        const double cap = h.y[i + 1] - EXPANSION_MIN_SECANT_EXPONENT * (h.x[i + 1] - h.x[i]);
+        h.y[i] = std::min(h.y[i], cap);
+    }
+    std::array<double, kExpKnots - 1> sec{};
+    for (std::size_t i = 0; i + 1 < kExpKnots; ++i) {
+        sec[i] = (h.y[i + 1] - h.y[i]) / (h.x[i + 1] - h.x[i]);
+    }
+    h.d[0] = 1.0;              // the laminar law, zeta Re^2 ~ Re
+    h.d[kExpKnots - 1] = 2.0;  // Borda-Carnot, zeta Re^2 ~ Re^2
+    for (std::size_t i = 1; i + 1 < kExpKnots; ++i) {
+        const double a = sec[i - 1];
+        const double b = sec[i];
+        h.d[i] = (a > 0.0 && b > 0.0) ? 2.0 * a * b / (a + b) : 0.0;
+    }
+    return h;
 }
 
-} // anonymous namespace
+const std::array<HermiteColumn, kExpCols>& expansion_columns() {
+    static const std::array<HermiteColumn, kExpCols> cols = [] {
+        std::array<HermiteColumn, kExpCols> out;
+        for (std::size_t c = 0; c < kExpCols; ++c) {
+            out[c] = build_column(c);
+        }
+        return out;
+    }();
+    return cols;
+}
 
-AreaChangeResult sharp_area_change(double m_dot, double rho, double mu,
-                                   double F0, double F1,
-                                   double Mach, double m_scale, double D_h) {
-    constexpr double eps = 1e-12;
+// A column's ratio to Borda-Carnot, R = zeta / (1 - n_c)^2, with dR/dRe and
+// d2R/dRe2 (the second for the drive floor's exponent, area_change_flow).
+struct Ratio {
+    double R = 1.0;
+    double dR = 0.0;
+    double d2R = 0.0;
+};
 
-    // --- Geometry (static, independent of flow direction) ---
-    double F_small = std::min(F0, F1);
-    double F_large = std::max(F0, F1);
-    double ar = F_small / std::max(F_large, eps);  // area ratio in (0, 1]
+Ratio column_ratio(double Re, std::size_t c) {
+    const double b = (1.0 - kExpN[c]) * (1.0 - kExpN[c]);
+    if (Re >= EXPANSION_RE_TURBULENT) {
+        return {1.0, 0.0, 0.0};
+    }
+    if (Re <= EXPANSION_RE_LAMINAR) {
+        const double R = EXPANSION_LAMINAR_COEFF / (Re * b);
+        return {R, -R / Re, 2.0 * R / (Re * Re)};
+    }
+    const HermiteColumn& h = expansion_columns()[c];
+    const double x = std::log(Re);
+    std::size_t i = 0;
+    while (i + 2 < kExpKnots && x > h.x[i + 1]) {
+        ++i;
+    }
+    const double w = h.x[i + 1] - h.x[i];
+    const double t = (x - h.x[i]) / w;
+    const double t2 = t * t;
+    const double t3 = t2 * t;
+    const double y = (2.0 * t3 - 3.0 * t2 + 1.0) * h.y[i] + (t3 - 2.0 * t2 + t) * w * h.d[i] +
+                     (-2.0 * t3 + 3.0 * t2) * h.y[i + 1] + (t3 - t2) * w * h.d[i + 1];
+    const double dy = ((6.0 * t2 - 6.0 * t) * h.y[i] + (3.0 * t2 - 4.0 * t + 1.0) * w * h.d[i] +
+                       (-6.0 * t2 + 6.0 * t) * h.y[i + 1] + (3.0 * t2 - 2.0 * t) * w * h.d[i + 1]) /
+                      w;
+    const double d2y = ((12.0 * t - 6.0) * h.y[i] + (6.0 * t - 4.0) * w * h.d[i] +
+                        (-12.0 * t + 6.0) * h.y[i + 1] + (6.0 * t - 2.0) * w * h.d[i + 1]) /
+                       (w * w);
+    // R(x) = exp(y - 2x) / b, x = ln Re.
+    const double R = std::exp(y - 2.0 * x) / b;
+    const double R_x = R * (dy - 2.0);
+    const double R_xx = R * ((dy - 2.0) * (dy - 2.0) + d2y);
+    return {R, R_x / Re, (R_xx - R_x) / (Re * Re)};
+}
 
-    // Hydraulic diameter of the smaller section (reference for Re).
-    // D_h > 0 overrides the circular assumption for non-circular ducts.
-    double D_small = (D_h > 0.0) ? D_h : std::sqrt(std::max(4.0 * F_small / M_PI, 0.0));
+// The ratio to Borda-Carnot at area ratio n: linear in n between printed
+// columns, the edge column's outside them.
+Ratio expansion_ratio3(double Re, double n) {
+    if (n <= kExpN.front()) {
+        return column_ratio(Re, 0);
+    }
+    if (n >= kExpN.back()) {
+        return column_ratio(Re, kExpCols - 1);
+    }
+    std::size_t j = 0;
+    while (j + 2 < kExpCols && n > kExpN[j + 1]) {
+        ++j;
+    }
+    const double w = (n - kExpN[j]) / (kExpN[j + 1] - kExpN[j]);
+    const Ratio a = column_ratio(Re, j);
+    const Ratio b = column_ratio(Re, j + 1);
+    return {(1.0 - w) * a.R + w * b.R, (1.0 - w) * a.dR + w * b.dR,
+            (1.0 - w) * a.d2R + w * b.d2R};
+}
 
-    // --- Reynolds number based on F_small (higher-velocity side) ---
-    double m_abs = smooth_abs(m_dot);
-    double v_small = m_abs / (rho * F_small + eps);
-    double Re = rho * v_small * D_small / (mu + eps);
+ZetaAndSlope expansion_ratio(double Re, double n) {
+    const Ratio r = expansion_ratio3(Re, n);
+    return {r.R, r.dR};
+}
 
-    // --- Loss coefficients (geometry-dependent, direction-independent) ---
-    // Expansion (Borda-Carnot): zeta_exp = alpha - 2*ar + ar^2
-    double alpha = 1.0 + 2.73 / std::pow(Re + 10.0, 0.4);
-    double zeta_exp = alpha - 2.0 * ar + ar * ar;
+// The incompressible loss's exponent in Re, e = d ln(zeta Re^2) / d ln Re,
+// and de/dRe: the flow then goes as drive^(1/e).
+std::pair<double, double> expansion_exponent(double Re, double n) {
+    const Ratio r = expansion_ratio3(Re, n);
+    const double e = 2.0 + Re * r.dR / r.R;
+    const double de = r.dR / r.R + Re * r.d2R / r.R - Re * r.dR * r.dR / (r.R * r.R);
+    return {e, de};
+}
 
-    // Contraction (Weisbach sharp-edge): zeta_con = 0.5 * (1 - ar)
-    double zeta_con = 0.5 * (1.0 - ar);
+void check_area_ratio(double n, const char* who) {
+    if (!(n >= 0.0) || n > 1.0) {
+        throw std::invalid_argument(std::string(who) + ": area ratio must be in [0, 1]");
+    }
+}
 
-    // --- Assign forward/reverse zeta based on geometry ---
-    // Positive m_dot means flow from F0 to F1.
-    // If F0 < F1: forward flow sees expansion, reverse sees contraction.
-    // If F0 > F1: forward flow sees contraction, reverse sees expansion.
-    double zeta_fwd, zeta_rev;
-    if (F0 <= F1) {
-        // F0 -> F1 is an expansion
-        zeta_fwd = zeta_exp;
-        zeta_rev = zeta_con;
+// --- Idelchik (1966) diagram 5-2, conical diffuser ---------------------------
+
+constexpr std::size_t kConeAngles = 14;
+constexpr std::size_t kConeRows = 11;
+constexpr std::array<double, kConeAngles> kConeAlpha = {3.0,  6.0,  8.0,  10.0, 12.0,
+                                                        14.0, 16.0, 20.0, 24.0, 30.0,
+                                                        40.0, 60.0, 90.0, 180.0};
+constexpr std::array<double, kConeRows> kConeN = {0.0,  0.05, 0.075, 0.1, 0.15, 0.2,
+                                                  0.25, 0.3,  0.4,   0.5, 0.6};
+constexpr double kConeZeta[kConeRows][kConeAngles] = {
+    {0.03, 0.08, 0.11, 0.15, 0.19, 0.23, 0.27, 0.36, 0.47, 0.65, 0.92, 1.15, 1.10, 1.02},
+    {0.03, 0.07, 0.10, 0.14, 0.16, 0.20, 0.24, 0.32, 0.42, 0.58, 0.83, 1.04, 0.99, 0.92},
+    {0.03, 0.07, 0.09, 0.13, 0.16, 0.19, 0.23, 0.30, 0.40, 0.55, 0.79, 0.99, 0.95, 0.88},
+    {0.03, 0.07, 0.09, 0.12, 0.15, 0.18, 0.22, 0.29, 0.38, 0.52, 0.75, 0.93, 0.89, 0.83},
+    {0.02, 0.06, 0.08, 0.11, 0.14, 0.17, 0.20, 0.26, 0.34, 0.46, 0.67, 0.84, 0.79, 0.74},
+    {0.02, 0.05, 0.07, 0.10, 0.12, 0.15, 0.17, 0.23, 0.30, 0.41, 0.59, 0.74, 0.70, 0.65},
+    {0.02, 0.05, 0.06, 0.08, 0.10, 0.13, 0.15, 0.20, 0.26, 0.35, 0.47, 0.65, 0.62, 0.58},
+    {0.02, 0.04, 0.05, 0.07, 0.09, 0.11, 0.13, 0.18, 0.23, 0.31, 0.40, 0.57, 0.54, 0.50},
+    {0.01, 0.03, 0.04, 0.06, 0.07, 0.08, 0.10, 0.13, 0.17, 0.23, 0.33, 0.41, 0.39, 0.37},
+    {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.09, 0.12, 0.16, 0.23, 0.29, 0.28, 0.26},
+    {0.01, 0.01, 0.02, 0.03, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10, 0.15, 0.18, 0.17, 0.16},
+};
+
+// phi = zeta_exp / (1 - n)^2 at a printed row, linear in alpha.
+double cone_phi_row(std::size_t r, double alpha) {
+    const double b = (1.0 - kConeN[r]) * (1.0 - kConeN[r]);
+    if (alpha <= kConeAlpha.front()) {
+        return kConeZeta[r][0] / b * std::max(alpha, 0.0) / kConeAlpha.front();
+    }
+    if (alpha >= kConeAlpha.back()) {
+        return kConeZeta[r][kConeAngles - 1] / b;
+    }
+    std::size_t i = 0;
+    while (i + 2 < kConeAngles && alpha > kConeAlpha[i + 1]) {
+        ++i;
+    }
+    const double w = (alpha - kConeAlpha[i]) / (kConeAlpha[i + 1] - kConeAlpha[i]);
+    return ((1.0 - w) * kConeZeta[r][i] + w * kConeZeta[r][i + 1]) / b;
+}
+
+double cone_phi(double alpha, double n) {
+    if (n >= kConeN.back()) {
+        return cone_phi_row(kConeRows - 1, alpha);
+    }
+    std::size_t j = 0;
+    while (j + 2 < kConeRows && n > kConeN[j + 1]) {
+        ++j;
+    }
+    const double w = (n - kConeN[j]) / (kConeN[j + 1] - kConeN[j]);
+    return (1.0 - w) * cone_phi_row(j, alpha) + w * cone_phi_row(j + 1, alpha);
+}
+
+// --- compressible Borda-Carnot, on any scalar ---------------------------------
+
+template <class S> struct BordaCarnotT {
+    S y;       // M2^2
+    S ln_p21;  // ln(p2 / p1)
+    S ln_pi;   // ln(Pt2 / Pt1)
+};
+
+// The subsonic root as 2 c^2 / (b + sqrt(disc)): no cancellation at low Mach,
+// and b = 1 - 2 gamma c^2 > 0 for every M1 <= 1. ln(Pt2/Pt1) from log1p
+// terms, each relative-accurate, so 1 - Pt2/Pt1 = -expm1(ln_pi) keeps its
+// relative precision as M1 -> 0 (it is O(M1^2)).
+template <class S> BordaCarnotT<S> borda_carnot_t(const S& M1, double n, const S& g) {
+    const S M1sq = M1 * M1;
+    const S a1 = 0.5 * (g - 1.0) * M1sq;
+    const S c = n * M1 * sqrt_(1.0 + a1) / (1.0 + n * g * M1sq);
+    const S c2 = c * c;
+    const S b = 1.0 - 2.0 * g * c2;
+    const S disc = 1.0 - 2.0 * (g + 1.0) * c2;
+    const S y = 2.0 * c2 / (b + sqrt_(disc));
+    const S ln_p21 = log1p_(n * g * M1sq) - log1p_(g * y);
+    const S ln_pi = ln_p21 + g / (g - 1.0) * (log1p_(0.5 * (g - 1.0) * y) - log1p_(a1));
+    return {y, ln_p21, ln_pi};
+}
+
+// --- one branch of the element ------------------------------------------------
+
+struct Branch {
+    bool expansion = true;
+    bool sharp = true;   // sharp expansion: the Re-dependent 4-1 ratio
+    double n = 1.0;      // small / large
+    double step = 1.0;   // area ratio of the Borda-Carnot step: n, or Cc
+    double Cc = 1.0;     // contraction: vena contracta over the small section
+    double phi = 1.0;    // conical expansion: 5-2's ratio to Borda-Carnot
+    double zeta_inc = 0.0;  // incompressible zeta at Re >= 3500 / any Re
+    double F_small = 0.0;
+    double D = 0.0;      // Re length
+    double floor = 0.0;  // drive floor [Pa]: zeta_inc times AREA_CHANGE_HEAD_FLOOR
+};
+
+Branch make_branch(double F_in, double F_out, const std::string& model, double length,
+                   double D_h) {
+    if (!(F_in > 0.0) || !(F_out > 0.0)) {
+        throw std::invalid_argument("area_change: areas must be positive");
+    }
+    if (model != "sharp" && model != "conical") {
+        throw std::invalid_argument("area_change: model must be 'sharp' or 'conical'");
+    }
+    Branch b;
+    b.F_small = std::min(F_in, F_out);
+    const double F_large = std::max(F_in, F_out);
+    b.n = b.F_small / F_large;
+    if (!(b.n < 1.0)) {
+        throw std::invalid_argument(
+            "area_change: equal areas are no area change (use a lossless connection)");
+    }
+    b.expansion = F_in < F_out;
+    b.sharp = model == "sharp";
+    b.D = (D_h > 0.0) ? D_h : std::sqrt(4.0 * b.F_small / M_PI);
+    if (b.expansion) {
+        b.step = b.n;
+        if (!b.sharp) {
+            if (!(length > 0.0)) {
+                throw std::invalid_argument("area_change: a conical model needs length > 0");
+            }
+            const double dr = std::sqrt(F_large / M_PI) - std::sqrt(b.F_small / M_PI);
+            const double alpha = 2.0 * std::atan2(dr, length) * 180.0 / M_PI;
+            b.phi = cone_phi(alpha, b.n);
+        }
+        b.zeta_inc = b.phi * (1.0 - b.n) * (1.0 - b.n);
     } else {
-        // F0 -> F1 is a contraction
-        zeta_fwd = zeta_con;
-        zeta_rev = zeta_exp;
+        if (b.sharp) {
+            b.zeta_inc = sharp_contraction_zeta(b.n);
+        } else {
+            if (!(length > 0.0)) {
+                throw std::invalid_argument("area_change: a conical model needs length > 0");
+            }
+            const double dr = std::sqrt(F_large / M_PI) - std::sqrt(b.F_small / M_PI);
+            b.zeta_inc = conical_nozzle_zeta(std::atan2(dr, length), b.n);
+        }
+        b.Cc = 1.0 / (1.0 + std::sqrt(b.zeta_inc));
+        b.step = b.Cc;
+    }
+    b.floor = b.zeta_inc * AREA_CHANGE_HEAD_FLOOR;
+    return b;
+}
+
+// Thermodynamic inputs at the upstream stagnation state, frozen across the
+// step, with the partials the derivatives need.
+struct Gas {
+    std::vector<double> X;
+    double g = 1.4;
+    double Rg = 287.0;
+    double g_T = 0.0;
+    std::vector<double> g_X;
+    std::vector<double> Rg_X;
+    double P = 1e5;  // for the transport calls (unused by them)
+};
+
+Gas make_gas(double Tt0, double Pt0, const std::vector<double>& Y, bool with_derivatives) {
+    Gas gas;
+    gas.X = mass_to_mole(normalize_fractions(Y));
+    gas.P = Pt0;
+    const double cp_mol = cp(Tt0, gas.X);
+    const double cv_mol = cp_mol - thermo::R_GAS;
+    gas.g = cp_mol / cv_mol;
+    gas.Rg = specific_gas_constant(gas.X);
+    if (with_derivatives) {
+        const double c = -thermo::R_GAS / (cv_mol * cv_mol);
+        gas.g_T = c * dcp_dT(Tt0, gas.X);
+        const double MW = mwmix(gas.X);
+        gas.g_X.resize(gas.X.size());
+        gas.Rg_X.resize(gas.X.size());
+        for (std::size_t k = 0; k < gas.X.size(); ++k) {
+            gas.g_X[k] = c * cp_species(k, Tt0);
+            gas.Rg_X[k] = -gas.Rg * species_molar_mass(k) / MW;
+        }
+    }
+    return gas;
+}
+
+// Viscosity lifted onto S: value and dT at T, plus the seed of an additive
+// offset (index kMuSeed) that carries d/dX at fixed T.
+constexpr int kSeeds = 6;  // the parameter (M or G), Pt0, Tt0, gamma, R, mu offset
+using D6 = DualN<kSeeds>;
+constexpr int kP = 0, kPt = 1, kTt = 2, kG = 3, kR = 4, kMu = 5;
+
+double mu_at(double T, const Gas& gas) { return viscosity(T, gas.P, gas.X); }
+template <int N> DualN<N> mu_at(const DualN<N>& T, const Gas& gas) {
+    const TransportDerivatives t = transport_and_dT(T.v, gas.P, gas.X);
+    DualN<N> r = lift(t.mu, t.dmu_dT, T);
+    if constexpr (N == kSeeds) {
+        r.d[kMu] += 1.0;
+    }
+    return r;
+}
+
+template <class S> struct EvalT {
+    S loss;     // Pt0 - Pt_out [Pa]
+    S G_small;  // mass flux at the small section
+    S Re;       // small section (sharp expansion; else 0)
+    double q_small = 0.0;  // static dynamic head at the small section
+    double mach = 0.0;     // at the closure's station
+};
+
+// Compressible: parametrised by the Mach number M at the closure's station
+// (the small section for an expansion, the vena contracta for a contraction).
+template <class S>
+EvalT<S> eval_compressible(const S& M, const S& Pt0, const S& Tt0, const S& g, const S& Rg,
+                           const Branch& b, const Gas& gas) {
+    const S Msq = M * M;
+    const S lnX = log1p_(0.5 * (g - 1.0) * Msq);
+    const S Ga = Pt0 * sqrt_(g / (Rg * Tt0)) * M * exp_(-(g + 1.0) / (2.0 * (g - 1.0)) * lnX);
+    const BordaCarnotT<S> bc = borda_carnot_t(M, b.step, g);
+    S loss = -Pt0 * expm1_(bc.ln_pi);
+    const S G_small = b.expansion ? Ga : b.Cc * Ga;
+    S Re = 0.0 * M;
+    const double Pa = value_of(Pt0) * std::exp(-value_of(g) / (value_of(g) - 1.0) * value_of(lnX));
+    double q_small = 0.0;
+    if (b.expansion) {
+        q_small = 0.5 * value_of(g) * Pa * value_of(Msq);
+        if (b.sharp) {
+            const S Ta = Tt0 / exp_(lnX);
+            Re = G_small * b.D / mu_at(Ta, gas);
+            const ZetaAndSlope r = expansion_ratio(value_of(Re), b.n);
+            loss = loss * lift(r.zeta, r.dzeta_dRe, Re);
+        } else {
+            loss = loss * b.phi;
+        }
+    } else {
+        // The small section is the step's exit, station 2.
+        const double p2 = Pa * std::exp(value_of(bc.ln_p21));
+        q_small = 0.5 * value_of(g) * p2 * value_of(bc.y);
+    }
+    return {loss, G_small, Re, q_small, value_of(M)};
+}
+
+// Incompressible (M -> 0): parametrised by the small section's mass flux.
+template <class S>
+EvalT<S> eval_incompressible(const S& G, const S& Pt0, const S& Tt0, const S& g, const S& Rg,
+                             const Branch& b, const Gas& gas) {
+    const S rho = Pt0 / (Rg * Tt0);
+    const S q = G * G / (2.0 * rho);
+    S zeta = b.zeta_inc + 0.0 * G;
+    S Re = 0.0 * G;
+    if (b.expansion && b.sharp) {
+        Re = G * b.D / mu_at(Tt0, gas);
+        const ZetaAndSlope r = expansion_ratio(value_of(Re), b.n);
+        zeta = lift(r.zeta, r.dzeta_dRe, Re) * ((1.0 - b.n) * (1.0 - b.n));
+    }
+    const double a0 = std::sqrt(value_of(g) * value_of(Rg) * value_of(Tt0));
+    const double Ga = value_of(G) / (b.expansion ? 1.0 : b.Cc);
+    return {zeta * q, G, Re, value_of(q), Ga / (value_of(rho) * a0)};
+}
+
+template <class S>
+EvalT<S> eval_branch(bool incompressible, const S& p, const S& Pt0, const S& Tt0, const S& g,
+                     const S& Rg, const Branch& b, const Gas& gas) {
+    return incompressible ? eval_incompressible(p, Pt0, Tt0, g, Rg, b, gas)
+                          : eval_compressible(p, Pt0, Tt0, g, Rg, b, gas);
+}
+
+double loss_at(bool inc, double p, double Pt0, double Tt0, const Branch& b, const Gas& gas) {
+    return eval_branch<double>(inc, p, Pt0, Tt0, gas.g, gas.Rg, b, gas).loss;
+}
+
+// d ln(loss) / d ln(p), for the Newton step on ln p.
+double log_slope(bool inc, double p, double Pt0, double Tt0, const Branch& b, const Gas& gas) {
+    using D1 = DualN<1>;
+    const auto e = eval_branch<D1>(inc, D1::seed(p, 0), D1::constant(Pt0), D1::constant(Tt0),
+                                   D1::constant(gas.g), D1::constant(gas.Rg), b, gas);
+    return e.loss.d[0] * p / e.loss.v;
+}
+
+// The parameter p (Mach, or flux if incompressible) whose loss is the drive,
+// on (lo, hi): safeguarded Newton in ln p. The loss rises monotonically in p
+// (sudden_expansion_zeta keeps the loss exponent positive), so the root is
+// unique.
+double solve_param(bool inc, double drive, double hi, double guess, double Pt0, double Tt0,
+                   const Branch& b, const Gas& gas) {
+    double p_hi = hi;
+    double p_lo = std::min(guess, 0.5 * hi);
+    for (int i = 0; i < 2000 && loss_at(inc, p_lo, Pt0, Tt0, b, gas) >= drive; ++i) {
+        p_hi = p_lo;
+        p_lo *= 0.1;
+    }
+    double u_lo = std::log(p_lo);
+    double u_hi = std::log(p_hi);
+    double u = std::log(std::clamp(guess, p_lo, p_hi));
+    const double ln_drive = std::log(drive);
+    for (int it = 0; it < 200; ++it) {
+        const double p = std::exp(u);
+        const double f = std::log(loss_at(inc, p, Pt0, Tt0, b, gas)) - ln_drive;
+        if (f > 0.0) {
+            u_hi = u;
+        } else {
+            u_lo = u;
+        }
+        const double fp = log_slope(inc, p, Pt0, Tt0, b, gas);
+        double u_new = (fp > 0.0) ? u - f / fp : 0.5 * (u_lo + u_hi);
+        if (!(u_new > u_lo && u_new < u_hi)) {
+            u_new = 0.5 * (u_lo + u_hi);
+        }
+        if (std::abs(u_new - u) <= 1e-15 * std::max(1.0, std::abs(u)) || u_hi - u_lo < 1e-15) {
+            return std::exp(u_new);
+        }
+        u = u_new;
+    }
+    return std::exp(u);
+}
+
+// The flow at a drive >= 0, without a floor. dm/d(drive) and dm/dPt0 at
+// fixed drive (the caller converts to Pt_target).
+struct RawFlow {
+    double m = 0.0;
+    bool choked = false;
+    double mach = 0.0;
+    double Re = 0.0;
+    double zeta = 0.0;
+    double dm_ddrive = 0.0;
+    double dm_dPt0 = 0.0;   // at fixed drive
+    double dm_dTt0 = 0.0;   // explicit + through gamma
+    double dm_dg = 0.0;
+    double dm_dR = 0.0;
+    double dm_dmu = 0.0;    // through the viscosity offset
+    double T_mu = 0.0;      // where mu was evaluated
+    // Re's partials at fixed drive, as the flow's (sharp expansion; else 0).
+    double dRe_dPt0 = 0.0;
+    double dRe_dTt0 = 0.0;
+    double dRe_dg = 0.0;
+    double dRe_dR = 0.0;
+    double dRe_dmu = 0.0;
+};
+
+RawFlow raw_flow(double drive, double Pt0, double Tt0, const Branch& b, const Gas& gas, bool inc,
+                 bool with_derivatives) {
+    RawFlow out;
+    double p = 0.0;
+    if (inc) {
+        const double rho = Pt0 / (gas.Rg * Tt0);
+        const double guess = std::sqrt(2.0 * rho * drive / std::max(b.zeta_inc, 1e-3));
+        double hi = 2.0 * guess + kEps;
+        for (int i = 0; i < 200 && loss_at(true, hi, Pt0, Tt0, b, gas) < drive; ++i) {
+            hi *= 4.0;
+        }
+        p = solve_param(true, drive, hi, guess, Pt0, Tt0, b, gas);
+    } else {
+        // The sonic loss: above it the closure is choked at M = 1.
+        if (loss_at(false, 1.0, Pt0, Tt0, b, gas) <= drive) {
+            p = 1.0;
+            out.choked = true;
+        } else {
+            const double guess =
+                std::sqrt(2.0 * drive / (gas.g * Pt0 * std::max(b.zeta_inc, 1e-3)));
+            p = solve_param(false, drive, 1.0, std::min(guess, 0.5), Pt0, Tt0, b, gas);
+        }
+    }
+    const auto e = eval_branch<D6>(inc, D6::seed(p, kP), D6::seed(Pt0, kPt), D6::seed(Tt0, kTt),
+                                   D6::seed(gas.g, kG), D6::seed(gas.Rg, kR), b, gas);
+    out.m = b.F_small * e.G_small.v;
+    out.mach = e.mach;
+    out.Re = e.Re.v;
+    out.zeta = (e.q_small > 0.0) ? e.loss.v / e.q_small : 0.0;
+    out.T_mu = inc ? Tt0 : Tt0 / (1.0 + 0.5 * (gas.g - 1.0) * e.mach * e.mach);
+    if (!with_derivatives) {
+        return out;
+    }
+    // loss(p; q) = drive: dp/dq = -L_q / L_p, dp/d(drive) = 1 / L_p; choked,
+    // p is pinned at M = 1.
+    const double L_p = e.loss.d[kP];
+    auto dp = [&](int q) { return out.choked ? 0.0 : -e.loss.d[q] / L_p; };
+    auto dm = [&](int q) { return b.F_small * (e.G_small.d[q] + e.G_small.d[kP] * dp(q)); };
+    out.dm_ddrive = out.choked ? 0.0 : b.F_small * e.G_small.d[kP] / L_p;
+    out.dm_dPt0 = dm(kPt);
+    out.dm_dg = dm(kG);
+    out.dm_dR = dm(kR);
+    out.dm_dmu = dm(kMu);
+    out.dm_dTt0 = dm(kTt) + out.dm_dg * gas.g_T;
+    auto dRe = [&](int q) { return e.Re.d[q] + e.Re.d[kP] * dp(q); };
+    out.dRe_dPt0 = dRe(kPt);
+    out.dRe_dg = dRe(kG);
+    out.dRe_dR = dRe(kR);
+    out.dRe_dmu = dRe(kMu);
+    out.dRe_dTt0 = dRe(kTt) + out.dRe_dg * gas.g_T;
+    return out;
+}
+
+}  // namespace
+
+// --- public helpers ------------------------------------------------------------
+
+ZetaAndSlope sudden_expansion_zeta(double Re, double area_ratio) {
+    check_area_ratio(area_ratio, "sudden_expansion_zeta");
+    if (!(Re > 0.0)) {
+        throw std::invalid_argument("sudden_expansion_zeta: Re must be positive");
+    }
+    const double b = (1.0 - area_ratio) * (1.0 - area_ratio);
+    const ZetaAndSlope r = expansion_ratio(Re, area_ratio);
+    return {r.zeta * b, r.dzeta_dRe * b};
+}
+
+double sharp_contraction_zeta(double area_ratio) {
+    check_area_ratio(area_ratio, "sharp_contraction_zeta");
+    return 0.5 * (1.0 - area_ratio);
+}
+
+double conical_diffuser_zeta(double full_angle_deg, double area_ratio) {
+    check_area_ratio(area_ratio, "conical_diffuser_zeta");
+    if (!(full_angle_deg >= 0.0)) {
+        throw std::invalid_argument("conical_diffuser_zeta: angle must be >= 0");
+    }
+    return cone_phi(full_angle_deg, area_ratio) * (1.0 - area_ratio) * (1.0 - area_ratio);
+}
+
+double conical_nozzle_zeta(double half_angle_rad, double area_ratio) {
+    check_area_ratio(area_ratio, "conical_nozzle_zeta");
+    const double s = std::sin(std::clamp(half_angle_rad, 0.0, 0.5 * M_PI));
+    return (0.04 + 0.46 * std::pow(s, 1.5)) * (1.0 - area_ratio);
+}
+
+BordaCarnotStep compressible_borda_carnot(double M1, double area_ratio, double gamma) {
+    check_area_ratio(area_ratio, "compressible_borda_carnot");
+    if (!(M1 >= 0.0) || M1 > 1.0) {
+        throw std::invalid_argument("compressible_borda_carnot: need 0 <= M1 <= 1");
+    }
+    if (!(gamma > 1.0)) {
+        throw std::invalid_argument("compressible_borda_carnot: need gamma > 1");
+    }
+    using D2 = DualN<2>;
+    const auto bc = borda_carnot_t(D2::seed(M1, 0), area_ratio, D2::seed(gamma, 1));
+    const D2 pi = solver::dexp(bc.ln_pi);
+    return {std::sqrt(bc.y.v), pi.v, pi.d[0], pi.d[1]};
+}
+
+AreaChangeLoss area_change_loss(double m_dot_abs, double Pt0, double Tt0,
+                                const std::vector<double>& Y, double F_in, double F_out,
+                                const std::string& model, double length, double D_h,
+                                bool incompressible) {
+    const Branch b = make_branch(F_in, F_out, model, length, D_h);
+    AreaChangeLoss out;
+    out.expansion = b.expansion;
+    if (!(m_dot_abs > 0.0)) {
+        return out;
+    }
+    const Gas gas = make_gas(Tt0, Pt0, Y, false);
+    const double G = m_dot_abs / b.F_small;
+    double p = G;
+    if (!incompressible) {
+        // The closure's Mach from its station's flux, isentropic from (Pt0, Tt0).
+        const double Ga = b.expansion ? G : G / b.Cc;
+        auto flux = [&](double M) {
+            return eval_compressible<double>(M, Pt0, Tt0, gas.g, gas.Rg, b, gas).G_small /
+                   (b.expansion ? 1.0 : b.Cc);
+        };
+        if (flux(1.0) <= Ga) {
+            p = 1.0;
+            out.choked = true;
+        } else {
+            double lo = 0.0;
+            double hi = 1.0;
+            double M = std::min(Ga / flux(1.0), 0.9);
+            for (int it = 0; it < 200; ++it) {
+                using D1 = DualN<1>;
+                const auto e = eval_compressible<D1>(D1::seed(M, 0), D1::constant(Pt0),
+                                                     D1::constant(Tt0), D1::constant(gas.g),
+                                                     D1::constant(gas.Rg), b, gas);
+                const double scale = b.expansion ? 1.0 : b.Cc;
+                const double f = e.G_small.v / scale - Ga;
+                if (f > 0.0) {
+                    hi = M;
+                } else {
+                    lo = M;
+                }
+                const double fp = e.G_small.d[0] / scale;
+                double M_new = (fp > 0.0) ? M - f / fp : 0.5 * (lo + hi);
+                if (!(M_new > lo && M_new < hi)) {
+                    M_new = 0.5 * (lo + hi);
+                }
+                if (std::abs(M_new - M) <= 1e-15 * M) {
+                    M = M_new;
+                    break;
+                }
+                M = M_new;
+            }
+            p = M;
+        }
+    }
+    const auto e = eval_branch<double>(incompressible, p, Pt0, Tt0, gas.g, gas.Rg, b, gas);
+    out.dPt = e.loss;
+    out.mach = e.mach;
+    out.zeta = (e.q_small > 0.0) ? e.loss / e.q_small : 0.0;
+    out.Re = (b.expansion && b.sharp)
+                 ? e.Re
+                 : G * b.D / viscosity(Tt0, gas.P, gas.X);
+    return out;
+}
+
+AreaChangeFlow area_change_flow(double Pt0, double Tt0, const std::vector<double>& Y,
+                                double Pt_target, double F_in, double F_out,
+                                const std::string& model, double length, double D_h,
+                                bool incompressible, bool with_derivatives) {
+    if (!(Pt0 > 0.0) || !(Tt0 > 0.0)) {
+        throw std::invalid_argument("area_change_flow: Pt0 and Tt0 must be positive");
+    }
+    const Branch b = make_branch(F_in, F_out, model, length, D_h);
+    const Gas gas = make_gas(Tt0, Pt0, Y, with_derivatives);
+    // Odd in the drive: a negative drive runs the same branch backwards,
+    // m(-d) = -m(d) at the same source state.
+    const double drive_signed = Pt0 - Pt_target;
+    const double sgn = (drive_signed < 0.0) ? -1.0 : 1.0;
+    const double drive = std::abs(drive_signed);
+
+    RawFlow r;
+    if (drive >= b.floor) {
+        r = raw_flow(drive, Pt0, Tt0, b, gas, incompressible, with_derivatives);
+    } else {
+        // Below the floor: m = m0 h(t), t = drive / floor, m0 the raw flow at
+        // the floor and
+        //   h(t) = t exp((sigma - 1)(t^2 - 1) / 2),
+        // odd, h(1) = 1, h'(1) = sigma, h'(0) = exp((1 - sigma)/2) > 0, and
+        // monotone for every sigma > 0. sigma is the incompressible law's
+        // exponent d ln m / d ln(drive) at the floor: 1/2 for a quadratic loss
+        // (contraction, cone), 1/e(Re) for a sudden expansion, e the exponent
+        // of zeta Re^2 (1 laminar, 2 Borda-Carnot, 0.06 ... 2.6 between). It is
+        // analytic in the state through Re, so every partial is exact; the
+        // compressible law's own exponent differs by O(M^2) at the floor, the
+        // size of the slope's step there.
+        const RawFlow at = raw_flow(b.floor, Pt0, Tt0, b, gas, incompressible,
+                                    true);
+        double sigma = 0.5;
+        double dsig_dRe = 0.0;
+        if (b.expansion && b.sharp) {
+            const auto [e, de] = expansion_exponent(at.Re, b.n);
+            sigma = 1.0 / e;
+            dsig_dRe = -de / (e * e);
+        }
+        const double t = drive / b.floor;
+        const double E = std::exp(0.5 * (sigma - 1.0) * (t * t - 1.0));
+        const double h = t * E;
+        const double dh = E * (1.0 + (sigma - 1.0) * t * t);
+        const double k = at.m * 0.5 * h * (t * t - 1.0) * dsig_dRe;  // dm / dRe_floor
+        r = at;
+        r.m = at.m * h;
+        r.choked = false;
+        r.dm_ddrive = at.m * dh / b.floor;
+        r.dm_dPt0 = h * at.dm_dPt0 + k * at.dRe_dPt0;
+        r.dm_dTt0 = h * at.dm_dTt0 + k * at.dRe_dTt0;
+        r.dm_dg = h * at.dm_dg + k * at.dRe_dg;
+        r.dm_dR = h * at.dm_dR + k * at.dRe_dR;
+        r.dm_dmu = h * at.dm_dmu + k * at.dRe_dmu;
+        const AreaChangeLoss l = area_change_loss(r.m, Pt0, Tt0, Y, F_in, F_out, model, length,
+                                                  D_h, incompressible);
+        r.mach = l.mach;
+        r.Re = l.Re;
+        r.zeta = l.zeta;
     }
 
-    // --- Sigmoid blending for smooth bidirectional transition ---
-    auto [w, dw_dx] = sigmoid(m_dot / m_scale);
-    double zeta_eff = w * zeta_fwd + (1.0 - w) * zeta_rev;
-
-    // --- Compressibility correction ---
-    auto [k1, mach_clamped] = mach_k1(Mach);
-
-    // --- Pressure drop: dP = k1 * zeta_eff * m_dot * |m_dot| / (2 * rho * F_small^2) ---
-    double K = k1 / (2.0 * rho * F_small * F_small + eps);
-    double dP = K * zeta_eff * m_dot * m_abs;
-
-    // --- Jacobians ---
-    // dm_abs/dm = m / m_abs  (smooth_abs derivative)
-    double dm_abs_dm = smooth_abs_deriv(m_dot, m_abs);
-
-    // dw/dm = dw/dx * dx/dm = dw/dx / m_scale
-    double dw_dm = dw_dx / m_scale;
-
-    // d(zeta_exp)/dm via alpha(Re(m_dot)):
-    //   alpha = 1 + 2.73 * (Re + 10)^(-0.4)
-    //   d(alpha)/dRe = -2.73 * 0.4 * (Re + 10)^(-1.4)
-    //   Re = m_abs * D_small / (mu * F_small)
-    //   dRe/dm = D_small / (mu * F_small + eps) * dm_abs/dm
-    double dalpha_dRe = -2.73 * 0.4 / std::pow(Re + 10.0, 1.4);
-    double dRe_dm = D_small / (mu * F_small + eps) * dm_abs_dm;
-    double dzeta_exp_dm = dalpha_dRe * dRe_dm;
-
-    // d(zeta_eff)/dm = sigmoid blend + Re-dependent alpha
-    //   = (zeta_fwd - zeta_rev) * dw/dm
-    //     + w * dzeta_fwd/dm + (1-w) * dzeta_rev/dm
-    // Only zeta_exp depends on Re; zeta_con does not.
-    double dzeta_fwd_dm = (F0 <= F1) ? dzeta_exp_dm : 0.0;
-    double dzeta_rev_dm = (F0 <= F1) ? 0.0 : dzeta_exp_dm;
-    double dzeta_dm = (zeta_fwd - zeta_rev) * dw_dm
-                      + w * dzeta_fwd_dm + (1.0 - w) * dzeta_rev_dm;
-
-    // dP = K * zeta_eff * m_dot * m_abs
-    // dS/dm = K * (zeta_eff * (m_abs + m_dot * dm_abs_dm) + dzeta_dm * m_dot * m_abs)
-    double dS_dm = K * (zeta_eff * (m_abs + m_dot * dm_abs_dm)
-                        + dzeta_dm * m_dot * m_abs);
-
-    // dS/drho = -dP / rho  (since K ~ 1/rho, dP/drho = -dP/rho)
-    double dS_drho = (std::abs(rho) > eps) ? -dP / rho : 0.0;
-
-    // dS/dmu: mu affects dP through Re -> alpha -> zeta_exp
-    //   dRe/dmu = -Re / mu
-    //   dzeta_exp/dmu = dalpha_dRe * dRe/dmu
-    double dRe_dmu = (std::abs(mu) > eps) ? -Re / mu : 0.0;
-    double dzeta_exp_dmu = dalpha_dRe * dRe_dmu;
-    double dzeta_fwd_dmu = (F0 <= F1) ? dzeta_exp_dmu : 0.0;
-    double dzeta_rev_dmu = (F0 <= F1) ? 0.0 : dzeta_exp_dmu;
-    double dzeta_eff_dmu = w * dzeta_fwd_dmu + (1.0 - w) * dzeta_rev_dmu;
-    double dS_dmu = K * dzeta_eff_dmu * m_dot * m_abs;
-
-    return {dP, dS_dm, dS_drho, dS_dmu, mach_clamped};
-}
-
-AreaChangeResult conical_area_change(double m_dot, double rho, double mu,
-                                     double F0, double F1,
-                                     double length,
-                                     double Mach, double m_scale) {
-    constexpr double eps    = 1e-12;
-    constexpr double k_eta  = 3.2;   // angle-efficiency curve fit constants
-    constexpr double n_eta  = 0.8;   // (Idelchik Fig. 5-2, circular diffusers)
-
-    (void)mu;  // accepted for API uniformity; unused in conical loss model
-
-    // --- Geometry (static, flow-independent) ---
-    double F_small = std::min(F0, F1);
-    double F_large = std::max(F0, F1);
-    double ar = F_small / std::max(F_large, eps);  // area ratio in (0, 1]
-
-    double r_small = std::sqrt(std::max(F_small / M_PI, 0.0));
-    double r_large = std::sqrt(std::max(F_large / M_PI, 0.0));
-    // Half-angle: atan2 keeps theta in [0, pi/2] for any positive length.
-    double theta = std::atan2(r_large - r_small, std::max(length, eps));
-
-    // --- Loss coefficients (purely geometric, no Re dependence) ---
-
-    // Expansion (diffuser): eta rises from 0 at theta=0 to ~1 at theta=pi/2,
-    // recovering Borda-Carnot in the sharp limit.
-    double eta     = 1.0 - std::exp(-k_eta * std::pow(theta, n_eta));
-    double zeta_exp = eta * (1.0 - ar) * (1.0 - ar);
-
-    // Contraction (nozzle): C_con interpolates from 0.04 (gradual) to 0.50
-    // (sharp, recovers Weisbach) with the half-angle.
-    double sin_theta = std::sin(theta);
-    double C_con     = 0.04 + 0.46 * std::pow(sin_theta, 1.5);
-    double zeta_con  = C_con * (1.0 - ar);
-
-    // --- Assign forward/reverse zeta based on geometry ---
-    double zeta_fwd, zeta_rev;
-    if (F0 <= F1) {
-        // F0 -> F1 is an expansion (diffuser direction)
-        zeta_fwd = zeta_exp;
-        zeta_rev = zeta_con;
-    } else {
-        // F0 -> F1 is a contraction (nozzle direction)
-        zeta_fwd = zeta_con;
-        zeta_rev = zeta_exp;
+    AreaChangeFlow out;
+    out.m_dot = sgn * r.m;
+    out.choked = r.choked;
+    out.mach = r.mach;
+    out.Re = r.Re;
+    out.zeta = r.zeta;
+    if (!with_derivatives) {
+        return out;
     }
-
-    // --- Sigmoid blending for smooth bidirectional transition ---
-    auto [w, dw_dx] = sigmoid(m_dot / m_scale);
-    double zeta_eff = w * zeta_fwd + (1.0 - w) * zeta_rev;
-
-    // --- Compressibility correction ---
-    auto [k1, mach_clamped] = mach_k1(Mach);
-
-    // --- Smooth |m_dot| ---
-    double m_abs = smooth_abs(m_dot);
-
-    // --- Pressure drop: dP = k1 * zeta_eff * m_dot * |m_dot| / (2*rho*F_small^2) ---
-    double K  = k1 / (2.0 * rho * F_small * F_small + eps);
-    double dP = K * zeta_eff * m_dot * m_abs;
-
-    // --- Jacobians ---
-    // zeta_exp and zeta_con are purely geometric: dzeta_exp/dm = dzeta_con/dm = 0.
-    // Therefore d(zeta_eff)/dm reduces to the sigmoid blend term only.
-    double dw_dm      = dw_dx / m_scale;
-    double dzeta_eff_dm = (zeta_fwd - zeta_rev) * dw_dm;  // Re chain absent
-
-    // d(m_dot * m_abs)/dm = m_abs + m_dot * dm_abs/dm
-    double dm_abs_dm  = smooth_abs_deriv(m_dot, m_abs);
-
-    // dS/dm = K * (zeta_eff * (m_abs + m_dot*dm_abs_dm) + dzeta_eff_dm * m_dot*m_abs)
-    double dS_dm = K * (zeta_eff * (m_abs + m_dot * dm_abs_dm)
-                        + dzeta_eff_dm * m_dot * m_abs);
-
-    // dS/drho = -dP / rho  (K ~ 1/rho)
-    double dS_drho = (std::abs(rho) > eps) ? -dP / rho : 0.0;
-
-    // dS/dmu = 0: mu does not appear in the conical loss model.
-    double dS_dmu = 0.0;
-
-    return {dP, dS_dm, dS_drho, dS_dmu, mach_clamped};
-
+    // (Pt0, drive) -> (Pt0, Pt_target): drive = Pt0 - Pt_target. Odd in the
+    // drive: d/d(drive) is even, the rest odd.
+    out.dm_dPt_target = -r.dm_ddrive;
+    out.dm_dPt0 = sgn * r.dm_dPt0 + r.dm_ddrive;
+    out.dm_dTt0 = sgn * r.dm_dTt0;
+    // Composition: gamma and R through X, and mu at the closure's
+    // temperature (mu_at's offset seed). dX/dY tangent to sum X = 1:
+    //   dX_i/dY_k = (delta_ik - X_i) / (W_k S),  S = sum_j Y_j / W_j.
+    const std::size_t ns = Y.size();
+    std::vector<double> mu_X(ns, 0.0);
+    if (r.dm_dmu != 0.0) {
+        mu_X = viscosity_dX(r.T_mu, gas.P, gas.X);
+    }
+    std::vector<double> dm_dX(ns, 0.0);
+    double x_dot = 0.0;
+    for (std::size_t k = 0; k < ns; ++k) {
+        dm_dX[k] = sgn * (r.dm_dg * gas.g_X[k] + r.dm_dR * gas.Rg_X[k] + r.dm_dmu * mu_X[k]);
+        x_dot += gas.X[k] * dm_dX[k];
+    }
+    double S = 0.0;
+    for (std::size_t k = 0; k < ns; ++k) {
+        S += Y[k] / species_molar_mass(k);
+    }
+    out.dm_dY.assign(ns, 0.0);
+    for (std::size_t k = 0; k < ns; ++k) {
+        out.dm_dY[k] = (dm_dX[k] - x_dot) / (species_molar_mass(k) * S);
+    }
+    return out;
 }
 
-} // namespace combaero
+AreaChangeElementFlow area_change_element_flow(double Pt_a, double Tt_a,
+                                               const std::vector<double>& Y_a, double Pt_b,
+                                               double Tt_b, const std::vector<double>& Y_b,
+                                               double F_a, double F_b, const std::string& model,
+                                               double length, double D_h, bool incompressible,
+                                               bool with_derivatives) {
+    // The blend's width: the smaller of the two directions' drive floors.
+    const double width = std::min(make_branch(F_a, F_b, model, length, D_h).floor,
+                                  make_branch(F_b, F_a, model, length, D_h).floor);
+    const double s = (Pt_a - Pt_b) / width;
+    double w = 1.0;
+    double dw_ds = 0.0;
+    if (s < -30.0) {
+        w = 0.0;
+    } else if (s <= 30.0) {
+        w = 1.0 / (1.0 + std::exp(-s));
+        dw_ds = w * (1.0 - w);
+    }
+    AreaChangeElementFlow out;
+    out.dm_dY_a.assign(Y_a.size(), 0.0);
+    out.dm_dY_b.assign(Y_b.size(), 0.0);
+    AreaChangeFlow ab;
+    AreaChangeFlow ba;
+    if (w > 0.0) {
+        ab = area_change_flow(Pt_a, Tt_a, Y_a, Pt_b, F_a, F_b, model, length, D_h,
+                              incompressible, with_derivatives);
+    }
+    if (w < 1.0) {
+        ba = area_change_flow(Pt_b, Tt_b, Y_b, Pt_a, F_b, F_a, model, length, D_h,
+                              incompressible, with_derivatives);
+    }
+    // In the element's orientation the b -> a flow is negative.
+    const double m_ab = ab.m_dot;
+    const double m_ba = -ba.m_dot;
+    out.m_dot = w * m_ab + (1.0 - w) * m_ba;
+    const AreaChangeFlow& up = (w >= 0.5) ? ab : ba;
+    out.choked = up.choked;
+    out.mach = up.mach;
+    out.Re = up.Re;
+    out.zeta = up.zeta;
+    if (!with_derivatives) {
+        return out;
+    }
+    const double blend = dw_ds / width * (m_ab - m_ba);
+    out.dm_dPt_a = blend;
+    out.dm_dPt_b = -blend;
+    if (w > 0.0) {
+        out.dm_dPt_a += w * ab.dm_dPt0;
+        out.dm_dPt_b += w * ab.dm_dPt_target;
+        out.dm_dTt_a += w * ab.dm_dTt0;
+        for (std::size_t k = 0; k < Y_a.size(); ++k) {
+            out.dm_dY_a[k] += w * ab.dm_dY[k];
+        }
+    }
+    if (w < 1.0) {
+        out.dm_dPt_b -= (1.0 - w) * ba.dm_dPt0;
+        out.dm_dPt_a -= (1.0 - w) * ba.dm_dPt_target;
+        out.dm_dTt_b -= (1.0 - w) * ba.dm_dTt0;
+        for (std::size_t k = 0; k < Y_b.size(); ++k) {
+            out.dm_dY_b[k] -= (1.0 - w) * ba.dm_dY[k];
+        }
+    }
+    return out;
+}
+
+// --- incompressible standalone kernels ------------------------------------------
+
+namespace {
+
+inline double smooth_abs(double m, double eps = 1e-12) { return std::sqrt(m * m + eps); }
+
+// Logistic sigmoid (w, dw/dx), clamped against overflow.
+inline std::pair<double, double> sigmoid(double x) {
+    if (x > 30.0) return {1.0, 0.0};
+    if (x < -30.0) return {0.0, 0.0};
+    const double w = 1.0 / (1.0 + std::exp(-x));
+    return {w, w * (1.0 - w)};
+}
+
+// zeta_fwd/zeta_rev (and their Re-slopes) blended by direction, then
+// dP = zeta m |m| / (2 rho F_small^2).
+AreaChangeResult blend_kernel(double m_dot, double rho, double mu, double F0, double F1,
+                              double m_scale, double D_small, double zeta_exp, double dzeta_exp_dRe,
+                              double zeta_con, double Re) {
+    const double F_small = std::min(F0, F1);
+    const double m_abs = smooth_abs(m_dot);
+    const bool fwd_exp = F0 <= F1;
+    const double zeta_fwd = fwd_exp ? zeta_exp : zeta_con;
+    const double zeta_rev = fwd_exp ? zeta_con : zeta_exp;
+    const auto [w, dw_dx] = sigmoid(m_dot / m_scale);
+    const double zeta_eff = w * zeta_fwd + (1.0 - w) * zeta_rev;
+    const double K = 1.0 / (2.0 * rho * F_small * F_small + kEps);
+    const double dP = K * zeta_eff * m_dot * m_abs;
+    const double dm_abs_dm = m_dot / m_abs;
+    const double dRe_dm = D_small / (mu * F_small + kEps) * dm_abs_dm;
+    const double w_exp = fwd_exp ? w : 1.0 - w;
+    const double dzeta_dm = (zeta_fwd - zeta_rev) * dw_dx / m_scale + w_exp * dzeta_exp_dRe * dRe_dm;
+    const double dS_dm = K * (zeta_eff * (m_abs + m_dot * dm_abs_dm) + dzeta_dm * m_dot * m_abs);
+    const double dS_drho = (std::abs(rho) > kEps) ? -dP / rho : 0.0;
+    const double dRe_dmu = (std::abs(mu) > kEps) ? -Re / mu : 0.0;
+    const double dS_dmu = K * w_exp * dzeta_exp_dRe * dRe_dmu * m_dot * m_abs;
+    return {dP, dS_dm, dS_drho, dS_dmu};
+}
+
+}  // namespace
+
+AreaChangeResult sharp_area_change(double m_dot, double rho, double mu, double F0, double F1,
+                                   double m_scale, double D_h) {
+    if (!(F0 > 0.0) || !(F1 > 0.0)) {
+        throw std::invalid_argument("sharp_area_change: areas must be positive");
+    }
+    const double F_small = std::min(F0, F1);
+    const double n = F_small / std::max(std::max(F0, F1), kEps);
+    const double D_small = (D_h > 0.0) ? D_h : std::sqrt(std::max(4.0 * F_small / M_PI, 0.0));
+    const double Re = smooth_abs(m_dot) * D_small / (mu * F_small + kEps);
+    const ZetaAndSlope z = sudden_expansion_zeta(Re, n);
+    return blend_kernel(m_dot, rho, mu, F0, F1, m_scale, D_small, z.zeta, z.dzeta_dRe,
+                        sharp_contraction_zeta(n), Re);
+}
+
+AreaChangeResult conical_area_change(double m_dot, double rho, double mu, double F0, double F1,
+                                     double length, double m_scale) {
+    if (!(F0 > 0.0) || !(F1 > 0.0)) {
+        throw std::invalid_argument("conical_area_change: areas must be positive");
+    }
+    const double F_small = std::min(F0, F1);
+    const double F_large = std::max(F0, F1);
+    const double n = F_small / std::max(F_large, kEps);
+    const double dr = std::sqrt(F_large / M_PI) - std::sqrt(F_small / M_PI);
+    const double theta = std::atan2(dr, std::max(length, kEps));
+    const double zeta_exp = conical_diffuser_zeta(2.0 * theta * 180.0 / M_PI, n);
+    const double zeta_con = conical_nozzle_zeta(theta, n);
+    return blend_kernel(m_dot, rho, mu, F0, F1, m_scale, 1.0, zeta_exp, 0.0, zeta_con, 0.0);
+}
+
+}  // namespace combaero

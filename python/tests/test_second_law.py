@@ -19,6 +19,7 @@ created the dynamic head of a downstream chamber as total pressure.
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import math
 import warnings
@@ -42,6 +43,7 @@ from combaero.network import (
     ThermalWall,
     WallLayer,
 )
+from combaero.network.components import LazyJacobian
 from combaero.network.second_law import SIGMA_TOL
 
 with redirect_stdout(io.StringIO()):
@@ -201,17 +203,22 @@ def test_without_the_heat_term_a_heated_channel_would_fail(monkeypatch) -> None:
 
 class _Pre541AreaChange(AreaChangeElement):
     """#541 as it was: the loss coupled to the downstream STATIC pressure, so
-    a downstream chamber's dynamic head appeared as free total pressure."""
+    a downstream chamber's dynamic head appeared as free total pressure. In
+    the mass-flow form (#731): the flow is driven to the downstream static
+    pressure instead of its stagnation pressure."""
 
-    residual_scale_kind = "p"  # still a pressure balance, Pa
+    residual_scale_kind = "mdot"  # still the mass-flow row, kg/s
 
     def residuals(self, state_in, state_out):
-        res, jac = super().residuals(state_in, state_out)
-        res[0] += state_out.Pt - state_out.P
-        row = jac[0]
-        row[f"{self.to_node}.Pt"] = row.get(f"{self.to_node}.Pt", 0.0) + 1.0
-        row[f"{self.to_node}.P"] = row.get(f"{self.to_node}.P", 0.0) - 1.0
-        return res, jac
+        res, jac = super().residuals(state_in, dataclasses.replace(state_out, Pt=state_out.P))
+        to_pt, to_p = f"{self.to_node}.Pt", f"{self.to_node}.P"
+
+        def remapped() -> dict[int, dict[str, float]]:
+            row = dict(jac[0])
+            row[to_p] = row.get(to_p, 0.0) + row.pop(to_pt, 0.0)
+            return {0: row}
+
+        return res, LazyJacobian(remapped)
 
 
 def test_the_541_area_change_is_caught_at_that_element_only() -> None:

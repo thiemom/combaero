@@ -904,20 +904,20 @@ TEST(SolverJacobianTest, SharpAreaChangeExpansionDerivatives) {
   double F1 = 0.04;   // large area (expansion for positive flow)
   double m_scale = 1e-4;
 
-  auto res = combaero::sharp_area_change(m_dot, rho, mu, F0, F1, 0.0, m_scale);
+  auto res = combaero::sharp_area_change(m_dot, rho, mu, F0, F1, m_scale);
 
   // Central FD for dS/dm
   double eps_m = 1e-7;
-  auto res_mp = combaero::sharp_area_change(m_dot + eps_m, rho, mu, F0, F1, 0.0, m_scale);
-  auto res_mm = combaero::sharp_area_change(m_dot - eps_m, rho, mu, F0, F1, 0.0, m_scale);
+  auto res_mp = combaero::sharp_area_change(m_dot + eps_m, rho, mu, F0, F1, m_scale);
+  auto res_mm = combaero::sharp_area_change(m_dot - eps_m, rho, mu, F0, F1, m_scale);
   double fd_dS_dm = (res_mp.dP - res_mm.dP) / (2.0 * eps_m);
   report_jacobian_difference("SharpAreaChangeExpansion", "dS_dm", res.dS_dm, fd_dS_dm);
   EXPECT_NEAR(res.dS_dm, fd_dS_dm, std::abs(fd_dS_dm) * 1e-4 + 1e-10);
 
   // Central FD for dS/drho
   double eps_rho = 1e-6;
-  auto res_rp = combaero::sharp_area_change(m_dot, rho + eps_rho, mu, F0, F1, 0.0, m_scale);
-  auto res_rm = combaero::sharp_area_change(m_dot, rho - eps_rho, mu, F0, F1, 0.0, m_scale);
+  auto res_rp = combaero::sharp_area_change(m_dot, rho + eps_rho, mu, F0, F1, m_scale);
+  auto res_rm = combaero::sharp_area_change(m_dot, rho - eps_rho, mu, F0, F1, m_scale);
   double fd_dS_drho = (res_rp.dP - res_rm.dP) / (2.0 * eps_rho);
   report_jacobian_difference("SharpAreaChangeExpansion", "dS_drho", res.dS_drho, fd_dS_drho);
   EXPECT_NEAR(res.dS_drho, fd_dS_drho, std::abs(fd_dS_drho) * 1e-4 + 1e-10);
@@ -931,20 +931,20 @@ TEST(SolverJacobianTest, SharpAreaChangeContractionDerivatives) {
   double F1 = 0.01;   // small area (contraction for positive flow)
   double m_scale = 1e-4;
 
-  auto res = combaero::sharp_area_change(m_dot, rho, mu, F0, F1, 0.0, m_scale);
+  auto res = combaero::sharp_area_change(m_dot, rho, mu, F0, F1, m_scale);
 
   // Central FD for dS/dm
   double eps_m = 1e-7;
-  auto res_mp = combaero::sharp_area_change(m_dot + eps_m, rho, mu, F0, F1, 0.0, m_scale);
-  auto res_mm = combaero::sharp_area_change(m_dot - eps_m, rho, mu, F0, F1, 0.0, m_scale);
+  auto res_mp = combaero::sharp_area_change(m_dot + eps_m, rho, mu, F0, F1, m_scale);
+  auto res_mm = combaero::sharp_area_change(m_dot - eps_m, rho, mu, F0, F1, m_scale);
   double fd_dS_dm = (res_mp.dP - res_mm.dP) / (2.0 * eps_m);
   report_jacobian_difference("SharpAreaChangeContraction", "dS_dm", res.dS_dm, fd_dS_dm);
   EXPECT_NEAR(res.dS_dm, fd_dS_dm, std::abs(fd_dS_dm) * 1e-4 + 1e-10);
 
   // Central FD for dS/drho
   double eps_rho = 1e-6;
-  auto res_rp = combaero::sharp_area_change(m_dot, rho + eps_rho, mu, F0, F1, 0.0, m_scale);
-  auto res_rm = combaero::sharp_area_change(m_dot, rho - eps_rho, mu, F0, F1, 0.0, m_scale);
+  auto res_rp = combaero::sharp_area_change(m_dot, rho + eps_rho, mu, F0, F1, m_scale);
+  auto res_rm = combaero::sharp_area_change(m_dot, rho - eps_rho, mu, F0, F1, m_scale);
   double fd_dS_drho = (res_rp.dP - res_rm.dP) / (2.0 * eps_rho);
   report_jacobian_difference("SharpAreaChangeContraction", "dS_drho", res.dS_drho, fd_dS_drho);
   EXPECT_NEAR(res.dS_drho, fd_dS_drho, std::abs(fd_dS_drho) * 1e-4 + 1e-10);
@@ -959,18 +959,18 @@ TEST(SolverJacobianTest, SharpAreaChangeReverseFlowDerivatives) {
   double F1 = 0.04;
   double m_scale = 1e-4;
 
-  auto res = combaero::sharp_area_change(m_dot, rho, mu, F0, F1, 0.0, m_scale);
+  auto res = combaero::sharp_area_change(m_dot, rho, mu, F0, F1, m_scale);
 
   double eps_m = 1e-7;
-  auto res_mp = combaero::sharp_area_change(m_dot + eps_m, rho, mu, F0, F1, 0.0, m_scale);
-  auto res_mm = combaero::sharp_area_change(m_dot - eps_m, rho, mu, F0, F1, 0.0, m_scale);
+  auto res_mp = combaero::sharp_area_change(m_dot + eps_m, rho, mu, F0, F1, m_scale);
+  auto res_mm = combaero::sharp_area_change(m_dot - eps_m, rho, mu, F0, F1, m_scale);
   double fd_dS_dm = (res_mp.dP - res_mm.dP) / (2.0 * eps_m);
   report_jacobian_difference("SharpAreaChangeReverse", "dS_dm", res.dS_dm, fd_dS_dm);
   EXPECT_NEAR(res.dS_dm, fd_dS_dm, std::abs(fd_dS_dm) * 1e-4 + 1e-10);
 
   double eps_rho = 1e-6;
-  auto res_rp = combaero::sharp_area_change(m_dot, rho + eps_rho, mu, F0, F1, 0.0, m_scale);
-  auto res_rm = combaero::sharp_area_change(m_dot, rho - eps_rho, mu, F0, F1, 0.0, m_scale);
+  auto res_rp = combaero::sharp_area_change(m_dot, rho + eps_rho, mu, F0, F1, m_scale);
+  auto res_rm = combaero::sharp_area_change(m_dot, rho - eps_rho, mu, F0, F1, m_scale);
   double fd_dS_drho = (res_rp.dP - res_rm.dP) / (2.0 * eps_rho);
   report_jacobian_difference("SharpAreaChangeReverse", "dS_drho", res.dS_drho, fd_dS_drho);
   EXPECT_NEAR(res.dS_drho, fd_dS_drho, std::abs(fd_dS_drho) * 1e-4 + 1e-10);
@@ -986,7 +986,7 @@ TEST(SolverJacobianTest, SharpAreaChangeZeroFlowSmooth) {
   double F1 = 0.04;
   double m_scale = 1e-4;
 
-  auto res = combaero::sharp_area_change(0.0, rho, mu, F0, F1, 0.0, m_scale);
+  auto res = combaero::sharp_area_change(0.0, rho, mu, F0, F1, m_scale);
 
   // No NaN or inf
   EXPECT_FALSE(std::isnan(res.dP));
@@ -1002,231 +1002,115 @@ TEST(SolverJacobianTest, SharpAreaChangeZeroFlowSmooth) {
 
   // Verify continuity: nearby points produce similar dP
   double m_tiny = 1e-8;
-  auto res_p = combaero::sharp_area_change(+m_tiny, rho, mu, F0, F1, 0.0, m_scale);
-  auto res_m = combaero::sharp_area_change(-m_tiny, rho, mu, F0, F1, 0.0, m_scale);
+  auto res_p = combaero::sharp_area_change(+m_tiny, rho, mu, F0, F1, m_scale);
+  auto res_m = combaero::sharp_area_change(-m_tiny, rho, mu, F0, F1, m_scale);
   EXPECT_NEAR(res_p.dP, 0.0, 1e-3);
   EXPECT_NEAR(res_m.dP, 0.0, 1e-3);
 }
 
 // ---------------------------------------------------------------------------
-// Area Change Element — solver_interface level Jacobians
+// Area change element kernel (area_change_flow, #731): every analytic partial
+// against central differences, across the closure's regimes.
 // ---------------------------------------------------------------------------
 
-// Helper: build dry-air mass fractions
-static std::vector<double> dry_air_Y() {
-  std::size_t ns = num_species();
-  std::vector<double> X(ns, 0.0);
-  for (std::size_t i = 0; i < ns; ++i) {
-    if (species_name(i) == "N2")
-      X[i] = 0.79;
-    else if (species_name(i) == "O2")
-      X[i] = 0.21;
+namespace {
+
+std::vector<double> air_fuel_Y() {
+  std::vector<double> X(combaero::num_species(), 0.0);
+  for (std::size_t i = 0; i < X.size(); ++i) {
+    if (combaero::species_name(i) == "N2") X[i] = 0.75;
+    if (combaero::species_name(i) == "O2") X[i] = 0.20;
+    if (combaero::species_name(i) == "CH4") X[i] = 0.05;
   }
-  return mole_to_mass(X);
+  return combaero::mole_to_mass(X);
 }
 
-TEST(SolverJacobianTest, AreaChangeResidualMdotDerivative) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05;
-  double T_up = 300.0;
-  double P_static_up = 101325.0;
-  double P_total_up = P_static_up;
-  double P_static_down = P_static_up;
-  double F0 = 0.01;
-  double F1 = 0.04;
-  double m_scale = 1e-4;
+struct AreaChangeFlowCase {
+  const char *name;
+  double Pt0, Tt0, drive, F_in, F_out;
+  const char *model;
+  double length;
+  bool incompressible;
+  double hp = 0.0;  // pressure step [Pa]; 0: min(1e-3 drive, 1e-3)
+};
 
-  auto res = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-
-  double eps = 1e-7;
-  auto res_p = solver::area_change_residuals_and_jacobian(
-      m_dot + eps, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-  auto res_m = solver::area_change_residuals_and_jacobian(
-      m_dot - eps, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-  double fd = (res_p.dP_calc - res_m.dP_calc) / (2.0 * eps);
-
-  report_jacobian_difference("AreaChangeResidual_Expansion", "d_dP_d_mdot",
-                             res.d_dP_d_mdot, fd);
-  EXPECT_NEAR(res.d_dP_d_mdot, fd, std::abs(fd) * 1e-4 + 1e-10);
+void check_area_change_flow(const AreaChangeFlowCase &c) {
+  const std::vector<double> Y = air_fuel_Y();
+  const double Pt_t = c.Pt0 - c.drive;
+  auto m = [&](double Pt0, double Tt0, const std::vector<double> &Yv, double Ptt) {
+    return combaero::area_change_flow(Pt0, Tt0, Yv, Ptt, c.F_in, c.F_out, c.model,
+                                      c.length, 0.0, c.incompressible, false)
+        .m_dot;
+  };
+  const auto r = combaero::area_change_flow(c.Pt0, c.Tt0, Y, Pt_t, c.F_in, c.F_out,
+                                            c.model, c.length, 0.0, c.incompressible, true);
+  ASSERT_GT(std::abs(r.m_dot), 0.0) << c.name;
+  const double tol = 2e-5;
+  // Pressure steps well inside the drive (and the 1 Pa floor), T in K.
+  const double hp = (c.hp > 0.0) ? c.hp : std::min(1e-3 * std::abs(c.drive), 1e-3);
+  const double fd_Pt0 = (m(c.Pt0 + hp, c.Tt0, Y, Pt_t) - m(c.Pt0 - hp, c.Tt0, Y, Pt_t)) / (2 * hp);
+  const double fd_Ptt = (m(c.Pt0, c.Tt0, Y, Pt_t + hp) - m(c.Pt0, c.Tt0, Y, Pt_t - hp)) / (2 * hp);
+  const double hT = 1e-3;
+  const double fd_Tt = (m(c.Pt0, c.Tt0 + hT, Y, Pt_t) - m(c.Pt0, c.Tt0 - hT, Y, Pt_t)) / (2 * hT);
+  // Scales: the flow over the drive, the pressure and the temperature.
+  const double sP = std::abs(r.m_dot) / std::max(std::abs(c.drive), 1e-12);
+  const double sT = std::abs(r.m_dot) / c.Tt0;
+  report_jacobian_difference(c.name, "dm_dPt0", r.dm_dPt0, fd_Pt0);
+  report_jacobian_difference(c.name, "dm_dPt_target", r.dm_dPt_target, fd_Ptt);
+  report_jacobian_difference(c.name, "dm_dTt0", r.dm_dTt0, fd_Tt);
+  EXPECT_NEAR(r.dm_dPt0, fd_Pt0, tol * sP) << c.name;
+  EXPECT_NEAR(r.dm_dPt_target, fd_Ptt, tol * sP) << c.name;
+  EXPECT_NEAR(r.dm_dTt0, fd_Tt, tol * sT) << c.name;
+  for (std::size_t k = 0; k < Y.size(); ++k) {
+    const double hY = 1e-6;
+    std::vector<double> Yp = Y, Ym = Y;
+    Yp[k] += hY;
+    double fd = 0.0;
+    if (Y[k] > hY) {
+      Ym[k] -= hY;
+      fd = (m(c.Pt0, c.Tt0, Yp, Pt_t) - m(c.Pt0, c.Tt0, Ym, Pt_t)) / (2 * hY);
+    } else {
+      fd = (m(c.Pt0, c.Tt0, Yp, Pt_t) - r.m_dot) / hY;
+    }
+    EXPECT_NEAR(r.dm_dY[k], fd, 1e-4 * std::max(std::abs(r.m_dot), std::abs(fd)))
+        << c.name << " Y[" << combaero::species_name(k) << "]";
+  }
 }
 
-TEST(SolverJacobianTest, AreaChangeResidualPressureDerivative) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05;
-  double T_up = 300.0;
-  double P_static_up = 101325.0;
-  double P_total_up = P_static_up;
-  double P_static_down = P_static_up;
-  double F0 = 0.01;
-  double F1 = 0.04;
-  double m_scale = 1e-4;
+}  // namespace
 
-  auto res = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-
-  double eps = 1.0;
-  auto res_p = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up + eps, T_up, Y, P_static_down, F0, F1, m_scale);
-  auto res_m = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up - eps, T_up, Y, P_static_down, F0, F1, m_scale);
-  double fd = (res_p.dP_calc - res_m.dP_calc) / (2.0 * eps);
-
-  report_jacobian_difference("AreaChangeResidual_Expansion", "d_dP_dP_static_up",
-                             res.d_dP_dP_static_up, fd);
-  EXPECT_NEAR(res.d_dP_dP_static_up, fd, std::abs(fd) * 1e-3 + 1e-10);
+TEST(AreaChangeFlowTest, DerivativesMatchCentralDifferences) {
+  const double F_s = 7.853981633974483e-7;  // 1 mm
+  const AreaChangeFlowCase cases[] = {
+      {"expansion M 0.3", 2e5, 300.0, 7e3, 1e-3, 4e-3, "sharp", 0.0, false},
+      {"expansion high Mach", 2e5, 600.0, 3e4, 1e-3, 2e-3, "sharp", 0.0, false},
+      {"expansion Re ~100", 2e5, 300.0, 1.0, F_s, 4 * F_s, "sharp", 0.0, false},
+      {"expansion Re ~2500", 2e5, 300.0, 300.0, F_s, 4 * F_s, "sharp", 0.0, false},
+      // Laminar (Re ~ 0.4): linear in the drive, so a step of 40% of it is exact,
+      // and well above the rounding of 1e5 Pa.
+      {"expansion near zero drive", 1e5, 300.0, 1e-5, 1e-4, 4e-4, "sharp", 0.0, false, 4e-6},
+      {"expansion reversed (odd)", 2e5, 300.0, -0.5, F_s, 4 * F_s, "sharp", 0.0, false},
+      {"contraction", 2e5, 300.0, 5e3, 4e-3, 1e-3, "sharp", 0.0, false},
+      {"contraction below floor", 2e5, 300.0, 0.4, 4e-3, 1e-3, "sharp", 0.0, false},
+      {"contraction choked", 2e5, 300.0, 1e5, 4e-3, 1e-3, "sharp", 0.0, false},
+      {"conical diffuser", 2e5, 300.0, 3e3, 1e-3, 4e-3, "conical", 0.05, false},
+      {"conical nozzle", 2e5, 300.0, 3e3, 4e-3, 1e-3, "conical", 0.05, false},
+      {"expansion incompressible", 2e5, 300.0, 5e3, 1e-3, 4e-3, "sharp", 0.0, true},
+      {"expansion incompressible Re ~2500", 2e5, 300.0, 300.0, F_s, 4 * F_s, "sharp", 0.0,
+       true},
+  };
+  for (const auto &c : cases) {
+    check_area_change_flow(c);
+  }
 }
 
-TEST(SolverJacobianTest, AreaChangeResidualTemperatureDerivative) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05;
-  double T_up = 300.0;
-  double P_static_up = 101325.0;
-  double P_total_up = P_static_up;
-  double P_static_down = P_static_up;
-  double F0 = 0.01;
-  double F1 = 0.04;
-  double m_scale = 1e-4;
-
-  auto res = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-
-  double eps = 1e-3;
-  auto res_p = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up + eps, Y, P_static_down, F0, F1, m_scale);
-  auto res_m = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up - eps, Y, P_static_down, F0, F1, m_scale);
-  double fd = (res_p.dP_calc - res_m.dP_calc) / (2.0 * eps);
-
-  report_jacobian_difference("AreaChangeResidual_Expansion", "d_dP_dT_up",
-                             res.d_dP_dT_up, fd);
-  EXPECT_NEAR(res.d_dP_dT_up, fd, std::abs(fd) * 1e-3 + 1e-10);
-}
-
-TEST(SolverJacobianTest, AreaChangeResidualContractionMdotDerivative) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05;
-  double T_up = 300.0;
-  double P_static_up = 101325.0;
-  double P_total_up = P_static_up;
-  double P_static_down = P_static_up;
-  double F0 = 0.04;  // contraction: F0 > F1
-  double F1 = 0.01;
-  double m_scale = 1e-4;
-
-  auto res = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-
-  double eps = 1e-7;
-  auto res_p = solver::area_change_residuals_and_jacobian(
-      m_dot + eps, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-  auto res_m = solver::area_change_residuals_and_jacobian(
-      m_dot - eps, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-  double fd = (res_p.dP_calc - res_m.dP_calc) / (2.0 * eps);
-
-  report_jacobian_difference("AreaChangeResidual_Contraction", "d_dP_d_mdot",
-                             res.d_dP_d_mdot, fd);
-  EXPECT_NEAR(res.d_dP_d_mdot, fd, std::abs(fd) * 1e-4 + 1e-10);
-}
-
-TEST(SolverJacobianTest, AreaChangeResidualContractionPressureDerivative) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05;
-  double T_up = 300.0;
-  double P_static_up = 101325.0;
-  double P_total_up = P_static_up;
-  double P_static_down = P_static_up;
-  double F0 = 0.04;
-  double F1 = 0.01;
-  double m_scale = 1e-4;
-
-  auto res = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-
-  double eps = 1.0;
-  auto res_p = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up + eps, T_up, Y, P_static_down, F0, F1, m_scale);
-  auto res_m = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up - eps, T_up, Y, P_static_down, F0, F1, m_scale);
-  double fd = (res_p.dP_calc - res_m.dP_calc) / (2.0 * eps);
-
-  report_jacobian_difference("AreaChangeResidual_Contraction", "d_dP_dP_static_up",
-                             res.d_dP_dP_static_up, fd);
-  EXPECT_NEAR(res.d_dP_dP_static_up, fd, std::abs(fd) * 1e-3 + 1e-10);
-}
-
-TEST(SolverJacobianTest, AreaChangeResidualContractionTemperatureDerivative) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05;
-  double T_up = 300.0;
-  double P_static_up = 101325.0;
-  double P_total_up = P_static_up;
-  double P_static_down = P_static_up;
-  double F0 = 0.04;
-  double F1 = 0.01;
-  double m_scale = 1e-4;
-
-  auto res = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-
-  double eps = 1e-3;
-  auto res_p = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up + eps, Y, P_static_down, F0, F1, m_scale);
-  auto res_m = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up - eps, Y, P_static_down, F0, F1, m_scale);
-  double fd = (res_p.dP_calc - res_m.dP_calc) / (2.0 * eps);
-
-  report_jacobian_difference("AreaChangeResidual_Contraction", "d_dP_dT_up",
-                             res.d_dP_dT_up, fd);
-  EXPECT_NEAR(res.d_dP_dT_up, fd, std::abs(fd) * 1e-3 + 1e-10);
-}
-
-TEST(SolverJacobianTest, AreaChangeResidualReverseFlowDerivatives) {
-  auto Y = dry_air_Y();
-  double m_dot = -0.05;  // reverse flow
-  double T_up = 300.0;
-  double P_static_up = 101325.0;
-  double P_total_up = P_static_up;
-  double P_static_down = P_static_up;
-  double F0 = 0.01;
-  double F1 = 0.04;
-  double m_scale = 1e-4;
-
-  auto res = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-
-  // d_dP_d_mdot
-  double eps_m = 1e-7;
-  auto res_mp = solver::area_change_residuals_and_jacobian(
-      m_dot + eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-  auto res_mm = solver::area_change_residuals_and_jacobian(
-      m_dot - eps_m, P_total_up, P_static_up, T_up, Y, P_static_down, F0, F1, m_scale);
-  double fd_dm = (res_mp.dP_calc - res_mm.dP_calc) / (2.0 * eps_m);
-  report_jacobian_difference("AreaChangeResidual_Reverse", "d_dP_d_mdot",
-                             res.d_dP_d_mdot, fd_dm);
-  EXPECT_NEAR(res.d_dP_d_mdot, fd_dm, std::abs(fd_dm) * 1e-4 + 1e-10);
-
-  // d_dP_dP_static_up
-  double eps_P = 1.0;
-  auto res_pp = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up + eps_P, T_up, Y, P_static_down, F0, F1, m_scale);
-  auto res_pm = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up - eps_P, T_up, Y, P_static_down, F0, F1, m_scale);
-  double fd_dP = (res_pp.dP_calc - res_pm.dP_calc) / (2.0 * eps_P);
-  report_jacobian_difference("AreaChangeResidual_Reverse", "d_dP_dP_static_up",
-                             res.d_dP_dP_static_up, fd_dP);
-  EXPECT_NEAR(res.d_dP_dP_static_up, fd_dP, std::abs(fd_dP) * 1e-3 + 1e-10);
-
-  // d_dP_dT_up
-  double eps_T = 1e-3;
-  auto res_tp = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up + eps_T, Y, P_static_down, F0, F1, m_scale);
-  auto res_tm = solver::area_change_residuals_and_jacobian(
-      m_dot, P_total_up, P_static_up, T_up - eps_T, Y, P_static_down, F0, F1, m_scale);
-  double fd_dT = (res_tp.dP_calc - res_tm.dP_calc) / (2.0 * eps_T);
-  report_jacobian_difference("AreaChangeResidual_Reverse", "d_dP_dT_up",
-                             res.d_dP_dT_up, fd_dT);
-  EXPECT_NEAR(res.d_dP_dT_up, fd_dT, std::abs(fd_dT) * 1e-3 + 1e-10);
+TEST(AreaChangeFlowTest, ChokedFlowIsIndependentOfTheTarget) {
+  const std::vector<double> Y = air_fuel_Y();
+  const auto a = combaero::area_change_flow(2e5, 300.0, Y, 1.0e5, 4e-3, 1e-3, "sharp", 0.0, 0.0, false);
+  const auto b = combaero::area_change_flow(2e5, 300.0, Y, 0.5e5, 4e-3, 1e-3, "sharp", 0.0, 0.0, false);
+  EXPECT_TRUE(a.choked);
+  EXPECT_DOUBLE_EQ(a.m_dot, b.m_dot);
+  EXPECT_EQ(a.dm_dPt_target, 0.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -1237,18 +1121,18 @@ TEST(SolverJacobianTest, ConicalAreaChangeDiffuserDerivatives) {
   double m_dot = 0.1, rho = 1.2, mu = 1.8e-5;
   double F0 = 0.01, F1 = 0.04, L = 0.1, m_scale = 1e-4;
 
-  auto res = combaero::conical_area_change(m_dot, rho, mu, F0, F1, L, 0.0, m_scale);
+  auto res = combaero::conical_area_change(m_dot, rho, mu, F0, F1, L, m_scale);
 
   double eps_m = 1e-7;
-  auto rp = combaero::conical_area_change(m_dot + eps_m, rho, mu, F0, F1, L, 0.0, m_scale);
-  auto rm = combaero::conical_area_change(m_dot - eps_m, rho, mu, F0, F1, L, 0.0, m_scale);
+  auto rp = combaero::conical_area_change(m_dot + eps_m, rho, mu, F0, F1, L, m_scale);
+  auto rm = combaero::conical_area_change(m_dot - eps_m, rho, mu, F0, F1, L, m_scale);
   double fd_dm = (rp.dP - rm.dP) / (2.0 * eps_m);
   report_jacobian_difference("ConicalDiffuser", "dS_dm", res.dS_dm, fd_dm);
   EXPECT_NEAR(res.dS_dm, fd_dm, std::abs(fd_dm) * 1e-4 + 1e-10);
 
   double eps_rho = 1e-6;
-  rp = combaero::conical_area_change(m_dot, rho + eps_rho, mu, F0, F1, L, 0.0, m_scale);
-  rm = combaero::conical_area_change(m_dot, rho - eps_rho, mu, F0, F1, L, 0.0, m_scale);
+  rp = combaero::conical_area_change(m_dot, rho + eps_rho, mu, F0, F1, L, m_scale);
+  rm = combaero::conical_area_change(m_dot, rho - eps_rho, mu, F0, F1, L, m_scale);
   double fd_drho = (rp.dP - rm.dP) / (2.0 * eps_rho);
   report_jacobian_difference("ConicalDiffuser", "dS_drho", res.dS_drho, fd_drho);
   EXPECT_NEAR(res.dS_drho, fd_drho, std::abs(fd_drho) * 1e-4 + 1e-10);
@@ -1261,18 +1145,18 @@ TEST(SolverJacobianTest, ConicalAreaChangeNozzleDerivatives) {
   double m_dot = 0.1, rho = 1.2, mu = 1.8e-5;
   double F0 = 0.04, F1 = 0.01, L = 0.1, m_scale = 1e-4;
 
-  auto res = combaero::conical_area_change(m_dot, rho, mu, F0, F1, L, 0.0, m_scale);
+  auto res = combaero::conical_area_change(m_dot, rho, mu, F0, F1, L, m_scale);
 
   double eps_m = 1e-7;
-  auto rp = combaero::conical_area_change(m_dot + eps_m, rho, mu, F0, F1, L, 0.0, m_scale);
-  auto rm = combaero::conical_area_change(m_dot - eps_m, rho, mu, F0, F1, L, 0.0, m_scale);
+  auto rp = combaero::conical_area_change(m_dot + eps_m, rho, mu, F0, F1, L, m_scale);
+  auto rm = combaero::conical_area_change(m_dot - eps_m, rho, mu, F0, F1, L, m_scale);
   double fd_dm = (rp.dP - rm.dP) / (2.0 * eps_m);
   report_jacobian_difference("ConicalNozzle", "dS_dm", res.dS_dm, fd_dm);
   EXPECT_NEAR(res.dS_dm, fd_dm, std::abs(fd_dm) * 1e-4 + 1e-10);
 
   double eps_rho = 1e-6;
-  rp = combaero::conical_area_change(m_dot, rho + eps_rho, mu, F0, F1, L, 0.0, m_scale);
-  rm = combaero::conical_area_change(m_dot, rho - eps_rho, mu, F0, F1, L, 0.0, m_scale);
+  rp = combaero::conical_area_change(m_dot, rho + eps_rho, mu, F0, F1, L, m_scale);
+  rm = combaero::conical_area_change(m_dot, rho - eps_rho, mu, F0, F1, L, m_scale);
   double fd_drho = (rp.dP - rm.dP) / (2.0 * eps_rho);
   report_jacobian_difference("ConicalNozzle", "dS_drho", res.dS_drho, fd_drho);
   EXPECT_NEAR(res.dS_drho, fd_drho, std::abs(fd_drho) * 1e-4 + 1e-10);
@@ -1282,133 +1166,21 @@ TEST(SolverJacobianTest, ConicalAreaChangeReverseDerivatives) {
   double m_dot = -0.1, rho = 1.2, mu = 1.8e-5;
   double F0 = 0.01, F1 = 0.04, L = 0.1, m_scale = 1e-4;
 
-  auto res = combaero::conical_area_change(m_dot, rho, mu, F0, F1, L, 0.0, m_scale);
+  auto res = combaero::conical_area_change(m_dot, rho, mu, F0, F1, L, m_scale);
 
   double eps_m = 1e-7;
-  auto rp = combaero::conical_area_change(m_dot + eps_m, rho, mu, F0, F1, L, 0.0, m_scale);
-  auto rm = combaero::conical_area_change(m_dot - eps_m, rho, mu, F0, F1, L, 0.0, m_scale);
+  auto rp = combaero::conical_area_change(m_dot + eps_m, rho, mu, F0, F1, L, m_scale);
+  auto rm = combaero::conical_area_change(m_dot - eps_m, rho, mu, F0, F1, L, m_scale);
   double fd_dm = (rp.dP - rm.dP) / (2.0 * eps_m);
   report_jacobian_difference("ConicalReverse", "dS_dm", res.dS_dm, fd_dm);
   EXPECT_NEAR(res.dS_dm, fd_dm, std::abs(fd_dm) * 1e-4 + 1e-10);
 
   double eps_rho = 1e-6;
-  rp = combaero::conical_area_change(m_dot, rho + eps_rho, mu, F0, F1, L, 0.0, m_scale);
-  rm = combaero::conical_area_change(m_dot, rho - eps_rho, mu, F0, F1, L, 0.0, m_scale);
+  rp = combaero::conical_area_change(m_dot, rho + eps_rho, mu, F0, F1, L, m_scale);
+  rm = combaero::conical_area_change(m_dot, rho - eps_rho, mu, F0, F1, L, m_scale);
   double fd_drho = (rp.dP - rm.dP) / (2.0 * eps_rho);
   report_jacobian_difference("ConicalReverse", "dS_drho", res.dS_drho, fd_drho);
   EXPECT_NEAR(res.dS_drho, fd_drho, std::abs(fd_drho) * 1e-4 + 1e-10);
-}
-
-// ---------------------------------------------------------------------------
-// Conical Area Change — solver_interface level Jacobians
-// ---------------------------------------------------------------------------
-
-TEST(SolverJacobianTest, ConicalResidualExpansionMdot) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05, T_up = 300.0, P = 101325.0;
-  double F0 = 0.01, F1 = 0.04, L = 0.1, m_scale = 1e-4;
-
-  auto res = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up, Y, P, F0, F1, L, m_scale);
-
-  double eps = 1e-7;
-  auto rp = solver::conical_area_change_residuals_and_jacobian(
-      m_dot + eps, P, P, T_up, Y, P, F0, F1, L, m_scale);
-  auto rm = solver::conical_area_change_residuals_and_jacobian(
-      m_dot - eps, P, P, T_up, Y, P, F0, F1, L, m_scale);
-  double fd = (rp.dP_calc - rm.dP_calc) / (2.0 * eps);
-  report_jacobian_difference("ConicalResidual_Exp", "d_dP_d_mdot", res.d_dP_d_mdot, fd);
-  EXPECT_NEAR(res.d_dP_d_mdot, fd, std::abs(fd) * 1e-4 + 1e-10);
-}
-
-TEST(SolverJacobianTest, ConicalResidualExpansionPressure) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05, T_up = 300.0, P = 101325.0;
-  double F0 = 0.01, F1 = 0.04, L = 0.1, m_scale = 1e-4;
-
-  auto res = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up, Y, P, F0, F1, L, m_scale);
-
-  double eps = 1.0;
-  auto rp = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P + eps, T_up, Y, P, F0, F1, L, m_scale);
-  auto rm = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P - eps, T_up, Y, P, F0, F1, L, m_scale);
-  double fd = (rp.dP_calc - rm.dP_calc) / (2.0 * eps);
-  report_jacobian_difference("ConicalResidual_Exp", "d_dP_dP_static_up", res.d_dP_dP_static_up, fd);
-  EXPECT_NEAR(res.d_dP_dP_static_up, fd, std::abs(fd) * 1e-3 + 1e-10);
-}
-
-TEST(SolverJacobianTest, ConicalResidualExpansionTemperature) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05, T_up = 300.0, P = 101325.0;
-  double F0 = 0.01, F1 = 0.04, L = 0.1, m_scale = 1e-4;
-
-  auto res = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up, Y, P, F0, F1, L, m_scale);
-
-  double eps = 1e-3;
-  auto rp = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up + eps, Y, P, F0, F1, L, m_scale);
-  auto rm = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up - eps, Y, P, F0, F1, L, m_scale);
-  double fd = (rp.dP_calc - rm.dP_calc) / (2.0 * eps);
-  report_jacobian_difference("ConicalResidual_Exp", "d_dP_dT_up", res.d_dP_dT_up, fd);
-  EXPECT_NEAR(res.d_dP_dT_up, fd, std::abs(fd) * 1e-3 + 1e-10);
-}
-
-TEST(SolverJacobianTest, ConicalResidualContractionMdot) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05, T_up = 300.0, P = 101325.0;
-  double F0 = 0.04, F1 = 0.01, L = 0.1, m_scale = 1e-4;
-
-  auto res = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up, Y, P, F0, F1, L, m_scale);
-
-  double eps = 1e-7;
-  auto rp = solver::conical_area_change_residuals_and_jacobian(
-      m_dot + eps, P, P, T_up, Y, P, F0, F1, L, m_scale);
-  auto rm = solver::conical_area_change_residuals_and_jacobian(
-      m_dot - eps, P, P, T_up, Y, P, F0, F1, L, m_scale);
-  double fd = (rp.dP_calc - rm.dP_calc) / (2.0 * eps);
-  report_jacobian_difference("ConicalResidual_Con", "d_dP_d_mdot", res.d_dP_d_mdot, fd);
-  EXPECT_NEAR(res.d_dP_d_mdot, fd, std::abs(fd) * 1e-4 + 1e-10);
-}
-
-TEST(SolverJacobianTest, ConicalResidualContractionPressure) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05, T_up = 300.0, P = 101325.0;
-  double F0 = 0.04, F1 = 0.01, L = 0.1, m_scale = 1e-4;
-
-  auto res = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up, Y, P, F0, F1, L, m_scale);
-
-  double eps = 1.0;
-  auto rp = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P + eps, T_up, Y, P, F0, F1, L, m_scale);
-  auto rm = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P - eps, T_up, Y, P, F0, F1, L, m_scale);
-  double fd = (rp.dP_calc - rm.dP_calc) / (2.0 * eps);
-  report_jacobian_difference("ConicalResidual_Con", "d_dP_dP_static_up", res.d_dP_dP_static_up, fd);
-  EXPECT_NEAR(res.d_dP_dP_static_up, fd, std::abs(fd) * 1e-3 + 1e-10);
-}
-
-TEST(SolverJacobianTest, ConicalResidualContractionTemperature) {
-  auto Y = dry_air_Y();
-  double m_dot = 0.05, T_up = 300.0, P = 101325.0;
-  double F0 = 0.04, F1 = 0.01, L = 0.1, m_scale = 1e-4;
-
-  auto res = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up, Y, P, F0, F1, L, m_scale);
-
-  double eps = 1e-3;
-  auto rp = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up + eps, Y, P, F0, F1, L, m_scale);
-  auto rm = solver::conical_area_change_residuals_and_jacobian(
-      m_dot, P, P, T_up - eps, Y, P, F0, F1, L, m_scale);
-  double fd = (rp.dP_calc - rm.dP_calc) / (2.0 * eps);
-  report_jacobian_difference("ConicalResidual_Con", "d_dP_dT_up", res.d_dP_dT_up, fd);
-  EXPECT_NEAR(res.d_dP_dT_up, fd, std::abs(fd) * 1e-3 + 1e-10);
 }
 
 // ---------------------------------------------------------------------------
@@ -1416,18 +1188,16 @@ TEST(SolverJacobianTest, ConicalResidualContractionTemperature) {
 // ---------------------------------------------------------------------------
 
 TEST(SolverJacobianTest, ConicalSharpLimitConsistency) {
-  // At length -> 0 (theta -> pi/2), conical should approach sharp-edge.
-  // Expansion: conical eta -> 1, zeta_exp -> (1-ar)^2
-  //            sharp  alpha -> ~1 at high Re, zeta_exp -> 1 - 2*ar + ar^2 = (1-ar)^2
+  // At length -> 0 the cone is 180 deg: Idelchik 5-2 prints 0.58 at n 0.25,
+  // Borda-Carnot (the sharp expansion at Re 6e4) is 0.5625.
   double m_dot = 0.1, rho = 1.2, mu = 1.8e-5;
   double F0 = 0.01, F1 = 0.04;
 
   auto sharp = combaero::sharp_area_change(m_dot, rho, mu, F0, F1);
   auto conical = combaero::conical_area_change(m_dot, rho, mu, F0, F1, 1e-6);
 
-  // Should agree within ~15% (alpha(Re) differs from 1.0)
   double rel = std::abs(conical.dP - sharp.dP) / std::abs(sharp.dP);
-  EXPECT_LT(rel, 0.15) << "Conical(L->0) vs Sharp: " << conical.dP << " vs " << sharp.dP;
+  EXPECT_NEAR(rel, 0.58 / 0.5625 - 1.0, 1e-5) << "Conical(L->0) vs Sharp: " << conical.dP << " vs " << sharp.dP;
 }
 
 // Test fixture to print summary at the end
