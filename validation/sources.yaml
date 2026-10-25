@@ -1245,6 +1245,45 @@ documents:
   records: [validation/cooling/extractions/hollworth_dagan_1980_vented_target.md, validation/cooling/data/hollworth_dagan1980/]
   notes: 'Fig. 8 overplots ~5 Re per Z, so any fidelity score on it is an upper bound resting on ~5-6
     clean stations per X. Data test: python/tests/test_hollworth_dagan_data.py.'
+- file: docs/heat_transfer/impingement/Chougule_Parishwad_Nadgire_2013_WCECS_multijet_pinfin_heatsink_effusion_slots.pdf
+  citation: 'Chougule, N. K., Parishwad, G. V., Nadgire, A. R. (2013). Numerical investigation of multijet
+    air impingement on pin fin heat sink with effusion slots. Proc. World Congress on Engineering and
+    Computer Science (WCECS 2013) Vol. II, San Francisco, pp. 935-939.'
+  id: ISBN 978-988-19253-1-2
+  topic: [impingement, pin_fin]
+  content: 'Electronics cooling: 3x3/5x5/10x10 round-jet arrays onto a 60 x 60 mm aluminium pin-fin heat
+    sink, spent air leaving through slots in the NOZZLE plate; CFX SST CFD, Re 11,000-49,000, fin H/d
+    3-5, 30 W. Table 1 lists 9 measured Nu_avg (4x4 sink, d_p 5 mm, H/d 3/4/5, Re 18,896/25,116/31,049)
+    beside CFD (CFD 11-15% high).'
+  status: screened
+  verdict: 'Not usable (2026-10-25). The 9 measured points cannot be scored: Nu = hL/k with L undefined;
+    Re is said to use sqrt(jet area) but the nomenclature says jet diameter; Table 2 repeats Table 1''s
+    two columns digit for digit relabelled "minimum crossflow" / "effusion slot", so what the "experimental"
+    column measured is ambiguous; no slot geometry. Configuration (jet-cooled pin-fin heat sink venting
+    through the jet plate) matches neither #468 (target-vented walls) nor #335 (channel pin fins).'
+  read_for: ['#468 impingement-effusion data', '#335 pin-fin data']
+  issues: [335, 468]
+  records: []
+  notes: Arrived as docs/new/WCECS2013_pp935-939.pdf. Cites Rhee, Yoon & Cho 2003 (on the wanted list).
+- file: docs/heat_transfer/impingement/Rachdi_2025_SciRep_15_3023_slot_jet_array_CFD.pdf
+  citation: 'Rachdi, Z., Hnaien, N., Eladeb, A., Alshammari, B. M., Kolsi, L., Dhahri, H. (2025). CFD analysis
+    of heat transfer enhancement in impinging jet array by varying number of jets and spacing. Scientific
+    Reports 15, 3023.'
+  id: doi:10.1038/s41598-025-86360-w
+  topic: [impingement]
+  content: '2-D RANS (standard k-omega, Fluent) of arrays of SLOT jets (w 3.175 mm), N 5-11, spacing S
+    = s/w 1-4, H 2-8, one Re (5500), isothermal plate; Eq. 22 mean-Nu correlation. The only measured data
+    are Gardon & Akfirat (1966) slot-jet results used for validation (Fig. 3 stagnation Nu vs H, plate
+    pressure).'
+  status: screened
+  verdict: 'Not useful (2026-10-25): CFD only at a single Re; Eq. 22 (Nu = 67.41 H^1.09 N^0.41 S^-0.14)
+    has a POSITIVE H exponent although its own text and Fig. 10 show Nu falling with H; mean Nu over
+    a fixed 80w plate makes the N dependence a coverage artefact. No slot-jet impingement model or open
+    issue needs it. If slot jets are ever wanted, go to Gardon & Akfirat 1966 directly.'
+  read_for: [impingement jet array data]
+  issues: []
+  records: []
+  notes: Arrived as docs/new/41598_2025_Article_86360.pdf. Data not public (on request).
 - file: docs/heat_transfer/NASA_CR-3837_1984.pdf
   citation: Han, J. C., Park, J. S., Lei, C. K. (1984). Heat transfer and pressure drop in blade cooling
     channels with turbulence promoters. NASA Contractor Report 3837, grant NAG3-311. November 1984.
