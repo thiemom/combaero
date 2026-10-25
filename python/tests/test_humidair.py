@@ -74,3 +74,44 @@ def test_humid_air_rh0_equals_dry_air():
     assert np.allclose(humid_rh0, dry, atol=1e-10), (
         f"humid_air_mass(RH=0) differs from dry_air_mass: max delta = {np.max(np.abs(humid_rh0 - dry))}"
     )
+
+
+# Reference wet-bulb temperatures from CoolProp HAPropsSI (ASHRAE RP-1485),
+# evaluated once offline; the reference is not a project dependency. The
+# simplified psychrometric equation used here (constant cp_air, no vapour cp
+# term, no enhancement factor) stays within 0.5 K of it on a liquid wet bulb.
+@pytest.mark.parametrize(
+    ("T", "P", "RH", "Twb_ref"),
+    [
+        (355.0, 50000.0, 0.0, 290.819),
+        (360.0, 50000.0, 0.5, 343.189),
+        (370.0, 50000.0, 0.05, 310.174),
+        (375.0, 101325.0, 0.0, 304.352),
+        (375.0, 101325.0, 0.5, 356.645),
+        (380.0, 101325.0, 0.5, 361.021),
+        (300.0, 101325.0, 0.5, 292.555),
+    ],
+)
+def test_wet_bulb_converges_when_T_exceeds_boiling_point(
+    T: float, P: float, RH: float, Twb_ref: float
+) -> None:
+    # Above the boiling point at P the saturation humidity ratio is undefined
+    # at Twb = T, which is where the old Newton start and clamp put the iterate.
+    Twb = wet_bulb_temperature(T, P, RH)
+    assert abs(Twb - Twb_ref) < 0.5
+
+
+def test_dewpoint_below_minus_100C_is_not_pinned_to_the_clamp() -> None:
+    # saturation_vapor_pressure accepts T down to 163.15 K; a dewpoint below
+    # 173.15 K used to be clamped there and returned as converged.
+    T, P, RH = 175.0, 101325.0, 0.1
+    Tdp = dewpoint(T, P, RH)
+    p_w = RH * cb.saturation_vapor_pressure(T)
+    assert cb.saturation_vapor_pressure(Tdp) == pytest.approx(p_w, rel=1e-6)
+
+
+def test_dewpoint_outside_svp_range_raises() -> None:
+    # A dewpoint below the saturation-pressure extrapolation limit cannot be
+    # represented; it must refuse, not return the limit.
+    with pytest.raises((ValueError, IndexError, RuntimeError)):
+        dewpoint(170.0, 101325.0, 1e-4)

@@ -274,28 +274,28 @@ All functions use consistent units to avoid conversion errors.
 
 #### Humid Air Properties
 
-| Function                          | Input Units              | Output Unit |
-|-----------------------------------|--------------------------|-------------|
-| `saturation_vapor_pressure`       | T: K                     | Pa          |
-| `vapor_pressure`                  | T: K, RH: - (0-1)        | Pa          |
-| `humidity_ratio`                  | T: K, P: Pa, RH: - (0-1) | kg/kg       |
-| `water_vapor_mole_fraction`       | T: K, P: Pa, RH: - (0-1) | mol/mol     |
-| `humid_air_composition`           | T: K, P: Pa, RH: - (0-1) | mol/mol     |
-| `dewpoint`                        | T: K, P: Pa, RH: - (0-1) | K           |
-| `relative_humidity_from_dewpoint` | T: K, Tdp: K, P: Pa      | - (0-1)     |
-| `wet_bulb_temperature`            | T: K, P: Pa, RH: - (0-1) | K           |
-| `humid_air_enthalpy`              | T: K, P: Pa, RH: - (0-1) | J/kg        |
-| `humid_air_density`               | T: K, P: Pa, RH: - (0-1) | kg/m^3      |
-| `HumidAir::set_TP_RH`             | T: K, P: Pa, RH: - (0-1) | HumidAir&   |
-| `HumidAir::set_TP_dewpoint`       | T: K, P: Pa, Tdp: K      | HumidAir&   |
-| `HumidAir::set_TP_omega`          | T: K, P: Pa, w: kg/kg    | HumidAir&   |
-| `HumidAir::RH`                    | -                        | - (0-1)     |
-| `HumidAir::dewpoint`              | -                        | K           |
-| `HumidAir::wet_bulb`              | -                        | K           |
-| `HumidAir::humidity_ratio`        | -                        | kg/kg       |
-| `HumidAir::h_mass`                | -                        | J/kg        |
-| `HumidAir::TP_RH`                 | -                        | (K, Pa, -)  |
-| `HumidAir::TP_dewpoint`           | -                        | (K, Pa, K)  |
+| Function                          | Input Units              | Output Unit  |
+|-----------------------------------|--------------------------|--------------|
+| `saturation_vapor_pressure`       | T: K                     | Pa           |
+| `vapor_pressure`                  | T: K, RH: - (0-1)        | Pa           |
+| `humidity_ratio`                  | T: K, P: Pa, RH: - (0-1) | kg/kg        |
+| `water_vapor_mole_fraction`       | T: K, P: Pa, RH: - (0-1) | mol/mol      |
+| `humid_air_composition`           | T: K, P: Pa, RH: - (0-1) | mol/mol      |
+| `dewpoint`                        | T: K, P: Pa, RH: - (0-1) | K            |
+| `relative_humidity_from_dewpoint` | T: K, Tdp: K, P: Pa      | - (0-1)      |
+| `wet_bulb_temperature`            | T: K, P: Pa, RH: - (0-1) | K            |
+| `humid_air_enthalpy`              | T: K, P: Pa, RH: - (0-1) | J/kg dry air |
+| `humid_air_density`               | T: K, P: Pa, RH: - (0-1) | kg/m^3       |
+| `HumidAir::set_TP_RH`             | T: K, P: Pa, RH: - (0-1) | HumidAir&    |
+| `HumidAir::set_TP_dewpoint`       | T: K, P: Pa, Tdp: K      | HumidAir&    |
+| `HumidAir::set_TP_omega`          | T: K, P: Pa, w: kg/kg    | HumidAir&    |
+| `HumidAir::RH`                    | -                        | - (0-1)      |
+| `HumidAir::dewpoint`              | -                        | K            |
+| `HumidAir::wet_bulb`              | -                        | K            |
+| `HumidAir::humidity_ratio`        | -                        | kg/kg        |
+| `HumidAir::h_mass`                | -                        | J/kg dry air |
+| `HumidAir::TP_RH`                 | -                        | (K, Pa, -)   |
+| `HumidAir::TP_dewpoint`           | -                        | (K, Pa, K)   |
 
 ---
 
@@ -1251,7 +1251,7 @@ All functions use consistent units to avoid conversion errors.
 | `convert_to_dry_fractions`                      | -                                                | -                                     |
 | `solve_orifice_mdot`                            | -                                                | Pa                                    |
 | `dry_air`                                       | -                                                | X: mol/mol                            |
-| `humid_air_enthalpy_nasa9`                      | -                                                | J/kg dry air                          |
+| `humid_air_enthalpy_nasa9`                      | T: K, P: Pa, RH: - (0-1)                         | J/kg dry air                          |
 | `complete_combustion_to_CO2_H2O_with_fraction`  | -                                                | -                                     |
 | `HumidAir::rh`                                  | -                                                | 0-1                                   |
 | `HumidAir::state`                               | -                                                | -                                     |

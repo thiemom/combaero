@@ -60,8 +60,12 @@ double humid_air_enthalpy(double T, double P,
                           double RH); // T in K, P in Pa, RH as fraction (0-1)
 
 // Calculate enthalpy of humid air using NASA-9 thermodynamic data [J/kg dry
-// air] More accurate than humid_air_enthalpy() at non-ambient temperatures.
-// Requires T in NASA-9 valid range (200–6000 K).
+// air]. NOT on the psychrometric datum of humid_air_enthalpy(): the NASA-9
+// datum is the elements at 298.15 K, so water vapour carries its formation
+// enthalpy (about -13.4 MJ/kg) and the two values differ by hundreds of
+// kJ/kg at the same state. Only differences at fixed humidity ratio are
+// comparable. T is still bounded by saturation_vapor_pressure's range
+// (163.15-383.15 K) because RH is evaluated at T.
 double
 humid_air_enthalpy_nasa9(double T, double P,
                          double RH); // T in K, P in Pa, RH as fraction (0-1)
