@@ -128,6 +128,8 @@ std::vector<BlochMode> solve_magnitude_minimization(
 ) {
     std::vector<BlochMode> modes;
     const int m_max = geom.n_cans / 2;
+    const double y_scale = geom.area_can / (rho_can * c_can) +
+                           2.0 * geom.area_plenum / (rho_plenum * c_plenum);
 
     for (int m = 0; m <= m_max; ++m) {
         for (double f_start = kScanStartHz; f_start < f_max; f_start += kScanWindowHz) {
@@ -150,7 +152,9 @@ std::vector<BlochMode> solve_magnitude_minimization(
                         omega, m, geom, c_can, c_plenum, rho_can, rho_plenum, bc_can_top
                     );
 
-                    if (std::abs(D) < kDispersionTolerance &&
+                    // D is an admittance; accept on |D| relative to the
+                    // characteristic admittances it is built from.
+                    if (std::abs(D) < kDispersionTolerance * y_scale &&
                         !is_duplicate_mode(modes, m, f_refined)) {
                         modes.push_back({m, f_refined, geom.n_cans});
                     }
@@ -423,7 +427,8 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
                     annular_duct_dispersion(std::complex<double>(omega, 0.0), m, geom, c, rho, bc_ends)
                 );
 
-                if (mag < kDispersionTolerance && !is_duplicate_annular(modes, m, f_best)) {
+                if (mag < kDispersionTolerance * geom.area() / (rho * c) &&
+                    !is_duplicate_annular(modes, m, f_best)) {
                     ++n_axial;
                     modes.push_back({m, n_axial, f_best});
                 }

@@ -23,6 +23,13 @@ namespace combaero {
 // Boundary Conditions
 // -------------------------------------------------------------
 
+// Rayleigh end correction of a flanged circular opening, (8/(3 pi)) r = 0.85 r
+// per face. A neck or a perforate orifice radiates from both faces, so its
+// inertial length is L + 0.85 d (Kinsler et al.; Melling 1973 without the
+// Fok interaction factor). Used by helmholtz_frequency (default), helmholtz_Q
+// and orifice_impedance_with_flow.
+inline constexpr double kEndCorrectionFlangedBothFaces = 0.85;  // [-], per d
+
 enum class BoundaryCondition {
     Open,    // Pressure release (p' = 0), velocity antinode
     Closed   // Rigid wall (u' = 0), pressure antinode
@@ -441,10 +448,15 @@ struct BlochMode {
 };
 
 // Solve for passive acoustic eigenmodes of can-annular system
-// Uses Argument Principle Method (Nyquist contour) for robust root finding
+// Delegates to solve_magnitude_minimization (can_annular_solvers.h): a scan
+// for minima of |D| plus Muller refinement. The Argument Principle variant is
+// can_annular_eigenmodes_with_method (C++ only).
 //
-// Finds ALL modes in frequency range by counting zeros of dispersion relation:
-//   D(ω) = Y_can(ω) + Y_annulus(ω, m) = 0
+// Dispersion relation (junction volume-flow balance, in pole-free form):
+//   D(w) = [Y_can(w) + Y_annulus(w, m)] * den_can * sin(k_p s) = 0
+//   Y_annulus = i (2 A_p / rho_p c_p) (cos(2 pi m / N) - cos(k_p s)) / sin(k_p s)
+// Checked against a 1-D finite-element model of the full N-can graph
+// (python/tests/test_acoustics_closed_forms.py).
 //
 // Modeling assumption: geometry is uniform within each region defined by
 // CanAnnularGeometry (single can section + single annulus section).
@@ -465,8 +477,8 @@ struct BlochMode {
 //   - Evesque & Polifke (2005): "Low-order acoustic modelling for annular combustors"
 //   - Silva et al. (2013): "Combining Helmholtz solver with flame describing function"
 //
-// Method: Argument Principle (counts zeros inside contour in complex plane)
-// Accuracy: Finds all modes, no missed roots
+// Accuracy: matches the finite-element reference to its discretisation error
+// on the cases tested; not a proof that no root is ever missed.
 // Valid: Passive acoustics (no flame response)
 std::vector<BlochMode> can_annular_eigenmodes(
     const CanAnnularGeometry& geom,
@@ -521,7 +533,7 @@ double particle_velocity(double p, double rho, double c);
 //
 // Applications: acoustic dampers, fuel system tuning, side-branch resonators
 double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
-                           double end_correction = 0.85);
+                           double end_correction = kEndCorrectionFlangedBothFaces);
 
 // -------------------------------------------------------------
 // Strouhal Number
@@ -589,8 +601,12 @@ double effective_viscothermal_layer(double delta_nu, double delta_kappa, double 
 // - Bellucci et al., JEGTP (Helmholtz dampers)
 // - Bourquard & Noiray, JSV 2018 (HR/QW comparison)
 
-// Helmholtz resonator quality factor (viscothermal losses only)
-// Q ≈ V / (A_neck · δ_eff · correction_factor)
+// Helmholtz resonator quality factor (neck viscothermal losses only)
+// Q = omega M / R = (d/2) * L_eff / (delta_eff * L_neck),
+//   L_eff = L_neck + 0.85 d,  delta_eff = effective_viscothermal_layer(...)
+// Neck wall resistance from the Kirchhoff wide-tube result; cavity-wall
+// thermal loss and radiation resistance are neglected. V is validated but
+// does not enter at a fixed f (it sets f through helmholtz_frequency).
 //
 // V      : cavity volume [m³]
 // A_neck : neck cross-sectional area [m²]

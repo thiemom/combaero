@@ -397,11 +397,15 @@ double helmholtz_Q(double V, double A_neck, double L_neck,
     double d_neck = 2.0 * std::sqrt(A_neck / M_PI);
 
     // Effective neck length (with standard end correction)
-    double L_eff = L_neck + 0.85 * d_neck;
+    double L_eff = L_neck + kEndCorrectionFlangedBothFaces * d_neck;
 
-    // Simplified model: Q ≈ d_neck / (4 * delta_eff) * sqrt(V / (A_neck * L_eff))
-    // This captures both neck losses and cavity energy storage
-    double Q = (d_neck / (4.0 * delta_eff)) * std::sqrt(V / (A_neck * L_eff));
+    // Lumped element: Q = omega * M / R, with inertance M = rho * L_eff / A
+    // and the Kirchhoff wall resistance of the neck, rho * omega * delta_eff
+    // / (a * A) per unit length, over the physical neck length L_neck:
+    //   Q = a * L_eff / (delta_eff * L_neck),  a = d_neck / 2.
+    // V only sets the frequency (pass helmholtz_frequency as f); at a fixed f
+    // the cavity volume does not enter. Cavity-wall thermal loss is neglected.
+    double Q = 0.5 * d_neck * L_eff / (delta_eff * L_neck);
 
     return Q;
 }
@@ -423,10 +427,9 @@ double tube_Q(double L, double D, double nu, double alpha, double gamma, double 
     double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
 
     // For a tube, losses occur along the entire length
-    // Q ≈ (tube cross-section) / (boundary layer area)
-    // Q ≈ (π D²/4) / (π D * delta_eff)
-    // Q ≈ D / (4 * delta_eff)
-    double Q = D / (4.0 * delta_eff);
+    // Kirchhoff wide-tube attenuation: alpha = k * delta_eff / D.
+    // A line resonator has Q = k / (2 alpha), so Q = D / (2 * delta_eff).
+    double Q = D / (2.0 * delta_eff);
 
     return Q;
 }
@@ -696,6 +699,12 @@ std::complex<double> orifice_impedance_with_flow(
     if (Cd <= 0.0 || Cd > 1.0) {
         throw std::runtime_error("Discharge coefficient must be in range (0, 1], got " + std::to_string(Cd));
     }
+    if (!(c > 0.0) || !std::isfinite(c)) {
+        throw std::runtime_error("Speed of sound must be positive and finite, got " + std::to_string(c));
+    }
+    if (!(rho > 0.0) || !std::isfinite(rho)) {
+        throw std::runtime_error("Density must be positive and finite, got " + std::to_string(rho));
+    }
 
     // Check Mach numbers (should be << 1 for acoustic theory)
     double M_bias = std::abs(u_bias) / c;
@@ -722,8 +731,9 @@ std::complex<double> orifice_impedance_with_flow(
     double R = R_bias + R_grazing;
 
     // 2. Reactance (Imaginary Part)
-    // Rayleigh end correction modified by flow
-    double delta_0 = 0.85 * (d_orifice / 2.0);  // ~0.425 * d
+    // Rayleigh end correction modified by flow: (8/(3 pi)) r = 0.85 r on EACH
+    // face of the orifice, 0.85 d in total -- the same as helmholtz_frequency.
+    double delta_0 = kEndCorrectionFlangedBothFaces * d_orifice;
 
     // Flow reduces effective end correction (frequency shift)
     // Empirical: δ_eff = δ_0 / (1 + M_g)
@@ -779,15 +789,15 @@ TransferMatrix quarter_wave_resonator_tmm(
     std::complex<double> i(0.0, 1.0);
     std::complex<double> Z_tube = -i / std::tan(k * L_tube);
 
-    // 3. Total branch impedance
-    // Series combination: Z_branch = Z_neck + Z_tube
-    std::complex<double> Z_branch_norm = Z_neck + Z_tube;
-
-    // 4. Scale by area ratio and denormalize
-    // The orifice area is: A_orifice = porosity * A_duct
-    // Branch admittance in main duct: Y = A_orifice / (ρc * Z_branch)
-    double A_orifice = porosity * A_duct;
-    std::complex<double> Y_branch = A_orifice / (rho * c * Z_branch_norm);
+    // 3. Series combination. The two parts are normalized on different
+    // areas, so they are denormalized by their own reference area first.
+    // Z_neck is normalized on the panel velocity (orifice area / porosity =
+    // A_duct, see orifice_impedance_with_flow); Z_tube on the tube's own
+    // characteristic impedance rho*c/A_tube. Acoustic impedance p/(u*S):
+    //   Z_branch = rho*c * (Z_neck / A_duct + Z_tube / A_tube)
+    std::complex<double> Z_branch_acoustic =
+        rho * c * (Z_neck / A_duct + Z_tube / A_tube);
+    std::complex<double> Y_branch = 1.0 / Z_branch_acoustic;
 
     // 5. Transfer matrix for side-branch
     // For a shunt element (parallel admittance):
@@ -863,88 +873,32 @@ CanAnnularGeometry to_acoustic_geometry(
 std::string BlochMode::symmetry_type() const {
     if (m_azimuthal == 0) {
         return "Push-Push (all cans in phase)";
-    } else if (m_azimuthal == n_cans / 2) {
+    } else if (n_cans % 2 == 0 && m_azimuthal == n_cans / 2) {
+        // Only an even can count has an m = N/2 (alternating) Bloch order.
         return "Push-Pull (adjacent cans 180deg out of phase)";
     } else {
         return "Spinning/Standing wave (m=" + std::to_string(m_azimuthal) + ")";
     }
 }
 
-// Internal helper: Can admittance (1D duct with boundary conditions)
-[[maybe_unused]] static std::complex<double> can_admittance(
-    double omega,
-    const CanAnnularGeometry& geom,
-    double c,
-    double rho,
-    BoundaryCondition bc_top
-) {
-    std::complex<double> k = omega / c;
-    std::complex<double> Y_char = geom.area_can / (rho * c);
-    std::complex<double> i(0.0, 1.0);
-
-    if (bc_top == BoundaryCondition::Closed) {
-        // Rigid wall at top: u=0, Y = i*Y_char*tan(kL)
-        return i * Y_char * std::tan(k * geom.length_can);
-    } else {
-        // Open at top: p=0, Y = -i*Y_char/tan(kL)
-        std::complex<double> tan_kL = std::tan(k * geom.length_can);
-        if (std::abs(tan_kL) < 1e-10) {
-            return std::complex<double>(1e10, 0.0);  // Avoid singularity
-        }
-        return -i * Y_char / tan_kL;
-    }
-}
-
-// Internal helper: Annulus admittance (Bloch-Floquet waveguide)
-[[maybe_unused]] static std::complex<double> annulus_admittance(
-    double omega,
-    int m,
-    const CanAnnularGeometry& geom,
-    double c,
-    double rho
-) {
-    // Special case: single can (N=1) has no annulus coupling
-    if (geom.n_cans == 1) {
-        return std::complex<double>(0.0, 0.0);  // No coupling
-    }
-
-    std::complex<double> k = omega / c;
-
-    // Sector geometry
-    double sector_angle = 2.0 * M_PI / geom.n_cans;
-    double sector_length = sector_angle * geom.radius_plenum;
-
-    // Bloch phase shift for mode m
-    double psi = 2.0 * M_PI * m / geom.n_cans;
-
-    // Transfer matrix formulation (Evesque & Polifke 2005, Eq. 14)
-    std::complex<double> kL = k * sector_length;
-    std::complex<double> cos_kL = std::cos(kL);
-    std::complex<double> sin_kL = std::sin(kL);
-    std::complex<double> cos_psi(std::cos(psi), 0.0);
-
-    // Avoid singularities
-    std::complex<double> num = cos_kL - cos_psi;
-    if (std::abs(num) < 1e-10) {
-        return std::complex<double>(1e10, 0.0);
-    }
-    if (std::abs(sin_kL) < 1e-10) {
-        return std::complex<double>(1e10, 0.0);
-    }
-
-    // Effective annulus impedance: Z_ann = -i*(rho*c)/(2*A_ann) * sin(kL)/(cos(kL)-cos(psi))
-    std::complex<double> i(0.0, 1.0);
-    std::complex<double> Z_ann = -i * (rho * c / (2.0 * geom.area_plenum)) * (sin_kL / num);
-
-    // Return admittance
-    if (std::abs(Z_ann) < 1e-10) {
-        return std::complex<double>(1e10, 0.0);
-    }
-    return 1.0 / Z_ann;
-}
-
-// Internal helper: Dispersion relation D(omega, m) = Y_can + Y_annulus
-// Overload for complex omega (needed for Argument Principle)
+// Internal helper: dispersion relation of the can-annular Bloch problem.
+// Overload for complex omega (needed for Argument Principle).
+//
+// Volume-flow balance at one can junction, outflow / p_j (same sign
+// convention for every branch):
+//   can (closed top):  Y_can = i Yc tan(k_c L)        Yc = A_can / (rho_c c_c)
+//   can (open top):    Y_can = -i Yc cot(k_c L)
+//   annulus sectors:   Y_ann = i 2Ya (cos(psi) - cos(k_p s)) / sin(k_p s)
+//                      Ya = A_plenum / (rho_p c_p), s = 2 pi R / N,
+//                      Bloch: p_{j+1} + p_{j-1} = 2 cos(psi) p_j, psi = 2 pi m / N
+// Low-frequency check: m = 0 gives Y_ann -> i w (A s) / (rho c^2), the
+// compliance of the sector volume, as a closed-top can gives i w (A L)/(rho c^2).
+//
+// Returned in POLE-FREE form, D = (Y_can + Y_ann) * den_can * sin(k_p s):
+// the admittance sum has poles where the denominators vanish, and modes with
+// a pressure node at every junction (sin(k_p s) = 0 with cos(psi) = cos(k_p s))
+// are roots of this product but not of the bare sum. Entire in omega, so the
+// Argument Principle counts zeros only. Units of admittance [m^3/(Pa s)].
 std::complex<double> dispersion_relation_complex(
     std::complex<double> omega,
     int m,
@@ -955,53 +909,37 @@ std::complex<double> dispersion_relation_complex(
     double rho_plenum,
     BoundaryCondition bc_top
 ) {
-    std::complex<double> k_can = omega / c_can;
-    std::complex<double> k_plenum = omega / c_plenum;
-    std::complex<double> i(0.0, 1.0);
+    const std::complex<double> i(0.0, 1.0);
+    const std::complex<double> k_can = omega / c_can;
+    const double Yc = geom.area_can / (rho_can * c_can);
+    const std::complex<double> sin_kl_can = std::sin(k_can * geom.length_can);
+    const std::complex<double> cos_kl_can = std::cos(k_can * geom.length_can);
 
-    // Can admittance - compute sin/cos separately to avoid tan() singularities
-    std::complex<double> Y_char_can = geom.area_can / (rho_can * c_can);
-    std::complex<double> sin_kl_can = std::sin(k_can * geom.length_can);
-    std::complex<double> cos_kl_can = std::cos(k_can * geom.length_can);
-
-    std::complex<double> Y_can;
+    // Y_can = can_num / can_den
+    std::complex<double> can_num;
+    std::complex<double> can_den;
     if (bc_top == BoundaryCondition::Closed) {
-        // Y = i * Y_char * tan(kL) = i * Y_char * (sin/cos)
-        if (std::abs(cos_kl_can) < 1e-12) {
-            return std::complex<double>(1e12, 0.0);  // Pole
-        }
-        Y_can = i * Y_char_can * (sin_kl_can / cos_kl_can);
+        can_num = i * Yc * sin_kl_can;
+        can_den = cos_kl_can;
     } else {
-        // Y = -i * Y_char * cot(kL) = -i * Y_char * (cos/sin)
-        if (std::abs(sin_kl_can) < 1e-12) {
-            return std::complex<double>(1e12, 0.0);  // Pole
-        }
-        Y_can = -i * Y_char_can * (cos_kl_can / sin_kl_can);
+        can_num = -i * Yc * cos_kl_can;
+        can_den = sin_kl_can;
     }
 
-    // Annulus admittance (skip if single can)
-    std::complex<double> Y_ann(0.0, 0.0);
-    if (geom.n_cans > 1) {
-        double sector_angle = 2.0 * M_PI / geom.n_cans;
-        double sector_len = sector_angle * geom.radius_plenum;
-        double psi = 2.0 * M_PI * m / geom.n_cans;
-
-        std::complex<double> kL = k_plenum * sector_len;
-        std::complex<double> cos_kL = std::cos(kL);
-        std::complex<double> sin_kL = std::sin(kL);
-        std::complex<double> cos_psi(std::cos(psi), 0.0);
-
-        std::complex<double> num = cos_kL - cos_psi;
-        std::complex<double> den = sin_kL;
-
-        // Y_ann = i * (2A / rho*c) * (cos(kL) - cos(psi)) / sin(kL)
-        if (std::abs(den) < 1e-12) {
-            return std::complex<double>(1e12, 0.0);  // Pole
-        }
-        Y_ann = i * (2.0 * geom.area_plenum / (rho_plenum * c_plenum)) * (num / den);
+    // Single can: no annulus coupling, D = Y_can * can_den
+    if (geom.n_cans <= 1) {
+        return can_num;
     }
 
-    return Y_can + Y_ann;
+    const std::complex<double> k_plenum = omega / c_plenum;
+    const double Ya = geom.area_plenum / (rho_plenum * c_plenum);
+    const double sector_len = 2.0 * M_PI * geom.radius_plenum / geom.n_cans;
+    const double psi = 2.0 * M_PI * m / geom.n_cans;
+    const std::complex<double> ks = k_plenum * sector_len;
+
+    // Y_ann = ann_num / sin(ks)
+    const std::complex<double> ann_num = i * (2.0 * Ya) * (std::cos(psi) - std::cos(ks));
+    return can_num * std::sin(ks) + ann_num * can_den;
 }
 
 // Real omega version (for backward compatibility)

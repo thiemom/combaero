@@ -33,9 +33,13 @@ inline constexpr double kContourImagMax = 200.0;
 inline constexpr int kContourStepsFreq = 40;
 inline constexpr int kContourStepsImag = 20;
 
-// Acceptance threshold: |D(ω)| must be below this for a candidate to be
-// accepted as a genuine mode.  Dimensionless after normalisation by Y_char.
-inline constexpr double kDispersionTolerance = 0.1;
+// Acceptance threshold: |D(omega)| / Y_char must be below this for a
+// candidate to be accepted as a genuine mode. D is an admittance
+// [m^3/(Pa s)], so the comparison is made relative to the characteristic
+// admittances A/(rho c) of the branches it sums (an absolute 0.1 accepted
+// any point, since A/(rho c) ~ 1e-5..1e-3). A converged Muller root sits
+// near 1e-9; 1e-6 still rejects a non-converged or diverged iterate.
+inline constexpr double kDispersionTolerance = 1e-6;
 
 // Duplicate-mode guard: two modes with the same m and |Δf| < this [Hz]
 // are considered identical.  Set to half the minimum expected mode spacing.

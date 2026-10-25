@@ -9,8 +9,9 @@
 
 namespace combaero {
 
-// Dispersion relation D(ω, m) = Y_can + Y_annulus evaluated at complex ω.
-// Used by Argument Principle contour integration.
+// Dispersion relation at complex omega, in pole-free form:
+//   D = (Y_can + Y_annulus) * den_can * sin(k_p s)
+// (see acoustics.cpp). Used by Argument Principle contour integration.
 std::complex<double> dispersion_relation_complex(
     std::complex<double> omega,
     int m,

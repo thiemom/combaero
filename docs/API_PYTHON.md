@@ -737,7 +737,9 @@ Re_d = cb.orifice_Re_d_from_mdot(mdot=0.1, d=0.01, mu=1.8e-5)
 sol = cb.orifice_flow_thermo(T=300, P=2e5, X=air, m_dot=0.1, area=1e-4, Cd=0.65)
 
 # Impedance with flow effects
-Z = cb.orifice_impedance_with_flow(mdot=0.1, area=1e-4, Cd=0.65, rho=1.2, c=340)
+# (normalised Z/(rho c) referred to the panel velocity; inertia uses t + 0.85 d)
+Z = cb.orifice_impedance_with_flow(freq=500.0, u_bias=2.0, u_grazing=10.0, d_orifice=1e-3,
+                                   l_orifice=1e-3, porosity=0.05, Cd=0.7, rho=1.2, c=340.0)
 
 ```
 
@@ -1000,7 +1002,8 @@ f_helm = cb.helmholtz_frequency(V=0.001, A_neck=1e-4, L_neck=0.01, c=340)
 
 # Duct modes
 tube = cb.Tube(L=1.0, D=0.1)
-modes = cb.tube_axial_modes(tube, c=340, bc1=cb.BoundaryCondition.Closed, bc2=cb.BoundaryCondition.Open)
+modes = cb.tube_axial_modes(tube, c=340, upstream=cb.BoundaryCondition.Closed,
+                            downstream=cb.BoundaryCondition.Open)
 ```
 
 ---
