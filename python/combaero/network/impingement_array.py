@@ -51,6 +51,16 @@ if TYPE_CHECKING:
 # it the reference is the supply's to solver noise (see summarize).
 BYPASS_DT_TOL_K = 1.0
 
+# A row whose plate total-pressure drop is below this fraction of the gap's
+# dynamic head there is below what the crossflow chain resolves (#729): the
+# station scheme is consistent to O(M^2 dm/m) of that head. On CR-3630 Table
+# D.2 (B(5,4,1) at mc/mj 0.5 and 1.01, M 0.22) the dead rows sit at up to 0.4%
+# of it, their flows alternating in sign from row to row; every other row is
+# above 6.9%. 1% falls in that gap. It is a resolution estimate, not a
+# measured band. The row's flow, Nu and eta_r are reported as unresolved
+# (see summarize).
+UNRESOLVED_ROW_DPT_FRACTION = 0.01
+
 
 @dataclass
 class ImpingementArray:
@@ -213,6 +223,13 @@ class ImpingementArray:
 
         Scalars for the array as a whole, plus a per-row list for each row
         quantity. The pressure block is supply-to-exit.
+
+        ``rows_unresolved`` marks (1.0) a starved row: its plate drop is below
+        ``UNRESOLVED_ROW_DPT_FRACTION`` of the gap's dynamic head, so its jet
+        flow -- sign included -- and the Nu and eta_r that follow from it are
+        below the crossflow model's resolution (#729). Such rows carry a tiny
+        share of the flow; their heat transfer is the gap's channel flow,
+        which the jet correlation does not model (#467).
         """
         n = int(self.n_rows)
         plates = [element_diag[self.plate_id(i)] for i in range(1, n + 1)]
@@ -241,6 +258,16 @@ class ImpingementArray:
         }
         for key in ("m_dot", "Re_j", "Gc_Gj", "Nu", "htc", "T_aw", "eta_r", "bypass_fraction"):
             out[f"rows_{key}"] = [float(p[key]) for p in plates]
+        # The gap's dynamic head at each row, on the segment leaving it.
+        unresolved = [
+            float(
+                abs(p["dPt"])
+                < UNRESOLVED_ROW_DPT_FRACTION * 0.5 * s["rho_ref"] * s["velocity"] ** 2
+            )
+            for p, s in zip(plates, segments, strict=True)
+        ]
+        out["rows_unresolved"] = unresolved
+        out["n_rows_unresolved"] = float(sum(unresolved))
         if self._bypass is not None:
             lead = element_diag[self.segment_id(0)]
             m_c = float(lead["m_dot"])

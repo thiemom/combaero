@@ -135,9 +135,11 @@ def _solve(key: Test) -> list[dict[str, float]]:
     res = NetworkSolver(net).solve()
     assert res["__success__"], f"{key}: {res.get('__message__')}"
     diag = res["__element_diag__"]
+    unresolved = arr.summarize(diag)["rows_unresolved"]
     rows = []
     for i in range(1, N_ROWS + 1):
         p = dict(diag[arr.plate_id(i)])
+        p["unresolved"] = unresolved[i - 1]
         p["eta"] = (p["T_aw"] - T0) / BYPASS_DT if m_c > 0.0 else math.nan
         rows.append(p)
     return rows
@@ -233,16 +235,21 @@ def test_the_jet_heat_transfer() -> None:
       Gc/Gj past 4.44), at -94%: the surface is cooled by the crossflow and
       the jet correlation has no channel-flow floor (CR-3936 conclusion 6;
       the open #467 item). Pinned so a floor shows here.
+
+    The array summary marks exactly those 8 rows unresolved (#729) and no
+    other.
     """
     groups: dict[str, list[float]] = defaultdict(list)
     for key in _scored():
         for p, r in zip(_solve(key), _d2()[key], strict=True):
             e = p["Nu"] / r["Nu"] - 1.0
+            starved = p["Gc_Gj"] < 0.0 or p["Gc_Gj"] > 4.44
+            assert bool(p["unresolved"]) == starved, (key, p["Gc_Gj"])
             if key[3] == 0.0:
                 groups["none"].append(e)
             elif p["surface_extrapolated"]:
                 groups["outside"].append(e)
-                if p["Gc_Gj"] < 0.0 or p["Gc_Gj"] > 4.44:
+                if starved:
                     groups["starved"].append(e)
             else:
                 groups["inside"].append(e)
