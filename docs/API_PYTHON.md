@@ -2297,6 +2297,16 @@ arr.add_to(net, supply="supply", exit="exit", bypass="byp")   # adds ia__x0: byp
   rows' `T_aw`, `eta_r` and `bypass_fraction`, and sets
   `heat_transfer_outside_source` when a bypass more than 1 K off the
   supply meets a staggered array or a row outside the inline data.
+- **Starved rows are reported unresolved (#729).** A strong bypass leaves
+  the upstream rows with almost no jet flow. Their plate drop is then a few
+  pascals against a gap dynamic head of kilopascals, below what the
+  crossflow chain resolves: their flows come out alternating in sign from
+  row to row. `rows_unresolved` (1.0 per row) and `n_rows_unresolved` mark
+  a row whose plate total-pressure drop is below 1% of the gap's dynamic
+  head (`UNRESOLVED_ROW_DPT_FRACTION`). Read its flow, `Nu` and `eta_r` as
+  unresolved: the surface there is cooled by the gap's channel flow, which
+  the jet correlation does not model. On Table D.2 the flag marks exactly
+  the 8 rows the jet Nu misses by -94%, and no other row.
 
 Spent air leaving through the target (#468) is a different configuration,
 with its own element to come. The building blocks below are public for

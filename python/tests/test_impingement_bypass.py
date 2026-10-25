@@ -109,6 +109,23 @@ def test_row_one_sees_the_bypass_as_its_crossflow() -> None:
     assert _rows(res, arr)[0] < _rows(res_c, arr_c)[0]
 
 
+def test_starved_rows_are_reported_unresolved() -> None:
+    """A row whose plate drop is below 1% of the gap's dynamic head is below
+    the crossflow chain's resolution (#729). Closed, no row is; a bypass that
+    starves the upstream rows marks them, and only them."""
+    res_c, arr_c = _closed()
+    s = arr_c.summarize(res_c["__element_diag__"])
+    assert s["n_rows_unresolved"] == 0.0
+    net, arr = _with_bypass(0.05)
+    d = _solve(net)["__element_diag__"]
+    s = arr.summarize(d)
+    flagged = [i for i, f in enumerate(s["rows_unresolved"], 1) if f]
+    # Measured: rows 1-5 at 0.02-0.41% of the head, row 6 at 5.8%.
+    assert flagged == [1, 2, 3, 4, 5]
+    m = s["rows_m_dot"]
+    assert max(abs(m[i - 1]) for i in flagged) < 0.1 * max(m)
+
+
 def test_the_feed_node_does_not_matter() -> None:
     """The lead-in accelerates the bypass from the feed node's TOTAL
     pressure, and a channel keeps its total pressure into either node. So a
