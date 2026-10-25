@@ -15,7 +15,7 @@ namespace combaero {
 
 // Width of each frequency search window [Hz].
 // Narrower windows reduce the chance of two modes sharing a box;
-// 50 Hz is a safe default for combustor-scale geometries (L ~ 0.3–1 m).
+// 50 Hz is a safe default for combustor-scale geometries (L ~ 0.3-1 m).
 inline constexpr double kScanWindowHz = 50.0;
 
 // Minimum frequency to start scanning [Hz].
@@ -28,20 +28,49 @@ inline constexpr double kScanStartHz = 10.0;
 inline constexpr double kContourImagMin = -10.0;
 inline constexpr double kContourImagMax = 200.0;
 
+// Minimum distance [Hz] between a real-axis pole of D and a vertical contour
+// edge. A box edge closer than this to a pole is moved outward by twice this
+// value, so the pole sits well inside the box and is counted.
+inline constexpr double kContourPoleClearanceHz = 5.0;
+
+// Points of the |D| scan that seeds Muller inside one annular-duct box
+// (local minima become starting points). ~0.25 Hz spacing on a 50 Hz box.
+inline constexpr int kAnnularScanPoints = 201;
+
+// Magnitude minimization: every |D| minimum of a scan window seeds Muller
+// (previously only the first two, which dropped the third root of a busy
+// window).
+inline constexpr int kMagnitudeScanMaxGuesses = 1000;
+
+// |k_x L| below which the annular-duct admittance uses its cut-on series
+// (two terms; relative truncation error ~ x^4 < 1e-16 here).
+inline constexpr double kAnnularCutOnSeries = 1e-4;
+
+// f_max is exclusive. A refined root within this relative distance below it is
+// treated as AT f_max (Muller lands on 999.9999999 for a 1000 Hz root), so the
+// numerical and analytical annular solvers return the same set.
+inline constexpr double kFmaxEdgeRelTol = 1e-9;
+
 // Number of contour steps along the frequency and imaginary axes.
 // Higher values reduce the chance of missing a winding due to coarse sampling.
 inline constexpr int kContourStepsFreq = 40;
 inline constexpr int kContourStepsImag = 20;
 
-// Acceptance threshold: |D(omega)| / Y_char must be below this for a
-// candidate to be accepted as a genuine mode. D is an admittance
-// [m^3/(Pa s)], so the comparison is made relative to the characteristic
-// admittances A/(rho c) of the branches it sums (an absolute 0.1 accepted
-// any point, since A/(rho c) ~ 1e-5..1e-3). A converged Muller root sits
-// near 1e-9; 1e-6 still rejects a non-converged or diverged iterate.
+// Adaptive contour refinement: a segment whose argument turns by more than
+// kContourMaxPhaseStep [rad] is bisected, at most kContourMaxBisections deep.
+// Without it a root within a few rad/s of a box edge aliases by 2 pi and the
+// box is skipped.
+inline constexpr double kContourMaxPhaseStep = M_PI / 4.0;
+inline constexpr int kContourMaxBisections = 12;
+
+// Acceptance threshold: |D(omega)| / Y_char must be below this for a refined
+// candidate to be accepted as a genuine mode. Y_char is the sum of the branch
+// characteristic admittances A / (rho c) at the junction, so the test is
+// dimensionless. A converged Muller root sits at ~1e-12; a non-converged
+// candidate next to a root or a pole sits at 1e-2 or above.
 inline constexpr double kDispersionTolerance = 1e-6;
 
-// Duplicate-mode guard: two modes with the same m and |Δf| < this [Hz]
+// Duplicate-mode guard: two modes with the same m and |Delta f| < this [Hz]
 // are considered identical.  Set to half the minimum expected mode spacing.
 inline constexpr double kDuplicateGuardHz = 1.0;
 
@@ -94,7 +123,7 @@ std::vector<BlochMode> can_annular_eigenmodes_with_method(
 // Method 1: Magnitude Minimization (WORKING - DEFAULT)
 // -------------------------------------------------------------
 // Fast, reliable solver using sliding window + magnitude minimization
-// Finds modes by scanning for local minima of |D(ω)|
+// Finds modes by scanning for local minima of |D(omega)|
 std::vector<BlochMode> solve_magnitude_minimization(
     const CanAnnularGeometry& geom,
     double c_can,
@@ -109,8 +138,10 @@ std::vector<BlochMode> solve_magnitude_minimization(
 // Method 2: Argument Principle (RESEARCH-GRADE)
 // -------------------------------------------------------------
 // Robust solver using Argument Principle (Nyquist contour)
-// Guarantees finding ALL modes by counting zeros in complex plane
-// Handles poles explicitly, works for complex frequencies
+// Counts zeros per frequency box by winding number (D is in pole-free
+// product form, so the count is zeros only) and refines each counted box with
+// Muller from its |D| minima, accepting only points with |D|/Y_char below
+// kDispersionTolerance.
 //
 // References:
 //   - Silva et al. (2013): Argument Principle for thermoacoustics
@@ -128,8 +159,9 @@ std::vector<BlochMode> solve_argument_principle(
 // -------------------------------------------------------------
 // Helper: Improved Argument Principle with Pole Handling
 // -------------------------------------------------------------
-// Counts zeros inside rectangular contour with adaptive pole avoidance
-// Returns: Number of zeros (or -1 if contour is unreliable)
+// Winding number of D around the rectangular contour: zeros MINUS poles inside
+// (D is pole-free, so this is the zero count). Returns 0 if the
+// contour hits a pole, 1 if a contour point hits a root.
 int count_zeros_argument_principle_improved(
     double f_min,
     double f_max,
@@ -147,8 +179,10 @@ int count_zeros_argument_principle_improved(
 // -------------------------------------------------------------
 // Helper: Identify Pole Frequencies
 // -------------------------------------------------------------
-// Returns frequencies where dispersion relation has poles
-// Used to shift contours away from singularities
+// Returns the CAN-term poles of the dispersion relation in [f_min, f_max]
+// (first 50 only). The plenum term adds poles at n c_plenum / (2 s) that this
+// helper cannot see (it takes no c_plenum). Not used by the solvers:
+// dispersion_relation_complex is in pole-free product form.
 std::vector<double> identify_pole_frequencies(
     const CanAnnularGeometry& geom,
     double c_can,
@@ -185,9 +219,12 @@ struct AnnularMode {
 // Parameters:
 //   geom    : Annulus geometry (from geometry.h)
 //   c       : speed of sound [m/s]
-//   rho     : density [kg/m³]
+//   rho     : density [kg/m^3]
 //   f_max   : maximum frequency [Hz]
-//   bc_ends : boundary condition at duct ends (default: Closed)
+//   bc_ends : boundary condition at the far end x = L (default: Closed). The
+//             end x = 0 is always rigid: Closed gives closed-closed modes
+//             f_ax = n c / (2 L); Open gives closed-open (quarter-wave) modes
+//             f_ax = (2n - 1) c / (4 L), NOT open-open.
 //
 // Returns: Vector of AnnularMode sorted by frequency
 //

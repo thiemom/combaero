@@ -2057,12 +2057,12 @@ warm start so `solve()` requires no additional `init_strategy`.
 ```python
 # Basic geometry
 tube = cb.Tube(L=1.0, D=0.1)
-annulus = cb.Annulus(R_outer=0.1, R_inner=0.05)
+annulus = cb.Annulus(L=0.5, D_inner=0.1, D_outer=0.2)   # DIAMETERS [m]
+annulus.area(), annulus.gap(), annulus.D_mean(), annulus.circumference()
 
-# Can-annular geometry
+# Can-annular flow geometry (primary zone, transition, annular section)
 can_geo = cb.CanAnnularFlowGeometry(
-    N_cans=12, R_can=0.05, L_can=0.3,
-    R_annulus_inner=0.06, R_annulus_outer=0.1
+    L=0.3, D_inner=0.4, D_outer=0.6, L_primary=0.2, D_primary=0.1, L_transition=0.05
 )
 ```
 
@@ -2081,13 +2081,29 @@ k_tbc = cb.k_tbc_ysz
 
 ### Advanced Geometry Functions
 ```python
-# Annular areas
-area_ann = cb.annular_area(R_outer=0.1, R_inner=0.05)
+# Annulus: pi (Do^2 - Di^2) / 4, Dh = Do - Di (diameters, D_outer > D_inner >= 0)
+area_ann = cb.annular_area(D_outer=0.2, D_inner=0.1)
+dh_ann = cb.hydraulic_diameter_annulus(D_outer=0.2, D_inner=0.1)
 
 # Residence times
 t_res = cb.residence_time(V=0.01, Q=0.1)
-t_res_ann = cb.residence_time_annulus(V=0.01, Q=0.1, R_outer=0.1, R_inner=0.05)
-t_res_can = cb.residence_time_can_annular(V=0.01, Q=0.1, N_cans=12, R_can=0.05)
+t_res_ann = cb.residence_time_annulus(annulus, Q=0.1)
+t_res_can = cb.residence_time_can_annular(can_geo, Q=0.1)
+```
+
+### Can-annular and annular-duct acoustics
+```python
+# N cans on an annular plenum, Bloch-Floquet: modes per azimuthal order m = 0..N/2
+geom = cb.to_acoustic_geometry(can_geo, n_cans=24, L_can=0.5, D_can=0.1)
+modes = cb.can_annular_eigenmodes(geom, c_can=500, c_plenum=550, rho_can=1.2,
+                                  rho_plenum=1.0, f_max=2000,
+                                  bc_can_top=cb.BoundaryCondition.Closed)
+
+# Uniform thin annular duct, rigid at x = 0; bc_ends is the far end (Open =
+# closed-open quarter-wave modes). Closed ends include n_axial = 0 azimuthal modes.
+modes = cb.annular_duct_eigenmodes(annulus, c=500, rho=1.2, f_max=1000)
+modes = cb.annular_duct_modes_analytical(annulus, c=500, f_max=1000)
+# cb.AnnularDuctGeometry is a deprecated alias of cb.Annulus
 ```
 
 ### Rib Correlations (parametrised)

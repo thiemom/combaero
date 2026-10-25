@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 #include "../include/acoustics.h"
+#include "../include/can_annular_solvers.h"
 #include "../include/geometry.h"
 #include "../include/math_constants.h"  // MSVC compatibility for M_PI
+#include <cmath>
+#include <vector>
 
 using namespace combaero;
 
@@ -142,4 +145,96 @@ TEST_F(AcousticAdapterTest, IntegrationWithSolver) {
     EXPECT_GT(geom.radius_plenum, 0.0);
     EXPECT_GT(geom.length_can, 0.0);
     EXPECT_GT(geom.n_cans, 0);
+}
+
+// -------------------------------------------------------------
+// Both can-annular solver methods against the straight-duct identity
+// -------------------------------------------------------------
+// A_can = 2 A_plenum, L_can = s/2 (s = 2 pi R / N) and one gas: for m = 0 the
+// can and the two closed half-sector stubs form one closed-closed duct of
+// length 2 L seen from its middle: below 1200 Hz its m = 0 modes are exactly
+// c / (4 L) = 500 Hz (pressure node at the junction) and c / (2 L) = 1000 Hz.
+// With the plenum term of the wrong sign the admittance sum vanishes
+// identically and every scan minimum is "a mode".
+namespace {
+CanAnnularGeometry straight_duct_geometry() {
+    CanAnnularGeometry g;
+    g.n_cans = 12;
+    g.length_can = 0.25;
+    g.area_can = 0.02;
+    g.area_plenum = 0.01;
+    g.radius_plenum = 2.0 * g.length_can * g.n_cans / (2.0 * M_PI);
+    return g;
+}
+}  // namespace
+
+TEST(CanAnnularSolverMethods, StraightDuctIdentityBothMethods) {
+    const auto g = straight_duct_geometry();
+    const double c = 500.0;
+    for (auto method : {CanAnnularSolverMethod::MagnitudeMinimization,
+                        CanAnnularSolverMethod::ArgumentPrinciple}) {
+        const auto modes = can_annular_eigenmodes_with_method(
+            g, c, c, 1.0, 1.0, 1200.0, BoundaryCondition::Closed, method);
+        std::vector<double> m0;
+        for (const auto& mode : modes) {
+            if (mode.m_azimuthal == 0) m0.push_back(mode.frequency);
+        }
+        ASSERT_EQ(m0.size(), 2u) << "method " << static_cast<int>(method);
+        EXPECT_NEAR(m0[0], c / (4.0 * g.length_can), 1e-6);
+        // 1000 Hz is a multiple root of the pole-free product (sin(kL) and
+        // sin(2kL) vanish together), so Muller converges only linearly there.
+        EXPECT_NEAR(m0[1], c / (2.0 * g.length_can), 1e-3);
+    }
+}
+
+// The Argument Principle method returns the same mode set as magnitude
+// minimization, which python/tests/test_can_annular_acoustics.py checks root
+// by root against an independently derived dispersion relation. With D as a
+// bare admittance sum the winding number was zeros minus poles and the method
+// dropped 4 of the 21 modes of the first case below; it also skipped roots
+// next to a box edge and accepted non-converged Muller iterates.
+TEST(CanAnnularSolverMethods, ArgumentPrincipleMatchesMagnitudeMinimization) {
+    struct Case {
+        int n;
+        double L, Ac, R, Ap, c_c, c_p, r_c, r_p, f_max;
+        BoundaryCondition bc;
+    };
+    const Case cases[] = {
+        {12, 0.5, 0.01, 0.5, 0.02, 500.0, 600.0, 1.0, 1.2, 1200.0, BoundaryCondition::Closed},
+        {24, 0.5, 0.01, 0.5, 0.02, 500.0, 600.0, 1.0, 1.2, 2000.0, BoundaryCondition::Closed},
+        {16, 0.8, 0.03, 1.2, 0.05, 800.0, 450.0, 0.4, 1.8, 1500.0, BoundaryCondition::Closed},
+        {2, 0.4, 0.01, 0.3, 0.01, 340.0, 340.0, 1.2, 1.2, 2000.0, BoundaryCondition::Closed},
+        {12, 0.5, 0.01, 0.5, 0.02, 500.0, 600.0, 1.0, 1.2, 1500.0, BoundaryCondition::Open},
+    };
+    for (const auto& k : cases) {
+        CanAnnularGeometry g;
+        g.n_cans = k.n;
+        g.length_can = k.L;
+        g.area_can = k.Ac;
+        g.radius_plenum = k.R;
+        g.area_plenum = k.Ap;
+        const auto ap = can_annular_eigenmodes_with_method(
+            g, k.c_c, k.c_p, k.r_c, k.r_p, k.f_max, k.bc,
+            CanAnnularSolverMethod::ArgumentPrinciple);
+        const auto mm = can_annular_eigenmodes_with_method(
+            g, k.c_c, k.c_p, k.r_c, k.r_p, k.f_max, k.bc,
+            CanAnnularSolverMethod::MagnitudeMinimization);
+        EXPECT_EQ(ap.size(), mm.size()) << "N=" << k.n;
+        auto contains = [](const std::vector<BlochMode>& set, const BlochMode& x) {
+            for (const auto& y : set) {
+                if (x.m_azimuthal == y.m_azimuthal && std::abs(x.frequency - y.frequency) < 1e-3) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        for (const auto& a : ap) {
+            EXPECT_TRUE(contains(mm, a)) << "N=" << k.n << " extra m=" << a.m_azimuthal
+                                         << " f=" << a.frequency;
+        }
+        for (const auto& b : mm) {
+            EXPECT_TRUE(contains(ap, b)) << "N=" << k.n << " missed m=" << b.m_azimuthal
+                                         << " f=" << b.frequency;
+        }
+    }
 }

@@ -1220,11 +1220,35 @@ struct WallCouplingResult {
 ## Geometry Utilities (geometry.h)
 
 ```cpp
-double channel_area(double D);
-double hydraulic_diameter(double A, double P_wetted);
-double channel_roughness(const std::string& material);
+double hydraulic_diameter(double A, double P_wetted);         // 4 A / P
+double hydraulic_diameter_rect(double a, double b);            // 2ab / (a + b)
+double hydraulic_diameter_annulus(double D_outer, double D_inner);  // Do - Di
+double circular_area(double D);
+double annular_area(double D_outer, double D_inner);           // pi (Do^2 - Di^2) / 4
+double cylinder_volume(double D, double L);
+// The free functions throw std::invalid_argument unless D_outer > D_inner >= 0
+// (and positive sizes); the structs below do not validate.
+
+struct Tube { double L, D; area(); volume(); perimeter(); };
+struct Annulus {
+    double L, D_inner, D_outer;   // diameters [m]
+    int n_azimuthal_max = 5;      // acoustic solvers
+    D_mean(); gap();              // gap = (Do - Di) / 2, half the hydraulic diameter
+    area(); volume(); circumference();  // circumference = pi D_mean
+    radius_inner(); radius_outer();
+};
+struct CanAnnularFlowGeometry {   // primary zone + transition + annulus
+    double L, D_inner, D_outer, L_primary, D_primary, L_transition;
+    // Annulus helpers plus area_primary, volume_primary, volume_transition,
+    // volume_total, length_total
+};
+
 double residence_time(double V, double Q);
+double residence_time_mdot(double V, double mdot, double rho);
+// overloads for Tube, Annulus, CanAnnularFlowGeometry; space_velocity(Q, V)
 ```
+
+`channel_roughness` lives in friction.h.
 
 ---
 
@@ -1663,6 +1687,34 @@ double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
 
 double acoustic_impedance(double rho, double c);
 double sound_pressure_level(double p_rms, double p_ref = 20e-6);
+```
+
+### Can-annular and annular-duct modes (acoustics.h, can_annular_solvers.h)
+
+```cpp
+struct CanAnnularGeometry { int n_cans; double length_can, area_can, radius_plenum, area_plenum; };
+struct BlochMode { int m_azimuthal; double frequency; int n_cans; std::string symmetry_type() const; };
+CanAnnularGeometry to_acoustic_geometry(const CanAnnularFlowGeometry&, int n_cans,
+                                        double L_can, double D_can);
+
+// Bloch-Floquet: per m = 0..N/2, roots of the junction volume-flow balance
+// (can + two plenum sectors). Default method: magnitude minimization + Muller.
+std::vector<BlochMode> can_annular_eigenmodes(const CanAnnularGeometry&, double c_can,
+    double c_plenum, double rho_can, double rho_plenum, double f_max = 2000,
+    BoundaryCondition bc_can_top = BoundaryCondition::Closed);
+enum class CanAnnularSolverMethod { MagnitudeMinimization, ArgumentPrinciple };
+std::vector<BlochMode> can_annular_eigenmodes_with_method(..., CanAnnularSolverMethod);  // C++ only
+std::vector<BlochMode> solve_magnitude_minimization(...);   // C++ only
+std::vector<BlochMode> solve_argument_principle(...);       // C++ only
+
+// Uniform thin annular duct, rigid at x = 0, bc_ends at x = L (Open = closed-open).
+// Rigid ends include the axially uniform n_axial = 0 mode for m >= 1. f_max exclusive.
+struct AnnularMode { int m_azimuthal, n_axial; double frequency; };
+std::vector<AnnularMode> annular_duct_eigenmodes(const Annulus&, double c, double rho,
+    double f_max, BoundaryCondition bc_ends = BoundaryCondition::Closed);
+std::vector<AnnularMode> annular_duct_modes_analytical(const Annulus&, double c,
+    double f_max, BoundaryCondition bc_ends = BoundaryCondition::Closed);
+using AnnularDuctGeometry [[deprecated]] = Annulus;  // since v0.2.0, no removal version set
 ```
 
 ---
