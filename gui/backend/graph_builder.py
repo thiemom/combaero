@@ -27,6 +27,7 @@ from combaero.network import (
     PressureLossElement,
     RibbedModel,
     SingleJetImpingementModel,
+    SlotFilmElement,
     SmoothModel,
     ThermalWall,
     VortexElement,
@@ -64,6 +65,7 @@ from .schemas import (
     PressureBoundaryData,
     RibbedModelData,
     SingleJetImpingementModelData,
+    SlotFilmData,
     SmoothModelData,
     ThermalWallData,
     VortexData,
@@ -1132,6 +1134,21 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 area_ratio=data.area_ratio if shaped else None,
                 breakout_width=data.breakout_width if shaped else None,
                 turbulence_intensity=data.turbulence_intensity,
+                correlation=data.correlation,
+                Cd=data.Cd,
+            )
+            net.add_element(elem)
+        elif elem_type == "slot_film":
+            data = SlotFilmData(**elem_data)
+            elem = SlotFilmElement(
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                slot_height=data.slot_height,
+                span=data.span,
+                lip_thickness=data.lip_thickness,
+                turbulence_intensity=data.turbulence_intensity,
+                C_m_multiplier=data.C_m_multiplier,
                 correlation=data.correlation,
                 Cd=data.Cd,
             )

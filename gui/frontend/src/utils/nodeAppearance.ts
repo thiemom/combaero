@@ -11,6 +11,7 @@
 import {
 	Activity,
 	ArrowRight,
+	BetweenHorizontalStart,
 	CircleDot,
 	Columns4,
 	Crosshair,
@@ -51,6 +52,7 @@ export const NODE_APPEARANCE = {
 	impingement_array: { icon: ShowerHead, colour: "text-orange-500" },
 	effusion_plate: { icon: Grip, colour: "text-orange-500" },
 	film_cooling: { icon: Waves, colour: "text-orange-500" },
+	slot_film: { icon: BetweenHorizontalStart, colour: "text-orange-500" },
 	effusion_liner: { icon: Columns4, colour: "text-orange-500" },
 	area_change: { icon: Maximize2, colour: "text-blue-500" },
 	discrete_loss: { icon: Activity, colour: "text-purple-500" },

@@ -16,6 +16,7 @@ import OrificeNode from "./nodes/OrificeNode";
 import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
 import ProbeNode from "./nodes/ProbeNode";
+import SlotFilmNode from "./nodes/SlotFilmNode";
 import VortexNode from "./nodes/VortexNode";
 import WallNode from "./nodes/WallNode";
 import ThermalEdge from "./ThermalEdge";
@@ -29,6 +30,7 @@ export const nodeTypes = {
 	impingement_array: ImpingementArrayNode,
 	effusion_plate: EffusionPlateNode,
 	film_cooling: FilmCoolingNode,
+	slot_film: SlotFilmNode,
 	effusion_liner: EffusionLinerNode,
 	combustor: CombustorNode,
 	momentum_chamber: MomentumChamberNode,

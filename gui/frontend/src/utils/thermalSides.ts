@@ -26,6 +26,7 @@ export const NO_THERMAL_SIDE: ReadonlySet<string> = new Set([
 	"area_change",
 	"effusion_plate",
 	"film_cooling",
+	"slot_film",
 ]);
 
 /** Drop the thermal walls a saved network hangs on a node with no surface.
