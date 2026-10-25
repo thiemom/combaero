@@ -748,6 +748,29 @@ documents:
   issues: [468]
   records: []
   notes: 'Page range from the #468 comment (pp. 565-631); p.1 shows only Vol. 39.'
+- file: docs/heat_transfer/film/Kim_Lee_2017_JKSAS_45_4_supersonic_slot_film_Mach3.pdf
+  citation: Kim, M., Lee, D. M. (2017). An experimental study of film cooling characteristics at supersonic
+    free stream conditions (in Korean). J. Korean Society for Aeronautical and Space Sciences 45(4), 342-348.
+  id: doi:10.5139/JKSAS.2017.45.4.342
+  topic:
+  - film
+  content: Tangential slot film (converging nozzle, exit 110 mm x 1.0 mm, behind a backward-facing step) on
+    a 30 deg wedge in a Mach 3.0 free jet (P0 16.9 bar, T0 450/644 K), air on air, angle of attack 0 to -20
+    deg; IR thermography on PEEK, 40 s runs. Table 1 TABULATES blowing ratio F (0.30-1.35) and coolant flow
+    for 17 runs, Table 3 the free-stream mass flux; film efficiency at x = 100 mm (Fig. 11) and film core length
+    (Fig. 12) PLOTTED.
+  status: screened
+  verdict: 'Not usable for #714 (2026-10-25): supersonic external aero-heating, far outside the D-7958 kernel''s
+    subsonic combustor envelope; eta (Eq. 3) uses the measured wall temperature at the slot exit instead of
+    the coolant temperature, on a transient non-adiabatic PEEK wall; x/S 100 vs D-7958''s 33.8. No supersonic
+    film model in combaero.'
+  read_for:
+  - '#714 slot film data'
+  issues:
+  - 714
+  records: []
+  notes: Arrived 2026-10-25 as docs/new/An Experimental Study of Film Cooling Characteristics at Supersonic
+    Free Stream Conditions.pdf. Agency for Defense Development (IR window cooling).
 - file: docs/heat_transfer/film/Modelling_and_Simulation_of_Effusion_Cooling-A_Rev.pdf
   citation: Xia, H., Chen, X., Ellis, C. D. (2024). Modelling and simulation of effusion cooling - a review
     of recent progress. Energies 17, 4480.
