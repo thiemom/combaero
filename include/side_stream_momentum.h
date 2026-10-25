@@ -108,6 +108,9 @@ struct MergeFaceState {
   double dPf_dP = 0.0, dPf_dT = 0.0, dPf_dT_main = 0.0;
   double dPtf_dm_main = 0.0, dPtf_dm_out = 0.0, dPtf_dJ = 0.0;
   double dPtf_dP = 0.0, dPtf_dT = 0.0, dPtf_dT_main = 0.0;
+  // Gradients in the MASS fractions of the chamber (outlet) gas and of the
+  // main stream (#743), one entry per species.
+  std::vector<double> dPf_dY, dPf_dY_main, dPtf_dY, dPtf_dY_main;
 };
 
 //

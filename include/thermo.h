@@ -116,6 +116,9 @@ double cp_mass(double T, const std::vector<double>& X);
 // exchange, which makes C_min (T_hot - T_cold) its exact maximum heat (#627).
 std::tuple<double, double, double> cp_secant_mass_and_jacobian(double T1, double T2,
                                                                const std::vector<double>& X);
+// The secant cp's gradient in the MASS fractions [J/(kg K)] per species
+// (#717): a wall side's capacity rate |m| cp moves with its composition.
+std::vector<double> cp_secant_mass_dY(double T1, double T2, const std::vector<double>& X);
 double cv_mass(double T, const std::vector<double>& X);
 double h_mass(double T, const std::vector<double>& X);
 double s_mass(double T, const std::vector<double>& X, double P, double P_ref = 101325.0);

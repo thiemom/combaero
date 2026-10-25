@@ -426,7 +426,41 @@ double mixture_conductivity_dT(const std::vector<double>& X, const std::vector<d
     return 0.5 * (s1 - ds2 / (s2 * s2));
 }
 
+// d k_mix / dx_k for k_mix = (sum x_i k_i + 1 / sum x_i/k_i) / 2, x
+// unnormalised: (k_k - (1/k_k) / s2^2) / 2, s2 = sum x_i / k_i over the
+// species present.
+std::vector<double> mixture_conductivity_dX(const std::vector<double>& X,
+                                            const std::vector<double>& k)
+{
+    double s2 = 0.0;
+    for (std::size_t i = 0; i < X.size(); ++i) {
+        if (X[i] > 0.0) {
+            s2 += X[i] / k[i];
+        }
+    }
+    std::vector<double> out(X.size(), 0.0);
+    for (std::size_t i = 0; i < X.size(); ++i) {
+        out[i] = 0.5 * (k[i] - (1.0 / k[i]) / (s2 * s2));
+    }
+    return out;
+}
+
 }  // namespace
+
+TransportDerivativesX transport_and_dX(double T, double P, const std::vector<double>& X)
+{
+    (void)P;
+    if (X.size() != species_names.size()) {
+        throw std::invalid_argument("transport_and_dX: Mole fraction vector size does not match number of species");
+    }
+    const auto ps = pure_species_transport(T, X);
+    TransportDerivativesX r;
+    r.mu = wilke_viscosity(X, ps.mu);
+    r.k = mixture_conductivity(X, ps.k);
+    r.dmu_dX = wilke_viscosity_dX(X, ps.mu);
+    r.dk_dX = mixture_conductivity_dX(X, ps.k);
+    return r;
+}
 
 std::vector<double> viscosity_dX(double T, double P, const std::vector<double>& X)
 {

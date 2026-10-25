@@ -837,7 +837,11 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dPtf_dJ", &combaero::MergeFaceState::dPtf_dJ)
       .def_readonly("dPtf_dP", &combaero::MergeFaceState::dPtf_dP)
       .def_readonly("dPtf_dT", &combaero::MergeFaceState::dPtf_dT)
-      .def_readonly("dPtf_dT_main", &combaero::MergeFaceState::dPtf_dT_main);
+      .def_readonly("dPtf_dT_main", &combaero::MergeFaceState::dPtf_dT_main)
+      .def_readonly("dPf_dY", &combaero::MergeFaceState::dPf_dY)
+      .def_readonly("dPf_dY_main", &combaero::MergeFaceState::dPf_dY_main)
+      .def_readonly("dPtf_dY", &combaero::MergeFaceState::dPtf_dY)
+      .def_readonly("dPtf_dY_main", &combaero::MergeFaceState::dPtf_dY_main);
   m.def("chamber_merge_face_state", &combaero::chamber_merge_face_state,
         py::arg("m_main"), py::arg("T_main"), py::arg("X_main"), py::arg("m_out"),
         py::arg("P"), py::arg("T"), py::arg("X"), py::arg("side_momentum"),
@@ -881,6 +885,19 @@ PYBIND11_MODULE(_core, m) {
         "The duct state a heat-transfer correlation reads: duct_static_state at a\n"
         "flux bent C1 below the sonic one (G itself below (1 - 2w) G*, capped at\n"
         "(1 - w) G*, w = DUCT_HTC_SONIC_MARGIN), so it is smooth through choke (#551).");
+
+  py::class_<combaero::DuctStaticStateDY>(m, "DuctStaticStateDY")
+      .def_readonly("dT_dY", &combaero::DuctStaticStateDY::dT_dY)
+      .def_readonly("dP_dY", &combaero::DuctStaticStateDY::dP_dY)
+      .def_readonly("drho_dY", &combaero::DuctStaticStateDY::drho_dY)
+      .def_readonly("dGeff_dY", &combaero::DuctStaticStateDY::dGeff_dY);
+  m.def("duct_htc_static_state_dY", &combaero::duct_htc_static_state_dY, py::arg("T0"),
+        py::arg("P0"), py::arg("G"), py::arg("X"), py::arg("state"),
+        "duct_htc_static_state's gradients in the MASS fractions at fixed T0, P0\n"
+        "and G (#717): dT_dY, dP_dY, drho_dY and the bent flux's dGeff_dY, one\n"
+        "entry per species. Implicit-function derivatives of the isentropic\n"
+        "energy and entropy balances. `state` is duct_htc_static_state(T0, P0,\n"
+        "G, X), already solved: below the bend nothing is solved again.");
 
   py::class_<combaero::JetImpulse>(m, "JetImpulse")
       .def_readonly("J", &combaero::JetImpulse::J)
@@ -1362,7 +1379,8 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("drho_dP", &solver::MomentumChamberResult::drho_dP)
       .def_readonly("drho_dT", &solver::MomentumChamberResult::drho_dT)
       .def_readonly("drho_dmdot", &solver::MomentumChamberResult::drho_dmdot)
-      .def_readonly("drho_dY", &solver::MomentumChamberResult::drho_dY);
+      .def_readonly("drho_dY", &solver::MomentumChamberResult::drho_dY)
+      .def_readonly("dT_static_dY", &solver::MomentumChamberResult::dT_static_dY);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
@@ -2311,6 +2329,17 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Secant cp over [T1, T2], (h(T1) - h(T2)) / (T1 - T2) [J/(kg*K)], and\n"
       "its partials in T1 and T2 (cp(T1) in the limit T2 -> T1). The capacity\n"
       "rate of an epsilon-NTU wall exchange (#627).");
+
+  m.def(
+      "cp_secant_mass_dY",
+      [](double T1, double T2,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {
+        return cp_secant_mass_dY(T1, T2, to_vec(X_arr));
+      },
+      py::arg("T1"), py::arg("T2"), py::arg("X"),
+      "The secant cp's gradient in the MASS fractions [J/(kg*K)], one entry\n"
+      "per species: a wall side's capacity rate |m| cp moves with its\n"
+      "composition (#717).");
 
   m.def(
       "cp_mass",
@@ -7480,6 +7509,12 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
                     "Jacobian: dq/dT [W/(m^2*K)]")
       .def_readonly("dq_dT_hot", &ChannelResult::dq_dT_hot,
                     "Jacobian: dq/dT_hot [W/(m^2*K)]")
+      .def_readonly("dh_dY", &ChannelResult::dh_dY,
+                    "Jacobian: dh/dY [W/(m^2*K)] per species (mass fractions) at fixed\n"
+                    "mdot, T, P (#717); empty for a correlation that does not provide it")
+      .def_readonly("dT_aw_dY", &ChannelResult::dT_aw_dY,
+                    "Jacobian: dT_aw/dY [K] per species (mass fractions) at fixed\n"
+                    "mdot, T, P (#717); empty for a correlation that does not provide it")
       .def("__repr__", [](const ChannelResult &r) {
         auto fmt = [](double v) {
           if (std::isnan(v))

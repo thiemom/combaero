@@ -192,6 +192,16 @@ struct ChamberStaticState {
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
 
+// chamber_static_state's gradients in the MOLE fractions at fixed T0, P and
+// G (#743), X unnormalised (map with mole_gradient_to_mass): the static T from
+// f = h(T0) - h(T) - (G R T / P)^2 / 2 = 0 by the implicit function theorem,
+// and ln(P0 / P) = sum_j X_j (s_j(T0) - s_j(T)) / R_u at that T.
+struct ChamberStaticStateDX {
+  std::vector<double> dT_dX, dlnP0P_dX;
+};
+ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+                                            const std::vector<double>& X);
+
 // -------------------------------------------------------------
 // The SONIC static state of a flow at stagnation temperature T0 and mass flux
 // G (#637): T* from h(T0) - h(T*) = a(T*)^2 / 2 (variable cp, a^2 = gamma R T),
@@ -250,6 +260,25 @@ constexpr double kDuctHtcSonicMargin = 1e-3;
 
 DuctStaticState duct_htc_static_state(double T0, double P0, double G,
                                       const std::vector<double>& X);
+
+// duct_htc_static_state's gradients in the MASS fractions at fixed T0, P0
+// and G (#717): the static T, P, rho and the bent flux G_eff. The isentropic
+// energy and entropy balances,
+//   f = h(T0) - h(T) - (G R T / P)^2 / 2 = 0,
+//   L = [sum_j X_j (s_j(T0) - s_j(T))] / R_u - ln(P0 / P) = 0,
+// differentiated in X at the root (implicit function theorem; h, R and the
+// species s_j are closed form). Near choke G_eff = ge(G / G*) G* also moves
+// with G*(X), differenced like its T0 slope (smooth there). Zero for a
+// floored T0 or P0.
+struct DuctStaticStateDY {
+  std::vector<double> dT_dY, dP_dY, drho_dY, dGeff_dY;
+};
+
+// `state` is duct_htc_static_state(T0, P0, G, X), already solved by the
+// caller: below the bend (state.G_eff == G) nothing is solved again.
+DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
+                                           const std::vector<double>& X,
+                                           const DuctStaticState& state);
 
 } // namespace combaero
 

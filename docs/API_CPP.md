@@ -69,6 +69,9 @@ double cp_mass(double T, const std::vector<double>& X);
 // the variable-property capacity rate of an epsilon-NTU wall exchange (#627).
 std::tuple<double, double, double> cp_secant_mass_and_jacobian(
     double T1, double T2, const std::vector<double>& X);
+// Its gradient in the MASS fractions, per species: a wall side's capacity
+// rate moves with its composition (#717).
+std::vector<double> cp_secant_mass_dY(double T1, double T2, const std::vector<double>& X);
 double cv_mass(double T, const std::vector<double>& X);
 double h_mass(double T, const std::vector<double>& X);
 double u_mass(double T, const std::vector<double>& X);
@@ -183,6 +186,16 @@ TransportDerivatives transport_and_dT(double T, double P, const std::vector<doub
 // d mu_mix / dX_k at fixed T, analytic (Wilke), per species, X unnormalised
 // (chain with a dX/dY that keeps sum X = 1); one-sided for an absent species.
 std::vector<double> viscosity_dX(double T, double P, const std::vector<double>& X);
+
+// mu and k with their mole-fraction gradients at fixed T (#717), same X
+// convention; k_mix is the mean of the series and parallel bounds.
+struct TransportDerivativesX { double mu, k; std::vector<double> dmu_dX, dk_dX; };
+TransportDerivativesX transport_and_dX(double T, double P, const std::vector<double>& X);
+
+// composition.h: a mole-fraction gradient as a mass-fraction gradient at X,
+// dg/dY_k = (g_X[k] - sum_i X_i g_X[i]) MW / W_k (the step keeps sum X = 1).
+std::vector<double> mole_gradient_to_mass(const std::vector<double>& X,
+                                          const std::vector<double>& g_X);
 
 // Omega*(2,2) and dOmega*/dT* (C2 quintic Hermite, see Transport Model below).
 struct Omega22Result { double omega, domega_dTstar; };
@@ -378,6 +391,12 @@ struct ChamberStaticState {
 };
 ChamberStaticState chamber_static_state(double T0, double P, double G,
                                         const std::vector<double>& X);
+// Its mole-fraction gradients at fixed T0, P, G (#743): dT_dX, dlnP0P_dX
+// (map with mole_gradient_to_mass). Implicit function theorem on the energy
+// balance; closed-form species h, s and R.
+struct ChamberStaticStateDX { std::vector<double> dT_dX, dlnP0P_dX; };
+ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+                                            const std::vector<double>& X);
 
 // The SONIC static state of flux G at stagnation T0 (#637): T* from
 // h(T0) - h(T*) = a*^2 / 2, P* = G sqrt(R T* / gamma*), with dT*/dT0,
@@ -402,6 +421,13 @@ struct DuctStaticState {
 };
 DuctStaticState duct_static_state(double T0, double P0, double G,
                                   const std::vector<double>& X);
+
+// duct_htc_static_state's mass-fraction gradients at fixed T0, P0, G (#717):
+// the implicit energy/entropy balances, plus the near-choke bent flux.
+struct DuctStaticStateDY { std::vector<double> dT_dY, dP_dY, drho_dY, dGeff_dY; };
+DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
+                                           const std::vector<double>& X,
+                                           const DuctStaticState& state);  // the solved htc state
 ```
 
 ---
@@ -1068,6 +1094,8 @@ struct MergeFaceState {
     double P_face, Pt_face, M_face; bool choked;
     double dPf_dm_main, dPf_dm_out, dPf_dJ, dPf_dP, dPf_dT, dPf_dT_main;
     double dPtf_dm_main, dPtf_dm_out, dPtf_dJ, dPtf_dP, dPtf_dT, dPtf_dT_main;
+    // Mass-fraction gradients of the chamber gas and the main stream (#743).
+    std::vector<double> dPf_dY, dPf_dY_main, dPtf_dY, dPtf_dY_main;
 };
 // incompressible (#588): the low-Mach limit, densities at the chamber P and
 // the stagnation temperatures; linear in P_face, nothing to choke.
@@ -1173,6 +1201,9 @@ struct ChannelResult {
     double dq_dmdot;       // dq/dmdot [W·s/(m²·kg)]
     double dq_dT;          // dq/dT [W/(m²·K)]
     double dq_dT_hot;     // dq/dT_hot [W/(m²·K)]
+    // Mass-fraction gradients at fixed mdot, T, P (#717); channel_smooth
+    // fills them, other correlations leave them empty (read as zero).
+    std::vector<double> dh_dY, dT_aw_dY;
 };
 
 struct WallCouplingResult {

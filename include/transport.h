@@ -39,6 +39,18 @@ TransportDerivatives transport_and_dT(double T, double P, const std::vector<doub
 // derivative as that species enters.
 std::vector<double> viscosity_dX(double T, double P, const std::vector<double>& X);
 
+// Mixture viscosity and thermal conductivity with their gradients in the
+// mole fractions at fixed T (#717): Wilke's rule and the mean of the series
+// and parallel conductivity bounds. Same unnormalised-X convention as
+// viscosity_dX; chain with dX/dY along a direction that keeps sum X = 1.
+struct TransportDerivativesX {
+    double mu = 0.0;                // [Pa*s]
+    double k = 0.0;                 // [W/(m*K)]
+    std::vector<double> dmu_dX;     // [Pa*s] per species
+    std::vector<double> dk_dX;      // [W/(m*K)] per species
+};
+TransportDerivativesX transport_and_dX(double T, double P, const std::vector<double>& X);
+
 // Transport properties
 double viscosity(double T, double P, const std::vector<double>& X);
 double thermal_conductivity(double T, double P, const std::vector<double>& X);

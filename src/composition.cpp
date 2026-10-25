@@ -117,4 +117,21 @@ double mwmix(const std::vector<double>& X) {
     return sum;
 }
 
+std::vector<double> mole_gradient_to_mass(const std::vector<double>& X,
+                                          const std::vector<double>& g_X) {
+    if (X.size() != molar_masses.size() || g_X.size() != X.size()) {
+        throw std::invalid_argument("mole_gradient_to_mass: vector size does not match number of species");
+    }
+    const double mw = mwmix(X);
+    double x_dot = 0.0;
+    for (std::size_t i = 0; i < X.size(); ++i) {
+        x_dot += X[i] * g_X[i];
+    }
+    std::vector<double> out(X.size(), 0.0);
+    for (std::size_t k = 0; k < X.size(); ++k) {
+        out[k] = (g_X[k] - x_dot) * mw / molar_masses[k];
+    }
+    return out;
+}
+
 } // namespace combaero

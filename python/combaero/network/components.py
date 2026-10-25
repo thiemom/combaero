@@ -989,10 +989,22 @@ class _DuctHtc:
         "dT_aw_dmdot",
         "dT_aw_dP",
         "dT_aw_dPt",
+        "_ctx",
+        "_dY",
     )
 
-    def __init__(self, r: Any, s: "cb.DuctStaticState", area: float) -> None:
+    def __init__(
+        self,
+        r: Any,
+        s: "cb.DuctStaticState",
+        area: float,
+        ctx: tuple[float, float, float, list[float], float, "cb.DuctStaticState"] | None = None,
+    ) -> None:
         self._r = r
+        # (T0, P0, G, X) the static state was taken at: the composition
+        # partials need its gradient too (#717), computed on first use.
+        self._ctx = ctx
+        self._dY: tuple[list[float], list[float]] | None = None
         # The surface's partials are at fixed m, in the static (T, P) it was
         # given; T_s and P_s move with T0, P0 and G = |m| / A.
         dh_dT, dTaw_dT = float(r.dh_dT), float(r.dT_aw_dT)
@@ -1010,6 +1022,43 @@ class _DuctHtc:
         # The static P is the duct's, a function of the feed's Pt: the feed
         # node's own static P does not enter.
         self.dT_aw_dP = 0.0
+
+    def _composition(self) -> tuple[list[float], list[float]]:
+        """(dh/dY, dT_aw/dY) of the feed's mass fractions at fixed T0, P0 and
+        flow (#717): the surface's own partials at fixed static state, plus
+        the static T, P and the bent flux moving with the composition. Empty
+        when the surface provides none (read as zero)."""
+        if self._dY is None:
+            r = self._r
+            dh_Y = list(getattr(r, "dh_dY", None) or [])
+            dTaw_Y = list(getattr(r, "dT_aw_dY", None) or [])
+            if not dh_Y or self._ctx is None:
+                self._dY = ([], [])
+            else:
+                T0, P0, G, X, area, st = self._ctx
+                sd = cb.duct_htc_static_state_dY(T0, P0, G, X, st)
+                dh_T, dTaw_T = float(r.dh_dT), float(r.dT_aw_dT)
+                dTaw_P = float(getattr(r, "dT_aw_dP", 0.0))
+                dh_m, dTaw_m = float(r.dh_dmdot), float(r.dT_aw_dmdot)
+                self._dY = (
+                    [
+                        a + dh_T * t + dh_m * area * g
+                        for a, t, g in zip(dh_Y, sd.dT_dY, sd.dGeff_dY, strict=True)
+                    ],
+                    [
+                        a + dTaw_T * t + dTaw_P * q + dTaw_m * area * g
+                        for a, t, q, g in zip(dTaw_Y, sd.dT_dY, sd.dP_dY, sd.dGeff_dY, strict=True)
+                    ],
+                )
+        return self._dY
+
+    @property
+    def dh_dY(self) -> list[float]:
+        return self._composition()[0]
+
+    @property
+    def dT_aw_dY(self) -> list[float]:
+        return self._composition()[1]
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._r, name)
@@ -1059,7 +1108,8 @@ def _duct_htc(
         T_hot=T_hot,
         flow_area=area,
     )
-    return None if r is None else _DuctHtc(r, s, area)
+    ctx = (float(state.Tt), float(state.Pt), G, list(state.X), area, s)
+    return None if r is None else _DuctHtc(r, s, area, ctx)
 
 
 class _ChamberHtc:
@@ -1068,7 +1118,17 @@ class _ChamberHtc:
     the closure's T_static moves with all three. Every other attribute is
     the surface result's."""
 
-    __slots__ = ("_r", "dh_dT", "dh_dmdot", "dh_dP", "dT_aw_dT", "dT_aw_dmdot", "dT_aw_dP")
+    __slots__ = (
+        "_r",
+        "dh_dT",
+        "dh_dmdot",
+        "dh_dP",
+        "dT_aw_dT",
+        "dT_aw_dmdot",
+        "dT_aw_dP",
+        "dh_dY",
+        "dT_aw_dY",
+    )
 
     def __init__(self, r: Any, c: Any) -> None:
         self._r = r
@@ -1079,6 +1139,13 @@ class _ChamberHtc:
         self.dT_aw_dT = dTaw_dT * c.dT_static_dT
         self.dT_aw_dmdot = float(r.dT_aw_dmdot) + dTaw_dT * c.dT_static_dmdot
         self.dT_aw_dP = float(getattr(r, "dT_aw_dP", 0.0)) + dTaw_dT * c.dT_static_dP
+        # Composition (#743): the surface's own, plus the static T moving
+        # with it. Empty when the surface provides none.
+        dh_Y = list(getattr(r, "dh_dY", None) or [])
+        dTaw_Y = list(getattr(r, "dT_aw_dY", None) or [])
+        dTs_Y = list(getattr(c, "dT_static_dY", None) or [0.0] * len(dh_Y))
+        self.dh_dY = [a + dh_dT * t for a, t in zip(dh_Y, dTs_Y, strict=False)]
+        self.dT_aw_dY = [a + dTaw_dT * t for a, t in zip(dTaw_Y, dTs_Y, strict=False)]
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._r, name)
@@ -2327,7 +2394,10 @@ class MomentumChamberNode(NetworkNode):
         self._face_choked = bool(r.choked)
         main_src = elems[self.main_inlet].from_node if self.main_inlet in elems else None
 
-        def chain(d_mm, d_mo, d_J, d_P, d_T, d_Tm) -> dict[str, float]:
+        # Composition (#743): the chamber gas's and the main stream's.
+        main_Y_node = self.id if main_T_key is not None else main_src
+
+        def chain(d_mm, d_mo, d_J, d_P, d_T, d_Tm, d_Y=(), d_Ym=()) -> dict[str, float]:
             out: dict[str, float] = {}
 
             def add(k: str, v: float) -> None:
@@ -2345,13 +2415,38 @@ class MomentumChamberNode(NetworkNode):
                 add(main_T_key, d_Tm)
             elif main_src is not None:
                 add(f"{main_src}.T", d_Tm)
+            for k, v in enumerate(d_Y):
+                if v != 0.0:
+                    add(f"{self.id}.Y[{k}]", v)
+            if main_Y_node is not None:
+                for k, v in enumerate(d_Ym):
+                    if v != 0.0:
+                        add(f"{main_Y_node}.Y[{k}]", v)
             return out
 
         return (
             float(r.P_face),
             float(r.Pt_face),
-            chain(r.dPf_dm_main, r.dPf_dm_out, r.dPf_dJ, r.dPf_dP, r.dPf_dT, r.dPf_dT_main),
-            chain(r.dPtf_dm_main, r.dPtf_dm_out, r.dPtf_dJ, r.dPtf_dP, r.dPtf_dT, r.dPtf_dT_main),
+            chain(
+                r.dPf_dm_main,
+                r.dPf_dm_out,
+                r.dPf_dJ,
+                r.dPf_dP,
+                r.dPf_dT,
+                r.dPf_dT_main,
+                r.dPf_dY,
+                r.dPf_dY_main,
+            ),
+            chain(
+                r.dPtf_dm_main,
+                r.dPtf_dm_out,
+                r.dPtf_dJ,
+                r.dPtf_dP,
+                r.dPtf_dT,
+                r.dPtf_dT_main,
+                r.dPtf_dY,
+                r.dPtf_dY_main,
+            ),
         )
 
     def mach(self, state: NetworkMixtureState) -> float:
@@ -5077,6 +5172,7 @@ class _FilmedHtc:
         "dT_aw_dT_coolant",
         "dT_aw_dT_inf",
         "film",
+        "_k",
     )
 
     def __init__(
@@ -5123,6 +5219,13 @@ class _FilmedHtc:
         self.dT_aw_dfilm_mdot = [a_M[h] * M[h] / m_c[h] for h in range(n)]
         self.dT_aw_dT_coolant = [w[h] - a_P[h] * DR[h] / T_c[h] for h in range(n)]
         self.film = film
+        self._k = k
+
+    @property
+    def dT_aw_dY(self) -> list[float]:
+        """The side's T_aw composition gradient through T_ref (#717). The
+        density ratio's dependence on the gas molar mass is not chained."""
+        return [self._k * float(v) for v in (getattr(self._r, "dT_aw_dY", None) or [])]
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._r, name)

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <stdexcept>
 
+#include "composition.h"
 #include "compressible.h"
 #include "solver_interface.h"
 #include "stagnation.h"
@@ -97,6 +98,23 @@ MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
     out.dPtf_dP = 1.0 - b * vo / P + 0.5 * a * vm / P;
     out.dPtf_dT = out.dPf_dT;
     out.dPtf_dT_main = -0.5 * a * Rm / P;
+    // Composition: R = R_u / MW in both specific volumes, dR/dX_j = -R W_j / MW.
+    {
+      const std::size_t n = X.size();
+      const double MW = mwmix(X) / 1000.0;
+      const double MWm = mwmix(X_main) / 1000.0;
+      std::vector<double> gPf(n), gPfm(n), gPtm(n);
+      for (std::size_t j = 0; j < n; ++j) {
+        const double W = species_molar_mass(j) / 1000.0;
+        gPf[j] = -b * vo * W / MW;
+        gPfm[j] = a * vm * W / MWm;
+        gPtm[j] = 0.5 * a * vm * W / MWm;
+      }
+      out.dPf_dY = mole_gradient_to_mass(X, gPf);
+      out.dPtf_dY = out.dPf_dY;
+      out.dPf_dY_main = mole_gradient_to_mass(X_main, gPfm);
+      out.dPtf_dY_main = mole_gradient_to_mass(X_main, gPtm);
+    }
     return out;
   }
   const double A = area;
@@ -209,6 +227,41 @@ MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
   {
     const double dTf = dTf_dPf * dPf_dT0m + fs.dT_dT0;
     out.dPtf_dT_main = dPt(dPf_dT0m, dTf, 1.0);
+  }
+
+  // Composition (#743). Outlet gas X: through Pi (R and the outlet static T
+  // in q). Main X: through c = m_main^2 R_m / A^2 (F1), the face static T
+  // (F2) and the entropy difference in Pt_f.
+  {
+    const std::size_t n = X.size();
+    const double MW = mwmix(X) / 1000.0;
+    const double MWm = mwmix(X_main) / 1000.0;
+    const ChamberStaticStateDX cx = chamber_static_state_dX(T0, P, std::abs(m_out) / A, X);
+    const ChamberStaticStateDX fx = chamber_static_state_dX(T0_main, P_f, Gm, X_main);
+    std::vector<double> gPf(n), gPt(n), gPfm(n), gPtm(n);
+    for (std::size_t j = 0; j < n; ++j) {
+      const double W = species_molar_mass(j) / 1000.0;
+      through_Pi(q * (-W / MW + cx.dT_dX[j] / cs.T), gPf[j], gPt[j]);
+      const double dc = -c * W / MWm;
+      double dPf_x = 0.0;
+      if (!choked) {
+        const double F1_Pf = 1.0 - c * T_f / (P_f * P_f);
+        const double F1_Tf = c / P_f;
+        const double det = F1_Pf - F1_Tf * (-fs.dT_dP);
+        // F1_x = (T_f / P_f) dc, F2_x = -dTs/dX at fixed P_f.
+        dPf_x = -((T_f / P_f) * dc - F1_Tf * (-fx.dT_dX[j])) / det;
+      }
+      const double dTf = dTf_dPf * dPf_x + fx.dT_dX[j];
+      gPfm[j] = dPf_x;
+      // ln(P0/P) at the face moves with X directly and through T_f.
+      const double dL = fx.dlnP0P_dX[j] - fx.dT_dX[j] * (-cp_f / (Rm * T_f)) +
+                        (-cp_f / (Rm * T_f)) * dTf;
+      gPtm[j] = (Pt_f / P_f) * dPf_x + Pt_f * dL;
+    }
+    out.dPf_dY = mole_gradient_to_mass(X, gPf);
+    out.dPtf_dY = mole_gradient_to_mass(X, gPt);
+    out.dPf_dY_main = mole_gradient_to_mass(X_main, gPfm);
+    out.dPtf_dY_main = mole_gradient_to_mass(X_main, gPtm);
   }
   return out;
 }
