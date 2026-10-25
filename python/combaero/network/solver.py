@@ -3,6 +3,7 @@ import os
 import time
 import traceback
 import warnings
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -1426,8 +1427,9 @@ class NetworkSolver:
 
     def _wall_capacity(
         self, eid: str, state: NetworkMixtureState, T_other: float
-    ) -> tuple[float, float, float, float, float, np.ndarray | None]:
-        """(C, dC/dm, dC/dT_own, dC/dT_other, flow sign, dC/dY_own) of one wall side.
+    ) -> tuple[float, float, float, float, float, Callable[[], np.ndarray] | None]:
+        """(C, dC/dm, dC/dT_own, dC/dT_other, flow sign, dC/dY_own) of one wall
+        side; dC/dY_own is a callable, evaluated only when the relay needs it.
 
         C = |m| cp [W/K] of the stream feeding it, cp the secant over the span
         from its own inlet T to the other side's (cb.cp_secant_mass_and_jacobian):
@@ -1444,13 +1446,17 @@ class NetworkSolver:
         cp, dcp_own, dcp_other = cb.cp_secant_mass_and_jacobian(float(state.Tt), float(T_other), X)
         sign = -1.0 if m < 0.0 else 1.0
         a = abs(m)
-        # Its composition moves cp too (#717).
-        dcp_Y = np.asarray(cb.cp_secant_mass_dY(float(state.Tt), float(T_other), X)) * a
-        return a * cp, sign * cp, a * dcp_own, a * dcp_other, sign, dcp_Y
+        # Its composition moves cp too (#717): on demand, for the relay.
+        Tt = float(state.Tt)
+
+        def dC_dY() -> np.ndarray:
+            return np.asarray(cb.cp_secant_mass_dY(Tt, float(T_other), X)) * a
+
+        return a * cp, sign * cp, a * dcp_own, a * dcp_other, sign, dC_dY
 
     @staticmethod
     def _wall_side_dQ_dY(
-        wall_result: Any, ch: Any, dC_dY: np.ndarray | None, side_a: bool
+        wall_result: Any, ch: Any, dC_dY: Callable[[], np.ndarray] | None, side_a: bool
     ) -> np.ndarray | None:
         """dQ/dY of one wall side's feed composition (#717): through its h and
         T_aw (a surface that gives no composition partials contributes none)
@@ -1459,12 +1465,15 @@ class NetworkSolver:
         dQ_dTaw = wall_result.dQ_dT_aw_a if side_a else wall_result.dQ_dT_aw_b
         dQ_dC = wall_result.dQ_dC_a if side_a else wall_result.dQ_dC_b
         out = None
-        for coeff, grad in (
-            (dQ_dh, getattr(ch, "dh_dY", None)),
-            (dQ_dTaw, getattr(ch, "dT_aw_dY", None)),
+        for coeff, get in (
+            (dQ_dh, lambda: getattr(ch, "dh_dY", None)),
+            (dQ_dTaw, lambda: getattr(ch, "dT_aw_dY", None)),
             (dQ_dC, dC_dY),
         ):
-            if grad is None or len(grad) == 0 or coeff == 0.0:
+            if get is None or coeff == 0.0:
+                continue
+            grad = get()
+            if grad is None or len(grad) == 0:
                 continue
             term = coeff * np.asarray(grad, dtype=float)
             out = term if out is None else out + term
@@ -1998,8 +2007,9 @@ class NetworkSolver:
                         )
                     )
                     # And its composition (#717): h, T_aw and C move with Y.
+                    ups_a = up(from_a)
                     factor_Y_a = self._wall_side_dQ_dY(wall_result, ch_a, dCa_dYa, side_a=True)
-                    for idx, sens_up in up(from_a).items():
+                    for idx, sens_up in ups_a.items():
                         nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                         nr["T"] += factor_T_a * sens_up["T"]
                         if factor_Y_a is not None:
@@ -2069,8 +2079,9 @@ class NetworkSolver:
                             + wall_result.dQ_dC_a * dCa_dTb
                         )
                     )
+                    ups_b = up(from_b)
                     factor_Y_b = self._wall_side_dQ_dY(wall_result, ch_b, dCb_dYb, side_a=False)
-                    for idx, sens_up in up(from_b).items():
+                    for idx, sens_up in ups_b.items():
                         nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                         nr["T"] += factor_T_b * sens_up["T"]
                         if factor_Y_b is not None:

@@ -998,7 +998,7 @@ class _DuctHtc:
         r: Any,
         s: "cb.DuctStaticState",
         area: float,
-        ctx: tuple[float, float, float, list[float], float] | None = None,
+        ctx: tuple[float, float, float, list[float], float, "cb.DuctStaticState"] | None = None,
     ) -> None:
         self._r = r
         # (T0, P0, G, X) the static state was taken at: the composition
@@ -1035,8 +1035,8 @@ class _DuctHtc:
             if not dh_Y or self._ctx is None:
                 self._dY = ([], [])
             else:
-                T0, P0, G, X, area = self._ctx
-                sd = cb.duct_htc_static_state_dY(T0, P0, G, X)
+                T0, P0, G, X, area, st = self._ctx
+                sd = cb.duct_htc_static_state_dY(T0, P0, G, X, st)
                 dh_T, dTaw_T = float(r.dh_dT), float(r.dT_aw_dT)
                 dTaw_P = float(getattr(r, "dT_aw_dP", 0.0))
                 dh_m, dTaw_m = float(r.dh_dmdot), float(r.dT_aw_dmdot)
@@ -1108,7 +1108,7 @@ def _duct_htc(
         T_hot=T_hot,
         flow_area=area,
     )
-    ctx = (float(state.Tt), float(state.Pt), G, list(state.X), area)
+    ctx = (float(state.Tt), float(state.Pt), G, list(state.X), area, s)
     return None if r is None else _DuctHtc(r, s, area, ctx)
 
 

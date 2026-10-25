@@ -420,7 +420,8 @@ DuctStaticState duct_static_state(double T0, double P0, double G,
 // the implicit energy/entropy balances, plus the near-choke bent flux.
 struct DuctStaticStateDY { std::vector<double> dT_dY, dP_dY, drho_dY, dGeff_dY; };
 DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
-                                           const std::vector<double>& X);
+                                           const std::vector<double>& X,
+                                           const DuctStaticState& state);  // the solved htc state
 ```
 
 ---

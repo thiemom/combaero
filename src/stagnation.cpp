@@ -529,7 +529,8 @@ DuctStaticState duct_htc_static_state(double T0, double P0, double G,
 }
 
 DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
-                                           const std::vector<double> &X) {
+                                           const std::vector<double> &X,
+                                           const DuctStaticState &state) {
   const std::size_t n = X.size();
   DuctStaticStateDY out;
   out.dT_dY.assign(n, 0.0);
@@ -540,9 +541,17 @@ DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
   if (!(T0 > thermo::T_FLOOR) || !(P0 > thermo::P_FLOOR)) {
     return out;
   }
-  const DuctStaticState s = duct_htc_static_state(T0, P0, G, X);
-  // The raw state at G_eff: its own G partials, before the bend's chain.
-  const DuctStaticState raw = duct_static_state(T0, P0, s.G_eff, X);
+  // The caller's solved state. Below the bend it IS the plain state at G
+  // (G_eff = G exactly) and nothing is solved again; in the bend, the raw
+  // state at G_eff gives its own G partials, before the bend's chain.
+  const DuctStaticState &s = state;
+  const bool bent = s.G_eff != G;
+  const DuctStaticState raw = bent ? duct_static_state(T0, P0, s.G_eff, X) : s;
+  auto sonic_flux = [&](const std::vector<double> &Xv) {
+    return mass_flux_isentropic(T0, P0, critical_pressure_ratio(T0, P0, Xv) * P0, Xv);
+  };
+  const double w = kDuctHtcSonicMargin;
+  const double a = 1.0 - 2.0 * w;
   const double T = s.T;
   const double P = s.P;
   const double R = specific_gas_constant(X);
@@ -552,9 +561,13 @@ DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
   const double v = s.G_eff * R * T / P;
   const double kk = (s.G_eff * R / P) * (s.G_eff * R / P);
   // Mass-specific enthalpy drop, molar species terms over MW.
+  // Species enthalpy and entropy drops T0 -> T, once.
+  std::vector<double> dh_j(n), ds_j(n);
   double dH = 0.0;
   for (std::size_t j = 0; j < n; ++j) {
-    dH += X[j] * (h_species(j, T0) - h_species(j, T));
+    dh_j[j] = h_species(j, T0) - h_species(j, T);
+    ds_j[j] = s_species(j, T0) - s_species(j, T);
+    dH += X[j] * dh_j[j];
   }
   dH /= MW;
   // Jacobian in (T, u = ln P): f_T, f_u; L_T, L_u = 1.
@@ -566,21 +579,16 @@ DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
   for (std::size_t j = 0; j < n; ++j) {
     const double W = species_molar_mass(j) / 1000.0;
     // dR/dX_j = -R W/MW enters f through -(v^2 / R) dR.
-    const double fX = (h_species(j, T0) - h_species(j, T) - dH * W) / MW + v * v * W / MW;
-    const double LX = (s_species(j, T0) - s_species(j, T)) / Ru;
+    const double fX = (dh_j[j] - dH * W) / MW + v * v * W / MW;
+    const double LX = ds_j[j] / Ru;
     dT_dX[j] = -(fX - fu * LX) / det;
     du_dX[j] = -(fT * LX - LT * fX) / det;
   }
   // The bent flux near choke: G_eff = ge G* with G*(T0, P0, X).
-  const double w = kDuctHtcSonicMargin;
-  const double a = 1.0 - 2.0 * w;
-  auto sonic_flux = [&](const std::vector<double> &Xv) {
-    return mass_flux_isentropic(T0, P0, critical_pressure_ratio(T0, P0, Xv) * P0, Xv);
-  };
-  const double Gs = sonic_flux(X);
-  const double g = G / Gs;
   std::vector<double> dGe_dX(n, 0.0);
-  if (g > a) {
+  if (bent) {
+    const double Gs = sonic_flux(X);
+    const double g = G / Gs;
     double ge = 1.0 - w;
     double dge = 0.0;
     if (g < 1.0) {

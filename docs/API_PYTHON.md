@@ -198,7 +198,8 @@ Its composition gradients (#717), one entry per species in the MASS
 fractions, at fixed T0, P0 and G, for the wall relay behind a combustor:
 
 ```python
-d = cb.duct_htc_static_state_dY(T0=1600, P0=2e5, G=150.0, X=air)
+s = cb.duct_htc_static_state(T0=1600, P0=2e5, G=150.0, X=air)
+d = cb.duct_htc_static_state_dY(T0=1600, P0=2e5, G=150.0, X=air, state=s)
 d.dT_dY, d.dP_dY, d.drho_dY, d.dGeff_dY
 ```
 
