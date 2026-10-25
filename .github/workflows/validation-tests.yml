@@ -5,9 +5,16 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # The backstop for a path filter that misses a dependency: every job runs
+  # on a push to main, nightly and on demand -- only a pull request is
+  # filtered.
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Keyed on the event too: the nightly run must not cancel a push to main.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -18,61 +25,89 @@ jobs:
     name: Detect Changed Paths
     runs-on: ubuntu-latest
     outputs:
-      source: ${{ steps.filter.outputs.source }}
-      gui_backend: ${{ steps.filter.outputs.gui_backend }}
-      gui: ${{ steps.filter.outputs.gui }}
-      documentation: ${{ steps.filter.outputs.documentation }}
+      pkg: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.pkg == 'true' }}
+      pytests: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.pytests == 'true' }}
+      examples: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.examples == 'true' }}
+      gui: ${{ steps.mode.outputs.full == 'true' || steps.filter.outputs.gui == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Detect source vs documentation changes
+      # Only a pull request is filtered; a push to main, the nightly run and
+      # a manual dispatch run everything.
+      - name: Full or filtered
+        id: mode
+        run: echo "full=${{ github.event_name != 'pull_request' }}" >> "$GITHUB_OUTPUT"
+
+      # Each filter names what its job READS. Pinned by SHA: this step
+      # decides which checks run.
+      - name: Detect changed paths
         id: filter
-        uses: dorny/paths-filter@v4
+        if: steps.mode.outputs.full != 'true'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # v4.0.3
         with:
           filters: |
-            source:
+            # The Cantera comparison: the package against Cantera. It reads
+            # no validation/ data.
+            pkg:
+              - 'python/combaero/**'
               - 'src/**'
               - 'include/**'
-              - 'python/**'
-              - 'tests/**'
               - 'cantera_validation_tests/**'
-              # validation/ holds BOTH the scored dataset and the runners
-              # that consume it -- scorecard.py, conventions.py, fidelity.py
-              # and the per-physics runners are code, and they live here
-              # rather than under python/. Without this line a change to
-              # either skips every test job and the status-check passes
-              # vacuously, which is how PR #437 merged with 10 of 14 checks
-              # skipped. The tests that read validation/cooling/data/** are
-              # exactly the ones a dataset change can break.
-              - 'validation/**'
-              - 'scripts/**'
-              - 'examples/**'
-              - '.github/workflows/**'
               - 'CMakeLists.txt'
               - 'pyproject.toml'
-              - '.pre-commit-config.yaml'
-              - 'ruff.toml'
-              - '.python-version'
-              - 'Makefile'
               - 'uv.lock'
-            # python/tests holds the GUI backend's tests (test_gui_*), so a
-            # backend-only change must run the Python unit job too. Without
-            # this a gui/backend PR ran no Python test at all.
-            gui_backend:
+              - '.python-version'
+              - '.github/workflows/validation-tests.yml'
+            # The Python suite reads far beyond python/: the scored data and
+            # runners in validation/ (PR #437 merged with 10 of 14 checks
+            # skipped without it), docs/ and READMEs (API and record sync),
+            # changelog.d/, the C++ test names (fidelity registry), the GUI
+            # backend and frontend (test_gui_*, units sync), scripts/ and
+            # thermo_data_generator/. So it runs on anything but a change
+            # confined to other workflow or tool-config files.
+            pytests:
+              - 'python/**'
+              - 'src/**'
+              - 'include/**'
+              - 'tests/**'
+              - 'validation/**'
+              - 'docs/**'
+              - '**/*.md'
+              - 'changelog.d/**'
+              - 'gui/**'
+              - 'scripts/**'
+              - 'thermo_data_generator/**'
+              - 'cantera_validation_tests/**'
+              - 'CMakeLists.txt'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.python-version'
+              - 'ruff.toml'
+              - '.github/workflows/validation-tests.yml'
+            # The examples run against the package; they also read
+            # python/tests/data/ and import gui.backend.
+            examples:
+              - 'python/examples/**'
+              - 'python/combaero/**'
+              - 'python/tests/data/**'
               - 'gui/backend/**'
-              - 'gui/pyproject.toml'
+              - 'scripts/run_examples.py'
+              - 'src/**'
+              - 'include/**'
+              - 'CMakeLists.txt'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.python-version'
+              - '.github/workflows/validation-tests.yml'
             gui:
               - 'gui/**'
-            documentation:
-              - 'docs/**'
-              - 'README.md'
-              - '**/*.md'
+              - '.github/workflows/validation-tests.yml'
 
   cantera-validation:
     name: Test Cantera Validation
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.pkg == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -139,7 +174,7 @@ jobs:
     # module on one worker, so the few heavy modules set its wall time.
     name: Test Python Unit (${{ matrix.tier }})
     needs: changes
-    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.gui_backend == 'true'
+    if: needs.changes.outputs.pytests == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -174,7 +209,7 @@ jobs:
   examples-smoke:
     name: Examples Smoke (run, not import)
     needs: changes
-    if: needs.changes.outputs.source == 'true'
+    if: needs.changes.outputs.examples == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -238,6 +273,8 @@ jobs:
     # IMPORTANT: Keep this literal name in sync with Iron ruleset required context:
     # "Validation Tests / status-check". Ruleset matching is strict and relies on exact string equality.
     name: Validation Tests / status-check
+    # Every job must be listed here: the ruleset requires only this one, so a
+    # job missing from `needs` is not enforced.
     needs: [changes, cantera-validation, python-unit-tests, examples-smoke, frontend-validation]
     if: always()
     runs-on: ubuntu-latest
@@ -245,48 +282,21 @@ jobs:
       - name: Evaluate validation workflow outcomes
         shell: bash
         run: |
-          source_changed="${{ needs.changes.outputs.source }}"
-          gui_changed="${{ needs.changes.outputs.gui }}"
-          gui_backend_changed="${{ needs.changes.outputs.gui_backend }}"
-          cantera_result="${{ needs.cantera-validation.result }}"
-          py_unit_result="${{ needs.python-unit-tests.result }}"
-          examples_result="${{ needs.examples-smoke.result }}"
-          frontend_result="${{ needs.frontend-validation.result }}"
-
-          echo "source_changed=${source_changed}"
-          echo "gui_changed=${gui_changed}"
-          echo "gui_backend_changed=${gui_backend_changed}"
-          echo "cantera_result=${cantera_result}"
-          echo "py_unit_result=${py_unit_result}"
-          echo "examples_result=${examples_result}"
-          echo "frontend_result=${frontend_result}"
-
-          # Allow success OR skipped
-          is_success() {
-            [[ "$1" == "success" || "$1" == "skipped" ]]
+          fail=0
+          # require <filter output> <job result> <name>: when the job's
+          # filter fired it must have RUN and succeeded. Skipped used to pass
+          # even then, which would have let a misfired filter merge untested
+          # code.
+          require() {
+            echo "$3: changed=$1 result=$2"
+            if [[ "$1" == "true" && "$2" != "success" ]]; then
+              echo "::error::$3 did not succeed ($2)"
+              fail=1
+            fi
           }
-
-          if [[ "${source_changed}" == "true" ]]; then
-            if ! is_success "${cantera_result}" || ! is_success "${py_unit_result}" \
-               || ! is_success "${examples_result}"; then
-              echo "One or more source validation jobs failed or were cancelled."
-              exit 1
-            fi
-          fi
-
-          # A backend-only change runs (only) the Python unit job: it must
-          # have run, not been skipped.
-          if [[ "${gui_backend_changed}" == "true" && "${py_unit_result}" != "success" ]]; then
-            echo "Python unit tests (GUI backend) failed, were cancelled or did not run."
-            exit 1
-          fi
-
-          if [[ "${gui_changed}" == "true" ]]; then
-            if ! is_success "${frontend_result}"; then
-              echo "Frontend validation failed or was cancelled."
-              exit 1
-            fi
-          fi
-
-          echo "All required validation jobs passed."
-          exit 0
+          require true "${{ needs.changes.result }}" "changes"
+          require "${{ needs.changes.outputs.pkg }}" "${{ needs.cantera-validation.result }}" "cantera-validation"
+          require "${{ needs.changes.outputs.pytests }}" "${{ needs.python-unit-tests.result }}" "python-unit-tests"
+          require "${{ needs.changes.outputs.examples }}" "${{ needs.examples-smoke.result }}" "examples-smoke"
+          require "${{ needs.changes.outputs.gui }}" "${{ needs.frontend-validation.result }}" "frontend-validation"
+          exit $fail
