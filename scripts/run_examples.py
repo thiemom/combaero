@@ -20,8 +20,16 @@ class ExampleResult(TypedDict):
 # entry comes out the moment the example runs again.
 KNOWN_BROKEN: dict[str, str] = {}
 
+# The default per-example limit [s], and the examples that need longer, with
+# why. network_from_grid.py solves three growing coupled grids (its last, 4 x 4
+# with walls, is the heaviest network any example builds); main ran it in
+# 82-116 s on CI against the 120 s default and timed out once, and the exact
+# wall composition relay (#717) adds about 10% more relay passes.
+DEFAULT_TIMEOUT = 120
+SLOW_EXAMPLES: dict[str, int] = {"network_from_grid.py": 300}
 
-def run_example(example_path: Path, timeout: int = 120) -> ExampleResult:
+
+def run_example(example_path: Path, timeout: int = DEFAULT_TIMEOUT) -> ExampleResult:
     """Run a single example script and return the result."""
     start_time = time.perf_counter()
     try:
@@ -86,7 +94,7 @@ def main() -> None:
 
     for i, example_file in enumerate(example_files, 1):
         print(f"[{i}/{len(example_files)}] Running {example_file.name}...", end=" ", flush=True)
-        res = run_example(example_file)
+        res = run_example(example_file, SLOW_EXAMPLES.get(example_file.name, DEFAULT_TIMEOUT))
         results.append(res)
 
         if res["name"] in KNOWN_BROKEN:
