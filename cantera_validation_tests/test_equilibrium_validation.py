@@ -578,3 +578,51 @@ class TestCombustionEquilibrium:
         assert T_diff < 150.0, (
             f"T [K]: CombAero={result_cb.state.T:.1f}, Cantera={gri30_gas.T:.1f} (CombAero lacks dissociation species)"
         )
+
+
+# ---------------------------------------------------------------------------
+# reforming_equilibrium is a SIMULTANEOUS equilibrium of steam reforming of
+# each hydrocarbon (both directions) and WGS. Before the fix one round of
+# (reform, WGS) left H2 7-49% low at 650-850 K and higher hydrocarbons 0.2 off.
+# ---------------------------------------------------------------------------
+
+_REFORMING_CASES = {
+    "CH4-steam": "CH4:0.1, H2O:0.3, N2:0.6",
+    "higher-hydrocarbons": "CH4:0.05, C2H6:0.03, C3H8:0.02, H2O:0.4, N2:0.5",
+    "steam-to-carbon-1.5": "CH4:0.2, H2O:0.3, CO2:0.05, N2:0.45",
+    "syngas-methanation": "CH4:0.02, CO:0.2, H2:0.3, H2O:0.1, CO2:0.05, N2:0.33",
+}
+_REFORMING_SPECIES = ["CH4", "C2H6", "C3H8", "H2O", "CO", "CO2", "H2"]
+
+
+def _cb_mix(spec: str) -> np.ndarray:
+    X = np.zeros(num_species())
+    for part in spec.split(","):
+        name, v = part.split(":")
+        X[species_index_from_name(name.strip())] = float(v)
+    return X
+
+
+@pytest.mark.parametrize("T", [600.0, 650.0, 712.0, 800.0, 900.0, 1100.0])
+@pytest.mark.parametrize("case", list(_REFORMING_CASES))
+def test_reforming_equilibrium_matches_cantera(combaero, cantera, case: str, T: float) -> None:
+    gas = cantera.Solution("gri30.yaml")
+    gas.TPX = T, 101325.0, _REFORMING_CASES[case]
+    gas.equilibrate("TP")
+    got = combaero.reforming_equilibrium(T, _cb_mix(_REFORMING_CASES[case]), 101325.0)
+    for name in _REFORMING_SPECIES:
+        assert got.state.X[species_index_from_name(name)] == pytest.approx(
+            gas[name].X[0], abs=1e-3
+        ), name
+
+
+@pytest.mark.parametrize("T_in", [700.0, 900.0, 1200.0])
+@pytest.mark.parametrize("case", list(_REFORMING_CASES))
+def test_reforming_equilibrium_adiabatic_matches_cantera(
+    combaero, cantera, case: str, T_in: float
+) -> None:
+    gas = cantera.Solution("gri30.yaml")
+    gas.TPX = T_in, 101325.0, _REFORMING_CASES[case]
+    gas.equilibrate("HP")
+    got = combaero.reforming_equilibrium_adiabatic(T_in, _cb_mix(_REFORMING_CASES[case]), 101325.0)
+    assert pytest.approx(gas.T, abs=0.5) == got.state.T
