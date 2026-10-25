@@ -14,6 +14,7 @@ was read for, the verdict, and where the repo uses it.
 uv run scripts/sources.py find impingement effusion   # entries matching ALL terms
 uv run scripts/sources.py list --status unscreened
 uv run scripts/sources.py list --topic film --long
+uv run scripts/sources.py list --wanted [--priority now]   # documents we lack, the question each settles
 uv run scripts/sources.py check --docs ../../docs     # schema; unregistered local documents
 uv run scripts/sources.py new docs/x/paper.pdf        # stub entry to fill in
 ```

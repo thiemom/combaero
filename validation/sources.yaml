@@ -5,6 +5,7 @@
 #
 #   uv run scripts/sources.py find <terms>      search every field
 #   uv run scripts/sources.py list --status unscreened
+#   uv run scripts/sources.py list --wanted            documents we lack, by priority
 #   uv run scripts/sources.py check             schema + unregistered local docs
 #   uv run scripts/sources.py new docs/x.pdf    stub entry for a new document
 #
@@ -22,6 +23,7 @@
 # Built 2026-10-25 from the documents, the extraction records, the issues and
 # the project memory.
 
+documents:
 - file: docs/ejector/19680008095.pdf
   citation: Sanger, N. L. (1968). Noncavitating performance of two low-area-ratio water jet pumps having
     throat lengths of 7.25 diameters. NASA TN D-4445, Lewis Research Center, March 1968.
@@ -33,7 +35,7 @@
   status: implemented
   verdict: 'Source of the shipped incompressible jet-pump closure (ejector regime=''incompressible'',
     #588) and of the Mach->0 limit the compressible closure must reduce to. Fidelity numbers come from
-    the companion TN D-4759 Table II (not in docs/), 9.3% mean error.'
+    the companion TN D-4759 Table II (docs/ejector/19680022488.pdf), 9.3% mean error.'
   read_for: ['#588 incompressible ejector closure', Mach->0 limit of the compressible ejector, lossless
       overprediction (~1.4x) of the jet-pump relation]
   issues: [268, 588, 593, 594, 595, 597]
@@ -41,7 +43,26 @@
   code: ['include/ejector.h: Sanger jet pump (Eq 11)', 'python/combaero/network/ejector_element.py: regime
       incompressible']
   notes: Filename is the NTRS accession number. Companion TN D-4759 (NTRS 19680022488) holds the tabulated
-    fidelity points; it is not in this folder.
+    fidelity points.
+- file: docs/ejector/19680022488.pdf
+  citation: Sanger, N. L. (1968). Noncavitating and cavitating performance of two low-area-ratio water
+    jet pumps with throat lengths of 5.66 diameters. NASA TN D-4759, Lewis Research Center.
+  id: NASA TN D-4759 (NTRS 19680022488)
+  topic: [ejector]
+  content: The D-4445 pumps (area ratios 0.066 and 0.197, throat 1.35 in) with the throat cut to 5.66 d_t;
+    noncavitating and cavitating performance vs nozzle spacing. Table II TABULATES the head rise at the
+    fully inserted nozzle (s/d_t = 0, 15 psia secondary inlet), 12 points; Appendix B gives the separately
+    calibrated K_s (0.09 / 0.14), K_t (0.076) and K_d (0.079). Peak efficiencies 31.3% / 37.6%.
+  status: fidelity
+  verdict: 'The fidelity set of the shipped incompressible jet pump (#588): Sanger''s Eq. 11 with his
+    own Appendix B losses scores 9.3% on his own Table II. Table II and the Appendix B coefficients in
+    test_ejector_incompressible.py were checked against the report on 2026-10-25: all 12 rows and the
+    four coefficients match.'
+  read_for: ['#588 fidelity of the incompressible jet pump (Table II, Appendix B)']
+  issues: [588]
+  records: [python/tests/test_ejector_incompressible.py, validation/ejector/README.md]
+  notes: Fetched from NTRS 2026-10-25 (it was cited as the fidelity source but not held). Filename is
+    the NTRS accession number. The cavitation data (figures) are not used.
 - file: docs/ejector/art_10.1007_s40430-025-05536-7.pdf
   citation: Akbarnejad, S., Ziabasharhagh, M. (2025). A novel 1D model for the analysis of double-choked
     ejectors validated by CFD simulations. J. Braz. Soc. Mech. Sci. Eng. 47, 253.
@@ -1913,3 +1934,139 @@
   records: [python/tests/test_vatistas_validation.py, python/tests/data/vatistas/]
   code: [include/vatistas.h, src/vatistas.cpp, python/combaero/vortex.py]
   notes: PDF page 1 begins with the end of the preceding article (Mao & Hanratty) in the same issue.
+
+# Documents we do NOT hold that would settle an open question. When one is
+# obtained, its entry moves up into `documents` with a file and a status.
+# `citation` here is as recalled unless `checked` is true; confirm it from
+# the document. priority: now (blocks or settles an open item) or later
+# (only when that work resumes).
+wanted:
+- citation: 'Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I., Nazari, A., Wu, J. (1990).
+    Impingement/effusion cooling: the influence of the number of impingement holes and pressure loss on the
+    heat-transfer coefficient. J. Turbomachinery 112(3), 467-476.'
+  checked: false
+  issues:
+  - 468
+  priority: now
+  question: The impingement Re exponent against the jet-to-vent ratio -- the one variable that could reconcile
+    Cho & Rhee's 0.56 with Hollworth & Dagan's 0.80 (88-GT-290 gives 0.72).
+  where: ASME journal; AGARD CP-527 paper 30 is an alternative.
+- citation: Roach, P. E. (1987). The generation of nearly isotropic turbulence by means of grids. Int. J. Heat
+    Fluid Flow 8(2), 82-92.
+  checked: false
+  issues:
+  - 714
+  priority: now
+  question: Turbulence decay behind grids and perforated plates vs solidity and x/b -- the link a Tu-from-loss
+    closure needs to be tested on D-7958's blockage plates (measured Tu 7/14/23/35%) without guessing the k
+    ~ c K q constant.
+  where: Elsevier journal.
+- citation: Laws, E. M., Livesey, J. L. (1978). Flow through screens. Annu. Rev. Fluid Mech. 10, 247-266.
+  checked: false
+  issues:
+  - 714
+  priority: later
+  question: Review companion to Roach 1987 -- screen loss coefficients and the turbulence they generate.
+  where: Annual Reviews.
+- citation: Rhee, D. H., Yoon, P. H., Cho, H. H. (2003). Local heat/mass transfer and flow characteristics
+    of array impinging jets with effusion holes ejecting spent air. Int. J. Heat Mass Transfer 46, 1049-1061.
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: Cross-source accuracy points for the vented-target closure (Cho group, one family).
+  where: Elsevier journal.
+- citation: Cho, H. H., Rhee, D. H., Goldstein, R. J. (2008). Effects of hole arrangements on local heat/mass
+    transfer for impingement/effusion cooling with small hole spacing. J. Turbomachinery 130, 041003.
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: Cross-source accuracy at small hole spacing (Cho group).
+  where: ASME journal.
+- citation: Jung, E. Y., Choi, S. M., Kim, ? (2024). ? (impingement/effusion, title not recalled).
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: A recent cross-source set, if it varies Re (the Cho group's effusion work is at Re 10,000 only).
+  where: '?'
+- citation: Vanga, S., et al. (2018). ? ASME GT2018-77036.
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: The original of the Click 2018 thesis Fig. 21 (impingement-effusion with crossflow); far outside
+    the Florschuetz H/D range, so accuracy only.
+  where: ASME Turbo Expo proceedings.
+- citation: Gillespie, D. R. H., Byerley, A. R., Ireland, P. T., Wang, Z., Jones, T. V., Kohler, S. T. (1996).
+    Detailed measurements of local heat transfer coefficient in the entrance to normal and inclined film cooling
+    holes. J. Turbomachinery 118, 285-290.
+  checked: false
+  issues: []
+  priority: later
+  question: Coolant-side heat transfer at an effusion hole inlet with crossflow (effusion configurations PR4;
+    no open issue).
+  where: ASME journal.
+- citation: Byerley, A. R., Jones, T. V., Ireland, P. T. (1992). Internal cooling passage heat transfer near
+    the entrance to a film cooling hole. ASME 92-GT-241.
+  checked: false
+  issues: []
+  priority: later
+  question: As Gillespie 1996 (effusion configurations PR4).
+  where: ASME Turbo Expo proceedings.
+- citation: Metzger, D. E., ? (1979). ? (effusion/film hole inlet heat transfer; co-author recalled as Cordoro).
+  checked: false
+  issues: []
+  priority: later
+  question: As Gillespie 1996 (effusion configurations PR4).
+  where: '?'
+- citation: 'Chyu, M. K., Hsing, Y. C., Shih, T. I.-P., Natarajan, V. (1999). Heat transfer contributions of
+    pins and endwall in pin-fin arrays: effects of thermal boundary condition modeling. J. Turbomachinery 121,
+    257-263.'
+  checked: false
+  issues:
+  - 335
+  priority: later
+  question: Inline pin arrays (now refused as out of box) and the pin/endwall split.
+  where: ASME journal.
+- citation: Arora, S. C., Abdel-Messeh, W. (1983). Pressure drop and heat transfer characteristics of circular
+    and oblong low aspect ratio pin fins. ASME 83-GT-123.
+  checked: false
+  issues:
+  - 335
+  priority: later
+  question: Short-pin friction and Nu from a non-NASA rig.
+  where: ASME Turbo Expo proceedings.
+- citation: Lawson, S. A. (2007?). ? MS thesis, Penn State University (about 107 pp.).
+  checked: false
+  issues:
+  - 335
+  priority: later
+  question: The friction-factor definition and per-geometry fits behind Lawson, Thrift, Thole & Kohli 2011
+    (local).
+  where: Penn State ETDA (unreachable from here; needs a browser).
+- citation: Eames, I. W., Ablwaifa, A. E., Petrenko, V. (2007). Results of an experimental study of an advanced
+    jet-pump refrigerator operating with R245fa. Applied Thermal Engineering 27, 2833-2840.
+  checked: false
+  issues: []
+  priority: later
+  question: A second R245fa rig with geometry and measured omega -- tests the shared front end (Eqs. 1-8) that
+    moved both closures 10-22 points from Eames 2013's duct A to B.
+  where: Elsevier journal.
+- citation: Scott, D., Aidoun, Z., Ouzzane, M. (2011). An experimental investigation of an ejector for validating
+    numerical simulations. Int. J. Refrigeration 34, 1717-1723.
+  checked: false
+  issues: []
+  priority: later
+  question: As Eames 2007; written for CFD validation, so geometry and operating points are likely given.
+  where: Elsevier journal.
+- citation: '? (no candidate known): film effectiveness measured in a CONFINED duct, far enough downstream
+    that the coolant mixes into the core.'
+  checked: false
+  issues:
+  - 694
+  priority: later
+  question: Where the film reference temperature moves from the undiluted T_inf (used now) towards the mixed
+    T.
+  where: '?'

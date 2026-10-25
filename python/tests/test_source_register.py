@@ -40,3 +40,24 @@ def test_the_schema_check_catches_what_it_should() -> None:
     assert any("topic must be" in p for p in found)
     assert any("does not exist" in p for p in found)
     assert any("needs a record or code reference" in p for p in found)
+
+
+def test_the_wanted_list_is_valid() -> None:
+    assert sources.wanted_problems(sources.load_wanted()) == []
+
+
+def test_the_wanted_check_catches_what_it_should() -> None:
+    """Falsified: an unknown priority, a held file, a non-boolean 'checked'
+    and string issue numbers are each reported."""
+    good = sources.load_wanted()[0]
+    bad = [
+        {**good, "priority": "urgent"},
+        {**good, "file": "docs/x.pdf"},
+        {**good, "checked": "no"},
+        {**good, "issues": ["468"]},
+    ]
+    found = sources.wanted_problems(bad)
+    assert any("priority 'urgent'" in p for p in found)
+    assert any("belongs in 'documents'" in p for p in found)
+    assert any("'checked' is true or false" in p for p in found)
+    assert any("list of integers" in p for p in found)

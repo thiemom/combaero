@@ -10,8 +10,13 @@ conclude?" and "what else covers this?".
     uv run scripts/sources.py find impingement effusion   # search (all terms)
     uv run scripts/sources.py list --status unscreened    # filter
     uv run scripts/sources.py list --topic film --status implemented
+    uv run scripts/sources.py list --wanted               # documents we lack
     uv run scripts/sources.py check                       # schema + local docs
     uv run scripts/sources.py new docs/x/new_paper.pdf    # print a stub entry
+
+The file has two lists: `documents` (what is local) and `wanted` (what we do
+not hold and the open question each would settle, with a priority). `find`
+searches both.
 
 `check` validates the register (schema, statuses, that every record and
 code path it names exists) and, where docs/ is present, lists local
@@ -62,13 +67,50 @@ TOPICS = {
 }
 REQUIRED = ("file", "citation", "topic", "content", "status", "verdict", "read_for", "issues", "records")
 OPTIONAL = ("id", "code", "notes")
+WANTED_KEYS = ("citation", "checked", "issues", "priority", "question", "where")
+PRIORITIES = {
+    "now": "blocks or settles an open item",
+    "later": "only when that work resumes",
+}
+
+
+def _register(path: Path) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text())
+    if not isinstance(data, dict) or not isinstance(data.get("documents"), list):
+        raise SystemExit(f"{path}: expected 'documents' (and optionally 'wanted') lists")
+    return data
 
 
 def load(path: Path = REGISTER) -> list[dict[str, Any]]:
-    entries = yaml.safe_load(path.read_text())
-    if not isinstance(entries, list):
-        raise SystemExit(f"{path}: expected a YAML list of entries")
-    return entries
+    """The local documents."""
+    return _register(path)["documents"]
+
+
+def load_wanted(path: Path = REGISTER) -> list[dict[str, Any]]:
+    """Documents we do not hold, each with the question it would settle."""
+    return _register(path).get("wanted") or []
+
+
+def wanted_problems(wanted: list[dict[str, Any]]) -> list[str]:
+    """Schema errors in the wanted list; empty when it is valid."""
+    out: list[str] = []
+    for i, w in enumerate(wanted):
+        where = f"wanted {i} ({str(w.get('citation', '?'))[:40]})"
+        if not isinstance(w, dict):
+            out.append(f"{where}: not a mapping")
+            continue
+        out += [f"{where}: missing '{k}'" for k in WANTED_KEYS if k not in w]
+        out += [f"{where}: unknown key '{k}'" for k in w if k not in WANTED_KEYS]
+        if "file" in w:
+            out.append(f"{where}: a held document belongs in 'documents'")
+        if w.get("priority") not in PRIORITIES:
+            out.append(f"{where}: priority '{w.get('priority')}' not one of {sorted(PRIORITIES)}")
+        if not isinstance(w.get("checked"), bool):
+            out.append(f"{where}: 'checked' is true or false")
+        issues = w.get("issues")
+        if not isinstance(issues, list) or any(not isinstance(n, int) for n in issues):
+            out.append(f"{where}: issues are a list of integers")
+    return out
 
 
 def problems(entries: list[dict[str, Any]]) -> list[str]:
@@ -139,20 +181,36 @@ def show(e: dict[str, Any], long: bool = False) -> str:
     return "\n".join(lines)
 
 
+def show_wanted(w: dict[str, Any]) -> str:
+    issues = ", ".join(f"#{n}" for n in w["issues"]) or "no issue"
+    unchecked = "" if w["checked"] else " (citation as recalled)"
+    return f"[wanted, {w['priority']}] {issues}\n    {w['citation']}{unchecked}\n    -> {w['question']}\n    where: {w['where']}"
+
+
 def cmd_find(args: argparse.Namespace) -> int:
     terms = [t.lower() for t in args.terms]
-    hits = [
-        e
-        for e in load()
-        if all(t in yaml.safe_dump(e, allow_unicode=True).lower() for t in terms)
-    ]
+
+    def match(e: dict[str, Any]) -> bool:
+        return all(t in yaml.safe_dump(e, allow_unicode=True).lower() for t in terms)
+
+    hits = [e for e in load() if match(e)]
+    wants = [w for w in load_wanted() if match(w)]
     for e in hits:
         print(show(e, args.long))
-    print(f"{len(hits)} match(es)")
+    for w in wants:
+        print(show_wanted(w))
+    print(f"{len(hits)} match(es), {len(wants)} wanted")
     return 0
 
 
 def cmd_list(args: argparse.Namespace) -> int:
+    if args.wanted:
+        rows = [w for w in load_wanted() if not args.priority or w["priority"] == args.priority]
+        rows.sort(key=lambda w: list(PRIORITIES).index(w["priority"]))
+        for w in rows:
+            print(show_wanted(w))
+        print(f"{len(rows)} wanted")
+        return 0
     rows = [
         e
         for e in load()
@@ -166,7 +224,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 def cmd_check(args: argparse.Namespace) -> int:
     entries = load()
-    errs = problems(entries)
+    errs = problems(entries) + wanted_problems(load_wanted())
     for p in errs:
         print(f"error: {p}")
     local = local_documents(Path(args.docs) if args.docs else DOCS)
@@ -183,6 +241,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     for e in entries:
         counts[e["status"]] = counts.get(e["status"], 0) + 1
     print(f"{len(entries)} entries: " + ", ".join(f"{k} {counts.get(k, 0)}" for k in STATUSES))
+    print(f"{len(load_wanted())} wanted")
     return 1 if errs else 0
 
 
@@ -209,7 +268,9 @@ def main() -> int:
     f.add_argument("terms", nargs="+")
     f.add_argument("--long", action="store_true")
     f.set_defaults(fn=cmd_find)
-    ls_ = sub.add_parser("list", help="entries by status and/or topic")
+    ls_ = sub.add_parser("list", help="entries by status and/or topic, or the wanted list")
+    ls_.add_argument("--wanted", action="store_true", help="documents we do not hold")
+    ls_.add_argument("--priority", choices=sorted(PRIORITIES), help="with --wanted")
     ls_.add_argument("--status", choices=sorted(STATUSES))
     ls_.add_argument("--topic", choices=sorted(TOPICS))
     ls_.add_argument("--long", action="store_true")
