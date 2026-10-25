@@ -525,3 +525,27 @@ def test_step_into_a_chamber_jacobian_matches_fd() -> None:
     row_scale = np.abs(fd * x).max(axis=1, keepdims=True) + 1e-300
     err = np.abs(jac - fd) * np.abs(x) / row_scale
     assert err.max() < 1e-6, err.max()
+
+
+@pytest.mark.parametrize(
+    ("F0", "F1"), [(_F_BIG, _F_SMALL), (_F_SMALL, _F_BIG)], ids=["contraction", "expansion"]
+)
+def test_the_diagnostics_report_the_loss_that_was_solved(F0: float, F1: float) -> None:
+    """zeta and dP_static are the solved Pt drop, at M_small ~0.4.
+
+    The diagnostics used to apply the kernels' k1 = 1 + 0.35 M^2, which the
+    residual never does (it passes Mach 0): measured 3.6% (contraction) and
+    5.0% (expansion) above the solved drop here. And the reference velocity
+    and Re were taken at F0, the LARGER face of a contraction, under the
+    label "small_section": 28 m/s against the 114 m/s the loss sees.
+    """
+    solver = _step_into_chamber(F0, F1)
+    solver.network.nodes["mfb"].m_dot = 0.3
+    sol = solver.solve()
+    assert sol["__success__"], sol["__message__"]
+    step = sol["__element_diag__"]["step"]
+    assert 0.3 < step["mach_loss_ref"] < 0.5
+    loss = sol["up.Pt"] - sol["down.Pt"]
+    # Measured 2026-10-24: 2e-10 and 1e-11 (the same kernel, the same state).
+    assert loss == pytest.approx(step["dP_static"], rel=1e-8)
+    assert step["velocity"] == pytest.approx(0.3 / (step["rho_ref"] * _F_SMALL), rel=1e-12)
