@@ -888,11 +888,12 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("drho_dY", &combaero::DuctStaticStateDY::drho_dY)
       .def_readonly("dGeff_dY", &combaero::DuctStaticStateDY::dGeff_dY);
   m.def("duct_htc_static_state_dY", &combaero::duct_htc_static_state_dY, py::arg("T0"),
-        py::arg("P0"), py::arg("G"), py::arg("X"),
+        py::arg("P0"), py::arg("G"), py::arg("X"), py::arg("state"),
         "duct_htc_static_state's gradients in the MASS fractions at fixed T0, P0\n"
         "and G (#717): dT_dY, dP_dY, drho_dY and the bent flux's dGeff_dY, one\n"
         "entry per species. Implicit-function derivatives of the isentropic\n"
-        "energy and entropy balances.");
+        "energy and entropy balances. `state` is duct_htc_static_state(T0, P0,\n"
+        "G, X), already solved: below the bend nothing is solved again.");
 
   py::class_<combaero::JetImpulse>(m, "JetImpulse")
       .def_readonly("J", &combaero::JetImpulse::J)

@@ -94,7 +94,7 @@ def test_duct_static_state_composition_gradient(G_frac: float, a: str, b: str) -
     X = _X(Y)
     Gs = cb.mass_flux_isentropic(T0, P0, cb.critical_pressure_ratio(T0, P0, X) * P0, X)
     G = G_frac * Gs
-    sd = cb.duct_htc_static_state_dY(T0, P0, G, X)
+    sd = cb.duct_htc_static_state_dY(T0, P0, G, X, cb.duct_htc_static_state(T0, P0, G, X))
     d = _dir(a, b)
     for field, grad in (
         ("T", sd.dT_dY),

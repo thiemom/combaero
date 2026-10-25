@@ -264,8 +264,11 @@ struct DuctStaticStateDY {
   std::vector<double> dT_dY, dP_dY, drho_dY, dGeff_dY;
 };
 
+// `state` is duct_htc_static_state(T0, P0, G, X), already solved by the
+// caller: below the bend (state.G_eff == G) nothing is solved again.
 DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
-                                           const std::vector<double>& X);
+                                           const std::vector<double>& X,
+                                           const DuctStaticState& state);
 
 } // namespace combaero
 
