@@ -66,7 +66,17 @@ TOPICS = {
     "review",
     "other",
 }
-REQUIRED = ("file", "citation", "topic", "content", "status", "verdict", "read_for", "issues", "records")
+REQUIRED = (
+    "file",
+    "citation",
+    "topic",
+    "content",
+    "status",
+    "verdict",
+    "read_for",
+    "issues",
+    "records",
+)
 OPTIONAL = ("id", "code", "notes")
 WANTED_KEYS = ("citation", "checked", "issues", "priority", "question", "where")
 PRIORITIES = {
@@ -165,15 +175,49 @@ def local_documents(docs: Path = DOCS) -> list[str]:
     if not docs.is_dir():
         return []
     return sorted(
-        "docs/" + str(p.relative_to(docs)) for p in docs.rglob("*") if p.suffix.lower() in DOC_SUFFIXES and p.is_file()
+        "docs/" + str(p.relative_to(docs))
+        for p in docs.rglob("*")
+        if p.suffix.lower() in DOC_SUFFIXES and p.is_file()
     )
+
+
+def tracked_documents(docs: Path, files: list[str]) -> list[str]:
+    """Local documents git would NOT ignore -- copyrighted material that a
+    `git add -A` would stage. `files` are paths starting docs/; the check runs
+    in the repository that contains `docs`."""
+    import subprocess
+
+    if not files:
+        return []
+    repo = docs.resolve().parent
+    try:
+        r = subprocess.run(
+            # -z: NUL-separated both ways. Without it git quotes a non-ASCII
+            # path in its output and the name no longer matches.
+            ["git", "-C", str(repo), "check-ignore", "-z", "--stdin"],
+            input="\0".join(files),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return []
+    if r.returncode not in (0, 1):  # 128: not a repository, nothing to say
+        return []
+    ignored = set(r.stdout.split("\0"))
+    return [f for f in files if f not in ignored]
 
 
 def show(e: dict[str, Any], long: bool = False) -> str:
     head = f"[{e['status']}] {e['file']}\n    {e['citation']}"
     if not long:
         return head + f"\n    -> {e['verdict']}"
-    lines = [head, f"    topic: {', '.join(e['topic'])}", f"    content: {e['content']}", f"    verdict: {e['verdict']}"]
+    lines = [
+        head,
+        f"    topic: {', '.join(e['topic'])}",
+        f"    content: {e['content']}",
+        f"    verdict: {e['verdict']}",
+    ]
     for k in ("read_for", "issues", "records", "code"):
         if e.get(k):
             lines.append(f"    {k}: {', '.join(str(v) for v in e[k])}")
@@ -215,7 +259,8 @@ def cmd_list(args: argparse.Namespace) -> int:
     rows = [
         e
         for e in load()
-        if (not args.status or e["status"] == args.status) and (not args.topic or args.topic in e["topic"])
+        if (not args.status or e["status"] == args.status)
+        and (not args.topic or args.topic in e["topic"])
     ]
     for e in rows:
         print(show(e, args.long))
@@ -236,6 +281,10 @@ def cmd_check(args: argparse.Namespace) -> int:
                 print(f"unregistered: {f}")
         for f in sorted(listed - set(local)):
             print(f"not found locally: {f}")
+        exposed = tracked_documents(Path(args.docs) if args.docs else DOCS, local)
+        for f in exposed:
+            print(f"error: not gitignored (copyrighted, would be committed): {f}")
+        errs += [f"not gitignored: {f}" for f in exposed]
     else:
         print("docs/ not present: local coverage not checked")
     counts: dict[str, int] = {}
@@ -263,7 +312,9 @@ def cmd_new(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("find", help="entries matching ALL terms (any field)")
     f.add_argument("terms", nargs="+")
