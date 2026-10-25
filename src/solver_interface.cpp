@@ -1632,41 +1632,29 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   res.d_res_dmdot = (area > 1e-12) ? -P0 * st.dln_dG * sgn / area : 0.0;
   res.d_res_dT = -P0 * st.dln_dT0;
 
-  // d(res)/dY_k as a central difference on the residual: Y moves R, h, cp and
-  // s together and the relay only reaches this row through these entries;
-  // without them a hot CO2 / air merge left the row 7.6e-5 off on the network
-  // Jacobian check (#517). The inner static-T solve converges to 1e-13 T0, so
-  // the difference does not pick up solver noise.
+  // Composition, analytic (#743): Y moves R, h, cp and s together, and the
+  // relay reaches this row only through these entries (#517, which used a
+  // central difference here). chamber_static_state_dX gives the static T and
+  // ln(P0/P) at fixed T0, P, G; rho = P MW / (R_u T).
   res.d_res_dY.assign(Y.size(), 0.0);
   res.drho_dY.assign(Y.size(), 0.0);
+  res.dT_static_dY.assign(Y.size(), 0.0);
   if (sum_Y >= eps) {
-    // (residual, rho_static) at a probe composition.
-    auto at_Y = [&](const std::vector<double> &Y_probe) -> std::pair<double, double> {
-      const std::vector<double> X_p =
-          combaero::mass_to_mole(combaero::normalize_fractions(Y_probe));
-      const ChamberStaticState sp = chamber_static_state(T0, P, G, X_p);
-      return {P_total - P * std::exp(sp.lnP0P),
-              P / (combaero::specific_gas_constant(X_p) * sp.T)};
-    };
-    // Step from a study on a CO2 / air node: converged to 1e-6 (relative)
-    // at 1e-4 and 1e-3.
-    const double hY = 1e-4 * sum_Y;
+    const ChamberStaticStateDX cx = chamber_static_state_dX(T0, P, G, X);
+    const double MW = combaero::mwmix(X) / 1000.0;
+    std::vector<double> g_res(X.size()), g_rho(X.size());
+    for (std::size_t k = 0; k < X.size(); ++k) {
+      const double W = combaero::species_molar_mass(k) / 1000.0;
+      g_res[k] = -P0 * cx.dlnP0P_dX[k];
+      g_rho[k] = rho * (W / MW - cx.dT_dX[k] / st.T);
+    }
+    res.d_res_dY = combaero::mole_gradient_to_mass(X, g_res);
+    res.drho_dY = combaero::mole_gradient_to_mass(X, g_rho);
+    res.dT_static_dY = combaero::mole_gradient_to_mass(X, cx.dT_dX);
+    // The relay never moves a species absent at the node; keep those zero.
     for (std::size_t k = 0; k < Y.size(); ++k) {
       if (!(Y[k] > 0.0)) {
-        continue;
-      }
-      std::vector<double> Y_p = Y;
-      std::vector<double> Y_m = Y;
-      Y_p[k] += hY;
-      const auto [r_p, rho_p] = at_Y(Y_p);
-      if (Y[k] > hY) {
-        Y_m[k] -= hY;
-        const auto [r_m, rho_m] = at_Y(Y_m);
-        res.d_res_dY[k] = (r_p - r_m) / (2.0 * hY);
-        res.drho_dY[k] = (rho_p - rho_m) / (2.0 * hY);
-      } else {
-        res.d_res_dY[k] = (r_p - res.residual) / hY;
-        res.drho_dY[k] = (rho_p - rho) / hY;
+        res.d_res_dY[k] = res.drho_dY[k] = res.dT_static_dY[k] = 0.0;
       }
     }
   }
