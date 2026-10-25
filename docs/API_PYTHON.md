@@ -399,6 +399,35 @@ Figs. 6-7 data (Gritsch configuration B, which it was fitted on) it scores
 3.6% RMS at `M = 0.5` and 12.1% at `M = 2.5`. See
 `validation/cooling/extractions/colban_2011_shaped_film.md`.
 
+#### Film cooling: Marek and Tacina (1975), 2-D slot
+
+Effectiveness downstream of a continuous **slot**, as in a combustor
+liner's cooling ring; Baldauf and Colban are for rows of holes and do not
+apply. NASA TN D-7958: `eta = 1/(1 + C_m x/(M S))` (Eq. 4) with
+`C_m = 0.25 Tu/100` (Eq. 5), so the free-stream turbulence `Tu` [%] sets the
+mixing.
+
+```python
+eta = cb.slot_film_effectiveness_marek_tacina_1975(x_over_S=15.0, M=1.0, Tu=14.0)
+
+# Solver form: (eta, deta/dM), closed form
+eta, deta_dM = cb.slot_film_effectiveness_marek_tacina_1975_and_derivatives(15.0, 1.0, 14.0)
+
+# Matching a rig is the user's job: scale C_m (Eq. 5's band is 0.4-1.6)
+eta = cb.slot_film_effectiveness_marek_tacina_1975(15.0, 1.0, 14.0, C_m_multiplier=1.3)
+```
+
+`M = rho_s U_s/(rho_H U_H)`; `x/S` is measured from the slot lip, where
+`eta = 1`. Warned, not enforced, outside the run: `Tu` 7-35%, `M` 0.41-1.87,
+`x/S` up to 33.8. Every test was co-flowing film.
+
+Scored on the report's own Table I (140 cooled points, the 72% plate's
+16.20 cm station not printed): with the authors' per-blockage C_m the kernel
+puts 136 of 140 points inside the +-30% the report states (p. 8); with
+C_m from Eq. (5) at the measured Tu the eta RMS is 0.070, 57 of 140 inside
+the authors' +-0.04 measurement band. See
+`validation/cooling/extractions/marek_tacina_1975_d7958.md`.
+
 #### Film a downstream wall sees (#386)
 
 ```python

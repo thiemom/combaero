@@ -391,6 +391,59 @@ double film_effectiveness_colban_2011(double x_over_D, double M,
 }
 
 // -------------------------------------------------------------
+// Marek and Tacina (1975) - slot film effectiveness against turbulence
+// -------------------------------------------------------------
+
+std::tuple<double, double> slot_film_effectiveness_marek_tacina_1975_and_derivatives(
+    double x_over_S, double M, double Tu, double C_m_multiplier,
+    CorrelationStatus *status) {
+    const char *fn = "slot_film_effectiveness_marek_tacina_1975";
+    if (x_over_S < 0.0) {
+        throw std::invalid_argument(std::string(fn) +
+                                    ": x/S must be >= 0; the film starts at the slot lip");
+    }
+    if (M <= 0.0) {
+        throw std::invalid_argument(std::string(fn) + ": M must be positive");
+    }
+    if (Tu < 0.0) {
+        throw std::invalid_argument(std::string(fn) + ": Tu [%] must be >= 0");
+    }
+    if (C_m_multiplier <= 0.0) {
+        throw std::invalid_argument(std::string(fn) + ": C_m_multiplier must be positive");
+    }
+    using namespace marek_tacina1975;
+    bool extrapolated = false;
+    const auto flag = [&](bool outside, const char *name, double value, double lo, double hi) {
+        if (!outside) {
+            return;
+        }
+        extrapolated = true;
+        if (!status) {
+            warn(std::string(fn) + ": " + name + " = " + std::to_string(value) +
+                 " is outside the fitted range [" + std::to_string(lo) + ", " +
+                 std::to_string(hi) + "]. Extrapolating; check results.");
+        }
+    };
+    flag(Tu < Tu_min || Tu > Tu_max, "Tu", Tu, Tu_min, Tu_max);
+    flag(M < M_min || M > M_max, "M", M, M_min, M_max);
+    flag(x_over_S > x_over_S_max, "x_over_S", x_over_S, 0.0, x_over_S_max);
+    if (status) {
+        *status = extrapolated ? CorrelationStatus::Extrapolated : CorrelationStatus::Valid;
+    }
+    // Eq. (4) with Eq. (5): the decay K/M, K = C_m x/S.
+    const double K = C_m_multiplier * C_m_per_Tu * Tu * x_over_S;
+    const double eta = 1.0 / (1.0 + K / M);
+    return {eta, eta * eta * K / (M * M)};
+}
+
+double slot_film_effectiveness_marek_tacina_1975(double x_over_S, double M, double Tu,
+                                                 double C_m_multiplier,
+                                                 CorrelationStatus *status) {
+    return std::get<0>(slot_film_effectiveness_marek_tacina_1975_and_derivatives(
+        x_over_S, M, Tu, C_m_multiplier, status));
+}
+
+// -------------------------------------------------------------
 // Multi-row film superposition
 // -------------------------------------------------------------
 

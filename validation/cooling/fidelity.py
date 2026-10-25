@@ -163,6 +163,27 @@ CHECKS: tuple[FidelityCheck, ...] = (
         "python/tests/test_cooling_validation.py::"
         "test_han_1988_reproduces_its_own_figure_454_line",
     ),
+    # --- Marek and Tacina 1975, 2-D slot (#714) ----------------------------
+    FidelityCheck(
+        "marek_tacina_1975_slot",
+        "the +-30% deviation stated for a constant C_m per blockage plate, "
+        "with the per-blockage averages 0.025/0.04/0.05/0.1",
+        "NASA TN D-7958 p. 8 (C_m table) on Table I (p. 14)",
+        "136 of 140 Table I points inside 30%, the worst 33% -- the "
+        "statement to its rounding",
+        "python/tests/test_slot_film.py::"
+        "test_reproduces_the_reports_30_percent_with_its_own_c_m",
+    ),
+    FidelityCheck(
+        "marek_tacina_1975_slot",
+        "Eq. (5), C_m = 0.25 Tu/100, at the measured Tu 7/14/23/35%",
+        "NASA TN D-7958 Eq. (5) on Table I, judged against the +-0.04 eta "
+        "band of p. 6",
+        "eta RMS 0.0696, 57 of 140 inside the band; the per-blockage bias "
+        "changes sign (+0.068 at 0%, -0.038 at 72%), Eq. (5)'s slope",
+        "python/tests/test_slot_film.py::"
+        "test_eq5_at_the_measured_turbulence_scores_on_table_one",
+    ),
 )
 
 

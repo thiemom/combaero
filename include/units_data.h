@@ -898,6 +898,10 @@ inline constexpr Entry function_units[] = {
      "x_over_D: -, M: -, area_ratio: -, P_over_D: -, t_over_P: -, alpha_deg: deg, "
      "density_ratio: -",
      "- (eta), - (deta/dM)"},
+    {"slot_film_effectiveness_marek_tacina_1975",
+     "x_over_S: -, M: -, Tu: %, C_m_multiplier: -", "- (eta)"},
+    {"slot_film_effectiveness_marek_tacina_1975_and_derivatives",
+     "x_over_S: -, M: -, Tu: %, C_m_multiplier: -", "- (eta), - (deta/dM)"},
     {"cooled_wall_heat_flux",
      "T_hot: K, T_coolant: K, h_hot: W/(m^2*K), h_coolant: W/(m^2*K), eta: -, "
      "t_wall: m, k_wall: W/(m*K)",

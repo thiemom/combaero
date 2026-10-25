@@ -53,6 +53,24 @@ of Free-Stream Turbulence on Film Cooling*, NASA TN D-7958 (1975),
 - **Wall temperature:** at every blockage and station the wall cools as the slot flow rises.
 - **Eq. 4 on Table I reproduces the authors' own average C_m:** 0.026, 0.037, 0.046 and 0.079 against the printed 0.025 +-0.01, 0.04 +-0.02, 0.05 +-0.03 and 0.1 +-0.05. This confirms the transcription and the M definition together.
 
+## Scored (2026-10-25, #714)
+
+`slot_film_effectiveness_marek_tacina_1975` (`include/cooling_correlations.h`)
+implements Eqs. (4) and (5). `python/tests/test_slot_film.py` scores every
+cooled, printed Table I cell (140):
+
+- **With the authors' per-blockage C_m (p. 8):** 136 of 140 inside 30%,
+  the worst 33%. That reproduces the report's "+-30 percent" for this case.
+- **With C_m from Eq. (5) at the measured Tu:**
+  - eta RMS 0.0696, bias +0.006;
+  - 57 of 140 inside the +-0.04 measurement band;
+  - by blockage the bias is +0.068 / +0.017 / -0.038 / -0.029 (0/52/72/90%).
+
+  Eq. (5)'s single slope under-mixes at low Tu and over-mixes at high Tu. That
+  is the line's fit to four averages, not a kernel error.
+- **Not scored:** the uncooled runs (eta undefined) and the user's
+  `C_m_multiplier`.
+
 ## Review log
 
 - 2026-10-25: transcribed from the page images; the four data tests pass.

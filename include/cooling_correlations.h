@@ -293,6 +293,77 @@ std::tuple<double, double> film_effectiveness_colban_2011_and_derivatives(
     CorrelationStatus *status = nullptr);
 
 // -------------------------------------------------------------
+// Marek and Tacina (1975) - slot film effectiveness against turbulence
+// -------------------------------------------------------------
+//
+// Marek, C.J. and Tacina, R.R. (1975). "Effect of Free-Stream Turbulence on
+// Film Cooling." NASA TN D-7958.
+// docs/heat_transfer/film/oct23/19750017021.pdf (gitignored).
+//
+// A two-dimensional SLOT film (a continuous slot across the span, as in a
+// combustor liner's cooling ring), not a row of holes: Baldauf and Colban
+// above do not apply to it. Juhasz-Marek turbulent mixing, Eq. (4):
+//
+//   eta = 1 / (1 + C_m x / (M S))
+//
+// with the mixing coefficient from the free-stream turbulence, Eq. (5):
+//
+//   C_m = (0.25 +- 0.15) Tu / 100
+//
+// x is the distance downstream of the slot lip, S the slot height, M =
+// rho_s U_s / (rho_H U_H) the blowing ratio and Tu the axial free-stream
+// turbulence intensity in PERCENT. eta = (T_H - T_wall)/(T_H - T_s), the
+// cooled fraction of the driving difference as for the hole films. Eq. (4)
+// carries no cp ratio; Juhasz and Marek (1971, TN D-6360) wrote one in,
+// and Eq. (5) was fitted without it.
+//
+// FITTED, NOT DERIVED. Eq. (5) is a line through the four per-blockage
+// averages of C_m (Tu 7, 14, 23, 35%). The entrainment rate C_m rho_H U_H
+// already scales with the hot-stream velocity, so the form has no Re;
+// Tu is its only turbulence input. Every test is co-flowing film.
+// See validation/cooling/extractions/marek_tacina_1975_d7958.md.
+namespace marek_tacina1975 {
+
+// Eq. (5): C_m per percent of turbulence, and its stated +- band.
+constexpr double C_m_per_Tu = 0.25 / 100.0;
+constexpr double C_m_per_Tu_band = 0.15 / 100.0;
+
+// The data's span (Table I and p. 9): axial Tu, blowing ratio
+// (m_s/m_H)(H/S) with H = 10.5 cm and S = 0.63 cm, and x/S at the nine
+// stations. Not stated as limits by the report; nothing outside was run.
+constexpr double Tu_min = 7.0, Tu_max = 35.0;
+constexpr double M_min = 0.41, M_max = 1.87;
+constexpr double x_over_S_max = 33.8;
+
+// The authors' maximum eta deviation from measurement (p. 6): +-5 K
+// hot-gas variation and up to 7 K axial wall conduction.
+constexpr double eta_measurement_band = 0.04;
+
+} // namespace marek_tacina1975
+
+// Slot film-cooling effectiveness downstream of a 2-D slot.
+//
+// Parameters:
+//   x_over_S       : distance downstream of the slot lip in slot heights, >= 0
+//   M              : blowing ratio rho_s U_s / (rho_H U_H) [-], > 0
+//   Tu             : axial free-stream turbulence intensity [%], >= 0
+//                    (7 to 35 run)
+//   C_m_multiplier : the user's rig-matching factor on Eq. (5)'s C_m [-],
+//                    > 0. 1 is the report's line; the band is 0.4 to 1.6.
+//                    Never scored.
+//
+// Returns: eta [-]; 1 at the lip.
+double slot_film_effectiveness_marek_tacina_1975(
+    double x_over_S, double M, double Tu, double C_m_multiplier = 1.0,
+    CorrelationStatus *status = nullptr);
+
+// Solver-facing (f, J): (eta, d eta/dM). M is the only input a network
+// solve varies; geometry and Tu are fixed per element. Closed form.
+std::tuple<double, double> slot_film_effectiveness_marek_tacina_1975_and_derivatives(
+    double x_over_S, double M, double Tu, double C_m_multiplier = 1.0,
+    CorrelationStatus *status = nullptr);
+
+// -------------------------------------------------------------
 // Multi-row film superposition
 // -------------------------------------------------------------
 //
