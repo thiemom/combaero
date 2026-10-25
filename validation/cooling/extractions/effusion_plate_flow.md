@@ -12,7 +12,7 @@ text layer.
 > Andrews, G.E., Asere, A.A., Hussain, C.I., Mkpadi, M.C. and Nazari, A.
 > (1988). Impingement/Effusion Cooling: Overall Wall Heat Transfer. ASME
 > 88-GT-290, Department of Fuel and Energy, University of Leeds.
-> `docs/heat_transfer/film/Impingement_Effusion_Cooling_Overall_Wal.pdf`
+> `docs/heat_transfer/film/Andrews_88-GT-290.pdf`
 > (gitignored, copyrighted).
 
 > van de Noort, M. and Ireland, P. (2022). A Low Order Flow Network Model for

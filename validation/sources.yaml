@@ -22,43 +22,6 @@
 # Built 2026-10-25 from the documents, the extraction records, the issues and
 # the project memory.
 
-- file: docs/bassett/bassett.pdf
-  citation: 'Bassett, M. D., Winterbone, D. E., Pearson, R. J. (2001). Calculation of steady flow pressure
-    loss coefficients for pipe junctions. Proc. IMechE Part C: J. Mechanical Engineering Science 215(8),
-    861-?.'
-  id: DOI 10.1177/095440620121500801
-  topic: [junction, tee]
-  content: 1-D control-volume model for steady loss coefficients of multi-pipe junctions; six flow types,
-    12 K forms for a tee at arbitrary angle and area ratio, with the Hager 3/4 effective-angle law. Equations
-    printed (Table 2, Eqs 33-37); measured comparisons only plotted (Figs 5-11).
-  status: implemented
-  verdict: 'The basis of the shipped junction closures: Bassett''s K forms are bound in C++, its 0.75
-    bleed kappa is a shipped constant, and Mynard''s Unified0D extends its control volume. Its figures
-    are a ''selected''-role dataset (they chose eta_scale = 0 and the dividing-streamline recovery), not
-    an independent accuracy check.'
-  read_for: [tee K forms (12 K), '#272 K_straight / Tier-1 M->0 gap', joining alpha (K11/K12 axis), bleed-station
-      kappa for effusion liner (#471), Gardel 1970 cross-source comparison model]
-  issues: [177, 183, 186, 188, 271, 272, 276, 295, 301, 311, 478, 479, 508, 533]
-  records: [validation/junction/data/bassett2001/, validation/junction/models/bassett2001.py, validation/junction/README.md]
-  code: ['include/side_stream_momentum.h: STATION_KAPPA_BLEED_BASSETT', 'include/solver_interface.h: Tee
-      Junction Elements (Bassett 2001)', 'include/multi_port_chamber.h: Hager/Bassett M->0 limit']
-  notes: Byte-identical duplicate of docs/junction/bassett.pdf (same md5). Mynard cites a later SAE Trans
-    112 (2003) Bassett paper that is not in docs/.
-- file: docs/bassett/stigler_2010.pdf
-  citation: 'Stigler, J. (2010). T-part as an element of the pipe-line system. The introduction of the
-    mathematical model of the fluid flow in T-part for the arbitrary angle of the adjacent branch. IOP
-    Conf. Ser.: Earth Environ. Sci. 12, 012102 (25th IAHR Symposium on Hydraulic Machinery and Systems).'
-  id: DOI 10.1088/1755-1315/12/1/012102
-  topic: [junction, tee]
-  content: Theoretical momentum/energy model of flow in a T-junction at arbitrary branch angle. No measurements
-    (the paper says they are still to be done).
-  status: screened
-  verdict: 'Excluded from the junction dataset: theory only, no data to score. Not useful unless its angle
-    formulation is wanted as a derivation cross-check.'
-  read_for: [junction validation dataset (#183)]
-  issues: [183, 272, 300]
-  records: [validation/junction/README.md]
-  notes: Byte-identical duplicate of docs/junction/stigler_2010.pdf.
 - file: docs/ejector/19680008095.pdf
   citation: Sanger, N. L. (1968). Noncavitating performance of two low-area-ratio water jet pumps having
     throat lengths of 7.25 diameters. NASA TN D-4445, Lewis Research Center, March 1968.
@@ -294,38 +257,6 @@
   read_for: ['#697 third-duct original nozzle point']
   issues: [697, 698]
   records: [validation/ejector/data/mazzelli2015_tables.py]
-- file: docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
-  citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
-    3rd ed. CRC Press, Boca Raton.'
-  id: ISBN 978-1-4200-8605-8 (ebook)
-  topic: [combustion, film, review]
-  content: 'Textbook (560 pp., no text layer): combustor design, diffusers, liner aerodynamics and pressure
-    loss, wall cooling (slot, film, effusion), heat transfer, emissions.'
-  status: unscreened
-  verdict: 'unscreened; (guess) a likely source for liner hole Cd, combustor pressure-loss and slot/louver
-    film-cooling correlations; #714 found no Lefebvre content in the code yet.'
-  read_for: []
-  issues: []
-  records: []
-  notes: Byte-identical duplicate of docs/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf. Scanned
-    without a text layer; needs OCR to search.
-- file: docs/heat_transfer/19940011518.pdf
-  citation: 'Johnson, B. V., Wagner, J. H., Steuber, G. D. (1993). Effects of rotation on coolant passage
-    heat transfer, Volume II: Coolant passages with trips normal and skewed to the flow. NASA Contractor
-    Report 4396, Vol. II, contract NAS3-23691, Pratt & Whitney. 124 pp.'
-  id: NASA CR-4396 Vol. II
-  topic: [rib]
-  content: Rotating and stationary 4-pass square coolant passage with trips normal and skewed (45 deg)
-    to the flow, Pratt & Whitney/UTRC rig; Nu as Nu/Nu_inf with Nu_inf = 0.0176 Re^0.8 (Kays-Perkins,
-    Pr 0.72). Stationary data only PLOTTED (Figs. 6.1/6.2, log y, 4 Re overplotted); no ribbed friction.
-  status: accuracy
-  verdict: Duplicate of CR4396/19940011518.pdf (identical text layer, different bytes); see that entry.
-    The repo cites the CR4396/ copy.
-  read_for: ['#452 independent-lab check of the Han R/G rib sets']
-  issues: [452, 700]
-  records: [validation/cooling/extractions/johnson_1993_cr4396.md, validation/cooling/data/johnson1993/]
-  notes: DUPLICATE of docs/heat_transfer/CR4396/19940011518.pdf (pdftotext output md5-identical; file
-    md5 differs, 65 MB each). Root copy dated 1 Oct, CR4396/ copy 2 Oct. Candidate for deletion.
 - file: docs/heat_transfer/ALKHAMIS-THESIS.pdf
   citation: Alkhamis, N. Y. (2009). Heat transfer and pressure drop measurement for square channels with
     V-shape ribs at high Reynolds numbers. M.S. thesis, Texas A&M University.
@@ -410,7 +341,7 @@
   issues: [403, 434, 444, 452, 700, 702, 703]
   records: [validation/cooling/extractions/johnson_1993_cr4396.md, validation/cooling/data/johnson1993/metadata.yaml]
   code: ['validation/cooling/conventions.py: Kays-Perkins to Dittus-Boelter conversion (0.873)']
-  notes: A text-identical copy sits at docs/heat_transfer/19940011518.pdf.
+  notes: A text-identical copy at docs/heat_transfer/19940011518.pdf was deleted 2026-10-25.
 - file: docs/heat_transfer/dimples/045312_1_online.pdf
   citation: Wang, F., Chen, L., Liu, K., Tang, H., Ren, Y. (2022). Heat transfer and flow friction characteristics
     of dimple-type heat exchanger in axial piston pump. AIP Advances 12, 045312.
@@ -628,22 +559,6 @@
   issues: [386, 387, 410, 479]
   records: [validation/cooling/extractions/effusion_plate_flow.md]
   code: ['python/combaero/network/components.py: EffusionPlateElement docstring']
-- file: docs/heat_transfer/film/A_Study_on_the_Film_Superposition_Method_for_the_M.pdf
-  citation: Gao, Z., Qiu, T., Liu, P., Ding, S., Li, Z., Cheng, R., Yuan, Q. (2025). A study on the film
-    superposition method for the multi-row film cooling of the turbine outer ring. Processes 13, 143.
-  id: doi:10.3390/pr13010143
-  topic: [film, effusion]
-  content: Sellers multi-row superposition and a per-row mainstream-temperature correction alpha (Eqs.
-    1-11, Eq. 5 with a = 12, b = 0.9465 PRINTED in 4.3.1); measurements on a turbine outer ring quantify
-    Sellers over-prediction with row count.
-  status: implemented
-  verdict: Source of film_superposition_sellers and the alpha-corrected superposition. (a, b) are rig-specific
-    and stay required inputs; alpha cannot be fitted on andrei2014; on murray2018 alpha is the wrong knob.
-  read_for: ['#386/#387 multi-row superposition', '#426 Gao coefficients']
-  issues: [386, 413, 420, 421, 425, 426]
-  records: [validation/cooling/extractions/film_superposition.md, validation/cooling/extractions/gao_alpha_fit_on_murray.md]
-  code: ['include/cooling_correlations.h: film_superposition_sellers, film_superposition_corrected']
-  notes: Byte-identical duplicate of processes-13-00143-v2.pdf (same md5). The code cites processes-13-00143-v2.pdf.
 - file: docs/heat_transfer/film/AGARDAG328.pdf
   citation: Hirsch, C. (ed.) (1993). Advanced methods for cascade testing. AGARDograph 328, AGARD, Neuilly-sur-Seine.
   id: AGARD-AG-328
@@ -671,11 +586,11 @@
     and the overall-effectiveness output; also the 1-vent-per-jet Re exponent 0.72 for #468. Whole-wall
     h, so it cannot isolate the coolant side.'
   read_for: ['#387 overall effectiveness output', '#476 augmentation', '#468 overall effectiveness', '#468
-      Re exponent 0.72']
+      Re exponent 0.72', '#410 plate geometry (Table 1)']
   issues: [386, 387, 410, 427, 428, 430, 431, 433, 468, 475, 476, 487, 684, 690]
   records: [validation/cooling/data/andrews1988/metadata.yaml, validation/cooling/extractions/andrews_effusion_overall_eta.md,
     validation/cooling/extractions/effusion_plate_flow.md]
-  notes: 'Byte-identical duplicate of Impingement_Effusion_Cooling_Overall_Wal.pdf (same md5). Local digitised
+  notes: 'A byte-identical copy, Impingement_Effusion_Cooling_Overall_Wal.pdf, was deleted 2026-10-25. Local digitised
     folder andrews_86-GT-290_fig10_data/ (misnamed ''86'', it is 88-GT-290 Fig. 10) and andrews_88-GT-290_fig_10.png.
     Title from the repo record (not in p.1 text layer). Local only (gitignored): docs/heat_transfer/film/andrews_86-GT-290_fig10_data/.'
 - file: docs/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
@@ -751,22 +666,6 @@
   issues: [403]
   records: []
   notes: Rib paper filed under film/.
-- file: docs/heat_transfer/film/Impingement_Effusion_Cooling_Overall_Wal.pdf
-  citation: 'Andrews, G. E., Asere, A. A., Hussain, C. I., Mkpadi, M. C., Nazari, A. (1988). Impingement/effusion
-    cooling: overall wall heat transfer. ASME 88-GT-290, Gas Turbine and Aeroengine Congress, Amsterdam.'
-  id: ASME 88-GT-290
-  topic: [impingement, effusion]
-  content: 'Same document as Andrews_88-GT-290.pdf: transient overall heat transfer in impingement/effusion
-    walls, Table 1 geometry PRINTED, h vs G and effectiveness PLOTTED, Re exponent 0.72 printed.'
-  status: accuracy
-  verdict: 'Cross-source accuracy data for effusion internal h and overall effectiveness; screened for
-    #468 for overall effectiveness and the 1-vent-per-jet Re exponent 0.72 (comment 2026-10-25). Whole-wall
-    h only.'
-  read_for: ['#468 overall effectiveness', '#468 Re exponent 0.72', '#410 plate geometry (Table 1)']
-  issues: [386, 387, 468]
-  records: [validation/cooling/extractions/effusion_plate_flow.md, validation/cooling/data/andrews1988/metadata.yaml]
-  notes: 'Byte-identical duplicate of Andrews_88-GT-290.pdf (same md5); effusion_plate_flow.md and #468
-    cite this file name, the andrews1988 dataset and andrews_effusion_overall_eta.md cite the other.'
 - file: docs/heat_transfer/film/Jackowski_2021_Energies_14_4843_impingement_effusion_double_wall.pdf
   citation: 'Jackowski, T., Elfner, M., Bauer, H.-J. (2021). Experimental study of impingement effusion-cooled
     double-wall combustor liners: thermal analysis. Energies 14(16), 4843.'
@@ -968,7 +867,7 @@
   issues: [386, 413, 420, 421, 425, 426]
   records: [validation/cooling/extractions/film_superposition.md, validation/cooling/extractions/gao_alpha_fit_on_murray.md]
   code: ['include/cooling_correlations.h: film_superposition_sellers, film_superposition_corrected']
-  notes: Byte-identical duplicate of A_Study_on_the_Film_Superposition_Method_for_the_M.pdf (same md5);
+  notes: A byte-identical copy, A_Study_on_the_Film_Superposition_Method_for_the_M.pdf, was deleted 2026-10-25;
     this is the file name the code cites.
 - file: docs/heat_transfer/film/taslim-spring-2012-friction-factors-and-heat-transfer-coefficients-in-turbulated-cooling-passages-of-different-aspect.pdf
   citation: 'Taslim, M. E., Spring, S. D. (1987). Friction factors and heat transfer coefficients in turbulated
@@ -1493,7 +1392,7 @@
   issues: [335, 455]
   records: [validation/cooling/extractions/pin_fin_sources.md]
   code: ['include/pin_fin_correlation.h: vanfossen_1982_staggered_nu']
-  notes: 'Journal version J. Eng. Power 104 (1982), 268. Byte-identical duplicate: pin_fin/NTRS_19810004791_VanFossen_1981_staggered_short_pin_fins.pdf.'
+  notes: 'Journal version J. Eng. Power 104 (1982), 268. A byte-identical copy, pin_fin/NTRS_19810004791_VanFossen_1981_staggered_short_pin_fins.pdf, was deleted 2026-10-25.'
 - file: docs/heat_transfer/pin_fin/NASA_TM-83005_Brigham_VanFossen_1983.pdf
   citation: Brigham, B. A., Van Fossen, G. J. (1983). Length to diameter ratio and row number effects
     in short pin fin heat transfer. NASA TM-83005 (prepared for the 28th ASME Gas Turbine Conference,
@@ -1511,8 +1410,8 @@
   records: [validation/cooling/extractions/pin_fin_sources.md]
   code: ['include/pin_fin_correlation.h: cited in the vanfossen_1982_staggered_nu comment (supporting
       evidence only)']
-  notes: 'Journal version J. Eng. Gas Turbines Power 106 (1984), 241. Byte-identical duplicate: pin_fin/NTRS_19830006160_Simoneau_VanFossen_1982_LD_row_effects.pdf
-    (misnamed).'
+  notes: 'Journal version J. Eng. Gas Turbines Power 106 (1984), 241. A byte-identical misnamed copy, pin_fin/NTRS_19830006160_Simoneau_VanFossen_1982_LD_row_effects.pdf,
+    was deleted 2026-10-25.'
 - file: docs/heat_transfer/pin_fin/NASA_TM-83801_Brigham_1984_convergence.pdf
   citation: Brigham, B. A. (1984). The effect of channel convergence on heat transfer in a passage with
     short pin fins. NASA TM-83801.
@@ -1546,34 +1445,6 @@
   records: []
   notes: 'NTRS 19820011619; journal version J. Heat Transfer 106 (1984), 42 per #335 (not shown in the
     document). Partly illegible.'
-- file: docs/heat_transfer/pin_fin/NTRS_19810004791_VanFossen_1981_staggered_short_pin_fins.pdf
-  citation: VanFossen, G. J. (1981). Heat transfer coefficients for staggered arrays of short pin fins.
-    NASA TM-81696.
-  id: NASA TM-81696
-  topic: [pin_fin]
-  content: Duplicate of NASA_TM-81696_VanFossen.pdf (identical MD5).
-  status: implemented
-  verdict: Duplicate; see NASA_TM-81696_VanFossen.pdf (source of vanfossen_1982_staggered_nu).
-  read_for: []
-  issues: [335]
-  records: [validation/cooling/extractions/pin_fin_sources.md]
-  code: ['include/pin_fin_correlation.h: vanfossen_1982_staggered_nu']
-  notes: Byte-identical duplicate of pin_fin/NASA_TM-81696_VanFossen.pdf (added 2026-10-20). Safe to delete
-    one copy.
-- file: docs/heat_transfer/pin_fin/NTRS_19830006160_Simoneau_VanFossen_1982_LD_row_effects.pdf
-  citation: Brigham, B. A., Van Fossen, G. J. (1983). Length to diameter ratio and row number effects
-    in short pin fin heat transfer. NASA TM-83005.
-  id: NASA TM-83005
-  topic: [pin_fin]
-  content: Duplicate of NASA_TM-83005_Brigham_VanFossen_1983.pdf (identical MD5).
-  status: screened
-  verdict: Duplicate; see NASA_TM-83005_Brigham_VanFossen_1983.pdf.
-  read_for: []
-  issues: [335]
-  records: [validation/cooling/extractions/pin_fin_sources.md]
-  notes: 'MISNAMED: the filename says Simoneau & VanFossen 1982, but the document is Brigham & Van Fossen,
-    TM-83005 (byte-identical to pin_fin/NASA_TM-83005_Brigham_VanFossen_1983.pdf, added 2026-10-20). Safe
-    to delete.'
 - file: docs/heat_transfer/pin_fin/Oda_Takeishi_2009_JTST_4_507_liner_ribs.pdf
   citation: Oda, Y., Takeishi, K., Motoda, Y., Sugimoto, S., Miyake, Y. (2009). Heat transfer characteristics
     of pin-fin arrays with ribs to cool combustor liners. Journal of Thermal Science and Technology 4(4),
@@ -1732,7 +1603,7 @@
   records: [validation/junction/data/bassett2001/, validation/junction/models/bassett2001.py, validation/junction/README.md]
   code: ['include/side_stream_momentum.h: STATION_KAPPA_BLEED_BASSETT', 'include/solver_interface.h: Tee
       Junction Elements (Bassett 2001)']
-  notes: Canonical copy; docs/bassett/bassett.pdf is a byte-identical duplicate.
+  notes: A byte-identical copy at docs/bassett/bassett.pdf was deleted 2026-10-25.
 - file: docs/junction/compressible_junction_model.pdf
   citation: '? (2026). Compressible extension of the Unified0D/Bassett T-junction model for 1D network
     solvers. Working notes, 27 May 2026.'
@@ -1886,7 +1757,7 @@
   read_for: [junction validation dataset (#183)]
   issues: [183, 272, 300]
   records: [validation/junction/README.md]
-  notes: Canonical copy; docs/bassett/stigler_2010.pdf is a byte-identical duplicate.
+  notes: A byte-identical copy at docs/bassett/stigler_2010.pdf was deleted 2026-10-25.
 - file: docs/junction/tb1283/OBJ.pdf
   citation: Blaisdell, F. W., Manson, P. W. (1963). Loss of energy at sharp-edged pipe junctions in water
     conveyance systems. USDA Agricultural Research Service, Technical Bulletin No. 1283, August 1963.
@@ -1976,8 +1847,7 @@
   read_for: []
   issues: []
   records: []
-  notes: Byte-identical duplicate of docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf. docs/lefebvre/
-    is gitignored.
+  notes: A byte-identical copy at docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf was deleted 2026-10-25.
 - file: docs/orifices/lichtarowicz-et-al-1965-discharge-coefficients-for-incompressible-non-cavitating-flow-through-long-orifices.pdf
   citation: Lichtarowicz, A., Duggins, R. K., Markland, E. (1965). Discharge coefficients for incompressible
     non-cavitating flow through long orifices. J. Mechanical Engineering Science 7(2), 210-219.
