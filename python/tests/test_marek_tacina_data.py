@@ -1,10 +1,9 @@
 """Marek & Tacina (1975), NASA TN D-7958, Table I (slot film cooling at four
 free-stream turbulence levels), transcribed from the page image (#714). The
 extraction record is
-validation/cooling/extractions/marek_tacina_1975_d7958.md (UNCONFIRMED).
+validation/cooling/extractions/marek_tacina_1975_d7958.md (CONFIRMED 2026-10-25).
 
-These tests check the transcription against the report's own identities;
-nothing scores against it until the record is signed off.
+These tests check the transcription against the report's own identities.
 """
 
 from __future__ import annotations
