@@ -1,5 +1,6 @@
 import asyncio
 import io
+import math
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -34,14 +35,23 @@ app.add_middleware(
 )
 
 
+def _dist_file(name: str) -> FileResponse:
+    # Without a built frontend (a repo checkout, the Vite dev server) the file
+    # is missing, and a FileResponse on it is a bare 500 from the server.
+    path = _FRONTEND_DIST / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"/{name} not found (frontend not built)")
+    return FileResponse(path)
+
+
 @app.get("/favicon.svg")
 async def favicon_svg():
-    return FileResponse(_FRONTEND_DIST / "favicon.svg")
+    return _dist_file("favicon.svg")
 
 
 @app.get("/icons.svg")
 async def icons_svg():
-    return FileResponse(_FRONTEND_DIST / "icons.svg")
+    return _dist_file("icons.svg")
 
 
 @app.get("/")
@@ -85,6 +95,11 @@ async def get_materials():
 
 # Module-level persistence for warm-starting the solver across requests.
 _continuation_state: dict | None = None
+
+#: Seconds /solve and /export wait beyond the solver's own (soft) timeout
+#: before answering 504. The worker thread cannot be cancelled; this only
+#: frees the request.
+HARD_TIMEOUT_MARGIN = 10.0
 
 
 def _solve_sync(schema: NetworkGraphSchema):
@@ -139,9 +154,9 @@ def _solve_sync(schema: NetworkGraphSchema):
 async def solve(schema: NetworkGraphSchema):
     # Hard async-level deadline: even if a single C++ Fanno/RK4 step blocks,
     # the event loop stays alive for health checks and subsequent requests.
-    # Add a 10 s buffer on top of the solver's own soft timeout.
+    # HARD_TIMEOUT_MARGIN on top of the solver's own soft timeout.
     soft_timeout = schema.solver_settings.timeout or 180.0
-    hard_timeout = soft_timeout + 10.0
+    hard_timeout = soft_timeout + HARD_TIMEOUT_MARGIN
     try:
         # Offload CPU-bound C++ solver to a worker thread
         result, node_results, element_results, edge_results, net, diag = await asyncio.wait_for(
@@ -168,7 +183,7 @@ async def solve(schema: NetworkGraphSchema):
     except TimeoutError:
         raise HTTPException(
             status_code=504,
-            detail=f"Solver exceeded the hard timeout of {hard_timeout:.0f}s. "
+            detail=f"Solver exceeded the hard timeout of {hard_timeout:g} s. "
             "Try raising the solver timeout, simplifying the network, or a "
             "different init strategy.",
         ) from None
@@ -176,6 +191,15 @@ async def solve(schema: NetworkGraphSchema):
         raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=humanize(str(e), schema)) from e
+
+
+def _json_number(v: object) -> object:
+    # The route has no response_model, so a NaN / inf reaches the JSON encoder
+    # and fails AFTER the route returned: a bare 500. /solve's response model
+    # writes non-finite floats as null; do the same here.
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    return v
 
 
 def _resolve_preview_sync(schema: NetworkGraphSchema) -> dict:
@@ -189,7 +213,10 @@ def _resolve_preview_sync(schema: NetworkGraphSchema) -> dict:
         items[item_id] = {
             "status": res.status,
             "reason": res.reason,
-            "fields": {k: {"value": fr.value, "source": fr.source} for k, fr in res.fields.items()},
+            "fields": {
+                k: {"value": _json_number(fr.value), "source": fr.source}
+                for k, fr in res.fields.items()
+            },
         }
     return {"items": items}
 
@@ -220,7 +247,7 @@ async def resolve_preview_endpoint(schema: NetworkGraphSchema):
 @app.post("/export")
 async def export_results(schema: NetworkGraphSchema):
     soft_timeout = schema.solver_settings.timeout or 180.0
-    hard_timeout = soft_timeout + 10.0
+    hard_timeout = soft_timeout + HARD_TIMEOUT_MARGIN
     try:
         # Solve quickly to get states
         # Six values, not five. `_solve_sync` gained a `diag` return in #168
@@ -260,7 +287,7 @@ async def export_results(schema: NetworkGraphSchema):
     except TimeoutError:
         raise HTTPException(
             status_code=504,
-            detail=f"Export solve exceeded the hard timeout of {hard_timeout:.0f}s.",
+            detail=f"Export solve exceeded the hard timeout of {hard_timeout:g} s.",
         ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
