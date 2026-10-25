@@ -371,6 +371,31 @@ class EffusionPlateData(BaseModel):
     label: str | None = None
 
 
+class SlotFilmData(BaseModel):
+    """A 2-D film slot (#714): coolant from the upstream node into the gas
+    through a continuous slot, and a film PROVIDER. It owns no wall: a
+    thermal wall on the gas duct downstream names it (``film``), the span
+    measured from the slot lip.
+
+    Defaults are Marek & Tacina's D-7958 rig, on which the film is scored:
+    a 0.63 cm slot across the 37 cm duct, Tu 14% (the case Eq. 5 fits
+    best). The 1 mm lip is not from the report; it only sets the orifice's
+    length.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    slot_height: float = Field(default=6.3e-3, gt=0.0)
+    span: float = Field(default=0.37, gt=0.0)
+    lip_thickness: float = Field(default=1.0e-3, gt=0.0)
+    turbulence_intensity: float = Field(default=14.0, ge=0.0)
+    C_m_multiplier: float = Field(default=1.0, gt=0.0)
+    correlation: Literal["IdelchikThick", "Lichtarowicz", "McGreehanSchotsch", "fixed"] = (
+        "IdelchikThick"
+    )
+    Cd: float = Field(default=0.6, gt=0.0, le=1.0)
+    label: str | None = None
+
+
 class FilmCoolingData(BaseModel):
     """Film-cooling holes (#386): coolant from the upstream node into the gas,
     and a film PROVIDER. It owns no wall: a thermal wall on the gas duct
@@ -604,7 +629,7 @@ class ThermalWallData(BaseModel):
     # How the two elements lie along the wall, from_node -> to_node: with the
     # flow signs it decides parallel or counter flow (ThermalWall, #627).
     orientation: Literal["aligned", "opposed"] = "aligned"
-    # A film covering one side (#386): the id of a film_cooling or
+    # A film covering one side (#386): the id of a film_cooling, slot_film or
     # effusion_plate node, the side it covers, and the wall's span [m]
     # downstream of that provider's last row.
     film: str | None = None

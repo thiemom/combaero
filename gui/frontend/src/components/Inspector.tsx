@@ -1411,6 +1411,79 @@ const Inspector = () => {
 						);
 					})()}
 
+				{selectedNode.type === "slot_film" &&
+					(() => {
+						const d = selectedNode.data;
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const num = (key: string, label: string, fallback: number) => (
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor={`${key}_${selectedNode.id}`}
+									className="text-xs font-bold text-gray-500 uppercase"
+								>
+									{label}
+								</label>
+								<NumericInput
+									id={`${key}_${selectedNode.id}`}
+									value={d[key] ?? fallback}
+									onChange={(val) => set({ [key]: val })}
+									className="p-1.5 h-8 text-sm border rounded bg-white"
+									placeholder={String(fallback)}
+								/>
+							</div>
+						);
+						const len = (key: string, label: string, fallback: number) => (
+							<LengthInput
+								id={`${key}_${selectedNode.id}`}
+								label={label}
+								value={d[key] ?? fallback}
+								onChange={(val) => set({ [key]: val })}
+							/>
+						);
+						return (
+							<>
+								<div className="text-[10px] text-gray-500 bg-stone-50 p-2 rounded border border-stone-200">
+									A 2-D film slot (Marek &amp; Tacina 1975): coolant from the
+									inlet into the gas. It owns no wall. Select this node as the
+									Film of a thermal wall on the gas duct downstream; the span is
+									measured from the slot lip. Defaults: the D-7958 rig.
+								</div>
+								{len("slot_height", "Slot Height S", 6.3e-3)}
+								{len("span", "Slot Span", 0.37)}
+								{len("lip_thickness", "Lip Thickness", 1.0e-3)}
+								{num(
+									"turbulence_intensity",
+									"Free-Stream Turbulence Tu [%]",
+									14,
+								)}
+								{num("C_m_multiplier", "C_m Multiplier (rig tuning)", 1.0)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Slot Discharge Model (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.correlation || "IdelchikThick"}
+										onChange={(e) => set({ correlation: e.target.value })}
+									>
+										<option value="IdelchikThick">
+											Deep Hole in Wall (Idelchik 4-18a, on Dh)
+										</option>
+										<option value="Lichtarowicz">
+											Long Orifice (Lichtarowicz 1965, on Dh)
+										</option>
+										<option value="McGreehanSchotsch">
+											Cooling Hole (M-S 1988, on Dh)
+										</option>
+										<option value="fixed">Manual / Fixed Value</option>
+									</select>
+								</div>
+								{d.correlation === "fixed" && num("Cd", "Fixed Cd Value", 0.6)}
+							</>
+						);
+					})()}
+
 				{selectedNode.type === "impingement_array" &&
 					(() => {
 						const d = selectedNode.data;
@@ -3507,6 +3580,7 @@ const Inspector = () => {
 					const providers = nodes.filter(
 						(n) =>
 							n.type === "film_cooling" ||
+							n.type === "slot_film" ||
 							n.type === "effusion_plate" ||
 							n.type === "effusion_liner",
 					);

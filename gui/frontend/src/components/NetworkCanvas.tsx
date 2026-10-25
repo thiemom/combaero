@@ -118,6 +118,19 @@ const NetworkCanvas = () => {
 					correlation: "IdelchikThick",
 					Cd: 0.6,
 				} as any;
+			} else if (type === "slot_film") {
+				// Marek & Tacina's D-7958 rig, on which the slot film is scored
+				// (#714): a working example, not invented typical values.
+				data = {
+					...data,
+					slot_height: 6.3e-3,
+					span: 0.37,
+					lip_thickness: 1.0e-3,
+					turbulence_intensity: 14.0,
+					C_m_multiplier: 1.0,
+					correlation: "IdelchikThick",
+					Cd: 0.6,
+				} as any;
 			} else if (type === "effusion_plate") {
 				// Andrews et al.'s plate C, the geometry the closure is scored
 				// on (#471): a working example, not invented typical values.
