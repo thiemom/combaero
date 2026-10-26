@@ -355,7 +355,7 @@ EquilibriumJacobian combustion_equilibrium_and_jacobian(const State& in, bool sm
 // Shift and reforming reactions
 State wgs_equilibrium(const State& in);
 State wgs_equilibrium_adiabatic(const State& in);
-State smr_wgs_equilibrium(const State& in);
+State smr_wgs_equilibrium(const State& in);   // deprecated, removed in 0.8.0: use reforming_equilibrium
 State reforming_equilibrium(const State& in);
 ```
 

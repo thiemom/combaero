@@ -4240,7 +4240,8 @@ class NetworkSolver:
 
         if init_strategy == "incompressible_warmstart":
             warnings.warn(
-                "init_strategy='incompressible_warmstart' is deprecated. "
+                "init_strategy='incompressible_warmstart' is deprecated and will be "
+                "removed in 0.8.0. "
                 "On the certified MPCE cold-start audit (2026-07) it "
                 "converged 10/32 cases at ~10x the wall time of "
                 "'analytical_pt_prop' (32/32). Use 'analytical_pt_prop' "

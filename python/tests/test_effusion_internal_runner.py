@@ -81,7 +81,7 @@ def test_the_two_conversions_the_axes_demand(plate_c) -> None:
     prediction from the correlation plus geometry alone.
     """
     D, X, L = er._geometry(plate_c)
-    air = cb.standard_dry_air_composition()
+    air = cb.species.dry_air()
     T, P = er.ASSUMED_T, er.ASSUMED_P
     k = cb.thermal_conductivity(T, P, air)
     mu = cb.viscosity(T, P, air)
@@ -519,7 +519,7 @@ def test_the_fidelity_miss_is_not_a_transcription_error(fig8_1986) -> None:
     ]
     assert abs(sum(errs) / len(errs)) < 0.025
 
-    air = cb.standard_dry_air_composition()
+    air = cb.species.dry_air()
     mu = cb.viscosity(er.ASSUMED_T, er.ASSUMED_P, air)
     below = above = 0
     for series in fig8_1986.values():

@@ -50,10 +50,8 @@ from .effusion_liner import EffusionLiner
 from .pressure_loss import (
     ConstantFractionLoss,
     ConstantHeadLoss,
-    ConstantLoss,
     LinearThetaFractionLoss,
     LinearThetaHeadLoss,
-    LinearThetaLoss,
 )
 from .schema import DiagnosticSpec, spec_for, validate_diagnostics, ALL_KNOWN_FIELDS
 from .solver import NetworkSolver, SolveOutcome
@@ -111,10 +109,17 @@ __all__: list[str] = [
     "SmoothModel",
     "WallLayer",
     "ThermalWall",
-    "ConstantLoss",
     "ConstantFractionLoss",
     "ConstantHeadLoss",
-    "LinearThetaLoss",
     "LinearThetaFractionLoss",
     "LinearThetaHeadLoss",
 ]
+
+
+def __getattr__(name: str) -> type:
+    """Deprecated aliases (ConstantLoss, LinearThetaLoss) warn on access."""
+    from . import pressure_loss as _pressure_loss
+
+    if name in _pressure_loss._DEPRECATED_ALIASES:
+        return getattr(_pressure_loss, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
