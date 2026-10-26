@@ -6,6 +6,8 @@
  * no field names are hardcoded; everything comes from the live solve data.
  */
 
+import { expectedResultKeys } from "./quantities";
+
 export interface DiscoveredField {
 	key: string;
 	/** True when at least one node result carries a finite value for this key. */
@@ -36,6 +38,55 @@ export function resolveField(result: unknown, key: string): number | undefined {
 	const nested = state?.[key];
 	if (isFiniteNum(nested)) return nested;
 	return undefined;
+}
+
+/**
+ * Resolve a probe slot key: `state.<k>` reads the node state first, a bare key
+ * the top level first (as resolveField). Finite numbers only, so a string or
+ * a NaN never reaches a formatter.
+ */
+export function resolveKey(result: unknown, key: string): number | undefined {
+	if (!key.startsWith("state.")) return resolveField(result, key);
+	if (!result || typeof result !== "object") return undefined;
+	const raw = key.slice(6);
+	const r = result as Record<string, unknown>;
+	const nested = (r.state as Record<string, unknown> | undefined)?.[raw];
+	if (isFiniteNum(nested)) return nested;
+	return isFiniteNum(r[raw]) ? (r[raw] as number) : undefined;
+}
+
+/**
+ * The keys a probe offers for a target: every finite number its result
+ * carries (`state.<k>` for a node state), or, with no result yet, the keys a
+ * solve gives a target of this kind (from the backend, see quantities.ts).
+ */
+export function probeKeyOptions(
+	result: unknown,
+	kind: string | undefined,
+): string[] {
+	if (!result || typeof result !== "object") return expectedResultKeys(kind);
+	const r = result as Record<string, unknown>;
+	const keys: string[] = [];
+	const state = r.state as Record<string, unknown> | undefined;
+	if (state && typeof state === "object") {
+		for (const [k, v] of Object.entries(state)) {
+			if (isFiniteNum(v)) keys.push(`state.${k}`);
+		}
+	}
+	for (const [k, v] of Object.entries(r)) {
+		if (k !== "state" && isFiniteNum(v)) keys.push(k);
+	}
+	return keys;
+}
+
+/**
+ * Whether a stored result is a converged solve. The backend returns the last
+ * iterate of a solve that did not converge, with `success: false`; it is
+ * shown, but must not read as an answer.
+ */
+export function isConvergedResult(result: unknown): boolean {
+	if (!result || typeof result !== "object") return false;
+	return (result as Record<string, unknown>).success !== false;
 }
 
 /**

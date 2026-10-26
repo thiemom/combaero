@@ -1,3 +1,5 @@
+import resultKeysJson from "./resultKeys.generated.json";
+
 /**
  * Quantity catalogue: mapping result keys to labels, units, and formatting logic.
  */
@@ -204,7 +206,6 @@ export const QUANTITY_CATALOGUE: Record<
 		format: (v) => (v ? "yes" : "no"),
 	},
 	Q: { label: "Q", unit: "W", format: (v) => v.toFixed(0) },
-	ref_location: { label: "Ref Loc", unit: "—", format: (v) => String(v) },
 	// State results (accessed via result.state.*)
 	P: { label: "P", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	Pt: { label: "Pt", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
@@ -264,47 +265,71 @@ export const QUANTITY_CATALOGUE: Record<
 	T_aw: { label: "Taw", unit: "K", format: (v) => v.toFixed(1) },
 };
 
-export const BASIC_STATE_KEYS = [
-	"P",
-	"Pt",
-	"T",
-	"Tt",
-	"m_dot",
-	"rho",
-	"mach",
-	"velocity",
-	"T_aw",
-	"P_in",
-	"P_out",
-	"T_in",
-	"T_out",
-	"Pt_in",
-	"Pt_out",
-	"Tt_in",
-	"Tt_out",
-	"zeta",
-	"sigma_norm",
-	"mach_in",
-	"mach_out",
-	"mach_loss_ref",
-	"area_ratio",
-	"dP",
-	"dPt",
-	"pr_static",
-	"pr_total",
-];
-export const TRANSPORT_KEYS = [
-	"mu",
-	"k",
-	"Pr",
-	"Re",
-	"cp",
-	"cv",
-	"gamma",
-	"a",
-	"mw",
-	"nu",
-	"h",
-	"s",
-	"u",
-];
+// ---------------------------------------------------------------------------
+// What the backend emits (derived, not hand-kept)
+// ---------------------------------------------------------------------------
+//
+// resultKeys.generated.json is written by scripts/gui_result_keys.py: it
+// solves a network per palette kind (and the variants that switch on optional
+// diagnostics) and lists every finite numeric key the node's result carries,
+// with its SI unit from gui/backend/units.py. The catalogue above only adds a
+// display label, a display unit and a format; a key without an entry is still
+// shown, under its own name, in its SI unit. quantities.test.ts fails when a
+// catalogue entry is never emitted or its unit disagrees with the backend's.
+
+type GeneratedResultKeys = {
+	kinds: Record<string, string[]>;
+	units: Record<string, string>;
+};
+const RESULT_KEYS = resultKeysJson as GeneratedResultKeys;
+
+/** The pseudo-kind under which thermal-wall (edge) results are listed. */
+export const THERMAL_WALL_KIND = "thermal_wall";
+
+/** Every result key a solve can give an element or node of this kind, as the
+ *  backend emits it (`state.<key>` for a node's state). Empty for a kind the
+ *  backend does not solve (the probe itself). */
+export function expectedResultKeys(kind: string | undefined): string[] {
+	return (kind && RESULT_KEYS.kinds[kind]) || [];
+}
+
+/** Every kind the generated list covers (palette kinds and the wall). */
+export function resultKinds(): string[] {
+	return Object.keys(RESULT_KEYS.kinds);
+}
+
+/** The backend's SI unit of a result key ("-" dimensionless), if known. */
+export function siUnit(key: string): string | undefined {
+	return RESULT_KEYS.units[key];
+}
+
+/** A readable number for a key with no catalogue format. */
+export function formatGeneric(v: number): string {
+	if (v === 0) return "0";
+	const a = Math.abs(v);
+	if (a >= 1e6 || a < 1e-3) return v.toExponential(3);
+	return String(Number.parseFloat(v.toPrecision(5)));
+}
+
+export type QuantityMeta = {
+	label: string;
+	unit: string;
+	format: (v: number) => string;
+	/** False for a key with no catalogue entry (label = the key itself). */
+	catalogued: boolean;
+};
+
+/** Label, display unit and format of a result key: the catalogue entry, or the
+ *  key under its own name in the backend's SI unit. */
+export function quantityMeta(key: string): QuantityMeta {
+	const raw = key.startsWith("state.") ? key.slice(6) : key;
+	const cat = QUANTITY_CATALOGUE[raw];
+	if (cat) return { ...cat, catalogued: true };
+	const si = siUnit(raw);
+	return {
+		label: raw,
+		unit: si === undefined || si === "-" ? "—" : si,
+		format: formatGeneric,
+		catalogued: false,
+	};
+}

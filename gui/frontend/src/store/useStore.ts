@@ -28,6 +28,9 @@ export const stripResults = <T extends Node | Edge>(items: T[]): T[] =>
 		return { ...item, data: rest };
 	});
 
+/** The (invisible) handle on a probe node a connection can be drawn to. */
+export const PROBE_HANDLE = "probe-in";
+
 const isStructural = (changes: (NodeChange | EdgeChange)[]): boolean =>
 	changes.some((c) => c.type === "add" || c.type === "remove");
 
@@ -59,6 +62,9 @@ export interface RFState {
 	speciesMetadata: { names: string[]; molar_masses: number[] } | null;
 	fetchSpeciesMetadata: () => Promise<void>;
 	displaySettings: string[];
+	/** Every field a solve has offered so far: only a field not in it is
+	 *  auto-added to displaySettings, so an unchecked field stays unchecked. */
+	knownFields: string[];
 	setDisplaySettings: (settings: string[]) => void;
 	solverSettings: {
 		global_regime: "incompressible" | "compressible";
@@ -154,6 +160,23 @@ const useStore = create<RFState>((set, get) => ({
 	},
 
 	onConnect: (connection: Connection) => {
+		// A connection drawn to a probe's handle points the probe at the node
+		// it starts from. It is not a flow edge: drawn as one it changed
+		// nothing the probe showed, and (a structural edit) cleared every
+		// result in the network.
+		if (connection.targetHandle === PROBE_HANDLE) {
+			const probeId = connection.target;
+			const targetId = connection.source;
+			if (!probeId || !targetId || probeId === targetId) return;
+			set({
+				nodes: get().nodes.map((n) =>
+					n.id === probeId
+						? { ...n, data: { ...n.data, target_id: targetId } }
+						: n,
+				),
+			});
+			return;
+		}
 		const isThermal =
 			connection.sourceHandle?.includes("thermal") ||
 			connection.targetHandle?.includes("thermal");
@@ -255,54 +278,58 @@ const useStore = create<RFState>((set, get) => ({
 	},
 
 	setSolveResults: (results: any) => {
+		// null clears the status banner only (start of a solve, dismiss,
+		// export): the stored per-node results stay.
 		set({ solveResults: results });
+		if (!results) return;
 
-		// Auto-promote every newly discovered scalar field into displaySettings so
-		// the Inspector and node cards show it without manual opt-in.  Users can
-		// uncheck individual fields afterwards to shorten the display.
-		if (results) {
-			const discovered = discoverFields(results);
-			const current = get().displaySettings;
-			const existing = new Set(current);
-			const toAdd = discovered
-				.filter((f) => !existing.has(f.key))
-				.map((f) => f.key);
-			if (toAdd.length > 0) {
-				set({ displaySettings: [...current, ...toAdd] });
-			}
-		}
-
-		// Also inject results into node data for reactive UI
-		if (results) {
+		// Auto-promote every NEWLY discovered scalar field into displaySettings
+		// so the Inspector and node cards show it without manual opt-in. A field
+		// seen before is left as the user set it: one they unchecked stays
+		// unchecked at the next solve (it used to be re-added every solve).
+		const discovered = discoverFields(results).map((f) => f.key);
+		const known = new Set(get().knownFields);
+		const fresh = discovered.filter((k) => !known.has(k));
+		if (fresh.length > 0) {
+			const shown = new Set(get().displaySettings);
 			set({
-				nodes: get().nodes.map((node) => {
-					// Check for node results
-					if (results.node_results?.[node.id]) {
-						return {
-							...node,
-							data: { ...node.data, result: results.node_results[node.id] },
-						};
-					}
-					// Check for element results (since elements are nodes now)
-					if (results.element_results?.[node.id]) {
-						return {
-							...node,
-							data: { ...node.data, result: results.element_results[node.id] },
-						};
-					}
-					return node;
-				}),
-				edges: get().edges.map((edge) => {
-					if (results.edge_results?.[edge.id]) {
-						return {
-							...edge,
-							data: { ...edge.data, result: results.edge_results[edge.id] },
-						};
-					}
-					return edge;
-				}),
+				knownFields: [...known, ...fresh],
+				displaySettings: [
+					...get().displaySettings,
+					...fresh.filter((k) => !shown.has(k)),
+				],
 			});
 		}
+
+		// Inject each result into its node / edge. A node or edge the response
+		// has no result for loses its old one: after a failed request (no
+		// results at all) or for an item the solve did not cover, a kept result
+		// would read as current in the probe, the telemetry and the cards.
+		const withResult = <T extends Node | Edge>(item: T, result: any): T => {
+			if (result) return { ...item, data: { ...item.data, result } };
+			if (!item.data?.result) return item;
+			const { result: _old, ...rest } = item.data;
+			return { ...item, data: rest };
+		};
+		set({
+			nodes: get().nodes.map((node) =>
+				withResult(
+					node,
+					results.node_results?.[node.id] ?? results.element_results?.[node.id],
+				),
+			),
+			edges: get().edges.map((edge) => {
+				const r = results.edge_results?.[edge.id];
+				// Wall results carry no success flag of their own: they share the
+				// solve's, so a probe on a wall can flag a non-converged solve.
+				return withResult(
+					edge,
+					r && r.success === undefined
+						? { ...r, success: results.success !== false }
+						: r,
+				);
+			}),
+		});
 	},
 
 	speciesMetadata: null,
@@ -317,6 +344,7 @@ const useStore = create<RFState>((set, get) => ({
 	},
 
 	displaySettings: ["T", "P", "m_dot", "rho"],
+	knownFields: ["T", "P", "m_dot", "rho"],
 	setDisplaySettings: (settings: string[]) => {
 		set({ displaySettings: settings });
 	},

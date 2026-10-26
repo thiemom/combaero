@@ -2,7 +2,10 @@
 	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
 	"files": {
 		"ignoreUnknown": true,
-		"includes": ["gui/frontend/src/**"]
+		"includes": [
+			"gui/frontend/src/**",
+			"!gui/frontend/src/utils/resultKeys.generated.json"
+		]
 	},
 	"formatter": {
 		"enabled": true,

@@ -1,25 +1,22 @@
 import { memo, useMemo } from "react";
 import { Handle, Position } from "reactflow";
 import useStore from "../../store/useStore";
+import { isConvergedResult, resolveKey } from "../../utils/diagnostics";
 import { nodeTypeLabel } from "../../utils/nodeUtils";
-import { QUANTITY_CATALOGUE } from "../../utils/quantities";
+import { withPortArm } from "../../utils/portArms";
+import { quantityMeta } from "../../utils/quantities";
 import NodeIcon from "../NodeIcon";
-
-function resolveQuantity(result: any, key: string): number | undefined {
-	if (!result) return undefined;
-	if (key.startsWith("state.")) {
-		const subKey = key.slice(6);
-		return result.state?.[subKey] ?? result[subKey];
-	}
-	return result[key] ?? result.state?.[key];
-}
 
 function ProbeSlot({
 	result,
 	quantityKey,
+	targetType,
+	targetData,
 }: {
 	result: any;
 	quantityKey: string | undefined;
+	targetType: string | undefined;
+	targetData: any;
 }) {
 	if (!quantityKey) {
 		return (
@@ -29,24 +26,19 @@ function ProbeSlot({
 		);
 	}
 
-	const rawKey = quantityKey.startsWith("state.")
-		? quantityKey.slice(6)
-		: quantityKey;
-	const meta = QUANTITY_CATALOGUE[rawKey];
-	const value = resolveQuantity(result, quantityKey);
+	const meta = quantityMeta(quantityKey);
+	const value = resolveKey(result, quantityKey);
 
 	return (
 		<div className="flex justify-between items-baseline gap-2 text-[11px] font-mono">
 			<span className="text-stone-500 min-w-[24px]">
-				{meta?.label ?? rawKey}
+				{withPortArm(meta.label, quantityKey, targetType, targetData)}
 			</span>
 			<span className="font-bold text-right">
-				{value !== undefined && value !== null
-					? (meta?.format(value) ?? String(value))
-					: "—"}
+				{value !== undefined ? meta.format(value) : "—"}
 			</span>
 			<span className="text-stone-400 text-[9px] font-light">
-				{meta?.unit ?? ""}
+				{meta.unit === "—" ? "" : meta.unit}
 			</span>
 		</div>
 	);
@@ -64,13 +56,17 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 
 	const result = targetElement?.data?.result;
 	const label = data.label || "Probe";
-	const targetLabel =
-		(targetElement as any)?.type === "thermal"
-			? (targetElement?.data?.label ?? "Thermal Wall")
-			: targetElement?.data?.label ||
-				nodeTypeLabel(targetElement?.type) ||
-				(data.target_id ? "Unknown target" : "No target");
+	const isWall = (targetElement as any)?.data?.type === "thermal";
+	const targetLabel = isWall
+		? (targetElement?.data?.label ?? "Thermal Wall")
+		: targetElement?.data?.label ||
+			nodeTypeLabel(targetElement?.type) ||
+			(data.target_id ? "Unknown target" : "No target");
 	const hasTarget = !!data.target_id;
+	const missing = hasTarget && !targetElement;
+	// The backend returns the last iterate of a solve that did not converge
+	// (success: false): shown, but flagged so it does not read as an answer.
+	const notConverged = !!result && !isConvergedResult(result);
 
 	return (
 		<div
@@ -89,28 +85,53 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 			</div>
 
 			{/* Target badge */}
-			<div className="px-2.5 pb-1">
+			<div className="px-2.5 pb-1 flex flex-wrap gap-1">
 				<span
 					className={`text-[8px] px-1.5 py-0.5 rounded-full ${
-						hasTarget
+						hasTarget && !missing
 							? "bg-stone-100 text-stone-500"
 							: "bg-amber-50 text-amber-500"
 					}`}
 				>
-					{hasTarget ? `→ ${targetLabel}` : "no target"}
+					{!hasTarget
+						? "no target"
+						: missing
+							? "target deleted"
+							: `→ ${targetLabel}`}
 				</span>
+				{notConverged && (
+					<span
+						className="text-[8px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-500"
+						title="The last solve did not converge: these are its last iterate, not a solution."
+					>
+						not converged
+					</span>
+				)}
 			</div>
 
 			{/* Divider */}
 			<div className="border-t border-stone-100 mx-2 mb-1" />
 
 			{/* Quantity slots */}
-			<div className="px-2.5 pb-2 flex flex-col gap-1">
-				<ProbeSlot result={result} quantityKey={data.slot1_key} />
-				<ProbeSlot result={result} quantityKey={data.slot2_key} />
+			<div
+				className={`px-2.5 pb-2 flex flex-col gap-1 ${notConverged ? "opacity-60" : ""}`}
+			>
+				<ProbeSlot
+					result={result}
+					quantityKey={data.slot1_key}
+					targetType={targetElement?.type}
+					targetData={targetElement?.data}
+				/>
+				<ProbeSlot
+					result={result}
+					quantityKey={data.slot2_key}
+					targetType={targetElement?.type}
+					targetData={targetElement?.data}
+				/>
 			</div>
 
-			{/* React Flow handle (invisible, for probe-link edges) */}
+			{/* Drawing a connection to this handle sets the probe's target
+			    (useStore.onConnect); it never becomes a flow edge. */}
 			<Handle
 				type="target"
 				position={Position.Left}
@@ -121,6 +142,4 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 	);
 }
 
-export const QUANTITY_CATALOGUE_KEYS = Object.keys(QUANTITY_CATALOGUE);
-export { QUANTITY_CATALOGUE };
 export default memo(ProbeNode);

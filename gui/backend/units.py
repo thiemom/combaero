@@ -1,7 +1,10 @@
 """Unit catalogue for result-export column headers.
 
-Mirrors the labels/units of the frontend ``QUANTITY_CATALOGUE`` so the CSV
-produced by ``/export`` is self-describing (``P [Pa]``, ``T [K]`` …).
+The SI unit of every result key, for the CSV produced by ``/export``
+(``P [Pa]``, ``T [K]`` ...) and, through ``unit_of`` and
+``scripts/gui_result_keys.py``, for the GUI: the frontend's
+``QUANTITY_CATALOGUE`` display units are checked against these
+(``quantities.test.ts``).
 
 Keep this module dependency-free; it is imported by ``main.py`` during the
 CSV-streaming response.
@@ -64,7 +67,7 @@ UNIT_MAP: dict[str, str] = {
     "cp": "J/kg/K",
     "cv": "J/kg/K",
     "gamma": "-",
-    "mw": "kg/mol",
+    "mw": "g/mol",  # State::mw (include/units_data.h)
     # --- Thermo reference-state block (Phase 2, element inlet state) ---
     "rho_ref": "kg/m³",
     "h_ref": "J/kg",
@@ -74,7 +77,7 @@ UNIT_MAP: dict[str, str] = {
     "cv_ref": "J/kg/K",
     "gamma_ref": "-",
     "a_ref": "m/s",
-    "mw_ref": "kg/mol",
+    "mw_ref": "g/mol",
     "mu_ref": "Pa·s",
     "k_ref": "W/m/K",
     "nu_ref": "m²/s",
@@ -163,6 +166,166 @@ UNIT_MAP: dict[str, str] = {
     "length": "m",
     "roughness": "m",
 }
+
+# Units of the result keys the export does NOT label (yet). Giving one of them
+# a unit in UNIT_MAP renames its CSV / DataFrame column ("omega" becomes
+# "omega [-]"), which breaks a notebook that reads the column by name, so they
+# are kept apart: the GUI shows these units (resultKeys.generated.json, via
+# unit_of) and the export keeps its columns. Moving them into UNIT_MAP is the
+# user's call. test_gui_result_keys_sync.py fails on an emitted key with no
+# unit in either map. Flags (0/1) and counts are "-".
+GUI_ONLY_UNITS: dict[str, str] = {
+    # Solver views
+    "sigma_norm": "-",
+    "sigma_norm_high": "-",
+    "sigma_norm_low": "-",
+    "incompressible_mach": "-",
+    "incompressible_mach_limit": "-",
+    # Node states
+    "T_static": "K",
+    # Channel / Fanno-Rayleigh duct (#551, #636)
+    "M_in_duct": "-",
+    "M_exit_duct": "-",
+    "f_surface": "-",
+    "Re_surface": "-",
+    "heat_area_ratio": "-",
+    "heat_area_exceeds_wetted": "-",
+    "rayleigh_in_momentum": "-",
+    "rayleigh_omitted": "-",
+    "rayleigh_omitted_frac": "-",
+    # Area change (#731)
+    "F0": "m\u00b2",
+    "F1": "m\u00b2",
+    "Re_small": "-",
+    "expansion": "-",
+    # Orifice approach and ISO 5167 taps (#649/#645/#651)
+    "beta": "-",
+    "beta_flow": "-",
+    "E": "-",
+    "Cd_pipe_ratio": "-",
+    "P_approach": "Pa",
+    "dp_tap": "Pa",
+    "dp_permanent": "Pa",
+    "loss_ratio": "-",
+    "pressure_recovery": "-",
+    "recovery_in_range": "-",
+    # Discharge holes, film and slot (#386, #714)
+    "G_coolant": "kg/m\u00b2/s",
+    "G_jet": "kg/m\u00b2/s",
+    "G_slot": "kg/m\u00b2/s",
+    "dP_drive": "Pa",
+    "L_over_d": "-",
+    "hole_length": "m",
+    "hydraulic_diameter": "m",
+    "slot_height": "m",
+    # SlotFilmElement takes Tu in percent (SlotFilmData); the effusion
+    # elements take a fraction but do not report it.
+    "turbulence_intensity": "%",
+    "is_ingesting": "-",
+    # Effusion plate (#471)
+    "Nu_approach": "-",
+    "Nu_internal": "-",
+    "Nu_throat": "-",
+    "Re_hole": "-",
+    "h_hole_area": "W/m\u00b2/K",
+    "h_plate_area": "W/m\u00b2/K",
+    "h_gas_unblown_Re": "-",
+    "h_gas_unblown_Pr": "-",
+    "h_gas_unblown_Nu": "-",
+    "T_gas_from_main_inlet": "-",
+    "film_extrapolated": "-",
+    "gas_side_chamber": "-",
+    "area_approach_total": "m\u00b2",
+    "area_hole_total": "m\u00b2",
+    "coolant_crossflow_ignored": "-",
+    "coolant_ht_plenum_assumed": "-",
+    "hole_count_exact": "-",
+    "internal_Nu_multiplier": "-",
+    "pitch_over_d": "-",
+    "porosity": "-",
+    "wall_conductivity": "W/m/K",
+    # Effusion liner (#471)
+    "crossflow_cd_beyond_8pct": "-",
+    "crossflow_cd_degraded": "-",
+    "station_psi_beyond_bassett": "-",
+    # Impingement array (#465)
+    "n_rows_unresolved": "-",
+    # Tee and chamber junctions (#517, #536)
+    "K11": "-",
+    "K12": "-",
+    "P_jct": "Pa",
+    "Pt_jct": "Pa",
+    "n_ports": "-",
+    "port_area_mismatch": "-",
+    # Ejector (#270, #619)
+    "m_dot_primary": "kg/s",
+    "m_dot_secondary": "kg/s",
+    "m_dot_outlet": "kg/s",
+    "omega": "-",  # the entrainment ratio m_dot_secondary / m_dot_primary
+    "omega_critical": "-",
+    "critical_mode": "-",
+    "s_choke": "-",
+    "r_gas": "J/kg/K",
+    "outlet_pt_pa": "Pa",
+    "p_py_pa": "Pa",
+    "p_c_star_pa": "Pa",
+    "p_b0_pa": "Pa",
+    # Incompressible ejector: Sanger's jet pump (#588)
+    "regime_incompressible": "-",
+    "mach_jet": "-",
+    "head_ratio_N": "-",
+    "efficiency": "-",
+    # Vortex (#661)
+    "omega_rpm": "rpm",
+    "v_theta_in": "m/s",
+    "v_theta_out": "m/s",
+    "M_theta_in": "-",
+    "M_theta_out": "-",
+    "P_swirl_in": "Pa",
+    "P_swirl_out": "Pa",
+    "dP_swirl_static": "Pa",
+    # Thermal wall exchange (#627)
+    "T_aw_a": "K",
+    "T_aw_b": "K",
+    "UA": "W/K",
+    "NTU": "-",
+    "effectiveness": "-",
+    "counterflow": "-",
+}
+
+# Per-port keys of the junctions, ``port_<i>_<quantity>`` (i = the element's
+# port index) and the tee's hidden port steps, ``step_<port>_<quantity>``.
+_PORT_UNITS: dict[str, str] = {
+    "P": "Pa",
+    "T": "K",
+    "m_dot": "kg/s",
+    "area": "m\u00b2",
+    "outer_area": "m\u00b2",
+    "area_ratio": "-",
+    "sign": "-",
+    "K": "-",
+    "flow_fraction": "-",
+}
+_STEP_UNITS: dict[str, str] = {"zeta": "-", "dPt": "Pa", "area_ratio": "-"}
+_PORT_RE = re.compile(r"^port_\d+_(\w+)$")
+_STEP_RE = re.compile(r"^step_(?:common|straight|branch)_(\w+)$")
+
+
+def unit_of(key: str) -> str | None:
+    """The SI unit of a result key, or None when none is known (the GUI's view;
+    the export labels UNIT_MAP keys only, see GUI_ONLY_UNITS)."""
+    if key in UNIT_MAP:
+        return UNIT_MAP[key]
+    if key in GUI_ONLY_UNITS:
+        return GUI_ONLY_UNITS[key]
+    m = _PORT_RE.match(key)
+    if m and m.group(1) in _PORT_UNITS:
+        return _PORT_UNITS[m.group(1)]
+    m = _STEP_RE.match(key)
+    if m and m.group(1) in _STEP_UNITS:
+        return _STEP_UNITS[m.group(1)]
+    return None
+
 
 # Composition keys render as ``Y[<label>] [-]``. ``<label>`` may be a species
 # name (e.g. ``N2``, ``H2O``, ``CH4``) or a numeric index for forward

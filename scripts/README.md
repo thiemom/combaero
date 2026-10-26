@@ -76,6 +76,15 @@ Regenerate `docs/UNITS.md` from `include/units_data.h`.
 uv run scripts/generate_units_md.py
 ```
 
+### gui_result_keys.py
+
+Regenerate `gui/frontend/src/utils/resultKeys.generated.json`: the result keys the GUI backend emits per palette kind, with their SI units from `gui/backend/units.py`. It solves one network per kind through `/solve`, plus the variants that switch on optional diagnostics. The Probe and the Live Telemetry read it, and `quantities.test.ts` checks `QUANTITY_CATALOGUE` against it. Rerun it after adding, renaming or removing a result key. The slow test `test_gui_result_keys_sync.py` fails while the file is stale. Do not edit the JSON by hand.
+
+```bash
+uv run python scripts/gui_result_keys.py          # rewrite
+uv run python scripts/gui_result_keys.py --check  # exit 1 when stale
+```
+
 ## Stress Testing
 
 ### stress/ (run.py, summarize.py, networks.py)
@@ -174,6 +183,7 @@ uv run scripts/dependency_floors.py > floors.in && uv pip install --resolution l
 | Check GUI style | `./scripts/check-gui-style.sh` |
 | Run static analysis | `./scripts/run-clang-tidy.sh` |
 | Regenerate units docs | `uv run scripts/generate_units_md.py` |
+| Regenerate the GUI result-key list | `uv run python scripts/gui_result_keys.py` |
 | Verify GUI wheel before publish | `./scripts/test-pypi-wheel.sh` |
 
 All scripts return `0` on success and `1` on failure.

@@ -13,7 +13,7 @@ import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useStore from "../store/useStore";
 import { discoverFields } from "../utils/diagnostics";
-import { QUANTITY_CATALOGUE } from "../utils/quantities";
+import { quantityMeta } from "../utils/quantities";
 
 function SourceBadge({
 	label,
@@ -55,10 +55,10 @@ export function DiagnosticsPanel() {
 		if (!q) return allFields;
 		return allFields.filter((f) => {
 			if (f.key.toLowerCase().includes(q)) return true;
-			const cat = QUANTITY_CATALOGUE[f.key];
+			const meta = quantityMeta(f.key);
 			return (
-				cat?.label.toLowerCase().includes(q) ||
-				cat?.unit.toLowerCase().includes(q)
+				meta.label.toLowerCase().includes(q) ||
+				meta.unit.toLowerCase().includes(q)
 			);
 		});
 	}, [allFields, search]);
@@ -171,7 +171,7 @@ export function DiagnosticsPanel() {
 								</p>
 							) : (
 								visible.map((field) => {
-									const cat = QUANTITY_CATALOGUE[field.key];
+									const meta = quantityMeta(field.key);
 									const isChecked = selectedSet.has(field.key);
 									return (
 										<label
@@ -186,14 +186,14 @@ export function DiagnosticsPanel() {
 											/>
 											{/* Label / key */}
 											<span className="font-mono text-[11px] text-stone-700 w-[4.5rem] flex-shrink-0 truncate">
-												{cat?.label ?? field.key}
+												{meta.label}
 											</span>
 											{/* Raw key + unit for non-catalogue fields */}
 											<span className="text-[10px] text-stone-400 flex-1 min-w-0 truncate">
-												{cat ? field.key : ""}
+												{meta.catalogued ? field.key : ""}
 											</span>
 											<span className="text-[9px] text-stone-300 flex-shrink-0 w-10 text-right truncate">
-												{cat?.unit ?? ""}
+												{meta.unit === "—" ? "" : meta.unit}
 											</span>
 											{/* Source badges: N = node, E = element, W = wall */}
 											<div className="flex gap-px flex-shrink-0">

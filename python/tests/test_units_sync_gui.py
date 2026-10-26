@@ -31,6 +31,14 @@ def test_label_with_unit():
     assert units.label_with_unit("dP") == "dP [Pa]"
     assert units.label_with_unit("ref_location") == "ref_location"
     assert units.label_with_unit("Y[N2]") == "Y[N2] [-]"
+    # State::mw is g/mol (include/units_data.h); the export said kg/mol.
+    assert units.label_with_unit("mw") == "mw [g/mol]"
+    # A unit only the GUI shows leaves the export column as it was.
+    assert units.unit_of("port_2_P") == "Pa"
+    assert units.unit_of("step_branch_dPt") == "Pa"
+    assert units.label_with_unit("port_2_P") == "port_2_P"
+    assert units.label_with_unit("omega") == "omega"
+    assert not set(units.UNIT_MAP) & set(units.GUI_ONLY_UNITS)
 
 
 def test_frontend_quantities_sync():
@@ -56,5 +64,8 @@ def test_frontend_quantities_sync():
     assert "dP" in content, "dP missing from quantities.ts"
     assert "pr_static" in content, "pr_static missing from quantities.ts"
 
-    # Verify ref_location
-    assert "ref_location" in content, "ref_location missing from quantities.ts"
+    # ref_location is a string (a meta column of the CSV export, see
+    # test_gui_backend_units_catalogue); the catalogue holds numeric keys only.
+    # The full key-by-key sync is test_gui_result_keys_sync.py plus
+    # gui/frontend/src/utils/quantities.test.ts.
+    assert "ref_location:" not in content
