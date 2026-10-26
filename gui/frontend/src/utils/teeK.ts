@@ -25,3 +25,14 @@ export function bassettDesignK(
 		((2 * psi) / d) * n + q * q * psi * psi - 1,
 	];
 }
+
+// Mirror of ConstantKTeeElement.design_net_loss: the pair's mass-weighted
+// total-pressure loss at its design share, per common-leg head. Below zero
+// the tee creates total pressure and the backend refuses the pair (#779).
+export function designNetLoss(
+	qBranch: number,
+	kStraight: number,
+	kBranch: number,
+): number {
+	return (1 - qBranch) * kStraight + qBranch * kBranch;
+}

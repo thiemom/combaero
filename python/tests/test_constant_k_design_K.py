@@ -58,3 +58,33 @@ def test_golden_values_shared_with_the_frontend(
 def test_refuses_a_share_outside_the_open_unit_interval(q: float) -> None:
     with pytest.raises(ValueError, match="q_branch"):
         ConstantKTeeElement.bassett_design_K("branch", q, 1.0, 90.0)
+
+
+def test_design_net_loss_is_the_mass_weighted_pair() -> None:
+    assert ConstantKTeeElement.design_net_loss(0.3, 0.2, -0.1) == pytest.approx(0.11)
+
+
+@pytest.mark.parametrize(
+    "flow_direction, q, psi, theta_deg, negative",
+    [
+        # #779: Bassett's joining pair at equal areas and shallow angles
+        # (measured at 30 deg, q = 0.5: about +0.05, Blaisdell & Manson).
+        ("merge", 0.5, 1.0, 30.0, True),
+        ("merge", 0.3, 1.0, 45.0, True),
+        ("merge", 0.5, 1.0, 90.0, False),
+        ("merge", 0.5, 2.0, 30.0, False),
+        # Dividing into a narrow, shallow branch.
+        ("branch", 0.25, 4.0, 15.0, True),
+        ("branch", 0.5, 1.0, 90.0, False),
+    ],
+)
+def test_bassett_pairs_that_create_total_pressure(
+    flow_direction: str, q: float, psi: float, theta_deg: float, negative: bool
+) -> None:
+    pair = ConstantKTeeElement.bassett_design_K(flow_direction, q, psi, theta_deg)
+    assert (ConstantKTeeElement.design_net_loss(q, *pair) < 0.0) is negative
+
+
+def test_design_net_loss_refuses_a_share_outside_the_open_unit_interval() -> None:
+    with pytest.raises(ValueError, match="q_branch"):
+        ConstantKTeeElement.design_net_loss(1.0, 0.1, 0.1)

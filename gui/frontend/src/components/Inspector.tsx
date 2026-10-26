@@ -18,7 +18,7 @@ import {
 	THERMAL_WALL_KIND,
 } from "../utils/quantities";
 import { describeElement, failuresFor } from "../utils/secondLaw";
-import { bassettDesignK } from "../utils/teeK";
+import { bassettDesignK, designNetLoss } from "../utils/teeK";
 import { validateNetwork } from "../utils/validation";
 import {
 	designArrangement,
@@ -1859,6 +1859,11 @@ const Inspector = () => {
 							psi ?? 1,
 							selectedNode.data.theta_deg ?? 90,
 						);
+						const netLoss = designNetLoss(
+							designShare,
+							selectedNode.data.K_straight ?? autoKStraight,
+							selectedNode.data.K_branch ?? autoKBranch,
+						);
 						const dFromF = (f: number) => Math.sqrt((4 * f) / Math.PI);
 						const lu = unitPreferences.length === "mm" ? 1000 : 1;
 						const lu_label = unitPreferences.length;
@@ -2080,6 +2085,16 @@ const Inspector = () => {
 												override, clear to return to it.
 											</p>
 										</div>
+										{netLoss < 0 && (
+											<p className="text-[10px] leading-snug text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+												This pair loses net total pressure {netLoss.toFixed(3)}{" "}
+												&lt; 0 at the design share: the tee would create total
+												pressure, so the solve refuses it. Enter both K values
+												(for example measured ones), move the design share, or
+												use the Mynard model. Bassett&apos;s analytical pair
+												runs low for joining tees at shallow angles.
+											</p>
+										)}
 									</>
 								)}
 

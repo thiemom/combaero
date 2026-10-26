@@ -902,6 +902,34 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 )
                 _K_str = _md.K_straight if _md.K_straight is not None else _K_str_d
                 _K_bra = _md.K_branch if _md.K_branch is not None else _K_bra_d
+                # A pair that creates total pressure at its own design split
+                # converges and is then rejected by the second-law check; refuse
+                # it here with the cause instead (#779). No clamp: a clamped
+                # zero is still not the user's K.
+                _net = ConstantKTeeElement.design_net_loss(_md.design_branch_share, _K_str, _K_bra)
+                if _net < 0.0:
+                    _blank = [
+                        name
+                        for name, typed in (
+                            ("K_straight", _md.K_straight),
+                            ("K_branch", _md.K_branch),
+                        )
+                        if typed is None
+                    ]
+                    _origin = (
+                        f" ({' and '.join(_blank)} from Bassett 2001's analytical pair)"
+                        if _blank
+                        else ""
+                    )
+                    raise ValueError(
+                        f"Tee '{elem_id}': constant-K pair K_straight = {_K_str:.3f}, "
+                        f"K_branch = {_K_bra:.3f}{_origin} loses net total pressure "
+                        f"{_net:.3f} < 0 at design branch share {_md.design_branch_share:g}: "
+                        "the tee would create total pressure and the solve would be "
+                        "rejected by the second-law check. Enter K_straight and K_branch "
+                        "explicitly (for example measured values), move the design share, "
+                        "or use the Mynard junction model."
+                    )
                 if _md.flow_direction == "branch":
                     _k_ports = {1: _K_str, 2: _K_bra}
                 else:

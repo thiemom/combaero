@@ -1030,6 +1030,26 @@ class ConstantKTeeElement(MultiPortChamberElement):
         K12 = (2.0 * psi / D) * (1.0 - qs * qs - q * q * psi * c) + q * q * psi * psi - 1.0
         return K11, K12
 
+    @staticmethod
+    def design_net_loss(q_branch: float, K_straight: float, K_branch: float) -> float:
+        """Mass-weighted total-pressure loss of a constant-K pair at its
+        design split, per common-leg dynamic head:
+        ``(1 - q_branch) K_straight + q_branch K_branch``.
+
+        With the element's sign convention (loss positive in both
+        directions) this is the tee's total-pressure drop across all of its
+        flow. Below zero the pair raises total pressure at the split it was
+        chosen for, and the second-law check rejects the converged solve
+        (#779). One negative K is physical (the branch at a low share, the
+        straight run at a high one); a negative sum is not. Bassett's
+        analytical pair (``bassett_design_K``) goes negative for joining at
+        psi = 1 and theta <= 60 deg, and for dividing into a narrow, shallow
+        branch.
+        """
+        if not 0.0 < q_branch < 1.0:
+            raise ValueError(f"q_branch must lie in (0, 1), got {q_branch}")
+        return (1.0 - q_branch) * K_straight + q_branch * K_branch
+
     def residuals(  # type: ignore[override]
         self,
         states: list[NetworkMixtureState],

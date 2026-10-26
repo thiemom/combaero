@@ -387,6 +387,37 @@ def test_constant_k_blank_K_follows_the_resolved_geometry(flow_direction: str) -
     assert K_bra > 3.0 * ConstantKTeeElement.bassett_design_K(flow_direction, 0.7, 1.0, 90.0)[1]
 
 
+def test_constant_k_refuses_a_default_pair_that_creates_total_pressure() -> None:
+    """#779: at equal areas and 30 deg Bassett's joining pair is -0.04 on both
+    legs. Built, it converges to a tee that raises total pressure and is
+    rejected post-solve; the builder names the cause instead."""
+    schema = _three_plenum_mpce_schema("merge")
+    node = next(n for n in schema.nodes if n.id == "mpce")
+    node.data.update(junction_model="constant_k", theta_deg=30.0)
+    with pytest.raises(ValueError, match=r"K_straight and K_branch from Bassett.*second-law"):
+        build_network_from_schema(schema)
+
+
+def test_constant_k_refuses_a_typed_pair_that_creates_total_pressure() -> None:
+    schema = _three_plenum_mpce_schema("merge")
+    node = next(n for n in schema.nodes if n.id == "mpce")
+    node.data.update(junction_model="constant_k", K_straight=0.1, K_branch=-0.3)
+    with pytest.raises(ValueError, match=r"K_branch = -0\.300 loses net total pressure -0\.100"):
+        build_network_from_schema(schema)
+
+
+def test_constant_k_typed_pair_overrides_a_net_negative_default() -> None:
+    """One negative K is physical; only the mass-weighted sum is checked."""
+    from combaero.network.mpce_element import ConstantKTeeElement
+
+    schema = _three_plenum_mpce_schema("merge")
+    node = next(n for n in schema.nodes if n.id == "mpce")
+    node.data.update(junction_model="constant_k", theta_deg=30.0, K_straight=0.15, K_branch=-0.05)
+    e = _get_element(build_network_from_schema(schema), "mpce")
+    assert isinstance(e, ConstantKTeeElement)
+    assert e.K_ports == {0: 0.15, 1: -0.05}
+
+
 def test_default_and_legacy_schemas_build_mynard_element():
     """junction_model absent (legacy save files) or 'mynard' keeps the
     full MultiPortChamberElement element -- and NOT the ConstantKTeeElement subclass."""
