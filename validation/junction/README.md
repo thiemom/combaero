@@ -272,6 +272,21 @@ Each coefficient is indexed on the fraction in its own leg, and which leg that
 is comes from Table 1, not from the coefficient's name: for type 4 the common
 branch is A, so K7 is the lateral coefficient and K8 the straight one.
 
+Every joining closure here (Mynard, ideal momentum, Bassett's K11/K12) gives
+all suppliers ONE junction static pressure, so K_branch - K_straight =
+(u_b^2 - u_s^2)/u_c^2 exactly and the angle moves both coefficients together,
+never the split. With equal supply pressures and equal upstream legs a merging
+tee therefore splits exactly 50/50 at every angle. Blaisdell & Manson's
+measured branch-minus-straight static (psi = 1, 0.35 < q < 0.65) is -0.01 to
+-0.09 of the common dynamic head, inside the run-to-run scatter (sd 0.05 to
+0.28). This is consistent with the data; it is not a defect.
+
+No case scores a pressure-DRIVEN joining split against a measured one: the
+`three_pb` and `mfb_two_pb` joining skeletons set their boundary pressures from
+Bassett's own K, and the per-coefficient scores impose q. A source with
+measured splits under imposed pressures is on the `wanted` list in
+`validation/sources.yaml`.
+
 ## Mach-indexed sources
 
 Most files are a coefficient against the flow split. Wang 2014 is a Mach sweep

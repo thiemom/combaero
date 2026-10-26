@@ -1493,10 +1493,20 @@ jct_k = ConstantKTeeElement(
 K_str, K_bra = ConstantKTeeElement.bassett_design_K(
     "branch", q_branch=0.5, psi=4.0, theta_deg=90.0   # -> (0.0, 3.47)
 )
+# For a MERGING tee Bassett's design pair can be net-negative at shallow
+# angles (psi = 1, theta <= 60 deg; at 30 deg and q = 0.5 both K are -0.04,
+# against +0.05 measured): the solve then converges to a junction that
+# raises total pressure and the second-law check rejects it (#779). Set
+# K_ports explicitly there, or use MultiPortChamberElement.
 
 # Ideal momentum junction (#517): parameter-free, a baseline beside the tuned
 # closures rather than a replacement. Suppliers sit at one junction STATIC
-# pressure p_jn (here P_jct is static, not Pt); each receiver obeys
+# pressure p_jn (the solved unknown and result key P_jct; static, not Pt).
+# Every joining closure shares this one-static-pressure property (Mynard and
+# Bassett too), so with equal supply pressures and equal upstream legs a
+# merging tee splits exactly 50/50 at any angle -- by construction, and
+# within the scatter of Blaisdell & Manson's measured statics. Each receiver
+# obeys
 # P_j - p_jn + (m_j/A_j)(u_j - V.n_j) = 0, V the supplied mass-weighted
 # velocity vector. Merge = Blaisdell & Manson's theory; split = vector
 # Borda-Carnot loss on every receiver (Idelchik Eq 7-6, A' = 1). No
