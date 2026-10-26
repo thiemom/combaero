@@ -1,0 +1,1 @@
+- GUI: the "Restored your last session" note above the canvas now goes away when a file is loaded or the canvas is cleared, instead of staying until it is dismissed by hand.

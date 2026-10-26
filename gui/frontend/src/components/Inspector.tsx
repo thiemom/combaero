@@ -1046,7 +1046,7 @@ const Inspector = () => {
 									"s" handle). Each station is a Bassett bleed and a panel whose
 									Cd sees the duct crossflow (McGreehan-Schotsch U1/Vi).
 									Coolant-side heat transfer is still the plenum-fed Andrews
-									model: provisional.
+									model: provisional (#785).
 								</div>
 								{num("n_segments", "Stations", 4)}
 								{len("length", "Liner Length (along duct)", 0.152)}
@@ -3986,22 +3986,15 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 	};
 
 	// Type-aware guess field selection. Elements carry only a solvable m_dot
-	// unknown; nodes carry P / T. Pressure-boundary nodes are fully specified
-	// (no unknowns) and are handled by returning an empty field list below.
+	// unknown; nodes carry P / Pt. Temperature is never an unknown: it is
+	// propagated from the inflows each evaluation, so a T guess has nothing
+	// to seed. Pressure-boundary nodes are fully specified (no unknowns) and
+	// are handled by returning an empty field list below.
 	const FIELDS_BY_TYPE: Record<string, { key: string; unit: string }[]> = {
-		// Volume nodes (P and T are solver unknowns)
-		plenum: [
-			{ key: "P", unit: "Pa" },
-			{ key: "T", unit: "K" },
-		],
-		combustor: [
-			{ key: "P", unit: "Pa" },
-			{ key: "T", unit: "K" },
-		],
-		momentum_chamber: [
-			{ key: "P", unit: "Pa" },
-			{ key: "T", unit: "K" },
-		],
+		// Volume nodes: P and Pt are the unknowns ("P" seeds both).
+		plenum: [{ key: "P", unit: "Pa" }],
+		combustor: [{ key: "P", unit: "Pa" }],
+		momentum_chamber: [{ key: "P", unit: "Pa" }],
 		// Boundaries: Pt is solved (mass-flow inlet) or fixed (pressure
 		// inlet). Short key "P" is broadcast to both by the backend; we show
 		// it only where at least one of the two is actually an unknown.

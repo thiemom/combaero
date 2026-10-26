@@ -23,11 +23,13 @@ const App = () => {
 		refreshPreview,
 		loadNotice,
 		dismissLoadNotice,
+		// When the canvas came back from the autosave (#596), so the restored
+		// network is never mistaken for a fresh start. In the store: a Load or
+		// a Clear replaces the restored canvas and resets it.
+		restoredAt,
+		setRestoredAt,
 	} = useStore();
 	const [isSolving, setIsSolving] = useState(false);
-	// When the canvas came back from the autosave (#596), so the restored
-	// network is never mistaken for a fresh start.
-	const [restoredAt, setRestoredAt] = useState<string | null>(null);
 
 	// Restore the last session once, then keep it saved. Only into an empty
 	// canvas: StrictMode runs this twice in development, and a restore must
@@ -39,7 +41,7 @@ const App = () => {
 			if (rec) {
 				store.loadNetwork(rec);
 				const t = new Date(rec.savedAt);
-				setRestoredAt(
+				store.setRestoredAt(
 					Number.isNaN(t.getTime())
 						? "earlier"
 						: t.toLocaleString([], {

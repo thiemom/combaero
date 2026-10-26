@@ -535,6 +535,14 @@ class NetworkSolver:
         self._n_species: int = len(self._default_Y)
         self._topological_order: list[str] = []
         self._derived_states: dict[str, tuple[float, list[float], Any]] = {}
+        # The gas a two-port element delivers into a PressureBoundary, keyed
+        # (boundary id, element id): (Tt, Y), from the element's own stream and
+        # wall heat. Reporting only: a PressureBoundary's state is its set
+        # Tt/Y, which no residual reads for an outflow, but an element's exit
+        # diagnostics (Tt_out, T_out, mach_out) did. Recorded on the final
+        # propagation only (_record_boundary_arrivals).
+        self._boundary_arrivals: dict[tuple[str, str], tuple[float, list[float]]] = {}
+        self._record_boundary_arrivals: bool = False
         # The undiluted gas each film provider discharges into (#694), keyed
         # FILM_INF_PREFIX + provider id: (T, Y), with the previous pass's for
         # a back-edge read, as for the nodes.
@@ -2339,6 +2347,23 @@ class NetworkSolver:
             if not T > 0.0:
                 self._T_no_gas.add(nid)
             self._derived_states[nid] = (T, Y, mix_res)
+
+            if self._record_boundary_arrivals and isinstance(node, PressureBoundary):
+                for s_up, elem, _src, _coeffs in stream_info:
+                    if elem is None or not hasattr(elem, "to_node") or not s_up.m_dot > 0.0:
+                        continue
+                    own = [
+                        wc for wc in wall_contributions if (wc[3] if wc[5] else wc[4]) == elem.id
+                    ]
+                    arrive = _solver_tools.mixer_from_streams_and_jacobians(
+                        [cb.MassStream(s_up.m_dot, s_up.Tt, s_up.Pt, s_up.Y)],
+                        Q=sum(float(wc[1]) for wc in own),
+                        fraction=0.0,
+                    )
+                    self._boundary_arrivals[(nid, elem.id)] = (
+                        float(arrive.T_mix),
+                        list(arrive.Y_mix),
+                    )
 
             # A wall-heated duct into a node whose T is not its exit Tt (the
             # node mixes other streams or heat, or is a boundary): its own exit
@@ -5144,7 +5169,12 @@ class NetworkSolver:
         # Ensure _derived_states matches final_x (best iterate), not the
         # last trial point the solver happened to evaluate.  This is cheap:
         # forward T/Y propagation only, no residuals or Jacobian.
-        self._propagate_states(final_x)
+        self._boundary_arrivals = {}
+        self._record_boundary_arrivals = True
+        try:
+            self._propagate_states(final_x)
+        finally:
+            self._record_boundary_arrivals = False
         from combaero import mass_to_mole
 
         for nid, (T, Y, _) in self._derived_states.items():
@@ -5223,6 +5253,16 @@ class NetworkSolver:
                         m_solved = float(final_x[m_indices[0]])
                         state_in.m_dot = m_solved
                         state_out.m_dot = m_solved
+                    # An end at a PressureBoundary that RECEIVES this element's
+                    # flow reports the gas arriving, not the boundary's set Tt/Y.
+                    for end_id, end_state in (
+                        (element.to_node, state_out),
+                        (element.from_node, state_in),
+                    ):
+                        arrival = self._boundary_arrivals.get((end_id, eid))
+                        if arrival is not None:
+                            end_state.T = end_state.Tt = arrival[0]
+                            end_state.Y = arrival[1]
                     self._main_face(element, self.network.nodes[element.to_node], state_out)
                     flows = self._network_flows(element, final_x)
                     temps = self._network_temperatures(element, final_x, lagged=False)

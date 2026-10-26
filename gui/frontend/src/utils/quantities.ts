@@ -213,10 +213,14 @@ export const QUANTITY_CATALOGUE: Record<
 		format: (v) => (v ? "yes" : "no"),
 	},
 	Q: { label: "Q", unit: "W", format: (v) => v.toFixed(0) },
-	// State results (accessed via result.state.*)
+	// State results (accessed via result.state.*). T is the node's TOTAL
+	// temperature at every node (the propagated, mixed Tt); a momentum
+	// chamber's static T is T_static. P is static (#773). The T/Tt key
+	// convention is #782.
 	P: { label: "P", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	Pt: { label: "Pt", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
-	T: { label: "T", unit: "K", format: (v) => v.toFixed(2) },
+	T: { label: "T (total)", unit: "K", format: (v) => v.toFixed(2) },
+	T_static: { label: "T (static)", unit: "K", format: (v) => v.toFixed(2) },
 	Tt: { label: "Tt", unit: "K", format: (v) => v.toFixed(2) },
 	rho: { label: "rho", unit: "kg/m³", format: (v) => v.toFixed(4) },
 	a: { label: "a", unit: "m/s", format: (v) => v.toFixed(2) },
@@ -262,11 +266,12 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => v.toFixed(0),
 	},
-	// Element-specific diagnostics (Static)
+	// Element end states: P_in/P_out static, T_in/T_out the end nodes'
+	// TOTAL temperature (equal to Tt_in/Tt_out until #782).
 	P_in: { label: "Pi", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	P_out: { label: "Po", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
-	T_in: { label: "Ti", unit: "K", format: (v) => v.toFixed(2) },
-	T_out: { label: "To", unit: "K", format: (v) => v.toFixed(2) },
+	T_in: { label: "Ti (total)", unit: "K", format: (v) => v.toFixed(2) },
+	T_out: { label: "To (total)", unit: "K", format: (v) => v.toFixed(2) },
 	// Element-specific diagnostics (Total)
 	Pt_in: { label: "Pti", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	Pt_out: { label: "Pto", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },

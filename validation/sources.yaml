@@ -2313,23 +2313,25 @@ wanted:
     Detailed measurements of local heat transfer coefficient in the entrance to normal and inclined film cooling
     holes. J. Turbomachinery 118, 285-290.
   checked: false
-  issues: []
+  issues:
+  - 785
   priority: later
-  question: Coolant-side heat transfer at an effusion hole inlet with crossflow (effusion configurations PR4;
-    no open issue).
+  question: Coolant-side heat transfer at an effusion hole inlet with crossflow (#785).
   where: ASME journal.
 - citation: Byerley, A. R., Jones, T. V., Ireland, P. T. (1992). Internal cooling passage heat transfer near
     the entrance to a film cooling hole. ASME 92-GT-241.
   checked: false
-  issues: []
+  issues:
+  - 785
   priority: later
-  question: As Gillespie 1996 (effusion configurations PR4).
+  question: As Gillespie 1996 (#785).
   where: ASME Turbo Expo proceedings.
 - citation: Metzger, D. E., ? (1979). ? (effusion/film hole inlet heat transfer; co-author recalled as Cordoro).
   checked: false
-  issues: []
+  issues:
+  - 785
   priority: later
-  question: As Gillespie 1996 (effusion configurations PR4).
+  question: As Gillespie 1996 (#785).
   where: '?'
 - citation: 'Chyu, M. K., Hsing, Y. C., Shih, T. I.-P., Natarajan, V. (1999). Heat transfer contributions of
     pins and endwall in pin-fin arrays: effects of thermal boundary condition modeling. J. Turbomachinery 121,

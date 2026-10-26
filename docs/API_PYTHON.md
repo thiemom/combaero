@@ -1303,6 +1303,7 @@ combustor.add_energy_boundary(EnergyBoundary("loss", fraction=-0.05))  # -5% of 
   - **A user-supplied callable** returning `(xi, dxi/dtheta)` still works. Its other dependences are central differences; that interface is the prototype for loss maps (#725).
 - **A `MomentumChamberNode`'s `T` is its stagnation temperature** (#576). Its inflows mix as `(m, Tt, Pt, Y)` streams. The closure solves the static T from `h(T0) = h(T) + v^2/2`, `v = m_dot / (rho(T, P) A)`, and closes `Pt = P exp((s(T0) - s(T)) / R)`.
   - The node's `mach` and its reported properties (`rho`, `a`, `velocity`, `Re`, plus a new `T_static`) come from that static state.
+  - Every node's result key `T`, and every element's `T_in`/`T_out`, is this TOTAL temperature, unlike `P`, which is static. Bringing temperature in line with `P`/`Pt` is #782.
   - `MomentumChamberNode.static_density(state)` returns `(rho, {name: d rho / d name})`. Junction elements (`MultiPortChamberBase.port_densities`) take their port densities from it, so a port's momentum rows and its node's Pt describe the same flow.
   - The chamber now passes up to the true choked flux. Before, T0 read as static capped it at 92 % of choked.
   - The merge-chamber face state (`cb.chamber_merge_face_state`) takes both temperatures as stagnation and solves the face's and the outlet's static states; its sensitivities are analytic (#578).

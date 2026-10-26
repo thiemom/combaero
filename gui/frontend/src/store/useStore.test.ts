@@ -235,3 +235,29 @@ describe("loadNetwork drops walls on surfaceless nodes (#720)", () => {
 		expect(useStore.getState().loadNotice).toBeNull();
 	});
 });
+
+describe("the restore note (#596) goes with the restored canvas", () => {
+	beforeEach(() => {
+		useStore.getState().setRestoredAt("23/10/2026, 21:28");
+	});
+
+	it("is cleared by loading a file", () => {
+		useStore
+			.getState()
+			.loadNetwork({ nodes: [nodeWithResult("n1")], edges: [] });
+		expect(useStore.getState().restoredAt).toBeNull();
+	});
+
+	it("is cleared by Clear, with the canvas and its results", () => {
+		useStore
+			.getState()
+			.loadNetwork({ nodes: [nodeWithResult("n1")], edges: [] });
+		useStore.getState().setRestoredAt("23/10/2026, 21:28");
+		useStore.getState().clearCanvas();
+		const s = useStore.getState();
+		expect(s.restoredAt).toBeNull();
+		expect(s.nodes).toEqual([]);
+		expect(s.edges).toEqual([]);
+		expect(s.solveResults).toBeNull();
+	});
+});

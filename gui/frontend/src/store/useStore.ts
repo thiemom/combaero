@@ -102,6 +102,12 @@ export interface RFState {
 	// What a load had to change in the file, shown once above the canvas.
 	loadNotice: string | null;
 	dismissLoadNotice: () => void;
+	// When the canvas came back from the autosave (#596), for the note above
+	// the canvas. Any load or a Clear replaces that canvas, so both reset it.
+	restoredAt: string | null;
+	setRestoredAt: (when: string | null) => void;
+	// Clear (#596): an empty canvas with no results and no restore note.
+	clearCanvas: () => void;
 	dismissSolveStatus: () => void;
 	isExporting: boolean;
 	exportNetworkResults: () => Promise<void>;
@@ -112,6 +118,7 @@ const useStore = create<RFState>((set, get) => ({
 	edges: [],
 	solveResults: null,
 	loadNotice: null,
+	restoredAt: null,
 	isExporting: false,
 	previewItems: {},
 
@@ -493,6 +500,7 @@ const useStore = create<RFState>((set, get) => ({
 				})),
 				solverSettings: loadedSettings,
 				solveResults: null,
+				restoredAt: null,
 				loadNotice:
 					dropped.length > 0
 						? `Removed ${dropped.length} thermal wall(s) on an orifice, area change, plenum or hole element (${dropped.join(", ")}): it has no surface to exchange heat. Wall a channel, loss element or chamber instead.`
@@ -507,6 +515,20 @@ const useStore = create<RFState>((set, get) => ({
 
 	dismissLoadNotice: () => {
 		set({ loadNotice: null });
+	},
+
+	setRestoredAt: (when) => {
+		set({ restoredAt: when });
+	},
+
+	clearCanvas: () => {
+		set({
+			nodes: [],
+			edges: [],
+			solveResults: null,
+			restoredAt: null,
+			loadNotice: null,
+		});
 	},
 
 	exportNetworkResults: async () => {
