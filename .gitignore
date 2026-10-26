@@ -134,6 +134,15 @@ docs/lefebvre/
 # COORDINATES from these sources are measurements and may be committed to
 # validation/; the scans themselves may not.
 docs/*.pdf
+# ... and a PDF filed in a NEW docs/ folder slipped past the per-folder rules
+# (docs/jet_mixing/, 2026-10-25). Any document anywhere under docs/, and the
+# docs/new/ drop folder, is ignored; `scripts/sources.py check --docs` flags
+# a local document git would still track.
+docs/**/*.pdf
+docs/**/*.djvu
+docs/**/*.epub
+docs/new/
+docs/jet_mixing/
 
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/
