@@ -121,20 +121,40 @@ iterate.
 ## Combustion & Equilibrium
 
 ### Complete Combustion
+Fuel C/H to CO2 + H2O(g), no dissociation; rich, every fuel burns 1/phi and
+the rest stays unburnt (no CO/H2). Model and smoothing: the Combustion note in
+[API_CPP.md](API_CPP.md). Invalid input (NaN, T or P <= 0, non-finite phi or
+target) raises `ValueError`.
 ```python
-# ADIABATIC flame temperature and products
-# smooth=True ensures a continuous Jacobian for root-finding near Phi=0
-burned = cb.complete_combustion(state, smooth=True)
+X = cb.set_equivalence_ratio_mole(0.8, X_fuel, X_air)   # phi > 0
+# ADIABATIC flame temperature and products. The Python defaults smooth both
+# phi = 0 and phi = 1 (smooth_phi0=smooth_phi1=True; the C++ default is off).
+burned = cb.complete_combustion(T=300.0, X=X, P=101325.0)
 print(f"Adiabatic T: {burned.T} K")
+exact = cb.complete_combustion(300.0, X, 101325.0, smooth_phi0=False, smooth_phi1=False)
 
-# Isothermal products
-products = cb.complete_combustion_isothermal(state, smooth=True)
+# Isothermal products, the bare product vector, and with dX_b/dX
+products = cb.complete_combustion_isothermal(300.0, X, 101325.0)
+X_b = cb.complete_combustion_to_CO2_H2O(X)               # smooth=False (phi = 0 only)
+X_b, f = cb.complete_combustion_to_CO2_H2O_with_fraction(X)
+jac = cb.complete_combustion_products_and_jacobian(X)    # .X_b, .dXb_dX[j][k]
+
+phi = cb.equivalence_ratio(X)                            # elemental, all atoms
+phi = cb.equivalence_ratio_mole(X, X_fuel, X_air)        # two-stream
+lhv = cb.fuel_lhv_mass(X_fuel)                           # J/kg, H2O vapour
+st = cb.combustion_state(X_fuel, X_air, phi=1.2, T_reactants=300.0, P=1e5)
+st.fuel_burn_fraction                                    # 1/1.2 for Complete
 ```
+Also: `set_equivalence_ratio_mass`, `bilger_stoich_mixture_fraction_mass`,
+`bilger_Z_from_equivalence_ratio_mass`, `equivalence_ratio_from_bilger_Z_mass`,
+`oxygen_required_per_*`, `combustion_state_from_streams`,
+`set_fuel_stream_for_phi` and the `set_{fuel,oxidizer}_stream_for_{Tad,O2,O2_dry,CO2,CO2_dry}`
+inverse solvers.
 
 ### Chemical Equilibrium
 ```python
 # T, P constant equilibrium
-eq_state = cb.combustion_equilibrium(state, smooth=True)
+eq_state = cb.combustion_equilibrium(T=300.0, X=X, P=101325.0, smooth=True)
 
 # Water-gas shift
 wgs = cb.wgs_equilibrium(state)

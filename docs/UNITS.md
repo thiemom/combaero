@@ -102,26 +102,26 @@ All functions use consistent units to avoid conversion errors.
 
 #### Mixture Properties (Mass/Other Basis)
 
-| Function                           | Input Units                                                                                                              | Output Unit                                            |
-|------------------------------------|--------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
-| `density`                          | T: K, P: Pa, X: mol/mol                                                                                                  | kg/m^3                                                 |
-| `molar_volume`                     | T: K, P: Pa                                                                                                              | m^3/mol                                                |
-| `specific_gas_constant`            | X: mol/mol                                                                                                               | J/(kg*K)                                               |
-| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                                                                                         | - (gamma)                                              |
-| `speed_of_sound`                   | T: K, X: mol/mol                                                                                                         | m/s                                                    |
-| `cp_mass`                          | T: K, X: mol/mol                                                                                                         | J/(kg*K)                                               |
-| `cp_secant_mass_and_jacobian`      | T1: K, T2: K, X: mol/mol                                                                                                 | cp: J/(kg*K), dcp_dT1: J/(kg*K^2), dcp_dT2: J/(kg*K^2) |
-| `cp_secant_mass_dY`                | T1: K, T2: K, X: mol/mol                                                                                                 | J/(kg*K) (per species)                                 |
-| `cv_mass`                          | T: K, X: mol/mol                                                                                                         | J/(kg*K)                                               |
-| `h_mass`                           | T: K, X: mol/mol                                                                                                         | J/kg                                                   |
-| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                                                                                       | J/(kg*K)                                               |
-| `u_mass`                           | T: K, X: mol/mol                                                                                                         | J/kg                                                   |
-| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                                                                                           | AirProperties struct                                   |
-| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                                                      | ThermoState struct                                     |
-| `transport_state`                  | T: K, P: Pa, X: mol/mol                                                                                                  | TransportState struct                                  |
-| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                                                      | CompleteState struct                                   |
-| `combustion_state`                 | X_fuel: mol/mol, X_ox: mol/mol, phi: -, T_reactants: K, P: Pa, fuel_name: str (default ''), smooth: bool (default False) | CombustionState struct                                 |
-| `combustion_state_from_streams`    | fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default ''), smooth: bool (default False)                        | CombustionState struct                                 |
+| Function                           | Input Units                                                                                                                                            | Output Unit                                            |
+|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
+| `density`                          | T: K, P: Pa, X: mol/mol                                                                                                                                | kg/m^3                                                 |
+| `molar_volume`                     | T: K, P: Pa                                                                                                                                            | m^3/mol                                                |
+| `specific_gas_constant`            | X: mol/mol                                                                                                                                             | J/(kg*K)                                               |
+| `isentropic_expansion_coefficient` | T: K, X: mol/mol                                                                                                                                       | - (gamma)                                              |
+| `speed_of_sound`                   | T: K, X: mol/mol                                                                                                                                       | m/s                                                    |
+| `cp_mass`                          | T: K, X: mol/mol                                                                                                                                       | J/(kg*K)                                               |
+| `cp_secant_mass_and_jacobian`      | T1: K, T2: K, X: mol/mol                                                                                                                               | cp: J/(kg*K), dcp_dT1: J/(kg*K^2), dcp_dT2: J/(kg*K^2) |
+| `cp_secant_mass_dY`                | T1: K, T2: K, X: mol/mol                                                                                                                               | J/(kg*K) (per species)                                 |
+| `cv_mass`                          | T: K, X: mol/mol                                                                                                                                       | J/(kg*K)                                               |
+| `h_mass`                           | T: K, X: mol/mol                                                                                                                                       | J/kg                                                   |
+| `s_mass`                           | T: K, X: mol/mol, P: Pa, P_ref: Pa                                                                                                                     | J/(kg*K)                                               |
+| `u_mass`                           | T: K, X: mol/mol                                                                                                                                       | J/kg                                                   |
+| `air_properties`                   | T: K, P: Pa, humidity: - (0-1)                                                                                                                         | AirProperties struct                                   |
+| `thermo_state`                     | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                                                                                    | ThermoState struct                                     |
+| `transport_state`                  | T: K, P: Pa, X: mol/mol                                                                                                                                | TransportState struct                                  |
+| `complete_state`                   | T: K, P: Pa, X: mol/mol, P_ref: Pa (default 101325)                                                                                                    | CompleteState struct                                   |
+| `combustion_state`                 | X_fuel: mol/mol, X_ox: mol/mol, phi: -, T_reactants: K, P: Pa, fuel_name: str (default ''), method, smooth_phi0: bool, smooth_phi1: bool, k0: -, k1: - | CombustionState struct                                 |
+| `combustion_state_from_streams`    | fuel_stream: Stream, ox_stream: Stream, fuel_name: str (default ''), method, smooth_phi0: bool, smooth_phi1: bool, k0: -, k1: -                        | CombustionState struct                                 |
 
 #### Inverse Solvers
 
@@ -306,17 +306,17 @@ All functions use consistent units to avoid conversion errors.
 | Function                                    | Input Units                                                    | Output Unit                                                                                                    |
 |---------------------------------------------|----------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | `oxygen_required_per_mol_fuel`              | -                                                              | mol O2/mol fuel                                                                                                |
-| `oxygen_required_per_kg_fuel`               | -                                                              | mol O2/kg fuel                                                                                                 |
+| `oxygen_required_per_kg_fuel`               | -                                                              | kg O2/kg fuel                                                                                                  |
 | `oxygen_required_per_mol_mixture`           | X: mol/mol                                                     | mol O2/mol mix                                                                                                 |
 | `complete_combustion_products_and_jacobian` | X: mol/mol, smooth_phi0: bool, smooth_phi1: bool, k0: -, k1: - | CompleteCombustionJacobian (X_b: mol/mol, dXb_dX: -)                                                           |
 | `combustion_equilibrium_and_jacobian`       | T: K, X: mol/mol, P: Pa, smooth: bool, k0: -                   | EquilibriumJacobian (state, dT_dT_in: -, dT_dP: K/Pa, dT_dX: K, dXout_dX: -, dXout_dT_in: 1/K, dXout_dP: 1/Pa) |
-| `oxygen_required_per_kg_mixture`            | X: mol/mol                                                     | mol O2/kg mix                                                                                                  |
+| `oxygen_required_per_kg_mixture`            | X: mol/mol                                                     | kg O2/kg mix                                                                                                   |
 | `fuel_lhv_molar`                            | X_fuel: mol/mol, reference_temperature: K                      | J/mol fuel                                                                                                     |
 | `fuel_lhv_mass`                             | X_fuel: mol/mol, reference_temperature: K                      | J/kg fuel                                                                                                      |
 | `dryair_required_per_mol_fuel`              | -                                                              | mol air/mol fuel                                                                                               |
-| `dryair_required_per_kg_fuel`               | -                                                              | mol air/kg fuel                                                                                                |
+| `dryair_required_per_kg_fuel`               | -                                                              | kg air/kg fuel                                                                                                 |
 | `dryair_required_per_mol_mixture`           | X: mol/mol                                                     | mol air/mol mix                                                                                                |
-| `dryair_required_per_kg_mixture`            | X: mol/mol                                                     | mol air/kg mix                                                                                                 |
+| `dryair_required_per_kg_mixture`            | X: mol/mol                                                     | kg air/kg mix                                                                                                  |
 
 #### Equivalence Ratio
 
@@ -339,11 +339,11 @@ All functions use consistent units to avoid conversion errors.
 
 #### Complete Combustion
 
-| Function                         | Input Units                                                   | Output Unit |
-|----------------------------------|---------------------------------------------------------------|-------------|
-| `complete_combustion_to_CO2_H2O` | X: mol/mol                                                    | mol/mol     |
-| `complete_combustion`            | State (T: K, P: Pa, X: mol/mol), smooth: bool (default False) | State       |
-| `complete_combustion_isothermal` | State, smooth: bool (default False)                           | State       |
+| Function                         | Input Units                                                                                  | Output Unit |
+|----------------------------------|----------------------------------------------------------------------------------------------|-------------|
+| `complete_combustion_to_CO2_H2O` | X: mol/mol, smooth: bool (smooth_phi0, default False)                                        | mol/mol     |
+| `complete_combustion`            | T: K, X: mol/mol, P: Pa (default 101325), smooth_phi0: bool, smooth_phi1: bool, k0: -, k1: - | State       |
+| `complete_combustion_isothermal` | T: K, X: mol/mol, P: Pa (default 101325), smooth_phi0: bool, smooth_phi1: bool, k0: -, k1: - | State       |
 
 #### Stream Solvers
 
@@ -1252,7 +1252,7 @@ All functions use consistent units to avoid conversion errors.
 | `solve_orifice_mdot`                            | -                                                                                                                                  | Pa                                    |
 | `dry_air`                                       | -                                                                                                                                  | X: mol/mol                            |
 | `humid_air_enthalpy_nasa9`                      | T: K, P: Pa, RH: - (0-1)                                                                                                           | J/kg dry air                          |
-| `complete_combustion_to_CO2_H2O_with_fraction`  | -                                                                                                                                  | -                                     |
+| `complete_combustion_to_CO2_H2O_with_fraction`  | X: mol/mol, smooth: bool                                                                                                           | (X_b: mol/mol, fuel burn fraction: -) |
 | `HumidAir::rh`                                  | -                                                                                                                                  | 0-1                                   |
 | `HumidAir::state`                               | -                                                                                                                                  | -                                     |
 | `AirProperties::P`                              | -                                                                                                                                  | Pa                                    |
