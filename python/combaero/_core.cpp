@@ -2739,7 +2739,8 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "Water vapor saturation pressure [Pa] using Huang (2018) formula.\n\n"
         "Validated range: -100\u00b0C to +100\u00b0C (173.15\u2013373.15 K).\n"
         "Extrapolation up to 5% of range span (~10 K) is allowed silently.\n"
-        "Raises RuntimeError beyond that.\n\n"
+        "Raises IndexError beyond that. Over ice at T <= 273.15 K, so an RH\n"
+        "below 0 C is relative to ice.\n\n"
         "T : temperature [K]\n\n"
         "Returns: saturation vapor pressure [Pa]");
 
@@ -2792,10 +2793,14 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         py::arg("P"), py::arg("RH"),
         "Enthalpy of humid air [J/kg dry air] using NASA-9 thermodynamic "
         "data.\n\n"
-        "More accurate than humid_air_enthalpy() at non-ambient temperatures.\n"
         "Computes h(T, X) from the NASA-9 polynomial database and converts\n"
         "to J/kg dry air basis.\n\n"
-        "T  : temperature [K] (valid range: 200-6000 K)\n"
+        "NOT on the psychrometric datum of humid_air_enthalpy(): the NASA-9\n"
+        "datum is the elements at 298.15 K, so water vapour carries its\n"
+        "formation enthalpy and the two differ by hundreds of kJ/kg at the\n"
+        "same state. Only differences at fixed humidity ratio compare.\n\n"
+        "T  : temperature [K] (bounded by saturation_vapor_pressure's range,\n"
+        "     163.15-383.15 K, because RH is evaluated at T)\n"
         "P  : total pressure [Pa]\n"
         "RH : relative humidity (0-1)\n\n"
         "Returns: enthalpy [J/kg dry air]");

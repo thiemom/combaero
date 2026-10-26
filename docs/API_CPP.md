@@ -1673,14 +1673,27 @@ double humidity_ratio(double T, double P, double RH);
 double dewpoint(double T, double P, double RH);
 double humid_air_density(double T, double P, double RH);
 
-class HumidAir {
-public:
-    void set_TP_RH(double T, double P, double RH);
-    double rh() const;
+struct HumidAir {
+    State state;      // public member
+    double rh = 0.0;  // RH used at the last set_*; not updated if state.T/P change
+    HumidAir& set_TP_RH(double T, double P, double RH);
+    HumidAir& set_TP_dewpoint(double T, double P, double Tdp);
+    HumidAir& set_TP_omega(double T, double P, double w);
+    double RH() const;
     double dewpoint() const;
-    State& state();
+    double wet_bulb() const;
+    double humidity_ratio() const;
+    double h_mass() const;   // ASHRAE psychrometric, J/kg dry air
 };
 ```
+
+Saturation pressure is Huang (2018), over ice at T <= 273.15 K (RH below
+0 C is relative to ice), accepted on 163.15-383.15 K. Mixing is ideal-gas
+with no enhancement factor: humidity ratio is ~0.5% low against ASHRAE
+RP-1485 at 1 atm, ~2% at 5 bar and ~13% at 30 bar on cold saturated air;
+density and `humid_air_enthalpy` are ideal-gas as well.
+`humid_air_enthalpy_nasa9` is on the NASA-9 datum (elements at 298.15 K),
+not the psychrometric one.
 
 ---
 

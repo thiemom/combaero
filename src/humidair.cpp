@@ -167,14 +167,25 @@ double dewpoint(double T, [[maybe_unused]] double P, double RH) {
   // Calculate vapor pressure
   double P_w = vapor_pressure(T, RH);
 
+  // Lowest temperature saturation_vapor_pressure accepts. A dewpoint below
+  // it cannot be represented: refuse rather than return the bound, which a
+  // clamped Newton iterate would otherwise report as converged.
+  const double T_lo = SVP_T_MIN - SVP_EXTRAP_TOL * (SVP_T_MAX - SVP_T_MIN);
+  if (P_w < saturation_vapor_pressure(T_lo)) {
+    throw std::out_of_range(
+        "dewpoint: the dewpoint lies below the saturation-pressure range "
+        "limit of " +
+        std::to_string(T_lo) + " K");
+  }
+
   // Use iterative method (Newton-Raphson) to solve for Tdp
 
   // Initial guess for dewpoint (slightly lower than ambient temperature)
   double Tdp = T - 10.0;
 
   // Ensure initial guess is within valid range
-  Tdp = std::max(Tdp, 173.15); // Minimum -100°C
-  Tdp = std::min(Tdp, T);      // Maximum ambient temperature
+  Tdp = std::max(Tdp, T_lo);
+  Tdp = std::min(Tdp, T); // Maximum ambient temperature
 
   // Iterative solution
   const std::size_t max_iterations = 100;
@@ -188,16 +199,18 @@ double dewpoint(double T, [[maybe_unused]] double P, double RH) {
     // respect to T Use central difference approximation
     const double delta =
         0.01; // Small temperature difference for derivative calculation
-    double P_ws_Tdp_plus = saturation_vapor_pressure(Tdp + delta);
-    double P_ws_Tdp_minus = saturation_vapor_pressure(Tdp - delta);
+    // Centre kept delta inside the accepted range at the lower bound
+    const double Tc = std::max(Tdp, T_lo + delta);
+    double P_ws_Tdp_plus = saturation_vapor_pressure(Tc + delta);
+    double P_ws_Tdp_minus = saturation_vapor_pressure(Tc - delta);
     double dP_ws_dT = (P_ws_Tdp_plus - P_ws_Tdp_minus) / (2.0 * delta);
 
     // Update Tdp using Newton-Raphson method
     double Tdp_new = Tdp - (P_ws_Tdp - P_w) / dP_ws_dT;
 
     // Ensure Tdp stays within valid range
-    Tdp_new = std::max(Tdp_new, 173.15); // Minimum -100°C
-    Tdp_new = std::min(Tdp_new, T);      // Maximum ambient temperature
+    Tdp_new = std::max(Tdp_new, T_lo);
+    Tdp_new = std::min(Tdp_new, T); // Maximum ambient temperature
 
     // Check for convergence
     if (std::abs(Tdp_new - Tdp) < tolerance) {
@@ -234,8 +247,12 @@ double relative_humidity_from_dewpoint(double T, double Tdp, double P) {
 // Used internally by wet_bulb_temperature Newton-Raphson solver
 static double d_saturation_vapor_pressure_dT(double T) {
   const double delta = 0.01;
-  return (saturation_vapor_pressure(T + delta) -
-          saturation_vapor_pressure(T - delta)) /
+  // Keep both stencil points inside the accepted range
+  const double span = SVP_T_MAX - SVP_T_MIN;
+  const double Tc = std::clamp(T, SVP_T_MIN - SVP_EXTRAP_TOL * span + delta,
+                               SVP_T_MAX + SVP_EXTRAP_TOL * span - delta);
+  return (saturation_vapor_pressure(Tc + delta) -
+          saturation_vapor_pressure(Tc - delta)) /
          (2.0 * delta);
 }
 
@@ -269,24 +286,43 @@ double wet_bulb_temperature(double T, double P, double RH) {
     return -cp_air - dhfg_dTw * (Ws(Tw) - W) - hfg(Tw) * dWs_dTw;
   };
 
-  double Twb = T * (1.0 - 0.5 * RH); // initial guess: between Tdp and T
-  Twb = std::max(Twb, SVP_T_MIN);
-  Twb = std::min(Twb, T);
+  // f decreases monotonically in Twb wherever P_ws(Twb) < P, is >= 0 at the
+  // dewpoint and <= 0 at T, and tends to -inf as P_ws(Twb) -> P. Keep a
+  // bracket [lo, hi] and fall back to bisection whenever a Newton step leaves
+  // it. Points with P_ws >= P (T above the boiling point at P) lie above the
+  // root. The old unbracketed start at T stalled there (Ws undefined).
+  double lo = SVP_T_MIN - SVP_EXTRAP_TOL * (SVP_T_MAX - SVP_T_MIN);
+  double hi = T;
+  if (lo >= hi) {
+    throw std::out_of_range(
+        "wet_bulb_temperature: T is below the saturation-pressure range");
+  }
 
-  const std::size_t max_iter = 50;
+  double Twb = (saturation_vapor_pressure(hi) < P) ? hi : 0.5 * (lo + hi);
+
+  const std::size_t max_iter = 200;
   const double tol = 1e-6;
 
   for (std::size_t i = 0; i < max_iter; ++i) {
-    double fval = f(Twb);
-    double dfval = df(Twb);
-    if (std::abs(dfval) < 1e-15)
-      break;
-    double step = fval / dfval;
-    Twb -= step;
-    Twb = std::max(Twb, SVP_T_MIN);
-    Twb = std::min(Twb, T);
-    if (std::abs(step) < tol)
+    if (saturation_vapor_pressure(Twb) >= P) {
+      hi = Twb;
+      Twb = 0.5 * (lo + hi);
+      continue;
+    }
+    const double fval = f(Twb);
+    if (fval == 0.0)
       return Twb;
+    if (fval > 0.0)
+      lo = Twb;
+    else
+      hi = Twb;
+    const double dfval = df(Twb);
+    double next = Twb - fval / dfval;
+    if (!std::isfinite(next) || next <= lo || next >= hi)
+      next = 0.5 * (lo + hi);
+    if (std::abs(next - Twb) < tol || hi - lo < tol)
+      return next;
+    Twb = next;
   }
 
   throw std::runtime_error(
