@@ -616,6 +616,13 @@ double fanno_max_length(double T_in, double P_in, double u_in,
                        double tol = 1e-6, std::size_t max_iter = 100);
 ```
 
+The inverse solvers refuse non-positive inputs (`std::invalid_argument`);
+`solve_P_back_from_mdot` throws `std::runtime_error` above the choked flow and
+`solve_A_eff_from_mdot` when `P_back >= P0`. `fanno_max_length` is
+`fanno_length_between(G, Tt, M_in, 1, X, D, 0, "fixed", f)` at the inlet flux
+and stagnation temperature (`tol`, `max_iter` unused) and throws for
+`u_in <= 0` or `f <= 0`.
+
 ### Fanno flow integrated in Mach number (`fanno_mach.h`)
 
 At fixed mass flux G and stagnation temperature Tt the station state is

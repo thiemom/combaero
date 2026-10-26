@@ -187,11 +187,17 @@ print(f"Outlet Mach: {sol.M}") # nan for incompressible
 
 ### Inverse Solvers
 ```python
-# Solve for unknown given mass flow rate
+# Solve for unknown given mass flow rate (invert nozzle_flow)
 A_eff = cb.solve_A_eff_from_mdot(T0=300, P0=2e5, P_back=1e5, mdot_target=0.1, X=air)
-P_back = cb.solve_P_back_from_mdot(T0=300, P0=2e5, A_eff=1e-4, mdot_target=0.1, X=air)
+# Subsonic root; RuntimeError above the choked flow (0.0467 kg/s here)
+P_back = cb.solve_P_back_from_mdot(T0=300, P0=2e5, A_eff=1e-4, mdot_target=0.04, X=air)
 P0 = cb.solve_P0_from_mdot(T0=300, P_back=1e5, A_eff=1e-4, mdot_target=0.1, X=air)
 ```
+
+Non-positive temperatures, pressures, areas or target flows raise `ValueError`.
+`fanno_max_length` integrates the constant-`f` Fanno flow in Mach number up to
+`M = 1` (the `fanno_length_between` quadrature); it raises `ValueError` for
+`u_in <= 0` or `f <= 0`, where `L*` is infinite.
 
 ### Utility Functions
 ```python

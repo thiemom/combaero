@@ -2,12 +2,15 @@
 // Solves isentropic relations numerically using Newton iteration.
 
 #include "compressible.h"
+#include "fanno_mach.h"
+#include "stagnation.h"
 #include "thermo.h"
 #include "friction.h"
 #include "transport.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
-#include <stdexcept>
 #include <algorithm>
+#include <cmath>
+#include <stdexcept>
 #include <string>
 
 
@@ -200,9 +203,15 @@ double solve_A_eff_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    T0 = std::max(T0, 10.0);
-    P0 = std::max(P0, 1.0);
-    P_back = std::max(P_back, 1.0);
+    // The inverse problems are user-facing (no network iterate calls them), so
+    // invalid input is refused rather than clamped: a clamped T0 or P0 used
+    // to return an area for a stagnation state nobody asked about.
+    if (!(T0 > 0.0) || !(P0 > 0.0) || !(P_back > 0.0)) {
+        throw std::invalid_argument("solve_A_eff_from_mdot: T0, P0 and P_back must be positive");
+    }
+    if (!(mdot_target > 0.0)) {
+        throw std::invalid_argument("solve_A_eff_from_mdot: mdot_target must be positive");
+    }
 
     // Compute mass flux at operating conditions
     State stag;
@@ -231,9 +240,10 @@ double solve_P_back_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    T0 = std::max(T0, 10.0);
-    P0 = std::max(P0, 1.0);
-    if (mdot_target <= 0.0) {
+    if (!(T0 > 0.0) || !(P0 > 0.0)) {
+        throw std::invalid_argument("solve_P_back_from_mdot: T0 and P0 must be positive");
+    }
+    if (!(mdot_target > 0.0)) {
         throw std::invalid_argument("solve_P_back_from_mdot: mdot_target must be positive");
     }
     if (A_eff <= 0.0) {
@@ -266,7 +276,12 @@ double solve_P_back_from_mdot(
     double P_lo = P_crit;
     double P_hi = P0;
 
-    for (std::size_t it = 0; it < max_iter; ++it) {
+    // The width is measured against the DRIVE P0 - P, not against P: at a
+    // small flow G ~ sqrt(P0 - P), so a P good to tol * P was a flow off by
+    // 73% at 1e-4 of the choked flux and 1e-4 at 1e-2 of it. Each step halves
+    // the bracket, so the budget is not max_iter (sized for Newton loops).
+    const std::size_t n_bisect = std::max<std::size_t>(max_iter, 200);
+    for (std::size_t it = 0; it < n_bisect; ++it) {
         double P_mid = 0.5 * (P_lo + P_hi);
         double G_mid = compute_mass_flux(T0, P0, P_mid, s0, h0, X, tol, max_iter);
 
@@ -281,8 +296,8 @@ double solve_P_back_from_mdot(
             P_hi = P_mid;
         }
 
-        if ((P_hi - P_lo) < tol * P_lo) {
-            return P_mid;
+        if ((P_hi - P_lo) < tol * (P0 - P_hi)) {
+            return 0.5 * (P_lo + P_hi);
         }
     }
 
@@ -294,26 +309,45 @@ double solve_P0_from_mdot(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    T0 = std::max(T0, 10.0);
-    P_back = std::max(P_back, 1.0);
-    if (mdot_target <= 0.0) {
+    if (!(T0 > 0.0) || !(P_back > 0.0)) {
+        throw std::invalid_argument("solve_P0_from_mdot: T0 and P_back must be positive");
+    }
+    if (!(A_eff > 0.0)) {
+        throw std::invalid_argument("solve_P0_from_mdot: A_eff must be positive");
+    }
+    if (!(mdot_target > 0.0)) {
         throw std::invalid_argument("solve_P0_from_mdot: mdot_target must be positive");
     }
 
-    // Bisection search for P0
-    // P0 must be > P_back for any flow
-    double P0_lo = P_back * 1.001;
+    // Bisection on P0 in (P_back, P0_hi]. The flow is zero at P0 = P_back
+    // and rises monotonically with P0, so P_back itself is the lower end. It
+    // was 1.001 P_back, above the root of any flow smaller than the one a
+    // 0.1% drive passes: such a target returned 1.001 P_back silently (+116%
+    // flow at 1e-3 kg/s through 2 cm^2 at 1 bar).
+    double P0_lo = P_back;
     double P0_hi = P_back * 1000.0;  // Start with large upper bound
 
-    // Expand upper bound if needed
-    for (int expand = 0; expand < 10; ++expand) {
+    // Expand upper bound if needed. Above choke the flow is linear in P0, so
+    // twelve decades bracket any finite target; failing that, refuse.
+    bool bracketed = false;
+    for (int expand = 0; expand < 12; ++expand) {
         auto sol = nozzle_flow(T0, P0_hi, P_back, A_eff, X, tol, max_iter);
-        if (sol.mdot >= mdot_target) break;
+        if (sol.mdot >= mdot_target) {
+            bracketed = true;
+            break;
+        }
+        P0_lo = P0_hi;
         P0_hi *= 10.0;
     }
+    if (!bracketed) {
+        throw std::runtime_error("solve_P0_from_mdot: no stagnation pressure reaches mdot_target");
+    }
 
-    // Bisection
-    for (std::size_t it = 0; it < max_iter; ++it) {
+    // Bisection. The width is measured against the drive P0 - P_back (at a
+    // small flow mdot ~ sqrt(P0 - P_back)), and the budget is not max_iter,
+    // which is sized for the Newton loops inside nozzle_flow.
+    const std::size_t n_bisect = std::max<std::size_t>(max_iter, 200);
+    for (std::size_t it = 0; it < n_bisect; ++it) {
         double P0_mid = 0.5 * (P0_lo + P0_hi);
         auto sol = nozzle_flow(T0, P0_mid, P_back, A_eff, X, tol, max_iter);
 
@@ -327,8 +361,8 @@ double solve_P0_from_mdot(
             P0_hi = P0_mid;
         }
 
-        if ((P0_hi - P0_lo) < tol * P0_lo) {
-            return P0_mid;
+        if ((P0_hi - P0_lo) < tol * (P0_lo - P_back)) {
+            return 0.5 * (P0_lo + P0_hi);
         }
     }
 
@@ -971,74 +1005,37 @@ double fanno_max_length(
     double T_in, double P_in, double u_in,
     double D, double f,
     const std::vector<double>& X,
-    double tol, std::size_t max_iter)
+    [[maybe_unused]] double tol, [[maybe_unused]] std::size_t max_iter)
 {
-    // Binary search for length that causes choking
-    // Start with an estimate based on ideal gas relations
+    if (!(T_in > 0.0) || !(P_in > 0.0)) {
+        throw std::invalid_argument("fanno_max_length: T_in and P_in must be positive");
+    }
+    if (!(u_in > 0.0)) {
+        throw std::invalid_argument("fanno_max_length: u_in must be positive (L* is infinite at rest)");
+    }
+    if (!(D > 0.0)) {
+        throw std::invalid_argument("fanno_max_length: D must be positive");
+    }
+    if (!(f > 0.0)) {
+        throw std::invalid_argument("fanno_max_length: f must be positive (L* is infinite without friction)");
+    }
 
-    State inlet;
-    inlet.T = T_in;
-    inlet.P = P_in;
-    inlet.set_X(X);
-    double M_in = u_in / inlet.a();
-
+    const double M_in = mach_number(u_in, T_in, X);
     if (M_in >= 1.0) {
         return 0.0;  // Already choked
     }
 
-    // Initial estimate: use ideal gas Fanno relation
-    // 4fL*/D = (1-M²)/(γM²) + (γ+1)/(2γ) * ln((γ+1)M² / (2 + (γ-1)M²))
-    double gamma = inlet.gamma();
-    double M2 = M_in * M_in;
-    double term1 = (1.0 - M2) / (gamma * M2);
-    double term2 = (gamma + 1.0) / (2.0 * gamma) *
-                   std::log((gamma + 1.0) * M2 / (2.0 + (gamma - 1.0) * M2));
-    // The tabulated group 4fL*/D is defined on FANNING friction, and f here is
-    // DARCY (the march's dpdx_fanno = -f/(2D) rho u^2 is Darcy-Weisbach), so
-    // f_Darcy = 4 f_Fanning and the length is D * term / f_Darcy. Dividing by
-    // 4f instead put the estimate at a quarter of the true L*, and since the
-    // bracket below is only twice the estimate, the bisection could never
-    // reach the answer -- it saturated at its own upper bound and returned
-    // exactly L*/2 at every inlet Mach. See issue #362.
-    double L_star_estimate = D * (term1 + term2) / f;
-
-    // Binary search. The bracket is generous rather than tight: the estimate
-    // is an ideal-gas relation and the march it is being reconciled with uses
-    // real properties, so an upper bound that merely doubles the estimate can
-    // sit below the answer.
-    double L_low = 0.0;
-    double L_high = 4.0 * L_star_estimate;
-
-    for (std::size_t iter = 0; iter < max_iter; ++iter) {
-        double L_mid = 0.5 * (L_low + L_high);
-
-        try {
-            auto sol = fanno_channel(T_in, P_in, u_in, L_mid, D, f, X, 200, false);
-
-            if (sol.choked) {
-                L_high = L_mid;
-            } else {
-                // Check outlet Mach
-                double A = M_PI * D * D / 4.0;
-                double u_out = sol.mdot / (sol.outlet.rho() * A);
-                double M_out = u_out / sol.outlet.a();
-
-                if (M_out > 0.99) {
-                    L_high = L_mid;
-                } else {
-                    L_low = L_mid;
-                }
-            }
-        } catch (...) {
-            L_high = L_mid;
-        }
-
-        if ((L_high - L_low) / L_high < tol) {
-            break;
-        }
-    }
-
-    return 0.5 * (L_low + L_high);
+    // L* by the Mach quadrature of fanno_mach.h, at the inlet's mass flux and
+    // stagnation temperature: the same adiabatic, constant-Darcy-f,
+    // thermally perfect Fanno flow fanno_channel marches, integrated in M up
+    // to M = 1 exactly. This used to bisect fanno_channel on "choked or
+    // M_out > 0.99"; the march itself declares choking at kFannoChokeMach, so
+    // the answer was the length to M ~ 0.99, short of L* by a (1 - M)^2-like
+    // tail: -0.8% at M_in = 0.9 and -24.5% at M_in = 0.98 (Ar, against the
+    // closed form). tol and max_iter are kept for the signature only.
+    const double G = density(T_in, P_in, X) * u_in;
+    const double Tt = T0_from_static_v(T_in, u_in, X);
+    return fanno_length_between(G, Tt, M_in, 1.0, X, D, 0.0, "fixed", f);
 }
 
 // -------------------------------------------------------------

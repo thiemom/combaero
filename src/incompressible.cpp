@@ -289,7 +289,7 @@ channel_flow(double T, double P, const std::vector<double> &X, double u,
   const double A = M_PI * D * D / 4.0;
   const double mdot = rho * u * A;
 
-  const double h_val = h(T, X);
+  const double h_val = h_mass(T, X); // [J/kg], as IncompressibleStation::h
 
   IncompressibleFlowSolution sol;
   sol.inlet.set_TPX(T, P, X);
@@ -336,7 +336,7 @@ channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
   const double A = M_PI * D * D / 4.0;
   const double mdot = rho * u * A;
 
-  const double h_val = h(T, X);
+  const double h_val = h_mass(T, X); // [J/kg], as IncompressibleStation::h
 
   IncompressibleFlowSolution sol;
   sol.inlet.set_TPX(T, P, X);
@@ -413,6 +413,13 @@ channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
   const double K = k_loss_fn(T, P, X, sol.Re);
   const double dP_extra = K * 0.5 * sol.rho * u * u;
   sol.dP += dP_extra;
+  // The outlet and the profile carry the total drop, not the friction drop
+  // alone (they were left at P - dP_friction).
+  sol.outlet.set_TPX(T, P - sol.dP, X);
+  if (store_profile) {
+    sol.profile = build_incompressible_profile(L, P, sol.dP, T, sol.rho, u,
+                                               h_mass(T, X), n_steps);
+  }
   return sol;
 }
 

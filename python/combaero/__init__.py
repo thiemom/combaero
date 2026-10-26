@@ -511,6 +511,8 @@ try:
         specific_gas_constant,
         speed_of_sound,
         standard_dry_air_composition,  # deprecated: use species.dry_air
+        stagnation_from_static,
+        bulk_velocity,
         stokes_layer,
         strouhal,
         sweep_liner_2dof_serial_absorption,
@@ -1674,6 +1676,8 @@ __all__ = [
     "hydraulic_diameter_rect",
     "is_well_behaved",
     "kinetic_energy",
+    "bulk_velocity",
+    "stagnation_from_static",
     "mach_number",
     "mixture_h",
     "molar_mass",

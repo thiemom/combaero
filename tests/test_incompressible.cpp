@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
+#include "../include/humidair.h"
 #include "../include/incompressible.h"
+#include "../include/thermo.h"
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 
 using namespace combaero;
 
@@ -90,4 +93,25 @@ TEST(ZetaCd, ConsistentWithOrificeDP) {
     double v_throat = mdot / (rho * A);
     double dP_zeta = pressure_loss(v_throat, rho, zeta_from_Cd(Cd));
     EXPECT_NEAR(dP_zeta, dP_orifice, 1e-9);
+}
+
+// -------------------------------------------------------------
+// channel_flow_rough with a K-loss: outlet and profile carry the total drop
+// -------------------------------------------------------------
+
+TEST(ChannelFlowRoughKLoss, OutletAndProfileCarryTotalDrop) {
+    const std::vector<double> X = dry_air();
+    const double T = 300.0, P = 1.2e5, u = 20.0;
+    const IncompressibleKLossFn k_loss =
+        [](double, double, const std::vector<double>&, double) { return 1.5; };
+    const IncompressibleFlowSolution base =
+        channel_flow_rough(T, P, X, u, 2.0, 0.05, 0.0, "haaland", 5, true);
+    const IncompressibleFlowSolution sol =
+        channel_flow_rough(T, P, X, u, 2.0, 0.05, 0.0, "haaland", k_loss, 5, true);
+    EXPECT_NEAR(sol.dP - base.dP, 1.5 * 0.5 * sol.rho * u * u, 1e-9);
+    EXPECT_NEAR(sol.outlet.P, P - sol.dP, 1e-9);
+    ASSERT_EQ(sol.profile.size(), 5u);
+    EXPECT_NEAR(sol.profile.back().P, P - sol.dP, 1e-9);
+    // IncompressibleStation::h is [J/kg].
+    EXPECT_NEAR(sol.profile.front().h, h_mass(T, X), 1e-9);
 }
