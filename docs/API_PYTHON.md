@@ -1498,6 +1498,12 @@ K_str, K_bra = ConstantKTeeElement.bassett_design_K(
 # against +0.05 measured): the solve then converges to a junction that
 # raises total pressure and the second-law check rejects it (#779). Set
 # K_ports explicitly there, or use MultiPortChamberElement.
+# design_net_loss is the pair's mass-weighted loss at its design share,
+# (1 - q) K_straight + q K_branch per common-leg head; below zero the pair
+# creates total pressure (one negative K is physical, a negative sum is not).
+# The GUI refuses such a pair at build time with this cause.
+ConstantKTeeElement.design_net_loss(0.5, *ConstantKTeeElement.bassett_design_K(
+    "merge", q_branch=0.5, psi=1.0, theta_deg=30.0))   # -> -0.04
 
 # Ideal momentum junction (#517): parameter-free, a baseline beside the tuned
 # closures rather than a replacement. Suppliers sit at one junction STATIC

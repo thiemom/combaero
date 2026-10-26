@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bassettDesignK } from "./teeK";
+import { bassettDesignK, designNetLoss } from "./teeK";
 
 // Same golden values as python/tests/test_constant_k_design_K.py: the
 // display mirror must show what the solve uses.
@@ -16,5 +16,15 @@ describe("bassettDesignK", () => {
 		const [ks, kb] = bassettDesignK(fd, q, psi, th);
 		expect(ks).toBeCloseTo(want[0], 6);
 		expect(kb).toBeCloseTo(want[1], 6);
+	});
+});
+
+describe("designNetLoss", () => {
+	it("is the mass-weighted pair", () => {
+		expect(designNetLoss(0.3, 0.2, -0.1)).toBeCloseTo(0.11, 12);
+	});
+	it("is negative for Bassett's joining pair at 30 deg, equal areas (#779)", () => {
+		const [ks, kb] = bassettDesignK("merge", 0.5, 1.0, 30.0);
+		expect(designNetLoss(0.5, ks, kb)).toBeLessThan(0);
 	});
 });

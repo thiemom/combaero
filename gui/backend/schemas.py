@@ -537,6 +537,8 @@ class MPCETeeData(BaseModel):
     # head. None = Bassett 2001's analytical pair at design_branch_share, the
     # resolved areas and theta (ConstantKTeeElement.bassett_design_K): a
     # constant K belongs to one split, and the branch's grows like (q psi)^2.
+    # The builder refuses a pair, typed or default, whose mass-weighted loss at
+    # design_branch_share is negative (ConstantKTeeElement.design_net_loss, #779).
     K_straight: float | None = None
     K_branch: float | None = None
     design_branch_share: float = Field(default=0.5, gt=0.0, lt=1.0)
