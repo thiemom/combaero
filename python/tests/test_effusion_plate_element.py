@@ -426,9 +426,9 @@ class TestInternalHeatTransfer:
         elem = self._panel()
         out = elem.internal_heat_transfer(self._state(elem, 0.5))
 
-        assert out["area_ratio"] == pytest.approx(3.46, abs=0.03)
+        assert out["approach_to_hole_area_ratio"] == pytest.approx(3.46, abs=0.03)
         assert out["h_hole_area"] == pytest.approx(
-            out["h_plate_area"] * out["area_ratio"], rel=1e-12
+            out["h_plate_area"] * out["approach_to_hole_area_ratio"], rel=1e-12
         )
         # The same heat, whichever pair is used -- which is what makes the
         # two interchangeable only in matched pairs.
@@ -511,7 +511,7 @@ class TestInternalHeatTransfer:
             "Nu_throat",
             "h_hole_area",
             "h_plate_area",
-            "area_ratio",
+            "approach_to_hole_area_ratio",
         ):
             assert key in diag, f"{key} missing from diagnostics"
         assert diag["h_plate_area"] > 0.0

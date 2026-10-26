@@ -463,15 +463,15 @@ def _ideal_runner_row(pt_branch: float):
     df = NetworkRunner.from_dict(schema).solve(timeout=60.0).to_dataframe()
     row = df[df["id"] == "mpce"].iloc[0]
     assert bool(row["success"]), "ideal tee GUI solve did not converge"
-    # Result columns carry their unit: "p_jn [Pa]".
+    # Result columns may carry their unit ("Pt_in [Pa]"); strip it.
     return {c.split(" [")[0]: row[c] for c in df.columns}
 
 
 def test_ideal_momentum_runner_dividing_tee_reports_split_coefficients() -> None:
     """Branch sink 3 kPa below the straight one: a genuine split. The row
-    carries p_jn and the dividing aliases, and the branch Borda loss is >= 0."""
+    carries P_jct (the static p_jn) and the dividing aliases, and the branch Borda loss is >= 0."""
     row = _ideal_runner_row(pt_branch=0.97e5)
-    assert row["p_jn"] > 0.0
+    assert row["P_jct"] > 0.0
     assert row["n_reversed_ports"] == 0
     assert row["m_dot_com"] == pytest.approx(row["m_dot_straight"] + row["m_dot_branch"])
     assert 0.0 < row["mass_flow_ratio"] < 1.0
@@ -485,7 +485,7 @@ def test_ideal_momentum_runner_entrainment_is_reported_as_reversal() -> None:
     geometric names, signed in the wired direction; split coefficients are not
     reported under a split's names for a state that is not a split.
 
-    Measured: branch flow -0.036 kg/s, p_jn 100.29 kPa. With both sinks at
+    Measured: branch flow -0.036 kg/s, P_jct (p_jn) 100.29 kPa. With both sinks at
     1 bar the straight leg's exit head (lost at its sink since #588) holds the
     junction just high enough that the jet no longer entrains (+0.009)."""
     pt_branch = 1.005e5
@@ -493,7 +493,7 @@ def test_ideal_momentum_runner_entrainment_is_reported_as_reversal() -> None:
     assert row["m_dot_branch"] < 0.0
     assert row["n_reversed_ports"] == 1
     assert row["m_dot_straight"] == pytest.approx(row["m_dot_com"] - row["m_dot_branch"])
-    assert row["p_jn"] < pt_branch  # below the branch boundary: what draws it in
+    assert row["P_jct"] < pt_branch  # below the branch boundary: what draws it in
     for key in ("K_straight", "K_branch", "mass_flow_ratio"):
         assert key not in row or row[key] != row[key], key  # absent or NaN
 
@@ -584,7 +584,7 @@ def _port_bookkeeping(model: str, D_straight: float) -> dict:
     net = build_network_from_schema(schema)
     net.resolve_all_topology()
     e = _get_element(net, "mpce")
-    states = [SimpleNamespace(P=1.0e5, T=300.0) for _ in range(e.N)]
+    states = [SimpleNamespace(P=1.0e5, Pt=1.0e5, T=300.0) for _ in range(e.N)]
     return e.diagnostics(states, 1.0e5, None)  # no flows: the port bookkeeping only
 
 
@@ -604,8 +604,8 @@ def test_port_area_step_to_the_connected_channel_is_reported(
     monkeypatch.setattr(gb, "TEE_PORT_STEP_TOL", math.inf)
     diag = _port_bookkeeping(model, D_straight)
     assert diag["port_area_mismatch"] == expected
-    assert diag["port_1_area_ratio"] == pytest.approx((D_straight / 0.1) ** 2)
-    assert diag["port_2_area_ratio"] == pytest.approx(1.0)
+    assert diag["port_1_connected_area_ratio"] == pytest.approx((D_straight / 0.1) ** 2)
+    assert diag["port_2_connected_area_ratio"] == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize("model", ["ideal_momentum", "mynard", "constant_k"])
@@ -613,4 +613,4 @@ def test_the_gui_leaves_no_unmodelled_port_step(model: str) -> None:
     """The GUI inserts the sharp step (#536), so the warning has nothing to report."""
     diag = _port_bookkeeping(model, 0.05)
     assert diag["port_area_mismatch"] == 0
-    assert "port_1_area_ratio" not in diag
+    assert "port_1_connected_area_ratio" not in diag

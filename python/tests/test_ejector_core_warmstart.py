@@ -59,7 +59,7 @@ def test_an_api_built_ejector_converges_cold_to_the_critical_point() -> None:
     r = s.solve(timeout=30.0)
     assert r["__success__"]
     assert r["ej.critical_mode"] == 1.0
-    assert r["ej.P_jct"] == pytest.approx(r["ej.p_c_star_pa"], rel=1e-3)
+    assert r["ej.P_jct"] == pytest.approx(r["ej.P_c_star"], rel=1e-3)
     assert r["cp.m_dot"] > 0.0 and r["cs.m_dot"] > 0.0
 
 

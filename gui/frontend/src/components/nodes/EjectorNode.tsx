@@ -64,8 +64,8 @@ const EjectorNode = ({ id, data, selected }: NodeProps) => {
 					{data.label ? data.label : "Ejector"}
 				</div>
 				<div className="text-[9px] font-mono whitespace-nowrap text-sky-500">
-					{isSolved && data.result?.omega != null
-						? `ω ${Number(data.result.omega).toFixed(3)}`
+					{isSolved && data.result?.entrainment_ratio != null
+						? `ER ${Number(data.result.entrainment_ratio).toFixed(3)}`
 						: "critical"}
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}

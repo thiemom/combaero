@@ -877,7 +877,7 @@ class NetworkSolver:
         ``m_dot = sign(dP) * A * sqrt(2 * rho_ref * |dP|)``.
 
         For each ``MultiPortChamberBase`` (and subclasses), seed the
-        ``P_jct`` unknown from the propagated Pt at the junction's
+        junction unknown (``P_jct`` or ``Pt_jct``) from the propagated Pt at the junction's
         "common" port (the arm on the single-inlet side for a branch or
         the single-outlet side for a merge). The default
         ``ref["P"] = min(boundary Pt)`` is almost never near the true
@@ -929,7 +929,7 @@ class NetworkSolver:
                 pt = p_guess.get(common)
                 if pt is None:
                     continue
-                overrides[f"{elem_id}.P_jct"] = pt
+                overrides[elem.junction_unknown] = pt
                 if getattr(elem, "seeds_ports_by_pressure_split", False):
                     overrides.update(
                         self._junction_split_guess(elem, common, p_guess, rho_ref, ref)
@@ -940,7 +940,7 @@ class NetworkSolver:
                 common_elem = elem._port_element_ids[elem.port_nodes.index(common)]
                 m_common = overrides.get(f"{common_elem}.m_dot")
                 if seed_P_jct is not None and m_common is not None:
-                    overrides[f"{elem_id}.P_jct"] = seed_P_jct(
+                    overrides[elem.junction_unknown] = seed_P_jct(
                         pt, float(m_common), rho_ref, elem.port_nodes.index(common)
                     )
         return overrides
@@ -1299,8 +1299,23 @@ class NetworkSolver:
                 for unk in unknowns:
                     self.unknown_names.append(unk)
                     guess_dict = getattr(element, "initial_guess", {})
+                    legacy = (
+                        element.legacy_unknown_names().get(unk)
+                        if hasattr(element, "legacy_unknown_names")
+                        else None
+                    )
                     if unk in guess_dict:
                         x0_list.append(guess_dict[unk])
+                    elif legacy is not None and legacy in guess_dict:
+                        # Renamed in #773 (P_jct holding a total became
+                        # Pt_jct); the old key seeds it until 0.8.0.
+                        warnings.warn(
+                            f"initial_guess key '{legacy}' is deprecated and will be "
+                            f"removed in 0.8.0: the unknown is now '{unk}' (#773).",
+                            DeprecationWarning,
+                            stacklevel=2,
+                        )
+                        x0_list.append(guess_dict[legacy])
                     elif unk in self._init_overrides:
                         x0_list.append(self._init_overrides[unk])
                     elif unk.endswith(".m_dot") or unk.endswith(".m_dot_com"):
@@ -1311,7 +1326,7 @@ class NetworkSolver:
                                 elem_id, mdot_guess.get(elem_id, ref["m_dot"]) * 0.5
                             )
                         )
-                    elif unk.endswith(".P_jct"):
+                    elif unk.endswith(".P_jct") or unk.endswith(".Pt_jct"):
                         # MultiPortChamberBase: P_jct should be close to the
                         # ambient port static pressure. Use the max boundary Pt
                         # as a stand-in (P_jct >= Pt at every port since the

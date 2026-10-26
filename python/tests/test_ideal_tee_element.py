@@ -365,7 +365,8 @@ def test_diagnostics_name_the_regime_from_the_converged_flows() -> None:
     states = [solver._get_node_state(net.nodes[n], solver._last_x) for n in jct.port_nodes]
     mdots = [jct._port_signs[i] * sol[f"{jct._port_element_ids[i]}.m_dot"] for i in range(3)]
     diag = jct.diagnostics(states, sol["jct.P_jct"], mdots)
-    assert diag["p_jn"] == sol["jct.P_jct"]
+    assert diag["P_jct"] == sol["jct.P_jct"]
+    assert "p_jn" not in diag  # the duplicate went in #773
     assert diag["mass_flow_ratio"] == pytest.approx(sol["ch_bra.m_dot"] / sol["ch_in.m_dot"])
     q_b = diag["mass_flow_ratio"]
     assert diag["K_branch"] == pytest.approx(1.0 + q_b * q_b, abs=2e-3)

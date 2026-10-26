@@ -99,7 +99,6 @@ UNIT_MAP: dict[str, str] = {
     "mass_flow_ratio": "kg/kg",
     "K_straight": "-",
     "K_branch": "-",
-    "p_jn": "Pa",  # ideal momentum tee: junction STATIC pressure (#517)
     "n_reversed_ports": "-",  # ideal momentum tee: ports run against the wiring
     # --- Element diagnostics ---
     "xi": "-",
@@ -168,8 +167,8 @@ UNIT_MAP: dict[str, str] = {
 }
 
 # Units of the result keys the export does NOT label (yet). Giving one of them
-# a unit in UNIT_MAP renames its CSV / DataFrame column ("omega" becomes
-# "omega [-]"), which breaks a notebook that reads the column by name, so they
+# a unit in UNIT_MAP renames its CSV / DataFrame column ("loss_ratio" becomes
+# "loss_ratio [-]"), which breaks a notebook that reads the column by name, so they
 # are kept apart: the GUI shows these units (resultKeys.generated.json, via
 # unit_of) and the export keeps its columns. Moving them into UNIT_MAP is the
 # user's call. test_gui_result_keys_sync.py fails on an emitted key with no
@@ -204,8 +203,8 @@ GUI_ONLY_UNITS: dict[str, str] = {
     "E": "-",
     "Cd_pipe_ratio": "-",
     "P_approach": "Pa",
-    "dp_tap": "Pa",
-    "dp_permanent": "Pa",
+    "dP_tap": "Pa",
+    "dP_permanent": "Pa",
     "loss_ratio": "-",
     "pressure_recovery": "-",
     "recovery_in_range": "-",
@@ -218,9 +217,8 @@ GUI_ONLY_UNITS: dict[str, str] = {
     "hole_length": "m",
     "hydraulic_diameter": "m",
     "slot_height": "m",
-    # SlotFilmElement takes Tu in percent (SlotFilmData); the effusion
-    # elements take a fraction but do not report it.
-    "turbulence_intensity": "%",
+    # A fraction on every element (#773); the slot film reports it.
+    "turbulence_intensity": "-",
     "is_ingesting": "-",
     # Effusion plate (#471)
     "Nu_approach": "-",
@@ -237,6 +235,7 @@ GUI_ONLY_UNITS: dict[str, str] = {
     "gas_side_chamber": "-",
     "area_approach_total": "m\u00b2",
     "area_hole_total": "m\u00b2",
+    "approach_to_hole_area_ratio": "-",  # approach area / hole area (#773)
     "coolant_crossflow_ignored": "-",
     "coolant_ht_plenum_assumed": "-",
     "hole_count_exact": "-",
@@ -261,22 +260,20 @@ GUI_ONLY_UNITS: dict[str, str] = {
     "m_dot_primary": "kg/s",
     "m_dot_secondary": "kg/s",
     "m_dot_outlet": "kg/s",
-    "omega": "-",  # the entrainment ratio m_dot_secondary / m_dot_primary
-    "omega_critical": "-",
+    "entrainment_ratio": "-",  # m_dot_secondary / m_dot_primary (#773)
+    "entrainment_ratio_critical": "-",
     "critical_mode": "-",
     "s_choke": "-",
     "r_gas": "J/kg/K",
-    "outlet_pt_pa": "Pa",
-    "p_py_pa": "Pa",
-    "p_c_star_pa": "Pa",
-    "p_b0_pa": "Pa",
+    "P_c_star": "Pa",
+    "P_b0": "Pa",
     # Incompressible ejector: Sanger's jet pump (#588)
     "regime_incompressible": "-",
     "mach_jet": "-",
     "head_ratio_N": "-",
     "efficiency": "-",
     # Vortex (#661)
-    "omega_rpm": "rpm",
+    "shaft_speed_rpm": "rpm",
     "v_theta_in": "m/s",
     "v_theta_out": "m/s",
     "M_theta_in": "-",
@@ -301,12 +298,12 @@ _PORT_UNITS: dict[str, str] = {
     "m_dot": "kg/s",
     "area": "m\u00b2",
     "outer_area": "m\u00b2",
-    "area_ratio": "-",
+    "connected_area_ratio": "-",  # connected element area / port area (#773)
     "sign": "-",
     "K": "-",
     "flow_fraction": "-",
 }
-_STEP_UNITS: dict[str, str] = {"zeta": "-", "dPt": "Pa", "area_ratio": "-"}
+_STEP_UNITS: dict[str, str] = {"zeta": "-", "dPt": "Pa", "connected_area_ratio": "-"}
 _PORT_RE = re.compile(r"^port_\d+_(\w+)$")
 _STEP_RE = re.compile(r"^step_(?:common|straight|branch)_(\w+)$")
 

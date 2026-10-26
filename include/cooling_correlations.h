@@ -308,11 +308,14 @@ std::tuple<double, double> film_effectiveness_colban_2011_and_derivatives(
 //
 // with the mixing coefficient from the free-stream turbulence, Eq. (5):
 //
-//   C_m = (0.25 +- 0.15) Tu / 100
+//   C_m = (0.25 +- 0.15) Tu / 100     (Tu in percent, as the report writes it)
+//       = (0.25 +- 0.15) Tu           (Tu a fraction, as this kernel takes it)
 //
 // x is the distance downstream of the slot lip, S the slot height, M =
 // rho_s U_s / (rho_H U_H) the blowing ratio and Tu the axial free-stream
-// turbulence intensity in PERCENT. eta = (T_H - T_wall)/(T_H - T_s), the
+// turbulence intensity, here a FRACTION (0.14 = 14%) like every other
+// turbulence input in the library (#773; the report gives percent).
+// eta = (T_H - T_wall)/(T_H - T_s), the
 // cooled fraction of the driving difference as for the hole films. Eq. (4)
 // carries no cp ratio; Juhasz and Marek (1971, TN D-6360) wrote one in,
 // and Eq. (5) was fitted without it.
@@ -324,14 +327,16 @@ std::tuple<double, double> film_effectiveness_colban_2011_and_derivatives(
 // See validation/cooling/extractions/marek_tacina_1975_d7958.md.
 namespace marek_tacina1975 {
 
-// Eq. (5): C_m per percent of turbulence, and its stated +- band.
-constexpr double C_m_per_Tu = 0.25 / 100.0;
-constexpr double C_m_per_Tu_band = 0.15 / 100.0;
+// Eq. (5): C_m per unit of turbulence (Tu a fraction), and its stated
+// +- band. The report's 0.25 per percent is 0.25 per unit fraction x 100
+// / 100: the same line.
+constexpr double C_m_per_Tu = 0.25;
+constexpr double C_m_per_Tu_band = 0.15;
 
-// The data's span (Table I and p. 9): axial Tu, blowing ratio
+// The data's span (Table I and p. 9): axial Tu (a fraction, 7 to 35%), blowing ratio
 // (m_s/m_H)(H/S) with H = 10.5 cm and S = 0.63 cm, and x/S at the nine
 // stations. Not stated as limits by the report; nothing outside was run.
-constexpr double Tu_min = 7.0, Tu_max = 35.0;
+constexpr double Tu_min = 0.07, Tu_max = 0.35;
 constexpr double M_min = 0.41, M_max = 1.87;
 constexpr double x_over_S_max = 33.8;
 
@@ -346,8 +351,9 @@ constexpr double eta_measurement_band = 0.04;
 // Parameters:
 //   x_over_S       : distance downstream of the slot lip in slot heights, >= 0
 //   M              : blowing ratio rho_s U_s / (rho_H U_H) [-], > 0
-//   Tu             : axial free-stream turbulence intensity [%], >= 0
-//                    (7 to 35 run)
+//   Tu             : axial free-stream turbulence intensity, a FRACTION in
+//                    [0, 1] (0.14 = 14%; 0.07 to 0.35 run). Above 1 throws:
+//                    that is a percent passed by mistake.
 //   C_m_multiplier : the user's rig-matching factor on Eq. (5)'s C_m [-],
 //                    > 0. 1 is the report's line; the band is 0.4 to 1.6.
 //                    Never scored.

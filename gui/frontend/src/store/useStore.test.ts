@@ -142,6 +142,47 @@ describe("loadNetwork legacy migration", () => {
 		);
 	});
 
+	it("moves the old omega_rpm to shaft_speed_rpm (#773)", () => {
+		const { shaft_speed_rpm: _drop, ...oldSettings } =
+			useStore.getState().solverSettings;
+		useStore.getState().loadNetwork({
+			nodes: [
+				{
+					id: "v1",
+					type: "vortex",
+					position: { x: 0, y: 0 },
+					data: { label: "v1", omega_rpm: 3000 },
+				},
+			],
+			edges: [],
+			solverSettings: { ...oldSettings, omega_rpm: 1500 },
+		});
+		const { nodes, solverSettings } = useStore.getState();
+		expect(nodes[0].data.shaft_speed_rpm).toBe(3000);
+		expect(nodes[0].data.omega_rpm).toBeUndefined();
+		expect(solverSettings.shaft_speed_rpm).toBe(1500);
+		expect("omega_rpm" in solverSettings).toBe(false);
+	});
+
+	it("moves a Mynard tee's P_jct guess to Pt_jct, not the ideal tee's (#773)", () => {
+		const tee = (id: string, junction_model?: string): Node => ({
+			id,
+			type: "mpce_tee",
+			position: { x: 0, y: 0 },
+			data: { label: id, junction_model, initial_guess: { P_jct: 1.2e5 } },
+		});
+		useStore.getState().loadNetwork({
+			nodes: [tee("m"), tee("k", "constant_k"), tee("i", "ideal_momentum")],
+			edges: [],
+			solverSettings: useStore.getState().solverSettings,
+		});
+		const guess = (id: string) =>
+			useStore.getState().nodes.find((n) => n.id === id)?.data.initial_guess;
+		expect(guess("m")).toEqual({ Pt_jct: 1.2e5 });
+		expect(guess("k")).toEqual({ Pt_jct: 1.2e5 });
+		expect(guess("i")).toEqual({ P_jct: 1.2e5 });
+	});
+
 	it("leaves current strategies untouched", () => {
 		useStore.getState().loadNetwork({
 			nodes: [nodeWithResult("n1")],

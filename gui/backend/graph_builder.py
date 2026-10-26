@@ -943,7 +943,14 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     strict=False,
                     joining_etransfer_alpha=_md.joining_etransfer_alpha,
                 )
-            _mpce.initial_guess = _expand_initial_guess(_md.initial_guess, elem_id)
+            _guess = dict(_md.initial_guess)
+            if _mpce.JUNCTION_UNKNOWN == "Pt_jct" and "P_jct" in _guess:
+                # A file saved before #773 named the Mynard / constant-K
+                # junction TOTAL "P_jct"; it is "Pt_jct" now. Migrated
+                # silently, as the frontend's loader does.
+                _guess.setdefault("Pt_jct", _guess["P_jct"])
+                del _guess["P_jct"]
+            _mpce.initial_guess = _expand_initial_guess(_guess, elem_id)
             if not _mpce.initial_guess:
                 _mpce.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             # The element sees these areas as explicit port areas ("user"); the
@@ -1299,10 +1306,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_element(elem)
         elif elem_type == "vortex":
             data = _parse(VortexData, elem_data, elem_id)
-            omega = (
-                data.omega_rpm
-                if data.omega_rpm is not None
-                else (schema.solver_settings.omega_rpm or 0.0)
+            shaft_speed = (
+                data.shaft_speed_rpm
+                if data.shaft_speed_rpm is not None
+                else (schema.solver_settings.shaft_speed_rpm or 0.0)
             )
             elem = VortexElement(
                 elem_id,
@@ -1310,7 +1317,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 to_node=target_id,
                 r_out=data.r_out,
                 r_in=data.r_in,
-                omega_rpm=float(omega),
+                shaft_speed_rpm=float(shaft_speed),
                 v_theta_in=data.v_theta_in,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)

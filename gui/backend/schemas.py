@@ -1,6 +1,7 @@
 from typing import Annotated, Literal, get_args
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -305,7 +306,7 @@ class OrificeData(BaseModel):
     plate_thickness: float = 0.0  # t [m], the hole length for a wall orifice
     edge_radius: float = 0.0  # r [m]
     bevel_depth: float = 0.0  # bevel depth along the hole axis [m]
-    # The pressure taps whose differential is REPORTED (dp_tap). Measurement
+    # The pressure taps whose differential is REPORTED (dP_tap). Measurement
     # only: the solved flow never depends on it (#649/#645).
     tap: Literal["Corner", "Flange", "D_D2"] = "Flange"
     regime: Literal["default", "incompressible", "compressible"] = "default"
@@ -413,8 +414,9 @@ class SlotFilmData(BaseModel):
     measured from the slot lip.
 
     Defaults are Marek & Tacina's D-7958 rig, on which the film is scored:
-    a 0.63 cm slot across the 37 cm duct, Tu 14% (the case Eq. 5 fits
-    best). The 1 mm lip is not from the report; it only sets the orifice's
+    a 0.63 cm slot across the 37 cm duct, Tu 0.14 (14%, the case Eq. 5
+    fits best). ``turbulence_intensity`` is a FRACTION, as on every other
+    element (#773). The 1 mm lip is not from the report; it only sets the orifice's
     length.
     """
 
@@ -422,7 +424,7 @@ class SlotFilmData(BaseModel):
     slot_height: float = Field(default=6.3e-3, gt=0.0)
     span: float = Field(default=0.37, gt=0.0)
     lip_thickness: float = Field(default=1.0e-3, gt=0.0)
-    turbulence_intensity: float = Field(default=14.0, ge=0.0)
+    turbulence_intensity: float = Field(default=0.14, ge=0.0, le=1.0)
     C_m_multiplier: float = Field(default=1.0, gt=0.0)
     correlation: Literal["IdelchikThick", "Lichtarowicz", "McGreehanSchotsch", "fixed"] = (
         "IdelchikThick"
@@ -617,7 +619,12 @@ class VortexData(BaseModel):
     # Vatistas core); extra="ignore" drops them, and the GUI notes the change.
     r_out: float = 0.10  # outlet radius [m]
     r_in: float = 0.05  # inlet radius [m]; 0 = on-axis, no angular momentum
-    omega_rpm: float | None = None  # shaft speed [rpm]; None = use global solver setting
+    # Shaft speed [rpm]; None = use the global solver setting. Named omega_rpm
+    # before #773 (omega is 2 pi f, not a speed in rpm): files saved with the
+    # old name still load.
+    shaft_speed_rpm: float | None = Field(
+        default=None, validation_alias=AliasChoices("shaft_speed_rpm", "omega_rpm")
+    )
     v_theta_in: float | None = None  # inlet swirl [m/s]; None = solid body, omega * r_in
     initial_guess: dict[str, float] = Field(default_factory=dict)
 
@@ -721,7 +728,11 @@ class SolverSettings(BaseModel):
         "df-sane",
     ] = "hybr"
     timeout: float | None = DEFAULT_SOLVE_TIMEOUT
-    omega_rpm: float | None = None  # global shaft speed [rpm]; None = disabled
+    # Global shaft speed [rpm]; None = disabled. Was omega_rpm before #773;
+    # the old name still loads.
+    shaft_speed_rpm: float | None = Field(
+        default=None, validation_alias=AliasChoices("shaft_speed_rpm", "omega_rpm")
+    )
     Nu_multiplier: float | None = (
         None  # global heat-transfer scale; stacks multiplicatively with per-element
     )

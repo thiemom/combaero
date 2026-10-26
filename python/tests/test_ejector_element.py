@@ -301,7 +301,7 @@ def test_diagnostics_reports_actual_omega_and_regime():
     # (regime-independent), NOT the choked-mode model value.
     port_mdots = [-0.5, -0.3, 0.8]
     diag = e.diagnostics([primary, secondary, outlet], 100000.0, port_mdots)
-    assert diag["omega"] == pytest.approx(0.3 / 0.5)  # ms / mp
+    assert diag["entrainment_ratio"] == pytest.approx(0.3 / 0.5)  # ms / mp
     assert diag["gamma"] == pytest.approx(1.4, abs=0.05)  # air
     assert diag["r_gas"] == pytest.approx(287.0, abs=1.0)  # air
     assert diag["m_dot_primary"] == pytest.approx(0.5)
@@ -311,7 +311,7 @@ def test_diagnostics_reports_actual_omega_and_regime():
     # below the ejector's P_c*: the double-choked critical plateau.
     assert diag["s_choke"] == pytest.approx(1.0)
     assert diag["critical_mode"] == 1.0
-    assert diag["p_c_star_pa"] > float(outlet.Pt)
+    assert diag["P_c_star"] > float(outlet.Pt)
 
 
 def test_diagnostics_reports_jet_pump_regime():
@@ -332,9 +332,9 @@ def test_diagnostics_reports_jet_pump_regime():
     diag = e.diagnostics([primary, secondary, outlet], 100142.0, port_mdots)
     assert diag["s_choke"] == pytest.approx(0.0)
     assert diag["critical_mode"] == 0.0
-    assert diag["omega"] == pytest.approx(0.0338 / 0.0051)
+    assert diag["entrainment_ratio"] == pytest.approx(0.0338 / 0.0051)
     # Critical-only diagnostics are NaN here and are not reported.
-    assert "p_c_star_pa" not in diag
+    assert "P_c_star" not in diag
 
 
 def test_verify_solution_consistent_always_true_all_regimes_modeled():

@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { exportResults, resolvePreview } from "../api";
 import { discoverFields } from "../utils/diagnostics";
 import type { PreviewItems } from "../utils/inheritance";
+import { migrateNodeData, migrateSolverSettings } from "../utils/legacyKeys";
 import { dropSurfacelessWalls } from "../utils/thermalSides";
 
 // Stored per-node/edge results warm-start the next solve (backend
@@ -76,7 +77,7 @@ export interface RFState {
 			| "continuation";
 		method: string;
 		timeout: number | null;
-		omega_rpm: number | null;
+		shaft_speed_rpm: number | null;
 		Nu_multiplier: number | null;
 		f_multiplier: number | null;
 		/** Mach above which an incompressible element is flagged (#588); null = 0.2. */
@@ -357,7 +358,7 @@ const useStore = create<RFState>((set, get) => ({
 		// Mirrors gui/backend/schemas.py DEFAULT_SOLVE_TIMEOUT; kept equal by
 		// python/tests/test_solve_timeout_default_sync.py.
 		timeout: 30,
-		omega_rpm: null,
+		shaft_speed_rpm: null,
 		Nu_multiplier: null,
 		f_multiplier: null,
 		incompressible_mach_limit: null,
@@ -463,7 +464,10 @@ const useStore = create<RFState>((set, get) => ({
 
 	loadNetwork: (data: any) => {
 		if (data.nodes && data.edges) {
-			const loadedSettings = data.solverSettings || get().solverSettings;
+			// Keys renamed since the file was saved (#773: omega_rpm).
+			const loadedSettings = migrateSolverSettings(
+				data.solverSettings || get().solverSettings,
+			);
 			// Legacy migration: the deprecated inlet-referenced incompressible
 			// warm start is no longer offered in the UI; its successor is the
 			// outlet-referenced variant (tracks the compressible root 6-7x
@@ -481,7 +485,7 @@ const useStore = create<RFState>((set, get) => ({
 			set({
 				nodes: data.nodes.map((n: any) => ({
 					...n,
-					data: { ...n.data, result: undefined },
+					data: { ...migrateNodeData(n.data, n.type), result: undefined },
 				})),
 				edges: keptEdges.map((e: any) => ({
 					...e,

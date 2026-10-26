@@ -724,21 +724,22 @@ TEST(FilmSpanAverageGroups, RefusesMismatchedGroups) {
 TEST(SlotFilmMarekTacina, IsEquationFourWithEquationFive) {
     combaero::CorrelationStatus status;
     const double eta =
-        cc::slot_film_effectiveness_marek_tacina_1975(15.0, 1.2, 14.0, 1.0, &status);
-    EXPECT_DOUBLE_EQ(eta, 1.0 / (1.0 + 0.0025 * 14.0 * 15.0 / 1.2));
+        cc::slot_film_effectiveness_marek_tacina_1975(15.0, 1.2, 0.14, 1.0, &status);
+    // Tu a fraction (#773): C_m = 0.25 Tu, the report's 0.25 Tu/100 in percent.
+    EXPECT_DOUBLE_EQ(eta, 1.0 / (1.0 + 0.25 * 0.14 * 15.0 / 1.2));
     EXPECT_EQ(status, combaero::CorrelationStatus::Valid);
     EXPECT_DOUBLE_EQ(
-        cc::slot_film_effectiveness_marek_tacina_1975(0.0, 1.2, 14.0, 1.0, &status), 1.0);
+        cc::slot_film_effectiveness_marek_tacina_1975(0.0, 1.2, 0.14, 1.0, &status), 1.0);
 }
 
 TEST(SlotFilmMarekTacina, AnalyticDerivativeAgreesWithFiniteDifferences) {
     combaero::CorrelationStatus status;
     const double M = 0.9;
     const auto [eta, d] = cc::slot_film_effectiveness_marek_tacina_1975_and_derivatives(
-        20.0, M, 23.0, 1.0, &status);
+        20.0, M, 0.23, 1.0, &status);
     const double h = 1e-6;
-    const double fd = (cc::slot_film_effectiveness_marek_tacina_1975(20.0, M + h, 23.0, 1.0, &status) -
-                       cc::slot_film_effectiveness_marek_tacina_1975(20.0, M - h, 23.0, 1.0, &status)) /
+    const double fd = (cc::slot_film_effectiveness_marek_tacina_1975(20.0, M + h, 0.23, 1.0, &status) -
+                       cc::slot_film_effectiveness_marek_tacina_1975(20.0, M - h, 0.23, 1.0, &status)) /
                       (2.0 * h);
     EXPECT_GT(eta, 0.0);
     EXPECT_NEAR(d, fd, 1e-7 * std::abs(fd));
@@ -746,8 +747,11 @@ TEST(SlotFilmMarekTacina, AnalyticDerivativeAgreesWithFiniteDifferences) {
 
 TEST(SlotFilmMarekTacina, OutsideTheRunIsReportedNotEnforced) {
     combaero::CorrelationStatus status;
-    cc::slot_film_effectiveness_marek_tacina_1975(10.0, 1.0, 50.0, 1.0, &status);
+    cc::slot_film_effectiveness_marek_tacina_1975(10.0, 1.0, 0.50, 1.0, &status);
     EXPECT_EQ(status, combaero::CorrelationStatus::Extrapolated);
-    EXPECT_THROW(cc::slot_film_effectiveness_marek_tacina_1975(10.0, -1.0, 14.0, 1.0, &status),
+    EXPECT_THROW(cc::slot_film_effectiveness_marek_tacina_1975(10.0, -1.0, 0.14, 1.0, &status),
+                 std::invalid_argument);
+    // A percent passed as the fraction (#773) is refused, not extrapolated.
+    EXPECT_THROW(cc::slot_film_effectiveness_marek_tacina_1975(10.0, 1.0, 14.0, 1.0, &status),
                  std::invalid_argument);
 }

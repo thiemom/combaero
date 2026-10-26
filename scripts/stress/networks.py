@@ -855,7 +855,7 @@ def series(seed: int) -> tuple[FlowNetwork, list[str]]:
                 f"e{i}",
                 x,
                 y,
-                omega_rpm=r.choice([500.0, 3000.0, 15000.0]),
+                shaft_speed_rpm=r.choice([500.0, 3000.0, 15000.0]),
                 r_out=r.choice([0.05, 0.1, 0.3]),
                 r_in=r.choice([0.0, 0.03]),
             )

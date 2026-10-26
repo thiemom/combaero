@@ -71,7 +71,7 @@ def test_the_default_node_is_the_d7958_rig() -> None:
     net = build_network_from_schema(NetworkGraphSchema(**_schema(FILM, slot={})))
     e = net.elements["slot"]
     assert isinstance(e, SlotFilmElement)
-    assert (e.slot_height, e.span, e.turbulence_intensity) == (6.3e-3, 0.37, 14.0)
+    assert (e.slot_height, e.span, e.turbulence_intensity) == (6.3e-3, 0.37, 0.14)
     assert e.C_m_multiplier == 1.0
     assert net.walls["w"].film == "slot"
 

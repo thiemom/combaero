@@ -82,7 +82,7 @@ def test_the_vortex_row_agrees() -> None:
     for n in ("p1", "p2"):
         g.add_node(PlenumNode(n))
     g.add_element(OrificeElement("o1", "a", "p1", Cd=0.8, diameter=0.02, correlation="fixed"))
-    g.add_element(VortexElement("vx", "p1", "p2", omega_rpm=3000.0))
+    g.add_element(VortexElement("vx", "p1", "p2", shaft_speed_rpm=3000.0))
     g.add_element(OrificeElement("o2", "p2", "b", Cd=0.8, diameter=0.02, correlation="fixed"))
     s = NetworkSolver(g)
     r = s.solve()

@@ -311,13 +311,36 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
             "raise loss_factor (1.0 is the parameter-free closure)."
         )
 
+    @staticmethod
+    def _report_total(
+        diag: dict[str, float],
+        states: list[NetworkMixtureState],
+        P_jct: float,
+        common: int | None,
+    ) -> None:
+        """``Pt_jct``: the junction static plus the common port's dynamic head
+        ``q_c = Pt_c - P_c`` (#773), the head every junction element refers
+        its losses to. On a dividing tee the common port supplies and sits at
+        ``p_jn``, so ``Pt_jct`` is its total pressure, as on the Mynard and
+        constant-K tees. Omitted when no common port is defined (a junction of
+        more than three ports with no lone port)."""
+        if common is None:
+            return
+        q_c = float(states[common].Pt) - float(states[common].P)
+        diag["Pt_jct"] = float(P_jct) + q_c
+
     def diagnostics(
         self,
         states: list[NetworkMixtureState],
         P_jct: float,
         port_mdots: list[float] | None = None,
     ) -> dict[str, float]:
-        """Port bookkeeping, ``p_jn``, and the loss coefficients the closure produced.
+        """Port bookkeeping, the junction pressures and the loss coefficients
+        the closure produced.
+
+        ``P_jct`` is the junction static pressure ``p_jn`` (the owned
+        unknown) and ``Pt_jct`` the junction total pressure (see
+        ``_report_total``).
 
         ``port_i_K`` is referenced to the common port's dynamic head (its own
         ``Pt - P``, what the port node calls dynamic head): ``(Pt_c - Pt_i)/q_c``
@@ -336,14 +359,15 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         as a split never reports a merge coefficient under a split's name.
         """
         diag = super().diagnostics(states, P_jct, port_mdots)
-        diag["p_jn"] = float(P_jct)
-        if port_mdots is None or len(port_mdots) != self.N:
-            return diag
-        outer = [float(s) * float(m) for s, m in zip(self._port_signs, port_mdots, strict=True)]
-        diag["n_reversed_ports"] = float(sum(m < 0.0 for m in outer))
         declared_common = None
         if self.N == 3:
             declared_common = 0 if len(self.inlet_nodes) == 1 else self.N - 1
+        if port_mdots is None or len(port_mdots) != self.N:
+            self._report_total(diag, states, P_jct, declared_common)
+            return diag
+        outer = [float(s) * float(m) for s, m in zip(self._port_signs, port_mdots, strict=True)]
+        diag["n_reversed_ports"] = float(sum(m < 0.0 for m in outer))
+        if declared_common is not None:
             d_straight, d_branch = (i for i in range(self.N) if i != declared_common)
             diag["m_dot_com"] = outer[declared_common]
             diag["m_dot_straight"] = outer[d_straight]
@@ -355,7 +379,9 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         elif len(out) == 1 and len(inn) == self.N - 1:
             common, dividing = out[0], False
         else:
+            self._report_total(diag, states, P_jct, declared_common)
             return diag
+        self._report_total(diag, states, P_jct, common)
         q_c = float(states[common].Pt) - float(states[common].P)
         if not q_c > 0.0:
             return diag

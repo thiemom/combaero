@@ -53,7 +53,8 @@ const SlotFilmNode = ({ id, data, selected }: NodeProps) => {
 					{data.label ? data.label : "Film Slot"}
 				</div>
 				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
-					S {slotMm.toFixed(1)} mm, Tu {data.turbulence_intensity ?? 14}%
+					S {slotMm.toFixed(1)} mm, Tu{" "}
+					{((data.turbulence_intensity ?? 0.14) * 100).toFixed(0)}%
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>

@@ -3130,7 +3130,7 @@ class OrificeElement(NetworkElement):
     tapping differential and is a function of beta = d/D. Both are evaluated
     at D-D/2 taps, the ones ISO's permanent-loss relation is derived for: the
     tap choice is a measurement convention and must not move the solved flow
-    (#645), so ``tap`` only selects the differential reported as ``dp_tap``.
+    (#645), so ``tap`` only selects the differential reported as ``dP_tap``.
 
     Between pipes (a pipe on the side the flow comes from sets beta, and a
     pipe on the side it goes to recovers the pressure) a metering or 'fixed'
@@ -3171,7 +3171,7 @@ class OrificeElement(NetworkElement):
         super().__init__(id, from_node, to_node)
         if tap not in _TAPS:
             raise ValueError(f"OrificeElement {id!r}: tap {tap!r} is not one of {sorted(_TAPS)}.")
-        # The taps whose differential diagnostics() reports as dp_tap. Never
+        # The taps whose differential diagnostics() reports as dP_tap. Never
         # the solved flow: that is evaluated at _NETWORK_TAP (#645).
         self.tap = tap
         # Angle of the discharged jet to the axis of a merge chamber it feeds
@@ -4085,12 +4085,12 @@ class OrificeElement(NetworkElement):
         """What a meter at ``self.tap`` reads, and the loss the row charged.
 
         beta_flow and E are the velocity of approach along the flow, which
-        reverses with it (#554). dp_tap is the tapping differential at the
+        reverses with it (#554). dP_tap is the tapping differential at the
         element's ``tap``. The row
         works at _NETWORK_TAP, so for a metering correlation the reported one
         is scaled by (C_network / C_tap)^2 at the same flow. Between pipes
-        (#645) dp_permanent is the stagnation drop the row charged and
-        loss_ratio = dp_permanent / dp_tap at the network taps;
+        (#645) dP_permanent is the stagnation drop the row charged and
+        loss_ratio = dP_permanent / dP_tap at the network taps;
         recovery_in_range is False where p_tap/p1 < 0.75, outside ISO's
         incompressible relation.
         """
@@ -4120,7 +4120,7 @@ class OrificeElement(NetworkElement):
                 p1, float(up.Pt), float(dn.Pt), beta, cd, self.regime == "compressible"
             )
             dp_net = p_up - float(t.p_tap)
-            out["dp_permanent"] = float(up.Pt) - float(dn.Pt)
+            out["dP_permanent"] = float(up.Pt) - float(dn.Pt)
             out["loss_ratio"] = float(t.loss_ratio)
             out["recovery_in_range"] = float(t.in_range)
         else:
@@ -4141,7 +4141,7 @@ class OrificeElement(NetworkElement):
             c_net = float(cb.metering_cd_and_dRe(metering, g, Re_D)[0])
             c_tap = float(cb.metering_cd_and_dRe(metering, at_tap, Re_D)[0])
             dp_net *= (c_net / c_tap) ** 2
-        out["dp_tap"] = dp_net
+        out["dP_tap"] = dp_net
         return out
 
 
@@ -4538,7 +4538,7 @@ class EffusionPlateElement(OrificeElement):
                            is Andrews' own definition and what his Fig. 8
                            plots
 
-        The two differ by `area_ratio` -- 3.46 for Andrews' plate C -- so
+        The two differ by `approach_to_hole_area_ratio` -- 3.46 for Andrews' plate C -- so
         using one where the other is meant is a factor-of-three error, not a
         refinement. For a panel energy balance use
         `Q = h_plate_area * area_approach_total * dT`.
@@ -4583,7 +4583,7 @@ class EffusionPlateElement(OrificeElement):
             "internal_Nu_multiplier": float(self.internal_Nu_multiplier),
             "h_hole_area": float(h_hole),
             "h_plate_area": float(h_hole * area_hole / area_approach),
-            "area_ratio": float(area_approach / area_hole),
+            "approach_to_hole_area_ratio": float(area_approach / area_hole),
             "area_approach_total": float(area_approach * self.n_holes),
             "area_hole_total": float(area_hole * self.n_holes),
         }
@@ -5090,12 +5090,13 @@ class FilmCoolingElement(OrificeElement):
         return base
 
 
-# The default free-stream turbulence of a slot film [%] (#714): D-7958's 52%
-# blockage plate (axial Tu 14%), where Eq. (5)'s line fits that report's own
-# Table I best (bias +0.017 in eta), inside the 10-20% Juhasz and Marek
+# The default free-stream turbulence of a slot film, a FRACTION (#714, #773):
+# 0.14 = 14%, D-7958's 52% blockage plate (axial Tu 14%), where Eq. (5)'s
+# line fits that report's own Table I best (bias +0.017 in eta), inside the
+# 10-20% Juhasz and Marek
 # (1971, TN D-6360) measured in a combustor. A working example, not a
 # universal value: a liner's Tu comes from what is upstream of it.
-SLOT_FILM_DEFAULT_TU = 14.0
+SLOT_FILM_DEFAULT_TU = 0.14
 
 
 class SlotFilmElement(OrificeElement):
@@ -5104,8 +5105,9 @@ class SlotFilmElement(OrificeElement):
     ``slot_height`` across ``span``.
 
     FILM: Marek and Tacina (1975), NASA TN D-7958, eta = 1/(1 + C_m x/(M S))
-    with C_m = 0.25 Tu/100 (Eqs. 4-5), ``turbulence_intensity`` the axial
-    free-stream Tu in percent and ``C_m_multiplier`` the user's rig-matching
+    with C_m = 0.25 Tu/100 (Eqs. 4-5, Tu in percent), ``turbulence_intensity``
+    the axial free-stream Tu as a FRACTION like every other element's (0.14 =
+    14%, as the kernel takes it too) and ``C_m_multiplier`` the user's rig-matching
     factor (never scored). As for FilmCoolingElement, the element owns no
     wall: a ThermalWall on the gas duct downstream names it with ``film=``,
     and that wall's span is measured from the slot lip. The blowing ratio is
@@ -5138,8 +5140,11 @@ class SlotFilmElement(OrificeElement):
             raise ValueError(f"{name}: slot_height, span and lip_thickness must be positive")
         if slot_height > span:
             raise ValueError(f"{name}: a slot is wider than it is high (span >= slot_height)")
-        if turbulence_intensity < 0.0:
-            raise ValueError(f"{name}: turbulence_intensity is the axial Tu in PERCENT, >= 0")
+        if not 0.0 <= turbulence_intensity <= 1.0:
+            raise ValueError(
+                f"{name}: turbulence_intensity is the axial Tu as a FRACTION in [0, 1] "
+                f"(0.14 = 14%); got {turbulence_intensity}"
+            )
         if C_m_multiplier <= 0.0:
             raise ValueError(f"{name}: C_m_multiplier must be positive")
         self.slot_height = float(slot_height)
@@ -5197,7 +5202,11 @@ class SlotFilmElement(OrificeElement):
         which Eq. (4) does not contain, and the kernel's envelope flag)."""
         S = self.slot_height
         return cb.slot_film_span_average_marek_tacina_1975(
-            x_start / S, x_end / S, M, self.turbulence_intensity, self.C_m_multiplier
+            x_start / S,
+            x_end / S,
+            M,
+            self.turbulence_intensity,
+            self.C_m_multiplier,
         )
 
     def diagnostics(
@@ -8775,8 +8784,27 @@ class MultiPortChamberBase(NetworkElement):
             "user" if a is not None else "" for a in self.port_areas
         ]
 
+    #: The owned unknown's name, after the result-key convention (#773):
+    #: ``P_jct`` where it is the junction STATIC pressure (ideal momentum tee,
+    #: ejector mixing plane), ``Pt_jct`` where it is the TOTAL (Mynard,
+    #: constant K). Before #773 every subclass called it ``P_jct``.
+    JUNCTION_UNKNOWN: str = "P_jct"
+
+    @property
+    def junction_unknown(self) -> str:
+        """The owned unknown's full name, ``{id}.P_jct`` or ``{id}.Pt_jct``."""
+        return f"{self.id}.{self.JUNCTION_UNKNOWN}"
+
+    def legacy_unknown_names(self) -> dict[str, str]:
+        """{current unknown name: pre-#773 name} for an ``initial_guess`` key
+        that was renamed; the solver still accepts the old key, with a
+        DeprecationWarning, until 0.8.0."""
+        if self.JUNCTION_UNKNOWN == "P_jct":
+            return {}
+        return {self.junction_unknown: f"{self.id}.P_jct"}
+
     def unknowns(self) -> list[str]:
-        return [f"{self.id}.P_jct"]
+        return [self.junction_unknown]
 
     def n_equations(self) -> int:
         return self.N + 1  # N impulse + 1 sum-mass
@@ -9000,6 +9028,13 @@ class MultiPortChamberBase(NetworkElement):
         in and computes no physics, which is why it survives the 0.6.0
         removal of this class's residual. ``MultiPortChamberElement.diagnostics``
         calls it through ``super()`` and adds its closure quantities on top.
+
+        ``P_jct`` here is the owned unknown as handed in. The result-key
+        convention (#773) is ``P_jct`` = junction STATIC and ``Pt_jct`` =
+        junction TOTAL pressure; a subclass whose unknown is a total pressure
+        (Mynard, constant K) overwrites ``P_jct`` with the static one.
+        ``port_{i}_connected_area_ratio`` is the connected element's area over
+        the port's own area (1 = no hidden step).
         """
         diag: dict[str, float | str] = {"P_jct": float(P_jct), "n_ports": float(self.N)}
         port_area_sources = getattr(self, "_port_area_sources", None) or [""] * self.N
@@ -9024,7 +9059,7 @@ class MultiPortChamberBase(NetworkElement):
                 continue
             ratio = float(outer_area) / float(area)
             diag[f"port_{i}_outer_area"] = float(outer_area)
-            diag[f"port_{i}_area_ratio"] = ratio
+            diag[f"port_{i}_connected_area_ratio"] = ratio
             if abs(ratio - 1.0) > self.PORT_AREA_MISMATCH_TOL:
                 n_mismatch += 1
         diag["port_area_mismatch"] = float(n_mismatch)
@@ -9190,7 +9225,8 @@ class VortexElement(NetworkElement):
     diagnostics; it is not a network unknown.
 
     The inlet swirl V_theta_in [m/s] is the user's; it defaults to solid-body
-    rotation at the shaft speed, omega * r_in.
+    rotation at the shaft speed ``shaft_speed_rpm`` (``omega_rpm`` before
+    #773, deprecated, removed in 0.8.0): V_theta_in = 2 pi N / 60 * r_in.
 
     Until #661 this element added the static radial-equilibrium rise of a
     Vatistas n-vortex to the TOTAL pressure at constant Tt: neither a free
@@ -9213,12 +9249,23 @@ class VortexElement(NetworkElement):
         *,
         r_out: float = 0.10,
         r_in: float = 0.05,
-        omega_rpm: float = 0.0,
+        shaft_speed_rpm: float = 0.0,
         v_theta_in: float | None = None,
         r_c: float | None = None,
         n: float | None = None,
+        omega_rpm: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
+        if omega_rpm is not None:
+            warnings.warn(
+                "VortexElement's omega_rpm is deprecated and will be removed in 0.8.0: "
+                "use shaft_speed_rpm (#773; omega is 2 pi f, not a speed in rpm).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if shaft_speed_rpm != 0.0:
+                raise TypeError("VortexElement: give shaft_speed_rpm or omega_rpm, not both")
+            shaft_speed_rpm = omega_rpm
         if r_c is not None or n is not None:
             warnings.warn(
                 "VortexElement's r_c and n are ignored and will be removed in 0.8.0: "
@@ -9237,15 +9284,26 @@ class VortexElement(NetworkElement):
             )
         self.r_out = float(r_out)
         self.r_in = float(r_in)
-        self.omega_rpm = float(omega_rpm)
+        self.shaft_speed_rpm = float(shaft_speed_rpm)
         self.v_theta_in = None if v_theta_in is None else float(v_theta_in)
+
+    @property
+    def omega_rpm(self) -> float:
+        """Deprecated alias of ``shaft_speed_rpm`` (#773), removed in 0.8.0."""
+        warnings.warn(
+            "VortexElement.omega_rpm is deprecated and will be removed in 0.8.0: "
+            "use shaft_speed_rpm (#773).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.shaft_speed_rpm
 
     def swirl(self) -> tuple[float, float]:
         """(V_theta at r_in, V_theta at r_out) [m/s]; r * V_theta is conserved."""
         if self.v_theta_in is not None:
             v_in = self.v_theta_in
         else:
-            v_in = self.omega_rpm * 2.0 * math.pi / 60.0 * self.r_in
+            v_in = self.shaft_speed_rpm * 2.0 * math.pi / 60.0 * self.r_in
         return v_in, v_in * self.r_in / self.r_out
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
@@ -9271,7 +9329,7 @@ class VortexElement(NetworkElement):
     ) -> dict[str, float]:
         out: dict[str, float] = {
             "m_dot": float(state_in.m_dot),
-            "omega_rpm": float(self.omega_rpm),
+            "shaft_speed_rpm": float(self.shaft_speed_rpm),
             **_element_pressure_block(state_in, state_out, mach_in=0.0, mach_out=0.0),
         }
         v_in, v_out = self.swirl()

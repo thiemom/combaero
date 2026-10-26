@@ -215,7 +215,7 @@ def test_a_critical_mode_ejector_into_a_low_outlet_converges_and_decouples() -> 
     omega = {}
     for p_out in (0.9e5, 1.013e5, 1.5e5, 2.0e5):
         _, r = _solve(build_network_from_schema(NetworkGraphSchema(**_ejector_into(p_out))))
-        omega[p_out] = r["ej.omega"]
+        omega[p_out] = r["ej.entrainment_ratio"]
         if p_out < 1.2e5:
             assert r["ej.critical_mode"] == 1.0
         ch = "__tee_jct__ej_outlet"
