@@ -172,7 +172,7 @@ def networks() -> Iterator[tuple[str, str, dict]]:
             # A free vortex conserves Pt, so two pressure boundaries leave no
             # solution: feed a flow, at a shaft speed (the palette's null is
             # the global setting, unset here, i.e. no swirl).
-            _with(graph, "x", omega_rpm=3000.0)
+            _with(graph, "x", shaft_speed_rpm=3000.0)
             graph["nodes"][0] = _node("in", "mass_boundary", {"m_dot": 0.05, "Tt": 300.0})
         yield kind, "palette", graph
 

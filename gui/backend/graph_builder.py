@@ -1299,10 +1299,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_element(elem)
         elif elem_type == "vortex":
             data = _parse(VortexData, elem_data, elem_id)
-            omega = (
-                data.omega_rpm
-                if data.omega_rpm is not None
-                else (schema.solver_settings.omega_rpm or 0.0)
+            shaft_speed = (
+                data.shaft_speed_rpm
+                if data.shaft_speed_rpm is not None
+                else (schema.solver_settings.shaft_speed_rpm or 0.0)
             )
             elem = VortexElement(
                 elem_id,
@@ -1310,7 +1310,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 to_node=target_id,
                 r_out=data.r_out,
                 r_in=data.r_in,
-                omega_rpm=float(omega),
+                shaft_speed_rpm=float(shaft_speed),
                 v_theta_in=data.v_theta_in,
             )
             elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)

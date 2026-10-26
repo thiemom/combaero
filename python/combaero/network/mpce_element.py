@@ -307,6 +307,30 @@ class MultiPortChamberElement(MultiPortChamberBase):
                 f"MultiPortChamberBase."
             )
 
+    def _common_port_index(self) -> int:
+        # Port order is inlet_nodes + outlet_nodes: the single inlet of a
+        # branch tee is port 0; the single outlet of a merge tee is the
+        # last port.
+        return 0 if self.flow_direction == "branch" else self.N - 1
+
+    def _junction_pressures(
+        self, diag: dict[str, float], states: list[NetworkMixtureState], Pt_jct: float
+    ) -> None:
+        """Report ``Pt_jct`` (the owned unknown, a TOTAL pressure) and the
+        junction STATIC pressure ``P_jct`` (#773).
+
+        The closure carries no loss on the common port (K = 0 there), so the
+        junction total is the common port's total, and its reference head is
+        the common port's dynamic head ``q_c = Pt_c - P_c`` -- the head K is
+        referred to. The static is ``P_jct = Pt_jct - q_c``, which at a
+        converged solution is the common port's static pressure. Reporting
+        only; the residual is unchanged.
+        """
+        c = self._common_port_index()
+        q_c = float(states[c].Pt) - float(states[c].P)
+        diag["Pt_jct"] = float(Pt_jct)
+        diag["P_jct"] = float(Pt_jct) - q_c
+
     def verify_solution_consistent(
         self,
         sol: dict[str, float],
@@ -405,8 +429,9 @@ class MultiPortChamberElement(MultiPortChamberBase):
     ) -> dict[str, float]:
         """Emit MPCE-v2 diagnostics: parent fields + Mynard K + named aliases.
 
-        Beyond the parent class output (``P_jct``, ``n_ports``, per-port
-        ``P/T/area/sign``), this re-evaluates Mynard at the converged
+        Beyond the parent class output (``n_ports``, per-port
+        ``P/T/area/sign``) and the junction pressures (``Pt_jct`` total,
+        ``P_jct`` static; see ``_junction_pressures``), this re-evaluates Mynard at the converged
         operating point to expose the K coefficient used in the residual,
         plus the topology-aware aliases that the GUI displays:
 
@@ -421,6 +446,7 @@ class MultiPortChamberElement(MultiPortChamberBase):
         per-element state.
         """
         diag = super().diagnostics(states, Pt_jct, port_mdots)
+        self._junction_pressures(diag, states, Pt_jct)
         if port_mdots is None or len(port_mdots) != self.N:
             return diag
 
@@ -497,10 +523,6 @@ class MultiPortChamberElement(MultiPortChamberBase):
             diag["m_dot_com"] = m_com
             diag["m_dot_branch"] = m_branch
             diag["m_dot_straight"] = max(m_com - m_branch, 0.0)
-
-        # Convenience: Pt at the chamber (equals P_jct in MPCE-v2 naming, since
-        # `P_jct` re-purposes the MPCE-v1 static slot for Pt).
-        diag["Pt_jct"] = float(Pt_jct)
         return diag
 
     def _soft_barrier_residual(
@@ -1002,12 +1024,6 @@ class ConstantKTeeElement(MultiPortChamberElement):
         K12 = (2.0 * psi / D) * (1.0 - qs * qs - q * q * psi * c) + q * q * psi * psi - 1.0
         return K11, K12
 
-    def _common_port_index(self) -> int:
-        # Port order is inlet_nodes + outlet_nodes: the single inlet of a
-        # branch tee is port 0; the single outlet of a merge tee is the
-        # last port.
-        return 0 if self.flow_direction == "branch" else self.N - 1
-
     def residuals(  # type: ignore[override]
         self,
         states: list[NetworkMixtureState],
@@ -1110,6 +1126,7 @@ class ConstantKTeeElement(MultiPortChamberElement):
         in port order, matching the GUI wiring.
         """
         diag = MultiPortChamberBase.diagnostics(self, states, Pt_jct, port_mdots)
+        self._junction_pressures(diag, states, Pt_jct)
         common = self._common_port_index()
         noncommon = [i for i in range(self.N) if i != common]
         for i in noncommon:

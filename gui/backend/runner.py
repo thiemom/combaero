@@ -142,7 +142,7 @@ def _build_result_objects(
         extra = {
             f"step_{port}_zeta": float(step.get("zeta", 0.0)),
             f"step_{port}_dPt": float(step.get("dPt", 0.0)),
-            f"step_{port}_area_ratio": float(ratio),
+            f"step_{port}_connected_area_ratio": float(ratio),
         }
         element_results[tee_id] = ElementResult(**{**tee_res.model_dump(), **extra})
 

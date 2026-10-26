@@ -4,7 +4,7 @@ import NodeIcon from "../NodeIcon";
 
 const VortexNode = ({ data, selected }: NodeProps) => {
 	const isSolved = !!data.result;
-	const hasLocalRpm = data.omega_rpm != null;
+	const hasLocalRpm = data.shaft_speed_rpm != null;
 
 	return (
 		<div
@@ -26,7 +26,7 @@ const VortexNode = ({ data, selected }: NodeProps) => {
 					{data.label ? data.label : "Vortex"}
 				</div>
 				<div className="text-[9px] font-mono text-violet-500 whitespace-nowrap truncate max-w-full">
-					{hasLocalRpm ? `${data.omega_rpm} rpm` : "global rpm"}
+					{hasLocalRpm ? `${data.shaft_speed_rpm} rpm` : "global rpm"}
 				</div>
 				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
 			</div>

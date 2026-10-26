@@ -32,7 +32,14 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => v.toFixed(4),
 	},
+	// Area change only: F1/F0 (#773). The effusion plate's and the junction
+	// ports' ratios have their own keys below.
 	area_ratio: { label: "Area ratio", unit: "—", format: (v) => v.toFixed(3) },
+	approach_to_hole_area_ratio: {
+		label: "Approach / hole area",
+		unit: "—",
+		format: (v) => v.toFixed(3),
+	},
 	dPt: {
 		label: "dP (total)",
 		unit: "bar",
@@ -134,18 +141,18 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "bar",
 		format: (v) => (v / 1e5).toFixed(4),
 	},
-	dp_tap: {
-		label: "dp at taps",
+	dP_tap: {
+		label: "dP at taps",
 		unit: "bar",
 		format: (v) => (v / 1e5).toFixed(4),
 	},
-	dp_permanent: {
-		label: "dp permanent",
+	dP_permanent: {
+		label: "dP permanent",
 		unit: "bar",
 		format: (v) => (v / 1e5).toFixed(4),
 	},
 	loss_ratio: {
-		label: "Permanent / tap dp",
+		label: "Permanent / tap dP",
 		unit: "—",
 		format: (v) => v.toFixed(3),
 	},
@@ -240,11 +247,16 @@ export const QUANTITY_CATALOGUE: Record<
 	// MPCE-v2 joining-flow K aliases (Bassett K11/K12 convention)
 	K11: { label: "K11", unit: "—", format: (v) => v.toFixed(3) },
 	K12: { label: "K12", unit: "—", format: (v) => v.toFixed(3) },
-	// Chamber stagnation pressure (MPCE-v2 emits Pt_jct; legacy P_jct stored too)
+	// Junction pressures, every junction element (#773): P static, Pt total.
+	// The ejector reports P_jct only (its mixing plane has no single Pt).
 	Pt_jct: { label: "Pt jct", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	P_jct: { label: "P jct", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
-	// Ideal momentum tee: the junction STATIC pressure (#517)
-	p_jn: { label: "p jn", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
+	// Ejector (#773): Huang's omega is reported as the entrainment ratio.
+	entrainment_ratio: {
+		label: "ṁs/ṁp (entrainment)",
+		unit: "kg/kg",
+		format: (v) => v.toFixed(4),
+	},
 	n_reversed_ports: {
 		label: "reversed ports",
 		unit: "—",

@@ -53,7 +53,7 @@ def _solve(g: FlowNetwork) -> dict:
 
 @pytest.mark.parametrize("rpm", [3000.0, 20000.0])
 def test_total_pressure_and_temperature_are_conserved(rpm: float) -> None:
-    r = _solve(_net(omega_rpm=rpm, r_in=0.05, r_out=0.10))
+    r = _solve(_net(shaft_speed_rpm=rpm, r_in=0.05, r_out=0.10))
     assert r["__converged__"], r["__message__"]
     assert r["p2.Pt"] == pytest.approx(r["p1.Pt"], rel=1e-9)
     assert r["p2.Tt"] == pytest.approx(r["p1.Tt"], rel=1e-9)
@@ -62,11 +62,13 @@ def test_total_pressure_and_temperature_are_conserved(rpm: float) -> None:
 
 
 def test_angular_momentum_is_carried_from_r_in_to_r_out() -> None:
-    el = VortexElement("v", "a", "b", omega_rpm=6000.0, r_in=0.04, r_out=0.10)
+    el = VortexElement("v", "a", "b", shaft_speed_rpm=6000.0, r_in=0.04, r_out=0.10)
     v_in, v_out = el.swirl()
     assert v_in == pytest.approx(6000.0 * 2.0 * math.pi / 60.0 * 0.04)
     assert v_out * 0.10 == pytest.approx(v_in * 0.04)
-    given = VortexElement("v", "a", "b", omega_rpm=6000.0, r_in=0.04, r_out=0.02, v_theta_in=30.0)
+    given = VortexElement(
+        "v", "a", "b", shaft_speed_rpm=6000.0, r_in=0.04, r_out=0.02, v_theta_in=30.0
+    )
     assert given.swirl() == pytest.approx((30.0, 60.0))
 
 
@@ -94,7 +96,7 @@ def test_the_swirl_static_state_is_isentropic_from_the_stagnation_state() -> Non
 
 
 def test_no_swirl_at_the_axis() -> None:
-    el = VortexElement("v", "a", "b", omega_rpm=3000.0, r_in=0.0)
+    el = VortexElement("v", "a", "b", shaft_speed_rpm=3000.0, r_in=0.0)
     assert el.swirl() == (0.0, 0.0)
     with pytest.raises(ValueError, match="no angular momentum"):
         VortexElement("v", "a", "b", r_in=0.0, v_theta_in=10.0)
@@ -102,8 +104,8 @@ def test_no_swirl_at_the_axis() -> None:
 
 def test_the_old_vatistas_parameters_are_deprecated_and_ignored() -> None:
     with pytest.warns(DeprecationWarning, match="r_c and n are ignored"):
-        old = VortexElement("v", "a", "b", omega_rpm=3000.0, r_c=0.02, n=2.0)
-    assert old.swirl() == VortexElement("v", "a", "b", omega_rpm=3000.0).swirl()
+        old = VortexElement("v", "a", "b", shaft_speed_rpm=3000.0, r_c=0.02, n=2.0)
+    assert old.swirl() == VortexElement("v", "a", "b", shaft_speed_rpm=3000.0).swirl()
     with pytest.raises(TypeError):
         VortexElement("v", "a", "b", 0.02, 0.1)  # the old positional r_c, r_out
 
@@ -138,3 +140,61 @@ def test_a_gui_file_saved_before_661_loads_as_a_free_vortex() -> None:
     assert net.elements["vx"].swirl() == (0.0, 0.0)
     assert net.elements["vn"].r_in == 0.05
     assert net.elements["vn"].swirl()[0] == 25.0
+
+
+def test_omega_rpm_is_a_deprecated_alias_of_shaft_speed_rpm() -> None:
+    """#773: omega is 2 pi f, so the shaft speed in rpm is shaft_speed_rpm.
+    The old keyword still works, with a DeprecationWarning, until 0.8.0."""
+    with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+        old = VortexElement("v", "a", "b", omega_rpm=3000.0)
+    new = VortexElement("v", "a", "b", shaft_speed_rpm=3000.0)
+    assert old.shaft_speed_rpm == 3000.0
+    assert old.swirl() == new.swirl()
+    with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+        assert new.omega_rpm == 3000.0
+    with pytest.warns(DeprecationWarning), pytest.raises(TypeError, match="not both"):
+        VortexElement("v", "a", "b", shaft_speed_rpm=1.0, omega_rpm=2.0)
+
+
+def test_a_gui_file_saved_with_omega_rpm_still_loads() -> None:
+    """A network saved before #773 names the shaft speed omega_rpm, on the
+    node and in the solver settings; both still reach the element."""
+
+    def graph(node_key: str, settings_key: str) -> dict:
+        def node(nid: str, ntype: str, data: dict) -> dict:
+            return {"id": nid, "type": ntype, "position": {"x": 0, "y": 0}, "data": data}
+
+        return {
+            "nodes": [
+                node("a", "pressure_boundary", {}),
+                node("b", "pressure_boundary", {}),
+                node("local", "vortex", {node_key: 3000.0, "r_in": 0.05}),
+                node("glob", "vortex", {}),
+            ],
+            "edges": [
+                {"id": "e1", "source": "a", "target": "local", "data": {}},
+                {"id": "e2", "source": "local", "target": "glob", "data": {}},
+                {"id": "e3", "source": "glob", "target": "b", "data": {}},
+            ],
+            "solver_settings": {settings_key: 1500.0},
+        }
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        old = build_network_from_schema(NetworkGraphSchema(**graph("omega_rpm", "omega_rpm")))
+        new = build_network_from_schema(
+            NetworkGraphSchema(**graph("shaft_speed_rpm", "shaft_speed_rpm"))
+        )
+    for net in (old, new):
+        assert net.elements["local"].shaft_speed_rpm == 3000.0
+        assert net.elements["glob"].shaft_speed_rpm == 1500.0
+    assert old.elements["local"].swirl() == new.elements["local"].swirl()
+    v_in = old.elements["local"].swirl()[0]
+    assert v_in == pytest.approx(3000.0 * 2.0 * math.pi / 60.0 * 0.05)
+
+
+def test_the_diagnostics_report_shaft_speed_rpm() -> None:
+    r = _solve(_net(shaft_speed_rpm=3000.0, r_in=0.05, r_out=0.10))
+    assert r["__converged__"], r["__message__"]
+    assert r["vx.shaft_speed_rpm"] == 3000.0
+    assert "vx.omega_rpm" not in r

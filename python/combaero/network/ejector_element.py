@@ -915,6 +915,18 @@ class EjectorElement(MultiPortChamberBase):
     ) -> dict[str, float]:
         """Parent per-port fields plus ejector-specific outputs: entrainment
         ratio, live gamma/R, and the critical-vs-actual back-pressure margin.
+
+        Pressures follow the result-key convention (#773): ``P`` static,
+        ``Pt`` total. ``P_jct`` is the owned unknown, the mixing-plane STATIC
+        pressure P_py at which both streams arrive; ``Pt_out`` the outlet
+        port's total; ``P_c_star`` / ``P_b0`` the critical and dead-head back
+        pressures (outlet totals). There is no ``Pt_jct``: at the mixing plane
+        the primary and secondary streams share the static P_py at different
+        velocities (the primary supersonic, the secondary sonic in critical
+        mode), so the plane has no single total pressure; the mixed stream's
+        total exists only downstream of the mixing, which is not the plane
+        P_jct describes. ``entrainment_ratio`` is m_dot_secondary /
+        m_dot_primary (Huang's omega).
         """
         diag = super().diagnostics(states, P_jct, port_mdots)
         primary, secondary, outlet = states
@@ -925,13 +937,12 @@ class EjectorElement(MultiPortChamberBase):
         r_gas = float(cb.specific_gas_constant(secondary.X))
         diag["gamma"] = gamma
         diag["r_gas"] = r_gas
-        diag["outlet_pt_pa"] = float(outlet.Pt)
-        diag["p_py_pa"] = float(P_jct)  # owned unknown = mixing-plane static
+        diag["Pt_out"] = float(outlet.Pt)
 
         # Operating regime: s_choke = smootherstep(mp/cap), reported so the GUI
         # can label critical (1) / jet-pump (0) / transition, plus the actual
         # entrainment ratio and the choked-mode reference quantities. The
-        # critical closures (omega_critical, P_c*) assume a choked primary and
+        # critical closures (entrainment_ratio_critical, P_c*) assume a choked primary and
         # return NaN in the jet-pump regime, so they are reported only when
         # meaningful (s_choke > 0).
         if port_mdots is not None and len(port_mdots) == self.N:
@@ -948,7 +959,7 @@ class EjectorElement(MultiPortChamberBase):
             diag["m_dot_secondary"] = ms
             diag["m_dot_outlet"] = float(port_mdots[2])
             # ACTUAL entrainment ratio -- regime-independent, always valid.
-            diag["omega"] = ms / mp if mp != 0.0 else float("nan")
+            diag["entrainment_ratio"] = ms / mp if mp != 0.0 else float("nan")
             # Regime label. critical_mode = 1 only when the primary is choked
             # AND the outlet sits below the ejector's critical back pressure
             # (double-choked plateau); 0 in the subcritical-droop and unchoked
@@ -958,17 +969,17 @@ class EjectorElement(MultiPortChamberBase):
             if s_choke > 0.0:
                 omega_c = self._critical_omega(primary, secondary, gamma)
                 p_c_star = self._critical_back_pressure(primary, secondary, gamma, r_gas)
-                diag["omega_critical"] = omega_c
-                diag["p_c_star_pa"] = p_c_star
+                diag["entrainment_ratio_critical"] = omega_c
+                diag["P_c_star"] = p_c_star
                 # Upper anchor of the subcritical droop (#619): omega falls
-                # linearly from omega_critical at P_c* to 0 here.
-                diag["p_b0_pa"] = self._dead_head_back_pressure(primary, secondary, gamma, r_gas)
+                # linearly from entrainment_ratio_critical at P_c* to 0 here.
+                diag["P_b0"] = self._dead_head_back_pressure(primary, secondary, gamma, r_gas)
                 if s_choke >= 0.5 and math.isfinite(p_c_star) and float(outlet.Pt) <= p_c_star:
                     critical_mode = 1.0
             diag["critical_mode"] = critical_mode
         else:
-            diag["omega"] = self._critical_omega(primary, secondary, gamma)
-            diag["p_c_star_pa"] = self._critical_back_pressure(primary, secondary, gamma, r_gas)
+            diag["entrainment_ratio"] = self._critical_omega(primary, secondary, gamma)
+            diag["P_c_star"] = self._critical_back_pressure(primary, secondary, gamma, r_gas)
         return diag
 
     def _incompressible_diagnostics(
@@ -985,15 +996,14 @@ class EjectorElement(MultiPortChamberBase):
         primary, secondary, outlet = states
         diag["regime_incompressible"] = 1.0
         diag["critical_mode"] = 0.0
-        diag["outlet_pt_pa"] = float(outlet.Pt)
-        diag["p_py_pa"] = float(P_jct)
+        diag["Pt_out"] = float(outlet.Pt)
         if port_mdots is None or len(port_mdots) != self.N:
             return diag
         mp, ms = -float(port_mdots[0]), -float(port_mdots[1])
         diag["m_dot_primary"] = mp
         diag["m_dot_secondary"] = ms
         diag["m_dot_outlet"] = float(port_mdots[2])
-        diag["omega"] = ms / mp if mp != 0.0 else float("nan")
+        diag["entrainment_ratio"] = ms / mp if mp != 0.0 else float("nan")
         rho_p = self.port_densities(states)[0][0]
         a_p = float(cb.speed_of_sound(primary.T, primary.X))
         diag["mach_jet"] = abs(mp) / (rho_p * self.nozzle_exit_area) / a_p if a_p > 0 else 0.0

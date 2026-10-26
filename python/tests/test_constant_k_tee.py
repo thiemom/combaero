@@ -236,7 +236,7 @@ def test_diagnostics_report_fixed_K():
     port_mdots = [
         float(jct._port_signs[i]) * sol[f"{jct._port_element_ids[i]}.m_dot"] for i in range(jct.N)
     ]
-    diag = jct.diagnostics(states, sol["jct.P_jct"], port_mdots)
+    diag = jct.diagnostics(states, sol["jct.Pt_jct"], port_mdots)
     assert diag["K_straight"] == 0.5
     assert diag["K_branch"] == 1.5
     assert "mass_flow_ratio" in diag

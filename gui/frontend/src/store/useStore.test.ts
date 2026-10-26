@@ -142,6 +142,28 @@ describe("loadNetwork legacy migration", () => {
 		);
 	});
 
+	it("moves the old omega_rpm to shaft_speed_rpm (#773)", () => {
+		const { shaft_speed_rpm: _drop, ...oldSettings } =
+			useStore.getState().solverSettings;
+		useStore.getState().loadNetwork({
+			nodes: [
+				{
+					id: "v1",
+					type: "vortex",
+					position: { x: 0, y: 0 },
+					data: { label: "v1", omega_rpm: 3000 },
+				},
+			],
+			edges: [],
+			solverSettings: { ...oldSettings, omega_rpm: 1500 },
+		});
+		const { nodes, solverSettings } = useStore.getState();
+		expect(nodes[0].data.shaft_speed_rpm).toBe(3000);
+		expect(nodes[0].data.omega_rpm).toBeUndefined();
+		expect(solverSettings.shaft_speed_rpm).toBe(1500);
+		expect("omega_rpm" in solverSettings).toBe(false);
+	});
+
 	it("leaves current strategies untouched", () => {
 		useStore.getState().loadNetwork({
 			nodes: [nodeWithResult("n1")],

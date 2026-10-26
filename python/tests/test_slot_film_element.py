@@ -75,6 +75,7 @@ def test_the_element_refuses_what_is_not_a_slot() -> None:
         {"span": 1e-3},
         {"lip_thickness": 0.0},
         {"turbulence_intensity": -1.0},
+        {"turbulence_intensity": 14.0},  # a percent passed as a fraction (#773)
     ):
         args = {"slot_height": S, "span": W, "lip_thickness": 1e-3, **kw}
         with pytest.raises(ValueError):
@@ -93,8 +94,9 @@ def test_the_hole_reynolds_number_is_the_slots() -> None:
 
 
 def test_the_default_turbulence_is_the_documented_example() -> None:
-    assert SLOT_FILM_DEFAULT_TU == 14.0
-    assert SlotFilmElement("s", "a", "b", S, W, 1e-3).turbulence_intensity == 14.0
+    # A fraction, as on every element (#773): 0.14 = D-7958's 14%.
+    assert SLOT_FILM_DEFAULT_TU == 0.14
+    assert SlotFilmElement("s", "a", "b", S, W, 1e-3).turbulence_intensity == 0.14
 
 
 def _net(span: tuple[float, float] = (0.0, 0.06), mixed_supply: bool = False) -> FlowNetwork:

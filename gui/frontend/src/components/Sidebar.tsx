@@ -555,17 +555,18 @@ const Sidebar = () => {
 						<NumericInput
 							className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1 min-w-0"
 							value={
-								solverSettings.omega_rpm != null
-									? solverSettings.omega_rpm *
+								solverSettings.shaft_speed_rpm != null
+									? solverSettings.shaft_speed_rpm *
 										(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
 									: null
 							}
 							onChange={(val) =>
 								updateSolverSettings({
-									omega_rpm: val * (unitPreferences.rotSpeed === "Hz" ? 60 : 1),
+									shaft_speed_rpm:
+										val * (unitPreferences.rotSpeed === "Hz" ? 60 : 1),
 								})
 							}
-							onClear={() => updateSolverSettings({ omega_rpm: null })}
+							onClear={() => updateSolverSettings({ shaft_speed_rpm: null })}
 							min={0}
 							placeholder="None"
 						/>

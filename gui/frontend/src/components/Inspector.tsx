@@ -904,17 +904,17 @@ const Inspector = () => {
 								)}
 
 								{/* Solved approach state, tap differential and permanent loss */}
-								{(q("dp_tap") || q("P_approach")) && (
+								{(q("dP_tap") || q("P_approach")) && (
 									<div className="rounded bg-stone-50 border border-stone-200 px-3 py-2 text-[10px] text-stone-600 flex flex-col gap-0.5">
 										{(
 											[
 												["P_approach", "p1 (approach pipe static)"],
 												[
-													"dp_tap",
-													`dp at ${String(res.tap ?? "Flange").replace("D_D2", "D-D/2")} taps`,
+													"dP_tap",
+													`dP at ${String(res.tap ?? "Flange").replace("D_D2", "D-D/2")} taps`,
 												],
-												["dp_permanent", "dp permanent"],
-												["loss_ratio", "Permanent / tap dp"],
+												["dP_permanent", "dP permanent"],
+												["loss_ratio", "Permanent / tap dP"],
 												["E", "E (along the flow)"],
 												["Cd_pipe_ratio", "Hole Cd factor in pipe"],
 											] as const
@@ -930,7 +930,7 @@ const Inspector = () => {
 												</div>
 											);
 										})}
-										{res.pressure_recovery === 0 && q("dp_tap") && (
+										{res.pressure_recovery === 0 && q("dP_tap") && (
 											<span className="text-[9px] italic text-stone-400">
 												No pipe recovery downstream: the jet's head is lost.
 											</span>
@@ -1454,8 +1454,8 @@ const Inspector = () => {
 								{len("lip_thickness", "Lip Thickness", 1.0e-3)}
 								{num(
 									"turbulence_intensity",
-									"Free-Stream Turbulence Tu [%]",
-									14,
+									"Free-Stream Turbulence Tu [-] (0.14 = 14%)",
+									0.14,
 								)}
 								{num("C_m_multiplier", "C_m Multiplier (rig tuning)", 1.0)}
 								<div className="flex flex-col gap-1">
@@ -2204,19 +2204,26 @@ const Inspector = () => {
 											{isMerge ? "Joining" : "Separating"} Flow Diagnostics
 										</h3>
 										<div className="grid grid-cols-2 gap-x-2 gap-y-3">
-											{/* Chamber stagnation pressure */}
-											{result.Pt_jct != null && (
-												<div className="flex flex-col col-span-2">
-													<span className="text-stone-400 text-[9px] font-bold uppercase">
-														Pt junction
-													</span>
-													<span className="font-mono text-xs font-bold">
-														{(result.Pt_jct ?? result.P_jct ?? 0).toFixed(1)}{" "}
-														<span className="text-[9px] font-normal text-stone-400">
-															Pa
+											{/* Junction total (Pt_jct) and static (P_jct) pressure (#773) */}
+											{(
+												[
+													["Pt_jct", "Pt junction"],
+													["P_jct", "P junction (static)"],
+												] as const
+											).map(([key, label]) =>
+												result[key] != null ? (
+													<div key={key} className="flex flex-col">
+														<span className="text-stone-400 text-[9px] font-bold uppercase">
+															{label}
 														</span>
-													</span>
-												</div>
+														<span className="font-mono text-xs font-bold">
+															{Number(result[key]).toFixed(1)}{" "}
+															<span className="text-[9px] font-normal text-stone-400">
+																Pa
+															</span>
+														</span>
+													</div>
+												) : null,
 											)}
 											{/* Per-port mdots (port_0_m_dot, etc.). Indices depend on
 											    flow direction:
@@ -2329,7 +2336,7 @@ const Inspector = () => {
 												)
 													.map((name, i) => ({
 														name,
-														r: result[`port_${i}_area_ratio`] as
+														r: result[`port_${i}_connected_area_ratio`] as
 															| number
 															| undefined,
 														a: result[`port_${i}_area`] as number | undefined,
@@ -2367,7 +2374,9 @@ const Inspector = () => {
 														<div key={p} className="font-mono">
 															{p}: A_channel / A_port{" "}
 															{(
-																result[`step_${p}_area_ratio`] as number
+																result[
+																	`step_${p}_connected_area_ratio`
+																] as number
 															).toFixed(2)}
 															, ζ{" "}
 															{(result[`step_${p}_zeta`] as number).toFixed(3)},
@@ -2398,26 +2407,26 @@ const Inspector = () => {
 							</label>
 							<div className="flex items-center gap-1">
 								<NumericInput
-									id={`omega_rpm_${selectedNode.id}`}
+									id={`shaft_speed_rpm_${selectedNode.id}`}
 									className="p-1 border rounded text-xs bg-white h-7 outline-none focus:ring-1 focus:ring-stone-200 flex-1"
 									value={
-										selectedNode.data.omega_rpm != null
-											? selectedNode.data.omega_rpm *
+										selectedNode.data.shaft_speed_rpm != null
+											? selectedNode.data.shaft_speed_rpm *
 												(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
 											: null
 									}
 									onChange={(val) =>
 										updateNodeData(selectedNode.id, {
-											omega_rpm:
+											shaft_speed_rpm:
 												val * (unitPreferences.rotSpeed === "Hz" ? 60 : 1),
 										})
 									}
 									onClear={() =>
-										updateNodeData(selectedNode.id, { omega_rpm: null })
+										updateNodeData(selectedNode.id, { shaft_speed_rpm: null })
 									}
 									min={0}
 									placeholder={`global: ${(
-										(solverSettings.omega_rpm ?? 0) *
+										(solverSettings.shaft_speed_rpm ?? 0) *
 											(unitPreferences.rotSpeed === "Hz" ? 1 / 60 : 1)
 									).toFixed(unitPreferences.rotSpeed === "Hz" ? 3 : 0)}`}
 								/>
@@ -2488,8 +2497,8 @@ const Inspector = () => {
 									updateNodeData(selectedNode.id, { v_theta_in: null })
 								}
 								placeholder={`solid body ω·r_in: ${(
-									(((selectedNode.data.omega_rpm ??
-										solverSettings.omega_rpm ??
+									(((selectedNode.data.shaft_speed_rpm ??
+										solverSettings.shaft_speed_rpm ??
 										0) *
 										2 *
 										Math.PI) /
@@ -2683,16 +2692,18 @@ const Inspector = () => {
 									Result
 								</div>
 								<div className="flex justify-between">
-									<span className="text-stone-500">ω (entrainment)</span>
+									<span className="text-stone-500">Entrainment ratio</span>
 									<span className="font-mono font-bold">
-										{(selectedNode.data.result.omega ?? 0).toFixed(4)}
+										{(selectedNode.data.result.entrainment_ratio ?? 0).toFixed(
+											4,
+										)}
 									</span>
 								</div>
-								{selectedNode.data.result.p_c_star_pa != null && (
+								{selectedNode.data.result.P_c_star != null && (
 									<div className="flex justify-between">
 										<span className="text-stone-500">P_c*</span>
 										<span className="font-mono font-bold">
-											{(selectedNode.data.result.p_c_star_pa / 1000).toFixed(2)}{" "}
+											{(selectedNode.data.result.P_c_star / 1000).toFixed(2)}{" "}
 											kPa
 										</span>
 									</div>
@@ -3984,9 +3995,12 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		orifice: [{ key: "m_dot", unit: "kg/s" }],
 		discrete_loss: [{ key: "m_dot", unit: "kg/s" }],
 		area_change: [{ key: "m_dot", unit: "kg/s" }],
-		// MPCE tee: the only element-owned unknown is the chamber stagnation
-		// pressure (legacy slot named P_jct; MPCE-v2 stores Pt there). Warm-
-		// starting Pt_jct is the most useful nudge for the slower MPCE solve.
+		// MPCE tee: the only element-owned unknown is the solver variable
+		// P_jct. Its name predates the result convention (#773): for the
+		// Mynard and constant-K models it holds the junction TOTAL pressure
+		// (reported as Pt_jct), for the ideal momentum tee the static one
+		// (reported as P_jct). Warm-starting it is the most useful nudge for
+		// the slower MPCE solve.
 		mpce_tee: [{ key: "P_jct", unit: "Pa" }],
 		// Ejector: element-owned unknown is P_jct (repurposed as the critical
 		// back pressure P_c*); warm-starting it helps this stiff solve.

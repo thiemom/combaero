@@ -179,7 +179,7 @@ def test_between_pipes_the_orifice_charges_isos_permanent_loss(node_cls: type, b
     # 1e-4: the network's air vs species.dry_air in rho; the change is 10-48%.
     assert r["a.Pt"] - r["b.Pt"] == pytest.approx(k * dp, rel=1e-4)
     assert r["o.pressure_recovery"] == 1.0
-    assert r["o.dp_permanent"] == pytest.approx(r["a.Pt"] - r["b.Pt"], rel=1e-12)
+    assert r["o.dP_permanent"] == pytest.approx(r["a.Pt"] - r["b.Pt"], rel=1e-12)
     assert r["o.loss_ratio"] == pytest.approx(k, rel=1e-12)
 
 
@@ -215,14 +215,14 @@ def test_the_node_type_does_not_move_the_flow(regime: str, beta: float) -> None:
 @pytest.mark.parametrize("correlation", ["ReaderHarrisGallagher", "Stolz"])
 def test_the_tap_never_moves_the_flow_only_the_reported_differential(correlation: str) -> None:
     """Owner's ruling on #645: the tap is measurement. Every tap gives the
-    same solved flow, to the last bit; dp_tap moves as 1/C_tap^2."""
+    same solved flow, to the last bit; dP_tap moves as 1/C_tap^2."""
     runs = {
         tap: _solve(_between_pipes(PlenumNode, 0.7, "incompressible", correlation, tap=tap))[1]
         for tap in ("Corner", "D_D2", "Flange")
     }
     m = {tap: r["o.m_dot"] for tap, r in runs.items()}
     assert m["Corner"] == m["D_D2"] == m["Flange"]
-    dp = {tap: r["o.dp_tap"] for tap, r in runs.items()}
+    dp = {tap: r["o.dP_tap"] for tap, r in runs.items()}
     assert len(set(dp.values())) == 3
     r = runs["Flange"]
     g = cb.OrificeGeometry()

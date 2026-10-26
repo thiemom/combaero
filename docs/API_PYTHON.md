@@ -499,11 +499,12 @@ the panel's own geometry and appears in `diagnostics()` after a solve:
 diag = result["__element_diag__"]["panel"]
 diag["h_plate_area"]   # W/m^2 K on the approach area, Andrews' definition
 diag["h_hole_area"]    # W/m^2 K on the hole internal area
-diag["area_ratio"]     # approach / hole internal, 3.46 for Andrews' plate C
+diag["approach_to_hole_area_ratio"]  # approach / hole internal, 3.46 for Andrews' plate C
 diag["Nu_approach"], diag["Nu_throat"]
 ```
 
-**Both coefficients are reported because they differ by `area_ratio`**, and
+**Both coefficients are reported because they differ by
+`approach_to_hole_area_ratio`** (named `area_ratio` before #773), and
 using one where the other is meant is a factor-of-three error. For a panel
 energy balance: `Q = h_plate_area * area_approach_total * dT`.
 
@@ -899,7 +900,8 @@ net.add_wall(ThermalWall(
   slot of `slot_height` across `span`, as in a combustor liner's cooling
   ring. Film: Marek & Tacina (1975), `eta = 1/(1 + C_m x/(M S))` with
   `C_m = 0.25 Tu/100`; the wall's span is measured from the slot lip.
-  `turbulence_intensity` is the axial free-stream Tu in PERCENT, default 14
+  `turbulence_intensity` is the axial free-stream Tu as a FRACTION, like
+  every element's (#773), default 0.14 = 14%
   (`SLOT_FILM_DEFAULT_TU`: D-7958's 52% blockage case, where Eq. 5 fits that
   report best, inside D-6360's combustor 10-20%) -- a working example; a
   liner's Tu comes from what is upstream of it. `C_m_multiplier` is the
@@ -909,7 +911,7 @@ net.add_wall(ThermalWall(
 
   ```python
   net.add_element(SlotFilmElement("ring", "annulus", "gas",
-      slot_height=2e-3, span=0.25, lip_thickness=1e-3, turbulence_intensity=14.0))
+      slot_height=2e-3, span=0.25, lip_thickness=1e-3, turbulence_intensity=0.14))
   ```
 - **An effusion panel is a provider too** (`film="<panel id>"`, needs
   `panel_length`): its rows, Baldauf each `pitch_x` apart and Sellers over
@@ -1262,7 +1264,7 @@ combustor.add_energy_boundary(EnergyBoundary("loss", fraction=-0.05))  # -5% of 
     - The direction comes from the pressures, blended through equal Pt over `ORIFICE_REVERSAL_P_SCALE` (0.1 Pa).
     - An orifice into a dead end (no flow boundary beyond its to-node) is never reversed: every root has zero flow there.
     - **With a pipe upstream (E applied) the orifice drives from that pipe's static state** (#651), the node's (Pt, Tt) at the pipe's mass flux, not from the node's own static pressure: a `PlenumNode` (P = Pt) and a `MomentumChamberNode` then give the same flow. Reported as `P_approach`. The row then solves its own consistency, m* = m_calc(m*, x).
-    - **Between pipes the orifice charges its permanent loss** (#645). With a pipe on the side the flow comes from (beta) and a wider one on the side it goes to, a metering or `fixed` orifice's drop is the nodes' stagnation difference, ISO 5167-2's k(beta, C) times the tapping differential, and the kernel expands to the implied tap pressure. Into a node with no pipe beyond it, the jet's head is lost and the drop is the tapping differential. The row's Cd is at D-D/2 taps; `OrificeElement(tap=...)` only picks the `dp_tap` it reports.
+    - **Between pipes the orifice charges its permanent loss** (#645). With a pipe on the side the flow comes from (beta) and a wider one on the side it goes to, a metering or `fixed` orifice's drop is the nodes' stagnation difference, ISO 5167-2's k(beta, C) times the tapping differential, and the kernel expands to the implied tap pressure. Into a node with no pipe beyond it, the jet's head is lost and the drop is the tapping differential. The row's Cd is at D-D/2 taps; `OrificeElement(tap=...)` only picks the `dP_tap` it reports.
   - **Incompressible channels:** the friction and exit-head density is the upstream node's along the flow, blended through zero flow over `FLOW_REVERSAL_M_SCALE`. It is taken at the duct's own inlet static state, the node's (Pt, T) at the duct's flux (#651), not at the node's static pressure.
   - **Cold start:** on networks driven by pressure boundaries alone, the cold-start pressure guess of an interior node is clamped to the boundaries' range.
   - A fraction loss (`ConstantFractionLoss`, `LinearThetaFractionLoss`) takes an optional design flow `m_ref` [kg/s]: at and above it the loss is exactly the fraction; below it the loss scales with the dynamic head (`1 - (1 - r^2)^3`, `r = |m_dot|/m_ref`, C2) and vanishes at zero flow.
@@ -1427,7 +1429,11 @@ jct = MultiPortChamberElement(
 # value; 1.249 with the element; #272). BorderCarnotLossElement is DEPRECATED
 # (removal in 0.8.0): it is exactly PressureLossElement with
 # correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area).
-# Solved unknowns: jct.P_jct (junction static pressure). Per-port mass flows
+# Solved unknowns: jct.P_jct -- for this closure the junction TOTAL pressure
+# (the solver variable keeps its name). Result keys (#773): P_jct is the
+# junction STATIC pressure (Pt_jct minus the common port's dynamic head,
+# i.e. the common port's static), Pt_jct the TOTAL; every junction element
+# reports both. Per-port mass flows
 # live on the connecting channels / loss elements; the junction reads them via
 # the graph. The N+1 residuals = N port total-pressure relations
 # (Pt_i - Pt_jct +/- K_i * q_dyn_com) + global sum-of-port-mdots = 0, computed
@@ -1479,14 +1485,17 @@ jct_ideal = IdealMomentumTeeElement(
     inlet_angles_deg=[0.0],
     outlet_angles_deg=[0.0, 90.0],
 )
-# Diagnostics: p_jn; port_i_K referenced to the converged common port's head;
+# Diagnostics: P_jct (= p_jn, static) and Pt_jct (P_jct plus the common
+# port's dynamic head; p_jn was a duplicate of P_jct until #773);
+# port_i_K referenced to the converged common port's head;
 # for a 3-port tee the geometric flows m_dot_com/straight/branch (signed in the
 # wired direction) and n_reversed_ports, plus K_straight/K_branch (dividing) or
 # K11/K12 (joining) only when the converged regime is the wired one. Exposed in
 # the GUI as the tee's "Ideal momentum (parameter-free)" junction model.
 #
 # Every multi-port junction also reports port_i_outer_area (the connected
-# element's own area), port_i_area_ratio (that over the port area) and
+# element's own area), port_i_connected_area_ratio (that over the port area;
+# port_i_area_ratio before #773) and
 # port_area_mismatch (ports off by more than PORT_AREA_MISMATCH_TOL = 5%): an
 # area step there is not modelled, and this closure, coupled on static
 # pressure, then creates total pressure across it (#536).
@@ -1509,13 +1518,14 @@ vortex = VortexElement(
     "vortex", "node_in", "node_out",
     r_in=0.05,        # inlet radius [m] (0 = on-axis: no angular momentum)
     r_out=0.10,       # outlet radius [m]; r_out < r_in is inward flow
-    omega_rpm=3000,   # shaft speed [rpm]; sets the default inlet swirl
+    shaft_speed_rpm=3000,  # shaft speed [rpm]; sets the default inlet swirl
+                      # (omega_rpm before #773: deprecated, removed in 0.8.0)
     v_theta_in=None,  # inlet swirl [m/s]; None = solid body, omega * r_in
 )
 # Residual: Pt_out - Pt_in = 0 (no work: Pt and Tt conserved).
 # r * V_theta is conserved, so V_theta_out = V_theta_in * r_in / r_out; the
 # swirl's dynamic head turns into static pressure outward (and back inward).
-# Diagnostics: m_dot, omega_rpm, v_theta_in/out [m/s], P_swirl_in/out [Pa]
+# Diagnostics: m_dot, shaft_speed_rpm, v_theta_in/out [m/s], P_swirl_in/out [Pa]
 # (static at each radius, isentropic from the stagnation state),
 # dP_swirl_static [Pa], M_theta_in/out, Pt_in, Pt_out.
 # r_c and n (the pre-#661 Vatistas core) are accepted, ignored and deprecated
@@ -1552,7 +1562,7 @@ ejector = EjectorElement(
 # k_diffuser (default 0). It reproduces Sanger's Eq. 11 to machine precision; with
 # his calibrated K's his theory scores 9.3% on his own Table II (D-4759). The
 # compressible ejector reduces to it as Ma^2 (gap 0.1% at a jet Ma of 0.03, equal
-# and unequal stream temperatures). Its diagnostics report omega, Sanger's head
+# and unequal stream temperatures). Its diagnostics report entrainment_ratio, Sanger's head
 # ratio N = (Pt_o - Pt_s)/(Pt_p - Pt_o), efficiency M N, and mach_jet, which the
 # incompressible validity report (#592) judges: a gas ejector of any real drive
 # runs its jet past Ma 0.2 and is flagged.
@@ -1567,7 +1577,12 @@ ejector = EjectorElement(
 # EOS (combustion/air species only, no halocarbon refrigerants); gamma/R evaluated
 # live at the entrained-flow choking plane. The whole 4-row (f, J) is assembled in
 # C++ (full analytic Jacobian, no FD fallback). diagnostics() reports the actual
-# omega = ms/mp, a critical_mode flag, and (in critical mode) p_c_star_pa.
+# entrainment_ratio = ms/mp (Huang's omega; the internal API keeps that name),
+# a critical_mode flag, and (in critical mode) P_c_star and
+# entrainment_ratio_critical. Pressure keys follow P = static, Pt = total
+# (#773): P_jct is the mixing-plane static P_py, Pt_out the outlet total;
+# there is no Pt_jct, as the plane carries two streams at one static
+# pressure and different velocities, hence no single total.
 # verify_solution_consistent(sol) returns True unconditionally now that every
 # regime is modeled.
 # Warm start: a compressible ejector seeds its own cold start at every
@@ -1579,7 +1594,7 @@ ejector = EjectorElement(
 # Choked SUBCRITICAL operation (#619): between P_c* and the dead-head P_b0 (the
 # same mixing closure at zero entrainment) the entrainment droops linearly from
 # omega_crit to 0 (Tier-1, design doc sec 8.1) and the outlet floats; the outlet
-# pin switches in at P_b0. diagnostics() reports p_b0_pa next to p_c_star_pa.
+# pin switches in at P_b0. diagnostics() reports P_b0 next to P_c_star.
 # Beyond P_b0 (backflow) is outside the model.
 ```
 

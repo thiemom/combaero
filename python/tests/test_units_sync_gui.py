@@ -37,7 +37,7 @@ def test_label_with_unit():
     assert units.unit_of("port_2_P") == "Pa"
     assert units.unit_of("step_branch_dPt") == "Pa"
     assert units.label_with_unit("port_2_P") == "port_2_P"
-    assert units.label_with_unit("omega") == "omega"
+    assert units.label_with_unit("entrainment_ratio") == "entrainment_ratio"
     assert not set(units.UNIT_MAP) & set(units.GUI_ONLY_UNITS)
 
 

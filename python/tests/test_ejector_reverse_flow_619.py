@@ -72,7 +72,7 @@ def test_below_shut_off_the_jet_pump_solves_forward() -> None:
     s, r = _solve(_jet_pump(1.159e5))
     assert r["__success__"], r["__message__"]
     assert r["__consistent__"] is True
-    assert r["ej.omega"] > 0.0
+    assert r["ej.entrainment_ratio"] > 0.0
 
 
 def test_past_shut_off_no_backwards_root_is_reported_as_a_solution() -> None:
@@ -81,7 +81,7 @@ def test_past_shut_off_no_backwards_root_is_reported_as_a_solution() -> None:
     going forward."""
     _, r = _solve(_jet_pump(171555.0))
     if r["__success__"]:
-        assert r["ej.omega"] >= 0.0
+        assert r["ej.entrainment_ratio"] >= 0.0
         assert r["co.m_dot"] >= 0.0
 
 

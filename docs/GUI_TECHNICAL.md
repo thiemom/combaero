@@ -65,8 +65,8 @@ one `outlet`; handle ids `port-{primary,secondary,outlet}-{target,source}`).
 - `recovery_efficiency`: Multiplies the lossless mixed stagnation pressure to
   give the critical back pressure P_c* (default 1.0 = no artificial loss).
 
-Diagnostics returned on solve include `omega` (entrainment ratio),
-`p_c_star_pa` (critical back pressure), and `gamma`.
+Diagnostics returned on solve include `entrainment_ratio`,
+`P_c_star` (critical back pressure), and `gamma`.
 
 ## Solver Settings
 ```json

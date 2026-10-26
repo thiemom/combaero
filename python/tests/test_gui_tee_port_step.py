@@ -139,7 +139,7 @@ def test_the_reported_network_solves_and_the_tee_reports_its_step(model: str) ->
     assert res.success, res.message
     assert res.consistent is True
     tee = res._element_results[TEE].model_dump()
-    assert tee["step_straight_area_ratio"] == pytest.approx(0.25)
+    assert tee["step_straight_connected_area_ratio"] == pytest.approx(0.25)
     # Weisbach sharp contraction, 0.5 (1 - 0.25), referenced to the channel,
     # at M -> 0; the compressible vena contracta (#731) reads 1.2% above it
     # at this step's Mach (measured 2026-10-25: 0.3797, 0.3792).

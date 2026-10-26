@@ -126,7 +126,7 @@ const NetworkCanvas = () => {
 					slot_height: 6.3e-3,
 					span: 0.37,
 					lip_thickness: 1.0e-3,
-					turbulence_intensity: 14.0,
+					turbulence_intensity: 0.14,
 					C_m_multiplier: 1.0,
 					correlation: "IdelchikThick",
 					Cd: 0.6,
@@ -219,7 +219,7 @@ const NetworkCanvas = () => {
 					...data,
 					r_out: 0.1,
 					r_in: 0.05,
-					omega_rpm: null,
+					shaft_speed_rpm: null,
 					v_theta_in: null,
 				} as any;
 			}
