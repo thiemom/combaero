@@ -65,7 +65,7 @@ def test_cold_start_all_zero_iterate_gets_continuity_with_its_jacobian():
     assert len(residuals) == 4
     for i in range(3):
         assert jac[i][f"p{i}.Pt"] == 1.0
-        assert jac[i]["jct.P_jct"] == -1.0
+        assert jac[i]["jct.Pt_jct"] == -1.0
     assert jac[3] == {"e0.m_dot": -1.0, "e1.m_dot": 1.0, "e2.m_dot": 1.0}
 
 

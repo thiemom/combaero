@@ -164,6 +164,25 @@ describe("loadNetwork legacy migration", () => {
 		expect("omega_rpm" in solverSettings).toBe(false);
 	});
 
+	it("moves a Mynard tee's P_jct guess to Pt_jct, not the ideal tee's (#773)", () => {
+		const tee = (id: string, junction_model?: string): Node => ({
+			id,
+			type: "mpce_tee",
+			position: { x: 0, y: 0 },
+			data: { label: id, junction_model, initial_guess: { P_jct: 1.2e5 } },
+		});
+		useStore.getState().loadNetwork({
+			nodes: [tee("m"), tee("k", "constant_k"), tee("i", "ideal_momentum")],
+			edges: [],
+			solverSettings: useStore.getState().solverSettings,
+		});
+		const guess = (id: string) =>
+			useStore.getState().nodes.find((n) => n.id === id)?.data.initial_guess;
+		expect(guess("m")).toEqual({ Pt_jct: 1.2e5 });
+		expect(guess("k")).toEqual({ Pt_jct: 1.2e5 });
+		expect(guess("i")).toEqual({ P_jct: 1.2e5 });
+	});
+
 	it("leaves current strategies untouched", () => {
 		useStore.getState().loadNetwork({
 			nodes: [nodeWithResult("n1")],

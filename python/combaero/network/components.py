@@ -5107,7 +5107,7 @@ class SlotFilmElement(OrificeElement):
     FILM: Marek and Tacina (1975), NASA TN D-7958, eta = 1/(1 + C_m x/(M S))
     with C_m = 0.25 Tu/100 (Eqs. 4-5, Tu in percent), ``turbulence_intensity``
     the axial free-stream Tu as a FRACTION like every other element's (0.14 =
-    14%; the kernel gets 100x it) and ``C_m_multiplier`` the user's rig-matching
+    14%, as the kernel takes it too) and ``C_m_multiplier`` the user's rig-matching
     factor (never scored). As for FilmCoolingElement, the element owns no
     wall: a ThermalWall on the gas duct downstream names it with ``film=``,
     and that wall's span is measured from the slot lip. The blowing ratio is
@@ -5205,7 +5205,7 @@ class SlotFilmElement(OrificeElement):
             x_start / S,
             x_end / S,
             M,
-            100.0 * self.turbulence_intensity,  # the kernel takes Tu in percent
+            self.turbulence_intensity,
             self.C_m_multiplier,
         )
 
@@ -8784,8 +8784,27 @@ class MultiPortChamberBase(NetworkElement):
             "user" if a is not None else "" for a in self.port_areas
         ]
 
+    #: The owned unknown's name, after the result-key convention (#773):
+    #: ``P_jct`` where it is the junction STATIC pressure (ideal momentum tee,
+    #: ejector mixing plane), ``Pt_jct`` where it is the TOTAL (Mynard,
+    #: constant K). Before #773 every subclass called it ``P_jct``.
+    JUNCTION_UNKNOWN: str = "P_jct"
+
+    @property
+    def junction_unknown(self) -> str:
+        """The owned unknown's full name, ``{id}.P_jct`` or ``{id}.Pt_jct``."""
+        return f"{self.id}.{self.JUNCTION_UNKNOWN}"
+
+    def legacy_unknown_names(self) -> dict[str, str]:
+        """{current unknown name: pre-#773 name} for an ``initial_guess`` key
+        that was renamed; the solver still accepts the old key, with a
+        DeprecationWarning, until 0.8.0."""
+        if self.JUNCTION_UNKNOWN == "P_jct":
+            return {}
+        return {self.junction_unknown: f"{self.id}.P_jct"}
+
     def unknowns(self) -> list[str]:
-        return [f"{self.id}.P_jct"]
+        return [self.junction_unknown]
 
     def n_equations(self) -> int:
         return self.N + 1  # N impulse + 1 sum-mass

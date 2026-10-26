@@ -413,21 +413,22 @@ Figs. 6-7 data (Gritsch configuration B, which it was fitted on) it scores
 Effectiveness downstream of a continuous **slot**, as in a combustor
 liner's cooling ring; Baldauf and Colban are for rows of holes and do not
 apply. NASA TN D-7958: `eta = 1/(1 + C_m x/(M S))` (Eq. 4) with
-`C_m = 0.25 Tu/100` (Eq. 5), so the free-stream turbulence `Tu` [%] sets the
-mixing.
+`C_m = 0.25 Tu/100` (Eq. 5, Tu in percent), so the free-stream turbulence
+sets the mixing. `Tu` is passed as a FRACTION (0.14 = 14%), like every
+turbulence input in combaero (#773); above 1 raises.
 
 ```python
-eta = cb.slot_film_effectiveness_marek_tacina_1975(x_over_S=15.0, M=1.0, Tu=14.0)
+eta = cb.slot_film_effectiveness_marek_tacina_1975(x_over_S=15.0, M=1.0, Tu=0.14)
 
 # Solver form: (eta, deta/dM), closed form
-eta, deta_dM = cb.slot_film_effectiveness_marek_tacina_1975_and_derivatives(15.0, 1.0, 14.0)
+eta, deta_dM = cb.slot_film_effectiveness_marek_tacina_1975_and_derivatives(15.0, 1.0, 0.14)
 
 # Matching a rig is the user's job: scale C_m (Eq. 5's band is 0.4-1.6)
-eta = cb.slot_film_effectiveness_marek_tacina_1975(15.0, 1.0, 14.0, C_m_multiplier=1.3)
+eta = cb.slot_film_effectiveness_marek_tacina_1975(15.0, 1.0, 0.14, C_m_multiplier=1.3)
 ```
 
 `M = rho_s U_s/(rho_H U_H)`; `x/S` is measured from the slot lip, where
-`eta = 1`. Warned, not enforced, outside the run: `Tu` 7-35%, `M` 0.41-1.87,
+`eta = 1`. Warned, not enforced, outside the run: `Tu` 0.07-0.35, `M` 0.41-1.87,
 `x/S` up to 33.8. Every test was co-flowing film.
 
 Scored on the report's own Table I (140 cooled points, the 72% plate's
@@ -445,7 +446,7 @@ f = cb.film_span_average_colban_2011(n_rows=2, row_pitch_over_D=10.0,
         area_ratio=3.5, P_over_D=6.0, t_over_P=0.5)
 f = cb.film_span_average_baldauf_2002(2, 10.0, 0.0, 50.0, M=1.0,
         density_ratio=1.8, alpha_deg=30.0, s_over_D=3.0, Tu=0.05)
-f = cb.slot_film_span_average_marek_tacina_1975(0.0, 30.0, M=1.0, Tu=14.0)  # x in slot heights
+f = cb.slot_film_span_average_marek_tacina_1975(0.0, 30.0, M=1.0, Tu=0.14)  # x in slot heights
 f.eta, f.deta_dM, f.deta_dP, f.extrapolated
 ```
 
@@ -1429,8 +1430,9 @@ jct = MultiPortChamberElement(
 # value; 1.249 with the element; #272). BorderCarnotLossElement is DEPRECATED
 # (removal in 0.8.0): it is exactly PressureLossElement with
 # correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area).
-# Solved unknowns: jct.P_jct -- for this closure the junction TOTAL pressure
-# (the solver variable keeps its name). Result keys (#773): P_jct is the
+# Solved unknowns: jct.Pt_jct -- for this closure the junction TOTAL pressure
+# (jct.P_jct before #773: an initial_guess under that key still seeds it,
+# with a DeprecationWarning, until 0.8.0). Result keys (#773): P_jct is the
 # junction STATIC pressure (Pt_jct minus the common port's dynamic head,
 # i.e. the common port's static), Pt_jct the TOTAL; every junction element
 # reports both. Per-port mass flows

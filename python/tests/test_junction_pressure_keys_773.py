@@ -107,3 +107,62 @@ def test_the_ejector_reports_its_mixing_plane_static_once() -> None:
     assert diag["entrainment_ratio"] == pytest.approx(
         diag["m_dot_secondary"] / diag["m_dot_primary"], rel=1e-12
     )
+
+
+@pytest.mark.parametrize(("variant", "graph"), _TEES, ids=[v for v, _ in _TEES])
+def test_the_unknown_is_named_after_what_it_holds(variant: str, graph: dict) -> None:
+    """The owned unknown is Pt_jct where it is a total (Mynard, constant K)
+    and P_jct where it is the static (ideal momentum), so the solver variable
+    and the result key of one name are one quantity."""
+    model = variant.split(", ")[1]
+    sol, solver, net = _solve(graph)
+    owned = [n for n in solver.unknown_names if n.startswith("x.")]
+    expected = "x.P_jct" if model == "ideal_momentum" else "x.Pt_jct"
+    assert owned == [expected]
+    x = float(solver._last_x[solver._unknown_indices["x"][0]])
+    assert sol[expected] == x
+    assert sol["x.Pt_jct"] >= sol["x.P_jct"]
+
+
+def _mynard_solver(guess: dict):
+    graph = next(g for v, g in _TEES if v == "branch, mynard")
+    graph = {**graph, "nodes": [dict(n) for n in graph["nodes"]]}
+    schema = NetworkGraphSchema(**graph)
+    net = build_network_from_schema(schema)
+    net.elements["x"].initial_guess = guess
+    solver = make_solver(net, schema)
+    net.resolve_all_topology()
+    return solver
+
+
+def test_an_old_P_jct_guess_still_seeds_the_mynard_tee() -> None:
+    """Before #773 the Mynard tee's total was the unknown 'x.P_jct'. A guess
+    under that key still seeds 'x.Pt_jct', with a DeprecationWarning."""
+    new = _mynard_solver({"x.Pt_jct": 1.234e5})
+    x_new = new._build_x0()[new.unknown_names.index("x.Pt_jct")]
+    old = _mynard_solver({"x.P_jct": 1.234e5})
+    with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+        x0 = old._build_x0()
+    assert x0[old.unknown_names.index("x.Pt_jct")] == 1.234e5 == x_new
+
+
+def test_a_gui_file_with_the_old_junction_guess_loads_silently() -> None:
+    """A saved GUI tee carries the short key; the backend maps P_jct to
+    Pt_jct for the Mynard and constant-K models without a warning, and leaves
+    the ideal tee's static P_jct alone."""
+    for model, key in (
+        ("mynard", "Pt_jct"),
+        ("constant_k", "Pt_jct"),
+        ("ideal_momentum", "P_jct"),
+    ):
+        graph = next(g for v, g in _TEES if v == f"branch, {model}")
+        nodes = []
+        for n in graph["nodes"]:
+            n = dict(n)
+            if n["id"] == "x":
+                n["data"] = {**n["data"], "initial_guess": {"P_jct": 1.1e5}}
+            nodes.append(n)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            net = build_network_from_schema(NetworkGraphSchema(**{**graph, "nodes": nodes}))
+        assert net.elements["x"].initial_guess == {f"x.{key}": 1.1e5}, model

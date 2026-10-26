@@ -142,7 +142,7 @@ def test_row_derivative_wrt_junction_pressure(factory, row: int):
         element.residuals(_states(), _PT_JCT + eps, _PORT_MDOTS)[0][row]
         - element.residuals(_states(), _PT_JCT - eps, _PORT_MDOTS)[0][row]
     ) / (2.0 * eps)
-    assert jac[row].get("jct.P_jct", 0.0) == pytest.approx(expected, rel=1e-6, abs=1e-9)
+    assert jac[row].get("jct.Pt_jct", 0.0) == pytest.approx(expected, rel=1e-6, abs=1e-9)
 
 
 @pytest.mark.parametrize("factory", ELEMENTS)

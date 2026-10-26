@@ -1,6 +1,7 @@
 """Slot film effectiveness, Marek & Tacina (1975) NASA TN D-7958 (#714).
 
 The kernel is Eq. (4), eta = 1/(1 + C_m x/(M S)), with C_m = 0.25 Tu/100
+(Tu in percent in the report; the kernel takes the fraction, #773)
 (Eq. 5). Fidelity is judged on the report's own Table I (the transcription
 is CONFIRMED, validation/cooling/extractions/marek_tacina_1975_d7958.md):
 
@@ -29,9 +30,10 @@ C_M_AUTHORS = {"0": 0.025, "52": 0.04, "72": 0.05, "90": 0.1}
 
 
 def _points() -> list[tuple[str, float, float, float, float]]:
-    """(blockage, x/S, M, Tu, measured eta) for every cooled, printed cell."""
+    """(blockage, x/S, M, Tu as a fraction, measured eta) for every cooled,
+    printed cell. The data file gives Tu in percent, as the report does."""
     with (DATA / "blockage_turbulence.csv").open() as f:
-        tu = {r["blockage_pct"]: float(r["Tu_axial_pct"]) for r in csv.DictReader(f)}
+        tu = {r["blockage_pct"]: float(r["Tu_axial_pct"]) / 100.0 for r in csv.DictReader(f)}
     out = []
     with (DATA / "table1_film_temperatures.csv").open() as f:
         for r in csv.DictReader(f):
@@ -61,9 +63,9 @@ def _warnings_of(*args: float) -> list[str]:
 
 
 def test_eq4_and_eq5_closed_form() -> None:
-    """eta = 1/(1 + 0.25 Tu/100 x/(M S)); 1 at the lip."""
-    x_S, M, Tu = 15.0, 1.2, 14.0
-    expected = 1.0 / (1.0 + 0.25 * Tu / 100.0 * x_S / M)
+    """eta = 1/(1 + 0.25 Tu x/(M S)), Tu a fraction; 1 at the lip."""
+    x_S, M, Tu = 15.0, 1.2, 0.14
+    expected = 1.0 / (1.0 + 0.25 * Tu * x_S / M)
     assert cb.slot_film_effectiveness_marek_tacina_1975(x_S, M, Tu) == pytest.approx(
         expected, rel=1e-14
     )
@@ -72,13 +74,13 @@ def test_eq4_and_eq5_closed_form() -> None:
 
 def test_the_multiplier_scales_c_m_only() -> None:
     """C_m_multiplier k is the same as Tu scaled by k: it acts on C_m alone."""
-    a = cb.slot_film_effectiveness_marek_tacina_1975(20.0, 0.8, 14.0, C_m_multiplier=1.5)
-    b = cb.slot_film_effectiveness_marek_tacina_1975(20.0, 0.8, 21.0)
+    a = cb.slot_film_effectiveness_marek_tacina_1975(20.0, 0.8, 0.14, C_m_multiplier=1.5)
+    b = cb.slot_film_effectiveness_marek_tacina_1975(20.0, 0.8, 0.21)
     assert a == pytest.approx(b, rel=1e-14)
 
 
 def test_the_derivative_is_the_central_difference() -> None:
-    for x_S, M, Tu in ((2.0, 0.5, 7.0), (15.0, 1.0, 14.0), (30.0, 1.8, 35.0)):
+    for x_S, M, Tu in ((2.0, 0.5, 0.07), (15.0, 1.0, 0.14), (30.0, 1.8, 0.35)):
         eta, d = cb.slot_film_effectiveness_marek_tacina_1975_and_derivatives(x_S, M, Tu)
         assert eta == cb.slot_film_effectiveness_marek_tacina_1975(x_S, M, Tu)
         h = 1e-6 * M
@@ -93,10 +95,11 @@ def test_the_derivative_is_the_central_difference() -> None:
 @pytest.mark.parametrize(
     ("args", "kw"),
     [
-        ((-1.0, 1.0, 14.0), {}),
-        ((5.0, 0.0, 14.0), {}),
+        ((-1.0, 1.0, 0.14), {}),
+        ((5.0, 0.0, 0.14), {}),
         ((5.0, 1.0, -1.0), {}),
-        ((5.0, 1.0, 14.0), {"C_m_multiplier": 0.0}),
+        ((5.0, 1.0, 14.0), {}),  # a percent passed as the fraction (#773)
+        ((5.0, 1.0, 0.14), {"C_m_multiplier": 0.0}),
     ],
 )
 def test_refuses_what_the_form_cannot_represent(
@@ -108,9 +111,9 @@ def test_refuses_what_the_form_cannot_represent(
 
 def test_outside_the_run_it_warns_and_extrapolates() -> None:
     for args, name in (
-        ((10.0, 1.0, 3.0), "Tu"),
-        ((10.0, 3.0, 14.0), "M"),
-        ((50.0, 1.0, 14.0), "x_over_S"),
+        ((10.0, 1.0, 0.03), "Tu"),
+        ((10.0, 3.0, 0.14), "M"),
+        ((50.0, 1.0, 0.14), "x_over_S"),
     ):
         (msg,) = _warnings_of(*args)
         assert f"{name} = " in msg and "Extrapolating" in msg
@@ -131,7 +134,7 @@ def test_reproduces_the_reports_30_percent_with_its_own_c_m() -> None:
     """
     rel = []
     for b, x_S, M, Tu, eta in _points():
-        k = C_M_AUTHORS[b] / (0.25 * Tu / 100.0)
+        k = C_M_AUTHORS[b] / (0.25 * Tu)
         rel.append(_quiet(x_S, M, Tu, C_m_multiplier=k) / eta - 1.0)
     assert len(rel) == 140
     assert sum(abs(r) <= 0.30 for r in rel) == 136

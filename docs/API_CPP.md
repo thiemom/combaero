@@ -1502,7 +1502,7 @@ Juhasz-Marek mixing with the mixing coefficient from the free-stream
 turbulence, NASA TN D-7958 Eqs. (4) and (5):
 
 ```cpp
-// eta = 1 / (1 + C_m x/(M S)),  C_m = 0.25 Tu/100 (x C_m_multiplier)
+// eta = 1 / (1 + C_m x/(M S)),  C_m = 0.25 Tu (x C_m_multiplier), Tu a fraction
 double slot_film_effectiveness_marek_tacina_1975(
     double x_over_S, double M, double Tu, double C_m_multiplier = 1.0,
     CorrelationStatus *status = nullptr);
@@ -1514,10 +1514,12 @@ std::tuple<double, double> slot_film_effectiveness_marek_tacina_1975_and_derivat
 ```
 
 `S` is the slot height, `M = rho_s U_s/(rho_H U_H)`, `Tu` the axial
-free-stream turbulence in percent. `C_m_multiplier` is the user's
+free-stream turbulence as a FRACTION (0.14 = 14%; the report writes Eq. 5
+as 0.25 Tu/100 with Tu in percent, the same line; above 1 throws, #773).
+`C_m_multiplier` is the user's
 rig-matching factor (Eq. 5's band is 0.4-1.6 of the line); the harness never
 scores it. Eq. (4) has no cp ratio, unlike Juhasz-Marek (1971). The run's
-span (Tu 7-35%, M 0.41-1.87, x/S up to 33.8) and the authors' +-0.04 eta
+span (Tu 0.07-0.35, M 0.41-1.87, x/S up to 33.8) and the authors' +-0.04 eta
 measurement band live in `marek_tacina1975::`. See
 `validation/cooling/extractions/marek_tacina_1975_d7958.md`.
 

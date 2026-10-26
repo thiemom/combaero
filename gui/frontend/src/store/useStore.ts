@@ -485,7 +485,7 @@ const useStore = create<RFState>((set, get) => ({
 			set({
 				nodes: data.nodes.map((n: any) => ({
 					...n,
-					data: { ...migrateNodeData(n.data), result: undefined },
+					data: { ...migrateNodeData(n.data, n.type), result: undefined },
 				})),
 				edges: keptEdges.map((e: any) => ({
 					...e,

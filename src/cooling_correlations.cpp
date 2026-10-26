@@ -405,8 +405,10 @@ std::tuple<double, double> slot_film_effectiveness_marek_tacina_1975_and_derivat
     if (M <= 0.0) {
         throw std::invalid_argument(std::string(fn) + ": M must be positive");
     }
-    if (Tu < 0.0) {
-        throw std::invalid_argument(std::string(fn) + ": Tu [%] must be >= 0");
+    if (Tu < 0.0 || Tu > 1.0) {
+        throw std::invalid_argument(std::string(fn) +
+                                    ": Tu is a fraction in [0, 1] (0.14 = 14%); got " +
+                                    std::to_string(Tu));
     }
     if (C_m_multiplier <= 0.0) {
         throw std::invalid_argument(std::string(fn) + ": C_m_multiplier must be positive");

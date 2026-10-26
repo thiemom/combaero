@@ -943,7 +943,14 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     strict=False,
                     joining_etransfer_alpha=_md.joining_etransfer_alpha,
                 )
-            _mpce.initial_guess = _expand_initial_guess(_md.initial_guess, elem_id)
+            _guess = dict(_md.initial_guess)
+            if _mpce.JUNCTION_UNKNOWN == "Pt_jct" and "P_jct" in _guess:
+                # A file saved before #773 named the Mynard / constant-K
+                # junction TOTAL "P_jct"; it is "Pt_jct" now. Migrated
+                # silently, as the frontend's loader does.
+                _guess.setdefault("Pt_jct", _guess["P_jct"])
+                del _guess["P_jct"]
+            _mpce.initial_guess = _expand_initial_guess(_guess, elem_id)
             if not _mpce.initial_guess:
                 _mpce.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             # The element sees these areas as explicit port areas ("user"); the

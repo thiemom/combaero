@@ -85,7 +85,7 @@ def test_every_reported_name_is_one_the_solver_knows():
         {f"{n}.P" for n in element.port_nodes}
         | {f"{n}.Pt" for n in element.port_nodes}
         | {f"{e}.m_dot" for e in element._port_element_ids}
-        | {f"{element.id}.P_jct"}
+        | {element.junction_unknown}
         # Relayed, not unknowns: a port node's derived T and Y reach the
         # columns through the propagation chain (#517, density columns).
         | {f"{n}.T" for n in element.port_nodes}
@@ -105,7 +105,7 @@ def test_the_pt_and_junction_columns_land_on_the_right_names():
 
     for i, node in enumerate(element.port_nodes):
         assert jac[i][f"{node}.Pt"] == pytest.approx(1.0)
-        assert jac[i][f"{element.id}.P_jct"] == pytest.approx(-1.0)
+        assert jac[i][element.junction_unknown] == pytest.approx(-1.0)
         for other in element.port_nodes:
             if other != node:
                 assert f"{other}.Pt" not in jac[i], f"row {i} reports {other}.Pt"

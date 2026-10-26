@@ -41,17 +41,17 @@ S, W = 2.0e-3, 0.25  # slot height and span [m]
 
 
 def test_a_point_span_is_the_kernel() -> None:
-    f = cb.slot_film_span_average_marek_tacina_1975(12.0, 12.0, 0.8, 14.0)
+    f = cb.slot_film_span_average_marek_tacina_1975(12.0, 12.0, 0.8, 0.14)
     assert f.eta == pytest.approx(
-        cb.slot_film_effectiveness_marek_tacina_1975(12.0, 0.8, 14.0), rel=1e-14
+        cb.slot_film_effectiveness_marek_tacina_1975(12.0, 0.8, 0.14), rel=1e-14
     )
     assert f.deta_dP == 0.0
 
 
-@pytest.mark.parametrize(("x0", "x1", "M", "Tu"), [(0.0, 30.0, 1.0, 14.0), (5.0, 33.0, 0.5, 35.0)])
+@pytest.mark.parametrize(("x0", "x1", "M", "Tu"), [(0.0, 30.0, 1.0, 0.14), (5.0, 33.0, 0.5, 0.35)])
 def test_the_span_average_is_the_integral(x0: float, x1: float, M: float, Tu: float) -> None:
     """Eq. (4) integrates in closed form: ln(1 + a x) / a over the span."""
-    a = 0.25 * Tu / 100.0 / M
+    a = 0.25 * Tu / M  # Tu a fraction (#773)
     exact = (math.log1p(a * x1) - math.log1p(a * x0)) / (a * (x1 - x0))
     f = cb.slot_film_span_average_marek_tacina_1975(x0, x1, M, Tu)
     assert f.eta == pytest.approx(exact, rel=1e-9)
@@ -59,10 +59,10 @@ def test_the_span_average_is_the_integral(x0: float, x1: float, M: float, Tu: fl
 
 def test_the_span_average_derivative_is_exact() -> None:
     def eta(M: float) -> float:
-        return cb.slot_film_span_average_marek_tacina_1975(0.0, 30.0, M, 14.0).eta
+        return cb.slot_film_span_average_marek_tacina_1975(0.0, 30.0, M, 0.14).eta
 
     h = 1e-6
-    d = cb.slot_film_span_average_marek_tacina_1975(0.0, 30.0, 0.9, 14.0).deta_dM
+    d = cb.slot_film_span_average_marek_tacina_1975(0.0, 30.0, 0.9, 0.14).deta_dM
     assert d == pytest.approx((eta(0.9 + h) - eta(0.9 - h)) / (2 * h), rel=1e-7)
 
 
@@ -183,7 +183,7 @@ def test_the_wall_sees_the_slot_film_at_the_slots_blowing_ratio() -> None:
     m_slot = r["__element_diag__"]["film"]["m_dot"]
     m_gas = r["__element_diag__"]["hot"]["m_dot"]
     M = (m_slot / (S * W)) / (m_gas / (math.pi * 0.08**2 / 4.0))
-    expected = cb.slot_film_span_average_marek_tacina_1975(0.0, 0.06 / S, M, 14.0).eta
+    expected = cb.slot_film_span_average_marek_tacina_1975(0.0, 0.06 / S, M, 0.14).eta
     assert 0.0 < r["w.eta_film"] < 1.0
     assert r["w.eta_film"] == pytest.approx(expected, rel=1e-9)
     assert r["w.T_aw_a"] == pytest.approx(

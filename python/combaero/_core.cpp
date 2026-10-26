@@ -6807,7 +6807,8 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         py::arg("Tu"), py::arg("C_m_multiplier") = 1.0,
         "Film a downstream wall sees from a 2-D SLOT: Marek & Tacina (1975)\n"
         "Eqs. (4)-(5), averaged over [x_start, x_end] downstream of the slot\n"
-        "lip (in slot heights S). deta_dP is 0: Eq. (4) has no density ratio.");
+        "lip (in slot heights S), Tu a FRACTION (0.14 = 14%). deta_dP is 0:\n"
+        "Eq. (4) has no density ratio.");
 
   m.def("film_superposition_sellers",
         &combaero::cooling::film_superposition_sellers, py::arg("eta_rows"),
@@ -7016,12 +7017,14 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "Film-cooling effectiveness downstream of a 2-D SLOT (a liner's\n"
         "cooling ring), Juhasz-Marek mixing with C_m from turbulence.\n\n"
         "Marek & Tacina (1975), NASA TN D-7958, Eqs. (4) and (5):\n"
-        "eta = 1/(1 + C_m x/(M S)), C_m = 0.25 Tu/100. eta = 1 at the lip.\n"
+        "eta = 1/(1 + C_m x/(M S)), C_m = 0.25 Tu (Tu a fraction; the report\n"
+        "writes 0.25 Tu/100 with Tu in percent). eta = 1 at the lip.\n"
         "Same eta convention as adiabatic_wall_temperature().\n\n"
         "Parameters:\n"
         "  x_over_S       : distance downstream of the slot lip / slot height, >= 0\n"
         "  M              : blowing ratio rho_s U_s/(rho_H U_H), > 0\n"
-        "  Tu             : axial free-stream turbulence intensity [%] (7 to 35 run)\n"
+        "  Tu             : axial free-stream turbulence intensity, a FRACTION\n"
+        "                   (0.14 = 14%; 0.07 to 0.35 run; above 1 raises)\n"
         "  C_m_multiplier : the user's rig-matching factor on C_m (1 = the\n"
         "                   report's line; its band is 0.4 to 1.6). Never scored.\n\n"
         "Outside the run's Tu, M or x/S span it warns and extrapolates.\n\n"

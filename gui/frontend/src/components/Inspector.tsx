@@ -9,6 +9,7 @@ import {
 import { defaultFilmSide } from "../utils/filmLink";
 import { warningsFor } from "../utils/incompressible";
 import { inheritedField, inheritedNote } from "../utils/inheritance";
+import { junctionGuessKey } from "../utils/legacyKeys";
 import { nodeTypeLabel } from "../utils/nodeUtils";
 import { withPortArm } from "../utils/portArms";
 import {
@@ -3995,13 +3996,14 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		orifice: [{ key: "m_dot", unit: "kg/s" }],
 		discrete_loss: [{ key: "m_dot", unit: "kg/s" }],
 		area_change: [{ key: "m_dot", unit: "kg/s" }],
-		// MPCE tee: the only element-owned unknown is the solver variable
-		// P_jct. Its name predates the result convention (#773): for the
-		// Mynard and constant-K models it holds the junction TOTAL pressure
-		// (reported as Pt_jct), for the ideal momentum tee the static one
-		// (reported as P_jct). Warm-starting it is the most useful nudge for
-		// the slower MPCE solve.
-		mpce_tee: [{ key: "P_jct", unit: "Pa" }],
+		// MPCE tee: the only element-owned unknown is the junction pressure,
+		// named by what it is (#773): the TOTAL Pt_jct for the Mynard and
+		// constant-K models, the static P_jct for the ideal momentum tee
+		// (see junctionGuessKey below). Warm-starting it is the most useful
+		// nudge for the slower MPCE solve.
+		mpce_tee: [
+			{ key: junctionGuessKey(node.data?.junction_model), unit: "Pa" },
+		],
 		// Ejector: element-owned unknown is P_jct (repurposed as the critical
 		// back pressure P_c*); warm-starting it helps this stiff solve.
 		ejector: [{ key: "P_jct", unit: "Pa" }],

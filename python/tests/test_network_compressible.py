@@ -865,7 +865,7 @@ def test_choke_barrier_rejects_dead_branch_spurious_root():
         "mc_str.Pt": 100000.0,
         "mc_bra.P": 100000.0,
         "mc_bra.Pt": 100000.0,
-        "jct.P_jct": 100000.0,
+        "jct.Pt_jct": 100000.0,
         "ch_in.m_dot": 0.8831240560197469,
         "ch_str.m_dot": 0.8831240560197469,
         "ch_bra.m_dot": 0.0,
@@ -1102,7 +1102,7 @@ def test_soft_barrier_artifact_root_demoted_to_failure():
         "ch_bra.m_dot": -0.00349,
         "ch_out.m_dot": 0.49448,
         "orf_out.m_dot": 0.49448,
-        "jct.P_jct": 114033.6720,
+        "jct.Pt_jct": 114033.6720,
     }
     net = _certified_merge_case1_network()
     solver = NetworkSolver(net)

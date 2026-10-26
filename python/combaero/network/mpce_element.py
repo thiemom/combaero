@@ -145,7 +145,13 @@ class MultiPortChamberElement(MultiPortChamberBase):
         signs imply separating flow instead.
       - ``"branch"``: 1 supplier + 2 collectors (separating flow). Errors
         on observed joining flow.
+
+    The owned unknown is the junction TOTAL pressure, ``{id}.Pt_jct``
+    (``{id}.P_jct`` before #773; an ``initial_guess`` under the old key is
+    still accepted, with a DeprecationWarning, until 0.8.0).
     """
+
+    JUNCTION_UNKNOWN = "Pt_jct"
 
     def row_scale_kinds(self) -> list[str]:
         """RESIDUAL-ROW-SCALING: the base pattern -- N impulse rows (Pa),
@@ -556,7 +562,7 @@ class MultiPortChamberElement(MultiPortChamberBase):
 
             row: dict[str, float] = {
                 f"{self.port_nodes[i]}.Pt": 1.0,
-                f"{self.id}.P_jct": -1.0,
+                self.junction_unknown: -1.0,
             }
             if slack > 0.0:
                 # d(pen)/d(mdot_i) = 2 * alpha * slack * (-e_i)
@@ -876,7 +882,7 @@ class MultiPortChamberElement(MultiPortChamberBase):
             [f"{self.port_nodes[i]}.P" for i in range(N)]
             + [f"{self.port_nodes[i]}.Pt" for i in range(N)]
             + [f"{self._port_element_ids[i]}.m_dot" for i in range(N)]
-            + [f"{self.id}.P_jct"]
+            + [self.junction_unknown]
         )
         jac: dict[int, dict[str, float]] = {}
         for row in range(N + 1):
@@ -1089,7 +1095,7 @@ class ConstantKTeeElement(MultiPortChamberElement):
             residuals.append(float(states[i].Pt) - Pt_jct + sign * K_i * q_dyn)
             row: dict[str, float] = {
                 f"{self.port_nodes[i]}.Pt": 1.0,
-                f"{self.id}.P_jct": -1.0,
+                self.junction_unknown: -1.0,
             }
             if K_i != 0.0:
                 # port_mdots[common] = sign_c * outer_c; q is quadratic in
