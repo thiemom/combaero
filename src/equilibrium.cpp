@@ -649,10 +649,17 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
                                          int n_C, int n_H,
                                          const ReformingConfig &cfg) {
   const double min_species = 1e-12;
+  const double m_H2 = n_C + 0.5 * n_H;
 
-  // Check if reaction can proceed
-  if (n0[i_hc] < min_species || n0[cfg.i_H2O] < min_species * n_C) {
-    return 0.0; // No hydrocarbon or insufficient H2O
+  // The extent is bracketed both ways: forward (reforming) until the
+  // hydrocarbon or the steam runs out, backward (methanation, the hydrocarbon
+  // re-forming from CO + H2) until CO or H2 does. Forward only left a mixture
+  // of higher hydrocarbons at 600-800 K 0.2 off in mole fraction: at
+  // equilibrium they become methane, which is CH4 reforming run backward.
+  const double xi_hi = std::min(n0[i_hc], n0[cfg.i_H2O] / n_C);
+  const double xi_lo = -std::min(n0[cfg.i_CO] / n_C, n0[cfg.i_H2] / m_H2);
+  if (xi_hi - xi_lo < min_species) {
+    return 0.0; // Nothing can move either way
   }
 
   double Kp = Kp_reforming(T, i_hc, n_C, n_H, cfg);
@@ -664,18 +671,16 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
   // delta_n = products - reactants = (n + (n+m/2)) - (1 + n) = n + m/2 - 1
   double delta_n = n_C + 0.5 * n_H - 1.0;
 
-  // Bounds: xi in [0, min(n0[hc], n0[H2O]/n_C)]
-  double xi_max = std::min(n0[i_hc], n0[cfg.i_H2O] / n_C);
+  const double span = xi_hi - xi_lo;
 
-  // Safeguarded Newton on F(xi) = ln Q - ln Kp over (0, xi_max), with the
+  // Safeguarded Newton on F(xi) = ln Q - ln Kp over (xi_lo, xi_hi), with the
   // analytic slope (#716)
   //   dF/dxi = nC^2/n_CO + m^2/n_H2 + 1/n_hc + nC^2/n_H2O - dn^2/n_t,  m = nC + nH/2,
-  // and bisection where a step leaves the bracket. F rises from -inf (no CO or
-  // H2 yet) or below to +inf as the hydrocarbon or the steam runs out, so the
-  // root is bracketed. The former finite-difference slope used an absolute
-  // step of 1e-8 mol: near complete reforming (1e-11 mol left) it stepped past
-  // the hydrocarbon and stalled off the root.
-  const double m_H2 = n_C + 0.5 * n_H;
+  // and bisection where a step leaves the bracket. F rises from -inf (CO or H2
+  // used up) to +inf as the hydrocarbon or the steam runs out, so the root is
+  // bracketed. The former finite-difference slope used an absolute step of
+  // 1e-8 mol: near complete reforming (1e-11 mol left) it stepped past the
+  // hydrocarbon and stalled off the root.
   double nt0 = 0.0;
   for (double v : n0)
     nt0 += v;
@@ -692,9 +697,9 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
          delta_n * delta_n / nt;
     return lnQ - lnKp;
   };
-  double lo = 0.0;
-  double hi = xi_max;
-  double xi = 0.5 * xi_max;
+  double lo = xi_lo;
+  double hi = xi_hi;
+  double xi = 0.5 * (xi_lo + xi_hi);
   for (int it = 0; it < 200; ++it) {
     double dF = 0.0;
     const double F = eval(xi, dF);
@@ -713,12 +718,12 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
     if (!(xi_new > lo && xi_new < hi)) {
       xi_new = 0.5 * (lo + hi);
     }
-    if (hi - lo <= 1e-15 * xi_max) {
+    if (hi - lo <= 1e-15 * span) {
       return xi_new;
     }
     xi = xi_new;
   }
-  return std::max(0.0, std::min(xi, xi_max));
+  return std::max(xi_lo, std::min(xi, xi_hi));
 }
 
 // Apply reforming extent to composition
@@ -730,15 +735,10 @@ static void apply_reforming(std::vector<double> &n, double xi, std::size_t i_hc,
   n[cfg.i_H2] += (n_C + 0.5 * n_H) * xi;
 }
 
-// Solve general reforming + WGS equilibrium at fixed T
-// Sequential approach: reform each hydrocarbon, then apply WGS
-static void solve_reforming_wgs_isothermal(const std::vector<double> &n0,
-                                           double T, double P,
-                                           const ReformingConfig &cfg,
-                                           std::vector<double> &n_out) {
-  n_out = n0;
-
-  // Reform each hydrocarbon sequentially
+// One round: reform each hydrocarbon in turn, then WGS, each to its own
+// equilibrium at the current composition.
+static void reforming_wgs_round(std::vector<double> &n_out, double T, double P,
+                                const ReformingConfig &cfg) {
   for (std::size_t k = 0; k < cfg.hc_indices.size(); ++k) {
     std::size_t i_hc = cfg.hc_indices[k];
     int n_C = cfg.hc_C[k];
@@ -748,7 +748,6 @@ static void solve_reforming_wgs_isothermal(const std::vector<double> &n0,
     apply_reforming(n_out, xi, i_hc, n_C, n_H, cfg);
   }
 
-  // Apply WGS equilibrium
   WgsConfig wgs_cfg = make_wgs_config();
 
   double xi_min = std::max(-n_out[wgs_cfg.i_CO2], -n_out[wgs_cfg.i_H2]);
@@ -763,6 +762,35 @@ static void solve_reforming_wgs_isothermal(const std::vector<double> &n0,
     n_out[wgs_cfg.i_CO2] += xi_wgs;
     n_out[wgs_cfg.i_H2] += xi_wgs;
   }
+}
+
+// Largest change of any amount between two rounds, relative to the total.
+static double reforming_round_change(const std::vector<double> &before,
+                                     const std::vector<double> &after) {
+  double total = 0.0, d = 0.0;
+  for (std::size_t j = 0; j < after.size(); ++j) {
+    total += after[j];
+    d = std::max(d, std::abs(after[j] - before[j]));
+  }
+  return d / std::max(total, 1e-300);
+}
+
+// Solve general reforming + WGS equilibrium at fixed T: rounds until the
+// composition stops moving (see REFORMING_PASS_RTOL). Returns whether it did.
+static bool solve_reforming_wgs_isothermal(const std::vector<double> &n0,
+                                           double T, double P,
+                                           const ReformingConfig &cfg,
+                                           std::vector<double> &n_out) {
+  n_out = n0;
+  std::vector<double> before;
+  for (int pass = 0; pass < REFORMING_MAX_PASSES; ++pass) {
+    before = n_out;
+    reforming_wgs_round(n_out, T, P, cfg);
+    if (reforming_round_change(before, n_out) <= REFORMING_PASS_RTOL) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Adiabatic solver functor for general reforming + WGS
@@ -807,14 +835,14 @@ EquilibriumResult reforming_equilibrium(const State &in) {
   }
 
   std::vector<double> n_out;
-  solve_reforming_wgs_isothermal(in.X, in.T, in.P, cfg, n_out);
+  const bool conv = solve_reforming_wgs_isothermal(in.X, in.T, in.P, cfg, n_out);
 
   std::vector<double> X_out;
   molefractions(n_out, X_out);
 
   State out;
   out.set_TPX(in.T, in.P, X_out);
-  return EquilibriumResult{out, in.T, 0.0, true};
+  return EquilibriumResult{out, in.T, 0.0, conv};
 }
 
 // Public API: General reforming + WGS equilibrium (adiabatic)
@@ -844,14 +872,14 @@ EquilibriumResult reforming_equilibrium_adiabatic(const State &in) {
 
   // Get equilibrium composition at T_ad
   std::vector<double> n_out;
-  solve_reforming_wgs_isothermal(in.X, T_ad, in.P, cfg, n_out);
+  const bool conv = solve_reforming_wgs_isothermal(in.X, T_ad, in.P, cfg, n_out);
 
   std::vector<double> X_out;
   molefractions(n_out, X_out);
 
   State out;
   out.set_TPX(T_ad, in.P, X_out);
-  return EquilibriumResult{out, in.T, T_ad - in.T, true};
+  return EquilibriumResult{out, in.T, T_ad - in.T, conv};
 }
 
 // -------------------------------------------------------------
@@ -974,7 +1002,7 @@ EquilibriumJacobian combustion_equilibrium_and_jacobian(const State &in, bool sm
       complete_combustion_products_and_jacobian(in.X, smooth_phi0, false, k0, SMOOTHING_K_PHI1);
   const std::vector<double> &n0 = cj.X_b;
 
-  // Stage 2: the same reforming + WGS sequence at T_ad, on duals.
+  // Stage 2: the same reforming + WGS rounds at T_ad, on duals.
   const DV T = dv_seed(T_ad, N, iT);
   const DV Pd = dv_seed(P, N, iP);
   const double P0 = 101325.0;
@@ -997,68 +1025,79 @@ EquilibriumJacobian combustion_equilibrium_and_jacobian(const State &in, bool sm
   for (std::size_t i_hc : cfg.hc_indices) {
     if (n0[i_hc] > 1e-10) has_hc = true;
   }
-  if (has_hc) {
-    for (std::size_t k = 0; k < cfg.hc_indices.size(); ++k) {
-      const std::size_t i_hc = cfg.hc_indices[k];
-      const int nC = cfg.hc_C[k];
-      const int nH = cfg.hc_H[k];
-      const std::vector<double> nv = values();
-      const double xi = solve_reforming_isothermal(nv, T_ad, P, i_hc, nC, nH, cfg);
-      DV xi_d = dv_const(0.0, N);
-      if (!(nv[i_hc] < 1e-12 || nv[cfg.i_H2O] < 1e-12 * nC) && xi > 0.0) {
-        const DV hi = dv_min(n[i_hc], (1.0 / nC) * n[cfg.i_H2O]);
-        const double dn = nC + 0.5 * nH - 1.0;
-        auto resid = [&](const DV &x) {
-          const DV nt = total() + dn * x;
-          const DV y_hc = (n[i_hc] - x) / nt;
-          const DV y_h2o = (n[cfg.i_H2O] - static_cast<double>(nC) * x) / nt;
-          const DV y_co = (n[cfg.i_CO] + static_cast<double>(nC) * x) / nt;
-          const DV y_h2 = (n[cfg.i_H2] + (nC + 0.5 * nH) * x) / nt;
-          const DV lnQ = static_cast<double>(nC) * dv_log(y_co) + (nC + 0.5 * nH) * dv_log(y_h2) -
-                         dv_log(y_hc) - static_cast<double>(nC) * dv_log(y_h2o) +
-                         dn * dv_log((1.0 / P0) * Pd);
-          const DV dg = static_cast<double>(nC) * g_over_RT_dv(cfg.i_CO, T) +
-                        (nC + 0.5 * nH) * g_over_RT_dv(cfg.i_H2, T) - g_over_RT_dv(i_hc, T) -
-                        static_cast<double>(nC) * g_over_RT_dv(cfg.i_H2O, T);
-          return lnQ + dg;  // lnQ - lnKp, lnKp = -dg
-        };
-        xi_d = implicit_extent(xi, dv_const(0.0, N), hi, ix, resid);
+  // Rounds until the composition stops moving, exactly as the value path
+  // (solve_reforming_wgs_isothermal): the derivatives of the fixed point are
+  // the limit of the rounds' chain rule.
+  for (int pass = 0; pass < REFORMING_MAX_PASSES; ++pass) {
+    const std::vector<double> before = values();
+    if (has_hc) {
+      for (std::size_t k = 0; k < cfg.hc_indices.size(); ++k) {
+        const std::size_t i_hc = cfg.hc_indices[k];
+        const int nC = cfg.hc_C[k];
+        const int nH = cfg.hc_H[k];
+        const std::vector<double> nv = values();
+        const double xi = solve_reforming_isothermal(nv, T_ad, P, i_hc, nC, nH, cfg);
+        DV xi_d = dv_const(0.0, N);
+        if (xi != 0.0) {
+          const DV hi = dv_min(n[i_hc], (1.0 / nC) * n[cfg.i_H2O]);
+          const DV lo = dv_const(0.0, N) -
+                        dv_min((1.0 / nC) * n[cfg.i_CO], (1.0 / (nC + 0.5 * nH)) * n[cfg.i_H2]);
+          const double dn = nC + 0.5 * nH - 1.0;
+          auto resid = [&](const DV &x) {
+            const DV nt = total() + dn * x;
+            const DV y_hc = (n[i_hc] - x) / nt;
+            const DV y_h2o = (n[cfg.i_H2O] - static_cast<double>(nC) * x) / nt;
+            const DV y_co = (n[cfg.i_CO] + static_cast<double>(nC) * x) / nt;
+            const DV y_h2 = (n[cfg.i_H2] + (nC + 0.5 * nH) * x) / nt;
+            const DV lnQ = static_cast<double>(nC) * dv_log(y_co) + (nC + 0.5 * nH) * dv_log(y_h2) -
+                           dv_log(y_hc) - static_cast<double>(nC) * dv_log(y_h2o) +
+                           dn * dv_log((1.0 / P0) * Pd);
+            const DV dg = static_cast<double>(nC) * g_over_RT_dv(cfg.i_CO, T) +
+                          (nC + 0.5 * nH) * g_over_RT_dv(cfg.i_H2, T) - g_over_RT_dv(i_hc, T) -
+                          static_cast<double>(nC) * g_over_RT_dv(cfg.i_H2O, T);
+            return lnQ + dg;  // lnQ - lnKp, lnKp = -dg
+          };
+          xi_d = implicit_extent(xi, lo, hi, ix, resid);
+        }
+        n[i_hc] = n[i_hc] - xi_d;
+        n[cfg.i_H2O] = n[cfg.i_H2O] - static_cast<double>(nC) * xi_d;
+        n[cfg.i_CO] = n[cfg.i_CO] + static_cast<double>(nC) * xi_d;
+        n[cfg.i_H2] = n[cfg.i_H2] + (nC + 0.5 * nH) * xi_d;
       }
-      n[i_hc] = n[i_hc] - xi_d;
-      n[cfg.i_H2O] = n[cfg.i_H2O] - static_cast<double>(nC) * xi_d;
-      n[cfg.i_CO] = n[cfg.i_CO] + static_cast<double>(nC) * xi_d;
-      n[cfg.i_H2] = n[cfg.i_H2] + (nC + 0.5 * nH) * xi_d;
     }
-  }
-  {
-    const WgsConfig w = make_wgs_config();
-    const std::vector<double> nv = values();
-    const double lo_v = std::max(-nv[w.i_CO2], -nv[w.i_H2]);
-    const double hi_v = std::min(nv[w.i_CO], nv[w.i_H2O]);
-    if (hi_v > lo_v + 1e-15) {
-      WgsIsothermalFun F{nv, T_ad, w};
-      const double xi = newton_damped(F, 0.0, lo_v, hi_v, 40);
-      const DV lo = (-nv[w.i_CO2] >= -nv[w.i_H2]) ? dv_const(0.0, N) - n[w.i_CO2]
-                                                  : dv_const(0.0, N) - n[w.i_H2];
-      const DV hi = dv_min(n[w.i_CO], n[w.i_H2O]);
-      auto resid = [&](const DV &x) {
-        const DV y_co2 = n[w.i_CO2] + x;
-        const DV y_h2 = n[w.i_H2] + x;
-        const DV y_co = n[w.i_CO] - x;
-        const DV y_h2o = n[w.i_H2O] - x;
-        const DV dg = g_over_RT_dv(w.i_CO2, T) + g_over_RT_dv(w.i_H2, T) -
-                      g_over_RT_dv(w.i_CO, T) - g_over_RT_dv(w.i_H2O, T);
-        // ln Q - ln Kp; WGS keeps the moles, so nt cancels in Q.
-        return dv_log(y_co2) + dv_log(y_h2) - dv_log(y_co) - dv_log(y_h2o) + dg;
-      };
-      const DV xi_d = implicit_extent(xi, lo, hi, ix, resid);
-      n[w.i_CO] = n[w.i_CO] - xi_d;
-      n[w.i_H2O] = n[w.i_H2O] - xi_d;
-      n[w.i_CO2] = n[w.i_CO2] + xi_d;
-      n[w.i_H2] = n[w.i_H2] + xi_d;
+    {
+      const WgsConfig w = make_wgs_config();
+      const std::vector<double> nv = values();
+      const double lo_v = std::max(-nv[w.i_CO2], -nv[w.i_H2]);
+      const double hi_v = std::min(nv[w.i_CO], nv[w.i_H2O]);
+      if (hi_v > lo_v + 1e-15) {
+        WgsIsothermalFun F{nv, T_ad, w};
+        const double xi = newton_damped(F, 0.0, lo_v, hi_v, 40);
+        const DV lo = (-nv[w.i_CO2] >= -nv[w.i_H2]) ? dv_const(0.0, N) - n[w.i_CO2]
+                                                    : dv_const(0.0, N) - n[w.i_H2];
+        const DV hi = dv_min(n[w.i_CO], n[w.i_H2O]);
+        auto resid = [&](const DV &x) {
+          const DV y_co2 = n[w.i_CO2] + x;
+          const DV y_h2 = n[w.i_H2] + x;
+          const DV y_co = n[w.i_CO] - x;
+          const DV y_h2o = n[w.i_H2O] - x;
+          const DV dg = g_over_RT_dv(w.i_CO2, T) + g_over_RT_dv(w.i_H2, T) -
+                        g_over_RT_dv(w.i_CO, T) - g_over_RT_dv(w.i_H2O, T);
+          // ln Q - ln Kp; WGS keeps the moles, so nt cancels in Q.
+          return dv_log(y_co2) + dv_log(y_h2) - dv_log(y_co) - dv_log(y_h2o) + dg;
+        };
+        const DV xi_d = implicit_extent(xi, lo, hi, ix, resid);
+        n[w.i_CO] = n[w.i_CO] - xi_d;
+        n[w.i_H2O] = n[w.i_H2O] - xi_d;
+        n[w.i_CO2] = n[w.i_CO2] + xi_d;
+        n[w.i_H2] = n[w.i_H2] + xi_d;
+      }
     }
-  }
 
+    if (reforming_round_change(before, values()) <= REFORMING_PASS_RTOL) {
+      break;
+    }
+  }
   // Stage 3: the adiabatic root F(T) = h(T, X_out)/MW_out - H_in = 0.
   const DV nt = total();
   DV h_mol = dv_const(0.0, N);

@@ -24,6 +24,15 @@ EquilibriumResult smr_wgs_equilibrium_adiabatic(const State &in);
 // -------------------------------------------------------------
 // Higher-fidelity product model for rich hydrocarbon combustion.
 // Produces CO, H2, CO2, H2O, N2 (ignoring soot/solid carbon).
+//
+// The reactions (steam reforming of each hydrocarbon, then WGS) are
+// equilibrated in turn and the round is REPEATED until no amount moves by more
+// than REFORMING_PASS_RTOL of the total: the fixed point is the simultaneous
+// equilibrium. A single round leaves reforming short of equilibrium once WGS
+// has moved CO, H2 and H2O -- at 650-850 K, the pre-reformer range, H2 came
+// out 7-49% low against Cantera.
+constexpr int REFORMING_MAX_PASSES = 2000;
+constexpr double REFORMING_PASS_RTOL = 1e-14;
 EquilibriumResult reforming_equilibrium(const State &in);
 EquilibriumResult reforming_equilibrium_adiabatic(const State &in);
 

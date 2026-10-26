@@ -1,0 +1,6 @@
+- **`reforming_equilibrium` and `reforming_equilibrium_adiabatic` now reach the simultaneous equilibrium.** They reformed each hydrocarbon and then applied WGS once, so reforming was left short of equilibrium after WGS had moved CO, H2 and H2O.
+  - **At 650-850 K, the pre-reformer range:** H2 was 7-49% low against Cantera. A CH4/steam feed at 900 K came out at 734.1 K instead of 711.9 K.
+  - **Reforming extents could only run forward,** so methane never re-formed from CO + H2 (methanation). Ethane and propane at 600-800 K were left 0.2 off in mole fraction.
+  - **The fix:** the reactions are re-equilibrated in rounds until nothing moves, with reforming extents bracketed in both directions. Over 600-1400 K and four feeds (CH4/steam, C2-C3 mixtures, steam-to-carbon 1.5 with CO2, syngas with CH4), composition is within 2.4e-4 of Cantera and adiabatic temperature within 0.12 K.
+  - **`combustion_equilibrium`** uses the same solver on hot burned gas, where its results are unchanged for CH4. Its analytic derivatives (#716) iterate the same rounds.
+  - **`converged` is now reported** instead of always True. Rich propane at phi >= 2.5 is steam-starved after complete combustion, the rounds do not converge, and the result is flagged rather than passed off as an equilibrium. That case was equally wrong before.

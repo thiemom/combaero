@@ -179,3 +179,99 @@ class TestSmrWgsEquilibrium:
         assert pytest.approx(2000.0, rel=1e-6) == result.state.T
         # WGS shifts CO + H2O -> CO2 + H2
         assert result.state.X[sp.indices["H2"]] > 0.0
+
+
+# ---------------------------------------------------------------------------
+# Simultaneous equilibrium: the reactions are re-equilibrated in rounds until
+# nothing moves. A single round (reform, then WGS once) left H2 7-49% low at
+# 650-850 K, the pre-reformer range: WGS moved CO, H2 and H2O after reforming
+# had equilibrated. Cantera comparisons: cantera_validation_tests.
+# ---------------------------------------------------------------------------
+
+
+def _mix(**kw: float) -> list[float]:
+    import numpy as np
+
+    X = np.zeros(ca.num_species())
+    for name, v in kw.items():
+        X[ca.species_index_from_name(name)] = v
+    return list(X / X.sum())
+
+
+def _elements(X: list[float]) -> dict[str, float]:
+    import numpy as np
+
+    counts = {
+        "C": {"CH4": 1, "C2H6": 2, "C3H8": 3, "CO": 1, "CO2": 1},
+        "H": {"CH4": 4, "C2H6": 6, "C3H8": 8, "H2": 2, "H2O": 2},
+        "O": {"CO": 1, "CO2": 2, "H2O": 1},
+    }
+    n = np.asarray(X)
+    return {
+        e: sum(k * n[ca.species_index_from_name(s)] for s, k in sp_.items())
+        / n[ca.species_index_from_name("N2")]
+        for e, sp_ in counts.items()
+    }
+
+
+class TestSimultaneousReformingEquilibrium:
+    @pytest.mark.parametrize("T", [600.0, 650.0, 712.0, 800.0, 900.0])
+    def test_matches_the_smr_wgs_solver_where_it_holds(self, T: float) -> None:
+        """CH4 + steam (forward reforming): smr_wgs solves both extents at
+        once, so the two must agree. A single round was 0.04 off at 712 K."""
+        import warnings
+
+        X = _mix(CH4=0.1, H2O=0.3, N2=0.6)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ref = ca.smr_wgs_equilibrium(T, X)
+        got = ca.reforming_equilibrium(T, X)
+        assert got.converged
+        assert pytest.approx(ref.state.X, abs=1e-6) == got.state.X
+
+    @pytest.mark.parametrize("T_in", [700.0, 900.0, 1200.0])
+    def test_adiabatic_matches_the_smr_wgs_solver(self, T_in: float) -> None:
+        """At 900 K inlet a single round gave 734.1 K; Cantera gives 711.9."""
+        import warnings
+
+        X = _mix(CH4=0.1, H2O=0.3, N2=0.6)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            ref = ca.smr_wgs_equilibrium_adiabatic(T_in, X)
+        got = ca.reforming_equilibrium_adiabatic(T_in, X)
+        assert got.converged
+        assert pytest.approx(ref.state.T, abs=1e-3) == got.state.T
+
+    @pytest.mark.parametrize(
+        "mix",
+        [
+            {"CH4": 0.05, "C2H6": 0.03, "C3H8": 0.02, "H2O": 0.4, "N2": 0.5},
+            {"CH4": 0.02, "CO": 0.2, "H2": 0.3, "H2O": 0.1, "CO2": 0.05, "N2": 0.33},
+        ],
+        ids=["higher-hydrocarbons", "syngas-methanation"],
+    )
+    @pytest.mark.parametrize("T", [650.0, 800.0])
+    def test_conserves_the_elements(self, mix: dict[str, float], T: float) -> None:
+        X = _mix(**mix)
+        got = ca.reforming_equilibrium(T, X)
+        assert got.converged
+        e0, e1 = _elements(X), _elements(list(got.state.X))
+        for el in e0:
+            assert e1[el] == pytest.approx(e0[el], rel=1e-10)
+
+    def test_higher_hydrocarbons_become_methane_at_low_temperature(self) -> None:
+        """At 650 K equilibrium holds almost no ethane or propane: they reform,
+        and CH4 re-forms from CO + H2 (methanation, a backward reforming
+        extent). Forward-only extents left them 0.2 off in mole fraction."""
+        X = _mix(CH4=0.05, C2H6=0.03, C3H8=0.02, H2O=0.4, N2=0.5)
+        got = ca.reforming_equilibrium(650.0, X)
+        for name in ("C2H6", "C3H8"):
+            assert got.state.X[ca.species_index_from_name(name)] < 1e-6
+        assert got.state.X[ca.species_index_from_name("CH4")] > 0.05
+
+    def test_a_steam_starved_rich_burn_reports_that_it_did_not_converge(self) -> None:
+        """Known limit: rich propane at phi 2.5 leaves no steam after complete
+        combustion, and round-by-round equilibration crawls through reverse
+        WGS. The result is flagged instead of reported as converged."""
+        X = _mix(C3H8=0.09, O2=0.18, N2=0.73)
+        assert not ca.combustion_equilibrium(500.0, X, 1e5).converged
