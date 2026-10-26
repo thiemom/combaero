@@ -2013,9 +2013,20 @@ m_dot_out    = result.get("hot_channel.m_dot")  # kg/s
 state = result.node_state("combustor")
 # {"T": 1738.0, "P": 195000.0, "Pt": 200000.0, "Tt": 1760.0, ...}
 
-# Full-detail DataFrame (matches GUI CSV export, unit-annotated columns)
+# Full-detail DataFrame (matches GUI CSV export, unit-annotated columns).
+# Every row carries the solve's status -- success, converged, consistent,
+# outcome, final_norm -- so filter on it before trusting the numbers: a
+# timed-out or second-law-rejected solve still produces a full frame.
+# A pressure boundary's P is its Pt (a reservoir: static = total).
 df = result.to_dataframe()
+df = df[df["success"]]
 ```
+
+The GUI's **Export CSV** writes this frame, solved again from the canvas. Its
+response headers `X-Combaero-Success` / `X-Combaero-Outcome` repeat the status
+(the GUI warns when the export's solve failed), and any text cell that starts
+with `= + - @`, a tab or a carriage return gets a leading `'` so a spreadsheet
+does not run it as a formula. Unit labels are ASCII (`kg/m^3`, `Pa*s`).
 
 ### Parametric sweep
 

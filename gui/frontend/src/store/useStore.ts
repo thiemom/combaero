@@ -1,3 +1,4 @@
+import axios from "axios";
 import {
 	addEdge,
 	applyEdgeChanges,
@@ -10,10 +11,11 @@ import {
 	type NodeChange,
 } from "reactflow";
 import { create } from "zustand";
-import { exportResults, resolvePreview } from "../api";
+import { exportResults, isBackendReachable, resolvePreview } from "../api";
 import { discoverFields } from "../utils/diagnostics";
 import type { PreviewItems } from "../utils/inheritance";
 import { migrateNodeData, migrateSolverSettings } from "../utils/legacyKeys";
+import { solveErrorMessage } from "../utils/solveError";
 import { dropSurfacelessWalls } from "../utils/thermalSides";
 
 // Stored per-node/edge results warm-start the next solve (backend
@@ -533,14 +535,24 @@ const useStore = create<RFState>((set, get) => ({
 
 	exportNetworkResults: async () => {
 		const { nodes, edges, solverSettings } = get();
-		set({ isExporting: true, solveResults: null });
+		// The displayed results stay: clearing them wiped the status badge, the
+		// diagnostics and the second-law flags, and nothing put them back.
+		set({ isExporting: true });
 
 		try {
-			const blob = await exportResults({
+			const { blob, success, outcome } = await exportResults({
 				nodes,
 				edges,
 				solver_settings: solverSettings,
 			});
+			// The export solves the canvas again. A failed or rejected solve
+			// still writes a CSV (every row says so in its `success` and
+			// `outcome` columns); say it here too, before anyone trusts it.
+			if (!success) {
+				set({
+					loadNotice: `Exported, but the export's solve did not succeed (${outcome || "unknown outcome"}): the CSV's rows carry success = False. Check the solve before using these numbers.`,
+				});
+			}
 
 			// 1. Try Native "Save As" Dialog (Chrome/Edge)
 			if ("showSaveFilePicker" in window) {
@@ -578,10 +590,13 @@ const useStore = create<RFState>((set, get) => ({
 			window.URL.revokeObjectURL(url);
 		} catch (error) {
 			console.error("Export failed:", error);
+			const backendReachable = axios.isAxiosError(error)
+				? await isBackendReachable()
+				: true;
 			set({
 				solveResults: {
 					success: false,
-					message: "Export failed. Check console for details.",
+					...solveErrorMessage(error, backendReachable, "Export"),
 				},
 			});
 		} finally {

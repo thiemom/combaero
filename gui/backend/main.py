@@ -3,6 +3,7 @@ import io
 import math
 from pathlib import Path
 
+import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -32,7 +33,27 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Combaero-Success", "X-Combaero-Outcome"],
 )
+
+
+# A spreadsheet runs a cell that starts with one of these as a formula. Labels
+# are user text and travel with a shared network file, so a label such as
+# =HYPERLINK("http://...") would run when a colleague opens the export. A
+# leading apostrophe makes the cell text (OWASP "CSV injection").
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _neutralise_formulas(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    for col in out.columns:
+        # Not `dtype == object`: pandas 3 gives text its own string dtype.
+        if pd.api.types.is_numeric_dtype(out[col]) or pd.api.types.is_bool_dtype(out[col]):
+            continue
+        out[col] = out[col].map(
+            lambda v: "'" + v if isinstance(v, str) and v.startswith(_FORMULA_PREFIXES) else v
+        )
+    return out
 
 
 def _dist_file(name: str) -> FileResponse:
@@ -277,12 +298,18 @@ async def export_results(schema: NetworkGraphSchema):
 
         # Stream as CSV
         stream = io.StringIO()
-        df.to_csv(stream, index=False)
+        _neutralise_formulas(df).to_csv(stream, index=False)
 
         return StreamingResponse(
             iter([stream.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=combaero_results.csv"},
+            headers={
+                "Content-Disposition": "attachment; filename=combaero_results.csv",
+                # The solve this CSV came from, for the GUI to warn on without
+                # parsing the file; every row carries the same columns.
+                "X-Combaero-Success": "true" if result_obj.success else "false",
+                "X-Combaero-Outcome": result_obj.outcome,
+            },
         )
     except TimeoutError:
         raise HTTPException(

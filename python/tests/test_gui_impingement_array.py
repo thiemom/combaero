@@ -100,6 +100,11 @@ def test_one_thermal_edge_heats_every_row_and_reports_as_one() -> None:
     assert edge["Q"] == pytest.approx(sum(edge["rows_Q"]), rel=1e-12)
     assert edge["Q"] > 0.0
     assert edge["T_hot"] == max(edge["rows_T_hot"])
+    # The per-row walls are internal ids: kept beside the aggregate, a sum of
+    # the export's wall rows counted the array's heat twice.
+    assert sorted(result._edge_results) == ["wall"]
+    walls = result.to_dataframe().query("type == 'thermal_wall'")
+    assert walls["Q [W]"].sum() == pytest.approx(edge["Q"], rel=1e-12)
 
 
 def test_orifice_offers_lichtarowicz() -> None:

@@ -1,0 +1,4 @@
+- GUI CSV export / `NetworkResult.to_dataframe()`: every row now carries the solve's status (`success`, `converged`, `consistent`, `outcome`, `final_norm`). Before, a timed-out or second-law-rejected solve exported numbers that looked valid, with `success` on element rows only. The GUI also warns when the export's own solve failed, and starting an export no longer clears the displayed results.
+- A pressure boundary's exported (and probed) static `P` is its `Pt`: it is a reservoir. It used to be a made-up 101325 Pa shown beside the real `Pt`.
+- An impingement array's thermal wall is exported once, as the aggregate that keeps the per-row values in `rows_Q` / `rows_T_hot`. The per-row walls were exported too, so summing `Q` over the export's wall rows gave twice the array's heat.
+- A failed export shows the backend's message ("Export failed: ...") instead of "Check console for details".

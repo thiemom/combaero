@@ -75,11 +75,38 @@ export const resolvePreview = async (
 	return response.data;
 };
 
-export const exportResults = async (graph: NetworkGraph): Promise<Blob> => {
-	const response = await axios.post(`${API_BASE_URL}/export`, graph, {
-		responseType: "blob",
-	});
-	return response.data;
+export interface ExportResponse {
+	blob: Blob;
+	// The export solves the canvas itself; whether THAT solve succeeded
+	// (every CSV row carries the same status columns).
+	success: boolean;
+	outcome: string;
+}
+
+export const exportResults = async (
+	graph: NetworkGraph,
+): Promise<ExportResponse> => {
+	try {
+		const response = await axios.post(`${API_BASE_URL}/export`, graph, {
+			responseType: "blob",
+		});
+		return {
+			blob: response.data,
+			success: response.headers["x-combaero-success"] !== "false",
+			outcome: response.headers["x-combaero-outcome"] ?? "",
+		};
+	} catch (err) {
+		// With responseType "blob" an error body arrives as a Blob too: decode
+		// it so the backend's `detail` reaches the user like a solve error's.
+		if (axios.isAxiosError(err) && err.response?.data instanceof Blob) {
+			try {
+				err.response.data = JSON.parse(await err.response.data.text());
+			} catch {
+				// not JSON: leave it; the caller falls back to a generic message
+			}
+		}
+		throw err;
+	}
 };
 
 export const fetchMaterials = async (): Promise<string[]> => {
