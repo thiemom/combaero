@@ -4458,9 +4458,17 @@ TEST(AcousticsTest, HelmholtzQ) {
     EXPECT_GT(Q, 10);
     EXPECT_LT(Q, 500);
 
-    // Larger cavity -> higher Q (more energy storage)
+    // Lumped Q = omega M / R = (d/2) L_eff / (delta_eff L_neck): at a fixed
+    // frequency the cavity volume does not enter (it only sets f).
+    double delta_eff = effective_viscothermal_layer(
+        stokes_layer(nu, f), thermal_layer(alpha, f), gamma);
+    double L_eff = L_neck + 0.85 * d_neck;
+    EXPECT_NEAR(Q, 0.5 * d_neck * L_eff / (delta_eff * L_neck), 1e-9 * Q);
     double Q_large = helmholtz_Q(4 * V, A_neck, L_neck, nu, alpha, gamma, f);
-    EXPECT_GT(Q_large, Q);
+    EXPECT_NEAR(Q_large, Q, 1e-9 * Q);
+    // A larger cavity lowers f, which thickens the layers and lowers Q.
+    double f_large = helmholtz_frequency(4 * V, A_neck, L_neck, c);
+    EXPECT_LT(helmholtz_Q(4 * V, A_neck, L_neck, nu, alpha, gamma, f_large), Q);
 }
 
 TEST(AcousticsTest, DampingRatio) {

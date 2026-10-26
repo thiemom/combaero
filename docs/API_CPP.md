@@ -1653,9 +1653,10 @@ the correction: an energy balance on mainstream entrained at each injection
 ## Acoustics (acoustics.h)
 
 ```cpp
-std::vector<double> tube_axial_modes(const Tube& tube, double c,
-                                     BoundaryCondition bc1, BoundaryCondition bc2,
-                                     int n_max);
+std::vector<AcousticMode> tube_axial_modes(const Tube& tube, double c,
+                                           BoundaryCondition upstream,
+                                           BoundaryCondition downstream,
+                                           int n_max = 5);
 
 double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
                            double end_correction = 0.85);
