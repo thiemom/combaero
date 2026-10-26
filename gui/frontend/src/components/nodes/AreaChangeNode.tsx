@@ -32,7 +32,7 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 	const f1: number | null =
 		data.F1 ?? inheritedField(previewItems, id, "F1")?.value ?? null;
 	const ratio: number | null =
-		data.result?.ratio ?? (f0 && f1 ? f1 / f0 : null);
+		data.result?.area_ratio ?? (f0 && f1 ? f1 / f0 : null);
 	const isExpansion = ratio == null || ratio >= 1;
 	const Icon = isExpansion ? Maximize2 : Minimize2;
 

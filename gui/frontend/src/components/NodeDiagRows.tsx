@@ -3,7 +3,7 @@
  *
  * Renders up to `maxRows` diagnostic values from a solve result, using
  * whichever keys the user has selected in `displaySettings`. Only fields
- * that resolve to a finite numeric value in this specific result are shown —
+ * that resolve to a finite numeric value in this specific result are shown â
  * stale or absent keys are silently skipped, so no hardcoded field lists are
  * needed here or in any consuming node component.
  */
@@ -11,7 +11,7 @@
 import { useMemo } from "react";
 import useStore from "../store/useStore";
 import { resolveField } from "../utils/diagnostics";
-import { QUANTITY_CATALOGUE } from "../utils/quantities";
+import { quantityMeta } from "../utils/quantities";
 
 interface Props {
 	result: unknown;
@@ -27,12 +27,12 @@ export function NodeDiagRows({ result, maxRows = 3 }: Props) {
 			.map((key) => {
 				const val = resolveField(result, key);
 				if (val === undefined) return null;
-				const cat = QUANTITY_CATALOGUE[key];
+				const meta = quantityMeta(key);
 				return {
 					key,
-					label: cat?.label ?? key,
-					formatted: cat ? cat.format(val) : val.toFixed(3),
-					unit: cat?.unit ?? "",
+					label: meta.label,
+					formatted: meta.format(val),
+					unit: meta.unit === "—" ? "" : meta.unit,
 				};
 			})
 			.filter(Boolean)

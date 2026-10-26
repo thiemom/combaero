@@ -1,15 +1,20 @@
 import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
-import { resolveField } from "../utils/diagnostics";
+import {
+	isConvergedResult,
+	probeKeyOptions,
+	resolveField,
+} from "../utils/diagnostics";
 import { defaultFilmSide } from "../utils/filmLink";
 import { warningsFor } from "../utils/incompressible";
 import { inheritedField, inheritedNote } from "../utils/inheritance";
 import { nodeTypeLabel } from "../utils/nodeUtils";
+import { withPortArm } from "../utils/portArms";
 import {
-	BASIC_STATE_KEYS,
 	QUANTITY_CATALOGUE,
-	TRANSPORT_KEYS,
+	quantityMeta,
+	THERMAL_WALL_KIND,
 } from "../utils/quantities";
 import { describeElement, failuresFor } from "../utils/secondLaw";
 import { bassettDesignK } from "../utils/teeK";
@@ -68,57 +73,40 @@ const Inspector = () => {
 			nodes.find((n) => n.id === probeData.target_id) ||
 			edges.find((e) => e.id === probeData.target_id);
 		const result = targetElement?.data?.result;
+		const targetKind =
+			(targetElement as any)?.data?.type === "thermal"
+				? THERMAL_WALL_KIND
+				: targetElement?.type;
 
-		// Build available quantity list
-		const availableKeys: { key: string; label: string }[] = [];
-		const seenKeys = new Set<string>();
-
-		const addKey = (k: string, isState = false) => {
-			const fullKey = isState ? `state.${k}` : k;
-			if (seenKeys.has(fullKey)) return;
-			seenKeys.add(fullKey);
-			const unit = QUANTITY_CATALOGUE[k]?.unit;
-			availableKeys.push({
-				key: fullKey,
-				label: unit ? `${k} [${unit}]` : k,
-			});
-		};
-
-		if (result) {
-			// Only offer keys whose value is actually a finite number in this
-			// target's result — mirrors discoverFields to avoid NaN / Infinity slots.
-			const isFiniteNum = (v: unknown): v is number =>
-				typeof v === "number" && Number.isFinite(v);
-			if (result.state) {
-				for (const k of Object.keys(result.state)) {
-					if (isFiniteNum(result.state[k])) addKey(k, true);
-				}
-			}
-			for (const k of Object.keys(result)) {
-				if (k !== "state" && isFiniteNum(result[k])) addKey(k);
-			}
-		} else {
-			// Fallback: show common state and transport quantities if no result yet
-			for (const k of [...BASIC_STATE_KEYS, ...TRANSPORT_KEYS]) {
-				addKey(k);
-			}
-			// Specifically add area change ones if target is area change
-			if (targetElement?.type === "area_change") {
-				addKey("zeta");
-				addKey("mach_loss_ref");
-				addKey("mach_in");
-				addKey("mach_out");
-				addKey("area_ratio");
+		// The keys this target's result carries (finite numbers only), or,
+		// before a solve, the keys a solve gives its kind
+		// (resultKeys.generated.json, from the backend).
+		const availableKeys = probeKeyOptions(result, targetKind).map((key) => {
+			const meta = quantityMeta(key);
+			const raw = key.startsWith("state.") ? key.slice(6) : key;
+			const label = withPortArm(
+				meta.label,
+				key,
+				targetElement?.type,
+				targetElement?.data,
+			);
+			const unit = meta.unit === "—" ? "" : ` [${meta.unit}]`;
+			return {
+				key,
+				label: meta.catalogued ? `${label}${unit} (${raw})` : `${label}${unit}`,
+			};
+		});
+		availableKeys.sort((a, b) => a.label.localeCompare(b.label));
+		// A slot key the target does not carry (picked for another target, or
+		// before a solve) stays selectable, marked, rather than vanishing.
+		for (const slotKey of [probeData.slot1_key, probeData.slot2_key]) {
+			if (slotKey && !availableKeys.some((o) => o.key === slotKey)) {
+				availableKeys.push({
+					key: slotKey,
+					label: `${quantityMeta(slotKey).label} (not on this target)`,
+				});
 			}
 		}
-
-		// Sort by label
-		availableKeys.sort((a, b) => a.label.localeCompare(b.label));
-
-		// availableKeys is already filtered to finite values for this target
-		// (via isFiniteNum when building the list). No further displaySettings
-		// filtering here — that would hide fields like phi/theta that exist on
-		// the target but aren't in the current displaySettings selection.
 
 		const slotSelect = (
 			slot: "slot1_key" | "slot2_key",
@@ -178,10 +166,15 @@ const Inspector = () => {
 					<select
 						className="p-1.5 border rounded text-xs bg-white w-full focus:ring-1 focus:ring-blue-500 outline-none"
 						value={probeData.target_id ?? ""}
+						// Display-only: re-targeting a probe changes nothing the
+						// solve depends on, so it keeps the solution it shows
+						// (it used to clear every result in the network).
 						onChange={(e) =>
-							updateNodeData(selectedNode.id, {
-								target_id: e.target.value || undefined,
-							})
+							updateNodeData(
+								selectedNode.id,
+								{ target_id: e.target.value || undefined },
+								true,
+							)
 						}
 					>
 						<optgroup label="Network Nodes">
@@ -233,9 +226,16 @@ const Inspector = () => {
 							</div>
 						</>
 					)}
-					{probeData.target_id && availableKeys.length === 0 && (
+					{probeData.target_id && targetElement && !result && (
 						<p className="text-[10px] text-stone-400 italic">
-							Run Solve to populate available quantities.
+							Not solved: the list is what a solve gives this kind. Run Solve to
+							see values.
+						</p>
+					)}
+					{result && !isConvergedResult(result) && (
+						<p className="text-[10px] text-red-500">
+							The last solve did not converge: the values are its last iterate,
+							not a solution.
 						</p>
 					)}
 				</div>
@@ -3268,6 +3268,12 @@ const Inspector = () => {
 								Live Telemetry
 							</h3>
 						</div>
+						{!isConvergedResult(selectedNode.data.result) && (
+							<p className="text-[10px] text-red-500 mb-2">
+								The last solve did not converge: these are its last iterate, not
+								a solution.
+							</p>
+						)}
 
 						{displaySettings.length === 0 ? (
 							<p className="text-[10px] text-stone-400 italic text-center py-2">
@@ -3280,33 +3286,27 @@ const Inspector = () => {
 									{displaySettings.map((key) => {
 										const val = resolveField(selectedNode.data.result, key);
 										if (val === undefined) return null;
-										const meta = QUANTITY_CATALOGUE[key];
-										// For mpce_tee, annotate port_X_* keys with the arm
-										// letter so the label matches the node card.
-										//   branch: 0=C, 1=S, 2=B
-										//   merge:  0=S, 1=B, 2=C
-										let label = meta?.label ?? key;
-										if (selectedNode.type === "mpce_tee") {
-											const m = /^port_([012])_/.exec(key);
-											if (m) {
-												const isMergeDir =
-													(selectedNode.data.flow_direction ?? "branch") ===
-													"merge";
-												const arms = isMergeDir
-													? ["S", "B", "C"]
-													: ["C", "S", "B"];
-												label = `${label} (${arms[Number(m[1])]})`;
-											}
-										}
+										const meta = quantityMeta(key);
+										// A junction's port_<i>_* keys carry the arm letter
+										// the node card draws (utils/portArms.ts).
+										const label = withPortArm(
+											meta.label,
+											key,
+											selectedNode.type,
+											selectedNode.data,
+										);
 										return (
 											<div key={key} className="flex flex-col">
-												<span className="text-stone-400 text-[9px] font-bold">
+												<span
+													className="text-stone-400 text-[9px] font-bold"
+													title={key}
+												>
 													{label}
 												</span>
 												<span className="font-mono text-xs font-bold whitespace-nowrap">
-													{meta ? meta.format(val) : val.toFixed(4)}{" "}
+													{meta.format(val)}{" "}
 													<span className="text-[9px] font-normal text-stone-400 ml-0.5">
-														{meta?.unit ?? ""}
+														{meta.unit === "—" ? "" : meta.unit}
 													</span>
 												</span>
 											</div>
