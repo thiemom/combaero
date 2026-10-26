@@ -1,6 +1,13 @@
-from typing import Literal
+from typing import Annotated, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from combaero.network.components import DEFAULT_REGIME
 
@@ -123,13 +130,41 @@ class PinFinModelData(BaseModel):
 # networks carrying one are rejected with a message naming the reason; see
 # graph_builder. Ribbed, impingement and pin-fin were restored on provenanced
 # replacements (#334, #337, #335).
-SurfaceModelData = (
+_SurfaceUnion = (
     SmoothModelData
     | RibbedModelData
     | ImpingementModelData
     | SingleJetImpingementModelData
     | PinFinModelData
 )
+
+#: Surface types that existed and were removed, and why (see map_surface_model).
+REMOVED_SURFACE_TYPES = frozenset({"dimpled"})
+
+
+def removed_surface_message(surface_type: object) -> str:
+    return (
+        f"Surface type {surface_type!r} was removed in 0.7.0: its correlation "
+        "could not be traced to its cited source. See issue #339. Use a "
+        "smooth surface."
+    )
+
+
+def _refuse_unknown_surface(v: object) -> object:
+    # Without this a removed or unknown type reaches the union, which refuses
+    # it as one literal mismatch per member -- five errors, none saying the
+    # type was removed or what to pick.
+    if isinstance(v, dict) and "type" in v:
+        known = {get_args(m.model_fields["type"].annotation)[0] for m in get_args(_SurfaceUnion)}
+        t = v["type"]
+        if t in REMOVED_SURFACE_TYPES:
+            raise ValueError(removed_surface_message(t))
+        if t not in known:
+            raise ValueError(f"unknown surface type {t!r}; expected one of {sorted(known)}")
+    return v
+
+
+SurfaceModelData = Annotated[_SurfaceUnion, BeforeValidator(_refuse_unknown_surface)]
 
 
 # --- Node Data Definitions ---

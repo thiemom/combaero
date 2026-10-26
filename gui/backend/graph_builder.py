@@ -1,5 +1,7 @@
 import math as _math
 
+from pydantic import ValidationError
+
 from combaero.network import (
     AreaChangeElement,
     ChannelElement,
@@ -70,6 +72,7 @@ from .schemas import (
     ThermalWallData,
     VortexData,
     WallData,
+    removed_surface_message,
 )
 
 #: |channel area / port area - 1| above which a tee port and its directly
@@ -82,6 +85,67 @@ TEE_PORT_STEP_TOL = MultiPortChamberBase.PORT_AREA_MISMATCH_TOL
 #: The impingement array's bypass handle (#467): an initial crossflow into the
 #: gap's upstream end. Must match ImpingementArrayNode.tsx.
 ARRAY_BYPASS_HANDLE = "port-bypass-target"
+
+
+#: Canvas kinds the second pass builds into elements. Any other kind that is
+#: not a physical node (first pass) or a probe is refused: skipping it would
+#: solve the network without it.
+ELEMENT_KINDS = frozenset(
+    {
+        "channel",
+        "orifice",
+        "effusion_plate",
+        "film_cooling",
+        "slot_film",
+        "impingement_array",
+        "area_change",
+        "lossless_connection",
+        "discrete_loss",
+        "vortex",
+        "mpce_tee",
+        "ejector",
+        "effusion_liner",
+    }
+)
+
+
+def _parse(model, data: dict | None, owner_id: str, what: str = "Node"):
+    """Validate one node's (or wall's) data, naming it in the error.
+
+    Pydantic's own message names the model ("ChannelData"), not the node,
+    and carries a documentation link per error; the user needs which node,
+    which field and why.
+    """
+    try:
+        return model(**(data or {}))
+    except ValidationError as e:
+        parts = []
+        for err in e.errors():
+            loc = ".".join(str(p) for p in err["loc"]) or "data"
+            parts.append(f"{loc}: {err['msg'].removeprefix('Value error, ')}")
+        raise ValueError(f"{what} '{owner_id}': " + "; ".join(parts)) from e
+
+
+def _checked_edges(schema: NetworkGraphSchema) -> NetworkGraphSchema:
+    """Refuse edges naming a node not on the canvas; drop edges to probes.
+
+    A probe is display-only, but its ``probe-in`` handle takes a flow edge;
+    counted, that edge was the element's second outlet. An edge to a missing
+    node was ignored, or blamed on its element as "not fully connected".
+    """
+    ids = {n.id for n in schema.nodes}
+    for edge in schema.edges:
+        for end in (edge.source, edge.target):
+            if end not in ids:
+                raise ValueError(
+                    f"Edge '{edge.id}' connects '{edge.source}' to '{edge.target}', "
+                    f"but '{end}' is not on the canvas."
+                )
+    probes = {n.id for n in schema.nodes if n.type == "probe"}
+    if not probes:
+        return schema
+    edges = [e for e in schema.edges if e.source not in probes and e.target not in probes]
+    return schema.model_copy(update={"edges": edges})
 
 
 def build_pressure_loss(data, area: float = 0.1):
@@ -169,12 +233,7 @@ def map_surface_model(data):
     # falling back to smooth: a saved network asking for one of these and
     # getting an unenhanced surface back is a wrong answer presented as a
     # right one.
-    surface_type = getattr(data, "type", "unknown")
-    raise ValueError(
-        f"Surface type {surface_type!r} was removed in 0.7.0: its correlation "
-        "could not be traced to its cited source. See issue #339. Use a "
-        "smooth surface."
-    )
+    raise ValueError(removed_surface_message(getattr(data, "type", "unknown")))
 
 
 def resolve_composition(
@@ -516,6 +575,7 @@ def _find_junction_port(
 
 
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
+    schema = _checked_edges(schema)
     net = FlowNetwork()
     nodes_map = {}  # ID -> Physical Node
     plenum_node_ids: set[str] = set()
@@ -528,7 +588,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         node_type = node_schema.type
 
         if node_type == "plenum":
-            data = PlenumData(**node_data)
+            data = _parse(PlenumData, node_data, node_id)
             node = PlenumNode(node_id)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             if not node.initial_guess:
@@ -537,7 +597,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             nodes_map[node_id] = node
             plenum_node_ids.add(node_id)
         elif node_type == "mass_boundary":
-            data = MassBoundaryData(**node_data)
+            data = _parse(MassBoundaryData, node_data, node_id)
             Y = resolve_composition(data.composition, data.Tt, 101325.0, schema.solver_settings)
             node = MassFlowBoundary(node_id, m_dot=data.m_dot, Tt=data.Tt, Y=Y)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
@@ -546,14 +606,14 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "pressure_boundary":
-            data = PressureBoundaryData(**node_data)
+            data = _parse(PressureBoundaryData, node_data, node_id)
             Y = resolve_composition(data.composition, data.Tt, data.Pt, schema.solver_settings)
             node = PressureBoundary(node_id, Pt=data.Pt, Tt=data.Tt, Y=Y)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "combustor":
-            data = CombustorData(**node_data)
+            data = _parse(CombustorData, node_data, node_id)
             node = CombustorNode(
                 node_id,
                 method=data.method,
@@ -573,7 +633,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "momentum_chamber":
-            data = MomentumChamberData(**node_data)
+            data = _parse(MomentumChamberData, node_data, node_id)
             node = MomentumChamberNode(
                 node_id,
                 area=data.area,
@@ -594,14 +654,18 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         elif node_type == "probe":
             pass  # Display-only diagnostic nodes -- not part of the solver graph
         elif node_type == "wall":
-            data = WallData(**node_data)
+            data = _parse(WallData, node_data, node_id)
             node = WallNode(node_id)
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
-        else:
-            # This is an element node (Channel, Orifice, etc.)
+        elif node_type in ELEMENT_KINDS:
             element_nodes.append(node_schema)
+        else:
+            raise ValueError(
+                f"Node '{node_id}' is of unknown kind {node_type!r}; this version "
+                "cannot build it, and solving without it would be a different network."
+            )
 
     element_ids = {node.id for node in element_nodes}
     # Impingement arrays (#465) expand into a row chain. Their ends fan out to
@@ -719,7 +783,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     for tee_node in element_nodes:
         if tee_node.type != "mpce_tee":
             continue
-        _td = MPCETeeData(**tee_node.data)
+        _td = _parse(MPCETeeData, tee_node.data, tee_node.id)
         _F_C, _F_B, _ = _resolve_tee_areas(
             schema.edges, schema.nodes, tee_node.id, _td.F_C, _td.F_branch, _td.psi
         )
@@ -783,7 +847,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         # 3-port element (Mynard-based). The flow_direction field constrains
         # which side is upstream.
         if elem_type == "mpce_tee":
-            _md = MPCETeeData(**elem_data)
+            _md = _parse(MPCETeeData, elem_data, elem_id)
             # Resolve areas with inheritance precedence (see _resolve_tee_areas).
             _F_C, _A_branch, _psi, _F_C_src, _A_branch_src = _resolve_tee_areas_with_sources(
                 schema.edges,
@@ -896,7 +960,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
         # secondary inlets, one outlet). Reuses the same named-port resolution
         # and per-port MomentumChamberNode auto-insertion as the tee.
         if elem_type == "ejector":
-            _ed = EjectorData(**elem_data)
+            _ed = _parse(EjectorData, elem_data, elem_id)
             _ports = ("primary", "secondary", "outlet")
             _primary = _find_junction_port(
                 schema.edges,
@@ -955,7 +1019,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
 
         # Effusion liner (#471): three named ports, expanded into N stations.
         if elem_type == "effusion_liner":
-            _ld = EffusionLinerData(**elem_data)
+            _ld = _parse(EffusionLinerData, elem_data, elem_id)
             _lports = ("coolantin", "coolantout", "discharge")
             _ends = [
                 _find_junction_port(
@@ -1038,7 +1102,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             raise ValueError(f"Element '{elem_id}' is not fully connected.")
 
         if elem_type == "channel":
-            data = ChannelData(**elem_data)
+            data = _parse(ChannelData, elem_data, elem_id)
             # The convective area is left to the element: it depends on the
             # surface model (#462) and, when D is inherited, on the resolved
             # diameter. ChannelElement.resolve_topology fills it.
@@ -1072,7 +1136,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "orifice":
-            data = OrificeData(**elem_data)
+            data = _parse(OrificeData, elem_data, elem_id)
             elem = OrificeElement(
                 elem_id,
                 from_node=source_id,
@@ -1094,7 +1158,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "effusion_plate":
-            data = EffusionPlateData(**elem_data)
+            data = _parse(EffusionPlateData, elem_data, elem_id)
             elem = EffusionPlateElement(
                 elem_id,
                 from_node=source_id,
@@ -1117,7 +1181,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             net.add_element(elem)
         elif elem_type == "film_cooling":
-            data = FilmCoolingData(**elem_data)
+            data = _parse(FilmCoolingData, elem_data, elem_id)
             shaped = data.hole_type == "shaped"
             elem = FilmCoolingElement(
                 elem_id,
@@ -1139,7 +1203,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             net.add_element(elem)
         elif elem_type == "slot_film":
-            data = SlotFilmData(**elem_data)
+            data = _parse(SlotFilmData, elem_data, elem_id)
             elem = SlotFilmElement(
                 elem_id,
                 from_node=source_id,
@@ -1154,7 +1218,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             net.add_element(elem)
         elif elem_type == "impingement_array":
-            data = ImpingementArrayData(**elem_data)
+            data = _parse(ImpingementArrayData, elem_data, elem_id)
             arr = ImpingementArray(
                 elem_id,
                 n_rows=data.n_rows,
@@ -1175,7 +1239,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             arr.add_to(net, source_id, target_id, bypass=bypass_id)
             gui_arrays[elem_id] = arr
         elif elem_type == "area_change":
-            data = AreaChangeData(**elem_data)
+            data = _parse(AreaChangeData, elem_data, elem_id)
             elem = AreaChangeElement(
                 id=elem_id,
                 from_node=source_id,
@@ -1197,7 +1261,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             elem = LosslessConnectionElement(elem_id, from_node=source_id, to_node=target_id)
             net.add_element(elem)
         elif elem_type == "discrete_loss":
-            data = DiscreteLossData(**elem_data)
+            data = _parse(DiscreteLossData, elem_data, elem_id)
             # area=None signals "inherit from the topology in resolve_topology".
             # The node-area lookup that used to live here is now part of the
             # library's shared inference path, so GUI and headless networks
@@ -1234,7 +1298,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "vortex":
-            data = VortexData(**elem_data)
+            data = _parse(VortexData, elem_data, elem_id)
             omega = (
                 data.omega_rpm
                 if data.omega_rpm is not None
@@ -1325,7 +1389,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if edge.source in plenum_node_ids or edge.target in plenum_node_ids:
                 continue
             wall_id = edge.id
-            data = ThermalWallData(**edge.data)
+            data = _parse(ThermalWallData, edge.data, wall_id, what="Thermal wall")
 
             # Build layers list
             layers = []
