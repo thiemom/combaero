@@ -2388,3 +2388,13 @@ wanted:
   question: The NASA empirical jet-in-crossflow mixing model itself (equations behind the spreadsheet that
     TM-2011-215980 extends) -- the closure a 1-D dilution-mixing element would be built on.
   where: NTRS (public).
+- citation: Bajura, R. A., Jones, E. H. (1976). Flow distribution manifolds. J. Fluids Eng. 98(4), 654-665.
+  checked: false
+  issues:
+  - 779
+  priority: later
+  question: A pressure-DRIVEN joining split against measured data -- every joining closure gives the suppliers
+    one junction static, and no validation case scores the split the network reaches (the skeletons impose
+    q or set boundaries from Bassett's own K). Combining-manifold flow distributions measured under imposed
+    pressures would.
+  where: ASME J. Fluids Eng.; any measured combining-tee or manifold flow distribution would do.
