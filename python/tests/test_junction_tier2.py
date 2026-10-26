@@ -146,25 +146,31 @@ def test_wang_is_declared_cross_source():
 
 
 def test_wang_cross_source_accuracy(wang):
-    """CROSS-SOURCE. Measured 2026-10-15: 190 of 200 points scored, MAE 0.127.
+    """CROSS-SOURCE. Measured 2026-10-26: 188 of 200 points scored, MAE 0.123.
 
     - Interior (0 < q < 1): 116 points, MAE 0.097.
     - Endpoints: the q = 0 / 1 curves, scored at their one-sided limit (#272;
-      network_runner._ENDPOINT_EPS). 74 points, MAE 0.173.
-    - By area ratio: 0.099 / 0.115 / 0.186 at a = 1 / 1.56 / 2.44.
+      network_runner._ENDPOINT_EPS). 72 points, MAE 0.164.
+    - By area ratio: 0.099 / 0.101 / 0.186 at a = 1 / 1.56 / 2.44.
     - Worst: K_23 at q = 1, where the straight inlet is dead and all the flow
       comes through the lateral (bias -0.30 over 17 points). That is a
       limitation of the model there, not a reason to drop the curve.
 
-    Unscored: 6 endpoint points and 4 interior points, all at a = 2.44 and
-    above M 0.39. They are coverage, not error.
+    Unscored: 6 endpoint points and 4 interior points at a = 2.44 above
+    M 0.39, and 2 endpoint points at a = 1.56, q = 1 (K_13, K_23). They are
+    coverage, not error. The last 2 were scored until 2026-10-26 (190 points,
+    MAE 0.127, endpoints 0.173, a = 1.56 0.115) on a root with the branch port
+    chamber at Mach 1.08 -- the supersonic root of its closure, fed by a
+    lossless connection -- which the solver now refuses as unphysical. They
+    leave for that reason; that the score improves is a side effect, and the
+    bounds below were not tightened.
 
     History: 188 scored, MAE 0.131, until #576 put the port chambers' static
     state (not their stagnation T) under both the port closure and the
     junction's momentum rows. Fixing the chamber alone scored 0.194, rising
     with Mach to 0.288 above M 0.45.
     """
-    assert len(wang) >= 190
+    assert len(wang) >= 188
     assert _mae(wang) < 0.145
     assert _mae([r for r in wang if not r.endpoint_limit]) < 0.12
     by_area = {a: _mae([r for r in wang if r.psi == a]) for a in (1.0, 1.56, 2.44)}
@@ -175,7 +181,8 @@ def test_wang_cross_source_accuracy(wang):
 
 def test_wang_error_does_not_grow_with_mach(wang):
     """The compressible part of the claim. MAE by Mach band, measured
-    2026-10-15 (#576): 0.127 below 0.15, 0.129 between, 0.124 above 0.45 --
+    2026-10-26: 0.127 below 0.15, 0.129 between, 0.111 above 0.45 (0.124 before
+    two supersonic-root points left, see the accuracy test) --
     flat. An incompressible reference head would add ~9% of K at M 0.6, and
     reading the port chambers' stagnation T as static (the pre-#576 port
     closure with the junction rows) raised the top band to 0.288."""
