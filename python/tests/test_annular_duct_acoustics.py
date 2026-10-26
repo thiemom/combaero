@@ -283,7 +283,10 @@ class TestPhysicalConsistency:
         modes = cb.annular_duct_eigenmodes(geom, 500, 1.2, f_max=1000)
 
         for mode in modes:
-            assert mode.n_axial > 0
+            assert mode.n_axial >= 0
+            # n = 0 (axially uniform) exists only for an azimuthal mode
+            # between rigid ends.
+            assert mode.n_axial > 0 or mode.m_azimuthal > 0
 
 
 class TestAnalyticalReference:
@@ -497,3 +500,101 @@ class TestComparisonWithCanAnnular:
             # Allow 30% difference (different solver methods)
             ratio = can_modes[0].frequency / ann_modes[0].frequency
             assert 0.7 < ratio < 1.3
+
+
+def _closed_form_modes(
+    L: float, D_inner: float, D_outer: float, c: float, f_max: float, m_max: int, closed: bool
+) -> list[tuple[int, int, float]]:
+    """Thin-annulus hard-walled duct, rigid at x = 0, bc_ends at x = L.
+
+    Re-derived here, not via annular_duct_modes_analytical: p ~ cos(m theta)
+    cos(k_x x), k^2 = k_x^2 + (m / r_mean)^2. Rigid-rigid: k_x L = n pi, n >= 0
+    (n = 0 with m >= 1 is the axially uniform, purely azimuthal mode at
+    f = m c / (pi D_mean), the classic first azimuthal mode of an annular
+    combustor). Rigid-open: k_x L = (n - 1/2) pi, n >= 1.
+    """
+    d_mean = 0.5 * (D_inner + D_outer)
+    out = []
+    for m in range(m_max + 1):
+        f_az = m * c / (math.pi * d_mean)
+        n = 0 if (closed and m > 0) else 1
+        while True:
+            f_ax = n * c / (2.0 * L) if closed else (2 * n - 1) * c / (4.0 * L)
+            f = math.hypot(f_ax, f_az)
+            if f >= f_max:
+                break
+            if f > 10.0:
+                out.append((m, n, f))
+            n += 1
+    return sorted(out, key=lambda t: (t[0], t[2]))
+
+
+class TestClosedFormSweep:
+    """Every mode of a uniform annular duct, both solvers, many geometries."""
+
+    CASES = [
+        (L, Di, c, f_max, bc)
+        for L in (0.3, 0.5, 1.0, 1.7)
+        for Di in (0.0, 0.4, 0.8)
+        for c in (340.0, 800.0)
+        for f_max in (1000.0, 2000.0)
+        for bc in ("closed", "open")
+    ]
+
+    @staticmethod
+    def _bc(name: str) -> cb.BoundaryCondition:
+        return cb.BoundaryCondition.Closed if name == "closed" else cb.BoundaryCondition.Open
+
+    @pytest.mark.parametrize("solver", ["eigenmodes", "analytical"])
+    def test_mode_sets_match_closed_form(self, solver: str) -> None:
+        failures = []
+        for L, Di, c, f_max, bc in self.CASES:
+            geom = cb.Annulus(L, Di, 1.0)
+            geom.n_azimuthal_max = 4
+            if solver == "eigenmodes":
+                modes = cb.annular_duct_eigenmodes(geom, c, 1.2, f_max, self._bc(bc))
+            else:
+                modes = cb.annular_duct_modes_analytical(geom, c, f_max, self._bc(bc))
+            ours = sorted(
+                (
+                    (x.m_azimuthal, x.n_axial, x.frequency)
+                    for x in modes
+                    # a root AT f_max is in or out by round-off only
+                    if 10.0 < x.frequency < f_max - 1e-6
+                ),
+                key=lambda t: (t[0], t[2]),
+            )
+            ref = _closed_form_modes(L, Di, 1.0, c, f_max - 1e-6, 4, bc == "closed")
+            ok = len(ours) == len(ref) and all(
+                a[0] == b[0] and a[1] == b[1] and abs(a[2] - b[2]) < 1e-6
+                for a, b in zip(ours, ref, strict=True)
+            )
+            if not ok:
+                failures.append((L, Di, c, f_max, bc, len(ours), len(ref)))
+        assert not failures, f"{len(failures)}/{len(self.CASES)} cases differ, e.g. {failures[:4]}"
+
+    def test_root_at_f_max_is_excluded_by_both(self) -> None:
+        """f_max is exclusive: the 1000 Hz root of a 0.5 m duct at c = 500 m/s
+        is out of both solvers' sets at f_max = 1000 Hz (Muller lands a few
+        1e-10 below it)."""
+        geom = cb.Annulus(0.5, 0.1, 0.2)
+        num = [x.frequency for x in cb.annular_duct_eigenmodes(geom, 500.0, 1.2, 1000.0)]
+        ana = [x.frequency for x in cb.annular_duct_modes_analytical(geom, 500.0, 1000.0)]
+        assert num == pytest.approx([500.0])
+        assert ana == pytest.approx([500.0])
+
+    def test_first_azimuthal_mode_between_rigid_ends(self) -> None:
+        """Rigid-rigid duct: lowest m = 1 mode is axially uniform, n = 0, at
+        f = c / (pi D_mean), below the first m = 0 axial mode here."""
+        geom = cb.Annulus(1.0, 0.4, 1.0)
+        geom.n_azimuthal_max = 1
+        c = 500.0
+        f_az = c / (math.pi * 0.7)
+        for modes in (
+            cb.annular_duct_eigenmodes(geom, c, 1.2, 300.0),
+            cb.annular_duct_modes_analytical(geom, c, 300.0),
+        ):
+            m1 = [x for x in modes if x.m_azimuthal == 1]
+            assert len(m1) == 1
+            assert m1[0].n_axial == 0
+            assert m1[0].frequency == pytest.approx(f_az, rel=1e-9)

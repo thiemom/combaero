@@ -1,5 +1,7 @@
 """Tests for can-annular and annular duct acoustic solvers."""
 
+import math
+
 import pytest
 
 import combaero as cb
@@ -452,3 +454,109 @@ class TestNumericalReference:
         assert len(modes_l1) >= 1 and len(modes_l2) >= 1
         ratio = modes_l1[0].frequency / modes_l2[0].frequency
         assert abs(ratio - 2.0) < 0.04, f"Length scaling ratio: {ratio:.4f}, expected ~2.0"
+
+
+def _reference_dispersion(
+    f: float,
+    m: int,
+    geom: cb.CanAnnularGeometry,
+    c_can: float,
+    c_plenum: float,
+    rho_can: float,
+    rho_plenum: float,
+) -> float:
+    """Independent junction balance, re-derived from the 1-D wave equation.
+
+    Volume flow out of one can/plenum junction, divided by i*p (closed can top):
+      can   : A_c/(rho_c c_c) tan(k_c L)
+      plenum: two sectors of length s = 2 pi R / N to the neighbouring
+              junctions, whose pressures carry the Bloch phase psi = 2 pi m / N:
+              2 A_p/(rho_p c_p) (cos(psi) - cos(k_p s)) / sin(k_p s)
+    For m = 0 the plenum term is 2 A_p/(rho_p c_p) tan(k_p s / 2): two closed
+    stubs of length s/2, the same sign as the closed can. Mode: sum = 0.
+
+    Returned multiplied by cos(k_c L) sin(k_p s), which removes the poles and
+    keeps the modes with a pressure node at every junction (roots of the
+    product, not of the bare sum).
+    """
+    k_c = 2.0 * math.pi * f / c_can
+    k_p = 2.0 * math.pi * f / c_plenum
+    s = 2.0 * math.pi * geom.radius_plenum / geom.n_cans
+    psi = 2.0 * math.pi * m / geom.n_cans
+    y_c = geom.area_can / (rho_can * c_can)
+    y_p = geom.area_plenum / (rho_plenum * c_plenum)
+    lc = k_c * geom.length_can
+    return y_c * math.sin(lc) * math.sin(k_p * s) + 2.0 * y_p * (
+        math.cos(psi) - math.cos(k_p * s)
+    ) * math.cos(lc)
+
+
+def _reference_roots(
+    m: int,
+    geom: cb.CanAnnularGeometry,
+    c_can: float,
+    c_plenum: float,
+    rho_can: float,
+    rho_plenum: float,
+    f_max: float,
+) -> list[float]:
+    """Sign changes of the reference dispersion that are roots, not poles."""
+    from scipy.optimize import brentq
+
+    def fun(f: float) -> float:
+        return _reference_dispersion(f, m, geom, c_can, c_plenum, rho_can, rho_plenum)
+
+    y_ref = geom.area_can / (rho_can * c_can)
+    fs = [1.0 + (f_max - 1.0) * i / 40000 for i in range(40001)]
+    vals = [fun(f) for f in fs]
+    out = []
+    for a, b, fa, fb in zip(fs[:-1], fs[1:], vals[:-1], vals[1:], strict=True):
+        if fa * fb < 0.0:
+            r = brentq(fun, a, b, xtol=1e-10)
+            if abs(fun(r)) < 1e-6 * y_ref:
+                out.append(r)
+    return out
+
+
+class TestIndependentDispersionReference:
+    """Can-annular modes against an independently derived junction balance."""
+
+    def test_straight_duct_equivalence(self) -> None:
+        """A_can = 2 A_plenum and L_can = s/2 with equal gas: for m = 0 the can
+        and the two half-sector stubs form one straight closed-closed duct of
+        length 2 L seen from its middle: closed-closed modes k 2L = n pi, so below
+        1200 Hz exactly f = c / (4 L) = 500 Hz (pressure node at the junction)
+        and f = c / (2 L) = 1000 Hz. A plenum admittance of the wrong sign makes
+        the sum D vanish identically and every scan minimum a mode.
+        """
+        geom = cb.CanAnnularGeometry()
+        geom.n_cans = 12
+        geom.length_can = 0.25
+        geom.area_can = 0.02
+        geom.area_plenum = 0.01
+        geom.radius_plenum = 2.0 * geom.length_can * geom.n_cans / (2.0 * math.pi)
+        c = 500.0
+        modes = cb.can_annular_eigenmodes(geom, c, c, 1.0, 1.0, f_max=1200.0)
+        m0 = [x.frequency for x in modes if x.m_azimuthal == 0]
+        expected = [c / (4.0 * geom.length_can), c / (2.0 * geom.length_can)]
+        assert len(m0) == 2, m0
+        assert m0 == pytest.approx(expected, abs=0.01)
+
+    def test_mode_set_matches_reference(self) -> None:
+        """Every m: the same roots as the reference, no spurious extras."""
+        geom = cb.CanAnnularGeometry()
+        geom.n_cans = 12
+        geom.length_can = 0.5
+        geom.area_can = 0.01
+        geom.radius_plenum = 0.5
+        geom.area_plenum = 0.02
+        args = (500.0, 600.0, 1.0, 1.2)
+        f_max = 1200.0
+        modes = cb.can_annular_eigenmodes(geom, *args, f_max=f_max)
+        for m in range(geom.n_cans // 2 + 1):
+            ours = sorted(x.frequency for x in modes if x.m_azimuthal == m)
+            ref = _reference_roots(m, geom, *args, f_max)
+            ref = [r for r in ref if r > 10.0]
+            assert len(ours) == len(ref), (m, ours, ref)
+            for a, b in zip(ours, ref, strict=True):
+                assert a == pytest.approx(b, abs=0.01), (m, ours, ref)

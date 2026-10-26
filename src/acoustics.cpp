@@ -1017,7 +1017,7 @@ double refine_root_muller(
     int max_iter = 50
 ) {
     // Initialize three starting points around guess
-    double h = 0.01 * f_guess;  // Step size
+    double h = 0.001 * f_guess;  // Step size
     std::complex<double> x0(2.0 * M_PI * (f_guess - h), 0.0);
     std::complex<double> x1(2.0 * M_PI * f_guess, 0.0);
     std::complex<double> x2(2.0 * M_PI * (f_guess + h), 0.0);
