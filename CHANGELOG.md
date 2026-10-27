@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-27
+
+### Fixed
+
+- **The Linux wheel builds again (manylinux_2_28, GCC 14).** GCC 14 at `-O3 -Werror` raised a false-positive `-Wstringop-overflow` on a vector allocation in `combustion_equilibrium_and_jacobian`. The Linux wheel failed, so **0.7.0 was tagged but never published to PyPI**, neither `combaero` nor `combaero-gui`; 0.7.1 is the first 0.7 release on PyPI and contains everything listed under 0.7.0. The Linux C++ CI job now builds with GCC 14, the wheel's compiler, so this is caught on a pull request.
+
 ## [0.7.0] - 2026-10-27
 
 ### Highlights
@@ -5866,7 +5872,8 @@ continuation retries; geometry inheritance and autosave in the GUI.
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/thiemom/combaero/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/thiemom/combaero/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/thiemom/combaero/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/thiemom/combaero/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/thiemom/combaero/compare/v0.4.2...v0.5.0

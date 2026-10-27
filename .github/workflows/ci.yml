@@ -240,6 +240,16 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
+      # GCC 14 is what the manylinux_2_28 wheel compiles with (gcc-toolset-14);
+      # the runner's default GCC 13 passed an -O3 -Werror warning that failed
+      # the v0.7.0 Linux wheel.
+      - name: Select GCC 14 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          g++-14 --version
+          echo "CC=gcc-14" >> "$GITHUB_ENV"
+          echo "CXX=g++-14" >> "$GITHUB_ENV"
+
       - name: Configure (default generator)
         if: runner.os != 'Windows'
         shell: bash
