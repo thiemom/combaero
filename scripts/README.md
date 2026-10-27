@@ -160,6 +160,16 @@ versions agree at its head) and squash-merged at exactly the verified commit.
 Fails when a tool pinned in several files (biome: package.json, biome.json,
 pre-commit, ci.yml) disagrees. `--ref REF` checks a git ref, e.g. a PR head.
 
+### check_ascii.py
+The `ascii-only` pre-commit hook (#791): fails on any non-ASCII character in
+a C++ or Python source, comments, docstrings and code alike. String literals
+are exempt only in the files on its `ALLOWLIST` (display units). The hook's
+`exclude:` list in `.pre-commit-config.yaml` is temporary, pending the sweep.
+```bash
+uv run scripts/check_ascii.py FILE...          # what the hook runs
+uv run scripts/check_ascii.py --all --stats    # counts per category/directory
+```
+
 ### dependency_floors.py
 Prints every runtime requirement of combaero and combaero-gui (core
 dependencies, the `examples`/`generator` extras, the GUI). The nightly
