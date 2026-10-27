@@ -2290,8 +2290,8 @@ documents:
     thick hole reads the OPPOSITE way (+41% at VHR 1-10), so Eq. 17 has no wall-thickness interaction: thin
     liner holes keep more Cd under strong crossflow than it predicts, thick holes less (Fig. 10 here shows
     the same t trend inside one study). GROBMAN 1959: yes, this is the Cd behind its model-D split (3/4 in
-    hole, 0.040 in wall = Fig. 6(e)/11; Grobman and Report 1373 Fig. 3 add TN 3924 curves for annulus
-    convergence alpha), so the "measured" split is measured row static drops through this curve: score
+    hole, 0.040 in wall = Fig. 6(e)/11; Grobman uses only this alpha = 0 curve and cites TN 3924, registered,
+    to neglect wall inclination; Report 1373 Fig. 3 is this correlation alone), so the "measured" split is measured row static drops through this curve: score
     combaero''s split with this Cd held fixed per row (or score the row static drops) to test the network,
     and treat a McGreehan-Schotsch run as network + Cd together -- at the upstream rows (C 0.1-0.6, Phi < 3)
     Eq. 17 alone reads 12-29% low. #800: DIFFERENT physics. TN 3663''s crossflow is on the SUPPLY side (the
@@ -2302,7 +2302,7 @@ documents:
     falling CD(Gc/Gj) can partly be a static-reference effect, not evidence.'
   read_for: ['#793 liner-hole Cd under annulus crossflow (Dittrich-Graves vs McGreehan-Schotsch)', the Cd inside
       Grobman 1959's model-D airflow split, '#800 crossflow-dependent impingement CD (relevance only)', whether
-      plunged/flanged liner holes need their own closure (not answered here; TN 3924 or Kaddah)]
+      plunged/flanged liner holes need their own closure (not answered here, nor in TN 3924; Kaddah/Freeman)]
   issues: [793, 800]
   records: []
   code: ['include/orifice.h: orifice::mcgreehan_schotsch::cd (Eq. 17, the closure it would score)', 'include/side_stream_momentum.h:
@@ -2312,6 +2312,70 @@ documents:
     large A_h/A_d ends; render at 130 dpi or more. Indicative script: tmp/tn3663/compare.py (main checkout,
     not committed). Fig. 6(j): at A_h/A_d 0.60 the hole swallows the whole approach flow at Phi 10, capping
     C_p at 0.53 -- a duct-blockage effect a single-hole Cd cannot carry.'
+- file: docs/combustor_network/dittrich_1958_NACA_TN_3924.pdf
+  citation: Dittrich, R. T. (1958). Discharge coefficients for combustor-liner air-entry holes II -- flush
+    rectangular holes, step louvers, and scoops. NACA TN 3924, Lewis Flight Propulsion Laboratory, April 1958.
+  id: NACA TN 3924
+  topic: [orifice, combustion]
+  content: 'Scanned, 58 PDF pp. (text pp. 1-14, Table I sketches pp. 15-20, figures pp. 21-56); read the
+    images, not the OCR. Same rig as TN 3663 (4 in square duct, test plate in one wall, discharge into a
+    quiescent plenum), duct height 2.23 in for every test, wall t about 0.040 in for EVERY configuration (no
+    wall-thickness series). 32 configurations in six groups (Table I): A-1..A-5 flush rectangular holes (0.5 x
+    0.5 to 1 x 2 in, slots 0.5 x 4 and 0.25 x 4 in, l/b 1-16, long side along the flow); B-1..B-12 step louvers
+    about 1 in wide, h 0.095-0.623 in, with/without wall overlap, a corrugated spacer (B-6) and side-wall
+    fences; C-1/C-2 thumbnail scoops (0.5 in radius hemisphere segment, h 0.150/0.265 in); D-1..D-4 scoops over
+    a 0.75 in hole (A_f/A_h 0.585-1.446, base radius 1 or 2 hole radii); E-1 the 0.75 in flush hole (TN 3663''s
+    Fig. 6(e) geometry re-run), E-2/E-3 the same hole and E-4/E-5 a 0.105 in louver in walls converging at 8
+    and 20 deg (duct static p_d,2 taken on the opposite wall); F-1/F-2 two 0.75 in holes in line at 5 and 1.5
+    d, F-3/F-4 rows of 0.125 in holes side by side at 2 and 4 d. V_d 0, 50, 150, 420 ft/s (F-3/F-4 40, 150,
+    500), V_j to 650 ft/s, p_d about 2100 psf, 75 F, static drop 2-250 psf, duct boundary layer 0.04/0.10/0.30
+    in. SAME correlating parameter as TN 3663: C (V_j, rho_j isentropic from P_d, T_d to p_j; A_h for holes, A_f
+    for louver/scoop faces) corrected by TN 3663''s C/C_p line evaluated at the generalised ratio (p_d + q_d
+    sin theta)/p_j (theta 90 deg for louvers and scoops, the wall angle for inclined holes; Fig. 5 scatter
+    about +-0.02 around the line), plotted against Phi = (P_d - p_j)/(P_d - p_d); louvers and scoops further
+    on the effective face area A_f* = A_f - b delta* (C_p,delta*, delta* vs Phi in Fig. 9 from the Fig. 8
+    face pressure profiles). Figs. 13(a)-(f) carry the points (about 15-30 per configuration, four velocity
+    symbols, cleanly sampled); Figs. 14-22 faired-curve comparisons; Fig. 3 zero-crossflow C vs p_d/p_j for
+    27 configurations (flush 0.59-0.63, louvers/thumbnails 0.67-0.79, scoops over holes 0.49-0.61 at 1.02);
+    Fig. 12 the zero-flow Phi of a louver or scoop vs its height h (0.55 at h 0.1 in to 0.05 at 0.9 in). Text
+    p. 13: a four-step design procedure. No measurement uncertainty stated.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 and #807. FLUSH HOLES: shape and size barely matter -- rectangular
+    slots l/b 1-16 lie within about +0.02 of the circular E-1 curve (Fig. 14), wall inclination to 20 deg is
+    negligible when Phi uses the LOCAL static at the hole (Fig. 21(a)), and in-line (5 to 1.5 d) or
+    side-by-side (4 to 2 d) neighbours change nothing below Phi 100 (Fig. 22). So the shipped circular-hole
+    closure extends to rectangular slots and to a converging annulus as long as the network hands it the
+    station static (CrossflowSegmentElement stations do) -- an accuracy statement, not a new closure. E-1 re-runs
+    TN 3663 Fig. 6(e) (0.75 in / 0.040 in) in the same rig, C_p 0.59 at Phi 100, so it is a REPLICATE of that
+    accuracy set (same lab and geometry -- it doubles the points, it is not an independent rig). ANNULUS
+    CONVERGENCE: the TN 3663 entry''s earlier claim that Grobman 1959 and Report 1373 use TN 3924 alpha curves
+    was wrong: Grobman computes everything with TN 3663''s alpha = 0, 3/4 in, 0.040 in curve and cites TN 3924
+    only to justify neglecting inclination; Report 1373 (constant annulus) uses TN 3663 alone and says its Cd
+    may not apply to louvers or scoops. #807: NO wall-thickness or L/d series here (t 0.040 in throughout), so
+    it cannot supply the L/d-dependent crossflow term #807 asks about. Only an indirect hint: F-3/F-4 (0.125 in,
+    t/d 0.32) vs E-1 (0.75 in, t/d 0.053), rough reads of the Fig. 22 faired curves normalised by each
+    plateau (0.645 vs 0.585), give C_p/C_p,inf 0.54 vs 0.62 at Phi 2 and 0.76 vs 0.84 at Phi 4 -- the thicker
+    relative wall loses more Cd under crossflow, the #807 direction, but d, t/d and the multi-hole row all
+    change together and TN 3663 Figs. 6(a)/12 already hold the same contrast. LOUVERS AND SCOOPS: PLUG A GAP
+    combaero does not model -- grep finds no louver, scoop or plunged-hole element or closure in
+    python/combaero, include or src. Physics a flush-hole Cd cannot represent: they keep flowing below Phi 1 by
+    ram (to Phi 0.05 for a 0.89 in scoop), peak C_p,delta* about 0.95 at Phi 1, and depend on the duct
+    boundary layer at low Phi; a scoop raises Cd only at low Phi and LOWERS it at high Phi unless A_f/A_h is
+    about 1.4. No measured louver/scoop combustor case in the register needs it now (Grobman model D is plain
+    holes), so this closes nothing yet: it is the primary for a louver/scoop entry Cd if a liner case or the
+    #714 slot film feed needs one. PLUNGED holes are NOT covered (none tested); that question stays with
+    Kaddah/Freeman (Lefebvre Eqs. 4.15/4.16, secondary).'
+  read_for: ['#793 non-circular and protruding liner entries (louvers, scoops) and the annulus-convergence
+      effect on Cd', '#807 any wall-thickness or L/d series for crossflow Cd of circular holes', whether
+      plunged liner holes need their own closure (not tested here)]
+  issues: [793, 807]
+  records: []
+  code: ['include/orifice.h: orifice::mcgreehan_schotsch::cd (Eq. 17; E-1/F-series would score it beside TN
+      3663)', 'python/combaero/network/components.py: EffusionPlateElement._supply_crossflow']
+  notes: 'Public NACA report. Digitising targets if used: Fig. 13(e) E-1 (about 15 points, TN 3663 Fig. 6(e)
+    replicate) and Fig. 13(f) F-3/F-4 (about 30 points each, 0.125 in) for the #807 crossflow set; for a
+    louver/scoop closure Figs. 13(b) (B-1/B-2, B-8 via Fig. 7) and 13(c)/(d) plus Fig. 12 (zero-flow Phi vs h)
+    and Fig. 9 (delta* vs Phi). Render at 130 dpi or more; several figures are rotated 90 deg in the scan.'
 - file: docs/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
@@ -2608,17 +2672,6 @@ wanted:
     q or set boundaries from Bassett's own K). Combining-manifold flow distributions measured under imposed
     pressures would.
   where: ASME J. Fluids Eng.; any measured combining-tee or manifold flow distribution would do.
-- citation: Dittrich, R. T. (1958). Discharge coefficients for combustor-liner air-entry holes II -- flush
-    rectangular holes, step louvers, and scoops. NACA TN 3924.
-  checked: false
-  issues:
-  - 793
-  priority: later
-  question: 'Part II of TN 3663 (registered): the non-circular and protruding entries (louvers, scoops) TN 3663
-    does not cover, and the annulus-convergence (alpha) curves Grobman 1959 and Report 1373 Fig. 3 use beside
-    TN 3663''s. Wanted when a liner case has louvers or a converging annulus, or to settle whether plunged
-    holes need their own closure.'
-  where: NTRS (public).
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
   checked: false
