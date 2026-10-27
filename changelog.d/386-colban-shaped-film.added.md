@@ -1,4 +1,0 @@
-- **Shaped-hole film effectiveness (#386)**: `film_effectiveness_colban_2011` and its `(eta, deta/dM)` form, Colban, Thole & Bogard (2011) Eq. (19) for one row of fan or laidback fan holes. Baldauf (2002) stays the cylindrical-hole correlation; the two are not interchangeable at high blowing.
-  - Lands on the Eq. (19) line the paper draws in Figs. 6-7 within 0.003 in eta (about a pixel). On those figures' Gritsch data, which the correlation was fitted on, it scores 3.6% RMS at M = 0.5 and 12.1% at M = 2.5.
-  - Table 4's limits, plus the fitted angle (30 deg) and density ratio (1.7-2.0), are reported as extrapolation, not enforced.
-  - The figures are committed as `validation/cooling/data/colban2011`, scored by the new `shaped_film_runner`.

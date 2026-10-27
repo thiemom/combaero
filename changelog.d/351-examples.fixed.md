@@ -1,3 +1,0 @@
-- **Every example under `python/examples/` runs again; none are skipped.**
-  - `combustor.json` declares its merge chamber: the bypass orifice is a side stream, and the chamber inherits its main inlet's area. This fixes `network_runner_bc_swap.py` and `network_runner_combustion_sweep.py`. The sweep example used to exit cleanly with every row failing; it now prints its convergence count and fails if no point converges.
-  - `combustor_pressure_loss_example.py` is rewritten around a `PressureLossElement` with `LinearThetaFractionLoss` on the combustor's outlet edge, the place combustor loss lives since it left `CombustorNode`. It checks the solved loss against the correlation.

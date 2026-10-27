@@ -1,4 +1,0 @@
-- **Sharp and conical contractions follow Idelchik (1966) (#731).** **Network results change below Re 1e4 and for conical nozzles.**
-  - **Sharp contraction:** diagrams 3-10 (Karev) and 3-9. That is 27/Re below Re 8, a C1 interpolation of the printed table to Re 1e4 (every cell exact), and 0.5 (1 - n) above. It replaces a constant 0.5 (1 - n) at every Re.
-  - **Conical contraction:** diagram 3-7, zeta' (1 - n), with zeta'(full angle, l/D) from diagram 3-6. It replaces the unsourced C_con = 0.04 + 0.46 sin(theta)^1.5.
-  - **API:** `sharp_contraction_zeta(n)` becomes `sudden_contraction_zeta(Re, n)` (returns `(zeta, dzeta_dRe)`), and `conical_nozzle_zeta` takes `(full_angle_deg, length_over_D, n)`. Neither has been released yet.

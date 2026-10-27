@@ -1,4 +1,0 @@
-- **A newly dropped GUI channel inherits its diameter (#570).**
-  - **Before:** the canvas seeded `D = 0.1` as a user value, so a fresh channel never inherited.
-  - **Now:** D is unset. The channel inherits from a sized neighbour, and with nothing to inherit from it falls back to a marked 0.1 m default (`area_source = "default"`, amber in the Inspector). A freshly built chain of channels still solves.
-  - New `ChannelElement(default_diameter=...)` opt-in, with `DEFAULT_CHANNEL_DIAMETER`. The Python API does not opt in, so a script with an unresolvable channel diameter is still refused (#262).

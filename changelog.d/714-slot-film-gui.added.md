@@ -1,1 +1,0 @@
-- GUI: a **Film Slot** node (`slot_film`), the `SlotFilmElement`, in the palette and the Inspector. Defaults are the D-7958 rig (0.63 cm slot, 37 cm span, Tu 0.14 = 14%). A thermal wall downstream names it as its film, like film holes (#714).

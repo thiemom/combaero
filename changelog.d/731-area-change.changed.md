@@ -1,8 +1,0 @@
-- **Area change closures follow Idelchik (1966) and carry Mach through their control volume (#731).** **Network results change.**
-  - **Sudden expansion:** diagram 4-1. That is 26/Re below Re 8, a C1 interpolation of the printed table to Re 3500, and Borda-Carnot above. The old alpha = 1 + 2.73/(Re + 10)^0.4 had no source: -50% bias against the table below Re 3500, and +0.069 dynamic heads above it at Re 1e4, even with no area change.
-  - **Conical diffuser:** diagram 5-2, exact at every printed cell. The old fit read 3x at full angles of 10 deg or less.
-  - **Compressible:** an expansion is the compressible Borda-Carnot step times the table's ratio to it; a contraction is a vena contracta re-expanding by the same step, which chokes. `regime="incompressible"` gives the M -> 0 limit.
-- **`AreaChangeElement` residual is a mass flow, `m - m_calc` (#731),** like the compressible channel and orifice.
-  - **Flow:** it rises monotonically with the drive and saturates at the sonic flow, C1 through zero drive and through choke.
-  - **Equal areas are refused.**
-- **The GUI's hidden tee-port steps run the network's regime (#731).**

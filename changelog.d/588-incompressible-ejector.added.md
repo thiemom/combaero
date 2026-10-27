@@ -1,6 +1,0 @@
-- `EjectorElement` takes a `regime` (#588), default `DEFAULT_REGIME` like every element, and the GUI passes the network's global regime. `"incompressible"` is the ejector's low-Mach limit: Sanger's one-dimensional jet pump (NASA TN D-4445, 1968), with each stream at its own constant density, no choking and no critical regime.
-  - Optional loss coefficients `k_nozzle`, `k_suction`, `k_throat` and `k_diffuser`. The nozzle and suction defaults are the compressible closure's own nozzle efficiencies (K = 1/eta - 1), so both regimes agree at low Mach out of the box.
-  - It reproduces Sanger's Eq. 11 to machine precision.
-  - With his calibrated losses, his theory scores 9.3% on his own measurements (TN D-4759, Table II).
-  - The compressible ejector reduces to it as Ma^2.
-  - A script that relied on the default ejector being compressible must now ask for `regime="compressible"`.

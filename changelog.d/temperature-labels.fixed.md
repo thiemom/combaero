@@ -1,2 +1,0 @@
-- GUI: a node's `T` and an element's `T_in`/`T_out` are labelled "(total)". They hold the total temperature at every node, but `T_in`/`T_out` were listed under a "Static" heading. A momentum chamber's `T_static` is now labelled "T (static)". The key convention itself (T static, Tt total, as for pressure) is #782.
-- GUI: plenum, combustor and momentum-chamber nodes no longer offer a `T` initial guess. Temperature is never a solver unknown, so the guess did nothing.

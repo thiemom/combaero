@@ -1,4 +1,0 @@
-- **Every element shows its cross-section the same way: D | Dh | A (#559).** Channel, area change (per face), tee (per arm), discrete loss, combustor and momentum chamber now share one geometry block.
-  - D and A are two views of one value: enter whichever you have and the other is computed (A = πD²/4; for a non-circular duct D is the area-equivalent diameter). Dh = D unless overridden on elements that store a Dh.
-  - Inherited geometry is locked by default and shown greyed with its source. Untick **Inherit** to opt out: the current inherited value becomes your own and the fields unlock. Ticking it again clears the override. This replaces "edit to override" / "Reset to inherited", under which a seeded value silently counted as user-set.
-  - An element with nothing to inherit is editable directly, with an amber hint; a nominal default (chamber 0.1 m², tee `F_C` 0.01 m²) is marked as such.

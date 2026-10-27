@@ -1,3 +1,0 @@
-- **Element diagnostics report where each geometry value came from (#559).**
-  - Every element that inherits or derives its flow area now surfaces `area_source` in its `diagnostics()` -- `"user"`, an `"inherited from ..."` / `"channel '<id>'"` string, or `"default"` -- and an area change reports `F0_source` / `F1_source` per face. `ChannelElement` and `TeeJunctionElement` previously discarded this provenance; `MomentumChamberNode`, `CombustorNode`, `PressureLossElement` and `AreaChangeElement` computed it but never exposed it.
-  - This is the authoritative provenance the GUI can read instead of re-deriving inheritance itself -- groundwork for single-source-of-truth geometry inheritance.

@@ -1,6 +1,0 @@
-- **A discrete pressure loss follows the flow (#550).**
-  - **Before:** `PressureLossElement` applied `Pt_to = (1 - xi) Pt_from` in its declared direction even when the flow reversed.
-    - A reversed constant fraction raised total pressure by `1/(1 - xi)`, in solves reported successful. The second-law check found it (#545).
-    - A reversed head loss lost nothing, because its correlation returns 0 for `m_dot <= 0`.
-  - **Now:** the loss runs from the flow's upstream node at `|m_dot|`, blended through zero flow as the area change is.
-  - **New: an optional design flow `m_ref`** for `ConstantFractionLoss` and `LinearThetaFractionLoss`. At and above it the loss is exactly the fraction; below it the loss scales with the dynamic head and vanishes at zero flow. Without it, a reversing flow must jump through the fraction's pressure difference at zero flow, which the solver cannot do. The GUI's Discrete Loss gains a "Design flow" field.

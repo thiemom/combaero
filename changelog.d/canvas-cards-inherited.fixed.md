@@ -1,1 +1,0 @@
-- **Canvas cards show inherited geometry (#559).** An area change whose faces inherit always read "F₁/F₀: 2.00" (placeholder areas 0.01/0.02) whatever the real ratio; it now shows the solver's resolved ratio. A channel that inherits its D showed a blank "D:"; it now shows the inherited D greyed (or an amber "?" when nothing can be inherited).

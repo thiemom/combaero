@@ -1,4 +1,0 @@
-- **Orifice and junction-port geometry provenance (#559).**
-  - An `OrificeElement` now reports `area_source` (`"user"` or `"default"`) plus its bore `diameter` and `beta` in `diagnostics()`; the fallback bore is the named constant `DEFAULT_ORIFICE_BORE` (0.08 m) instead of a bare literal.
-  - A `MultiPortChamberBase` reports `port_<i>_area_source` (`"user"` or `"inherited from <id>"`) per port, set idempotently across resolve passes.
-  - Completes the geometry-provenance exposure started in B1a (#560).

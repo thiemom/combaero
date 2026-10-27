@@ -1,6 +1,0 @@
-- **A wall-heated compressible channel flags the heating its momentum leaves out (#551).**
-  - **Why:** its kernel is adiabatic Fanno flow at the inlet Tt, and the wall heat only raises the downstream node's Tt.
-  - **New diagnostics:** `rayleigh_omitted_frac` and `rayleigh_dPt_omitted` give the first-order Rayleigh estimate (gamma M^2 / 2) ln(Tt_exit / Tt_in) of the missing total-pressure change: a loss when heated, a gain when cooled. `rayleigh_omitted` is set above 0.1% of the inlet Pt.
-  - **GUI:** the Inspector shows "Heating not in the momentum" with the estimate.
-  - **Size:** in the stress hotcold pairs it is +4 to +9% of Pt on the heated side and -5 to -24% on the cooled side near choke.
-  - **The solve itself is unchanged.**

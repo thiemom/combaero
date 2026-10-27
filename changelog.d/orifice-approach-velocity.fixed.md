@@ -1,4 +1,0 @@
-- **A pipe-fed orifice no longer counts the approach velocity twice.** With a pipe upstream, the orifice applies the velocity-of-approach factor E = 1/sqrt(1 - beta^4).
-  - **Before:** it also drove from the upstream stagnation pressure. Behind a node that carries the pipe's velocity head (a `MomentumChamberNode`), that counted the head twice: the flow was 1.2% high at beta 0.5 and 6.2% high at beta 0.7.
-  - **Now:** with E applied, both kernels drive from the upstream static pressure, which is ISO 5167's tapping differential. Behind a `PlenumNode` (Pt = P) nothing changes, so the node type no longer decides the flow.
-  - **API:** `orifice_compressible_residuals_and_jacobian` takes `P_static_up` after `P_total_up`. `orifice_residuals_and_jacobian` takes an optional `P_rho_ref`, the density reference, whose column is `d_mdot_dP_rho_ref`.

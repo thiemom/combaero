@@ -1,2 +1,0 @@
-- **Area change closures exposed (#731):** `sudden_expansion_zeta` (returns `(zeta, dzeta_dRe)`), `sudden_contraction_zeta` (returns `(zeta, dzeta_dRe)`), `conical_diffuser_zeta`, `conical_nozzle_zeta`, `compressible_borda_carnot`, `area_change_loss`, `area_change_flow` and `area_change_element_flow`.
-- **`viscosity_dX` (C++),** the analytic composition derivative of the Wilke mixture viscosity.

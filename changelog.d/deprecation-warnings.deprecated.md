@@ -1,6 +1,0 @@
-- **Every deprecated name now warns and names its removal release, 0.8.0.** Before this, four were deprecated only in a comment or a docstring, so a user had no notice before the name disappeared:
-  - `standard_dry_air_composition()`: use `species.dry_air()`.
-  - `smr_wgs_equilibrium` / `smr_wgs_equilibrium_adiabatic`: use `reforming_equilibrium` / `reforming_equilibrium_adiabatic`. These are equivalent replacements only since the simultaneous-equilibrium fix; before it, the replacement was 22 K off at a 900 K pre-reformer inlet.
-  - `combaero.network.ConstantLoss` / `LinearThetaLoss`: use `ConstantFractionLoss` / `LinearThetaFractionLoss`. They warn on access and are no longer star-exported.
-  - `init_strategy='incompressible_warmstart'` already warned and now names 0.8.0 too.
-- `python/tests/test_deprecations.py` is the inventory: each deprecated name must warn, name 0.8.0, and agree with its replacement.

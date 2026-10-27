@@ -1,3 +1,0 @@
-- **The area change's Mach correction k1 = 1 + 0.35 M^2 (#731).** Removed: the `Mach` argument of `sharp_area_change` and `conical_area_change`, `MACH_CLAMP`, `MACH_ACCURACY_LIMIT`, `AreaChangeResult.mach_clamped`, and the solver wrappers `area_change_residuals_and_jacobian`, `conical_area_change_residuals_and_jacobian` with `AreaChangeElementResult`.
-  - **Why:** k1 had no source, and the network never applied it (its residuals passed Mach 0). Compressibility is now in the closure itself (see Changed).
-  - **Migration:** drop `Mach=`. For the network form use `area_change_flow` / `area_change_element_flow`. The diagnostic `dP_static` is now `dPt_loss`: it was always a stagnation-pressure loss.

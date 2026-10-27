@@ -1,3 +1,0 @@
-- **The 'Miller' orifice correlation.** No published source matched the C++ formula, `0.596 + 0.031 beta^2 + 0.5 beta^2.5 / sqrt(Re_D)`. The network's 'Miller' had been computing Stolz.
-  - `MeteringCdCorrelation.Miller`, `orifice::Cd_Miller`, the GUI option and the schema value are gone.
-  - A network or saved GUI file that names 'Miller' is refused with a message: pick 'Stolz' or 'ReaderHarrisGallagher'.

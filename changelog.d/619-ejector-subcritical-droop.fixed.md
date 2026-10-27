@@ -1,5 +1,0 @@
-- A choked compressible `EjectorElement` now solves the subcritical regime (outlet between the critical back pressure P_c* and the dead-head P_b0). Before, it kept the critical entrainment there and pinned the outlet port at P_c*, below its boundary, so there was no root.
-  - **Entrainment:** it now follows the Phase-1A Tier-1 droop, linear from omega_crit at P_c* to 0 at P_b0, and the outlet floats. The outlet pin switches in at P_b0.
-  - **Diagnostics:** `diagnostics()` reports `p_b0_pa`.
-  - **Critical-mode results:** unchanged.
-  - **Cold stress draws:** 22 of 22 compressible draws converge, against 8 before.

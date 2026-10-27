@@ -1,3 +1,0 @@
-- The solver's stall detector catches a dead plateau just under its "near the root" gate (|F| < 100x tolerance). A cold attempt whose best |F| does not improve at all over three windows (15 s) now hands over, instead of grinding without end.
-  - **Where it showed:** a 5-row hot impingement array's LM fallback sat at |F| = 0.0718 for 175 s with no timeout set.
-  - **Crawls are untouched:** any improvement still counts as a crawl, and seeded attempts never run the detector.

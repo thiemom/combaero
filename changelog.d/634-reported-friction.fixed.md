@@ -1,5 +1,0 @@
-- **A channel reports the friction factor its pressure drop uses.**
-  - **Before:** every channel carries a convective surface, so its diagnostics reported the heat-transfer correlation's f at that correlation's own Re (16% apart at Re 70). That value kept the old Re floor sqrt(Re^2 + 64^2), so a stagnant duct showed f = 1 while its row used Poiseuille 64/Re with #634's floor.
-  - **Now:** `f` is the residual's value: the C++ laminar-turbulent blend at the inlet Re, times the f multiplier.
-  - **Enhanced surfaces** (ribbed, pin-fin), whose residual uses the surface f, still report it.
-  - **The correlation's own value** is reported as `f_surface`.

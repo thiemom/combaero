@@ -1,1 +1,0 @@
-- `ImpingementArray.summarize`'s `heat_transfer_outside_source` now flags a bypass more than 1 K off the supply only when it meets a staggered array or a row outside CR-3936's inline data. Inside that data, a hotter bypass is modelled rather than flagged. The GUI label reads "eta_r outside data" (#467).

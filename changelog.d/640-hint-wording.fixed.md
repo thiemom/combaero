@@ -1,1 +1,0 @@
-- GUI: the hint a failed solve gives for a declared-direction tee (#640) now names what the Tee Inspector shows, such as the "Ideal momentum (parameter-free)" junction model and Flow Direction "Merge". It used to name solver classes (`IdealMomentumTeeElement`) and attributes (`flow_direction='merge'`), which nothing on the canvas maps back to.

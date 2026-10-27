@@ -1,1 +1,0 @@
-- **GUI polish (#321):** the lossless connection's port labels are `i` / `o` (matching the channel and the palette legend) instead of the clipped `in` / `out`, and its title follows the channel card's typography. `scripts/run-gui.sh` binds the dev server to `127.0.0.1` instead of every interface.

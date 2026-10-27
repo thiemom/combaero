@@ -1,1 +1,0 @@
-- A failed cold solve of a junction network that is incompressible throughout is now retried from a compressible warm start: the same network solved with its incompressible elements compressible, which shares the root at low Mach. Before, such networks got no retry at all. Reported as `compressible_warmstart` (#588).

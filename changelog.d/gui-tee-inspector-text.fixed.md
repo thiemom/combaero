@@ -1,2 +1,0 @@
-- GUI tee inspector: the Constant K description now shows only for the Constant K model, and the straight-arm note says every junction model takes F_S = F_C instead of attributing it to Mynard alone.
-- GUI numeric fields no longer push a value above their maximum to the node while typing (the tee's branch label briefly read "900°"); the value is still clamped on blur as before.
