@@ -1,1 +1,0 @@
-- GUI CSV export: a text cell (a label, an id) that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, so a spreadsheet opening the export shows it as text instead of running it as a formula. Labels travel with shared network files; `=HYPERLINK(...)` used to be written as is.

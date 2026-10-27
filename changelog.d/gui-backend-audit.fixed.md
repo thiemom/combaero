@@ -1,8 +1,0 @@
-- **GUI backend: requests the builder could not represent are refused, not dropped or answered with a bare 500.**
-  - **A node of unknown kind is refused.** It was skipped: a parallel branch of an unknown kind (for example from a file saved by another version) solved without that branch and reported success.
-  - **An edge naming a node that is not on the canvas is refused,** naming the edge. It was ignored, or blamed on its element as "not fully connected".
-  - **A flow edge drawn to a probe's handle no longer breaks the element** ("has multiple downstream links"); probes are display-only.
-  - **A removed surface type ("dimpled") says it was removed (#339) and names the node,** as `map_surface_model` intended. The schema's surface union refused it first, with five pydantic literal errors.
-  - **Invalid node or wall data names the node or wall and the field,** without pydantic's model name and documentation links.
-  - **`/resolve_preview` writes a non-finite value as null,** as `/solve` does, instead of failing in the JSON encoder after the route returned.
-  - **`/favicon.svg` and `/icons.svg` are a 404 without a built frontend,** not a 500.

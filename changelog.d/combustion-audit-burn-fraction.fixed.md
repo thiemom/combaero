@@ -1,2 +1,0 @@
-- **`CombustionState.fuel_burn_fraction` is the share of the fuel burnt.** Complete combustion burns 1/phi of the fuel when rich and leaves the rest in the products, but the field read 1.0 at every phi. It now reads min(1, 1/phi) (0.5 at phi = 2).
-- **`combustion_state_from_streams` puts the products at the mixed pressure.** The reactant temperature already came from `mix()` at the lowest inlet pressure, but the reactants and products were placed at the fuel stream's pressure. Both now use the `mix()` pressure, so a 3 bar fuel line feeding 1 bar air gives 1 bar products.

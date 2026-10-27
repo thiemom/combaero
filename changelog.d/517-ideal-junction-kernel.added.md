@@ -1,4 +1,0 @@
-- **Ideal momentum junction kernel (#517)**: `_core.ideal_junction_residuals_and_jacobian`, a parameter-free junction closure with its whole-element (f, J). It is a baseline, parallel to the Mynard closure, and is not yet wired into a network element.
-  - **Physics:** suppliers share one junction static pressure; each receiver takes its momentum along its own axis from the supplied mean velocity. A merge is Blaisdell & Manson's theory. A split loses the vector Borda-Carnot head on every outlet, which is Idelchik's diverging-branch Eq 7-6 with A' = 1. Nothing is fitted.
-  - **Solver-friendly by construction:** one signed formulation covers merge, split and reversal, C-infinity everywhere including zero flow. There is no flow ratio, no direction classification and no degenerate-state fallback.
-  - **Compressible:** exact momentum in static pressure with each port's own density. There is no Mach inversion in the kernel.

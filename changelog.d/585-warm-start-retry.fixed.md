@@ -1,4 +1,0 @@
-- **A failed compressible solve retries from the incompressible solution whatever the network (#585).**
-  - The outlet-referenced incompressible warm start rescued only networks with a junction (`MultiPortChamberBase`). A duct-fed `EffusionLiner` has none: its cold compressible solve stalled, and the same network seeded from its incompressible root converges in one pass.
-  - Networks without a junction keep their whole timeout for the cold attempt, and retry only in the time left. A junction network's 40 / 25 / 35 budget split is unchanged.
-  - The cold attempt's "did not converge" warning is no longer emitted when the retry runs, so a converged result no longer warns. The `RuntimeWarning` naming the retry stays.

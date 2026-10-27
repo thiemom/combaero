@@ -1,4 +1,0 @@
-- **Where the network ends is defined once, on the node (#545).**
-  - **Before:** graph validation matched class names, the solver matched `PressureBoundary`/`MassFlowBoundary`, and the GUI export kept its own kind list.
-  - **Now:** every node class says whether the network may end there (`is_boundary`: pressure, mass-flow and wall nodes) and whether mass and enthalpy cross the network's control volume there (`is_flow_boundary`: pressure and mass-flow nodes). Validation, the solver and the GUI export all read these attributes.
-  - **Export:** the `is_boundary` column is now also true for wall nodes, which it previously left out.

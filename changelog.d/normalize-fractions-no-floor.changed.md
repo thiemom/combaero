@@ -1,4 +1,0 @@
-- `normalize_fractions` no longer floors every fraction at 1e-15. It clamps negatives to 0 and keeps absent species exactly 0. The network's state composition likewise clamps to [0, 1] instead of [1e-12, 1].
-  - **Why:** the floors put a trace of all 15 species into every stream, and every mixture property then evaluated all of them. Dry air is 4 species.
-  - **Speed-up:** the Fanno channel kernel runs 3.3x faster on air (13.5 to 4.1 ms per call). The slowest suite test went from 189 s to 65 s locally, and the full suite from about 245 s to 130 s.
-  - **No numerical change:** no validation score moves at its printed precision. Mixture `cp`, `h` and `dcp_dT` skip absent species (bit-identical), and `isentropic_expansion_coefficient` evaluates the mixture cp once.

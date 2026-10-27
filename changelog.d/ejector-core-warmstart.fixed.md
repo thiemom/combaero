@@ -1,3 +1,0 @@
-- A compressible `EjectorElement` built through the Python API now gets the physics warm start the GUI gave it, so its cold solves converge like GUI-built ones. The warm start covers the port chamber pressures, `P_jct` (= P_c*) and the port-chain flows, taken from the closed forms.
-  - **Where it lives:** `EjectorElement.seed_warm_start`, run at every `resolve_topology`. It moved there from `gui/backend/graph_builder`. It seeds only where no `initial_guess` was given, replaces its own seeds on a re-solve, and seeds nothing for the incompressible regime.
-  - **Effect:** cold compressible stress draws went from 2 of 22 converged to 8 of 22, every critical one.

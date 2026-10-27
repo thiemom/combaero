@@ -1,1 +1,0 @@
-- GUI: the tee result `mass_flow_ratio` was labelled "ṁ str/ṁ com", but every tee closure reports the branch share. It is now labelled "ṁ br/ṁ com".

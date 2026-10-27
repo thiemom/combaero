@@ -1,1 +1,0 @@
-- **`combaero.network.diagnostics` imports without matplotlib.** matplotlib is the optional `examples` extra, but the module imported `pyplot` at load time, so a plain `pip install combaero` could not import it (found by the 0.7.0 clean-venv wheel check). Only the heatmap functions need it now, and they say how to install it.

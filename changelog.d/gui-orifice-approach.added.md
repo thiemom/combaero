@@ -1,7 +1,0 @@
-- `velocity_of_approach_factor(beta)`: ISO 5167-1's E = 1 / sqrt(1 - beta^4), with 1 outside 0 < beta < 1, the network's no-correction convention. It is now the only definition: the orifice kernels' six inline copies call it.
-- `OrificeElement` diagnostics report `beta_flow` and `E`, the velocity of approach along the solved flow. A reversed orifice reports its to-node pipe's; `beta` stays the declared one.
-- GUI orifice Inspector:
-  - The **Pressure Taps (reported)** select (Flange, Corner, D and D/2) for the ISO 5167 correlations. It picks the differential reported as dp at taps and never moves the flow.
-  - The reverse-flow approach pipe with its beta and E.
-  - The solved approach-pipe static pressure p1, the tap differential, the permanent loss and its ratio, and a warning when the tap pressure falls outside ISO's permanent-loss range.
-  - beta and E now come from the solver's resolve pass rather than being recomputed in the browser.

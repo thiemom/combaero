@@ -1,3 +1,0 @@
-- **GUI: node text stays inside its node.**
-  - **Before:** the Effusion and Orifice nodes (120 px) and the Impingement node (150 px) printed their result rows past the node's end, which is most visible when the node is rotated.
-  - **Now:** those nodes are 140, 140 and 172 px wide. On every node, a row that is still too long is cut with an ellipsis instead of overflowing.

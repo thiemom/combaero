@@ -1,1 +1,0 @@
-- Documented the 1000 K species-polynomial join in the C++ API reference: values are continuous, slopes one-sided (dk/dT -0.01% air, -0.1% lean CH4 products). The data stay unblended, and a test pins the bound.

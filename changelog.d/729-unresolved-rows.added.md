@@ -1,1 +1,0 @@
-- `ImpingementArray.summarize` reports starved rows as unresolved: `rows_unresolved` and `n_rows_unresolved` mark a row whose plate total-pressure drop is below 1% of the gap's dynamic head, where the crossflow chain cannot resolve the jet flow (its sign included) or the Nu and eta_r that follow from it (#729). On NASA CR-3630 Table D.2 it marks exactly the 8 starved rows.

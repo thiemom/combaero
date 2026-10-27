@@ -1,4 +1,0 @@
-- **A warm-started compressible channel no longer returns a wrong flow (#585).**
-  - The C++ Fanno solve (`fanno_channel_flow`) brackets the exit Mach around the caller's guess, the channel's previous exit Mach. The bracket widened only to about 3.6x the guess. A root above that was never enclosed, and the solve returned the end of the bracket.
-  - A short duct warm-started at M 0.01 then passed G = 13.5 kg/(m^2 s) for every drive from 5 Pa to 400 Pa; the true flux rises from 33 to 219.
-  - A guess the widening cannot bracket now falls back to the cold bracket down from M = 1. The flow no longer depends on the warm start.

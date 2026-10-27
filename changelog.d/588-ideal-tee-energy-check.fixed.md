@@ -1,1 +1,0 @@
-- The ideal momentum tee's energy check measures the balance volumetrically, `sum m (Pt - p_jn) / rho`, as the closure's guarantee is stated, with the port densities its rows used. Scored on mass-weighted Pt, a lossless split whose ports differ in density gained 1.1e-7 and was refused as an artifact root; it dissipates and now passes (#588).

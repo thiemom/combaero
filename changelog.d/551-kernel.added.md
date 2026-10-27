@@ -1,5 +1,0 @@
-- **Fanno-Rayleigh duct kernel (#551): friction and heat transfer together.** `fanno_rayleigh_channel_flow` has `fanno_channel_flow`'s contract, plus the exit stagnation temperature and a new `dG_dTt_exit` field. It marches the duct with Tt rising linearly from inlet to exit, exactly for a thermally perfect gas.
-  - **Choking:** at the exit, at an interior throat (cooling after a sonic point), or at the inlet.
-  - **Also new:** `fanno_rayleigh_march` (one duct at a given mass flux) and `fanno_rayleigh_choked_mass_flux`.
-  - **Checked against:** the adiabatic kernel at zero heat (<= 1e-7 in G), and exact Rayleigh flow at zero friction (<= 1e-8 in exit Mach), including its thermal choke.
-  - **Not yet wired into `ChannelElement`;** a follow-up does that.
