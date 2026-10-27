@@ -10,7 +10,7 @@ interface SurfaceModelData {
 		| "pin_fin"
 		| "impingement"
 		| "single_jet_impingement";
-	// Ribbed, rebuilt in 0.8.0 on a provenanced correlation set.
+	// Ribbed, rebuilt in 0.7.0 on a provenanced correlation set.
 	e_D?: number;
 	p_e?: number;
 	alpha_deg?: number;
@@ -31,7 +31,7 @@ interface SurfaceModelData {
 	// Pin-fin, rebuilt on provenanced sets (#335). The fields above keep their
 	// pre-0.7.0 names so saved networks load intact; k_pin is new.
 	k_pin?: number;
-	// Impingement (array), rebuilt in 0.9.0 on Florschuetz, Truman and Metzger
+	// Impingement (array), rebuilt in 0.7.0 on Florschuetz, Truman and Metzger
 	// (1981) with a real Gc/Gj crossflow term -- see issue #337. d_jet is
 	// shared with the single-jet block below.
 	d_jet?: number;
@@ -138,7 +138,7 @@ const SurfaceEnhancementInspector: React.FC<Props> = ({
 					<option value="pin_fin">Pin-Fin Array</option>
 					{/* Dimpled was removed in 0.7.0: its correlation could not be
 					    traced to its cited source, and remains deferred (issue
-					    #339). Ribbed returned in 0.8.0, impingement in 0.9.0
+					    #339). Ribbed returned in 0.7.0, impingement also in 0.7.0
 					    (#337) and pin-fin on provenanced sets (#335).
 
 					    Dimpled's parameter block below is deliberately KEPT. It is

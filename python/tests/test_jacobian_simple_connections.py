@@ -42,7 +42,9 @@ ELEMENTS: dict[str, Callable[[str, str], NetworkElement]] = {
         "x", a, b, diameter=0.03, zeta=2.5
     ),
     "vortex-free": lambda a, b: VortexElement("x", a, b, r_out=0.1, r_in=0.05, v_theta_in=30.0),
-    "vortex-shaft": lambda a, b: VortexElement("x", a, b, r_out=0.1, r_in=0.05, omega_rpm=3000.0),
+    "vortex-shaft": lambda a, b: VortexElement(
+        "x", a, b, r_out=0.1, r_in=0.05, shaft_speed_rpm=3000.0
+    ),
 }
 
 

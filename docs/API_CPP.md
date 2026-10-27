@@ -425,7 +425,6 @@ EquilibriumJacobian combustion_equilibrium_and_jacobian(const State& in, bool sm
 // Shift and reforming reactions
 State wgs_equilibrium(const State& in);
 State wgs_equilibrium_adiabatic(const State& in);
-State smr_wgs_equilibrium(const State& in);   // deprecated, removed in 0.8.0: use reforming_equilibrium
 State reforming_equilibrium(const State& in);
 ```
 
@@ -2188,46 +2187,6 @@ mass-weighted Pt dissipation is the suppliers' mixing term
 - Any `f >= 0` keeps the mechanical dissipation non-negative. Negative or non-finite
   factors are refused.
 - `f` is the user's rig-matching knob; the scored closure is `f = 1`.
-
-### Border-Carnot Turning Loss (former momentum-CV junction companion)
-
-> **Deprecated in 0.7.0, removed in 0.8.0 together with the Python
-> `BorderCarnotLossElement`** -- it is exactly a constant head loss
-> (`PressureLossElement` + `ConstantHeadLoss`), and its K formula is junction
-> physics the closures already carry.
-
-> **Never validated, and not for junction ports.** `MultiPortChamberElement`
-> and `ConstantKTeeElement` carry each port's turning loss in their own closure;
-> putting this element on a port as well double-counts it. Measured on
-> Bassett's 90 deg, psi = 1 dividing tee (#272): K6 = 0.867 from the closure
-> alone (Bassett 0.867), 1.249 with the element at q = 0.5 (+16% at q = 0.3,
-> +78% at 0.7). Its only check was paired with the junction model removed in
-> 0.6.0, which missed Bassett K6 by 11-29%; those tests went with it (#322).
-
-> **The junction half of this was removed in 0.6.0.** `multi_port_chamber_residuals_and_jacobian` and its result structs backed `MultiPortChamberBase`'s own impulse model, which is gone; `MultiPortChamberElement` supersedes it and computes its own whole-element `(f, J)` (see the Momentum-CV Junction section above). What remains here is the Border-Carnot loss element, which is unaffected.
-
-```cpp
-// Loss-element constants (multi_port_chamber.h)
-inline constexpr double HAGER_FRACTION       = 0.75;  // sharp-edge angle correction
-inline constexpr double BC_LOSS_PREFACTOR    = 4.0;   // L = 4*(1 - cos(theta_eff))^2
-
-// Loss coefficient L = 4*(1 - cos((3/4)*delta_geom))^2  [-]
-double border_carnot_L(double delta_geom);
-double dborder_carnot_L_ddelta(double delta_geom);
-
-// Result structs (solver_interface.h)
-// Two-port in-line loss element: Pt_in - Pt_out - L*0.5*rho*u_in^2 = 0.
-// L applies the Hager (3/4) effective-angle correction, INTENDED to reproduce
-// Hager xi_l and Bassett K_inc at M -> 0 on a sharp-edged lateral -- never
-// validated (see the note above). Sign-free in mdot (mdot^2 in the dynamic
-// head).
-BorderCarnotLossResult border_carnot_loss_residual_and_jacobian(
-    double mdot,
-    double Pt_in, double Pt_out,
-    double P_in, double T_in,
-    const std::vector<double>& Y_in,
-    double area, double delta_geom);
-```
 
 DOF accounting per junction: +1 unknown (`P_jct`), +N+1 residuals = net +N
 equations. Combined with port-MCN mass-row skip in the solver (the junction's

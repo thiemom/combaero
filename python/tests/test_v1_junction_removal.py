@@ -24,10 +24,7 @@ import inspect
 
 import pytest
 
-from combaero.network.components import (
-    BorderCarnotLossElement,
-    MultiPortChamberBase,
-)
+from combaero.network.components import MultiPortChamberBase
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 # ---------------------------------------------------------------------------
@@ -101,27 +98,3 @@ def test_diagnostics_survived_as_machinery():
     `super()`, so removing it breaks the element that replaced v1."""
     assert "diagnostics" in MultiPortChamberBase.__dict__
     assert "super()" in inspect.getsource(MultiPortChamberElement.diagnostics)
-
-
-def test_the_border_carnot_loss_element_is_untouched():
-    """It paired with a junction in the Tier-1 design but is a separate element
-    and did not leave with v1. Deprecated in 0.7.0 for removal in 0.8.0 (see
-    test_border_carnot_deprecation.py); this guard goes with it."""
-    assert BorderCarnotLossElement is not None
-    assert "residuals" in BorderCarnotLossElement.__dict__
-
-
-def test_the_border_carnot_cpp_path_survives():
-    """`include/multi_port_chamber.h` was NOT deleted with the model: it also
-    holds `border_carnot_L` and `HAGER_FRACTION`, which
-    `border_carnot_loss_residual_and_jacobian` is built on. Deleting the
-    header wholesale broke the build once while doing this, which is why the
-    check is here rather than in a comment.
-
-    `border_carnot_L` itself is C++-internal and not bound, so the bound
-    function that depends on it is what gets exercised.
-    """
-    from combaero import _core, _solver_tools
-
-    assert hasattr(_core, "border_carnot_loss_residual_and_jacobian")
-    assert hasattr(_solver_tools, "border_carnot_loss_residual_and_jacobian")

@@ -1,7 +1,7 @@
 """RESIDUAL-ROW-SCALING (#614): elements whose residual is a pressure in Pa
 must be scaled as pressure rows.
 
-PressureLossElement, BorderCarnotLossElement and VortexElement write a
+PressureLossElement and VortexElement write a
 total-pressure balance (as AreaChangeElement did until #731 made its row a
 mass flow), but the default in
 ``_build_residual_scales`` filed them as mass-flow rows: weighted
@@ -18,7 +18,6 @@ import pytest
 import combaero as cb
 from combaero.network import (
     AreaChangeElement,
-    BorderCarnotLossElement,
     FlowNetwork,
     NetworkSolver,
     OrificeElement,
@@ -33,7 +32,7 @@ from combaero.network.pressure_loss import ConstantFractionLoss
 Y = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
-@pytest.mark.parametrize("cls", [PressureLossElement, BorderCarnotLossElement, VortexElement])
+@pytest.mark.parametrize("cls", [PressureLossElement, VortexElement])
 def test_a_pressure_balance_element_declares_pressure_rows(cls: type) -> None:
     assert cls.residual_scale_kind == "p"
 

@@ -373,7 +373,7 @@ class NetworkSolver:
         network validation unless the kind is declared on the class that
         defines ``residuals`` or a subclass of it, so a subclass that rewrites
         its residual must re-declare its units. Until then a silent "mdot"
-        default filed PressureLoss, AreaChange, BorderCarnotLoss and Vortex
+        default filed PressureLoss, AreaChange, BorderCarnotLoss (removed in 0.8.0) and Vortex
         rows (all Pa) 1e5-1e9 too heavily (#614).
         Changing an element's residual form means changing its declared kind
         in the same commit. A strict solve (the test suite) then checks every
@@ -1313,23 +1313,8 @@ class NetworkSolver:
                 for unk in unknowns:
                     self.unknown_names.append(unk)
                     guess_dict = getattr(element, "initial_guess", {})
-                    legacy = (
-                        element.legacy_unknown_names().get(unk)
-                        if hasattr(element, "legacy_unknown_names")
-                        else None
-                    )
                     if unk in guess_dict:
                         x0_list.append(guess_dict[unk])
-                    elif legacy is not None and legacy in guess_dict:
-                        # Renamed in #773 (P_jct holding a total became
-                        # Pt_jct); the old key seeds it until 0.8.0.
-                        warnings.warn(
-                            f"initial_guess key '{legacy}' is deprecated and will be "
-                            f"removed in 0.8.0: the unknown is now '{unk}' (#773).",
-                            DeprecationWarning,
-                            stacklevel=2,
-                        )
-                        x0_list.append(guess_dict[legacy])
                     elif unk in self._init_overrides:
                         x0_list.append(self._init_overrides[unk])
                     elif unk.endswith(".m_dot") or unk.endswith(".m_dot_com"):
@@ -3267,12 +3252,10 @@ class NetworkSolver:
         x0: np.ndarray | None = None,
         init_strategy: Literal[
             "default",
-            "incompressible_warmstart",
             "outletref_warmstart",
             "homotopy",
             "analytical_pt_prop",
         ] = "default",
-        warmstart_maxfev: int = 150,
         lambda_steps: list[float] | None = None,
         auto_retry: bool = True,
     ) -> dict[str, float]:
@@ -3369,7 +3352,6 @@ class NetworkSolver:
                     options=options,
                     use_jac=use_jac,
                     init_strategy=init_strategy,
-                    warmstart_maxfev=warmstart_maxfev,
                     lambda_steps=lambda_steps,
                 )
             finally:
@@ -3400,7 +3382,6 @@ class NetworkSolver:
             "options": options,
             "use_jac": use_jac,
             "init_strategy": init_strategy,
-            "warmstart_maxfev": warmstart_maxfev,
             "lambda_steps": lambda_steps,
         }
         if x0 is None and auto_retry and not getattr(self, "_in_rayleigh_stage", False):
@@ -3417,7 +3398,6 @@ class NetworkSolver:
             use_jac=use_jac,
             x0=x0,
             init_strategy=init_strategy,
-            warmstart_maxfev=warmstart_maxfev,
             lambda_steps=lambda_steps,
             auto_retry=auto_retry,
         )
@@ -3709,7 +3689,6 @@ class NetworkSolver:
                         use_jac=use_jac,
                         x0=x,
                         init_strategy="default",
-                        warmstart_maxfev=150,
                         lambda_steps=None,
                         auto_retry=False,
                     )
@@ -3839,7 +3818,6 @@ class NetworkSolver:
         use_jac: bool,
         x0: np.ndarray | None,
         init_strategy: str,
-        warmstart_maxfev: int,
         lambda_steps: list[float] | None,
         auto_retry: bool,
     ) -> dict[str, float]:
@@ -3866,7 +3844,6 @@ class NetworkSolver:
                 use_jac=use_jac,
                 x0=x0,
                 init_strategy=init_strategy,
-                warmstart_maxfev=warmstart_maxfev,
                 lambda_steps=lambda_steps,
             )
 
@@ -3890,7 +3867,6 @@ class NetworkSolver:
                     use_jac=use_jac,
                     x0=None,
                     init_strategy="outletref_warmstart",
-                    warmstart_maxfev=warmstart_maxfev,
                     lambda_steps=lambda_steps,
                 )
             if warm.get("__success__", False):
@@ -3921,7 +3897,6 @@ class NetworkSolver:
                 use_jac=use_jac,
                 x0=None,
                 init_strategy=init_strategy,
-                warmstart_maxfev=warmstart_maxfev,
                 lambda_steps=lambda_steps,
             )
 
@@ -4201,12 +4176,10 @@ class NetworkSolver:
         x0: np.ndarray | None = None,
         init_strategy: Literal[
             "default",
-            "incompressible_warmstart",
             "outletref_warmstart",
             "homotopy",
             "analytical_pt_prop",
         ] = "default",
-        warmstart_maxfev: int = 150,
         lambda_steps: list[float] | None = None,
     ) -> dict[str, float]:
         """
@@ -4239,18 +4212,11 @@ class NetworkSolver:
                 from path-length artifacts.
                 ``analytical_pt_prop`` seeds topology-aware initial
                 guesses (channel Bernoulli m_dot + MPCE junction P_jct
-                at the common port). ``incompressible_warmstart``
-                (DEPRECATED: 10/32 on the same audit at ~10x the wall
-                time) first solves an incompressible-regime proxy
-                network and uses that solution as x0.
-                ``outletref_warmstart`` solves the outlet-referenced
+                at the common port). ``outletref_warmstart`` solves the outlet-referenced
                 incompressible proxy (densities at the DOWNSTREAM
                 static; the auto-retry's seed) and warm-starts from it
                 directly -- 16/16 same-root on branch topologies,
                 11/16 on merge in the certified audit.
-            warmstart_maxfev: Maximum function evaluations for the
-                incompressible proxy solve when
-                ``init_strategy='incompressible_warmstart'``.
             lambda_steps: Optional list of mass flow scaling factors for
                 ``init_strategy='homotopy'``. Defaults to 10 steps
                 from 0.1 to 1.0.
@@ -4262,18 +4228,15 @@ class NetworkSolver:
 
         if init_strategy not in (
             "default",
-            "incompressible_warmstart",
             "outletref_warmstart",
             "homotopy",
             "continuation",
             "analytical_pt_prop",
         ):
             raise ValueError(
-                "init_strategy must be one of: 'default', 'incompressible_warmstart', "
-                "'outletref_warmstart', 'homotopy', 'continuation', 'analytical_pt_prop'."
+                f"init_strategy must be one of: 'default', 'outletref_warmstart', "
+                f"'homotopy', 'continuation', 'analytical_pt_prop'; got {init_strategy!r}."
             )
-        if warmstart_maxfev <= 0:
-            raise ValueError("warmstart_maxfev must be > 0.")
 
         options = {} if options is None else dict(options)
 
@@ -4285,18 +4248,6 @@ class NetworkSolver:
         if method != "hybr" and "maxfev" in options:
             options.setdefault("maxiter", options.pop("maxfev"))
 
-        if init_strategy == "incompressible_warmstart":
-            warnings.warn(
-                "init_strategy='incompressible_warmstart' is deprecated and will be "
-                "removed in 0.8.0. "
-                "On the certified MPCE cold-start audit (2026-07) it "
-                "converged 10/32 cases at ~10x the wall time of "
-                "'analytical_pt_prop' (32/32). Use 'analytical_pt_prop' "
-                "or leave init_strategy='default'.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         # Ensure topology is resolved before solving
         self.network.resolve_all_topology()
         self.network.validate()
@@ -4307,9 +4258,8 @@ class NetworkSolver:
         # converged 32/32 to the certified root vs 28/32 for the plain
         # cold start, and was the fastest strategy overall. Explicitly
         # passing any other init_strategy (or an x0) opts out.
-        # The incompressible_warmstart proxy solve passes "default" and
-        # must keep the legacy plain cold start (flag below), otherwise
-        # the deprecated strategy's behavior silently changes.
+        # A warm-start proxy solve passes "default" and keeps the plain
+        # cold start (flag below).
         # The upgrade additionally requires >= 2 PressureBoundary nodes:
         # the strategy's Pt propagation needs a boundary pressure
         # gradient to be meaningful. On MFB-driven networks with a
@@ -4373,8 +4323,7 @@ class NetworkSolver:
             # Explicit selection of the auto-retry's seed: solve the
             # outlet-referenced incompressible proxy and warm-start the
             # compressible solve from it. Same budget formula as the
-            # retry path. When the proxy fails, warn and proceed cold --
-            # mirroring incompressible_warmstart's failure behavior.
+            # retry path. When the proxy fails, warn and proceed cold.
             _proxy_timeout = 60.0 if timeout is None else max(min(0.3 * timeout, 60.0), 10.0)
             warmstart_x0 = self._outlet_ref_incompressible_seed(
                 use_jac=use_jac, timeout=_proxy_timeout
@@ -4386,49 +4335,6 @@ class NetworkSolver:
                     RuntimeWarning,
                     stacklevel=2,
                 )
-
-        if x0 is None and init_strategy == "incompressible_warmstart":
-            overrides = self._compressible_element_overrides()
-            if overrides:
-                original_regimes = {
-                    elem_id: getattr(self.network.elements[elem_id], "regime", None)
-                    for elem_id in overrides
-                }
-                try:
-                    for elem_id, fallback_regime in overrides.items():
-                        self.network.elements[elem_id].regime = fallback_regime
-
-                    self.network.resolve_all_topology()
-
-                    warm_options = {"maxfev": int(warmstart_maxfev)}
-                    self._in_warmstart_proxy = True
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore", DeprecationWarning)
-                        warm_sol = self._solve_impl(
-                            method="hybr",
-                            timeout=timeout,
-                            options=warm_options,
-                            use_jac=use_jac,
-                            x0=None,
-                            init_strategy="default",
-                        )
-
-                    if bool(warm_sol.get("__success__", False)):
-                        candidate = getattr(self, "_last_x", None)
-                        if candidate is not None:
-                            warmstart_x0 = np.asarray(candidate, dtype=float)
-                except Exception as e:
-                    warnings.warn(
-                        "Incompressible warmstart failed. Proceeding with default initialization: "
-                        f"{e}",
-                        RuntimeWarning,
-                        stacklevel=2,
-                    )
-                finally:
-                    self._in_warmstart_proxy = False
-                    for elem_id, regime in original_regimes.items():
-                        self.network.elements[elem_id].regime = regime
-                    self.network.resolve_all_topology()
 
         if x0 is None and init_strategy == "homotopy":
             # Identify all MassFlowBoundary nodes and their target m_dot

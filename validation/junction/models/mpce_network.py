@@ -3,7 +3,7 @@ Network-mode adapter for MPCE-v2 (Mynard Unified0D residual).
 
 Mirrors `MPCEv1Network` but builds the junction with `MultiPortChamberElement`
 (subclass of MPCE-v1 with Mynard's K-based residual replacing the
-cross-coupling impulse formula). No BorderCarnotLossElement on the
+cross-coupling impulse formula). No separate turning-loss element on the
 lateral branch because Mynard's K already captures the full loss.
 """
 

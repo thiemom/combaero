@@ -2016,12 +2016,13 @@ documents:
     effective-angle correction; xi_t (Eq 8) and xi_l (Eq 19) printed; measured comparisons plotted (Fig
     4).
   status: implemented
-  verdict: Source of the shipped HAGER_FRACTION = 0.75 effective-angle law used by the junction kernels;
-    its figures form a 'selected'-role dataset with Bassett. Equal-area only (psi = 1).
+  verdict: Source of the (3/4) effective-angle law in the Bassett tee kernels (the HAGER_FRACTION constant
+    went with the Border-Carnot loss element in 0.8.0); its figures form a 'selected'-role dataset with
+    Bassett. Equal-area only (psi = 1).
   read_for: [3/4 angle law, '#272 Tier-1 M->0 disagreement', dividing-streamline recovery (#296)]
   issues: [177, 187, 272, 273, 296, 300, 502, 505]
   records: [validation/junction/data/hager1984/, validation/junction/models/hager1984.py]
-  code: ['include/multi_port_chamber.h: HAGER_FRACTION', 'include/tee_junction.h: Hager 3/4 factor']
+  code: ['include/tee_junction.h: Hager 3/4 factor']
 - file: docs/junction/Idelchik.pdf
   citation: 'Idel''chik, I. E. (1966). Handbook of Hydraulic Resistance: Coefficients of Local Resistance
     and of Friction. Israel Program for Scientific Translations, Jerusalem (translated from the 1960 Russian
@@ -2059,7 +2060,7 @@ documents:
   read_for: ['#177 momentum-CV junction design', '#272 straight-port residual']
   issues: [177, 272]
   records: []
-  code: ['include/multi_port_chamber.h: sanctioned successor to the K-closure tee', 'python/combaero/network/components.py:
+  code: ['python/combaero/network/components.py:
       momentum-CV junction machinery']
   notes: Internal design note; supersedes the K-based tee closure in compressible_junction_model_v3.pdf.
 - file: "docs/junction/Perez-Garci\u0301a-2010.pdf"
@@ -2236,8 +2237,8 @@ documents:
     vortices (n = 2 best fit); measured profiles plotted (Figs 1b, 2a, 2b).
   status: implemented
   verdict: 'Shipped as the Vatistas n-vortex kernel with analytic derivatives and checked against its
-    own digitised figures. Since #661 the VortexElement is a free vortex and its r_c/n inputs are deprecated
-    (removal in 0.8.0), so the kernel no longer drives the element''s physics.'
+    own digitised figures. Since #661 the VortexElement is a free vortex (its r_c/n inputs were removed in
+    0.8.0), so the kernel no longer drives the element''s physics.'
   read_for: ['#150 Vatistas kernel', '#151 VortexElement', '#661 free vortex rewrite']
   issues: [150, 151, 598, 661, 662]
   records: [python/tests/test_vatistas_validation.py, python/tests/data/vatistas/]

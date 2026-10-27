@@ -161,7 +161,7 @@ def test_step_4_adding_bypass():
     # mc1: splitting junction (1 inflow from o1, 2 outflows to p2 and p_bypass).
     # Port-face MCNs: com (inlet) + str (straight outlet) + bra (branch outlet,
     # 90 deg). The junction's closure carries the bypass arm's turning loss;
-    # a BorderCarnotLossElement here as well would double-count it (#272).
+    # a separate turning-loss element here as well would double-count it (#272).
     mc1_com = MomentumChamberNode("mc1_com", area=A_main)
     mc1_str = MomentumChamberNode("mc1_str", area=A_main)
     mc1_bra = MomentumChamberNode("mc1_bra", area=A_bypass)

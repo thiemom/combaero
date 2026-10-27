@@ -664,30 +664,6 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
     double P, double P_total, double m_dot, double T,
     const std::vector<double> &Y, double area, bool incompressible = false);
 
-// -----------------------------------------------------------------------------
-// Border-Carnot turning loss: a two-port in-line loss,
-//   Pt_in - Pt_out - L(delta_geom) * 0.5 * rho_in * u_in^2 = 0,
-//   L = 4 * (1 - cos((3/4) * delta_geom))^2.
-// It was the lateral-port companion of the momentum-CV junction's impulse
-// model, which was removed in 0.6.0 (#322). Never validated, and NOT for a
-// MultiPortChamberElement or ConstantKTeeElement port: those closures already
-// carry the port's turning loss (see BC_LOSS_PREFACTOR, multi_port_chamber.h).
-struct BorderCarnotLossResult {
-  double residual;
-  double d_res_dPt_in;
-  double d_res_dPt_out;
-  double d_res_dP_in;  // through rho(T_in, P_in, Y_in)
-  double d_res_dT_in;  // through rho
-  double d_res_dmdot;
-};
-
-BorderCarnotLossResult border_carnot_loss_residual_and_jacobian(
-    double mdot,
-    double Pt_in, double Pt_out,
-    double P_in, double T_in,
-    const std::vector<double> &Y_in,
-    double area, double delta_geom);
-
 // 4. Area change elements: see area_change.h (area_change_flow), called by
 // the network element directly (#731).
 

@@ -1543,29 +1543,6 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "See include/ideal_junction.h.\n\n"
         "Jacobian columns: p_static[0..N-1], outer_mdot[0..N-1], p_jn.");
 
-  // Border-Carnot loss element
-  py::class_<solver::BorderCarnotLossResult>(
-      m, "BorderCarnotLossResult",
-      "Result of Border-Carnot loss residual and Jacobian evaluation")
-      .def_readonly("residual", &solver::BorderCarnotLossResult::residual)
-      .def_readonly("d_res_dPt_in",
-                    &solver::BorderCarnotLossResult::d_res_dPt_in)
-      .def_readonly("d_res_dPt_out",
-                    &solver::BorderCarnotLossResult::d_res_dPt_out)
-      .def_readonly("d_res_dP_in",
-                    &solver::BorderCarnotLossResult::d_res_dP_in)
-      .def_readonly("d_res_dT_in",
-                    &solver::BorderCarnotLossResult::d_res_dT_in)
-      .def_readonly("d_res_dmdot",
-                    &solver::BorderCarnotLossResult::d_res_dmdot);
-
-  m.def("border_carnot_loss_residual_and_jacobian",
-        &solver::border_carnot_loss_residual_and_jacobian, py::arg("mdot"),
-        py::arg("Pt_in"), py::arg("Pt_out"), py::arg("P_in"), py::arg("T_in"),
-        py::arg("Y_in"), py::arg("area"), py::arg("delta_geom"),
-        "Border-Carnot turning loss: Pt_in - Pt_out - L*0.5*rho*u^2 = 0 with "
-        "L = 4*(1 - cos((3/4)*delta_geom))^2 (Hager sharp-edge correction).");
-
   // Ejector (supersonic ejector on the MultiPortChamberBase topology,
   // spanning the critical / subcritical / unchoked jet-pump regimes). Physics
   // + analytic Jacobians in include/ejector.h. The critical-mode scalar
@@ -2713,10 +2690,6 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "Get standard dry air composition (mole fractions) as a vector of size "
         "num_species().\n\n"
         "Orders determined by NASA-9 thermo data index.");
-
-  // Alias for backward compatibility
-  m.def("standard_dry_air_composition", &dry_air,
-        "Alias for dry_air(). Returns standard dry air mole fractions.");
 
   m.def("humid_air_composition", &humid_air_composition, py::arg("T"),
         py::arg("P"), py::arg("RH"),
@@ -3892,35 +3865,6 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       },
       py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
       "Adiabatic WGS equilibrium (CO + H2O <-> CO2 + H2).\n\n"
-      "Returns EquilibriumResult with equilibrium temperature and "
-      "composition.");
-
-  // SMR+WGS equilibrium (CH4 only) — deprecated, use reforming_equilibrium
-  // instead
-  m.def(
-      "smr_wgs_equilibrium",
-      [make_state](
-          double T,
-          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-          double P) { return smr_wgs_equilibrium(make_state(T, P, X_arr)); },
-      py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
-      "Isothermal SMR+WGS equilibrium for CH4 (deprecated).\n\n"
-      "Use reforming_equilibrium instead — it handles CH4 and all other "
-      "hydrocarbons.\n\n"
-      "Returns EquilibriumResult with equilibrium composition at input "
-      "temperature.");
-
-  m.def(
-      "smr_wgs_equilibrium_adiabatic",
-      [make_state](
-          double T,
-          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
-          double P) {
-        return smr_wgs_equilibrium_adiabatic(make_state(T, P, X_arr));
-      },
-      py::arg("T"), py::arg("X"), py::arg("P") = 101325.0,
-      "Adiabatic SMR+WGS equilibrium for CH4 (deprecated).\n\n"
-      "Use reforming_equilibrium_adiabatic instead.\n\n"
       "Returns EquilibriumResult with equilibrium temperature and "
       "composition.");
 

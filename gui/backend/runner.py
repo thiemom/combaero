@@ -588,8 +588,8 @@ class NetworkRunner:
                 ``{"outlet.Pt": 200000.0}``.
             method: scipy root-finding method passed to NetworkSolver.
             init_strategy: Solver initialisation strategy
-                (``"default"``, ``"incompressible_warmstart"``,
-                ``"homotopy"``).
+                (``"default"``, ``"analytical_pt_prop"``,
+                ``"outletref_warmstart"``, ``"homotopy"``).
             timeout: Per-solve soft timeout in seconds (default
                 ``DEFAULT_SOLVE_TIMEOUT``, 30 s, as in the GUI; ``None``: no limit).
             _x0: Internal — solver solution vector from a prior solve used

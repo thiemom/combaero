@@ -102,14 +102,6 @@ def test_no_swirl_at_the_axis() -> None:
         VortexElement("v", "a", "b", r_in=0.0, v_theta_in=10.0)
 
 
-def test_the_old_vatistas_parameters_are_deprecated_and_ignored() -> None:
-    with pytest.warns(DeprecationWarning, match="r_c and n are ignored"):
-        old = VortexElement("v", "a", "b", shaft_speed_rpm=3000.0, r_c=0.02, n=2.0)
-    assert old.swirl() == VortexElement("v", "a", "b", shaft_speed_rpm=3000.0).swirl()
-    with pytest.raises(TypeError):
-        VortexElement("v", "a", "b", 0.02, 0.1)  # the old positional r_c, r_out
-
-
 def test_a_gui_file_saved_before_661_loads_as_a_free_vortex() -> None:
     """The legacy r_c and n are dropped without a warning; the GUI shows the
     note. Its r_in = 0 (the old drop default) means no swirl."""
@@ -140,20 +132,6 @@ def test_a_gui_file_saved_before_661_loads_as_a_free_vortex() -> None:
     assert net.elements["vx"].swirl() == (0.0, 0.0)
     assert net.elements["vn"].r_in == 0.05
     assert net.elements["vn"].swirl()[0] == 25.0
-
-
-def test_omega_rpm_is_a_deprecated_alias_of_shaft_speed_rpm() -> None:
-    """#773: omega is 2 pi f, so the shaft speed in rpm is shaft_speed_rpm.
-    The old keyword still works, with a DeprecationWarning, until 0.8.0."""
-    with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-        old = VortexElement("v", "a", "b", omega_rpm=3000.0)
-    new = VortexElement("v", "a", "b", shaft_speed_rpm=3000.0)
-    assert old.shaft_speed_rpm == 3000.0
-    assert old.swirl() == new.swirl()
-    with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-        assert new.omega_rpm == 3000.0
-    with pytest.warns(DeprecationWarning), pytest.raises(TypeError, match="not both"):
-        VortexElement("v", "a", "b", shaft_speed_rpm=1.0, omega_rpm=2.0)
 
 
 def test_a_gui_file_saved_with_omega_rpm_still_loads() -> None:

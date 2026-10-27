@@ -374,8 +374,6 @@ All functions use consistent units to avoid conversion errors.
 |-----------------------------------|-------------------------------------|-------------|
 | `wgs_equilibrium`                 | State (T: K, P: Pa, X: mol/mol)     | State       |
 | `wgs_equilibrium_adiabatic`       | State                               | State       |
-| `smr_wgs_equilibrium`             | State                               | State       |
-| `smr_wgs_equilibrium_adiabatic`   | State                               | State       |
 | `reforming_equilibrium`           | State                               | State       |
 | `reforming_equilibrium_adiabatic` | State                               | State       |
 | `combustion_equilibrium`          | State, smooth: bool (default False) | State       |
@@ -888,13 +886,6 @@ All functions use consistent units to avoid conversion errors.
 | `tee_K10`                              | q: -, psi: -, theta: rad                                                                                                                                                 | - (K)                                                                                                                                                                                                   |
 | `tee_K11`                              | q: -, psi: -, theta: rad                                                                                                                                                 | - (K)                                                                                                                                                                                                   |
 | `tee_K12`                              | q: -, psi: -, theta: rad                                                                                                                                                 | - (K)                                                                                                                                                                                                   |
-
-### multi_port_chamber.h + solver_interface.h - Momentum-CV junction
-
-| Function                                   | Input Units                                                                                   | Output Unit                                                                                                                       |
-|--------------------------------------------|-----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| `border_carnot_loss_residual_and_jacobian` | mdot: kg/s, Pt_in: Pa, Pt_out: Pa, P_in: Pa, T_in: K, Y_in: kg/kg, area: m^2, delta_geom: rad | BorderCarnotLossResult (residual: Pa, d_res_dPt_in: -, d_res_dPt_out: -, d_res_dP_in: -, d_res_dT_in: Pa/K, d_res_dmdot: Pa*s/kg) |
-| `border_carnot_L`                          | delta_geom: rad                                                                               | - (L = 4*(1-cos((3/4)*delta))^2)                                                                                                  |
 
 ### mpce_junction.h - Momentum-CV junction, whole-element (f, J)
 

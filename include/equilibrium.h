@@ -14,12 +14,6 @@ EquilibriumResult wgs_equilibrium(const State &in);
 EquilibriumResult wgs_equilibrium_adiabatic(const State &in);
 
 // -------------------------------------------------------------
-// SMR + WGS equilibrium (DEPRECATED: use reforming_equilibrium)
-// -------------------------------------------------------------
-EquilibriumResult smr_wgs_equilibrium(const State &in);
-EquilibriumResult smr_wgs_equilibrium_adiabatic(const State &in);
-
-// -------------------------------------------------------------
 // Reforming + WGS equilibrium
 // -------------------------------------------------------------
 // Higher-fidelity product model for rich hydrocarbon combustion.

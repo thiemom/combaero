@@ -2,7 +2,6 @@
 
 import pytest
 
-import combaero.network as _net
 from combaero.network import (
     ConstantFractionLoss,
     LinearThetaFractionLoss,
@@ -19,7 +18,7 @@ class _Ctx:
 
 
 # ---------------------------------------------------------------------------
-# ConstantFractionLoss (and alias ConstantLoss)
+# ConstantFractionLoss
 # ---------------------------------------------------------------------------
 
 
@@ -48,13 +47,9 @@ class TestConstantFractionLoss:
         assert xi == pytest.approx(0.0)
         assert dxi == pytest.approx(0.0)
 
-    def test_alias_constant_loss(self) -> None:
-        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-            assert _net.ConstantLoss is ConstantFractionLoss
-
 
 # ---------------------------------------------------------------------------
-# LinearThetaFractionLoss (and alias LinearThetaLoss)
+# LinearThetaFractionLoss
 # ---------------------------------------------------------------------------
 
 
@@ -93,10 +88,6 @@ class TestLinearThetaFractionLoss:
         xi_p, _ = loss(_Ctx(theta=theta + eps))
         fd = (xi_p - xi0_val) / eps
         assert dxi == pytest.approx(fd, rel=1e-5)
-
-    def test_alias_linear_theta_loss(self) -> None:
-        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-            assert _net.LinearThetaLoss is LinearThetaFractionLoss
 
 
 # ---------------------------------------------------------------------------

@@ -131,19 +131,18 @@ class TestReformingEquilibrium:
         assert ar_per_n2_in == pytest.approx(ar_per_n2_out, rel=1e-10)
 
 
-class TestSmrWgsEquilibrium:
-    """Tests for SMR+WGS equilibrium (CH4 only)."""
+class TestCh4OnlyReformingEquilibrium:
+    """CH4-only reforming (the cases of the removed smr_wgs_equilibrium)."""
 
-    def test_smr_wgs_isothermal(self, sp: SpeciesLocator) -> None:
-        """Test isothermal SMR+WGS equilibrium."""
+    def test_ch4_isothermal(self, sp: SpeciesLocator) -> None:
+        """Isothermal CH4 reforming + WGS."""
         X = sp.empty()
         X[sp.indices["CH4"]] = 0.02
         X[sp.indices["H2O"]] = 0.20
         X[sp.indices["CO2"]] = 0.08
         X[sp.indices["N2"]] = 0.70
 
-        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-            result = ca.smr_wgs_equilibrium(2000.0, X)
+        result = ca.reforming_equilibrium(2000.0, X)
 
         # CH4 should be reformed
         assert result.state.X[sp.indices["CH4"]] < X[sp.indices["CH4"]] * 0.5
@@ -152,8 +151,8 @@ class TestSmrWgsEquilibrium:
         assert result.state.X[sp.indices["CO"]] > 0.01
         assert result.state.X[sp.indices["H2"]] > 0.01
 
-    def test_smr_wgs_adiabatic(self, sp: SpeciesLocator) -> None:
-        """Test adiabatic SMR+WGS equilibrium."""
+    def test_ch4_adiabatic(self, sp: SpeciesLocator) -> None:
+        """Adiabatic CH4 reforming + WGS."""
         X = sp.empty()
         X[sp.indices["CH4"]] = 0.02
         X[sp.indices["H2O"]] = 0.20
@@ -161,22 +160,20 @@ class TestSmrWgsEquilibrium:
         X[sp.indices["N2"]] = 0.70
 
         T_in = 2200.0
-        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-            result = ca.smr_wgs_equilibrium_adiabatic(T_in, X)
+        result = ca.reforming_equilibrium_adiabatic(T_in, X)
 
         # Temperature should decrease
         assert T_in > result.state.T
 
-    def test_smr_wgs_fallback_to_wgs(self, sp: SpeciesLocator) -> None:
-        """Test that SMR+WGS falls back to WGS when no CH4 present."""
+    def test_fallback_to_wgs(self, sp: SpeciesLocator) -> None:
+        """With no hydrocarbon present, reforming reduces to WGS."""
         X = sp.empty()
         X[sp.indices["CO"]] = 0.05
         X[sp.indices["H2O"]] = 0.20
         X[sp.indices["CO2"]] = 0.05
         X[sp.indices["N2"]] = 0.70
 
-        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-            result = ca.smr_wgs_equilibrium(2000.0, X)
+        result = ca.reforming_equilibrium(2000.0, X)
 
         # Should still work (WGS only)
         assert pytest.approx(2000.0, rel=1e-6) == result.state.T
@@ -218,32 +215,38 @@ def _elements(X: list[float]) -> dict[str, float]:
 
 
 class TestSimultaneousReformingEquilibrium:
+    # Golden values from the two-extent SMR+WGS Newton solver
+    # (smr_wgs_equilibrium, removed in 0.8.0), evaluated at v0.7.1 just before
+    # its removal: it solved both extents at once, so the simultaneous rounds
+    # must reproduce it. Mole fractions of CH4, H2O, CO, CO2, H2.
+    _SMR_WGS_X = {
+        600.0: (0.084596974, 0.266713558, 0.000086780, 0.012749074, 0.051256639),
+        650.0: (0.074570404, 0.245360322, 0.000457781, 0.020733550, 0.084307540),
+        712.0: (0.058178650, 0.211869097, 0.002482021, 0.032369103, 0.136922477),
+        800.0: (0.029704814, 0.161972378, 0.014278614, 0.044300708, 0.220038672),
+        900.0: (0.004793335, 0.131784917, 0.038066025, 0.041272863, 0.279289526),
+    }
+    _SMR_WGS_T_AD = {700.0: 617.762887, 900.0: 711.998293, 1200.0: 824.688325}
+
     @pytest.mark.parametrize("T", [600.0, 650.0, 712.0, 800.0, 900.0])
     def test_matches_the_smr_wgs_solver_where_it_holds(self, T: float) -> None:
-        """CH4 + steam (forward reforming): smr_wgs solves both extents at
-        once, so the two must agree. A single round was 0.04 off at 712 K."""
-        import warnings
-
+        """CH4 + steam (forward reforming): the removed smr_wgs solver solved
+        both extents at once, so the two must agree. A single round was 0.04
+        off at 712 K."""
         X = _mix(CH4=0.1, H2O=0.3, N2=0.6)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            ref = ca.smr_wgs_equilibrium(T, X)
         got = ca.reforming_equilibrium(T, X)
         assert got.converged
-        assert pytest.approx(ref.state.X, abs=1e-6) == got.state.X
+        names = ("CH4", "H2O", "CO", "CO2", "H2")
+        got_X = [got.state.X[ca.species_index_from_name(n)] for n in names]
+        assert pytest.approx(self._SMR_WGS_X[T], abs=1e-6) == got_X
 
     @pytest.mark.parametrize("T_in", [700.0, 900.0, 1200.0])
     def test_adiabatic_matches_the_smr_wgs_solver(self, T_in: float) -> None:
         """At 900 K inlet a single round gave 734.1 K; Cantera gives 711.9."""
-        import warnings
-
         X = _mix(CH4=0.1, H2O=0.3, N2=0.6)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            ref = ca.smr_wgs_equilibrium_adiabatic(T_in, X)
         got = ca.reforming_equilibrium_adiabatic(T_in, X)
         assert got.converged
-        assert pytest.approx(ref.state.T, abs=1e-3) == got.state.T
+        assert pytest.approx(self._SMR_WGS_T_AD[T_in], abs=1e-3) == got.state.T
 
     @pytest.mark.parametrize(
         "mix",

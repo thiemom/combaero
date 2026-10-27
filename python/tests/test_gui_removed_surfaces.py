@@ -5,8 +5,8 @@ could not be traced to their cited sources. A saved network asking for a ribbed
 channel and getting an unribbed one back would be a wrong answer presented as a
 right one, so `map_surface_model` raises instead of falling through.
 
-Ribbed returned in 0.8.0 on a provenanced correlation set; impingement (both
-the jet array and the single-jet form) returned in 0.9.0 on Florschuetz,
+Ribbed returned in 0.7.0 on a provenanced correlation set; impingement (both
+the jet array and the single-jet form) returned in 0.7.0 on Florschuetz,
 Truman and Metzger (1981) with a real crossflow term (#337). Pin-fin returned
 on provenanced sets (#335). Dimpled remains deferred (#339). This file pins
 three things: that the restored surfaces map again, that dimpled refuses, and
@@ -34,7 +34,7 @@ def test_smooth_still_maps() -> None:
 
 
 def test_ribbed_maps_again_and_tolerates_an_older_saved_network() -> None:
-    """Ribbed returned in 0.8.0 on a provenanced correlation set.
+    """Ribbed returned in 0.7.0 on a provenanced correlation set.
 
     A network saved before the newer fields existed carries only `type`, so the
     mapping falls back to the schema defaults rather than raising an
@@ -49,7 +49,7 @@ def test_ribbed_maps_again_and_tolerates_an_older_saved_network() -> None:
 
 
 def test_impingement_maps_again_and_tolerates_an_older_saved_network() -> None:
-    """Impingement (jet array) returned in 0.9.0 on Florschuetz, Truman and
+    """Impingement (jet array) returned in 0.7.0 on Florschuetz, Truman and
     Metzger (1981) with a real crossflow term -- see issue #337."""
     from combaero.network.components import ImpingementModel
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
 
 # ---------------------------------------------------------------------------
-# The ribbed round trip, restored in 0.8.0
+# The ribbed round trip, restored in 0.7.0
 # ---------------------------------------------------------------------------
 
 
@@ -169,7 +169,7 @@ def test_a_channel_with_no_surface_still_defaults_to_smooth() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Impingement, restored in 0.9.0
+# Impingement, restored in 0.7.0
 # ---------------------------------------------------------------------------
 
 

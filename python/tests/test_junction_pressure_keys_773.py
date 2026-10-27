@@ -135,15 +135,18 @@ def _mynard_solver(guess: dict):
     return solver
 
 
-def test_an_old_P_jct_guess_still_seeds_the_mynard_tee() -> None:
-    """Before #773 the Mynard tee's total was the unknown 'x.P_jct'. A guess
-    under that key still seeds 'x.Pt_jct', with a DeprecationWarning."""
+def test_an_old_P_jct_guess_no_longer_seeds_the_mynard_tee() -> None:
+    """Before #773 the Mynard tee's total was the unknown 'x.P_jct'. The old
+    key seeded 'x.Pt_jct', with a DeprecationWarning, until 0.8.0; now only
+    the current key does."""
     new = _mynard_solver({"x.Pt_jct": 1.234e5})
-    x_new = new._build_x0()[new.unknown_names.index("x.Pt_jct")]
+    assert new._build_x0()[new.unknown_names.index("x.Pt_jct")] == 1.234e5
     old = _mynard_solver({"x.P_jct": 1.234e5})
-    with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
         x0 = old._build_x0()
-    assert x0[old.unknown_names.index("x.Pt_jct")] == 1.234e5 == x_new
+    assert x0[old.unknown_names.index("x.Pt_jct")] != 1.234e5
+    assert not hasattr(old.network.elements["x"], "legacy_unknown_names")
 
 
 def test_a_gui_file_with_the_old_junction_guess_loads_silently() -> None:

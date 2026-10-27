@@ -275,7 +275,7 @@ def _run_network_case(case: BenchmarkCase, solver_timeout_s: float) -> dict[str,
         method="lm",
         timeout=solver_timeout_s,
         options=solver_options,
-        init_strategy="incompressible_warmstart",
+        init_strategy="outletref_warmstart",
     )
     elapsed = perf_counter() - t0
 
