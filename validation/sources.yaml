@@ -2163,16 +2163,65 @@ documents:
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
   id: ISBN 978-1-4200-8605-8 (ebook)
-  topic: [combustion, film, review]
-  content: 'Textbook (560 pp., no text layer): combustor design, diffusers, liner aerodynamics and pressure
-    loss, wall cooling, heat transfer, emissions.'
-  status: unscreened
-  verdict: unscreened; (guess) combustor liner pressure loss, hole Cd and slot-film cooling chapters are
-    the likely relevant parts.
-  read_for: []
-  issues: []
+  topic: [combustion, film, orifice, jet_mixing, review]
+  content: 'Textbook, 560 pp. with a usable text layer (pdftotext works; PDF page = book page + 21). Parts
+    that matter here. Ch. 4 Aerodynamics (pp. 113-152): pressure-loss factor and overall loss, Eqs. 4.1-4.7
+    with Table 4.1 (dP/P3, dP/qref, m T^0.5/(Aref P3) for tubular/tuboannular/annular; the three rows obey
+    Eq. 4.1 to 2%), hot loss Eqs. 4.8-4.10; liner-hole Cd after Kaddah 1964 (Eq. 4.15, plain) and Freeman
+    1965 (Eq. 4.16, plunged) with Kaddah''s measured points in Fig. 4.2 (about 6 per hole shape, cleanly
+    sampled) and curves only in Fig. 4.3; initial jet angle Eq. 4.17; jet trajectory and penetration
+    Eqs. 4.18-4.20 (Norster, Sridhara; Figs. 4.7-4.8); Cranfield and NASA dilution-design methods Eqs.
+    4.24-4.28; pattern factor Eqs. 4.21-4.23 and Lefebvre''s correlation Eqs. 4.30/4.31 with data Figs.
+    4.11/4.12; axial swirler flow Eqs. 4.33-4.36. Ch. 5 (pp. 153-188): theta parameter Eq. 5.6 (design
+    charts only). Ch. 2 Fig. 2.19 (p. 72): kerosine adiabatic temperature rise curves. Ch. 8 Heat Transfer
+    (pp. 315-357): the Lefebvre-Herbert liner-wall method -- gas radiation R1 with Reeves emissivity and
+    luminosity factor L (Eqs. 8.4-8.15), liner-to-casing radiation R2 (Eqs. 8.16-8.19), internal convection
+    0.020/0.017 Re^0.8 (Eqs. 8.20-8.22), annulus convection (Eq. 8.23), balance Eq. 8.25; slot-film
+    effectiveness (Stollery-El-Ehwany 8.30-8.33, Ballal-Lefebvre near-slot and wall-jet 8.34-8.38 with lip
+    thickness, Sturgess practical slots 8.39/8.40); film-side Nu (Eqs. 8.41-8.44); TBC layer Eq. 8.46; F101
+    measured vs predicted wall temperature against fuel H content (Fig. 8.5). THREE CHAINED WORKED EXAMPLES
+    with every input, intermediate and result printed: uncooled primary-zone liner (pp. 325-328, Tw1/Tw2 =
+    1640/1603 K), the same liner film-cooled at x/s = 18 (pp. 338-340, 1283/1265 K), and with a 0.5 mm TBC
+    (pp. 350-351, 1304/1236/1220 K). Only two blocks in the book are headed "Example"; the third (TBC)
+    continues the second.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 worked examples and missing liner correlations. BEST #793 CASE:
+    the Ch. 8 liner-wall-temperature trio. Re-solving the printed equations reproduces all three printed
+    answers within 1 K (1640.8/1603.7, 1282.8/1264.4, 1303.8/1236.4/1220.3), so the book''s own chain is
+    self-consistent and is a printed-quantity fidelity target. combaero CANNOT build it as a network yet:
+    there is no radiation anywhere in the code (no gas emissivity, no luminosity factor, no wall-to-casing
+    radiation; components.py says "Radiation is not modelled"); conduction (ThermalWall/WallLayer, two
+    layers for the TBC case) and both convective sides exist, and the annulus h from channel_smooth
+    (Gnielinski) is within 1% of the book''s 920 W/m2K. The film-cooled case also needs the Ballal-Lefebvre
+    thick-lip eta (Eq. 8.38; combaero''s Marek-Tacina gives 0.801 at Tu 14% against the book''s 0.789, M =
+    2.54 outside Marek-Tacina''s 0.41-1.87) and a film-side h (Eq. 8.44), which combaero does not have (the
+    film changes only T_aw, the duct keeps its own h). SIMPLEST READY CASE: Table 4.1 / Eqs. 4.1-4.7,
+    pressure-loss factor and effective liner hole area, as a two-orifice network. Correlation gaps
+    Lefebvre exposes: gas radiation with luminosity (primary Lefebvre-Herbert 1960, wanted); plunged-hole
+    Cd and Kaddah''s Cd(K, alpha) for liner holes (secondary, primaries are Cranfield MSc theses; NACA TN
+    3663 wanted instead); thick-lip and high-M slot film plus film-side Nu (primary Ballal-Lefebvre 1972,
+    wanted, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
+    penetration (secondary, Holdeman already registered is the better source). LinearThetaHeadLoss in
+    network/pressure_loss.py is Eqs. 4.8-4.10 in form (k = 1 is Eq. 4.9''s low-Mach constant-area value)
+    but cites no source. Book errata found while reproducing: Eq. 8.29 prints C2 = 291(Tw2 - 880) for
+    921(...); the film example substitutes k_g = 0.157 but its 1926 coefficient uses k_a = 0.0553 as Eq.
+    8.44 says; rho_g U_g = 2.62/0.137 should read /0.0137; eps_g = 0.61 needs the nominal q = 0.0588 while
+    Tg used the efficiency-reduced 0.050; Eq. 8.9 prints "2 - exp" for "1 - exp". The book''s air k at 880
+    K (0.0553) is 8% below combaero''s 0.060 and standard tables; its product k at 2280 K (0.157) is 14%
+    above combaero''s frozen 0.138. combaero''s complete combustion of n-heptane at q = 0.050, 880 K gives
+    dT = 1592 K against the book''s dissociated kerosine 1455 K, so an example must take Tg = 2280 K as
+    the book''s input, not recompute it.'
+  read_for: ['#793 worked examples: liner wall temperature (radiation + convection + film + TBC)', '#793
+      worked examples: pressure-loss factor, liner effective hole area, flow split', liner-hole Cd vs
+      annulus crossflow (Kaddah/Freeman) against the shipped McGreehan-Schotsch crossflow Cd, '#714 slot
+      film: Ballal-Lefebvre thick-lip and wall-jet effectiveness against Marek-Tacina', flame radiation
+      and luminosity factor, pattern factor correlation, provenance of LinearThetaHeadLoss]
+  issues: [714, 793]
   records: []
   notes: A byte-identical copy at docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf was deleted 2026-10-25.
+    The earlier "no text layer" note was wrong. Secondary throughout Ch. 4 and 8 except the liner-wall
+    method, Eqs. 4.30/4.31 and Eq. 8.15 (Lefebvre's own); figures reprinted from theses (Kaddah, Freeman,
+    Norster, Sridhara) carry their author as `after:` if digitised.
 - file: docs/orifices/lichtarowicz-et-al-1965-discharge-coefficients-for-incompressible-non-cavitating-flow-through-long-orifices.pdf
   citation: Lichtarowicz, A., Duggins, R. K., Markland, E. (1965). Discharge coefficients for incompressible
     non-cavitating flow through long orifices. J. Mechanical Engineering Science 7(2), 210-219.
@@ -2406,3 +2455,64 @@ wanted:
     q or set boundaries from Bassett's own K). Combining-manifold flow distributions measured under imposed
     pressures would.
   where: ASME J. Fluids Eng.; any measured combining-tee or manifold flow distribution would do.
+- citation: Graves, C. C., Grobman, J. S. (1958). Theoretical analysis of total pressure loss and airflow distribution
+    for tubular turbojet combustors with constant annulus and liner cross-sectional areas. NACA Report 1373.
+  checked: false
+  issues:
+  - 793
+  priority: now
+  question: 'A system-level #793 case -- annulus/liner airflow split and total pressure loss of a whole tubular
+    combustor, hole row by hole row, with the method''s own printed numbers (Lefebvre Ch. 4 cites it, ref. 9).'
+  where: NTRS (public).
+- citation: Grobman, J. S. (1959). Comparison of calculated and experimental total pressure loss and airflow
+    distribution in tubular turbojet combustors with tapered liners. NASA Memo 11-26-58E.
+  checked: false
+  issues:
+  - 793
+  priority: now
+  question: 'MEASURED liner airflow distribution and pressure loss for a full combustor -- the accuracy
+    (cross-source) half of the NACA Report 1373 case, which a combaero annulus + liner-hole network would be
+    scored against.'
+  where: NTRS (public).
+- citation: Dittrich, R. T., Graves, C. C. (1956). Discharge coefficients for combustor-liner air-entry holes I
+    -- circular holes with parallel flow. NACA TN 3663.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'Primary measured Cd of liner holes against annulus velocity and bleed fraction, the data Kaddah''s
+    Cd(K, alpha) (Lefebvre Eq. 4.15, a Cranfield MSc thesis we cannot get) summarises; would score the shipped
+    McGreehan-Schotsch crossflow Cd on liner holes and say whether plunged (flanged) holes need their own
+    closure. Part II (TN 3924, Dittrich 1958) covers rectangular holes, louvers and scoops.'
+  where: NTRS (public).
+- citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
+    Proc. IMechE 174(12), 463-473.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'Primary for the liner-wall method and the luminous-flame emissivity with luminosity factor L
+    (Lefebvre Eqs. 8.7, 8.11, 8.12) -- the radiation combaero lacks entirely; what data L was fitted to and
+    over what pressure and fuel range.'
+  where: SAGE (Proc. IMechE archive).
+- citation: Ballal, D. R., Lefebvre, A. H. (1972). A proposed method for calculating film-cooled wall temperatures
+    in gas turbine combustion chambers. ASME Paper 72-WA/HT-24.
+  checked: false
+  issues:
+  - 714
+  priority: later
+  question: 'Primary for the thick-lip slot-film effectiveness (Lefebvre Eqs. 8.37/8.38, blowing ratio up to 4
+    where Marek-Tacina stops at 1.87) and the film-side Nusselt numbers (Eqs. 8.41/8.43) that combaero''s film
+    path lacks -- with the data they were fitted to. Companion: Ballal and Lefebvre (1973) J. Heat Transfer 95,
+    265-266 (near-slot region).'
+  where: ASME Digital Collection.
+- citation: Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
+    AFWAL-TR-84-2104.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'Operating conditions and geometry behind Lefebvre Fig. 8.5 (GE F101 measured liner wall temperature
+    against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
+    radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
+  where: DTIC (public, ADA-numbered).
