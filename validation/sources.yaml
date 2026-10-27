@@ -2187,7 +2187,8 @@ documents:
     curve over rows 1-5). Labels: the split and losses are ACCURACY (cross-source; no combaero closure is
     from this rig); reproducing the Graves-Grobman calculated curves is model-vs-model only, not fidelity.
     The split carries TN 3663''s Cd inside it, so scoring it mixes the network with the Cd question (TN 3663
-    raised to now). The fuel nozzle alone raises dP/q_r by about 0.3, and heat-release runs had it in place.
+    now registered: Eq. 17 reads 12-29% low at its Phi < 3). The fuel nozzle alone raises dP/q_r by about
+    0.3, and heat-release runs had it in place.
     combaero pieces: annulus as CrossflowSegmentElement stations (Pt-conserving bleed is kappa of about 1;
     GG assume no annulus mixing loss), liner rows as duct-fed EffusionPlateElement panels (90 deg,
     McGreehan-Schotsch U1/Vi Cd), liner as MomentumChamberNode merge chambers (main_inlet + side streams).
@@ -2223,7 +2224,7 @@ documents:
     model-vs-model (code-to-code) target, never fidelity or accuracy. What it gives: the 1-D annulus + liner
     momentum equations a combaero annulus/hole/liner network should reduce to in the incompressible,
     uniform-jet limit, and Fig. 5 as a full static/total pressure profile to reproduce. Its measured counterpart is
-    Grobman 1959 (tapered liners). The Cd it uses is TN 3663''s (wanted).'
+    Grobman 1959 (tapered liners). The Cd it uses is TN 3663''s (registered).'
   read_for: ['#793 worked examples: system-level combustor flow split (method)', provenance of the 1-D
       annulus/liner momentum model]
   issues: [793]
@@ -2245,6 +2246,72 @@ documents:
   issues: [793]
   records: []
   notes: Dated 1956 in the filename (report number); Grobman 1959 cites it as 1957.
+- file: docs/combustor_network/dittrich_graves_1956_NACA_TN_3663.pdf
+  citation: Dittrich, R. T., Graves, C. C. (1956). Discharge coefficients for combustor-liner air-entry holes
+    I -- circular holes with parallel flow. NACA TN 3663, Lewis Flight Propulsion Laboratory, April 1956.
+  id: NACA TN 3663
+  topic: [orifice, combustion]
+  content: 'Scanned, 42 PDF pp. (text pp. 1-15, figures pp. 16-39; PDF page order of text pp. 9-14 is
+    shuffled); read the images, not the OCR. Rig: 4 in square duct, one wall replaced by a FLAT plate with
+    FLUSH square-edged circular holes, discharging into a quiescent plenum (no internal/discharge-side
+    flow). Geometry (table p. 6): d 0.125 and 0.25 in (five holes at 1/2 in pitch across the duct), 0.75 and
+    1.50 in (single hole); wall t 0.040 in, plus 0.125 and 0.500 in for the 0.75 in hole (d/t 1.5-37.5, L/d
+    0.027-0.67); duct height 0.74-2.23 in (A_h/A_d 0.004-0.60); boundary layer 0.04-0.10 in with/without
+    bleed-off (Fig. 7); duct static 1060, 1910, 3605 psf; air about 75 F. NO plunged holes, louvers, scoops
+    or angled approach (Part II, TN 3924). Approach velocity V_d 0, 40, 70, 150, 300, 500 ft/s (M to about
+    0.44), static drop 1-470 psf, p_d/p_j to 1.32. Re not stated; from the ranges about 2e3 (0.125 in, 1 psf)
+    to 5e5 (1.5 in, 470 psf). C = w_h/(rho_j V_j A_h) with V_j, rho_j ISENTROPIC from duct TOTAL P_d, T_d
+    to jet static p_j (Rohde''s convention). Correlated as corrected C_p = C/(C/C_p) against the flow
+    parameter Phi = (P_d - p_j)/(P_d - p_d); C/C_p(p_d/p_j) from the 0.75 in zero-crossflow data (Fig. 5,
+    1.00 to 1.08 at 1.32) is applied to every geometry. Fig. 2 zero-crossflow C vs p_d/p_j (0.60-0.75); Fig.
+    3/4 raw C for 0.75 in / 0.040 in; Fig. 6(a)-(k) C_p vs Phi per test series, 30-60 points each, the
+    velocity series collapsing to one curve from 0 at Phi 1 to the zero-crossflow value (0.58-0.66) at
+    Phi > 100; Figs. 8-13 faired-curve comparisons (boundary layer, pressure level, t, d, d at fixed d/t,
+    duct height). Appendix: the design procedure Graves-Grobman use. No measurement uncertainty stated.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 and #800. PLUGS A GAP, not an overlap: the shipped duct-fed Cd
+    (McGreehan-Schotsch Eq. 17 in U1/Vi, EffusionPlateElement._supply_crossflow via crossflow_velocity_ratio)
+    is scored only on Rohde 1969 (L/d 1.06, d 0.06 in, duct M 0.14); this is the thin-wall (L/d 0.05),
+    liner-scale (0.75 in) case at duct M to 0.44 and down to C_p of about 0.1, and is not in McGreehan-
+    Schotsch''s Fig. 4 compilation (Rohde, Grimm, Meyfarth-Shine). Same lab as Rohde but a different study,
+    so it is ACCURACY (cross-source), never fidelity. CONVERSION is the Rohde one already in
+    orifice_runner/conventions: incompressibly P_d - p_d = rho U1^2/2 and p_d - p_j = rho Vi^2/2 (Vi from
+    duct STATIC, McGreehan-Schotsch item 22), so Phi = 1 + (Vi/U1)^2, U1/Vi = 1/sqrt(Phi - 1), and
+    Cd_static = C_p sqrt(Phi/(Phi - 1)) (ideal flux from P_d vs from p_d). Exact only incompressibly: at
+    the 300-500 ft/s series q_c exceeds rho U1^2/2 by about M^2/4 (up to 5%), shifting U1/Vi up to about
+    2.5%; an exact map needs each point''s nominal V_d, p_d and T_d (all given), which crossflow_velocity_ratio
+    already computes. Also C_p is the authors'' pressure-ratio-1 value, compared with Eq. 17''s Cd without
+    its Y factor; and combaero''s U1 is the mean of the approach and departing duct flows, TN 3663''s the
+    approach V_d 1 in upstream (equivalent here, the bleed per hole is small at A_h/A_d 0.049). INDICATIVE
+    (14 rough reads off the Fig. 6(e) faired curve, 0.75 in / 0.040 in, scan not digitised, uncommitted
+    script): Eq. 17 anchored to the measured 0.60 zero-crossflow C_p reads LOW by -26% at Phi < 2 (U1/Vi >
+    1), -10% at Phi 2-10, and HIGH by +7% at Phi > 10 where the data show no Eq. 17 bump; the full chain at
+    Re 1e5, L/d 0.053 gives 0.593 at U1/Vi = 0 against 0.60 measured and the same shape. Rohde''s sharp
+    thick hole reads the OPPOSITE way (+41% at VHR 1-10), so Eq. 17 has no wall-thickness interaction: thin
+    liner holes keep more Cd under strong crossflow than it predicts, thick holes less (Fig. 10 here shows
+    the same t trend inside one study). GROBMAN 1959: yes, this is the Cd behind its model-D split (3/4 in
+    hole, 0.040 in wall = Fig. 6(e)/11; Grobman and Report 1373 Fig. 3 add TN 3924 curves for annulus
+    convergence alpha), so the "measured" split is measured row static drops through this curve: score
+    combaero''s split with this Cd held fixed per row (or score the row static drops) to test the network,
+    and treat a McGreehan-Schotsch run as network + Cd together -- at the upstream rows (C 0.1-0.6, Phi < 3)
+    Eq. 17 alone reads 12-29% low. #800: DIFFERENT physics. TN 3663''s crossflow is on the SUPPLY side (the
+    U1/Vi McGreehan-Schotsch term); #800''s CR-3630 Gc/Gj is spent-air crossflow on the DISCHARGE side, which
+    orifice.h already forbids feeding into U1/Vi, so this data cannot score #800. Its only bearing: the
+    authors (citing Callaghan-Bowden TN 1947, Dewey TN 3442) state supply-side curves hold with discharge-
+    side flow too provided V_j exceeds that flow and the LOCAL jet-exit static is used -- a hint that a
+    falling CD(Gc/Gj) can partly be a static-reference effect, not evidence.'
+  read_for: ['#793 liner-hole Cd under annulus crossflow (Dittrich-Graves vs McGreehan-Schotsch)', the Cd inside
+      Grobman 1959's model-D airflow split, '#800 crossflow-dependent impingement CD (relevance only)', whether
+      plunged/flanged liner holes need their own closure (not answered here; TN 3924 or Kaddah)]
+  issues: [793, 800]
+  records: []
+  code: ['include/orifice.h: orifice::mcgreehan_schotsch::cd (Eq. 17, the closure it would score)', 'include/side_stream_momentum.h:
+      crossflow_velocity_ratio (U1/Vi of a duct-fed hole)', 'python/combaero/network/components.py: EffusionPlateElement._supply_crossflow']
+  notes: 'Public NACA report. Digitising target if this becomes a scored set: Fig. 6(e) (cleanly sampled, about
+    45 points, Grobman''s exact hole), then 6(f)/(g) for wall thickness and 6(a)/(j) for the small-hole and
+    large A_h/A_d ends; render at 130 dpi or more. Indicative script: tmp/tn3663/compare.py (main checkout,
+    not committed). Fig. 6(j): at A_h/A_d 0.60 the hole swallows the whole approach flow at Phi 10, capping
+    C_p at 0.53 -- a duct-blockage effect a single-hole Cd cannot carry.'
 - file: docs/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
@@ -2285,7 +2352,7 @@ documents:
     pressure-loss factor and effective liner hole area, as a two-orifice network. Correlation gaps
     Lefebvre exposes: gas radiation with luminosity (primary Lefebvre-Herbert 1960, wanted); plunged-hole
     Cd and Kaddah''s Cd(K, alpha) for liner holes (secondary, primaries are Cranfield MSc theses; NACA TN
-    3663 wanted instead); thick-lip and high-M slot film plus film-side Nu (primary Ballal-Lefebvre 1972,
+    3663, now registered, instead); thick-lip and high-M slot film plus film-side Nu (primary Ballal-Lefebvre 1972,
     wanted, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
     penetration (secondary, Holdeman already registered is the better source). LinearThetaHeadLoss in
     network/pressure_loss.py is Eqs. 4.8-4.10 in form (k = 1 is Eq. 4.9''s low-Mach constant-area value)
@@ -2541,19 +2608,16 @@ wanted:
     q or set boundaries from Bassett's own K). Combining-manifold flow distributions measured under imposed
     pressures would.
   where: ASME J. Fluids Eng.; any measured combining-tee or manifold flow distribution would do.
-- citation: Dittrich, R. T., Graves, C. C. (1956). Discharge coefficients for combustor-liner air-entry holes I
-    -- circular holes with parallel flow. NACA TN 3663.
+- citation: Dittrich, R. T. (1958). Discharge coefficients for combustor-liner air-entry holes II -- flush
+    rectangular holes, step louvers, and scoops. NACA TN 3924.
   checked: false
   issues:
   - 793
-  priority: now
-  question: 'Primary measured Cd of liner holes against annulus velocity and bleed fraction, the data Kaddah''s
-    Cd(K, alpha) (Lefebvre Eq. 4.15, a Cranfield MSc thesis we cannot get) summarises; would score the shipped
-    McGreehan-Schotsch crossflow Cd on liner holes and say whether plunged (flanged) holes need their own
-    closure. Part II (TN 3924, Dittrich 1958) covers rectangular holes, louvers and scoops. Raised to now
-    (2026-10-27): Grobman 1959''s "measured" model-D airflow split is computed from measured row static drops
-    WITH this Cd (3/4 in hole, 0.040 in wall), so scoring combaero''s split against it separates the network
-    from the Cd only if we hold the Cd data too.'
+  priority: later
+  question: 'Part II of TN 3663 (registered): the non-circular and protruding entries (louvers, scoops) TN 3663
+    does not cover, and the annulus-convergence (alpha) curves Grobman 1959 and Report 1373 Fig. 3 use beside
+    TN 3663''s. Wanted when a liner case has louvers or a converging annulus, or to settle whether plunged
+    holes need their own closure.'
   where: NTRS (public).
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
