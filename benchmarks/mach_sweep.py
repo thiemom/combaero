@@ -241,12 +241,12 @@ def main() -> None:
     ax[1].set_ylabel("PR difference [%]\n(incomp - comp)")
     ax[1].grid(True, alpha=0.3)
 
-    ax[2].plot(data_comp["mach_solved_hot"], data_comp["delta_t_hot"], "-", label="Hot cooling ΔT")
+    ax[2].plot(data_comp["mach_solved_hot"], data_comp["delta_t_hot"], "-", label="Hot cooling Delta_T")
     ax[2].plot(
-        data_comp["mach_solved_hot"], data_comp["delta_t_cold"], "-", label="Cold heating ΔT"
+        data_comp["mach_solved_hot"], data_comp["delta_t_cold"], "-", label="Cold heating Delta_T"
     )
     ax[2].set_xlabel("Mach number (hot stream)")
-    ax[2].set_ylabel("Thermal coupling ΔT [K]")
+    ax[2].set_ylabel("Thermal coupling Delta_T [K]")
     ax[2].grid(True, alpha=0.3)
     ax[2].legend()
 

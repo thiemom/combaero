@@ -70,7 +70,7 @@ double v_from_h0(double h0, double h_static_J_per_kg);
 double mach_number(double v, double T, const std::vector<double>& X);
 
 // -------------------------------------------------------------
-// Stagnation temperature (iterative — variable cp)
+// Stagnation temperature (iterative -- variable cp)
 // -------------------------------------------------------------
 
 // Stagnation temperature T0 from static T and Mach number.
@@ -96,7 +96,7 @@ double T_from_stagnation(double T0, double M, const std::vector<double>& X,
                          double tol = 1e-8, std::size_t max_iter = 50);
 
 // -------------------------------------------------------------
-// Stagnation pressure (isentropic — uses entropy conservation)
+// Stagnation pressure (isentropic -- uses entropy conservation)
 // -------------------------------------------------------------
 
 // Stagnation pressure P0 from static (P, T) and Mach number.

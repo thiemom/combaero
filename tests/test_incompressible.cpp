@@ -63,7 +63,7 @@ TEST(ZetaCd, KnownValues) {
 }
 
 TEST(ZetaCd, SharpEdgeOrifice) {
-    // Typical sharp-edge Cd ≈ 0.61 → ζ ≈ 2.69
+    // Typical sharp-edge Cd ~= 0.61 -> zeta ~= 2.69
     const double Cd = 0.61;
     const double zeta = zeta_from_Cd(Cd);
     EXPECT_NEAR(zeta, 1.0 / (Cd * Cd), 1e-12);
@@ -84,7 +84,7 @@ TEST(ZetaCd, InvalidArgs) {
 TEST(ZetaCd, ConsistentWithOrificeDP) {
     // For a restriction where reference area = throat area:
     //   orifice_dP(mdot, A, Cd, rho) == pressure_loss(v_throat, rho, zeta_from_Cd(Cd))
-    const double A = 1e-4;   // 1 cm²
+    const double A = 1e-4;   // 1 cm^2
     const double Cd = 0.61;
     const double rho = 1.2;
     const double mdot = 0.05;

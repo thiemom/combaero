@@ -59,7 +59,7 @@ def compare_results(standalone: dict, network: dict, tol_rel: float = 0.01) -> b
         rel_error = abs(val_n - val_s) / abs(val_s) if abs(val_s) > 1e-12 else abs(val_n - val_s)
 
         max_error = max(max_error, rel_error)
-        status = "✓ PASS" if rel_error < tol_rel else "✗ FAIL"
+        status = "PASS" if rel_error < tol_rel else "FAIL"
 
         if rel_error >= tol_rel:
             all_match = False
@@ -68,7 +68,7 @@ def compare_results(standalone: dict, network: dict, tol_rel: float = 0.01) -> b
 
     print("-" * 80)
     print(f"Maximum relative error: {max_error * 100:.4f}%")
-    print(f"Overall: {'✓ ALL PASS' if all_match else '✗ SOME FAILURES'}")
+    print(f"Overall: {'ALL PASS' if all_match else 'SOME FAILURES'}")
     print("=" * 80)
 
     return all_match
@@ -77,7 +77,7 @@ def compare_results(standalone: dict, network: dict, tol_rel: float = 0.01) -> b
 def main() -> int:
 
     print("=" * 80)
-    print("Combustor Liner Cooling — Implementation Comparison")
+    print("Combustor Liner Cooling -- Implementation Comparison")
     print("=" * 80)
 
     # Test conditions (same as both implementations)
@@ -168,20 +168,20 @@ def main() -> int:
 
         if not test_pass:
             all_tests_pass = False
-            print(f"\n⚠️  Test case FAILED: f_cool={f_cool:.2f}, channel={ch_name}")
+            print(f"\nWARN: Test case FAILED: f_cool={f_cool:.2f}, channel={ch_name}")
         else:
-            print(f"\n✓ Test case PASSED: f_cool={f_cool:.2f}, channel={ch_name}")
+            print(f"\nOK: Test case PASSED: f_cool={f_cool:.2f}, channel={ch_name}")
 
     # Final summary
     print("\n" + "=" * 80)
     print("FINAL SUMMARY")
     print("=" * 80)
     if all_tests_pass:
-        print("✓ ALL TEST CASES PASSED")
+        print("OK: ALL TEST CASES PASSED")
         print("Both implementations produce matching results within 1% tolerance.")
         return 0
     else:
-        print("✗ SOME TEST CASES FAILED")
+        print("FAIL: SOME TEST CASES FAILED")
         print("Discrepancies found between implementations. Investigation needed.")
         return 1
 

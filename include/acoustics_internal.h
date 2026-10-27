@@ -1,7 +1,7 @@
 #pragma once
 
 // Internal helpers shared between acoustics.cpp and can_annular_solvers.cpp.
-// Not part of the public API — do not include from python/ or external code.
+// Not part of the public API -- do not include from python/ or external code.
 
 #include "acoustics.h"
 #include <complex>
@@ -23,7 +23,7 @@ std::complex<double> dispersion_relation_complex(
     BoundaryCondition bc_top
 );
 
-// Real-ω overload (delegates to complex version with zero imaginary part).
+// Real-omega overload (delegates to complex version with zero imaginary part).
 std::complex<double> dispersion_relation(
     double omega,
     int m,
@@ -35,7 +35,7 @@ std::complex<double> dispersion_relation(
     BoundaryCondition bc_top
 );
 
-// Scan [f_min, f_max] for local minima of |D(ω)| and return up to
+// Scan [f_min, f_max] for local minima of |D(omega)| and return up to
 // n_zeros_expected frequency guesses suitable for Muller refinement.
 std::vector<double> find_zero_guesses(
     int m,
@@ -50,7 +50,7 @@ std::vector<double> find_zero_guesses(
     int n_zeros_expected
 );
 
-// Muller's method: refine a frequency guess to a root of D(ω, m) = 0.
+// Muller's method: refine a frequency guess to a root of D(omega, m) = 0.
 // Returns refined frequency [Hz].
 double refine_root_muller(
     double f_guess,

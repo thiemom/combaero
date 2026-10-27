@@ -17,7 +17,7 @@
 // given static temperature T and static pressure P.
 //
 // Exception: CompressibleFlowSolution::stagnation holds a State at
-// stagnation conditions (T0, P0) — the only deliberate use of State
+// stagnation conditions (T0, P0) -- the only deliberate use of State
 // to carry total rather than static values.
 //
 // For the network solver, use MixtureState (NETWORK_ROADMAP.md) which
@@ -52,11 +52,11 @@ struct State {
   double a() const;
 
   // Transport properties (recomputed on each call)
-  double mu() const;    // Dynamic viscosity [Pa·s]
-  double k() const;     // Thermal conductivity [W/(m·K)]
-  double nu() const;    // Kinematic viscosity [m²/s]
+  double mu() const;    // Dynamic viscosity [Pa*s]
+  double k() const;     // Thermal conductivity [W/(m*K)]
+  double nu() const;    // Kinematic viscosity [m^2/s]
   double Pr() const;    // Prandtl number [-]
-  double alpha() const; // Thermal diffusivity [m²/s]
+  double alpha() const; // Thermal diffusivity [m^2/s]
 
   // Convenience setters (return *this for chaining)
   State &set_T(double T_new) {
@@ -201,14 +201,14 @@ Stream mix(const std::vector<Stream> &streams, double P_out = -1.0,
 struct TransportState {
   double T;     // Temperature [K] (input, echoed back)
   double P;     // Pressure [Pa] (input, echoed back)
-  double rho;   // Density [kg/m³]
-  double mu;    // Dynamic viscosity [Pa·s]
-  double k;     // Thermal conductivity [W/(m·K)]
-  double nu;    // Kinematic viscosity [m²/s]
-  double alpha; // Thermal diffusivity [m²/s]
+  double rho;   // Density [kg/m^3]
+  double mu;    // Dynamic viscosity [Pa*s]
+  double k;     // Thermal conductivity [W/(m*K)]
+  double nu;    // Kinematic viscosity [m^2/s]
+  double alpha; // Thermal diffusivity [m^2/s]
   double Pr;    // Prandtl number [-]
-  double cp;    // Specific heat at constant pressure [J/(kg·K)]
-  double cv;    // Specific heat at constant volume [J/(kg·K)]
+  double cp;    // Specific heat at constant pressure [J/(kg*K)]
+  double cv;    // Specific heat at constant volume [J/(kg*K)]
   double gamma; // Heat capacity ratio cp/cv [-]
   double a;     // Speed of sound [m/s]
 };
@@ -222,18 +222,18 @@ struct TransportState {
 struct ThermoState {
   double T;        // Temperature [K] (input, echoed back)
   double P;        // Pressure [Pa] (input, echoed back)
-  double rho;      // Density [kg/m³]
-  double cp;       // Specific heat at constant pressure [J/(kg·K)]
-  double cv;       // Specific heat at constant volume [J/(kg·K)]
+  double rho;      // Density [kg/m^3]
+  double cp;       // Specific heat at constant pressure [J/(kg*K)]
+  double cv;       // Specific heat at constant volume [J/(kg*K)]
   double h;        // Specific enthalpy [J/kg]
-  double s;        // Specific entropy [J/(kg·K)]
+  double s;        // Specific entropy [J/(kg*K)]
   double u;        // Specific internal energy [J/kg]
   double gamma;    // Isentropic expansion coefficient [-]
   double a;        // Speed of sound [m/s]
-  double cp_mole;  // Molar cp [J/(mol·K)]
-  double cv_mole;  // Molar cv [J/(mol·K)]
+  double cp_mole;  // Molar cp [J/(mol*K)]
+  double cv_mole;  // Molar cv [J/(mol*K)]
   double h_mole;   // Molar enthalpy [J/mol]
-  double s_mole;   // Molar entropy [J/(mol·K)]
+  double s_mole;   // Molar entropy [J/(mol*K)]
   double u_mole;   // Molar internal energy [J/mol]
   double mw;       // Molecular weight [g/mol]
 };
@@ -247,7 +247,7 @@ using AirProperties = TransportState;
 // Equilibrium Result Bundle
 // -------------------------------------------------------------
 
-// Result of any equilibrium solve — carries the final state plus diagnostics.
+// Result of any equilibrium solve -- carries the final state plus diagnostics.
 // Designed to be network-node-friendly: converged flag propagates through a
 // network without silently passing bad values.
 struct EquilibriumResult {

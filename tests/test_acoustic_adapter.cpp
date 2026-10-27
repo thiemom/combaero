@@ -34,14 +34,14 @@ TEST_F(AcousticAdapterTest, BasicConversion) {
     EXPECT_EQ(geom.n_cans, 24);
     EXPECT_DOUBLE_EQ(geom.length_can, 0.5);
 
-    // Can area = π * (0.1/2)^2 = π * 0.0025
+    // Can area = pi * (0.1/2)^2 = pi * 0.0025
     const double expected_can_area = M_PI * 0.0025;
     EXPECT_NEAR(geom.area_can, expected_can_area, 1e-10);
 
     // Plenum radius = D_mean / 2 = (0.4 + 0.6) / 4 = 0.25
     EXPECT_DOUBLE_EQ(geom.radius_plenum, 0.25);
 
-    // Plenum area = flow_geom.area() = π * ((0.6/2)^2 - (0.4/2)^2)
+    // Plenum area = flow_geom.area() = pi * ((0.6/2)^2 - (0.4/2)^2)
     const double expected_plenum_area = flow_geom.area();
     EXPECT_DOUBLE_EQ(geom.area_plenum, expected_plenum_area);
 }

@@ -9,7 +9,7 @@ import pytest
 import combaero as cb
 
 AIR = cb.species.dry_air()
-TOL = 1e-3  # K — tighter than the solver default (1e-6 K) to catch regressions
+TOL = 1e-3  # K -- tighter than the solver default (1e-6 K) to catch regressions
 
 
 @pytest.fixture

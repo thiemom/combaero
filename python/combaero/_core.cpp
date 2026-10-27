@@ -3831,7 +3831,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Isothermal complete combustion to CO2 and H2O.\n\n"
       "Returns State with reactant temperature and burned composition.");
 
-  // Helper: construct State from (T, P, X_arr) — avoids 4-line boilerplate in
+  // Helper: construct State from (T, P, X_arr) -- avoids 4-line boilerplate in
   // every binding
   auto make_state =
       [](double T, double P,
@@ -5099,7 +5099,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
         "CombustionMethod.Equilibrium\n\n"
         "Returns: CombustionState with phi computed from flow rates");
 
-  // PressureLossContext — read-only view passed to user pressure-loss callables
+  // PressureLossContext -- read-only view passed to user pressure-loss callables
   py::class_<PressureLossContext>(
       m, "PressureLossContext",
       "Context passed to user pressure-loss correlations.\n"
@@ -7089,7 +7089,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Returns: dict mapping function_name -> {'input': ..., 'output': ...}");
 
   // =========================================================================
-  // Incompressible flow — scalar primitives
+  // Incompressible flow -- scalar primitives
   // =========================================================================
 
   m.def(
@@ -7127,7 +7127,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Discharge coefficient from loss coefficient: Cd = 1/sqrt(zeta) [-].");
 
   // =========================================================================
-  // Incompressible flow — thermo-aware high-level API
+  // Incompressible flow -- thermo-aware high-level API
   // =========================================================================
 
   m.def(
@@ -7238,7 +7238,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "Returns tuple (dP [Pa], Re [-], f [-]).");
 
   // =========================================================================
-  // Compressible flow — new functions
+  // Compressible flow -- new functions
   // =========================================================================
 
   m.def(

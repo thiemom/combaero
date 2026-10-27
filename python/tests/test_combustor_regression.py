@@ -431,8 +431,8 @@ def test_pressure_loss_invalid_theta_source_raises():
 
 
 def test_combustor_channel_outlet_network_converges():
-    """Regression: the original failing network — MassFlowBoundary inlets, CombustorNode,
-    ChannelElement, PressureBoundary outlet — must converge with correct mass balance."""
+    """Regression: the original failing network -- MassFlowBoundary inlets, CombustorNode,
+    ChannelElement, PressureBoundary outlet -- must converge with correct mass balance."""
     Y_air = cb.species.dry_air_mass()
     Y_ch4 = cb.species.pure_species("CH4")
 
@@ -467,7 +467,7 @@ def test_combustor_diagnostics_exposes_m_dot():
     """CombustorNode.diagnostics must expose the total mass flow as ``m_dot``.
 
     The GUI's Live Telemetry panel renders `state.m_dot` in a prominent slot;
-    without this field combustor nodes would silently display ṁ = 0.
+    without this field combustor nodes would silently display m_dot = 0.
     """
     net, _ = _make_lossless_inlet_network(xi=None)
     sol = NetworkSolver(net).solve(method="hybr", use_jac=True)

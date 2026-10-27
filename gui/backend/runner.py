@@ -409,8 +409,8 @@ class NetworkResult:
         state so that the first re-solve reproduces the same physical operating
         point:
 
-        * ``mass_boundary`` → ``pressure_boundary``: copies solved ``Pt``.
-        * ``pressure_boundary`` → ``mass_boundary``: sums ``m_dot`` of all
+        * ``mass_boundary`` -> ``pressure_boundary``: copies solved ``Pt``.
+        * ``pressure_boundary`` -> ``mass_boundary``: sums ``m_dot`` of all
           adjacent elements.
 
         ``Tt``, ``composition``, ``label``, and ``initial_guess`` are
@@ -448,7 +448,7 @@ class NetworkResult:
         if new_type == "pressure_boundary":
             if state.Pt is None:
                 raise ValueError(
-                    f"Solved state for '{label}' has no Pt — cannot swap to pressure_boundary."
+                    f"Solved state for '{label}' has no Pt -- cannot swap to pressure_boundary."
                 )
             node.data.pop("m_dot", None)
             node.data["Pt"] = float(state.Pt)
@@ -459,7 +459,7 @@ class NetworkResult:
 
         # Seed initial_guess on internal (non-pressure-boundary) nodes so that
         # the first solve after the swap starts from a physically valid point.
-        # PressureBoundary nodes must NOT have P/Pt/T/Tt in initial_guess —
+        # PressureBoundary nodes must NOT have P/Pt/T/Tt in initial_guess --
         # _get_node_state() prefers initial_guess over node.Pt/Tt, so seeding
         # them would prevent BC overrides (e.g. pressure sweeps) from taking effect.
         for n in schema.nodes:
@@ -498,7 +498,7 @@ class NetworkResult:
         connected = downstream or upstream
         if not connected:
             raise ValueError(
-                f"Node '{node_id}' has no connected elements — cannot determine m_dot."
+                f"Node '{node_id}' has no connected elements -- cannot determine m_dot."
             )
         return sum(
             float(self._element_results[e.id].m_dot)
@@ -592,7 +592,7 @@ class NetworkRunner:
                 ``"outletref_warmstart"``, ``"homotopy"``).
             timeout: Per-solve soft timeout in seconds (default
                 ``DEFAULT_SOLVE_TIMEOUT``, 30 s, as in the GUI; ``None``: no limit).
-            _x0: Internal — solver solution vector from a prior solve used
+            _x0: Internal -- solver solution vector from a prior solve used
                 as the initial guess (passed by ``sweep`` for continuation).
 
         Returns:

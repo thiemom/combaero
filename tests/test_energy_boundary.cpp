@@ -34,11 +34,11 @@ static std::vector<double> ch4_Y() {
 }
 
 // =============================================================================
-// 1. Mixer Q parameter accuracy: known Q → known ΔT
+// 1. Mixer Q parameter accuracy: known Q -> known Delta_T
 // =============================================================================
 
 TEST(EnergyBoundaryTest, MixerQ_PositiveHeating) {
-  // Single air stream at 300K, mdot=1 kg/s, Q=50 kW → delta_h=50 kJ/kg
+  // Single air stream at 300K, mdot=1 kg/s, Q=50 kW -> delta_h=50 kJ/kg
   sv::Stream st;
   st.m_dot = 1.0;
   st.T = 300.0;
@@ -52,7 +52,7 @@ TEST(EnergyBoundaryTest, MixerQ_PositiveHeating) {
   auto res_base = sv::mixer_from_streams_and_jacobians({st}, 0.0, 0.0);
   EXPECT_NEAR(res_base.T_mix, 300.0, 0.1);
 
-  // cp_air ~ 1005 J/(kg·K), so ΔT ~ 50000/(1.0*1005) ~ 49.75 K
+  // cp_air ~ 1005 J/(kg*K), so Delta_T ~ 50000/(1.0*1005) ~ 49.75 K
   double dT = res.T_mix - res_base.T_mix;
   EXPECT_GT(dT, 40.0);
   EXPECT_LT(dT, 60.0);
@@ -66,7 +66,7 @@ TEST(EnergyBoundaryTest, MixerQ_PositiveHeating) {
 }
 
 TEST(EnergyBoundaryTest, MixerQ_NegativeCooling) {
-  // Single air stream at 800K, mdot=1 kg/s, Q=-100 kW → T should drop
+  // Single air stream at 800K, mdot=1 kg/s, Q=-100 kW -> T should drop
   sv::Stream st;
   st.m_dot = 1.0;
   st.T = 800.0;
@@ -133,7 +133,7 @@ TEST(EnergyBoundaryTest, MixerQ_TwoStreams) {
 // it the sensible and absolute forms coincide.
 
 TEST(EnergyBoundaryTest, MixerFraction_NegativeCooling) {
-  // Single air stream, fraction=-0.05 → 5% enthalpy loss
+  // Single air stream, fraction=-0.05 -> 5% enthalpy loss
   sv::Stream st;
   st.m_dot = 1.0;
   st.T = 600.0;
@@ -155,7 +155,7 @@ TEST(EnergyBoundaryTest, MixerFraction_NegativeCooling) {
 }
 
 TEST(EnergyBoundaryTest, MixerFraction_PositiveHeating) {
-  // Two streams, fraction=0.10 → 10% enthalpy gain
+  // Two streams, fraction=0.10 -> 10% enthalpy gain
   sv::Stream s1;
   s1.m_dot = 0.5;
   s1.T = 400.0;
@@ -211,7 +211,7 @@ TEST(EnergyBoundaryTest, MixerCombined_Q_and_Fraction) {
 // =============================================================================
 
 TEST(EnergyBoundaryTest, MixerJacobian_Q_dT_dmdot_SingleStream) {
-  // Verify dT/dmdot includes Q correction: -Q/mdot²
+  // Verify dT/dmdot includes Q correction: -Q/mdot^2
   sv::Stream st;
   st.m_dot = 1.0;
   st.T = 500.0;

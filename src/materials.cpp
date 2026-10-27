@@ -94,7 +94,7 @@ double k_tbc_ysz(double T, double hours, bool is_ebpvd) {
 
     // Sintering model (NASA Zhu/Miller TM-2010-216765)
     // k increases as pores close over time at high temperature
-    constexpr double k_fully_sintered = 1.85;  // W/(m·K) - fully dense YSZ limit
+    constexpr double k_fully_sintered = 1.85;  // W/(m*K) - fully dense YSZ limit
     constexpr double E_activation = 12000.0;   // Activation energy [K]
 
     // Sintering rate (Arrhenius relationship)
@@ -143,7 +143,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         k_aluminum_6061,
         200.0, 600.0,
         "ASM Handbook, Aluminum Association",
-        "Aluminum alloy, limited to <300°C due to T6 temper"
+        "Aluminum alloy, limited to <300degC due to T6 temper"
     }},
     {"ysz", {
         "ysz",

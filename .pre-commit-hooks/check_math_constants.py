@@ -69,7 +69,7 @@ def main():
         errors.extend(check_file(filepath))
 
     if errors:
-        print("\n❌ Math constants portability check failed:\n")
+        print("\nFAIL: Math constants portability check failed:\n")
         for error in errors:
             print(f"  {error}")
         print(

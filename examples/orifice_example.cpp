@@ -26,7 +26,7 @@ int main()
     const std::vector<double> X_air = dry_air();
 
     // =========================================================================
-    // 1. Cd correlations — sharp thin-plate sweep over beta and Re
+    // 1. Cd correlations -- sharp thin-plate sweep over beta and Re
     // =========================================================================
 
     std::cout << "=========================================================================\n";
@@ -156,7 +156,7 @@ int main()
     geom_iter.D = 0.050;   // 50 mm pipe
 
     std::cout << "Hot gas: T=" << T_hot << " K, P=" << P_hot / 1e5 << " bar\n";
-    std::cout << "  rho=" << rho_hot << " kg/m³,  mu=" << mu_hot * 1e6 << " μPa·s\n";
+    std::cout << "  rho=" << rho_hot << " kg/m^3,  mu=" << mu_hot * 1e6 << " uPa*s\n";
     std::cout << "Orifice: d=" << geom_iter.d * 1e3 << " mm, D=" << geom_iter.D * 1e3 << " mm"
               << ", beta=" << geom_iter.beta() << "\n\n";
 
@@ -208,7 +208,7 @@ int main()
     std::cout << "  Re_d         = " << res.Re_d << "\n";
     std::cout << "  Cd           = " << res.Cd << "\n";
     std::cout << "  epsilon      = " << res.epsilon << "  (1.0 = incompressible)\n";
-    std::cout << "  rho_corrected= " << res.rho_corrected << " kg/m³\n\n";
+    std::cout << "  rho_corrected= " << res.rho_corrected << " kg/m^3\n\n";
 
     // =========================================================================
     // 5. Expansibility factor for compressible flow

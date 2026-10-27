@@ -2017,7 +2017,7 @@ void tee_fd_density_jacobians(
         return std::make_pair(c.R_straight, c.R_branch);
     };
 
-    // Central FD w.r.t. P_static — scale with pressure so the step is
+    // Central FD w.r.t. P_static -- scale with pressure so the step is
     // never negligibly small at high-altitude or high-pressure conditions.
     const double eps_P = std::max(1.0, std::abs(P_static) * 1e-4);
     auto [Rs_pp, Rb_pp] = eval(std::get<0>(density_and_jacobians(T, P_static + eps_P, X)));

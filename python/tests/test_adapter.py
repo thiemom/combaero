@@ -64,7 +64,7 @@ class TestAnnulusStruct:
         """Test circumference calculation."""
         annulus = cb.Annulus(L=1.0, D_inner=0.4, D_outer=1.0)
 
-        expected_circumference = math.pi * 0.7  # π * D_mean
+        expected_circumference = math.pi * 0.7  # pi * D_mean
         assert abs(annulus.circumference() - expected_circumference) < 1e-10
 
 
@@ -82,7 +82,7 @@ class TestToAcousticGeometry:
         assert geom.n_cans == 24
         assert geom.length_can == 0.5
 
-        # Can area = π * (0.1/2)^2
+        # Can area = pi * (0.1/2)^2
         expected_can_area = math.pi * 0.0025
         assert abs(geom.area_can - expected_can_area) < 1e-10
 

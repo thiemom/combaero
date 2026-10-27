@@ -81,7 +81,7 @@ int main() {
     // Output results
     std::cout << std::setw(6) << phi << std::setw(10) << fuel_phi.mdot
               << std::setw(10) << mixed.state.T << std::setw(10) << eq.state.T
-              << std::setw(12) << eq.state.mu() * 1.0e6 // convert to μPa·s
+              << std::setw(12) << eq.state.mu() * 1.0e6 // convert to uPa*s
               << std::setw(12) << eq.state.Pr() << "\n";
   }
 
@@ -111,22 +111,22 @@ int main() {
   std::cout << "  T = " << mixed_stoich.state.T << " K\n";
   std::cout << "  P = " << mixed_stoich.state.P << " Pa\n";
   std::cout << "  mdot = " << mixed_stoich.mdot << " kg/s\n";
-  std::cout << "  rho = " << mixed_stoich.state.rho() << " kg/m³\n";
-  std::cout << "  cp = " << mixed_stoich.state.cp() << " J/(mol·K)\n\n";
+  std::cout << "  rho = " << mixed_stoich.state.rho() << " kg/m^3\n";
+  std::cout << "  cp = " << mixed_stoich.state.cp() << " J/(mol*K)\n\n";
 
   std::cout << "Complete Combustion (CO2 + H2O only):\n";
   std::cout << "  T_ad = " << burned_stoich.T << " K\n";
-  std::cout << "  rho = " << burned_stoich.rho() << " kg/m³\n";
-  std::cout << "  cp = " << burned_stoich.cp() << " J/(mol·K)\n";
-  std::cout << "  mu = " << burned_stoich.mu() * 1.0e6 << " μPa·s\n";
-  std::cout << "  k = " << burned_stoich.k() << " W/(m·K)\n";
+  std::cout << "  rho = " << burned_stoich.rho() << " kg/m^3\n";
+  std::cout << "  cp = " << burned_stoich.cp() << " J/(mol*K)\n";
+  std::cout << "  mu = " << burned_stoich.mu() * 1.0e6 << " uPa*s\n";
+  std::cout << "  k = " << burned_stoich.k() << " W/(m*K)\n";
   std::cout << "  Pr = " << burned_stoich.Pr() << "\n";
   std::cout << "  a = " << burned_stoich.a() << " m/s\n\n";
 
   std::cout << "Reforming + WGS Equilibrium:\n";
   std::cout << "  T_eq = " << eq_stoich.state.T << " K\n";
-  std::cout << "  rho = " << eq_stoich.state.rho() << " kg/m³\n";
-  std::cout << "  mu = " << eq_stoich.state.mu() * 1.0e6 << " μPa·s\n";
+  std::cout << "  rho = " << eq_stoich.state.rho() << " kg/m^3\n";
+  std::cout << "  mu = " << eq_stoich.state.mu() * 1.0e6 << " uPa*s\n";
   std::cout << "  Pr = " << eq_stoich.state.Pr() << "\n\n";
 
   // Show product composition

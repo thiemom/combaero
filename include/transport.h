@@ -26,10 +26,10 @@ constexpr double CV_VIB_SMOOTH_HALF_WIDTH = 0.002;
 
 // Mixture viscosity and thermal conductivity with analytic d/dT.
 struct TransportDerivatives {
-    double mu = 0.0;      // [Pa·s]
-    double dmu_dT = 0.0;  // [Pa·s/K]
-    double k = 0.0;       // [W/(m·K)]
-    double dk_dT = 0.0;   // [W/(m·K^2)]
+    double mu = 0.0;      // [Pa*s]
+    double dmu_dT = 0.0;  // [Pa*s/K]
+    double k = 0.0;       // [W/(m*K)]
+    double dk_dT = 0.0;   // [W/(m*K^2)]
 };
 TransportDerivatives transport_and_dT(double T, double P, const std::vector<double>& X);
 
@@ -56,7 +56,7 @@ double viscosity(double T, double P, const std::vector<double>& X);
 double thermal_conductivity(double T, double P, const std::vector<double>& X);
 double prandtl(double T, double P, const std::vector<double>& X);
 double kinematic_viscosity(double T, double P, const std::vector<double>& X);
-double thermal_diffusivity(double T, double P, const std::vector<double>& X);  // α = k/(ρ·cp) [m²/s]
+double thermal_diffusivity(double T, double P, const std::vector<double>& X);  // alpha = k/(rho*cp) [m^2/s]
 double reynolds(double T, double P, const std::vector<double>& X, double V, double L);  // Re = rho*VL/mu [-]
 double peclet(double T, double P, const std::vector<double>& X, double V, double L);    // Pe = VL/alpha [-]
 

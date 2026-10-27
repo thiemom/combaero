@@ -21,7 +21,7 @@ class TestSuperalloys:
         T = 300.0  # K (27degC)
         k = cb.k_inconel718(T)
 
-        # At 300K (27degC): k ≈ 11.4 + 0.0146*27 ≈ 11.79 W/(m*K)
+        # At 300K (27degC): k ~= 11.4 + 0.0146*27 ~= 11.79 W/(m*K)
         assert k == pytest.approx(11.79, abs=0.1)
 
     def test_inconel718_high_temp(self):

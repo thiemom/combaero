@@ -113,7 +113,7 @@ def _assert_jacobians_not_discarded(result: object, label: str) -> None:
     """Assert *result* exposes all ChannelResult Jacobian fields.
 
     Uses ``dir()`` introspection so the check is resilient to future
-    return-type changes — any object that carries the fields passes.
+    return-type changes -- any object that carries the fields passes.
     """
     if result is None:
         return  # None means "no surface"; nothing to discard

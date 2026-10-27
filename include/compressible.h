@@ -52,7 +52,7 @@ struct CompressibleFlowSolution {
 // T0      : stagnation temperature [K]
 // P0      : stagnation pressure [Pa]
 // P_back  : back pressure [Pa]
-// A_eff   : effective flow area [m²] (= A * Cd)
+// A_eff   : effective flow area [m^2] (= A * Cd)
 // X       : mole fractions
 // tol     : convergence tolerance (default: 1e-8)
 // max_iter: maximum iterations (default: 50)
@@ -111,7 +111,7 @@ double mach_from_pressure_ratio(
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
-// Compute mass flux G = rho * v [kg/(m²·s)] at given pressure for isentropic
+// Compute mass flux G = rho * v [kg/(m^2*s)] at given pressure for isentropic
 // expansion from stagnation conditions.
 double mass_flux_isentropic(
     double T0, double P0, double P,
@@ -122,24 +122,24 @@ double mass_flux_isentropic(
 // Quasi-1D nozzle flow with variable area A(x)
 // -------------------------------------------------------------
 // Solves quasi-1D compressible flow through a nozzle with area variation:
-//   - Mass: mdot = ρ * u * A(x) = const
-//   - Energy: h + u²/2 = h0 (adiabatic)
-//   - Momentum: dp/dx + ρ*u*du/dx = 0 (frictionless) or with loss model
+//   - Mass: mdot = rho * u * A(x) = const
+//   - Energy: h + u^2/2 = h0 (adiabatic)
+//   - Momentum: dp/dx + rho*u*du/dx = 0 (frictionless) or with loss model
 //
 // Marches along x, solving 2x2 nonlinear system (T, P) at each station
 // using Newton iteration with analytic derivatives from thermo backend.
 
 // Function type for area distribution A(x)
-// x: axial position [m], returns area [m²]
+// x: axial position [m], returns area [m^2]
 using AreaFunction = std::function<double(double)>;
 
 // Station data for quasi-1D nozzle flow
 struct NozzleStation {
     double x = 0.0;      // Axial position [m]
-    double A = 0.0;      // Area [m²]
+    double A = 0.0;      // Area [m^2]
     double P = 0.0;      // Static pressure [Pa]
     double T = 0.0;      // Static temperature [K]
-    double rho = 0.0;    // Density [kg/m³]
+    double rho = 0.0;    // Density [kg/m^3]
     double u = 0.0;      // Velocity [m/s]
     double M = 0.0;      // Mach number [-]
     double h = 0.0;      // Specific enthalpy [J/kg]
@@ -155,7 +155,7 @@ struct NozzleSolution {
     double P0 = 0.0;                     // Stagnation pressure [Pa]
     bool choked = false;                 // True if throat is sonic
     double x_throat = 0.0;               // Throat position [m]
-    double A_throat = 0.0;               // Throat area [m²]
+    double A_throat = 0.0;               // Throat area [m^2]
     std::vector<NozzleStation> profile;  // Axial profile
 };
 
@@ -164,7 +164,7 @@ struct NozzleSolution {
 // Inputs:
 //   T0, P0    : Stagnation conditions [K, Pa]
 //   P_exit    : Exit static pressure [Pa] (determines if subsonic/supersonic)
-//   area_func : Function A(x) returning area [m²] at position x [m]
+//   area_func : Function A(x) returning area [m^2] at position x [m]
 //   x_start   : Start position [m]
 //   x_end     : End position [m]
 //   X         : Mole fractions [-]
@@ -191,7 +191,7 @@ NozzleSolution nozzle_quasi1d(
     double tol = 1e-8, std::size_t max_iter = 50);
 
 // Convenience: solve with polynomial area distribution
-// A(x) = a0 + a1*x + a2*x² + ...
+// A(x) = a0 + a1*x + a2*x^2 + ...
 NozzleSolution nozzle_quasi1d_poly(
     double T0, double P0, double P_exit,
     const std::vector<double>& area_coeffs,  // Polynomial coefficients [a0, a1, a2, ...]
@@ -215,9 +215,9 @@ NozzleSolution nozzle_cd(
 // Fanno flow: adiabatic pipe flow with friction
 // -------------------------------------------------------------
 // Solves compressible pipe flow with wall friction, conserving:
-//   - Mass: ρ * u * A = const = mdot
-//   - Energy: h + u²/2 = h0 (adiabatic, no work)
-//   - Momentum: dp/dx = -f/(2D) * ρ * u² (friction loss)
+//   - Mass: rho * u * A = const = mdot
+//   - Energy: h + u^2/2 = h0 (adiabatic, no work)
+//   - Momentum: dp/dx = -f/(2D) * rho * u^2 (friction loss)
 //
 // Integration via RK4 on p(x), solving for T from energy at each step.
 
@@ -256,11 +256,11 @@ struct FannoStation {
     double x   = 0.0;    // Position along channel [m]
     double P   = 0.0;    // Static pressure [Pa]
     double T   = 0.0;    // Static temperature [K]
-    double rho = 0.0;    // Density [kg/m³]
+    double rho = 0.0;    // Density [kg/m^3]
     double u   = 0.0;    // Velocity [m/s]
     double M   = 0.0;    // Mach number [-]
     double h   = 0.0;    // Specific enthalpy [J/kg]
-    double s   = 0.0;    // Specific entropy [J/(kg·K)]
+    double s   = 0.0;    // Specific entropy [J/(kg*K)]
     double f   = 0.0;    // Local Darcy friction factor [-]
     double Re  = 0.0;    // Local Reynolds number [-]
 };
@@ -295,7 +295,7 @@ struct FannoSolution {
 //   store_profile : If true, store axial profile in solution
 //
 // Returns FannoSolution with outlet conditions.
-// If flow chokes (M→1) before reaching L, integration stops and choked=true.
+// If flow chokes (M->1) before reaching L, integration stops and choked=true.
 FannoSolution fanno_channel(
     double T_in, double P_in, double u_in,
     double L, double D, double f,

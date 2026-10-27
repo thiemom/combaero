@@ -431,7 +431,7 @@ double lmtd(double dT1, double dT2) {
         "lmtd: temperature differences must be positive");
   }
 
-  // If dT1 ≈ dT2, use arithmetic mean to avoid 0/0
+  // If dT1 ~= dT2, use arithmetic mean to avoid 0/0
   double ratio = dT1 / dT2;
   if (std::abs(ratio - 1.0) < 1e-6) {
     return (dT1 + dT2) / 2.0;
@@ -468,7 +468,7 @@ wall_temperature_profile(double T_hot, double T_cold, double h_hot,
         "wall_temperature_profile: HTCs must be positive");
   }
 
-  // Total thermal resistance per unit area [m²·K/W]
+  // Total thermal resistance per unit area [m^2*K/W]
   double R_total = 1.0 / h_hot + 1.0 / h_cold + R_fouling;
   for (double r : t_over_k) {
     if (r < 0) {
@@ -712,7 +712,7 @@ double dT_edge_dq(std::size_t edge_idx, double h_hot,
   }
 
   // T_edge = T_hot - q * R_hot_to_edge
-  // ∂T_edge/∂q = -R_hot_to_edge
+  // dT_edge/dq = -R_hot_to_edge
   double R_hot_to_edge = 1.0 / h_hot;
   for (std::size_t i = 0; i < edge_idx; ++i) {
     R_hot_to_edge += t_over_k[i];
@@ -800,7 +800,7 @@ double nusselt_circular_channel(const State &s, double velocity, double diameter
         throw std::invalid_argument("nusselt_circular_channel: diameter must be positive");
     }
 
-  // Re = ρ * V * D / μ
+  // Re = rho * V * D / mu
   double rho = s.rho();
   double mu = s.mu();
   double Re = rho * velocity * diameter / mu;
@@ -1020,7 +1020,7 @@ channel_smooth(double T, double P, const std::vector<double> &X,
                   ? f * (length / diameter) * (rho * velocity * velocity / 2.0)
                   : 0.0;
 
-  // Mach number and T_aw — always continuous
+  // Mach number and T_aw -- always continuous
   double a = speed_of_sound(T, X);
   double M = (a > 0.0) ? velocity / a : 0.0;
   const bool turbulent_flow = true;
@@ -1114,7 +1114,7 @@ channel_smooth(double T, double P, const std::vector<double> &X,
 
     // dq/dmdot and dq/dT: q = h * (T_aw - T_hot)
     // Full product rule: dq/dx = dh/dx * (T_aw - T_hot) + h * dT_aw/dx
-    // T_aw derivatives — always computed so Python relay can use them
+    // T_aw derivatives -- always computed so Python relay can use them
     // T_aw = T + r * v^2 / (2*cp), where v = mdot/(rho*A), r = Pr^(1/3)
     double cp_mass_val = cp_mass(T, X);
     double r = std::cbrt(Pr);

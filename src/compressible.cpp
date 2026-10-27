@@ -66,7 +66,7 @@ double solve_T_isentropic(double P, double s0, double T_init,
 }
 
 // Compute mass flux G = rho * v for isentropic expansion from (T0, P0) to P
-// Returns G in kg/(m²·s)
+// Returns G in kg/(m^2*s)
 double compute_mass_flux(double T0, double P0, double P, double s0, double h0,
                          const std::vector<double>& X,
                          double tol, std::size_t max_iter) {
@@ -436,7 +436,7 @@ double mass_flux_isentropic(
 
 namespace {
 
-// Solve for T given P such that h(T) + u²/2 = h0, with u from mass conservation.
+// Solve for T given P such that h(T) + u^2/2 = h0, with u from mass conservation.
 // Returns T, and sets u_out and rho_out.
 double solve_T_from_energy(
     double P, double h0_mass, double mdot, double A,
@@ -462,15 +462,15 @@ double solve_T_from_energy(
         double h_mol = h(T, X);  // J/mol
         double h_mass = h_mol / mw_g * 1000.0;  // J/kg
 
-        // Energy equation residual: h + u²/2 - h0 = 0
+        // Energy equation residual: h + u^2/2 - h0 = 0
         double F = h_mass + 0.5 * u * u - h0_mass;
 
         // Derivative: dF/dT = dh/dT + u * du/dT
         // dh/dT = cp (mass basis)
         // du/dT = d(mdot/(rho*A))/dT = mdot/A * d(1/rho)/dT
         //       = mdot/A * d(R*T/(P*mw_kg))/dT = mdot*R/(A*P*mw_kg) = u/T
-        double cp_mol = cp(T, X);  // J/(mol·K)
-        double cp_mass = cp_mol / mw_g * 1000.0;  // J/(kg·K)
+        double cp_mol = cp(T, X);  // J/(mol*K)
+        double cp_mass = cp_mol / mw_g * 1000.0;  // J/(kg*K)
         double du_dT = u / T;
         double dF = cp_mass + u * du_dT;
 
@@ -565,7 +565,7 @@ FannoSolution fanno_channel(
     sol.inlet.set_X(X);
     double mw_g = sol.inlet.mw();  // g/mol
     double mw_kg = mw_g / 1000.0;  // kg/mol
-    double A = M_PI * D * D / 4.0;  // m²
+    double A = M_PI * D * D / 4.0;  // m^2
 
     // Inlet density and mass flow
     double rho_in = sol.inlet.rho();
@@ -575,7 +575,7 @@ FannoSolution fanno_channel(
     sol.Re_in = reynolds(T_in, P_in, X, u_in, D);
     sol.f_avg = f;  // constant-f overload: f_avg == f
 
-    // Stagnation enthalpy (conserved): h0 = h + u²/2
+    // Stagnation enthalpy (conserved): h0 = h + u^2/2
     double h_in_mol = h(T_in, X);  // J/mol
     double h_in_mass = h_in_mol / mw_g * 1000.0;  // J/kg
     sol.h0 = h_in_mass + 0.5 * u_in * u_in;
@@ -597,7 +597,7 @@ FannoSolution fanno_channel(
         st.u  = u_in;
         st.M  = M_in;
         st.h  = h_in_mass;
-        st.s  = sol.inlet.s();  // J/(kg·K)
+        st.s  = sol.inlet.s();  // J/(kg*K)
         st.f  = f;
         st.Re = sol.Re_in;
         sol.profile.push_back(st);
@@ -804,7 +804,7 @@ FannoSolution fanno_channel_rough(
     sol.inlet.set_X(X);
     const double mw_g  = sol.inlet.mw();       // g/mol
     const double mw_kg = mw_g / 1000.0;        // kg/mol
-    const double A     = M_PI * D * D / 4.0;   // m²
+    const double A     = M_PI * D * D / 4.0;   // m^2
 
     const double rho_in = sol.inlet.rho();
     sol.mdot = rho_in * u_in * A;
@@ -1046,7 +1046,7 @@ namespace {
 
 // Solve for (T, u) given P, h0, mdot, A using Newton iteration.
 // Constraints:
-//   1. Energy: h(T) + u²/2 = h0
+//   1. Energy: h(T) + u^2/2 = h0
 //   2. Mass: rho(T,P) * u * A = mdot
 //
 // Returns true if converged, false otherwise.
@@ -1071,15 +1071,15 @@ namespace {
         double h_mol = h(T, X);  // J/mol
         double h_mass = h_mol / mw_g * 1000.0;  // J/kg
 
-        // Energy equation residual: h + u²/2 - h0 = 0
+        // Energy equation residual: h + u^2/2 - h0 = 0
         double F = h_mass + 0.5 * u * u - h0_mass;
 
         // Derivative: dF/dT = dh/dT + u * du/dT
         // dh/dT = cp (mass basis)
         // du/dT = d(mdot/(rho*A))/dT = mdot/A * d(1/rho)/dT
         //       = mdot/A * d(R*T/(P*mw_kg))/dT = u/T
-        double cp_mol = cp(T, X);  // J/(mol·K)
-        double cp_mass = cp_mol / mw_g * 1000.0;  // J/(kg·K)
+        double cp_mol = cp(T, X);  // J/(mol*K)
+        double cp_mass = cp_mol / mw_g * 1000.0;  // J/(kg*K)
         double du_dT = u / T;
         double dF = cp_mass + u * du_dT;
 
@@ -1146,7 +1146,7 @@ double interpolate_area(const std::vector<std::pair<double, double>>& profile, d
     return profile.back().second;
 }
 
-// Evaluate polynomial A(x) = a0 + a1*x + a2*x² + ...
+// Evaluate polynomial A(x) = a0 + a1*x + a2*x^2 + ...
 double eval_poly_area(const std::vector<double>& coeffs, double x) {
     double result = 0.0;
     double x_pow = 1.0;
@@ -1260,12 +1260,12 @@ NozzleSolution nozzle_quasi1d(
     double exp_val = gp1 / (2.0 * gm1);
 
     // For subsonic flow, compute effective A* from exit conditions
-    // A/A* = (1/M) * [(2/(gamma+1)) * (1 + (gamma-1)/2 * M²)]^((gamma+1)/(2*(gamma-1)))
+    // A/A* = (1/M) * [(2/(gamma+1)) * (1 + (gamma-1)/2 * M^2)]^((gamma+1)/(2*(gamma-1)))
     double A_star_eff = A_star;
     if (!sol.choked) {
         // For subsonic flow, find M_exit from pressure ratio, then compute A*_eff
         double P_ratio = P_exit / P0;
-        // P/P0 = (1 + (gamma-1)/2 * M²)^(-gamma/(gamma-1))
+        // P/P0 = (1 + (gamma-1)/2 * M^2)^(-gamma/(gamma-1))
         // Solve for M_exit
         double M_exit = std::sqrt(2.0 / gm1 * (std::pow(P_ratio, -gm1 / gamma) - 1.0));
         if (M_exit > 0.99) M_exit = 0.99;  // Keep subsonic
@@ -1325,7 +1325,7 @@ NozzleSolution nozzle_quasi1d(
         double M_guess = M_ideal[i];
 
         // Compute initial guess for T and P from ideal-gas relations
-        // T/T0 = 1 / (1 + (gamma-1)/2 * M²)
+        // T/T0 = 1 / (1 + (gamma-1)/2 * M^2)
         // P/P0 = (T/T0)^(gamma/(gamma-1))
         double T_ratio = 1.0 / (1.0 + 0.5 * gm1 * M_guess * M_guess);
         double T_guess = T0 * T_ratio;
@@ -1333,7 +1333,7 @@ NozzleSolution nozzle_quasi1d(
 
         // Solve (T, P) using Newton iteration with constraints:
         //   1. Isentropic: s(T, P) = s0
-        //   2. Energy with fixed M: h(T) + 0.5*(M_guess*a(T,P))² = h0
+        //   2. Energy with fixed M: h(T) + 0.5*(M_guess*a(T,P))^2 = h0
         // This keeps sub/sup branches cleanly separated
         double T = T_guess;
         double P = P_guess;
@@ -1344,9 +1344,9 @@ NozzleSolution nozzle_quasi1d(
             double cp_mass_val = cp_mass(T, X);
             double cv_mass_val = cv_mass(T, X);
             double gamma_local = cp_mass_val / cv_mass_val;
-            double R_specific = R_GAS / mw_kg;  // J/(kg·K)
+            double R_specific = R_GAS / mw_kg;  // J/(kg*K)
 
-            // Speed of sound: a² = gamma * R_specific * T
+            // Speed of sound: a^2 = gamma * R_specific * T
             double a2 = gamma_local * R_specific * T;
             double a = std::sqrt(a2);
 
@@ -1360,7 +1360,7 @@ NozzleSolution nozzle_quasi1d(
             double s_curr = s_mass(T, X, P);
 
             // Residuals (all mass basis)
-            double f1 = s_curr - s0;  // Entropy error [J/(kg·K)]
+            double f1 = s_curr - s0;  // Entropy error [J/(kg*K)]
             double f2 = h_mass_val + ke_mass - sol.h0;  // Energy error [J/kg]
 
             if (std::abs(f1) < tol * std::abs(s0) && std::abs(f2) < tol * sol.h0) break;
@@ -1373,7 +1373,7 @@ NozzleSolution nozzle_quasi1d(
             // df2/dT = dh_mass/dT + d(ke_mass)/dT
             // dh_mass/dT = cp_mass
             // d(ke_mass)/dT = u * du/dT = u * M_guess * da/dT
-            // da/dT = a / (2*T) * (1 + T/gamma * dgamma/dT) ≈ a / (2*T) for slowly varying gamma
+            // da/dT = a / (2*T) * (1 + T/gamma * dgamma/dT) ~= a / (2*T) for slowly varying gamma
             double da_dT = a / (2.0 * T);
             double du_dT = M_guess * da_dT;
             double df2_dT = cp_mass_val + u * du_dT;
@@ -1382,7 +1382,7 @@ NozzleSolution nozzle_quasi1d(
             [[maybe_unused]] double df2_dP = 0.0;
 
             // Solve 2x2 system: J * [dT, dP]^T = -[f1, f2]^T
-            // Since df2_dP ≈ 0, solve sequentially:
+            // Since df2_dP ~= 0, solve sequentially:
             // dT = -f2 / df2_dT (from energy)
             // dP from entropy: df1_dT * dT + df1_dP * dP = -f1
             double dT = (std::abs(df2_dT) > 1e-30) ? -f2 / df2_dT : 0.0;
@@ -1524,7 +1524,7 @@ NozzleSolution nozzle_cd(
 // Rocket nozzle thrust
 // -------------------------------------------------------------
 
-constexpr double G0 = 9.80665;  // Standard gravity [m/s²]
+constexpr double G0 = 9.80665;  // Standard gravity [m/s^2]
 
 ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb)
 {

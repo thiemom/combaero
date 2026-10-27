@@ -291,7 +291,7 @@ def _expand_initial_guess(short_guess: dict, prefix: str) -> dict:
     if not short_guess:
         return {}
     result: dict = {}
-    # Pass 1 — broadcast P and T to both static and total variants.
+    # Pass 1 -- broadcast P and T to both static and total variants.
     for key, val in short_guess.items():
         if "." in key:
             continue
@@ -301,7 +301,7 @@ def _expand_initial_guess(short_guess: dict, prefix: str) -> dict:
         elif key == "T":
             result[f"{prefix}.T"] = val
             result[f"{prefix}.Tt"] = val
-    # Pass 2 — explicit short keys (Pt, Tt, m_dot, X[i], etc.)
+    # Pass 2 -- explicit short keys (Pt, Tt, m_dot, X[i], etc.)
     # are applied after the broadcast so they win on conflict.
     for key, val in short_guess.items():
         if "." in key:
@@ -720,7 +720,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             edge_junction_map[(edge.source, edge.target)] = junction_id
 
         elif src_tee and tgt_elem:
-            # Junction port → element (e.g. tee.common-source → channel): auto-insert
+            # Junction port -> element (e.g. tee.common-source -> channel): auto-insert
             # MomentumChamberNode so that Pt != P_static and velocity is accounted for.
             port = _port_from_handle(edge.sourceHandle)
             if port and (edge.source, port) not in tee_port_node_map:
@@ -733,7 +733,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 edge_junction_map[(edge.source, edge.target)] = jid
 
         elif src_elem and tgt_tee:
-            # Element → junction port (e.g. channel → tee.straight-target): auto-insert MomentumChamberNode
+            # Element -> junction port (e.g. channel -> tee.straight-target): auto-insert MomentumChamberNode
             port = _port_from_handle(edge.targetHandle)
             if port and (edge.target, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.target}_{port}"

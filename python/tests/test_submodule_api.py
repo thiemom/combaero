@@ -27,7 +27,7 @@ from combaero import FlowSolution
 
 
 def air() -> tuple:
-    """Return (T, P, X) for dry air at 400 K, 2 bar — subsonic Fanno regime."""
+    """Return (T, P, X) for dry air at 400 K, 2 bar -- subsonic Fanno regime."""
     X = cb.species.dry_air()
     return 400.0, 200_000.0, X
 
@@ -70,7 +70,7 @@ class TestFlowSolution:
 
 
 # ---------------------------------------------------------------------------
-# Symmetric channel_flow — same kwargs, different module
+# Symmetric channel_flow -- same kwargs, different module
 # ---------------------------------------------------------------------------
 
 
@@ -151,11 +151,11 @@ class TestSymmetricChannelFlow:
         sol_i = incomp.channel_flow(T, P, X, **self.KWARGS)
         sol_c = comp.channel_flow(T, P, X, **self.KWARGS)
         # Both positive; compressible dP >= incompressible dP (density drops)
-        assert sol_c.dP >= sol_i.dP * 0.9  # within 10% — just check sign
+        assert sol_c.dP >= sol_i.dP * 0.9  # within 10% -- just check sign
 
 
 # ---------------------------------------------------------------------------
-# Symmetric channel_flow_rough — same kwargs, different module
+# Symmetric channel_flow_rough -- same kwargs, different module
 # ---------------------------------------------------------------------------
 
 

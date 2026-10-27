@@ -106,7 +106,7 @@ class TestPlenumEnergyBoundary:
         T_base, _, _ = node2.compute_derived_state([up])
 
         assert T_heated > T_base
-        # delta_h = 50000 W / 1 kg/s = 50000 J/kg, ΔT ≈ 50 K for air
+        # delta_h = 50000 W / 1 kg/s = 50000 J/kg, Delta_T ~= 50 K for air
         assert T_heated - T_base == pytest.approx(50000.0 / 1005.0, rel=0.05)
 
     def test_plenum_cooling_lowers_temperature(self) -> None:
@@ -300,7 +300,7 @@ class TestMomentumChamberEnergyBoundary:
         T_base, _, _ = node2.compute_derived_state([up])
 
         assert T_heated > T_base
-        # delta_h = 60000/2 = 30000 J/kg, ΔT ≈ 30 K
+        # delta_h = 60000/2 = 30000 J/kg, Delta_T ~= 30 K
         assert T_heated - T_base == pytest.approx(30000.0 / 1014.0, rel=0.05)
 
 
@@ -471,7 +471,7 @@ def test_heat_exchange_node():
     """Verify Q parameter changes outlet temperature correctly."""
     graph = FlowNetwork()
 
-    # Simple network: MassFlowBoundary → Plenum(Q=1000W) → PressureBoundary
+    # Simple network: MassFlowBoundary -> Plenum(Q=1000W) -> PressureBoundary
     Y_air = _air_Y()
     inlet = MassFlowBoundary("inlet", m_dot=0.1, Tt=600.0, Y=Y_air)
     plenum = PlenumNode("plenum")
@@ -524,9 +524,11 @@ def test_heat_exchange_node():
 
     # Also verify temperature increased (sanity check)
     delta_T = T_out - T_in
-    assert delta_T > 0, f"Temperature should increase: ΔT = {delta_T:.1f}K"
+    assert delta_T > 0, f"Temperature should increase: Delta_T = {delta_T:.1f}K"
 
-    print(f"Heat exchange test passed: T_in={T_in:.1f}K → T_out={T_out:.1f}K (ΔT={delta_T:.1f}K)")
+    print(
+        f"Heat exchange test passed: T_in={T_in:.1f}K -> T_out={T_out:.1f}K (Delta_T={delta_T:.1f}K)"
+    )
     print(
         f"Energy balance verified: h_in={h_in:.1f} J/kg + Q/mdot={Q / mdot:.1f} J/kg = h_out={h_out_actual:.1f} J/kg"
     )

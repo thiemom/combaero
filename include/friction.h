@@ -8,11 +8,11 @@
 // Darcy friction factor correlations for turbulent channel flow
 // -------------------------------------------------------------
 // All functions compute the Darcy friction factor f for use in:
-//   ΔP = f * (L/D) * (ρ * v²/2)
+//   Delta_P = f * (L/D) * (rho * v^2/2)
 //
 // Parameters:
 //   Re  : Reynolds number [-] (must be > 0)
-//   e_D : relative roughness ε/D [-] (must be >= 0)
+//   e_D : relative roughness eps/D [-] (must be >= 0)
 //
 // Valid for turbulent flow (Re > ~2300). For laminar flow, use f = 64/Re.
 //
@@ -22,7 +22,7 @@
 // - Serghides (1984): Chemical Engineering, Nov. 5
 
 // Haaland correlation (1983) - explicit approximation
-// 1/√f = -1.8 * log10( (ε/D / 3.7)^1.11 + 6.9/Re )
+// 1/sqrt(f) = -1.8 * log10( (eps/D / 3.7)^1.11 + 6.9/Re )
 // Accuracy: ~2-3% vs Colebrook-White
 namespace haaland {
 constexpr double coeff_outer = -1.8;
@@ -34,17 +34,17 @@ double friction_haaland(double Re, double e_D);
 
 // Serghides correlation (1984) - explicit approximation
 // Uses Steffensen acceleration on Colebrook iteration.
-// 1/√f = A - (B-A)² / (C - 2B + A)
+// 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
 // Accuracy: <0.3% vs Colebrook-White (very accurate)
 namespace serghides {
-constexpr double coeff_roughness = 3.7;    // ε/D divisor (same as Colebrook/Haaland)
+constexpr double coeff_roughness = 3.7;    // eps/D divisor (same as Colebrook/Haaland)
 constexpr double coeff_reynolds_A = 12.0;  // 12/Re term in A
 constexpr double coeff_reynolds_BC = 2.51; // 2.51*A/Re term in B, C
 } // namespace serghides
 double friction_serghides(double Re, double e_D);
 
 // Colebrook-White equation (1939) - implicit, solved iteratively
-// 1/√f = -2 * log10( ε/D/3.7 + 2.51/(Re*√f) )
+// 1/sqrt(f) = -2 * log10( eps/D/3.7 + 2.51/(Re*sqrt(f)) )
 // The reference standard for turbulent friction factor.
 // Uses Haaland as initial guess, Newton-Raphson iteration.
 double friction_colebrook(double Re, double e_D, double tol = 1e-10,
@@ -102,8 +102,8 @@ double friction_colebrook_dRe(double Re, double e_D);
 // -------------------------------------------------------------
 // Channel Roughness Database
 // -------------------------------------------------------------
-// Absolute roughness ε [m] for common channel materials.
-// Used as e_D = ε/D in friction factor correlations.
+// Absolute roughness eps [m] for common channel materials.
+// Used as e_D = eps/D in friction factor correlations.
 //
 // References:
 // - Moody (1944): Transactions of the ASME, 66(8)

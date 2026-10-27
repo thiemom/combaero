@@ -141,21 +141,21 @@ if __name__ == "__main__":
     print("Testing combustion Jacobian functions...")
 
     test_adiabatic_complete_jacobian_basic()
-    print("✅ Basic complete combustion Jacobian test passed")
+    print("OK: Basic complete combustion Jacobian test passed")
 
     test_adiabatic_equilibrium_jacobian_basic()
-    print("✅ Basic equilibrium combustion Jacobian test passed")
+    print("OK: Basic equilibrium combustion Jacobian test passed")
 
     test_jacobian_sensitivity()
-    print("✅ Jacobian sensitivity test passed")
+    print("OK: Jacobian sensitivity test passed")
 
     test_lean_vs_stoichiometric()
-    print("✅ Lean vs stoichiometric test completed")
+    print("OK: Lean vs stoichiometric test completed")
 
     test_pressure_dependence()
-    print("✅ Pressure dependence test completed")
+    print("OK: Pressure dependence test completed")
 
-    print("\\n🎉 All combustion Jacobian tests completed!")
+    print("\\nAll combustion Jacobian tests completed!")
 
 
 # --- #716: the composition derivatives are analytic --------------------------

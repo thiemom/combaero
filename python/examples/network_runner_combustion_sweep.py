@@ -39,7 +39,7 @@ _OUTLET = "node_1778699154284"
 # phi=0.518 at m_fuel=0.03 kg/s, m_air=1.0 kg/s
 _FAR_STOICH = 0.03 / (1.0 * 0.518)  # ~0.0579
 
-M_AIR = 1.0  # kg/s — baseline air mass flow
+M_AIR = 1.0  # kg/s -- baseline air mass flow
 
 
 def load_runner() -> NetworkRunner:
@@ -66,7 +66,7 @@ def main() -> None:
     phi_range = np.linspace(0.30, 0.90, 13)
     params = pd.DataFrame({"fuel_inlet.m_dot": phi_range * _FAR_STOICH * M_AIR})
 
-    print(f"Sweeping {len(phi_range)} equivalence ratios …")
+    print(f"Sweeping {len(phi_range)} equivalence ratios ...")
     sweep_df = runner.sweep(params, metrics=["combustor.T", "combustor.phi"])
 
     # phi from solver (more precise than our input estimate)
@@ -86,7 +86,7 @@ def main() -> None:
         ax.legend()
     ax.set_xlabel("Equivalence ratio $\\phi$")
     ax.set_ylabel("Combustor exit temperature $T$ [K]")
-    ax.set_title("Combustion sweep — compressible CH4/air network")
+    ax.set_title("Combustion sweep -- compressible CH4/air network")
     ax.grid(True, alpha=0.4)
     fig.tight_layout()
 

@@ -381,7 +381,7 @@ class TestCommonNamesSymmetry:
         n2f = _parse_name_to_formula(REAL_COMMON_NAMES_H)
         assert len(f2n) == len(n2f), (
             f"formula_to_name has {len(f2n)} entries but "
-            f"name_to_formula has {len(n2f)} — maps are out of sync"
+            f"name_to_formula has {len(n2f)} -- maps are out of sync"
         )
 
     def test_formula_to_name_is_inverse_of_name_to_formula(self) -> None:
@@ -392,7 +392,7 @@ class TestCommonNamesSymmetry:
             assert name in n2f, f'"{name}" is in formula_to_name but missing from name_to_formula'
             assert n2f[name] == formula, (
                 f'name_to_formula["{name}"] = "{n2f[name]}" '
-                f'but formula_to_name["{formula}"] = "{name}" — maps disagree'
+                f'but formula_to_name["{formula}"] = "{name}" -- maps disagree'
             )
 
     def test_name_to_formula_is_inverse_of_formula_to_name(self) -> None:
@@ -405,7 +405,7 @@ class TestCommonNamesSymmetry:
             )
             assert f2n[formula] == name, (
                 f'formula_to_name["{formula}"] = "{f2n[formula]}" '
-                f'but name_to_formula["{name}"] = "{formula}" — maps disagree'
+                f'but name_to_formula["{name}"] = "{formula}" -- maps disagree'
             )
 
     def test_all_active_species_have_common_name(self) -> None:

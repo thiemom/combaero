@@ -139,7 +139,7 @@ std::vector<AcousticMode> annulus_azimuthal_modes(
         mode.n_axial = 0;
         mode.n_azimuthal = m;
 
-        // f_m = m * c / (π * D_mean)
+        // f_m = m * c / (pi * D_mean)
         mode.frequency = m * c / (M_PI * D_mean);
 
         modes.push_back(mode);
@@ -175,7 +175,7 @@ std::vector<AcousticMode> annulus_modes(
             AcousticMode combined;
             combined.n_axial = ax.n_axial;
             combined.n_azimuthal = az.n_azimuthal;
-            // Combined frequency: f = sqrt(f_axial² + f_azimuthal²)
+            // Combined frequency: f = sqrt(f_axial^2 + f_azimuthal^2)
             combined.frequency = std::sqrt(ax.frequency * ax.frequency +
                                            az.frequency * az.frequency);
             modes.push_back(combined);
@@ -298,11 +298,11 @@ double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
     }
 
     // Effective neck length with end correction
-    // d_neck = 2 * sqrt(A_neck / π)
+    // d_neck = 2 * sqrt(A_neck / pi)
     double d_neck = 2.0 * std::sqrt(A_neck / M_PI);
     double L_eff = L_neck + end_correction * d_neck;
 
-    // f = (c / 2π) * sqrt(A / (V * L_eff))
+    // f = (c / (2*pi)) * sqrt(A / (V * L_eff))
     return (c / (2.0 * M_PI)) * std::sqrt(A_neck / (V * L_eff));
 }
 
@@ -720,11 +720,11 @@ std::complex<double> orifice_impedance_with_flow(
 
     // 1. Resistance (Real Part)
     // Bias flow resistance (Rogers & Marble 1956)
-    // R_bias = M_b / (σ * Cd²)
+    // R_bias = M_b / (sigma * Cd^2)
     double R_bias = M_bias / (porosity * Cd * Cd);
 
     // Grazing flow resistance (Howe 1979, Bourquard & Noiray 2019)
-    // R_grazing = M_g / (2σ)
+    // R_grazing = M_g / (2*sigma)
     double R_grazing = M_grazing / (2.0 * porosity);
 
     // Total resistance (linear superposition for small Mach numbers)
@@ -736,14 +736,14 @@ std::complex<double> orifice_impedance_with_flow(
     double delta_0 = kEndCorrectionFlangedBothFaces * d_orifice;
 
     // Flow reduces effective end correction (frequency shift)
-    // Empirical: δ_eff = δ_0 / (1 + M_g)
+    // Empirical: delta_eff = delta_0 / (1 + M_g)
     double flow_modifier = 1.0 / (1.0 + M_grazing);
     double l_eff = l_orifice + delta_0 * flow_modifier;
 
-    // Inertance (mass reactance): X = ω*l_eff / (c*σ)
+    // Inertance (mass reactance): X = omega*l_eff / (c*sigma)
     double X = (omega * l_eff) / (c * porosity);
 
-    // Return normalized impedance Z/(ρc)
+    // Return normalized impedance Z/(rho*c)
     return std::complex<double>(R, X);
 }
 
@@ -772,10 +772,10 @@ TransferMatrix quarter_wave_resonator_tmm(
 
     double k = (2.0 * M_PI * freq) / c;
 
-    // Check that we're below cutoff (kL < π for quarter-wave)
+    // Check that we're below cutoff (kL < pi for quarter-wave)
     if (k * L_tube > M_PI) {
         throw std::runtime_error("Frequency too high: kL = " + std::to_string(k * L_tube) +
-                                 " > π (above quarter-wave cutoff)");
+                                 " > pi (above quarter-wave cutoff)");
     }
 
     // 1. Neck impedance (with flow effects)
@@ -785,7 +785,7 @@ TransferMatrix quarter_wave_resonator_tmm(
 
     // 2. Tube backing impedance (closed-end quarter-wave)
     // For a closed-end tube: Z_tube = -i*cot(kL)
-    // This is the normalized impedance (Z/(ρc))
+    // This is the normalized impedance (Z/(rho*c))
     std::complex<double> i(0.0, 1.0);
     std::complex<double> Z_tube = -i / std::tan(k * L_tube);
 
@@ -973,7 +973,7 @@ std::vector<double> find_zero_guesses(
 ) {
     std::vector<double> guesses;
 
-    // Scan for local minima of |D(ω)|
+    // Scan for local minima of |D(omega)|
     int n_scan = 500;
     std::vector<double> freqs;
     std::vector<double> mags;
@@ -1137,7 +1137,7 @@ double sound_pressure_level(double p_rms, double p_ref) {
         throw std::invalid_argument("sound_pressure_level: p_ref must be positive");
     }
     if (p_rms == 0.0) {
-        return -std::numeric_limits<double>::infinity();  // -∞ dB for zero pressure
+        return -std::numeric_limits<double>::infinity();  // -inf dB for zero pressure
     }
     return 20.0 * std::log10(p_rms / p_ref);
 }

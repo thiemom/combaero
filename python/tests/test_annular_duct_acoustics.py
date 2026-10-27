@@ -327,8 +327,8 @@ class TestNumericalReference:
     """Numerical regression tests for the annular duct solver.
 
     These tests pin the solver output against analytically-derived reference
-    values.  They are NOT golden truth — the solver uses approximate methods
-    (Argument Principle + Muller) — but they detect regressions caused by
+    values.  They are NOT golden truth -- the solver uses approximate methods
+    (Argument Principle + Muller) -- but they detect regressions caused by
     refactoring.
 
     Reference geometry: L=1.0 m, r_inner=0.2 m, r_outer=0.5 m, c=500 m/s

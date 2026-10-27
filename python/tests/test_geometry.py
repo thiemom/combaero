@@ -1,7 +1,7 @@
 """Tests for geometry utility functions.
 
 Verifies Python bindings for hydraulic diameter and residence time calculations.
-Units: Dh in [m], τ in [s], SV in [1/s], A in [m2], V in [m3].
+Units: Dh in [m], tau in [s], SV in [1/s], A in [m2], V in [m3].
 """
 
 import numpy as np
@@ -18,7 +18,7 @@ class TestSimpleGeometryHelpers:
         D = 0.1  # Diameter [m]
         A = cb.channel_area(D)
 
-        # A = π * (D/2)2
+        # A = pi * (D/2)^2
         expected = np.pi * (D / 2) ** 2
         assert abs(A - expected) < 1e-15
 
@@ -44,7 +44,7 @@ class TestSimpleGeometryHelpers:
 
     def test_channel_area_error_on_zero(self):
         """Test channel area raises error for zero diameter."""
-        with pytest.raises(ValueError):  # C++ invalid_argument → ValueError
+        with pytest.raises(ValueError):  # C++ invalid_argument -> ValueError
             cb.channel_area(0.0)
 
     def test_channel_area_error_on_negative(self):
@@ -58,7 +58,7 @@ class TestSimpleGeometryHelpers:
         D_inner = 0.10  # Inner diameter [m]
         A = cb.annular_area(D_outer, D_inner)
 
-        # A = π * ((D_outer/2)2 - (D_inner/2)2)
+        # A = pi * ((D_outer/2)^2 - (D_inner/2)^2)
         expected = np.pi * ((D_outer / 2) ** 2 - (D_inner / 2) ** 2)
         assert abs(A - expected) < 1e-15
 
@@ -104,7 +104,7 @@ class TestSimpleGeometryHelpers:
         L = 2.0  # Length [m]
         V = cb.channel_volume(D, L)
 
-        # V = π * (D/2)2 * L
+        # V = pi * (D/2)^2 * L
         expected = np.pi * (D / 2) ** 2 * L
         assert abs(V - expected) < 1e-15
 
@@ -261,7 +261,7 @@ class TestResidenceTime:
 
         tau = cb.residence_time(V, Q)
 
-        # τ = V/Q = 1.0/0.1 = 10 s
+        # tau = V/Q = 1.0/0.1 = 10 s
         assert abs(tau - 10.0) < 1e-10
 
         # Units check: should be in seconds
@@ -275,7 +275,7 @@ class TestResidenceTime:
 
         tau = cb.residence_time(V, Q)
 
-        # τ = 0.5/10 = 0.05 s
+        # tau = 0.5/10 = 0.05 s
         assert abs(tau - 0.05) < 1e-10
         assert tau > 0
 
@@ -287,7 +287,7 @@ class TestResidenceTime:
 
         tau = cb.residence_time_mdot(V, mdot, rho)
 
-        # τ = V*ρ/ṁ = 1.0*1.2/1.2 = 1.0 s
+        # tau = V*rho/m_dot = 1.0*1.2/1.2 = 1.0 s
         assert abs(tau - 1.0) < 1e-10
         assert tau > 0
 
@@ -312,7 +312,7 @@ class TestResidenceTime:
 
         tau = cb.residence_time_mdot(V, mdot, rho)
 
-        # τ = 0.1*1.2/0.5 = 0.24 s = 240 ms
+        # tau = 0.1*1.2/0.5 = 0.24 s = 240 ms
         assert abs(tau - 0.24) < 1e-10
 
         # Typical combustor residence time: 10-500 ms
@@ -325,7 +325,7 @@ class TestResidenceTime:
 
         tau = cb.residence_time(V, Q)
 
-        # τ = 5/2 = 2.5 s
+        # tau = 5/2 = 2.5 s
         assert abs(tau - 2.5) < 1e-10
         assert tau > 0
 
@@ -355,7 +355,7 @@ class TestSpaceVelocity:
         SV = cb.space_velocity(Q, V)
         tau = cb.residence_time(V, Q)
 
-        # SV = 1/τ
+        # SV = 1/tau
         assert abs(SV * tau - 1.0) < 1e-10
         assert abs(SV - 1.0 / tau) < 1e-10
 
@@ -404,7 +404,7 @@ class TestIntegration:
         # Calculate residence time
         tau = cb.residence_time(V, Q)
 
-        # τ = L/v (for constant area channel)
+        # tau = L/v (for constant area channel)
         expected_tau = L / v
         assert abs(tau - expected_tau) < 0.001
 

@@ -18,7 +18,7 @@ int main() {
   // Temperature, pressure, and relative humidity conditions to test
   std::vector<double> temperatures = {
       273.15, 293.15, 303.15, 313.15,
-      323.15};                // K (0°C, 20°C, 30°C, 40°C, 50°C)
+      323.15};                // K (0degC, 20degC, 30degC, 40degC, 50degC)
   double pressure = 101325.0; // Pa (standard atmospheric pressure)
   std::vector<double> rel_humidities = {
       0.0, 0.2, 0.4, 0.6, 0.8, 1.0}; // Relative humidity (0% to 100%)
@@ -47,7 +47,7 @@ int main() {
   // Example 2: Saturation vapor pressure
   std::cout << "\n2. Saturation Vapor Pressure (Hyland-Wexler)" << std::endl;
   std::cout << "----------------------------------------" << std::endl;
-  std::cout << "Temperature (°C) | Saturation Pressure (Pa)" << std::endl;
+  std::cout << "Temperature (degC) | Saturation Pressure (Pa)" << std::endl;
   std::cout << "----------------------------------------" << std::endl;
 
   for (double T : temperatures) {
@@ -61,10 +61,10 @@ int main() {
   std::cout << "-------------------------------------------" << std::endl;
 
   for (double T : temperatures) {
-    std::cout << "\nTemperature: " << T - 273.15 << " °C" << std::endl;
+    std::cout << "\nTemperature: " << T - 273.15 << " degC" << std::endl;
     std::cout << "-------------------------------------------" << std::endl;
-    std::cout << "RH | Vapor Press (Pa) | Humidity Ratio | Dewpoint (°C) | "
-                 "Density (kg/m³) | h_mass (J/kg)"
+    std::cout << "RH | Vapor Press (Pa) | Humidity Ratio | Dewpoint (degC) | "
+                 "Density (kg/m^3) | h_mass (J/kg)"
               << std::endl;
     std::cout << "-------------------------------------------" << std::endl;
 
@@ -83,7 +83,7 @@ int main() {
       // Handle dewpoint calculation (only valid for RH > 0)
       if (RH > 0.0) {
         try {
-          double dp = air.dewpoint() - 273.15; // Convert to °C
+          double dp = air.dewpoint() - 273.15; // Convert to degC
           std::cout << std::setw(13) << dp << " | ";
         } catch (const std::exception &) {
           std::cout << std::setw(13) << "N/A" << " | ";
@@ -101,14 +101,14 @@ int main() {
   // Example 4: Humid air composition
   std::cout << "\n4. Humid Air Composition Example" << std::endl;
   std::cout << "----------------------------" << std::endl;
-  double example_T = 303.15; // 30°C
+  double example_T = 303.15; // 30degC
   double example_RH = 0.6;   // 60% RH
 
   HumidAir air;
   air.set_TP_RH(example_T, pressure, example_RH);
 
   std::cout << "Conditions: T = " << example_T - 273.15
-            << " °C, P = " << pressure << " Pa, RH = " << example_RH * 100
+            << " degC, P = " << pressure << " Pa, RH = " << example_RH * 100
             << "%" << std::endl;
 
   std::cout << "\nMole Fractions:" << std::endl;
@@ -127,17 +127,17 @@ int main() {
   std::cout << "-------------------------------------" << std::endl;
 
   std::cout << "Temperature: " << example_T - 273.15
-            << " °C, Pressure: " << pressure << " Pa, RH: " << example_RH * 100
+            << " degC, Pressure: " << pressure << " Pa, RH: " << example_RH * 100
             << "%" << std::endl;
 
   // Use embedded state object for seamless robust thermo property calculation
-  std::cout << "Specific Heat (Cp): " << air.state.cp() << " J/(mol·K)"
+  std::cout << "Specific Heat (Cp): " << air.state.cp() << " J/(mol*K)"
             << std::endl;
   std::cout << "Enthalpy (H): " << air.state.h() << " J/mol" << std::endl;
-  std::cout << "Entropy (S): " << air.state.s() << " J/(mol·K)" << std::endl;
-  std::cout << "Density: " << air.state.rho() << " kg/m³" << std::endl;
-  std::cout << "Viscosity: " << air.state.mu() * 1.0e6 << " μPa·s" << std::endl;
-  std::cout << "Thermal Conductivity: " << air.state.k() << " W/(m·K)"
+  std::cout << "Entropy (S): " << air.state.s() << " J/(mol*K)" << std::endl;
+  std::cout << "Density: " << air.state.rho() << " kg/m^3" << std::endl;
+  std::cout << "Viscosity: " << air.state.mu() * 1.0e6 << " uPa*s" << std::endl;
+  std::cout << "Thermal Conductivity: " << air.state.k() << " W/(m*K)"
             << std::endl;
   std::cout << "Prandtl Number: " << air.state.Pr() << std::endl;
 

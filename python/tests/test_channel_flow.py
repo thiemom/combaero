@@ -85,7 +85,7 @@ class TestChannelSmooth:
         assert sol.T_aw == pytest.approx(T_AIR, rel=1e-9)
 
     def test_T_aw_continuous_across_mach(self):
-        """T_aw must be continuous — no jump at any velocity."""
+        """T_aw must be continuous -- no jump at any velocity."""
         D = 0.05
         L = 1.0
         velocities = [0.0, 50.0, 100.0, 150.0, 200.0]

@@ -157,7 +157,7 @@ _REGIME = "compressible"
 
 
 def _q_dyn_ref(m_dot: float = _M_DOT_REF, area: float = _F_C, Pt: float = _PT_REF) -> float:
-    """Reference dynamic head at the low-Mach inlet (ρ·u²/2)."""
+    """Reference dynamic head at the low-Mach inlet (rho*u^2/2)."""
     X = _x_air()
     rho = float(cb.density(_TT_REF, Pt, X))
     u = m_dot / (rho * area)

@@ -136,7 +136,7 @@ TEST_F(MixerJacobianTest, dYmix_d_Y) {
 }
 
 // ---------------------------------------------------------------------------
-// Adiabatic T (Complete) from streams — FD validation
+// Adiabatic T (Complete) from streams -- FD validation
 // ---------------------------------------------------------------------------
 
 class AdiabaticCompleteJacobianTest : public ::testing::Test {
@@ -254,7 +254,7 @@ TEST_F(AdiabaticCompleteJacobianTest, dYburned_d_Y) {
 }
 
 // ---------------------------------------------------------------------------
-// Adiabatic T (Equilibrium) from streams — FD validation
+// Adiabatic T (Equilibrium) from streams -- FD validation
 // ---------------------------------------------------------------------------
 
 class AdiabaticEquilibriumJacobianTest : public ::testing::Test {
@@ -378,7 +378,7 @@ TEST_F(AdiabaticEquilibriumJacobianTest, dYburned_d_Y) {
 }
 
 // ---------------------------------------------------------------------------
-// Plenum ChamberResult — local + stream Jacobian FD validation
+// Plenum ChamberResult -- local + stream Jacobian FD validation
 // ---------------------------------------------------------------------------
 
 #if 0
@@ -537,7 +537,7 @@ TEST_F(PlenumJacobianTest, StreamJacobian_Y) {
 #endif
 
 // ---------------------------------------------------------------------------
-// Combustor ChamberResult — local + stream Jacobian FD validation
+// Combustor ChamberResult -- local + stream Jacobian FD validation
 // ---------------------------------------------------------------------------
 
 #if 0
@@ -712,7 +712,7 @@ TEST_F(CombustorJacobianTest, StreamJacobian_Y) {
 #endif
 
 // ---------------------------------------------------------------------------
-// Combustor Equilibrium — verify same structure works
+// Combustor Equilibrium -- verify same structure works
 // ---------------------------------------------------------------------------
 
 #if 0

@@ -47,7 +47,7 @@ def test_separating_emits_K_straight_K_branch_and_matches_direct_mynard():
     """The K values the element emits must match a direct Mynard call at
     the same (q, psi, theta)."""
     net = MPCENetwork(joining_etransfer_alpha=0.0)  # alpha=0 for separating test
-    # imposed_q at theta=90, psi=1, q=0.3 — a sane separating operating point
+    # imposed_q at theta=90, psi=1, q=0.3 -- a sane separating operating point
     q, psi, theta_deg = 0.3, 1.0, 90.0
     r = net.evaluate_network(
         "bassett2001", "K6", q, psi, math.radians(theta_deg), topology="imposed_q"
@@ -160,7 +160,7 @@ def test_diagnostics_element_level_joining_emits_K11_K12():
 
 def test_diagnostics_without_port_mdots_returns_parent_fields_only():
     """Without port_mdots (legacy callers), diagnostics returns the parent
-    class fields only — no K, no aliases. Ensures backward compatibility."""
+    class fields only -- no K, no aliases. Ensures backward compatibility."""
     from combaero.network.mpce_element import MultiPortChamberElement
 
     e = MultiPortChamberElement(

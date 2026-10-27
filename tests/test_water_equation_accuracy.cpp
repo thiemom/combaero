@@ -16,8 +16,8 @@ using namespace combaero;
 // validated range and shows higher relative errors.
 
 int main() {
-    // Reference data from the paper for water vapor (0°C to 80°C)
-    // Note: Excluding the extreme temperature of 100°C which is at the boundary
+    // Reference data from the paper for water vapor (0degC to 80degC)
+    // Note: Excluding the extreme temperature of 100degC which is at the boundary
     // of the validated range and shows higher relative errors
     std::map<double, double> water_reference = {
         {0.01, 611.655},
@@ -28,12 +28,12 @@ int main() {
     };
 
     std::cout << "====================================================" << std::endl;
-    std::cout << "Water Equation Accuracy Test (0°C to 80°C)" << std::endl;
+    std::cout << "Water Equation Accuracy Test (0degC to 80degC)" << std::endl;
     std::cout << "====================================================" << std::endl;
     std::cout << "Testing against reference values from Hyland-Wexler paper" << std::endl;
     std::cout << "Maximum claimed accuracy: 0.0057%" << std::endl;
     std::cout << "----------------------------------------------------" << std::endl;
-    std::cout << std::setw(10) << "Temp (°C)" << " | "
+    std::cout << std::setw(10) << "Temp (degC)" << " | "
               << std::setw(15) << "Reference (Pa)" << " | "
               << std::setw(15) << "Calculated (Pa)" << " | "
               << std::setw(15) << "Rel. Error (%)" << std::endl;
@@ -69,7 +69,7 @@ int main() {
 
     std::cout << "----------------------------------------------------" << std::endl;
     std::cout << "Maximum Relative Error: " << std::setprecision(6) << max_relative_error << "%" << std::endl;
-    std::cout << "Worst case at " << worst_temp << "°C: Ref = " << worst_ref
+    std::cout << "Worst case at " << worst_temp << "degC: Ref = " << worst_ref
               << " Pa, Calc = " << worst_calc << " Pa" << std::endl;
 
     // Check if the maximum relative error is within the claimed accuracy

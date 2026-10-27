@@ -328,7 +328,7 @@ class TestEquivalenceRatio:
         X_mix = cb.set_equivalence_ratio_mole(phi_target, X_fuel, X_air)
 
         # Compare equivalence ratio [dimensionless]
-        # Round-trip test: set φ=1.0, calculate φ from mixture
+        # Round-trip test: set phi=1.0, calculate phi from mixture
         phi_calc = cb.equivalence_ratio_mole(X_mix, X_fuel, X_air)
         assert abs(phi_calc - phi_target) < 1e-6, (
             f"Equivalence ratio [dimensionless]: Expected {phi_target}, got {phi_calc}"

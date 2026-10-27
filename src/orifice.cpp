@@ -1392,7 +1392,7 @@ double solve_orifice_mdot(
         }
 
         // Update Reynolds number based on new mdot
-        // Re_D = (4 * mdot) / (π * D * μ)
+        // Re_D = (4 * mdot) / (pi * D * mu)
         const double Re_D = (4.0 * mdot_new) / (M_PI * D * mu);
 
         // Update Cd based on new Reynolds number
@@ -1437,7 +1437,7 @@ double expansibility_factor(double beta, double dP, double P_upstream, double ka
     // Pressure ratio
     const double tau = dP / P_upstream;
 
-    // Check validity range (ISO 5167-2 recommends τ ≤ 0.25)
+    // Check validity range (ISO 5167-2 recommends tau <= 0.25)
     if (tau > 0.25) {
         // Still compute but this is outside recommended range
         // User should be aware via documentation
@@ -1449,7 +1449,7 @@ double expansibility_factor(double beta, double dP, double P_upstream, double ka
     const double beta8 = beta4 * beta4;
 
     // ISO 5167-2:2003 expansibility factor formula
-    // ε = 1 - (0.351 + 0.256·β⁴ + 0.93·β⁸) · [1 - (1 - τ)^(1/κ)]
+    // eps = 1 - (0.351 + 0.256*beta^4 + 0.93*beta^8) * [1 - (1 - tau)^(1/kappa)]
     const double coeff = 0.351 + 0.256 * beta4 + 0.93 * beta8;
     const double expansion_term = 1.0 - std::pow(1.0 - tau, 1.0 / kappa);
 
@@ -1494,8 +1494,8 @@ OrificeFlowResult orifice_flow(
     // Compute ideal gas density
     // For now, use simple ideal gas law with air composition
     // rho_ideal = P * MW / (R * T)
-    // For air: MW ≈ 28.97 g/mol, R = 8.314 J/(mol·K)
-    const double R_gas = 8.314;  // J/(mol·K)
+    // For air: MW ~= 28.97 g/mol, R = 8.314 J/(mol*K)
+    const double R_gas = 8.314;  // J/(mol*K)
     const double MW_air = 0.02897;  // kg/mol (air molecular weight)
     const double rho_ideal = (P * MW_air) / (R_gas * T);
 
@@ -1589,7 +1589,7 @@ double orifice_area_from_beta(double D, double beta) {
         throw std::invalid_argument("orifice_area_from_beta: beta must be in range (0, 1)");
     }
 
-    // A = π * (D * beta / 2)²
+    // A = pi * (D * beta / 2)^2
     const double d = D * beta;
     return M_PI * d * d / 4.0;
 }
@@ -1620,6 +1620,6 @@ double orifice_Re_d_from_mdot(double mdot, double d, double mu) {
         throw std::invalid_argument("orifice_Re_d_from_mdot: mu must be positive");
     }
 
-    // Re_d = 4 * mdot / (π * d * mu)
+    // Re_d = 4 * mdot / (pi * d * mu)
     return (4.0 * mdot) / (M_PI * d * mu);
 }

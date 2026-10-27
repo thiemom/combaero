@@ -17,7 +17,7 @@ _FIXTURE_DIR = Path(__file__).parent.parent.parent / "gui" / "tmp"
 _MULTI_WALL_TEE = _FIXTURE_DIR / "multi_wall_tee.json"
 
 # ---------------------------------------------------------------------------
-# Minimal inline fixture — one mass boundary, one channel, one pressure boundary.
+# Minimal inline fixture -- one mass boundary, one channel, one pressure boundary.
 # Uses the incompressible (default) solver for speed.
 # ---------------------------------------------------------------------------
 
@@ -179,7 +179,7 @@ def test_from_dict_snake_case_solver_settings_unchanged():
 
 
 # ---------------------------------------------------------------------------
-# Solve — basic
+# Solve -- basic
 # ---------------------------------------------------------------------------
 
 
@@ -205,7 +205,7 @@ def test_solve_mass_conservation():
 
 
 # ---------------------------------------------------------------------------
-# Solve — statelessness (repeated calls must not interfere)
+# Solve -- statelessness (repeated calls must not interfere)
 # ---------------------------------------------------------------------------
 
 
@@ -471,7 +471,7 @@ def test_swap_missing_label_raises():
 
 
 # ---------------------------------------------------------------------------
-# Integration — multi_wall_tee.json (skipped if fixture absent)
+# Integration -- multi_wall_tee.json (skipped if fixture absent)
 # ---------------------------------------------------------------------------
 
 

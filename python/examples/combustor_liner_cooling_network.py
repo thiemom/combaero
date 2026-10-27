@@ -511,7 +511,7 @@ def main() -> None:
     from plot_utils import show_or_save
 
     print("=" * 70)
-    print("Combustor Liner Cooling — FlowNetwork Version")
+    print("Combustor Liner Cooling -- FlowNetwork Version")
     print("=" * 70)
 
     # Fixed operating conditions (same as standalone)
@@ -659,7 +659,7 @@ def main() -> None:
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(
-        f"Combustor Liner Cooling — FlowNetwork Version\n"
+        f"Combustor Liner Cooling -- FlowNetwork Version\n"
         f"(COT={COT_target:.0f} K, PR={PR:.0f}, dP_burner={dP_burner_frac * 100:.0f}%)\n"
         f"{N_ch} channels D_h={D_ch * 1e3:.0f} mm, L={L_ch * 1e3:.0f} mm  |  {primary_cfg}",
         fontsize=11,

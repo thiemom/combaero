@@ -17,8 +17,8 @@ protected:
         // Typical flow conditions
         state.Re_D = 100000.0;
         state.dP = 10000.0;   // 10 kPa
-        state.rho = 1.2;      // kg/m³ (air at ~20°C)
-        state.mu = 1.8e-5;    // Pa·s
+        state.rho = 1.2;      // kg/m^3 (air at ~20degC)
+        state.mu = 1.8e-5;    // Pa*s
     }
 };
 

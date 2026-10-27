@@ -167,7 +167,7 @@ def test_fanno_channel_rough_smooth_matches_constant_f() -> None:
     sol_const = cb.fanno_channel(T_in, P_in, u_in, L, D, f_in, X, n_steps=200)
     sol_rough = cb.fanno_channel_rough(T_in, P_in, u_in, L, D, 0.0, X, n_steps=200)
 
-    # Outlet pressure should be close (within 1% — Re varies slightly along channel)
+    # Outlet pressure should be close (within 1% -- Re varies slightly along channel)
     assert np.isclose(sol_const.outlet.P, sol_rough.outlet.P, rtol=0.01)
     # f_avg should be close to f_in for smooth channel
     assert np.isclose(sol_rough.f_avg, f_in, rtol=0.05)
@@ -220,7 +220,7 @@ def test_fanno_channel_rough_choked() -> None:
     X = cb.species.dry_air()
     T_in = 400.0
     P_in = 200000.0
-    u_in = 250.0  # high subsonic velocity — short L* expected
+    u_in = 250.0  # high subsonic velocity -- short L* expected
     D = 0.05
     roughness = 1e-4
 
@@ -364,7 +364,7 @@ def test_de_laval_nozzle_supersonic() -> None:
     throat_idx = min(range(len(sol.profile)), key=lambda i: abs(sol.profile[i].x - x_throat))
     throat = sol.profile[throat_idx]
 
-    # Throat should be near sonic (M ≈ 1)
+    # Throat should be near sonic (M ~= 1)
     assert 0.9 < throat.M < 1.1
 
     # Exit should be supersonic (M > 1)

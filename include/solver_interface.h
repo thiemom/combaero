@@ -109,7 +109,7 @@ using PipeResult = ChannelResult;
 // Method: Analytical Chain Rule
 // Inputs:
 //   dP   : Differential pressure drop across the orifice [Pa]
-//   rho  : Fluid density [kg/m³]
+//   rho  : Fluid density [kg/m^3]
 //   Cd   : Discharge coefficient [-]
 //   beta : Orifice beta ratio (d/D) [-]
 //
@@ -117,7 +117,7 @@ using PipeResult = ChannelResult;
 //   tuple(mdot, d_mdot_d_dP, d_mdot_d_rho)
 //   mdot         : Mass flow rate [kg/s]
 //   d_mdot_d_dP  : Jacobian gradient w.r.t. pressure difference [kg/(s*Pa)]
-//   d_mdot_d_rho : Jacobian gradient w.r.t. density [kg*m³/(s*kg)] = [m³/s]
+//   d_mdot_d_rho : Jacobian gradient w.r.t. density [kg*m^3/(s*kg)] = [m^3/s]
 std::tuple<double, double, double> orifice_mdot_and_jacobian(double dP, double rho,
                                                               double Cd, double area,
                                                               double beta);
@@ -146,7 +146,7 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
 // Method: Analytical Chain Rule
 // Inputs:
 //   v   : Fluid velocity [m/s]
-//   rho : Fluid density [kg/m³]
+//   rho : Fluid density [kg/m^3]
 //   K   : Forward loss coefficient [-]
 //
 // Returns:
@@ -202,7 +202,7 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 //   P_back : Back pressure [Pa]
 //   X    : Mole fractions [-]
 //   Cd   : Discharge coefficient [-]
-//   area : Geometric throat area [m²]
+//   area : Geometric throat area [m^2]
 //   beta : Orifice beta ratio (d/D) [-]
 //
 // Returns:
@@ -413,9 +413,9 @@ friction_and_jacobian(const std::string &tag, double Re, double e_D);
 //
 // Returns:
 //   tuple(rho, d_rho_d_T, d_rho_d_P)
-//   rho       : Density [kg/m³]
-//   d_rho_d_T : Jacobian gradient w.r.t Temperature [(kg/m³)/K]
-//   d_rho_d_P : Jacobian gradient w.r.t Pressure [(kg/m³)/Pa]
+//   rho       : Density [kg/m^3]
+//   d_rho_d_T : Jacobian gradient w.r.t Temperature [(kg/m^3)/K]
+//   d_rho_d_P : Jacobian gradient w.r.t Pressure [(kg/m^3)/Pa]
 std::tuple<double, double, double>
 density_and_jacobians(double T, double P, const std::vector<double> &X);
 

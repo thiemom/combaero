@@ -179,8 +179,8 @@ double compute_delta_star(double well_depth_K, double diameter_A, double dipole_
 }
 
 struct PureSpeciesTransport {
-    std::vector<double> mu;      // pure-species dynamic viscosity [Pa·s]
-    std::vector<double> k;       // pure-species thermal conductivity [W/(m·K)]
+    std::vector<double> mu;      // pure-species dynamic viscosity [Pa*s]
+    std::vector<double> k;       // pure-species thermal conductivity [W/(m*K)]
     std::vector<double> dmu_dT;  // [Pa*s/K], analytic
     std::vector<double> dk_dT;   // [W/(m*K^2)], analytic
 };
@@ -298,7 +298,7 @@ PureSpeciesTransport pure_species_transport(double T_in, const std::vector<doubl
     return out;
 }
 
-// Wilke mixing rule for viscosity given pre-computed pure-species μᵢ.
+// Wilke mixing rule for viscosity given pre-computed pure-species mu_i.
 double wilke_viscosity(const std::vector<double>& X,
                        const std::vector<double>& pure_mu)
 {
@@ -327,7 +327,7 @@ double wilke_viscosity(const std::vector<double>& X,
     return mix_visc;
 }
 
-// Mixture thermal conductivity (average of upper/lower bounds) given pre-computed kᵢ.
+// Mixture thermal conductivity (average of upper/lower bounds) given pre-computed k_i.
 double mixture_conductivity(const std::vector<double>& X,
                             const std::vector<double>& pure_k)
 {
@@ -489,7 +489,7 @@ TransportDerivatives transport_and_dT(double T, double P, const std::vector<doub
     return r;
 }
 
-// Dynamic viscosity [Pa·s]
+// Dynamic viscosity [Pa*s]
 double viscosity(double T, double P, const std::vector<double>& X)
 {
     (void)P;
@@ -500,7 +500,7 @@ double viscosity(double T, double P, const std::vector<double>& X)
     return wilke_viscosity(X, ps.mu);
 }
 
-// Thermal conductivity [W/(m·K)]
+// Thermal conductivity [W/(m*K)]
 double thermal_conductivity(double T, double P, const std::vector<double>& X)
 {
     (void)P;
@@ -525,17 +525,17 @@ double prandtl(double T, double P, const std::vector<double>& X)
         throw std::runtime_error("prandtl: thermal conductivity must be positive");
     }
     const double MW      = mwmix(X) / 1000.0;   // kg/mol
-    const double cp_mass = cp(T, X) / MW;        // J/(kg·K)
+    const double cp_mass = cp(T, X) / MW;        // J/(kg*K)
     return (cp_mass * mu_mix) / k_mix;
 }
 
-// Kinematic viscosity [m²/s]
+// Kinematic viscosity [m^2/s]
 double kinematic_viscosity(double T, double P, const std::vector<double>& X)
 {
     return viscosity(T, P, X) / density(T, P, X);
 }
 
-// Thermal diffusivity [m²/s] — α = k / (ρ cp)
+// Thermal diffusivity [m^2/s] -- alpha = k / (rho cp)
 double thermal_diffusivity(double T, double P, const std::vector<double>& X)
 {
     const double k_mix   = thermal_conductivity(T, P, X);
@@ -545,7 +545,7 @@ double thermal_diffusivity(double T, double P, const std::vector<double>& X)
     return k_mix / (rho * cp_mass);
 }
 
-// Reynolds number — Re = ρ V L / μ
+// Reynolds number -- Re = rho V L / mu
 double reynolds(double T, double P, const std::vector<double>& X, double V, double L)
 {
     const double rho_val = density(T, P, X);
@@ -556,7 +556,7 @@ double reynolds(double T, double P, const std::vector<double>& X, double V, doub
     return (rho_val * V * L) / mu;
 }
 
-// Peclet number (thermal) — Pe = V L / α
+// Peclet number (thermal) -- Pe = V L / alpha
 double peclet(double T, double P, const std::vector<double>& X, double V, double L)
 {
     const double alpha = thermal_diffusivity(T, P, X);
@@ -567,20 +567,20 @@ double peclet(double T, double P, const std::vector<double>& X, double V, double
 }
 
 // -------------------------------------------------------------
-// Transport State Bundle — single-pass implementation
+// Transport State Bundle -- single-pass implementation
 // -------------------------------------------------------------
 
 TransportState transport_state(double T, double P, const std::vector<double>& X) {
 
-    // Single species-loop pass — omega22 called N times total
+    // Single species-loop pass -- omega22 called N times total
     auto ps = pure_species_transport(T, X);
 
     const double mu  = wilke_viscosity(X, ps.mu);
     const double k   = mixture_conductivity(X, ps.k);
     const double rho = density(T, P, X);
     const double MW  = mwmix(X) / 1000.0;   // kg/mol
-    const double cp_m = cp(T, X) / MW;      // J/(kg·K)
-    const double cv_m = cv(T, X) / MW;      // J/(kg·K)
+    const double cp_m = cp(T, X) / MW;      // J/(kg*K)
+    const double cv_m = cv(T, X) / MW;      // J/(kg*K)
 
     TransportState state;
     state.T     = T;

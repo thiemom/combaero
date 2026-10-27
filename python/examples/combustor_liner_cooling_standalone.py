@@ -188,7 +188,7 @@ def solve_operating_point(
 def main() -> None:
 
     print("=" * 70)
-    print("Combustor Liner Convective Cooling — Bypass Sweep (COT = const)")
+    print("Combustor Liner Convective Cooling -- Bypass Sweep (COT = const)")
     print("=" * 70)
 
     # -----------------------------------------------------------------------
@@ -351,7 +351,7 @@ def main() -> None:
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle(
-        f"Combustor Liner Cooling — Bypass Sweep  "
+        f"Combustor Liner Cooling -- Bypass Sweep  "
         f"(COT={COT_target:.0f} K, PR={PR:.0f}, dP_burner={dP_burner_frac * 100:.0f}%)\n"
         f"{N_ch} channels D_h={D_ch * 1e3:.0f} mm, L={L_ch * 1e3:.0f} mm  |  {primary_cfg}",
         fontsize=11,

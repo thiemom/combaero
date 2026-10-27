@@ -254,11 +254,11 @@ class TestPressureLossElementConvectiveSurface:
         # Sanity ranges: forced convection in a short hot duct at 1 kg/s.
         assert res.h > 0.0 and res.h < 1e6
         assert res.Nu > 0.0
-        # T_aw close to recovery temperature (≈ static T for Pr≈0.7 at low Mach).
+        # T_aw close to recovery temperature (~= static T for Pr~=0.7 at low Mach).
         assert 600.0 < res.T_aw < 900.0
 
     def test_htc_none_when_flow_area_missing(self) -> None:
-        """Flow area unset ⇒ velocity undefined ⇒ htc_and_T returns None."""
+        """Flow area unset => velocity undefined => htc_and_T returns None."""
         from combaero.heat_transfer import ConvectiveSurface, SmoothModel
         from combaero.network import PressureLossElement
 
@@ -433,7 +433,7 @@ class TestPressureLossElementWallCoupling:
         cold_mid = PlenumNode("cold_mid")
 
         area = float(np.pi * 0.04**2 / 4.0)  # 0.04 m Dh
-        surf_area = float(np.pi * 0.04 * 0.04)  # A_conv = π·D·L with L=D
+        surf_area = float(np.pi * 0.04 * 0.04)  # A_conv = pi*D*L with L=D
 
         hot_loss = PressureLossElement(
             "hot_loss",
