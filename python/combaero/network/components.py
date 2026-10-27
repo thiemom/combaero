@@ -4792,7 +4792,7 @@ class EffusionPlateElement(OrificeElement):
             "coolant_crossflow_ignored": float(getattr(self, "_coolant_crossflow_ignored", False)),
             # Duct-fed: the Cd sees the crossflow, but the coolant-side heat
             # transfer is still Andrews' still-plenum correlation (provisional
-            # until a crossflow-supply source; #471 PR4).
+            # until a crossflow-supply source; #785).
             "coolant_ht_plenum_assumed": float(self.crossflow_segments is not None),
         }
         gas = _chamber_gas_side(getattr(self, "_discharge_node", None), state_out)

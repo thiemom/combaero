@@ -21,9 +21,8 @@ const Sidebar = () => {
 		setRotSpeedUnit,
 		nodes,
 		setNodes,
-		setEdges,
-		dismissSolveStatus,
 		solveResults,
+		clearCanvas,
 	} = useStore();
 
 	// Clear (#596): empties the canvas and deletes the autosaved copy. Two
@@ -42,9 +41,7 @@ const Sidebar = () => {
 			return;
 		}
 		setConfirmClear(false);
-		setNodes([]);
-		setEdges([]);
-		dismissSolveStatus();
+		clearCanvas();
 		clearAutosave();
 	};
 
