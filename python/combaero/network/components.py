@@ -1416,12 +1416,136 @@ class EnergyBoundary:
     Both can be set simultaneously. The heat a fraction applied is reported
     as {node}.Q_fraction [W]. C++ handles the conversion to delta_h and all
     Jacobian corrections.
+
+    Third mode, a set outlet temperature (#792):
+      - Tt_target [K]: the node's TOTAL temperature after the heat. The heat
+        flow becomes a solver unknown, ``{id}.Q`` [W], closed by one residual
+        Tt_node - Tt_target = 0 (a temperature row). Exclusive: Q and
+        fraction must stay 0, and a node takes at most one such boundary. On a
+        CombustorNode it is the heat taken out (or put in) AFTER the reaction
+        to reach that exit Tt; it does not change the fuel flow.
+
+    In every mode the solve reports the heat a boundary applied as ``{id}.Q``
+    [W] -- its Q, its solved Q, or its share of ``{node}.Q_fraction`` -- and
+    their sum per node as ``{node}.Q``. ``heat`` is the Q part alone (what
+    enters the mixer as Q; the fraction enters as a fraction).
     """
 
-    def __init__(self, id: str, Q: float = 0.0, fraction: float = 0.0) -> None:
+    def __init__(
+        self,
+        id: str,
+        Q: float = 0.0,
+        fraction: float = 0.0,
+        Tt_target: float | None = None,
+    ) -> None:
         self.id = id
         self.Q = Q  # [W]
         self.fraction = fraction  # [-]
+        self.Tt_target = Tt_target  # [K], total; None = Q/fraction mode
+        # Target mode: the solver writes its unknown's current value here.
+        self.Q_solved = 0.0  # [W]
+        self.check()
+
+    @property
+    def is_target(self) -> bool:
+        """True when the heat flow is an unknown closed by Tt_target."""
+        return self.Tt_target is not None
+
+    @property
+    def unknown_name(self) -> str:
+        """The solver unknown of the target mode, ``{id}.Q`` [W]."""
+        return f"{self.id}.Q"
+
+    @property
+    def heat(self) -> float:
+        """The heat flow this boundary applies [W] (> 0 heats the fluid): Q,
+        or in target mode the solver's current value of its unknown."""
+        return float(self.Q_solved) if self.is_target else float(self.Q)
+
+    def check(self) -> None:
+        """Refuse an over-specified or meaningless target (ValueError)."""
+        if self.Tt_target is None:
+            return
+        T = float(self.Tt_target)
+        if not (math.isfinite(T) and T > 0.0):
+            raise ValueError(
+                f"EnergyBoundary '{self.id}': Tt_target must be a positive, finite "
+                f"total temperature [K], got {self.Tt_target!r}."
+            )
+        if self.Q != 0.0 or self.fraction != 0.0:
+            raise ValueError(
+                f"EnergyBoundary '{self.id}': Tt_target is set together with "
+                f"Q={self.Q!r} / fraction={self.fraction!r}. With a target outlet "
+                "temperature the heat flow is solved for, so Q and fraction must "
+                "be 0 (over-specified); use a second boundary for a fixed heat."
+            )
+
+
+#: Node types that can honour an EnergyBoundary(Tt_target=...): the ones
+#: whose derived Tt is a mixer (or combustor) output the heat shifts.
+def _energy_target_node_types() -> tuple[type, ...]:
+    return (PlenumNode, MomentumChamberNode, CombustorNode)
+
+
+def target_energy_boundaries(node: Any) -> list[EnergyBoundary]:
+    """The node's EnergyBoundaries in Tt_target mode (at most one, validated)."""
+    return [eb for eb in getattr(node, "energy_boundaries", None) or [] if eb.is_target]
+
+
+def validate_energy_boundaries(node: Any) -> None:
+    """Network-build checks of a node's EnergyBoundaries (#792): each one's own
+    consistency, at most one Tt_target per node, and a Tt_target only on a
+    node type whose energy balance can honour it."""
+    ebs = getattr(node, "energy_boundaries", None) or []
+    for eb in ebs:
+        eb.check()
+    targets = [eb for eb in ebs if eb.is_target]
+    if not targets:
+        return
+    if not isinstance(node, _energy_target_node_types()):
+        raise ValueError(
+            f"EnergyBoundary '{targets[0].id}' sets Tt_target on {type(node).__name__} "
+            f"'{node.id}', which cannot honour it: only a PlenumNode, "
+            "MomentumChamberNode or CombustorNode derives its Tt from an energy "
+            "balance the heat enters."
+        )
+    if len(targets) > 1:
+        raise ValueError(
+            f"Node '{node.id}' has {len(targets)} EnergyBoundaries with Tt_target "
+            f"({', '.join(repr(eb.id) for eb in targets)}): one node has one outlet "
+            "temperature, so at most one boundary may set it."
+        )
+
+
+def _attach_energy_boundary(node: Any, eb: EnergyBoundary) -> None:
+    """Shared add_energy_boundary: refuse a second Tt_target at once."""
+    if eb.is_target and target_energy_boundaries(node):
+        raise ValueError(
+            f"Node '{node.id}' already has an EnergyBoundary with Tt_target "
+            f"('{target_energy_boundaries(node)[0].id}'); '{eb.id}' would set its "
+            "outlet temperature a second time."
+        )
+    node.energy_boundaries.append(eb)
+
+
+def _energy_target_rows(
+    node: Any, state: "NetworkMixtureState", res: list[float], jac: dict[int, dict[str, float]]
+) -> None:
+    """Append the Tt_target rows (#792): Tt_node - Tt_target = 0 [K].
+
+    The node's Tt is derived, not an unknown: the ``{node}.T`` key is relayed
+    by the solver through the propagation chain, whose ``T`` is the mixer's
+    (combustor's) output TOTAL temperature -- and with it the column of the
+    boundary's own ``{eb}.Q`` unknown, dT_mix/dQ from C++.
+    """
+    for eb in target_energy_boundaries(node):
+        jac[len(res)] = {f"{node.id}.T": 1.0}
+        res.append(float(state.Tt) - float(eb.Tt_target))
+
+
+def _applied_heat(node: Any) -> float:
+    """Sum of the heat [W] the node's EnergyBoundaries apply (fraction aside)."""
+    return sum(eb.heat for eb in getattr(node, "energy_boundaries", None) or [])
 
 
 @dataclass
@@ -2072,11 +2196,14 @@ class PlenumNode(NetworkNode):
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this plenum."""
-        self.energy_boundaries.append(eb)
+        _attach_energy_boundary(self, eb)
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
-        return [f"{self.id}.P", f"{self.id}.Pt"]
+        # A Tt_target EnergyBoundary adds its heat flow (#792).
+        return [f"{self.id}.P", f"{self.id}.Pt"] + [
+            eb.unknown_name for eb in target_energy_boundaries(self)
+        ]
 
     def compute_derived_state(
         self, upstream_states: list[NetworkMixtureState]
@@ -2087,7 +2214,7 @@ class PlenumNode(NetworkNode):
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
-        Q_total = sum(eb.Q for eb in self.energy_boundaries)
+        Q_total = _applied_heat(self)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
         mix_res = _solver_tools.mixer_from_streams_and_jacobians(
@@ -2102,6 +2229,7 @@ class PlenumNode(NetworkNode):
         # Base residual: Pt = P for plenum
         res = [state.Pt - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
+        _energy_target_rows(self, state, res, jac)
         return res, jac
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
@@ -2183,7 +2311,7 @@ class MomentumChamberNode(NetworkNode):
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this momentum chamber."""
-        self.energy_boundaries.append(eb)
+        _attach_energy_boundary(self, eb)
 
     def set_port_angle(self, element_id: str, angle_deg: float) -> None:
         """Set the angle of the flow for a specific connected element."""
@@ -2195,7 +2323,10 @@ class MomentumChamberNode(NetworkNode):
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
-        return [f"{self.id}.P", f"{self.id}.Pt"]
+        # A Tt_target EnergyBoundary adds its heat flow (#792).
+        return [f"{self.id}.P", f"{self.id}.Pt"] + [
+            eb.unknown_name for eb in target_energy_boundaries(self)
+        ]
 
     def compute_derived_state(
         self, upstream_states: list[NetworkMixtureState]
@@ -2219,7 +2350,7 @@ class MomentumChamberNode(NetworkNode):
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
 
         streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
-        Q_total = sum(eb.Q for eb in self.energy_boundaries)
+        Q_total = _applied_heat(self)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
         mix_res = _solver_tools.mixer_from_streams_and_jacobians(
@@ -2318,6 +2449,7 @@ class MomentumChamberNode(NetworkNode):
             if coeff != 0.0:
                 jac[0][var_name] = jac[0].get(var_name, 0.0) + result.d_res_dmdot * coeff
 
+        _energy_target_rows(self, state, res, jac)
         return res, jac
 
     def has_side_streams(self) -> bool:
@@ -2841,11 +2973,14 @@ class CombustorNode(NetworkNode):
 
     def add_energy_boundary(self, eb: EnergyBoundary) -> None:
         """Attach an energy source/sink to this combustor (post-combustion)."""
-        self.energy_boundaries.append(eb)
+        _attach_energy_boundary(self, eb)
 
     def unknowns(self) -> list[str]:
         # Pure Pressure-Flow: Temperature and Composition are derived forward, not unknowns.
-        return [f"{self.id}.P", f"{self.id}.Pt"]
+        # A Tt_target EnergyBoundary adds its heat flow (#792).
+        return [f"{self.id}.P", f"{self.id}.Pt"] + [
+            eb.unknown_name for eb in target_energy_boundaries(self)
+        ]
 
     def compute_derived_state(
         self, upstream_states: list[NetworkMixtureState]
@@ -2893,7 +3028,7 @@ class CombustorNode(NetworkNode):
         else:
             P_ref = upstream_states[0].Pt
 
-        Q_total = sum(eb.Q for eb in self.energy_boundaries)
+        Q_total = _applied_heat(self)
         fraction_total = sum(eb.fraction for eb in self.energy_boundaries)
 
         # Combustor only: mixing + combustion, NO pressure loss (that's on the edge).
@@ -2927,6 +3062,7 @@ class CombustorNode(NetworkNode):
         # Pressure loss is applied by an adjacent PressureLossElement, not here.
         res = [state.Pt - state.P]
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
+        _energy_target_rows(self, state, res, jac)
         return res, jac
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:

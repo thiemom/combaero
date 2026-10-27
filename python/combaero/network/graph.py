@@ -319,6 +319,10 @@ class FlowNetwork:
             node_validate = getattr(node, "validate", None)
             if callable(node_validate):
                 node_validate()
+            # EnergyBoundary(Tt_target=...) refusals (#792)
+            from .components import validate_energy_boundaries
+
+            validate_energy_boundaries(node)
 
     def to_dict(self) -> dict:
         """

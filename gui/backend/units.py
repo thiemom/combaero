@@ -90,7 +90,9 @@ UNIT_MAP: dict[str, str] = {
     "Q": "W",
     "Q_to_boundary": "W",  # wall heat that left with a stream into a boundary
     "Q_wall_out": "W",
+    "Q_fraction": "W",  # heat an EnergyBoundary fraction applied
     "Q_withheld": "W",
+    "Tt_target": "K",  # heat source (#792): the set outlet TOTAL temperature
     # --- Tee junction ---
     "m_dot_com": "kg/s",
     "m_dot_straight": "kg/s",

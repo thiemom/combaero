@@ -19,6 +19,7 @@ import {
 	Flame,
 	Gauge,
 	Grip,
+	Heater,
 	Link,
 	LogIn,
 	type LucideIcon,
@@ -61,6 +62,7 @@ export const NODE_APPEARANCE = {
 	ejector: { icon: Wind, colour: "text-sky-500" },
 	vortex: { icon: Tornado, colour: "text-violet-500" },
 	probe: { icon: Crosshair, colour: "text-blue-500" },
+	heat_source: { icon: Heater, colour: "text-rose-600" },
 } satisfies Record<string, NodeAppearance>;
 
 export type AppearanceType = keyof typeof NODE_APPEARANCE;

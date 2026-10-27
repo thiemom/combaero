@@ -115,7 +115,7 @@ def closure(solver: Any, result: dict) -> dict[str, float] | None:
         imbalance[n] += float(o.m_dot)
 
     q_user = sum(
-        eb.Q
+        eb.heat
         for nid, node in nodes.items()
         for eb in getattr(node, "energy_boundaries", []) or []
         if eb.id != f"_wall_{nid}"

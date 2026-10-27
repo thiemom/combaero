@@ -119,6 +119,21 @@ def _build_result_objects(
         )
         node_results[node_id] = NodeResult(state=state_res, success=success)
 
+    # A heat source (#792) reports the heat it applied -- the SOLVED Q in a
+    # Tt_target mode, the set one otherwise, NaN when undetermined (no
+    # through-flow) -- beside the state of the node it heats, whose T/Tt are
+    # that node's TOTAL temperature.
+    for hs_id, (target, eb) in getattr(net, "_gui_heat_sources", {}).items():
+        node_res = node_results.get(target)
+        if node_res is None:
+            continue
+        extra = {"Q": float(result.get(f"{hs_id}.Q", math.nan))}
+        if eb.is_target:
+            extra["Tt_target"] = float(eb.Tt_target)
+        node_results[hs_id] = NodeResult(
+            state=node_res.state, success=success, heated_node=target, **extra
+        )
+
     element_results: dict[str, ElementResult] = {}
     elem_diags = result.get("__element_diag__", {})
     for elem_id in net.elements:

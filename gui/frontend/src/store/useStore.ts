@@ -13,6 +13,7 @@ import {
 import { create } from "zustand";
 import { exportResults, isBackendReachable, resolvePreview } from "../api";
 import { discoverFields } from "../utils/diagnostics";
+import { HEAT_SOURCE_HANDLE, heatSourceEdgeProps } from "../utils/heatSource";
 import type { PreviewItems } from "../utils/inheritance";
 import { migrateNodeData, migrateSolverSettings } from "../utils/legacyKeys";
 import { solveErrorMessage } from "../utils/solveError";
@@ -184,6 +185,20 @@ const useStore = create<RFState>((set, get) => ({
 						? { ...n, data: { ...n.data, target_id: targetId } }
 						: n,
 				),
+			});
+			return;
+		}
+		// A heat source's edge (#792) names the node it heats: no flow.
+		if (connection.sourceHandle === HEAT_SOURCE_HANDLE) {
+			const edge: Edge = {
+				...connection,
+				id: `edge_${Date.now()}`,
+				...heatSourceEdgeProps(),
+			} as Edge;
+			set({
+				edges: stripResults(addEdge(edge, get().edges)),
+				nodes: stripResults(get().nodes),
+				solveResults: null,
 			});
 			return;
 		}

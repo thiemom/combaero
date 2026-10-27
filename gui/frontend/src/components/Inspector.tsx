@@ -7,6 +7,14 @@ import {
 	resolveField,
 } from "../utils/diagnostics";
 import { defaultFilmSide } from "../utils/filmLink";
+import {
+	formatHeat,
+	formatKelvin,
+	HEAT_SOURCE_DEFAULTS,
+	HEAT_SOURCE_MODES,
+	type HeatSourceMode,
+	heatedNodeId,
+} from "../utils/heatSource";
 import { warningsFor } from "../utils/incompressible";
 import { inheritedField, inheritedNote } from "../utils/inheritance";
 import { junctionGuessKey } from "../utils/legacyKeys";
@@ -521,6 +529,144 @@ const Inspector = () => {
 						Closed end — zero mass flow. No configurable parameters.
 					</div>
 				)}
+
+				{selectedNode.type === "heat_source" &&
+					(() => {
+						// #792: an EnergyBoundary on the node its one edge points at.
+						const d = selectedNode.data;
+						const mode: HeatSourceMode = d.mode ?? HEAT_SOURCE_DEFAULTS.mode;
+						const heated = heatedNodeId(selectedNode.id, edges);
+						const heatedNode = nodes.find((n) => n.id === heated);
+						const res = d.result;
+						return (
+							<div className="flex flex-col gap-3">
+								<div className="text-[10px] text-stone-500 leading-snug">
+									Heats{" "}
+									<span className="font-mono font-bold">
+										{heatedNode
+											? heatedNode.data.label || heatedNode.id
+											: "nothing yet"}
+									</span>
+									{heatedNode ? ` (${nodeTypeLabel(heatedNode.type)})` : ""}. Q
+									&gt; 0 heats the fluid, Q &lt; 0 cools it.
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`hs_mode_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Set
+									</label>
+									<select
+										id={`hs_mode_${selectedNode.id}`}
+										value={mode}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												mode: e.target.value as HeatSourceMode,
+											})
+										}
+										className="p-2 border rounded text-sm"
+									>
+										{HEAT_SOURCE_MODES.map((m) => (
+											<option key={m.value} value={m.value}>
+												{m.label}
+											</option>
+										))}
+									</select>
+								</div>
+								{mode === "Q" && (
+									<div className="flex flex-col gap-2">
+										<label
+											htmlFor={`hs_Q_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Q (W)
+										</label>
+										<NumericInput
+											id={`hs_Q_${selectedNode.id}`}
+											value={d.Q ?? HEAT_SOURCE_DEFAULTS.Q}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { Q: val })
+											}
+											className="p-2 border rounded"
+										/>
+									</div>
+								)}
+								{mode === "fraction" && (
+									<div className="flex flex-col gap-2">
+										<label
+											htmlFor={`hs_f_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Fraction of sensible enthalpy (-)
+										</label>
+										<NumericInput
+											id={`hs_f_${selectedNode.id}`}
+											value={d.fraction ?? HEAT_SOURCE_DEFAULTS.fraction}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { fraction: val })
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											Of h(T) - h(298.15 K) of the inflow (of the products on a
+											combustor). -0.05 removes 5%.
+										</span>
+									</div>
+								)}
+								{mode === "Tt_target" && (
+									<div className="flex flex-col gap-2">
+										<label
+											htmlFor={`hs_T_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Outlet Tt (total) (K)
+										</label>
+										<NumericInput
+											id={`hs_T_${selectedNode.id}`}
+											value={d.Tt_target ?? HEAT_SOURCE_DEFAULTS.Tt_target}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { Tt_target: val })
+											}
+											className="p-2 border rounded"
+										/>
+										<span className="text-[9px] text-stone-400">
+											The node's TOTAL temperature after the heat; the heat flow
+											is solved for. On a combustor: the exit Tt, reached by
+											heat taken out after the reaction (the fuel flow is
+											unchanged).
+										</span>
+									</div>
+								)}
+								{res && (
+									<div className="grid grid-cols-2 gap-x-2 gap-y-2 p-2 bg-rose-50 border border-rose-200 rounded">
+										<div className="flex flex-col">
+											<span className="text-stone-400 text-[9px] font-bold">
+												{mode === "Tt_target" ? "Q (solved)" : "Q (applied)"}
+											</span>
+											<span className="font-mono text-xs font-bold">
+												{formatHeat(res.Q)}
+											</span>
+										</div>
+										<div className="flex flex-col">
+											<span className="text-stone-400 text-[9px] font-bold">
+												Tt (total) of {heatedNode?.data.label || heated}
+											</span>
+											<span className="font-mono text-xs font-bold">
+												{formatKelvin(res.state?.Tt ?? res.state?.T)}
+											</span>
+										</div>
+										{!Number.isFinite(res.Q) && (
+											<div className="col-span-2 text-[10px] text-red-600 leading-snug">
+												No heat determined: without flow through the node no
+												heat sets its outlet temperature.
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						);
+					})()}
 
 				{selectedNode.type === "channel" &&
 					(() => {

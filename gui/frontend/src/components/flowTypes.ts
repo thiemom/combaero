@@ -7,6 +7,7 @@ import EffusionLinerNode from "./nodes/EffusionLinerNode";
 import EffusionPlateNode from "./nodes/EffusionPlateNode";
 import EjectorNode from "./nodes/EjectorNode";
 import FilmCoolingNode from "./nodes/FilmCoolingNode";
+import HeatSourceNode from "./nodes/HeatSourceNode";
 import ImpingementArrayNode from "./nodes/ImpingementArrayNode";
 import LosslessNode from "./nodes/LosslessNode";
 import MassBoundaryNode from "./nodes/MassBoundaryNode";
@@ -42,6 +43,7 @@ export const nodeTypes = {
 	ejector: EjectorNode,
 	vortex: VortexNode,
 	wall: WallNode,
+	heat_source: HeatSourceNode,
 };
 
 export const edgeTypes = {

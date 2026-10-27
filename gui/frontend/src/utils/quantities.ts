@@ -222,6 +222,12 @@ export const QUANTITY_CATALOGUE: Record<
 	T: { label: "T (total)", unit: "K", format: (v) => v.toFixed(2) },
 	T_static: { label: "T (static)", unit: "K", format: (v) => v.toFixed(2) },
 	Tt: { label: "Tt", unit: "K", format: (v) => v.toFixed(2) },
+	// A heat source's set outlet temperature (#792): a TOTAL temperature.
+	Tt_target: {
+		label: "Tt target (total)",
+		unit: "K",
+		format: (v) => v.toFixed(2),
+	},
 	rho: { label: "rho", unit: "kg/m³", format: (v) => v.toFixed(4) },
 	a: { label: "a", unit: "m/s", format: (v) => v.toFixed(2) },
 	h: { label: "h", unit: "J/kg", format: (v) => v.toFixed(0) },

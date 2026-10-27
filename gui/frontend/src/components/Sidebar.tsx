@@ -233,6 +233,17 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "heat_source")}
+				title="A heat source or sink on a plenum, momentum chamber or combustor: a set heat flow, a fraction of the sensible enthalpy, or a set outlet total temperature (the heat is then solved for). Wire it by one edge to the node it heats."
+				draggable
+			>
+				<NodeIcon type="heat_source" size={18} />
+				<span>Heat Source</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "momentum_chamber")}
 				draggable
 			>
