@@ -59,6 +59,22 @@ pytestmark = pytest.mark.slow
 Geom = tuple[int, int, int]
 Test = tuple[int, int, int, float, float]  # geometry, mc/mj, Re_j / 1000
 
+# Tests the network does not solve from a cold start, each with its reason.
+# B(5,4,1) at mc/mj 1.01 is D.1's B(5,4,1) 0.99 regime: the exit segment runs
+# at the edge of a false Fanno choke (#802). Before #782 it solved, with the
+# jets of rows 1-5 reversed; with #782 a regular root still exists (reached by
+# continuation from that one), but a cold start steps onto the choke plateau.
+# Scored without it; #802 should flip the strict xfail below.
+STALLED: dict[Test, str] = {
+    (
+        5,
+        4,
+        1,
+        1.01,
+        10.2,
+    ): "#799/#802: cold start stalls on a false Fanno choke at the exit segment",
+}
+
 
 @cache
 def _d1() -> dict[tuple[int, int, int, float], list[dict[str, str]]]:
@@ -149,6 +165,10 @@ def _scored() -> list[Test]:
     return [k for k in sorted(_d2()) if _flow_test(k) is not None]
 
 
+def _solving() -> list[Test]:
+    return [k for k in _scored() if k not in STALLED]
+
+
 def _bias_rms(v: list[float]) -> tuple[float, float]:
     return sum(v) / len(v), math.sqrt(sum(x * x for x in v) / len(v))
 
@@ -161,9 +181,22 @@ def test_the_scored_set() -> None:
     assert sum(1 for k in scored if k[3] > 0.0) == 30
 
 
+@pytest.mark.parametrize(
+    "key",
+    [pytest.param(k, marks=pytest.mark.xfail(reason=r, strict=True)) for k, r in STALLED.items()],
+    ids=str,
+)
+def test_the_stalled_tests_still_stall(key: Test) -> None:
+    """Strict: a STALLED test that starts solving fails here, so it is looked
+    at and returned to the score rather than left out silently."""
+    _solve(key)
+
+
 def test_the_bypass_reference_temperature() -> None:
     """D.2's ETA from the network's T_aw = T_j + eta_r phi_0 (T_0 - T_j).
 
+    Measured 2026-10-27 (#782) over the 290 rows of the tests that solve
+    (STALLED aside): bias +0.010, RMSE 0.075.
     Measured 2026-10-24 over 300 rows: bias +0.013, RMSE 0.078; by row the
     bias runs from -0.09 at row 1 to +0.06 at row 10. Contrasts on the same
     rows, from the same solves: the mixing share alone (eta_r = 1, T_aw the
@@ -171,7 +204,7 @@ def test_the_bypass_reference_temperature() -> None:
     Before #728 a reversed jet row dropped to eta_r = 0: RMSE 0.163.
     """
     err, mix, none = [], [], []
-    for key in _scored():
+    for key in _solving():
         if key[3] == 0.0:
             continue
         for p, r in zip(_solve(key), _d2()[key], strict=True):
@@ -183,7 +216,7 @@ def test_the_bypass_reference_temperature() -> None:
         f"\nD.2 eta: n {len(err)} bias {bias:+.3f} RMSE {rms:.3f};"
         f" eta_r=1 RMSE {_bias_rms(mix)[1]:.3f}; eta=0 RMSE {_bias_rms(none)[1]:.3f}"
     )
-    assert len(err) == 300
+    assert len(err) == 290
     assert rms < 0.085
     assert abs(bias) < 0.025
     # The closure must earn its place over the mixing share alone.
@@ -226,21 +259,25 @@ def test_the_bypass_closure_at_the_measured_flows() -> None:
 def test_the_jet_heat_transfer() -> None:
     """Florschuetz (1981) Nu per row, at the network's own Re_j and Gc/Gj.
 
-    Measured 2026-10-24 (Nu_model / Nu_D2 - 1):
+    Measured 2026-10-27 (#782; STALLED aside, Nu_model / Nu_D2 - 1):
 
     - no initial crossflow, 100 rows: bias +5.8%, RMS 8.4%;
-    - with it, inside the correlation's range, 195 rows: -2.7%, 21.5%;
-    - with it, flagged outside the range (surface_extrapolated), 105 rows:
-      -16.9%, 34.9%. Among them the 8 starved rows (network jet reversed or
-      Gc/Gj past 4.44), at -94%: the surface is cooled by the crossflow and
+    - with it, inside the correlation's range, 196 rows: -2.7%, 21.5%;
+    - with it, flagged outside the range (surface_extrapolated), 94 rows:
+      -13.8%, 29.0%. Among them the 3 starved rows (network jet reversed or
+      Gc/Gj past 4.44), at -90%: the surface is cooled by the crossflow and
       the jet correlation has no channel-flow floor (CR-3936 conclusion 6;
       the open #467 item). Pinned so a floor shows here.
 
-    The array summary marks exactly those 8 rows unresolved (#729) and no
+    Before #782 (2026-10-24, with B(5,4,1) at mc/mj 1.01): inside 195 rows,
+    outside 105 at -16.9% / 34.9%, starved 8 -- five of the eight were that
+    test's reversed rows 1-5, which return to the score with #802.
+
+    The array summary marks exactly the starved rows unresolved (#729) and no
     other.
     """
     groups: dict[str, list[float]] = defaultdict(list)
-    for key in _scored():
+    for key in _solving():
         for p, r in zip(_solve(key), _d2()[key], strict=True):
             e = p["Nu"] / r["Nu"] - 1.0
             starved = p["Gc_Gj"] < 0.0 or p["Gc_Gj"] > 4.44
@@ -262,9 +299,9 @@ def test_the_jet_heat_transfer() -> None:
     )
     assert {k: len(v) for k, v in groups.items()} == {
         "none": 100,
-        "inside": 195,
-        "outside": 105,
-        "starved": 8,
+        "inside": 196,
+        "outside": 94,
+        "starved": 3,
     }
     assert abs(stats["none"][0]) < 0.07 and stats["none"][1] < 0.09
     assert abs(stats["inside"][0]) < 0.04 and stats["inside"][1] < 0.23

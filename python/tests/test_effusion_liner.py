@@ -76,6 +76,22 @@ def _net(liner: EffusionLiner, p_in=1.04e5, p_out=1.035e5, chamber: bool = False
     return g
 
 
+def _static_T(Tt: float, P: float, G: float, X: list[float]) -> float:
+    """Static T of gas at stagnation Tt, static P and mass flux G, from
+    h(Tt) = h(T) + (G R T / P)^2 / 2 by bisection: independent of the C++
+    chamber closure the panel uses (#782)."""
+    R = cb.specific_gas_constant(X)
+    ht = cb.h_mass(Tt, X)
+    lo, hi = 0.3 * Tt, Tt
+    for _ in range(200):
+        T = 0.5 * (lo + hi)
+        if ht - cb.h_mass(T, X) - 0.5 * (G * R * T / P) ** 2 > 0.0:
+            lo = T
+        else:
+            hi = T
+    return 0.5 * (lo + hi)
+
+
 def _solve(g: FlowNetwork) -> tuple[NetworkSolver, dict]:
     s = NetworkSolver(g)
     r = s.solve()
@@ -104,13 +120,18 @@ def test_the_stations_are_wired_as_bleeds_with_duct_fed_panels() -> None:
 
 def test_each_panel_cd_sees_its_stations_crossflow() -> None:
     """The panel's Cd is McGreehan-Schotsch at the U1/Vi of the SOLVED duct
-    flows either side of its station, Vi from the station's static drive."""
+    flows either side of its station, Vi from the station's static drive.
+    The ratio's T is the station's STATIC T (#782): the node carries T0, and
+    its gas moves at the mean of the two duct flows."""
     s, r = _solve(_net(_liner()))
     d = r["__element_diag__"]
+    A = 0.03 * 0.152
     for i in (1, 2, 3, 4):
         m_a, m_b = d[f"ln__s{i - 1}"]["m_dot"], d[f"ln__s{i}"]["m_dot"]
         P, T = r[f"ln__b{i}.P"], s._derived_states[f"ln__b{i}"][0]
-        ratio = cb.crossflow_velocity_ratio(m_a, m_b, P, T, X_AIR, 1.0e5, 0.03 * 0.152)
+        T_static = _static_T(T, P, abs(0.5 * (m_a + m_b)) / A, list(X_AIR))
+        assert T_static < T
+        ratio = cb.crossflow_velocity_ratio(m_a, m_b, P, T_static, X_AIR, 1.0e5, A)
         assert d[f"ln__p{i}"]["U1_over_Vi"] == pytest.approx(ratio.U1_over_Vi, rel=1e-9)
         panel = s.network.elements[f"ln__p{i}"]
         st = NetworkMixtureState(T=T, P=P, Pt=P, Tt=T, m_dot=d[f"ln__p{i}"]["m_dot"], Y=Y_AIR)
