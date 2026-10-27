@@ -960,16 +960,6 @@ def test_mfb_driven_mpce_network_keeps_plain_default_init():
     assert sol["__success__"], sol.get("__message__")
 
 
-def test_incompressible_warmstart_deprecated():
-    net = FlowNetwork()
-    net.add_node(PressureBoundary("in", Pt=200000.0, Tt=300.0))
-    net.add_node(PressureBoundary("out", Pt=100000.0, Tt=300.0))
-    net.add_element(OrificeElement("orf", "in", "out", 0.6, 0.05, correlation="fixed"))
-    solver = NetworkSolver(net)
-    with pytest.warns(DeprecationWarning, match="incompressible_warmstart"):
-        _ = solver.solve(init_strategy="incompressible_warmstart", timeout=10.0)
-
-
 def test_analytical_pt_prop_respects_user_initial_guess():
     """User-provided initial_guess on a channel wins over the analytical seed."""
     net = _mpce_tee_network(

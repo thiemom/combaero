@@ -72,7 +72,7 @@ Diagnostics returned on solve include `entrainment_ratio`,
 ```json
 {
   "global_regime": "incompressible" | "compressible",
-  "init_strategy": "default" | "incompressible_warmstart" | "homotopy",
+  "init_strategy": "default" | "analytical_pt_prop" | "outletref_warmstart" | "homotopy" | "continuation",
   "method": "hybr" | "lm" | "broyden1" | ...,
   "timeout": 30.0
 }

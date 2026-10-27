@@ -33,7 +33,6 @@ from .components import (
     TeeJunctionElement,
     VortexElement,
     MultiPortChamberBase,
-    BorderCarnotLossElement,
     WallNode,
 )
 from .mpce_element import ConstantKTeeElement, MultiPortChamberElement
@@ -85,7 +84,6 @@ __all__: list[str] = [
     "MultiPortChamberElement",
     "ConstantKTeeElement",
     "IdealMomentumTeeElement",
-    "BorderCarnotLossElement",
     "EnergyBoundary",
     "NetworkMixtureState",
     "CombustionResult",
@@ -114,12 +112,3 @@ __all__: list[str] = [
     "LinearThetaFractionLoss",
     "LinearThetaHeadLoss",
 ]
-
-
-def __getattr__(name: str) -> type:
-    """Deprecated aliases (ConstantLoss, LinearThetaLoss) warn on access."""
-    from . import pressure_loss as _pressure_loss
-
-    if name in _pressure_loss._DEPRECATED_ALIASES:
-        return getattr(_pressure_loss, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

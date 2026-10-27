@@ -87,7 +87,7 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
     closure is f = 1 (dividing bias on Bassett 2001, K straight +0.26, K branch
     +0.23), and the harness reports, never recommends, other values.
 
-    Do not add a ``BorderCarnotLossElement`` on a port: the closure already
+    Do not add a separate turning-loss element on a port: the closure already
     carries the turning loss.
     """
 

@@ -214,7 +214,7 @@ def build_and_solve_network(
         method="lm",
         timeout=timeout,
         options=solver_options,
-        init_strategy="incompressible_warmstart",
+        init_strategy="outletref_warmstart",
     )
     wall_time = time.time() - start_time
 

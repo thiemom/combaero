@@ -21,7 +21,7 @@ class SmoothModelData(BaseModel):
 class RibbedModelData(BaseModel):
     """Rib-roughened walls, on a provenanced correlation set.
 
-    Restored in 0.8.0 after the previous rib correlation was removed for
+    Restored in 0.7.0 after the previous rib correlation was removed for
     failing provenance review -- its friction multiplier was 4-5x below the
     only rib datum in the repository. See issue #334.
     """
@@ -52,7 +52,7 @@ class ImpingementModelData(BaseModel):
     matched to the channel cross-section, A_flow * (xn/d) / (z/d), so the
     hole count follows from the channel (#462).
 
-    Restored in 0.9.0 after the previous impingement correlation was removed
+    Restored in 0.7.0 after the previous impingement correlation was removed
     for citing this same paper while taking no crossflow input at all,
     making it structurally unable to be that correlation. See issue #337.
 
@@ -712,11 +712,19 @@ class SolverSettings(BaseModel):
     init_strategy: Literal[
         "default",
         "analytical_pt_prop",
-        "incompressible_warmstart",
         "outletref_warmstart",
         "homotopy",
         "continuation",
     ] = "default"
+
+    @field_validator("init_strategy", mode="before")
+    @classmethod
+    def _migrate_init_strategy(cls, v: object) -> object:
+        # The inlet-referenced incompressible warm start was removed from the
+        # library in 0.8.0. A file saved with it gets its outlet-referenced
+        # successor, as the frontend does on load.
+        return "outletref_warmstart" if v == "incompressible_warmstart" else v
+
     method: Literal[
         "hybr",
         "lm",

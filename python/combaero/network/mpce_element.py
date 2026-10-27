@@ -147,8 +147,8 @@ class MultiPortChamberElement(MultiPortChamberBase):
         on observed joining flow.
 
     The owned unknown is the junction TOTAL pressure, ``{id}.Pt_jct``
-    (``{id}.P_jct`` before #773; an ``initial_guess`` under the old key is
-    still accepted, with a DeprecationWarning, until 0.8.0).
+    (``{id}.P_jct`` before #773; the old ``initial_guess`` key was removed
+    in 0.8.0).
     """
 
     JUNCTION_UNKNOWN = "Pt_jct"

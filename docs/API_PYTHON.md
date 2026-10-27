@@ -1202,8 +1202,8 @@ graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, diameter=0.01
 
 solver = NetworkSolver(graph)
 # init_strategy options: "default", "analytical_pt_prop", "homotopy",
-# "continuation", "outletref_warmstart", "incompressible_warmstart"
-# (deprecated).
+# "continuation", "outletref_warmstart" ("incompressible_warmstart" was
+# removed in 0.8.0 and raises ValueError).
 # "default" auto-upgrades to "analytical_pt_prop" for networks that
 # contain a MultiPortChamberBase; pass another strategy or an
 # explicit x0 to opt out.
@@ -1309,7 +1309,7 @@ combustor.add_energy_boundary(EnergyBoundary("loss", fraction=-0.05))  # -5% of 
   - The chamber now passes up to the true choked flux. Before, T0 read as static capped it at 92 % of choked.
   - The merge-chamber face state (`cb.chamber_merge_face_state`) takes both temperatures as stagnation and solves the face's and the outlet's static states; its sensitivities are analytic (#578).
   - The chamber's heat-transfer correlation, and an effusion plate's gas-side density, use the chamber's static state (#578).
-  - Still read as static: an incompressible `ChannelElement` or a `BorderCarnotLossElement` whose upstream node is a chamber, and the legacy `TeeJunctionElement` (#578).
+  - Still read as static: an incompressible `ChannelElement` whose upstream node is a chamber, and the legacy `TeeJunctionElement` (#578).
 - **A `MomentumChamberNode` has a `regime`** (#588), default `DEFAULT_REGIME` like the elements; the GUI gives every chamber (drawn, or inserted at a junction port, an edge or a merge) the network's global regime.
   - `"compressible"`: the closure above.
   - `"incompressible"`: its low-Mach limit. The static state is the stagnation one (`T_static = T0`, `rho = P / (R T0)`) and `Pt = P + (m/A)^2 / (2 rho)`: no sonic limit, so an incompressible network keeps none hidden in its chambers. The merge face takes both densities at the chamber pressure, `P_face = P + m_out^2/(rho A^2) - J/A - m_main^2/(rho_main A^2)`, linear with nothing to choke.
@@ -1455,15 +1455,13 @@ jct = MultiPortChamberElement(
     flow_direction="branch",         # 1 supplier + N-1 collectors
     # port_areas (length = N_in + N_out) inherited from connecting channels if not given
 )
-# Do NOT add a BorderCarnotLossElement on a port: the Mynard closure already
+# Do NOT add a turning-loss element on a port: the Mynard closure already
 # carries the lateral turning loss, and the two together double-count it
 # (Bassett K6 at 90 deg, psi = 1, q = 0.5: 0.867 alone, which is Bassett's
-# value; 1.249 with the element; #272). BorderCarnotLossElement is DEPRECATED
-# (removal in 0.8.0): it is exactly PressureLossElement with
-# correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area).
+# value; 1.249 with the removed BorderCarnotLossElement; #272).
 # Solved unknowns: jct.Pt_jct -- for this closure the junction TOTAL pressure
-# (jct.P_jct before #773: an initial_guess under that key still seeds it,
-# with a DeprecationWarning, until 0.8.0). Result keys (#773): P_jct is the
+# (jct.P_jct before #773; the old initial_guess key was removed in 0.8.0).
+# Result keys (#773): P_jct is the
 # junction STATIC pressure (Pt_jct minus the common port's dynamic head,
 # i.e. the common port's static), Pt_jct the TOTAL; every junction element
 # reports both. Per-port mass flows
@@ -1568,7 +1566,7 @@ vortex = VortexElement(
     r_in=0.05,        # inlet radius [m] (0 = on-axis: no angular momentum)
     r_out=0.10,       # outlet radius [m]; r_out < r_in is inward flow
     shaft_speed_rpm=3000,  # shaft speed [rpm]; sets the default inlet swirl
-                      # (omega_rpm before #773: deprecated, removed in 0.8.0)
+                      # (omega_rpm before #773; removed in 0.8.0)
     v_theta_in=None,  # inlet swirl [m/s]; None = solid body, omega * r_in
 )
 # Residual: Pt_out - Pt_in = 0 (no work: Pt and Tt conserved).
@@ -1577,8 +1575,8 @@ vortex = VortexElement(
 # Diagnostics: m_dot, shaft_speed_rpm, v_theta_in/out [m/s], P_swirl_in/out [Pa]
 # (static at each radius, isentropic from the stagnation state),
 # dP_swirl_static [Pa], M_theta_in/out, Pt_in, Pt_out.
-# r_c and n (the pre-#661 Vatistas core) are accepted, ignored and deprecated
-# (removed in 0.8.0); the cb.vatistas_* functions below are unchanged.
+# r_c and n (the pre-#661 Vatistas core) were removed in 0.8.0; the
+# cb.vatistas_* functions below are unchanged.
 
 # Supersonic ejector across all operating regimes -- critical (double-choked),
 # subcritical droop, and unchoked-primary subsonic jet pump -- in one C1 residual
@@ -1680,7 +1678,7 @@ Components that need a reference flow area infer one from the topology when you
 do not supply it. Inference searches the neighbourhood of the attached nodes:
 channels first (so networks that resolved before resolve identically), then any
 other area-bearing element (`AreaChangeElement`, `TeeJunctionElement`,
-`BorderCarnotLossElement`, `PressureLossElement`), then adjacent nodes whose
+`PressureLossElement`), then adjacent nodes whose
 area you set explicitly (`MomentumChamberNode`, `CombustorNode`). An area that
 was itself auto-sized is never used as a source -- inheriting a placeholder
 would launder one guess into another.
@@ -1692,7 +1690,6 @@ What happens when nothing can be inferred depends on what the area means:
 | `AreaChangeElement` | `F0`, `F1` | **raises** |
 | `ChannelElement` | `diameter` | **raises**; with `default_diameter=` set (the GUI passes `DEFAULT_CHANNEL_DIAMETER` = 0.1 m, #570), that default, reported as `area_source = "default"` |
 | `TeeJunctionElement` | `F_C` | **raises** |
-| `BorderCarnotLossElement` | `area` | **raises** |
 | `MomentumChamberNode` | `area` | nominal default |
 | `CombustorNode` | `area` | nominal default |
 | `PressureLossElement` | `area` | nominal default, warns if a head-loss correlation reads it |

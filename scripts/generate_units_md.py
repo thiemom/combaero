@@ -46,7 +46,7 @@ def parse_units_data(path: Path) -> list[UnitEntry]:
     # The original pattern required exactly one literal per field and so
     # matched none of those, silently dropping 35 of the entries in
     # units_data.h from docs/UNITS.md -- the whole solver-interface family
-    # (merging_tee, branching_tee, multi_port_chamber, border_carnot_loss,
+    # (merging_tee, branching_tee, multi_port_chamber, border_carnot_loss (removed in 0.8.0),
     # the compressible orifice and channel), the acoustics liner family and
     # the cooling channel family among them. Nothing failed; the generated
     # document was simply short, which is the worst way for a generator to be

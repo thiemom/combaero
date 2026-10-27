@@ -62,7 +62,7 @@ def main() -> None:
     print("Solving design point (mass-driven) …")
     design = runner.solve(
         {"fuel_inlet.m_dot": 0.03},
-        init_strategy="incompressible_warmstart",
+        init_strategy="outletref_warmstart",
     )
     assert design.success, f"Design solve failed: {design.message}"
 
@@ -75,7 +75,7 @@ def main() -> None:
     p_runner = design.swap_boundary("air_inlet", "pressure_boundary")
 
     # 3. Verify the swap gives the same operating point
-    verify = p_runner.solve(init_strategy="incompressible_warmstart")
+    verify = p_runner.solve(init_strategy="outletref_warmstart")
     assert verify.success, f"Swap verify failed: {verify.message}"
     dT = abs(verify.get("combustor.T") - design_T)
     print(

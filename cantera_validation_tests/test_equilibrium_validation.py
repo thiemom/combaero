@@ -445,35 +445,6 @@ class TestReformingEquilibrium:
             f"H2: CombAero={X_H2_out:.5f}, Cantera={X_H2_ct:.5f}"
         )
 
-    def test_reforming_vs_smr_wgs_consistency(self, combaero):
-        """reforming_equilibrium and smr_wgs_equilibrium give same result for CH4-only input.
-
-        This validates the deprecation claim: smr_wgs_equilibrium is redundant.
-        """
-        cb = combaero
-
-        X = np.zeros(num_species())
-        X[species_index_from_name("CH4")] = 0.10
-        X[species_index_from_name("H2O")] = 0.30
-        X[species_index_from_name("N2")] = 0.60
-
-        T, P = 1200.0, 101325.0
-
-        result_ref = cb.reforming_equilibrium(T, X, P)
-        with pytest.warns(DeprecationWarning, match="removed in 0.8.0"):
-            result_smr = cb.smr_wgs_equilibrium(T, X, P)
-
-        print("\nreforming_equilibrium vs smr_wgs_equilibrium (CH4 only):")
-        for sp in ["CH4", "H2O", "CO", "CO2", "H2"]:
-            idx = species_index_from_name(sp)
-            X_ref = result_ref.state.X[idx]
-            X_smr = result_smr.state.X[idx]
-            diff = abs(X_ref - X_smr)
-            print(f"  {sp}: reforming={X_ref:.6f}, smr_wgs={X_smr:.6f}, diff={diff:.6f}")
-            assert diff < 0.005, (
-                f"{sp}: reforming={X_ref:.6f} vs smr_wgs={X_smr:.6f}, diff={diff:.6f}"
-            )
-
 
 class TestCombustionEquilibrium:
     """Validate combustion_equilibrium against Cantera full equilibrium."""

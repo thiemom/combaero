@@ -92,8 +92,6 @@ IGNORE_LIST = {
     "OrificeResult",
     "WallCouplingResult",
     "Registry",
-    # Deprecated in favour of species.dry_air; a composition, not a quantity.
-    "standard_dry_air_composition",
 }
 
 # Special magic methods created by pybind11 that aren't public calculation points

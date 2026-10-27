@@ -477,11 +477,10 @@ const useStore = create<RFState>((set, get) => ({
 			const loadedSettings = migrateSolverSettings(
 				data.solverSettings || get().solverSettings,
 			);
-			// Legacy migration: the deprecated inlet-referenced incompressible
-			// warm start is no longer offered in the UI; its successor is the
-			// outlet-referenced variant (tracks the compressible root 6-7x
-			// closer). The backend still accepts the old value for headless
-			// workflows.
+			// Legacy migration: the inlet-referenced incompressible warm start
+			// was removed in 0.8.0; its successor is the outlet-referenced
+			// variant (tracks the compressible root 6-7x closer). The backend
+			// maps the old value the same way for headless workflows.
 			if (loadedSettings.init_strategy === "incompressible_warmstart") {
 				loadedSettings.init_strategy = "outletref_warmstart";
 			}

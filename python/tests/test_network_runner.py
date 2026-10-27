@@ -479,7 +479,7 @@ def test_swap_missing_label_raises():
 def test_multi_wall_tee_solve():
     # init_strategy="default": the fixture's stored results are from a
     # FAILED solve, so since the warm-start success gate they no longer
-    # seed the solver -- and the deprecated incompressible_warmstart this
+    # seed the solver -- and the incompressible_warmstart (removed in 0.8.0) this
     # test used to pin only converged FROM that poisoned seed. The plain
     # default converges cold.
     runner = NetworkRunner.from_file(_MULTI_WALL_TEE)

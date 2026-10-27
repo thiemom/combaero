@@ -11,7 +11,7 @@ solver stall whose message blamed the solver.
 Two behaviours are separated deliberately:
 
 * Where the area IS the geometry being modelled (AreaChangeElement F0/F1,
-  ChannelElement diameter, TeeJunctionElement F_C, BorderCarnotLossElement),
+  ChannelElement diameter, TeeJunctionElement F_C),
   an unresolvable area raises. A default there invents a contraction or
   expansion that does not exist.
 * Where the area is only a dynamic-head reference (MomentumChamberNode,
@@ -33,7 +33,6 @@ import pytest
 import combaero as cb
 from combaero.network import (
     AreaChangeElement,
-    BorderCarnotLossElement,
     ChannelElement,
     CombustorNode,
     FlowNetwork,
@@ -236,23 +235,6 @@ def test_tee_junction_inherits_F_C_from_a_chamber():
     net.resolve_all_topology()
 
     assert pytest.approx(_CHAMBER_AREA) == tee.F_C
-
-
-def test_border_carnot_loss_inherits_area_from_a_chamber():
-    net = FlowNetwork()
-    _mfb(net)
-    net.add_node(MomentumChamberNode("chamber", area=_CHAMBER_AREA))
-    net.add_node(PlenumNode("mid"))
-    _pb(net)
-    net.add_element(LosslessConnectionElement("feed", "mfb", "chamber"))
-    with pytest.warns(DeprecationWarning):
-        loss = BorderCarnotLossElement("turn", "chamber", "mid", delta_geom_deg=90.0)
-    net.add_element(loss)
-    net.add_element(LosslessConnectionElement("exit", "mid", "pb"))
-
-    net.resolve_all_topology()
-
-    assert loss.area == pytest.approx(_CHAMBER_AREA)
 
 
 def test_chamber_node_inherits_area_from_a_combustor():

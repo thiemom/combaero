@@ -1245,11 +1245,11 @@ TEST_F(ThermoTransportTest, RichCombustionNaturalGasUnburnedHC) {
 }
 
 // =============================================================================
-// SMR+WGS Equilibrium Tests
+// Reforming equilibrium, CH4 only (formerly the SMR+WGS solver's tests)
 // =============================================================================
 
-// Test SMR+WGS equilibrium at high temperature with CH4
-TEST_F(ThermoTransportTest, SmrWgsEquilibriumIsothermal) {
+// Test reforming equilibrium at high temperature with CH4 only
+TEST_F(ThermoTransportTest, ReformingCh4Isothermal) {
     const std::size_t n = species_names.size();
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_H2O = species_index_from_name("H2O");
@@ -1267,7 +1267,7 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumIsothermal) {
     State in;
     in.set_TPX(2000.0, 101325.0, X_in);  // High temperature favors SMR
 
-    EquilibriumResult out = smr_wgs_equilibrium(in);
+    EquilibriumResult out = reforming_equilibrium(in);
 
     // Temperature should be unchanged (isothermal)
     EXPECT_NEAR(out.state.T, in.T, 1e-6);
@@ -1299,8 +1299,8 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumIsothermal) {
     EXPECT_NEAR(H_per_N2_in, H_per_N2_out, 1e-6);
 }
 
-// Test SMR+WGS adiabatic equilibrium
-TEST_F(ThermoTransportTest, SmrWgsEquilibriumAdiabatic) {
+// Test adiabatic reforming equilibrium with CH4 only
+TEST_F(ThermoTransportTest, ReformingCh4Adiabatic) {
     const std::size_t n = species_names.size();
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_H2O = species_index_from_name("H2O");
@@ -1316,7 +1316,7 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumAdiabatic) {
     State in;
     in.set_TPX(2200.0, 101325.0, X_in);  // Start at high temperature
 
-    EquilibriumResult out = smr_wgs_equilibrium_adiabatic(in);
+    EquilibriumResult out = reforming_equilibrium_adiabatic(in);
 
     // SMR is endothermic, so temperature should decrease
     EXPECT_LT(out.state.T, in.T);
@@ -1332,8 +1332,8 @@ TEST_F(ThermoTransportTest, SmrWgsEquilibriumAdiabatic) {
     EXPECT_NEAR(H_per_N2_in, H_per_N2_out, std::abs(H_per_N2_in) * 0.05);
 }
 
-// Test SMR+WGS falls back to WGS when no CH4
-TEST_F(ThermoTransportTest, SmrWgsFallbackToWgs) {
+// Test reforming falls back to WGS when no hydrocarbon
+TEST_F(ThermoTransportTest, ReformingFallbackToWgs) {
     const std::size_t n = species_names.size();
     const std::size_t idx_H2O = species_index_from_name("H2O");
     const std::size_t idx_CO2 = species_index_from_name("CO2");
@@ -1347,18 +1347,18 @@ TEST_F(ThermoTransportTest, SmrWgsFallbackToWgs) {
     State in;
     in.set_TPX(2200.0, 101325.0, X_in);
 
-    EquilibriumResult out_smr_wgs = smr_wgs_equilibrium_adiabatic(in);
+    EquilibriumResult out_reforming = reforming_equilibrium_adiabatic(in);
     EquilibriumResult out_wgs = wgs_equilibrium_adiabatic(in);
 
     // Results should be identical when no CH4
-    EXPECT_NEAR(out_smr_wgs.state.T, out_wgs.state.T, 1e-6);
+    EXPECT_NEAR(out_reforming.state.T, out_wgs.state.T, 1e-6);
     for (std::size_t i = 0; i < n; ++i) {
-        EXPECT_NEAR(out_smr_wgs.state.X[i], out_wgs.state.X[i], 1e-10);
+        EXPECT_NEAR(out_reforming.state.X[i], out_wgs.state.X[i], 1e-10);
     }
 }
 
-// Test SMR+WGS with complete combustion products at rich conditions
-TEST_F(ThermoTransportTest, SmrWgsRichCombustion) {
+// Test CH4 reforming of complete combustion products at rich conditions
+TEST_F(ThermoTransportTest, ReformingCh4RichCombustion) {
     const std::size_t n = species_names.size();
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_CO = species_index_from_name("CO");
@@ -1384,8 +1384,8 @@ TEST_F(ThermoTransportTest, SmrWgsRichCombustion) {
     // Verify there's unburned CH4
     EXPECT_GT(burned.X[idx_CH4], 0.01);
 
-    // Apply SMR+WGS equilibrium
-    EquilibriumResult eq = smr_wgs_equilibrium_adiabatic(burned);
+    // Apply reforming equilibrium
+    EquilibriumResult eq = reforming_equilibrium_adiabatic(burned);
 
     // CH4 should be mostly reformed
     EXPECT_LT(eq.state.X[idx_CH4], burned.X[idx_CH4] * 0.5);
@@ -1683,11 +1683,11 @@ TEST_F(ThermoTransportTest, ReformingWithExistingCOH2) {
     EXPECT_NEAR(in.X[idx_AR] / n2_in, out.state.X[idx_AR] / n2_out, 1e-10);
 }
 
-// Test element conservation in SMR+WGS
+// Test element conservation in CH4 reforming
 // Note: SMR changes total moles (Δn=2), so we need to account for this
 // when checking element balance. We use the ratio of elements to N2
 // (which is inert) to verify conservation.
-TEST_F(ThermoTransportTest, SmrWgsElementConservation) {
+TEST_F(ThermoTransportTest, ReformingCh4ElementConservation) {
     const std::size_t n = species_names.size();
     const std::size_t idx_CH4 = species_index_from_name("CH4");
     const std::size_t idx_H2O = species_index_from_name("H2O");
@@ -1708,7 +1708,7 @@ TEST_F(ThermoTransportTest, SmrWgsElementConservation) {
         State in;
         in.set_TPX(T, 101325.0, X_in);
 
-        EquilibriumResult out = smr_wgs_equilibrium(in);
+        EquilibriumResult out = reforming_equilibrium(in);
 
         // Use N2 as reference (inert, doesn't participate in reactions)
         // Element ratios relative to N2 should be conserved

@@ -1666,7 +1666,7 @@ def _element_area_facing(elem: "NetworkElement", node_id: str) -> float | None:
         if node_id == elem.branch_node:
             return float(elem.F_C) / elem.psi
         return float(elem.F_C)
-    if isinstance(elem, (BorderCarnotLossElement, PressureLossElement)):
+    if isinstance(elem, PressureLossElement):
         return float(elem.area) if elem.area is not None else None
     # Elements defined outside this module (e.g. the ejector's outlet duct)
     # declare their own faces.
@@ -8636,7 +8636,7 @@ class TeeJunctionElement(NetworkElement):
 # ---------------------------------------------------------------------------
 # Momentum-CV junction machinery (momentum cv implementation guide.pdf). The
 # residuals live in the subclasses (mpce_element.py), whose closures carry the
-# port losses; BorderCarnotLossElement below is NOT a companion for them.
+# port losses, so no separate turning-loss element belongs on a port (#272).
 # ---------------------------------------------------------------------------
 
 
@@ -8655,9 +8655,8 @@ class MultiPortChamberBase(NetworkElement):
     per-port orientation derived from the topology (positive = flow out of
     the junction). The per-port relation, and with it the port losses, is
     the subclass's closure -- Mynard's for ``MultiPortChamberElement``, fixed
-    K for ``ConstantKTeeElement``. Do not add a
-    :class:`BorderCarnotLossElement` on a port as well: that double-counts
-    the turning loss (#272).
+    K for ``ConstantKTeeElement``. Do not add a turning-loss element on a
+    port as well: that double-counts the turning loss (#272).
 
     Topology contract (see PDF Section 2 + addendum task #10):
 
@@ -8794,14 +8793,6 @@ class MultiPortChamberBase(NetworkElement):
     def junction_unknown(self) -> str:
         """The owned unknown's full name, ``{id}.P_jct`` or ``{id}.Pt_jct``."""
         return f"{self.id}.{self.JUNCTION_UNKNOWN}"
-
-    def legacy_unknown_names(self) -> dict[str, str]:
-        """{current unknown name: pre-#773 name} for an ``initial_guess`` key
-        that was renamed; the solver still accepts the old key, with a
-        DeprecationWarning, until 0.8.0."""
-        if self.JUNCTION_UNKNOWN == "P_jct":
-            return {}
-        return {self.junction_unknown: f"{self.id}.P_jct"}
 
     def unknowns(self) -> list[str]:
         return [self.junction_unknown]
@@ -8985,8 +8976,6 @@ class MultiPortChamberBase(NetworkElement):
             outer_area: float | None = None
             if isinstance(outer, ChannelElement) and outer.diameter is not None:
                 outer_area = math.pi * (outer.diameter / 2.0) ** 2
-            elif isinstance(outer, BorderCarnotLossElement) and outer.area is not None:
-                outer_area = float(outer.area)
             self._outer_areas[i] = outer_area
             # Only the unset ports inherit; this branch is idempotent across
             # resolve passes (after it runs once port_areas[i] is no longer None),
@@ -9066,135 +9055,6 @@ class MultiPortChamberBase(NetworkElement):
         return diag
 
 
-class BorderCarnotLossElement(NetworkElement):
-    """
-    Border-Carnot turning-loss element: a two-port in-line loss. It was the
-    lateral-port companion of the momentum-CV junction's impulse model,
-    removed in 0.6.0 (#322).
-
-    DEPRECATED in 0.7.0, for removal in 0.8.0. Its residual is exactly a
-    constant head loss, so the replacement reproduces it to round-off
-    (measured 1e-11 in Pt drop and mass flow)::
-
-        PressureLossElement(id, from_node, to_node,
-            correlation=ConstantHeadLoss(
-                zeta=4 * (1 - cos(0.75 * delta)) ** 2, area=area),
-            area=area)
-
-    with ``delta`` the geometric turn in radians. The only thing this class
-    adds is that zeta formula, which was derived for a junction's lateral
-    branch -- physics both junction closures now carry -- and was never
-    compared against bend data. Choose a bend's K from a handbook instead.
-
-    NOT FOR JUNCTION PORTS. ``MultiPortChamberElement`` and
-    ``ConstantKTeeElement`` carry each port's turning loss in their own
-    closure, and adding this element double-counts it: on Bassett's 90 deg,
-    psi = 1 dividing tee, K6 at q = 0.5 is 0.867 from the closure alone
-    (Bassett 0.867) and 1.249 with this element (+16% at q = 0.3, +78% at
-    0.7; #272).
-
-    Residual (PDF Section 3.1):
-
-        Pt_in - Pt_out - L(delta_geom) * 0.5 * rho_in * u_in^2 = 0
-        L = 4 * (1 - cos((3/4) * delta_geom))^2
-
-    The (3/4) factor is Hager's effective-angle correction for sharp-edged
-    lateral branches. The form is *intended* to reproduce Hager xi_l and
-    Bassett K_inc at M -> 0 on a sharp-edged 90-deg lateral. That was never
-    demonstrated: its only check, paired with the removed junction model,
-    missed Bassett K6 by 11-29%, and the tests went with that model (#322).
-    Do not rely on it being anchored to Hager or Bassett. delta_geom = 0
-    gives L = 0.
-
-    The element is sign-free in m_dot (mdot^2 in the dynamic head). The
-    initial form has no direction asymmetry parameter; an
-    ``alpha_contract`` calibration multiplier can be added later if validation
-    data forces it (PDF Section 3.3, deferred).
-    """
-
-    #: RESIDUAL-ROW-SCALING: the row is Pt_in - Pt_out - dP_loss, in Pa. It was
-    #: filed as a mass-flow row by default, weighting it ref_p/ref_mdot
-    #: (1e5-1e9) too heavily; LM then traded every pressure for it (#614).
-    residual_scale_kind = "p"
-
-    def __init__(
-        self,
-        id: str,
-        from_node: str,
-        to_node: str,
-        delta_geom_deg: float,
-        area: float | None = None,
-    ):
-        warnings.warn(
-            "BorderCarnotLossElement is deprecated and will be removed in 0.8.0. "
-            "It is exactly PressureLossElement with "
-            "correlation=ConstantHeadLoss(zeta=4*(1-cos(0.75*delta))**2, area=area); "
-            "its zeta formula is a junction-lateral loss that MultiPortChamberElement "
-            "and ConstantKTeeElement already carry, so never put it on their ports.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(id, from_node, to_node)
-        self.delta_geom_deg = float(delta_geom_deg)
-        self.area = area
-        self._area_source = "user" if area is not None else ""
-
-    def unknowns(self) -> list[str]:
-        return [f"{self.id}.m_dot"]
-
-    def n_equations(self) -> int:
-        return 1
-
-    def resolve_topology(self, graph: "FlowNetwork") -> None:
-        # This element already refused to guess an area before #262; it now
-        # shares the widened inference path, so a chamber or area-change
-        # neighbour resolves it where only a channel used to.
-        if self.area is None:
-            self.area, self._area_source = _infer_flow_area(
-                graph, [self.from_node, self.to_node], exclude=self
-            )
-            if self.area is None:
-                raise _unresolved_area_error(self, "area", [self.from_node, self.to_node])
-
-    def residuals(
-        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
-    ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        delta_rad = math.radians(self.delta_geom_deg)
-        cpp = _solver_tools.border_carnot_loss_residual_and_jacobian(
-            mdot=state_in.m_dot,
-            Pt_in=state_in.Pt,
-            Pt_out=state_out.Pt,
-            P_in=state_in.P,
-            T_in=state_in.T,
-            Y_in=list(state_in.Y),
-            area=float(self.area),
-            delta_geom=delta_rad,
-        )
-        res = [cpp.residual]
-        jac: dict[int, dict[str, float]] = {
-            0: {
-                f"{self.from_node}.Pt": cpp.d_res_dPt_in,
-                f"{self.to_node}.Pt": cpp.d_res_dPt_out,
-                f"{self.from_node}.P": cpp.d_res_dP_in,
-                f"{self.from_node}.T": cpp.d_res_dT_in,
-                f"{self.id}.m_dot": cpp.d_res_dmdot,
-            }
-        }
-        return res, jac
-
-    def diagnostics(
-        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
-    ) -> dict[str, float]:
-        return {
-            "m_dot": float(state_in.m_dot),
-            "Pt_in": float(state_in.Pt),
-            "Pt_out": float(state_out.Pt),
-            "dPt": float(state_in.Pt - state_out.Pt),
-            "delta_geom_deg": float(self.delta_geom_deg),
-            "area": float(self.area or 0.0),
-        }
-
-
 # ---------------------------------------------------------------------------
 # Vortex element: free-vortex swirl redistribution (#661)
 # ---------------------------------------------------------------------------
@@ -9226,14 +9086,14 @@ class VortexElement(NetworkElement):
 
     The inlet swirl V_theta_in [m/s] is the user's; it defaults to solid-body
     rotation at the shaft speed ``shaft_speed_rpm`` (``omega_rpm`` before
-    #773, deprecated, removed in 0.8.0): V_theta_in = 2 pi N / 60 * r_in.
+    #773; the old name was removed in 0.8.0): V_theta_in = 2 pi N / 60 * r_in.
 
     Until #661 this element added the static radial-equilibrium rise of a
     Vatistas n-vortex to the TOTAL pressure at constant Tt: neither a free
     vortex (no Pt change) nor rotor work (Tt rises with Pt), and it destroyed
-    entropy for every omega > 0. Its core radius ``r_c`` and shape ``n`` are
-    accepted, ignored, and deprecated (removed in 0.8.0); the Vatistas
-    functions themselves (``cb.vatistas_*``) are unchanged.
+    entropy for every omega > 0. Its core radius ``r_c`` and shape ``n`` were
+    ignored from #661 and removed in 0.8.0; the Vatistas functions themselves
+    (``cb.vatistas_*``) are unchanged.
     """
 
     #: RESIDUAL-ROW-SCALING: the row is Pt_out - Pt_in, in Pa. It was
@@ -9251,28 +9111,8 @@ class VortexElement(NetworkElement):
         r_in: float = 0.05,
         shaft_speed_rpm: float = 0.0,
         v_theta_in: float | None = None,
-        r_c: float | None = None,
-        n: float | None = None,
-        omega_rpm: float | None = None,
     ):
         super().__init__(id, from_node, to_node)
-        if omega_rpm is not None:
-            warnings.warn(
-                "VortexElement's omega_rpm is deprecated and will be removed in 0.8.0: "
-                "use shaft_speed_rpm (#773; omega is 2 pi f, not a speed in rpm).",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if shaft_speed_rpm != 0.0:
-                raise TypeError("VortexElement: give shaft_speed_rpm or omega_rpm, not both")
-            shaft_speed_rpm = omega_rpm
-        if r_c is not None or n is not None:
-            warnings.warn(
-                "VortexElement's r_c and n are ignored and will be removed in 0.8.0: "
-                "the element is a free vortex (#661), which has no Vatistas core.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
         if r_out <= 0.0:
             raise ValueError(f"Outlet radius r_out must be > 0; got {r_out}")
         if r_in < 0.0:
@@ -9286,17 +9126,6 @@ class VortexElement(NetworkElement):
         self.r_in = float(r_in)
         self.shaft_speed_rpm = float(shaft_speed_rpm)
         self.v_theta_in = None if v_theta_in is None else float(v_theta_in)
-
-    @property
-    def omega_rpm(self) -> float:
-        """Deprecated alias of ``shaft_speed_rpm`` (#773), removed in 0.8.0."""
-        warnings.warn(
-            "VortexElement.omega_rpm is deprecated and will be removed in 0.8.0: "
-            "use shaft_speed_rpm (#773).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.shaft_speed_rpm
 
     def swirl(self) -> tuple[float, float]:
         """(V_theta at r_in, V_theta at r_out) [m/s]; r * V_theta is conserved."""
