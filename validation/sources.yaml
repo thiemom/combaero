@@ -2521,6 +2521,25 @@ documents:
   read_for: ['#793 worked example candidate']
   issues: [793]
   records: []
+- file: docs/flow_network/meitner2004_NASA_TM-2004-211885.pdf
+  citation: 'Meitner, P. L. (2004). Procedure for determining one-dimensional flow distributions in arbitrarily
+    connected passages without the influence of pumping. NASA/TM-2004-211885, ARL-TR-3213 (also ASME GT2003-38061).'
+  id: NASA-TM-2004-211885
+  topic: [channel]
+  content: 'Network procedure for 1-D compressible flow distributions in connected passages (no pumping).
+    Worked example: an 8-element network, 3 inlets (50 psia total; 500/400/300 F), 2 outlets (20 and 15
+    psia static); Table 1 node coordinates and inlet/outlet areas, Fanning f = 0.20 everywhere, gamma 1.4,
+    fixed cp/mu, no heat transfer; Table 2 every element''s flow, total/static pressure, temperature and
+    Mach (element 4 carries only 0.0068 of 0.674 lbm/s, a sensitive branch).'
+  status: screened
+  verdict: 'The best fully printed network example found for #793: code-to-code, not measurement. Needs
+    a fixed-friction-factor option and tapered (linear-area) channels (or segment chains) in combaero.
+    Oddity in the source: element 8''s exit Tt (405.5 F) is below its inlet (406.9 F) with no heat transfer.
+    GTINDIA2012-9644 reprints the case but misnumbers the constant-area elements (TM: 1 and 3).'
+  read_for: ['#793 worked example candidate']
+  issues: [793]
+  records: []
+  notes: Fetched from NTRS 20040082327 (public) on 2026-10-27 during the docs/new screening.
 - file: docs/new/ceas-2007-026.pdf
   citation: 'Andreini, A., Carcasci, C., Ceccherini, A., Facchini, B., Surace, M., Coutandin, D., Gori,
     S., Peschiulli, A. (2007). Combustor liner temperature prediction: a preliminary tool development and
@@ -2885,19 +2904,6 @@ wanted:
     against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
     radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
   where: DTIC (public, ADA-numbered).
-- citation: Meitner, P. L. (2004). Procedure for determining one-dimensional flow distributions in arbitrarily
-    connected passages without the influence of pumping. NASA/TM-2004-211885, ARL-TR-3213 (also ASME GT2003-38061).
-  checked: true
-  issues:
-  - 793
-  priority: now
-  question: 'A fully printed, code-to-code network example for #793: 8 elements, 3 inlets (50 psia total;
-    500/400/300 F), 2 outlets (20 and 15 psia static), Table 1 node coordinates and inlet/outlet areas,
-    Fanning f = 0.20 everywhere, gamma 1.4, fixed cp/mu, no heat transfer; Table 2 prints every element''s
-    flow, total/static pressure, temperature and Mach (element 4 carries only 0.0068 of 0.674 lbm/s, a
-    sensitive branch). Needs a fixed-f option and tapered (linear-area) channels in combaero.'
-  where: NTRS 20040082327 (public, fetched and read 2026-10-27 for the docs/new screening); save to docs/
-    and register.
 - citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
     NASA TP-2985, AVSCOM TP 89-C-008.
   checked: false
