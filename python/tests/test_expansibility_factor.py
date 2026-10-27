@@ -127,11 +127,11 @@ class TestExpansibilityFactor:
         P_upstream = 101325.0  # Pa
         kappa = 1.4
 
-        # Near lower limit (β = 0.1)
+        # Near lower limit (beta = 0.1)
         eps_low = cb.expansibility_factor(0.15, dP, P_upstream, kappa)
         assert 0.95 < eps_low <= 1.0
 
-        # Near upper limit (β = 0.75)
+        # Near upper limit (beta = 0.75)
         eps_high = cb.expansibility_factor(0.7, dP, P_upstream, kappa)
         assert 0.90 < eps_high < 1.0
 

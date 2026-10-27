@@ -215,7 +215,7 @@ print(
 separator("Example 5: NetworkSolver channel+orifice -- validate vs direct API")
 
 # Same geometry as Examples 2/3.
-A_orif = 1e-4  # 1 cm² throat (same as Example 3)
+A_orif = 1e-4  # 1 cm^2 throat (same as Example 3)
 Cd_orif = 0.65
 P_low = 101_325.0  # atmospheric outlet
 Y = list(cb.mole_to_mass(X))
@@ -224,8 +224,8 @@ area_channel = 0.25 * math.pi * D**2
 velocities = [5.0, 20.0, 50.0, 100.0, 150.0, 200.0]
 
 print(
-    f"\n  Network: MassFlowBoundary -> Channel(L={L}m, D={D * 1e3:.0f}mm, ε={roughness * 1e3:.1f}mm)"
-    f" -> Plenum -> Orifice(A={A_orif * 1e4:.0f}cm², Cd={Cd_orif})"
+    f"\n  Network: MassFlowBoundary -> Channel(L={L}m, D={D * 1e3:.0f}mm, eps={roughness * 1e3:.1f}mm)"
+    f" -> Plenum -> Orifice(A={A_orif * 1e4:.0f}cm^2, Cd={Cd_orif})"
     f" -> PressureBoundary({P_low / 1e5:.1f}bar)"
 )
 print(f"  Inlet T={T}K,  Outlet P={P_low / 1e5:.2f} bar")
@@ -237,14 +237,14 @@ def _direct_incompressible(mdot: float) -> float:
     """Self-consistent P_in: iterate on P_junction via brentq."""
 
     def _residual(P_junc: float) -> float:
-        # Orifice: junction → outlet
+        # Orifice: junction -> outlet
         rho_j = cb.density(T, P_junc, X)
         mdot_orif = cb.orifice_mdot(P_junc, P_low, A_orif, Cd_orif, rho_j)
         return mdot - mdot_orif
 
     P_junc = _brentq(_residual, P_low + 1.0, 1e8)
 
-    # Channel: inlet → junction
+    # Channel: inlet -> junction
     rho_in_est = cb.density(T, P_junc + 1.0, X)
     v_channel = mdot / (rho_in_est * area_channel)
     dP_channel, _, _ = cb.channel_pressure_drop(

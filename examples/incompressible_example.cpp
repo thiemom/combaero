@@ -32,7 +32,7 @@ int main()
     std::cout << "1. Scalar Primitives (Bernoulli, Orifice, Pipe)\n";
     std::cout << "=========================================================================\n\n";
 
-    const double rho = 1.2;     // kg/m³  (air at ~300 K, 1 atm)
+    const double rho = 1.2;     // kg/m^3  (air at ~300 K, 1 atm)
     const double P1  = 101325.0;
     const double v1  = 5.0;     // m/s upstream velocity
     const double v2  = 20.0;    // m/s downstream velocity (area contraction)
@@ -42,7 +42,7 @@ int main()
     std::cout << "  P2 = " << P2_bern << " Pa  (dP = " << P1 - P2_bern << " Pa)\n\n";
 
     // Orifice primitives
-    const double A_or  = 1.0e-4;  // m²  orifice area
+    const double A_or  = 1.0e-4;  // m^2  orifice area
     const double Cd_or = 0.62;    // sharp-edge discharge coefficient
     const double dP_or = 5000.0;  // Pa  differential pressure
 
@@ -50,7 +50,7 @@ int main()
     const double Q_or    = orifice_Q(P1, P1 - dP_or, A_or, Cd_or, rho);
     const double dP_back = orifice_dP(mdot_or, A_or, Cd_or, rho);
 
-    std::cout << "Orifice (A=" << A_or * 1e4 << " cm², Cd=" << Cd_or << ", dP=" << dP_or << " Pa):\n";
+    std::cout << "Orifice (A=" << A_or * 1e4 << " cm^2, Cd=" << Cd_or << ", dP=" << dP_or << " Pa):\n";
     std::cout << "  mdot = " << mdot_or << " kg/s\n";
     std::cout << "  Q    = " << Q_or * 1e3 << " L/s\n";
     std::cout << "  dP (back-calc) = " << dP_back << " Pa\n\n";
@@ -93,7 +93,7 @@ int main()
     const double T_or   = 600.0;    // K  hot gas temperature
     const double P_or   = 3.0e5;    // Pa upstream pressure
     const double P_back = 2.8e5;    // Pa downstream pressure
-    const double A_hole = 2.0e-4;   // m² orifice area
+    const double A_hole = 2.0e-4;   // m^2 orifice area
 
     // Fixed Cd
     IncompressibleFlowSolution sol_fixed = orifice_flow_thermo(T_or, P_or, X_air,
@@ -102,7 +102,7 @@ int main()
     std::cout << "  mdot = " << sol_fixed.mdot << " kg/s\n";
     std::cout << "  v    = " << sol_fixed.v << " m/s\n";
     std::cout << "  Re   = " << sol_fixed.Re << "\n";
-    std::cout << "  rho  = " << sol_fixed.rho << " kg/m³\n\n";
+    std::cout << "  rho  = " << sol_fixed.rho << " kg/m^3\n\n";
 
     // User-supplied Cd hook: Re-dependent (simplified Idelchik-style)
     // Cd rises from ~0.6 at low Re to ~0.65 at high Re
@@ -153,7 +153,7 @@ int main()
     const double D_seg   = 0.03;     // m
     const double rough   = channel_roughness("commercial_steel");
 
-    std::cout << "Pipe roughness (commercial steel): " << rough * 1e6 << " μm\n\n";
+    std::cout << "Pipe roughness (commercial steel): " << rough * 1e6 << " um\n\n";
 
     // Smooth pipe (roughness = 0)
     IncompressibleFlowSolution sol_smooth = pipe_flow_rough(T_pipe, P_pipe, X_air,
@@ -169,7 +169,7 @@ int main()
     std::cout << "  dP = " << sol_rough.dP << " Pa,  f = " << sol_rough.f
               << ",  Re = " << sol_rough.Re << "\n\n";
 
-    // K-loss hook: 90° elbow (K ≈ 0.9) + sudden expansion (K ≈ 0.5)
+    // K-loss hook: 90 deg elbow (K ~= 0.9) + sudden expansion (K ~= 0.5)
     // Returns total additional K independent of Re for this simple model
     IncompressibleKLossFn k_fittings = [](double, double,
                                            const std::vector<double>&, double) {
@@ -187,7 +187,7 @@ int main()
 
     // Correlation comparison sweep (velocity)
     std::cout << "Friction correlation comparison (D=" << D_seg * 1e3 << " mm, rough="
-              << rough * 1e6 << " μm):\n";
+              << rough * 1e6 << " um):\n";
     std::cout << std::setw(10) << "u [m/s]"
               << std::setw(10) << "Re"
               << std::setw(12) << "f_haaland"

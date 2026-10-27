@@ -18,19 +18,19 @@ namespace combaero {
 
 double bernoulli_P2(double P1, double v1, double v2, double rho, double dz,
                     double g) {
-  // P1 + ½ρv1² + ρgh1 = P2 + ½ρv2² + ρgh2
-  // P2 = P1 + ½ρ(v1² - v2²) - ρg·dz
+  // P1 + 0.5*rho*v1^2 + rho*g*h1 = P2 + 0.5*rho*v2^2 + rho*g*h2
+  // P2 = P1 + 0.5*rho*(v1^2 - v2^2) - rho*g*dz
   return P1 + 0.5 * rho * (v1 * v1 - v2 * v2) - rho * g * dz;
 }
 
 double bernoulli_v2(double P1, double P2, double v1, double rho, double dz,
                     double g) {
-  // P1 + ½ρv1² = P2 + ½ρv2² + ρg·dz
-  // v2² = v1² + 2(P1 - P2)/ρ - 2g·dz
+  // P1 + 0.5*rho*v1^2 = P2 + 0.5*rho*v2^2 + rho*g*dz
+  // v2^2 = v1^2 + 2(P1 - P2)/rho - 2g*dz
   double v2_sq = v1 * v1 + 2.0 * (P1 - P2) / rho - 2.0 * g * dz;
   if (v2_sq < 0.0) {
     throw std::invalid_argument(
-        "bernoulli_v2: insufficient energy for flow (v2² < 0)");
+        "bernoulli_v2: insufficient energy for flow (v2^2 < 0)");
   }
   return std::sqrt(v2_sq);
 }
@@ -46,13 +46,13 @@ double orifice_mdot(double P1, double P2, double A, double Cd, double rho) {
   if (A <= 0.0 || Cd <= 0.0 || rho <= 0.0) {
     throw std::invalid_argument("orifice_mdot: A, Cd, rho must be positive");
   }
-  // ṁ = Cd · A · √(2 · ρ · ΔP)
+  // m_dot = Cd * A * sqrt(2 * rho * Delta_P)
   double dP = P1 - P2;
   return Cd * A * std::sqrt(2.0 * rho * dP);
 }
 
 double orifice_Q(double P1, double P2, double A, double Cd, double rho) {
-  // Q = ṁ / ρ
+  // Q = m_dot / rho
   return orifice_mdot(P1, P2, A, Cd, rho) / rho;
 }
 
@@ -63,7 +63,7 @@ double orifice_velocity(double P1, double P2, double rho) {
   if (rho <= 0.0) {
     throw std::invalid_argument("orifice_velocity: rho must be positive");
   }
-  // v = √(2 · ΔP / ρ)
+  // v = sqrt(2 * Delta_P / rho)
   return std::sqrt(2.0 * (P1 - P2) / rho);
 }
 
@@ -74,7 +74,7 @@ double orifice_area(double mdot, double P1, double P2, double Cd, double rho) {
   if (mdot <= 0.0 || Cd <= 0.0 || rho <= 0.0) {
     throw std::invalid_argument("orifice_area: mdot, Cd, rho must be positive");
   }
-  // A = ṁ / (Cd · √(2 · ρ · ΔP))
+  // A = m_dot / (Cd * sqrt(2 * rho * Delta_P))
   double dP = P1 - P2;
   return mdot / (Cd * std::sqrt(2.0 * rho * dP));
 }
@@ -83,7 +83,7 @@ double orifice_dP(double mdot, double A, double Cd, double rho) {
   if (mdot < 0.0 || A <= 0.0 || Cd <= 0.0 || rho <= 0.0) {
     throw std::invalid_argument("orifice_dP: invalid parameters");
   }
-  // ΔP = (ṁ / (Cd · A))² / (2 · ρ)
+  // Delta_P = (m_dot / (Cd * A))^2 / (2 * rho)
   double term = mdot / (Cd * A);
   return term * term / (2.0 * rho);
 }
@@ -96,7 +96,7 @@ double channel_dP(double v, double L, double D, double f, double rho) {
   if (D <= 0.0 || L < 0.0 || f < 0.0 || rho <= 0.0) {
     throw std::invalid_argument("channel_dP: invalid parameters");
   }
-  // ΔP = f · (L/D) · (ρ · v² / 2)
+  // Delta_P = f * (L/D) * (rho * v^2 / 2)
   return f * (L / D) * 0.5 * rho * v * v;
 }
 
@@ -109,7 +109,7 @@ double channel_velocity(double mdot, double D, double rho) {
   if (D <= 0.0 || rho <= 0.0) {
     throw std::invalid_argument("channel_velocity: D and rho must be positive");
   }
-  // v = ṁ / (ρ · A) where A = π·D²/4
+  // v = m_dot / (rho * A) where A = pi*D^2/4
   double A = M_PI * D * D / 4.0;
   return mdot / (rho * A);
 }
@@ -118,7 +118,7 @@ double channel_mdot(double v, double D, double rho) {
   if (D <= 0.0 || rho <= 0.0) {
     throw std::invalid_argument("channel_mdot: D and rho must be positive");
   }
-  // ṁ = ρ · v · A where A = π·D²/4
+  // m_dot = rho * v * A where A = pi*D^2/4
   double A = M_PI * D * D / 4.0;
   return rho * v * A;
 }
@@ -128,7 +128,7 @@ double channel_mdot(double v, double D, double rho) {
 // -------------------------------------------------------------
 
 double dynamic_pressure(double v, double rho) {
-  // q = ½ · ρ · v²
+  // q = 0.5 * rho * v^2
   return 0.5 * rho * v * v;
 }
 
@@ -136,7 +136,7 @@ double velocity_from_q(double q, double rho) {
   if (q < 0.0 || rho <= 0.0) {
     throw std::invalid_argument("velocity_from_q: q >= 0 and rho > 0 required");
   }
-  // v = √(2 · q / ρ)
+  // v = sqrt(2 * q / rho)
   return std::sqrt(2.0 * q / rho);
 }
 
@@ -149,7 +149,7 @@ double pressure_loss(double v, double rho, double zeta) {
     throw std::invalid_argument(
         "pressure_loss: rho > 0 and zeta >= 0 required");
   }
-  // ΔP = ζ · ½ρv²
+  // Delta_P = zeta * 0.5*rho*v^2
   return zeta * 0.5 * rho * v * v;
 }
 
@@ -158,7 +158,7 @@ double velocity_from_pressure_loss(double dP, double rho, double zeta) {
     throw std::invalid_argument(
         "velocity_from_pressure_loss: dP >= 0, rho > 0, zeta > 0 required");
   }
-  // v = √(2·ΔP / (ζ·ρ))
+  // v = sqrt(2*Delta_P / (zeta*rho))
   return std::sqrt(2.0 * dP / (zeta * rho));
 }
 
@@ -166,7 +166,7 @@ double zeta_from_Cd(double Cd) {
   if (Cd <= 0.0) {
     throw std::invalid_argument("zeta_from_Cd: Cd must be positive");
   }
-  // ζ = 1 / Cd²
+  // zeta = 1 / Cd^2
   return 1.0 / (Cd * Cd);
 }
 
@@ -174,7 +174,7 @@ double Cd_from_zeta(double zeta) {
   if (zeta <= 0.0) {
     throw std::invalid_argument("Cd_from_zeta: zeta must be positive");
   }
-  // Cd = 1 / √ζ
+  // Cd = 1 / sqrt(zeta)
   return 1.0 / std::sqrt(zeta);
 }
 

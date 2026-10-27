@@ -67,7 +67,7 @@ inline double soft_lower(double x, double lo) {
 }
 
 // -----------------------------------------------------------------------------
-// Raw loss coefficients (Bassett 2001, Table 2) — pure math, no guards.
+// Raw loss coefficients (Bassett 2001, Table 2) -- pure math, no guards.
 // These are provided for testing and diagnostics. Call with inputs validated
 // by tee_check_inputs() for physically meaningful results.
 // -----------------------------------------------------------------------------

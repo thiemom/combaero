@@ -340,7 +340,7 @@ def merge_yaml_sources(
 ) -> dict[str, dict[str, Any]]:
     """Merge species data from multiple YAML sources.
 
-    Strategy: first source wins for conflicts — put the most authoritative
+    Strategy: first source wins for conflicts -- put the most authoritative
     source first and let the rest fill gaps.
     """
     merged: dict[str, dict[str, Any]] = {}

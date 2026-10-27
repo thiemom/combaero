@@ -1116,7 +1116,7 @@ TEST(AreaChangeFlowTest, ChokedFlowIsIndependentOfTheTarget) {
 }
 
 // ---------------------------------------------------------------------------
-// Conical Area Change — low-level Jacobians
+// Conical Area Change -- low-level Jacobians
 // ---------------------------------------------------------------------------
 
 TEST(SolverJacobianTest, ConicalAreaChangeDiffuserDerivatives) {

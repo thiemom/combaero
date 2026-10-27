@@ -95,11 +95,11 @@ class TestNusseltCorrelations:
         Pr = 0.7  # Prandtl number [-]
 
         # Heating: wall cooler than bulk, mu_wall > mu_bulk
-        mu_ratio_heating = 0.8  # μ_bulk / μ_wall [-]
+        mu_ratio_heating = 0.8  # mu_bulk / mu_wall [-]
         Nu_heating = cb.nusselt_sieder_tate(Re, Pr, mu_ratio_heating)
 
         # Cooling: wall hotter than bulk, mu_wall < mu_bulk
-        mu_ratio_cooling = 1.2  # μ_bulk / μ_wall [-]
+        mu_ratio_cooling = 1.2  # mu_bulk / mu_wall [-]
         Nu_cooling = cb.nusselt_sieder_tate(Re, Pr, mu_ratio_cooling)
 
         # No correction
@@ -198,7 +198,7 @@ class TestLMTD:
 
         lmtd_val = cb.lmtd(dT1, dT2)
 
-        # LMTD = (50 - 40) / ln(50/40) = 10 / 0.223 ≈ 44.8 K
+        # LMTD = (50 - 40) / ln(50/40) = 10 / 0.223 ~= 44.8 K
         assert abs(lmtd_val - 44.8) < 0.5
 
         # LMTD should be between dT1 and dT2
@@ -214,7 +214,7 @@ class TestLMTD:
 
         lmtd_val = cb.lmtd(dT1, dT2)
 
-        # LMTD = (80 - 20) / ln(80/20) = 60 / 1.386 ≈ 43.3 K
+        # LMTD = (80 - 20) / ln(80/20) = 60 / 1.386 ~= 43.3 K
         assert abs(lmtd_val - 43.3) < 0.5
 
         # LMTD should be between dT1 and dT2
@@ -248,7 +248,7 @@ class TestLMTD:
         lmtd_val = cb.lmtd(dT1, dT2)
 
         # LMTD should be in Kelvin (same units as input)
-        # LMTD = (100 - 50) / ln(100/50) = 50 / 0.693 ≈ 72.1 K
+        # LMTD = (100 - 50) / ln(100/50) = 50 / 0.693 ~= 72.1 K
         assert abs(lmtd_val - 72.1) < 0.5
 
         # Should be positive and between the two inputs

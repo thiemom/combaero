@@ -85,7 +85,7 @@ std::vector<AcousticMode> tube_axial_modes(
 // Modes in an annular duct (thin annulus approximation).
 //
 // Longitudinal modes: same as tube
-// Azimuthal (tangential) modes: f_m = m * c / (π * D_mean)
+// Azimuthal (tangential) modes: f_m = m * c / (pi * D_mean)
 //
 // Parameters:
 //   annulus   : annular geometry (L, D_inner, D_outer)
@@ -107,7 +107,7 @@ std::vector<AcousticMode> annulus_azimuthal_modes(
     int m_max = 4);
 
 // Combined axial + azimuthal modes
-// f_combined = sqrt(f_axial² + f_azimuthal²)
+// f_combined = sqrt(f_axial^2 + f_azimuthal^2)
 std::vector<AcousticMode> annulus_modes(
     const Annulus& annulus, double c,
     BoundaryCondition upstream, BoundaryCondition downstream,
@@ -137,7 +137,7 @@ double min_mode_separation(const std::vector<AcousticMode>& modes);
 // Mean Flow Correction (Axial Modes)
 // -------------------------------------------------------------
 // Convective frequency shift for waves propagating with/against mean flow.
-// f± = f₀ / (1 ∓ M)
+// f+/- = f_0 / (1 -/+ M)
 //
 // Valid for: M < 0.3 (linear acoustics)
 // Note: For azimuthal modes with swirl, use specialized tools (not covered here)
@@ -160,7 +160,7 @@ std::pair<double, double> axial_mode_split(double f0, double M);
 struct AcousticProperties {
     double wavelength;         // Acoustic wavelength [m]
     double frequency;          // Frequency [Hz]
-    double impedance;          // Characteristic acoustic impedance [Pa·s/m]
+    double impedance;          // Characteristic acoustic impedance [Pa*s/m]
     double particle_velocity;  // Particle velocity amplitude [m/s]
     double spl;                // Sound pressure level [dB]
 };
@@ -168,7 +168,7 @@ struct AcousticProperties {
 // Compute all acoustic properties at once
 // Parameters:
 //   f     : frequency [Hz]
-//   rho   : density [kg/m³]
+//   rho   : density [kg/m^3]
 //   c     : speed of sound [m/s]
 //   p_rms : RMS pressure amplitude [Pa] (default: 20e-6 Pa = 0 dB reference)
 //   p_ref : reference pressure for SPL [Pa] (default: 20e-6 Pa in air)
@@ -292,10 +292,10 @@ std::vector<double> sweep_liner_2dof_serial_absorption(
 //   l_orifice  : orifice/neck length [m]
 //   porosity   : open area ratio A_orifice/A_duct [-]
 //   Cd         : discharge coefficient [-]
-//   rho        : fluid density [kg/m³]
+//   rho        : fluid density [kg/m^3]
 //   c          : speed of sound [m/s]
 //
-// Returns: Complex impedance Z/ρc (normalized) [-]
+// Returns: Complex impedance Z/(rho*c) (normalized) [-]
 //
 // References:
 //   - Bourquard & Noiray (2019): Resistance with flow
@@ -320,22 +320,22 @@ std::complex<double> orifice_impedance_with_flow(
 // Distributed parameter model for side-branch tube resonator
 //
 // Three distinct areas:
-//   A_duct     : main duct cross-sectional area [m²]
-//   A_orifice  : neck/orifice area (= porosity * A_duct) [m²]
-//   A_tube     : resonator tube cross-sectional area [m²]
+//   A_duct     : main duct cross-sectional area [m^2]
+//   A_orifice  : neck/orifice area (= porosity * A_duct) [m^2]
+//   A_tube     : resonator tube cross-sectional area [m^2]
 //
 // Parameters:
 //   freq       : frequency [Hz]
 //   L_tube     : resonator tube length [m]
-//   A_duct     : main duct area [m²]
-//   A_tube     : resonator tube area [m²]
+//   A_duct     : main duct area [m^2]
+//   A_tube     : resonator tube area [m^2]
 //   d_orifice  : neck/orifice diameter [m]
 //   l_orifice  : neck length [m]
 //   porosity   : open area ratio A_orifice/A_duct [-]
 //   Cd         : discharge coefficient [-]
 //   u_bias     : bias flow through orifice [m/s]
 //   u_grazing  : grazing flow in main duct [m/s]
-//   rho        : fluid density [kg/m³]
+//   rho        : fluid density [kg/m^3]
 //   c          : speed of sound [m/s]
 //
 // Returns: 2x2 TransferMatrix for the side-branch resonator
@@ -344,7 +344,7 @@ std::complex<double> orifice_impedance_with_flow(
 //   - Munjal (1987): Acoustics of Ducts and Mufflers
 //   - Dowling & Ffowcs Williams (1983): Sound and Sources of Sound
 //
-// Valid: kL < π (below cutoff), M < 0.3
+// Valid: kL < pi (below cutoff), M < 0.3
 // Accuracy: +/-15-20%
 TransferMatrix quarter_wave_resonator_tmm(
     double freq,
@@ -398,9 +398,9 @@ bool is_whistling_risk(
 struct CanAnnularGeometry {
     int n_cans;            // Total number of cans (N)
     double length_can;     // Length of one can [m]
-    double area_can;       // Cross-sectional area of one can [m²]
+    double area_can;       // Cross-sectional area of one can [m^2]
     double radius_plenum;  // Mean radius of the annular plenum [m]
-    double area_plenum;    // Cross-sectional area of the plenum [m²]
+    double area_plenum;    // Cross-sectional area of the plenum [m^2]
 };
 
 // Adapter: Convert CanAnnularFlowGeometry (flow/geometry) to CanAnnularGeometry (acoustic solver)
@@ -420,7 +420,7 @@ struct CanAnnularGeometry {
 // Notes:
 // - Plenum radius derived from flow_geom.D_mean() / 2
 // - Plenum area from flow_geom.area()
-// - Can area from π*(D_can/2)²
+// - Can area from pi*(D_can/2)^2
 //
 // Example:
 //   auto flow_geom = CanAnnularFlowGeometry{...};
@@ -442,7 +442,7 @@ struct BlochMode {
 
     // Mode symmetry classification
     // m=0: "Push-Push" (all cans in phase)
-    // m=N/2: "Push-Pull" (adjacent cans 180° out of phase)
+    // m=N/2: "Push-Pull" (adjacent cans 180 deg out of phase)
     // 0 < m < N/2: "Spinning/Standing wave"
     std::string symmetry_type() const;
 };
@@ -465,8 +465,8 @@ struct BlochMode {
 //   geom       : can-annular geometry
 //   c_can      : speed of sound in can [m/s]
 //   c_plenum   : speed of sound in plenum [m/s] (often different!)
-//   rho_can    : density in can [kg/m³]
-//   rho_plenum : density in plenum [kg/m³]
+//   rho_can    : density in can [kg/m^3]
+//   rho_plenum : density in plenum [kg/m^3]
 //   f_max      : maximum frequency to search [Hz] (default: 2000 Hz)
 //   bc_can_top : boundary condition at can top (default: Closed)
 //
@@ -495,37 +495,37 @@ std::vector<BlochMode> can_annular_eigenmodes(
 // -------------------------------------------------------------
 
 // Acoustic wavelength from frequency
-// λ = c / f
+// lambda = c / f
 double wavelength(double f, double c);
 
 // Frequency from wavelength
-// f = c / λ
+// f = c / lambda
 double frequency_from_wavelength(double lambda, double c);
 
 // Characteristic acoustic impedance
-// Z = ρ · c
+// Z = rho * c
 double acoustic_impedance(double rho, double c);
 
 // Sound pressure level in dB
-// SPL = 20 · log₁₀(p_rms / p_ref)
-// Default p_ref = 20 μPa (standard reference in air)
+// SPL = 20 * log10(p_rms / p_ref)
+// Default p_ref = 20 uPa (standard reference in air)
 double sound_pressure_level(double p_rms, double p_ref = 20e-6);
 
 // Particle velocity from pressure amplitude
-// u = p / (ρ · c)
+// u = p / (rho * c)
 double particle_velocity(double p, double rho, double c);
 
 // -------------------------------------------------------------
 // Helmholtz Resonator
 // -------------------------------------------------------------
 // Classic "bottle resonance" frequency.
-// f = (c / 2π) * √(A / (V * L_eff))
+// f = (c / (2*pi)) * sqrt(A / (V * L_eff))
 //
 // where L_eff = L_neck + end_correction * d_neck
 //
 // Parameters:
-//   V              : cavity volume [m³]
-//   A_neck         : neck cross-sectional area [m²]
+//   V              : cavity volume [m^3]
+//   A_neck         : neck cross-sectional area [m^2]
 //   L_neck         : neck length [m]
 //   c              : speed of sound [m/s]
 //   end_correction : end correction factor [-] (default: 0.85 for flanged)
@@ -542,7 +542,7 @@ double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
 // St = f * L / u
 //
 // Applications:
-// - Vortex shedding: St ≈ 0.2 for cylinders
+// - Vortex shedding: St ~= 0.2 for cylinders
 // - Flame dynamics: relates heat release oscillation to convective time
 // - Scaling between test rigs and full scale
 
@@ -569,21 +569,21 @@ double half_wave_frequency(double L, double c);
 // Penetration depths for viscous and thermal effects at walls.
 // These determine acoustic losses in resonators and ducts.
 //
-// Educational screening tools - expect ±50% accuracy.
+// Educational screening tools - expect +/-50% accuracy.
 // Real designs require experimental validation.
 
-// Stokes (viscous) layer thickness: δ_ν = √(2ν/ω)
-// nu : kinematic viscosity [m²/s]
+// Stokes (viscous) layer thickness: delta_nu = sqrt(2*nu/omega)
+// nu : kinematic viscosity [m^2/s]
 // f  : frequency [Hz]
 double stokes_layer(double nu, double f);
 
-// Thermal penetration depth: δ_κ = √(2α/ω)
-// alpha : thermal diffusivity [m²/s] (use thermal_diffusivity from transport.h)
+// Thermal penetration depth: delta_kappa = sqrt(2*alpha/omega)
+// alpha : thermal diffusivity [m^2/s] (use thermal_diffusivity from transport.h)
 // f     : frequency [Hz]
 double thermal_layer(double alpha, double f);
 
 // Effective viscothermal layer for acoustic losses
-// δ_eff = δ_ν + (γ-1)·δ_κ
+// delta_eff = delta_nu + (gamma-1)*delta_kappa
 // Combines viscous and thermal boundary layer effects.
 double effective_viscothermal_layer(double delta_nu, double delta_kappa, double gamma);
 
@@ -608,31 +608,31 @@ double effective_viscothermal_layer(double delta_nu, double delta_kappa, double 
 // thermal loss and radiation resistance are neglected. V is validated but
 // does not enter at a fixed f (it sets f through helmholtz_frequency).
 //
-// V      : cavity volume [m³]
-// A_neck : neck cross-sectional area [m²]
+// V      : cavity volume [m^3]
+// A_neck : neck cross-sectional area [m^2]
 // L_neck : neck length [m]
-// nu     : kinematic viscosity [m²/s]
-// alpha  : thermal diffusivity [m²/s]
+// nu     : kinematic viscosity [m^2/s]
+// alpha  : thermal diffusivity [m^2/s]
 // gamma  : specific heat ratio [-]
 // f      : frequency [Hz] (use helmholtz_frequency result)
 double helmholtz_Q(double V, double A_neck, double L_neck,
                    double nu, double alpha, double gamma, double f);
 
 // Quarter-wave tube quality factor (viscothermal losses only)
-// Q ≈ D / (2 · δ_eff)
+// Q ~= D / (2 * delta_eff)
 //
 // L     : tube length [m]
 // D     : tube diameter [m]
-// nu    : kinematic viscosity [m²/s]
-// alpha : thermal diffusivity [m²/s]
+// nu    : kinematic viscosity [m^2/s]
+// alpha : thermal diffusivity [m^2/s]
 // gamma : specific heat ratio [-]
 // f     : frequency [Hz]
 double tube_Q(double L, double D, double nu, double alpha, double gamma, double f);
 
-// Damping ratio from quality factor: ζ = 1/(2Q)
+// Damping ratio from quality factor: zeta = 1/(2Q)
 double damping_ratio(double Q);
 
-// Half-power bandwidth: Δf = f₀/Q
+// Half-power bandwidth: Delta_f = f_0/Q
 double bandwidth(double f0, double Q);
 
 } // namespace combaero

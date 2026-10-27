@@ -21,7 +21,7 @@ enum class CorrelationStatus : uint8_t {
 using WarningHandler = std::function<void(const std::string&)>;
 
 // Replace the global warning handler.  Pass an empty function to suppress all
-// warnings.  Not thread-safe — call once at program startup or use
+// warnings.  Not thread-safe -- call once at program startup or use
 // suppress_warnings() in Python for batch runs.
 void set_warning_handler(WarningHandler fn);
 
@@ -33,7 +33,7 @@ void warn(const std::string& msg);
 
 // Returns true when a correlation result is safe to use in a Jacobian-based
 // solver: finite, strictly positive (> lo), and below the overflow guard (< hi).
-// lo defaults to 1e-12 (covers Nu, h, f — all must be positive).
+// lo defaults to 1e-12 (covers Nu, h, f -- all must be positive).
 // hi defaults to 1e15 (well below double overflow).
 inline bool is_well_behaved(double v, double lo = 1e-12, double hi = 1e15) {
     return std::isfinite(v) && v > lo && v < hi;

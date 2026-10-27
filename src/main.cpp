@@ -42,19 +42,19 @@ int main() {
     // Print basic properties of air
     std::cout << "\n1. Basic Air Properties (T = 300K, P = 1 atm):" << std::endl;
     std::cout << "----------------------------------------" << std::endl;
-    std::cout << "Specific Heat (Cp): " << cp(T, X) << " J/(mol·K)" << std::endl;
+    std::cout << "Specific Heat (Cp): " << cp(T, X) << " J/(mol*K)" << std::endl;
     std::cout << "Enthalpy (H): " << h(T, X) << " J/mol" << std::endl;
-    std::cout << "Entropy (S): " << s(T, X, P) << " J/(mol·K)" << std::endl;
-    std::cout << "Density: " << density(T, P, X) << " kg/m³" << std::endl;
-    std::cout << "Viscosity: " << viscosity(T, P, X) * 1.0e6 << " μPa·s" << std::endl;
-    std::cout << "Thermal Conductivity: " << thermal_conductivity(T, P, X) << " W/(m·K)" << std::endl;
+    std::cout << "Entropy (S): " << s(T, X, P) << " J/(mol*K)" << std::endl;
+    std::cout << "Density: " << density(T, P, X) << " kg/m^3" << std::endl;
+    std::cout << "Viscosity: " << viscosity(T, P, X) * 1.0e6 << " uPa*s" << std::endl;
+    std::cout << "Thermal Conductivity: " << thermal_conductivity(T, P, X) << " W/(m*K)" << std::endl;
     std::cout << "Prandtl Number: " << prandtl(T, P, X) << std::endl;
 
     // Demonstrate humid air calculations
-    std::cout << "\n2. Humid Air Properties (T = 25°C, P = 1 atm):" << std::endl;
+    std::cout << "\n2. Humid Air Properties (T = 25degC, P = 1 atm):" << std::endl;
     std::cout << "------------------------------------------" << std::endl;
 
-    double T_humid = 298.15; // 25°C
+    double T_humid = 298.15; // 25degC
     double RH = 0.5;         // 50% relative humidity
 
     // Calculate humid air properties
@@ -63,12 +63,12 @@ int main() {
     double dp = dewpoint(T_humid, P, RH);
     double rho = humid_air_density(T_humid, P, RH);
 
-    std::cout << "Temperature: " << T_humid - 273.15 << " °C" << std::endl;
+    std::cout << "Temperature: " << T_humid - 273.15 << " degC" << std::endl;
     std::cout << "Relative Humidity: " << RH * 100.0 << "%" << std::endl;
     std::cout << "Vapor Pressure: " << vp << " Pa" << std::endl;
-    std::cout << "Humidity Ratio: " << hr << " kg H₂O/kg dry air" << std::endl;
-    std::cout << "Dewpoint: " << dp - 273.15 << " °C" << std::endl;
-    std::cout << "Density: " << rho << " kg/m³" << std::endl;
+    std::cout << "Humidity Ratio: " << hr << " kg H2O/kg dry air" << std::endl;
+    std::cout << "Dewpoint: " << dp - 273.15 << " degC" << std::endl;
+    std::cout << "Density: " << rho << " kg/m^3" << std::endl;
 
     // Get humid air composition
     std::vector<double> humid_comp = humid_air_composition(T_humid, P, RH);

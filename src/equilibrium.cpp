@@ -146,7 +146,7 @@ static double solve_wgs_isothermal(const std::vector<double> &n0, double T,
                                    const WgsConfig &cfg) {
   WgsIsothermalFun F{n0, T, cfg};
 
-  // Determine ξ bounds from non-negativity constraints
+  // Determine xi bounds from non-negativity constraints
   // Reaction: CO + H2O -> CO2 + H2 (forward: xi > 0)
   //
   // n[CO]  = n0[CO]  - xi  >= 0  =>  xi <= n0[CO]
@@ -178,7 +178,7 @@ struct AdiabaticFun {
         X(n_in_.size()) {}
 
   double f(double T) const {
-    // Inner: solve ξ(T)
+    // Inner: solve xi(T)
     double xi = solve_wgs_isothermal(n_in, T, cfg);
 
     composition_from_xi(n_in, xi, cfg, n);
@@ -318,7 +318,7 @@ static double Kp_reforming(double T, std::size_t i_hc, int n_C, int n_H,
   // CnHm + n*H2O -> n*CO + (n + m/2)*H2
   double n_H2_prod = n_C + 0.5 * n_H; // n + m/2
 
-  // ΔG/RT = n*g_CO + (n+m/2)*g_H2 - g_CnHm - n*g_H2O
+  // Delta_G/RT = n*g_CO + (n+m/2)*g_H2 - g_CnHm - n*g_H2O
   double d_gRT = n_C * g_CO + n_H2_prod * g_H2 - g_hc - n_C * g_H2O;
   return std::exp(-d_gRT);
 }

@@ -111,11 +111,11 @@ class TestOrificeFlowIdealGas:
 
         result = cb.orifice_flow(geom, dP=10000, T=300, P=101325, mu=mu, Z=1.0)
 
-        # Re_D = 4 * mdot / (pi * D * μ)
+        # Re_D = 4 * mdot / (pi * D * mu)
         Re_D_expected = (4.0 * result.mdot) / (np.pi * geom.D * mu)
         assert abs(result.Re_D - Re_D_expected) < 1e-10
 
-        # Re_d = 4 * mdot / (pi * d * μ)
+        # Re_d = 4 * mdot / (pi * d * mu)
         Re_d_expected = (4.0 * result.mdot) / (np.pi * geom.d * mu)
         assert abs(result.Re_d - Re_d_expected) < 1e-10
 
@@ -252,20 +252,20 @@ class TestUtilityFunctions:
 
         Re_d = cb.orifice_Re_d_from_mdot(mdot, d, mu)
 
-        # Re_d = 4 * mdot / (pi * d * μ)
+        # Re_d = 4 * mdot / (pi * d * mu)
         Re_d_expected = (4.0 * mdot) / (np.pi * d * mu)
 
         assert abs(Re_d - Re_d_expected) < 1e-10
 
     def test_round_trip_beta_area(self):
-        """Test round-trip: D, beta → A → beta."""
+        """Test round-trip: D, beta -> A -> beta."""
         D = 0.1
         beta_original = 0.5
 
-        # beta → area
+        # beta -> area
         A = cb.orifice_area_from_beta(D, beta_original)
 
-        # area → d → beta
+        # area -> d -> beta
         d = np.sqrt(4.0 * A / np.pi)
         beta_recovered = cb.beta_from_diameters(d, D)
 
@@ -395,7 +395,7 @@ class TestPressureEffects:
         result_low = cb.orifice_flow(geom, dP=10000, T=300, P=1e5, mu=1.8e-5)
         result_high = cb.orifice_flow(geom, dP=10000, T=300, P=1e7, mu=1.8e-5)
 
-        # Higher pressure → higher density → higher mass flow
+        # Higher pressure -> higher density -> higher mass flow
         assert result_high.rho_corrected > result_low.rho_corrected
         assert result_high.mdot > result_low.mdot
 

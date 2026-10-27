@@ -163,8 +163,10 @@ pre-commit, ci.yml) disagrees. `--ref REF` checks a git ref, e.g. a PR head.
 ### check_ascii.py
 The `ascii-only` pre-commit hook (#791): fails on any non-ASCII character in
 a C++ or Python source, comments, docstrings and code alike. String literals
-are exempt only in the files on its `ALLOWLIST` (display units). The hook's
-`exclude:` list in `.pre-commit-config.yaml` is temporary, pending the sweep.
+are exempt only in the files on its `ALLOWLIST` (display units). Every
+tracked source passes; there is no exclude list. ASCII spellings: `--`,
+`->`, `~=`, `<=`, `+/-`, `*` for a product or unit dot, `^2`, `degC`,
+Greek letters by name (`rho`, `mu`, `Delta_P`), `d` for a partial, `sqrt`.
 ```bash
 uv run scripts/check_ascii.py FILE...          # what the hook runs
 uv run scripts/check_ascii.py --all --stats    # counts per category/directory

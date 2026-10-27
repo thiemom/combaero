@@ -168,7 +168,7 @@ class TestUtilityFunctions:
         assert abs(u - u_expected) < 1e-15
 
     def test_round_trip_wavelength_frequency(self):
-        """Test round-trip: f → λ → f."""
+        """Test round-trip: f -> lambda -> f."""
         f_original = 1000  # Hz
         c = 340  # m/s
 
@@ -307,7 +307,7 @@ class TestEdgeCases:
             cb.acoustic_properties(f=1000, rho=1.2, c=340, p_rms=-1.0)
 
     def test_zero_p_rms_gives_minus_infinity_spl(self):
-        """Test that zero p_rms gives -∞ dB."""
+        """Test that zero p_rms gives -inf dB."""
         props = cb.acoustic_properties(f=1000, rho=1.2, c=340, p_rms=0.0)
         assert props.spl == -np.inf
 

@@ -29,7 +29,7 @@ int main()
     const std::vector<double> X_air = dry_air();
 
     // =========================================================================
-    // 1. Isentropic nozzle flow — forward problem
+    // 1. Isentropic nozzle flow -- forward problem
     // =========================================================================
 
     std::cout << "=========================================================================\n";
@@ -38,7 +38,7 @@ int main()
 
     const double T0    = 800.0;     // K  stagnation temperature
     const double P0    = 5.0e5;     // Pa stagnation pressure
-    const double A_eff = 1.5e-4;    // m² effective throat area (A * Cd)
+    const double A_eff = 1.5e-4;    // m^2 effective throat area (A * Cd)
 
     // Subsonic case: back pressure above critical
     const double P_back_sub = 4.0e5;
@@ -79,8 +79,8 @@ int main()
 
     // Find area for given mdot
     const double A_solved = solve_A_eff_from_mdot(T0, P0, P_back_sub, mdot_target, X_air);
-    std::cout << "solve_A_eff_from_mdot: A_eff = " << A_solved * 1e4 << " cm²"
-              << "  (input: " << A_eff * 1e4 << " cm²)\n";
+    std::cout << "solve_A_eff_from_mdot: A_eff = " << A_solved * 1e4 << " cm^2"
+              << "  (input: " << A_eff * 1e4 << " cm^2)\n";
 
     // Find back pressure for given mdot
     const double P_back_solved = solve_P_back_from_mdot(T0, P0, A_eff, mdot_target, X_air);
@@ -100,10 +100,10 @@ int main()
     std::cout << "3. Converging-Diverging Nozzle (quasi-1D profile)\n";
     std::cout << "=========================================================================\n\n";
 
-    // Geometry: inlet 4 cm², throat 1 cm², exit 2.5 cm²
-    const double A_in     = 4.0e-4;   // m²
-    const double A_throat = 1.0e-4;   // m²
-    const double A_exit   = 2.5e-4;   // m²
+    // Geometry: inlet 4 cm^2, throat 1 cm^2, exit 2.5 cm^2
+    const double A_in     = 4.0e-4;   // m^2
+    const double A_throat = 1.0e-4;   // m^2
+    const double A_exit   = 2.5e-4;   // m^2
     const double x_throat = 0.05;     // m
     const double x_exit   = 0.12;     // m
 
@@ -121,7 +121,7 @@ int main()
 
     // Print axial profile (every 10th station)
     std::cout << std::setw(8) << "x [m]"
-              << std::setw(10) << "A [cm²]"
+              << std::setw(10) << "A [cm^2]"
               << std::setw(8) << "M [-]"
               << std::setw(10) << "T [K]"
               << std::setw(10) << "P [bar]"
@@ -157,7 +157,7 @@ int main()
                                            "haaland", 200, true);
 
     std::cout << "Fanno pipe (L=" << L << " m, D=" << D * 1e3 << " mm, rough="
-              << rough * 1e6 << " μm):\n";
+              << rough * 1e6 << " um):\n";
     std::cout << "  Re_in  = " << fanno.Re_in << "\n";
     std::cout << "  f_avg  = " << fanno.f_avg << "\n";
     std::cout << "  choked = " << (fanno.choked ? "yes" : "no") << "\n";
@@ -231,9 +231,9 @@ int main()
     const double P_amb_sl  = 101325.0;  // Pa  sea level
     const double P_amb_vac = 500.0;     // Pa  near-vacuum design point (P_amb=0 for thrust)
 
-    const double A_in_r  = 1.0e-2;   // m²
-    const double A_th_r  = 5.0e-4;   // m²
-    const double A_ex_r  = 3.0e-3;   // m²
+    const double A_in_r  = 1.0e-2;   // m^2
+    const double A_th_r  = 5.0e-4;   // m^2
+    const double A_ex_r  = 3.0e-3;   // m^2
     const double x_th_r  = 0.15;     // m
     const double x_ex_r  = 0.40;     // m
 

@@ -54,7 +54,7 @@ int main() {
     // Example 3: Temperature dependence of properties (air)
     std::cout << "\n\n3. Temperature Dependence of Properties" << std::endl;
     std::cout << "------------------------------------" << std::endl;
-    std::cout << "Temp (K)   Cp (J/mol·K)   Gamma   Sound Speed (m/s)   Viscosity (μPa·s)   Thermal Cond (W/m·K)" << std::endl;
+    std::cout << "Temp (K)   Cp (J/mol*K)   Gamma   Sound Speed (m/s)   Viscosity (uPa*s)   Thermal Cond (W/m*K)" << std::endl;
     std::cout << "--------------------------------------------------------------------------------------------" << std::endl;
 
     for (double temp = 300.0; temp <= 2600.0; temp += 300.0) {

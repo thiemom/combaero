@@ -408,7 +408,7 @@ class TestPressureLossHook:
         assert captured["P_in"] == pytest.approx(400_000.0, rel=1e-6)
 
     def test_theta_based_hook_increases_loss_with_phi(self):
-        """Higher phi → higher T_ad → higher theta → higher loss."""
+        """Higher phi -> higher T_ad -> higher theta -> higher loss."""
         X_fuel, X_ox = self._ch4_air()
 
         def theta_hook(ctx):
@@ -431,7 +431,7 @@ class TestPressureLossHook:
             pressure_loss=theta_hook,
         )
 
-        # Stoichiometric has higher T_ad → higher loss → lower P_out
+        # Stoichiometric has higher T_ad -> higher loss -> lower P_out
         assert r_rich.products.thermo.P < r_lean.products.thermo.P
 
     def test_streams_hook_receives_mdot(self):
@@ -479,7 +479,7 @@ class TestIncompressibleHooks:
         T, P, P_back, A = 300.0, 200_000.0, 190_000.0, 1e-4
 
         sol_const = cb.orifice_flow_thermo(T, P, X, P_back, A, Cd=0.7)
-        # Cd increases with Re — at high Re returns 0.85
+        # Cd increases with Re -- at high Re returns 0.85
         sol_fn = cb.orifice_flow_thermo(T, P, X, P_back, A, cd_fn=lambda T_, P_, X_, Re: 0.85)
 
         assert sol_fn.mdot > sol_const.mdot

@@ -103,8 +103,8 @@ struct OrificeGeometry {
 struct OrificeState {
     double Re_D = 0.0;    // Pipe Reynolds number (based on D) [-]
     double dP = 0.0;      // Differential pressure across orifice [Pa]
-    double rho = 0.0;     // Fluid density [kg/m³]
-    double mu = 0.0;      // Dynamic viscosity [Pa·s]
+    double rho = 0.0;     // Fluid density [kg/m^3]
+    double mu = 0.0;      // Dynamic viscosity [Pa*s]
 
     // Derived quantities
     double Re_d(double beta) const;  // Orifice Reynolds number (based on d)
@@ -854,7 +854,7 @@ std::unique_ptr<OrificeCorrelationBase> make_user_correlation(
 //    - Jacobians not available for PR-dependent correlations
 //
 // BEST PRACTICES:
-// - Use sufficiently dense grids (Δbeta < 0.05, ΔlogRe < 0.2)
+// - Use sufficiently dense grids (Delta_beta < 0.05, Delta_logRe < 0.2)
 // - Ensure smooth underlying data (avoid measurement noise)
 // - For critical applications, validate convergence with grid refinement
 //
@@ -998,14 +998,14 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
 // Solve for mass flow rate accounting for Cd-Re_D dependency.
 //
 // This function iteratively solves the coupled system:
-//   mdot = ε · Cd(Re_D) · A · √(2 · ρ · ΔP)
-//   Re_D = 4 · mdot / (π · D · μ)
+//   mdot = eps * Cd(Re_D) * A * sqrt(2 * rho * Delta_P)
+//   Re_D = 4 * mdot / (pi * D * mu)
 //
 // The iteration continues until mdot converges within the specified tolerance.
 //
 // Algorithm:
 //   1. Start with initial Cd guess (typically 0.61 for sharp orifices)
-//   2. Calculate mdot using current Cd and expansibility factor ε
+//   2. Calculate mdot using current Cd and expansibility factor eps
 //   3. Update Re_D based on new mdot
 //   4. Recalculate Cd using updated Re_D
 //   5. Repeat until |mdot_new - mdot_old| < tol * mdot_old
@@ -1013,8 +1013,8 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
 // Parameters:
 //   geom        : Orifice geometry
 //   dP          : Differential pressure [Pa]
-//   rho         : Upstream density [kg/m³]
-//   mu          : Dynamic viscosity [Pa·s]
+//   rho         : Upstream density [kg/m^3]
+//   mu          : Dynamic viscosity [Pa*s]
 //   P_upstream  : Absolute upstream pressure [Pa] (for compressibility)
 //   kappa       : Isentropic exponent cp/cv [-] (0 = incompressible)
 //   correlation : Cd correlation to use (default: ReaderHarrisGallagher)
@@ -1025,7 +1025,7 @@ double orifice_Cd_from_measurement(const OrificeGeometry& geom,
 //
 // Throws: std::runtime_error if iteration fails to converge
 //
-// Note: For incompressible flow, set kappa = 0 (expansibility ε = 1)
+// Note: For incompressible flow, set kappa = 0 (expansibility eps = 1)
 //       For typical applications, convergence occurs in 3-5 iterations
 double solve_orifice_mdot(
     const OrificeGeometry& geom,
@@ -1051,7 +1051,7 @@ struct OrificeFlowResult {
     double Re_d;           // Orifice Reynolds number (based on d) [-]
     double Cd;             // Discharge coefficient [-]
     double epsilon;        // Expansibility factor [-] (1.0 for incompressible)
-    double rho_corrected;  // Density corrected for compressibility [kg/m³]
+    double rho_corrected;  // Density corrected for compressibility [kg/m^3]
 };
 
 // Compute all orifice flow properties at once with real gas correction
@@ -1060,7 +1060,7 @@ struct OrificeFlowResult {
 //   dP          : Differential pressure [Pa]
 //   T           : Temperature [K]
 //   P           : Absolute upstream pressure [Pa]
-//   mu          : Dynamic viscosity [Pa·s]
+//   mu          : Dynamic viscosity [Pa*s]
 //   Z           : Compressibility factor [-] (default: 1.0 = ideal gas)
 //   X           : Mole fractions [-] (optional, uses air if empty)
 //   kappa       : Isentropic exponent cp/cv [-] (default: 0.0 = incompressible)
@@ -1086,7 +1086,7 @@ OrificeFlowResult orifice_flow(
 double orifice_velocity_from_mdot(double mdot, double rho, double d, double Z = 1.0);
 
 // Orifice area from beta ratio
-// A = π * (D * beta / 2)²
+// A = pi * (D * beta / 2)^2
 double orifice_area_from_beta(double D, double beta);
 
 // Beta ratio from diameters
@@ -1094,7 +1094,7 @@ double orifice_area_from_beta(double D, double beta);
 double beta_from_diameters(double d, double D);
 
 // Orifice Reynolds number from mass flow rate
-// Re_d = 4 * mdot / (π * d * mu)
+// Re_d = 4 * mdot / (pi * d * mu)
 double orifice_Re_d_from_mdot(double mdot, double d, double mu);
 
 // -------------------------------------------------------------
@@ -1103,23 +1103,23 @@ double orifice_Re_d_from_mdot(double mdot, double d, double mu);
 
 // Expansibility factor for compressible gas flow through orifices.
 //
-// The expansibility factor ε accounts for gas expansion as it accelerates
-// through the orifice. For incompressible flow, ε = 1.0.
+// The expansibility factor eps accounts for gas expansion as it accelerates
+// through the orifice. For incompressible flow, eps = 1.0.
 //
 // Formula from ISO 5167-2:2003, Section 5.3.2.2:
-//   ε = 1 - (0.351 + 0.256·β⁴ + 0.93·β⁸) · [1 - (1 - τ)^(1/κ)]
+//   eps = 1 - (0.351 + 0.256*beta^4 + 0.93*beta^8) * [1 - (1 - tau)^(1/kappa)]
 //
 // where:
-//   τ = ΔP / P_upstream  (pressure ratio)
-//   β = d/D              (diameter ratio)
-//   κ = cp/cv            (isentropic exponent)
+//   tau = Delta_P / P_upstream  (pressure ratio)
+//   beta = d/D           (diameter ratio)
+//   kappa = cp/cv        (isentropic exponent)
 //
 // Usage in compressible mass flow:
-//   mdot = ε · Cd · A · √(2 · ρ_upstream · ΔP)
+//   mdot = eps * Cd * A * sqrt(2 * rho_upstream * Delta_P)
 //
 // Valid for:
-//   - 0.1 ≤ β ≤ 0.75
-//   - τ ≤ 0.25 (ΔP/P ≤ 25%)
+//   - 0.1 <= beta <= 0.75
+//   - tau <= 0.25 (Delta_P/P <= 25%)
 //   - Ideal gas behavior
 //
 // Parameters:
@@ -1128,7 +1128,7 @@ double orifice_Re_d_from_mdot(double mdot, double d, double mu);
 //   P_upstream  : Absolute upstream static pressure [Pa]
 //   kappa       : Isentropic exponent cp/cv [-]
 //
-// Returns: Expansibility factor ε [-] (dimensionless, 0 < ε ≤ 1)
+// Returns: Expansibility factor eps [-] (dimensionless, 0 < eps <= 1)
 //
 // Reference: ISO 5167-2:2003, Measurement of fluid flow by means of
 //            pressure differential devices inserted in circular cross-section

@@ -304,8 +304,8 @@ class TestNumericalReference:
     """Numerical regression tests for the can-annular solver.
 
     These tests pin the solver output against analytically-derived reference
-    values.  They are NOT golden truth — the solver uses approximate methods
-    (Muller + magnitude minimization) — but they detect regressions in the
+    values.  They are NOT golden truth -- the solver uses approximate methods
+    (Muller + magnitude minimization) -- but they detect regressions in the
     numerical output caused by refactoring.
 
     Reference geometry: single can, c=500 m/s, L=0.5 m
@@ -313,7 +313,7 @@ class TestNumericalReference:
       Tolerance: 5 Hz (1% of fundamental) to allow for solver approximation.
 
     Reference geometry: 12-can system, c_can=500 m/s, c_plenum=600 m/s, L=0.3 m
-      Analytical uncoupled can resonance: f_1 = c_can / (2*L) ≈ 833 Hz
+      Analytical uncoupled can resonance: f_1 = c_can / (2*L) ~= 833 Hz
       Coupling shifts modes; we verify count and ordering, not exact values.
     """
 
@@ -408,7 +408,7 @@ class TestNumericalReference:
         """Solver fundamental must match analytical half-wave resonance within 2 Hz.
 
         Single can, closed-closed: f_1 = c / (2*L).
-        This is the tightest numerical regression check — 0.4% tolerance.
+        This is the tightest numerical regression check -- 0.4% tolerance.
         """
         geom = self._single_can_geom()
         c = 500.0
@@ -422,10 +422,10 @@ class TestNumericalReference:
         )
 
     def test_frequency_scales_with_sound_speed(self):
-        """Modes must scale linearly with c: f(2c) / f(c) ≈ 2.0 within 2%.
+        """Modes must scale linearly with c: f(2c) / f(c) ~= 2.0 within 2%.
 
-        c=400 m/s, L=0.5 m → fundamental at 400 Hz; use f_max=450.
-        c=800 m/s, L=0.5 m → fundamental at 800 Hz; use f_max=900.
+        c=400 m/s, L=0.5 m -> fundamental at 400 Hz; use f_max=450.
+        c=800 m/s, L=0.5 m -> fundamental at 800 Hz; use f_max=900.
         """
         geom = self._single_can_geom()
         modes_c1 = cb.can_annular_eigenmodes(geom, 400, 400, 1.2, 1.2, f_max=450)
@@ -436,7 +436,7 @@ class TestNumericalReference:
         assert abs(ratio - 2.0) < 0.04, f"Frequency scaling ratio: {ratio:.4f}, expected ~2.0"
 
     def test_frequency_scales_inversely_with_length(self):
-        """Modes must scale as 1/L: f(L) / f(2L) ≈ 2.0 within 2%."""
+        """Modes must scale as 1/L: f(L) / f(2L) ~= 2.0 within 2%."""
 
         def make_geom(length: float) -> cb.CanAnnularGeometry:
             g = cb.CanAnnularGeometry()

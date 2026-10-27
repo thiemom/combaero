@@ -117,7 +117,7 @@ def test_two_channel_wall_coupling_convergence():
     # Cold side should heat up
     assert T_cold > 400.0, "Cold side should heat up"
 
-    # Verify energy balance (Q_hot ≈ -Q_cold)
+    # Verify energy balance (Q_hot ~= -Q_cold)
     X_air = cb.mass_to_mole(cb.normalize_fractions(Y_air))
     cp_hot = cb.cp_mass(T_hot, X_air)
     cp_cold = cb.cp_mass(T_cold, X_air)

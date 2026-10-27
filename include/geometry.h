@@ -13,7 +13,7 @@ namespace combaero {
 // Dh = 4 * A / P_wetted
 //
 // Parameters:
-//   A        : cross-sectional area [m²]
+//   A        : cross-sectional area [m^2]
 //   P_wetted : wetted perimeter [m]
 // Returns: hydraulic diameter [m]
 double hydraulic_diameter(double A, double P_wetted);
@@ -41,30 +41,30 @@ double hydraulic_diameter_annulus(double D_outer, double D_inner);
 // Common geometric calculations for channel flow
 
 // Circular channel cross-sectional area
-// A = π * (D/2)²
+// A = pi * (D/2)^2
 //
 // Parameters:
 //   D : diameter [m]
-// Returns: area [m²]
+// Returns: area [m^2]
 double circular_area(double D);
 
 
 // Annular cross-sectional area
-// A = π * ((D_outer/2)² - (D_inner/2)²)
+// A = pi * ((D_outer/2)^2 - (D_inner/2)^2)
 //
 // Parameters:
 //   D_outer : outer diameter [m]
 //   D_inner : inner diameter [m]
-// Returns: area [m²]
+// Returns: area [m^2]
 double annular_area(double D_outer, double D_inner);
 
 // Cylindrical channel volume
-// V = π * (D/2)² * L
+// V = pi * (D/2)^2 * L
 //
 // Parameters:
 //   D : diameter [m]
 //   L : length [m]
-// Returns: volume [m³]
+// Returns: volume [m^3]
 double cylinder_volume(double D, double L);
 
 
@@ -79,8 +79,8 @@ struct Tube {
     double L;   // Length [m]
     double D;   // Diameter [m]
 
-    double area() const;           // Cross-sectional area [m²]
-    double volume() const;         // Volume [m³]
+    double area() const;           // Cross-sectional area [m^2]
+    double volume() const;         // Volume [m^3]
     double perimeter() const;      // Circumference [m]
 };
 
@@ -97,9 +97,9 @@ struct Annulus {
     // Diameter-based accessors (flow/geometry convention)
     double D_mean() const;         // Mean diameter [m]: (D_inner + D_outer) / 2
     double gap() const;            // Annular gap [m]: (D_outer - D_inner) / 2
-    double area() const;           // Cross-sectional area [m²]
-    double volume() const;         // Volume [m³]
-    double circumference() const;  // Mean circumference [m]: π * D_mean
+    double area() const;           // Cross-sectional area [m^2]
+    double volume() const;         // Volume [m^3]
+    double circumference() const;  // Mean circumference [m]: pi * D_mean
 
     // Radius-based accessors (acoustic solver convention)
     double radius_inner() const { return D_inner / 2.0; }  // Inner radius [m]
@@ -128,15 +128,15 @@ struct CanAnnularFlowGeometry {
     // Annular-section helpers (same meaning as Annulus)
     double D_mean() const;         // Mean annular diameter [m]
     double gap() const;            // Annular gap [m]
-    double area() const;           // Annular cross-sectional area [m²]
-    double volume() const;         // Annular section volume [m³]
+    double area() const;           // Annular cross-sectional area [m^2]
+    double volume() const;         // Annular section volume [m^3]
     double circumference() const;  // Mean annular circumference [m]
 
     // Can-specific helpers
-    double area_primary() const;       // Primary circular area [m²]
-    double volume_primary() const;     // Primary circular volume [m³]
-    double volume_transition() const;  // Transition volume [m³]
-    double volume_total() const;       // Total volume [m³]
+    double area_primary() const;       // Primary circular area [m^2]
+    double volume_primary() const;     // Primary circular volume [m^3]
+    double volume_transition() const;  // Transition volume [m^3]
+    double volume_total() const;       // Total volume [m^3]
     double length_total() const;       // Total length [m]
 };
 
@@ -144,22 +144,22 @@ struct CanAnnularFlowGeometry {
 // Residence Time
 // -------------------------------------------------------------
 // Time for fluid to pass through a volume.
-// τ = V / Q̇  [s]
+// tau = V / Q_dot  [s]
 //
 // Applications:
-// - Reactor design (Damköhler number: Da = τ_res / τ_reaction)
+// - Reactor design (Damkoehler number: Da = tau_res / tau_reaction)
 // - Combustor sizing
 // - Mixing time estimates
 
-// Generic: τ = V / Q̇
-// V : volume [m³]
-// Q : volumetric flow rate [m³/s]
+// Generic: tau = V / Q_dot
+// V : volume [m^3]
+// Q : volumetric flow rate [m^3/s]
 double residence_time(double V, double Q);
 
-// From mass flow: τ = V·ρ / ṁ
-// V    : volume [m³]
+// From mass flow: tau = V*rho / m_dot
+// V    : volume [m^3]
 // mdot : mass flow rate [kg/s]
-// rho  : density [kg/m³]
+// rho  : density [kg/m^3]
 double residence_time_mdot(double V, double mdot, double rho);
 
 // Convenience overloads for geometry structs
@@ -171,7 +171,7 @@ double residence_time_mdot(const Annulus& annulus, double mdot, double rho);
 double residence_time_mdot(const CanAnnularFlowGeometry& geom, double mdot, double rho);
 
 // Space velocity (inverse of residence time)
-// SV = Q̇ / V = 1/τ  [1/s]
+// SV = Q_dot / V = 1/tau  [1/s]
 double space_velocity(double Q, double V);
 
 } // namespace combaero

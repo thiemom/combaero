@@ -14,7 +14,7 @@ namespace combaero::materials {
 // Material thermal property data structure
 struct ThermalMaterial {
     std::string name;                           // Material identifier
-    std::function<double(double)> k_func;       // k(T) function [W/(m·K)]
+    std::function<double(double)> k_func;       // k(T) function [W/(m*K)]
     double T_min;                               // Minimum valid temperature [K]
     double T_max;                               // Maximum valid temperature [K]
     std::string source;                         // Data source reference
@@ -28,7 +28,7 @@ std::vector<std::string> list_materials();
 // -------------------------------------------------------------
 // Superalloys - Thermal Conductivity k(T)
 // -------------------------------------------------------------
-// All functions take temperature in Kelvin and return k in W/(m·K)
+// All functions take temperature in Kelvin and return k in W/(m*K)
 
 // Inconel 718 (Ni-based superalloy)
 // Source: Haynes International, Special Metals Corporation
@@ -76,7 +76,7 @@ double k_aluminum_6061(double T);
 //   T        : temperature [K]
 //   hours    : operating hours at temperature (default: 0 = as-sprayed)
 //   is_ebpvd : true for EB-PVD coating, false for APS (default: false)
-// Returns: thermal conductivity k [W/(m·K)]
+// Returns: thermal conductivity k [W/(m*K)]
 double k_tbc_ysz(double T, double hours = 0.0, bool is_ebpvd = false);
 
 // -------------------------------------------------------------

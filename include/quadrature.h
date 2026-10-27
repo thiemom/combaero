@@ -1,5 +1,5 @@
 #pragma once
-// Numerical integration utilities — header-only.
+// Numerical integration utilities -- header-only.
 //
 // composite_simpson: Composite Simpson's 1/3 rule.
 // Error: O(h^4), where h = (b-a)/n.  For smooth integrands with n=64,

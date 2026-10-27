@@ -92,7 +92,7 @@ def print_summary(results):
         for _, row in worst_regressions.iterrows():
             print(
                 f"{row['test_name']}.{row['derivative']}: "
-                f"{row['abs_diff_baseline']:.2e} → {row['abs_diff_current']:.2e} "
+                f"{row['abs_diff_baseline']:.2e} -> {row['abs_diff_current']:.2e} "
                 f"(+{row['abs_diff_change']:.2e})"
             )
 
@@ -103,7 +103,7 @@ def print_summary(results):
         for _, row in best_improvements.iterrows():
             print(
                 f"{row['test_name']}.{row['derivative']}: "
-                f"{row['abs_diff_baseline']:.2e} → {row['abs_diff_current']:.2e} "
+                f"{row['abs_diff_baseline']:.2e} -> {row['abs_diff_current']:.2e} "
                 f"({row['abs_diff_change']:.2e})"
             )
 
@@ -239,10 +239,10 @@ def main():
 
     # Return error code if there are regressions
     if len(results["regressions"]) > 0:
-        print(f"⚠️  DETECTED {len(results['regressions'])} REGRESSIONS")
+        print(f"WARN: DETECTED {len(results['regressions'])} REGRESSIONS")
         return 1
     else:
-        print("\n✅ NO REGRESSIONS DETECTED")
+        print("\nOK: NO REGRESSIONS DETECTED")
         return 0
 
 

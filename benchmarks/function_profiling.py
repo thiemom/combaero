@@ -29,7 +29,7 @@ def print_result(name, code, setup, runs=100000):
     time_taken = timeit.timeit(stmt=code, setup=setup, number=runs)
     ns_per_call = (time_taken / runs) * 1e9
     us_per_call = ns_per_call / 1000.0
-    print(f"{name:<40} | {us_per_call:>8.3f} μs | {ns_per_call:>8.0f} ns")
+    print(f"{name:<40} | {us_per_call:>8.3f} us | {ns_per_call:>8.0f} ns")
 
 
 print("CombAero Function Profiling (per call)")

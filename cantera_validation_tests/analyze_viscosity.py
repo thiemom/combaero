@@ -55,13 +55,13 @@ print("=" * 80)
 print(
     """
 CombAero uses Sutherland's formula:
-  μ(T) = μ_ref * (T/T_ref)^1.5 * (T_ref + S) / (T + S)
+  mu(T) = mu_ref * (T/T_ref)^1.5 * (T_ref + S) / (T + S)
 
   Where S is the Sutherland constant (~110K for air)
 
 Cantera uses full kinetic theory with Lennard-Jones potentials:
-  - Accounts for collision integrals Ω(T*)
-  - Uses species-specific L-J parameters (ε/k, σ)
+  - Accounts for collision integrals Omega(T*)
+  - Uses species-specific L-J parameters (eps/k, sigma)
   - More accurate but computationally expensive
 
 Key observations:

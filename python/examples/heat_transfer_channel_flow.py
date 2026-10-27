@@ -79,8 +79,8 @@ def main() -> None:
     print(f"Air temperature: T = {T:.0f} K")
 
     print("\nAir properties:")
-    print(f"  Density:              ρ = {rho:.3f} kg/m3")
-    print(f"  Viscosity:            μ = {mu * 1e6:.2f} μPa*s")
+    print(f"  Density:              rho = {rho:.3f} kg/m3")
+    print(f"  Viscosity:            mu = {mu * 1e6:.2f} uPa*s")
     print(f"  Thermal conductivity: k = {k * 1000:.2f} mW/(m*K)")
     print(f"  Specific heat:        cp = {cp:.1f} J/(mol*K)")
     print(f"  Prandtl number:       Pr = {Pr:.3f}")
@@ -131,12 +131,12 @@ def main() -> None:
     LMTD = cb.lmtd(dT1, dT2)
 
     # Required length: Q = h * A_surface * LMTD
-    # A_surface = π * D * L
+    # A_surface = pi * D * L
     L = Q / (h * np.pi * D * LMTD)
 
     print("\nDesign requirements:")
     print(f"  Heat air from {T_in:.0f} K to {T_out:.0f} K")
-    print(f"  Mass flow rate:  ṁ = {mdot:.3f} kg/s")
+    print(f"  Mass flow rate:  m_dot = {mdot:.3f} kg/s")
     print(f"  Wall temperature: T_wall = {T_wall:.0f} K")
     print(f"  Channel diameter:    D = {D * 1000:.1f} mm")
 
@@ -173,8 +173,8 @@ def main() -> None:
     dT1 = T_hot_in - T_cold_out  # For display
     dT2 = T_hot_out - T_cold_in
 
-    print(f"  Hot side:  {T_hot_in - 273.15:.0f}degC → {T_hot_out - 273.15:.0f}degC")
-    print(f"  Cold side: {T_cold_in - 273.15:.0f}degC → {T_cold_out - 273.15:.0f}degC")
+    print(f"  Hot side:  {T_hot_in - 273.15:.0f}degC -> {T_hot_out - 273.15:.0f}degC")
+    print(f"  Cold side: {T_cold_in - 273.15:.0f}degC -> {T_cold_out - 273.15:.0f}degC")
     print(f"  DeltaT1 = {dT1:.2f} K (hot in - cold out)")
     print(f"  DeltaT2 = {dT2:.2f} K (hot out - cold in)")
     print(f"  LMTD = {LMTD_counter:.2f} K")
@@ -203,12 +203,12 @@ def main() -> None:
     Re = 5e4
     Pr = 0.7
 
-    # Heating: wall cooler than bulk, so μ_wall > μ_bulk
+    # Heating: wall cooler than bulk, so mu_wall > mu_bulk
     mu_ratios = [0.6, 0.8, 1.0, 1.2, 1.4]
 
     print(f"\nReynolds number: Re = {Re:.0e}")
     print(f"Prandtl number:  Pr = {Pr:.2f}")
-    print(f"\n{'μ_bulk/μ_wall':>15s}  {'Nu (Sieder-Tate)':>20s}  {'Effect':>10s}")
+    print(f"\n{'mu_bulk/mu_wall':>15s}  {'Nu (Sieder-Tate)':>20s}  {'Effect':>10s}")
     print("-" * 50)
 
     Nu_base = cb.nusselt_sieder_tate(Re, Pr, mu_ratio=1.0)
@@ -218,8 +218,8 @@ def main() -> None:
         effect = (Nu - Nu_base) / Nu_base * 100
         print(f"{mu_ratio:15.2f}  {Nu:20.2f}  {effect:+9.1f}%")
 
-    print("\nNote: μ_bulk/μ_wall < 1 → heating (wall hotter)")
-    print("      μ_bulk/μ_wall > 1 → cooling (wall cooler)")
+    print("\nNote: mu_bulk/mu_wall < 1 -> heating (wall hotter)")
+    print("      mu_bulk/mu_wall > 1 -> cooling (wall cooler)")
 
     # =========================================================================
     # Example 6: Combined friction and heat transfer
@@ -246,8 +246,8 @@ def main() -> None:
     print(f"\nReynolds number: Re = {Re:.0e}")
     print(f"Prandtl number:  Pr = {Pr:.2f}")
     print(f"Channel diameter:   D = {D * 1000:.0f} mm")
-    print(f"Roughness:       ε = {eps * 1e6:.1f} μm (commercial steel)")
-    print(f"Relative rough:  ε/D = {e_D:.6f}")
+    print(f"Roughness:       eps = {eps * 1e6:.1f} um (commercial steel)")
+    print(f"Relative rough:  eps/D = {e_D:.6f}")
 
     print("\nResults:")
     print(f"  Friction factor:          f = {f:.6f}")

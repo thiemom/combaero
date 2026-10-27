@@ -123,7 +123,7 @@ def test_orifice_symmetry():
             jac_neg, jac_pos, rtol=1e-10, err_msg=f"Jacobian should be symmetric at dP={dP}"
         )
 
-        # Density derivative should be antisymmetric (like mdot, since d_mdot_drho ∝ mdot)
+        # Density derivative should be antisymmetric (like mdot, since d_mdot_drho ~ mdot)
         np.testing.assert_allclose(
             drho_neg,
             -drho_pos,
@@ -446,9 +446,9 @@ def test_orifice_compressible_subsonic():
     assert mdot > 0, "Mass flow should be positive"
 
     # Verify Jacobians have correct signs
-    assert d_P0 > 0, "d_mdot_dP0 should be positive (higher P0 → more flow)"
-    assert d_Pb < 0, "d_mdot_dP_back should be negative (higher P_back → less flow)"
-    assert d_T0 < 0, "d_mdot_dT0 should be negative (higher T0 → lower density)"
+    assert d_P0 > 0, "d_mdot_dP0 should be positive (higher P0 -> more flow)"
+    assert d_Pb < 0, "d_mdot_dP_back should be negative (higher P_back -> less flow)"
+    assert d_T0 < 0, "d_mdot_dT0 should be negative (higher T0 -> lower density)"
 
     # Verify against direct nozzle_flow
     A_eff = Cd * area / np.sqrt(1 - beta**4)

@@ -131,8 +131,8 @@ def test_momentum_chamber_vs_plenum():
     assert q_dynamic > 10.0  # At least 10 Pa
 
     print("Plenum vs Momentum Chamber:")
-    print(f"  Plenum: P={P_ple:.1f} Pa, Pt={Pt_ple:.1f} Pa, ΔP={Pt_ple - P_ple:.1f} Pa")
-    print(f"  Momentum: P={P_mom:.1f} Pa, Pt={Pt_mom:.1f} Pa, ΔP={q_dynamic:.1f} Pa")
+    print(f"  Plenum: P={P_ple:.1f} Pa, Pt={Pt_ple:.1f} Pa, Delta_P={Pt_ple - P_ple:.1f} Pa")
+    print(f"  Momentum: P={P_mom:.1f} Pa, Pt={Pt_mom:.1f} Pa, Delta_P={q_dynamic:.1f} Pa")
 
 
 def test_momentum_chamber_with_heat_exchange():
@@ -190,7 +190,7 @@ def test_momentum_chamber_with_heat_exchange():
 
     print("Momentum chamber with heat exchange:")
     print(
-        f"  T_in = {T_inlet:.1f} K → T_chamber = {T_chamber:.1f} K (ΔT = {T_chamber - T_inlet:.1f} K)"
+        f"  T_in = {T_inlet:.1f} K -> T_chamber = {T_chamber:.1f} K (Delta_T = {T_chamber - T_inlet:.1f} K)"
     )
     print(f"  Pt = P + q_dynamic: {Pt:.1f} = {P:.1f} + {q_dynamic:.1f} Pa")
 

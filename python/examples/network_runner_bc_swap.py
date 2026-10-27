@@ -3,7 +3,7 @@
 Loads the compressible CH4/air combustor network, solves the design point
 with a fixed air mass flow, swaps the air inlet to a pressure boundary
 (Pt auto-populated from the solved state), and sweeps inlet total pressure
-±10 % to show how combustor temperature responds.
++/-10 % to show how combustor temperature responds.
 
 The swap step also validates that switching boundary type reproduces the same
 physical operating point: the re-solve after the swap must give the same
@@ -59,7 +59,7 @@ def main() -> None:
     runner = load_runner()
 
     # 1. Solve design point with fixed air mass flow
-    print("Solving design point (mass-driven) …")
+    print("Solving design point (mass-driven) ...")
     design = runner.solve(
         {"fuel_inlet.m_dot": 0.03},
         init_strategy="outletref_warmstart",
@@ -71,7 +71,7 @@ def main() -> None:
     print(f"  Pt_inlet = {design_Pt:.0f} Pa,  T_combustor = {design_T:.0f} K")
 
     # 2. Swap air inlet to pressure boundary (Pt auto-populated from solved Pt)
-    print("Swapping air_inlet: mass_boundary → pressure_boundary …")
+    print("Swapping air_inlet: mass_boundary -> pressure_boundary ...")
     p_runner = design.swap_boundary("air_inlet", "pressure_boundary")
 
     # 3. Verify the swap gives the same operating point
@@ -79,10 +79,10 @@ def main() -> None:
     assert verify.success, f"Swap verify failed: {verify.message}"
     dT = abs(verify.get("combustor.T") - design_T)
     print(
-        f"  Re-solve T_combustor = {verify.get('combustor.T'):.1f} K  (ΔT = {dT:.2f} K vs design)"
+        f"  Re-solve T_combustor = {verify.get('combustor.T'):.1f} K  (Delta_T = {dT:.2f} K vs design)"
     )
 
-    # 4. Sweep inlet total pressure ±10 % at constant fuel flow
+    # 4. Sweep inlet total pressure +/-10 % at constant fuel flow
     Pt_range = design_Pt * np.linspace(0.90, 1.10, 11)
     params = pd.DataFrame(
         {
@@ -91,7 +91,9 @@ def main() -> None:
         }
     )
 
-    print(f"Sweeping Pt over [{Pt_range[0]:.0f}, {Pt_range[-1]:.0f}] Pa ({len(Pt_range)} points) …")
+    print(
+        f"Sweeping Pt over [{Pt_range[0]:.0f}, {Pt_range[-1]:.0f}] Pa ({len(Pt_range)} points) ..."
+    )
     # default init_strategy + continuation (sweep passes _x0 forward automatically)
     sweep_df = p_runner.sweep(params, metrics=["combustor.T"])
 
@@ -112,7 +114,7 @@ def main() -> None:
     ax.set_xlabel(r"$P_{t,\mathrm{inlet}}\ /\ P_{t,\mathrm{design}}$")
     ax.set_ylabel(r"$T_\mathrm{combustor}$ [K]")
     ax.set_title(
-        "Off-design pressure sensitivity — compressible CH4/air combustor\n"
+        "Off-design pressure sensitivity -- compressible CH4/air combustor\n"
         "(pressure-driven after BC swap from fixed mass flow)"
     )
     ax.grid(True, alpha=0.4)

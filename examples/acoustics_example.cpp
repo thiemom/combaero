@@ -32,7 +32,7 @@ int main()
 
     std::cout << "Combustor conditions: T=" << T_hot << " K, P=" << P_comb / 1e5
               << " bar\n";
-    std::cout << "  c = " << c << " m/s,  rho = " << rho << " kg/m³\n\n";
+    std::cout << "  c = " << c << " m/s,  rho = " << rho << " kg/m^3\n\n";
 
     using namespace combaero;
 
@@ -47,7 +47,7 @@ int main()
     // Combustor liner tube: L=0.4 m, D=0.12 m
     Tube liner{0.4, 0.12};
 
-    // Closed-closed (both ends rigid — pressure antinodes at both ends)
+    // Closed-closed (both ends rigid -- pressure antinodes at both ends)
     auto modes_cc = tube_axial_modes(liner, c,
                                      BoundaryCondition::Closed,
                                      BoundaryCondition::Closed, 4);
@@ -60,7 +60,7 @@ int main()
         std::cout << std::setw(8) << m.label() << std::setw(12) << m.frequency << "\n";
     }
 
-    // Open-closed (inlet open, outlet closed — quarter-wave resonator)
+    // Open-closed (inlet open, outlet closed -- quarter-wave resonator)
     auto modes_oc = tube_axial_modes(liner, c,
                                      BoundaryCondition::Open,
                                      BoundaryCondition::Closed, 4);
@@ -144,7 +144,7 @@ int main()
     LinerFlowState sdof_flow{2.0, 15.0};                            // u_bias, u_grazing [m/s]
     AcousticMedium medium{rho, c};
 
-    // Frequency sweep 100–1000 Hz
+    // Frequency sweep 100-1000 Hz
     std::vector<double> freqs;
     for (double f = 100.0; f <= 1000.0; f += 50.0) {
         freqs.push_back(f);
@@ -216,7 +216,7 @@ int main()
 
     std::cout << "At f=" << f_peak << " Hz, p_rms=" << p_rms << " Pa:\n";
     std::cout << "  wavelength        = " << props.wavelength << " m\n";
-    std::cout << "  impedance (rho*c) = " << props.impedance << " Pa·s/m\n";
+    std::cout << "  impedance (rho*c) = " << props.impedance << " Pa*s/m\n";
     std::cout << "  particle velocity = " << props.particle_velocity << " m/s\n";
     std::cout << "  SPL               = " << props.spl << " dB\n\n";
 

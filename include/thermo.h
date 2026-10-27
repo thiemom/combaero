@@ -10,7 +10,7 @@
 
 namespace combaero::thermo {
 
-// Universal gas constant [J/(mol·K)]
+// Universal gas constant [J/(mol*K)]
 constexpr double R_GAS = 8.31446261815324;
 
 // Boltzmann constant [J/K]
@@ -92,9 +92,9 @@ double s_R(std::size_t species_idx, double T);
 double g_over_RT(std::size_t species_idx, double T);
 
 // Per-species dimensional properties
-double cp_species(std::size_t species_idx, double T);  // [J/(mol·K)]
+double cp_species(std::size_t species_idx, double T);  // [J/(mol*K)]
 double h_species(std::size_t species_idx, double T);   // [J/mol]
-double s_species(std::size_t species_idx, double T);   // [J/(mol·K)] at P_ref
+double s_species(std::size_t species_idx, double T);   // [J/(mol*K)] at P_ref
 
 // Thermodynamic properties
 double cp(double T, const std::vector<double>& X);
@@ -103,7 +103,7 @@ double s(double T, const std::vector<double>& X, double P, double P_ref = 101325
 double cv(double T, const std::vector<double>& X);
 double u(double T, const std::vector<double>& X);  // Internal energy [J/mol]
 double density(double T, double P, const std::vector<double>& X);
-double molar_volume(double T, double P);  // Ideal gas molar volume [m³/mol]
+double molar_volume(double T, double P);  // Ideal gas molar volume [m^3/mol]
 double specific_gas_constant(const std::vector<double>& X);
 double isentropic_expansion_coefficient(double T, const std::vector<double>& X);
 double speed_of_sound(double T, const std::vector<double>& X);

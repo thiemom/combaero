@@ -7,7 +7,7 @@ from combaero._core import num_species, species_index_from_name, species_name
 class TestWgsEquilibrium:
     """Validate WGS (Water-Gas Shift) equilibrium against Cantera.
 
-    Reaction: CO + H2O ⇌ CO2 + H2
+    Reaction: CO + H2O <=> CO2 + H2
 
     CombAero uses partial equilibrium (WGS only), Cantera uses restricted
     species to match the same equilibrium model.
@@ -175,7 +175,7 @@ class TestWgsEquilibrium:
         wgs_gas.equilibrate("HP")  # Adiabatic (constant enthalpy, pressure)
 
         # Compare final temperature [K]
-        # WGS is exothermic in forward direction (CO + H2O → CO2 + H2)
+        # WGS is exothermic in forward direction (CO + H2O -> CO2 + H2)
         # At high T, equilibrium favors reactants, so forward reaction releases heat
         T_diff = abs(result_cb.state.T - wgs_gas.T)
         print("\nWGS adiabatic:")
@@ -332,7 +332,7 @@ class TestReformingEquilibrium:
         gas.X = ct_species
 
     def test_reforming_ch4_isothermal(self, combaero, cantera, reforming_gas, species_mapping):
-        """CH4 + H2O reforming at 1200 K, 5 bar — compare with Cantera TP equilibrium."""
+        """CH4 + H2O reforming at 1200 K, 5 bar -- compare with Cantera TP equilibrium."""
         cb = combaero
 
         X = np.zeros(num_species())
@@ -363,7 +363,7 @@ class TestReformingEquilibrium:
                 )
 
     def test_reforming_ch4_adiabatic(self, combaero, cantera, reforming_gas, species_mapping):
-        """CH4 + H2O adiabatic reforming — compare T_final and composition with Cantera HP."""
+        """CH4 + H2O adiabatic reforming -- compare T_final and composition with Cantera HP."""
         cb = combaero
 
         X = np.zeros(num_species())
@@ -405,7 +405,7 @@ class TestReformingEquilibrium:
     def test_reforming_c2h6_isothermal(
         self, combaero, cantera, reforming_gas_c2h6, species_mapping
     ):
-        """C2H6 + H2O reforming at 1400 K — verify C2H6 consumed, CO/H2 produced."""
+        """C2H6 + H2O reforming at 1400 K -- verify C2H6 consumed, CO/H2 produced."""
         cb = combaero
 
         X = np.zeros(num_species())

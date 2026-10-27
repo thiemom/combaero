@@ -12,8 +12,8 @@
 // Heat Transfer Correlations for Forced Convection
 // -------------------------------------------------------------
 // All Nusselt correlations return Nu [-], from which:
-//   h = Nu * k / L   [W/(m²·K)]
-// where k is thermal conductivity [W/(m·K)] and L is characteristic length [m].
+//   h = Nu * k / L   [W/(m^2*K)]
+// where k is thermal conductivity [W/(m*K)] and L is characteristic length [m].
 //
 // For channel flow: L = D (diameter)
 // For flat plate: L = x (distance from leading edge) or plate length
@@ -158,7 +158,7 @@ NuAndDerivative nusselt_channel_gnielinski_and_derivative(
     double Re, double Pr, double f_turb, double df_turb_dRe, double Nu_laminar);
 
 // Sieder-Tate correlation (1936)
-// Nu = 0.027 * Re^0.8 * Pr^(1/3) * (μ_bulk / μ_wall)^0.14
+// Nu = 0.027 * Re^0.8 * Pr^(1/3) * (mu_bulk / mu_wall)^0.14
 //
 // Accounts for viscosity variation between bulk and wall temperatures.
 // Valid for:
@@ -169,7 +169,7 @@ NuAndDerivative nusselt_channel_gnielinski_and_derivative(
 // Parameters:
 //   Re       : Reynolds number at bulk temperature [-]
 //   Pr       : Prandtl number at bulk temperature [-]
-//   mu_ratio : μ_bulk / μ_wall [-] (typically 0.5-2.0)
+//   mu_ratio : mu_bulk / mu_wall [-] (typically 0.5-2.0)
 //   status   : if non-null, set to Extrapolated when Re or Pr is outside the
 //              validated range; no warning is emitted in that case
 namespace sieder_tate {
@@ -221,11 +221,11 @@ constexpr double NU_LAMINAR_CONST_Q = 4.36;
 // -------------------------------------------------------------
 
 // Heat transfer coefficient from Nusselt number
-// h = Nu * k / L  [W/(m²·K)]
+// h = Nu * k / L  [W/(m^2*K)]
 //
 // Parameters:
 //   Nu : Nusselt number [-]
-//   k  : thermal conductivity [W/(m·K)]
+//   k  : thermal conductivity [W/(m*K)]
 //   L  : characteristic length [m] (diameter for channel flow)
 double htc_from_nusselt(double Nu, double k, double L);
 
@@ -240,9 +240,9 @@ double htc_from_nusselt(double Nu, double k, double L);
 //   1/U = 1/h_inner + t_wall/k_wall + 1/h_outer + R_fouling
 //
 // Parameters:
-//   h_values : vector of convective HTCs [W/(m²·K)]
-//   t_over_k : vector of thickness/conductivity ratios [m / W/(m·K) = m²·K/W]
-// Returns: overall HTC [W/(m²·K)]
+//   h_values : vector of convective HTCs [W/(m^2*K)]
+//   t_over_k : vector of thickness/conductivity ratios [m / W/(m*K) = m^2*K/W]
+// Returns: overall HTC [W/(m^2*K)]
 double overall_htc(const std::vector<double> &h_values,
                    const std::vector<double> &t_over_k = {});
 
@@ -252,7 +252,7 @@ double overall_htc_wall(double h_inner, double h_outer, double t_wall,
                         double k_wall, double R_fouling = 0.0);
 
 // Multi-layer wall: h_in, [t1/k1, t2/k2, ...], h_out
-// 1/U = 1/h_inner + Σ(t_i/k_i) + 1/h_outer
+// 1/U = 1/h_inner + Sigma(t_i/k_i) + 1/h_outer
 //
 // Example: insulated channel with steel + insulation
 //   overall_htc_wall(500, 10, {0.003/50, 0.05/0.04})
@@ -260,7 +260,7 @@ double overall_htc_wall(double h_inner, double h_outer, double t_wall,
 double overall_htc_wall(double h_inner, double h_outer,
                         const std::vector<double> &t_over_k_layers);
 
-// With additional fouling resistance (R_f in m²·K/W)
+// With additional fouling resistance (R_f in m^2*K/W)
 double overall_htc_wall(double h_inner, double h_outer,
                         const std::vector<double> &t_over_k_layers,
                         double R_fouling);
@@ -280,22 +280,22 @@ double thermal_resistance_wall(double thickness, double k, double A);
 // -------------------------------------------------------------
 
 // LMTD for heat exchangers
-// LMTD = (ΔT1 - ΔT2) / ln(ΔT1 / ΔT2)
+// LMTD = (Delta_T1 - Delta_T2) / ln(Delta_T1 / Delta_T2)
 //
 // For counter-flow:
-//   ΔT1 = T_hot_in - T_cold_out
-//   ΔT2 = T_hot_out - T_cold_in
+//   Delta_T1 = T_hot_in - T_cold_out
+//   Delta_T2 = T_hot_out - T_cold_in
 //
 // For parallel-flow:
-//   ΔT1 = T_hot_in - T_cold_in
-//   ΔT2 = T_hot_out - T_cold_out
+//   Delta_T1 = T_hot_in - T_cold_in
+//   Delta_T2 = T_hot_out - T_cold_out
 //
 // Parameters:
 //   dT1 : temperature difference at one end [K]
 //   dT2 : temperature difference at other end [K]
 // Returns: log mean temperature difference [K]
 //
-// Note: If dT1 ≈ dT2, returns arithmetic mean to avoid 0/0.
+// Note: If dT1 ~= dT2, returns arithmetic mean to avoid 0/0.
 double lmtd(double dT1, double dT2);
 
 // LMTD for counter-flow heat exchanger (convenience function)
@@ -315,24 +315,24 @@ double lmtd_parallelflow(double T_hot_in, double T_hot_out, double T_cold_in,
 // Heat Transfer Rate and Heat Flux
 // -------------------------------------------------------------
 
-// Heat transfer rate Q = U * A * ΔT  [W]
-// U  : overall heat transfer coefficient [W/(m²·K)]
-// A  : heat transfer area [m²]
+// Heat transfer rate Q = U * A * Delta_T  [W]
+// U  : overall heat transfer coefficient [W/(m^2*K)]
+// A  : heat transfer area [m^2]
 // dT : temperature difference [K]
 inline double heat_rate(double U, double A, double dT) { return U * A * dT; }
 
-// Heat flux q = U * ΔT  [W/m²]
+// Heat flux q = U * Delta_T  [W/m^2]
 // (heat rate per unit area)
 inline double heat_flux(double U, double dT) { return U * dT; }
 
 // Required area for given heat rate
-// A = Q / (U * ΔT)  [m²]
+// A = Q / (U * Delta_T)  [m^2]
 inline double heat_transfer_area(double Q, double U, double dT) {
   return Q / (U * dT);
 }
 
 // Temperature difference for given heat rate
-// ΔT = Q / (U * A)  [K]
+// Delta_T = Q / (U * A)  [K]
 inline double heat_transfer_dT(double Q, double U, double A) {
   return Q / (U * A);
 }
@@ -355,10 +355,10 @@ inline double heat_transfer_dT(double Q, double U, double A) {
 // Parameters:
 //   T_hot      : hot-side bulk fluid temperature [K]
 //   T_cold     : cold-side bulk fluid temperature [K]
-//   h_hot      : hot-side convective HTC [W/(m²·K)]
-//   h_cold     : cold-side convective HTC [W/(m²·K)]
-//   t_over_k   : vector of thickness/conductivity for each layer [m²·K/W]
-//   q          : (output) heat flux through wall [W/m²]
+//   h_hot      : hot-side convective HTC [W/(m^2*K)]
+//   h_cold     : cold-side convective HTC [W/(m^2*K)]
+//   t_over_k   : vector of thickness/conductivity for each layer [m^2*K/W]
+//   q          : (output) heat flux through wall [W/m^2]
 //
 // The heat flux is constant through all layers (steady state).
 std::vector<double>
@@ -407,11 +407,11 @@ inline std::vector<double> wall_temperature_profile(double T_hot, double T_cold,
 //   edge_idx   : edge index (0 = hot surface, N = cold surface)
 //   T_hot      : hot-side bulk fluid temperature [K]
 //   T_cold     : cold-side bulk fluid temperature [K]
-//   h_hot      : hot-side convective HTC [W/(m²·K)]
-//   h_cold     : cold-side convective HTC [W/(m²·K)]
-//   t_over_k   : vector of thickness/conductivity for each layer [m²·K/W]
+//   h_hot      : hot-side convective HTC [W/(m^2*K)]
+//   h_cold     : cold-side convective HTC [W/(m^2*K)]
+//   t_over_k   : vector of thickness/conductivity for each layer [m^2*K/W]
 //
-// Returns: heat flux q [W/m²]
+// Returns: heat flux q [W/m^2]
 double heat_flux_from_T_at_edge(double T_measured, std::size_t edge_idx,
                                 double T_hot, double T_cold, double h_hot,
                                 double h_cold,
@@ -422,11 +422,11 @@ double heat_flux_from_T_at_edge(double T_measured, std::size_t edge_idx,
 //   T_measured     : measured temperature [K]
 //   depth_from_hot : depth from hot surface into wall [m]
 //   T_hot, T_cold  : bulk fluid temperatures [K]
-//   h_hot, h_cold  : convective HTCs [W/(m²·K)]
+//   h_hot, h_cold  : convective HTCs [W/(m^2*K)]
 //   thicknesses    : vector of layer thicknesses [m]
-//   conductivities : vector of layer thermal conductivities [W/(m·K)]
+//   conductivities : vector of layer thermal conductivities [W/(m*K)]
 //
-// Returns: heat flux q [W/m²]
+// Returns: heat flux q [W/m^2]
 // Throws if depth is outside the wall or negative
 double heat_flux_from_T_at_depth(double T_measured, double depth_from_hot,
                                  double T_hot, double T_cold, double h_hot,
@@ -440,10 +440,10 @@ double heat_flux_from_T_at_depth(double T_measured, double depth_from_hot,
 // Parameters:
 //   T_measured : measured temperature at edge [K]
 //   edge_idx   : edge index
-//   q          : known heat flux [W/m²] (positive = hot to cold)
-//   h_hot      : hot-side HTC [W/(m²·K)]
-//   h_cold     : cold-side HTC [W/(m²·K)]
-//   t_over_k   : layer resistances [m²·K/W]
+//   q          : known heat flux [W/m^2] (positive = hot to cold)
+//   h_hot      : hot-side HTC [W/(m^2*K)]
+//   h_cold     : cold-side HTC [W/(m^2*K)]
+//   t_over_k   : layer resistances [m^2*K/W]
 //   solve_for  : "hot" or "cold" - which bulk temperature to solve for
 //
 // Returns: inferred bulk fluid temperature [K]
@@ -470,29 +470,29 @@ double bulk_T_from_edge_T_and_q(double T_measured, std::size_t edge_idx,
 //          (R_hot_to_edge/R_total)
 //
 // Therefore:
-//   ∂T_edge/∂T_hot  = R_edge_to_cold / R_total  (always positive, ≤1)
-//   ∂T_edge/∂T_cold = R_hot_to_edge / R_total   (always positive, ≤1)
+//   dT_edge/dT_hot  = R_edge_to_cold / R_total  (always positive, <=1)
+//   dT_edge/dT_cold = R_hot_to_edge / R_total   (always positive, <=1)
 //   Sum = 1 (as expected for linear interpolation)
 
 // Sensitivity of edge temperature to hot-side bulk temperature change
-// Returns: ∂T_edge/∂T_hot [-] (dimensionless, 0 to 1)
+// Returns: dT_edge/dT_hot [-] (dimensionless, 0 to 1)
 double dT_edge_dT_hot(std::size_t edge_idx, double h_hot, double h_cold,
                       const std::vector<double> &t_over_k);
 
 // Sensitivity of edge temperature to cold-side bulk temperature change
-// Returns: ∂T_edge/∂T_cold [-] (dimensionless, 0 to 1)
+// Returns: dT_edge/dT_cold [-] (dimensionless, 0 to 1)
 double dT_edge_dT_cold(std::size_t edge_idx, double h_hot, double h_cold,
                        const std::vector<double> &t_over_k);
 
 // Both sensitivities at once (more efficient)
-// Returns: {∂T_edge/∂T_hot, ∂T_edge/∂T_cold}
+// Returns: {dT_edge/dT_hot, dT_edge/dT_cold}
 std::pair<double, double> dT_edge_dT_bulk(std::size_t edge_idx, double h_hot,
                                           double h_cold,
                                           const std::vector<double> &t_over_k);
 
 // Sensitivity of edge temperature to heat flux change
-// Returns: ∂T_edge/∂q [K·m²/W] (negative for edges closer to hot side)
-// Useful for: "If heat flux increases by 100 W/m², how does edge T change?"
+// Returns: dT_edge/dq [K*m^2/W] (negative for edges closer to hot side)
+// Useful for: "If heat flux increases by 100 W/m^2, how does edge T change?"
 double dT_edge_dq(std::size_t edge_idx, double h_hot,
                   const std::vector<double> &t_over_k);
 
@@ -512,16 +512,16 @@ inline double capacity_ratio(double C_min, double C_max) {
 }
 
 // Effectiveness for counter-flow heat exchanger
-// ε = (1 - exp(-NTU*(1-C_r))) / (1 - C_r*exp(-NTU*(1-C_r)))
-// For C_r = 1: ε = NTU / (1 + NTU)
+// eps = (1 - exp(-NTU*(1-C_r))) / (1 - C_r*exp(-NTU*(1-C_r)))
+// For C_r = 1: eps = NTU / (1 + NTU)
 double effectiveness_counterflow(double NTU, double C_r);
 
 // Effectiveness for parallel-flow heat exchanger
-// ε = (1 - exp(-NTU*(1+C_r))) / (1 + C_r)
+// eps = (1 - exp(-NTU*(1+C_r))) / (1 + C_r)
 double effectiveness_parallelflow(double NTU, double C_r);
 
 // Actual heat transfer from effectiveness
-// Q = ε * C_min * (T_hot_in - T_cold_in)
+// Q = eps * C_min * (T_hot_in - T_cold_in)
 inline double heat_rate_from_effectiveness(double epsilon, double C_min,
                                            double T_hot_in, double T_cold_in) {
   return epsilon * C_min * (T_hot_in - T_cold_in);
@@ -539,13 +539,13 @@ double nusselt_circular_channel(const State &s, double velocity, double diameter
                                 bool heating = true, double roughness = 0.0);
 
 
-// Heat transfer coefficient for circular channel flow [W/(m²·K)]
+// Heat transfer coefficient for circular channel flow [W/(m^2*K)]
 double htc_circular_channel(const State &s, double velocity, double diameter,
                             bool heating = true, double roughness = 0.0);
 
 
 // Composite function: compute HTC, Nu, and Re from thermodynamic state
-// Returns: tuple (h [W/(m²·K)], Nu [-], Re [-])
+// Returns: tuple (h [W/(m^2*K)], Nu [-], Re [-])
 //
 // Parameters:
 //   T           : bulk static temperature [K]
@@ -562,11 +562,11 @@ double htc_circular_channel(const State &s, double velocity, double diameter,
 //   diameter    : channel diameter [m]
 //   correlation : "gnielinski" (default), "dittus_boelter", "sieder_tate",
 //   "petukhov" heating     : true for heating, false for cooling (affects
-//   Dittus-Boelter) mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity
+//   Dittus-Boelter) mu_ratio    : mu_bulk / mu_wall for Sieder-Tate viscosity
 //   correction (default: 1.0) roughness   : absolute roughness [m] (default:
 //   0.0 = smooth channel)
 //
-// Automatically computes: ρ, μ, k, Pr, Re from (T, P, X)
+// Automatically computes: rho, mu, k, Pr, Re from (T, P, X)
 // Selects appropriate correlation and handles laminar flow (Re < 2300)
 // Selects appropriate correlation and handles laminar flow (Re < 2300)
 std::tuple<double, double, double>
@@ -585,7 +585,7 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
 // All properties are evaluated from (T, P, X) in a single pass.
 //
 // T_aw is always computed continuously for all M:
-//   T_aw = T_static + r * v² / (2 * cp)
+//   T_aw = T_static + r * v^2 / (2 * cp)
 //   r = Pr^(1/3) turbulent, Pr^(1/2) laminar
 //   At v=0: T_aw = T_static exactly (no discontinuity, no threshold).
 //   This keeps the Jacobian smooth for network solvers.
@@ -595,11 +595,11 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
 // f meaning depends on geometry:
 //   smooth / ribbed / dimpled : Darcy friction factor [-]
 //   pin_fin                   : pin-array friction coefficient [-]
-//                               (dP = N_rows * f * rho*v_max²/2)
+//                               (dP = N_rows * f * rho*v_max^2/2)
 //   impingement               : jet-plate loss coefficient [-]
-//                               (dP = f * rho*v_jet²/2)
+//                               (dP = f * rho*v_jet^2/2)
 struct ChannelResult {
-  double h;  // convective HTC [W/(m²·K)]
+  double h;  // convective HTC [W/(m^2*K)]
   double Nu; // Nusselt number [-]
   double
       Re; // Reynolds number [-]  (hydraulic D or pin D depending on geometry)
@@ -608,13 +608,13 @@ struct ChannelResult {
   double dP;   // pressure drop [Pa]
   double M;    // Mach number [-]  (computed internally from v/a(T,X))
   double T_aw; // adiabatic wall temperature [K]  (always computed, see above)
-  double q;    // heat flux [W/m²]  (nan if T_wall not supplied)
+  double q;    // heat flux [W/m^2]  (nan if T_wall not supplied)
 
-  // Jacobians — derivatives w.r.t. mass flow rate and temperature
+  // Jacobians -- derivatives w.r.t. mass flow rate and temperature
   // These enable network solver coupling with analytical gradients
-  double dh_dmdot = 0.0;     // ∂h/∂ṁ  [W/(m²·K·kg/s)]
-  double dh_dT = 0.0;        // ∂h/∂T  [W/(m²·K²)]
-  double ddP_dmdot = 0.0;    // ∂(dP)/∂ṁ [Pa·s/kg]
+  double dh_dmdot = 0.0;     // dh/dm_dot  [W/(m^2*K*kg/s)]
+  double dh_dT = 0.0;        // dh/dT  [W/(m^2*K^2)]
+  double ddP_dmdot = 0.0;    // d(dP)/dm_dot [Pa*s/kg]
   // d(dP)/d(velocity) [Pa*s/m]. Prefer this over ddP_dmdot when chaining
   // from a caller's own mass flow: ddP_dmdot is taken w.r.t. the mass flow
   // through THIS correlation's internal flow area (the pin-array minimum
@@ -623,16 +623,16 @@ struct ChannelResult {
   // 45x for a 25 mm channel over a 3 mm pin array. Velocity is the
   // quantity the caller actually passes in, so it needs no such factor.
   double ddP_dvelocity = 0.0;
-  double ddP_dT = 0.0;       // ∂(dP)/∂T [Pa/K]
-  double dT_aw_dmdot = 0.0;  // ∂T_aw/∂ṁ [K·s/kg]
-  double dT_aw_dT = 0.0;     // ∂T_aw/∂T [-] (≈1 at low Mach)
+  double ddP_dT = 0.0;       // d(dP)/dT [Pa/K]
+  double dT_aw_dmdot = 0.0;  // dT_aw/dm_dot [K*s/kg]
+  double dT_aw_dT = 0.0;     // dT_aw/dT [-] (~=1 at low Mach)
   // dT_aw/dP [K/Pa] at fixed mass flow and T: the dynamic rise r v^2/(2 cp)
   // with v = mdot/(rho A), rho ~ P, so -2 (T_aw - T)/P. h does not move with
   // P at fixed mdot (Re, Pr, k do not). The wall relay's pressure column (#496).
   double dT_aw_dP = 0.0;
-  double dq_dmdot = 0.0;     // ∂q/∂ṁ  [W·s/(m²·kg)]
-  double dq_dT = 0.0;        // ∂q/∂T  [W/(m²·K)]
-  double dq_dT_hot = 0.0;   // ∂q/∂T_hot [W/(m²·K)]  (= -h when T_hot finite)
+  double dq_dmdot = 0.0;     // dq/dm_dot  [W*s/(m^2*kg)]
+  double dq_dT = 0.0;        // dq/dT  [W/(m^2*K)]
+  double dq_dT_hot = 0.0;   // dq/dT_hot [W/(m^2*K)]  (= -h when T_hot finite)
   // Gradients in the MASS fractions at fixed mdot, T and P (#717): the
   // transport properties, cp, rho and the recovery factor move with the
   // composition. Filled by channel_smooth; EMPTY for a correlation that does
@@ -642,19 +642,19 @@ struct ChannelResult {
 };
 
 // -------------------------------------------------------------
-// WallCouplingResult — heat transfer through a wall between two elements
+// WallCouplingResult -- heat transfer through a wall between two elements
 // -------------------------------------------------------------
 
 struct WallCouplingResult {
-  double Q = 0.0;            // heat transfer rate [W] (positive A→B)
+  double Q = 0.0;            // heat transfer rate [W] (positive A->B)
   double T_hot = 0.0;       // wall temperature [K] (hot-side surface)
-  double dQ_dh_a = 0.0;      // ∂Q/∂h_a [W·m²·K/W]
-  double dQ_dh_b = 0.0;      // ∂Q/∂h_b [W·m²·K/W]
-  double dQ_dT_aw_a = 0.0;   // ∂Q/∂T_aw_a [W/K]
-  double dQ_dT_aw_b = 0.0;   // ∂Q/∂T_aw_b [W/K]
+  double dQ_dh_a = 0.0;      // dQ/dh_a [W*m^2*K/W]
+  double dQ_dh_b = 0.0;      // dQ/dh_b [W*m^2*K/W]
+  double dQ_dT_aw_a = 0.0;   // dQ/dT_aw_a [W/K]
+  double dQ_dT_aw_b = 0.0;   // dQ/dT_aw_b [W/K]
   // wall_exchange_and_jacobian only (0 for the linear coupling):
-  double dQ_dC_a = 0.0;      // ∂Q/∂C_a [K]
-  double dQ_dC_b = 0.0;      // ∂Q/∂C_b [K]
+  double dQ_dC_a = 0.0;      // dQ/dC_a [K]
+  double dQ_dC_b = 0.0;      // dQ/dC_b [K]
   double UA = 0.0;           // overall conductance [W/K]
   double effectiveness = 0.0;  // Q / (C_min dT) [-] (0 when C_min dT = 0)
 };
@@ -667,13 +667,13 @@ constexpr double WALL_HTC_KNEE = 1e-2;
 // Compute heat transfer and Jacobians for wall coupling between two elements
 //
 // Parameters:
-//   h_a, h_b    : convective HTCs on sides A and B [W/(m²·K)]
+//   h_a, h_b    : convective HTCs on sides A and B [W/(m^2*K)]
 //   T_aw_a, T_aw_b : adiabatic wall temperatures on sides A and B [K]
-//   t_over_k    : wall_thickness / wall_conductivity [m²·K/W]
-//   A           : effective heat transfer area [m²]
+//   t_over_k    : wall_thickness / wall_conductivity [m^2*K/W]
+//   A           : effective heat transfer area [m^2]
 //
 // Returns:
-//   WallCouplingResult with Q (positive = A→B) and analytical Jacobians
+//   WallCouplingResult with Q (positive = A->B) and analytical Jacobians
 //
 // Uses overall_htc_wall(h_a, h_b, t_over_k) internally.
 // Derivatives are analytical since U = 1 / (1/h_a + t/k + 1/h_b).
@@ -685,8 +685,8 @@ WallCouplingResult wall_coupling_and_jacobian(
 
 // Multi-layer wall coupling
 // Parameters:
-//   t_over_k_layers : thicknesses / conductivities for each layer [m²·K/W]
-//   R_fouling : additional fouling resistance [m²·K/W]
+//   t_over_k_layers : thicknesses / conductivities for each layer [m^2*K/W]
+//   R_fouling : additional fouling resistance [m^2*K/W]
 WallCouplingResult wall_coupling_and_jacobian(
     double h_a, double T_aw_a,
     double h_b, double T_aw_b,
@@ -722,13 +722,13 @@ WallCouplingResult wall_exchange_and_jacobian(
     bool counterflow);
 
 // -------------------------------------------------------------
-// High-level channel functions — each returns a ChannelResult
+// High-level channel functions -- each returns a ChannelResult
 // -------------------------------------------------------------
 //
 // All functions:
 //   - evaluate fluid properties (rho, mu, k, Pr, cp) once from (T, P, X)
 //   - compute M = v / a(T, X) internally
-//   - compute T_aw = T_static + r*v²/(2*cp) continuously
+//   - compute T_aw = T_static + r*v^2/(2*cp) continuously
 //   - set q = h*(T_aw - T_wall) if T_wall is finite, else q = nan
 //
 // User contract: choose the model that matches the geometry.

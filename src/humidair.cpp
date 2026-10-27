@@ -17,16 +17,16 @@ const std::unordered_map<std::string, double> dry_air_composition = {
 
 // Saturation vapor pressure constants
 // Reference: Huang (2018), doi:10.1175/JAMC-D-17-0334.1
-// Base equation: Ps = exp(a - b/(t + d1)) / (t + d2)^c, t in °C, Ps in Pa
+// Base equation: Ps = exp(a - b/(t + d1)) / (t + d2)^c, t in degC, Ps in Pa
 
-// For water vapor (t > 0°C) - Equation (17)
+// For water vapor (t > 0degC) - Equation (17)
 static constexpr double WATER_A = 34.494;
 static constexpr double WATER_B = 4924.99;
 static constexpr double WATER_D1 = 237.1;
 static constexpr double WATER_D2 = 105.0;
 static constexpr double WATER_C = 1.57;
 
-// For ice (t ≤ 0°C) - Equation (18)
+// For ice (t <= 0degC) - Equation (18)
 static constexpr double ICE_A = 43.494;
 static constexpr double ICE_B = 6545.8;
 static constexpr double ICE_D1 = 278.0;
@@ -34,15 +34,15 @@ static constexpr double ICE_D2 = 868.0;
 static constexpr double ICE_C = 2.0;
 
 // Validated range [K]
-static constexpr double SVP_T_MIN = 173.15; // -100°C
-static constexpr double SVP_T_MAX = 373.15; // +100°C
+static constexpr double SVP_T_MIN = 173.15; // -100degC
+static constexpr double SVP_T_MAX = 373.15; // +100degC
 
 // Maximum relative extrapolation beyond validated range before throwing
 // 5% of the range span (200 K) = 10 K
 static constexpr double SVP_EXTRAP_TOL = 0.05;
 
 // Water vapor saturation pressure [Pa] using Huang (2018)
-// Validated: -100°C to +100°C (173.15–373.15 K)
+// Validated: -100degC to +100degC (173.15-373.15 K)
 // Extrapolation up to 5% of range span (~10 K) is allowed silently.
 // Beyond that, throws std::out_of_range.
 double saturation_vapor_pressure(double T) {
@@ -56,7 +56,7 @@ double saturation_vapor_pressure(double T) {
         std::to_string(SVP_T_MAX + tol) + "] K");
   }
 
-  // Convert temperature from K to °C
+  // Convert temperature from K to degC
   double t = T - 273.15;
 
   // Calculate saturation vapor pressure
@@ -262,9 +262,9 @@ static double d_saturation_vapor_pressure_dT(double T) {
 // where hfg(Twb) = 2501000 - 2381*(Twb - 273.15) [J/kg] (linear fit, ASHRAE)
 double wet_bulb_temperature(double T, double P, double RH) {
   const double W = humidity_ratio(T, P, RH);
-  static constexpr double cp_air = 1005.0; // J/(kg·K)
+  static constexpr double cp_air = 1005.0; // J/(kg*K)
 
-  // hfg as a function of Twb: linear approximation valid 0-100°C
+  // hfg as a function of Twb: linear approximation valid 0-100degC
   auto hfg = [](double Tw) { return 2501000.0 - 2381.0 * (Tw - 273.15); };
 
   // Ws(Twb): saturation humidity ratio at wet-bulb temperature
@@ -336,11 +336,11 @@ double humid_air_enthalpy(double T, double P, double RH) {
 
   // Calculate enthalpy of dry air
   double h_da =
-      1005.0 * (T - 273.15); // cp_air * (T - T_ref), cp_air = 1005 J/(kg·K)
+      1005.0 * (T - 273.15); // cp_air * (T - T_ref), cp_air = 1005 J/(kg*K)
 
   // Calculate enthalpy of water vapor
   // h_wv = h_fg + cp_wv * (T - T_ref)
-  // h_fg = 2501000 J/kg at 0°C, cp_wv = 1860 J/(kg·K)
+  // h_fg = 2501000 J/kg at 0degC, cp_wv = 1860 J/(kg*K)
   double h_wv = 2501000.0 + 1860.0 * (T - 273.15);
 
   // Calculate total enthalpy of humid air
@@ -362,14 +362,14 @@ double humid_air_enthalpy_nasa9(double T, double P, double RH) {
   return h_mix_J_per_mol * 1000.0 / MW_mix * (1.0 + W);
 }
 
-// Calculate density of humid air [kg/m³]
+// Calculate density of humid air [kg/m^3]
 double humid_air_density(double T, double P, double RH) {
   // Calculate humidity ratio
   double W = humidity_ratio(T, P, RH);
 
   // Calculate gas constant for humid air
   // R_ha = R_da * (1 + W/0.621945) / (1 + W)
-  // R_da = 287.058 J/(kg·K)
+  // R_da = 287.058 J/(kg*K)
   double R_ha = 287.058 * (1.0 + W / 0.621945) / (1.0 + W);
 
   // Calculate density using ideal gas law

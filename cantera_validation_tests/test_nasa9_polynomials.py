@@ -127,7 +127,7 @@ class TestNASA9Polynomials:
     ):
         """Test enthalpy via Cp integration (validates polynomial integration).
 
-        Computes ΔH = ∫Cp dT numerically and compares CombAero vs Cantera.
+        Computes Delta_H = integral Cp dT numerically and compares CombAero vs Cantera.
         This validates the polynomial integration without reference state dependency.
         Expected: < 0.001% deviation
         """
@@ -135,7 +135,7 @@ class TestNASA9Polynomials:
         T_ref = 298.15  # Reference temperature [K]
 
         print(f"\n{'=' * 80}")
-        print(f"NASA-9 Polynomial Validation: ∫Cp dT Integration (from {T_ref} K)")
+        print(f"NASA-9 Polynomial Validation: integral Cp dT Integration (from {T_ref} K)")
         print(f"{'=' * 80}")
 
         max_deviations = {}
@@ -153,14 +153,14 @@ class TestNASA9Polynomials:
 
             print(f"\n{species}:")
             print(
-                f"  {'T [K]':>8s}  {'∫Cp dT (CB)':>14s}  {'∫Cp dT (CT)':>14s}  {'Deviation':>12s}"
+                f"  {'T [K]':>8s}  {'Delta_H (CB)':>14s}  {'Delta_H (CT)':>14s}  {'Deviation':>12s}"
             )
 
             for T_target in test_temperatures:
                 if T_target <= T_ref:
                     continue  # Skip temperatures at or below reference
 
-                # Numerical integration: ∫Cp dT from T_ref to T_target
+                # Numerical integration: integral Cp dT from T_ref to T_target
                 n_points = 50
                 dT = (T_target - T_ref) / n_points
 
@@ -194,11 +194,11 @@ class TestNASA9Polynomials:
 
                 # Assert < 0.01% deviation (validates polynomial integration)
                 assert max_dev < 0.0001, (
-                    f"{species} ∫Cp dT deviation {max_dev * 100:.6f}% exceeds 0.01%"
+                    f"{species} integral Cp dT deviation {max_dev * 100:.6f}% exceeds 0.01%"
                 )
 
         print(f"\n{'=' * 80}")
-        print("Summary: ∫Cp dT Integration")
+        print("Summary: integral Cp dT Integration")
         print(f"{'=' * 80}")
         for species, dev in max_deviations.items():
             print(f"  {species:6s}: {dev * 100:8.6f}% max deviation")
@@ -207,7 +207,7 @@ class TestNASA9Polynomials:
     def test_entropy_evaluation(
         self, combaero, nasa9_gas, test_species, test_temperatures, species_mapping
     ):
-        """Test ΔS polynomial evaluation using s(T) - s(Tref).
+        """Test Delta_S polynomial evaluation using s(T) - s(Tref).
 
         Compares entropy CHANGES (not absolute values) to avoid reference state issues.
         """
@@ -216,7 +216,7 @@ class TestNASA9Polynomials:
         P = 101325.0  # Pressure [Pa]
 
         print(f"\n{'=' * 80}")
-        print(f"NASA-9 Polynomial Validation: ΔS Evaluation (relative to {T_ref} K)")
+        print(f"NASA-9 Polynomial Validation: Delta_S Evaluation (relative to {T_ref} K)")
         print(f"{'=' * 80}")
 
         max_deviations = {}
@@ -239,7 +239,7 @@ class TestNASA9Polynomials:
             s_ref_ct = nasa9_gas.entropy_mole / 1000.0  # J/kmol -> J/mol
 
             print(f"\n{species}:")
-            print("     T [K]     ΔS (CB)       ΔS (CT)       Deviation")
+            print("     T [K]     Delta_S (CB)  Delta_S (CT)  Deviation")
 
             for T in test_temperatures:
                 X = np.zeros(num_species())
@@ -249,11 +249,11 @@ class TestNASA9Polynomials:
                 nasa9_gas.TPX = T, P, {ct_name: 1.0}
                 s_ct = nasa9_gas.entropy_mole / 1000.0  # J/kmol -> J/mol
 
-                # Calculate ΔS = S(T) - S(Tref)
+                # Calculate Delta_S = S(T) - S(Tref)
                 delta_s_cb = s_cb - s_ref_cb
                 delta_s_ct = s_ct - s_ref_ct
 
-                # Relative deviation in ΔS
+                # Relative deviation in Delta_S
                 deviation = (
                     abs(delta_s_cb - delta_s_ct) / abs(delta_s_ct)
                     if abs(delta_s_ct) > 1e-6
@@ -274,11 +274,11 @@ class TestNASA9Polynomials:
 
                 # Assert < 0.01% deviation (same precision as Cp test)
                 assert max_dev < 0.0001, (
-                    f"{species} ΔS deviation {max_dev * 100:.6f}% exceeds 0.01%"
+                    f"{species} Delta_S deviation {max_dev * 100:.6f}% exceeds 0.01%"
                 )
 
         print(f"\n{'=' * 80}")
-        print("Summary: ΔS = S(T) - S(Tref) Evaluation")
+        print("Summary: Delta_S = S(T) - S(Tref) Evaluation")
         print(f"{'=' * 80}")
         for species, dev in max_deviations.items():
             print(f"  {species:6s}: {dev * 100:8.6f}% max deviation")

@@ -12,7 +12,7 @@
 #include <unordered_map>
 
 // Haaland correlation (1983)
-// 1/√f = -1.8 * log10( (ε/D / 3.7)^1.11 + 6.9/Re )
+// 1/sqrt(f) = -1.8 * log10( (eps/D / 3.7)^1.11 + 6.9/Re )
 // Accuracy: ~2-3% vs Colebrook
 double friction_haaland(double Re, double e_D) {
   // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
@@ -31,10 +31,10 @@ double friction_haaland(double Re, double e_D) {
 }
 
 // Serghides correlation (1984) - Steffensen acceleration on Colebrook
-// A = -2 * log10( ε/D/3.7 + 12/Re )
-// B = -2 * log10( ε/D/3.7 + 2.51*A/Re )
-// C = -2 * log10( ε/D/3.7 + 2.51*B/Re )
-// 1/√f = A - (B-A)² / (C - 2B + A)
+// A = -2 * log10( eps/D/3.7 + 12/Re )
+// B = -2 * log10( eps/D/3.7 + 2.51*A/Re )
+// C = -2 * log10( eps/D/3.7 + 2.51*B/Re )
+// 1/sqrt(f) = A - (B-A)^2 / (C - 2B + A)
 // Accuracy: <0.3% vs Colebrook
 double friction_serghides(double Re, double e_D) {
   // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
@@ -44,8 +44,8 @@ double friction_serghides(double Re, double e_D) {
     throw std::invalid_argument("friction_serghides: e_D must be non-negative");
   }
 
-  // Note: In Serghides, A/B/C are successive approximations to 1/√f
-  // The term 2.51*A/Re corresponds to 2.51/(Re*√f) when √f ≈ 1/A
+  // Note: In Serghides, A/B/C are successive approximations to 1/sqrt(f)
+  // The term 2.51*A/Re corresponds to 2.51/(Re*sqrt(f)) when sqrt(f) ~= 1/A
   double A = -2.0 * std::log10(e_D / serghides::coeff_roughness +
                                serghides::coeff_reynolds_A / Re);
   double B = -2.0 * std::log10(e_D / serghides::coeff_roughness +
@@ -66,7 +66,7 @@ double friction_serghides(double Re, double e_D) {
 }
 
 // Colebrook-White equation (1939) - implicit, solved iteratively
-// 1/√f = -2 * log10( ε/D/3.7 + 2.51/(Re*√f) )
+// 1/sqrt(f) = -2 * log10( eps/D/3.7 + 2.51/(Re*sqrt(f)) )
 // Uses Serghides as initial guess, Newton-Raphson iteration.
 double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
   // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
@@ -80,9 +80,9 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
   // ~2-3%)
   double f = friction_serghides(Re, e_D);
 
-  // Newton-Raphson iteration on: F(x) = x + 2*log10(ε/D/3.7 + 2.51*x/Re) = 0
-  // where x = 1/√f
-  // Note: 2.51/(Re*√f) = 2.51/(Re/x) = 2.51*x/Re
+  // Newton-Raphson iteration on: F(x) = x + 2*log10(eps/D/3.7 + 2.51*x/Re) = 0
+  // where x = 1/sqrt(f)
+  // Note: 2.51/(Re*sqrt(f)) = 2.51/(Re/x) = 2.51*x/Re
   const double ln10 = std::log(10.0);
   double x = 1.0 / std::sqrt(f);
 

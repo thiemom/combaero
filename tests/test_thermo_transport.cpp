@@ -353,7 +353,7 @@ TEST_F(ThermoTransportTest, TransportProperties) {
     EXPECT_GT(mu, 1.0e-6);  // Lower bound for gas viscosity
     EXPECT_LT(mu, 1.0e-4);  // Upper bound for gas viscosity
 
-    // Test thermal diffusivity: α = k / (ρ * cp)
+    // Test thermal diffusivity: alpha = k / (rho * cp)
     double alpha = thermal_diffusivity(T, P, air_composition);
     double k_val = thermal_conductivity(T, P, air_composition);
     double rho_val = density(T, P, air_composition);
@@ -953,9 +953,9 @@ TEST_F(ThermoTransportTest, ThermoPropertiesNaturalGasMixture) {
     ng.set_TPX(300.0, 101325.0, X_ng);
 
     // Verify thermo properties are reasonable
-    EXPECT_GT(ng.cp(), 1500.0);  // J/(kg·K) - mass-specific heat capacity
+    EXPECT_GT(ng.cp(), 1500.0);  // J/(kg*K) - mass-specific heat capacity
     EXPECT_LT(ng.cp(), 3000.0);
-    EXPECT_GT(ng.rho(), 0.5);  // kg/m³
+    EXPECT_GT(ng.rho(), 0.5);  // kg/m^3
     EXPECT_LT(ng.rho(), 1.5);
     EXPECT_GT(ng.mw(), 16.0);  // g/mol (CH4 is 16)
     EXPECT_LT(ng.mw(), 20.0);
@@ -964,7 +964,7 @@ TEST_F(ThermoTransportTest, ThermoPropertiesNaturalGasMixture) {
     EXPECT_LT(h(ng.T, ng.X), 0.0);
 
     // Transport properties
-    EXPECT_GT(ng.mu(), 1e-6);  // Pa·s
+    EXPECT_GT(ng.mu(), 1e-6);  // Pa*s
     EXPECT_LT(ng.mu(), 2e-5);
     EXPECT_GT(ng.Pr(), 0.6);
     EXPECT_LT(ng.Pr(), 1.0);
@@ -1684,7 +1684,7 @@ TEST_F(ThermoTransportTest, ReformingWithExistingCOH2) {
 }
 
 // Test element conservation in CH4 reforming
-// Note: SMR changes total moles (Δn=2), so we need to account for this
+// Note: SMR changes total moles (Delta_n=2), so we need to account for this
 // when checking element balance. We use the ratio of elements to N2
 // (which is inert) to verify conservation.
 TEST_F(ThermoTransportTest, ReformingCh4ElementConservation) {
@@ -2533,7 +2533,7 @@ TEST_F(ThermoTransportTest, NozzleFlowSubsonicBasic) {
     double T0 = 500.0;      // K
     double P0 = 150000.0;   // Pa (1.5 bar)
     double P_back = 120000.0; // Pa - mild expansion, subsonic
-    double A_eff = 0.001;   // m²
+    double A_eff = 0.001;   // m^2
 
     auto sol = nozzle_flow(T0, P0, P_back, A_eff, X_air);
 
@@ -2864,7 +2864,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConservation) {
     double h0_out = h_out + 0.5 * u_out * u_out;
 
     // Stagnation enthalpy should be conserved to machine precision
-    // Fanno flow solver conserves h0 = h + u²/2 via energy equation at each RK4 step
+    // Fanno flow solver conserves h0 = h + u^2/2 via energy equation at each RK4 step
     EXPECT_NEAR(h0_out, h0_in, h0_in * 1e-10);  // ~machine precision
 }
 
@@ -2902,7 +2902,7 @@ TEST_F(ThermoTransportTest, FannoFlowEnergyConvergence) {
     // Verify energy conservation is at machine precision level
     // Previous test had units bug: h_in = sol.inlet.h() / mw * 1000.0 (WRONG!)
     // State.h() already returns J/kg, no conversion needed.
-    // With correct units: error_200 ≈ 8e-14%, error_2000 ≈ 4e-14% (machine precision!)
+    // With correct units: error_200 ~= 8e-14%, error_2000 ~= 4e-14% (machine precision!)
     // This proves Fanno flow solver conserves energy perfectly.
 
     // Print actual errors for diagnostic purposes
@@ -2984,9 +2984,9 @@ TEST(Quasi1DNozzle, SubsonicConvergingDiverging) {
     double P0 = 500000.0;  // Pa
     double P_exit = 450000.0;  // High back pressure -> subsonic
 
-    double A_inlet = 0.01;   // m²
-    double A_throat = 0.005; // m²
-    double A_exit = 0.01;    // m²
+    double A_inlet = 0.01;   // m^2
+    double A_throat = 0.005; // m^2
+    double A_exit = 0.01;    // m^2
     double x_throat = 0.1;   // m
     double x_exit = 0.2;     // m
 
@@ -3131,7 +3131,7 @@ TEST(Quasi1DNozzle, AreaProfileInterface) {
 }
 
 TEST(Quasi1DNozzle, PolynomialArea) {
-    // Test with polynomial area: A(x) = 0.01 - 0.1*x + 0.5*x²
+    // Test with polynomial area: A(x) = 0.01 - 0.1*x + 0.5*x^2
     // This gives a minimum at x = 0.1
     std::vector<double> X_air = {0.79, 0.21, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -3139,7 +3139,7 @@ TEST(Quasi1DNozzle, PolynomialArea) {
     double P0 = 400000.0;
     double P_exit = 350000.0;
 
-    std::vector<double> coeffs = {0.01, -0.1, 0.5};  // a0 + a1*x + a2*x²
+    std::vector<double> coeffs = {0.01, -0.1, 0.5};  // a0 + a1*x + a2*x^2
 
     auto sol = nozzle_quasi1d_poly(T0, P0, P_exit, coeffs, 0.0, 0.2, X_air, 25);
 
@@ -3192,12 +3192,12 @@ TEST(HeatTransferTest, DittusBoelterBasic) {
     // because Pr^0.4 < Pr^0.3 when Pr < 1
     EXPECT_LT(Nu_heat, Nu_cool);
 
-    // Check approximate value: Nu ≈ 0.023 * 50000^0.8 * 0.7^0.4 ≈ 115
+    // Check approximate value: Nu ~= 0.023 * 50000^0.8 * 0.7^0.4 ~= 115
     EXPECT_NEAR(Nu_heat, 115, 10);
 }
 
 TEST(HeatTransferTest, DittusBoelterValidRange) {
-    // Re < 10000: warns and extrapolates (power law — no divergence)
+    // Re < 10000: warns and extrapolates (power law -- no divergence)
     double Nu_low_Re = 0.0;
     EXPECT_NO_THROW(Nu_low_Re = nusselt_dittus_boelter(5000, 0.7));
     EXPECT_GT(Nu_low_Re, 0.0);
@@ -3325,12 +3325,12 @@ TEST(HeatTransferTest, PetukhovBasic) {
 TEST(HeatTransferTest, HtcFromNusselt) {
     // h = Nu * k / L
     double Nu = 100;
-    double k = 0.026;  // W/(m·K), typical for air
+    double k = 0.026;  // W/(m*K), typical for air
     double D = 0.05;   // m
 
     double h = htc_from_nusselt(Nu, k, D);
 
-    // h = 100 * 0.026 / 0.05 = 52 W/(m²·K)
+    // h = 100 * 0.026 / 0.05 = 52 W/(m^2*K)
     EXPECT_NEAR(h, 52.0, 0.1);
 }
 
@@ -3399,12 +3399,12 @@ TEST(HeatTransferTest, LmtdBasic) {
     // dT1 = 100 - 80 = 20, dT2 = 60 - 20 = 40
     double lmtd_val = lmtd(20.0, 40.0);
 
-    // LMTD = (20 - 40) / ln(20/40) = -20 / ln(0.5) = -20 / -0.693 ≈ 28.85
+    // LMTD = (20 - 40) / ln(20/40) = -20 / ln(0.5) = -20 / -0.693 ~= 28.85
     EXPECT_NEAR(lmtd_val, 28.85, 0.1);
 }
 
 TEST(HeatTransferTest, LmtdEqualDeltaT) {
-    // When dT1 ≈ dT2, should return arithmetic mean
+    // When dT1 ~= dT2, should return arithmetic mean
     double lmtd_val = lmtd(30.0, 30.0);
     EXPECT_NEAR(lmtd_val, 30.0, 0.01);
 
@@ -3415,23 +3415,23 @@ TEST(HeatTransferTest, LmtdEqualDeltaT) {
 
 TEST(HeatTransferTest, LmtdCounterflow) {
     // Counter-flow heat exchanger
-    // Hot: 150°C -> 90°C, Cold: 30°C -> 110°C
+    // Hot: 150degC -> 90degC, Cold: 30degC -> 110degC
     double lmtd_cf = lmtd_counterflow(150 + 273.15, 90 + 273.15,
                                        30 + 273.15, 110 + 273.15);
 
     // dT1 = 150 - 110 = 40, dT2 = 90 - 30 = 60
-    // LMTD = (40 - 60) / ln(40/60) ≈ 49.3 K
+    // LMTD = (40 - 60) / ln(40/60) ~= 49.3 K
     EXPECT_NEAR(lmtd_cf, 49.3, 0.5);
 }
 
 TEST(HeatTransferTest, LmtdParallelflow) {
     // Parallel-flow heat exchanger
-    // Hot: 150°C -> 90°C, Cold: 30°C -> 70°C
+    // Hot: 150degC -> 90degC, Cold: 30degC -> 70degC
     double lmtd_pf = lmtd_parallelflow(150 + 273.15, 90 + 273.15,
                                         30 + 273.15, 70 + 273.15);
 
     // dT1 = 150 - 30 = 120, dT2 = 90 - 70 = 20
-    // LMTD = (120 - 20) / ln(120/20) = 100 / ln(6) ≈ 55.8 K
+    // LMTD = (120 - 20) / ln(120/20) = 100 / ln(6) ~= 55.8 K
     EXPECT_NEAR(lmtd_pf, 55.8, 0.5);
 }
 
@@ -3445,27 +3445,27 @@ TEST(HeatTransferTest, LmtdInvalidInput) {
 TEST(HeatTransferTest, OverallHtcBasic) {
     // Two convective resistances in series
     // 1/U = 1/h1 + 1/h2
-    double h1 = 100.0;  // W/(m²·K)
-    double h2 = 200.0;  // W/(m²·K)
+    double h1 = 100.0;  // W/(m^2*K)
+    double h2 = 200.0;  // W/(m^2*K)
 
     double U = overall_htc({h1, h2});
 
     // 1/U = 1/100 + 1/200 = 0.01 + 0.005 = 0.015
-    // U = 66.67 W/(m²·K)
+    // U = 66.67 W/(m^2*K)
     EXPECT_NEAR(U, 66.67, 0.1);
 }
 
 TEST(HeatTransferTest, OverallHtcWithWall) {
     // Convection + conduction + convection
-    double h_inner = 500.0;   // W/(m²·K)
-    double h_outer = 50.0;    // W/(m²·K)
+    double h_inner = 500.0;   // W/(m^2*K)
+    double h_outer = 50.0;    // W/(m^2*K)
     double t_wall = 0.003;    // 3 mm
-    double k_wall = 50.0;     // W/(m·K), steel
+    double k_wall = 50.0;     // W/(m*K), steel
 
     double U = overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
 
     // 1/U = 1/500 + 0.003/50 + 1/50 = 0.002 + 0.00006 + 0.02 = 0.02206
-    // U ≈ 45.3 W/(m²·K)
+    // U ~= 45.3 W/(m^2*K)
     EXPECT_NEAR(U, 45.3, 0.5);
 }
 
@@ -3474,7 +3474,7 @@ TEST(HeatTransferTest, OverallHtcWithFouling) {
     double h_outer = 50.0;
     double t_wall = 0.003;
     double k_wall = 50.0;
-    double R_fouling = 0.0002;  // m²·K/W, typical fouling
+    double R_fouling = 0.0002;  // m^2*K/W, typical fouling
 
     double U_clean = overall_htc_wall(h_inner, h_outer, t_wall, k_wall);
     double U_fouled = overall_htc_wall(h_inner, h_outer, t_wall, k_wall, R_fouling);
@@ -3488,8 +3488,8 @@ TEST(HeatTransferTest, OverallHtcWithFouling) {
 }
 
 TEST(HeatTransferTest, ThermalResistance) {
-    double h = 100.0;  // W/(m²·K)
-    double A = 2.0;    // m²
+    double h = 100.0;  // W/(m^2*K)
+    double A = 2.0;    // m^2
 
     double R = thermal_resistance(h, A);
 
@@ -3499,8 +3499,8 @@ TEST(HeatTransferTest, ThermalResistance) {
 
 TEST(HeatTransferTest, ThermalResistanceWall) {
     double t = 0.01;   // 10 mm
-    double k = 50.0;   // W/(m·K)
-    double A = 2.0;    // m²
+    double k = 50.0;   // W/(m*K)
+    double A = 2.0;    // m^2
 
     double R = thermal_resistance_wall(t, k, A);
 
@@ -3510,19 +3510,19 @@ TEST(HeatTransferTest, ThermalResistanceWall) {
 
 TEST(HeatTransferTest, OverallHtcMultiLayer) {
     // Insulated steel pipe: steel 3mm + insulation 50mm
-    double h_inner = 500.0;   // W/(m²·K)
-    double h_outer = 10.0;    // W/(m²·K), natural convection
+    double h_inner = 500.0;   // W/(m^2*K)
+    double h_outer = 10.0;    // W/(m^2*K), natural convection
     double t_steel = 0.003;   // 3 mm
-    double k_steel = 50.0;    // W/(m·K)
+    double k_steel = 50.0;    // W/(m*K)
     double t_insul = 0.05;    // 50 mm
-    double k_insul = 0.04;    // W/(m·K), mineral wool
+    double k_insul = 0.04;    // W/(m*K), mineral wool
 
     double U = overall_htc_wall(h_inner, h_outer,
                                 {t_steel / k_steel, t_insul / k_insul});
 
     // 1/U = 1/500 + 0.003/50 + 0.05/0.04 + 1/10
     //     = 0.002 + 0.00006 + 1.25 + 0.1 = 1.35206
-    // U ≈ 0.74 W/(m²·K)
+    // U ~= 0.74 W/(m^2*K)
     EXPECT_NEAR(U, 0.74, 0.01);
 
     // Insulation dominates - removing it should increase U dramatically
@@ -3535,8 +3535,8 @@ TEST(HeatTransferTest, OverallHtcMultiLayer) {
 // ============================================================
 
 TEST(HeatTransferTest, HeatRate) {
-    double U = 100.0;   // W/(m²·K)
-    double A = 2.0;     // m²
+    double U = 100.0;   // W/(m^2*K)
+    double A = 2.0;     // m^2
     double dT = 50.0;   // K
 
     // Q = U * A * dT = 100 * 2 * 50 = 10000 W
@@ -3544,26 +3544,26 @@ TEST(HeatTransferTest, HeatRate) {
 }
 
 TEST(HeatTransferTest, HeatFlux) {
-    double U = 100.0;   // W/(m²·K)
+    double U = 100.0;   // W/(m^2*K)
     double dT = 50.0;   // K
 
-    // q = U * dT = 100 * 50 = 5000 W/m²
+    // q = U * dT = 100 * 50 = 5000 W/m^2
     EXPECT_DOUBLE_EQ(heat_flux(U, dT), 5000.0);
 }
 
 TEST(HeatTransferTest, HeatTransferArea) {
     double Q = 10000.0;  // W
-    double U = 100.0;    // W/(m²·K)
+    double U = 100.0;    // W/(m^2*K)
     double dT = 50.0;    // K
 
-    // A = Q / (U * dT) = 10000 / (100 * 50) = 2 m²
+    // A = Q / (U * dT) = 10000 / (100 * 50) = 2 m^2
     EXPECT_DOUBLE_EQ(heat_transfer_area(Q, U, dT), 2.0);
 }
 
 TEST(HeatTransferTest, HeatTransferDT) {
     double Q = 10000.0;  // W
-    double U = 100.0;    // W/(m²·K)
-    double A = 2.0;      // m²
+    double U = 100.0;    // W/(m^2*K)
+    double A = 2.0;      // m^2
 
     // dT = Q / (U * A) = 10000 / (100 * 2) = 50 K
     EXPECT_DOUBLE_EQ(heat_transfer_dT(Q, U, A), 50.0);
@@ -3576,26 +3576,26 @@ TEST(HeatTransferTest, HeatTransferDT) {
 TEST(HeatTransferTest, WallTemperatureProfileSingleLayer) {
     double T_hot = 400.0;   // K
     double T_cold = 300.0;  // K
-    double h_hot = 500.0;   // W/(m²·K)
-    double h_cold = 100.0;  // W/(m²·K)
+    double h_hot = 500.0;   // W/(m^2*K)
+    double h_cold = 100.0;  // W/(m^2*K)
     double t_wall = 0.01;   // m
-    double k_wall = 50.0;   // W/(m·K)
+    double k_wall = 50.0;   // W/(m*K)
 
     double q = 0.0;
     std::vector<double> layers = {t_wall / k_wall};
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, layers, 0.0, q);
 
-    // Total R = 1/500 + 0.01/50 + 1/100 = 0.002 + 0.0002 + 0.01 = 0.0122 m²·K/W
-    // q = 100 / 0.0122 ≈ 8197 W/m²
+    // Total R = 1/500 + 0.01/50 + 1/100 = 0.002 + 0.0002 + 0.01 = 0.0122 m^2*K/W
+    // q = 100 / 0.0122 ~= 8197 W/m^2
     EXPECT_NEAR(q, 8197, 10);
 
     // Should have 2 interface temperatures
     ASSERT_EQ(temps.size(), 2u);
 
-    // T_hot_surface = T_hot - q/h_hot = 400 - 8197/500 ≈ 383.6 K
+    // T_hot_surface = T_hot - q/h_hot = 400 - 8197/500 ~= 383.6 K
     EXPECT_NEAR(temps[0], 383.6, 0.5);
 
-    // T_cold_surface = T_hot_surface - q*(t/k) ≈ 383.6 - 8197*0.0002 ≈ 382.0 K
+    // T_cold_surface = T_hot_surface - q*(t/k) ~= 383.6 - 8197*0.0002 ~= 382.0 K
     EXPECT_NEAR(temps[1], 382.0, 0.5);
 
     // Verify: T_cold_surface - q/h_cold should equal T_cold
@@ -3605,14 +3605,14 @@ TEST(HeatTransferTest, WallTemperatureProfileSingleLayer) {
 TEST(HeatTransferTest, WallTemperatureProfileMultiLayer) {
     double T_hot = 500.0;   // K
     double T_cold = 300.0;  // K
-    double h_hot = 500.0;   // W/(m²·K)
-    double h_cold = 50.0;   // W/(m²·K)
+    double h_hot = 500.0;   // W/(m^2*K)
+    double h_cold = 50.0;   // W/(m^2*K)
 
     // Steel + insulation
     double t_steel = 0.005;   // m
-    double k_steel = 50.0;    // W/(m·K)
+    double k_steel = 50.0;    // W/(m*K)
     double t_insul = 0.05;    // m
-    double k_insul = 0.04;    // W/(m·K)
+    double k_insul = 0.04;    // W/(m*K)
 
     double q = 0.0;
     auto temps = wall_temperature_profile(T_hot, T_cold, h_hot, h_cold,
@@ -3644,8 +3644,8 @@ TEST(HeatTransferTest, WallTemperatureProfileMultiLayer) {
 // ============================================================
 
 TEST(HeatTransferTest, NTU) {
-    double U = 100.0;     // W/(m²·K)
-    double A = 10.0;      // m²
+    double U = 100.0;     // W/(m^2*K)
+    double A = 10.0;      // m^2
     double C_min = 500.0; // W/K
 
     // NTU = U * A / C_min = 100 * 10 / 500 = 2
@@ -3658,33 +3658,33 @@ TEST(HeatTransferTest, CapacityRatio) {
 }
 
 TEST(HeatTransferTest, EffectivenessCounterflowBalanced) {
-    // For C_r = 1: ε = NTU / (1 + NTU)
+    // For C_r = 1: eps = NTU / (1 + NTU)
     EXPECT_NEAR(effectiveness_counterflow(1.0, 1.0), 0.5, 1e-10);
     EXPECT_NEAR(effectiveness_counterflow(2.0, 1.0), 2.0/3.0, 1e-10);
     EXPECT_NEAR(effectiveness_counterflow(9.0, 1.0), 0.9, 1e-10);
 }
 
 TEST(HeatTransferTest, EffectivenessCounterflowCondenser) {
-    // For C_r = 0: ε = 1 - exp(-NTU)
+    // For C_r = 0: eps = 1 - exp(-NTU)
     EXPECT_NEAR(effectiveness_counterflow(1.0, 0.0), 1.0 - std::exp(-1.0), 1e-10);
     EXPECT_NEAR(effectiveness_counterflow(3.0, 0.0), 1.0 - std::exp(-3.0), 1e-10);
 }
 
 TEST(HeatTransferTest, EffectivenessCounterflowGeneral) {
     // NTU = 2, C_r = 0.5
-    // ε = (1 - exp(-2*0.5)) / (1 - 0.5*exp(-2*0.5))
+    // eps = (1 - exp(-2*0.5)) / (1 - 0.5*exp(-2*0.5))
     //   = (1 - exp(-1)) / (1 - 0.5*exp(-1))
-    //   ≈ 0.6321 / 0.8161 ≈ 0.775
+    //   ~= 0.6321 / 0.8161 ~= 0.775
     double eps = effectiveness_counterflow(2.0, 0.5);
     EXPECT_NEAR(eps, 0.775, 0.001);
 }
 
 TEST(HeatTransferTest, EffectivenessParallelflow) {
-    // For C_r = 0: ε = 1 - exp(-NTU)
+    // For C_r = 0: eps = 1 - exp(-NTU)
     EXPECT_NEAR(effectiveness_parallelflow(1.0, 0.0), 1.0 - std::exp(-1.0), 1e-10);
 
     // General case: NTU = 2, C_r = 0.5
-    // ε = (1 - exp(-2*1.5)) / 1.5 = (1 - exp(-3)) / 1.5 ≈ 0.633
+    // eps = (1 - exp(-2*1.5)) / 1.5 = (1 - exp(-3)) / 1.5 ~= 0.633
     double eps = effectiveness_parallelflow(2.0, 0.5);
     EXPECT_NEAR(eps, 0.633, 0.001);
 
@@ -3699,7 +3699,7 @@ TEST(HeatTransferTest, HeatRateFromEffectiveness) {
     double T_hot_in = 400.0;
     double T_cold_in = 300.0;
 
-    // Q = ε * C_min * (T_hot_in - T_cold_in) = 0.8 * 500 * 100 = 40000 W
+    // Q = eps * C_min * (T_hot_in - T_cold_in) = 0.8 * 500 * 100 = 40000 W
     EXPECT_DOUBLE_EQ(heat_rate_from_effectiveness(epsilon, C_min, T_hot_in, T_cold_in), 40000.0);
 }
 
@@ -3984,7 +3984,7 @@ TEST(AcousticsTest, AnnulusGeometry) {
     EXPECT_DOUBLE_EQ(ann.gap(), 0.05);
     EXPECT_NEAR(ann.circumference(), M_PI * 0.45, 1e-10);
 
-    // Area = π/4 * (D_outer² - D_inner²)
+    // Area = pi/4 * (D_outer^2 - D_inner^2)
     double expected_area = M_PI / 4.0 * (0.25 - 0.16);
     EXPECT_NEAR(ann.area(), expected_area, 1e-10);
 }
@@ -3992,7 +3992,7 @@ TEST(AcousticsTest, AnnulusGeometry) {
 TEST(AcousticsTest, TubeClosedClosed) {
     // Closed-Closed tube: f_n = n * c / (2L)
     Tube tube{1.0, 0.1};
-    double c = 343.0;  // Air at ~20°C
+    double c = 343.0;  // Air at ~20degC
 
     auto modes = tube_axial_modes(tube, c, BoundaryCondition::Closed,
                                    BoundaryCondition::Closed, 5);
@@ -4053,13 +4053,13 @@ TEST(AcousticsTest, AnnulusAxialModes) {
 }
 
 TEST(AcousticsTest, AnnulusAzimuthalModes) {
-    // f_m = m * c / (π * D_mean)
+    // f_m = m * c / (pi * D_mean)
     Annulus ann{0.5, 0.4, 0.5};  // D_mean = 0.45m
     double c = 500.0;
 
     auto modes = annulus_azimuthal_modes(ann, c, 3);
 
-    // f_1 = c / (π * D_mean) = 500 / (π * 0.45) ≈ 353.7 Hz
+    // f_1 = c / (pi * D_mean) = 500 / (pi * 0.45) ~= 353.7 Hz
     double f_1T = c / (M_PI * 0.45);
     EXPECT_NEAR(modes[0].frequency, f_1T, 0.1);
     EXPECT_NEAR(modes[1].frequency, 2 * f_1T, 0.1);
@@ -4154,7 +4154,7 @@ TEST(AcousticsTest, RealCombustorExample) {
     auto modes = annulus_modes(combustor, c, BoundaryCondition::Closed,
                                 BoundaryCondition::Open, 3, 3);
 
-    // 1T mode: f = c / (π * D_mean) = 800 / (π * 0.6) ≈ 424 Hz
+    // 1T mode: f = c / (pi * D_mean) = 800 / (pi * 0.6) ~= 424 Hz
     // This is in the typical combustion instability range (100-1000 Hz)
     double f_1T = c / (M_PI * 0.6);
 
@@ -4169,19 +4169,19 @@ TEST(AcousticsTest, RealCombustorExample) {
 // ============================================================
 
 TEST(GeometryTest, ResidenceTimeBasic) {
-    // τ = V / Q
-    double V = 0.001;  // 1 liter = 0.001 m³
-    double Q = 0.0001; // 0.1 L/s = 0.0001 m³/s
+    // tau = V / Q
+    double V = 0.001;  // 1 liter = 0.001 m^3
+    double Q = 0.0001; // 0.1 L/s = 0.0001 m^3/s
 
     double tau = residence_time(V, Q);
     EXPECT_NEAR(tau, 10.0, 1e-10);  // 10 seconds
 }
 
 TEST(GeometryTest, ResidenceTimeMdot) {
-    // τ = V * ρ / ṁ
+    // tau = V * rho / m_dot
     double V = 0.001;    // 1 liter
     double mdot = 0.001; // 1 g/s = 0.001 kg/s
-    double rho = 1.0;    // 1 kg/m³
+    double rho = 1.0;    // 1 kg/m^3
 
     double tau = residence_time_mdot(V, mdot, rho);
     EXPECT_NEAR(tau, 1.0, 1e-10);  // 1 second
@@ -4192,7 +4192,7 @@ TEST(GeometryTest, ResidenceTimeTube) {
     double Q = tube.area();  // Q = A means u = 1 m/s
 
     double tau = residence_time(tube, Q);
-    EXPECT_NEAR(tau, 1.0, 1e-10);  // τ = L/u = 1s
+    EXPECT_NEAR(tau, 1.0, 1e-10);  // tau = L/u = 1s
 }
 
 TEST(GeometryTest, ResidenceTimeAnnulus) {
@@ -4200,7 +4200,7 @@ TEST(GeometryTest, ResidenceTimeAnnulus) {
     double Q = ann.area();  // u = 1 m/s
 
     double tau = residence_time(ann, Q);
-    EXPECT_NEAR(tau, 0.5, 1e-10);  // τ = L/u = 0.5s
+    EXPECT_NEAR(tau, 0.5, 1e-10);  // tau = L/u = 0.5s
 }
 
 TEST(GeometryTest, SpaceVelocity) {
@@ -4210,7 +4210,7 @@ TEST(GeometryTest, SpaceVelocity) {
     double SV = space_velocity(Q, V);
     EXPECT_NEAR(SV, 10.0, 1e-10);  // 10 /s
 
-    // SV = 1/τ
+    // SV = 1/tau
     double tau = residence_time(V, Q);
     EXPECT_NEAR(SV, 1.0 / tau, 1e-10);
 }
@@ -4249,7 +4249,7 @@ TEST(AcousticsTest, AxialModeDownstream) {
     double f0 = 100.0;
     double M = 0.2;
 
-    // f- = f0 / (1 + M) = 100 / 1.2 ≈ 83.33 Hz
+    // f- = f0 / (1 + M) = 100 / 1.2 ~= 83.33 Hz
     double f_down = axial_mode_downstream(f0, M);
     EXPECT_NEAR(f_down, 83.333, 0.01);
 
@@ -4263,8 +4263,8 @@ TEST(AcousticsTest, AxialModeSplit) {
 
     auto [f_up, f_down] = axial_mode_split(f0, M);
 
-    // f+ = 200 / 0.9 ≈ 222.22
-    // f- = 200 / 1.1 ≈ 181.82
+    // f+ = 200 / 0.9 ~= 222.22
+    // f- = 200 / 1.1 ~= 181.82
     EXPECT_NEAR(f_up, 222.22, 0.01);
     EXPECT_NEAR(f_down, 181.82, 0.01);
 
@@ -4274,11 +4274,11 @@ TEST(AcousticsTest, AxialModeSplit) {
 
 TEST(AcousticsTest, HelmholtzFrequency) {
     // Classic example: 500 mL bottle with 2 cm diameter, 5 cm long neck
-    double V = 0.0005;           // 500 mL = 0.0005 m³
+    double V = 0.0005;           // 500 mL = 0.0005 m^3
     double d_neck = 0.02;        // 2 cm
     double A_neck = M_PI * d_neck * d_neck / 4.0;
     double L_neck = 0.05;        // 5 cm
-    double c = 343.0;            // Air at 20°C
+    double c = 343.0;            // Air at 20degC
 
     double f = helmholtz_frequency(V, A_neck, L_neck, c);
 
@@ -4310,7 +4310,7 @@ TEST(AcousticsTest, HelmholtzEndCorrection) {
 }
 
 TEST(AcousticsTest, Strouhal) {
-    // Vortex shedding from cylinder: St ≈ 0.2
+    // Vortex shedding from cylinder: St ~= 0.2
     double f = 100.0;  // Hz
     double L = 0.01;   // 1 cm diameter
     double u = 5.0;    // 5 m/s
@@ -4372,11 +4372,11 @@ TEST(AcousticsTest, HalfWaveFrequency) {
 // ============================================================
 
 TEST(AcousticsTest, StokesLayer) {
-    // Air at 20°C: ν ≈ 1.5e-5 m²/s
+    // Air at 20degC: nu ~= 1.5e-5 m^2/s
     double nu = 1.5e-5;
     double f = 100.0;  // Hz
 
-    // δ_ν = √(2ν/ω) = √(2 * 1.5e-5 / (2π * 100)) ≈ 0.22 mm
+    // delta_nu = sqrt(2*nu/omega) = sqrt(2 * 1.5e-5 / (2*pi * 100)) ~= 0.22 mm
     double delta = stokes_layer(nu, f);
     EXPECT_NEAR(delta * 1000, 0.22, 0.01);  // in mm
 
@@ -4387,7 +4387,7 @@ TEST(AcousticsTest, StokesLayer) {
 }
 
 TEST(AcousticsTest, ThermalLayer) {
-    // Air at 20°C: α ≈ 2.1e-5 m²/s
+    // Air at 20degC: alpha ~= 2.1e-5 m^2/s
     double alpha = 2.1e-5;
     double f = 100.0;
 
@@ -4398,7 +4398,7 @@ TEST(AcousticsTest, ThermalLayer) {
     double delta_nu = stokes_layer(nu, f);
     EXPECT_GT(delta, delta_nu);
 
-    // Ratio should be 1/√Pr ≈ 1.18 for air (Pr ≈ 0.71)
+    // Ratio should be 1/sqrt(Pr) ~= 1.18 for air (Pr ~= 0.71)
     double ratio = delta / delta_nu;
     EXPECT_NEAR(ratio, std::sqrt(alpha / nu), 1e-6);
 }
@@ -4408,7 +4408,7 @@ TEST(AcousticsTest, EffectiveViscothermalLayer) {
     double delta_kappa = 0.00024; // 0.24 mm
     double gamma = 1.4;
 
-    // δ_eff = δ_ν + (γ-1)·δ_κ = 0.2 + 0.4*0.24 = 0.296 mm
+    // delta_eff = delta_nu + (gamma-1)*delta_kappa = 0.2 + 0.4*0.24 = 0.296 mm
     double delta_eff = effective_viscothermal_layer(delta_nu, delta_kappa, gamma);
     EXPECT_NEAR(delta_eff * 1000, 0.296, 0.001);
 }
@@ -4475,7 +4475,7 @@ TEST(AcousticsTest, DampingRatio) {
     double Q = 50.0;
     double zeta = damping_ratio(Q);
 
-    // ζ = 1/(2Q) = 0.01
+    // zeta = 1/(2Q) = 0.01
     EXPECT_NEAR(zeta, 0.01, 1e-10);
 
     // Higher Q -> lower damping
@@ -4486,7 +4486,7 @@ TEST(AcousticsTest, Bandwidth) {
     double f0 = 200.0;
     double Q = 50.0;
 
-    // Δf = f0/Q = 4 Hz
+    // Delta_f = f0/Q = 4 Hz
     double df = bandwidth(f0, Q);
     EXPECT_NEAR(df, 4.0, 1e-10);
 }
