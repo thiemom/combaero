@@ -5,6 +5,7 @@
 #include "thermo_transport_data.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 namespace combaero {
@@ -1131,12 +1132,13 @@ EquilibriumJacobian combustion_equilibrium_and_jacobian(const State &in, bool sm
     nvals[j] = n[j].v;
     ntv += n[j].v;
   }
-  auto dX_from_dn = [&](const std::vector<double> &dn) {
+  // Rewrites dn in place: a fresh std::vector<double>(ns) here tripped GCC 14's
+  // -Wstringop-overflow at -O3 (a false positive), failing the manylinux wheel.
+  auto dX_from_dn = [&](std::vector<double> dn) {
     double dN = 0.0;
     for (double x : dn) dN += x;
-    std::vector<double> dX(ns);
-    for (std::size_t j = 0; j < ns; ++j) dX[j] = (dn[j] - nvals[j] / ntv * dN) / ntv;
-    return dX;
+    for (std::size_t j = 0; j < dn.size(); ++j) dn[j] = (dn[j] - nvals[j] / ntv * dN) / ntv;
+    return dn;
   };
   out.dXout_dX.assign(ns, std::vector<double>(ns, 0.0));
   for (std::size_t k = 0; k < ns; ++k) {
@@ -1146,7 +1148,7 @@ EquilibriumJacobian combustion_equilibrium_and_jacobian(const State &in, bool sm
       for (std::size_t l = 0; l < ns; ++l) v += n[j].d[l] * cj.dXb_dX[l][k];
       dn[j] = v;
     }
-    const auto dX = dX_from_dn(dn);
+    const auto dX = dX_from_dn(std::move(dn));
     for (std::size_t j = 0; j < ns; ++j) out.dXout_dX[j][k] = dX[j];
   }
   std::vector<double> dn_T(ns), dn_P(ns);
@@ -1154,8 +1156,8 @@ EquilibriumJacobian combustion_equilibrium_and_jacobian(const State &in, bool sm
     dn_T[j] = n[j].d[iT] * out.dT_dT_in;
     dn_P[j] = n[j].d[iT] * out.dT_dP + n[j].d[iP];
   }
-  out.dXout_dT_in = dX_from_dn(dn_T);
-  out.dXout_dP = dX_from_dn(dn_P);
+  out.dXout_dT_in = dX_from_dn(std::move(dn_T));
+  out.dXout_dP = dX_from_dn(std::move(dn_P));
   return out;
 }
 
