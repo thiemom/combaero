@@ -2047,20 +2047,20 @@ class NetworkSolver:
                         idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                     )
                     # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
-                    node_relay["T"] += t_jac.d_T * sens_up["T"]
+                    node_relay["T"] += t_jac.d_Tt * sens_up["T"]
                     # Note: stagnation Pt doesn't usually have T/Y dependency, but we relay it if present
-                    node_relay["T"] += t_jac.d_P_total * sens_up.get("Pt", 0.0)
+                    node_relay["T"] += t_jac.d_Pt * sens_up.get("Pt", 0.0)
                     node_relay["T"] += np.dot(t_jac.d_Y, sens_up["Y"])
 
                     # dP_total_mix/dx
-                    node_relay["Pt_mix"] += pt_jac.d_T * sens_up["T"]
-                    node_relay["Pt_mix"] += pt_jac.d_P_total * sens_up.get("Pt", 0.0)
+                    node_relay["Pt_mix"] += pt_jac.d_Tt * sens_up["T"]
+                    node_relay["Pt_mix"] += pt_jac.d_Pt * sens_up.get("Pt", 0.0)
                     node_relay["Pt_mix"] += np.dot(pt_jac.d_Y, sens_up["Y"])
 
                     # dY_k/dx
                     for k in range(n_species):
-                        node_relay["Y"][k] += y_jacs[k].d_T * sens_up["T"]
-                        node_relay["Y"][k] += y_jacs[k].d_P_total * sens_up.get("Pt", 0.0)
+                        node_relay["Y"][k] += y_jacs[k].d_Tt * sens_up["T"]
+                        node_relay["Y"][k] += y_jacs[k].d_Pt * sens_up.get("Pt", 0.0)
                         node_relay["Y"][k] += np.dot(y_jacs[k].d_Y, sens_up["Y"])
 
         # Wall coupling relay extension: dT_node/dx += dT_mix/dQ * dQ/dx

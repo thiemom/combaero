@@ -53,13 +53,13 @@ static double cp_mass_at(double T, const std::vector<double>& X) {
     return cp(T, X) / mw_g * 1000.0;  // J/(mol*K) / (g/mol) * 1000 = J/(kg*K)
 }
 
-double T0_from_static_v(double T, double v, const std::vector<double>& X,
+double Tt_from_static_v(double T, double v, const std::vector<double>& X,
                          double tol, std::size_t max_iter) {
     if (T <= 0.0) {
-        throw std::invalid_argument("T0_from_static_v: T must be positive");
+        throw std::invalid_argument("Tt_from_static_v: T must be positive");
     }
     if (v < 0.0) {
-        throw std::invalid_argument("T0_from_static_v: v must be non-negative");
+        throw std::invalid_argument("Tt_from_static_v: v must be non-negative");
     }
 
     double h_static = h_mass_at(T, X);
@@ -92,33 +92,33 @@ double T0_from_static_v(double T, double v, const std::vector<double>& X,
     return T0;
 }
 
-double T0_from_static(double T, double M, const std::vector<double>& X,
+double Tt_from_static(double T, double M, const std::vector<double>& X,
                        double tol, std::size_t max_iter) {
     if (M < 0.0) {
-        throw std::invalid_argument("T0_from_static: M must be non-negative");
+        throw std::invalid_argument("Tt_from_static: M must be non-negative");
     }
     double a = speed_of_sound(T, X);
     double v = M * a;
-    return T0_from_static_v(T, v, X, tol, max_iter);
+    return Tt_from_static_v(T, v, X, tol, max_iter);
 }
 
-double T_from_stagnation(double T0, double M, const std::vector<double>& X,
+double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
                           double tol, std::size_t max_iter) {
-    if (T0 <= 0.0) {
-        throw std::invalid_argument("T_from_stagnation: T0 must be positive");
+    if (Tt <= 0.0) {
+        throw std::invalid_argument("T_from_stagnation: Tt must be positive");
     }
     if (M < 0.0) {
         throw std::invalid_argument("T_from_stagnation: M must be non-negative");
     }
-    if (M == 0.0) return T0;
+    if (M == 0.0) return Tt;
 
-    double h0 = h_mass_at(T0, X);
+    double h0 = h_mass_at(Tt, X);
 
     // Newton iteration: find T such that h(T) + M^2*a(T)^2/2 = h0
     // F(T) = h(T) + M^2*a(T)^2/2 - h0
     // dF/dT = cp(T) + M^2 * a * da/dT
     // da/dT = (1/(2a)) * d(gamma*R*T)/dT  -- approximate as a/(2T) for ideal gas
-    double T = T0 / (1.0 + 0.2 * M * M);  // calorically perfect gas initial guess
+    double T = Tt / (1.0 + 0.2 * M * M);  // calorically perfect gas initial guess
 
     constexpr double T_MIN = thermo::T_FLOOR;  // as compressible.cpp solve_T_isentropic
 
@@ -150,20 +150,20 @@ double T_from_stagnation(double T0, double M, const std::vector<double>& X,
 // Stagnation pressure (isentropic)
 // -------------------------------------------------------------
 
-double P0_from_static(double P, double T, double M,
+double Pt_from_static(double P, double T, double M,
                        const std::vector<double>& X,
                        double tol, std::size_t max_iter) {
     if (P <= 0.0) {
-        throw std::invalid_argument("P0_from_static: P must be positive");
+        throw std::invalid_argument("Pt_from_static: P must be positive");
     }
     if (M < 0.0) {
-        throw std::invalid_argument("P0_from_static: M must be non-negative");
+        throw std::invalid_argument("Pt_from_static: M must be non-negative");
     }
     if (M == 0.0) return P;
 
     constexpr double P_REF = 101325.0;
     double s0 = s(T, X, P, P_REF);
-    double T0 = T0_from_static(T, M, X, tol, max_iter);
+    double T0 = Tt_from_static(T, M, X, tol, max_iter);
 
     double R_specific = specific_gas_constant(X);  // J/(kg*K)
     double mw_kg = mwmix(X) / 1000.0;  // kg/mol
@@ -174,20 +174,20 @@ double P0_from_static(double P, double T, double M,
     return P_REF * std::exp(ln_ratio);
 }
 
-double P_from_stagnation(double P0, double T0, double M,
+double P_from_stagnation(double Pt, double Tt, double M,
                           const std::vector<double>& X,
                           double tol, std::size_t max_iter) {
-    if (P0 <= 0.0) {
-        throw std::invalid_argument("P_from_stagnation: P0 must be positive");
+    if (Pt <= 0.0) {
+        throw std::invalid_argument("P_from_stagnation: Pt must be positive");
     }
     if (M < 0.0) {
         throw std::invalid_argument("P_from_stagnation: M must be non-negative");
     }
-    if (M == 0.0) return P0;
+    if (M == 0.0) return Pt;
 
     constexpr double P_REF = 101325.0;
-    double s0 = s(T0, X, P0, P_REF);
-    double T_static = T_from_stagnation(T0, M, X, tol, max_iter);
+    double s0 = s(Tt, X, Pt, P_REF);
+    double T_static = T_from_stagnation(Tt, M, X, tol, max_iter);
 
     double R_specific = specific_gas_constant(X);  // J/(kg*K)
     double mw_kg = mwmix(X) / 1000.0;  // kg/mol
@@ -251,10 +251,10 @@ std::tuple<double, double> stagnation_from_static(
     if (v == 0.0) return {T, P};
 
     // One Newton loop for Tt.
-    double Tt = T0_from_static_v(T, v, X, tol, max_iter);
+    double Tt = Tt_from_static_v(T, v, X, tol, max_iter);
 
     // Pt from isentropic entropy conservation: s(T, P) = s(Tt, Pt).
-    // Bypasses P0_from_static to avoid its internal T0_from_static call,
+    // Bypasses Pt_from_static to avoid its internal Tt_from_static call,
     // which would repeat the Newton loop and re-evaluate speed_of_sound(T, X).
     constexpr double P_REF = 101325.0;
     const double mw_kg  = mwmix(X) / 1000.0;
@@ -325,13 +325,13 @@ ChamberStaticState chamber_static_state(double T0, double P, double G,
   const double cp_T0 = cp_mass(T0, X);
   const double fT = -cp_T - k * T;
   // df/dx for x = T0, P, G; dT/dx = -(df/dx) / fT.
-  out.dT_dT0 = -cp_T0 / fT;
+  out.dT_dTt = -cp_T0 / fT;
   out.dT_dP = -(k * T * T / P) / fT;
   out.dT_dG = (G > 0.0) ? -(-k * T * T / G) / fT : 0.0;
   // ln(P0 / P) = (s(T0) - s(T)) / R = (1/R) integral of cp / T.
   out.lnP0P = gl8_split(cp_over_T, T, T0) / R;
   const double dln_dTs = -cp_T / (R * T);
-  out.dln_dT0 = cp_T0 / (R * T0) + dln_dTs * out.dT_dT0;
+  out.dln_dTt = cp_T0 / (R * T0) + dln_dTs * out.dT_dTt;
   out.dln_dP = dln_dTs * out.dT_dP;
   out.dln_dG = dln_dTs * out.dT_dG;
   const double a = speed_of_sound(T, X);
@@ -369,7 +369,7 @@ ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
   return out;
 }
 
-SonicStaticState sonic_static_state(double T0, double G,
+SonicStaticState sonic_static_state(double Tt, double G,
                                     const std::vector<double> &X) {
   const double R = specific_gas_constant(X);
   const double mw_g = mwmix(X);  // g/mol
@@ -382,19 +382,19 @@ SonicStaticState sonic_static_state(double T0, double G,
     dg = -R * dc / (cv * cv);
     return c / cv;
   };
-  // F(T) = [h(T0) - h(T)] - a(T)^2 / 2, a^2 = gamma R T; F falls in T.
+  // F(T) = [h(Tt) - h(T)] - a(T)^2 / 2, a^2 = gamma R T; F falls in T.
   double dg0 = 0.0;
-  const double g0 = gamma_and_d(T0, dg0);
-  double T = 2.0 * T0 / (g0 + 1.0);
+  const double g0 = gamma_and_d(Tt, dg0);
+  double T = 2.0 * Tt / (g0 + 1.0);
   double dFdT = -1.0;
   for (int it = 0; it < 100; ++it) {
     double dg = 0.0;
     const double g = gamma_and_d(T, dg);
-    const double F = gl8_split(cp_m, T, T0) - 0.5 * g * R * T;
+    const double F = gl8_split(cp_m, T, Tt) - 0.5 * g * R * T;
     dFdT = -cp_mass(T, X) - 0.5 * R * (g + T * dg);
     const double step = F / dFdT;
     T -= step;
-    if (std::abs(step) <= 1e-13 * T0) {
+    if (std::abs(step) <= 1e-13 * Tt) {
       break;
     }
   }
@@ -403,41 +403,41 @@ SonicStaticState sonic_static_state(double T0, double G,
   dFdT = -cp_mass(T, X) - 0.5 * R * (g + T * dg);
   SonicStaticState out{};
   out.T = T;
-  out.dT_dT0 = cp_mass(T0, X) / -dFdT;
+  out.dT_dTt = cp_mass(Tt, X) / -dFdT;
   const double Gabs = std::abs(G);
   out.P = Gabs * std::sqrt(R * T / g);
   // d ln P* / d T* = 1/(2 T*) - gamma'/(2 gamma).
   const double dlnP_dT = 0.5 / T - 0.5 * dg / g;
-  out.dP_dT0 = out.P * dlnP_dT * out.dT_dT0;
+  out.dP_dTt = out.P * dlnP_dT * out.dT_dTt;
   out.dP_dG = (Gabs > 0.0) ? out.P / Gabs * (G >= 0.0 ? 1.0 : -1.0) : std::sqrt(R * T / g);
   return out;
 }
 
-DuctStaticState duct_static_state(double T0, double P0, double G,
+DuctStaticState duct_static_state(double Tt, double Pt, double G,
                                   const std::vector<double> &X) {
   // An unphysical iterate is evaluated at the floors, finite; the partials
   // in a floored argument are then zero.
-  const bool T0_floored = !(T0 > thermo::T_FLOOR);
-  const bool P0_floored = !(P0 > thermo::P_FLOOR);
-  T0 = T0_floored ? thermo::T_FLOOR : T0;
-  P0 = P0_floored ? thermo::P_FLOOR : P0;
+  const bool T0_floored = !(Tt > thermo::T_FLOOR);
+  const bool P0_floored = !(Pt > thermo::P_FLOOR);
+  Tt = T0_floored ? thermo::T_FLOOR : Tt;
+  Pt = P0_floored ? thermo::P_FLOOR : Pt;
   const double R = specific_gas_constant(X);
-  const double lnP0 = std::log(P0);
+  const double lnP0 = std::log(Pt);
   G = std::abs(G);
-  // L(u) = lnP0P(T0, e^u, G) + u - ln P0, increasing in u on [ln P*, ln P0].
+  // L(u) = lnP0P(Tt, e^u, G) + u - ln Pt, increasing in u on [ln P*, ln Pt].
   auto eval = [&](double u, ChamberStaticState &cs) {
-    cs = chamber_static_state(T0, std::exp(u), G, X);
+    cs = chamber_static_state(Tt, std::exp(u), G, X);
     return cs.lnP0P + u - lnP0;
   };
   DuctStaticState out{};
   ChamberStaticState cs{};
-  const double P_star = critical_pressure_ratio(T0, P0, X) * P0;
+  const double P_star = critical_pressure_ratio(Tt, Pt, X) * Pt;
   double u_lo = std::log(P_star);
   double u_hi = lnP0;
   if (eval(u_lo, cs) > 0.0) {
     // Beyond choke: the sonic state, at the choked flux.
-    const double G_star = mass_flux_isentropic(T0, P0, P_star, X);
-    cs = chamber_static_state(T0, P_star, G_star, X);
+    const double G_star = mass_flux_isentropic(Tt, Pt, P_star, X);
+    cs = chamber_static_state(Tt, P_star, G_star, X);
     out.T = cs.T;
     out.P = P_star;
     out.rho = P_star / (R * cs.T);
@@ -445,17 +445,17 @@ DuctStaticState duct_static_state(double T0, double P0, double G,
     out.choked = true;
     out.G_eff = G;
     out.dGeff_dG = 1.0;
-    const double r = P_star / P0;
-    out.dP_dP0 = r;
-    out.dT_dT0 = cs.dT_dT0;
-    out.dT_dP0 = cs.dT_dP * r;
-    out.drho_dT0 = -out.rho * out.dT_dT0 / out.T;
-    out.drho_dP0 = out.rho * (out.dP_dP0 / out.P - out.dT_dP0 / out.T);
+    const double r = P_star / Pt;
+    out.dP_dPt = r;
+    out.dT_dTt = cs.dT_dTt;
+    out.dT_dPt = cs.dT_dP * r;
+    out.drho_dTt = -out.rho * out.dT_dTt / out.T;
+    out.drho_dPt = out.rho * (out.dP_dPt / out.P - out.dT_dPt / out.T);
     if (T0_floored) {
-      out.dT_dT0 = out.dP_dT0 = out.drho_dT0 = 0.0;
+      out.dT_dTt = out.dP_dTt = out.drho_dTt = 0.0;
     }
     if (P0_floored) {
-      out.dT_dP0 = out.dP_dP0 = out.drho_dP0 = 0.0;
+      out.dT_dPt = out.dP_dPt = out.drho_dPt = 0.0;
     }
     return out;
   }
@@ -481,50 +481,50 @@ DuctStaticState duct_static_state(double T0, double P0, double G,
   }
   const double P = std::exp(u);
   const double dL_du = 1.0 + P * cs.dln_dP;
-  // du/dx = -(dL/dx) / (dL/du); dL/dT0 = dln_dT0, dL/dP0 = -1/P0, dL/dG = dln_dG.
-  const double du_dT0 = -cs.dln_dT0 / dL_du;
-  const double du_dP0 = (1.0 / P0) / dL_du;
+  // du/dx = -(dL/dx) / (dL/du); dL/dT0 = dln_dTt, dL/dP0 = -1/Pt, dL/dG = dln_dG.
+  const double du_dT0 = -cs.dln_dTt / dL_du;
+  const double du_dP0 = (1.0 / Pt) / dL_du;
   const double du_dG = -cs.dln_dG / dL_du;
   out.P = P;
   out.T = cs.T;
   out.rho = P / (R * cs.T);
   out.M = cs.M;
   out.choked = false;
-  out.dP_dT0 = P * du_dT0;
-  out.dP_dP0 = P * du_dP0;
+  out.dP_dTt = P * du_dT0;
+  out.dP_dPt = P * du_dP0;
   out.dP_dG = P * du_dG;
-  out.dT_dT0 = cs.dT_dT0 + cs.dT_dP * out.dP_dT0;
-  out.dT_dP0 = cs.dT_dP * out.dP_dP0;
+  out.dT_dTt = cs.dT_dTt + cs.dT_dP * out.dP_dTt;
+  out.dT_dPt = cs.dT_dP * out.dP_dPt;
   out.dT_dG = cs.dT_dG + cs.dT_dP * out.dP_dG;
-  out.drho_dT0 = out.rho * (out.dP_dT0 / P - out.dT_dT0 / out.T);
-  out.drho_dP0 = out.rho * (out.dP_dP0 / P - out.dT_dP0 / out.T);
+  out.drho_dTt = out.rho * (out.dP_dTt / P - out.dT_dTt / out.T);
+  out.drho_dPt = out.rho * (out.dP_dPt / P - out.dT_dPt / out.T);
   out.drho_dG = out.rho * (out.dP_dG / P - out.dT_dG / out.T);
   out.G_eff = G;
   out.dGeff_dG = 1.0;
   if (T0_floored) {
-    out.dT_dT0 = out.dP_dT0 = out.drho_dT0 = 0.0;
+    out.dT_dTt = out.dP_dTt = out.drho_dTt = 0.0;
   }
   if (P0_floored) {
-    out.dT_dP0 = out.dP_dP0 = out.drho_dP0 = 0.0;
+    out.dT_dPt = out.dP_dPt = out.drho_dPt = 0.0;
   }
   return out;
 }
 
-DuctStaticState duct_htc_static_state(double T0, double P0, double G,
+DuctStaticState duct_htc_static_state(double Tt, double Pt, double G,
                                       const std::vector<double> &X) {
   G = std::abs(G);
-  if (!(T0 > thermo::T_FLOOR) || !(P0 > thermo::P_FLOOR)) {
-    return duct_static_state(T0, P0, G, X);
+  if (!(Tt > thermo::T_FLOOR) || !(Pt > thermo::P_FLOOR)) {
+    return duct_static_state(Tt, Pt, G, X);
   }
   auto sonic_flux = [&](double T, double P) {
     return mass_flux_isentropic(T, P, critical_pressure_ratio(T, P, X) * P, X);
   };
-  const double Gs = sonic_flux(T0, P0);
+  const double Gs = sonic_flux(Tt, Pt);
   const double w = kDuctHtcSonicMargin;
   const double a = 1.0 - 2.0 * w;
   const double g = G / Gs;
   if (g <= a) {
-    return duct_static_state(T0, P0, G, X);
+    return duct_static_state(Tt, Pt, G, X);
   }
   // g_eff = g - (g - a)^2 / (4 w) on [a, 1]: value and slope meet g at a and
   // the cap 1 - w (slope 0) at 1.
@@ -534,31 +534,31 @@ DuctStaticState duct_htc_static_state(double T0, double P0, double G,
     ge = g - (g - a) * (g - a) / (4.0 * w);
     dge = 1.0 - (g - a) / (2.0 * w);
   }
-  DuctStaticState s = duct_static_state(T0, P0, ge * Gs, X);
-  // G_eff = Gs(T0, P0) ge(G / Gs): d/dG = dge, d/dGs = ge - g dge. The sonic
-  // flux is proportional to P0 at fixed T0 (ideal gas: P*/P0 depends on T0
-  // only); its T0 slope is differenced (smooth, step 1e-6).
-  const double hT = 1e-6 * T0;
-  const double dGs_dT0 = (sonic_flux(T0 + hT, P0) - sonic_flux(T0 - hT, P0)) / (2.0 * hT);
-  const double dGs_dP0 = Gs / P0;
+  DuctStaticState s = duct_static_state(Tt, Pt, ge * Gs, X);
+  // G_eff = Gs(Tt, Pt) ge(G / Gs): d/dG = dge, d/dGs = ge - g dge. The sonic
+  // flux is proportional to Pt at fixed Tt (ideal gas: P*/Pt depends on Tt
+  // only); its Tt slope is differenced (smooth, step 1e-6).
+  const double hT = 1e-6 * Tt;
+  const double dGs_dT0 = (sonic_flux(Tt + hT, Pt) - sonic_flux(Tt - hT, Pt)) / (2.0 * hT);
+  const double dGs_dP0 = Gs / Pt;
   const double dGe_dGs = ge - g * dge;
   s.G_eff = ge * Gs;
   s.dGeff_dG = dge;
-  s.dGeff_dT0 = dGe_dGs * dGs_dT0;
-  s.dGeff_dP0 = dGe_dGs * dGs_dP0;
+  s.dGeff_dTt = dGe_dGs * dGs_dT0;
+  s.dGeff_dPt = dGe_dGs * dGs_dP0;
   // Chain the state's G partials through G_eff.
   auto chain = [&](double &d_T0, double &d_P0, double &d_G) {
-    d_T0 += d_G * s.dGeff_dT0;
-    d_P0 += d_G * s.dGeff_dP0;
+    d_T0 += d_G * s.dGeff_dTt;
+    d_P0 += d_G * s.dGeff_dPt;
     d_G *= s.dGeff_dG;
   };
-  chain(s.dT_dT0, s.dT_dP0, s.dT_dG);
-  chain(s.dP_dT0, s.dP_dP0, s.dP_dG);
-  chain(s.drho_dT0, s.drho_dP0, s.drho_dG);
+  chain(s.dT_dTt, s.dT_dPt, s.dT_dG);
+  chain(s.dP_dTt, s.dP_dPt, s.dP_dG);
+  chain(s.drho_dTt, s.drho_dPt, s.drho_dG);
   return s;
 }
 
-DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
+DuctStaticStateDY duct_htc_static_state_dY(double Tt, double Pt, double G,
                                            const std::vector<double> &X,
                                            const DuctStaticState &state) {
   const std::size_t n = X.size();
@@ -568,7 +568,7 @@ DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
   out.drho_dY.assign(n, 0.0);
   out.dGeff_dY.assign(n, 0.0);
   G = std::abs(G);
-  if (!(T0 > thermo::T_FLOOR) || !(P0 > thermo::P_FLOOR)) {
+  if (!(Tt > thermo::T_FLOOR) || !(Pt > thermo::P_FLOOR)) {
     return out;
   }
   // The caller's solved state. Below the bend it IS the plain state at G
@@ -576,9 +576,9 @@ DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
   // state at G_eff gives its own G partials, before the bend's chain.
   const DuctStaticState &s = state;
   const bool bent = s.G_eff != G;
-  const DuctStaticState raw = bent ? duct_static_state(T0, P0, s.G_eff, X) : s;
+  const DuctStaticState raw = bent ? duct_static_state(Tt, Pt, s.G_eff, X) : s;
   auto sonic_flux = [&](const std::vector<double> &Xv) {
-    return mass_flux_isentropic(T0, P0, critical_pressure_ratio(T0, P0, Xv) * P0, Xv);
+    return mass_flux_isentropic(Tt, Pt, critical_pressure_ratio(Tt, Pt, Xv) * Pt, Xv);
   };
   const double w = kDuctHtcSonicMargin;
   const double a = 1.0 - 2.0 * w;
@@ -591,12 +591,12 @@ DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
   const double v = s.G_eff * R * T / P;
   const double kk = (s.G_eff * R / P) * (s.G_eff * R / P);
   // Mass-specific enthalpy drop, molar species terms over MW.
-  // Species enthalpy and entropy drops T0 -> T, once.
+  // Species enthalpy and entropy drops Tt -> T, once.
   std::vector<double> dh_j(n), ds_j(n);
   double dH = 0.0;
   for (std::size_t j = 0; j < n; ++j) {
-    dh_j[j] = h_species(j, T0) - h_species(j, T);
-    ds_j[j] = s_species(j, T0) - s_species(j, T);
+    dh_j[j] = h_species(j, Tt) - h_species(j, T);
+    ds_j[j] = s_species(j, Tt) - s_species(j, T);
     dH += X[j] * dh_j[j];
   }
   dH /= MW;
@@ -614,7 +614,7 @@ DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
     dT_dX[j] = -(fX - fu * LX) / det;
     du_dX[j] = -(fT * LX - LT * fX) / det;
   }
-  // The bent flux near choke: G_eff = ge G* with G*(T0, P0, X).
+  // The bent flux near choke: G_eff = ge G* with G*(Tt, Pt, X).
   std::vector<double> dGe_dX(n, 0.0);
   if (bent) {
     const double Gs = sonic_flux(X);

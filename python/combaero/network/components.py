@@ -1013,12 +1013,12 @@ class _DuctHtc:
         # handed, area * G_eff, which moves with the true flow (dGeff_dG) and,
         # near choke, with T0 and P0 through the sonic flux (#551).
         dh_m, dTaw_m = float(r.dh_dmdot), float(r.dT_aw_dmdot)
-        self.dh_dT = dh_dT * s.dT_dT0 + dh_m * area * s.dGeff_dT0
+        self.dh_dT = dh_dT * s.dT_dTt + dh_m * area * s.dGeff_dTt
         self.dh_dmdot = dh_m * s.dGeff_dG + dh_dT * s.dT_dG / area
-        self.dh_dPt = dh_dT * s.dT_dP0 + dh_m * area * s.dGeff_dP0
-        self.dT_aw_dT = dTaw_dT * s.dT_dT0 + dTaw_dP * s.dP_dT0 + dTaw_m * area * s.dGeff_dT0
+        self.dh_dPt = dh_dT * s.dT_dPt + dh_m * area * s.dGeff_dPt
+        self.dT_aw_dT = dTaw_dT * s.dT_dTt + dTaw_dP * s.dP_dTt + dTaw_m * area * s.dGeff_dTt
         self.dT_aw_dmdot = dTaw_m * s.dGeff_dG + (dTaw_dT * s.dT_dG + dTaw_dP * s.dP_dG) / area
-        self.dT_aw_dPt = dTaw_dT * s.dT_dP0 + dTaw_dP * s.dP_dP0 + dTaw_m * area * s.dGeff_dP0
+        self.dT_aw_dPt = dTaw_dT * s.dT_dPt + dTaw_dP * s.dP_dPt + dTaw_m * area * s.dGeff_dPt
         # The static P is the duct's, a function of the feed's Pt: the feed
         # node's own static P does not enter.
         self.dT_aw_dP = 0.0
@@ -3123,7 +3123,7 @@ class CombustorNode(NetworkNode):
                     dict(getattr(s, "_m_dot_jac_names", {})),
                     getattr(s, "_src_node", None),
                     float(d.d_mdot),
-                    float(d.d_T),
+                    float(d.d_Tt),
                     list(d.d_Y),
                 )
                 for s, d in zip(upstream_states, mix_u.dT_mix_d_stream, strict=True)
@@ -4023,7 +4023,7 @@ class OrificeElement(NetworkElement):
         g = float(r.d_mdot_dP_static_down)
         d: dict[str, float] = {
             f"{src_id}.Pt": float(r.d_mdot_dP_total_up),
-            f"{src_id}.T": float(r.d_mdot_dT_up),
+            f"{src_id}.T": float(r.d_mdot_dTt_up),
             f"{dst_id}.P": float(r.d_mdot_dP_rho_ref) + (0.0 if tap else g),
         }
         # d(m_calc)/d(p1): the kernel's own column and, between pipes, the tap
@@ -6465,7 +6465,7 @@ class PortDischargeElement(NetworkElement):
             f"{self.id}.m_dot": -w_star * float(s.dP_dG) * (1.0 if m >= 0.0 else -1.0) / A,
             # T and Y are relayed through the chamber's propagation chain,
             # as the chamber's own closure row does.
-            f"{c}.T": -w_star * float(s.dP_dT0),
+            f"{c}.T": -w_star * float(s.dP_dTt),
         }
         for k, dy in enumerate(s.dP_dY):
             if dy != 0.0:
@@ -7578,7 +7578,7 @@ class ChannelElement(NetworkElement):
             self._exit_head_lost(m_dot),
         )
         g = float(r.d_dP_dP_static_up)
-        d: dict[str, float] = {f"{src_id}.T": float(r.d_dP_dT_up)}
+        d: dict[str, float] = {f"{src_id}.T": float(r.d_dP_dTt_up)}
         for i, val in enumerate(r.d_dP_dY_up):
             if val != 0.0:
                 d[f"{src_id}.Y[{i}]"] = float(val)

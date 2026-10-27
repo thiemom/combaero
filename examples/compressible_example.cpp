@@ -88,8 +88,8 @@ int main()
               << "  (input: " << P_back_sub / 1e5 << " bar)\n";
 
     // Find stagnation pressure for given mdot
-    const double P0_solved = solve_P0_from_mdot(T0, P_back_sub, A_eff, mdot_target, X_air);
-    std::cout << "solve_P0_from_mdot: P0 = " << P0_solved / 1e5 << " bar"
+    const double P0_solved = solve_Pt_from_mdot(T0, P_back_sub, A_eff, mdot_target, X_air);
+    std::cout << "solve_Pt_from_mdot: P0 = " << P0_solved / 1e5 << " bar"
               << "  (input: " << P0 / 1e5 << " bar)\n\n";
 
     // =========================================================================
@@ -114,8 +114,8 @@ int main()
     std::cout << "Converging-diverging nozzle (subsonic, P_exit=3.5 bar):\n";
     std::cout << "  mdot     = " << noz.mdot << " kg/s\n";
     std::cout << "  choked   = " << (noz.choked ? "yes" : "no") << "\n";
-    std::cout << "  T0       = " << noz.T0 << " K\n";
-    std::cout << "  P0       = " << noz.P0 / 1e5 << " bar\n";
+    std::cout << "  T0       = " << noz.Tt << " K\n";
+    std::cout << "  P0       = " << noz.Pt / 1e5 << " bar\n";
     std::cout << "  T_exit   = " << noz.outlet.T << " K\n";
     std::cout << "  P_exit   = " << noz.outlet.P / 1e5 << " bar\n\n";
 
@@ -276,8 +276,8 @@ int main()
     const double P_static = 2.0e5;   // Pa
     const double M_flow   = 0.5;     // Mach number
 
-    const double T0_calc = T0_from_static(T_static, M_flow, X_air);
-    const double P0_calc = P0_from_static(P_static, T_static, M_flow, X_air);
+    const double T0_calc = Tt_from_static(T_static, M_flow, X_air);
+    const double P0_calc = Pt_from_static(P_static, T_static, M_flow, X_air);
 
     std::cout << "Static -> Stagnation (M=" << M_flow << "):\n";
     std::cout << "  T_static = " << T_static << " K  ->  T0 = " << T0_calc << " K\n";

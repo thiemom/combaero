@@ -2601,7 +2601,7 @@ TEST_F(ThermoTransportTest, CompressibleRoundTripPback) {
     EXPECT_NEAR(P_back_calc, P_back_orig, P_back_orig * 0.01);
 }
 
-// Round-trip test: nozzle_flow -> solve_P0_from_mdot
+// Round-trip test: nozzle_flow -> solve_Pt_from_mdot
 TEST_F(ThermoTransportTest, CompressibleRoundTripP0) {
     const std::size_t n = species_names.size();
     const std::size_t idx_N2 = species_index_from_name("N2");
@@ -2621,7 +2621,7 @@ TEST_F(ThermoTransportTest, CompressibleRoundTripP0) {
     EXPECT_GT(sol.outlet.T, 300.0);
 
     // Inverse
-    double P0_calc = solve_P0_from_mdot(T0, P_back, A_eff, sol.mdot, X_air);
+    double P0_calc = solve_Pt_from_mdot(T0, P_back, A_eff, sol.mdot, X_air);
 
     EXPECT_NEAR(P0_calc, P0_orig, P0_orig * 0.01);
 }

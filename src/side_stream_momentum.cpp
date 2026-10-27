@@ -131,7 +131,7 @@ MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
   const double dPi_dP = 1.0 + q * (cs.dT_dP / cs.T - 1.0 / P);
   const double dPi_dmout =
       2.0 * std::abs(m_out) * R * cs.T / (P * A * A) + q * (cs.dT_dG * s_out / A) / cs.T;
-  const double dPi_dT0 = q * cs.dT_dT0 / cs.T;
+  const double dPi_dT0 = q * cs.dT_dTt / cs.T;
   const double dPi_dJ = -1.0 / A;
 
   // Main face: static (P_f, T_f) from the impulse and the main stream's
@@ -189,7 +189,7 @@ MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
     auto dPf = [&](double F1_x, double F2_x) { return -(F1_x - F1_Tf * F2_x) / det; };
     dPf_dPi = dPf(-1.0, 0.0);
     dPf_dc = dPf(T_f / P_f, 0.0);
-    dPf_dT0m = dPf(0.0, -fs.dT_dT0);
+    dPf_dT0m = dPf(0.0, -fs.dT_dTt);
     dPf_dGm = dPf(0.0, -fs.dT_dG);
   }
   // T_f = Ts(T0_main, P_f, Gm): its total derivative per input follows P_f.
@@ -225,7 +225,7 @@ MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
   // T0_main: through T_f (F2) and through s(T0_main) in Pt_f.
   out.dPf_dT_main = dPf_dT0m;
   {
-    const double dTf = dTf_dPf * dPf_dT0m + fs.dT_dT0;
+    const double dTf = dTf_dPf * dPf_dT0m + fs.dT_dTt;
     out.dPtf_dT_main = dPt(dPf_dT0m, dTf, 1.0);
   }
 

@@ -60,7 +60,7 @@ def test_the_inlet_is_isentropic_from_the_stagnation_state() -> None:
     s = r.inlet
     assert s.rho * s.u == pytest.approx(G, rel=1e-12)
     assert cb.h_mass(s.T, X) + 0.5 * s.u**2 == pytest.approx(cb.h_mass(TT, X), rel=1e-12)
-    assert cb.P0_from_static(s.P, s.T, s.M, X) == pytest.approx(PT, rel=1e-9)
+    assert cb.Pt_from_static(s.P, s.T, s.M, X) == pytest.approx(PT, rel=1e-9)
 
 
 def test_the_choked_flux_chokes_exactly_at_the_exit() -> None:

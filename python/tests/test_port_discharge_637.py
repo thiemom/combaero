@@ -64,7 +64,7 @@ def test_the_sonic_static_pressure_is_where_the_flux_is_sonic(T0: float, G: floa
         _solver_tools.sonic_static_pressure(T0, G + hG, Y_AIR).P
         - _solver_tools.sonic_static_pressure(T0, G - hG, Y_AIR).P
     ) / (2 * hG)
-    assert s.dP_dT0 == pytest.approx(fdT, rel=1e-7)
+    assert s.dP_dTt == pytest.approx(fdT, rel=1e-7)
     assert s.dP_dG == pytest.approx(fdG, rel=1e-7)
 
 

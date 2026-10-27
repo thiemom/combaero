@@ -86,7 +86,7 @@ def test_solve_P0_from_mdot_round_trip(mdot: float, rel: float) -> None:
     """Small flows need P0 within 0.1% of P_back; the bracket must reach them."""
     X = cb.species.dry_air()
     T0, P_back, A = 600.0, 1.0e5, 2.0e-4
-    P0 = cb.solve_P0_from_mdot(T0, P_back, A, mdot, X)
+    P0 = cb.solve_Pt_from_mdot(T0, P_back, A, mdot, X)
     assert P_back < P0
     assert cb.nozzle_flow(T0, P0, P_back, A, X).mdot == pytest.approx(mdot, rel=rel)
 
@@ -119,11 +119,11 @@ def test_solve_inverse_functions_refuse_invalid_input() -> None:
     with pytest.raises(ValueError):
         cb.solve_A_eff_from_mdot(-600.0, 4e5, 2e5, 0.05, X)
     with pytest.raises(ValueError):
-        cb.solve_P0_from_mdot(-600.0, 1e5, 2e-4, 0.05, X)
+        cb.solve_Pt_from_mdot(-600.0, 1e5, 2e-4, 0.05, X)
     with pytest.raises(ValueError):
-        cb.solve_P0_from_mdot(600.0, -1e5, 2e-4, 0.05, X)
+        cb.solve_Pt_from_mdot(600.0, -1e5, 2e-4, 0.05, X)
     with pytest.raises(ValueError):
-        cb.solve_P0_from_mdot(600.0, 1e5, 0.0, 0.05, X)
+        cb.solve_Pt_from_mdot(600.0, 1e5, 0.0, 0.05, X)
     with pytest.raises(ValueError):
         cb.solve_P_back_from_mdot(-600.0, 4e5, 2e-4, 0.05, X)
     with pytest.raises(ValueError):
@@ -137,8 +137,8 @@ def test_isentropic_relations_constant_gamma_limit(M: float) -> None:
     T, P = 300.0, 1.0e5
     T0_ref = T * (1.0 + 0.5 * (g - 1.0) * M * M)
     P0_ref = P * (T0_ref / T) ** (g / (g - 1.0))
-    assert cb.T0_from_static(T, M, X) == pytest.approx(T0_ref, rel=1e-12)
-    assert cb.P0_from_static(P, T, M, X) == pytest.approx(P0_ref, rel=1e-12)
+    assert cb.Tt_from_static(T, M, X) == pytest.approx(T0_ref, rel=1e-12)
+    assert cb.Pt_from_static(P, T, M, X) == pytest.approx(P0_ref, rel=1e-12)
     assert cb.T_from_stagnation(T0_ref, M, X) == pytest.approx(T, rel=1e-12)
     assert cb.P_from_stagnation(P0_ref, T0_ref, M, X) == pytest.approx(P, rel=1e-12)
     assert cb.mach_from_pressure_ratio(T0_ref, P0_ref, P, X) == pytest.approx(M, rel=1e-10)
@@ -162,8 +162,8 @@ def test_stagnation_helpers_documented_in_api_are_exported() -> None:
     assert v == pytest.approx(0.5 / (1.2 * 1e-3))
     Tt, Pt = cb.stagnation_from_static(T=300.0, P=101325.0, v=v, X=air)
     M = cb.mach_number(v, 300.0, air)
-    assert Tt == pytest.approx(cb.T0_from_static(300.0, M, air), rel=1e-12)
-    assert Pt == pytest.approx(cb.P0_from_static(101325.0, 300.0, M, air), rel=1e-12)
+    assert Tt == pytest.approx(cb.Tt_from_static(300.0, M, air), rel=1e-12)
+    assert Pt == pytest.approx(cb.Pt_from_static(101325.0, 300.0, M, air), rel=1e-12)
 
 
 def test_incompressible_channel_profile_enthalpy_is_mass_basis() -> None:

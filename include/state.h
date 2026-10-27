@@ -21,7 +21,7 @@
 // to carry total rather than static values.
 //
 // For the network solver, use MixtureState (NETWORK_ROADMAP.md) which
-// carries both static (T, P) and total (T_total, P_total) explicitly.
+// carries both static (T, P) and total (Tt, Pt) explicitly.
 namespace combaero {
 struct State {
   double T = 298.15;     // Temperature [K]
@@ -116,13 +116,13 @@ struct State {
 };
 
 // High-level thermodynamic state for network nodes.
-// Carries both static (P, T) and total (P_total, T_total) conditions,
+// Carries both static (P, T) and total (Pt, Tt) conditions,
 // along with mass flow and composition.
 struct MixtureState {
   double P = 101325.0;       // Static pressure [Pa]
-  double P_total = 101325.0; // Total pressure [Pa]
+  double Pt = 101325.0;      // Total pressure [Pa]
   double T = 298.15;         // Static temperature [K]
-  double T_total = 298.15;   // Total temperature [K]
+  double Tt = 298.15;        // Total temperature [K]
   double m_dot = 0.0;        // Mass flow rate [kg/s]
   std::vector<double> X;     // Mole fractions [-]
   std::vector<double> Y;     // Mass fractions [-]
@@ -137,7 +137,7 @@ struct MixtureState {
   // Returns a standard State object at stagnation conditions
   State total_state() const {
     State s;
-    s.set_TPX(T_total, P_total, X);
+    s.set_TPX(Tt, Pt, X);
     return s;
   }
 };

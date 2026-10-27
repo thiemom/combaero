@@ -36,7 +36,7 @@ TEST(ChamberMergeFace, NoSideStreamsIsTheChamberItself) {
   const auto st = combaero::chamber_static_state(T, P, m / A, X);
   const double rho = combaero::density(st.T, P, X);
   const double M = m / (rho * A) / combaero::speed_of_sound(st.T, X);
-  EXPECT_NEAR(r.Pt_face, combaero::P0_from_static(P, st.T, M, X), 1e-6 * P);
+  EXPECT_NEAR(r.Pt_face, combaero::Pt_from_static(P, st.T, M, X), 1e-6 * P);
   EXPECT_NEAR(r.M_face, M, 1e-9);
   EXPECT_FALSE(r.choked);
 }
@@ -352,7 +352,7 @@ TEST(SonicStaticState, TheFluxIsSonicThereAndTheDerivativesAreExact) {
                         combaero::sonic_static_state(T0 - hT, G, X).P) / (2.0 * hT);
     const double fdG = (combaero::sonic_static_state(T0, G + hG, X).P -
                         combaero::sonic_static_state(T0, G - hG, X).P) / (2.0 * hG);
-    EXPECT_NEAR(s.dP_dT0 / fdT, 1.0, 1e-7);
+    EXPECT_NEAR(s.dP_dTt / fdT, 1.0, 1e-7);
     EXPECT_NEAR(s.dP_dG / fdG, 1.0, 1e-7);
   }
   EXPECT_EQ(combaero::sonic_static_state(300.0, 0.0, X).P, 0.0);

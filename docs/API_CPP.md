@@ -433,10 +433,19 @@ State reforming_equilibrium(const State& in);
 ## Stagnation / Static Conversions (stagnation.h)
 
 ```cpp
-double T0_from_static(double T, double M, const std::vector<double>& X);
-double P0_from_static(double P, double T, double M, const std::vector<double>& X);
-double T_from_stagnation(double T0, double M, const std::vector<double>& X);
-double P_from_stagnation(double P0, double T0, double M, const std::vector<double>& X);
+double Tt_from_static(double T, double M, const std::vector<double>& X);
+double Tt_from_static_v(double T, double v, const std::vector<double>& X);
+double Pt_from_static(double P, double T, double M, const std::vector<double>& X);
+double T_from_stagnation(double Tt, double M, const std::vector<double>& X);
+double P_from_stagnation(double Pt, double Tt, double M, const std::vector<double>& X);
+// T0_from_static, T0_from_static_v, P0_from_static: [[deprecated]] inline
+// forwarders to the Tt/Pt names (#782), removed in 0.9.0. Likewise
+// solve_P0_from_mdot (compressible.h) and T0_/P0_from_static_and_jacobian_M
+// (solver_interface.h). Renamed struct fields (Stream::Tt/Pt,
+// StreamJacobian::d_Tt/d_Pt, MixtureState::Tt/Pt, NozzleSolution::Tt/Pt,
+// DuctStaticState::d*_dTt/d*_dPt, SonicStatic::dP_dTt,
+// OrificeResult::d_mdot_dTt_up, ChannelResult::d_dP_dTt_up) have no C++
+// alias; the Python bindings keep the old spellings as warning properties.
 
 double T_adiabatic_wall(double T_static, double v, double T, double P,
                         const std::vector<double>& X, bool turbulent = true);
@@ -454,8 +463,8 @@ std::tuple<double, double> stagnation_from_static(
 // G = |m_dot|/A (#576): T from h(T0) = h(T) + (G R T / P)^2 / 2 (unique root),
 // ln(P0/P) = (s(T0) - s(T))/R, Mach, and partials in T0, P and G.
 struct ChamberStaticState {
-    double T, dT_dT0, dT_dP, dT_dG;
-    double lnP0P, dln_dT0, dln_dP, dln_dG;
+    double T, dT_dTt, dT_dP, dT_dG;
+    double lnP0P, dln_dTt, dln_dP, dln_dG;
     double M;
 };
 ChamberStaticState chamber_static_state(double T0, double P, double G,
@@ -467,34 +476,34 @@ struct ChamberStaticStateDX { std::vector<double> dT_dX, dlnP0P_dX; };
 ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
                                             const std::vector<double>& X);
 
-// The SONIC static state of flux G at stagnation T0 (#637): T* from
-// h(T0) - h(T*) = a*^2 / 2, P* = G sqrt(R T* / gamma*), with dT*/dT0,
+// The SONIC static state of flux G at stagnation Tt (#637): T* from
+// h(Tt) - h(T*) = a*^2 / 2, P* = G sqrt(R T* / gamma*), with dT*/dT0,
 // dP*/dT0 and dP*/dG. A chamber discharging into a reservoir cannot sit
 // below P*.
-struct SonicStaticState { double T, P, dT_dT0, dP_dT0, dP_dG; };
-SonicStaticState sonic_static_state(double T0, double G, const std::vector<double>& X);
+struct SonicStaticState { double T, P, dT_dTt, dP_dTt, dP_dG; };
+SonicStaticState sonic_static_state(double Tt, double G, const std::vector<double>& X);
 
-// Static state at a duct inlet fed from stagnation (T0, P0) at mass flux G
+// Static state at a duct inlet fed from stagnation (Tt, Pt) at mass flux G
 // (#636): chamber_static_state at the static P whose isentropic stagnation
-// pressure is P0 (bracketed Newton on the subsonic branch [P*, P0]). Above
-// the choked flux: the sonic state, choked = true, no G dependence. T0 and P0
+// pressure is Pt (bracketed Newton on the subsonic branch [P*, Pt]). Above
+// the choked flux: the sonic state, choked = true, no G dependence. Tt and Pt
 // are floored at thermo::T_FLOOR / thermo::P_FLOOR (partials 0 there). The
 // network's duct heat transfer is evaluated at this state, not at the feed
 // node's (stagnation) T.
 struct DuctStaticState {
     double T, P, rho, M;
-    double dT_dT0, dT_dP0, dT_dG;
-    double dP_dT0, dP_dP0, dP_dG;
+    double dT_dTt, dT_dP0, dT_dG;
+    double dP_dTt, dP_dP0, dP_dG;
     double drho_dT0, drho_dP0, drho_dG;
     bool choked;
 };
-DuctStaticState duct_static_state(double T0, double P0, double G,
+DuctStaticState duct_static_state(double Tt, double Pt, double G,
                                   const std::vector<double>& X);
 
-// duct_htc_static_state's mass-fraction gradients at fixed T0, P0, G (#717):
+// duct_htc_static_state's mass-fraction gradients at fixed Tt, Pt, G (#717):
 // the implicit energy/entropy balances, plus the near-choke bent flux.
 struct DuctStaticStateDY { std::vector<double> dT_dY, dP_dY, drho_dY, dGeff_dY; };
-DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
+DuctStaticStateDY duct_htc_static_state_dY(double Tt, double Pt, double G,
                                            const std::vector<double>& X,
                                            const DuctStaticState& state);  // the solved htc state
 ```
@@ -533,7 +542,7 @@ struct FannoSolution {
 // 200 K, which zeroed the flow from a stagnation state at or below 200 K, #552)
 // and has no upper bound (a 6000 K cap read a hotter stream's density at
 // 6000 K, #626); likewise the stagnation conversions (stagnation.h).
-CompressibleFlowSolution nozzle_flow(double T0, double P0, double P_back,
+CompressibleFlowSolution nozzle_flow(double Tt, double Pt, double P_back,
                                      double A_eff, const std::vector<double>& X,
                                      double tol = 1e-8, std::size_t max_iter = 50);
 
@@ -558,24 +567,24 @@ struct NozzleStation {
 
 struct NozzleSolution {
     State inlet, outlet;
-    double mdot, h0, T0, P0;
+    double mdot, h0, Tt, Pt;
     bool choked;
     double x_throat, A_throat;
     std::vector<NozzleStation> profile;
 };
 
-NozzleSolution nozzle_quasi1d(double T0, double P0, double P_exit,
+NozzleSolution nozzle_quasi1d(double Tt, double Pt, double P_exit,
                              const AreaFunction& area_func,
                              double x_start, double x_end,
                              const std::vector<double>& X,
                              std::size_t n_stations = 100);
 
-NozzleSolution nozzle_quasi1d(double T0, double P0, double P_exit,
+NozzleSolution nozzle_quasi1d(double Tt, double Pt, double P_exit,
                              const std::vector<std::pair<double, double>>& area_profile,
                              const std::vector<double>& X,
                              std::size_t n_stations = 100);
 
-NozzleSolution nozzle_cd(double T0, double P0, double P_exit,
+NozzleSolution nozzle_cd(double Tt, double Pt, double P_exit,
                          double A_inlet, double A_throat, double A_exit,
                          double x_throat, double x_exit,
                          const std::vector<double>& X,
@@ -584,29 +593,29 @@ NozzleSolution nozzle_cd(double T0, double P0, double P_exit,
 
 ### Inverse Solvers
 ```cpp
-double solve_A_eff_from_mdot(double T0, double P0, double P_back, double mdot_target,
+double solve_A_eff_from_mdot(double Tt, double Pt, double P_back, double mdot_target,
                              const std::vector<double>& X,
                              double tol = 1e-8, std::size_t max_iter = 50);
 
-double solve_P_back_from_mdot(double T0, double P0, double A_eff, double mdot_target,
+double solve_P_back_from_mdot(double Tt, double Pt, double A_eff, double mdot_target,
                              const std::vector<double>& X,
                              double tol = 1e-8, std::size_t max_iter = 50);
 
-double solve_P0_from_mdot(double T0, double P_back, double A_eff, double mdot_target,
+double solve_Pt_from_mdot(double Tt, double P_back, double A_eff, double mdot_target,
                          const std::vector<double>& X,
                          double tol = 1e-8, std::size_t max_iter = 50);
 ```
 
 ### Utility Functions
 ```cpp
-double critical_pressure_ratio(double T0, double P0, const std::vector<double>& X,
+double critical_pressure_ratio(double Tt, double Pt, const std::vector<double>& X,
                                double tol = 1e-8, std::size_t max_iter = 50);
 
-double mach_from_pressure_ratio(double T0, double P0, double P,
+double mach_from_pressure_ratio(double Tt, double Pt, double P,
                                const std::vector<double>& X,
                                double tol = 1e-8, std::size_t max_iter = 50);
 
-double mass_flux_isentropic(double T0, double P0, double P,
+double mass_flux_isentropic(double Tt, double Pt, double P,
                              const std::vector<double>& X,
                              double tol = 1e-8, std::size_t max_iter = 50);
 
@@ -617,7 +626,7 @@ double fanno_max_length(double T_in, double P_in, double u_in,
 
 The inverse solvers refuse non-positive inputs (`std::invalid_argument`);
 `solve_P_back_from_mdot` throws `std::runtime_error` above the choked flow and
-`solve_A_eff_from_mdot` when `P_back >= P0`. `fanno_max_length` is
+`solve_A_eff_from_mdot` when `P_back >= Pt`. `fanno_max_length` is
 `fanno_length_between(G, Tt, M_in, 1, X, D, 0, "fixed", f)` at the inlet flux
 and stagnation temperature (`tol`, `max_iter` unused) and throws for
 `u_in <= 0` or `f <= 0`.
@@ -722,7 +731,7 @@ struct ThrustResult {
 
 ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb);
 
-ThrustResult nozzle_thrust(double T0, double P0, double P_design, double P_amb,
+ThrustResult nozzle_thrust(double Tt, double Pt, double P_design, double P_amb,
                            double A_inlet, double A_throat, double A_exit,
                            double x_throat, double x_exit,
                            const std::vector<double>& X,
@@ -1842,15 +1851,15 @@ template <typename T> struct CorrelationResult {
 
 struct Stream {
     double m_dot;
-    double T;
-    double P_total;
+    double Tt;  // total temperature [K] (T before #782)
+    double Pt;  // total pressure [Pa] (P_total before #782)
     std::vector<double> Y;
 };
 
 struct StreamJacobian {
     double d_mdot;
-    double d_T;
-    double d_P_total;
+    double d_Tt;
+    double d_Pt;
     std::vector<double> d_Y;
 };
 
@@ -1858,7 +1867,7 @@ struct OrificeResult {
     double m_dot_calc;
     double d_mdot_dP_total_up;
     double d_mdot_dP_static_down;
-    double d_mdot_dT_up;
+    double d_mdot_dTt_up;
     std::vector<double> d_mdot_dY_up;
 };
 
@@ -1866,7 +1875,7 @@ struct ChannelResult {
     double dP_calc;
     double d_dP_d_mdot;
     double d_dP_dP_static_up;
-    double d_dP_dT_up;
+    double d_dP_dTt_up;
     std::vector<double> d_dP_dY_up;
 };
 
@@ -1902,21 +1911,21 @@ inline bool approach_from_static(double beta);
 // Orifice flow with discharge coefficient. Density at P_static_up, or at
 // P_rho_ref when > 0 (its derivative is then d_mdot_dP_rho_ref).
 OrificeResult orifice_residuals_and_jacobian(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta = 0.0, double P_rho_ref = -1.0);
 
 // Channel flow with Darcy friction; exit_head_lost adds the exit dynamic
 // head m|m| / (2 rho A^2), dissipated at a stagnant sink (#588)
 ChannelResult channel_residuals_and_jacobian(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up, double P_static_down, double L, double D,
     double roughness, const std::string& friction_model,
     double f_multiplier = 1.0, bool exit_head_lost = false);
 
 // Flow restriction (K-factor)
 ChannelResult restriction_residuals_and_jacobian(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up, double P_static_down, double K);
 ```
 
@@ -1924,30 +1933,30 @@ ChannelResult restriction_residuals_and_jacobian(
 ```cpp
 // Compressible orifice flow using isentropic nozzle model
 std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
-    double T0, double P0, double P_back, const std::vector<double>& X,
+    double Tt, double Pt, double P_back, const std::vector<double>& X,
     double Cd, double area, double beta);
 
-// Full compressible orifice evaluation for network solver. T_up is the
+// Full compressible orifice evaluation for network solver. Tt_up is the
 // upstream stagnation temperature. The nozzle expands from the state
-// approach_from_static picks: (T_up, P_total_up) without E; with E the
+// approach_from_static picks: (Tt_up, P_total_up) without E; with E the
 // upstream static state, P_static_up at the isentrope's temperature through
-// (T_up, P_total_up).
+// (Tt_up, P_total_up).
 OrificeResult orifice_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta);
 
 // The sonic static pressure P* = G sqrt(R T* / gamma*) of a chamber at
-// stagnation T0 and mass flux G (#637), T* from h(T0) - h(T*) = a*^2 / 2: the
+// stagnation Tt and mass flux G (#637), T* from h(Tt) - h(T*) = a*^2 / 2: the
 // floor of a junction port's chamber discharging into a pressure boundary.
-SonicStatic sonic_static_pressure(double T0, double G, const std::vector<double>& Y);
+SonicStatic sonic_static_pressure(double Tt, double G, const std::vector<double>& Y);
 
 // The static pressure of an orifice's (or incompressible channel's) approach
 // pipe (#651): the flow at mass flux G from stagnation (Pt, Tt), with its
 // derivatives. Compressible: duct_static_state. Incompressible: the
 // momentum chamber's low-Mach closure Pt = P + G^2 R Tt / (2 P), root
 // [Pt + sqrt(Pt^2 - 2 G^2 R Tt)] / 2; past its maximum flux P = Pt / 2, choked.
-ApproachStatic approach_static_pressure(double P_total, double T_total, double G,
+ApproachStatic approach_static_pressure(double Pt, double Tt, double G,
                                         const std::vector<double>& Y,
                                         bool incompressible);
 
@@ -2221,10 +2230,10 @@ EntropyGenerationResult entropy_generation(
     const std::vector<Stream>& inflows, const std::vector<Stream>& outflows,
     double S_heat = 0.0);
 
-// integral dQ / T [W/K] as a stream's total temperature runs T0_in -> T0_out,
-// at the STATIC temperature (Mach linear in T0 from M_in to M_out). At M = 0
-// exactly m [s(T0_out, P) - s(T0_in, P)]; the Mach part by composite Simpson.
-double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
+// integral dQ / T [W/K] as a stream's total temperature runs Tt_in -> Tt_out,
+// at the STATIC temperature (Mach linear in Tt from M_in to M_out). At M = 0
+// exactly m [s(Tt_out, P) - s(Tt_in, P)]; the Mach part by composite Simpson.
+double heat_entropy_flux(double m_dot, double Tt_in, double Tt_out,
                          const std::vector<double>& Y, double M_in = 0.0,
                          double M_out = 0.0);
 

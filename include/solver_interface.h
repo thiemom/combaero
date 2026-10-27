@@ -42,15 +42,15 @@ template <typename T> struct CorrelationResult {
 
 struct Stream {
   double m_dot;
-  double T;
-  double P_total;
+  double Tt;  // total (stagnation) temperature [K]
+  double Pt;  // total pressure [Pa]
   std::vector<double> Y;
 };
 
 struct StreamJacobian {
   double d_mdot;
-  double d_T;
-  double d_P_total;
+  double d_Tt;
+  double d_Pt;
   std::vector<double> d_Y;
 };
 
@@ -86,7 +86,7 @@ struct OrificeResult {
   double d_mdot_dP_static_down;
   double d_mdot_dP_static_up;
   double d_mdot_dP_rho_ref = 0.0;  // density reference named by P_rho_ref
-  double d_mdot_dT_up;
+  double d_mdot_dTt_up;
   std::vector<double> d_mdot_dY_up;
 };
 
@@ -94,7 +94,7 @@ struct ChannelResult {
   double dP_calc;
   double d_dP_d_mdot;
   double d_dP_dP_static_up;
-  double d_dP_dT_up;
+  double d_dP_dTt_up;
   std::vector<double> d_dP_dY_up;
 };
 
@@ -135,7 +135,7 @@ inline bool approach_from_static(double beta) { return beta > 0.0 && beta < 1.0;
 // approach_from_static. The density is evaluated at P_static_up, or at
 // P_rho_ref when that is > 0 (its derivative then goes to d_mdot_dP_rho_ref).
 OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
-                                             double P_static_up, double T_up,
+                                             double P_static_up, double Tt_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double Cd,
                                              double area, double beta,
@@ -164,7 +164,7 @@ std::tuple<double, double> pressure_loss_and_jacobian(double v, double rho,
 // head, exactly as the compressible Fanno form does (#588). rho is the
 // upstream static density, the same constant density the friction term uses.
 ChannelResult channel_residuals_and_jacobian(double m_dot, double P_total_up,
-                                             double P_static_up, double T_up,
+                                             double P_static_up, double Tt_up,
                                              const std::vector<double> &Y_up,
                                              double P_static_down, double L,
                                              double D, double roughness,
@@ -212,7 +212,7 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 //   d_mdot_dP_back : Jacobian w.r.t. back pressure [kg/(s*Pa)] (smooth through choked transition)
 //   d_mdot_dT0     : Jacobian w.r.t. stagnation temperature [kg/(s*K)]
 std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
-    double T0, double P0, double P_back,
+    double Tt, double Pt, double P_back,
     const std::vector<double>& X,
     double Cd, double area, double beta);
 
@@ -222,7 +222,7 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
 // P_total_up); with E from the upstream static state, P_static_up at the
 // temperature on the isentrope through (T_up, P_total_up) (#645).
 OrificeResult orifice_compressible_residuals_and_jacobian(
-    double m_dot, double P_total_up, double P_static_up, double T_up,
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
@@ -255,12 +255,12 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 struct SonicStatic {
   double P;
   double T;
-  double dP_dT0;
+  double dP_dTt;
   double dP_dG;
   std::vector<double> dP_dY;
 };
 
-SonicStatic sonic_static_pressure(double T0, double G, const std::vector<double>& Y);
+SonicStatic sonic_static_pressure(double Tt, double G, const std::vector<double>& Y);
 
 struct ApproachStatic {
   double P;
@@ -271,7 +271,7 @@ struct ApproachStatic {
   bool choked;
 };
 
-ApproachStatic approach_static_pressure(double P_total, double T_total, double G,
+ApproachStatic approach_static_pressure(double Pt, double Tt, double G,
                                         const std::vector<double>& Y,
                                         bool incompressible);
 
@@ -466,14 +466,27 @@ T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
 // Calculate Stagnation Temperature from Static and its derivative wrt Mach
 // Method: Central Finite Difference
 std::tuple<double, double>
-T0_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X);
+Tt_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X);
 
 // Calculate Stagnation Pressure from Static and its derivative wrt Mach
 // Method: Central Finite Difference
 std::tuple<double, double>
-P0_from_static_and_jacobian_M(double P, double T, double M,
+Pt_from_static_and_jacobian_M(double P, double T, double M,
                               const std::vector<double> &X,
                               double tol = 1e-8, std::size_t max_iter = 50);
+
+// Deprecated names (#782), removed in 0.9.0.
+[[deprecated("renamed Tt_from_static_and_jacobian_M (#782); removed in 0.9.0")]]
+inline std::tuple<double, double>
+T0_from_static_and_jacobian_M(double T, double M, const std::vector<double> &X) {
+  return Tt_from_static_and_jacobian_M(T, M, X);
+}
+[[deprecated("renamed Pt_from_static_and_jacobian_M (#782); removed in 0.9.0")]]
+inline std::tuple<double, double>
+P0_from_static_and_jacobian_M(double P, double T, double M, const std::vector<double> &X,
+                              double tol = 1e-8, std::size_t max_iter = 50) {
+  return Pt_from_static_and_jacobian_M(P, T, M, X, tol, max_iter);
+}
 
 // -----------------------------------------------------------------------------
 // 6. Combustion Interfaces
@@ -582,7 +595,7 @@ EntropyGenerationResult entropy_generation(const std::vector<Stream> &inflows,
 // P. Heating at Mach M brings in more entropy than at M = 0 -- the static
 // temperature is lower -- which is the total-pressure cost of Rayleigh flow,
 // and cooling the gain. Variable cp throughout (composite Simpson, n = 64).
-double heat_entropy_flux(double m_dot, double T0_in, double T0_out,
+double heat_entropy_flux(double m_dot, double Tt_in, double Tt_out,
                          const std::vector<double> &Y, double M_in = 0.0,
                          double M_out = 0.0);
 

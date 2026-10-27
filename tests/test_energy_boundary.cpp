@@ -41,8 +41,8 @@ TEST(EnergyBoundaryTest, MixerQ_PositiveHeating) {
   // Single air stream at 300K, mdot=1 kg/s, Q=50 kW -> delta_h=50 kJ/kg
   sv::Stream st;
   st.m_dot = 1.0;
-  st.T = 300.0;
-  st.P_total = 101325.0;
+  st.Tt = 300.0;
+  st.Pt = 101325.0;
   st.Y = air_Y();
 
   double Q = 50000.0; // 50 kW
@@ -69,8 +69,8 @@ TEST(EnergyBoundaryTest, MixerQ_NegativeCooling) {
   // Single air stream at 800K, mdot=1 kg/s, Q=-100 kW -> T should drop
   sv::Stream st;
   st.m_dot = 1.0;
-  st.T = 800.0;
-  st.P_total = 101325.0;
+  st.Tt = 800.0;
+  st.Pt = 101325.0;
   st.Y = air_Y();
 
   double Q = -100000.0; // -100 kW
@@ -87,8 +87,8 @@ TEST(EnergyBoundaryTest, MixerQ_NegativeCooling) {
 TEST(EnergyBoundaryTest, MixerQ_ZeroIsNoop) {
   sv::Stream st;
   st.m_dot = 1.0;
-  st.T = 500.0;
-  st.P_total = 200000.0;
+  st.Tt = 500.0;
+  st.Pt = 200000.0;
   st.Y = air_Y();
 
   auto res_zero = sv::mixer_from_streams_and_jacobians({st}, 0.0, 0.0);
@@ -102,14 +102,14 @@ TEST(EnergyBoundaryTest, MixerQ_TwoStreams) {
   // Two streams with different T, mdot_tot=1.0 kg/s, Q=20 kW
   sv::Stream s1;
   s1.m_dot = 0.5;
-  s1.T = 300.0;
-  s1.P_total = 101325.0;
+  s1.Tt = 300.0;
+  s1.Pt = 101325.0;
   s1.Y = air_Y();
 
   sv::Stream s2;
   s2.m_dot = 0.5;
-  s2.T = 600.0;
-  s2.P_total = 101325.0;
+  s2.Tt = 600.0;
+  s2.Pt = 101325.0;
   s2.Y = air_Y();
 
   double Q = 20000.0; // 20 kW
@@ -136,8 +136,8 @@ TEST(EnergyBoundaryTest, MixerFraction_NegativeCooling) {
   // Single air stream, fraction=-0.05 -> 5% enthalpy loss
   sv::Stream st;
   st.m_dot = 1.0;
-  st.T = 600.0;
-  st.P_total = 101325.0;
+  st.Tt = 600.0;
+  st.Pt = 101325.0;
   st.Y = air_Y();
 
   double fraction = -0.05;
@@ -158,14 +158,14 @@ TEST(EnergyBoundaryTest, MixerFraction_PositiveHeating) {
   // Two streams, fraction=0.10 -> 10% enthalpy gain
   sv::Stream s1;
   s1.m_dot = 0.5;
-  s1.T = 400.0;
-  s1.P_total = 101325.0;
+  s1.Tt = 400.0;
+  s1.Pt = 101325.0;
   s1.Y = air_Y();
 
   sv::Stream s2;
   s2.m_dot = 0.5;
-  s2.T = 800.0;
-  s2.P_total = 101325.0;
+  s2.Tt = 800.0;
+  s2.Pt = 101325.0;
   s2.Y = air_Y();
 
   double fraction = 0.10;
@@ -186,8 +186,8 @@ TEST(EnergyBoundaryTest, MixerCombined_Q_and_Fraction) {
   // Both Q and fraction set: effective Q = Q + fraction * H_tot
   sv::Stream st;
   st.m_dot = 2.0;
-  st.T = 500.0;
-  st.P_total = 101325.0;
+  st.Tt = 500.0;
+  st.Pt = 101325.0;
   st.Y = air_Y();
 
   double Q = 10000.0; // 10 kW
@@ -197,7 +197,7 @@ TEST(EnergyBoundaryTest, MixerCombined_Q_and_Fraction) {
 
   // Compute expected delta_h manually
   std::vector<double> X = mass_to_mole(normalize_fractions(st.Y));
-  double h_in = h_mass(st.T, X);
+  double h_in = h_mass(st.Tt, X);
   double H_tot = st.m_dot * h_in;
   double Q_eff = Q + fraction * H_tot;
   double delta_h_expected = Q_eff / st.m_dot;
@@ -214,8 +214,8 @@ TEST(EnergyBoundaryTest, MixerJacobian_Q_dT_dmdot_SingleStream) {
   // Verify dT/dmdot includes Q correction: -Q/mdot^2
   sv::Stream st;
   st.m_dot = 1.0;
-  st.T = 500.0;
-  st.P_total = 200000.0;
+  st.Tt = 500.0;
+  st.Pt = 200000.0;
   st.Y = air_Y();
 
   double Q = 50000.0; // 50 kW
@@ -239,14 +239,14 @@ TEST(EnergyBoundaryTest, MixerJacobian_Q_dT_dmdot_TwoStreams) {
   // Two streams with Q: verify both dT/dmdot_i derivatives
   sv::Stream s1;
   s1.m_dot = 0.3;
-  s1.T = 400.0;
-  s1.P_total = 150000.0;
+  s1.Tt = 400.0;
+  s1.Pt = 150000.0;
   s1.Y = air_Y();
 
   sv::Stream s2;
   s2.m_dot = 0.7;
-  s2.T = 700.0;
-  s2.P_total = 150000.0;
+  s2.Tt = 700.0;
+  s2.Pt = 150000.0;
   s2.Y = air_Y();
 
   double Q = -30000.0; // -30 kW
@@ -286,14 +286,14 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dmdot) {
   // Verify dT/dmdot includes fraction correction
   sv::Stream s1;
   s1.m_dot = 0.4;
-  s1.T = 400.0;
-  s1.P_total = 150000.0;
+  s1.Tt = 400.0;
+  s1.Pt = 150000.0;
   s1.Y = air_Y();
 
   sv::Stream s2;
   s2.m_dot = 0.6;
-  s2.T = 800.0;
-  s2.P_total = 150000.0;
+  s2.Tt = 800.0;
+  s2.Pt = 150000.0;
   s2.Y = air_Y();
 
   double fraction = -0.03; // -3%
@@ -317,14 +317,14 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dT) {
   // Verify dT/dT_i includes fraction correction
   sv::Stream s1;
   s1.m_dot = 0.5;
-  s1.T = 500.0;
-  s1.P_total = 150000.0;
+  s1.Tt = 500.0;
+  s1.Pt = 150000.0;
   s1.Y = air_Y();
 
   sv::Stream s2;
   s2.m_dot = 0.5;
-  s2.T = 700.0;
-  s2.P_total = 150000.0;
+  s2.Tt = 700.0;
+  s2.Pt = 150000.0;
   s2.Y = air_Y();
 
   double fraction = 0.05; // +5%
@@ -333,26 +333,26 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dT) {
   // FD: dT_mix/dT_1
   double eps_T = 0.01;
   sv::Stream s1_Tp = s1;
-  s1_Tp.T += eps_T;
+  s1_Tp.Tt += eps_T;
   sv::Stream s1_Tm = s1;
-  s1_Tm.T -= eps_T;
+  s1_Tm.Tt -= eps_T;
   auto res_Tp = sv::mixer_from_streams_and_jacobians({s1_Tp, s2}, 0.0, fraction);
   auto res_Tm = sv::mixer_from_streams_and_jacobians({s1_Tm, s2}, 0.0, fraction);
   double fd_dT1 = (res_Tp.T_mix - res_Tm.T_mix) / (2.0 * eps_T);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[0].d_T, fd_dT1,
+  EXPECT_NEAR(res.dT_mix_d_stream[0].d_Tt, fd_dT1,
               std::max(std::abs(fd_dT1) * 1e-4, 1e-6));
 
   // FD: dT_mix/dT_2
   sv::Stream s2_Tp = s2;
-  s2_Tp.T += eps_T;
+  s2_Tp.Tt += eps_T;
   sv::Stream s2_Tm = s2;
-  s2_Tm.T -= eps_T;
+  s2_Tm.Tt -= eps_T;
   auto res2_Tp = sv::mixer_from_streams_and_jacobians({s1, s2_Tp}, 0.0, fraction);
   auto res2_Tm = sv::mixer_from_streams_and_jacobians({s1, s2_Tm}, 0.0, fraction);
   double fd_dT2 = (res2_Tp.T_mix - res2_Tm.T_mix) / (2.0 * eps_T);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[1].d_T, fd_dT2,
+  EXPECT_NEAR(res.dT_mix_d_stream[1].d_Tt, fd_dT2,
               std::max(std::abs(fd_dT2) * 1e-4, 1e-6));
 }
 
@@ -360,8 +360,8 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dY) {
   // Verify dT/dY_i includes fraction correction
   sv::Stream st;
   st.m_dot = 1.0;
-  st.T = 600.0;
-  st.P_total = 150000.0;
+  st.Tt = 600.0;
+  st.Pt = 150000.0;
   st.Y = air_Y();
 
   double fraction = -0.04; // -4%
@@ -398,14 +398,14 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Q_Cooling) {
   // Combust CH4 + air, then apply heat loss via Q
   sv::Stream fuel;
   fuel.m_dot = 0.05;
-  fuel.T = 300.0;
-  fuel.P_total = 101325.0;
+  fuel.Tt = 300.0;
+  fuel.Pt = 101325.0;
   fuel.Y = ch4_Y();
 
   sv::Stream ox;
   ox.m_dot = 1.0;
-  ox.T = 600.0;
-  ox.P_total = 101325.0;
+  ox.Tt = 600.0;
+  ox.Pt = 101325.0;
   ox.Y = air_Y();
 
   double P = 101325.0;
@@ -439,14 +439,14 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Fraction_Cooling) {
   // Combust CH4 + air, then apply heat loss via fraction
   sv::Stream fuel;
   fuel.m_dot = 0.05;
-  fuel.T = 300.0;
-  fuel.P_total = 101325.0;
+  fuel.Tt = 300.0;
+  fuel.Pt = 101325.0;
   fuel.Y = ch4_Y();
 
   sv::Stream ox;
   ox.m_dot = 1.0;
-  ox.T = 600.0;
-  ox.P_total = 101325.0;
+  ox.Tt = 600.0;
+  ox.Pt = 101325.0;
   ox.Y = air_Y();
 
   double P = 101325.0;
@@ -473,14 +473,14 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Fraction_Cooling) {
 TEST(EnergyBoundaryTest, CompleteCombustion_Q_Zero_IsNoop) {
   sv::Stream fuel;
   fuel.m_dot = 0.05;
-  fuel.T = 300.0;
-  fuel.P_total = 101325.0;
+  fuel.Tt = 300.0;
+  fuel.Pt = 101325.0;
   fuel.Y = ch4_Y();
 
   sv::Stream ox;
   ox.m_dot = 1.0;
-  ox.T = 600.0;
-  ox.P_total = 101325.0;
+  ox.Tt = 600.0;
+  ox.Pt = 101325.0;
   ox.Y = air_Y();
 
   double P = 101325.0;
@@ -501,14 +501,14 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Jacobian_Q_dT_dmdot) {
   // Verify combustion dT/dmdot includes Q correction
   sv::Stream fuel;
   fuel.m_dot = 0.05;
-  fuel.T = 300.0;
-  fuel.P_total = 101325.0;
+  fuel.Tt = 300.0;
+  fuel.Pt = 101325.0;
   fuel.Y = ch4_Y();
 
   sv::Stream ox;
   ox.m_dot = 1.0;
-  ox.T = 600.0;
-  ox.P_total = 101325.0;
+  ox.Tt = 600.0;
+  ox.Pt = 101325.0;
   ox.Y = air_Y();
 
   double P = 101325.0;
@@ -537,14 +537,14 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Jacobian_Fraction_dT_dT) {
   // Verify combustion dT/dT_i includes fraction correction
   sv::Stream fuel;
   fuel.m_dot = 0.05;
-  fuel.T = 300.0;
-  fuel.P_total = 101325.0;
+  fuel.Tt = 300.0;
+  fuel.Pt = 101325.0;
   fuel.Y = ch4_Y();
 
   sv::Stream ox;
   ox.m_dot = 1.0;
-  ox.T = 600.0;
-  ox.P_total = 101325.0;
+  ox.Tt = 600.0;
+  ox.Pt = 101325.0;
   ox.Y = air_Y();
 
   double P = 101325.0;
@@ -556,16 +556,16 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Jacobian_Fraction_dT_dT) {
   // FD: dT/dT_air
   double eps_T = 0.5;
   sv::Stream ox_Tp = ox;
-  ox_Tp.T += eps_T;
+  ox_Tp.Tt += eps_T;
   sv::Stream ox_Tm = ox;
-  ox_Tm.T -= eps_T;
+  ox_Tm.Tt -= eps_T;
   auto res_Tp = sv::adiabatic_T_complete_and_jacobian_T_from_streams(
       {fuel, ox_Tp}, P, 0.0, fraction);
   auto res_Tm = sv::adiabatic_T_complete_and_jacobian_T_from_streams(
       {fuel, ox_Tm}, P, 0.0, fraction);
   double fd_dT = (res_Tp.T_mix - res_Tm.T_mix) / (2.0 * eps_T);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[1].d_T, fd_dT,
+  EXPECT_NEAR(res.dT_mix_d_stream[1].d_Tt, fd_dT,
               std::max(std::abs(fd_dT) * 0.06, 1e-4));
 }
 
@@ -576,14 +576,14 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Jacobian_Fraction_dT_dT) {
 TEST(EnergyBoundaryTest, EquilibriumCombustion_Q_Cooling) {
   sv::Stream fuel;
   fuel.m_dot = 0.05;
-  fuel.T = 300.0;
-  fuel.P_total = 101325.0;
+  fuel.Tt = 300.0;
+  fuel.Pt = 101325.0;
   fuel.Y = ch4_Y();
 
   sv::Stream ox;
   ox.m_dot = 1.0;
-  ox.T = 600.0;
-  ox.P_total = 101325.0;
+  ox.Tt = 600.0;
+  ox.Pt = 101325.0;
   ox.Y = air_Y();
 
   double P = 101325.0;
@@ -601,14 +601,14 @@ TEST(EnergyBoundaryTest, EquilibriumCombustion_Jacobian_Fraction_dT_dmdot) {
   // Verify equilibrium combustion dT/dmdot with fraction
   sv::Stream fuel;
   fuel.m_dot = 0.05;
-  fuel.T = 300.0;
-  fuel.P_total = 101325.0;
+  fuel.Tt = 300.0;
+  fuel.Pt = 101325.0;
   fuel.Y = ch4_Y();
 
   sv::Stream ox;
   ox.m_dot = 1.0;
-  ox.T = 600.0;
-  ox.P_total = 101325.0;
+  ox.Tt = 600.0;
+  ox.Pt = 101325.0;
   ox.Y = air_Y();
 
   double P = 101325.0;

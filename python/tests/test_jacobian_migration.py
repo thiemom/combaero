@@ -60,14 +60,14 @@ def test_orifice_jacobian_accuracy():
     print("\nOrifice Comparison:")
     print(f"Total Up: Analytical={res_obj.d_mdot_dP_total_up:.6e}, Numerical={d_tot_num:.6e}")
     print(f"Static Up: Analytical={res_obj.d_mdot_dP_static_up:.6e}, Numerical={d_stat_num:.6e}")
-    print(f"Temp Up: Analytical={res_obj.d_mdot_dT_up:.6e}, Numerical={d_temp_num:.6e}")
+    print(f"Temp Up: Analytical={res_obj.d_mdot_dTt_up:.6e}, Numerical={d_temp_num:.6e}")
     print(
         f"Static Down: Analytical={res_obj.d_mdot_dP_static_down:.6e}, Numerical={d_down_num:.6e}"
     )
 
     assert res_obj.d_mdot_dP_total_up == pytest.approx(d_tot_num, rel=1e-4)
     assert res_obj.d_mdot_dP_static_up == pytest.approx(d_stat_num, rel=1e-4)
-    assert res_obj.d_mdot_dT_up == pytest.approx(d_temp_num, rel=1e-4)
+    assert res_obj.d_mdot_dTt_up == pytest.approx(d_temp_num, rel=1e-4)
     assert res_obj.d_mdot_dP_static_down == pytest.approx(d_down_num, rel=1e-4)
 
 
@@ -121,8 +121,8 @@ def test_channel_jacobian_accuracy():
     print("\nChannel Comparison:")
     print(f"m_dot: Analytical={res_obj.d_dP_d_mdot:.6e}, Numerical={d_mdot_num:.6e}")
     print(f"Static Up: Analytical={res_obj.d_dP_dP_static_up:.6e}, Numerical={d_stat_num:.6e}")
-    print(f"Temp Up: Analytical={res_obj.d_dP_dT_up:.6e}, Numerical={d_temp_num:.6e}")
+    print(f"Temp Up: Analytical={res_obj.d_dP_dTt_up:.6e}, Numerical={d_temp_num:.6e}")
 
     assert res_obj.d_dP_d_mdot == pytest.approx(d_mdot_num, rel=1e-4)
     assert res_obj.d_dP_dP_static_up == pytest.approx(d_stat_num, rel=1e-4)
-    assert res_obj.d_dP_dT_up == pytest.approx(d_temp_num, rel=1e-4)
+    assert res_obj.d_dP_dTt_up == pytest.approx(d_temp_num, rel=1e-4)

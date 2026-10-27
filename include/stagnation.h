@@ -73,52 +73,70 @@ double mach_number(double v, double T, const std::vector<double>& X);
 // Stagnation temperature (iterative -- variable cp)
 // -------------------------------------------------------------
 
-// Stagnation temperature T0 from static T and Mach number.
-// Solves h(T0) = h(T) + v^2/2 iteratively using Newton on h(T).
+// Stagnation temperature Tt from static T and Mach number.
+// Solves h(Tt) = h(T) + v^2/2 iteratively using Newton on h(T).
 // v = M * a(T, X)  is computed internally.
 //
 // Parameters:
 //   T   : static temperature [K]
 //   M   : Mach number [-]
 //   X   : mole fractions [-]
-// Returns: stagnation temperature T0 [K]
-double T0_from_static(double T, double M, const std::vector<double>& X,
+// Returns: stagnation temperature Tt [K]
+double Tt_from_static(double T, double M, const std::vector<double>& X,
                       double tol = 1e-8, std::size_t max_iter = 50);
 
-// Convenience: T0 from static T and velocity v [m/s]
-double T0_from_static_v(double T, double v, const std::vector<double>& X,
+// Convenience: Tt from static T and velocity v [m/s]
+double Tt_from_static_v(double T, double v, const std::vector<double>& X,
                         double tol = 1e-8, std::size_t max_iter = 50);
 
-// Static temperature from stagnation T0 and Mach number.
-// Solves h(T0) = h(T) + M^2*a(T)^2/2 iteratively.
+// Static temperature from stagnation Tt and Mach number.
+// Solves h(Tt) = h(T) + M^2*a(T)^2/2 iteratively.
 // Returns: static temperature T [K]
-double T_from_stagnation(double T0, double M, const std::vector<double>& X,
+double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
                          double tol = 1e-8, std::size_t max_iter = 50);
 
 // -------------------------------------------------------------
 // Stagnation pressure (isentropic -- uses entropy conservation)
 // -------------------------------------------------------------
 
-// Stagnation pressure P0 from static (P, T) and Mach number.
-// Uses isentropic relation: s(T0, P0) = s(T, P)
-// Solves for P0 given T0 = T0_from_static(T, M, X).
+// Stagnation pressure Pt from static (P, T) and Mach number.
+// Uses isentropic relation: s(Tt, Pt) = s(T, P)
+// Solves for Pt given Tt = Tt_from_static(T, M, X).
 //
 // Parameters:
 //   P   : static pressure [Pa]
 //   T   : static temperature [K]
 //   M   : Mach number [-]
 //   X   : mole fractions [-]
-// Returns: stagnation pressure P0 [Pa]
-double P0_from_static(double P, double T, double M,
+// Returns: stagnation pressure Pt [Pa]
+double Pt_from_static(double P, double T, double M,
                       const std::vector<double>& X,
                       double tol = 1e-8, std::size_t max_iter = 50);
 
-// Static pressure from stagnation (P0, T0) and Mach number.
-// Uses isentropic relation: s(T, P) = s(T0, P0)
+// Static pressure from stagnation (Pt, Tt) and Mach number.
+// Uses isentropic relation: s(T, P) = s(Tt, Pt)
 // Returns: static pressure P [Pa]
-double P_from_stagnation(double P0, double T0, double M,
+double P_from_stagnation(double Pt, double Tt, double M,
                          const std::vector<double>& X,
                          double tol = 1e-8, std::size_t max_iter = 50);
+
+// Deprecated names (#782): the T0/P0 spelling of the functions above. They
+// forward unchanged and are removed in 0.9.0.
+[[deprecated("renamed Tt_from_static (#782); removed in 0.9.0")]]
+inline double T0_from_static(double T, double M, const std::vector<double>& X,
+                             double tol = 1e-8, std::size_t max_iter = 50) {
+  return Tt_from_static(T, M, X, tol, max_iter);
+}
+[[deprecated("renamed Tt_from_static_v (#782); removed in 0.9.0")]]
+inline double T0_from_static_v(double T, double v, const std::vector<double>& X,
+                               double tol = 1e-8, std::size_t max_iter = 50) {
+  return Tt_from_static_v(T, v, X, tol, max_iter);
+}
+[[deprecated("renamed Pt_from_static (#782); removed in 0.9.0")]]
+inline double P0_from_static(double P, double T, double M, const std::vector<double>& X,
+                             double tol = 1e-8, std::size_t max_iter = 50) {
+  return Pt_from_static(P, T, M, X, tol, max_iter);
+}
 
 // -------------------------------------------------------------
 // Adiabatic wall temperature
@@ -149,7 +167,7 @@ double T_adiabatic_wall(double T_static, double v,
 
 // Combined stagnation state from static conditions and velocity.
 // Returns (Tt, Pt) = (T0, P0) in a single call.
-// Equivalent to calling T0_from_static_v then P0_from_static, but avoids
+// Equivalent to calling Tt_from_static_v then Pt_from_static, but avoids
 // recomputing Mach number internally.
 std::tuple<double, double> stagnation_from_static(
     double T, double P, double v,
@@ -184,9 +202,9 @@ double recovery_factor(double Pr, bool turbulent = true);
 // through the implicit f).
 struct ChamberStaticState {
   double T;
-  double dT_dT0, dT_dP, dT_dG;
+  double dT_dTt, dT_dP, dT_dG;
   double lnP0P;
-  double dln_dT0, dln_dP, dln_dG;
+  double dln_dTt, dln_dP, dln_dG;
   double M;
 };
 
@@ -204,49 +222,49 @@ ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
                                             const std::vector<double>& X);
 
 // -------------------------------------------------------------
-// The SONIC static state of a flow at stagnation temperature T0 and mass flux
-// G (#637): T* from h(T0) - h(T*) = a(T*)^2 / 2 (variable cp, a^2 = gamma R T),
+// The SONIC static state of a flow at stagnation temperature Tt and mass flux
+// G (#637): T* from h(Tt) - h(T*) = a(T*)^2 / 2 (variable cp, a^2 = gamma R T),
 // and the static pressure at which G is sonic, P* = G sqrt(R T* / gamma*)
 // (rho* a* = G with rho* = P* / (R T*)). A chamber of that flux cannot sit below P*: a
 // duct discharging into a reservoir below it leaves choked, under-expanded,
-// at P*. Derivatives in T0 and G are closed form (implicit function on T*).
+// at P*. Derivatives in Tt and G are closed form (implicit function on T*).
 // G = 0 gives P* = 0.
 struct SonicStaticState {
   double T;
   double P;
-  double dT_dT0;
-  double dP_dT0;
+  double dT_dTt;
+  double dP_dTt;
   double dP_dG;
 };
 
-SonicStaticState sonic_static_state(double T0, double G, const std::vector<double>& X);
+SonicStaticState sonic_static_state(double Tt, double G, const std::vector<double>& X);
 
 // -------------------------------------------------------------
-// Static state at a duct's inlet from the STAGNATION state (T0, P0) it is
+// Static state at a duct's inlet from the STAGNATION state (Tt, Pt) it is
 // fed from and its mass flux G = |m_dot| / A (#636): the isentropic
 // acceleration from rest, i.e. chamber_static_state at the static P whose
-// isentropic stagnation pressure is P0,
-//   L(ln P) = ln(P0 / P)|isentropic(T0, P, G) - ln(P0 / P) = 0.
-// L is monotone on the subsonic branch [P*, P0], P* the sonic pressure, so a
+// isentropic stagnation pressure is Pt,
+//   L(ln P) = ln(Pt / P)|isentropic(Tt, P, G) - ln(Pt / P) = 0.
+// L is monotone on the subsonic branch [P*, Pt], P* the sonic pressure, so a
 // bracketed Newton finds the unique subsonic root. A G above the choked
 // mass flux has no subsonic state: the sonic state at P* is returned, with
 // choked = true and no G dependence. A heat-transfer correlation needs this
 // state: a plenum's T is the stagnation T, and reading it as the duct's
-// static T put T_aw above T0 by about (1 + r) (T0 - T).
-// Partials with respect to T0, P0 and G, by the implicit function theorem.
+// static T put T_aw above Tt by about (1 + r) (Tt - T).
+// Partials with respect to Tt, Pt and G, by the implicit function theorem.
 struct DuctStaticState {
   double T, P, rho, M;
-  double dT_dT0, dT_dP0, dT_dG;
-  double dP_dT0, dP_dP0, dP_dG;
-  double drho_dT0, drho_dP0, drho_dG;
+  double dT_dTt, dT_dPt, dT_dG;
+  double dP_dTt, dP_dPt, dP_dG;
+  double drho_dTt, drho_dPt, drho_dG;
   bool choked;
   // The mass flux the state was evaluated at, and its partials: G itself
   // (dGeff_dG = 1) from duct_static_state; the bent flux from
   // duct_htc_static_state.
-  double G_eff, dGeff_dT0, dGeff_dP0, dGeff_dG;
+  double G_eff, dGeff_dTt, dGeff_dPt, dGeff_dG;
 };
 
-DuctStaticState duct_static_state(double T0, double P0, double G,
+DuctStaticState duct_static_state(double Tt, double Pt, double G,
                                   const std::vector<double>& X);
 
 // The duct state a heat-transfer correlation reads (#551): duct_static_state
@@ -256,28 +274,28 @@ DuctStaticState duct_static_state(double T0, double P0, double G,
 // kink there; a duct choked at its INLET -- possible once cooling is in the
 // momentum (Fanno-Rayleigh) -- sits exactly on it, and its wall coupling then
 // could not converge. Below (1 - 2w) G* it is duct_static_state exactly.
-// The partials include G_eff's dependence on (T0, P0) through G*.
+// The partials include G_eff's dependence on (Tt, Pt) through G*.
 constexpr double kDuctHtcSonicMargin = 1e-3;
 
-DuctStaticState duct_htc_static_state(double T0, double P0, double G,
+DuctStaticState duct_htc_static_state(double Tt, double Pt, double G,
                                       const std::vector<double>& X);
 
-// duct_htc_static_state's gradients in the MASS fractions at fixed T0, P0
+// duct_htc_static_state's gradients in the MASS fractions at fixed Tt, Pt
 // and G (#717): the static T, P, rho and the bent flux G_eff. The isentropic
 // energy and entropy balances,
-//   f = h(T0) - h(T) - (G R T / P)^2 / 2 = 0,
-//   L = [sum_j X_j (s_j(T0) - s_j(T))] / R_u - ln(P0 / P) = 0,
+//   f = h(Tt) - h(T) - (G R T / P)^2 / 2 = 0,
+//   L = [sum_j X_j (s_j(Tt) - s_j(T))] / R_u - ln(Pt / P) = 0,
 // differentiated in X at the root (implicit function theorem; h, R and the
 // species s_j are closed form). Near choke G_eff = ge(G / G*) G* also moves
-// with G*(X), differenced like its T0 slope (smooth there). Zero for a
-// floored T0 or P0.
+// with G*(X), differenced like its Tt slope (smooth there). Zero for a
+// floored Tt or Pt.
 struct DuctStaticStateDY {
   std::vector<double> dT_dY, dP_dY, drho_dY, dGeff_dY;
 };
 
-// `state` is duct_htc_static_state(T0, P0, G, X), already solved by the
+// `state` is duct_htc_static_state(Tt, Pt, G, X), already solved by the
 // caller: below the bend (state.G_eff == G) nothing is solved again.
-DuctStaticStateDY duct_htc_static_state_dY(double T0, double P0, double G,
+DuctStaticStateDY duct_htc_static_state_dY(double Tt, double Pt, double G,
                                            const std::vector<double>& X,
                                            const DuctStaticState& state);
 

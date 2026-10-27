@@ -28,9 +28,9 @@ namespace combaero {
 
 // Result of a compressible flow calculation
 struct CompressibleFlowSolution {
-    // Stagnation state at (T0, P0). This is the one place in CombAero where
+    // Stagnation state at (Tt, Pt). This is the one place in CombAero where
     // a State struct holds total rather than static conditions.
-    // stagnation.h() returns h(T0) = stagnation enthalpy [J/mol].
+    // stagnation.h() returns h(Tt) = stagnation enthalpy [J/mol].
     State stagnation;    // Stagnation state (T0, P0, h0, s0, ...)
     State outlet;        // Outlet static state (T, P, rho, h, s, a)
                          // For heat transfer at high Mach: use T_adiabatic_wall()
@@ -49,8 +49,8 @@ struct CompressibleFlowSolution {
 // Isentropic nozzle flow: given stagnation conditions, back pressure, and
 // effective flow area (A * Cd), compute mass flow and outlet state.
 //
-// T0      : stagnation temperature [K]
-// P0      : stagnation pressure [Pa]
+// Tt      : stagnation temperature [K]
+// Pt      : stagnation pressure [Pa]
 // P_back  : back pressure [Pa]
 // A_eff   : effective flow area [m^2] (= A * Cd)
 // X       : mole fractions
@@ -60,7 +60,7 @@ struct CompressibleFlowSolution {
 // Returns CompressibleFlowSolution with outlet state at throat/exit.
 // If P_back <= P_critical, flow is choked and outlet is at sonic conditions.
 CompressibleFlowSolution nozzle_flow(
-    double T0, double P0, double P_back, double A_eff,
+    double Tt, double Pt, double P_back, double A_eff,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
@@ -70,51 +70,59 @@ CompressibleFlowSolution nozzle_flow(
 
 // Find effective area for given mass flow rate (any mdot_target > 0 is
 // reachable: above choke the area just carries the choked flux).
-// Throws std::invalid_argument for non-positive T0, P0, P_back or
-// mdot_target, std::runtime_error when P_back >= P0 (no forward flow).
+// Throws std::invalid_argument for non-positive Tt, Pt, P_back or
+// mdot_target, std::runtime_error when P_back >= Pt (no forward flow).
 double solve_A_eff_from_mdot(
-    double T0, double P0, double P_back, double mdot_target,
+    double Tt, double Pt, double P_back, double mdot_target,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
 // Find back pressure for given mass flow rate.
 // Returns the subsonic solution (P_back > P_critical), P_critical itself at
 // the choked flow. Throws std::runtime_error if mdot_target exceeds the
-// choked mass flow, std::invalid_argument for non-positive T0, P0, A_eff or
+// choked mass flow, std::invalid_argument for non-positive Tt, Pt, A_eff or
 // mdot_target.
 double solve_P_back_from_mdot(
-    double T0, double P0, double A_eff, double mdot_target,
+    double Tt, double Pt, double A_eff, double mdot_target,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
 // Find stagnation pressure for given mass flow rate (root in (P_back, inf)).
-// Throws std::invalid_argument for non-positive T0, P_back, A_eff or
-// mdot_target, std::runtime_error if no P0 up to 1e14 P_back reaches it.
-double solve_P0_from_mdot(
-    double T0, double P_back, double A_eff, double mdot_target,
+// Throws std::invalid_argument for non-positive Tt, P_back, A_eff or
+// mdot_target, std::runtime_error if no Pt up to 1e14 P_back reaches it.
+double solve_Pt_from_mdot(
+    double Tt, double P_back, double A_eff, double mdot_target,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
+
+// Deprecated name (#782), removed in 0.9.0.
+[[deprecated("renamed solve_Pt_from_mdot (#782); removed in 0.9.0")]]
+inline double solve_P0_from_mdot(double Tt, double P_back, double A_eff, double mdot_target,
+                                 const std::vector<double>& X, double tol = 1e-8,
+                                 std::size_t max_iter = 50) {
+  return solve_Pt_from_mdot(Tt, P_back, A_eff, mdot_target, X, tol, max_iter);
+}
 
 // -------------------------------------------------------------
 // Utility functions
 // -------------------------------------------------------------
 
-// Compute critical (sonic) pressure ratio P*/P0 for given stagnation state.
+// Compute critical (sonic) pressure ratio P*/Pt for given stagnation state.
 // Uses isentropic expansion to find where M = 1.
 double critical_pressure_ratio(
-    double T0, double P0, const std::vector<double>& X,
+    double Tt, double Pt, const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
-// Compute Mach number from pressure ratio P/P0 (isentropic).
+// Compute Mach number from pressure ratio P/Pt (isentropic).
 double mach_from_pressure_ratio(
-    double T0, double P0, double P,
+    double Tt, double Pt, double P,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
 // Compute mass flux G = rho * v [kg/(m^2*s)] at given pressure for isentropic
 // expansion from stagnation conditions.
 double mass_flux_isentropic(
-    double T0, double P0, double P,
+    double Tt, double Pt, double P,
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
@@ -151,8 +159,8 @@ struct NozzleSolution {
     State outlet;                        // Outlet thermodynamic state
     double mdot = 0.0;                   // Mass flow rate [kg/s]
     double h0 = 0.0;                     // Stagnation enthalpy [J/kg]
-    double T0 = 0.0;                     // Stagnation temperature [K]
-    double P0 = 0.0;                     // Stagnation pressure [Pa]
+    double Tt = 0.0;                     // Stagnation temperature [K]
+    double Pt = 0.0;                     // Stagnation pressure [Pa]
     bool choked = false;                 // True if throat is sonic
     double x_throat = 0.0;               // Throat position [m]
     double A_throat = 0.0;               // Throat area [m^2]
@@ -162,7 +170,7 @@ struct NozzleSolution {
 // Solve quasi-1D nozzle flow with given area distribution.
 //
 // Inputs:
-//   T0, P0    : Stagnation conditions [K, Pa]
+//   Tt, Pt    : Stagnation conditions [K, Pa]
 //   P_exit    : Exit static pressure [Pa] (determines if subsonic/supersonic)
 //   area_func : Function A(x) returning area [m^2] at position x [m]
 //   x_start   : Start position [m]
@@ -174,7 +182,7 @@ struct NozzleSolution {
 // For subsonic flow throughout, P decreases then increases.
 // For choked flow, throat is sonic (M=1) at minimum area.
 NozzleSolution nozzle_quasi1d(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     const AreaFunction& area_func,
     double x_start, double x_end,
     const std::vector<double>& X,
@@ -184,7 +192,7 @@ NozzleSolution nozzle_quasi1d(
 // Convenience: solve with area given as vector of (x, A) pairs
 // Linearly interpolates between points.
 NozzleSolution nozzle_quasi1d(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     const std::vector<std::pair<double, double>>& area_profile,  // (x, A) pairs
     const std::vector<double>& X,
     std::size_t n_stations = 100,
@@ -193,7 +201,7 @@ NozzleSolution nozzle_quasi1d(
 // Convenience: solve with polynomial area distribution
 // A(x) = a0 + a1*x + a2*x^2 + ...
 NozzleSolution nozzle_quasi1d_poly(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     const std::vector<double>& area_coeffs,  // Polynomial coefficients [a0, a1, a2, ...]
     double x_start, double x_end,
     const std::vector<double>& X,
@@ -204,7 +212,7 @@ NozzleSolution nozzle_quasi1d_poly(
 // A(x) = A_inlet at x=0, A_throat at x=x_throat, A_exit at x=x_exit
 // Uses smooth cosine interpolation between sections.
 NozzleSolution nozzle_cd(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     double A_inlet, double A_throat, double A_exit,
     double x_throat, double x_exit,
     const std::vector<double>& X,
@@ -383,7 +391,7 @@ struct ThrustResult {
 //
 // F = mdot * u_e + (P_e - P_amb) * A_e
 // Isp = F / (mdot * g0)
-// C_F = F / (P0 * A_throat)
+// C_F = F / (Pt * A_throat)
 //
 // Inputs:
 //   sol   : NozzleSolution from nozzle_cd() or similar
@@ -399,7 +407,7 @@ ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb);
 // P_amb is the ambient pressure used for the thrust equation (may be 0 for vacuum).
 // For a design-point calculation pass P_design == P_amb.
 ThrustResult nozzle_thrust(
-    double T0, double P0, double P_design, double P_amb,
+    double Tt, double Pt, double P_design, double P_amb,
     double A_inlet, double A_throat, double A_exit,
     double x_throat, double x_exit,
     const std::vector<double>& X,
