@@ -2618,6 +2618,23 @@ first = CrossflowSegmentElement("s0", "plenum", "b1", length=0.01, area=4e-3,
   `to_kappa` dumps its dynamic head (static continuity). A reversed flow
   through an `entry_K` end is such an exit too: the entry term applies to
   inflow only.
+- **Compressible: the Fanno duct runs between the duct's own end states
+  (#802).** A station node holds a STATIC pressure, so it is not the duct's
+  stagnation pressure. The duct's inlet static is `P_from` less half the
+  from-station, and its outlet static is `P_to` plus half the to-station (at
+  an exit, the node's P). Each end's Pt is the stagnation pressure of that
+  static state at the segment's flux, from the momentum chamber closure. An
+  end with no station is a terminal node. Where it feeds the segment, its own
+  Pt is used: a reservoir entry also adds only the loss `K_in/(1 + K_in)` of
+  `channel_entry_drop` to the outlet. Where the segment discharges into it, a
+  plenum or boundary takes static continuity, and a momentum chamber takes Pt
+  continuity. An end static below the sonic static P* of the flux is choked:
+  its Pt is continued C1 below Pt*, never on the supersonic branch. Before #802
+  the node's static P was fed as the duct's P0, a dynamic head low, so exit
+  segments choked early: CR-3630 D.2 B(5,4,1) at mc/mj 1.01 runs its exit
+  segment at 81% of its true choked flow, not at 99.7% of the false one. The
+  diagnostics `choked`, `M_in_duct` and `M_exit_duct` report this duct; they
+  used to report every exit segment choked.
 - **Bleed scored on Bassett's own measured K5** (Fig. 7c, 43 points): MAE
   0.039 in K overall, 0.021 at q >= 0.6 (the few-percent bleed of an effusion
   station). Bassett measured psi = 1-3; a station bleeding through holes far

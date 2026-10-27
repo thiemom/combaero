@@ -228,18 +228,22 @@ def test_segment_residual_jacobian_matches_central_differences() -> None:
     def r(m_=m, fl=flows, P_in=1.0e5, P_out=0.99e5):
         return seg.residuals(_state(m_, P=P_in), _state(m, P=P_out), flows=fl)[0][0]
 
-    e = 1e-7
+    # A 1e-6 kg/s flow step: since #802 both duct ends' Pt move with the flow,
+    # and the Fanno kernel's own solve tolerance (~5e-12 relative in m_calc)
+    # put 1e-6 of noise into a 1e-7 step. Truncation at 1e-6 is 1e-12.
+    e = 1e-6
     assert row["x2.m_dot"] == pytest.approx((r(m_=m + e) - r(m_=m - e)) / (2 * e), rel=1e-6)
     for src in ("x1", "x3"):
         up, dn = dict(flows, **{src: flows[src] + e}), dict(flows, **{src: flows[src] - e})
         assert row[f"{src}.m_dot"] == pytest.approx((r(fl=up) - r(fl=dn)) / (2 * e), rel=1e-6)
     # The helper moves a plenum's P and Pt together (Pt = P), so the finite
-    # difference sees the channel's -1 on Pt plus the momentum's density term
-    # on P. A 0.01 Pa step: the compressible row inverts the segment's small
+    # difference sees both columns. Since #802 the station is a STATIC
+    # pressure to the duct and the whole term sits on P (Pt carries none).
+    # A 0.01 Pa step: the compressible row inverts the segment's small
     # friction drop, so 1 Pa already truncates at 9e-6.
     h = 0.01
     fd_out = (r(P_out=0.99e5 + h) - r(P_out=0.99e5 - h)) / (2 * h)
-    assert row["c3.P"] + row["c3.Pt"] == pytest.approx(fd_out, rel=1e-6)
+    assert row["c3.P"] + row.get("c3.Pt", 0.0) == pytest.approx(fd_out, rel=1e-6)
     assert row["c3.P"] != 0.0
 
 

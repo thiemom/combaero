@@ -1642,6 +1642,38 @@ def _moving_static_T(
     )
 
 
+class _MovingTotalP(NamedTuple):
+    """Stagnation pressure of gas at static P moving at ``|m| / A`` and its
+    partials: d/d(static P), d/d(T0), d/d(m) (signed) and d/d(Y[k])."""
+
+    Pt: float
+    dP: float
+    dT0: float
+    dm: float
+    dY: dict[int, float]
+
+
+def _moving_total_P(
+    P: float, T0: float, Y: list[float], m_dot: float, area: float
+) -> _MovingTotalP:
+    """The stagnation pressure of a duct's static state (#802).
+
+    The momentum chamber closure (#357, #576), as ``_moving_static_T``: the
+    static T from h(T0) = h(T) + (G R T / P)^2 / 2, G = |m| / A, then
+    Pt = P exp((s(T0) - s(T)) / R). C++ returns the closure as a residual
+    P_total - P0 with its analytic partials; P0 is read with P_total = 0 and
+    the partials are the residual's, negated.
+    """
+    c = _solver_tools.momentum_chamber_residual_and_jacobian(P, 0.0, m_dot, T0, Y, area, False)
+    return _MovingTotalP(
+        float(P) + float(c.q_dyn),
+        -float(c.d_res_dP),
+        -float(c.d_res_dT),
+        -float(c.d_res_dmdot),
+        {k: -float(d) for k, d in enumerate(c.d_res_dY) if d != 0.0},
+    )
+
+
 def _station_node_partials(r: "_StaticChainedDrop", node: str) -> list[tuple[str, float]]:
     """A station term's partials in its node's P, T (T0) and Y, keyed by name."""
     out = [(f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)]
@@ -7994,9 +8026,13 @@ class CrossflowSegmentElement(ChannelElement):
     FRICTION follows ``ChannelElement``: Darcy-Weisbach on the
     equivalent-area diameter (the C++ channel's circular convention, #463).
 
-    COMPRESSIBLE, the friction is the Fanno flow and the station drop shifts
-    its discharge target: Pt_in drives against Pt_out + dP_momentum, the
-    incompressible balance as Ma -> 0 (#585).
+    COMPRESSIBLE, the friction is the Fanno flow of the duct between its own
+    end states (#802): the station half-drops move the end STATIC pressures
+    (inlet P_from - half, outlet P_to + half, or the exit node's P), and the
+    kernel runs between those statics' stagnation pressures at the segment's
+    flux (``_duct_ends``). The incompressible balance as Ma -> 0 (#585).
+    Feeding a station's static P to the kernel as P0, as before #802, put the
+    duct's choke a dynamic head too early.
     """
 
     @property
@@ -8068,10 +8104,10 @@ class CrossflowSegmentElement(ChannelElement):
         state_in: NetworkMixtureState,
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None,
-    ) -> list[tuple["cb.StationHalfDrop", str, str | None, str, NetworkElement | None]]:
+    ) -> list[tuple["_StaticChainedDrop", str, str | None, str, NetworkElement | None, str]]:
         """Each momentum term: (C++ result, node it sits at, which derivative is
         this segment's own flow ('a' or 'b' or None), neighbour's node, the
-        neighbour element)."""
+        neighbour element, kind: 'entry', 'from' or 'to')."""
         flows = flows or {}
         m = float(state_in.m_dot)
         incompressible = self.regime == "incompressible"
@@ -8088,7 +8124,14 @@ class CrossflowSegmentElement(ChannelElement):
             r = cb.channel_entry_drop(m, state_out.P, st.T, state_out.X, self.area, self.entry_K)
             nb = self._next if to_station else None
             terms.append(
-                (_StaticChainedDrop(r, st, nb is not None), self.to_node, "a", self.to_node, nb)
+                (
+                    _StaticChainedDrop(r, st, nb is not None),
+                    self.to_node,
+                    "a",
+                    self.to_node,
+                    nb,
+                    "entry",
+                )
             )
         if self.from_kappa is not None:
             m_a = flows.get(self._prev.id, 0.0) if self._prev is not None else 0.0
@@ -8097,7 +8140,14 @@ class CrossflowSegmentElement(ChannelElement):
                 m_a, m, state_in.P, st.T, state_in.X, self.area, self.from_kappa
             )
             terms.append(
-                (_StaticChainedDrop(r, st, True), self.from_node, "b", self.from_node, self._prev)
+                (
+                    _StaticChainedDrop(r, st, True),
+                    self.from_node,
+                    "b",
+                    self.from_node,
+                    self._prev,
+                    "from",
+                )
             )
         if to_station:
             m_b = flows.get(self._next.id, m)
@@ -8106,7 +8156,7 @@ class CrossflowSegmentElement(ChannelElement):
                 m, m_b, state_out.P, st.T, state_out.X, self.area, self.to_kappa
             )
             terms.append(
-                (_StaticChainedDrop(r, st, True), self.to_node, "a", self.to_node, self._next)
+                (_StaticChainedDrop(r, st, True), self.to_node, "a", self.to_node, self._next, "to")
             )
         return terms
 
@@ -8134,7 +8184,7 @@ class CrossflowSegmentElement(ChannelElement):
         res, jac = super().residuals(state_in, state_out)
         row = jac[0]
         own = f"{self.id}.m_dot"
-        for r, node, own_side, nb_node, nb in self._momentum_terms(state_in, state_out, flows):
+        for r, node, own_side, nb_node, nb, _ in self._momentum_terms(state_in, state_out, flows):
             res[0] -= r.dP
             d_own = r.d_dm_a if own_side == "a" else r.d_dm_b
             row[own] = row.get(own, 0.0) - d_own
@@ -8153,44 +8203,197 @@ class CrossflowSegmentElement(ChannelElement):
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None,
     ) -> tuple[list[float], "LazyJacobian"]:
-        """m - m_calc, the station momentum drop shifting the Fanno target.
+        """m - m_calc: the Fanno flow between the duct's own end states.
 
         The compressible channel row is a MASS FLOW (#481); the station terms
         are pressures. Subtracting them from that row, as the incompressible
         form does, mixed kg/s with Pa and solved a meaningless equation: a
-        1 um bleed segment held 1 kPa at zero flow. Instead the friction
-        drives from Pt_in to Pt_out + dP_momentum, so as Ma -> 0 the row is
-        the incompressible Pt_in - Pt_out = dP_friction + dP_momentum.
+        1 um bleed segment held 1 kPa at zero flow (#585). The station terms
+        instead move the duct's end STATIC pressures, and the Fanno kernel
+        runs between the stagnation pressures of those static states
+        (``_duct_ends``, #802). As Ma -> 0 the row is the incompressible
+        Pt_in - Pt_out = dP_friction + dP_momentum.
         """
         f_mult = self.surface.f_multiplier if self.surface else 1.0
         terms = self._momentum_terms(state_in, state_out, flows)
-        target = copy.copy(state_out)
-        target.Pt = state_out.Pt + sum(t[0].dP for t in terms)
-        m_calc, _, _ = self._compressible_flow(state_in, target, f_mult, derivatives=False)
+        src, dst, d_in, d_out = self._duct_ends(state_in, state_out, terms)
+        m_calc, _, _ = self._compressible_flow(src, dst, f_mult, derivatives=False)
 
         def jacobian() -> dict[int, dict[str, float]]:
-            _, derivs, _ = self._compressible_flow(state_in, target, f_mult)
+            _, derivs, _ = self._compressible_flow(src, dst, f_mult)
+            # The kernel's two end Pt are the duct ends', chained below.
+            k_in = derivs.pop(f"{self.from_node}.Pt", 0.0)
+            k_out = derivs.pop(f"{self.to_node}.Pt", 0.0)
             own = f"{self.id}.m_dot"
             row: dict[str, float] = {own: 1.0}
             for name, d in derivs.items():
                 row[name] = row.get(name, 0.0) - d
-            # d m_calc / d dP_momentum: the shift enters as to_node's Pt.
-            k = derivs.get(f"{self.to_node}.Pt", 0.0)
-            for r, node, own_side, nb_node, nb in terms:
-                d_own = r.d_dm_a if own_side == "a" else r.d_dm_b
-                row[own] -= k * d_own
-                if nb is not None:
-                    d_nb = r.d_dm_b if own_side == "a" else r.d_dm_a
-                    names = nb.unknowns()
-                    for local, coeff in nb.flow_jac_at_node(
-                        nb_node, list(range(len(names)))
-                    ).items():
-                        row[names[local]] = row.get(names[local], 0.0) - k * d_nb * coeff
-                for key, d in _station_node_partials(r, node):
-                    row[key] = row.get(key, 0.0) - k * d
+            for k, partials in ((k_in, d_in), (k_out, d_out)):
+                for name, d in partials.items():
+                    row[name] = row.get(name, 0.0) - k * d
             return {0: row}
 
         return [state_in.m_dot - m_calc], LazyJacobian(jacobian)
+
+    def _term_partials(self, term: tuple) -> dict[str, float]:
+        """A momentum term's partials, keyed by unknown: this segment's flow,
+        the neighbour segment's (through its flow at the shared station), and
+        the station node's P, T0 and Y."""
+        r, node, own_side, nb_node, nb, _ = term
+        out: dict[str, float] = {f"{self.id}.m_dot": r.d_dm_a if own_side == "a" else r.d_dm_b}
+        if nb is not None:
+            d_nb = r.d_dm_b if own_side == "a" else r.d_dm_a
+            names = nb.unknowns()
+            for local, coeff in nb.flow_jac_at_node(nb_node, list(range(len(names)))).items():
+                out[names[local]] = out.get(names[local], 0.0) + d_nb * coeff
+        for key, d in _station_node_partials(r, node):
+            out[key] = out.get(key, 0.0) + d
+        return out
+
+    def _duct_ends(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        terms: list[tuple],
+    ) -> tuple[NetworkMixtureState, NetworkMixtureState, dict[str, float], dict[str, float]]:
+        """The Fanno kernel's two ends: stagnation pressures of the duct's own
+        end states, and their partials by unknown (#802).
+
+        A station node holds the STATIC pressure at the middle of its station
+        (Pt = P, a plenum). Half the station lies between it and the duct, so
+        the duct's end statics are
+
+            inlet   P_from - dP_half(from station)
+            outlet  P_to + dP_half(to station)   (the node's P at an exit:
+                                                  static continuity)
+
+        and each end's stagnation pressure is that static state's, moving at
+        this segment's flux |m| / A: the momentum chamber closure at the gas's
+        T0 and composition (``_moving_total_P``). Before #802 the kernel was
+        fed the node's P as the duct's P0, a dynamic head low: CR-3630 D.2
+        B(5,4,1)'s exit segment ran at 99.7% of that false choke, 81% of the
+        true one.
+
+        The gas is the one this segment carries: the from-node's (T0, Y) for
+        m >= 0, the to-node's for m < 0. Both ends use it, so at m = 0 both
+        stagnation pressures are the statics and the row stays continuous
+        through reversal. At the root the kernel's exit static is the outlet
+        static exactly (adiabatic; a wall-heated segment's closure omits its
+        own heat, second order in the dynamic head).
+
+        An end with no station (a reservoir entry, an exit) is a TERMINAL
+        node. Where it feeds the segment it is a reservoir: its own Pt. Where
+        the segment discharges into it, a node at rest (a plenum, a boundary:
+        Pt = P) takes the closure of its P, static continuity with the head
+        lost; a moving node (a momentum chamber) takes its Pt, as a
+        ChannelElement into a chamber. At rest the two meet at m = 0 (C1).
+        A reservoir entry's dynamic head is now the outlet closure's, so only
+        the loss K_in/(1 + K_in) of ``channel_entry_drop`` is added to the
+        outlet. A segment with neither stations nor an entry is a
+        ChannelElement: Pt to Pt, unchanged.
+
+        An end static below the sonic static P* of the flux is a choked end:
+        its Pt is continued below Pt*, never on the supersonic branch (see
+        ``closure``).
+        """
+        A = self.area
+        m = float(state_in.m_dot)
+        kinds = {t[5]: t for t in terms}
+        if self.from_kappa is None and self.entry_K is None and "to" not in kinds:
+            return (
+                state_in,
+                state_out,
+                {f"{self.from_node}.Pt": 1.0},
+                {f"{self.to_node}.Pt": 1.0},
+            )
+        gas_id, gas = (self.from_node, state_in) if m >= 0.0 else (self.to_node, state_out)
+        own = f"{self.id}.m_dot"
+
+        def closure(e: float, de: dict[str, float]) -> tuple[float, dict[str, float]]:
+            if m == 0.0:
+                return e, dict(de)  # at rest: Pt = P (the closure is even in m)
+
+            def chained(c: _MovingTotalP, w: float, d: dict[str, float]) -> None:
+                # w * (c's own partials in m, T0 and Y) into d.
+                d[own] = d.get(own, 0.0) + w * c.dm
+                d[f"{gas_id}.T"] = d.get(f"{gas_id}.T", 0.0) + w * c.dT0
+                for k, v in c.dY.items():
+                    d[f"{gas_id}.Y[{k}]"] = d.get(f"{gas_id}.Y[{k}]", 0.0) + w * v
+
+            # Subsonic branch only. At fixed flux, Pt(P) has its minimum at the
+            # sonic static P* and rises again below it (the supersonic branch,
+            # #637): there a falling end static would RAISE its Pt, reverse the
+            # drive and admit spurious roots. Below P* the end is choked and its
+            # Pt is continued as Pt* (1 - u^2), u = (P* - e) / P*: C1 at P*
+            # (dPt/dP = 0 on both sides) and monotone, so the end keeps a slope
+            # in its static. Holding Pt* instead added a plateau of its own to
+            # the kernel's choke plateau: a free exit pressure ran off to
+            # -3e7 Pa on it. Only an iterate sees this: at a root the kernel
+            # saturates at its choked flow for any target below Pt*.
+            T0 = float(gas.Tt)
+            s = _solver_tools.sonic_static_pressure(T0, abs(m) / A, gas.Y)
+            Ps = float(s.P)
+            if e >= Ps:
+                c = _moving_total_P(e, T0, gas.Y, m, A)
+                d = {name: c.dP * v for name, v in de.items()}
+                chained(c, 1.0, d)
+                return c.Pt, d
+            cs = _moving_total_P(Ps, T0, gas.Y, m, A)
+            u = (Ps - e) / Ps
+            w = 1.0 - u * u
+            d = {name: 2.0 * cs.Pt * u / Ps * v for name, v in de.items()}
+            # Through P*: u's own dependence plus Pt*'s (whose dP is ~0 there).
+            k_ps = -2.0 * cs.Pt * u * e / (Ps * Ps) + w * cs.dP
+            sgn = 1.0 if m >= 0.0 else -1.0
+            d[own] = d.get(own, 0.0) + k_ps * float(s.dP_dG) * sgn / A
+            d[f"{gas_id}.T"] = d.get(f"{gas_id}.T", 0.0) + k_ps * float(s.dP_dT0)
+            for k, v in enumerate(s.dP_dY):
+                if v != 0.0:
+                    d[f"{gas_id}.Y[{k}]"] = d.get(f"{gas_id}.Y[{k}]", 0.0) + k_ps * float(v)
+            chained(cs, w, d)
+            return cs.Pt * w, d
+
+        def terminal(
+            node_id: str, state: NetworkMixtureState, node: Any, feeds: bool
+        ) -> tuple[float, dict[str, float]]:
+            at_rest = node is None or isinstance(node, PlenumNode) or node.is_boundary
+            if feeds or not at_rest:
+                return float(state.Pt), {f"{node_id}.Pt": 1.0}
+            return closure(float(state.P), {f"{node_id}.P": 1.0})
+
+        if self.from_kappa is not None:
+            t = kinds["from"]
+            de = {f"{self.from_node}.P": 1.0}
+            for name, v in self._term_partials(t).items():
+                de[name] = de.get(name, 0.0) - v
+            Pt_in, d_in = closure(float(state_in.P) - t[0].dP, de)
+        else:
+            Pt_in, d_in = terminal(
+                self.from_node, state_in, getattr(self, "_upstream_node", None), m >= 0.0
+            )
+
+        if "to" in kinds:
+            t = kinds["to"]
+            de = {f"{self.to_node}.P": 1.0}
+            for name, v in self._term_partials(t).items():
+                de[name] = de.get(name, 0.0) + v
+            Pt_out, d_out = closure(float(state_out.P) + t[0].dP, de)
+        else:
+            Pt_out, d_out = terminal(
+                self.to_node, state_out, getattr(self, "_downstream_node", None), m < 0.0
+            )
+        if "entry" in kinds:
+            t = kinds["entry"]
+            share = self.entry_K / (1.0 + self.entry_K)
+            Pt_out += share * t[0].dP
+            for name, v in self._term_partials(t).items():
+                d_out[name] = d_out.get(name, 0.0) + share * v
+
+        src = copy.copy(state_in)
+        src.Pt = Pt_in
+        dst = copy.copy(state_out)
+        dst.Pt = Pt_out
+        return src, dst, d_in, d_out
 
     def htc_and_T(self, state: NetworkMixtureState, flows: dict[str, float] | None = None):
         return super().htc_and_T(state)
@@ -8202,7 +8405,17 @@ class CrossflowSegmentElement(ChannelElement):
         flows: dict[str, float] | None = None,
     ) -> dict[str, float | str]:
         out = super().diagnostics(state_in, state_out)
-        out["dP_momentum"] = self._momentum_drop_value(state_in, state_out, flows)
+        terms = self._momentum_terms(state_in, state_out, flows)
+        out["dP_momentum"] = float(sum(t[0].dP for t in terms))
+        if self.regime == "compressible":
+            # The duct the row solves, between its own end states (#802), not
+            # ChannelElement's node-to-node one.
+            src, dst, _, _ = self._duct_ends(state_in, state_out, terms)
+            f_mult = self.surface.f_multiplier if self.surface else 1.0
+            _, _, flow = self._compressible_flow(src, dst, f_mult, derivatives=False)
+            out["choked"] = float(flow.choked)
+            out["M_in_duct"] = float(flow.M_in)
+            out["M_exit_duct"] = float(flow.M_exit)
         return out
 
 
