@@ -16,7 +16,7 @@ def test_label_with_unit_known_scalar_temperature_and_flow():
 
 
 def test_label_with_unit_heat_transfer_fields():
-    assert label_with_unit("htc") == "htc [W/m²/K]"
+    assert label_with_unit("htc") == "htc [W/m^2/K]"
     assert label_with_unit("Q") == "Q [W]"
     assert label_with_unit("Nu") == "Nu [-]"
 

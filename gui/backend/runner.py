@@ -24,6 +24,7 @@ Typical notebook usage::
 """
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -101,11 +102,17 @@ def _build_result_objects(
                 x_vals.append(float(node_vals.pop(f"X[{i}]")))
             i += 1
 
+        # A pressure boundary emits only Pt/Tt: it is a reservoir, so its
+        # static state IS its total state (its rho, h, ... are evaluated there).
+        # The old fallback was a made-up 101325 Pa / 300 K, which the probe and
+        # the CSV export showed beside the real Pt.
+        Pt = node_vals.pop("Pt", None)
+        Tt = node_vals.pop("Tt", None)
         state_res = StateResult(
-            T=float(node_vals.pop("T", 300.0)),
-            P=float(node_vals.pop("P", 101325.0)),
-            Pt=node_vals.pop("Pt", None),
-            Tt=node_vals.pop("Tt", None),
+            T=float(node_vals.pop("T", math.nan if Tt is None else Tt)),
+            P=float(node_vals.pop("P", math.nan if Pt is None else Pt)),
+            Pt=Pt,
+            Tt=Tt,
             Y=y_vals,
             X=x_vals or None,
             **node_vals,
@@ -182,6 +189,11 @@ def _build_result_objects(
                 rows.setdefault(wid.rpartition("__r")[0], []).append(edge_results[wid])
         for base, per_row in rows.items():
             edge_results[base] = _aggregate_array_wall(per_row)
+        # The per-row walls are internal ids (no drawn edge); their values live
+        # on in the aggregate's rows_* lists. Kept, they doubled the array's
+        # heat in any sum over the export's wall rows.
+        for wid in [w for w in edge_results if w.rpartition("__r")[0] in rows]:
+            del edge_results[wid]
 
     return node_results, element_results, edge_results
 
@@ -315,6 +327,9 @@ class NetworkResult:
         Returns one row per network entity (nodes, flow elements, thermal walls)
         with all available diagnostic quantities.  Column names carry unit
         annotations matching the GUI export (e.g. ``'P [Pa]'``, ``'T [K]'``).
+        Every row carries the solve's status (``success``, ``converged``,
+        ``consistent``, ``outcome``, ``final_norm``): check ``success`` before
+        trusting the numbers.
         """
         species_labels: list[str] = list(cb.species.names)
         data: list[dict] = []
@@ -370,6 +385,21 @@ class NetworkResult:
             )
 
         df = pd.DataFrame(data)
+        # The solve's own status on EVERY row, beside the label: a timed-out or
+        # rejected solve exports numbers that look valid, and a filtered or
+        # pivoted frame must still say which solve its rows came from. Element
+        # rows used to carry `success` alone and node rows nothing.
+        status = {
+            "success": self.success,
+            "converged": self.converged,
+            "consistent": self.consistent,
+            "outcome": self.outcome,
+            "final_norm": self.final_norm,
+        }
+        df = df.drop(columns=[c for c in status if c in df.columns])
+        at = list(df.columns).index("label") + 1 if "label" in df.columns else 0
+        for offset, (col, value) in enumerate(status.items()):
+            df.insert(at + offset, col, [value] * len(df))
         return df.rename(columns={col: label_with_unit(col) for col in df.columns})
 
     def swap_boundary(self, label: str, new_type: str) -> "NetworkRunner":

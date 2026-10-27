@@ -55,4 +55,18 @@ describe("solveErrorMessage", () => {
 		const info = solveErrorMessage(axiosError({ data: {} }), true);
 		expect(info.message).toContain("Check console for details");
 	});
+
+	it("names the export when the export failed", () => {
+		const info = solveErrorMessage(
+			axiosError({ data: { detail: "Element 'ch' is not fully connected." } }),
+			true,
+			"Export",
+		);
+		expect(info.message).toBe(
+			"Export failed: Element 'ch' is not fully connected.",
+		);
+		expect(solveErrorMessage(new Error("x"), true, "Export").message).toBe(
+			"Export failed. Check console for details.",
+		);
+	});
 });

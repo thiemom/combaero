@@ -13,7 +13,7 @@ CSV-streaming response.
 import re
 
 # ---------------------------------------------------------------------------
-# Scalar quantity → unit mapping
+# Scalar quantity -> unit mapping
 # ---------------------------------------------------------------------------
 
 UNIT_MAP: dict[str, str] = {
@@ -53,14 +53,14 @@ UNIT_MAP: dict[str, str] = {
     "Tt": "K",
     "Pt": "Pa",
     # --- Transport ---
-    "mu": "Pa·s",
+    "mu": "Pa\u00b7s",
     "k": "W/m/K",
-    "nu": "m²/s",
+    "nu": "m\u00b2/s",
     "Pr": "-",
     "Re": "-",
     "Dh": "m",
     # --- Thermo per-mass (node/element state) ---
-    "rho": "kg/m³",
+    "rho": "kg/m\u00b3",
     "h": "J/kg",
     "s": "J/kg/K",
     "u": "J/kg",
@@ -69,7 +69,7 @@ UNIT_MAP: dict[str, str] = {
     "gamma": "-",
     "mw": "g/mol",  # State::mw (include/units_data.h)
     # --- Thermo reference-state block (Phase 2, element inlet state) ---
-    "rho_ref": "kg/m³",
+    "rho_ref": "kg/m\u00b3",
     "h_ref": "J/kg",
     "s_ref": "J/kg/K",
     "u_ref": "J/kg",
@@ -78,20 +78,19 @@ UNIT_MAP: dict[str, str] = {
     "gamma_ref": "-",
     "a_ref": "m/s",
     "mw_ref": "g/mol",
-    "mu_ref": "Pa·s",
+    "mu_ref": "Pa\u00b7s",
     "k_ref": "W/m/K",
-    "nu_ref": "m²/s",
+    "nu_ref": "m\u00b2/s",
     "Pr_ref": "-",
     # --- Heat transfer ---
     "Nu": "-",
-    "htc": "W/m²/K",
-    "h_a": "W/m²/K",
-    "h_b": "W/m²/K",
+    "htc": "W/m\u00b2/K",
+    "h_a": "W/m\u00b2/K",
+    "h_b": "W/m\u00b2/K",
     "Q": "W",
     "Q_to_boundary": "W",  # wall heat that left with a stream into a boundary
     "Q_wall_out": "W",
     "Q_withheld": "W",
-    "Q_fraction": "W",
     # --- Tee junction ---
     "m_dot_com": "kg/s",
     "m_dot_straight": "kg/s",
@@ -104,7 +103,6 @@ UNIT_MAP: dict[str, str] = {
     "xi": "-",
     "theta": "-",
     "zeta": "-",
-    "ratio": "-",  # AreaChangeElement (renamed to area_ratio in Phase 2)
     "area_ratio": "-",  # Phase 2 name
     "is_correlation": "-",
     "Cd_in_range": "-",  # 1 inside the discharge correlation's source range
@@ -116,9 +114,9 @@ UNIT_MAP: dict[str, str] = {
     "surface_extrapolated": "-",
     "dP_momentum": "Pa",
     # --- Effusion plate wall (#471) ---
-    "h_internal_plate_area": "W/m²/K",
-    "h_gas_unblown": "W/m²/K",
-    "h_gas": "W/m²/K",
+    "h_internal_plate_area": "W/m\u00b2/K",
+    "h_gas_unblown": "W/m\u00b2/K",
+    "h_gas": "W/m\u00b2/K",
     "gas_augmentation": "-",
     "T_gas": "K",
     "eta_film": "-",
@@ -126,13 +124,13 @@ UNIT_MAP: dict[str, str] = {
     "T_adiabatic_wall": "K",
     "T_wall_hot": "K",
     "T_wall_cold": "K",
-    "q_wall": "W/m²",
+    "q_wall": "W/m\u00b2",
     "Q_wall": "W",
     "blowing_ratio": "-",
     "velocity_ratio": "-",
     "density_ratio": "-",
     "U_gas": "m/s",
-    "gas_heat_flux_imposed": "W/m²",
+    "gas_heat_flux_imposed": "W/m\u00b2",
     # --- Effusion liner (#471) ---
     "m_dot_out": "kg/s",
     "m_dot_bleed": "kg/s",
@@ -148,7 +146,7 @@ UNIT_MAP: dict[str, str] = {
     "Re_j_max": "-",
     "Gc_Gj_max": "-",
     "Nu_mean": "-",
-    "htc_mean": "W/m²/K",
+    "htc_mean": "W/m\u00b2/K",
     "jet_flow_nonuniformity": "-",
     # --- Impingement array bypass (#467) ---
     "m_dot_bypass": "kg/s",
@@ -160,7 +158,7 @@ UNIT_MAP: dict[str, str] = {
     "Cd": "-",
     "phi": "-",
     # --- Geometry ---
-    "area": "m²",
+    "area": "m\u00b2",
     "diameter": "m",
     "length": "m",
     "roughness": "m",
@@ -333,17 +331,23 @@ _COMPOSITION_RE = re.compile(r"^[YX]\[[A-Za-z0-9_+\-()]+\]$")
 def label_with_unit(column: str) -> str:
     """Return ``'<column> [<unit>]'`` when a unit is known, else ``column``.
 
-    Meta columns such as ``id``, ``type``, ``label``, ``kind``, ``success``
-    and ``is_boundary`` are passed through unchanged.
+    Meta columns such as ``id``, ``type``, ``label``, ``kind``, the solve
+    status and ``is_boundary`` are passed through unchanged. Units are written
+    in ASCII (``kg/m^3``, ``Pa*s``).
     """
     if column in _META_COLUMNS:
         return column
     if column in UNIT_MAP:
-        return f"{column} [{UNIT_MAP[column]}]"
+        return f"{column} [{UNIT_MAP[column].translate(_ASCII_UNITS)}]"
     if _COMPOSITION_RE.match(column):
         return f"{column} [-]"
     return column
 
+
+# Export headers are ASCII: the CSV is UTF-8 without a byte-order mark, and
+# Excel read "kg/m\u00b3" as mojibake. The GUI keeps the typeset units
+# (UNIT_MAP is also the source of resultKeys.generated.json).
+_ASCII_UNITS = str.maketrans({"\u00b2": "^2", "\u00b3": "^3", "\u00b7": "*"})
 
 _META_COLUMNS: frozenset[str] = frozenset(
     {
@@ -352,6 +356,10 @@ _META_COLUMNS: frozenset[str] = frozenset(
         "type",
         "kind",
         "success",
+        "converged",
+        "consistent",
+        "outcome",
+        "final_norm",
         "is_boundary",
         "combustion_method",
         "ref_location",
