@@ -49,8 +49,8 @@ jobs:
         with:
           filters: |
             # check-source-style.sh scans src/include/examples/tests;
-            # check-python-style.sh every .py. A superset of `cpp`, which
-            # the native builds wait on.
+            # check-python-style.sh every .py; ascii-only every C++ and .py
+            # file. A superset of `cpp`, which the native builds wait on.
             lint:
               - 'src/**'
               - 'include/**'
@@ -58,6 +58,12 @@ jobs:
               - 'tests/**'
               - 'validation/**/*.h'
               - '**/*.py'
+              # ascii-only hook: python/combaero/_core.cpp and the rest.
+              - '**/*.cpp'
+              - '**/*.cc'
+              - '**/*.h'
+              - '**/*.hpp'
+              - '.pre-commit-config.yaml'
               - 'CMakeLists.txt'
               - 'ruff.toml'
               - 'pyproject.toml'
@@ -169,6 +175,11 @@ jobs:
 
       - name: Check Python code style
         run: uv run ./scripts/check-python-style.sh --verbose
+
+      # Every tracked C++/Python source except the hook's temporary
+      # exclude list (#791), so a commit made without hooks is caught too.
+      - name: ASCII-only sources
+        run: uv run pre-commit run ascii-only --all-files
 
   lint-gui:
     name: Lint & Style Checks (GUI)
