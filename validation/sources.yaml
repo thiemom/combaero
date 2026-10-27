@@ -2159,6 +2159,92 @@ documents:
   issues: [183, 187, 271, 272, 300, 502, 505, 509, 517, 522, 579]
   records: [validation/junction/data/wang2014/, validation/junction/models/wang2014.py, validation/junction/network_runner.py]
   notes: Online 2014 (filename), issue 2015 (vol. 229).
+- file: docs/combustor_network/grobman_1959_NASA_Memo_11-26-58E.pdf
+  citation: Grobman, J. S. (1959). Comparison of calculated and experimental total-pressure loss and airflow
+    distribution in tubular turbojet combustors with tapered liners. NASA Memo 11-26-58E, Lewis Research
+    Center, January 1959.
+  id: NASA Memo 11-26-58E (E-126)
+  topic: [combustion, orifice, channel]
+  content: 'Scanned, 50 PDF pp. (PDF page = printed page + 2); OCR unusable, read the images. Rig: 8.0 in ID
+    housing, four tapered liners A-D (Table I, p. 18: L 12/12/12/24 in, L/D 1.5/1.5/1.5/3, alpha 14/7/3.5/3.5
+    deg, A_L,2/A_r 0.06/0.40/0.67/0.40), each with 108 flush circular holes in 9 rows of 4, 6, ... 20 holes
+    (rows at x/L = (1.5 + k)/12, k = 0..8, read from the sketches), hole d 1/2, 5/8, 3/4 in giving A_h,T/A_r
+    0.422/0.659/0.950 -- 12 liners; 0.043 in Inconel wall; no dome flow. Isothermal air at about 300 K, 2 and
+    4 lb/s, P1 10-60 in Hg, M_r 0.04-0.25; propane heat release on five liners, exit/inlet T 2-4. MEASURED:
+    total-pressure loss dP/q_r from 20-tube rakes at B and C, all 12 liners vs M_r (Fig. 11(a)-(l), mostly
+    cleanly sampled, two airflows), with heat release (Fig. 14, overplotted clusters); combustion efficiency
+    (Fig. 15, 0.4-0.9). Model D only has liner and annulus static taps per row: its airflow split (Fig. 17,
+    3/4 in holes, M_r 0.102, 2 lb/s, isothermal, 8 cleanly sampled points) is COMPUTED from the measured
+    row static drops and the TN 3663 Cd, not metered. Also the Graves-Grobman method extended to tapered
+    liners (App. B), with calculated curves (Figs. 7-10, 16) and the calculated value beside each experiment
+    (Figs. 13, 14, 17). No measurement uncertainty is stated anywhere.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793: the MEASURED full-combustor case the issue asked for, rated MOSTLY
+    ready. Best case: model D, 3/4 in holes, isothermal -- geometry fully recoverable from Table I (every
+    printed ratio reproduced from the sketch dimensions: A_h,T/A_r 0.949, A_L,2/A_r 0.392, alpha 3.56 deg),
+    scored on dP/q_r vs M_r (Fig. 11(l)/13(d): about 4.75 at M_r -> 0, rising to 8.5 at 0.27; the method
+    calculates 5.50, +16%) and on the row-by-row split (Fig. 17; measured lies 0.02-0.06 below the method''s
+    curve over rows 1-5). Labels: the split and losses are ACCURACY (cross-source; no combaero closure is
+    from this rig); reproducing the Graves-Grobman calculated curves is model-vs-model only, not fidelity.
+    The split carries TN 3663''s Cd inside it, so scoring it mixes the network with the Cd question (TN 3663
+    raised to now). The fuel nozzle alone raises dP/q_r by about 0.3, and heat-release runs had it in place.
+    combaero pieces: annulus as CrossflowSegmentElement stations (Pt-conserving bleed is kappa of about 1;
+    GG assume no annulus mixing loss), liner rows as duct-fed EffusionPlateElement panels (90 deg,
+    McGreehan-Schotsch U1/Vi Cd), liner as MomentumChamberNode merge chambers (main_inlet + side streams).
+    Gaps: the GG liner momentum gives each jet the annulus axial velocity V_A, combaero a fixed injection
+    angle; growing liner and shrinking annulus areas between stations; McGreehan-Schotsch vs Dittrich-Graves
+    Cd at the low-Cd upstream rows (C 0.1-0.6). Heat release is weaker (efficiency 0.4-0.9, exit T measured
+    only; would need EnergyBoundary(Tt_target) per liner station with an assumed T_L(x)). Draft extraction
+    with page/figure for every number: tmp/grobman_case.md (main checkout, not committed).'
+  read_for: ['#793 worked examples: measured full-combustor total-pressure loss and liner airflow split', liner
+      hole Cd under annulus crossflow (Dittrich-Graves vs McGreehan-Schotsch), provenance of a 1-D annulus +
+      liner momentum model]
+  issues: [793]
+  records: []
+  notes: 'Companion theory: Graves & Grobman, NACA Report 1373 (= RM E56I04), both registered. Fig. 17''s
+    cylindrical-liner squares are unpublished NACA data with no geometry -- not usable. Figure scans are
+    small; render at 300 dpi before digitising.'
+- file: docs/combustor_network/graves_grobman_1958_NACA_Report_1373.pdf
+  citation: Graves, C. C., Grobman, J. S. (1958). Theoretical analysis of total-pressure loss and airflow distribution
+    for tubular turbojet combustors with constant annulus and liner cross-sectional areas. NACA Report 1373.
+  id: NACA Report 1373 (supersedes RM E56I04)
+  topic: [combustion, orifice, channel]
+  content: 'Theory only, 26 pp. (printed pp. 899-924), two-column scan. 1-D incompressible (App. B) and
+    compressible cold-flow (App. C, M_r up to 0.15) model of a parallel-wall tubular combustor: annulus with
+    friction (f_A 0.005, l/D 4), flush liner holes as a continuous slot with the Dittrich-Graves Cd (Fig. 3,
+    3/4 in hole in 0.040 in wall: C_p vs (P_A - p_j)/(P_A - p_A), C/C_p vs p_A/p_j; Eq. 17 C = 0.827 sin
+    theta - 0.232), instantaneous jet mixing, jets keep the annulus axial velocity, heat release through T_L/T_1
+    from fuel-air ratio (Fig. 2, n-octane). Generalised calculated curves: dP/q_r vs A_h,T/A_r for A_L/A_r
+    0.4-0.75, T ratio 1-4, dome flow 0-0.1, M_r 0-0.15 (Figs. 6-15); w_L/w_T vs A_h/A_h,T (Figs. 16-23); one
+    worked pressure profile along the combustor (Fig. 5: A_L/A_r 0.6, A_h,T/A_r 1.09, V_r 100 ft/s, P_1 30 in
+    Hg, T ratio 1 and 3).'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793. NO measured data: every curve is calculated, so it is a
+    model-vs-model (code-to-code) target, never fidelity or accuracy. What it gives: the 1-D annulus + liner
+    momentum equations a combaero annulus/hole/liner network should reduce to in the incompressible,
+    uniform-jet limit, and Fig. 5 as a full static/total pressure profile to reproduce. Its measured counterpart is
+    Grobman 1959 (tapered liners). The Cd it uses is TN 3663''s (wanted).'
+  read_for: ['#793 worked examples: system-level combustor flow split (method)', provenance of the 1-D
+      annulus/liner momentum model]
+  issues: [793]
+  records: []
+  notes: Same content as RM E56I04; the RM scan has one figure per page and is the better one to digitise.
+- file: docs/combustor_network/graves_grobman_1956_NACA_RM_E56I04.pdf
+  citation: Graves, C. C., Grobman, J. S. (1957). Theoretical analysis of total-pressure loss and airflow distribution
+    for tubular turbojet combustors with constant annulus and liner cross-sectional areas. NACA RM E56I04
+    (Confidential, declassified).
+  id: NACA RM E56I04
+  topic: [combustion, orifice, channel]
+  content: 'The research-memorandum version of NACA Report 1373, 89 PDF pp. (PDF page = printed page + 2):
+    same analysis and figures, one figure per page (Fig. 3 Cd on PDF p. 49, Fig. 5 pressure profiles PDF
+    pp. 51-53), plus Table I subsonic compressible-flow parameters for gamma 1.4 and 1.30 (printed pp. 40-44).'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 together with Report 1373 -- theory only, no measured data. Keep it
+    as the scan to digitise the method''s curves from (larger, cleaner figures).'
+  read_for: ['#793 worked examples: system-level combustor flow split (method)']
+  issues: [793]
+  records: []
+  notes: Dated 1956 in the filename (report number); Grobman 1959 cites it as 1957.
 - file: docs/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
@@ -2455,35 +2541,19 @@ wanted:
     q or set boundaries from Bassett's own K). Combining-manifold flow distributions measured under imposed
     pressures would.
   where: ASME J. Fluids Eng.; any measured combining-tee or manifold flow distribution would do.
-- citation: Graves, C. C., Grobman, J. S. (1958). Theoretical analysis of total pressure loss and airflow distribution
-    for tubular turbojet combustors with constant annulus and liner cross-sectional areas. NACA Report 1373.
-  checked: false
-  issues:
-  - 793
-  priority: now
-  question: 'A system-level #793 case -- annulus/liner airflow split and total pressure loss of a whole tubular
-    combustor, hole row by hole row, with the method''s own printed numbers (Lefebvre Ch. 4 cites it, ref. 9).'
-  where: NTRS (public).
-- citation: Grobman, J. S. (1959). Comparison of calculated and experimental total pressure loss and airflow
-    distribution in tubular turbojet combustors with tapered liners. NASA Memo 11-26-58E.
-  checked: false
-  issues:
-  - 793
-  priority: now
-  question: 'MEASURED liner airflow distribution and pressure loss for a full combustor -- the accuracy
-    (cross-source) half of the NACA Report 1373 case, which a combaero annulus + liner-hole network would be
-    scored against.'
-  where: NTRS (public).
 - citation: Dittrich, R. T., Graves, C. C. (1956). Discharge coefficients for combustor-liner air-entry holes I
     -- circular holes with parallel flow. NACA TN 3663.
   checked: false
   issues:
   - 793
-  priority: later
+  priority: now
   question: 'Primary measured Cd of liner holes against annulus velocity and bleed fraction, the data Kaddah''s
     Cd(K, alpha) (Lefebvre Eq. 4.15, a Cranfield MSc thesis we cannot get) summarises; would score the shipped
     McGreehan-Schotsch crossflow Cd on liner holes and say whether plunged (flanged) holes need their own
-    closure. Part II (TN 3924, Dittrich 1958) covers rectangular holes, louvers and scoops.'
+    closure. Part II (TN 3924, Dittrich 1958) covers rectangular holes, louvers and scoops. Raised to now
+    (2026-10-27): Grobman 1959''s "measured" model-D airflow split is computed from measured row static drops
+    WITH this Cd (3/4 in hole, 0.040 in wall), so scoring combaero''s split against it separates the network
+    from the Cd only if we hold the Cd data too.'
   where: NTRS (public).
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
