@@ -1262,7 +1262,35 @@ combustor = CombustorNode("combustor", method="complete")  # or "equilibrium"
 momentum = MomentumChamberNode("momentum", area=0.01, regime="compressible")
 combustor.add_energy_boundary(EnergyBoundary("energy", Q=50000))  # heat addition [W]
 combustor.add_energy_boundary(EnergyBoundary("loss", fraction=-0.05))  # -5% of the SENSIBLE enthalpy
+junction.add_energy_boundary(EnergyBoundary("heater", Tt_target=650.0))  # set outlet Tt [K]: Q solved
 ```
+
+`EnergyBoundary(id, Q=0.0, fraction=0.0, Tt_target=None)` attaches to a
+`PlenumNode`, `MomentumChamberNode` or `CombustorNode`. Sign: > 0 heats the
+fluid. Three modes:
+
+| mode | set | the solver |
+|---|---|---|
+| heat flow | `Q` [W] | derives the outlet temperature |
+| fraction | `fraction` [-] | of the sensible enthalpy (below) |
+| outlet temperature (#792) | `Tt_target` [K], the node's TOTAL temperature | solves the heat flow |
+
+- **`Tt_target`** makes the heat an unknown, `{id}.Q` [W], closed by one row
+  `Tt_node - Tt_target = 0`, scaled as a temperature (row kind `"T"`, see
+  `NetworkSolver._build_residual_scales`). Its Jacobian column is C++'s
+  `dT_mix/dQ`, relayed to every row that reads the node's temperature. It is
+  refused (`ValueError`) together with a nonzero `Q` or `fraction` on the same
+  boundary, as a second `Tt_target` on one node, and on any other node type.
+  A fixed-`Q` boundary beside it on the same node is fine: the target's `Q`
+  is what the rest leaves. On a `CombustorNode` it is the heat taken out (or
+  put in) AFTER the reaction to reach that exit Tt; it does not move the fuel
+  flow. A node with no through-flow (below `cb.MIXER_HEAT_MDOT_FLOOR`) has no
+  heat that sets its temperature: the solve does not succeed, its message
+  names the boundary, `__heat_undetermined__` lists it and its `Q` is
+  reported as NaN.
+- **Reported heat**, in every mode: `{id}.Q` [W] per boundary (the set `Q`,
+  the solved `Q`, or its share of `{node}.Q_fraction`) and `{node}.Q`, their
+  sum. The second-law check and the balance ledger (#552) use the solved heat.
 
 - **`fraction`** scales the inflow's sensible enthalpy, `h(T) - h(298.15 K)`
   at its own composition (`cb.SENSIBLE_ENTHALPY_REF_T`); on a combustor, the

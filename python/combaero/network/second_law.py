@@ -381,7 +381,7 @@ class SecondLawReport:
                 (cv.inflows if into_chain else cv.outflows).append(stream)
         for nid in stations:
             node = self.net.nodes[nid]
-            q = sum(float(eb.Q) for eb in getattr(node, "energy_boundaries", None) or [])
+            q = sum(float(eb.heat) for eb in getattr(node, "energy_boundaries", None) or [])
             q -= float(self.sol.get(f"{nid}.Q_withheld", 0.0))
             m_thru = sum(m for m, _, _ in self.solver._node_inflows(nid, self.x))
             if q and m_thru > 0.0:
@@ -594,7 +594,7 @@ class SecondLawReport:
         for nid, node in self.net.nodes.items():
             for eb in getattr(node, "energy_boundaries", None) or []:
                 if eb.id != f"_wall_{nid}":
-                    q_given += float(eb.Q)
+                    q_given += float(eb.heat)  # the SOLVED heat of a Tt_target (#792)
             q_given += float(self.sol.get(f"{nid}.Q_fraction", 0.0))
         q_out = sum(float(v) for k, v in self.sol.items() if k.endswith(".Q_wall_out"))
         q_withheld = sum(float(v) for k, v in self.sol.items() if k.endswith(".Q_withheld"))

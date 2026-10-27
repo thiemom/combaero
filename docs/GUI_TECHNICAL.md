@@ -41,6 +41,21 @@ Internal node with heat release logic.
 - `method`: "complete" or "equilibrium"
 - `area`: Cross-sectional area [m²]
 
+#### Heat Source (`heat_source`)
+A heat source or sink (#792): an `EnergyBoundary` on the plenum, momentum
+chamber or combustor that its ONE edge (handle `heat-out`, edge
+`data.type = "heat"`) points at. Not a flow path. The backend refuses an
+unwired source, an edge to an element or boundary, and edges to two nodes.
+- `mode`: `"Q"` (default), `"fraction"` or `"Tt_target"`
+- `Q`: Heat flow [W], > 0 heats the fluid (Default: 1000.0)
+- `fraction`: Fraction of the inflow's sensible enthalpy [-] (Default: 0.01)
+- `Tt_target`: The node's outlet TOTAL temperature [K]; the heat is then
+  solved for (Default: 600.0)
+
+Its result (`node_results[<id>]`) carries `Q` [W], the heat it applied in
+every mode (NaN when no through-flow determines it), `Tt_target` in that mode,
+`heated_node`, and the heated node's `state`.
+
 ### Element Data Schemas
 Elements are defined by edges in the graph but carry their own physical parameters.
 

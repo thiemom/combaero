@@ -1,3 +1,4 @@
+import math
 from typing import Annotated, Literal, get_args
 
 from pydantic import (
@@ -209,6 +210,27 @@ class WallData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     label: str | None = None
     initial_guess: dict[str, float] = Field(default_factory=dict)
+
+
+class HeatSourceData(BaseModel):
+    """A heat source/sink wired by one edge to a plenum, momentum chamber or
+    combustor (#792): an EnergyBoundary on that node. ``mode`` picks which
+    value is set; the others are kept (a mode switch loses nothing) but not
+    used. Defaults are a working example: 1 kW into the node."""
+
+    model_config = ConfigDict(extra="ignore")
+    mode: Literal["Q", "fraction", "Tt_target"] = "Q"
+    Q: float = 1000.0  # [W], > 0 heats the fluid
+    fraction: float = 0.01  # [-] of the inflow's sensible enthalpy
+    Tt_target: float = 600.0  # [K], the node's TOTAL temperature
+    label: str | None = None
+
+    @field_validator("Tt_target")
+    @classmethod
+    def _positive_target(cls, v: float) -> float:
+        if not (math.isfinite(v) and v > 0.0):
+            raise ValueError("Tt_target must be a positive total temperature [K]")
+        return v
 
 
 class ConstantFractionLossData(BaseModel):

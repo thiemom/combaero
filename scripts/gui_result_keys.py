@@ -218,6 +218,16 @@ def networks() -> Iterator[tuple[str, str, dict]]:
         graph["nodes"][0] = _node("in", "mass_boundary", {"m_dot": 0.05, "Tt": 300.0})
         yield "discrete_loss", corr, _with(graph, "x", correlation_type=corr)
     yield (
+        "heat_source",
+        "outlet Tt (total)",
+        _with(http._palette_network("heat_source"), "x", mode="Tt_target", Tt_target=320.0),
+    )
+    yield (
+        "heat_source",
+        "fraction",
+        _with(http._palette_network("heat_source"), "x", mode="fraction", fraction=0.01),
+    )
+    yield (
         "combustor",
         "equilibrium",
         _with(http._palette_network("combustor"), "x", method="equilibrium"),

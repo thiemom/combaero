@@ -371,6 +371,26 @@
 			"u_ref",
 			"velocity"
 		],
+		"heat_source": [
+			"Q",
+			"Tt_target",
+			"state.P",
+			"state.Pt",
+			"state.Q",
+			"state.Q_fraction",
+			"state.T",
+			"state.Tt",
+			"state.a",
+			"state.cp",
+			"state.cv",
+			"state.gamma",
+			"state.h",
+			"state.mach",
+			"state.mw",
+			"state.rho",
+			"state.s",
+			"state.u"
+		],
 		"impingement_array": [
 			"Cd",
 			"Cd_in_range",
@@ -761,6 +781,11 @@
 		"film_cooling": [
 			"palette"
 		],
+		"heat_source": [
+			"palette",
+			"outlet Tt (total)",
+			"fraction"
+		],
 		"impingement_array": [
 			"palette",
 			"bypass from a boundary",
@@ -852,6 +877,7 @@
 		"Pt_jct": "Pa",
 		"Pt_out": "Pa",
 		"Q": "W",
+		"Q_fraction": "W",
 		"Q_to_boundary": "W",
 		"Q_wall": "W",
 		"Re": "-",
@@ -877,6 +903,7 @@
 		"Tt": "K",
 		"Tt_in": "K",
 		"Tt_out": "K",
+		"Tt_target": "K",
 		"U1_over_Vi_max": "-",
 		"UA": "W/K",
 		"U_gas": "m/s",

@@ -32,6 +32,7 @@ from .components import (
     film_discharge_node,
     film_on_wall_side,
     film_sources,
+    target_energy_boundaries,
 )
 from .graph import FlowNetwork
 
@@ -354,6 +355,8 @@ class NetworkSolver:
         D_f[i] is chosen by what row i MEASURES, not by which object owns it:
             "p"    -> ref_p    [Pa]   (boundary pressure spread)
             "mdot" -> ref_mdot [kg/s] (median flow unknown)
+            "T"    -> ref_T    [K]    (_reference_T_scale: an
+                                       EnergyBoundary Tt_target row, #792)
         ref_p / ref_mdot is ~1e5, so a row filed under the wrong kind is
         weighted ~1e5 too heavily or too lightly and Newton stalls. This has
         happened repeatedly:
@@ -388,10 +391,30 @@ class NetworkSolver:
         error in a Pa column next to d/dm = 1 (#481).
         """
         ref_p, ref_mdot = self._reference_scales(x0_use)
-        _row_scale_kind_map = {"p": ref_p, "mdot": ref_mdot}
+        _row_scale_kind_map = {"p": ref_p, "mdot": ref_mdot, "T": self._reference_T_scale()}
         return np.asarray(
             [_row_scale_kind_map[kind] for _owner, kind in self._row_kinds(x0_use)], dtype=float
         )
+
+    def _reference_T_scale(self) -> float:
+        """Row scale [K] of a temperature row (an EnergyBoundary Tt_target,
+        #792): the spread of the boundary and target total temperatures, at
+        least 1% of their largest and at least 1 K -- the temperature analogue
+        of ref_p (boundary pressure spread with a relative floor)."""
+        temps = [
+            float(n.Tt)
+            for n in self.network.nodes.values()
+            if isinstance(n, PressureBoundary | MassFlowBoundary)
+            and math.isfinite(float(getattr(n, "Tt", math.nan)))
+        ]
+        temps += [
+            float(eb.Tt_target)
+            for n in self.network.nodes.values()
+            for eb in target_energy_boundaries(n)
+        ]
+        if not temps:
+            return 1.0
+        return max(max(temps) - min(temps), 1e-2 * max(abs(t) for t in temps), 1.0)
 
     def _row_kinds(self, x: np.ndarray) -> list[tuple[str, str]]:
         """(owner, declared kind) per residual row, in residual-row order.
@@ -408,7 +431,11 @@ class NetworkSolver:
 
             state = self._get_node_state(node, x)
             node_res, _ = node.residuals(state)
-            rows.extend((f"node '{node_id}'", "p") for _ in node_res)
+            # The node's own rows are pressure rows, except the trailing
+            # Tt_target rows of its EnergyBoundaries (temperature, #792).
+            n_T = len(target_energy_boundaries(node))
+            rows.extend((f"node '{node_id}'", "p") for _ in node_res[: len(node_res) - n_T])
+            rows.extend((f"node '{node_id}' Tt_target", "T") for _ in range(n_T))
 
             # Node mass conservation equation appended in _residuals_and_jacobian,
             # unless the node is a junction port (then the MultiPortChamberBase's
@@ -487,7 +514,11 @@ class NetworkSolver:
                 elif is_m[j]:
                     has_m, m_unit = True, m_unit or unit
             measured = "p" if p_unit and not m_unit else "mdot" if m_unit and not p_unit else None
-            if measured is not None:
+            if declared == "T":
+                # A temperature row (#792) is written on a DERIVED Tt, never on
+                # an unknown of its own, so no unit coefficient identifies it.
+                verdict = "untestable"
+            elif measured is not None:
                 verdict = "agree" if measured == declared else "DISAGREE"
             else:
                 verdict = "unclear" if has_p and has_m else "untestable"
@@ -534,6 +565,9 @@ class NetworkSolver:
         self.unknown_names: list[str] = []
         # Mapping from node/element ID to index in the flattened x array
         self._unknown_indices: dict[str, list[int]] = {}
+        # EnergyBoundary(Tt_target) heat unknowns per node (#792):
+        # {node id: [(boundary, global index)]}, set by _build_x0.
+        self._target_q_columns: dict[str, list[tuple[EnergyBoundary, int]]] = {}
         # Mapping from unknown name to global index
         self._name_to_index: dict[str, int] = {}
         # Canonical default composition (Mass Fractions)
@@ -1281,6 +1315,13 @@ class NetworkSolver:
             )
             _tee_branch_guess[_eid] = max(_bernoulli_br, mdot_guess[_eid] * 0.25)
 
+        # EnergyBoundary(Tt_target) heat unknowns (#792): {name: (node, eb)}
+        target_q = {
+            eb.unknown_name: (nid, eb)
+            for nid, n in self.network.nodes.items()
+            for eb in target_energy_boundaries(n)
+        }
+
         # Iterate through interior nodes and gather unknowns
         for node_id, node in self.network.nodes.items():
             if not isinstance(node, PressureBoundary):
@@ -1301,6 +1342,9 @@ class NetworkSolver:
                         elif ".Y[" in unk:
                             idx = int(unk.split(".Y[")[1].replace("]", ""))
                             x0_list.append(ref["Y"][idx])
+                        elif unk in target_q:
+                            # Refined below, from the propagated start.
+                            x0_list.append(0.0)
                         else:
                             x0_list.append(ref["m_dot"])
                     self._unknown_indices[node_id] = list(range(start_idx, len(x0_list)))
@@ -1370,7 +1414,45 @@ class NetworkSolver:
         if self.network.thermal_coupling_enabled and self.network.walls:
             self._setup_wall_energy_boundaries()
 
-        return np.array(x0_list, dtype=float)
+        x0 = np.array(x0_list, dtype=float)
+        self._target_q_columns = {
+            nid: [(eb, self._name_to_index[name])] for name, (nid, eb) in target_q.items()
+        }
+        if target_q:
+            self._seed_target_heat(x0, target_q)
+        return x0
+
+    def _seed_target_heat(
+        self, x0: np.ndarray, target_q: dict[str, tuple[str, EnergyBoundary]]
+    ) -> None:
+        """Start each Tt_target heat unknown (#792) at the heat that takes the
+        node's propagated start temperature (with no target heat) to its
+        target at the start flow: Q0 = m (h(Tt_target) - h(T0)). It also sets
+        the column scale (D_x = |x0|), so it is floored at the heat of 1 K of
+        that flow. A user initial_guess for the unknown is kept."""
+        try:
+            self._propagate_states(x0, with_relay=False)
+        except Exception:  # noqa: BLE001 -- a start estimate never breaks a solve
+            return
+        for name, (nid, eb) in target_q.items():
+            if name in getattr(self.network.nodes[nid], "initial_guess", {}):
+                continue
+            derived = self._derived_states.get(nid)
+            if derived is None:
+                continue
+            T0, Y0, _ = derived
+            m = abs(sum(m for m, _, _ in self._node_inflows(nid, x0)))
+            m = max(m, 1e-3)
+            try:
+                X = list(cb.mass_to_mole(list(Y0)))
+                cp = float(cb.cp_mass(float(T0), X))
+                q = m * (float(cb.h_mass(float(eb.Tt_target), X)) - float(cb.h_mass(float(T0), X)))
+            except (ValueError, RuntimeError):
+                continue
+            floor = m * cp * 1.0
+            if not math.isfinite(q):
+                continue
+            x0[self._name_to_index[name]] = q if abs(q) >= floor else math.copysign(floor, q)
 
     def _compute_topological_order(self) -> list[str]:
         """Simple topological sort starting from boundary nodes."""
@@ -2313,6 +2395,11 @@ class NetworkSolver:
             if has_walls:
                 wall_contributions = self._evaluate_walls_for_node(nid, up_elems, x)
 
+            # A Tt_target boundary's heat is its unknown's value at x (#792).
+            target_cols = self._target_q_columns.get(nid, ())
+            for eb, i_q in target_cols:
+                eb.Q_solved = float(x[i_q])
+
             T, Y, mix_res = node.compute_derived_state(up_states)
             if no_inflow:
                 # A node whose flows all leave it carries no flow: continuous
@@ -2424,6 +2511,16 @@ class NetworkSolver:
                 self._relay_mix(
                     relay[nid], nid, stream_info, mix_res, wall_contributions, x, relay, up
                 )
+                # The Tt_target heat unknown's own column (#792): dT_mix/dQ
+                # from C++ (the heat per unit flow over cp, fading to 0 at no
+                # flow). The composition does not move with Q: the mixer's
+                # Y_mix is Q-free and a combustor shifts its products' T at
+                # frozen composition.
+                for _eb, i_q in target_cols:
+                    pkg = relay[nid].setdefault(
+                        i_q, {"T": 0.0, "Y": np.zeros(self._n_species), "Pt_mix": 0.0}
+                    )
+                    pkg["T"] += float(mix_res.dT_mix_dQ)
 
             # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])
@@ -5001,7 +5098,9 @@ class NetworkSolver:
         _heat_faded: list[str] = []
         if success:
             for nid, node in self.network.nodes.items():
-                q_given = sum(float(eb.Q) for eb in getattr(node, "energy_boundaries", None) or [])
+                q_given = sum(
+                    float(eb.heat) for eb in getattr(node, "energy_boundaries", None) or []
+                )
                 if q_given == 0.0:
                     continue
                 m_in = sum(m for m, _, _ in self._node_inflows(nid, final_x))
@@ -5020,6 +5119,36 @@ class NetworkSolver:
                     "fade of the heat makes, not the network's. Check heat inputs "
                     "against the flow they heat."
                 )
+
+        # An EnergyBoundary(Tt_target) on a node with (next to) no through-flow
+        # (#792): Q enters as Q phi(m) / cp, so below MIXER_HEAT_MDOT_FLOOR the
+        # target row hardly sees Q and at zero flow not at all -- any Q "meets"
+        # the target, or none does. Such a Q is not an answer: a converged solve
+        # is demoted, a failed one says why, and neither reports the iterate's
+        # Q (it is NaN below).
+        _target_stagnant: list[str] = []
+        for nid, cols in self._target_q_columns.items():
+            try:
+                m_in = sum(m for m, _, _ in self._node_inflows(nid, final_x))
+            except Exception:  # noqa: BLE001 -- a diagnostic never breaks a solve
+                continue
+            if not m_in >= cb.MIXER_HEAT_MDOT_FLOOR:
+                _target_stagnant.extend(eb.id for eb, _ in cols)
+        if _target_stagnant:
+            note = (
+                f"EnergyBoundary {_target_stagnant} sets Tt_target on a node with no "
+                f"through-flow (below MIXER_HEAT_MDOT_FLOOR, {cb.MIXER_HEAT_MDOT_FLOOR:g} "
+                "kg/s): the heat that sets an outlet temperature is undetermined "
+                "without flow, so no Q is reported. Drive flow through the node, or "
+                "set Q instead."
+            )
+            if success:
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                message = f"Converged, but {note[0].lower()}{note[1:]}"
+            else:
+                message = f"{message} {note}"
 
         # A momentum chamber on the supersonic root of its closure (the
         # states are those of the propagation above). Seen on a channel into a
@@ -5342,7 +5471,11 @@ class NetworkSolver:
             ebs = getattr(node, "energy_boundaries", None) or []
             if not ebs:
                 continue
-            q_given = sum(float(eb.Q) for eb in ebs)
+            for eb in ebs:
+                if eb.is_target and eb.unknown_name in self._name_to_index:
+                    eb.Q_solved = float(final_x[self._name_to_index[eb.unknown_name]])
+            # An undetermined Tt_target heat (no through-flow) applies none.
+            q_given = sum(float(eb.heat) for eb in ebs if eb.id not in _target_stagnant)
             frac = sum(float(eb.fraction) for eb in ebs)
             inflows = self._node_inflows(nid, final_x)
             m_in = sum(m for m, _, _ in inflows)
@@ -5377,6 +5510,19 @@ class NetworkSolver:
                 sol_dict[f"{nid}.Q_fraction"] = (
                     frac * m_in * (h_out - h_ref - q_given * phi) / (1.0 + frac)
                 )
+            # The heat each user boundary applied, in every mode (#792): the
+            # declared Q, a Tt_target's SOLVED Q (its unknown at final_x, NaN
+            # when no through-flow determines it), plus its share of the
+            # fraction heat; summed per node as {node}.Q. > 0 heats the fluid.
+            # A wall's heat is its wall's {wid}.Q.
+            q_frac = float(sol_dict.get(f"{nid}.Q_fraction", 0.0))
+            user_ebs = [eb for eb in ebs if eb.id != f"_wall_{nid}"]
+            for eb in user_ebs:
+                share = q_frac * float(eb.fraction) / frac if frac != 0.0 else 0.0
+                undetermined = eb.id in _target_stagnant
+                sol_dict[f"{eb.id}.Q"] = math.nan if undetermined else float(eb.heat) + share
+            if user_ebs:
+                sol_dict[f"{nid}.Q"] = float(sum(sol_dict[f"{eb.id}.Q"] for eb in user_ebs))
 
         # Second law per element and the network's control-volume ledger
         # (#545). Both demote, below. Evaluated where the root finder
@@ -5505,6 +5651,7 @@ class NetworkSolver:
         sol_dict["__inconsistent_elements__"] = list(_bad_junctions)
         sol_dict["__T_clamped__"] = list(_T_clamped)
         sol_dict["__heat_faded__"] = list(_heat_faded)
+        sol_dict["__heat_undetermined__"] = list(_target_stagnant)
         sol_dict["__supersonic_chambers__"] = list(_supersonic)
         sol_dict["__outcome__"] = outcome
         # The rows carrying the residual, largest first. Already computed for

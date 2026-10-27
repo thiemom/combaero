@@ -389,6 +389,7 @@ def _palette_network(kind: str) -> dict:
         "combustor",
         "wall",
         "probe",
+        "heat_source",
         # These two need a neighbour with an area / a lossy element beside them.
         "area_change",
         "lossless_connection",
@@ -411,6 +412,11 @@ def _palette_network(kind: str) -> dict:
         elif kind == "probe":
             nodes.append(_node("x", kind, {**data, "target_id": "c1"}))
             edges.append(_edge("e2", "c1", "c2"))
+        elif kind == "heat_source":
+            # Heats a plenum between the channels by its one edge (#792).
+            nodes += [_node("pl", "plenum"), _node("x", kind, data)]
+            edges += [_edge("e2", "c1", "pl"), _edge("e4", "pl", "c2")]
+            edges.append(_edge("e5", "x", "pl", sh="heat-out", th="flow-top"))
         else:
             nodes.append(_node("x", kind, data))
             edges += [_edge("e2", "c1", "x"), _edge("e4", "x", "c2")]
@@ -430,7 +436,7 @@ def _palette_network(kind: str) -> dict:
 
 def test_the_palette_list_is_what_this_file_knows() -> None:
     """A new palette kind needs a network in `_palette_network`."""
-    assert len(_palette_kinds()) == 20, _palette_kinds()
+    assert len(_palette_kinds()) == 21, _palette_kinds()
 
 
 @pytest.mark.parametrize("kind", _palette_kinds())

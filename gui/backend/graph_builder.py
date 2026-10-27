@@ -11,6 +11,7 @@ from combaero.network import (
     ConvectiveSurface,
     EffusionLiner,
     EffusionPlateElement,
+    EnergyBoundary,
     FilmCoolingElement,
     FlowNetwork,
     ImpingementArray,
@@ -53,6 +54,7 @@ from .schemas import (
     EffusionPlateData,
     EjectorData,
     FilmCoolingData,
+    HeatSourceData,
     ImpingementArrayData,
     ImpingementModelData,
     LinearThetaFractionLossData,
@@ -109,6 +111,11 @@ ELEMENT_KINDS = frozenset(
 )
 
 
+#: The heat source canvas kind (#792) and the kinds it may heat.
+HEAT_SOURCE_KIND = "heat_source"
+HEAT_SOURCE_TARGETS = frozenset({"plenum", "momentum_chamber", "combustor"})
+
+
 def _parse(model, data: dict | None, owner_id: str, what: str = "Node"):
     """Validate one node's (or wall's) data, naming it in the error.
 
@@ -141,11 +148,63 @@ def _checked_edges(schema: NetworkGraphSchema) -> NetworkGraphSchema:
                     f"Edge '{edge.id}' connects '{edge.source}' to '{edge.target}', "
                     f"but '{end}' is not on the canvas."
                 )
-    probes = {n.id for n in schema.nodes if n.type == "probe"}
-    if not probes:
+    # Probes are display-only; a heat source's one edge names the node it
+    # heats (_heat_source_links), not a flow path.
+    dropped = {n.id for n in schema.nodes if n.type in ("probe", HEAT_SOURCE_KIND)}
+    if not dropped:
         return schema
-    edges = [e for e in schema.edges if e.source not in probes and e.target not in probes]
+    edges = [e for e in schema.edges if e.source not in dropped and e.target not in dropped]
     return schema.model_copy(update={"edges": edges})
+
+
+def _heat_source_links(schema: NetworkGraphSchema) -> dict[str, str]:
+    """{heat source id: the canvas node it heats} (#792).
+
+    A heat source is wired by exactly ONE edge, to a plenum, momentum chamber
+    or combustor. Anything else is refused by name: an unwired source would
+    solve the network without its heat, an element has no energy balance of
+    its own to take it, and two nodes would leave its heat split by nothing.
+    """
+    kinds = {n.id: n.type for n in schema.nodes}
+    links: dict[str, str] = {}
+    for n in schema.nodes:
+        if n.type != HEAT_SOURCE_KIND:
+            continue
+        ends = sorted(
+            {
+                e.target if e.source == n.id else e.source
+                for e in schema.edges
+                if n.id in (e.source, e.target)
+            }
+        )
+        if not ends:
+            raise ValueError(
+                f"Heat source '{n.id}' is not wired: connect it by one edge to the "
+                "plenum, momentum chamber or combustor it heats."
+            )
+        if len(ends) > 1:
+            raise ValueError(
+                f"Heat source '{n.id}' is wired to {len(ends)} nodes ({', '.join(ends)}): "
+                "a heat source heats one node. Use one heat source per node."
+            )
+        target = ends[0]
+        if kinds[target] not in HEAT_SOURCE_TARGETS:
+            raise ValueError(
+                f"Heat source '{n.id}' is wired to '{target}', a {kinds[target].replace('_', ' ')}: "
+                "a heat source heats a plenum, momentum chamber or combustor (a node whose "
+                "outlet temperature comes from an energy balance), not an element or a boundary."
+            )
+        links[n.id] = target
+    return links
+
+
+def _heat_source_boundary(node_id: str, data: HeatSourceData) -> EnergyBoundary:
+    """The EnergyBoundary a heat source puts on its node, by its mode."""
+    if data.mode == "Tt_target":
+        return EnergyBoundary(node_id, Tt_target=data.Tt_target)
+    if data.mode == "fraction":
+        return EnergyBoundary(node_id, fraction=data.fraction)
+    return EnergyBoundary(node_id, Q=data.Q)
 
 
 def build_pressure_loss(data, area: float = 0.1):
@@ -575,7 +634,9 @@ def _find_junction_port(
 
 
 def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
-    schema = _checked_edges(schema)
+    checked = _checked_edges(schema)  # refuses an edge to a missing node first
+    heat_links = _heat_source_links(schema)
+    schema = checked
     net = FlowNetwork()
     nodes_map = {}  # ID -> Physical Node
     plenum_node_ids: set[str] = set()
@@ -653,6 +714,8 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             nodes_map[node_id] = node
         elif node_type == "probe":
             pass  # Display-only diagnostic nodes -- not part of the solver graph
+        elif node_type == HEAT_SOURCE_KIND:
+            pass  # An EnergyBoundary on the node it is wired to (below)
         elif node_type == "wall":
             data = _parse(WallData, node_data, node_id)
             node = WallNode(node_id)
@@ -666,6 +729,21 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 f"Node '{node_id}' is of unknown kind {node_type!r}; this version "
                 "cannot build it, and solving without it would be a different network."
             )
+
+    # Heat sources (#792): each an EnergyBoundary, named by the source's id, on
+    # the node it is wired to. Two Tt_target sources on one node are refused
+    # by the node itself (one outlet temperature).
+    heat_sources: dict[str, tuple[str, EnergyBoundary]] = {}
+    hs_data = {n.id: n.data for n in schema.nodes if n.type == HEAT_SOURCE_KIND}
+    for hs_id, target in heat_links.items():
+        data = _parse(HeatSourceData, hs_data[hs_id], hs_id)
+        eb = _heat_source_boundary(hs_id, data)
+        try:
+            nodes_map[target].add_energy_boundary(eb)
+        except ValueError as exc:
+            raise ValueError(f"Heat source '{hs_id}': {exc}") from exc
+        heat_sources[hs_id] = (target, eb)
+    net._gui_heat_sources = heat_sources
 
     element_ids = {node.id for node in element_nodes}
     # Impingement arrays (#465) expand into a row chain. Their ends fan out to

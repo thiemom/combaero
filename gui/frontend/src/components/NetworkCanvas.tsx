@@ -11,6 +11,7 @@ import { useCallback, useRef } from "react";
 import { useCopyPaste } from "../hooks/useCopyPaste";
 import useStore, { stripResults } from "../store/useStore";
 import { defaultFilmSide, FILM_HANDLE } from "../utils/filmLink";
+import { heatSourceConnectionError } from "../utils/heatSource";
 import { edgeTypes, nodeTypes } from "./flowTypes";
 import SolverStatusBadge from "./SolverStatusBadge";
 
@@ -214,6 +215,15 @@ const NetworkCanvas = () => {
 					mixing_area: null,
 					recovery_efficiency: 1.0,
 				} as any;
+			} else if (type === "heat_source") {
+				data = {
+					...data,
+					// A working example (#792): 1 kW into the node it is wired to.
+					mode: "Q",
+					Q: 1000.0,
+					fraction: 0.01,
+					Tt_target: 600.0,
+				} as any;
 			} else if (type === "vortex") {
 				data = {
 					...data,
@@ -277,8 +287,10 @@ const NetworkCanvas = () => {
 	);
 	const isValidConnection = useCallback(
 		(c: Connection) =>
-			c.sourceHandle !== FILM_HANDLE && c.targetHandle !== FILM_HANDLE,
-		[],
+			c.sourceHandle !== FILM_HANDLE &&
+			c.targetHandle !== FILM_HANDLE &&
+			heatSourceConnectionError(c, nodes, edges) === null,
+		[nodes, edges],
 	);
 
 	return (

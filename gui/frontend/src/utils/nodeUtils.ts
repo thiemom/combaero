@@ -78,7 +78,10 @@ export const handleStyle = (
 
 // Display names for node types whose type string is internal. The type
 // strings themselves are persisted in saved networks and never change.
-const TYPE_LABEL: Record<string, string> = { mpce_tee: "Tee" };
+const TYPE_LABEL: Record<string, string> = {
+	mpce_tee: "Tee",
+	heat_source: "Heat Source",
+};
 
 /** User-facing name for a node type: "mpce_tee" -> "Tee", else underscores to spaces. */
 export const nodeTypeLabel = (type?: string | null): string =>
