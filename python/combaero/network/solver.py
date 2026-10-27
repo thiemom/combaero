@@ -207,6 +207,12 @@ _STALL_NEAR_MIN_REL = 0.05
 # made (in a driven net, the hotter the node the less it flows), not the
 # network's. A dead end's root takes up < 1e-12 of its heat (#626).
 _HEAT_FADE_TOL = 1e-6
+# A compressible momentum chamber's closure Pt = P0(P, T0, |m|/A) has two
+# static roots for one (Pt, m): the subsonic one and a supersonic one below the
+# sonic P*. No element here accelerates a stream past Mach 1 (a constant-area
+# channel chokes at 1; an orifice discharges at the chamber's static P), so a
+# chamber on the supersonic root is an artifact of the root finder, not a flow.
+_SUPERSONIC_CHAMBER_TOL = 1e-6
 
 
 def _stall_detected(
@@ -3236,6 +3242,7 @@ class NetworkSolver:
             "__inconsistent_elements__": [],
             "__T_clamped__": [],
             "__heat_faded__": [],
+            "__supersonic_chambers__": [],
             "__outcome__": SolveOutcome.ERROR,
             "__final_norm__": float("inf"),
             "__worst_residuals__": [],
@@ -5108,6 +5115,40 @@ class NetworkSolver:
                     "against the flow they heat."
                 )
 
+        # A momentum chamber on the supersonic root of its closure (the
+        # states are those of the propagation above). Seen on a channel into a
+        # junction before a wide orifice: the junction at Mach 1.46, the
+        # channel "leaving" at Mach 1.67 unchoked, the orifice's static
+        # pressure rising across it -- reported as converged and consistent.
+        _supersonic: list[str] = []
+        _supersonic_notes: list[str] = []
+        if success:
+            for nid, node in self.network.nodes.items():
+                if (
+                    not isinstance(node, MomentumChamberNode)
+                    or node.regime == "incompressible"
+                    or not node.area
+                    or nid in self._T_no_gas
+                ):
+                    continue
+                M = float(node.mach(self._get_node_state(node, final_x)))
+                if M > 1.0 + _SUPERSONIC_CHAMBER_TOL:
+                    feeds = sorted(e.id for e in self.network.get_upstream_elements(nid))
+                    _supersonic.append(nid)
+                    _supersonic_notes.append(f"'{nid}' at Mach {M:.3g} (fed by {feeds})")
+            if _supersonic:
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                message = (
+                    f"Converged with momentum chamber(s) {', '.join(_supersonic_notes)} on the "
+                    "supersonic root of the chamber closure: its static pressure is below "
+                    "the sonic pressure of its flow, which no element here produces (a "
+                    "constant-area channel chokes at Mach 1). Usually the element "
+                    "downstream is no restriction for that flow -- check its geometry -- "
+                    "and the duct feeding the chamber is choked."
+                )
+
         if not success:
             try:
                 _hint = self._declared_direction_hints(final_x)
@@ -5558,6 +5599,7 @@ class NetworkSolver:
         sol_dict["__inconsistent_elements__"] = list(_bad_junctions)
         sol_dict["__T_clamped__"] = list(_T_clamped)
         sol_dict["__heat_faded__"] = list(_heat_faded)
+        sol_dict["__supersonic_chambers__"] = list(_supersonic)
         sol_dict["__outcome__"] = outcome
         # The rows carrying the residual, largest first. Already computed for
         # the diagnostic payload; a failed solve is far easier to read with
