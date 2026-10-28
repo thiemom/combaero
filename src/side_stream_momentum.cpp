@@ -16,9 +16,6 @@ namespace {
 // Floor on the impulse quadratic's discriminant, relative to Pi^2, so a
 // choked face stays finite and differentiable (flagged, not hidden).
 constexpr double MERGE_DISCRIMINANT_FLOOR = 1e-8;
-// Central-difference steps for the smooth temperature sensitivities.
-constexpr double T_STEP_REL = 1e-6;
-constexpr double P_STEP_REL = 1e-7;
 }  // namespace
 
 StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
@@ -267,25 +264,68 @@ MergeFaceState chamber_merge_face_state(double m_main, double T0_main,
 }
 
 namespace {
+// w(Pt, Tt, P) and its partials, analytic (#816). The gas is ideal with
+// cp(T): along the isentrope s0(T) - R ln P = s0(Tt) - R ln Pt, so
+//   (cp(T)/T) dT = (cp(Tt)/Tt) dTt - R dPt/Pt + R dP/P   (mass-specific).
 struct JetW {
-  double w;
-  bool choked;
+  double w = 0.0;
+  bool choked = false;
+  double dw_dPt = 0.0, dw_dTt = 0.0, dw_dP = 0.0;
 };
 
 JetW jet_w(double Pt, double Tt, double P, const std::vector<double>& X) {
+  JetW out;
   if (!(Pt > 0.0) || !(Tt > 0.0) || !(P > 0.0) || P >= Pt) {
-    return {0.0, false};
+    return out;
   }
-  const double P_star = critical_pressure_ratio(Tt, Pt, X) * Pt;
+  const double R = specific_gas_constant(X);
+  const double cp_t = cp_mass(Tt, X);
+  // The sonic state ON the isentrope: T* from h(Tt) - h(T*) = a(T*)^2 / 2 (a
+  // smooth Newton solve), P* = Pt exp((s0(T*) - s0(Tt)) / R). The golden-
+  // section mass-flux maximum (critical_pressure_ratio) locates the same
+  // point only to ~1e-8 of Pt on a flat peak, noise the choked w carried.
+  const double T_star = T_from_stagnation(Tt, 1.0, X);
+  const double P_star =
+      Pt * std::exp((s_mass(T_star, X, Pt) - s_mass(Tt, X, Pt)) / R);
   if (P >= P_star) {
     const double M = mach_from_pressure_ratio(Tt, Pt, P, X);
     const double Ts = T_from_stagnation(Tt, M, X);
-    return {M * speed_of_sound(Ts, X), false};
+    out.w = M * speed_of_sound(Ts, X);
+    if (!(out.w > 0.0)) {
+      return out;
+    }
+    // w^2 = 2 (h(Tt) - h(Ts)): dw = (cp(Tt) dTt - cp(Ts) dTs) / w, with dTs
+    // from the isentrope: dTs = (Ts/cp(Ts)) ((cp(Tt)/Tt) dTt - R dPt/Pt +
+    // R dP/P), so cp(Ts) dTs = Ts (...).
+    out.dw_dTt = (cp_t - Ts * cp_t / Tt) / out.w;
+    out.dw_dPt = Ts * R / Pt / out.w;
+    out.dw_dP = -Ts * R / P / out.w;
+    return out;
   }
-  const double T_star = T_from_stagnation(Tt, 1.0, X);
+  // Sonic: h(Tt) - h(T*) = a(T*)^2 / 2 fixes T*(Tt); P* = Pt exp(-(s0(Tt) -
+  // s0(T*))/R) from the isentrope; w = u* + (P* - P) / (rho* u*).
+  out.choked = true;
   const double u_star = speed_of_sound(T_star, X);
   const double rho_star = density(T_star, P_star, X);
-  return {u_star + (P_star - P) / (rho_star * u_star), true};
+  out.w = u_star + (P_star - P) / (rho_star * u_star);
+  // d(a^2)/dT = R (gamma + T dgamma/dT), gamma = c/(c - R_mol) on molar cp c.
+  const double c = cp(T_star, X);
+  const double gamma = c / (c - thermo::R_GAS);
+  const double dgamma_dT = -thermo::R_GAS * dcp_dT(T_star, X) / ((c - thermo::R_GAS) * (c - thermo::R_GAS));
+  const double da2_dT = R * (gamma + T_star * dgamma_dT);
+  const double cp_s = cp_mass(T_star, X);
+  const double dTs_dTt = cp_t / (cp_s + 0.5 * da2_dT);
+  const double du_dTt = da2_dT / (2.0 * u_star) * dTs_dTt;
+  // ln P* = ln Pt + (s0(T*) - s0(Tt)) / R.
+  const double dlnPs_dTt = (cp_s / T_star * dTs_dTt - cp_t / Tt) / R;
+  // w = u* + (P* - P) K, K = R T* / (P* u*) = 1 / (rho* u*).
+  const double K = R * T_star / (P_star * u_star);
+  const double dPs_dTt = P_star * dlnPs_dTt;
+  const double dK_dTt = K * (dTs_dTt / T_star - dlnPs_dTt - du_dTt / u_star);
+  out.dw_dP = -K;
+  out.dw_dPt = K * P / Pt;  // P* ~ Pt at fixed Tt: d((P* - P) K)/dPt = K P / Pt
+  out.dw_dTt = du_dTt + dPs_dTt * K + (P_star - P) * dK_dTt;
+  return out;
 }
 }  // namespace
 
@@ -296,16 +336,9 @@ JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
   out.J = m * base.w;
   out.dJ_dm = base.w;
   out.choked = base.choked;
-  if (base.w == 0.0) {
-    return out;
-  }
-  // w(Pt, Tt, P) is smooth (C1 across choking); central differences, kept
-  // inside C++ like the chamber's own stagnation sensitivities.
-  const double hP = std::max(1.0, Pt * P_STEP_REL);
-  const double hT = std::max(1e-4, Tt * T_STEP_REL);
-  out.dJ_dPt = m * (jet_w(Pt + hP, Tt, P, X).w - jet_w(Pt - hP, Tt, P, X).w) / (2.0 * hP);
-  out.dJ_dTt = m * (jet_w(Pt, Tt + hT, P, X).w - jet_w(Pt, Tt - hT, P, X).w) / (2.0 * hT);
-  out.dJ_dP = m * (jet_w(Pt, Tt, P + hP, X).w - jet_w(Pt, Tt, P - hP, X).w) / (2.0 * hP);
+  out.dJ_dPt = m * base.dw_dPt;
+  out.dJ_dTt = m * base.dw_dTt;
+  out.dJ_dP = m * base.dw_dP;
   return out;
 }
 

@@ -133,7 +133,9 @@ MergeFaceState chamber_merge_face_state(double m_main, double T_main,
 //   choked (P < P*): w = u* + (P* - P) / (rho* u*), the sonic jet's momentum
 //                    plus its pressure thrust on the vena-contracta area.
 // Cd does not enter: it sets the area, not the jet velocity. w is C1 across
-// choking. P >= Pt gives w = 0 (no outflow to carry momentum).
+// choking. P >= Pt gives w = 0 (no outflow to carry momentum). The partials
+// are analytic on the variable-cp isentrope (#816; they were central
+// differences, about 1% off once choked).
 struct JetImpulse {
   double J = 0.0;       // [N]
   double dJ_dm = 0.0;   // = w [m/s]

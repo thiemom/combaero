@@ -199,15 +199,51 @@ TEST(JetImpulse, PressureDerivativeIsEuler) {
 TEST(JetImpulse, IsContinuousAndSmoothAcrossChoking) {
   const auto X = air();
   const double Pt = 3.0e5, Tt = 600.0, m = 0.02;
-  const double Pstar = combaero::critical_pressure_ratio(Tt, Pt, X) * Pt;
+  // jet_impulse's own sonic point (the isentrope at M = 1); the golden-
+  // section critical_pressure_ratio agrees to ~1e-8.
+  const double Tstar = combaero::T_from_stagnation(Tt, 1.0, X);
+  const double R = combaero::specific_gas_constant(X);
+  const double Pstar =
+      Pt * std::exp((combaero::s_mass(Tstar, X, Pt) - combaero::s_mass(Tt, X, Pt)) / R);
+  EXPECT_NEAR(Pstar / Pt, combaero::critical_pressure_ratio(Tt, Pt, X), 1e-6);
   const auto a = jet_impulse(m, Pt, Tt, Pstar * (1.0 + 1e-6), X);
   const auto b = jet_impulse(m, Pt, Tt, Pstar * (1.0 - 1e-6), X);
   EXPECT_FALSE(a.choked);
   EXPECT_TRUE(b.choked);
   EXPECT_NEAR(a.J, b.J, 1e-4 * a.J);
-  EXPECT_NEAR(a.dJ_dP, b.dJ_dP, 1e-2 * std::abs(a.dJ_dP));
+  // Analytic on both sides (#816): every partial joins to O(1e-6).
+  EXPECT_NEAR(a.dJ_dP, b.dJ_dP, 1e-4 * std::abs(a.dJ_dP));
+  EXPECT_NEAR(a.dJ_dPt, b.dJ_dPt, 1e-4 * std::abs(a.dJ_dPt));
+  EXPECT_NEAR(a.dJ_dTt, b.dJ_dTt, 1e-4 * std::abs(a.dJ_dTt));
   // Below choking the jet still gains thrust as the back pressure falls.
   EXPECT_GT(jet_impulse(m, Pt, Tt, 0.5 * Pstar, X).J, b.J);
+}
+
+TEST(JetImpulse, AnalyticPartialsMatchFiniteDifferences) {
+  // #816: the partials were central differences inside C++ and read ~1%
+  // off once choked (an inner solve's tolerance inside a Pt*1e-7 step).
+  // Analytic now; checked here against differences of J itself, unchoked
+  // and choked, over the supply temperature.
+  const auto X = air();
+  const double m = 0.05;
+  for (const double Tt : {300.0, 600.0, 1200.0}) {
+    for (const double ratio : {1.05, 1.6, 2.5, 4.0}) {  // Pt / P
+      const double P = 1.0e5;
+      const double Pt = ratio * P;
+      const auto r = jet_impulse(m, Pt, Tt, P, X);
+      const double hP = 1e-5 * P;
+      const double hPt = 1e-5 * Pt;
+      const double hT = 1e-5 * Tt;
+      const double fd_P = (jet_impulse(m, Pt, Tt, P + hP, X).J - jet_impulse(m, Pt, Tt, P - hP, X).J) / (2 * hP);
+      const double fd_Pt =
+          (jet_impulse(m, Pt + hPt, Tt, P, X).J - jet_impulse(m, Pt - hPt, Tt, P, X).J) / (2 * hPt);
+      const double fd_T =
+          (jet_impulse(m, Pt, Tt + hT, P, X).J - jet_impulse(m, Pt, Tt - hT, P, X).J) / (2 * hT);
+      EXPECT_NEAR(r.dJ_dP, fd_P, 1e-4 * std::abs(fd_P)) << Tt << " " << ratio;
+      EXPECT_NEAR(r.dJ_dPt, fd_Pt, 1e-4 * std::abs(fd_Pt)) << Tt << " " << ratio;
+      EXPECT_NEAR(r.dJ_dTt, fd_T, 1e-4 * std::abs(fd_T)) << Tt << " " << ratio;
+    }
+  }
 }
 
 TEST(JetImpulse, NoOutflowNoMomentum) {

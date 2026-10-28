@@ -168,3 +168,22 @@ def test_the_ledger_credits_the_jet_to_the_chain(regime: str) -> None:
     assert sl["h"]["verdict"] == "pass"
     report = SecondLawReport(s, np.array(r["__x_solution__"], dtype=float), r)
     assert _sigma(report._chain(["s0", "s1"], []))["sigma_norm_high"] < 0.0
+
+
+def test_a_choked_jets_jacobian_is_exact() -> None:
+    """A jet from a 3 bar supply into a 1 bar chain is choked (compressible
+    only: incompressible has no sonic limit to hold it): its momentum's
+    partials (C++ jet_impulse) are analytic since #816. Central differences
+    inside C++ read them ~1% off there, on top of a sonic point noisy to
+    ~1e-8 of Pt."""
+    s, r = _solve(_net(30.0, "compressible", p_res=1.0e5, p_sup=3.0e5))
+    x0 = np.array(r["__x_solution__"], dtype=float)
+    a = s._get_node_state(s.network.nodes["st"], x0)
+    jet = cb.jet_impulse(float(r["h.m_dot"]), 3.0e5, 300.0, float(r["st.P"]), list(a.X))
+    assert jet.choked
+    x = np.array(r["__x_solution__"], dtype=float)
+    J = s._residuals_and_jacobian(x)[1].toarray()
+    fd = approx_derivative(s._residuals, x, method="3-point", abs_step=np.abs(x) * 1e-7 + 1e-12)
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    scale = np.maximum(np.max(np.abs(fd * cols), axis=1, keepdims=True), 1e-300)
+    assert float(np.max(np.abs((J - fd) * cols) / scale)) < 1e-6
