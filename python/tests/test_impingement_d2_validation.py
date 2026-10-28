@@ -252,30 +252,39 @@ def test_the_bypass_closure_at_the_measured_flows() -> None:
 def test_the_jet_heat_transfer() -> None:
     """Florschuetz (1981) Nu per row, at the network's own Re_j and Gc/Gj.
 
-    Measured 2026-10-27 (#802; all 40 tests, Nu_model / Nu_D2 - 1):
+    Measured 2026-10-28 (#800, the holes' crossflow Cd, Rogers & Hersh 1976
+    by default; all 40 tests, Nu_model / Nu_D2 - 1):
 
     - no initial crossflow, 100 rows: bias +5.8%, RMS 8.4%;
-    - with it, inside the correlation's range, 196 rows: -2.7%, 21.5%;
-    - with it, flagged outside the range (surface_extrapolated), 104 rows:
-      -16.9%, 35.1%. Among them the 8 starved rows (network jet reversed or
-      Gc/Gj past 4.44), at -95%: the surface is cooled by the crossflow and
+    - with it, inside the correlation's range, 197 rows: -2.7%, 21.5%;
+    - with it, flagged outside the range (surface_extrapolated), 103 rows:
+      -17.9%, 35.4%. Among them the 11 starved rows (network jet reversed or
+      Gc/Gj past 4.44), at -81%: the surface is cooled by the crossflow and
       the jet correlation has no channel-flow floor (CR-3936 conclusion 6;
-      the open #467 item). Pinned so a floor shows here. Five of the eight
-      are B(5,4,1) mc/mj 1.01's rows 1-5, back in the score with #802.
+      the open #467 item). Pinned so a floor shows here. The crossflow Cd
+      weakens the starved jets, so more rows pass Gc/Gj 4.44 (8 -> 11).
+
+    #802 to #800 (constant Cd): inside 196, outside 104 at -16.9% / 35.1%,
+    starved 8 at -95%.
 
     #782 to #802 (that test STALLED): outside 94 rows at -13.8% / 29.0%,
-    starved 3; the other groups as now. Before #782 (2026-10-24): inside
+    starved 3; the other groups as at #802. Before #782 (2026-10-24): inside
     195 rows, outside 105 at -16.9% / 34.9%, starved 8.
 
-    The array summary marks exactly the starved rows unresolved (#729) and no
-    other.
+    The array summary marks only starved rows unresolved (#729): 2 of the 11
+    under the crossflow Cd (all 8 under a constant Cd).
     """
     groups: dict[str, list[float]] = defaultdict(list)
+    n_unresolved = 0
     for key in _solving():
         for p, r in zip(_solve(key), _d2()[key], strict=True):
             e = p["Nu"] / r["Nu"] - 1.0
             starved = p["Gc_Gj"] < 0.0 or p["Gc_Gj"] > 4.44
-            assert bool(p["unresolved"]) == starved, (key, p["Gc_Gj"])
+            # Only a starved row can be unresolved (#729). Under the crossflow
+            # Cd (#800) most starved rows' small flows take a drop above the
+            # chain's resolution: counted below.
+            assert not p["unresolved"] or starved, (key, p["Gc_Gj"])
+            n_unresolved += bool(p["unresolved"])
             if key[3] == 0.0:
                 groups["none"].append(e)
             elif p["surface_extrapolated"]:
@@ -285,6 +294,7 @@ def test_the_jet_heat_transfer() -> None:
             else:
                 groups["inside"].append(e)
     stats = {k: _bias_rms(v) for k, v in groups.items()}
+    print(f"\nD.2 unresolved rows: {n_unresolved}")
     print(
         "\nD.2 Nu: "
         + "; ".join(
@@ -293,11 +303,12 @@ def test_the_jet_heat_transfer() -> None:
     )
     assert {k: len(v) for k, v in groups.items()} == {
         "none": 100,
-        "inside": 196,
-        "outside": 104,
-        "starved": 8,
+        "inside": 197,
+        "outside": 103,
+        "starved": 11,
     }
+    assert n_unresolved == 2
     assert abs(stats["none"][0]) < 0.07 and stats["none"][1] < 0.09
     assert abs(stats["inside"][0]) < 0.04 and stats["inside"][1] < 0.23
     assert stats["outside"][0] < -0.10 and stats["outside"][1] < 0.37
-    assert stats["starved"][0] < -0.85
+    assert stats["starved"][0] < -0.75

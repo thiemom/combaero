@@ -21,6 +21,7 @@
 #include "pin_fin_correlation.h"
 #include "rib_correlation.h"
 #include "rib_ratio_correlation.h"
+#include "crossflow_cd.h"
 #include "side_stream_momentum.h"
 #include "fanno_mach.h"
 #include "correlation_status.h"
@@ -685,6 +686,33 @@ PYBIND11_MODULE(_core, m) {
         "dh/dm_crossflow. Which flows count as crossflow is the caller's\n"
         "configuration.");
 
+  m.attr("ROGERS_HERSH_1976_CAP_BAND") = combaero::ROGERS_HERSH_1976_CAP_BAND;
+  m.attr("FLORSCHUETZ_METZGER_SU_1982_CAP_BAND") =
+      combaero::FLORSCHUETZ_METZGER_SU_1982_CAP_BAND;
+  m.attr("ROGERS_HERSH_1976_INJECTION_A") = combaero::ROGERS_HERSH_1976_INJECTION_A;
+  m.attr("ROGERS_HERSH_1976_INJECTION_B") = combaero::ROGERS_HERSH_1976_INJECTION_B;
+  m.attr("ROGERS_HERSH_1976_SUCTION_A") = combaero::ROGERS_HERSH_1976_SUCTION_A;
+  m.attr("ROGERS_HERSH_1976_SUCTION_B") = combaero::ROGERS_HERSH_1976_SUCTION_B;
+  py::class_<combaero::CrossflowCd>(m, "CrossflowCd")
+      .def_readonly("Cd", &combaero::CrossflowCd::Cd)
+      .def_readonly("dCd_dG_ideal", &combaero::CrossflowCd::dCd_dG_ideal)
+      .def_readonly("dCd_dG_c", &combaero::CrossflowCd::dCd_dG_c)
+      .def_readonly("capped", &combaero::CrossflowCd::capped);
+  m.def("rogers_hersh_1976_cd", &combaero::rogers_hersh_1976_cd, py::arg("Cd0"),
+        py::arg("G_ideal"), py::arg("G_c"), py::arg("suction"),
+        "Discharge coefficient of a wall hole under a grazing crossflow, Rogers\n"
+        "& Hersh (1976) NASA CR-2681 Fig. 11, resolved in q = G_ideal / G_c\n"
+        "(ideal hole over crossflow mass velocity) and capped at the hole's own\n"
+        "Cd0. suction: the hole draws from the grazing stream (a reversed jet).\n"
+        "Analytic dCd/dG_ideal, dCd/dG_c.");
+  m.def("florschuetz_metzger_su_1982_has_plate",
+        &combaero::florschuetz_metzger_su_1982_has_plate, py::arg("xn_d"), py::arg("yn_d"),
+        py::arg("z_d"), "True when CR-3630 Table 4.1 covers the jet plate.");
+  m.def("florschuetz_metzger_su_1982_cd", &combaero::florschuetz_metzger_su_1982_cd,
+        py::arg("xn_d"), py::arg("yn_d"), py::arg("z_d"), py::arg("G_ideal"), py::arg("G_c"),
+        "CR-3630 Table 4.1 / Eq. 4.2 Cd of a B-size impingement plate under its\n"
+        "crossflow, resolved in q = G_ideal / G_c; the table's own Cd (no Cd0).\n"
+        "Raises for a plate the table does not cover. Analytic derivatives.");
   m.attr("STATION_KAPPA_MERGE_NORMAL") = combaero::STATION_KAPPA_MERGE_NORMAL;
   m.attr("STATION_KAPPA_BLEED_BASSETT") = combaero::STATION_KAPPA_BLEED_BASSETT;
   m.attr("WALL_HTC_KNEE") = combaero::WALL_HTC_KNEE;

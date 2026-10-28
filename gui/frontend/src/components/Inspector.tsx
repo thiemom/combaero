@@ -1756,6 +1756,28 @@ const Inspector = () => {
 								</div>
 								{(d.correlation || "fixed") === "fixed" &&
 									ratio("Cd", "Fixed Cd Value", 0.79)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Crossflow on the Holes (Cd)
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.cd_crossflow || "rogers_hersh_1976"}
+										onChange={(e) => set({ cd_crossflow: e.target.value })}
+									>
+										<option value="rogers_hersh_1976">
+											Grazing flow (Rogers &amp; Hersh 1976)
+										</option>
+										<option value="florschuetz_metzger_su_1982">
+											CR-3630 Table 4.1 (tested plates only)
+										</option>
+										<option value="none">None (constant Cd)</option>
+									</select>
+									<div className="text-[9px] text-gray-400">
+										A strong crossflow bends the jets over and lowers the Cd.
+										Below Gc/Gj ~1.5 the hole's own Cd holds.
+									</div>
+								</div>
 								{ratio("Nu_multiplier", "Nu Multiplier (rig matching)", 1.0)}
 								{hasBypass && (
 									<>

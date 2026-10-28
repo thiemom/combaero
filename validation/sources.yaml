@@ -1076,7 +1076,8 @@ documents:
   code: ['python/combaero/network/impingement_array.py: bypass configuration (docstring cites CR-3630)',
     'python/combaero/network/components.py: ImpingementPlateElement/ImpingementCrossflowElement bypass_inlet
       docstrings', 'python/tests/test_impingement_bypass_validation.py: D.1 flow split and the Eq. 4.10
-      comparison (#782)']
+      comparison (#782)', 'include/crossflow_cd.h: florschuetz_metzger_su_1982_cd (Table 4.1, selectable
+      cd_crossflow, #800)']
   notes: 'Journal versions: Florschuetz, Metzger & Su (1984) JHT 106 (per #467); conference version NTRS_19850002659
     and Florschuetz & Isoda 82-GT-156. Table D.1''s Gj/Gj_mean is not measured flow: it is the authors'' Eq.
     4.1 reduction (isentropic orifice, plenum P0/T0) of the measured channel static pressures, with the
@@ -2695,8 +2696,11 @@ documents:
     not below Vi/V_inf 0.35-0.5 (Fig. 17); resistance ~ (delta/D)^-0.2 (Figs. 15-16). A lid model (Eqs.
     11, 19, App. D). Figs. 13-14 replot Feder (P&W) hole-cluster data. Data plotted only, no tables. PDF
     page = printed page + 6.'
-  status: screened
-  verdict: 'Screened 2026-10-28 for Cd under strong crossflow (#799, #800, #807). Plugs the gap: measured
+  status: implemented
+  verdict: 'IMPLEMENTED 2026-10-28 (#800) as the DEFAULT impingement-hole crossflow Cd (ImpingementPlateElement
+    cd_crossflow=''rogers_hersh_1976''): the Fig. 11 fits resolved in q = G_ideal/G_c, capped C1 at the hole''s own
+    Cd; Florschuetz 1981 arrays bit-identical, CR-3630 D.1 worst row 0.111 -> 0.085 (z/d >= 2), #799 alternation
+    gone; cross-source (ACCURACY) for any impingement plate. Screening: plugs the gap: measured
     suction AND injection Cd down to Vi/V_inf 0.004, where CR-3630 D.1 B(5,4,1)''s stagnant rows sit
     (Gc/Gj ~125, Vi/V_inf ~0.008: Cd ~0.08 both ways by the fits, against the constant 0.85 used). Suction
     is not much lower than injection there, so a reverse-only Cd does not follow from it. Cd ~ (Vi/V_inf)^0.5
@@ -2710,6 +2714,8 @@ documents:
       with Gc/Gj', '#807 thin-wall (L/D) effect on crossflow Cd']
   issues: [799, 800, 807]
   records: []
+  code: ['include/crossflow_cd.h: rogers_hersh_1976_cd', 'python/combaero/network/components.py: ImpingementPlateElement
+      cd_crossflow', 'python/tests/test_impingement_crossflow_cd_800.py']
   notes: Arrived 2026-10-28 as docs/new/19760015890.pdf (NTRS 19760015890). Primary data (Hersh Acoustical
     Engineering wind tunnel); cites TN 3663 for suction Cd without comparing numbers.
 - file: docs/orifices/hersh_walker_1979_NASA_CR-3177_grazing_flow_helmholtz_impedance.pdf

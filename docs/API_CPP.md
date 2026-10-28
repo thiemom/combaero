@@ -1168,6 +1168,25 @@ CrossflowRatio crossflow_velocity_ratio(double m_a, double m_b, double P, double
                                         const std::vector<double>& X, double P_down,
                                         double area);
 
+// Wall-hole Cd under a grazing crossflow (#800, crossflow_cd.h), in
+// q = G_ideal / G_c (ideal hole over crossflow mass velocity), resolved so
+// Cd does not read the hole's own flow. Rogers & Hersh (1976) CR-2681:
+// 0.97 (Gj/Gc)^0.534 injecting, 0.80 (Gj/Gc)^0.47 suction, joined C1 to Cd0
+// over +/-ROGERS_HERSH_1976_CAP_BAND. Florschuetz, Metzger & Su (1982)
+// CR-3630 Table 4.1 / Eq. 4.2 for the plates it covers (throws otherwise),
+// its pieces made continuous within the printed digits.
+constexpr double ROGERS_HERSH_1976_CAP_BAND = 0.1;
+constexpr double ROGERS_HERSH_1976_INJECTION_A = 0.97, ROGERS_HERSH_1976_INJECTION_B = 0.534;
+constexpr double ROGERS_HERSH_1976_SUCTION_A = 0.80, ROGERS_HERSH_1976_SUCTION_B = 0.47;
+constexpr double FLORSCHUETZ_METZGER_SU_1982_CAP_BAND = 0.1;
+constexpr double FLORSCHUETZ_METZGER_SU_1982_ZETA_C = 1.06, FLORSCHUETZ_METZGER_SU_1982_ZETA_X0 = 0.806,
+                 FLORSCHUETZ_METZGER_SU_1982_ZETA_N = 0.602;
+struct CrossflowCd { double Cd, dCd_dG_ideal, dCd_dG_c; bool capped; };
+CrossflowCd rogers_hersh_1976_cd(double Cd0, double G_ideal, double G_c, bool suction);
+bool florschuetz_metzger_su_1982_has_plate(double xn_d, double yn_d, double z_d);
+CrossflowCd florschuetz_metzger_su_1982_cd(double xn_d, double yn_d, double z_d,
+                                           double G_ideal, double G_c);
+
 // Merge chamber (#471): the main-inlet face from the impulse balance
 //   P_f + m_main^2 R T_f / (P_f A^2) = P + m_out^2/(rho A^2) - J/A
 // with T and T_main STAGNATION temperatures (#578): the face's static T_f

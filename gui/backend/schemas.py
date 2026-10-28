@@ -508,6 +508,10 @@ class ImpingementArrayData(BaseModel):
     # Discharge-hole family only: a jet plate has no pipe, so no beta.
     correlation: Literal["fixed", "IdelchikThick", "Lichtarowicz", "McGreehanSchotsch"] = "fixed"
     Cd: float = 0.79  # Florschuetz's own default, cb.FLORSCHUETZ_1981_DEFAULT_CD
+    # The holes' Cd under the gap's crossflow (#800), ImpingementPlateElement's.
+    cd_crossflow: Literal["rogers_hersh_1976", "florschuetz_metzger_su_1982", "none"] = (
+        "rogers_hersh_1976"
+    )
     Nu_multiplier: float = Field(default=1.0, gt=0.0)
     roughness: float = Field(default=0.0, ge=0.0)
     # Initial (bypass) crossflow (#467), used only when the bypass handle is

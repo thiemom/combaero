@@ -21,6 +21,7 @@ back pressure); a failure is a finding to triage, not automatically a bug.
   ejector       an ejector between three channels, compressible or jet pump
   legacy_tee    the Bassett TeeJunctionElement
   impingement   an impingement array, optionally under a wall-coupled hot duct
+  impingement_bypass  an impingement array under a pressure-fed bypass crossflow
   effusion      an effusion plate, a channel-fed chain of plates, or a liner
   pin_fin       a pin-fin channel, optionally wall-coupled to a hot channel
   bleed_station a crossflow bleed or injection station
@@ -689,6 +690,42 @@ def impingement(seed: int) -> tuple[FlowNetwork, list[str]]:
     return g, tags
 
 
+
+def impingement_bypass(seed: int) -> tuple[FlowNetwork, list[str]]:
+    """An impingement array under an initial (bypass) crossflow (#467, #800).
+
+    The bypass is drawn from a feed at a pressure between the exit's and
+    above the supply's, so the upstream rows run from strong jets to
+    stagnant or reversed ones (Gc/Gj up to ~100): the regime where the
+    holes' crossflow Cd acts and where a constant Cd let the stagnant rows
+    alternate in sign (#799). The impingement family has no bypass and never
+    leaves the Cd's cap.
+    """
+    r = random.Random(seed)
+    g = FlowNetwork()
+    D = r.choice([0.00127, 0.00254])
+    xn, yn, zd = r.choice([(5.0, 4.0, 1.0), (5.0, 4.0, 2.0), (5.0, 8.0, 1.0), (10.0, 8.0, 1.0)])
+    n = r.randint(3, 10)
+    P = r.choice([1.0e5, 3e5])
+    drive = r.choice([0.005, 0.03, 0.15])
+    feed = r.choice([0.3, 0.8, 1.0, 1.1])
+    _pb(g, "sup", P * (1 + drive), 300.0)
+    _pb(g, "ex", P)
+    _pb(g, "byp", P * (1 + feed * drive), r.choice([300.0, 320.0]))
+    ImpingementArray(
+        "ia",
+        n_rows=n,
+        d_jet=D,
+        xn_d=xn,
+        yn_d=yn,
+        z_d=zd,
+        span=12 * yn * D,
+        plate_thickness=D,
+        correlation=r.choice(["fixed", "IdelchikThick"]),
+        bypass_entry_K=r.choice([0.0, 0.5]),
+    ).add_to(g, "sup", "ex", bypass="byp")
+    return g, ["impingement_bypass", f"rows:{n}", f"feed:{feed}"]
+
 def effusion(seed: int) -> tuple[FlowNetwork, list[str]]:
     r = random.Random(seed)
     g = FlowNetwork()
@@ -958,6 +995,7 @@ FAMILIES: dict[str, Builder] = {
     "ejector": ejector,
     "legacy_tee": legacy_tee,
     "impingement": impingement,
+    "impingement_bypass": impingement_bypass,
     "effusion": effusion,
     "pin_fin": pin_fin,
     "bleed_station": bleed_station,
