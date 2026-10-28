@@ -449,7 +449,13 @@ def test_the_film_reads_the_gas_before_its_coolant_mixed_in() -> None:
     assert T_mix < 1500.0 - 10.0
     assert r["w.T_aw_unfilmed"] == pytest.approx(own + 1500.0 - T_mix, rel=1e-12)
     T_c = r["w.T_coolant_film"]
-    assert r["w.film_density_ratio"] == pytest.approx(1500.0 / T_c, rel=1e-9)
+    # DR takes the undiluted gas at its STATIC T where the jets meet it: the
+    # duct closure at (T_inf, Pt, G_gas) (#782 audit), below T_inf / T_c.
+    state = s._get_node_state(g.nodes["g"], np.array(r["__x_solution__"]))
+    G = abs(r["__element_diag__"]["hot"]["m_dot"]) / g.elements["hot"].area
+    T_gs = float(cb.duct_htc_static_state(1500.0, state.Pt, G, state.X).T)
+    assert r["w.film_density_ratio"] == pytest.approx(T_gs / T_c, rel=1e-9)
+    assert r["w.film_density_ratio"] < 1500.0 / T_c
 
 
 def test_a_side_not_fed_by_the_discharge_node_reads_its_own_state() -> None:

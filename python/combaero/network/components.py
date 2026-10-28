@@ -5661,7 +5661,10 @@ class _FilmedHtc:
 
     one term per coolant source g (an effusion liner's panels, #695; a single
     source gives T_ref - eta (T_ref - T_c)). eta and w_g depend on every
-    source's M_g = G_jet,g / G_gas and DR_g = (W_c,g / W_g)(T_g / T_c,g).
+    source's M_g = G_jet,g / G_gas and DR_g = (W_c,g / W_g)(T_gs / T_c,g),
+    T_gs the gas's STATIC T at G_gas (the duct closure at (T_g, Pt, G_gas),
+    #782 audit): it moves with T_g, the side's Pt and its flow
+    (``dlnTs`` = d ln T_gs / d(T_g, Pt, m_gas)).
 
     T_ref is the side's own T_aw, shifted by ``T_shift`` = T_inf - T_mix to
     the undiluted gas when the solver has it (#694): eta is defined against
@@ -5695,7 +5698,7 @@ class _FilmedHtc:
         T_c: list[float],
         m_c: list[float],
         m_gas: float,
-        T_g: float,
+        dlnTs: tuple[float, float, float],
         film: dict[str, float],
         T_shift: float | None = None,
     ) -> None:
@@ -5720,13 +5723,20 @@ class _FilmedHtc:
             + sum(T_c[g] * float(groups.d_weight_dP[g][h]) for g in range(n))
             for h in range(n)
         ]
-        # The gas temperature in DR: the side's own T, or T_inf when undiluted.
-        d_gas_T = sum(a_P[h] * DR[h] / T_g for h in range(n))
+        # The gas temperature in DR: the side's own T, or T_inf when undiluted,
+        # through its static T at G_gas, which also moves with Pt and the flow.
+        a_DR = sum(a_P[h] * DR[h] for h in range(n))
+        dlnTs_dT, dlnTs_dPt, dlnTs_dm = dlnTs
+        d_gas_T = a_DR * dlnTs_dT
         self.dT_aw_dT = k * (float(r.dT_aw_dT) - float(undiluted)) + (0.0 if undiluted else d_gas_T)
         self.dT_aw_dT_inf = (k + d_gas_T) if undiluted else 0.0
-        self.dT_aw_dmdot = k * float(r.dT_aw_dmdot) - sum(a_M[h] * M[h] / m_gas for h in range(n))
+        self.dT_aw_dmdot = (
+            k * float(r.dT_aw_dmdot)
+            - sum(a_M[h] * M[h] / m_gas for h in range(n))
+            + a_DR * dlnTs_dm
+        )
         self.dT_aw_dP = k * float(getattr(r, "dT_aw_dP", 0.0))
-        self.dT_aw_dPt = k * float(getattr(r, "dT_aw_dPt", 0.0))
+        self.dT_aw_dPt = k * float(getattr(r, "dT_aw_dPt", 0.0)) + a_DR * dlnTs_dPt
         self.dT_aw_dfilm_mdot = [a_M[h] * M[h] / m_c[h] for h in range(n)]
         self.dT_aw_dT_coolant = [w[h] - a_P[h] * DR[h] / T_c[h] for h in range(n)]
         self.film = film
@@ -5784,14 +5794,26 @@ def film_on_wall_side(
     T_c = [float(st.Tt) for st, _ in coolant]
     if gas_inf is None:
         T_g = float(gas_state.Tt)
-        W_g = float(cb.mwmix(gas_state.X))
+        X_g = list(gas_state.X)
         T_shift = None
     else:
         T_g = float(gas_inf[0])
-        W_g = float(cb.mwmix(cb.mass_to_mole(list(gas_inf[1]))))
+        X_g = list(cb.mass_to_mole(list(gas_inf[1])))
         T_shift = T_g - float(gas_state.Tt)
+    W_g = float(cb.mwmix(X_g))
+    # DR is rho_c / rho_g where the jets meet the gas: the gas moves at G_gas,
+    # so rho_g is at its STATIC T, the duct closure's at (T_g, Pt, G_gas)
+    # (#782 audit; the effusion path takes the chamber's static density). The
+    # coolant comes from a plenum at rest: its Tt.
+    s_g = cb.duct_htc_static_state(T_g, float(gas_state.Pt), G_gas, X_g)
+    T_gs = float(s_g.T)
+    dlnTs = (
+        float(s_g.dT_dTt) / T_gs,
+        float(s_g.dT_dPt) / T_gs,
+        float(s_g.dT_dG) / (T_gs * area),
+    )
     DR = [
-        float(cb.mwmix(st.X)) / W_g * (T_g / Tc) for (st, _), Tc in zip(coolant, T_c, strict=True)
+        float(cb.mwmix(st.X)) / W_g * (T_gs / Tc) for (st, _), Tc in zip(coolant, T_c, strict=True)
     ]
     f = film_groups(provider, x_start, x_end, M, DR)
     eta = float(f.eta)
@@ -5811,7 +5833,7 @@ def film_on_wall_side(
         "T_aw_unfilmed": float(r.T_aw) + (T_shift or 0.0),
         "film_gas_undiluted": float(T_shift is not None),
     }
-    return _FilmedHtc(r, f, M, DR, T_c, m_c, mg, T_g, film, T_shift)
+    return _FilmedHtc(r, f, M, DR, T_c, m_c, mg, dlnTs, film, T_shift)
 
 
 @dataclass
