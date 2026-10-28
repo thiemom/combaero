@@ -1688,9 +1688,12 @@ class _StaticChainedDrop:
     of the station's arriving (a) and leaving (b) flows when ``two_sided``,
     else the arriving flow alone."""
 
-    __slots__ = ("dP", "d_dm_a", "d_dm_b", "d_dP", "d_dT", "d_dY")
+    __slots__ = ("dP", "d_dm_a", "d_dm_b", "d_dP", "d_dT", "d_dY", "extra")
 
     def __init__(self, r: Any, st: _MovingStaticT, two_sided: bool) -> None:
+        #: Partials by unknown name beyond the station's own flows and node
+        #: state: the joining jets' axial momentum (#813).
+        self.extra: dict[str, float] = {}
         dm = float(r.d_dT) * st.dm
         self.dP = float(r.dP)
         self.d_dm_a = float(r.d_dm_a) + (0.5 * dm if two_sided else dm)
@@ -1706,9 +1709,10 @@ class _ReservoirExitInflow:
     a momentum term of this segment's signed m. The static P at the duct end
     is the node's P less the head, so the term is a negative drop."""
 
-    __slots__ = ("dP", "d_dm_a", "d_dm_b", "d_dP", "d_dT", "d_dY")
+    __slots__ = ("dP", "d_dm_a", "d_dm_b", "d_dP", "d_dT", "d_dY", "extra")
 
     def __init__(self, r: Any) -> None:
+        self.extra: dict[str, float] = {}
         self.dP = -float(r.dP)
         self.d_dm_a = float(r.d_dm_a)  # d(-q(-m))/dm = q'(-m)
         self.d_dm_b = 0.0
@@ -2324,6 +2328,11 @@ class PlenumNode(NetworkNode):
         self, upstream_states: list[NetworkMixtureState]
     ) -> tuple[float, list[float], Any]:
         """Derived T and Y for a plenum (simple mixing + energy boundaries)."""
+
+        # Each inflow's supply state: a crossflow station reads the axial
+        # momentum its joining jets bring from it (#813), as a merge chamber
+        # does.
+        self._inflows = [(getattr(s, "_element_id", None), s) for s in upstream_states]
 
         if not upstream_states:
             return 300.0, list(cb.mole_to_mass(cb.species.dry_air())), None
@@ -8025,6 +8034,11 @@ class CrossflowSegmentElement(ChannelElement):
       coefficient K2/K5 (Eq. 15), theta- and psi-independent, reproduced for
       every split.
 
+    JETS that join at a station bring the axial momentum their element
+    declares (#813): ``injection_momentum``, m w cos(theta), the hook a
+    merge chamber reads. Over the station, (P_a - P_b) A gains -J. Normal
+    jets (90 deg, every impingement row) bring none.
+
     CENTRED: a segment carries half of the station at each end, each at its
     node's own STATIC density (C++ ``station_half_drop``), so every node holds
     the static pressure at the middle of its station. The node carries T0;
@@ -8114,6 +8128,50 @@ class CrossflowSegmentElement(ChannelElement):
         super().resolve_topology(graph)
         self._prev = graph.elements.get(self.prev_seg) if self.prev_seg else None
         self._next = graph.elements.get(self.next_seg) if self.next_seg else None
+        self._elements = graph.elements
+
+    def _station_jets(
+        self, node: Any, station: NetworkMixtureState
+    ) -> tuple[float, dict[str, float]]:
+        """Axial momentum the side streams joining at a station bring (#813).
+
+        Each joining element declares it (``injection_momentum``, the same
+        hook a merge chamber reads): J = m w cos(theta), the jet's velocity
+        from its supply to the station's static pressure. 90 deg (impingement
+        jets, normal holes) brings none, so such a station is untouched. A
+        segment of the chain is not a side stream.
+        """
+        J, dJ = 0.0, {}
+        elements = getattr(self, "_elements", {})
+        for eid, st in getattr(node, "_inflows", ()):
+            el = elements.get(eid)
+            if el is None or isinstance(el, CrossflowSegmentElement):
+                continue
+            hook = getattr(el, "injection_momentum", None)
+            if hook is None:
+                continue
+            j, dj = hook(st, station)
+            if j == 0.0 and not dj:
+                continue
+            J += j
+            for k, v in dj.items():
+                dJ[k] = dJ.get(k, 0.0) + v
+        return J, dJ
+
+    def _with_jets(self, term: "_StaticChainedDrop", node: Any, station: Any) -> None:
+        """Fold the station's joining-jet momentum into this segment's half.
+
+        Over the station, (P_a - P_b) A = m_b u_b - m_a u_a - J: the jets'
+        axial momentum J lowers the static drop. Centred, each segment
+        carries half of it.
+        """
+        J, dJ = self._station_jets(node, station)
+        if J == 0.0 and not dJ:
+            return
+        w = -0.5 / self.area
+        term.dP += w * J
+        for k, v in dJ.items():
+            term.extra[k] = term.extra.get(k, 0.0) + w * v
 
     def network_flow_inputs(self) -> list[tuple[str, str]]:
         """The neighbour segments' flows, each read at the station it shares."""
@@ -8164,9 +8222,11 @@ class CrossflowSegmentElement(ChannelElement):
             r = cb.station_half_drop(
                 m_a, m, state_in.P, st.T, state_in.X, self.area, self.from_kappa
             )
+            t_from = _StaticChainedDrop(r, st, True)
+            self._with_jets(t_from, getattr(self, "_upstream_node", None), state_in)
             terms.append(
                 (
-                    _StaticChainedDrop(r, st, True),
+                    t_from,
                     self.from_node,
                     "b",
                     self.from_node,
@@ -8180,9 +8240,9 @@ class CrossflowSegmentElement(ChannelElement):
             r = cb.station_half_drop(
                 m, m_b, state_out.P, st.T, state_out.X, self.area, self.to_kappa
             )
-            terms.append(
-                (_StaticChainedDrop(r, st, True), self.to_node, "a", self.to_node, self._next, "to")
-            )
+            t_to = _StaticChainedDrop(r, st, True)
+            self._with_jets(t_to, getattr(self, "_downstream_node", None), state_out)
+            terms.append((t_to, self.to_node, "a", self.to_node, self._next, "to"))
         elif (
             incompressible and m < 0.0 and (self.from_kappa is not None or self.entry_K is not None)
         ):
@@ -8236,6 +8296,8 @@ class CrossflowSegmentElement(ChannelElement):
                     row[names[local]] = row.get(names[local], 0.0) - d_nb * coeff
             for key, d in _station_node_partials(r, node):
                 row[key] = row.get(key, 0.0) - d
+            for key, d in r.extra.items():
+                row[key] = row.get(key, 0.0) - d
         return res, jac
 
     def _compressible_station_residuals(
@@ -8288,6 +8350,8 @@ class CrossflowSegmentElement(ChannelElement):
             for local, coeff in nb.flow_jac_at_node(nb_node, list(range(len(names)))).items():
                 out[names[local]] = out.get(names[local], 0.0) + d_nb * coeff
         for key, d in _station_node_partials(r, node):
+            out[key] = out.get(key, 0.0) + d
+        for key, d in r.extra.items():
             out[key] = out.get(key, 0.0) + d
         return out
 

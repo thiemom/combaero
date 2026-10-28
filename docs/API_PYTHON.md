@@ -1384,7 +1384,8 @@ panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
 - **The injector owns its jet.** Orifice-type elements carry
   `injection_angle_deg` (90 by default, no axial momentum);
   `EffusionPlateElement` uses its hole inclination `angle_deg`. The jet
-  velocity is the element's own, from its supply's stagnation state.
+  velocity is the element's own, from its supply's stagnation state. A
+  crossflow-segment station reads the same declaration (#813).
 - **Refused:** two inflows without `main_inlet`, a `main_inlet` that does not
   flow in, and any split (more than one outlet needs a loss closure: use a
   tee).
@@ -2603,6 +2604,17 @@ the side stream's axial velocity `kappa * u_arriving`:
 |---|---|---|
 | `cb.STATION_KAPPA_MERGE_NORMAL` = 0 | jets merging normally (impingement) | Florschuetz's P + G^2/rho = const |
 | `cb.STATION_KAPPA_BLEED_BASSETT` = 0.75 | bleed through the wall (effusion holes) | Bassett et al. (2001) K2/K5, Eq. 15, reproduced for every split |
+
+**Joining jets bring their own axial momentum (#813).** Every element that
+discharges INTO a station declares it, the hook a merge chamber reads:
+`injection_momentum` = m w cos(theta), w the jet's velocity from its supply's
+stagnation state to the station's static pressure, theta its
+`injection_angle_deg` (an `EffusionPlateElement`'s `angle_deg`). It enters the
+station as `- J / A`, half on each segment. Normal jets (90 deg, the default,
+and every impingement row) bring none, so `kappa = 0` stations are unchanged;
+`kappa` stays the receiving duct's own coefficient (Bassett's bleed). The
+second-law ledger counts a hole whose jet brings momentum as part of the
+chain's control volume, entering at its supply's Pt.
 
 ```python
 from combaero.network import CrossflowSegmentElement

@@ -54,7 +54,11 @@ Control volumes
   (``from_kappa`` / ``to_kappa``), less any boundary. Streams crossing it:
   the chain's two ends, and every other element at a station (the holes), at
   the station's total pressure. Heat on a station node is taken as raising
-  the node's mixed stream to the node's temperature.
+  the node's mixed stream to the node's temperature. A hole whose jet brings
+  axial momentum into the chain (``injection_angle_deg`` below 90, #813) is a
+  member instead: its stream enters at its supply's total pressure. The
+  chain's pressure recovery is the jet's, so closing the hole at the
+  station's Pt would charge the chain with momentum it was given.
 
 Not checked: elements without a solved flow, the legacy
 ``TeeJunctionElement``, and a stagnant control volume (no flow through it).
@@ -334,10 +338,28 @@ class SecondLawReport:
             return "no flow"
         return cv
 
-    def _chain(self, members: list[str]) -> _Volume | str:
-        """A crossflow chain: its stations are the nodes its members declare."""
+    def _momentum_jets(self, members: list[str]) -> list[str]:
+        """Holes at the chain's stations whose jets join it with axial
+        momentum (#813): a non-normal ``injection_angle_deg``, flowing in."""
+        stations = self._stations(members)
+        out = []
+        for eid, element in self.net.elements.items():
+            if eid in members or element.to_node not in stations:
+                continue
+            angle = getattr(element, "injection_angle_deg", None)
+            if angle is None or abs(np.cos(np.radians(float(angle)))) < 1e-12:
+                continue
+            m = self._flow(eid)
+            if m is not None and m > 0.0:
+                out.append(eid)
+        return out
+
+    def _chain(self, members: list[str], jets: list[str] | None = None) -> _Volume | str:
+        """A crossflow chain: its stations are the nodes its members declare.
+        ``jets`` enter at their supply's total pressure (``_momentum_jets``)."""
         els = self.net.elements
         stations = self._stations(members)
+        jets = jets or []
         cv = _Volume()
         for eid, element in els.items():
             touches = [n for n in (element.from_node, element.to_node) if n in stations]
@@ -371,11 +393,12 @@ class SecondLawReport:
                 station = touches[0]
                 into_chain = (m >= 0.0) == (element.to_node == station)
                 src = element.from_node if m >= 0.0 else element.to_node
+                at = src if eid in jets else station
                 stream = self._stream_at(
                     src if into_chain else station,
                     abs(m),
-                    Pt=self._state(station).Pt,
-                    pt_node=station,
+                    Pt=self._state(at).Pt,
+                    pt_node=at,
                 )
             if stream.m:
                 (cv.inflows if into_chain else cv.outflows).append(stream)
@@ -467,8 +490,14 @@ class SecondLawReport:
         for chain in self._chains():
             if not self._stations(chain):
                 continue  # no side streams: each segment is a plain two-port
-            chained.update(chain)
-            record(chain, lambda chain=chain: self._chain(chain), group="+".join(chain))
+            jets = self._momentum_jets(chain)
+            group = sorted(chain + jets)
+            chained.update(group)
+            record(
+                group,
+                lambda chain=chain, jets=jets: self._chain(chain, jets),
+                group="+".join(group),
+            )
         for eid, element in self.net.elements.items():
             if eid in chained:
                 continue
