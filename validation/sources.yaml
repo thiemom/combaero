@@ -2439,7 +2439,7 @@ documents:
     The earlier "no text layer" note was wrong. Secondary throughout Ch. 4 and 8 except the liner-wall
     method, Eqs. 4.30/4.31 and Eq. 8.15 (Lefebvre's own); figures reprinted from theses (Kaddah, Freeman,
     Norster, Sridhara) carry their author as `after:` if digitised.
-- file: docs/new/4-2-2-2.pdf
+- file: docs/heat_transfer/han_wright2006_DOE_handbook_4.2.2.2_internal_cooling.pdf
   citation: 'Han, J.-C., Wright, L. M. (2006). Enhanced internal cooling of turbine blades and vanes. In:
     The Gas Turbine Handbook (R. Dennis, ed.), Sec. 4.2.2.2, pp. 321-352. U.S. DOE National Energy Technology
     Laboratory.'
@@ -2460,9 +2460,9 @@ documents:
   read_for: ['#793 worked example candidate', correlation coverage gaps (impingement, ribs, pins, dimples)]
   issues: [793]
   records: []
-  notes: Same handbook as docs/new/4-4.pdf. The rib correlation figures are images; HDE 2013 (docs/heat_transfer/han/)
+  notes: Arrived 2026-10-27 as docs/new/4-2-2-2.pdf. Same handbook as docs/heat_transfer/cunha2006_DOE_handbook_4.4_heat_transfer_analysis.pdf. The rib correlation figures are images; HDE 2013 (docs/heat_transfer/han/)
     carries the same material in more detail.
-- file: docs/new/4-4.pdf
+- file: docs/heat_transfer/cunha2006_DOE_handbook_4.4_heat_transfer_analysis.pdf
   citation: 'Cunha, F. J. (2006). Heat transfer analysis. In: The Gas Turbine Handbook (R. Dennis, ed.),
     Sec. 4.4, pp. 389-410. U.S. DOE National Energy Technology Laboratory.'
   id: NETL Gas Turbine Handbook 4.4
@@ -2481,8 +2481,8 @@ documents:
   read_for: ['#793 worked example candidate', correlation coverage gaps]
   issues: [793]
   records: []
-  notes: Same handbook as docs/new/4-2-2-2.pdf.
-- file: docs/new/86.01_18.pdf
+  notes: Arrived 2026-10-27 as docs/new/4-4.pdf. Same handbook as docs/heat_transfer/han_wright2006_DOE_handbook_4.2.2.2_internal_cooling.pdf.
+- file: docs/flow_network/kukutla2017_impingement_film_nozzle_network.pdf
   citation: 'Kukutla, P. R., Prasad, B. V. S. S. S. (2017). Coupled flow network model and CFD analysis
     for a combined impingement and film cooled gas turbine nozzle guide vane. AMSE J. Modelling B 86(1),
     250-270.'
@@ -2500,7 +2500,8 @@ documents:
   read_for: ['#793 worked example candidate']
   issues: [793]
   records: []
-- file: docs/new/ASMEConference2012-9644.pdf
+  notes: Arrived 2026-10-27 as docs/new/86.01_18.pdf.
+- file: docs/flow_network/alizadeh2012_GTINDIA2012-9644_blade_cooling_network.pdf
   citation: 'Alizadeh, M., Izadi, A., Fathi, A., Khaledi, H. (2012). Flow and heat transfer analysis of
     turbine blade cooling passages using network method. Proc. ASME Gas Turbine India Conference, GTINDIA2012-9644,
     Mumbai.'
@@ -2521,6 +2522,7 @@ documents:
   read_for: ['#793 worked example candidate']
   issues: [793]
   records: []
+  notes: Arrived 2026-10-27 as docs/new/ASMEConference2012-9644.pdf.
 - file: docs/flow_network/meitner2004_NASA_TM-2004-211885.pdf
   citation: 'Meitner, P. L. (2004). Procedure for determining one-dimensional flow distributions in arbitrarily
     connected passages without the influence of pumping. NASA/TM-2004-211885, ARL-TR-3213 (also ASME GT2003-38061).'
@@ -2540,7 +2542,7 @@ documents:
   issues: [793]
   records: []
   notes: Fetched from NTRS 20040082327 (public) on 2026-10-27 during the docs/new screening.
-- file: docs/new/ceas-2007-026.pdf
+- file: docs/combustor_network/andreini2007_CEAS-2007-026_liner_temperature.pdf
   citation: 'Andreini, A., Carcasci, C., Ceccherini, A., Facchini, B., Surace, M., Coutandin, D., Gori,
     S., Peschiulli, A. (2007). Combustor liner temperature prediction: a preliminary tool development and
     its application on effusion cooling systems. 1st CEAS European Air and Space Conference, CEAS-2007-026,
@@ -2562,8 +2564,8 @@ documents:
   read_for: ['#793 worked example candidate', liner gas-side radiation correlations]
   issues: [793]
   records: []
-  notes: PDF metadata creation date is wrong (1999); the conference is 2007.
-- file: docs/new/CONV14_1D-HT-GTCC-r1.pdf
+  notes: Arrived 2026-10-27 as docs/new/ceas-2007-026.pdf. PDF metadata creation date is wrong (1999); the conference is 2007.
+- file: docs/combustor_network/topal2014_CONV14_1D_heat_transfer_combustor.pdf
   citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional
     heat transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp.
     on Convective Heat and Mass Transfer, Turkey, paper CONV-14-123.'
@@ -2581,7 +2583,8 @@ documents:
   read_for: ['#793 worked example candidate']
   issues: [793]
   records: []
-- file: docs/new/EJC96482.pdf
+  notes: Arrived 2026-10-27 as docs/new/CONV14_1D-HT-GTCC-r1.pdf.
+- file: docs/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf
   citation: 'Gouws, J. J., Morris, R. M., Visser, J. A. (2006). Modelling of a gas turbine combustor using
     a network solver. S. Afr. J. Science 102, 533-536 (with online supplementary Tables 2-4).'
   id: S. Afr. J. Sci. 102:533
@@ -2601,7 +2604,8 @@ documents:
   read_for: ['#793 worked example candidate (combustor liner flow split)']
   issues: [793]
   records: []
-- file: docs/new/jpc_2015_sarikaya_varol_tuncer.pdf
+  notes: Arrived 2026-10-27 as docs/new/EJC96482.pdf.
+- file: docs/combustor_network/varol2015_reverse_flow_combustor_network.pdf
   citation: 'Varol, G., Sarikaya, G., Tuncer, O. (2015). One dimensional network model for a reverse flow
     combustor. AIAA paper, Istanbul Technical University (venue and number not printed; filename suggests
     the 2015 AIAA Joint Propulsion Conference).'
@@ -2624,8 +2628,8 @@ documents:
   read_for: ['#793 worked example candidate (combustor liner flow split)']
   issues: [793]
   records: []
-  notes: The PDF has a damaged xref table (poppler reconstructs it); text extracts fine.
-- file: docs/new/THERMAL_ANALYSIS_OF_A_TURBINE_ROTOR_BLAD.pdf
+  notes: Arrived 2026-10-27 as docs/new/jpc_2015_sarikaya_varol_tuncer.pdf. The PDF has a damaged xref table (poppler reconstructs it); text extracts fine.
+- file: docs/heat_transfer/panduranga2013_turbine_rotor_blade_thermal.pdf
   citation: 'Panduranga, B. P., Suresh, B., Purushotham, H. R. (2013). Thermal analysis of a turbine rotor
     blade. Int. Conf. on Advanced Materials, Manufacturing, Management and Thermal Sciences (AMMMT 2013),
     SIT Tumkur, ISBN 978-81-926304-0-3.'
@@ -2640,6 +2644,7 @@ documents:
   read_for: ['#793 worked example candidate']
   issues: [793]
   records: []
+  notes: Arrived 2026-10-27 as docs/new/THERMAL_ANALYSIS_OF_A_TURBINE_ROTOR_BLAD.pdf.
 - file: docs/orifices/lichtarowicz-et-al-1965-discharge-coefficients-for-incompressible-non-cavitating-flow-through-long-orifices.pdf
   citation: Lichtarowicz, A., Duggins, R. K., Markland, E. (1965). Discharge coefficients for incompressible
     non-cavitating flow through long orifices. J. Mechanical Engineering Science 7(2), 210-219.
@@ -2921,7 +2926,7 @@ wanted:
   issues:
   - 793
   priority: now
-  question: 'The T56 liner hole and cooling-device geometry behind Gouws et al. 2006 (docs/new/EJC96482.pdf),
+  question: 'The T56 liner hole and cooling-device geometry behind Gouws et al. 2006 (docs/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf),
     whose Table 2 holds a MEASURED isothermal flow split over 16 features. With the areas this becomes
     the system-level combustor liner example #793 asks for, scored against measurement.'
   where: University of Pretoria repository (UPSpace), open access likely; Van Niekerk & Morris 2005 (ISABE)
