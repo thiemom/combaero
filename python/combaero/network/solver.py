@@ -1,3 +1,4 @@
+import contextlib
 import functools
 import math
 import os
@@ -145,6 +146,30 @@ def _static_t_result(solve: Callable[..., Any]) -> Callable[..., Any]:
         return _StaticTResult(sol) if isinstance(sol, dict) else sol
 
     return wrapper
+
+
+def _station_ends(diag: dict[str, Any], element: Any, station_pt: dict[str, tuple]) -> None:
+    """A crossflow segment ending at a station reports the station's true Pt
+    (#782 audit): the node holds Pt = P, its gas moves along the chain. dPt
+    and the total pressure ratio follow. Only the chain's own segments: a
+    plate's or hole's jets discharge into the station's STATIC pressure and
+    do not recover the crossflow's head, so their drop stays the drop to P."""
+    if getattr(element, "station_report", None) is None:
+        return
+    ends = (
+        ("Pt_in", getattr(element, "from_node", None)),
+        ("Pt_out", getattr(element, "to_node", None)),
+    )
+    changed = False
+    for key, nid in ends:
+        if nid in station_pt and key in diag:
+            diag[key] = float(station_pt[nid][0])
+            changed = True
+    if changed and "Pt_in" in diag and "Pt_out" in diag:
+        if "dPt" in diag:
+            diag["dPt"] = float(diag["Pt_in"] - diag["Pt_out"])
+        if "pr_total" in diag:
+            diag["pr_total"] = float(diag["Pt_out"] / diag["Pt_in"]) if diag["Pt_in"] > 0 else 0.0
 
 
 class SolverTimeoutError(Exception):
@@ -3025,6 +3050,51 @@ class NetworkSolver:
             state.Y = Y_prev
         return state
 
+    def _report_moving_nodes(
+        self, x: np.ndarray, sol: dict[str, Any]
+    ) -> dict[str, tuple[float, float]]:
+        """Static T of the nodes that hold Pt = P while their gas moves (#782
+        audit): a crossflow station (the segment's mean-flow state, as its
+        half-drops form it) and a combustor with an area. Kept for
+        ``_report_state``; returns the stations' (Pt, Mach). Reporting only."""
+        self._report_T: dict[str, float] = {}
+        station_pt: dict[str, tuple[float, float]] = {}
+        for eid, el in self.network.elements.items():
+            report = getattr(el, "station_report", None)
+            prev = getattr(el, "_prev", None)
+            if report is None or prev is None:
+                continue
+            node = self.network.nodes[el.from_node]
+            try:
+                r = report(
+                    self._get_node_state(node, x),
+                    float(sol.get(f"{prev.id}.m_dot", 0.0)),
+                    float(sol.get(f"{eid}.m_dot", 0.0)),
+                )
+            except (ValueError, RuntimeError):
+                r = None
+            if r is not None:
+                nid, T_s, Pt_s, M_s = r
+                self._report_T[nid] = T_s
+                station_pt[nid] = (Pt_s, M_s)
+        for nid, node in self.network.nodes.items():
+            static_T = getattr(node, "static_T", None)
+            if static_T is None or nid in self._report_T:
+                continue
+            with contextlib.suppress(ValueError, RuntimeError):
+                self._report_T[nid] = float(static_T(self._get_node_state(node, x)))
+        return station_pt
+
+    def _report_state(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
+        """``_get_node_state`` with the reported static T of a moving node
+        that holds Pt = P (``_report_moving_nodes``). For diagnostics only:
+        no residual reads ``T``."""
+        state = self._get_node_state(node, x)
+        T_s = getattr(self, "_report_T", {}).get(node.id)
+        if T_s is not None:
+            state.__dict__["_T_static"] = T_s
+        return state
+
     def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
         """Constructs a NetworkMixtureState for a given node based on the current solver vector x."""
         default_Y = self._default_Y
@@ -5470,6 +5540,7 @@ class NetworkSolver:
             self._record_boundary_arrivals = False
         from combaero import mass_to_mole
 
+        station_pt = self._report_moving_nodes(final_x, sol_dict)
         for nid, (T, Y, _) in self._derived_states.items():
             # The node's stagnation T; ".T" is its static T (#782), set below once
             # the state is evaluable (a node with no gas state keeps T = Tt).
@@ -5493,7 +5564,7 @@ class NetworkSolver:
                 sol_dict[f"{nid}.no_gas_state"] = 1.0
                 continue
             try:
-                state = self._get_node_state(node, final_x)
+                state = self._report_state(node, final_x)
                 sol_dict[f"{nid}.mach"] = node.mach(state)
                 diag = node.diagnostics(state) if hasattr(node, "diagnostics") else {}
                 for key, val in diag.items():
@@ -5502,6 +5573,8 @@ class NetworkSolver:
                 # solved (also reported as "T_static" until 0.9.0); any other
                 # node's is the state's (Tt at a plenum or incompressible node).
                 sol_dict[f"{nid}.T"] = float(diag.get("T_static", state.T))
+                if nid in station_pt:
+                    sol_dict[f"{nid}.Pt"], sol_dict[f"{nid}.mach"] = station_pt[nid]
             except (ValueError, RuntimeError) as exc:
                 if success:
                     raise
@@ -5521,9 +5594,9 @@ class NetworkSolver:
                 m_indices = self._unknown_indices.get(eid, [])
                 if isinstance(element, _TeeJunctionElement):
                     nodes = self.network.nodes
-                    state_com = self._get_node_state(nodes[element.common_node], final_x)
-                    state_straight = self._get_node_state(nodes[element.straight_node], final_x)
-                    state_branch = self._get_node_state(nodes[element.branch_node], final_x)
+                    state_com = self._report_state(nodes[element.common_node], final_x)
+                    state_straight = self._report_state(nodes[element.straight_node], final_x)
+                    state_branch = self._report_state(nodes[element.branch_node], final_x)
                     if m_indices:
                         state_com.m_dot = float(final_x[m_indices[0]])
                         state_branch.m_dot = float(final_x[m_indices[1]])
@@ -5534,7 +5607,7 @@ class NetworkSolver:
                 elif isinstance(element, _MultiPortChamberBase):
                     nodes = self.network.nodes
                     port_states = [
-                        self._get_node_state(nodes[pid], final_x) for pid in element.port_nodes
+                        self._report_state(nodes[pid], final_x) for pid in element.port_nodes
                     ]
                     P_jct_val = float(final_x[m_indices[0]]) if m_indices else 0.0
                     # Per-port mdots in junction convention (positive = out of
@@ -5546,8 +5619,8 @@ class NetworkSolver:
                         port_mdots.append(element._port_signs[i] * outer_mdot)
                     diag = element.diagnostics(port_states, P_jct_val, port_mdots)
                 else:
-                    state_in = self._get_node_state(self.network.nodes[element.from_node], final_x)
-                    state_out = self._get_node_state(self.network.nodes[element.to_node], final_x)
+                    state_in = self._report_state(self.network.nodes[element.from_node], final_x)
+                    state_out = self._report_state(self.network.nodes[element.to_node], final_x)
                     # Inject solved m_dot so velocity-dependent diagnostics (e.g. Mach) are correct
                     if m_indices:
                         m_solved = float(final_x[m_indices[0]])
@@ -5590,6 +5663,7 @@ class NetworkSolver:
                     raise
                 self._record_diagnostics_exception(exc, f"element '{eid}'")
                 diag = {}
+            _station_ends(diag, element, station_pt)
             sol_dict["__element_diag__"][eid] = diag
             for key, val in diag.items():
                 sol_dict[f"{eid}.{key}"] = val

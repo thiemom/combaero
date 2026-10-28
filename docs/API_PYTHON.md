@@ -3059,6 +3059,8 @@ keys and `NetworkMixtureState` are the next section.
 | element `T_in`, `T_out` (`result["__element_diag__"][id]`) | stagnation T of the end nodes | **static** T of the end nodes, as `P_in`/`P_out`; `Tt_in`/`Tt_out` unchanged |
 | `"<chamber>.T_static"` | a momentum chamber's static T | deprecated alias of `"<chamber>.T"`, removed in 0.9.0 |
 | junction `port_<i>_T` (`__element_diag__`) | the port's stagnation T | **static** T of the port; the stagnation T is the new `port_<i>_Tt` |
+| a crossflow station's `.T`, `.Pt`, `.mach` | Tt, the static P, 0 | the station's moving state: static T and Mach at the station's mean flow, its true Pt (the node's `.P` is the static P at the middle of the station) |
+| an area `CombustorNode`'s `.T` | Tt | the static T at G = m / area (its `.P` = `.Pt`, a large slow volume) |
 | `NetworkMixtureState.T` | a field, filled with `Tt` | a computed property, the static T |
 
 The static T is regime-aware. A plenum (`P = Pt`) and an incompressible
