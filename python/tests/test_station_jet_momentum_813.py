@@ -171,19 +171,45 @@ def test_the_ledger_credits_the_jet_to_the_chain(regime: str) -> None:
 
 
 def test_a_choked_jets_jacobian_is_exact() -> None:
-    """A jet from a 3 bar supply into a 1 bar chain is choked (compressible
-    only: incompressible has no sonic limit to hold it): its momentum's
-    partials (C++ jet_impulse) are analytic since #816. Central differences
-    inside C++ read them ~1% off there, on top of a sonic point noisy to
-    ~1e-8 of Pt."""
-    s, r = _solve(_net(30.0, "compressible", p_res=1.0e5, p_sup=3.0e5))
-    x0 = np.array(r["__x_solution__"], dtype=float)
-    a = s._get_node_state(s.network.nodes["st"], x0)
-    jet = cb.jet_impulse(float(r["h.m_dot"]), 3.0e5, 300.0, float(r["st.P"]), list(a.X))
-    assert jet.choked
+    """A jet from an orifice-fed plenum at ~4 bar into a 1 bar chain is
+    choked; the plenum's Pt is an unknown, so its momentum's dJ/dPt (C++
+    jet_impulse) enters the station rows. Analytic since #816: on main those
+    entries read 2% off FD (central differences inside C++ around a sonic
+    point noisy to ~1e-8 of Pt, golden-section), here 1e-7."""
+    g = FlowNetwork()
+    for n, pt in (("res", 1.0e5), ("hp", 4.0e5), ("out", 1.0e5)):
+        b = PressureBoundary(n)
+        b.Pt, b.Tt, b.Y = pt, 300.0, Y_AIR
+        g.add_node(b)
+    g.add_node(PlenumNode("sup"))
+    g.add_node(PlenumNode("st"))
+    g.add_element(OrificeElement("feed", "hp", "sup", Cd=0.8, diameter=0.04, correlation="fixed"))
+    g.add_element(
+        CrossflowSegmentElement(
+            "s0", "res", "st", length=0.02, area=AREA, entry_K=0.0, to_kappa=0.0, next_seg="s1"
+        )
+    )
+    g.add_element(
+        CrossflowSegmentElement(
+            "s1", "st", "out", length=0.02, area=AREA, from_kappa=0.0, prev_seg="s0"
+        )
+    )
+    g.add_element(
+        OrificeElement(
+            "h", "sup", "st", Cd=0.8, diameter=0.02, correlation="fixed", injection_angle_deg=30.0
+        )
+    )
+    s, r = _solve(g)
     x = np.array(r["__x_solution__"], dtype=float)
+    st = s._get_node_state(s.network.nodes["st"], x)
+    jet = cb.jet_impulse(
+        float(r["h.m_dot"]), float(r["sup.P"]), 300.0, float(r["st.P"]), list(st.X)
+    )
+    assert jet.choked
     J = s._residuals_and_jacobian(x)[1].toarray()
-    fd = approx_derivative(s._residuals, x, method="3-point", abs_step=np.abs(x) * 1e-7 + 1e-12)
-    cols = np.maximum(np.abs(x), 1e-12)[None, :]
-    scale = np.maximum(np.max(np.abs(fd * cols), axis=1, keepdims=True), 1e-300)
-    assert float(np.max(np.abs((J - fd) * cols) / scale)) < 1e-6
+    fd = approx_derivative(s._residuals, x, method="3-point", abs_step=np.abs(x) * 1e-6 + 1e-12)
+    col = s.unknown_names.index("sup.Pt")
+    big = np.abs(fd[:, col]) > 1e-9
+    assert big.sum() >= 3  # the plenum's own row and both segments' station rows
+    rel = np.abs(J[big, col] - fd[big, col]) / np.abs(fd[big, col])
+    assert float(rel.max()) < 1e-5
