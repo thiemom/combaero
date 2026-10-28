@@ -2866,7 +2866,9 @@ documents:
       of the exit-side grazing Cd', '#807 L/D effect (none usable)']
   issues: [800, 807, 813]
   records: []
-  notes: Arrived 2026-10-28 as docs/new/243_1_Bensamour_1983.pdf (was on the wanted list).
+  notes: Arrived 2026-10-28 as docs/new/243_1_Bensamour_1983.pdf (was on the wanted list). Its detailed data are in
+    Benmansour's M.Phil. thesis (Nottingham, 1983), not digitised online; dropped from wanted (user, 2026-10-28) --
+    Hay & Lampard 1996 Fig. 4 reprints its inlet-crossflow points.
 - file: docs/orifices/rogers_hersh_1976_NASA_CR-2681_grazing_flow_orifice_resistance.pdf
   citation: 'Rogers, T., Hersh, A. S. (1976). Effect of grazing flow on steady-state resistance of isolated
     square-edged orifices. NASA CR-2681 (NAS3-17858), Hersh Acoustical Engineering.'
@@ -3232,16 +3234,3 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
-- citation: Benmansour, S. (1983; 1981 in Hay & Lampard 1996 Fig. 4). Discharge coefficient of film cooling holes.
-    M.Phil. thesis, University of Nottingham.
-  checked: false
-  issues:
-  - 807
-  - 813
-  priority: later
-  question: 'The detailed data behind Hay, Lampard & Benmansour 1983 (held): the L/D 2 parallel-flow results the
-    paper measured but does not publish (the L/D interaction with crossflow, #807) and tabulated Cd for the
-    coolant- and mainstream-crossflow maps (#813). Not digitised online (user, 2026-10-28). Its inlet-crossflow
-    points are reprinted in Hay & Lampard 1996 Fig. 4 (held; L/d > 2). Title from Hay & Lampard 1996.'
-  where: University of Nottingham library (thesis request) or the British Library thesis service; no online
-    copy known.
