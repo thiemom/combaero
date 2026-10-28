@@ -1156,6 +1156,11 @@ constexpr double STATION_KAPPA_BLEED_BASSETT = 0.75;
 struct StationHalfDrop { double dP, d_dm_a, d_dm_b, d_dP, d_dT; };
 StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
                                   const std::vector<double>& X, double area, double kappa);
+// Area change over a segment between two static ends (#812), Bernoulli, even in m:
+//   m^2 / (2 rho) (1/A_to^2 - 1/A_from^2); zero for equal areas.
+StationHalfDrop segment_area_change_drop(double m, double P, double T,
+                                         const std::vector<double>& X, double area_from,
+                                         double area_to);
 // Reservoir entry into a duct: (1 + K_in) m|m| / (2 rho A^2).
 StationHalfDrop channel_entry_drop(double m, double P, double T,
                                    const std::vector<double>& X, double area, double K_in);

@@ -2647,6 +2647,14 @@ first = CrossflowSegmentElement("s0", "plenum", "b1", length=0.01, area=4e-3,
                                 to_kappa=cb.STATION_KAPPA_BLEED_BASSETT, next_seg="s1")
 ```
 
+- **Taper (#812).** `area` is the from-end's section; `area_to` (default: the
+  same) the to-end's. Each end's station half-drop, joining jets and
+  static-to-total closure use its own section, friction the mean; Pt carries
+  across bar friction (an isentropic area change). Incompressible, a from-end
+  station adds Bernoulli's `cb.segment_area_change_drop` (m^2/(2 rho)
+  (1/A_to^2 - 1/A_from^2), even in m). The incompressible regime stops
+  holding where the dynamic head is a sizeable fraction of P (a 2:1 taper
+  reversed at M ~0.55 has no root there; compressible solves it).
 - **Centred.** A segment carries half of the station at each end, each at its
   node's own density, so every node holds its station's mid static pressure.
   Station nodes must be `PlenumNode`s (Pt = P).

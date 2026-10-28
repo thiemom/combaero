@@ -37,6 +37,27 @@ StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
   return out;
 }
 
+StationHalfDrop segment_area_change_drop(double m, double P, double T,
+                                         const std::vector<double>& X, double area_from,
+                                         double area_to) {
+  if (!(area_from > 0.0) || !(area_to > 0.0) || !(P > 0.0) || !(T > 0.0)) {
+    throw std::invalid_argument(
+        "segment_area_change_drop: areas, P and T must be positive");
+  }
+  StationHalfDrop out;
+  if (area_from == area_to) {
+    return out;
+  }
+  auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
+  const double c = 0.5 * (1.0 / (area_to * area_to) - 1.0 / (area_from * area_from)) / rho;
+  out.dP = m * m * c;
+  out.d_dm_a = 2.0 * m * c;
+  const double d_drho = -out.dP / rho;
+  out.d_dP = d_drho * drho_dP;
+  out.d_dT = d_drho * drho_dT;
+  return out;
+}
+
 StationHalfDrop channel_entry_drop(double m, double P, double T,
                                    const std::vector<double>& X, double area,
                                    double K_in) {

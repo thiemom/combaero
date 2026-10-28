@@ -69,6 +69,15 @@ StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
 // the dynamic head lost, the segment's own convention at an exit into a
 // plenum. So 0, not the mirrored m|m| that charged the outflow (1 + K_in)
 // dynamic heads of static drop (#705). C1 through m = 0.
+// Area change over a duct segment between two static ends (#812), Bernoulli:
+//   dP = P_from - P_to = m^2 / (2 rho) (1 / A_to^2 - 1 / A_from^2)
+// even in m (lossless; friction is the segment's own), at the density of the
+// gas the segment carries. Zero, with zero partials, for A_from == A_to.
+// Derivative in d_dm_a.
+StationHalfDrop segment_area_change_drop(double m, double P, double T,
+                                         const std::vector<double>& X, double area_from,
+                                         double area_to);
+
 StationHalfDrop channel_entry_drop(double m, double P, double T,
                                    const std::vector<double>& X, double area,
                                    double K_in);

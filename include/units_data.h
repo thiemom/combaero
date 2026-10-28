@@ -345,6 +345,8 @@ inline constexpr Entry function_units[] = {
      "StationHalfDrop"},
     {"channel_entry_drop", "m: kg/s, P: Pa, T: K, X: -, area: m^2, K_in: -",
      "StationHalfDrop"},
+    {"segment_area_change_drop",
+     "m: kg/s, P: Pa, T: K, X: -, area_from: m^2, area_to: m^2", "StationHalfDrop"},
     {"StationHalfDrop::dP", "Pa", "Pa"},
     {"StationHalfDrop::d_dm_a", "Pa/(kg/s)", "Pa/(kg/s)"},
     {"StationHalfDrop::d_dm_b", "Pa/(kg/s)", "Pa/(kg/s)"},

@@ -253,6 +253,35 @@ TEST(JetImpulse, NoOutflowNoMomentum) {
   EXPECT_EQ(r.dJ_dm, 0.0);
 }
 
+// ---- area change over a segment (#812) --------------------------------------
+
+TEST(SegmentAreaChangeDrop, IsBernoulliEvenInFlowAndZeroAtEqualAreas) {
+  const auto X = air();
+  const double P = 1.0e5, T = 300.0, m = 0.1;
+  const auto r = combaero::segment_area_change_drop(m, P, T, X, 2e-3, 1e-3);
+  const double rho = combaero::density(T, P, X);
+  EXPECT_NEAR(r.dP, m * m / (2.0 * rho) * (1.0 / 1e-6 - 1.0 / 4e-6), 1e-9 * r.dP);
+  EXPECT_DOUBLE_EQ(combaero::segment_area_change_drop(-m, P, T, X, 2e-3, 1e-3).dP, r.dP);
+  const auto z = combaero::segment_area_change_drop(m, P, T, X, 2e-3, 2e-3);
+  EXPECT_EQ(z.dP, 0.0);
+  EXPECT_EQ(z.d_dm_a, 0.0);
+  // An expansion recovers static pressure: a negative drop.
+  EXPECT_LT(combaero::segment_area_change_drop(m, P, T, X, 1e-3, 2e-3).dP, 0.0);
+}
+
+TEST(SegmentAreaChangeDrop, AnalyticPartials) {
+  const auto X = air();
+  const double P = 1.2e5, T = 450.0, m = 0.07;
+  auto f = [&](double mm, double PP, double TT) {
+    return combaero::segment_area_change_drop(mm, PP, TT, X, 3e-3, 1.2e-3).dP;
+  };
+  const auto r = combaero::segment_area_change_drop(m, P, T, X, 3e-3, 1.2e-3);
+  EXPECT_NEAR(r.d_dm_a, (f(m + 1e-6, P, T) - f(m - 1e-6, P, T)) / 2e-6, 1e-7 * std::abs(r.d_dm_a));
+  EXPECT_NEAR(r.d_dP, (f(m, P + 1.0, T) - f(m, P - 1.0, T)) / 2.0, 1e-6 * std::abs(r.d_dP));
+  EXPECT_NEAR(r.d_dT, (f(m, P, T + 1e-3) - f(m, P, T - 1e-3)) / 2e-3, 1e-6 * std::abs(r.d_dT));
+  EXPECT_THROW(combaero::segment_area_change_drop(m, P, T, X, 0.0, 1e-3), std::invalid_argument);
+}
+
 // ---- one station, half at a time (#471) ------------------------------------
 
 TEST(StationHalfDrop, BleedAtBassettKappaIsBassettK5ForEverySplit) {
