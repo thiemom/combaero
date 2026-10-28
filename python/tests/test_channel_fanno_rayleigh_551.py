@@ -117,8 +117,8 @@ def test_the_duct_flow_is_the_fanno_rayleigh_flow_of_its_end_states() -> None:
         assert "rayleigh_omitted" not in d[name]
         G = cb.fanno_rayleigh_channel_flow(
             r[f"{name}_in.Pt"],
-            r[f"{name}_in.T"],
-            r[f"{name}_p.T"],
+            r[f"{name}_in.Tt"],
+            r[f"{name}_p.Tt"],
             X_AIR,
             r[f"{name}_p.Pt"],
             True,
@@ -129,7 +129,7 @@ def test_the_duct_flow_is_the_fanno_rayleigh_flow_of_its_end_states() -> None:
         ).G
         assert r[f"{name}.m_dot"] == pytest.approx(G * el.area, rel=1e-9)
     # The heat really went across: hot cooled, cold heated.
-    assert r["hot_p.T"] < 1200.0 and r["cold_p.T"] > 400.0
+    assert r["hot_p.Tt"] < 1200.0 and r["cold_p.Tt"] > 400.0
     assert r["__second_law_failures__"] == []
 
 
@@ -159,11 +159,11 @@ def test_into_a_mixing_node_the_duct_derives_its_own_exit_state() -> None:
     assert "rayleigh_omitted" not in d["cold"]
     exit_T = s.network.elements["cold"]._rayleigh_exit[1]
     _, ref = _solve(_pair(mix_into_cold=True, cold_exit_plenum=True))
-    assert exit_T == pytest.approx(ref["cold_x.T"], rel=1e-6)
-    for key in ("cold.m_dot", "hot.m_dot", "cold_p.T", "hot_p.T"):
+    assert exit_T == pytest.approx(ref["cold_x.Tt"], rel=1e-6)
+    for key in ("cold.m_dot", "hot.m_dot", "cold_p.Tt", "hot_p.Tt"):
         assert r[key] == pytest.approx(ref[key], rel=1e-6), key
     # The heat is in the momentum: without it the flow differs.
-    assert exit_T > r["cold_in.T"] + 1.0
+    assert exit_T > r["cold_in.Tt"] + 1.0
 
 
 def test_into_a_mixing_node_the_global_jacobian_matches_finite_differences() -> None:

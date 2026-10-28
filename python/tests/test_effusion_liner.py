@@ -134,7 +134,7 @@ def test_each_panel_cd_sees_its_stations_crossflow() -> None:
         ratio = cb.crossflow_velocity_ratio(m_a, m_b, P, T_static, X_AIR, 1.0e5, A)
         assert d[f"ln__p{i}"]["U1_over_Vi"] == pytest.approx(ratio.U1_over_Vi, rel=1e-9)
         panel = s.network.elements[f"ln__p{i}"]
-        st = NetworkMixtureState(T=T, P=P, Pt=P, Tt=T, m_dot=d[f"ln__p{i}"]["m_dot"], Y=Y_AIR)
+        st = NetworkMixtureState(P=P, Pt=P, Tt=T, m_dot=d[f"ln__p{i}"]["m_dot"], Y=Y_AIR)
         hole = cb.DischargeHoleGeometry(d=3.27e-3, L=panel.hole_length, r=0.0)
         cd = cb.discharge_cd(
             cb.DischargeCdCorrelation.McGreehanSchotsch1988,

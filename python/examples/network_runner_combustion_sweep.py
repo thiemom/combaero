@@ -67,11 +67,11 @@ def main() -> None:
     params = pd.DataFrame({"fuel_inlet.m_dot": phi_range * _FAR_STOICH * M_AIR})
 
     print(f"Sweeping {len(phi_range)} equivalence ratios ...")
-    sweep_df = runner.sweep(params, metrics=["combustor.T", "combustor.phi"])
+    sweep_df = runner.sweep(params, metrics=["combustor.Tt", "combustor.phi"])
 
     # phi from solver (more precise than our input estimate)
     phi_solved = sweep_df["combustor.phi"].values
-    T_exit = sweep_df["combustor.T"].values
+    T_exit = sweep_df["combustor.Tt"].values
     converged = sweep_df["success"].values
     print(f"  Converged: {converged.sum()}/{len(converged)}")
     if not converged.any():

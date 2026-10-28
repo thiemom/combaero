@@ -101,7 +101,7 @@ def main():
 
     Y_out = [sol[f"combustor.Y[{i}]"] for i in range(cb.num_species())]
     X_out = cb.mass_to_mole(Y_out)
-    h_out, _ = cb._core.enthalpy_and_jacobian(sol["combustor.T"], X_out)
+    h_out, _ = cb._core.enthalpy_and_jacobian(sol["combustor.Tt"], X_out)
     H_out = sol["nozzle.m_dot"] * h_out
 
     print(f"Energy Flux In:  {H_in / 1e6:.4f} MW")

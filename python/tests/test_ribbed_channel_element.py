@@ -165,8 +165,8 @@ def _element(model) -> ChannelElement:
 
 
 def _element_states(m_dot: float):
-    a = NetworkMixtureState(T=600.0, P=2e5, Pt=2.1e5, Tt=610.0, m_dot=m_dot, Y=Y_AIR)
-    b = NetworkMixtureState(T=595.0, P=1.95e5, Pt=1.95e5, Tt=605.0, m_dot=m_dot, Y=Y_AIR)
+    a = NetworkMixtureState(P=2e5, Pt=2.1e5, Tt=610.0, m_dot=m_dot, Y=Y_AIR)
+    b = NetworkMixtureState(P=1.95e5, Pt=1.95e5, Tt=605.0, m_dot=m_dot, Y=Y_AIR)
     return a, b
 
 

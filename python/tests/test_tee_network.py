@@ -361,9 +361,9 @@ def test_merging_tee_enthalpy_conservation():
     m_br = sol["lc_br.m_dot"]
     m_com = sol["lc_com.m_dot"]
 
-    T_str = sol.get("pl_str.T", 300.0)
-    T_br = sol.get("pl_br.T", 400.0)
-    T_com = sol.get("pl_com.T")
+    T_str = sol.get("pl_str.Tt", 300.0)
+    T_br = sol.get("pl_br.Tt", 400.0)
+    T_com = sol.get("pl_com.Tt")
     assert T_com is not None
 
     n_spec = cb.num_species()

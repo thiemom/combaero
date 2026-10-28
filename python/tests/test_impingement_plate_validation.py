@@ -245,7 +245,7 @@ def test_row1_reproduces_fig5_through_the_plate() -> None:
             "p", "s", "c", d_jet=D, xn_d=xn, yn_d=yn, z_d=z, span=12 * yn * D, plate_thickness=D
         )
         m = plate.n_holes * 1.0e4 * tr.mu * math.pi * D / 4.0
-        r = plate.htc_and_T(NetworkMixtureState(T=T, P=P, Pt=P, Tt=T, m_dot=m, Y=Y_AIR))
+        r = plate.htc_and_T(NetworkMixtureState(P=P, Pt=P, Tt=T, m_dot=m, Y=Y_AIR))
         err.append(r.h * D / tr.k / nu - 1.0)
     err = np.array(err)
     assert len(err) == 27

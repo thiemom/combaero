@@ -266,7 +266,7 @@ def test_heat_given_to_a_stagnant_node_is_reported_as_withheld() -> None:
     assert r["dead.Q_withheld"] == pytest.approx(100.0, rel=1e-6)
     # It holds the temperature of what reaches it: the C1 floor this replaced
     # spread the 100 W over 0.5 mg/s, 1e5 K, which a [200, 5000] K clamp hid.
-    assert r["dead.T"] == pytest.approx(r["p.T"], abs=1e-3)
+    assert r["dead.Tt"] == pytest.approx(r["p.Tt"], abs=1e-3)
     _assert_closed(s, r)
 
 

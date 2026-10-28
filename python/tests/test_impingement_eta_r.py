@@ -55,7 +55,7 @@ def test_a_hot_bypass_moves_each_row_by_its_share() -> None:
     net, arr = _with_bypass(0.004, Tt=400.0)
     res = _solve(net)
     diag = res["__element_diag__"]
-    T0 = float(res["byp.T"])
+    T0 = float(res["byp.Tt"])
     m_b = float(diag[arr.segment_id(0)]["m_dot"])
     T_aw, eta, phi = (_rows(diag, arr, k) for k in ("T_aw", "eta_r", "bypass_fraction"))
     m_c = [m_b] + [float(diag[arr.segment_id(i)]["m_dot"]) for i in range(1, 10)]
@@ -141,6 +141,6 @@ def test_the_reference_temperature_is_in_the_jacobian(regime: str) -> None:
     # The case exercises what it claims: a hot bypass reaching the rows.
     res = s.solve(init_strategy="outletref_warmstart")
     d = res["__element_diag__"]
-    assert float(res["byp.T"]) > 400.0
+    assert float(res["byp.Tt"]) > 400.0
     assert float(d["ia__p1"]["T_aw"]) > 330.0
     assert np.isfinite(float(d["ia__p5"]["T_aw"]))

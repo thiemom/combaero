@@ -51,7 +51,7 @@ def test_mass_boundary_sink_convergence() -> None:
     assert pytest.approx(m_dot_chan, rel=1e-6) == 0.5
 
     # Outlet temperature should be ~300 K (inherited from inlet), not 1000 K (ignored value)
-    T_outlet = result.get("outlet.T")
+    T_outlet = result.get("outlet.Tt")
     assert pytest.approx(T_outlet, rel=1e-3) == 300.0
 
 

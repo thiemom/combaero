@@ -88,7 +88,7 @@ def _fanno(seg: ImpingementCrossflowElement, P0: float, P_exit_static: float) ->
 
 
 def _state(P: float, m: float) -> NetworkMixtureState:
-    return NetworkMixtureState(P=P, Pt=P, T=T0, Tt=T0, m_dot=m, Y=Y_AIR)
+    return NetworkMixtureState(P=P, Pt=P, Tt=T0, m_dot=m, Y=Y_AIR)
 
 
 def _exit_pair() -> tuple[ImpingementCrossflowElement, ImpingementCrossflowElement]:
@@ -311,7 +311,6 @@ def test_the_duct_end_partials_match_finite_differences(
         sa = _state(P_in + dx.get(f"{a_id}.P", 0.0), m + dx.get(f"{seg}.m_dot", 0.0))
         sb = _state(P_out + dx.get(f"{b_id}.P", 0.0), m + dx.get(f"{seg}.m_dot", 0.0))
         for st, nid in ((sa, a_id), (sb, b_id)):
-            st.T += dx.get(f"{nid}.T", 0.0)
             st.Tt += dx.get(f"{nid}.T", 0.0)
             st.Pt = st.P
         f = {k: v + dx.get(f"{k}.m_dot", 0.0) for k, v in flows.items()}

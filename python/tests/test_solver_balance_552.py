@@ -87,7 +87,7 @@ def test_admissible_cooling_still_solves() -> None:
     """200 W out of the same stream: 34 K of cooling, a normal root."""
     r = NetworkSolver(_cooled_chain(-200.0)).solve(auto_retry=False)
     assert r["__success__"]
-    assert 260.0 < r["p.T"] < 270.0
+    assert 260.0 < r["p.Tt"] < 270.0
 
 
 @pytest.mark.parametrize("Tt", [120.0, 150.0, 199.0, 200.0, 201.0])

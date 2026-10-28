@@ -69,10 +69,7 @@ def _element(flow_direction: str = "branch") -> ConstantKTeeElement:
 
 
 def _states(P, Pt, T):
-    return [
-        NetworkMixtureState(P=P[i], Pt=Pt[i], T=T[i], Tt=T[i], m_dot=0.0, Y=list(_Y))
-        for i in range(3)
-    ]
+    return [NetworkMixtureState(P=P[i], Pt=Pt[i], Tt=T[i], m_dot=0.0, Y=list(_Y)) for i in range(3)]
 
 
 def _residual(element, P=None, Pt=None, T=None, outer=None) -> np.ndarray:
@@ -263,7 +260,7 @@ def test_the_residual_matches_the_documented_closed_form(direction):
     # operating point and diverge as the square of Mach. K is tabulated as
     # dPt/q_dyn, so the reference has to follow the ports.
     P_c = float(states[common].P)
-    T_c = float(states[common].T)
+    T_c = float(states[common].Tt)
     X_c = list(states[common].X)
     q_dyn = chamber_isentropic_rise(P_c, T_c, m_common, area, X_c)
     rho = chamber_static_density(P_c, T_c, m_common, area, X_c)

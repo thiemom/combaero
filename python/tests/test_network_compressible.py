@@ -1223,7 +1223,7 @@ def _mk_state(P: float, Pt: float, m_dot: float = 0.1) -> "object":
     from combaero.network.components import NetworkMixtureState
 
     y_air = list(cb.mole_to_mass(cb.species.dry_air()))
-    return NetworkMixtureState(P=P, Pt=Pt, T=300.0, Tt=300.0, m_dot=m_dot, Y=y_air)
+    return NetworkMixtureState(P=P, Pt=Pt, Tt=300.0, m_dot=m_dot, Y=y_air)
 
 
 def test_outlet_ref_channel_moves_density_sensitivity_downstream():

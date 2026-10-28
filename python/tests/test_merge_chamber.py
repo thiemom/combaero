@@ -91,10 +91,8 @@ def test_the_solution_satisfies_the_control_volume_momentum_balance(angle: float
         rho = chamber_static_density(P, T, m_out, A, list(X_AIR))
         rho_face = chamber_static_density(P_face, 1200.0, m_main, A, list(X_AIR))
     eff = s.network.elements["eff"]
-    supply = NetworkMixtureState(
-        T=600.0, P=1.03e5, Pt=1.03e5, Tt=600.0, m_dot=d["eff"]["m_dot"], Y=Y_AIR
-    )
-    chamber = NetworkMixtureState(T=T, P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
+    supply = NetworkMixtureState(P=1.03e5, Pt=1.03e5, Tt=600.0, m_dot=d["eff"]["m_dot"], Y=Y_AIR)
+    chamber = NetworkMixtureState(P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
     S, _ = eff.injection_momentum(supply, chamber)
     lhs = P_face * A + m_main**2 / (rho_face * A) + S
     rhs = P * A + m_out**2 / (rho * A)
@@ -231,10 +229,8 @@ def test_a_compressible_liner_balances_the_exact_impulse() -> None:
     assert m_out / (rho * A) / cb.speed_of_sound(T_static, X_AIR) > 0.3
     P_face = d["duct"]["P_out"]
     rho_face = chamber_static_density(P_face, 1200.0, m_main, A, list(X_AIR))
-    supply = NetworkMixtureState(
-        T=600.0, P=1.35e5, Pt=1.35e5, Tt=600.0, m_dot=d["eff"]["m_dot"], Y=Y_AIR
-    )
-    chamber = NetworkMixtureState(T=T, P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
+    supply = NetworkMixtureState(P=1.35e5, Pt=1.35e5, Tt=600.0, m_dot=d["eff"]["m_dot"], Y=Y_AIR)
+    chamber = NetworkMixtureState(P=P, Pt=r["ch.Pt"], Tt=T, m_dot=m_out, Y=Y_AIR)
     S, _ = s.network.elements["eff"].injection_momentum(supply, chamber)
     lhs = P_face * A + m_main**2 / (rho_face * A) + S
     rhs = P * A + m_out**2 / (rho * A)

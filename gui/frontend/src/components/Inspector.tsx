@@ -653,7 +653,7 @@ const Inspector = () => {
 												Tt (total) of {heatedNode?.data.label || heated}
 											</span>
 											<span className="font-mono text-xs font-bold">
-												{formatKelvin(res.state?.Tt ?? res.state?.T)}
+												{formatKelvin(res.state?.Tt)}
 											</span>
 										</div>
 										{!Number.isFinite(res.Q) && (

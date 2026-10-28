@@ -121,8 +121,8 @@ def _build_result_objects(
 
     # A heat source (#792) reports the heat it applied -- the SOLVED Q in a
     # Tt_target mode, the set one otherwise, NaN when undetermined (no
-    # through-flow) -- beside the state of the node it heats, whose T/Tt are
-    # that node's TOTAL temperature.
+    # through-flow) -- beside the state of the node it heats, whose Tt is
+    # that node's TOTAL temperature (T its static one, #782).
     for hs_id, (target, eb) in getattr(net, "_gui_heat_sources", {}).items():
         node_res = node_results.get(target)
         if node_res is None:
@@ -297,7 +297,7 @@ class NetworkResult:
 
         Tries the key directly first (raw ``'<id>.<quantity>'`` form), then
         resolves the left-hand part as a node/element label so callers can
-        write ``result.get("combustor.T")`` instead of a UUID key.
+        write ``result.get("combustor.Tt")`` instead of a UUID key.
         """
         if key in self._raw:
             return float(self._raw[key])
@@ -553,7 +553,7 @@ class NetworkRunner:
             "air_inlet.m_dot": [0.8, 1.0, 1.2],
             "fuel_inlet.m_dot": [0.03, 0.04, 0.05],
         })
-        sweep_df = runner.sweep(params, metrics=["combustor.T", "hot_channel.m_dot"])
+        sweep_df = runner.sweep(params, metrics=["combustor.Tt", "hot_channel.m_dot"])
     """
 
     def __init__(
@@ -669,7 +669,7 @@ class NetworkRunner:
             params: DataFrame whose columns are override keys and whose rows
                 are individual parameter combinations.
             metrics: Optional list of raw solver keys to extract per solve
-                (e.g. ``["combustor.T", "hot_channel.m_dot"]``).
+                (e.g. ``["combustor.Tt", "hot_channel.m_dot"]``).
 
                 * When supplied, returns a compact DataFrame with one row per
                   solve: the param columns, ``success``, ``final_norm``, and

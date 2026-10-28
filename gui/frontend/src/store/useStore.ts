@@ -368,8 +368,8 @@ const useStore = create<RFState>((set, get) => ({
 		}
 	},
 
-	displaySettings: ["T", "P", "m_dot", "rho"],
-	knownFields: ["T", "P", "m_dot", "rho"],
+	displaySettings: ["Tt", "P", "m_dot", "rho"],
+	knownFields: ["Tt", "P", "m_dot", "rho"],
 	setDisplaySettings: (settings: string[]) => {
 		set({ displaySettings: settings });
 	},

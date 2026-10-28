@@ -41,7 +41,6 @@ def test_mix_streams_basic():
     state1 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
-        T=300.0,
         Tt=300.0,
         m_dot=0.05,
         Y=cb.species.empty(),
@@ -51,7 +50,6 @@ def test_mix_streams_basic():
     state2 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
-        T=400.0,
         Tt=400.0,
         m_dot=0.05,
         Y=cb.species.empty(),
@@ -73,7 +71,6 @@ def test_mix_streams_energy_conservation():
     state1 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
-        T=300.0,
         Tt=300.0,
         m_dot=0.05,
         Y=cb.species.dry_air_mass(),
@@ -82,7 +79,6 @@ def test_mix_streams_energy_conservation():
     state2 = NetworkMixtureState(
         P=101325.0,
         Pt=101325.0,
-        T=300.0,
         Tt=300.0,
         m_dot=0.05,
         Y=cb.species.dry_air_mass(),
@@ -99,7 +95,6 @@ def test_combustion_from_phi_basic():
     air_state = NetworkMixtureState(
         P=500000.0,
         Pt=500000.0,
-        T=700.0,
         Tt=700.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
@@ -121,7 +116,6 @@ def test_combustion_from_phi_lean_vs_rich():
     air_state = NetworkMixtureState(
         P=500000.0,
         Pt=500000.0,
-        T=700.0,
         Tt=700.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
@@ -142,7 +136,6 @@ def test_combustion_efficiency():
     air_state = NetworkMixtureState(
         P=500000.0,
         Pt=500000.0,
-        T=700.0,
         Tt=700.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
@@ -161,7 +154,6 @@ def test_pressure_drop():
     air_state = NetworkMixtureState(
         P=500000.0,
         Pt=500000.0,
-        T=700.0,
         Tt=700.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),

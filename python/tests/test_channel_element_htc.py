@@ -41,7 +41,6 @@ def test_channel_element_default_surface():
 
     # Create test state
     state = NetworkMixtureState(
-        T=300.0,
         P=101325.0,
         Pt=101325.0,
         Tt=300.0,
@@ -77,7 +76,6 @@ def test_channel_element_with_surface():
 
     # Create test state
     state = NetworkMixtureState(
-        T=300.0,
         P=101325.0,
         Pt=101325.0,
         Tt=300.0,
@@ -100,7 +98,6 @@ def test_channel_element_with_surface():
 def _make_state(m_dot: float = 0.5) -> NetworkMixtureState:
     """Helper: representative flowing state with non-trivial Re."""
     return NetworkMixtureState(
-        T=600.0,
         P=200000.0,
         Pt=210000.0,
         Tt=610.0,
@@ -202,7 +199,6 @@ def test_channel_element_with_t_hot():
 
     # Create test state
     state = NetworkMixtureState(
-        T=300.0,
         P=101325.0,
         Pt=101325.0,
         Tt=300.0,
@@ -240,7 +236,6 @@ def test_network_element_default():
 
     # Create test state
     state = NetworkMixtureState(
-        T=300.0,
         P=101325.0,
         Pt=101325.0,
         Tt=300.0,

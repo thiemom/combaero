@@ -91,7 +91,7 @@ def test_a_channels_t_aw_lies_below_the_stagnation_temperature(M: float) -> None
         "c", "a", "b", length=0.3, diameter=D, surface=ConvectiveSurface(model=SmoothModel())
     )
     el._fill_convective_area()
-    state = NetworkMixtureState(P=P0, Pt=P0, T=T0, Tt=T0, m_dot=G * A, Y=Y_AIR)
+    state = NetworkMixtureState(P=P0, Pt=P0, Tt=T0, m_dot=G * A, Y=Y_AIR)
     r = el.htc_and_T(state)
     s = cb.duct_static_state(T0, P0, G, X_AIR)
     assert s.T < r.T_aw < T0, (s.T, r.T_aw)
@@ -167,7 +167,7 @@ def test_past_choke_the_duct_heat_transfer_stays_bounded() -> None:
     )
     el._fill_convective_area()
     for G in (1e3, 1e4, 1e5):
-        state = NetworkMixtureState(P=P0, Pt=P0, T=T0, Tt=T0, m_dot=G * A, Y=Y_AIR)
+        state = NetworkMixtureState(P=P0, Pt=P0, Tt=T0, m_dot=G * A, Y=Y_AIR)
         r = el.htc_and_T(state)
         assert cb.duct_static_state(T0, P0, G, X_AIR).choked
         assert r.T_aw < T0

@@ -1,3 +1,4 @@
+import functools
 import math
 import os
 import time
@@ -12,7 +13,7 @@ import scipy.sparse as sp
 from scipy.optimize import root
 
 import combaero as cb
-from combaero import _solver_tools
+from combaero import _renamed, _solver_tools
 
 from .components import (
     RAYLEIGH_EXIT_PREFIX,
@@ -39,6 +40,89 @@ from .graph import FlowNetwork
 # Relay key of the gas a film's holes discharge into, before their coolant
 # mixes in (#694): FILM_INF_PREFIX + provider id.
 FILM_INF_PREFIX = "__film_inf__"
+
+
+# 0.8 changed what "<node>.T" and an element's "T_in"/"T_out" mean (#782):
+# STATIC temperature, as P/P_in already were; until 0.7 they held the
+# stagnation T, now "<node>.Tt"/"Tt_in". The first read of such a key
+# whose value differs from its Tt says so, once per process. Removed with
+# the deprecated "<chamber>.T_static" key in 0.9.0.
+_STATIC_T_WARNED = False
+
+
+def _warn_static_t(key: str) -> None:
+    global _STATIC_T_WARNED
+    if _STATIC_T_WARNED:
+        return
+    _STATIC_T_WARNED = True
+    warnings.warn(
+        f"result[{key!r}] is the STATIC temperature since combaero 0.8; until 0.7 it was "
+        "the stagnation temperature, now under the Tt key (e.g. '<node>.Tt', 'Tt_in'). "
+        "This warning is shown once and removed in 0.9.0.",
+        FutureWarning,
+        stacklevel=4,
+    )
+
+
+class _ElementDiag(dict):
+    """An element's diagnostics; ``T_in``/``T_out`` warn as ``_StaticTResult``."""
+
+    def _check(self, key: Any) -> None:
+        if key in ("T_in", "T_out") and key in self:
+            tt = dict.get(self, "Tt" + key[1:])
+            if tt is not None and dict.__getitem__(self, key) != tt:
+                _warn_static_t(key)
+
+    def __getitem__(self, key: Any) -> Any:
+        self._check(key)
+        return dict.__getitem__(self, key)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        self._check(key)
+        return dict.get(self, key, default)
+
+
+class _StaticTResult(dict):
+    """``solve()``'s result: a plain dict that, for 0.8, warns on the keys
+    whose meaning changed (see ``_warn_static_t``) and on the deprecated
+    ``"<chamber>.T_static"`` (now ``"<chamber>.T"``)."""
+
+    def __init__(self, sol: dict[str, Any]) -> None:
+        super().__init__(sol)
+        diag = dict.get(self, "__element_diag__")
+        if isinstance(diag, dict):
+            dict.__setitem__(
+                self,
+                "__element_diag__",
+                {k: _ElementDiag(v) if isinstance(v, dict) else v for k, v in diag.items()},
+            )
+
+    def _check(self, key: Any) -> None:
+        if not isinstance(key, str) or key not in self:
+            return
+        if key.endswith(".T_static"):
+            _renamed._warn(f"result[{key!r}]", f"result[{key[: -len('_static')]!r}]")
+        elif key.endswith(".T"):
+            tt = dict.get(self, key + "t")
+            if tt is not None and dict.__getitem__(self, key) != tt:
+                _warn_static_t(key)
+
+    def __getitem__(self, key: Any) -> Any:
+        self._check(key)
+        return dict.__getitem__(self, key)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        self._check(key)
+        return dict.get(self, key, default)
+
+
+def _static_t_result(solve: Callable[..., Any]) -> Callable[..., Any]:
+    @functools.wraps(solve)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        sol = solve(self, *args, **kwargs)
+        return _StaticTResult(sol) if isinstance(sol, dict) else sol
+
+    return wrapper
 
 
 class SolverTimeoutError(Exception):
@@ -2374,7 +2458,6 @@ class NetworkSolver:
                 inj = NetworkMixtureState(
                     P=own.P,
                     Pt=own.Pt,
-                    T=float(node.Tt),
                     Tt=float(node.Tt),
                     m_dot=float(node.m_dot),
                     Y=node.Y if node.Y is not None else self._default_Y,
@@ -2916,7 +2999,6 @@ class NetworkSolver:
         self._lagged_read = True
         if node.id in self._prev_derived_states:
             T_prev, Y_prev, _ = self._prev_derived_states[node.id]
-            state.T = float(T_prev)
             state.Tt = float(T_prev)
             state.Y = Y_prev
         return state
@@ -2931,13 +3013,10 @@ class NetworkSolver:
             P_tot = guess.get(f"{node.id}.Pt", getattr(node, "Pt", 101325.0))
             P_stat = guess.get(f"{node.id}.P", P_tot)
             T_tot = guess.get(f"{node.id}.Tt", getattr(node, "Tt", 300.0))
-            T_stat = guess.get(f"{node.id}.T", T_tot)
             Y = getattr(node, "Y", None)
             if Y is None:
                 Y = default_Y
-            return NetworkMixtureState(
-                float(P_stat), float(P_tot), float(T_stat), float(T_tot), 0.0, Y
-            )
+            return NetworkMixtureState(P=float(P_stat), Pt=float(P_tot), Tt=float(T_tot), Y=Y)
 
         if isinstance(node, MassFlowBoundary):
             guess = getattr(node, "initial_guess", {})
@@ -2954,7 +3033,6 @@ class NetworkSolver:
             if Y is None:
                 Y = default_Y
 
-            T_stat = guess.get(f"{node.id}.T", T_tot)
             p_val = guess.get(f"{node.id}.P", 101325.0)
             ptot_val = guess.get(f"{node.id}.Pt", 101325.0)
 
@@ -2967,7 +3045,7 @@ class NetworkSolver:
                     ptot_val = x[i]
 
             return NetworkMixtureState(
-                float(p_val), float(ptot_val), float(T_stat), float(T_tot), float(m), Y
+                P=float(p_val), Pt=float(ptot_val), Tt=float(T_tot), m_dot=float(m), Y=Y
             )
 
         # For interior nodes, unpack from x
@@ -2978,7 +3056,6 @@ class NetworkSolver:
         state_dict = {
             "P": 101325.0,
             "Pt": 101325.0,
-            "T": 300.0,
             "Tt": 300.0,
             "m_dot": 0.0,
             "Y": default_Y,
@@ -2987,7 +3064,6 @@ class NetworkSolver:
         # Override with derived state if available
         if node.id in self._derived_states:
             T, Y, _ = self._derived_states[node.id]
-            state_dict["T"] = T
             state_dict["Tt"] = T
             state_dict["Y"] = Y
 
@@ -3014,12 +3090,12 @@ class NetworkSolver:
         P_safe = max(float(state_dict["P"]), 1000.0)
 
         return NetworkMixtureState(
-            P_safe,
-            float(state_dict["Pt"]),
-            float(state_dict["T"]),
-            float(state_dict["Tt"]),
-            float(state_dict["m_dot"]),
-            Y_safe,
+            P=P_safe,
+            Pt=float(state_dict["Pt"]),
+            Tt=float(state_dict["Tt"]),
+            m_dot=float(state_dict["m_dot"]),
+            Y=Y_safe,
+            incompressible=getattr(node, "regime", None) == "incompressible",
         )
 
     def _residuals_and_jacobian(
@@ -3352,6 +3428,7 @@ class NetworkSolver:
         sol["__caught_exception_count__"] = self._caught_count
         return sol
 
+    @_static_t_result
     def solve(
         self,
         method: str = "hybr",
@@ -5369,6 +5446,9 @@ class NetworkSolver:
         from combaero import mass_to_mole
 
         for nid, (T, Y, _) in self._derived_states.items():
+            # The node's stagnation T; ".T" is its static T (#782), set below once
+            # the state is evaluable (a node with no gas state keeps T = Tt).
+            sol_dict[f"{nid}.Tt"] = T
             sol_dict[f"{nid}.T"] = T
             for i, yi in enumerate(Y):
                 sol_dict[f"{nid}.Y[{i}]"] = float(yi)
@@ -5390,10 +5470,13 @@ class NetworkSolver:
             try:
                 state = self._get_node_state(node, final_x)
                 sol_dict[f"{nid}.mach"] = node.mach(state)
-                if hasattr(node, "diagnostics"):
-                    diag = node.diagnostics(state)
-                    for key, val in diag.items():
-                        sol_dict[f"{nid}.{key}"] = val
+                diag = node.diagnostics(state) if hasattr(node, "diagnostics") else {}
+                for key, val in diag.items():
+                    sol_dict[f"{nid}.{key}"] = val
+                # The static T: a momentum chamber's is the one its closure
+                # solved (also reported as "T_static" until 0.9.0); any other
+                # node's is the state's (Tt at a plenum or incompressible node).
+                sol_dict[f"{nid}.T"] = float(diag.get("T_static", state.T))
             except (ValueError, RuntimeError) as exc:
                 if success:
                     raise
@@ -5453,7 +5536,7 @@ class NetworkSolver:
                     ):
                         arrival = self._boundary_arrivals.get((end_id, eid))
                         if arrival is not None:
-                            end_state.T = end_state.Tt = arrival[0]
+                            end_state.Tt = arrival[0]
                             end_state.Y = arrival[1]
                     self._main_face(element, self.network.nodes[element.to_node], state_out)
                     flows = self._network_flows(element, final_x)

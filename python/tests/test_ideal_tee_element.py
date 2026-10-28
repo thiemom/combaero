@@ -415,7 +415,7 @@ def test_two_suppliers_into_two_receivers() -> None:
         head = 0.5 * rho * (m / (rho * _A)) ** 2
         assert sol[f"{node}.Pt"] - sol[f"{node}.P"] == pytest.approx(head, rel=5e-3), node
     # Both receivers carry the same supplied mixture.
-    assert sol["mc_s.T"] == pytest.approx(sol["mc_r.T"], rel=1e-9)
+    assert sol["mc_s.Tt"] == pytest.approx(sol["mc_r.Tt"], rel=1e-9)
     assert 300.0 < sol["mc_s.Tt"] < 400.0
     x = np.array([sol[n] for n in solver.unknown_names], dtype=float)
     x = x * (1.0 + 1e-3 * np.random.default_rng(2).standard_normal(x.size))

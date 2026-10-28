@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 import combaero as cb
-from combaero import _solver_tools
+from combaero import _renamed, _solver_tools
 
 # Physics configuration types for network introspectability
 CompressibilityLiteral = Literal["incompressible", "compressible"]
@@ -1548,7 +1548,7 @@ def _applied_heat(node: Any) -> float:
     return sum(eb.heat for eb in getattr(node, "energy_boundaries", None) or [])
 
 
-@dataclass
+@dataclass(init=False)
 class NetworkMixtureState:
     """A node's gas state as the residuals see it.
 
@@ -1557,21 +1557,76 @@ class NetworkMixtureState:
     solver's Jacobian keys ``f"{node}.T"`` are derivatives with respect to
     this ``Tt``; the name is historical (#782).
 
-    ``T`` is not read inside the solver: every residual and property method
-    takes ``Tt``, and ``test_network_state_static_t_unread`` keeps it so.
-    The solver fills it with ``Tt`` too, except a boundary whose
-    ``initial_guess`` holds a ``.T`` entry. The property methods are
-    therefore evaluated at (``Tt``, static ``P``); where a static T is meant
-    (density, cp, transport of a moving gas) that is the stagnation value,
-    and a caller wanting the static state forms it from the velocity.
+    ``T`` is the STATIC temperature, computed (#782): ``Tt`` at an
+    incompressible node (the low-Mach limit its closure solves) and where
+    ``P >= Pt`` (a plenum); otherwise the T on the isentrope through
+    (``Tt``, ``Pt``) at the static ``P``, which at a converged momentum
+    chamber is its closure's static T. No residual reads it
+    (``test_network_state_static_t_unread`` keeps it so); results and
+    diagnostics do.
+
+    The property methods are evaluated at (``Tt``, static ``P``); where a
+    static T is meant (density, cp, transport of a moving gas) that is the
+    stagnation value (#824).
+
+    The constructor keeps the 0.7 signature ``(P, Pt, T, Tt, m_dot, Y)``;
+    passing ``T`` is deprecated and ignored (it was always ``Tt``) and is
+    removed in 0.9.0.
     """
 
     P: float
     Pt: float
-    T: float
     Tt: float
     m_dot: float
     Y: list[float]
+    incompressible: bool
+
+    def __init__(
+        self,
+        P: float,
+        Pt: float,
+        T: float | None = None,
+        Tt: float | None = None,
+        m_dot: float = 0.0,
+        Y: list[float] | None = None,
+        *,
+        incompressible: bool = False,
+    ) -> None:
+        if T is not None:
+            _renamed._warn(
+                "NetworkMixtureState(T=...)",
+                "Tt=...; T is the static temperature, computed from (P, Pt, Tt)",
+            )
+            if Tt is None:
+                Tt = T
+        if Tt is None:
+            raise TypeError("NetworkMixtureState() missing required argument: 'Tt'")
+        if Y is None:
+            raise TypeError("NetworkMixtureState() missing required argument: 'Y'")
+        self.P = P
+        self.Pt = Pt
+        self.Tt = Tt
+        self.m_dot = m_dot
+        self.Y = Y
+        self.incompressible = incompressible
+
+    @property
+    def T(self) -> float:
+        """Static temperature [K] (see the class docstring)."""
+        Tt, P, Pt = float(self.Tt), float(self.P), float(self.Pt)
+        if self.incompressible or not Pt > P or not Tt > 0.0 or not P > 0.0:
+            return Tt
+        X = self.X
+        return float(cb.calc_T_from_s(cb.s(Tt, X, Pt), P, X, Tt, 1e-10))
+
+    @T.setter
+    def T(self, value: float) -> None:
+        # 0.7 code set T to the stagnation T it carried (#782).
+        _renamed._warn(
+            "setting NetworkMixtureState.T",
+            "NetworkMixtureState.Tt; T is the static temperature, computed from (P, Pt, Tt)",
+        )
+        self.Tt = value
 
     @property
     def X(self) -> list[float]:
@@ -2127,8 +2182,8 @@ def _element_pressure_block(
     return {
         "P_in": float(state_in.P),
         "P_out": float(state_out.P),
-        "T_in": float(state_in.Tt),
-        "T_out": float(state_out.Tt),
+        "T_in": float(state_in.T),
+        "T_out": float(state_out.T),
         "Pt_in": float(state_in.Pt),
         "Pt_out": float(state_out.Pt),
         "Tt_in": float(state_in.Tt),
@@ -8640,7 +8695,7 @@ class CrossflowSegmentElement(ChannelElement):
             k_ps = -2.0 * cs.Pt * u * e / (Ps * Ps) + w * cs.dP
             sgn = 1.0 if m >= 0.0 else -1.0
             d[own] = d.get(own, 0.0) + k_ps * float(s.dP_dG) * sgn / A
-            d[f"{gas_id}.T"] = d.get(f"{gas_id}.T", 0.0) + k_ps * float(s.dP_dT0)
+            d[f"{gas_id}.T"] = d.get(f"{gas_id}.T", 0.0) + k_ps * float(s.dP_dTt)
             for k, v in enumerate(s.dP_dY):
                 if v != 0.0:
                     d[f"{gas_id}.Y[{k}]"] = d.get(f"{gas_id}.Y[{k}]", 0.0) + k_ps * float(v)

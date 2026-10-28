@@ -6,7 +6,6 @@ def test_universal_pressure_block():
     """Verify that _element_pressure_block emits the required keys including Tt and Pt."""
     # Create simple mock states
     st_in = components.NetworkMixtureState(
-        T=300.0,
         P=100000.0,
         Pt=100500.0,
         Tt=301.0,
@@ -15,7 +14,6 @@ def test_universal_pressure_block():
     )
 
     st_out = components.NetworkMixtureState(
-        T=290.0,
         P=95000.0,
         Pt=96000.0,
         Tt=295.0,
@@ -53,7 +51,6 @@ def test_orifice_element_diagnostics():
     elem = components.OrificeElement("ori", "in", "out", area=0.1)
 
     st_in = components.NetworkMixtureState(
-        T=300.0,
         P=100000.0,
         Pt=100500.0,
         Tt=300.0,
@@ -62,7 +59,6 @@ def test_orifice_element_diagnostics():
     )
 
     st_out = components.NetworkMixtureState(
-        T=290.0,
         P=95000.0,
         Pt=96000.0,
         Tt=290.0,
@@ -87,7 +83,6 @@ def test_area_change_element_diagnostics():
     elem = components.AreaChangeElement("ac", "in", "out", F0=0.1, F1=0.05)
 
     st_in = components.NetworkMixtureState(
-        T=300.0,
         P=100000.0,
         Pt=100500.0,
         Tt=300.0,
@@ -96,7 +91,6 @@ def test_area_change_element_diagnostics():
     )
 
     st_out = components.NetworkMixtureState(
-        T=290.0,
         P=95000.0,
         Pt=96000.0,
         Tt=290.0,
@@ -120,7 +114,6 @@ def test_plenum_diagnostics():
     """Verify PlenumNode diagnostics emit explicit Tt and Pt."""
     node = components.PlenumNode("plenum")
     st = components.NetworkMixtureState(
-        T=300.0,
         P=100000.0,
         Pt=100000.0,
         Tt=300.0,

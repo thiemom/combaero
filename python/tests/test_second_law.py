@@ -281,7 +281,7 @@ def test_the_ledger_closes_on_a_plenum_heated_past_the_old_clamp() -> None:
     g.add_element(OrificeElement("o2", "p", "b", Cd=0.8, diameter=0.01, correlation="fixed"))
     r = _solve(g, auto_retry=False)
     assert r["__success__"]
-    assert r["p.T"] > 1e5
+    assert r["p.Tt"] > 1e5
     assert abs(r["__ledger__"]["energy_closure_rel"]) < 1e-12
 
 

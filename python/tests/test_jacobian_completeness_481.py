@@ -85,7 +85,7 @@ def test_a_node_heated_past_the_old_clamp_relays_its_temperature_sensitivity() -
     r = s.solve(auto_retry=False)
     assert r["__success__"]
     assert r["__T_clamped__"] == [] and r["__heat_faded__"] == []
-    assert r["p.T"] > 1e4
+    assert r["p.Tt"] > 1e4
     assert r["__ledger__"]["energy_closure_rel"] < 1e-12
     assert _jac_err(s, np.array(r["__x_solution__"])) < 1e-6
 
@@ -165,9 +165,9 @@ def test_the_unburned_temperature_is_the_enthalpy_mix(corr: object) -> None:
 
     M = m_pre + m_dil
     Y_mix = [(m_pre * a + m_dil * b) / M for a, b in zip(Y_pre, Y_dil, strict=True)]
-    h_in = (m_pre * h(r["premix.T"], Y_pre) + m_dil * h(800.0, Y_dil)) / M
+    h_in = (m_pre * h(r["premix.Tt"], Y_pre) + m_dil * h(800.0, Y_dil)) / M
     assert h(comb._T_unburned, Y_mix) == pytest.approx(h_in, rel=1e-9, abs=1e-3)
     # The mass-weighted Tt it replaced misses that balance.
-    T_mass = (m_pre * r["premix.T"] + m_dil * 800.0) / M
+    T_mass = (m_pre * r["premix.Tt"] + m_dil * 800.0) / M
     assert abs(T_mass - comb._T_unburned) > 0.3
     assert _jac_err(s, np.array(r["__x_solution__"])) < 2e-5

@@ -72,7 +72,7 @@ def _solve(p_out: float, closure: str) -> tuple[dict, NetworkSolver]:
 
 def _reference(r: dict, closure: str) -> tuple[float, float, float, float]:
     """(omega_crit, P_c*, P_b0, omega_chord) at the solved port states."""
-    pg, tg, pe, te, po = r["mp.Pt"], r["mp.T"], r["ms.Pt"], r["ms.T"], r["mo.Pt"]
+    pg, tg, pe, te, po = r["mp.Pt"], r["mp.Tt"], r["ms.Pt"], r["ms.Tt"], r["mo.Pt"]
     X = [r[f"ms.X[{i}]"] for i in range(len(cb.species.dry_air()))]
     gamma, r_gas = choke_plane_gamma(te, X), float(cb.specific_gas_constant(X))
     geom = EjectorGeometry(A_E / A_T, A_MIX / A_T)
