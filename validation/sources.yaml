@@ -2810,7 +2810,10 @@ documents:
   topic: [orifice, film]
   content: 'Measured Cd of single rows of sharp-edged holes (D 3.5 mm, S/D 2.5; isothermal, room-temperature air)
     with crossflow on BOTH sides, varied independently: coolant (inlet) Mc 0-0.4 and mainstream (exit) M_inf
-    0-0.5, pressure ratio p_c+/p_inf 1-2, Re 1e4-1e5; L/D 2 and 6 (Table 2; every plotted figure is L/D 6), 30,
+    0-0.5, pressure ratio p_c+/p_inf 1-2, Re 1e4-1e5; Table 2 (checked on the rendered page; its L/D column is
+    lost in the text layer): parallel flow L/D 2 at 30/60/90 deg and L/D 6 at 30/90 deg, perpendicular L/D 6
+    at 30/90 deg. Every figure whose legend gives L/D (Figs. 5, 6, 8-15) is L/D 6; Fig. 7 (vs Rohde, zero
+    mainstream crossflow) gives none. 30,
     60, 90 deg, coolant duct parallel (Fig. 3) or perpendicular (Fig. 4) to the mainstream. Cd ideal flow from
     the COOLANT STAGNATION pressure to the mainstream STATIC (p. 245). Uncertainty 6-8% at PR < 1.2, 1.5% above
     1.5 (Table 3). Plotted only (5-12 points per faired curve): Fig. 5 mainstream effect, Fig. 6 coolant effect
@@ -2826,7 +2829,10 @@ documents:
     holes, never the Gc/Gj ~125 stagnant-row regime; there these thick holes fall BELOW the fit (rough read,
     Fig. 6, 90 deg, Mc 0: Cd 0.54 vs 0.70 at PR 1.02, 0.66 vs 0.80 at 1.04, 0.76 vs 0.80 at 1.1) -- recorded,
     not acted on (impingement plates are thin, L/D ~1). Mainstream effect weak (-10 to -15% at low PR, Table 4).
-    For #807: nothing usable (L/D 2-10 "hardly any effect", p. 244; the L/D 2 data are not shown). To use:
+    For #807: nothing usable -- L/D 2 was measured (parallel tests) but not published as data: "for the range of
+    L/D of interest (2-10) it had hardly any effect on Cd" (p. 244), and without crossflow at high Re "Cd
+    becomes constant at a value ranging between 0.8 and 0.74 depending on L/D" (p. 247), unassigned; only
+    Fig. 7 (unlabelled L/D) might hold L/D 2 points. To use:
     digitise Figs. 6, 5, 15 (and 8, 12).'
   read_for: ['#813 duct-fed hole Cd reference pressure and coolant-side crossflow', '#800/#818 cross-source check
       of the exit-side grazing Cd', '#807 L/D effect (none usable)']
@@ -3205,7 +3211,9 @@ wanted:
   - 807
   - 813
   priority: later
-  question: 'The detailed data behind Hay, Lampard & Benmansour 1983 (held): the L/D 2 results the paper does not
-    plot (the L/D interaction with crossflow, #807) and tabulated Cd for the coolant- and mainstream-crossflow
-    maps (#813). Title as recalled, unverified.'
-  where: University of Nottingham library / British Library EThOS.
+  question: 'The detailed data behind Hay, Lampard & Benmansour 1983 (held): the L/D 2 parallel-flow results the
+    paper measured but does not publish (the L/D interaction with crossflow, #807) and tabulated Cd for the
+    coolant- and mainstream-crossflow maps (#813). Not digitised online (user, 2026-10-28). Title as recalled,
+    unverified.'
+  where: University of Nottingham library (thesis request) or the British Library thesis service; no online
+    copy known.
