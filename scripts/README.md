@@ -105,12 +105,12 @@ uv run python scripts/stress/run.py --strict ...                                
 uv run python scripts/stress/summarize.py tmp/stress/after.jsonl --compare tmp/stress/before.jsonl
 ```
 
-- **Families:** `networks.FAMILIES` holds 13:
+- **Families:** `networks.FAMILIES` holds 14:
   - layered random networks of the basic elements;
   - wall-coupled hot/cold channels;
   - junctions (MPCE, constant-K, ideal, legacy tee);
   - ejectors;
-  - impingement arrays;
+  - impingement arrays, with and without a bypass crossflow;
   - effusion plates and liners;
   - pin-fin channels;
   - bleed stations;
