@@ -60,8 +60,9 @@ Key = tuple[int, int, int, float]
 # (a strict xfail below). None since #802: B(5,4,1) at mc/mj 0.99 stalled on a
 # false Fanno choke at its exit segment, a station's static P fed to the
 # kernel as P0 (99.7% of that choke; 81% of the true one). It now solves cold.
-# Its stagnant rows 1-4 (data Gj/Gj_mean 0.00-0.16) still come out with
-# alternating signs, the #799 pattern: constant Cd at dP ~ 0 (#800).
+# Its stagnant rows 1-4 (data Gj/Gj_mean 0.00-0.16) came out with
+# alternating signs under a constant Cd (#799); under the holes' crossflow
+# Cd (#800) they are monotone, as the data are.
 STALLED: dict[Key, str] = {}
 
 
@@ -193,13 +194,20 @@ def test_each_test_solves(key: Key) -> None:
 def test_the_flow_distribution_matches_the_authors_data() -> None:
     """Row-by-row Gj/Gj_mean over all 42 tests (STALLED aside: none).
 
-    Measured 2026-10-27 (#802), worst row per test: z/d >= 2 median 0.021,
-    max 0.111 (B(5,4,2) at mc/mj 1.01, row 10); z/d = 1 up to 0.269
-    (B(5,4,1) at mc/mj 0.99, row 4: its stagnant rows, #799). P/P0 mean
-    absolute error 0.0075. The #802 change moved no row of the 41 tests
-    that solved before it by more than 3e-4 in Gj/Gj_mean or 1e-4 in P/P0;
-    B(5,4,1) 0.99 is the one added (P/P0 error 0.013 on its own). Before
-    #782 (kernels fed T0): median 0.021, max 0.100, same test and row.
+    Measured 2026-10-28 (#800, the holes' crossflow Cd, Rogers & Hersh
+    1976 by default), worst row per test: z/d >= 2 median 0.021, max 0.085;
+    z/d = 1 up to 0.231. P/P0 mean absolute error 0.0073.
+
+    NOT strictly like for like: the authors reduced Table D.1's Gj/Gj_mean
+    with their own Table 4.1 Cd(Gc/Gj) above each plate's break point
+    (CR-3630 Sec. 4; the extraction record), the network uses CR-2681's
+    generic law. The measured quantity is P/P0. ``cd_crossflow=
+    'florschuetz_metzger_su_1982'`` is the authors' law.
+
+    History: #802 (constant Cd) z/d >= 2 max 0.111 (B(5,4,2) mc/mj 1.01,
+    row 10), z/d = 1 up to 0.269 (B(5,4,1) mc/mj 0.99, row 4: the stagnant
+    rows alternating in sign, #799), P/P0 0.0075. Before #782 (kernels fed
+    T0): median 0.021, max 0.100.
     """
     wide, narrow, p_err = [], [], []
     for key in _solved():
@@ -217,10 +225,11 @@ def test_the_flow_distribution_matches_the_authors_data() -> None:
     # From the measurement band, not from the score: CR-3630 Appendix B
     # (Section 4.4.1) puts Gj/Gj_mean at about +/-2%. The worst z/d >= 2 row
     # is B(5,4,2) mc/mj 1.01 row 10, measured Gj/Gj_mean 1.98, where the
-    # network missed by 0.100 with the kernels fed T0 -- the constant-Cd
-    # limitation the authors report (their Table 4.1 has CD falling with
-    # Gc/Gj). A change smaller than that row's band, 0.02 * 1.98 = 0.04,
-    # cannot be told from the data: the guard is 0.100 + 0.04.
+    # network missed by 0.100 with the kernels fed T0 and a constant Cd
+    # (the authors' Table 4.1 has CD falling with Gc/Gj; 0.085 under the
+    # crossflow Cd, #800). A change smaller than that row's band,
+    # 0.02 * 1.98 = 0.04, cannot be told from the data: the guard is
+    # 0.100 + 0.04.
     assert max(wide) < 0.14
     assert max(narrow) < 0.30
     assert statistics.mean(p_err) < 0.010

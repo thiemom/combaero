@@ -84,6 +84,10 @@ class ImpingementArray:
         Entry loss into the gap, on its dynamic head: 0 for a bypass arriving
         along a duct, 0.5 for an abrupt sharp-edged entry from a large
         plenum. Unused when the gap continues an upstream array's.
+    cd_crossflow : {'rogers_hersh_1976', 'florschuetz_metzger_su_1982', 'none'}
+        The holes' Cd under the gap's crossflow (#800), as
+        ``ImpingementPlateElement``: Rogers & Hersh (1976) by default,
+        CR-3630 Table 4.1 for the plates it covers, or the constant Cd.
     """
 
     id: str
@@ -101,6 +105,9 @@ class ImpingementArray:
     roughness: float = 0.0
     bypass_length: float | None = None
     bypass_entry_K: float = 0.0
+    cd_crossflow: Literal["rogers_hersh_1976", "florschuetz_metzger_su_1982", "none"] = (
+        "rogers_hersh_1976"
+    )
     _bypass: str | None = field(default=None, init=False, repr=False)
     _rows: list[tuple[str, str, str]] = field(default_factory=list, init=False, repr=False)
 
@@ -168,6 +175,7 @@ class ImpingementArray:
                     Cd=self.Cd,
                     row=i,
                     Nu_multiplier=self.Nu_multiplier,
+                    cd_crossflow=self.cd_crossflow,
                 )
             )
             net.add_element(

@@ -72,9 +72,10 @@ def _boundary(name: str, Pt: float) -> PressureBoundary:
 
 @cache
 def _chain(
-    xn_d: float, yn_d: float, z_d: float, momentum: bool = True
+    xn_d: float, yn_d: float, z_d: float, momentum: bool = True, cd_crossflow: str | None = None
 ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
-    """Solve an N-row inline array; return per-row (m_dot, Gc/Gj, Re_j)."""
+    """Solve an N-row inline array; return per-row (m_dot, Gc/Gj, Re_j).
+    ``cd_crossflow`` None keeps the plate's default law."""
     span = 12 * yn_d * D
     height = z_d * D
     g = FlowNetwork()
@@ -95,6 +96,7 @@ def _chain(
                 span=span,
                 plate_thickness=D,
                 row=i,
+                **({} if cd_crossflow is None else {"cd_crossflow": cd_crossflow}),
             )
         )
         to = f"c{i + 1}" if i < N_ROWS else "exit"
@@ -177,8 +179,10 @@ def test_the_network_reproduces_florschuetz_flow_model() -> None:
 def test_without_the_momentum_term_the_supply_stays_uniform() -> None:
     """Why ImpingementCrossflowElement exists: plain channels carry friction
     only, every row sees the same pressure drop, and on the strongest
-    crossflow geometry (5, 4, 1) row 10's Gc/Gj comes out at twice Eq. 8."""
-    m, gc, _ = _chain(5.0, 4.0, 1.0, momentum=False)
+    crossflow geometry (5, 4, 1) row 10's Gc/Gj comes out at twice Eq. 8.
+    The hole Cd is held constant (``cd_crossflow='none'``) to isolate the
+    momentum term: at twice Eq. 8 the crossflow Cd (#800) would act too."""
+    m, gc, _ = _chain(5.0, 4.0, 1.0, momentum=False, cd_crossflow="none")
     assert max(m) / min(m) < 1.05
     assert gc[-1] / cb.crossflow_to_jet_ratio_at_row(4.0, 1.0, CD, N_ROWS) > 2.0
 

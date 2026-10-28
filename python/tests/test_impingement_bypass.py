@@ -112,11 +112,13 @@ def test_row_one_sees_the_bypass_as_its_crossflow() -> None:
 def test_starved_rows_are_reported_unresolved() -> None:
     """A row whose plate drop is below 1% of the gap's dynamic head is below
     the crossflow chain's resolution (#729). Closed, no row is; a bypass that
-    starves the upstream rows marks them, and only them."""
+    starves the upstream rows marks them, and only them. With the holes' Cd
+    held constant (``cd_crossflow='none'``): under the crossflow Cd (#800)
+    the same starved rows need a drop well above that (next test)."""
     res_c, arr_c = _closed()
     s = arr_c.summarize(res_c["__element_diag__"])
     assert s["n_rows_unresolved"] == 0.0
-    net, arr = _with_bypass(0.05)
+    net, arr = _with_bypass(0.05, cd_crossflow="none")
     d = _solve(net)["__element_diag__"]
     s = arr.summarize(d)
     flagged = [i for i, f in enumerate(s["rows_unresolved"], 1) if f]
@@ -124,6 +126,20 @@ def test_starved_rows_are_reported_unresolved() -> None:
     assert flagged == [1, 2, 3, 4, 5]
     m = s["rows_m_dot"]
     assert max(abs(m[i - 1]) for i in flagged) < 0.1 * max(m)
+
+
+def test_under_the_crossflow_cd_the_starved_rows_are_resolved() -> None:
+    """The crossflow Cd (#800, default) makes a starved row's flow go as
+    dP^1.07: the small flow now takes a drop above the chain's resolution, so
+    no row is flagged, and the rows' flows rise monotonically from the
+    upstream end (none reversed)."""
+    net, arr = _with_bypass(0.05)
+    d = _solve(net)["__element_diag__"]
+    s = arr.summarize(d)
+    assert s["n_rows_unresolved"] == 0.0
+    m = s["rows_m_dot"]
+    assert all(b > a for a, b in zip(m, m[1:], strict=False))
+    assert m[0] > 0.0
 
 
 def test_the_feed_node_does_not_matter() -> None:

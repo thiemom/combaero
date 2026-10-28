@@ -3512,6 +3512,14 @@ class NetworkSolver:
         )
         if sol.get("__success__", False) or not auto_retry or x0 is not None:
             return self._with_caught(sol)
+        if not getattr(self, "_in_constant_cd_stage", False):
+            plates = self._crossflow_cd_plates()
+            if plates:
+                staged = self._solve_constant_cd_staged(
+                    plates, sol, method, timeout, options, use_jac, _t0
+                )
+                if staged is not None:
+                    return self._with_caught(staged)
         # Zero-flow fallback: a network whose only solution is zero flow -- equal
         # boundary pressures, nothing imposing a flow -- stalls because dP/dm -> 0
         # at m=0, so the default non-zero flow seed cannot descend to it. Seeding
@@ -3572,6 +3580,71 @@ class NetworkSolver:
         if not self.network.thermal_coupling_enabled:
             return []
         return [el for el in self.network.elements.values() if getattr(el, "_rayleigh_ends", None)]
+
+    def _crossflow_cd_plates(self) -> list[Any]:
+        """Jet plates whose hole Cd follows the crossflow (#800)."""
+        from .components import ImpingementPlateElement
+
+        return [
+            el
+            for el in self.network.elements.values()
+            if isinstance(el, ImpingementPlateElement) and el.cd_crossflow != "none"
+        ]
+
+    def _solve_constant_cd_staged(
+        self,
+        plates: list[Any],
+        failed: dict[str, Any],
+        method: str,
+        timeout: float | None,
+        options: dict[str, Any] | None,
+        use_jac: bool,
+        t0: float,
+    ) -> dict[str, Any] | None:
+        """Retry of a failed cold solve with crossflow-Cd jet plates (#800):
+        first with every plate at its own constant Cd (the full retry chain),
+        then the exact problem from that root. None if either stage fails.
+
+        A retry, not a stage of every solve: a network that converges cold
+        keeps its path. CR-3630 D.2 B(5,4,1) at mc/mj 1.01 with a 20 K
+        heated bypass stalled cold at |F| 1.8e-2 (Jacobian exact there to
+        3e-7); from the constant-Cd root, whose flows differ only at the
+        crossflow-dominated rows, it converged in 1.1 s.
+        """
+
+        def left() -> float | None:
+            return None if timeout is None else max(timeout - (time.time() - t0), 1.0)
+
+        if timeout is not None and timeout - (time.time() - t0) <= 1.0:
+            return None
+        self._in_constant_cd_stage = True
+        was = [el._cd_crossflow_suspended for el in plates]
+        try:
+            for el in plates:
+                el._cd_crossflow_suspended = True
+            seed = self.solve(method=method, timeout=left(), options=options, use_jac=use_jac)
+        finally:
+            for el, flag in zip(plates, was, strict=True):
+                el._cd_crossflow_suspended = flag
+            self._in_constant_cd_stage = False
+        if not seed.get("__success__", False) or seed.get("__x_solution__") is None:
+            return None
+        sol = self.solve(
+            method=method,
+            timeout=left(),
+            options=options,
+            use_jac=use_jac,
+            x0=np.asarray(seed["__x_solution__"]),
+        )
+        if not sol.get("__success__", False):
+            return None
+        primary_msg = str(failed.get("__message__", "")).strip()
+        sol["__message__"] = (
+            f"{str(sol.get('__message__', '')).strip()} [from the constant-Cd solution: "
+            "jet plates solved with their own Cd, then with the crossflow Cd; the "
+            f"primary attempt failed with: {primary_msg}]"
+        )
+        return sol
 
     def _solve_rayleigh_staged(self, heated: list[Any], kw: dict[str, Any]) -> dict[str, Any]:
         """Cold solve of a network with Fanno-Rayleigh channels, in two stages

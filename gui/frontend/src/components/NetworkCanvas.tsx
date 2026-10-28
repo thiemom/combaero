@@ -167,6 +167,7 @@ const NetworkCanvas = () => {
 					pattern: "inline",
 					correlation: "fixed",
 					Cd: 0.79,
+					cd_crossflow: "rogers_hersh_1976",
 					Nu_multiplier: 1.0,
 				} as any;
 			} else if (type === "discrete_loss") {

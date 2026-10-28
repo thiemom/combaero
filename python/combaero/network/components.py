@@ -3361,6 +3361,9 @@ _TAPS = {
 # permanent-loss ratio k(beta, C) moves the tap pressure too (#645).
 _DM_DCD = "__dm_dCd__"
 
+#: ImpingementPlateElement's crossflow Cd laws (#800).
+_CD_CROSSFLOW_LAWS = ("rogers_hersh_1976", "florschuetz_metzger_su_1982", "none")
+
 
 class OrificeElement(NetworkElement):
     """
@@ -5809,14 +5812,41 @@ class ImpingementPlateElement(OrificeElement):
     staggered array is outside it too (the summary says so). The heat
     leaves the wall into ``to_node``: the spent air carries it downstream.
 
-    DISCHARGE COEFFICIENT. Default ``'fixed'`` at Florschuetz's own 0.79
-    (measured 0.73-0.85 across their plates). The hole Cd does not depend on
-    the crossflow: McGreehan-Schotsch's ``U1/Vi`` is the SUPPLY-side
-    approach velocity, zero for a plenum, never Gc/Gj. Selectable
+    DISCHARGE COEFFICIENT. The hole's own Cd: default ``'fixed'`` at
+    Florschuetz's 0.79 (measured 0.73-0.85 across their plates). Selectable
     alternatives, never chosen automatically: ``'IdelchikThick'``,
-    ``'Lichtarowicz'`` (long hole, l/d 2-10) and ``'McGreehanSchotsch'``.
-    ``Cd_in_range`` in the diagnostics says whether the plate is inside the
-    chosen correlation's source range.
+    ``'Lichtarowicz'`` (long hole, l/d 2-10) and ``'McGreehanSchotsch'``
+    (whose ``U1/Vi`` is the SUPPLY-side approach velocity, zero for a
+    plenum). ``Cd_in_range`` in the diagnostics says whether the plate is
+    inside the chosen correlation's source range.
+
+    CROSSFLOW ON THE HOLE (#800). The crossflow passing the jets' exits bends
+    them over and lowers the Cd, steeply at large Gc/Gj: Rogers & Hersh
+    (1976, NASA CR-2681) measured Cd ~ 0.08 at Vi/V_inf 0.008 (a hole
+    discharging into a grazing stream 125 times faster), and Florschuetz,
+    Metzger & Su (1982, NASA CR-3630 Table 4.1) on these very plates.
+    ``cd_crossflow`` selects the law, in q = G_ideal / G_c (C++
+    ``rogers_hersh_1976_cd`` / ``florschuetz_metzger_su_1982_cd``):
+
+    * ``'rogers_hersh_1976'`` (DEFAULT): CR-2681's single-hole fits,
+      0.97 (Gj/Gc)^0.534 injecting, 0.80 (Gj/Gc)^0.47 for a reversed jet,
+      capped at the hole's own Cd. Generic (any hole); below Gc/Gj ~1.5 at
+      Cd 0.79 the cap holds, so Florschuetz's arrays (Gc/Gj <= 0.77) are
+      unchanged. Cross-source for any impingement plate: ACCURACY.
+    * ``'florschuetz_metzger_su_1982'``: CR-3630 Table 4.1, the authors'
+      own law for the plates they tested (B(5,4,z), B(5,8,1); B(10,x,1)
+      inferred by them). Its own Cd replaces the hole's. Refused for any
+      other plate. The law the authors reduced Table D.1 with, so the one
+      to score D.1 like for like.
+    * ``'none'``: the hole's own Cd at any crossflow (the constant-Cd
+      model of Florschuetz's Eq. 8 and CR-3630's Eq. 4.10).
+
+    Resolved explicitly in the ideal jet velocity, the law makes the row's
+    flow go as dP^1.07 under a strong crossflow (a linear resistance) instead
+    of sqrt(dP): the stagnant rows of CR-3630 B(5,4,1) no longer alternate
+    in sign (#799). G_ideal = sqrt(2 rho dP) from the supply's (jet's) static
+    density and the supply-to-channel drop; G_c the approaching crossflow
+    over the channel section ``n_holes yn z d^2``.
 
     NOT MODELLED. The temperature sensitivity of the correlation's
     properties (``dh_dT`` is 0, the same documented gap the channel
@@ -5868,7 +5898,24 @@ class ImpingementPlateElement(OrificeElement):
         row: int | None = None,
         Nu_multiplier: float = 1.0,
         edge_radius: float = 0.0,
+        cd_crossflow: Literal[
+            "rogers_hersh_1976", "florschuetz_metzger_su_1982", "none"
+        ] = "rogers_hersh_1976",
     ) -> None:
+        if cd_crossflow not in _CD_CROSSFLOW_LAWS:
+            raise ValueError(
+                f"ImpingementPlateElement: cd_crossflow {cd_crossflow!r} is not one of "
+                f"{sorted(_CD_CROSSFLOW_LAWS)}"
+            )
+        if cd_crossflow == "florschuetz_metzger_su_1982" and not (
+            cb.florschuetz_metzger_su_1982_has_plate(xn_d, yn_d, z_d)
+        ):
+            raise ValueError(
+                "ImpingementPlateElement: cd_crossflow 'florschuetz_metzger_su_1982' is "
+                f"CR-3630 Table 4.1, which covers the plates the authors tested only: "
+                f"B(5,4,1-3), B(5,8,1), B(10,4,1), B(10,8,1); not B({xn_d:g},{yn_d:g},"
+                f"{z_d:g}). Use 'rogers_hersh_1976' (generic) or 'none'."
+            )
         for name, val in (
             ("d_jet", d_jet),
             ("xn_d", xn_d),
@@ -5899,7 +5946,14 @@ class ImpingementPlateElement(OrificeElement):
         self.pattern = pattern
         self.row = row
         self.Nu_multiplier = float(Nu_multiplier)
+        self.cd_crossflow = cd_crossflow
+        # Set by the solver's constant-Cd stage only (NetworkSolver
+        # ._solve_constant_cd_staged): the law off, the hole's own Cd.
+        self._cd_crossflow_suspended = False
         self.n_holes = n_holes
+        # The crossflow channel's section, as Florschuetz's Gc/Gj reads it:
+        # (pi/4) / ((yn/d)(z/d)) is the jet row's area over it.
+        self.channel_area = n_holes * yn_d * z_d * d_jet * d_jet
         self.hole_count_exact = n_exact
         if correlation_set is None:
             correlation_set = (
@@ -5949,6 +6003,7 @@ class ImpingementPlateElement(OrificeElement):
         self._crossflow_sources = [
             e.id for e in graph.get_upstream_elements(self.to_node) if e.id != self.id
         ]
+        self._source_elements = {eid: graph.elements[eid] for eid in self._crossflow_sources}
         self._topology_error = self._configuration_error(graph)
         seg = self._find_bypass(graph)
         self._bypass_segment = seg.id if seg is not None else None
@@ -6062,9 +6117,92 @@ class ImpingementPlateElement(OrificeElement):
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None = None,
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
-        """The orifice flow. ``flows`` is accepted and unused: the hole Cd
-        does not depend on the crossflow (see the class docstring)."""
-        return super().residuals(state_in, state_out)
+        """The orifice flow; ``flows`` carries the approaching crossflow the
+        hole's Cd reads (``cd_crossflow``, see the class docstring)."""
+        return super().residuals(state_in, state_out, flows)
+
+    def _crossflow_cd(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None,
+        base_cd: float,
+    ) -> tuple[float, dict[str, float] | None]:
+        """(Cd, dCd/d(name)) under the crossflow law; None for the partials
+        where the law holds the hole's own Cd (the base partials then apply).
+
+        G_ideal = sqrt(2 rho dP) along the flow: supply -> channel injecting,
+        channel -> supply for a reversed jet (CR-2681's suction branch), rho
+        the upstream static density. G_c = |m_c| / channel_area, m_c every
+        crossflow source's flow into ``to_node``.
+        """
+        if self.cd_crossflow == "none" or self._cd_crossflow_suspended:
+            return base_cd, None
+        forward = state_in.Pt >= state_out.P
+        up, down = (state_in, state_out) if forward else (state_out, state_in)
+        up_id, down_id = (
+            (self.from_node, self.to_node) if forward else (self.to_node, self.from_node)
+        )
+        dP = float(up.Pt) - float(down.P)
+        rho, drho_dT, drho_dP = _solver_tools.density_and_jacobians(
+            float(up.T), float(up.P), list(up.X)
+        )
+        G_i = math.sqrt(2.0 * rho * dP) if dP > 0.0 else 0.0
+        flows = flows or {}
+        m_c = float(sum(flows.get(eid, 0.0) for eid in self._crossflow_sources))
+        G_c = abs(m_c) / self.channel_area
+        if self.cd_crossflow == "rogers_hersh_1976":
+            r = cb.rogers_hersh_1976_cd(base_cd, G_i, G_c, not forward)
+        else:
+            r = cb.florschuetz_metzger_su_1982_cd(self.xn_d, self.yn_d, self.z_d, G_i, G_c)
+        if r.capped and self.cd_crossflow == "rogers_hersh_1976":
+            return base_cd, None
+        out: dict[str, float] = {}
+        if r.capped or not G_i > 0.0:
+            # The table's constant, or no drive: Cd ~ G_i^1.15 has no slope
+            # at G_i = 0 that the flow (~ Cd sqrt(dP)) would feel.
+            return float(r.Cd), out
+
+        def add(name: str, v: float) -> None:
+            if v != 0.0:
+                out[name] = out.get(name, 0.0) + v
+
+        dGi_ddP = rho / G_i
+        dGi_drho = dP / G_i
+        dcd_dGi = float(r.dCd_dG_ideal)
+        add(f"{up_id}.Pt", dcd_dGi * dGi_ddP)
+        add(f"{down_id}.P", -dcd_dGi * dGi_ddP)
+        add(f"{up_id}.T", dcd_dGi * dGi_drho * float(drho_dT))
+        add(f"{up_id}.P", dcd_dGi * dGi_drho * float(drho_dP))
+        if m_c != 0.0:
+            dcd_dmc = float(r.dCd_dG_c) * (1.0 if m_c > 0.0 else -1.0) / self.channel_area
+            for eid in self._crossflow_sources:
+                el = self._source_elements[eid]
+                names = el.unknowns()
+                for local, coeff in el.flow_jac_at_node(
+                    self.to_node, list(range(len(names)))
+                ).items():
+                    add(names[local], dcd_dmc * coeff)
+        return float(r.Cd), out
+
+    def _effective_Cd(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> float:
+        base = super()._effective_Cd(state_in, state_out, flows)
+        return self._crossflow_cd(state_in, state_out, flows, base)[0]
+
+    def _dCd_dnames(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float]:
+        base = super()._effective_Cd(state_in, state_out, flows)
+        _, d = self._crossflow_cd(state_in, state_out, flows, base)
+        return super()._dCd_dnames(state_in, state_out, flows) if d is None else d
 
     def htc_and_T(
         self,
@@ -6136,12 +6274,14 @@ class ImpingementPlateElement(OrificeElement):
         flows: dict[str, float] | None = None,
         temperatures: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        base = super().diagnostics(state_in, state_out)
+        base = super().diagnostics(state_in, state_out, flows)
         if not base:
             return base
         r = self.htc_and_T(state_in, flows=flows, temperatures=temperatures)
+        own_cd = super()._effective_Cd(state_in, state_out, flows)
         out = {
             "n_holes": float(self.n_holes),
+            "Cd_own": float(own_cd),
             "Re_j": float(r.Re),
             "Nu": float(r.Nu),
             "htc": float(r.h),
@@ -6153,10 +6293,10 @@ class ImpingementPlateElement(OrificeElement):
             "eta_r_extrapolated": float(r.eta_r_extrapolated),
         }
         if self.row is not None:
-            # Florschuetz's uniform-supply Eq. 8 at this row, for comparison.
-            cd = self._effective_Cd(state_in, state_out)
+            # Florschuetz's uniform-supply Eq. 8 at this row, for comparison:
+            # their constant-Cd model, at the hole's own Cd.
             out["Gc_Gj_closed_form"] = float(
-                cb.crossflow_to_jet_ratio_at_row(self.yn_d, self.z_d, cd, self.row)
+                cb.crossflow_to_jet_ratio_at_row(self.yn_d, self.z_d, own_cd, self.row)
             )
         return {**base, **out}
 

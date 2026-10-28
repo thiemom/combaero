@@ -1344,6 +1344,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 pattern=data.pattern,
                 correlation=data.correlation,
                 Cd=data.Cd,
+                cd_crossflow=data.cd_crossflow,
                 Nu_multiplier=data.Nu_multiplier * (schema.solver_settings.Nu_multiplier or 1.0),
                 roughness=data.roughness,
                 bypass_length=data.bypass_length,

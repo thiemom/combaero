@@ -2567,6 +2567,26 @@ are crossflow.
   alternatives `'IdelchikThick'`, `'Lichtarowicz'` (long hole, l/d 2-10)
   and `'McGreehanSchotsch'` (supply-side `U1/Vi = 0`, never Gc/Gj).
   `Cd_in_range` reports whether the plate is inside the chosen source's range.
+- **Crossflow on the holes (#800), `cd_crossflow`** (also on `ImpingementArray`
+  and in the GUI). The gap's crossflow bends the jets over and lowers their Cd,
+  steeply at large Gc/Gj. In q = G_ideal / G_c (ideal hole over crossflow mass
+  velocity, G_ideal = sqrt(2 rho dP)):
+  - `'rogers_hersh_1976'` (default): Rogers & Hersh (1976, NASA CR-2681) Fig. 11,
+    0.97 (Gj/Gc)^0.534 injecting, 0.80 (Gj/Gc)^0.47 for a reversed jet,
+    resolved explicitly in q and capped (C1 over +/-10%) at the hole's own
+    Cd. Below Gc/Gj ~1.5 at Cd 0.79 the hole's own Cd holds: Florschuetz's
+    arrays (Gc/Gj <= 0.77) are bit-identical. Cross-source for any plate.
+  - `'florschuetz_metzger_su_1982'`: CR-3630 Table 4.1 / Eq. 4.2, the
+    authors' own law for B(5,4,1-3), B(5,8,1) and (inferred) B(10,x,1);
+    refused for other plates. The law behind Table D.1's Gj, so the one to
+    score D.1 like for like. Its own Cd replaces the hole's.
+  - `'none'`: the hole's own Cd at any crossflow (Eq. 8 / Eq. 4.10's model).
+
+  Resolved in q, the row flow goes as dP^1.07 under a strong crossflow (a
+  linear resistance) instead of sqrt(dP), which removed the alternating-sign
+  stagnant rows of CR-3630 B(5,4,1) (#799). Diagnostics add `Cd` (the one
+  used) beside `Cd_own`. A cold solve that fails is retried once from the
+  constant-Cd root (`NetworkSolver`, "[from the constant-Cd solution]").
 - Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `htc`, `T_aw`, `eta_r`,
   `bypass_fraction`, `eta_r_extrapolated`, `surface_extrapolated`, and
   `Gc_Gj_closed_form` (Eq. 8) when `row` is given.
