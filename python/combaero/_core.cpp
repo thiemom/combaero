@@ -860,27 +860,27 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("P", &combaero::DuctStaticState::P)
       .def_readonly("rho", &combaero::DuctStaticState::rho)
       .def_readonly("M", &combaero::DuctStaticState::M)
-      .def_readonly("dT_dT0", &combaero::DuctStaticState::dT_dT0)
-      .def_readonly("dT_dP0", &combaero::DuctStaticState::dT_dP0)
+      .def_readonly("dT_dTt", &combaero::DuctStaticState::dT_dTt)
+      .def_readonly("dT_dPt", &combaero::DuctStaticState::dT_dPt)
       .def_readonly("dT_dG", &combaero::DuctStaticState::dT_dG)
-      .def_readonly("dP_dT0", &combaero::DuctStaticState::dP_dT0)
-      .def_readonly("dP_dP0", &combaero::DuctStaticState::dP_dP0)
+      .def_readonly("dP_dTt", &combaero::DuctStaticState::dP_dTt)
+      .def_readonly("dP_dPt", &combaero::DuctStaticState::dP_dPt)
       .def_readonly("dP_dG", &combaero::DuctStaticState::dP_dG)
-      .def_readonly("drho_dT0", &combaero::DuctStaticState::drho_dT0)
-      .def_readonly("drho_dP0", &combaero::DuctStaticState::drho_dP0)
+      .def_readonly("drho_dTt", &combaero::DuctStaticState::drho_dTt)
+      .def_readonly("drho_dPt", &combaero::DuctStaticState::drho_dPt)
       .def_readonly("drho_dG", &combaero::DuctStaticState::drho_dG)
       .def_readonly("choked", &combaero::DuctStaticState::choked)
       .def_readonly("G_eff", &combaero::DuctStaticState::G_eff)
-      .def_readonly("dGeff_dT0", &combaero::DuctStaticState::dGeff_dT0)
-      .def_readonly("dGeff_dP0", &combaero::DuctStaticState::dGeff_dP0)
+      .def_readonly("dGeff_dTt", &combaero::DuctStaticState::dGeff_dTt)
+      .def_readonly("dGeff_dPt", &combaero::DuctStaticState::dGeff_dPt)
       .def_readonly("dGeff_dG", &combaero::DuctStaticState::dGeff_dG);
-  m.def("duct_static_state", &combaero::duct_static_state, py::arg("T0"), py::arg("P0"),
+  m.def("duct_static_state", &combaero::duct_static_state, py::arg("Tt"), py::arg("Pt"),
         py::arg("G"), py::arg("X"),
-        "Static state at a duct inlet fed from stagnation (T0, P0) at mass flux\n"
+        "Static state at a duct inlet fed from stagnation (Tt, Pt) at mass flux\n"
         "G = |m_dot| / A: the isentropic subsonic root, or the sonic state when G\n"
-        "exceeds the choked flux (choked = True). Partials in T0, P0, G (#636).");
+        "exceeds the choked flux (choked = True). Partials in Tt, Pt, G (#636).");
   m.attr("DUCT_HTC_SONIC_MARGIN") = combaero::kDuctHtcSonicMargin;
-  m.def("duct_htc_static_state", &combaero::duct_htc_static_state, py::arg("T0"), py::arg("P0"),
+  m.def("duct_htc_static_state", &combaero::duct_htc_static_state, py::arg("Tt"), py::arg("Pt"),
         py::arg("G"), py::arg("X"),
         "The duct state a heat-transfer correlation reads: duct_static_state at a\n"
         "flux bent C1 below the sonic one (G itself below (1 - 2w) G*, capped at\n"
@@ -891,12 +891,12 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dP_dY", &combaero::DuctStaticStateDY::dP_dY)
       .def_readonly("drho_dY", &combaero::DuctStaticStateDY::drho_dY)
       .def_readonly("dGeff_dY", &combaero::DuctStaticStateDY::dGeff_dY);
-  m.def("duct_htc_static_state_dY", &combaero::duct_htc_static_state_dY, py::arg("T0"),
-        py::arg("P0"), py::arg("G"), py::arg("X"), py::arg("state"),
-        "duct_htc_static_state's gradients in the MASS fractions at fixed T0, P0\n"
+  m.def("duct_htc_static_state_dY", &combaero::duct_htc_static_state_dY, py::arg("Tt"),
+        py::arg("Pt"), py::arg("G"), py::arg("X"), py::arg("state"),
+        "duct_htc_static_state's gradients in the MASS fractions at fixed Tt, Pt\n"
         "and G (#717): dT_dY, dP_dY, drho_dY and the bent flux's dGeff_dY, one\n"
         "entry per species. Implicit-function derivatives of the isentropic\n"
-        "energy and entropy balances. `state` is duct_htc_static_state(T0, P0,\n"
+        "energy and entropy balances. `state` is duct_htc_static_state(Tt, Pt,\n"
         "G, X), already solved: below the bend nothing is solved again.");
 
   py::class_<combaero::JetImpulse>(m, "JetImpulse")
@@ -1180,26 +1180,26 @@ PYBIND11_MODULE(_core, m) {
   py::class_<solver::Stream>(m, "MassStream", "Mass stream descriptor")
       .def(py::init<double, double, double, std::vector<double>>())
       .def_readwrite("m_dot", &solver::Stream::m_dot)
-      .def_readwrite("T", &solver::Stream::T)
-      .def_readwrite("P_total", &solver::Stream::P_total)
+      .def_readwrite("Tt", &solver::Stream::Tt)
+      .def_readwrite("Pt", &solver::Stream::Pt)
       .def_readwrite("Y", &solver::Stream::Y);
 
   py::class_<solver::StreamJacobian>(m, "StreamJacobian",
                                      "Derivatives w.r.t a stream")
       .def_readonly("d_mdot", &solver::StreamJacobian::d_mdot)
-      .def_readonly("d_T", &solver::StreamJacobian::d_T)
-      .def_readonly("d_P_total", &solver::StreamJacobian::d_P_total)
+      .def_readonly("d_Tt", &solver::StreamJacobian::d_Tt)
+      .def_readonly("d_Pt", &solver::StreamJacobian::d_Pt)
       .def_readonly("d_Y", &solver::StreamJacobian::d_Y);
 
   py::class_<MixtureState>(m, "MixtureState",
                            "High-level state for network components")
-      .def(py::init([](double P, double P_total, double T, double T_total,
+      .def(py::init([](double P, double Pt, double T, double Tt,
                        double m_dot, const std::vector<double> &Y) {
              MixtureState s;
              s.P = P;
-             s.P_total = P_total;
+             s.Pt = Pt;
              s.T = T;
-             s.T_total = T_total;
+             s.Tt = Tt;
              s.m_dot = m_dot;
              if (!Y.empty()) {
                s.Y = Y;
@@ -1223,13 +1223,13 @@ PYBIND11_MODULE(_core, m) {
              }
              return s;
            }),
-           py::arg("P") = 101325.0, py::arg("P_total") = 101325.0,
-           py::arg("T") = 298.15, py::arg("T_total") = 298.15,
+           py::arg("P") = 101325.0, py::arg("Pt") = 101325.0,
+           py::arg("T") = 298.15, py::arg("Tt") = 298.15,
            py::arg("m_dot") = 0.0, py::arg("Y") = std::vector<double>{})
       .def_readwrite("P", &MixtureState::P)
-      .def_readwrite("P_total", &MixtureState::P_total)
+      .def_readwrite("Pt", &MixtureState::Pt)
       .def_readwrite("T", &MixtureState::T)
-      .def_readwrite("T_total", &MixtureState::T_total)
+      .def_readwrite("Tt", &MixtureState::Tt)
       .def_readwrite("m_dot", &MixtureState::m_dot)
       .def_property(
           "X", [](const MixtureState &s) { return s.X; },
@@ -1295,13 +1295,13 @@ EntropyGenerationResult(sigma [W/K], sigma_norm [-]); sigma_norm =
 sigma / (R m_in), which for an adiabatic two-port of fixed composition is
 -ln(P_total_out / P_total_in).)doc");
   m.def("heat_entropy_flux", &solver::heat_entropy_flux, py::arg("m_dot"),
-        py::arg("T0_in"), py::arg("T0_out"), py::arg("Y"), py::arg("M_in") = 0.0,
+        py::arg("Tt_in"), py::arg("Tt_out"), py::arg("Y"), py::arg("M_in") = 0.0,
         py::arg("M_out") = 0.0,
         R"doc(Entropy [W/K] heat added to a stream brings in (#545).
 
-Integral of dQ / T as the stream's total temperature runs from T0_in to
-T0_out [K], dQ = m_dot dh(T0), at the static temperature T(T0, M); the Mach
-number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
+Integral of dQ / T as the stream's total temperature runs from Tt_in to
+Tt_out [K], dQ = m_dot dh(Tt), at the static temperature T(Tt, M); the Mach
+number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("mixer_from_streams_and_jacobians",
         &solver::mixer_from_streams_and_jacobians, py::arg("streams"),
@@ -1344,7 +1344,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("d_mdot_dP_static_up",
                     &solver::OrificeResult::d_mdot_dP_static_up)
       .def_readonly("d_mdot_dP_rho_ref", &solver::OrificeResult::d_mdot_dP_rho_ref)
-      .def_readonly("d_mdot_dT_up", &solver::OrificeResult::d_mdot_dT_up)
+      .def_readonly("d_mdot_dTt_up", &solver::OrificeResult::d_mdot_dTt_up)
       .def_readonly("d_mdot_dY_up", &solver::OrificeResult::d_mdot_dY_up);
 
   py::class_<solver::ChannelResult>(
@@ -1355,7 +1355,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("d_dP_d_mdot", &solver::ChannelResult::d_dP_d_mdot)
       .def_readonly("d_dP_dP_static_up",
                     &solver::ChannelResult::d_dP_dP_static_up)
-      .def_readonly("d_dP_dT_up", &solver::ChannelResult::d_dP_dT_up)
+      .def_readonly("d_dP_dTt_up", &solver::ChannelResult::d_dP_dTt_up)
       .def_readonly("d_dP_dY_up", &solver::ChannelResult::d_dP_dY_up);
 
   py::class_<solver::MomentumChamberResult>(
@@ -1384,7 +1384,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),
-        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("Tt_up"),
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"),
         py::arg("area"), py::arg("beta") = 0.0, py::arg("P_rho_ref") = -1.0,
         "Incompressible orifice with all derivatives. With E applied\n"
@@ -1394,22 +1394,22 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("channel_residuals_and_jacobian",
         &solver::channel_residuals_and_jacobian, py::arg("m_dot"),
-        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("Tt_up"),
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("L"), py::arg("D"),
         py::arg("roughness"), py::arg("friction_model"),
         py::arg("f_multiplier") = 1.0, py::arg("exit_head_lost") = false);
 
   // Compressible flow elements
   m.def("orifice_compressible_mdot_and_jacobian",
-        &solver::orifice_compressible_mdot_and_jacobian, py::arg("T0"),
-        py::arg("P0"), py::arg("P_back"), py::arg("X"), py::arg("Cd"),
+        &solver::orifice_compressible_mdot_and_jacobian, py::arg("Tt"),
+        py::arg("Pt"), py::arg("P_back"), py::arg("X"), py::arg("Cd"),
         py::arg("area"), py::arg("beta") = 0.0,
         "Compressible orifice flow with smooth choked flow Jacobians.\n\n"
         "Returns: (mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0)");
 
   m.def("orifice_compressible_residuals_and_jacobian",
         &solver::orifice_compressible_residuals_and_jacobian, py::arg("m_dot"),
-        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("T_up"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("Tt_up"),
         py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"), py::arg("area"),
         py::arg("beta") = 0.0,
         "Compressible orifice for network solver with all derivatives. With E\n"
@@ -1420,12 +1420,12 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       m, "SonicStatic", "Sonic static state of a chamber's mass flux (#637)")
       .def_readonly("P", &solver::SonicStatic::P)
       .def_readonly("T", &solver::SonicStatic::T)
-      .def_readonly("dP_dT0", &solver::SonicStatic::dP_dT0)
+      .def_readonly("dP_dTt", &solver::SonicStatic::dP_dTt)
       .def_readonly("dP_dG", &solver::SonicStatic::dP_dG)
       .def_readonly("dP_dY", &solver::SonicStatic::dP_dY);
-  m.def("sonic_static_pressure", &solver::sonic_static_pressure, py::arg("T0"), py::arg("G"),
+  m.def("sonic_static_pressure", &solver::sonic_static_pressure, py::arg("Tt"), py::arg("G"),
         py::arg("Y"),
-        "Static pressure P* at which mass flux G is sonic for stagnation T0\n"
+        "Static pressure P* at which mass flux G is sonic for stagnation Tt\n"
         "(variable cp): the floor of a chamber discharging into a reservoir\n"
         "(#637). P* = G sqrt(R T* / gamma*).");
   py::class_<solver::ApproachStatic>(
@@ -1437,7 +1437,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("dP_dY", &solver::ApproachStatic::dP_dY)
       .def_readonly("choked", &solver::ApproachStatic::choked);
   m.def("approach_static_pressure", &solver::approach_static_pressure,
-        py::arg("P_total"), py::arg("T_total"), py::arg("G"), py::arg("Y"),
+        py::arg("Pt"), py::arg("Tt"), py::arg("G"), py::arg("Y"),
         py::arg("incompressible"),
         "Static pressure of the flow at mass flux G from stagnation (Pt, Tt):\n"
         "duct_static_state compressible, Pt = P + G^2 R Tt / (2 P)\n"
@@ -4487,8 +4487,8 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("outlet", &NozzleSolution::outlet, "Outlet state")
       .def_readonly("mdot", &NozzleSolution::mdot, "Mass flow rate [kg/s]")
       .def_readonly("h0", &NozzleSolution::h0, "Stagnation enthalpy [J/kg]")
-      .def_readonly("T0", &NozzleSolution::T0, "Stagnation temperature [K]")
-      .def_readonly("P0", &NozzleSolution::P0, "Stagnation pressure [Pa]")
+      .def_readonly("Tt", &NozzleSolution::Tt, "Stagnation temperature [K]")
+      .def_readonly("Pt", &NozzleSolution::Pt, "Stagnation pressure [Pa]")
       .def_readonly("choked", &NozzleSolution::choked,
                     "True if throat is sonic")
       .def_readonly("x_throat", &NozzleSolution::x_throat,
@@ -4544,17 +4544,17 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
   // Isentropic nozzle flow
   m.def(
       "nozzle_flow",
-      [](double T0, double P0, double P_back, double A_eff,
+      [](double Tt, double Pt, double P_back, double A_eff,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return nozzle_flow(T0, P0, P_back, A_eff, X, tol, max_iter);
+        return nozzle_flow(Tt, Pt, P_back, A_eff, X, tol, max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("P_back"), py::arg("A_eff"),
+      py::arg("Tt"), py::arg("Pt"), py::arg("P_back"), py::arg("A_eff"),
       py::arg("X"), py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Isentropic nozzle flow.\n\n"
-      "T0     : stagnation temperature [K]\n"
-      "P0     : stagnation pressure [Pa]\n"
+      "Tt     : stagnation temperature [K]\n"
+      "Pt     : stagnation pressure [Pa]\n"
       "P_back : back pressure [Pa]\n"
       "A_eff  : effective flow area [m²]\n"
       "X      : mole fractions\n\n"
@@ -4563,40 +4563,40 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
   // Inverse solvers
   m.def(
       "solve_A_eff_from_mdot",
-      [](double T0, double P0, double P_back, double mdot_target,
+      [](double Tt, double Pt, double P_back, double mdot_target,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return solve_A_eff_from_mdot(T0, P0, P_back, mdot_target, X, tol,
+        return solve_A_eff_from_mdot(Tt, Pt, P_back, mdot_target, X, tol,
                                      max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("P_back"), py::arg("mdot_target"),
+      py::arg("Tt"), py::arg("Pt"), py::arg("P_back"), py::arg("mdot_target"),
       py::arg("X"), py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Find effective area for given mass flow rate.");
 
   m.def(
       "solve_P_back_from_mdot",
-      [](double T0, double P0, double A_eff, double mdot_target,
+      [](double Tt, double Pt, double A_eff, double mdot_target,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return solve_P_back_from_mdot(T0, P0, A_eff, mdot_target, X, tol,
+        return solve_P_back_from_mdot(Tt, Pt, A_eff, mdot_target, X, tol,
                                       max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("A_eff"), py::arg("mdot_target"),
+      py::arg("Tt"), py::arg("Pt"), py::arg("A_eff"), py::arg("mdot_target"),
       py::arg("X"), py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Find back pressure for given mass flow rate.");
 
   m.def(
-      "solve_P0_from_mdot",
-      [](double T0, double P_back, double A_eff, double mdot_target,
+      "solve_Pt_from_mdot",
+      [](double Tt, double P_back, double A_eff, double mdot_target,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return solve_P0_from_mdot(T0, P_back, A_eff, mdot_target, X, tol,
+        return solve_Pt_from_mdot(Tt, P_back, A_eff, mdot_target, X, tol,
                                   max_iter);
       },
-      py::arg("T0"), py::arg("P_back"), py::arg("A_eff"),
+      py::arg("Tt"), py::arg("P_back"), py::arg("A_eff"),
       py::arg("mdot_target"), py::arg("X"), py::arg("tol") = 1e-8,
       py::arg("max_iter") = 50,
       "Find stagnation pressure for given mass flow rate.");
@@ -4604,51 +4604,51 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
   // Utility functions
   m.def(
       "critical_pressure_ratio",
-      [](double T0, double P0,
+      [](double Tt, double Pt,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return critical_pressure_ratio(T0, P0, X, tol, max_iter);
+        return critical_pressure_ratio(Tt, Pt, X, tol, max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("X"), py::arg("tol") = 1e-8,
-      py::arg("max_iter") = 50, "Critical (sonic) pressure ratio P*/P0.");
+      py::arg("Tt"), py::arg("Pt"), py::arg("X"), py::arg("tol") = 1e-8,
+      py::arg("max_iter") = 50, "Critical (sonic) pressure ratio P*/Pt.");
 
   m.def(
       "mach_from_pressure_ratio",
-      [](double T0, double P0, double P,
+      [](double Tt, double Pt, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return mach_from_pressure_ratio(T0, P0, P, X, tol, max_iter);
+        return mach_from_pressure_ratio(Tt, Pt, P, X, tol, max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("P"), py::arg("X"),
+      py::arg("Tt"), py::arg("Pt"), py::arg("P"), py::arg("X"),
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
-      "Mach number from pressure ratio P/P0 (isentropic).");
+      "Mach number from pressure ratio P/Pt (isentropic).");
 
   m.def(
       "mass_flux_isentropic",
-      [](double T0, double P0, double P,
+      [](double Tt, double Pt, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return mass_flux_isentropic(T0, P0, P, X, tol, max_iter);
+        return mass_flux_isentropic(Tt, Pt, P, X, tol, max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("P"), py::arg("X"),
+      py::arg("Tt"), py::arg("Pt"), py::arg("P"), py::arg("X"),
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Mass flux G = rho*v [kg/(m²·s)] at given pressure (isentropic).");
 
   // Quasi-1D nozzle with C-D geometry
   m.def(
       "nozzle_cd",
-      [](double T0, double P0, double P_exit, double A_inlet, double A_throat,
+      [](double Tt, double Pt, double P_exit, double A_inlet, double A_throat,
          double A_exit, double x_throat, double x_exit,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          std::size_t n_stations, double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return nozzle_cd(T0, P0, P_exit, A_inlet, A_throat, A_exit, x_throat,
+        return nozzle_cd(Tt, Pt, P_exit, A_inlet, A_throat, A_exit, x_throat,
                          x_exit, X, n_stations, tol, max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("P_exit"), py::arg("A_inlet"),
+      py::arg("Tt"), py::arg("Pt"), py::arg("P_exit"), py::arg("A_inlet"),
       py::arg("A_throat"), py::arg("A_exit"), py::arg("x_throat"),
       py::arg("x_exit"), py::arg("X"), py::arg("n_stations") = 100,
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
@@ -5869,15 +5869,15 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
   // Nozzle thrust (convenience, from parameters)
   m.def(
       "nozzle_thrust_cd",
-      [](double T0, double P0, double P_design, double P_amb, double A_inlet,
+      [](double Tt, double Pt, double P_design, double P_amb, double A_inlet,
          double A_throat, double A_exit, double x_throat, double x_exit,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          std::size_t n_stations, double tol, std::size_t max_iter) {
         auto X = to_vec(X_arr);
-        return nozzle_thrust(T0, P0, P_design, P_amb, A_inlet, A_throat, A_exit,
+        return nozzle_thrust(Tt, Pt, P_design, P_amb, A_inlet, A_throat, A_exit,
                              x_throat, x_exit, X, n_stations, tol, max_iter);
       },
-      py::arg("T0"), py::arg("P0"), py::arg("P_design"), py::arg("P_amb"),
+      py::arg("Tt"), py::arg("Pt"), py::arg("P_design"), py::arg("P_amb"),
       py::arg("A_inlet"), py::arg("A_throat"), py::arg("A_exit"),
       py::arg("x_throat"), py::arg("x_exit"), py::arg("X"),
       py::arg("n_stations") = 100, py::arg("tol") = 1e-8,
@@ -7300,63 +7300,63 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       "M = v / a(T, X).");
 
   m.def(
-      "T0_from_static",
+      "Tt_from_static",
       [](double T, double M,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
-        return T0_from_static(T, M, to_vec(X_arr), tol, max_iter);
+        return Tt_from_static(T, M, to_vec(X_arr), tol, max_iter);
       },
       py::arg("T"), py::arg("M"), py::arg("X"), py::arg("tol") = 1e-8,
       py::arg("max_iter") = 50,
-      "Stagnation temperature T0 [K] from static T [K] and Mach number.\n"
+      "Stagnation temperature Tt [K] from static T [K] and Mach number.\n"
       "Iterative for variable cp(T) (thermally perfect gas).");
 
   m.def(
-      "T0_from_static_v",
+      "Tt_from_static_v",
       [](double T, double v,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
-        return T0_from_static_v(T, v, to_vec(X_arr), tol, max_iter);
+        return Tt_from_static_v(T, v, to_vec(X_arr), tol, max_iter);
       },
       py::arg("T"), py::arg("v"), py::arg("X"), py::arg("tol") = 1e-8,
       py::arg("max_iter") = 50,
-      "Stagnation temperature T0 [K] from static T [K] and velocity v [m/s].\n"
+      "Stagnation temperature Tt [K] from static T [K] and velocity v [m/s].\n"
       "Iterative for variable cp(T).");
 
   m.def(
       "T_from_stagnation",
-      [](double T0, double M,
+      [](double Tt, double M,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
-        return T_from_stagnation(T0, M, to_vec(X_arr), tol, max_iter);
+        return T_from_stagnation(Tt, M, to_vec(X_arr), tol, max_iter);
       },
-      py::arg("T0"), py::arg("M"), py::arg("X"), py::arg("tol") = 1e-8,
+      py::arg("Tt"), py::arg("M"), py::arg("X"), py::arg("tol") = 1e-8,
       py::arg("max_iter") = 50,
-      "Static temperature T [K] from stagnation T0 [K] and Mach number.\n"
+      "Static temperature T [K] from stagnation Tt [K] and Mach number.\n"
       "Iterative for variable cp(T).");
 
   m.def(
-      "P0_from_static",
+      "Pt_from_static",
       [](double P, double T, double M,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
-        return P0_from_static(P, T, M, to_vec(X_arr), tol, max_iter);
+        return Pt_from_static(P, T, M, to_vec(X_arr), tol, max_iter);
       },
       py::arg("P"), py::arg("T"), py::arg("M"), py::arg("X"),
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
-      "Stagnation pressure P0 [Pa] from static P [Pa], T [K] and Mach number.\n"
+      "Stagnation pressure Pt [Pa] from static P [Pa], T [K] and Mach number.\n"
       "Uses isentropic entropy conservation (variable cp).");
 
   m.def(
       "P_from_stagnation",
-      [](double P0, double T0, double M,
+      [](double Pt, double Tt, double M,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double tol, std::size_t max_iter) {
-        return P_from_stagnation(P0, T0, M, to_vec(X_arr), tol, max_iter);
+        return P_from_stagnation(Pt, Tt, M, to_vec(X_arr), tol, max_iter);
       },
-      py::arg("P0"), py::arg("T0"), py::arg("M"), py::arg("X"),
+      py::arg("Pt"), py::arg("Tt"), py::arg("M"), py::arg("X"),
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
-      "Static pressure P [Pa] from stagnation P0 [Pa], T0 [K] and Mach "
+      "Static pressure P [Pa] from stagnation Pt [Pa], Tt [K] and Mach "
       "number.\n"
       "Uses isentropic entropy conservation (variable cp).");
 
@@ -7405,7 +7405,7 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Combined stagnation state (Tt, Pt) from static (T, P) and velocity v.\n"
       "Returns tuple (Tt [K], Pt [Pa]).\n"
-      "Preferred over calling T0_from_static_v + P0_from_static separately\n"
+      "Preferred over calling Tt_from_static_v + Pt_from_static separately\n"
       "as it uses a single Newton loop and avoids redundant physics calls.");
 
   m.def("bulk_velocity", &bulk_velocity, py::arg("m_dot"), py::arg("rho"),
@@ -7699,13 +7699,13 @@ number runs linearly in T0 from M_in to M_out. Variable cp throughout.)doc");
       py::arg("turbulent") = true,
       "Calculate Adiabatic Wall Temperature and its Jacobian w.r.t Velocity.");
 
-  m.def("T0_from_static_and_jacobian_M", &solver::T0_from_static_and_jacobian_M,
+  m.def("Tt_from_static_and_jacobian_M", &solver::Tt_from_static_and_jacobian_M,
         py::arg("T"), py::arg("M"), py::arg("X"),
         "Calculate Stagnation Temperature from Static and its Jacobian w.r.t "
         "Mach.");
 
   m.def(
-      "P0_from_static_and_jacobian_M", &solver::P0_from_static_and_jacobian_M,
+      "Pt_from_static_and_jacobian_M", &solver::Pt_from_static_and_jacobian_M,
       py::arg("P"), py::arg("T"), py::arg("M"), py::arg("X"),
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
       "Calculate Stagnation Pressure from Static and its Jacobian w.r.t Mach.");

@@ -136,12 +136,12 @@ double find_critical_pressure(double T0, double P0, double s0, double h0,
 // -------------------------------------------------------------
 
 CompressibleFlowSolution nozzle_flow(
-    double T0, double P0, double P_back, double A_eff,
+    double Tt, double Pt, double P_back, double A_eff,
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    T0 = std::max(T0, 10.0);
-    P0 = std::max(P0, 1.0);
+    Tt = std::max(Tt, 10.0);
+    Pt = std::max(Pt, 1.0);
     P_back = std::max(P_back, 1.0);
     if (A_eff <= 0.0) {
         throw std::invalid_argument("nozzle_flow: A_eff must be positive");
@@ -150,16 +150,16 @@ CompressibleFlowSolution nozzle_flow(
     CompressibleFlowSolution sol;
 
     // Set up stagnation state
-    sol.stagnation.T = T0;
-    sol.stagnation.P = P0;
+    sol.stagnation.T = Tt;
+    sol.stagnation.P = Pt;
     sol.stagnation.set_X(X);
 
     double h0 = sol.stagnation.h();
     double s0 = sol.stagnation.s();
 
     // Find critical pressure (where mass flux is maximum)
-    double P_crit = find_critical_pressure(T0, P0, s0, h0, X, tol, max_iter);
-    [[maybe_unused]] double G_crit = compute_mass_flux(T0, P0, P_crit, s0, h0, X, tol, max_iter);
+    double P_crit = find_critical_pressure(Tt, Pt, s0, h0, X, tol, max_iter);
+    [[maybe_unused]] double G_crit = compute_mass_flux(Tt, Pt, P_crit, s0, h0, X, tol, max_iter);
 
     double P_outlet;
     if (P_back <= P_crit) {
@@ -173,7 +173,7 @@ CompressibleFlowSolution nozzle_flow(
     }
 
     // Compute outlet state
-    double T_outlet = solve_T_isentropic(P_outlet, s0, T0, X, tol, max_iter);
+    double T_outlet = solve_T_isentropic(P_outlet, s0, Tt, X, tol, max_iter);
     sol.outlet.T = T_outlet;
     sol.outlet.P = P_outlet;
     sol.outlet.set_X(X);
@@ -199,15 +199,15 @@ CompressibleFlowSolution nozzle_flow(
 // -------------------------------------------------------------
 
 double solve_A_eff_from_mdot(
-    double T0, double P0, double P_back, double mdot_target,
+    double Tt, double Pt, double P_back, double mdot_target,
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
     // The inverse problems are user-facing (no network iterate calls them), so
-    // invalid input is refused rather than clamped: a clamped T0 or P0 used
+    // invalid input is refused rather than clamped: a clamped Tt or Pt used
     // to return an area for a stagnation state nobody asked about.
-    if (!(T0 > 0.0) || !(P0 > 0.0) || !(P_back > 0.0)) {
-        throw std::invalid_argument("solve_A_eff_from_mdot: T0, P0 and P_back must be positive");
+    if (!(Tt > 0.0) || !(Pt > 0.0) || !(P_back > 0.0)) {
+        throw std::invalid_argument("solve_A_eff_from_mdot: Tt, Pt and P_back must be positive");
     }
     if (!(mdot_target > 0.0)) {
         throw std::invalid_argument("solve_A_eff_from_mdot: mdot_target must be positive");
@@ -215,18 +215,18 @@ double solve_A_eff_from_mdot(
 
     // Compute mass flux at operating conditions
     State stag;
-    stag.T = T0;
-    stag.P = P0;
+    stag.T = Tt;
+    stag.P = Pt;
     stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
     // Find critical conditions
-    double P_crit = find_critical_pressure(T0, P0, s0, h0, X, tol, max_iter);
-    [[maybe_unused]] double G_crit = compute_mass_flux(T0, P0, P_crit, s0, h0, X, tol, max_iter);
+    double P_crit = find_critical_pressure(Tt, Pt, s0, h0, X, tol, max_iter);
+    [[maybe_unused]] double G_crit = compute_mass_flux(Tt, Pt, P_crit, s0, h0, X, tol, max_iter);
 
     double P_outlet = (P_back <= P_crit) ? P_crit : P_back;
-    double G_outlet = compute_mass_flux(T0, P0, P_outlet, s0, h0, X, tol, max_iter);
+    double G_outlet = compute_mass_flux(Tt, Pt, P_outlet, s0, h0, X, tol, max_iter);
 
     if (G_outlet <= 0.0) {
         throw std::runtime_error("solve_A_eff_from_mdot: zero mass flux at operating conditions");
@@ -236,12 +236,12 @@ double solve_A_eff_from_mdot(
 }
 
 double solve_P_back_from_mdot(
-    double T0, double P0, double A_eff, double mdot_target,
+    double Tt, double Pt, double A_eff, double mdot_target,
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    if (!(T0 > 0.0) || !(P0 > 0.0)) {
-        throw std::invalid_argument("solve_P_back_from_mdot: T0 and P0 must be positive");
+    if (!(Tt > 0.0) || !(Pt > 0.0)) {
+        throw std::invalid_argument("solve_P_back_from_mdot: Tt and Pt must be positive");
     }
     if (!(mdot_target > 0.0)) {
         throw std::invalid_argument("solve_P_back_from_mdot: mdot_target must be positive");
@@ -251,15 +251,15 @@ double solve_P_back_from_mdot(
     }
 
     State stag;
-    stag.T = T0;
-    stag.P = P0;
+    stag.T = Tt;
+    stag.P = Pt;
     stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
     // Find critical conditions
-    double P_crit = find_critical_pressure(T0, P0, s0, h0, X, tol, max_iter);
-    double G_crit = compute_mass_flux(T0, P0, P_crit, s0, h0, X, tol, max_iter);
+    double P_crit = find_critical_pressure(Tt, Pt, s0, h0, X, tol, max_iter);
+    double G_crit = compute_mass_flux(Tt, Pt, P_crit, s0, h0, X, tol, max_iter);
     double mdot_choked = A_eff * G_crit;
 
     if (mdot_target > mdot_choked * (1.0 + tol)) {
@@ -271,32 +271,32 @@ double solve_P_back_from_mdot(
         return P_crit;
     }
 
-    // Bisection search for P_back in [P_crit, P0]
+    // Bisection search for P_back in [P_crit, Pt]
     double G_target = mdot_target / A_eff;
     double P_lo = P_crit;
-    double P_hi = P0;
+    double P_hi = Pt;
 
-    // The width is measured against the DRIVE P0 - P, not against P: at a
-    // small flow G ~ sqrt(P0 - P), so a P good to tol * P was a flow off by
+    // The width is measured against the DRIVE Pt - P, not against P: at a
+    // small flow G ~ sqrt(Pt - P), so a P good to tol * P was a flow off by
     // 73% at 1e-4 of the choked flux and 1e-4 at 1e-2 of it. Each step halves
     // the bracket, so the budget is not max_iter (sized for Newton loops).
     const std::size_t n_bisect = std::max<std::size_t>(max_iter, 200);
     for (std::size_t it = 0; it < n_bisect; ++it) {
         double P_mid = 0.5 * (P_lo + P_hi);
-        double G_mid = compute_mass_flux(T0, P0, P_mid, s0, h0, X, tol, max_iter);
+        double G_mid = compute_mass_flux(Tt, Pt, P_mid, s0, h0, X, tol, max_iter);
 
         if (std::abs(G_mid - G_target) < tol * G_target) {
             return P_mid;
         }
 
-        // Mass flux decreases as P increases toward P0
+        // Mass flux decreases as P increases toward Pt
         if (G_mid > G_target) {
             P_lo = P_mid;
         } else {
             P_hi = P_mid;
         }
 
-        if ((P_hi - P_lo) < tol * (P0 - P_hi)) {
+        if ((P_hi - P_lo) < tol * (Pt - P_hi)) {
             return 0.5 * (P_lo + P_hi);
         }
     }
@@ -304,19 +304,19 @@ double solve_P_back_from_mdot(
     return 0.5 * (P_lo + P_hi);
 }
 
-double solve_P0_from_mdot(
-    double T0, double P_back, double A_eff, double mdot_target,
+double solve_Pt_from_mdot(
+    double Tt, double P_back, double A_eff, double mdot_target,
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    if (!(T0 > 0.0) || !(P_back > 0.0)) {
-        throw std::invalid_argument("solve_P0_from_mdot: T0 and P_back must be positive");
+    if (!(Tt > 0.0) || !(P_back > 0.0)) {
+        throw std::invalid_argument("solve_Pt_from_mdot: Tt and P_back must be positive");
     }
     if (!(A_eff > 0.0)) {
-        throw std::invalid_argument("solve_P0_from_mdot: A_eff must be positive");
+        throw std::invalid_argument("solve_Pt_from_mdot: A_eff must be positive");
     }
     if (!(mdot_target > 0.0)) {
-        throw std::invalid_argument("solve_P0_from_mdot: mdot_target must be positive");
+        throw std::invalid_argument("solve_Pt_from_mdot: mdot_target must be positive");
     }
 
     // Bisection on P0 in (P_back, P0_hi]. The flow is zero at P0 = P_back
@@ -331,7 +331,7 @@ double solve_P0_from_mdot(
     // twelve decades bracket any finite target; failing that, refuse.
     bool bracketed = false;
     for (int expand = 0; expand < 12; ++expand) {
-        auto sol = nozzle_flow(T0, P0_hi, P_back, A_eff, X, tol, max_iter);
+        auto sol = nozzle_flow(Tt, P0_hi, P_back, A_eff, X, tol, max_iter);
         if (sol.mdot >= mdot_target) {
             bracketed = true;
             break;
@@ -340,7 +340,7 @@ double solve_P0_from_mdot(
         P0_hi *= 10.0;
     }
     if (!bracketed) {
-        throw std::runtime_error("solve_P0_from_mdot: no stagnation pressure reaches mdot_target");
+        throw std::runtime_error("solve_Pt_from_mdot: no stagnation pressure reaches mdot_target");
     }
 
     // Bisection. The width is measured against the drive P0 - P_back (at a
@@ -349,7 +349,7 @@ double solve_P0_from_mdot(
     const std::size_t n_bisect = std::max<std::size_t>(max_iter, 200);
     for (std::size_t it = 0; it < n_bisect; ++it) {
         double P0_mid = 0.5 * (P0_lo + P0_hi);
-        auto sol = nozzle_flow(T0, P0_mid, P_back, A_eff, X, tol, max_iter);
+        auto sol = nozzle_flow(Tt, P0_mid, P_back, A_eff, X, tol, max_iter);
 
         if (std::abs(sol.mdot - mdot_target) < tol * mdot_target) {
             return P0_mid;
@@ -374,35 +374,35 @@ double solve_P0_from_mdot(
 // -------------------------------------------------------------
 
 double critical_pressure_ratio(
-    double T0, double P0, const std::vector<double>& X,
+    double Tt, double Pt, const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
     State stag;
-    stag.T = T0;
-    stag.P = P0;
+    stag.T = Tt;
+    stag.P = Pt;
     stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
-    double P_crit = find_critical_pressure(T0, P0, s0, h0, X, tol, max_iter);
-    return P_crit / P0;
+    double P_crit = find_critical_pressure(Tt, Pt, s0, h0, X, tol, max_iter);
+    return P_crit / Pt;
 }
 
 double mach_from_pressure_ratio(
-    double T0, double P0, double P,
+    double Tt, double Pt, double P,
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    if (P >= P0) return 0.0;
+    if (P >= Pt) return 0.0;
 
     State stag;
-    stag.T = T0;
-    stag.P = P0;
+    stag.T = Tt;
+    stag.P = Pt;
     stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
-    double T = solve_T_isentropic(P, s0, T0, X, tol, max_iter);
+    double T = solve_T_isentropic(P, s0, Tt, X, tol, max_iter);
 
     double h_curr = h_mass(T, X);
     double dh = h0 - h_curr;
@@ -416,18 +416,18 @@ double mach_from_pressure_ratio(
 }
 
 double mass_flux_isentropic(
-    double T0, double P0, double P,
+    double Tt, double Pt, double P,
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
     State stag;
-    stag.T = T0;
-    stag.P = P0;
+    stag.T = Tt;
+    stag.P = Pt;
     stag.set_X(X);
     double h0 = stag.h();
     double s0 = stag.s();
 
-    return compute_mass_flux(T0, P0, P, s0, h0, X, tol, max_iter);
+    return compute_mass_flux(Tt, Pt, P, s0, h0, X, tol, max_iter);
 }
 
 // -------------------------------------------------------------
@@ -1034,7 +1034,7 @@ double fanno_max_length(
     // tail: -0.8% at M_in = 0.9 and -24.5% at M_in = 0.98 (Ar, against the
     // closed form). tol and max_iter are kept for the signature only.
     const double G = density(T_in, P_in, X) * u_in;
-    const double Tt = T0_from_static_v(T_in, u_in, X);
+    const double Tt = Tt_from_static_v(T_in, u_in, X);
     return fanno_length_between(G, Tt, M_in, 1.0, X, D, 0.0, "fixed", f);
 }
 
@@ -1179,7 +1179,7 @@ double cd_nozzle_area(double x, double A_inlet, double A_throat, double A_exit,
 }  // namespace
 
 NozzleSolution nozzle_quasi1d(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     const AreaFunction& area_func,
     double x_start, double x_end,
     const std::vector<double>& X,
@@ -1187,34 +1187,34 @@ NozzleSolution nozzle_quasi1d(
     double tol, std::size_t max_iter)
 {
     // Validate inputs
-    if (T0 <= 0.0) {
-        throw std::invalid_argument("nozzle_quasi1d: T0 must be positive");
+    if (Tt <= 0.0) {
+        throw std::invalid_argument("nozzle_quasi1d: Tt must be positive");
     }
-    if (P0 <= 0.0) {
-        throw std::invalid_argument("nozzle_quasi1d: P0 must be positive");
+    if (Pt <= 0.0) {
+        throw std::invalid_argument("nozzle_quasi1d: Pt must be positive");
     }
-    if (P_exit >= P0) {
-        throw std::invalid_argument("nozzle_quasi1d: P_exit must be less than P0");
+    if (P_exit >= Pt) {
+        throw std::invalid_argument("nozzle_quasi1d: P_exit must be less than Pt");
     }
     // Clamp near-zero P_exit (e.g. vacuum) to a small positive floor so the
     // isentropic marcher can compute a finite Mach number.  The floor is
-    // 1e-6 * P0 which corresponds to M >> 1 and is well outside the range of
+    // 1e-6 * Pt which corresponds to M >> 1 and is well outside the range of
     // any real nozzle; callers should pass a physically meaningful P_exit.
     if (P_exit <= 0.0) {
-        P_exit = 1.0e-6 * P0;
+        P_exit = 1.0e-6 * Pt;
     }
     if (n_stations < 2) {
         throw std::invalid_argument("nozzle_quasi1d: n_stations must be >= 2");
     }
 
     NozzleSolution sol;
-    sol.T0 = T0;
-    sol.P0 = P0;
+    sol.Tt = Tt;
+    sol.Pt = Pt;
 
     // Stagnation state
     State stag;
-    stag.T = T0;
-    stag.P = P0;
+    stag.T = Tt;
+    stag.P = Pt;
     stag.set_X(X);
     double mw_g = stag.mw();  // g/mol
     double mw_kg = mw_g / 1000.0;  // kg/mol
@@ -1228,8 +1228,8 @@ NozzleSolution nozzle_quasi1d(
     sol.A_throat = area_func(x_throat);
 
     // Determine if flow is choked by checking critical pressure ratio
-    double P_crit_ratio = critical_pressure_ratio(T0, P0, X, tol, max_iter);
-    double P_crit = P_crit_ratio * P0;
+    double P_crit_ratio = critical_pressure_ratio(Tt, Pt, X, tol, max_iter);
+    double P_crit = P_crit_ratio * Pt;
     sol.choked = (P_exit <= P_crit);
 
     // Compute mass flow rate
@@ -1240,11 +1240,11 @@ NozzleSolution nozzle_quasi1d(
 
     if (sol.choked) {
         // Choked: mass flux at throat is maximum
-        double G_throat = mass_flux_isentropic(T0, P0, P_crit, X, tol, max_iter);
+        double G_throat = mass_flux_isentropic(Tt, Pt, P_crit, X, tol, max_iter);
         sol.mdot = G_throat * sol.A_throat;
     } else {
         // Subsonic throughout: use exit conditions
-        double G_exit = mass_flux_isentropic(T0, P0, P_exit, X, tol, max_iter);
+        double G_exit = mass_flux_isentropic(Tt, Pt, P_exit, X, tol, max_iter);
         sol.mdot = G_exit * A_exit;
     }
 
@@ -1264,8 +1264,8 @@ NozzleSolution nozzle_quasi1d(
     double A_star_eff = A_star;
     if (!sol.choked) {
         // For subsonic flow, find M_exit from pressure ratio, then compute A*_eff
-        double P_ratio = P_exit / P0;
-        // P/P0 = (1 + (gamma-1)/2 * M^2)^(-gamma/(gamma-1))
+        double P_ratio = P_exit / Pt;
+        // P/Pt = (1 + (gamma-1)/2 * M^2)^(-gamma/(gamma-1))
         // Solve for M_exit
         double M_exit = std::sqrt(2.0 / gm1 * (std::pow(P_ratio, -gm1 / gamma) - 1.0));
         if (M_exit > 0.99) M_exit = 0.99;  // Keep subsonic
@@ -1325,11 +1325,11 @@ NozzleSolution nozzle_quasi1d(
         double M_guess = M_ideal[i];
 
         // Compute initial guess for T and P from ideal-gas relations
-        // T/T0 = 1 / (1 + (gamma-1)/2 * M^2)
-        // P/P0 = (T/T0)^(gamma/(gamma-1))
+        // T/Tt = 1 / (1 + (gamma-1)/2 * M^2)
+        // P/Pt = (T/Tt)^(gamma/(gamma-1))
         double T_ratio = 1.0 / (1.0 + 0.5 * gm1 * M_guess * M_guess);
-        double T_guess = T0 * T_ratio;
-        double P_guess = P0 * std::pow(T_ratio, gamma / gm1);
+        double T_guess = Tt * T_ratio;
+        double P_guess = Pt * std::pow(T_ratio, gamma / gm1);
 
         // Solve (T, P) using Newton iteration with constraints:
         //   1. Isentropic: s(T, P) = s0
@@ -1395,9 +1395,9 @@ NozzleSolution nozzle_quasi1d(
             T += dT;
             P += dP;
 
-            // Keep in range: positive (the gas is ideal to 0 K) and below T0
-            T = std::clamp(T, thermo::T_FLOOR, T0);
-            P = std::clamp(P, 100.0, P0);
+            // Keep in range: positive (the gas is ideal to 0 K) and below Tt
+            T = std::clamp(T, thermo::T_FLOOR, Tt);
+            P = std::clamp(P, 100.0, Pt);
         }
 
         // Final state computation
@@ -1456,7 +1456,7 @@ NozzleSolution nozzle_quasi1d(
 }
 
 NozzleSolution nozzle_quasi1d(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     const std::vector<std::pair<double, double>>& area_profile,
     const std::vector<double>& X,
     std::size_t n_stations,
@@ -1473,11 +1473,11 @@ NozzleSolution nozzle_quasi1d(
         return interpolate_area(area_profile, x);
     };
 
-    return nozzle_quasi1d(T0, P0, P_exit, area_func, x_start, x_end, X, n_stations, tol, max_iter);
+    return nozzle_quasi1d(Tt, Pt, P_exit, area_func, x_start, x_end, X, n_stations, tol, max_iter);
 }
 
 NozzleSolution nozzle_quasi1d_poly(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     const std::vector<double>& area_coeffs,
     double x_start, double x_end,
     const std::vector<double>& X,
@@ -1492,11 +1492,11 @@ NozzleSolution nozzle_quasi1d_poly(
         return eval_poly_area(area_coeffs, x);
     };
 
-    return nozzle_quasi1d(T0, P0, P_exit, area_func, x_start, x_end, X, n_stations, tol, max_iter);
+    return nozzle_quasi1d(Tt, Pt, P_exit, area_func, x_start, x_end, X, n_stations, tol, max_iter);
 }
 
 NozzleSolution nozzle_cd(
-    double T0, double P0, double P_exit,
+    double Tt, double Pt, double P_exit,
     double A_inlet, double A_throat, double A_exit,
     double x_throat, double x_exit,
     const std::vector<double>& X,
@@ -1517,7 +1517,7 @@ NozzleSolution nozzle_cd(
         return cd_nozzle_area(x, A_inlet, A_throat, A_exit, x_throat, x_exit);
     };
 
-    return nozzle_quasi1d(T0, P0, P_exit, area_func, 0.0, x_exit, X, n_stations, tol, max_iter);
+    return nozzle_quasi1d(Tt, Pt, P_exit, area_func, 0.0, x_exit, X, n_stations, tol, max_iter);
 }
 
 // -------------------------------------------------------------
@@ -1554,16 +1554,16 @@ ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb)
         result.specific_impulse = result.thrust / (sol.mdot * G0);
     }
 
-    // Thrust coefficient: C_F = F / (P0 * A_throat)
-    if (sol.P0 > 0.0 && sol.A_throat > 0.0) {
-        result.thrust_coefficient = result.thrust / (sol.P0 * sol.A_throat);
+    // Thrust coefficient: C_F = F / (Pt * A_throat)
+    if (sol.Pt > 0.0 && sol.A_throat > 0.0) {
+        result.thrust_coefficient = result.thrust / (sol.Pt * sol.A_throat);
     }
 
     return result;
 }
 
 ThrustResult nozzle_thrust(
-    double T0, double P0, double P_design, double P_amb,
+    double Tt, double Pt, double P_design, double P_amb,
     double A_inlet, double A_throat, double A_exit,
     double x_throat, double x_exit,
     const std::vector<double>& X,
@@ -1572,7 +1572,7 @@ ThrustResult nozzle_thrust(
 {
     // P_design drives the nozzle Mach profile (must be > 0).
     // P_amb is used only in the thrust equation and may be 0 for vacuum.
-    NozzleSolution sol = nozzle_cd(T0, P0, P_design, A_inlet, A_throat, A_exit,
+    NozzleSolution sol = nozzle_cd(Tt, Pt, P_design, A_inlet, A_throat, A_exit,
                                     x_throat, x_exit, X, n_stations, tol, max_iter);
     return nozzle_thrust(sol, P_amb);
 }

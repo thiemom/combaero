@@ -78,10 +78,10 @@ TEST_F(MixerJacobianTest, dTmix_d_T) {
     const double eps = 0.1;
     for (std::size_t i = 0; i < streams.size(); ++i) {
         auto s_p = streams;
-        s_p[i].T += eps;
+        s_p[i].Tt += eps;
         auto res_p = mixer_from_streams_and_jacobians(s_p);
         double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_T, fd,
+        EXPECT_NEAR(base.dT_mix_d_stream[i].d_Tt, fd,
                     std::abs(fd) * 1e-3 + 1e-6)
             << "stream " << i;
     }
@@ -175,11 +175,11 @@ TEST_F(AdiabaticCompleteJacobianTest, dTad_d_T) {
     const double eps = 1.0;
     for (std::size_t i = 0; i < streams.size(); ++i) {
         auto s_p = streams;
-        s_p[i].T += eps;
+        s_p[i].Tt += eps;
         auto res_p =
             adiabatic_T_complete_and_jacobian_T_from_streams(s_p, P);
         double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_T, fd,
+        EXPECT_NEAR(base.dT_mix_d_stream[i].d_Tt, fd,
                     std::abs(fd) * 5e-3 + 1e-2)
             << "stream " << i;
     }
@@ -222,12 +222,12 @@ TEST_F(AdiabaticCompleteJacobianTest, dYburned_d_T) {
     const double eps = 1.0;
     for (std::size_t i = 0; i < streams.size(); ++i) {
         auto s_p = streams;
-        s_p[i].T += eps;
+        s_p[i].Tt += eps;
         auto res_p =
             adiabatic_T_complete_and_jacobian_T_from_streams(s_p, P);
         for (std::size_t k = 0; k < ns; ++k) {
             double fd = (res_p.Y_mix[k] - base.Y_mix[k]) / eps;
-            EXPECT_NEAR(base.dY_mix_d_stream[k][i].d_T, fd,
+            EXPECT_NEAR(base.dY_mix_d_stream[k][i].d_Tt, fd,
                         std::abs(fd) * 5e-3 + 1e-6)
                 << "stream " << i << " species " << k;
         }
@@ -294,11 +294,11 @@ TEST_F(AdiabaticEquilibriumJacobianTest, dTad_d_T) {
     const double eps = 1.0;
     for (std::size_t i = 0; i < streams.size(); ++i) {
         auto s_p = streams;
-        s_p[i].T += eps;
+        s_p[i].Tt += eps;
         auto res_p =
             adiabatic_T_equilibrium_and_jacobians_from_streams(s_p, P);
         double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_T, fd,
+        EXPECT_NEAR(base.dT_mix_d_stream[i].d_Tt, fd,
                     std::abs(fd) * 0.01 + 0.1)
             << "stream " << i;
     }
@@ -341,12 +341,12 @@ TEST_F(AdiabaticEquilibriumJacobianTest, dYburned_d_T) {
     const double eps = 1.0;
     for (std::size_t i = 0; i < streams.size(); ++i) {
         auto s_p = streams;
-        s_p[i].T += eps;
+        s_p[i].Tt += eps;
         auto res_p =
             adiabatic_T_equilibrium_and_jacobians_from_streams(s_p, P);
         for (std::size_t k = 0; k < ns; ++k) {
             double fd = (res_p.Y_mix[k] - base.Y_mix[k]) / eps;
-            EXPECT_NEAR(base.dY_mix_d_stream[k][i].d_T, fd,
+            EXPECT_NEAR(base.dY_mix_d_stream[k][i].d_Tt, fd,
                         std::abs(fd) * 0.01 + 1e-5)
                 << "stream " << i << " species " << k;
         }
@@ -386,9 +386,9 @@ static MixtureState make_state(double P, double P_total, double T,
                                 double m_dot, const std::vector<double> &Y) {
     MixtureState s;
     s.P = P;
-    s.P_total = P_total;
+    s.Pt = P_total;
     s.T = T;
-    s.T_total = T;
+    s.Tt = T;
     s.m_dot = m_dot;
     s.set_Y(Y);
     return s;
@@ -508,7 +508,7 @@ TEST_F(PlenumJacobianTest, StreamJacobian_T) {
 
         for (std::size_t eq = 0; eq < base.residuals.size(); ++eq) {
             double fd = (res_p.residuals[eq] - base.residuals[eq]) / eps;
-            double analytical = base.stream_jacobian[eq][i].d_T;
+            double analytical = base.stream_jacobian[eq][i].d_Tt;
             EXPECT_NEAR(analytical, fd, std::abs(fd) * 1e-3 + 1e-4)
                 << "eq " << eq << " stream " << i << " d/dT";
         }
@@ -665,7 +665,7 @@ TEST_F(CombustorJacobianTest, StreamJacobian_T) {
 
         for (std::size_t eq = 0; eq < base.residuals.size(); ++eq) {
             double fd = (res_p.residuals[eq] - base.residuals[eq]) / eps;
-            double analytical = base.stream_jacobian[eq][i].d_T;
+            double analytical = base.stream_jacobian[eq][i].d_Tt;
             EXPECT_NEAR(analytical, fd, std::abs(fd) * 0.01 + 0.1)
                 << "eq " << eq << " stream " << i << " d/dT";
         }
@@ -682,7 +682,7 @@ TEST_F(CombustorJacobianTest, StreamJacobian_P_total) {
 
         for (std::size_t eq = 0; eq < base.residuals.size(); ++eq) {
             double fd = (res_p.residuals[eq] - base.residuals[eq]) / eps;
-            double analytical = base.stream_jacobian[eq][i].d_P_total;
+            double analytical = base.stream_jacobian[eq][i].d_Pt;
             EXPECT_NEAR(analytical, fd, std::abs(fd) * 1e-3 + 1e-4)
                 << "eq " << eq << " stream " << i << " d/dP_total";
         }

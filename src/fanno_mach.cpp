@@ -339,7 +339,7 @@ FannoDuctResult fanno_duct(double Pt, double Tt, double G, const std::vector<dou
     out.choked = true;
     out.L_star = 0.0;
     out.exit = out.inlet;
-    out.Pt_exit = P0_from_static(out.exit.P, out.exit.T, 1.0, X);
+    out.Pt_exit = Pt_from_static(out.exit.P, out.exit.T, 1.0, X);
     return out;
   }
   out.L_star = fanno_length_between(G, Tt, M_in, 1.0, X, D, roughness, friction_model,
@@ -358,7 +358,7 @@ FannoDuctResult fanno_duct(double Pt, double Tt, double G, const std::vector<dou
     M_exit = brent(length_to, M_in, 1.0, -L, out.L_star - L, kFannoMachRelTol);
   }
   out.exit = fanno_state_at_mach(G, Tt, M_exit, X);
-  out.Pt_exit = P0_from_static(out.exit.P, out.exit.T, M_exit, X, 1e-13, 100);
+  out.Pt_exit = Pt_from_static(out.exit.P, out.exit.T, M_exit, X, 1e-13, 100);
   return out;
 }
 

@@ -202,9 +202,9 @@ def test_the_combustor_derivatives_match_central_differences(method: str, phi: f
     checks = [
         (r.dT_mix_d_stream[1].d_mdot, lambda d: burn(1.0, mf + d).T_mix, h),
         (r.dT_mix_d_stream[0].d_mdot, lambda d: burn(1.0 + d, mf).T_mix, h),
-        (r.dT_mix_d_stream[0].d_T, lambda d: burn(1.0, mf, 700.0 + d).T_mix, hT),
+        (r.dT_mix_d_stream[0].d_Tt, lambda d: burn(1.0, mf, 700.0 + d).T_mix, hT),
         (r.dY_mix_d_stream[ico][1].d_mdot, lambda d: burn(1.0, mf + d).Y_mix[ico], h),
-        (r.dY_mix_d_stream[ico][0].d_T, lambda d: burn(1.0, mf, 700.0 + d).Y_mix[ico], hT),
+        (r.dY_mix_d_stream[ico][0].d_Tt, lambda d: burn(1.0, mf, 700.0 + d).Y_mix[ico], hT),
     ]
     for an, f, step in checks:
         fd = (f(step) - f(-step)) / (2 * step)

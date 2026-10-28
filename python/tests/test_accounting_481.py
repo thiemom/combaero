@@ -220,7 +220,7 @@ def test_the_mixer_jacobian_holds_with_heat_and_fraction(Q: float, fraction: flo
         tp[i] += 1e-3
         tm[i] -= 1e-3
         fd = (mix(ms, tp, Ys).T_mix - mix(ms, tm, Ys).T_mix) / 2e-3
-        assert r.dT_mix_d_stream[i].d_T == pytest.approx(fd, rel=1e-6)
+        assert r.dT_mix_d_stream[i].d_Tt == pytest.approx(fd, rel=1e-6)
         for k in (I_CH4, I_O2):
             yp, ym = [list(y) for y in Ys], [list(y) for y in Ys]
             yp[i][k] += 1e-6

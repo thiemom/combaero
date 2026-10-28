@@ -213,7 +213,7 @@ TEST(SolverJacobianTest, OrificeDerivatives) {
   EXPECT_NEAR(rr.d_mdot_dP_rho_ref, fd_dP_rho, std::abs(fd_dP_rho) * 1e-7 + 1e-14);
   EXPECT_GT(std::abs(rr.d_mdot_dP_rho_ref), 0.0);
 
-  // d_mdot_dT_up
+  // d_mdot_dTt_up
   double eps_T = 1e-4;
   auto res_T_p = orifice_residuals_and_jacobian(m_dot, P_total_up, P_static_up,
                                                 T_up + eps_T, Y, P_static_down,
@@ -222,9 +222,9 @@ TEST(SolverJacobianTest, OrificeDerivatives) {
                                                 T_up - eps_T, Y, P_static_down,
                                                 Cd, area, beta);
   double fd_dT_up = (res_T_p.m_dot_calc - res_T_m.m_dot_calc) / (2.0 * eps_T);
-  report_jacobian_difference("OrificeDerivatives", "d_mdot_dT_up",
-                             res.d_mdot_dT_up, fd_dT_up);
-  EXPECT_NEAR(res.d_mdot_dT_up, fd_dT_up, std::abs(fd_dT_up) * 1e-6);
+  report_jacobian_difference("OrificeDerivatives", "d_mdot_dTt_up",
+                             res.d_mdot_dTt_up, fd_dT_up);
+  EXPECT_NEAR(res.d_mdot_dTt_up, fd_dT_up, std::abs(fd_dT_up) * 1e-6);
 
   // Y derivatives
   double eps_Y = 1e-6;
@@ -296,9 +296,9 @@ TEST(SolverJacobianTest, PipeDerivatives) {
                                                 T_up - eps_T, Y, P_static_down,
                                                 L, D, roughness, model);
   double fd_dT = (res_T_p.dP_calc - res_T_m.dP_calc) / (2.0 * eps_T);
-  report_jacobian_difference("PipeDerivatives", "d_dP_dT_up", res.d_dP_dT_up,
+  report_jacobian_difference("PipeDerivatives", "d_dP_dTt_up", res.d_dP_dTt_up,
                              fd_dT);
-  EXPECT_NEAR(res.d_dP_dT_up, fd_dT, std::abs(fd_dT) * 1e-8);
+  EXPECT_NEAR(res.d_dP_dTt_up, fd_dT, std::abs(fd_dT) * 1e-8);
 
   double eps_Y = 1e-6;
   for (size_t i = 0; i < ns; ++i) {
@@ -366,7 +366,7 @@ TEST(SolverJacobianTest, PipeDerivativesExitHeadLost) {
     const double fd_T = (eval(m_dot, P_static_up, T_up + eps_T, Y, true).dP_calc -
                          eval(m_dot, P_static_up, T_up - eps_T, Y, true).dP_calc) /
                         (2.0 * eps_T);
-    EXPECT_NEAR(res.d_dP_dT_up, fd_T, std::abs(fd_T) * 1e-6);
+    EXPECT_NEAR(res.d_dP_dTt_up, fd_T, std::abs(fd_T) * 1e-6);
 
     const double eps_Y = 1e-6;
     for (size_t i = 0; i < ns; ++i) {
@@ -461,9 +461,9 @@ TEST(SolverJacobianTest, OrificeCompressibleDerivatives) {
     const double fd_dT = (f(P_total_up, P_static_up, T_up + eps_T, P_static_down).m_dot_calc -
                           f(P_total_up, P_static_up, T_up - eps_T, P_static_down).m_dot_calc) /
                          (2.0 * eps_T);
-    report_jacobian_difference("OrificeCompressibleDerivatives", "d_mdot_dT_up",
-                               res.d_mdot_dT_up, fd_dT);
-    EXPECT_NEAR(res.d_mdot_dT_up, fd_dT, std::abs(fd_dT) * 1e-8 + 1e-12);
+    report_jacobian_difference("OrificeCompressibleDerivatives", "d_mdot_dTt_up",
+                               res.d_mdot_dTt_up, fd_dT);
+    EXPECT_NEAR(res.d_mdot_dTt_up, fd_dT, std::abs(fd_dT) * 1e-8 + 1e-12);
   }
 }
 
@@ -591,13 +591,13 @@ TEST(SolverJacobianTest, MomentumChamberDerivatives) {
   double M = std::abs(v) / speed_of_sound(Ts, X);
   EXPECT_NEAR(res.M, M, 1e-10);
   EXPECT_NEAR(res.rho_static, rho, 1e-12 * rho);
-  double expected_residual = P_total - P0_from_static(P, Ts, M, X);
+  double expected_residual = P_total - Pt_from_static(P, Ts, M, X);
   EXPECT_NEAR(res.residual, expected_residual, 1e-6);
 
   // The incompressible form is the limit it reduces to, not an equal: the
   // stagnation rise must exceed 0.5*rho*v^2 at any finite Mach.
   double q_incompressible = 0.5 * rho * v * v;
-  EXPECT_GT(P0_from_static(P, Ts, M, X) - P, q_incompressible);
+  EXPECT_GT(Pt_from_static(P, Ts, M, X) - P, q_incompressible);
 
   // Static-density sensitivities against central differences.
   const double hP = P * 1e-6;
@@ -711,12 +711,12 @@ TEST(SolverJacobianTest, T0FromStaticDerivatives) {
   double T = 300.0;
   double M = 0.5;
 
-  auto [T0, dT0_dM] = T0_from_static_and_jacobian_M(T, M, X);
+  auto [T0, dT0_dM] = Tt_from_static_and_jacobian_M(T, M, X);
 
   // Central FD for dT0/dM
   double eps_M = 1e-5;
-  auto [T0_plus, dummy1] = T0_from_static_and_jacobian_M(T, M + eps_M, X);
-  auto [T0_minus, dummy2] = T0_from_static_and_jacobian_M(T, M - eps_M, X);
+  auto [T0_plus, dummy1] = Tt_from_static_and_jacobian_M(T, M + eps_M, X);
+  auto [T0_minus, dummy2] = Tt_from_static_and_jacobian_M(T, M - eps_M, X);
   double fd_dT0_dM = (T0_plus - T0_minus) / (2.0 * eps_M);
 
   report_jacobian_difference("T0FromStaticDerivatives", "dT0_dM", dT0_dM,
@@ -726,9 +726,9 @@ TEST(SolverJacobianTest, T0FromStaticDerivatives) {
 
   // Test at higher Mach
   M = 0.8;
-  auto [T0_high, dT0_dM_high] = T0_from_static_and_jacobian_M(T, M, X);
-  auto [T0_high_plus, dummy3] = T0_from_static_and_jacobian_M(T, M + eps_M, X);
-  auto [T0_high_minus, dummy4] = T0_from_static_and_jacobian_M(T, M - eps_M, X);
+  auto [T0_high, dT0_dM_high] = Tt_from_static_and_jacobian_M(T, M, X);
+  auto [T0_high_plus, dummy3] = Tt_from_static_and_jacobian_M(T, M + eps_M, X);
+  auto [T0_high_minus, dummy4] = Tt_from_static_and_jacobian_M(T, M - eps_M, X);
   double fd_dT0_dM_high = (T0_high_plus - T0_high_minus) / (2.0 * eps_M);
 
   report_jacobian_difference("T0FromStaticDerivatives", "dT0_dM_high",
@@ -752,12 +752,12 @@ TEST(SolverJacobianTest, P0FromStaticDerivatives) {
   double T = 300.0;
   double M = 0.5;
 
-  auto [P0, dP0_dM] = P0_from_static_and_jacobian_M(P, T, M, X);
+  auto [P0, dP0_dM] = Pt_from_static_and_jacobian_M(P, T, M, X);
 
   // Central FD for dP0/dM
   double eps_M = 1e-5;
-  auto [P0_plus, dummy1] = P0_from_static_and_jacobian_M(P, T, M + eps_M, X);
-  auto [P0_minus, dummy2] = P0_from_static_and_jacobian_M(P, T, M - eps_M, X);
+  auto [P0_plus, dummy1] = Pt_from_static_and_jacobian_M(P, T, M + eps_M, X);
+  auto [P0_minus, dummy2] = Pt_from_static_and_jacobian_M(P, T, M - eps_M, X);
   double fd_dP0_dM = (P0_plus - P0_minus) / (2.0 * eps_M);
 
   report_jacobian_difference("P0FromStaticDerivatives", "dP0_dM", dP0_dM,
@@ -767,11 +767,11 @@ TEST(SolverJacobianTest, P0FromStaticDerivatives) {
 
   // Test at higher Mach
   M = 0.8;
-  auto [P0_high, dP0_dM_high] = P0_from_static_and_jacobian_M(P, T, M, X);
+  auto [P0_high, dP0_dM_high] = Pt_from_static_and_jacobian_M(P, T, M, X);
   auto [P0_high_plus, dummy3] =
-      P0_from_static_and_jacobian_M(P, T, M + eps_M, X);
+      Pt_from_static_and_jacobian_M(P, T, M + eps_M, X);
   auto [P0_high_minus, dummy4] =
-      P0_from_static_and_jacobian_M(P, T, M - eps_M, X);
+      Pt_from_static_and_jacobian_M(P, T, M - eps_M, X);
   double fd_dP0_dM_high = (P0_high_plus - P0_high_minus) / (2.0 * eps_M);
 
   report_jacobian_difference("P0FromStaticDerivatives", "dP0_dM_high",

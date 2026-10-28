@@ -48,8 +48,8 @@ int main()
     std::cout << std::string(56, '-') << "\n";
 
     for (double M : {0.1, 0.2, 0.3, 0.5, 0.7, 0.9, 1.0}) {
-        const double T0 = T0_from_static(T_static, M, X_air);
-        const double P0 = P0_from_static(P_static, T_static, M, X_air);
+        const double T0 = Tt_from_static(T_static, M, X_air);
+        const double P0 = Pt_from_static(P_static, T_static, M, X_air);
         std::cout << std::setw(8)  << M
                   << std::setw(12) << T0
                   << std::setw(12) << P0 / 1e5
@@ -76,8 +76,8 @@ int main()
     std::cout << std::string(64, '-') << "\n";
 
     for (double M : {0.1, 0.3, 0.5, 0.7, 0.9}) {
-        const double T0 = T0_from_static(T_static, M, X_air);
-        const double P0 = P0_from_static(P_static, T_static, M, X_air);
+        const double T0 = Tt_from_static(T_static, M, X_air);
+        const double P0 = Pt_from_static(P_static, T_static, M, X_air);
         const double T_back = T_from_stagnation(T0, M, X_air);
         const double P_back = P_from_stagnation(P0, T0, M, X_air);
         std::cout << std::setw(8)  << M
@@ -108,7 +108,7 @@ int main()
 
     for (double T_s : {300.0, 600.0, 1000.0, 1500.0, 2000.0}) {
         for (double M_s : {0.3, 0.8}) {
-            const double T0_var = T0_from_static(T_s, M_s, X_air);
+            const double T0_var = Tt_from_static(T_s, M_s, X_air);
 
             // Constant-gamma approximation: T0 = T * (1 + (gamma-1)/2 * M^2)
             const double gamma_s = isentropic_expansion_coefficient(T_s, X_air);
@@ -149,7 +149,7 @@ int main()
     std::cout << std::string(72, '-') << "\n";
 
     for (double M_aw : {0.1, 0.2, 0.3, 0.5, 0.7, 0.9}) {
-        const double T0_aw   = T0_from_static(T_bulk, M_aw, X_air);
+        const double T0_aw   = Tt_from_static(T_bulk, M_aw, X_air);
         const double T_aw_t  = T_adiabatic_wall_mach(T_bulk, M_aw, T_bulk, P_bulk, X_air, true);
         const double T_aw_l  = T_adiabatic_wall_mach(T_bulk, M_aw, T_bulk, P_bulk, X_air, false);
         const double r_turb  = recovery_factor(Pr_val, true);

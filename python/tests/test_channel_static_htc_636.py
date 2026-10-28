@@ -53,18 +53,18 @@ def test_the_duct_state_closes_energy_and_its_stagnation_pressure(G: float) -> N
     assert not s.choked
     v = G / s.rho
     assert cb.h_mass(T0, X_AIR) - cb.h_mass(s.T, X_AIR) == pytest.approx(0.5 * v * v, rel=1e-9)
-    assert cb.P0_from_static(s.P, s.T, s.M, X_AIR) == pytest.approx(P0, rel=1e-10)
+    assert cb.Pt_from_static(s.P, s.T, s.M, X_AIR) == pytest.approx(P0, rel=1e-10)
 
 
 @pytest.mark.parametrize("G", [5.0, 150.0])
 def test_the_duct_state_partials_match_central_differences(G: float) -> None:
     s = cb.duct_static_state(T0, P0, G, X_AIR)
-    for arg, step in (("T0", 1e-2), ("P0", 1.0), ("G", 1e-4 * G)):
+    for arg, step in (("Tt", 1e-2), ("Pt", 1.0), ("G", 1e-4 * G)):
 
         def at(d: float, arg: str = arg) -> cb.DuctStaticState:
-            kw = {"T0": T0, "P0": P0, "G": G}
+            kw = {"Tt": T0, "Pt": P0, "G": G}
             kw[arg] += d
-            return cb.duct_static_state(kw["T0"], kw["P0"], kw["G"], X_AIR)
+            return cb.duct_static_state(kw["Tt"], kw["Pt"], kw["G"], X_AIR)
 
         sp, sm = at(step), at(-step)
         for q in ("T", "P", "rho"):

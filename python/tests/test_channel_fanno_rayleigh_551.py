@@ -231,7 +231,7 @@ def test_its_partials_match_differences(g: float) -> None:
         return np.array([t.T, t.P, t.rho, t.G_eff])
 
     G = g * GS
-    for name, i, h in (("T0", 0, 1e-5 * T0), ("P0", 1, 1e-5 * P0), ("G", 2, 1e-7 * G)):
+    for name, i, h in (("Tt", 0, 1e-5 * T0), ("Pt", 1, 1e-5 * P0), ("G", 2, 1e-7 * G)):
         args_p, args_m = [T0, P0, G], [T0, P0, G]
         args_p[i] += h
         args_m[i] -= h

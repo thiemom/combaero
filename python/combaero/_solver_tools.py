@@ -7,6 +7,9 @@ They are not part of the public API and may change without notice.
 from . import _core
 
 # Re-export all internal solver tools from _core
+Pt_from_static_and_jacobian_M = _core.Pt_from_static_and_jacobian_M
+Tt_from_static_and_jacobian_M = _core.Tt_from_static_and_jacobian_M
+# Deprecated (#782), removed in 0.9.0: warn and forward to the Pt/Tt names.
 P0_from_static_and_jacobian_M = _core.P0_from_static_and_jacobian_M
 T0_from_static_and_jacobian_M = _core.T0_from_static_and_jacobian_M
 T_adiabatic_wall_and_jacobian_v = _core.T_adiabatic_wall_and_jacobian_v
@@ -68,7 +71,9 @@ wall_exchange_and_jacobian = _core.wall_exchange_and_jacobian
 
 __all__ = [
     "P0_from_static_and_jacobian_M",
+    "Pt_from_static_and_jacobian_M",
     "T0_from_static_and_jacobian_M",
+    "Tt_from_static_and_jacobian_M",
     "T_adiabatic_wall_and_jacobian_v",
     "adiabatic_T_complete_and_jacobian_T",
     "adiabatic_T_complete_and_jacobian_T_from_streams",

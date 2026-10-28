@@ -95,7 +95,7 @@ def main() -> None:
 
     print(f"Inlet: A = {A_inlet * 1e4:.1f} cm^2, Throat: A = {A_throat * 1e4:.1f} cm^2")
     print(f"Exit: A = {A_exit * 1e4:.1f} cm^2")
-    print(f"Stagnation: T0 = {sol_cd.T0:.1f} K, P0 = {sol_cd.P0 / 1000:.0f} kPa")
+    print(f"Stagnation: Tt = {sol_cd.Tt:.1f} K, Pt = {sol_cd.Pt / 1000:.0f} kPa")
     print(f"Mass flow: {sol_cd.mdot:.4f} kg/s")
     print(f"Choked: {sol_cd.choked}")
     print(f"Throat location: x = {sol_cd.x_throat:.3f} m")

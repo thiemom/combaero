@@ -1,7 +1,8 @@
 """Compressible flow submodule.
 
 Provides a symmetric high-level API that mirrors ``combaero.incompressible``.
-All functions accept ``(T, P, X, ...)`` and return a :class:`FlowSolution`.
+All functions accept ``(T, P, X, ...)`` and return a :class:`FlowSolution`;
+``nozzle_flow`` takes the stagnation state ``(Tt, Pt, X, ...)`` it expands from.
 
 Swapping the import is sufficient to switch flow regimes::
 
@@ -40,6 +41,7 @@ from ._core import (
     nozzle_flow as _nozzle_flow,
 )
 from ._flow_solution import FlowSolution
+from ._renamed import renamed_kwargs
 
 
 def _fanno_to_flow_solution(sol: FannoSolution, store_profile: bool = False) -> FlowSolution:
@@ -196,8 +198,8 @@ def channel_flow_rough(
 
 
 def nozzle_flow(
-    T: float,
-    P: float,
+    Tt: float,
+    Pt: float,
     X: Sequence[float],
     *,
     P_back: float,
@@ -209,10 +211,11 @@ def nozzle_flow(
 
     Parameters
     ----------
-    T:
-        Stagnation temperature [K].
-    P:
-        Stagnation pressure [Pa].
+    Tt:
+        Stagnation (total) temperature [K]. Was ``T`` before 0.8.0; ``T=``
+        still works, with a DeprecationWarning, until 0.9.0.
+    Pt:
+        Stagnation (total) pressure [Pa]. Was ``P`` (same deprecation).
     X:
         Mole fractions [-].
     P_back:
@@ -230,5 +233,9 @@ def nozzle_flow(
         ``regime="compressible"``.  ``dP``, ``Re``, ``rho``, ``f``, ``Cd``,
         and ``L_choke`` are not applicable and carry ``nan``.
     """
-    sol = _nozzle_flow(T, P, P_back, A_eff, list(X), tol=tol, max_iter=max_iter)
+    sol = _nozzle_flow(Tt, Pt, P_back, A_eff, list(X), tol=tol, max_iter=max_iter)
     return _nozzle_to_flow_solution(sol)
+
+
+# T/P meant the stagnation state here, against the P/Pt rule (#782).
+nozzle_flow = renamed_kwargs(nozzle_flow, "compressible.nozzle_flow", {"T": "Tt", "P": "Pt"})

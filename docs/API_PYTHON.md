@@ -46,7 +46,7 @@ The `MixtureState` struct is used for network node properties and carries both s
 **Units**: P [Pa], T [K], m_dot [kg/s].
 
 ```python
-# Constructor: MixtureState(P, P_total, T, T_total, m_dot, Y)
+# Constructor: MixtureState(P, Pt, T, Tt, m_dot, Y); P, T static, Pt, Tt total
 node_state = cb.MixtureState(1e5, 1.1e5, 300, 300, 1.5, y_vec)
 
 print(node_state.P)       # Static [Pa]
@@ -188,10 +188,10 @@ print(f"Outlet Mach: {sol.M}") # nan for incompressible
 ### Inverse Solvers
 ```python
 # Solve for unknown given mass flow rate (invert nozzle_flow)
-A_eff = cb.solve_A_eff_from_mdot(T0=300, P0=2e5, P_back=1e5, mdot_target=0.1, X=air)
+A_eff = cb.solve_A_eff_from_mdot(Tt=300, Pt=2e5, P_back=1e5, mdot_target=0.1, X=air)
 # Subsonic root; RuntimeError above the choked flow (0.0467 kg/s here)
-P_back = cb.solve_P_back_from_mdot(T0=300, P0=2e5, A_eff=1e-4, mdot_target=0.04, X=air)
-P0 = cb.solve_P0_from_mdot(T0=300, P_back=1e5, A_eff=1e-4, mdot_target=0.1, X=air)
+P_back = cb.solve_P_back_from_mdot(Tt=300, Pt=2e5, A_eff=1e-4, mdot_target=0.04, X=air)
+Pt = cb.solve_Pt_from_mdot(Tt=300, P_back=1e5, A_eff=1e-4, mdot_target=0.1, X=air)
 ```
 
 Non-positive temperatures, pressures, areas or target flows raise `ValueError`.
@@ -202,30 +202,30 @@ Non-positive temperatures, pressures, areas or target flows raise `ValueError`.
 ### Utility Functions
 ```python
 # Critical pressure ratio and Mach number
-P_crit_ratio = cb.critical_pressure_ratio(T0=300, P0=2e5, X=air)
-Mach = cb.mach_from_pressure_ratio(T0=300, P0=2e5, P=1.5e5, X=air)
+P_crit_ratio = cb.critical_pressure_ratio(Tt=300, Pt=2e5, X=air)  # P*/Pt
+Mach = cb.mach_from_pressure_ratio(Tt=300, Pt=2e5, P=1.5e5, X=air)
 
 # Mass flux and flow analysis
-G = cb.mass_flux_isentropic(T0=300, P0=2e5, P=1.5e5, X=air)
+G = cb.mass_flux_isentropic(Tt=300, Pt=2e5, P=1.5e5, X=air)
 L_max = cb.fanno_max_length(T_in=300, P_in=2e5, u_in=50, D=0.05, f=0.02, X=air)
 ```
 
 A duct's inlet static state from the stagnation state feeding it and its mass
-flux (#636), with partials in T0, P0 and G; the sonic state above the choked
+flux (#636), with partials in Tt, Pt and G; the sonic state above the choked
 flux (`choked`). Network ducts evaluate their heat transfer here, so their
 T_aw lies between the static and the stagnation temperature:
 
 ```python
-s = cb.duct_static_state(T0=1600, P0=2e5, G=150.0, X=air)
-s.T, s.P, s.rho, s.M, s.choked, s.dT_dT0, s.dP_dG
+s = cb.duct_static_state(Tt=1600, Pt=2e5, G=150.0, X=air)
+s.T, s.P, s.rho, s.M, s.choked, s.dT_dTt, s.dP_dG
 ```
 
 Its composition gradients (#717), one entry per species in the MASS
-fractions, at fixed T0, P0 and G, for the wall relay behind a combustor:
+fractions, at fixed Tt, Pt and G, for the wall relay behind a combustor:
 
 ```python
-s = cb.duct_htc_static_state(T0=1600, P0=2e5, G=150.0, X=air)
-d = cb.duct_htc_static_state_dY(T0=1600, P0=2e5, G=150.0, X=air, state=s)
+s = cb.duct_htc_static_state(Tt=1600, Pt=2e5, G=150.0, X=air)
+d = cb.duct_htc_static_state_dY(Tt=1600, Pt=2e5, G=150.0, X=air, state=s)
 d.dT_dY, d.dP_dY, d.drho_dY, d.dGeff_dY
 ```
 
@@ -249,12 +249,13 @@ mu(T).
 ### Rocket Nozzle Functions
 ```python
 # Converging-diverging nozzle analysis
-sol = cb.nozzle_cd(T0=300, P0=2e5, P_design=1e5, P_amb=101325,
+sol = cb.nozzle_cd(Tt=300, Pt=2e5, P_exit=1e5,
                    A_inlet=1e-3, A_throat=5e-4, A_exit=2e-3,
                    x_throat=0.1, x_exit=0.2, X=air)
+sol.Tt, sol.Pt, sol.mdot, sol.choked   # stagnation state the nozzle expands from
 
 # Thrust calculations
-thrust = cb.nozzle_thrust_cd(T0=300, P0=2e5, P_design=1e5, P_amb=101325,
+thrust = cb.nozzle_thrust_cd(Tt=300, Pt=2e5, P_design=1e5, P_amb=101325,
                              A_inlet=1e-3, A_throat=5e-4, A_exit=2e-3,
                              x_throat=0.1, x_exit=0.2, X=air)
 print(f"Thrust: {thrust.thrust} N")
@@ -1807,8 +1808,9 @@ from combaero.network.combustion import (
 )
 
 # Create combustion from streams
-fuel_stream = cb.Stream(m_dot=0.01, T=300, P_total=2e5, Y=fuel_y)
-oxidizer_stream = cb.Stream(m_dot=0.2, T=300, P_total=2e5, Y=air_y)
+# cb.MassStream(m_dot, Tt, Pt, Y): total temperature and pressure
+fuel_stream = cb.MassStream(0.01, 300.0, 2e5, fuel_y)
+oxidizer_stream = cb.MassStream(0.2, 300.0, 2e5, air_y)
 
 result = combustion_from_streams([fuel_stream, oxidizer_stream], phi=1.0)
 print(f"Products: {result.products.Y}")
@@ -1822,11 +1824,11 @@ result = combustion_from_phi(phi=0.8, T=300, P=2e5, fuel="CH4", oxidizer="air")
 ```python
 from combaero.network import MixtureState
 
-# Constructor: MixtureState(P, P_total, T, T_total, m_dot, Y)
+# Constructor: MixtureState(P, Pt, T, Tt, m_dot, Y)
 node_state = MixtureState(1e5, 1.1e5, 300, 300, 1.5, air_vec)
 
 print(f"Static pressure: {node_state.P} Pa")
-print(f"Total pressure: {node_state.P_total} Pa")
+print(f"Total pressure: {node_state.Pt} Pa")
 print(f"Mass flow: {node_state.m_dot} kg/s")
 print(f"Static density: {node_state.density()} kg/m³")
 ```
@@ -1834,11 +1836,13 @@ print(f"Static density: {node_state.density()} kg/m³")
 ### Advanced (f, J) Interface
 High-accuracy analytical Jacobians are available for performance-critical solver loops.
 ```python
-# Exact residuals and derivatives wrt (P_tot, P_static, T, Y); internal
-# (combaero._solver_tools), used by the network elements
+# Exact residuals and derivatives wrt (P_tot, P_static, Tt, Y); internal
+# (combaero._solver_tools), used by the network elements. Tt_up is the
+# upstream TOTAL temperature (T_up before #782); res.d_mdot_dTt_up,
+# res.d_dP_dTt_up its columns.
 from combaero import _solver_tools as st
-res_ori = st.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, Cd, area)
-res_chan = st.channel_residuals_and_jacobian(m_dot, P_tot, P_stat, T, Y, P_down, L, D, roughness, correlation,
+res_ori = st.orifice_residuals_and_jacobian(m_dot, P_tot, P_stat, Tt, Y, P_down, Cd, area)
+res_chan = st.channel_residuals_and_jacobian(m_dot, P_tot, P_stat, Tt, Y, P_down, L, D, roughness, correlation,
                                              f_multiplier=1.0, exit_head_lost=False)  # True adds the exit head (#588)
 # Mix and burn streams (cb.MassStream), Q [W] and 'fraction' after combustion
 res_comb = st.combustor_residuals_and_jacobians(streams, P, Q=0.0, fraction=0.0,
@@ -2950,7 +2954,42 @@ Re = cb.reynolds_from_state(rho=1.2, v=v, L=0.05, mu=1.8e-5)
 
 # Stagnation conditions from static state and velocity
 Tt, Pt = cb.stagnation_from_static(T=300, P=101325, v=v, X=air)  # (K, Pa)
+
+# One at a time, from the Mach number (variable cp), and back
+Tt = cb.Tt_from_static(T=300, M=0.5, X=air)
+Pt = cb.Pt_from_static(P=101325, T=300, M=0.5, X=air)
+Tt = cb.Tt_from_static_v(T=300, v=v, X=air)
+T = cb.T_from_stagnation(Tt=Tt, M=0.5, X=air)
+P = cb.P_from_stagnation(Pt=Pt, Tt=Tt, M=0.5, X=air)
 ```
+
+### Stagnation names: Tt/Pt, deprecated T0/P0 (#782)
+
+`P`/`T` are static and `Pt`/`Tt` total (stagnation) everywhere in the API:
+the pressure rule of #773 holds for temperature too. The spellings below
+still work until **0.9.0**, each with a `DeprecationWarning` naming its
+replacement and bit-for-bit the same result; passing an old keyword together
+with its replacement raises `TypeError`. A positional call is unaffected.
+
+| Deprecated (removed in 0.9.0) | Use |
+|---|---|
+| `T0=`, `P0=` keywords of `nozzle_flow`, `nozzle_cd`, `nozzle_thrust_cd`, `solve_A_eff_from_mdot`, `solve_P_back_from_mdot`, `critical_pressure_ratio`, `mach_from_pressure_ratio`, `mass_flux_isentropic`, `duct_static_state`, `duct_htc_static_state`, `duct_htc_static_state_dY`, `T_from_stagnation`, `P_from_stagnation` | `Tt=`, `Pt=` |
+| `compressible.nozzle_flow(T=, P=)` (the stagnation state) | `Tt=`, `Pt=` |
+| `T0_from_static`, `T0_from_static_v`, `P0_from_static` | `Tt_from_static`, `Tt_from_static_v`, `Pt_from_static` |
+| `solve_P0_from_mdot` (and its `T0=`) | `solve_Pt_from_mdot` (`Tt=`) |
+| `heat_entropy_flux(T0_in=, T0_out=)` | `Tt_in=`, `Tt_out=` |
+| `MixtureState.T_total`, `.P_total` and the constructor keywords | `MixtureState.Tt`, `.Pt` |
+| `MassStream.T`, `.P_total` | `MassStream.Tt`, `.Pt` |
+| `StreamJacobian.d_T`, `.d_P_total` | `.d_Tt`, `.d_Pt` |
+| `NozzleSolution.T0`, `.P0` | `.Tt`, `.Pt` |
+| `DuctStaticState.dT_dT0`, `dT_dP0`, `dP_dT0`, `dP_dP0`, `drho_dT0`, `drho_dP0`, `dGeff_dT0`, `dGeff_dP0` | the same with `Tt`/`Pt`: `dT_dTt`, ... |
+| internal solver tools: `sonic_static_pressure(T0=)`, `approach_static_pressure(P_total=, T_total=)`, `orifice_compressible_mdot_and_jacobian(T0=, P0=)`, `T_up=` of `orifice_residuals_and_jacobian`, `channel_residuals_and_jacobian`, `orifice_compressible_residuals_and_jacobian`; `SonicStatic.dP_dT0`, `OrificeResult.d_mdot_dT_up`, `ChannelSolverResult.d_dP_dT_up`; `T0_/P0_from_static_and_jacobian_M` | `Tt=`, `Pt=`, `Tt_up=`; `dP_dTt`, `d_mdot_dTt_up`, `d_dP_dTt_up`; `Tt_/Pt_from_static_and_jacobian_M` |
+
+Kept: `Pt0`/`Tt0` of the Fanno functions (`fanno_channel_flow`,
+`fanno_rayleigh_*`, `area_change_*`) -- the `t` already says total and the
+`0` is the inlet station, paired with `Tt_exit` -- and `T_from_stagnation` /
+`P_from_stagnation`, whose names already say what they take. Network result
+keys and `NetworkMixtureState` are unchanged here.
 
 ---
 

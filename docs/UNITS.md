@@ -171,15 +171,16 @@ All functions use consistent units to avoid conversion errors.
 
 | Function                   | Input Units                                                  | Output Unit              |
 |----------------------------|--------------------------------------------------------------|--------------------------|
-| `nozzle_flow`              | T0: K, P0: Pa, P_back: Pa, A_eff: m^2, X: mol/mol            | CompressibleFlowSolution |
-| `nozzle_quasi1d`           | T0: K, P0: Pa, P_exit: Pa, x: m, A: m^2, X: mol/mol          | NozzleSolution           |
-| `nozzle_cd`                | T0: K, P0: Pa, P_exit: Pa, A: m^2, x: m, X: mol/mol          | NozzleSolution           |
-| `solve_A_eff_from_mdot`    | T0: K, P0: Pa, P_back: Pa, mdot_target: kg/s, X: mol/mol     | m^2                      |
-| `solve_P_back_from_mdot`   | T0: K, P0: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol     | Pa                       |
-| `solve_P0_from_mdot`       | T0: K, P_back: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol | Pa                       |
-| `critical_pressure_ratio`  | T0: K, P0: Pa, X: mol/mol                                    | - (P*/P0)                |
-| `mach_from_pressure_ratio` | T0: K, P0: Pa, P: Pa, X: mol/mol                             | - (M)                    |
-| `mass_flux_isentropic`     | T0: K, P0: Pa, P: Pa, X: mol/mol                             | kg/(m^2*s)               |
+| `nozzle_flow`              | Tt: K, Pt: Pa, P_back: Pa, A_eff: m^2, X: mol/mol            | CompressibleFlowSolution |
+| `nozzle_quasi1d`           | Tt: K, Pt: Pa, P_exit: Pa, x: m, A: m^2, X: mol/mol          | NozzleSolution           |
+| `nozzle_cd`                | Tt: K, Pt: Pa, P_exit: Pa, A: m^2, x: m, X: mol/mol          | NozzleSolution           |
+| `solve_A_eff_from_mdot`    | Tt: K, Pt: Pa, P_back: Pa, mdot_target: kg/s, X: mol/mol     | m^2                      |
+| `solve_P_back_from_mdot`   | Tt: K, Pt: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol     | Pa                       |
+| `solve_Pt_from_mdot`       | Tt: K, P_back: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol | Pa                       |
+| `solve_P0_from_mdot`       | Tt: K, P_back: Pa, A_eff: m^2, mdot_target: kg/s, X: mol/mol | Pa                       |
+| `critical_pressure_ratio`  | Tt: K, Pt: Pa, X: mol/mol                                    | - (P*/Pt)                |
+| `mach_from_pressure_ratio` | Tt: K, Pt: Pa, P: Pa, X: mol/mol                             | - (M)                    |
+| `mass_flux_isentropic`     | Tt: K, Pt: Pa, P: Pa, X: mol/mol                             | kg/(m^2*s)               |
 
 #### Fanno Flow
 
@@ -427,24 +428,27 @@ All functions use consistent units to avoid conversion errors.
 
 #### Stagnation/Static Conversions
 
-| Function                 | Input Units                                                                 | Output Unit                                         |
-|--------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------|
-| `kinetic_energy`         | v: m/s                                                                      | J/kg                                                |
-| `bulk_velocity`          | m_dot: kg/s, rho: kg/m^3, area: m^2                                         | m/s                                                 |
-| `h0_from_static`         | h_static: J/kg, v: m/s                                                      | J/kg                                                |
-| `v_from_h0`              | h0: J/kg, h_static: J/kg                                                    | m/s                                                 |
-| `mach_number`            | v: m/s, T: K, X: mol/mol                                                    | - (M)                                               |
-| `T0_from_static`         | T: K, M: -, X: mol/mol                                                      | K                                                   |
-| `T0_from_static_v`       | T: K, v: m/s, X: mol/mol                                                    | K                                                   |
-| `T_from_stagnation`      | T0: K, M: -, X: mol/mol                                                     | K                                                   |
-| `P0_from_static`         | P: Pa, T: K, M: -, X: mol/mol                                               | Pa                                                  |
-| `P_from_stagnation`      | P0: Pa, T0: K, M: -, X: mol/mol                                             | Pa                                                  |
-| `recovery_factor`        | Pr: -                                                                       | - (r)                                               |
-| `T_adiabatic_wall`       | T_static: K, v: m/s, T: K, P: Pa, X: mol/mol                                | K                                                   |
-| `T_adiabatic_wall_mach`  | T_static: K, M: -, T: K, P: Pa, X: mol/mol                                  | K                                                   |
-| `stagnation_from_static` | T: K, P: Pa, v: m/s, X: mol/mol                                             | tuple(K, Pa)                                        |
-| `entropy_generation`     | inflows: MassStream (kg/s, K, Pa, kg/kg), outflows: MassStream, S_heat: W/K | EntropyGenerationResult (sigma: W/K, sigma_norm: -) |
-| `heat_entropy_flux`      | m_dot: kg/s, T0_in: K, T0_out: K, Y: kg/kg, M_in: -, M_out: -               | W/K                                                 |
+| Function                 | Input Units                                                                                   | Output Unit                                         |
+|--------------------------|-----------------------------------------------------------------------------------------------|-----------------------------------------------------|
+| `kinetic_energy`         | v: m/s                                                                                        | J/kg                                                |
+| `bulk_velocity`          | m_dot: kg/s, rho: kg/m^3, area: m^2                                                           | m/s                                                 |
+| `h0_from_static`         | h_static: J/kg, v: m/s                                                                        | J/kg                                                |
+| `v_from_h0`              | h0: J/kg, h_static: J/kg                                                                      | m/s                                                 |
+| `mach_number`            | v: m/s, T: K, X: mol/mol                                                                      | - (M)                                               |
+| `Tt_from_static`         | T: K, M: -, X: mol/mol                                                                        | K                                                   |
+| `Tt_from_static_v`       | T: K, v: m/s, X: mol/mol                                                                      | K                                                   |
+| `T_from_stagnation`      | Tt: K, M: -, X: mol/mol                                                                       | K                                                   |
+| `Pt_from_static`         | P: Pa, T: K, M: -, X: mol/mol                                                                 | Pa                                                  |
+| `P_from_stagnation`      | Pt: Pa, Tt: K, M: -, X: mol/mol                                                               | Pa                                                  |
+| `T0_from_static`         | T: K, M: -, X: mol/mol                                                                        | K                                                   |
+| `T0_from_static_v`       | T: K, v: m/s, X: mol/mol                                                                      | K                                                   |
+| `P0_from_static`         | P: Pa, T: K, M: -, X: mol/mol                                                                 | Pa                                                  |
+| `recovery_factor`        | Pr: -                                                                                         | - (r)                                               |
+| `T_adiabatic_wall`       | T_static: K, v: m/s, T: K, P: Pa, X: mol/mol                                                  | K                                                   |
+| `T_adiabatic_wall_mach`  | T_static: K, M: -, T: K, P: Pa, X: mol/mol                                                    | K                                                   |
+| `stagnation_from_static` | T: K, P: Pa, v: m/s, X: mol/mol                                                               | tuple(K, Pa)                                        |
+| `entropy_generation`     | inflows: MassStream (m_dot: kg/s, Tt: K, Pt: Pa, Y: kg/kg), outflows: MassStream, S_heat: W/K | EntropyGenerationResult (sigma: W/K, sigma_norm: -) |
+| `heat_entropy_flux`      | m_dot: kg/s, Tt_in: K, Tt_out: K, Y: kg/kg, M_in: -, M_out: -                                 | W/K                                                 |
 
 ### composition.h - Composition Utilities
 
@@ -707,28 +711,28 @@ All functions use consistent units to avoid conversion errors.
 | `MIXER_HEAT_MDOT_FLOOR`                         | -                                                                                                                              | kg/s                            |
 | `mixer_heat_per_unit_flow`                      | mdot_tot: kg/s                                                                                                                 | phi: s/kg, dphi_dmdot: s^2/kg^2 |
 | `SENSIBLE_ENTHALPY_REF_T`                       | -                                                                                                                              | K                               |
-| `duct_static_state`                             | T0: K, P0: Pa, G: kg/(m^2*s), X: mol/mol                                                                                       | DuctStaticState                 |
+| `duct_static_state`                             | Tt: K, Pt: Pa, G: kg/(m^2*s), X: mol/mol                                                                                       | DuctStaticState                 |
 | `DuctStaticState::T`                            | K                                                                                                                              | K                               |
 | `DuctStaticState::P`                            | Pa                                                                                                                             | Pa                              |
 | `DuctStaticState::rho`                          | kg/m^3                                                                                                                         | kg/m^3                          |
 | `DuctStaticState::M`                            | -                                                                                                                              | -                               |
-| `DuctStaticState::dT_dT0`                       | -                                                                                                                              | -                               |
-| `DuctStaticState::dT_dP0`                       | K/Pa                                                                                                                           | K/Pa                            |
+| `DuctStaticState::dT_dTt`                       | -                                                                                                                              | -                               |
+| `DuctStaticState::dT_dPt`                       | K/Pa                                                                                                                           | K/Pa                            |
 | `DuctStaticState::dT_dG`                        | K/(kg/(m^2*s))                                                                                                                 | K/(kg/(m^2*s))                  |
-| `DuctStaticState::dP_dT0`                       | Pa/K                                                                                                                           | Pa/K                            |
-| `DuctStaticState::dP_dP0`                       | -                                                                                                                              | -                               |
+| `DuctStaticState::dP_dTt`                       | Pa/K                                                                                                                           | Pa/K                            |
+| `DuctStaticState::dP_dPt`                       | -                                                                                                                              | -                               |
 | `DuctStaticState::dP_dG`                        | Pa/(kg/(m^2*s))                                                                                                                | Pa/(kg/(m^2*s))                 |
-| `DuctStaticState::drho_dT0`                     | kg/(m^3*K)                                                                                                                     | kg/(m^3*K)                      |
-| `DuctStaticState::drho_dP0`                     | kg/(m^3*Pa)                                                                                                                    | kg/(m^3*Pa)                     |
+| `DuctStaticState::drho_dTt`                     | kg/(m^3*K)                                                                                                                     | kg/(m^3*K)                      |
+| `DuctStaticState::drho_dPt`                     | kg/(m^3*Pa)                                                                                                                    | kg/(m^3*Pa)                     |
 | `DuctStaticState::drho_dG`                      | s/m                                                                                                                            | s/m                             |
 | `DuctStaticState::choked`                       | -                                                                                                                              | -                               |
 | `DuctStaticState::G_eff`                        | kg/(m^2*s)                                                                                                                     | kg/(m^2*s)                      |
-| `DuctStaticState::dGeff_dT0`                    | kg/(m^2*s*K)                                                                                                                   | kg/(m^2*s*K)                    |
-| `DuctStaticState::dGeff_dP0`                    | kg/(m^2*s*Pa)                                                                                                                  | kg/(m^2*s*Pa)                   |
+| `DuctStaticState::dGeff_dTt`                    | kg/(m^2*s*K)                                                                                                                   | kg/(m^2*s*K)                    |
+| `DuctStaticState::dGeff_dPt`                    | kg/(m^2*s*Pa)                                                                                                                  | kg/(m^2*s*Pa)                   |
 | `DuctStaticState::dGeff_dG`                     | -                                                                                                                              | -                               |
-| `duct_htc_static_state`                         | T0: K, P0: Pa, G: kg/(m^2*s), X: mol/mol                                                                                       | DuctStaticState                 |
+| `duct_htc_static_state`                         | Tt: K, Pt: Pa, G: kg/(m^2*s), X: mol/mol                                                                                       | DuctStaticState                 |
 | `DUCT_HTC_SONIC_MARGIN`                         | -                                                                                                                              | -                               |
-| `duct_htc_static_state_dY`                      | T0: K, P0: Pa, G: kg/(m^2*s), X: mol/mol, state: DuctStaticState                                                               | DuctStaticStateDY               |
+| `duct_htc_static_state_dY`                      | Tt: K, Pt: Pa, G: kg/(m^2*s), X: mol/mol, state: DuctStaticState                                                               | DuctStaticStateDY               |
 | `DuctStaticStateDY::dT_dY`                      | K (per species)                                                                                                                | K (per species)                 |
 | `DuctStaticStateDY::dP_dY`                      | Pa (per species)                                                                                                               | Pa (per species)                |
 | `DuctStaticStateDY::drho_dY`                    | kg/m^3 (per species)                                                                                                           | kg/m^3 (per species)            |
@@ -832,13 +836,13 @@ All functions use consistent units to avoid conversion errors.
 
 ### solver_interface.h - Compressible Flow Elements
 
-| Function                                      | Input Units                                                                                                      | Output Unit                                 |
-|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| `orifice_compressible_mdot_and_jacobian`      | T0: K, P0: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                 | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
-| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, T_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: - | OrificeResult                               |
-| `sonic_static_pressure`                       | T0: K, G: kg/(m^2*s), Y: kg/kg                                                                                   | SonicStatic                                 |
-| `approach_static_pressure`                    | P_total: Pa, T_total: K, G: kg/(m^2*s), Y: kg/kg, incompressible: bool                                           | ApproachStatic                              |
-| `orifice_tap_pressure_and_jacobian`           | P_static_up: Pa, P_total_up: Pa, P_total_down: Pa, beta: -, C: -, compressible: bool                             | OrificeTapPressure                          |
+| Function                                      | Input Units                                                                                                       | Output Unit                                 |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
+| `orifice_compressible_mdot_and_jacobian`      | Tt: K, Pt: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                  | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
+| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: - | OrificeResult                               |
+| `sonic_static_pressure`                       | Tt: K, G: kg/(m^2*s), Y: kg/kg                                                                                    | SonicStatic                                 |
+| `approach_static_pressure`                    | Pt: Pa, Tt: K, G: kg/(m^2*s), Y: kg/kg, incompressible: bool                                                      | ApproachStatic                              |
+| `orifice_tap_pressure_and_jacobian`           | P_static_up: Pa, P_total_up: Pa, P_total_down: Pa, beta: -, C: -, compressible: bool                              | OrificeTapPressure                          |
 
 ### geometry.h - Geometric Utilities
 
@@ -1317,8 +1321,8 @@ All functions use consistent units to avoid conversion errors.
 | `NozzleStation::u`                              | -                                                                                                                                  | m/s                                   |
 | `NozzleStation::x`                              | -                                                                                                                                  | m                                     |
 | `NozzleSolution::A_throat`                      | -                                                                                                                                  | m²                                    |
-| `NozzleSolution::P0`                            | -                                                                                                                                  | Pa                                    |
-| `NozzleSolution::T0`                            | -                                                                                                                                  | K                                     |
+| `NozzleSolution::Pt`                            | -                                                                                                                                  | Pa                                    |
+| `NozzleSolution::Tt`                            | -                                                                                                                                  | K                                     |
 | `NozzleSolution::choked`                        | -                                                                                                                                  | -                                     |
 | `NozzleSolution::h0`                            | -                                                                                                                                  | J/kg                                  |
 | `NozzleSolution::inlet`                         | -                                                                                                                                  | -                                     |
@@ -1546,9 +1550,20 @@ All functions use consistent units to avoid conversion errors.
 | `OrificeFlowResult::v`                          | -                                                                                                                                  | m/s                                   |
 | `SonicStatic::P`                                | -                                                                                                                                  | Pa                                    |
 | `SonicStatic::T`                                | -                                                                                                                                  | K                                     |
-| `SonicStatic::dP_dT0`                           | -                                                                                                                                  | Pa/K                                  |
+| `SonicStatic::dP_dTt`                           | -                                                                                                                                  | Pa/K                                  |
 | `SonicStatic::dP_dG`                            | -                                                                                                                                  | Pa/(kg/(m^2*s))                       |
 | `SonicStatic::dP_dY`                            | -                                                                                                                                  | Pa                                    |
+| `DuctStaticState::dT_dT0`                       | -                                                                                                                                  | -                                     |
+| `DuctStaticState::dT_dP0`                       | K/Pa                                                                                                                               | K/Pa                                  |
+| `DuctStaticState::dP_dT0`                       | Pa/K                                                                                                                               | Pa/K                                  |
+| `DuctStaticState::dP_dP0`                       | -                                                                                                                                  | -                                     |
+| `DuctStaticState::drho_dT0`                     | kg/(m^3*K)                                                                                                                         | kg/(m^3*K)                            |
+| `DuctStaticState::drho_dP0`                     | kg/(m^3*Pa)                                                                                                                        | kg/(m^3*Pa)                           |
+| `DuctStaticState::dGeff_dT0`                    | kg/(m^2*s*K)                                                                                                                       | kg/(m^2*s*K)                          |
+| `DuctStaticState::dGeff_dP0`                    | kg/(m^2*s*Pa)                                                                                                                      | kg/(m^2*s*Pa)                         |
+| `NozzleSolution::P0`                            | -                                                                                                                                  | Pa                                    |
+| `NozzleSolution::T0`                            | -                                                                                                                                  | K                                     |
+| `SonicStatic::dP_dT0`                           | -                                                                                                                                  | Pa/K                                  |
 | `ApproachStatic::P`                             | -                                                                                                                                  | Pa                                    |
 | `ApproachStatic::dP_dPt`                        | -                                                                                                                                  | -                                     |
 | `ApproachStatic::dP_dTt`                        | -                                                                                                                                  | Pa/K                                  |
