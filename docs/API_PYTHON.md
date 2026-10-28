@@ -2163,6 +2163,8 @@ warm start so `solve()` requires no additional `init_strategy`.
 tube = cb.Tube(L=1.0, D=0.1)
 annulus = cb.Annulus(L=0.5, D_inner=0.1, D_outer=0.2)   # DIAMETERS [m]
 annulus.area(), annulus.gap(), annulus.D_mean(), annulus.circumference()
+# Methods raise ValueError unless D_outer > D_inner >= 0 and the sizes they
+# read are finite and positive (a swapped annulus used to give a negative area)
 
 # Can-annular flow geometry (primary zone, transition, annular section)
 can_geo = cb.CanAnnularFlowGeometry(
@@ -2181,6 +2183,9 @@ k_ss = cb.k_stainless_steel_316
 k_inconel = cb.k_inconel718
 k_haynes = cb.k_haynes230
 k_tbc = cb.k_tbc_ysz
+# Out-of-range or NaN T raises RuntimeError. get_material_conductivity(name, T)
+# clamps a finite T to the material range (solver robustness) and raises
+# RuntimeError for NaN or inf T.
 ```
 
 ### Advanced Geometry Functions

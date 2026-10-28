@@ -4,6 +4,7 @@
 #include "../include/humidair.h"
 #include "../include/math_constants.h"
 #include "../include/orifice.h"
+#include "../include/input_validation.h"
 #include "../include/thermo.h"
 #include <algorithm>
 #include <cmath>
@@ -16,7 +17,7 @@
 // -------------------------------------------------------------
 
 double OrificeGeometry::beta() const {
-    if (D <= 0.0) {
+    if (!combaero::validation::is_finite_positive(D)) {
         throw std::invalid_argument("OrificeGeometry: pipe diameter D must be > 0");
     }
     return d / D;
@@ -385,7 +386,7 @@ double Cd_McGreehanSchotsch(double Re, double r_over_d, double L_over_d,
 }
 
 double K_from_Cd(double Cd, double beta) {
-    if (Cd <= 0.0 || Cd > 1.5) {
+    if (!combaero::validation::is_finite_positive(Cd) || Cd > 1.5) {
         throw std::invalid_argument("Cd must be in (0, 1.5]");
     }
     const double b = clamp_beta(beta);
@@ -394,7 +395,7 @@ double K_from_Cd(double Cd, double beta) {
 }
 
 double Cd_from_K(double K, double beta) {
-    if (K < 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(K)) {
         throw std::invalid_argument("K must be >= 0");
     }
     const double b = clamp_beta(beta);
@@ -765,7 +766,7 @@ public:
         const DischargeHoleGeometry& hole,
         const DischargeHoleState& flow) const override {
         const Interpolated z = zeta(hole, flow);
-        if (z.value <= 0.0) {
+        if (!combaero::validation::is_finite_positive(z.value)) {
             throw std::invalid_argument(
                 "Idelchik wall orifice: non-positive resistance coefficient");
         }
@@ -970,7 +971,7 @@ public:
         const double den = 1.0 + L::trans_c1 * u * u;
 
         const double inv_cd = 1.0 / cdu + b / re - cc / den;
-        if (inv_cd <= 0.0) {
+        if (!combaero::validation::is_finite_positive(inv_cd)) {
             throw std::invalid_argument(
                 "Lichtarowicz (1965): non-positive 1/Cd; check l/d and Re");
         }
@@ -1289,7 +1290,7 @@ double discharge_pipe_cd_ratio(DischargeCdCorrelation id, const DischargeHoleGeo
 
 double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP,
                     double rho, double epsilon) {
-    if (dP < 0.0 || rho <= 0.0 || Cd <= 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(dP) || !combaero::validation::is_finite_positive(rho) || !combaero::validation::is_finite_positive(Cd)) {
         throw std::invalid_argument("orifice_mdot: invalid parameters");
     }
     const double beta = geom.beta();
@@ -1299,7 +1300,7 @@ double orifice_mdot(const OrificeGeometry& geom, double Cd, double dP,
 
 double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot,
                   double rho, double epsilon) {
-    if (mdot < 0.0 || rho <= 0.0 || Cd <= 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(mdot) || !combaero::validation::is_finite_positive(rho) || !combaero::validation::is_finite_positive(Cd)) {
         throw std::invalid_argument("orifice_dP: invalid parameters");
     }
     // From mdot = Cd * E * epsilon * A * sqrt(2 * rho * dP)
@@ -1313,7 +1314,7 @@ double orifice_dP(const OrificeGeometry& geom, double Cd, double mdot,
 
 double orifice_Cd_from_measurement(const OrificeGeometry& geom,
                                     double mdot, double dP, double rho) {
-    if (dP <= 0.0 || rho <= 0.0 || mdot <= 0.0) {
+    if (!combaero::validation::is_finite_positive(dP) || !combaero::validation::is_finite_positive(rho) || !combaero::validation::is_finite_positive(mdot)) {
         throw std::invalid_argument("orifice_Cd_from_measurement: invalid parameters");
     }
     const double beta = geom.beta();
@@ -1341,19 +1342,19 @@ double solve_orifice_mdot(
     if (!geom.is_valid()) {
         throw std::invalid_argument("solve_orifice_mdot: invalid geometry");
     }
-    if (dP < 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(dP)) {
         throw std::invalid_argument("solve_orifice_mdot: dP must be non-negative");
     }
-    if (rho <= 0.0) {
+    if (!combaero::validation::is_finite_positive(rho)) {
         throw std::invalid_argument("solve_orifice_mdot: rho must be positive");
     }
-    if (mu <= 0.0) {
+    if (!combaero::validation::is_finite_positive(mu)) {
         throw std::invalid_argument("solve_orifice_mdot: mu must be positive");
     }
-    if (P_upstream <= 0.0) {
+    if (!combaero::validation::is_finite_positive(P_upstream)) {
         throw std::invalid_argument("solve_orifice_mdot: P_upstream must be positive");
     }
-    if (tol <= 0.0) {
+    if (!combaero::validation::is_finite_positive(tol)) {
         throw std::invalid_argument("solve_orifice_mdot: tol must be positive");
     }
     if (max_iter < 1) {
@@ -1438,13 +1439,13 @@ double solve_orifice_mdot(
 
 double expansibility_factor(double beta, double dP, double P_upstream, double kappa) {
     // Input validation
-    if (beta <= 0.0 || beta >= 1.0) {
+    if (!combaero::validation::is_finite_positive(beta) || beta >= 1.0) {
         throw std::invalid_argument("expansibility_factor: beta must be in range (0, 1)");
     }
-    if (P_upstream <= 0.0) {
+    if (!combaero::validation::is_finite_positive(P_upstream)) {
         throw std::invalid_argument("expansibility_factor: P_upstream must be positive");
     }
-    if (dP < 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(dP)) {
         throw std::invalid_argument("expansibility_factor: dP must be non-negative");
     }
 
@@ -1494,19 +1495,19 @@ OrificeFlowResult orifice_flow(
     if (!geom.is_valid()) {
         throw std::invalid_argument("orifice_flow: invalid geometry");
     }
-    if (T <= 0.0) {
+    if (!combaero::validation::is_finite_positive(T)) {
         throw std::invalid_argument("orifice_flow: temperature must be positive");
     }
-    if (P <= 0.0) {
+    if (!combaero::validation::is_finite_positive(P)) {
         throw std::invalid_argument("orifice_flow: pressure must be positive");
     }
-    if (mu <= 0.0) {
+    if (!combaero::validation::is_finite_positive(mu)) {
         throw std::invalid_argument("orifice_flow: viscosity must be positive");
     }
-    if (Z <= 0.0) {
+    if (!combaero::validation::is_finite_positive(Z)) {
         throw std::invalid_argument("orifice_flow: compressibility factor Z must be positive");
     }
-    if (dP < 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(dP)) {
         throw std::invalid_argument("orifice_flow: differential pressure must be non-negative");
     }
 
@@ -1573,16 +1574,16 @@ OrificeFlowResult orifice_flow(
 // -------------------------------------------------------------
 
 double orifice_velocity_from_mdot(double mdot, double rho, double d, double Z) {
-    if (mdot < 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(mdot)) {
         throw std::invalid_argument("orifice_velocity_from_mdot: mdot must be non-negative");
     }
-    if (rho <= 0.0) {
+    if (!combaero::validation::is_finite_positive(rho)) {
         throw std::invalid_argument("orifice_velocity_from_mdot: rho must be positive");
     }
-    if (d <= 0.0) {
+    if (!combaero::validation::is_finite_positive(d)) {
         throw std::invalid_argument("orifice_velocity_from_mdot: d must be positive");
     }
-    if (Z <= 0.0) {
+    if (!combaero::validation::is_finite_positive(Z)) {
         throw std::invalid_argument("orifice_velocity_from_mdot: Z must be positive");
     }
 
@@ -1597,10 +1598,10 @@ double orifice_velocity_from_mdot(double mdot, double rho, double d, double Z) {
 }
 
 double orifice_area_from_beta(double D, double beta) {
-    if (D <= 0.0) {
+    if (!combaero::validation::is_finite_positive(D)) {
         throw std::invalid_argument("orifice_area_from_beta: D must be positive");
     }
-    if (beta <= 0.0 || beta >= 1.0) {
+    if (!combaero::validation::is_finite_positive(beta) || beta >= 1.0) {
         throw std::invalid_argument("orifice_area_from_beta: beta must be in range (0, 1)");
     }
 
@@ -1610,10 +1611,10 @@ double orifice_area_from_beta(double D, double beta) {
 }
 
 double beta_from_diameters(double d, double D) {
-    if (d <= 0.0) {
+    if (!combaero::validation::is_finite_positive(d)) {
         throw std::invalid_argument("beta_from_diameters: d must be positive");
     }
-    if (D <= 0.0) {
+    if (!combaero::validation::is_finite_positive(D)) {
         throw std::invalid_argument("beta_from_diameters: D must be positive");
     }
     if (d >= D) {
@@ -1625,13 +1626,13 @@ double beta_from_diameters(double d, double D) {
 }
 
 double orifice_Re_d_from_mdot(double mdot, double d, double mu) {
-    if (mdot < 0.0) {
+    if (!combaero::validation::is_finite_nonnegative(mdot)) {
         throw std::invalid_argument("orifice_Re_d_from_mdot: mdot must be non-negative");
     }
-    if (d <= 0.0) {
+    if (!combaero::validation::is_finite_positive(d)) {
         throw std::invalid_argument("orifice_Re_d_from_mdot: d must be positive");
     }
-    if (mu <= 0.0) {
+    if (!combaero::validation::is_finite_positive(mu)) {
         throw std::invalid_argument("orifice_Re_d_from_mdot: mu must be positive");
     }
 

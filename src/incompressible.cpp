@@ -5,6 +5,7 @@
 #include "math_constants.h" // Provides M_PI for MSVC
 #include "thermo.h"
 #include "transport.h"
+#include "input_validation.h"
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -28,7 +29,7 @@ double bernoulli_v2(double P1, double P2, double v1, double rho, double dz,
   // P1 + 0.5*rho*v1^2 = P2 + 0.5*rho*v2^2 + rho*g*dz
   // v2^2 = v1^2 + 2(P1 - P2)/rho - 2g*dz
   double v2_sq = v1 * v1 + 2.0 * (P1 - P2) / rho - 2.0 * g * dz;
-  if (v2_sq < 0.0) {
+  if (!validation::is_finite_nonnegative(v2_sq)) {
     throw std::invalid_argument(
         "bernoulli_v2: insufficient energy for flow (v2^2 < 0)");
   }
@@ -40,10 +41,10 @@ double bernoulli_v2(double P1, double P2, double v1, double rho, double dz,
 // -------------------------------------------------------------
 
 double orifice_mdot(double P1, double P2, double A, double Cd, double rho) {
-  if (P1 < P2) {
+  if (!validation::is_finite(P1) || !validation::is_finite(P2) || P1 < P2) {
     throw std::invalid_argument("orifice_mdot: P1 must be >= P2");
   }
-  if (A <= 0.0 || Cd <= 0.0 || rho <= 0.0) {
+  if (!validation::is_finite_positive(A) || !validation::is_finite_positive(Cd) || !validation::is_finite_positive(rho)) {
     throw std::invalid_argument("orifice_mdot: A, Cd, rho must be positive");
   }
   // m_dot = Cd * A * sqrt(2 * rho * Delta_P)
@@ -57,10 +58,10 @@ double orifice_Q(double P1, double P2, double A, double Cd, double rho) {
 }
 
 double orifice_velocity(double P1, double P2, double rho) {
-  if (P1 < P2) {
+  if (!validation::is_finite(P1) || !validation::is_finite(P2) || P1 < P2) {
     throw std::invalid_argument("orifice_velocity: P1 must be >= P2");
   }
-  if (rho <= 0.0) {
+  if (!validation::is_finite_positive(rho)) {
     throw std::invalid_argument("orifice_velocity: rho must be positive");
   }
   // v = sqrt(2 * Delta_P / rho)
@@ -68,10 +69,10 @@ double orifice_velocity(double P1, double P2, double rho) {
 }
 
 double orifice_area(double mdot, double P1, double P2, double Cd, double rho) {
-  if (P1 <= P2) {
+  if (!validation::is_finite(P1) || !validation::is_finite(P2) || P1 <= P2) {
     throw std::invalid_argument("orifice_area: P1 must be > P2");
   }
-  if (mdot <= 0.0 || Cd <= 0.0 || rho <= 0.0) {
+  if (!validation::is_finite_positive(mdot) || !validation::is_finite_positive(Cd) || !validation::is_finite_positive(rho)) {
     throw std::invalid_argument("orifice_area: mdot, Cd, rho must be positive");
   }
   // A = m_dot / (Cd * sqrt(2 * rho * Delta_P))
@@ -80,7 +81,7 @@ double orifice_area(double mdot, double P1, double P2, double Cd, double rho) {
 }
 
 double orifice_dP(double mdot, double A, double Cd, double rho) {
-  if (mdot < 0.0 || A <= 0.0 || Cd <= 0.0 || rho <= 0.0) {
+  if (!validation::is_finite_nonnegative(mdot) || !validation::is_finite_positive(A) || !validation::is_finite_positive(Cd) || !validation::is_finite_positive(rho)) {
     throw std::invalid_argument("orifice_dP: invalid parameters");
   }
   // Delta_P = (m_dot / (Cd * A))^2 / (2 * rho)
@@ -93,7 +94,7 @@ double orifice_dP(double mdot, double A, double Cd, double rho) {
 // -------------------------------------------------------------
 
 double channel_dP(double v, double L, double D, double f, double rho) {
-  if (D <= 0.0 || L < 0.0 || f < 0.0 || rho <= 0.0) {
+  if (!validation::is_finite_positive(D) || !validation::is_finite_nonnegative(L) || !validation::is_finite_nonnegative(f) || !validation::is_finite_positive(rho)) {
     throw std::invalid_argument("channel_dP: invalid parameters");
   }
   // Delta_P = f * (L/D) * (rho * v^2 / 2)
@@ -106,7 +107,7 @@ double channel_dP_mdot(double mdot, double L, double D, double f, double rho) {
 }
 
 double channel_velocity(double mdot, double D, double rho) {
-  if (D <= 0.0 || rho <= 0.0) {
+  if (!validation::is_finite_positive(D) || !validation::is_finite_positive(rho)) {
     throw std::invalid_argument("channel_velocity: D and rho must be positive");
   }
   // v = m_dot / (rho * A) where A = pi*D^2/4
@@ -115,7 +116,7 @@ double channel_velocity(double mdot, double D, double rho) {
 }
 
 double channel_mdot(double v, double D, double rho) {
-  if (D <= 0.0 || rho <= 0.0) {
+  if (!validation::is_finite_positive(D) || !validation::is_finite_positive(rho)) {
     throw std::invalid_argument("channel_mdot: D and rho must be positive");
   }
   // m_dot = rho * v * A where A = pi*D^2/4
@@ -133,7 +134,7 @@ double dynamic_pressure(double v, double rho) {
 }
 
 double velocity_from_q(double q, double rho) {
-  if (q < 0.0 || rho <= 0.0) {
+  if (!validation::is_finite_nonnegative(q) || !validation::is_finite_positive(rho)) {
     throw std::invalid_argument("velocity_from_q: q >= 0 and rho > 0 required");
   }
   // v = sqrt(2 * q / rho)
@@ -145,7 +146,7 @@ double velocity_from_q(double q, double rho) {
 // -------------------------------------------------------------
 
 double pressure_loss(double v, double rho, double zeta) {
-  if (rho <= 0.0 || zeta < 0.0) {
+  if (!validation::is_finite_positive(rho) || !validation::is_finite_nonnegative(zeta)) {
     throw std::invalid_argument(
         "pressure_loss: rho > 0 and zeta >= 0 required");
   }
@@ -154,7 +155,7 @@ double pressure_loss(double v, double rho, double zeta) {
 }
 
 double velocity_from_pressure_loss(double dP, double rho, double zeta) {
-  if (dP < 0.0 || rho <= 0.0 || zeta <= 0.0) {
+  if (!validation::is_finite_nonnegative(dP) || !validation::is_finite_positive(rho) || !validation::is_finite_positive(zeta)) {
     throw std::invalid_argument(
         "velocity_from_pressure_loss: dP >= 0, rho > 0, zeta > 0 required");
   }
@@ -163,7 +164,7 @@ double velocity_from_pressure_loss(double dP, double rho, double zeta) {
 }
 
 double zeta_from_Cd(double Cd) {
-  if (Cd <= 0.0) {
+  if (!validation::is_finite_positive(Cd)) {
     throw std::invalid_argument("zeta_from_Cd: Cd must be positive");
   }
   // zeta = 1 / Cd^2
@@ -171,7 +172,7 @@ double zeta_from_Cd(double Cd) {
 }
 
 double Cd_from_zeta(double zeta) {
-  if (zeta <= 0.0) {
+  if (!validation::is_finite_positive(zeta)) {
     throw std::invalid_argument("Cd_from_zeta: zeta must be positive");
   }
   // Cd = 1 / sqrt(zeta)
@@ -203,17 +204,17 @@ IncompressibleFlowSolution orifice_flow_thermo(double T, double P,
                                                const std::vector<double> &X,
                                                double P_back, double A,
                                                double Cd) {
-  if (T <= 0.0)
+  if (!validation::is_finite_positive(T))
     throw std::invalid_argument("orifice_flow: T must be positive");
-  if (P <= 0.0)
+  if (!validation::is_finite_positive(P))
     throw std::invalid_argument("orifice_flow: P must be positive");
-  if (P_back < 0.0)
+  if (!validation::is_finite_nonnegative(P_back))
     throw std::invalid_argument("orifice_flow: P_back must be non-negative");
   if (P < P_back)
     throw std::invalid_argument("orifice_flow: P must be >= P_back");
-  if (A <= 0.0)
+  if (!validation::is_finite_positive(A))
     throw std::invalid_argument("orifice_flow: A must be positive");
-  if (Cd <= 0.0 || Cd > 1.0)
+  if (!validation::is_finite_positive(Cd) || Cd > 1.0)
     throw std::invalid_argument("orifice_flow: Cd must be in (0, 1]");
 
   const double rho = density(T, P, X);
@@ -269,17 +270,17 @@ IncompressibleFlowSolution
 channel_flow(double T, double P, const std::vector<double> &X, double u,
              double L, double D, double f, std::size_t n_steps,
              bool store_profile) {
-  if (T <= 0.0)
+  if (!validation::is_finite_positive(T))
     throw std::invalid_argument("channel_flow: T must be positive");
-  if (P <= 0.0)
+  if (!validation::is_finite_positive(P))
     throw std::invalid_argument("channel_flow: P must be positive");
-  if (u < 0.0)
+  if (!validation::is_finite_nonnegative(u))
     throw std::invalid_argument("channel_flow: u must be non-negative");
-  if (L < 0.0)
+  if (!validation::is_finite_nonnegative(L))
     throw std::invalid_argument("channel_flow: L must be non-negative");
-  if (D <= 0.0)
+  if (!validation::is_finite_positive(D))
     throw std::invalid_argument("channel_flow: D must be positive");
-  if (f < 0.0)
+  if (!validation::is_finite_nonnegative(f))
     throw std::invalid_argument("channel_flow: f must be non-negative");
 
   const double rho = density(T, P, X);
@@ -313,17 +314,17 @@ channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
                    double L, double D, double roughness,
                    const std::string &correlation, std::size_t n_steps,
                    bool store_profile) {
-  if (T <= 0.0)
+  if (!validation::is_finite_positive(T))
     throw std::invalid_argument("channel_flow_rough: T must be positive");
-  if (P <= 0.0)
+  if (!validation::is_finite_positive(P))
     throw std::invalid_argument("channel_flow_rough: P must be positive");
-  if (u < 0.0)
+  if (!validation::is_finite_nonnegative(u))
     throw std::invalid_argument("channel_flow_rough: u must be non-negative");
-  if (L < 0.0)
+  if (!validation::is_finite_nonnegative(L))
     throw std::invalid_argument("channel_flow_rough: L must be non-negative");
-  if (D <= 0.0)
+  if (!validation::is_finite_positive(D))
     throw std::invalid_argument("channel_flow_rough: D must be positive");
-  if (roughness < 0.0)
+  if (!validation::is_finite_nonnegative(roughness))
     throw std::invalid_argument(
         "channel_flow_rough: roughness must be non-negative");
 
@@ -361,15 +362,15 @@ channel_flow_rough(double T, double P, const std::vector<double> &X, double u,
 IncompressibleFlowSolution
 orifice_flow_thermo(double T, double P, const std::vector<double> &X,
                     double P_back, double A, const IncompressibleCdFn &cd_fn) {
-  if (T <= 0.0)
+  if (!validation::is_finite_positive(T))
     throw std::invalid_argument("orifice_flow: T must be positive");
-  if (P <= 0.0)
+  if (!validation::is_finite_positive(P))
     throw std::invalid_argument("orifice_flow: P must be positive");
-  if (P_back < 0.0)
+  if (!validation::is_finite_nonnegative(P_back))
     throw std::invalid_argument("orifice_flow: P_back must be non-negative");
   if (P < P_back)
     throw std::invalid_argument("orifice_flow: P must be >= P_back");
-  if (A <= 0.0)
+  if (!validation::is_finite_positive(A))
     throw std::invalid_argument("orifice_flow: A must be positive");
 
   const double rho = density(T, P, X);
@@ -382,7 +383,7 @@ orifice_flow_thermo(double T, double P, const std::vector<double> &X,
   const double Re = (mu > 0.0) ? rho * v_ideal * D_eq / mu : 0.0;
 
   const double Cd = cd_fn(T, P, X, Re);
-  if (Cd <= 0.0 || Cd > 1.0)
+  if (!validation::is_finite_positive(Cd) || Cd > 1.0)
     throw std::runtime_error(
         "orifice_flow: Cd correlation returned value outside (0, 1]");
 
@@ -427,17 +428,17 @@ std::tuple<double, double, double>
 channel_pressure_drop(double T, double P, const std::vector<double> &X, double v,
                       double D, double L, double roughness,
                       const std::string &correlation) {
-  if (T <= 0.0)
+  if (!validation::is_finite_positive(T))
     throw std::invalid_argument("channel_pressure_drop: T must be positive");
-  if (P <= 0.0)
+  if (!validation::is_finite_positive(P))
     throw std::invalid_argument("channel_pressure_drop: P must be positive");
-  if (D <= 0.0)
+  if (!validation::is_finite_positive(D))
     throw std::invalid_argument("channel_pressure_drop: D must be positive");
-  if (L < 0.0)
+  if (!validation::is_finite_nonnegative(L))
     throw std::invalid_argument("channel_pressure_drop: L must be non-negative");
-  if (v < 0.0)
+  if (!validation::is_finite_nonnegative(v))
     throw std::invalid_argument("channel_pressure_drop: v must be non-negative");
-  if (roughness < 0.0)
+  if (!validation::is_finite_nonnegative(roughness))
     throw std::invalid_argument(
         "channel_pressure_drop: roughness must be non-negative");
 

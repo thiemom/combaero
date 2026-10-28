@@ -269,7 +269,7 @@ double fanno_dx_dmach(double G, double Tt, double M, const std::vector<double>& 
 double fanno_length_between(double G, double Tt, double M1, double M2,
                             const std::vector<double>& X, double D, double roughness,
                             const std::string& friction_model, double f_multiplier) {
-  if (!(M1 > 0.0) || M2 < M1 || M2 > 1.0) {
+  if (!(M1 > 0.0) || !(M2 >= M1) || !(M2 <= 1.0)) {
     throw std::invalid_argument("fanno_length_between: need 0 < M1 <= M2 <= 1");
   }
   if (M2 == M1) {
