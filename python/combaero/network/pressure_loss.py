@@ -4,20 +4,22 @@ Pressure-loss correlation classes for CombustorNode.
 Two families of correlations are provided:
 
 **Fraction family** -- loss expressed as a fraction of inlet total pressure:
-    dP_total = xi * P_in        =>   P_out = P_in * (1 - xi)
+    dPt = xi * Pt_in        =>   Pt_out = Pt_in * (1 - xi)
   Classes: ConstantFractionLoss, LinearThetaFractionLoss
 
 **Head family** -- loss expressed as a multiple of the inlet dynamic head:
-    dP = zeta * 0.5 * rho_in * v_in^2
+    dPt = zeta * 0.5 * rho_in * v_in^2, rho_in and v_in at the inlet
+    STAGNATION state (Tt_in, Pt_in): Lefebvre's pressure-loss factor, a
+    total-total low-Mach form (#782 audit; a coupled Fanno-Rayleigh form is #830)
   Classes: ConstantHeadLoss, LinearThetaHeadLoss  (Phase 1b, needs mdot_total in ctx)
 
 All callables return ``(loss_value, d_loss_value_d_theta)`` where
 ``loss_value`` is the *fractional* total-pressure loss (dimensionless)
-consumed by ``P_out = P_in * (1 - loss_value)``.
+consumed by ``Pt_out = Pt_in * (1 - loss_value)``.
 
 WHERE THE LOSS IS EVALUATED. The four built-in classes evaluate in C++
 (``cb.combustor_fraction_loss`` / ``cb.combustor_head_loss``), and their
-``evaluate(ctx, Y_in)`` returns every partial (theta, m_dot, T_in, P_in, each
+``evaluate(ctx, Y_in)`` returns every partial (theta, m_dot, Tt_in, Pt_in, each
 inlet mass fraction). A ``PressureLossElement`` builds its Jacobian from those.
 The C++ ``combustor_residuals_and_jacobians`` also accepts a loss callable,
 but ``CombustorNode`` passes it a zero loss, so that chain does not run in a
@@ -29,12 +31,19 @@ which are what let it be arbitrary Python. That interface is the prototype for
 user-supplied loss maps (e.g. a scipy interpolant over theta and fuel splits;
 the input design for the splits is open, #725).
 
-Theta = T_ad / T_in - 1  (dimensionless temperature-rise ratio).
+Theta = T_ad / Tt_in - 1  (dimensionless temperature-rise ratio).
+
+THE CONTEXT (``PressureLossContext``) carries the inlet's stagnation state as
+``Tt_in``/``Pt_in``. Until 0.8 these were ``T_in``/``P_in`` (``P_in`` the
+inlet's STATIC pressure); the old names still read, with a
+``DeprecationWarning``, until 0.9.0.
 """
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Protocol, runtime_checkable
 
+from .. import _renamed
 from .._core import (
     CombustorLossResult,
     combustor_fraction_loss,
@@ -47,15 +56,53 @@ from .._core import (
 class PressureLossCallable(Protocol):
     """Protocol for pressure-loss correlation objects.
 
-    The context object passed at solve time is ``PressureLossContext``
-    (exposed from C++ via pybind).
+    The context object passed at solve time is a ``PressureLossContext``.
     """
 
     def __call__(self, ctx: object) -> tuple[float, float]: ...
 
 
+class PressureLossContext(SimpleNamespace):
+    """What a loss correlation is evaluated at: ``theta``, ``mdot_total``,
+    the inlet stagnation state ``Tt_in``/``Pt_in``, ``X_in``, ``T_ad``, ...
+
+    ``T_in``/``P_in`` are the 0.7 names (``P_in`` was the inlet's static
+    pressure); they read and write ``Tt_in``/``Pt_in`` with a
+    ``DeprecationWarning`` and are removed in 0.9.0.
+    """
+
+    @property
+    def T_in(self) -> float:
+        _renamed._warn("PressureLossContext.T_in", "PressureLossContext.Tt_in")
+        return self.Tt_in  # type: ignore[no-any-return]
+
+    @T_in.setter
+    def T_in(self, value: float) -> None:
+        _renamed._warn("PressureLossContext.T_in", "PressureLossContext.Tt_in")
+        self.Tt_in = value
+
+    @property
+    def P_in(self) -> float:
+        _renamed._warn("PressureLossContext.P_in", "PressureLossContext.Pt_in")
+        return self.Pt_in  # type: ignore[no-any-return]
+
+    @P_in.setter
+    def P_in(self, value: float) -> None:
+        _renamed._warn("PressureLossContext.P_in", "PressureLossContext.Pt_in")
+        self.Pt_in = value
+
+
+def _ctx_inlet(ctx: object) -> tuple[float, float]:
+    """(Tt_in, Pt_in) of a context; a hand-built 0.7 context with only
+    ``T_in``/``P_in`` still works, with a ``DeprecationWarning``."""
+    if hasattr(ctx, "Tt_in") or hasattr(ctx, "Pt_in"):
+        return float(ctx.Tt_in), float(ctx.Pt_in)  # type: ignore[attr-defined]
+    _renamed._warn("a loss context's T_in/P_in", "Tt_in/Pt_in", stacklevel=4)
+    return float(ctx.T_in), float(ctx.P_in)  # type: ignore[attr-defined]
+
+
 # ---------------------------------------------------------------------------
-# Fraction family:  dP/P_in = xi   (total-pressure ratio convention)
+# Fraction family:  dPt/Pt_in = xi   (total-pressure ratio convention)
 # ---------------------------------------------------------------------------
 
 
@@ -86,12 +133,12 @@ def _inlet_Y(ctx: object, Y_in: list[float] | None) -> list[float]:
 class ConstantFractionLoss:
     """Constant fractional total-pressure loss.
 
-    Formula:  dP/P_in = xi   =>   P_out = P_in * (1 - xi)
+    Formula:  dPt/Pt_in = xi   =>   Pt_out = Pt_in * (1 - xi)
 
     Parameters
     ----------
     xi : float
-        Fractional total-pressure loss [-].  E.g. 0.03 = 3% of P_in.
+        Fractional total-pressure loss [-].  E.g. 0.03 = 3% of Pt_in.
     m_ref : float | None
         Design mass flow [kg/s]. Below it the loss scales with the dynamic
         head and vanishes at zero flow (``_m_ref_arg``); at and above
@@ -122,8 +169,8 @@ class ConstantFractionLoss:
 class LinearThetaFractionLoss:
     """Total-pressure loss fraction linear in temperature-rise ratio Theta.
 
-    Formula:  dP/P_in = k * Theta + xi0
-              Theta   = T_ad / T_in - 1
+    Formula:  dPt/Pt_in = k * Theta + xi0
+              Theta   = T_ad / Tt_in - 1
 
     Parameters
     ----------
@@ -161,21 +208,23 @@ class LinearThetaFractionLoss:
 # Head family:  dP = zeta * 0.5 * rho_in * v_in^2  (Euler loss coefficient)
 #
 # v_in = mdot_total / (rho_in * area), rho_in the ideal-gas density at
-# (T_in, P_in, inlet composition). The return value is still a *fraction* of
-# P_in, xi = zeta * 0.5 rho_in v_in^2 / P_in, so P_out = P_in (1 - xi) holds
-# for both families. The partials in m_dot, T_in, P_in and composition come
-# from C++ with the value (``cb.combustor_head_loss``).
+# (Tt_in, Pt_in, inlet composition): Lefebvre's total-total form. The return
+# value is still a *fraction* of Pt_in, xi = zeta * 0.5 rho_in v_in^2 / Pt_in,
+# so Pt_out = Pt_in (1 - xi) holds for both families. The partials in m_dot,
+# Tt_in, Pt_in and composition come from C++ with the value
+# (``cb.combustor_head_loss``).
 # ---------------------------------------------------------------------------
 
 
 def _head(
     ctx: object, Y_in: list[float] | None, k: float, zeta0: float, area: float
 ) -> CombustorLossResult:
+    Tt_in, Pt_in = _ctx_inlet(ctx)
     return combustor_head_loss(
         float(ctx.theta),  # type: ignore[attr-defined]
         float(ctx.mdot_total),  # type: ignore[attr-defined]
-        float(ctx.T_in),  # type: ignore[attr-defined]
-        float(ctx.P_in),  # type: ignore[attr-defined]
+        Tt_in,
+        Pt_in,
         _inlet_Y(ctx, Y_in),
         k,
         zeta0,
@@ -199,8 +248,8 @@ class ConstantHeadLoss:
 
     Notes
     -----
-    Internally converts to a pressure fraction xi = dP/P_in so both families
-    share P_out = P_in (1 - xi).
+    Internally converts to a pressure fraction xi = dPt/Pt_in so both
+    families share Pt_out = Pt_in (1 - xi).
     """
 
     zeta: float = 5.0
@@ -220,7 +269,7 @@ class LinearThetaHeadLoss:
     """Euler head-loss coefficient linear in temperature-rise ratio Theta.
 
     Formula:  dP = (k * Theta + zeta0) * 0.5 * rho_in * v_in^2
-              Theta = T_ad / T_in - 1
+              Theta = T_ad / Tt_in - 1
               v_in  = mdot_total / (rho_in * area)
 
     Parameters
@@ -234,7 +283,7 @@ class LinearThetaHeadLoss:
 
     Notes
     -----
-    ``d(xi)/dTheta = k * q_frac``, q_frac = 0.5*rho_in*v_in^2 / P_in; the
+    ``d(xi)/dTheta = k * q_frac``, q_frac = 0.5*rho_in*v_in^2 / Pt_in; the
     other partials come with it from ``evaluate``.
     """
 

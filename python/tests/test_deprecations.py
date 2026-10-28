@@ -207,6 +207,16 @@ def _calls() -> dict[str, dict[str, object]]:
             "M_in": 0.1,
             "M_out": 0.3,
         },
+        "combustor_head_loss": {
+            "theta": 0.2,
+            "mdot": 0.4,
+            "Tt_in": 700.0,
+            "Pt_in": 2.0e5,
+            "Y_in": _Y,
+            "k": 1.0,
+            "zeta0": 3.0,
+            "area": 0.05,
+        },
     }
 
 
@@ -332,6 +342,7 @@ def _instances() -> dict[str, object]:
         "ChannelSolverResult": _solver_tools.channel_residuals_and_jacobian(
             **calls["channel_residuals_and_jacobian"]
         ),
+        "CombustorLossResult": cb.combustor_head_loss(**calls["combustor_head_loss"]),
     }
 
 

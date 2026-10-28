@@ -46,7 +46,7 @@ TEST(CombustorLoss, HeadLossPartialsMatchDifferences) {
   const std::vector<double> Y = air_with_fuel();
   const double x0[4] = {1.7, 0.8, 650.0, 1.6e5};
   const auto r = cb::combustor_head_loss(x0[0], x0[1], x0[2], x0[3], Y, 1.0, 3.0, 0.05);
-  const double an[4] = {r.dxi_dtheta, r.dxi_dmdot, r.dxi_dT_in, r.dxi_dP_in};
+  const double an[4] = {r.dxi_dtheta, r.dxi_dmdot, r.dxi_dTt_in, r.dxi_dPt_in};
   for (int i = 0; i < 4; ++i) {
     double a[4] = {x0[0], x0[1], x0[2], x0[3]};
     double b[4] = {x0[0], x0[1], x0[2], x0[3]};

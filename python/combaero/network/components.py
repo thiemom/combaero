@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 import combaero as cb
 from combaero import _renamed, _solver_tools
 
+from .pressure_loss import PressureLossContext
+
 # Physics configuration types for network introspectability
 CompressibilityLiteral = Literal["incompressible", "compressible"]
 FrictionModelLiteral = Literal["haaland", "colebrook", "serghides", "petukhov"]
@@ -6758,10 +6760,10 @@ def _correlation_is_linear_theta(correlation: Callable) -> bool:
     theta-aware if its returned ``dxi_dtheta`` is nonzero.
     """
     try:
-        ctx_zero = SimpleNamespace(
+        ctx_zero = PressureLossContext(
             theta=0.0,
-            T_in=300.0,
-            P_in=101325.0,
+            Tt_in=300.0,
+            Pt_in=101325.0,
             X_in=[1.0],
             T_ad=300.0,
             phi=0.0,
@@ -6998,10 +7000,12 @@ class PressureLossElement(NetworkElement):
             T_ctx = float(state_in.Tt)
             T_ad = float(state_in.Tt)
 
-        return SimpleNamespace(
+        # The inlet STAGNATION state: Lefebvre's loss factor is total-total
+        # (#782 audit); until 0.8 P_in was the static P.
+        return PressureLossContext(
             theta=theta,
-            T_in=T_ctx,
-            P_in=float(state_in.P),
+            Tt_in=T_ctx,
+            Pt_in=float(state_in.Pt),
             X_in=list(state_in.X),
             T_ad=T_ad,
             phi=0.0,
@@ -7097,11 +7101,11 @@ class PressureLossElement(NetworkElement):
         }
 
         # ----- Analytical theta Jacobian (linear-theta correlations) -----
-        # d_res/d_T_burned = -Pt_in * dxi_dtheta / T_in.
-        if self._theta_source_resolved is not None and dxi_dtheta != 0.0 and ctx.T_in > 0:
-            jac[0][f"{self._theta_source_resolved}.Tt"] = state_in.Pt * dxi_dtheta / ctx.T_in
+        # d_res/d_T_burned = -Pt_in * dxi_dtheta / Tt_in.
+        if self._theta_source_resolved is not None and dxi_dtheta != 0.0 and ctx.Tt_in > 0:
+            jac[0][f"{self._theta_source_resolved}.Tt"] = state_in.Pt * dxi_dtheta / ctx.Tt_in
 
-        # ----- The other dependences: m_dot, P_in, T_in, composition. A
+        # ----- The other dependences: m_dot, Pt_in, Tt_in, composition. A
         # built-in correlation returns them analytically from C++ (evaluate,
         # #718); a user callable (the loss-map prototype) is differenced.
         evaluate = getattr(self.correlation, "evaluate", None)
@@ -7111,8 +7115,8 @@ class PressureLossElement(NetworkElement):
             if partials is not None:
                 return {
                     "mdot_total": partials.dxi_dmdot,
-                    "P_in": partials.dxi_dP_in,
-                    "T_in": partials.dxi_dT_in,
+                    "Pt_in": partials.dxi_dPt_in,
+                    "Tt_in": partials.dxi_dTt_in,
                 }[attr]
             eps = step_scale if val == 0.0 else max(abs(val) * 1e-6, step_scale)
             saved = getattr(ctx, attr)
@@ -7131,18 +7135,19 @@ class PressureLossElement(NetworkElement):
         if dxi_dmdot != 0.0:
             jac[0][f"{self.id}.m_dot"] = state_in.Pt * dxi_dmdot * m_sign
 
-        dxi_dP_in = _dxi_dvar("P_in", ctx.P_in, 1.0)
-        if dxi_dP_in != 0.0:
-            # P_in = state_in.P.  Static P is driven by the node's P unknown.
-            jac[0][f"{up_id}.P"] = state_in.Pt * dxi_dP_in
+        dxi_dPt_in = _dxi_dvar("Pt_in", ctx.Pt_in, 1.0)
+        if dxi_dPt_in != 0.0:
+            # Pt_in = state_in.Pt: into the same column as the -(1 - xi) term.
+            key = f"{up_id}.Pt"
+            jac[0][key] = jac[0].get(key, 0.0) + state_in.Pt * dxi_dPt_in
 
         if self._theta_source_resolved is None:
-            # When no theta source, ctx.T_in = state_in.T (a derived state).
-            # Emit a relay-routable T Jacobian on the upstream node.
-            dxi_dT_in = _dxi_dvar("T_in", ctx.T_in, 0.01)
-            if dxi_dT_in != 0.0:
-                jac[0][f"{up_id}.Tt"] = state_in.Pt * dxi_dT_in
-        elif graph is not None and ctx.T_in > 0:
+            # When no theta source, ctx.Tt_in = state_in.Tt (a derived state).
+            # Emit a relay-routable Tt Jacobian on the upstream node.
+            dxi_dTt_in = _dxi_dvar("Tt_in", ctx.Tt_in, 0.01)
+            if dxi_dTt_in != 0.0:
+                jac[0][f"{up_id}.Tt"] = state_in.Pt * dxi_dTt_in
+        elif graph is not None and ctx.Tt_in > 0:
             self._add_unburned_jacobian(jac[0], graph, ctx, state_in.Pt, dxi_dtheta, _dxi_dvar)
 
         # Composition of the inlet state (a head loss's density): per species,
@@ -7191,7 +7196,7 @@ class PressureLossElement(NetworkElement):
         """d(res)/d(unknowns) through the source's UNBURNED temperature (#481 C1).
 
         T_u enters twice: theta = T_b/T_u - 1 (d theta/dT_u = -T_b/T_u^2) and
-        as the correlation's reference temperature ctx.T_in (a head loss's
+        as the correlation's reference temperature ctx.Tt_in (a head loss's
         density). T_u is the enthalpy mix of the source's inflows (#718), so
         dT_u = sum(dT_u/dm_i dm_i + dT_u/dTt_i dTt_i + dT_u/dY_i . dY_i), the
         partials from the C++ mixer: the flows' unknowns directly, each Tt_i
@@ -7202,8 +7207,8 @@ class PressureLossElement(NetworkElement):
         streams = getattr(src, "_unburned_streams", None)
         if not streams:
             return
-        T_u, T_b = ctx.T_in, ctx.T_ad
-        dres_dTu = Pt_in * (dxi_dtheta * (-T_b / (T_u * T_u)) + dxi_dvar("T_in", T_u, 0.01))
+        T_u, T_b = ctx.Tt_in, ctx.T_ad
+        dres_dTu = Pt_in * (dxi_dtheta * (-T_b / (T_u * T_u)) + dxi_dvar("Tt_in", T_u, 0.01))
         if dres_dTu == 0.0:
             return
         for names, src_node, dTu_dm, dTu_dTt, dTu_dY in streams:
