@@ -2675,6 +2675,63 @@ documents:
   issues: [339, 375, 381, 382, 383, 384, 406, 409, 465, 645, 649]
   records: [validation/cooling/extractions/orifice_discharge_coefficient.md, validation/cooling/data/mcgreehan_schotsch1988/]
   code: ['include/orifice.h: orifice::mcgreehan_schotsch, McGreehanSchotsch1988']
+- file: docs/orifices/rogers_hersh_1976_NASA_CR-2681_grazing_flow_orifice_resistance.pdf
+  citation: 'Rogers, T., Hersh, A. S. (1976). Effect of grazing flow on steady-state resistance of isolated
+    square-edged orifices. NASA CR-2681 (NAS3-17858), Hersh Acoustical Engineering.'
+  id: NASA-CR-2681
+  topic: [orifice, acoustics]
+  content: 'Measured steady discharge coefficient of single square-edged wall holes under a turbulent
+    grazing flow, BOTH directions. NOTE the paper''s terms: its "inflow" (grazing stream into the cavity)
+    is a suction/bleed hole, its "outflow" an injection hole. Cd_De is referenced to the grazing STATIC
+    pressure, incompressible (Eqs. 20-24, p. 11). D 1-12.7 mm, L/D 0.12-2.0 (3.14 without grazing, App.
+    E), delta about 9 mm (delta/D 0.7-9), V_inf 12.9-85 m/s (M <= 0.25), Vi/V_inf 0.004 to about 0.9.
+    Fig. 11 (p. 41, D 12.7 mm, L/D 1): fits Cd = 0.8 (Vi/V_inf)^0.47 suction, 0.97 (Vi/V_inf)^0.534
+    injection, about 10-15 clean points per direction; crossing near Vi/V_inf 0.05, injection higher
+    above. L/D strongly affects suction Cd at every ratio, minimum at L/D 0.6 (Figs. 18-19), injection
+    not below Vi/V_inf 0.35-0.5 (Fig. 17); resistance ~ (delta/D)^-0.2 (Figs. 15-16). A lid model (Eqs.
+    11, 19, App. D). Figs. 13-14 replot Feder (P&W) hole-cluster data. Data plotted only, no tables. PDF
+    page = printed page + 6.'
+  status: screened
+  verdict: 'Screened 2026-10-28 for Cd under strong crossflow (#799, #800, #807). Plugs the gap: measured
+    suction AND injection Cd down to Vi/V_inf 0.004, where CR-3630 D.1 B(5,4,1)''s stagnant rows sit
+    (Gc/Gj ~125, Vi/V_inf ~0.008: Cd ~0.08 both ways by the fits, against the constant 0.85 used). Suction
+    is not much lower than injection there, so a reverse-only Cd does not follow from it. Cd ~ (Vi/V_inf)^0.5
+    makes the hole resistance LINEAR in dP under strong grazing flow (Vi ~ dP / V_inf), which would remove
+    the sqrt(dP) singularity behind the #799 alternating mode -- an inference, untested. McGreehan-Schotsch
+    (shipped) covers injection only at modest crossflow; TN 3663 (registered) references the grazing TOTAL
+    pressure, so the two must be converted before mixing. Limits: acoustic-liner hole sizes, one boundary
+    layer, static-pressure Cd. To use: digitise Fig. 11, then Figs. 18 and 17; the in-text fits are a
+    starting closure, accuracy (cross-source) for any impingement or liner use.'
+  read_for: ['#799 stagnant-row jets: Cd under strong crossflow, suction vs injection', '#800 Cd falling
+      with Gc/Gj', '#807 thin-wall (L/D) effect on crossflow Cd']
+  issues: [799, 800, 807]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/19760015890.pdf (NTRS 19760015890). Primary data (Hersh Acoustical
+    Engineering wind tunnel); cites TN 3663 for suction Cd without comparing numbers.
+- file: docs/orifices/hersh_walker_1979_NASA_CR-3177_grazing_flow_helmholtz_impedance.pdf
+  citation: 'Hersh, A. S., Walker, B. (1979). Effect of grazing flow on the acoustic impedance of Helmholtz
+    resonators consisting of single and clustered orifices. NASA CR-3177 (NAS3-19745).'
+  id: NASA-CR-3177
+  topic: [acoustics, orifice]
+  content: 'Acoustic impedance of single (16 models, d 0.91-7.11 mm, t/d 0.07-0.80; Table I) and clustered
+    orifices (20 configurations, N 1-64 at 1.96% open area, S/d 1.5-6; Table IV) under grazing flow to
+    about 80 m/s; thick plates t/d 0.29-8.9 (Table II). The "Cd" is an ACOUSTIC discharge coefficient from a
+    two-microphone ratio (Eqs. 13, 41), zero mean flow through the hole. A steady grazing-inflow model
+    without data (Sec. 3.2, Eq. 45) is mapped onto sound pressure and fitted (Eqs. 47-48). Grazing-flow
+    resistance R/rho c ~ M/(1.87 + 0.17 dBL/d) (Eq. 54), reactance (Eq. 55), self-noise Strouhal 0.26
+    (Table III), cluster end corrections (Eqs. 68-70). Appendices A, C, D tabulate every point. PDF page =
+    report page + 4.'
+  status: screened
+  verdict: 'Screened 2026-10-28 for steady Cd under crossflow: NONE -- every measurement is acoustic with
+    zero mean flow, so suction and injection are not separable, and the lowest eta ~0.03-0.05 is far from
+    the CR-3630 stagnant rows. Not used for Cd; CR-2681 (its reference 5) is the steady source. Of possible
+    use only for a grazing-flow term in an orifice/Helmholtz acoustic impedance (not checked against
+    combaero''s acoustics module). Cluster results: number and spacing of holes barely matter except 4 in
+    line with the flow at S/d 2.'
+  read_for: ['#799/#800 steady Cd under crossflow (none)', grazing-flow orifice impedance (acoustics)]
+  issues: [799, 800]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/19790023885.pdf (NTRS 19790023885). Acoustic follow-on to CR-2681.
 - file: docs/orifices/Rohde_NASA_TN_D-5467.pdf
   citation: Rohde, J. E., Richards, H. T., Metger, G. W. (1969). Discharge coefficients for thick plate
     orifices with approach flow perpendicular and inclined to the orifice axis. NASA TN D-5467, Lewis
