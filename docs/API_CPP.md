@@ -442,9 +442,9 @@ CombustorLossResult combustor_head_loss(double theta, double mdot, double Tt_in,
 // Combustion equilibrium (T, P constant)
 State combustion_equilibrium(const State& in, bool smooth = false);
 
-// With analytic derivatives (#716): implicit in each stage's extent (reforming
-// per hydrocarbon, WGS) and in the adiabatic root; a bound extent takes the
-// bound's derivative.
+// With analytic derivatives (#716): one implicit-function solve on the joint
+// extents (reforming per hydrocarbon, WGS; #759) and the adiabatic root; a
+// reaction with an absent species keeps a zero derivative.
 struct EquilibriumJacobian {
     State state; double dT_dT_in, dT_dP; std::vector<double> dT_dX;
     std::vector<std::vector<double>> dXout_dX; std::vector<double> dXout_dT_in, dXout_dP;

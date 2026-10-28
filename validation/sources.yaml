@@ -2995,6 +2995,24 @@ documents:
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
   notes: Supplied by the user 2026-10-28 (the haynesintl.com PDF links return 403 to automated fetches).
+- file: docs/combustion/gordon_mcbride_1994_NASA_RP-1311_part1_analysis.pdf
+  citation: Gordon, S., McBride, B. J. (1994). Computer program for calculation of complex chemical equilibrium
+    compositions and applications. I. Analysis. NASA RP-1311.
+  id: NTRS 19950013764
+  topic: [combustion]
+  content: 'The CEA method -- Gibbs minimisation by element potentials (Ch. 2, Tables 2.1-2.2), initial
+    estimates, convergence controls (Sec. 3, control factors lambda_1 Eq. 3.1 and lambda_2 Eq. 3.2, SIZE/TSIZE
+    trace handling), thermodynamic derivatives.'
+  status: implemented
+  verdict: 'Source of two numerical devices in the joint reforming/WGS solve (#759): the element-potential
+    restart (Ch. 2-3) and the trace-species step bound -- Eq. 3.2 keeps a species with a small mole fraction
+    from rising above 1e-4 in one step (REFORMING_TRACE_FRACTION). Checked against the text 2026-10-29. Not a
+    model source: the equilibrium itself is verified against Cantera HP (CH4 and C3H8, phi 0.8-3.0).'
+  read_for: ['#759 steam-starved joint equilibrium']
+  issues: [759]
+  records: [python/tests/test_reforming_equilibrium.py, cantera_validation_tests/test_equilibrium_validation.py]
+  code: [src/equilibrium.cpp, include/equilibrium.h]
+  notes: Fetched from NTRS (open, government public use) 2026-10-29.
 
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
