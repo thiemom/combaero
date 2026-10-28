@@ -3042,6 +3042,7 @@ keys and `NetworkMixtureState` are the next section.
 | `"<node>.T"` | stagnation T | **static** T; the stagnation T is `"<node>.Tt"` |
 | element `T_in`, `T_out` (`result["__element_diag__"][id]`) | stagnation T of the end nodes | **static** T of the end nodes, as `P_in`/`P_out`; `Tt_in`/`Tt_out` unchanged |
 | `"<chamber>.T_static"` | a momentum chamber's static T | deprecated alias of `"<chamber>.T"`, removed in 0.9.0 |
+| junction `port_<i>_T` (`__element_diag__`) | the port's stagnation T | **static** T of the port; the stagnation T is the new `port_<i>_Tt` |
 | `NetworkMixtureState.T` | a field, filled with `Tt` | a computed property, the static T |
 
 The static T is regime-aware. A plenum (`P = Pt`) and an incompressible
@@ -3062,8 +3063,15 @@ total temperature. The warning goes in 0.9.0.
 that regime). Removed in 0.9.0.
 
 No residual reads `NetworkMixtureState.T` (#825), so solutions are
-unchanged. Where the properties of a moving gas want the static T and still
-take the stagnation one is #824.
+unchanged. The residuals already form the static state wherever a node
+moves (the chamber closure, junction port densities, crossflow stations;
+#576, #782). The reported diagnostics did not: an element's inlet and
+outlet properties (`rho`, `a`, Mach, transport) were evaluated at
+(`Tt`, `P`), up to 11% off in T at a moving compressible node. They take
+the static state since #824. Three residual inputs still read `Tt` at a
+moving node, as closure choices: the legacy tee's `gamma_eff`, the
+ejector's choke-plane gamma (its sources take inlet conditions) and a
+loss correlation's `T_in`.
 
 A residual's Jacobian names a node's stagnation-T column `"<node>.Tt"`, the
 quantity it is (#782). A custom element that still keys it `"<node>.T"`, the

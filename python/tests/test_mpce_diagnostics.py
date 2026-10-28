@@ -72,6 +72,7 @@ class _State:
         self.Pt = Pt
         self.P = Pt - 1000.0  # arbitrary; not used by diagnostics K logic
         self.Tt = 300.0
+        self.T = 300.0  # at rest: static = total
         self._rho = rho
 
     def density(self) -> float:

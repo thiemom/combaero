@@ -80,13 +80,20 @@ def _warn_jacobian_T_key(key: str) -> None:
 
 
 class _ElementDiag(dict):
-    """An element's diagnostics; ``T_in``/``T_out`` warn as ``_StaticTResult``."""
+    """An element's diagnostics; ``T_in``/``T_out`` and a junction's
+    ``port_<i>_T`` warn as ``_StaticTResult``."""
 
     def _check(self, key: Any) -> None:
-        if key in ("T_in", "T_out") and key in self:
+        if not isinstance(key, str) or key not in self:
+            return
+        if key in ("T_in", "T_out"):
             tt = dict.get(self, "Tt" + key[1:])
-            if tt is not None and dict.__getitem__(self, key) != tt:
-                _warn_static_t(key)
+        elif key.startswith("port_") and key.endswith("_T"):
+            tt = dict.get(self, key + "t")
+        else:
+            return
+        if tt is not None and dict.__getitem__(self, key) != tt:
+            _warn_static_t(key)
 
     def __getitem__(self, key: Any) -> Any:
         self._check(key)

@@ -2131,7 +2131,7 @@ class NetworkNode(ABC):
             return {}
 
         try:
-            cs = cb.complete_state(state.Tt, state.P, state.X)
+            cs = cb.complete_state(state.T, state.P, state.X)
             return {
                 "Tt": float(state.Tt),
                 "Pt": float(state.Pt),
@@ -2150,7 +2150,7 @@ class NetworkNode(ABC):
                 "nu": cs.transport.nu,
             }
         except Exception:
-            ts = cb.thermo_state(state.Tt, state.P, state.X)
+            ts = cb.thermo_state(state.T, state.P, state.X)
             return {
                 "Tt": float(state.Tt),
                 "Pt": float(state.Pt),
@@ -2430,7 +2430,7 @@ class PlenumNode(NetworkNode):
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
         # Plenums: v ~ 0, so stagnation = static
-        ts = cb.thermo_state(state.Tt, state.P, state.X)
+        ts = cb.thermo_state(state.T, state.P, state.X)
         return {
             "Tt": float(state.Tt),
             "Pt": float(state.P),
@@ -3264,7 +3264,7 @@ class CombustorNode(NetworkNode):
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:
         if state.P <= 0 or state.Tt <= 0:
             return {}
-        cs = cb.complete_state(state.Tt, state.P, state.X)
+        cs = cb.complete_state(state.T, state.P, state.X)
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho = cs.thermo.rho
@@ -4363,7 +4363,7 @@ class OrificeElement(NetworkElement):
     ) -> dict[str, float | str]:
         if state_in.P <= 0 or state_in.Tt <= 0:
             return {}
-        cs = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
+        cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
 
         # Throat Mach: isentropic pressure ratio from the UPSTREAM total to the
         # downstream static -- upstream along the flow, which may run against
@@ -4389,7 +4389,7 @@ class OrificeElement(NetworkElement):
 
         # Outlet Mach (use outlet state for accuracy)
         try:
-            cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
+            cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
             v_out = (
                 (abs(state_in.m_dot)) / ((cs_out.thermo.rho) * (self.area))
                 if self.area > 0 and cs_out.thermo.rho > 0
@@ -4473,7 +4473,7 @@ class OrificeElement(NetworkElement):
             at_tap = cb.OrificeGeometry()
             at_tap.d, at_tap.D, at_tap.t, at_tap.r = g.d, g.D, g.t, g.r
             at_tap.tap = _TAPS[self.tap]
-            mu = cb.transport_state(state_in.Tt, state_in.P, state_in.X).mu
+            mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
             m = abs(float(state_in.m_dot))
             Re_D = 4.0 * m / (math.pi * g.D * mu) if (mu > 0.0 and m > 1e-12) else 1e4
             c_net = float(cb.metering_cd_and_dRe(metering, g, Re_D)[0])
@@ -6604,7 +6604,7 @@ class LosslessConnectionElement(NetworkElement):
         if state_in.P <= 0 or state_in.Tt <= 0:
             return {}
 
-        cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         ref = _element_reference_block(
             cs_in, m_dot=state_in.m_dot, area=self.area or 0.0, Dh=self.diameter, location="inlet"
         )
@@ -7237,14 +7237,14 @@ class PressureLossElement(NetworkElement):
         area = getattr(self, "area", None) or getattr(self.correlation, "area", None)
         Dh = math.sqrt(4.0 * area / math.pi) if area and area > 0 else None
 
-        cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         ref = _element_reference_block(
             cs_in, m_dot=state_in.m_dot, area=area or 0.0, Dh=Dh, location="inlet"
         )
         v_in = ref["velocity"]
         mach_in = v_in / cs_in.thermo.a if cs_in.thermo.a > 0 and v_in > 0 else 0.0
 
-        cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
+        cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
         rho_out = cs_out.thermo.rho
         v_out = (
             (abs(state_out.m_dot)) / ((rho_out) * (area))
@@ -7866,7 +7866,7 @@ class ChannelElement(NetworkElement):
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
-        cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
         ref = _element_reference_block(
             cs_in,
             m_dot=state_in.m_dot,
@@ -7878,7 +7878,7 @@ class ChannelElement(NetworkElement):
         re_in = ref["Re"]
         mach_in = v_in / cs_in.thermo.a if cs_in.thermo.a > 0 and v_in > 0 else 0.0
 
-        cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
+        cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
         rho_out = cs_out.thermo.rho
         v_out = (
             (abs(state_out.m_dot)) / ((rho_out) * (self.area))
@@ -9054,7 +9054,7 @@ class AreaChangeElement(NetworkElement):
         # The upwind node feeds the closure, and the face it enters by.
         up, F_in, F_out = (state_in, f0, f1) if m_dot >= 0.0 else (state_out, f1, f0)
         try:
-            cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
+            cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
             loss = cb.area_change_loss(
                 abs(m_dot),
                 float(up.Pt),
@@ -9074,7 +9074,7 @@ class AreaChangeElement(NetworkElement):
         v_in = abs(m_dot) / (rho_in * f0) if rho_in > 0 else 0.0
         mach_in = v_in / a_in if a_in > 0 else 0.0
         try:
-            cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
+            cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
             v_out = abs(m_dot) / (cs_out.thermo.rho * f1) if cs_out.thermo.rho > 0 else 0.0
             mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 else 0.0
         except Exception:
@@ -9929,7 +9929,8 @@ class MultiPortChamberBase(NetworkElement):
         port_area_sources = getattr(self, "_port_area_sources", None) or [""] * self.N
         for i in range(self.N):
             diag[f"port_{i}_P"] = float(states[i].P)
-            diag[f"port_{i}_T"] = float(states[i].Tt)
+            diag[f"port_{i}_T"] = float(states[i].T)  # static (#782, 0.8)
+            diag[f"port_{i}_Tt"] = float(states[i].Tt)
             diag[f"port_{i}_area"] = float(self.port_areas[i] or 0.0)
             diag[f"port_{i}_area_source"] = port_area_sources[i]
             diag[f"port_{i}_sign"] = float(self._port_signs[i])
