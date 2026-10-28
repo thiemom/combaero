@@ -8165,7 +8165,7 @@ class CrossflowSegmentElement(ChannelElement):
     A, with the side stream's AXIAL velocity ``kappa * u_a``, momentum gives
     the static-pressure drop
 
-        dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+        dP = (m_b^2 - m_a^2 + kappa m_a (m_a - m_b)) / (rho A^2)
 
     * ``kappa = 0``: normal injection (impingement jets). Florschuetz's
       P + G^2/rho = const.

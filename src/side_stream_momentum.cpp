@@ -26,11 +26,13 @@ StationHalfDrop station_half_drop(double m_a, double m_b, double P, double T,
   }
   auto [rho, drho_dT, drho_dP] = solver::density_and_jacobians(T, P, X);
   const double k = 0.5 / (rho * area * area);
-  const double f = m_b * std::abs(m_b) - m_a * std::abs(m_a) + kappa * m_a * (m_a - m_b);
+  // Momentum flux m u = m^2 / (rho A) is positive whichever way the gas
+  // moves: m^2, not m|m| (#815; m|m| flipped the drop for reversed flow).
+  const double f = m_b * m_b - m_a * m_a + kappa * m_a * (m_a - m_b);
   StationHalfDrop out;
   out.dP = f * k;
-  out.d_dm_a = (-2.0 * std::abs(m_a) + kappa * (2.0 * m_a - m_b)) * k;
-  out.d_dm_b = (2.0 * std::abs(m_b) - kappa * m_a) * k;
+  out.d_dm_a = (-2.0 * m_a + kappa * (2.0 * m_a - m_b)) * k;
+  out.d_dm_b = (2.0 * m_b - kappa * m_a) * k;
   const double d_drho = -out.dP / rho;
   out.d_dP = d_drho * drho_dP;
   out.d_dT = d_drho * drho_dT;
