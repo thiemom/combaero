@@ -2557,8 +2557,8 @@ documents:
   verdict: 'No #793 example: the liner geometry is normalised (D-bar, W-bar, T/Tref) and results are
     plotted only. Correlation value: it prints the liner gas-side radiation set (Reeves, Lefebvre luminosity
     factor, Lefebvre-Herbert) that combaero lacks entirely -- a real gap for any liner wall temperature
-    case, but these are secondary reprints; the primaries are in the held, unscreened Lefebvre & Ballal
-    book (screen its heat-transfer chapter before fetching anything).'
+    case, but these are secondary reprints. Lefebvre & Ballal Ch. 8 (screened 2026-10-27) prints the same
+    set in full with a reproducible worked example; its primary, Lefebvre-Herbert 1960, is wanted.'
   read_for: ['#793 worked example candidate', liner gas-side radiation correlations]
   issues: [793]
   records: []
@@ -2943,15 +2943,17 @@ wanted:
   question: Liner-hole Cd against bleed ratio (hole flow / annulus flow) for plain and plunged holes, the
     Kaddah 1964 / Freeman 1965 / Norster regime. combaero's discharge-hole Cd with crossflow is McGreehan-Schotsch
     (long holes, modest crossflow); a combustor liner network with high bleed ratios has no closure.
-  where: ASME Gas Turbine Conference 1986; Lefebvre & Ballal (held, unscreened) likely reprints the Kaddah/Norster form.
+  where: ASME Gas Turbine Conference 1986. Lefebvre & Ballal (screened) reprints Kaddah (Eq. 4.15, Fig. 4.2 points)
+    and Freeman (Eq. 4.16); NACA TN 3663 (held) measures Cd against bleed for thin-wall holes (#807).
 - citation: Lefebvre, A. H. (1984). Flame radiation in gas turbine combustion chambers. Int. J. Heat Mass
     Transfer 27(9), 1493-1510.
   checked: false
   issues: []
   priority: later
   question: Primary of the liner gas-side radiation set (luminosity factor, emissivity) reprinted by every
-    combustor network paper in docs/new; combaero has no gas radiation. Screen the held Lefebvre & Ballal
-    book first -- it may suffice.
+    combustor network paper in docs/new; combaero has no gas radiation. Lefebvre & Ballal Ch. 8 (screened)
+    prints the set in full (Eqs. 8.4-8.15) and suffices to implement it; this paper would add the data
+    behind the luminosity factor.
   where: Elsevier journal.
 - citation: Chupp, R. E., Helms, H. E., McFadden, P. W., Brown, T. R. (1969). Evaluation of internal heat-transfer
     coefficients for impingement-cooled turbine airfoils. J. Aircraft 6(3), 203-208.
