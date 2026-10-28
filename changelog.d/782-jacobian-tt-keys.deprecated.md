@@ -1,0 +1,3 @@
+- **A residual Jacobian keyed `"<node>.T"` is deprecated; the node's stagnation-T column is `"<node>.Tt"` (#782).**
+  - Every built-in element now uses `"<node>.Tt"`. The residual vector and Jacobian are bit-identical on all 560 stress networks.
+  - A custom element that returns the 0.7 name `"<node>.T"` gets the same Jacobian, with one `DeprecationWarning` per process. The old name is removed in 0.9.0.

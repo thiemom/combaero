@@ -90,7 +90,7 @@ def _columns(element):
     return (
         [(f"{element.port_nodes[i]}.P", "P", i, max(_BASE_P[i] * 1e-6, 1.0)) for i in range(3)]
         + [(f"{element.port_nodes[i]}.Pt", "Pt", i, 1.0) for i in range(3)]
-        + [(f"{element.port_nodes[i]}.T", "T", i, 1e-4) for i in range(3)]
+        + [(f"{element.port_nodes[i]}.Tt", "T", i, 1e-4) for i in range(3)]
         + [(f"{element._port_element_ids[i]}.m_dot", "m", i, 1e-7) for i in range(3)]
     )
 
@@ -158,7 +158,7 @@ def test_only_the_common_port_enters_the_loss_term(direction):
         for i in range(3):
             if i == common:
                 continue
-            for suffix in (".P", ".T"):
+            for suffix in (".P", ".Tt"):
                 name = f"{element.port_nodes[i]}{suffix}"
                 assert jac[row].get(name, 0.0) == 0.0, f"row {row} depends on {name}"
             mdot = f"{element._port_element_ids[i]}.m_dot"
@@ -205,13 +205,13 @@ def test_the_temperature_column_is_correct_but_currently_unattachable():
             source = inspect.getsource(obj.unknowns)
         except (OSError, TypeError):
             continue
-        if '.T"' in source:
+        if '.T"' in source or '.Tt"' in source:
             declares_temperature.append(name)
 
     element = _element()
     jac = _jacobian(element)
     common = element._common_port_index()
-    t_name = f"{element.port_nodes[common]}.T"
+    t_name = f"{element.port_nodes[common]}.Tt"
     assert any(t_name in jac[row] for row in range(3)), "the T column is no longer reported"
 
     assert not declares_temperature, (

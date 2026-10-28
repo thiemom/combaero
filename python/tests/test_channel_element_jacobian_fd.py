@@ -77,7 +77,7 @@ def _central_difference(elem: ChannelElement, var: str, step: float) -> float:
 
 COLUMNS = [
     ("m_dot", "ch.m_dot", 1e-6),
-    ("T_up", "A.T", 1e-3),
+    ("T_up", "A.Tt", 1e-3),
     ("Pt_up", "A.Pt", 1.0),
     ("P_dn", "B.Pt", 1.0),
 ]

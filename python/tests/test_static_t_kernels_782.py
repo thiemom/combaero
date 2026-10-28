@@ -183,7 +183,7 @@ def test_the_panel_crossflow_ratio_partials_match_finite_differences() -> None:
     hP, hT, hm = 1.0, 1e-3, 1e-6
     fd = {
         "ln__b2.P": (ratio(dP=hP) - ratio(dP=-hP)) / (2 * hP),
-        "ln__b2.T": (ratio(dT=hT) - ratio(dT=-hT)) / (2 * hT),
+        "ln__b2.Tt": (ratio(dT=hT) - ratio(dT=-hT)) / (2 * hT),
         "ln__s1.m_dot": (ratio(ds1=hm) - ratio(ds1=-hm)) / (2 * hm),
         "ln__s2.m_dot": (ratio(ds2=hm) - ratio(ds2=-hm)) / (2 * hm),
     }

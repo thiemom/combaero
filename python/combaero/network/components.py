@@ -1539,7 +1539,7 @@ def _energy_target_rows(
     boundary's own ``{eb}.Q`` unknown, dT_mix/dQ from C++.
     """
     for eb in target_energy_boundaries(node):
-        jac[len(res)] = {f"{node.id}.T": 1.0}
+        jac[len(res)] = {f"{node.id}.Tt": 1.0}
         res.append(float(state.Tt) - float(eb.Tt_target))
 
 
@@ -1554,8 +1554,9 @@ class NetworkMixtureState:
 
     ``Tt`` is the node's stagnation temperature, the T the solver carries
     (the derived mixing T of an interior node, a boundary's ``Tt``). The
-    solver's Jacobian keys ``f"{node}.T"`` are derivatives with respect to
-    this ``Tt``; the name is historical (#782).
+    solver's Jacobian keys ``f"{node}.Tt"`` are derivatives with respect to
+    this ``Tt`` (``f"{node}.T"`` until 0.7, still accepted with a
+    ``DeprecationWarning`` until 0.9.0; #782).
 
     ``T`` is the STATIC temperature, computed (#782): ``Tt`` at an
     incompressible node (the low-Mach limit its closure solves) and where
@@ -1675,7 +1676,7 @@ class NetworkMixtureState:
 
 class _MovingStaticT(NamedTuple):
     """Static T of the gas at a node moving at ``|m| / A`` and its partials:
-    d/d(node T0) (the solver's ``{node}.T``), d/d(static P), d/d(m) (signed)
+    d/d(node T0) (the solver's ``{node}.Tt``), d/d(static P), d/d(m) (signed)
     and d/d(Y[k]) for the species that move it."""
 
     T: float
@@ -1747,7 +1748,7 @@ def _moving_total_P(
 
 def _station_node_partials(r: "_StaticChainedDrop", node: str) -> list[tuple[str, float]]:
     """A station term's partials in its node's P, T (T0) and Y, keyed by name."""
-    out = [(f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)]
+    out = [(f"{node}.P", r.d_dP), (f"{node}.Tt", r.d_dT)]
     out.extend((f"{node}.Y[{k}]", d) for k, d in r.d_dY.items())
     return out
 
@@ -2626,7 +2627,7 @@ class MomentumChamberNode(NetworkNode):
                 # _residuals_and_jacobian). The compressible closure depends on
                 # T through T0, a(T) and s(T), not just through rho, so the
                 # term is no longer small enough to omit.
-                f"{self.id}.T": result.d_res_dT,
+                f"{self.id}.Tt": result.d_res_dT,
             }
         }
         # Composition, relayed the same way: a node mixing gases of
@@ -2663,7 +2664,7 @@ class MomentumChamberNode(NetworkNode):
         Exact (compressible) impulse over the constant-area chamber, C++'s
         ``chamber_merge_face_state``: the face static pressure on the subsonic
         root, the face Pt from the same stagnation closure as the chamber.
-        Derivatives are keyed by unknown name; ``"<node>.T"`` keys are relayed
+        Derivatives are keyed by unknown name; ``"<node>.Tt"`` keys are relayed
         by the solver.
 
         ``m_main`` is the main element's signed flow into the chamber, for a
@@ -2705,7 +2706,7 @@ class MomentumChamberNode(NetworkNode):
             out_names[f"{self.main_inlet}.m_dot"] = (
                 out_names.get(f"{self.main_inlet}.m_dot", 0.0) + 1.0
             )
-            main_T_key = f"{self.id}.T"
+            main_T_key = f"{self.id}.Tt"
         r = cb.chamber_merge_face_state(
             m_main,
             T_main,
@@ -2737,11 +2738,11 @@ class MomentumChamberNode(NetworkNode):
             for k, v in dS.items():
                 add(k, d_J * v)
             add(f"{self.id}.P", d_P)
-            add(f"{self.id}.T", d_T)
+            add(f"{self.id}.Tt", d_T)
             if main_T_key is not None:
                 add(main_T_key, d_Tm)
             elif main_src is not None:
-                add(f"{main_src}.T", d_Tm)
+                add(f"{main_src}.Tt", d_Tm)
             for k, v in enumerate(d_Y):
                 if v != 0.0:
                     add(f"{self.id}.Y[{k}]", v)
@@ -2798,14 +2799,14 @@ class MomentumChamberNode(NetworkNode):
         the junction's impulse describe two different flows (Wang 2014 MAE
         0.13 -> 0.19, rising with Mach, with only the chamber side fixed).
 
-        Keys: ``{id}.P`` (an unknown), ``{id}.T`` / ``{id}.Y[k]`` (relayed by
+        Keys: ``{id}.P`` (an unknown), ``{id}.Tt`` / ``{id}.Y[k]`` (relayed by
         the solver) and the upstream flow unknowns that set this chamber's
         through-flow (the chain the chamber's own residual uses). With no area
         the chamber has no velocity: rho(T0, P) with the ideal-gas columns.
         """
         if not self.area > 0.0:
             rho = float(state.density())
-            d0: dict[str, float] = {f"{self.id}.P": rho / state.P, f"{self.id}.T": -rho / state.Tt}
+            d0: dict[str, float] = {f"{self.id}.P": rho / state.P, f"{self.id}.Tt": -rho / state.Tt}
             W = float(cb.mwmix(state.X))
             for k, y in enumerate(state.Y):
                 if y > 0.0:
@@ -2813,7 +2814,7 @@ class MomentumChamberNode(NetworkNode):
             return rho, d0
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         r = self._closure(state, m_dot_total)
-        d: dict[str, float] = {f"{self.id}.P": r.drho_dP, f"{self.id}.T": r.drho_dT}
+        d: dict[str, float] = {f"{self.id}.P": r.drho_dP, f"{self.id}.Tt": r.drho_dT}
         for k, v in enumerate(r.drho_dY):
             if v != 0.0:
                 d[f"{self.id}.Y[{k}]"] = v
@@ -3800,7 +3801,7 @@ class OrificeElement(NetworkElement):
         return jet.J * cos_t, {
             f"{self.id}.m_dot": jet.dJ_dm * cos_t,
             f"{self.from_node}.Pt": jet.dJ_dPt * cos_t,
-            f"{self.from_node}.T": jet.dJ_dTt * cos_t,
+            f"{self.from_node}.Tt": jet.dJ_dTt * cos_t,
             f"{self.to_node}.P": jet.dJ_dP * cos_t,
         }
 
@@ -3891,7 +3892,7 @@ class OrificeElement(NetworkElement):
         )
         if not mu > 0.0:
             return {}
-        out = {f"{self.from_node}.T": -Re * float(dmu_dT) / mu}
+        out = {f"{self.from_node}.Tt": -Re * float(dmu_dT) / mu}
         if dmu_dP != 0.0:
             out[f"{self.from_node}.P"] = -Re * float(dmu_dP) / mu
         return out
@@ -4106,7 +4107,7 @@ class OrificeElement(NetworkElement):
         g = float(r.d_mdot_dP_static_down)
         d: dict[str, float] = {
             f"{src_id}.Pt": float(r.d_mdot_dP_total_up),
-            f"{src_id}.T": float(r.d_mdot_dTt_up),
+            f"{src_id}.Tt": float(r.d_mdot_dTt_up),
             f"{dst_id}.P": float(r.d_mdot_dP_rho_ref) + (0.0 if tap else g),
         }
         # d(m_calc)/d(p1): the kernel's own column and, between pipes, the tap
@@ -4168,7 +4169,7 @@ class OrificeElement(NetworkElement):
         sgn = 1.0 if m >= 0.0 else -1.0
         out = {
             f"{src_id}.Pt": float(a.dP_dPt),
-            f"{src_id}.T": float(a.dP_dTt),
+            f"{src_id}.Tt": float(a.dP_dTt),
             f"{self.id}.m_dot": float(a.dP_dG) * sgn / A,
         }
         for i, val in enumerate(a.dP_dY):
@@ -4842,7 +4843,7 @@ class EffusionPlateElement(OrificeElement):
                 d[names[local]] = d.get(names[local], 0.0) + coeff_m * c
         for key, v in (
             (f"{self.from_node}.P", r.d_dP + r.d_dT * st.dP),
-            (f"{self.from_node}.T", r.d_dT * st.dT0),
+            (f"{self.from_node}.Tt", r.d_dT * st.dT0),
             (f"{self.to_node}.P", r.d_dP_down),
         ):
             d[key] = d.get(key, 0.0) + v
@@ -6243,7 +6244,7 @@ class ImpingementPlateElement(OrificeElement):
         dcd_dGi = float(r.dCd_dG_ideal)
         add(f"{up_id}.Pt", dcd_dGi * dGi_ddP)
         add(f"{down_id}.P", -dcd_dGi * dGi_ddP)
-        add(f"{up_id}.T", dcd_dGi * dGi_drho * float(drho_dT))
+        add(f"{up_id}.Tt", dcd_dGi * dGi_drho * float(drho_dT))
         add(f"{up_id}.P", dcd_dGi * dGi_drho * float(drho_dP))
         if m_c != 0.0:
             dcd_dmc = float(r.dCd_dG_c) * (1.0 if m_c > 0.0 else -1.0) / self.channel_area
@@ -6688,7 +6689,7 @@ class PortDischargeElement(NetworkElement):
             f"{self.id}.m_dot": -w_star * float(s.dP_dG) * (1.0 if m >= 0.0 else -1.0) / A,
             # T and Y are relayed through the chamber's propagation chain,
             # as the chamber's own closure row does.
-            f"{c}.T": -w_star * float(s.dP_dTt),
+            f"{c}.Tt": -w_star * float(s.dP_dTt),
         }
         for k, dy in enumerate(s.dP_dY):
             if dy != 0.0:
@@ -7098,7 +7099,7 @@ class PressureLossElement(NetworkElement):
         # ----- Analytical theta Jacobian (linear-theta correlations) -----
         # d_res/d_T_burned = -Pt_in * dxi_dtheta / T_in.
         if self._theta_source_resolved is not None and dxi_dtheta != 0.0 and ctx.T_in > 0:
-            jac[0][f"{self._theta_source_resolved}.T"] = state_in.Pt * dxi_dtheta / ctx.T_in
+            jac[0][f"{self._theta_source_resolved}.Tt"] = state_in.Pt * dxi_dtheta / ctx.T_in
 
         # ----- The other dependences: m_dot, P_in, T_in, composition. A
         # built-in correlation returns them analytically from C++ (evaluate,
@@ -7140,7 +7141,7 @@ class PressureLossElement(NetworkElement):
             # Emit a relay-routable T Jacobian on the upstream node.
             dxi_dT_in = _dxi_dvar("T_in", ctx.T_in, 0.01)
             if dxi_dT_in != 0.0:
-                jac[0][f"{up_id}.T"] = state_in.Pt * dxi_dT_in
+                jac[0][f"{up_id}.Tt"] = state_in.Pt * dxi_dT_in
         elif graph is not None and ctx.T_in > 0:
             self._add_unburned_jacobian(jac[0], graph, ctx, state_in.Pt, dxi_dtheta, _dxi_dvar)
 
@@ -7194,7 +7195,7 @@ class PressureLossElement(NetworkElement):
         density). T_u is the enthalpy mix of the source's inflows (#718), so
         dT_u = sum(dT_u/dm_i dm_i + dT_u/dTt_i dTt_i + dT_u/dY_i . dY_i), the
         partials from the C++ mixer: the flows' unknowns directly, each Tt_i
-        and Y_i through its node's relayed "{src}.T" and "{src}.Y[k]". It was
+        and Y_i through its node's relayed "{src}.Tt" and "{src}.Y[k]". It was
         missing: d/d(fuel flow) read 0 against 95 by differences.
         """
         src = graph.nodes[self._theta_source_resolved]
@@ -7209,7 +7210,7 @@ class PressureLossElement(NetworkElement):
             for var, coeff in names.items():
                 row[var] = row.get(var, 0.0) + dres_dTu * dTu_dm * coeff
             if src_node is not None:
-                key = f"{src_node}.T"
+                key = f"{src_node}.Tt"
                 row[key] = row.get(key, 0.0) + dres_dTu * dTu_dTt
                 for k, d in enumerate(dTu_dY):
                     if d != 0.0:
@@ -7469,7 +7470,7 @@ class ChannelElement(NetworkElement):
                 f"{self.id}.m_dot": -d_dP_d_mdot,
                 f"{self.from_node}.Pt": 1.0,
                 f"{self.to_node}.Pt": -1.0,
-                f"{self.from_node}.T": -d_dP_dT,
+                f"{self.from_node}.Tt": -d_dP_dT,
                 f"{self.from_node}.P": -d_dP_dP_static,
             }
         }
@@ -7547,7 +7548,7 @@ class ChannelElement(NetworkElement):
                 f"{self.id}.m_dot": -d_dP_d_mdot,
                 f"{self.from_node}.Pt": 1.0,
                 f"{self.to_node}.Pt": -1.0,
-                f"{self.from_node}.T": -d_dP_dT,
+                f"{self.from_node}.Tt": -d_dP_dT,
                 f"{self.from_node}.P": -d_dP_dP_static,
             }
         }
@@ -7686,7 +7687,7 @@ class ChannelElement(NetworkElement):
             return sign * A * flow.G, {}, flow
         derivs = {
             f"{src_id}.Pt": sign * A * flow.dG_dPt0,
-            f"{src_id}.T": sign * A * flow.dG_dTt0,
+            f"{src_id}.Tt": sign * A * flow.dG_dTt0,
             f"{dst_id}.Pt": sign * A * flow.dG_dP_target,
         }
         if heated:
@@ -7781,7 +7782,7 @@ class ChannelElement(NetworkElement):
                 float(src.Pt), float(src.Tt), abs(m_dot) / A, src.Y, True
             )
             p_rho = float(a.P)
-            dp_rho = {f"{src_id}.Pt": float(a.dP_dPt), f"{src_id}.T": float(a.dP_dTt)}
+            dp_rho = {f"{src_id}.Pt": float(a.dP_dPt), f"{src_id}.Tt": float(a.dP_dTt)}
             for i, val in enumerate(a.dP_dY):
                 if val != 0.0:
                     dp_rho[f"{src_id}.Y[{i}]"] = float(val)
@@ -7801,7 +7802,7 @@ class ChannelElement(NetworkElement):
             self._exit_head_lost(m_dot),
         )
         g = float(r.d_dP_dP_static_up)
-        d: dict[str, float] = {f"{src_id}.T": float(r.d_dP_dTt_up)}
+        d: dict[str, float] = {f"{src_id}.Tt": float(r.d_dP_dTt_up)}
         for i, val in enumerate(r.d_dP_dY_up):
             if val != 0.0:
                 d[f"{src_id}.Y[{i}]"] = float(val)
@@ -7994,13 +7995,13 @@ class ChannelElement(NetworkElement):
         in its residual that cost a stress draw its cold solve.
         """
         if dst_id in getattr(self, "_rayleigh_ends", ()):
-            return (float(dst.Tt), [(f"{dst_id}.T", 1.0)]) if float(dst.Tt) > 0.0 else None
+            return (float(dst.Tt), [(f"{dst_id}.Tt", 1.0)]) if float(dst.Tt) > 0.0 else None
         if dst_id not in getattr(self, "_rayleigh_mix_ends", ()):
             return None
         rx = getattr(self, "_rayleigh_exit", None)
         if rx is None or not rx[1] > 0.0:
             return None
-        key = f"{RAYLEIGH_EXIT_PREFIX}{self.id}.T"
+        key = f"{RAYLEIGH_EXIT_PREFIX}{self.id}.Tt"
         if rx[0] == dst_id:
             return float(rx[1]), [(key, 1.0)]
         # Flow sign and Pt disagree: rx[0] is this kernel's source, rx[2] its exit.
@@ -8009,7 +8010,7 @@ class ChannelElement(NetworkElement):
         exit_Tt = float(src.Tt) + float(rx[1]) - float(dst.Tt)
         if not exit_Tt > 0.0:
             return None
-        return exit_Tt, [(key, 1.0), (f"{dst_id}.T", -1.0), (f"{src_id}.T", 1.0)]
+        return exit_Tt, [(key, 1.0), (f"{dst_id}.Tt", -1.0), (f"{src_id}.Tt", 1.0)]
 
     def _rayleigh_omission(
         self,
@@ -8665,7 +8666,7 @@ class CrossflowSegmentElement(ChannelElement):
             def chained(c: _MovingTotalP, w: float, d: dict[str, float]) -> None:
                 # w * (c's own partials in m, T0 and Y) into d.
                 d[own] = d.get(own, 0.0) + w * c.dm
-                d[f"{gas_id}.T"] = d.get(f"{gas_id}.T", 0.0) + w * c.dT0
+                d[f"{gas_id}.Tt"] = d.get(f"{gas_id}.Tt", 0.0) + w * c.dT0
                 for k, v in c.dY.items():
                     d[f"{gas_id}.Y[{k}]"] = d.get(f"{gas_id}.Y[{k}]", 0.0) + w * v
 
@@ -8695,7 +8696,7 @@ class CrossflowSegmentElement(ChannelElement):
             k_ps = -2.0 * cs.Pt * u * e / (Ps * Ps) + w * cs.dP
             sgn = 1.0 if m >= 0.0 else -1.0
             d[own] = d.get(own, 0.0) + k_ps * float(s.dP_dG) * sgn / A
-            d[f"{gas_id}.T"] = d.get(f"{gas_id}.T", 0.0) + k_ps * float(s.dP_dTt)
+            d[f"{gas_id}.Tt"] = d.get(f"{gas_id}.Tt", 0.0) + k_ps * float(s.dP_dTt)
             for k, v in enumerate(s.dP_dY):
                 if v != 0.0:
                     d[f"{gas_id}.Y[{k}]"] = d.get(f"{gas_id}.Y[{k}]", 0.0) + k_ps * float(v)
@@ -9032,8 +9033,8 @@ class AreaChangeElement(NetworkElement):
                 f"{self.id}.m_dot": 1.0,
                 f"{a}.Pt": -float(f.dm_dPt_a),
                 f"{b}.Pt": -float(f.dm_dPt_b),
-                f"{a}.T": -float(f.dm_dTt_a),
-                f"{b}.T": -float(f.dm_dTt_b),
+                f"{a}.Tt": -float(f.dm_dTt_a),
+                f"{b}.Tt": -float(f.dm_dTt_b),
             }
             for node, grad in ((a, f.dm_dY_a), (b, f.dm_dY_b)):
                 for i, val in enumerate(grad):
@@ -9370,9 +9371,9 @@ class TeeJunctionElement(NetworkElement):
                 1: {
                     f"{self.common_node}.Pt": res.dR1_dPt_com,
                     f"{self.straight_node}.P": res.dR1_dP_str,
-                    f"{self.straight_node}.T": res.dR1_dT_str,
+                    f"{self.straight_node}.Tt": res.dR1_dT_str,
                     f"{self.branch_node}.P": res.dR1_dP_bra,
-                    f"{self.branch_node}.T": res.dR1_dT_bra,
+                    f"{self.branch_node}.Tt": res.dR1_dT_bra,
                     f"{self.id}.m_dot_com": res.dR1_dmdot_com,
                     f"{self.id}.m_dot_branch": res.dR1_dmdot_branch,
                 },
@@ -9389,7 +9390,7 @@ class TeeJunctionElement(NetworkElement):
                     f"{self.id}.m_dot_branch": res.dR0_dmdot_branch,
                     f"{self.common_node}.Pt": res.dR0_dPt_com,
                     f"{self.common_node}.P": res.dR0_dP_com,
-                    f"{self.common_node}.T": res.dR0_dT_com,
+                    f"{self.common_node}.Tt": res.dR0_dT_com,
                     f"{self.straight_node}.Pt": res.dR0_dPt_str,
                 },
                 1: {
@@ -9397,10 +9398,10 @@ class TeeJunctionElement(NetworkElement):
                     f"{self.id}.m_dot_branch": res.dR1_dmdot_branch,
                     f"{self.common_node}.Pt": res.dR1_dPt_com,
                     f"{self.common_node}.P": res.dR1_dP_com,
-                    f"{self.common_node}.T": res.dR1_dT_com,
+                    f"{self.common_node}.Tt": res.dR1_dT_com,
                     f"{self.branch_node}.Pt": res.dR1_dPt_bra,
                     f"{self.branch_node}.P": res.dR1_dP_bra,
-                    f"{self.branch_node}.T": res.dR1_dT_bra,
+                    f"{self.branch_node}.Tt": res.dR1_dT_bra,
                 },
             }
 
@@ -9464,16 +9465,16 @@ class TeeJunctionElement(NetworkElement):
         ports: list[tuple[Any, _MovingStaticT, str, str, dict[str, float]]],
     ) -> None:
         """The kernel's d/d(port static T), chained onto what that T depends
-        on (#782): the node's T0 (the solver's ``{node}.T``), its static P,
+        on (#782): the node's T0 (the solver's ``{node}.Tt``), its static P,
         its composition and the arm's flow."""
         for row in (0, 1):
             r = jac[row]
             for _, st, node, suffix, dm in ports:
                 dR_dT = float(getattr(res, f"dR{row}_dT_{suffix}"))
-                r.pop(f"{node}.T", None)
+                r.pop(f"{node}.Tt", None)
                 if dR_dT == 0.0:
                     continue
-                r[f"{node}.T"] = dR_dT * st.dT0
+                r[f"{node}.Tt"] = dR_dT * st.dT0
                 if st.dP != 0.0:
                     r[f"{node}.P"] = r.get(f"{node}.P", 0.0) + dR_dT * st.dP
                 for name, coeff in dm.items():
@@ -9794,7 +9795,7 @@ class MultiPortChamberBase(NetworkElement):
             rho = float(st.density())
             d: dict[str, float] = {f"{port}.P": rho / P if P > 0.0 else 0.0}
             if T > 0.0 and X is not None:
-                d[f"{port}.T"] = -rho / T
+                d[f"{port}.Tt"] = -rho / T
                 W = float(cb.mwmix(X))
                 for k, y in enumerate(st.Y):
                     if y > 0.0:
