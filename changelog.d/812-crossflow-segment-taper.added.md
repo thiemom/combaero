@@ -1,0 +1,7 @@
+- **Tapered crossflow segments (#812).** `CrossflowSegmentElement(area=A_from, area_to=A_to)` models a tapering annulus or a growing liner. Each end's station half-drop, joining jets and static-to-total closure use that end's own section, and friction uses the mean section. Total pressure carries across the segment apart from friction, so the area change is isentropic.
+  - **Incompressible:** a from-end station adds Bernoulli's area term, C++ `segment_area_change_drop`, with analytic partials.
+  - **Unchanged:** without `area_to`, or with `area_to` equal to `area`, a segment is bit-identical.
+  - **Checks:**
+    - A frictionless taper passes Bernoulli's flow to 3e-3.
+    - The two regimes agree to O(M^2) at low Mach.
+    - Tapered chains pass the second law in both directions. A constant section standing in for the taper used to read sigma_norm of about -0.06.

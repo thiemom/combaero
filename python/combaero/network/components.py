@@ -8202,6 +8202,16 @@ class CrossflowSegmentElement(ChannelElement):
     Station nodes must be PlenumNodes (Pt = P): the node pressure is the
     channel's static pressure, which is what a side stream sees.
 
+    TAPER (#812): ``area`` is the from-end's section, ``area_to`` (None: the
+    same) the to-end's -- a tapering annulus or a growing liner. Each end's
+    station half-drop, joining jets and static-to-total closure read its own
+    section; friction runs on the mean. Compressible, the ends' closures carry
+    the area change (Pt continuous bar friction); incompressible, a from-end
+    station adds Bernoulli's m^2/(2 rho)(1/A_to^2 - 1/A_from^2) (C++
+    ``segment_area_change_drop``; a reservoir entry already accelerates to
+    the to-end's section). Two segments meeting at a station with different
+    sections are a sudden area change at the station, each half at its own.
+
     FRICTION follows ``ChannelElement``: Darcy-Weisbach on the
     equivalent-area diameter (the C++ channel's circular convention, #463).
 
@@ -8237,9 +8247,12 @@ class CrossflowSegmentElement(ChannelElement):
         prev_seg: str | None = None,
         next_seg: str | None = None,
         entry_K: float | None = None,
+        area_to: float | None = None,
     ) -> None:
         if length <= 0.0 or area <= 0.0:
             raise ValueError(f"{type(self).__name__}: length and area must be positive")
+        if area_to is not None and not area_to > 0.0:
+            raise ValueError(f"{type(self).__name__}: area_to must be positive")
         if entry_K is not None and from_kappa is not None:
             raise ValueError(
                 f"{type(self).__name__} {id!r}: from_node is either a reservoir "
@@ -8250,12 +8263,23 @@ class CrossflowSegmentElement(ChannelElement):
             from_node,
             to_node,
             length=length,
-            diameter=math.sqrt(4.0 * area / math.pi),
+            # A taper's friction runs on the mean section (#812).
+            diameter=math.sqrt(
+                4.0 * (area if area_to is None else 0.5 * (area + area_to)) / math.pi
+            ),
             Dh=Dh,
             roughness=roughness,
             regime=regime,
             friction_model=friction_model,
         )
+        # Each end's own section (#812): the stations' half-drops, the jets'
+        # momentum and the ends' static-to-total closures read it. A constant
+        # segment keeps the one area the channel derived, bit for bit.
+        if area_to is None:
+            self.area_from = self.area_to = self.area
+        else:
+            self.area_from = float(area)
+            self.area_to = float(area_to)
         self.from_kappa = from_kappa
         self.to_kappa = to_kappa
         self.prev_seg = prev_seg
@@ -8298,7 +8322,7 @@ class CrossflowSegmentElement(ChannelElement):
                 dJ[k] = dJ.get(k, 0.0) + v
         return J, dJ
 
-    def _with_jets(self, term: "_StaticChainedDrop", node: Any, station: Any) -> None:
+    def _with_jets(self, term: "_StaticChainedDrop", node: Any, station: Any, area: float) -> None:
         """Fold the station's joining-jet momentum into this segment's half.
 
         Over the station, (P_a - P_b) A = m_b u_b - m_a u_a - J: the jets'
@@ -8308,7 +8332,7 @@ class CrossflowSegmentElement(ChannelElement):
         J, dJ = self._station_jets(node, station)
         if J == 0.0 and not dJ:
             return
-        w = -0.5 / self.area
+        w = -0.5 / area
         term.dP += w * J
         for k, v in dJ.items():
             term.extra[k] = term.extra.get(k, 0.0) + w * v
@@ -8343,8 +8367,8 @@ class CrossflowSegmentElement(ChannelElement):
         terms = []
         if self.entry_K is not None:
             m_b = flows.get(self._next.id, m) if to_station else m
-            st = _moving_static_T(state_out, 0.5 * (m + m_b), self.area, incompressible)
-            r = cb.channel_entry_drop(m, state_out.P, st.T, state_out.X, self.area, self.entry_K)
+            st = _moving_static_T(state_out, 0.5 * (m + m_b), self.area_to, incompressible)
+            r = cb.channel_entry_drop(m, state_out.P, st.T, state_out.X, self.area_to, self.entry_K)
             nb = self._next if to_station else None
             terms.append(
                 (
@@ -8358,12 +8382,12 @@ class CrossflowSegmentElement(ChannelElement):
             )
         if self.from_kappa is not None:
             m_a = flows.get(self._prev.id, 0.0) if self._prev is not None else 0.0
-            st = _moving_static_T(state_in, 0.5 * (m_a + m), self.area, incompressible)
+            st = _moving_static_T(state_in, 0.5 * (m_a + m), self.area_from, incompressible)
             r = cb.station_half_drop(
-                m_a, m, state_in.P, st.T, state_in.X, self.area, self.from_kappa
+                m_a, m, state_in.P, st.T, state_in.X, self.area_from, self.from_kappa
             )
             t_from = _StaticChainedDrop(r, st, True)
-            self._with_jets(t_from, getattr(self, "_upstream_node", None), state_in)
+            self._with_jets(t_from, getattr(self, "_upstream_node", None), state_in, self.area_from)
             terms.append(
                 (
                     t_from,
@@ -8376,12 +8400,12 @@ class CrossflowSegmentElement(ChannelElement):
             )
         if to_station:
             m_b = flows.get(self._next.id, m)
-            st = _moving_static_T(state_out, 0.5 * (m + m_b), self.area, incompressible)
+            st = _moving_static_T(state_out, 0.5 * (m + m_b), self.area_to, incompressible)
             r = cb.station_half_drop(
-                m, m_b, state_out.P, st.T, state_out.X, self.area, self.to_kappa
+                m, m_b, state_out.P, st.T, state_out.X, self.area_to, self.to_kappa
             )
             t_to = _StaticChainedDrop(r, st, True)
-            self._with_jets(t_to, getattr(self, "_downstream_node", None), state_out)
+            self._with_jets(t_to, getattr(self, "_downstream_node", None), state_out, self.area_to)
             terms.append((t_to, self.to_node, "a", self.to_node, self._next, "to"))
         elif (
             incompressible and m < 0.0 and (self.from_kappa is not None or self.entry_K is not None)
@@ -8394,11 +8418,20 @@ class CrossflowSegmentElement(ChannelElement):
             # compressible one.
             node = getattr(self, "_downstream_node", None)
             if node is None or isinstance(node, PlenumNode) or node.is_boundary:
-                st = _moving_static_T(state_out, m, self.area, True)
-                r = cb.channel_entry_drop(-m, state_out.P, st.T, state_out.X, self.area, 0.0)
+                st = _moving_static_T(state_out, m, self.area_to, True)
+                r = cb.channel_entry_drop(-m, state_out.P, st.T, state_out.X, self.area_to, 0.0)
                 terms.append(
                     (_ReservoirExitInflow(r), self.to_node, "a", self.to_node, None, "exit_in")
                 )
+        if incompressible and self.from_kappa is not None and self.area_from != self.area_to:
+            # Bernoulli between the two end statics (#812): a station's static
+            # at the from-end, the to-end's static (station or exit). A
+            # reservoir entry already accelerates to the to-end's section.
+            # Compressible, the ends' closures carry it (``_duct_ends``).
+            up_id, up = (self.from_node, state_in) if m >= 0.0 else (self.to_node, state_out)
+            st = _moving_static_T(up, m, self.area_from, True)
+            r = cb.segment_area_change_drop(m, up.P, st.T, up.X, self.area_from, self.area_to)
+            terms.append((_StaticChainedDrop(r, st, False), up_id, "a", up_id, None, "area"))
         return terms
 
     def _exit_head_lost(self, m_dot: float) -> bool:
@@ -8541,7 +8574,6 @@ class CrossflowSegmentElement(ChannelElement):
         its Pt is continued below Pt*, never on the supersonic branch (see
         ``closure``).
         """
-        A = self.area
         m = float(state_in.m_dot)
         kinds = {t[5]: t for t in terms}
         if self.from_kappa is None and self.entry_K is None and "to" not in kinds:
@@ -8554,7 +8586,8 @@ class CrossflowSegmentElement(ChannelElement):
         gas_id, gas = (self.from_node, state_in) if m >= 0.0 else (self.to_node, state_out)
         own = f"{self.id}.m_dot"
 
-        def closure(e: float, de: dict[str, float]) -> tuple[float, dict[str, float]]:
+        def closure(e: float, de: dict[str, float], A: float) -> tuple[float, dict[str, float]]:
+            # A: this end's own section (#812).
             if m == 0.0:
                 return e, dict(de)  # at rest: Pt = P (the closure is even in m)
 
@@ -8599,22 +8632,26 @@ class CrossflowSegmentElement(ChannelElement):
             return cs.Pt * w, d
 
         def terminal(
-            node_id: str, state: NetworkMixtureState, node: Any, feeds: bool
+            node_id: str, state: NetworkMixtureState, node: Any, feeds: bool, A: float
         ) -> tuple[float, dict[str, float]]:
             at_rest = node is None or isinstance(node, PlenumNode) or node.is_boundary
             if feeds or not at_rest:
                 return float(state.Pt), {f"{node_id}.Pt": 1.0}
-            return closure(float(state.P), {f"{node_id}.P": 1.0})
+            return closure(float(state.P), {f"{node_id}.P": 1.0}, A)
 
         if self.from_kappa is not None:
             t = kinds["from"]
             de = {f"{self.from_node}.P": 1.0}
             for name, v in self._term_partials(t).items():
                 de[name] = de.get(name, 0.0) - v
-            Pt_in, d_in = closure(float(state_in.P) - t[0].dP, de)
+            Pt_in, d_in = closure(float(state_in.P) - t[0].dP, de, self.area_from)
         else:
             Pt_in, d_in = terminal(
-                self.from_node, state_in, getattr(self, "_upstream_node", None), m >= 0.0
+                self.from_node,
+                state_in,
+                getattr(self, "_upstream_node", None),
+                m >= 0.0,
+                self.area_from,
             )
 
         if "to" in kinds:
@@ -8622,10 +8659,14 @@ class CrossflowSegmentElement(ChannelElement):
             de = {f"{self.to_node}.P": 1.0}
             for name, v in self._term_partials(t).items():
                 de[name] = de.get(name, 0.0) + v
-            Pt_out, d_out = closure(float(state_out.P) + t[0].dP, de)
+            Pt_out, d_out = closure(float(state_out.P) + t[0].dP, de, self.area_to)
         else:
             Pt_out, d_out = terminal(
-                self.to_node, state_out, getattr(self, "_downstream_node", None), m < 0.0
+                self.to_node,
+                state_out,
+                getattr(self, "_downstream_node", None),
+                m < 0.0,
+                self.area_to,
             )
         if "entry" in kinds:
             t = kinds["entry"]

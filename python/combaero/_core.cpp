@@ -737,6 +737,11 @@ PYBIND11_MODULE(_core, m) {
         "node's density: (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) /\n"
         "(2 rho A^2). kappa = 0: normal injection (merge); kappa = 0.75:\n"
         "bleed, Bassett et al. (2001) K2/K5 exactly.");
+  m.def("segment_area_change_drop", &combaero::segment_area_change_drop, py::arg("m"),
+        py::arg("P"), py::arg("T"), py::arg("X"), py::arg("area_from"), py::arg("area_to"),
+        "Static drop over a duct segment from its area change alone (#812):\n"
+        "m^2 / (2 rho) (1/A_to^2 - 1/A_from^2), Bernoulli, even in m. Zero for\n"
+        "equal areas. Derivative in d_dm_a.");
   m.def("channel_entry_drop", &combaero::channel_entry_drop, py::arg("m"), py::arg("P"),
         py::arg("T"), py::arg("X"), py::arg("area"), py::arg("K_in"),
         "Static drop entering a duct from a reservoir: (1 + K_in) m|m| /\n"
