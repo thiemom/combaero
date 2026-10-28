@@ -2159,20 +2159,286 @@ documents:
   issues: [183, 187, 271, 272, 300, 502, 505, 509, 517, 522, 579]
   records: [validation/junction/data/wang2014/, validation/junction/models/wang2014.py, validation/junction/network_runner.py]
   notes: Online 2014 (filename), issue 2015 (vol. 229).
+- file: docs/combustor_network/grobman_1959_NASA_Memo_11-26-58E.pdf
+  citation: Grobman, J. S. (1959). Comparison of calculated and experimental total-pressure loss and airflow
+    distribution in tubular turbojet combustors with tapered liners. NASA Memo 11-26-58E, Lewis Research
+    Center, January 1959.
+  id: NASA Memo 11-26-58E (E-126)
+  topic: [combustion, orifice, channel]
+  content: 'Scanned, 50 PDF pp. (PDF page = printed page + 2); OCR unusable, read the images. Rig: 8.0 in ID
+    housing, four tapered liners A-D (Table I, p. 18: L 12/12/12/24 in, L/D 1.5/1.5/1.5/3, alpha 14/7/3.5/3.5
+    deg, A_L,2/A_r 0.06/0.40/0.67/0.40), each with 108 flush circular holes in 9 rows of 4, 6, ... 20 holes
+    (rows at x/L = (1.5 + k)/12, k = 0..8, read from the sketches), hole d 1/2, 5/8, 3/4 in giving A_h,T/A_r
+    0.422/0.659/0.950 -- 12 liners; 0.043 in Inconel wall; no dome flow. Isothermal air at about 300 K, 2 and
+    4 lb/s, P1 10-60 in Hg, M_r 0.04-0.25; propane heat release on five liners, exit/inlet T 2-4. MEASURED:
+    total-pressure loss dP/q_r from 20-tube rakes at B and C, all 12 liners vs M_r (Fig. 11(a)-(l), mostly
+    cleanly sampled, two airflows), with heat release (Fig. 14, overplotted clusters); combustion efficiency
+    (Fig. 15, 0.4-0.9). Model D only has liner and annulus static taps per row: its airflow split (Fig. 17,
+    3/4 in holes, M_r 0.102, 2 lb/s, isothermal, 8 cleanly sampled points) is COMPUTED from the measured
+    row static drops and the TN 3663 Cd, not metered. Also the Graves-Grobman method extended to tapered
+    liners (App. B), with calculated curves (Figs. 7-10, 16) and the calculated value beside each experiment
+    (Figs. 13, 14, 17). No measurement uncertainty is stated anywhere.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793: the MEASURED full-combustor case the issue asked for, rated MOSTLY
+    ready. Best case: model D, 3/4 in holes, isothermal -- geometry fully recoverable from Table I (every
+    printed ratio reproduced from the sketch dimensions: A_h,T/A_r 0.949, A_L,2/A_r 0.392, alpha 3.56 deg),
+    scored on dP/q_r vs M_r (Fig. 11(l)/13(d): about 4.75 at M_r -> 0, rising to 8.5 at 0.27; the method
+    calculates 5.50, +16%) and on the row-by-row split (Fig. 17; measured lies 0.02-0.06 below the method''s
+    curve over rows 1-5). Labels: the split and losses are ACCURACY (cross-source; no combaero closure is
+    from this rig); reproducing the Graves-Grobman calculated curves is model-vs-model only, not fidelity.
+    The split carries TN 3663''s Cd inside it, so scoring it mixes the network with the Cd question (TN 3663
+    now registered: Eq. 17 reads 12-29% low at its Phi < 3). The fuel nozzle alone raises dP/q_r by about
+    0.3, and heat-release runs had it in place.
+    combaero pieces: annulus as CrossflowSegmentElement stations (Pt-conserving bleed is kappa of about 1;
+    GG assume no annulus mixing loss), liner rows as duct-fed EffusionPlateElement panels (90 deg,
+    McGreehan-Schotsch U1/Vi Cd), liner as MomentumChamberNode merge chambers (main_inlet + side streams).
+    Gaps: the GG liner momentum gives each jet the annulus axial velocity V_A, combaero a fixed injection
+    angle; growing liner and shrinking annulus areas between stations; McGreehan-Schotsch vs Dittrich-Graves
+    Cd at the low-Cd upstream rows (C 0.1-0.6). Heat release is weaker (efficiency 0.4-0.9, exit T measured
+    only; would need EnergyBoundary(Tt_target) per liner station with an assumed T_L(x)). Draft extraction
+    with page/figure for every number: tmp/grobman_case.md (main checkout, not committed).'
+  read_for: ['#793 worked examples: measured full-combustor total-pressure loss and liner airflow split', liner
+      hole Cd under annulus crossflow (Dittrich-Graves vs McGreehan-Schotsch), provenance of a 1-D annulus +
+      liner momentum model]
+  issues: [793]
+  records: []
+  notes: 'Companion theory: Graves & Grobman, NACA Report 1373 (= RM E56I04), both registered. Fig. 17''s
+    cylindrical-liner squares are unpublished NACA data with no geometry -- not usable. Figure scans are
+    small; render at 300 dpi before digitising.'
+- file: docs/combustor_network/graves_grobman_1958_NACA_Report_1373.pdf
+  citation: Graves, C. C., Grobman, J. S. (1958). Theoretical analysis of total-pressure loss and airflow distribution
+    for tubular turbojet combustors with constant annulus and liner cross-sectional areas. NACA Report 1373.
+  id: NACA Report 1373 (supersedes RM E56I04)
+  topic: [combustion, orifice, channel]
+  content: 'Theory only, 26 pp. (printed pp. 899-924), two-column scan. 1-D incompressible (App. B) and
+    compressible cold-flow (App. C, M_r up to 0.15) model of a parallel-wall tubular combustor: annulus with
+    friction (f_A 0.005, l/D 4), flush liner holes as a continuous slot with the Dittrich-Graves Cd (Fig. 3,
+    3/4 in hole in 0.040 in wall: C_p vs (P_A - p_j)/(P_A - p_A), C/C_p vs p_A/p_j; Eq. 17 C = 0.827 sin
+    theta - 0.232), instantaneous jet mixing, jets keep the annulus axial velocity, heat release through T_L/T_1
+    from fuel-air ratio (Fig. 2, n-octane). Generalised calculated curves: dP/q_r vs A_h,T/A_r for A_L/A_r
+    0.4-0.75, T ratio 1-4, dome flow 0-0.1, M_r 0-0.15 (Figs. 6-15); w_L/w_T vs A_h/A_h,T (Figs. 16-23); one
+    worked pressure profile along the combustor (Fig. 5: A_L/A_r 0.6, A_h,T/A_r 1.09, V_r 100 ft/s, P_1 30 in
+    Hg, T ratio 1 and 3).'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793. NO measured data: every curve is calculated, so it is a
+    model-vs-model (code-to-code) target, never fidelity or accuracy. What it gives: the 1-D annulus + liner
+    momentum equations a combaero annulus/hole/liner network should reduce to in the incompressible,
+    uniform-jet limit, and Fig. 5 as a full static/total pressure profile to reproduce. Its measured counterpart is
+    Grobman 1959 (tapered liners). The Cd it uses is TN 3663''s (registered).'
+  read_for: ['#793 worked examples: system-level combustor flow split (method)', provenance of the 1-D
+      annulus/liner momentum model]
+  issues: [793]
+  records: []
+  notes: Same content as RM E56I04; the RM scan has one figure per page and is the better one to digitise.
+- file: docs/combustor_network/graves_grobman_1956_NACA_RM_E56I04.pdf
+  citation: Graves, C. C., Grobman, J. S. (1957). Theoretical analysis of total-pressure loss and airflow distribution
+    for tubular turbojet combustors with constant annulus and liner cross-sectional areas. NACA RM E56I04
+    (Confidential, declassified).
+  id: NACA RM E56I04
+  topic: [combustion, orifice, channel]
+  content: 'The research-memorandum version of NACA Report 1373, 89 PDF pp. (PDF page = printed page + 2):
+    same analysis and figures, one figure per page (Fig. 3 Cd on PDF p. 49, Fig. 5 pressure profiles PDF
+    pp. 51-53), plus Table I subsonic compressible-flow parameters for gamma 1.4 and 1.30 (printed pp. 40-44).'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 together with Report 1373 -- theory only, no measured data. Keep it
+    as the scan to digitise the method''s curves from (larger, cleaner figures).'
+  read_for: ['#793 worked examples: system-level combustor flow split (method)']
+  issues: [793]
+  records: []
+  notes: Dated 1956 in the filename (report number); Grobman 1959 cites it as 1957.
+- file: docs/combustor_network/dittrich_graves_1956_NACA_TN_3663.pdf
+  citation: Dittrich, R. T., Graves, C. C. (1956). Discharge coefficients for combustor-liner air-entry holes
+    I -- circular holes with parallel flow. NACA TN 3663, Lewis Flight Propulsion Laboratory, April 1956.
+  id: NACA TN 3663
+  topic: [orifice, combustion]
+  content: 'Scanned, 42 PDF pp. (text pp. 1-15, figures pp. 16-39; PDF page order of text pp. 9-14 is
+    shuffled); read the images, not the OCR. Rig: 4 in square duct, one wall replaced by a FLAT plate with
+    FLUSH square-edged circular holes, discharging into a quiescent plenum (no internal/discharge-side
+    flow). Geometry (table p. 6): d 0.125 and 0.25 in (five holes at 1/2 in pitch across the duct), 0.75 and
+    1.50 in (single hole); wall t 0.040 in, plus 0.125 and 0.500 in for the 0.75 in hole (d/t 1.5-37.5, L/d
+    0.027-0.67); duct height 0.74-2.23 in (A_h/A_d 0.004-0.60); boundary layer 0.04-0.10 in with/without
+    bleed-off (Fig. 7); duct static 1060, 1910, 3605 psf; air about 75 F. NO plunged holes, louvers, scoops
+    or angled approach (Part II, TN 3924). Approach velocity V_d 0, 40, 70, 150, 300, 500 ft/s (M to about
+    0.44), static drop 1-470 psf, p_d/p_j to 1.32. Re not stated; from the ranges about 2e3 (0.125 in, 1 psf)
+    to 5e5 (1.5 in, 470 psf). C = w_h/(rho_j V_j A_h) with V_j, rho_j ISENTROPIC from duct TOTAL P_d, T_d
+    to jet static p_j (Rohde''s convention). Correlated as corrected C_p = C/(C/C_p) against the flow
+    parameter Phi = (P_d - p_j)/(P_d - p_d); C/C_p(p_d/p_j) from the 0.75 in zero-crossflow data (Fig. 5,
+    1.00 to 1.08 at 1.32) is applied to every geometry. Fig. 2 zero-crossflow C vs p_d/p_j (0.60-0.75); Fig.
+    3/4 raw C for 0.75 in / 0.040 in; Fig. 6(a)-(k) C_p vs Phi per test series, 30-60 points each, the
+    velocity series collapsing to one curve from 0 at Phi 1 to the zero-crossflow value (0.58-0.66) at
+    Phi > 100; Figs. 8-13 faired-curve comparisons (boundary layer, pressure level, t, d, d at fixed d/t,
+    duct height). Appendix: the design procedure Graves-Grobman use. No measurement uncertainty stated.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 and #800. PLUGS A GAP, not an overlap: the shipped duct-fed Cd
+    (McGreehan-Schotsch Eq. 17 in U1/Vi, EffusionPlateElement._supply_crossflow via crossflow_velocity_ratio)
+    is scored only on Rohde 1969 (L/d 1.06, d 0.06 in, duct M 0.14); this is the thin-wall (L/d 0.05),
+    liner-scale (0.75 in) case at duct M to 0.44 and down to C_p of about 0.1, and is not in McGreehan-
+    Schotsch''s Fig. 4 compilation (Rohde, Grimm, Meyfarth-Shine). Same lab as Rohde but a different study,
+    so it is ACCURACY (cross-source), never fidelity. CONVERSION is the Rohde one already in
+    orifice_runner/conventions: incompressibly P_d - p_d = rho U1^2/2 and p_d - p_j = rho Vi^2/2 (Vi from
+    duct STATIC, McGreehan-Schotsch item 22), so Phi = 1 + (Vi/U1)^2, U1/Vi = 1/sqrt(Phi - 1), and
+    Cd_static = C_p sqrt(Phi/(Phi - 1)) (ideal flux from P_d vs from p_d). Exact only incompressibly: at
+    the 300-500 ft/s series q_c exceeds rho U1^2/2 by about M^2/4 (up to 5%), shifting U1/Vi up to about
+    2.5%; an exact map needs each point''s nominal V_d, p_d and T_d (all given), which crossflow_velocity_ratio
+    already computes. Also C_p is the authors'' pressure-ratio-1 value, compared with Eq. 17''s Cd without
+    its Y factor; and combaero''s U1 is the mean of the approach and departing duct flows, TN 3663''s the
+    approach V_d 1 in upstream (equivalent here, the bleed per hole is small at A_h/A_d 0.049). INDICATIVE
+    (14 rough reads off the Fig. 6(e) faired curve, 0.75 in / 0.040 in, scan not digitised, uncommitted
+    script): Eq. 17 anchored to the measured 0.60 zero-crossflow C_p reads LOW by -26% at Phi < 2 (U1/Vi >
+    1), -10% at Phi 2-10, and HIGH by +7% at Phi > 10 where the data show no Eq. 17 bump; the full chain at
+    Re 1e5, L/d 0.053 gives 0.593 at U1/Vi = 0 against 0.60 measured and the same shape. Rohde''s sharp
+    thick hole reads the OPPOSITE way (+41% at VHR 1-10), so Eq. 17 has no wall-thickness interaction: thin
+    liner holes keep more Cd under strong crossflow than it predicts, thick holes less (Fig. 10 here shows
+    the same t trend inside one study). GROBMAN 1959: yes, this is the Cd behind its model-D split (3/4 in
+    hole, 0.040 in wall = Fig. 6(e)/11; Grobman uses only this alpha = 0 curve and cites TN 3924, registered,
+    to neglect wall inclination; Report 1373 Fig. 3 is this correlation alone), so the "measured" split is measured row static drops through this curve: score
+    combaero''s split with this Cd held fixed per row (or score the row static drops) to test the network,
+    and treat a McGreehan-Schotsch run as network + Cd together -- at the upstream rows (C 0.1-0.6, Phi < 3)
+    Eq. 17 alone reads 12-29% low. #800: DIFFERENT physics. TN 3663''s crossflow is on the SUPPLY side (the
+    U1/Vi McGreehan-Schotsch term); #800''s CR-3630 Gc/Gj is spent-air crossflow on the DISCHARGE side, which
+    orifice.h already forbids feeding into U1/Vi, so this data cannot score #800. Its only bearing: the
+    authors (citing Callaghan-Bowden TN 1947, Dewey TN 3442) state supply-side curves hold with discharge-
+    side flow too provided V_j exceeds that flow and the LOCAL jet-exit static is used -- a hint that a
+    falling CD(Gc/Gj) can partly be a static-reference effect, not evidence.'
+  read_for: ['#793 liner-hole Cd under annulus crossflow (Dittrich-Graves vs McGreehan-Schotsch)', the Cd inside
+      Grobman 1959's model-D airflow split, '#800 crossflow-dependent impingement CD (relevance only)', whether
+      plunged/flanged liner holes need their own closure (not answered here, nor in TN 3924; Kaddah/Freeman)]
+  issues: [793, 800]
+  records: []
+  code: ['include/orifice.h: orifice::mcgreehan_schotsch::cd (Eq. 17, the closure it would score)', 'include/side_stream_momentum.h:
+      crossflow_velocity_ratio (U1/Vi of a duct-fed hole)', 'python/combaero/network/components.py: EffusionPlateElement._supply_crossflow']
+  notes: 'Public NACA report. Digitising target if this becomes a scored set: Fig. 6(e) (cleanly sampled, about
+    45 points, Grobman''s exact hole), then 6(f)/(g) for wall thickness and 6(a)/(j) for the small-hole and
+    large A_h/A_d ends; render at 130 dpi or more. Indicative script: tmp/tn3663/compare.py (main checkout,
+    not committed). Fig. 6(j): at A_h/A_d 0.60 the hole swallows the whole approach flow at Phi 10, capping
+    C_p at 0.53 -- a duct-blockage effect a single-hole Cd cannot carry.'
+- file: docs/combustor_network/dittrich_1958_NACA_TN_3924.pdf
+  citation: Dittrich, R. T. (1958). Discharge coefficients for combustor-liner air-entry holes II -- flush
+    rectangular holes, step louvers, and scoops. NACA TN 3924, Lewis Flight Propulsion Laboratory, April 1958.
+  id: NACA TN 3924
+  topic: [orifice, combustion]
+  content: 'Scanned, 58 PDF pp. (text pp. 1-14, Table I sketches pp. 15-20, figures pp. 21-56); read the
+    images, not the OCR. Same rig as TN 3663 (4 in square duct, test plate in one wall, discharge into a
+    quiescent plenum), duct height 2.23 in for every test, wall t about 0.040 in for EVERY configuration (no
+    wall-thickness series). 32 configurations in six groups (Table I): A-1..A-5 flush rectangular holes (0.5 x
+    0.5 to 1 x 2 in, slots 0.5 x 4 and 0.25 x 4 in, l/b 1-16, long side along the flow); B-1..B-12 step louvers
+    about 1 in wide, h 0.095-0.623 in, with/without wall overlap, a corrugated spacer (B-6) and side-wall
+    fences; C-1/C-2 thumbnail scoops (0.5 in radius hemisphere segment, h 0.150/0.265 in); D-1..D-4 scoops over
+    a 0.75 in hole (A_f/A_h 0.585-1.446, base radius 1 or 2 hole radii); E-1 the 0.75 in flush hole (TN 3663''s
+    Fig. 6(e) geometry re-run), E-2/E-3 the same hole and E-4/E-5 a 0.105 in louver in walls converging at 8
+    and 20 deg (duct static p_d,2 taken on the opposite wall); F-1/F-2 two 0.75 in holes in line at 5 and 1.5
+    d, F-3/F-4 rows of 0.125 in holes side by side at 2 and 4 d. V_d 0, 50, 150, 420 ft/s (F-3/F-4 40, 150,
+    500), V_j to 650 ft/s, p_d about 2100 psf, 75 F, static drop 2-250 psf, duct boundary layer 0.04/0.10/0.30
+    in. SAME correlating parameter as TN 3663: C (V_j, rho_j isentropic from P_d, T_d to p_j; A_h for holes, A_f
+    for louver/scoop faces) corrected by TN 3663''s C/C_p line evaluated at the generalised ratio (p_d + q_d
+    sin theta)/p_j (theta 90 deg for louvers and scoops, the wall angle for inclined holes; Fig. 5 scatter
+    about +-0.02 around the line), plotted against Phi = (P_d - p_j)/(P_d - p_d); louvers and scoops further
+    on the effective face area A_f* = A_f - b delta* (C_p,delta*, delta* vs Phi in Fig. 9 from the Fig. 8
+    face pressure profiles). Figs. 13(a)-(f) carry the points (about 15-30 per configuration, four velocity
+    symbols, cleanly sampled); Figs. 14-22 faired-curve comparisons; Fig. 3 zero-crossflow C vs p_d/p_j for
+    27 configurations (flush 0.59-0.63, louvers/thumbnails 0.67-0.79, scoops over holes 0.49-0.61 at 1.02);
+    Fig. 12 the zero-flow Phi of a louver or scoop vs its height h (0.55 at h 0.1 in to 0.05 at 0.9 in). Text
+    p. 13: a four-step design procedure. No measurement uncertainty stated.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 and #807. FLUSH HOLES: shape and size barely matter -- rectangular
+    slots l/b 1-16 lie within about +0.02 of the circular E-1 curve (Fig. 14), wall inclination to 20 deg is
+    negligible when Phi uses the LOCAL static at the hole (Fig. 21(a)), and in-line (5 to 1.5 d) or
+    side-by-side (4 to 2 d) neighbours change nothing below Phi 100 (Fig. 22). So the shipped circular-hole
+    closure extends to rectangular slots and to a converging annulus as long as the network hands it the
+    station static (CrossflowSegmentElement stations do) -- an accuracy statement, not a new closure. E-1 re-runs
+    TN 3663 Fig. 6(e) (0.75 in / 0.040 in) in the same rig, C_p 0.59 at Phi 100, so it is a REPLICATE of that
+    accuracy set (same lab and geometry -- it doubles the points, it is not an independent rig). ANNULUS
+    CONVERGENCE: the TN 3663 entry''s earlier claim that Grobman 1959 and Report 1373 use TN 3924 alpha curves
+    was wrong: Grobman computes everything with TN 3663''s alpha = 0, 3/4 in, 0.040 in curve and cites TN 3924
+    only to justify neglecting inclination; Report 1373 (constant annulus) uses TN 3663 alone and says its Cd
+    may not apply to louvers or scoops. #807: NO wall-thickness or L/d series here (t 0.040 in throughout), so
+    it cannot supply the L/d-dependent crossflow term #807 asks about. Only an indirect hint: F-3/F-4 (0.125 in,
+    t/d 0.32) vs E-1 (0.75 in, t/d 0.053), rough reads of the Fig. 22 faired curves normalised by each
+    plateau (0.645 vs 0.585), give C_p/C_p,inf 0.54 vs 0.62 at Phi 2 and 0.76 vs 0.84 at Phi 4 -- the thicker
+    relative wall loses more Cd under crossflow, the #807 direction, but d, t/d and the multi-hole row all
+    change together and TN 3663 Figs. 6(a)/12 already hold the same contrast. LOUVERS AND SCOOPS: PLUG A GAP
+    combaero does not model -- grep finds no louver, scoop or plunged-hole element or closure in
+    python/combaero, include or src. Physics a flush-hole Cd cannot represent: they keep flowing below Phi 1 by
+    ram (to Phi 0.05 for a 0.89 in scoop), peak C_p,delta* about 0.95 at Phi 1, and depend on the duct
+    boundary layer at low Phi; a scoop raises Cd only at low Phi and LOWERS it at high Phi unless A_f/A_h is
+    about 1.4. No measured louver/scoop combustor case in the register needs it now (Grobman model D is plain
+    holes), so this closes nothing yet: it is the primary for a louver/scoop entry Cd if a liner case or the
+    #714 slot film feed needs one. PLUNGED holes are NOT covered (none tested); that question stays with
+    Kaddah/Freeman (Lefebvre Eqs. 4.15/4.16, secondary).'
+  read_for: ['#793 non-circular and protruding liner entries (louvers, scoops) and the annulus-convergence
+      effect on Cd', '#807 any wall-thickness or L/d series for crossflow Cd of circular holes', whether
+      plunged liner holes need their own closure (not tested here)]
+  issues: [793, 807]
+  records: []
+  code: ['include/orifice.h: orifice::mcgreehan_schotsch::cd (Eq. 17; E-1/F-series would score it beside TN
+      3663)', 'python/combaero/network/components.py: EffusionPlateElement._supply_crossflow']
+  notes: 'Public NACA report. Digitising targets if used: Fig. 13(e) E-1 (about 15 points, TN 3663 Fig. 6(e)
+    replicate) and Fig. 13(f) F-3/F-4 (about 30 points each, 0.125 in) for the #807 crossflow set; for a
+    louver/scoop closure Figs. 13(b) (B-1/B-2, B-8 via Fig. 7) and 13(c)/(d) plus Fig. 12 (zero-flow Phi vs h)
+    and Fig. 9 (delta* vs Phi). Render at 130 dpi or more; several figures are rotated 90 deg in the scan.'
 - file: docs/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
   id: ISBN 978-1-4200-8605-8 (ebook)
-  topic: [combustion, film, review]
-  content: 'Textbook (560 pp., no text layer): combustor design, diffusers, liner aerodynamics and pressure
-    loss, wall cooling, heat transfer, emissions.'
-  status: unscreened
-  verdict: unscreened; (guess) combustor liner pressure loss, hole Cd and slot-film cooling chapters are
-    the likely relevant parts.
-  read_for: []
-  issues: []
+  topic: [combustion, film, orifice, jet_mixing, review]
+  content: 'Textbook, 560 pp. with a usable text layer (pdftotext works; PDF page = book page + 21). Parts
+    that matter here. Ch. 4 Aerodynamics (pp. 113-152): pressure-loss factor and overall loss, Eqs. 4.1-4.7
+    with Table 4.1 (dP/P3, dP/qref, m T^0.5/(Aref P3) for tubular/tuboannular/annular; the three rows obey
+    Eq. 4.1 to 2%), hot loss Eqs. 4.8-4.10; liner-hole Cd after Kaddah 1964 (Eq. 4.15, plain) and Freeman
+    1965 (Eq. 4.16, plunged) with Kaddah''s measured points in Fig. 4.2 (about 6 per hole shape, cleanly
+    sampled) and curves only in Fig. 4.3; initial jet angle Eq. 4.17; jet trajectory and penetration
+    Eqs. 4.18-4.20 (Norster, Sridhara; Figs. 4.7-4.8); Cranfield and NASA dilution-design methods Eqs.
+    4.24-4.28; pattern factor Eqs. 4.21-4.23 and Lefebvre''s correlation Eqs. 4.30/4.31 with data Figs.
+    4.11/4.12; axial swirler flow Eqs. 4.33-4.36. Ch. 5 (pp. 153-188): theta parameter Eq. 5.6 (design
+    charts only). Ch. 2 Fig. 2.19 (p. 72): kerosine adiabatic temperature rise curves. Ch. 8 Heat Transfer
+    (pp. 315-357): the Lefebvre-Herbert liner-wall method -- gas radiation R1 with Reeves emissivity and
+    luminosity factor L (Eqs. 8.4-8.15), liner-to-casing radiation R2 (Eqs. 8.16-8.19), internal convection
+    0.020/0.017 Re^0.8 (Eqs. 8.20-8.22), annulus convection (Eq. 8.23), balance Eq. 8.25; slot-film
+    effectiveness (Stollery-El-Ehwany 8.30-8.33, Ballal-Lefebvre near-slot and wall-jet 8.34-8.38 with lip
+    thickness, Sturgess practical slots 8.39/8.40); film-side Nu (Eqs. 8.41-8.44); TBC layer Eq. 8.46; F101
+    measured vs predicted wall temperature against fuel H content (Fig. 8.5). THREE CHAINED WORKED EXAMPLES
+    with every input, intermediate and result printed: uncooled primary-zone liner (pp. 325-328, Tw1/Tw2 =
+    1640/1603 K), the same liner film-cooled at x/s = 18 (pp. 338-340, 1283/1265 K), and with a 0.5 mm TBC
+    (pp. 350-351, 1304/1236/1220 K). Only two blocks in the book are headed "Example"; the third (TBC)
+    continues the second.'
+  status: screened
+  verdict: 'Screened 2026-10-27 for #793 worked examples and missing liner correlations. BEST #793 CASE:
+    the Ch. 8 liner-wall-temperature trio. Re-solving the printed equations reproduces all three printed
+    answers within 1 K (1640.8/1603.7, 1282.8/1264.4, 1303.8/1236.4/1220.3), so the book''s own chain is
+    self-consistent and is a printed-quantity fidelity target. combaero CANNOT build it as a network yet:
+    there is no radiation anywhere in the code (no gas emissivity, no luminosity factor, no wall-to-casing
+    radiation; components.py says "Radiation is not modelled"); conduction (ThermalWall/WallLayer, two
+    layers for the TBC case) and both convective sides exist, and the annulus h from channel_smooth
+    (Gnielinski) is within 1% of the book''s 920 W/m2K. The film-cooled case also needs the Ballal-Lefebvre
+    thick-lip eta (Eq. 8.38; combaero''s Marek-Tacina gives 0.801 at Tu 14% against the book''s 0.789, M =
+    2.54 outside Marek-Tacina''s 0.41-1.87) and a film-side h (Eq. 8.44), which combaero does not have (the
+    film changes only T_aw, the duct keeps its own h). SIMPLEST READY CASE: Table 4.1 / Eqs. 4.1-4.7,
+    pressure-loss factor and effective liner hole area, as a two-orifice network. Correlation gaps
+    Lefebvre exposes: gas radiation with luminosity (primary Lefebvre-Herbert 1960, wanted); plunged-hole
+    Cd and Kaddah''s Cd(K, alpha) for liner holes (secondary, primaries are Cranfield MSc theses; NACA TN
+    3663, now registered, instead); thick-lip and high-M slot film plus film-side Nu (primary Ballal-Lefebvre 1972,
+    wanted, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
+    penetration (secondary, Holdeman already registered is the better source). LinearThetaHeadLoss in
+    network/pressure_loss.py is Eqs. 4.8-4.10 in form (k = 1 is Eq. 4.9''s low-Mach constant-area value)
+    but cites no source. Book errata found while reproducing: Eq. 8.29 prints C2 = 291(Tw2 - 880) for
+    921(...); the film example substitutes k_g = 0.157 but its 1926 coefficient uses k_a = 0.0553 as Eq.
+    8.44 says; rho_g U_g = 2.62/0.137 should read /0.0137; eps_g = 0.61 needs the nominal q = 0.0588 while
+    Tg used the efficiency-reduced 0.050; Eq. 8.9 prints "2 - exp" for "1 - exp". The book''s air k at 880
+    K (0.0553) is 8% below combaero''s 0.060 and standard tables; its product k at 2280 K (0.157) is 14%
+    above combaero''s frozen 0.138. combaero''s complete combustion of n-heptane at q = 0.050, 880 K gives
+    dT = 1592 K against the book''s dissociated kerosine 1455 K, so an example must take Tg = 2280 K as
+    the book''s input, not recompute it.'
+  read_for: ['#793 worked examples: liner wall temperature (radiation + convection + film + TBC)', '#793
+      worked examples: pressure-loss factor, liner effective hole area, flow split', liner-hole Cd vs
+      annulus crossflow (Kaddah/Freeman) against the shipped McGreehan-Schotsch crossflow Cd, '#714 slot
+      film: Ballal-Lefebvre thick-lip and wall-jet effectiveness against Marek-Tacina', flame radiation
+      and luminosity factor, pattern factor correlation, provenance of LinearThetaHeadLoss]
+  issues: [714, 793]
   records: []
   notes: A byte-identical copy at docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf was deleted 2026-10-25.
+    The earlier "no text layer" note was wrong. Secondary throughout Ch. 4 and 8 except the liner-wall
+    method, Eqs. 4.30/4.31 and Eq. 8.15 (Lefebvre's own); figures reprinted from theses (Kaddah, Freeman,
+    Norster, Sridhara) carry their author as `after:` if digitised.
 - file: docs/orifices/lichtarowicz-et-al-1965-discharge-coefficients-for-incompressible-non-cavitating-flow-through-long-orifices.pdf
   citation: Lichtarowicz, A., Duggins, R. K., Markland, E. (1965). Discharge coefficients for incompressible
     non-cavitating flow through long orifices. J. Mechanical Engineering Science 7(2), 210-219.
@@ -2406,3 +2672,34 @@ wanted:
     q or set boundaries from Bassett's own K). Combining-manifold flow distributions measured under imposed
     pressures would.
   where: ASME J. Fluids Eng.; any measured combining-tee or manifold flow distribution would do.
+- citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
+    Proc. IMechE 174(12), 463-473.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'Primary for the liner-wall method and the luminous-flame emissivity with luminosity factor L
+    (Lefebvre Eqs. 8.7, 8.11, 8.12) -- the radiation combaero lacks entirely; what data L was fitted to and
+    over what pressure and fuel range.'
+  where: SAGE (Proc. IMechE archive).
+- citation: Ballal, D. R., Lefebvre, A. H. (1972). A proposed method for calculating film-cooled wall temperatures
+    in gas turbine combustion chambers. ASME Paper 72-WA/HT-24.
+  checked: false
+  issues:
+  - 714
+  priority: later
+  question: 'Primary for the thick-lip slot-film effectiveness (Lefebvre Eqs. 8.37/8.38, blowing ratio up to 4
+    where Marek-Tacina stops at 1.87) and the film-side Nusselt numbers (Eqs. 8.41/8.43) that combaero''s film
+    path lacks -- with the data they were fitted to. Companion: Ballal and Lefebvre (1973) J. Heat Transfer 95,
+    265-266 (near-slot region).'
+  where: ASME Digital Collection.
+- citation: Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
+    AFWAL-TR-84-2104.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'Operating conditions and geometry behind Lefebvre Fig. 8.5 (GE F101 measured liner wall temperature
+    against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
+    radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
+  where: DTIC (public, ADA-numbered).
