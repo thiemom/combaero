@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import combaero as cb
 
@@ -470,7 +471,7 @@ def test_orifice_compressible_choked():
         T0, P0, P_back_choked, X, Cd, area, beta
     )
 
-    # In choked flow, d_mdot_dP_back should be near zero (smoothed)
+    # Choked, the outlet sits at P* whatever P_back is: the derivative is zero
     assert abs(d_Pb) < 1e-10, "d_mdot_dP_back should be ~0 when well choked"
 
     # But d_mdot_dP0 should still be positive
@@ -583,6 +584,65 @@ def test_orifice_compressible_jacobian_accuracy():
     )
     d_T0_num = (mdot_plus - mdot) / eps_T0
     np.testing.assert_allclose(d_T0, d_T0_num, rtol=1e-5)
+
+
+def _orifice_band_points() -> list[tuple[str, float]]:
+    """Back pressures across the choke band, as offsets from P* (#772)."""
+    T0, P0 = 300.0, 200000.0
+    P_star = cb.critical_pressure_ratio(T0, P0, cb.species.dry_air()) * P0
+    pts = [(f"{r:g} P*", r * P_star) for r in (0.97, 0.99, 0.999, 1.001, 1.005, 1.01, 1.03)]
+    pts += [(f"P* {d:+g} Pa", P_star + d) for d in (-50.0, 50.0)]
+    return pts
+
+
+@pytest.mark.parametrize("reverse", [False, True], ids=["forward", "reverse"])
+@pytest.mark.parametrize("label_Pb", _orifice_band_points(), ids=lambda p: p[0])
+def test_orifice_compressible_jacobian_through_choke_band(
+    label_Pb: tuple[str, float], reverse: bool
+) -> None:
+    """Analytic (Pt, P_back, Tt) derivatives equal central FD across choke (#772).
+
+    Until #772 a cubic blend in the pressure ratio, 0.01 either side of the
+    critical ratio, scaled d(mdot)/dP_back but not mdot itself: 46% off FD at
+    P* + 50 Pa, and d(mdot)/dPt (which reuses it) up to 0.3% off. Each FD is
+    taken at two steps a decade apart and must agree with itself first, so a
+    failure is the Jacobian's, not the difference quotient's.
+    """
+    _, Pb = label_Pb
+    T0, P0 = 300.0, 200000.0
+    X = cb.species.dry_air()
+    Cd, area, beta = 0.65, 1e-4, 0.5
+    f = cb._core.orifice_compressible_mdot_and_jacobian
+
+    # Reverse flow: the same nozzle with the two pressures swapped.
+    def mdot(Tt: float, P_up: float, P_dn: float) -> float:
+        args = (Tt, P_dn, P_up) if reverse else (Tt, P_up, P_dn)
+        return f(*args, X, Cd, area, beta)[0]
+
+    if reverse:
+        m, d_Pb_rev, d_P0_rev, d_T0 = f(T0, Pb, P0, X, Cd, area, beta)
+        d_P0, d_Pb = d_P0_rev, d_Pb_rev
+    else:
+        m, d_P0, d_Pb, d_T0 = f(T0, P0, Pb, X, Cd, area, beta)
+
+    def central(g, h: float) -> float:
+        return (g(h) - g(-h)) / (2.0 * h)
+
+    fds = {
+        "Pt": (d_P0, lambda h: central(lambda e: mdot(T0, P0 + e, Pb), h), 1.0),
+        "P_back": (d_Pb, lambda h: central(lambda e: mdot(T0, P0, Pb + e), h), 1.0),
+        "Tt": (d_T0, lambda h: central(lambda e: mdot(T0 + e, P0, Pb), h), 1e-2),
+    }
+    # Scales for the absolute floor: mdot over the variable's own size.
+    scale = {"Pt": abs(m) / P0, "P_back": abs(m) / P0, "Tt": abs(m) / T0}
+    for name, (analytic, fd_of, h) in fds.items():
+        fd_h, fd_h10 = fd_of(h), fd_of(h / 10.0)
+        atol = 1e-7 * scale[name]
+        # Step-size check: the difference quotient has converged.
+        assert abs(fd_h - fd_h10) <= 1e-4 * abs(fd_h) + atol, (name, fd_h, fd_h10)
+        assert abs(analytic - fd_h) <= 1e-4 * abs(fd_h) + atol, (
+            f"{name}: analytic {analytic:.6e} vs FD {fd_h:.6e} at Pb - P* offset {label_Pb[0]}"
+        )
 
 
 def test_orifice_compressible_matches_nozzle_flow():
