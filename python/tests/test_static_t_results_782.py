@@ -9,7 +9,10 @@ solves), a compressible one's lies on the isentrope through (Tt, Pt) at P.
 
 from __future__ import annotations
 
+import math
+import sys
 import warnings
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -26,6 +29,7 @@ from combaero.network import (
     PressureBoundary,
 )
 from combaero.network import solver as solver_module
+from combaero.network.components import MultiPortChamberBase
 
 Y_AIR = list(cb.species.dry_air_mass())
 X_AIR = list(cb.species.dry_air())
@@ -175,3 +179,53 @@ def test_a_custom_element_still_keyed_by_the_0_7_name_gets_the_same_jacobian(
         monkeypatch.setattr(el, "residuals", dropped)
     _, J_dropped = solver._residuals_and_jacobian(x0)
     assert not np.array_equal(J_dropped.toarray(), J_new.toarray())
+
+
+def _tee3(seed: int) -> tuple[Any, dict, str]:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "stress"))
+    from networks import FAMILIES
+
+    net, _ = FAMILIES["tee3"](seed)
+    sol = NetworkSolver(net).solve(timeout=30.0)
+    assert sol["__converged__"]
+    eid = next(k for k, e in net.elements.items() if isinstance(e, MultiPortChamberBase))
+    return net, sol, eid
+
+
+@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
+def test_a_junction_reports_each_port_static_and_total_T() -> None:
+    """#824: a junction's port_<i>_T is the port's static T (it was the
+    total), port_<i>_Tt the total -- the port nodes' own .T and .Tt."""
+    net, sol, eid = _tee3(2)  # compressible: the ports move
+    d = sol["__element_diag__"][eid]
+    for i, port in enumerate(net.elements[eid].port_nodes):
+        assert d[f"port_{i}_Tt"] == sol[f"{port}.Tt"]
+        # The isentrope through (Tt, Pt) and the chamber closure meet at the
+        # converged Pt residual, not to round-off.
+        assert d[f"port_{i}_T"] == pytest.approx(sol[f"{port}.T"], rel=1e-10)
+        assert d[f"port_{i}_T"] < d[f"port_{i}_Tt"]
+
+
+def test_a_changed_port_T_warns_like_the_node_keys(fresh_warning: None) -> None:
+    _, sol, eid = _tee3(2)
+    with pytest.warns(FutureWarning, match="port_0_T"):
+        sol["__element_diag__"][eid]["port_0_T"]
+
+
+def test_an_incompressible_junction_port_T_is_its_Tt() -> None:
+    net, sol, eid = _tee3(5)
+    d = sol["__element_diag__"][eid]
+    for i in range(net.elements[eid].N):
+        assert dict.__getitem__(d, f"port_{i}_T") == dict.__getitem__(d, f"port_{i}_Tt")
+
+
+@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
+def test_an_element_reports_its_outlet_flow_at_the_static_state() -> None:
+    """#824: the outlet Mach an element reports is formed at its outlet
+    node's static state, not at (Tt, P)."""
+    sol = NetworkSolver(_chamber_network("compressible")).solve()
+    orf = sol["__element_diag__"]["orf1"]  # its outlet is the moving chamber
+    T, P = sol["chamber.T"], sol["chamber.P"]
+    area = math.pi * 0.04**2 / 4.0
+    v = 0.5 / (cb.density(T, P, X_AIR) * area)
+    assert orf["mach_out"] == pytest.approx(v / cb.speed_of_sound(T, X_AIR), rel=1e-9)

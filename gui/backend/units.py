@@ -294,7 +294,8 @@ GUI_ONLY_UNITS: dict[str, str] = {
 # port index) and the tee's hidden port steps, ``step_<port>_<quantity>``.
 _PORT_UNITS: dict[str, str] = {
     "P": "Pa",
-    "T": "K",
+    "T": "K",  # static (#782, 0.8)
+    "Tt": "K",
     "m_dot": "kg/s",
     "area": "m\u00b2",
     "outer_area": "m\u00b2",
