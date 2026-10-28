@@ -2385,7 +2385,7 @@ documents:
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
   id: ISBN 978-1-4200-8605-8 (ebook)
-  topic: [combustion, film, orifice, jet_mixing, review]
+  topic: [combustion, film, orifice, jet_mixing, review, radiation]
   content: 'Textbook, 560 pp. with a usable text layer (pdftotext works; PDF page = book page + 21). Parts
     that matter here. Ch. 4 Aerodynamics (pp. 113-152): pressure-loss factor and overall loss, Eqs. 4.1-4.7
     with Table 4.1 (dP/P3, dP/qref, m T^0.5/(Aref P3) for tubular/tuboannular/annular; the three rows obey
@@ -2553,7 +2553,7 @@ documents:
     its application on effusion cooling systems. 1st CEAS European Air and Space Conference, CEAS-2007-026,
     pp. 297-303.'
   id: CEAS-2007-026
-  topic: [effusion, combustion, film]
+  topic: [effusion, combustion, film, radiation]
   content: 'Florence/Avio liner tool: SRBC 1-D coolant network plus 1-D FD wall conduction; Lefebvre
     liner heat balance R1+C1 = R2+C2 = K1-2; gas emissivity Reeves (Eq. 5), Reeves-Lefebvre luminosity
     (Eqs. 6-7), Lefebvre-Herbert/Farag (Eq. 8), generalised luminosity Eq. 9; film from L''Ecuyer-Soechting
@@ -2570,6 +2570,33 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/ceas-2007-026.pdf. PDF metadata creation date is wrong (1999); the conference is 2007.
+- file: docs/radiation/bordbar_wecel_hyppanen_2014_CNF_161_2435_LBL_WSGG_H2O_CO2.pdf
+  citation: 'Bordbar, M. H., Wecel, G., Hyppanen, T. (2014). A line by line based weighted sum of gray gases model
+    for inhomogeneous CO2-H2O mixture in oxy-fired combustion. Combustion and Flame 161, 2435-2445.'
+  id: doi:10.1016/j.combustflame.2014.03.013
+  topic: [radiation, combustion]
+  content: 'WSGG model (4 gray gases + a transparent one) for the TOTAL emissivity of H2O-CO2 mixtures, fitted to
+    an LBL database from HITEMP 2010 (6800 emissivities): T 500-2400 K (Tr = T/1200 K), pressure-path length
+    0.01-60 atm m, molar ratio Mr = H2O/CO2 0.01-4 (one coefficient set for all Mr: weights a_i = sum_j b_ij
+    Tr^j with b_ij = sum_k c_ijk Mr^k, absorption K_i = sum_k d_ik Mr^k; Eqs. 6-11, Table 1). Benchmarked
+    against Johansson, Yin, Smith and Leckner (Fig. 1) and against LBL for inhomogeneous / non-isothermal
+    slabs and a 3-D oxy-fired benchmark. Non-luminous gas only: soot is not included (an extension is
+    referenced, not given). Total pressure 1 atm (the database''s); no pressure-broadening correction.'
+  status: screened
+  verdict: 'Screened 2026-10-28 for the gas radiation combaero lacks (blocking the Lefebvre & Ballal liner-wall
+    examples, #793). A citable, LBL-based NON-LUMINOUS emissivity for H2O-CO2 at 1 atm, closed-form in T,
+    partial-pressure path length and Mr -- a physics-based alternative to Lefebvre''s empirical Eq. 8.11 gas
+    emissivity, and a cross-check of it at 1 atm. Limits for a gas-turbine liner: 1 atm only (liners run at
+    10-40 bar, where pressure broadening raises H2O/CO2 emissivity; a high-pressure WSGG or a correction is
+    needed), no soot (Lefebvre''s luminosity factor L stays the luminous part), oxy-fired fit (air-fired
+    Mr ~1-2 is inside its range). No issue exists for a radiation model yet; this is a candidate for its
+    non-luminous kernel, not used.'
+  read_for: ['#793 liner wall temperature: gas radiation (non-luminous emissivity)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/1-s2.0-S0010218014000935-Bordbar.pdf. The text layer DROPS the minus
+    signs in Table 1 (and elsewhere, e.g. "1  YCO2"); transcribe the coefficients from the rendered page.
+    The authors offer the coefficients as a data file with Matlab code on request.
 - file: docs/combustor_network/topal2014_CONV14_1D_heat_transfer_combustor.pdf
   citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional
     heat transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp.

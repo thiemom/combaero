@@ -62,6 +62,7 @@ TOPICS = {
     "area_change",
     "vortex",
     "acoustics",
+    "radiation",
     "transport",
     "review",
     "other",
