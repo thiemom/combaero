@@ -39,8 +39,13 @@ double k_haynes230(double T) {
     constexpr double T_max = 1400.0;
     validate_temperature("Haynes 230", T, T_min, T_max);
 
+    // HAYNES 230 brochure H-3000O (2021), "Physical Properties": k = 8.9 W/m K
+    // at room temperature and 10.4 + 2.0 per 100 C to 28.4 at 1000 C. The
+    // line below reproduces every printed value from 25 to 1000 C (1273 K);
+    // 1273-1400 K extends the table's constant slope. The quadratic used
+    // before was 37% high at room temperature (#761).
     double T_C = T - 273.15;
-    return 11.8 + 0.0158 * T_C + 1.1e-6 * T_C * T_C;
+    return 8.4 + 0.020 * T_C;
 }
 
 // -------------------------------------------------------------
@@ -134,8 +139,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "haynes230",
         k_haynes230,
         300.0, 1400.0,
-        "Haynes International Technical Data",
-        "Ni-Cr-W-Mo alloy, high-temperature oxidation resistance"
+        "HAYNES 230 alloy brochure H-3000O (Haynes International, 2021)",
+        "Ni-Cr-W-Mo alloy; table to 1273 K, linear extension to 1400 K"
     }},
     {"ss316", {
         "ss316",
