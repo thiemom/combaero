@@ -1069,7 +1069,7 @@ documents:
     Florschuetz 1981 at local Gc/Gj.'
   read_for: ['#474 Eq. 8 pressure range', '#467 bypass flow distribution', '#467 bypass heat transfer
       (D.2)', '#713 eta_r reference temperature', '#729 starved/reversed rows']
-  issues: [467, 474, 683, 705, 706, 709, 721, 728, 729, 730, 734, 782]
+  issues: [467, 474, 683, 705, 706, 709, 721, 728, 729, 730, 734, 782, 802]
   records: [validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630.md, validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630_table_d2.md,
     validation/cooling/data/florschuetz_metzger_su1982/]
   code: ['python/combaero/network/impingement_array.py: bypass configuration (docstring cites CR-3630)',

@@ -56,16 +56,13 @@ pytestmark = pytest.mark.slow
 
 Key = tuple[int, int, int, float]
 
-# Tests the network does not solve from a cold start, each with its reason.
-# B(5,4,1) at mc/mj 0.99: rows 1-4 are stagnant in the data (Gj/Gj_mean 0.00,
-# 0.02, 0.07, 0.16) and the last segment runs at the edge of a false Fanno
-# choke (#802: a station's static P is fed to the kernel as P0). Before #782
-# there was no root at all: LM's |F| 1.9e-4 was the overshoot m - m_choke of
-# the last segment. With #782 a regular root exists (found by continuation),
-# but a cold start steps onto the choke plateau. #802 should flip this.
-STALLED: dict[Key, str] = {
-    (5, 4, 1, 0.99): "#799/#802: cold start stalls on a false Fanno choke at the exit segment",
-}
+# Tests the network does not solve from a cold start, each with its reason
+# (a strict xfail below). None since #802: B(5,4,1) at mc/mj 0.99 stalled on a
+# false Fanno choke at its exit segment, a station's static P fed to the
+# kernel as P0 (99.7% of that choke; 81% of the true one). It now solves cold.
+# Its stagnant rows 1-4 (data Gj/Gj_mean 0.00-0.16) still come out with
+# alternating signs, the #799 pattern: constant Cd at dP ~ 0 (#800).
+STALLED: dict[Key, str] = {}
 
 
 @cache
@@ -194,12 +191,15 @@ def test_each_test_solves(key: Key) -> None:
 
 
 def test_the_flow_distribution_matches_the_authors_data() -> None:
-    """Row-by-row Gj/Gj_mean over the 41 tests that solve (STALLED aside).
+    """Row-by-row Gj/Gj_mean over all 42 tests (STALLED aside: none).
 
-    Measured 2026-10-27 (#782), worst row per test: z/d >= 2 median 0.021,
-    max 0.111 (B(5,4,2) at mc/mj 1.01, row 10); z/d = 1 up to 0.252
-    (B(5,8,1) at mc/mj 0.99). P/P0 mean absolute error 0.007. Before #782
-    (kernels fed T0): median 0.021, max 0.100, same test and row.
+    Measured 2026-10-27 (#802), worst row per test: z/d >= 2 median 0.021,
+    max 0.111 (B(5,4,2) at mc/mj 1.01, row 10); z/d = 1 up to 0.269
+    (B(5,4,1) at mc/mj 0.99, row 4: its stagnant rows, #799). P/P0 mean
+    absolute error 0.0075. The #802 change moved no row of the 41 tests
+    that solved before it by more than 3e-4 in Gj/Gj_mean or 1e-4 in P/P0;
+    B(5,4,1) 0.99 is the one added (P/P0 error 0.013 on its own). Before
+    #782 (kernels fed T0): median 0.021, max 0.100, same test and row.
     """
     wide, narrow, p_err = [], [], []
     for key in _solved():
@@ -212,7 +212,7 @@ def test_the_flow_distribution_matches_the_authors_data() -> None:
         f"\nGj/Gj_mean worst row: z/d>=2 median {statistics.median(wide):.3f} max {max(wide):.3f};"
         f" z/d=1 max {max(narrow):.3f}; P/P0 mean |err| {statistics.mean(p_err):.4f}"
     )
-    assert len(wide) + len(narrow) == 41
+    assert len(wide) + len(narrow) == 42
     assert statistics.median(wide) < 0.03
     # From the measurement band, not from the score: CR-3630 Appendix B
     # (Section 4.4.1) puts Gj/Gj_mean at about +/-2%. The worst z/d >= 2 row
