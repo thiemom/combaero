@@ -3307,6 +3307,17 @@ class NetworkSolver:
             }
         )
 
+    def _record_diagnostics_exception(self, exc: BaseException, where: str) -> None:
+        """Keep a diagnostics exception on a FAILED solve's final state
+        (phase ``diagnostics``, ``where`` the node or element): that state
+        reports no diagnostics for it instead of raising out of solve (#810)."""
+        saved = self._eval_where
+        self._eval_where = where
+        try:
+            self._record_exception(exc, phase="diagnostics")
+        finally:
+            self._eval_where = saved
+
     def _failed_start_result(self, x0_use: np.ndarray, exc: BaseException) -> dict[str, Any]:
         """The result of an attempt whose starting point could not be
         evaluated: not converged, outcome ERROR, nothing derived. The retries
@@ -3322,6 +3333,7 @@ class NetworkSolver:
             "__converged__": False,
             "__consistent__": None,
             "__inconsistent_elements__": [],
+            "__P_nonpositive__": [],
             "__T_clamped__": [],
             "__heat_faded__": [],
             "__supersonic_chambers__": [],
@@ -5060,6 +5072,36 @@ class NetworkSolver:
                         "connected element's is the usual cause."
                     )
 
+        # A node at or below zero pressure is not a gas state, whatever the
+        # residuals say: an element's continuation can close its row there (a
+        # Fanno kernel's C1 continuation below the sonic static: a crossflow
+        # array on its false choke "converged" with the free exit at -113 kPa,
+        # #810). Not admissible. Checked here, before anything evaluates the
+        # state: the element diagnostics below raise on a converged state they
+        # cannot evaluate, and that raise used to escape solve() before the
+        # second-law check (NaN sigma) could demote the root. NaN-safe.
+        _P_nonpositive: list[str] = []
+        if success:
+            _P_nonpositive = sorted(
+                {
+                    name.rsplit(".", 1)[0]
+                    for name, val in zip(self.unknown_names, final_x, strict=False)
+                    if name.rsplit(".", 1)[-1] in ("P", "Pt")
+                    and name.rsplit(".", 1)[0] in self.network.nodes
+                    and not float(val) > 0.0
+                }
+            )
+            if _P_nonpositive:
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                message = (
+                    f"Converged with node pressure(s) at or below zero at "
+                    f"{_P_nonpositive}: not a gas state. Usually an element "
+                    "between them and the supply cannot pass the imposed flow "
+                    "(choked or too restrictive); check the flow against it."
+                )
+
         # A node at T(h) <= 0 K had more heat taken out than its flow holds at
         # 0 K (the gas is ideal down to it): the residuals can close on the
         # continuation while the state is not a gas. Not admissible, and
@@ -5272,16 +5314,17 @@ class NetworkSolver:
             if nid in self._T_no_gas:
                 sol_dict[f"{nid}.no_gas_state"] = 1.0
                 continue
-            state = self._get_node_state(node, final_x)
             try:
+                state = self._get_node_state(node, final_x)
                 sol_dict[f"{nid}.mach"] = node.mach(state)
                 if hasattr(node, "diagnostics"):
                     diag = node.diagnostics(state)
                     for key, val in diag.items():
                         sol_dict[f"{nid}.{key}"] = val
-            except (ValueError, RuntimeError):
+            except (ValueError, RuntimeError) as exc:
                 if success:
                     raise
+                self._record_diagnostics_exception(exc, f"node '{nid}'")
 
         # Element-specific diagnostics (e.g. throat Mach, P-ratio)
         from .components import (
@@ -5350,16 +5393,21 @@ class NetworkSolver:
                         diag = element.diagnostics(
                             state_in, state_out, flows=flows, temperatures=temps
                         )
-            except (ValueError, RuntimeError):
+            except (ValueError, RuntimeError) as exc:
                 # A failed solve can end on a state no element can evaluate
                 # (a negative pressure from a diverging iterate). Raising here
                 # threw away the auto-retry that would have recovered it (#536:
                 # a tee with port steps, recovered by the warm-start retry), so
                 # a FAILED solve reports no diagnostics for that element
-                # instead. A converged state that cannot be evaluated is a bug
-                # and still raises.
+                # instead, and records why in __caught_exceptions__ (#810),
+                # strict mode or not: a failed state is expected to be
+                # unevaluable, as a rejected probe is. A converged state that
+                # cannot be evaluated is a bug and still raises; the
+                # admissibility checks above demote the non-physical roots
+                # (#810: a negative node pressure) before this runs.
                 if success:
                     raise
+                self._record_diagnostics_exception(exc, f"element '{eid}'")
                 diag = {}
             sol_dict["__element_diag__"][eid] = diag
             for key, val in diag.items():
@@ -5649,6 +5697,7 @@ class NetworkSolver:
         sol_dict["__converged__"] = bool(converged)
         sol_dict["__consistent__"] = consistent
         sol_dict["__inconsistent_elements__"] = list(_bad_junctions)
+        sol_dict["__P_nonpositive__"] = list(_P_nonpositive)
         sol_dict["__T_clamped__"] = list(_T_clamped)
         sol_dict["__heat_faded__"] = list(_heat_faded)
         sol_dict["__heat_undetermined__"] = list(_target_stagnant)
