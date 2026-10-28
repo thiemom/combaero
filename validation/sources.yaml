@@ -2803,6 +2803,36 @@ documents:
   issues: [807]
   records: []
   notes: Arrived 2026-10-28 as docs/new/aerospace-13-00555-v2.pdf.
+- file: docs/orifices/hay_lampard_benmansour_1983_JEP_105_243_crossflow_cd.pdf
+  citation: 'Hay, N., Lampard, D., Benmansour, S. (1983). Effect of crossflows on the discharge coefficient of film
+    cooling holes. ASME J. Engineering for Power 105(2), 243-248 (ASME 82-GT-147).'
+  id: ASME 82-GT-147
+  topic: [orifice, film]
+  content: 'Measured Cd of single rows of sharp-edged holes (D 3.5 mm, S/D 2.5; isothermal, room-temperature air)
+    with crossflow on BOTH sides, varied independently: coolant (inlet) Mc 0-0.4 and mainstream (exit) M_inf
+    0-0.5, pressure ratio p_c+/p_inf 1-2, Re 1e4-1e5; L/D 2 and 6 (Table 2; every plotted figure is L/D 6), 30,
+    60, 90 deg, coolant duct parallel (Fig. 3) or perpendicular (Fig. 4) to the mainstream. Cd ideal flow from
+    the COOLANT STAGNATION pressure to the mainstream STATIC (p. 245). Uncertainty 6-8% at PR < 1.2, 1.5% above
+    1.5 (Table 3). Plotted only (5-12 points per faired curve): Fig. 5 mainstream effect, Fig. 6 coolant effect
+    at 90 deg, Figs. 8/12 30 deg, plateau maps Figs. 9, 10, 13, 14, Fig. 15 Cd vs u_j/u_inf. No correlation;
+    Fig. 7 agrees with Rohde (TN D-5467) at M_inf 0. Detailed data in Benmansour''s 1981 M.Phil. thesis.'
+  status: screened
+  verdict: 'Screened 2026-10-28 (#800/#818, #807, #813). The foundational two-sided crossflow Cd study (Thole et
+    al. 1997 cite it as such). For #813: Cd referenced to the coolant TOTAL pressure (as Thole et al.), so the
+    supply dynamic head is booked once; even so coolant crossflow moves Cd -- 90 deg: -20% at low PR, -6% on
+    the plateau (Fig. 6, Table 4); 30 deg co-aligned: about +30% (Figs. 8, 10); perpendicular layout: lower at
+    both angles (Figs. 12-14) -- an angle- and orientation-dependent residual a duct-fed hole model must carry.
+    For #818 (exit-side default Rogers & Hersh): cross-source ACCURACY only for u_j/u_inf ~0.25-2 with L/D 6
+    holes, never the Gc/Gj ~125 stagnant-row regime; there these thick holes fall BELOW the fit (rough read,
+    Fig. 6, 90 deg, Mc 0: Cd 0.54 vs 0.70 at PR 1.02, 0.66 vs 0.80 at 1.04, 0.76 vs 0.80 at 1.1) -- recorded,
+    not acted on (impingement plates are thin, L/D ~1). Mainstream effect weak (-10 to -15% at low PR, Table 4).
+    For #807: nothing usable (L/D 2-10 "hardly any effect", p. 244; the L/D 2 data are not shown). To use:
+    digitise Figs. 6, 5, 15 (and 8, 12).'
+  read_for: ['#813 duct-fed hole Cd reference pressure and coolant-side crossflow', '#800/#818 cross-source check
+      of the exit-side grazing Cd', '#807 L/D effect (none usable)']
+  issues: [800, 807, 813]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/243_1_Bensamour_1983.pdf (was on the wanted list).
 - file: docs/orifices/rogers_hersh_1976_NASA_CR-2681_grazing_flow_orifice_resistance.pdf
   citation: 'Rogers, T., Hersh, A. S. (1976). Effect of grazing flow on steady-state resistance of isolated
     square-edged orifices. NASA CR-2681 (NAS3-17858), Hersh Acoustical Engineering.'
@@ -3072,19 +3102,6 @@ wanted:
     McGreehan-Schotsch. The pressure-reference question is answered by Thole et al. 1997 (held: Cd referenced
     to the supply TOTAL pressure). Content as recalled, unverified.'
   where: ASME Digital Collection (paywalled).
-- citation: Hay, N., Lampard, D., Benmansour, S. (1983). Effect of crossflows on the discharge coefficient of
-    film cooling holes. ASME J. Engineering for Power 105(2), 243-248.
-  checked: false
-  issues:
-  - 799
-  - 800
-  - 807
-  priority: now
-  question: 'Cd with crossflow on the inlet AND exit side of a hole (the general case of which CR-2681 covers
-    single holes under exit/inlet grazing flow): ranges of crossflow-to-jet ratio, pressure reference, and
-    whether it reaches the strong-crossflow regime of CR-3630''s stagnant rows (Gc/Gj ~125). As recalled,
-    unverified.'
-  where: ASME Digital Collection (paywalled).
 - citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
     NASA TP-2985, AVSCOM TP 89-C-008.
   checked: false
@@ -3181,3 +3198,14 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
+- citation: Benmansour, S. (1981). (Discharge coefficients of film cooling holes with crossflow.) M.Phil. thesis,
+    University of Nottingham.
+  checked: false
+  issues:
+  - 807
+  - 813
+  priority: later
+  question: 'The detailed data behind Hay, Lampard & Benmansour 1983 (held): the L/D 2 results the paper does not
+    plot (the L/D interaction with crossflow, #807) and tabulated Cd for the coolant- and mainstream-crossflow
+    maps (#813). Title as recalled, unverified.'
+  where: University of Nottingham library / British Library EThOS.
