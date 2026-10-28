@@ -110,7 +110,7 @@ def test_combustion_from_phi_basic():
     result = combustion_from_phi(air_state, X_ch4, phi=1.0)
 
     assert result.m_dot > air_state.m_dot
-    assert result.T > air_state.T
+    assert air_state.Tt < result.T
     assert result.phi > 0.0
     assert result.T_adiabatic == pytest.approx(result.T, rel=1e-3)
     assert result.Q_released > 0

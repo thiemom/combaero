@@ -1005,7 +1005,7 @@ class EjectorElement(MultiPortChamberBase):
         diag["m_dot_outlet"] = float(port_mdots[2])
         diag["entrainment_ratio"] = ms / mp if mp != 0.0 else float("nan")
         rho_p = self.port_densities(states)[0][0]
-        a_p = float(cb.speed_of_sound(primary.T, primary.X))
+        a_p = float(cb.speed_of_sound(primary.Tt, primary.X))
         diag["mach_jet"] = abs(mp) / (rho_p * self.nozzle_exit_area) / a_p if a_p > 0 else 0.0
         drive = float(primary.Pt) - float(outlet.Pt)
         if drive != 0.0:

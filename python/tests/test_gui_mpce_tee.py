@@ -615,7 +615,7 @@ def _port_bookkeeping(model: str, D_straight: float) -> dict:
     net = build_network_from_schema(schema)
     net.resolve_all_topology()
     e = _get_element(net, "mpce")
-    states = [SimpleNamespace(P=1.0e5, Pt=1.0e5, T=300.0) for _ in range(e.N)]
+    states = [SimpleNamespace(P=1.0e5, Pt=1.0e5, Tt=300.0) for _ in range(e.N)]
     return e.diagnostics(states, 1.0e5, None)  # no flows: the port bookkeeping only
 
 

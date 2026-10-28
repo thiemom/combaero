@@ -75,7 +75,7 @@ def _port_gamma(state, rho: float | None = None) -> float:
     composition; 0.0 tells the kernel to use the incompressible reference head,
     so those callers keep exactly the behaviour they had.
     """
-    T = getattr(state, "T", None)
+    T = getattr(state, "Tt", None)
     X = getattr(state, "X", None)
     if T is None or X is None:
         return 0.0
@@ -1061,7 +1061,7 @@ class ConstantKTeeElement(MultiPortChamberElement):
         sign = +1.0 if self.flow_direction == "branch" else -1.0
         A_c = float(self.port_areas[common])
         P_c = float(states[common].P)
-        T_c = float(states[common].T)
+        T_c = float(states[common].Tt)
         m_c = float(port_mdots[common])
         # Reference head = the common port's isentropic stagnation rise: the
         # SAME closure the port MomentumChamberNode solves, q = P0 - P with the

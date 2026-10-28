@@ -58,7 +58,7 @@ def _channel(surface_key: str) -> ChannelElement:
 
 
 def _states(m_dot: float, T_up: float, P_up: float, Pt_up: float, P_dn: float):
-    s_in = NetworkMixtureState(T=T_up, P=P_up, Pt=Pt_up, Tt=610.0, m_dot=m_dot, Y=Y_AIR)
+    s_in = NetworkMixtureState(T=T_up, P=P_up, Pt=Pt_up, Tt=T_up, m_dot=m_dot, Y=Y_AIR)
     s_out = NetworkMixtureState(T=595.0, P=P_dn, Pt=P_dn, Tt=605.0, m_dot=m_dot, Y=Y_AIR)
     return s_in, s_out
 

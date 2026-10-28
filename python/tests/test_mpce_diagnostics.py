@@ -71,7 +71,7 @@ class _State:
     def __init__(self, Pt: float, rho: float = 1.16) -> None:
         self.Pt = Pt
         self.P = Pt - 1000.0  # arbitrary; not used by diagnostics K logic
-        self.T = 300.0
+        self.Tt = 300.0
         self._rho = rho
 
     def density(self) -> float:

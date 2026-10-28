@@ -186,10 +186,10 @@ def test_drop_is_the_per_row_definition_not_a_quarter_of_it() -> None:
     m = 0.02
     a, b = _states(m)
     dP = a.Pt - b.Pt - el.residuals(a, b)[0][0]
-    rho = cb.density(a.T, a.P, cb.mass_to_mole(Y_AIR))
+    rho = cb.density(a.Tt, a.P, cb.mass_to_mole(Y_AIR))
     a_min = el.area * cb.pin_fin_amin_over_afrontal(model.geometry())
     v_max = m / (rho * a_min)
-    mu = cb.complete_state(a.T, a.P, cb.mass_to_mole(Y_AIR)).transport.mu
+    mu = cb.complete_state(a.Tt, a.P, cb.mass_to_mole(Y_AIR)).transport.mu
     Re = m * model.pin_diameter / (a_min * mu)
     f = cb.evaluate_pin_fin_friction(cb.metzger_1982_staggered_friction(), model.geometry(), Re).f
     assert dP == pytest.approx(2.0 * rho * v_max**2 * model.N_rows * f, rel=1e-6)

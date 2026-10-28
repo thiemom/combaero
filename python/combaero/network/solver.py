@@ -5625,7 +5625,7 @@ class NetworkSolver:
                 # saw an unexplained imbalance and demoted the root.
                 st = self._get_node_state(node, final_x)
                 X_b = list(st.X)
-                h_out = float(cb.h_mass(float(st.T), X_b))
+                h_out = float(cb.h_mass(float(st.Tt), X_b))
                 h_ref = float(cb.h_mass(cb.SENSIBLE_ENTHALPY_REF_T, X_b))
                 phi, _ = cb.mixer_heat_per_unit_flow(m_in)
                 sol_dict[f"{nid}.Q_fraction"] = (

@@ -162,7 +162,7 @@ class TestHoleReynoldsNumber:
         e.resolve_topology(FlowNetwork())
 
         class _S:
-            T, P, m_dot = 300.0, 1e5, 1.0
+            Tt, P, m_dot = 300.0, 1e5, 1.0
             X = cb.species.dry_air()
 
         re_panel = e._hole_reynolds(_S())
@@ -182,7 +182,7 @@ class TestHoleReynoldsNumber:
 
         def _re(m_dot):
             class _S:
-                T, P = 300.0, 1e5
+                Tt, P = 300.0, 1e5
                 X = cb.species.dry_air()
 
             s = _S()
@@ -385,7 +385,7 @@ class TestInternalHeatTransfer:
         """Minimal stand-in for a solved NetworkMixtureState."""
 
         def __init__(self, T, P, X, m_dot):
-            self.T, self.P, self.X, self.m_dot = T, P, X, m_dot
+            self.Tt, self.P, self.X, self.m_dot = T, P, X, m_dot
 
     def _panel(self, panel_area=0.01, **overrides):
         geom = {**ANDREWS_C, **overrides}
@@ -546,7 +546,7 @@ class TestInternalHeatTransfer:
         out = elem.internal_heat_transfer(state)
         # The Prandtl number the element itself uses, not a pinned constant
         # (0.7272 was air's Pr while its viscosity was 11.8% low, #485).
-        pr = cb.complete_state(state.T, state.P, state.X).transport.Pr
+        pr = cb.complete_state(state.Tt, state.P, state.X).transport.Pr
         expected = cb.effusion_approach_nusselt(
             out["Re_hole"], pr, elem.pitch_actual / elem.hole_length
         )
@@ -584,7 +584,7 @@ class TestOverallEffectiveness:
         """Minimal stand-in for a solved NetworkMixtureState."""
 
         def __init__(self, T, P, X, m_dot):
-            self.T, self.P, self.X, self.m_dot = T, P, X, m_dot
+            self.Tt, self.P, self.X, self.m_dot = T, P, X, m_dot
 
     def _panel(self, geom, G):
         e = EffusionPlateElement("p", "c", "g", panel_area=1.0, **geom)
@@ -721,7 +721,7 @@ class TestTheKnobsThatCloseTheDocumentedGap:
 
     class _State:
         def __init__(self, T, P, X, m_dot):
-            self.T, self.P, self.X, self.m_dot = T, P, X, m_dot
+            self.Tt, self.P, self.X, self.m_dot = T, P, X, m_dot
 
     def _panel(self, G, **kw):
         e = EffusionPlateElement("p", "c", "g", panel_area=1.0, **self.ANDREWS_B, **kw)

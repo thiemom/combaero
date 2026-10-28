@@ -150,7 +150,7 @@ def test_the_reported_cd_is_the_law_at_the_solved_state() -> None:
     el = solver.network.elements[pid]
     a = solver._get_node_state(solver.network.nodes["supply"], x)
     b = solver._get_node_state(solver.network.nodes[arr.node_id(row)], x)
-    rho = cb.density(a.T, a.P, a.X)
+    rho = cb.density(a.Tt, a.P, a.X)
     G_i = math.sqrt(2.0 * rho * (a.Pt - b.P))
     m_c = float(res[f"{arr.segment_id(row - 1)}.m_dot"])
     expect = cb.rogers_hersh_1976_cd(0.85, G_i, m_c / el.channel_area, False).Cd

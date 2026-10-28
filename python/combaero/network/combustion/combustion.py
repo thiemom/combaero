@@ -172,18 +172,18 @@ def combustion_from_phi(
     from combaero.network.components import NetworkMixtureState
 
     air_cb = cb.Stream()
-    air_cb.set_T(state_air.T).set_P(state_air.Pt).set_X(
+    air_cb.set_T(state_air.Tt).set_P(state_air.Pt).set_X(
         list(cb.mass_to_mole(list(state_air.Y)))
     ).set_mdot(state_air.m_dot)
 
     fuel_cb = cb.Stream()
-    fuel_cb.set_T(state_air.T).set_X(list(X_fuel))
+    fuel_cb.set_T(state_air.Tt).set_X(list(X_fuel))
     fuel_cb = cb.set_fuel_stream_for_phi(phi, fuel_cb, air_cb)
 
     state_fuel = NetworkMixtureState(
         P=state_air.P,
         Pt=state_air.Pt,
-        T=state_air.T,
+        T=state_air.Tt,
         Tt=state_air.Tt,
         m_dot=fuel_cb.mdot,
         Y=list(cb.mole_to_mass(list(X_fuel))),
