@@ -94,7 +94,7 @@ def test_channel_element_with_surface():
     assert channel.surface.area == 0.1  # Area should match surface area
 
     # T_aw should be close to T for low velocity
-    assert abs(result.T_aw - state.T) < 10.0
+    assert abs(result.T_aw - state.Tt) < 10.0
 
 
 def _make_state(m_dot: float = 0.5) -> NetworkMixtureState:
@@ -144,7 +144,7 @@ def test_convective_surface_exposes_jacobians(model_name: str, model: object) ->
     velocity = state.m_dot / (rho * channel_area)
 
     result = surface.htc_and_T(
-        T=state.T,
+        T=state.Tt,
         P=state.P,
         X=state.X,
         velocity=velocity,

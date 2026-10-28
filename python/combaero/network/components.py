@@ -1550,6 +1550,22 @@ def _applied_heat(node: Any) -> float:
 
 @dataclass
 class NetworkMixtureState:
+    """A node's gas state as the residuals see it.
+
+    ``Tt`` is the node's stagnation temperature, the T the solver carries
+    (the derived mixing T of an interior node, a boundary's ``Tt``). The
+    solver's Jacobian keys ``f"{node}.T"`` are derivatives with respect to
+    this ``Tt``; the name is historical (#782).
+
+    ``T`` is not read inside the solver: every residual and property method
+    takes ``Tt``, and ``test_network_state_static_t_unread`` keeps it so.
+    The solver fills it with ``Tt`` too, except a boundary whose
+    ``initial_guess`` holds a ``.T`` entry. The property methods are
+    therefore evaluated at (``Tt``, static ``P``); where a static T is meant
+    (density, cp, transport of a moving gas) that is the stagnation value,
+    and a caller wanting the static state forms it from the velocity.
+    """
+
     P: float
     Pt: float
     T: float
@@ -1576,29 +1592,29 @@ class NetworkMixtureState:
             return x
 
     def density(self) -> float:
-        """Static density [kg/m^3]."""
-        return cb.density(self.T, self.P, self.X)
+        """Density [kg/m^3] at (Tt, static P)."""
+        return cb.density(self.Tt, self.P, self.X)
 
     def enthalpy(self) -> float:
-        """Static specific enthalpy [J/kg]."""
-        return cb.h_mass(self.T, self.X)
+        """Specific enthalpy [J/kg] at Tt (equals total_enthalpy)."""
+        return cb.h_mass(self.Tt, self.X)
 
     def total_enthalpy(self) -> float:
         """Total (stagnation) specific enthalpy [J/kg]."""
         return cb.h_mass(self.Tt, self.X)
 
     def cp(self) -> float:
-        """Specific heat capacity at constant pressure [J/(kg*K)]."""
-        return cb.cp_mass(self.T, self.X)
+        """Specific heat capacity at constant pressure [J/(kg*K)] at Tt."""
+        return cb.cp_mass(self.Tt, self.X)
 
     def speed_of_sound(self) -> float:
-        """Speed of sound [m/s]."""
-        return cb.speed_of_sound(self.T, self.X)
+        """Speed of sound [m/s] at Tt."""
+        return cb.speed_of_sound(self.Tt, self.X)
 
     def gamma(self) -> float:
-        """Ratio of specific heats (cp/cv) [-]."""
+        """Ratio of specific heats (cp/cv) [-] at Tt."""
         cp = self.cp()
-        cv = cb.cv_mass(self.T, self.X)
+        cv = cb.cv_mass(self.Tt, self.X)
         return cp / cv if cv > 0 else 1.4
 
 
@@ -2059,7 +2075,7 @@ class NetworkNode(ABC):
             return {}
 
         try:
-            cs = cb.complete_state(state.T, state.P, state.X)
+            cs = cb.complete_state(state.Tt, state.P, state.X)
             return {
                 "Tt": float(state.Tt),
                 "Pt": float(state.Pt),
@@ -2078,7 +2094,7 @@ class NetworkNode(ABC):
                 "nu": cs.transport.nu,
             }
         except Exception:
-            ts = cb.thermo_state(state.T, state.P, state.X)
+            ts = cb.thermo_state(state.Tt, state.P, state.X)
             return {
                 "Tt": float(state.Tt),
                 "Pt": float(state.Pt),
@@ -2111,8 +2127,8 @@ def _element_pressure_block(
     return {
         "P_in": float(state_in.P),
         "P_out": float(state_out.P),
-        "T_in": float(state_in.T),
-        "T_out": float(state_out.T),
+        "T_in": float(state_in.Tt),
+        "T_out": float(state_out.Tt),
         "Pt_in": float(state_in.Pt),
         "Pt_out": float(state_out.Pt),
         "Tt_in": float(state_in.Tt),
@@ -2358,9 +2374,9 @@ class PlenumNode(NetworkNode):
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float]:
         # Plenums: v ~ 0, so stagnation = static
-        ts = cb.thermo_state(state.T, state.P, state.X)
+        ts = cb.thermo_state(state.Tt, state.P, state.X)
         return {
-            "Tt": float(state.T),
+            "Tt": float(state.Tt),
             "Pt": float(state.P),
             "h": ts.h,
             "s": ts.s,
@@ -2490,7 +2506,7 @@ class MomentumChamberNode(NetworkNode):
             state.P,
             state.Pt,
             m,
-            state.T,
+            state.Tt,
             state.Y,
             self.area,
             self.regime == "incompressible",
@@ -2507,7 +2523,7 @@ class MomentumChamberNode(NetworkNode):
         # chamber's stagnation T, so use the static state its closure solved
         # (#578). T_aw then sits between T_static and T0 by the recovery
         # factor, as it should.
-        T_static = float(state.T)
+        T_static = float(state.Tt)
         c = None
         if self.area > 0:
             c = self._closure(state, m_dot_total)
@@ -2627,7 +2643,7 @@ class MomentumChamberNode(NetworkNode):
         else:
             # Reversed (or idle) main: chamber fluid leaves through the face.
             m_main = float(m_main) if m_main is not None else 0.0
-            T_main = float(state.T)
+            T_main = float(state.Tt)
             X_main = state.X
             main_names = {f"{self.main_inlet}.m_dot": 1.0}
             m_out += m_main
@@ -2641,7 +2657,7 @@ class MomentumChamberNode(NetworkNode):
             X_main,
             m_out,
             state.P,
-            state.T,
+            state.Tt,
             state.X,
             S,
             self.area,
@@ -2734,7 +2750,7 @@ class MomentumChamberNode(NetworkNode):
         """
         if not self.area > 0.0:
             rho = float(state.density())
-            d0: dict[str, float] = {f"{self.id}.P": rho / state.P, f"{self.id}.T": -rho / state.T}
+            d0: dict[str, float] = {f"{self.id}.P": rho / state.P, f"{self.id}.T": -rho / state.Tt}
             W = float(cb.mwmix(state.X))
             for k, y in enumerate(state.Y):
                 if y > 0.0:
@@ -2756,7 +2772,7 @@ class MomentumChamberNode(NetworkNode):
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         # Properties at the STATIC state the closure solved; state.T is the
         # chamber's stagnation T (#576).
-        T_static = float(state.T)
+        T_static = float(state.Tt)
         if self.area > 0:
             T_static = float(self._closure(state, m_dot_total).T_static)
         cs = cb.complete_state(T_static, state.P, state.X)
@@ -2770,7 +2786,7 @@ class MomentumChamberNode(NetworkNode):
 
         nu_val = 0.0
         htc_val = 0.0
-        t_aw_val = float(state.T)
+        t_aw_val = float(state.Tt)
         if self.has_convective_surface:
             h_res = self.htc_and_T(state)
             if h_res is not None:
@@ -3190,9 +3206,9 @@ class CombustorNode(NetworkNode):
         return res, jac
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:
-        if state.P <= 0 or state.T <= 0:
+        if state.P <= 0 or state.Tt <= 0:
             return {}
-        cs = cb.complete_state(state.T, state.P, state.X)
+        cs = cb.complete_state(state.Tt, state.P, state.X)
 
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         rho = cs.thermo.rho
@@ -3204,7 +3220,7 @@ class CombustorNode(NetworkNode):
 
         nu_val = 0.0
         htc_val = 0.0
-        t_aw_val = float(state.T)
+        t_aw_val = float(state.Tt)
         if self.has_convective_surface:
             h_res = self.htc_and_T(state)
             if h_res is not None:
@@ -3265,7 +3281,7 @@ class CombustorNode(NetworkNode):
         length = 0.1  # Combustors are modelled as a single zone
         if not self.area > 0:
             return self.surface.htc_and_T(
-                T=state.T,
+                T=state.Tt,
                 P=state.P,
                 X=state.X,
                 velocity=1.0,
@@ -3629,7 +3645,7 @@ class OrificeElement(NetworkElement):
         d = self._orifice_geom.d if self._orifice_geom is not None else 0.0
         if d <= 0.0:
             return 1.0e5
-        mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+        mu = cb.transport_state(state_in.Tt, state_in.P, state_in.X).mu
         if mu <= 0.0:
             mu = 1.8e-5
         m_dot_hole = abs(state_in.m_dot) / self._hole_count()
@@ -3657,7 +3673,7 @@ class OrificeElement(NetworkElement):
         # Estimate Re_D from current m_dot and upstream viscosity.
         D_up = self._orifice_geom.D
         if D_up > 0.0:
-            ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+            ts = cb.transport_state(state_in.Tt, state_in.P, state_in.X)
             mu = ts.mu if ts.mu > 0.0 else 1.8e-5
             m_dot_abs = abs(state_in.m_dot)
             Re_D = (4.0 * m_dot_abs) / (math.pi * D_up * mu) if m_dot_abs > 1e-12 else 1e4
@@ -3667,8 +3683,8 @@ class OrificeElement(NetworkElement):
         flow_state = cb.OrificeState()
         flow_state.Re_D = Re_D
         flow_state.dP = max(state_in.Pt - state_out.P, 1.0)
-        flow_state.rho = cb.density(state_in.T, state_in.P, state_in.X)
-        flow_state.mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+        flow_state.rho = cb.density(state_in.Tt, state_in.P, state_in.X)
+        flow_state.mu = cb.transport_state(state_in.Tt, state_in.P, state_in.X).mu
 
         # The ISO 5167 correlations below are functions of the PIPE Reynolds
         # number Re_D, but the discharge-hole family (Idelchik,
@@ -3816,7 +3832,7 @@ class OrificeElement(NetworkElement):
         in the column that moves the plenum's T. Empty where Re used the mu
         fallback."""
         mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
-            state_in.T, state_in.P, list(state_in.X)
+            state_in.Tt, state_in.P, list(state_in.X)
         )
         if not mu > 0.0:
             return {}
@@ -3835,7 +3851,7 @@ class OrificeElement(NetworkElement):
         m = float(state_in.m_dot)
         if not (D_up > 0.0) or abs(m) <= 1e-12:
             return {}
-        mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+        mu = cb.transport_state(state_in.Tt, state_in.P, state_in.X).mu
         mu_fallback = not mu > 0.0
         mu = 1.8e-5 if mu_fallback else mu
         Re = 4.0 * abs(m) / (math.pi * D_up * mu)
@@ -3861,7 +3877,7 @@ class OrificeElement(NetworkElement):
         metering = _METERING_SELECTORS.get(self.correlation)
         if metering is not None and self._orifice_geom is not None:
             D_up = self._orifice_geom.D
-            mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+            mu = cb.transport_state(state_in.Tt, state_in.P, state_in.X).mu
             m = abs(float(state_in.m_dot))
             Re_D = 4.0 * m / (math.pi * D_up * mu) if (mu > 0.0 and D_up > 0.0) else 0.0
             in_pipe = bool(self.upstream_diameter)
@@ -4023,7 +4039,7 @@ class OrificeElement(NetworkElement):
                 src.m_dot,
                 src.Pt,
                 p1,
-                src.T,
+                src.Tt,
                 src.Y,
                 p_down,
                 cd_k,
@@ -4133,7 +4149,7 @@ class OrificeElement(NetworkElement):
         if getattr(self, "_to_side_closed", False):
             return self._kernel_from(state_in, state_out, self.from_node, self.to_node, cd)
         # A node without a physical state (no positive P and T) is no source.
-        if not (float(state_out.P) > 0.0 and float(state_out.T) > 0.0):
+        if not (float(state_out.P) > 0.0 and float(state_out.Tt) > 0.0):
             return self._kernel_from(state_in, state_out, self.from_node, self.to_node, cd)
         w, dw = _pressure_blend(float(state_in.Pt) - float(state_out.Pt))
         if w == 1.0:
@@ -4289,9 +4305,9 @@ class OrificeElement(NetworkElement):
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None = None,
     ) -> dict[str, float | str]:
-        if state_in.P <= 0 or state_in.T <= 0:
+        if state_in.P <= 0 or state_in.Tt <= 0:
             return {}
-        cs = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        cs = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
 
         # Throat Mach: isentropic pressure ratio from the UPSTREAM total to the
         # downstream static -- upstream along the flow, which may run against
@@ -4317,7 +4333,7 @@ class OrificeElement(NetworkElement):
 
         # Outlet Mach (use outlet state for accuracy)
         try:
-            cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+            cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
             v_out = (
                 (abs(state_in.m_dot)) / ((cs_out.thermo.rho) * (self.area))
                 if self.area > 0 and cs_out.thermo.rho > 0
@@ -4401,7 +4417,7 @@ class OrificeElement(NetworkElement):
             at_tap = cb.OrificeGeometry()
             at_tap.d, at_tap.D, at_tap.t, at_tap.r = g.d, g.D, g.t, g.r
             at_tap.tap = _TAPS[self.tap]
-            mu = cb.transport_state(state_in.T, state_in.P, state_in.X).mu
+            mu = cb.transport_state(state_in.Tt, state_in.P, state_in.X).mu
             m = abs(float(state_in.m_dot))
             Re_D = 4.0 * m / (math.pi * g.D * mu) if (mu > 0.0 and m > 1e-12) else 1e4
             c_net = float(cb.metering_cd_and_dRe(metering, g, Re_D)[0])
@@ -4450,7 +4466,7 @@ def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, Any]
     if node.main_inlet is not None and node.has_side_streams():
         for eid, st, _names in getattr(node, "_inflows", []):
             if eid == node.main_inlet:
-                T_gas, from_main = float(st.T), True
+                T_gas, from_main = float(st.Tt), True
     model = node.surface.model
     corr = getattr(model, "correlation", None)
     return {
@@ -4831,7 +4847,7 @@ class EffusionPlateElement(OrificeElement):
         is near one; a strongly rectangular array is outside what the
         correlation was fitted on.
         """
-        ts = cb.transport_state(state_in.T, state_in.P, state_in.X)
+        ts = cb.transport_state(state_in.Tt, state_in.P, state_in.X)
         mu = ts.mu if ts.mu > 0.0 else 1.8e-5
         k = ts.k
         pr = ts.Pr
@@ -4949,7 +4965,7 @@ class EffusionPlateElement(OrificeElement):
 
         h_i = internal["h_plate_area"]
         h_gas = h_gas_unblown * gas_augmentation
-        T_c = state_in.T
+        T_c = state_in.Tt
         # The two-resistance closure eta = (h_i + h_gas eta_film)/(h_i + h_gas)
         # is the wall core below with no conduction resistance.
         T_aw = T_gas - eta_film * (T_gas - T_c)
@@ -5061,7 +5077,7 @@ class EffusionPlateElement(OrificeElement):
         if not internal:
             return {}
         h_i = internal["h_plate_area"]
-        T_c = float(state_in.T)
+        T_c = float(state_in.Tt)
         A = self.panel_area
         t_over_k = self.wall_thickness / self.wall_conductivity
         out: dict[str, float] = {
@@ -5690,7 +5706,7 @@ def film_on_wall_side(
     M = [m / src.hole_area / G_gas for m, src in zip(m_c, sources, strict=True)]
     T_c = [float(st.Tt) for st, _ in coolant]
     if gas_inf is None:
-        T_g = float(gas_state.T)
+        T_g = float(gas_state.Tt)
         W_g = float(cb.mwmix(gas_state.X))
         T_shift = None
     else:
@@ -6145,7 +6161,7 @@ class ImpingementPlateElement(OrificeElement):
         )
         dP = float(up.Pt) - float(down.P)
         rho, drho_dT, drho_dP = _solver_tools.density_and_jacobians(
-            float(up.T), float(up.P), list(up.X)
+            float(up.Tt), float(up.P), list(up.X)
         )
         G_i = math.sqrt(2.0 * rho * dP) if dP > 0.0 else 0.0
         flows = flows or {}
@@ -6221,14 +6237,14 @@ class ImpingementPlateElement(OrificeElement):
         derivatives are C++'s ``jet_row_heat_transfer``.
         """
         flows = flows or {}
-        cs = cb.complete_state(state.T, state.P, state.X)
+        cs = cb.complete_state(state.Tt, state.P, state.X)
         tr = cs.transport
         m_c = float(sum(flows.get(eid, 0.0) for eid in self._crossflow_sources))
         row = cb.jet_row_heat_transfer(
             self.correlation_set, self._row_geometry, float(state.m_dot), m_c, tr.mu, tr.k, tr.Pr
         )
         mult = self.Nu_multiplier
-        T_j = float(state.T)
+        T_j = float(state.Tt)
         # CR-3936's reference temperature, on the bypass's share only (see
         # the class docstring): T_aw = T_j + eta_r phi_0 (T_0 - T_j).
         T_0 = T_j
@@ -6529,10 +6545,10 @@ class LosslessConnectionElement(NetworkElement):
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
-        if state_in.P <= 0 or state_in.T <= 0:
+        if state_in.P <= 0 or state_in.Tt <= 0:
             return {}
 
-        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
         ref = _element_reference_block(
             cs_in, m_dot=state_in.m_dot, area=self.area or 0.0, Dh=self.diameter, location="inlet"
         )
@@ -6604,7 +6620,7 @@ class PortDischargeElement(NetworkElement):
         if not (compressible and A > 0.0):
             return float(state_in.P) - P_b, {f"{c}.P": 1.0, f"{b}.Pt": -1.0}, 0.0
         m = float(state_in.m_dot)
-        s = _solver_tools.sonic_static_pressure(float(state_in.T), abs(m) / A, state_in.Y)
+        s = _solver_tools.sonic_static_pressure(float(state_in.Tt), abs(m) / A, state_in.Y)
         P_star = float(s.P)
         eps = PORT_DISCHARGE_CHOKE_BLEND * P_b
         d = P_star - P_b
@@ -6649,7 +6665,7 @@ class PortDischargeElement(NetworkElement):
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
-        if state_in.P <= 0 or state_in.T <= 0:
+        if state_in.P <= 0 or state_in.Tt <= 0:
             return {}
         _, _, P_star = self._outflow_row(state_in, state_out)
         chamber = getattr(self, "_chamber", None)
@@ -6916,15 +6932,15 @@ class PressureLossElement(NetworkElement):
         # Theta sourcing: read the reference node's burned/unburned temperatures.
         if self._theta_source_resolved is not None and graph is not None:
             src = graph.nodes[self._theta_source_resolved]
-            T_unburned = float(getattr(src, "_T_unburned", state_in.T))
-            T_burned = float(getattr(src, "_T_burned", state_in.T))
+            T_unburned = float(getattr(src, "_T_unburned", state_in.Tt))
+            T_burned = float(getattr(src, "_T_burned", state_in.Tt))
             theta = (T_burned / T_unburned - 1.0) if T_unburned > 0 else 0.0
             T_ctx = T_unburned
             T_ad = T_burned
         else:
             theta = 0.0
-            T_ctx = float(state_in.T)
-            T_ad = float(state_in.T)
+            T_ctx = float(state_in.Tt)
+            T_ad = float(state_in.Tt)
 
         return SimpleNamespace(
             theta=theta,
@@ -7148,7 +7164,7 @@ class PressureLossElement(NetworkElement):
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
-        if state_in.P <= 0 or state_in.T <= 0 or state_out.P <= 0 or state_out.T <= 0:
+        if state_in.P <= 0 or state_in.Tt <= 0 or state_out.P <= 0 or state_out.Tt <= 0:
             return {}
 
         graph = getattr(self, "_graph_ref", None)
@@ -7165,14 +7181,14 @@ class PressureLossElement(NetworkElement):
         area = getattr(self, "area", None) or getattr(self.correlation, "area", None)
         Dh = math.sqrt(4.0 * area / math.pi) if area and area > 0 else None
 
-        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
         ref = _element_reference_block(
             cs_in, m_dot=state_in.m_dot, area=area or 0.0, Dh=Dh, location="inlet"
         )
         v_in = ref["velocity"]
         mach_in = v_in / cs_in.thermo.a if cs_in.thermo.a > 0 and v_in > 0 else 0.0
 
-        cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+        cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
         rho_out = cs_out.thermo.rho
         v_out = (
             (abs(state_out.m_dot)) / ((rho_out) * (area))
@@ -7306,7 +7322,7 @@ class ChannelElement(NetworkElement):
         area = self.area or 0.0
         if area <= 0.0:
             return 0.0
-        mu = cb.complete_state(state.T, state.Pt, state.X).transport.mu
+        mu = cb.complete_state(state.Tt, state.Pt, state.X).transport.mu
         if mu <= 0.0:
             return 0.0
         return abs(state.m_dot) * (self.Dh or self.diameter or 1.0) / (area * mu)
@@ -7349,7 +7365,7 @@ class ChannelElement(NetworkElement):
         f_mult = self.surface.f_multiplier
 
         rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
-            state_in.T, state_in.P, state_in.X
+            state_in.Tt, state_in.P, state_in.X
         )
         rho, drho_draw = _safe_rho(rho_raw)
         drho_dT = drho_draw * drho_raw_dT
@@ -7364,7 +7380,7 @@ class ChannelElement(NetworkElement):
             }
 
         dh = self.Dh or self.diameter or 1.0
-        mu = cb.complete_state(state_in.T, state_in.P, state_in.X).transport.mu
+        mu = cb.complete_state(state_in.Tt, state_in.P, state_in.X).transport.mu
         Re = abs(m_dot) * dh / (area * mu) if mu > 0.0 else 0.0
         Re = math.copysign(Re, m_dot)
 
@@ -7429,7 +7445,7 @@ class ChannelElement(NetworkElement):
         f_mult = self.surface.f_multiplier
 
         rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
-            state_in.T, state_in.P, state_in.X
+            state_in.Tt, state_in.P, state_in.X
         )
         rho, drho_draw = _safe_rho(rho_raw)
         drho_dT = drho_draw * drho_raw_dT
@@ -7444,7 +7460,7 @@ class ChannelElement(NetworkElement):
             }
 
         mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
-            state_in.T, state_in.P, state_in.X
+            state_in.Tt, state_in.P, state_in.X
         )
         D = model.pin_diameter
         a_min = area * cb.pin_fin_amin_over_afrontal(model.geometry())
@@ -7707,7 +7723,7 @@ class ChannelElement(NetworkElement):
             # carries this state.
             A = math.pi * self.diameter * self.diameter / 4.0
             a = _solver_tools.approach_static_pressure(
-                float(src.Pt), float(src.T), abs(m_dot) / A, src.Y, True
+                float(src.Pt), float(src.Tt), abs(m_dot) / A, src.Y, True
             )
             p_rho = float(a.P)
             dp_rho = {f"{src_id}.Pt": float(a.dP_dPt), f"{src_id}.T": float(a.dP_dTt)}
@@ -7719,7 +7735,7 @@ class ChannelElement(NetworkElement):
             m_dot,
             src.Pt,
             p_rho,
-            src.T,
+            src.Tt,
             src.Y,
             dst.P,
             self.length,
@@ -7794,7 +7810,7 @@ class ChannelElement(NetworkElement):
     def diagnostics(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
-        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
         ref = _element_reference_block(
             cs_in,
             m_dot=state_in.m_dot,
@@ -7806,7 +7822,7 @@ class ChannelElement(NetworkElement):
         re_in = ref["Re"]
         mach_in = v_in / cs_in.thermo.a if cs_in.thermo.a > 0 and v_in > 0 else 0.0
 
-        cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+        cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
         rho_out = cs_out.thermo.rho
         v_out = (
             (abs(state_out.m_dot)) / ((rho_out) * (self.area))
@@ -7833,7 +7849,7 @@ class ChannelElement(NetworkElement):
             # enhanced (ribbed, pin-fin) surface, whose residual uses it.
             surface_diag["f_surface"] = float(h_res.f)
         else:
-            Nu, htc, T_aw = 0.0, 0.0, state_in.T
+            Nu, htc, T_aw = 0.0, 0.0, state_in.Tt
         if enhanced and h_res is not None:
             f = h_res.f
         else:
@@ -7979,12 +7995,12 @@ class ChannelElement(NetworkElement):
         Requires the solved inlet NetworkMixtureState.
         """
 
-        rho = cb.density(state_in.T, state_in.P, state_in.X)
+        rho = cb.density(state_in.Tt, state_in.P, state_in.X)
         u = cb.channel_velocity(state_in.m_dot, self.diameter, rho)
 
         if self.regime == "incompressible":
             res = cb.channel_flow_rough(
-                state_in.T,
+                state_in.Tt,
                 state_in.P,
                 state_in.X,
                 u,
@@ -8982,7 +8998,7 @@ class AreaChangeElement(NetworkElement):
         # The upwind node feeds the closure, and the face it enters by.
         up, F_in, F_out = (state_in, f0, f1) if m_dot >= 0.0 else (state_out, f1, f0)
         try:
-            cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+            cs_in = cb.complete_state(state_in.Tt, state_in.P, state_in.X)
             loss = cb.area_change_loss(
                 abs(m_dot),
                 float(up.Pt),
@@ -9002,7 +9018,7 @@ class AreaChangeElement(NetworkElement):
         v_in = abs(m_dot) / (rho_in * f0) if rho_in > 0 else 0.0
         mach_in = v_in / a_in if a_in > 0 else 0.0
         try:
-            cs_out = cb.complete_state(state_out.T, state_out.P, state_out.X)
+            cs_out = cb.complete_state(state_out.Tt, state_out.P, state_out.X)
             v_out = abs(m_dot) / (cs_out.thermo.rho * f1) if cs_out.thermo.rho > 0 else 0.0
             mach_out = v_out / cs_out.thermo.a if cs_out.thermo.a > 0 else 0.0
         except Exception:
@@ -9426,7 +9442,7 @@ class TeeJunctionElement(NetworkElement):
                 dP0_straight=state_straight.Pt - state_com.P,
                 dP0_branch=state_branch.Pt - state_com.P,
                 P_static_com=state_com.P,
-                T_com=state_com.T,
+                T_com=state_com.Tt,
                 Y_com=state_com.Y,
                 theta=abs(self.theta),
                 psi=self.psi,
@@ -9440,7 +9456,7 @@ class TeeJunctionElement(NetworkElement):
                 dP0_straight=state_com.Pt - state_straight.P,
                 dP0_branch=state_com.Pt - state_branch.P,
                 P_static_com=state_com.P,
-                T_com=state_com.T,
+                T_com=state_com.Tt,
                 Y_com=state_com.Y,
                 theta=abs(self.theta),
                 psi=self.psi,
@@ -9714,7 +9730,7 @@ class MultiPortChamberBase(NetworkElement):
         out: list[tuple[float, dict[str, float]]] = []
         for i, st in enumerate(states):
             port = self.port_nodes[i]
-            T = float(getattr(st, "T", 0.0) or 0.0)
+            T = float(getattr(st, "Tt", 0.0) or 0.0)
             X = getattr(st, "X", None)
             P = float(st.P)
             if i < len(nodes) and T > 0.0 and X is not None and P > 0.0:
@@ -9857,7 +9873,7 @@ class MultiPortChamberBase(NetworkElement):
         port_area_sources = getattr(self, "_port_area_sources", None) or [""] * self.N
         for i in range(self.N):
             diag[f"port_{i}_P"] = float(states[i].P)
-            diag[f"port_{i}_T"] = float(states[i].T)
+            diag[f"port_{i}_T"] = float(states[i].Tt)
             diag[f"port_{i}_area"] = float(self.port_areas[i] or 0.0)
             diag[f"port_{i}_area_source"] = port_area_sources[i]
             diag[f"port_{i}_sign"] = float(self._port_signs[i])
