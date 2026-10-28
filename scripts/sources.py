@@ -35,7 +35,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 REGISTER = ROOT / "validation" / "sources.yaml"
 DOCS = ROOT / "docs"
-DOC_SUFFIXES = {".pdf", ".djvu", ".epub"}
+DOC_SUFFIXES = {".pdf", ".djvu", ".epub", ".zip"}  # .zip: a paper's supplementary archive
 
 STATUSES = {
     "implemented": "a shipped closure or kernel is built from it",
@@ -62,6 +62,7 @@ TOPICS = {
     "area_change",
     "vortex",
     "acoustics",
+    "radiation",
     "transport",
     "review",
     "other",

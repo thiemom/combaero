@@ -2385,7 +2385,7 @@ documents:
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
   id: ISBN 978-1-4200-8605-8 (ebook)
-  topic: [combustion, film, orifice, jet_mixing, review]
+  topic: [combustion, film, orifice, jet_mixing, review, radiation]
   content: 'Textbook, 560 pp. with a usable text layer (pdftotext works; PDF page = book page + 21). Parts
     that matter here. Ch. 4 Aerodynamics (pp. 113-152): pressure-loss factor and overall loss, Eqs. 4.1-4.7
     with Table 4.1 (dP/P3, dP/qref, m T^0.5/(Aref P3) for tubular/tuboannular/annular; the three rows obey
@@ -2553,7 +2553,7 @@ documents:
     its application on effusion cooling systems. 1st CEAS European Air and Space Conference, CEAS-2007-026,
     pp. 297-303.'
   id: CEAS-2007-026
-  topic: [effusion, combustion, film]
+  topic: [effusion, combustion, film, radiation]
   content: 'Florence/Avio liner tool: SRBC 1-D coolant network plus 1-D FD wall conduction; Lefebvre
     liner heat balance R1+C1 = R2+C2 = K1-2; gas emissivity Reeves (Eq. 5), Reeves-Lefebvre luminosity
     (Eqs. 6-7), Lefebvre-Herbert/Farag (Eq. 8), generalised luminosity Eq. 9; film from L''Ecuyer-Soechting
@@ -2570,6 +2570,85 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/ceas-2007-026.pdf. PDF metadata creation date is wrong (1999); the conference is 2007.
+- file: docs/radiation/bordbar_et_al_2021_IJHMT_173_121207_pressure_dependent_WSGG.pdf
+  citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Pressure-dependent
+    weighted-sum-of-gray-gases models for heterogeneous CO2-H2O mixtures at sub- and super-atmospheric pressure.
+    Int. J. Heat Mass Transfer 173, 121207.'
+  id: doi:10.1016/j.ijheatmasstransfer.2021.121207
+  topic: [radiation, combustion]
+  content: 'The Bordbar et al. (2014) WSGG formulation (Mr in the coefficients) extended to total pressure: ten
+    SEPARATE coefficient sets for p = 0.1, 0.5, 1, 2, 5, 10, 20, 30, 50, 80 atm; T 300-3000 K, Mr = H2O/CO2
+    0.1-4 (33 discrete values fitted), LBL from HITEMP2010 over 150-25000 cm-1. Weights a_i polynomial in
+    T (b_ij) with b_ij = sum_k c_ijk Mr^(4-k), absorption kappa_p,i = sum_k d_ik Mr^(4-k) (Eqs. 8-11). Table 1
+    surveys earlier pressure-dependent WSGG models (Bahador & Sunden, Coelho & Franca, Shan et al., Wang &
+    Xuan). Validated against LBL on 1-D slabs (isothermal/homogeneous and varying T, composition and Mr);
+    average errors < 5% (Shan''s model > 6% at best, Table 2). Non-luminous: no soot.'
+  status: screened
+  verdict: 'Screened 2026-10-28: the pressure coverage Bordbar et al. (2014) lacked -- gas-turbine liners at
+    10-40 bar sit inside 0.1-80 atm -- making it the better candidate for a non-luminous gas-radiation kernel
+    (#793 Lefebvre & Ballal liner examples; no radiation issue exists yet). BUT the coefficients are NOT in the
+    paper: they are in its supplementary material (one set per pressure, with a MATLAB function) -- now held,
+    but licensed non-commercial / no redistribution without the author''s permission (its entry).
+    Between the ten pressures an implementation must interpolate (in p or ln p; the paper does not prescribe
+    one). Soot stays outside (Lefebvre''s luminosity factor).'
+  read_for: ['#793 liner wall temperature: non-luminous gas emissivity at combustor pressure']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/Pressure-dependent-weighted-sum-of-gray-gases-model_2021_International-Journ.pdf.
+- file: docs/radiation/bordbar_et_al_2021_IJHMT_173_121207_supplementary_mmc1_mmc2.zip
+  citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Supplementary
+    material to Int. J. Heat Mass Transfer 173, 121207: mmc1 (Appendix A, WSGG model constants, 11 pp.) and mmc2
+    (MATLAB function, sample script and coefficient files Final_PWSGG_Model_Coef_Pt001-010.dat).'
+  id: 1-s2.0-S0017931021003100-mmc1/mmc2
+  topic: [radiation]
+  content: 'mmc1.pdf: Tables A.1-A.10, the c_ijk / d_ik constants for p = 0.1-80 atm. mmc2: ten .dat files
+    (one per pressure: 4 gray gases x (5 a-polynomial rows + 1 k row), each a 4th-order polynomial in Mr), the
+    MATLAB function Bordbar_PWSGG_MatlabFunction_IJHMT2021.m (Tr = T/1500 K; kappa_i = K_i (x_CO2 + x_H2O) Pt;
+    accepts only the ten tabulated pressures exactly -- no interpolation) and a sample script. Inputs Pt 0.1-80
+    atm, T 300-3000 K, x_H2O, x_CO2, optional path length; datasets 33 Mr points 0.1-4, 55 T points 300-3000 K,
+    19 path lengths 0.01-60 m.'
+  status: screened
+  verdict: 'Received 2026-10-28; read, not run. LICENCE: every .dat file says "COPYRIGHT (C) 2020 HADI BORDBAR
+    ... Used for non-commercial purposes only with the permission of the copywriter. Not to be distributed
+    without the permission of the copywriter." -> the coefficients must NOT be committed to or shipped with
+    combaero (PyPI) without the author''s written permission; ask before any implementation. DISCREPANCY to
+    settle first: the mmc1 Appendix A tables and the mmc2 .dat coefficients differ at the same pressure (0.1
+    atm, gas 1, first entry: -1.017554e-3 vs -6.685900e-4) -- the ordering (k vs b4..b0), the reference
+    temperature (the function uses 1500 K; the 2014 model 1200 K) or a later refit; which set reproduces the
+    paper''s figures is unverified. An implementation would also have to choose the interpolation between the
+    ten pressures.'
+  read_for: ['#793 non-luminous gas emissivity at combustor pressure: the coefficients']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/ScienceDirect_files_28Oct2026_13-20-09.809.zip (outer zip holding mmc1.pdf
+    and mmc2.zip). Extracted for reading into tmp/bordbar2021_supp/ (gitignored); no code executed.
+- file: docs/radiation/bordbar_wecel_hyppanen_2014_CNF_161_2435_LBL_WSGG_H2O_CO2.pdf
+  citation: 'Bordbar, M. H., Wecel, G., Hyppanen, T. (2014). A line by line based weighted sum of gray gases model
+    for inhomogeneous CO2-H2O mixture in oxy-fired combustion. Combustion and Flame 161, 2435-2445.'
+  id: doi:10.1016/j.combustflame.2014.03.013
+  topic: [radiation, combustion]
+  content: 'WSGG model (4 gray gases + a transparent one) for the TOTAL emissivity of H2O-CO2 mixtures, fitted to
+    an LBL database from HITEMP 2010 (6800 emissivities): T 500-2400 K (Tr = T/1200 K), pressure-path length
+    0.01-60 atm m, molar ratio Mr = H2O/CO2 0.01-4 (one coefficient set for all Mr: weights a_i = sum_j b_ij
+    Tr^j with b_ij = sum_k c_ijk Mr^k, absorption K_i = sum_k d_ik Mr^k; Eqs. 6-11, Table 1). Benchmarked
+    against Johansson, Yin, Smith and Leckner (Fig. 1) and against LBL for inhomogeneous / non-isothermal
+    slabs and a 3-D oxy-fired benchmark. Non-luminous gas only: soot is not included (an extension is
+    referenced, not given). Total pressure 1 atm (the database''s); no pressure-broadening correction.'
+  status: screened
+  verdict: 'Screened 2026-10-28 for the gas radiation combaero lacks (blocking the Lefebvre & Ballal liner-wall
+    examples, #793). A citable, LBL-based NON-LUMINOUS emissivity for H2O-CO2 at 1 atm, closed-form in T,
+    partial-pressure path length and Mr -- a physics-based alternative to Lefebvre''s empirical Eq. 8.11 gas
+    emissivity, and a cross-check of it at 1 atm. Limits for a gas-turbine liner: 1 atm only (liners run at
+    10-40 bar, where pressure broadening raises H2O/CO2 emissivity: Bordbar et al. 2021 (held) is that
+    pressure-dependent extension), no soot (Lefebvre''s luminosity factor L stays the luminous part), oxy-fired fit (air-fired
+    Mr ~1-2 is inside its range). No issue exists for a radiation model yet; this is a candidate for its
+    non-luminous kernel, not used.'
+  read_for: ['#793 liner wall temperature: gas radiation (non-luminous emissivity)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/1-s2.0-S0010218014000935-Bordbar.pdf. The text layer DROPS the minus
+    signs in Table 1 (and elsewhere, e.g. "1  YCO2"); transcribe the coefficients from the rendered page.
+    The authors offer the coefficients as a data file with Matlab code on request.
 - file: docs/combustor_network/topal2014_CONV14_1D_heat_transfer_combustor.pdf
   citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional
     heat transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp.
@@ -2724,6 +2803,72 @@ documents:
   issues: [807]
   records: []
   notes: Arrived 2026-10-28 as docs/new/aerospace-13-00555-v2.pdf.
+- file: docs/orifices/hay_lampard_1996_ASME_96-GT-492_cooling_hole_cd_review.pdf
+  citation: 'Hay, N., Lampard, D. (1996). Discharge coefficient of turbine cooling holes: a review. ASME 96-GT-492
+    (Proc. ASME Turbo Expo 1996, Vol. 4, V004T09A056).'
+  id: ASME 96-GT-492
+  topic: [orifice, film, review]
+  content: 'Review of cooling-hole Cd: Table 1 classifies the literature by geometry and inlet/outlet crossflow.
+    Fig. 3 (p. 4): Adkins & Gueroui (1986) measured Cd of SHORT combustor cooling holes against the flow
+    parameter (p_c - p_inf)/(p_c+ - p_c), with McNown & Hsu''s potential-flow prediction. Fig. 4 (p. 4): normal
+    holes with INLET crossflow, Cd against the velocity head ratio (p_c+ - p_inf)/(p_c+ - p_c) -- Rohde et al.
+    1969, Benmansour (thesis), Byerley 1989 collapse on one curve (Cd ~0.2 at 1.2 rising to 0.8-0.85 above
+    ~20) with a potential-flow line; the text: this parameter "has been shown to work over a wide range of inlet
+    cross flow Mach numbers for orifices with L/d > 2" (p. 5). Fig. 5: McGreehan-Schotsch inlet-radiusing
+    correction against Hay & Spencer (1992) data. Discusses Rogers & Hersh''s lid model (short normal holes,
+    empirical), the additional-loss method, CFD.'
+  status: screened
+  verdict: 'Screened 2026-10-28 (#807, #813). Fig. 4 gives the inlet-crossflow Cd of normal holes with L/d > 2 as
+    one curve over three sources (incl. the Benmansour thesis points): the velocity head ratio is (Vi/U1)^2, so it
+    maps onto McGreehan-Schotsch''s U1/Vi (= 1/sqrt(ratio)) -- a cross-source ACCURACY check of the shipped
+    duct-fed-hole Cd once digitised (~50 points); it also settles that L/d (>2) hardly matters under inlet
+    crossflow. NOT #807''s thin walls (L/d < 2): Fig. 3 (Adkins & Gueroui''s short combustor holes, wanted) is the
+    thin-hole data, in a different parameter -- digitise it for #807. Fig. 5 partly reprints Hay & Spencer 1992
+    (wanted).'
+  read_for: ['#807 thin-wall (short-hole) Cd under crossflow', '#813 inlet-crossflow Cd of duct-fed holes vs
+      McGreehan-Schotsch', 'reprints of wanted Adkins & Gueroui 1986 and Hay & Spencer 1992']
+  issues: [807, 813]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/v004t09a056-96-gt-492.pdf (suggested by the user for its Fig. 4). Cites the
+    Benmansour thesis as 1983 (reference list) and 1981 (Fig. 4 legend).
+- file: docs/orifices/hay_lampard_benmansour_1983_JEP_105_243_crossflow_cd.pdf
+  citation: 'Hay, N., Lampard, D., Benmansour, S. (1983). Effect of crossflows on the discharge coefficient of film
+    cooling holes. ASME J. Engineering for Power 105(2), 243-248 (ASME 82-GT-147).'
+  id: ASME 82-GT-147
+  topic: [orifice, film]
+  content: 'Measured Cd of single rows of sharp-edged holes (D 3.5 mm, S/D 2.5; isothermal, room-temperature air)
+    with crossflow on BOTH sides, varied independently: coolant (inlet) Mc 0-0.4 and mainstream (exit) M_inf
+    0-0.5, pressure ratio p_c+/p_inf 1-2, Re 1e4-1e5; Table 2 (checked on the rendered page; its L/D column is
+    lost in the text layer): parallel flow L/D 2 at 30/60/90 deg and L/D 6 at 30/90 deg, perpendicular L/D 6
+    at 30/90 deg. Every figure whose legend gives L/D (Figs. 5, 6, 8-15) is L/D 6; Fig. 7 (vs Rohde, zero
+    mainstream crossflow) gives none. 30,
+    60, 90 deg, coolant duct parallel (Fig. 3) or perpendicular (Fig. 4) to the mainstream. Cd ideal flow from
+    the COOLANT STAGNATION pressure to the mainstream STATIC (p. 245). Uncertainty 6-8% at PR < 1.2, 1.5% above
+    1.5 (Table 3). Plotted only (5-12 points per faired curve): Fig. 5 mainstream effect, Fig. 6 coolant effect
+    at 90 deg, Figs. 8/12 30 deg, plateau maps Figs. 9, 10, 13, 14, Fig. 15 Cd vs u_j/u_inf. No correlation;
+    Fig. 7 agrees with Rohde (TN D-5467) at M_inf 0. Detailed data in Benmansour''s 1981 M.Phil. thesis.'
+  status: screened
+  verdict: 'Screened 2026-10-28 (#800/#818, #807, #813). The foundational two-sided crossflow Cd study (Thole et
+    al. 1997 cite it as such). For #813: Cd referenced to the coolant TOTAL pressure (as Thole et al.), so the
+    supply dynamic head is booked once; even so coolant crossflow moves Cd -- 90 deg: -20% at low PR, -6% on
+    the plateau (Fig. 6, Table 4); 30 deg co-aligned: about +30% (Figs. 8, 10); perpendicular layout: lower at
+    both angles (Figs. 12-14) -- an angle- and orientation-dependent residual a duct-fed hole model must carry.
+    For #818 (exit-side default Rogers & Hersh): cross-source ACCURACY only for u_j/u_inf ~0.25-2 with L/D 6
+    holes, never the Gc/Gj ~125 stagnant-row regime; there these thick holes fall BELOW the fit (rough read,
+    Fig. 6, 90 deg, Mc 0: Cd 0.54 vs 0.70 at PR 1.02, 0.66 vs 0.80 at 1.04, 0.76 vs 0.80 at 1.1) -- recorded,
+    not acted on (impingement plates are thin, L/D ~1). Mainstream effect weak (-10 to -15% at low PR, Table 4).
+    For #807: nothing usable -- L/D 2 was measured (parallel tests) but not published as data: "for the range of
+    L/D of interest (2-10) it had hardly any effect on Cd" (p. 244), and without crossflow at high Re "Cd
+    becomes constant at a value ranging between 0.8 and 0.74 depending on L/D" (p. 247), unassigned; only
+    Fig. 7 (unlabelled L/D) might hold L/D 2 points. To use:
+    digitise Figs. 6, 5, 15 (and 8, 12).'
+  read_for: ['#813 duct-fed hole Cd reference pressure and coolant-side crossflow', '#800/#818 cross-source check
+      of the exit-side grazing Cd', '#807 L/D effect (none usable)']
+  issues: [800, 807, 813]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/243_1_Bensamour_1983.pdf (was on the wanted list). Its detailed data are in
+    Benmansour's M.Phil. thesis (Nottingham, 1983), not digitised online; dropped from wanted (user, 2026-10-28) --
+    Hay & Lampard 1996 Fig. 4 reprints its inlet-crossflow points.
 - file: docs/orifices/rogers_hersh_1976_NASA_CR-2681_grazing_flow_orifice_resistance.pdf
   citation: 'Rogers, T., Hersh, A. S. (1976). Effect of grazing flow on steady-state resistance of isolated
     square-edged orifices. NASA CR-2681 (NAS3-17858), Hersh Acoustical Engineering.'
@@ -2992,19 +3137,6 @@ wanted:
     inlets, at pressure ratios to about 2 -- duct-fed liner and effusion holes (#813 PR 2, #807) beyond
     McGreehan-Schotsch. The pressure-reference question is answered by Thole et al. 1997 (held: Cd referenced
     to the supply TOTAL pressure). Content as recalled, unverified.'
-  where: ASME Digital Collection (paywalled).
-- citation: Hay, N., Lampard, D., Benmansour, S. (1983). Effect of crossflows on the discharge coefficient of
-    film cooling holes. ASME J. Engineering for Power 105(2), 243-248.
-  checked: false
-  issues:
-  - 799
-  - 800
-  - 807
-  priority: now
-  question: 'Cd with crossflow on the inlet AND exit side of a hole (the general case of which CR-2681 covers
-    single holes under exit/inlet grazing flow): ranges of crossflow-to-jet ratio, pressure reference, and
-    whether it reaches the strong-crossflow regime of CR-3630''s stagnant rows (Gc/Gj ~125). As recalled,
-    unverified.'
   where: ASME Digital Collection (paywalled).
 - citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
     NASA TP-2985, AVSCOM TP 89-C-008.
