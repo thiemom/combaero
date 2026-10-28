@@ -5068,8 +5068,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("xi", &combaero::CombustorLossResult::xi)
       .def_readonly("dxi_dtheta", &combaero::CombustorLossResult::dxi_dtheta)
       .def_readonly("dxi_dmdot", &combaero::CombustorLossResult::dxi_dmdot)
-      .def_readonly("dxi_dT_in", &combaero::CombustorLossResult::dxi_dT_in)
-      .def_readonly("dxi_dP_in", &combaero::CombustorLossResult::dxi_dP_in)
+      .def_readonly("dxi_dTt_in", &combaero::CombustorLossResult::dxi_dTt_in)
+      .def_readonly("dxi_dPt_in", &combaero::CombustorLossResult::dxi_dPt_in)
       .def_readonly("dxi_dY", &combaero::CombustorLossResult::dxi_dY);
   m.def("combustor_fraction_loss", &combaero::combustor_fraction_loss,
         py::arg("theta"), py::arg("mdot"), py::arg("k"), py::arg("xi0"),
@@ -5078,12 +5078,13 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "g(|mdot|/m_ref), g = 1 - (1 - r^2)^3 below the design flow (m_ref\n"
         "<= 0: no fade), with its partials in theta and mdot.");
   m.def("combustor_head_loss", &combaero::combustor_head_loss, py::arg("theta"),
-        py::arg("mdot"), py::arg("T_in"), py::arg("P_in"), py::arg("Y_in"),
+        py::arg("mdot"), py::arg("Tt_in"), py::arg("Pt_in"), py::arg("Y_in"),
         py::arg("k"), py::arg("zeta0"), py::arg("area"),
-        "Combustor head loss as a fraction of P_in: xi = (k theta + zeta0)\n"
-        "0.5 rho v^2 / P_in, v = mdot/(rho area), ideal-gas rho at\n"
-        "(T_in, P_in, Y_in), with its partials in theta, mdot, T_in, P_in\n"
-        "and each inlet mass fraction Y_k (the others held fixed).");
+        "Combustor head loss as a fraction of the inlet total pressure Pt_in:\n"
+        "xi = (k theta + zeta0) 0.5 rho v^2 / Pt_in, v = mdot/(rho area),\n"
+        "ideal-gas rho at (Tt_in, Pt_in, Y_in) -- Lefebvre's total-total\n"
+        "low-Mach pressure-loss factor -- with its partials in theta, mdot,\n"
+        "Tt_in, Pt_in and each inlet mass fraction Y_k (the others held fixed).");
   m.def("combustion_state",
         static_cast<CombustionStateBaseFn>(&combustion_state),
         py::arg("X_fuel"), py::arg("X_ox"), py::arg("phi"),

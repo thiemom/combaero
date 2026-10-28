@@ -386,20 +386,21 @@ using PressureLossCorrelation = std::function<std::tuple<double, double>(const P
 ## Combustor Pressure Loss (combustor_loss.h)
 
 The built-in combustor losses as a fraction of the inlet total pressure,
-`P_out = P_in (1 - xi)`, with every partial (#718). The Python classes in
+`Pt_out = Pt_in (1 - xi)`, with every partial (#718). The Python classes in
 `combaero.network.pressure_loss` call these, and `PressureLossElement` builds
 its Jacobian from the partials.
 
 ```cpp
 struct CombustorLossResult {
-    double xi, dxi_dtheta, dxi_dmdot, dxi_dT_in, dxi_dP_in;
+    double xi, dxi_dtheta, dxi_dmdot, dxi_dTt_in, dxi_dPt_in;
     std::vector<double> dxi_dY;  // per inlet mass fraction; empty for the fraction family
 };
 // xi = (k theta + xi0) g(|mdot|/m_ref), g = 1 - (1 - r^2)^3 below r = 1; m_ref <= 0: g = 1
 CombustorLossResult combustor_fraction_loss(double theta, double mdot, double k,
                                             double xi0, double m_ref);
-// xi = (k theta + zeta0) mdot^2 R T_in / (2 area^2 P_in^2 MW(Y_in)), the dynamic head over P_in
-CombustorLossResult combustor_head_loss(double theta, double mdot, double T_in, double P_in,
+// xi = (k theta + zeta0) mdot^2 R Tt_in / (2 area^2 Pt_in^2 MW(Y_in)): Lefebvre's pressure-loss
+// factor, total-total at low Mach (the dynamic head at the inlet stagnation state, over Pt_in)
+CombustorLossResult combustor_head_loss(double theta, double mdot, double Tt_in, double Pt_in,
                                         const std::vector<double>& Y_in,
                                         double k, double zeta0, double area);
 ```

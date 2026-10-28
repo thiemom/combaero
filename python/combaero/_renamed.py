@@ -143,6 +143,8 @@ KWARGS: dict[str, dict[str, str]] = {
     "channel_residuals_and_jacobian": {"T_up": "Tt_up"},
     "orifice_compressible_residuals_and_jacobian": {"T_up": "Tt_up"},
     "heat_entropy_flux": {"T0_in": "Tt_in", "T0_out": "Tt_out"},
+    # The head loss is total-total (Lefebvre; #782 audit).
+    "combustor_head_loss": {"T_in": "Tt_in", "P_in": "Pt_in"},
 }
 
 #: Function renames: old name -> new name.
@@ -177,6 +179,7 @@ FIELDS: dict[str, tuple[dict[str, str], bool]] = {
     "SonicStatic": ({"dP_dT0": "dP_dTt"}, False),
     "OrificeResult": ({"d_mdot_dT_up": "d_mdot_dTt_up"}, False),
     "ChannelSolverResult": ({"d_dP_dT_up": "d_dP_dTt_up"}, False),
+    "CombustorLossResult": ({"dxi_dT_in": "dxi_dTt_in", "dxi_dP_in": "dxi_dPt_in"}, False),
 }
 
 #: Constructor keyword renames: class -> {old keyword: new keyword}.

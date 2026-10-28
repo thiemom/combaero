@@ -505,7 +505,7 @@ def test_builtin_losses_evaluate_in_cpp_with_their_partials() -> None:
 
     Y = list(cb.species.dry_air_mass())
     ctx = SimpleNamespace(
-        theta=1.2, mdot_total=0.4, T_in=700.0, P_in=2e5, X_in=list(cb.mass_to_mole(Y))
+        theta=1.2, mdot_total=0.4, Tt_in=700.0, Pt_in=2e5, X_in=list(cb.mass_to_mole(Y))
     )
     for corr in (
         ConstantFractionLoss(xi=0.03, m_ref=0.5),
@@ -519,3 +519,49 @@ def test_builtin_losses_evaluate_in_cpp_with_their_partials() -> None:
         assert corr.evaluate(ctx).xi == pytest.approx(r.xi, rel=1e-12)
         # Below the design flow / for a head loss the flow partial is live.
         assert r.dxi_dmdot > 0.0
+
+
+def test_the_head_loss_is_total_total() -> None:
+    """Lefebvre's pressure-loss factor is total-total at low Mach (#782
+    audit): the element evaluates the head loss at the inlet's (Tt, Pt). It
+    used the static P with Tt, +8% in the loss at an inlet Mach of 0.3."""
+
+    import combaero as cb
+    from combaero.network.components import NetworkMixtureState, PressureLossElement
+    from combaero.network.pressure_loss import ConstantHeadLoss
+
+    Y = list(cb.species.dry_air_mass())
+    corr = ConstantHeadLoss(zeta=4.0, area=0.05)
+    el = PressureLossElement("loss", "a", "b", correlation=corr)
+    # A moving inlet: static P well below Pt.
+    a = NetworkMixtureState(P=1.6e5, Pt=2.0e5, Tt=700.0, m_dot=8.0, Y=Y)
+    b = NetworkMixtureState(P=1.9e5, Pt=1.9e5, Tt=700.0, m_dot=8.0, Y=Y)
+    res, _ = el.residuals(a, b)
+    expected = cb.combustor_head_loss(0.0, 8.0, 700.0, 2.0e5, Y, 0.0, 4.0, 0.05).xi
+    assert res[0] == pytest.approx(b.Pt - a.Pt * (1.0 - expected), rel=1e-12)
+
+
+def test_a_0_7_context_still_evaluates_and_says_so() -> None:
+    """A hand-built context with the 0.7 names T_in/P_in (P_in was the
+    static P) evaluates the same loss with a DeprecationWarning."""
+    from types import SimpleNamespace
+
+    import combaero as cb
+    from combaero.network.pressure_loss import ConstantHeadLoss, PressureLossContext
+
+    Y = list(cb.species.dry_air_mass())
+    X = list(cb.mass_to_mole(Y))
+    corr = ConstantHeadLoss(zeta=4.0, area=0.05)
+    new = corr.evaluate(
+        SimpleNamespace(theta=0.0, mdot_total=0.4, Tt_in=700.0, Pt_in=2e5, X_in=X), Y
+    )
+    old_ctx = SimpleNamespace(theta=0.0, mdot_total=0.4, T_in=700.0, P_in=2e5, X_in=X)
+    with pytest.warns(DeprecationWarning, match="0.9.0"):
+        old = corr.evaluate(old_ctx, Y)
+    assert old.xi == new.xi
+    ctx = PressureLossContext(theta=0.0, mdot_total=0.4, Tt_in=700.0, Pt_in=2e5, X_in=X)
+    with pytest.warns(DeprecationWarning, match="Pt_in"):
+        assert ctx.P_in == 2e5
+    with pytest.warns(DeprecationWarning, match="Tt_in"):
+        ctx.T_in = 650.0
+    assert ctx.Tt_in == 650.0

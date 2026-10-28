@@ -31,8 +31,8 @@ CombustorLossResult combustor_fraction_loss(double theta, double mdot, double k,
   return r;
 }
 
-CombustorLossResult combustor_head_loss(double theta, double mdot, double T_in,
-                                        double P_in,
+CombustorLossResult combustor_head_loss(double theta, double mdot, double Tt_in,
+                                        double Pt_in,
                                         const std::vector<double> &Y_in,
                                         double k, double zeta0, double area) {
   if (Y_in.size() != molar_masses.size()) {
@@ -40,7 +40,7 @@ CombustorLossResult combustor_head_loss(double theta, double mdot, double T_in,
   }
   CombustorLossResult r;
   r.dxi_dY.assign(Y_in.size(), 0.0);
-  if (mdot <= 0.0 || area <= 0.0 || P_in <= 0.0 || T_in <= 0.0) {
+  if (mdot <= 0.0 || area <= 0.0 || Pt_in <= 0.0 || Tt_in <= 0.0) {
     return r;
   }
   // MW = S / U with S = sum(Y), U = sum(Y_k / W_k): mass_to_mole normalises,
@@ -56,14 +56,14 @@ CombustorLossResult combustor_head_loss(double theta, double mdot, double T_in,
   }
   const double MW = S / U;
   // R in J/(mol K) over MW in g/mol: the specific gas constant is R*1000/MW.
-  const double q = mdot * mdot * thermo::R_GAS * 1000.0 * T_in /
-                   (2.0 * area * area * P_in * P_in * MW);
+  const double q = mdot * mdot * thermo::R_GAS * 1000.0 * Tt_in /
+                   (2.0 * area * area * Pt_in * Pt_in * MW);
   const double c = k * theta + zeta0;
   r.xi = c * q;
   r.dxi_dtheta = k * q;
   r.dxi_dmdot = 2.0 * r.xi / mdot;
-  r.dxi_dT_in = r.xi / T_in;
-  r.dxi_dP_in = -2.0 * r.xi / P_in;
+  r.dxi_dTt_in = r.xi / Tt_in;
+  r.dxi_dPt_in = -2.0 * r.xi / Pt_in;
   // dMW/dY_k = 1/U - S/(U^2 W_k); dq/dMW = -q/MW.
   for (std::size_t i = 0; i < Y_in.size(); ++i) {
     const double dMW = 1.0 / U - S / (U * U * molar_masses[i]);
