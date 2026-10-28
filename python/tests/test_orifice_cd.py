@@ -375,3 +375,29 @@ class TestMcGreehanSchotsch1988:
 
         computed = ImpingementModel(C_D=cb.mcgreehan_schotsch_1988_cd(1.0e4, 0.0, 2.0))
         assert pytest.approx(0.8211, rel=1e-3) == computed.C_D
+
+
+@pytest.mark.parametrize(
+    ("sel", "floor"),
+    [
+        (cb.DischargeCdCorrelation.McGreehanSchotsch1988, 1.0e4),
+        (cb.DischargeCdCorrelation.Idelchik1966Sharp, 25.0),
+        (cb.DischargeCdCorrelation.Idelchik1966Thick, 25.0),
+        (cb.DischargeCdCorrelation.Lichtarowicz1965, None),
+    ],
+)
+def test_the_cd_value_is_held_below_its_reported_re_floor(
+    sel: cb.DischargeCdCorrelation, floor: float | None
+) -> None:
+    """discharge_cd_re_floor is where the VALUE stops moving (#760): below it
+    the true dCd/dRe is 0, whatever the solver form continues."""
+    re_floor = cb.discharge_cd_re_floor(sel)
+    if floor is not None:
+        assert re_floor == floor
+    hole = cb.DischargeHoleGeometry(d=1e-3, L=4e-3)
+    at = cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=re_floor))
+    for re in (0.2 * re_floor, 0.9 * re_floor):
+        assert cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=re)) == at
+    # Above it the value moves again.
+    assert cb.discharge_cd(sel, hole, cb.DischargeHoleState(Re=1.5 * re_floor)) != at
+    assert cb.discharge_cd_re_floor(cb.DischargeCdCorrelation.Constant) == 0.0

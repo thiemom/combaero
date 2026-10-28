@@ -1484,6 +1484,12 @@ std::unique_ptr<DischargeCorrelationBase> make_constant_discharge_correlation(do
 bool discharge_cd_in_range(DischargeCdCorrelation id,
                            const DischargeHoleGeometry&, const DischargeHoleState&);
 
+// Re below which the Cd VALUE is held (Re clamped up to it): its true dCd/dRe
+// is 0 there. Cd_and_derivatives continues the slope below it for
+// McGreehan-Schotsch and Idelchik (a Newton aid); a sensitivity built on the
+// held value takes the zero. 0 for Constant.
+double discharge_cd_re_floor(DischargeCdCorrelation id);
+
 // The hole as an orifice in a straight pipe (Idelchik 4-13..4-16): permanent
 // loss on the PIPE velocity head, and the factor R with C_pipe = Cd_wall R
 // that gives it through ISO 5167-2's recovery relation (R -> 1 as beta -> 0).
