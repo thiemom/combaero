@@ -141,6 +141,19 @@ docs/*.pdf
 docs/**/*.pdf
 docs/**/*.djvu
 docs/**/*.epub
+# Supplementary archives and data files travel with papers too, and some are
+# licence-restricted (Bordbar et al. 2021's WSGG coefficients: "not to be
+# distributed"); a .zip in a new docs/ folder slipped past the PDF rule
+# (docs/radiation/, 2026-10-28).
+docs/**/*.zip
+docs/**/*.tar
+docs/**/*.tar.gz
+docs/**/*.tgz
+docs/**/*.7z
+docs/**/*.rar
+docs/**/*.dat
+docs/**/*.m
+docs/radiation/
 docs/new/
 docs/jet_mixing/
 

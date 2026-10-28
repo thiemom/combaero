@@ -2587,13 +2587,41 @@ documents:
   verdict: 'Screened 2026-10-28: the pressure coverage Bordbar et al. (2014) lacked -- gas-turbine liners at
     10-40 bar sit inside 0.1-80 atm -- making it the better candidate for a non-luminous gas-radiation kernel
     (#793 Lefebvre & Ballal liner examples; no radiation issue exists yet). BUT the coefficients are NOT in the
-    paper: they are in its supplementary material (one set per pressure, with a MATLAB function), wanted.
+    paper: they are in its supplementary material (one set per pressure, with a MATLAB function) -- now held,
+    but licensed non-commercial / no redistribution without the author''s permission (its entry).
     Between the ten pressures an implementation must interpolate (in p or ln p; the paper does not prescribe
     one). Soot stays outside (Lefebvre''s luminosity factor).'
   read_for: ['#793 liner wall temperature: non-luminous gas emissivity at combustor pressure']
   issues: [793]
   records: []
   notes: Arrived 2026-10-28 as docs/new/Pressure-dependent-weighted-sum-of-gray-gases-model_2021_International-Journ.pdf.
+- file: docs/radiation/bordbar_et_al_2021_IJHMT_173_121207_supplementary_mmc1_mmc2.zip
+  citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Supplementary
+    material to Int. J. Heat Mass Transfer 173, 121207: mmc1 (Appendix A, WSGG model constants, 11 pp.) and mmc2
+    (MATLAB function, sample script and coefficient files Final_PWSGG_Model_Coef_Pt001-010.dat).'
+  id: 1-s2.0-S0017931021003100-mmc1/mmc2
+  topic: [radiation]
+  content: 'mmc1.pdf: Tables A.1-A.10, the c_ijk / d_ik constants for p = 0.1-80 atm. mmc2: ten .dat files
+    (one per pressure: 4 gray gases x (5 a-polynomial rows + 1 k row), each a 4th-order polynomial in Mr), the
+    MATLAB function Bordbar_PWSGG_MatlabFunction_IJHMT2021.m (Tr = T/1500 K; kappa_i = K_i (x_CO2 + x_H2O) Pt;
+    accepts only the ten tabulated pressures exactly -- no interpolation) and a sample script. Inputs Pt 0.1-80
+    atm, T 300-3000 K, x_H2O, x_CO2, optional path length; datasets 33 Mr points 0.1-4, 55 T points 300-3000 K,
+    19 path lengths 0.01-60 m.'
+  status: screened
+  verdict: 'Received 2026-10-28; read, not run. LICENCE: every .dat file says "COPYRIGHT (C) 2020 HADI BORDBAR
+    ... Used for non-commercial purposes only with the permission of the copywriter. Not to be distributed
+    without the permission of the copywriter." -> the coefficients must NOT be committed to or shipped with
+    combaero (PyPI) without the author''s written permission; ask before any implementation. DISCREPANCY to
+    settle first: the mmc1 Appendix A tables and the mmc2 .dat coefficients differ at the same pressure (0.1
+    atm, gas 1, first entry: -1.017554e-3 vs -6.685900e-4) -- the ordering (k vs b4..b0), the reference
+    temperature (the function uses 1500 K; the 2014 model 1200 K) or a later refit; which set reproduces the
+    paper''s figures is unverified. An implementation would also have to choose the interpolation between the
+    ten pressures.'
+  read_for: ['#793 non-luminous gas emissivity at combustor pressure: the coefficients']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/ScienceDirect_files_28Oct2026_13-20-09.809.zip (outer zip holding mmc1.pdf
+    and mmc2.zip). Extracted for reading into tmp/bordbar2021_supp/ (gitignored); no code executed.
 - file: docs/radiation/bordbar_wecel_hyppanen_2014_CNF_161_2435_LBL_WSGG_H2O_CO2.pdf
   citation: 'Bordbar, M. H., Wecel, G., Hyppanen, T. (2014). A line by line based weighted sum of gray gases model
     for inhomogeneous CO2-H2O mixture in oxy-fired combustion. Combustion and Flame 161, 2435-2445.'
@@ -3153,13 +3181,3 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
-- citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Supplementary
-    material to: Pressure-dependent WSGG models for heterogeneous CO2-H2O mixtures, Int. J. Heat Mass Transfer
-    173, 121207 (coefficient tables per pressure and a MATLAB function).'
-  checked: false
-  issues:
-  - 793
-  priority: later
-  question: 'The c_ijk and d_ik coefficient sets for the ten total pressures (0.1-80 atm) -- not printed in the
-    paper (held) -- needed to implement its non-luminous H2O-CO2 emissivity at combustor pressure.'
-  where: The article's online supplementary material (ScienceDirect, doi:10.1016/j.ijheatmasstransfer.2021.121207).
