@@ -1700,6 +1700,23 @@ class _StaticChainedDrop:
         self.d_dY = {k: float(r.d_dT) * d for k, d in st.dY.items()}
 
 
+class _ReservoirExitInflow:
+    """Incompressible acceleration out of a segment's exit node at rest when
+    the flow reverses: ``channel_entry_drop`` evaluated at -m (K_in = 0), as
+    a momentum term of this segment's signed m. The static P at the duct end
+    is the node's P less the head, so the term is a negative drop."""
+
+    __slots__ = ("dP", "d_dm_a", "d_dm_b", "d_dP", "d_dT", "d_dY")
+
+    def __init__(self, r: Any) -> None:
+        self.dP = -float(r.dP)
+        self.d_dm_a = float(r.d_dm_a)  # d(-q(-m))/dm = q'(-m)
+        self.d_dm_b = 0.0
+        self.d_dP = -float(r.d_dP)
+        self.d_dT = -float(r.d_dT)
+        self.d_dY: dict[int, float] = {}
+
+
 #: Flow regime every element defaults to when none is given. It is the GUI's
 #: default too (gui/backend/schemas.py SolverSettings.global_regime and the
 #: frontend store), and test_regime_default_sync.py keeps the three equal: a
@@ -8018,7 +8035,9 @@ class CrossflowSegmentElement(ChannelElement):
       static density instead of a from-station. Reversed, the duct discharges into
       the reservoir at static continuity, the same as an exit: no term.
     * an exit into a plenum (no to-station) loses the dynamic head: static
-      continuity, as any Pt-coupled channel into a plenum.
+      continuity, as any Pt-coupled channel into a plenum. Reversed, that node
+      at rest is a reservoir: the gas accelerates out of it (one dynamic head,
+      no loss; compressible, the duct end takes its Pt).
 
     Station nodes must be PlenumNodes (Pt = P): the node pressure is the
     channel's static pressure, which is what a side stream sees.
@@ -8158,6 +8177,22 @@ class CrossflowSegmentElement(ChannelElement):
             terms.append(
                 (_StaticChainedDrop(r, st, True), self.to_node, "a", self.to_node, self._next, "to")
             )
+        elif (
+            incompressible and m < 0.0 and (self.from_kappa is not None or self.entry_K is not None)
+        ):
+            # Reversed out of an exit node at rest (a plenum, a boundary): the
+            # node is a reservoir and the gas accelerates out of it, one
+            # dynamic head at the duct's static density, no entry loss. The
+            # compressible duct ends take that node's own Pt (``_duct_ends``);
+            # without this term the incompressible reversed flow ran ~5x the
+            # compressible one.
+            node = getattr(self, "_downstream_node", None)
+            if node is None or isinstance(node, PlenumNode) or node.is_boundary:
+                st = _moving_static_T(state_out, m, self.area, True)
+                r = cb.channel_entry_drop(-m, state_out.P, st.T, state_out.X, self.area, 0.0)
+                terms.append(
+                    (_ReservoirExitInflow(r), self.to_node, "a", self.to_node, None, "exit_in")
+                )
         return terms
 
     def _exit_head_lost(self, m_dot: float) -> bool:

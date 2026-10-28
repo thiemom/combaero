@@ -197,8 +197,8 @@ def test_the_compressible_station_jacobian_matches_finite_differences() -> None:
     assert float(np.max(np.abs((J - fd) * cols) / scale)) < 1e-5
 
 
-def _entry_segment(entry_K: float, p_res: float, p_duct: float, regime: str) -> float:
-    """Reservoir --[segment, entry_K]--> plenum boundary; the solved flow."""
+def _entry_net(entry_K: float, p_res: float, p_duct: float, regime: str) -> FlowNetwork:
+    """Reservoir --[segment, entry_K]--> plenum boundary."""
     g = FlowNetwork()
     for n, pt in (("res", p_res), ("duct", p_duct)):
         b = PressureBoundary(n)
@@ -209,7 +209,12 @@ def _entry_segment(entry_K: float, p_res: float, p_duct: float, regime: str) -> 
             "s", "res", "duct", length=0.05, area=1e-3, entry_K=entry_K, regime=regime
         )
     )
-    res = NetworkSolver(g).solve()
+    return g
+
+
+def _entry_segment(entry_K: float, p_res: float, p_duct: float, regime: str) -> float:
+    """The solved flow of ``_entry_net``."""
+    res = NetworkSolver(_entry_net(entry_K, p_res, p_duct, regime)).solve()
     assert res["__success__"], res.get("__message__")
     return float(res["s.m_dot"])
 
@@ -226,6 +231,36 @@ def test_the_entry_loss_applies_to_inflow_only(regime: str) -> None:
     assert fwd[0] > fwd[1] > 0.0
     assert rev[0] < 0.0
     assert rev[1] == pytest.approx(rev[0], rel=1e-9)
-    # Reversed, only friction holds the flow back: it runs faster than the
-    # forward flow, which pays the entry acceleration besides.
-    assert abs(rev[0]) > fwd[0]
+    # Reversed, the plenum boundary at rest is the reservoir: its gas pays the
+    # same acceleration (#802). Before, the reversed flow paid only friction
+    # and ran ~5x the forward one. With K = 0 the two directions are mirror
+    # images; incompressible takes rho at the other node's P (1 %).
+    assert abs(rev[0]) == pytest.approx(fwd[0], rel=1e-2)
+
+
+def test_reversed_out_of_an_exit_the_regimes_agree() -> None:
+    """Low Mach, the compressible duct ends and the incompressible momentum
+    terms charge the same head where the gas leaves an exit node at rest. Before
+    the incompressible reversed flow paid friction only, ~5x the compressible
+    one; now they agree to 0.5 % (forward: 0.04 %), the difference being
+    where each takes the density."""
+    inc = _entry_segment(0.5, 1.0e5, 1.01e5, "incompressible")
+    com = _entry_segment(0.5, 1.0e5, 1.01e5, "compressible")
+    assert inc < 0.0
+    assert com == pytest.approx(inc, rel=1e-2)
+
+
+def test_the_reversed_exit_inflow_jacobian_matches_finite_differences() -> None:
+    """The incompressible reversed-exit head, through the solver's assembly."""
+    from scipy.optimize._numdiff import approx_derivative
+
+    s = NetworkSolver(_entry_net(0.5, 1.0e5, 1.01e5, "incompressible"))
+    r = s.solve()
+    assert r["__success__"], r.get("__message__")
+    x = np.array(r["__x_solution__"], dtype=float)
+    assert x[s.unknown_names.index("s.m_dot")] < 0.0
+    J = s._residuals_and_jacobian(x)[1].toarray()
+    fd = approx_derivative(s._residuals, x, method="3-point", abs_step=np.abs(x) * 1e-6 + 1e-10)
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    scale = np.maximum(np.max(np.abs(fd * cols), axis=1, keepdims=True), 1e-300)
+    assert float(np.max(np.abs((J - fd) * cols) / scale)) < 1e-6
