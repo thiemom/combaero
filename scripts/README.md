@@ -105,7 +105,7 @@ uv run python scripts/stress/run.py --strict ...                                
 uv run python scripts/stress/summarize.py tmp/stress/after.jsonl --compare tmp/stress/before.jsonl
 ```
 
-- **Families:** `networks.FAMILIES` holds 12:
+- **Families:** `networks.FAMILIES` holds 13:
   - layered random networks of the basic elements;
   - wall-coupled hot/cold channels;
   - junctions (MPCE, constant-K, ideal, legacy tee);
@@ -115,6 +115,7 @@ uv run python scripts/stress/summarize.py tmp/stress/after.jsonl --compare tmp/s
   - pin-fin channels;
   - bleed stations;
   - series of vortex/connection elements.
+  - crossflow chains fed by inclined jets.
 - **Per solve, the runner records:**
   - the outcome;
   - the caught-exception log;

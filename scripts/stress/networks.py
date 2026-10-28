@@ -25,6 +25,8 @@ back pressure); a failure is a finding to triage, not automatically a bug.
   pin_fin       a pin-fin channel, optionally wall-coupled to a hot channel
   bleed_station a crossflow bleed or injection station
   series        vortex, connection, loss and orifice elements in series
+  jet_chain     a crossflow chain fed by inclined jets (#813), from a reservoir
+                or a closed end
 """
 
 from __future__ import annotations
@@ -836,6 +838,62 @@ def bleed_station(seed: int) -> tuple[FlowNetwork, list[str]]:
     return g, ["bleed_station", "bleed" if bleed else "inject", regime]
 
 
+
+def jet_chain(seed: int) -> tuple[FlowNetwork, list[str]]:
+    """A crossflow chain fed by inclined jets (#813): each station's hole
+    declares m w cos(theta), which the station takes into its momentum.
+
+    1-10 stations, each with its own angle (90 = normal, no momentum); the
+    chain's upstream end is a reservoir entry or a closed end (the jets alone
+    drive it, an impingement gap's topology). Exercises the station's jet
+    term, its Jacobian and the ledger's grouping of momentum-bearing holes.
+    """
+    r = random.Random(seed)
+    g = FlowNetwork()
+    regime = r.choice(["compressible", "incompressible"])
+    n = r.randint(1, 10)
+    P = r.choice([1e5, 5e5, 2e6])
+    drive = r.choice([0.005, 0.03, 0.15, 0.5])
+    A = r.choice([2e-4, 2e-3, 2e-2])
+    L = r.choice([0.005, 0.02, 0.1])
+    d_hole = r.choice([0.002, 0.005, 0.01]) * math.sqrt(A / 2e-3)
+    closed = r.random() < 0.4
+    _pb(g, "sup", P * (1.0 + drive), r.choice([300.0, 600.0]))
+    _pb(g, "ex", P)
+    if not closed:
+        _pb(g, "res", P * (1.0 + drive * r.choice([0.0, 0.3, 1.0])), r.choice([300.0, 900.0]))
+    for i in range(1, n + 1):
+        g.add_node(PlenumNode(f"b{i}"))
+    if not closed:
+        g.add_element(
+            CrossflowSegmentElement(
+                "s0", "res", "b1", length=L, area=A, entry_K=r.choice([0.0, 0.5]),
+                to_kappa=0.0, next_seg="s1", regime=regime,
+            )
+        )  # fmt: skip
+    angles = []
+    for i in range(1, n + 1):
+        last = i == n
+        g.add_element(
+            CrossflowSegmentElement(
+                f"s{i}", f"b{i}", "ex" if last else f"b{i + 1}", length=L, area=A,
+                from_kappa=0.0, prev_seg=None if (closed and i == 1) else f"s{i - 1}",
+                to_kappa=None if last else 0.0, next_seg=None if last else f"s{i + 1}",
+                regime=regime,
+            )
+        )  # fmt: skip
+        theta = r.choice([90.0, 60.0, 30.0, 15.0])
+        angles.append(theta)
+        g.add_element(
+            OrificeElement(
+                f"h{i}", "sup", f"b{i}", diameter=d_hole, Cd=0.7, correlation="fixed",
+                injection_angle_deg=theta, regime=regime,
+            )
+        )  # fmt: skip
+    tags = ["jet_chain", f"stations:{n}", regime, "closed" if closed else "reservoir"]
+    tags.append("angled" if any(a < 90.0 for a in angles) else "normal")
+    return g, tags
+
 def series(seed: int) -> tuple[FlowNetwork, list[str]]:
     r = random.Random(seed)
     g = FlowNetwork()
@@ -904,4 +962,5 @@ FAMILIES: dict[str, Builder] = {
     "pin_fin": pin_fin,
     "bleed_station": bleed_station,
     "series": series,
+    "jet_chain": jet_chain,
 }
