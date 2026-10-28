@@ -2680,6 +2680,50 @@ documents:
   issues: [339, 375, 381, 382, 383, 384, 406, 409, 465, 645, 649]
   records: [validation/cooling/extractions/orifice_discharge_coefficient.md, validation/cooling/data/mcgreehan_schotsch1988/]
   code: ['include/orifice.h: orifice::mcgreehan_schotsch, McGreehanSchotsch1988']
+- file: docs/orifices/thole_gritsch_schulz_wittig_1997_JFE_119_533_entrance_crossflow.pdf
+  citation: 'Thole, K. A., Gritsch, M., Schulz, A., Wittig, S. (1997). Effect of a crossflow at the entrance to a
+    film-cooling hole. ASME J. Fluids Engineering 119, 533-540.'
+  id: J. Fluids Eng. 119 (Sept. 1997)
+  topic: [orifice, film]
+  content: 'Mostly LDV flowfield (inside the hole at x/D -0.75, entrance, exit, exit crossflow; Figs. 5-12) of
+    ONE round sharp-edged hole, D 10 mm, 30 deg, L/D 6, fed from a COFLOWING supply channel, Ma_c 0-0.59; exit
+    crossflow Ma_inf 0 (Fig. 4) or 0.25 (Table 2); VR = DR = 1; Re_D 5.2e4 exit. Cd (actual / ideal flow,
+    referenced to the supply TOTAL pressure over the exit static, Pt_c / p_inf, p. 536): Fig. 4, four PR curves
+    (1.11-1.63), ~10-12 plotted points each -- Cd 0.73-0.77 at Ma_c 0 rising to 0.85-0.86 (peak Ma_c 0.18-0.3),
+    then collapsing (0.65 at Ma_c 0.36, PR 1.11) as the supply static approaches p_inf; Table 2, three points
+    (0.72, 0.72, 0.47 at Ma_c 0, 0.3, 0.5). +/-4%. No correlation. Entrance separation moves from leeward to
+    windward as Ma_c rises (Fig. 13).'
+  status: screened
+  verdict: 'Screened 2026-10-28 (#800, #807, #813). Settles #813''s reference-pressure question: Cd is referenced
+    to the supply TOTAL pressure, so the supply crossflow''s dynamic head is already in the jet''s drive; a jet
+    also given the supply''s axial velocity as separate momentum (#813 PR 2) must book that head once, not twice.
+    Confirms Hay, Lampard & Benmansour (1983) as the foundational entrance-crossflow Cd study (wanted). One
+    geometry: nothing for #807''s L/D question. Usable as cross-source data for a coflow inlet-crossflow Cd
+    (digitise Fig. 4, ~45 points, + Table 2); McGreehan-Schotsch covers normal holes.'
+  read_for: ['#813 Cd reference pressure for duct-fed holes', '#800/#807 inlet-crossflow Cd data']
+  issues: [800, 807, 813]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/Effect_of_a_Crossflow_at_the_Entrance_to_a_Film-Co.pdf. Cites Gritsch,
+    Schulz & Wittig 1997 ASME 97-GT-165 (expanded exits, wanted) and Leylek & Zerkle 1994 (entrance separation).
+- file: docs/orifices/yan_et_al_2026_aerospace_13_555_rotating_inclined_orifice_cd.pdf
+  citation: 'Yan, J., Wei, S., Mao, J., Yang, Z., Han, F., Wang, L. (2026). A model for accurate prediction of
+    discharge coefficients in rotating orifices with different wall inclination angles. Aerospace 13, 555.
+    doi:10.3390/aerospace13060555'
+  id: doi:10.3390/aerospace13060555
+  topic: [orifice]
+  content: 'RANS (rotating frame, 240 cases: inclination pi/2-pi, N 0-7000 rpm, Pi 1.01-1.09, L/d 0.5-2) and a
+    Cd model on Miller + Idris pressure-ratio + Zhu L/d chain with a fitted incidence-angle term (Eqs. 7-38).
+    MEASURED: radial-inflow holes only (alpha = pi), N 0-1560 rpm, Pi 1.04-1.08, L/d 1.67 and 2, +/-3.51%; Fig.
+    24a/b, 14 plotted points (N = 0: Cd ~0.79). d, rotation radius and Re not given.'
+  status: screened
+  verdict: 'Screened 2026-10-28: low priority. The model and most figures are CFD-fitted (tuning, not data, by
+    the validation policy). The measured points are few, rotating, radial-inflow, at L/d >= 1.67 and without d
+    or Re: nothing for #807''s thin-wall question; a McGreehan-Schotsch rotation-term check would need the
+    unstated geometry.'
+  read_for: ['#807 L/d effect on Cd', 'non-rotating orifice Cd data']
+  issues: [807]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/aerospace-13-00555-v2.pdf.
 - file: docs/orifices/rogers_hersh_1976_NASA_CR-2681_grazing_flow_orifice_resistance.pdf
   citation: 'Rogers, T., Hersh, A. S. (1976). Effect of grazing flow on steady-state resistance of isolated
     square-edged orifices. NASA CR-2681 (NAS3-17858), Hersh Acoustical Engineering.'
@@ -2801,7 +2845,7 @@ wanted:
   checked: false
   issues:
   - 468
-  priority: now
+  priority: later
   question: The impingement Re exponent against the jet-to-vent ratio -- the one variable that could reconcile
     Cho & Rhee's 0.56 with Hollworth & Dagan's 0.80 (88-GT-290 gives 0.72).
   where: ASME journal; AGARD CP-527 paper 30 is an alternative.
@@ -2809,7 +2853,7 @@ wanted:
     Fluid Flow 8(2), 82-92.
   checked: false
   issues:
-  - 714
+  - 763
   priority: now
   question: Turbulence decay behind grids and perforated plates vs solidity and x/b -- the link a Tu-from-loss
     closure needs to be tested on D-7958's blockage plates (measured Tu 7/14/23/35%) without guessing the k
@@ -2818,7 +2862,7 @@ wanted:
 - citation: Laws, E. M., Livesey, J. L. (1978). Flow through screens. Annu. Rev. Fluid Mech. 10, 247-266.
   checked: false
   issues:
-  - 714
+  - 763
   priority: later
   question: Review companion to Roach 1987 -- screen loss coefficients and the turbulence they generate.
   where: Annual Reviews.
@@ -2878,15 +2922,6 @@ wanted:
   priority: later
   question: As Gillespie 1996 (#785).
   where: '?'
-- citation: 'Chyu, M. K., Hsing, Y. C., Shih, T. I.-P., Natarajan, V. (1999). Heat transfer contributions of
-    pins and endwall in pin-fin arrays: effects of thermal boundary condition modeling. J. Turbomachinery 121,
-    257-263.'
-  checked: false
-  issues:
-  - 335
-  priority: later
-  question: Inline pin arrays (now refused as out of box) and the pin/endwall split.
-  where: ASME journal.
 - citation: Arora, S. C., Abdel-Messeh, W. (1983). Pressure drop and heat transfer characteristics of circular
     and oblong low aspect ratio pin fins. ASME 83-GT-123.
   checked: false
@@ -2903,42 +2938,12 @@ wanted:
   question: The friction-factor definition and per-geometry fits behind Lawson, Thrift, Thole & Kohli 2011
     (local).
   where: Penn State ETDA (unreachable from here; needs a browser).
-- citation: Eames, I. W., Ablwaifa, A. E., Petrenko, V. (2007). Results of an experimental study of an advanced
-    jet-pump refrigerator operating with R245fa. Applied Thermal Engineering 27, 2833-2840.
-  checked: false
-  issues: []
-  priority: later
-  question: A second R245fa rig with geometry and measured omega -- tests the shared front end (Eqs. 1-8) that
-    moved both closures 10-22 points from Eames 2013's duct A to B.
-  where: Elsevier journal.
-- citation: Scott, D., Aidoun, Z., Ouzzane, M. (2011). An experimental investigation of an ejector for validating
-    numerical simulations. Int. J. Refrigeration 34, 1717-1723.
-  checked: false
-  issues: []
-  priority: later
-  question: As Eames 2007; written for CFD validation, so geometry and operating points are likely given.
-  where: Elsevier journal.
-- citation: '? (no candidate known): film effectiveness measured in a CONFINED duct, far enough downstream
-    that the coolant mixes into the core.'
-  checked: false
-  issues:
-  - 694
-  priority: later
-  question: Where the film reference temperature moves from the undiluted T_inf (used now) towards the mixed
-    T.
-  where: '?'
-- citation: Holdeman, J. D., Smith, T. D., Clisset, J. R., Lear, W. E. (2005). A spreadsheet for the mixing
-    of a row of jets with a confined crossflow. NASA/TM-2005-213137.
-  checked: false
-  issues: []
-  priority: later
-  question: The NASA empirical jet-in-crossflow mixing model itself (equations behind the spreadsheet that
-    TM-2011-215980 extends) -- the closure a 1-D dilution-mixing element would be built on.
-  where: NTRS (public).
 - citation: Bajura, R. A., Jones, E. H. (1976). Flow distribution manifolds. J. Fluids Eng. 98(4), 654-665.
   checked: false
   issues:
   - 779
+  - 812
+  - 813
   priority: later
   question: A pressure-DRIVEN joining split against measured data -- every joining closure gives the suppliers
     one junction static, and no validation case scores the split the network reaches (the skeletons impose
@@ -2959,7 +2964,7 @@ wanted:
     in gas turbine combustion chambers. ASME Paper 72-WA/HT-24.
   checked: false
   issues:
-  - 714
+  - 763
   priority: later
   question: 'Primary for the thick-lip slot-film effectiveness (Lefebvre Eqs. 8.37/8.38, blowing ratio up to 4
     where Marek-Tacina stops at 1.87) and the film-side Nusselt numbers (Eqs. 8.41/8.43) that combaero''s film
@@ -2983,11 +2988,10 @@ wanted:
   - 807
   - 813
   priority: later
-  question: 'Cd of holes fed from a moving stream (inlet-side crossflow) with radiused and chamfered inlets,
-    at pressure ratios to about 2 -- duct-fed liner and effusion holes (#813 PR 2, #807) beyond McGreehan-Schotsch.
-    Also: which pressure (crossflow total or static) its Cd is referenced to, and how the inlet crossflow''s
-    momentum is booked -- needed so a jet carrying the supply velocity (#813) does not count the crossflow
-    dynamic head twice. User suggestion 2026-10-28; content as recalled, unverified.'
+  question: 'Cd of holes fed from a moving stream (inlet-side crossflow) with radiused and chamfered
+    inlets, at pressure ratios to about 2 -- duct-fed liner and effusion holes (#813 PR 2, #807) beyond
+    McGreehan-Schotsch. The pressure-reference question is answered by Thole et al. 1997 (held: Cd referenced
+    to the supply TOTAL pressure). Content as recalled, unverified.'
   where: ASME Digital Collection (paywalled).
 - citation: Hay, N., Lampard, D., Benmansour, S. (1983). Effect of crossflows on the discharge coefficient of
     film cooling holes. ASME J. Engineering for Power 105(2), 243-248.
@@ -2996,7 +3000,7 @@ wanted:
   - 799
   - 800
   - 807
-  priority: later
+  priority: now
   question: 'Cd with crossflow on the inlet AND exit side of a hole (the general case of which CR-2681 covers
     single holes under exit/inlet grazing flow): ranges of crossflow-to-jet ratio, pressure reference, and
     whether it reaches the strong-crossflow regime of CR-3630''s stagnant rows (Gc/Gj ~125). As recalled,
@@ -3018,6 +3022,7 @@ wanted:
   checked: false
   issues:
   - 793
+  - 813
   priority: now
   question: 'The T56 liner hole and cooling-device geometry behind Gouws et al. 2006 (docs/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf),
     whose Table 2 holds a MEASURED isothermal flow split over 16 features. With the areas this becomes
@@ -3036,7 +3041,8 @@ wanted:
 - citation: Adkins, R. C., Gueroui, D. (1986). An improved method for accurate prediction of mass flows
     through combustor liner holes. ASME 86-GT-149.
   checked: false
-  issues: []
+  issues:
+  - 807
   priority: later
   question: Liner-hole Cd against bleed ratio (hole flow / annulus flow) for plain and plunged holes, the
     Kaddah 1964 / Freeman 1965 / Norster regime. combaero's discharge-hole Cd with crossflow is McGreehan-Schotsch
@@ -3046,28 +3052,53 @@ wanted:
 - citation: Lefebvre, A. H. (1984). Flame radiation in gas turbine combustion chambers. Int. J. Heat Mass
     Transfer 27(9), 1493-1510.
   checked: false
-  issues: []
+  issues:
+  - 793
   priority: later
   question: Primary of the liner gas-side radiation set (luminosity factor, emissivity) reprinted by every
     combustor network paper in docs/new; combaero has no gas radiation. Lefebvre & Ballal Ch. 8 (screened)
     prints the set in full (Eqs. 8.4-8.15) and suffices to implement it; this paper would add the data
     behind the luminosity factor.
   where: Elsevier journal.
-- citation: Chupp, R. E., Helms, H. E., McFadden, P. W., Brown, T. R. (1969). Evaluation of internal heat-transfer
-    coefficients for impingement-cooled turbine airfoils. J. Aircraft 6(3), 203-208.
-  checked: false
-  issues: []
-  priority: later
-  question: Primary of the curved (leading-edge) row-of-jets impingement correlation that impingement_correlation.h
-    defers (HDE Sec. 4.1.4); needed only if a leading-edge impingement element is built.
-  where: AIAA journal.
 - citation: Andreini, A., Champion, J. L., Facchini, B., Mercier, E., Surace, M. (2006). Advanced liner cooling
     numerical analysis for low emission combustors. 25th ICAS Congress, Hamburg.
   checked: false
   issues:
-  - 387
+  - 793
   priority: later
   question: The effusion flat plate with measured overall effectiveness that CEAS-2007-026 validates against;
     a second-lab cross-source set for EffusionPlateElement beside Andrews 88-GT-290, if the plate geometry
     and conditions are printed.
   where: ICAS 2006 proceedings (icas.org archive, open).
+- citation: Gritsch, M., Schulz, A., Wittig, S. (1998). Discharge coefficient measurements of film-cooling holes
+    with expanded exits. ASME J. Turbomachinery 120(3), 557-563 (ASME 97-GT-165).
+  checked: false
+  issues:
+  - 807
+  - 813
+  priority: later
+  question: 'Cd of a cylindrical reference hole and expanded-exit holes under inlet (internal) crossflow up to
+    about Mach 0.6 and external crossflow -- the duct-fed liner/effusion hole regime McGreehan-Schotsch covers
+    only at modest crossflow. Cited by Thole et al. 1997 (held). As recalled, unverified.'
+  where: ASME Digital Collection.
+- citation: Van Niekerk, J. E., Morris, R. M. (2005). (T56 combustor isothermal flow split measurement.) ISABE
+    2005.
+  checked: false
+  issues:
+  - 793
+  - 813
+  priority: later
+  question: 'The primary of the measured T56 flow split that Gouws et al. 2006 (held) reprints in its Table 2: a
+    second independent liner flow split for #813 PR 2 and a #793 example, if the hole geometry is given (else
+    Gouws 2007). Title as recalled, unverified.'
+  where: ISABE 2005 proceedings.
+- citation: Kaddah, K. S. (1964). Discharge coefficients and jet deflection angles for combustor liner air
+    admission ports. M.Sc. thesis, College of Aeronautics, Cranfield.
+  checked: false
+  issues:
+  - 807
+  priority: later
+  question: 'The primary of Lefebvre & Ballal Eq. 4.15 / Fig. 4.2 (plain liner-hole Cd against the pressure-loss
+    parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
+    as recalled, unverified.'
+  where: Cranfield University library.
