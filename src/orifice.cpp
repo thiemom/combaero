@@ -1,8 +1,10 @@
 #include "../include/dual_number.h"
 #include "../include/correlation_status.h"
 #include "../include/friction.h"
+#include "../include/humidair.h"
 #include "../include/math_constants.h"
 #include "../include/orifice.h"
+#include "../include/thermo.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -1467,7 +1469,7 @@ OrificeFlowResult orifice_flow(
     double P,
     double mu,
     double Z,
-    [[maybe_unused]] const std::vector<double>& X,
+    const std::vector<double>& X,
     double kappa,
     MeteringCdCorrelation correlation)
 {
@@ -1491,13 +1493,9 @@ OrificeFlowResult orifice_flow(
         throw std::invalid_argument("orifice_flow: differential pressure must be non-negative");
     }
 
-    // Compute ideal gas density
-    // For now, use simple ideal gas law with air composition
-    // rho_ideal = P * MW / (R * T)
-    // For air: MW ~= 28.97 g/mol, R = 8.314 J/(mol*K)
-    const double R_gas = 8.314;  // J/(mol*K)
-    const double MW_air = 0.02897;  // kg/mol (air molecular weight)
-    const double rho_ideal = (P * MW_air) / (R_gas * T);
+    // Ideal-gas density of the given composition (dry air when X is empty,
+    // as documented). It used air's molar mass for every X (#829).
+    const double rho_ideal = combaero::density(T, P, X.empty() ? combaero::dry_air() : X);
 
     // Apply real gas correction
     const double rho_corrected = rho_ideal / Z;
