@@ -1849,7 +1849,7 @@ documents:
     defines A_J/A_M, C = (S/H) sqrt(J), Cd. Conclusion: parallel staggered slanted slots mix best at any downstream
     distance.'
   status: screened
-  verdict: 'An extension; the empirical model itself is documented in TM-2005-213137 (on the wanted list).
+  verdict: 'An extension; the empirical model itself is documented in TM-2005-213137 (registered 2026-10-28, docs/jet_mixing/Holdeman_Smith_Clisset_Lear_2005_NASA_TM-2005-213137_spreadsheet_row_of_jets.pdf).
     combaero has no jet-mixing / dilution model and no issue yet; a jet-in-crossflow element is a planned future extension (user, 2026-10-25), and this is a candidate source for it.'
   read_for:
   - jet-in-crossflow mixing (new topic)
@@ -2977,6 +2977,173 @@ documents:
   records: [python/tests/test_vatistas_validation.py, python/tests/data/vatistas/]
   code: [include/vatistas.h, src/vatistas.cpp, python/combaero/vortex.py]
   notes: PDF page 1 begins with the end of the preceding article (Mao & Hanratty) in the same issue.
+- file: docs/heat_transfer/impingement/AlDabagh_Andrews_1990_JTurbomach_112_467_impingement_effusion_hole_number.pdf
+  citation: 'Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I., Nazari, A., Wu, J. (1990).
+    Impingement/effusion cooling: the influence of the number of impingement holes and pressure loss on the
+    heat transfer coefficient. ASME J. Turbomachinery 112(3), 467-476.'
+  id: ASME 89-GT-188
+  topic: [impingement, effusion]
+  content: 'Leeds transient-cooling rig (152 mm square Nimonic 75 walls, Z = 8 mm, no net gap crossflow: all
+    jet air leaves through the effusion holes, offset half a pitch). Table 1 PRINTS five configurations:
+    N 4306/26910/1076 m^-2, impingement X/D 1.8-11, effusion X/D 4.7 (1.8 for config 2), Ae/Ai 1-5.6, Z/D
+    0.5-6.1; config 5 is ONE impingement hole per FOUR effusion holes (N 1076/4306, Ae/Ai 5.3), config 3 its
+    1:1 counterpart (X/D 11/4.67, Ae/Ai 5.6). Eqs. 1-4 reprint the Andrews impingement-only correlations
+    (Nu/Pr^0.33 = 1.05 Re^0.72 (X/D)^-0.72 (Z/D)^-0.14 D^0.28; Nu = 0.29 (X/D)^-1.08 Re^0.72; h = 75 (X/D)^0.64
+    G^0.72), Eq. 8 the X/D-pressure-loss scaling. h vs G (whole-wall h on the effusion plate approach area,
+    +-5%) PLOTTED log-log: Fig. 11 (config 1 at Z/D 0.5-5 and config 3, with Chance, Kercher-Tabakoff,
+    Florschuetz and Hollworth-Dagan lines), Fig. 14 (configs 1-3), Fig. 15 (N 4306 vs 26910), Fig. 16 (configs
+    3 vs 5). Jet-plate recirculation h (Fig. 12, T_z Figs. 9-10) and 2-D FLUENT gap flow (Figs. 6-8).'
+  status: screened
+  verdict: 'Screened 2026-10-28 for the #468 wanted question (does the jet-to-vent ratio reconcile Cho & Rhee
+    0.56 with Hollworth & Dagan 0.80?). It is the only local study that changes the jets-per-vent count at
+    fixed area ratio, but it does NOT print an exponent: Fig. 16 holds both curves. By eye (unscored, not
+    digitised) the 1:4 config 5 matches the 1:1 config 3 below G 0.3 kg/s m2 and falls about 20% below it
+    at G 1-2, i.e. a LOWER apparent exponent with fewer jets per vent -- the opposite direction to what would
+    explain H&D''s 0.80 (H&D used 1 jet per 4 vents too), so the ratio alone does not look like the reconciler;
+    the question stays open until Fig. 16 (and Fig. 14) are digitised and fitted. Whole-wall transient h on
+    the plate approach area, same Leeds group as 88-GT-290: accuracy (cross-source to Hollworth/Cho) only,
+    never a coolant-side fidelity set, and it cannot separate jet from vent heat transfer. Plugs a gap: a
+    second Leeds geometry set (5 configurations, Table 1) beside 88-GT-290 for EffusionPlateElement-style
+    impingement/effusion h, if digitised.'
+  read_for: ['#468 Re exponent against the jet-to-vent ratio (wanted question)', '#468 impingement/effusion
+      overall h, accuracy']
+  issues: [468]
+  records: []
+  notes: 'Arrived 2026-10-28 as docs/new/467_1_AlDabagh_1990.pdf (moved here from the wanted list). Scan with
+    an OCR layer; equations and figure labels read off the page images. Fig. 11-16 are log-log scans of fair
+    quality, digitisable.'
+- file: docs/junction/bajura_jones_1976_JFE_98_654_flow_distribution_manifolds.pdf
+  citation: Bajura, R. A., Jones, E. H., Jr. (1976). Flow distribution manifolds. ASME J. Fluids Eng. 98(4),
+    654-665.
+  id: ASME 76-FE-7
+  topic: [junction, tee]
+  content: 'Continuous (header-averaged) momentum model of dividing, combining, reverse and parallel flow
+    manifolds: pressure-flow equation set (Eqs. 16-23) and flow distribution ODE (Eqs. 18, 21, 24), coefficients
+    in Tables 2-3; lateral discharge Eq. 12-13 with lateral resistance H (velocity heads) and turning losses
+    C_TD/C_TC. Momentum coefficients from uniform-discharge tests (Eqs. 29-30): theta1 = 1.05 +- 0.05 (dividing
+    static regain), theta2 = 2.60 +- 0.05 (combining). Rig (Fig. 5): 10.16 cm PVC headers, 3.81 cm laterals 1.56
+    m long at 2.55 header diameters spacing, 20 or 10 branches (L/D 51 / 25.5), lateral orifices 0.96/2.54/3.18
+    cm (H 12.2 or 4.5), area ratio A_r = N A_lat/A_header 2.81 or 1.405, air, header Re 6-8e4, lateral Re 8-10e3.
+    Measured header static pressures and the header-to-header differential along x/L PLOTTED, normalised (Figs.
+    6-9, cases A-D, reverse and parallel; Figs. 10-11 last 80% of the header), model coefficients per figure in
+    Table 4.'
+  status: screened
+  verdict: 'Screened 2026-10-28 for the #779/#812/#813 wanted question (a pressure-DRIVEN joining split
+    against measured data). PARTLY settles it: the combining header here is fed by 10-20 laterals whose flows
+    are set by the header-to-header differential through a known resistance H, and the resulting header
+    pressures are MEASURED -- a pressure-driven multi-junction case no current skeleton has. But the lateral
+    flows themselves are NOT measured (two laterals metered only as a check; the paper reads the distribution
+    as sqrt of the plotted differential), the data are normalised by a reference dP with no absolute velocity
+    beyond the Re range (Jones''s thesis, ref. 28, has the rig detail), and the closure is a distributed momentum
+    coefficient for closely spaced 90 deg branches (spacing 2.55 D, per-branch area ratio 0.14), not a discrete
+    tee K -- so a combaero network of N tees + N orifice laterals scored on Figs. 6-11 tests whether the tee
+    closures add up to theta2 = 2.60 / theta1 = 1.05, which is accuracy (cross-source), not fidelity of any
+    tee model. Fidelity caveat: the authors tuned the entrance (theta1 1.30 -> 1.05 over the first 20%, dbeta/dx
+    = -0.3) to their data; Figs. 10-11 drop that region and are the clean comparison. Plots digitisable (clean
+    line art, three series per panel).'
+  read_for: ['#779/#812/#813 pressure-driven joining split against measured data (wanted question)', manifold
+      flow distribution as a multi-tee network case]
+  issues: [779, 812, 813]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/654_1_Bajura_1976.pdf (moved here from the wanted list). Scan with an
+    OCR layer (garbled in the equations); read from the page images.
+- file: docs/heat_transfer/turbulence/VanFossen_Ching_1994_NASA_TM-106503_stagnation_length_scale.pdf
+  citation: Van Fossen, G. J., Ching, C. Y. (1994). Measurements of the influence of integral length scale
+    on stagnation region heat transfer. NASA TM-106503 (prepared for the 5th Symposium on Transport Phenomena
+    and Dynamics of Rotating Machinery, Kaanapali, May 1994).
+  id: NASA TM-106503 (NTRS 19940020701, N94-25183)
+  topic: [other]
+  content: 'Circular leading edge (d 6.60 cm) behind four square-bar biplane grids (M/b 4.5, 60.5% open, b 0.16-1.27
+    cm) and one parallel-wire array; Re_d 42,000-193,000, Tu 1.1-15.9%, Lambda_x/d 0.05-0.30. Eq. 11 with the
+    Fig. 10 constants: Fr(0) = 0.00799 sqrt(Tu Re_d^0.800 (Lambda_x/d)^-0.574) + 0.939, +-4% on the isotropic
+    grids, +-8% on other authors (Fig. 12); anisotropic wire-array turbulence augments more (Fig. 11). Table II
+    PRINTS the grid decay fits Tu = a (x/b)^m (a 75-206, m -0.67 to -0.88) and Lambda_x/b = l (x/b)^0.5 (l
+    0.24-0.30, Roach form) per grid and velocity. Frossling uncertainty +-6.6%, Tu +-15%.'
+  status: screened
+  verdict: 'Screened 2026-10-28. No combaero counterpart: there is no stagnation-region / leading-edge gas-side
+    heat transfer anywhere in the code, so Eq. 11 plugs no current gap (it would, for a future turbine-airfoil
+    gas side). Its one bearing on #763 (Tu from the upstream hardware): Table II is measured grid decay with
+    length scale, but at ONE solidity and with no loss coefficient, so it cannot test a Tu-from-loss closure
+    across blockage -- Roach 1987 (wanted) and Lang 2023 (registered) remain the sources for that.'
+  read_for: ['#763 grid turbulence decay vs x/b', stagnation-region heat transfer with free-stream turbulence]
+  issues: [763]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/19940020701.pdf (NTRS accession number). Scan with an OCR layer; Eq.
+    11 is an image (its constants are printed only on Fig. 10).
+- file: docs/heat_transfer/turbulence/Lang_2023_RWTH_diss_turbulent_decay_compressor_cascade.pdf
+  citation: Lang, H. M. (2023). Einfluss der turbulenten Abklingrate auf die Umstroemung eines Verdichtergitters
+    (Impact of the turbulent decay on a compressor cascade flow). Dr.-Ing. dissertation, RWTH Aachen University.
+  topic: [other]
+  content: 'German, 262 pp. Linear HP-compressor cascade (M 0.56, Re 790,000) at two turbulent decay rates
+    (grids TG2/TG3); transition, wake, k-omega / gamma-Re_theta assessment. Of use here: Sec. 3.1.1-3.1.2 (pp.
+    45-48) reviews grid-turbulence decay -- Roach Tu = 1.13 (x/d)^(-5/7) for square-mesh square-bar grids,
+    porosity > 0.5; Batchelor / Laws-Livesey Eq. 3.2 Tu^2 = (xi_s/C3) ((x - x0)/m)^-1 with C3 ~ 100 for square
+    meshes, x0 ~ 10 m (the LOSS-based Tu closure); grid loss vs porosity (Pinker-Herbert, Idelchik) and its
+    rise with Mach from M ~ 0.3. Table 6.2 (p. 125) scores both on the author''s measured grid TG2: Roach -17%
+    to +153%, Laws +10% to +382%, depending on which loss correlation (xi_s Roach 5.49 vs Idelchik 7.96) and which
+    nozzle-contraction correction (Dunham, Rannacher, none) is used. Sec. 6.2.3 (pp. 134-141): a Roach variant
+    for inclined grids (Eq. 6.27: Roach with the bar width projected to d cos(Theta) and a factor 0.93; the
+    thesis quotes C1'' = 0.72 at Theta = 58 deg, which Eq. 6.27 as printed does not reproduce -- 0.67 -- so
+    check before use) and measured loss-vs-Mach maps of grids to M ~ 0.6 (Figs. 6.13a, 6.15; Tables 6.3-6.4 geometry).'
+  status: screened
+  verdict: 'Screened 2026-10-28 for #763 (a Tu-from-loss closure for the slot-film C_m(Tu)). Plugs part of the
+    gap the Roach / Laws-Livesey wanted entries name: it states the loss-based relation Tu^2 = (xi_s/C3)(x/m)^-1
+    with C3 ~ 100 (secondary, citing Laws & Livesey 1978) and, more usefully, MEASURES how badly it can miss
+    (Table 6.2: +10% to +382% from the choice of loss correlation and contraction correction alone) -- a
+    warning that a Tu-from-loss closure is only as good as its loss coefficient. Not a scoring set for D-7958''s
+    blockage plates (grids, porosity > 0.5, no film). Everything else (cascade aero, transition) is outside
+    combaero. Secondary for the correlations; the primaries stay wanted.'
+  read_for: ['#763 Tu from the loss of the upstream hardware (grid decay, k ~ c K q constant)']
+  issues: [763]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/987434.pdf (the number is likely the RWTH publications record id,
+    unverified). Oral examination 10 Nov 2023; the PDF is dated 2024. German text, English abstract p. ii.
+- file: docs/jet_mixing/Holdeman_Smith_Clisset_Lear_2005_NASA_TM-2005-213137_spreadsheet_row_of_jets.pdf
+  citation: 'Holdeman, J. D., Smith, T. D., Clisset, J. R., Lear, W. E. (2005). A spreadsheet for the mixing of
+    a row of jets with a confined crossflow. NASA/TM-2005-213137.'
+  id: NASA/TM-2005-213137
+  topic: [jet_mixing, combustion]
+  content: 'The NASA empirical confined jet-in-crossflow model in full. Eq. 1: Gaussian vertical scalar profile
+    in theta = (T_M - T)/(T_M - T_J) about the trajectory with separate half-widths and minima either side;
+    Appendix C (pp. 33-35) PRINTS every scaling correlation (trajectory yc/H, theta_c, theta_min+/-, W1/2+/-,
+    off-centreplane variation), the superposition rule for double/opposed rows and nonuniform mainstream
+    (C3-9), flow-area convergence J(x) = J (H(x)/H)^2 (C3-10) and the slot equivalence (C3-11). Table I (p.
+    39) is the validity box: DR 0.5-2.2, J 5-105.6, Cd 0.6-1, x/H 0-2, S/H up to 1, H/d 4-16, A_J/A_M 0.025-0.1,
+    C = (S/H) sqrt(J) 0.5-10. Appendices A-B list the original Applesoft BASIC programs; Table 2 cross-references
+    each calculated case to the measured data in refs. 5, 11, 14, 15 (Holdeman-Walker, Srinivasan et al.).
+    Figures are MODEL output, not data.'
+  status: screened
+  verdict: 'Screened 2026-10-28: the model document the 2011 slanted-slot TM points to (formerly named as
+    wanted in that entry). Plugs the jet-mixing gap fully on the MODEL side -- everything needed to implement
+    a rectangular-duct jet-in-crossflow mixing kernel (the planned future element, no issue yet) is printed,
+    with an explicit validity box. Not a fidelity set: its figures are the model''s own output; fidelity needs
+    the measured profiles of refs. 5/11/14/15 (Holdeman & Walker 1977 NASA TM X-73582 lineage), which are not
+    held. Rectangular, non-curving duct only (the can case is TM-107185, registered).'
+  read_for: ['jet-in-crossflow mixing (future element): the empirical model and its validity range']
+  issues: []
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/A_Spreadsheet_for_the_Mixing_of_a_Row_of.pdf. 91 pp.; text layer
+    clean.
+- file: docs/heat_transfer/film/Lawson_2011_PhD_PennState_particle_deposition_film_cooling.pdf
+  citation: Lawson, S. A. (2011). Simulations of multi-phase particle deposition on film-cooled turbine sections.
+    PhD dissertation, The Pennsylvania State University.
+  topic: [film]
+  content: 'Wax-particle deposition on film-cooled flat plate, vane leading edge and cascade endwalls (flat,
+    trenched, contoured); adiabatic effectiveness before and after deposition. The flat-plate baseline (Ch.
+    6, Figs. 6.1-6.4): one row of 30 deg round holes, L/d 3, P/d 3, DR 1.06, Tu 4.6 and 12.3%, I 0.23-0.95,
+    centreline and laterally averaged eta PLOTTED against Sinha, Schmidt, Lutum-Johnson and Kunze (Table
+    6.1). Vita (p. 190) gives the author''s MS thesis.'
+  status: screened
+  verdict: 'Screened 2026-10-28. NOT the wanted Lawson MS thesis (#335 pin-fin friction definition): that is
+    a Virginia Tech MS thesis, May 2007, "Heat transfer from multiple row arrays of low aspect ratio pin fins"
+    (vita, p. 190) -- the wanted entry is corrected accordingly and stays wanted. Low value: deposition is
+    outside combaero; the clean baseline is one near-unity-DR geometry already covered by the literature it is
+    compared to, so it plugs no film-kernel gap (at most a high-Tu, 12.3%, cross-source accuracy curve).'
+  read_for: ['#335 Lawson MS thesis (wanted) -- not it', round-hole film effectiveness, accuracy]
+  issues: [335]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/Slawson_Dissertation_FINAL.pdf. Kept as a held copy; delete if
+    unwanted.
 
 - file: docs/materials/haynes_230_alloy_brochure_H-3000.pdf
   citation: Haynes International (2021). HAYNES 230 alloy (UNS N06230), product brochure H-3000O.
@@ -3020,16 +3187,6 @@ documents:
 # the document. priority: now (blocks or settles an open item) or later
 # (only when that work resumes).
 wanted:
-- citation: 'Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I., Nazari, A., Wu, J. (1990).
-    Impingement/effusion cooling: the influence of the number of impingement holes and pressure loss on the
-    heat-transfer coefficient. J. Turbomachinery 112(3), 467-476.'
-  checked: false
-  issues:
-  - 468
-  priority: later
-  question: The impingement Re exponent against the jet-to-vent ratio -- the one variable that could reconcile
-    Cho & Rhee's 0.56 with Hollworth & Dagan's 0.80 (88-GT-290 gives 0.72).
-  where: ASME journal; AGARD CP-527 paper 30 is an alternative.
 - citation: Roach, P. E. (1987). The generation of nearly isotropic turbulence by means of grids. Int. J. Heat
     Fluid Flow 8(2), 82-92.
   checked: false
@@ -3039,14 +3196,18 @@ wanted:
   question: Turbulence decay behind grids and perforated plates vs solidity and x/b -- the link a Tu-from-loss
     closure needs to be tested on D-7958's blockage plates (measured Tu 7/14/23/35%) without guessing the k
     ~ c K q constant.
-  where: Elsevier journal.
+  where: 'Elsevier journal. Lang 2023 (held, docs/heat_transfer/turbulence/) reprints Roach''s Tu = 1.13 (x/d)^(-5/7)
+    and scores it on a measured grid; Van Fossen & Ching 1994 (held) fits the Roach length-scale form on
+    one-solidity grids.'
 - citation: Laws, E. M., Livesey, J. L. (1978). Flow through screens. Annu. Rev. Fluid Mech. 10, 247-266.
   checked: false
   issues:
   - 763
   priority: later
   question: Review companion to Roach 1987 -- screen loss coefficients and the turbulence they generate.
-  where: Annual Reviews.
+  where: 'Annual Reviews. Lang 2023 (held, docs/heat_transfer/turbulence/) reprints its loss-based decay Tu^2
+    = (xi_s/C3)((x - x0)/m)^-1 with C3 ~ 100 for square meshes and measures it missing a grid by +10% to +382%
+    depending on the loss coefficient used.'
 - citation: Rhee, D. H., Choi, J. H., Cho, H. H. (2003). Flow and heat (mass) transfer characteristics in an
     impingement/effusion cooling system with crossflow. J. Turbomachinery 125(1), 74-82.
   checked: false
@@ -3111,26 +3272,17 @@ wanted:
   priority: later
   question: Short-pin friction and Nu from a non-NASA rig.
   where: ASME Turbo Expo proceedings.
-- citation: Lawson, S. A. (2007?). ? MS thesis, Penn State University (about 107 pp.).
+- citation: Lawson, S. A. (2007). Heat transfer from multiple row arrays of low aspect ratio pin fins. MS
+    thesis, Virginia Tech, Blacksburg (chair K. A. Thole).
   checked: false
   issues:
   - 335
   priority: later
   question: The friction-factor definition and per-geometry fits behind Lawson, Thrift, Thole & Kohli 2011
     (local).
-  where: Penn State ETDA (unreachable from here; needs a browser).
-- citation: Bajura, R. A., Jones, E. H. (1976). Flow distribution manifolds. J. Fluids Eng. 98(4), 654-665.
-  checked: false
-  issues:
-  - 779
-  - 812
-  - 813
-  priority: later
-  question: A pressure-DRIVEN joining split against measured data -- every joining closure gives the suppliers
-    one junction static, and no validation case scores the split the network reaches (the skeletons impose
-    q or set boundaries from Bassett's own K). Combining-manifold flow distributions measured under imposed
-    pressures would.
-  where: ASME J. Fluids Eng.; any measured combining-tee or manifold flow distribution would do.
+  where: 'Virginia Tech ETD repository (VTechWorks), NOT Penn State as first recorded: institution, date and
+    title are from the vita in Lawson''s 2011 Penn State PhD (held, docs/heat_transfer/film/Lawson_2011_PhD_PennState_particle_deposition_film_cooling.pdf),
+    which is not this thesis.'
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
   checked: false
