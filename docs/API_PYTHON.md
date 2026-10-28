@@ -1337,7 +1337,7 @@ fluid. Three modes:
   - The chamber now passes up to the true choked flux. Before, T0 read as static capped it at 92 % of choked.
   - The merge-chamber face state (`cb.chamber_merge_face_state`) takes both temperatures as stagnation and solves the face's and the outlet's static states; its sensitivities are analytic (#578).
   - The chamber's heat-transfer correlation, and an effusion plate's gas-side density, use the chamber's static state (#578).
-  - Still read as static: an incompressible `ChannelElement` whose upstream node is a chamber, and the legacy `TeeJunctionElement` (#578).
+  - Still read as static: an incompressible `ChannelElement` whose upstream node is a chamber (#578). The legacy `TeeJunctionElement` now hands its kernel the static T of a chamber port at the arm's flow (#782); so do `CrossflowSegmentElement`'s station and entry drops and a duct-fed `EffusionPlateElement`'s `U1/Vi`, at the station's mean flow.
 - **A `MomentumChamberNode` has a `regime`** (#588), default `DEFAULT_REGIME` like the elements; the GUI gives every chamber (drawn, or inserted at a junction port, an edge or a merge) the network's global regime.
   - `"compressible"`: the closure above.
   - `"incompressible"`: its low-Mach limit. The static state is the stagnation one (`T_static = T0`, `rho = P / (R T0)`) and `Pt = P + (m/A)^2 / (2 rho)`: no sonic limit, so an incompressible network keeps none hidden in its chambers. The merge face takes both densities at the chamber pressure, `P_face = P + m_out^2/(rho A^2) - J/A - m_main^2/(rho_main A^2)`, linear with nothing to choke.

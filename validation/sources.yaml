@@ -1069,14 +1069,19 @@ documents:
     Florschuetz 1981 at local Gc/Gj.'
   read_for: ['#474 Eq. 8 pressure range', '#467 bypass flow distribution', '#467 bypass heat transfer
       (D.2)', '#713 eta_r reference temperature', '#729 starved/reversed rows']
-  issues: [467, 474, 683, 705, 706, 709, 721, 728, 729, 730, 734]
+  issues: [467, 474, 683, 705, 706, 709, 721, 728, 729, 730, 734, 782]
   records: [validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630.md, validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630_table_d2.md,
     validation/cooling/data/florschuetz_metzger_su1982/]
   code: ['python/combaero/network/impingement_array.py: bypass configuration (docstring cites CR-3630)',
     'python/combaero/network/components.py: ImpingementPlateElement/ImpingementCrossflowElement bypass_inlet
-      docstrings']
+      docstrings', 'python/tests/test_impingement_bypass_validation.py: D.1 flow split and the Eq. 4.10
+      comparison (#782)']
   notes: 'Journal versions: Florschuetz, Metzger & Su (1984) JHT 106 (per #467); conference version NTRS_19850002659
-    and Florschuetz & Isoda 82-GT-156.'
+    and Florschuetz & Isoda 82-GT-156. Table D.1''s Gj/Gj_mean is not measured flow: it is the authors'' Eq.
+    4.1 reduction (isentropic orifice, constant CD per plate, plenum P0/T0) of the measured channel static
+    pressures -- the same relation the network applies to its own pressures, so the D.1 Gj score is like for
+    like (#782). Table D.1 prints P/P0 to two decimals: P/P0 fidelity is floored at +/-0.005. Measurement
+    uncertainty (Appendix B, Section 4.4.1): Gj/Gj_mean about +/-2%, Gc/Gj +/-2 to 4%.'
 - file: docs/heat_transfer/flohrshuetz/NASA_CR-3936_Florschuetz_Su_1985_crossflow_temperature.pdf
   citation: Florschuetz, L. W., Su, C. C. (1985). Heat transfer characteristics within an array of impinging
     jets -- effects of crossflow temperature relative to jet temperature. NASA Contractor Report 3936,

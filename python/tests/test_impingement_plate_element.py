@@ -178,19 +178,44 @@ def test_the_segment_reads_its_neighbour_segments() -> None:
     assert g_first.prev_seg is None  # row 1: closed end
 
 
+def _static_T(Tt: float, P: float, G: float, X: list[float]) -> float:
+    """Static T of gas at stagnation Tt, static P and mass flux G, from
+    h(Tt) = h(T) + (G R T / P)^2 / 2 by bisection: independent of the C++
+    chamber closure the element uses (#782)."""
+    R = cb.specific_gas_constant(X)
+    ht = cb.h_mass(Tt, X)
+    lo, hi = 0.3 * Tt, Tt
+    for _ in range(200):
+        T = 0.5 * (lo + hi)
+        if ht - cb.h_mass(T, X) - 0.5 * (G * R * T / P) ** 2 > 0.0:
+            lo = T
+        else:
+            hi = T
+    return 0.5 * (lo + hi)
+
+
 def test_the_momentum_term_is_half_of_each_station_at_its_own_density() -> None:
+    """Each half at its node's STATIC density (#782): the node carries T0, and
+    the station's gas moves at the mean of the flows arriving and leaving."""
     seg = _segment_with_neighbours()
     m, m_arr, m_next = 0.02, 0.015, 0.026
     st_in, st_out = _state(m, P=1.0e5), _state(m, P=0.95e5)
     dP = seg._momentum_drop_value(st_in, st_out, {"x1": m_arr, "x3": m_next})
-    X = cb.species.dry_air()
-    r_in, r_out = cb.density(300.0, 1.0e5, X), cb.density(300.0, 0.95e5, X)
+    X = list(cb.species.dry_air())
     A = 2 * D * 0.1
+    T_in = _static_T(300.0, 1.0e5, 0.5 * (m_arr + m) / A, X)
+    T_out = _static_T(300.0, 0.95e5, 0.5 * (m + m_next) / A, X)
+    r_in, r_out = cb.density(T_in, 1.0e5, X), cb.density(T_out, 0.95e5, X)
     # Normal injection (kappa = 0): each half at its node's density. The
     # segment's own flow appears in both halves and leaves the own-flow term
     # m^2 (1/r_in - 1/r_out)/2.
     expected = 0.5 * ((m**2 - m_arr**2) / r_in + (m_next**2 - m**2) / r_out) / (A * A)
     assert dP == pytest.approx(expected, rel=1e-9)
+    # The case tells the conventions apart: at T0 the term is off by more
+    # than the tolerance (M ~ 0.1 here, so by about 0.2 %).
+    r0_in, r0_out = cb.density(300.0, 1.0e5, X), cb.density(300.0, 0.95e5, X)
+    at_T0 = 0.5 * ((m**2 - m_arr**2) / r0_in + (m_next**2 - m**2) / r0_out) / (A * A)
+    assert abs(at_T0 / expected - 1.0) > 1e-4
 
 
 def test_segment_residual_jacobian_matches_central_differences() -> None:

@@ -1602,6 +1602,72 @@ class NetworkMixtureState:
         return cp / cv if cv > 0 else 1.4
 
 
+class _MovingStaticT(NamedTuple):
+    """Static T of the gas at a node moving at ``|m| / A`` and its partials:
+    d/d(node T0) (the solver's ``{node}.T``), d/d(static P), d/d(m) (signed)
+    and d/d(Y[k]) for the species that move it."""
+
+    T: float
+    dT0: float
+    dP: float
+    dm: float
+    dY: dict[int, float]
+
+
+def _moving_static_T(
+    state: NetworkMixtureState, m_dot: float, area: float, incompressible: bool = False
+) -> _MovingStaticT:
+    """The static T a kernel documented as STATIC must be given (#782).
+
+    A node carries its stagnation temperature. Where a kernel pairs the node's
+    static P with a velocity m / (rho A) of its own, the static T is the
+    momentum chamber closure's, h(T0) = h(T) + (G R T / P)^2 / 2 with
+    G = |m| / A (#576) -- the same state a MomentumChamberNode solves for
+    itself. Incompressible, or with no area, it is the low-Mach limit
+    T = T0.
+    """
+    T0 = float(state.Tt)
+    if incompressible or not area > 0.0:
+        return _MovingStaticT(T0, 1.0, 0.0, 0.0, {})
+    c = _solver_tools.momentum_chamber_residual_and_jacobian(
+        state.P, state.Pt, m_dot, T0, state.Y, area, False
+    )
+    dY = {k: float(d) for k, d in enumerate(c.dT_static_dY) if d != 0.0}
+    return _MovingStaticT(
+        float(c.T_static),
+        float(c.dT_static_dT),
+        float(c.dT_static_dP),
+        float(c.dT_static_dmdot),
+        dY,
+    )
+
+
+def _station_node_partials(r: "_StaticChainedDrop", node: str) -> list[tuple[str, float]]:
+    """A station term's partials in its node's P, T (T0) and Y, keyed by name."""
+    out = [(f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)]
+    out.extend((f"{node}.Y[{k}]", d) for k, d in r.d_dY.items())
+    return out
+
+
+class _StaticChainedDrop:
+    """A ``StationHalfDrop`` evaluated at a node's moving static T, its partials
+    chained onto what that T depends on (#782): the node's T0, its static P,
+    its composition, and the flow the static state was taken at -- the mean
+    of the station's arriving (a) and leaving (b) flows when ``two_sided``,
+    else the arriving flow alone."""
+
+    __slots__ = ("dP", "d_dm_a", "d_dm_b", "d_dP", "d_dT", "d_dY")
+
+    def __init__(self, r: Any, st: _MovingStaticT, two_sided: bool) -> None:
+        dm = float(r.d_dT) * st.dm
+        self.dP = float(r.dP)
+        self.d_dm_a = float(r.d_dm_a) + (0.5 * dm if two_sided else dm)
+        self.d_dm_b = float(r.d_dm_b) + (0.5 * dm if two_sided else 0.0)
+        self.d_dP = float(r.d_dP) + float(r.d_dT) * st.dP
+        self.d_dT = float(r.d_dT) * st.dT0
+        self.d_dY = {k: float(r.d_dT) * d for k, d in st.dY.items()}
+
+
 #: Flow regime every element defaults to when none is given. It is the GUI's
 #: default too (gui/backend/schemas.py SolverSettings.global_regime and the
 #: frontend store), and test_regime_default_sync.py keeps the three equal: a
@@ -4621,21 +4687,33 @@ class EffusionPlateElement(OrificeElement):
         prev_id, next_id = self.crossflow_segments
         m_a = flows.get(prev_id, 0.0) if prev_id else 0.0
         m_b = flows.get(next_id, 0.0) if next_id else 0.0
-        r = cb.crossflow_velocity_ratio(
-            m_a, m_b, state_in.P, state_in.T, state_in.X, state_out.P, self.crossflow_area
+        # The duct's STATIC state at the station (#782): its node carries T0,
+        # and the station's gas moves at the same mean flow U1 is built from.
+        st = _moving_static_T(
+            state_in,
+            0.5 * (m_a + m_b),
+            self.crossflow_area,
+            self.regime == "incompressible",
         )
+        r = cb.crossflow_velocity_ratio(
+            m_a, m_b, state_in.P, st.T, state_in.X, state_out.P, self.crossflow_area
+        )
+        d_dm_T = 0.5 * r.d_dT * st.dm
         d: dict[str, float] = {}
         for elem, eid in self._xf_elems:
-            coeff_m = r.d_dm_a if eid == prev_id else r.d_dm_b
+            coeff_m = (r.d_dm_a if eid == prev_id else r.d_dm_b) + d_dm_T
             names = elem.unknowns()
             for local, c in elem.flow_jac_at_node(self.from_node, list(range(len(names)))).items():
                 d[names[local]] = d.get(names[local], 0.0) + coeff_m * c
         for key, v in (
-            (f"{self.from_node}.P", r.d_dP),
-            (f"{self.from_node}.T", r.d_dT),
+            (f"{self.from_node}.P", r.d_dP + r.d_dT * st.dP),
+            (f"{self.from_node}.T", r.d_dT * st.dT0),
             (f"{self.to_node}.P", r.d_dP_down),
         ):
             d[key] = d.get(key, 0.0) + v
+        for k, dT_dY in st.dY.items():
+            key = f"{self.from_node}.Y[{k}]"
+            d[key] = d.get(key, 0.0) + r.d_dT * dT_dY
         return float(r.U1_over_Vi), d
 
     def validate(self) -> None:
@@ -7893,9 +7971,11 @@ class CrossflowSegmentElement(ChannelElement):
       every split.
 
     CENTRED: a segment carries half of the station at each end, each at its
-    node's own density (C++ ``station_half_drop``), so every node holds the
-    static pressure at the middle of its station. Ends are explicit, wired by
-    whoever builds the chain:
+    node's own STATIC density (C++ ``station_half_drop``), so every node holds
+    the static pressure at the middle of its station. The node carries T0;
+    the density is taken at the static T of the station's mean flow, the
+    momentum chamber closure's (#782), the same for both halves. Ends are
+    explicit, wired by whoever builds the chain:
 
     * ``from_kappa`` with ``prev_seg``: a station at ``from_node``; the flow
       arriving there is ``prev_seg``'s (0 if None: a closed end).
@@ -7903,7 +7983,7 @@ class CrossflowSegmentElement(ChannelElement):
       leaving it is ``next_seg``'s.
     * ``entry_K``: ``from_node`` is a reservoir; the segment carries the
       entry acceleration ``(1 + K_in) m^2/(2 rho A^2)`` at the duct (to-node)
-      density instead of a from-station. Reversed, the duct discharges into
+      static density instead of a from-station. Reversed, the duct discharges into
       the reservoir at static continuity, the same as an exit: no term.
     * an exit into a plenum (no to-station) loses the dynamic head: static
       continuity, as any Pt-coupled channel into a plenum.
@@ -7994,24 +8074,40 @@ class CrossflowSegmentElement(ChannelElement):
         neighbour element)."""
         flows = flows or {}
         m = float(state_in.m_dot)
+        incompressible = self.regime == "incompressible"
+        to_station = self.to_kappa is not None and self._next is not None
+        # Each kernel forms rho from the node's static P and a STATIC T (#782).
+        # The node carries T0; its gas moves at the station's mean flow (the
+        # one arriving and the one leaving), so both segments sharing a station
+        # see the same static state. A duct node with no station downstream
+        # moves at this segment's own flow.
         terms = []
         if self.entry_K is not None:
-            r = cb.channel_entry_drop(
-                m, state_out.P, state_out.T, state_out.X, self.area, self.entry_K
+            m_b = flows.get(self._next.id, m) if to_station else m
+            st = _moving_static_T(state_out, 0.5 * (m + m_b), self.area, incompressible)
+            r = cb.channel_entry_drop(m, state_out.P, st.T, state_out.X, self.area, self.entry_K)
+            nb = self._next if to_station else None
+            terms.append(
+                (_StaticChainedDrop(r, st, nb is not None), self.to_node, "a", self.to_node, nb)
             )
-            terms.append((r, self.to_node, "a", self.to_node, None))
         if self.from_kappa is not None:
             m_a = flows.get(self._prev.id, 0.0) if self._prev is not None else 0.0
+            st = _moving_static_T(state_in, 0.5 * (m_a + m), self.area, incompressible)
             r = cb.station_half_drop(
-                m_a, m, state_in.P, state_in.T, state_in.X, self.area, self.from_kappa
+                m_a, m, state_in.P, st.T, state_in.X, self.area, self.from_kappa
             )
-            terms.append((r, self.from_node, "b", self.from_node, self._prev))
-        if self.to_kappa is not None and self._next is not None:
+            terms.append(
+                (_StaticChainedDrop(r, st, True), self.from_node, "b", self.from_node, self._prev)
+            )
+        if to_station:
             m_b = flows.get(self._next.id, m)
+            st = _moving_static_T(state_out, 0.5 * (m + m_b), self.area, incompressible)
             r = cb.station_half_drop(
-                m, m_b, state_out.P, state_out.T, state_out.X, self.area, self.to_kappa
+                m, m_b, state_out.P, st.T, state_out.X, self.area, self.to_kappa
             )
-            terms.append((r, self.to_node, "a", self.to_node, self._next))
+            terms.append(
+                (_StaticChainedDrop(r, st, True), self.to_node, "a", self.to_node, self._next)
+            )
         return terms
 
     def _exit_head_lost(self, m_dot: float) -> bool:
@@ -8047,7 +8143,7 @@ class CrossflowSegmentElement(ChannelElement):
                 names = nb.unknowns()
                 for local, coeff in nb.flow_jac_at_node(nb_node, list(range(len(names)))).items():
                     row[names[local]] = row.get(names[local], 0.0) - d_nb * coeff
-            for key, d in ((f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)):
+            for key, d in _station_node_partials(r, node):
                 row[key] = row.get(key, 0.0) - d
         return res, jac
 
@@ -8090,7 +8186,7 @@ class CrossflowSegmentElement(ChannelElement):
                         nb_node, list(range(len(names)))
                     ).items():
                         row[names[local]] = row.get(names[local], 0.0) - k * d_nb * coeff
-                for key, d in ((f"{node}.P", r.d_dP), (f"{node}.T", r.d_dT)):
+                for key, d in _station_node_partials(r, node):
                     row[key] = row.get(key, 0.0) - k * d
             return {0: row}
 
@@ -8597,6 +8693,13 @@ class TeeJunctionElement(NetworkElement):
         if self.F_C is not None and self._F_branch is not None and self._F_branch > 0:
             self.psi = self.F_C / self._F_branch
 
+        # The port nodes: a MomentumChamberNode port's gas moves, so the
+        # kernel gets its static T (#782).
+        self._port_nodes = {
+            nid: graph.nodes.get(nid)
+            for nid in (self.common_node, self.straight_node, self.branch_node)
+        }
+
         # Step 4: propagate duct area to auto-area MCN nodes at each arm.
         # MCN nodes at straight/branch ports cannot see an upstream channel in
         # their own resolve_topology (the upstream is this tee element), so they
@@ -8642,17 +8745,32 @@ class TeeJunctionElement(NetworkElement):
         m_dot: float,
         A: float,
         theta: float,
-    ) -> "cb._core.BranchInput":
+        node_id: str,
+    ) -> tuple["cb._core.BranchInput", _MovingStaticT]:
+        """The kernel's port input and the static T it carries (#782).
+
+        ``BranchInput.T`` is a STATIC temperature: the kernel forms
+        rho = P / (R T) and u = m / (rho A) from it beside the static P. The
+        node carries T0. At a MomentumChamberNode port the gas moves, and its
+        static T is the chamber closure's at this arm's flow and area (the
+        port's own state when its area is the arm's). A plenum or boundary
+        port holds gas at rest: static = total.
+        """
+        node = getattr(self, "_port_nodes", {}).get(node_id)
+        if isinstance(node, MomentumChamberNode):
+            st = _moving_static_T(state, m_dot, A, node.regime == "incompressible")
+        else:
+            st = _MovingStaticT(float(state.Tt), 1.0, 0.0, 0.0, {})
         bi = cb._core.BranchInput()
         bi.P_static = state.P
         bi.Pt = state.Pt
-        bi.T = state.T
+        bi.T = st.T
         bi.m_dot = m_dot
         bi.A = A
         bi.theta = theta
         bi.gamma_eff = state.gamma()
         bi.R_gas = float(cb.specific_gas_constant(state.X))
-        return bi
+        return bi, st
 
     def residuals(
         self,
@@ -8662,17 +8780,16 @@ class TeeJunctionElement(NetworkElement):
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         m_com = state_com.m_dot
         m_branch = state_branch.m_dot
-        m_straight = m_com - m_branch
         A_branch = self._F_branch if self._F_branch is not None else self.F_C / max(self.psi, 1e-6)
 
         if self.tee_type == "merging":
             # Suppliers: straight (m_straight > 0) and branch (m_branch > 0)
             # Collector: common (m_com > 0 is the outlet)
             # BranchInput sign: >0 = supplier. Straight and branch supply; common collects.
-            bra_com = self._make_branch_input(state_com, -m_com, self.F_C, 0.0)
-            bra_str = self._make_branch_input(state_straight, m_straight, self.F_C, 0.0)
-            bra_bra = self._make_branch_input(state_branch, m_branch, A_branch, abs(self.theta))
-            res = cb._core.compressible_merging_tee_rj(bra_com, bra_str, bra_bra)
+            ports = self._branch_inputs(
+                state_com, state_straight, state_branch, -1.0, m_com, m_branch, A_branch
+            )
+            res = cb._core.compressible_merging_tee_rj(*(p[0] for p in ports))
             # R_0 = P_str - P_bra  (R_sp: equal static pressure at merge point)
             # R_1 = p0_dat - Pt_com - K_com * q_ref  (R_K,com: loss to collector)
             jac: dict[int, dict[str, float]] = {
@@ -8692,10 +8809,10 @@ class TeeJunctionElement(NetworkElement):
             }
         else:
             # Supplier: common. Collectors: straight and branch.
-            bra_com = self._make_branch_input(state_com, m_com, self.F_C, 0.0)
-            bra_str = self._make_branch_input(state_straight, m_straight, self.F_C, 0.0)
-            bra_bra = self._make_branch_input(state_branch, m_branch, A_branch, abs(self.theta))
-            res = cb._core.compressible_branching_tee_rj(bra_com, bra_str, bra_bra)
+            ports = self._branch_inputs(
+                state_com, state_straight, state_branch, 1.0, m_com, m_branch, A_branch
+            )
+            res = cb._core.compressible_branching_tee_rj(*(p[0] for p in ports))
             jac = {
                 0: {
                     f"{self.id}.m_dot_com": res.dR0_dmdot_com,
@@ -8717,7 +8834,83 @@ class TeeJunctionElement(NetworkElement):
                 },
             }
 
+        self._chain_static_T(res, jac, ports)
         return [res.R_0, res.R_1], jac
+
+    def _branch_inputs(
+        self,
+        state_com: NetworkMixtureState,
+        state_straight: NetworkMixtureState,
+        state_branch: NetworkMixtureState,
+        com_sign: float,
+        m_com: float,
+        m_branch: float,
+        A_branch: float,
+    ) -> list[tuple[Any, _MovingStaticT, str, str, dict[str, float]]]:
+        """(BranchInput, static T, node, kernel suffix, d(arm m_dot)/d(unknown))
+        for the common, straight and branch arms. ``com_sign`` is the
+        BranchInput sign of the common arm: +1 supplier (branching), -1
+        collector (merging)."""
+        u_com, u_bra = f"{self.id}.m_dot_com", f"{self.id}.m_dot_branch"
+        arms = (
+            (
+                state_com,
+                com_sign * m_com,
+                self.F_C,
+                0.0,
+                self.common_node,
+                "com",
+                {u_com: com_sign},
+            ),
+            (
+                state_straight,
+                m_com - m_branch,
+                self.F_C,
+                0.0,
+                self.straight_node,
+                "str",
+                {u_com: 1.0, u_bra: -1.0},
+            ),
+            (
+                state_branch,
+                m_branch,
+                A_branch,
+                abs(self.theta),
+                self.branch_node,
+                "bra",
+                {u_bra: 1.0},
+            ),
+        )
+        out = []
+        for state, m, A, theta, node, suffix, dm in arms:
+            bi, st = self._make_branch_input(state, m, A, theta, node)
+            out.append((bi, st, node, suffix, dm))
+        return out
+
+    @staticmethod
+    def _chain_static_T(
+        res: Any,
+        jac: dict[int, dict[str, float]],
+        ports: list[tuple[Any, _MovingStaticT, str, str, dict[str, float]]],
+    ) -> None:
+        """The kernel's d/d(port static T), chained onto what that T depends
+        on (#782): the node's T0 (the solver's ``{node}.T``), its static P,
+        its composition and the arm's flow."""
+        for row in (0, 1):
+            r = jac[row]
+            for _, st, node, suffix, dm in ports:
+                dR_dT = float(getattr(res, f"dR{row}_dT_{suffix}"))
+                r.pop(f"{node}.T", None)
+                if dR_dT == 0.0:
+                    continue
+                r[f"{node}.T"] = dR_dT * st.dT0
+                if st.dP != 0.0:
+                    r[f"{node}.P"] = r.get(f"{node}.P", 0.0) + dR_dT * st.dP
+                for name, coeff in dm.items():
+                    r[name] = r.get(name, 0.0) + dR_dT * st.dm * coeff
+                for k, d in st.dY.items():
+                    key = f"{node}.Y[{k}]"
+                    r[key] = r.get(key, 0.0) + dR_dT * d
 
     def diagnostics(
         self,
