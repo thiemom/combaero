@@ -2803,6 +2803,34 @@ documents:
   issues: [807]
   records: []
   notes: Arrived 2026-10-28 as docs/new/aerospace-13-00555-v2.pdf.
+- file: docs/orifices/hay_lampard_1996_ASME_96-GT-492_cooling_hole_cd_review.pdf
+  citation: 'Hay, N., Lampard, D. (1996). Discharge coefficient of turbine cooling holes: a review. ASME 96-GT-492
+    (Proc. ASME Turbo Expo 1996, Vol. 4, V004T09A056).'
+  id: ASME 96-GT-492
+  topic: [orifice, film, review]
+  content: 'Review of cooling-hole Cd: Table 1 classifies the literature by geometry and inlet/outlet crossflow.
+    Fig. 3 (p. 4): Adkins & Gueroui (1986) measured Cd of SHORT combustor cooling holes against the flow
+    parameter (p_c - p_inf)/(p_c+ - p_c), with McNown & Hsu''s potential-flow prediction. Fig. 4 (p. 4): normal
+    holes with INLET crossflow, Cd against the velocity head ratio (p_c+ - p_inf)/(p_c+ - p_c) -- Rohde et al.
+    1969, Benmansour (thesis), Byerley 1989 collapse on one curve (Cd ~0.2 at 1.2 rising to 0.8-0.85 above
+    ~20) with a potential-flow line; the text: this parameter "has been shown to work over a wide range of inlet
+    cross flow Mach numbers for orifices with L/d > 2" (p. 5). Fig. 5: McGreehan-Schotsch inlet-radiusing
+    correction against Hay & Spencer (1992) data. Discusses Rogers & Hersh''s lid model (short normal holes,
+    empirical), the additional-loss method, CFD.'
+  status: screened
+  verdict: 'Screened 2026-10-28 (#807, #813). Fig. 4 gives the inlet-crossflow Cd of normal holes with L/d > 2 as
+    one curve over three sources (incl. the Benmansour thesis points): the velocity head ratio is (Vi/U1)^2, so it
+    maps onto McGreehan-Schotsch''s U1/Vi (= 1/sqrt(ratio)) -- a cross-source ACCURACY check of the shipped
+    duct-fed-hole Cd once digitised (~50 points); it also settles that L/d (>2) hardly matters under inlet
+    crossflow. NOT #807''s thin walls (L/d < 2): Fig. 3 (Adkins & Gueroui''s short combustor holes, wanted) is the
+    thin-hole data, in a different parameter -- digitise it for #807. Fig. 5 partly reprints Hay & Spencer 1992
+    (wanted).'
+  read_for: ['#807 thin-wall (short-hole) Cd under crossflow', '#813 inlet-crossflow Cd of duct-fed holes vs
+      McGreehan-Schotsch', 'reprints of wanted Adkins & Gueroui 1986 and Hay & Spencer 1992']
+  issues: [807, 813]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/v004t09a056-96-gt-492.pdf (suggested by the user for its Fig. 4). Cites the
+    Benmansour thesis as 1983 (reference list) and 1981 (Fig. 4 legend).
 - file: docs/orifices/hay_lampard_benmansour_1983_JEP_105_243_crossflow_cd.pdf
   citation: 'Hay, N., Lampard, D., Benmansour, S. (1983). Effect of crossflows on the discharge coefficient of film
     cooling holes. ASME J. Engineering for Power 105(2), 243-248 (ASME 82-GT-147).'
@@ -3204,8 +3232,8 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
-- citation: Benmansour, S. (1981). (Discharge coefficients of film cooling holes with crossflow.) M.Phil. thesis,
-    University of Nottingham.
+- citation: Benmansour, S. (1983; 1981 in Hay & Lampard 1996 Fig. 4). Discharge coefficient of film cooling holes.
+    M.Phil. thesis, University of Nottingham.
   checked: false
   issues:
   - 807
@@ -3213,7 +3241,7 @@ wanted:
   priority: later
   question: 'The detailed data behind Hay, Lampard & Benmansour 1983 (held): the L/D 2 parallel-flow results the
     paper measured but does not publish (the L/D interaction with crossflow, #807) and tabulated Cd for the
-    coolant- and mainstream-crossflow maps (#813). Not digitised online (user, 2026-10-28). Title as recalled,
-    unverified.'
+    coolant- and mainstream-crossflow maps (#813). Not digitised online (user, 2026-10-28). Its inlet-crossflow
+    points are reprinted in Hay & Lampard 1996 Fig. 4 (held; L/d > 2). Title from Hay & Lampard 1996.'
   where: University of Nottingham library (thesis request) or the British Library thesis service; no online
     copy known.
