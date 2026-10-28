@@ -793,9 +793,9 @@ class EjectorElement(MultiPortChamberBase):
             (f"{self._port_element_ids[1]}.m_dot", -self._port_signs[1]),  # 1 ms
             (f"{self._port_element_ids[2]}.m_dot", self._port_signs[2]),  # 2 mdot_out
             (f"{self.primary_node}.Pt", 1.0),  # 3 p_g
-            (f"{self.primary_node}.T", 1.0),  # 4 t_g
+            (f"{self.primary_node}.Tt", 1.0),  # 4 t_g
             (f"{self.secondary_node}.Pt", 1.0),  # 5 p_e
-            (f"{self.secondary_node}.T", 1.0),  # 6 t_e
+            (f"{self.secondary_node}.Tt", 1.0),  # 6 t_e
             (f"{self.outlet_node}.Pt", 1.0),  # 7 p_out
             (f"{self.id}.P_jct", 1.0),  # 8 P_py (owned)
         ]

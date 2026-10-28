@@ -75,19 +75,19 @@ def test_a_reversed_orifice_reads_the_outlet_side(regime: str) -> None:
     m_calc, d = o._flow_and_partials(s_in, s_out, 0.6)
     m_ref, _ = o._kernel_from(s_out, s_in, "B", "A", 0.6)
     assert m_calc == pytest.approx(-m_ref, rel=1e-12)
-    assert "B.T" in d and "A.T" not in d  # the outlet side's temperature drives it
+    assert "B.Tt" in d and "A.Tt" not in d  # the outlet side's temperature drives it
 
     def m_at(**kw: float) -> float:
         a, b = _states(-0.1)
         for k, v in kw.items():
             node, attr = k.split("_")
             st = a if node == "A" else b
-            setattr(st, "Tt" if attr == "T" else attr, v)
+            setattr(st, attr, v)
             if attr == "Pt":
                 st.P = v
         return o._flow_and_partials(a, b, 0.6)[0]
 
-    for col, base, h in (("B_Pt", 1.5e5, 1.0), ("A_Pt", 1.2e5, 1.0), ("B_T", 450.0, 1e-3)):
+    for col, base, h in (("B_Pt", 1.5e5, 1.0), ("A_Pt", 1.2e5, 1.0), ("B_Tt", 450.0, 1e-3)):
         fd = (m_at(**{col: base + h}) - m_at(**{col: base - h})) / (2 * h)
         name = col.replace("_", ".")
         ana = d.get(name, 0.0) + (d.get(name.replace(".Pt", ".P"), 0.0) if ".Pt" in name else 0.0)
@@ -106,7 +106,7 @@ def test_a_reversed_incompressible_channel_reads_the_outlet_side() -> None:
     r_fwd, _ = fwd.residuals(f_in, f_out)
     # Pt_from - Pt_to - dP: the same equation with every sign flipped.
     assert r_rev[0] == pytest.approx(-r_fwd[0], rel=1e-12)
-    assert "B.T" in j_rev[0] and "A.T" not in j_rev[0]
+    assert "B.Tt" in j_rev[0] and "A.Tt" not in j_rev[0]
 
 
 def test_the_cold_start_stays_between_the_boundaries() -> None:

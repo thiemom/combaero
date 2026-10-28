@@ -10,7 +10,9 @@ solves), a compressible one's lies on the isentrope through (Tt, Pt) at P.
 from __future__ import annotations
 
 import warnings
+from typing import Any
 
+import numpy as np
 import pytest
 
 import combaero as cb
@@ -112,3 +114,64 @@ def test_the_0_7_constructor_and_setter_still_work_and_say_so() -> None:
     assert old.Tt == 610.0
     with pytest.raises(TypeError, match="Tt"):
         NetworkMixtureState(P=2.0e5, Pt=2.0e5, Y=Y_AIR)
+
+
+def test_a_custom_element_still_keyed_by_the_0_7_name_gets_the_same_jacobian(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A residual Jacobian keyed "<node>.T" (0.7) is relayed as "<node>.Tt",
+    with one DeprecationWarning, so a user's element keeps its T column."""
+    # Two streams of different Tt mix in the chamber, so its Tt moves with
+    # the flow split and the element leaving it has a live Tt column.
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("hot", Pt=2.0e5, Tt=600.0, Y=Y_AIR))
+    g.add_node(PressureBoundary("cold", Pt=2.0e5, Tt=300.0, Y=Y_AIR))
+    g.add_node(MomentumChamberNode("chamber", area=3e-3, regime="compressible"))
+    g.add_node(PressureBoundary("outlet", Pt=1.0e5))
+    for eid, a, b, d in (
+        ("h", "hot", "chamber", 0.03),
+        ("c", "cold", "chamber", 0.02),
+        ("o", "chamber", "outlet", 0.04),
+    ):
+        g.add_element(OrificeElement(eid, a, b, Cd=0.6, diameter=d, correlation="fixed"))
+    solver = NetworkSolver(g)
+    x0 = np.array(solver._build_x0(), dtype=float)
+    F_new, J_new = solver._residuals_and_jacobian(x0)
+
+    def old_names(jac: dict) -> dict:
+        return {
+            row: {(k[:-1] if k.endswith(".Tt") else k): v for k, v in cols.items()}
+            for row, cols in jac.items()
+        }
+
+    renamed = 0
+    for el in g.elements.values():
+        original = el.residuals
+
+        def residuals(*args: Any, _original: Any = original, **kwargs: Any) -> Any:
+            nonlocal renamed
+            res, jac = _original(*args, **kwargs)
+            renamed += sum(k.endswith(".Tt") for cols in jac.values() for k in cols)
+            return res, old_names(jac)
+
+        monkeypatch.setattr(el, "residuals", residuals)
+    monkeypatch.setattr(solver_module, "_JACOBIAN_T_KEY_WARNED", False)
+    with pytest.warns(DeprecationWarning, match=r"Jacobian key '.*\.T'"):
+        F_old, J_old = solver._residuals_and_jacobian(x0)
+    assert renamed > 0  # the network has a T column to rename
+    assert np.array_equal(F_old, F_new)
+    assert np.array_equal(J_old.toarray(), J_new.toarray())
+
+    # And the column matters: dropped, the Jacobian differs.
+    for el in g.elements.values():
+        inner = el.residuals
+
+        def dropped(*args: Any, _inner: Any = inner, **kwargs: Any) -> Any:
+            res, jac = _inner(*args, **kwargs)
+            return res, {
+                r: {k: v for k, v in c.items() if not k.endswith(".T")} for r, c in jac.items()
+            }
+
+        monkeypatch.setattr(el, "residuals", dropped)
+    _, J_dropped = solver._residuals_and_jacobian(x0)
+    assert not np.array_equal(J_dropped.toarray(), J_new.toarray())

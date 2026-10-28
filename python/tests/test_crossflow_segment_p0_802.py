@@ -311,7 +311,7 @@ def test_the_duct_end_partials_match_finite_differences(
         sa = _state(P_in + dx.get(f"{a_id}.P", 0.0), m + dx.get(f"{seg}.m_dot", 0.0))
         sb = _state(P_out + dx.get(f"{b_id}.P", 0.0), m + dx.get(f"{seg}.m_dot", 0.0))
         for st, nid in ((sa, a_id), (sb, b_id)):
-            st.Tt += dx.get(f"{nid}.T", 0.0)
+            st.Tt += dx.get(f"{nid}.Tt", 0.0)
             st.Pt = st.P
         f = {k: v + dx.get(f"{k}.m_dot", 0.0) for k, v in flows.items()}
         src, dst, _, _ = e._duct_ends(sa, sb, e._momentum_terms(sa, sb, f))
@@ -319,9 +319,9 @@ def test_the_duct_end_partials_match_finite_differences(
 
     sa, sb = _state(P_in, m), _state(P_out, m)
     _, _, d_in, d_out = e._duct_ends(sa, sb, e._momentum_terms(sa, sb, flows))
-    keys = [f"{a_id}.P", f"{b_id}.P", f"{a_id}.T", f"{b_id}.T", f"{seg}.m_dot"]
+    keys = [f"{a_id}.P", f"{b_id}.P", f"{a_id}.Tt", f"{b_id}.Tt", f"{seg}.m_dot"]
     keys += [f"{k}.m_dot" for k in flows]
-    steps = {"P": 1.0, "T": 1e-3, "m_dot": 1e-7}
+    steps = {"P": 1.0, "Tt": 1e-3, "m_dot": 1e-7}
     for key in keys:
         h = steps[key.rsplit(".", 1)[1]]
         hi, lo = ends({key: h}), ends({key: -h})

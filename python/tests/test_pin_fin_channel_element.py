@@ -160,7 +160,7 @@ def test_drop_jacobian_matches_central_differences(m_dot: float) -> None:
         (r(m_dot=m_dot + h) - r(m_dot=m_dot - h)) / (2 * h), rel=1e-5
     )
     dT = 1e-2
-    assert jac[0]["A.T"] == pytest.approx((r(T=700.0 + dT) - r(T=700.0 - dT)) / (2 * dT), rel=2e-3)
+    assert jac[0]["A.Tt"] == pytest.approx((r(T=700.0 + dT) - r(T=700.0 - dT)) / (2 * dT), rel=2e-3)
     dPs = 10.0
     fd_P = (r(P=1.5e6 + dPs) - r(P=1.5e6 - dPs)) / (2 * dPs)
     # The residual's Pt terms move with P in _states; strip them (d/dP = 0).

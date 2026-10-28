@@ -3065,6 +3065,11 @@ No residual reads `NetworkMixtureState.T` (#825), so solutions are
 unchanged. Where the properties of a moving gas want the static T and still
 take the stagnation one is #824.
 
+A residual's Jacobian names a node's stagnation-T column `"<node>.Tt"`, the
+quantity it is (#782). A custom element that still keys it `"<node>.T"`, the
+0.7 name, gets the same Jacobian with one `DeprecationWarning`; the old name
+is removed in 0.9.0.
+
 ---
 
 ## Psychrometrics (Humid Air)

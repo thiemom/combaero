@@ -213,7 +213,7 @@ class IdealMomentumTeeElement(MultiPortChamberBase):
         """d(row)/d(port T, Y[k], flows) through the port density.
 
         A port node's T and Y are not unknowns: the solver derives them by
-        mixing and relays a ``{port}.T`` / ``{port}.Y[k]`` entry through that
+        mixing and relays a ``{port}.Tt`` / ``{port}.Y[k]`` entry through that
         chain. Without these the junction rows missed how a port's density
         follows its mixed temperature, measured at 1.2e-4 (scaled) on a hot
         forward merge and 8.7e-4 on a hot reversed one (#517).

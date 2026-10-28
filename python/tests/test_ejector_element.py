@@ -266,9 +266,9 @@ def test_residuals_jacobian_matches_finite_difference(monkeypatch):
         "chan_s.m_dot": perturb_mdot(1, e._port_signs[1]),
         "chan_o.m_dot": perturb_mdot(2, e._port_signs[2]),
         "p.Pt": perturb_state(0, "Pt"),
-        "p.T": perturb_state(0, "Tt"),
+        "p.Tt": perturb_state(0, "Tt"),
         "s.Pt": perturb_state(1, "Pt"),
-        "s.T": perturb_state(1, "Tt"),
+        "s.Tt": perturb_state(1, "Tt"),
         "ej1.P_jct": (perturb_pjct, P_jct0),
     }
 

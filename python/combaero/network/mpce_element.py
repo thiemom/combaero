@@ -1109,7 +1109,7 @@ class ConstantKTeeElement(MultiPortChamberElement):
         jac: dict[int, dict[str, float]] = {}
         m_var_c = f"{self._port_element_ids[common]}.m_dot"
         p_var_c = f"{self.port_nodes[common]}.P"
-        t_var_c = f"{self.port_nodes[common]}.T"
+        t_var_c = f"{self.port_nodes[common]}.Tt"
         for i in range(N):
             K_i = 0.0 if i == common else float(self.K_ports.get(i, 0.0))
             residuals.append(float(states[i].Pt) - Pt_jct + sign * K_i * q_dyn)

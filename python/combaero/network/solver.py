@@ -64,6 +64,21 @@ def _warn_static_t(key: str) -> None:
     )
 
 
+_JACOBIAN_T_KEY_WARNED = False
+
+
+def _warn_jacobian_T_key(key: str) -> None:
+    """A residual Jacobian keyed by "<node>.T": the 0.7 name of the node's
+    stagnation T column, "<node>.Tt" since 0.8 (#782). Still relayed, with
+    one DeprecationWarning per process; removed in 0.9.0."""
+    global _JACOBIAN_T_KEY_WARNED
+    if _JACOBIAN_T_KEY_WARNED:
+        return
+    _JACOBIAN_T_KEY_WARNED = True
+    node = key.rsplit(".", 1)[0]
+    _renamed._warn(f"the Jacobian key {key!r}", f"{node + '.Tt'!r}", stacklevel=2)
+
+
 class _ElementDiag(dict):
     """An element's diagnostics; ``T_in``/``T_out`` warn as ``_StaticTResult``."""
 
@@ -3269,9 +3284,12 @@ class NetworkSolver:
                             # Pt for element residuals)
                             parts = unk_name.split(".")
                             nid, prop = parts[0], parts[1]
+                            if prop == "T":
+                                _warn_jacobian_T_key(unk_name)
+                                prop = "Tt"
                             if nid in relay:
                                 for unk_idx, sens_pkg in relay[nid].items():
-                                    if prop == "T" and "T" in sens_pkg:
+                                    if prop == "Tt" and "T" in sens_pkg:
                                         rows.append(row)
                                         cols.append(unk_idx)
                                         data.append(deriv * sens_pkg["T"])
