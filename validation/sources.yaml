@@ -2439,6 +2439,207 @@ documents:
     The earlier "no text layer" note was wrong. Secondary throughout Ch. 4 and 8 except the liner-wall
     method, Eqs. 4.30/4.31 and Eq. 8.15 (Lefebvre's own); figures reprinted from theses (Kaddah, Freeman,
     Norster, Sridhara) carry their author as `after:` if digitised.
+- file: docs/new/4-2-2-2.pdf
+  citation: 'Han, J.-C., Wright, L. M. (2006). Enhanced internal cooling of turbine blades and vanes. In:
+    The Gas Turbine Handbook (R. Dennis, ed.), Sec. 4.2.2.2, pp. 321-352. U.S. DOE National Energy Technology
+    Laboratory.'
+  id: NETL Gas Turbine Handbook 4.2.2.2
+  topic: [review, rib, pin_fin, impingement, dimple]
+  content: 'Review chapter (34 pp.). Vanes: jet-array impingement with crossflow (Florschuetz,
+    Kercher-Tabakoff, Bailey-Bunker, Huang/Ekkad), curved leading-edge impingement (Chupp 1969, Bunker-Metzger),
+    pin fins (Metzger, VanFossen, Chyu, partial-length and ejection), dimples, compound techniques. Blades:
+    Han rib R/G correlations (Eqs. 1-3, Figs. 8-9 printed as images), V/W/broken ribs, film-bleed effect,
+    and most of the chapter on rotation (Coriolis/buoyancy, Fu et al. Nu_R/Nu_S vs buoyancy parameter,
+    Figs. 18-33). No new correlation constants, no network case.'
+  status: screened
+  verdict: 'Secondary review, nothing to implement from it: every correlation it shows is a reprint of
+    a primary combaero already holds or ships (Han ribs, Florschuetz jets, Metzger/VanFossen/Chyu pins)
+    or is the deferred curved leading-edge impingement (Chupp 1969, now on the wanted list). Rotation
+    (half the chapter) is out of scope: combaero has no rotating channels. No #793 example (no case
+    with geometry and results).'
+  read_for: ['#793 worked example candidate', correlation coverage gaps (impingement, ribs, pins, dimples)]
+  issues: [793]
+  records: []
+  notes: Same handbook as docs/new/4-4.pdf. The rib correlation figures are images; HDE 2013 (docs/heat_transfer/han/)
+    carries the same material in more detail.
+- file: docs/new/4-4.pdf
+  citation: 'Cunha, F. J. (2006). Heat transfer analysis. In: The Gas Turbine Handbook (R. Dennis, ed.),
+    Sec. 4.4, pp. 389-410. U.S. DOE National Energy Technology Laboratory.'
+  id: NETL Gas Turbine Handbook 4.4
+  topic: [review, film, rib, pin_fin, impingement]
+  content: 'Review chapter (23 pp.) on HPT airfoil thermal design: overall cooling effectiveness / convective
+    efficiency / film effectiveness framework (Torbidoni-Horlock), gas-side flat-plate and leading-edge
+    loads, film effectiveness with coverage, rib roughness functions R/G (Webb-Eckert, Han; Tables I-II),
+    the Florschuetz jet-array correlation (Eq. 29 constants printed), pedestal Nu table (Table III),
+    coolant bulk temperature with rotational pumping (Eqs. 35-37), and an E3 blade FEM illustration.
+    Most equations are images (no text layer).'
+  status: screened
+  verdict: 'Secondary review, nothing to implement: its correlations are reprints of shipped primaries
+    (Florschuetz 1981, Han ribs) or design-level framework (cooling effectiveness vs heat-load parameter)
+    that combaero builds bottom-up from elements instead. The E3 blade example has no published network
+    numbers, so no #793 case.'
+  read_for: ['#793 worked example candidate', correlation coverage gaps]
+  issues: [793]
+  records: []
+  notes: Same handbook as docs/new/4-2-2-2.pdf.
+- file: docs/new/86.01_18.pdf
+  citation: 'Kukutla, P. R., Prasad, B. V. S. S. S. (2017). Coupled flow network model and CFD analysis
+    for a combined impingement and film cooled gas turbine nozzle guide vane. AMSE J. Modelling B 86(1),
+    250-270.'
+  id: DOI 10.18280/mmc_b.860118
+  topic: [impingement, film, orifice]
+  content: 'NGV with front/aft impingement inserts (217/144 holes) and 156 film holes in 13 rows; Fluent
+    CHT gives Cd and film-exit static pressures, which are fed to a Flownex network (incompressible, K
+    from Cd); outputs per-hole flow and dp plotted (Figs. 8-14), overall split FIT/AIT 25.5/74.5% and
+    LE/mid-chord/TE 24.3/51.9/22.5%. No hole diameters, no Cd values, no pressures printed.'
+  status: screened
+  verdict: 'Not usable as a #793 example: the network is driven by CFD-derived Cd and boundary pressures
+    that are not printed, and the geometry is incomplete (no hole diameters). No correlation content.
+    Its value is its reference list: Damerow 1972 (NASA CR-120883, already held, Table I composite airfoil
+    network) and Jin et al. 2008 (GT2008-50431, flow-tested compressible blade network; wanted).'
+  read_for: ['#793 worked example candidate']
+  issues: [793]
+  records: []
+- file: docs/new/ASMEConference2012-9644.pdf
+  citation: 'Alizadeh, M., Izadi, A., Fathi, A., Khaledi, H. (2012). Flow and heat transfer analysis of
+    turbine blade cooling passages using network method. Proc. ASME Gas Turbine India Conference, GTINDIA2012-9644,
+    Mumbai.'
+  id: GTINDIA2012-9644
+  topic: [rib, pin_fin, channel]
+  content: 'In-house network code: element solver marching Meitner''s CPF 1-D compressible equations
+    (friction, area change, heat transfer), node solver on flow functions K = mdot/dp. Verified against
+    Fanno/Rayleigh, a convergent-duct CFD case (L 30 mm, D 20->10 mm; only relative errors printed, Table
+    1) and Meitner''s 8-element triangle network (Tables 2-3 reprint areas and BCs; Table 4 only relative
+    errors). Then a vane case (6 cooling technologies) with results only in a figure, and a correlation
+    reference table (Table 5).'
+  status: screened
+  verdict: 'The paper itself gives no reproducible case (no element lengths, results only as relative
+    errors). It led to the case it reprints: Meitner (2004) NASA TM-2004-211885 / GT2003-38061, which
+    prints the full input (Table 1: node coordinates, inlet/outlet areas, BCs, f = 0.20, fixed properties)
+    and the full solution (Table 2: flows, total/static pressures, temperatures, Mach). That TM is the
+    best code-to-code network example found for #793 (wanted, checked).'
+  read_for: ['#793 worked example candidate']
+  issues: [793]
+  records: []
+- file: docs/flow_network/meitner2004_NASA_TM-2004-211885.pdf
+  citation: 'Meitner, P. L. (2004). Procedure for determining one-dimensional flow distributions in arbitrarily
+    connected passages without the influence of pumping. NASA/TM-2004-211885, ARL-TR-3213 (also ASME GT2003-38061).'
+  id: NASA-TM-2004-211885
+  topic: [channel]
+  content: 'Network procedure for 1-D compressible flow distributions in connected passages (no pumping).
+    Worked example: an 8-element network, 3 inlets (50 psia total; 500/400/300 F), 2 outlets (20 and 15
+    psia static); Table 1 node coordinates and inlet/outlet areas, Fanning f = 0.20 everywhere, gamma 1.4,
+    fixed cp/mu, no heat transfer; Table 2 every element''s flow, total/static pressure, temperature and
+    Mach (element 4 carries only 0.0068 of 0.674 lbm/s, a sensitive branch).'
+  status: screened
+  verdict: 'The best fully printed network example found for #793: code-to-code, not measurement. Needs
+    a fixed-friction-factor option and tapered (linear-area) channels (or segment chains) in combaero.
+    Oddity in the source: element 8''s exit Tt (405.5 F) is below its inlet (406.9 F) with no heat transfer.
+    GTINDIA2012-9644 reprints the case but misnumbers the constant-area elements (TM: 1 and 3).'
+  read_for: ['#793 worked example candidate']
+  issues: [793]
+  records: []
+  notes: Fetched from NTRS 20040082327 (public) on 2026-10-27 during the docs/new screening.
+- file: docs/new/ceas-2007-026.pdf
+  citation: 'Andreini, A., Carcasci, C., Ceccherini, A., Facchini, B., Surace, M., Coutandin, D., Gori,
+    S., Peschiulli, A. (2007). Combustor liner temperature prediction: a preliminary tool development and
+    its application on effusion cooling systems. 1st CEAS European Air and Space Conference, CEAS-2007-026,
+    pp. 297-303.'
+  id: CEAS-2007-026
+  topic: [effusion, combustion, film]
+  content: 'Florence/Avio liner tool: SRBC 1-D coolant network plus 1-D FD wall conduction; Lefebvre
+    liner heat balance R1+C1 = R2+C2 = K1-2; gas emissivity Reeves (Eq. 5), Reeves-Lefebvre luminosity
+    (Eqs. 6-7), Lefebvre-Herbert/Farag (Eq. 8), generalised luminosity Eq. 9; film from L''Ecuyer-Soechting
+    rows with Sellers superposition; ribs (Han) and impingement (Florschuetz) as cold-side augmentation.
+    Parametric effusion study (hole D, angle, pitch, TBC) on NORMALISED geometry; validation figure against
+    an effusion plate from Andreini et al. ICAS 2006.'
+  status: screened
+  verdict: 'No #793 example: the liner geometry is normalised (D-bar, W-bar, T/Tref) and results are
+    plotted only. Correlation value: it prints the liner gas-side radiation set (Reeves, Lefebvre luminosity
+    factor, Lefebvre-Herbert) that combaero lacks entirely -- a real gap for any liner wall temperature
+    case, but these are secondary reprints. Lefebvre & Ballal Ch. 8 (screened 2026-10-27) prints the same
+    set in full with a reproducible worked example; its primary, Lefebvre-Herbert 1960, is wanted.'
+  read_for: ['#793 worked example candidate', liner gas-side radiation correlations]
+  issues: [793]
+  records: []
+  notes: PDF metadata creation date is wrong (1999); the conference is 2007.
+- file: docs/new/CONV14_1D-HT-GTCC-r1.pdf
+  citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional
+    heat transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp.
+    on Convective Heat and Mass Transfer, Turkey, paper CONV-14-123.'
+  id: CONV-14-123
+  topic: [combustion]
+  content: 'TEI PreCoDe spreadsheet tool (Kaddah/Freeman liner-hole Cd, Odgers zone efficiency, Lefebvre
+    liner heat balance and luminous emissivity, Kadoya air properties Table 1) on a small annular combustor
+    at atmospheric rig conditions (Table 3: P3 101.2 kPa, T3 404 K, dP/P 5%, 0.2 kg/s). Measured outer-liner
+    temperature by thermal paint (scale Table 2) and three thermocouples, plotted against prediction (Fig.
+    12); peak 953 K predicted vs 969 K paint.'
+  status: screened
+  verdict: 'No #793 example: liner and hole geometry are not given (Fig. 7 only), and the equations are
+    images. Measured liner temperatures exist but cannot be reproduced without the geometry. Correlation
+    pointers only (Kaddah 1964 / Freeman 1965 liner-hole Cd -- see the Adkins-Gueroui wanted entry).'
+  read_for: ['#793 worked example candidate']
+  issues: [793]
+  records: []
+- file: docs/new/EJC96482.pdf
+  citation: 'Gouws, J. J., Morris, R. M., Visser, J. A. (2006). Modelling of a gas turbine combustor using
+    a network solver. S. Afr. J. Science 102, 533-536 (with online supplementary Tables 2-4).'
+  id: S. Afr. J. Sci. 102:533
+  topic: [combustion, orifice, film]
+  content: 'T56 can-annular combustor (one of six cans, half modelled), commercial network solver (Flownex-type
+    RD/RL/DG elements). Take-off conditions Table 1 (T03 566 K, P03 923.9 kPa, 14.154 kg/s, AFR 50). Supplement
+    Table 2: predicted vs MEASURED isothermal flow split (Van Niekerk & Morris, atmospheric) for 16 features
+    (dome splash strips, 5 wiggle strips, primary/secondary/dilution hole sets); Table 3 after calibrating
+    Cd to the measured split (pressure loss 2.24% -> 5.10%); Table 4 assumed vs calibrated Cd. Exit temperature
+    profile vs CFD (Fig. 3).'
+  status: screened
+  verdict: 'The only one of the nine with a MEASURED combustor flow split, but not reproducible: no hole
+    areas or counts are printed, and with calibrated Cd on unknown areas a reproduction would be circular.
+    Becomes a system-level #793 candidate only if the hole geometry is obtained (Gouws 2007 MEng thesis,
+    wanted). Its Table 4 is a useful sanity range for liner-feature Cd (wiggle strips 0.40-0.65, splash
+    strips 0.09-0.53, plain holes 0.44-0.62).'
+  read_for: ['#793 worked example candidate (combustor liner flow split)']
+  issues: [793]
+  records: []
+- file: docs/new/jpc_2015_sarikaya_varol_tuncer.pdf
+  citation: 'Varol, G., Sarikaya, G., Tuncer, O. (2015). One dimensional network model for a reverse flow
+    combustor. AIAA paper, Istanbul Technical University (venue and number not printed; filename suggests
+    the 2015 AIAA Joint Propulsion Conference).'
+  topic: [combustion, orifice, film]
+  content: 'Reverse-flow annular combustor for a 1000 hp turboshaft, 1/13 sector. Table 1 idle/cruise/take-off
+    conditions; Table 3 hole sets (positions, counts, diameters: 3 machined-ring film sets and 2 plain-hole
+    sets per liner); Table 4 per-set mass flow and fraction from isothermal CFD and from the 1-D code; Table
+    5 CFD and 1-D Cd. Norster Cd correlation (Eqs. 6-8, garbled in print), Odgers zone efficiency, Lefebvre
+    radiation, Rizk convection, Ballal-Lefebvre slot film (Eq. 31); liner temperatures plotted only (Fig.
+    11).'
+  status: screened
+  verdict: 'The simplest #793 example found, rated "mostly ready": checked 2026-10-27 that Table 4 is
+    a single-plenum parallel-orifice split -- with cruise inlet density (763 kPa, 564 K) every hole set''s
+    CFD flow and Cd give the same dp, 33.4-34.0 kPa (4.4% of P3), and the 1-D column is reproduced
+    to 0.5% by m_i proportional to Cd_i A_i with the code''s Cd 0.600/0.625. Needs one assumption: the swirler
+    area is not printed (back it out as 116.5 mm2 from its CFD Cd and flow). Reference values are CFD and
+    the authors'' own 1-D code, not measurement; matching the CFD column with the CFD Cd is near-tautological,
+    so the example demonstrates a flow split, not a Cd model. The heat-transfer half is not reproducible
+    (no liner geometry).'
+  read_for: ['#793 worked example candidate (combustor liner flow split)']
+  issues: [793]
+  records: []
+  notes: The PDF has a damaged xref table (poppler reconstructs it); text extracts fine.
+- file: docs/new/THERMAL_ANALYSIS_OF_A_TURBINE_ROTOR_BLAD.pdf
+  citation: 'Panduranga, B. P., Suresh, B., Purushotham, H. R. (2013). Thermal analysis of a turbine rotor
+    blade. Int. Conf. on Advanced Materials, Manufacturing, Management and Thermal Sciences (AMMMT 2013),
+    SIT Tumkur, ISBN 978-81-926304-0-3.'
+  topic: [rib, pin_fin, impingement]
+  content: 'Flowmaster blade network (LE impingement, 3-pass ribbed serpentine, pin-fin TE) with a 2-D
+    FEM; correlations quoted: Han two-wall rib f and St, Metzger pin-fin f = 0.317 Re^-0.132 and Nu, Chupp
+    leading-edge impingement (Eq. 5, garbled), Lowery-Vachon stagnation, flat-plate gas side; sensitivity
+    Table 1 only.'
+  status: screened
+  verdict: 'No #793 example (arbitrary configuration, no geometry, results normalised) and no correlation
+    beyond reprints. Only pointer of interest is Chupp 1969 leading-edge impingement (wanted).'
+  read_for: ['#793 worked example candidate']
+  issues: [793]
+  records: []
 - file: docs/orifices/lichtarowicz-et-al-1965-discharge-coefficients-for-incompressible-non-cavitating-flow-through-long-orifices.pdf
   citation: Lichtarowicz, A., Duggins, R. K., Markland, E. (1965). Discharge coefficients for incompressible
     non-cavitating flow through long orifices. J. Mechanical Engineering Science 7(2), 210-219.
@@ -2703,3 +2904,72 @@ wanted:
     against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
     radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
   where: DTIC (public, ADA-numbered).
+- citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
+    NASA TP-2985, AVSCOM TP 89-C-008.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: The single-passage CPF code behind the 2004 network procedure (its governing equations and
+    any sample cases); a further code-to-code check of one compressible passage with friction, area change
+    and heat transfer.
+  where: NTRS (NASA Technical Paper).
+- citation: Gouws, J. J. (2007). Combining a one-dimensional empirical and network solver with computational
+    fluid dynamics to investigate possible modifications to a commercial gas turbine combustor. M.Eng. thesis,
+    University of Pretoria.
+  checked: false
+  issues:
+  - 793
+  priority: now
+  question: 'The T56 liner hole and cooling-device geometry behind Gouws et al. 2006 (docs/new/EJC96482.pdf),
+    whose Table 2 holds a MEASURED isothermal flow split over 16 features. With the areas this becomes
+    the system-level combustor liner example #793 asks for, scored against measurement.'
+  where: University of Pretoria repository (UPSpace), open access likely; Van Niekerk & Morris 2005 (ISABE)
+    holds the measurement.
+- citation: Jin, H., Riddle, A., Cooke, L. (2008). A compressible flow network analysis for design upgrade
+    of industrial aero derivative HP turbine blades. ASME GT2008-50431.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: A blade cooling network with bench flow-test data (pressure ratio up to 1.5, inlet metering
+    plate); a measured network example if the geometry is printed.
+  where: ASME Turbo Expo 2008 proceedings.
+- citation: Adkins, R. C., Gueroui, D. (1986). An improved method for accurate prediction of mass flows
+    through combustor liner holes. ASME 86-GT-149.
+  checked: false
+  issues: []
+  priority: later
+  question: Liner-hole Cd against bleed ratio (hole flow / annulus flow) for plain and plunged holes, the
+    Kaddah 1964 / Freeman 1965 / Norster regime. combaero's discharge-hole Cd with crossflow is McGreehan-Schotsch
+    (long holes, modest crossflow); a combustor liner network with high bleed ratios has no closure.
+  where: ASME Gas Turbine Conference 1986. Lefebvre & Ballal (screened) reprints Kaddah (Eq. 4.15, Fig. 4.2 points)
+    and Freeman (Eq. 4.16); NACA TN 3663 (held) measures Cd against bleed for thin-wall holes (#807).
+- citation: Lefebvre, A. H. (1984). Flame radiation in gas turbine combustion chambers. Int. J. Heat Mass
+    Transfer 27(9), 1493-1510.
+  checked: false
+  issues: []
+  priority: later
+  question: Primary of the liner gas-side radiation set (luminosity factor, emissivity) reprinted by every
+    combustor network paper in docs/new; combaero has no gas radiation. Lefebvre & Ballal Ch. 8 (screened)
+    prints the set in full (Eqs. 8.4-8.15) and suffices to implement it; this paper would add the data
+    behind the luminosity factor.
+  where: Elsevier journal.
+- citation: Chupp, R. E., Helms, H. E., McFadden, P. W., Brown, T. R. (1969). Evaluation of internal heat-transfer
+    coefficients for impingement-cooled turbine airfoils. J. Aircraft 6(3), 203-208.
+  checked: false
+  issues: []
+  priority: later
+  question: Primary of the curved (leading-edge) row-of-jets impingement correlation that impingement_correlation.h
+    defers (HDE Sec. 4.1.4); needed only if a leading-edge impingement element is built.
+  where: AIAA journal.
+- citation: Andreini, A., Champion, J. L., Facchini, B., Mercier, E., Surace, M. (2006). Advanced liner cooling
+    numerical analysis for low emission combustors. 25th ICAS Congress, Hamburg.
+  checked: false
+  issues:
+  - 387
+  priority: later
+  question: The effusion flat plate with measured overall effectiveness that CEAS-2007-026 validates against;
+    a second-lab cross-source set for EffusionPlateElement beside Andrews 88-GT-290, if the plate geometry
+    and conditions are printed.
+  where: ICAS 2006 proceedings (icas.org archive, open).
