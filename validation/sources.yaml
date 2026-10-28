@@ -1068,8 +1068,9 @@ documents:
     fidelity; it also fixes the documented Eq. 8 range (P/P0 >= ~0.7). No new closure: heat transfer stays
     Florschuetz 1981 at local Gc/Gj.'
   read_for: ['#474 Eq. 8 pressure range', '#467 bypass flow distribution', '#467 bypass heat transfer
-      (D.2)', '#713 eta_r reference temperature', '#729 starved/reversed rows']
-  issues: [467, 474, 683, 705, 706, 709, 721, 728, 729, 730, 734, 782, 802]
+      (D.2)', '#713 eta_r reference temperature', '#729 starved/reversed rows', '#799/#800 Table 4.1 C_D
+      with crossflow behind the D.1 reduction']
+  issues: [467, 474, 683, 705, 706, 709, 721, 728, 729, 730, 734, 782, 799, 800, 802]
   records: [validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630.md, validation/cooling/extractions/florschuetz_metzger_su_1982_cr3630_table_d2.md,
     validation/cooling/data/florschuetz_metzger_su1982/]
   code: ['python/combaero/network/impingement_array.py: bypass configuration (docstring cites CR-3630)',
@@ -1078,9 +1079,12 @@ documents:
       comparison (#782)']
   notes: 'Journal versions: Florschuetz, Metzger & Su (1984) JHT 106 (per #467); conference version NTRS_19850002659
     and Florschuetz & Isoda 82-GT-156. Table D.1''s Gj/Gj_mean is not measured flow: it is the authors'' Eq.
-    4.1 reduction (isentropic orifice, constant CD per plate, plenum P0/T0) of the measured channel static
-    pressures -- the same relation the network applies to its own pressures, so the D.1 Gj score is like for
-    like (#782). Table D.1 prints P/P0 to two decimals: P/P0 fidelity is floored at +/-0.005. Measurement
+    4.1 reduction (isentropic orifice, plenum P0/T0) of the measured channel static pressures, with the
+    CROSSFLOW-DEPENDENT CD of Table 4.1 (Eq. 4.2, break points per plate; the (10,x) laws inferred, not
+    measured) wherever Gc/Gj exceeds the break point (Sec. 4, printed pp. 25-27). Corrected 2026-10-28
+    (#799/#800): the earlier note here said constant CD; re-reducing the printed P/P0 with Table 4.1 closes
+    the high-crossflow tests far better (B(5,4,2) 1.01: 0.311 -> 0.079). A constant-Cd network is therefore
+    like for like with D.1 only below the break points; P/P0 is the measured quantity. Table D.1 prints P/P0 to two decimals: P/P0 fidelity is floored at +/-0.005. Measurement
     uncertainty (Appendix B, Section 4.4.1): Gj/Gj_mean about +/-2%, Gc/Gj +/-2 to 4%.'
 - file: docs/heat_transfer/flohrshuetz/NASA_CR-3936_Florschuetz_Su_1985_crossflow_temperature.pdf
   citation: Florschuetz, L. W., Su, C. C. (1985). Heat transfer characteristics within an array of impinging
