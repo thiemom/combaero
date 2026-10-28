@@ -2600,7 +2600,8 @@ are crossflow.
 **`ImpingementCrossflowElement`** is a `ChannelElement` (area `height *
 span`) plus the momentum the jets cost: they enter with no streamwise
 momentum, so each merge drops the static pressure by
-`(m_b|m_b| - m_a|m_a|)/(rho A^2)`. The drop is split half-and-half between
+`(m_b^2 - m_a^2)/(rho A^2)` (momentum flux m^2/(rho A), any flow direction,
+#815). The drop is split half-and-half between
 the segments either side, so each crossflow node holds the static pressure at
 its row centre. **Without this term every row sees the same pressure
 difference and the supply stays uniform.** That puts Gc/Gj at twice Eq. 8 on
@@ -2618,7 +2619,7 @@ match), otherwise an entry from that node's total pressure.
 channel segment whose end nodes are side-stream STATIONS. Over a station, with
 the side stream's axial velocity `kappa * u_arriving`:
 
-    dP_static = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+    dP_static = (m_b^2 - m_a^2 + kappa m_a (m_a - m_b)) / (rho A^2)
 
 | `kappa` | station | source |
 |---|---|---|

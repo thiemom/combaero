@@ -309,6 +309,23 @@ TEST(StationHalfDrop, NormalMergeIsTheImpingementTerm) {
   EXPECT_NEAR(h.dP, 0.5 * (0.021 * 0.021 - 0.015 * 0.015) / (rho * A * A), 1e-12 * h.dP);
 }
 
+TEST(StationHalfDrop, IsMirrorSymmetric) {
+  // #815: a station traversed the other way -- a and b swapped, both flows
+  // negated -- is the same physics, so the drop from a to b reverses sign.
+  // The momentum flux m u = m^2/(rho A) is positive either way; the m|m|
+  // form this replaced gave the SAME sign, a merge in a reversed chain
+  // raising the static pressure along the flow.
+  const auto X = air();
+  const double P = 1.0e5, T = 300.0, A = 2e-3;
+  for (const auto& [ma, mb] : {std::pair{0.10, 0.13}, std::pair{0.10, 0.07}, std::pair{-0.04, 0.05}}) {
+    const double fwd = combaero::station_half_drop(ma, mb, P, T, X, A, 0.0).dP;
+    const double mir = combaero::station_half_drop(-mb, -ma, P, T, X, A, 0.0).dP;
+    EXPECT_NEAR(mir, -fwd, 1e-12 * std::abs(fwd));
+  }
+  // A symmetric split (the side stream leaves both ways): no net drop.
+  EXPECT_NEAR(combaero::station_half_drop(-0.05, 0.05, P, T, X, A, 0.0).dP, 0.0, 1e-12);
+}
+
 TEST(StationHalfDrop, DerivativesMatchCentralDifferences) {
   const auto X = air();
   const double P = 1.1e5, T = 420.0, A = 2e-3, e = 1e-8;
@@ -324,7 +341,7 @@ TEST(StationHalfDrop, DerivativesMatchCentralDifferences) {
         const double fP = (f(ma, mb, P + 1.0, T) - f(ma, mb, P - 1.0, T)) / 2.0;
         const double fT = (f(ma, mb, P, T + 1e-3) - f(ma, mb, P, T - 1e-3)) / 2e-3;
         // Absolute floor: round-off of a ~1e2 Pa value over a 1e-8 step,
-        // where the analytic slope can be exactly 0 (2|m_b| = kappa m_a).
+        // where the analytic slope can be exactly 0 (2 m_b = kappa m_a).
         EXPECT_NEAR(r.d_dm_a, fa, 1e-6 * std::abs(fa) + 1e-4);
         EXPECT_NEAR(r.d_dm_b, fb, 1e-6 * std::abs(fb) + 1e-4);
         EXPECT_NEAR(r.d_dP, fP, 1e-5 * std::abs(fP) + 1e-12);

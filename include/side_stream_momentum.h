@@ -28,9 +28,14 @@ namespace combaero {
 // With the side stream's AXIAL velocity written as u_s = kappa * u_a,
 // momentum over the station gives the static-pressure DROP
 //
-//   dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+//   dP = (m_b^2 - m_a^2 + kappa m_a (m_a - m_b)) / (rho A^2)
 //
-// at the station node's own density.
+// at the station node's own density. The momentum flux m u = m^2/(rho A) is
+// positive whichever way the gas moves, so the form holds for reversed flow
+// and for a station the flow leaves both ways (#815). An m|m| form, used
+// until #815, flipped the sign of the drop for reversed flow: a merge in a
+// reversed chain RAISED the static pressure along the flow, and a split
+// station had no physical root.
 //
 //   kappa = 0     normal injection (merge): the jets bring no axial momentum.
 //                 Florschuetz's P + G^2/rho = const; the #465 impingement term.

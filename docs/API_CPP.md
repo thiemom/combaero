@@ -1147,7 +1147,7 @@ ImpingementEtaR impingement_eta_r(double Gc_Gj, double xn_d, double yn_d,
 
 // One side-stream station, half at a time (#465, #471). m_a arrives, m_b
 // leaves along the channel; the side stream's axial velocity is kappa*u_a:
-//   dP = (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) / (rho A^2)
+//   dP = (m_b^2 - m_a^2 + kappa m_a (m_a - m_b)) / (rho A^2)   (m^2: any flow direction, #815)
 // kappa = 0: normal injection (merge, Florschuetz). kappa = 0.75: bleed,
 // Bassett et al. (2001) K2/K5 Eq. 15 exactly. A segment carries half of the
 // station at each end, each at its node's density.

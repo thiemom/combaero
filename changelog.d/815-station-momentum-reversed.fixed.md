@@ -1,0 +1,8 @@
+- **Crossflow stations hold for reversed flow (#815).** `station_half_drop` used m|m| for the channel's momentum flux. The flux, m u = m^2/(rho A), is positive whichever way the gas moves, so the drop now uses m^2. Forward flow is unchanged.
+  - **Before, with reversed flow** through a station:
+    - a merge in a reversed chain RAISED the static pressure along the flow, acting as a pump: a mirrored chain ran 1.7x the flow, with its stations below the exit pressure;
+    - a station the flow leaves both ways (a side stream splitting) had no physical root. Incompressible did not converge, and compressible landed on a root the second law rejected.
+  - **Now:**
+    - a reversed chain is its forward mirror: identical compressible, within 0.5% incompressible;
+    - a split station solves symmetrically and passes the second law.
+  - **Validation:** every scorecard is unchanged (CR-3630 D.1 and D.2, Florschuetz 1981), since their channel flows run forward.

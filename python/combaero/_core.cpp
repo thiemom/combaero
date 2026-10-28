@@ -734,9 +734,9 @@ PYBIND11_MODULE(_core, m) {
         py::arg("P"), py::arg("T"), py::arg("X"), py::arg("area"), py::arg("kappa"),
         "Half the static-pressure drop over one side-stream station (m_a\n"
         "arriving, m_b leaving along a channel of area A), at the station\n"
-        "node's density: (m_b|m_b| - m_a|m_a| + kappa m_a (m_a - m_b)) /\n"
-        "(2 rho A^2). kappa = 0: normal injection (merge); kappa = 0.75:\n"
-        "bleed, Bassett et al. (2001) K2/K5 exactly.");
+        "node's density: (m_b^2 - m_a^2 + kappa m_a (m_a - m_b)) / (2 rho A^2),\n"
+        "any flow direction (#815). kappa = 0: normal injection (merge);\n"
+        "kappa = 0.75: bleed, Bassett et al. (2001) K2/K5 exactly.");
   m.def("segment_area_change_drop", &combaero::segment_area_change_drop, py::arg("m"),
         py::arg("P"), py::arg("T"), py::arg("X"), py::arg("area_from"), py::arg("area_to"),
         "Static drop over a duct segment from its area change alone (#812):\n"
