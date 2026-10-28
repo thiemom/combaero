@@ -1209,7 +1209,8 @@ MergeFaceState chamber_merge_face_state(
     double side_momentum, double area, bool incompressible = false);
 
 // Streamwise jet impulse per unit cos(theta), J = m w: isentropic velocity to
-// P (variable cp), or choked: w = u* + (P* - P)/(rho* u*). C1 across choking;
+// P (variable cp), or choked: w = u* + (P* - P)/(rho* u*), the sonic point
+// on the isentrope at M = 1. Partials analytic (#816). C1 across choking;
 // Cd does not enter.
 struct JetImpulse { double J, dJ_dm, dJ_dPt, dJ_dTt, dJ_dP; bool choked; };
 JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
