@@ -115,7 +115,7 @@ class TestPressureLossElementResidual:
                 Y[k] = 0.767
             elif name == "O2":
                 Y[k] = 0.233
-        return NetworkMixtureState(P=Pt, Pt=Pt, T=T, Tt=T, m_dot=m_dot, Y=Y)
+        return NetworkMixtureState(P=Pt, Pt=Pt, Tt=T, m_dot=m_dot, Y=Y)
 
     def test_constant_fraction_residual_zero_at_exact_ratio(self) -> None:
         """res == 0 iff Pt_out / Pt_in == (1 - xi)."""
@@ -203,7 +203,7 @@ def _air_mixture_state(P: float = 150000.0, T: float = 700.0, m_dot: float = 1.0
             Y[k] = 0.767
         elif name == "O2":
             Y[k] = 0.233
-    return NetworkMixtureState(P=P, Pt=P, T=T, Tt=T, m_dot=m_dot, Y=Y)
+    return NetworkMixtureState(P=P, Pt=P, Tt=T, m_dot=m_dot, Y=Y)
 
 
 class TestPressureLossElementConvectiveSurface:

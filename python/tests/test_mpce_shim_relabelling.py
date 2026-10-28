@@ -61,7 +61,7 @@ def _element(flow_direction: str = "branch") -> MultiPortChamberElement:
 
 def _states():
     return [
-        NetworkMixtureState(P=1.0e5, Pt=100_300.0, T=300.0, Tt=300.5, m_dot=0.0, Y=list(_Y))
+        NetworkMixtureState(P=1.0e5, Pt=100_300.0, Tt=300.5, m_dot=0.0, Y=list(_Y))
         for _ in range(3)
     ]
 
@@ -146,8 +146,7 @@ def test_each_named_column_matches_a_finite_difference(direction, mdots):
 
     def residual(perturb=None):
         local = [
-            NetworkMixtureState(P=s.P, Pt=s.Pt, T=s.T, Tt=s.Tt, m_dot=s.m_dot, Y=list(s.Y))
-            for s in states
+            NetworkMixtureState(P=s.P, Pt=s.Pt, Tt=s.Tt, m_dot=s.m_dot, Y=list(s.Y)) for s in states
         ]
         flows = list(mdots)
         if perturb is not None:
@@ -156,7 +155,6 @@ def test_each_named_column_matches_a_finite_difference(direction, mdots):
                 local[index] = NetworkMixtureState(
                     P=local[index].P + delta,
                     Pt=local[index].Pt,
-                    T=local[index].T,
                     Tt=local[index].Tt,
                     m_dot=local[index].m_dot,
                     Y=list(local[index].Y),
@@ -165,7 +163,6 @@ def test_each_named_column_matches_a_finite_difference(direction, mdots):
                 local[index] = NetworkMixtureState(
                     P=local[index].P,
                     Pt=local[index].Pt + delta,
-                    T=local[index].T,
                     Tt=local[index].Tt,
                     m_dot=local[index].m_dot,
                     Y=list(local[index].Y),

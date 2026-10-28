@@ -79,7 +79,7 @@ def test_the_static_rise_is_the_swirl_head_given_up() -> None:
         r = _solve(_net(r_in=r_in, r_out=r_out, v_theta_in=40.0))
         assert r["__converged__"], r["__message__"]
         d = r["vx.v_theta_in"], r["vx.v_theta_out"]
-        rho = cb.density(r["p1.T"], r["vx.P_swirl_in"], X)
+        rho = cb.density(r["p1.Tt"], r["vx.P_swirl_in"], X)
         expect = 0.5 * rho * (d[0] ** 2 - d[1] ** 2)
         assert r["vx.dP_swirl_static"] == pytest.approx(expect, rel=0.01)
         assert math.copysign(1.0, r["vx.dP_swirl_static"]) == math.copysign(1.0, r_out - r_in)

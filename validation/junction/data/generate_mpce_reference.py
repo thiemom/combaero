@@ -66,7 +66,7 @@ def _states(P: list[float], Pt: list[float], T: float) -> list[NetworkMixtureSta
     # Tt and m_dot play no part in the junction residual; the element reads
     # Pt, and density() reads T, P and Y.
     return [
-        NetworkMixtureState(P=p, Pt=pt, T=T, Tt=T, m_dot=0.0, Y=list(_Y))
+        NetworkMixtureState(P=p, Pt=pt, Tt=T, m_dot=0.0, Y=list(_Y))
         for p, pt in zip(P, Pt, strict=True)
     ]
 
@@ -164,9 +164,9 @@ def render() -> str:
         drho = np.zeros(_N)
         for i, s in enumerate(states):
             h = max(abs(case["P"][i]) * _FD_REL, 1.0)
-            hi = NetworkMixtureState(P=case["P"][i] + h, Pt=case["Pt"][i], T=case["T"],
+            hi = NetworkMixtureState(P=case["P"][i] + h, Pt=case["Pt"][i],
                                      Tt=case["T"], m_dot=0.0, Y=list(_Y))
-            lo = NetworkMixtureState(P=case["P"][i] - h, Pt=case["Pt"][i], T=case["T"],
+            lo = NetworkMixtureState(P=case["P"][i] - h, Pt=case["Pt"][i],
                                      Tt=case["T"], m_dot=0.0, Y=list(_Y))
             drho[i] = (float(hi.density()) - float(lo.density())) / (2.0 * h)
 

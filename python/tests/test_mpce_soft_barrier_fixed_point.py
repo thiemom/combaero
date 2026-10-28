@@ -146,9 +146,9 @@ def test_the_barrier_fixed_point_follows_the_closed_form():
     e0 = float(element._port_signs[0])
     port_mdots = [-e0 * slack_star, -0.04, 0.10]
     states = [
-        NetworkMixtureState(P=98_000.0, Pt=Pt_jct - dP, T=300.0, Tt=300.5, m_dot=0.0, Y=list(_Y)),
-        NetworkMixtureState(P=98_000.0, Pt=Pt_jct, T=300.0, Tt=300.5, m_dot=0.0, Y=list(_Y)),
-        NetworkMixtureState(P=98_000.0, Pt=Pt_jct, T=300.0, Tt=300.5, m_dot=0.0, Y=list(_Y)),
+        NetworkMixtureState(P=98_000.0, Pt=Pt_jct - dP, Tt=300.5, m_dot=0.0, Y=list(_Y)),
+        NetworkMixtureState(P=98_000.0, Pt=Pt_jct, Tt=300.5, m_dot=0.0, Y=list(_Y)),
+        NetworkMixtureState(P=98_000.0, Pt=Pt_jct, Tt=300.5, m_dot=0.0, Y=list(_Y)),
     ]
 
     residuals, _ = element._soft_barrier_residual(states, Pt_jct, port_mdots)

@@ -69,7 +69,7 @@ def _states(p_common: float = _P_COMMON, pt_shift: float = 0.0):
     pressures = [p_common, 100_000.0, 100_000.0]
     totals = [100_300.0 + pt_shift, 100_300.0, 100_300.0]
     return [
-        NetworkMixtureState(P=pressures[i], Pt=totals[i], T=300.0, Tt=300.5, m_dot=0.0, Y=_Y)
+        NetworkMixtureState(P=pressures[i], Pt=totals[i], Tt=300.5, m_dot=0.0, Y=_Y)
         for i in range(3)
     ]
 
@@ -117,9 +117,7 @@ def test_row_derivative_wrt_port_total_pressure(factory, row: int):
     def shifted(delta: float):
         out = list(_states())
         s = out[row]
-        out[row] = NetworkMixtureState(
-            P=s.P, Pt=s.Pt + delta, T=s.T, Tt=s.Tt, m_dot=s.m_dot, Y=list(s.Y)
-        )
+        out[row] = NetworkMixtureState(P=s.P, Pt=s.Pt + delta, Tt=s.Tt, m_dot=s.m_dot, Y=list(s.Y))
         return out
 
     expected = (

@@ -50,7 +50,7 @@ def _plate(**kw) -> ImpingementPlateElement:
 
 
 def _state(m_dot: float, T: float = 300.0, P: float = 1.03e5) -> NetworkMixtureState:
-    return NetworkMixtureState(T=T, P=P, Pt=P, Tt=T, m_dot=m_dot, Y=Y_AIR)
+    return NetworkMixtureState(P=P, Pt=P, Tt=T, m_dot=m_dot, Y=Y_AIR)
 
 
 def test_geometry_follows_the_plate_design() -> None:

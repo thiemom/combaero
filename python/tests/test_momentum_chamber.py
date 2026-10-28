@@ -295,6 +295,7 @@ def test_closure_jacobian_matches_central_differences(M: float, sign: float) -> 
     assert r.drho_dY[k_co2] == pytest.approx(fd_rho, rel=1e-6)
 
 
+@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
 def test_node_reports_the_static_state_its_closure_used() -> None:
     """mach, rho and T_static of a solved chamber come from the static state,
     not from its stagnation T."""
@@ -315,9 +316,9 @@ def test_node_reports_the_static_state_its_closure_used() -> None:
     solver = NetworkSolver(graph)
     sol = solver.solve()
     assert sol["__success__"]
-    T0 = sol["chamber.T"]
+    T0 = sol["chamber.Tt"]
     P = sol["chamber.P"]
-    T_static = sol["chamber.T_static"]
+    T_static = sol["chamber.T"]
     v = 0.5 / (sol["chamber.rho"] * chamber.area)
     # Energy: h(T0) = h(T) + v^2 / 2, at the reported static state.
     assert cb.h_mass(T0, _X_AIR) - cb.h_mass(T_static, _X_AIR) == pytest.approx(
@@ -345,9 +346,9 @@ def test_an_incompressible_chamber_reports_its_low_mach_state() -> None:
     )
     sol = NetworkSolver(graph).solve()
     assert sol["__success__"]
-    T0, P, Pt = sol["chamber.T"], sol["chamber.P"], sol["chamber.Pt"]
+    T0, P, Pt = sol["chamber.Tt"], sol["chamber.P"], sol["chamber.Pt"]
     rho = float(cb.density(T0, P, _X_AIR))
     v = 0.5 / (rho * chamber.area)
-    assert sol["chamber.T_static"] == pytest.approx(T0, rel=1e-12)
+    assert sol["chamber.T"] == pytest.approx(T0, rel=1e-12)
     assert sol["chamber.rho"] == pytest.approx(rho, rel=1e-9)
     assert Pt - P == pytest.approx(0.5 * rho * v * v, rel=1e-9)

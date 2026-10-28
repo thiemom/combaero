@@ -111,7 +111,7 @@ def test_round_trip_recovers_the_heat(node: str, regime: str, Q1: float) -> None
     """Solve with Q = Q1 for Tt1; solve with Tt_target = Tt1 and get Q1 back."""
     r1 = NetworkSolver(_chain(EnergyBoundary("h", Q=Q1), node, regime)).solve()
     assert r1["__success__"]
-    Tt1 = r1["p.T"]
+    Tt1 = r1["p.Tt"]
     assert (Tt1 > 400.0) == (Q1 > 0.0)
     assert r1["h.Q"] == Q1 and r1["p.Q"] == Q1  # reported in fixed mode too
 
@@ -119,8 +119,8 @@ def test_round_trip_recovers_the_heat(node: str, regime: str, Q1: float) -> None
     assert r2["__success__"], r2["__message__"]
     assert r2["h.Q"] == pytest.approx(Q1, rel=1e-8)
     assert r2["p.Q"] == pytest.approx(Q1, rel=1e-8)
-    assert r2["p.T"] == pytest.approx(Tt1, abs=1e-6)
-    for k in ("o1.m_dot", "p.P", "q.T"):
+    assert r2["p.Tt"] == pytest.approx(Tt1, abs=1e-6)
+    for k in ("o1.m_dot", "p.P", "q.Tt"):
         assert r2[k] == pytest.approx(r1[k], rel=1e-7)
 
 
@@ -133,7 +133,7 @@ def test_round_trip_on_a_combustor_is_the_heat_after_the_reaction() -> None:
     assert r1["__success__"]
 
     net2, comb2 = tcr._make_effective_area_inlet_network()
-    comb2.add_energy_boundary(EnergyBoundary("loss", Tt_target=r1["comb.T"]))
+    comb2.add_energy_boundary(EnergyBoundary("loss", Tt_target=r1["comb.Tt"]))
     r2 = NetworkSolver(net2).solve()
     assert r2["__success__"], r2["__message__"]
     assert r2["loss.Q"] == pytest.approx(-1.5e5, rel=1e-8)
@@ -146,7 +146,7 @@ def test_a_target_beside_a_fixed_heat_solves_for_the_rest() -> None:
     is what the fixed one leaves; the node reports the sum."""
     r1 = NetworkSolver(_chain(EnergyBoundary("h", Q=3.0e4))).solve()
     g = _chain(EnergyBoundary("fixed", Q=1.0e4))
-    g.nodes["p"].add_energy_boundary(EnergyBoundary("trim", Tt_target=r1["p.T"]))
+    g.nodes["p"].add_energy_boundary(EnergyBoundary("trim", Tt_target=r1["p.Tt"]))
     r2 = NetworkSolver(g).solve()
     assert r2["__success__"]
     assert r2["fixed.Q"] == 1.0e4
@@ -159,7 +159,7 @@ def test_reverse_flow_through_the_node() -> None:
     the target still fixes Q, the same heat the fixed-Q twin applies."""
     r1 = NetworkSolver(_chain(EnergyBoundary("h", Q=2.0e4), Pa=1.0e5, Pb=1.3e5)).solve()
     assert r1["__success__"] and r1["o1.m_dot"] < 0.0 and r1["o2.m_dot"] < 0.0
-    g = _chain(EnergyBoundary("h", Tt_target=r1["p.T"]), Pa=1.0e5, Pb=1.3e5)
+    g = _chain(EnergyBoundary("h", Tt_target=r1["p.Tt"]), Pa=1.0e5, Pb=1.3e5)
     s = NetworkSolver(g)
     r2 = s.solve()
     assert r2["__success__"], r2["__message__"]
@@ -268,7 +268,7 @@ def test_the_jacobian_matches_differences_on_a_combustor_with_a_theta_loss() -> 
     s = NetworkSolver(net)
     r = s.solve()
     assert r["__success__"], r["__message__"]
-    assert r["comb.T"] == pytest.approx(1500.0, abs=1e-6)
+    assert r["comb.Tt"] == pytest.approx(1500.0, abs=1e-6)
     assert _jac_err(s, np.array(r["__x_solution__"])) < 2e-5
 
 
@@ -281,7 +281,7 @@ def test_the_ledgers_use_the_solved_heat(Q1: float) -> None:
     would leave the balance open by Q1 -- far above its bound), and the second
     law sees the same heat as the fixed-Q twin."""
     r1 = NetworkSolver(_chain(EnergyBoundary("h", Q=Q1))).solve()
-    r2 = NetworkSolver(_chain(EnergyBoundary("h", Tt_target=r1["p.T"]))).solve()
+    r2 = NetworkSolver(_chain(EnergyBoundary("h", Tt_target=r1["p.Tt"]))).solve()
     assert r2["__success__"]
     led = r2["__ledger__"]
     assert led["Q_given"] == pytest.approx(r2["h.Q"], rel=1e-12)

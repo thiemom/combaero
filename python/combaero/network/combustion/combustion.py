@@ -183,7 +183,6 @@ def combustion_from_phi(
     state_fuel = NetworkMixtureState(
         P=state_air.P,
         Pt=state_air.Pt,
-        T=state_air.Tt,
         Tt=state_air.Tt,
         m_dot=fuel_cb.mdot,
         Y=list(cb.mole_to_mass(list(X_fuel))),

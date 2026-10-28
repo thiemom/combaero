@@ -1332,9 +1332,9 @@ fluid. Three modes:
   - Set `m_ref` wherever the flow may run low or reverse. A constant fraction holds a pressure difference at zero flow, and a reversing flow cannot be carried through it.
   - **The four built-in loss classes evaluate in C++** (`cb.combustor_fraction_loss`, `cb.combustor_head_loss`, #718). `corr.evaluate(ctx, Y_in)` returns a `CombustorLossResult` (`xi` and its partials in theta, m_dot, T_in, P_in and each inlet `Y_k`), and `PressureLossElement` builds its Jacobian from it. Calling the class still returns `(xi, dxi/dtheta)`.
   - **A user-supplied callable** returning `(xi, dxi/dtheta)` still works. Its other dependences are central differences; that interface is the prototype for loss maps (#725).
-- **A `MomentumChamberNode`'s `T` is its stagnation temperature** (#576). Its inflows mix as `(m, Tt, Pt, Y)` streams. The closure solves the static T from `h(T0) = h(T) + v^2/2`, `v = m_dot / (rho(T, P) A)`, and closes `Pt = P exp((s(T0) - s(T)) / R)`.
-  - The node's `mach` and its reported properties (`rho`, `a`, `velocity`, `Re`, plus a new `T_static`) come from that static state.
-  - Every node's result key `T`, and every element's `T_in`/`T_out`, is this TOTAL temperature, unlike `P`, which is static. Bringing temperature in line with `P`/`Pt` is #782.
+- **A `MomentumChamberNode` carries its stagnation temperature `Tt`** (#576). Its inflows mix as `(m, Tt, Pt, Y)` streams. The closure solves the static T from `h(T0) = h(T) + v^2/2`, `v = m_dot / (rho(T, P) A)`, and closes `Pt = P exp((s(T0) - s(T)) / R)`.
+  - The node's `mach` and its reported properties (`rho`, `a`, `velocity`, `Re`, plus its static `T`, reported as `T_static` until 0.9.0) come from that static state.
+  - Since 0.8 every node's result key `T`, and every element's `T_in`/`T_out`, is the STATIC temperature, like `P`; the total is `Tt`, `Tt_in`/`Tt_out` (#782, see [Static T in network results](#static-t-in-network-results-08)).
   - `MomentumChamberNode.static_density(state)` returns `(rho, {name: d rho / d name})`. Junction elements (`MultiPortChamberBase.port_densities`) take their port densities from it, so a port's momentum rows and its node's Pt describe the same flow.
   - The chamber now passes up to the true choked flux. Before, T0 read as static capped it at 92 % of choked.
   - The merge-chamber face state (`cb.chamber_merge_face_state`) takes both temperatures as stagnation and solves the face's and the outlet's static states; its sensitivities are analytic (#578).
@@ -2037,7 +2037,7 @@ result = runner.solve({
 print(result.success, result.final_norm)
 
 # Scalar result by label.quantity (resolves label → node ID automatically)
-T_combustor = result.get("combustor.T")         # K
+T_combustor = result.get("combustor.Tt")         # K
 phi          = result.get("combustor.phi")
 m_dot_out    = result.get("hot_channel.m_dot")  # kg/s
 
@@ -2070,8 +2070,8 @@ params = pd.DataFrame({
 })
 
 # Compact: one row per solve, only requested metrics
-sweep_df = runner.sweep(params, metrics=["combustor.T", "combustor.phi"])
-# columns: fuel_inlet.m_dot | combustor.T | combustor.phi | success | final_norm
+sweep_df = runner.sweep(params, metrics=["combustor.Tt", "combustor.phi"])
+# columns: fuel_inlet.m_dot | combustor.Tt | combustor.phi | success | final_norm
 
 # Full detail: complete to_dataframe() output for each solve, stacked
 full_df = runner.sweep(params)
@@ -2128,7 +2128,7 @@ result2 = p_runner.solve()  # starts from solved state, converges immediately
 import pandas as pd, numpy as np
 design_Pt = result.node_state("air_inlet")["Pt"]
 params = pd.DataFrame({"air_inlet.Pt": design_Pt * np.linspace(0.90, 1.10, 11)})
-sweep_df = p_runner.sweep(params, metrics=["combustor.T"])
+sweep_df = p_runner.sweep(params, metrics=["combustor.Tt"])
 ```
 
 Only `mass_boundary` ↔ `pressure_boundary` swaps are supported.  The returned
@@ -3031,7 +3031,39 @@ Kept: `Pt0`/`Tt0` of the Fanno functions (`fanno_channel_flow`,
 `fanno_rayleigh_*`, `area_change_*`) -- the `t` already says total and the
 `0` is the inlet station, paired with `Tt_exit` -- and `T_from_stagnation` /
 `P_from_stagnation`, whose names already say what they take. Network result
-keys and `NetworkMixtureState` are unchanged here.
+keys and `NetworkMixtureState` are the next section.
+
+### Static T in network results (0.8)
+
+`P` and `T` are static, `Pt` and `Tt` total, in network results too (#782):
+
+| Key | Until 0.7 | Since 0.8 |
+|---|---|---|
+| `"<node>.T"` | stagnation T | **static** T; the stagnation T is `"<node>.Tt"` |
+| element `T_in`, `T_out` (`result["__element_diag__"][id]`) | stagnation T of the end nodes | **static** T of the end nodes, as `P_in`/`P_out`; `Tt_in`/`Tt_out` unchanged |
+| `"<chamber>.T_static"` | a momentum chamber's static T | deprecated alias of `"<chamber>.T"`, removed in 0.9.0 |
+| `NetworkMixtureState.T` | a field, filled with `Tt` | a computed property, the static T |
+
+The static T is regime-aware. A plenum (`P = Pt`) and an incompressible
+node report `T = Tt`, the low-Mach limit their closures solve. A moving
+compressible node's `T` lies on the isentrope through (`Tt`, `Pt`) at `P`;
+a momentum chamber reports the static T its closure solved, which is that
+point.
+
+The same key name changed meaning, so code that read `"<node>.T"` as the
+total temperature keeps running with a different number. In 0.8 the result
+of `NetworkSolver.solve()` warns once (`FutureWarning`) the first time such a
+key is read where its value differs from the `Tt` one. Read `Tt` for the
+total temperature. The warning goes in 0.9.0.
+
+`NetworkMixtureState(P, Pt, T, Tt, m_dot, Y)` still accepts `T`, and
+`state.T = ...` still assigns, both with a `DeprecationWarning`: they set
+`Tt`, which is what `T` held. Pass `Tt=` (and `incompressible=` for a node in
+that regime). Removed in 0.9.0.
+
+No residual reads `NetworkMixtureState.T` (#825), so solutions are
+unchanged. Where the properties of a moving gas want the static T and still
+take the stagnation one is #824.
 
 ---
 

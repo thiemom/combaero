@@ -145,7 +145,7 @@ def main():
     print(f"{'Node':<25} {'T [K]':>10} {'P_tot [kPa]':>12}")
     print("-" * 50)
     for node_id in ["pilot_zone", "main_zone", "intermediate_exit", "axial_zone"]:
-        T = sol[f"{node_id}.T"]
+        T = sol[f"{node_id}.Tt"]
         P = sol[f"{node_id}.Pt"] / 1e3
         print(f"{node_id:<25} {T:10.2f} {P:12.2f}")
 

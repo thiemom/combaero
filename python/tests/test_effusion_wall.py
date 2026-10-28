@@ -78,7 +78,7 @@ def test_a_chamber_discharge_takes_its_gas_side_from_the_chamber() -> None:
     d = r["__element_diag__"]["eff"]
     ch = s.network.nodes["ch"]
     T, P = s._derived_states["ch"][0], r["ch.P"]
-    state = NetworkMixtureState(T=T, P=P, Pt=r["ch.Pt"], Tt=T, m_dot=0.0, Y=Y_AIR)
+    state = NetworkMixtureState(P=P, Pt=r["ch.Pt"], Tt=T, m_dot=0.0, Y=Y_AIR)
     gas = ch.htc_and_T(state)
     assert d["gas_side_chamber"] == 1.0
     assert d["h_gas_unblown"] == pytest.approx(gas.h, rel=1e-6)
@@ -107,7 +107,7 @@ def test_the_wall_is_the_validated_closure_when_conduction_vanishes() -> None:
     s, r = _liner(wall_conductivity=1e9, gas_augmentation=1.7)
     d = r["__element_diag__"]["eff"]
     eff = s.network.elements["eff"]
-    supply = NetworkMixtureState(T=600.0, P=1.03e5, Pt=1.03e5, Tt=600.0, m_dot=d["m_dot"], Y=Y_AIR)
+    supply = NetworkMixtureState(P=1.03e5, Pt=1.03e5, Tt=600.0, m_dot=d["m_dot"], Y=Y_AIR)
     ref = eff.overall_effectiveness(supply, d["h_gas_unblown"], d["T_gas"], gas_augmentation=1.7)
     assert d["eta_overall"] == pytest.approx(ref["eta_overall"], rel=1e-6)
     assert d["T_wall_hot"] == pytest.approx(ref["T_wall"], rel=1e-6)

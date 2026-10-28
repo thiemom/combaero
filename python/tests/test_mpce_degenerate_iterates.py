@@ -47,9 +47,7 @@ def _element(flow_direction: str = "branch", strict: bool = False) -> MultiPortC
 
 
 def _states(pt=(100_300.0, 100_100.0, 100_050.0)):
-    return [
-        NetworkMixtureState(P=1.0e5, Pt=pt[i], T=300.0, Tt=300.5, m_dot=0.0, Y=_Y) for i in range(3)
-    ]
+    return [NetworkMixtureState(P=1.0e5, Pt=pt[i], Tt=300.5, m_dot=0.0, Y=_Y) for i in range(3)]
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,9 @@
+- **Network results report the STATIC temperature under `T` (#782), as they already did for `P`.** The same key name changed meaning.
+  - `"<node>.T"` and every element's `T_in`/`T_out` are the static temperature. Until 0.7 they held the stagnation temperature, which is now `"<node>.Tt"` (on every node) and `Tt_in`/`Tt_out`.
+  - A momentum chamber's `"<chamber>.T"` is the static T its closure solved, formerly `"<chamber>.T_static"`.
+  - The static T is regime-aware. A plenum (`P = Pt`) and an incompressible node report `T = Tt`. A moving compressible node's `T` lies on the isentrope through (`Tt`, `Pt`) at its static `P`.
+  - Reading such a key on a `solve()` result warns once (`FutureWarning`) where its value differs from the `Tt` one.
+  - Solutions are unchanged: no residual reads `T` (#825). The residual vector and Jacobian are bit-identical on all 560 stress networks.
+  - `extract_complete_states()` now pairs the static `P` with the static `T`.
+- **`NetworkMixtureState.T` is a computed property, the static temperature.** The constructor takes `incompressible=` for a node in that regime.
+- **GUI:** node cards show `Tt` by default; `T`, `T_in` and `T_out` are labelled static.

@@ -26,8 +26,8 @@ Y_AIR = list(cb.mole_to_mass(cb.species.dry_air()))
 
 
 def _states() -> tuple[NetworkMixtureState, NetworkMixtureState]:
-    up = NetworkMixtureState(P=1.9e5, Pt=2e5, T=598.0, Tt=600.0, m_dot=0.1, Y=list(Y_AIR))
-    dn = NetworkMixtureState(P=1.8e5, Pt=1.8e5, T=598.0, Tt=598.0, m_dot=0.1, Y=list(Y_AIR))
+    up = NetworkMixtureState(P=1.9e5, Pt=2e5, Tt=600.0, m_dot=0.1, Y=list(Y_AIR))
+    dn = NetworkMixtureState(P=1.8e5, Pt=1.8e5, Tt=598.0, m_dot=0.1, Y=list(Y_AIR))
     return up, dn
 
 

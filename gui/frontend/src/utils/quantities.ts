@@ -213,14 +213,19 @@ export const QUANTITY_CATALOGUE: Record<
 		format: (v) => (v ? "yes" : "no"),
 	},
 	Q: { label: "Q", unit: "W", format: (v) => v.toFixed(0) },
-	// State results (accessed via result.state.*). T is the node's TOTAL
-	// temperature at every node (the propagated, mixed Tt); a momentum
-	// chamber's static T is T_static. P is static (#773). The T/Tt key
-	// convention is #782.
+	// State results (accessed via result.state.*). P and T are static, Pt and
+	// Tt total (#773, #782): until 0.7 T held the total temperature. T is Tt
+	// at a plenum and an incompressible node; a moving compressible node's T
+	// is on the isentrope through (Tt, Pt). T_static is the old name of a
+	// momentum chamber's T, emitted until 0.9.0.
 	P: { label: "P", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	Pt: { label: "Pt", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
-	T: { label: "T (total)", unit: "K", format: (v) => v.toFixed(2) },
-	T_static: { label: "T (static)", unit: "K", format: (v) => v.toFixed(2) },
+	T: { label: "T (static)", unit: "K", format: (v) => v.toFixed(2) },
+	T_static: {
+		label: "T_static (deprecated: T)",
+		unit: "K",
+		format: (v) => v.toFixed(2),
+	},
 	Tt: { label: "Tt", unit: "K", format: (v) => v.toFixed(2) },
 	// A heat source's set outlet temperature (#792): a TOTAL temperature.
 	Tt_target: {
@@ -272,12 +277,12 @@ export const QUANTITY_CATALOGUE: Record<
 		unit: "—",
 		format: (v) => v.toFixed(0),
 	},
-	// Element end states: P_in/P_out static, T_in/T_out the end nodes'
-	// TOTAL temperature (equal to Tt_in/Tt_out until #782).
+	// Element end states: P_in/P_out and T_in/T_out the end nodes' static
+	// state (T_in/T_out were the total temperature until 0.7, #782).
 	P_in: { label: "Pi", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	P_out: { label: "Po", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
-	T_in: { label: "Ti (total)", unit: "K", format: (v) => v.toFixed(2) },
-	T_out: { label: "To (total)", unit: "K", format: (v) => v.toFixed(2) },
+	T_in: { label: "Ti (static)", unit: "K", format: (v) => v.toFixed(2) },
+	T_out: { label: "To (static)", unit: "K", format: (v) => v.toFixed(2) },
 	// Element-specific diagnostics (Total)
 	Pt_in: { label: "Pti", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },
 	Pt_out: { label: "Pto", unit: "bar", format: (v) => (v / 1e5).toFixed(3) },

@@ -1,0 +1,5 @@
+- **`"<chamber>.T_static"`, `NetworkMixtureState(T=...)` (and the positional `T` of `(P, Pt, T, Tt, m_dot, Y)`), and assigning `state.T` are deprecated and will be removed in 0.9.0 (#782).**
+  - `"<chamber>.T_static"` returns the same value as `"<chamber>.T"`.
+  - The constructor argument and the assignment set `Tt`, which is what `T` held until 0.7.
+  - Each warns with a `DeprecationWarning`.
+  - The 0.8 `FutureWarning` on reading a changed `T` key goes in 0.9.0 too.

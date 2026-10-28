@@ -53,10 +53,7 @@ def _element(flow_direction: str = "branch") -> MultiPortChamberElement:
 
 
 def _states():
-    return [
-        NetworkMixtureState(P=1.0e5, Pt=100_300.0, T=300.0, Tt=300.5, m_dot=0.0, Y=_Y)
-        for _ in range(3)
-    ]
+    return [NetworkMixtureState(P=1.0e5, Pt=100_300.0, Tt=300.5, m_dot=0.0, Y=_Y) for _ in range(3)]
 
 
 _BRANCH_MDOTS = [-0.10, 0.06, 0.04]  # one supplier -> sympy Jacobian path

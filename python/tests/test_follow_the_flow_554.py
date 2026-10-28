@@ -61,8 +61,8 @@ _AIR = list(cb.mole_to_mass(cb.species.dry_air()))
 def _states(m: float) -> tuple[NetworkMixtureState, NetworkMixtureState]:
     # Declared inlet at 1.2 bar / 300 K, outlet at 1.5 bar / 450 K: reversed,
     # and the two sides' densities differ by ~13%.
-    s_in = NetworkMixtureState(T=300.0, P=1.2e5, Pt=1.2e5, Tt=300.0, m_dot=m, Y=_AIR)
-    s_out = NetworkMixtureState(T=450.0, P=1.5e5, Pt=1.5e5, Tt=450.0, m_dot=m, Y=_AIR)
+    s_in = NetworkMixtureState(P=1.2e5, Pt=1.2e5, Tt=300.0, m_dot=m, Y=_AIR)
+    s_out = NetworkMixtureState(P=1.5e5, Pt=1.5e5, Tt=450.0, m_dot=m, Y=_AIR)
     return s_in, s_out
 
 
@@ -82,11 +82,9 @@ def test_a_reversed_orifice_reads_the_outlet_side(regime: str) -> None:
         for k, v in kw.items():
             node, attr = k.split("_")
             st = a if node == "A" else b
-            setattr(st, attr, v)
+            setattr(st, "Tt" if attr == "T" else attr, v)
             if attr == "Pt":
                 st.P = v
-            if attr == "T":
-                st.Tt = v
         return o._flow_and_partials(a, b, 0.6)[0]
 
     for col, base, h in (("B_Pt", 1.5e5, 1.0), ("A_Pt", 1.2e5, 1.0), ("B_T", 450.0, 1e-3)):

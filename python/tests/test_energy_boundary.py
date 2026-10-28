@@ -75,7 +75,6 @@ class TestPlenumEnergyBoundary:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=300.0,
             Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -94,7 +93,6 @@ class TestPlenumEnergyBoundary:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=300.0,
             Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -120,7 +118,6 @@ class TestPlenumEnergyBoundary:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=600.0,
             Tt=600.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -143,7 +140,6 @@ class TestPlenumEnergyBoundary:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=300.0,
             Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -170,7 +166,6 @@ class TestPlenumEnergyBoundary:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=400.0,
             Tt=400.0,
             m_dot=mdot,
             Y=_air_Y(),
@@ -196,7 +191,6 @@ class TestPlenumEnergyBoundary:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=500.0,
             Tt=500.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -222,7 +216,6 @@ class TestCombustorEnergyBoundary:
         fuel = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=300.0,
             Tt=300.0,
             m_dot=0.05,
             Y=_ch4_Y(),
@@ -230,7 +223,6 @@ class TestCombustorEnergyBoundary:
         air = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=600.0,
             Tt=600.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -289,7 +281,6 @@ class TestMomentumChamberEnergyBoundary:
         up = NetworkMixtureState(
             P=200000.0,
             Pt=200000.0,
-            T=400.0,
             Tt=400.0,
             m_dot=2.0,
             Y=_air_Y(),
@@ -317,7 +308,6 @@ class TestSignConvention:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=300.0,
             Tt=300.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -339,7 +329,6 @@ class TestSignConvention:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=800.0,
             Tt=800.0,
             m_dot=1.0,
             Y=_air_Y(),
@@ -361,7 +350,6 @@ class TestSignConvention:
         up = NetworkMixtureState(
             P=101325.0,
             Pt=101325.0,
-            T=500.0,
             Tt=500.0,
             m_dot=1.0,
             Y=_air_Y(),

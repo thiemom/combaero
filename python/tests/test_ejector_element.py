@@ -36,13 +36,9 @@ _CHANNEL_D = 0.05
 
 
 def _states() -> list[NetworkMixtureState]:
-    primary = NetworkMixtureState(
-        P=700000.0, Pt=700000.0, T=440.0, Tt=440.0, m_dot=0.0, Y=_DRY_AIR_Y
-    )
-    secondary = NetworkMixtureState(
-        P=22850.0, Pt=22850.0, T=280.0, Tt=280.0, m_dot=0.0, Y=_DRY_AIR_Y
-    )
-    outlet = NetworkMixtureState(P=40000.0, Pt=40000.0, T=300.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y)
+    primary = NetworkMixtureState(P=700000.0, Pt=700000.0, Tt=440.0, m_dot=0.0, Y=_DRY_AIR_Y)
+    secondary = NetworkMixtureState(P=22850.0, Pt=22850.0, Tt=280.0, m_dot=0.0, Y=_DRY_AIR_Y)
+    outlet = NetworkMixtureState(P=40000.0, Pt=40000.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y)
     return [primary, secondary, outlet]
 
 
@@ -319,15 +315,9 @@ def test_diagnostics_reports_jet_pump_regime():
     # regime. s_choke -> 0 and the critical-only fields are suppressed.
     e = _element()
     e._port_element_ids = ["chan_p", "chan_s", "chan_o"]
-    primary = NetworkMixtureState(
-        P=101325.0, Pt=101325.0, T=300.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y
-    )
-    secondary = NetworkMixtureState(
-        P=101325.0, Pt=101325.0, T=300.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y
-    )
-    outlet = NetworkMixtureState(
-        P=101325.0, Pt=101325.0, T=300.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y
-    )
+    primary = NetworkMixtureState(P=101325.0, Pt=101325.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y)
+    secondary = NetworkMixtureState(P=101325.0, Pt=101325.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y)
+    outlet = NetworkMixtureState(P=101325.0, Pt=101325.0, Tt=300.0, m_dot=0.0, Y=_DRY_AIR_Y)
     port_mdots = [-0.0051, -0.0338, 0.0389]
     diag = e.diagnostics([primary, secondary, outlet], 100142.0, port_mdots)
     assert diag["s_choke"] == pytest.approx(0.0)

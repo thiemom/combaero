@@ -259,7 +259,6 @@ def solve_operating_point_network(
         # Get HTC and heat flux from cooling side
         cool_elem = net.elements["cool_channel"]
         cool_state_in = NetworkMixtureState(
-            T=T2,
             Tt=T2,
             P=P2,
             Pt=P2,
@@ -308,7 +307,6 @@ def solve_operating_point_network(
     solver_smooth = NetworkSolver(net_smooth)
     solver_smooth.solve()
     cool_state_smooth = NetworkMixtureState(
-        T=T2,
         Tt=T2,
         P=P2,
         Pt=P2,
@@ -410,7 +408,7 @@ def solve_operating_point_network_coupled(
         if not result:
             raise RuntimeError("Coupled network solver failed to converge")
 
-        T_cool_exit = result["cool_exit.T"]
+        T_cool_exit = result["cool_exit.Tt"]
 
         cool_s = cb.Stream()
         cool_s.T, cool_s.P, cool_s.X, cool_s.mdot = T_cool_exit, P2, X_cool, mdot_cool
@@ -430,8 +428,7 @@ def solve_operating_point_network_coupled(
     cool_elem = net.elements["cool_channel"]
     hot_elem = net.elements["hot_channel"]
     cool_state_in = NetworkMixtureState(
-        T=result["cool_inlet.T"],
-        Tt=result["cool_inlet.T"],
+        Tt=result["cool_inlet.Tt"],
         P=result["cool_inlet.P"],
         Pt=result["cool_inlet.P"],
         Y=cb.mole_to_mass(X_cool),
@@ -439,8 +436,7 @@ def solve_operating_point_network_coupled(
     )
     A_ann = np.pi * (D_ann / 2.0) ** 2
     hot_state_in = NetworkMixtureState(
-        T=result["hot_inlet.T"],
-        Tt=result["hot_inlet.T"],
+        Tt=result["hot_inlet.Tt"],
         P=result["hot_inlet.P"],
         Pt=result["hot_inlet.P"],
         Y=cb.mole_to_mass(X_air),
@@ -463,7 +459,6 @@ def solve_operating_point_network_coupled(
     net_smooth.elements["cool_channel"].t_wall = T_hot_est
     NetworkSolver(net_smooth).solve()
     cool_state_smooth = NetworkMixtureState(
-        T=T2,
         Tt=T2,
         P=P2,
         Pt=P2,

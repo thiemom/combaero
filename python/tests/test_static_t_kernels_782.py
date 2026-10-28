@@ -176,7 +176,6 @@ def test_the_panel_crossflow_ratio_partials_match_finite_differences() -> None:
         a = copy.copy(st_in)
         a.__dict__.pop("_X", None)
         a.P += dP
-        a.T += dT
         a.Tt += dT
         f = {"ln__s1": flows["ln__s1"] + ds1, "ln__s2": flows["ln__s2"] + ds2}
         return plate._supply_crossflow(a, st_out, f)[0]

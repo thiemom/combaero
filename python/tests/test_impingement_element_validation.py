@@ -73,7 +73,7 @@ def _element_nu(
         ),
         t_hot=400.0,
     )
-    state = NetworkMixtureState(T=T, P=P, Pt=P, Tt=T, m_dot=m_dot, Y=Y_AIR)
+    state = NetworkMixtureState(P=P, Pt=P, Tt=T, m_dot=m_dot, Y=Y_AIR)
     nu = el.htc_and_T(state).h * D_JET / k
     return (nu, m_dot, el.area) if with_flow else nu
 

@@ -67,7 +67,7 @@ def main() -> None:
     assert design.success, f"Design solve failed: {design.message}"
 
     design_Pt = design.node_state("air_inlet")["Pt"]
-    design_T = design.get("combustor.T")
+    design_T = design.get("combustor.Tt")
     print(f"  Pt_inlet = {design_Pt:.0f} Pa,  T_combustor = {design_T:.0f} K")
 
     # 2. Swap air inlet to pressure boundary (Pt auto-populated from solved Pt)
@@ -77,7 +77,7 @@ def main() -> None:
     # 3. Verify the swap gives the same operating point
     verify = p_runner.solve(init_strategy="outletref_warmstart")
     assert verify.success, f"Swap verify failed: {verify.message}"
-    dT = abs(verify.get("combustor.T") - design_T)
+    dT = abs(verify.get("combustor.Tt") - design_T)
     print(
         f"  Re-solve T_combustor = {verify.get('combustor.T'):.1f} K  (Delta_T = {dT:.2f} K vs design)"
     )
@@ -95,11 +95,11 @@ def main() -> None:
         f"Sweeping Pt over [{Pt_range[0]:.0f}, {Pt_range[-1]:.0f}] Pa ({len(Pt_range)} points) ..."
     )
     # default init_strategy + continuation (sweep passes _x0 forward automatically)
-    sweep_df = p_runner.sweep(params, metrics=["combustor.T"])
+    sweep_df = p_runner.sweep(params, metrics=["combustor.Tt"])
 
     converged = sweep_df["success"].values
     Pt_norm = sweep_df["air_inlet.Pt"].values / design_Pt
-    T_combustor = sweep_df["combustor.T"].values
+    T_combustor = sweep_df["combustor.Tt"].values
     print(f"  Converged: {converged.sum()}/{len(converged)}")
 
     fig, ax = plt.subplots(figsize=(7, 4))

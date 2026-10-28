@@ -99,7 +99,6 @@ def test_chamber_pressure_relationship():
     state = NetworkMixtureState(
         P=100000.0,
         Pt=100000.0,
-        T=300.0,
         Tt=300.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
@@ -115,7 +114,6 @@ def test_chamber_pressure_relationship():
     state_mismatch = NetworkMixtureState(
         P=100000.0,
         Pt=101000.0,
-        T=300.0,
         Tt=300.0,
         m_dot=0.1,
         Y=cb.species.dry_air_mass(),
