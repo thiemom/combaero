@@ -2966,6 +2966,32 @@ wanted:
     against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
     radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
   where: DTIC (public, ADA-numbered).
+- citation: Hay, N., Spencer, A. (1992). Discharge coefficients of cooling holes with radiused and chamfered
+    inlets. ASME J. Turbomachinery 114(4), 701-706.
+  checked: false
+  issues:
+  - 807
+  - 813
+  priority: later
+  question: 'Cd of holes fed from a moving stream (inlet-side crossflow) with radiused and chamfered inlets,
+    at pressure ratios to about 2 -- duct-fed liner and effusion holes (#813 PR 2, #807) beyond McGreehan-Schotsch.
+    Also: which pressure (crossflow total or static) its Cd is referenced to, and how the inlet crossflow''s
+    momentum is booked -- needed so a jet carrying the supply velocity (#813) does not count the crossflow
+    dynamic head twice. User suggestion 2026-10-28; content as recalled, unverified.'
+  where: ASME Digital Collection (paywalled).
+- citation: Hay, N., Lampard, D., Benmansour, S. (1983). Effect of crossflows on the discharge coefficient of
+    film cooling holes. ASME J. Engineering for Power 105(2), 243-248.
+  checked: false
+  issues:
+  - 799
+  - 800
+  - 807
+  priority: later
+  question: 'Cd with crossflow on the inlet AND exit side of a hole (the general case of which CR-2681 covers
+    single holes under exit/inlet grazing flow): ranges of crossflow-to-jet ratio, pressure reference, and
+    whether it reaches the strong-crossflow regime of CR-3630''s stagnant rows (Gc/Gj ~125). As recalled,
+    unverified.'
+  where: ASME Digital Collection (paywalled).
 - citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
     NASA TP-2985, AVSCOM TP 89-C-008.
   checked: false
