@@ -30,8 +30,8 @@ namespace combaero {
 struct CompressibleFlowSolution {
     // Stagnation state at (Tt, Pt). This is the one place in CombAero where
     // a State struct holds total rather than static conditions.
-    // stagnation.h() returns h(Tt) = stagnation enthalpy [J/mol].
-    State stagnation;    // Stagnation state (T0, P0, h0, s0, ...)
+    // stagnation.h() returns h(Tt) = stagnation enthalpy [J/kg].
+    State stagnation;    // Stagnation state (Tt, Pt, h0, s0, ...)
     State outlet;        // Outlet static state (T, P, rho, h, s, a)
                          // For heat transfer at high Mach: use T_adiabatic_wall()
                          // from stagnation.h, not outlet.T, as the hot-side
@@ -361,7 +361,8 @@ FannoSolution fanno_channel_rough(
     bool store_profile = false);
 
 
-// Compute maximum channel length before choking (L*) for given inlet conditions.
+// Compute maximum channel length before choking (L*) for the given inlet STATIC
+// state (T_in, P_in) and velocity u_in.
 // Returns the length at which M reaches 1.0 (constant Darcy f, adiabatic,
 // thermally perfect), integrated in Mach by fanno_length_between
 // (fanno_mach.h); 0 for a sonic or supersonic inlet. tol and max_iter are

@@ -117,7 +117,7 @@ def test_a_combustor_loss_is_a_fraction_of_its_products_sensible_heat() -> None:
 
     r0, r1 = burn(0.0), burn(-0.05)
     Xb = cb.mass_to_mole(list(r1.Y_mix))
-    assert _sensible(r1.T_mix, Xb) == pytest.approx(0.95 * _sensible(r0.T_mix, Xb), rel=1e-9)
+    assert _sensible(r1.Tt_mix, Xb) == pytest.approx(0.95 * _sensible(r0.Tt_mix, Xb), rel=1e-9)
 
 
 @pytest.mark.parametrize("method", ["complete", "equilibrium"])
@@ -141,14 +141,14 @@ def test_the_combustor_heat_shift_jacobian_holds(method: str, Q: float, fraction
 
     m_air, m_fuel, e = 1.0, 0.03, 1e-6
     r = burn(m_air, m_fuel)
-    fd_air = (burn(m_air + e, m_fuel).T_mix - burn(m_air - e, m_fuel).T_mix) / (2 * e)
-    fd_fuel = (burn(m_air, m_fuel + e).T_mix - burn(m_air, m_fuel - e).T_mix) / (2 * e)
+    fd_air = (burn(m_air + e, m_fuel).Tt_mix - burn(m_air - e, m_fuel).Tt_mix) / (2 * e)
+    fd_fuel = (burn(m_air, m_fuel + e).Tt_mix - burn(m_air, m_fuel - e).Tt_mix) / (2 * e)
     # The composition derivatives are analytic since #716 (they were forward
     # differences inside: 7e-6 complete, 2e-3 equilibrium). The rest is the
     # central difference's own error at e = 1e-6.
     tol = 2e-6
-    assert r.dT_mix_d_stream[0].d_mdot == pytest.approx(fd_air, rel=tol)
-    assert r.dT_mix_d_stream[1].d_mdot == pytest.approx(fd_fuel, rel=tol)
+    assert r.dTt_mix_d_stream[0].d_mdot == pytest.approx(fd_air, rel=tol)
+    assert r.dTt_mix_d_stream[1].d_mdot == pytest.approx(fd_fuel, rel=tol)
 
 
 def _burner(fraction: float) -> tuple[FlowNetwork, str]:
@@ -183,7 +183,7 @@ def test_a_combustor_fraction_loss_closes_the_ledger() -> None:
     assert abs(r["__ledger__"]["energy_closure_rel"]) < 1e-12
     comb = net.nodes[nid]
     X_b = cb.mass_to_mole(list(comb._last_mix_res.Y_mix))
-    T_out = float(comb._last_mix_res.T_mix)
+    T_out = float(comb._last_mix_res.Tt_mix)
     m = float(comb._total_m_dot)
     # h_out - h_ref = (1 + f)(h_ad - h_ref): the heat is f m (h_ad - h_ref)
     expected = -0.05 * m * _sensible(T_out, X_b) / 0.95
@@ -214,19 +214,19 @@ def test_the_mixer_jacobian_holds_with_heat_and_fraction(Q: float, fraction: flo
         mp, mm = list(ms), list(ms)
         mp[i] += 1e-7
         mm[i] -= 1e-7
-        fd = (mix(mp, Ts, Ys).T_mix - mix(mm, Ts, Ys).T_mix) / 2e-7
-        assert r.dT_mix_d_stream[i].d_mdot == pytest.approx(fd, rel=1e-6)
+        fd = (mix(mp, Ts, Ys).Tt_mix - mix(mm, Ts, Ys).Tt_mix) / 2e-7
+        assert r.dTt_mix_d_stream[i].d_mdot == pytest.approx(fd, rel=1e-6)
         tp, tm = list(Ts), list(Ts)
         tp[i] += 1e-3
         tm[i] -= 1e-3
-        fd = (mix(ms, tp, Ys).T_mix - mix(ms, tm, Ys).T_mix) / 2e-3
-        assert r.dT_mix_d_stream[i].d_Tt == pytest.approx(fd, rel=1e-6)
+        fd = (mix(ms, tp, Ys).Tt_mix - mix(ms, tm, Ys).Tt_mix) / 2e-3
+        assert r.dTt_mix_d_stream[i].d_Tt == pytest.approx(fd, rel=1e-6)
         for k in (I_CH4, I_O2):
             yp, ym = [list(y) for y in Ys], [list(y) for y in Ys]
             yp[i][k] += 1e-6
             ym[i][k] -= 1e-6
-            fd = (mix(ms, Ts, yp).T_mix - mix(ms, Ts, ym).T_mix) / 2e-6
-            assert r.dT_mix_d_stream[i].d_Y[k] == pytest.approx(fd, rel=1e-6)
+            fd = (mix(ms, Ts, yp).Tt_mix - mix(ms, Ts, ym).Tt_mix) / 2e-6
+            assert r.dTt_mix_d_stream[i].d_Y[k] == pytest.approx(fd, rel=1e-6)
 
 
 # --- heat over the real flow; what a stagnant node cannot take ---------------
@@ -240,7 +240,7 @@ def test_heat_is_spread_over_the_real_flow_down_to_a_milligram_per_second(m: flo
     mix = _solver_tools.mixer_from_streams_and_jacobians(
         [cb.MassStream(m, 400.0, 1e5, Y_AIR)], Q=q, fraction=0.0
     )
-    dh = cb.h_mass(mix.T_mix, X_AIR) - cb.h_mass(400.0, X_AIR)
+    dh = cb.h_mass(mix.Tt_mix, X_AIR) - cb.h_mass(400.0, X_AIR)
     assert m * dh == pytest.approx(q, rel=1e-9)
 
 

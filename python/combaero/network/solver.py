@@ -2116,8 +2116,8 @@ class NetworkSolver:
         for i, (_, elem, src_nid, coeffs) in enumerate(stream_info):
             if elem is None:
                 continue  # a fixed injection: nothing to relay
-            t_jac = mix_res.dT_mix_d_stream[i]
-            pt_jac = mix_res.dP_total_mix_d_stream[i]
+            t_jac = mix_res.dTt_mix_d_stream[i]
+            pt_jac = mix_res.dPt_mix_d_stream[i]
             # dY_mix_d_stream is indexed by [species][stream]
             y_jacs = [mix_res.dY_mix_d_stream[k][i] for k in range(n_species)]
 
@@ -2175,9 +2175,9 @@ class NetworkSolver:
         #   dQ/dT    = dQ/dh_a * dh_a/dT    + dQ/dT_aw_a * dT_aw_a/dT    + (side B terms)
         if wall_contributions:
             # Wall Q is a heat rate [W]: dT/dQ = (1/cp) / m_eff, m_eff
-            # the flow the mixer spreads Q over (dT_mix_dQ, exact also
+            # the flow the mixer spreads Q over (dTt_mix_dQ, exact also
             # below kMixerHeatMdotFloor and for a non-positive total).
-            dT_mix_dQ = mix_res.dT_mix_dQ
+            dTt_mix_dQ = mix_res.dTt_mix_dQ
             for (
                 _wall,
                 _Qi,
@@ -2199,7 +2199,7 @@ class NetworkSolver:
                 if from_a in relay:
                     # dQ/dT_aw_a * dT_aw_a/dT + dQ/dh_a * dh_a/dT
                     factor_T_a = (
-                        dT_mix_dQ
+                        dTt_mix_dQ
                         * sign
                         * (
                             wall_result.dQ_dT_aw_a * ch_a.dT_aw_dT
@@ -2215,13 +2215,13 @@ class NetworkSolver:
                         nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                         nr["T"] += factor_T_a * sens_up["T"]
                         if factor_Y_a is not None:
-                            nr["T"] += dT_mix_dQ * sign * float(np.dot(factor_Y_a, sens_up["Y"]))
+                            nr["T"] += dTt_mix_dQ * sign * float(np.dot(factor_Y_a, sens_up["Y"]))
 
                 # Mass-flow coupling: dT_node/dmdot_a (direct)
                 for idx_mdot_a, dm_a in self._htc_flow_columns(ea_id):
                     # dQ/dh_a * dh_a/dmdot + dQ/dT_aw_a * dT_aw_a/dmdot
                     factor_mdot_a = (
-                        dT_mix_dQ
+                        dTt_mix_dQ
                         * sign
                         * self._htc_mdot_sign(obj_a, x)
                         * (
@@ -2230,19 +2230,19 @@ class NetworkSolver:
                         )
                     )
                     # The capacity rate |m| cp (signed in the unknown)
-                    factor_mdot_a += dT_mix_dQ * sign * wall_result.dQ_dC_a * dCa_dm
+                    factor_mdot_a += dTt_mix_dQ * sign * wall_result.dQ_dC_a * dCa_dm
                     nr = out.setdefault(idx_mdot_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                     nr["T"] += factor_mdot_a * dm_a
 
                 # Neighbour flows the side-A htc reads (#465)
-                self._relay_flow_inputs(out, obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dh_a)
+                self._relay_flow_inputs(out, obj_a, ch_a, dTt_mix_dQ * sign * wall_result.dQ_dh_a)
                 # The film's provider flow and coolant temperature (#386)
                 self._relay_film(
-                    out, _wall, ch_a, dT_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
+                    out, _wall, ch_a, dTt_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
                 )
                 # A reference temperature on neighbours' flows and T (#467)
                 self._relay_reference_inputs(
-                    out, obj_a, ch_a, dT_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
+                    out, obj_a, ch_a, dTt_mix_dQ * sign * wall_result.dQ_dT_aw_a, relay, up
                 )
 
                 # Pressure coupling (#496): the side's T_aw moves with its feed
@@ -2254,7 +2254,7 @@ class NetworkSolver:
                 ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dP", 0.0)
                 if idx_P_a is not None and dQ_dP_a != 0.0:
                     nr = out.setdefault(idx_P_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
-                    nr["T"] += dT_mix_dQ * sign * dQ_dP_a
+                    nr["T"] += dTt_mix_dQ * sign * dQ_dP_a
                 # A duct's T_aw moves with its feed's Pt instead (#636).
                 idx_Pt_a = self._name_to_index.get(f"{from_a}.Pt")
                 # and so does its h, through the duct's static T.
@@ -2263,7 +2263,7 @@ class NetworkSolver:
                 ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dPt", 0.0)
                 if idx_Pt_a is not None and dQ_dPt_a != 0.0:
                     nr = out.setdefault(idx_Pt_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
-                    nr["T"] += dT_mix_dQ * sign * dQ_dPt_a
+                    nr["T"] += dTt_mix_dQ * sign * dQ_dPt_a
 
                 # Side B contributions
                 obj_b = self.network.elements.get(eb_id) or self.network.nodes.get(eb_id)
@@ -2272,7 +2272,7 @@ class NetworkSolver:
                 # Temperature coupling: dT_node/dT_upstream_b
                 if from_b in relay:
                     factor_T_b = (
-                        dT_mix_dQ
+                        dTt_mix_dQ
                         * sign
                         * (
                             wall_result.dQ_dT_aw_b * ch_b.dT_aw_dT
@@ -2287,12 +2287,12 @@ class NetworkSolver:
                         nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                         nr["T"] += factor_T_b * sens_up["T"]
                         if factor_Y_b is not None:
-                            nr["T"] += dT_mix_dQ * sign * float(np.dot(factor_Y_b, sens_up["Y"]))
+                            nr["T"] += dTt_mix_dQ * sign * float(np.dot(factor_Y_b, sens_up["Y"]))
 
                 # Mass-flow coupling: dT_node/dmdot_b (direct)
                 for idx_mdot_b, dm_b in self._htc_flow_columns(eb_id):
                     factor_mdot_b = (
-                        dT_mix_dQ
+                        dTt_mix_dQ
                         * sign
                         * self._htc_mdot_sign(obj_b, x)
                         * (
@@ -2301,17 +2301,17 @@ class NetworkSolver:
                         )
                     )
                     # The capacity rate |m| cp (signed in the unknown)
-                    factor_mdot_b += dT_mix_dQ * sign * wall_result.dQ_dC_b * dCb_dm
+                    factor_mdot_b += dTt_mix_dQ * sign * wall_result.dQ_dC_b * dCb_dm
                     nr = out.setdefault(idx_mdot_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                     nr["T"] += factor_mdot_b * dm_b
 
-                self._relay_flow_inputs(out, obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dh_b)
+                self._relay_flow_inputs(out, obj_b, ch_b, dTt_mix_dQ * sign * wall_result.dQ_dh_b)
                 self._relay_film(
-                    out, _wall, ch_b, dT_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
+                    out, _wall, ch_b, dTt_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
                 )
                 # A reference temperature on neighbours' flows and T (#467)
                 self._relay_reference_inputs(
-                    out, obj_b, ch_b, dT_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
+                    out, obj_b, ch_b, dTt_mix_dQ * sign * wall_result.dQ_dT_aw_b, relay, up
                 )
 
                 # Pressure coupling (#496): the side's T_aw moves with its feed
@@ -2323,7 +2323,7 @@ class NetworkSolver:
                 ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dP", 0.0)
                 if idx_P_b is not None and dQ_dP_b != 0.0:
                     nr = out.setdefault(idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
-                    nr["T"] += dT_mix_dQ * sign * dQ_dP_b
+                    nr["T"] += dTt_mix_dQ * sign * dQ_dP_b
                 # A duct's T_aw moves with its feed's Pt instead (#636).
                 idx_Pt_b = self._name_to_index.get(f"{from_b}.Pt")
                 # and so does its h, through the duct's static T.
@@ -2332,7 +2332,7 @@ class NetworkSolver:
                 ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dPt", 0.0)
                 if idx_Pt_b is not None and dQ_dPt_b != 0.0:
                     nr = out.setdefault(idx_Pt_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
-                    nr["T"] += dT_mix_dQ * sign * dQ_dPt_b
+                    nr["T"] += dTt_mix_dQ * sign * dQ_dPt_b
 
     def _propagate_pass(
         self,
@@ -2544,7 +2544,7 @@ class NetworkSolver:
                         fraction=0.0,
                     )
                     self._boundary_arrivals[(nid, elem.id)] = (
-                        float(arrive.T_mix),
+                        float(arrive.Tt_mix),
                         list(arrive.Y_mix),
                     )
 
@@ -2562,7 +2562,7 @@ class NetworkSolver:
                     Q=sum(float(wc[1]) for wc in own),
                     fraction=0.0,
                 )
-                elem._rayleigh_exit = (nid, float(exit_mix.T_mix), src_nid)
+                elem._rayleigh_exit = (nid, float(exit_mix.Tt_mix), src_nid)
                 if with_relay:
                     key = f"{RAYLEIGH_EXIT_PREFIX}{elem.id}"
                     relay[key] = {}
@@ -2579,7 +2579,7 @@ class NetworkSolver:
 
             # Store wall coupling debug info on the node
             if wall_contributions:
-                dT_mix_dQ = mix_res.dT_mix_dQ if mix_res else 0.0
+                dTt_mix_dQ = mix_res.dTt_mix_dQ if mix_res else 0.0
                 node._wall_couplings = []
                 for (
                     wall,
@@ -2593,7 +2593,7 @@ class NetworkSolver:
                     _caps,
                 ) in wall_contributions:
                     # dQ_inject/dQ_wall = -1 if is_side_a, +1 otherwise
-                    dT_dQ_signed = -dT_mix_dQ if is_side_a else dT_mix_dQ
+                    dT_dQ_signed = -dTt_mix_dQ if is_side_a else dTt_mix_dQ
                     node._wall_couplings.append(
                         {
                             "wall": wall,
@@ -2602,7 +2602,7 @@ class NetworkSolver:
                             "is_side_a": is_side_a,
                             "elem_a_id": ea_id,
                             "elem_b_id": eb_id,
-                            "dT_mix_dQ": dT_dQ_signed,
+                            "dTt_mix_dQ": dT_dQ_signed,
                             "ch_result_a": ch_a,
                             "ch_result_b": ch_b,
                         }
@@ -2625,7 +2625,7 @@ class NetworkSolver:
                     pkg = relay[nid].setdefault(
                         i_q, {"T": 0.0, "Y": np.zeros(self._n_species), "Pt_mix": 0.0}
                     )
-                    pkg["T"] += float(mix_res.dT_mix_dQ)
+                    pkg["T"] += float(mix_res.dTt_mix_dQ)
 
             # 3. Add own unknowns (Pt) to the relay
             node_unks = self._unknown_indices.get(nid, [])
@@ -2862,7 +2862,7 @@ class NetworkSolver:
             fraction=sum(eb.fraction for eb in ebs),
         )
         key = f"{FILM_INF_PREFIX}{pid}"
-        self._film_inf_states[key] = (float(mix.T_mix), list(mix.Y_mix))
+        self._film_inf_states[key] = (float(mix.Tt_mix), list(mix.Y_mix))
         if with_relay:
             relay[key] = {}
             self._relay_mix(relay[key], nid, others, mix, [], x, relay, up)

@@ -101,10 +101,10 @@ def test_the_mixer_reports_its_own_heat_sensitivity(m: float) -> None:
         )
 
     h = 1e-7
-    fd = (mix(1e-4 + h).T_mix - mix(1e-4 - h).T_mix) / (2 * h)
-    assert mix(1e-4).dT_mix_dQ == pytest.approx(fd, rel=1e-6)
+    fd = (mix(1e-4 + h).Tt_mix - mix(1e-4 - h).Tt_mix) / (2 * h)
+    assert mix(1e-4).dTt_mix_dQ == pytest.approx(fd, rel=1e-6)
     phi, _ = cb.mixer_heat_per_unit_flow(m)
-    assert mix(1e-4).dT_mix_dQ == pytest.approx(mix(1e-4).dT_mix_d_delta_h * phi, rel=1e-12)
+    assert mix(1e-4).dTt_mix_dQ == pytest.approx(mix(1e-4).dTt_mix_d_delta_h * phi, rel=1e-12)
 
 
 def _premixed_and_dilution_network(corr: object) -> FlowNetwork:

@@ -119,6 +119,7 @@ def renamed_init_kwargs(cls: type, mapping: Mapping[str, str]) -> None:
 
 
 _TP = {"T0": "Tt", "P0": "Pt"}
+_EJ = {"p0": "Pt", "t0": "Tt"}
 
 #: Keyword renames: function -> {old keyword: new keyword}.
 KWARGS: dict[str, dict[str, str]] = {
@@ -145,6 +146,13 @@ KWARGS: dict[str, dict[str, str]] = {
     "heat_entropy_flux": {"T0_in": "Tt_in", "T0_out": "Tt_out"},
     # The head loss is total-total (Lefebvre; #782 audit).
     "combustor_head_loss": {"T_in": "Tt_in", "P_in": "Pt_in"},
+    # The #782 audit's stragglers: totals still spelled the old way.
+    "chamber_merge_face_state": {"T_main": "Tt_main", "T": "Tt"},
+    "momentum_chamber_residual_and_jacobian": {"P_total": "Pt", "T": "Tt"},
+    "orifice_tap_pressure_and_jacobian": {"P_total_up": "Pt_up", "P_total_down": "Pt_down"},
+    "ejector_choked_mass_flow_and_jacobian": _EJ,
+    "ejector_cd_nozzle_mass_flow_and_jacobian": _EJ,
+    "ejector_cd_nozzle_exit_static_and_jacobian": _EJ,
 }
 
 #: Function renames: old name -> new name.
@@ -180,6 +188,17 @@ FIELDS: dict[str, tuple[dict[str, str], bool]] = {
     "OrificeResult": ({"d_mdot_dT_up": "d_mdot_dTt_up"}, False),
     "ChannelSolverResult": ({"d_dP_dT_up": "d_dP_dTt_up"}, False),
     "CombustorLossResult": ({"dxi_dT_in": "dxi_dTt_in", "dxi_dP_in": "dxi_dPt_in"}, False),
+    "MixerResult": (
+        {
+            "T_mix": "Tt_mix",
+            "P_total_mix": "Pt_mix",
+            "dT_mix_d_stream": "dTt_mix_d_stream",
+            "dP_total_mix_d_stream": "dPt_mix_d_stream",
+            "dT_mix_d_delta_h": "dTt_mix_d_delta_h",
+            "dT_mix_dQ": "dTt_mix_dQ",
+        },
+        False,
+    ),
 }
 
 #: Constructor keyword renames: class -> {old keyword: new keyword}.

@@ -17,7 +17,7 @@
 // given static temperature T and static pressure P.
 //
 // Exception: CompressibleFlowSolution::stagnation holds a State at
-// stagnation conditions (T0, P0) -- the only deliberate use of State
+// stagnation conditions (Tt, Pt) -- the only deliberate use of State
 // to carry total rather than static values.
 //
 // For the network solver, use MixtureState (NETWORK_ROADMAP.md) which

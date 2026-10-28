@@ -67,8 +67,8 @@ TEST_F(MixerJacobianTest, dTmix_d_mdot) {
         auto s_p = streams;
         s_p[i].m_dot += eps;
         auto res_p = mixer_from_streams_and_jacobians(s_p);
-        double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_mdot, fd,
+        double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+        EXPECT_NEAR(base.dTt_mix_d_stream[i].d_mdot, fd,
                     std::abs(fd) * 1e-3 + 1e-6)
             << "stream " << i;
     }
@@ -80,8 +80,8 @@ TEST_F(MixerJacobianTest, dTmix_d_T) {
         auto s_p = streams;
         s_p[i].Tt += eps;
         auto res_p = mixer_from_streams_and_jacobians(s_p);
-        double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_Tt, fd,
+        double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+        EXPECT_NEAR(base.dTt_mix_d_stream[i].d_Tt, fd,
                     std::abs(fd) * 1e-3 + 1e-6)
             << "stream " << i;
     }
@@ -94,8 +94,8 @@ TEST_F(MixerJacobianTest, dTmix_d_Y) {
             auto s_p = streams;
             s_p[i].Y[k] += eps;
             auto res_p = mixer_from_streams_and_jacobians(s_p);
-            double fd = (res_p.T_mix - base.T_mix) / eps;
-            EXPECT_NEAR(base.dT_mix_d_stream[i].d_Y[k], fd,
+            double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+            EXPECT_NEAR(base.dTt_mix_d_stream[i].d_Y[k], fd,
                         std::abs(fd) * 5e-3 + 1e-4)
                 << "stream " << i << " species " << k;
         }
@@ -164,8 +164,8 @@ TEST_F(AdiabaticCompleteJacobianTest, dTad_d_mdot) {
         s_p[i].m_dot += eps;
         auto res_p =
             adiabatic_T_complete_and_jacobian_T_from_streams(s_p, P);
-        double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_mdot, fd,
+        double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+        EXPECT_NEAR(base.dTt_mix_d_stream[i].d_mdot, fd,
                     std::abs(fd) * 5e-3 + 1e-2)
             << "stream " << i;
     }
@@ -178,8 +178,8 @@ TEST_F(AdiabaticCompleteJacobianTest, dTad_d_T) {
         s_p[i].Tt += eps;
         auto res_p =
             adiabatic_T_complete_and_jacobian_T_from_streams(s_p, P);
-        double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_Tt, fd,
+        double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+        EXPECT_NEAR(base.dTt_mix_d_stream[i].d_Tt, fd,
                     std::abs(fd) * 5e-3 + 1e-2)
             << "stream " << i;
     }
@@ -193,8 +193,8 @@ TEST_F(AdiabaticCompleteJacobianTest, dTad_d_Y) {
             s_p[i].Y[k] += eps;
             auto res_p =
                 adiabatic_T_complete_and_jacobian_T_from_streams(s_p, P);
-            double fd = (res_p.T_mix - base.T_mix) / eps;
-            EXPECT_NEAR(base.dT_mix_d_stream[i].d_Y[k], fd,
+            double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+            EXPECT_NEAR(base.dTt_mix_d_stream[i].d_Y[k], fd,
                         std::abs(fd) * 0.02 + 0.5)
                 << "stream " << i << " species " << k;
         }
@@ -283,8 +283,8 @@ TEST_F(AdiabaticEquilibriumJacobianTest, dTad_d_mdot) {
         s_p[i].m_dot += eps;
         auto res_p =
             adiabatic_T_equilibrium_and_jacobians_from_streams(s_p, P);
-        double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_mdot, fd,
+        double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+        EXPECT_NEAR(base.dTt_mix_d_stream[i].d_mdot, fd,
                     std::abs(fd) * 0.01 + 0.1)
             << "stream " << i;
     }
@@ -297,8 +297,8 @@ TEST_F(AdiabaticEquilibriumJacobianTest, dTad_d_T) {
         s_p[i].Tt += eps;
         auto res_p =
             adiabatic_T_equilibrium_and_jacobians_from_streams(s_p, P);
-        double fd = (res_p.T_mix - base.T_mix) / eps;
-        EXPECT_NEAR(base.dT_mix_d_stream[i].d_Tt, fd,
+        double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+        EXPECT_NEAR(base.dTt_mix_d_stream[i].d_Tt, fd,
                     std::abs(fd) * 0.01 + 0.1)
             << "stream " << i;
     }
@@ -312,8 +312,8 @@ TEST_F(AdiabaticEquilibriumJacobianTest, dTad_d_Y) {
             s_p[i].Y[k] += eps;
             auto res_p =
                 adiabatic_T_equilibrium_and_jacobians_from_streams(s_p, P);
-            double fd = (res_p.T_mix - base.T_mix) / eps;
-            EXPECT_NEAR(base.dT_mix_d_stream[i].d_Y[k], fd,
+            double fd = (res_p.Tt_mix - base.Tt_mix) / eps;
+            EXPECT_NEAR(base.dTt_mix_d_stream[i].d_Y[k], fd,
                         std::abs(fd) * 0.05 + 1.0)
                 << "stream " << i << " species " << k;
         }
@@ -409,7 +409,7 @@ class PlenumJacobianTest : public ::testing::Test {
         for (auto &s : streams)
             m_tot += s.m_dot;
 
-        state = make_state(150000.0, 150000.0, mix.T_mix, m_tot, mix.Y_mix);
+        state = make_state(150000.0, 150000.0, mix.Tt_mix, m_tot, mix.Y_mix);
         base = plenum_residuals_and_jacobian(state, streams);
     }
 
@@ -558,7 +558,7 @@ class CombustorJacobianTest : public ::testing::Test {
         for (auto &s : streams)
             m_tot += s.m_dot;
 
-        state = make_state(140000.0, 140000.0, mix.T_mix, m_tot, mix.Y_mix);
+        state = make_state(140000.0, 140000.0, mix.Tt_mix, m_tot, mix.Y_mix);
         base = combustor_residuals_and_jacobian(
             state, streams, CombustionMethod::Complete, pressure_loss_frac);
     }
@@ -731,7 +731,7 @@ TEST(CombustorEquilibriumTest, StructureAndStreamJacobian_mdot) {
         m_tot += s.m_dot;
 
     auto state =
-        make_state(140000.0, 140000.0, mix.T_mix, m_tot, mix.Y_mix);
+        make_state(140000.0, 140000.0, mix.Tt_mix, m_tot, mix.Y_mix);
     auto base = combustor_residuals_and_jacobian(
         state, streams, CombustionMethod::Equilibrium, pressure_loss_frac);
 
@@ -785,8 +785,8 @@ TEST(CombustorPressureLossJacobianTest, mdot_chain_rule) {
 
         auto res_p = combustor_residuals_and_jacobians(streams_p, P_out, 0.0, 0.0, linear_loss, false);
 
-        double analytical = base.dP_total_mix_d_stream[i].d_mdot;
-        double fd = (res_p.P_total_mix - base.P_total_mix) / eps;
+        double analytical = base.dPt_mix_d_stream[i].d_mdot;
+        double fd = (res_p.Pt_mix - base.Pt_mix) / eps;
 
         EXPECT_NEAR(analytical, fd, std::abs(fd) * 1e-4 + 1e-6)
             << "stream " << i << " mdot derivative check failed";

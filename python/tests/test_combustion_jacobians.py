@@ -200,9 +200,9 @@ def test_the_combustor_derivatives_match_central_differences(method: str, phi: f
     h, hT = (1e-9 if in_band else 1e-7), 1e-3
     ico = _cb.species_index_from_name("CO" if method == "equilibrium" else "CO2")
     checks = [
-        (r.dT_mix_d_stream[1].d_mdot, lambda d: burn(1.0, mf + d).T_mix, h),
-        (r.dT_mix_d_stream[0].d_mdot, lambda d: burn(1.0 + d, mf).T_mix, h),
-        (r.dT_mix_d_stream[0].d_Tt, lambda d: burn(1.0, mf, 700.0 + d).T_mix, hT),
+        (r.dTt_mix_d_stream[1].d_mdot, lambda d: burn(1.0, mf + d).Tt_mix, h),
+        (r.dTt_mix_d_stream[0].d_mdot, lambda d: burn(1.0 + d, mf).Tt_mix, h),
+        (r.dTt_mix_d_stream[0].d_Tt, lambda d: burn(1.0, mf, 700.0 + d).Tt_mix, hT),
         (r.dY_mix_d_stream[ico][1].d_mdot, lambda d: burn(1.0, mf + d).Y_mix[ico], h),
         (r.dY_mix_d_stream[ico][0].d_Tt, lambda d: burn(1.0, mf, 700.0 + d).Y_mix[ico], hT),
     ]

@@ -53,7 +53,8 @@ Control volumes
   ``next_seg`` links; its stations are the nodes they declare
   (``from_kappa`` / ``to_kappa``), less any boundary. Streams crossing it:
   the chain's two ends, and every other element at a station (the holes), at
-  the station's total pressure. Heat on a station node is taken as raising
+  the station's ``Pt`` (which a station's Pt = P closure makes its static
+  pressure). Heat on a station node is taken as raising
   the node's mixed stream to the node's temperature. A hole whose jet brings
   axial momentum into the chain (``injection_angle_deg`` below 90, #813) is a
   member instead: its stream enters at its supply's total pressure. The

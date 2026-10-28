@@ -1047,9 +1047,11 @@ import combaero.species as species
 net = FlowNetwork()
 
 # 2. Define Boundaries & Nodes
-net.add_node(PressureBoundary("inlet", P_total=5e5, T_total=400, Y=species.dry_air_mass()))
-net.add_node(PlenumNode("plenum", P=4e5, T=400))
-net.add_node(PressureBoundary("outlet", P_total=1e5, T_total=300))
+net.add_node(PressureBoundary("inlet", Pt=5e5, Tt=400, Y=species.dry_air_mass()))
+plenum = PlenumNode("plenum")       # its P (= Pt) is solved; T comes from the inflows
+plenum.initial_guess = {"plenum.P": 4e5, "plenum.Pt": 4e5}   # optional seed
+net.add_node(plenum)
+net.add_node(PressureBoundary("outlet", Pt=1e5, Tt=300))
 
 # 3. Add Elements
 net.add_element(OrificeElement("feed", "inlet", "plenum", diameter=0.01, Cd=0.65))
@@ -1059,9 +1061,9 @@ net.add_element(OrificeElement("exhaust", "plenum", "outlet", diameter=0.015, Cd
 solver = NetworkSolver(net)
 results = solver.solve(method="hybr")
 
-# 5. Access Results
-print(f"Plenum Pressure: {results.nodes['plenum'].P} Pa")
-print(f"System Mass Flow: {results.elements['feed'].m_dot} kg/s")
+# 5. Access Results: a flat dict keyed "<id>.<quantity>"
+print(f"Plenum Pressure: {results['plenum.P']} Pa")
+print(f"System Mass Flow: {results['feed.m_dot']} kg/s")
 ```
 
 > [!TIP]
@@ -1280,7 +1282,7 @@ fluid. Three modes:
 - **`Tt_target`** makes the heat an unknown, `{id}.Q` [W], closed by one row
   `Tt_node - Tt_target = 0`, scaled as a temperature (row kind `"T"`, see
   `NetworkSolver._build_residual_scales`). Its Jacobian column is C++'s
-  `dT_mix/dQ`, relayed to every row that reads the node's temperature. It is
+  `dTt_mix/dQ`, relayed to every row that reads the node's temperature. It is
   refused (`ValueError`) together with a nonzero `Q` or `fraction` on the same
   boundary, as a second `Tt_target` on one node, and on any other node type.
   A fixed-`Q` boundary beside it on the same node is fine: the target's `Q`
@@ -1825,16 +1827,23 @@ result = combustion_from_phi(phi=0.8, T=300, P=2e5, fuel="CH4", oxidizer="air")
 
 ### MixtureState for Network Data
 ```python
-from combaero.network import MixtureState
+import combaero as cb
+from combaero import MixtureState
 
-# Constructor: MixtureState(P, Pt, T, Tt, m_dot, Y)
-node_state = MixtureState(1e5, 1.1e5, 300, 300, 1.5, air_vec)
+air_Y = list(cb.species.dry_air_mass())
+
+# Constructor: MixtureState(P, Pt, T, Tt, m_dot, Y); P, T static, Pt, Tt total
+node_state = MixtureState(P=1e5, Pt=1.1e5, T=292.0, Tt=300.0, m_dot=1.5, Y=air_Y)
 
 print(f"Static pressure: {node_state.P} Pa")
 print(f"Total pressure: {node_state.Pt} Pa")
 print(f"Mass flow: {node_state.m_dot} kg/s")
-print(f"Static density: {node_state.density()} kg/m³")
+print(f"Static density: {node_state.density()} kg/m^3")
 ```
+
+The network's own node state is `combaero.network.NetworkMixtureState`, which
+derives the static `T` from `Tt`; build it with keywords
+(`NetworkMixtureState(P=..., Pt=..., Tt=..., m_dot=..., Y=...)`).
 
 ### Advanced (f, J) Interface
 High-accuracy analytical Jacobians are available for performance-critical solver loops.
@@ -1852,8 +1861,12 @@ res_comb = st.combustor_residuals_and_jacobians(streams, P, Q=0.0, fraction=0.0,
                                                 pressure_loss=loss, use_equilibrium=False)
 ```
 
-The combustor returns a `MixerResult`: the products' `T_mix`, `Y_mix` and
-`P_total_mix`, with their derivatives per stream (`dT_mix_d_stream` etc.).
+The combustor returns a `MixerResult`: the products' total temperature
+`Tt_mix`, `Y_mix` and total pressure `Pt_mix`, with their derivatives per
+stream (`dTt_mix_d_stream`, `dPt_mix_d_stream`, `dY_mix_d_stream`). The
+pre-0.8 spellings `T_mix`, `P_total_mix`, `dT_mix_d_stream`,
+`dP_total_mix_d_stream`, `dT_mix_d_delta_h` and `dT_mix_dQ` still read
+with a `DeprecationWarning` until 0.9.0.
 
 ### Tee Junction Interface
 
@@ -3026,6 +3039,8 @@ with its replacement raises `TypeError`. A positional call is unaffected.
 | `StreamJacobian.d_T`, `.d_P_total` | `.d_Tt`, `.d_Pt` |
 | `NozzleSolution.T0`, `.P0` | `.Tt`, `.Pt` |
 | `DuctStaticState.dT_dT0`, `dT_dP0`, `dP_dT0`, `dP_dP0`, `drho_dT0`, `drho_dP0`, `dGeff_dT0`, `dGeff_dP0` | the same with `Tt`/`Pt`: `dT_dTt`, ... |
+| `chamber_merge_face_state(T_main=, T=)` (both stagnation) | `Tt_main=`, `Tt=` |
+| internal solver tools: `momentum_chamber_residual_and_jacobian(P_total=, T=)`, `orifice_tap_pressure_and_jacobian(P_total_up=, P_total_down=)`, `p0=`, `t0=` of `ejector_choked_mass_flow_and_jacobian`, `ejector_cd_nozzle_mass_flow_and_jacobian`, `ejector_cd_nozzle_exit_static_and_jacobian`; `MixerResult.T_mix`, `.P_total_mix`, `.dT_mix_d_stream`, `.dP_total_mix_d_stream`, `.dT_mix_d_delta_h`, `.dT_mix_dQ` | `Pt=`, `Tt=`, `Pt_up=`, `Pt_down=`; `Tt_mix`, `Pt_mix`, `dTt_mix_d_stream`, `dPt_mix_d_stream`, `dTt_mix_d_delta_h`, `dTt_mix_dQ` |
 | internal solver tools: `sonic_static_pressure(T0=)`, `approach_static_pressure(P_total=, T_total=)`, `orifice_compressible_mdot_and_jacobian(T0=, P0=)`, `T_up=` of `orifice_residuals_and_jacobian`, `channel_residuals_and_jacobian`, `orifice_compressible_residuals_and_jacobian`; `SonicStatic.dP_dT0`, `OrificeResult.d_mdot_dT_up`, `ChannelSolverResult.d_dP_dT_up`; `T0_/P0_from_static_and_jacobian_M` | `Tt=`, `Pt=`, `Tt_up=`; `dP_dTt`, `d_mdot_dTt_up`, `d_dP_dTt_up`; `Tt_/Pt_from_static_and_jacobian_M` |
 
 Kept: `Pt0`/`Tt0` of the Fanno functions (`fanno_channel_flow`,

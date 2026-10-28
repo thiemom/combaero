@@ -50,17 +50,17 @@ TEST(EnergyBoundaryTest, MixerQ_PositiveHeating) {
 
   // Expected: T_mix > 300 K, roughly T_base + Q/(mdot*cp_air)
   auto res_base = sv::mixer_from_streams_and_jacobians({st}, 0.0, 0.0);
-  EXPECT_NEAR(res_base.T_mix, 300.0, 0.1);
+  EXPECT_NEAR(res_base.Tt_mix, 300.0, 0.1);
 
   // cp_air ~ 1005 J/(kg*K), so Delta_T ~ 50000/(1.0*1005) ~ 49.75 K
-  double dT = res.T_mix - res_base.T_mix;
+  double dT = res.Tt_mix - res_base.Tt_mix;
   EXPECT_GT(dT, 40.0);
   EXPECT_LT(dT, 60.0);
 
   // Verify via enthalpy balance: h(T_mix, X) should equal h(300, X) + Q/mdot
   std::vector<double> X = mass_to_mole(normalize_fractions(st.Y));
   double h_base = h_mass(300.0, X);
-  double h_out = h_mass(res.T_mix, X);
+  double h_out = h_mass(res.Tt_mix, X);
   double delta_h = Q / st.m_dot;
   EXPECT_NEAR(h_out, h_base + delta_h, std::abs(h_base + delta_h) * 1e-6);
 }
@@ -78,10 +78,10 @@ TEST(EnergyBoundaryTest, MixerQ_NegativeCooling) {
 
   std::vector<double> X = mass_to_mole(normalize_fractions(st.Y));
   double h_base = h_mass(800.0, X);
-  double h_out = h_mass(res.T_mix, X);
+  double h_out = h_mass(res.Tt_mix, X);
   double delta_h = Q / st.m_dot;
   EXPECT_NEAR(h_out, h_base + delta_h, std::abs(h_base + delta_h) * 1e-6);
-  EXPECT_LT(res.T_mix, 800.0);
+  EXPECT_LT(res.Tt_mix, 800.0);
 }
 
 TEST(EnergyBoundaryTest, MixerQ_ZeroIsNoop) {
@@ -94,8 +94,8 @@ TEST(EnergyBoundaryTest, MixerQ_ZeroIsNoop) {
   auto res_zero = sv::mixer_from_streams_and_jacobians({st}, 0.0, 0.0);
   auto res_none = sv::mixer_from_streams_and_jacobians({st});
 
-  EXPECT_DOUBLE_EQ(res_zero.T_mix, res_none.T_mix);
-  EXPECT_DOUBLE_EQ(res_zero.P_total_mix, res_none.P_total_mix);
+  EXPECT_DOUBLE_EQ(res_zero.Tt_mix, res_none.Tt_mix);
+  EXPECT_DOUBLE_EQ(res_zero.Pt_mix, res_none.Pt_mix);
 }
 
 TEST(EnergyBoundaryTest, MixerQ_TwoStreams) {
@@ -117,10 +117,10 @@ TEST(EnergyBoundaryTest, MixerQ_TwoStreams) {
   auto res_base = sv::mixer_from_streams_and_jacobians({s1, s2}, 0.0, 0.0);
 
   // Mixed T_base should be ~450K (mass-weighted average for same composition)
-  EXPECT_NEAR(res_base.T_mix, 450.0, 2.0);
+  EXPECT_NEAR(res_base.Tt_mix, 450.0, 2.0);
 
   // Q/(mdot_tot*cp) should raise it by ~20 K
-  double dT = res.T_mix - res_base.T_mix;
+  double dT = res.Tt_mix - res_base.Tt_mix;
   EXPECT_GT(dT, 15.0);
   EXPECT_LT(dT, 25.0);
 }
@@ -145,12 +145,12 @@ TEST(EnergyBoundaryTest, MixerFraction_NegativeCooling) {
   auto res_base = sv::mixer_from_streams_and_jacobians({st}, 0.0, 0.0);
 
   // T should drop
-  EXPECT_LT(res.T_mix, res_base.T_mix);
+  EXPECT_LT(res.Tt_mix, res_base.Tt_mix);
 
   // Enthalpy should be reduced by 5%
   std::vector<double> X = mass_to_mole(normalize_fractions(st.Y));
-  double h_base = h_mass(res_base.T_mix, X);
-  double h_out = h_mass(res.T_mix, X);
+  double h_base = h_mass(res_base.Tt_mix, X);
+  double h_out = h_mass(res.Tt_mix, X);
   EXPECT_NEAR(h_out / h_base, 1.0 + fraction, 1e-5);
 }
 
@@ -173,12 +173,12 @@ TEST(EnergyBoundaryTest, MixerFraction_PositiveHeating) {
   auto res_base = sv::mixer_from_streams_and_jacobians({s1, s2}, 0.0, 0.0);
 
   // T should rise
-  EXPECT_GT(res.T_mix, res_base.T_mix);
+  EXPECT_GT(res.Tt_mix, res_base.Tt_mix);
 
   // Enthalpy should increase by 10%
   std::vector<double> X = mass_to_mole(normalize_fractions(s1.Y));
-  double h_base = h_mass(res_base.T_mix, X);
-  double h_out = h_mass(res.T_mix, X);
+  double h_base = h_mass(res_base.Tt_mix, X);
+  double h_out = h_mass(res.Tt_mix, X);
   EXPECT_NEAR(h_out / h_base, 1.0 + fraction, 1e-5);
 }
 
@@ -202,7 +202,7 @@ TEST(EnergyBoundaryTest, MixerCombined_Q_and_Fraction) {
   double Q_eff = Q + fraction * H_tot;
   double delta_h_expected = Q_eff / st.m_dot;
 
-  double h_out = h_mass(res.T_mix, X);
+  double h_out = h_mass(res.Tt_mix, X);
   EXPECT_NEAR(h_out, h_in + delta_h_expected, std::abs(h_in) * 1e-5);
 }
 
@@ -229,9 +229,9 @@ TEST(EnergyBoundaryTest, MixerJacobian_Q_dT_dmdot_SingleStream) {
   st_mm.m_dot -= eps_m;
   auto res_mp = sv::mixer_from_streams_and_jacobians({st_mp}, Q, 0.0);
   auto res_mm = sv::mixer_from_streams_and_jacobians({st_mm}, Q, 0.0);
-  double fd_dmdot = (res_mp.T_mix - res_mm.T_mix) / (2.0 * eps_m);
+  double fd_dmdot = (res_mp.Tt_mix - res_mm.Tt_mix) / (2.0 * eps_m);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[0].d_mdot, fd_dmdot,
+  EXPECT_NEAR(res.dTt_mix_d_stream[0].d_mdot, fd_dmdot,
               std::max(std::abs(fd_dmdot) * 1e-4, 1e-6));
 }
 
@@ -260,9 +260,9 @@ TEST(EnergyBoundaryTest, MixerJacobian_Q_dT_dmdot_TwoStreams) {
   s1_mm.m_dot -= eps_m;
   auto res_mp = sv::mixer_from_streams_and_jacobians({s1_mp, s2}, Q, 0.0);
   auto res_mm = sv::mixer_from_streams_and_jacobians({s1_mm, s2}, Q, 0.0);
-  double fd_dmdot1 = (res_mp.T_mix - res_mm.T_mix) / (2.0 * eps_m);
+  double fd_dmdot1 = (res_mp.Tt_mix - res_mm.Tt_mix) / (2.0 * eps_m);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[0].d_mdot, fd_dmdot1,
+  EXPECT_NEAR(res.dTt_mix_d_stream[0].d_mdot, fd_dmdot1,
               std::max(std::abs(fd_dmdot1) * 1e-4, 1e-6));
 
   // FD: dT_mix/dmdot_2
@@ -272,9 +272,9 @@ TEST(EnergyBoundaryTest, MixerJacobian_Q_dT_dmdot_TwoStreams) {
   s2_mm.m_dot -= eps_m;
   auto res2_mp = sv::mixer_from_streams_and_jacobians({s1, s2_mp}, Q, 0.0);
   auto res2_mm = sv::mixer_from_streams_and_jacobians({s1, s2_mm}, Q, 0.0);
-  double fd_dmdot2 = (res2_mp.T_mix - res2_mm.T_mix) / (2.0 * eps_m);
+  double fd_dmdot2 = (res2_mp.Tt_mix - res2_mm.Tt_mix) / (2.0 * eps_m);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[1].d_mdot, fd_dmdot2,
+  EXPECT_NEAR(res.dTt_mix_d_stream[1].d_mdot, fd_dmdot2,
               std::max(std::abs(fd_dmdot2) * 1e-4, 1e-6));
 }
 
@@ -307,9 +307,9 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dmdot) {
   s1_mm.m_dot -= eps_m;
   auto res_mp = sv::mixer_from_streams_and_jacobians({s1_mp, s2}, 0.0, fraction);
   auto res_mm = sv::mixer_from_streams_and_jacobians({s1_mm, s2}, 0.0, fraction);
-  double fd_dmdot1 = (res_mp.T_mix - res_mm.T_mix) / (2.0 * eps_m);
+  double fd_dmdot1 = (res_mp.Tt_mix - res_mm.Tt_mix) / (2.0 * eps_m);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[0].d_mdot, fd_dmdot1,
+  EXPECT_NEAR(res.dTt_mix_d_stream[0].d_mdot, fd_dmdot1,
               std::max(std::abs(fd_dmdot1) * 1e-4, 1e-6));
 }
 
@@ -338,9 +338,9 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dT) {
   s1_Tm.Tt -= eps_T;
   auto res_Tp = sv::mixer_from_streams_and_jacobians({s1_Tp, s2}, 0.0, fraction);
   auto res_Tm = sv::mixer_from_streams_and_jacobians({s1_Tm, s2}, 0.0, fraction);
-  double fd_dT1 = (res_Tp.T_mix - res_Tm.T_mix) / (2.0 * eps_T);
+  double fd_dT1 = (res_Tp.Tt_mix - res_Tm.Tt_mix) / (2.0 * eps_T);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[0].d_Tt, fd_dT1,
+  EXPECT_NEAR(res.dTt_mix_d_stream[0].d_Tt, fd_dT1,
               std::max(std::abs(fd_dT1) * 1e-4, 1e-6));
 
   // FD: dT_mix/dT_2
@@ -350,9 +350,9 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dT) {
   s2_Tm.Tt -= eps_T;
   auto res2_Tp = sv::mixer_from_streams_and_jacobians({s1, s2_Tp}, 0.0, fraction);
   auto res2_Tm = sv::mixer_from_streams_and_jacobians({s1, s2_Tm}, 0.0, fraction);
-  double fd_dT2 = (res2_Tp.T_mix - res2_Tm.T_mix) / (2.0 * eps_T);
+  double fd_dT2 = (res2_Tp.Tt_mix - res2_Tm.Tt_mix) / (2.0 * eps_T);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[1].d_Tt, fd_dT2,
+  EXPECT_NEAR(res.dTt_mix_d_stream[1].d_Tt, fd_dT2,
               std::max(std::abs(fd_dT2) * 1e-4, 1e-6));
 }
 
@@ -384,9 +384,9 @@ TEST(EnergyBoundaryTest, MixerJacobian_Fraction_dT_dY) {
   st_Ym.Y[k_N2] -= eps_Y;
   auto res_Yp = sv::mixer_from_streams_and_jacobians({st_Yp}, 0.0, fraction);
   auto res_Ym = sv::mixer_from_streams_and_jacobians({st_Ym}, 0.0, fraction);
-  double fd_dY = (res_Yp.T_mix - res_Ym.T_mix) / (2.0 * eps_Y);
+  double fd_dY = (res_Yp.Tt_mix - res_Ym.Tt_mix) / (2.0 * eps_Y);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[0].d_Y[k_N2], fd_dY,
+  EXPECT_NEAR(res.dTt_mix_d_stream[0].d_Y[k_N2], fd_dY,
               std::max(std::abs(fd_dY) * 0.05, 1.0));
 }
 
@@ -420,12 +420,12 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Q_Cooling) {
       {fuel, ox}, P, Q, 0.0);
 
   // Cooled T should be lower
-  EXPECT_LT(res_cooled.T_mix, res_base.T_mix);
+  EXPECT_LT(res_cooled.Tt_mix, res_base.Tt_mix);
 
   // Verify enthalpy balance
   std::vector<double> X_b = mass_to_mole(normalize_fractions(res_base.Y_mix));
-  double h_ad = h_mass(res_base.T_mix, X_b);
-  double h_cooled = h_mass(res_cooled.T_mix, X_b);
+  double h_ad = h_mass(res_base.Tt_mix, X_b);
+  double h_cooled = h_mass(res_cooled.Tt_mix, X_b);
   double delta_h = Q / mdot_tot;
   EXPECT_NEAR(h_cooled, h_ad + delta_h, std::abs(h_ad + delta_h) * 1e-5);
 
@@ -458,15 +458,15 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Fraction_Cooling) {
       {fuel, ox}, P, 0.0, fraction);
 
   // Cooled T should be lower
-  EXPECT_LT(res_cooled.T_mix, res_base.T_mix);
+  EXPECT_LT(res_cooled.Tt_mix, res_base.Tt_mix);
 
   // The products' SENSIBLE enthalpy is reduced by the fraction (#481): on
   // absolute h, which carries the products' formation enthalpy, a loss would
   // raise their temperature.
   std::vector<double> X_b = mass_to_mole(normalize_fractions(res_base.Y_mix));
   const double h_ref = h_mass(sv::kSensibleEnthalpyRefT, X_b);
-  double h_ad = h_mass(res_base.T_mix, X_b);
-  double h_cooled = h_mass(res_cooled.T_mix, X_b);
+  double h_ad = h_mass(res_base.Tt_mix, X_b);
+  double h_cooled = h_mass(res_cooled.Tt_mix, X_b);
   EXPECT_NEAR((h_cooled - h_ref) / (h_ad - h_ref), 1.0 + fraction, 1e-9);
 }
 
@@ -490,7 +490,7 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Q_Zero_IsNoop) {
   auto res_none = sv::adiabatic_T_complete_and_jacobian_T_from_streams(
       {fuel, ox}, P);
 
-  EXPECT_DOUBLE_EQ(res_zero.T_mix, res_none.T_mix);
+  EXPECT_DOUBLE_EQ(res_zero.Tt_mix, res_none.Tt_mix);
 }
 
 // =============================================================================
@@ -527,9 +527,9 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Jacobian_Q_dT_dmdot) {
       {fuel_mp, ox}, P, Q, 0.0);
   auto res_mm = sv::adiabatic_T_complete_and_jacobian_T_from_streams(
       {fuel_mm, ox}, P, Q, 0.0);
-  double fd_dmdot = (res_mp.T_mix - res_mm.T_mix) / (2.0 * eps_m);
+  double fd_dmdot = (res_mp.Tt_mix - res_mm.Tt_mix) / (2.0 * eps_m);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[0].d_mdot, fd_dmdot,
+  EXPECT_NEAR(res.dTt_mix_d_stream[0].d_mdot, fd_dmdot,
               std::max(std::abs(fd_dmdot) * 0.01, 1e-3));
 }
 
@@ -563,9 +563,9 @@ TEST(EnergyBoundaryTest, CompleteCombustion_Jacobian_Fraction_dT_dT) {
       {fuel, ox_Tp}, P, 0.0, fraction);
   auto res_Tm = sv::adiabatic_T_complete_and_jacobian_T_from_streams(
       {fuel, ox_Tm}, P, 0.0, fraction);
-  double fd_dT = (res_Tp.T_mix - res_Tm.T_mix) / (2.0 * eps_T);
+  double fd_dT = (res_Tp.Tt_mix - res_Tm.Tt_mix) / (2.0 * eps_T);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[1].d_Tt, fd_dT,
+  EXPECT_NEAR(res.dTt_mix_d_stream[1].d_Tt, fd_dT,
               std::max(std::abs(fd_dT) * 0.06, 1e-4));
 }
 
@@ -594,7 +594,7 @@ TEST(EnergyBoundaryTest, EquilibriumCombustion_Q_Cooling) {
   auto res_cooled = sv::adiabatic_T_equilibrium_and_jacobians_from_streams(
       {fuel, ox}, P, Q, 0.0);
 
-  EXPECT_LT(res_cooled.T_mix, res_base.T_mix);
+  EXPECT_LT(res_cooled.Tt_mix, res_base.Tt_mix);
 }
 
 TEST(EnergyBoundaryTest, EquilibriumCombustion_Jacobian_Fraction_dT_dmdot) {
@@ -627,9 +627,9 @@ TEST(EnergyBoundaryTest, EquilibriumCombustion_Jacobian_Fraction_dT_dmdot) {
       {fuel, ox_mp}, P, 0.0, fraction);
   auto res_mm = sv::adiabatic_T_equilibrium_and_jacobians_from_streams(
       {fuel, ox_mm}, P, 0.0, fraction);
-  double fd_dmdot = (res_mp.T_mix - res_mm.T_mix) / (2.0 * eps_m);
+  double fd_dmdot = (res_mp.Tt_mix - res_mm.Tt_mix) / (2.0 * eps_m);
 
-  EXPECT_NEAR(res.dT_mix_d_stream[1].d_mdot, fd_dmdot,
+  EXPECT_NEAR(res.dTt_mix_d_stream[1].d_mdot, fd_dmdot,
               std::max(std::abs(fd_dmdot) * 0.015, 1e-3));
 }
 

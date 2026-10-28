@@ -876,14 +876,17 @@ PYBIND11_MODULE(_core, m) {
       .def_readonly("dPtf_dY", &combaero::MergeFaceState::dPtf_dY)
       .def_readonly("dPtf_dY_main", &combaero::MergeFaceState::dPtf_dY_main);
   m.def("chamber_merge_face_state", &combaero::chamber_merge_face_state,
-        py::arg("m_main"), py::arg("T_main"), py::arg("X_main"), py::arg("m_out"),
-        py::arg("P"), py::arg("T"), py::arg("X"), py::arg("side_momentum"),
+        py::arg("m_main"), py::arg("Tt_main"), py::arg("X_main"), py::arg("m_out"),
+        py::arg("P"), py::arg("Tt"), py::arg("X"), py::arg("side_momentum"),
         py::arg("area"), py::arg("incompressible") = false,
         "Main-inlet face of a merge chamber from the exact (compressible)\n"
         "impulse balance over a constant-area control volume: face static P\n"
         "on the subsonic root of the ideal-gas quadratic, face Pt from the\n"
-        "same entropy-based stagnation closure as the chamber. P, T: the\n"
-        "chamber (outlet) state; T_main: the main stream's static T;\n"
+        "same entropy-based stagnation closure as the chamber. P: the\n"
+        "chamber (outlet) static pressure; Tt, Tt_main: the STAGNATION\n"
+        "temperatures of the chamber and of the main stream (the face and\n"
+        "outlet static T are solved inside; the dPf_dT/dPf_dT_main and\n"
+        "dPtf_dT/dPtf_dT_main fields are with respect to Tt and Tt_main);\n"
         "side_momentum: sum of the side streams' streamwise impulse.\n"
         "incompressible: the low-Mach limit, densities at the chamber P and\n"
         "the stagnation temperatures; linear in P_face, no choking (#588).");
@@ -1300,14 +1303,14 @@ PYBIND11_MODULE(_core, m) {
 
   py::class_<solver::MixerResult>(
       m, "MixerResult", "Output and internal gradients of stream mixes")
-      .def_readonly("T_mix", &solver::MixerResult::T_mix)
-      .def_readonly("P_total_mix", &solver::MixerResult::P_total_mix)
+      .def_readonly("Tt_mix", &solver::MixerResult::Tt_mix)
+      .def_readonly("Pt_mix", &solver::MixerResult::Pt_mix)
       .def_readonly("Y_mix", &solver::MixerResult::Y_mix)
-      .def_readonly("dT_mix_d_delta_h", &solver::MixerResult::dT_mix_d_delta_h)
-      .def_readonly("dT_mix_dQ", &solver::MixerResult::dT_mix_dQ)
-      .def_readonly("dT_mix_d_stream", &solver::MixerResult::dT_mix_d_stream)
-      .def_readonly("dP_total_mix_d_stream",
-                    &solver::MixerResult::dP_total_mix_d_stream)
+      .def_readonly("dTt_mix_d_delta_h", &solver::MixerResult::dTt_mix_d_delta_h)
+      .def_readonly("dTt_mix_dQ", &solver::MixerResult::dTt_mix_dQ)
+      .def_readonly("dTt_mix_d_stream", &solver::MixerResult::dTt_mix_d_stream)
+      .def_readonly("dPt_mix_d_stream",
+                    &solver::MixerResult::dPt_mix_d_stream)
       .def_readonly("dY_mix_d_stream", &solver::MixerResult::dY_mix_d_stream);
 
   py::class_<solver::EntropyGenerationResult>(
@@ -1322,11 +1325,11 @@ PYBIND11_MODULE(_core, m) {
         R"doc(Internal entropy generation of a control volume (#545).
 
 sigma = sum_out m s - sum_in m s - S_heat, with each MassStream at its
-stagnation state (T = total temperature, P_total) and S_heat [W/K] the
+stagnation state (Tt, Pt) and S_heat [W/K] the
 entropy the heat brought in (heat_entropy_flux). Returns
 EntropyGenerationResult(sigma [W/K], sigma_norm [-]); sigma_norm =
 sigma / (R m_in), which for an adiabatic two-port of fixed composition is
--ln(P_total_out / P_total_in).)doc");
+-ln(Pt_out / Pt_in).)doc");
   m.def("heat_entropy_flux", &solver::heat_entropy_flux, py::arg("m_dot"),
         py::arg("Tt_in"), py::arg("Tt_out"), py::arg("Y"), py::arg("M_in") = 0.0,
         py::arg("M_out") = 0.0,
@@ -1438,7 +1441,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("Pt"), py::arg("P_back"), py::arg("X"), py::arg("Cd"),
         py::arg("area"), py::arg("beta") = 0.0,
         "Compressible orifice flow with smooth choked flow Jacobians.\n\n"
-        "Returns: (mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0)");
+        "Returns: (mdot, d_mdot_dPt, d_mdot_dP_back, d_mdot_dTt)");
 
   m.def("orifice_compressible_residuals_and_jacobian",
         &solver::orifice_compressible_residuals_and_jacobian, py::arg("m_dot"),
@@ -1487,22 +1490,24 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("floored", &solver::OrificeTapPressure::floored)
       .def_readonly("in_range", &solver::OrificeTapPressure::in_range);
   m.def("orifice_tap_pressure_and_jacobian", &solver::orifice_tap_pressure_and_jacobian,
-        py::arg("P_static_up"), py::arg("P_total_up"), py::arg("P_total_down"),
+        py::arg("P_static_up"), py::arg("Pt_up"), py::arg("Pt_down"),
         py::arg("beta"), py::arg("C"), py::arg("compressible"),
-        "p_tap = P_static_up - (P_total_up - P_total_down) / k(beta, C): the\n"
+        "p_tap = P_static_up - (Pt_up - Pt_down) / k(beta, C): the\n"
         "tap pressure that a recovered drop between two pipes implies, with\n"
-        "its derivatives. k is ISO 5167-2's permanent-loss ratio.\n"
+        "its derivatives (d_dP_total_up/down are with respect to Pt_up/down).\n"
+        "k is ISO 5167-2's permanent-loss ratio.\n"
         "Compressible, p_tap is floored below any critical ratio.");
 
 
   m.def("momentum_chamber_residual_and_jacobian",
         &solver::momentum_chamber_residual_and_jacobian, py::arg("P"),
-        py::arg("P_total"), py::arg("m_dot"), py::arg("T"), py::arg("Y"),
+        py::arg("Pt"), py::arg("m_dot"), py::arg("Tt"), py::arg("Y"),
         py::arg("area"), py::arg("incompressible") = false,
-        "Momentum chamber residual: P_total = P0(P, T_static); T is the "
-        "chamber stagnation temperature T0, the static T is solved inside "
-        "(#576). incompressible: the low-Mach limit, T_static = T0 and "
-        "P_total = P + (m/A)^2 / (2 rho) (#588).");
+        "Momentum chamber residual: Pt = Pt(P, T); Tt is the chamber "
+        "stagnation temperature, the static T is solved inside (#576). "
+        "The d_res_dT, dT_static_dT and drho_dT fields are with respect to "
+        "Tt, d_res_dP_total with respect to Pt. incompressible: the low-Mach "
+        "limit, T_static = Tt and Pt = P + (m/A)^2 / (2 rho) (#588).");
 
   // --- Momentum-CV junction: whole-element (f, J) -------------------------
   py::class_<solver::MpceGeometry>(
@@ -1671,26 +1676,31 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("dp03_domega", &solver::EjectorJetPumpDischargeJacobian::dp03_domega);
 
   m.def("ejector_choked_mass_flow_and_jacobian",
-        &solver::ejector_choked_mass_flow_and_jacobian, py::arg("p0"),
-        py::arg("t0"), py::arg("area_throat"), py::arg("gamma"),
+        &solver::ejector_choked_mass_flow_and_jacobian, py::arg("Pt"),
+        py::arg("Tt"), py::arg("area_throat"), py::arg("gamma"),
         py::arg("r_gas"), py::arg("eta"),
-        "Choked (sonic-throat) mass flow (Huang 1999 Eqs. 1, 7).\n\n"
-        "Returns: (mdot, d_mdot_dp0, d_mdot_dt0)");
+        "Choked (sonic-throat) mass flow (Huang 1999 Eqs. 1, 7) from the\n"
+        "primary stagnation state (Pt, Tt).\n\n"
+        "Returns: (mdot, d_mdot_dPt, d_mdot_dTt)");
 
   m.def("ejector_cd_nozzle_mass_flow_and_jacobian",
-        &solver::ejector_cd_nozzle_mass_flow_and_jacobian, py::arg("p0"),
-        py::arg("t0"), py::arg("p_static_down"), py::arg("area_throat"),
+        &solver::ejector_cd_nozzle_mass_flow_and_jacobian, py::arg("Pt"),
+        py::arg("Tt"), py::arg("p_static_down"), py::arg("area_throat"),
         py::arg("area_exit"), py::arg("gamma"), py::arg("r_gas"), py::arg("eta"),
         py::arg("eps_frac"),
-        "C-D nozzle mass flow (choked/unchoked) with analytic Jacobian.\n\n"
-        "Returns: EjectorCDNozzleJacobian (mdot + dmdot_d{p0,t0,p_py})");
+        "C-D nozzle mass flow (choked/unchoked) from the primary stagnation\n"
+        "state (Pt, Tt) with analytic Jacobian.\n\n"
+        "Returns: EjectorCDNozzleJacobian (mdot + dmdot_d{p0,t0,p_py}, the\n"
+        "p0/t0 suffixes being d/dPt and d/dTt)");
 
   m.def("ejector_cd_nozzle_exit_static_and_jacobian",
         &solver::ejector_cd_nozzle_exit_static_and_jacobian, py::arg("m_dot"),
-        py::arg("p0"), py::arg("t0"), py::arg("area_throat"), py::arg("area_exit"),
+        py::arg("Pt"), py::arg("Tt"), py::arg("area_throat"), py::arg("area_exit"),
         py::arg("gamma"), py::arg("r_gas"), py::arg("eta"), py::arg("eps_frac"),
-        "C-D nozzle exit static P_py that passes m_dot, with implicit Jacobian.\n\n"
-        "Returns: EjectorCDExitStaticJacobian (p_py + dp_py_d{m_dot,p0,t0})");
+        "C-D nozzle exit static P_py that passes m_dot from the primary\n"
+        "stagnation state (Pt, Tt), with implicit Jacobian.\n\n"
+        "Returns: EjectorCDExitStaticJacobian (p_py + dp_py_d{m_dot,p0,t0}, the\n"
+        "p0/t0 suffixes being d/dPt and d/dTt)");
 
   m.def("ejector_jetpump_discharge_and_jacobian",
         &solver::ejector_jetpump_discharge_and_jacobian, py::arg("p_g"),
@@ -2240,7 +2250,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         return cp(T, X);
       },
       py::arg("T"), py::arg("X"),
-      "Mixture isobaric heat capacity Cp(T, X) [J/(mol·K)].");
+      "Mixture isobaric heat capacity Cp(T, X) [J/(mol*K)].");
 
   m.def(
       "h",
@@ -2260,7 +2270,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         return s(T, X, P, P_ref);
       },
       py::arg("T"), py::arg("X"), py::arg("P"), py::arg("P_ref") = 101325.0,
-      "Mixture entropy s(T, X, P, P_ref) [J/(mol·K)].");
+      "Mixture entropy s(T, X, P, P_ref) [J/(mol*K)].");
 
   m.def(
       "cv",
@@ -2303,7 +2313,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         auto X = to_vec(X_arr);
         return specific_gas_constant(X);
       },
-      py::arg("X"), "Mixture specific gas constant R_s(X) [J/(kg·K)].");
+      py::arg("X"), "Mixture specific gas constant R_s(X) [J/(kg*K)].");
 
   m.def(
       "isentropic_expansion_coefficient",
@@ -2364,7 +2374,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Parameters:\n"
       "  T : temperature [K]\n"
       "  X : mole fractions [mol/mol]\n\n"
-      "Returns: heat capacity [J/(kg·K)]");
+      "Returns: heat capacity [J/(kg*K)]");
 
   m.def(
       "cv_mass",
@@ -2379,7 +2389,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Parameters:\n"
       "  T : temperature [K]\n"
       "  X : mole fractions [mol/mol]\n\n"
-      "Returns: heat capacity [J/(kg·K)]");
+      "Returns: heat capacity [J/(kg*K)]");
 
   m.def(
       "h_mass",
@@ -2430,7 +2440,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Returns: internal energy [J/kg]");
 
   m.def("molar_volume", &molar_volume, py::arg("T"), py::arg("P"),
-        "Ideal gas molar volume V_m = R*T/P [m³/mol].");
+        "Ideal gas molar volume V_m = R*T/P [m^3/mol].");
 
   // Transport properties
   py::class_<TransportDerivatives>(m, "TransportDerivatives")
@@ -2489,7 +2499,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         return viscosity(T, P, X);
       },
       py::arg("T"), py::arg("P"), py::arg("X"),
-      "Dynamic viscosity mu(T, P, X) [Pa·s].");
+      "Dynamic viscosity mu(T, P, X) [Pa*s].");
 
   m.def(
       "thermal_conductivity",
@@ -2499,7 +2509,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         return thermal_conductivity(T, P, X);
       },
       py::arg("T"), py::arg("P"), py::arg("X"),
-      "Thermal conductivity lambda(T, P, X) [W/(m·K)].");
+      "Thermal conductivity lambda(T, P, X) [W/(m*K)].");
 
   m.def(
       "kinematic_viscosity",
@@ -2562,29 +2572,29 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Attributes:\n"
       "  T     : Temperature [K] (input, echoed back)\n"
       "  P     : Pressure [Pa] (input, echoed back)\n"
-      "  rho   : Density [kg/m³]\n"
-      "  mu    : Dynamic viscosity [Pa·s]\n"
-      "  k     : Thermal conductivity [W/(m·K)]\n"
-      "  nu    : Kinematic viscosity [m²/s]\n"
-      "  alpha : Thermal diffusivity [m²/s]\n"
+      "  rho   : Density [kg/m^3]\n"
+      "  mu    : Dynamic viscosity [Pa*s]\n"
+      "  k     : Thermal conductivity [W/(m*K)]\n"
+      "  nu    : Kinematic viscosity [m^2/s]\n"
+      "  alpha : Thermal diffusivity [m^2/s]\n"
       "  Pr    : Prandtl number [-]\n"
-      "  cp    : Specific heat at constant pressure [J/(kg·K)]\n"
-      "  cv    : Specific heat at constant volume [J/(kg·K)]\n"
+      "  cp    : Specific heat at constant pressure [J/(kg*K)]\n"
+      "  cv    : Specific heat at constant volume [J/(kg*K)]\n"
       "  gamma : Heat capacity ratio cp/cv [-]\n"
       "  a     : Speed of sound [m/s]")
       .def_readonly("T", &TransportState::T, "Temperature [K]")
       .def_readonly("P", &TransportState::P, "Pressure [Pa]")
-      .def_readonly("rho", &TransportState::rho, "Density [kg/m³]")
-      .def_readonly("mu", &TransportState::mu, "Dynamic viscosity [Pa·s]")
-      .def_readonly("k", &TransportState::k, "Thermal conductivity [W/(m·K)]")
-      .def_readonly("nu", &TransportState::nu, "Kinematic viscosity [m²/s]")
+      .def_readonly("rho", &TransportState::rho, "Density [kg/m^3]")
+      .def_readonly("mu", &TransportState::mu, "Dynamic viscosity [Pa*s]")
+      .def_readonly("k", &TransportState::k, "Thermal conductivity [W/(m*K)]")
+      .def_readonly("nu", &TransportState::nu, "Kinematic viscosity [m^2/s]")
       .def_readonly("alpha", &TransportState::alpha,
-                    "Thermal diffusivity [m²/s]")
+                    "Thermal diffusivity [m^2/s]")
       .def_readonly("Pr", &TransportState::Pr, "Prandtl number [-]")
       .def_readonly("cp", &TransportState::cp,
-                    "Specific heat at constant pressure [J/(kg·K)]")
+                    "Specific heat at constant pressure [J/(kg*K)]")
       .def_readonly("cv", &TransportState::cv,
-                    "Specific heat at constant volume [J/(kg·K)]")
+                    "Specific heat at constant volume [J/(kg*K)]")
       .def_readonly("gamma", &TransportState::gamma,
                     "Heat capacity ratio cp/cv [-]")
       .def_readonly("a", &TransportState::a, "Speed of sound [m/s]")
@@ -2596,10 +2606,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
                " Pa, "
                "mu=" +
                std::to_string(s.mu) +
-               " Pa·s, "
+               " Pa*s, "
                "k=" +
                std::to_string(s.k) +
-               " W/(m·K), "
+               " W/(m*K), "
                "Pr=" +
                std::to_string(s.Pr) +
                ", "
@@ -2683,9 +2693,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
                " Pa, "
                "rho=" +
                std::to_string(s.thermo.rho) +
-               " kg/m³, "
+               " kg/m^3, "
                "mu=" +
-               std::to_string(s.transport.mu) + " Pa·s>";
+               std::to_string(s.transport.mu) + " Pa*s>";
       });
 
   m.def(
@@ -3252,24 +3262,24 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       // Computed thermodynamic properties (read-only)
       .def_property_readonly("mw", &State::mw, "Molecular weight [g/mol]")
       .def_property_readonly("cp", &State::cp,
-                             "Specific heat at constant pressure [J/(kg·K)]")
+                             "Specific heat at constant pressure [J/(kg*K)]")
       .def_property_readonly("h", &State::h, "Specific enthalpy [J/kg]")
-      .def_property_readonly("s", &State::s, "Specific entropy [J/(kg·K)]")
+      .def_property_readonly("s", &State::s, "Specific entropy [J/(kg*K)]")
       .def_property_readonly("cv", &State::cv,
-                             "Specific heat at constant volume [J/(kg·K)]")
+                             "Specific heat at constant volume [J/(kg*K)]")
       .def_property_readonly("u", &State::u, "Specific internal energy [J/kg]")
-      .def_property_readonly("rho", &State::rho, "Density [kg/m³]")
-      .def_property_readonly("R", &State::R, "Specific gas constant [J/(kg·K)]")
+      .def_property_readonly("rho", &State::rho, "Density [kg/m^3]")
+      .def_property_readonly("R", &State::R, "Specific gas constant [J/(kg*K)]")
       .def_property_readonly("gamma", &State::gamma,
                              "Isentropic expansion coefficient [-]")
       .def_property_readonly("a", &State::a, "Speed of sound [m/s]")
       // Transport properties (read-only)
-      .def_property_readonly("mu", &State::mu, "Dynamic viscosity [Pa·s]")
-      .def_property_readonly("k", &State::k, "Thermal conductivity [W/(m·K)]")
-      .def_property_readonly("nu", &State::nu, "Kinematic viscosity [m²/s]")
+      .def_property_readonly("mu", &State::mu, "Dynamic viscosity [Pa*s]")
+      .def_property_readonly("k", &State::k, "Thermal conductivity [W/(m*K)]")
+      .def_property_readonly("nu", &State::nu, "Kinematic viscosity [m^2/s]")
       .def_property_readonly("Pr", &State::Pr, "Prandtl number [-]")
       .def_property_readonly("alpha", &State::alpha,
-                             "Thermal diffusivity [m²/s]")
+                             "Thermal diffusivity [m^2/s]")
       // Fluent setters (return self for chaining)
       .def("set_T", &State::set_T, py::arg("T"),
            "Set temperature [K], returns self")
@@ -3364,7 +3374,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
               throw std::invalid_argument("DP must be a 2-tuple (rho, P)");
             s.set_DP_mass(t[0].cast<double>(), t[1].cast<double>());
           },
-          "Get/Set Density [kg/m³] and Pressure [Pa] as a tuple (rho, P)")
+          "Get/Set Density [kg/m^3] and Pressure [Pa] as a tuple (rho, P)")
       .def_property(
           "HP", [](const State &s) { return py::make_tuple(s.h(), s.P); },
           [](State &s, py::tuple t) {
@@ -3393,7 +3403,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
             s.set_UV_mass(t[0].cast<double>(), t[1].cast<double>());
           },
           "Get/Set Mass Internal Energy [J/kg] and Mass Specific Volume "
-          "[m³/kg] as a tuple (u, v)")
+          "[m^3/kg] as a tuple (u, v)")
       .def_property(
           "SV",
           [](const State &s) {
@@ -3405,7 +3415,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
               throw std::invalid_argument("SV must be a 2-tuple (s, v)");
             s.set_SV_mass(t[0].cast<double>(), t[1].cast<double>());
           },
-          "Get/Set Mass Entropy [J/(kg K)] and Mass Specific Volume [m³/kg] as "
+          "Get/Set Mass Entropy [J/(kg K)] and Mass Specific Volume [m^3/kg] as "
           "a tuple (s, v)")
       .def_property(
           "PV",
@@ -3418,7 +3428,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
               throw std::invalid_argument("PV must be a 2-tuple (P, v)");
             s.set_PV_mass(t[0].cast<double>(), t[1].cast<double>());
           },
-          "Get/Set Pressure [Pa] and Mass Specific Volume [m³/kg] as a tuple "
+          "Get/Set Pressure [Pa] and Mass Specific Volume [m^3/kg] as a tuple "
           "(P, v)")
       .def_property(
           "UP", [](const State &s) { return py::make_tuple(s.u(), s.P); },
@@ -3440,7 +3450,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
               throw std::invalid_argument("VH must be a 2-tuple (v, h)");
             s.set_VH_mass(t[0].cast<double>(), t[1].cast<double>());
           },
-          "Get/Set Mass Specific Volume [m³/kg] and Mass Enthalpy [J/kg] as a "
+          "Get/Set Mass Specific Volume [m^3/kg] and Mass Enthalpy [J/kg] as a "
           "tuple (v, h)")
       .def_property(
           "SH", [](const State &s) { return py::make_tuple(s.s(), s.h()); },
@@ -3484,37 +3494,37 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Attributes:\n"
       "  T        : Temperature [K] (input, echoed back)\n"
       "  P        : Pressure [Pa] (input, echoed back)\n"
-      "  rho      : Density [kg/m³]\n"
-      "  cp       : Specific heat at constant pressure [J/(kg·K)]\n"
-      "  cv       : Specific heat at constant volume [J/(kg·K)]\n"
+      "  rho      : Density [kg/m^3]\n"
+      "  cp       : Specific heat at constant pressure [J/(kg*K)]\n"
+      "  cv       : Specific heat at constant volume [J/(kg*K)]\n"
       "  h        : Specific enthalpy [J/kg]\n"
-      "  s        : Specific entropy [J/(kg·K)]\n"
+      "  s        : Specific entropy [J/(kg*K)]\n"
       "  u        : Specific internal energy [J/kg]\n"
       "  gamma    : Isentropic expansion coefficient [-]\n"
       "  a        : Speed of sound [m/s]\n"
-      "  cp_mole  : Molar cp [J/(mol·K)]\n"
-      "  cv_mole  : Molar cv [J/(mol·K)]\n"
+      "  cp_mole  : Molar cp [J/(mol*K)]\n"
+      "  cv_mole  : Molar cv [J/(mol*K)]\n"
       "  h_mole   : Molar enthalpy [J/mol]\n"
-      "  s_mole   : Molar entropy [J/(mol·K)]\n"
+      "  s_mole   : Molar entropy [J/(mol*K)]\n"
       "  u_mole   : Molar internal energy [J/mol]\n"
       "  mw       : Molecular weight [g/mol]")
       .def_readonly("T", &ThermoState::T, "Temperature [K]")
       .def_readonly("P", &ThermoState::P, "Pressure [Pa]")
-      .def_readonly("rho", &ThermoState::rho, "Density [kg/m³]")
+      .def_readonly("rho", &ThermoState::rho, "Density [kg/m^3]")
       .def_readonly("cp", &ThermoState::cp,
-                    "Specific heat at constant pressure [J/(kg·K)]")
+                    "Specific heat at constant pressure [J/(kg*K)]")
       .def_readonly("cv", &ThermoState::cv,
-                    "Specific heat at constant volume [J/(kg·K)]")
+                    "Specific heat at constant volume [J/(kg*K)]")
       .def_readonly("h", &ThermoState::h, "Specific enthalpy [J/kg]")
-      .def_readonly("s", &ThermoState::s, "Specific entropy [J/(kg·K)]")
+      .def_readonly("s", &ThermoState::s, "Specific entropy [J/(kg*K)]")
       .def_readonly("u", &ThermoState::u, "Specific internal energy [J/kg]")
       .def_readonly("gamma", &ThermoState::gamma,
                     "Isentropic expansion coefficient [-]")
       .def_readonly("a", &ThermoState::a, "Speed of sound [m/s]")
-      .def_readonly("cp_mole", &ThermoState::cp_mole, "Molar cp [J/(mol·K)]")
-      .def_readonly("cv_mole", &ThermoState::cv_mole, "Molar cv [J/(mol·K)]")
+      .def_readonly("cp_mole", &ThermoState::cp_mole, "Molar cp [J/(mol*K)]")
+      .def_readonly("cv_mole", &ThermoState::cv_mole, "Molar cv [J/(mol*K)]")
       .def_readonly("h_mole", &ThermoState::h_mole, "Molar enthalpy [J/mol]")
-      .def_readonly("s_mole", &ThermoState::s_mole, "Molar entropy [J/(mol·K)]")
+      .def_readonly("s_mole", &ThermoState::s_mole, "Molar entropy [J/(mol*K)]")
       .def_readonly("u_mole", &ThermoState::u_mole,
                     "Molar internal energy [J/mol]")
       .def_readonly("mw", &ThermoState::mw, "Molecular weight [g/mol]")
@@ -3525,7 +3535,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
                std::to_string(s.P) +
                " Pa, "
                "rho=" +
-               std::to_string(s.rho) + " kg/m³>";
+               std::to_string(s.rho) + " kg/m^3>";
       });
 
   m.def("thermo_state", &thermo_state, py::arg("T"), py::arg("P"), py::arg("X"),
@@ -3571,10 +3581,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       // Computed properties (read-only)
       .def_property_readonly("mw", &Stream::mw, "Molecular weight [g/mol]")
       .def_property_readonly("cp", &Stream::cp,
-                             "Specific heat at constant pressure [J/(kg·K)]")
+                             "Specific heat at constant pressure [J/(kg*K)]")
       .def_property_readonly("h", &Stream::h, "Specific enthalpy [J/kg]")
-      .def_property_readonly("s", &Stream::s, "Specific entropy [J/(kg·K)]")
-      .def_property_readonly("rho", &Stream::rho, "Density [kg/m³]")
+      .def_property_readonly("s", &Stream::s, "Specific entropy [J/(kg*K)]")
+      .def_property_readonly("rho", &Stream::rho, "Density [kg/m^3]")
       // Fluent setters (return self for chaining)
       .def("set_T", &Stream::set_T, py::arg("T"),
            "Set temperature [K], returns self")
@@ -3998,7 +4008,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "f = 1 / [-1.8 * log10((e_D/3.7)^1.11 + 6.9/Re)]^2\n\n"
         "Parameters:\n"
         "  Re  : Reynolds number [-] (must be > 0)\n"
-        "  e_D : relative roughness ε/D [-] (must be >= 0)\n\n"
+        "  e_D : relative roughness eps/D [-] (must be >= 0)\n\n"
         "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
         "Valid for turbulent flow (Re > ~2300).\n"
         "For laminar flow, use f = 64/Re.");
@@ -4010,7 +4020,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Accuracy: <0.3% vs Colebrook-White (very accurate).\n\n"
         "Parameters:\n"
         "  Re  : Reynolds number [-] (must be > 0)\n"
-        "  e_D : relative roughness ε/D [-] (must be >= 0)\n\n"
+        "  e_D : relative roughness eps/D [-] (must be >= 0)\n\n"
         "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
         "Valid for turbulent flow (Re > ~2300).");
 
@@ -4019,10 +4029,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Colebrook-White friction factor equation (1939).\n\n"
         "Implicit equation solved iteratively using Newton-Raphson.\n"
         "The reference standard for turbulent friction factor.\n\n"
-        "1/√f = -2 * log10(ε/D/3.7 + 2.51/(Re*√f))\n\n"
+        "1/sqrt(f) = -2 * log10(eps/D/3.7 + 2.51/(Re*sqrt(f)))\n\n"
         "Parameters:\n"
         "  Re       : Reynolds number [-] (must be > 0)\n"
-        "  e_D      : relative roughness ε/D [-] (must be >= 0)\n"
+        "  e_D      : relative roughness eps/D [-] (must be >= 0)\n"
         "  tol      : convergence tolerance [-] (default: 1e-10)\n"
         "  max_iter : maximum iterations (default: 20)\n\n"
         "Returns: Darcy friction factor f [-] (dimensionless)\n\n"
@@ -4227,10 +4237,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "h = Nu * k / L\n\n"
         "Parameters:\n"
         "  Nu : Nusselt number [-] (dimensionless)\n"
-        "  k  : thermal conductivity [W/(m·K)]\n"
+        "  k  : thermal conductivity [W/(m*K)]\n"
         "  L  : characteristic length [m] (diameter for circular channel "
         "flow)\n\n"
-        "Returns: heat transfer coefficient h [W/(m²·K)]");
+        "Returns: heat transfer coefficient h [W/(m^2*K)]");
 
   m.def(
       "nusselt_circular_channel",
@@ -4270,8 +4280,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Automatically calculates density, viscosity, thermal conductivity, and "
       "Prandtl number.\n\n"
       "Parameters:\n"
-      "  T           : temperature [K]\n"
-      "  P           : pressure [Pa]\n"
+      "  T           : static temperature [K]\n"
+      "  P           : static pressure [Pa]\n"
       "  X           : mole fractions [mol/mol]\n"
       "  velocity    : flow velocity [m/s]\n"
       "  diameter    : channel diameter [m]\n"
@@ -4279,12 +4289,12 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "'sieder_tate', 'petukhov'\n"
       "  heating     : True for heating, False for cooling (affects "
       "Dittus-Boelter)\n"
-      "  mu_ratio    : μ_bulk / μ_wall for Sieder-Tate viscosity correction "
+      "  mu_ratio    : mu_bulk / mu_wall for Sieder-Tate viscosity correction "
       "(default: 1.0)\n"
       "  roughness   : absolute roughness [m] (default: 0.0 = smooth "
       "channel)\n\n"
       "Returns: tuple (h, Nu, Re)\n"
-      "  h  : heat transfer coefficient [W/(m²·K)]\n"
+      "  h  : heat transfer coefficient [W/(m^2*K)]\n"
       "  Nu : Nusselt number [-]\n"
       "  Re : Reynolds number [-]\n\n"
       "Correlations:\n"
@@ -4298,18 +4308,18 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("lmtd", &lmtd, py::arg("dT1"), py::arg("dT2"),
         "Log mean temperature difference (LMTD) for heat exchangers.\n\n"
-        "LMTD = (ΔT1 - ΔT2) / ln(ΔT1 / ΔT2)\n\n"
+        "LMTD = (dT1 - dT2) / ln(dT1 / dT2)\n\n"
         "For counter-flow:\n"
-        "  ΔT1 = T_hot_in - T_cold_out\n"
-        "  ΔT2 = T_hot_out - T_cold_in\n\n"
+        "  dT1 = T_hot_in - T_cold_out\n"
+        "  dT2 = T_hot_out - T_cold_in\n\n"
         "For parallel-flow:\n"
-        "  ΔT1 = T_hot_in - T_cold_in\n"
-        "  ΔT2 = T_hot_out - T_cold_out\n\n"
+        "  dT1 = T_hot_in - T_cold_in\n"
+        "  dT2 = T_hot_out - T_cold_out\n\n"
         "Parameters:\n"
         "  dT1 : temperature difference at one end [K]\n"
         "  dT2 : temperature difference at other end [K]\n\n"
         "Returns: log mean temperature difference [K]\n\n"
-        "Note: If dT1 ≈ dT2, returns arithmetic mean to avoid 0/0.");
+        "Note: If dT1 ~ dT2, returns arithmetic mean to avoid 0/0.");
 
   // -------------------------------------------------------------
   // Geometry utilities
@@ -4320,7 +4330,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Hydraulic diameter for arbitrary cross-section.\n\n"
         "Dh = 4 * A / P_wetted\n\n"
         "Parameters:\n"
-        "  A        : cross-sectional area [m²]\n"
+        "  A        : cross-sectional area [m^2]\n"
         "  P_wetted : wetted perimeter [m]\n\n"
         "Returns: hydraulic diameter Dh [m]");
 
@@ -4345,24 +4355,24 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("residence_time", py::overload_cast<double, double>(&residence_time),
         py::arg("V"), py::arg("Q"),
         "Residence time from volumetric flow rate.\n\n"
-        "τ = V / Q̇\n\n"
+        "tau = V / Q_dot\n\n"
         "Time for fluid to pass through a volume.\n"
-        "Used in reactor design (Damköhler number), combustor sizing.\n\n"
+        "Used in reactor design (Damkoehler number), combustor sizing.\n\n"
         "Parameters:\n"
-        "  V : volume [m³]\n"
-        "  Q : volumetric flow rate [m³/s]\n\n"
-        "Returns: residence time τ [s]");
+        "  V : volume [m^3]\n"
+        "  Q : volumetric flow rate [m^3/s]\n\n"
+        "Returns: residence time tau [s]");
 
   m.def("residence_time_mdot",
         py::overload_cast<double, double, double>(&residence_time_mdot),
         py::arg("V"), py::arg("mdot"), py::arg("rho"),
         "Residence time from mass flow rate.\n\n"
-        "τ = V·ρ / ṁ\n\n"
+        "tau = V*rho / mdot\n\n"
         "Parameters:\n"
-        "  V    : volume [m³]\n"
+        "  V    : volume [m^3]\n"
         "  mdot : mass flow rate [kg/s]\n"
-        "  rho  : density [kg/m³]\n\n"
-        "Returns: residence time τ [s]");
+        "  rho  : density [kg/m^3]\n\n"
+        "Returns: residence time tau [s]");
 
   m.def("channel_mdot", &channel_mdot, py::arg("v"), py::arg("D"),
         py::arg("rho"),
@@ -4414,34 +4424,34 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("space_velocity", &space_velocity, py::arg("Q"), py::arg("V"),
         "Space velocity (inverse of residence time).\n\n"
-        "SV = Q̇ / V = 1/τ\n\n"
+        "SV = Q_dot / V = 1/tau\n\n"
         "Parameters:\n"
-        "  Q : volumetric flow rate [m³/s]\n"
-        "  V : volume [m³]\n\n"
+        "  Q : volumetric flow rate [m^3/s]\n"
+        "  V : volume [m^3]\n\n"
         "Returns: space velocity SV [1/s]");
 
   m.def("circular_area", &circular_area, py::arg("D"),
         "Circular cross-sectional area.\n\n"
-        "A = π * (D/2)²\n\n"
+        "A = pi * (D/2)^2\n\n"
         "Parameters:\n"
         "  D : diameter [m]\n\n"
-        "Returns: area [m²]");
+        "Returns: area [m^2]");
 
   m.def("annular_area", &annular_area, py::arg("D_outer"), py::arg("D_inner"),
         "Annular cross-sectional area.\n\n"
-        "A = π * ((D_outer/2)² - (D_inner/2)²)\n\n"
+        "A = pi * ((D_outer/2)^2 - (D_inner/2)^2)\n\n"
         "Parameters:\n"
         "  D_outer : outer diameter [m]\n"
         "  D_inner : inner diameter [m]\n\n"
-        "Returns: area [m²]");
+        "Returns: area [m^2]");
 
   m.def("cylinder_volume", &cylinder_volume, py::arg("D"), py::arg("L"),
         "Cylindrical volume.\n\n"
-        "V = π * (D/2)² * L\n\n"
+        "V = pi * (D/2)^2 * L\n\n"
         "Parameters:\n"
         "  D : diameter [m]\n"
         "  L : length [m]\n\n"
-        "Returns: volume [m³]");
+        "Returns: volume [m^3]");
 
   // -------------------------------------------------------------
   // Compressible flow
@@ -4455,7 +4465,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readwrite("x", &IncompressibleStation::x, "Distance from inlet [m]")
       .def_readwrite("P", &IncompressibleStation::P, "Static Pressure [Pa]")
       .def_readwrite("T", &IncompressibleStation::T, "Static Temperature [K]")
-      .def_readwrite("rho", &IncompressibleStation::rho, "Density [kg/m³]")
+      .def_readwrite("rho", &IncompressibleStation::rho, "Density [kg/m^3]")
       .def_readwrite("u", &IncompressibleStation::v, "Velocity [m/s]")
       .def_readwrite("M", &IncompressibleStation::M, "Mach Number [-]")
       .def_readwrite("h", &IncompressibleStation::h, "Enthalpy [J/kg]")
@@ -4475,7 +4485,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("dP", &IncompressibleFlowSolution::dP, "Pressure drop [Pa]")
       .def_readonly("Re", &IncompressibleFlowSolution::Re,
                     "Reynolds number [-]")
-      .def_readwrite("rho", &IncompressibleFlowSolution::rho, "Density [kg/m³]")
+      .def_readwrite("rho", &IncompressibleFlowSolution::rho, "Density [kg/m^3]")
       .def_readwrite("f", &IncompressibleFlowSolution::f,
                      "Friction factor / Discharge coefficient [-]")
       .def_readwrite("profile", &IncompressibleFlowSolution::profile,
@@ -4505,10 +4515,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   py::class_<NozzleStation>(m, "NozzleStation")
       .def(py::init<>())
       .def_readonly("x", &NozzleStation::x, "Axial position [m]")
-      .def_readonly("A", &NozzleStation::A, "Area [m²]")
+      .def_readonly("A", &NozzleStation::A, "Area [m^2]")
       .def_readonly("P", &NozzleStation::P, "Static pressure [Pa]")
       .def_readonly("T", &NozzleStation::T, "Static temperature [K]")
-      .def_readonly("rho", &NozzleStation::rho, "Density [kg/m³]")
+      .def_readonly("rho", &NozzleStation::rho, "Density [kg/m^3]")
       .def_readonly("u", &NozzleStation::u, "Velocity [m/s]")
       .def_readonly("M", &NozzleStation::M, "Mach number [-]")
       .def_readonly("h", &NozzleStation::h, "Specific enthalpy [J/kg]");
@@ -4526,7 +4536,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
                     "True if throat is sonic")
       .def_readonly("x_throat", &NozzleSolution::x_throat,
                     "Throat position [m]")
-      .def_readonly("A_throat", &NozzleSolution::A_throat, "Throat area [m²]")
+      .def_readonly("A_throat", &NozzleSolution::A_throat, "Throat area [m^2]")
       .def_readonly("profile", &NozzleSolution::profile, "Axial profile");
 
   // ThrustResult struct
@@ -4547,11 +4557,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("x", &FannoStation::x, "Position [m]")
       .def_readonly("P", &FannoStation::P, "Static pressure [Pa]")
       .def_readonly("T", &FannoStation::T, "Static temperature [K]")
-      .def_readonly("rho", &FannoStation::rho, "Density [kg/m³]")
+      .def_readonly("rho", &FannoStation::rho, "Density [kg/m^3]")
       .def_readonly("u", &FannoStation::u, "Velocity [m/s]")
       .def_readonly("M", &FannoStation::M, "Mach number [-]")
       .def_readonly("h", &FannoStation::h, "Specific enthalpy [J/kg]")
-      .def_readonly("s", &FannoStation::s, "Specific entropy [J/(kg·K)]")
+      .def_readonly("s", &FannoStation::s, "Specific entropy [J/(kg*K)]")
       .def_readonly("f", &FannoStation::f, "Local Darcy friction factor [-]")
       .def_readonly("Re", &FannoStation::Re, "Local Reynolds number [-]");
 
@@ -4589,7 +4599,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Tt     : stagnation temperature [K]\n"
       "Pt     : stagnation pressure [Pa]\n"
       "P_back : back pressure [Pa]\n"
-      "A_eff  : effective flow area [m²]\n"
+      "A_eff  : effective flow area [m^2]\n"
       "X      : mole fractions\n\n"
       "Returns CompressibleFlowSolution.");
 
@@ -4668,7 +4678,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       },
       py::arg("Tt"), py::arg("Pt"), py::arg("P"), py::arg("X"),
       py::arg("tol") = 1e-8, py::arg("max_iter") = 50,
-      "Mass flux G = rho*v [kg/(m²·s)] at given pressure (isentropic).");
+      "Mass flux G = rho*v [kg/(m^2*s)] at given pressure (isentropic).");
 
   // Quasi-1D nozzle with C-D geometry
   m.def(
@@ -4703,8 +4713,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("D"), py::arg("f"), py::arg("X"), py::arg("n_steps") = 100,
       py::arg("store_profile") = false,
       "Fanno flow (adiabatic channel with friction).\n\n"
-      "T_in : inlet temperature [K]\n"
-      "P_in : inlet pressure [Pa]\n"
+      "T_in : inlet static temperature [K]\n"
+      "P_in : inlet static pressure [Pa]\n"
       "u_in : inlet velocity [m/s]\n"
       "L    : channel length [m]\n"
       "D    : channel diameter [m]\n"
@@ -4795,9 +4805,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       },
       py::arg("h_values"), py::arg("t_over_k") = py::array_t<double>(),
       "Overall HTC from thermal resistance network.\n\n"
-      "1/U = Σ(1/h_i) + Σ(t_j/k_j)\n\n"
-      "h_values : convective HTCs [W/(m²·K)]\n"
-      "t_over_k : thickness/conductivity ratios [m²·K/W]");
+      "1/U = sum(1/h_i) + sum(t_j/k_j)\n\n"
+      "h_values : convective HTCs [W/(m^2*K)]\n"
+      "t_over_k : thickness/conductivity ratios [m^2*K/W]");
 
   m.def("overall_htc_wall",
         py::overload_cast<double, double, double, double, double>(&overall_htc_wall),
@@ -4820,7 +4830,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("h_inner"), py::arg("h_outer"), py::arg("t_over_k_layers"),
       py::arg("R_fouling") = -1.0,
       "Overall HTC for multi-layer wall.\n\n"
-      "1/U = 1/h_inner + Σ(t_i/k_i) + 1/h_outer [+ R_fouling]\n\n"
+      "1/U = 1/h_inner + sum(t_i/k_i) + 1/h_outer [+ R_fouling]\n\n"
       "Example: steel + insulation\n"
       "  overall_htc_wall_multilayer(500, 10, [0.003/50, 0.05/0.04])");
 
@@ -4836,26 +4846,26 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("lmtd_counterflow", &lmtd_counterflow, py::arg("T_hot_in"),
         py::arg("T_hot_out"), py::arg("T_cold_in"), py::arg("T_cold_out"),
         "LMTD for counter-flow heat exchanger.\n\n"
-        "ΔT1 = T_hot_in - T_cold_out\n"
-        "ΔT2 = T_hot_out - T_cold_in");
+        "dT1 = T_hot_in - T_cold_out\n"
+        "dT2 = T_hot_out - T_cold_in");
 
   m.def("lmtd_parallelflow", &lmtd_parallelflow, py::arg("T_hot_in"),
         py::arg("T_hot_out"), py::arg("T_cold_in"), py::arg("T_cold_out"),
         "LMTD for parallel-flow heat exchanger.\n\n"
-        "ΔT1 = T_hot_in - T_cold_in\n"
-        "ΔT2 = T_hot_out - T_cold_out");
+        "dT1 = T_hot_in - T_cold_in\n"
+        "dT2 = T_hot_out - T_cold_out");
 
   m.def("heat_rate", &heat_rate, py::arg("U"), py::arg("A"), py::arg("dT"),
-        "Heat transfer rate Q = U * A * ΔT [W]");
+        "Heat transfer rate Q = U * A * dT [W]");
 
   m.def("heat_flux", &heat_flux, py::arg("U"), py::arg("dT"),
-        "Heat flux q = U * ΔT [W/m²]");
+        "Heat flux q = U * dT [W/m^2]");
 
   m.def("heat_transfer_area", &heat_transfer_area, py::arg("Q"), py::arg("U"),
-        py::arg("dT"), "Required area A = Q / (U * ΔT) [m²]");
+        py::arg("dT"), "Required area A = Q / (U * dT) [m^2]");
 
   m.def("heat_transfer_dT", &heat_transfer_dT, py::arg("Q"), py::arg("U"),
-        py::arg("A"), "Temperature difference ΔT = Q / (U * A) [K]");
+        py::arg("A"), "Temperature difference dT = Q / (U * A) [K]");
 
   m.def(
       "wall_temperature_profile",
@@ -4873,7 +4883,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Temperature profile through multi-layer wall.\n\n"
       "Returns (temps, q) where:\n"
       "  temps : interface temperatures [K]\n"
-      "  q     : heat flux [W/m²]");
+      "  q     : heat flux [W/m^2]");
 
   m.def("ntu", &ntu, py::arg("U"), py::arg("A"), py::arg("C_min"),
         "Number of Transfer Units: NTU = U * A / C_min");
@@ -4884,17 +4894,17 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("effectiveness_counterflow", &effectiveness_counterflow, py::arg("NTU"),
         py::arg("C_r"),
         "Effectiveness for counter-flow heat exchanger.\n\n"
-        "ε = (1 - exp(-NTU*(1-C_r))) / (1 - C_r*exp(-NTU*(1-C_r)))");
+        "eps = (1 - exp(-NTU*(1-C_r))) / (1 - C_r*exp(-NTU*(1-C_r)))");
 
   m.def("effectiveness_parallelflow", &effectiveness_parallelflow,
         py::arg("NTU"), py::arg("C_r"),
         "Effectiveness for parallel-flow heat exchanger.\n\n"
-        "ε = (1 - exp(-NTU*(1+C_r))) / (1 + C_r)");
+        "eps = (1 - exp(-NTU*(1+C_r))) / (1 + C_r)");
 
   m.def("heat_rate_from_effectiveness", &heat_rate_from_effectiveness,
         py::arg("epsilon"), py::arg("C_min"), py::arg("T_hot_in"),
         py::arg("T_cold_in"),
-        "Heat rate from effectiveness: Q = ε * C_min * (T_hot_in - T_cold_in) "
+        "Heat rate from effectiveness: Q = eps * C_min * (T_hot_in - T_cold_in) "
         "[W]");
 
   m.def(
@@ -4912,7 +4922,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("t_over_k"),
       "Heat flux from temperature measured at wall edge.\n\n"
       "Edge indexing: 0 = hot surface, N = cold surface.\n"
-      "Returns heat flux q [W/m²].");
+      "Returns heat flux q [W/m^2].");
 
   m.def(
       "heat_flux_from_T_at_depth",
@@ -4931,7 +4941,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("thicknesses"), py::arg("conductivities"),
       "Heat flux from temperature measured at depth from hot surface.\n\n"
       "Useful when thermocouple is embedded slightly into wall.\n"
-      "Returns heat flux q [W/m²].");
+      "Returns heat flux q [W/m^2].");
 
   m.def(
       "bulk_T_from_edge_T_and_q",
@@ -4962,7 +4972,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("edge_idx"), py::arg("h_hot"), py::arg("h_cold"),
       py::arg("t_over_k"),
       "Sensitivity of edge temperature to hot-side bulk temperature.\n\n"
-      "Returns ∂T_edge/∂T_hot [-] (0 to 1).");
+      "Returns dT_edge/dT_hot [-] (0 to 1).");
 
   m.def(
       "dT_edge_dT_cold",
@@ -4975,7 +4985,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("edge_idx"), py::arg("h_hot"), py::arg("h_cold"),
       py::arg("t_over_k"),
       "Sensitivity of edge temperature to cold-side bulk temperature.\n\n"
-      "Returns ∂T_edge/∂T_cold [-] (0 to 1).");
+      "Returns dT_edge/dT_cold [-] (0 to 1).");
 
   m.def(
       "dT_edge_dT_bulk",
@@ -4990,7 +5000,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("edge_idx"), py::arg("h_hot"), py::arg("h_cold"),
       py::arg("t_over_k"),
       "Both sensitivities at once.\n\n"
-      "Returns (∂T_edge/∂T_hot, ∂T_edge/∂T_cold).");
+      "Returns (dT_edge/dT_hot, dT_edge/dT_cold).");
 
   m.def(
       "dT_edge_dq",
@@ -5002,7 +5012,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       },
       py::arg("edge_idx"), py::arg("h_hot"), py::arg("t_over_k"),
       "Sensitivity of edge temperature to heat flux.\n\n"
-      "Returns ∂T_edge/∂q [K·m²/W] (negative).");
+      "Returns dT_edge/dq [K*m^2/W] (negative).");
 
   // =========================================================================
   // Combustion Method enum + Combustion State
@@ -5264,8 +5274,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
            "Create tube with length L [m] and diameter D [m]")
       .def_readwrite("L", &Tube::L, "Length [m]")
       .def_readwrite("D", &Tube::D, "Diameter [m]")
-      .def("area", &Tube::area, "Cross-sectional area [m²]")
-      .def("volume", &Tube::volume, "Volume [m³]")
+      .def("area", &Tube::area, "Cross-sectional area [m^2]")
+      .def("volume", &Tube::volume, "Volume [m^3]")
       .def("perimeter", &Tube::perimeter, "Circumference [m]");
 
   py::enum_<OrificeTap>(
@@ -5336,8 +5346,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
                      "Maximum azimuthal mode number to search")
       .def("D_mean", &Annulus::D_mean, "Mean diameter [m]")
       .def("gap", &Annulus::gap, "Annular gap [m]")
-      .def("area", &Annulus::area, "Cross-sectional area [m²]")
-      .def("volume", &Annulus::volume, "Volume [m³]")
+      .def("area", &Annulus::area, "Cross-sectional area [m^2]")
+      .def("volume", &Annulus::volume, "Volume [m^3]")
       .def("circumference", &Annulus::circumference, "Mean circumference [m]")
       // Backward-compat properties for AnnularDuctGeometry API (settable radius
       // accessors)
@@ -5378,19 +5388,19 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
            "Annular mean diameter [m]")
       .def("gap", &CanAnnularFlowGeometry::gap, "Annular gap [m]")
       .def("area", &CanAnnularFlowGeometry::area,
-           "Annular cross-sectional area [m²]")
+           "Annular cross-sectional area [m^2]")
       .def("volume", &CanAnnularFlowGeometry::volume,
-           "Annular section volume [m³]")
+           "Annular section volume [m^3]")
       .def("circumference", &CanAnnularFlowGeometry::circumference,
            "Annular mean circumference [m]")
       .def("area_primary", &CanAnnularFlowGeometry::area_primary,
-           "Primary circular area [m²]")
+           "Primary circular area [m^2]")
       .def("volume_primary", &CanAnnularFlowGeometry::volume_primary,
-           "Primary zone volume [m³]")
+           "Primary zone volume [m^3]")
       .def("volume_transition", &CanAnnularFlowGeometry::volume_transition,
-           "Transition volume [m³]")
+           "Transition volume [m^3]")
       .def("volume_total", &CanAnnularFlowGeometry::volume_total,
-           "Total geometry volume [m³]")
+           "Total geometry volume [m^3]")
       .def("length_total", &CanAnnularFlowGeometry::length_total,
            "Total geometry length [m]");
 
@@ -5435,7 +5445,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("annulus_azimuthal_modes", &annulus_azimuthal_modes, py::arg("annulus"),
         py::arg("c"), py::arg("m_max") = 4,
         "Compute azimuthal (tangential) acoustic modes of an annulus.\n\n"
-        "f_m = m * c / (π * D_mean)");
+        "f_m = m * c / (pi * D_mean)");
 
   m.def("annulus_modes", &annulus_modes, py::arg("annulus"), py::arg("c"),
         py::arg("upstream"), py::arg("downstream"), py::arg("n_max") = 5,
@@ -5487,9 +5497,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("A_neck"), py::arg("L_neck"), py::arg("c"),
         py::arg("end_correction") = 0.85,
         "Helmholtz resonator frequency.\n\n"
-        "f = (c / 2π) * √(A / (V * L_eff))\n\n"
-        "V              : cavity volume [m³]\n"
-        "A_neck         : neck area [m²]\n"
+        "f = (c / (2*pi)) * sqrt(A / (V * L_eff))\n\n"
+        "V              : cavity volume [m^3]\n"
+        "A_neck         : neck area [m^2]\n"
         "L_neck         : neck length [m]\n"
         "c              : speed of sound [m/s]\n"
         "end_correction : end correction factor (default: 0.85 flanged)");
@@ -5511,37 +5521,37 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   // Viscothermal boundary layers
   m.def("stokes_layer", &stokes_layer, py::arg("nu"), py::arg("f"),
-        "Stokes (viscous) boundary layer thickness: δ_ν = √(2ν/ω)\n\n"
-        "nu : kinematic viscosity [m²/s]\n"
+        "Stokes (viscous) boundary layer thickness: delta_nu = sqrt(2*nu/omega)\n\n"
+        "nu : kinematic viscosity [m^2/s]\n"
         "f  : frequency [Hz]");
 
   m.def("thermal_layer", &thermal_layer, py::arg("alpha"), py::arg("f"),
-        "Thermal penetration depth: δ_κ = √(2α/ω)\n\n"
-        "alpha : thermal diffusivity [m²/s]\n"
+        "Thermal penetration depth: delta_kappa = sqrt(2*alpha/omega)\n\n"
+        "alpha : thermal diffusivity [m^2/s]\n"
         "f     : frequency [Hz]");
 
   m.def("effective_viscothermal_layer", &effective_viscothermal_layer,
         py::arg("delta_nu"), py::arg("delta_kappa"), py::arg("gamma"),
-        "Effective viscothermal layer: δ_eff = δ_ν + (γ-1)·δ_κ");
+        "Effective viscothermal layer: delta_eff = delta_nu + (gamma-1)*delta_kappa");
 
   // Quality factor screening
   m.def("helmholtz_Q", &helmholtz_Q, py::arg("V"), py::arg("A_neck"),
         py::arg("L_neck"), py::arg("nu"), py::arg("alpha"), py::arg("gamma"),
         py::arg("f"),
         "Helmholtz resonator Q factor (viscothermal losses).\n\n"
-        "Screening estimate - expect ±50% accuracy.\n"
+        "Screening estimate - expect +/-50% accuracy.\n"
         "Real designs require experimental validation.");
 
   m.def("tube_Q", &tube_Q, py::arg("L"), py::arg("D"), py::arg("nu"),
         py::arg("alpha"), py::arg("gamma"), py::arg("f"),
         "Quarter/half-wave tube Q factor (viscothermal losses).\n\n"
-        "Screening estimate - expect ±50% accuracy.");
+        "Screening estimate - expect +/-50% accuracy.");
 
   m.def("damping_ratio", &damping_ratio, py::arg("Q"),
-        "Damping ratio from quality factor: ζ = 1/(2Q)");
+        "Damping ratio from quality factor: zeta = 1/(2Q)");
 
   m.def("bandwidth", &bandwidth, py::arg("f0"), py::arg("Q"),
-        "Half-power bandwidth: Δf = f₀/Q [Hz]");
+        "Half-power bandwidth: df = f0/Q [Hz]");
 
   // AcousticProperties struct binding - Bundle of acoustic properties
   py::class_<AcousticProperties>(
@@ -5552,7 +5562,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Attributes:\n"
       "  wavelength        : Acoustic wavelength [m]\n"
       "  frequency         : Frequency [Hz]\n"
-      "  impedance         : Characteristic acoustic impedance [Pa·s/m]\n"
+      "  impedance         : Characteristic acoustic impedance [Pa*s/m]\n"
       "  particle_velocity : Particle velocity amplitude [m/s]\n"
       "  spl               : Sound pressure level [dB]")
       .def_readonly("wavelength", &AcousticProperties::wavelength,
@@ -5560,7 +5570,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("frequency", &AcousticProperties::frequency,
                     "Frequency [Hz]")
       .def_readonly("impedance", &AcousticProperties::impedance,
-                    "Characteristic acoustic impedance [Pa·s/m]")
+                    "Characteristic acoustic impedance [Pa*s/m]")
       .def_readonly("particle_velocity", &AcousticProperties::particle_velocity,
                     "Particle velocity amplitude [m/s]")
       .def_readonly("spl", &AcousticProperties::spl,
@@ -5568,7 +5578,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def("__repr__", [](const AcousticProperties &p) {
         return "<AcousticProperties: f=" + std::to_string(p.frequency) +
                " Hz, "
-               "λ=" +
+               "lambda=" +
                std::to_string(p.wavelength) +
                " m, "
                "SPL=" +
@@ -5585,7 +5595,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "for IDE autocomplete support.\n\n"
       "Parameters:\n"
       "  f     : frequency [Hz]\n"
-      "  rho   : density [kg/m³]\n"
+      "  rho   : density [kg/m^3]\n"
       "  c     : speed of sound [m/s]\n"
       "  p_rms : RMS pressure amplitude [Pa] (default: 20e-6 Pa = 0 dB "
       "reference)\n"
@@ -5596,7 +5606,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "  >>> props = cb.acoustic_properties(f=1000, rho=1.2, c=340, "
       "p_rms=1.0)\n"
       "  >>> print(f'Wavelength: {props.wavelength:.3f} m')\n"
-      "  >>> print(f'Impedance: {props.impedance:.1f} Pa·s/m')\n"
+      "  >>> print(f'Impedance: {props.impedance:.1f} Pa*s/m')\n"
       "  >>> print(f'SPL: {props.spl:.1f} dB')");
 
   // =========================================================================
@@ -5763,7 +5773,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Notes:\n"
       "  - Plenum radius derived from flow_geom.D_mean() / 2\n"
       "  - Plenum area from flow_geom.area()\n"
-      "  - Can area computed as π*(D_can/2)²\n\n"
+      "  - Can area computed as pi*(D_can/2)^2\n\n"
       "Example:\n"
       "  >>> flow_geom = cb.CanAnnularFlowGeometry(L=0.3, D_inner=0.4, "
       "D_outer=0.6,\n"
@@ -5827,7 +5837,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   // Utility functions
   m.def("wavelength", &wavelength, py::arg("f"), py::arg("c"),
         "Acoustic wavelength from frequency.\n\n"
-        "λ = c / f\n\n"
+        "lambda = c / f\n\n"
         "Parameters:\n"
         "  f : frequency [Hz]\n"
         "  c : speed of sound [m/s]\n\n"
@@ -5836,7 +5846,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("frequency_from_wavelength", &frequency_from_wavelength,
         py::arg("lambda"), py::arg("c"),
         "Frequency from wavelength.\n\n"
-        "f = c / λ\n\n"
+        "f = c / lambda\n\n"
         "Parameters:\n"
         "  lambda : wavelength [m]\n"
         "  c      : speed of sound [m/s]\n\n"
@@ -5844,16 +5854,16 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("acoustic_impedance", &acoustic_impedance, py::arg("rho"), py::arg("c"),
         "Characteristic acoustic impedance.\n\n"
-        "Z = ρ · c\n\n"
+        "Z = rho * c\n\n"
         "Parameters:\n"
-        "  rho : density [kg/m³]\n"
+        "  rho : density [kg/m^3]\n"
         "  c   : speed of sound [m/s]\n\n"
-        "Returns: impedance [Pa·s/m]");
+        "Returns: impedance [Pa*s/m]");
 
   m.def("sound_pressure_level", &sound_pressure_level, py::arg("p_rms"),
         py::arg("p_ref") = 20e-6,
         "Sound pressure level in dB.\n\n"
-        "SPL = 20 · log₁₀(p_rms / p_ref)\n\n"
+        "SPL = 20 * log10(p_rms / p_ref)\n\n"
         "Parameters:\n"
         "  p_rms : RMS pressure amplitude [Pa]\n"
         "  p_ref : reference pressure [Pa] (default: 20e-6 Pa in air)\n\n"
@@ -5862,10 +5872,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("particle_velocity", &particle_velocity, py::arg("p"), py::arg("rho"),
         py::arg("c"),
         "Particle velocity from pressure amplitude.\n\n"
-        "u = p / (ρ · c)\n\n"
+        "u = p / (rho * c)\n\n"
         "Parameters:\n"
         "  p   : pressure amplitude [Pa]\n"
-        "  rho : density [kg/m³]\n"
+        "  rho : density [kg/m^3]\n"
         "  c   : speed of sound [m/s]\n\n"
         "Returns: particle velocity [m/s]");
 
@@ -5931,13 +5941,13 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("v2"), py::arg("rho"), py::arg("dz") = 0.0,
         py::arg("g") = 9.80665,
         "Bernoulli equation: solve for downstream pressure P2.\n\n"
-        "P1 + ½ρv1² + ρgh1 = P2 + ½ρv2² + ρgh2\n\n"
+        "P1 + 0.5*rho*v1^2 + rho*g*h1 = P2 + 0.5*rho*v2^2 + rho*g*h2\n\n"
         "P1  : upstream pressure [Pa]\n"
         "v1  : upstream velocity [m/s]\n"
         "v2  : downstream velocity [m/s]\n"
-        "rho : fluid density [kg/m³]\n"
+        "rho : fluid density [kg/m^3]\n"
         "dz  : elevation change z2-z1 [m] (positive=up)\n"
-        "g   : gravitational acceleration [m/s²]");
+        "g   : gravitational acceleration [m/s^2]");
 
   m.def("bernoulli_v2", &bernoulli_v2, py::arg("P1"), py::arg("P2"),
         py::arg("v1"), py::arg("rho"), py::arg("dz") = 0.0,
@@ -5946,9 +5956,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "P1  : upstream pressure [Pa]\n"
         "P2  : downstream pressure [Pa]\n"
         "v1  : upstream velocity [m/s]\n"
-        "rho : fluid density [kg/m³]\n"
+        "rho : fluid density [kg/m^3]\n"
         "dz  : elevation change z2-z1 [m]\n"
-        "g   : gravitational acceleration [m/s²]");
+        "g   : gravitational acceleration [m/s^2]");
 
   // Orifice flow
   m.def("orifice_mdot",
@@ -5957,49 +5967,49 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("P1"), py::arg("P2"), py::arg("A"), py::arg("Cd"),
         py::arg("rho"),
         "Orifice mass flow rate (incompressible).\n\n"
-        "ṁ = Cd · A · √(2 · ρ · ΔP)\n\n"
+        "mdot = Cd * A * sqrt(2 * rho * dP)\n\n"
         "P1  : upstream pressure [Pa]\n"
         "P2  : downstream pressure [Pa]\n"
-        "A   : orifice area [m²]\n"
+        "A   : orifice area [m^2]\n"
         "Cd  : discharge coefficient [-] (typically 0.6-0.65)\n"
-        "rho : fluid density [kg/m³]\n\n"
+        "rho : fluid density [kg/m^3]\n\n"
         "Returns: mass flow rate [kg/s]");
 
   m.def("orifice_Q", &orifice_Q, py::arg("P1"), py::arg("P2"), py::arg("A"),
         py::arg("Cd"), py::arg("rho"),
         "Orifice volumetric flow rate.\n\n"
-        "Q = Cd · A · √(2 · ΔP / ρ)\n\n"
-        "Returns: volumetric flow rate [m³/s]");
+        "Q = Cd * A * sqrt(2 * dP / rho)\n\n"
+        "Returns: volumetric flow rate [m^3/s]");
 
   m.def("orifice_velocity", &orifice_velocity, py::arg("P1"), py::arg("P2"),
         py::arg("rho"),
         "Ideal orifice velocity (no losses).\n\n"
-        "v = √(2 · ΔP / ρ)\n\n"
+        "v = sqrt(2 * dP / rho)\n\n"
         "Returns: velocity [m/s]");
 
   m.def("orifice_area", &orifice_area, py::arg("mdot"), py::arg("P1"),
         py::arg("P2"), py::arg("Cd"), py::arg("rho"),
         "Solve for required orifice area given mass flow.\n\n"
-        "A = ṁ / (Cd · √(2 · ρ · ΔP))\n\n"
-        "Returns: orifice area [m²]");
+        "A = mdot / (Cd * sqrt(2 * rho * dP))\n\n"
+        "Returns: orifice area [m^2]");
 
   m.def("orifice_dP",
         static_cast<double (*)(double, double, double, double)>(&orifice_dP),
         py::arg("mdot"), py::arg("A"), py::arg("Cd"), py::arg("rho"),
         "Solve for pressure drop given mass flow and area.\n\n"
-        "ΔP = (ṁ / (Cd · A))² / (2 · ρ)\n\n"
+        "dP = (mdot / (Cd * A))^2 / (2 * rho)\n\n"
         "Returns: pressure drop P1-P2 [Pa]");
 
   // Channel flow
   m.def("channel_dP", &channel_dP, py::arg("v"), py::arg("L"), py::arg("D"),
         py::arg("f"), py::arg("rho"),
         "Channel pressure drop (Darcy-Weisbach).\n\n"
-        "ΔP = f · (L/D) · (ρ · v² / 2)\n\n"
+        "dP = f * (L/D) * (rho * v^2 / 2)\n\n"
         "v   : flow velocity [m/s]\n"
         "L   : channel length [m]\n"
         "D   : channel diameter [m]\n"
         "f   : Darcy friction factor [-]\n"
-        "rho : fluid density [kg/m³]\n\n"
+        "rho : fluid density [kg/m^3]\n\n"
         "Returns: pressure drop [Pa]");
 
   m.def("channel_dP_mdot", &channel_dP_mdot, py::arg("mdot"), py::arg("L"),
@@ -6010,18 +6020,18 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("channel_velocity", &channel_velocity, py::arg("mdot"), py::arg("D"),
         py::arg("rho"),
         "Channel velocity from mass flow rate.\n\n"
-        "v = ṁ / (ρ · π · D² / 4)\n\n"
+        "v = mdot / (rho * pi * D^2 / 4)\n\n"
         "Returns: velocity [m/s]");
 
   // Hydraulic utilities
   m.def("dynamic_pressure", &dynamic_pressure, py::arg("v"), py::arg("rho"),
         "Dynamic pressure (velocity head).\n\n"
-        "q = ½ · ρ · v²\n\n"
+        "q = 0.5 * rho * v^2\n\n"
         "Returns: dynamic pressure [Pa]");
 
   m.def("velocity_from_q", &velocity_from_q, py::arg("q"), py::arg("rho"),
         "Velocity from dynamic pressure.\n\n"
-        "v = √(2 · q / ρ)\n\n"
+        "v = sqrt(2 * q / rho)\n\n"
         "Returns: velocity [m/s]");
 
   // =========================================================================
@@ -6047,7 +6057,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_property_readonly("beta", &OrificeGeometry::beta,
                              "Diameter ratio d/D [-]")
       .def_property_readonly("area", &OrificeGeometry::area,
-                             "Orifice area [m²]")
+                             "Orifice area [m^2]")
       .def_property_readonly("t_over_d", &OrificeGeometry::t_over_d,
                              "Thickness ratio t/d [-]")
       .def_property_readonly("r_over_d", &OrificeGeometry::r_over_d,
@@ -6061,13 +6071,13 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
                            "Attributes:\n"
                            "  Re_D : channel Reynolds number (based on D) [-]\n"
                            "  dP   : differential pressure [Pa]\n"
-                           "  rho  : fluid density [kg/m³]\n"
-                           "  mu   : dynamic viscosity [Pa·s]")
+                           "  rho  : fluid density [kg/m^3]\n"
+                           "  mu   : dynamic viscosity [Pa*s]")
       .def(py::init<>())
       .def_readwrite("Re_D", &OrificeState::Re_D, "Channel Reynolds number [-]")
       .def_readwrite("dP", &OrificeState::dP, "Differential pressure [Pa]")
-      .def_readwrite("rho", &OrificeState::rho, "Fluid density [kg/m³]")
-      .def_readwrite("mu", &OrificeState::mu, "Dynamic viscosity [Pa·s]")
+      .def_readwrite("rho", &OrificeState::rho, "Fluid density [kg/m^3]")
+      .def_readwrite("mu", &OrificeState::mu, "Dynamic viscosity [Pa*s]")
       .def("Re_d", &OrificeState::Re_d, py::arg("beta"),
            "Orifice Reynolds number (based on d)");
 
@@ -6328,14 +6338,14 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("tol") = 1e-6, py::arg("max_iter") = 20,
         "Iterative solver for orifice mass flow with Cd-Re coupling.\n\n"
         "Solves the coupled system:\n"
-        "  mdot = ε · Cd(Re_D) · A · √(2 · ρ · ΔP)\n"
-        "  Re_D = 4 · mdot / (π · D · μ)\n\n"
+        "  mdot = eps * Cd(Re_D) * A * sqrt(2 * rho * dP)\n"
+        "  Re_D = 4 * mdot / (pi * D * mu)\n\n"
         "Iterates until mdot converges (typically 3-5 iterations).\n\n"
         "Parameters:\n"
         "  geom        : OrificeGeometry\n"
         "  dP          : differential pressure [Pa]\n"
-        "  rho         : upstream density [kg/m³]\n"
-        "  mu          : dynamic viscosity [Pa·s]\n"
+        "  rho         : upstream density [kg/m^3]\n"
+        "  mu          : dynamic viscosity [Pa*s]\n"
         "  P_upstream  : absolute upstream pressure [Pa] (default: 101325)\n"
         "  kappa       : isentropic exponent cp/cv (0 = incompressible)\n"
         "  correlation : Cd correlation (default: ReaderHarrisGallagher)\n"
@@ -6364,7 +6374,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("geom"), py::arg("Cd"), py::arg("mdot"), py::arg("rho"),
         py::arg("epsilon") = 1.0,
         "Pressure drop for given mass flow and Cd.\n\n"
-        "dP = (mdot / (Cd * E * epsilon * A))² / (2 * rho)\n\n"
+        "dP = (mdot / (Cd * E * epsilon * A))^2 / (2 * rho)\n\n"
         "Returns: pressure drop [Pa]");
 
   m.def("orifice_Cd_from_measurement", &orifice_Cd_from_measurement,
@@ -6383,26 +6393,26 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Expansibility factor for compressible gas flow through orifices.\n\n"
         "Accounts for gas expansion as it accelerates through the orifice.\n"
         "Formula from ISO 5167-2:2003, Section 5.3.2.2.\n\n"
-        "ε = 1 - (0.351 + 0.256·β⁴ + 0.93·β⁸) · [1 - (1 - τ)^(1/κ)]\n\n"
-        "where τ = ΔP/P_upstream, β = d/D, κ = cp/cv\n\n"
-        "Usage: mdot = ε · Cd · A · √(2 · ρ_upstream · ΔP)\n\n"
+        "eps = 1 - (0.351 + 0.256*beta^4 + 0.93*beta^8) * [1 - (1 - tau)^(1/kappa)]\n\n"
+        "where tau = dP/P_upstream, beta = d/D, kappa = cp/cv\n\n"
+        "Usage: mdot = eps * Cd * A * sqrt(2 * rho_upstream * dP)\n\n"
         "Parameters:\n"
         "  beta        : diameter ratio d/D [-]\n"
         "  dP          : differential pressure [Pa]\n"
         "  P_upstream  : absolute upstream pressure [Pa]\n"
         "  kappa       : isentropic exponent cp/cv [-]\n\n"
-        "Returns: expansibility factor ε [-] (0 < ε ≤ 1)\n\n"
-        "Valid for: 0.1 ≤ β ≤ 0.75, τ ≤ 0.25, ideal gas");
+        "Returns: expansibility factor eps [-] (0 < eps <= 1)\n\n"
+        "Valid for: 0.1 <= beta <= 0.75, tau <= 0.25, ideal gas");
 
   // Namespace functions
   m.def("orifice_K_from_Cd", &orifice::K_from_Cd, py::arg("Cd"),
         py::arg("beta"),
         "Loss coefficient K from discharge coefficient Cd.\n\n"
-        "K = (1/Cd² - 1) * (1 - beta⁴)");
+        "K = (1/Cd^2 - 1) * (1 - beta^4)");
 
   m.def("orifice_Cd_from_K", &orifice::Cd_from_K, py::arg("K"), py::arg("beta"),
         "Discharge coefficient Cd from loss coefficient K.\n\n"
-        "Cd = 1 / sqrt(1 + K / (1 - beta⁴))");
+        "Cd = 1 / sqrt(1 + K / (1 - beta^4))");
 
 
   // OrificeFlowResult struct binding - Bundle of orifice flow properties
@@ -6419,7 +6429,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "  Re_d          : Orifice Reynolds number (based on d) [-]\n"
       "  Cd            : Discharge coefficient [-]\n"
       "  epsilon       : Expansibility factor [-] (1.0 for incompressible)\n"
-      "  rho_corrected : Density corrected for compressibility [kg/m³]")
+      "  rho_corrected : Density corrected for compressibility [kg/m^3]")
       .def_readonly("mdot", &OrificeFlowResult::mdot, "Mass flow rate [kg/s]")
       .def_readonly("v", &OrificeFlowResult::v,
                     "Velocity through orifice throat [m/s]")
@@ -6431,7 +6441,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("epsilon", &OrificeFlowResult::epsilon,
                     "Expansibility factor [-]")
       .def_readonly("rho_corrected", &OrificeFlowResult::rho_corrected,
-                    "Density corrected for compressibility [kg/m³]")
+                    "Density corrected for compressibility [kg/m^3]")
       .def("__repr__", [](const OrificeFlowResult &r) {
         return "<OrificeFlowResult: mdot=" + std::to_string(r.mdot) +
                " kg/s, "
@@ -6459,9 +6469,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Parameters:\n"
       "  geom        : OrificeGeometry\n"
       "  dP          : differential pressure [Pa]\n"
-      "  T           : temperature [K]\n"
-      "  P           : absolute upstream pressure [Pa]\n"
-      "  mu          : dynamic viscosity [Pa·s]\n"
+      "  T           : upstream static temperature [K]\n"
+      "  P           : absolute upstream static pressure [Pa]\n"
+      "  mu          : dynamic viscosity [Pa*s]\n"
       "  Z           : compressibility factor [-] (default: 1.0 = ideal gas)\n"
       "  X           : mole fractions [-] (optional, uses air if empty)\n"
       "  kappa       : isentropic exponent cp/cv [-] (default: 0.0 = "
@@ -6508,8 +6518,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Parameters:\n"
       "  geom        : OrificeGeometry\n"
       "  dP          : differential pressure [Pa]\n"
-      "  T           : temperature [K]\n"
-      "  P           : absolute upstream pressure [Pa]\n"
+      "  T           : upstream static temperature [K]\n"
+      "  P           : absolute upstream static pressure [Pa]\n"
       "  X           : mole fractions [-]\n"
       "  Z           : compressibility factor [-] (default: 1.0 = ideal gas)\n"
       "  kappa       : isentropic exponent cp/cv [-] (default: 0.0 = "
@@ -6532,10 +6542,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Velocity through orifice from mass flow rate with real gas "
         "correction.\n\n"
         "v = mdot / (rho_corrected * A)\n"
-        "where rho_corrected = rho / Z, A = π·d²/4\n\n"
+        "where rho_corrected = rho / Z, A = pi*d^2/4\n\n"
         "Parameters:\n"
         "  mdot : mass flow rate [kg/s]\n"
-        "  rho  : density [kg/m³]\n"
+        "  rho  : density [kg/m^3]\n"
         "  d    : orifice diameter [m]\n"
         "  Z    : compressibility factor [-] (default: 1.0 = ideal gas)\n\n"
         "Returns: velocity [m/s]");
@@ -6544,11 +6554,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("orifice_area_from_beta", &orifice_area_from_beta, py::arg("D"),
         py::arg("beta"),
         "Orifice area from beta ratio.\n\n"
-        "A = π·(D·beta/2)²\n\n"
+        "A = pi*(D*beta/2)^2\n\n"
         "Parameters:\n"
         "  D    : channel diameter [m]\n"
         "  beta : diameter ratio d/D [-]\n\n"
-        "Returns: orifice area [m²]");
+        "Returns: orifice area [m^2]");
 
   m.def("beta_from_diameters", &beta_from_diameters, py::arg("d"), py::arg("D"),
         "Beta ratio from diameters.\n\n"
@@ -6561,11 +6571,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("orifice_Re_d_from_mdot", &orifice_Re_d_from_mdot, py::arg("mdot"),
         py::arg("d"), py::arg("mu"),
         "Orifice Reynolds number from mass flow rate.\n\n"
-        "Re_d = 4·mdot / (π·d·μ)\n\n"
+        "Re_d = 4*mdot / (pi*d*mu)\n\n"
         "Parameters:\n"
         "  mdot : mass flow rate [kg/s]\n"
         "  d    : orifice diameter [m]\n"
-        "  mu   : dynamic viscosity [Pa·s]\n\n"
+        "  mu   : dynamic viscosity [Pa*s]\n\n"
         "Returns: Reynolds number [-]");
 
   // =========================================================================
@@ -6574,11 +6584,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("channel_roughness", &channel_roughness, py::arg("material"),
         "Get absolute roughness for a standard channel material.\n\n"
-        "Returns the absolute roughness ε [m] for common channel materials.\n"
+        "Returns the absolute roughness eps [m] for common channel materials.\n"
         "Material names are case-insensitive.\n\n"
         "Parameters:\n"
         "  material : channel material name (str)\n\n"
-        "Returns: absolute roughness ε [m]\n\n"
+        "Returns: absolute roughness eps [m]\n\n"
         "Available materials:\n"
         "  - 'smooth', 'drawn_tubing', 'pvc', 'plastic'\n"
         "  - 'commercial_steel', 'new_steel', 'wrought_iron'\n"
@@ -6592,7 +6602,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "    Munson (2013), Crane (2009)\n\n"
         "Example:\n"
         "  >>> eps = channel_roughness('commercial_steel')\n"
-        "  >>> print(f'Roughness: {eps*1e6:.1f} μm')  # 45.0 μm");
+        "  >>> print(f'Roughness: {eps*1e6:.1f} um')  # 45.0 um");
 
   m.def("standard_channel_roughness", &standard_channel_roughness,
         "Get all standard channel roughness values.\n\n"
@@ -6602,7 +6612,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Example:\n"
         "  >>> roughness_db = standard_channel_roughness()\n"
         "  >>> for material, eps in sorted(roughness_db.items()):\n"
-        "  ...     print(f'{material:20s}: {eps*1e6:8.2f} μm')");
+        "  ...     print(f'{material:20s}: {eps*1e6:8.2f} um')");
 
   // =========================================================================
   // Materials Database
@@ -6610,7 +6620,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   // Material thermal conductivity functions
   m.def("k_inconel718", &combaero::materials::k_inconel718, py::arg("T"),
-        "Thermal conductivity of Inconel 718 [W/(m·K)].\n\n"
+        "Thermal conductivity of Inconel 718 [W/(m*K)].\n\n"
         "Ni-based superalloy commonly used in turbine applications.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
@@ -6618,7 +6628,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Source: Haynes International, Special Metals Corporation");
 
   m.def("k_haynes230", &combaero::materials::k_haynes230, py::arg("T"),
-        "Thermal conductivity of Haynes 230 [W/(m·K)].\n\n"
+        "Thermal conductivity of Haynes 230 [W/(m*K)].\n\n"
         "Ni-Cr-W-Mo alloy with high-temperature oxidation resistance.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
@@ -6627,7 +6637,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("k_stainless_steel_316", &combaero::materials::k_stainless_steel_316,
         py::arg("T"),
-        "Thermal conductivity of Stainless Steel 316 [W/(m·K)].\n\n"
+        "Thermal conductivity of Stainless Steel 316 [W/(m*K)].\n\n"
         "Austenitic stainless steel with corrosion resistance.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
@@ -6635,8 +6645,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Source: NIST, ASM Handbook");
 
   m.def("k_aluminum_6061", &combaero::materials::k_aluminum_6061, py::arg("T"),
-        "Thermal conductivity of Aluminum 6061 [W/(m·K)].\n\n"
-        "Aluminum alloy, limited to <300°C due to T6 temper stability.\n\n"
+        "Thermal conductivity of Aluminum 6061 [W/(m*K)].\n\n"
+        "Aluminum alloy, limited to <300 degC due to T6 temper stability.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
         "Valid range: 200-600 K\n"
@@ -6645,7 +6655,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def(
       "k_tbc_ysz", &combaero::materials::k_tbc_ysz, py::arg("T"),
       py::arg("hours") = 0.0, py::arg("is_ebpvd") = false,
-      "Thermal conductivity of YSZ thermal barrier coating [W/(m·K)].\n\n"
+      "Thermal conductivity of YSZ thermal barrier coating [W/(m*K)].\n\n"
       "7-8 wt% Y2O3 stabilized zirconia with sintering model.\n"
       "Conductivity increases over time at high temperature (>1073 K) due to "
       "pore closure.\n\n"
@@ -6683,7 +6693,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         return std::max(1e-3, k);
       },
       py::arg("name"), py::arg("T"),
-      "Get thermal conductivity [W/(m·K)] for a named material at temperature T "
+      "Get thermal conductivity [W/(m*K)] for a named material at temperature T "
       "[K].\n"
       "Automatically clamps T to the material's valid range and ensures k > 0 "
       "for numerical stability.");
@@ -7291,6 +7301,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("correlation") = "haaland", py::arg("f_multiplier") = 1.0,
       py::arg("n_steps") = 100, py::arg("store_profile") = false,
       "Fanno flow with roughness-based variable friction factor f(x).\n"
+      "T_in, P_in: the inlet STATIC state [K, Pa]; u_in the inlet velocity.\n"
       "Recomputes f at each RK4 stage from local Re and roughness.\n"
       "Returns FannoSolution with f_avg and Re_in populated.");
 
@@ -7305,7 +7316,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("T_in"), py::arg("P_in"), py::arg("u_in"), py::arg("D"),
       py::arg("f"), py::arg("X"), py::arg("tol") = 1e-6,
       py::arg("max_iter") = 100,
-      "Maximum channel length before choking (Fanno L*) [m].");
+      "Maximum channel length before choking (Fanno L*) [m] from the inlet\n"
+      "STATIC state (T_in [K], P_in [Pa]) and velocity u_in [m/s].");
 
   // =========================================================================
   // Stagnation / static conversion utilities  (stagnation.h)
@@ -7411,7 +7423,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Adiabatic wall temperature T_aw [K] from static T [K] and velocity v "
       "[m/s].\n"
       "T_aw = T_static + r * v^2 / (2*cp)  where r = Pr^(1/3) turbulent.\n"
-      "Use T_aw (not T_static or T_total) as the hot-side driving temperature\n"
+      "Use T_aw (not T_static or Tt) as the hot-side driving temperature\n"
       "in channel evaluations and cooled_wall_heat_flux() for M > 0.3.");
 
   m.def(
@@ -7669,9 +7681,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "d(mdot)/d(dP)).\n\n"
         "Parameters:\n"
         "  dP   : Pressure drop [Pa]\n"
-        "  rho  : Density [kg/m³]\n"
+        "  rho  : Density [kg/m^3]\n"
         "  Cd   : Discharge coefficient [-]\n"
-        "  area : Orifice area [m²]\n"
+        "  area : Orifice area [m^2]\n"
         "  beta : Diameter ratio beta = d/D [-] (default 0.0)\n\n"
         "Returns: tuple(mass_flow [kg/s], derivative [kg/(s*Pa)])");
 
@@ -7681,7 +7693,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "d(dP)/d(v)).\n\n"
         "Parameters:\n"
         "  v   : Velocity [m/s]\n"
-        "  rho : Density [kg/m³]\n"
+        "  rho : Density [kg/m^3]\n"
         "  K   : Loss coefficient [-]\n\n"
         "Returns: tuple(dP [Pa], derivative [Pa/(m/s)])");
 
@@ -7800,8 +7812,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "  T : Temperature [K]\n"
         "  P : Pressure [Pa]\n"
         "  X : Mole fractions [-]\n\n"
-        "Returns: tuple(rho [kg/m³], d_rho_d_T [(kg/m³)/K], d_rho_d_P "
-        "[(kg/m³)/Pa])");
+        "Returns: tuple(rho [kg/m^3], d_rho_d_T [(kg/m^3)/K], d_rho_d_P "
+        "[(kg/m^3)/Pa])");
 
   m.def("enthalpy_and_jacobian", &solver::enthalpy_and_jacobian, py::arg("T"),
         py::arg("X"),

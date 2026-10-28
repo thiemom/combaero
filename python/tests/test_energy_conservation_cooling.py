@@ -155,7 +155,7 @@ def test_the_mixer_deposits_the_whole_heat(m: float) -> None:
         mix = _solver_tools.mixer_from_streams_and_jacobians(
             [cb.MassStream(m, 800.0, 1e5, Y_AIR)], Q=q, fraction=0.0
         )
-        dh = cb.h_mass(mix.T_mix, X_AIR) - cb.h_mass(800.0, X_AIR)
+        dh = cb.h_mass(mix.Tt_mix, X_AIR) - cb.h_mass(800.0, X_AIR)
         assert m * dh == pytest.approx(q, rel=1e-10, abs=1e-6)
 
 
@@ -167,14 +167,14 @@ def test_the_mixer_heat_term_derivative_across_the_floor(m: float) -> None:
     def t_mix(mm: float) -> float:
         return _solver_tools.mixer_from_streams_and_jacobians(
             [cb.MassStream(mm, 800.0, 1e5, Y_AIR)], Q=5.0, fraction=0.0
-        ).T_mix
+        ).Tt_mix
 
     mix = _solver_tools.mixer_from_streams_and_jacobians(
         [cb.MassStream(m, 800.0, 1e5, Y_AIR)], Q=5.0, fraction=0.0
     )
     step = 1e-6 * m
     fd = (t_mix(m + step) - t_mix(m - step)) / (2.0 * step)
-    assert mix.dT_mix_d_stream[0].d_mdot == pytest.approx(fd, rel=1e-5)
+    assert mix.dTt_mix_d_stream[0].d_mdot == pytest.approx(fd, rel=1e-5)
 
 
 def test_solving_the_same_network_again_does_not_stack_wall_heat() -> None:

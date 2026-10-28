@@ -65,14 +65,14 @@ double solve_T_isentropic(double P, double s0, double T_init,
     return T;
 }
 
-// Compute mass flux G = rho * v for isentropic expansion from (T0, P0) to P
+// Compute mass flux G = rho * v for isentropic expansion from (Tt, Pt) to P
 // Returns G in kg/(m^2*s)
-double compute_mass_flux(double T0, double P0, double P, double s0, double h0,
+double compute_mass_flux(double Tt, double Pt, double P, double s0, double h0,
                          const std::vector<double>& X,
                          double tol, std::size_t max_iter) {
-    if (P >= P0) return 0.0;
+    if (P >= Pt) return 0.0;
 
-    double T = solve_T_isentropic(P, s0, T0, X, tol, max_iter);
+    double T = solve_T_isentropic(P, s0, Tt, X, tol, max_iter);
 
     double h_curr = h_mass(T, X);
     double dh = h0 - h_curr;
@@ -86,26 +86,26 @@ double compute_mass_flux(double T0, double P0, double P, double s0, double h0,
 }
 
 // Golden section search to find pressure that maximizes mass flux (critical point)
-double find_critical_pressure(double T0, double P0, double s0, double h0,
+double find_critical_pressure(double Tt, double Pt, double s0, double h0,
                               const std::vector<double>& X,
                               double tol, std::size_t max_iter) {
     // Golden-section MAXIMISATION of the isentropic mass flux G(P). The
     // critical (sonic) pressure is where G peaks. Interior points lo < hi,
     // kept in that order: if G(lo) > G(hi) the peak lies below hi, else above
     // lo. (The previous version kept them the other way round while updating
-    // as if lo < hi, so it shrank onto a fixed point near 0.5636 P0 whatever
+    // as if lo < hi, so it shrank onto a fixed point near 0.5636 Pt whatever
     // the gas or temperature -- 6% high for air, and the choked mass flux
     // 0.1-0.3% low. See #471.)
     const double r = 0.5 * (std::sqrt(5.0) - 1.0);  // 0.618...
 
-    // For an ideal gas P*/P0 ~ 0.528 at gamma = 1.4; bracket generously.
-    double a = 0.3 * P0;
-    double b = 0.99 * P0;
+    // For an ideal gas P*/Pt ~ 0.528 at gamma = 1.4; bracket generously.
+    double a = 0.3 * Pt;
+    double b = 0.99 * Pt;
 
     double lo = b - r * (b - a);
     double hi = a + r * (b - a);
-    double f_lo = compute_mass_flux(T0, P0, lo, s0, h0, X, tol, max_iter);
-    double f_hi = compute_mass_flux(T0, P0, hi, s0, h0, X, tol, max_iter);
+    double f_lo = compute_mass_flux(Tt, Pt, lo, s0, h0, X, tol, max_iter);
+    double f_hi = compute_mass_flux(Tt, Pt, hi, s0, h0, X, tol, max_iter);
 
     // Each step shrinks the bracket by 0.618; 200 steps reach any tol.
     const std::size_t n_steps = std::max<std::size_t>(max_iter, 200);
@@ -116,13 +116,13 @@ double find_critical_pressure(double T0, double P0, double s0, double h0,
             hi = lo;
             f_hi = f_lo;
             lo = b - r * (b - a);
-            f_lo = compute_mass_flux(T0, P0, lo, s0, h0, X, tol, max_iter);
+            f_lo = compute_mass_flux(Tt, Pt, lo, s0, h0, X, tol, max_iter);
         } else {
             a = lo;
             lo = hi;
             f_lo = f_hi;
             hi = a + r * (b - a);
-            f_hi = compute_mass_flux(T0, P0, hi, s0, h0, X, tol, max_iter);
+            f_hi = compute_mass_flux(Tt, Pt, hi, s0, h0, X, tol, max_iter);
         }
     }
 
@@ -319,54 +319,54 @@ double solve_Pt_from_mdot(
         throw std::invalid_argument("solve_Pt_from_mdot: mdot_target must be positive");
     }
 
-    // Bisection on P0 in (P_back, P0_hi]. The flow is zero at P0 = P_back
-    // and rises monotonically with P0, so P_back itself is the lower end. It
+    // Bisection on Pt in (P_back, Pt_hi]. The flow is zero at Pt = P_back
+    // and rises monotonically with Pt, so P_back itself is the lower end. It
     // was 1.001 P_back, above the root of any flow smaller than the one a
     // 0.1% drive passes: such a target returned 1.001 P_back silently (+116%
     // flow at 1e-3 kg/s through 2 cm^2 at 1 bar).
-    double P0_lo = P_back;
-    double P0_hi = P_back * 1000.0;  // Start with large upper bound
+    double Pt_lo = P_back;
+    double Pt_hi = P_back * 1000.0;  // Start with large upper bound
 
-    // Expand upper bound if needed. Above choke the flow is linear in P0, so
+    // Expand upper bound if needed. Above choke the flow is linear in Pt, so
     // twelve decades bracket any finite target; failing that, refuse.
     bool bracketed = false;
     for (int expand = 0; expand < 12; ++expand) {
-        auto sol = nozzle_flow(Tt, P0_hi, P_back, A_eff, X, tol, max_iter);
+        auto sol = nozzle_flow(Tt, Pt_hi, P_back, A_eff, X, tol, max_iter);
         if (sol.mdot >= mdot_target) {
             bracketed = true;
             break;
         }
-        P0_lo = P0_hi;
-        P0_hi *= 10.0;
+        Pt_lo = Pt_hi;
+        Pt_hi *= 10.0;
     }
     if (!bracketed) {
         throw std::runtime_error("solve_Pt_from_mdot: no stagnation pressure reaches mdot_target");
     }
 
-    // Bisection. The width is measured against the drive P0 - P_back (at a
-    // small flow mdot ~ sqrt(P0 - P_back)), and the budget is not max_iter,
+    // Bisection. The width is measured against the drive Pt - P_back (at a
+    // small flow mdot ~ sqrt(Pt - P_back)), and the budget is not max_iter,
     // which is sized for the Newton loops inside nozzle_flow.
     const std::size_t n_bisect = std::max<std::size_t>(max_iter, 200);
     for (std::size_t it = 0; it < n_bisect; ++it) {
-        double P0_mid = 0.5 * (P0_lo + P0_hi);
-        auto sol = nozzle_flow(Tt, P0_mid, P_back, A_eff, X, tol, max_iter);
+        double Pt_mid = 0.5 * (Pt_lo + Pt_hi);
+        auto sol = nozzle_flow(Tt, Pt_mid, P_back, A_eff, X, tol, max_iter);
 
         if (std::abs(sol.mdot - mdot_target) < tol * mdot_target) {
-            return P0_mid;
+            return Pt_mid;
         }
 
         if (sol.mdot < mdot_target) {
-            P0_lo = P0_mid;
+            Pt_lo = Pt_mid;
         } else {
-            P0_hi = P0_mid;
+            Pt_hi = Pt_mid;
         }
 
-        if ((P0_hi - P0_lo) < tol * (P0_lo - P_back)) {
-            return 0.5 * (P0_lo + P0_hi);
+        if ((Pt_hi - Pt_lo) < tol * (Pt_lo - P_back)) {
+            return 0.5 * (Pt_lo + Pt_hi);
         }
     }
 
-    return 0.5 * (P0_lo + P0_hi);
+    return 0.5 * (Pt_lo + Pt_hi);
 }
 
 // -------------------------------------------------------------
@@ -725,7 +725,7 @@ FannoSolution fanno_channel(
             st.h   = h(T, X) / mw_g * 1000.0;
             st.s   = current.s();
             st.f   = f;
-            st.Re  = rho * u * D / sol.inlet.mu();
+            st.Re  = rho * u * D / current.mu();  // mu at the station static T
             sol.profile.push_back(st);
         }
 

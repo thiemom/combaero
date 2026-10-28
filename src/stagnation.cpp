@@ -302,36 +302,36 @@ double gl8_split(F f, double a, double b) {
 
 }  // namespace
 
-ChamberStaticState chamber_static_state(double T0, double P, double G,
+ChamberStaticState chamber_static_state(double Tt, double P, double G,
                                         const std::vector<double> &X) {
   const double R = specific_gas_constant(X);
   const double k = (G * R / P) * (G * R / P);  // v^2 = k T^2
   auto cp_of = [&](double t) { return cp_mass(t, X); };
   auto cp_over_T = [&](double t) { return cp_mass(t, X) / t; };
-  // f(T) = [h(T0) - h(T)] - k T^2 / 2, the enthalpy difference integrated.
-  double T = T0;
+  // f(T) = [h(Tt) - h(T)] - k T^2 / 2, the enthalpy difference integrated.
+  double T = Tt;
   for (int it = 0; it < 100; ++it) {
-    const double f = gl8_split(cp_of, T, T0) - 0.5 * k * T * T;
+    const double f = gl8_split(cp_of, T, Tt) - 0.5 * k * T * T;
     const double fT = -cp_mass(T, X) - k * T;
     const double step = f / fT;
     T -= step;
-    if (std::abs(step) <= 1e-13 * T0) {
+    if (std::abs(step) <= 1e-13 * Tt) {
       break;
     }
   }
   ChamberStaticState out{};
   out.T = T;
   const double cp_T = cp_mass(T, X);
-  const double cp_T0 = cp_mass(T0, X);
+  const double cp_Tt = cp_mass(Tt, X);
   const double fT = -cp_T - k * T;
-  // df/dx for x = T0, P, G; dT/dx = -(df/dx) / fT.
-  out.dT_dTt = -cp_T0 / fT;
+  // df/dx for x = Tt, P, G; dT/dx = -(df/dx) / fT.
+  out.dT_dTt = -cp_Tt / fT;
   out.dT_dP = -(k * T * T / P) / fT;
   out.dT_dG = (G > 0.0) ? -(-k * T * T / G) / fT : 0.0;
-  // ln(P0 / P) = (s(T0) - s(T)) / R = (1/R) integral of cp / T.
-  out.lnP0P = gl8_split(cp_over_T, T, T0) / R;
+  // ln(Pt / P) = (s(Tt) - s(T)) / R = (1/R) integral of cp / T.
+  out.lnPtP = gl8_split(cp_over_T, T, Tt) / R;
   const double dln_dTs = -cp_T / (R * T);
-  out.dln_dTt = cp_T0 / (R * T0) + dln_dTs * out.dT_dTt;
+  out.dln_dTt = cp_Tt / (R * Tt) + dln_dTs * out.dT_dTt;
   out.dln_dP = dln_dTs * out.dT_dP;
   out.dln_dG = dln_dTs * out.dT_dG;
   const double a = speed_of_sound(T, X);
@@ -339,13 +339,13 @@ ChamberStaticState chamber_static_state(double T0, double P, double G,
   return out;
 }
 
-ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+ChamberStaticStateDX chamber_static_state_dX(double Tt, double P, double G,
                                             const std::vector<double> &X) {
   const std::size_t n = X.size();
   ChamberStaticStateDX out;
   out.dT_dX.assign(n, 0.0);
-  out.dlnP0P_dX.assign(n, 0.0);
-  const ChamberStaticState cs = chamber_static_state(T0, P, G, X);
+  out.dlnPtP_dX.assign(n, 0.0);
+  const ChamberStaticState cs = chamber_static_state(Tt, P, G, X);
   const double T = cs.T;
   const double R = specific_gas_constant(X);
   const double MW = mwmix(X) / 1000.0;  // kg/mol
@@ -355,16 +355,16 @@ ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
   const double fT = -cpT - (G * R / P) * (G * R / P) * T;
   double dH = 0.0;
   for (std::size_t j = 0; j < n; ++j) {
-    dH += X[j] * (h_species(j, T0) - h_species(j, T));
+    dH += X[j] * (h_species(j, Tt) - h_species(j, T));
   }
   dH /= MW;
   for (std::size_t j = 0; j < n; ++j) {
     const double W = species_molar_mass(j) / 1000.0;
     // h_mass difference and R = R_u / MW both move with X_j.
-    const double fX = (h_species(j, T0) - h_species(j, T) - dH * W) / MW + v * v * W / MW;
+    const double fX = (h_species(j, Tt) - h_species(j, T) - dH * W) / MW + v * v * W / MW;
     out.dT_dX[j] = -fX / fT;
-    out.dlnP0P_dX[j] =
-        (s_species(j, T0) - s_species(j, T)) / Ru - cpT / (R * T) * out.dT_dX[j];
+    out.dlnPtP_dX[j] =
+        (s_species(j, Tt) - s_species(j, T)) / Ru - cpT / (R * T) * out.dT_dX[j];
   }
   return out;
 }
@@ -424,10 +424,10 @@ DuctStaticState duct_static_state(double Tt, double Pt, double G,
   const double R = specific_gas_constant(X);
   const double lnP0 = std::log(Pt);
   G = std::abs(G);
-  // L(u) = lnP0P(Tt, e^u, G) + u - ln Pt, increasing in u on [ln P*, ln Pt].
+  // L(u) = lnPtP(Tt, e^u, G) + u - ln Pt, increasing in u on [ln P*, ln Pt].
   auto eval = [&](double u, ChamberStaticState &cs) {
     cs = chamber_static_state(Tt, std::exp(u), G, X);
-    return cs.lnP0P + u - lnP0;
+    return cs.lnPtP + u - lnP0;
   };
   DuctStaticState out{};
   ChamberStaticState cs{};

@@ -460,26 +460,26 @@ std::tuple<double, double> stagnation_from_static(
     const std::vector<double>& X,
     double tol = 1e-8, std::size_t max_iter = 50);
 
-// Static state of a duct station from stagnation T0, static P and mass flux
-// G = |m_dot|/A (#576): T from h(T0) = h(T) + (G R T / P)^2 / 2 (unique root),
-// ln(P0/P) = (s(T0) - s(T))/R, Mach, and partials in T0, P and G.
+// Static state of a duct station from stagnation Tt, static P and mass flux
+// G = |m_dot|/A (#576): T from h(Tt) = h(T) + (G R T / P)^2 / 2 (unique root),
+// lnPtP = ln(Pt/P) = (s(Tt) - s(T))/R, Mach, and partials in Tt, P and G.
 struct ChamberStaticState {
     double T, dT_dTt, dT_dP, dT_dG;
-    double lnP0P, dln_dTt, dln_dP, dln_dG;
+    double lnPtP, dln_dTt, dln_dP, dln_dG;
     double M;
 };
-ChamberStaticState chamber_static_state(double T0, double P, double G,
+ChamberStaticState chamber_static_state(double Tt, double P, double G,
                                         const std::vector<double>& X);
-// Its mole-fraction gradients at fixed T0, P, G (#743): dT_dX, dlnP0P_dX
+// Its mole-fraction gradients at fixed Tt, P, G (#743): dT_dX, dlnPtP_dX
 // (map with mole_gradient_to_mass). Implicit function theorem on the energy
 // balance; closed-form species h, s and R.
-struct ChamberStaticStateDX { std::vector<double> dT_dX, dlnP0P_dX; };
-ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+struct ChamberStaticStateDX { std::vector<double> dT_dX, dlnPtP_dX; };
+ChamberStaticStateDX chamber_static_state_dX(double Tt, double P, double G,
                                             const std::vector<double>& X);
 
 // The SONIC static state of flux G at stagnation Tt (#637): T* from
-// h(Tt) - h(T*) = a*^2 / 2, P* = G sqrt(R T* / gamma*), with dT*/dT0,
-// dP*/dT0 and dP*/dG. A chamber discharging into a reservoir cannot sit
+// h(Tt) - h(T*) = a*^2 / 2, P* = G sqrt(R T* / gamma*), with dT*/dTt,
+// dP*/dTt and dP*/dG. A chamber discharging into a reservoir cannot sit
 // below P*.
 struct SonicStaticState { double T, P, dT_dTt, dP_dTt, dP_dG; };
 SonicStaticState sonic_static_state(double Tt, double G, const std::vector<double>& X);
@@ -493,10 +493,14 @@ SonicStaticState sonic_static_state(double Tt, double G, const std::vector<doubl
 // node's (stagnation) T.
 struct DuctStaticState {
     double T, P, rho, M;
-    double dT_dTt, dT_dP0, dT_dG;
-    double dP_dTt, dP_dP0, dP_dG;
-    double drho_dT0, drho_dP0, drho_dG;
+    double dT_dTt, dT_dPt, dT_dG;
+    double dP_dTt, dP_dPt, dP_dG;
+    double drho_dTt, drho_dPt, drho_dG;
     bool choked;
+    // The mass flux the state was evaluated at, and its partials: G itself
+    // (dGeff_dG = 1) from duct_static_state; the bent flux from
+    // duct_htc_static_state.
+    double G_eff, dGeff_dTt, dGeff_dPt, dGeff_dG;
 };
 DuctStaticState duct_static_state(double Tt, double Pt, double G,
                                   const std::vector<double>& X);
@@ -1195,11 +1199,12 @@ CrossflowCd florschuetz_metzger_su_1982_cd(double xn_d, double yn_d, double z_d,
 
 // Merge chamber (#471): the main-inlet face from the impulse balance
 //   P_f + m_main^2 R T_f / (P_f A^2) = P + m_out^2/(rho A^2) - J/A
-// with T and T_main STAGNATION temperatures (#578): the face's static T_f
-// solves h(T_main) = h(T_f) + u_f^2/2, the outlet's comes from
-// chamber_static_state. Subsonic root; Pt_face = P_f exp((s(T_main) -
-// s(T_f))/R). Sensitivities analytic. `choked` flags a face that cannot
-// carry the impulse subsonically.
+// with Tt and Tt_main STAGNATION temperatures (#578): the face's static T_f
+// solves h(Tt_main) = h(T_f) + u_f^2/2, the outlet's comes from
+// chamber_static_state. Subsonic root; Pt_face = P_f exp((s(Tt_main) -
+// s(T_f))/R). Sensitivities analytic (the dT/dT_main field suffixes are
+// with respect to Tt/Tt_main). `choked` flags a face that cannot carry the
+// impulse subsonically.
 struct MergeFaceState {
     double P_face, Pt_face, M_face; bool choked;
     double dPf_dm_main, dPf_dm_out, dPf_dJ, dPf_dP, dPf_dT, dPf_dT_main;
@@ -1210,8 +1215,8 @@ struct MergeFaceState {
 // incompressible (#588): the low-Mach limit, densities at the chamber P and
 // the stagnation temperatures; linear in P_face, nothing to choke.
 MergeFaceState chamber_merge_face_state(
-    double m_main, double T_main, const std::vector<double>& X_main,
-    double m_out, double P, double T, const std::vector<double>& X,
+    double m_main, double Tt_main, const std::vector<double>& X_main,
+    double m_out, double P, double Tt, const std::vector<double>& X,
     double side_momentum, double area, bool incompressible = false);
 
 // Streamwise jet impulse per unit cos(theta), J = m w: isentropic velocity to
@@ -1905,23 +1910,17 @@ struct ChannelResult {
     std::vector<double> d_dP_dY_up;
 };
 
+// The mixed TOTAL state (#782 names; T_mix/P_total_mix before 0.8): Tt_mix
+// from the h(Tt) balance, Pt_mix the mass-averaged total pressure. The
+// combustor wrappers return the same struct.
 struct MixerResult {
-    double T_mix;
-    double P_total_mix;
+    double Tt_mix;
+    double Pt_mix;
     std::vector<double> Y_mix;
-    double dT_mix_d_delta_h;
-    double dT_mix_dQ;  // = dT_mix_d_delta_h / m_eff (the flow Q is spread over)
-    std::vector<StreamJacobian> dT_mix_d_stream;
-    std::vector<StreamJacobian> dP_total_mix_d_stream;
-    std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
-};
-
-struct AdiabaticResult {
-    double T_mix;
-    double P_total_mix;
-    std::vector<double> Y_mix;
-    std::vector<StreamJacobian> dT_mix_d_stream;
-    std::vector<StreamJacobian> dP_total_mix_d_stream;
+    double dTt_mix_d_delta_h;
+    double dTt_mix_dQ;  // = dTt_mix_d_delta_h * phi (mixer_heat_per_unit_flow)
+    std::vector<StreamJacobian> dTt_mix_d_stream;
+    std::vector<StreamJacobian> dPt_mix_d_stream;
     std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
 };
 ```
@@ -1988,13 +1987,14 @@ ApproachStatic approach_static_pressure(double Pt, double Tt, double G,
 
 // An orifice between pipes (#645): the tap pressure the kernels expand to,
 // from the recovered (stagnation) drop between the two pipes' nodes,
-//   p_tap = P_static_up - (P_total_up - P_total_down) / k(beta, C),
-// with its derivatives (d_dC through k). Compressible, floored at
+//   p_tap = P_static_up - (Pt_up - Pt_down) / k(beta, C),
+// with its derivatives (d_dP_total_up/down are d/dPt_up and d/dPt_down; d_dC
+// through k). Compressible, floored at
 // ORIFICE_TAP_PRESSURE_FLOOR * P_static_up (0.1, below any critical ratio);
 // in_range is p_tap / P_static_up >= ORIFICE_RECOVERY_MIN_PRESSURE_RATIO (0.75).
 OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
-                                                     double P_total_up,
-                                                     double P_total_down,
+                                                     double Pt_up,
+                                                     double Pt_down,
                                                      double beta, double C,
                                                      bool compressible);
 

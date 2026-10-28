@@ -101,7 +101,7 @@ double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma);
 // Choked (sonic-throat) mass flow rate (Huang 1999 Eqs. 1 and 7).
 //
 // Method: Analytical Chain Rule (see ejector_choked_mass_flow_and_jacobian).
-double ejector_choked_mass_flow(double p0, double t0, double area_throat,
+double ejector_choked_mass_flow(double Pt, double Tt, double area_throat,
                                 double gamma, double r_gas, double eta);
 
 // Converging-diverging nozzle mass flow spanning choked and unchoked, the R0
@@ -111,7 +111,7 @@ double ejector_choked_mass_flow(double p0, double t0, double area_throat,
 // (area_throat); the two are equal at the choke threshold so the min is
 // continuous, and the C1 sqrt-smoothing (eps = eps_frac * cap) rounds the
 // corner. 1:1 with cd_nozzle_mass_flow in _ejector_huang1999.py.
-double ejector_cd_nozzle_mass_flow(double p0, double t0, double p_static_down,
+double ejector_cd_nozzle_mass_flow(double Pt, double Tt, double p_static_down,
                                    double area_throat, double area_exit,
                                    double gamma, double r_gas, double eta,
                                    double eps_frac);
@@ -160,9 +160,9 @@ EjectorCriticalPressureResult ejector_critical_back_pressure(
 // Jacobian-carrying variants: (value, d/dp_g, d/dt_g, d/dp_e, d/dt_e).
 // -----------------------------------------------------------------------------
 
-// (m_dot, d_mdot_dp0, d_mdot_dt0)
+// (m_dot, d_mdot_dPt, d_mdot_dTt), Pt and Tt the primary stagnation state
 std::tuple<double, double, double>
-ejector_choked_mass_flow_and_jacobian(double p0, double t0, double area_throat,
+ejector_choked_mass_flow_and_jacobian(double Pt, double Tt, double area_throat,
                                       double gamma, double r_gas, double eta);
 
 struct EjectorCDNozzleJacobian {
@@ -173,11 +173,12 @@ struct EjectorCDNozzleJacobian {
 };
 
 // C-D nozzle mass flow with its analytic Jacobian w.r.t. the three inputs that
-// are Newton-solved unknowns for EjectorElement (p0 = primary Pt, t0 = primary
-// Tt, p_static_down = P_py). gamma/r_gas/geometry/eta are frozen parameters.
+// are Newton-solved unknowns for EjectorElement (Pt, Tt = the primary
+// stagnation state, p_static_down = P_py). gamma/r_gas/geometry/eta are frozen
+// parameters. The dmdot_dp0/dmdot_dt0 fields are d/dPt and d/dTt.
 // The secondary entrained flux reuses this with area_throat = area_exit = A_s.
 EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
-    double p0, double t0, double p_static_down, double area_throat,
+    double Pt, double Tt, double p_static_down, double area_throat,
     double area_exit, double gamma, double r_gas, double eta, double eps_frac);
 
 struct EjectorCDExitStaticJacobian {
@@ -192,9 +193,9 @@ struct EjectorCDExitStaticJacobian {
 // operating-regime element's unchoked branch (OPERATING_REGIMES_DESIGN.md sec
 // 6b); 1:1 with cd_nozzle_exit_static in _ejector_huang1999.py. The partials
 // are ratios of the C-D nozzle's own Jacobian at the solved P_py:
-//   dP_py/dm_dot = 1/(dmdot/dP_py),  dP_py/dp0 = -(dmdot/dp0)/(dmdot/dP_py), ...
+//   dP_py/dm_dot = 1/(dmdot/dP_py),  dP_py/dPt = -(dmdot/dPt)/(dmdot/dP_py), ...
 EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
-    double m_dot, double p0, double t0, double area_throat, double area_exit,
+    double m_dot, double Pt, double Tt, double area_throat, double area_exit,
     double gamma, double r_gas, double eta, double eps_frac);
 
 struct EjectorJetPumpDischargeJacobian {

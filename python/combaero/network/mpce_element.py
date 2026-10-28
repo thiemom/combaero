@@ -81,8 +81,8 @@ def _port_gamma(state, rho: float | None = None) -> float:
         return 0.0
     try:
         if rho is not None and rho > 0.0 and float(state.P) > 0.0:
-            # At the port's STATIC T, P / (R rho): state.T is the chamber's
-            # stagnation T (#576).
+            # At the port's STATIC T, P / (R rho), not the chamber's
+            # stagnation state.Tt (#576).
             T = float(state.P) / (float(cb.specific_gas_constant(X)) * rho)
         return float(_core.isentropic_expansion_coefficient(float(T), X))
     except Exception:

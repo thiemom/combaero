@@ -1081,11 +1081,12 @@ def _duct_htc(
 ) -> "_DuctHtc | None":
     """The surface correlation at a duct's inlet static state (#636).
 
-    ``state`` is the feed node's: its T and Pt are stagnation values (a
-    plenum's gas is at rest; a chamber's T is its stagnation T, #578). The
-    duct's static state comes from them and the mass flux by the isentropic
-    acceleration (C++ ``duct_static_state``). Handing the node's T to the
-    correlation as static put T_aw above the stagnation temperature, by
+    ``state`` is the feed node's: the function reads its ``Tt`` and ``Pt``
+    (a plenum's gas is at rest, so there Pt = P; a chamber carries its
+    stagnation ``Tt``, #578). The duct's static state comes from them and the
+    mass flux by the isentropic acceleration (C++ ``duct_static_state``).
+    Handing the node's Tt to the correlation as static put T_aw above the
+    stagnation temperature, by
     about (1 + r)(Tt - T): 2.6 K at Mach 0.1, 22 K at 0.3, 51 K at 0.5 for a
     1600 K stream.
     """
@@ -2419,7 +2420,7 @@ class PlenumNode(NetworkNode):
             streams, Q=Q_total, fraction=fraction_total
         )
 
-        return mix_res.T_mix, mix_res.Y_mix, mix_res
+        return mix_res.Tt_mix, mix_res.Y_mix, mix_res
 
     def residuals(
         self, state: NetworkMixtureState
@@ -2555,7 +2556,7 @@ class MomentumChamberNode(NetworkNode):
             streams, Q=Q_total, fraction=fraction_total
         )
 
-        return mix_res.T_mix, mix_res.Y_mix, mix_res
+        return mix_res.Tt_mix, mix_res.Y_mix, mix_res
 
     def _closure(self, state: NetworkMixtureState, m_dot: float | None = None) -> Any:
         """The chamber closure at ``state`` in this chamber's regime (#588)."""
@@ -2577,9 +2578,9 @@ class MomentumChamberNode(NetworkNode):
 
         T_hot = self.t_hot if self.t_hot is not None else math.nan
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        # The correlation takes the BULK STATIC state; state.T is the
+        # The correlation takes the BULK STATIC state; state.Tt is the
         # chamber's stagnation T, so use the static state its closure solved
-        # (#578). T_aw then sits between T_static and T0 by the recovery
+        # (#578). T_aw then sits between T_static and Tt by the recovery
         # factor, as it should.
         T_static = float(state.Tt)
         c = None
@@ -2786,17 +2787,17 @@ class MomentumChamberNode(NetworkNode):
         if self.area <= 0 or m_dot_total <= 1e-12:
             return 0.0
 
-        # state.T is the chamber's stagnation T; the closure solves the static
-        # state, and its Mach is the one the residual used (#576).
+        # The closure solves the static state from the chamber's stagnation
+        # state.Tt, and its Mach is the one the residual used (#576).
         return float(self._closure(state, m_dot_total).M)
 
     def static_density(self, state: NetworkMixtureState) -> tuple[float, dict[str, float]]:
         """Static density of the chamber and d(rho)/d(name), for elements that
         read this chamber as a junction PORT (#576).
 
-        ``state.T`` is the chamber's stagnation T0; ``state.density()`` would
-        evaluate rho at T0 and so disagree with this chamber's own closure,
-        which solves the static T from (T0, P, |m_dot| / A). A junction's
+        The closure reads the chamber's stagnation ``state.Tt`` and solves
+        the static T from (Tt, P, |m_dot| / A); rho evaluated at Tt would
+        disagree with it. A junction's
         momentum rows must use the same static state, or the port's Pt and
         the junction's impulse describe two different flows (Wang 2014 MAE
         0.13 -> 0.19, rising with Mach, with only the chamber side fixed).
@@ -2828,8 +2829,8 @@ class MomentumChamberNode(NetworkNode):
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
-        # Properties at the STATIC state the closure solved; state.T is the
-        # chamber's stagnation T (#576).
+        # Properties at the STATIC state the closure solved from the
+        # chamber's stagnation state.Tt (#576).
         T_static = float(state.Tt)
         if self.area > 0:
             T_static = float(self._closure(state, m_dot_total).T_static)
@@ -3069,7 +3070,7 @@ class MassFlowBoundary(NetworkNode):
             # This ensures energy conservation and correct species transport at outlets.
             streams = [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
             mix_res = _solver_tools.mixer_from_streams_and_jacobians(streams)
-            return mix_res.T_mix, mix_res.Y_mix, mix_res
+            return mix_res.Tt_mix, mix_res.Y_mix, mix_res
 
         # SOURCE behavior: Use developer/user-defined boundary constants
         Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
@@ -3196,7 +3197,7 @@ class CombustorNode(NetworkNode):
             mix_u = _solver_tools.mixer_from_streams_and_jacobians(
                 [cb.MassStream(s.m_dot, s.Tt, s.Pt, s.Y) for s in upstream_states]
             )
-            self._T_unburned = float(mix_u.T_mix)
+            self._T_unburned = float(mix_u.Tt_mix)
             # The streams behind T_unburned, for its Jacobian in a theta-sourced
             # PressureLossElement: ({unknown: dm/d(unknown)}, source node,
             # dT_u/dm, dT_u/dTt, dT_u/dY). T_u is not a relayed node property
@@ -3209,7 +3210,7 @@ class CombustorNode(NetworkNode):
                     float(d.d_Tt),
                     list(d.d_Y),
                 )
-                for s, d in zip(upstream_states, mix_u.dT_mix_d_stream, strict=True)
+                for s, d in zip(upstream_states, mix_u.dTt_mix_d_stream, strict=True)
             ]
 
         # Upstream element ids, and d(throughput)/d(unknown) for the wall
@@ -3248,8 +3249,8 @@ class CombustorNode(NetworkNode):
             ) from exc
         self._last_mix_res = mix_res
         # Expose burned temperature for adjacent PressureLossElement (theta source).
-        self._T_burned = float(mix_res.T_mix)
-        return mix_res.T_mix, mix_res.Y_mix, mix_res
+        self._T_burned = float(mix_res.Tt_mix)
+        return mix_res.Tt_mix, mix_res.Y_mix, mix_res
 
     def residuals(
         self, state: NetworkMixtureState
@@ -3348,9 +3349,10 @@ class CombustorNode(NetworkNode):
                 T_hot=T_hot,
                 flow_area=self.area,
             )
-        # The node's T and Pt are stagnation values (its closure is Pt = P);
-        # the gas sweeping the wall at m / (rho A) is at the static state that
-        # flux implies, as in a plenum-fed duct. Handing the stagnation T to
+        # The htc reads the node's Tt and Pt (its closure is Pt = P, so this
+        # Pt is the node's static P); the gas sweeping the wall at m / (rho A)
+        # is at the static state that flux implies, as in a plenum-fed duct.
+        # Handing the stagnation T to
         # the correlation as static put T_aw above Tt: +4.7 K at Mach 0.15,
         # +46 K at Mach 0.49 for a 1430 K stream.
         s = copy.copy(state)
@@ -4518,7 +4520,7 @@ def _chamber_gas_side(node: Any, state: "NetworkMixtureState") -> dict[str, Any]
     gas = node.htc_and_T(state)
     if gas is None:
         return None
-    # The chamber's static density (#578): state.T is its stagnation T.
+    # The chamber's static density (#578), from its closure on state.Tt.
     rho_g, _ = _safe_rho(node.static_density(state)[0])
     T_gas, from_main = float(gas.T_aw), False
     if node.main_inlet is not None and node.has_side_streams():
@@ -7370,23 +7372,6 @@ class ChannelElement(NetworkElement):
 
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
-
-    def _reynolds(self, state: NetworkMixtureState) -> float:
-        """Reynolds number on the hydraulic diameter, for surface correlations.
-
-        Density cancels: rho * v is m_dot / area, so Re = m_dot * Dh / (A * mu)
-        and no density guard is needed. This replaced a block that substituted
-        air at STP (rho = 1.2, mu = 1.8e-5) whenever a state looked unphysical
-        -- fabricated properties that a mid-Newton iterate would silently pick
-        up, in the path where a discontinuity costs most.
-        """
-        area = self.area or 0.0
-        if area <= 0.0:
-            return 0.0
-        mu = cb.complete_state(state.Tt, state.Pt, state.X).transport.mu
-        if mu <= 0.0:
-            return 0.0
-        return abs(state.m_dot) * (self.Dh or self.diameter or 1.0) / (area * mu)
 
     def _ribbed_residuals(self, state_in: NetworkMixtureState, state_out: NetworkMixtureState):
         """Ribbed channel: the correlation owns the friction factor.

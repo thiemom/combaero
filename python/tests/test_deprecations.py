@@ -144,6 +144,15 @@ _NOZZLE_GEOM = {
     "x_exit": 0.15,
 }
 _UP = {"m_dot": 0.4, "P_total_up": _PT, "P_static_up": 3.0e5, "Tt_up": _TT, "Y_up": _Y}
+_EJ_TP = {"Pt": _PT, "Tt": _TT}
+_EJ_GEOM = {
+    "area_throat": 3.14e-5,
+    "area_exit": 1.0e-4,
+    "gamma": 1.4,
+    "r_gas": 287.0,
+    "eta": 0.95,
+    "eps_frac": 0.01,
+}
 
 
 def _calls() -> dict[str, dict[str, object]]:
@@ -216,6 +225,50 @@ def _calls() -> dict[str, dict[str, object]]:
             "k": 1.0,
             "zeta0": 3.0,
             "area": 0.05,
+        },
+        "chamber_merge_face_state": {
+            "m_main": 0.2,
+            "Tt_main": 700.0,
+            "X_main": _X,
+            "m_out": 0.23,
+            "P": 1.5e5,
+            "Tt": 650.0,
+            "X": _X,
+            "side_momentum": 8.0,
+            "area": 3.14e-4,
+        },
+        "momentum_chamber_residual_and_jacobian": {
+            "P": 2.5e5,
+            "Pt": 2.6e5,
+            "m_dot": 0.7,
+            "Tt": _TT,
+            "Y": _Y,
+            "area": 4e-3,
+        },
+        "orifice_tap_pressure_and_jacobian": {
+            "P_static_up": 3.0e5,
+            "Pt_up": _PT,
+            "Pt_down": 2.9e5,
+            "beta": 0.5,
+            "C": 0.61,
+            "compressible": True,
+        },
+        "ejector_choked_mass_flow_and_jacobian": {
+            **_EJ_TP,
+            "area_throat": 3.14e-5,
+            "gamma": 1.4,
+            "r_gas": 287.0,
+            "eta": 0.95,
+        },
+        "ejector_cd_nozzle_mass_flow_and_jacobian": {
+            **_EJ_TP,
+            "p_static_down": 2.0e5,
+            **_EJ_GEOM,
+        },
+        "ejector_cd_nozzle_exit_static_and_jacobian": {
+            "m_dot": 0.005,
+            **_EJ_TP,
+            **_EJ_GEOM,
         },
     }
 
@@ -330,9 +383,10 @@ def _instances() -> dict[str, object]:
     mix = _solver_tools.mixer_from_streams_and_jacobians([s1, s2], 1500.0, 0.0)
     calls = _calls()
     return {
+        "MixerResult": mix,
         "MixtureState": cb.MixtureState(2.5e5, 3.0e5, 560.0, 640.0, 0.7, _Y),
         "MassStream": s1,
-        "StreamJacobian": mix.dT_mix_d_stream[0],
+        "StreamJacobian": mix.dTt_mix_d_stream[0],
         "NozzleSolution": cb.nozzle_cd(**calls["nozzle_cd"]),
         "DuctStaticState": cb.duct_static_state(_TT, _PT, 300.0, _X),
         "SonicStatic": _solver_tools.sonic_static_pressure(_TT, 700.0, _Y),
