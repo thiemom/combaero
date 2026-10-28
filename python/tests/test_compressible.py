@@ -467,3 +467,22 @@ def test_nozzle_thrust_vacuum() -> None:
     # Vacuum thrust should be higher (no back pressure)
     assert thrust_vac.thrust > thrust_sea.thrust
     assert thrust_vac.specific_impulse > thrust_sea.specific_impulse
+
+
+def test_fanno_channel_profile_re_uses_the_local_viscosity() -> None:
+    """Every stored station's Re is rho u D / mu(T, P) at that station.
+
+    The constant-f march divided by the INLET viscosity (#782 audit), 1.9% off
+    at the outlet of this duct; the rough overload already used the local one.
+    The march itself runs on f, so P, T and M are unaffected.
+    """
+    X = cb.species.dry_air()
+    T_in, P_in, D = 900.0, 5e5, 0.05
+    u_in = 0.5 * cb.speed_of_sound(T_in, X)
+    sol = cb.fanno_channel(T_in, P_in, u_in, 2.0, D, 0.02, X, store_profile=True)
+    assert not sol.choked
+    for st in sol.profile:
+        assert st.Re == pytest.approx(st.rho * st.u * D / cb.viscosity(st.T, st.P, X), rel=1e-12)
+    out = sol.profile[-1]
+    assert T_in - 20.0 > out.T
+    assert out.Re > 1.01 * out.rho * out.u * D / cb.viscosity(T_in, P_in, X)

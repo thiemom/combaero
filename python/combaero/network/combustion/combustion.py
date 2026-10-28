@@ -34,8 +34,8 @@ def mix_streams(
     ]
     mix = core.mixer_from_streams_and_jacobians(streams)
 
-    T = mix.T_mix
-    P = mix.P_total_mix
+    T = mix.Tt_mix
+    P = mix.Pt_mix
     Y = list(mix.Y_mix)
     X = list(cb.mass_to_mole(Y))
     mw = cb.mwmix(X)
@@ -96,7 +96,7 @@ def combustion_from_streams(
     P = state_air.P
 
     mix_in = core.mixer_from_streams_and_jacobians(streams)
-    T_in = mix_in.T_mix
+    T_in = mix_in.Tt_mix
     X_mix_in = list(cb.mass_to_mole(list(mix_in.Y_mix)))
 
     if method == "complete":
@@ -104,7 +104,7 @@ def combustion_from_streams(
     else:
         res = core.adiabatic_T_equilibrium_and_jacobians_from_streams(streams, P)
 
-    T_ad = res.T_mix
+    T_ad = res.Tt_mix
     Y_products = list(res.Y_mix)
     X_products = list(cb.mass_to_mole(Y_products))
 

@@ -54,19 +54,21 @@ struct StreamJacobian {
   std::vector<double> d_Y;
 };
 
+// The mixed TOTAL state: Tt_mix from the h(Tt) balance, Pt_mix the
+// mass-averaged total pressure (#782 names).
 struct MixerResult {
-  double T_mix;
-  double P_total_mix;
+  double Tt_mix;
+  double Pt_mix;
   std::vector<double> Y_mix;
-  double dT_mix_d_delta_h = 0.0;
-  // dT_mix/dQ [K/W] = dT_mix_d_delta_h * phi, with phi = delta_h / Q the
+  double dTt_mix_d_delta_h = 0.0;
+  // dTt_mix/dQ [K/W] = dTt_mix_d_delta_h * phi, with phi = delta_h / Q the
   // heat per unit flow (mixer_heat_per_unit_flow: 1/|m| above
   // kMixerHeatMdotFloor, fading to 0 at zero flow below it). A
   // caller relaying a heat input (a wall) needs this, not 1/(cp sum m),
   // which was wrong below the floor and for a zero or negative total (#481).
-  double dT_mix_dQ = 0.0;
-  std::vector<StreamJacobian> dT_mix_d_stream;
-  std::vector<StreamJacobian> dP_total_mix_d_stream;
+  double dTt_mix_dQ = 0.0;
+  std::vector<StreamJacobian> dTt_mix_d_stream;
+  std::vector<StreamJacobian> dPt_mix_d_stream;
   std::vector<std::vector<StreamJacobian>> dY_mix_d_stream;
 };
 
@@ -197,8 +199,8 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 //
 // Method: Finite Difference Jacobians (nozzle_flow is iterative)
 // Inputs:
-//   T0   : Stagnation temperature [K]
-//   P0   : Stagnation pressure [Pa]
+//   Tt   : Stagnation temperature [K]
+//   Pt   : Stagnation pressure [Pa]
 //   P_back : Back pressure [Pa]
 //   X    : Mole fractions [-]
 //   Cd   : Discharge coefficient [-]
@@ -206,21 +208,21 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 //   beta : Orifice beta ratio (d/D) [-]
 //
 // Returns:
-//   tuple(mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0)
+//   tuple(mdot, d_mdot_dPt, d_mdot_dP_back, d_mdot_dTt)
 //   mdot           : Mass flow rate [kg/s]
-//   d_mdot_dP0     : Jacobian w.r.t. stagnation pressure [kg/(s*Pa)]
+//   d_mdot_dPt     : Jacobian w.r.t. stagnation pressure [kg/(s*Pa)]
 //   d_mdot_dP_back : Jacobian w.r.t. back pressure [kg/(s*Pa)] (smooth through choked transition)
-//   d_mdot_dT0     : Jacobian w.r.t. stagnation temperature [kg/(s*K)]
+//   d_mdot_dTt     : Jacobian w.r.t. stagnation temperature [kg/(s*K)]
 std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
     double Tt, double Pt, double P_back,
     const std::vector<double>& X,
     double Cd, double area, double beta);
 
 // Full compressible orifice evaluation with all derivatives for network solver.
-// T_up is the upstream STAGNATION temperature. The nozzle expands from the
-// upstream state approach_from_static picks: without E from (T_up,
+// Tt_up is the upstream STAGNATION temperature. The nozzle expands from the
+// upstream state approach_from_static picks: without E from (Tt_up,
 // P_total_up); with E from the upstream static state, P_static_up at the
-// temperature on the isentrope through (T_up, P_total_up) (#645).
+// temperature on the isentrope through (Tt_up, P_total_up) (#645).
 OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up,
@@ -232,7 +234,7 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 // tapping differential dp = dw / k (k: permanent_loss_ratio_and_dC). This
 // maps the recovered drop to the downstream TAP pressure the kernels expand
 // to:
-//   p_tap = P_static_up - (P_total_up - P_total_down) / k(beta, C).
+//   p_tap = P_static_up - (Pt_up - Pt_down) / k(beta, C).
 // Compressible, p_tap is held at ORIFICE_TAP_PRESSURE_FLOOR P_static_up,
 // below any critical ratio, so the choked nozzle reads it as choked; the
 // incompressible map has no floor. ISO's relation is incompressible:
@@ -248,7 +250,7 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 // Pt = P + G^2 R Tt / (2 P), whose subsonic root is
 // P = [Pt + sqrt(Pt^2 - 2 G^2 R Tt)] / 2; past its maximum flux it holds
 // P = Pt / 2 (choked = true, derivatives of that branch).
-// The sonic static pressure P* of a chamber at stagnation T0 and mass flux G
+// The sonic static pressure P* of a chamber at stagnation Tt and mass flux G
 // (#637): the floor its static pressure cannot go below while it discharges
 // into a reservoir (combaero::sonic_static_state). dP_dY by a forward
 // difference, as approach_static_pressure.
@@ -282,16 +284,16 @@ struct OrificeTapPressure {
   double p_tap;
   double loss_ratio;        // k = dw / dp
   double d_dP_static_up;
-  double d_dP_total_up;
-  double d_dP_total_down;
+  double d_dP_total_up;    // d/dPt_up
+  double d_dP_total_down;  // d/dPt_down
   double d_dC;              // through k(C)
   bool floored;
   bool in_range;
 };
 
 OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
-                                                     double P_total_up,
-                                                     double P_total_down,
+                                                     double Pt_up,
+                                                     double Pt_down,
                                                      double beta, double C,
                                                      bool compressible);
 
@@ -456,7 +458,10 @@ viscosity_and_jacobians(double T, double P, const std::vector<double> &X);
 std::tuple<double, double>
 mach_number_and_jacobian_v(double v, double T, const std::vector<double> &X);
 
-// Calculate Adiabatic Wall Temperature and its derivative wrt Velocity
+// Calculate Adiabatic Wall Temperature and its derivative wrt Velocity:
+// T_aw = T_static + r v^2 / (2 cp). T and P: the state the gas properties
+// (Pr for the recovery factor r, cp) are read at, normally the same static
+// state as T_static.
 // Method: Analytical Chain Rule
 std::tuple<double, double>
 T_adiabatic_wall_and_jacobian_v(double T_static, double v, double T, double P,
@@ -567,17 +572,17 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
 // Internal entropy generation of a control volume (#545): the second-law
 // check the network applies to every element after a solve.
 //
-//   sigma = sum_out m s(T, P_total, Y) - sum_in m s(T, P_total, Y) - S_heat
+//   sigma = sum_out m s(Tt, Pt, Y) - sum_in m s(Tt, Pt, Y) - S_heat
 //
-// Streams carry STAGNATION states (T is the total temperature, as in the
-// mixer); s(T0, P0) = s(T, P) by definition of the stagnation state. S_heat
+// Streams carry STAGNATION states (Tt, Pt, as in the mixer); s(Tt, Pt) =
+// s(T, P) by definition of the stagnation state. S_heat
 // [W/K] is the entropy the heat brought in, integral dQ / T at the fluid's
 // static temperature (heat_entropy_flux), which makes sigma the INTERNAL
 // generation: a necessary condition that needs no wall temperature.
 //
 // sigma_norm = sigma / (R m_in), with R the specific gas constant of the
 // largest inflow. For an adiabatic two-port of fixed composition it is
-// exactly -ln(P_total_out / P_total_in).
+// exactly -ln(Pt_out / Pt_in).
 struct EntropyGenerationResult {
   double sigma;       // [W/K]
   double sigma_norm;  // [-]
@@ -588,10 +593,10 @@ EntropyGenerationResult entropy_generation(const std::vector<Stream> &inflows,
                                            double S_heat = 0.0);
 
 // Entropy [W/K] that heat added to a stream brings in: integral of dQ / T as
-// the stream's total temperature runs from T0_in to T0_out, dQ = m_dot
-// dh(T0), at the STATIC temperature T(T0, M) (T_from_stagnation). The Mach
-// number runs linearly in T0 from M_in to M_out; pass M_in == M_out for a
-// constant one. At M = 0 it is m_dot [s(T0_out, P) - s(T0_in, P)], for any
+// the stream's total temperature runs from Tt_in to Tt_out, dQ = m_dot
+// dh(Tt), at the STATIC temperature T(Tt, M) (T_from_stagnation). The Mach
+// number runs linearly in Tt from M_in to M_out; pass M_in == M_out for a
+// constant one. At M = 0 it is m_dot [s(Tt_out, P) - s(Tt_in, P)], for any
 // P. Heating at Mach M brings in more entropy than at M = 0 -- the static
 // temperature is lower -- which is the total-pressure cost of Rayleigh flow,
 // and cooling the gain. Variable cp throughout (composite Simpson, n = 64).
@@ -621,18 +626,19 @@ MixerResult combustor_residuals_and_jacobians(
     const std::vector<Stream> &streams, double P, double Q, double fraction,
     const PressureLossCorrelation &pressure_loss, bool use_equilibrium = false);
 
-// Momentum chamber residual: P_total = P0(P, T_static), the isentropic
-// stagnation pressure of the chamber's static state. T is the chamber's
-// STAGNATION temperature T0 (#576); the static T is solved inside from
-// h(T0) = h(T) + v^2 / 2, v = m_dot / (rho(T, P) * A).
-// Returns residual and Jacobian entries for P, P_total, m_dot, T0 and Y.
+// Momentum chamber residual: Pt = Pt(P, T), the isentropic stagnation
+// pressure of the chamber's static state. Tt is the chamber's STAGNATION
+// temperature (#576); the static T is solved inside from
+// h(Tt) = h(T) + v^2 / 2, v = m_dot / (rho(T, P) * A).
+// Returns residual and Jacobian entries for P, Pt (d_res_dP_total), m_dot,
+// Tt (the *_dT fields) and Y.
 struct MomentumChamberResult {
   double residual;
   double d_res_dP;
   double d_res_dP_total;
   double d_res_dmdot;
-  // Sensitivity to the stagnation temperature T0 (the argument T): through
-  // the static T it implies and through s(T0). Closed form (#576).
+  // Sensitivity to the stagnation temperature Tt: through the static T it
+  // implies and through s(Tt). Closed form (#576).
   double d_res_dT;
   // Composition sensitivity, per species mass fraction (Y is normalised
   // inside, so any mass-conserving direction of the relay is exact). Y
@@ -640,15 +646,15 @@ struct MomentumChamberResult {
   // stream carries them, so the relay never moves them.
   std::vector<double> d_res_dY;
   // The static state the closure solved for (#576): static T [K] and Mach
-  // number [-] from (T0, P, |m_dot| / A). Reporting reads these so the Mach
+  // number [-] from (Tt, P, |m_dot| / A). Reporting reads these so the Mach
   // it shows is the one the residual used.
   double T_static = 0.0;
   double M = 0.0;
-  // Partials of T_static w.r.t. the closure's inputs P, T0 and m_dot (signed:
+  // Partials of T_static w.r.t. the closure's inputs P, Tt and m_dot (signed:
   // T_static is even in m_dot), for a wall correlation evaluated at the
-  // chamber's static T. The incompressible limit has T_static = T0.
+  // chamber's static T. The incompressible limit has T_static = Tt.
   double dT_static_dP = 0.0;
-  double dT_static_dT = 0.0; // d/dT0
+  double dT_static_dT = 0.0; // d/dTt
   double dT_static_dmdot = 0.0;
   // ... and w.r.t. the mass fractions (#743), per species; zero in the
   // incompressible limit and for species absent at the node.
@@ -656,25 +662,25 @@ struct MomentumChamberResult {
   // Static density rho(T_static, P) and its sensitivities to the closure's
   // inputs, for elements that read the chamber as a port (junction kernels):
   // their momentum rows must see the same static state as this row.
-  // Isentropic dynamic head P0 - P, computed as P expm1(ln(P0/P)) rather
-  // than as a difference of two pressures (one ULP of P0 would otherwise
+  // Isentropic dynamic head Pt - P, computed as P expm1(ln(Pt/P)) rather
+  // than as a difference of two pressures (one ULP of Pt would otherwise
   // be its noise floor). Its partials are the residual's, negated, with
   // d/dP shifted by one: dq/dP = -d_res_dP - 1.
   double q_dyn = 0.0;
   double rho_static = 0.0;
   double drho_dP = 0.0;
-  double drho_dT = 0.0;     // d/dT0
+  double drho_dT = 0.0;     // d/dTt
   double drho_dmdot = 0.0;
   std::vector<double> drho_dY;
 };
 
 // incompressible (#588): the low-Mach limit of the same closure, for a
 // network solved incompressibly. The static state IS the stagnation one
-// (T_static = T0, rho = P / (R T0)) and Pt = P + (|m_dot| / A)^2 / (2 rho):
+// (T_static = Tt, rho = P / (R Tt)) and Pt = P + (|m_dot| / A)^2 / (2 rho):
 // no sonic limit, so no fold for a neighbour to drive the chamber onto. It
 // agrees with the compressible closure to O(Ma^2).
 MomentumChamberResult momentum_chamber_residual_and_jacobian(
-    double P, double P_total, double m_dot, double T,
+    double P, double Pt, double m_dot, double Tt,
     const std::vector<double> &Y, double area, bool incompressible = false);
 
 // 4. Area change elements: see area_change.h (area_change_flow), called by
@@ -696,7 +702,7 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
 //   dP0_straight : p0_upstream - p0_downstream for the straight path [Pa]
 //   dP0_branch   : p0_upstream - p0_downstream for the branch path [Pa]
 //   P_static_com : static pressure at common port [Pa] (used for density)
-//   T_com        : temperature at common port [K]
+//   T_com        : STATIC temperature at common port [K] (pairs with P_static_com)
 //   Y_com        : mass fractions at common port [-]
 //   theta        : branch angle [rad] (validated range: (0, pi/2])
 //   psi          : area ratio F_C/F_B [-] (validated range: >= 0.05)

@@ -793,9 +793,12 @@ AreaChangeLoss area_change_loss(double m_dot_abs, double Pt0, double Tt0,
     out.dPt = e.loss;
     out.mach = e.mach;
     out.zeta = (e.q_small > 0.0) ? e.loss / e.q_small : 0.0;
-    out.Re = b.low_re
-                 ? e.Re
-                 : G * b.D / viscosity(Tt0, gas.P, gas.X);
+    // Re at the closure station's static T (the stagnation T in the
+    // incompressible limit), as raw_flow's T_mu; diagnostic only, the loss
+    // above does not read it.
+    const double T_mu =
+        incompressible ? Tt0 : Tt0 / (1.0 + 0.5 * (gas.g - 1.0) * e.mach * e.mach);
+    out.Re = b.low_re ? e.Re : G * b.D / viscosity(T_mu, gas.P, gas.X);
     return out;
 }
 

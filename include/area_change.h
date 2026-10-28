@@ -158,7 +158,7 @@ struct AreaChangeLoss {
     double zeta = 0.0;     // dPt over the small section's static 0.5 rho w^2
     double mach = 0.0;     // the closure's Mach: small section (expansion) or
                            // vena contracta (contraction); 0 if incompressible
-    double Re = 0.0;       // small section
+    double Re = 0.0;       // small section, mu at the station's static T
     bool expansion = true;
     bool choked = false;   // the flow was above the sonic flow; dPt is at it
 };

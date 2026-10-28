@@ -121,15 +121,15 @@ def test_the_mixer_inverts_to_zero_kelvin_and_continues_through_it() -> None:
 
     for T in (150.0, 50.0, 5.0):
         Q = -m * (cb.h_mass(300.0, X) - cb.h_mass(T, X))
-        assert mix(Q).T_mix == pytest.approx(T, abs=1e-6)
-    Ts = [mix(Q).T_mix for Q in (0.5 * Q0, 0.99 * Q0, 1.01 * Q0, 3.0 * Q0)]
+        assert mix(Q).Tt_mix == pytest.approx(T, abs=1e-6)
+    Ts = [mix(Q).Tt_mix for Q in (0.5 * Q0, 0.99 * Q0, 1.01 * Q0, 3.0 * Q0)]
     assert Ts == sorted(Ts, reverse=True)
     assert Ts[2] < 0.0 < Ts[1]
     # slope continuous through 0 K, and the reported dT/dQ is the slope
     dQ = 1e-3 * abs(Q0)
-    slopes = [(mix(Q + dQ).T_mix - mix(Q - dQ).T_mix) / (2 * dQ) for Q in (0.98 * Q0, 1.02 * Q0)]
+    slopes = [(mix(Q + dQ).Tt_mix - mix(Q - dQ).Tt_mix) / (2 * dQ) for Q in (0.98 * Q0, 1.02 * Q0)]
     assert slopes[0] == pytest.approx(slopes[1], rel=1e-3)
-    assert mix(3.0 * Q0).dT_mix_dQ == pytest.approx(slopes[1], rel=1e-6)
+    assert mix(3.0 * Q0).dTt_mix_dQ == pytest.approx(slopes[1], rel=1e-6)
 
 
 @pytest.mark.parametrize("Tt", [5000.0, 6500.0, 9000.0, 15000.0])

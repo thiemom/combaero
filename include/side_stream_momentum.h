@@ -95,18 +95,18 @@ StationHalfDrop channel_entry_drop(double m, double P, double T,
 // chamber node carries the outlet state: static P and the STAGNATION T (#578);
 // the outlet's static T comes from chamber_static_state, as in the chamber's
 // own closure (#576). The main stream arrives along the axis at the MAIN FACE
-// with stagnation T_main; the face's static (P_f, T_f) solve
+// with stagnation Tt_main; the face's static (P_f, T_f) solve
 //
 //   P_f + m_main^2 R T_f / (P_f A^2) = P + m_out^2 / (rho A^2) - J / A
-//   h(T_main) = h(T_f) + u_f^2 / 2,   u_f = m_main R T_f / (P_f A)
+//   h(Tt_main) = h(T_f) + u_f^2 / 2,   u_f = m_main R T_f / (P_f A)
 //
 // by fixed point (the impulse quadratic on its SUBSONIC root, then the energy
 // solve), with analytic sensitivities from the implicit function theorem.
-// Pt_face = P_f exp((s(T_main) - s(T_f)) / R), the same entropy-based closure
+// Pt_face = P_f exp((s(Tt_main) - s(T_f)) / R), the same entropy-based closure
 // as the chamber itself (#357). No
 // loss coefficient: the stagnation-pressure loss of mixing follows from
 // momentum; transverse momentum is reacted by the walls. With no side streams
-// (m_out = m_main, J = 0, T = T_main) the face IS the chamber.
+// (m_out = m_main, J = 0, Tt = Tt_main) the face IS the chamber.
 //
 // When the impulse cannot be carried subsonically (the main stream would
 // have to choke at the face) the discriminant is held at a floor and
@@ -116,7 +116,8 @@ struct MergeFaceState {
   double Pt_face = 0.0;  // [Pa]
   double M_face = 0.0;   // [-]
   bool choked = false;
-  // d/d(m_main, m_out, J, P, T, T_main), all analytic (implicit function
+  // d/d(m_main, m_out, J, P, Tt, Tt_main), all analytic; the dT/dT_main
+  // field suffixes name the stagnation temperatures Tt and Tt_main (implicit function
   // theorem through the static-state solves, #578).
   double dPf_dm_main = 0.0, dPf_dm_out = 0.0, dPf_dJ = 0.0;
   double dPf_dP = 0.0, dPf_dT = 0.0, dPf_dT_main = 0.0;
@@ -129,14 +130,14 @@ struct MergeFaceState {
 
 //
 // incompressible (#588): the low-Mach limit. Both densities are taken at the
-// chamber pressure and the stagnation temperatures (rho = P / (R T0)), so the
+// chamber pressure and the stagnation temperatures (rho = P / (R Tt)), so the
 // impulse is linear in P_f and there is no root to choose and nothing to
 // choke:
 //   P_f  = P + m_out^2 / (rho A^2) - J / A - m_main^2 / (rho_main A^2)
 //   Pt_f = P_f + m_main^2 / (2 rho_main A^2)
-MergeFaceState chamber_merge_face_state(double m_main, double T_main,
+MergeFaceState chamber_merge_face_state(double m_main, double Tt_main,
                                         const std::vector<double>& X_main,
-                                        double m_out, double P, double T,
+                                        double m_out, double P, double Tt,
                                         const std::vector<double>& X,
                                         double side_momentum, double area,
                                         bool incompressible = false);

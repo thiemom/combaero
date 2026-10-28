@@ -16,8 +16,8 @@ namespace combaero {
 // Conventions used throughout CombAero:
 //   - thermo.h functions h(T,X), cp(T,X), s(T,P,X) operate on STATIC conditions.
 //   - Stagnation enthalpy:  h0 = h(T_static) + v^2/2  [J/kg]
-//   - Stagnation temperature T0: defined by h(T0) = h0  (iterative for variable cp)
-//   - Stagnation pressure P0:    isentropic relation s(T0,P0) = s(T,P)
+//   - Stagnation temperature Tt: defined by h(Tt) = h0  (iterative for variable cp)
+//   - Stagnation pressure Pt:    isentropic relation s(Tt,Pt) = s(T,P)
 //
 // Adiabatic wall temperature (for convective heat transfer at high Mach):
 //   q = h_conv * (T_aw - T_wall)          <- correct driving temperature
@@ -25,10 +25,10 @@ namespace combaero {
 //   r = Pr^(1/3)  turbulent  (default)
 //   r = Pr^(1/2)  laminar
 //
-//   T_aw is always between T_static and T_total:
-//     T_static < T_aw < T_total  (since r < 1 for air)
+//   T_aw is always between T_static and Tt:
+//     T_static < T_aw < Tt  (since r < 1 for air)
 //   Using T_static underestimates heat load at high M.
-//   Using T_total overestimates (r < 1, so T_aw < T0 always).
+//   Using Tt overestimates (r < 1, so T_aw < Tt always).
 //
 // References:
 //   Anderson, J.D. (2003) Modern Compressible Flow, 3rd ed., Ch. 3
@@ -166,7 +166,7 @@ double T_adiabatic_wall(double T_static, double v,
                         bool turbulent = true);
 
 // Combined stagnation state from static conditions and velocity.
-// Returns (Tt, Pt) = (T0, P0) in a single call.
+// Returns (Tt, Pt) in a single call.
 // Equivalent to calling Tt_from_static_v then Pt_from_static, but avoids
 // recomputing Mach number internally.
 std::tuple<double, double> stagnation_from_static(
@@ -185,40 +185,40 @@ double T_adiabatic_wall_mach(double T_static, double M,
 double recovery_factor(double Pr, bool turbulent = true);
 
 // -------------------------------------------------------------
-// Static state of a duct station from stagnation T0 and mass flux (#576)
+// Static state of a duct station from stagnation Tt and mass flux (#576)
 // -------------------------------------------------------------
-// Static state of a chamber from its STAGNATION temperature T0, static P and
-// mass flux G = |m_dot| / A (issue #576). Energy: h(T0) = h(T) + v^2 / 2 with
+// Static state of a chamber from its STAGNATION temperature Tt, static P and
+// mass flux G = |m_dot| / A (issue #576). Energy: h(Tt) = h(T) + v^2 / 2 with
 // v = G / rho(T, P) = G R T / P, i.e.
-//   f(T) = h(T0) - h(T) - (G R T / P)^2 / 2 = 0.
-// f is strictly decreasing (f' = -cp - G^2 R^2 T / P^2) and f(T0) <= 0, so
-// the root is unique and lies in (0, T0]; with cp rising in T, f is concave
-// and Newton from T0 approaches it monotonically from above. The root exists
+//   f(T) = h(Tt) - h(T) - (G R T / P)^2 / 2 = 0.
+// f is strictly decreasing (f' = -cp - G^2 R^2 T / P^2) and f(Tt) <= 0, so
+// the root is unique and lies in (0, Tt]; with cp rising in T, f is concave
+// and Newton from Tt approaches it monotonically from above. The root exists
 // at any G -- subsonic or supersonic -- so the closure itself no longer caps
-// the flow; the choking limit comes out of P0(P) at fixed G as it should.
+// the flow; the choking limit comes out of Pt(P) at fixed G as it should.
 //
-// Returns T and the ln(P0 / P) of the isentropic stagnation state, with their
-// partial derivatives with respect to T0, P and G (closed form, chain rule
-// through the implicit f).
+// Returns T and lnPtP = ln(Pt / P) of the isentropic stagnation state, with
+// their partial derivatives with respect to Tt, P and G (closed form, chain
+// rule through the implicit f).
 struct ChamberStaticState {
   double T;
   double dT_dTt, dT_dP, dT_dG;
-  double lnP0P;
+  double lnPtP;
   double dln_dTt, dln_dP, dln_dG;
   double M;
 };
 
-ChamberStaticState chamber_static_state(double T0, double P, double G,
+ChamberStaticState chamber_static_state(double Tt, double P, double G,
                                         const std::vector<double>& X);
 
-// chamber_static_state's gradients in the MOLE fractions at fixed T0, P and
+// chamber_static_state's gradients in the MOLE fractions at fixed Tt, P and
 // G (#743), X unnormalised (map with mole_gradient_to_mass): the static T from
-// f = h(T0) - h(T) - (G R T / P)^2 / 2 = 0 by the implicit function theorem,
-// and ln(P0 / P) = sum_j X_j (s_j(T0) - s_j(T)) / R_u at that T.
+// f = h(Tt) - h(T) - (G R T / P)^2 / 2 = 0 by the implicit function theorem,
+// and ln(Pt / P) = sum_j X_j (s_j(Tt) - s_j(T)) / R_u at that T.
 struct ChamberStaticStateDX {
-  std::vector<double> dT_dX, dlnP0P_dX;
+  std::vector<double> dT_dX, dlnPtP_dX;
 };
-ChamberStaticStateDX chamber_static_state_dX(double T0, double P, double G,
+ChamberStaticStateDX chamber_static_state_dX(double Tt, double P, double G,
                                             const std::vector<double>& X);
 
 // -------------------------------------------------------------

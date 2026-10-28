@@ -727,3 +727,22 @@ def test_a_dead_or_creeping_area_change_solves(dp: float) -> None:
         assert abs(m) < 1e-5 * sol["o1.m_dot"]
     else:
         assert np.sign(m) == -np.sign(dp)
+
+
+def test_conical_loss_re_uses_the_station_static_viscosity() -> None:
+    """area_change_loss's conical Re takes mu at the closure station's static T.
+
+    It took mu(Tt0) before (#782 audit), 4% low at M 0.62. Diagnostic only:
+    the loss itself does not read Re, so dPt is unchanged.
+    """
+    X = list(cb.species.dry_air())
+    Pt0, Tt0, F_in, F_out = 3e5, 900.0, 1e-3, 3e-3
+    fl = cb.area_change_flow(Pt0, Tt0, Y_AIR, 2.8e5, F_in, F_out, "conical", 0.05, 0.0, False)
+    loss = cb.area_change_loss(fl.m_dot, Pt0, Tt0, Y_AIR, F_in, F_out, "conical", 0.05, 0.0, False)
+    assert loss.mach > 0.5
+    assert loss.dPt == pytest.approx(Pt0 - 2.8e5, rel=1e-9)
+    g = cb.isentropic_expansion_coefficient(Tt0, X)
+    T_static = Tt0 / (1.0 + 0.5 * (g - 1.0) * loss.mach**2)
+    G_D = fl.m_dot / F_in * math.sqrt(4.0 * F_in / math.pi)
+    assert loss.Re == pytest.approx(G_D / cb.viscosity(T_static, Pt0, X), rel=1e-12)
+    assert loss.Re > 1.03 * G_D / cb.viscosity(Tt0, Pt0, X)

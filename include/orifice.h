@@ -1058,8 +1058,8 @@ struct OrificeFlowResult {
 // Parameters:
 //   geom        : Orifice geometry
 //   dP          : Differential pressure [Pa]
-//   T           : Temperature [K]
-//   P           : Absolute upstream pressure [Pa]
+//   T           : Upstream static temperature [K]
+//   P           : Absolute upstream static pressure [Pa]
 //   mu          : Dynamic viscosity [Pa*s]
 //   Z           : Compressibility factor [-] (default: 1.0 = ideal gas)
 //   X           : Mole fractions [-] (optional, uses air if empty)

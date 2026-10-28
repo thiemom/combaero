@@ -736,23 +736,23 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   double delta_h = Q * phi_Q + fraction * (h_mix_base - h_ref);
 
   double h_mix = h_mix_base + delta_h;
-  double P_total_mix = (mdot_tot > 0.0)
-                            ? (P_total_tot / mdot_tot)
-                            : (n_streams > 0 ? streams[0].Pt : 0.0);
+  double Pt_mix = (mdot_tot > 0.0)
+                      ? (P_total_tot / mdot_tot)
+                      : (n_streams > 0 ? streams[0].Pt : 0.0);
 
   std::vector<double> X_mix = combaero::mass_to_mole(normalized_Y_mix);
   double T_guess = 300.0;
   if (n_streams > 0)
     T_guess = streams[0].Tt;
-  const double T_mix = T_from_h_mass_continued(h_mix, X_mix, T_guess);
-  const double T_eval = T_mix;
+  const double Tt_mix = T_from_h_mass_continued(h_mix, X_mix, T_guess);
+  const double T_eval = Tt_mix;
 
   MixerResult res;
-  res.T_mix = T_mix;
-  res.P_total_mix = P_total_mix;
+  res.Tt_mix = Tt_mix;
+  res.Pt_mix = Pt_mix;
   res.Y_mix = normalized_Y_mix;
-  res.dT_mix_d_stream.resize(n_streams);
-  res.dP_total_mix_d_stream.resize(n_streams);
+  res.dTt_mix_d_stream.resize(n_streams);
+  res.dPt_mix_d_stream.resize(n_streams);
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
 
   double cp_mix = 0.0;
@@ -766,12 +766,12 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
   }
 
   // Store dT/d(delta_h) for reference (not directly used in Jacobians)
-  res.dT_mix_d_delta_h = (cp_mix > 0.0) ? (1.0 / cp_mix) : 0.0;
-  res.dT_mix_dQ = res.dT_mix_d_delta_h * phi_Q;
+  res.dTt_mix_d_delta_h = (cp_mix > 0.0) ? (1.0 / cp_mix) : 0.0;
+  res.dTt_mix_dQ = res.dTt_mix_d_delta_h * phi_Q;
 
   for (std::size_t i = 0; i < n_streams; ++i) {
-    StreamJacobian &dT_jac = res.dT_mix_d_stream[i];
-    StreamJacobian &dP_jac = res.dP_total_mix_d_stream[i];
+    StreamJacobian &dT_jac = res.dTt_mix_d_stream[i];
+    StreamJacobian &dP_jac = res.dPt_mix_d_stream[i];
     dT_jac.d_Y.assign(n_species, 0.0);
     dP_jac.d_Y.assign(n_species, 0.0);
 
@@ -779,10 +779,10 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
       // P_total sensitivities
       dT_jac.d_Pt = 0.0;
       dP_jac.d_Pt = streams[i].m_dot / mdot_tot;
-      dP_jac.d_mdot = (streams[i].Pt - P_total_mix) / mdot_tot;
+      dP_jac.d_mdot = (streams[i].Pt - Pt_mix) / mdot_tot;
       dP_jac.d_Tt = 0.0;
 
-      // d(T_mix)/d(T_i)
+      // d(Tt_mix)/d(T_i)
       // Base contribution
       double dT_base_dT = (streams[i].m_dot * cp_stream[i]) / (mdot_tot * cp_mix);
 
@@ -792,8 +792,8 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
 
       dT_jac.d_Tt = dT_base_dT + dT_frac_dT;
 
-      // d(T_mix)/d(m_dot_i). h_mix = (1+f) h_base - f h_ref + Q/m_eff, then T
-      // at fixed h moves with the composition: -sum_k hk(T_mix) dY_k/dm_i.
+      // d(Tt_mix)/d(m_dot_i). h_mix = (1+f) h_base - f h_ref + Q/m_eff, then T
+      // at fixed h moves with the composition: -sum_k hk(Tt_mix) dY_k/dm_i.
       // Only the enthalpy terms carry (1+f), not the composition term.
       double h_diff = (h_stream[i] - h_mix_base);
       double y_sum = 0.0;
@@ -809,7 +809,7 @@ mixer_from_streams_and_jacobians(const std::vector<Stream> &streams,
 
       dT_jac.d_mdot = (dh_mix_dmdot + dh_Q_dmdot - y_sum / mdot_tot) / cp_mix;
 
-      // d(T_mix)/d(Y_i,k): h_base moves by w hk_i, h_ref by w (href_k - h_ref)
+      // d(Tt_mix)/d(Y_i,k): h_base moves by w hk_i, h_ref by w (href_k - h_ref)
       // and the normalised composition by w (e_k - Y), w = m_i / m; the last
       // shifts T at fixed h by -w (hk_mix - h_mix) -- the FINAL h_mix, which
       // the base-only form (h_mix_base) got wrong whenever Q or f was set.
@@ -883,7 +883,7 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
-  const CompleteAdiabatic cad = complete_adiabatic(mix.T_mix, P, X_mix);
+  const CompleteAdiabatic cad = complete_adiabatic(mix.Tt_mix, P, X_mix);
   double T_ad = cad.T_ad;
   double dT_ad_dT_mix = cad.dT_dTin;
   std::vector<double> X_b = cad.X_b;
@@ -983,17 +983,17 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
   }
 
   MixerResult res;
-  res.T_mix = T_ad;
-  res.P_total_mix = mix.P_total_mix;
+  res.Tt_mix = T_ad;
+  res.Pt_mix = mix.Pt_mix;
   res.Y_mix = Y_b;
-  res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
-  res.dT_mix_dQ = res.dT_mix_d_delta_h * phi_Q;
-  res.dT_mix_d_stream.resize(n_streams);
-  res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
+  res.dTt_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
+  res.dTt_mix_dQ = res.dTt_mix_d_delta_h * phi_Q;
+  res.dTt_mix_d_stream.resize(n_streams);
+  res.dPt_mix_d_stream = mix.dPt_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
 
   for (std::size_t i = 0; i < n_streams; ++i) {
-    StreamJacobian &dT_stream = res.dT_mix_d_stream[i];
+    StreamJacobian &dT_stream = res.dTt_mix_d_stream[i];
     dT_stream.d_Y.assign(n_species, 0.0);
 
     auto compute_chain = [&](double d_prop_T,
@@ -1014,20 +1014,20 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
     }
 
     dT_stream.d_mdot =
-        compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+        compute_chain(mix.dTt_mix_d_stream[i].d_mdot, dY_mix_dmdot);
     // Q is spread over the throughput: d(Q phi)/dm_i = Q phi', a pure
     // enthalpy shift of the products. Missing, a combustor carrying wall heat
     // had dT/dm = 0 where the difference gave 1658 K per kg/s.
-    dT_stream.d_mdot += res.dT_mix_d_delta_h * Q * dphi_Q;
-    dT_stream.d_Tt = compute_chain(mix.dT_mix_d_stream[i].d_Tt, dY_mix_dT);
+    dT_stream.d_mdot += res.dTt_mix_d_delta_h * Q * dphi_Q;
+    dT_stream.d_Tt = compute_chain(mix.dTt_mix_d_stream[i].d_Tt, dY_mix_dT);
     dT_stream.d_Pt =
-        compute_chain(mix.dT_mix_d_stream[i].d_Pt, dY_mix_dP_total);
+        compute_chain(mix.dTt_mix_d_stream[i].d_Pt, dY_mix_dP_total);
 
     for (std::size_t j = 0; j < n_species; ++j) {
       std::vector<double> dY_j(n_species);
       for (std::size_t k = 0; k < n_species; ++k)
         dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
-      dT_stream.d_Y[j] = compute_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+      dT_stream.d_Y[j] = compute_chain(mix.dTt_mix_d_stream[i].d_Y[j], dY_j);
     }
 
     for (std::size_t tgt = 0; tgt < n_species; ++tgt) {
@@ -1044,16 +1044,16 @@ MixerResult adiabatic_T_complete_and_jacobian_T_from_streams(
       };
 
       dY_stream.d_mdot =
-          compute_Y_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
-      dY_stream.d_Tt = compute_Y_chain(mix.dT_mix_d_stream[i].d_Tt, dY_mix_dT);
+          compute_Y_chain(mix.dTt_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+      dY_stream.d_Tt = compute_Y_chain(mix.dTt_mix_d_stream[i].d_Tt, dY_mix_dT);
       dY_stream.d_Pt =
-          compute_Y_chain(mix.dT_mix_d_stream[i].d_Pt, dY_mix_dP_total);
+          compute_Y_chain(mix.dTt_mix_d_stream[i].d_Pt, dY_mix_dP_total);
 
       for (std::size_t j = 0; j < n_species; ++j) {
         std::vector<double> dY_j(n_species);
         for (std::size_t k = 0; k < n_species; ++k)
           dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
-        dY_stream.d_Y[j] = compute_Y_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+        dY_stream.d_Y[j] = compute_Y_chain(mix.dTt_mix_d_stream[i].d_Y[j], dY_j);
       }
     }
   }
@@ -1090,9 +1090,9 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   (void)h_mix_base;
 
   std::vector<double> X_mix = combaero::mass_to_mole(combaero::normalize_fractions(mix.Y_mix));
-  const bool T_clamped = mix.T_mix < thermo::T_FLOOR;
+  const bool T_clamped = mix.Tt_mix < thermo::T_FLOOR;
   State eq_in;
-  eq_in.set_TPX(std::max(mix.T_mix, thermo::T_FLOOR), std::max(P, 100.0), X_mix);
+  eq_in.set_TPX(std::max(mix.Tt_mix, thermo::T_FLOOR), std::max(P, 100.0), X_mix);
   const EquilibriumJacobian ej = combaero::combustion_equilibrium_and_jacobian(eq_in);
   double T_ad = ej.state.T;
   double dT_ad_dT_mix = T_clamped ? 0.0 : ej.dT_dT_in;
@@ -1192,17 +1192,17 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
   }
 
   MixerResult res;
-  res.T_mix = T_ad;
-  res.P_total_mix = mix.P_total_mix;
+  res.Tt_mix = T_ad;
+  res.Pt_mix = mix.Pt_mix;
   res.Y_mix = Y_b;
-  res.dT_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
-  res.dT_mix_dQ = res.dT_mix_d_delta_h * phi_Q;
-  res.dT_mix_d_stream.resize(n_streams);
-  res.dP_total_mix_d_stream = mix.dP_total_mix_d_stream;
+  res.dTt_mix_d_delta_h = (cp_out > 0.0) ? (1.0 / cp_out) : 0.0;
+  res.dTt_mix_dQ = res.dTt_mix_d_delta_h * phi_Q;
+  res.dTt_mix_d_stream.resize(n_streams);
+  res.dPt_mix_d_stream = mix.dPt_mix_d_stream;
   res.dY_mix_d_stream.assign(n_species, std::vector<StreamJacobian>(n_streams));
 
   for (std::size_t i = 0; i < n_streams; ++i) {
-    StreamJacobian &dT_stream = res.dT_mix_d_stream[i];
+    StreamJacobian &dT_stream = res.dTt_mix_d_stream[i];
     dT_stream.d_Y.assign(n_species, 0.0);
 
     auto compute_chain = [&](double d_prop_T,
@@ -1223,20 +1223,20 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
     }
 
     dT_stream.d_mdot =
-        compute_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+        compute_chain(mix.dTt_mix_d_stream[i].d_mdot, dY_mix_dmdot);
     // Q is spread over the throughput: d(Q phi)/dm_i = Q phi', a pure
     // enthalpy shift of the products. Missing, a combustor carrying wall heat
     // had dT/dm = 0 where the difference gave 1658 K per kg/s.
-    dT_stream.d_mdot += res.dT_mix_d_delta_h * Q * dphi_Q;
-    dT_stream.d_Tt = compute_chain(mix.dT_mix_d_stream[i].d_Tt, dY_mix_dT);
+    dT_stream.d_mdot += res.dTt_mix_d_delta_h * Q * dphi_Q;
+    dT_stream.d_Tt = compute_chain(mix.dTt_mix_d_stream[i].d_Tt, dY_mix_dT);
     dT_stream.d_Pt =
-        compute_chain(mix.dT_mix_d_stream[i].d_Pt, dY_mix_dP_total);
+        compute_chain(mix.dTt_mix_d_stream[i].d_Pt, dY_mix_dP_total);
 
     for (std::size_t j = 0; j < n_species; ++j) {
       std::vector<double> dY_j(n_species);
       for (std::size_t k = 0; k < n_species; ++k)
         dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
-      dT_stream.d_Y[j] = compute_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+      dT_stream.d_Y[j] = compute_chain(mix.dTt_mix_d_stream[i].d_Y[j], dY_j);
     }
 
     for (std::size_t tgt = 0; tgt < n_species; ++tgt) {
@@ -1253,16 +1253,16 @@ MixerResult adiabatic_T_equilibrium_and_jacobians_from_streams(
       };
 
       dY_stream.d_mdot =
-          compute_Y_chain(mix.dT_mix_d_stream[i].d_mdot, dY_mix_dmdot);
-      dY_stream.d_Tt = compute_Y_chain(mix.dT_mix_d_stream[i].d_Tt, dY_mix_dT);
+          compute_Y_chain(mix.dTt_mix_d_stream[i].d_mdot, dY_mix_dmdot);
+      dY_stream.d_Tt = compute_Y_chain(mix.dTt_mix_d_stream[i].d_Tt, dY_mix_dT);
       dY_stream.d_Pt =
-          compute_Y_chain(mix.dT_mix_d_stream[i].d_Pt, dY_mix_dP_total);
+          compute_Y_chain(mix.dTt_mix_d_stream[i].d_Pt, dY_mix_dP_total);
 
       for (std::size_t j = 0; j < n_species; ++j) {
         std::vector<double> dY_j(n_species);
         for (std::size_t k = 0; k < n_species; ++k)
           dY_j[k] = mix.dY_mix_d_stream[k][i].d_Y[j];
-        dY_stream.d_Y[j] = compute_Y_chain(mix.dT_mix_d_stream[i].d_Y[j], dY_j);
+        dY_stream.d_Y[j] = compute_Y_chain(mix.dTt_mix_d_stream[i].d_Y[j], dY_j);
       }
     }
   }
@@ -1275,14 +1275,14 @@ MixerResult combustor_residuals_and_jacobians(
 
   // 1. Get unburned mixture state (T_in, P_in)
   MixerResult mix_in = mixer_from_streams_and_jacobians(streams);
-  double T_in = mix_in.T_mix;
+  double T_in = mix_in.Tt_mix;
 
   // 2. Get burned state (T_ad, Y_products) including all stream jacobians
   MixerResult res = use_equilibrium
       ? adiabatic_T_equilibrium_and_jacobians_from_streams(streams, P, Q, fraction)
       : adiabatic_T_complete_and_jacobian_T_from_streams(streams, P, Q, fraction);
 
-  double T_ad = res.T_mix;
+  double T_ad = res.Tt_mix;
   double theta = (T_in > 0.0) ? (T_ad / T_in - 1.0) : 0.0;
 
   // 3. Form Context and evaluate Hook
@@ -1314,7 +1314,7 @@ MixerResult combustor_residuals_and_jacobians(
 
   // 4. Update Result with P_out
   double P_out = P * (1.0 - zeta);
-  res.P_total_mix = P_out;
+  res.Pt_mix = P_out;
 
   // 5. Analytical Chain Rule for dP_out/d_stream
   // dP_out/dx = dP/dx * (1 - zeta) - P * dzeta/dx
@@ -1348,10 +1348,10 @@ MixerResult combustor_residuals_and_jacobians(
           }
       };
 
-      update_jac(res.dP_total_mix_d_stream[i],
-                res.dT_mix_d_stream[i], // dT_ad
-                mix_in.dT_mix_d_stream[i], // dT_in
-                mix_in.dP_total_mix_d_stream[i]); // dP_in
+      update_jac(res.dPt_mix_d_stream[i],
+                res.dTt_mix_d_stream[i], // dT_ad
+                mix_in.dTt_mix_d_stream[i], // dT_in
+                mix_in.dPt_mix_d_stream[i]); // dP_in
   }
 
   return res;
@@ -1512,12 +1512,12 @@ using combaero::ChamberStaticState;
 using combaero::chamber_static_state;
 
 MomentumChamberResult momentum_chamber_residual_and_jacobian(
-    double P, double P_total, double m_dot, double T0,
+    double P, double Pt, double m_dot, double Tt,
     const std::vector<double> &Y, double area, bool incompressible) {
-  // Momentum chamber: P_total = P0(P, T, M), the isentropic stagnation
+  // Momentum chamber: Pt = Pt(P, T, M), the isentropic stagnation
   // pressure of the chamber's static state. The node carries the MIXED
-  // STAGNATION temperature T0 (its inflows mix as (m, Tt, Pt, Y) streams), so
-  // the static T is solved here from h(T0) = h(T) + v^2 / 2 (#576).
+  // STAGNATION temperature Tt (its inflows mix as (m, Tt, Pt, Y) streams), so
+  // the static T is solved here from h(Tt) = h(T) + v^2 / 2 (#576).
 
   // Soft normalization to handle edge cases (all-zero Y)
   std::vector<double> Y_safe = Y;
@@ -1541,26 +1541,26 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   MomentumChamberResult res;
 
   if (incompressible) {
-    // Low-Mach limit (#588): T_static = T0, rho = P / (R T0), and
+    // Low-Mach limit (#588): T_static = Tt, rho = P / (R Tt), and
     // Pt = P + q with q = G^2 / (2 rho), G = |m_dot| / A. Even in m_dot like
-    // the compressible form; q scales as T0 / P through 1 / rho.
+    // the compressible form; q scales as Tt / P through 1 / rho.
     const double G = (area > 1e-12) ? std::abs(m_dot) / area : 0.0;
     const double sgn = (m_dot >= 0.0) ? 1.0 : -1.0;
     const double R_gas = combaero::specific_gas_constant(X);
-    const double rho = P / (R_gas * T0);
+    const double rho = P / (R_gas * Tt);
     const double q = 0.5 * G * G / rho;
-    res.residual = P_total - P - q;
+    res.residual = Pt - P - q;
     res.d_res_dP_total = 1.0;
     res.d_res_dP = -1.0 + q / P;
-    res.d_res_dT = -q / T0;
+    res.d_res_dT = -q / Tt;
     res.d_res_dmdot = (area > 1e-12) ? -(G / rho) * sgn / area : 0.0;
-    res.T_static = T0;
+    res.T_static = Tt;
     res.dT_static_dT = 1.0;
     res.q_dyn = q;
-    res.M = (G / rho) / combaero::speed_of_sound(T0, X);
+    res.M = (G / rho) / combaero::speed_of_sound(Tt, X);
     res.rho_static = rho;
     res.drho_dP = rho / P;
-    res.drho_dT = -rho / T0;
+    res.drho_dT = -rho / Tt;
     res.drho_dmdot = 0.0;
     // Y moves R alone here: q ~ R and rho ~ 1 / R, by a central difference
     // on R as the compressible branch does on its full closure.
@@ -1593,13 +1593,13 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
     return res;
   }
 
-  // Compressible stagnation closure (issue #357): Pt = P * exp((s(T0) -
+  // Compressible stagnation closure (issue #357): Pt = P * exp((s(Tt) -
   // s(T)) / R), entropy conservation with variable cp, rather than the
   // incompressible Pt = P + 0.5*rho*v^2, which under-predicts the stagnation
   // rise without bound past sonic.
   //
-  // Until #576 the node's T0 was used here AS the static T: rho, a and M all
-  // came from T0, so the static state was too hot by T0 / T = 1 + (g-1)/2 M^2.
+  // Until #576 the node's Tt was used here AS the static T: rho, a and M all
+  // came from Tt, so the static state was too hot by Tt / T = 1 + (g-1)/2 M^2.
   // At fixed Pt that capped the mass flux at 92% of choked (peak at M 0.913),
   // and Newton stalled on any chamber asked to pass more. Solving the static
   // T from the energy equation removes the cap.
@@ -1608,43 +1608,43 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   // taken as |m_dot| / A and the sign is carried back into d(res)/d(m_dot),
   // keeping the residual even in m_dot.
   const double G = (area > 1e-12) ? std::abs(m_dot) / area : 0.0;
-  const ChamberStaticState st = chamber_static_state(T0, P, G, X);
-  const double P0 = P * std::exp(st.lnP0P);
+  const ChamberStaticState st = chamber_static_state(Tt, P, G, X);
+  const double Pt_cl = P * std::exp(st.lnPtP);
   const double sgn = (m_dot >= 0.0) ? 1.0 : -1.0;
 
-  res.residual = P_total - P0;
+  res.residual = Pt - Pt_cl;
   res.d_res_dP_total = 1.0;
   res.T_static = st.T;
   res.dT_static_dP = st.dT_dP;
   res.dT_static_dT = st.dT_dTt;
   res.dT_static_dmdot = (area > 1e-12) ? st.dT_dG * sgn / area : 0.0;
-  res.q_dyn = P * std::expm1(st.lnP0P);
+  res.q_dyn = P * std::expm1(st.lnPtP);
   res.M = st.M;
-  // Static density, ideal gas: rho = P / (R T), T = T(T0, P, G).
+  // Static density, ideal gas: rho = P / (R T), T = T(Tt, P, G).
   const double R_gas = combaero::specific_gas_constant(X);
   const double rho = P / (R_gas * st.T);
   res.rho_static = rho;
   res.drho_dP = rho / P - (rho / st.T) * st.dT_dP;
   res.drho_dT = -(rho / st.T) * st.dT_dTt;
   res.drho_dmdot = (area > 1e-12) ? -(rho / st.T) * st.dT_dG * sgn / area : 0.0;
-  res.d_res_dP = -(P0 / P + P0 * st.dln_dP);
-  res.d_res_dmdot = (area > 1e-12) ? -P0 * st.dln_dG * sgn / area : 0.0;
-  res.d_res_dT = -P0 * st.dln_dTt;
+  res.d_res_dP = -(Pt_cl / P + Pt_cl * st.dln_dP);
+  res.d_res_dmdot = (area > 1e-12) ? -Pt_cl * st.dln_dG * sgn / area : 0.0;
+  res.d_res_dT = -Pt_cl * st.dln_dTt;
 
   // Composition, analytic (#743): Y moves R, h, cp and s together, and the
   // relay reaches this row only through these entries (#517, which used a
   // central difference here). chamber_static_state_dX gives the static T and
-  // ln(P0/P) at fixed T0, P, G; rho = P MW / (R_u T).
+  // ln(Pt/P) at fixed Tt, P, G; rho = P MW / (R_u T).
   res.d_res_dY.assign(Y.size(), 0.0);
   res.drho_dY.assign(Y.size(), 0.0);
   res.dT_static_dY.assign(Y.size(), 0.0);
   if (sum_Y >= eps) {
-    const ChamberStaticStateDX cx = chamber_static_state_dX(T0, P, G, X);
+    const ChamberStaticStateDX cx = chamber_static_state_dX(Tt, P, G, X);
     const double MW = combaero::mwmix(X) / 1000.0;
     std::vector<double> g_res(X.size()), g_rho(X.size());
     for (std::size_t k = 0; k < X.size(); ++k) {
       const double W = combaero::species_molar_mass(k) / 1000.0;
-      g_res[k] = -P0 * cx.dlnP0P_dX[k];
+      g_res[k] = -Pt_cl * cx.dlnPtP_dX[k];
       g_rho[k] = rho * (W / MW - cx.dT_dX[k] / st.T);
     }
     res.d_res_dY = combaero::mole_gradient_to_mass(X, g_res);
@@ -1891,12 +1891,12 @@ ApproachStatic approach_static_pressure(double Pt, double Tt, double G,
 }
 
 OrificeTapPressure orifice_tap_pressure_and_jacobian(double P_static_up,
-                                                     double P_total_up,
-                                                     double P_total_down,
+                                                     double Pt_up,
+                                                     double Pt_down,
                                                      double beta, double C,
                                                      bool compressible) {
   auto [k, dk_dC] = permanent_loss_ratio_and_dC(beta, C);
-  const double dw = P_total_up - P_total_down;
+  const double dw = Pt_up - Pt_down;
   OrificeTapPressure out{};
   out.loss_ratio = k;
   out.p_tap = P_static_up - dw / k;

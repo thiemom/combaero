@@ -33,8 +33,11 @@ Used for inlets/outlets with fixed total conditions.
 - `composition`: Composition object (Mode: mole/mass, Source: dry_air/fuel/custom)
 
 #### Plenum Node (`plenum`)
-Internal mixing node where pressure and temperature are solved.
-- `initial_guess`: `{"P": float, "T": float}` (Optional)
+Internal mixing node; its pressure is solved (P and Pt are the unknowns, and
+a plenum's gas is at rest, so Pt = P). Temperature is not an unknown: it is
+propagated from the inflows at every evaluation.
+- `initial_guess`: `{"P": float}` (Optional; seeds both P and Pt). The
+  Inspector offers P only; a `T` key in a hand-written file has nothing to seed.
 
 #### Combustor Node (`combustor`)
 Internal node with heat release logic.

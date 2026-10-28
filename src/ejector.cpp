@@ -33,30 +33,30 @@ double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma) 
   return 0.5 * (lo + hi);
 }
 
-double ejector_choked_mass_flow(double p0, double t0, double area_throat,
+double ejector_choked_mass_flow(double Pt, double Tt, double area_throat,
                                 double gamma, double r_gas, double eta) {
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
   double choke_const = std::sqrt(gamma / r_gas * std::pow(2.0 / gp1, gp1 / gm1));
-  return (p0 * area_throat / std::sqrt(t0)) * choke_const * std::sqrt(eta);
+  return (Pt * area_throat / std::sqrt(Tt)) * choke_const * std::sqrt(eta);
 }
 
 std::tuple<double, double, double>
-ejector_choked_mass_flow_and_jacobian(double p0, double t0, double area_throat,
+ejector_choked_mass_flow_and_jacobian(double Pt, double Tt, double area_throat,
                                       double gamma, double r_gas, double eta) {
-  double mdot = ejector_choked_mass_flow(p0, t0, area_throat, gamma, r_gas, eta);
-  // mdot = C * p0 / sqrt(t0)  =>  d/dp0 = mdot/p0,  d/dt0 = -mdot/(2*t0)
-  return {mdot, mdot / p0, -0.5 * mdot / t0};
+  double mdot = ejector_choked_mass_flow(Pt, Tt, area_throat, gamma, r_gas, eta);
+  // mdot = C * Pt / sqrt(Tt)  =>  d/dPt = mdot/Pt,  d/dTt = -mdot/(2*Tt)
+  return {mdot, mdot / Pt, -0.5 * mdot / Tt};
 }
 
 namespace {
 
 // Forward C-D nozzle flow from stagnation p_up to exit static p_down <= p_up:
 // the subsonic exit flux smooth-min'd with the sonic-throat cap.
-double cd_nozzle_forward(double p_up, double t0, double p_down, double area_throat,
+double cd_nozzle_forward(double p_up, double Tt, double p_down, double area_throat,
                          double area_exit, double gamma, double r_gas, double eta,
                          double eps_frac) {
-  double cap = ejector_choked_mass_flow(p_up, t0, area_throat, gamma, r_gas, eta);
+  double cap = ejector_choked_mass_flow(p_up, Tt, area_throat, gamma, r_gas, eta);
   double exit_flux = 0.0;
   double r = p_down / p_up;
   if (r < 1.0) {
@@ -69,7 +69,7 @@ double cd_nozzle_forward(double p_up, double t0, double p_down, double area_thro
     // A_e/A_t = 1.5), a non-monotone nozzle flow in P_py (#619).
     mach = std::min(mach, 1.0);
     double flux = mach * std::pow(1.0 + 0.5 * gm1 * mach * mach, -gp1 / (2.0 * gm1));
-    exit_flux = area_exit * p_up / std::sqrt(t0) * std::sqrt(gamma / r_gas) * flux * std::sqrt(eta);
+    exit_flux = area_exit * p_up / std::sqrt(Tt) * std::sqrt(gamma / r_gas) * flux * std::sqrt(eta);
   }
   double eps = eps_frac * cap;
   double diff = exit_flux - cap;
@@ -78,23 +78,23 @@ double cd_nozzle_forward(double p_up, double t0, double p_down, double area_thro
 
 } // namespace
 
-double ejector_cd_nozzle_mass_flow(double p0, double t0, double p_static_down,
+double ejector_cd_nozzle_mass_flow(double Pt, double Tt, double p_static_down,
                                    double area_throat, double area_exit,
                                    double gamma, double r_gas, double eta,
                                    double eps_frac) {
-  if (p_static_down <= p0) {
-    return cd_nozzle_forward(p0, t0, p_static_down, area_throat, area_exit, gamma, r_gas, eta,
+  if (p_static_down <= Pt) {
+    return cd_nozzle_forward(Pt, Tt, p_static_down, area_throat, area_exit, gamma, r_gas, eta,
                              eps_frac);
   }
   // Exit static above the supply (#619): the nozzle passes REVERSE flow, the
-  // same closure from p_static_down back into p0, shifted by the smooth-min's
+  // same closure from p_static_down back into Pt, shifted by the smooth-min's
   // r = 1 value so the flow is continuous there. The former zero exit flux
   // was flat in P_py, which let zero flow at any P_py above both supplies
   // close the ejector rows (a spurious root at P_py ~ 1e13 Pa).
-  double cap = ejector_choked_mass_flow(p0, t0, area_throat, gamma, r_gas, eta);
+  double cap = ejector_choked_mass_flow(Pt, Tt, area_throat, gamma, r_gas, eta);
   double eps = eps_frac * cap;
   double offset = std::sqrt(cap * cap + eps * eps) - cap;
-  return -cd_nozzle_forward(p_static_down, t0, p0, area_throat, area_exit, gamma, r_gas, eta,
+  return -cd_nozzle_forward(p_static_down, Tt, Pt, area_throat, area_exit, gamma, r_gas, eta,
                             eps_frac) -
          offset;
 }
@@ -111,12 +111,12 @@ double ejector_q_lambda(double lam, double gamma) {
 // deliberately left here: it backs the validated critical-mode path.
 
 EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
-    double p0_val, double t0_val, double p_py_val, double area_throat,
+    double Pt_val, double Tt_val, double p_py_val, double area_throat,
     double area_exit, double gamma, double r_gas, double eta, double eps_frac) {
-  // Seeds: 0 = p0, 1 = t0, 2 = p_py.
+  // Seeds: 0 = p0 (Pt), 1 = t0 (Tt), 2 = p_py.
   using D = DualN<3>;
-  D p0 = D::seed(p0_val, 0);
-  D t0 = D::seed(t0_val, 1);
+  D p0 = D::seed(Pt_val, 0);
+  D t0 = D::seed(Tt_val, 1);
   D p_py = D::seed(p_py_val, 2);
 
   double gm1 = gamma - 1.0;
@@ -144,7 +144,7 @@ EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
   };
 
   D mdot = D::constant(0.0);
-  if (p_py_val <= p0_val) {
+  if (p_py_val <= Pt_val) {
     mdot = forward(p0, p_py);
   } else {
     // Reverse flow above the supply (#619), continuous at P_py = p0: see
@@ -157,17 +157,17 @@ EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
 }
 
 EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
-    double m_dot, double p0, double t0, double area_throat, double area_exit,
+    double m_dot, double Pt, double Tt, double area_throat, double area_exit,
     double gamma, double r_gas, double eta, double eps_frac) {
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
   double r_crit = std::pow(2.0 / gp1, gamma / gm1);
   // cd_nozzle_mass_flow is monotone decreasing in P_py: bisect for the root.
-  double lo = p0 * r_crit;
-  double hi = p0 * (1.0 - 1e-12);
+  double lo = Pt * r_crit;
+  double hi = Pt * (1.0 - 1e-12);
   for (int i = 0; i < 200; ++i) {
     double mid = 0.5 * (lo + hi);
-    double f = ejector_cd_nozzle_mass_flow(p0, t0, mid, area_throat, area_exit, gamma, r_gas,
+    double f = ejector_cd_nozzle_mass_flow(Pt, Tt, mid, area_throat, area_exit, gamma, r_gas,
                                            eta, eps_frac);
     if (f > m_dot) {
       lo = mid; // too much flow -> raise P_py
@@ -179,7 +179,7 @@ EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
   // Implicit function theorem: F(P_py) = cd_nozzle(P_py) - m_dot = 0, so
   // dP_py/dx = -(dF/dx)/(dF/dP_py), using the C-D nozzle's own Jacobian.
   EjectorCDNozzleJacobian j = ejector_cd_nozzle_mass_flow_and_jacobian(
-      p0, t0, p_py, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
+      Pt, Tt, p_py, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
   double inv = 1.0 / j.dmdot_dp_py;
   return {p_py, inv, -j.dmdot_dp0 * inv, -j.dmdot_dt0 * inv};
 }
