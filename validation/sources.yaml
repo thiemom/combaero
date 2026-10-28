@@ -2570,6 +2570,30 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/ceas-2007-026.pdf. PDF metadata creation date is wrong (1999); the conference is 2007.
+- file: docs/radiation/bordbar_et_al_2021_IJHMT_173_121207_pressure_dependent_WSGG.pdf
+  citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Pressure-dependent
+    weighted-sum-of-gray-gases models for heterogeneous CO2-H2O mixtures at sub- and super-atmospheric pressure.
+    Int. J. Heat Mass Transfer 173, 121207.'
+  id: doi:10.1016/j.ijheatmasstransfer.2021.121207
+  topic: [radiation, combustion]
+  content: 'The Bordbar et al. (2014) WSGG formulation (Mr in the coefficients) extended to total pressure: ten
+    SEPARATE coefficient sets for p = 0.1, 0.5, 1, 2, 5, 10, 20, 30, 50, 80 atm; T 300-3000 K, Mr = H2O/CO2
+    0.1-4 (33 discrete values fitted), LBL from HITEMP2010 over 150-25000 cm-1. Weights a_i polynomial in
+    T (b_ij) with b_ij = sum_k c_ijk Mr^(4-k), absorption kappa_p,i = sum_k d_ik Mr^(4-k) (Eqs. 8-11). Table 1
+    surveys earlier pressure-dependent WSGG models (Bahador & Sunden, Coelho & Franca, Shan et al., Wang &
+    Xuan). Validated against LBL on 1-D slabs (isothermal/homogeneous and varying T, composition and Mr);
+    average errors < 5% (Shan''s model > 6% at best, Table 2). Non-luminous: no soot.'
+  status: screened
+  verdict: 'Screened 2026-10-28: the pressure coverage Bordbar et al. (2014) lacked -- gas-turbine liners at
+    10-40 bar sit inside 0.1-80 atm -- making it the better candidate for a non-luminous gas-radiation kernel
+    (#793 Lefebvre & Ballal liner examples; no radiation issue exists yet). BUT the coefficients are NOT in the
+    paper: they are in its supplementary material (one set per pressure, with a MATLAB function), wanted.
+    Between the ten pressures an implementation must interpolate (in p or ln p; the paper does not prescribe
+    one). Soot stays outside (Lefebvre''s luminosity factor).'
+  read_for: ['#793 liner wall temperature: non-luminous gas emissivity at combustor pressure']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-10-28 as docs/new/Pressure-dependent-weighted-sum-of-gray-gases-model_2021_International-Journ.pdf.
 - file: docs/radiation/bordbar_wecel_hyppanen_2014_CNF_161_2435_LBL_WSGG_H2O_CO2.pdf
   citation: 'Bordbar, M. H., Wecel, G., Hyppanen, T. (2014). A line by line based weighted sum of gray gases model
     for inhomogeneous CO2-H2O mixture in oxy-fired combustion. Combustion and Flame 161, 2435-2445.'
@@ -2587,8 +2611,8 @@ documents:
     examples, #793). A citable, LBL-based NON-LUMINOUS emissivity for H2O-CO2 at 1 atm, closed-form in T,
     partial-pressure path length and Mr -- a physics-based alternative to Lefebvre''s empirical Eq. 8.11 gas
     emissivity, and a cross-check of it at 1 atm. Limits for a gas-turbine liner: 1 atm only (liners run at
-    10-40 bar, where pressure broadening raises H2O/CO2 emissivity; a high-pressure WSGG or a correction is
-    needed), no soot (Lefebvre''s luminosity factor L stays the luminous part), oxy-fired fit (air-fired
+    10-40 bar, where pressure broadening raises H2O/CO2 emissivity: Bordbar et al. 2021 (held) is that
+    pressure-dependent extension), no soot (Lefebvre''s luminosity factor L stays the luminous part), oxy-fired fit (air-fired
     Mr ~1-2 is inside its range). No issue exists for a radiation model yet; this is a candidate for its
     non-luminous kernel, not used.'
   read_for: ['#793 liner wall temperature: gas radiation (non-luminous emissivity)']
@@ -3129,3 +3153,13 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
+- citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Supplementary
+    material to: Pressure-dependent WSGG models for heterogeneous CO2-H2O mixtures, Int. J. Heat Mass Transfer
+    173, 121207 (coefficient tables per pressure and a MATLAB function).'
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'The c_ijk and d_ik coefficient sets for the ten total pressures (0.1-80 atm) -- not printed in the
+    paper (held) -- needed to implement its non-luminous H2O-CO2 emissivity at combustor pressure.'
+  where: The article's online supplementary material (ScienceDirect, doi:10.1016/j.ijheatmasstransfer.2021.121207).
