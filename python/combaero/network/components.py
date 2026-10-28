@@ -1954,7 +1954,7 @@ def _infer_flow_area(
             return area, f"node '{node_id}'"
 
     for node_id, elem in neighbours:
-        for other in set(elem.all_source_nodes()) | set(elem.all_sink_nodes()):
+        for other in dict.fromkeys([*elem.all_source_nodes(), *elem.all_sink_nodes()]):
             if other == node_id:
                 continue
             area = _known_node_area(graph.nodes.get(other))
@@ -3942,7 +3942,7 @@ class OrificeElement(NetworkElement):
             for elem in graph.get_upstream_elements(nid) + graph.get_downstream_elements(nid):
                 if elem is self:
                     continue
-                for other in set(elem.all_source_nodes()) | set(elem.all_sink_nodes()):
+                for other in dict.fromkeys([*elem.all_source_nodes(), *elem.all_sink_nodes()]):
                     if other not in seen:
                         seen.add(other)
                         todo.append(other)
@@ -4132,7 +4132,10 @@ class OrificeElement(NetworkElement):
             return m_r, d_r
         m_f, d_f = self._kernel_from(state_in, state_out, self.from_node, self.to_node, cd)
         out: dict[str, float] = {}
-        for k in set(d_f) | set(d_r):
+        # dict.fromkeys, not a set union: a set of str iterates in hash order,
+        # randomised per process, and the key order sets how assemble() sums
+        # coinciding terms -- a 1-ulp Jacobian change that moved the path.
+        for k in dict.fromkeys([*d_f, *d_r]):
             out[k] = w * d_f.get(k, 0.0) + (1.0 - w) * d_r.get(k, 0.0)
         g = (m_f - m_r) * dw
         out[f"{self.from_node}.Pt"] = out.get(f"{self.from_node}.Pt", 0.0) + g
@@ -6489,7 +6492,7 @@ class PortDischargeElement(NetworkElement):
         if w == 1.0:
             return [r_out], {0: j_out}
         jac: dict[str, float] = {}
-        for k in set(j_in) | set(j_out):
+        for k in dict.fromkeys([*j_in, *j_out]):  # deterministic order (see _flow_and_partials)
             jac[k] = w * j_out.get(k, 0.0) + (1.0 - w) * j_in.get(k, 0.0)
         jac[m_name] = jac.get(m_name, 0.0) + (r_out - r_in) * dw
         return [w * r_out + (1.0 - w) * r_in], {0: jac}
@@ -7625,7 +7628,10 @@ class ChannelElement(NetworkElement):
             )
             dP = w * f_dP + (1.0 - w) * r_dP
             dP_dm = w * f_dm + (1.0 - w) * r_dm + dw * (f_dP - r_dP)
-            dd = {k: w * f_d.get(k, 0.0) + (1.0 - w) * r_d.get(k, 0.0) for k in set(f_d) | set(r_d)}
+            dd = {
+                k: w * f_d.get(k, 0.0) + (1.0 - w) * r_d.get(k, 0.0)
+                for k in dict.fromkeys([*f_d, *r_d])
+            }
         res = [state_in.Pt - state_out.Pt - dP]
         row: dict[str, float] = {
             f"{self.id}.m_dot": -dP_dm,
