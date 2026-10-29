@@ -1,0 +1,5 @@
+- **Opt-in extrapolation for material conductivity** (#761). The table-backed `k_*` functions, `get_material_conductivity` and `WallLayer` take `extrapolate=False`.
+  - **Default (unchanged):** outside its valid range a `k_*` function raises, and the database lookup holds the end value.
+  - **`extrapolate=True`:** continues the end slope linearly. On a table this is the end segment; on a fitted polynomial it is the tangent. It raises if that reaches k <= 0 or T <= 0.
+  - The continuation is unsourced; the user asks for it explicitly.
+  - `k_tbc_ysz` keeps its own range.

@@ -25,6 +25,13 @@ struct ThermalMaterial {
 const ThermalMaterial& get_material(const std::string& name);
 std::vector<std::string> list_materials();
 
+// k(T) of a database material [W/(m*K)]. Inside [T_min, T_max] this is
+// k_func(T). Outside it, extrapolate = false holds the end value (T is
+// clamped to the range) and extrapolate = true continues the end slope
+// linearly: an opt-in, unsourced continuation the caller asks for. Throws
+// for a non-finite T, T <= 0 or a continued k <= 0.
+double material_conductivity(const std::string& name, double T, bool extrapolate);
+
 // -------------------------------------------------------------
 // Superalloys - Thermal Conductivity k(T)
 // -------------------------------------------------------------
@@ -43,6 +50,42 @@ double k_inconel718(double T);
 // Valid: 300-1273 K, where the table ends
 // Linear: k = 8.4 + 0.020*T_C, exact at every printed point (#761)
 double k_haynes230(double T);
+
+// Combustor liner / transition-piece alloys. Source: the manufacturers'
+// alloy brochures (Haynes International), Physical Properties table, metric
+// column, interpolated linearly (exact at every printed point; RT = 25 C).
+// Convenience data: a user with qualified properties supplies their own.
+
+// HASTELLOY X (Ni-Cr-Fe-Mo). Valid: 300-1273 K: the brochure table to 900 C
+// plus 400 C and 1000 C from the manufacturer's data sheet ("sheet, tested at
+// 760 C"), which agrees with the brochure within 0.1 W/m K where both print.
+double k_hastelloy_x(double T);
+
+// HAYNES 188 (Co-Ni-Cr-W). Valid: 300-1273 K (table to 1000 C).
+double k_haynes188(double T);
+
+// HAYNES 263 (Ni-Co-Cr-Mo, age-hardenable). Valid: 300-1273 K (table to 1000 C).
+double k_haynes263(double T);
+
+// Further tabulated materials (#761), interpolated linearly in the source
+// table and refused outside it:
+// HAYNES 25 (L-605, Co-Cr-W-Ni), brochure table 25-1000 C. Valid: 298-1273 K.
+double k_haynes25(double T);
+// INCONEL 625 (Ni-Cr-Mo-Nb), Special Metals Table 3, -157 to 982 C. Valid: 116-1255 K.
+double k_inconel625(double T);
+// NIMONIC 75 (Ni-Cr-Ti), Virgamet N75 table 20-1000 C. Valid: 293-1273 K.
+double k_nimonic75(double T);
+// High-purity copper, NSRDS-NBS 8 Table 2b. Valid: 100-1200 K.
+double k_copper(double T);
+// Al2O3, 99.5% pure, 98% dense, NSRDS-NBS 8 Table 14. Valid: 100-2000 K.
+double k_alumina(double T);
+// X22CrMoV12-1 (1.4923), data sheet values at 20 and 650 C. Valid: 293-923 K.
+double k_x22crmov12_1(double T);
+
+// NiCoCrAlY TBC bond coat. Source: Zhu & Miller 1999, NASA/TM-1999-209069,
+// Fig. 2 (literature values): k = 6.729572 + 0.02344*T_C. Valid: 848-1373 K,
+// the range the line is drawn over (about 575-1100 C).
+double k_bondcoat_nicocraly(double T);
 
 // -------------------------------------------------------------
 // Structural Alloys - Thermal Conductivity k(T)

@@ -100,14 +100,25 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     // materials.h - Material Thermal Conductivity
     // -------------------------------------------------------------------------
-    {"k_inconel718", "T: K", "W/(m*K)"},
-    {"k_haynes230", "T: K", "W/(m*K)"},
-    {"k_stainless_steel_316", "T: K", "W/(m*K)"},
+    {"k_inconel718", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_haynes230", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_hastelloy_x", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_haynes188", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_haynes263", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_haynes25", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_inconel625", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_nimonic75", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_copper", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_alumina", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_x22crmov12_1", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_bondcoat_nicocraly", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
+    {"k_stainless_steel_316", "T: K, extrapolate: bool (default False)", "W/(m*K)"},
     {"k_aluminum_6061", "T: K", "W/(m*K)"},
     {"k_tbc_ysz", "T: K, hours: h (default 0), is_ebpvd: bool (default False)",
      "W/(m*K)"},
     {"list_materials", "-", "list[str]"},
-    {"get_material_conductivity", "name: str, T: K", "W/(m*K)"},
+    {"get_material_conductivity", "name: str, T: K, extrapolate: bool (default False)",
+     "W/(m*K)"},
 
     // -------------------------------------------------------------------------
     // cooling_correlations.h - Advanced Cooling Correlations

@@ -104,34 +104,14 @@ class TestStructuralAlloys:
         with pytest.raises(RuntimeError):
             cb.k_stainless_steel_316(250)
 
-    def test_aluminum_6061_ambient(self):
-        """Test Aluminum 6061 at ambient temperature."""
-        T = 300.0  # K
-        k = cb.k_aluminum_6061(T)
-
-        # At 300K: k approx 167.0 - 0.012*27 approx 166.7 W/(m*K)
-        assert k == pytest.approx(166.7, abs=1.0)
-
-    def test_aluminum_6061_elevated_temp(self):
-        """Test Al6061 at elevated temperature."""
-        T = 500.0  # K (227C)
-        k = cb.k_aluminum_6061(T)
-
-        # Should decrease with temperature
-        k_ambient = cb.k_aluminum_6061(300)
-        assert k < k_ambient
-
-    def test_aluminum_6061_temperature_range(self):
-        """Test Al6061 valid temperature range (limited by T6 temper)."""
-        # Valid range: 200-600 K
-        assert cb.k_aluminum_6061(200) > 0
-        assert cb.k_aluminum_6061(600) > 0
-
-        with pytest.raises(RuntimeError):
-            cb.k_aluminum_6061(150)
-
-        with pytest.raises(RuntimeError):
-            cb.k_aluminum_6061(700)
+    def test_aluminum_6061_is_deprecated_but_still_answers(self):
+        """No cited source (#761): warns, removed in 0.9.0, unchanged until then."""
+        with pytest.warns(DeprecationWarning, match="0.9.0"):
+            assert cb.k_aluminum_6061(300.0) == pytest.approx(167.0 - 0.012 * 26.85, rel=1e-12)
+        with pytest.warns(DeprecationWarning, match="al6061"):
+            assert cb.get_material_conductivity("al6061", 300.0) > 0
+        with pytest.warns(DeprecationWarning), pytest.raises(RuntimeError):
+            cb.k_aluminum_6061(700.0)
 
 
 class TestThermalBarrierCoatings:
@@ -226,15 +206,6 @@ class TestTemperatureTrends:
         assert k_600 > k_300
         assert k_900 > k_600
 
-    def test_aluminum_decreases_with_temperature(self):
-        """Test that aluminum k decreases with T (phonon scattering)."""
-        k_300 = cb.k_aluminum_6061(300)
-        k_400 = cb.k_aluminum_6061(400)
-        k_500 = cb.k_aluminum_6061(500)
-
-        assert k_400 < k_300
-        assert k_500 < k_400
-
     def test_tbc_as_sprayed_is_flat_in_temperature(self):
         """Plasma-sprayed YSZ as sprayed: about 1 W/m K at every T (Zhu &
         Miller 2000); the literature has it roughly flat, 0.8-1.1."""
@@ -261,13 +232,6 @@ class TestMagnitudeRanges:
 
         assert 13 < k < 25
 
-    def test_aluminum_magnitude(self):
-        """Test aluminum k is in typical range (150-180 W/(m*K))."""
-        T = 300.0
-        k = cb.k_aluminum_6061(T)
-
-        assert 150 < k < 180
-
     def test_tbc_magnitude(self):
         """Test TBC k is in typical range (0.8-2.0 W/(m*K))."""
         T = 1200.0
@@ -277,3 +241,313 @@ class TestMagnitudeRanges:
 
         assert 0.8 < k_fresh < 2.0
         assert 0.8 < k_aged < 2.0
+
+
+class TestLinerAlloysAndBondCoat:
+    """Manufacturer brochure tables (Haynes International) and the Zhu &
+    Miller 1999 bond-coat line: exact at every printed point."""
+
+    @pytest.mark.parametrize(
+        ("func", "table"),
+        [
+            (
+                "k_hastelloy_x",
+                [
+                    (25, 9.2),
+                    (100, 11.2),
+                    (200, 14.1),
+                    (400, 16.9),
+                    (600, 20.9),
+                    (650, 21.9),
+                    (700, 22.8),
+                    (750, 23.8),
+                    (800, 24.7),
+                    (850, 25.7),
+                    (900, 26.7),
+                    (1000, 28.7),
+                ],
+            ),
+            (
+                "k_haynes188",
+                [
+                    (100, 12.2),
+                    (200, 14.3),
+                    (300, 15.9),
+                    (400, 17.5),
+                    (500, 19.3),
+                    (600, 21.1),
+                    (700, 23.0),
+                    (800, 24.8),
+                    (900, 25.5),
+                    (1000, 27.6),
+                ],
+            ),
+            (
+                "k_haynes263",
+                [
+                    (100, 13.0),
+                    (200, 14.7),
+                    (300, 16.3),
+                    (400, 18.0),
+                    (500, 19.7),
+                    (600, 21.4),
+                    (700, 23.0),
+                    (800, 24.7),
+                    (900, 26.8),
+                    (1000, 28.5),
+                ],
+            ),
+        ],
+    )
+    def test_the_brochure_table_is_reproduced(self, func: str, table: list) -> None:
+        f = getattr(cb, func)
+        for T_C, k in table:
+            if T_C + 273.15 >= 300.0:
+                assert f(T_C + 273.15) == pytest.approx(k, rel=1e-12)
+
+    def test_between_points_is_linear(self) -> None:
+        # Hastelloy X between the data sheet's 400 C and the brochure's 600 C.
+        assert cb.k_hastelloy_x(500.0 + 273.15) == pytest.approx(0.5 * (16.9 + 20.9), rel=1e-12)
+
+    def test_the_ranges_are_the_tables(self) -> None:
+        for f, T_max in (
+            (cb.k_hastelloy_x, 1273.15),
+            (cb.k_haynes188, 1273.15),
+            (cb.k_haynes263, 1273.15),
+        ):
+            assert f(T_max) > 0
+            with pytest.raises(RuntimeError):
+                f(T_max + 1.0)
+
+    def test_the_bond_coat_is_the_zhu_miller_line_over_its_drawn_range(self) -> None:
+        for T_C in (575.0, 800.0, 1100.0):
+            assert cb.k_bondcoat_nicocraly(T_C + 273.15) == pytest.approx(
+                6.729572 + 0.02344 * T_C, rel=1e-12
+            )
+        with pytest.raises(RuntimeError):
+            cb.k_bondcoat_nicocraly(500.0 + 273.15)
+        with pytest.raises(RuntimeError):
+            cb.k_bondcoat_nicocraly(1200.0 + 273.15)
+
+    def test_they_are_in_the_material_database(self) -> None:
+        names = cb.list_materials()
+        for n in ("hastelloy_x", "haynes188", "haynes263", "nicocraly"):
+            assert n in names
+        assert cb.get_material_conductivity("hastelloy_x", 873.15) == pytest.approx(20.9, rel=1e-12)
+
+
+class TestFurtherAlloysCopperAlumina:
+    """Tables from Haynes, Special Metals, Virgamet, Edelstahlwerke
+    Suedwestfalen and NSRDS-NBS 8 (#761): exact at every printed point, linear
+    between them, refused outside the table."""
+
+    TABLES = [
+        (
+            "k_haynes25",
+            "C",
+            298.15,
+            1273.15,
+            [
+                (25, 10.5),
+                (100, 12.0),
+                (200, 14.0),
+                (300, 15.9),
+                (400, 17.7),
+                (500, 19.5),
+                (600, 21.2),
+                (700, 22.9),
+                (800, 24.5),
+                (900, 26.0),
+                (1000, 27.5),
+            ],
+        ),
+        (
+            "k_inconel625",
+            "C",
+            116.15,
+            1255.15,
+            [
+                (-157, 7.2),
+                (-129, 7.5),
+                (-73, 8.4),
+                (-18, 9.2),
+                (21, 9.8),
+                (38, 10.1),
+                (93, 10.8),
+                (204, 12.5),
+                (316, 14.1),
+                (427, 15.7),
+                (538, 17.5),
+                (649, 19.0),
+                (760, 20.8),
+                (871, 22.8),
+                (982, 25.2),
+            ],
+        ),
+        (
+            "k_nimonic75",
+            "C",
+            293.15,
+            1273.15,
+            [
+                (20, 11.7),
+                (400, 18.6),
+                (600, 22.7),
+                (700, 24.7),
+                (800, 26.5),
+                (900, 28.4),
+                (1000, 30.1),
+            ],
+        ),
+        (
+            "k_copper",
+            "K",
+            100.0,
+            1200.0,
+            [
+                (100, 483),
+                (150, 428),
+                (200, 413),
+                (250, 404),
+                (273, 401),
+                (300, 398),
+                (350, 394),
+                (400, 392),
+                (500, 388),
+                (600, 383),
+                (700, 377),
+                (800, 371),
+                (900, 364),
+                (1000, 357),
+                (1100, 350),
+                (1200, 342),
+            ],
+        ),
+        (
+            "k_alumina",
+            "K",
+            100.0,
+            2000.0,
+            [
+                (100, 133.0),
+                (150, 77.0),
+                (200, 55.0),
+                (250, 43.4),
+                (273, 39.7),
+                (300, 36.0),
+                (350, 30.7),
+                (400, 26.4),
+                (500, 20.2),
+                (600, 15.8),
+                (700, 12.6),
+                (800, 10.4),
+                (900, 8.9),
+                (1000, 7.85),
+                (1100, 7.1),
+                (1200, 6.55),
+                (1300, 6.13),
+                (1400, 5.85),
+                (1500, 5.66),
+                (1600, 5.56),
+                (1700, 5.54),
+                (1800, 5.59),
+                (1900, 5.74),
+                (2000, 6.0),
+            ],
+        ),
+        ("k_x22crmov12_1", "C", 293.15, 923.15, [(20, 24.0), (650, 29.0)]),
+    ]
+
+    @pytest.mark.parametrize(("func", "unit", "T_min", "T_max", "table"), TABLES)
+    def test_the_table_is_reproduced_and_bounded(
+        self, func: str, unit: str, T_min: float, T_max: float, table: list
+    ) -> None:
+        f = getattr(cb, func)
+        to_K = 273.15 if unit == "C" else 0.0
+        for x, k in table:
+            assert f(x + to_K) == pytest.approx(k, rel=1e-12)
+        (x0, k0), (x1, k1) = table[0], table[1]
+        assert f(0.5 * (x0 + x1) + to_K) == pytest.approx(0.5 * (k0 + k1), rel=1e-12)
+        assert f(T_min) == pytest.approx(table[0][1], rel=1e-12)
+        assert f(T_max) == pytest.approx(table[-1][1], rel=1e-12)
+        with pytest.raises(RuntimeError):
+            f(T_min - 1.0)
+        with pytest.raises(RuntimeError):
+            f(T_max + 1.0)
+
+    def test_they_are_in_the_material_database(self) -> None:
+        names = cb.list_materials()
+        for n in ("haynes25", "inconel625", "nimonic75", "copper", "alumina", "x22crmov12_1"):
+            assert n in names
+            assert cb.get_material_conductivity(n, 700.0) == pytest.approx(
+                getattr(cb, f"k_{n}")(700.0), rel=1e-12
+            )
+
+    @pytest.mark.parametrize(("func", "unit", "T_min", "T_max", "table"), TABLES)
+    def test_the_database_clamps_to_the_table_ends(
+        self, func: str, unit: str, T_min: float, T_max: float, table: list
+    ) -> None:
+        name = func.removeprefix("k_")
+        assert cb.get_material_conductivity(name, 1.0) == pytest.approx(table[0][1], rel=1e-12)
+        assert cb.get_material_conductivity(name, 5000.0) == pytest.approx(table[-1][1], rel=1e-12)
+
+
+class TestOptInExtrapolation:
+    """Outside the valid range a k_* function raises and the database holds
+    the end value; extrapolate=True continues the end slope linearly."""
+
+    def test_default_refuses_or_holds_the_end_value(self) -> None:
+        with pytest.raises(RuntimeError):
+            cb.k_copper(1300.0)
+        assert cb.get_material_conductivity("copper", 1300.0) == pytest.approx(342.0, rel=1e-12)
+        assert cb.get_material_conductivity("alumina", 50.0) == pytest.approx(133.0, rel=1e-12)
+
+    def test_a_table_continues_its_end_segment(self) -> None:
+        # Copper 1100 -> 1200 K: 350 -> 342, slope -0.08 per K.
+        assert cb.k_copper(1300.0, extrapolate=True) == pytest.approx(334.0, rel=1e-9)
+        # Alumina 100 -> 150 K: 133 -> 77, slope -1.12 per K, continued below 100 K.
+        assert cb.k_alumina(50.0, extrapolate=True) == pytest.approx(189.0, rel=1e-9)
+        # Hastelloy X 900 -> 1000 C: 26.7 -> 28.7.
+        assert cb.k_hastelloy_x(1100.0 + 273.15, extrapolate=True) == pytest.approx(30.7, rel=1e-9)
+        assert cb.get_material_conductivity("copper", 1300.0, extrapolate=True) == pytest.approx(
+            334.0, rel=1e-9
+        )
+
+    def test_inside_the_range_the_flag_changes_nothing(self) -> None:
+        for T in (300.0, 777.7, 1273.15):
+            assert cb.k_hastelloy_x(T, extrapolate=True) == cb.k_hastelloy_x(T)
+
+    def test_a_fitted_polynomial_continues_its_tangent(self) -> None:
+        # SS 316: 13.5 + 0.015 T_C - 2.1e-6 T_C^2 up to 1200 K.
+        t = 1200.0 - 273.15
+        slope = 0.015 - 4.2e-6 * t
+        k_end = 13.5 + 0.015 * t - 2.1e-6 * t * t
+        assert cb.k_stainless_steel_316(1300.0, extrapolate=True) == pytest.approx(
+            k_end + 100.0 * slope, rel=1e-6
+        )
+
+    def test_haynes230_continues_its_table_line_past_1000_c(self) -> None:
+        # 8.4 + 0.020 T_C ends at 28.4 (1000 C); the flag continues the line.
+        assert cb.k_haynes230(1100.0 + 273.15, extrapolate=True) == pytest.approx(30.4, rel=1e-9)
+        assert cb.get_material_conductivity("haynes230", 1400.0) == pytest.approx(28.4, rel=1e-12)
+
+    def test_it_refuses_where_the_continuation_is_unphysical(self) -> None:
+        with pytest.raises(RuntimeError, match="<= 0"):
+            cb.k_copper(6000.0, extrapolate=True)
+        with pytest.raises(RuntimeError, match="> 0 K"):
+            cb.k_copper(0.0, extrapolate=True)
+        for bad in (float("nan"), float("inf")):
+            with pytest.raises(RuntimeError, match="finite"):
+                cb.k_copper(bad, extrapolate=True)
+            with pytest.raises(RuntimeError, match="finite"):
+                cb.get_material_conductivity("copper", bad, extrapolate=True)
+
+    def test_a_wall_layer_opts_in(self) -> None:
+        from combaero.network.components import WallLayer
+
+        held = WallLayer(thickness=1e-3, conductivity=1.0, material="copper")
+        held.update_conductivity(1300.0)
+        assert held.conductivity == pytest.approx(342.0, rel=1e-12)
+        continued = WallLayer(thickness=1e-3, conductivity=1.0, material="copper", extrapolate=True)
+        continued.update_conductivity(1300.0)
+        assert continued.conductivity == pytest.approx(334.0, rel=1e-9)

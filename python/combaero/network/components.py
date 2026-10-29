@@ -1197,11 +1197,15 @@ class WallLayer:
         Thermal conductivity of the material [W/(m*K)].
     material : str
         Material name (e.g., 'inconel718', 'haynes230', or 'custom').
+    extrapolate : bool
+        Outside the material's valid range: False (default) holds the end
+        value, True continues the end slope linearly (unsourced; opt-in).
     """
 
     thickness: float
     conductivity: float
     material: str = "custom"
+    extrapolate: bool = False
 
     def __post_init__(self) -> None:
         # An unknown name used to be swallowed at every evaluation, so a typo
@@ -1219,9 +1223,12 @@ class WallLayer:
 
         # 'generic' is legacy, 'custom' is new name for manual input
         if self.material.lower() not in ("generic", "custom"):
-            # The binding clamps T to the material's valid range and k > 0, so
-            # a known material does not raise at any finite T.
-            self.conductivity = cb.get_material_conductivity(self.material, T)
+            # By default the binding clamps T to the material's valid range and
+            # k > 0, so a known material does not raise at any finite T. extrapolate
+            # continues the end slope and raises if that reaches k <= 0.
+            self.conductivity = cb.get_material_conductivity(
+                self.material, T, extrapolate=self.extrapolate
+            )
 
     @property
     def r_val(self) -> float:
