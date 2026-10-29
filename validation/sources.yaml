@@ -3558,6 +3558,28 @@ documents:
   notes: Supplied by the user 2026-10-29 (moved here from the wanted list). The 2022 edition was only available
     as the free preview (stops in 5.2) and was not kept.
 
+- file: sources/orifices/jobson_1955_PIMechE_169_767_compressible_orifice.pdf
+  citation: Jobson, D. A. (1955). On the flow of a compressible fluid through orifices. Proc. Instn Mech. Engrs
+    169, 767-776. doi:10.1243/PIME_PROC_1955_169_077_02
+  topic: [orifice]
+  content: 'Theory of the compressible contraction coefficient of a sharp-edged orifice from a reservoir: force
+    defect f = 1/Ci - 1/(2 Ci^2) from the incompressible Ci (Eq. 5), subcritical C(r) (Eq. 11), choked C(r)
+    (Eq. 15) to any back pressure, Borda limits (Eqs. 16/17), m = Cv C K_N A sqrt(p0 rho0). Table 2: C vs r for
+    a plane slit (Ci = pi/(pi+2)) against Howarth''s hodograph (Table 1); Fig. 5: Perry 1949 (air) and Schiller
+    1933 (steam) mass-flow coefficients vs pressure ratio.'
+  status: screened
+  verdict: 'The physics-based compressible orifice for #854, with no fitted constant: our transcription reproduces
+    Table 2 within 0.0006 at every r (inside its 3-decimal rounding). Its expansibility at beta -> 0 lies within
+    0.1-0.8% of ISO 5167-2 Eq. (5) inside ISO''s range (p2/p1 >= 0.75), where the isentropic nozzle combaero
+    applies today is 0.9-9% low; it continues smoothly below 0.75 and through choke (C keeps rising past choke).
+    Assumes a reservoir (no approach velocity): exact for plenum-fed holes (liner, effusion, impingement), an
+    extension for in-pipe plates (beta up to 0.75) is not in the paper. Fig. 5 (Perry, Schiller) is a fidelity
+    set for digitising.'
+  read_for: ['#854 compressible orifice expansion']
+  issues: [854]
+  records: []
+  notes: Supplied by the user 2026-10-29 (uploaded from a phone).
+
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
 # `citation` here is as recalled unless `checked` is true; confirm it from
