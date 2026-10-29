@@ -56,7 +56,7 @@ const DiscreteLossNode = ({ id, data, selected }: NodeProps) => {
 					{data.label ? data.label : "Discrete Loss"}
 				</div>
 				{isSolved ? (
-					<NodeDiagRows kind="discrete_loss" result={data.result} maxRows={1} />
+					<NodeDiagRows kind="discrete_loss" result={data.result} maxRows={2} />
 				) : (
 					<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 						{formula}
