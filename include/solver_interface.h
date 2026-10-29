@@ -197,7 +197,8 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 // Compressible orifice flow using isentropic nozzle model.
 // Applies discharge coefficient and velocity-of-approach factor to nozzle_flow.
 //
-// Method: Finite Difference Jacobians (nozzle_flow is iterative)
+// Method: analytic Jacobians on the isentrope through the nozzle_flow outlet
+// state, the exact derivatives of the returned mdot on both sides of choke.
 // Inputs:
 //   Tt   : Stagnation temperature [K]
 //   Pt   : Stagnation pressure [Pa]
@@ -211,7 +212,7 @@ std::tuple<double, double> lossless_pressure_and_jacobian(double P_in,
 //   tuple(mdot, d_mdot_dPt, d_mdot_dP_back, d_mdot_dTt)
 //   mdot           : Mass flow rate [kg/s]
 //   d_mdot_dPt     : Jacobian w.r.t. stagnation pressure [kg/(s*Pa)]
-//   d_mdot_dP_back : Jacobian w.r.t. back pressure [kg/(s*Pa)] (smooth through choked transition)
+//   d_mdot_dP_back : Jacobian w.r.t. back pressure [kg/(s*Pa)] (zero when choked; continuous through P*)
 //   d_mdot_dTt     : Jacobian w.r.t. stagnation temperature [kg/(s*K)]
 std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
     double Tt, double Pt, double P_back,

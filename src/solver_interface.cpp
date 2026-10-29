@@ -1696,28 +1696,21 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
   double cp_outlet = combaero::cp_mass(T_outlet, X);
   double cp0 = combaero::cp_mass(Tt, X);
 
-  // Unchoked derivatives (subsonic branch)
-  double dmdot_dP_back_sub = 0.0;
-  if (v_outlet > 1e-6) {
-    dmdot_dP_back_sub = A_eff * (1.0 / v_outlet) * (M_outlet * M_outlet - 1.0);
+  // Back-pressure derivative: the exact derivative of the value as written.
+  // Unchoked, mdot = A_eff G(Pb) on the isentrope, dG/dPb = (M^2 - 1) / v.
+  // Choked, the outlet sits at P* whatever Pb is, so dmdot/dPb = 0. The value
+  // is already C1 through P*: G peaks there, so the unchoked slope (M^2 - 1)/v
+  // falls to zero as M -> 1 and meets the choked branch's zero. No blend is
+  // needed. One was here until #772, a cubic in PR over 0.01 either side of
+  // the critical ratio applied to the derivative only: above P* it scaled the
+  // slope by a factor that reached 1.5 at the band's edge and jumped back to 1
+  // there, so d(mdot)/dPb was up to 46% off a difference of the value (and
+  // d(mdot)/dPt, which reuses it, up to 0.3%).
+  double d_mdot_dP_back_fwd = 0.0;
+  if (!sol.choked && v_outlet > 1e-6) {
+    d_mdot_dP_back_fwd = A_eff * (1.0 / v_outlet) * (M_outlet * M_outlet - 1.0);
   }
-
-  // Choked derivatives (constant mass flow)
-  // mdot_choked = A_eff * G_crit
-  // G_crit ~ Pt / sqrt(Tt)
-  double dmdot_dP_back_choked = 0.0;
-
-  // Apply smooth transition (C1 continuous)
-  double PR = P_back_fwd / P0_fwd;
-  double PR_crit = combaero::critical_pressure_ratio(T0_fwd, P0_fwd, X);
-  const double delta_PR = 0.01;
-  double t = (PR - PR_crit) / delta_PR;
-  double choke_factor = 1.0;
-  if (t >= 1.0) choke_factor = 1.0;
-  else if (t <= -1.0) choke_factor = 0.0;
-  else choke_factor = 0.5 * (1.0 + t * (3.0 - t * t));
-
-  double d_mdot_dP_back_fwd = dmdot_dP_back_sub * choke_factor + dmdot_dP_back_choked * (1.0 - choke_factor);
+  const double PR = P_back_fwd / P0_fwd;
 
   // Upstream pressure derivative: Pt only affects PR and scales G linearly if choked
   // dmdot/dP0 = mdot/Pt - (Pb/Pt) * dmdot/dPb

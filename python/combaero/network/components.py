@@ -3463,7 +3463,7 @@ class OrificeElement(NetworkElement):
     Orifice flow element with incompressible or compressible formulation.
 
     - regime='incompressible': m_dot = Cd * A * sqrt(2 * rho * dP)
-    - regime='compressible': Uses isentropic nozzle flow with smooth choked transition
+    - regime='compressible': Uses isentropic nozzle flow, choked below P* (C1 through it)
 
     The discharge coefficient Cd is determined by the 'correlation' parameter:
       - 'fixed': Uses the user-supplied Cd value directly.

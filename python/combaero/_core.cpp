@@ -1440,7 +1440,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         &solver::orifice_compressible_mdot_and_jacobian, py::arg("Tt"),
         py::arg("Pt"), py::arg("P_back"), py::arg("X"), py::arg("Cd"),
         py::arg("area"), py::arg("beta") = 0.0,
-        "Compressible orifice flow with smooth choked flow Jacobians.\n\n"
+        "Compressible orifice flow, analytic Jacobians exact on both sides of\n"
+        "choke (the flow is C1 through P*, #772).\n\n"
         "Returns: (mdot, d_mdot_dPt, d_mdot_dP_back, d_mdot_dTt)");
 
   m.def("orifice_compressible_residuals_and_jacobian",
