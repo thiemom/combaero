@@ -1,6 +1,8 @@
 import asyncio
 import io
+import itertools
 import math
+import threading
 from pathlib import Path
 
 import pandas as pd
@@ -122,20 +124,85 @@ _continuation_state: dict | None = None
 #: frees the request.
 HARD_TIMEOUT_MARGIN = 10.0
 
+# A worker thread outlives a request that answered 504 (#762): it cannot be
+# cancelled, and it may still converge. Each request holds a token while it
+# waits; the worker writes `_continuation_state` only while its token is live,
+# under the same lock the request takes to give the token up. A result that
+# arrives after its request timed out is discarded, so the next continuation
+# solve never warm-starts from a state the user was told had failed.
+_state_lock = threading.Lock()
+_live_tokens: set[int] = set()
+_token_counter = itertools.count(1)
 
-def _solve_sync(schema: NetworkGraphSchema):
+
+def _open_token() -> int:
+    token = next(_token_counter)
+    with _state_lock:
+        _live_tokens.add(token)
+    return token
+
+
+def _close_token(token: int) -> None:
+    with _state_lock:
+        _live_tokens.discard(token)
+
+
+def _commit_continuation(state: dict, token: int | None) -> bool:
+    """Store `state` for continuation unless `token`'s request has gone.
+
+    `token=None` (a direct, synchronous caller) always commits.
+    """
+    global _continuation_state
+    with _state_lock:
+        if token is not None and token not in _live_tokens:
+            return False
+        _continuation_state = state
+        return True
+
+
+def _hard_timeout(timeout: float | None) -> float | None:
+    """The request-level deadline for a solver `timeout`.
+
+    None is no limit for the solver, so none for the request either (#762):
+    the solve runs until it finishes. Any number, 0 included, is what the
+    solver itself gets (0 times out at its first residual) plus the margin;
+    a negative one counts as 0.
+    """
+    if timeout is None:
+        return None
+    return max(timeout, 0.0) + HARD_TIMEOUT_MARGIN
+
+
+def _timeout_detail(what: str, timeout: float | None) -> str:
+    # Reached with a finite timeout only: a null one sets no deadline (#762),
+    # so "raise it, or clear it for no limit" is always something the user can do.
+    if timeout is None:
+        return f"{what} raised a timeout with no Max Solver Time set."
+    hard_timeout = _hard_timeout(timeout)
+    return (
+        f"{what} did not return within {hard_timeout:g} s (Max Solver Time "
+        f"{max(timeout, 0.0):g} s plus a {HARD_TIMEOUT_MARGIN:g} s grace): one step could "
+        "not be interrupted. Raise Max Solver Time or clear it for no limit, simplify "
+        "the network, or try a different init strategy."
+    )
+
+
+def _solve_sync(schema: NetworkGraphSchema, token: int | None = None):
     """
     Synchronous helper to build and solve the network.
     Runs in a separate thread to avoid blocking the FastAPI event loop.
+
+    `token` is the request's (see `_open_token`); a converged state is kept
+    for continuation only while it is live.
     """
-    global _continuation_state
+    state = _continuation_state
     net = build_network_from_schema(schema)
     solver = make_solver(net, schema)
     x0 = None
-    if schema.solver_settings.init_strategy == "continuation" and _continuation_state:
+    if schema.solver_settings.init_strategy == "continuation" and state:
         # Check topology fingerprint
         solver._build_x0()
-        if _continuation_state["unknown_names"] != list(solver.unknown_names):
+        if state["unknown_names"] != list(solver.unknown_names):
             raise ValueError(
                 "Topology mismatch: the current network unknowns do not match "
                 "the saved continuation state. Please run a 'Default' solve first."
@@ -143,13 +210,13 @@ def _solve_sync(schema: NetworkGraphSchema):
 
         # Safety Reset: Check if initial guesses have changed
         current_guesses = {n.id: n.data.get("initial_guess", {}) for n in schema.nodes}
-        if _continuation_state.get("initial_guesses") != current_guesses:
+        if state.get("initial_guesses") != current_guesses:
             raise ValueError(
                 "Initial guess mismatch: user overrides have changed since the last solve. "
                 "Please run a 'Default' solve to incorporate these changes."
             )
 
-        x0 = _continuation_state["x"]
+        x0 = state["x"]
 
     result = solver.solve(
         method=schema.solver_settings.method,
@@ -160,30 +227,45 @@ def _solve_sync(schema: NetworkGraphSchema):
     success = bool(result.get("__success__", False))
 
     if success:
-        _continuation_state = {
-            "x": result["__x_solution__"],
-            "unknown_names": result["__unknown_names__"],
-            "initial_guesses": {n.id: n.data.get("initial_guess", {}) for n in schema.nodes},
-        }
+        _commit_continuation(
+            {
+                "x": result["__x_solution__"],
+                "unknown_names": result["__unknown_names__"],
+                "initial_guesses": {n.id: n.data.get("initial_guess", {}) for n in schema.nodes},
+            },
+            token,
+        )
 
     node_results, element_results, edge_results = _build_result_objects(result, net)
     diag = getattr(solver, "_diagnostic_data", {})
     return result, node_results, element_results, edge_results, net, diag
 
 
+async def _run_solve(schema: NetworkGraphSchema):
+    """`_solve_sync` in a worker thread, bounded by `_hard_timeout`.
+
+    The token is given up however the wait ends, so a worker still running
+    after a 504 (or an error) cannot write the continuation state.
+    """
+    token = _open_token()
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_solve_sync, schema, token),
+            timeout=_hard_timeout(schema.solver_settings.timeout),
+        )
+    finally:
+        _close_token(token)
+
+
 @app.post("/solve", response_model=SolveResponse)
 async def solve(schema: NetworkGraphSchema):
     # Hard async-level deadline: even if a single C++ Fanno/RK4 step blocks,
     # the event loop stays alive for health checks and subsequent requests.
-    # HARD_TIMEOUT_MARGIN on top of the solver's own soft timeout.
-    soft_timeout = schema.solver_settings.timeout or 180.0
-    hard_timeout = soft_timeout + HARD_TIMEOUT_MARGIN
+    # HARD_TIMEOUT_MARGIN on top of the solver's own soft timeout; none when
+    # the solver has none (#762).
     try:
         # Offload CPU-bound C++ solver to a worker thread
-        result, node_results, element_results, edge_results, net, diag = await asyncio.wait_for(
-            asyncio.to_thread(_solve_sync, schema),
-            timeout=hard_timeout,
-        )
+        result, node_results, element_results, edge_results, net, diag = await _run_solve(schema)
 
         gui_ids = {n.id for n in schema.nodes}
         return SolveResponse(
@@ -204,9 +286,7 @@ async def solve(schema: NetworkGraphSchema):
     except TimeoutError:
         raise HTTPException(
             status_code=504,
-            detail=f"Solver exceeded the hard timeout of {hard_timeout:g} s. "
-            "Try raising the solver timeout, simplifying the network, or a "
-            "different init strategy.",
+            detail=_timeout_detail("The solver", schema.solver_settings.timeout),
         ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
@@ -267,8 +347,6 @@ async def resolve_preview_endpoint(schema: NetworkGraphSchema):
 
 @app.post("/export")
 async def export_results(schema: NetworkGraphSchema):
-    soft_timeout = schema.solver_settings.timeout or 180.0
-    hard_timeout = soft_timeout + HARD_TIMEOUT_MARGIN
     try:
         # Solve quickly to get states
         # Six values, not five. `_solve_sync` gained a `diag` return in #168
@@ -277,10 +355,7 @@ async def export_results(schema: NetworkGraphSchema):
         # (expected 5)" -- for three and a half months, because `to_dataframe`
         # is unit-tested but the route that calls it was not. Named rather
         # than discarded with `*_` so the next addition breaks loudly here too.
-        raw, node_results, element_results, edge_results, net, _diag = await asyncio.wait_for(
-            asyncio.to_thread(_solve_sync, schema),
-            timeout=hard_timeout,
-        )
+        raw, node_results, element_results, edge_results, net, _diag = await _run_solve(schema)
 
         id_to_label, id_to_kind, id_to_method = _schema_maps(schema)
         result_obj = NetworkResult(
@@ -314,7 +389,7 @@ async def export_results(schema: NetworkGraphSchema):
     except TimeoutError:
         raise HTTPException(
             status_code=504,
-            detail=f"Export solve exceeded the hard timeout of {hard_timeout:g} s.",
+            detail=_timeout_detail("The export solve", schema.solver_settings.timeout),
         ) from None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=humanize(str(e), schema)) from e
