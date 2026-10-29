@@ -28,6 +28,7 @@ Open http://127.0.0.1:8000 in your browser.
 - **Connect**: Click and drag from node handles to element ports.
 - **Solve**: Click the **Solve** button in the header. Successful solves turn node borders green.
 - **Inspect**: Click on any node or element to view real-time diagnostics in the Inspector sidebar.
+- **Examples**: The **Examples** menu in the header opens worked examples rebuilt from papers (the Florschuetz 1981 jet array, an ISO 5167-2 orifice metering run). Each opens with a short description: the source, what is reproduced, where to look, and whether the comparison is fidelity (the source's own data) or cross-source. The matching scripts, with the full comparison, are in `python/examples/papers/` of the source repository.
 
 ---
 

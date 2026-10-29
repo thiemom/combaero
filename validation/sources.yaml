@@ -1011,8 +1011,9 @@ documents:
     as fidelity (inline 3.7%/9.6% bias/RMS); staggered unvalidated against scatter.
   read_for: ['#337 jet-array correlation re-add', '#380 Fig. 6 fidelity', '#465 impingement array element',
     '#474 Eq. 8 pressure range']
-  issues: [337, 380, 465, 467, 474, 481]
-  records: [validation/cooling/extractions/han_impingement.md, validation/cooling/data/florschuetz1981/metadata.yaml]
+  issues: [337, 380, 465, 467, 474, 481, 793]
+  records: [validation/cooling/extractions/han_impingement.md, validation/cooling/data/florschuetz1981/metadata.yaml,
+    python/examples/papers/florschuetz1981_jet_array.py, gui/examples/florschuetz1981_jet_array.json]
   code: ['include/impingement_correlation.h: florschuetz_1981_inline, florschuetz_1981_staggered, FLORSCHUETZ_1981_DEFAULT_CD,
       crossflow_to_jet_ratio_at_row (Eq. 8)']
   notes: Journal version of NASA CR-3373. Local-only digitising folder sources/heat_transfer/flohrshuetz/fig6_data/
@@ -3731,3 +3732,17 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
+- citation: 'ISO 5167-2:2003. Measurement of fluid flow by means of pressure differential devices inserted in
+    circular cross-section conduits running full -- Part 2: Orifice plates. International Organization for Standardization.'
+  checked: false
+  issues:
+  - 645
+  - 649
+  - 793
+  priority: later
+  question: 'The standard itself is not held: Eq. (4) (Reader-Harris/Gallagher C with the tap and small-pipe
+    terms), Eq. (5) (expansibility) and 5.4.1 (pressure loss, long and short forms) were implemented in #649/#650
+    and are typed again in python/examples/papers/iso5167_orifice_metering.py, which scores the network against
+    them (fidelity to the equations, no measurement). Holding the text would check those transcriptions against
+    the source and add Annex A''s tables of C as a tabulated fidelity set.'
+  where: ISO (paid standard); national adoptions (BS EN ISO 5167-2, DIN EN ISO 5167-2) through a library.

@@ -47,6 +47,8 @@ _TESTED_ROUTES = {
     "/export",
     "/solver/continuation_available",
     "/health",
+    "/examples",
+    "/examples/{example_id}",
     "/{path:path}",
     "/assets",  # mounted only when the frontend is built
 }
@@ -123,6 +125,30 @@ def test_every_route_is_covered_here() -> None:
 def test_health() -> None:
     r = request(app, "GET", "/health")
     assert r.status_code == 200 and r.json() == {"status": "ok"}
+
+
+def test_examples_lists_every_shipped_example() -> None:
+    """The Examples menu (#793) reads id, title and label for each file in
+    gui/examples/."""
+    r = request(app, "GET", "/examples")
+    assert r.status_code == 200
+    listed = {e["id"]: e for e in r.json()["examples"]}
+    shipped = {p.stem for p in (_REPO / "gui" / "examples").glob("*.json")}
+    assert set(listed) == shipped and len(shipped) >= 2
+    assert all(e["title"] and e["label"] in ("fidelity", "cross-source") for e in listed.values())
+
+
+def test_an_example_is_served_as_a_network_file() -> None:
+    r = request(app, "GET", "/examples/iso5167_orifice_metering")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["nodes"] and body["edges"] and body["example"]["label"] == "fidelity"
+
+
+@pytest.mark.parametrize("bad", ["no_such_example", "..%2Fpyproject", "%2E%2E"])
+def test_only_listed_examples_are_served(bad: str) -> None:
+    """The id is looked up in the listing, never joined onto a path."""
+    assert request(app, "GET", f"/examples/{bad}").status_code == 404
 
 
 def test_root_serves_the_app_or_the_api_banner() -> None:

@@ -1,6 +1,7 @@
 import asyncio
 import io
 import itertools
+import json
 import math
 import threading
 from pathlib import Path
@@ -25,6 +26,9 @@ from .schemas import (
 from .solver_setup import make_solver
 
 _FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+# Worked examples from papers (#793): package data of combaero-gui
+# (gui/pyproject.toml), so they load from an installed wheel too.
+_EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
 app = FastAPI(title="CombAero Network GUI API")
 
@@ -406,6 +410,33 @@ async def get_continuation_available():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+def _example_files() -> dict[str, Path]:
+    """The worked examples shipped with the package (#793), by id."""
+    if not _EXAMPLES_DIR.is_dir():
+        return {}
+    return {p.stem: p for p in sorted(_EXAMPLES_DIR.glob("*.json"))}
+
+
+@app.get("/examples")
+async def list_examples():
+    """The Examples menu: id, title and validation label of each shipped example."""
+    out = []
+    for eid, path in _example_files().items():
+        info = json.loads(path.read_text(encoding="utf-8")).get("example", {})
+        out.append({"id": eid, "title": info.get("title", eid), "label": info.get("label")})
+    return {"examples": out}
+
+
+@app.get("/examples/{example_id}")
+async def get_example(example_id: str):
+    """One example as a network file, with its description under ``example``.
+    Only ids from the listing are served, never a path."""
+    path = _example_files().get(example_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail=f"No example {example_id!r}")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 if (_FRONTEND_DIST / "assets").is_dir():

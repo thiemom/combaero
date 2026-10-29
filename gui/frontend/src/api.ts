@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { ExampleListing } from "./utils/exampleInfo";
 import type { IncompressibleFlag } from "./utils/incompressible";
 import type { Ledger, SecondLawFlag } from "./utils/secondLaw";
 
@@ -112,6 +113,19 @@ export const exportResults = async (
 export const fetchMaterials = async (): Promise<string[]> => {
 	const response = await axios.get(`${API_BASE_URL}/metadata/materials`);
 	return response.data.names || [];
+};
+
+// Worked examples from papers (#793), shipped with the package.
+export const fetchExamples = async (): Promise<ExampleListing[]> => {
+	const response = await axios.get(`${API_BASE_URL}/examples`);
+	return response.data.examples || [];
+};
+
+export const fetchExample = async (id: string): Promise<any> => {
+	const response = await axios.get(
+		`${API_BASE_URL}/examples/${encodeURIComponent(id)}`,
+	);
+	return response.data;
 };
 
 export const checkContinuationAvailable = async (): Promise<boolean> => {

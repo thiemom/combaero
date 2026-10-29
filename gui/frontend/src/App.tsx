@@ -3,6 +3,8 @@ import { Download, Play, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "reactflow";
 import { isBackendReachable, solveNetwork } from "./api";
+import ExamplePanel from "./components/ExamplePanel";
+import ExamplesMenu from "./components/ExamplesMenu";
 import Inspector from "./components/Inspector";
 import NetworkCanvas from "./components/NetworkCanvas";
 import Sidebar from "./components/Sidebar";
@@ -105,7 +107,7 @@ const App = () => {
 	return (
 		<div className="flex flex-col h-screen w-screen overflow-hidden text-slate-900">
 			{/* Header */}
-			<header className="h-14 border-b bg-white flex items-center justify-between px-6 shadow-sm z-10">
+			<header className="relative h-14 border-b bg-white flex items-center justify-between px-6 shadow-sm z-10">
 				<div className="flex items-center gap-2">
 					<Zap className="text-orange-500 fill-orange-500" size={24} />
 					<h1 className="text-xl font-bold tracking-tight">
@@ -115,6 +117,7 @@ const App = () => {
 				</div>
 
 				<div className="flex items-center gap-3">
+					<ExamplesMenu />
 					<button
 						type="button"
 						onClick={exportNetworkResults}
@@ -210,6 +213,8 @@ const App = () => {
 					</button>
 				</div>
 			)}
+
+			<ExamplePanel />
 
 			{/* Main Content */}
 			<div className="flex flex-grow overflow-hidden" ref={reactFlowWrapper}>

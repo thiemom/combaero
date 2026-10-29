@@ -256,6 +256,18 @@ if echo "$JS_CT" | grep -qi "text/html"; then
 fi
 ok "JS asset content-type: $JS_CT"
 
+# ── /examples: the worked examples (#793) ship as package data ────────────────
+curl -fsS "http://localhost:$PORT/examples" | grep -q '"florschuetz1981_jet_array"' || {
+    fail "/examples does not list the shipped examples"
+    fail "Check gui/pyproject.toml package-data includes examples/*.json."
+    exit 1
+}
+curl -fsS "http://localhost:$PORT/examples/iso5167_orifice_metering" | grep -q '"nodes"' || {
+    fail "/examples/iso5167_orifice_metering did not return a network"
+    exit 1
+}
+ok "/examples → shipped examples listed and served"
+
 kill "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
 

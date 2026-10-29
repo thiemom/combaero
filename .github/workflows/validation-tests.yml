@@ -87,11 +87,13 @@ jobs:
               - 'ruff.toml'
               - '.github/workflows/validation-tests.yml'
             # The examples run against the package; they also read
-            # python/tests/data/ and import gui.backend.
+            # python/tests/data/ and import gui.backend. The worked examples
+            # from papers (#793) read digitised data under validation/.
             examples:
               - 'python/examples/**'
               - 'python/combaero/**'
               - 'python/tests/data/**'
+              - 'validation/cooling/data/florschuetz1981/**'
               - 'gui/backend/**'
               - 'scripts/run_examples.py'
               - 'src/**'

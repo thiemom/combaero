@@ -13,6 +13,7 @@ import {
 import { create } from "zustand";
 import { exportResults, isBackendReachable, resolvePreview } from "../api";
 import { discoverFields } from "../utils/diagnostics";
+import { type ExampleInfo, parseExampleInfo } from "../utils/exampleInfo";
 import { HEAT_SOURCE_HANDLE, heatSourceEdgeProps } from "../utils/heatSource";
 import type { PreviewItems } from "../utils/inheritance";
 import { migrateNodeData, migrateSolverSettings } from "../utils/legacyKeys";
@@ -105,6 +106,10 @@ export interface RFState {
 	// What a load had to change in the file, shown once above the canvas.
 	loadNotice: string | null;
 	dismissLoadNotice: () => void;
+	// A worked example's description (#793), from the file's `example` key:
+	// shown above the canvas until dismissed or another file replaces it.
+	exampleInfo: ExampleInfo | null;
+	dismissExampleInfo: () => void;
 	// When the canvas came back from the autosave (#596), for the note above
 	// the canvas. Any load or a Clear replaces that canvas, so both reset it.
 	restoredAt: string | null;
@@ -121,6 +126,7 @@ const useStore = create<RFState>((set, get) => ({
 	edges: [],
 	solveResults: null,
 	loadNotice: null,
+	exampleInfo: null,
 	restoredAt: null,
 	isExporting: false,
 	previewItems: {},
@@ -517,6 +523,7 @@ const useStore = create<RFState>((set, get) => ({
 				solverSettings: loadedSettings,
 				solveResults: null,
 				restoredAt: null,
+				exampleInfo: parseExampleInfo(data.example),
 				loadNotice:
 					dropped.length > 0
 						? `Removed ${dropped.length} thermal wall(s) on an orifice, area change, plenum or hole element (${dropped.join(", ")}): it has no surface to exchange heat. Wall a channel, loss element or chamber instead.`
@@ -533,6 +540,10 @@ const useStore = create<RFState>((set, get) => ({
 		set({ loadNotice: null });
 	},
 
+	dismissExampleInfo: () => {
+		set({ exampleInfo: null });
+	},
+
 	setRestoredAt: (when) => {
 		set({ restoredAt: when });
 	},
@@ -544,6 +555,7 @@ const useStore = create<RFState>((set, get) => ({
 			solveResults: null,
 			restoredAt: null,
 			loadNotice: null,
+			exampleInfo: null,
 		});
 	},
 
