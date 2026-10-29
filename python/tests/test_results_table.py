@@ -2,7 +2,13 @@
 (kind, entity, quantity) columns, units and solver state in attrs."""
 
 import copy
+import csv
+import inspect
+import io
 import math
+import sys
+import typing
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -17,6 +23,13 @@ from gui.backend.results import (
     varied_inputs,
 )
 from gui.backend.runner import NetworkRunner
+from gui.backend.units import input_unit
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+import gui_result_keys  # noqa: E402
+import test_gui_http_routes as http  # noqa: E402
+
+import gui.backend.schemas as schemas  # noqa: E402
 
 _SIMPLE: dict = {
     "nodes": [
@@ -113,28 +126,58 @@ def test_sweep_raising_case_keeps_its_inputs(runner: NetworkRunner) -> None:
     assert df["inputs"]["chan", "L"].iloc[0] == 1.0
 
 
+def _assert_same_table(a: pd.DataFrame, b: pd.DataFrame, rel_tol: float = 1e-12) -> None:
+    """Same rows, columns (labels), values, units and solver state."""
+    assert list(a.index) == list(b.index)
+    assert list(a.columns) == list(b.columns)
+    for col in a.columns:
+        for x, y in zip(a[col], b[col], strict=True):
+            if isinstance(x, float) and isinstance(y, float):
+                assert (math.isnan(x) and math.isnan(y)) or math.isclose(x, y, rel_tol=rel_tol), col
+            else:
+                assert x == y, (col, x, y)
+    assert a.attrs == b.attrs
+
+
 def test_export_csv_round_trip(runner: NetworkRunner, tmp_path: Path) -> None:
-    # The network passed must be the one solved: an export carries no inputs.
-    result = runner.solve()
+    # The export carries the inputs (#784): the overridden m_dot comes back
+    # from the CSV alone, as do the units, initial guesses and solver options.
+    result = runner.solve({"inlet.m_dot": 0.7})
     direct = load_results(result)
-    loaded = load_results(_export_csv(result, tmp_path / "x.csv"), network=_SIMPLE)
-    assert list(loaded.index) == [0]
-    assert set(loaded.columns) == set(direct.columns)
-    for col in direct.columns:
-        a, b = direct[col].iloc[0], loaded[col].iloc[0]
-        if isinstance(a, float):
-            assert (math.isnan(a) and math.isnan(b)) or math.isclose(a, b, rel_tol=1e-12), col
-        else:
-            assert a == b, col
-    # units come back from the export's headers
-    outputs_units = {c: u for c, u in direct.attrs["units"].items() if c[0] == "outputs"}
-    assert {c: loaded.attrs["units"][c] for c in outputs_units} == outputs_units
+    loaded = load_results(_export_csv(result, tmp_path / "x.csv"))
+    _assert_same_table(direct, loaded)
+    assert loaded["inputs"].loc[0, ("inlet", "m_dot")] == 0.7
+    assert loaded.attrs["units"][("inputs", "chan", "L")] == "m"
+    assert loaded.attrs["initial_guesses"][0] == {
+        "chan": {"m_dot": 0.9},
+        "outlet": {"Pt": 101325.0},
+    }
+    assert loaded.attrs["solver_options"][0]["method"] == "hybr"
 
 
-def test_export_csv_without_network_has_outputs_only(runner: NetworkRunner, tmp_path: Path) -> None:
-    df = load_results(_export_csv(runner.solve(), tmp_path / "x.csv"))
-    assert set(df.columns.get_level_values(0)) == {"outputs"}
-    assert ("outputs", "chan", "m_dot") in df.columns
+def test_export_route_round_trip() -> None:
+    # The GUI's own /export response reads back to the runner's table.
+    r = http._post("/export", _SIMPLE)
+    assert r.status_code == 200, r.text[:300]
+    from_route = load_results(pd.read_csv(io.StringIO(r.text), dtype={"id": str, "label": str}))
+    from_runner = load_results(NetworkRunner.from_dict(_SIMPLE).solve())
+    _assert_same_table(from_runner, from_route, rel_tol=1e-9)
+
+
+def test_export_keeps_the_774_output_columns(runner: NetworkRunner) -> None:
+    # Inputs are appended after every result column, on a new network row:
+    # the unit-labelled output headers and the entity rows are as before.
+    long = runner.solve().to_dataframe()
+    cols = list(long.columns)
+    first_input = next(i for i, c in enumerate(cols) if c.startswith("input:"))
+    assert all(c.startswith(("input:", "initial_guess:", "solver:")) for c in cols[first_input:])
+    assert "T [K]" in cols[:first_input]
+    assert list(long["type"])[-1] == "network"
+    assert set(list(long["type"])[:-1]) == {"node", "element"}
+    net = long[long["type"] == "network"].iloc[0]
+    assert net["id"] == "_network"
+    assert net["solver:method"] == "hybr"
+    assert net["input:global_regime"] in ("compressible", "incompressible")
 
 
 def test_table_csv_round_trip(sweep: pd.DataFrame, tmp_path: Path) -> None:
@@ -208,7 +251,9 @@ def test_guesses_and_solver_options_are_not_inputs(sweep: pd.DataFrame) -> None:
 def test_duplicate_labels_refused() -> None:
     net = copy.deepcopy(_SIMPLE)
     net["nodes"][2]["data"]["label"] = "chan"
-    with pytest.raises(ValueError, match=r"'n_chan' and 'outlet'"):
+    with pytest.raises(
+        ValueError, match=r"named 'chan' \(ids '(n_chan|outlet)' and '(n_chan|outlet)'"
+    ):
         NetworkRunner.from_dict(net).sweep(pd.DataFrame({"inlet.m_dot": [1.0]}))
 
 
@@ -240,3 +285,81 @@ def test_legacy_sweep_frame(runner: NetworkRunner) -> None:
     assert list(df.index) == [0, 1]
     assert list(df["inputs"]["inlet", "m_dot"]) == [0.5, 1.0]
     assert math.isclose(df["outputs"].loc[1, ("chan", "m_dot")], 1.0, rel_tol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Units of the inputs
+# ---------------------------------------------------------------------------
+
+_NETWORKS = list(gui_result_keys.networks())
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [g for _, _, g in _NETWORKS],
+    ids=[f"{kind}-{variant}" for kind, variant, _ in _NETWORKS],
+)
+def test_every_numeric_input_column_has_a_unit(graph: dict) -> None:
+    """Every input column of the export with a number in it carries its unit
+    (as test_every_export_column_has_a_unit does for the outputs). Text-valued
+    inputs stay bare. A new numeric field fails here: add it to
+    INPUT_UNIT_MAP in gui/backend/units.py."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = http._post("/export", graph)
+    assert r.status_code == 200, r.text[:300]
+    rows = list(csv.DictReader(io.StringIO(r.text)))
+    unlabelled = set()
+    for col in rows[0]:
+        if not col.startswith("input:") or col.endswith("]"):
+            continue
+        for row in rows:
+            cell = row[col]
+            if cell in ("True", "False"):
+                unlabelled.add(col)
+                continue
+            try:
+                float(cell)
+            except ValueError:
+                continue
+            unlabelled.add(col)
+    assert unlabelled == set()
+
+
+_NOT_INPUT_FIELDS = {"timeout", "incompressible_mach_limit", "initial_guess"}
+_RESULT_MODELS = {
+    "StateResult",
+    "NodeResult",
+    "ElementResult",
+    "ConvergencePoint",
+    "WorstResidual",
+    "SecondLawFlag",
+    "IncompressibleFlag",
+    "SolveResponse",
+    "NodePosition",
+}
+
+
+def test_every_numeric_schema_field_has_an_input_unit() -> None:
+    """Every numeric field a network can carry -- not only those the
+    representative networks set -- has an input unit."""
+    missing = []
+    for name, cls in inspect.getmembers(schemas, inspect.isclass):
+        if not issubclass(cls, schemas.BaseModel) or name in _RESULT_MODELS:
+            continue
+        for field, info in cls.model_fields.items():
+            args = typing.get_args(info.annotation) or (info.annotation,)
+            if field in _NOT_INPUT_FIELDS or not set(args) & {int, float, bool}:
+                continue
+            if input_unit(field) is None:
+                missing.append(f"{name}.{field}")
+    assert missing == []
+
+
+def test_input_units_of_nested_keys() -> None:
+    assert input_unit("composition.ambient_T") == "K"
+    assert input_unit("composition.custom_fractions.CH4") == "-"
+    assert input_unit("layers.0.thickness") == "m"
+    assert input_unit("surface.alpha_deg") == "deg"
+    assert input_unit("k") == "-"  # a discrete loss's slope, not a conductivity
+    assert input_unit("composition.source") is None

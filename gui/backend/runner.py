@@ -37,6 +37,7 @@ import pandas as pd
 import combaero as cb
 
 from .graph_builder import build_network_from_schema
+from .results import input_cells
 from .schemas import (
     DEFAULT_SOLVE_TIMEOUT,
     ElementResult,
@@ -361,6 +362,13 @@ class NetworkResult:
         Every row carries the solve's status (``success``, ``converged``,
         ``consistent``, ``outcome``, ``final_norm``): check ``success`` before
         trusting the numbers.
+
+        After the result columns come the case's inputs (#784, 0.8.0):
+        ``input:<key> [<unit>]`` on each entity's row, ``initial_guess:<key>``,
+        and a ``network`` row (id ``_network``) with the network-wide
+        settings and the ``solver:<key>`` options. An edge with inputs and no
+        result row gets an ``edge`` row. ``gui.backend.results.load_results``
+        reads this frame, or its CSV, into the one-row-per-case table.
         """
         species_labels: list[str] = list(cb.species.names)
         data: list[dict] = []
@@ -415,6 +423,13 @@ class NetworkResult:
                 }
             )
 
+        # The case's inputs (#784), after every result column: so an exported
+        # CSV reads back into the full results table (gui.backend.results).
+        cells, input_rows = input_cells(
+            self._schema, [r["id"] for r in data], self._solver_options, self._warm_start
+        )
+        data.extend(input_rows)
+
         df = pd.DataFrame(data)
         # The solve's own status on EVERY row, beside the label: a timed-out or
         # rejected solve exports numbers that look valid, and a filtered or
@@ -431,7 +446,9 @@ class NetworkResult:
         at = list(df.columns).index("label") + 1 if "label" in df.columns else 0
         for offset, (col, value) in enumerate(status.items()):
             df.insert(at + offset, col, [value] * len(df))
-        return df.rename(columns={col: label_with_unit(col) for col in df.columns})
+        df = df.rename(columns={col: label_with_unit(col) for col in df.columns})
+        inputs = pd.DataFrame([cells.get(rid, {}) for rid in df["id"]], index=df.index)
+        return pd.concat([df, inputs], axis=1)
 
     def swap_boundary(self, label: str, new_type: str) -> "NetworkRunner":
         """Return a new NetworkRunner with one boundary node retyped.
@@ -717,7 +734,7 @@ class NetworkRunner:
             ``"exception"``. Until 0.8.0 this returned a flat frame (metric
             columns, or ``to_dataframe()`` stacked per case).
         """
-        from .results import _build_case, _case_from, _frame
+        from .results import _build_case, _case_from, _frame, _schema_frame
 
         cases: list[Any] = []
         _prev_x: Any = None
@@ -744,10 +761,13 @@ class NetworkRunner:
                     self._apply_overrides(schema, overrides)
                 except (KeyError, ValueError):
                     schema = self._schema
-                case = _build_case(idx, None, schema)
-                case.solver_options.update(
-                    {"method": method, "init_strategy": init_strategy, "timeout": timeout}
-                )
+                options = {
+                    "method": method,
+                    "init_strategy": init_strategy,
+                    "timeout": timeout,
+                    "incompressible_mach_limit": schema.solver_settings.incompressible_mach_limit,
+                }
+                case = _build_case(idx, _schema_frame(schema, options))
                 case.values[("outputs", "_solve", "success")] = False
                 case.values[("outputs", "_solve", "outcome")] = "exception"
                 for m in metrics or []:
@@ -755,7 +775,7 @@ class NetworkRunner:
                     case.values[("outputs", entity, q)] = math.nan
                 cases.append(case)
                 continue
-            case = _case_from(result, idx, None, metrics=metrics)
+            case = _case_from(result, idx, metrics=metrics)
             case.warm_start = _prev_name if _prev_x is not None else result._warm_start
             cases.append(case)
             if result.success:

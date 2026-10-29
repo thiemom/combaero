@@ -105,3 +105,30 @@ After a solve, the backend returns a `SolveResponse`.
   - `state`: `{"P": float, "T": float, "Pt": float, "Tt": float, "Y": list[float], ...}`
 - `element_results`: Map of element IDs to results.
   - `m_dot`: Mass flow rate [kg/s]
+
+## CSV Export
+`POST /export` solves the network and returns `NetworkResult.to_dataframe()`
+as CSV (ASCII, UTF-8 without BOM). The format is one row per entity:
+
+| Columns | Rows | Content |
+|---|---|---|
+| `type`, `kind`, `is_boundary`, `combustion_method`, `id`, `label` | all | what the row is |
+| `success`, `converged`, `consistent`, `outcome`, `final_norm` | all | the solve's status |
+| `<key> [<unit>]` (`T [K]`, `m_dot [kg/s]`, `Y[N2] [-]`, ...) | result rows | results (#774) |
+| `input:<key> [<unit>]` (`input:L [m]`, `input:composition.source`) | entity rows | the case's inputs, nested fields dotted (#784) |
+| `initial_guess:<key>` | entity rows | the entity's initial guess |
+| `solver:<key>` (`solver:method`, `solver:timeout`, ...) | network row | how the case was solved |
+
+Result rows are `node`, `element` and `thermal_wall`, as before. Since 0.8.0
+the input columns follow every result column, and two row types are added:
+one `network` row (id `_network`) with the network-wide settings
+(`input:global_regime`, ambient conditions, multipliers) and the solver
+options, and an `edge` row for an edge with inputs and no result row. A flow
+edge's inputs go on its auto-linked element row. Every numeric input carries
+its unit (`INPUT_UNIT_MAP` in `gui/backend/units.py`); text inputs are bare.
+A text cell starting with `= + - @`, a tab or a carriage return gets a
+leading `'`.
+
+`gui.backend.results.load_results("combaero_results.csv")` reads the file back
+into the one-row-per-case results table, inputs included; see
+[API_PYTHON.md](API_PYTHON.md#results-table-one-row-per-case).
