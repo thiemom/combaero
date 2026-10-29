@@ -220,6 +220,9 @@ double k_tbc_ysz(double T, double hours, bool is_ebpvd) {
     //   tau = tau0 exp(Q_tau / R T)  [s],
     // their Eq. 1 (p. 7) for the overall conductivity under a 64 W/cm^2
     // gradient at surface temperature T: an effective through-thickness value.
+    // Fidelity on their Fig. 4 at 32 h: on the 1320 C curve, +2% at 1100 C
+    // and +3% at 990 C (the printed A, Q give too weak a T dependence; the
+    // paper's own curves are not least-squares fits either). Kept as printed.
     if (!(hours > 0.0)) {
         return YSZ_APS_K0;
     }

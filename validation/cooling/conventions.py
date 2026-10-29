@@ -95,6 +95,7 @@ CONVENTION_NOTES: dict[str, str] = {
     ),
     "h_hole_internal_area": "h referenced to the hole internal surface, pi D L",
     "h_plate_approach_area": "h referenced to the plate area, X^2 - pi D^2/4",
+    "h_target_plate_area": "h referenced to the impingement target plate's plan area",
 }
 
 # ---------------------------------------------------------------------------
@@ -131,6 +132,11 @@ SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     # The pair that cost -60% when confused. Same lab, same figure number.
     ("andrews1986", "h_hole_length"): "h_hole_internal_area",
     ("andrews1988", "h_internal"): "h_plate_approach_area",
+    # Same Leeds rig and area as andrews1988, but the WHOLE impingement/
+    # effusion wall: its own y_axis so the effusion-internal runner, which
+    # claims h_internal, cannot score it as an effusion plate alone.
+    ("aldabagh1990", "h_imp_eff_wall"): "h_plate_approach_area",
+    ("aldabagh1990", "h_impingement_target"): "h_target_plate_area",
     # NASA CR-4396 Vol. II, Figs. 6.1/6.2 (#452): Kays and Perkins, not DB.
     ("johnson1993", "Nu_ratio_KP"): "Nu_ratio_ribbed_KP",
 }

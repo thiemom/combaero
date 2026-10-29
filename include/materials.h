@@ -116,9 +116,12 @@ double k_aluminum_6061(double T);
 //   k = k0 + (k_inf - k0) A exp(-Q/RT) [1 - exp(-t/tau)],
 //   tau = tau0 exp(Q_tau/RT), t in seconds,
 // A = 102.2, Q = 68228 J/mol, tau0 = 572.5 s, Q_tau = 41710 J/mol. k_inf =
-// 1.74 W/m K is inferred: with Eq. 1's own prefactor it reproduces the three
-// plateaus of their Fig. 4 (1.44 / 1.17 / 1.09 W/m K at 1320 / 1100 / 990 C
-// surface; read off the figure, unconfirmed). The fit is the overall
+// 1.74 W/m K is inferred from the 1320 C plateau of their Fig. 4 (1.44 W/m K).
+// Fidelity on Fig. 4 at 32 h (overlay, user-checked 2026-10-29): on the
+// 1320 C curve, 2% high at 1100 C (1.19 vs 1.17) and 3% high at 990 C (1.11
+// vs 1.08). The printed A and Q give too weak a temperature dependence for
+// one k_inf to fit all three, and the paper's own curves are not
+// least-squares fits of its data either; Eq. 1 is kept as printed. The fit is the overall
 // conductivity of a 254 um coating under a 64 W/cm^2 gradient: an effective
 // through-thickness value, best for coatings of that order. A user with a
 // characterised coating supplies its own conductivity.

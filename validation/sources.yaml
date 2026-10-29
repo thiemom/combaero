@@ -2993,7 +2993,7 @@ documents:
     +-5%) PLOTTED log-log: Fig. 11 (config 1 at Z/D 0.5-5 and config 3, with Chance, Kercher-Tabakoff,
     Florschuetz and Hollworth-Dagan lines), Fig. 14 (configs 1-3), Fig. 15 (N 4306 vs 26910), Fig. 16 (configs
     3 vs 5). Jet-plate recirculation h (Fig. 12, T_z Figs. 9-10) and 2-D FLUENT gap flow (Figs. 6-8).'
-  status: screened
+  status: extracted
   verdict: 'Screened 2026-10-28 for the #468 wanted question (does the jet-to-vent ratio reconcile Cho & Rhee
     0.56 with Hollworth & Dagan 0.80?). It is the only local study that changes the jets-per-vent count at
     fixed area ratio, but it does NOT print an exponent: Fig. 16 holds both curves. By eye (unscored, not
@@ -3004,11 +3004,15 @@ documents:
     the plate approach area, same Leeds group as 88-GT-290: accuracy (cross-source to Hollworth/Cho) only,
     never a coolant-side fidelity set, and it cannot separate jet from vent heat transfer. Plugs a gap: a
     second Leeds geometry set (5 configurations, Table 1) beside 88-GT-290 for EffusionPlateElement-style
-    impingement/effusion h, if digitised.'
+    impingement/effusion h, if digitised. DIGITISED 2026-10-28, user-confirmed on a scan overlay 2026-10-29
+    (validation/cooling/data/aldabagh1990): Fig. 14 config 3 (1:1, 10 points) n = 0.73, Fig. 16 config 5 (1:4,
+    12 points) n = 0.58, impingement only n = 0.87. Going from 1:1 to H&D''s 1:4 LOWERS the exponent, so the
+    jet-to-vent ratio does not explain H&D''s 0.80; 1:4 sits near Cho & Rhee. Unscored until #468 picks an
+    exponent.'
   read_for: ['#468 Re exponent against the jet-to-vent ratio (wanted question)', '#468 impingement/effusion
       overall h, accuracy']
   issues: [468]
-  records: []
+  records: [validation/cooling/data/aldabagh1990/metadata.yaml]
   notes: 'Arrived 2026-10-28 as docs/new/467_1_AlDabagh_1990.pdf (moved here from the wanted list). Scan with
     an OCR layer; equations and figure labels read off the page images. Fig. 11-16 are log-log scans of fair
     quality, digitisable.'
@@ -3027,7 +3031,7 @@ documents:
     Measured header static pressures and the header-to-header differential along x/L PLOTTED, normalised (Figs.
     6-9, cases A-D, reverse and parallel; Figs. 10-11 last 80% of the header), model coefficients per figure in
     Table 4.'
-  status: screened
+  status: extracted
   verdict: 'Screened 2026-10-28 for the #779/#812/#813 wanted question (a pressure-DRIVEN joining split
     against measured data). PARTLY settles it: the combining header here is fed by 10-20 laterals whose flows
     are set by the header-to-header differential through a known resistance H, and the resulting header
@@ -3040,11 +3044,14 @@ documents:
     closures add up to theta2 = 2.60 / theta1 = 1.05, which is accuracy (cross-source), not fidelity of any
     tee model. Fidelity caveat: the authors tuned the entrance (theta1 1.30 -> 1.05 over the first 20%, dbeta/dx
     = -0.3) to their data; Figs. 10-11 drop that region and are the clean comparison. Plots digitisable (clean
-    line art, three series per panel).'
+    line art, three series per panel). DIGITISED Figs. 10-11 2026-10-28, user-confirmed on a scan overlay
+    2026-10-29 (validation/junction/data/bajura1976): Fig. 10''s y label ".8" is a misprint for 0.9, and with it
+    the differential equals dividing - combining within 0.014; in Fig. 11 the differential falls up to 0.18
+    below dividing - combining beyond x/L 0.6 -- read correctly, the printed values do not add up, unexplained.'
   read_for: ['#779/#812/#813 pressure-driven joining split against measured data (wanted question)', manifold
       flow distribution as a multi-tee network case]
   issues: [779, 812, 813]
-  records: []
+  records: [validation/junction/data/bajura1976/README.md]
   notes: Arrived 2026-10-28 as docs/new/654_1_Bajura_1976.pdf (moved here from the wanted list). Scan with an
     OCR layer (garbled in the equations); read from the page images.
 - file: docs/heat_transfer/turbulence/VanFossen_Ching_1994_NASA_TM-106503_stagnation_length_scale.pdf
@@ -3193,8 +3200,11 @@ documents:
     ZrO2-Y2O3 about 2.5 W/m K (p. 6).'
   status: implemented
   verdict: 'The plasma-sprayed YSZ model of k_tbc_ysz (#761): k0 = 1.0 flat in T (p. 6), sintering = Eq. 1
-    exactly. Eq. 1 does not give k_inf; 1.74 W/m K is inferred so that Eq. 1''s own prefactor reproduces the
-    Fig. 4 plateaus (1.44/1.17/1.09 at 1320/1100/990 C, read off the figure, unconfirmed). Replaces an uncited
+    exactly. Eq. 1 does not give k_inf; 1.74 W/m K is inferred from the 1320 C plateau of Fig. 4 (1.44).
+    FIDELITY on the paper''s own Fig. 4 at 32 h (scan overlay, user-checked 2026-10-29): on the 1320 C curve,
+    +2% at 1100 C (1.19 vs 1.17) and +3% at 990 C (1.11 vs 1.08). The printed A and Q give too weak a
+    temperature dependence for one k_inf to fit all three, and the paper''s own fitted curves are not
+    least-squares fits of its data either; the user chose to keep Eq. 1 as printed and document the miss. Replaces an uncited
     model ("NASA TM-2010-216765", not found) that was nearly inert (+3.8% after 1000 h at 1589 K vs ~+40%
     here within hours) and rose as sprayed 0.81 -> 1.39 with T. Caveat: the measured k is the overall value of a
     254 um coating under a 64 W/cm2 gradient, an effective through-thickness property. Gives no EB-PVD
