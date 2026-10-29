@@ -56,6 +56,8 @@ gui = [
     "frontend/dist/*",
     "frontend/dist/assets/*",
     "frontend/dist/**/*",
+    # Worked examples from papers (#793), served by /examples.
+    "examples/*.json",
 ]
 
 [tool.setuptools_scm]

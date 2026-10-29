@@ -84,8 +84,10 @@ def main() -> None:
         print(f"Error: {examples_dir} not found.")
         sys.exit(1)
 
-    # Discover all .py files, excluding utilities
+    # Discover all .py files, excluding utilities, plus the worked examples
+    # from papers (#793) in papers/.
     example_files = sorted([f for f in examples_dir.glob("*.py") if f.name != "plot_utils.py"])
+    example_files += sorted((examples_dir / "papers").glob("*.py"))
 
     print(f"Found {len(example_files)} examples in {examples_dir}")
     print("-" * 60)

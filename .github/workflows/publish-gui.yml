@@ -162,6 +162,10 @@ jobs:
             echo "JS content-type: $JS_CT"
             echo "$JS_CT" | grep -qi "text/html" && { echo "FAIL: JS asset served as HTML — MIME bug present!"; kill $SERVER_PID; exit 1; }
           fi
+          # the worked examples (#793) are package data: the Examples menu
+          # must list them from the installed wheel, not a checkout
+          curl -fsS http://localhost:8000/examples | grep -q '"florschuetz1981_jet_array"' || { echo "FAIL: /examples does not list the shipped examples (package data missing?)"; kill $SERVER_PID; exit 1; }
+          curl -fsS http://localhost:8000/examples/iso5167_orifice_metering | grep -q '"nodes"' || { echo "FAIL: /examples/<id> did not return a network"; kill $SERVER_PID; exit 1; }
           kill $SERVER_PID
           echo "All smoke tests passed"
 

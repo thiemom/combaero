@@ -1,0 +1,130 @@
+{
+  "version": "1.1",
+  "example": {
+    "title": "ISO 5167-2 orifice metering run",
+    "source": "ISO 5167-2:2003, Measurement of fluid flow by means of pressure differential devices -- Part 2: Orifice plates. Eq. (4) (Reader-Harris/Gallagher C), the flow equation, and 5.4.1 (pressure loss).",
+    "reproduced": "A metering run: air at 300 K in a 100 mm pipe, a square-edged plate of beta = 0.5 with flange taps, and a pipe downstream, between 2 bar and 1.95 bar. The plate drives from the approach pipe's static pressure with the velocity-of-approach factor E, and between pipes it charges only the permanent loss of 5.4.1 to the system.",
+    "where_to_look": "Solve, then select the orifice plate. dP_tap is the flange-tap differential a meter would read (about 6.5 kPa); dP_permanent is what the plate costs the system (about 4.8 kPa, 73% of it, as 5.4.1 gives at beta 0.5). Cd is the Reader-Harris/Gallagher C at D and D/2 taps, beta and E the velocity-of-approach terms.",
+    "label": "fidelity",
+    "label_note": "Checked against the standard's own equations, not against measurements: C to 3e-6, the permanent loss to 1e-4. Reading dP_tap back through ISO's flow equation returns the solved flow to 0.9% (exactly when the network runs incompressible): the compressible orifice kernel against ISO's empirical expansibility.",
+    "script": "python/examples/papers/iso5167_orifice_metering.py"
+  },
+  "nodes": [
+    {
+      "id": "supply",
+      "type": "pressure_boundary",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "id": "supply",
+        "label": "Supply",
+        "Pt": 200000,
+        "Tt": 300,
+        "composition": { "source": "dry_air", "mode": "mole", "relative_humidity": 0 }
+      }
+    },
+    {
+      "id": "pipe_up",
+      "type": "channel",
+      "position": { "x": 200, "y": 0 },
+      "data": {
+        "id": "pipe_up",
+        "label": "Upstream pipe, 20 D",
+        "L": 2.0,
+        "D": 0.1,
+        "roughness": 1e-5,
+        "Nu_multiplier": 1,
+        "f_multiplier": 1
+      }
+    },
+    {
+      "id": "plate",
+      "type": "orifice",
+      "position": { "x": 400, "y": 0 },
+      "data": {
+        "id": "plate",
+        "label": "Orifice plate, beta 0.5",
+        "diameter": 0.05,
+        "Cd": 0.6,
+        "correlation": "ReaderHarrisGallagher",
+        "tap": "Flange"
+      }
+    },
+    {
+      "id": "pipe_down",
+      "type": "channel",
+      "position": { "x": 600, "y": 0 },
+      "data": {
+        "id": "pipe_down",
+        "label": "Downstream pipe, 10 D",
+        "L": 1.0,
+        "D": 0.1,
+        "roughness": 1e-5,
+        "Nu_multiplier": 1,
+        "f_multiplier": 1
+      }
+    },
+    {
+      "id": "sink",
+      "type": "pressure_boundary",
+      "position": { "x": 800, "y": 0 },
+      "data": {
+        "id": "sink",
+        "label": "Sink",
+        "Pt": 195000,
+        "Tt": 300,
+        "composition": { "source": "dry_air", "mode": "mole", "relative_humidity": 0 }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_supply_pipe",
+      "source": "supply",
+      "sourceHandle": "flow-source",
+      "target": "pipe_up",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_pipe_plate",
+      "source": "pipe_up",
+      "sourceHandle": "flow-source",
+      "target": "plate",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_plate_pipe",
+      "source": "plate",
+      "sourceHandle": "flow-source",
+      "target": "pipe_down",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_pipe_sink",
+      "source": "pipe_down",
+      "sourceHandle": "flow-source",
+      "target": "sink",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    }
+  ],
+  "solverSettings": {
+    "global_regime": "compressible",
+    "init_strategy": "default",
+    "method": "hybr",
+    "timeout": 30,
+    "shaft_speed_rpm": null,
+    "Nu_multiplier": null,
+    "f_multiplier": null,
+    "incompressible_mach_limit": null,
+    "ambient_T": null,
+    "ambient_P": null,
+    "ambient_RH": null
+  }
+}

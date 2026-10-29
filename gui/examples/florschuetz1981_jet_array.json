@@ -1,0 +1,93 @@
+{
+  "version": "1.1",
+  "example": {
+    "title": "Florschuetz 1981 jet array",
+    "source": "Florschuetz, L. W., Truman, C. R., Metzger, D. E. (1981). Streamwise flow and heat transfer distributions for jet array impingement with crossflow. ASME J. Heat Transfer 103, 337-342.",
+    "reproduced": "The paper's rig: a jet plate fed from one plenum, ten spanwise rows of 0.1 in holes, the spent air leaving in one direction down the gap. Geometry B(5,4)I at z/d = 2 (xn/d 5, yn/d 4). The network solves the jet flow split; each row reads its own crossflow-to-jet ratio Gc/Gj from it and its Nu from the paper's correlation.",
+    "where_to_look": "Solve, then select the impingement array. Its Per Row table shows Gc/Gj building up from 0 at row 1 to about 0.65 at row 10 (the paper's Eq. 8 gives the same to 1%) and Nu falling from row 1 as the crossflow grows. Fig. 6 of the paper plots the measured Nu/Nu1 against that Gc/Gj: 2% mean error at this geometry.",
+    "label": "fidelity",
+    "label_note": "Compared with the authors' own measured data (Fig. 6, digitised), so a miss is the implementation's to explain. All nine Fig. 6 panels: +4.0% bias, 6.9% mean error over 242 points.",
+    "script": "python/examples/papers/florschuetz1981_jet_array.py"
+  },
+  "nodes": [
+    {
+      "id": "supply",
+      "type": "pressure_boundary",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "id": "supply",
+        "label": "Supply plenum",
+        "Pt": 106000,
+        "Tt": 300,
+        "composition": { "source": "dry_air", "mode": "mole", "relative_humidity": 0 }
+      }
+    },
+    {
+      "id": "array",
+      "type": "impingement_array",
+      "position": { "x": 260, "y": 0 },
+      "data": {
+        "id": "array",
+        "label": "B(5,4)I, z/d 2",
+        "n_rows": 10,
+        "d_jet": 0.00254,
+        "xn_d": 5,
+        "yn_d": 4,
+        "z_d": 2,
+        "span": 0.12192,
+        "plate_thickness": 0.00254,
+        "pattern": "inline",
+        "correlation": "fixed",
+        "Cd": 0.79,
+        "cd_crossflow": "rogers_hersh_1976",
+        "Nu_multiplier": 1,
+        "roughness": 0
+      }
+    },
+    {
+      "id": "exit",
+      "type": "pressure_boundary",
+      "position": { "x": 560, "y": 0 },
+      "data": {
+        "id": "exit",
+        "label": "Gap exit",
+        "Pt": 100000,
+        "Tt": 300,
+        "composition": { "source": "dry_air", "mode": "mole", "relative_humidity": 0 }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_supply_array",
+      "source": "supply",
+      "sourceHandle": "flow-source",
+      "target": "array",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_array_exit",
+      "source": "array",
+      "sourceHandle": "flow-source",
+      "target": "exit",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    }
+  ],
+  "solverSettings": {
+    "global_regime": "compressible",
+    "init_strategy": "default",
+    "method": "hybr",
+    "timeout": 30,
+    "shaft_speed_rpm": null,
+    "Nu_multiplier": null,
+    "f_multiplier": null,
+    "incompressible_mach_limit": null,
+    "ambient_T": null,
+    "ambient_P": null,
+    "ambient_RH": null
+  }
+}

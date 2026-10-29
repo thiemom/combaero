@@ -1,1 +1,2 @@
 recursive-include frontend/dist *
+recursive-include examples *.json
