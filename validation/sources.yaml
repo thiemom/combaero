@@ -3472,6 +3472,92 @@ documents:
   notes: Supplied by the user 2026-10-29. 3470 pages; the 6061 data sheet is in "Properties of Wrought Aluminum and
     Aluminum Alloys".
 
+- file: sources/combustor_network/gouws_2007_MEng_UP_T56_network_solver_cfd.pdf
+  citation: Gouws, J. J. (2007). Combining a one-dimensional empirical and network solver with computational
+    fluid dynamics to investigate possible modifications to a commercial gas turbine combustor. M.Eng.
+    dissertation, University of Pretoria.
+  topic: [combustion, orifice]
+  content: 'T56 can combustor: 1-D empirical code (App. D, MATLAB, every hole set defined), compressible network
+    solver, CFD. Table 2.1 measured isothermal flow split over 16 liner features (Van Niekerk & Morris 2001,
+    atmospheric) with the author''s predicted split and assumed Cd; Table 3.1 the network prediction (dP 2.24%);
+    Tables 3.2/3.3 Cd CALIBRATED to the measurement (dP 5.10%). App. D: 22 hole sets with type (plain, splash,
+    wiggle strip, swirler), count, diameter or slot width, axial position, slot heights, calibrated Cd.'
+  status: screened
+  verdict: 'The system-level combustor-liner example #793 and #813 asked for: a measured flow split over 16
+    features with the full hole geometry. Score combaero''s own Cd closures (incl. Adkins & Gueroui for the high
+    bleed-ratio holes) against the MEASURED split; the calibrated Cd (Table 3.3) were tuned to that same
+    measurement, so using them would be circular (fidelity on fitted data). Cooling devices (wiggle strips,
+    splash rings) carry >50% of the air and have no combaero closure; their Cd is the open part.'
+  read_for: ['#793 system-level liner example', '#813 measured liner flow split']
+  issues: [793, 813]
+  records: []
+  notes: Supplied by the user 2026-10-29 (moved here from the wanted list).
+- file: sources/combustor_network/meyers_et_al_2012_PIMechE_A_226_892_can_combustor_piv.pdf
+  citation: Meyers, B. C., Snedden, G. C., Meyer, J. P., Roos, T. H., Mahmood, G. I. (2012). Three-component
+    particle image velocimetry in a generic can-type gas turbine combustor. Proc. IMechE Part A, J. Power and
+    Energy 226(7), 892-906. doi:10.1177/0957650912454780
+  topic: [combustion, orifice]
+  content: 'CSIR optically accessible can combustor, non-reacting: 10-vane swirler, primary 6 x 9.5 mm, secondary
+    8 x 5 mm, dilution 10 x 11.8 mm holes, cooling rings 30 and 50 x 1.2 mm, casing 121.2 mm. Table 1: 0.056 kg/s,
+    86.3 kPa, 309.5 K, liner pressure loss 1555 Pa (1.76%), PLF 123.7, Re 3.17e4. Stereo PIV planes; quotes
+    primary 22.5% and secondary 8.8% of the flow from its ref. 2.'
+  status: screened
+  verdict: 'A cross-source accuracy case for a cold-flow liner network (#793): printed hole geometry, mass flow
+    and MEASURED overall liner pressure loss, plus two zone flow fractions from ref. 2 (not held). Swirler
+    geometry needs checking before it can be built. The PIV fields themselves are 3-D detail outside a 1-D
+    network.'
+  read_for: ['#793 cold-flow liner network example']
+  issues: [793]
+  records: []
+  notes: Supplied by the user 2026-10-29.
+- file: sources/orifices/adkins_gueroui_1986_JEGTP_108_491_liner_hole_cd.pdf
+  citation: Adkins, R. C., Gueroui, D. (1986). An improved method for accurate prediction of mass flows
+    through combustor liner holes. ASME J. Eng. Gas Turbines Power 108(3), 491-497 (86-GT-149).
+  topic: [orifice]
+  content: 'Liner-hole Cd theory: contraction coefficient from the pressure-difference ratio phi (Eq. 8),
+    corrections for liner curvature, Reynolds number and casing interference (Figs. 4-8), jet angle; an
+    empirical correlation fitted to the authors'' plenum rig (Eqs. 23-25, Figs. 12-13), quoted within 1% of
+    their data.'
+  status: screened
+  verdict: 'The closure for plain liner holes at high bleed ratio (hole flow / annulus flow) that #807 lacks;
+    McGreehan-Schotsch covers long holes at modest crossflow. First use: the Gouws 2007 T56 liner example.'
+  read_for: ['#807 liner-hole Cd vs bleed ratio']
+  issues: [807]
+  records: []
+  notes: Supplied by the user 2026-10-29 (moved here from the wanted list).
+- file: sources/heat_transfer/turbulence/roach_1987_IJHFF_8_82_grid_turbulence.pdf
+  citation: Roach, P. E. (1987). The generation of nearly isotropic turbulence by means of grids. Int. J. Heat
+    Fluid Flow 8(2), 82-92.
+  topic: [film]
+  content: Design rules for turbulence grids and perforated plates; decay of turbulence intensity and length
+    scale against x/b and solidity (Tu = C (x/d)^(-5/7) form).
+  status: unscreened
+  verdict: 'The primary behind Lang 2023''s reprint (held), for the #763 Tu-from-geometry closure of the slot
+    film (D-7958 blockage plates, measured Tu 7/14/23/35%). Not yet read in detail.'
+  read_for: ['#763 Tu closure']
+  issues: [763]
+  records: []
+  notes: Supplied by the user 2026-10-29 (moved here from the wanted list).
+- file: sources/orifices/iso_5167-2_2003_orifice_plates.pdf
+  citation: 'ISO 5167-2:2003. Measurement of fluid flow by means of pressure differential devices inserted in
+    circular cross-section conduits running full -- Part 2: Orifice plates. International Organization for
+    Standardization.'
+  topic: [orifice]
+  content: 'Plate geometry, tappings (5.2), limits of use (5.3.1), Reader-Harris/Gallagher C Eq. (4) (5.3.2.1),
+    expansibility Eq. (5) (5.3.2.2, p2/p1 >= 0.75), uncertainties, pressure loss Eq. (7) and 1 - beta^1.9
+    (5.4), installation; Annex A Tables A.1-A.11 of C and A.12 of epsilon.'
+  status: implemented
+  verdict: 'Checked 2026-10-29: metering_cd_and_dRe(ReaderHarrisGallagher) reproduces every Annex A Table
+    A.1-A.11 entry (corner, D-D/2, flange taps, D 50-1000 mm, about 4800 points) to the table''s rounding;
+    permanent_loss_ratio_and_dC is Eq. (7). The compressible kernel does NOT use Eq. (5): it applies the
+    isentropic nozzle expansion, -0.9% at p2/p1 0.97 and -7 to -9% at 0.80 (#854).'
+  read_for: ['#645/#649 metering orifice', '#793 ISO worked example', '#854 expansibility']
+  issues: [645, 649, 793, 854]
+  records: [python/tests/test_orifice_metering_taps.py, python/tests/test_orifice_permanent_loss.py]
+  code: [src/orifice.cpp, include/orifice.h]
+  notes: Supplied by the user 2026-10-29 (moved here from the wanted list). The 2022 edition was only available
+    as the free preview (stops in 5.2) and was not kept.
+
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
 # `citation` here is as recalled unless `checked` is true; confirm it from
@@ -3487,28 +3573,6 @@ wanted:
   question: 'k_tbc_ysz(is_ebpvd=True) is an uncited legacy fit (1.5 + 0.0002 T_C, as deposited, no sintering);
     Zhu & Miller 2000 (held) gives no EB-PVD conductivity. A public source would let it be cited and aged.'
   where: NASA NTRS (Zhu/Miller laser-rig series), or a journal paper.
-- citation: 'Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I., Nazari, A., Wu, J. (1990).
-    Impingement/effusion cooling: the influence of the number of impingement holes and pressure loss on the
-    heat-transfer coefficient. J. Turbomachinery 112(3), 467-476.'
-  checked: false
-  issues:
-  - 468
-  priority: later
-  question: The impingement Re exponent against the jet-to-vent ratio -- the one variable that could reconcile
-    Cho & Rhee's 0.56 with Hollworth & Dagan's 0.80 (88-GT-290 gives 0.72).
-  where: ASME journal; AGARD CP-527 paper 30 is an alternative.
-- citation: Roach, P. E. (1987). The generation of nearly isotropic turbulence by means of grids. Int. J. Heat
-    Fluid Flow 8(2), 82-92.
-  checked: false
-  issues:
-  - 763
-  priority: now
-  question: Turbulence decay behind grids and perforated plates vs solidity and x/b -- the link a Tu-from-loss
-    closure needs to be tested on D-7958's blockage plates (measured Tu 7/14/23/35%) without guessing the k
-    ~ c K q constant.
-  where: 'Elsevier journal. Lang 2023 (held, sources/heat_transfer/turbulence/) reprints Roach''s Tu = 1.13 (x/d)^(-5/7)
-    and scores it on a measured grid; Van Fossen & Ching 1994 (held) fits the Roach length-scale form on
-    one-solidity grids.'
 - citation: Laws, E. M., Livesey, J. L. (1978). Flow through screens. Annu. Rev. Fluid Mech. 10, 247-266.
   checked: false
   issues:
@@ -3613,7 +3677,7 @@ wanted:
     where Marek-Tacina stops at 1.87) and the film-side Nusselt numbers (Eqs. 8.41/8.43) that combaero''s film
     path lacks -- with the data they were fitted to. Companion: Ballal and Lefebvre (1973) J. Heat Transfer 95,
     265-266 (near-slot region).'
-  where: ASME Digital Collection.
+  where: Not found by the user (2026-10-29); the book reprint (Lefebvre & Ballal Ch. 8, held) is implemented meanwhile. ASME Digital Collection.
 - citation: Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
     AFWAL-TR-84-2104.
   checked: false
@@ -3646,19 +3710,6 @@ wanted:
     any sample cases); a further code-to-code check of one compressible passage with friction, area change
     and heat transfer.
   where: NTRS (NASA Technical Paper).
-- citation: Gouws, J. J. (2007). Combining a one-dimensional empirical and network solver with computational
-    fluid dynamics to investigate possible modifications to a commercial gas turbine combustor. M.Eng. thesis,
-    University of Pretoria.
-  checked: false
-  issues:
-  - 793
-  - 813
-  priority: now
-  question: 'The T56 liner hole and cooling-device geometry behind Gouws et al. 2006 (sources/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf),
-    whose Table 2 holds a MEASURED isothermal flow split over 16 features. With the areas this becomes
-    the system-level combustor liner example #793 asks for, scored against measurement.'
-  where: University of Pretoria repository (UPSpace), open access likely; Van Niekerk & Morris 2005 (ISABE)
-    holds the measurement.
 - citation: Jin, H., Riddle, A., Cooke, L. (2008). A compressible flow network analysis for design upgrade
     of industrial aero derivative HP turbine blades. ASME GT2008-50431.
   checked: false
@@ -3668,17 +3719,6 @@ wanted:
   question: A blade cooling network with bench flow-test data (pressure ratio up to 1.5, inlet metering
     plate); a measured network example if the geometry is printed.
   where: ASME Turbo Expo 2008 proceedings.
-- citation: Adkins, R. C., Gueroui, D. (1986). An improved method for accurate prediction of mass flows
-    through combustor liner holes. ASME 86-GT-149.
-  checked: false
-  issues:
-  - 807
-  priority: later
-  question: Liner-hole Cd against bleed ratio (hole flow / annulus flow) for plain and plunged holes, the
-    Kaddah 1964 / Freeman 1965 / Norster regime. combaero's discharge-hole Cd with crossflow is McGreehan-Schotsch
-    (long holes, modest crossflow); a combustor liner network with high bleed ratios has no closure.
-  where: ASME Gas Turbine Conference 1986. Lefebvre & Ballal (screened) reprints Kaddah (Eq. 4.15, Fig. 4.2 points)
-    and Freeman (Eq. 4.16); NACA TN 3663 (held) measures Cd against bleed for thin-wall holes (#807).
 - citation: Lefebvre, A. H. (1984). Flame radiation in gas turbine combustion chambers. Int. J. Heat Mass
     Transfer 27(9), 1493-1510.
   checked: false
@@ -3732,17 +3772,54 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
-- citation: 'ISO 5167-2:2003. Measurement of fluid flow by means of pressure differential devices inserted in
-    circular cross-section conduits running full -- Part 2: Orifice plates. International Organization for Standardization.'
+- citation: Ballal, D. R., Lefebvre, A. H. (1973). Film-cooling effectiveness in the near-slot region. ASME
+    J. Heat Transfer 95(2), 265-266. doi:10.1115/1.3450039
+  checked: true
+  issues:
+  - 714
+  - 763
+  priority: now
+  question: 'The near-slot (potential-core) region of thick-lip slot films, where the Ballal-Lefebvre 1972
+    correlation (reprinted in Lefebvre & Ballal Ch. 8, held) is weakest; liner cooling rings are short, so much
+    of each segment is near-slot. The 1972 primary could not be found (2026-10-29); the thick-lip film and
+    film-side Nu are implemented from the book (a reprint, checked only against its worked example).'
+  where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled).
+- citation: Reader-Harris, M. J., Sattary, J. A. (1996). The orifice plate discharge coefficient equation --
+    the equation for ISO 5167-1. Proc. 14th North Sea Flow Measurement Workshop. (citation as recalled)
   checked: false
   issues:
-  - 645
+  - 854
+  priority: now
+  question: The primary of the Reader-Harris/Gallagher discharge coefficient (ISO 5167-2 Eq. 4), with the
+    database it was fitted to. combaero's RHG reproduces Annex A of ISO 5167-2:2003 (held) to rounding, so this
+    adds the data behind the equation, not a check of the code.
+  where: North Sea Flow Measurement Workshop archive (NFOGM), usually free.
+- citation: Reader-Harris, M. J. (1998). The equation for the expansibility factor for orifice plates. Proc.
+    FLOMEKO 98, Lund. (citation as recalled)
+  checked: false
+  issues:
+  - 854
+  priority: now
+  question: 'The primary of ISO 5167-2 Eq. (5), the orifice expansibility, and its data (air, steam, natural
+    gas). #854 found the compressible kernel applies the isentropic NOZZLE expansion to sharp plates: -0.9% at
+    p2/p1 0.97, -7 to -9% at 0.80 against Eq. (5). The data decide the scope of a fix and whether Eq. (5) can be
+    stretched below p2/p1 = 0.75.'
+  where: FLOMEKO / IMEKO proceedings, often free.
+- citation: Urner, G. (1997). Pressure loss of orifice plates according to ISO 5167. Flow Meas. Instrum. 8(1),
+    39-41. (citation as recalled)
+  checked: false
+  issues:
   - 649
-  - 793
   priority: later
-  question: 'The standard itself is not held: Eq. (4) (Reader-Harris/Gallagher C with the tap and small-pipe
-    terms), Eq. (5) (expansibility) and 5.4.1 (pressure loss, long and short forms) were implemented in #649/#650
-    and are typed again in python/examples/papers/iso5167_orifice_metering.py, which scores the network against
-    them (fidelity to the equations, no measurement). Holding the text would check those transcriptions against
-    the source and add Annex A''s tables of C as a tabulated fidelity set.'
-  where: ISO (paid standard); national adoptions (BS EN ISO 5167-2, DIN EN ISO 5167-2) through a library.
+  question: The primary of ISO 5167-2 5.4 Eq. (7), the permanent pressure loss (implemented as
+    permanent_loss_ratio_and_dC, matching the held standard's equation).
+  where: Elsevier journal (short note, paywalled).
+- citation: Reader-Harris, M. J. (2015). Orifice Plates and Venturi Tubes. Springer (Experimental Fluid
+    Mechanics). (citation as recalled)
+  checked: false
+  issues:
+  - 854
+  priority: later
+  question: All three ISO 5167-2 closures (C, expansibility, pressure loss) with derivations and the data behind
+    them in one source; an alternative to the three papers above.
+  where: Springer book; often through library access.
