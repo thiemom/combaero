@@ -66,7 +66,13 @@ def _mixing_pair() -> FlowNetwork:
         )
         g.add_element(
             OrificeElement(
-                f"{side}_o", f"{side}_p", f"{side}_out", Cd=0.8, diameter=0.011, correlation="fixed"
+                f"{side}_o",
+                f"{side}_p",
+                f"{side}_out",
+                Cd=0.8,
+                diameter=0.011,
+                correlation="fixed",
+                in_pipe=False,
             )
         )
         g.add_element(

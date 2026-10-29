@@ -333,7 +333,9 @@ def _orifice_channel_net():
     net.add_node(PlenumNode("n1"))
     net.add_node(PressureBoundary("out", Pt=101325.0, Tt=300.0))
     net.add_element(
-        OrificeElement("orf", "in", "n1", Cd=0.6, diameter=0.112838, correlation="fixed")
+        OrificeElement(
+            "orf", "in", "n1", Cd=0.6, diameter=0.112838, correlation="fixed", in_pipe=False
+        )
     )
     net.add_element(ChannelElement("ch", "n1", "out", length=1.0, diameter=0.1, roughness=1e-5))
     return net

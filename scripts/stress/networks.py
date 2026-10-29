@@ -68,6 +68,7 @@ from combaero.network import (
     WallLayer,
     WallNode,
 )
+from combaero.network.components import ORIFICE_BORE_PIPE_RTOL
 from combaero.network.ejector_element import EjectorElement
 from combaero.network.pressure_loss import ConstantFractionLoss
 
@@ -303,7 +304,35 @@ class _Layered:
                 )
             )
             self.tags.append("thermal_wall")
+        _lump_orifices_at_or_above_their_pipe(net)
         return net
+
+
+def _lump_orifices_at_or_above_their_pipe(net: FlowNetwork) -> None:
+    """Declare the draws' lumped restrictions (#788). The family draws an
+    orifice as a lumped Cd*A restriction, so its bore may meet or exceed a
+    neighbouring channel's diameter. Until 0.8.0 the element silently read
+    that as a wall hole (beta = 0); now a bore equal to its pipe is no orifice
+    and a larger one is refused. Mark those draws in_pipe=False -- the same
+    wall hole, said -- with no random draw, so every seed draws the network
+    it drew before. The pipes are the ones that set beta: the single
+    upstream channel forward, the single to-side channel in reverse. Rows
+    are bit-identical except where a draw sat between a pipe narrower than
+    its bore and a wider one: that was a wall hole one way and an in-pipe
+    orifice the other, and is a wall hole both ways now (17 of seeds
+    0-299)."""
+    for e in net.elements.values():
+        if type(e) is not OrificeElement or e.diameter is None:
+            continue
+        up = [c for c in net.get_upstream_elements(e.from_node) if isinstance(c, ChannelElement)]
+        to = [
+            c
+            for c in net.get_upstream_elements(e.to_node) + net.get_downstream_elements(e.to_node)
+            if isinstance(c, ChannelElement)
+        ]
+        pipes = [g[0].diameter for g in (up, to) if len(g) == 1 and g[0].diameter]
+        if any(e.diameter >= D * (1.0 - ORIFICE_BORE_PIPE_RTOL) for D in pipes):
+            e.in_pipe = False
 
 
 def layered_random(seed: int) -> tuple[FlowNetwork, list[str]]:

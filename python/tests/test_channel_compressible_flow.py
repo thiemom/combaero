@@ -109,7 +109,9 @@ def test_an_imposed_flow_above_choke_raises_the_supply_pressure() -> None:
     g.add_node(MassFlowBoundary("in", m_dot=1.2 * M_CHOKE, Tt=TT, Y=Y))
     g.add_node(PlenumNode("p"))
     g.add_node(_pb("out", 1.0e4))
-    g.add_element(OrificeElement("o", "in", "p", Cd=0.95, diameter=0.06, correlation="fixed"))
+    g.add_element(
+        OrificeElement("o", "in", "p", Cd=0.95, diameter=0.06, correlation="fixed", in_pipe=False)
+    )
     g.add_element(
         ChannelElement(
             "c", "p", "out", length=L, diameter=D, roughness=ROUGH, regime="compressible"
@@ -168,13 +170,17 @@ def test_the_global_jacobian_matches_finite_differences(P_out: float, choked: bo
     g.add_node(PlenumNode("p1"))
     g.add_node(PlenumNode("p2"))
     g.add_node(_pb("out", P_out))
-    g.add_element(OrificeElement("o1", "in", "p1", Cd=0.8, diameter=0.06, correlation="fixed"))
+    g.add_element(
+        OrificeElement("o1", "in", "p1", Cd=0.8, diameter=0.06, correlation="fixed", in_pipe=False)
+    )
     g.add_element(
         ChannelElement(
             "c", "p1", "p2", length=L, diameter=D, roughness=ROUGH, regime="compressible"
         )
     )
-    g.add_element(OrificeElement("o2", "p2", "out", Cd=0.8, diameter=0.04, correlation="fixed"))
+    g.add_element(
+        OrificeElement("o2", "p2", "out", Cd=0.8, diameter=0.04, correlation="fixed", in_pipe=False)
+    )
     s = NetworkSolver(g)
     r = s.solve()
     assert r["__success__"], r["__message__"]
@@ -190,7 +196,9 @@ def test_the_global_jacobian_through_a_reversed_duct() -> None:
     g.add_element(
         ChannelElement("c", "a", "p", length=L, diameter=D, roughness=ROUGH, regime="compressible")
     )
-    g.add_element(OrificeElement("o", "p", "b", Cd=0.8, diameter=0.04, correlation="fixed"))
+    g.add_element(
+        OrificeElement("o", "p", "b", Cd=0.8, diameter=0.04, correlation="fixed", in_pipe=False)
+    )
     s = NetworkSolver(g)
     r = s.solve()
     assert r["__success__"] and r["c.m_dot"] < 0.0

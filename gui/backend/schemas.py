@@ -331,6 +331,10 @@ class OrificeData(BaseModel):
     # The pressure taps whose differential is REPORTED (dP_tap). Measurement
     # only: the solved flow never depends on it (#649/#645).
     tap: Literal["Corner", "Flange", "D_D2"] = "Flange"
+    # False: no pipe diameter -- a lumped Cd*A restriction (a hole in a wall,
+    # beta = 0) whatever channels adjoin it (#788). True: the adjoining pipe
+    # sets beta; a bore equal to it is no orifice, a larger one is refused.
+    in_pipe: bool = True
     regime: Literal["default", "incompressible", "compressible"] = "default"
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None

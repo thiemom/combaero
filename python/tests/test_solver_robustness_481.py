@@ -42,8 +42,10 @@ def _pb(name: str, Pt: float, Tt: float) -> PressureBoundary:
     return b
 
 
-def _orifice(eid: str, a: str, b: str, d: float = 0.01) -> OrificeElement:
-    return OrificeElement(eid, a, b, Cd=0.7, diameter=d, correlation="fixed")
+def _orifice(eid: str, a: str, b: str, d: float = 0.01, in_pipe: bool = True) -> OrificeElement:
+    # in_pipe=False where the bore meets its pipe: a lumped Cd*A
+    # restriction, not the no-orifice of a bore equal to its pipe (#788).
+    return OrificeElement(eid, a, b, Cd=0.7, diameter=d, correlation="fixed", in_pipe=in_pipe)
 
 
 def _jac_vs_fd(s: NetworkSolver, x: np.ndarray) -> float:
@@ -109,7 +111,7 @@ def test_the_relay_carries_the_reversed_stream() -> None:
     g.add_node(_pb("A", 1.02e5, 400.0))
     g.add_node(_pb("B", 1.03e5, 600.0))
     g.add_node(PlenumNode("p"))
-    g.add_element(_orifice("e1", "A", "p"))
+    g.add_element(_orifice("e1", "A", "p", in_pipe=False))
     g.add_element(ChannelElement("e2", "p", "B", length=0.5, diameter=0.01))
     s = NetworkSolver(g)
     r = s.solve()
@@ -125,7 +127,7 @@ def test_a_reversed_channel_jacobian_has_the_right_sign() -> None:
     g.add_node(_pb("b", 1.01e5, 300.0))
     g.add_node(PlenumNode("p"))
     g.add_element(ChannelElement("c", "a", "p", length=1.0, diameter=0.02, roughness=1e-5))
-    g.add_element(_orifice("o", "p", "b", 0.02))
+    g.add_element(_orifice("o", "p", "b", 0.02, in_pipe=False))
     s = NetworkSolver(g)
     r = s.solve()
     assert r["__success__"] and r["c.m_dot"] < 0.0
@@ -304,7 +306,7 @@ def test_a_wall_on_a_reversed_channel_relays_the_right_sign() -> None:
     area = 3.14159 * 0.02
     surface = ConvectiveSurface(area=area)
     g.add_element(ChannelElement("hot", "A", "p", length=1.0, diameter=0.02, surface=surface))
-    g.add_element(_orifice("o", "p", "B", 0.02))
+    g.add_element(_orifice("o", "p", "B", 0.02, in_pipe=False))
     g.add_node(MassFlowBoundary("cin", m_dot=0.01, Tt=300.0, Y=Y_AIR))
     g.add_node(PlenumNode("cp"))
     g.add_node(_pb("cout", 1.0e5, 300.0))
@@ -313,7 +315,7 @@ def test_a_wall_on_a_reversed_channel_relays_the_right_sign() -> None:
             "cold", "cin", "cp", length=1.0, diameter=0.02, surface=ConvectiveSurface(area=area)
         )
     )
-    g.add_element(_orifice("co", "cp", "cout", 0.02))
+    g.add_element(_orifice("co", "cp", "cout", 0.02, in_pipe=False))
     g.add_wall(
         ThermalWall(id="w", element_a="hot", element_b="cold", layers=[WallLayer(0.002, 20.0)])
     )

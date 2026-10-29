@@ -90,9 +90,13 @@ def test_step_3_full_series_no_bypass():
     mc2 = MomentumChamberNode("mc2")
 
     p1 = ChannelElement("p1", "inlet", "n1", length=2.0, diameter=0.1, roughness=1e-4)
-    o1 = OrificeElement("o1", "n1", "mc1", Cd=0.6, diameter=0.100925, correlation="fixed")
+    o1 = OrificeElement(
+        "o1", "n1", "mc1", Cd=0.6, diameter=0.100925, correlation="fixed", in_pipe=False
+    )
     p2 = ChannelElement("p2", "mc1", "n2", length=2.0, diameter=0.1, roughness=1e-4)
-    o2 = OrificeElement("o2", "n2", "plenum", Cd=0.6, diameter=0.100925, correlation="fixed")
+    o2 = OrificeElement(
+        "o2", "n2", "plenum", Cd=0.6, diameter=0.100925, correlation="fixed", in_pipe=False
+    )
     p3 = ChannelElement("p3", "plenum", "mc2", length=2.0, diameter=0.1, roughness=1e-4)
     p4 = ChannelElement("p4", "mc2", "outlet", length=2.0, diameter=0.1, roughness=1e-4)
 
@@ -198,9 +202,13 @@ def test_step_4_adding_bypass():
 
     # Main series elements (now attach to port-face MCNs at mc1, mc2).
     p1 = ChannelElement("p1", "inlet", "n1", length=2.0, diameter=D_main, roughness=1e-4)
-    o1 = OrificeElement("o1", "n1", "mc1_com", Cd=0.6, diameter=0.100925, correlation="fixed")
+    o1 = OrificeElement(
+        "o1", "n1", "mc1_com", Cd=0.6, diameter=0.100925, correlation="fixed", in_pipe=False
+    )
     p2 = ChannelElement("p2", "mc1_str", "n2", length=2.0, diameter=D_main, roughness=1e-4)
-    o2 = OrificeElement("o2", "n2", "plenum", Cd=0.6, diameter=0.100925, correlation="fixed")
+    o2 = OrificeElement(
+        "o2", "n2", "plenum", Cd=0.6, diameter=0.100925, correlation="fixed", in_pipe=False
+    )
     p3 = ChannelElement("p3", "plenum", "mc2_str", length=2.0, diameter=D_main, roughness=1e-4)
     p4 = ChannelElement("p4", "mc2_com", "outlet", length=2.0, diameter=D_main, roughness=1e-4)
 

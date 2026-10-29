@@ -89,7 +89,13 @@ def _pair(
         )
         g.add_element(
             OrificeElement(
-                f"{name}_o", f"{name}_p", f"{name}_out", Cd=0.8, diameter=0.012, correlation="fixed"
+                f"{name}_o",
+                f"{name}_p",
+                f"{name}_out",
+                Cd=0.8,
+                diameter=0.012,
+                correlation="fixed",
+                in_pipe=False,
             )
         )
     if warm_bleed:

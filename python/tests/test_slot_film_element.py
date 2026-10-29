@@ -150,7 +150,9 @@ def _net(span: tuple[float, float] = (0.0, 0.06), mixed_supply: bool = False) ->
         )
     )
     g.add_element(
-        OrificeElement("co", "cp", "cold_out", Cd=0.8, diameter=0.03, correlation="fixed")
+        OrificeElement(
+            "co", "cp", "cold_out", Cd=0.8, diameter=0.03, correlation="fixed", in_pipe=False
+        )
     )
     g.add_wall(
         ThermalWall(

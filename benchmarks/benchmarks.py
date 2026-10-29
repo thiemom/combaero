@@ -138,6 +138,8 @@ def _build_fully_coupled_grid(
                 f"cold_chamber_{p}_0",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime=ori_regime,
             )
         )
@@ -164,6 +166,8 @@ def _build_fully_coupled_grid(
                 f"mixing_plenum_{p}",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime=ori_regime,
             )
         )
@@ -184,6 +188,8 @@ def _build_fully_coupled_grid(
                 f"hot_chamber_{p}_0",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime=ori_regime,
             )
         )
@@ -224,6 +230,8 @@ def _build_fully_coupled_grid(
                 "collector",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime=ori_regime,
             )
         )

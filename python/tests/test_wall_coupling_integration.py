@@ -83,10 +83,22 @@ def test_two_channel_wall_coupling_convergence():
 
     # Connect plenums to outlets with orifices
     hot_orifice = OrificeElement(
-        "hot_orifice", "hot_plenum", "hot_outlet", Cd=0.8, diameter=0.079788, correlation="fixed"
+        "hot_orifice",
+        "hot_plenum",
+        "hot_outlet",
+        Cd=0.8,
+        diameter=0.079788,
+        correlation="fixed",
+        in_pipe=False,
     )
     cold_orifice = OrificeElement(
-        "cold_orifice", "cold_plenum", "cold_outlet", Cd=0.8, diameter=0.079788, correlation="fixed"
+        "cold_orifice",
+        "cold_plenum",
+        "cold_outlet",
+        Cd=0.8,
+        diameter=0.079788,
+        correlation="fixed",
+        in_pipe=False,
     )
     net.add_element(hot_orifice)
     net.add_element(cold_orifice)

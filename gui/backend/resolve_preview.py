@@ -126,13 +126,20 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
     if type(item) is OrificeElement:  # not the plate subclasses
         # The bore never inherits (it is the restriction); the upstream pipe's
         # diameter does, and sets beta = d / D for the velocity-of-approach
-        # factor. beta = 0 means no correction: no single upstream channel, or a
-        # bore >= the pipe (the GUI warns on the latter). Reversed flow
+        # factor. beta = 0 means no correction: no single upstream channel, or
+        # in_pipe=False (a lumped Cd*A restriction). A bore equal to the pipe
+        # is no orifice (pass_through = 1, beta = 1, zero loss); a larger one
+        # is refused, so it arrives here as unresolved (#788). Reversed flow
         # approaches through the to-node's single pipe (#554). E comes from the
         # C++ factor the kernels use, never re-derived in the frontend.
         beta = _f(item, "beta") or 0.0
         beta_rev = _f(item, "beta_reverse") or 0.0
+        pass_through = bool(getattr(item, "_pass_through", False))
         return {
+            "pass_through": FieldResolution(
+                1.0 if pass_through else 0.0,
+                "bore = pipe D: no orifice" if pass_through else "",
+            ),
             "diameter": FieldResolution(_f(item, "diameter"), _s(item, "_area_source")),
             "pipe_diameter": FieldResolution(
                 _f(item, "upstream_diameter"), _s(item, "_upstream_source")

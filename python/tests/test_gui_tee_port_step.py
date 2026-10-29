@@ -44,7 +44,10 @@ def _schema(model: str, D_straight: float) -> dict:
         _node(TEE, "mpce_tee", junction_model=model, flow_direction="branch", theta_deg=90.0),
         _node("ch_str", "channel", L=1.0, D=D_straight),
         _node("ch_bra", "channel", L=1.0, D=0.05),
-        _node("orf", "orifice", Cd=0.6, diameter=0.08),
+        # The reported network's bore (0.08) exceeds its 0.05 branch pipe:
+        # refused since #788, so the lumped restriction it acted as is
+        # written explicitly, with no pipe diameter.
+        _node("orf", "orifice", Cd=0.6, diameter=0.08, in_pipe=False),
         _node("ch_ret", "channel", L=1.0, D=0.1),
         _node("out", "pressure_boundary", Pt=101325.0, Tt=300.0),
     ]

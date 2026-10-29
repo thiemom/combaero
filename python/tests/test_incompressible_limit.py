@@ -42,7 +42,9 @@ def _dpt(kind: str, regime: str, m_dot: float, sink: str = "boundary") -> float:
         net.add_node(MomentumChamberNode("mcn", area=AREA))
         to = "mcn"
         net.add_element(
-            OrificeElement("exit", "mcn", "outlet", Cd=1.0, diameter=D, correlation="fixed")
+            OrificeElement(
+                "exit", "mcn", "outlet", Cd=1.0, diameter=D, correlation="fixed", in_pipe=False
+            )
         )
     if kind == "channel":
         el = ChannelElement("el", "inlet", to, length=1.0, diameter=D, regime=regime)
