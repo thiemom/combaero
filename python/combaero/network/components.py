@@ -1220,7 +1220,7 @@ class WallLayer:
         # 'generic' is legacy, 'custom' is new name for manual input
         if self.material.lower() not in ("generic", "custom"):
             # The binding clamps T to the material's valid range and k > 0, so
-            # a known material does not raise at any T.
+            # a known material does not raise at any finite T.
             self.conductivity = cb.get_material_conductivity(self.material, T)
 
     @property

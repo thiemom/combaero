@@ -1,6 +1,7 @@
 #include "../include/state.h"
 #include "../include/thermo.h"
 #include "../include/transport.h"
+#include "../include/input_validation.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -55,7 +56,7 @@ State &State::set_TP(double T_new, double P_new) {
 }
 
 State &State::set_DP_mass(double rho_new, double P_new) {
-  if (rho_new <= 0)
+  if (!validation::is_finite_positive(rho_new))
     throw std::invalid_argument("Density must be positive");
   P = P_new;
   // rho = P / (R * T) => T = P / (rho * R)
@@ -76,7 +77,7 @@ State &State::set_SP_mass(double s_new, double P_new) {
 }
 
 State &State::set_UV_mass(double u_new, double v_new) {
-  if (v_new <= 0)
+  if (!validation::is_finite_positive(v_new))
     throw std::invalid_argument("Specific volume must be positive");
   T = calc_T_from_u_mass(u_new, X, T);
   P = R() * T / v_new;
@@ -84,7 +85,7 @@ State &State::set_UV_mass(double u_new, double v_new) {
 }
 
 State &State::set_SV_mass(double s_new, double v_new) {
-  if (v_new <= 0)
+  if (!validation::is_finite_positive(v_new))
     throw std::invalid_argument("Specific volume must be positive");
   T = calc_T_from_sv_mass(s_new, v_new, X, T);
   P = R() * T / v_new;
@@ -92,7 +93,7 @@ State &State::set_SV_mass(double s_new, double v_new) {
 }
 
 State &State::set_PV_mass(double P_new, double v_new) {
-  if (v_new <= 0)
+  if (!validation::is_finite_positive(v_new))
     throw std::invalid_argument("Specific volume must be positive");
   P = P_new;
   T = P_new * v_new / R();
@@ -106,7 +107,7 @@ State &State::set_UP_mass(double u_new, double P_new) {
 }
 
 State &State::set_VH_mass(double v_new, double h_new) {
-  if (v_new <= 0)
+  if (!validation::is_finite_positive(v_new))
     throw std::invalid_argument("Specific volume must be positive");
   // h = u + Pv = u + RT => find T such that u(T) + RT = h_target
   // This is slightly more complex, but for ideal gas we can iterate

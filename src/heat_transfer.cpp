@@ -9,6 +9,7 @@
 #include "../include/state.h"
 #include "../include/thermo.h"    // density, cp_mass, speed_of_sound
 #include "../include/transport.h" // viscosity, thermal_conductivity, prandtl
+#include "../include/input_validation.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -56,7 +57,7 @@ double nusselt_dittus_boelter(double Re, double Pr, bool heating,
 
 double nusselt_gnielinski(double Re, double Pr, double f,
                           combaero::CorrelationStatus *status) {
-  if (f <= 0.0) {
+  if (!validation::is_finite_positive(f)) {
     throw std::invalid_argument(
         "nusselt_gnielinski: friction factor must be positive");
   }
@@ -262,7 +263,7 @@ NuAndDerivative nusselt_channel_gnielinski_and_derivative(
 
 double nusselt_sieder_tate(double Re, double Pr, double mu_ratio,
                            combaero::CorrelationStatus *status) {
-  if (mu_ratio <= 0.0) {
+  if (!validation::is_finite_positive(mu_ratio)) {
     throw std::invalid_argument(
         "nusselt_sieder_tate: mu_ratio must be positive");
   }
@@ -295,7 +296,7 @@ double nusselt_sieder_tate(double Re, double Pr, double mu_ratio,
 
 double nusselt_petukhov(double Re, double Pr, double f,
                         combaero::CorrelationStatus *status) {
-  if (f <= 0.0) {
+  if (!validation::is_finite_positive(f)) {
     throw std::invalid_argument(
         "nusselt_petukhov: friction factor must be positive");
   }
@@ -338,11 +339,11 @@ double nusselt_petukhov(double Re, double Pr,
 // -------------------------------------------------------------
 
 double htc_from_nusselt(double Nu, double k, double L) {
-  if (L <= 0) {
+  if (!validation::is_finite_positive(L)) {
     throw std::invalid_argument(
         "htc_from_nusselt: characteristic length must be positive");
   }
-  if (k <= 0) {
+  if (!validation::is_finite_positive(k)) {
     throw std::invalid_argument(
         "htc_from_nusselt: thermal conductivity must be positive");
   }
@@ -363,7 +364,7 @@ double overall_htc(const std::vector<double> &h_values,
 
   // Add convective resistances: 1/h
   for (double h : h_values) {
-    if (h <= 0) {
+    if (!(h > 0.0)) {
       throw std::invalid_argument("overall_htc: h values must be positive");
     }
     R_total += 1.0 / h;
@@ -371,7 +372,7 @@ double overall_htc(const std::vector<double> &h_values,
 
   // Add conductive resistances: t/k
   for (double tk : t_over_k) {
-    if (tk < 0) {
+    if (!validation::is_finite_nonnegative(tk)) {
       throw std::invalid_argument(
           "overall_htc: t/k values must be non-negative");
     }
@@ -383,7 +384,7 @@ double overall_htc(const std::vector<double> &h_values,
 
 double overall_htc_wall(double h_inner, double h_outer, double t_wall,
                         double k_wall, double R_fouling) {
-  if (k_wall <= 0) {
+  if (!validation::is_finite_positive(k_wall)) {
     throw std::invalid_argument("overall_htc_wall: k_wall must be positive");
   }
   return overall_htc_wall(h_inner, h_outer, std::vector<double>{t_wall / k_wall}, R_fouling);
@@ -397,7 +398,7 @@ double overall_htc_wall(double h_inner, double h_outer,
 double overall_htc_wall(double h_inner, double h_outer,
                         const std::vector<double> &t_over_k_layers,
                         double R_fouling) {
-  if (R_fouling < 0) {
+  if (!validation::is_finite_nonnegative(R_fouling)) {
     throw std::invalid_argument(
         "overall_htc_wall: R_fouling must be non-negative");
   }
@@ -408,14 +409,14 @@ double overall_htc_wall(double h_inner, double h_outer,
 }
 
 double thermal_resistance(double h, double A) {
-  if (h <= 0 || A <= 0) {
+  if (!(h > 0.0) || !validation::is_finite_positive(A)) {
     throw std::invalid_argument("thermal_resistance: h and A must be positive");
   }
   return 1.0 / (h * A);
 }
 
 double thermal_resistance_wall(double thickness, double k, double A) {
-  if (thickness < 0 || k <= 0 || A <= 0) {
+  if (!validation::is_finite_nonnegative(thickness) || !validation::is_finite_positive(k) || !validation::is_finite_positive(A)) {
     throw std::invalid_argument("thermal_resistance_wall: invalid parameters");
   }
   return thickness / (k * A);
@@ -426,7 +427,7 @@ double thermal_resistance_wall(double thickness, double k, double A) {
 // -------------------------------------------------------------
 
 double lmtd(double dT1, double dT2) {
-  if (dT1 <= 0 || dT2 <= 0) {
+  if (!validation::is_finite_positive(dT1) || !validation::is_finite_positive(dT2)) {
     throw std::invalid_argument(
         "lmtd: temperature differences must be positive");
   }
@@ -463,7 +464,7 @@ wall_temperature_profile(double T_hot, double T_cold, double h_hot,
                          double h_cold, const std::vector<double> &t_over_k,
                          double R_fouling, double &q) {
 
-  if (h_hot <= 0 || h_cold <= 0) {
+  if (!(h_hot > 0.0) || !(h_cold > 0.0)) {
     throw std::invalid_argument(
         "wall_temperature_profile: HTCs must be positive");
   }
@@ -471,7 +472,7 @@ wall_temperature_profile(double T_hot, double T_cold, double h_hot,
   // Total thermal resistance per unit area [m^2*K/W]
   double R_total = 1.0 / h_hot + 1.0 / h_cold + R_fouling;
   for (double r : t_over_k) {
-    if (r < 0) {
+    if (!validation::is_finite_nonnegative(r)) {
       throw std::invalid_argument(
           "wall_temperature_profile: t/k values must be non-negative");
     }
@@ -524,7 +525,7 @@ double heat_flux_from_T_at_edge(double T_measured, std::size_t edge_idx,
         std::to_string(n_layers) + ")");
   }
 
-  if (h_hot <= 0 || h_cold <= 0) {
+  if (!(h_hot > 0.0) || !(h_cold > 0.0)) {
     throw std::invalid_argument(
         "heat_flux_from_T_at_edge: HTCs must be positive");
   }
@@ -563,11 +564,11 @@ double heat_flux_from_T_at_depth(double T_measured, double depth_from_hot,
     throw std::invalid_argument("heat_flux_from_T_at_depth: thicknesses and "
                                 "conductivities must have same size");
   }
-  if (depth_from_hot < 0) {
+  if (!validation::is_finite_nonnegative(depth_from_hot)) {
     throw std::invalid_argument(
         "heat_flux_from_T_at_depth: depth must be non-negative");
   }
-  if (h_hot <= 0 || h_cold <= 0) {
+  if (!(h_hot > 0.0) || !(h_cold > 0.0)) {
     throw std::invalid_argument(
         "heat_flux_from_T_at_depth: HTCs must be positive");
   }
@@ -619,7 +620,7 @@ double bulk_T_from_edge_T_and_q(double T_measured, std::size_t edge_idx,
         std::to_string(n_layers) + ")");
   }
 
-  if (h_hot <= 0 || h_cold <= 0) {
+  if (!(h_hot > 0.0) || !(h_cold > 0.0)) {
     throw std::invalid_argument(
         "bulk_T_from_edge_T_and_q: HTCs must be positive");
   }
@@ -660,7 +661,7 @@ std::pair<double, double> dT_edge_dT_bulk(std::size_t edge_idx, double h_hot,
         std::to_string(n_layers) + ")");
   }
 
-  if (h_hot <= 0 || h_cold <= 0) {
+  if (!(h_hot > 0.0) || !(h_cold > 0.0)) {
     throw std::invalid_argument("dT_edge_dT_bulk: HTCs must be positive");
   }
 
@@ -707,7 +708,7 @@ double dT_edge_dq(std::size_t edge_idx, double h_hot,
                                 std::to_string(n_layers) + ")");
   }
 
-  if (h_hot <= 0) {
+  if (!(h_hot > 0.0)) {
     throw std::invalid_argument("dT_edge_dq: h_hot must be positive");
   }
 
@@ -726,11 +727,11 @@ double dT_edge_dq(std::size_t edge_idx, double h_hot,
 // -------------------------------------------------------------
 
 double effectiveness_counterflow(double NTU, double C_r) {
-  if (NTU < 0) {
+  if (!(NTU >= 0.0)) {
     throw std::invalid_argument(
         "effectiveness_counterflow: NTU must be non-negative");
   }
-  if (C_r < 0 || C_r > 1) {
+  if (!validation::is_finite_nonnegative(C_r) || C_r > 1) {
     throw std::invalid_argument(
         "effectiveness_counterflow: C_r must be in [0, 1]");
   }
@@ -752,11 +753,11 @@ double effectiveness_counterflow(double NTU, double C_r) {
 }
 
 double effectiveness_parallelflow(double NTU, double C_r) {
-  if (NTU < 0) {
+  if (!(NTU >= 0.0)) {
     throw std::invalid_argument(
         "effectiveness_parallelflow: NTU must be non-negative");
   }
-  if (C_r < 0 || C_r > 1) {
+  if (!validation::is_finite_nonnegative(C_r) || C_r > 1) {
     throw std::invalid_argument(
         "effectiveness_parallelflow: C_r must be in [0, 1]");
   }
@@ -793,10 +794,10 @@ static double vdi_transition_blend(double Re, bool heating, Fn &&nu_turb) {
 
 double nusselt_circular_channel(const State &s, double velocity, double diameter,
                                 bool heating, double roughness) {
-    if (velocity <= 0) {
+    if (!validation::is_finite_positive(velocity)) {
         throw std::invalid_argument("nusselt_circular_channel: velocity must be positive");
     }
-    if (diameter <= 0) {
+    if (!validation::is_finite_positive(diameter)) {
         throw std::invalid_argument("nusselt_circular_channel: diameter must be positive");
     }
 
@@ -826,16 +827,16 @@ htc_circular_channel(double T, double P, const std::vector<double> &X,
                      double velocity, double diameter,
                      const std::string &correlation, bool heating,
                      double mu_ratio, double roughness) {
-    if (velocity <= 0) {
+    if (!validation::is_finite_positive(velocity)) {
         throw std::invalid_argument("htc_circular_channel: velocity must be positive");
     }
-    if (diameter <= 0) {
+    if (!validation::is_finite_positive(diameter)) {
         throw std::invalid_argument("htc_circular_channel: diameter must be positive");
     }
-    if (T <= 0) {
+    if (!validation::is_finite_positive(T)) {
         throw std::invalid_argument("htc_circular_channel: temperature must be positive");
     }
-    if (P <= 0) {
+    if (!validation::is_finite_positive(P)) {
         throw std::invalid_argument("htc_circular_channel: pressure must be positive");
     }
 
@@ -917,10 +918,10 @@ channel_smooth(double T, double P, const std::vector<double> &X,
   // Negative velocity can arise from reversed flow during Newton iteration
   // or from negative mass-flow boundary conditions.
   velocity = std::abs(velocity);
-  if (diameter <= 0.0) {
+  if (!validation::is_finite_positive(diameter)) {
     throw std::invalid_argument("channel_smooth: diameter must be positive");
   }
-  if (length < 0.0) {
+  if (!validation::is_finite_nonnegative(length)) {
     throw std::invalid_argument("channel_smooth: length must be non-negative");
   }
 

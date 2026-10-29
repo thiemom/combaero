@@ -1,7 +1,10 @@
 #include "materials.h"
+#include "input_validation.h"
 #include <cmath>
 #include <stdexcept>
 #include <map>
+#include <string>
+#include <vector>
 
 namespace combaero::materials {
 
@@ -10,7 +13,7 @@ namespace combaero::materials {
 // -------------------------------------------------------------
 
 void validate_temperature(const std::string& material_name, double T, double T_min, double T_max) {
-    if (T < T_min || T > T_max) {
+    if (!validation::is_finite_in_range(T, T_min, T_max)) {
         throw std::runtime_error(
             "Temperature " + std::to_string(T) + " K is outside valid range [" +
             std::to_string(T_min) + ", " + std::to_string(T_max) + "] K for " + material_name
@@ -68,8 +71,11 @@ double k_aluminum_6061(double T) {
 
 double k_tbc_ysz(double T, double hours, bool is_ebpvd) {
     // Validate temperature
-    if (T < 300.0 || T > 1700.0) {
+    if (!validation::is_finite_in_range(T, 300.0, 1700.0)) {
         throw std::runtime_error("k_tbc_ysz: Temperature must be in range [300, 1700] K, got " + std::to_string(T));
+    }
+    if (std::isnan(hours)) {
+        throw std::runtime_error("k_tbc_ysz: hours must not be NaN");
     }
 
     double T_C = T - 273.15;

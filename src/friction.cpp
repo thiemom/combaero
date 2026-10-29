@@ -6,6 +6,7 @@
 // - Serghides (1984): Chemical Engineering, Nov. 5
 
 #include "friction.h"
+#include "input_validation.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -18,7 +19,7 @@ double friction_haaland(double Re, double e_D) {
   // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
   // steps while maintaining continuous derivatives (min ~64 for laminar bound)
   Re = std::sqrt(Re * Re + 64.0 * 64.0);
-  if (e_D < 0.0) {
+  if (!combaero::validation::is_finite_nonnegative(e_D)) {
     throw std::invalid_argument("friction_haaland: e_D must be non-negative");
   }
 
@@ -40,7 +41,7 @@ double friction_serghides(double Re, double e_D) {
   // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
   // steps while maintaining continuous derivatives (min ~64 for laminar bound)
   Re = std::sqrt(Re * Re + 64.0 * 64.0);
-  if (e_D < 0.0) {
+  if (!combaero::validation::is_finite_nonnegative(e_D)) {
     throw std::invalid_argument("friction_serghides: e_D must be non-negative");
   }
 
@@ -72,7 +73,7 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
   // Smooth minimum to safeguard Colebrook/Haaland against zero-crossing Newton
   // steps while maintaining continuous derivatives (min ~64 for laminar bound)
   Re = std::sqrt(Re * Re + 64.0 * 64.0);
-  if (e_D < 0.0) {
+  if (!combaero::validation::is_finite_nonnegative(e_D)) {
     throw std::invalid_argument("friction_colebrook: e_D must be non-negative");
   }
 

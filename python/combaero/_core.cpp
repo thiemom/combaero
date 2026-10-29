@@ -31,6 +31,7 @@
 #include "geometry.h"
 #include "heat_transfer.h"
 #include "humidair.h"
+#include "input_validation.h"
 #include "incompressible.h"
 #include "ideal_junction.h"
 #include "mpce_junction.h"
@@ -6693,6 +6694,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "get_material_conductivity",
       [](const std::string &name, double T) {
         const auto &mat = combaero::materials::get_material(name);
+        // NaN would pass the clamp below and come out as the 1e-3 floor
+        // (#769): refuse a non-finite T instead.
+        combaero::validation::require_finite<std::runtime_error>(
+            T, "get_material_conductivity: T must be finite");
         // Clamp temperature to material valid range for solver robustness
         double T_clamped = std::clamp(T, mat.T_min, mat.T_max);
         // Evaluate k(T) and clamp to physically positive value
@@ -6703,7 +6708,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Get thermal conductivity [W/(m*K)] for a named material at temperature T "
       "[K].\n"
       "Automatically clamps T to the material's valid range and ensures k > 0 "
-      "for numerical stability.");
+      "for numerical stability.\n"
+      "Raises RuntimeError for an unknown material or a non-finite T.");
 
   // =========================================================================
   // Advanced Cooling Correlations

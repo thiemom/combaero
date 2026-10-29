@@ -5,6 +5,7 @@
 #include "vatistas.h"
 #include "math_constants.h"
 #include "quadrature.h"
+#include "input_validation.h"
 #include <cmath>
 #include <stdexcept>
 #include <tuple>
@@ -84,14 +85,14 @@ double vatistas_d_pressure_integral_drbar(double r_bar, double n) {
 // ---------------------------------------------------------------------------
 
 static void validate_vatistas(double Gamma, double r_c, double n) {
-  if (n < vatistas::n_min) {
+  if (!(n >= vatistas::n_min) || !validation::is_finite(n)) {
     throw std::invalid_argument(
         "vatistas: n must be >= 1 (singularities in V_r and V_z for n < 1)");
   }
-  if (Gamma <= 0.0) {
+  if (!validation::is_finite_positive(Gamma)) {
     throw std::invalid_argument("vatistas: Gamma must be > 0");
   }
-  if (r_c <= 0.0) {
+  if (!validation::is_finite_positive(r_c)) {
     throw std::invalid_argument("vatistas: r_c must be > 0");
   }
 }

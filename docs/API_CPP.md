@@ -3,6 +3,7 @@
 This document provides the technical reference for the CombAero C++ library. For Python usage, see [API_PYTHON.md](API_PYTHON.md).
 
 ## Table of Contents
+- [Input validation (input_validation.h)](#input-validation-input_validationh)
 - [Thermodynamics (thermo.h)](#thermodynamics-thermoh)
 - [Transport Properties (transport.h)](#transport-properties-transporth)
 - [Combustion (combustion.h)](#combustion-combustionh)
@@ -24,6 +25,34 @@ This document provides the technical reference for the CombAero C++ library. For
 - [Humid Air (humidair.h)](#humid-air-humidairh)
 - [Network Solver Interface (solver_interface.h)](#network-solver-interface-solver_interfaceh)
   - [Tee Junction Components](#tee-junction-components-tee_junctionh--solver_interfaceh)
+
+---
+
+## Input validation (input_validation.h)
+
+A domain check written `if (x <= 0) throw` lets NaN through, because every
+comparison with NaN is false. Public functions check input with the NaN-safe
+predicates below, which NaN and +/-inf fail, and keep the exception type they
+already threw (#769):
+
+```cpp
+namespace combaero::validation {
+bool is_finite(double x);
+bool is_finite_positive(double x);                    // finite, x > 0
+bool is_finite_nonnegative(double x);                 // finite, x >= 0
+bool is_finite_in_range(double x, double lo, double hi);  // finite, lo <= x <= hi
+
+// Throw E(message) when the predicate fails; E defaults to std::invalid_argument.
+template <class E = std::invalid_argument> void require_finite(double x, const char* message);
+template <class E = std::invalid_argument> void require_finite_positive(double x, const char* message);
+template <class E = std::invalid_argument> void require_finite_nonnegative(double x, const char* message);
+template <class E = std::invalid_argument>
+void require_finite_in_range(double x, double lo, double hi, const char* message);
+}
+```
+
+Where +inf is a physical limit rather than bad input (NTU, a film coefficient
+h, YSZ aging hours) the check refuses NaN only.
 
 ---
 
@@ -1342,8 +1371,9 @@ double hydraulic_diameter_annulus(double D_outer, double D_inner);  // Do - Di
 double circular_area(double D);
 double annular_area(double D_outer, double D_inner);           // pi (Do^2 - Di^2) / 4
 double cylinder_volume(double D, double L);
-// The free functions throw std::invalid_argument unless D_outer > D_inner >= 0
-// (and positive sizes); the structs below do not validate.
+// Every function and struct method throws std::invalid_argument unless
+// D_outer > D_inner >= 0 and every size it uses is finite and positive (NaN
+// and inf included, #769); the struct methods check the members they read.
 
 struct Tube { double L, D; area(); volume(); perimeter(); };
 struct Annulus {

@@ -6,6 +6,7 @@
 #include "../include/compressible.h"
 #include "../include/thermo.h"
 #include "../include/transport.h"
+#include "../include/input_validation.h"
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
@@ -31,7 +32,7 @@ double v_from_h0(double h0, double h_static_J_per_kg) {
 
 double mach_number(double v, double T, const std::vector<double>& X) {
     double a = speed_of_sound(T, X);
-    if (a <= 0.0) {
+    if (!validation::is_finite_positive(a)) {
         throw std::invalid_argument("mach_number: speed of sound is non-positive");
     }
     return v / a;
@@ -55,10 +56,10 @@ static double cp_mass_at(double T, const std::vector<double>& X) {
 
 double Tt_from_static_v(double T, double v, const std::vector<double>& X,
                          double tol, std::size_t max_iter) {
-    if (T <= 0.0) {
+    if (!validation::is_finite_positive(T)) {
         throw std::invalid_argument("Tt_from_static_v: T must be positive");
     }
-    if (v < 0.0) {
+    if (!validation::is_finite_nonnegative(v)) {
         throw std::invalid_argument("Tt_from_static_v: v must be non-negative");
     }
 
@@ -94,7 +95,7 @@ double Tt_from_static_v(double T, double v, const std::vector<double>& X,
 
 double Tt_from_static(double T, double M, const std::vector<double>& X,
                        double tol, std::size_t max_iter) {
-    if (M < 0.0) {
+    if (!validation::is_finite_nonnegative(M)) {
         throw std::invalid_argument("Tt_from_static: M must be non-negative");
     }
     double a = speed_of_sound(T, X);
@@ -104,10 +105,10 @@ double Tt_from_static(double T, double M, const std::vector<double>& X,
 
 double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
                           double tol, std::size_t max_iter) {
-    if (Tt <= 0.0) {
+    if (!validation::is_finite_positive(Tt)) {
         throw std::invalid_argument("T_from_stagnation: Tt must be positive");
     }
-    if (M < 0.0) {
+    if (!validation::is_finite_nonnegative(M)) {
         throw std::invalid_argument("T_from_stagnation: M must be non-negative");
     }
     if (M == 0.0) return Tt;
@@ -153,10 +154,10 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
 double Pt_from_static(double P, double T, double M,
                        const std::vector<double>& X,
                        double tol, std::size_t max_iter) {
-    if (P <= 0.0) {
+    if (!validation::is_finite_positive(P)) {
         throw std::invalid_argument("Pt_from_static: P must be positive");
     }
-    if (M < 0.0) {
+    if (!validation::is_finite_nonnegative(M)) {
         throw std::invalid_argument("Pt_from_static: M must be non-negative");
     }
     if (M == 0.0) return P;
@@ -177,10 +178,10 @@ double Pt_from_static(double P, double T, double M,
 double P_from_stagnation(double Pt, double Tt, double M,
                           const std::vector<double>& X,
                           double tol, std::size_t max_iter) {
-    if (Pt <= 0.0) {
+    if (!validation::is_finite_positive(Pt)) {
         throw std::invalid_argument("P_from_stagnation: Pt must be positive");
     }
-    if (M < 0.0) {
+    if (!validation::is_finite_nonnegative(M)) {
         throw std::invalid_argument("P_from_stagnation: M must be non-negative");
     }
     if (M == 0.0) return Pt;
@@ -203,7 +204,7 @@ double P_from_stagnation(double Pt, double Tt, double M,
 // -------------------------------------------------------------
 
 double recovery_factor(double Pr, bool turbulent) {
-    if (Pr <= 0.0) {
+    if (!validation::is_finite_positive(Pr)) {
         throw std::invalid_argument("recovery_factor: Pr must be positive");
     }
     return turbulent ? std::cbrt(Pr) : std::sqrt(Pr);
@@ -227,7 +228,7 @@ double T_adiabatic_wall(double T_static, double v,
 double T_adiabatic_wall_mach(double T_static, double M,
                                double T, double P, const std::vector<double>& X,
                                bool turbulent) {
-    if (M < 0.0) {
+    if (!validation::is_finite_nonnegative(M)) {
         throw std::invalid_argument("T_adiabatic_wall_mach: M must be non-negative");
     }
     if (M == 0.0) return T_static;
@@ -242,11 +243,11 @@ std::tuple<double, double> stagnation_from_static(
     const std::vector<double>& X,
     double tol, std::size_t max_iter)
 {
-    if (T <= 0.0)
+    if (!validation::is_finite_positive(T))
         throw std::invalid_argument("stagnation_from_static: T must be positive");
-    if (P <= 0.0)
+    if (!validation::is_finite_positive(P))
         throw std::invalid_argument("stagnation_from_static: P must be positive");
-    if (v < 0.0)
+    if (!validation::is_finite_nonnegative(v))
         throw std::invalid_argument("stagnation_from_static: v must be non-negative");
     if (v == 0.0) return {T, P};
 

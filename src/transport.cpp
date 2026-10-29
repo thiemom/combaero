@@ -5,6 +5,7 @@
 #include "thermo_transport_data.h"
 #include "collision_integral_data.h"
 #include "../include/math_constants.h"  // MSVC compatibility for M_PI
+#include "../include/input_validation.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -521,7 +522,7 @@ double prandtl(double T, double P, const std::vector<double>& X)
     auto ps  = pure_species_transport(T, X);
     double mu_mix = wilke_viscosity(X, ps.mu);
     double k_mix  = mixture_conductivity(X, ps.k);
-    if (k_mix <= 0.0) {
+    if (!validation::is_finite_positive(k_mix)) {
         throw std::runtime_error("prandtl: thermal conductivity must be positive");
     }
     const double MW      = mwmix(X) / 1000.0;   // kg/mol
@@ -550,7 +551,7 @@ double reynolds(double T, double P, const std::vector<double>& X, double V, doub
 {
     const double rho_val = density(T, P, X);
     const double mu      = viscosity(T, P, X);
-    if (mu <= 0.0) {
+    if (!validation::is_finite_positive(mu)) {
         throw std::runtime_error("reynolds: viscosity must be positive");
     }
     return (rho_val * V * L) / mu;
@@ -560,7 +561,7 @@ double reynolds(double T, double P, const std::vector<double>& X, double V, doub
 double peclet(double T, double P, const std::vector<double>& X, double V, double L)
 {
     const double alpha = thermal_diffusivity(T, P, X);
-    if (alpha <= 0.0) {
+    if (!validation::is_finite_positive(alpha)) {
         throw std::runtime_error("peclet: thermal diffusivity must be positive");
     }
     return (V * L) / alpha;

@@ -1,12 +1,19 @@
 #include "../include/humidair.h"
 #include "../include/composition.h"
+#include "../include/input_validation.h"
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <string>
 
 namespace combaero {
+
+using validation::is_finite_in_range;
+using validation::is_finite_positive;
+using validation::require_finite_nonnegative;
+using validation::require_finite_positive;
 
 // Constants for dry air composition (mole fractions)
 const std::unordered_map<std::string, double> dry_air_composition = {
@@ -48,7 +55,7 @@ static constexpr double SVP_EXTRAP_TOL = 0.05;
 double saturation_vapor_pressure(double T) {
   const double span = SVP_T_MAX - SVP_T_MIN;
   const double tol = SVP_EXTRAP_TOL * span;
-  if (T < SVP_T_MIN - tol || T > SVP_T_MAX + tol) {
+  if (!is_finite_in_range(T, SVP_T_MIN - tol, SVP_T_MAX + tol)) {
     throw std::out_of_range(
         "saturation_vapor_pressure: T=" + std::to_string(T) +
         " K is outside extrapolation range [" +
@@ -75,7 +82,7 @@ double saturation_vapor_pressure(double T) {
 // Calculate actual vapor pressure from relative humidity [Pa]
 double vapor_pressure(double T, double RH) {
   // Validate inputs
-  if (RH < 0.0 || RH > 1.0) {
+  if (!is_finite_in_range(RH, 0.0, 1.0)) {
     throw std::runtime_error("Relative humidity must be between 0 and 1");
   }
 
@@ -84,6 +91,8 @@ double vapor_pressure(double T, double RH) {
 
 // Calculate humidity ratio (kg water vapor per kg dry air)
 double humidity_ratio(double T, double P, double RH) {
+  require_finite_positive<std::runtime_error>(
+      P, "humidity_ratio: P must be finite and > 0");
   // Calculate vapor pressure
   double P_w = vapor_pressure(T, RH);
 
@@ -100,6 +109,8 @@ double humidity_ratio(double T, double P, double RH) {
 
 // Calculate mole fraction of water vapor in humid air
 double water_vapor_mole_fraction(double T, double P, double RH) {
+  require_finite_positive<std::runtime_error>(
+      P, "water_vapor_mole_fraction: P must be finite and > 0");
   // Calculate vapor pressure
   double P_w = vapor_pressure(T, RH);
 
@@ -160,7 +171,7 @@ std::vector<double> humid_air_composition(double T, double P, double RH) {
 
 // Calculate dewpoint temperature from T, P, RH [K]
 double dewpoint(double T, [[maybe_unused]] double P, double RH) {
-  if (RH <= 0.0) {
+  if (!is_finite_positive(RH)) {
     throw std::invalid_argument("dewpoint: RH must be > 0");
   }
 
@@ -228,7 +239,7 @@ double dewpoint(double T, [[maybe_unused]] double P, double RH) {
 double relative_humidity_from_dewpoint(double T, double Tdp, double P) {
   (void)P;
 
-  if (Tdp > T) {
+  if (!(Tdp <= T)) {
     throw std::invalid_argument(
         "relative_humidity_from_dewpoint: Tdp cannot exceed T");
   }
@@ -381,7 +392,7 @@ double humid_air_density(double T, double P, double RH) {
 // -------------------------------------------------------------------------
 
 HumidAir &HumidAir::set_TP_RH(double T, double P, double RH_new) {
-  if (RH_new < 0.0 || RH_new > 1.0) {
+  if (!is_finite_in_range(RH_new, 0.0, 1.0)) {
     throw std::invalid_argument("HumidAir: RH must be between 0 and 1");
   }
   rh = RH_new;
@@ -396,10 +407,7 @@ HumidAir &HumidAir::set_TP_dewpoint(double T, double P, double Tdp) {
 }
 
 HumidAir &HumidAir::set_TP_omega(double T, double P, double w) {
-  if (w < 0.0) {
-    throw std::invalid_argument(
-        "HumidAir: humidity ratio must be non-negative");
-  }
+  require_finite_nonnegative(w, "HumidAir: humidity ratio must be non-negative");
   // w = 0.621945 * P_w / (P - P_w)
   // P_w = w * P / (0.621945 + w)
   double P_w = w * P / (0.621945 + w);

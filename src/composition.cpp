@@ -2,6 +2,7 @@
 #include "../include/thermo_transport_data.h" // For molar_masses
 #include "../include/thermo.h"               // For species_index_from_name
 #include "../include/correlation_status.h" // For warn()
+#include "../include/input_validation.h"
 #include <numeric>
 #include <algorithm>
 #include <stdexcept>
@@ -44,7 +45,7 @@ std::vector<double> mole_to_mass(const std::vector<double>& X) {
     for (std::size_t k = 0; k < X.size(); ++k) {
         denom += X[k] * molar_masses[k];
     }
-    if (denom <= 0.0) {
+    if (!validation::is_finite_positive(denom)) {
         throw std::runtime_error("mole_to_mass: non-positive denominator");
     }
 
@@ -63,12 +64,12 @@ std::vector<double> mass_to_mole(const std::vector<double>& Y) {
     double denom = 0.0;
     for (std::size_t k = 0; k < Y.size(); ++k) {
         double Wk = molar_masses[k];
-        if (Wk <= 0.0) {
+        if (!validation::is_finite_positive(Wk)) {
             throw std::runtime_error("mass_to_mole: non-positive molar mass");
         }
         denom += Y[k] / Wk;
     }
-    if (denom <= 0.0) {
+    if (!validation::is_finite_positive(denom)) {
         throw std::runtime_error("mass_to_mole: non-positive denominator");
     }
 

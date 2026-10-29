@@ -4,6 +4,7 @@
 #include "../include/thermo_c2_refit_data.h"
 #include "../include/thermo_transport_data.h"
 #include "../include/transport.h"
+#include "../include/input_validation.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -627,13 +628,13 @@ double u_mass(double T, const std::vector<double> &X) {
 // -------------------------------------------------------------
 
 AirProperties air_properties(double T, double P, double humidity) {
-  if (T <= 0) {
+  if (!validation::is_finite_positive(T)) {
     throw std::invalid_argument("air_properties: temperature must be positive");
   }
-  if (P <= 0) {
+  if (!validation::is_finite_positive(P)) {
     throw std::invalid_argument("air_properties: pressure must be positive");
   }
-  if (humidity < 0.0 || humidity > 1.0) {
+  if (!validation::is_finite_nonnegative(humidity) || humidity > 1.0) {
     throw std::invalid_argument(
         "air_properties: humidity must be in range [0, 1]");
   }
@@ -652,10 +653,10 @@ AirProperties air_properties(double T, double P, double humidity) {
 // -------------------------------------------------------------
 
 ThermoState thermo_state(double T, double P, const std::vector<double> &X, double P_ref) {
-  if (T <= 0.0) throw std::invalid_argument("thermo_state: temperature must be positive");
-  if (P <= 0.0) throw std::invalid_argument("thermo_state: pressure must be positive");
+  if (!validation::is_finite_positive(T)) throw std::invalid_argument("thermo_state: temperature must be positive");
+  if (!validation::is_finite_positive(P)) throw std::invalid_argument("thermo_state: pressure must be positive");
   if (X.empty()) throw std::invalid_argument("thermo_state: composition must not be empty");
-  if (P_ref <= 0.0) throw std::invalid_argument("thermo_state: reference pressure must be positive");
+  if (!validation::is_finite_positive(P_ref)) throw std::invalid_argument("thermo_state: reference pressure must be positive");
   ThermoState ts;
   ts.T = T;
   ts.P = P;

@@ -4,6 +4,7 @@
 #include "../include/thermo.h"
 #include "../include/composition.h"
 #include "../include/thermo_transport_data.h"
+#include "../include/input_validation.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -264,7 +265,7 @@ double fuel_lhv_mass(const std::vector<double> &X_fuel,
                      const double reference_temperature) {
   validate_fuel_mole_fractions(X_fuel);
   const double mw_fuel = mwmix(X_fuel); // [g/mol]
-  if (mw_fuel <= 0.0) {
+  if (!validation::is_finite_positive(mw_fuel)) {
     throw std::runtime_error(
         "fuel_lhv_mass: fuel molecular weight must be positive");
   }
@@ -557,14 +558,14 @@ static double stoich_f_over_o_mole(const std::vector<double> &X_fuel,
   }
 
   const double X_O2_ox = X_ox[species_index.at("O2")];
-  if (X_O2_ox <= 0.0) {
+  if (!validation::is_finite_positive(X_O2_ox)) {
     throw std::runtime_error(
         "stoich_f_over_o_mole: oxidizer has zero O2 mole fraction");
   }
 
   // moles O2 required per mole of fuel mixture
   const double nu_O2_req = oxygen_required_per_mol_mixture(X_fuel);
-  if (nu_O2_req <= 0.0) {
+  if (!validation::is_finite_positive(nu_O2_req)) {
     throw std::runtime_error(
         "stoich_f_over_o_mole: oxygen_required_per_mol_mixture returned "
         "non-positive");
@@ -653,7 +654,7 @@ set_equivalence_ratio_mole(double phi, const std::vector<double> &X_fuel,
     throw std::invalid_argument("set_equivalence_ratio_mole: size mismatch");
   }
   require_finite(phi, "set_equivalence_ratio_mole: phi");
-  if (phi <= 0.0) {
+  if (!validation::is_finite_positive(phi)) {
     throw std::invalid_argument("set_equivalence_ratio_mole: phi must be > 0");
   }
 
@@ -682,7 +683,7 @@ set_equivalence_ratio_mole(double phi, const std::vector<double> &X_fuel,
 
   // Renormalize to guard against small numerical drifts
   double sum = std::accumulate(X_mix.begin(), X_mix.end(), 0.0);
-  if (sum <= 0.0) {
+  if (!validation::is_finite_positive(sum)) {
     throw std::runtime_error(
         "set_equivalence_ratio_mole: resulting mixture has non-positive sum");
   }
@@ -711,7 +712,7 @@ static double stoich_f_over_o_mass(const std::vector<double> &Y_fuel,
   }
 
   const double Y_O2_ox = Y_ox[species_index.at("O2")];
-  if (Y_O2_ox <= 0.0) {
+  if (!validation::is_finite_positive(Y_O2_ox)) {
     throw std::runtime_error(
         "stoich_f_over_o_mass: oxidizer has zero O2 mass fraction");
   }
@@ -722,7 +723,7 @@ static double stoich_f_over_o_mass(const std::vector<double> &Y_fuel,
 
   // kg O2 per kg fuel mixture
   const double m_O2_req = oxygen_required_per_kg_mixture(X_fuel);
-  if (m_O2_req <= 0.0) {
+  if (!validation::is_finite_positive(m_O2_req)) {
     throw std::runtime_error(
         "stoich_f_over_o_mass: oxygen_required_per_kg_mixture returned "
         "non-positive");
@@ -817,7 +818,7 @@ set_equivalence_ratio_mass(double phi, const std::vector<double> &Y_fuel,
     throw std::invalid_argument("set_equivalence_ratio_mass: size mismatch");
   }
   require_finite(phi, "set_equivalence_ratio_mass: phi");
-  if (phi <= 0.0) {
+  if (!validation::is_finite_positive(phi)) {
     throw std::invalid_argument("set_equivalence_ratio_mass: phi must be > 0");
   }
 
@@ -846,7 +847,7 @@ set_equivalence_ratio_mass(double phi, const std::vector<double> &Y_fuel,
 
   // Renormalize to guard against any small numerical drift
   double sum = std::accumulate(Y_mix.begin(), Y_mix.end(), 0.0);
-  if (sum <= 0.0) {
+  if (!validation::is_finite_positive(sum)) {
     throw std::runtime_error(
         "set_equivalence_ratio_mass: resulting mixture has non-positive sum");
   }
@@ -863,7 +864,7 @@ double bilger_stoich_mixture_fraction_mass(const std::vector<double> &Y_F,
   // already implemented as part of equivalence_ratio_mass helpers:
   const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
 
-  if (r_st <= 0.0) {
+  if (!validation::is_finite_positive(r_st)) {
     throw std::runtime_error("bilger_stoich_mixture_fraction_mass: r_st <= 0");
   }
 
@@ -885,13 +886,13 @@ double bilger_Z_from_equivalence_ratio_mass(double phi,
                                             const std::vector<double> &Y_F,
                                             const std::vector<double> &Y_O) {
   require_finite(phi, "bilger_Z_from_equivalence_ratio_mass: phi");
-  if (phi <= 0.0) {
+  if (!validation::is_finite_positive(phi)) {
     throw std::invalid_argument(
         "bilger_Z_from_equivalence_ratio_mass: phi must be > 0");
   }
 
   const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
-  if (r_st <= 0.0) {
+  if (!validation::is_finite_positive(r_st)) {
     throw std::runtime_error("bilger_Z_from_equivalence_ratio_mass: r_st <= 0");
   }
 
@@ -912,7 +913,7 @@ double equivalence_ratio_from_bilger_Z_mass(double Z,
   }
 
   const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
-  if (r_st <= 0.0) {
+  if (!validation::is_finite_positive(r_st)) {
     throw std::runtime_error("equivalence_ratio_from_bilger_Z_mass: r_st <= 0");
   }
 
@@ -957,7 +958,7 @@ double bilger_beta(const std::vector<double> &Y) {
     const auto &ms = molecular_structures[k];
     double Wk = molar_masses[k]; // g/mol
 
-    if (Wk <= 0.0) {
+    if (!validation::is_finite_positive(Wk)) {
       throw std::runtime_error("bilger_beta: non-positive molar mass");
     }
 
@@ -1039,11 +1040,11 @@ static double stoich_fuel_ox_ratio(const std::vector<double> &X_fuel,
 Stream set_fuel_stream_for_phi(double phi, const Stream &fuel,
                                const Stream &oxidizer) {
   require_finite(phi, "set_fuel_stream_for_phi: phi");
-  if (phi <= 0.0) {
+  if (!validation::is_finite_positive(phi)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_phi: phi must be positive");
   }
-  if (oxidizer.mdot <= 0.0) {
+  if (!validation::is_finite_positive(oxidizer.mdot)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_phi: oxidizer.mdot must be positive");
   }
@@ -1206,7 +1207,7 @@ Stream set_fuel_stream_for_Tad(double T_ad_target, const Stream &fuel,
                                std::size_t max_iter, bool lean,
                                double phi_max) {
   require_finite(T_ad_target, "set_fuel_stream_for_Tad: T_ad_target");
-  if (oxidizer.mdot <= 0.0) {
+  if (!validation::is_finite_positive(oxidizer.mdot)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_Tad: oxidizer.mdot must be positive");
   }
@@ -1279,13 +1280,13 @@ Stream set_fuel_stream_for_O2(double X_O2_target, const Stream &fuel,
                               const Stream &oxidizer, double tol,
                               std::size_t max_iter) {
   require_finite(X_O2_target, "set_fuel_stream_for_O2: X_O2_target");
-  if (oxidizer.mdot <= 0.0) {
+  if (!validation::is_finite_positive(oxidizer.mdot)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_O2: oxidizer.mdot must be positive");
   }
 
   double X_O2_ox = oxidizer.X()[species_index.at("O2")];
-  if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
+  if (!validation::is_finite_positive(X_O2_target) || X_O2_target >= X_O2_ox) {
     throw std::invalid_argument(
         "set_fuel_stream_for_O2: X_O2_target must be in (0, X_O2_oxidizer)");
   }
@@ -1311,7 +1312,7 @@ Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream &fuel,
                                   const Stream &oxidizer, double tol,
                                   std::size_t max_iter) {
   require_finite(X_O2_dry_target, "set_fuel_stream_for_O2_dry: X_O2_dry_target");
-  if (oxidizer.mdot <= 0.0) {
+  if (!validation::is_finite_positive(oxidizer.mdot)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_O2_dry: oxidizer.mdot must be positive");
   }
@@ -1319,7 +1320,7 @@ Stream set_fuel_stream_for_O2_dry(double X_O2_dry_target, const Stream &fuel,
   // Dry O2 upper bound is from dry oxidizer composition
   std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
   double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
-  if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
+  if (!validation::is_finite_positive(X_O2_dry_target) || X_O2_dry_target >= X_O2_ox_dry) {
     throw std::invalid_argument("set_fuel_stream_for_O2_dry: X_O2_dry_target "
                                 "must be in (0, X_O2_dry_oxidizer)");
   }
@@ -1345,11 +1346,11 @@ Stream set_fuel_stream_for_CO2(double X_CO2_target, const Stream &fuel,
                                const Stream &oxidizer, double tol,
                                std::size_t max_iter) {
   require_finite(X_CO2_target, "set_fuel_stream_for_CO2: X_CO2_target");
-  if (oxidizer.mdot <= 0.0) {
+  if (!validation::is_finite_positive(oxidizer.mdot)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_CO2: oxidizer.mdot must be positive");
   }
-  if (X_CO2_target <= 0.0) {
+  if (!validation::is_finite_positive(X_CO2_target)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_CO2: X_CO2_target must be positive");
   }
@@ -1375,11 +1376,11 @@ Stream set_fuel_stream_for_CO2_dry(double X_CO2_dry_target, const Stream &fuel,
                                    const Stream &oxidizer, double tol,
                                    std::size_t max_iter) {
   require_finite(X_CO2_dry_target, "set_fuel_stream_for_CO2_dry: X_CO2_dry_target");
-  if (oxidizer.mdot <= 0.0) {
+  if (!validation::is_finite_positive(oxidizer.mdot)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_CO2_dry: oxidizer.mdot must be positive");
   }
-  if (X_CO2_dry_target <= 0.0) {
+  if (!validation::is_finite_positive(X_CO2_dry_target)) {
     throw std::invalid_argument(
         "set_fuel_stream_for_CO2_dry: X_CO2_dry_target must be positive");
   }
@@ -1410,7 +1411,7 @@ Stream set_oxidizer_stream_for_Tad(double T_ad_target, const Stream &fuel,
                                    std::size_t max_iter, bool lean,
                                    double phi_max) {
   require_finite(T_ad_target, "set_oxidizer_stream_for_Tad: T_ad_target");
-  if (fuel.mdot <= 0.0) {
+  if (!validation::is_finite_positive(fuel.mdot)) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_Tad: fuel.mdot must be positive");
   }
@@ -1483,13 +1484,13 @@ Stream set_oxidizer_stream_for_O2(double X_O2_target, const Stream &fuel,
                                   const Stream &oxidizer, double tol,
                                   std::size_t max_iter) {
   require_finite(X_O2_target, "set_oxidizer_stream_for_O2: X_O2_target");
-  if (fuel.mdot <= 0.0) {
+  if (!validation::is_finite_positive(fuel.mdot)) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_O2: fuel.mdot must be positive");
   }
 
   double X_O2_ox = oxidizer.X()[species_index.at("O2")];
-  if (X_O2_target <= 0.0 || X_O2_target >= X_O2_ox) {
+  if (!validation::is_finite_positive(X_O2_target) || X_O2_target >= X_O2_ox) {
     throw std::invalid_argument("set_oxidizer_stream_for_O2: X_O2_target must "
                                 "be in (0, X_O2_oxidizer)");
   }
@@ -1517,14 +1518,14 @@ Stream set_oxidizer_stream_for_O2_dry(double X_O2_dry_target,
                                       const Stream &oxidizer, double tol,
                                       std::size_t max_iter) {
   require_finite(X_O2_dry_target, "set_oxidizer_stream_for_O2_dry: X_O2_dry_target");
-  if (fuel.mdot <= 0.0) {
+  if (!validation::is_finite_positive(fuel.mdot)) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_O2_dry: fuel.mdot must be positive");
   }
 
   std::vector<double> X_ox_dry = convert_to_dry_fractions(oxidizer.X());
   double X_O2_ox_dry = X_ox_dry[species_index.at("O2")];
-  if (X_O2_dry_target <= 0.0 || X_O2_dry_target >= X_O2_ox_dry) {
+  if (!validation::is_finite_positive(X_O2_dry_target) || X_O2_dry_target >= X_O2_ox_dry) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_O2_dry: X_O2_dry_target must be in (0, "
         "X_O2_dry_oxidizer)");
@@ -1551,11 +1552,11 @@ Stream set_oxidizer_stream_for_CO2(double X_CO2_target, const Stream &fuel,
                                    const Stream &oxidizer, double tol,
                                    std::size_t max_iter) {
   require_finite(X_CO2_target, "set_oxidizer_stream_for_CO2: X_CO2_target");
-  if (fuel.mdot <= 0.0) {
+  if (!validation::is_finite_positive(fuel.mdot)) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_CO2: fuel.mdot must be positive");
   }
-  if (X_CO2_target <= 0.0) {
+  if (!validation::is_finite_positive(X_CO2_target)) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_CO2: X_CO2_target must be positive");
   }
@@ -1583,11 +1584,11 @@ Stream set_oxidizer_stream_for_CO2_dry(double X_CO2_dry_target,
                                        const Stream &oxidizer, double tol,
                                        std::size_t max_iter) {
   require_finite(X_CO2_dry_target, "set_oxidizer_stream_for_CO2_dry: X_CO2_dry_target");
-  if (fuel.mdot <= 0.0) {
+  if (!validation::is_finite_positive(fuel.mdot)) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_CO2_dry: fuel.mdot must be positive");
   }
-  if (X_CO2_dry_target <= 0.0) {
+  if (!validation::is_finite_positive(X_CO2_dry_target)) {
     throw std::invalid_argument(
         "set_oxidizer_stream_for_CO2_dry: X_CO2_dry_target must be positive");
   }

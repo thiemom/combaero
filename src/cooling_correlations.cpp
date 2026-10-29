@@ -3,6 +3,7 @@
 #include "heat_transfer.h"
 #include "correlation_status.h"
 #include "math_constants.h"
+#include "input_validation.h"
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
@@ -30,7 +31,7 @@ double thermal_performance_factor(double Nu_ratio, double f_ratio) {
 }
 
 double adiabatic_wall_temperature(double T_hot, double T_coolant, double eta) {
-    if (eta < 0.0 || eta > 1.0) {
+    if (!validation::is_finite_nonnegative(eta) || eta > 1.0) {
         throw std::runtime_error(
             "Cooling effectiveness eta must be in range [0, 1], got " + std::to_string(eta)
         );
@@ -42,10 +43,10 @@ double cooled_wall_heat_flux(double T_hot, double T_coolant,
                              double h_hot, double h_coolant,
                              double eta,
                              double t_wall, double k_wall) {
-    if (h_hot <= 0.0 || h_coolant <= 0.0) {
+    if (!validation::is_finite_positive(h_hot) || !validation::is_finite_positive(h_coolant)) {
         throw std::runtime_error("Heat transfer coefficients must be positive");
     }
-    if (t_wall < 0.0 || k_wall <= 0.0) {
+    if (!validation::is_finite_nonnegative(t_wall) || !validation::is_finite_positive(k_wall)) {
         throw std::runtime_error("Wall thickness must be non-negative and conductivity positive");
     }
 
@@ -180,12 +181,12 @@ T baldauf_eta_impl(double x_over_D, const T& M, const T& P, double alpha_deg,
 
 void check_inputs(double x_over_D, double M, double P, double alpha_deg,
                   double sD, double Tu) {
-    if (x_over_D <= 0.0) {
+    if (!validation::is_finite_positive(x_over_D)) {
         throw std::invalid_argument(
             "film_effectiveness_baldauf_2002: x/D must be positive; the "
             "correlation is defined downstream of the ejection point");
     }
-    if (M <= 0.0 || P <= 0.0 || sD <= 0.0) {
+    if (!validation::is_finite_positive(M) || !validation::is_finite_positive(P) || !validation::is_finite_positive(sD)) {
         throw std::invalid_argument(
             "film_effectiveness_baldauf_2002: M, P and s/D must be positive");
     }
@@ -196,7 +197,7 @@ void check_inputs(double x_over_D, double M, double P, double alpha_deg,
             "film_effectiveness_baldauf_2002: Tu must be positive; Eq. (34) "
             "contains -0.0012/Tu^2 and is singular at zero turbulence");
     }
-    if (alpha_deg <= 0.0 || alpha_deg > 90.0) {
+    if (!validation::is_finite_positive(alpha_deg) || alpha_deg > 90.0) {
         throw std::invalid_argument(
             "film_effectiveness_baldauf_2002: alpha_deg is the ejection angle "
             "to the SURFACE and must lie in (0, 90]");
@@ -290,27 +291,27 @@ namespace {
 
 void check_colban_inputs(double x_over_D, double M, double AR, double PD,
                          double tP, double alpha_deg, double DR) {
-    if (x_over_D < 0.0) {
+    if (!validation::is_finite_nonnegative(x_over_D)) {
         throw std::invalid_argument(
             "film_effectiveness_colban_2011: x/D must be >= 0; the "
             "correlation starts at the hole breakout");
     }
-    if (M <= 0.0 || PD <= 0.0 || DR <= 0.0) {
+    if (!validation::is_finite_positive(M) || !validation::is_finite_positive(PD) || !validation::is_finite_positive(DR)) {
         throw std::invalid_argument(
             "film_effectiveness_colban_2011: M, P/D and density_ratio must "
             "be positive");
     }
-    if (AR < 1.0) {
+    if (!(AR >= 1.0) || !validation::is_finite(AR)) {
         throw std::invalid_argument(
             "film_effectiveness_colban_2011: area_ratio is A_exit/A_inlet of "
             "a DIFFUSING hole and must be >= 1");
     }
-    if (tP <= 0.0 || tP > 1.0) {
+    if (!validation::is_finite_positive(tP) || tP > 1.0) {
         throw std::invalid_argument(
             "film_effectiveness_colban_2011: t/P is breakout width over "
             "pitch and must lie in (0, 1]");
     }
-    if (alpha_deg <= 0.0 || alpha_deg > 90.0) {
+    if (!validation::is_finite_positive(alpha_deg) || alpha_deg > 90.0) {
         throw std::invalid_argument(
             "film_effectiveness_colban_2011: alpha_deg is the angle to the "
             "SURFACE and must lie in (0, 90]");
@@ -398,19 +399,19 @@ std::tuple<double, double> slot_film_effectiveness_marek_tacina_1975_and_derivat
     double x_over_S, double M, double Tu, double C_m_multiplier,
     CorrelationStatus *status) {
     const char *fn = "slot_film_effectiveness_marek_tacina_1975";
-    if (x_over_S < 0.0) {
+    if (!validation::is_finite_nonnegative(x_over_S)) {
         throw std::invalid_argument(std::string(fn) +
                                     ": x/S must be >= 0; the film starts at the slot lip");
     }
-    if (M <= 0.0) {
+    if (!validation::is_finite_positive(M)) {
         throw std::invalid_argument(std::string(fn) + ": M must be positive");
     }
-    if (Tu < 0.0 || Tu > 1.0) {
+    if (!validation::is_finite_nonnegative(Tu) || Tu > 1.0) {
         throw std::invalid_argument(std::string(fn) +
                                     ": Tu is a fraction in [0, 1] (0.14 = 14%); got " +
                                     std::to_string(Tu));
     }
-    if (C_m_multiplier <= 0.0) {
+    if (!validation::is_finite_positive(C_m_multiplier)) {
         throw std::invalid_argument(std::string(fn) + ": C_m_multiplier must be positive");
     }
     using namespace marek_tacina1975;
@@ -844,13 +845,13 @@ std::pair<double, std::vector<double>> film_superposition_corrected_and_gradient
 
 double mainstream_temperature_correction(double mass_flow_ratio, double a,
                                          double b) {
-    if (mass_flow_ratio < 0.0) {
+    if (!validation::is_finite_nonnegative(mass_flow_ratio)) {
         throw std::invalid_argument(
             "mainstream_temperature_correction: mass_flow_ratio must be "
             "non-negative");
     }
     const double ar = a * mass_flow_ratio;
-    if (ar + 1.0 <= 0.0) {
+    if (!(ar + 1.0 > 0.0) || !validation::is_finite(ar)) {
         throw std::invalid_argument(
             "mainstream_temperature_correction: a * mass_flow_ratio + 1 must "
             "be positive");
@@ -859,7 +860,7 @@ double mainstream_temperature_correction(double mass_flow_ratio, double a,
 }
 
 double equivalent_slot_width(double hole_area, double pitch) {
-    if (hole_area <= 0.0 || pitch <= 0.0) {
+    if (!validation::is_finite_positive(hole_area) || !validation::is_finite_positive(pitch)) {
         throw std::invalid_argument(
             "equivalent_slot_width: hole_area and pitch must be positive");
     }
@@ -868,7 +869,7 @@ double equivalent_slot_width(double hole_area, double pitch) {
 
 double equivalent_blowing_ratio(double M_baseline, double area_baseline,
                                 double area_equivalent) {
-    if (area_equivalent <= 0.0 || area_baseline <= 0.0) {
+    if (!validation::is_finite_positive(area_equivalent) || !validation::is_finite_positive(area_baseline)) {
         throw std::invalid_argument(
             "equivalent_blowing_ratio: areas must be positive");
     }

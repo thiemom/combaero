@@ -8,6 +8,7 @@
 #include "friction.h"
 #include "transport.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
+#include "input_validation.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -143,7 +144,7 @@ CompressibleFlowSolution nozzle_flow(
     Tt = std::max(Tt, 10.0);
     Pt = std::max(Pt, 1.0);
     P_back = std::max(P_back, 1.0);
-    if (A_eff <= 0.0) {
+    if (!validation::is_finite_positive(A_eff)) {
         throw std::invalid_argument("nozzle_flow: A_eff must be positive");
     }
 
@@ -228,7 +229,7 @@ double solve_A_eff_from_mdot(
     double P_outlet = (P_back <= P_crit) ? P_crit : P_back;
     double G_outlet = compute_mass_flux(Tt, Pt, P_outlet, s0, h0, X, tol, max_iter);
 
-    if (G_outlet <= 0.0) {
+    if (!validation::is_finite_positive(G_outlet)) {
         throw std::runtime_error("solve_A_eff_from_mdot: zero mass flux at operating conditions");
     }
 
@@ -246,7 +247,7 @@ double solve_P_back_from_mdot(
     if (!(mdot_target > 0.0)) {
         throw std::invalid_argument("solve_P_back_from_mdot: mdot_target must be positive");
     }
-    if (A_eff <= 0.0) {
+    if (!validation::is_finite_positive(A_eff)) {
         throw std::invalid_argument("solve_P_back_from_mdot: A_eff must be positive");
     }
 
@@ -541,13 +542,13 @@ FannoSolution fanno_channel(
     T_in = std::max(T_in, 10.0);
     P_in = std::max(P_in, 1.0);
 
-    if (L <= 0.0) {
+    if (!validation::is_finite_positive(L)) {
         throw std::invalid_argument("fanno_channel: L must be positive");
     }
-    if (D <= 0.0) {
+    if (!validation::is_finite_positive(D)) {
         throw std::invalid_argument("fanno_channel: D must be positive");
     }
-    if (f < 0.0) {
+    if (!validation::is_finite_nonnegative(f)) {
         throw std::invalid_argument("fanno_channel: f must be non-negative");
     }
     if (n_steps == 0) {
@@ -784,11 +785,11 @@ FannoSolution fanno_channel_rough(
     T_in = std::max(T_in, 10.0);
     P_in = std::max(P_in, 1.0);
 
-    if (L <= 0.0)
+    if (!validation::is_finite_positive(L))
         throw std::invalid_argument("fanno_channel_rough: L must be positive");
-    if (D <= 0.0)
+    if (!validation::is_finite_positive(D))
         throw std::invalid_argument("fanno_channel_rough: D must be positive");
-    if (roughness < 0.0)
+    if (!validation::is_finite_nonnegative(roughness))
         throw std::invalid_argument("fanno_channel_rough: roughness must be non-negative");
     if (n_steps == 0)
         throw std::invalid_argument("fanno_channel_rough: n_steps must be positive");
@@ -1187,13 +1188,13 @@ NozzleSolution nozzle_quasi1d(
     double tol, std::size_t max_iter)
 {
     // Validate inputs
-    if (Tt <= 0.0) {
+    if (!validation::is_finite_positive(Tt)) {
         throw std::invalid_argument("nozzle_quasi1d: Tt must be positive");
     }
-    if (Pt <= 0.0) {
+    if (!validation::is_finite_positive(Pt)) {
         throw std::invalid_argument("nozzle_quasi1d: Pt must be positive");
     }
-    if (P_exit >= Pt) {
+    if (!(P_exit < Pt)) {
         throw std::invalid_argument("nozzle_quasi1d: P_exit must be less than Pt");
     }
     // Clamp near-zero P_exit (e.g. vacuum) to a small positive floor so the
@@ -1503,13 +1504,13 @@ NozzleSolution nozzle_cd(
     std::size_t n_stations,
     double tol, std::size_t max_iter)
 {
-    if (A_inlet <= 0.0 || A_throat <= 0.0 || A_exit <= 0.0) {
+    if (!validation::is_finite_positive(A_inlet) || !validation::is_finite_positive(A_throat) || !validation::is_finite_positive(A_exit)) {
         throw std::invalid_argument("nozzle_cd: all areas must be positive");
     }
     if (A_throat >= A_inlet || A_throat >= A_exit) {
         throw std::invalid_argument("nozzle_cd: A_throat must be smaller than A_inlet and A_exit");
     }
-    if (x_throat <= 0.0 || x_exit <= x_throat) {
+    if (!validation::is_finite_positive(x_throat) || !(x_exit > x_throat) || !validation::is_finite(x_exit)) {
         throw std::invalid_argument("nozzle_cd: must have 0 < x_throat < x_exit");
     }
 

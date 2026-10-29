@@ -1,13 +1,19 @@
 #include "../include/acoustics.h"
 #include "../include/acoustics_internal.h"
 #include "../include/can_annular_solvers.h"
+#include "../include/input_validation.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <limits>
 #include <stdexcept>
 #include "../include/math_constants.h"
 
 namespace combaero {
+
+using validation::is_finite;
+using validation::is_finite_nonnegative;
+using validation::is_finite_positive;
 
 // -------------------------------------------------------------
 // AcousticMode methods
@@ -40,10 +46,10 @@ std::vector<AcousticMode> tube_axial_modes(
     BoundaryCondition upstream, BoundaryCondition downstream,
     int n_max) {
 
-    if (tube.L <= 0 || tube.D <= 0) {
+    if (!is_finite_positive(tube.L) || !is_finite_positive(tube.D)) {
         throw std::invalid_argument("tube_axial_modes: tube dimensions must be positive");
     }
-    if (c <= 0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("tube_axial_modes: speed of sound must be positive");
     }
     if (n_max < 1) {
@@ -83,10 +89,10 @@ std::vector<AcousticMode> annulus_axial_modes(
     BoundaryCondition upstream, BoundaryCondition downstream,
     int n_max) {
 
-    if (annulus.L <= 0 || annulus.D_outer <= annulus.D_inner || annulus.D_inner < 0) {
+    if (!is_finite_positive(annulus.L) || !is_finite_positive(annulus.D_outer) || !(annulus.D_outer > annulus.D_inner) || !is_finite_nonnegative(annulus.D_inner)) {
         throw std::invalid_argument("annulus_axial_modes: invalid annulus dimensions");
     }
-    if (c <= 0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("annulus_axial_modes: speed of sound must be positive");
     }
     if (n_max < 1) {
@@ -119,10 +125,10 @@ std::vector<AcousticMode> annulus_azimuthal_modes(
     const Annulus& annulus, double c,
     int m_max) {
 
-    if (annulus.D_outer <= annulus.D_inner || annulus.D_inner < 0) {
+    if (!is_finite_positive(annulus.D_outer) || !(annulus.D_outer > annulus.D_inner) || !is_finite_nonnegative(annulus.D_inner)) {
         throw std::invalid_argument("annulus_azimuthal_modes: invalid annulus dimensions");
     }
-    if (c <= 0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("annulus_azimuthal_modes: speed of sound must be positive");
     }
     if (m_max < 1) {
@@ -261,20 +267,20 @@ double min_mode_separation(const std::vector<AcousticMode>& modes) {
 // -------------------------------------------------------------
 
 double axial_mode_upstream(double f0, double M) {
-    if (f0 <= 0) {
+    if (!is_finite_positive(f0)) {
         throw std::invalid_argument("axial_mode_upstream: f0 must be positive");
     }
-    if (M < 0 || M >= 1) {
+    if (!is_finite_nonnegative(M) || M >= 1) {
         throw std::invalid_argument("axial_mode_upstream: M must be in [0, 1)");
     }
     return f0 / (1.0 - M);
 }
 
 double axial_mode_downstream(double f0, double M) {
-    if (f0 <= 0) {
+    if (!is_finite_positive(f0)) {
         throw std::invalid_argument("axial_mode_downstream: f0 must be positive");
     }
-    if (M < 0) {
+    if (!is_finite_nonnegative(M)) {
         throw std::invalid_argument("axial_mode_downstream: M must be >= 0");
     }
     return f0 / (1.0 + M);
@@ -290,10 +296,10 @@ std::pair<double, double> axial_mode_split(double f0, double M) {
 
 double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
                            double end_correction) {
-    if (V <= 0 || A_neck <= 0 || L_neck <= 0 || c <= 0) {
+    if (!is_finite_positive(V) || !is_finite_positive(A_neck) || !is_finite_positive(L_neck) || !is_finite_positive(c)) {
         throw std::invalid_argument("helmholtz_frequency: all parameters must be positive");
     }
-    if (end_correction < 0) {
+    if (!is_finite_nonnegative(end_correction)) {
         throw std::invalid_argument("helmholtz_frequency: end_correction must be >= 0");
     }
 
@@ -311,14 +317,14 @@ double helmholtz_frequency(double V, double A_neck, double L_neck, double c,
 // -------------------------------------------------------------
 
 double strouhal(double f, double L, double u) {
-    if (f <= 0 || L <= 0 || u <= 0) {
+    if (!is_finite_positive(f) || !is_finite_positive(L) || !is_finite_positive(u)) {
         throw std::invalid_argument("strouhal: f, L, and u must be positive");
     }
     return f * L / u;
 }
 
 double frequency_from_strouhal(double St, double L, double u) {
-    if (St <= 0 || L <= 0 || u <= 0) {
+    if (!is_finite_positive(St) || !is_finite_positive(L) || !is_finite_positive(u)) {
         throw std::invalid_argument("frequency_from_strouhal: St, L, and u must be positive");
     }
     return St * u / L;
@@ -329,14 +335,14 @@ double frequency_from_strouhal(double St, double L, double u) {
 // -------------------------------------------------------------
 
 double quarter_wave_frequency(double L, double c) {
-    if (L <= 0 || c <= 0) {
+    if (!is_finite_positive(L) || !is_finite_positive(c)) {
         throw std::invalid_argument("quarter_wave_frequency: L and c must be positive");
     }
     return c / (4.0 * L);
 }
 
 double half_wave_frequency(double L, double c) {
-    if (L <= 0 || c <= 0) {
+    if (!is_finite_positive(L) || !is_finite_positive(c)) {
         throw std::invalid_argument("half_wave_frequency: L and c must be positive");
     }
     return c / (2.0 * L);
@@ -347,7 +353,7 @@ double half_wave_frequency(double L, double c) {
 // -------------------------------------------------------------
 
 double stokes_layer(double nu, double f) {
-    if (nu <= 0 || f <= 0) {
+    if (!is_finite_positive(nu) || !is_finite_positive(f)) {
         throw std::invalid_argument("stokes_layer: nu and f must be positive");
     }
     double omega = 2.0 * M_PI * f;
@@ -355,7 +361,7 @@ double stokes_layer(double nu, double f) {
 }
 
 double thermal_layer(double alpha, double f) {
-    if (alpha <= 0 || f <= 0) {
+    if (!is_finite_positive(alpha) || !is_finite_positive(f)) {
         throw std::invalid_argument("thermal_layer: alpha and f must be positive");
     }
     double omega = 2.0 * M_PI * f;
@@ -363,10 +369,10 @@ double thermal_layer(double alpha, double f) {
 }
 
 double effective_viscothermal_layer(double delta_nu, double delta_kappa, double gamma) {
-    if (delta_nu <= 0 || delta_kappa <= 0) {
+    if (!is_finite_positive(delta_nu) || !is_finite_positive(delta_kappa)) {
         throw std::invalid_argument("effective_viscothermal_layer: deltas must be positive");
     }
-    if (gamma <= 1.0) {
+    if (!(gamma > 1.0) || !is_finite(gamma)) {
         throw std::invalid_argument("effective_viscothermal_layer: gamma must be > 1");
     }
     return delta_nu + (gamma - 1.0) * delta_kappa;
@@ -378,13 +384,13 @@ double effective_viscothermal_layer(double delta_nu, double delta_kappa, double 
 
 double helmholtz_Q(double V, double A_neck, double L_neck,
                    double nu, double alpha, double gamma, double f) {
-    if (V <= 0 || A_neck <= 0 || L_neck <= 0) {
+    if (!is_finite_positive(V) || !is_finite_positive(A_neck) || !is_finite_positive(L_neck)) {
         throw std::invalid_argument("helmholtz_Q: geometry parameters must be positive");
     }
-    if (nu <= 0 || alpha <= 0 || f <= 0) {
+    if (!is_finite_positive(nu) || !is_finite_positive(alpha) || !is_finite_positive(f)) {
         throw std::invalid_argument("helmholtz_Q: fluid/frequency parameters must be positive");
     }
-    if (gamma <= 1.0) {
+    if (!(gamma > 1.0) || !is_finite(gamma)) {
         throw std::invalid_argument("helmholtz_Q: gamma must be > 1");
     }
 
@@ -411,13 +417,13 @@ double helmholtz_Q(double V, double A_neck, double L_neck,
 }
 
 double tube_Q(double L, double D, double nu, double alpha, double gamma, double f) {
-    if (L <= 0 || D <= 0) {
+    if (!is_finite_positive(L) || !is_finite_positive(D)) {
         throw std::invalid_argument("tube_Q: L and D must be positive");
     }
-    if (nu <= 0 || alpha <= 0 || f <= 0) {
+    if (!is_finite_positive(nu) || !is_finite_positive(alpha) || !is_finite_positive(f)) {
         throw std::invalid_argument("tube_Q: fluid/frequency parameters must be positive");
     }
-    if (gamma <= 1.0) {
+    if (!(gamma > 1.0) || !is_finite(gamma)) {
         throw std::invalid_argument("tube_Q: gamma must be > 1");
     }
 
@@ -435,14 +441,14 @@ double tube_Q(double L, double D, double nu, double alpha, double gamma, double 
 }
 
 double damping_ratio(double Q) {
-    if (Q <= 0) {
+    if (!is_finite_positive(Q)) {
         throw std::invalid_argument("damping_ratio: Q must be positive");
     }
     return 1.0 / (2.0 * Q);
 }
 
 double bandwidth(double f0, double Q) {
-    if (f0 <= 0 || Q <= 0) {
+    if (!is_finite_positive(f0) || !is_finite_positive(Q)) {
         throw std::invalid_argument("bandwidth: f0 and Q must be positive");
     }
     return f0 / Q;
@@ -460,19 +466,19 @@ AcousticProperties acoustic_properties(
     double p_ref)
 {
     // Input validation
-    if (f <= 0.0) {
+    if (!is_finite_positive(f)) {
         throw std::invalid_argument("acoustic_properties: frequency must be positive");
     }
-    if (rho <= 0.0) {
+    if (!is_finite_positive(rho)) {
         throw std::invalid_argument("acoustic_properties: density must be positive");
     }
-    if (c <= 0.0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("acoustic_properties: speed of sound must be positive");
     }
-    if (p_rms < 0.0) {
+    if (!is_finite_nonnegative(p_rms)) {
         throw std::invalid_argument("acoustic_properties: p_rms must be non-negative");
     }
-    if (p_ref <= 0.0) {
+    if (!is_finite_positive(p_ref)) {
         throw std::invalid_argument("acoustic_properties: p_ref must be positive");
     }
 
@@ -520,7 +526,7 @@ std::complex<double> liner_sdof_impedance_norm(
     const LinerFlowState& flow,
     const AcousticMedium& medium
 ) {
-    if (cavity.depth <= 0.0) {
+    if (!is_finite_positive(cavity.depth)) {
         throw std::runtime_error("Cavity depth must be positive");
     }
 
@@ -579,7 +585,7 @@ std::complex<double> liner_2dof_serial_impedance_norm(
     const LinerFlowState& septum_flow,
     const AcousticMedium& medium
 ) {
-    if (depth_1 <= 0.0 || depth_2 <= 0.0) {
+    if (!is_finite_positive(depth_1) || !is_finite_positive(depth_2)) {
         throw std::runtime_error("Serial cavity depths must be positive");
     }
 
@@ -687,23 +693,26 @@ std::complex<double> orifice_impedance_with_flow(
     double c
 ) {
     // Validate parameters
-    if (freq <= 0.0) {
+    if (!is_finite_positive(freq)) {
         throw std::runtime_error("Frequency must be positive, got " + std::to_string(freq));
     }
-    if (d_orifice <= 0.0 || l_orifice <= 0.0) {
+    if (!is_finite_positive(d_orifice) || !is_finite_positive(l_orifice)) {
         throw std::runtime_error("Orifice dimensions must be positive");
     }
-    if (porosity <= 0.0 || porosity > 0.5) {
+    if (!is_finite_positive(porosity) || porosity > 0.5) {
         throw std::runtime_error("Porosity must be in range (0, 0.5], got " + std::to_string(porosity));
     }
-    if (Cd <= 0.0 || Cd > 1.0) {
+    if (!is_finite_positive(Cd) || Cd > 1.0) {
         throw std::runtime_error("Discharge coefficient must be in range (0, 1], got " + std::to_string(Cd));
     }
-    if (!(c > 0.0) || !std::isfinite(c)) {
+    if (!is_finite_positive(c)) {
         throw std::runtime_error("Speed of sound must be positive and finite, got " + std::to_string(c));
     }
-    if (!(rho > 0.0) || !std::isfinite(rho)) {
+    if (!is_finite_positive(rho)) {
         throw std::runtime_error("Density must be positive and finite, got " + std::to_string(rho));
+    }
+    if (!is_finite(u_bias) || !is_finite(u_grazing)) {
+        throw std::runtime_error("Bias and grazing velocities must be finite");
     }
 
     // Check Mach numbers (should be << 1 for acoustic theory)
@@ -763,10 +772,10 @@ TransferMatrix quarter_wave_resonator_tmm(
     double c
 ) {
     // Validate parameters
-    if (L_tube <= 0.0) {
+    if (!is_finite_positive(L_tube)) {
         throw std::runtime_error("Tube length must be positive, got " + std::to_string(L_tube));
     }
-    if (A_duct <= 0.0 || A_tube <= 0.0) {
+    if (!is_finite_positive(A_duct) || !is_finite_positive(A_tube)) {
         throw std::runtime_error("Areas must be positive");
     }
 
@@ -820,7 +829,10 @@ bool is_whistling_risk(
     double d_orifice
 ) {
     // Validate inputs
-    if (freq < 0.0 || d_orifice <= 0.0) {
+    if (!is_finite_nonnegative(freq) || !is_finite_positive(d_orifice)) {
+        throw std::runtime_error("Invalid parameters for whistling risk assessment");
+    }
+    if (!is_finite(u_bias)) {
         throw std::runtime_error("Invalid parameters for whistling risk assessment");
     }
 
@@ -852,10 +864,10 @@ CanAnnularGeometry to_acoustic_geometry(
     if (n_cans < 1) {
         throw std::invalid_argument("to_acoustic_geometry: n_cans must be positive");
     }
-    if (L_can <= 0.0) {
+    if (!is_finite_positive(L_can)) {
         throw std::invalid_argument("to_acoustic_geometry: L_can must be positive");
     }
-    if (D_can <= 0.0) {
+    if (!is_finite_positive(D_can)) {
         throw std::invalid_argument("to_acoustic_geometry: D_can must be positive");
     }
 
@@ -1075,19 +1087,19 @@ std::vector<BlochMode> can_annular_eigenmodes(
     if (geom.n_cans < 1) {
         throw std::runtime_error("Number of cans must be positive");
     }
-    if (geom.length_can <= 0.0 || geom.area_can <= 0.0) {
+    if (!is_finite_positive(geom.length_can) || !is_finite_positive(geom.area_can)) {
         throw std::runtime_error("Can dimensions must be positive");
     }
-    if (geom.radius_plenum <= 0.0 || geom.area_plenum <= 0.0) {
+    if (!is_finite_positive(geom.radius_plenum) || !is_finite_positive(geom.area_plenum)) {
         throw std::runtime_error("Plenum dimensions must be positive");
     }
-    if (c_can <= 0.0 || c_plenum <= 0.0) {
+    if (!is_finite_positive(c_can) || !is_finite_positive(c_plenum)) {
         throw std::runtime_error("Speed of sound must be positive");
     }
-    if (rho_can <= 0.0 || rho_plenum <= 0.0) {
+    if (!is_finite_positive(rho_can) || !is_finite_positive(rho_plenum)) {
         throw std::runtime_error("Density must be positive");
     }
-    if (f_max <= 0.0) {
+    if (!is_finite_positive(f_max)) {
         throw std::runtime_error("Maximum frequency must be positive");
     }
 
@@ -1100,40 +1112,40 @@ std::vector<BlochMode> can_annular_eigenmodes(
 // -------------------------------------------------------------
 
 double wavelength(double f, double c) {
-    if (f <= 0.0) {
+    if (!is_finite_positive(f)) {
         throw std::invalid_argument("wavelength: frequency must be positive");
     }
-    if (c <= 0.0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("wavelength: speed of sound must be positive");
     }
     return c / f;
 }
 
 double frequency_from_wavelength(double lambda, double c) {
-    if (lambda <= 0.0) {
+    if (!is_finite_positive(lambda)) {
         throw std::invalid_argument("frequency_from_wavelength: wavelength must be positive");
     }
-    if (c <= 0.0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("frequency_from_wavelength: speed of sound must be positive");
     }
     return c / lambda;
 }
 
 double acoustic_impedance(double rho, double c) {
-    if (rho <= 0.0) {
+    if (!is_finite_positive(rho)) {
         throw std::invalid_argument("acoustic_impedance: density must be positive");
     }
-    if (c <= 0.0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("acoustic_impedance: speed of sound must be positive");
     }
     return rho * c;
 }
 
 double sound_pressure_level(double p_rms, double p_ref) {
-    if (p_rms < 0.0) {
+    if (!is_finite_nonnegative(p_rms)) {
         throw std::invalid_argument("sound_pressure_level: p_rms must be non-negative");
     }
-    if (p_ref <= 0.0) {
+    if (!is_finite_positive(p_ref)) {
         throw std::invalid_argument("sound_pressure_level: p_ref must be positive");
     }
     if (p_rms == 0.0) {
@@ -1143,13 +1155,13 @@ double sound_pressure_level(double p_rms, double p_ref) {
 }
 
 double particle_velocity(double p, double rho, double c) {
-    if (p < 0.0) {
+    if (!is_finite_nonnegative(p)) {
         throw std::invalid_argument("particle_velocity: pressure must be non-negative");
     }
-    if (rho <= 0.0) {
+    if (!is_finite_positive(rho)) {
         throw std::invalid_argument("particle_velocity: density must be positive");
     }
-    if (c <= 0.0) {
+    if (!is_finite_positive(c)) {
         throw std::invalid_argument("particle_velocity: speed of sound must be positive");
     }
     return p / (rho * c);
