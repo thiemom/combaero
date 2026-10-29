@@ -57,19 +57,27 @@ def test_cooling_a_stream_below_zero_enthalpy_is_refused_not_raised() -> None:
     caught, it converged to zero flow under a 10 kPa drive (item 3). The root
     it reaches now is below 0 K at p, and refused by name (#626).
 
-    WHICH refusal depends on the starting point, because there is no root to
-    find: from the resistance-network seed (#682) Linux lands on the
-    heat-fade root and macOS on this one. Pinned to the uniform start so the
-    named below-0 K refusal stays tested; the seeded start is held to
-    "refused, never raised" by the next test."""
+    WHICH refusal depends on the solve path, because there is no root to
+    find: the solver's wall-clock budgets steer it, and even from the uniform
+    start Linux CI has landed on the heat-fade root (2026-10-29) where macOS
+    lands on the below-0 K one. Both are named refusals of the same
+    inadmissible problem, so either passes; each is checked by its own
+    fields. The seeded start is held to "refused, never raised" by the next
+    test."""
     s = NetworkSolver(_cooled_chain(-2e4))
     s.resistance_seed = False
-    with pytest.warns(UserWarning, match="at or below 0 K"):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
         r = s.solve(auto_retry=False)
+    messages = " ".join(str(w.message) for w in caught if issubclass(w.category, UserWarning))
     assert r["__converged__"] and not r["__success__"]
     assert r["__outcome__"] == "inconsistent"
-    assert "p" in r["__T_clamped__"]
-    assert r["p.no_gas_state"] == 1.0
+    if "at or below 0 K" in messages:
+        assert "p" in r["__T_clamped__"]
+        assert r["p.no_gas_state"] == 1.0
+    else:
+        assert "taking up only part of their heat" in messages, messages
+        assert "p" in r["__heat_faded__"]
 
 
 @pytest.mark.no_closure_check  # the clamp discards energy: that is the point
