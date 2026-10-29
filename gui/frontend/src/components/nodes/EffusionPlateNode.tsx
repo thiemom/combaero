@@ -57,7 +57,13 @@ const EffusionPlateNode = ({ id, data, selected }: NodeProps) => {
 						? `${data.result.T_wall_hot.toFixed(0)} K`
 						: "—"}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows
+						kind="effusion_plate"
+						result={data.result}
+						maxRows={1}
+					/>
+				)}
 			</div>
 
 			<div

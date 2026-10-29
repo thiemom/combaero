@@ -1,6 +1,7 @@
 import { Activity, Crosshair, RotateCw } from "lucide-react";
 import React from "react";
 import useStore from "../store/useStore";
+import { isCardKind } from "../utils/cardRows";
 import {
 	isConvergedResult,
 	probeKeyOptions,
@@ -36,6 +37,7 @@ import {
 	solvedArrangement,
 } from "../utils/wallArrangement";
 import AreaInput from "./AreaInput";
+import { CardRowPin, CardRowsReset } from "./CardRowControls";
 import CompositionEditor from "./CompositionEditor";
 import GeometryFields from "./GeometryFields";
 import LengthInput from "./LengthInput";
@@ -3488,6 +3490,9 @@ const Inspector = () => {
 								<Activity size={14} />
 								Live Telemetry
 							</h3>
+							{isCardKind(selectedNode.type) && (
+								<CardRowsReset kind={selectedNode.type} />
+							)}
 						</div>
 						{!isConvergedResult(selectedNode.data.result) && (
 							<p className="text-[10px] text-red-500 mb-2">
@@ -3518,11 +3523,19 @@ const Inspector = () => {
 										);
 										return (
 											<div key={key} className="flex flex-col">
-												<span
-													className="text-stone-400 text-[9px] font-bold"
-													title={key}
-												>
-													{label}
+												<span className="flex items-center gap-1">
+													<span
+														className="text-stone-400 text-[9px] font-bold"
+														title={key}
+													>
+														{label}
+													</span>
+													{isCardKind(selectedNode.type) && (
+														<CardRowPin
+															kind={selectedNode.type}
+															fieldKey={key}
+														/>
+													)}
 												</span>
 												<span className="font-mono text-xs font-bold whitespace-nowrap">
 													{meta.format(val)}{" "}

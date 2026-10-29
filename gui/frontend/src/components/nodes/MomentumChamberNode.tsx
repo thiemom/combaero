@@ -47,7 +47,9 @@ const MomentumChamberNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-xs font-bold whitespace-nowrap">
 					{data.label ? data.label : "Mom. Chamber"}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} />}
+				{isSolved && (
+					<NodeDiagRows kind="momentum_chamber" result={data.result} />
+				)}
 			</div>
 
 			<div

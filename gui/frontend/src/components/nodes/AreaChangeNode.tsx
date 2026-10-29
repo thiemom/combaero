@@ -73,7 +73,9 @@ const AreaChangeNode = ({ id, data, selected }: NodeProps) => {
 				<div className="flex flex-row gap-1 text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					<div>F₁/F₀: {ratio != null ? ratio.toFixed(2) : "—"}</div>
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows kind="area_change" result={data.result} maxRows={1} />
+				)}
 			</div>
 
 			<div

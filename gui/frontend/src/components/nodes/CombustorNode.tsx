@@ -47,7 +47,7 @@ const CombustorNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-xs font-bold whitespace-nowrap">
 					{data.label ? data.label : "Combustor"}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} />}
+				{isSolved && <NodeDiagRows kind="combustor" result={data.result} />}
 			</div>
 
 			<div

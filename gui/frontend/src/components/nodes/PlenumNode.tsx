@@ -47,7 +47,7 @@ const PlenumNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-xs font-bold whitespace-nowrap">
 					{data.label ? data.label : "Plenum"}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} />}
+				{isSolved && <NodeDiagRows kind="plenum" result={data.result} />}
 			</div>
 
 			{/* Flow port labels: L/T = i (in), R/B = o (out) */}
