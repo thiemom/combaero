@@ -576,7 +576,7 @@ const Sidebar = () => {
 							}
 							onClear={() => updateSolverSettings({ shaft_speed_rpm: null })}
 							min={0}
-							placeholder="None"
+							placeholder="No limit"
 						/>
 						<select
 							value={unitPreferences.rotSpeed}

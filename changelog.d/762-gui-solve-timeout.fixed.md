@@ -1,0 +1,5 @@
+- **GUI: a cleared Max Solver Time is no limit, and a timed-out solve no longer seeds continuation (#762).**
+  - The empty Max Solver Time field now reads "No limit" (it read "None").
+  - `timeout: null` on `/solve` and `/export` now sets no request deadline either; the route used to substitute 180 s and answer 504 at 190 s. `timeout: 0` bounds the request at what the solver itself gets (0 s, it times out at once) plus the 10 s grace, instead of 180 + 10 s.
+  - The 504 now names the Max Solver Time and the grace it waited, and suggests raising it or clearing it for no limit. It is only sent when a limit was set.
+  - A worker thread that finishes after its request answered 504 can no longer write the continuation state: each request holds a token while it waits, and the state is stored only while that token is live. The thread itself still cannot be cancelled and runs to completion in the background.

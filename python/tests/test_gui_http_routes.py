@@ -18,6 +18,7 @@ import csv
 import io
 import json
 import re
+import threading
 import time
 import warnings
 from pathlib import Path
@@ -650,7 +651,7 @@ def test_the_hard_timeout_answers_while_the_worker_is_still_stuck(
     """A worker that ignores the soft timeout (one long C++ call) must not
     hold the request: the route answers 504 at soft + margin."""
 
-    def stuck(schema: object) -> None:
+    def stuck(schema: object, token: int | None = None) -> None:
         time.sleep(1.5)
         raise AssertionError("the route should not have waited for this")
 
@@ -659,4 +660,95 @@ def test_the_hard_timeout_answers_while_the_worker_is_still_stuck(
     r = _post(route, _pipe(timeout=0.1))
     assert r.status_code == 504
     assert r.elapsed < 1.0, r.elapsed
-    assert "hard timeout" in r.json()["detail"]
+    detail = r.json()["detail"]
+    # The limit it names is one the user can raise, or clear (#762).
+    assert "0.3 s" in detail and "Max Solver Time" in detail, detail
+    assert "clear it for no limit" in detail, detail
+
+
+def _slow_then_real(delay: float, done: threading.Event):
+    """A `_solve_sync` stand-in that sits `delay` s in one uninterruptible
+    call, as a long C++ step would, then runs the real solve."""
+    real = backend._solve_sync
+
+    def slow(schema: object, token: int | None = None):
+        try:
+            time.sleep(delay)
+            return real(schema, token)
+        finally:
+            done.set()
+
+    return slow
+
+
+@pytest.mark.parametrize("route", ["/solve", "/export"])
+def test_no_timeout_means_no_hard_timeout_either(
+    route: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`timeout: null` is no limit (#762). The route used to substitute
+    180 s and cut the request at 190 s. With the margin shrunk to 0.05 s a
+    0.5 s worker outlasts any ceiling the route could still be adding."""
+    done = threading.Event()
+    monkeypatch.setattr(backend, "_solve_sync", _slow_then_real(0.5, done))
+    monkeypatch.setattr(backend, "HARD_TIMEOUT_MARGIN", 0.05)
+    r = _post(route, _pipe(timeout=None))
+    assert r.status_code == 200, r.text[:300]
+    assert r.elapsed >= 0.5
+    if route == "/solve":
+        assert r.json()["success"] is True, r.json()["message"]
+    else:
+        assert r.headers["x-combaero-success"] == "true"
+
+
+def test_hard_timeout_follows_the_solver_timeout() -> None:
+    """The request deadline is whatever the solver gets plus the margin:
+    0 is 0 (it used to become 180 s while the solver got 0), None is none."""
+    m = backend.HARD_TIMEOUT_MARGIN
+    assert backend._hard_timeout(None) is None
+    assert backend._hard_timeout(0.0) == m
+    assert backend._hard_timeout(-1.0) == m
+    assert backend._hard_timeout(5.0) == 5.0 + m
+
+
+@pytest.mark.parametrize("route", ["/solve", "/export"])
+def test_zero_timeout_times_out_at_once(route: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`timeout: 0` reaches the solver as 0 (out of time at its first
+    residual) and bounds the request at the margin, not at 180 + margin."""
+    r = _post(route, _pipe(timeout=0))
+    assert r.status_code == 200
+    assert r.elapsed < 5.0
+    if route == "/solve":
+        assert r.json()["success"] is False and "timed out" in r.json()["message"]
+    else:
+        assert r.headers["x-combaero-success"] == "false"
+
+    done = threading.Event()
+    monkeypatch.setattr(backend, "_solve_sync", _slow_then_real(0.5, done))
+    monkeypatch.setattr(backend, "HARD_TIMEOUT_MARGIN", 0.05)
+    r = _post(route, _pipe(timeout=0))
+    assert r.status_code == 504
+    assert r.elapsed < 0.5, r.elapsed
+    assert done.wait(30.0)
+
+
+@pytest.mark.parametrize("route", ["/solve", "/export"])
+def test_a_result_after_the_504_does_not_land(route: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The worker outlives its request (#762). When it converges after the
+    route answered 504, its state must not become the continuation seed: the
+    user was told that solve failed."""
+    done = threading.Event()
+    monkeypatch.setattr(backend, "_solve_sync", _slow_then_real(0.5, done))
+    monkeypatch.setattr(backend, "_hard_timeout", lambda timeout: 0.1)
+    r = _post(route, _pipe(timeout=20.0))
+    assert r.status_code == 504
+    assert done.wait(30.0), "the worker never finished"
+    assert backend._continuation_state is None
+    assert request(app, "GET", "/solver/continuation_available").json() == {"available": False}
+    assert not backend._live_tokens  # the route gave its token up
+
+    # Control: the same slow worker inside its deadline does land.
+    done.clear()
+    monkeypatch.setattr(backend, "_hard_timeout", lambda timeout: None)
+    r = _post(route, _pipe(timeout=20.0))
+    assert r.status_code == 200
+    assert backend._continuation_state is not None
