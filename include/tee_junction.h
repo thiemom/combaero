@@ -358,7 +358,7 @@ inline double tee_flow_ratio(double m_dot_branch, double m_dot_com) {
 
 // =============================================================================
 // Unified0D compressible junction model
-// Mynard & Valen-Sendstad 2015, extended to O(M^2) (see docs/junction/).
+// Mynard & Valen-Sendstad 2015, extended to O(M^2) (see sources/junction/).
 // =============================================================================
 
 // Per-branch face state, templated on scalar T (double or complex<double>).
@@ -389,7 +389,7 @@ struct BranchState {
 };
 
 // Closed-form K_dat,j to O(M^2), Variant-2 (momentum-consistent) expansion;
-// see Section 5 (eq. Kclosed) of docs/junction/junction_model_v2.tex.
+// see Section 5 (eq. Kclosed) of sources/junction/junction_model_v2.tex.
 //   x_j   = lambda_j * psi_j  (flow-area ratio product, >= 0)
 //   phi_j  = effective inflow angle [rad]  (Hager 3/4 factor already applied)
 //   M_dat2 = M_dat^2 of the pseudodatum
@@ -418,7 +418,7 @@ T K_dat_j_closed(T x_j, T phi_j, T M_dat2) {
 }
 
 // Dividing-tee branch turning-loss model (blended closure; see Finding 5 of
-// docs/junction/junction_model_v3_addendum.md). The committed parallel closure
+// sources/junction/junction_model_v3_addendum.md). The committed parallel closure
 //   R_branch = Pt_com - Pt_bra - K_bc * q_ref
 // charges both collector legs the common dynamic head q_ref, forcing K_str = K_bra
 // at equal outlets, which has no forward-octant root for an angled branch. The

@@ -10,6 +10,12 @@ repos:
 
   - repo: local
     hooks:
+      - id: no-sources
+        name: No copyrighted sources (sources/, documents, images outside the allowlist) (#846)
+        entry: uv run --no-project scripts/check_no_sources.py
+        language: system
+        stages: [pre-commit]
+
       - id: changelog-fragments
         name: Changelog fragments (changelog.d/)
         entry: uv run scripts/changelog.py check

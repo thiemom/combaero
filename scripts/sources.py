@@ -1,7 +1,8 @@
 """The source register: every local reference document, what it holds and
 what has been done with it.
 
-The documents themselves live under docs/ and are gitignored (copyright);
+The documents themselves live under sources/, which git ignores whatever
+the file type (copyright, #846);
 validation/sources.yaml records, per file, its citation, what it contains,
 which questions it has been read for and with what verdict, and where the
 repo uses it. One place to answer "do we already have this?", "what did we
@@ -11,16 +12,18 @@ conclude?" and "what else covers this?".
     uv run scripts/sources.py list --status unscreened    # filter
     uv run scripts/sources.py list --topic film --status implemented
     uv run scripts/sources.py list --wanted               # documents we lack
-    uv run scripts/sources.py check                       # schema + local docs
-    uv run scripts/sources.py new docs/x/new_paper.pdf    # print a stub entry
+    uv run scripts/sources.py check                       # schema + local sources
+    uv run scripts/sources.py check --sources <main checkout>/sources
+    uv run scripts/sources.py new sources/x/new_paper.pdf # print a stub entry
 
 The file has two lists: `documents` (what is local) and `wanted` (what we do
 not hold and the open question each would settle, with a priority). `find`
 searches both.
 
 `check` validates the register (schema, statuses, that every record and
-code path it names exists) and, where docs/ is present, lists local
-documents with no entry and entries whose file is missing.
+code path it names exists, that every `file:` is under sources/) and,
+where sources/ is present, lists local documents with no entry, entries
+whose file is missing, and any file there git would track.
 """
 
 from __future__ import annotations
@@ -34,7 +37,10 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 REGISTER = ROOT / "validation" / "sources.yaml"
-DOCS = ROOT / "docs"
+SOURCES = ROOT / "sources"
+PREFIX = "sources/"
+# Local files that are neither sources nor a leak.
+IGNORED_NAMES = {".gitignore", ".DS_Store"}
 DOC_SUFFIXES = {".pdf", ".djvu", ".epub", ".zip"}  # .zip: a paper's supplementary archive
 
 STATUSES = {
@@ -141,8 +147,10 @@ def problems(entries: list[dict[str, Any]]) -> list[str]:
             if k not in REQUIRED and k not in OPTIONAL:
                 out.append(f"{where}: unknown key '{k}'")
         f = str(e.get("file", ""))
-        if not f.startswith("docs/") or Path(f).suffix.lower() not in DOC_SUFFIXES:
-            out.append(f"{where}: file must be a document under docs/")
+        if not f.startswith(PREFIX):
+            out.append(f"{where}: file must be under {PREFIX} (#846)")
+        if Path(f).suffix.lower() not in DOC_SUFFIXES:
+            out.append(f"{where}: file must be a document ({sorted(DOC_SUFFIXES)})")
         if f in seen:
             out.append(f"{where}: duplicate file")
         seen.add(f)
@@ -170,31 +178,39 @@ def problems(entries: list[dict[str, Any]]) -> list[str]:
     return out
 
 
-def local_documents(docs: Path = DOCS) -> list[str]:
-    """Documents under `docs` (the repo's docs/ by default; a worktree has
-    none, so point it at the main checkout's), as paths starting docs/."""
-    if not docs.is_dir():
+def local_files(sources: Path = SOURCES) -> list[str]:
+    """Every file under `sources` (the repo's sources/ by default; a worktree
+    has none, so point it at the main checkout's), as paths starting
+    sources/. Figure crops, transcriptions and data files included."""
+    if not sources.is_dir():
         return []
     return sorted(
-        "docs/" + str(p.relative_to(docs))
-        for p in docs.rglob("*")
-        if p.suffix.lower() in DOC_SUFFIXES and p.is_file()
+        PREFIX + p.relative_to(sources).as_posix()
+        for p in sources.rglob("*")
+        if p.is_file() and p.name not in IGNORED_NAMES
     )
 
 
-def tracked_documents(docs: Path, files: list[str]) -> list[str]:
-    """Local documents git would NOT ignore -- copyrighted material that a
-    `git add -A` would stage. `files` are paths starting docs/; the check runs
-    in the repository that contains `docs`."""
+def local_documents(sources: Path = SOURCES) -> list[str]:
+    """The registrable documents (DOC_SUFFIXES) among `local_files`."""
+    return [f for f in local_files(sources) if Path(f).suffix.lower() in DOC_SUFFIXES]
+
+
+def tracked_documents(sources: Path, files: list[str]) -> list[str]:
+    """Files under `sources` that git would NOT ignore -- copyrighted
+    material that a `git add -A` would stage, or that is already tracked.
+    `files` are paths starting sources/; the check runs in the repository
+    that contains `sources`."""
     import subprocess
 
     if not files:
         return []
-    repo = docs.resolve().parent
+    repo = sources.resolve().parent
     try:
         r = subprocess.run(
             # -z: NUL-separated both ways. Without it git quotes a non-ASCII
-            # path in its output and the name no longer matches.
+            # path in its output and the name no longer matches. Without
+            # --no-index a tracked file is reported as not ignored.
             ["git", "-C", str(repo), "check-ignore", "-z", "--stdin"],
             input="\0".join(files),
             capture_output=True,
@@ -274,20 +290,28 @@ def cmd_check(args: argparse.Namespace) -> int:
     errs = problems(entries) + wanted_problems(load_wanted())
     for p in errs:
         print(f"error: {p}")
-    local = local_documents(Path(args.docs) if args.docs else DOCS)
-    if local:
+    sources = Path(args.sources) if args.sources else SOURCES
+    files = local_files(sources)
+    local = local_documents(sources)
+    if files:
         listed = {e["file"] for e in entries}
         for f in local:
             if f not in listed:
                 print(f"unregistered: {f}")
         for f in sorted(listed - set(local)):
             print(f"not found locally: {f}")
-        exposed = tracked_documents(Path(args.docs) if args.docs else DOCS, local)
+        exposed = tracked_documents(sources, files)
         for f in exposed:
             print(f"error: not gitignored (copyrighted, would be committed): {f}")
         errs += [f"not gitignored: {f}" for f in exposed]
     else:
-        print("docs/ not present: local coverage not checked")
+        print(f"no local files under {sources}: local coverage not checked")
+    old = sources.parent / "docs"
+    if old.is_dir() and any(p.suffix.lower() in DOC_SUFFIXES for p in old.rglob("*")):
+        print(
+            f"warning: documents still under {old}; move them with "
+            "scripts/migrate_docs_to_sources.py (#846)"
+        )
     counts: dict[str, int] = {}
     for e in entries:
         counts[e["status"]] = counts.get(e["status"], 0) + 1
@@ -329,7 +353,7 @@ def main() -> int:
     ls_.add_argument("--long", action="store_true")
     ls_.set_defaults(fn=cmd_list)
     c = sub.add_parser("check", help="validate the register; list unregistered local documents")
-    c.add_argument("--docs", help="the docs/ directory to audit (default: this checkout's)")
+    c.add_argument("--sources", help="the sources/ directory to audit (default: this checkout's)")
     c.set_defaults(fn=cmd_check)
     n = sub.add_parser("new", help="print a stub entry for a new document")
     n.add_argument("file")

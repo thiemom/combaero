@@ -309,6 +309,6 @@ carries the provenance record from #333 -- `after`, `page`, `item`,
 `geometry`, `extraction`, `confidence`, and a `cross_check` that could have
 failed. A series without one is not loaded.
 
-Source scans stay gitignored under `docs/heat_transfer/`. Only the
+Source scans stay gitignored under `sources/heat_transfer/`. Only the
 digitised coordinates are committed; they are measurements, the scans are
 copyrighted.

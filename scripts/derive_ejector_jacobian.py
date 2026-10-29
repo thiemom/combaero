@@ -13,7 +13,7 @@ scripts/derive_mynard_jacobian.py.
 Run:
     uv run python scripts/derive_ejector_jacobian.py
 
-Key simplification (see docs/ejector C++ port plan): `mach_p1` (the primary
+Key simplification (see sources/ejector C++ port plan): `mach_p1` (the primary
 nozzle-exit Mach number) is the supersonic root of an isentropic area-Mach
 relation that depends ONLY on `area_ratio_nozzle` and `gamma` -- neither is
 a Newton-solved unknown for EjectorElement, so mach_p1 has an EXACT zero

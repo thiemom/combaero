@@ -2,7 +2,7 @@
 #
 # The book is a SECONDARY source for every series here: each figure is
 # reprinted from a primary paper, named per-series under `after`. The
-# scans stay gitignored under docs/heat_transfer/; only these coordinates
+# scans stay gitignored under sources/heat_transfer/; only these coordinates
 # are committed.
 
 paper:

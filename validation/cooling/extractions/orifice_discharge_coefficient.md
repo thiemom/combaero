@@ -17,7 +17,7 @@ Tracked by #375. Surfaced from #337 (item 24b), under #339.
 > McGreehan, W.F. and Schotsch, M.J. (1988). Flow Characteristics of Long
 > Orifices With Rotation and Corner Radiusing. *ASME J. Turbomachinery*,
 > **110**(2), 213-217. Paper No. 87-GT-162. DOI 10.1115/1.3262183.
-> `docs/orifices/mcgreehan_schotsch_1988.pdf` (gitignored, copyrighted).
+> `sources/orifices/mcgreehan_schotsch_1988.pdf` (gitignored, copyrighted).
 >
 > **Note the title.** #375 and the earlier session record both call this
 > "...With Rotation and Crossflow". The printed title is "**...With Rotation
@@ -27,11 +27,11 @@ Tracked by #375. Surfaced from #337 (item 24b), under #339.
 > Rohde, J.E., Richards, H.T. and Metzger, G.W. (1969). Discharge Coefficients
 > for Thick Plate Orifices With Approach Flow Perpendicular and Inclined to the
 > Orifice Axis. NASA TN D-5467, Lewis Research Center, October 1969.
-> `docs/orifices/Rohde_NASA_TN_D-5467.pdf` (gitignored).
+> `sources/orifices/Rohde_NASA_TN_D-5467.pdf` (gitignored).
 
 > Wu, D., Burton, R. and Schoenau, G. (2002). An Empirical Discharge
 > Coefficient Model for Orifice Flow. *International Journal of Fluid Power*,
-> **3**(3), 13-18. `docs/orifices/wu_burton_schoenau_2002_orifces.pdf`
+> **3**(3), 13-18. `sources/orifices/wu_burton_schoenau_2002_orifces.pdf`
 > (gitignored).
 
 **What each one actually is**, which differs from what #375 assumed:

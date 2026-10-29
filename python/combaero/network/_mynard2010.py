@@ -1,7 +1,7 @@
 """
 Mynard & Valen-Sendstad 2010 Unified0D junction-loss model.
 
-Faithful Python port of `docs/junction/JunctionLossCoefficient.m`
+Faithful Python port of `sources/junction/JunctionLossCoefficient.m`
 (BSD-licensed reference code accompanying:
 
     J P Mynard, K Valen-Sendstad,

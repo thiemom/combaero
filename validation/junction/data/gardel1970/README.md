@@ -4,7 +4,7 @@ Gardel, A. and Rechsteiner, G. F. (1970), *Les pertes de charge dans les
 branchements en Te des conduites de section circulaire*, Bulletin technique de
 la Suisse romande 96(25), pp. 363-391, doi:10.5169/seals-70882 (e-periodica,
 ETH Library). The scan is copyrighted and gitignored
-(`docs/junction/gardel_1970.pdf`).
+(`sources/junction/gardel_1970.pdf`).
 
 **Not a reprint of Gardel 1957**: a new EPFL campaign that supersedes it.
 - **Geometry:** 33 shapes, all water at D = 150 mm in asbestos-cement pipe.

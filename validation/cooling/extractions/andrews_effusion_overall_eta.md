@@ -3,7 +3,7 @@
 Andrews, G.E., Asere, A.A., Hussain, C.I., Mkpadi, M.C. and Nazari, A.
 (1988). "Impingement/Effusion Cooling: Overall Wall Heat Transfer."
 ASME 88-GT-290, Gas Turbine and Aeroengine Congress, Amsterdam.
-`docs/heat_transfer/film/Andrews_88-GT-290.pdf`
+`sources/heat_transfer/film/Andrews_88-GT-290.pdf`
 
 This closes #387's last piece -- the overall effectiveness OUTPUT -- and
 reshapes it. The internal side is `andrews_effusion_internal_h.md`; the

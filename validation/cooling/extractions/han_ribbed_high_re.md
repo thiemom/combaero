@@ -192,7 +192,7 @@ but not conclusive.
 
 Both plotted correlation lines were digitised, five points each, spanning
 `e+ = 85` to `31,000`:
-`docs/heat_transfer/han/fig_4.193_correlation_{1,2}_data.csv`.
+`sources/heat_transfer/han/fig_4.193_correlation_{1,2}_data.csv`.
 
 | # | item | state |
 |---|---|---|

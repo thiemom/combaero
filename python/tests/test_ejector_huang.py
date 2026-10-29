@@ -19,8 +19,8 @@ no longer uses Huang's original Eqs. 9-18):
   * P_c* decreases monotonically as A_3/A_t increases at fixed inlets (Fig.
     9/10 trend)
 
-References: docs/ejector/Huang_1d_analysis_ejector.pdf,
-docs/ejector/Development_of_an_Analytical_Method_for.pdf (Kracik & Dvorak)
+References: sources/ejector/Huang_1d_analysis_ejector.pdf,
+sources/ejector/Development_of_an_Analytical_Method_for.pdf (Kracik & Dvorak)
 """
 
 from __future__ import annotations

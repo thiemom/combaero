@@ -3,7 +3,7 @@
 **Status: IMPLEMENTED and REVIEWED 2026-10-23** as the CR-3630 flow check of
 `ImpingementArray(bypass=...)` (#467, #705). Signed off by the user after
 checking every Table D.1 page against the scans: no errors found. Source:
-`docs/heat_transfer/flohrshuetz/NASA_CR-3630_Florschuetz_Metzger_Su_1982_initial_crossflow.pdf`
+`sources/heat_transfer/flohrshuetz/NASA_CR-3630_Florschuetz_Metzger_Su_1982_initial_crossflow.pdf`
 (gitignored), Appendix D, Table D.1, printed pp. 137-148 (PDF pp. 149-160).
 Data: `data/florschuetz_metzger_su1982/table_d1_flow.csv`.
 

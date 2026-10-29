@@ -4,7 +4,7 @@
 *"New Coefficient to Characterize Energy Losses in Compressible Flow at
 T-Junctions"*, Applied Mathematical Modelling 34:4289-4305, 2010.
 
-PDF in `docs/junction/Perez-García-2010.pdf` (gitignored — copyright).
+PDF in `sources/junction/Perez-García-2010.pdf` (gitignored — copyright).
 
 ## Conventions
 

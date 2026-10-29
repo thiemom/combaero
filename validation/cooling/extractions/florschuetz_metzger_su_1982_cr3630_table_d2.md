@@ -2,7 +2,7 @@
 
 **Status: REVIEWED 2026-10-24 (#467).** Signed off by the user after
 checking the pages against the scans: no errors found. Source:
-`docs/heat_transfer/flohrshuetz/NASA_CR-3630_Florschuetz_Metzger_Su_1982_initial_crossflow.pdf`
+`sources/heat_transfer/flohrshuetz/NASA_CR-3630_Florschuetz_Metzger_Su_1982_initial_crossflow.pdf`
 (gitignored), Appendix D, Table D.2, "Heat transfer data", printed pp. 150-161
 (PDF pp. 162-173). Data: `data/florschuetz_metzger_su1982/table_d2_heat_transfer.csv`.
 The flow side of the same report (Table D.1) is a separate, signed-off record

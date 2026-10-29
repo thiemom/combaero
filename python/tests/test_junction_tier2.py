@@ -1,6 +1,6 @@
 """Tier 2: the junction closure at finite Mach (#272).
 
-Two sources were planned (the local docs/junction/tier2_reference_data.md;
+Two sources were planned (the local sources/junction/tier2_reference_data.md;
 the tracked record is validation/junction/README.md, "Tier 2"). Neither is the
 closure's own paper (Mynard 2015), so both can only answer the ACCURACY question,
 and the results are labelled CROSS-SOURCE (docs/VALIDATION_POLICY.md).

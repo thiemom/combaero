@@ -4,7 +4,7 @@ Murray, A.V., Ireland, P.T., Wong, T.H., Tang, S.W. and Rawlinson, A.J. (2018).
 "High Resolution Experimental and Computational Methods for Modelling Multiple
 Row Effusion Cooling Performance." *Int. J. Turbomachinery, Propulsion and
 Power* **3**(1), 4. Open access (MDPI, CC BY).
-`docs/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf`
+`sources/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf`
 
 **Read 2026-09-30, before digitising anything.** No data is extracted yet.
 This record exists because the paper already answers the question #420 left

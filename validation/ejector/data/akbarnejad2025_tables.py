@@ -2,7 +2,7 @@
 
 S. Akbarnejad, M. Ziabasharhagh, "Development of a Theoretical Model for
 Predicting Performance of a Gas Ejector", Thermal Engineering 72(1) (2025).
-Source PDF: docs/ejector/Theoretical Model for Predicting Performance of a Gas
+Source PDF: sources/ejector/Theoretical Model for Predicting Performance of a Gas
 Ejector.pdf (gitignored).
 
 What these numbers are

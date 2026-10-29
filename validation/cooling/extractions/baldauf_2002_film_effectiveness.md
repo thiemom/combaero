@@ -11,7 +11,7 @@ and is implemented as printed. See "The one discrepancy" below.
 > of Film-Cooling Effectiveness From Thermographic Measurements at Enginelike
 > Conditions." *ASME J. Turbomachinery* **124**(4), 686-698.
 > DOI 10.1115/1.1504443. Conference version ASME GT-2002-30180.
-> `docs/heat_transfer/film/686_1_Baldauf_Film_2002.pdf` and the publisher HTML
+> `sources/heat_transfer/film/686_1_Baldauf_Film_2002.pdf` and the publisher HTML
 > alongside it (both gitignored, copyrighted).
 
 A row of CYLINDRICAL, streamwise-inclined holes on a flat plate, measured by
@@ -186,7 +186,7 @@ the right place, the pins say it has not moved.
   mainstream-temperature correction for the error that accumulates with row
   count) is the next piece, and it is what #386 and #387 both need.
 - **Cylindrical holes only.** Shaped holes are Colban, Thole and Bogard
-  (2011), in `docs/heat_transfer/film/`, not extracted.
+  (2011), in `sources/heat_transfer/film/`, not extracted.
 - **No heat transfer coefficient.** The companion paper (ref [25]) gives the
   matching `h` correlation and is not in hand.
 - **`delta_1/D` and `L/D`** appear in Eq. (2)'s parameter list but are not

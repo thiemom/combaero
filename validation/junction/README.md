@@ -28,7 +28,7 @@ validation/junction/
 
 ## Excluded sources
 
-The directory `docs/junction/` includes several PDFs not used in this
+The directory `sources/junction/` includes several PDFs not used in this
 dataset:
 - **Stigler 2010**: theoretical paper, no measurements; paper itself states
   measurements "are going to be done soon" (i.e., never within the paper).

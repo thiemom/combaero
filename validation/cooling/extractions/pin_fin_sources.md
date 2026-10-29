@@ -2,7 +2,7 @@
 
 Every equation below was read from the page image, not the text layer
 (scanned NASA reports misread digits, e.g. Faulkner's C2 3.094 OCRs as
-5.094). Local copies are in `docs/heat_transfer/pin_fin/` (gitignored).
+5.094). Local copies are in `sources/heat_transfer/pin_fin/` (gitignored).
 The scoping history, including dead ends, is on issue #335.
 
 ## Canonical basis used by `pin_fin_correlation.h`

@@ -29,7 +29,7 @@ the page, no rows are missing.
 
 Sources: the OBJ scan (`OBJ.pdf`, 600 dpi, cleanest), its own text layer, the
 HathiTrust page TIFFs, and a ScanTailor dewarp of them. The scans are
-copyrighted and gitignored (`docs/junction/tb1283/`); the extraction scripts
+copyrighted and gitignored (`sources/junction/tb1283/`); the extraction scripts
 were throw-away and are not in the repo.
 
 Each cell was cropped from the deskewed, rule-gridded pages and read by Apple

@@ -135,6 +135,11 @@ jobs:
       - name: Pinned tool versions agree
         run: uv run --no-project scripts/check_version_sync.py
 
+      # Every tracked file, not only the PR diff: it also runs on pushes to
+      # main, so a --no-verify commit or a web edit cannot slip through (#846).
+      - name: No copyrighted sources committed
+        run: uv run --no-project scripts/check_no_sources.py --all
+
   actionlint:
     name: Lint workflows (actionlint)
     needs: changes

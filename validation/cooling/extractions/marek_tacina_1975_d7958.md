@@ -3,7 +3,7 @@
 **Status: CONFIRMED (transcribed and signed off by the user 2026-10-25,
 #714).** Source: C. J. Marek and R. R. Tacina, *Effect
 of Free-Stream Turbulence on Film Cooling*, NASA TN D-7958 (1975),
-`docs/heat_transfer/film/oct23/19750017021.pdf` (local only). Data:
+`sources/heat_transfer/film/oct23/19750017021.pdf` (local only). Data:
 `data/marek_tacina1975/`.
 
 ## For the reviewer
