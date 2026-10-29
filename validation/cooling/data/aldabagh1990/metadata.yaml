@@ -1,0 +1,155 @@
+# Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I.,
+# Nazari, A., Wu, J. (1990). "Impingement/effusion cooling: the influence of
+# the number of impingement holes and pressure loss on the heat transfer
+# coefficient." ASME J. Turbomachinery 112, 467-476 (89-GT-188).
+#
+# Leeds transient rig, the same group and the same h definition as
+# andrews1988: whole-wall h on the effusion plate referenced to the plate
+# approach area, +-5% per the paper. Z = 8 mm, no net gap crossflow (all jet
+# air leaves through the effusion holes), effusion wall X/D 4.67 in both
+# configurations here. Table 1:
+#   config 3: impingement N 4306 m^-2 over effusion N 4306 (1:1), imp. X/D 11,
+#             Ae/Ai 5.6;
+#   config 5: impingement N 1076 over effusion N 4306 (1:4, Hollworth &
+#             Dagan's jet-to-vent ratio), Ae/Ai 5.3.
+# Fig. 16 also re-plots impingement ALONE at N 1076, X/D 10.6 (Andrews 1985d).
+#
+# WHY THESE SERIES. #468's wanted question: does the jet-to-vent ratio
+# reconcile Cho & Rhee's Re^0.558 with Hollworth & Dagan's 0.80? This paper is
+# the only local study that changes jets-per-vent at fixed effusion wall.
+# Power-law fits to the points below (h ~ G^n, least squares in log-log):
+#   config 3 (1:1)  n = 0.73 (0.75 on the G range common with config 5)
+#   config 5 (1:4)  n = 0.58 (0.61 on the common range)
+#   impingement only n = 0.87
+# So going from 1:1 to H&D's 1:4 LOWERS the exponent: the ratio does not
+# explain H&D's 0.80, and 1:4 sits near Cho & Rhee. h5/h3 from the fits is
+# 1.04 at G 0.1, 0.88 at 0.3, 0.73 at 1.0 kg/m2s, matching the text ("about
+# 20 percent lower at G 1-2, negligible below 0.3"). At fixed hole diameters
+# the G exponent equals the Re exponent.
+#
+# DIGITISATION (2026-10-28, automated, page images at 300 dpi):
+#   * log-log frames: Fig. 14 log G -1..1, log h 1..3; Fig. 16 log G -2..1,
+#     log h 1..3; calibration from the frame lines.
+#   * Fig. 14: the filled asterisks (config 3) only; Fig. 16: asterisks
+#     (config 5) and circles (impingement only).
+#   * config 5's lowest point (G 0.08) sits above the fit line, as printed;
+#     it is a real symbol. The common-range fits exclude it.
+#   * user-confirmed (2026-10-29) on a scan overlay: calibrated frame on the
+#     printed axes, every cross on its symbol.
+#
+# WHY UNSCORED. Whole-wall h: accuracy (cross-source) only, never a
+# coolant-side fidelity set, and it cannot separate jet from vent heat
+# transfer. It becomes the cross-source check for whichever exponent the
+# impingement-effusion element takes (#468); no set scores it yet.
+
+paper:
+  name: aldabagh1990
+  citation: >-
+    Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I.,
+    Nazari, A., Wu, J. (1990). "Impingement/effusion cooling: the influence
+    of the number of impingement holes and pressure loss on the heat transfer
+    coefficient." ASME Journal of Turbomachinery 112, 467-476.
+
+files:
+  - path: fig14_config3_imp_eff_1to1.csv
+    after: null
+    page: 7
+    item: "Figure 14, filled asterisks, configuration 3"
+    series: >-
+      Whole-wall heat transfer coefficient h [W/m^2 K] on the plate approach
+      area vs coolant mass flux G [kg/s/m^2], impingement/effusion
+      configuration 3 (N 4306 over 4306, 1:1)
+    figure: "14"
+    panel: single
+    geometry:
+      N_imp_per_m2: 4306.0
+      N_eff_per_m2: 4306.0
+      X_over_D_imp: 11.0
+      X_over_D_eff: 4.67
+      Ae_over_Ai: 5.6
+      Z_mm: 8.0
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_imp_eff_wall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Fit h ~ G^0.73 (0.75 on the range common with config 5). h5/h3 from the
+      fits reproduces the paper's text (about 20% lower at G 1-2, negligible
+      below 0.3). User-confirmed on a scan overlay 2026-10-29. `uncertainty`
+      left null: the paper's +-5% is stated for the technique, not per point.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [0.1, 10.0]
+      plot_y_limits: [10.0, 1000.0]
+  - path: fig16_config5_imp_eff_1to4.csv
+    after: null
+    page: 9
+    item: "Figure 16, asterisks, configuration 5"
+    series: >-
+      Whole-wall heat transfer coefficient h [W/m^2 K] on the plate approach
+      area vs coolant mass flux G [kg/s/m^2], impingement/effusion
+      configuration 5 (N 1076 over 4306, 1:4)
+    figure: "16"
+    panel: single
+    geometry:
+      N_imp_per_m2: 1076.0
+      N_eff_per_m2: 4306.0
+      X_over_D_eff: 4.67
+      Ae_over_Ai: 5.3
+      Z_mm: 8.0
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_imp_eff_wall
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Fit h ~ G^0.58 (0.61 on the common range, excluding the G 0.08 point,
+      which sits above the line as printed). User-confirmed on a scan overlay
+      2026-10-29.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [0.01, 10.0]
+      plot_y_limits: [10.0, 1000.0]
+  - path: fig16_impingement_only_N1076.csv
+    after: "Andrews et al. 1985d"
+    page: 9
+    item: "Figure 16, circles, impingement only"
+    series: >-
+      Impingement-only heat transfer coefficient h [W/m^2 K] vs coolant mass
+      flux G [kg/s/m^2], N 1076 m^-2, X/D 10.6 (re-plotted from Andrews 1985d)
+    figure: "16"
+    panel: single
+    geometry:
+      N_imp_per_m2: 1076.0
+      X_over_D_imp: 10.6
+    alpha_deg: 90.0
+    x_axis: G_coolant
+    x_scale: 1.0
+    y_axis: h_impingement_target
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    uncertainty: null
+    cross_check: >-
+      Fit h ~ G^0.87. Re-plotted from an earlier Leeds paper (Andrews 1985d,
+      not held). User-confirmed on a scan overlay 2026-10-29.
+    class_confidence: confirmed
+    scores: null
+    verification:
+      x_axis_type: log
+      y_axis_type: log
+      plot_x_limits: [0.01, 10.0]
+      plot_y_limits: [10.0, 1000.0]

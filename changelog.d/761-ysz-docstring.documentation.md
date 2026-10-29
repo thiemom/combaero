@@ -1,0 +1,1 @@
+- **`k_tbc_ysz`'s docstring now describes the shipped model** (#761). It still cited the untraceable "NASA TM-2010-216765" and the replaced APS/EB-PVD behaviour. It now gives Zhu & Miller 2000 Eq. 1 and records the model's fidelity on the paper's own Fig. 4 at 32 h: it matches the 1320 C curve, and is 2% high at 1100 C and 3% high at 990 C. Eq. 1 is kept as printed.
