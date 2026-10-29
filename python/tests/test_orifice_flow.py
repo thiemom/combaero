@@ -135,16 +135,13 @@ class TestOrificeFlowRealGas:
 
         result = cb.orifice_flow(geom, dP=50000, T=T, P=P, mu=mu, Z=Z)
 
-        # Calculate ideal gas density
-        R_gas = 8.314  # J/(mol*K)
-        MW_air = 0.02897  # kg/mol
-        rho_ideal = (P * MW_air) / (R_gas * T)
+        # Ideal-gas density of dry air (the default composition, #829)
+        rho_ideal = cb.density(T, P, cb.species.dry_air())
 
         # Real gas correction
         rho_expected = rho_ideal / Z
 
-        # Must match within machine precision
-        assert abs(result.rho_corrected - rho_expected) < 1e-12
+        assert result.rho_corrected == pytest.approx(rho_expected, rel=1e-12)
 
     def test_real_gas_higher_mdot_than_ideal(self):
         """Test that real gas (Z<1) gives higher mass flow than ideal gas."""
@@ -450,3 +447,23 @@ class TestTypicalApplications:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_the_density_is_the_given_compositions() -> None:
+    """orifice_flow forms rho from X (#829); it used air's molar mass for
+    every composition. Empty X is dry air, as documented."""
+    geom = cb.OrificeGeometry()
+    geom.d = 0.05
+    geom.D = 0.1
+    ch4 = [0.0] * cb.num_species()
+    ch4[cb.species_index_from_name("CH4")] = 1.0
+    air = cb.orifice_flow(geom, dP=10000, T=300, P=101325, mu=1.8e-5)
+    gas = cb.orifice_flow(geom, dP=10000, T=300, P=101325, mu=1.8e-5, X=ch4)
+    assert air.rho_corrected == pytest.approx(
+        cb.density(300, 101325, cb.species.dry_air()), rel=1e-12
+    )
+    assert gas.rho_corrected == pytest.approx(cb.density(300, 101325, ch4), rel=1e-12)
+    # At equal Re-free Cd the flow scales with sqrt(rho); Cd moves a little with Re.
+    assert gas.mdot / air.mdot == pytest.approx(
+        np.sqrt(gas.rho_corrected / air.rho_corrected), rel=5e-3
+    )
