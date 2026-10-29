@@ -87,6 +87,8 @@ AXIS_NAMES = {
     "h_imp_eff_wall": "imp./effusion wall h on A = X2 - piD2/4 [W/m2K]",
     "h_impingement_target": "impingement target-plate h [W/m2K]",
     "eta_overall": "overall cooling effectiveness (Tg-Tw)/(Tg-Tc)",
+    "pressure_ratio": "pressure ratio r = p / p0",
+    "K_mass_flow": "mass-flow coefficient K = m / (A sqrt(p0 rho0))",
 }
 
 

@@ -3449,6 +3449,17 @@ _DISCHARGE_SELECTORS = {
 # kernels are linear in Cd and refuse A_eff <= 0 (OrificeElement._kernel_from).
 _KERNEL_CD_MIN = 1e-12
 
+#: OrificeElement.compressible_model (#854): the default isentropic nozzle,
+#: Jobson (1955) with the approach-velocity extension, or ISO 5167-2:2003's
+#: Eq. (5) expansibility. The last two are opt-in.
+ORIFICE_COMPRESSIBLE_MODELS = ("nozzle", "jobson1955", "iso5167")
+
+# Jobson's flow is not linear in Cd (Ci enters the force defect as 1/Ci^2):
+# below this Cd it is evaluated here and scaled linearly to zero, the same
+# trace-Cd treatment as _KERNEL_CD_MIN with a floor the closure stays
+# well-conditioned at.
+_JOBSON_CD_MIN = 1e-6
+
 # The taps the network's metering Cd is evaluated at. ISO 5167-2's
 # permanent-loss relation (permanent_loss_ratio_and_dC) is Bernoulli to the
 # vena contracta plus a momentum balance after it, so its tapping
@@ -3529,6 +3540,24 @@ class OrificeElement(NetworkElement):
         beta = 0 both ways, no pressure recovery: a hole in a wall, i.e. a
         lumped Cd*A restriction. Write a lumped restriction this way; a bore
         at or above the pipe is no longer read as one.
+
+    ``compressible_model`` (#854) picks how the compressible regime expands
+    the flow; the incompressible regime ignores it (each reduces to Cd E A
+    sqrt(2 rho dP) there):
+      - 'nozzle' (default): the isentropic nozzle at A_eff = Cd E A, choked
+        at P*. Its expansion is a nozzle's, 3-9% below a sharp plate's at
+        10-20% pressure drop, and flat past choke.
+      - 'jobson1955': Jobson (1955), the contraction of a sharp-edged jet
+        widening as the pressure ratio falls, through choke and beyond, with
+        the approach-velocity extension of #854 in a pipe. Its only input is
+        the incompressible contraction Ci from the correlation's Cd, Cd = Cv
+        Ci (``Cv``, the velocity coefficient, default 1). Physics, nothing
+        fitted; its stated range (0.5 <= Ci <= 0.7, beta <= 0.75) is flagged
+        in diagnostics (model_in_range), not enforced.
+      - 'iso5167': ISO 5167-2:2003 Eq. (1) with Eq. (5)'s empirical
+        expansibility, for a Reader-Harris/Gallagher metering plate only.
+        Valid for p2/p1 >= 0.75 (flagged below it, where Eq. (5) is
+        extrapolated and has no choke).
     """
 
     # The jet: its vena-contracta Mach from the pressure ratio, not the bore's.
@@ -3550,10 +3579,35 @@ class OrificeElement(NetworkElement):
         injection_angle_deg: float = 90.0,
         tap: str = "Flange",
         in_pipe: bool = True,
+        compressible_model: str = "nozzle",
+        Cv: float = 1.0,
     ):
         super().__init__(id, from_node, to_node)
         # False: no pipe diameter, a lumped Cd*A restriction (#788).
         self.in_pipe = bool(in_pipe)
+        # How the compressible regime expands the flow (#854). Opt-in models
+        # beside the default isentropic nozzle; ignored when incompressible,
+        # where every model reduces to m = Cd E A sqrt(2 rho dP).
+        if compressible_model not in ORIFICE_COMPRESSIBLE_MODELS:
+            raise ValueError(
+                f"OrificeElement {id!r}: compressible_model {compressible_model!r} is not "
+                f"one of {list(ORIFICE_COMPRESSIBLE_MODELS)}."
+            )
+        if compressible_model == "iso5167" and correlation != "ReaderHarrisGallagher":
+            raise ValueError(
+                f"OrificeElement {id!r}: compressible_model 'iso5167' is ISO 5167-2:2003's "
+                "Eq. (5) expansibility, defined with its own discharge coefficient: use "
+                f"correlation='ReaderHarrisGallagher', not {correlation!r}."
+            )
+        if not (0.0 < Cv <= 1.0):
+            raise ValueError(f"OrificeElement {id!r}: Cv = {Cv!r} must be in (0, 1].")
+        if Cv != 1.0 and compressible_model != "jobson1955":
+            raise ValueError(
+                f"OrificeElement {id!r}: Cv is Jobson's velocity coefficient and applies "
+                "to compressible_model='jobson1955' only."
+            )
+        self.compressible_model = compressible_model
+        self.Cv = float(Cv)
         # bore == pipe: no orifice, set in resolve_topology (#788).
         self._pass_through = False
         if tap not in _TAPS:
@@ -4086,6 +4140,11 @@ class OrificeElement(NetworkElement):
         if self._approach_reads_flow():
             return self._flow_consistent_residuals(state_in, state_out, flows, effective_cd)
         if self._cd_follows_own_flow():
+            if self._flow_nonlinear_in_cd():
+                # _self_consistent_residuals takes m = Cd K (#582); Jobson's
+                # flow is not linear in Cd, so solve m* = m_calc(m*) on the
+                # kernel's own d(m)/d(Cd) instead (#854).
+                return self._flow_consistent_residuals(state_in, state_out, flows, effective_cd)
             return self._self_consistent_residuals(state_in, state_out, flows, effective_cd)
 
         m_calc, partials = self._flow_and_partials(state_in, state_out, effective_cd)
@@ -4105,6 +4164,14 @@ class OrificeElement(NetworkElement):
                 jac[0][name] = jac[0].get(name, 0.0) - dm_dcd * dcd
 
         return res, jac
+
+    def _flow_nonlinear_in_cd(self) -> bool:
+        """True when m_calc is not linear in Cd even without a recovering
+        pipe: Jobson's compressible closure (#854)."""
+        return (
+            self.regime == "compressible"
+            and getattr(self, "compressible_model", "nozzle") == "jobson1955"
+        )
 
     def _cd_follows_own_flow(self) -> bool:
         """True when Cd moves with this element's own flow through a hole
@@ -4181,7 +4248,12 @@ class OrificeElement(NetworkElement):
         # (U1/Vi -> inf in McGreehan-Schotsch's exp(-Rv^n)), and the kernels
         # refuse A_eff <= 0: evaluate at Cd = 1 there and scale, which is
         # exact, so a trace Cd gives a trace flow instead of an exception.
-        cd_k = cd if cd >= _KERNEL_CD_MIN else 1.0
+        model = getattr(self, "compressible_model", "nozzle") if compressible else "nozzle"
+        if model == "jobson1955":
+            # Not linear in Cd: a trace Cd is scaled linearly from the floor.
+            cd_k = cd if cd >= _JOBSON_CD_MIN else _JOBSON_CD_MIN
+        else:
+            cd_k = cd if cd >= _KERNEL_CD_MIN else 1.0
         scale = cd / cd_k
         # With a velocity of approach the kernels drive from the upstream
         # STATIC pressure (approach_from_static), since E carries the approach
@@ -4196,7 +4268,15 @@ class OrificeElement(NetworkElement):
                 p1, src.Pt, dst.Pt, beta, max(cd, _KERNEL_CD_MIN), compressible
             )
             p_down = float(tap.p_tap)
-        if compressible:
+        if model == "jobson1955":
+            r = _solver_tools.orifice_jobson_residuals_and_jacobian(
+                src.m_dot, src.Pt, p1, src.Tt, src.Y, p_down, cd_k, self.area, beta, self.Cv
+            )
+        elif model == "iso5167":
+            r = _solver_tools.orifice_iso5167_residuals_and_jacobian(
+                src.m_dot, src.Pt, p1, src.Tt, src.Y, p_down, cd_k, self.area, beta
+            )
+        elif compressible:
             r = _solver_tools.orifice_compressible_residuals_and_jacobian(
                 src.m_dot, src.Pt, p1, src.Tt, src.Y, p_down, cd_k, self.area, beta
             )
@@ -4224,7 +4304,13 @@ class OrificeElement(NetworkElement):
         # d(m_calc)/d(p1): the kernel's own column and, between pipes, the tap
         # pressure's through g. Spread over p1's dependencies below.
         dm_dp1 = float(r.d_mdot_dP_static_up)
-        dm_dcd = float(r.m_dot_calc) / cd_k
+        # The nozzle and ISO kernels are linear in Cd; Jobson's is not, and
+        # returns its own column (exact from the floor up, the linear scale
+        # below it).
+        if model == "jobson1955" and cd >= _JOBSON_CD_MIN:
+            dm_dcd = float(r.d_mdot_dCd)
+        else:
+            dm_dcd = float(r.m_dot_calc) / cd_k
         if tap is not None:
             dm_dp1 += g * float(tap.d_dP_static_up)
             # p_tap(p1, Pt_up, Pt_down, C): its other columns through g.
@@ -4533,7 +4619,58 @@ class OrificeElement(NetworkElement):
             "beta": float(self.beta),
             "area_source": self._area_source,
             **self._tap_diagnostics(state_in, state_out, cd),
+            **self._model_diagnostics(state_in, state_out, cd),
         }
+
+    def _model_diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        cd: float,
+    ) -> dict[str, float | str]:
+        """The opt-in compressible model's state along the flow (#854).
+
+        Empty for the default nozzle and in the incompressible regime, so a
+        default orifice reports exactly what it did. Ci is the incompressible
+        contraction the model used (Jobson) or C (ISO); contraction_C is
+        Jobson's compressible C; expansibility is m over the incompressible
+        Cd E A sqrt(2 rho1 dP) at the approach static state; model_in_range
+        is 1 inside the model's stated range (Jobson: 0.5 <= Ci <= 0.7, beta
+        <= 0.75; ISO: p2/p1 >= 0.75). A flag, never a refusal.
+        """
+        model = getattr(self, "compressible_model", "nozzle")
+        if model == "nozzle" or self.regime != "compressible" or self._pass_through:
+            return {}
+        forward = not (state_out.Pt > state_in.Pt)
+        up, dn = (state_in, state_out) if forward else (state_out, state_in)
+        up_id = self.from_node if forward else self.to_node
+        beta = self.beta if forward else getattr(self, "beta_reverse", 0.0)
+        recovers = self._recovery_fwd if forward else self._recovery_rev
+        ratio = getattr(self, "_pipe_cd_ratio_fwd" if forward else "_pipe_cd_ratio_rev", 1.0)
+        c = max(cd * ratio, _JOBSON_CD_MIN)
+        p1 = self._approach_static(up, up_id, forward, beta)[0]
+        p_down = float(dn.P)
+        if recovers:
+            p_down = float(
+                _solver_tools.orifice_tap_pressure_and_jacobian(
+                    p1, float(up.Pt), float(dn.Pt), beta, c, True
+                ).p_tap
+            )
+        args = (float(up.m_dot), float(up.Pt), p1, float(up.Tt), up.Y, p_down, c, self.area, beta)
+        if model == "jobson1955":
+            r = _solver_tools.orifice_jobson_residuals_and_jacobian(*args, self.Cv)
+        else:
+            r = _solver_tools.orifice_iso5167_residuals_and_jacobian(*args)
+        out: dict[str, float | str] = {
+            "compressible_model": model,
+            "Ci": float(r.Ci),
+            "expansibility": float(r.expansibility),
+            "model_in_range": float(r.in_range),
+        }
+        if model == "jobson1955":
+            out["contraction_C"] = float(r.contraction)
+            out["Cv"] = self.Cv
+        return out
 
     def _tap_diagnostics(
         self,

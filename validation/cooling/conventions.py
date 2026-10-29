@@ -49,6 +49,13 @@ CONVENTION_NOTES: dict[str, str] = {
     # Discharge coefficient
     "Cd_total": "Cd referenced to duct TOTAL pressure (Rohde 1969)",
     "Cd_static": "Cd referenced to duct STATIC pressure (McGreehan-Schotsch)",
+    # Compressible orifice mass flow (#854)
+    "K_reservoir_total": (
+        "mass-flow coefficient K = m_dot / (A sqrt(p0 rho0)) on the GEOMETRIC "
+        "orifice area and the upstream RESERVOIR (stagnation) state, against "
+        "r = p/p0 (Jobson 1955). Not a Cd: it carries the isentropic flux "
+        "K_N(r) as well as the contraction"
+    ),
     # Rib roughness functions
     "G_ribbed_wall": "heat-transfer roughness function on the RIBBED wall only",
     "G_four_wall": "G_bar, averaged over two ribbed and two smooth walls",
@@ -105,6 +112,7 @@ CONVENTION_NOTES: dict[str, str] = {
 SOURCE_PUBLISHES: dict[tuple[str, str], str] = {
     ("rohde1969", "Cd"): "Cd_total",
     ("mcgreehan_schotsch1988", "Cd"): "Cd_static",
+    ("jobson1955", "K_mass_flow"): "K_reservoir_total",
     ("han2012", "G"): "G_ribbed_wall",
     ("han_park_lei1984", "G"): "G_ribbed_wall",
     ("lau1990", "G"): "G_ribbed_wall",
@@ -157,6 +165,7 @@ SET_PRODUCES: dict[str, str] = {
     "florschuetz_1981_inline": "Nu_over_Nu1",
     "mcgreehan_schotsch_1988_cd": "Cd_static",
     "mcgreehan_schotsch_1988_crossflow_cd": "Cd_static",
+    "jobson_1955_mass_flow": "K_reservoir_total",
     "baldauf_2002_sellers": "eta_adiabatic",
     "colban_2011_shaped": "eta_adiabatic",
     # One set, two quantities: it produces an internal h, and the overall

@@ -207,6 +207,12 @@ UNIT_MAP: dict[str, str] = {
     "loss_ratio": "-",
     "pressure_recovery": "-",
     "recovery_in_range": "-",
+    # Opt-in compressible orifice models (#854)
+    "Ci": "-",
+    "contraction_C": "-",
+    "expansibility": "-",
+    "model_in_range": "-",
+    "Cv": "-",
     # Discharge holes, film and slot (#386, #714)
     "G_coolant": "kg/m\u00b2/s",
     "G_jet": "kg/m\u00b2/s",
@@ -336,6 +342,7 @@ def unit_of(key: str) -> str | None:
 TEXT_KEYS: frozenset[str] = frozenset(
     {
         "area_source",  # where an element's area came from (#773)
+        "compressible_model",  # the orifice expansion model (#854)
         "F0_source",
         "F1_source",
         "h_gas_unblown_model",

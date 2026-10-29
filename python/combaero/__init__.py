@@ -212,6 +212,10 @@ try:
         metering_cd_in_range,
         permanent_loss_ratio_and_dC,
         velocity_of_approach_factor,
+        jobson_force_defect,
+        jobson_ci_from_cd,
+        jobson_contraction_coefficient,
+        jobson_expansibility,
         DischargeCdCorrelation,
         DischargeHoleGeometry,
         DischargeHoleState,
@@ -915,6 +919,10 @@ except (ModuleNotFoundError, ImportError) as e:
     metering_cd_in_range = _core.metering_cd_in_range
     permanent_loss_ratio_and_dC = _core.permanent_loss_ratio_and_dC
     velocity_of_approach_factor = _core.velocity_of_approach_factor
+    jobson_force_defect = _core.jobson_force_defect
+    jobson_ci_from_cd = _core.jobson_ci_from_cd
+    jobson_contraction_coefficient = _core.jobson_contraction_coefficient
+    jobson_expansibility = _core.jobson_expansibility
     discharge_cd = _core.discharge_cd
     discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     discharge_cd_in_range = _core.discharge_cd_in_range
@@ -1586,6 +1594,10 @@ __all__ = [
     "metering_cd_in_range",
     "permanent_loss_ratio_and_dC",
     "velocity_of_approach_factor",
+    "jobson_force_defect",
+    "jobson_ci_from_cd",
+    "jobson_contraction_coefficient",
+    "jobson_expansibility",
     "discharge_cd",
     "discharge_cd_and_derivatives",
     "discharge_cd_in_range",

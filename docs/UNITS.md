@@ -264,6 +264,10 @@ All functions use consistent units to avoid conversion errors.
 | `metering_cd_in_range`                       | correlation: -, geom: OrificeGeometry, Re_D: -         | - (bool)                |
 | `permanent_loss_ratio_and_dC`                | beta: -, C: -                                          | tuple(-, -)             |
 | `velocity_of_approach_factor`                | beta: -                                                | -                       |
+| `jobson_force_defect`                        | Ci: -, beta: -, Cv: -                                  | - (f)                   |
+| `jobson_ci_from_cd`                          | Cd: -, beta: -, Cv: -                                  | - (Ci)                  |
+| `jobson_contraction_coefficient`             | r: -, Ci: -, n: -                                      | - (C)                   |
+| `jobson_expansibility`                       | r: -, beta: -, Ci: -, n: -                             | - (eps)                 |
 | `Cd`                                         | OrificeGeometry, OrificeState                          | - (Cd)                  |
 | `mcgreehan_schotsch_1988_cd`                 | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: - | - (Cd)                  |
 | `mcgreehan_schotsch_1988_cd_and_derivatives` | Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -         | - (Cd, dCd/dRe, dCd/du) |
@@ -860,13 +864,15 @@ All functions use consistent units to avoid conversion errors.
 
 ### solver_interface.h - Compressible Flow Elements
 
-| Function                                      | Input Units                                                                                                       | Output Unit                                 |
-|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
-| `orifice_compressible_mdot_and_jacobian`      | Tt: K, Pt: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                  | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
-| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: - | OrificeResult                               |
-| `sonic_static_pressure`                       | Tt: K, G: kg/(m^2*s), Y: kg/kg                                                                                    | SonicStatic                                 |
-| `approach_static_pressure`                    | Pt: Pa, Tt: K, G: kg/(m^2*s), Y: kg/kg, incompressible: bool                                                      | ApproachStatic                              |
-| `orifice_tap_pressure_and_jacobian`           | P_static_up: Pa, P_total_up: Pa, P_total_down: Pa, beta: -, C: -, compressible: bool                              | OrificeTapPressure                          |
+| Function                                      | Input Units                                                                                                              | Output Unit                                 |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|---------------------------------------------|
+| `orifice_compressible_mdot_and_jacobian`      | Tt: K, Pt: Pa, P_back: Pa, X: mol/mol, Cd: -, area: m^2, beta: -                                                         | tuple(kg/s, kg/(s*Pa), kg/(s*Pa), kg/(s*K)) |
+| `orifice_compressible_residuals_and_jacobian` | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: -        | OrificeResult                               |
+| `orifice_jobson_residuals_and_jacobian`       | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: -, Cv: - | OrificeModelResult                          |
+| `orifice_iso5167_residuals_and_jacobian`      | m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, P_static_down: Pa, Cd: -, area: m^2, beta: -        | OrificeModelResult                          |
+| `sonic_static_pressure`                       | Tt: K, G: kg/(m^2*s), Y: kg/kg                                                                                           | SonicStatic                                 |
+| `approach_static_pressure`                    | Pt: Pa, Tt: K, G: kg/(m^2*s), Y: kg/kg, incompressible: bool                                                             | ApproachStatic                              |
+| `orifice_tap_pressure_and_jacobian`           | P_static_up: Pa, P_total_up: Pa, P_total_down: Pa, beta: -, C: -, compressible: bool                                     | OrificeTapPressure                          |
 
 ### geometry.h - Geometric Utilities
 

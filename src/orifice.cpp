@@ -4,11 +4,13 @@
 #include "../include/humidair.h"
 #include "../include/math_constants.h"
 #include "../include/orifice.h"
+#include "../include/orifice_jobson.h"
 #include "../include/input_validation.h"
 #include "../include/thermo.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -1470,7 +1472,8 @@ double expansibility_factor(double beta, double dP, double P_upstream, double ka
 
     // ISO 5167-2:2003 expansibility factor formula
     // eps = 1 - (0.351 + 0.256*beta^4 + 0.93*beta^8) * [1 - (1 - tau)^(1/kappa)]
-    const double coeff = 0.351 + 0.256 * beta4 + 0.93 * beta8;
+    namespace ie = orifice::iso5167_expansibility;
+    const double coeff = ie::c0 + ie::c4 * beta4 + ie::c8 * beta8;
     const double expansion_term = 1.0 - std::pow(1.0 - tau, 1.0 / kappa);
 
     return 1.0 - coeff * expansion_term;
@@ -1638,4 +1641,92 @@ double orifice_Re_d_from_mdot(double mdot, double d, double mu) {
 
     // Re_d = 4 * mdot / (pi * d * mu)
     return (4.0 * mdot) / (M_PI * d * mu);
+}
+
+// -------------------------------------------------------------
+// Jobson (1955) compressible contraction (#854)
+// -------------------------------------------------------------
+
+namespace {
+using J1 = combaero::solver::DualN<1>;
+
+void check_jobson_inputs(const char* who, double Ci, double beta, double n) {
+    if (!(Ci > 0.0) || !std::isfinite(Ci)) {
+        throw std::invalid_argument(std::string(who) + ": Ci must be > 0");
+    }
+    if (!(beta >= 0.0 && beta < 1.0)) {
+        throw std::invalid_argument(std::string(who) + ": beta must be in [0, 1)");
+    }
+    const double b4 = beta * beta * beta * beta;
+    if (!(Ci * Ci * b4 < 1.0)) {
+        throw std::invalid_argument(std::string(who) + ": Ci^2 beta^4 must be < 1");
+    }
+    if (!(n > 1.0) || !std::isfinite(n)) {
+        throw std::invalid_argument(std::string(who) + ": n must be > 1");
+    }
+}
+} // namespace
+
+double jobson_force_defect(double Ci, double beta, double Cv) {
+    if (!(Ci > 0.0) || !(Cv > 0.0)) {
+        throw std::invalid_argument("jobson_force_defect: Ci and Cv must be > 0");
+    }
+    const double b2 = (beta > 0.0 && beta < 1.0) ? beta * beta : 0.0;
+    return 1.0 / Ci - 0.5 / (Ci * Ci) - Cv * b2 + 0.5 * Cv * Cv * b2 * b2;
+}
+
+double jobson_ci_from_cd(double Cd, double beta, double Cv) {
+    if (!(Cd > 0.0) || !(Cv > 0.0)) {
+        throw std::invalid_argument("jobson_ci_from_cd: Cd and Cv must be > 0");
+    }
+    return combaero::orifice_jobson::ci_from_cd(J1::constant(Cd), beta, Cv).v;
+}
+
+double jobson_contraction_coefficient(double r, double Ci, double n) {
+    check_jobson_inputs("jobson_contraction_coefficient", Ci, 0.0, n);
+    if (!(r > 0.0 && r <= 1.0)) {
+        throw std::invalid_argument("jobson_contraction_coefficient: r must be in (0, 1]");
+    }
+    if (r == 1.0) {
+        return Ci;  // the incompressible limit, where the quadratic is 0/0
+    }
+    // Reservoir at p0 = rho0 = 1: C depends only on r, n and Ci.
+    const J1 one = J1::constant(1.0);
+    return combaero::orifice_jobson::flux(one, one, one, J1::constant(r), J1::constant(Ci),
+                                          J1::constant(n), 0.0)
+        .C.v;
+}
+
+double jobson_expansibility(double r, double beta, double Ci, double n) {
+    check_jobson_inputs("jobson_expansibility", Ci, beta, n);
+    if (!(r > 0.0 && r <= 1.0)) {
+        throw std::invalid_argument("jobson_expansibility: r must be in (0, 1]");
+    }
+    if (r == 1.0) {
+        return 1.0;
+    }
+    const double b2 = beta * beta;
+    // Upstream static state p1 = rho1 = 1; the approach velocity raises the
+    // stagnation state the jet expands from, V1 = g beta^2 / rho1, so solve
+    // g = flux(p0(g), rho0(g)) by fixed point (the approach term is O(b^4)).
+    double g = 0.0;
+    for (int it = 0; it < 200; ++it) {
+        const double V1 = g * b2;
+        const double tau = 1.0 + V1 * V1 * (n - 1.0) / (2.0 * n);  // T0/T1
+        const double p0 = std::pow(tau, n / (n - 1.0));
+        const double rho0 = std::pow(tau, 1.0 / (n - 1.0));
+        const double g_new =
+            combaero::orifice_jobson::flux(J1::constant(p0), J1::constant(rho0),
+                                           J1::constant(1.0), J1::constant(r),
+                                           J1::constant(Ci), J1::constant(n), beta)
+                .g.v;
+        const bool done = std::abs(g_new - g) <= 1e-15 * std::abs(g_new);
+        g = g_new;
+        if (done) {
+            break;
+        }
+    }
+    const double b4 = b2 * b2;
+    const double g_inc = Ci * std::sqrt(2.0 * (1.0 - r)) / std::sqrt(1.0 - Ci * Ci * b4);
+    return g / g_inc;
 }

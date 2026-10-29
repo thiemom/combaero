@@ -1179,6 +1179,82 @@ const Inspector = () => {
 										<option value="compressible">Forced Compressible</option>
 									</select>
 								</div>
+
+								{/* Compressible expansion model (#854): opt-in, nozzle default */}
+								<div className="flex flex-col gap-1 mt-2">
+									<label
+										htmlFor={`compressible_model_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase tracking-wide"
+									>
+										Compressible Model
+									</label>
+									<select
+										id={`compressible_model_${selectedNode.id}`}
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={selectedNode.data.compressible_model || "nozzle"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												compressible_model: e.target.value,
+											})
+										}
+									>
+										<option value="nozzle">Isentropic nozzle (default)</option>
+										<option value="jobson1955">
+											Sharp-edged jet (Jobson 1955)
+										</option>
+										<option
+											value="iso5167"
+											disabled={
+												(selectedNode.data.correlation ||
+													"ReaderHarrisGallagher") !== "ReaderHarrisGallagher"
+											}
+										>
+											ISO 5167-2 expansibility (RHG only)
+										</option>
+									</select>
+									<span className="text-[9px] italic text-stone-400">
+										Compressible regime only. Jobson: the jet widens as the
+										pressure ratio falls, through choke; ISO: valid for p2/p1 ≥
+										0.75.
+									</span>
+									{selectedNode.data.compressible_model === "iso5167" &&
+										(selectedNode.data.correlation ||
+											"ReaderHarrisGallagher") !== "ReaderHarrisGallagher" && (
+											<p className="text-[9px] text-amber-700">
+												ISO 5167-2 expansibility needs the
+												Reader-Harris/Gallagher Cd: the solver refuses this
+												pairing.
+											</p>
+										)}
+									{selectedNode.data.result?.model_in_range === 0 && (
+										<p className="text-[9px] text-amber-700">
+											Outside the compressible model's stated range.
+										</p>
+									)}
+								</div>
+								{selectedNode.data.compressible_model === "jobson1955" && (
+									<div className="flex flex-col gap-1 mt-1">
+										<label
+											htmlFor={`Cv_${selectedNode.id}`}
+											className="text-xs font-bold text-gray-500 uppercase"
+										>
+											Velocity Coefficient Cv
+										</label>
+										<NumericInput
+											id={`Cv_${selectedNode.id}`}
+											value={selectedNode.data.Cv ?? 1.0}
+											onChange={(val) =>
+												updateNodeData(selectedNode.id, { Cv: val })
+											}
+											className="p-1.5 h-8 text-sm border rounded bg-white"
+											placeholder="1.0"
+										/>
+										<span className="text-[9px] italic text-stone-400">
+											Cd = Cv Ci: the contraction Ci is Cd / Cv (Jobson used
+											0.982).
+										</span>
+									</div>
+								)}
 								<InitialGuessEditor node={selectedNode} />
 							</>
 						);

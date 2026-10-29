@@ -179,6 +179,8 @@ def networks() -> Iterator[tuple[str, str, dict]]:
     yield "channel", "heated (thermal wall)", _heated_pair()
     yield "channel", "incompressible", _with(_heated_pair(), "x", regime="incompressible")
     yield "orifice", "in a pipe", _orifice_in_pipe({})
+    for model in ("jobson1955", "iso5167"):
+        yield "orifice", f"in a pipe, {model}", _orifice_in_pipe({"compressible_model": model})
     for corr in ("Stolz", "Lichtarowicz", "IdelchikThick", "McGreehanSchotsch", "fixed"):
         # A 0.1 m plate: l/d = 2, inside every discharge-hole correlation.
         yield (

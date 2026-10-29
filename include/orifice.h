@@ -800,6 +800,32 @@ double K_from_Cd(double Cd, double beta);
 // Cd from loss coefficient K
 double Cd_from_K(double K, double beta);
 
+// ISO 5167-2:2003 5.3.2.2, Eq. (5): the empirical expansibility of an orifice
+// plate, eps = 1 - (c0 + c4 beta^4 + c8 beta^8) [1 - (p2/p1)^(1/kappa)].
+// Valid for p2/p1 >= min_pressure_ratio only; its stated uncertainty is
+// uncertainty_pct dp / (kappa p1) percent (5.3.3.2).
+namespace iso5167_expansibility {
+constexpr double c0                 = 0.351;
+constexpr double c4                 = 0.256;
+constexpr double c8                 = 0.93;
+constexpr double min_pressure_ratio = 0.75;
+constexpr double uncertainty_pct    = 3.5;
+} // namespace iso5167_expansibility
+
+// Jobson (1955), Proc. IMechE 169, 767: the compressible contraction
+// coefficient of a sharp-edged orifice from its incompressible one, through
+// the force defect on the reservoir wall (Eq. 5), f = 1/Ci - 1/(2 Ci^2).
+// The paper evaluates Ci from 0.5 (Borda mouthpiece) to 0.7 (Figs. 3 and 4);
+// p. 772 "tentatively" suggests Ci = 0.7 as the theory's upper limit, as it
+// fails when the orifice approaches a nozzle (f -> 0.5); the beta
+// extension (#854) is checked against ISO 5167-2 Eq. (5) up to its beta 0.75.
+// These bounds set a diagnostic flag, never a refusal.
+namespace jobson1955 {
+constexpr double ci_min   = 0.5;   // Borda mouthpiece, f = 0
+constexpr double ci_max   = 0.7;   // the paper's suggested upper limit (p. 772)
+constexpr double beta_max = 0.75;  // the beta extension's checked range
+} // namespace jobson1955
+
 } // namespace orifice
 
 // -------------------------------------------------------------
@@ -1148,5 +1174,50 @@ double orifice_Re_d_from_mdot(double mdot, double d, double mu);
 //            pressure differential devices inserted in circular cross-section
 //            conduits running full
 double expansibility_factor(double beta, double dP, double P_upstream, double kappa);
+
+// -------------------------------------------------------------
+// Jobson (1955): compressible contraction of a sharp-edged orifice (#854)
+// -------------------------------------------------------------
+//
+// Jobson's control volume (his Fig. 2): the momentum of the jet balances the
+// drive across the orifice area plus a force defect F = f mdot^2/(rho A) on
+// the reservoir wall, whose coefficient f is fixed by incompressible flow and
+// then carried unchanged to compressible flow. The jet is isentropic from the
+// upstream stagnation state (polytropic index n); choked, the jet's first
+// throat is sonic and the back pressure acts outside it (Eq. 15), so C keeps
+// rising past choke as the jet widens. Mass flow m = Cv C K_N A sqrt(p0 rho0).
+//
+// APPROACH VELOCITY (#854, not in the paper). In a pipe, the approach flow
+// enters the control volume at V1 = mdot beta^2 / (rho1 A) with static p1,
+// rho1:  (p1 - p) A + f mdot^2/(rho1 A) = mdot (u - V1),  u from the TOTAL
+// state. Its incompressible limit fixes
+//   f(Ci, beta) = 1/Ci - 1/(2 Ci^2) - beta^2 + beta^4 / 2,
+// Jobson's Eq. 5 at beta = 0. Choked, the same V1 term enters Eq. 15's
+// balance, (p1 - p) A - (pc - p) C A + f mdot^2/(rho1 A) = mdot (uc - V1).
+// With a velocity coefficient Cv (actual flow = Cv x theoretical) V1 is the
+// ACTUAL approach velocity, Cv mdot beta^2 / (rho1 A), the one the pipe's
+// static p1 carries, and the incompressible limit then fixes
+//   f(Ci, beta, Cv) = 1/Ci - 1/(2 Ci^2) - Cv beta^2 + Cv^2 beta^4 / 2,
+// the form above at Cv = 1.
+
+// The force-defect coefficient f(Ci, beta, Cv) above [-].
+double jobson_force_defect(double Ci, double beta = 0.0, double Cv = 1.0);
+
+// The incompressible contraction Ci of an orifice whose incompressible flow
+// is m = Cd E A sqrt(2 rho1 dp) (ISO's form, E = 1/sqrt(1 - beta^4)), with
+// the velocity coefficient Cv as an overall factor (Jobson's Cd = Cv Ci):
+// Cv Ci / sqrt(1 - (Cv Ci)^2 beta^4) = Cd E. beta = 0: Ci = Cd / Cv.
+double jobson_ci_from_cd(double Cd, double beta = 0.0, double Cv = 1.0);
+
+// The paper's C(r) for a reservoir-fed orifice (beta = 0): Eq. (11) for
+// r = p/p0 >= r_c and Eq. (15) below it. Ci in (0, 1], n > 1, 0 < r <= 1.
+double jobson_contraction_coefficient(double r, double Ci, double n);
+
+// Expansibility the beta-extended theory implies, comparable with ISO
+// 5167-2's eps: mdot / mdot_inc at the same upstream STATIC state (p1, rho1)
+// and the same Ci, with mdot_inc = Ci A sqrt(2 rho1 dp) / sqrt(1 - Ci^2 b^4).
+// r = p2/p1; the approach velocity's stagnation rise is solved to
+// consistency. Subcritical and choked alike.
+double jobson_expansibility(double r, double beta, double Ci, double n);
 
 #endif // ORIFICE_H

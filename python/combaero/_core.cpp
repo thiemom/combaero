@@ -1465,6 +1465,35 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "applied (0 < beta < 1) the nozzle expands from P_static_up, else from\n"
         "P_total_up.");
 
+  py::class_<solver::OrificeModelResult, solver::OrificeResult>(
+      m, "OrificeModelResult",
+      "OrificeResult of an opt-in compressible orifice model (#854), plus\n"
+      "d_mdot_dCd and the model's state.")
+      .def_readonly("d_mdot_dCd", &solver::OrificeModelResult::d_mdot_dCd)
+      .def_readonly("Ci", &solver::OrificeModelResult::Ci)
+      .def_readonly("contraction", &solver::OrificeModelResult::contraction)
+      .def_readonly("expansibility", &solver::OrificeModelResult::expansibility)
+      .def_readonly("choked", &solver::OrificeModelResult::choked)
+      .def_readonly("in_range", &solver::OrificeModelResult::in_range);
+
+  m.def("orifice_jobson_residuals_and_jacobian",
+        &solver::orifice_jobson_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("Tt_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"), py::arg("area"),
+        py::arg("beta") = 0.0, py::arg("Cv") = 1.0,
+        "Jobson (1955) compressible orifice with the approach-velocity\n"
+        "extension (#854), sub- and supercritical, all derivatives analytic\n"
+        "(composition by a forward difference). Cd is the incompressible\n"
+        "coefficient in ISO's form; Ci from jobson_ci_from_cd(Cd, beta, Cv).");
+
+  m.def("orifice_iso5167_residuals_and_jacobian",
+        &solver::orifice_iso5167_residuals_and_jacobian, py::arg("m_dot"),
+        py::arg("P_total_up"), py::arg("P_static_up"), py::arg("Tt_up"),
+        py::arg("Y_up"), py::arg("P_static_down"), py::arg("Cd"), py::arg("area"),
+        py::arg("beta") = 0.0,
+        "ISO 5167-2:2003 Eq. (1) with Eq. (5)'s expansibility (#854).\n"
+        "in_range is False below p2/p1 = 0.75, where Eq. (5) is extrapolated.");
+
   py::class_<solver::SonicStatic>(
       m, "SonicStatic", "Sonic static state of a chamber's mass flux (#637)")
       .def_readonly("P", &solver::SonicStatic::P)
@@ -6126,6 +6155,26 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "ISO 5167-1 velocity-of-approach factor E = 1 / sqrt(1 - beta^4).\n"
         "Returns 1 outside 0 < beta < 1 (no approach pipe, or a bore at\n"
         "least as wide as the pipe): the network's no-correction convention.");
+  m.def("jobson_force_defect", &jobson_force_defect, py::arg("Ci"), py::arg("beta") = 0.0,
+        py::arg("Cv") = 1.0,
+        "Jobson (1955) force-defect coefficient with the approach-velocity\n"
+        "extension (#854): f = 1/Ci - 1/(2 Ci^2) - Cv beta^2 + Cv^2 beta^4/2.\n"
+        "beta = 0 is the paper's Eq. (5).");
+  m.def("jobson_ci_from_cd", &jobson_ci_from_cd, py::arg("Cd"), py::arg("beta") = 0.0,
+        py::arg("Cv") = 1.0,
+        "Incompressible contraction Ci of an orifice whose incompressible\n"
+        "flow is Cd E A sqrt(2 rho1 dp), with Jobson's velocity coefficient\n"
+        "Cv: Cv Ci / sqrt(1 - (Cv Ci)^2 beta^4) = Cd E. beta = 0: Cd / Cv.");
+  m.def("jobson_contraction_coefficient", &jobson_contraction_coefficient, py::arg("r"),
+        py::arg("Ci"), py::arg("n"),
+        "Jobson (1955) compressible contraction coefficient C of a\n"
+        "reservoir-fed sharp-edged orifice: Eq. (11) for r = p/p0 >= r_c,\n"
+        "Eq. (15) below. Mass flow Cv C K_N A sqrt(p0 rho0).");
+  m.def("jobson_expansibility", &jobson_expansibility, py::arg("r"), py::arg("beta"),
+        py::arg("Ci"), py::arg("n"),
+        "Expansibility implied by Jobson's theory with the approach-velocity\n"
+        "extension (#854): mdot / mdot_inc at the same upstream static state\n"
+        "and Ci, r = p2/p1. Comparable with ISO 5167-2 Eq. (5).");
 
 
 

@@ -3549,12 +3549,15 @@ documents:
   status: implemented
   verdict: 'Checked 2026-10-29: metering_cd_and_dRe(ReaderHarrisGallagher) reproduces every Annex A Table
     A.1-A.11 entry (corner, D-D/2, flange taps, D 50-1000 mm, about 4800 points) to the table''s rounding;
-    permanent_loss_ratio_and_dC is Eq. (7). The compressible kernel does NOT use Eq. (5): it applies the
-    isentropic nozzle expansion, -0.9% at p2/p1 0.97 and -7 to -9% at 0.80 (#854).'
+    permanent_loss_ratio_and_dC is Eq. (7). The default compressible kernel applies the isentropic nozzle
+    expansion (-0.9% at p2/p1 0.97, -7 to -9% at 0.80); Eq. (1) with Eq. (5) is the opt-in compressible_model
+    "iso5167" (RHG only, flagged below p2/p1 0.75), which closes #852''s example gap to 0.01%, and Eq. (5) is
+    the cross-source check of the Jobson beta extension (#854).'
   read_for: ['#645/#649 metering orifice', '#793 ISO worked example', '#854 expansibility']
   issues: [645, 649, 793, 854]
-  records: [python/tests/test_orifice_metering_taps.py, python/tests/test_orifice_permanent_loss.py]
-  code: [src/orifice.cpp, include/orifice.h]
+  records: [python/tests/test_orifice_metering_taps.py, python/tests/test_orifice_permanent_loss.py,
+    tests/test_orifice_jobson.cpp, python/tests/test_orifice_jobson_854.py]
+  code: [src/orifice.cpp, include/orifice.h, src/solver_interface.cpp]
   notes: Supplied by the user 2026-10-29 (moved here from the wanted list). The 2022 edition was only available
     as the free preview (stops in 5.2) and was not kept.
 
@@ -3566,19 +3569,25 @@ documents:
     defect f = 1/Ci - 1/(2 Ci^2) from the incompressible Ci (Eq. 5), subcritical C(r) (Eq. 11), choked C(r)
     (Eq. 15) to any back pressure, Borda limits (Eqs. 16/17), m = Cv C K_N A sqrt(p0 rho0). Table 2: C vs r for
     a plane slit (Ci = pi/(pi+2)) against Howarth''s hodograph (Table 1); Fig. 5: Perry 1949 (air) and Schiller
-    1933 (steam) mass-flow coefficients vs pressure ratio.'
-  status: screened
-  verdict: 'The physics-based compressible orifice for #854, with no fitted constant: our transcription reproduces
-    Table 2 within 0.0006 at every r (inside its 3-decimal rounding). Its expansibility at beta -> 0 lies within
-    0.1-0.8% of ISO 5167-2 Eq. (5) inside ISO''s range (p2/p1 >= 0.75), where the isentropic nozzle combaero
-    applies today is 0.9-9% low; it continues smoothly below 0.75 and through choke (C keeps rising past choke).
-    Assumes a reservoir (no approach velocity): exact for plenum-fed holes (liner, effusion, impingement), an
-    extension for in-pipe plates (beta up to 0.75) is not in the paper. Fig. 5 (Perry, Schiller) is a fidelity
-    set for digitising.'
+    1933 (steam) mass-flow coefficients vs pressure ratio. p. 772 suggests Ci <= 0.7 as the theory''s upper
+    limit; Bosanquet''s discussion (p. 773) shows C dipping to 0.852 at f = 0.5 (the nozzle limit).'
+  status: implemented
+  verdict: 'Implemented (#854) as the opt-in OrificeElement compressible_model "jobson1955", analytic (f, J),
+    with an approach-velocity extension not in the paper: f(Ci, beta, Cv) = 1/Ci - 1/(2 Ci^2) - Cv beta^2 + Cv^2
+    beta^4/2, fixed by the incompressible limit. Fidelity: Table 2 reproduced within 0.001 at every printed r
+    (tests/test_orifice_jobson.cpp). Cross-source accuracy (Jobson fitted nothing to Perry; Cd 0.600 = slit Ci x
+    Cv 0.982): on Perry 1949 air, Fig. 5a digitised and user-confirmed 2026-10-29, N = 15, bias -1.4%, RMS 1.6%,
+    worst -2.5%; the default isentropic nozzle at the same Cd scores RMS 20.5% (flat below r_c). The beta
+    extension lies inside ISO 5167-2 Eq. (5)''s stated uncertainty over beta 0.2-0.75, p2/p1 0.75-0.98 with RHG
+    C (cross-source). Fig. 5b (Schiller 1933 steam, n = 1.3) not digitised. Default unchanged pending a decision.'
   read_for: ['#854 compressible orifice expansion']
   issues: [854]
-  records: []
-  notes: Supplied by the user 2026-10-29 (uploaded from a phone).
+  records: [validation/cooling/data/jobson1955/metadata.yaml, validation/cooling/orifice_runner.py,
+    tests/test_orifice_jobson.cpp, python/tests/test_orifice_jobson_854.py, python/tests/test_jobson1955_perry.py]
+  code: [include/orifice_jobson.h, include/orifice.h, src/orifice.cpp, src/solver_interface.cpp,
+    python/combaero/network/components.py]
+  notes: Supplied by the user 2026-10-29 (uploaded from a phone). Perry (1949) is cited in its Appendix II as
+    Trans. ASME 71, 757, 'Critical Flow Through Sharp-edged Orifices'; we do not hold Perry itself.
 
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
