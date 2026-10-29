@@ -51,7 +51,9 @@ const OrificeNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					Cd: {(data.result?.Cd ?? data.Cd ?? 0.6).toFixed(3)}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows kind="orifice" result={data.result} maxRows={1} />
+				)}
 			</div>
 
 			<div

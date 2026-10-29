@@ -4,6 +4,8 @@
  * After a solve the panel scans every finite numeric scalar across all node,
  * element, and thermal-wall results and presents a searchable, checkboxed
  * list. Checking a field adds it to `displaySettings`; unchecking removes it.
+ * The selection drives the Live Telemetry; node cards show their own
+ * per-kind rows (utils/cardRows.ts, #775).
  *
  * "Filter and forget": the search input resets to empty whenever the solve
  * results change, so the list is always presented clean for the new topology.

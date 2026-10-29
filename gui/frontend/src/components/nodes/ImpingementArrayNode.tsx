@@ -55,7 +55,13 @@ const ImpingementArrayNode = ({ id, data, selected }: NodeProps) => {
 					{data.n_rows ?? 10} rows, d{" "}
 					{((data.d_jet ?? 0.00254) * 1000).toFixed(2)} mm
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows
+						kind="impingement_array"
+						result={data.result}
+						maxRows={1}
+					/>
+				)}
 			</div>
 
 			<div

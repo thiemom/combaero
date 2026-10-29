@@ -71,6 +71,11 @@ export interface RFState {
 	 *  auto-added to displaySettings, so an unchecked field stays unchecked. */
 	knownFields: string[];
 	setDisplaySettings: (settings: string[]) => void;
+	/** Node-card rows the user chose, per palette kind (#775); a kind not in
+	 *  it shows its curated default (utils/cardRows.ts). */
+	cardRows: Partial<Record<string, string[]>>;
+	/** Set a kind's card rows; null restores the curated default. */
+	setCardRows: (kind: string, keys: string[] | null) => void;
 	solverSettings: {
 		global_regime: "incompressible" | "compressible";
 		init_strategy:
@@ -315,7 +320,8 @@ const useStore = create<RFState>((set, get) => ({
 		if (!results) return;
 
 		// Auto-promote every NEWLY discovered scalar field into displaySettings
-		// so the Inspector and node cards show it without manual opt-in. A field
+		// so the Live Telemetry shows it without manual opt-in (node cards
+		// show their own per-kind rows, utils/cardRows.ts). A field
 		// seen before is left as the user set it: one they unchecked stays
 		// unchecked at the next solve (it used to be re-added every solve).
 		const discovered = discoverFields(results).map((f) => f.key);
@@ -378,6 +384,11 @@ const useStore = create<RFState>((set, get) => ({
 	knownFields: ["Tt", "P", "m_dot", "rho"],
 	setDisplaySettings: (settings: string[]) => {
 		set({ displaySettings: settings });
+	},
+	cardRows: {},
+	setCardRows: (kind: string, keys: string[] | null) => {
+		const { [kind]: _old, ...rest } = get().cardRows;
+		set({ cardRows: keys === null ? rest : { ...rest, [kind]: keys } });
 	},
 	solverSettings: {
 		// Mirrors combaero.network.components.DEFAULT_REGIME; kept equal by

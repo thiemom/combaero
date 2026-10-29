@@ -56,7 +56,9 @@ const FilmCoolingNode = ({ id, data, selected }: NodeProps) => {
 				<div className="text-[9px] font-mono text-gray-500 whitespace-nowrap truncate max-w-full">
 					{nHoles} {data.hole_type === "cylindrical" ? "cyl." : "shaped"}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows kind="film_cooling" result={data.result} maxRows={1} />
+				)}
 			</div>
 
 			<div

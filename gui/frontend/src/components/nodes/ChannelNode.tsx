@@ -68,7 +68,9 @@ const ChannelNode = ({ id, data, selected }: NodeProps) => {
 						<span className="text-amber-600">?</span>
 					)}
 				</span>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows kind="channel" result={data.result} maxRows={1} />
+				)}
 			</div>
 
 			<div

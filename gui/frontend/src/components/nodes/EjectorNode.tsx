@@ -68,7 +68,9 @@ const EjectorNode = ({ id, data, selected }: NodeProps) => {
 						? `ER ${Number(data.result.entrainment_ratio).toFixed(3)}`
 						: "critical"}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows kind="ejector" result={data.result} maxRows={1} />
+				)}
 			</div>
 
 			{/* Port labels: P (primary) left, S (secondary) bottom, O (outlet) right. */}

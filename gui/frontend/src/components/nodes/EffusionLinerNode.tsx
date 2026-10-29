@@ -70,7 +70,13 @@ const EffusionLinerNode = ({ id, data, selected }: NodeProps) => {
 						? `bleed ${(100 * Number(bleed)).toFixed(0)}%`
 						: `${data.n_segments ?? 4} stations`}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows
+						kind="effusion_liner"
+						result={data.result}
+						maxRows={1}
+					/>
+				)}
 			</div>
 
 			{/* Port labels: C in (left), C out (right), G discharge (top). */}

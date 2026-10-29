@@ -72,7 +72,9 @@ const MPCETeeNode = ({ id, data, selected }: NodeProps) => {
 					{isMerge ? "merge" : "branch"}{" "}
 					{Math.round(Math.abs(data.theta_deg ?? 90))}&deg;
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows kind="mpce_tee" result={data.result} maxRows={1} />
+				)}
 			</div>
 
 			{/* Port labels: S/C swap left/right per flow_direction; B stays at bottom. */}

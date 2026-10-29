@@ -1,31 +1,33 @@
 /**
  * Shared micro-component for node cards.
  *
- * Renders up to `maxRows` diagnostic values from a solve result, using
- * whichever keys the user has selected in `displaySettings`. Only fields
- * that resolve to a finite numeric value in this specific result are shown â
- * stale or absent keys are silently skipped, so no hardcoded field lists are
- * needed here or in any consuming node component.
+ * Renders up to `maxRows` diagnostic values from a solve result: the card
+ * rows of this kind (utils/cardRows.ts), which are the curated per-kind
+ * default unless the user pinned others in the Live Telemetry (#775). Only
+ * keys that resolve to a finite number in this result are shown, so a row a
+ * variant does not carry is skipped and the next one takes its place.
  */
 
 import { useMemo } from "react";
 import useStore from "../store/useStore";
-import { resolveField } from "../utils/diagnostics";
+import { type CardKind, cardRowKeys } from "../utils/cardRows";
+import { resolveKey } from "../utils/diagnostics";
 import { quantityMeta } from "../utils/quantities";
 
 interface Props {
+	kind: CardKind;
 	result: unknown;
 	maxRows?: number;
 }
 
-export function NodeDiagRows({ result, maxRows = 3 }: Props) {
-	const { displaySettings } = useStore();
+export function NodeDiagRows({ kind, result, maxRows = 3 }: Props) {
+	const cardRows = useStore((s) => s.cardRows);
 
 	const rows = useMemo(() => {
 		if (!result) return [];
-		return displaySettings
+		return cardRowKeys(kind, cardRows)
 			.map((key) => {
-				const val = resolveField(result, key);
+				const val = resolveKey(result, key);
 				if (val === undefined) return null;
 				const meta = quantityMeta(key);
 				return {
@@ -42,7 +44,7 @@ export function NodeDiagRows({ result, maxRows = 3 }: Props) {
 			formatted: string;
 			unit: string;
 		}[];
-	}, [result, displaySettings, maxRows]);
+	}, [kind, result, cardRows, maxRows]);
 
 	if (rows.length === 0) return null;
 

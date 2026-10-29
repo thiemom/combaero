@@ -28,7 +28,9 @@ const VortexNode = ({ data, selected }: NodeProps) => {
 				<div className="text-[9px] font-mono text-violet-500 whitespace-nowrap truncate max-w-full">
 					{hasLocalRpm ? `${data.shaft_speed_rpm} rpm` : "global rpm"}
 				</div>
-				{isSolved && <NodeDiagRows result={data.result} maxRows={1} />}
+				{isSolved && (
+					<NodeDiagRows kind="vortex" result={data.result} maxRows={1} />
+				)}
 			</div>
 
 			<div className="absolute -left-3 top-1/2 -translate-y-1/2 text-[7px] font-extrabold leading-none select-none pointer-events-none bg-white/70 rounded-sm px-0.5 text-blue-500">
