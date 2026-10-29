@@ -1617,6 +1617,12 @@ class NetworkMixtureState:
     @property
     def T(self) -> float:
         """Static temperature [K] (see the class docstring)."""
+        # A node whose static state is not on its own (Tt, Pt) isentrope: a
+        # crossflow station or an area combustor holds Pt = P while its gas
+        # moves. The solver sets this for result reporting only (#782 audit).
+        override = self.__dict__.get("_T_static")
+        if override is not None:
+            return float(override)
         Tt, P, Pt = float(self.Tt), float(self.P), float(self.Pt)
         if self.incompressible or not Pt > P or not Tt > 0.0 or not P > 0.0:
             return Tt
@@ -3263,6 +3269,17 @@ class CombustorNode(NetworkNode):
         jac = {0: {f"{self.id}.P": -1.0, f"{self.id}.Pt": 1.0}}
         _energy_target_rows(self, state, res, jac)
         return res, jac
+
+    def static_T(self, state: NetworkMixtureState) -> float:
+        """The static T of the gas moving through ``area`` (#782 audit): the
+        node holds Pt = P (a large, slow volume), so its own isentrope gives
+        Tt; with an area, the duct closure at G = |m| / area does. Tt with no
+        area or no flow. Reporting only."""
+        m = abs(float(getattr(self, "_total_m_dot", 0.0)))
+        if not (self.area > 0.0 and m > 0.0 and state.Tt > 0.0 and state.Pt > 0.0):
+            return float(state.Tt)
+        s = cb.duct_htc_static_state(float(state.Tt), float(state.Pt), m / self.area, state.X)
+        return float(s.T)
 
     def diagnostics(self, state: NetworkMixtureState) -> dict[str, float | str]:
         if state.P <= 0 or state.Tt <= 0:
@@ -8355,6 +8372,30 @@ class CrossflowSegmentElement(ChannelElement):
         self._prev = graph.elements.get(self.prev_seg) if self.prev_seg else None
         self._next = graph.elements.get(self.next_seg) if self.next_seg else None
         self._elements = graph.elements
+
+    def station_report(
+        self, state: NetworkMixtureState, m_prev: float, m_self: float
+    ) -> tuple[str, float, float, float] | None:
+        """The moving state of this segment's FROM station, for reporting
+        (#782 audit): (node id, static T, Pt, Mach). A station node holds the
+        static P at the middle of its station and carries T0; its gas moves at
+        the station's mean flow, the one its half-drops use. None without a
+        from-station."""
+        if self._prev is None or self.from_kappa is None:
+            return None
+        A = float(self.area_from)
+        m = 0.5 * (float(m_prev) + float(m_self))
+        incompressible = self.regime == "incompressible"
+        st = _moving_static_T(state, m, A, incompressible)
+        T, P, X = float(st.T), float(state.P), state.X
+        if not (A > 0.0 and T > 0.0 and P > 0.0):
+            return None
+        rho = float(cb.density(T, P, X))
+        u = abs(m) / (rho * A)
+        a = float(cb.speed_of_sound(T, X))
+        M = u / a if a > 0.0 else 0.0
+        Pt = P + 0.5 * rho * u * u if incompressible else float(cb.Pt_from_static(P, T, M, X))
+        return self.from_node, T, Pt, M
 
     def _station_jets(
         self, node: Any, station: NetworkMixtureState

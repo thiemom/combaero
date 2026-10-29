@@ -229,3 +229,69 @@ def test_an_element_reports_its_outlet_flow_at_the_static_state() -> None:
     area = math.pi * 0.04**2 / 4.0
     v = 0.5 / (cb.density(T, P, X_AIR) * area)
     assert orf["mach_out"] == pytest.approx(v / cb.speed_of_sound(T, X_AIR), rel=1e-9)
+
+
+def _stress(family: str, seed: int) -> tuple[Any, dict]:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "stress"))
+    from networks import FAMILIES
+
+    net, _ = FAMILIES[family](seed)
+    sol = NetworkSolver(net).solve(timeout=30.0)
+    assert sol["__converged__"]
+    return net, sol
+
+
+@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
+def test_a_crossflow_station_reports_its_moving_state() -> None:
+    """A crossflow station holds Pt = P (its node is the static P at the
+    middle of the station) while its gas moves at the station's mean flow
+    (#782 audit). It reports that flow's static T, its true Pt and Mach; the
+    segment leaving it reports the same Pt, a plate discharging into it the
+    drop to the station's STATIC P its jets see."""
+    from combaero.network.components import CrossflowSegmentElement, ImpingementPlateElement
+
+    net, sol = _stress("impingement", 1)
+    diag = sol["__element_diag__"]
+    stations = {
+        e.from_node: eid
+        for eid, e in net.elements.items()
+        if isinstance(e, CrossflowSegmentElement) and e.prev_seg and e.from_kappa is not None
+    }
+    assert stations
+    for nid, seg in stations.items():
+        T, Tt, P, Pt = (sol[f"{nid}.{k}"] for k in ("T", "Tt", "P", "Pt"))
+        assert Tt > T and Pt > P and sol[f"{nid}.mach"] > 0.05
+        assert cb.s(T, X_AIR, P) == pytest.approx(cb.s(Tt, X_AIR, Pt), rel=1e-9)
+        assert diag[seg]["Pt_in"] == Pt
+        assert diag[seg]["T_in"] == T
+    plates = [e for e in net.elements.values() if isinstance(e, ImpingementPlateElement)]
+    for pl in plates:
+        if pl.to_node in stations:
+            assert diag[pl.id]["Pt_out"] == sol[f"{pl.to_node}.P"]
+
+
+@pytest.mark.filterwarnings("ignore:.*STATIC temperature:FutureWarning")
+def test_an_area_combustor_reports_its_static_T() -> None:
+    """A combustor with an area holds Pt = P but its gas moves through the
+    area: it reports the duct closure's static T at G = m / area (#782
+    audit), and its Mach at that state."""
+    from combaero.network import ChannelElement, CombustorNode
+
+    Yf = [0.0] * len(Y_AIR)
+    Yf[cb.species_index_from_name("CH4")] = 1.0
+    g = FlowNetwork()
+    g.add_node(PressureBoundary("ai", Pt=1.6e5, Tt=700.0, Y=Y_AIR))
+    g.add_node(PressureBoundary("fi", Pt=1.6e5, Tt=300.0, Y=Yf))
+    g.add_node(PressureBoundary("ho", Pt=1.0e5, Tt=300.0, Y=Y_AIR))
+    g.add_node(CombustorNode("hn", area=1e-3))
+    g.add_element(ChannelElement("oa", "ai", "hn", length=0.3, diameter=0.02))
+    g.add_element(ChannelElement("of", "fi", "hn", length=0.3, diameter=0.003))
+    g.add_element(ChannelElement("hout", "hn", "ho", length=0.4, diameter=0.02))
+    sol = NetworkSolver(g).solve()
+    assert sol["__converged__"]
+    Tt, Pt = sol["hn.Tt"], sol["hn.Pt"]
+    m = sol["oa.m_dot"] + sol["of.m_dot"]
+    X = [sol[f"hn.X[{k}]"] for k in range(len(Y_AIR))]
+    s = cb.duct_htc_static_state(Tt, Pt, m / 1e-3, X)
+    assert sol["hn.T"] == pytest.approx(float(s.T), rel=1e-12)
+    assert sol["hn.T"] < Tt
