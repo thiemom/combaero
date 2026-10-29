@@ -267,10 +267,10 @@ def test_ejector_runner_solve_converges_cold_and_exposes_diagnostics():
     df = result.to_dataframe()
     row = df[df["id"] == "ej1"]
     assert not row.empty, "ejector element row missing from results"
-    assert "entrainment_ratio" in df.columns and "P_c_star" in df.columns
+    assert "entrainment_ratio [-]" in df.columns and "P_c_star [Pa]" in df.columns
     assert bool(row["success"].iloc[0]), "cold ejector solve did not converge"
-    omega = float(row["entrainment_ratio"].iloc[0])
-    p_c = float(row["P_c_star"].iloc[0])
+    omega = float(row["entrainment_ratio [-]"].iloc[0])
+    p_c = float(row["P_c_star [Pa]"].iloc[0])
     assert 0.0 < omega < 3.0
     assert p_c > 0.0
 
@@ -327,18 +327,18 @@ def test_ejector_runner_solves_unchoked_jet_pump_regime():
     assert not row.empty, "ejector element row missing from results"
     assert bool(row["success"].iloc[0]), "jet-pump ejector solve did not converge"
 
-    mp = float(row["m_dot_primary"].iloc[0])
-    ms = float(row["m_dot_secondary"].iloc[0])
+    mp = float(row["m_dot_primary [kg/s]"].iloc[0])
+    ms = float(row["m_dot_secondary [kg/s]"].iloc[0])
     assert mp == pytest.approx(0.0051, rel=1e-3)
     assert ms > 0.0  # entrained flow is drawn in (positive suction)
-    omega = float(row["entrainment_ratio"].iloc[0])
+    omega = float(row["entrainment_ratio [-]"].iloc[0])
     # ~4.7: the nozzles' losses (Huang's eta 0.95 / 0.85) now cost drive. The
     # mixing used to take isentropic velocities and so handed those losses
     # back -- omega 6.62 at zero drive with zero entropy generation (#588).
     assert 4.0 < omega < 5.5, f"expected jet-pump omega ~ 4.7, got {omega}"
     # Unchoked regime, not the double-choked artifact.
-    assert float(row["s_choke"].iloc[0]) == pytest.approx(0.0, abs=1e-6)
-    assert float(row["critical_mode"].iloc[0]) == 0.0
+    assert float(row["s_choke [-]"].iloc[0]) == pytest.approx(0.0, abs=1e-6)
+    assert float(row["critical_mode [-]"].iloc[0]) == 0.0
     # Primary floats up to ~the back pressure: forward flow, dp >= 0.
     mc_p = df[df["id"] == "mc_p"]
     if not mc_p.empty and "Pt" in df.columns:
@@ -447,7 +447,7 @@ def test_jet_pump_with_an_outlet_pipe_converges():
         df = NetworkRunner.from_dict(g).solve(timeout=120.0).to_dataframe()
         row = df[df["id"] == "ej1"]
         assert bool(row["success"].iloc[0]), regime
-        assert lo < float(row["entrainment_ratio"].iloc[0]) < hi, regime
+        assert lo < float(row["entrainment_ratio [-]"].iloc[0]) < hi, regime
 
 
 def test_cleared_throat_and_nozzle_exit_mean_the_default():
@@ -482,7 +482,7 @@ _A3_PIPE_D = (4 * _MIXING / 3.141592653589793) ** 0.5  # pipe with area A_3
 
 def _critical_omega_bare_outlet() -> float:
     df = NetworkRunner.from_dict(_solvable_ejector_schema()).solve(timeout=120.0).to_dataframe()
-    return float(df[df["id"] == "ej1"]["entrainment_ratio"].iloc[0])
+    return float(df[df["id"] == "ej1"]["entrainment_ratio [-]"].iloc[0])
 
 
 def test_warmstart_seeds_port_chain_flows_in_the_critical_regime():
@@ -510,7 +510,7 @@ def test_double_choked_ejector_behind_an_outlet_pipe_converges_to_the_critical_r
     df = NetworkRunner.from_dict(g).solve(timeout=120.0).to_dataframe()
     row = df[df["id"] == "ej1"]
     assert bool(row["success"].iloc[0])
-    assert float(row["entrainment_ratio"].iloc[0]) == pytest.approx(
+    assert float(row["entrainment_ratio [-]"].iloc[0]) == pytest.approx(
         _critical_omega_bare_outlet(), rel=1e-6
     )
 

@@ -156,25 +156,24 @@ UNIT_MAP: dict[str, str] = {
     "bypass_Tt_minus_supply": "K",
     "heat_transfer_outside_source": "-",
     "bypass_reversed": "-",
+    "bypass_fraction": "-",
+    "eta_r": "-",  # CR-3936 recovery-temperature effectiveness (#713)
+    "eta_r_extrapolated": "-",
+    "Cd_own": "-",
     "f": "-",
     "Cd": "-",
     "phi": "-",
+    # --- Per-row lists of the arrays (``rows_<key>``, unit of <key>) ---
+    "rows_P_backside": "Pa",  # effusion liner: each panel's P_in
+    "rows_unresolved": "-",  # impingement array: 1.0 marks a starved row
     # --- Geometry ---
     "area": "m\u00b2",
     "diameter": "m",
     "length": "m",
     "roughness": "m",
-}
-
-# Units of the result keys the export does NOT label (yet). Giving one of them
-# a unit in UNIT_MAP renames its CSV / DataFrame column ("loss_ratio" becomes
-# "loss_ratio [-]"), which breaks a notebook that reads the column by name, so they
-# are kept apart: the GUI shows these units (resultKeys.generated.json, via
-# unit_of) and the export keeps its columns. Moving them into UNIT_MAP is the
-# user's call. test_gui_result_keys_sync.py fails on an emitted key with no
-# unit in either map. Flags (0/1) and counts are "-".
-GUI_ONLY_UNITS: dict[str, str] = {
-    # Solver views
+    # Until 0.8.0 the keys below had a unit in the GUI only and an unlabelled
+    # export column (#774). Flags (0/1) and counts are "-".
+    # --- Solver views ---
     "sigma_norm": "-",
     "sigma_norm_high": "-",
     "sigma_norm_low": "-",
@@ -307,22 +306,55 @@ _PORT_UNITS: dict[str, str] = {
 _STEP_UNITS: dict[str, str] = {"zeta": "-", "dPt": "Pa", "connected_area_ratio": "-"}
 _PORT_RE = re.compile(r"^port_\d+_(\w+)$")
 _STEP_RE = re.compile(r"^step_(?:common|straight|branch)_(\w+)$")
+# The arrays' per-row lists (impingement array, effusion liner): ``rows_<key>``
+# carries <key>'s unit.
+_ROWS_RE = re.compile(r"^rows_(\w+)$")
 
 
 def unit_of(key: str) -> str | None:
-    """The SI unit of a result key, or None when none is known (the GUI's view;
-    the export labels UNIT_MAP keys only, see GUI_ONLY_UNITS)."""
+    """The SI unit of a result key (UNIT_MAP, then the ``port_<i>_*``,
+    ``step_<port>_*`` and ``rows_*`` patterns), or None when none is known.
+    The export labels every column this returns a unit for; the GUI shows the
+    same."""
     if key in UNIT_MAP:
         return UNIT_MAP[key]
-    if key in GUI_ONLY_UNITS:
-        return GUI_ONLY_UNITS[key]
     m = _PORT_RE.match(key)
     if m and m.group(1) in _PORT_UNITS:
         return _PORT_UNITS[m.group(1)]
     m = _STEP_RE.match(key)
     if m and m.group(1) in _STEP_UNITS:
         return _STEP_UNITS[m.group(1)]
+    m = _ROWS_RE.match(key)
+    if m and m.group(1) in UNIT_MAP:
+        return UNIT_MAP[m.group(1)]
     return None
+
+
+# Result keys whose value is text (a source, a model name, a verdict), not a
+# quantity: their export column carries no unit. Listed so that a test can
+# tell them from a numeric key nobody gave a unit (test_gui_export_units.py).
+TEXT_KEYS: frozenset[str] = frozenset(
+    {
+        "area_source",  # where an element's area came from (#773)
+        "F0_source",
+        "F1_source",
+        "h_gas_unblown_model",
+        "incompressible_validity",
+        "second_law",  # the #545 verdict and its context
+        "second_law_group",
+        "second_law_reason",
+        "tap",  # ISO 5167 tap arrangement
+    }
+)
+_PORT_TEXT = frozenset({"area_source"})
+
+
+def is_text_key(key: str) -> bool:
+    """True for a result key whose value is text and has no unit."""
+    if key in TEXT_KEYS:
+        return True
+    m = _PORT_RE.match(key)
+    return bool(m and m.group(1) in _PORT_TEXT)
 
 
 # Composition keys render as ``Y[<label>] [-]``. ``<label>`` may be a species
@@ -340,8 +372,9 @@ def label_with_unit(column: str) -> str:
     """
     if column in _META_COLUMNS:
         return column
-    if column in UNIT_MAP:
-        return f"{column} [{UNIT_MAP[column].translate(_ASCII_UNITS)}]"
+    unit = unit_of(column)
+    if unit is not None:
+        return f"{column} [{unit.translate(_ASCII_UNITS)}]"
     if _COMPOSITION_RE.match(column):
         return f"{column} [-]"
     return column

@@ -20,7 +20,7 @@ Typical notebook usage::
 
     import pandas as pd
     params = pd.DataFrame({"air_inlet.m_dot": [0.8, 1.0, 1.2]})
-    sweep_df = runner.sweep(params, metrics=["channel_1.m_dot [kg/s]"])
+    sweep_df = runner.sweep(params, metrics=["channel_1.m_dot"])
 """
 
 import json
