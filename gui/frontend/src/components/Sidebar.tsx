@@ -521,7 +521,7 @@ const Sidebar = () => {
 						onChange={(val) => updateSolverSettings({ timeout: val })}
 						onClear={() => updateSolverSettings({ timeout: null })}
 						min={0}
-						placeholder="None"
+						placeholder="No limit"
 					/>
 					<span className="text-[9px] text-stone-400">
 						The solve, its retries and the last homotopy retry all run within
@@ -576,7 +576,7 @@ const Sidebar = () => {
 							}
 							onClear={() => updateSolverSettings({ shaft_speed_rpm: null })}
 							min={0}
-							placeholder="No limit"
+							placeholder="None"
 						/>
 						<select
 							value={unitPreferences.rotSpeed}
