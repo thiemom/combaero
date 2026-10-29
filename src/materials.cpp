@@ -1,5 +1,6 @@
 #include "materials.h"
 #include "input_validation.h"
+#include "thermo.h"
 #include <cmath>
 #include <stdexcept>
 #include <map>
@@ -75,52 +76,34 @@ double k_aluminum_6061(double T) {
 // -------------------------------------------------------------
 
 double k_tbc_ysz(double T, double hours, bool is_ebpvd) {
-    // Validate temperature
-    if (!validation::is_finite_in_range(T, 300.0, 1700.0)) {
+    if (!validation::is_finite_in_range(T, YSZ_T_MIN, YSZ_T_MAX)) {
         throw std::runtime_error("k_tbc_ysz: Temperature must be in range [300, 1700] K, got " + std::to_string(T));
     }
     if (std::isnan(hours)) {
         throw std::runtime_error("k_tbc_ysz: hours must not be NaN");
     }
 
-    double T_C = T - 273.15;
-
-    // As-sprayed thermal conductivity (different for APS vs EB-PVD)
-    double k_initial;
     if (is_ebpvd) {
-        // EB-PVD: Electron beam physical vapor deposition
-        // Columnar microstructure -> higher initial conductivity
-        k_initial = 1.5 + 0.0002 * T_C;
-    } else {
-        // APS: Atmospheric plasma spray (default)
-        // Splat boundaries -> lower initial conductivity
-        k_initial = 0.8 + 0.00045 * T_C;
+        // EB-PVD (columnar): as-deposited only, an uncited legacy fit kept until
+        // a public source is held (sources.yaml wanted list). Zhu & Miller's
+        // kinetics below are for plasma-sprayed coatings and are not applied.
+        return 1.5 + 0.0002 * (T - 273.15);
     }
 
-    // No aging or low temperature (sintering negligible below ~1073 K / 800 C)
-    // Sintering is diffusion-driven and requires high temperature
-    if (hours <= 0.0 || T < 1073.0) {
-        return k_initial;
+    // Plasma-sprayed ZrO2-8wt%Y2O3 (Zhu & Miller 2000, NASA/TM-2000-210237).
+    // As sprayed about 1 W/m K, flat in T (p. 6); sintering raises it as
+    //   (k - k0)/(k_inf - k0) = A exp(-Q / R T) [1 - exp(-t / tau)],
+    //   tau = tau0 exp(Q_tau / R T)  [s],
+    // their Eq. 1 (p. 7) for the overall conductivity under a 64 W/cm^2
+    // gradient at surface temperature T: an effective through-thickness value.
+    if (!(hours > 0.0)) {
+        return YSZ_APS_K0;
     }
-
-    // Sintering model (NASA Zhu/Miller TM-2010-216765)
-    // k increases as pores close over time at high temperature
-    constexpr double k_fully_sintered = 1.85;  // W/(m*K) - fully dense YSZ limit
-    constexpr double E_activation = 12000.0;   // Activation energy [K]
-
-    // Sintering rate (Arrhenius relationship)
-    // Rate increases exponentially with temperature
-    double rate = 0.01 * std::exp(-E_activation / T);
-
-    // Sintering progress (stretched exponential, n=0.4 for APS YSZ)
-    // zeta = 1 - exp(-(rate*t)^n) where 0 <= zeta <= 1
-    double progress = 1.0 - std::exp(-std::pow(rate * hours, 0.4));
-
-    // Interpolate between as-sprayed and fully sintered
-    double k_sintered = k_initial + (k_fully_sintered - k_initial) * progress;
-
-    // Clamp to physical limit (fully dense YSZ)
-    return std::min(k_sintered, k_fully_sintered);
+    const double RT = thermo::R_GAS * T;
+    const double tau_s = YSZ_ZHU_TAU0_S * std::exp(YSZ_ZHU_Q_TAU / RT);
+    const double reach = YSZ_ZHU_A * std::exp(-YSZ_ZHU_Q / RT);
+    const double progress = reach * (1.0 - std::exp(-hours * 3600.0 / tau_s));
+    return YSZ_APS_K0 + (YSZ_APS_K_INF - YSZ_APS_K0) * progress;
 }
 
 // -------------------------------------------------------------
@@ -160,7 +143,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "ysz",
         [](double T) { return k_tbc_ysz(T, 0.0); },  // Default: as-sprayed
         300.0, 1700.0,
-        "NASA TM-2010-216765 (Zhu/Miller sintering model)",
+        "Zhu & Miller 2000, NASA/TM-2000-210237 (plasma-sprayed, as sprayed)",
         "7-8 wt% Y2O3 stabilized zirconia, thermal barrier coating"
     }}
 };

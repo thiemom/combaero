@@ -3181,12 +3181,55 @@ documents:
   code: [src/equilibrium.cpp, include/equilibrium.h]
   notes: Fetched from NTRS (open, government public use) 2026-10-29.
 
+- file: docs/materials/zhu_2000_NASA_TM-2000-210237_TBC_thermophysical_properties.pdf
+  citation: Zhu, D., Miller, R. A. (2000). Thermophysical and thermomechanical properties of thermal barrier coating
+    systems. NASA/TM-2000-210237.
+  id: NTRS 20000083966
+  topic: [other]
+  content: 'Sintering and creep of plasma-sprayed and EB-PVD ZrO2-8wt%Y2O3; laser high-heat-flux measurement of
+    the coating conductivity change in time. Eq. 1 (p. 7): (k - k0)/(k_inf - k0) = 102.2 exp(-68228/RT)
+    [1 - exp(-t/tau)], tau = 572.5 exp(41710/RT) with t in s; Fig. 4 (p. 8) conductivity vs time to 32 h at
+    990/1100/1320 C surface temperature; plasma-sprayed coating about 1 W/m K as sprayed, intrinsic dense
+    ZrO2-Y2O3 about 2.5 W/m K (p. 6).'
+  status: implemented
+  verdict: 'The plasma-sprayed YSZ model of k_tbc_ysz (#761): k0 = 1.0 flat in T (p. 6), sintering = Eq. 1
+    exactly. Eq. 1 does not give k_inf; 1.74 W/m K is inferred so that Eq. 1''s own prefactor reproduces the
+    Fig. 4 plateaus (1.44/1.17/1.09 at 1320/1100/990 C, read off the figure, unconfirmed). Replaces an uncited
+    model ("NASA TM-2010-216765", not found) that was nearly inert (+3.8% after 1000 h at 1589 K vs ~+40%
+    here within hours) and rose as sprayed 0.81 -> 1.39 with T. Caveat: the measured k is the overall value of a
+    254 um coating under a 64 W/cm2 gradient, an effective through-thickness property. Gives no EB-PVD
+    conductivity.'
+  read_for: ['#761 YSZ sintering model']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Arrived 2026-10-29 in docs/new as 20000083966.pdf (NTRS accession); title and authors checked on NTRS.
+
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
 # `citation` here is as recalled unless `checked` is true; confirm it from
 # the document. priority: now (blocks or settles an open item) or later
 # (only when that work resumes).
 wanted:
+- citation: A public EB-PVD YSZ conductivity source (as deposited and after sintering), e.g. a NASA Glenn
+    laser-heat-flux report on EB-PVD ZrO2-8wt%Y2O3.
+  checked: false
+  issues:
+  - 761
+  priority: later
+  question: 'k_tbc_ysz(is_ebpvd=True) is an uncited legacy fit (1.5 + 0.0002 T_C, as deposited, no sintering);
+    Zhu & Miller 2000 (held) gives no EB-PVD conductivity. A public source would let it be cited and aged.'
+  where: NASA NTRS (Zhu/Miller laser-rig series), or a journal paper.
+- citation: 'Al Dabagh, A. M., Andrews, G. E., Abdul Husain, R. A. A., Husain, C. I., Nazari, A., Wu, J. (1990).
+    Impingement/effusion cooling: the influence of the number of impingement holes and pressure loss on the
+    heat-transfer coefficient. J. Turbomachinery 112(3), 467-476.'
+  checked: false
+  issues:
+  - 468
+  priority: later
+  question: The impingement Re exponent against the jet-to-vent ratio -- the one variable that could reconcile
+    Cho & Rhee's 0.56 with Hollworth & Dagan's 0.80 (88-GT-290 gives 0.72).
+  where: ASME journal; AGARD CP-527 paper 30 is an alternative.
 - citation: Roach, P. E. (1987). The generation of nearly isotropic turbulence by means of grids. Int. J. Heat
     Fluid Flow 8(2), 82-92.
   checked: false

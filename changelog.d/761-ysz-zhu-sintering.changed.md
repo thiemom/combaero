@@ -1,0 +1,6 @@
+- **`k_tbc_ysz` (plasma-sprayed) follows Zhu & Miller 2000, NASA/TM-2000-210237 (#761).**
+  - **As sprayed:** k = 1.0 W/m K at every temperature, the paper's "about 1 W/m-K". It used to rise from 0.81 to 1.39 W/m K, which the literature does not support.
+  - **Sintering:** their Eq. 1, with t in seconds. At 1320 C the conductivity rises about 44% within hours, against +3.8% after 1000 h before. There is no 1073 K on/off gate any more, so k is continuous in T.
+  - **Fully sintered limit:** k_inf = 1.74 W/m K, inferred from their Fig. 4 plateaus and flagged as unconfirmed.
+  - **Caveat:** the measured k is an effective through-thickness value for a 254 um coating under a strong gradient. Users with a characterised coating should supply its conductivity.
+  - **EB-PVD:** keeps its as-deposited fit, now marked uncited, with no sintering.

@@ -8,6 +8,8 @@ Tests verify:
 - Database access functions
 """
 
+import math
+
 import pytest
 
 import combaero as cb
@@ -133,173 +135,63 @@ class TestStructuralAlloys:
 
 
 class TestThermalBarrierCoatings:
-    """Test thermal barrier coating thermal conductivity with aging."""
+    """YSZ: Zhu & Miller 2000 (NASA/TM-2000-210237), plasma-sprayed (#761)."""
 
-    def test_ysz_as_sprayed_ambient(self):
-        """Test YSZ as-sprayed at ambient temperature."""
-        T = 300.0  # K
-        k = cb.k_tbc_ysz(T, hours=0)
+    def test_as_sprayed_is_about_one_and_flat_in_temperature(self):
+        """Zhu & Miller: as-sprayed plasma coating 'about 1 W/m-K'. The old
+        uncited fit rose 0.81 -> 1.39 from 300 to 1589 K."""
+        for T in (300.0, 800.0, 1200.0, 1700.0):
+            assert cb.k_tbc_ysz(T, hours=0) == pytest.approx(1.0, rel=1e-12)
 
-        # At 300K: k approx 0.8 + 0.00045*27 approx 0.81 W/(m*K)
-        assert k == pytest.approx(0.81, abs=0.05)
+    def test_the_sintering_is_zhu_miller_eq_1(self):
+        """k = k0 + (k_inf - k0) A exp(-Q/RT)[1 - exp(-t/tau)], tau = tau0
+        exp(Q_tau/RT) with t in s (Eq. 1, p. 7; k_inf = 1.74 inferred)."""
+        R = 8.31446261815324
+        for T, h in ((1263.15, 4.0), (1373.15, 12.0), (1593.15, 2.0), (1500.0, 100.0)):
+            tau = 572.5 * math.exp(41710.0 / (R * T))
+            prog = 102.2 * math.exp(-68228.0 / (R * T)) * (1.0 - math.exp(-h * 3600.0 / tau))
+            assert cb.k_tbc_ysz(T, hours=h) == pytest.approx(1.0 + 0.74 * prog, rel=1e-12)
 
-    def test_ysz_as_sprayed_high_temp(self):
-        """Test YSZ as-sprayed at high temperature."""
-        T = 1500.0  # K (1227C)
-        k = cb.k_tbc_ysz(T, hours=0)
+    def test_the_plateaus_match_figure_4(self):
+        """Fig. 4 plateaus (read off the figure, unconfirmed): about 1.09 /
+        1.17 / 1.44 W/m K at 990 / 1100 / 1320 C surface after 32 h."""
+        for T_C, k_fig in ((990.0, 1.09), (1100.0, 1.17), (1320.0, 1.44)):
+            assert cb.k_tbc_ysz(T_C + 273.15, hours=32) == pytest.approx(k_fig, abs=0.03)
 
-        # At 1500K: k approx 0.8 + 0.00045*1227 approx 1.35 W/(m*K)
-        assert k == pytest.approx(1.35, abs=0.1)
+    def test_sintering_rises_then_saturates(self):
+        T = 1593.15
+        k = [cb.k_tbc_ysz(T, hours=h) for h in (0.0, 1.0, 4.0, 8.0, 32.0, 1000.0)]
+        assert all(b >= a for a, b in zip(k, k[1:], strict=False))
+        assert k[-1] == pytest.approx(k[-2], rel=1e-3)  # saturated within a day
+        assert k[-1] < 1.74  # below the fully sintered limit
 
-    def test_ysz_sintering_increases_conductivity(self):
-        """Test that sintering increases thermal conductivity."""
-        T = 1500.0  # K
+    def test_hotter_sinters_more(self):
+        assert cb.k_tbc_ysz(1500.0, hours=100) > cb.k_tbc_ysz(1300.0, hours=100)
 
-        k_fresh = cb.k_tbc_ysz(T, hours=0)
-        k_aged_100h = cb.k_tbc_ysz(T, hours=100)
-        k_aged_1000h = cb.k_tbc_ysz(T, hours=1000)
-        k_aged_10000h = cb.k_tbc_ysz(T, hours=10000)
+    def test_cold_exposure_is_negligible_without_a_jump(self):
+        """No 1073 K gate any more: the Arrhenius factor makes it small, and
+        k is continuous through 1073 K."""
+        assert cb.k_tbc_ysz(773.0, hours=1000) == pytest.approx(1.0, rel=5e-3)
+        lo, hi = cb.k_tbc_ysz(1072.9, hours=100), cb.k_tbc_ysz(1073.1, hours=100)
+        assert hi - lo < 1e-3
 
-        # Conductivity should increase with aging
-        assert k_aged_100h > k_fresh
-        assert k_aged_1000h > k_aged_100h
-        assert k_aged_10000h > k_aged_1000h
-
-        # Should approach fully sintered value (~1.85 W/(m*K))
-        assert k_aged_10000h < 2.0
-
-    def test_ysz_sintering_temperature_dependence(self):
-        """Test that sintering rate increases with temperature."""
-        hours = 1000
-
-        # Higher temperature -> faster sintering -> higher k increase
-        k_low_T = cb.k_tbc_ysz(T=1000, hours=hours)
-        k_high_T = cb.k_tbc_ysz(T=1500, hours=hours)
-
-        k_low_T_fresh = cb.k_tbc_ysz(T=1000, hours=0)
-        k_high_T_fresh = cb.k_tbc_ysz(T=1500, hours=0)
-
-        # Relative increase should be larger at high temperature
-        increase_low_T = (k_low_T - k_low_T_fresh) / k_low_T_fresh
-        increase_high_T = (k_high_T - k_high_T_fresh) / k_high_T_fresh
-
-        assert increase_high_T > increase_low_T
+    def test_ebpvd_is_as_deposited_only(self):
+        """EB-PVD keeps its as-deposited fit (uncited) and gets no sintering:
+        Zhu & Miller's kinetics are for plasma-sprayed coatings."""
+        T = 1300.0
+        assert cb.k_tbc_ysz(T, hours=0, is_ebpvd=True) == pytest.approx(1.5 + 0.0002 * (T - 273.15))
+        assert cb.k_tbc_ysz(T, hours=100, is_ebpvd=True) == cb.k_tbc_ysz(T, hours=0, is_ebpvd=True)
 
     def test_ysz_temperature_range(self):
-        """Test YSZ valid temperature range."""
-        # Valid range: 300-1700 K
         assert cb.k_tbc_ysz(300) > 0
         assert cb.k_tbc_ysz(1700) > 0
-
         with pytest.raises(RuntimeError):
             cb.k_tbc_ysz(250)
-
         with pytest.raises(RuntimeError):
             cb.k_tbc_ysz(1800)
 
     def test_ysz_negative_hours_treated_as_zero(self):
-        """Test that negative hours are treated as as-sprayed."""
-        T = 1000.0
-
-        k_zero = cb.k_tbc_ysz(T, hours=0)
-        k_negative = cb.k_tbc_ysz(T, hours=-100)
-
-        assert k_negative == k_zero
-
-
-class TestTBCSintering:
-    """Test TBC sintering model enhancements."""
-
-    def test_tbc_no_sintering_at_low_temperature(self):
-        """Verify no sintering occurs below 1073 K (800 C)."""
-        # At 773 K (500 C), sintering should not occur
-        k_cold_fresh = cb.k_tbc_ysz(T=773, hours=0)
-        k_cold_aged = cb.k_tbc_ysz(T=773, hours=1000)
-
-        # Should be identical (no sintering)
-        assert k_cold_fresh == pytest.approx(k_cold_aged, rel=1e-10)
-
-    def test_tbc_sintering_at_high_temperature(self):
-        """Verify sintering occurs above 1073 K."""
-        # At 1373 K (1100 C), sintering should be significant
-        k_hot_fresh = cb.k_tbc_ysz(T=1373, hours=0)
-        k_hot_aged = cb.k_tbc_ysz(T=1373, hours=200)
-
-        # Aged coating should have higher k due to pore closure
-        assert k_hot_aged > k_hot_fresh
-
-        # Should be bounded by fully dense YSZ limit
-        assert k_hot_aged <= 1.85
-
-    def test_tbc_sintering_increases_with_time(self):
-        """Verify k increases monotonically with exposure time."""
-        T = 1500  # K
-        k_0h = cb.k_tbc_ysz(T, hours=0)
-        k_100h = cb.k_tbc_ysz(T, hours=100)
-        k_500h = cb.k_tbc_ysz(T, hours=500)
-        k_1000h = cb.k_tbc_ysz(T, hours=1000)
-
-        # Should increase monotonically
-        assert k_100h > k_0h
-        assert k_500h > k_100h
-        assert k_1000h > k_500h
-
-    def test_tbc_ebpvd_higher_than_aps(self):
-        """Verify EB-PVD has higher initial k than APS."""
-        T = 800  # K - use moderate temperature
-
-        # As-sprayed comparison
-        k_aps = cb.k_tbc_ysz(T, hours=0, is_ebpvd=False)
-        k_ebpvd = cb.k_tbc_ysz(T, hours=0, is_ebpvd=True)
-
-        # EB-PVD should have higher initial k (columnar vs splat)
-        assert k_ebpvd > k_aps
-
-        # Typical values at 800K
-        assert 0.8 < k_aps < 1.1  # APS range
-        assert 1.5 < k_ebpvd < 1.7  # EB-PVD range
-
-    def test_tbc_ebpvd_also_sinters(self):
-        """Verify EB-PVD also undergoes sintering at high T."""
-        T = 1500  # K
-
-        k_ebpvd_fresh = cb.k_tbc_ysz(T, hours=0, is_ebpvd=True)
-        k_ebpvd_aged = cb.k_tbc_ysz(T, hours=500, is_ebpvd=True)
-
-        # EB-PVD should also sinter (though starts higher)
-        assert k_ebpvd_aged > k_ebpvd_fresh
-
-    def test_tbc_sintering_rate_increases_with_temperature(self):
-        """Verify Arrhenius behavior - faster sintering at higher T."""
-        # Compare sintering progress at two temperatures
-        hours = 100
-
-        k_low_fresh = cb.k_tbc_ysz(T=1273, hours=0)
-        k_low_aged = cb.k_tbc_ysz(T=1273, hours=hours)
-        delta_low = k_low_aged - k_low_fresh
-
-        k_high_fresh = cb.k_tbc_ysz(T=1573, hours=0)
-        k_high_aged = cb.k_tbc_ysz(T=1573, hours=hours)
-        delta_high = k_high_aged - k_high_fresh
-
-        # Higher temperature should cause more sintering in same time
-        assert delta_high > delta_low
-
-    def test_tbc_bounded_by_dense_limit(self):
-        """Verify k never exceeds fully dense YSZ limit."""
-        # Extreme aging at very high temperature
-        k_extreme = cb.k_tbc_ysz(T=1600, hours=10000)
-
-        # Should not exceed fully dense limit
-        assert k_extreme <= 1.85
-
-    def test_tbc_backward_compatibility(self):
-        """Verify default behavior matches original APS implementation."""
-        # Default should be APS (is_ebpvd=False)
-        k_default = cb.k_tbc_ysz(T=1500, hours=100)
-        k_aps_explicit = cb.k_tbc_ysz(T=1500, hours=100, is_ebpvd=False)
-
-        assert k_default == pytest.approx(k_aps_explicit, rel=1e-10)
+        assert cb.k_tbc_ysz(1000.0, hours=-100) == cb.k_tbc_ysz(1000.0, hours=0)
 
 
 class TestMaterialDatabase:
@@ -343,14 +235,10 @@ class TestTemperatureTrends:
         assert k_400 < k_300
         assert k_500 < k_400
 
-    def test_tbc_increases_with_temperature(self):
-        """Test that TBC k increases with T (radiation contribution)."""
-        k_500 = cb.k_tbc_ysz(500, hours=0)
-        k_1000 = cb.k_tbc_ysz(1000, hours=0)
-        k_1500 = cb.k_tbc_ysz(1500, hours=0)
-
-        assert k_1000 > k_500
-        assert k_1500 > k_1000
+    def test_tbc_as_sprayed_is_flat_in_temperature(self):
+        """Plasma-sprayed YSZ as sprayed: about 1 W/m K at every T (Zhu &
+        Miller 2000); the literature has it roughly flat, 0.8-1.1."""
+        assert cb.k_tbc_ysz(500, hours=0) == cb.k_tbc_ysz(1500, hours=0)
 
 
 class TestMagnitudeRanges:
