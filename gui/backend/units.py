@@ -363,6 +363,20 @@ def is_text_key(key: str) -> bool:
 _COMPOSITION_RE = re.compile(r"^[YX]\[[A-Za-z0-9_+\-()]+\]$")
 
 
+def column_unit(column: str) -> str | None:
+    """The ASCII unit an export column for ``column`` is labelled with
+    (``kg/m^3``, ``Pa*s``, ``-`` for a composition), or None for a meta
+    column, a text key or a key with no known unit."""
+    if column in _META_COLUMNS:
+        return None
+    unit = unit_of(column)
+    if unit is not None:
+        return unit.translate(_ASCII_UNITS)
+    if _COMPOSITION_RE.match(column):
+        return "-"
+    return None
+
+
 def label_with_unit(column: str) -> str:
     """Return ``'<column> [<unit>]'`` when a unit is known, else ``column``.
 
@@ -370,14 +384,8 @@ def label_with_unit(column: str) -> str:
     status and ``is_boundary`` are passed through unchanged. Units are written
     in ASCII (``kg/m^3``, ``Pa*s``).
     """
-    if column in _META_COLUMNS:
-        return column
-    unit = unit_of(column)
-    if unit is not None:
-        return f"{column} [{unit.translate(_ASCII_UNITS)}]"
-    if _COMPOSITION_RE.match(column):
-        return f"{column} [-]"
-    return column
+    unit = column_unit(column)
+    return column if unit is None else f"{column} [{unit}]"
 
 
 # Export headers are ASCII: the CSV is UTF-8 without a byte-order mark, and

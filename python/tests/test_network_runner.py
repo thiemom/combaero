@@ -2,7 +2,8 @@
 
 Covers: from_file, from_dict, solve (no overrides), BC overrides, sweep,
 NetworkResult.get, node_state, to_dataframe, and the multi_wall_tee.json
-integration case (python/tests/data, #783).
+integration case (python/tests/data, #783). The sweep's results table
+itself is tested in test_results_table.py (#784).
 """
 
 import math
@@ -349,13 +350,16 @@ def test_to_dataframe_unit_annotated_columns():
 
 
 def test_sweep_metrics_shape():
+    # One row per case, (kind, entity, quantity) columns (#784).
     runner = NetworkRunner.from_dict(_SIMPLE)
     params = pd.DataFrame({"inlet.m_dot": [0.5, 1.0, 1.5]})
     df = runner.sweep(params, metrics=["chan.m_dot"])
     assert len(df) == 3
-    assert "chan.m_dot" in df.columns
-    assert "inlet.m_dot" in df.columns
-    assert "success" in df.columns
+    assert ("outputs", "chan", "m_dot") in df.columns
+    assert ("inputs", "inlet", "m_dot") in df.columns
+    assert ("outputs", "_solve", "success") in df.columns
+    # metrics keeps only the named outputs (and the solve status)
+    assert set(df["outputs"].columns.get_level_values(0)) == {"_solve", "chan"}
 
 
 def test_sweep_metrics_values():
@@ -363,15 +367,17 @@ def test_sweep_metrics_values():
     params = pd.DataFrame({"inlet.m_dot": [0.5, 1.0, 2.0]})
     df = runner.sweep(params, metrics=["chan.m_dot"])
     for i, expected in enumerate([0.5, 1.0, 2.0]):
-        assert math.isclose(df.loc[i, "chan.m_dot"], expected, rel_tol=1e-3)
+        assert math.isclose(df["outputs"].loc[i, ("chan", "m_dot")], expected, rel_tol=1e-3)
 
 
 def test_sweep_no_metrics_returns_full_detail():
     runner = NetworkRunner.from_dict(_SIMPLE)
     params = pd.DataFrame({"inlet.m_dot": [0.5, 1.0]})
     df = runner.sweep(params)
-    assert "_sweep_index" in df.columns
-    assert len(df) > 2
+    assert len(df) == 2
+    entities = set(df["outputs"].columns.get_level_values(0))
+    assert {"inlet", "chan", "outlet", "_solve"} <= entities
+    assert ("outputs", "outlet", "T") in df.columns
 
 
 def test_sweep_empty_params():
