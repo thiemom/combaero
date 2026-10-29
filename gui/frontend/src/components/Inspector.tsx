@@ -852,10 +852,16 @@ const Inspector = () => {
 								"ReaderHarrisGallagher" ||
 							selectedNode.data.correlation === "Stolz";
 						const lu = unitPreferences.length === "mm" ? 1000 : 1;
+						// #788: in_pipe = false is a lumped Cd*A restriction (no pipe
+						// diameter, beta = 0). In a pipe, a bore equal to it is no
+						// orifice (the solver's pass_through verdict); a larger one is
+						// refused, and the resolve pass reports it unresolved.
+						const inPipe = selectedNode.data.in_pipe !== false;
+						const passThrough = field("pass_through")?.value === 1;
 						const boreVsPipe =
-							pipeD == null
+							!inPipe || pipeD == null
 								? null
-								: Math.abs(boreDiameter - pipeD) <= 1e-9 * pipeD
+								: passThrough
 									? "equal"
 									: boreDiameter > pipeD
 										? "larger"
@@ -904,10 +910,16 @@ const Inspector = () => {
 											</div>
 										</>
 									)}
-									{pipeD == null && (
+									{pipeD == null && inPipe && (
 										<span className="text-[9px] italic text-stone-400">
 											No single upstream channel: no velocity-of-approach
 											correction (β = 0).
+										</span>
+									)}
+									{!inPipe && (
+										<span className="text-[9px] italic text-stone-400">
+											No pipe diameter: a lumped Cd·A restriction, a hole in a
+											wall (β = 0 both ways, no recovery).
 										</span>
 									)}
 									{betaRev != null && pipeDRev != null && (
@@ -934,16 +946,30 @@ const Inspector = () => {
 										</>
 									)}
 								</div>
+								<label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+									<input
+										type="checkbox"
+										checked={inPipe}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												in_pipe: e.target.checked,
+											})
+										}
+										className="rounded"
+									/>
+									In a pipe (the adjoining channel sets β)
+								</label>
 								{boreVsPipe === "equal" && (
 									<p className="text-[9px] text-amber-700">
-										Bore = pipe D: no restriction — this behaves as a continuous
-										pipe (E = 1).
+										Bore = pipe D: no orifice — zero loss, the flow passes
+										unchanged. Untick "In a pipe" for a lumped Cd·A restriction.
 									</p>
 								)}
 								{boreVsPipe === "larger" && (
 									<p className="text-[9px] text-amber-700">
-										Bore larger than the pipe it sits in — likely not intended.
-										The velocity-of-approach correction is skipped (E = 1).
+										Bore larger than the pipe it sits in: the solver refuses
+										this geometry. Untick "In a pipe" for a lumped Cd·A
+										restriction.
 									</p>
 								)}
 

@@ -107,6 +107,8 @@ def build_and_solve_network(
                 f"cold_chamber_{p}_0",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime="compressible",
             )
         )
@@ -133,6 +135,8 @@ def build_and_solve_network(
                 f"mixing_plenum_{p}",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime="compressible",
             )
         )
@@ -153,6 +157,8 @@ def build_and_solve_network(
                 f"hot_chamber_{p}_0",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime="compressible",
             )
         )
@@ -192,6 +198,8 @@ def build_and_solve_network(
                 "collector",
                 Cd=0.8,
                 area=A_branch,
+                # bore == channel D: a lumped Cd*A restriction, said (#788)
+                in_pipe=False,
                 regime="compressible",
             )
         )

@@ -1840,6 +1840,14 @@ DEFAULT_CHANNEL_DIAMETER = 0.1
 #: "default"`` (issue #559).
 DEFAULT_ORIFICE_BORE = 0.08
 
+#: Relative tolerance on "orifice bore == pipe diameter" (#788). A bore that
+#: matches the pipe it sits in to within this is NO orifice: zero loss, the
+#: flow passes unchanged (beta = 1). A bore larger than the pipe by more than
+#: this is refused. Wide enough to absorb a diameter round-tripped through an
+#: area or a unit conversion; at beta = 1 - 1e-6 an in-pipe orifice's
+#: permanent loss is nil anyway, so nothing physical hides inside it.
+ORIFICE_BORE_PIPE_RTOL = 1e-6
+
 #: Mass flow [kg/s] over which a directional loss blends its forward and
 #: reverse forms, logistic in m_dot / scale (C++ ``sigmoid`` in
 #: area_change.cpp). Outside a few scales either form holds alone.
@@ -3507,10 +3515,21 @@ class OrificeElement(NetworkElement):
     DISCHARGE correlations for a hole in a wall, where zeta is referenced to
     the hole velocity and there is no beta. They are not interchangeable, and
     there is deliberately no 'Auto' arm choosing between them from geometry.
-    """
 
-    #: RESIDUAL-ROW-SCALING: m - m_calc, kg/s (every orifice-family closure).
-    residual_scale_kind = "mdot"
+    The bore against the pipe it sits in (#788). The pipe diameter comes from
+    the single channel on the side the flow comes from (``in_pipe=True``, the
+    default); per direction, beta = d / D:
+      - d < D: an orifice in a pipe, as above.
+      - d == D (to ORIFICE_BORE_PIPE_RTOL, on either side): NO orifice. Zero
+        loss, the flow passes unchanged: the row is Pt_in - Pt_out = 0, like
+        LosslessConnectionElement. How an orifice is switched off without
+        editing the network.
+      - d > D: refused; there is no such geometry.
+      - ``in_pipe=False``: no pipe diameter, whatever channels adjoin it.
+        beta = 0 both ways, no pressure recovery: a hole in a wall, i.e. a
+        lumped Cd*A restriction. Write a lumped restriction this way; a bore
+        at or above the pipe is no longer read as one.
+    """
 
     # The jet: its vena-contracta Mach from the pressure ratio, not the bore's.
     validity_mach_keys = ("mach_throat",)
@@ -3530,8 +3549,13 @@ class OrificeElement(NetworkElement):
         area: float | None = None,
         injection_angle_deg: float = 90.0,
         tap: str = "Flange",
+        in_pipe: bool = True,
     ):
         super().__init__(id, from_node, to_node)
+        # False: no pipe diameter, a lumped Cd*A restriction (#788).
+        self.in_pipe = bool(in_pipe)
+        # bore == pipe: no orifice, set in resolve_topology (#788).
+        self._pass_through = False
         if tap not in _TAPS:
             raise ValueError(f"OrificeElement {id!r}: tap {tap!r} is not one of {sorted(_TAPS)}.")
         # The taps whose differential diagnostics() reports as dP_tap. Never
@@ -3591,10 +3615,19 @@ class OrificeElement(NetworkElement):
 
     def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
         """Start guess: m = Cd A sqrt(2 rho dP); a correlation's Cd is
-        approximated by the user value."""
+        approximated by the user value. No orifice (bore == pipe): no loss."""
+        if self._pass_through:
+            return 0.0
         if not self.area:
             return None
         return 1.0 / (2.0 * rho * (self.Cd * self.area) ** 2)
+
+    @property
+    def residual_scale_kind(self) -> str:
+        """RESIDUAL-ROW-SCALING: m - m_calc, kg/s (every orifice-family
+        closure); a total-pressure equality, Pa, where the bore equals the
+        pipe and there is no orifice (#788). Must change with the residual."""
+        return "p" if self._pass_through else "mdot"
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
         self._to_node_obj = graph.nodes.get(self.to_node)
@@ -3633,6 +3666,7 @@ class OrificeElement(NetworkElement):
         d_bore = math.sqrt(4.0 * self.area / math.pi)
         self.beta = 0.0
         self._orifice_geom = None
+        self._pass_through = False
 
         # Reversed flow approaches from the to-node's side (#554): the single
         # pipe there, declared either way, sets the velocity of approach.
@@ -3643,32 +3677,61 @@ class OrificeElement(NetworkElement):
             + graph.get_downstream_elements(self.to_node)
             if isinstance(e, ChannelElement) and e.id != self.id
         ]
-        # The reverse approach pipe's diameter: its static state is the
-        # orifice's p1 in reverse (#651).
-        self._reverse_pipe_diameter = None
-        self._reverse_pipe_source = ""
-        if len(to_pipes) == 1 and to_pipes[0].diameter and d_bore < to_pipes[0].diameter:
-            self.beta_reverse = d_bore / to_pipes[0].diameter
-            self._reverse_pipe_diameter = to_pipes[0].diameter
-            self._reverse_pipe_source = f"channel '{to_pipes[0].id}'"
         from_pipes = [
             e
             for e in graph.get_upstream_elements(self.from_node)
             + graph.get_downstream_elements(self.from_node)
             if isinstance(e, ChannelElement) and e.id != self.id
         ]
+        # The reverse approach pipe's diameter: its static state is the
+        # orifice's p1 in reverse (#651).
+        self._reverse_pipe_diameter = None
+        self._reverse_pipe_source = ""
+
+        if not self.in_pipe:
+            # No pipe diameter (#788): a lumped Cd*A restriction, a hole in a
+            # wall. Whatever channels adjoin it set no beta and recover
+            # nothing, in either direction.
+            self.upstream_diameter = None
+            self._upstream_source = ""
+            to_pipes, from_pipes = [], []
+
+        # The pipe that sets beta, per direction: the single upstream channel
+        # forward, the single to-side channel in reverse. The bore against it
+        # (#788): equal is no orifice, larger is refused. There is no silent
+        # fallback to a wall hole any more; that is in_pipe=False, said.
+        pipes = []
+        if self.upstream_diameter and self.upstream_diameter > 0:
+            pipes.append((self.upstream_diameter, self._upstream_source))
+        if len(to_pipes) == 1 and to_pipes[0].diameter and to_pipes[0].diameter > 0:
+            pipes.append((to_pipes[0].diameter, f"channel '{to_pipes[0].id}'"))
+        for D, source in pipes:
+            if d_bore > D * (1.0 + ORIFICE_BORE_PIPE_RTOL):
+                raise ValueError(
+                    f"OrificeElement {self.id!r}: bore {d_bore:.6g} m is larger than "
+                    f"the pipe it sits in ({source}, D = {D:.6g} m). There is no such "
+                    "geometry. A bore equal to the pipe is no orifice (zero loss); for "
+                    "a lumped Cd*A restriction set in_pipe=False (no pipe diameter, "
+                    "beta = 0)."
+                )
+            if abs(d_bore - D) <= ORIFICE_BORE_PIPE_RTOL * D:
+                self._pass_through = True
+        if self._pass_through:
+            # beta = 1: no restriction, and no orifice physics to set up.
+            self.beta = 1.0
+            self._recovery_fwd = False
+            self._recovery_rev = False
+            self._pipe_cd_ratio_fwd = 1.0
+            self._pipe_cd_ratio_rev = 1.0
+            return
+
+        if len(to_pipes) == 1 and to_pipes[0].diameter:
+            self.beta_reverse = d_bore / to_pipes[0].diameter
+            self._reverse_pipe_diameter = to_pipes[0].diameter
+            self._reverse_pipe_source = f"channel '{to_pipes[0].id}'"
 
         if self.upstream_diameter and self.upstream_diameter > 0:
-            if d_bore < self.upstream_diameter:
-                self.beta = d_bore / self.upstream_diameter
-            else:
-                warnings.warn(
-                    f"OrificeElement '{self.id}': inferred bore diameter "
-                    f"({d_bore:.4f} m) >= channel diameter "
-                    f"({self.upstream_diameter:.4f} m). "
-                    f"Skipping velocity-of-approach correction (E=1).",
-                    stacklevel=2,
-                )
+            self.beta = d_bore / self.upstream_diameter
 
         # Pressure recovery (#645), per flow direction: the approach pipe sets
         # beta, and a single wider pipe on the far side recovers the jet's
@@ -3995,6 +4058,14 @@ class OrificeElement(NetworkElement):
         state_out: "NetworkMixtureState",
         flows: dict[str, float] | None = None,
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
+
+        if self._pass_through:
+            # Bore == pipe (#788): no orifice. Zero loss, the flow passes
+            # unchanged; its rate is the network's. Exact and linear, so
+            # the Jacobian is the constant +-1 of a lossless connection.
+            return [state_in.Pt - state_out.Pt], {
+                0: {f"{self.from_node}.Pt": 1.0, f"{self.to_node}.Pt": -1.0}
+            }
 
         m_dot = state_in.m_dot
         effective_cd = self._effective_Cd(state_in, state_out, flows)

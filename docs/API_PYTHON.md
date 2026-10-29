@@ -1332,6 +1332,7 @@ fluid. Three modes:
     - An orifice into a dead end (no flow boundary beyond its to-node) is never reversed: every root has zero flow there.
     - **With a pipe upstream (E applied) the orifice drives from that pipe's static state** (#651), the node's (Pt, Tt) at the pipe's mass flux, not from the node's own static pressure: a `PlenumNode` (P = Pt) and a `MomentumChamberNode` then give the same flow. Reported as `P_approach`. The row then solves its own consistency, m* = m_calc(m*, x).
     - **Between pipes the orifice charges its permanent loss** (#645). With a pipe on the side the flow comes from (beta) and a wider one on the side it goes to, a metering or `fixed` orifice's drop is the nodes' stagnation difference, ISO 5167-2's k(beta, C) times the tapping differential, and the kernel expands to the implied tap pressure. Into a node with no pipe beyond it, the jet's head is lost and the drop is the tapping differential. The row's Cd is at D-D/2 taps; `OrificeElement(tap=...)` only picks the `dP_tap` it reports.
+    - **The bore against its pipe** (#788, 0.8.0). The pipes that set beta (the single upstream channel forward, the single to-side channel in reverse) are compared with the bore to `ORIFICE_BORE_PIPE_RTOL` (1e-6 relative). Equal on either side is **no orifice**: zero loss, the row is `Pt_in - Pt_out = 0` with Jacobian +1/-1 (row kind "p"), `beta = 1`, and the resolve preview reports `pass_through = 1`; this is how an orifice is switched off without editing the network. A bore larger than either pipe is refused (`ValueError`). Until 0.8.0 a bore at or above the pipe silently became a wall hole (beta = 0, and only in that direction); that fallback is gone. Write a lumped Cd*A restriction as `OrificeElement(..., in_pipe=False)` (GUI: untick "In a pipe"): no pipe diameter, beta = 0 both ways, no recovery. Its metering Cd (Reader-Harris/Gallagher, Stolz) is then evaluated as for a plenum-fed orifice, at D = 1 m; the old fallback used D = 10 d.
   - **Incompressible channels:** the friction and exit-head density is the upstream node's along the flow, blended through zero flow over `FLOW_REVERSAL_M_SCALE`. It is taken at the duct's own inlet static state, the node's (Pt, T) at the duct's flux (#651), not at the node's static pressure.
   - **Cold start:** on networks driven by pressure boundaries alone, the cold-start pressure guess of an interior node is clamped to the boundaries' range.
   - A fraction loss (`ConstantFractionLoss`, `LinearThetaFractionLoss`) takes an optional design flow `m_ref` [kg/s]: at and above it the loss is exactly the fraction; below it the loss scales with the dynamic head (`1 - (1 - r^2)^3`, `r = |m_dot|/m_ref`, C2) and vanishes at zero flow.
@@ -1413,6 +1414,12 @@ from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberE
 
 # Flow elements
 orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
+# The bore against the pipe it sits in (#788, 0.8.0): equal (to
+# ORIFICE_BORE_PIPE_RTOL = 1e-6 relative) is NO orifice -- zero loss, the row is
+# Pt_in - Pt_out = 0 and the flow passes unchanged -- and larger is refused. A
+# lumped Cd*A restriction is an orifice with no pipe diameter: in_pipe=False
+# (beta = 0 both ways, no recovery, whatever channels adjoin it).
+lumped = OrificeElement("lumped", "node1", "node2", Cd=0.8, diameter=0.05, correlation="fixed", in_pipe=False)
 channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
 # Compressible channel (#481): residual m - m_calc, m_calc = A * fanno_channel_flow(
 # feeding node's Pt/Tt, other node's Pt). The duct is fed isentropically from the

@@ -97,7 +97,9 @@ def _net(
         )
     )
     g.add_element(
-        OrificeElement("co", "cp", "cold_out", Cd=0.8, diameter=0.03, correlation="fixed")
+        OrificeElement(
+            "co", "cp", "cold_out", Cd=0.8, diameter=0.03, correlation="fixed", in_pipe=False
+        )
     )
     kw = {"film": "ln", "film_start": 0.0, "film_end": 0.05} if film else {}
     g.add_wall(
