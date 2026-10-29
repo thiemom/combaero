@@ -63,15 +63,15 @@ class TestSuperalloys:
 
     def test_haynes230_temperature_range(self):
         """Test Haynes 230 valid temperature range."""
-        # Valid range: 300-1400 K
+        # Valid range: 300-1273 K, where the brochure table ends (1000 C)
         assert cb.k_haynes230(300) > 0
-        assert cb.k_haynes230(1400) > 0
+        assert cb.k_haynes230(1000.0 + 273.15) == pytest.approx(28.4, rel=1e-12)
 
         with pytest.raises(RuntimeError):
             cb.k_haynes230(250)
 
         with pytest.raises(RuntimeError):
-            cb.k_haynes230(1500)
+            cb.k_haynes230(1274.15)
 
 
 class TestStructuralAlloys:

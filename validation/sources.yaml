@@ -2987,8 +2987,8 @@ documents:
   status: implemented
   verdict: 'The primary table for k_haynes230 (#761). Thermal conductivity, metric column: 8.9 W/m C at RT,
     10.4 at 100 C, then +2.0 per 100 C to 28.4 at 1000 C, i.e. exactly k = 8.4 + 0.020 T[C]. The quadratic
-    shipped before was +37% at RT, +2-6% at liner temperatures. The table stops at 1000 C (1273 K);
-    k_haynes230 keeps its 1400 K limit by extending the constant slope (documented). Note the specific-heat
+    shipped before was +37% at RT, +2-6% at liner temperatures. The table stops at 1000 C (1273 K),
+    and so does the valid range of k_haynes230 (it used to run to 1400 K). Note the specific-heat
     column prints 5595 J/kg C at 800 C, an obvious misprint (574 at 700 C, 609 at 900 C) -- not used.'
   read_for: ['#761 Haynes 230 conductivity']
   issues: [761]

@@ -40,7 +40,7 @@ double k_inconel718(double T);
 // Source: HAYNES 230 alloy brochure H-3000O (Haynes International, 2021),
 // Physical Properties table: 8.9 W/m K at RT, 10.4 at 100 C rising 2.0 per
 // 100 C to 28.4 at 1000 C.
-// Valid: 300-1400 K (table to 1273 K; 1273-1400 K extends its slope)
+// Valid: 300-1273 K, where the table ends
 // Linear: k = 8.4 + 0.020*T_C, exact at every printed point (#761)
 double k_haynes230(double T);
 

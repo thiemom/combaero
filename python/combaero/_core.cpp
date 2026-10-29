@@ -6640,8 +6640,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Ni-Cr-W-Mo alloy with high-temperature oxidation resistance.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
-        "Valid range: 300-1400 K\n"
-        "Source: Haynes International Technical Data");
+        "Valid range: 300-1273 K (the brochure table ends at 1000 C)\n"
+        "Source: HAYNES 230 brochure H-3000O (Haynes International, 2021)");
 
   m.def("k_stainless_steel_316", &combaero::materials::k_stainless_steel_316,
         py::arg("T"),
