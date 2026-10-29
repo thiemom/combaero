@@ -33,12 +33,20 @@ def test_label_with_unit():
     assert units.label_with_unit("Y[N2]") == "Y[N2] [-]"
     # State::mw is g/mol (include/units_data.h); the export said kg/mol.
     assert units.label_with_unit("mw") == "mw [g/mol]"
-    # A unit only the GUI shows leaves the export column as it was.
+    # Every key with a unit is labelled in the export, the junction port and
+    # step patterns and the arrays' per-row lists included (#774, 0.8.0).
     assert units.unit_of("port_2_P") == "Pa"
     assert units.unit_of("step_branch_dPt") == "Pa"
-    assert units.label_with_unit("port_2_P") == "port_2_P"
-    assert units.label_with_unit("entrainment_ratio") == "entrainment_ratio"
-    assert not set(units.UNIT_MAP) & set(units.GUI_ONLY_UNITS)
+    assert units.label_with_unit("port_2_P") == "port_2_P [Pa]"
+    assert units.label_with_unit("step_branch_dPt") == "step_branch_dPt [Pa]"
+    assert units.label_with_unit("port_0_area") == "port_0_area [m^2]"
+    assert units.label_with_unit("entrainment_ratio") == "entrainment_ratio [-]"
+    assert units.label_with_unit("rows_T_hot") == "rows_T_hot [K]"
+    assert units.label_with_unit("UA") == "UA [W/K]"
+    # Text-valued keys carry no unit.
+    assert units.is_text_key("port_1_area_source")
+    assert units.label_with_unit("port_1_area_source") == "port_1_area_source"
+    assert units.label_with_unit("second_law") == "second_law"
 
 
 def test_frontend_quantities_sync():

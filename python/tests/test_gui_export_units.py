@@ -1,6 +1,46 @@
 """Unit tests for :mod:`gui.backend.units` used by the CSV export pipeline."""
 
-from gui.backend.units import UNIT_MAP, label_with_unit
+import csv
+import io
+import sys
+import warnings
+from pathlib import Path
+
+import pytest
+
+from gui.backend.units import _META_COLUMNS, UNIT_MAP, is_text_key, label_with_unit
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+
+import gui_result_keys  # noqa: E402
+import test_gui_http_routes as http  # noqa: E402
+
+# One network per palette kind plus the variants that switch on optional
+# diagnostics (scripts/gui_result_keys.py, the source of the GUI's key list).
+_NETWORKS = list(gui_result_keys.networks())
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [g for _, _, g in _NETWORKS],
+    ids=[f"{kind}-{variant}" for kind, variant, _ in _NETWORKS],
+)
+def test_every_export_column_has_a_unit(graph: dict) -> None:
+    """Every column of the CSV export carries its unit (#774), unless it is a
+    meta column (id, label, status ...) or a text-valued key (is_text_key).
+    A new result key with no unit fails here: add it to UNIT_MAP in
+    gui/backend/units.py (or to TEXT_KEYS when its value is text)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = http._post("/export", graph)
+    assert r.status_code == 200, r.text[:300]
+    header = next(csv.reader(io.StringIO(r.text)))
+    unlabelled = [
+        c
+        for c in header
+        if not (c in _META_COLUMNS or is_text_key(c) or (" [" in c and c.endswith("]")))
+    ]
+    assert unlabelled == []
 
 
 def test_label_with_unit_known_scalar_pressure():

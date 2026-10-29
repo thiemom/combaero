@@ -2078,6 +2078,14 @@ response headers `X-Combaero-Success` / `X-Combaero-Outcome` repeat the status
 with `= + - @`, a tab or a carriage return gets a leading `'` so a spreadsheet
 does not run it as a formula. Unit labels are ASCII (`kg/m^3`, `Pa*s`).
 
+Every quantity column carries its unit, `<key> [<unit>]`, dimensionless ones
+included (`entrainment_ratio [-]`, `port_0_P [Pa]`, `rows_T_hot [K]`); only
+the meta columns (`id`, `label`, `type`, `kind`, the solve status, ...) and the
+text-valued keys (`area_source`, `second_law`, `tap`, ...) are bare. The units
+come from `gui/backend/units.py` (`UNIT_MAP`, `unit_of`). Until 0.8.0 about 130
+keys had no unit there and kept a bare column (#774). `sweep(..., metrics=[...])`
+names its columns by the metric strings you pass and is unaffected.
+
 ### Parametric sweep
 
 ```python

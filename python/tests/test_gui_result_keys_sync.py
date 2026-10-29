@@ -38,8 +38,7 @@ def test_every_palette_kind_and_element_kind_is_listed() -> None:
 
 def test_every_emitted_key_has_a_unit() -> None:
     """A key with no unit in gui/backend/units.py shows a bare number in the
-    GUI: add it to UNIT_MAP, or to GUI_ONLY_UNITS where giving the export
-    column a unit would rename it."""
+    GUI and an unlabelled export column: add it to UNIT_MAP."""
     missing = sorted(k for k, u in _DOC["units"].items() if u is None)
     assert missing == []
 

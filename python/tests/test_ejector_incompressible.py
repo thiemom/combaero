@@ -206,7 +206,7 @@ def _jetpump_run(regime: str, m: float, t_p: float) -> tuple[float, float]:
     raw = res._raw
     assert raw["__success__"], (regime, m, raw["__message__"])
     df = res.to_dataframe()
-    omega = float(df[df["id"] == "ej1"].iloc[0]["entrainment_ratio"])
+    omega = float(df[df["id"] == "ej1"].iloc[0]["entrainment_ratio [-]"])
     return omega, raw["mc_p.Pt"] - 101325.0
 
 
