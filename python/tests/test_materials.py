@@ -50,28 +50,28 @@ class TestSuperalloys:
         T = 300.0  # K
         k = cb.k_haynes230(T)
 
-        # At 300K: k approx 11.8 + 0.0158*27 + 1.1e-6*27^2 approx 12.23 W/(m*K)
-        assert k == pytest.approx(12.23, abs=0.1)
+        # Brochure H-3000O: 8.9 W/m K at room temperature (#761)
+        assert k == pytest.approx(8.94, abs=0.01)
 
     def test_haynes230_high_temp(self):
         """Test Haynes 230 at high temperature."""
         T = 1200.0  # K (927C)
         k = cb.k_haynes230(T)
 
-        # Quadratic fit should give reasonable value
-        assert 20 < k < 35
+        # Brochure H-3000O: 26.4 W/m K at 900 C, 28.4 at 1000 C (linear)
+        assert k == pytest.approx(8.4 + 0.020 * (1200.0 - 273.15), rel=1e-12)
 
     def test_haynes230_temperature_range(self):
         """Test Haynes 230 valid temperature range."""
-        # Valid range: 300-1400 K
+        # Valid range: 300-1273 K, where the brochure table ends (1000 C)
         assert cb.k_haynes230(300) > 0
-        assert cb.k_haynes230(1400) > 0
+        assert cb.k_haynes230(1000.0 + 273.15) == pytest.approx(28.4, rel=1e-12)
 
         with pytest.raises(RuntimeError):
             cb.k_haynes230(250)
 
         with pytest.raises(RuntimeError):
-            cb.k_haynes230(1500)
+            cb.k_haynes230(1274.15)
 
 
 class TestStructuralAlloys:

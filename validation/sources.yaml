@@ -2978,6 +2978,24 @@ documents:
   code: [include/vatistas.h, src/vatistas.cpp, python/combaero/vortex.py]
   notes: PDF page 1 begins with the end of the preceding article (Mao & Hanratty) in the same issue.
 
+- file: docs/materials/haynes_230_alloy_brochure_H-3000.pdf
+  citation: Haynes International (2021). HAYNES 230 alloy (UNS N06230), product brochure H-3000O.
+  topic: [other]
+  content: Composition, physical properties (density, electrical resistivity, thermal diffusivity, thermal
+    conductivity, specific heat, mean thermal expansion, dynamic modulus) tabulated RT to 1000 C, plus
+    mechanical, oxidation and fabrication data.
+  status: implemented
+  verdict: 'The primary table for k_haynes230 (#761). Thermal conductivity, metric column: 8.9 W/m C at RT,
+    10.4 at 100 C, then +2.0 per 100 C to 28.4 at 1000 C, i.e. exactly k = 8.4 + 0.020 T[C]. The quadratic
+    shipped before was +37% at RT, +2-6% at liner temperatures. The table stops at 1000 C (1273 K),
+    and so does the valid range of k_haynes230 (it used to run to 1400 K). Note the specific-heat
+    column prints 5595 J/kg C at 800 C, an obvious misprint (574 at 700 C, 609 at 900 C) -- not used.'
+  read_for: ['#761 Haynes 230 conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-28 (the haynesintl.com PDF links return 403 to automated fetches).
+
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
 # `citation` here is as recalled unless `checked` is true; confirm it from
