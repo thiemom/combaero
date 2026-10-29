@@ -1,8 +1,8 @@
 """Tests for NetworkRunner and NetworkResult.
 
 Covers: from_file, from_dict, solve (no overrides), BC overrides, sweep,
-NetworkResult.get, node_state, to_dataframe.  The multi_wall_tee.json
-integration test is skipped if the fixture file is absent.
+NetworkResult.get, node_state, to_dataframe, and the multi_wall_tee.json
+integration case (python/tests/data, #783).
 """
 
 import math
@@ -13,7 +13,7 @@ import pytest
 
 from gui.backend.runner import NetworkResult, NetworkRunner
 
-_FIXTURE_DIR = Path(__file__).parent.parent.parent / "gui" / "tmp"
+_FIXTURE_DIR = Path(__file__).parent / "data"
 _MULTI_WALL_TEE = _FIXTURE_DIR / "multi_wall_tee.json"
 
 # ---------------------------------------------------------------------------
@@ -471,11 +471,10 @@ def test_swap_missing_label_raises():
 
 
 # ---------------------------------------------------------------------------
-# Integration -- multi_wall_tee.json (skipped if fixture absent)
+# Integration -- multi_wall_tee.json
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not _MULTI_WALL_TEE.exists(), reason="fixture not present")
 def test_multi_wall_tee_solve():
     # init_strategy="default": the fixture's stored results are from a
     # FAILED solve, so since the warm-start success gate they no longer
@@ -492,7 +491,6 @@ def test_multi_wall_tee_solve():
     assert result.final_norm < 1e-3
 
 
-@pytest.mark.skipif(not _MULTI_WALL_TEE.exists(), reason="fixture not present")
 def test_multi_wall_tee_to_dataframe():
     runner = NetworkRunner.from_file(_MULTI_WALL_TEE)
     result = runner.solve(
