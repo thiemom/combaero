@@ -63,7 +63,15 @@ def test_cooling_a_stream_below_zero_enthalpy_is_refused_not_raised() -> None:
     lands on the below-0 K one. Both are named refusals of the same
     inadmissible problem, so either passes; each is checked by its own
     fields. The seeded start is held to "refused, never raised" by the next
-    test."""
+    test.
+
+    Deliberately strict: a THIRD outcome fails here (the assertion prints the
+    warning text). That means the solver now refuses this network under
+    another name, or no longer refuses it. If the new name is a legitimate
+    refusal of an inadmissible root (a new consistency check reached first),
+    add a branch for it with its own field checks; if it is a timeout, an
+    exception or a success, the #552 contract broke and the solver needs the
+    fix, not this test."""
     s = NetworkSolver(_cooled_chain(-2e4))
     s.resistance_seed = False
     with warnings.catch_warnings(record=True) as caught:
