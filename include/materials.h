@@ -65,20 +65,37 @@ double k_aluminum_6061(double T);
 // -------------------------------------------------------------
 
 // Yttria-Stabilized Zirconia (YSZ) - 7-8 wt% Y2O3
-// Source: NASA TM-2010-216765 (Zhu/Miller sintering model)
+// Source: Zhu, D., Miller, R. A. (2000). NASA/TM-2000-210237 (#761).
 // Valid: 300-1700 K
 //
-// Sintering model:
-// - Initial k increases linearly with T
-// - Over time at high T (>1073 K), pores close (sintering) -> k increases
-// - Rate depends on temperature (Arrhenius)
-// - EB-PVD (columnar) has higher initial k than APS (splat boundaries)
+// Plasma-sprayed (default): as sprayed k0 = 1.0 W/m K, flat in T (Zhu &
+// Miller: "about 1 W/m-K"). Sintering after `hours` at T follows their Eq. 1:
+//   k = k0 + (k_inf - k0) A exp(-Q/RT) [1 - exp(-t/tau)],
+//   tau = tau0 exp(Q_tau/RT), t in seconds,
+// A = 102.2, Q = 68228 J/mol, tau0 = 572.5 s, Q_tau = 41710 J/mol. k_inf =
+// 1.74 W/m K is inferred: with Eq. 1's own prefactor it reproduces the three
+// plateaus of their Fig. 4 (1.44 / 1.17 / 1.09 W/m K at 1320 / 1100 / 990 C
+// surface; read off the figure, unconfirmed). The fit is the overall
+// conductivity of a 254 um coating under a 64 W/cm^2 gradient: an effective
+// through-thickness value, best for coatings of that order. A user with a
+// characterised coating supplies its own conductivity.
+//
+// EB-PVD: as-deposited 1.5 + 0.0002 T_C only, uncited (kept until a public
+// source is held); no sintering.
 //
 // Parameters:
-//   T        : temperature [K]
-//   hours    : operating hours at temperature (default: 0 = as-sprayed)
-//   is_ebpvd : true for EB-PVD coating, false for APS (default: false)
+//   T        : (surface) temperature [K]
+//   hours    : exposure at T [h] (default: 0 = as sprayed)
+//   is_ebpvd : true for EB-PVD, false for plasma-sprayed (default: false)
 // Returns: thermal conductivity k [W/(m*K)]
+constexpr double YSZ_T_MIN = 300.0;
+constexpr double YSZ_T_MAX = 1700.0;
+constexpr double YSZ_APS_K0 = 1.0;        // W/(m K), as sprayed
+constexpr double YSZ_APS_K_INF = 1.74;    // W/(m K), inferred from Fig. 4
+constexpr double YSZ_ZHU_A = 102.2;       // -
+constexpr double YSZ_ZHU_Q = 68228.0;     // J/mol
+constexpr double YSZ_ZHU_TAU0_S = 572.5;  // s
+constexpr double YSZ_ZHU_Q_TAU = 41710.0; // J/mol
 double k_tbc_ysz(double T, double hours = 0.0, bool is_ebpvd = false);
 
 // -------------------------------------------------------------
