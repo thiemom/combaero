@@ -7,32 +7,32 @@ recreating a CoolProp environment**.
 
 ## Source
 
-- `../../docs/ejector/Huang_1d_analysis_ejector.pdf` — B.J. Huang, J.M. Chang,
+- `../../sources/ejector/Huang_1d_analysis_ejector.pdf` — B.J. Huang, J.M. Chang,
   C.P. Wang, V.A. Petrenko, "A 1-D analysis of ejector performance",
   *Int. J. Refrigeration* 22 (1999) 354-364. Source of `entrainment_ratio`
   (Eqs. 1-8) and of the digitized Tables 3-4 validation data.
-- `../../docs/ejector/Development_of_an_Analytical_Method_for.pdf` — J. Kracik,
+- `../../sources/ejector/Development_of_an_Analytical_Method_for.pdf` — J. Kracik,
   V. Dvorak, "Development of an Analytical Method for Predicting Flow in a
   Supersonic Air Ejector", EPJ Web of Conferences 114, 02059 (2016),
   DOI: 10.1051/epjconf/201611402059. Source of the mixing closure
   `critical_back_pressure` implements (their Eqs. 7-13) -- see Accuracy below
   for why this replaced Huang's original P_c* chain.
-- `../../docs/ejector/art_10.1007_s40430-025-05536-7.pdf` — S. Akbarnejad,
+- `../../sources/ejector/art_10.1007_s40430-025-05536-7.pdf` — S. Akbarnejad,
   M. Ziabasharhagh, "A novel 1D model for the analysis of double-choked
   ejectors validated by CFD simulations", J. Braz. Soc. Mech. Sci. Eng.
   47:253 (2025), DOI: 10.1007/s40430-025-05536-7. CFD confirmation that a
   naive momentum balance across the mixing region is unreliable (evaluated,
   not adopted -- see Accuracy below).
-- `../../docs/ejector/Lienhard_One dimensional.pdf` — R.K. McGovern,
+- `../../sources/ejector/Lienhard_One dimensional.pdf` — R.K. McGovern,
   K.V. Bulusu, M.A. Antar, J.H. Lienhard V, "One-dimensional Model of an
   Optimal Ejector and Parametric Study of Ejector Efficiency" (MIT/GWU/KFUPM).
   Independent corroboration of the same momentum-retaining, shock-free mixing
   pattern as Kracik & Dvorak (evaluated, not adopted -- see Accuracy below).
-- `../../docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf` — Henry, Leclaire, Hemidi,
+- `../../sources/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf` — Henry, Leclaire, Hemidi,
   Seynhaeve, Bartosiewicz, HEFAT2007: independent air-ejector CFD + experiment
   (validation cross-check target; not a model source). Its measured Fig. 5 is
   `data/henry2007_fig5.py`, with the rig's geometry.
-- `../../docs/ejector/Theoretical Model for Predicting Performance of a Gas
+- `../../sources/ejector/Theoretical Model for Predicting Performance of a Gas
   Ejector.pdf` — S. Akbarnejad, M. Ziabasharhagh, Thermal Engineering 72(1)
   (2025). Steam-ejector CFD (Tables 1-3, `data/akbarnejad2025_tables.py`), a
   cross-check target. Its own model is a scaling law from a reference curve

@@ -75,7 +75,7 @@ double cooled_wall_heat_flux(double T_hot, double T_coolant,
 // of Film-Cooling Effectiveness From Thermographic Measurements at Enginelike
 // Conditions." ASME J. Turbomachinery 124(4), 686-698. DOI 10.1115/1.1504443
 // (conference version ASME GT-2002-30180).
-// docs/heat_transfer/film/686_1_Baldauf_Film_2002.pdf (gitignored).
+// sources/heat_transfer/film/686_1_Baldauf_Film_2002.pdf (gitignored).
 //
 // A row of CYLINDRICAL, streamwise-inclined holes on a flat plate. Unlike the
 // older exponential-decay correlations it is valid from the ejection point
@@ -207,7 +207,7 @@ std::tuple<double, double, double> film_effectiveness_baldauf_2002_and_derivativ
 // Colban, W.F., Thole, K.A. and Bogard, D. (2011). "A Film-Cooling
 // Correlation for Shaped Holes on a Flat-Plate Surface." ASME J.
 // Turbomachinery 133(1), 011002. DOI 10.1115/1.4002064.
-// docs/heat_transfer/film/2011-Colban-JT-1fygyl9.pdf (gitignored).
+// sources/heat_transfer/film/2011-Colban-JT-1fygyl9.pdf (gitignored).
 //
 // One row of FAN-SHAPED or LAIDBACK FAN-SHAPED holes on a flat plate.
 // Baldauf above is for cylindrical holes; the two are not interchangeable,
@@ -298,7 +298,7 @@ std::tuple<double, double> film_effectiveness_colban_2011_and_derivatives(
 //
 // Marek, C.J. and Tacina, R.R. (1975). "Effect of Free-Stream Turbulence on
 // Film Cooling." NASA TN D-7958.
-// docs/heat_transfer/film/oct23/19750017021.pdf (gitignored).
+// sources/heat_transfer/film/oct23/19750017021.pdf (gitignored).
 //
 // A two-dimensional SLOT film (a continuous slot across the span, as in a
 // combustor liner's cooling ring), not a row of holes: Baldauf and Colban
@@ -379,7 +379,7 @@ std::tuple<double, double> slot_film_effectiveness_marek_tacina_1975_and_derivat
 //   Gao, Z., Qiu, T., Liu, P., Ding, S., Li, Z., Cheng, R. and Yuan, Q.
 //   (2025). "A Study on the Film Superposition Method for the Multi-Row Film
 //   Cooling of the Turbine Outer Ring." Processes 13, 143, Eqs. (1)-(11).
-//   docs/heat_transfer/film/processes-13-00143-v2.pdf (open access).
+//   sources/heat_transfer/film/processes-13-00143-v2.pdf (open access).
 //
 // WHY A CORRECTION IS NEEDED. Sellers assumes the rows are independent. Gao
 // measures what that costs: "the Sellers method accumulates prediction

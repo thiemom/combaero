@@ -343,7 +343,7 @@ constexpr double re_correction_exp  = 0.2;
 // -------------------------------------------------------------
 //
 // Idelchik, I.E. "Handbook of Hydraulic Resistance", 1st English edition,
-// AEC-tr-6630 (1966). docs/junction/Idelchik.pdf (gitignored, copyrighted) --
+// AEC-tr-6630 (1966). sources/junction/Idelchik.pdf (gitignored, copyrighted) --
 // the same copy the junction work digitised diagrams 7-1..7-7 from.
 //
 // GEOMETRY: F1 = F2 = infinity, a hole in a wall between two large volumes.
@@ -462,7 +462,7 @@ constexpr double pipe_thick_wall_offset = 1.5;
 // Lichtarowicz, A., Duggins, R.K. and Markland, E. (1965). "Discharge
 // coefficients for incompressible non-cavitating flow through long
 // orifices." J. Mech. Engng Sci. 7(2), 210-219.
-// docs/orifices/lichtarowicz-et-al-1965-...pdf (gitignored, copyrighted).
+// sources/orifices/lichtarowicz-et-al-1965-...pdf (gitignored, copyrighted).
 //
 // WHY IT EARNS A PLACE. It plugs a coverage hole the other two leave:
 //

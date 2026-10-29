@@ -759,7 +759,7 @@ TeeJunctionResult branching_tee_residuals_and_jacobian(
 // -----------------------------------------------------------------------------
 // Replaces the Bassett incompressible K tables with a geometry-derived K to
 // O(M^2) that is consistent with mass-flow continuity and stagnation pressure.
-// See docs/junction/junction_model.tex for derivation.
+// See sources/junction/junction_model.tex for derivation.
 //
 // Per-branch input struct.  mdot sign: >0 = supplier (inflow to junction).
 // P_static and Pt are both passed explicitly (available as state_X.P / Pt in

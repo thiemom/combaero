@@ -12,19 +12,19 @@ text layer.
 > Andrews, G.E., Asere, A.A., Hussain, C.I., Mkpadi, M.C. and Nazari, A.
 > (1988). Impingement/Effusion Cooling: Overall Wall Heat Transfer. ASME
 > 88-GT-290, Department of Fuel and Energy, University of Leeds.
-> `docs/heat_transfer/film/Andrews_88-GT-290.pdf`
+> `sources/heat_transfer/film/Andrews_88-GT-290.pdf`
 > (gitignored, copyrighted).
 
 > van de Noort, M. and Ireland, P. (2022). A Low Order Flow Network Model for
 > Double-Wall Effusion Cooling Systems. *Int. J. Turbomach. Propuls. Power*
 > **7**, 5. DOI 10.3390/ijtpp7010005. Open access (CC BY-NC-ND).
-> `docs/heat_transfer/film/A_Low_Order_Flow_Network_Model_for_Doubl.pdf`.
+> `sources/heat_transfer/film/A_Low_Order_Flow_Network_Model_for_Doubl.pdf`.
 
 > Andrei, L., Andreini, A., Bianchini, C., Caciolli, G., Facchini, B.,
 > Mazzei, L., Picchi, A. and Turrini, F. (2014). Effusion cooling plates for
 > combustor liners: experimental and numerical investigations on the effect
 > of density ratio. *Energy Procedia* **45**, 1402-1411.
-> `docs/heat_transfer/film/1-s2.0-S1876610214001489-main.pdf`. **Not used
+> `sources/heat_transfer/film/1-s2.0-S1876610214001489-main.pdf`. **Not used
 > yet** -- it is the PR 2 film closure.
 
 ## Geometry, validated against Andrews Table 1

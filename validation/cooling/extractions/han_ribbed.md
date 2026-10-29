@@ -52,7 +52,7 @@ for each is in the tables below under the same number.
 ### Flag list -- checkable against the printed page
 
 Every quantity appearing in both the page images and the text extraction
-(`docs/heat_transfer/han/han_ribs.md`) was compared. These agree exactly and
+(`sources/heat_transfer/han/han_ribs.md`) was compared. These agree exactly and
 need no checking: `u+`, `T+`, `e+`, Eq. 4.15, Eq. 4.16, Eq. 4.18, the `m`/`n`
 rules, the `W/H` cap, the validity ranges, `R = 3.2 (P/e/10)^0.35`, and
 `G = 3.7 (e+)^0.28`.
@@ -196,10 +196,10 @@ Secondary source. The rib correlations are **after Han, J.C., ASME J. Heat
 Transfer, 110, 321, 1988**, per the caption of Figure 4.46. Figure 4.46 also
 carries data attributed to Han (1984).
 
-Page images are kept in `docs/sources/`, which is gitignored -- they are
+Page images are kept in `sources/scans/`, which is gitignored -- they are
 copyrighted and must not be committed. This document is the tracked artifact.
 
-| item | file in `docs/sources/` |
+| item | file in `sources/scans/` |
 |---|---|
 | Eq. 4.15, 4.16, e+, four-sided f | `han_2012_rib_eq_4.15_4.16.png` |
 | Fig. 4.46, Eq. 4.17 | `han_2012_rib_fig_4.46_eq_4.17.png` |
@@ -455,7 +455,7 @@ descriptions.
 
 ### Figure 4.47 (item 18) and what it settles
 
-Read from `docs/heat_transfer/han/han_fig4.47_pp377.png`.
+Read from `sources/heat_transfer/han/han_fig4.47_pp377.png`.
 
 | # | item | as extracted | state |
 |---|---|---|---|
@@ -495,7 +495,7 @@ Two transcriptions of Eq. 4.17 disagree:
 | source | denominator |
 |---|---|
 | page image `han_2012_rib_fig_4.46_eq_4.17.png` | `(P/e/10)^0.35 * (W/H)^m` |
-| text extraction, `docs/heat_transfer/han/han_ribs.md` line 125 | `(P/e/10)^0.35` only |
+| text extraction, `sources/heat_transfer/han/han_ribs.md` line 125 | `(P/e/10)^0.35` only |
 
 The image version is the more likely correct one, because the sentence
 immediately following the equation reads "where `m = 0` for `alpha = 90` and
@@ -1181,7 +1181,7 @@ confirmation it was waiting for came from a different and stronger place.
 | 2026-09-10 | reviewer | item 25: confirmed the text presents the correlations for `Pr ~ 0.7`. Raised Dipprey and Sabersky (1963) as a possible source of a `Pr`-explicit form; its role in the book is at Eq. 4.14, as the conceptual origin of the wall laws. Not yet consulted. |
 | 2026-09-10 | reviewer | accepted D1: follow Han in treating `R` as constant in `e+`. The figure does show a slope, but it is smaller than Han's own 6% band and following the text keeps the chain closed form. |
 | 2026-09-10 | extracted by Claude | systematic comparison of both channels. Five quantities agree exactly. Flag list raised: items 24 (`(W/H)^m` in Eq. 4.17), 6, 10, 25 (`Pr = 0.703` only) and 26 (Eq. 4.14 has one channel). |
-| 2026-09-10 | reviewer | section text supplied (`docs/heat_transfer/han/han_ribs.md`). **Item 7 resolved**: the text states R is independent of `e+`, valid `e+ >= 50`, 6% deviation for 95% of data -- the measured 4.5% slope was artefact. **Item 23 resolved**: Fig. 4.46 and Fig. 4.47 cover different configurations. **Item 10 partly resolved.** Adds Eq. 4.14, the stated tolerances, and opens item 24 -- the text extraction dropped `(W/H)^m` from Eq. 4.17 where the image has it. |
+| 2026-09-10 | reviewer | section text supplied (`sources/heat_transfer/han/han_ribs.md`). **Item 7 resolved**: the text states R is independent of `e+`, valid `e+ >= 50`, 6% deviation for 95% of data -- the measured 4.5% slope was artefact. **Item 23 resolved**: Fig. 4.46 and Fig. 4.47 cover different configurations. **Item 10 partly resolved.** Adds Eq. 4.14, the stated tolerances, and opens item 24 -- the text extraction dropped `(W/H)^m` from Eq. 4.17 where the image has it. |
 | 2026-09-10 | reviewer | Eq. 4.18 image supplied: item 19 confirmed, items 20-22 now interpretable. Opened item 23 -- Eq. 4.18 and Fig. 4.46 disagree on `G` by up to 22%, with different `e+` exponents (0.35 vs 0.28). |
 | 2026-09-10 | reviewer | page 377 supplied: resolves the `m` rule (item 15), adds the `W/H` cap (16), the validity range (17) and the Eq. 4.18 exponents (20-22). Eq. 4.18 itself still missing -- plain text drops equation images. |
 | 2026-09-10 | reviewer | item 7 challenged: y-axis is logarithmic and the curve is not flat. Measured against the panel frame as a skew control: curve slope is ~100x the frame's, about 4.5% rise across the range. Item 7 reopened; the closed-form claim now conditional. |

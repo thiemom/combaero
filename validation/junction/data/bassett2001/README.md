@@ -4,7 +4,7 @@
 *"Calculation of steady flow pressure loss coefficients for pipe junctions"*,
 Proc IMechE Part C, 215(8):861–881, 2001.
 
-PDF in `docs/junction/bassett.pdf` (gitignored — copyright).
+PDF in `sources/junction/bassett.pdf` (gitignored — copyright).
 
 ## Conventions
 

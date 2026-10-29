@@ -15,7 +15,7 @@ References
 [Huang 1999] B.J. Huang, J.M. Chang, C.P. Wang, V.A. Petrenko,
     "A 1-D analysis of ejector performance",
     International Journal of Refrigeration 22 (1999) 354-364.
-    Local copy: docs/ejector/Huang_1d_analysis_ejector.pdf
+    Local copy: sources/ejector/Huang_1d_analysis_ejector.pdf
     Source of `entrainment_ratio` (Eqs. 1-8) and of the original P_c* chain
     (Eqs. 9-18: phi_m-weighted momentum + Rankine-Hugoniot shock + isentropic
     diffuser) that `critical_back_pressure` no longer uses -- see below.
@@ -24,7 +24,7 @@ References
     "Development of an Analytical Method for Predicting Flow in a Supersonic
     Air Ejector", EPJ Web of Conferences 114, 02059 (2016),
     DOI: 10.1051/epjconf/201611402059.
-    Local copy: docs/ejector/Development_of_an_Analytical_Method_for.pdf
+    Local copy: sources/ejector/Development_of_an_Analytical_Method_for.pdf
     Source of the mixing closure `critical_back_pressure` implements (their
     Eqs. 7-13, a lambda/q(lambda)/z(lambda) formalism after Christianovic,
     Kiselev and Abramovich): mass, momentum and energy are solved together
@@ -37,7 +37,7 @@ References
     "A novel 1D model for the analysis of double-choked ejectors validated by
     CFD simulations", J. Braz. Soc. Mech. Sci. Eng. 47:253 (2025),
     DOI: 10.1007/s40430-025-05536-7.
-    Local copy: docs/ejector/art_10.1007_s40430-025-05536-7.pdf
+    Local copy: sources/ejector/art_10.1007_s40430-025-05536-7.pdf
     Independent CFD confirmation that a naive momentum balance across the
     mixing region (as used by Huang and predecessors) is unreliable: their
     Psi_5 metric (relative error of assuming momentum is simply conserved)
@@ -52,7 +52,7 @@ References
 [Lienhard/McGovern] R.K. McGovern, K.V. Bulusu, M.A. Antar, J.H. Lienhard V,
     "One-dimensional Model of an Optimal Ejector and Parametric Study of
     Ejector Efficiency" (MIT/GWU/KFUPM).
-    Local copy: docs/ejector/Lienhard_One dimensional.pdf
+    Local copy: sources/ejector/Lienhard_One dimensional.pdf
     A third, independent source using the same momentum-retaining,
     shock-free mixing pattern as Kracik & Dvorak (their Eqs. 8-11): further
     corroboration, not the equations implemented here.

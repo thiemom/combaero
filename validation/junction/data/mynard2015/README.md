@@ -3,7 +3,7 @@
 **Source:** J P Mynard, K Valen-Sendstad, *"A unified method for estimating
 pressure losses at vascular junctions"*, Int J Numer Methods Biomed Eng
 31(7):e02717, 2015, DOI 10.1002/cnm.2717. This is the accepted manuscript
-(University of Melbourne repository), `docs/junction/a-unified-method-...pdf`,
+(University of Melbourne repository), `sources/junction/a-unified-method-...pdf`,
 which is gitignored for copyright. The digitised coordinates are committed.
 
 ## Files

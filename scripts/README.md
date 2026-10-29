@@ -7,16 +7,19 @@ Utility scripts for code quality, documentation generation, and testing.
 ### sources.py
 
 The register of every local reference document (`validation/sources.yaml`;
-the PDFs under `docs/` are gitignored): citation, content, the questions it
-was read for, the verdict, and where the repo uses it.
+the documents live in `sources/`, which git ignores whatever the file type,
+#846): citation, content, the questions it was read for, the verdict, and
+where the repo uses it.
 
 ```bash
 uv run scripts/sources.py find impingement effusion   # entries matching ALL terms
 uv run scripts/sources.py list --status unscreened
 uv run scripts/sources.py list --topic film --long
 uv run scripts/sources.py list --wanted [--priority now]   # documents we lack, the question each settles
-uv run scripts/sources.py check --docs ../../docs     # schema; unregistered local documents
-uv run scripts/sources.py new docs/x/paper.pdf        # stub entry to fill in
+uv run scripts/sources.py check --sources ../../sources   # schema; unregistered or trackable local files
+uv run scripts/sources.py new sources/x/paper.pdf     # stub entry to fill in
+uv run --no-project scripts/check_no_sources.py --all # no copyrighted file is tracked (pre-commit + CI)
+uv run --no-project scripts/migrate_docs_to_sources.py [--root DIR] [--apply]  # one-shot docs/ -> sources/ move (#846)
 ```
 
 `python/tests/test_source_register.py` keeps the register valid in CI (the

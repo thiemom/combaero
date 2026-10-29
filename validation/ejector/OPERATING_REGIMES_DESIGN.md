@@ -262,7 +262,7 @@ Two in-repo, air-fluid sources cover the plateau -> knee (`P_c*`) -> droop ->
 breakdown (`P_b0`) structure directly, so no refrigerant EOS / CoolProp is
 needed (unlike the R141b critical fixture):
 
-- **Henry et al. (2007), HEFAT2007** (`../../docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf`). Fig. 5 is the measured air-ejector
+- **Henry et al. (2007), HEFAT2007** (`../../sources/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf`). Fig. 5 is the measured air-ejector
   characteristic `omega(Pb/P2^0)` at three primary pressures (4/5/6 bar), each
   showing the full plateau -> droop -> near-breakdown shape, with a reported
   CFD-vs-experiment deviation < 10%. **Digitized and committed** as
@@ -586,14 +586,14 @@ Still open:
 
 - Huang, Chang, Wang, Petrenko (1999), *A 1-D analysis of ejector performance*,
   Int. J. Refrigeration 22:354-364.
-  `../../docs/ejector/Huang_1d_analysis_ejector.pdf`.
+  `../../sources/ejector/Huang_1d_analysis_ejector.pdf`.
 - Kracik, Dvorak (2016), *Development of an Analytical Method for Predicting
   Flow in a Supersonic Air Ejector*, EPJ Web Conf. 114:02059.
-  `../../docs/ejector/Development_of_an_Analytical_Method_for.pdf`.
+  `../../sources/ejector/Development_of_an_Analytical_Method_for.pdf`.
 - Henry, Leclaire, Hemidi, Seynhaeve, Bartosiewicz (2007), *Analysis of
   Supersonic Ejector Operation: Experimental Validation and Two-Phase Aspects*,
   HEFAT2007, Sun City, paper HF1 -- air-ejector experiment + CFD; Fig. 5 is the
-  subcritical-droop validation target. `../../docs/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf`.
+  subcritical-droop validation target. `../../sources/ejector/Henry_2007_HEFAT_HF1_supersonic_ejector.pdf`.
   Digitized:
   `validation/ejector/data/henry2007_fig5.py`.
 - Akbarnejad, Ziabasharhagh (2025), *Theoretical Model for Predicting
@@ -606,7 +606,7 @@ Still open:
   lossless incompressible jet-pump relation N(M,R) (Appendix B) that the Phase
   1B compressible closure reduces to as Mach -> 0, and the measured water data
   that anchors the ~1.4x lossless overprediction (recovery ~= 0.7).
-  `../../docs/ejector/19680008095.pdf`.
+  `../../sources/ejector/19680008095.pdf`.
 - ESDU 86030, *Ejectors and jet pumps* (subcritical/breakdown characteristic
   shape reference; optional independent jet-pump cross-check).
 

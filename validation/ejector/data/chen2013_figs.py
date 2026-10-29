@@ -4,7 +4,7 @@ W. Chen, M. Liu, D. Chong, J. Yan, A.B. Little, Y. Bartosiewicz, "A 1D model
 to predict ejector performance at critical and sub-critical operational
 regimes", International Journal of Refrigeration 36 (2013) 1750-1761,
 DOI 10.1016/j.ijrefrig.2013.04.009. Source PDF:
-docs/ejector/Chen2013_1D_model_critical_subcritical.pdf (gitignored).
+sources/ejector/Chen2013_1D_model_critical_subcritical.pdf (gitignored).
 
 Chen's model is Huang 1999's chain (Eqs. 9-18 with phi_m, Eq. 19) run forward
 at the experimental mixing area, plus a subcritical branch (the entrained flow

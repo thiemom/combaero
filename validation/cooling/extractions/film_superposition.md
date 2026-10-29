@@ -10,12 +10,12 @@ defaulting to plain Sellers rather than a fitted default.
 > *AIAA Journal* **1**(9), 2154-2156. Not held directly; restated as Eq. (1)
 > by Gao et al. below, and independently described in the AFIT thesis
 > "Overall Effectiveness Superposition Theory for a Film Cooled Leading
-> Edge" (2023), both in `docs/heat_transfer/film/`.
+> Edge" (2023), both in `sources/heat_transfer/film/`.
 
 > Gao, Z., Qiu, T., Liu, P., Ding, S., Li, Z., Cheng, R. and Yuan, Q.
 > (2025). "A Study on the Film Superposition Method for the Multi-Row Film
 > Cooling of the Turbine Outer Ring." *Processes* **13**, 143.
-> `docs/heat_transfer/film/processes-13-00143-v2.pdf`. Open access.
+> `sources/heat_transfer/film/processes-13-00143-v2.pdf`. Open access.
 
 ## What is implemented
 

@@ -47,7 +47,7 @@ widen the fidelity basis from one geometry to five.
 > Colban, W.F., Thole, K.A. and Bogard, D. (2011). "A Film-Cooling
 > Correlation for Shaped Holes on a Flat-Plate Surface." *ASME J.
 > Turbomachinery* **133**(1), 011002. DOI 10.1115/1.4002064.
-> `docs/heat_transfer/film/2011-Colban-JT-1fygyl9.pdf` (gitignored).
+> `sources/heat_transfer/film/2011-Colban-JT-1fygyl9.pdf` (gitignored).
 
 One row of fan-shaped (FS) or laidback fan-shaped (LFS) holes on a flat
 plate, laterally averaged adiabatic effectiveness, low freestream turbulence,

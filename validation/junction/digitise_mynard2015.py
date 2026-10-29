@@ -1,7 +1,7 @@
 """Digitise Mynard & Valen-Sendstad 2015, Figs 4 and 6-11, by colour.
 
 The figures are 150-dpi raster images in the accepted manuscript
-(docs/junction/a-unified-method-...pdf, gitignored: copyright). Each panel
+(sources/junction/a-unified-method-...pdf, gitignored: copyright). Each panel
 plots Mynard's own model ("Unified0D", a red line) and his 3D CFD reference
 ("Ref3D", black dots on a black line). Both are separable by colour, so the
 extraction is automatic and repeatable:
@@ -45,7 +45,7 @@ from PIL import Image, ImageDraw
 from scipy import ndimage
 
 _REPO = Path(__file__).resolve().parents[2]
-_PDF = _REPO / "docs/junction/a-unified-method-for-estimating-pressure-losses-at-vascular-3elbvn7sno.pdf"
+_PDF = _REPO / "sources/junction/a-unified-method-for-estimating-pressure-losses-at-vascular-3elbvn7sno.pdf"
 _OUT = Path(__file__).resolve().parent / "data/mynard2015"
 
 

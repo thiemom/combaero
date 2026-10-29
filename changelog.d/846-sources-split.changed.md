@@ -1,0 +1,6 @@
+- **Copyrighted third-party documents live in a top-level `sources/`, never in git (#846).** Papers, handbooks, scans, figure crops and supplementary archives used to sit in gitignored folders under `docs/`, protected by a per-folder and per-extension denylist that leaked for every new file type or folder.
+  - `sources/` is ignored whatever the file type; `sources/.gitignore` is a second lock.
+  - `docs/` is an allowlist: only directories and `.md` files are un-ignored, so a new file type or folder there stays out of git until someone allows it.
+  - A `no-sources` pre-commit hook and a CI step (`scripts/check_no_sources.py`) reject any committed `sources/` path and any document, archive, office or image file outside an allowlist of directories holding images we made. This catches `git add -f`, `--no-verify` and web edits.
+  - `validation/sources.yaml` entries point at `sources/<topic>/...`; `scripts/sources.py check` takes `--sources` (was `--docs`) and reports register entries outside `sources/`, unregistered documents and any file there git would track.
+  - `scripts/migrate_docs_to_sources.py` moves an existing checkout's untracked `docs/` files to `sources/` (dry run unless `--apply`; `docs/sources/` scans become `sources/scans/`). Run it once after pulling this change: an untracked `.md` left in a `docs/` subfolder is no longer ignored.

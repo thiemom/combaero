@@ -3,7 +3,7 @@
 **Status: CONFIRMED (transcribed 2026-10-24, signed off by the user
 2026-10-25, #731).** Source: I. E. Idel'chik, *Handbook of
 Hydraulic Resistance*, 1st English edition (AEC-tr-6630, 1966),
-`docs/junction/Idelchik.pdf` (local only). Data: `data/idelchik1966/`.
+`sources/junction/Idelchik.pdf` (local only). Data: `data/idelchik1966/`.
 
 ## For the reviewer
 

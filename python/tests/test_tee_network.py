@@ -95,7 +95,7 @@ def _branching_net(
     K ~ 1, the bug Finding 5 removes. With a small straight drop the solver reaches a
     clean all-forward exact root; the split is branch-dominated because the low-loss run
     cannot carry much flow without downstream loading (see addendum Finding 6). See
-    docs/junction/'momentum cv implementation guide.pdf' for the momentum-CV successor
+    sources/junction/'momentum cv implementation guide.pdf' for the momentum-CV successor
     that removes this envelope limit entirely.
     """
     net = FlowNetwork()

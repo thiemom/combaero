@@ -16,14 +16,14 @@
 // [Huang 1999] B.J. Huang, J.M. Chang, C.P. Wang, V.A. Petrenko,
 //     "A 1-D analysis of ejector performance",
 //     International Journal of Refrigeration 22 (1999) 354-364.
-//     Local copy: docs/ejector/Huang_1d_analysis_ejector.pdf
+//     Local copy: sources/ejector/Huang_1d_analysis_ejector.pdf
 //     Source of ejector_entrainment_ratio (Eqs. 1-8) and
 //     ejector_choked_mass_flow (Eqs. 1, 7).
 // [Kracik & Dvorak 2016] J. Kracik, V. Dvorak,
 //     "Development of an Analytical Method for Predicting Flow in a
 //     Supersonic Air Ejector", EPJ Web of Conferences 114, 02059 (2016),
 //     DOI: 10.1051/epjconf/201611402059.
-//     Local copy: docs/ejector/Development_of_an_Analytical_Method_for.pdf
+//     Local copy: sources/ejector/Development_of_an_Analytical_Method_for.pdf
 //     Source of the mixing closure ejector_critical_back_pressure
 //     implements (their Eqs. 7-13).
 //

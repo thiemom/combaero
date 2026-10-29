@@ -4,7 +4,7 @@
 *"An experimental study of compressible combining flow at 45 degree T-junctions"*,
 Proc IMechE Part C: J Mech Eng Sci 229(9):1600–1610, 2015 (received 2014).
 
-PDF in `docs/junction/wang-et-al-2014-an-experimental-study-of-compressible-combining-flow-at-45-t-junctions.pdf`
+PDF in `sources/junction/wang-et-al-2014-an-experimental-study-of-compressible-combining-flow-at-45-t-junctions.pdf`
 (gitignored — copyright).
 
 ## Conventions

@@ -12,7 +12,7 @@ the PDF text layer, which garbles both (Eq. 7 OCRs as `0+327-0.00851/d`).
 > Lichtarowicz, A., Duggins, R.K. and Markland, E. (1965). "Discharge
 > coefficients for incompressible non-cavitating flow through long
 > orifices." *J. Mech. Engng Sci.* **7**(2), 210-219.
-> `docs/orifices/lichtarowicz-et-al-1965-...pdf` (gitignored, copyrighted).
+> `sources/orifices/lichtarowicz-et-al-1965-...pdf` (gitignored, copyrighted).
 
 ## Why it earns a place -- the coverage criterion
 

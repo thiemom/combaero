@@ -2151,7 +2151,7 @@ TeeJunctionResult branching_tee_residuals_and_jacobian(
 }
 
 // =============================================================================
-// Unified0D compressible tee junction (Section 5-7, docs/junction/)
+// Unified0D compressible tee junction (Section 5-7, sources/junction/)
 // =============================================================================
 
 CompressibleTeeResult compressible_branching_tee_rj(

@@ -1,0 +1,4 @@
+# Copyrighted third-party material: never committed (#846).
+# Everything here is ignored; this file is the only tracked entry.
+*
+!.gitignore

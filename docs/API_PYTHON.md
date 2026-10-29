@@ -1474,7 +1474,7 @@ tee_branch = TeeJunctionElement(
 # Straight flow is implicit: m_dot_straight = m_dot_com - m_dot_branch
 
 # Momentum-CV junction (PDF spec, supersedes K-closure for n>3 manifolds and
-# high-Mach / ejector behaviour; see docs/junction/momentum cv implementation guide.pdf).
+# high-Mach / ejector behaviour; see sources/junction/momentum cv implementation guide.pdf).
 # N port-MCNs feed a single junction, whose closure carries every port's loss --
 # connect the ports with plain elements (channels, LosslessConnectionElement).
 mc_com = MomentumChamberNode("mc_com", area=0.01)

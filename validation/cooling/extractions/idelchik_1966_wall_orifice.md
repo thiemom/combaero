@@ -13,7 +13,7 @@ is exactly.
 
 > Idelchik, I.E. *Handbook of Hydraulic Resistance*, 1st English edition,
 > AEC-tr-6630 (1966). Israel Program for Scientific Translations.
-> `docs/junction/Idelchik.pdf` (gitignored, copyrighted) -- the same copy the
+> `sources/junction/Idelchik.pdf` (gitignored, copyrighted) -- the same copy the
 > junction work digitised diagrams 7-1..7-7 from.
 
 Section IV, Figure 4-8 enumerates the four edge types this implements:
@@ -289,7 +289,7 @@ combines length and rounding.
   stated for `Re >= 1e5`; below that the value is held rather than borrowed
   from the sharp branch.
 - **Lichtarowicz (1965)**, long orifices `L/d = 2..10` including cavitation
-  limits. PDF is in `docs/orifices/`; declared as
+  limits. PDF is in `sources/orifices/`; declared as
   `DischargeCdCorrelation::Lichtarowicz1965`, which **refuses explicitly**
   rather than substituting.
 - **Compressibility.** All of Section IV is incompressible. Diagram 4-19

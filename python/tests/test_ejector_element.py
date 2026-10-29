@@ -10,8 +10,8 @@ solver integration), not the underlying physics functions, which are
 already covered by python/tests/test_ejector_huang.py against Huang's
 digitized Table 3/4 data.
 
-References: docs/ejector/Huang_1d_analysis_ejector.pdf,
-docs/ejector/Development_of_an_Analytical_Method_for.pdf
+References: sources/ejector/Huang_1d_analysis_ejector.pdf,
+sources/ejector/Development_of_an_Analytical_Method_for.pdf
 """
 
 from __future__ import annotations

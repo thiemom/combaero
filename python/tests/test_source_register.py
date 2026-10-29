@@ -30,16 +30,40 @@ def test_the_schema_check_catches_what_it_should() -> None:
     an 'implemented' entry naming no code are each reported."""
     good = sources.load()[0]
     bad = [
-        {**good, "file": "docs/a.pdf", "status": "read"},
-        {**good, "file": "docs/b.pdf", "topic": ["plasma"]},
-        {**good, "file": "docs/c.pdf", "records": ["validation/nowhere.md"]},
-        {**good, "file": "docs/d.pdf", "status": "implemented", "records": [], "code": []},
+        {**good, "file": "sources/a.pdf", "status": "read"},
+        {**good, "file": "sources/b.pdf", "topic": ["plasma"]},
+        {**good, "file": "sources/c.pdf", "records": ["validation/nowhere.md"]},
+        {**good, "file": "sources/d.pdf", "status": "implemented", "records": [], "code": []},
     ]
     found = sources.problems(bad)
     assert any("status 'read'" in p for p in found)
     assert any("topic must be" in p for p in found)
     assert any("does not exist" in p for p in found)
     assert any("needs a record or code reference" in p for p in found)
+
+
+def test_a_file_outside_sources_is_reported() -> None:
+    """Falsified (#846): a register entry still pointing into docs/ is an
+    error -- copyrighted documents live in the ignored sources/ only."""
+    good = sources.load()[0]
+    assert good["file"].startswith("sources/")
+    found = sources.problems([{**good, "file": "docs/junction/x.pdf"}])
+    assert any("must be under sources/" in p for p in found)
+
+
+def test_local_files_are_listed_under_sources(tmp_path: Path) -> None:
+    """Every file below the sources dir is seen (any type, nested), as a
+    sources/ path; only registrable types count as documents."""
+    root = tmp_path / "sources"
+    (root / "junction" / "crops").mkdir(parents=True)
+    (root / "junction" / "paper.pdf").write_bytes(b"%PDF")
+    (root / "junction" / "crops" / "fig.png").write_bytes(b"png")
+    (root / ".gitignore").write_text("*\n")
+    assert sources.local_files(root) == [
+        "sources/junction/crops/fig.png",
+        "sources/junction/paper.pdf",
+    ]
+    assert sources.local_documents(root) == ["sources/junction/paper.pdf"]
 
 
 def test_the_wanted_list_is_valid() -> None:
@@ -52,7 +76,7 @@ def test_the_wanted_check_catches_what_it_should() -> None:
     good = sources.load_wanted()[0]
     bad = [
         {**good, "priority": "urgent"},
-        {**good, "file": "docs/x.pdf"},
+        {**good, "file": "sources/x.pdf"},
         {**good, "checked": "no"},
         {**good, "issues": ["468"]},
     ]

@@ -3,7 +3,7 @@
 **Source paper:** W H Hager, *"An approximate treatment of flow in branches and bends"*,
 Proc IMechE Part C, 198C(4):63–69, 1984.
 
-PDF in `docs/junction/hager1984.pdf` (gitignored — copyright).
+PDF in `sources/junction/hager1984.pdf` (gitignored — copyright).
 
 Foundational paper introducing the `(3/4)*delta` angle correction adopted by
 Bassett. Considers equal-area T-junctions only (`psi = 1` implicit). The

@@ -9668,8 +9668,8 @@ class MultiPortChamberBase(NetworkElement):
     Port areas are inherited from the connecting :class:`ChannelElement`'s
     diameter unless explicitly given.
 
-    See ``docs/junction/momentum cv implementation guide.pdf`` Sections 2-3
-    and ``docs/junction/junction_model_v3_addendum.md`` Finding 6 for the
+    See ``sources/junction/momentum cv implementation guide.pdf`` Sections 2-3
+    and ``sources/junction/junction_model_v3_addendum.md`` Finding 6 for the
     motivation (the K-closure's structural K_run ~ 0.30 ceiling and its
     inability to represent ejector / merge-split direction natively).
     """

@@ -10,11 +10,6 @@ cmake-build-*/
 humidair_examples/
 cantera_examples/
 temp/
-docs/bassett
-docs/vatistas
-docs/junction
-docs/ejector
-docs/orifices
 
 # IDE files
 .idea/
@@ -120,42 +115,18 @@ TODO.md
 !.claude/skills/model-provenance/
 !.claude/skills/write-pr/
 
-# Copyrighted source material for correlation extraction (#339).
-# Page scans and figures live here so an extraction can be re-checked against
-# them, but they are NOT redistributable and must never be committed. The
-# extraction documents under validation/cooling/extractions/ are the tracked
-# artifact.
-docs/sources/
-docs/heat_transfer/
-docs/lefebvre/
-# Copyrighted source material must never be committed. The rules above name
-# directories, which only helps for material filed in them -- a PDF dropped
-# straight into docs/ slipped past and was staged by a `git add -A`. Digitised
-# COORDINATES from these sources are measurements and may be committed to
-# validation/; the scans themselves may not.
-docs/*.pdf
-# ... and a PDF filed in a NEW docs/ folder slipped past the per-folder rules
-# (docs/jet_mixing/, 2026-10-25). Any document anywhere under docs/, and the
-# docs/new/ drop folder, is ignored; `scripts/sources.py check --docs` flags
-# a local document git would still track.
-docs/**/*.pdf
-docs/**/*.djvu
-docs/**/*.epub
-# Supplementary archives and data files travel with papers too, and some are
-# licence-restricted (Bordbar et al. 2021's WSGG coefficients: "not to be
-# distributed"); a .zip in a new docs/ folder slipped past the PDF rule
-# (docs/radiation/, 2026-10-28).
-docs/**/*.zip
-docs/**/*.tar
-docs/**/*.tar.gz
-docs/**/*.tgz
-docs/**/*.7z
-docs/**/*.rar
-docs/**/*.dat
-docs/**/*.m
-docs/radiation/
-docs/new/
-docs/jet_mixing/
+# Copyrighted third-party material (#846). Papers, handbooks, scans, figure
+# crops and supplementary files live in sources/, which is ignored whatever
+# the file type; sources/.gitignore is the second lock. docs/ is an
+# ALLOWLIST: everything is ignored except directories and our own .md, so a
+# new file type or folder stays out until someone allows it here. Digitised
+# coordinates are measurements and go to validation/. The pre-commit hook
+# scripts/check_no_sources.py (and CI) catch a forced add.
+/sources/*
+!/sources/.gitignore
+/docs/**
+!/docs/**/
+!/docs/**/*.md
 
 # Benchmark run outputs (auto-generated, not for tracking)
 benchmarks/runs/
@@ -167,9 +138,6 @@ gui/tmp/
 .package_tests/
 test_venv_env/
 test_uv_env/
-
-# Local validation data and reference papers
-docs/bassett/
 
 # pnpm content-addressable store, created when pnpm runs outside gui/frontend
 .pnpm-store/

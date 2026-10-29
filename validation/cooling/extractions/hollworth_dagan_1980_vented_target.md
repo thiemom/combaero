@@ -8,7 +8,7 @@ Surface, Part 1: Average Heat Transfer", ASME J. Eng. Power 102 (1980) 994-999
 it is by Hollworth, Lehmann and Rosiczkowski, ASME J. Eng. Power 105 (1983)
 393-402, not Hollworth and Dagan (corrected 2026-10-25, from the PDF; the
 local file is `393_1_Hollworth_1980_part_II.pdf`). Both PDFs are local only
-(gitignored), in `docs/heat_transfer/hollworth/`; see `validation/sources.yaml`.
+(gitignored), in `sources/heat_transfer/hollworth/`; see `validation/sources.yaml`.
 Data: `data/hollworth_dagan1980/`.
 
 ## Review questions and answers

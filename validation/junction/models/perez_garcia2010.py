@@ -4,7 +4,7 @@ Perez-Garcia 2010 K-hat linking-between-branches correlations.
 Reference: J Perez-Garcia, E Sanmiguel-Rojas, A Viedma,
 "New Coefficient to Characterize Energy Losses in Compressible Flow at
 T-Junctions", Applied Mathematical Modelling 34:4289-4305, 2010. Read from the
-accepted manuscript in docs/junction/ (gitignored).
+accepted manuscript in sources/junction/ (gitignored).
 
 DEFINITION (Eqs 41/42). With f(M) = (1 + (gamma-1)/2 M^2)^(gamma/(gamma-1)),
 which is p0/p:
@@ -45,7 +45,7 @@ import math
 #
 # Re-read 2026-10-10 from the table image at 700 dpi. The previous
 # transcription carried seven wrong values: C1 K_hat_1 m 2.0263, C2 m 2.0222,
-# and four it shared with the (local, gitignored) docs/junction/
+# and four it shared with the (local, gitignored) sources/junction/
 # tier2_reference_data.md -- C2 n_m1
 # -0.0057, D1 K_hat_1 n_m1 0.0938, D2 m 1.9027 and n_m1 -0.1338.
 TABLE_1: dict[tuple[str, str], dict[str, float]] = {

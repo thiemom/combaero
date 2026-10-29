@@ -5,7 +5,7 @@ and the reference temperature of `ImpingementPlateElement` with a bypass
 (#467 PR 2). CONFIRMED 2026-10-23: signed off by the user after a
 page-by-page check against the scans, every patched cell plus random rows,
 columns and single values, about 90% of the table. No errors found. Source:
-`docs/heat_transfer/flohrshuetz/NASA_CR-3936_Florschuetz_Su_1985_crossflow_temperature.pdf`
+`sources/heat_transfer/flohrshuetz/NASA_CR-3936_Florschuetz_Su_1985_crossflow_temperature.pdf`
 (gitignored), Appendix A, "Tabular Results in Terms of Individual Spanwise
 Row Parameters", printed pp. 133-148 (PDF pp. 145-160).
 Data: `data/florschuetz_su1985/appendix_a_row.csv`.

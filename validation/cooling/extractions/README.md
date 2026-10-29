@@ -35,7 +35,7 @@ against itself.
 
 ## Rules
 
-- **Source material is not committed.** Page scans live in `docs/sources/`,
+- **Source material is not committed.** Page scans live in `sources/scans/`,
   which is gitignored -- they are copyrighted. These documents are the tracked
   artifact and must stand on their own.
 - **Three states, never two.** *confirmed*, *suspect* (read correctly, content

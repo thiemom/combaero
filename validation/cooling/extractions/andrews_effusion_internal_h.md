@@ -4,7 +4,7 @@ Andrews, G.E., Alikhanizadeh, M., Asere, A.A., Hussain, C.I., Khoshkbar
 Azari, M.S. and Mkpadi, M.C. (1986). "Small Diameter Film Cooling Holes:
 Wall Convective Heat Transfer." ASME 86-GT-225. Department of Fuel and
 Energy, University of Leeds.
-`docs/heat_transfer/film/V004T09A022-86-GT-225.pdf`
+`sources/heat_transfer/film/V004T09A022-86-GT-225.pdf`
 
 This closes #387's internal side. The external side is
 `baldauf_2002_film_effectiveness.md` and `film_superposition.md`.

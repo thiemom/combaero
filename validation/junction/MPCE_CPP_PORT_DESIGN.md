@@ -1038,7 +1038,7 @@ Still open:
    its place: drop (provenance-clean default) or re-fit on current plumbing.
 5. **Retiring v1** as a solver element (sec 5).
 
-## References on disk (`docs/junction/`, gitignored, present)
+## References on disk (`sources/junction/`, gitignored, present)
 
 - `bassett.pdf` -- Table 1 (definitions, q conventions), Eqs 13-15 (K5),
   22-27 (K6, xi), 28-34 (joining, angle corrections), Figs 7, 9-13.
