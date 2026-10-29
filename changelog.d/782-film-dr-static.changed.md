@@ -1,0 +1,4 @@
+- **The film density ratio takes the gas's static temperature (#782 audit).** `DR = rho_c / rho_g` is formed where the jets meet the gas. The gas moves at G_gas, so `rho_g` is at the static T of the duct closure at (T_gas, Pt, G_gas), as the effusion path's chamber density already was; it was at the gas Tt.
+  - The coolant leaves a plenum and keeps its Tt.
+  - Film effectiveness moves by under 0.7% at a gas Mach of 0.3 or less, and up to 2% at Mach 0.5. In the film test network, DR moves by -0.35%.
+  - The scorecards are unchanged: none runs a film through `film_on_wall_side`.
