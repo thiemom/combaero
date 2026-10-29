@@ -292,6 +292,10 @@ Cd, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
 # Inside the source's own Re and l/d range? A flag, never a selector.
 cb.discharge_cd_in_range(cb.DischargeCdCorrelation.Lichtarowicz1965, hole, flow)
 
+# Re below which the Cd VALUE is held (true dCd/dRe = 0 there; the solver
+# form above continues the slope for McGreehan-Schotsch and Idelchik)
+re_floor = cb.discharge_cd_re_floor(cb.DischargeCdCorrelation.McGreehanSchotsch1988)  # 1e4
+
 # The same hole as an orifice in a straight pipe (Idelchik 4-13..4-16):
 # permanent loss on the pipe velocity head, and the Cd factor the network
 # applies between pipes (C_pipe = Cd_wall * R, R -> 1 as beta -> 0)

@@ -3872,6 +3872,7 @@ class OrificeElement(NetworkElement):
         state_in: "NetworkMixtureState",
         state_out: "NetworkMixtureState",
         flows: dict[str, float] | None = None,
+        continue_re_floor: bool = False,
     ) -> dict[str, float]:
         """d(Cd)/d(unknown), keyed by name, analytic.
 
@@ -3880,6 +3881,15 @@ class OrificeElement(NetworkElement):
         (linear in m_dot, so dRe/dm = Re/m) and, for a duct-fed hole, through
         U1/Vi. 'fixed' has none, and the normed metering correlations keep
         their documented gap.
+
+        BELOW THE CORRELATION'S Re FLOOR the Cd value is held, so its true
+        dCd/dRe is 0 -- in the m_dot column and in the viscosity columns
+        alike. C++ continues the slope there as a Newton aid; that is only
+        wanted by a search ON Cd (``continue_re_floor=True``, the
+        self-consistent inner solve). Every sensitivity of a flow built on
+        the held value takes the zero: with the continued slope, the
+        implicit-function denominator 1 - K dCd/dm of a McGreehan-Schotsch
+        panel below Re = 1e4 scaled its whole row by ~0.987 (#760, #801).
         """
         if self._orifice_geom is None or not self.use_correlation:
             return {}
@@ -3891,6 +3901,8 @@ class OrificeElement(NetworkElement):
         _, dCd_dRe, dCd_dU = cb.discharge_cd_and_derivatives(
             selector, self._discharge_hole(), cb.DischargeHoleState(Re=Re, U1_over_Vi=u1_vi)
         )
+        if not continue_re_floor and Re < cb.discharge_cd_re_floor(selector):
+            dCd_dRe = 0.0
         out: dict[str, float] = {}
         m = float(state_in.m_dot)
         if abs(m) > 1e-12:
@@ -4270,11 +4282,13 @@ class OrificeElement(NetworkElement):
         probe = copy.copy(state_in)
         m_key = f"{self.id}.m_dot"
 
-        def cd_and_slope(a: float) -> tuple[float, float]:
+        def cd_and_slope(a: float, continued: bool = True) -> tuple[float, float]:
             probe.m_dot = a
             cd = self._effective_Cd(probe, state_out, flows)
-            slope = self._dCd_dnames(probe, state_out, flows).get(m_key, 0.0) if a > 0 else 0.0
-            return cd, slope
+            if not a > 0:
+                return cd, 0.0
+            d = self._dCd_dnames(probe, state_out, flows, continue_re_floor=continued)
+            return cd, d.get(m_key, 0.0)
 
         a = aK * cd0
         for _ in range(50):
@@ -4289,7 +4303,9 @@ class OrificeElement(NetworkElement):
             a = step_to
             if done:
                 break
-        cd_star, cd_m = cd_and_slope(a)
+        # The search above may lean on C++'s slope continued below the Re
+        # floor; the sensitivities below are of the HELD value (#760).
+        cd_star, cd_m = cd_and_slope(a, continued=False)
         probe.m_dot = sgn * a
         m_star, partial = self._flow_and_partials(probe, state_out, cd_star)
         # Linear in Cd here: the discharge-hole family never recovers (#645),
@@ -4340,13 +4356,18 @@ class OrificeElement(NetworkElement):
 
         def evaluate(
             a: float,
+            continued: bool = True,
         ) -> tuple[float, float, dict[str, float], float, dict[str, float]]:
             p_in.m_dot = a
             p_out.m_dot = a
             cd = self._effective_Cd(p_in, p_out, flows) if own_cd else cd_iterate
             m, part = self._flow_and_partials(p_in, p_out, cd)
             dm_dcd = part.pop(_DM_DCD, 0.0)
-            dcd = self._dCd_dnames(p_in, p_out, flows) if (own_cd and cd > 0.0) else {}
+            dcd = (
+                self._dCd_dnames(p_in, p_out, flows, continue_re_floor=continued)
+                if (own_cd and cd > 0.0)
+                else {}
+            )
             slope = part.get(m_key, 0.0) + dm_dcd * dcd.get(m_key, 0.0)
             return m, slope, part, dm_dcd, dcd
 
@@ -4359,7 +4380,8 @@ class OrificeElement(NetworkElement):
             a = a_new
             if done:
                 break
-        m_star, slope, part, dm_dcd, dcd = evaluate(a)
+        # Sensitivities of the HELD Cd below its Re floor (#760).
+        m_star, slope, part, dm_dcd, dcd = evaluate(a, continued=False)
         hp = 1.0 - slope
         part.pop(m_key, None)
         if own_cd:
@@ -6314,10 +6336,13 @@ class ImpingementPlateElement(OrificeElement):
         state_in: NetworkMixtureState,
         state_out: NetworkMixtureState,
         flows: dict[str, float] | None = None,
+        continue_re_floor: bool = False,
     ) -> dict[str, float]:
         base = super()._effective_Cd(state_in, state_out, flows)
         _, d = self._crossflow_cd(state_in, state_out, flows, base)
-        return super()._dCd_dnames(state_in, state_out, flows) if d is None else d
+        if d is not None:
+            return d
+        return super()._dCd_dnames(state_in, state_out, flows, continue_re_floor)
 
     def htc_and_T(
         self,

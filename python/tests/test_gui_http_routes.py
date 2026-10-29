@@ -457,6 +457,48 @@ def test_every_palette_kind_solves_through_http(kind: str) -> None:
     assert _post("/resolve_preview", graph).status_code == 200
 
 
+def test_the_palette_effusion_liner_panels_have_their_exact_jacobian() -> None:
+    """#760: the palette's effusion_liner panels run below McGreehan-Schotsch's
+    Re floor (Cd held), where each panel row's Jacobian was uniformly 0.9874x
+    central differences (1.26e-2 in J_ij |x_j|, the same at every step): the
+    self-consistent row divided by 1 - K dCd/dm with the C++ floor
+    continuation slope instead of the held value's 0.
+
+    Panel rows only: measured 4.6e-9 at a 1e-6 step (1.1e-8 at 1e-5). The
+    chamber's rows carry FD truncation at that step (2.9e-3, falling 100x per
+    decade of step), which is not what this checks."""
+    import numpy as np
+    from scipy.optimize._numdiff import approx_derivative
+
+    from combaero.network import NetworkSolver
+    from gui.backend.graph_builder import build_network_from_schema
+    from gui.backend.schemas import NetworkGraphSchema
+
+    net = build_network_from_schema(NetworkGraphSchema(**_palette_network("effusion_liner")))
+    s = NetworkSolver(net)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = s.solve()
+    assert r["__success__"]
+    d = r["__element_diag__"]
+    panels = [k for k in d if "Re_hole" in d[k] and "U1_over_Vi" in d[k]]
+    assert len(panels) == 4 and all(d[k]["Re_hole"] < 1e4 for k in panels)
+    x = np.array(r["__x_solution__"])
+    _, J = s._residuals_and_jacobian(x)
+    fd = approx_derivative(
+        lambda v: s._residuals_and_jacobian(v, compute_jacobian=False)[0],
+        x,
+        method="3-point",
+        abs_step=np.maximum(np.abs(x) * 1e-6, 1e-9),
+    )
+    cols = np.maximum(np.abs(x), 1e-12)[None, :]
+    rows = [i for i, (o, _) in enumerate(s._row_kinds(x)) if o.startswith("EffusionPlateElement")]
+    assert len(rows) == 4
+    Js, fds = (J.toarray() * cols)[rows], (fd * cols)[rows]
+    scale = np.max(np.abs(fds), axis=1, keepdims=True)
+    assert float(np.max(np.abs(Js - fds) / scale)) < 1e-6
+
+
 # ---------------------------------------------------------------------------
 # Error paths: a readable 4xx, never a raw 500 or a silent drop
 # ---------------------------------------------------------------------------

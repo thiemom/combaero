@@ -1167,6 +1167,23 @@ bool discharge_cd_in_range(DischargeCdCorrelation id,
     return false;
 }
 
+double discharge_cd_re_floor(DischargeCdCorrelation id) {
+    switch (id) {
+        case DischargeCdCorrelation::McGreehanSchotsch1988:
+            return orifice::mcgreehan_schotsch::re_min;
+        case DischargeCdCorrelation::Idelchik1966Sharp:
+        case DischargeCdCorrelation::Idelchik1966Thick:
+        case DischargeCdCorrelation::Idelchik1966Beveled:
+        case DischargeCdCorrelation::Idelchik1966Rounded:
+            return orifice::idelchik::re_points[0];
+        case DischargeCdCorrelation::Lichtarowicz1965:
+            return orifice::lichtarowicz::re_floor;
+        case DischargeCdCorrelation::Constant:
+            return 0.0;
+    }
+    return 0.0;
+}
+
 // -------------------------------------------------------------
 // Discharge hole as an orifice in a straight pipe (#645)
 // -------------------------------------------------------------

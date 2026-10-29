@@ -6303,6 +6303,12 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "fitted or tabulated on: Re, and the l/d (or bevel, r/d) axis of its\n"
         "source. A flag to report, never a selector; discharge_cd still\n"
         "returns a value outside it.");
+  m.def("discharge_cd_re_floor", &discharge_cd_re_floor, py::arg("correlation"),
+        "Hole Reynolds number below which the correlation HOLDS its Cd value\n"
+        "(Re clamped up to it), so the value's true dCd/dRe there is 0.\n"
+        "discharge_cd_and_derivatives continues the slope below it for\n"
+        "McGreehanSchotsch1988 and Idelchik (a Newton aid); a sensitivity\n"
+        "built on the held value must use 0 below this Re. 0 for Constant.");
   m.def("discharge_pipe_zeta", &discharge_pipe_zeta, py::arg("correlation"), py::arg("hole"),
         py::arg("beta"),
         "Idelchik (1966) diagrams 4-13..4-16: the hole's permanent loss as an\n"

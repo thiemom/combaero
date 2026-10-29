@@ -939,6 +939,20 @@ bool discharge_cd_in_range(DischargeCdCorrelation id,
                            const DischargeHoleGeometry& hole,
                            const DischargeHoleState& flow);
 
+// The hole Reynolds number below which the selected correlation HOLDS its Cd
+// value (Re is clamped up to it), so the value's true dCd/dRe there is zero.
+// Cd_and_derivatives does not always report that zero: McGreehanSchotsch1988
+// and the Idelchik Re tables continue the slope at the floor, a Newton aid
+// for a row that evaluates Cd at its own iterate. A caller that differentiates
+// a quantity built on the held VALUE -- an implicit-function sensitivity of a
+// self-consistent flow (#760, #801) -- must use the zero below this Re.
+//   McGreehanSchotsch1988  re_min (1e4)
+//   Idelchik1966*          25, the first table knot (Beveled and Rounded do
+//                          not read Re at all)
+//   Lichtarowicz1965       re_floor (its derivative is already 0 below it)
+//   Constant               0 (no Re dependence)
+double discharge_cd_re_floor(DischargeCdCorrelation id);
+
 // Idelchik (1966) permanent loss of a discharge hole as an orifice in a
 // straight pipe, zeta1 = DH / (rho w1^2 / 2), PIPE-velocity referenced
 // (diagrams 4-13..4-16, see orifice::idelchik). The hole's geometry picks the

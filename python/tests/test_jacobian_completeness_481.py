@@ -12,6 +12,11 @@ C5  The wall relay took dT/dQ = 1/(cp sum m); the mixer applies Q phi(m)
     (cb.mixer_heat_per_unit_flow: 1/|m| above MIXER_HEAT_MDOT_FLOOR, fading
     below it): 2x off below the floor and of the wrong sign for a negative
     total.
+#760/#801  An EffusionPlateElement's self-consistent row m - m*(x) divided
+    every sensitivity by 1 - K dCd/dm with C++'s Re-floor CONTINUATION slope,
+    although below McGreehan-Schotsch's floor (Re 1e4) the Cd value is held
+    and its true slope is 0: each duct-fed panel row was uniformly 0.987x
+    (1.26e-2) to 0.97x (2.98e-2, duct Mach 0.5) the differences.
 """
 
 from __future__ import annotations
@@ -35,8 +40,9 @@ from combaero.network import (
 )
 
 
-def _jac_err(s: NetworkSolver, x: np.ndarray) -> float:
-    """RESIDUAL-ROW-SCALING: compare J_ij |x_j| (see _build_residual_scales)."""
+def _jac_err(s: NetworkSolver, x: np.ndarray, owner: str | None = None) -> float:
+    """RESIDUAL-ROW-SCALING: compare J_ij |x_j| (see _build_residual_scales).
+    ``owner`` restricts it to the rows whose owner label starts with it."""
     _, J = s._residuals_and_jacobian(x)
     fd = approx_derivative(
         lambda v: s._residuals_and_jacobian(v, compute_jacobian=False)[0],
@@ -47,7 +53,12 @@ def _jac_err(s: NetworkSolver, x: np.ndarray) -> float:
     cols = np.maximum(np.abs(x), 1e-12)[None, :]
     Js, fds = J.toarray() * cols, fd * cols
     scale = np.maximum(np.max(np.abs(fds), axis=1, keepdims=True), 1e-300)
-    return float(np.max(np.abs(Js - fds) / scale))
+    err = np.max(np.abs(Js - fds) / scale, axis=1)
+    if owner is not None:
+        rows = [i for i, (o, _) in enumerate(s._row_kinds(x)) if o.startswith(owner)]
+        assert rows, owner
+        err = err[rows]
+    return float(np.max(err))
 
 
 @pytest.mark.parametrize(
@@ -171,3 +182,23 @@ def test_the_unburned_temperature_is_the_enthalpy_mix(corr: object) -> None:
     T_mass = (m_pre * r["premix.Tt"] + m_dil * 800.0) / M
     assert abs(T_mass - comb._T_unburned) > 0.3
     assert _jac_err(s, np.array(r["__x_solution__"])) < 2e-5
+
+
+def test_a_duct_fed_liner_at_duct_mach_half_differentiates_the_held_cd() -> None:
+    """#801: a duct-fed EffusionLiner at duct Mach 0.5, its panels straddling
+    McGreehan-Schotsch's Re floor (1e4). Below it the Cd value is held, so
+    the panel row's implicit-function denominator 1 - K dCd/dm is 1, not the
+    C++ continuation's; with the continuation every panel row was 2.98e-2 off
+    (uniformly 0.97x the differences), at every FD step.
+
+    Measured with the fix: 2e-7 for the whole network at a 1e-6 step (6.6e-9
+    on the panel rows; the rest is FD truncation in the duct rows)."""
+    import test_effusion_liner as tel
+
+    s, r = tel._solve(tel._net(tel._liner(3, duct_height=0.005), p_in=1.4e5, p_out=1.2e5))
+    assert r["__element_diag__"]["ln__s0"]["M_in_duct"] == pytest.approx(0.5, abs=0.02)
+    x = np.array(r["__x_solution__"])
+    re = [r["__element_diag__"][f"ln__p{i}"]["Re_hole"] for i in (1, 2, 3)]
+    assert min(re) < 1e4 < max(re), re
+    assert _jac_err(s, x, owner="EffusionPlateElement") < 1e-6
+    assert _jac_err(s, x) < 1e-6
