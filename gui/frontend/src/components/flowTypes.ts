@@ -20,6 +20,7 @@ import ProbeNode from "./nodes/ProbeNode";
 import SlotFilmNode from "./nodes/SlotFilmNode";
 import VortexNode from "./nodes/VortexNode";
 import WallNode from "./nodes/WallNode";
+import ProbeLinkEdge from "./ProbeLinkEdge";
 import ThermalEdge from "./ThermalEdge";
 
 export const nodeTypes = {
@@ -49,4 +50,5 @@ export const nodeTypes = {
 export const edgeTypes = {
 	thermal: ThermalEdge,
 	default: FlowEdge,
+	probe_link: ProbeLinkEdge,
 };

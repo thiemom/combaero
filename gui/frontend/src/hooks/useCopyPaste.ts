@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Node } from "reactflow";
 import useStore, { stripResults } from "../store/useStore";
+import { DISPLAY_ONLY_KINDS } from "../utils/probeLink";
 
 const PASTE_OFFSET = 50;
 
@@ -68,8 +69,14 @@ export const useCopyPaste = () => {
 				});
 
 				// Structural edit: stored results solved a different network,
-				// so drop them from the existing nodes too.
-				const current = stripResults(nodesRef.current);
+				// so drop them from the existing nodes too. Pasted probes alone
+				// change nothing the solve saw (#856) and keep them.
+				const onlyDisplay = newNodes.every((n) =>
+					DISPLAY_ONLY_KINDS.has(n.type ?? ""),
+				);
+				const current = onlyDisplay
+					? nodesRef.current
+					: stripResults(nodesRef.current);
 				setNodes([
 					...current.map((n) => ({ ...n, selected: false })),
 					...newNodes,

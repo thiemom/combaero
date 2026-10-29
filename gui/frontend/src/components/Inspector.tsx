@@ -213,6 +213,10 @@ const Inspector = () => {
 							⚠ Target not found
 						</span>
 					)}
+					<span className="text-stone-400 text-[10px]">
+						Or drag from the probe's right-hand dot onto a node or thermal wall.
+						Select the dotted link and press Delete to detach it.
+					</span>
 				</div>
 
 				{/* Slot selectors */}

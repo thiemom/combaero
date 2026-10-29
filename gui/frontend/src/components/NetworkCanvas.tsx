@@ -7,11 +7,17 @@ import ReactFlow, {
 	useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useCopyPaste } from "../hooks/useCopyPaste";
 import useStore, { stripResults } from "../store/useStore";
 import { defaultFilmSide, FILM_HANDLE } from "../utils/filmLink";
 import { heatSourceConnectionError } from "../utils/heatSource";
+import {
+	DISPLAY_ONLY_KINDS,
+	dropTargetId,
+	PROBE_LINK_HANDLE,
+	probeLinkEdges,
+} from "../utils/probeLink";
 import { edgeTypes, nodeTypes } from "./flowTypes";
 import SolverStatusBadge from "./SolverStatusBadge";
 
@@ -25,8 +31,16 @@ const NetworkCanvas = () => {
 		onEdgesChange,
 		onConnect,
 		updateEdgeData,
+		setProbeTarget,
+		selectedProbeLinks,
 	} = useStore();
 	useCopyPaste();
+	// Each probe's dotted link to its target (#856), derived from target_id:
+	// drawn by React Flow but never stored, saved or sent to the backend.
+	const shownEdges = useMemo(
+		() => [...edges, ...probeLinkEdges(nodes, edges, selectedProbeLinks)],
+		[nodes, edges, selectedProbeLinks],
+	);
 	const { screenToFlowPosition } = useReactFlow();
 
 	const onDragOver = useCallback((event: React.DragEvent) => {
@@ -243,8 +257,14 @@ const NetworkCanvas = () => {
 			};
 
 			// Adding a node is a structural edit: stored results solved a
-			// different network and must not warm-start the next solve.
-			setNodes(stripResults(nodes).concat(newNode));
+			// different network and must not warm-start the next solve. A
+			// probe is not (#856): it keeps them, and shows its target's value
+			// as soon as it is pointed at one.
+			setNodes(
+				(DISPLAY_ONLY_KINDS.has(type) ? nodes : stripResults(nodes)).concat(
+					newNode,
+				),
+			);
 		},
 		[nodes, setNodes, screenToFlowPosition],
 	);
@@ -253,18 +273,33 @@ const NetworkCanvas = () => {
 	// wall's label box names the holes as that wall's film and selects the
 	// wall, so the link and the Inspector's Film section show at once.
 	const filmDrag = useRef<string | null>(null);
+	// A probe's link (#856): a drag from the probe's link handle that ends on
+	// a node or a thermal wall (its path or label box) points the probe at it.
+	const probeDrag = useRef<string | null>(null);
 	const onConnectStart = useCallback(
 		(_: unknown, { nodeId, handleId }: OnConnectStartParams) => {
 			filmDrag.current = handleId === FILM_HANDLE ? nodeId : null;
+			probeDrag.current = handleId === PROBE_LINK_HANDLE ? nodeId : null;
 		},
 		[],
 	);
 	const onConnectEnd = useCallback(
 		(event: MouseEvent | TouchEvent) => {
 			const holes = filmDrag.current;
+			const probe = probeDrag.current;
 			filmDrag.current = null;
-			if (!holes) return;
+			probeDrag.current = null;
 			const pt = "changedTouches" in event ? event.changedTouches[0] : event;
+			if (probe) {
+				const targetId = dropTargetId(
+					document.elementFromPoint(pt.clientX, pt.clientY),
+				);
+				// setProbeTarget ignores the probe itself, another probe and
+				// a flow edge (no results to read).
+				if (targetId) setProbeTarget(probe, targetId);
+				return;
+			}
+			if (!holes) return;
 			const wallId = document
 				.elementFromPoint(pt.clientX, pt.clientY)
 				?.closest("[data-film-wall]")
@@ -284,12 +319,14 @@ const NetworkCanvas = () => {
 					.edges.map((e) => ({ ...e, selected: e.id === wall.id })),
 			);
 		},
-		[edges, updateEdgeData, setNodes, setEdges],
+		[edges, updateEdgeData, setNodes, setEdges, setProbeTarget],
 	);
 	const isValidConnection = useCallback(
 		(c: Connection) =>
 			c.sourceHandle !== FILM_HANDLE &&
 			c.targetHandle !== FILM_HANDLE &&
+			// The probe's link attaches on drop (onConnectEnd), never as an edge.
+			c.sourceHandle !== PROBE_LINK_HANDLE &&
 			heatSourceConnectionError(c, nodes, edges) === null,
 		[nodes, edges],
 	);
@@ -303,7 +340,7 @@ const NetworkCanvas = () => {
 			<SolverStatusBadge />
 			<ReactFlow
 				nodes={nodes}
-				edges={edges}
+				edges={shownEdges}
 				onNodesChange={onNodesChange}
 				onEdgesChange={onEdgesChange}
 				onConnect={onConnect}

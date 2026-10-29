@@ -17,6 +17,13 @@ import { type ExampleInfo, parseExampleInfo } from "../utils/exampleInfo";
 import { HEAT_SOURCE_HANDLE, heatSourceEdgeProps } from "../utils/heatSource";
 import type { PreviewItems } from "../utils/inheritance";
 import { migrateNodeData, migrateSolverSettings } from "../utils/legacyKeys";
+import {
+	isProbeTarget,
+	isStructuralNodeChange,
+	PROBE_HANDLE,
+	PROBE_LINK_HANDLE,
+	probeOfLink,
+} from "../utils/probeLink";
 import { solveErrorMessage } from "../utils/solveError";
 import { dropSurfacelessWalls } from "../utils/thermalSides";
 
@@ -25,7 +32,8 @@ import { dropSurfacelessWalls } from "../utils/thermalSides";
 // connection) changes the system those results solved, so they must be
 // dropped: a converged 5-tee solution seeding a 6-tee network poisons
 // the first solve after the topology edit. Position/selection changes
-// keep results.
+// keep results, and so does anything done to a probe (#856): the backend
+// drops probes before the solve, so a probe never changes the system.
 export const stripResults = <T extends Node | Edge>(items: T[]): T[] =>
 	items.map((item) => {
 		if (!item.data?.result) return item;
@@ -34,10 +42,14 @@ export const stripResults = <T extends Node | Edge>(items: T[]): T[] =>
 	});
 
 /** The (invisible) handle on a probe node a connection can be drawn to. */
-export const PROBE_HANDLE = "probe-in";
+export { PROBE_HANDLE };
 
-const isStructural = (changes: (NodeChange | EdgeChange)[]): boolean =>
+const isStructuralEdgeChange = (changes: EdgeChange[]): boolean =>
 	changes.some((c) => c.type === "add" || c.type === "remove");
+
+/** The probe whose derived link (#856) an edge change is about, or null. */
+const linkProbe = (c: EdgeChange): string | null =>
+	"id" in c ? probeOfLink(c.id) : null;
 
 export interface RFState {
 	nodes: Node[];
@@ -46,6 +58,12 @@ export interface RFState {
 	onNodesChange: (changes: NodeChange[]) => void;
 	onEdgesChange: (changes: EdgeChange[]) => void;
 	onConnect: (connection: Connection) => void;
+	/** Point a probe at a node or thermal wall, or (null) at nothing. Keeps
+	 *  every result: a probe is display-only. An invalid target is ignored. */
+	setProbeTarget: (probeId: string, targetId: string | null) => void;
+	/** Ids of the selected probe links (utils/probeLink.ts). The links are
+	 *  derived from target_id, so their selection lives here, not on edges. */
+	selectedProbeLinks: string[];
 	setNodes: (nodes: Node[]) => void;
 	setEdges: (edges: Edge[]) => void;
 	updateNodeData: (
@@ -135,6 +153,7 @@ const useStore = create<RFState>((set, get) => ({
 	restoredAt: null,
 	isExporting: false,
 	previewItems: {},
+	selectedProbeLinks: [],
 
 	refreshPreview: async () => {
 		const { nodes, edges, solverSettings } = get();
@@ -156,29 +175,68 @@ const useStore = create<RFState>((set, get) => ({
 	},
 
 	onNodesChange: (changes: NodeChange[]) => {
-		const nodes = applyNodeChanges(changes, get().nodes);
-		if (isStructural(changes)) {
+		const before = get().nodes;
+		const nodes = applyNodeChanges(changes, before);
+		if (isStructuralNodeChange(changes, before)) {
 			set({
 				nodes: stripResults(nodes),
 				edges: stripResults(get().edges),
 				solveResults: null,
 			});
 		} else {
-			set({ nodes, solveResults: null });
+			// A move, a selection, a measured size, or a probe added or removed:
+			// the solved system is unchanged, so its results and the solve's
+			// status (ledger, second-law and Mach flags) stay. Clicking a node
+			// used to drop the status, and with it the Inspector's flags.
+			set({ nodes });
 		}
 	},
 
 	onEdgesChange: (changes: EdgeChange[]) => {
-		const edges = applyEdgeChanges(changes, get().edges);
-		if (isStructural(changes)) {
+		// A probe's link (#856) is derived from its target_id, not stored:
+		// its selection is kept here, and deleting it clears the target.
+		const linkChanges = changes.filter((c) => linkProbe(c) !== null);
+		if (linkChanges.length > 0) {
+			let selectedLinks = get().selectedProbeLinks;
+			for (const c of linkChanges) {
+				if (c.type === "select") {
+					selectedLinks = selectedLinks.filter((id) => id !== c.id);
+					if (c.selected) selectedLinks = [...selectedLinks, c.id];
+				} else if (c.type === "remove") {
+					selectedLinks = selectedLinks.filter((id) => id !== c.id);
+					get().setProbeTarget(linkProbe(c) as string, null);
+				}
+			}
+			set({ selectedProbeLinks: selectedLinks });
+		}
+		const flowChanges = changes.filter((c) => linkProbe(c) === null);
+		if (flowChanges.length === 0) return;
+		const edges = applyEdgeChanges(flowChanges, get().edges);
+		if (isStructuralEdgeChange(flowChanges)) {
 			set({
 				edges: stripResults(edges),
 				nodes: stripResults(get().nodes),
 				solveResults: null,
 			});
 		} else {
-			set({ edges, solveResults: null });
+			set({ edges });
 		}
+	},
+
+	setProbeTarget: (probeId: string, targetId: string | null) => {
+		const { nodes, edges } = get();
+		if (targetId !== null && !isProbeTarget(probeId, targetId, nodes, edges))
+			return;
+		set({
+			nodes: nodes.map((n) => {
+				if (n.id !== probeId || n.type !== "probe") return n;
+				if (targetId === null) {
+					const { target_id: _old, ...rest } = n.data ?? {};
+					return { ...n, data: rest };
+				}
+				return { ...n, data: { ...n.data, target_id: targetId } };
+			}),
+		});
 	},
 
 	onConnect: (connection: Connection) => {
@@ -187,16 +245,16 @@ const useStore = create<RFState>((set, get) => ({
 		// nothing the probe showed, and (a structural edit) cleared every
 		// result in the network.
 		if (connection.targetHandle === PROBE_HANDLE) {
-			const probeId = connection.target;
-			const targetId = connection.source;
-			if (!probeId || !targetId || probeId === targetId) return;
-			set({
-				nodes: get().nodes.map((n) =>
-					n.id === probeId
-						? { ...n, data: { ...n.data, target_id: targetId } }
-						: n,
-				),
-			});
+			if (connection.target && connection.source)
+				get().setProbeTarget(connection.target, connection.source);
+			return;
+		}
+		// The same from the probe's link handle (#856), should a drag from it
+		// end on another node's handle. NetworkCanvas attaches the probe on
+		// drop (onConnectEnd), so this is the fallback.
+		if (connection.sourceHandle === PROBE_LINK_HANDLE) {
+			if (connection.source && connection.target)
+				get().setProbeTarget(connection.source, connection.target);
 			return;
 		}
 		// A heat source's edge (#792) names the node it heats: no flow.
@@ -533,6 +591,7 @@ const useStore = create<RFState>((set, get) => ({
 				})),
 				solverSettings: loadedSettings,
 				solveResults: null,
+				selectedProbeLinks: [],
 				restoredAt: null,
 				exampleInfo: parseExampleInfo(data.example),
 				loadNotice:
@@ -564,6 +623,7 @@ const useStore = create<RFState>((set, get) => ({
 			nodes: [],
 			edges: [],
 			solveResults: null,
+			selectedProbeLinks: [],
 			restoredAt: null,
 			loadNotice: null,
 			exampleInfo: null,

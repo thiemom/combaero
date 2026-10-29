@@ -4,6 +4,11 @@ import useStore from "../../store/useStore";
 import { isConvergedResult, resolveKey } from "../../utils/diagnostics";
 import { nodeTypeLabel } from "../../utils/nodeUtils";
 import { withPortArm } from "../../utils/portArms";
+import {
+	PROBE_HANDLE,
+	PROBE_LINK_COLOR,
+	PROBE_LINK_HANDLE,
+} from "../../utils/probeLink";
 import { quantityMeta } from "../../utils/quantities";
 import NodeIcon from "../NodeIcon";
 
@@ -131,12 +136,27 @@ function ProbeNode({ data, selected }: { data: any; selected?: boolean }) {
 			</div>
 
 			{/* Drawing a connection to this handle sets the probe's target
-			    (useStore.onConnect); it never becomes a flow edge. */}
+			    (useStore.onConnect); it never becomes a flow edge. It also
+			    anchors the derived link edge (utils/probeLink.ts). */}
 			<Handle
 				type="target"
 				position={Position.Left}
-				id="probe-in"
+				id={PROBE_HANDLE}
 				style={{ opacity: 0, width: 6, height: 6 }}
+			/>
+			{/* Drag from here onto a node or a thermal wall to probe it (#856):
+			    the probe's target, drawn as a dotted link. */}
+			<Handle
+				type="source"
+				position={Position.Right}
+				id={PROBE_LINK_HANDLE}
+				title="Drag onto a node or thermal wall to probe it"
+				style={{
+					width: 8,
+					height: 8,
+					background: "#fff",
+					border: `1.5px dotted ${PROBE_LINK_COLOR}`,
+				}}
 			/>
 		</div>
 	);
