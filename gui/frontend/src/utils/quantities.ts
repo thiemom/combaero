@@ -5,7 +5,13 @@ import resultKeysJson from "./resultKeys.generated.json";
  */
 export const QUANTITY_CATALOGUE: Record<
 	string,
-	{ label: string; unit: string; format: (v: number) => string }
+	{
+		label: string;
+		unit: string;
+		format: (v: number) => string;
+		/** Shorter label for the narrow node cards; Telemetry keeps `label`. */
+		cardLabel?: string;
+	}
 > = {
 	// Scalar results (accessed via result.*)
 	m_dot: { label: "ṁ", unit: "kg/s", format: (v) => v.toFixed(4) },
@@ -42,11 +48,13 @@ export const QUANTITY_CATALOGUE: Record<
 	},
 	dPt: {
 		label: "dP (total)",
+		cardLabel: "ΔPt",
 		unit: "bar",
 		format: (v) => (v / 1e5).toFixed(4),
 	},
 	dP: {
 		label: "dP (static)",
+		cardLabel: "ΔP",
 		unit: "bar",
 		format: (v) => (v / 1e5).toFixed(4),
 	},
@@ -254,6 +262,7 @@ export const QUANTITY_CATALOGUE: Record<
 	mass_flow_ratio: {
 		// Every tee closure reports the BRANCH share of the common flow.
 		label: "ṁ br/ṁ com",
+		cardLabel: "ṁbr/ṁcom",
 		unit: "kg/kg",
 		format: (v) => v.toFixed(3),
 	},
@@ -269,7 +278,20 @@ export const QUANTITY_CATALOGUE: Record<
 	// Ejector (#773): Huang's omega is reported as the entrainment ratio.
 	entrainment_ratio: {
 		label: "ṁs/ṁp (entrainment)",
+		cardLabel: "ṁs/ṁp",
 		unit: "kg/kg",
+		format: (v) => v.toFixed(4),
+	},
+	m_dot_primary: {
+		label: "ṁ primary",
+		cardLabel: "ṁp",
+		unit: "kg/s",
+		format: (v) => v.toFixed(4),
+	},
+	m_dot_secondary: {
+		label: "ṁ secondary",
+		cardLabel: "ṁs",
+		unit: "kg/s",
 		format: (v) => v.toFixed(4),
 	},
 	n_reversed_ports: {
@@ -341,6 +363,8 @@ export function formatGeneric(v: number): string {
 
 export type QuantityMeta = {
 	label: string;
+	/** Shorter label for node cards, where it differs from `label`. */
+	cardLabel?: string;
 	unit: string;
 	format: (v: number) => string;
 	/** False for a key with no catalogue entry (label = the key itself). */

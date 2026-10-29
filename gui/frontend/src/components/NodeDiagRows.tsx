@@ -32,7 +32,7 @@ export function NodeDiagRows({ kind, result, maxRows = 3 }: Props) {
 				const meta = quantityMeta(key);
 				return {
 					key,
-					label: meta.label,
+					label: meta.cardLabel ?? meta.label,
 					formatted: meta.format(val),
 					unit: meta.unit === "—" ? "" : meta.unit,
 				};

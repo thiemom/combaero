@@ -10,7 +10,7 @@ import {
 	toggleCardRow,
 } from "./cardRows";
 import { resolveKey } from "./diagnostics";
-import { expectedResultKeys } from "./quantities";
+import { expectedResultKeys, quantityMeta } from "./quantities";
 
 const kinds = Object.keys(CARD_ROW_DEFAULTS) as CardKind[];
 
@@ -86,5 +86,26 @@ describe("card rows the user changes", () => {
 		expect(useStore.getState().cardRows).toEqual({ orifice: ["Cd"] });
 		setCardRows("orifice", null);
 		expect(useStore.getState().cardRows).toEqual({});
+	});
+});
+
+describe("card rows fit the card (#775)", () => {
+	// A 144 px element card fits about 21 characters of the 9 px mono row
+	// text; the user found "dP (total): 0.0123 bar" (22) cut off. Each
+	// curated row, at a typical value, must fit -- a long Telemetry label
+	// gets a short `cardLabel` instead.
+	it("every default row's text is at most 21 characters", () => {
+		const tooLong: string[] = [];
+		for (const [kind, keys] of Object.entries(CARD_ROW_DEFAULTS)) {
+			for (const key of keys) {
+				const meta = quantityMeta(key);
+				const unit = meta.unit === "—" ? "" : meta.unit;
+				const text =
+					`${meta.cardLabel ?? meta.label}: ${meta.format(1.2345)} ${unit}`.trim();
+				if (text.length > 21)
+					tooLong.push(`${kind}.${key}: "${text}" (${text.length})`);
+			}
+		}
+		expect(tooLong).toEqual([]);
 	});
 });
