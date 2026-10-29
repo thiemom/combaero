@@ -553,6 +553,45 @@ class TestCombustionEquilibrium:
 
 
 # ---------------------------------------------------------------------------
+# combustion_equilibrium over phi 0.8-3.0 against Cantera HP (#759). Below
+# phi 1.5 the model lacks dissociation (O, H, OH, NO): the stoichiometric
+# tolerances above apply. From phi 1.5 the products are CO2, H2O, CO, H2, CH4
+# and N2, all in the model: 3 K and 1e-3 in mole fraction. Before #759 rich
+# propane (phi >= 2.5) left no steam and ended 124-320 K hot, unconverged.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("phi", [0.8, 1.0, 1.2, 1.5, 2.0, 2.5, 2.75, 3.0])
+@pytest.mark.parametrize("fuel", ["CH4", "C3H8"])
+def test_combustion_equilibrium_matches_cantera_hp_over_phi(
+    combaero, cantera, fuel: str, phi: float
+) -> None:
+    X_fuel = np.zeros(num_species())
+    X_fuel[species_index_from_name(fuel)] = 1.0
+    X_mix = np.asarray(combaero.set_equivalence_ratio_mole(phi, X_fuel, combaero.species.dry_air()))
+    T_in, P = 300.0, 101325.0
+    got = combaero.combustion_equilibrium(T_in, X_mix, P)
+    gas = cantera.Solution("gri30.yaml")
+    names = [species_name(i) for i in range(num_species())]
+    gas.TPX = (
+        T_in,
+        P,
+        {n: x for n, x in zip(names, X_mix, strict=True) if x > 0 and n in gas.species_names},
+    )
+    gas.equilibrate("HP")
+    assert got.converged
+    rich = phi >= 1.5
+    assert abs(got.state.T - gas.T) < (3.0 if rich else 150.0), (got.state.T, gas.T)
+    for sp in ["CO2", "H2O", "CO", "H2", "CH4"]:
+        diff = abs(got.state.X[species_index_from_name(sp)] - gas[sp].X[0])
+        assert diff < (1e-3 if rich else 0.015), (
+            sp,
+            got.state.X[species_index_from_name(sp)],
+            gas[sp].X[0],
+        )
+
+
+# ---------------------------------------------------------------------------
 # reforming_equilibrium is a SIMULTANEOUS equilibrium of steam reforming of
 # each hydrocarbon (both directions) and WGS. Before the fix one round of
 # (reform, WGS) left H2 7-49% low at 650-850 K and higher hydrocarbons 0.2 off.

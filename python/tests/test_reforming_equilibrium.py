@@ -275,9 +275,79 @@ class TestSimultaneousReformingEquilibrium:
             assert got.state.X[ca.species_index_from_name(name)] < 1e-6
         assert got.state.X[ca.species_index_from_name("CH4")] > 0.05
 
-    def test_a_steam_starved_rich_burn_reports_that_it_did_not_converge(self) -> None:
-        """Known limit: rich propane at phi 2.5 leaves no steam after complete
-        combustion, and round-by-round equilibration crawls through reverse
-        WGS. The result is flagged instead of reported as converged."""
-        X = _mix(C3H8=0.09, O2=0.18, N2=0.73)
-        assert not ca.combustion_equilibrium(500.0, X, 1e5).converged
+
+# ---------------------------------------------------------------------------
+# Steam-starved rich burn (#759). Complete combustion of rich propane leaves
+# steam that the propane reforming then uses up; the rounds (#755) got it back
+# only through reverse WGS, a sliver per round, and stopped 2000 rounds short:
+# phi 2.5-3.0 ended 124-320 K above Cantera, converged=False. The extents are
+# now solved jointly (Newton, element-potential restart). Cantera gri30 HP
+# temperatures recorded 2026-10-28 (cantera_validation_tests compares live).
+# ---------------------------------------------------------------------------
+
+
+def _rich(fuel: str, phi: float) -> list[float]:
+    import numpy as np
+
+    X_fuel = np.zeros(ca.num_species())
+    X_fuel[ca.species_index_from_name(fuel)] = 1.0
+    return list(ca.set_equivalence_ratio_mole(phi, X_fuel, ca.species.dry_air()))
+
+
+_C3H8_RICH_CANTERA_T = {2.5: 1336.72, 2.75: 1200.50, 3.0: 1080.77}
+
+
+@pytest.mark.parametrize("phi", [2.5, 2.75, 3.0])
+def test_steam_starved_rich_propane_converges_to_cantera(phi: float) -> None:
+    """Before #759: converged=False and T 124 / 229 / 320 K hot; now within
+    1.5 K (the rest is the NASA-7 vs gri30 thermo and gri30's minor species)."""
+    got = ca.combustion_equilibrium(300.0, _rich("C3H8", phi), 101325.0)
+    assert got.converged
+    assert pytest.approx(_C3H8_RICH_CANTERA_T[phi], abs=3.0) == got.state.T
+    # The steam is back: Cantera has 0.048 / 0.030 / 0.015, the rounds left 0.
+    assert got.state.X[ca.species_index_from_name("H2O")] > 0.01
+
+
+def test_the_steam_starved_issue_mixture_converges() -> None:
+    """The #755 report's case: C3H8 0.09, O2 0.18, N2 0.73 (phi 2.5) at 500 K.
+    Cantera gri30 HP: 1446.38 K; the rounds gave 1559.9 K, unconverged."""
+    X = _mix(C3H8=0.09, O2=0.18, N2=0.73)
+    got = ca.combustion_equilibrium(500.0, X, 1e5)
+    assert got.converged
+    assert pytest.approx(1446.38, abs=3.0) == got.state.T
+
+
+@pytest.mark.parametrize("phi", [2.5, 3.0])
+def test_the_steam_starved_jacobian_matches_central_differences(phi: float) -> None:
+    """combustion_equilibrium_and_jacobian is one implicit-function solve on
+    the converged joint system. Before #759 it chained the unconverged rounds:
+    dT/dT_in 1.5% off, dX_CO 10x. Two step sizes each; measured <= 3e-7 (P) and <= 6e-8 (T_in, X)."""
+    import numpy as np
+
+    X = np.array(_rich("C3H8", phi))
+    T, P = 300.0, 101325.0
+    j = ca.combustion_equilibrium_and_jacobian(T, X, P)
+    idx = [ca.species_index_from_name(n) for n in ("CO", "H2O", "H2", "CO2", "CH4")]
+    v = np.zeros(len(X))
+    v[ca.species_index_from_name("C3H8")], v[ca.species_index_from_name("N2")] = 1.0, -1.0
+
+    def val(T_: float = T, P_: float = P, d: float = 0.0) -> np.ndarray:
+        r = ca.combustion_equilibrium(T_, X + d * v, P_)
+        return np.array([r.state.T] + [r.state.X[i] for i in idx])
+
+    dX_dX = np.array(j.dXout_dX)
+    analytic = {
+        "T_in": np.array([j.dT_dT_in] + [j.dXout_dT_in[i] for i in idx]),
+        "P": np.array([j.dT_dP] + [j.dXout_dP[i] for i in idx]),
+        "X": np.array([np.dot(j.dT_dX, v)] + [np.dot(dX_dX[i], v) for i in idx]),
+    }
+    checks = [
+        ("T_in", (1e-2, 1e-3), lambda h: (val(T_=T + h) - val(T_=T - h)) / (2 * h), 1e-6),
+        ("P", (100.0, 10.0), lambda h: (val(P_=P + h) - val(P_=P - h)) / (2 * h), 1e-5),
+        ("X", (1e-6, 1e-7), lambda h: (val(d=h) - val(d=-h)) / (2 * h), 1e-6),
+    ]
+    for q, steps, fd_of, rtol in checks:
+        for h in steps:
+            fd = fd_of(h)
+            err = np.abs(analytic[q] - fd) / np.abs(fd)
+            assert err.max() <= rtol, (q, h, err, analytic[q], fd)
