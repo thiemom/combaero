@@ -2178,14 +2178,31 @@ can_geo = cb.CanAnnularFlowGeometry(
 materials = cb.list_materials()
 
 # Thermal conductivity [W/(m·K)]
-k_al = cb.k_aluminum_6061
+k_al = cb.k_aluminum_6061      # deprecated (no cited source), removed in 0.9.0
 k_ss = cb.k_stainless_steel_316
 k_inconel = cb.k_inconel718
 k_haynes = cb.k_haynes230
+k_hx = cb.k_hastelloy_x       # HASTELLOY X brochure + data sheet, 300-1273 K
+k_188 = cb.k_haynes188        # HAYNES 188 brochure table, 300-1273 K
+k_263 = cb.k_haynes263        # HAYNES 263 brochure table, 300-1273 K
+k_25 = cb.k_haynes25          # HAYNES 25 (L-605) brochure table, 298-1273 K
+k_625 = cb.k_inconel625       # Special Metals INCONEL 625 Table 3, 116-1255 K
+k_75 = cb.k_nimonic75         # Virgamet N75 table (RT = Special Metals), 293-1273 K
+k_cu = cb.k_copper            # high-purity copper, NSRDS-NBS 8 Table 2b, 100-1200 K
+k_al2o3 = cb.k_alumina        # dense Al2O3, NSRDS-NBS 8 Table 14, 100-2000 K
+k_1_4923 = cb.k_x22crmov12_1  # X22CrMoV12-1 data sheet, 20 and 650 C, 293-923 K
+k_bc = cb.k_bondcoat_nicocraly  # NiCoCrAlY bond coat (Zhu & Miller 1999), 848-1373 K
 k_tbc = cb.k_tbc_ysz
 # Out-of-range or NaN T raises RuntimeError. get_material_conductivity(name, T)
 # clamps a finite T to the material range (solver robustness) and raises
 # RuntimeError for NaN or inf T.
+
+# Outside its valid range a k_* function raises; extrapolate=True opts into a
+# linear continuation of the end slope instead (unsourced). The database lookup
+# holds the end value by default and takes the same flag; so does WallLayer.
+k = cb.k_hastelloy_x(1400.0, extrapolate=True)
+k = cb.get_material_conductivity("hastelloy_x", 1400.0)                    # = k at 1273.15 K
+k = cb.get_material_conductivity("hastelloy_x", 1400.0, extrapolate=True)  # end slope
 ```
 
 ### Advanced Geometry Functions

@@ -83,6 +83,17 @@ struct PyWarningHandler {
   }
 };
 
+// Al 6061 has no cited source (#761); deprecated, removed in 0.9.0.
+static void warn_al6061_deprecated() {
+  if (PyErr_WarnEx(PyExc_DeprecationWarning,
+                   "Al 6061 (k_aluminum_6061, material 'al6061') has no cited source and is "
+                   "deprecated; it will be removed in 0.9.0. Give the layer its conductivity "
+                   "(material='custom') instead.",
+                   1) < 0) {
+    throw py::error_already_set();
+  }
+}
+
 PYBIND11_MODULE(_core, m) {
 
   // ---------------------------------------------------------------------
@@ -6627,32 +6638,103 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   // =========================================================================
 
   // Material thermal conductivity functions
-  m.def("k_inconel718", &combaero::materials::k_inconel718, py::arg("T"),
+  // Range-checked by default (a RuntimeError outside the source's range);
+  // extrapolate=True opts into the database's linear continuation of the end
+  // slope (materials::material_conductivity).
+  const auto material_k = [](double (*fn)(double), const char *db_name) {
+    return [fn, db_name](double T, bool extrapolate) {
+      return extrapolate ? combaero::materials::material_conductivity(db_name, T, true) : fn(T);
+    };
+  };
+  m.def("k_inconel718", material_k(&combaero::materials::k_inconel718, "inconel718"), py::arg("T"), py::arg("extrapolate") = false,
         "Thermal conductivity of Inconel 718 [W/(m*K)].\n\n"
         "Ni-based superalloy commonly used in turbine applications.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
         "Valid range: 300-1200 K\n"
-        "Source: Haynes International, Special Metals Corporation");
+        "Source: Haynes International, Special Metals Corporation\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
 
-  m.def("k_haynes230", &combaero::materials::k_haynes230, py::arg("T"),
+  m.def("k_haynes230", material_k(&combaero::materials::k_haynes230, "haynes230"), py::arg("T"), py::arg("extrapolate") = false,
         "Thermal conductivity of Haynes 230 [W/(m*K)].\n\n"
         "Ni-Cr-W-Mo alloy with high-temperature oxidation resistance.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
         "Valid range: 300-1273 K (the brochure table ends at 1000 C)\n"
-        "Source: HAYNES 230 brochure H-3000O (Haynes International, 2021)");
+        "Source: HAYNES 230 brochure H-3000O (Haynes International, 2021)\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
 
-  m.def("k_stainless_steel_316", &combaero::materials::k_stainless_steel_316,
-        py::arg("T"),
+  m.def("k_hastelloy_x", material_k(&combaero::materials::k_hastelloy_x, "hastelloy_x"), py::arg("T"), py::arg("extrapolate") = false,
+        "Hastelloy X thermal conductivity [W/(m*K)] from the HASTELLOY X brochure\n"
+        "and data sheet (Haynes International), interpolated linearly. Valid 300-1273 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_haynes188", material_k(&combaero::materials::k_haynes188, "haynes188"), py::arg("T"), py::arg("extrapolate") = false,
+        "Haynes 188 thermal conductivity [W/(m*K)] from the HAYNES 188 brochure\n"
+        "table (Haynes International), interpolated linearly. Valid 300-1273 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_haynes263", material_k(&combaero::materials::k_haynes263, "haynes263"), py::arg("T"), py::arg("extrapolate") = false,
+        "Haynes 263 thermal conductivity [W/(m*K)] from the HAYNES 263 brochure\n"
+        "table (Haynes International), interpolated linearly. Valid 300-1273 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_haynes25", material_k(&combaero::materials::k_haynes25, "haynes25"), py::arg("T"), py::arg("extrapolate") = false,
+        "Haynes 25 (L-605) thermal conductivity [W/(m*K)] from the HAYNES 25\n"
+        "brochure table (Haynes International), interpolated linearly. Valid 298-1273 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_inconel625", material_k(&combaero::materials::k_inconel625, "inconel625"), py::arg("T"), py::arg("extrapolate") = false,
+        "Inconel 625 thermal conductivity [W/(m*K)] from the Special Metals\n"
+        "INCONEL alloy 625 Table 3, interpolated linearly. Valid 116-1255 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_nimonic75", material_k(&combaero::materials::k_nimonic75, "nimonic75"), py::arg("T"), py::arg("extrapolate") = false,
+        "Nimonic 75 thermal conductivity [W/(m*K)] from the Virgamet Alloy N75 table\n"
+        "(20 C value = Special Metals sheet), interpolated linearly. Valid 293-1273 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_copper", material_k(&combaero::materials::k_copper, "copper"), py::arg("T"), py::arg("extrapolate") = false,
+        "High-purity copper thermal conductivity [W/(m*K)] from NSRDS-NBS 8\n"
+        "Table 2b, interpolated linearly. Valid 100-1200 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_alumina", material_k(&combaero::materials::k_alumina, "alumina"), py::arg("T"), py::arg("extrapolate") = false,
+        "Dense Al2O3 (99.5% pure, 98% dense) thermal conductivity [W/(m*K)] from\n"
+        "NSRDS-NBS 8 Table 14, interpolated linearly. Valid 100-2000 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_x22crmov12_1", material_k(&combaero::materials::k_x22crmov12_1, "x22crmov12_1"), py::arg("T"), py::arg("extrapolate") = false,
+        "X22CrMoV12-1 (1.4923) thermal conductivity [W/(m*K)]: linear between the\n"
+        "data sheet's 20 C and 650 C values (Edelstahlwerke Suedwestfalen). Valid 293-923 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_bondcoat_nicocraly", material_k(&combaero::materials::k_bondcoat_nicocraly, "nicocraly"), py::arg("T"), py::arg("extrapolate") = false,
+        "NiCoCrAlY bond coat thermal conductivity [W/(m*K)]: Zhu & Miller 1999\n"
+        "(NASA/TM-1999-209069) Fig. 2, k = 6.729572 + 0.02344 T_C. Valid 848-1373 K.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+  m.def("k_stainless_steel_316", material_k(&combaero::materials::k_stainless_steel_316, "ss316"),
+        py::arg("T"), py::arg("extrapolate") = false,
         "Thermal conductivity of Stainless Steel 316 [W/(m*K)].\n\n"
         "Austenitic stainless steel with corrosion resistance.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
         "Valid range: 300-1200 K\n"
-        "Source: NIST, ASM Handbook");
+        "Source: NIST, ASM Handbook\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
 
-  m.def("k_aluminum_6061", &combaero::materials::k_aluminum_6061, py::arg("T"),
+  m.def(
+      "k_aluminum_6061",
+      [](double T) {
+        warn_al6061_deprecated();
+        return combaero::materials::k_aluminum_6061(T);
+      },
+      py::arg("T"),
+        "Deprecated (no cited source), removed in 0.9.0.\n\n"
         "Thermal conductivity of Aluminum 6061 [W/(m*K)].\n\n"
         "Aluminum alloy, limited to <300 degC due to T6 temper stability.\n\n"
         "Parameters:\n"
@@ -6688,28 +6770,29 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Example:\n"
         "  >>> materials = cb.list_materials()\n"
         "  >>> print(materials)\n"
-        "  ['inconel718', 'haynes230', 'ss316', 'al6061', 'ysz']");
+        "  ['al6061', 'alumina', 'copper', 'hastelloy_x', 'haynes188', 'haynes230',\n"
+        "   'haynes25', 'haynes263', 'inconel625', 'inconel718', 'nicocraly', 'nimonic75',\n"
+        "   'ss316', 'x22crmov12_1', 'ysz']");
 
   m.def(
       "get_material_conductivity",
-      [](const std::string &name, double T) {
-        const auto &mat = combaero::materials::get_material(name);
-        // NaN would pass the clamp below and come out as the 1e-3 floor
-        // (#769): refuse a non-finite T instead.
-        combaero::validation::require_finite<std::runtime_error>(
-            T, "get_material_conductivity: T must be finite");
-        // Clamp temperature to material valid range for solver robustness
-        double T_clamped = std::clamp(T, mat.T_min, mat.T_max);
-        // Evaluate k(T) and clamp to physically positive value
-        double k = mat.k_func(T_clamped);
+      [](const std::string &name, double T, bool extrapolate) {
+        if (name == "al6061") {
+          warn_al6061_deprecated();
+        }
+        // Outside the valid range: the end value by default (T clamped, for
+        // solver robustness), the linear end-slope continuation on request.
+        const double k = combaero::materials::material_conductivity(name, T, extrapolate);
         return std::max(1e-3, k);
       },
-      py::arg("name"), py::arg("T"),
+      py::arg("name"), py::arg("T"), py::arg("extrapolate") = false,
       "Get thermal conductivity [W/(m*K)] for a named material at temperature T "
       "[K].\n"
-      "Automatically clamps T to the material's valid range and ensures k > 0 "
-      "for numerical stability.\n"
-      "Raises RuntimeError for an unknown material or a non-finite T.");
+      "Outside the material's valid range, extrapolate=False (default) holds the\n"
+      "end value (T is clamped); extrapolate=True continues the end slope linearly\n"
+      "(unsourced; opt-in) and raises if that reaches k <= 0. k is floored at\n"
+      "1e-3 for numerical stability. Raises RuntimeError for an unknown material\n"
+      "or a non-finite T.");
 
   // =========================================================================
   // Advanced Cooling Correlations

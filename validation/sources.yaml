@@ -3205,6 +3205,262 @@ documents:
   code: [src/materials.cpp, include/materials.h]
   notes: Arrived 2026-10-29 in docs/new as 20000083966.pdf (NTRS accession); title and authors checked on NTRS.
 
+- file: docs/materials/haynes_hastelloy_x_alloy_brochure.pdf
+  citation: Haynes International. HASTELLOY X (UNS N06002) alloy, product brochure (web edition, accessed 2026-10-29).
+  topic: [other]
+  content: Composition, physical properties (thermal conductivity, specific heat, expansion, modulus, ...)
+    tabulated in British and metric units, plus mechanical, oxidation and fabrication data.
+  status: implemented
+  verdict: 'k_hastelloy_x interpolates the metric thermal-conductivity column linearly, exact at every printed point
+    (9.2 W/m C at 25 C to 26.7 at 900 C; the metric rows jump from 200 to 600 C as printed), with 400 C and
+    1000 C from the manufacturer''s data sheet (registered); valid 300-1273 K. Convenience data per the materials policy.'
+  read_for: ['liner / transition-piece alloy conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads).
+- file: docs/materials/haynes_188_alloy_brochure.pdf
+  citation: Haynes International. HAYNES 188 (UNS R30188) alloy, product brochure (web edition, accessed 2026-10-29).
+  topic: [other]
+  content: Composition, physical properties (thermal conductivity, specific heat, expansion, modulus, ...)
+    tabulated in British and metric units, plus mechanical, oxidation and fabrication data.
+  status: implemented
+  verdict: 'k_haynes188 interpolates the metric thermal-conductivity column linearly, exact at every printed point
+    (10.4 W/m C at RT to 27.6 at 1000 C); valid 300-1273 K. Convenience data per the materials policy.'
+  read_for: ['liner / transition-piece alloy conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads).
+- file: docs/materials/haynes_263_alloy_brochure.pdf
+  citation: Haynes International. HAYNES 263 (UNS N07263) alloy, product brochure (web edition, accessed 2026-10-29).
+  topic: [other]
+  content: Composition, physical properties (thermal conductivity, specific heat, expansion, modulus, ...)
+    tabulated in British and metric units, plus mechanical, oxidation and fabrication data.
+  status: implemented
+  verdict: 'k_haynes263 interpolates the metric thermal-conductivity column linearly, exact at every printed point
+    (11.7 W/m C at RT to 28.5 at 1000 C); valid 300-1273 K. Convenience data per the materials policy.'
+  read_for: ['liner / transition-piece alloy conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads).
+- file: docs/materials/zhu_miller_1999_NASA_TM-1999-209069_TBC_conductivity_modulus.pdf
+  citation: Zhu, D., Miller, R. A. (1999). Thermal conductivity and elastic modulus evolution of thermal barrier
+    coatings under high heat flux conditions. NASA/TM-1999-209069.
+  id: NTRS 19990047263
+  topic: [other]
+  content: 'Laser high-heat-flux measurement of ZrO2-8wt%Y2O3 TBC conductivity and modulus evolution; Fig. 2
+    (p. 6): literature conductivity of the CMSX-4 substrate (k = 8.471358 + 0.019374 T_C) and the NiCoCrAlY bond
+    coat (k = 6.729572 + 0.02344 T_C, line drawn over about 575-1100 C).'
+  status: implemented
+  verdict: 'k_bondcoat_nicocraly is the Fig. 2 bond-coat line, restricted to the range it is drawn over
+    (848-1373 K). Literature values compiled by the authors, not their measurement. CMSX-4 (a blade alloy) is
+    not implemented. The YSZ kinetics here precede and agree in form with Zhu & Miller 2000 (held).'
+  read_for: ['TBC bond-coat conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Arrived 2026-10-29 in docs/new twice (19990047263.pdf and zhu1999.pdf, same report); title and authors
+    checked on NTRS.
+- file: docs/materials/planques_2017_OxidMet_88_133_plasma_TBC_property_survey.pdf
+  citation: Planques, P., Vidal, V., Lours, P., Proton, V., Crabos, F., Huez, J., Viguier, B. (2017). Mechanical and
+    thermo-physical properties of plasma-sprayed thermal barrier coatings -- a literature survey. Oxidation of
+    Metals 88(1-2), 133-143.
+  id: DOI 10.1007/s11085-016-9693-1
+  topic: [other]
+  content: 'Table 1: ZrO2-8%Y2O3 thermal conductivity 0.6-1 W/m K for plasma TBC, 1.3-1.6 for vertically cracked
+    (DVC) plasma TBC ("close to EB-PVD"), 2.2-2.8 for dense zirconia (20-1000 C); density, expansion, modulus,
+    strength.'
+  status: accuracy
+  verdict: 'Cross-source check for k_tbc_ysz: the plasma-sprayed 1.0 W/m K (Zhu & Miller 2000) sits at the
+    top of the surveyed 0.6-1 band, flat over 20-1000 C as modelled; the uncited EB-PVD as-deposited fit
+    (1.5-1.7 W/m K) sits at the top of the 1.3-1.6 DVC/EB-PVD band. Ranges only, no fit.'
+  read_for: ['#761 YSZ cross-check']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  notes: Arrived 2026-10-29 in docs/new; HAL open-archive copy.
+
+- file: docs/materials/hastelloy_x_sheet_760C_datasheet_compilation.pdf
+  citation: 'Haynes Hastelloy X alloy, sheet, tested at 760 C (1400 F). Data sheet, "data provided by the
+    manufacturer, Haynes International, Inc." (web compilation, accessed 2026-10-29).'
+  topic: [other]
+  content: Composition, mechanical properties at 760 C, physical properties incl. thermal conductivity at 400,
+    600, 700, 800, 900 and 1000 C.
+  status: implemented
+  verdict: 'Fills the HASTELLOY X brochure''s 200-600 C gap and extends it to 1000 C in k_hastelloy_x: 16.9 W/m K
+    at 400 C, 28.7 at 1000 C. The 400 C row is labelled "390 F", copied from the 200 C modulus row above: its
+    117 Btu-in/ft2-h-F is 16.9 W/m K, and the brochure''s British column (98 at 500 F, 144 at 1100 F)
+    interpolates to 117 at 752 F (= 400 C). Where both print a value (600-900 C) they agree
+    within 0.1 W/m K.'
+  read_for: ['Hastelloy X conductivity gap']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp]
+  notes: Supplied by the user 2026-10-29.
+
+- file: docs/materials/haynes_25_alloy_brochure.pdf
+  citation: Haynes International. HAYNES 25 (L-605, UNS R30605) alloy, product brochure (web edition, accessed
+    2026-10-29).
+  topic: [other]
+  content: Composition, physical properties (thermal conductivity, specific heat, expansion, modulus) tabulated
+    in British and metric units, plus mechanical, oxidation and fabrication data.
+  status: implemented
+  verdict: 'k_haynes25 interpolates the metric thermal-conductivity column linearly, exact at every printed point
+    (10.5 W/m C at 25 C to 27.5 at 1000 C); valid 298-1273 K. Convenience data per the materials policy.'
+  read_for: ['Co-base combustor / turbine alloy conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/special_metals_inconel_625.pdf
+  citation: Special Metals Corporation. INCONEL alloy 625, product data sheet (2013).
+  topic: [other]
+  content: Composition, physical constants, Table 3 thermal and electrical properties (-250 to 2000 F),
+    modulus, mechanical, corrosion and fabrication data.
+  status: implemented
+  verdict: 'k_inconel625 interpolates Table 3 (metric column, Battelle measurements on material annealed
+    2100 F / 1 h) linearly, exact at every printed point: 7.2 W/m C at -157 C to 25.2 at 982 C; valid 116-1255 K.
+    The 1093 C row prints no conductivity, so the range stops at 982 C.'
+  read_for: ['liner / duct / bellows alloy conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/special_metals_nimonic_75_SMC-058.pdf
+  citation: Special Metals Corporation. NIMONIC alloy 75, publication SMC-058 (2004).
+  topic: [other]
+  content: Composition, physical constants at room temperature, elevated-temperature tensile and creep charts.
+  status: accuracy
+  verdict: 'Prints conductivity only at 20 C: 11.7 W/m C. The Virgamet table that k_nimonic75 uses gives the
+    same value there; the manufacturer gives nothing at temperature to cross-check the rest.'
+  read_for: ['Nimonic 75 conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/virgamet_nimonic_75_alloy_N75.pdf
+  citation: 'Virgamet. Nimonic 75, Alloy N75, 2.4630, 2.4951 - nickel alloy, product data page (web, accessed
+    2026-10-29).'
+  topic: [other]
+  content: Grade cross-reference (UNS N06075, W.Nr 2.4951/2.4630), composition by standard, expansion and
+    thermal conductivity at 20, 400, 600, 700, 800, 900 and 1000 C.
+  status: implemented
+  verdict: 'k_nimonic75 interpolates the table linearly, exact at every printed point: 11.7 W/m K at 20 C to
+    30.1 at 1000 C; valid 293-1273 K. A distributor page, not the manufacturer: its 20 C value equals the
+    Special Metals sheet (registered), the only manufacturer value available.'
+  read_for: ['Nimonic 75 conductivity at temperature']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/powell_ho_liley_1966_NSRDS-NBS-8_thermal_conductivity.pdf
+  citation: 'Powell, R. W., Ho, C. Y. and Liley, P. E. Thermal Conductivity of Selected Materials. NSRDS-NBS 8,
+    National Bureau of Standards, 1966.'
+  topic: [other]
+  content: 'Recommended k(T) for metals (Al, Cu, Au, Armco and pure iron, manganin, Hg, Pt, Pt-Rh, Ag, W; Table 2a/2b),
+    nonmetallic solids (Al2O3, BeO, Pyrex 7740, diamond, MgO, Pyroceram 9606, quartz, ThO2, TiO2; Table 14),
+    liquids and gases. Scanned, no text layer.'
+  status: implemented
+  verdict: 'k_copper is the Table 2b copper column (high purity, 100-1200 K; the extrapolated 1300 K value not
+    used) and k_alumina the Table 14 Al2O3 column (99.5% pure, 98% dense, 100-2000 K; extrapolated 2100 K not
+    used), both printed in W/(cm K) and x100 here. Read from 300 dpi renders of pdf pages 23 and 79. MgO and
+    BeO are there too if a ceramic is needed.'
+  read_for: ['copper and alumina conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29. Table 2b is page 16 (pdf 23), Table 14 page 72 (pdf 79), both rotated.
+- file: docs/materials/suedwestfalen_1.4923_X22CrMoV12-1_datasheet.pdf
+  citation: Edelstahlwerke Suedwestfalen GmbH. 1.4923 X22CrMoV12-1, material data sheet, revision 4923-0 (2001).
+  topic: [other]
+  content: Composition, physical properties (conductivity at 20 and 650 C, specific heat, expansion), heat
+    treatment, elevated-temperature strength and creep, welding, forging and machining.
+  status: implemented
+  verdict: 'k_x22crmov12_1 is the straight line between the two printed values, 24 W/m K at 20 C and 29 at
+    650 C; valid 293-923 K. Two points only, so the shape between them is assumed.'
+  read_for: ['12% Cr turbine steel conductivity']
+  issues: [761]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Supplied by the user 2026-10-29. Publisher identified from the page logo.
+- file: docs/materials/cleveland_cliffs_armco_17-4_ph_datasheet.pdf
+  citation: Cleveland-Cliffs. ARMCO 17-4 PH stainless steel, product data bulletin (10/2022).
+  topic: [other]
+  content: Composition, heat treatments, mechanical and physical properties (Table 17), corrosion, fabrication.
+  status: screened
+  verdict: 'Not implemented: conductivity is printed only at 149, 260, 460 and 482 C (17.9-22.6 W/m K), for one
+    condition, with no room-temperature value. Same four values as the 15-5 PH bulletin.'
+  read_for: ['PH stainless conductivity']
+  issues: [761]
+  records: []
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/cleveland_cliffs_armco_15-5_ph_datasheet.pdf
+  citation: Cleveland-Cliffs. ARMCO 15-5 PH stainless steel, product data bulletin (07/2022).
+  topic: [other]
+  content: Composition, heat treatments, mechanical and physical properties (Table 18), corrosion, fabrication.
+  status: screened
+  verdict: 'Not implemented: conductivity at 149-482 C only (17.9-22.6 W/m K, identical to 17-4 PH), and the
+    table notes "one test from one heat".'
+  read_for: ['PH stainless conductivity']
+  issues: [761]
+  records: []
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/nist_cryogenic_al6061_t6.pdf
+  citation: 'NIST Cryogenics Technologies Group. Material Properties: Aluminum 6061-T6 (UNS AA96061), web page
+    (no longer updated; accessed 2026-10-29).'
+  topic: [other]
+  content: log10-polynomial fits for conductivity, specific heat, modulus and expansion, 4-300 K.
+  status: accuracy
+  verdict: 'Cross-check of the uncited k_aluminum_6061 line (167 - 0.012 T_C, 200-600 K): the NIST fit gives
+    136 W/m K at 200 K and 155 at 300 K, where the line gives 168 and 167 -- 23% and 7% high, and the line falls
+    with T where the fit rises. Outcome (#761): 4-300 K is outside
+    combaero''s range, and no sourced elevated-temperature table was found (ASM Vol. 2 gives 25 C only;
+    the MIL-HDBK-5H change notice we hold lacks Fig. 3.6.2.0), so k_aluminum_6061 is deprecated for 0.9.0.'
+  read_for: ['Al 6061 conductivity provenance']
+  issues: [761]
+  records: []
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/nist_cryogenic_304_stainless.pdf
+  citation: 'NIST Cryogenics Technologies Group. Material Properties: 304 Stainless (UNS S30400), web page
+    (accessed 2026-10-29).'
+  topic: [other]
+  content: log10-polynomial fits for conductivity, specific heat, modulus and expansion, 4-300 K.
+  status: screened
+  verdict: 'Cryogenic only (k = 15.3 W/m K at 300 K). Not implemented: a 304 function that refuses above 300 K
+    would not serve casings or rig hardware; it needs an elevated-temperature source to pair with.'
+  read_for: ['304 stainless conductivity']
+  issues: [761]
+  records: []
+  notes: Supplied by the user 2026-10-29.
+- file: docs/materials/nist_cryogenic_310_stainless.pdf
+  citation: 'NIST Cryogenics Technologies Group. Material Properties: 310 Stainless (UNS S31000), web page
+    (accessed 2026-10-29).'
+  topic: [other]
+  content: log10-polynomial fits for conductivity, specific heat, modulus and expansion, 4-300 K.
+  status: screened
+  verdict: 'Cryogenic only (k = 11.6 W/m K at 300 K). Not implemented, as for 304: needs an elevated-temperature
+    source.'
+  read_for: ['310 stainless conductivity']
+  issues: [761]
+  records: []
+  notes: Supplied by the user 2026-10-29.
+
+- file: docs/materials/asm_handbook_vol2_1990_nonferrous_alloys.pdf
+  citation: 'ASM International. Metals Handbook, 10th ed., Vol. 2: Properties and Selection: Nonferrous Alloys and
+    Special-Purpose Materials, 1990.'
+  topic: [other]
+  content: Wrought and cast aluminium, copper, nickel, cobalt, titanium and other nonferrous alloys -- compositions,
+    tempers, typical physical properties (thermal conductivity mostly at a single temperature), mechanical data.
+  status: screened
+  verdict: 'Settles 6061 at 25 C only: O temper 180, T4 154, T6 167 W/m K. No k(T), so it cannot source a
+    temperature-dependent k_aluminum_6061, which is deprecated (#761). Kept as the reference for room-temperature
+    conductivity of nonferrous alloys (copper alloys, titanium, nickel) if one is needed.'
+  read_for: ['Al 6061 conductivity provenance']
+  issues: [761]
+  records: []
+  notes: Supplied by the user 2026-10-29. 3470 pages; the 6061 data sheet is in "Properties of Wrought Aluminum and
+    Aluminum Alloys".
+
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
 # `citation` here is as recalled unless `checked` is true; confirm it from
