@@ -96,7 +96,8 @@ def test_the_whole_dataset_resolves(dataset) -> None:
     # their ratio sets (#444), +2 Colban 2011 Figs. 6-7 shaped-hole film (#386)
     # +5 Taslim & Spring AR 0.5 / 3.5 two-side friction, every eligible set.
     # +1 Perry 1949 air via Jobson Fig. 5a, K on the reservoir state (#854).
-    assert len(statuses[C.STATUS_DIRECT]) == 122
+    # +1 Schiller 1933 steam via Jobson Fig. 5b, same convention (#861).
+    assert len(statuses[C.STATUS_DIRECT]) == 123
     # +12 CR-4396 Figs. 6.1/6.2, Kays-Perkins to Dittus-Boelter (#452).
     cr4396 = [
         f"johnson1993/fig{fig}_{wall}_seg{seg}"

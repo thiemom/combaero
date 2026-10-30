@@ -3579,15 +3579,18 @@ documents:
     Cv 0.982): on Perry 1949 air, Fig. 5a digitised and user-confirmed 2026-10-29, N = 15, bias -1.4%, RMS 1.6%,
     worst -2.5%; the default isentropic nozzle at the same Cd scores RMS 20.5% (flat below r_c). The beta
     extension lies inside ISO 5167-2 Eq. (5)''s stated uncertainty over beta 0.2-0.75, p2/p1 0.75-0.98 with RHG
-    C (cross-source). Fig. 5b (Schiller 1933 steam, n = 1.3) not digitised. Default unchanged pending a decision.'
+    C (cross-source). Fig. 5b (Schiller 1933 superheated steam, n = 1.3) digitised and user-confirmed 2026-10-30
+    (#861), cross-source: N = 9, bias +1.1%, RMS 1.9%, worst +5.1% (r = 0.89, steep slope); nozzle RMS 19.8%.
+    Default unchanged; the switch decision is #861.'
   read_for: ['#854 compressible orifice expansion']
-  issues: [854]
+  issues: [854, 861]
   records: [validation/cooling/data/jobson1955/metadata.yaml, validation/cooling/orifice_runner.py,
-    tests/test_orifice_jobson.cpp, python/tests/test_orifice_jobson_854.py, python/tests/test_jobson1955_perry.py]
+    tests/test_orifice_jobson.cpp, python/tests/test_orifice_jobson_854.py, python/tests/test_jobson1955_fig5.py]
   code: [include/orifice_jobson.h, include/orifice.h, src/orifice.cpp, src/solver_interface.cpp,
     python/combaero/network/components.py]
   notes: Supplied by the user 2026-10-29 (uploaded from a phone). Perry (1949) is cited in its Appendix II as
-    Trans. ASME 71, 757, 'Critical Flow Through Sharp-edged Orifices'; we do not hold Perry itself.
+    Trans. ASME 71, 757, 'Critical Flow Through Sharp-edged Orifices', and Schiller (1933) as Forschung Ing.-Wes.
+    4, 128; we hold neither primary.
 
 # Documents we do NOT hold that would settle an open question. When one is
 # obtained, its entry moves up into `documents` with a file and a status.
