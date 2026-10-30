@@ -3462,11 +3462,48 @@ ORIFICE_COMPRESSIBLE_MODELS = ("nozzle", "jobson1955", "iso5167")
 # well-conditioned at.
 _JOBSON_CD_MIN = 1e-6
 
-# OrificeElement._flow_consistent_residuals (#861): a Newton stop at the
-# iteration cap is a root when |a - m_calc(a)| is within these [-, kg/s];
-# otherwise the root is solved on the bracket.
+# OrificeElement's inner flow solves (#861): a stop at the iteration cap is a
+# root when |a - m_calc(a)| is within these [-, kg/s]; otherwise the root is
+# solved on a bracket (_root_on_bracket).
 _OWN_FLOW_RTOL = 1e-9
 _OWN_FLOW_ATOL = 1e-15
+
+
+def _root_on_bracket(
+    h: Callable[[float], float],
+    a_end: float,
+    lo: float | None,
+    hi: float | None,
+    probes: Callable[[], list[float]],
+) -> float:
+    """A root of h(a) = a - m_calc(a) after an inner solve stopped at its
+    iteration cap at a_end (#861).
+
+    a_end is returned unchanged when it already is a root to _OWN_FLOW_RTOL /
+    _OWN_FLOW_ATOL, so a solve that met its root keeps its bits. Otherwise a
+    bracket is formed from the signs seen on the way (lo: h < 0, hi: h > 0),
+    completed from ``probes()`` where one side is missing, and the root is
+    solved on it by brentq. With no bracket to be had, a_end is returned.
+    """
+    h_end = h(a_end)
+    if abs(h_end) <= _OWN_FLOW_RTOL * max(abs(a_end), abs(a_end - h_end)) + _OWN_FLOW_ATOL:
+        return a_end
+    if lo is None or hi is None:
+        for p in probes():
+            hp = h(p)
+            if hp == 0.0:
+                return p
+            if hp < 0.0 and lo is None:
+                lo = p
+            elif hp > 0.0 and hi is None:
+                hi = p
+            if lo is not None and hi is not None:
+                break
+        else:
+            return a_end
+    assert lo is not None and hi is not None
+    return float(_brentq(h, lo, hi, xtol=1e-13 * max(abs(lo), abs(hi), 1e-30)))
+
 
 # The taps the network's metering Cd is evaluated at. ISO 5167-2's
 # permanent-loss relation (permanent_loss_ratio_and_dC) is Bernoulli to the
@@ -4463,9 +4500,16 @@ class OrificeElement(NetworkElement):
             return cd, d.get(m_key, 0.0)
 
         a = aK * cd0
+        lo: float | None = None  # an a with g(a) < 0
+        hi: float | None = None  # an a with g(a) > 0
+        done = False
         for _ in range(50):
             cd, slope = cd_and_slope(a)
             g = a - cd * aK
+            if g < 0.0:
+                lo = a
+            elif g > 0.0:
+                hi = a
             gp = 1.0 - aK * slope
             # Newton; off the consistent root (|K| dCd/da < 0.2 there) g' can
             # vanish, where the contracting fixed-point step is used instead.
@@ -4475,6 +4519,18 @@ class OrificeElement(NetworkElement):
             a = step_to
             if done:
                 break
+        if not done:
+            # The fixed-point step contracts at 1 - g' per iteration: where
+            # |K| dCd/da sits just under 1 (a long hole at low Re, steep Cd(Re))
+            # 50 steps end up to 1.7% short of the root (#861). g(0) < 0 and,
+            # with Cd <= 1, g(|K|) >= 0, so the root is bracketed.
+            a = _root_on_bracket(
+                lambda t: t - cd_and_slope(t)[0] * aK,
+                a,
+                lo,
+                hi,
+                lambda: [0.0, aK, 2.0 * aK, 4.0 * aK],
+            )
         # The search above may lean on C++'s slope continued below the Re
         # floor; the sensitivities below are of the HELD value (#760).
         cd_star, cd_m = cd_and_slope(a, continued=False)
@@ -4561,24 +4617,25 @@ class OrificeElement(NetworkElement):
             a = a_new
             if done:
                 break
-        if not done and lo is not None and hi is not None:
+        if not done:
             # m_calc(a) can carry a kink: the approach pipe's choke (flat
             # beyond it), Jobson's held discriminant (beta past its range).
             # Newton across one 2-cycles to the cap, and the a it stopped at
             # is no root: the row was off by the cycle's width (6% on a
             # stress bleed station; a GUI net's orifice passed 33 kg/s where
             # its consistent flow was 38, #861) and its Jacobian matched
-            # neither side. Solve on the bracket instead. Only when
-            # the stop is no root, so every solve that met its root before
-            # (to the cap's rounding included) is untouched.
-            m_end = evaluate(a)[0]
-            if abs(a - m_end) > _OWN_FLOW_RTOL * max(abs(a), abs(m_end)) + _OWN_FLOW_ATOL:
-                a = _brentq(
-                    lambda t: t - evaluate(t)[0],
-                    lo,
-                    hi,
-                    xtol=1e-13 * max(abs(lo), abs(hi), 1e-30),
-                )
+            # neither side. With a Cd rising steeply in Re the fixed-point
+            # step also stops short of the root, approaching from one side.
+            # Solve on a bracket instead, only when the stop is no root, so
+            # every solve that met its root before is untouched.
+            def h_of(t: float) -> float:
+                return t - evaluate(t)[0]
+
+            def probes() -> list[float]:
+                m0 = evaluate(0.0)[0]  # the flow at zero approach velocity
+                return [0.0, m0, 2.0 * m0, 4.0 * m0]
+
+            a = _root_on_bracket(h_of, a, lo, hi, probes)
         # Sensitivities of the HELD Cd below its Re floor (#760).
         m_star, slope, part, dm_dcd, dcd = evaluate(a, continued=False)
         hp = 1.0 - slope
