@@ -172,8 +172,9 @@ describe("link geometry", () => {
 		const measured = (id: string, x: number, pos: Position, kind: string) =>
 			({
 				...node(id, "plenum"),
-				position: { x, y: 0 },
-				positionAbsolute: { x, y: 0 },
+				// Positions are card centres (#865): this box spans x .. x + 100.
+				position: { x: x + 50, y: 20 },
+				positionAbsolute: { x: x + 50, y: 20 },
 				width: 100,
 				height: 40,
 				[internalsSymbol]: {
@@ -203,10 +204,16 @@ describe("link geometry", () => {
 	});
 
 	it("falls back to the node centres before React Flow measured handles", () => {
-		const a = { ...node("a", "plenum"), width: 100, height: 40 };
+		// Card centres (#865): boxes at (0, 0) and (200, 100), 100 x 40.
+		const a = {
+			...node("a", "plenum"),
+			position: { x: 50, y: 20 },
+			width: 100,
+			height: 40,
+		};
 		const b = {
 			...node("b", "plenum"),
-			position: { x: 200, y: 100 },
+			position: { x: 250, y: 120 },
 			width: 100,
 			height: 40,
 		};

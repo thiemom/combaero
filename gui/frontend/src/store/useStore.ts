@@ -18,6 +18,10 @@ import { HEAT_SOURCE_HANDLE, heatSourceEdgeProps } from "../utils/heatSource";
 import type { PreviewItems } from "../utils/inheritance";
 import { migrateNodeData, migrateSolverSettings } from "../utils/legacyKeys";
 import {
+	migrateNodePositions,
+	NETWORK_FILE_VERSION,
+} from "../utils/nodeOrigin";
+import {
 	isProbeTarget,
 	isStructuralNodeChange,
 	PROBE_HANDLE,
@@ -503,7 +507,12 @@ const useStore = create<RFState>((set, get) => ({
 
 	saveNetwork: async (filename?: string) => {
 		const { nodes, edges, solverSettings } = get();
-		const data = { nodes, edges, solverSettings, version: "1.1" };
+		const data = {
+			nodes,
+			edges,
+			solverSettings,
+			version: NETWORK_FILE_VERSION,
+		};
 		const content = JSON.stringify(data, null, 2);
 
 		// Try File System Access API (Native "Save As" Dialog)
@@ -588,7 +597,8 @@ const useStore = create<RFState>((set, get) => ({
 				data.edges,
 			);
 			set({
-				nodes: data.nodes.map((n: any) => ({
+				// Up to file version 1.1 positions were top-left corners (#865).
+				nodes: migrateNodePositions(data.nodes, data.version).map((n: any) => ({
 					...n,
 					data: { ...migrateNodeData(n.data, n.type), result: undefined },
 				})),

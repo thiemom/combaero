@@ -13,6 +13,7 @@ import {
 	Position,
 } from "reactflow";
 import { labelPosition } from "./labelOffset";
+import { cardSize, nodeTopLeft } from "./nodeOrigin";
 
 /** The probe's hidden target handle. A connection drawn from a node to it
  *  points the probe at that node (the original way to attach a probe). */
@@ -171,8 +172,9 @@ export interface Rect {
 
 /** A node's box in flow coordinates, as React Flow measured it. */
 export function nodeRect(n: Node): Rect {
-	const p = n.positionAbsolute ?? n.position;
-	return { x: p.x, y: p.y, width: n.width ?? 140, height: n.height ?? 48 };
+	const p = nodeTopLeft(n);
+	const [width, height] = cardSize(n);
+	return { x: p.x, y: p.y, width, height };
 }
 
 /** Where the segment from the box's centre toward `toward` leaves the box

@@ -17,6 +17,7 @@
  */
 import type { Edge, Node } from "reactflow";
 import { stripResults } from "../store/useStore";
+import { NETWORK_FILE_VERSION } from "./nodeOrigin";
 
 export const AUTOSAVE_KEY = "combaero.autosave.v1";
 export const AUTOSAVE_DELAY_MS = 1000;
@@ -62,7 +63,7 @@ export const writeAutosave = (
 			nodes: stripResults(snap.nodes),
 			edges: stripResults(snap.edges),
 			solverSettings: { ...snap.solverSettings } as Record<string, unknown>,
-			version: "1.1",
+			version: NETWORK_FILE_VERSION,
 			savedAt: now.toISOString(),
 		};
 		s.setItem(AUTOSAVE_KEY, JSON.stringify(record));

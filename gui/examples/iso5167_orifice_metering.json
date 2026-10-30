@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "example": {
     "title": "ISO 5167-2 orifice metering run",
     "source": "ISO 5167-2:2003, Measurement of fluid flow by means of pressure differential devices -- Part 2: Orifice plates. Eq. (4) (Reader-Harris/Gallagher C), the flow equation, and 5.4.1 (pressure loss).",
@@ -13,7 +13,7 @@
     {
       "id": "supply",
       "type": "pressure_boundary",
-      "position": { "x": 0, "y": 0 },
+      "position": { "x": 64, "y": 0 },
       "data": {
         "id": "supply",
         "label": "Supply",
@@ -25,7 +25,7 @@
     {
       "id": "pipe_up",
       "type": "channel",
-      "position": { "x": 200, "y": 0 },
+      "position": { "x": 270, "y": 0 },
       "data": {
         "id": "pipe_up",
         "label": "Upstream pipe, 20 D",
@@ -39,7 +39,7 @@
     {
       "id": "plate",
       "type": "orifice",
-      "position": { "x": 400, "y": 0 },
+      "position": { "x": 470, "y": 0 },
       "data": {
         "id": "plate",
         "label": "Orifice plate, beta 0.5",
@@ -52,7 +52,7 @@
     {
       "id": "pipe_down",
       "type": "channel",
-      "position": { "x": 600, "y": 0 },
+      "position": { "x": 670, "y": 0 },
       "data": {
         "id": "pipe_down",
         "label": "Downstream pipe, 10 D",
@@ -66,7 +66,7 @@
     {
       "id": "sink",
       "type": "pressure_boundary",
-      "position": { "x": 800, "y": 0 },
+      "position": { "x": 864, "y": 0 },
       "data": {
         "id": "sink",
         "label": "Sink",
