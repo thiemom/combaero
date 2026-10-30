@@ -1262,7 +1262,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 bevel_depth=data.bevel_depth,
                 tap=data.tap,
                 in_pipe=data.in_pipe,
-                compressible_model=data.compressible_model,
+                # "default": the element selects at build (#861).
+                compressible_model=(
+                    None if data.compressible_model == "default" else data.compressible_model
+                ),
                 # Cv is Jobson's alone; a value left from an earlier pick of
                 # that model must not refuse the others.
                 Cv=data.Cv if data.compressible_model == "jobson1955" else 1.0,

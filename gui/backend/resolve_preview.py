@@ -153,6 +153,14 @@ def _extract(item: Any) -> dict[str, FieldResolution]:
             "E_reverse": FieldResolution(
                 float(cb.velocity_of_approach_factor(beta_rev)), "derived from beta"
             ),
+            # The compressible model the element runs (#861): 1 = jobson1955,
+            # 0 = anything else; selected at build unless the user set one.
+            "jobson1955": FieldResolution(
+                1.0 if getattr(item, "compressible_model", "nozzle") == "jobson1955" else 0.0,
+                "user"
+                if getattr(item, "_compressible_model_explicit", True)
+                else "selected at build",
+            ),
         }
     return {}
 

@@ -1079,6 +1079,7 @@ inline constexpr Entry function_units[] = {
     {"jobson_ci_from_cd", "Cd: -, beta: -, Cv: -", "- (Ci)"},
     {"jobson_contraction_coefficient", "r: -, Ci: -, n: -", "- (C)"},
     {"jobson_expansibility", "r: -, beta: -, Ci: -, n: -", "- (eps)"},
+    {"JOBSON_1955_BETA_MAX", "-", "-"},
     {"Cd", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"mcgreehan_schotsch_1988_cd",
      "Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: -", "- (Cd)"},

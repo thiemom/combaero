@@ -6175,6 +6175,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Expansibility implied by Jobson's theory with the approach-velocity\n"
         "extension (#854): mdot / mdot_inc at the same upstream static state\n"
         "and Ci, r = p2/p1. Comparable with ISO 5167-2 Eq. (5).");
+  // The beta extension's checked range: OrificeElement selects jobson1955
+  // by default only at or below it (#861).
+  m.attr("JOBSON_1955_BETA_MAX") = orifice::jobson1955::beta_max;
 
 
 

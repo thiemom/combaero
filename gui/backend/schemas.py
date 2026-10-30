@@ -336,10 +336,12 @@ class OrificeData(BaseModel):
     # sets beta; a bore equal to it is no orifice, a larger one is refused.
     in_pipe: bool = True
     regime: Literal["default", "incompressible", "compressible"] = "default"
-    # How the compressible regime expands the flow (#854). "nozzle" is the
-    # default; "jobson1955" (sharp-edged jet, any correlation) and "iso5167"
-    # (ISO 5167-2 Eq. (5), Reader-Harris/Gallagher only) are opt-in.
-    compressible_model: Literal["nozzle", "jobson1955", "iso5167"] = "nozzle"
+    # How the compressible regime expands the flow (#854). "default" lets the
+    # element select at build (#861, 0.8.0): jobson1955 for an
+    # incompressible-referenced Cd on a sharp-edged bore at beta <= 0.75,
+    # else the nozzle. A file saved without the key gets that selection; an
+    # explicit "nozzle", "jobson1955" or "iso5167" (RHG only) is kept.
+    compressible_model: Literal["default", "nozzle", "jobson1955", "iso5167"] = "default"
     # Jobson's velocity coefficient, Cd = Cv Ci; read for jobson1955 only.
     Cv: float = Field(default=1.0, gt=0.0, le=1.0)
     initial_guess: dict[str, float] = Field(default_factory=dict)

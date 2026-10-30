@@ -1180,7 +1180,8 @@ const Inspector = () => {
 									</select>
 								</div>
 
-								{/* Compressible expansion model (#854): opt-in, nozzle default */}
+								{/* Compressible expansion model (#854); the default is
+								    selected at build from correlation + geometry (#861) */}
 								<div className="flex flex-col gap-1 mt-2">
 									<label
 										htmlFor={`compressible_model_${selectedNode.id}`}
@@ -1191,14 +1192,15 @@ const Inspector = () => {
 									<select
 										id={`compressible_model_${selectedNode.id}`}
 										className="p-2 border rounded bg-white text-xs border-stone-200"
-										value={selectedNode.data.compressible_model || "nozzle"}
+										value={selectedNode.data.compressible_model || "default"}
 										onChange={(e) =>
 											updateNodeData(selectedNode.id, {
 												compressible_model: e.target.value,
 											})
 										}
 									>
-										<option value="nozzle">Isentropic nozzle (default)</option>
+										<option value="default">Default (selected at build)</option>
+										<option value="nozzle">Isentropic nozzle</option>
 										<option value="jobson1955">
 											Sharp-edged jet (Jobson 1955)
 										</option>
@@ -1215,8 +1217,21 @@ const Inspector = () => {
 									<span className="text-[9px] italic text-stone-400">
 										Compressible regime only. Jobson: the jet widens as the
 										pressure ratio falls, through choke; ISO: valid for p2/p1 ≥
-										0.75.
+										0.75. Default: Jobson for an incompressible-referenced Cd
+										(RHG, Idelchik, Lichtarowicz, McGreehan-Schotsch) on a
+										sharp-edged bore at β ≤ 0.75; the nozzle for fixed Cd,
+										Stolz, a rounded or beveled edge or a wider bore.
 									</span>
+									{(selectedNode.data.compressible_model || "default") ===
+										"default" &&
+										field("jobson1955") != null && (
+											<span className="text-[9px] text-stone-500">
+												Selected:{" "}
+												{field("jobson1955")?.value === 1
+													? "Jobson 1955"
+													: "isentropic nozzle"}
+											</span>
+										)}
 									{selectedNode.data.compressible_model === "iso5167" &&
 										(selectedNode.data.correlation ||
 											"ReaderHarrisGallagher") !== "ReaderHarrisGallagher" && (

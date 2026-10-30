@@ -89,7 +89,7 @@ def test_jobson_scores_inside_its_band(jobson_series, figure) -> None:
 
 
 @pytest.mark.parametrize("figure", sorted(SERIES))
-def test_jobson_beats_the_default_nozzle(jobson_series, figure) -> None:
+def test_jobson_beats_the_nozzle(jobson_series, figure) -> None:
     """The nozzle's flow is flat below r_c where a sharp orifice keeps
     passing more, so no Cd fixes its shape (#854). Same Cd 0.600 for both."""
     n = SERIES[figure][0]

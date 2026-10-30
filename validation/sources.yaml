@@ -3572,20 +3572,23 @@ documents:
     1933 (steam) mass-flow coefficients vs pressure ratio. p. 772 suggests Ci <= 0.7 as the theory''s upper
     limit; Bosanquet''s discussion (p. 773) shows C dipping to 0.852 at f = 0.5 (the nozzle limit).'
   status: implemented
-  verdict: 'Implemented (#854) as the opt-in OrificeElement compressible_model "jobson1955", analytic (f, J),
+  verdict: 'Implemented (#854) as OrificeElement compressible_model "jobson1955", analytic (f, J),
     with an approach-velocity extension not in the paper: f(Ci, beta, Cv) = 1/Ci - 1/(2 Ci^2) - Cv beta^2 + Cv^2
     beta^4/2, fixed by the incompressible limit. Fidelity: Table 2 reproduced within 0.001 at every printed r
     (tests/test_orifice_jobson.cpp). Cross-source accuracy (Jobson fitted nothing to Perry; Cd 0.600 = slit Ci x
     Cv 0.982): on Perry 1949 air, Fig. 5a digitised and user-confirmed 2026-10-29, N = 15, bias -1.4%, RMS 1.6%,
-    worst -2.5%; the default isentropic nozzle at the same Cd scores RMS 20.5% (flat below r_c). The beta
+    worst -2.5%; the isentropic nozzle (the pre-0.8 default) at the same Cd scores RMS 20.5% (flat below r_c). The beta
     extension lies inside ISO 5167-2 Eq. (5)''s stated uncertainty over beta 0.2-0.75, p2/p1 0.75-0.98 with RHG
     C (cross-source). Fig. 5b (Schiller 1933 superheated steam, n = 1.3) digitised and user-confirmed 2026-10-30
     (#861), cross-source: N = 9, bias +1.1%, RMS 1.9%, worst +5.1% (r = 0.89, steep slope); nozzle RMS 19.8%.
-    Default unchanged; the switch decision is #861.'
+    Since 0.8.0 (#861) the build-time default for an incompressible-referenced Cd (RHG, Idelchik, Lichtarowicz,
+    McGreehan-Schotsch baseline) on a sharp-edged bore at beta <= 0.75; the nozzle stays for fixed Cd, Stolz and
+    the McGreehan-Schotsch crossflow term.'
   read_for: ['#854 compressible orifice expansion']
   issues: [854, 861]
   records: [validation/cooling/data/jobson1955/metadata.yaml, validation/cooling/orifice_runner.py,
-    tests/test_orifice_jobson.cpp, python/tests/test_orifice_jobson_854.py, python/tests/test_jobson1955_fig5.py]
+    tests/test_orifice_jobson.cpp, python/tests/test_orifice_jobson_854.py, python/tests/test_jobson1955_fig5.py,
+    python/tests/test_orifice_default_model_861.py]
   code: [include/orifice_jobson.h, include/orifice.h, src/orifice.cpp, src/solver_interface.cpp,
     python/combaero/network/components.py]
   notes: Supplied by the user 2026-10-29 (uploaded from a phone). Perry (1949) is cited in its Appendix II as
