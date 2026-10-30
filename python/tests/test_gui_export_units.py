@@ -35,10 +35,17 @@ def test_every_export_column_has_a_unit(graph: dict) -> None:
         r = http._post("/export", graph)
     assert r.status_code == 200, r.text[:300]
     header = next(csv.reader(io.StringIO(r.text)))
+    # The input, initial-guess and solver columns (#784) are checked by
+    # test_results_table.test_every_numeric_input_column_has_a_unit.
     unlabelled = [
         c
         for c in header
-        if not (c in _META_COLUMNS or is_text_key(c) or (" [" in c and c.endswith("]")))
+        if not (
+            c in _META_COLUMNS
+            or is_text_key(c)
+            or (" [" in c and c.endswith("]"))
+            or c.startswith(("input:", "initial_guess:", "solver:"))
+        )
     ]
     assert unlabelled == []
 

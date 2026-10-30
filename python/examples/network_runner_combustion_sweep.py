@@ -70,9 +70,10 @@ def main() -> None:
     sweep_df = runner.sweep(params, metrics=["combustor.Tt", "combustor.phi"])
 
     # phi from solver (more precise than our input estimate)
-    phi_solved = sweep_df["combustor.phi"].values
-    T_exit = sweep_df["combustor.Tt"].values
-    converged = sweep_df["success"].values
+    out = sweep_df["outputs"]  # one row per case, (entity, quantity) columns
+    phi_solved = out["combustor", "phi"].to_numpy()
+    T_exit = out["combustor", "Tt"].to_numpy()
+    converged = out["_solve", "success"].to_numpy(dtype=bool)
     print(f"  Converged: {converged.sum()}/{len(converged)}")
     if not converged.any():
         # A sweep catches each row's exception, so a network that no longer

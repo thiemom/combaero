@@ -21,6 +21,10 @@ Typical notebook usage::
     import pandas as pd
     params = pd.DataFrame({"air_inlet.m_dot": [0.8, 1.0, 1.2]})
     sweep_df = runner.sweep(params, metrics=["channel_1.m_dot"])
+    sweep_df["outputs"]["channel_1", "m_dot"]   # one row per case (#784)
+
+The sweep's table, and ``load_results`` / ``append_case`` for exported CSVs
+and single results, are in ``gui.backend.results``.
 """
 
 import json
@@ -33,6 +37,7 @@ import pandas as pd
 import combaero as cb
 
 from .graph_builder import build_network_from_schema
+from .results import input_cells
 from .schemas import (
     DEFAULT_SOLVE_TIMEOUT,
     ElementResult,
@@ -291,6 +296,18 @@ class NetworkResult:
         self._id_to_label = id_to_label
         self._id_to_kind = id_to_kind
         self._id_to_method = id_to_method
+        # How the case was solved, for the results table's attrs (#784): not
+        # inputs, since they do not change a converged answer. The GUI routes
+        # solve with the schema's settings; NetworkRunner.solve overwrites
+        # these with the arguments it was given.
+        settings = schema.solver_settings
+        self._solver_options: dict[str, Any] = {
+            "method": settings.method,
+            "init_strategy": settings.init_strategy,
+            "timeout": settings.timeout,
+            "incompressible_mach_limit": settings.incompressible_mach_limit,
+        }
+        self._warm_start: Any = None
 
     def get(self, key: str) -> float:
         """Get a scalar result by solver key or ``'<label>.<quantity>'``.
@@ -345,6 +362,13 @@ class NetworkResult:
         Every row carries the solve's status (``success``, ``converged``,
         ``consistent``, ``outcome``, ``final_norm``): check ``success`` before
         trusting the numbers.
+
+        After the result columns come the case's inputs (#784, 0.8.0):
+        ``input:<key> [<unit>]`` on each entity's row, ``initial_guess:<key>``,
+        and a ``network`` row (id ``_network``) with the network-wide
+        settings and the ``solver:<key>`` options. An edge with inputs and no
+        result row gets an ``edge`` row. ``gui.backend.results.load_results``
+        reads this frame, or its CSV, into the one-row-per-case table.
         """
         species_labels: list[str] = list(cb.species.names)
         data: list[dict] = []
@@ -399,6 +423,13 @@ class NetworkResult:
                 }
             )
 
+        # The case's inputs (#784), after every result column: so an exported
+        # CSV reads back into the full results table (gui.backend.results).
+        cells, input_rows = input_cells(
+            self._schema, [r["id"] for r in data], self._solver_options, self._warm_start
+        )
+        data.extend(input_rows)
+
         df = pd.DataFrame(data)
         # The solve's own status on EVERY row, beside the label: a timed-out or
         # rejected solve exports numbers that look valid, and a filtered or
@@ -415,7 +446,9 @@ class NetworkResult:
         at = list(df.columns).index("label") + 1 if "label" in df.columns else 0
         for offset, (col, value) in enumerate(status.items()):
             df.insert(at + offset, col, [value] * len(df))
-        return df.rename(columns={col: label_with_unit(col) for col in df.columns})
+        df = df.rename(columns={col: label_with_unit(col) for col in df.columns})
+        inputs = pd.DataFrame([cells.get(rid, {}) for rid in df["id"]], index=df.index)
+        return pd.concat([df, inputs], axis=1)
 
     def swap_boundary(self, label: str, new_type: str) -> "NetworkRunner":
         """Return a new NetworkRunner with one boundary node retyped.
@@ -554,6 +587,7 @@ class NetworkRunner:
             "fuel_inlet.m_dot": [0.03, 0.04, 0.05],
         })
         sweep_df = runner.sweep(params, metrics=["combustor.Tt", "hot_channel.m_dot"])
+        T_exit = sweep_df["outputs"]["combustor", "Tt"]
     """
 
     def __init__(
@@ -636,7 +670,7 @@ class NetworkRunner:
         raw = solver.solve(method=method, init_strategy=init_strategy, timeout=timeout, x0=x0_array)
         node_results, element_results, edge_results = _build_result_objects(raw, net)
 
-        return NetworkResult(
+        result = NetworkResult(
             raw=raw,
             node_results=node_results,
             element_results=element_results,
@@ -647,6 +681,14 @@ class NetworkRunner:
             id_to_kind=dict(self._id_to_kind),
             id_to_method=dict(self._id_to_method),
         )
+        result._solver_options.update(
+            {"method": method, "init_strategy": init_strategy, "timeout": timeout}
+        )
+        if _x0 is not None:
+            result._warm_start = "x0"
+        elif self._warm_state:
+            result._warm_start = "solved_state"
+        return result
 
     # ------------------------------------------------------------------
     # Sweep
@@ -663,31 +705,40 @@ class NetworkRunner:
         """Run a parametric sweep over rows of ``params``.
 
         Each row of ``params`` is a set of BC overrides (column names are
-        override keys in ``<label>.<attribute>`` format).
+        override keys in ``<label>.<attribute>`` format) and one case of the
+        result.
 
         Args:
             params: DataFrame whose columns are override keys and whose rows
-                are individual parameter combinations.
-            metrics: Optional list of raw solver keys to extract per solve
-                (e.g. ``["combustor.Tt", "hot_channel.m_dot"]``).
-
-                * When supplied, returns a compact DataFrame with one row per
-                  solve: the param columns, ``success``, ``final_norm``, and
-                  the requested metric values.
-                * When ``None``, returns the full ``to_dataframe()`` output
-                  for each solve, stacked with the param values and a
-                  ``_sweep_index`` column prepended.
-
+                are individual parameter combinations. Its index labels the
+                cases (``0, 1, 2...`` for a default index; set it to names
+                for readable rows).
+            metrics: Optional list of ``"<label>.<quantity>"`` keys (or
+                ``"<id>.<quantity>"``) to keep in ``outputs``, e.g.
+                ``["combustor.Tt", "hot_channel.m_dot"]``. ``None`` keeps every
+                quantity of every entity. A key the solve did not produce is a
+                NaN column.
             method: scipy root-finding method forwarded to the solver.
             init_strategy: Solver initialisation strategy.
             timeout: Per-solve timeout in seconds (default
                 ``DEFAULT_SOLVE_TIMEOUT``, 30 s, as in the GUI; ``None``: no limit).
 
         Returns:
-            DataFrame with one or more rows per parameter combination.
+            The results table of ``gui.backend.results`` (#784): one row per
+            case, ``(kind, entity, quantity)`` columns. ``df["inputs"]`` is
+            each case's full network inputs (the overridden values included),
+            ``df["outputs"]`` its results with the solve status under
+            ``_solve``; units, solver options, initial guesses and the warm
+            start are in ``df.attrs``. A row whose solve raised has its
+            inputs, ``_solve.success`` False and ``_solve.outcome``
+            ``"exception"``. Until 0.8.0 this returned a flat frame (metric
+            columns, or ``to_dataframe()`` stacked per case).
         """
-        rows: list[Any] = []
+        from .results import _build_case, _case_from, _frame, _schema_frame
+
+        cases: list[Any] = []
         _prev_x: Any = None
+        _prev_name: Any = None
         for idx, param_row in params.iterrows():
             overrides = {col: param_row[col] for col in params.columns}
             try:
@@ -698,8 +749,6 @@ class NetworkRunner:
                     timeout=timeout,
                     _x0=_prev_x,
                 )
-                if result.success:
-                    _prev_x = result._x_solution
             except Exception as exc:
                 import warnings
 
@@ -707,38 +756,33 @@ class NetworkRunner:
                     f"NetworkRunner.sweep: solve raised an exception at index {idx}: {exc}",
                     stacklevel=2,
                 )
-                if metrics is not None:
-                    row: dict[str, Any] = dict(param_row)
-                    row["success"] = False
-                    row["final_norm"] = None
-                    for m in metrics:
-                        row[m] = None
-                    rows.append(row)
+                schema = self._schema.model_copy(deep=True)
+                try:
+                    self._apply_overrides(schema, overrides)
+                except (KeyError, ValueError):
+                    schema = self._schema
+                options = {
+                    "method": method,
+                    "init_strategy": init_strategy,
+                    "timeout": timeout,
+                    "incompressible_mach_limit": schema.solver_settings.incompressible_mach_limit,
+                }
+                case = _build_case(idx, _schema_frame(schema, options))
+                case.values[("outputs", "_solve", "success")] = False
+                case.values[("outputs", "_solve", "outcome")] = "exception"
+                for m in metrics or []:
+                    entity, _, q = m.partition(".")
+                    case.values[("outputs", entity, q)] = math.nan
+                cases.append(case)
                 continue
-            if metrics is not None:
-                row: dict[str, Any] = dict(param_row)
-                row["success"] = result.success
-                row["final_norm"] = result.final_norm
-                for m in metrics:
-                    try:
-                        row[m] = result.get(m)
-                    except (KeyError, ValueError):
-                        row[m] = None
-                rows.append(row)
-            else:
-                detail = result.to_dataframe()
-                for col in reversed(list(params.columns)):
-                    detail.insert(0, col, param_row[col])
-                detail.insert(0, "_sweep_index", idx)
-                detail["success"] = result.success
-                detail["final_norm"] = result.final_norm
-                rows.append(detail)
+            case = _case_from(result, idx, metrics=metrics)
+            case.warm_start = _prev_name if _prev_x is not None else result._warm_start
+            cases.append(case)
+            if result.success:
+                _prev_x = result._x_solution
+                _prev_name = idx
 
-        if not rows:
-            return pd.DataFrame()
-        if metrics is not None:
-            return pd.DataFrame(rows)
-        return pd.concat(rows, ignore_index=True)
+        return _frame(cases)
 
     # ------------------------------------------------------------------
     # Internals

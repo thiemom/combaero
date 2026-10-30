@@ -363,6 +363,161 @@ def is_text_key(key: str) -> bool:
 _COMPOSITION_RE = re.compile(r"^[YX]\[[A-Za-z0-9_+\-()]+\]$")
 
 
+# ---------------------------------------------------------------------------
+# Input (network data) key -> unit mapping (#784)
+# ---------------------------------------------------------------------------
+
+# The unit of every numeric field a node, edge or the solver settings can
+# carry (gui/backend/schemas.py), by field name. A nested field
+# (``composition.ambient_T``, ``surface.d_jet``, ``layers.0.thickness``) takes
+# its last segment's unit. Kept apart from UNIT_MAP because some names mean
+# something else as an input: a discrete loss's ``k`` is a dimensionless slope,
+# not a conductivity. test_results_table.py fails on a numeric field missing
+# here.
+INPUT_UNIT_MAP: dict[str, str] = {
+    # Boundary conditions
+    "m_dot": "kg/s",
+    "Pt": "Pa",
+    "Tt": "K",
+    "Q": "W",
+    "Tt_target": "K",
+    "fraction": "-",
+    # Composition and ambient
+    "relative_humidity": "-",
+    "ambient_T": "K",
+    "ambient_P": "Pa",
+    "ambient_RH": "-",
+    # Geometry: lengths
+    "L": "m",
+    "D": "m",
+    "Dh": "m",
+    "D_h": "m",
+    "diameter": "m",
+    "length": "m",
+    "width": "m",
+    "span": "m",
+    "roughness": "m",
+    "thickness": "m",
+    "wall_thickness": "m",
+    "plate_thickness": "m",
+    "lip_thickness": "m",
+    "edge_radius": "m",
+    "bevel_depth": "m",
+    "duct_height": "m",
+    "slot_height": "m",
+    "hole_diameter": "m",
+    "d_jet": "m",
+    "pin_diameter": "m",
+    "channel_height": "m",
+    "pitch_x": "m",
+    "pitch_y": "m",
+    "lateral_pitch": "m",
+    "row_pitch": "m",
+    "breakout_width": "m",
+    "panel_length": "m",
+    "panel_width": "m",
+    "bypass_length": "m",
+    "r_in": "m",
+    "r_out": "m",
+    "film_start": "m",
+    "film_end": "m",
+    # Geometry: areas
+    "area": "m^2",
+    "F0": "m^2",
+    "F1": "m^2",
+    "F_C": "m^2",
+    "F_branch": "m^2",
+    "throat_area": "m^2",
+    "nozzle_exit_area": "m^2",
+    "mixing_area": "m^2",
+    # Angles
+    "angle_deg": "deg",
+    "alpha_deg": "deg",
+    "theta_deg": "deg",
+    # Speeds
+    "shaft_speed_rpm": "rpm",
+    "v_theta_in": "m/s",
+    # Materials and heat transfer
+    "conductivity": "W/m/K",
+    "wall_conductivity": "W/m/K",
+    "k_pin": "W/m/K",
+    "R_fouling": "m^2*K/W",
+    "gas_heat_flux": "W/m^2",
+    # Flow references
+    "m_ref": "kg/s",
+    # Dimensionless: coefficients, ratios, multipliers, counts and flags
+    "Cd": "-",
+    "C_D": "-",
+    "xi": "-",
+    "xi0": "-",
+    "k": "-",  # discrete loss: slope of xi or zeta in theta
+    "zeta": "-",
+    "zeta0": "-",
+    "entry_K": "-",
+    "bypass_entry_K": "-",
+    "K_straight": "-",
+    "K_branch": "-",
+    "k_nozzle": "-",
+    "k_suction": "-",
+    "k_throat": "-",
+    "k_diffuser": "-",
+    "loss_factor": "-",
+    "psi": "-",
+    "design_branch_share": "-",
+    "joining_etransfer_alpha": "-",
+    "recovery_efficiency": "-",
+    "area_ratio": "-",
+    "turbulence_intensity": "-",
+    "gas_augmentation": "-",
+    "Nu_multiplier": "-",
+    "f_multiplier": "-",
+    "internal_Nu_multiplier": "-",
+    "smooth_wall_Nu_multiplier": "-",
+    "C_m_multiplier": "-",
+    "e_D": "-",
+    "p_e": "-",
+    "W_H": "-",
+    "xn_d": "-",
+    "yn_d": "-",
+    "z_d": "-",
+    "L_D": "-",
+    "R_D": "-",
+    "S_D": "-",
+    "X_D": "-",
+    "n_rows": "-",
+    "n_segments": "-",
+    "holes_per_row": "-",
+    "n_ribbed_walls": "-",
+    "N_rows": "-",
+    "row": "-",
+    "is_staggered": "-",
+    "in_pipe": "-",
+}
+
+
+def input_unit(key: str) -> str | None:
+    """The ASCII unit of an input key (a network data field, dotted when
+    nested), or None for a text field or an unknown one. Custom mixture
+    fractions (``composition.custom_fractions.<species>``) are ``-``."""
+    if ".custom_fractions." in f".{key}":
+        return "-"
+    return INPUT_UNIT_MAP.get(key.rsplit(".", 1)[-1])
+
+
+def column_unit(column: str) -> str | None:
+    """The ASCII unit an export column for ``column`` is labelled with
+    (``kg/m^3``, ``Pa*s``, ``-`` for a composition), or None for a meta
+    column, a text key or a key with no known unit."""
+    if column in _META_COLUMNS:
+        return None
+    unit = unit_of(column)
+    if unit is not None:
+        return unit.translate(_ASCII_UNITS)
+    if _COMPOSITION_RE.match(column):
+        return "-"
+    return None
+
+
 def label_with_unit(column: str) -> str:
     """Return ``'<column> [<unit>]'`` when a unit is known, else ``column``.
 
@@ -370,14 +525,8 @@ def label_with_unit(column: str) -> str:
     status and ``is_boundary`` are passed through unchanged. Units are written
     in ASCII (``kg/m^3``, ``Pa*s``).
     """
-    if column in _META_COLUMNS:
-        return column
-    unit = unit_of(column)
-    if unit is not None:
-        return f"{column} [{unit.translate(_ASCII_UNITS)}]"
-    if _COMPOSITION_RE.match(column):
-        return f"{column} [-]"
-    return column
+    unit = column_unit(column)
+    return column if unit is None else f"{column} [{unit}]"
 
 
 # Export headers are ASCII: the CSV is UTF-8 without a byte-order mark, and

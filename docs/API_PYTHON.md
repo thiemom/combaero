@@ -2090,26 +2090,97 @@ included (`entrainment_ratio [-]`, `port_0_P [Pa]`, `rows_T_hot [K]`); only
 the meta columns (`id`, `label`, `type`, `kind`, the solve status, ...) and the
 text-valued keys (`area_source`, `second_law`, `tap`, ...) are bare. The units
 come from `gui/backend/units.py` (`UNIT_MAP`, `unit_of`). Until 0.8.0 about 130
-keys had no unit there and kept a bare column (#774). `sweep(..., metrics=[...])`
-names its columns by the metric strings you pass and is unaffected.
+keys had no unit there and kept a bare column (#774). The results table below
+keeps quantity names unit-free and carries the units in `df.attrs["units"]`.
 
-### Parametric sweep
+Since 0.8.0 the frame also carries the case's inputs (#784), after every
+result column, so an export reads back into the full results table on its
+own:
+
+- `input:<key> [<unit>]` on each entity's row: its node or edge data, nested
+  fields dotted (`input:L [m]`, `input:composition.source`,
+  `input:layers.0.thickness [m]`), plus `input:type`. Every numeric input
+  has a unit (`INPUT_UNIT_MAP` in `gui/backend/units.py`); text is bare.
+- `initial_guess:<key>` on the entity's row.
+- one row of `type` `network` (id `_network`): the network-wide settings as
+  `input:` columns and the solver options (and warm start) as `solver:<key>`.
+- a row of `type` `edge` for an edge with inputs and no result row; a flow
+  edge's inputs go on its auto-linked element row.
+
+The result rows and their `<key> [<unit>]` columns are unchanged; a reader
+that iterates over all rows now also meets the `network` row (filter on
+`type`). The full format is in [GUI_TECHNICAL.md](GUI_TECHNICAL.md#csv-export).
+
+### Results table: one row per case
+
+`sweep()`, `load_results()` and `append_case()` (`gui.backend.results`, #784)
+share one shape: one row per case, columns a 3-level MultiIndex
+`(kind, entity, quantity)` with kind `inputs` or `outputs`.
+
+```
+kind          inputs                        outputs
+entity        inlet          chan           _solve   chan    outlet
+quantity      m_dot   Tt     L     D   ...  success  m_dot   T      ...
+0             0.5     300.0  1.0   0.1      True     0.5     300.0
+1             1.0     300.0  1.0   0.1      True     1.0     300.0
+```
+
+- **Rows**: labelled `0, 1, 2...`; `sweep()` uses the index of `params`
+  (set it to names for readable rows), `append_case(..., name=...)` names one.
+- **`df["outputs"]`** is the plain results table, `(entity, quantity)` columns:
+  `df["outputs"]["chan", "m_dot"]`. Its `_solve` entity holds the status
+  (`success`, `converged`, `consistent`, `outcome`, `final_norm`).
+- **`df["inputs"]`** is what defined the case, as the network file gives it
+  (a field left at its default is absent): boundary conditions, geometry,
+  element and mixture settings (`composition.source`, ...), each entity's
+  `type`, and the network-wide physics settings under `_network`
+  (`global_regime`, `Nu_multiplier`, ambient conditions, ...).
+- **Not inputs**: initial guesses, the warm start and the solver options
+  (`method`, `init_strategy`, `timeout`, `incompressible_mach_limit`) do not
+  change a converged answer. They are in `df.attrs["initial_guesses"]`,
+  `df.attrs["warm_start"]` (the case a sweep row started from) and
+  `df.attrs["solver_options"]`, each keyed by case label.
+- **Units**: `df.attrs["units"][("outputs", "chan", "m_dot")] == "kg/s"`
+  (ASCII, as in the export). A table re-read from its own `df.to_csv()` gets
+  them back from the quantity names, but not the other attrs: keep the long
+  export for full persistence.
+- **Entities** are named by label, falling back to the id. Two entities with
+  the same name are refused with a message naming both ids. `_solve` and
+  `_network` are reserved.
 
 ```python
 import pandas as pd
+from gui.backend.results import append_case, load_results, varied_inputs
 
-params = pd.DataFrame({
-    "fuel_inlet.m_dot": [0.020, 0.025, 0.030, 0.035],
-})
+params = pd.DataFrame({"fuel_inlet.m_dot": [0.020, 0.025, 0.030, 0.035]})
+df = runner.sweep(params)                      # every quantity of every entity
+df = runner.sweep(params, metrics=["combustor.Tt", "combustor.phi"])  # only these outputs
+T_exit = df["outputs"]["combustor", "Tt"]
+ok = df["outputs"]["_solve", "success"]
 
-# Compact: one row per solve, only requested metrics
-sweep_df = runner.sweep(params, metrics=["combustor.Tt", "combustor.phi"])
-# columns: fuel_inlet.m_dot | combustor.Tt | combustor.phi | success | final_norm
+varied_inputs(df)                              # the inputs that differ between rows
 
-# Full detail: complete to_dataframe() output for each solve, stacked
-full_df = runner.sweep(params)
-# columns: _sweep_index | fuel_inlet.m_dot | <all entity columns> | success | final_norm
+# One more case: inputs are read from the network the result was solved on
+df = append_case(df, runner.solve({"fuel_inlet.m_dot": 0.04}), name="rich")
+
+# A GUI CSV export reads back in full: inputs, outputs, units, initial
+# guesses and solver options
+one = load_results("combaero_results.csv")
+
+df.to_csv("study.csv")                         # and back: load_results("study.csv")
 ```
+
+| Function | Returns | Description |
+|---|---|---|
+| `load_results(source)` | `DataFrame` | A GUI CSV export, a table saved with `to_csv()`, a `to_dataframe()` frame, a `NetworkResult`, a table of this shape, or a 0.7 full-detail sweep frame, as the table |
+| `append_case(df, source, name=None)` | `DataFrame` | `df` with a case appended (a `NetworkResult` reads its full inputs itself); refuses a name already used |
+| `varied_inputs(df)` | `DataFrame` | The `inputs` columns whose values differ between rows |
+| `NetworkRunner.sweep(params, metrics=None, ...)` | `DataFrame` | One case per row of `params`; a row whose solve raised keeps its inputs, `_solve.outcome == "exception"` |
+
+Until 0.8.0 `sweep()` returned a flat frame: with `metrics`, the override
+columns, `success`, `final_norm` and one column per metric string; without,
+`to_dataframe()` stacked per case with a `_sweep_index` column.
+`load_results()` still reads the latter.
 
 ### Injecting labels for unlabelled networks
 

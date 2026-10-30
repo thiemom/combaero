@@ -97,9 +97,9 @@ def main() -> None:
     # default init_strategy + continuation (sweep passes _x0 forward automatically)
     sweep_df = p_runner.sweep(params, metrics=["combustor.Tt"])
 
-    converged = sweep_df["success"].values
-    Pt_norm = sweep_df["air_inlet.Pt"].values / design_Pt
-    T_combustor = sweep_df["combustor.Tt"].values
+    converged = sweep_df["outputs"]["_solve", "success"].to_numpy(dtype=bool)
+    Pt_norm = sweep_df["inputs"]["air_inlet", "Pt"].to_numpy() / design_Pt
+    T_combustor = sweep_df["outputs"]["combustor", "Tt"].to_numpy()
     print(f"  Converged: {converged.sum()}/{len(converged)}")
 
     fig, ax = plt.subplots(figsize=(7, 4))
