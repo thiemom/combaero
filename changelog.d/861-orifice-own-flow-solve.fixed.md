@@ -1,0 +1,13 @@
+- **An orifice in a pipe now always solves its own flow to a root (#861).** `OrificeElement` solves m* = m_calc(m*, x) itself when its drive reads its own flow through the approach pipe (#651). Where m_calc(m) has a kink, Newton went back and forth across it until the 60-iteration cap, and the value it stopped at was not a root. The solver was never told.
+  - **Where it showed:** two cases.
+    - The approach pipe's choke at beta 0.95 (any `compressible_model`).
+    - Jobson's held discriminant past its stated beta (`compressible_model="jobson1955"`, beta 0.84).
+  - **Now:** when the cap is reached with |a - m_calc(a)| above 1e-9 relative, the root is solved by Brent's method on the bracket that Newton crossed. A solve that already met its root is unchanged bit for bit:
+    - On the stress families the bracket solve never runs for the default nozzle.
+    - The F and J hashes of all 560 stress networks are identical.
+  - **Changed result: the GUI combustor -> channel -> orifice regression net** (`test_supersonic_chamber_root.py`; 33 kg/s through a 95 mm orifice in a 100 mm channel).
+    - **Before:** the first attempt "converged" with the channel-to-orifice junction at Mach 1.46 and was refused as supersonic. The retry reported Mach 0.63 at junction Pt 56.7 bar. Both points carried an orifice row that was not a root: the orifice's consistent flow at 56.7 bar is about 38 kg/s, not 33.
+    - **Now:** the solve converges directly to the network's consistent root, junction Pt 49.6 bar, Mach 0.86, and the combustor upstream at 52.1 bar instead of 58.3. The supersonic-root refusal itself is unchanged and is still exercised by the junction runner's Wang cases.
+  - **Jobson stress bleed station (seeds 6 and 39):**
+    - **Before:** the orifice row was 6-12% off and its Pt column 6% off a central difference. LM took 685 evaluations where the nozzle took 437, and both seeds ran out of their 20 s.
+    - **Now:** both converge in 8.7 s.
