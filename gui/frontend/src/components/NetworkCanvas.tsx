@@ -12,6 +12,7 @@ import { useCopyPaste } from "../hooks/useCopyPaste";
 import useStore, { stripResults } from "../store/useStore";
 import { defaultFilmSide, FILM_HANDLE } from "../utils/filmLink";
 import { heatSourceConnectionError } from "../utils/heatSource";
+import { NODE_ORIGIN, SNAP_GRID } from "../utils/nodeOrigin";
 import {
 	DISPLAY_ONLY_KINDS,
 	dropTargetId,
@@ -349,6 +350,9 @@ const NetworkCanvas = () => {
 				isValidConnection={isValidConnection}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
+				nodeOrigin={NODE_ORIGIN}
+				snapToGrid
+				snapGrid={SNAP_GRID}
 				fitView
 				fitViewOptions={{ padding: 0.5, maxZoom: 1.0 }}
 			>

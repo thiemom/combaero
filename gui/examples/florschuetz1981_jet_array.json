@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "example": {
     "title": "Florschuetz 1981 jet array",
     "source": "Florschuetz, L. W., Truman, C. R., Metzger, D. E. (1981). Streamwise flow and heat transfer distributions for jet array impingement with crossflow. ASME J. Heat Transfer 103, 337-342.",
@@ -13,7 +13,7 @@
     {
       "id": "supply",
       "type": "pressure_boundary",
-      "position": { "x": 0, "y": 0 },
+      "position": { "x": 64, "y": 0 },
       "data": {
         "id": "supply",
         "label": "Supply plenum",
@@ -25,7 +25,7 @@
     {
       "id": "array",
       "type": "impingement_array",
-      "position": { "x": 260, "y": 0 },
+      "position": { "x": 346, "y": 0 },
       "data": {
         "id": "array",
         "label": "B(5,4)I, z/d 2",
@@ -47,7 +47,7 @@
     {
       "id": "exit",
       "type": "pressure_boundary",
-      "position": { "x": 560, "y": 0 },
+      "position": { "x": 624, "y": 0 },
       "data": {
         "id": "exit",
         "label": "Gap exit",

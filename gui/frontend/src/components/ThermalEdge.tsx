@@ -134,9 +134,10 @@ export default function ThermalEdge({
 	);
 	let filmLink: { d: string; x0: number; y0: number } | null = null;
 	if (filmNode && (selected || filmNode.selected)) {
+		// Positions are card centres (#865).
 		const p = filmNode.positionAbsolute ?? filmNode.position;
-		const x0 = p.x + (filmNode.width ?? 140) / 2;
-		const y0 = p.y + (filmNode.height ?? 48) / 2;
+		const x0 = p.x;
+		const y0 = p.y;
 		// It ends at the label point and runs under the label box, so it stops
 		// visually at the box edge; a gentle bow keeps it off flow edges.
 		const mx = (x0 + boxX) / 2 - (boxY - y0) * 0.2;
