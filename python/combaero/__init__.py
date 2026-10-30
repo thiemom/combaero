@@ -216,6 +216,7 @@ try:
         jobson_ci_from_cd,
         jobson_contraction_coefficient,
         jobson_expansibility,
+        JOBSON_1955_BETA_MAX,
         DischargeCdCorrelation,
         DischargeHoleGeometry,
         DischargeHoleState,
@@ -923,6 +924,7 @@ except (ModuleNotFoundError, ImportError) as e:
     jobson_ci_from_cd = _core.jobson_ci_from_cd
     jobson_contraction_coefficient = _core.jobson_contraction_coefficient
     jobson_expansibility = _core.jobson_expansibility
+    JOBSON_1955_BETA_MAX = _core.JOBSON_1955_BETA_MAX
     discharge_cd = _core.discharge_cd
     discharge_cd_and_derivatives = _core.discharge_cd_and_derivatives
     discharge_cd_in_range = _core.discharge_cd_in_range
@@ -1598,6 +1600,7 @@ __all__ = [
     "jobson_ci_from_cd",
     "jobson_contraction_coefficient",
     "jobson_expansibility",
+    "JOBSON_1955_BETA_MAX",
     "discharge_cd",
     "discharge_cd_and_derivatives",
     "discharge_cd_in_range",

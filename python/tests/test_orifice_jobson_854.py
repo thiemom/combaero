@@ -3,9 +3,10 @@
 ``jobson1955`` is Jobson's theory for the compressible contraction of a
 sharp-edged orifice (Proc. IMechE 169, 767), extended with the approach
 velocity of a pipe; ``iso5167`` is ISO 5167-2:2003 Eq. (1) with Eq. (5)'s
-empirical expansibility, restricted to p2/p1 >= 0.75. Neither is the
-default: the default nozzle path is unchanged (bit-identity was checked by
-hashing F and J over the stress networks, see the PR).
+empirical expansibility, restricted to p2/p1 >= 0.75. Since 0.8.0 (#861)
+jobson1955 is the build-time default for an incompressible-referenced Cd on
+a sharp-edged bore at beta <= 0.75 (test_orifice_default_model_861.py); the
+nozzle path itself is unchanged.
 
 Two kinds of evidence, kept apart (docs/VALIDATION_POLICY.md):
   * FIDELITY, on the author's own numbers: Jobson's Table 2.
@@ -273,8 +274,10 @@ def _solve(net: FlowNetwork) -> tuple[NetworkSolver, dict]:
     return s, r
 
 
-def test_the_default_is_the_nozzle_and_reports_nothing_new() -> None:
-    o = OrificeElement("x", "a", "b", diameter=0.01)
+def test_the_nozzle_reports_nothing_new() -> None:
+    """The nozzle (explicit here; the default for 'fixed' and Stolz, #861)
+    reports no model diagnostics."""
+    o = OrificeElement("x", "a", "b", diameter=0.01, correlation="fixed")
     assert o.compressible_model == "nozzle" and o.Cv == 1.0
     _, r = _solve(_plenum_net("nozzle", 1.6e5))
     assert "x.dP_tap" in r  # diagnostics are reported...
@@ -375,14 +378,19 @@ def test_a_reynolds_dependent_hole_uses_the_nonlinear_consistency_solve() -> Non
 
 
 @pytest.mark.parametrize(
-    ("model", "tol"), [("nozzle", None), ("jobson1955", 0.002), ("iso5167", 0.0005)]
+    ("model", "tol"),
+    [("nozzle", None), ("jobson1955", 0.002), ("iso5167", 0.0005), (None, 0.002)],
 )
-def test_the_iso_metering_example_reads_back_its_own_flow(model: str, tol: float | None) -> None:
+def test_the_iso_metering_example_reads_back_its_own_flow(
+    model: str | None, tol: float | None
+) -> None:
     """#852's ISO 5167-2 example (air 300 K, D 100 mm, flange taps, ~3% dp)
     reads the network's flow back through ISO's Eqs. (1), (4), (5). The
     default nozzle passes 0.8-0.9% less (the issue); the ISO type closes it
     to the regularisation and Re iteration, Jobson to <0.1% with nothing
-    taken from ISO."""
+    taken from ISO. None is the build-time default since 0.8.0 (#861):
+    jobson1955 here (RHG, sharp, beta <= 0.75), so the gap is closed by
+    default."""
     import functools
     import importlib.util
     from pathlib import Path

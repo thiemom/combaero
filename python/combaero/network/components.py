@@ -3451,10 +3451,33 @@ _DISCHARGE_SELECTORS = {
 # kernels are linear in Cd and refuse A_eff <= 0 (OrificeElement._kernel_from).
 _KERNEL_CD_MIN = 1e-12
 
-#: OrificeElement.compressible_model (#854): the default isentropic nozzle,
-#: Jobson (1955) with the approach-velocity extension, or ISO 5167-2:2003's
-#: Eq. (5) expansibility. The last two are opt-in.
+#: OrificeElement.compressible_model (#854): the isentropic nozzle, Jobson
+#: (1955) with the approach-velocity extension, or ISO 5167-2:2003's Eq. (5)
+#: expansibility. Without an explicit choice the element selects one at
+#: build (#861): see _JOBSON_DEFAULT_CORRELATIONS.
 ORIFICE_COMPRESSIBLE_MODELS = ("nozzle", "jobson1955", "iso5167")
+
+#: The Cd correlations whose Cd is referenced to INCOMPRESSIBLE flow, so it
+#: carries no expansion of its own (#861 audit): ISO 5167-2's C (expansion is
+#: its separate eps), Idelchik's diagram 4-18 (M <= 0.3, compressibility a
+#: separate factor), Lichtarowicz (liquid rigs) and McGreehan-Schotsch's
+#: baseline chain (its Y_o removes the expansion). For these the default
+#: compressible model is jobson1955 on a sharp-edged bore at beta <=
+#: JOBSON_1955_BETA_MAX, chosen once at build and never per iterate. Every
+#: other case keeps the nozzle: 'fixed' (the user's measurement basis is
+#: unknown), Stolz (ISO 5167:1980 not held) and McGreehan-Schotsch's
+#: crossflow term (Rohde-fitted, nozzle-referenced), which only the duct-fed
+#: EffusionPlateElement feeds; a plain orifice is plenum-fed, U1/Vi = 0.
+_JOBSON_DEFAULT_CORRELATIONS = frozenset(
+    {
+        "ReaderHarrisGallagher",
+        "IdelchikThick",
+        "IdelchikBeveled",
+        "IdelchikRounded",
+        "Lichtarowicz",
+        "McGreehanSchotsch",
+    }
+)
 
 # Jobson's flow is not linear in Cd (Ci enters the force defect as 1/Ci^2):
 # below this Cd it is evaluated here and scaled linearly to zero, the same
@@ -3588,17 +3611,27 @@ class OrificeElement(NetworkElement):
 
     ``compressible_model`` (#854) picks how the compressible regime expands
     the flow; the incompressible regime ignores it (each reduces to Cd E A
-    sqrt(2 rho dP) there):
-      - 'nozzle' (default): the isentropic nozzle at A_eff = Cd E A, choked
-        at P*. Its expansion is a nozzle's, 3-9% below a sharp plate's at
-        10-20% pressure drop, and flat past choke.
+    sqrt(2 rho dP) there). An explicit choice always wins. Left at None it
+    is selected ONCE at build from the correlation and the geometry (#861,
+    0.8.0), never switched per iterate: 'jobson1955' for a Cd referenced to
+    incompressible flow (ReaderHarrisGallagher, the Idelchik family,
+    Lichtarowicz, McGreehanSchotsch) on a sharp-edged bore (edge_radius = 0,
+    bevel_depth = 0) at beta <= JOBSON_1955_BETA_MAX in both flow
+    directions; 'nozzle' otherwise ('fixed', Stolz, a rounded or beveled
+    edge, a wider bore). A Ci above Jobson's 0.7 is flagged by
+    model_in_range, not refused. Before resolve_topology the attribute holds
+    the selection for a plenum-fed bore (beta = 0).
+      - 'nozzle': the isentropic nozzle at A_eff = Cd E A, choked at P*.
+        Its expansion is a nozzle's, 3-9% below a sharp plate's at 10-20%
+        pressure drop, and flat past choke.
       - 'jobson1955': Jobson (1955), the contraction of a sharp-edged jet
         widening as the pressure ratio falls, through choke and beyond, with
         the approach-velocity extension of #854 in a pipe. Its only input is
         the incompressible contraction Ci from the correlation's Cd, Cd = Cv
-        Ci (``Cv``, the velocity coefficient, default 1). Physics, nothing
-        fitted; its stated range (0.5 <= Ci <= 0.7, beta <= 0.75) is flagged
-        in diagnostics (model_in_range), not enforced.
+        Ci (``Cv``, the velocity coefficient, default 1; a Cv other than 1
+        needs compressible_model='jobson1955' set explicitly). Physics,
+        nothing fitted; its stated range (0.5 <= Ci <= 0.7, beta <= 0.75)
+        is flagged in diagnostics (model_in_range), not enforced.
       - 'iso5167': ISO 5167-2:2003 Eq. (1) with Eq. (5)'s empirical
         expansibility, for a Reader-Harris/Gallagher metering plate only.
         Valid for p2/p1 >= 0.75 (flagged below it, where Eq. (5) is
@@ -3607,6 +3640,11 @@ class OrificeElement(NetworkElement):
 
     # The jet: its vena-contracta Mach from the pressure ratio, not the bore's.
     validity_mach_keys = ("mach_throat",)
+
+    # Whether an unset compressible_model is selected from the correlation
+    # and geometry (#861). The cooling and connection subclasses keep the
+    # nozzle: their Cd laws are outside the #861 audit.
+    _selects_compressible_model = True
 
     def __init__(
         self,
@@ -3624,16 +3662,17 @@ class OrificeElement(NetworkElement):
         injection_angle_deg: float = 90.0,
         tap: str = "Flange",
         in_pipe: bool = True,
-        compressible_model: str = "nozzle",
+        compressible_model: str | None = None,
         Cv: float = 1.0,
     ):
         super().__init__(id, from_node, to_node)
         # False: no pipe diameter, a lumped Cd*A restriction (#788).
         self.in_pipe = bool(in_pipe)
-        # How the compressible regime expands the flow (#854). Opt-in models
-        # beside the default isentropic nozzle; ignored when incompressible,
-        # where every model reduces to m = Cd E A sqrt(2 rho dP).
-        if compressible_model not in ORIFICE_COMPRESSIBLE_MODELS:
+        # How the compressible regime expands the flow (#854); ignored when
+        # incompressible, where every model reduces to m = Cd E A
+        # sqrt(2 rho dP). None: selected at build (#861), see
+        # _default_compressible_model.
+        if compressible_model is not None and compressible_model not in ORIFICE_COMPRESSIBLE_MODELS:
             raise ValueError(
                 f"OrificeElement {id!r}: compressible_model {compressible_model!r} is not "
                 f"one of {list(ORIFICE_COMPRESSIBLE_MODELS)}."
@@ -3649,9 +3688,12 @@ class OrificeElement(NetworkElement):
         if Cv != 1.0 and compressible_model != "jobson1955":
             raise ValueError(
                 f"OrificeElement {id!r}: Cv is Jobson's velocity coefficient and applies "
-                "to compressible_model='jobson1955' only."
+                "to compressible_model='jobson1955' only: set it explicitly."
             )
-        self.compressible_model = compressible_model
+        # An explicit model always wins; None is resolved below and again in
+        # resolve_topology once beta is known (#861).
+        self._compressible_model_explicit = compressible_model is not None
+        self.compressible_model = compressible_model or "nozzle"
         self.Cv = float(Cv)
         # bore == pipe: no orifice, set in resolve_topology (#788).
         self._pass_through = False
@@ -3711,6 +3753,26 @@ class OrificeElement(NetworkElement):
         self._pipe_cd_ratio_rev = 1.0
         # OrificeGeometry built in resolve_topology
         self._orifice_geom: object | None = None
+        # The build-time selection for a plenum-fed bore (beta = 0);
+        # resolve_topology re-selects with the pipes' beta.
+        if not self._compressible_model_explicit:
+            self.compressible_model = self._default_compressible_model(0.0)
+
+    def _default_compressible_model(self, beta: float) -> str:
+        """The compressible model an unset ``compressible_model`` resolves to
+        (#861): 'jobson1955' for an incompressible-referenced Cd correlation
+        (_JOBSON_DEFAULT_CORRELATIONS) on a sharp-edged bore at beta <=
+        JOBSON_1955_BETA_MAX, else 'nozzle'. A function of construction data
+        and beta only, so it is fixed for a built network."""
+        sharp = self.edge_radius == 0.0 and self.bevel_depth == 0.0
+        if (
+            type(self)._selects_compressible_model
+            and self.correlation in _JOBSON_DEFAULT_CORRELATIONS
+            and sharp
+            and beta <= cb.JOBSON_1955_BETA_MAX
+        ):
+            return "jobson1955"
+        return "nozzle"
 
     def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
         """Start guess: m = Cd A sqrt(2 rho dP); a correlation's Cd is
@@ -3831,6 +3893,14 @@ class OrificeElement(NetworkElement):
 
         if self.upstream_diameter and self.upstream_diameter > 0:
             self.beta = d_bore / self.upstream_diameter
+
+        # The compressible model, selected once here from the correlation and
+        # geometry when the user set none (#861): Jobson's range must hold for
+        # the beta of either flow direction, since one model serves both.
+        if not self._compressible_model_explicit:
+            self.compressible_model = self._default_compressible_model(
+                max(self.beta, self.beta_reverse)
+            )
 
         # Pressure recovery (#645), per flow direction: the approach pipe sets
         # beta, and a single wider pipe on the far side recovers the jet's
@@ -4720,10 +4790,10 @@ class OrificeElement(NetworkElement):
         state_out: NetworkMixtureState,
         cd: float,
     ) -> dict[str, float | str]:
-        """The opt-in compressible model's state along the flow (#854).
+        """The compressible model's state along the flow (#854).
 
-        Empty for the default nozzle and in the incompressible regime, so a
-        default orifice reports exactly what it did. Ci is the incompressible
+        Empty for the nozzle and in the incompressible regime, so a nozzle
+        orifice reports exactly what it did before #854. Ci is the incompressible
         contraction the model used (Jobson) or C (ISO); contraction_C is
         Jobson's compressible C; expansibility is m over the incompressible
         Cd E A sqrt(2 rho1 dP) at the approach static state; model_in_range
@@ -4978,6 +5048,8 @@ class EffusionPlateElement(OrificeElement):
     uses Andrews' still-plenum coolant side; `coolant_crossflow_ignored`
     flags a supply node a channel runs through.
     """
+
+    _selects_compressible_model = False  # keeps the nozzle (#861)
 
     def __init__(
         self,
@@ -5637,6 +5709,8 @@ class FilmCoolingElement(OrificeElement):
     the drilled length ``wall_thickness / sin(angle_deg)``, plenum-fed.
     """
 
+    _selects_compressible_model = False  # keeps the nozzle (#861)
+
     def __init__(
         self,
         id: str,
@@ -5820,6 +5894,8 @@ class SlotFilmElement(OrificeElement):
     carries its area, so the hole Reynolds number is the slot's own. A
     measured slot Cd is better given with correlation='fixed'.
     """
+
+    _selects_compressible_model = False  # keeps the nozzle (#861)
 
     def __init__(
         self,
@@ -6324,6 +6400,8 @@ class ImpingementPlateElement(OrificeElement):
     # htc_and_T's dh_dmdot comes from C++ in the signed jet flow (#481).
     _htc_dmdot_is_signed = True
 
+    _selects_compressible_model = False  # keeps the nozzle (#861)
+
     def __init__(
         self,
         id: str,
@@ -6776,6 +6854,8 @@ class EffectiveAreaConnectionElement(OrificeElement):
     geometry discovery is not performed.
     """
 
+    _selects_compressible_model = False  # keeps the nozzle (#861)
+
     def __init__(self, id: str, from_node: str, to_node: str, effective_area: float) -> None:
         """
         Initialize with effective area (Cd * A product).
@@ -6844,6 +6924,8 @@ class DiameterDischargeCoefficientConnectionElement(OrificeElement):
     Use this when you have a physical diameter measurement and want to specify loss characteristics
     via discharge coefficient or loss coefficient.
     """
+
+    _selects_compressible_model = False  # keeps the nozzle (#861)
 
     def __init__(
         self,

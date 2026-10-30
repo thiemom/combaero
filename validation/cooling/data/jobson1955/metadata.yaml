@@ -37,8 +37,8 @@
 # on 2026-10-30.
 #
 # Reference scores, informative only (python/tests/test_jobson1955_fig5.py
-# pins them inside a band), Jobson at Cd 0.600 vs the default isentropic
-# nozzle at the same Cd: Perry bias -1.4 %, RMS 1.6 %, worst -2.5 % vs RMS
+# pins them inside a band), Jobson at Cd 0.600 vs the isentropic nozzle
+# (the default before 0.8.0, #861) at the same Cd: Perry bias -1.4 %, RMS 1.6 %, worst -2.5 % vs RMS
 # 20.5 %; Schiller bias +1.1 %, RMS 1.9 %, worst +5.1 % vs RMS 19.8 %.
 
 paper:
@@ -96,7 +96,7 @@ files:
       Scored against Jobson's Eqs. (11)/(15) at his own inputs (Ci =
       pi/(pi+2), Cv = 0.982, n = 1.4), nothing fitted: N = 15, bias -1.4 %,
       RMS 1.6 %, worst -2.5 % -- CROSS-SOURCE accuracy, Jobson has no data of
-      his own. The default isentropic nozzle at the same Cd 0.600 scores RMS
+      his own. The isentropic nozzle (pre-0.8 default) at the same Cd 0.600 scores RMS
       20.5 % (worst -28 %): flat below r_c where Perry's orifice keeps
       passing more flow. A best-fit Cd does not rescue the nozzle (its
       search hit the 0.70 bound at RMS 10.8 %), which is the shape argument
@@ -149,7 +149,7 @@ files:
       pi/(pi+2), Cv = 0.982, n = 1.3), nothing fitted: N = 9, bias +1.1 %,
       RMS 1.9 %, worst +5.1 % at r = 0.89, where K falls steeply and a 0.01
       read error in r moves K by about 4 % -- CROSS-SOURCE accuracy. The
-      default isentropic nozzle at the same Cd 0.600 scores RMS 19.8 %
+      isentropic nozzle (pre-0.8 default) at the same Cd 0.600 scores RMS 19.8 %
       (worst -28 %), flat below r_c = 0.546 like on Perry. Our Jobson curve
       matches the dashed theory curve Jobson drew, where it can be read
       clear of the data line (r = 0.35, 0.45, 0.85), to within 0.3 %.

@@ -1433,11 +1433,19 @@ orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284
 # (beta = 0 both ways, no recovery, whatever channels adjoin it).
 lumped = OrificeElement("lumped", "node1", "node2", Cd=0.8, diameter=0.05, correlation="fixed", in_pipe=False)
 # How the compressible regime expands the flow (#854); the incompressible regime
-# ignores it. "nozzle" (default): isentropic nozzle at Cd E A, flat past choke.
-# "jobson1955" (opt-in, any correlation): Jobson's sharp-edged jet, which widens
+# ignores it. compressible_model=None (default, 0.8.0, #861) selects ONCE at
+# build, never per iterate: "jobson1955" for a Cd referenced to incompressible
+# flow (ReaderHarrisGallagher, IdelchikThick/Beveled/Rounded, Lichtarowicz,
+# McGreehanSchotsch) on a sharp-edged bore (edge_radius = bevel_depth = 0) at
+# beta <= cb.JOBSON_1955_BETA_MAX (0.75) in both directions; "nozzle" for
+# "fixed", "Stolz", a rounded/beveled edge or a wider bore. The cooling-plate and
+# connection subclasses keep the nozzle. An explicit choice always wins.
+# "nozzle": isentropic nozzle at Cd E A, flat past choke. "jobson1955" (any
+# correlation): Jobson's sharp-edged jet, which widens
 # as p2/p1 falls, through choke and beyond, with the approach-velocity extension
 # in a pipe; Ci from the correlation's Cd = Cv Ci (Cv default 1, Jobson used
-# 0.982). "iso5167" (opt-in, ReaderHarrisGallagher only): ISO 5167-2:2003
+# 0.982; Cv != 1 needs compressible_model="jobson1955" set explicitly).
+# "iso5167" (ReaderHarrisGallagher only): ISO 5167-2:2003
 # Eq. (1) with Eq. (5)'s expansibility. Diagnostics: "compressible_model", "Ci",
 # "expansibility", "model_in_range" (Jobson: 0.5 <= Ci <= 0.7, beta <= 0.75;
 # ISO: p2/p1 >= 0.75; a flag, never a refusal), and for Jobson "contraction_C", "Cv".
