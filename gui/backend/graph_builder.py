@@ -133,6 +133,18 @@ def _parse(model, data: dict | None, owner_id: str, what: str = "Node"):
         raise ValueError(f"{what} '{owner_id}': " + "; ".join(parts)) from e
 
 
+def _fixed_cd(
+    data: OrificeData | EffusionPlateData | FilmCoolingData | SlotFilmData | ImpingementArrayData,
+) -> float | None:
+    """The Cd an orifice-family element is built with (#872): the field's
+    value for the 'fixed' correlation, None for any other, which computes its
+    own. The node keeps a Cd field whatever its correlation (the Inspector
+    shows it for 'fixed' only), and the element refuses a Cd given with a
+    correlation; a file saved with both loads, and its Cd is not used, as it
+    never was."""
+    return data.Cd if data.correlation == "fixed" else None
+
+
 def _checked_edges(schema: NetworkGraphSchema) -> NetworkGraphSchema:
     """Refuse edges naming a node not on the canvas; drop edges to probes.
 
@@ -1255,7 +1267,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 from_node=source_id,
                 to_node=target_id,
                 diameter=data.diameter,
-                Cd=data.Cd,
+                Cd=_fixed_cd(data),
                 correlation=data.correlation,
                 plate_thickness=data.plate_thickness,
                 edge_radius=data.edge_radius,
@@ -1292,7 +1304,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 panel_width=data.panel_width,
                 angle_deg=data.angle_deg,
                 correlation=data.correlation,
-                Cd=data.Cd,
+                Cd=_fixed_cd(data),
                 internal_Nu_multiplier=data.internal_Nu_multiplier,
                 wall_conductivity=data.wall_conductivity,
                 gas_film=data.gas_film,
@@ -1320,7 +1332,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 breakout_width=data.breakout_width if shaped else None,
                 turbulence_intensity=data.turbulence_intensity,
                 correlation=data.correlation,
-                Cd=data.Cd,
+                Cd=_fixed_cd(data),
             )
             net.add_element(elem)
         elif elem_type == "slot_film":
@@ -1335,7 +1347,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 turbulence_intensity=data.turbulence_intensity,
                 C_m_multiplier=data.C_m_multiplier,
                 correlation=data.correlation,
-                Cd=data.Cd,
+                Cd=_fixed_cd(data),
             )
             net.add_element(elem)
         elif elem_type == "impingement_array":
@@ -1351,7 +1363,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 plate_thickness=data.plate_thickness,
                 pattern=data.pattern,
                 correlation=data.correlation,
-                Cd=data.Cd,
+                Cd=_fixed_cd(data),
                 cd_crossflow=data.cd_crossflow,
                 Nu_multiplier=data.Nu_multiplier * (schema.solver_settings.Nu_multiplier or 1.0),
                 roughness=data.roughness,

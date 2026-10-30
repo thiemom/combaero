@@ -1064,8 +1064,8 @@ net.add_node(plenum)
 net.add_node(PressureBoundary("outlet", Pt=1e5, Tt=300))
 
 # 3. Add Elements
-net.add_element(OrificeElement("feed", "inlet", "plenum", diameter=0.01, Cd=0.65))
-net.add_element(OrificeElement("exhaust", "plenum", "outlet", diameter=0.015, Cd=0.62))
+net.add_element(OrificeElement("feed", "inlet", "plenum", diameter=0.01, Cd=0.65, correlation="fixed"))
+net.add_element(OrificeElement("exhaust", "plenum", "outlet", diameter=0.015, Cd=0.62, correlation="fixed"))
 
 # 4. Solve
 solver = NetworkSolver(net)
@@ -1212,7 +1212,7 @@ Note there is no `__residual_norm__`; the norm is `__final_norm__`.
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement
 
 graph = FlowNetwork()
-graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", Cd=0.6, diameter=0.011284))
+graph.add_element(OrificeElement("ori1", "nodeA", "nodeB", diameter=0.011284))  # Reader-Harris/Gallagher Cd
 
 solver = NetworkSolver(graph)
 # init_strategy options: "default", "analytical_pt_prop", "homotopy",
@@ -1425,7 +1425,11 @@ from combaero.network import (
 from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberElement
 
 # Flow elements
-orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284, regime="compressible")
+# Cd is the "fixed" correlation's value only (#872, 0.8.0): with any other
+# correlation (default "ReaderHarrisGallagher") the correlation computes it and a
+# Cd given too raises ValueError; "fixed" without a Cd raises as well.
+orifice = OrificeElement("orifice", "node1", "node2", diameter=0.011284, regime="compressible")
+measured = OrificeElement("measured", "node1", "node2", Cd=0.65, diameter=0.011284, correlation="fixed")
 # The bore against the pipe it sits in (#788, 0.8.0): equal (to
 # ORIFICE_BORE_PIPE_RTOL = 1e-6 relative) is NO orifice -- zero loss, the row is
 # Pt_in - Pt_out = 0 and the flow passes unchanged -- and larger is refused. A
@@ -2723,7 +2727,7 @@ The physics is C++'s `cb.jet_row_heat_transfer(set, cb.JetRowGeometry(...),
 m_jet, m_crossflow, mu, k, Pr)`, which returns `h` and its analytic
 derivatives with respect to both flows; the element only decides which flows
 are crossflow.
-- Hole Cd: default `'fixed'` at Florschuetz's 0.79 (measured 0.73-0.85);
+- Hole Cd: default `'fixed'` at Florschuetz's 0.79 (measured 0.73-0.85), what an unset `Cd` takes; a `Cd` given with a correlation raises (#872);
   alternatives `'IdelchikThick'`, `'Lichtarowicz'` (long hole, l/d 2-10)
   and `'McGreehanSchotsch'` (supply-side `U1/Vi = 0`, never Gc/Gj).
   `Cd_in_range` reports whether the plate is inside the chosen source's range.

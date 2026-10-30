@@ -39,7 +39,7 @@ def test_a_vanishing_cd_is_a_vanishing_flow_not_an_exception(regime: str) -> Non
     scales. The nozzle's property: it is pinned, since the default for this
     Reader-Harris/Gallagher bore is jobson1955 since 0.8.0 (#861), whose flow
     is not linear in Cd and has its own trace-Cd floor."""
-    o = OrificeElement("o", "a", "b", Cd=0.6, area=1e-3, regime=regime, compressible_model="nozzle")
+    o = OrificeElement("o", "a", "b", area=1e-3, regime=regime, compressible_model="nozzle")
     up, dn = _states()
     m1, d1 = o._kernel_from(up, dn, "a", "b", 1.0)
     assert d1.pop(_DM_DCD) == m1

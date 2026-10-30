@@ -44,7 +44,6 @@
         "id": "plate",
         "label": "Orifice plate, beta 0.5",
         "diameter": 0.05,
-        "Cd": 0.6,
         "correlation": "ReaderHarrisGallagher",
         "tap": "Flange"
       }

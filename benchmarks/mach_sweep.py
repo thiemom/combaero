@@ -116,6 +116,7 @@ def _build_coupled_network(
             from_node="hot_plenum",
             to_node="hot_outlet",
             Cd=cfg.cd,
+            correlation="fixed",
             area=_area_from_diameter(cfg.d_orifice_hot),
             regime=orifice_regime,
         )
@@ -139,6 +140,7 @@ def _build_coupled_network(
             from_node="cold_plenum",
             to_node="cold_outlet",
             Cd=cfg.cd,
+            correlation="fixed",
             area=_area_from_diameter(cfg.d_orifice_cold),
             regime=orifice_regime,
         )
@@ -241,7 +243,9 @@ def main() -> None:
     ax[1].set_ylabel("PR difference [%]\n(incomp - comp)")
     ax[1].grid(True, alpha=0.3)
 
-    ax[2].plot(data_comp["mach_solved_hot"], data_comp["delta_t_hot"], "-", label="Hot cooling Delta_T")
+    ax[2].plot(
+        data_comp["mach_solved_hot"], data_comp["delta_t_hot"], "-", label="Hot cooling Delta_T"
+    )
     ax[2].plot(
         data_comp["mach_solved_hot"], data_comp["delta_t_cold"], "-", label="Cold heating Delta_T"
     )

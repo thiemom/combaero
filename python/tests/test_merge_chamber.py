@@ -58,6 +58,7 @@ def _liner(angle_deg: float = 30.0, correlation: str = "IdelchikThick", **chambe
             panel_area=0.01,
             angle_deg=angle_deg,
             correlation=correlation,
+            Cd=0.6 if correlation == "fixed" else None,
         )
     )
     return g
@@ -169,7 +170,7 @@ def test_a_main_inlet_that_does_not_flow_in_is_refused() -> None:
 def test_a_split_is_still_refused() -> None:
     net = _liner(30.0)
     net.add_node(_pb("bleed", 0.99e5, 300.0))
-    net.add_element(OrificeElement("bl", "ch", "bleed", diameter=0.01, correlation="fixed"))
+    net.add_element(OrificeElement("bl", "ch", "bleed", Cd=0.6, diameter=0.01, correlation="fixed"))
     with pytest.raises(ValueError, match="multiple outgoing"):
         NetworkSolver(net).solve()
 

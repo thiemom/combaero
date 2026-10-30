@@ -179,7 +179,13 @@ def _pipe_orifice_sink(node_cls: type, beta: float, regime: str, correlation: st
     g.add_element(ChannelElement("p1", "hi", "a", length=0.5, diameter=D, regime=regime))
     g.add_element(
         OrificeElement(
-            "o", "a", "ho", Cd=0.6, diameter=beta * D, regime=regime, correlation=correlation
+            "o",
+            "a",
+            "ho",
+            Cd=0.6 if correlation == "fixed" else None,
+            diameter=beta * D,
+            regime=regime,
+            correlation=correlation,
         )
     )
     return g

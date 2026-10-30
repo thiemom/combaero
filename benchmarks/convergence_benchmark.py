@@ -81,6 +81,7 @@ def _build_fully_coupled_network(mach_target: float) -> FlowNetwork:
             from_node="hot_plenum",
             to_node="hot_outlet",
             Cd=0.72,
+            correlation="fixed",
             area=_area(0.030),
             regime="compressible",
         )
@@ -103,6 +104,7 @@ def _build_fully_coupled_network(mach_target: float) -> FlowNetwork:
             from_node="cold_plenum",
             to_node="cold_outlet",
             Cd=0.72,
+            correlation="fixed",
             area=_area(0.025),
             regime="compressible",
         )

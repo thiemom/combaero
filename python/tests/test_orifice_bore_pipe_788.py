@@ -67,7 +67,7 @@ def _net(
                 "o",
                 "a",
                 "b",
-                Cd=0.6,
+                Cd=0.6 if correlation == "fixed" else None,
                 diameter=bore,
                 correlation=correlation,
                 regime=regime,

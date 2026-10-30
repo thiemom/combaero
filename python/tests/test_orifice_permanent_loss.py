@@ -142,7 +142,14 @@ def _between_pipes(
         g.add_node(_node(node_cls, "b", regime))
     g.add_element(
         OrificeElement(
-            "o", "a", to, Cd=0.6, diameter=beta * D, regime=regime, correlation=correlation, tap=tap
+            "o",
+            "a",
+            to,
+            Cd=0.6 if correlation == "fixed" else None,
+            diameter=beta * D,
+            regime=regime,
+            correlation=correlation,
+            tap=tap,
         )
     )
     if downstream_pipe:
