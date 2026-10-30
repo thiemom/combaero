@@ -305,6 +305,7 @@ class NetworkResult:
             "method": settings.method,
             "init_strategy": settings.init_strategy,
             "timeout": settings.timeout,
+            "stall_handover": settings.stall_handover,
             "incompressible_mach_limit": settings.incompressible_mach_limit,
         }
         self._warm_start: Any = None
@@ -667,7 +668,13 @@ class NetworkRunner:
                 ],
                 dtype=float,
             )
-        raw = solver.solve(method=method, init_strategy=init_strategy, timeout=timeout, x0=x0_array)
+        raw = solver.solve(
+            method=method,
+            init_strategy=init_strategy,
+            timeout=timeout,
+            x0=x0_array,
+            stall_handover=schema.solver_settings.stall_handover,
+        )
         node_results, element_results, edge_results = _build_result_objects(raw, net)
 
         result = NetworkResult(
@@ -765,6 +772,7 @@ class NetworkRunner:
                     "method": method,
                     "init_strategy": init_strategy,
                     "timeout": timeout,
+                    "stall_handover": schema.solver_settings.stall_handover,
                     "incompressible_mach_limit": schema.solver_settings.incompressible_mach_limit,
                 }
                 case = _build_case(idx, _schema_frame(schema, options))

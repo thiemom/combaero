@@ -258,3 +258,52 @@ def test_stall_error_is_timeout_subclass():
     from combaero.network.solver import SolverStallError, SolverTimeoutError
 
     assert issubclass(SolverStallError, SolverTimeoutError)
+
+
+def test_stall_handover_false_turns_every_handover_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """solve(stall_handover=False) (#864): no cold rung consults the stall
+    detector, so none hands its budget over. The detector is replaced by one
+    that fires on every check; the same solve with the default proves the
+    network does reach it (a cold MPCE attempt, >= 10 evaluations)."""
+    from test_network_compressible import _certified_merge_case1_network
+
+    import combaero.network.solver as solver_mod
+
+    calls: list[int] = []
+
+    def always_stalled(samples: list[tuple[float, float]], *args: object, **kwargs: object) -> bool:
+        calls.append(len(samples))
+        return True
+
+    monkeypatch.setattr(solver_mod, "_stall_detected", always_stalled)
+
+    solver = NetworkSolver(_certified_merge_case1_network())
+    solver.solve(timeout=30.0, stall_handover=False)
+    assert calls == []
+    assert solver._diagnostic_data["solver_settings_used"]["stall_handover"] is False
+    # Restored after the call: the next default solve hands over again.
+    assert solver._stall_handover is True
+
+    NetworkSolver(_certified_merge_case1_network()).solve(timeout=30.0)
+    assert calls, "control: the default solve never reached the stall detector"
+
+
+def test_stall_handover_false_reaches_the_wall_free_seed_solver(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The wall-free seed of a failed cold solve runs on a solver of its own
+    (#864): it inherits the opt-out instead of handing over again."""
+    from test_network_compressible import _certified_merge_case1_network
+
+    seen: list[bool] = []
+    original = NetworkSolver.solve
+
+    def spy(self: NetworkSolver, *args: object, **kwargs: object) -> object:
+        seen.append(self._stall_handover)
+        return original(self, *args, **kwargs)
+
+    solver = NetworkSolver(_certified_merge_case1_network())
+    solver._stall_handover = False
+    monkeypatch.setattr(NetworkSolver, "solve", spy)
+    solver._wall_free_seed(method="hybr", timeout=30.0, use_jac=True)
+    assert seen and not any(seen)

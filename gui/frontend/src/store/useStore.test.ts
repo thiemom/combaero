@@ -186,6 +186,23 @@ describe("loadNetwork legacy migration", () => {
 		expect(guess("i")).toEqual({ P_jct: 1.2e5 });
 	});
 
+	it("gives a file saved before #864 the stall handover, and keeps an opt-out", () => {
+		const { stall_handover: _drop, ...oldSettings } =
+			useStore.getState().solverSettings;
+		useStore.getState().loadNetwork({
+			nodes: [nodeWithResult("n1")],
+			edges: [],
+			solverSettings: oldSettings,
+		});
+		expect(useStore.getState().solverSettings.stall_handover).toBe(true);
+		useStore.getState().loadNetwork({
+			nodes: [nodeWithResult("n1")],
+			edges: [],
+			solverSettings: { ...oldSettings, stall_handover: false },
+		});
+		expect(useStore.getState().solverSettings.stall_handover).toBe(false);
+	});
+
 	it("leaves current strategies untouched", () => {
 		useStore.getState().loadNetwork({
 			nodes: [nodeWithResult("n1")],

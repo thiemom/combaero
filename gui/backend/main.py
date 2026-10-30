@@ -227,6 +227,7 @@ def _solve_sync(schema: NetworkGraphSchema, token: int | None = None):
         init_strategy=schema.solver_settings.init_strategy,
         timeout=schema.solver_settings.timeout,
         x0=x0,
+        stall_handover=schema.solver_settings.stall_handover,
     )
     success = bool(result.get("__success__", False))
 

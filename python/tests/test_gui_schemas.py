@@ -3,6 +3,7 @@ from gui.backend.schemas import (
     CombustorData,
     DiscreteLossData,
     MomentumChamberData,
+    NetworkGraphSchema,
     PlenumData,
     SolverSettings,
 )
@@ -81,6 +82,19 @@ def test_discrete_loss_data_multipliers():
 def test_solver_settings_accepts_outletref_warmstart():
     s = SolverSettings(init_strategy="outletref_warmstart")
     assert s.init_strategy == "outletref_warmstart"
+
+
+def test_solver_settings_stall_handover_round_trip():
+    # #864: on by default, also for a file saved before the setting existed;
+    # an opt-out survives a dump and reload under either key spelling.
+    assert SolverSettings().stall_handover is True
+    assert SolverSettings(**{"timeout": 10.0}).stall_handover is True
+    off = NetworkGraphSchema(nodes=[], edges=[], solver_settings={"stall_handover": False})
+    dumped = off.model_dump()
+    assert dumped["solver_settings"]["stall_handover"] is False
+    assert NetworkGraphSchema(**dumped).solver_settings.stall_handover is False
+    camel = {"nodes": [], "edges": [], "solverSettings": {"stall_handover": False}}
+    assert NetworkGraphSchema(**camel).solver_settings.stall_handover is False
 
 
 if __name__ == "__main__":

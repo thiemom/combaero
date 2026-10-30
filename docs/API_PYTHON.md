@@ -1250,7 +1250,11 @@ solver = NetworkSolver(graph)
 # when the LM fallback plateaus too the attempt fails fast so the
 # auto-retry gets the budget. Cold attempts only -- seeded solves
 # (explicit x0 or a warm-start seed) are the last rung and keep
-# their full budget.
+# their full budget. stall_handover=False (default True, #864) turns
+# every handover off for the call, its retries and nested solves
+# included: each cold rung then runs to its own share of the budget.
+# The GUI's "Stall handover" checkbox sets it; the results table keeps
+# it with the solver options (solver:stall_handover).
 results = solver.solve(method="hybr", init_strategy="homotopy")
 ```
 

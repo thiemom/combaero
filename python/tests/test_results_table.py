@@ -155,6 +155,19 @@ def test_export_csv_round_trip(runner: NetworkRunner, tmp_path: Path) -> None:
     assert loaded.attrs["solver_options"][0]["method"] == "hybr"
 
 
+def test_stall_handover_is_a_solver_option_not_an_input(tmp_path: Path) -> None:
+    # #864: persisted with the solver options (#784/#859), and an opt-out
+    # read back from the exported CSV; it does not define the case.
+    schema = copy.deepcopy(_SIMPLE)
+    schema["solver_settings"] = {"stall_handover": False}
+    result = NetworkRunner.from_dict(schema).solve()
+    loaded = load_results(_export_csv(result, tmp_path / "x.csv"))
+    assert loaded.attrs["solver_options"][0]["stall_handover"] is False
+    assert "stall_handover" not in set(loaded["inputs"].columns.get_level_values(1))
+    default = load_results(NetworkRunner.from_dict(_SIMPLE).solve())
+    assert default.attrs["solver_options"][0]["stall_handover"] is True
+
+
 def test_export_route_round_trip() -> None:
     # The GUI's own /export response reads back to the runner's table.
     r = http._post("/export", _SIMPLE)
@@ -326,7 +339,7 @@ def test_every_numeric_input_column_has_a_unit(graph: dict) -> None:
     assert unlabelled == set()
 
 
-_NOT_INPUT_FIELDS = {"timeout", "incompressible_mach_limit", "initial_guess"}
+_NOT_INPUT_FIELDS = {"timeout", "stall_handover", "incompressible_mach_limit", "initial_guess"}
 _RESULT_MODELS = {
     "StateResult",
     "NodeResult",

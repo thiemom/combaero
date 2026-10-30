@@ -774,6 +774,10 @@ class SolverSettings(BaseModel):
         "df-sane",
     ] = "hybr"
     timeout: float | None = DEFAULT_SOLVE_TIMEOUT
+    # NetworkSolver.solve(stall_handover=...) (#864): False lets every cold
+    # attempt grind to its share of the budget instead of handing over on a
+    # stall. A file saved without it gets the default.
+    stall_handover: bool = True
     # Global shaft speed [rpm]; None = disabled. Was omega_rpm before #773;
     # the old name still loads.
     shaft_speed_rpm: float | None = Field(

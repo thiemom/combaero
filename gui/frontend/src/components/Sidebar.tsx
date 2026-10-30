@@ -529,6 +529,25 @@ const Sidebar = () => {
 					</span>
 				</div>
 
+				<div className="flex flex-col gap-1">
+					<label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+						<input
+							type="checkbox"
+							checked={solverSettings.stall_handover ?? true}
+							onChange={(e) =>
+								updateSolverSettings({ stall_handover: e.target.checked })
+							}
+							className="rounded"
+						/>
+						Stall handover
+					</label>
+					<span className="text-[9px] text-stone-400">
+						A cold attempt that stalls far from the root hands the rest of its
+						time to the next retry. Off: every attempt runs to its share of the
+						time.
+					</span>
+				</div>
+
 				<div className="border-t border-stone-200 pt-2 flex flex-col gap-2">
 					<button
 						type="button"

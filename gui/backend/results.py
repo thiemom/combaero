@@ -89,7 +89,13 @@ _LONG_META = frozenset(
 _NOT_INPUT = frozenset({"id", "label", "initial_guess"})
 # Solver settings that do not define the physical case: how it is solved, and
 # the report-only incompressible-validity threshold.
-_SOLVER_OPTIONS = ("method", "init_strategy", "timeout", "incompressible_mach_limit")
+_SOLVER_OPTIONS = (
+    "method",
+    "init_strategy",
+    "timeout",
+    "stall_handover",
+    "incompressible_mach_limit",
+)
 # A unit-labelled export header, "<key> [<unit>]" ("Y[N2] [-]" included).
 _HEADER_RE = re.compile(r"^(.*\S) \[([^\[\]]*)\]$")
 # The export prefixes a text cell starting with one of these with "'" so a
