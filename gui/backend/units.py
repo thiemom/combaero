@@ -454,6 +454,7 @@ INPUT_UNIT_MAP: dict[str, str] = {
     "m_ref": "kg/s",
     # Dimensionless: coefficients, ratios, multipliers, counts and flags
     "Cd": "-",
+    "Cv": "-",  # orifice: Jobson velocity coefficient
     "C_D": "-",
     "xi": "-",
     "xi0": "-",
