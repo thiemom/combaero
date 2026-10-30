@@ -1248,7 +1248,9 @@ solver = NetworkSolver(graph)
 # Stall detection ends doomed phases early: when hybr's best |F|
 # plateaus far from tolerance it hands over to the LM fallback, and
 # when the LM fallback plateaus too the attempt fails fast so the
-# auto-retry gets the budget. Cold attempts only -- seeded solves
+# auto-retry gets the budget. Far from tolerance a phase also hands
+# over when its recent rate projects tolerance beyond 3x the time the
+# attempt has left (60 s without a timeout). Cold attempts only -- seeded solves
 # (explicit x0 or a warm-start seed) are the last rung and keep
 # their full budget. stall_handover=False (default True, #864) turns
 # every handover off for the call, its retries and nested solves

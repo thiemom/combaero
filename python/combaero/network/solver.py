@@ -333,6 +333,17 @@ _STALL_DEAD_WINDOWS = 3
 # 15 s), for 200 s of LM before the warm-start retry solved it in 0.3 s. LM
 # converging near a root is quadratic, orders of magnitude faster than this.
 _STALL_NEAR_MIN_REL = 0.05
+# Far from the root a crawl that beats the 10% floor is not a stall either,
+# but it can still never arrive: LM on the jobson1955 jet_chain stress net
+# improves just over 10% per 5 s at |F| ~ 2 and times out at 20 s, while the
+# warm-start retry solves it in 6 s (#864). So far from tol, a phase also
+# hands over when the time to tol projected from its log-rate over the window
+# exceeds _STALL_PROJ_FACTOR x the attempt's remaining budget (or a fixed
+# horizon without a timeout). Measured on 14 stress families x 80 seeds under
+# both orifice models plus the audit set: no success lost, one gained, 2-3%
+# less time; a 2.5 s window lost one, so the window stays at 5 s.
+_STALL_PROJ_FACTOR = 3.0
+_STALL_PROJ_HORIZON_S = 60.0
 # A heated node's share of its heat taken up (cb.mixer_heat_per_unit_flow) is
 # 1 at or above MIXER_HEAT_MDOT_FLOOR and 0 when stagnant. A root strictly
 # between, by more than this, sits in the fade below the floor: one the fade
@@ -391,6 +402,42 @@ def _stall_detected(
     if best_then is None or best_then <= 0.0:
         return False
     return (best_then - best_now) / best_then < min_rel
+
+
+def _crawl_too_slow(
+    samples: list[tuple[float, float]],
+    remaining: float | None,
+    window: float = _STALL_WINDOW_S,
+    tol: float = 1e-3,
+    far_factor: float = _STALL_FAR_FACTOR,
+) -> bool:
+    """Return True when a far-from-root crawl cannot reach tol in time.
+
+    ``samples`` as for ``_stall_detected``. The projected time to ``tol`` is
+    ``ln(best_now / tol) / r`` with ``r = ln(best_then / best_now) / window``
+    the log-rate over the last window; it fires when that exceeds
+    ``_STALL_PROJ_FACTOR`` x ``remaining`` seconds of the attempt
+    (``_STALL_PROJ_HORIZON_S`` when the attempt has no timeout). Near the root
+    (``<= far_factor * tol``) it never fires: convergence there turns
+    quadratic and a log-rate projection says nothing (#864).
+    """
+    if not samples:
+        return False
+    t_now, best_now = samples[-1]
+    if t_now < window or best_now <= far_factor * tol:
+        return False
+    best_then = None
+    for tv, bv in reversed(samples):
+        if tv <= t_now - window:
+            best_then = bv
+            break
+    if best_then is None or best_then <= 0.0:
+        return False
+    rate = math.log(best_then / best_now) / window
+    budget = _STALL_PROJ_HORIZON_S if remaining is None else max(remaining, 0.0)
+    if rate <= 0.0:
+        return True
+    return math.log(best_now / tol) / rate > _STALL_PROJ_FACTOR * budget
 
 
 class NetworkSolver:
@@ -4924,6 +4971,22 @@ class NetworkSolver:
         # solve(stall_handover=False) turns both handovers off (#864).
         _cold_attempt = x0 is None and warmstart_x0 is None and self._stall_handover
 
+        def _stall_reason(samples: list[tuple[float, float]], t_solve: float) -> str:
+            # The plateau/crawl detector first, then the projected-time rule;
+            # the remaining budget is the attempt's, from solve-relative time.
+            if _stall_detected(samples, tol=_RESIDUAL_TOL):
+                return (
+                    f"improved less than {_STALL_MIN_REL_IMPROVEMENT:.0%} over the "
+                    f"last {_STALL_WINDOW_S:.0f} s"
+                )
+            remaining = None if timeout is None else timeout - t_solve
+            if _crawl_too_slow(samples, remaining, tol=_RESIDUAL_TOL):
+                return (
+                    f"projects past {_STALL_PROJ_FACTOR:.0f}x the remaining "
+                    "budget to reach tolerance"
+                )
+            return ""
+
         # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
         best_x = x0_use.copy()
@@ -5001,16 +5064,13 @@ class NetworkSolver:
                     and _lm_started_at_eval[0] is None
                 ):
                     _stall_samples.append((_t, float(best_res_norm)))
-                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and _stall_detected(
-                        _stall_samples, tol=_RESIDUAL_TOL
+                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and (
+                        _why := _stall_reason(_stall_samples, _t)
                     ):
                         _stall_fired[0] = True
                         raise SolverStallError(
                             f"hybr stalled: best |F|={best_res_norm:.3e} "
-                            f"improved less than "
-                            f"{_STALL_MIN_REL_IMPROVEMENT:.0%} over the last "
-                            f"{_STALL_WINDOW_S:.0f} s; handing over to the "
-                            "LM fallback."
+                            f"{_why}; handing over to the LM fallback."
                         )
 
                 # Same detector for the LM fallback phase (phase-relative
@@ -5022,15 +5082,13 @@ class NetworkSolver:
                 # Cold attempts only -- see _cold_attempt above.
                 elif _has_compressible and _cold_attempt and _lm_started_at_eval[0] is not None:
                     _lm_stall_samples.append((_t - _lm_start_t[0], float(best_res_norm)))
-                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and _stall_detected(
-                        _lm_stall_samples, tol=_RESIDUAL_TOL
+                    if _eval_count[0] % _STALL_CHECK_EVERY == 0 and (
+                        _why := _stall_reason(_lm_stall_samples, _t)
                     ):
                         _lm_stall_fired[0] = True
                         raise SolverStallError(
                             f"LM fallback stalled: best |F|={best_res_norm:.3e} "
-                            f"improved less than "
-                            f"{_STALL_MIN_REL_IMPROVEMENT:.0%} over the last "
-                            f"{_STALL_WINDOW_S:.0f} s; abandoning this attempt."
+                            f"{_why}; abandoning this attempt."
                         )
 
                 # Scale residuals

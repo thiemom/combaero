@@ -252,6 +252,49 @@ def test_stall_detector_grace_period():
     assert not _stall_detected([], window=5.0)
 
 
+def test_crawl_too_slow_catches_a_far_crawl_the_floor_spares():
+    """#864: LM on the jobson1955 jet_chain stress net improves just over 10%
+    per 5 s at |F| ~ 2 -- above the stall floor, so _stall_detected spares it --
+    and timed out at 20 s; the warm-start retry solves it in 6 s. At that rate
+    tol is ~5 min away: far past 3x the budget left."""
+    from combaero.network.solver import _crawl_too_slow, _stall_detected
+
+    trace = _trace([(0.5 * i, 2.0 * 0.89 ** (0.5 * i / 5.0)) for i in range(30)])
+    assert not _stall_detected(trace, window=5.0, min_rel=0.10, tol=1e-3)
+    assert _crawl_too_slow(trace, remaining=10.0, window=5.0, tol=1e-3)
+    # Without a timeout the fixed horizon decides; 5 min still exceeds 3 x 60 s.
+    assert _crawl_too_slow(trace, remaining=None, window=5.0, tol=1e-3)
+
+
+def test_crawl_too_slow_spares_a_phase_that_arrives_in_time():
+    """A decade per 5 s from |F| = 10 reaches tol in 20 s: within 3x a 15 s
+    remaining budget, so it keeps its time; with 5 s left it hands over."""
+    from combaero.network.solver import _crawl_too_slow
+
+    trace = _trace([(0.5 * i, 10.0 ** (1.0 + (5.5 - 0.5 * i) / 5.0)) for i in range(12)])
+    assert not _crawl_too_slow(trace, remaining=15.0, window=5.0, tol=1e-3)
+    assert not _crawl_too_slow(trace, remaining=None, window=5.0, tol=1e-3)
+    assert _crawl_too_slow(trace, remaining=5.0, window=5.0, tol=1e-3)
+
+
+def test_crawl_too_slow_never_fires_near_tolerance():
+    """Below the far gate convergence turns quadratic and a log-rate projection
+    says nothing (the 5-tee seeded crawl at 12x tol converged); the near-root
+    crawl and plateau rules of _stall_detected own that region."""
+    from combaero.network.solver import _crawl_too_slow
+
+    trace = _trace([(0.5 * i, 9.0e-2 * 0.99**i) for i in range(30)])
+    assert not _crawl_too_slow(trace, remaining=1.0, window=5.0, tol=1e-3, far_factor=100.0)
+
+
+def test_crawl_too_slow_grace_period():
+    from combaero.network.solver import _crawl_too_slow
+
+    trace = _trace([(0.5 * i, 2.0) for i in range(8)])  # 3.5 s < 5 s
+    assert not _crawl_too_slow(trace, remaining=0.0, window=5.0)
+    assert not _crawl_too_slow([], remaining=0.0)
+
+
 def test_stall_error_is_timeout_subclass():
     """SolverStallError must route through every existing timeout handler
     (end the phase, keep the best iterate, reach the LM fallback)."""
