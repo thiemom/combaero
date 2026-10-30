@@ -1,4 +1,5 @@
-# Perry's (1949) sharp-edged orifice in air, as Jobson (1955) plots it.
+# Perry's (1949) sharp-edged orifice in air and Schiller's (1933) in
+# superheated steam, as Jobson (1955) plots them.
 #
 # WHAT THIS IS. Jobson's Fig. 5a plots Perry's measured mass-flow
 # coefficient K = m_dot / (A sqrt(p0 rho0)) of a sharp-edged orifice fed
@@ -6,15 +7,17 @@
 # 0.85 -- mostly CHOKED (r_c = 0.528 at n = 1.4). The point of the figure
 # is that a sharp orifice keeps passing more flow below r_c as its jet
 # widens, where a nozzle's flow is flat; no single Cd on a nozzle can follow
-# that shape (#854).
+# that shape (#854). Fig. 5b is the same plot for Schiller's steam tests,
+# r = 0.09 to 0.89, n = 1.3 (r_c = 0.546): a second choked series, in a
+# second gas (#861).
 #
 # WHAT IT SCORES, AND ON WHICH BASIS. Jobson's theory (his Eqs. 11 and 15)
 # at the paper's own inputs: Ci = pi/(pi + 2) = 0.611 from slit theory and
-# a velocity coefficient Cv = 0.982 (Cd = Cv Ci = 0.600), n = 1.4. Jobson
-# fitted NOTHING to Perry: his Cd comes from potential-flow slit theory and
+# a velocity coefficient Cv = 0.982 (Cd = Cv Ci = 0.600), n = 1.4 (Perry)
+# or 1.3 (Schiller). Jobson fitted NOTHING to either: his Cd comes from potential-flow slit theory and
 # a hydraulics velocity coefficient. So for Jobson's theory this series is
 # CROSS-SOURCE ACCURACY (docs/VALIDATION_POLICY.md), never fidelity -- the
-# paper has no data of its own; the curves it draws over Perry are its
+# paper has no data of its own; the curves it draws over the data are its
 # prediction, not its fit. scorecard.SET_OWN_FIGURES pins that.
 #
 # DIGITISATION (2026-10-29). Page rendered at 400 dpi. Grid calibrated by
@@ -25,9 +28,18 @@
 # excluded. User-confirmed on a scan overlay (scan + calibrated grid +
 # detections as crosses) on 2026-10-29. The scan itself is not committed.
 #
-# Reference scores, informative only (python/tests/test_jobson1955_perry.py
-# pins them inside a band): Jobson at Cd 0.600, bias -1.4 %, RMS 1.6 %,
-# worst -2.5 %; the default isentropic-nozzle path at the same Cd, RMS 20.5 %.
+# DIGITISATION, Fig. 5b (2026-10-30). Same render and marker detection;
+# grid interpolated cell by cell between the 6 x and 7 y grid lines, since
+# a single linear fit left residuals up to 0.003 in r on this panel. 8 of
+# the 9 circles were found automatically; the r = 0.3 circle merges with
+# the dashed theory curve (its ring is open) and was placed by hand. The
+# label glyphs ("0.982") were excluded. User-confirmed on a scan overlay
+# on 2026-10-30.
+#
+# Reference scores, informative only (python/tests/test_jobson1955_fig5.py
+# pins them inside a band), Jobson at Cd 0.600 vs the default isentropic
+# nozzle at the same Cd: Perry bias -1.4 %, RMS 1.6 %, worst -2.5 % vs RMS
+# 20.5 %; Schiller bias +1.1 %, RMS 1.9 %, worst +5.1 % vs RMS 19.8 %.
 
 paper:
   name: jobson1955
@@ -89,3 +101,55 @@ files:
       passing more flow. A best-fit Cd does not rescue the nozzle (its
       search hit the 0.70 bound at RMS 10.8 %), which is the shape argument
       of #854 and not a Cd disagreement.
+  - path: fig5b_schiller1933_steam.csv
+    after: >-
+      Schiller, W. (1933). Ueberkritische Entspannung kompressibler
+      Fluessigkeiten. Forschung auf dem Gebiete des Ingenieurwesens 4, 128
+      (as cited in Jobson's Appendix II). Sharp-edged orifice, superheated
+      steam.
+    page: 771
+    item: "Figure 5b, open-circle series (Schiller's tests, using steam)"
+    series: "Schiller 1933 steam, mass-flow coefficient K vs p/p0, n = 1.3"
+    figure: "5b"
+    panel: single
+    geometry:
+      Ci: 0.6110154703516573  # pi / (pi + 2), Jobson's slit value
+      Cv: 0.982
+      # Jobson's polytropic index for superheated steam (Fig. 5b legend),
+      # not a real-gas gamma.
+      n: 1.3
+    alpha_deg: null
+    x_axis: pressure_ratio
+    x_scale: 1.0
+    y_axis: K_mass_flow
+    scores: jobson_1955_mass_flow
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    # No stated accuracy band for Schiller's tests in Jobson. The grid
+    # calibration is NOT a measurement band.
+    uncertainty: null
+    verification:
+      x_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+      x_multiplier: 1.0
+      y_axis_type: linear
+      y_ticks: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      y_multiplier: 1.0
+      plot_x_limits: [0.0, 1.0]
+      plot_y_limits: [0.0, 0.6]
+      # Counted on the 400 dpi render: 9 open circles in panel b.
+      expected_points: 9
+      monotonic: decreasing
+      # The drawn curves are Jobson's THEORY, not a printed closed form of
+      # the data, so they are not an independent check on the digitisation.
+      printed_curve: null
+    cross_check: >-
+      Scored against Jobson's Eqs. (11)/(15) at his own inputs (Ci =
+      pi/(pi+2), Cv = 0.982, n = 1.3), nothing fitted: N = 9, bias +1.1 %,
+      RMS 1.9 %, worst +5.1 % at r = 0.89, where K falls steeply and a 0.01
+      read error in r moves K by about 4 % -- CROSS-SOURCE accuracy. The
+      default isentropic nozzle at the same Cd 0.600 scores RMS 19.8 %
+      (worst -28 %), flat below r_c = 0.546 like on Perry. Our Jobson curve
+      matches the dashed theory curve Jobson drew, where it can be read
+      clear of the data line (r = 0.35, 0.45, 0.85), to within 0.3 %.
