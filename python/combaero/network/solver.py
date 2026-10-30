@@ -753,6 +753,9 @@ class NetworkSolver:
         # mass conserved), where every element offers a seed resistance
         # (``_seed_resistance``); other networks keep the propagated start.
         self.resistance_seed: bool = True
+        # solve(stall_handover=False) turns this off for the duration of the
+        # call, nested solves and the wall-free seed solver included (#864).
+        self._stall_handover: bool = True
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -3539,6 +3542,7 @@ class NetworkSolver:
         ] = "default",
         lambda_steps: list[float] | None = None,
         auto_retry: bool = True,
+        stall_handover: bool = True,
     ) -> dict[str, float]:
         """
         Executes the root finding algorithm to solve the network.
@@ -3616,7 +3620,29 @@ class NetworkSolver:
         also checks each converged solution's residual rows against their
         declared units and raises ``RowKindMismatchError`` on a misfiled one
         (``check_row_kinds``; RESIDUAL-ROW-SCALING).
+
+        ``stall_handover`` (default True): a COLD attempt whose best |F|
+        stalls (``_stall_detected``) hands the rest of its budget to the next
+        rung -- hybr to the LM fallback, the LM fallback to the warm-start
+        retry. False turns every stall handover off for this call, its
+        retries and nested solves included: each cold rung then runs to its
+        own share of the budget (#864).
         """
+        if not stall_handover and self._stall_handover:
+            self._stall_handover = False
+            try:
+                return self.solve(
+                    method=method,
+                    timeout=timeout,
+                    options=options,
+                    use_jac=use_jac,
+                    x0=x0,
+                    init_strategy=init_strategy,
+                    lambda_steps=lambda_steps,
+                    auto_retry=auto_retry,
+                )
+            finally:
+                self._stall_handover = True
         if (
             (self.homotopy_retry or self.bc_ramp_retry)
             and x0 is None
@@ -4078,6 +4104,7 @@ class NetworkSolver:
         try:
             seed_solver = NetworkSolver(net)
             seed_solver.raise_internal_errors = self.raise_internal_errors
+            seed_solver._stall_handover = self._stall_handover
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 r = seed_solver.solve(method=method, timeout=timeout, use_jac=use_jac)
@@ -4894,7 +4921,8 @@ class NetworkSolver:
         # mid-seeded-solve turned two 20 s successes into failures
         # (audit cases 13/19) because LM cannot always finish from the
         # same seed.
-        _cold_attempt = x0 is None and warmstart_x0 is None
+        # solve(stall_handover=False) turns both handovers off (#864).
+        _cold_attempt = x0 is None and warmstart_x0 is None and self._stall_handover
 
         # State for timeout and best iterate tracking (in real space)
         start_time = time.perf_counter()
@@ -5523,6 +5551,7 @@ class NetworkSolver:
                 "method": method,
                 "init_strategy": init_strategy,
                 "timeout": timeout,
+                "stall_handover": self._stall_handover,
                 **options,
             },
         }

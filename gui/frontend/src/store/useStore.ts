@@ -104,6 +104,8 @@ export interface RFState {
 			| "continuation";
 		method: string;
 		timeout: number | null;
+		/** Hand a stalled cold attempt's budget to the next rung (#864). */
+		stall_handover: boolean;
 		shaft_speed_rpm: number | null;
 		Nu_multiplier: number | null;
 		f_multiplier: number | null;
@@ -457,6 +459,7 @@ const useStore = create<RFState>((set, get) => ({
 		// Mirrors gui/backend/schemas.py DEFAULT_SOLVE_TIMEOUT; kept equal by
 		// python/tests/test_solve_timeout_default_sync.py.
 		timeout: 30,
+		stall_handover: true,
 		shaft_speed_rpm: null,
 		Nu_multiplier: null,
 		f_multiplier: null,
@@ -573,6 +576,10 @@ const useStore = create<RFState>((set, get) => ({
 			// maps the old value the same way for headless workflows.
 			if (loadedSettings.init_strategy === "incompressible_warmstart") {
 				loadedSettings.init_strategy = "outletref_warmstart";
+			}
+			// Files saved before #864 have no stall_handover: the default (on).
+			if (typeof loadedSettings.stall_handover !== "boolean") {
+				loadedSettings.stall_handover = true;
 			}
 			// A wall on a node with no convective surface (#720): the solver
 			// refuses it and the node has no handle to draw it from.
