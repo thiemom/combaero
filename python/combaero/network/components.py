@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
+from scipy.optimize import brentq as _brentq
+
 import combaero as cb
 from combaero import _renamed, _solver_tools
 
@@ -3460,6 +3462,12 @@ ORIFICE_COMPRESSIBLE_MODELS = ("nozzle", "jobson1955", "iso5167")
 # well-conditioned at.
 _JOBSON_CD_MIN = 1e-6
 
+# OrificeElement._flow_consistent_residuals (#861): a Newton stop at the
+# iteration cap is a root when |a - m_calc(a)| is within these [-, kg/s];
+# otherwise the root is solved on the bracket.
+_OWN_FLOW_RTOL = 1e-9
+_OWN_FLOW_ATOL = 1e-15
+
 # The taps the network's metering Cd is evaluated at. ISO 5167-2's
 # permanent-loss relation (permanent_loss_ratio_and_dC) is Bernoulli to the
 # vena contracta plus a momentum balance after it, so its tapping
@@ -4536,14 +4544,41 @@ class OrificeElement(NetworkElement):
             return m, slope, part, dm_dcd, dcd
 
         a = evaluate(float(state_in.m_dot))[0]
+        # The signs of h(a) = a - m_calc(a) seen on the way bracket the root.
+        lo: float | None = None  # an a with h(a) < 0
+        hi: float | None = None  # an a with h(a) > 0
+        done = False
         for _ in range(60):
             m, slope, _, _, _ = evaluate(a)
+            h = a - m
+            if h < 0.0:
+                lo = a
+            elif h > 0.0:
+                hi = a
             hp = 1.0 - slope
-            a_new = m if hp <= 0.1 else a - (a - m) / hp
+            a_new = m if hp <= 0.1 else a - h / hp
             done = abs(a_new - a) <= 1e-13 * max(abs(a_new), 1e-30)
             a = a_new
             if done:
                 break
+        if not done and lo is not None and hi is not None:
+            # m_calc(a) can carry a kink: the approach pipe's choke (flat
+            # beyond it), Jobson's held discriminant (beta past its range).
+            # Newton across one 2-cycles to the cap, and the a it stopped at
+            # is no root: the row was off by the cycle's width (6% on a
+            # stress bleed station; a GUI net's orifice passed 33 kg/s where
+            # its consistent flow was 38, #861) and its Jacobian matched
+            # neither side. Solve on the bracket instead. Only when
+            # the stop is no root, so every solve that met its root before
+            # (to the cap's rounding included) is untouched.
+            m_end = evaluate(a)[0]
+            if abs(a - m_end) > _OWN_FLOW_RTOL * max(abs(a), abs(m_end)) + _OWN_FLOW_ATOL:
+                a = _brentq(
+                    lambda t: t - evaluate(t)[0],
+                    lo,
+                    hi,
+                    xtol=1e-13 * max(abs(lo), abs(hi), 1e-30),
+                )
         # Sensitivities of the HELD Cd below its Re floor (#760).
         m_star, slope, part, dm_dcd, dcd = evaluate(a, continued=False)
         hp = 1.0 - slope

@@ -1,16 +1,20 @@
-"""A momentum chamber on the supersonic root of its closure is refused.
+"""The GUI combustor -> channel -> orifice net that once landed on a supersonic
+chamber root now lands on its one consistent root (#861).
 
 The chamber closure Pt = P0(P, T0, |m|/A) has two static roots for one
-(Pt, m): subsonic, and supersonic below the sonic P*. No element in the
-network accelerates a subsonic stream past Mach 1 (a constant-area channel
-chokes at 1), so a chamber on the supersonic root is a root-finder artifact.
+(Pt, m): subsonic, and supersonic below the sonic P*. A chamber on the
+supersonic root is a root-finder artifact and is refused (exercised by the
+junction runner's Wang cases, test_junction_network_runner.py).
 
 Reported from the GUI: combustor -> 1 m x 100 mm channel -> 95 mm orifice ->
-20 bar, 33 kg/s. The first attempt converged with the channel-to-orifice
-junction at Mach 1.46 (static 17.2 bar, Pt 56.7 bar), the channel "leaving"
-at Mach 1.67 unchoked and the orifice's static pressure RISING across it --
-reported as converged and consistent. The subsonic root has the same flow
-and Pt with the junction at Mach 0.63.
+20 bar, 33 kg/s. The first attempt "converged" with the channel-to-orifice
+junction at Mach 1.46 (Pt 56.7 bar), and the retry with it at Mach 0.63 at
+the same Pt. Neither was a root. The orifice (beta 0.95) solves its own flow
+through the approach pipe (#651), and its Newton 2-cycled across the pipe's
+choke and stopped at a = 40 kg/s, where m_calc = 33. The consistent own flow
+at Pt 56.7 bar is about 38 kg/s. Solved on the bracket, the orifice passes
+33 kg/s at junction Pt 49.6 bar, Mach 0.86. The cold attempt reaches that
+root directly, so no supersonic root is met on the way.
 """
 
 from __future__ import annotations
@@ -71,30 +75,26 @@ def _schema() -> dict:
     }
 
 
-def test_the_supersonic_chamber_root_is_refused() -> None:
+def _assert_the_consistent_root(raw: dict) -> None:
+    assert raw["__supersonic_chambers__"] == []
+    assert raw[f"{JUNCTION}.mach"] == pytest.approx(0.863, abs=0.005)
+    assert raw[f"{JUNCTION}.Pt"] == pytest.approx(4.960e6, rel=1e-3)
+    diag = raw["__element_diag__"]
+    assert diag["ch"]["mach_out"] < 1.0
+    assert diag["ori"]["dP"] > 0.0
+
+
+def test_the_cold_solve_lands_on_the_consistent_root() -> None:
     net = build_network_from_schema(NetworkGraphSchema(**_schema()))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sol = NetworkSolver(net).solve(auto_retry=False)
     assert sol["__converged__"] is True
-    assert sol["__success__"] is False
-    assert sol["__consistent__"] is False
-    assert sol["__outcome__"] == "inconsistent"
-    assert sol["__supersonic_chambers__"] == [JUNCTION]
-    assert "supersonic root" in sol["__message__"]
-    assert f"'{JUNCTION}' at Mach 1.46" in sol["__message__"]
-    assert "fed by ['ch']" in sol["__message__"]
+    assert sol["__success__"] is True
+    _assert_the_consistent_root(sol)
 
 
-def test_the_retry_then_finds_the_subsonic_root() -> None:
+def test_the_runner_finds_the_same_root() -> None:
     result = NetworkRunner.from_dict(_schema()).solve(timeout=60.0)
     assert result.success, result.message
-    raw = result._raw
-    assert raw["__supersonic_chambers__"] == []
-    assert raw[f"{JUNCTION}.mach"] == pytest.approx(0.629, abs=0.01)
-    diag = raw["__element_diag__"]
-    assert diag["ch"]["mach_out"] < 1.0
-    assert diag["ori"]["dP"] > 0.0
-    # Same flow and total pressure as the refused root: only the static
-    # branch differs.
-    assert raw[f"{JUNCTION}.Pt"] == pytest.approx(5.665e6, rel=1e-3)
+    _assert_the_consistent_root(result._raw)
