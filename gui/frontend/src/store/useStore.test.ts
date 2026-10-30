@@ -77,6 +77,9 @@ describe("useStore topology result invalidation", () => {
 		];
 		useStore.getState().onNodesChange(changes);
 		expect(useStore.getState().nodes[0].data.result).toBeDefined();
+		// The solve's status too (#856): a click used to drop it, and with it
+		// the Inspector's second-law and Mach flags for the clicked node.
+		expect(useStore.getState().solveResults).toEqual({ success: true });
 	});
 
 	it("strips all node and edge results when a node is removed", () => {
