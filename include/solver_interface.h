@@ -229,6 +229,46 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     const std::vector<double>& Y_up,
     double P_static_down, double Cd, double area, double beta);
 
+// The opt-in compressible orifice models (#854), with OrificeResult's columns
+// plus d(mdot)/d(Cd): Jobson's flow is not linear in Cd, so the network
+// cannot take m/Cd for it.
+struct OrificeModelResult : OrificeResult {
+  double d_mdot_dCd = 0.0;
+  double Ci = 0.0;             // incompressible contraction (Jobson); Cd (ISO)
+  double contraction = 0.0;    // Jobson's compressible C; 0 for ISO
+  double expansibility = 1.0;  // mdot / (Cd E A sqrt(2 rho1 dp)), rho1 static
+  bool choked = false;
+  bool in_range = true;        // inside the model's stated range (a flag only)
+};
+
+// Jobson (1955) with the approach-velocity extension (orifice.h). Inputs as
+// orifice_compressible_residuals_and_jacobian; Cd is the element's
+// incompressible coefficient in ISO's form, Cv Jobson's velocity coefficient
+// (Ci from jobson_ci_from_cd). With E (0 < beta < 1) the approach static
+// state is (P_static_up, isentropic from the total); without, a reservoir at
+// (P_total_up, Tt_up). The jet expands from the TOTAL state, polytropic with
+// n = gamma(Tt_up). Back pressure above the drive: the mirrored flow from
+// a reservoir at P_static_down (the raw kernel's reverse band; the network
+// evaluates reversed flow from the other node). Analytic (Pt, P1, Tt, Pb,
+// Cd) columns by DualN; composition by a forward difference, as the other
+// orifice kernels. in_range: jobson1955::ci_min <= Ci <= ci_max, beta <=
+// beta_max and a real root.
+OrificeModelResult orifice_jobson_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
+    double beta, double Cv = 1.0);
+
+// ISO 5167-2:2003 Eq. (1) with Eq. (5)'s expansibility:
+//   mdot = Cd E eps A sqrt(2 rho1 (p1 - p2)),
+// rho1 the approach static density (isentropic from the total state, kappa
+// = gamma(Tt_up)). Eq. (5) is extrapolated below p2/p1 = 0.75 (in_range
+// false there; no choke exists in it). The drive is regularised at 1 Pa
+// like orifice_residuals_and_jacobian; reversed, eps uses p1/p2.
+OrificeModelResult orifice_iso5167_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
+    double beta);
+
 // An orifice plate between pipes recovers pressure downstream of its vena
 // contracta (#645). The network row sees the RECOVERED drop, the stagnation
 // difference between the two pipes' nodes, while C is referenced to the

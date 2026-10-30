@@ -278,6 +278,12 @@ ok = cb.metering_cd_in_range(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geo
 k, dk_dC = cb.permanent_loss_ratio_and_dC(beta, Cd)
 E = cb.velocity_of_approach_factor(beta)  # 1/sqrt(1-beta^4); 1 outside 0<beta<1
 
+# Jobson (1955) compressible contraction of a sharp-edged orifice (#854)
+f = cb.jobson_force_defect(Ci, beta=0.0, Cv=1.0)  # 1/Ci - 1/(2 Ci^2) - Cv b^2 + Cv^2 b^4/2
+Ci = cb.jobson_ci_from_cd(Cd, beta, Cv=1.0)  # Cv Ci / sqrt(1 - (Cv Ci)^2 b^4) = Cd E
+C = cb.jobson_contraction_coefficient(r, Ci, n=1.4)  # Eqs. 11 / 15, r = p/p0, reservoir-fed
+eps = cb.jobson_expansibility(r, beta, Ci, 1.4)  # vs ISO 5167-2 Eq. (5), r = p2/p1
+
 # Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
 # geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.
 hole = cb.DischargeHoleGeometry(d=1e-3, L=2e-3, r=0.0)
@@ -1420,6 +1426,20 @@ orifice = OrificeElement("orifice", "node1", "node2", Cd=0.65, diameter=0.011284
 # lumped Cd*A restriction is an orifice with no pipe diameter: in_pipe=False
 # (beta = 0 both ways, no recovery, whatever channels adjoin it).
 lumped = OrificeElement("lumped", "node1", "node2", Cd=0.8, diameter=0.05, correlation="fixed", in_pipe=False)
+# How the compressible regime expands the flow (#854); the incompressible regime
+# ignores it. "nozzle" (default): isentropic nozzle at Cd E A, flat past choke.
+# "jobson1955" (opt-in, any correlation): Jobson's sharp-edged jet, which widens
+# as p2/p1 falls, through choke and beyond, with the approach-velocity extension
+# in a pipe; Ci from the correlation's Cd = Cv Ci (Cv default 1, Jobson used
+# 0.982). "iso5167" (opt-in, ReaderHarrisGallagher only): ISO 5167-2:2003
+# Eq. (1) with Eq. (5)'s expansibility. Diagnostics: "compressible_model", "Ci",
+# "expansibility", "model_in_range" (Jobson: 0.5 <= Ci <= 0.7, beta <= 0.75;
+# ISO: p2/p1 >= 0.75; a flag, never a refusal), and for Jobson "contraction_C", "Cv".
+# Kernels (internal solver tools): orifice_jobson_residuals_and_jacobian(...,
+# beta, Cv) and orifice_iso5167_residuals_and_jacobian(..., beta) return an
+# OrificeModelResult: OrificeResult's columns plus d_mdot_dCd, Ci, contraction,
+# expansibility, choked, in_range.
+sharp = OrificeElement("sharp", "node1", "node2", diameter=0.01, compressible_model="jobson1955", Cv=0.982)
 channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05, roughness=1e-4, regime="compressible")
 # Compressible channel (#481): residual m - m_calc, m_calc = A * fanno_channel_flow(
 # feeding node's Pt/Tt, other node's Pt). The duct is fed isentropically from the

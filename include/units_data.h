@@ -681,6 +681,14 @@ inline constexpr Entry function_units[] = {
      "m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, "
      "P_static_down: Pa, Cd: -, area: m^2, beta: -",
      "OrificeResult"},
+    {"orifice_jobson_residuals_and_jacobian",
+     "m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, "
+     "P_static_down: Pa, Cd: -, area: m^2, beta: -, Cv: -",
+     "OrificeModelResult"},
+    {"orifice_iso5167_residuals_and_jacobian",
+     "m_dot: kg/s, P_total_up: Pa, P_static_up: Pa, Tt_up: K, Y_up: kg/kg, "
+     "P_static_down: Pa, Cd: -, area: m^2, beta: -",
+     "OrificeModelResult"},
     {"sonic_static_pressure", "Tt: K, G: kg/(m^2*s), Y: kg/kg", "SonicStatic"},
     {"approach_static_pressure",
      "Pt: Pa, Tt: K, G: kg/(m^2*s), Y: kg/kg, incompressible: bool",
@@ -1067,6 +1075,10 @@ inline constexpr Entry function_units[] = {
     {"metering_cd_in_range", "correlation: -, geom: OrificeGeometry, Re_D: -", "- (bool)"},
     {"permanent_loss_ratio_and_dC", "beta: -, C: -", "tuple(-, -)"},
     {"velocity_of_approach_factor", "beta: -", "-"},
+    {"jobson_force_defect", "Ci: -, beta: -, Cv: -", "- (f)"},
+    {"jobson_ci_from_cd", "Cd: -, beta: -, Cv: -", "- (Ci)"},
+    {"jobson_contraction_coefficient", "r: -, Ci: -, n: -", "- (C)"},
+    {"jobson_expansibility", "r: -, beta: -, Ci: -, n: -", "- (eps)"},
     {"Cd", "OrificeGeometry, OrificeState", "- (Cd)"},
     {"mcgreehan_schotsch_1988_cd",
      "Re: -, r_over_d: -, L_over_d: -, U1_over_Vi: -, eps: -", "- (Cd)"},

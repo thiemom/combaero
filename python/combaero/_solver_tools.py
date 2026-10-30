@@ -58,6 +58,8 @@ nusselt_and_jacobian_petukhov = _core.nusselt_and_jacobian_petukhov
 nusselt_and_jacobian_sieder_tate = _core.nusselt_and_jacobian_sieder_tate
 orifice_compressible_mdot_and_jacobian = _core.orifice_compressible_mdot_and_jacobian
 orifice_compressible_residuals_and_jacobian = _core.orifice_compressible_residuals_and_jacobian
+orifice_iso5167_residuals_and_jacobian = _core.orifice_iso5167_residuals_and_jacobian
+orifice_jobson_residuals_and_jacobian = _core.orifice_jobson_residuals_and_jacobian
 orifice_mdot_and_jacobian = _core.orifice_mdot_and_jacobian
 orifice_residuals_and_jacobian = _core.orifice_residuals_and_jacobian
 orifice_tap_pressure_and_jacobian = _core.orifice_tap_pressure_and_jacobian
@@ -107,6 +109,8 @@ __all__ = [
     "nusselt_and_jacobian_sieder_tate",
     "orifice_compressible_mdot_and_jacobian",
     "orifice_compressible_residuals_and_jacobian",
+    "orifice_iso5167_residuals_and_jacobian",
+    "orifice_jobson_residuals_and_jacobian",
     "orifice_mdot_and_jacobian",
     "orifice_residuals_and_jacobian",
     "orifice_tap_pressure_and_jacobian",

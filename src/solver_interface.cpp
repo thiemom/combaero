@@ -14,6 +14,7 @@
 #include "../include/thermo.h"
 #include "../include/math_constants.h"
 #include "../include/orifice.h"
+#include "../include/orifice_jobson.h"
 #include "../include/thermo_transport_data.h"
 
 #include <algorithm>
@@ -1811,6 +1812,179 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   }
 
   return res;
+}
+
+// -----------------------------------------------------------------------------
+// Opt-in compressible orifice models (#854): Jobson (1955), ISO 5167-2 Eq. (5)
+// -----------------------------------------------------------------------------
+
+namespace {
+
+using MD = DualN<5>;
+// Partial indices: upstream total and approach static pressure, upstream total
+// temperature, back pressure, the element's incompressible coefficient.
+enum : int { kMdPt = 0, kMdP1 = 1, kMdTt = 2, kMdPb = 3, kMdCd = 4 };
+
+// gamma(Tt) carrying d/dTt: gamma = cp / (cp - R), so
+// dgamma/dT = -R cp'(T) / (cp - R)^2 (molar cp; R the universal constant).
+MD gamma_of_Tt(double Tt, const std::vector<double>& X) {
+  const double c = combaero::cp(Tt, X);
+  const double cv = c - combaero::thermo::R_GAS;
+  MD n = MD::constant(c / cv);
+  n.d[kMdTt] = -combaero::thermo::R_GAS * combaero::dcp_dT(Tt, X) / (cv * cv);
+  return n;
+}
+
+struct ModelEval {
+  MD m = MD::constant(0.0);
+  MD eps = MD::constant(1.0);
+  double Ci = 0.0;
+  double C = 0.0;
+  bool choked = false;
+  bool in_range = true;
+};
+
+ModelEval jobson_eval(double Pt, double P1, double Tt, double Pb, double Cd, double area,
+                      double beta, double Cv, const std::vector<double>& X) {
+  const bool from_static = approach_from_static(beta);
+  const double b = from_static ? beta : 0.0;
+  const MD pt = MD::seed(Pt, kMdPt);
+  const MD tt = MD::seed(Tt, kMdTt);
+  const MD pb = MD::seed(Pb, kMdPb);
+  const MD cd = MD::seed(Cd, kMdCd);
+  // The drive: the approach static with E, the reservoir's total without.
+  const MD pd = from_static ? MD::seed(P1, kMdP1) : pt;
+  const MD n = gamma_of_Tt(Tt, X);
+  const double R = combaero::specific_gas_constant(X);
+  const MD ci = orifice_jobson::ci_from_cd(cd, b, Cv);
+  const double E = velocity_of_approach_factor(b);
+
+  ModelEval out;
+  out.Ci = ci.v;
+  out.C = ci.v;
+  bool degenerate = false;
+  if (pb.v < pd.v) {
+    const MD rho0 = pt / (R * tt);
+    const auto fl = orifice_jobson::flux(pt, rho0, pd, pb, ci, n, b, Cv);
+    out.m = Cv * area * fl.g;
+    out.C = fl.C.v;
+    out.choked = fl.choked;
+    degenerate = fl.degenerate;
+    const MD rho1 = rho0 * orifice_jobson::pow_dd(pd / pt, 1.0 / n);
+    out.eps = out.m / (cd * (E * area) * dsqrt(2.0 * rho1 * (pd - pb)));
+  } else if (pb.v > pd.v) {
+    // Reverse band of the raw kernel: a reservoir at the back pressure.
+    const MD rho0 = pb / (R * tt);
+    const auto fl = orifice_jobson::flux(pb, rho0, pb, pd, ci, n, b, Cv);
+    out.m = -(Cv * area) * fl.g;
+    out.C = fl.C.v;
+    out.choked = fl.choked;
+    degenerate = fl.degenerate;
+    out.eps = out.m / (-(cd * (E * area)) * dsqrt(2.0 * rho0 * (pb - pd)));
+  }
+  namespace jb = ::orifice::jobson1955;
+  out.in_range = ci.v >= jb::ci_min && ci.v <= jb::ci_max && b <= jb::beta_max && !degenerate;
+  return out;
+}
+
+ModelEval iso5167_eval(double Pt, double P1, double Tt, double Pb, double Cd, double area,
+                       double beta, const std::vector<double>& X) {
+  const bool from_static = approach_from_static(beta);
+  const double b = from_static ? beta : 0.0;
+  const MD pt = MD::seed(Pt, kMdPt);
+  const MD tt = MD::seed(Tt, kMdTt);
+  const MD pb = MD::seed(Pb, kMdPb);
+  const MD pd = from_static ? MD::seed(P1, kMdP1) : pt;
+  const MD n = gamma_of_Tt(Tt, X);
+  const double R = combaero::specific_gas_constant(X);
+  const MD rho0 = pt / (R * tt);
+  const MD rho1 = rho0 * orifice_jobson::pow_dd(pd / pt, 1.0 / n);
+
+  const bool forward = pb.v <= pd.v;
+  const MD r = forward ? pb / pd : pd / pb;
+  const MD rho_up = forward ? rho1 : pb / (R * tt);
+  const double b4 = b * b * b * b;
+  namespace ie = ::orifice::iso5167_expansibility;
+  const double coeff = ie::c0 + ie::c4 * b4 + ie::c8 * b4 * b4;
+
+  ModelEval out;
+  out.Ci = Cd;
+  out.eps = 1.0 - coeff * (1.0 - orifice_jobson::pow_dd(r, 1.0 / n));
+  // ISO's incompressible Eq. (1) at unit C (linear in it), with the network's
+  // 1 Pa regularisation of the drive.
+  const auto [k1, dk_ddp, dk_drho] = orifice_mdot_and_jacobian(pd.v - pb.v, rho_up.v, 1.0, area, b);
+  MD m_inc = MD::constant(Cd * k1);
+  for (int i = 0; i < 5; ++i) {
+    m_inc.d[i] = Cd * (dk_ddp * (pd.d[i] - pb.d[i]) + dk_drho * rho_up.d[i]);
+  }
+  m_inc.d[kMdCd] += k1;
+  out.m = out.eps * m_inc;
+  out.in_range = r.v >= ie::min_pressure_ratio;
+  return out;
+}
+
+template <typename Eval>
+OrificeModelResult model_result(const Eval& eval, const std::vector<double>& Y_up) {
+  const auto X_of = [](const std::vector<double>& Y) {
+    return combaero::mass_to_mole(combaero::normalize_fractions(Y));
+  };
+  const ModelEval e = eval(X_of(Y_up));
+  OrificeModelResult res;
+  res.m_dot_calc = e.m.v;
+  res.d_mdot_dP_total_up = e.m.d[kMdPt];
+  res.d_mdot_dP_static_up = e.m.d[kMdP1];
+  res.d_mdot_dP_static_down = e.m.d[kMdPb];
+  res.d_mdot_dP_rho_ref = 0.0;
+  res.d_mdot_dTt_up = e.m.d[kMdTt];
+  res.d_mdot_dCd = e.m.d[kMdCd];
+  res.Ci = e.Ci;
+  res.contraction = e.C;
+  res.expansibility = e.eps.v;
+  res.choked = e.choked;
+  res.in_range = e.in_range;
+  // Composition: a forward difference, as the other orifice kernels.
+  res.d_mdot_dY_up.assign(Y_up.size(), 0.0);
+  const double eps_Y = 1e-6;
+  for (std::size_t i = 0; i < Y_up.size(); ++i) {
+    std::vector<double> Y_plus = Y_up;
+    Y_plus[i] += eps_Y;
+    res.d_mdot_dY_up[i] = (eval(X_of(Y_plus)).m.v - e.m.v) / eps_Y;
+  }
+  return res;
+}
+
+}  // namespace
+
+OrificeModelResult orifice_jobson_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
+    double beta, double Cv) {
+  (void)m_dot;
+  if (!(Cd > 0.0) || !(Cv > 0.0) || !(area > 0.0)) {
+    throw std::invalid_argument(
+        "orifice_jobson_residuals_and_jacobian: Cd, Cv and area must be > 0");
+  }
+  return model_result(
+      [&](const std::vector<double>& X) {
+        return jobson_eval(P_total_up, P_static_up, Tt_up, P_static_down, Cd, area, beta, Cv,
+                           X);
+      },
+      Y_up);
+}
+
+OrificeModelResult orifice_iso5167_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
+    double beta) {
+  (void)m_dot;
+  if (!(Cd > 0.0) || !(area > 0.0)) {
+    throw std::invalid_argument("orifice_iso5167_residuals_and_jacobian: Cd and area must be > 0");
+  }
+  return model_result(
+      [&](const std::vector<double>& X) {
+        return iso5167_eval(P_total_up, P_static_up, Tt_up, P_static_down, Cd, area, beta, X);
+      },
+      Y_up);
 }
 
 SonicStatic sonic_static_pressure(double Tt, double G, const std::vector<double>& Y) {

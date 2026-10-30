@@ -197,6 +197,10 @@ SET_ORIGIN: dict[str, str] = {
     "florschuetz_1981_inline": "florschuetz1981",
     "mcgreehan_schotsch_1988_cd": "mcgreehan_schotsch1988",
     "mcgreehan_schotsch_1988_crossflow_cd": "mcgreehan_schotsch1988",
+    # Jobson (1955) is theory with no data of its own: the Perry points his
+    # Fig. 5a plots are a DIFFERENT study, so they are cross-source accuracy.
+    # SET_OWN_FIGURES below pins that (no figure of his is his own data).
+    "jobson_1955_mass_flow": "jobson1955",
     # Baldauf's own data is not in this repo, so nothing scored by this set
     # can ever read "fidelity" -- which is correct. Naming the origin makes
     # the verdict "accuracy" rather than "unknown", so the report states the
@@ -234,6 +238,9 @@ for _tag in ("90", "60par", "60crs", "60vee", "60lam", "45par", "45crs", "45vee"
 SET_OWN_FIGURES: dict[str, tuple[str, frozenset[str]]] = {
     "han_park_1988_angled": ("han2012", frozenset({"4.47"})),
     "han_1989_narrow_channel": ("han2012", frozenset({"4.48"})),
+    # Every point under jobson1955 is someone else's measurement (Perry 1949),
+    # so none is the theory's own data: accuracy, never fidelity (#854).
+    "jobson_1955_mass_flow": ("jobson1955", frozenset()),
 }
 
 # Which LAB each rib set comes from. Two sets from one lab agreeing is not

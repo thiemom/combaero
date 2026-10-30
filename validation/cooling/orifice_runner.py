@@ -170,8 +170,36 @@ def score_by_vhr_band(records: list[Record], bands) -> "dict":
     return out
 
 
+# ---------------------------------------------------------------------------
+# Jobson (1955): compressible mass flow of a reservoir-fed sharp orifice.
+# ---------------------------------------------------------------------------
+
+JOBSON_SET = "jobson_1955_mass_flow"
+
+
+def nozzle_flux_coefficient(r: float, n: float) -> float:
+    """Jobson's K_N (Eqs. 8 and 12): the isentropic nozzle's
+    m / (A sqrt(p0 rho0)), held at its critical value below r_c."""
+    rc = (2.0 / (n + 1.0)) ** (n / (n - 1.0))
+    re = max(r, rc)
+    return math.sqrt(2.0 * n / (n - 1.0) * re ** (2.0 / n) * (1.0 - re ** ((n - 1.0) / n)))
+
+
+def predict_jobson_K(series: SeriesMetadata, r: float) -> float:
+    """K = Cv C(r) K_N(r) at the paper's own inputs (series geometry: Ci,
+    Cv, n), C from Eqs. (11)/(15) via cb.jobson_contraction_coefficient.
+    Nothing fitted to the data it is scored on."""
+    g = series.geometry or {}
+    n = float(g["n"])
+    return float(g["Cv"]) * cb.jobson_contraction_coefficient(r, float(g["Ci"]), n) * (
+        nozzle_flux_coefficient(r, n)
+    )
+
+
 def owns(series: SeriesMetadata) -> bool:
     """Whether this runner is the one that should score ``series``."""
+    if series.y_axis == "K_mass_flow" and series.x_axis == "pressure_ratio":
+        return True
     return series.y_axis == "Cd" and series.x_axis in (
         "U1_over_Vi",
         "velocity_head_ratio",
@@ -181,6 +209,21 @@ def owns(series: SeriesMetadata) -> bool:
 def run_series(series: SeriesMetadata, mode: Mode = "eq17") -> list[Record]:
     if not owns(series):
         return []
+
+    if series.y_axis == "K_mass_flow":
+        if series.scores != JOBSON_SET:
+            return [
+                Record(series=series, x=p.x, measured=p.y, predicted=None,
+                       reason=f"K_mass_flow is scored by {JOBSON_SET} only, "
+                       f"not {series.scores}")
+                for p in load_points(series)
+            ]
+        return [
+            Record(series=series, x=p.x, measured=p.y,
+                   predicted=predict_jobson_K(series, p.x),
+                   scored_by=series.scores)
+            for p in load_points(series)
+        ]
 
     if series.x_axis == "U1_over_Vi":
         return [

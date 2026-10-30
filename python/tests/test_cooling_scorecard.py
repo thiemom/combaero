@@ -543,6 +543,8 @@ def test_every_scored_series_basis_is_what_its_provenance_says(dataset) -> None:
         ("andrews1988", "andrews_1986_effusion_internal"): "accuracy",
         ("florschuetz1981", "florschuetz_1981_inline"): "fidelity",
         ("mcgreehan_schotsch1988", "mcgreehan_schotsch_1988_crossflow_cd"): "fidelity",
+        # Perry's data in Jobson's figure: the theory has no data of its own.
+        ("jobson1955", "jobson_1955_mass_flow"): "accuracy",
         ("rohde1969", "mcgreehan_schotsch_1988_cd"): "accuracy",
         ("murray2018", "baldauf_2002_sellers"): "accuracy",
         ("andrei2014", "baldauf_2002_sellers"): "accuracy",

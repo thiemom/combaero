@@ -1460,6 +1460,21 @@ std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C);
 // 0 < beta < 1 (no approach pipe, or bore >= pipe).
 double velocity_of_approach_factor(double beta);
 
+// Jobson (1955), Proc. IMechE 169, 767: compressible contraction of a
+// sharp-edged orifice from its incompressible Ci (#854). Force defect with the
+// approach-velocity extension, f = 1/Ci - 1/(2 Ci^2) - Cv b^2 + Cv^2 b^4 / 2
+// (Eq. 5 at beta = 0). Constants in orifice::jobson1955 (Ci 0.5-0.7, beta
+// <= 0.75: a diagnostic range) and orifice::iso5167_expansibility (Eq. 5).
+double jobson_force_defect(double Ci, double beta = 0.0, double Cv = 1.0);
+// Ci of an orifice whose incompressible flow is Cd E A sqrt(2 rho1 dp):
+// Cv Ci / sqrt(1 - (Cv Ci)^2 beta^4) = Cd E.
+double jobson_ci_from_cd(double Cd, double beta = 0.0, double Cv = 1.0);
+// The paper's C(r), reservoir-fed: Eq. (11) for r >= r_c, Eq. (15) below.
+double jobson_contraction_coefficient(double r, double Ci, double n);
+// mdot / mdot_inc at the same upstream static state, r = p2/p1, the beta
+// extension solved to consistency: comparable with ISO 5167-2 Eq. (5).
+double jobson_expansibility(double r, double beta, double Ci, double n);
+
 // Fixed Cd from an explicit value. make_correlation(MeteringCdCorrelation::Constant)
 // can only return the default, so this is how a chosen constant is pinned.
 std::unique_ptr<OrificeCorrelationBase> make_constant_correlation(double Cd);
@@ -2006,6 +2021,27 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta);
+
+// Opt-in compressible orifice models (#854). OrificeResult's columns plus
+// d_mdot_dCd (Jobson is not linear in Cd), Ci, contraction (Jobson's C),
+// expansibility (mdot / Cd E A sqrt(2 rho1 dp)), choked and in_range (a flag).
+// Analytic (Pt, P1, Tt, Pb, Cd) columns by DualN; composition by a forward
+// difference like the other orifice kernels. Jet polytropic, n = gamma(Tt_up).
+struct OrificeModelResult : OrificeResult { /* d_mdot_dCd, Ci, contraction,
+    expansibility, choked, in_range */ };
+// Jobson (1955) with the approach-velocity extension, sub- and supercritical
+// (Eq. 15 with the same V1 term), C1 through r_c. include/orifice_jobson.h
+// holds the one templated body the library functions above share.
+OrificeModelResult orifice_jobson_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
+    double beta, double Cv = 1.0);
+// ISO 5167-2:2003 Eq. (1) with Eq. (5); in_range false below p2/p1 = 0.75,
+// where Eq. (5) is extrapolated (it has no choke).
+OrificeModelResult orifice_iso5167_residuals_and_jacobian(
+    double m_dot, double P_total_up, double P_static_up, double Tt_up,
+    const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
+    double beta);
 
 // The sonic static pressure P* = G sqrt(R T* / gamma*) of a chamber at
 // stagnation Tt and mass flux G (#637), T* from h(Tt) - h(T*) = a*^2 / 2: the

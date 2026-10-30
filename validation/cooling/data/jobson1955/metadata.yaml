@@ -1,0 +1,91 @@
+# Perry's (1949) sharp-edged orifice in air, as Jobson (1955) plots it.
+#
+# WHAT THIS IS. Jobson's Fig. 5a plots Perry's measured mass-flow
+# coefficient K = m_dot / (A sqrt(p0 rho0)) of a sharp-edged orifice fed
+# from a reservoir, against the pressure ratio r = p/p0, from r = 0.15 to
+# 0.85 -- mostly CHOKED (r_c = 0.528 at n = 1.4). The point of the figure
+# is that a sharp orifice keeps passing more flow below r_c as its jet
+# widens, where a nozzle's flow is flat; no single Cd on a nozzle can follow
+# that shape (#854).
+#
+# WHAT IT SCORES, AND ON WHICH BASIS. Jobson's theory (his Eqs. 11 and 15)
+# at the paper's own inputs: Ci = pi/(pi + 2) = 0.611 from slit theory and
+# a velocity coefficient Cv = 0.982 (Cd = Cv Ci = 0.600), n = 1.4. Jobson
+# fitted NOTHING to Perry: his Cd comes from potential-flow slit theory and
+# a hydraulics velocity coefficient. So for Jobson's theory this series is
+# CROSS-SOURCE ACCURACY (docs/VALIDATION_POLICY.md), never fidelity -- the
+# paper has no data of its own; the curves it draws over Perry are its
+# prediction, not its fit. scorecard.SET_OWN_FIGURES pins that.
+#
+# DIGITISATION (2026-10-29). Page rendered at 400 dpi. Grid calibrated by
+# least squares on 6 x grid lines (r = 0 to 1.0) and 7 y grid lines
+# (K = 0 to 0.6), residuals < 0.0025 on both axes. Markers found as
+# enclosed white holes (open circles), 15 kept; the panel's label glyphs
+# ("a", "C_v = 1", "C_v = 0.982") were identified by size and position and
+# excluded. User-confirmed on a scan overlay (scan + calibrated grid +
+# detections as crosses) on 2026-10-29. The scan itself is not committed.
+#
+# Reference scores, informative only (python/tests/test_jobson1955_perry.py
+# pins them inside a band): Jobson at Cd 0.600, bias -1.4 %, RMS 1.6 %,
+# worst -2.5 %; the default isentropic-nozzle path at the same Cd, RMS 20.5 %.
+
+paper:
+  name: jobson1955
+  citation: >-
+    Jobson, D.A. (1955). "On the Flow of a Compressible Fluid through
+    Orifices." Proc. Instn Mech. Engrs 169, 767-776.
+    doi:10.1243/PIME_PROC_1955_169_077_02
+  secondary: true
+
+files:
+  - path: fig5a_perry1949_air.csv
+    after: >-
+      Perry, J.A., jun. (1949). Critical Flow Through Sharp-edged Orifices.
+      Trans. ASME 71, 757 (as cited in Jobson's Appendix II). Sharp-edged
+      orifice, air.
+    page: 771
+    item: "Figure 5a, open-circle series (Perry's tests, using air)"
+    series: "Perry 1949 air, mass-flow coefficient K vs p/p0, n = 1.4"
+    figure: "5a"
+    panel: single
+    geometry:
+      Ci: 0.6110154703516573  # pi / (pi + 2), Jobson's slit value
+      Cv: 0.982
+      n: 1.4
+    alpha_deg: null
+    x_axis: pressure_ratio
+    x_scale: 1.0
+    y_axis: K_mass_flow
+    scores: jobson_1955_mass_flow
+    kind: measured
+    extraction: figure-digitised
+    confidence: band
+    # No stated accuracy band for Perry's tests in Jobson. The grid
+    # calibration residual (< 0.0025) is NOT a measurement band.
+    uncertainty: null
+    verification:
+      x_axis_type: linear
+      x_ticks: [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+      x_multiplier: 1.0
+      y_axis_type: linear
+      y_ticks: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+      y_multiplier: 1.0
+      plot_x_limits: [0.0, 1.0]
+      plot_y_limits: [0.0, 0.6]
+      # Counted on the 400 dpi render: 15 open circles in panel a.
+      expected_points: 15
+      # K falls monotonically as r rises: the flow grows as the back
+      # pressure drops, choked or not (the whole point of the figure).
+      monotonic: decreasing
+      # The drawn curves are Jobson's THEORY, not a printed closed form of
+      # the data, so they are not an independent check on the digitisation.
+      printed_curve: null
+    cross_check: >-
+      Scored against Jobson's Eqs. (11)/(15) at his own inputs (Ci =
+      pi/(pi+2), Cv = 0.982, n = 1.4), nothing fitted: N = 15, bias -1.4 %,
+      RMS 1.6 %, worst -2.5 % -- CROSS-SOURCE accuracy, Jobson has no data of
+      his own. The default isentropic nozzle at the same Cd 0.600 scores RMS
+      20.5 % (worst -28 %): flat below r_c where Perry's orifice keeps
+      passing more flow. A best-fit Cd does not rescue the nozzle (its
+      search hit the 0.70 bound at RMS 10.8 %), which is the shape argument
+      of #854 and not a Cd disagreement.
