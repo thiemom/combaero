@@ -1,7 +1,0 @@
-- **Liner and transition-piece alloys, and a TBC bond coat, in the materials database.** Each is a function and a `get_material_conductivity` / `list_materials` entry.
-  - `k_hastelloy_x`, `k_haynes188` and `k_haynes263` (300-1273 K) interpolate the manufacturers' tables (Haynes International) linearly, so they are exact at every printed point.
-  - `k_bondcoat_nicocraly` (848-1373 K) is the NiCoCrAlY line from Zhu & Miller 1999 (NASA/TM-1999-209069, Fig. 2), limited to the range it is drawn over.
-  - `k_haynes25` (298-1273 K, Haynes), `k_inconel625` (116-1255 K, Special Metals) and `k_nimonic75` (293-1273 K, Virgamet; its 20 C value matches Special Metals) interpolate the published tables the same way.
-  - `k_copper` (high purity, 100-1200 K) and `k_alumina` (dense Al2O3, 100-2000 K) are the NSRDS-NBS 8 recommended values (Powell, Ho & Liley 1966).
-  - `k_x22crmov12_1` (1.4923, 293-923 K) is the straight line between the data sheet's 20 C and 650 C values.
-  - These are convenience data. A user with qualified properties supplies their own conductivity.

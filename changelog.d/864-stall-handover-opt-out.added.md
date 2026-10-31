@@ -1,3 +1,0 @@
-- **Stall handover can be turned off (#864).** `NetworkSolver.solve(stall_handover=False)` turns off the stall handover for that call. Without it, a cold rung does not cut itself short when it stalls: hybr does not hand over to the LM fallback early, and the LM fallback does not hand over to the warm-start retry early. Each cold rung runs to its own share of the budget. The retries and nested solves of the call are covered too. The default (`True`) is unchanged.
-  - **GUI:** a "Stall handover" checkbox in Solver Configuration, saved with the drawing. A file saved without the setting loads with it on.
-  - **Results table:** the setting is stored with the solver options as `solver:stall_handover` (#784). It is not an input.

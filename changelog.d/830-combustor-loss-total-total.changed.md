@@ -1,4 +1,0 @@
-- **The combustor head loss is total-total, as in Lefebvre's pressure-loss factor (#782 audit).**
-  - `ConstantHeadLoss`/`LinearThetaHeadLoss` evaluate the inlet dynamic head at the inlet stagnation state (`Tt_in`, `Pt_in`) and divide by `Pt_in`. They used the inlet's static P with Tt, which overstated the loss at a moving inlet: +8% at M 0.3, +24% at M 0.5.
-  - At a plenum inlet (P = Pt) nothing changes: residual vector and Jacobian bit-identical on all 560 stress networks; scorecards byte-identical.
-  - The loss context is a `PressureLossContext` carrying `Tt_in`/`Pt_in`. `combustor_head_loss` takes `Tt_in`/`Pt_in`, and `CombustorLossResult` reports `dxi_dTt_in`/`dxi_dPt_in`.

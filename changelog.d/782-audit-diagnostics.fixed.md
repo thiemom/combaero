@@ -1,3 +1,0 @@
-- **Two reported Reynolds numbers now take the viscosity at the local static temperature.** Diagnostics only: no flow, loss or solver result changes.
-  - `fanno_channel` (constant f) stored each profile station's `Re` with the inlet viscosity: 1.9 % off at the outlet of an air duct from 900 K, M 0.5 to M 0.66. The rough overload already used the local one.
-  - `area_change_loss`, conical branch: `Re` used mu at the stagnation `Tt0`, 4 % low at M 0.62; it now uses the closure station's static T, as the sharp branch and `area_change_flow` do.

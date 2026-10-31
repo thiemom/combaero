@@ -1,4 +1,0 @@
-- **Element diagnostics are evaluated at the static state of their end nodes (#824).** An element's reported inlet/outlet `rho`, speed of sound, Mach and transport properties were formed at (`Tt`, static `P`). At a moving compressible node, T was up to 11% below Tt, so they were off by about that much.
-  - A junction's `port_<i>_T` is now the port's static T; the stagnation T is the new `port_<i>_Tt`.
-  - The ejector's `mach_jet` takes the primary's static speed of sound.
-  - Solutions are unchanged: residual vector and Jacobian bit-identical on all 560 stress networks.
