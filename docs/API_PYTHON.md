@@ -2312,14 +2312,15 @@ materials = cb.list_materials()
 
 # Thermal conductivity [W/(m·K)]
 k_al = cb.k_aluminum_6061      # deprecated (no cited source), removed in 0.9.0
-k_ss = cb.k_stainless_steel_316
+k_ss = cb.k_stainless_steel_316  # Gen3 CSP measured, 533-1093 K
+k_310 = cb.k_stainless_steel_310  # Gen3 CSP measured, 533-1073 K
 k_inconel = cb.k_inconel718
-k_haynes = cb.k_haynes230
+k_haynes = cb.k_haynes230     # HAYNES 230 brochure alpha*cp*rho, 298-1273 K
 k_hx = cb.k_hastelloy_x       # HASTELLOY X brochure + data sheet, 300-1273 K
 k_188 = cb.k_haynes188        # HAYNES 188 brochure table, 300-1273 K
 k_263 = cb.k_haynes263        # HAYNES 263 brochure table, 300-1273 K
 k_25 = cb.k_haynes25          # HAYNES 25 (L-605) brochure table, 298-1273 K
-k_625 = cb.k_inconel625       # Special Metals INCONEL 625 Table 3, 116-1255 K
+k_625 = cb.k_inconel625       # Special Metals INCONEL 625 Table 3, 116-1255 K (Gen3 CSP 14-25% higher, #881)
 k_75 = cb.k_nimonic75         # Virgamet N75 table (RT = Special Metals), 293-1273 K
 k_cu = cb.k_copper            # high-purity copper, NSRDS-NBS 8 Table 2b, 100-1200 K
 k_al2o3 = cb.k_alumina        # dense Al2O3, NSRDS-NBS 8 Table 14, 100-2000 K

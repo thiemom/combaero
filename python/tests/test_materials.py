@@ -47,27 +47,25 @@ class TestSuperalloys:
         with pytest.raises(RuntimeError):
             cb.k_inconel718(1300)
 
-    def test_haynes230_ambient(self):
-        """Test Haynes 230 at ambient temperature."""
-        T = 300.0  # K
-        k = cb.k_haynes230(T)
+    def test_haynes230_is_alpha_cp_rho_from_the_brochure(self):
+        """Brochure H-3000O: k = alpha cp rho, 8970 kg/m3 (#881)."""
+        # 500 C: 38.5e-3 cm2/s, 473 J/kg C.
+        assert cb.k_haynes230(500.0 + 273.15) == pytest.approx(16.33, rel=1e-12)
+        assert pytest.approx(16.33, abs=0.005) == 38.5e-7 * 473.0 * 8970.0
+        # RT (25 C): 24.2e-3 cm2/s, 397 J/kg C.
+        assert cb.k_haynes230(25.0 + 273.15) == pytest.approx(8.62, rel=1e-12)
+        # 800 C row skipped (cp misprint): linear between 700 and 900 C.
+        assert cb.k_haynes230(800.0 + 273.15) == pytest.approx(0.5 * (22.14 + 24.25), rel=1e-12)
 
-        # Brochure H-3000O: 8.9 W/m K at room temperature (#761)
-        assert k == pytest.approx(8.94, abs=0.01)
-
-    def test_haynes230_high_temp(self):
-        """Test Haynes 230 at high temperature."""
-        T = 1200.0  # K (927C)
-        k = cb.k_haynes230(T)
-
-        # Brochure H-3000O: 26.4 W/m K at 900 C, 28.4 at 1000 C (linear)
-        assert k == pytest.approx(8.4 + 0.020 * (1200.0 - 273.15), rel=1e-12)
+    def test_haynes230_sits_inside_the_gen3csp_band(self):
+        """Gen3 CSP measured k (95% band) at 500 C: 16.02 +- 1.01; the brochure's
+        printed conductivity column (18.4) is outside it, the product is inside."""
+        assert abs(cb.k_haynes230(500.0 + 273.15) - 16.02) < 1.01
+        assert abs(18.4 - 16.02) > 1.01
 
     def test_haynes230_temperature_range(self):
-        """Test Haynes 230 valid temperature range."""
-        # Valid range: 300-1273 K, where the brochure table ends (1000 C)
-        assert cb.k_haynes230(300) > 0
-        assert cb.k_haynes230(1000.0 + 273.15) == pytest.approx(28.4, rel=1e-12)
+        """Valid 25-1000 C, where the brochure table ends."""
+        assert cb.k_haynes230(1000.0 + 273.15) == pytest.approx(26.68, rel=1e-12)
 
         with pytest.raises(RuntimeError):
             cb.k_haynes230(250)
@@ -79,30 +77,35 @@ class TestSuperalloys:
 class TestStructuralAlloys:
     """Test structural alloy thermal conductivity functions."""
 
-    def test_ss316_ambient(self):
-        """Test Stainless Steel 316 at ambient temperature."""
-        T = 300.0  # K
-        k = cb.k_stainless_steel_316(T)
+    def test_ss316_is_the_gen3csp_table(self):
+        """Georgia Tech Gen3 CSP measured k, 260-820 C (#881)."""
+        assert cb.k_stainless_steel_316(260.0 + 273.15) == pytest.approx(17.83, rel=1e-12)
+        assert cb.k_stainless_steel_316(500.0 + 273.15) == pytest.approx(20.78, rel=1e-12)
+        assert cb.k_stainless_steel_316(820.0 + 273.15) == pytest.approx(23.12, rel=1e-12)
+        assert cb.k_stainless_steel_316(520.0 + 273.15) == pytest.approx(
+            0.5 * (20.78 + 21.16), rel=1e-12
+        )
 
-        # At 300K: k approx 13.5 + 0.015*27 - 2.1e-6*27^2 approx 13.9 W/(m*K)
-        assert k == pytest.approx(13.9, abs=0.2)
-
-    def test_ss316_high_temp(self):
-        """Test SS316 at high temperature."""
-        T = 800.0  # K (527C)
-        k = cb.k_stainless_steel_316(T)
-
-        # Should be in reasonable range for austenitic stainless
-        assert 18 < k < 25
-
-    def test_ss316_temperature_range(self):
-        """Test SS316 valid temperature range."""
-        # Valid range: 300-1200 K
-        assert cb.k_stainless_steel_316(300) > 0
-        assert cb.k_stainless_steel_316(1200) > 0
-
+    def test_ss316_refuses_outside_the_measured_range(self):
         with pytest.raises(RuntimeError):
-            cb.k_stainless_steel_316(250)
+            cb.k_stainless_steel_316(300.0)
+        with pytest.raises(RuntimeError):
+            cb.k_stainless_steel_316(1200.0)
+        # The database lookup holds the end values.
+        assert cb.get_material_conductivity("ss316", 300.0) == pytest.approx(17.83, rel=1e-12)
+
+    def test_ss310_is_the_gen3csp_table(self):
+        """Georgia Tech Gen3 CSP measured k, 260-800 C (#881)."""
+        assert cb.k_stainless_steel_310(260.0 + 273.15) == pytest.approx(17.13, rel=1e-12)
+        assert cb.k_stainless_steel_310(500.0 + 273.15) == pytest.approx(20.55, rel=1e-12)
+        assert cb.k_stainless_steel_310(800.0 + 273.15) == pytest.approx(25.12, rel=1e-12)
+        assert cb.get_material_conductivity("ss310", 600.0 + 273.15) == pytest.approx(
+            0.5 * (22.08 + 23.08), rel=1e-12
+        )
+        with pytest.raises(RuntimeError):
+            cb.k_stainless_steel_310(300.0)
+        with pytest.raises(RuntimeError):
+            cb.k_stainless_steel_310(800.0 + 273.15 + 1.0)
 
     def test_aluminum_6061_is_deprecated_but_still_answers(self):
         """No cited source (#761): warns, removed in 0.9.0, unchanged until then."""
@@ -186,6 +189,7 @@ class TestMaterialDatabase:
     assert "inconel718" in materials
     assert "haynes230" in materials
     assert "ss316" in materials
+    assert "ss310" in materials
     assert "al6061" in materials
     assert "ysz" in materials
 
@@ -517,19 +521,19 @@ class TestOptInExtrapolation:
         for T in (300.0, 777.7, 1273.15):
             assert cb.k_hastelloy_x(T, extrapolate=True) == cb.k_hastelloy_x(T)
 
-    def test_a_fitted_polynomial_continues_its_tangent(self) -> None:
-        # SS 316: 13.5 + 0.015 T_C - 2.1e-6 T_C^2 up to 1200 K.
-        t = 1200.0 - 273.15
-        slope = 0.015 - 4.2e-6 * t
-        k_end = 13.5 + 0.015 * t - 2.1e-6 * t * t
-        assert cb.k_stainless_steel_316(1300.0, extrapolate=True) == pytest.approx(
-            k_end + 100.0 * slope, rel=1e-6
+    def test_a_fitted_line_continues_its_tangent(self) -> None:
+        # Inconel 718: 11.4 + 0.0146 T_C up to 1200 K.
+        k_end = 11.4 + 0.0146 * (1200.0 - 273.15)
+        assert cb.k_inconel718(1300.0, extrapolate=True) == pytest.approx(
+            k_end + 100.0 * 0.0146, rel=1e-6
         )
 
-    def test_haynes230_continues_its_table_line_past_1000_c(self) -> None:
-        # 8.4 + 0.020 T_C ends at 28.4 (1000 C); the flag continues the line.
-        assert cb.k_haynes230(1100.0 + 273.15, extrapolate=True) == pytest.approx(30.4, rel=1e-9)
-        assert cb.get_material_conductivity("haynes230", 1400.0) == pytest.approx(28.4, rel=1e-12)
+    def test_haynes230_continues_its_end_segment_past_1000_c(self) -> None:
+        # alpha cp rho, 900 -> 1000 C: 24.25 -> 26.68; the flag continues it.
+        assert cb.k_haynes230(1100.0 + 273.15, extrapolate=True) == pytest.approx(
+            26.68 + (26.68 - 24.25), rel=1e-9
+        )
+        assert cb.get_material_conductivity("haynes230", 1400.0) == pytest.approx(26.68, rel=1e-12)
 
     def test_it_refuses_where_the_continuation_is_unphysical(self) -> None:
         with pytest.raises(RuntimeError, match="<= 0"):

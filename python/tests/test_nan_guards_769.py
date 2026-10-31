@@ -83,6 +83,7 @@ CASES: list[Case] = [
     # -- materials ---------------------------------------------------------
     ("k_inconel718", cb.k_inconel718, (800.0,), RuntimeError, ()),
     ("k_haynes230", cb.k_haynes230, (800.0,), RuntimeError, ()),
+    ("k_stainless_steel_310", cb.k_stainless_steel_310, (800.0,), RuntimeError, ()),
     ("k_stainless_steel_316", cb.k_stainless_steel_316, (800.0,), RuntimeError, ()),
     ("k_aluminum_6061", cb.k_aluminum_6061, (400.0,), RuntimeError, ()),
     # hours = +inf is the fully sintered limit, so only NaN is refused there.
