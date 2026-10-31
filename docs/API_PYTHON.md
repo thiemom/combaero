@@ -274,6 +274,11 @@ Cd = cb.Cd_sharp_thin_plate(geom, state)  # Reader-Harris/Gallagher at geom.tap
 Cd, dCd_dRe = cb.Cd_sharp_thin_plate_and_dRe(geom, state)  # analytic Re_D derivative
 Cd, dCd_dRe = cb.metering_cd_and_dRe(cb.MeteringCdCorrelation.Stolz, geom, Re_D)
 ok = cb.metering_cd_in_range(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom, Re_D)
+# RHG's lower Re_D bound (ISO 5167-2 5.3.1). Below it the RHG Cd is HELD (#873,
+# 0.8.0), entered C1 in ln Re_D over 0.1 just below the bound; metering_cd_in_range
+# is False there. It used to climb to a 1.5 cap. Stolz: no hold, and
+# metering_cd_re_min raises ValueError (ISO 5167:1980's bound is not held).
+Re_b = cb.metering_cd_re_min(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom)
 # ISO 5167-2 permanent loss / tapping differential between pipes, and dk/dC
 k, dk_dC = cb.permanent_loss_ratio_and_dC(beta, Cd)
 E = cb.velocity_of_approach_factor(beta)  # 1/sqrt(1-beta^4); 1 outside 0<beta<1

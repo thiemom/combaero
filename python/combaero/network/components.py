@@ -4244,7 +4244,8 @@ class OrificeElement(NetworkElement):
         A flag for diagnostics, never a selector. True for 'fixed' (the value
         is the caller's). The normed metering family asks C++'s
         metering_cd_in_range at the pipe Reynolds number (ISO 5167-2:2003
-        5.3.1 for Reader-Harris/Gallagher; Stolz's 1980 limits are not
+        5.3.1 for Reader-Harris/Gallagher, below whose lower Re_D bound the
+        Cd is held (#873) and this reads False; Stolz's 1980 limits are not
         encoded). A plenum-fed metering plate reads False: it has no pipe.
         """
         metering = _METERING_SELECTORS.get(self.correlation)

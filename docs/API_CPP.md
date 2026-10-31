@@ -1440,14 +1440,24 @@ enum class MeteringCdCorrelation {
 
 // Reader-Harris/Gallagher at geom.tap, with the small-pipe term below 71.12 mm.
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
-// (Cd, dCd/dRe_D), analytic; 0 below the Re_D floor and above the 1.5 cap.
+// (Cd, dCd/dRe_D), analytic; held below ISO's lower Re_D bound (below).
 // The network orifice's flow column uses it (dRe_D/dm = Re_D/|m|).
 std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
                                                        const OrificeState& state);
 // (Cd, dCd/dRe_D) of ReaderHarrisGallagher or Stolz at geom.tap; the network
-// element's only metering entry point. Constant/UserFunction throw.
+// element's only metering entry point. Constant/UserFunction throw. RHG below
+// Re_b = metering_cd_re_min is HELD (#873, 0.8.0), entered C1 in ln Re_D over
+// orifice::metering_hold::blend_ln_re = 0.1 just below Re_b (the slope ramps
+// linearly to 0); at Re_D >= Re_b nothing changed. The form and its
+// derivative are in include/orifice.h. A 1.5 cap stays for flange taps below
+// D ~32 mm. Stolz has no hold (ISO 5167:1980 not held): Re_D < 1 floor and
+// 1.5 cap, as before.
 std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
                                                const OrificeGeometry& geom, double Re_D);
+// RHG's lower Re_D bound, ISO 5167-2:2003 5.3.1 (5000, 16000 b^2 above
+// beta 0.56, flange max(5000, 170 b^2 D[mm])). Throws std::invalid_argument
+// for every other correlation: Stolz has no encoded bound and no hold.
+double metering_cd_re_min(MeteringCdCorrelation id, const OrificeGeometry& geom);
 // ISO 5167-2:2003 5.3.1 range (Reader-Harris/Gallagher); Stolz returns true.
 bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D);

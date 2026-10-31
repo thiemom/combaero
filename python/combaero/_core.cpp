@@ -6137,12 +6137,26 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("geom"), py::arg("Re_D"),
         "(Cd, dCd/dRe_D) of a metering correlation at the taps geom.tap.\n\n"
         "ReaderHarrisGallagher (ISO 5167-2:2003) or Stolz (ISO 5167:1980).\n"
-        "Constant and UserFunction raise ValueError: their Cd is the caller's.");
+        "ReaderHarrisGallagher: below the lower Re_D bound Re_b\n"
+        "(metering_cd_re_min) Cd is HELD, entered C1 in ln Re_D over 0.1 just\n"
+        "below Re_b (#873): the slope ramps linearly to 0, so Cd and\n"
+        "dCd/dRe_D stay continuous and values at Re_D >= Re_b are Eq. (4)'s\n"
+        "own. metering_cd_in_range is False there. Stolz: no hold (its 1980\n"
+        "bound is not held as a source); held at its Re_D = 1 value below 1\n"
+        "and capped at 1.5, as before. Constant and UserFunction raise\n"
+        "ValueError: their Cd is the caller's.");
+  m.def("metering_cd_re_min", &metering_cd_re_min, py::arg("correlation"), py::arg("geom"),
+        "Lower Re_D bound of Reader-Harris/Gallagher's stated range for this\n"
+        "geometry, where metering_cd_and_dRe's hold begins (ISO 5167-2:2003\n"
+        "5.3.1): corner/D-D/2 5000 (beta <= 0.56) or 16000 beta^2; flange\n"
+        "max(5000, 170 beta^2 D[mm]). ValueError for every other correlation:\n"
+        "Stolz has no encoded bound (ISO 5167:1980 is not held) and no hold;\n"
+        "Constant/UserFunction carry no formula.");
   m.def("metering_cd_in_range", &metering_cd_in_range, py::arg("correlation"),
         py::arg("geom"), py::arg("Re_D"),
         "Is the plate inside the correlation's stated range? A diagnostic,\n"
         "never a selector. ReaderHarrisGallagher: ISO 5167-2:2003 5.3.1 (d,\n"
-        "D, beta and the tap-dependent Re_D floor). Stolz: always True, its\n"
+        "D, beta and Re_D >= metering_cd_re_min). Stolz: always True, its\n"
         "1980 limits are not encoded.");
   m.def("permanent_loss_ratio_and_dC", &permanent_loss_ratio_and_dC, py::arg("beta"),
         py::arg("C"),

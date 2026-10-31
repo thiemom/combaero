@@ -2,6 +2,8 @@
 #include "../include/orifice.h"
 #include <cmath>
 #include <stdexcept>
+#include <tuple>
+#include <vector>
 
 // Test fixture for orifice tests
 class OrificeTest : public ::testing::Test {
@@ -611,6 +613,144 @@ TEST_F(OrificeTest, KFromCdHighBeta) {
     // Round-trip should be exact even with clamping because both use the same internal clamp
     double Cd_back = orifice::Cd_from_K(K, beta_extreme);
     EXPECT_NEAR(Cd_back, Cd_val, 1e-10);
+}
+
+// -------------------------------------------------------------
+// Metering Cd held below its lower Re_D bound (#873)
+// -------------------------------------------------------------
+//
+// RHG was evaluated far below its Re_D range, where the Re terms grow
+// without bound: a 4 mm, beta 0.5 plate hit the 1.5 cap below Re_D ~ 40. It
+// is now held below Re_b = metering_cd_re_min, entered C1 in ln Re_D over
+// orifice::metering_hold::blend_ln_re. Stolz has no hold (ISO 5167:1980 is
+// not held as a source) and is pinned to its pre-#873 values.
+
+namespace {
+
+OrificeGeometry metering_plate(double beta, double D, OrificeTap tap) {
+    OrificeGeometry g;
+    g.D = D;
+    g.d = beta * D;
+    g.tap = tap;
+    return g;
+}
+
+struct MeteringCase {
+    MeteringCdCorrelation id;
+    OrificeGeometry geom;
+};
+
+std::vector<MeteringCase> metering_cases() {
+    std::vector<MeteringCase> out;
+    for (OrificeTap tap : {OrificeTap::Corner, OrificeTap::D_D2, OrificeTap::Flange}) {
+        for (double D : {0.004, 0.1, 1.0}) {
+            for (double beta : {0.2, 0.5, 0.6, 0.75}) {
+                out.push_back(
+                    {MeteringCdCorrelation::ReaderHarrisGallagher, metering_plate(beta, D, tap)});
+            }
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST(MeteringCdHold, IsConstantWithZeroSlopeBelowTheBlend) {
+    const double w = orifice::metering_hold::blend_ln_re;
+    for (const auto& c : metering_cases()) {
+        const double Rb = metering_cd_re_min(c.id, c.geom);
+        const auto [C_b, dC_b] = metering_cd_and_dRe(c.id, c.geom, Rb);
+        const double held = C_b - 0.5 * dC_b * Rb * w;
+        EXPECT_GE(held, C_b);  // monotone: the hold never dips below the bound
+        for (double Re : {Rb * std::exp(-w) * 0.999, 0.5 * Rb, 1e-3 * Rb, 1.0, 0.0, -3.0}) {
+            const auto [C, dC] = metering_cd_and_dRe(c.id, c.geom, Re);
+            EXPECT_NEAR(C, held, 1e-13) << "Re_D " << Re;
+            EXPECT_EQ(dC, 0.0) << "Re_D " << Re;
+        }
+    }
+}
+
+TEST(MeteringCdHold, IsC1AndItsDerivativeIsExactAcrossTheBlend) {
+    const double w = orifice::metering_hold::blend_ln_re;
+    for (const auto& c : metering_cases()) {
+        const double Rb = metering_cd_re_min(c.id, c.geom);
+        const double s = std::abs(std::get<1>(metering_cd_and_dRe(c.id, c.geom, Rb))) * Rb;
+        for (double edge : {Rb, Rb * std::exp(-w)}) {
+            const auto [Cl, dl] = metering_cd_and_dRe(c.id, c.geom, edge * (1.0 - 1e-11));
+            const auto [Ch, dh] = metering_cd_and_dRe(c.id, c.geom, edge * (1.0 + 1e-11));
+            EXPECT_NEAR(Cl, Ch, 3e-11 * s + 1e-14);
+            EXPECT_NEAR(dl * edge, dh * edge, 1e-8 * s);
+        }
+        for (double u : {-0.09, -0.05, -0.01, -1e-4, 1e-4, 0.05}) {
+            const double Re = Rb * std::exp(u);
+            const double h = 1e-6 * Re;
+            const double fd = (std::get<0>(metering_cd_and_dRe(c.id, c.geom, Re + h)) -
+                               std::get<0>(metering_cd_and_dRe(c.id, c.geom, Re - h))) /
+                              (2.0 * h);
+            const double an = std::get<1>(metering_cd_and_dRe(c.id, c.geom, Re));
+            EXPECT_NEAR(an * Re, fd * Re, 1e-7 * s) << "u " << u;
+            if (u < 0.0) {
+                // The log-slope ramps linearly from its bound value to 0.
+                const double s_b = std::get<1>(metering_cd_and_dRe(c.id, c.geom, Rb)) * Rb;
+                EXPECT_NEAR(an * Re, s_b * (1.0 + u / w), 1e-9 * s) << "u " << u;
+            }
+        }
+    }
+}
+
+TEST(MeteringCdHold, TheIssueExampleNoLongerClimbsToTheCap) {
+    // D 4 mm, beta 0.5, D-D/2: 1.5 at Re_D 1-40, 1.162 at 100, 0.687 at 1000
+    // before; 0.6345 everywhere below 0.905 Re_b now.
+    const auto g = metering_plate(0.5, 0.004, OrificeTap::D_D2);
+    for (double Re : {1.0, 40.0, 100.0, 1000.0}) {
+        EXPECT_NEAR(std::get<0>(metering_cd_and_dRe(MeteringCdCorrelation::ReaderHarrisGallagher,
+                                                    g, Re)),
+                    0.6345, 5e-5);
+    }
+}
+
+TEST(MeteringCdHold, BoundsAreTheStandardsAndTheFlagSaysBelowThem) {
+    using M = MeteringCdCorrelation;
+    EXPECT_EQ(metering_cd_re_min(M::ReaderHarrisGallagher, metering_plate(0.5, 0.1, OrificeTap::Corner)), 5000.0);
+    EXPECT_NEAR(metering_cd_re_min(M::ReaderHarrisGallagher, metering_plate(0.7, 0.1, OrificeTap::D_D2)), 7840.0, 1e-9);
+    EXPECT_NEAR(metering_cd_re_min(M::ReaderHarrisGallagher, metering_plate(0.7, 0.5, OrificeTap::Flange)), 41650.0, 1e-9);
+    EXPECT_THROW(metering_cd_re_min(M::Constant, metering_plate(0.5, 0.1, OrificeTap::Corner)),
+                 std::invalid_argument);
+    // Stolz: ISO 5167:1980 is not held, so no bound is encoded.
+    for (OrificeTap tap : {OrificeTap::Corner, OrificeTap::D_D2, OrificeTap::Flange}) {
+        EXPECT_THROW(metering_cd_re_min(M::Stolz, metering_plate(0.5, 0.1, tap)),
+                     std::invalid_argument);
+    }
+    const auto g = metering_plate(0.5, 0.1, OrificeTap::D_D2);
+    const double Rb = metering_cd_re_min(M::ReaderHarrisGallagher, g);
+    EXPECT_TRUE(metering_cd_in_range(M::ReaderHarrisGallagher, g, Rb));
+    EXPECT_FALSE(metering_cd_in_range(M::ReaderHarrisGallagher, g, 0.999 * Rb));
+    EXPECT_FALSE(metering_cd_in_range(M::ReaderHarrisGallagher, g, 0.0));
+    EXPECT_TRUE(metering_cd_in_range(M::Stolz, g, 0.0));  // 1980 limits not encoded
+}
+
+TEST(MeteringCdHold, StolzIsUnchanged) {
+    // metering_cd_and_dRe(Stolz) before #873 (af22aedc): the Re_D < 1 floor,
+    // the 1.5 cap and the equation, to the last bit.
+    struct Ref {
+        OrificeTap tap;
+        double beta, D, Re, C, dC;
+    };
+    const Ref refs[] = {
+        {OrificeTap::Corner, 0.1, 0.1, 0.0, 0.886160312783276, 0.0},
+        {OrificeTap::Corner, 0.1, 0.1, 0.5, 0.886160312783276, 0.0},
+        {OrificeTap::Corner, 0.1, 0.1, 1.0, 0.886160312783276, -0.21750936316053165},
+        {OrificeTap::Corner, 0.5, 0.1, 10.0, 1.5, 0.0},
+        {OrificeTap::Corner, 0.5, 0.1, 100.0, 1.1151333928752514, -0.0038450586415594823},
+        {OrificeTap::D_D2, 0.5, 0.004, 1000.0, 0.69424688050302, -6.837588612677457e-05},
+        {OrificeTap::Flange, 0.6, 0.05, 1e5, 0.6101390386232195, -3.410798652982583e-08},
+    };
+    for (const Ref& r : refs) {
+        const auto [C, dC] = metering_cd_and_dRe(MeteringCdCorrelation::Stolz,
+                                                 metering_plate(r.beta, r.D, r.tap), r.Re);
+        EXPECT_EQ(C, r.C) << "Re_D " << r.Re;
+        EXPECT_EQ(dC, r.dC) << "Re_D " << r.Re;
+    }
 }
 
 TEST(IdelchikWallOrifice, DegenerateGeometryStaysFinite) {

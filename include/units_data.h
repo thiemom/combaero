@@ -1073,6 +1073,7 @@ inline constexpr Entry function_units[] = {
     {"metering_cd_and_dRe", "correlation: -, geom: OrificeGeometry, Re_D: -",
      "- (Cd), - (dCd/dRe_D)"},
     {"metering_cd_in_range", "correlation: -, geom: OrificeGeometry, Re_D: -", "- (bool)"},
+    {"metering_cd_re_min", "correlation: - (RHG only), geom: OrificeGeometry", "- (Re_D)"},
     {"permanent_loss_ratio_and_dC", "beta: -, C: -", "tuple(-, -)"},
     {"velocity_of_approach_factor", "beta: -", "-"},
     {"jobson_force_defect", "Ci: -, beta: -, Cv: -", "- (f)"},

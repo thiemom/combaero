@@ -76,8 +76,12 @@ def _taps(D: float) -> list[tuple[object, tuple[float, float]]]:
 @pytest.mark.parametrize("Re", [5e3, 1e5, 3e6])
 def test_rhg_is_iso_eq4_at_every_tap(D: float, beta: float, Re: float) -> None:
     for tap, (L1, L2) in _taps(D):
-        cd, _ = cb.metering_cd_and_dRe(M.ReaderHarrisGallagher, _geom(beta, D, tap), Re)
-        assert cd == pytest.approx(_iso_rhg(beta, Re, D, L1, L2), abs=1e-12), tap
+        g = _geom(beta, D, tap)
+        # Eq. (4) holds from ISO's lower Re_D bound up; below it Cd is held
+        # (#873, test_orifice_metering_low_re_hold.py).
+        Re_in = max(Re, cb.metering_cd_re_min(M.ReaderHarrisGallagher, g))
+        cd, _ = cb.metering_cd_and_dRe(M.ReaderHarrisGallagher, g, Re_in)
+        assert cd == pytest.approx(_iso_rhg(beta, Re_in, D, L1, L2), abs=1e-12), tap
 
 
 @pytest.mark.parametrize("corr", [M.ReaderHarrisGallagher, M.Stolz])
@@ -86,6 +90,10 @@ def test_rhg_is_iso_eq4_at_every_tap(D: float, beta: float, Re: float) -> None:
 def test_the_re_derivative_is_exact_at_every_tap(corr: object, D: float, Re: float) -> None:
     for tap, _ in _taps(D):
         g = _geom(0.6, D, tap)
+        # RHG: above its lower Re_D bound, clear of the C1 point at the bound
+        # where a central difference straddles two curvatures (#873).
+        if corr == M.ReaderHarrisGallagher:
+            Re = max(Re, 1.01 * cb.metering_cd_re_min(corr, g))
         _, dcd = cb.metering_cd_and_dRe(corr, g, Re)
         h = 1e-6 * Re
         fd = (

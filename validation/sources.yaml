@@ -3821,6 +3821,19 @@ wanted:
     of each segment is near-slot. The 1972 primary could not be found (2026-10-29); the thick-lip film and
     film-side Nu are implemented from the book (a reprint, checked only against its worked example).'
   where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled).
+- citation: ISO 5167:1980 (or its restatement ISO 5167-1:1991). Measurement of fluid flow by means of
+    orifice plates, nozzles and Venturi tubes inserted in circular cross-section conduits running full.
+    International Organization for Standardization. (citation as recalled)
+  checked: false
+  issues:
+  - 873
+  priority: later
+  question: 'The Stolz equation''s limits of use. #873 holds Reader-Harris/Gallagher Cd below its ISO 5167-2
+    lower Re_D bound, but Stolz has NO low-Re hold: its bound is known only from memory, so none is encoded
+    and metering_cd_re_min refuses Stolz. The text is needed to add the hold (its lower Re_D bound per tap)
+    and the d, D and beta limits that metering_cd_in_range does not encode for Stolz. Follow-up of #873
+    (issue to be filed).'
+  where: ISO (withdrawn standard; national-library or university copy).
 - citation: Reader-Harris, M. J., Sattary, J. A. (1996). The orifice plate discharge coefficient equation --
     the equation for ISO 5167-1. Proc. 14th North Sea Flow Measurement Workshop. (citation as recalled)
   checked: false

@@ -210,6 +210,7 @@ try:
         OrificeTap,
         metering_cd_and_dRe,
         metering_cd_in_range,
+        metering_cd_re_min,
         permanent_loss_ratio_and_dC,
         velocity_of_approach_factor,
         jobson_force_defect,
@@ -918,6 +919,7 @@ except (ModuleNotFoundError, ImportError) as e:
     Cd_sharp_thin_plate_and_dRe = _core.Cd_sharp_thin_plate_and_dRe
     metering_cd_and_dRe = _core.metering_cd_and_dRe
     metering_cd_in_range = _core.metering_cd_in_range
+    metering_cd_re_min = _core.metering_cd_re_min
     permanent_loss_ratio_and_dC = _core.permanent_loss_ratio_and_dC
     velocity_of_approach_factor = _core.velocity_of_approach_factor
     jobson_force_defect = _core.jobson_force_defect
@@ -1594,6 +1596,7 @@ __all__ = [
     "Cd_sharp_thin_plate_and_dRe",
     "metering_cd_and_dRe",
     "metering_cd_in_range",
+    "metering_cd_re_min",
     "permanent_loss_ratio_and_dC",
     "velocity_of_approach_factor",
     "jobson_force_defect",
