@@ -55,17 +55,19 @@ double k_inconel718(double T) {
 }
 
 double k_haynes230(double T) {
-    constexpr double T_min = 300.0;
-    constexpr double T_max = 1000.0 + 273.15;
-    validate_temperature("Haynes 230", T, T_min, T_max);
-
-    // HAYNES 230 brochure H-3000O (2021), "Physical Properties": k = 8.9 W/m K
-    // at room temperature and 10.4 + 2.0 per 100 C to 28.4 at 1000 C. The
-    // line below reproduces every printed value from 25 to 1000 C, where the
-    // table (and the valid range) ends. The quadratic used before was 37%
-    // high at room temperature (#761).
-    double T_C = T - 273.15;
-    return 8.4 + 0.020 * T_C;
+    validate_temperature("Haynes 230", T, 25.0 + 273.15, 1000.0 + 273.15);
+    // HAYNES 230 brochure H-3000O (2021), Physical Properties: k = alpha cp
+    // rho from its diffusivity and specific-heat columns, rho = 8970 kg/m3
+    // (#881). The 800 C row is skipped: its specific heat prints 5595 J/kg C
+    // (574 at 700 C, 609 at 900 C), a misprint. The step from 600 to 700 C
+    // follows the specific heat (486 -> 574); Gen3 CSP measures the same step.
+    // The brochure's own conductivity column (8.4 + 0.020 T_C, shipped until
+    // #881) is 13% above this product at 500 C and outside Gen3 CSP's band.
+    static constexpr std::array<double, 10> T_C = {25.0, 100.0, 200.0, 300.0, 400.0,
+                                                   500.0, 600.0, 700.0, 900.0, 1000.0};
+    static constexpr std::array<double, 10> k = {8.62, 10.07, 11.67, 13.22, 14.89,
+                                                 16.33, 18.27, 22.14, 24.25, 26.68};
+    return table_k(T_C, k, T - 273.15);
 }
 
 // Combustor liner / transition-piece alloys: the manufacturers' Physical
@@ -119,7 +121,10 @@ double k_haynes25(double T) {
 
 double k_inconel625(double T) {
     // INCONEL alloy 625, Special Metals, Table 3 (Battelle measurements,
-    // annealed 2100 F / 1 h); the 1093 C row prints no conductivity.
+    // annealed 2100 F / 1 h); the 1093 C row prints no conductivity. Gen3 CSP
+    // measures 14% more at 260-580 C (its diffusivity is 22-40% higher, its
+    // specific heat lower) and 25% more at 620-700 C, where its specific heat
+    // steps up as the alloy ages. Kept until a third source settles it (#881).
     validate_temperature("Inconel 625", T, -157.0 + 273.15, 982.0 + 273.15);
     static constexpr std::array<double, 15> T_C = {-157.0, -129.0, -73.0, -18.0, 21.0, 38.0, 93.0, 204.0, 316.0, 427.0, 538.0, 649.0, 760.0, 871.0, 982.0};
     static constexpr std::array<double, 15> k = {7.2, 7.5, 8.4, 9.2, 9.8, 10.1, 10.8, 12.5, 14.1, 15.7, 17.5, 19.0, 20.8, 22.8, 25.2};
@@ -178,12 +183,33 @@ double k_bondcoat_nicocraly(double T) {
 // -------------------------------------------------------------
 
 double k_stainless_steel_316(double T) {
-    constexpr double T_min = 300.0;
-    constexpr double T_max = 1200.0;
-    validate_temperature("Stainless Steel 316", T, T_min, T_max);
+    // Georgia Tech Gen3 CSP database, SS316 measured k (laser-flash alpha
+    // times cp times a constant rho), 95% band 0.9 W/m K at 260 C to 2.7 at
+    // 820 C (#881). The quadratic shipped before (unsourced) lay inside the
+    // band at every point but ran to 1200 K, past the data.
+    validate_temperature("Stainless Steel 316", T, 260.0 + 273.15, 820.0 + 273.15);
+    static constexpr std::array<double, 15> T_C = {260.0, 300.0, 340.0, 380.0, 420.0,
+                                                   460.0, 500.0, 540.0, 580.0, 620.0,
+                                                   660.0, 700.0, 740.0, 780.0, 820.0};
+    static constexpr std::array<double, 15> k = {17.83, 18.32, 18.90, 19.37, 19.83,
+                                                 20.33, 20.78, 21.16, 21.78, 22.50,
+                                                 22.79, 22.97, 22.87, 22.90, 23.12};
+    return table_k(T_C, k, T - 273.15);
+}
 
-    double T_C = T - 273.15;
-    return 13.5 + 0.015 * T_C - 2.1e-6 * T_C * T_C;
+double k_stainless_steel_310(double T) {
+    // Georgia Tech Gen3 CSP database, SS310 measured k, 95% band 0.8 W/m K
+    // at 260 C to 2.5 at 800 C (#881). Not joined to NIST's cryogenic fit
+    // (11.6 at 300 K): this data's trend runs back to about 13.7 there, so
+    // the two are different samples, and the gap is not bridged.
+    validate_temperature("Stainless Steel 310", T, 260.0 + 273.15, 800.0 + 273.15);
+    static constexpr std::array<double, 15> T_C = {260.0, 300.0, 340.0, 380.0, 420.0,
+                                                   460.0, 500.0, 540.0, 580.0, 620.0,
+                                                   660.0, 700.0, 740.0, 780.0, 800.0};
+    static constexpr std::array<double, 15> k = {17.13, 17.72, 18.31, 18.91, 19.47,
+                                                 20.04, 20.55, 21.11, 22.08, 23.08,
+                                                 23.58, 24.13, 24.55, 24.83, 25.12};
+    return table_k(T_C, k, T - 273.15);
 }
 
 double k_aluminum_6061(double T) {
@@ -248,8 +274,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     {"haynes230", {
         "haynes230",
         k_haynes230,
-        300.0, 1000.0 + 273.15,
-        "HAYNES 230 alloy brochure H-3000O (Haynes International, 2021)",
+        25.0 + 273.15, 1000.0 + 273.15,
+        "HAYNES 230 brochure H-3000O (Haynes International, 2021): alpha * cp * rho, 25-1000 C",
         "Ni-Cr-W-Mo alloy; table to 1000 C"
     }},
     {"hastelloy_x", {
@@ -325,9 +351,16 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     {"ss316", {
         "ss316",
         k_stainless_steel_316,
-        300.0, 1200.0,
-        "NIST, ASM Handbook",
+        260.0 + 273.15, 820.0 + 273.15,
+        "Georgia Tech Gen3 CSP database, measured 260-820 C",
         "Austenitic stainless steel, corrosion resistant"
+    }},
+    {"ss310", {
+        "ss310",
+        k_stainless_steel_310,
+        260.0 + 273.15, 800.0 + 273.15,
+        "Georgia Tech Gen3 CSP database, measured 260-800 C",
+        "Austenitic 25Cr-20Ni heat-resisting stainless steel (cascade vanes, furnace parts)"
     }},
     {"al6061", {
         "al6061",
