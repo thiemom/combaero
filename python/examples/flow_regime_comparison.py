@@ -316,6 +316,7 @@ for u_in in velocities:
                 from_node="junction",
                 to_node="outlet",
                 Cd=Cd_orif,
+                correlation="fixed",
                 diameter=math.sqrt(4.0 * A_orif / math.pi),
                 regime=orif_regime,
             )

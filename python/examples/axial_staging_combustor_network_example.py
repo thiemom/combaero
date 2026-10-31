@@ -104,7 +104,13 @@ def main():
 
     # Final Discharge
     nozzle = OrificeElement(
-        "nozzle", "axial_zone", "turbine_bc", Cd=0.85, diameter=0.159577, regime="compressible"
+        "nozzle",
+        "axial_zone",
+        "turbine_bc",
+        Cd=0.85,
+        correlation="fixed",
+        diameter=0.159577,
+        regime="compressible",
     )
 
     # --- Assemble Network ---

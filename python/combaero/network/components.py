@@ -1850,6 +1850,11 @@ DEFAULT_ORIFICE_BORE = 0.08
 #: permanent loss is nil anyway, so nothing physical hides inside it.
 ORIFICE_BORE_PIPE_RTOL = 1e-6
 
+#: The Cd an orifice-family start guess assumes when a correlation computes
+#: the Cd (#872): the value the unset Cd defaulted to before 0.8.0, so every
+#: start guess is unchanged. Never a result.
+_ORIFICE_SEED_CD = 0.6
+
 #: Mass flow [kg/s] over which a directional loss blends its forward and
 #: reverse forms, logistic in m_dot / scale (C++ ``sigmoid`` in
 #: area_change.cpp). Outside a few scales either form holds alone.
@@ -3560,7 +3565,7 @@ class OrificeElement(NetworkElement):
     - regime='compressible': Uses isentropic nozzle flow, choked below P* (C1 through it)
 
     The discharge coefficient Cd is determined by the 'correlation' parameter:
-      - 'fixed': Uses the user-supplied Cd value directly.
+      - 'fixed': Uses the user-supplied Cd value directly; Cd is required.
       - 'ReaderHarrisGallagher': Sharp thin-plate (ISO 5167-2:2003 / RHG).
       - 'Stolz': ISO 5167:1980.
       - 'IdelchikThick': Deep hole in a wall, Idelchik diagram 4-18a
@@ -3594,6 +3599,11 @@ class OrificeElement(NetworkElement):
     DISCHARGE correlations for a hole in a wall, where zeta is referenced to
     the hole velocity and there is no beta. They are not interchangeable, and
     there is deliberately no 'Auto' arm choosing between them from geometry.
+
+    ``Cd`` is the 'fixed' correlation's value and nothing else (#872, 0.8.0):
+    with any other correlation the Cd is the correlation's, and passing
+    ``Cd`` too raises ValueError rather than being silently ignored, as it
+    was before 0.8.0. 'fixed' without a ``Cd`` raises as well.
 
     The bore against the pipe it sits in (#788). The pipe diameter comes from
     the single channel on the side the flow comes from (``in_pipe=True``, the
@@ -3646,12 +3656,21 @@ class OrificeElement(NetworkElement):
     # nozzle: their Cd laws are outside the #861 audit.
     _selects_compressible_model = True
 
+    # The Cd a 'fixed' correlation takes when none is given (#872). None:
+    # 'fixed' requires a Cd. A subclass with a documented default (the
+    # impingement plate's Florschuetz 0.79) sets it.
+    _fixed_Cd_default: float | None = None
+    # The Cd the resistance start guess assumes when the Cd is a
+    # correlation's (#872). A start guess only: the solved flow does not
+    # depend on it.
+    _seed_Cd_default: float = _ORIFICE_SEED_CD
+
     def __init__(
         self,
         id: str,
         from_node: str,
         to_node: str,
-        Cd: float = 0.6,
+        Cd: float | None = None,
         diameter: float | None = None,
         regime: Literal["incompressible", "compressible"] = DEFAULT_REGIME,
         correlation: str = "ReaderHarrisGallagher",
@@ -3728,7 +3747,24 @@ class OrificeElement(NetworkElement):
                 "'Miller' had been computing Stolz). Use 'Stolz' or "
                 "'ReaderHarrisGallagher'."
             )
-        self.Cd = Cd
+        name = type(self).__name__
+        if correlation == "fixed":
+            if Cd is None:
+                Cd = type(self)._fixed_Cd_default
+            if Cd is None:
+                raise ValueError(
+                    f"{name} {id!r}: correlation='fixed' needs a Cd. Pass Cd=..., or "
+                    "pick a correlation that computes it."
+                )
+        elif Cd is not None:
+            raise ValueError(
+                f"{name} {id!r}: Cd={Cd!r} with correlation={correlation!r}. The "
+                f"correlation computes its own Cd and a given one would be ignored. "
+                "For a fixed discharge coefficient pass correlation='fixed'; to use "
+                "the correlation, drop Cd."
+            )
+        # The 'fixed' correlation's Cd; None when a correlation computes it.
+        self.Cd: float | None = Cd
         self.regime = regime
         self.correlation = correlation
         self.use_correlation = correlation != "fixed"
@@ -3774,14 +3810,21 @@ class OrificeElement(NetworkElement):
             return "jobson1955"
         return "nozzle"
 
+    @property
+    def _seed_Cd(self) -> float:
+        """The Cd a start guess assumes: the 'fixed' Cd, else
+        ``_seed_Cd_default`` standing in for the correlation's (#872)."""
+        return self.Cd if self.Cd is not None else type(self)._seed_Cd_default
+
     def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
         """Start guess: m = Cd A sqrt(2 rho dP); a correlation's Cd is
-        approximated by the user value. No orifice (bore == pipe): no loss."""
+        approximated by ``_seed_Cd_default`` (#872). No orifice (bore ==
+        pipe): no loss."""
         if self._pass_through:
             return 0.0
         if not self.area:
             return None
-        return 1.0 / (2.0 * rho * (self.Cd * self.area) ** 2)
+        return 1.0 / (2.0 * rho * (self._seed_Cd * self.area) ** 2)
 
     @property
     def residual_scale_kind(self) -> str:
@@ -3983,8 +4026,10 @@ class OrificeElement(NetworkElement):
     ) -> float:
         """Return effective Cd: from correlation or user-supplied fixed value."""
         if not self.use_correlation or self._orifice_geom is None:
-            # Clamp manual Cd strictly <= 1.0 to strictly preserve vena contracta physics (A_eff <= A_geom)
-            return max(1e-4, min(self.Cd, 1.0))
+            # Clamp manual Cd strictly <= 1.0 to strictly preserve vena contracta physics (A_eff <= A_geom).
+            # A correlation with no geometry (before resolve_topology, or
+            # bore == pipe, no orifice) has no Cd: the seed's stands in (#872).
+            return max(1e-4, min(self._seed_Cd, 1.0))
 
         # Estimate Re_D from current m_dot and upstream viscosity.
         D_up = self._orifice_geom.D
@@ -5066,7 +5111,7 @@ class EffusionPlateElement(OrificeElement):
         panel_width: float | None = None,
         angle_deg: float = 90.0,
         correlation: str = "IdelchikThick",
-        Cd: float = 0.6,
+        Cd: float | None = None,
         edge_radius: float = 0.0,
         internal_Nu_multiplier: float = 1.0,
         wall_conductivity: float = 20.0,
@@ -5728,7 +5773,7 @@ class FilmCoolingElement(OrificeElement):
         breakout_width: float | None = None,
         turbulence_intensity: float = 0.05,
         correlation: str = "IdelchikThick",
-        Cd: float = 0.6,
+        Cd: float | None = None,
         edge_radius: float = 0.0,
     ) -> None:
         name = f"FilmCoolingElement {id!r}"
@@ -5908,7 +5953,7 @@ class SlotFilmElement(OrificeElement):
         turbulence_intensity: float = SLOT_FILM_DEFAULT_TU,
         C_m_multiplier: float = 1.0,
         correlation: str = "IdelchikThick",
-        Cd: float = 0.6,
+        Cd: float | None = None,
         edge_radius: float = 0.0,
     ) -> None:
         name = f"SlotFilmElement {id!r}"
@@ -6333,8 +6378,10 @@ class ImpingementPlateElement(OrificeElement):
     leaves the wall into ``to_node``: the spent air carries it downstream.
 
     DISCHARGE COEFFICIENT. The hole's own Cd: default ``'fixed'`` at
-    Florschuetz's 0.79 (measured 0.73-0.85 across their plates). Selectable
-    alternatives, never chosen automatically: ``'IdelchikThick'``,
+    Florschuetz's 0.79 (measured 0.73-0.85 across their plates), the value
+    an unset ``Cd`` takes. ``Cd`` is the 'fixed' value only: passed with a
+    correlation it raises (#872). Selectable alternatives, never chosen
+    automatically: ``'IdelchikThick'``,
     ``'Lichtarowicz'`` (long hole, l/d 2-10) and ``'McGreehanSchotsch'``
     (whose ``U1/Vi`` is the SUPPLY-side approach velocity, zero for a
     plenum). ``Cd_in_range`` in the diagnostics says whether the plate is
@@ -6401,6 +6448,11 @@ class ImpingementPlateElement(OrificeElement):
     _htc_dmdot_is_signed = True
 
     _selects_compressible_model = False  # keeps the nozzle (#861)
+    # Florschuetz's measured 0.79: the Cd of an unset Cd with correlation
+    # 'fixed' (#872), and the start guess's Cd under a correlation, as it
+    # was before 0.8.0.
+    _fixed_Cd_default = cb.FLORSCHUETZ_1981_DEFAULT_CD
+    _seed_Cd_default = cb.FLORSCHUETZ_1981_DEFAULT_CD
 
     def __init__(
         self,
@@ -6415,7 +6467,7 @@ class ImpingementPlateElement(OrificeElement):
         plate_thickness: float,
         pattern: Literal["inline", "staggered"] = "inline",
         correlation: str = "fixed",
-        Cd: float = cb.FLORSCHUETZ_1981_DEFAULT_CD,
+        Cd: float | None = None,
         correlation_set: object | None = None,
         row: int | None = None,
         Nu_multiplier: float = 1.0,

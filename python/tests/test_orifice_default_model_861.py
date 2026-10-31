@@ -64,6 +64,8 @@ def _net(
             n.add_element(OrificeElement(cid, s, t, diameter=0.2, correlation="fixed", Cd=1.0))
         else:
             n.add_element(ChannelElement(cid, s, t, length=0.5, diameter=D))
+    if kw.get("correlation") == "fixed":
+        kw.setdefault("Cd", 0.6)  # 'fixed' needs its Cd (#872)
     n.add_element(OrificeElement("x", "a", "b", diameter=bore, **kw))
     return n
 

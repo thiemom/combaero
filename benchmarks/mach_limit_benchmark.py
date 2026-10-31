@@ -63,7 +63,13 @@ def build_network(regime: str, mach_target: float) -> FlowNetwork:
     )
     net.add_element(
         OrificeElement(
-            "orifice", "plenum", "outlet", Cd=0.6, area=_area(d_pipe * 0.8), regime=orifice_regime
+            "orifice",
+            "plenum",
+            "outlet",
+            Cd=0.6,
+            correlation="fixed",
+            area=_area(d_pipe * 0.8),
+            regime=orifice_regime,
         )
     )
 

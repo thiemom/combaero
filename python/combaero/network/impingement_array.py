@@ -33,8 +33,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
-import combaero as cb
-
 from .components import (
     ImpingementCrossflowElement,
     ImpingementPlateElement,
@@ -100,7 +98,7 @@ class ImpingementArray:
     plate_thickness: float
     pattern: Literal["inline", "staggered"] = "inline"
     correlation: str = "fixed"
-    Cd: float = cb.FLORSCHUETZ_1981_DEFAULT_CD
+    Cd: float | None = None
     Nu_multiplier: float = 1.0
     roughness: float = 0.0
     bypass_length: float | None = None
@@ -118,6 +116,14 @@ class ImpingementArray:
             raise ValueError(f"ImpingementArray {self.id!r}: bypass_length must be positive")
         if self.bypass_entry_K < 0.0:
             raise ValueError(f"ImpingementArray {self.id!r}: bypass_entry_K must be non-negative")
+        if self.Cd is not None and self.correlation != "fixed":
+            # As ImpingementPlateElement (#872), said at construction.
+            raise ValueError(
+                f"ImpingementArray {self.id!r}: Cd={self.Cd!r} with correlation="
+                f"{self.correlation!r}. The correlation computes its own Cd and a given "
+                "one would be ignored. For a fixed discharge coefficient pass "
+                "correlation='fixed'; to use the correlation, drop Cd."
+            )
 
     def plate_id(self, row: int) -> str:
         return f"{self.id}__p{row}"

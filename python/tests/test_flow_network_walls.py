@@ -302,7 +302,7 @@ def test_restrictions_and_plates_are_not_wall_sides() -> None:
     the bore twice. Both stay off the wall-side list."""
     from combaero.network import EffusionPlateElement, OrificeElement
 
-    assert not OrificeElement("o", "a", "b", Cd=0.6, area=1e-4).has_convective_surface
+    assert not OrificeElement("o", "a", "b", area=1e-4).has_convective_surface
     plate = EffusionPlateElement(
         "e", "a", "b", hole_diameter=0.5e-3, wall_thickness=2e-3, pitch=4e-3, panel_area=1e-2
     )

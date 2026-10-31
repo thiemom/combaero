@@ -50,7 +50,14 @@ def main() -> None:
         )
     )
     net.add_element(
-        OrificeElement("Exit", from_node="PreOutlet", to_node="Outlet", Cd=0.8, diameter=0.356825)
+        OrificeElement(
+            "Exit",
+            from_node="PreOutlet",
+            to_node="Outlet",
+            Cd=0.8,
+            correlation="fixed",
+            diameter=0.356825,
+        )
     )
 
     solver = NetworkSolver(net)

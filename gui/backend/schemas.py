@@ -311,6 +311,7 @@ class ChannelData(BaseModel):
 class OrificeData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     diameter: float | None = None  # None = the default bore (a bore never inherits)
+    # Read for correlation "fixed" only (graph_builder._fixed_cd, #872).
     Cd: float = 0.6
     # Normed metering (ISO 5167, function of beta) and discharge-hole
     # (Idelchik / McGreehan-Schotsch, function of L/d and r/d) families. They

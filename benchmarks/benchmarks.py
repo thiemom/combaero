@@ -87,7 +87,13 @@ def _build_fully_coupled_grid(
 
     net.add_element(
         OrificeElement(
-            "ori_air_in", "inlet_air", "distributor", Cd=0.8, area=total_area, regime=ori_regime
+            "ori_air_in",
+            "inlet_air",
+            "distributor",
+            Cd=0.8,
+            correlation="fixed",
+            area=total_area,
+            regime=ori_regime,
         )
     )
 
@@ -105,6 +111,7 @@ def _build_fully_coupled_grid(
             "inlet_fuel",
             "distributor_fuel",
             Cd=0.6,
+            correlation="fixed",
             area=A_branch * 0.1 * n_parallel,
             regime=ori_regime,
         )
@@ -122,6 +129,7 @@ def _build_fully_coupled_grid(
                 "distributor_fuel",
                 f"mixing_plenum_{p}",
                 Cd=0.6,
+                correlation="fixed",
                 area=A_branch * 0.1,
                 regime=ori_regime,
             )
@@ -137,6 +145,7 @@ def _build_fully_coupled_grid(
                 "distributor",
                 f"cold_chamber_{p}_0",
                 Cd=0.8,
+                correlation="fixed",
                 area=A_branch,
                 # bore == channel D: a lumped Cd*A restriction, said (#788)
                 in_pipe=False,
@@ -165,6 +174,7 @@ def _build_fully_coupled_grid(
                 f"cold_chamber_{p}_{n_serial}",
                 f"mixing_plenum_{p}",
                 Cd=0.8,
+                correlation="fixed",
                 area=A_branch,
                 # bore == channel D: a lumped Cd*A restriction, said (#788)
                 in_pipe=False,
@@ -177,6 +187,7 @@ def _build_fully_coupled_grid(
                 f"mixing_plenum_{p}",
                 f"combustor_{p}",
                 Cd=0.8,
+                correlation="fixed",
                 area=A_branch,
                 regime=ori_regime,
             )
@@ -187,6 +198,7 @@ def _build_fully_coupled_grid(
                 f"combustor_{p}",
                 f"hot_chamber_{p}_0",
                 Cd=0.8,
+                correlation="fixed",
                 area=A_branch,
                 # bore == channel D: a lumped Cd*A restriction, said (#788)
                 in_pipe=False,
@@ -229,6 +241,7 @@ def _build_fully_coupled_grid(
                 f"hot_chamber_{p}_{n_serial}",
                 "collector",
                 Cd=0.8,
+                correlation="fixed",
                 area=A_branch,
                 # bore == channel D: a lumped Cd*A restriction, said (#788)
                 in_pipe=False,
@@ -238,7 +251,13 @@ def _build_fully_coupled_grid(
 
     net.add_element(
         OrificeElement(
-            "ori_exhaust", "collector", "outlet", Cd=0.8, area=total_area, regime=ori_regime
+            "ori_exhaust",
+            "collector",
+            "outlet",
+            Cd=0.8,
+            correlation="fixed",
+            area=total_area,
+            regime=ori_regime,
         )
     )
 

@@ -103,6 +103,7 @@ def _build_coupled_network(
             from_node="hot_plenum",
             to_node="hot_outlet",
             Cd=cfg.cd,
+            correlation="fixed",
             area=_area_from_diameter(cfg.d_orifice_hot),
             regime=orifice_regime,
         )
@@ -125,6 +126,7 @@ def _build_coupled_network(
             from_node="cold_plenum",
             to_node="cold_outlet",
             Cd=cfg.cd,
+            correlation="fixed",
             area=_area_from_diameter(cfg.d_orifice_cold),
             regime=orifice_regime,
         )

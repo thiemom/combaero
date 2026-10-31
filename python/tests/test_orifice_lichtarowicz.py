@@ -71,7 +71,10 @@ def test_the_flag_reports_an_out_of_range_hole() -> None:
 
 def test_fixed_cd_is_always_in_range() -> None:
     assert (
-        _solve(OrificeElement("o", "a", "b", diameter=D, correlation="fixed"))["Cd_in_range"] == 1.0
+        _solve(OrificeElement("o", "a", "b", Cd=0.6, diameter=D, correlation="fixed"))[
+            "Cd_in_range"
+        ]
+        == 1.0
     )
 
 

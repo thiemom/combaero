@@ -277,7 +277,7 @@ def _solve(net: FlowNetwork) -> tuple[NetworkSolver, dict]:
 def test_the_nozzle_reports_nothing_new() -> None:
     """The nozzle (explicit here; the default for 'fixed' and Stolz, #861)
     reports no model diagnostics."""
-    o = OrificeElement("x", "a", "b", diameter=0.01, correlation="fixed")
+    o = OrificeElement("x", "a", "b", Cd=0.6, diameter=0.01, correlation="fixed")
     assert o.compressible_model == "nozzle" and o.Cv == 1.0
     _, r = _solve(_plenum_net("nozzle", 1.6e5))
     assert "x.dP_tap" in r  # diagnostics are reported...

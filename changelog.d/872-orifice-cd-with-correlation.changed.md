@@ -1,0 +1,14 @@
+- **`Cd` on an orifice-family element is the `"fixed"` correlation's value only; a `Cd` given with any other correlation raises (#872). Breaking in 0.8.0.**
+  - **Before:** `OrificeElement`, `EffusionPlateElement`, `FilmCoolingElement`, `SlotFilmElement`, `ImpingementPlateElement` and `ImpingementArray` took `Cd=0.6` (0.79 on the impingement elements) by default and, under any correlation but `"fixed"`, used it only as the solver's start guess. `OrificeElement(..., Cd=0.8)` ran the default `ReaderHarrisGallagher` Cd, about 0.6, with no warning.
+  - **Now:** `Cd` defaults to `None`. `Cd` with a correlation other than `"fixed"` raises `ValueError` naming `correlation="fixed"`; `"fixed"` without a `Cd` raises too, except on `ImpingementPlateElement`/`ImpingementArray`, whose documented `"fixed"` default stays Florschuetz's 0.79. The connection elements (`EffectiveAreaConnectionElement`, `DiameterDischargeCoefficientConnectionElement`) are `"fixed"` with a Cd already and are unaffected.
+  - **To migrate:** for a measured or assumed Cd add `correlation="fixed"`; to use the correlation drop `Cd`. Dropping it gives the numbers you had before. Adding `"fixed"` gives the Cd you wrote, so the results move.
+  - **Start guess:** with a correlation it still assumes Cd 0.6 (0.79 on an impingement plate), so a network that never passed a `Cd` with a correlation solves bit-identically.
+  - **Examples:** every example that passed a `Cd` with the default correlation meant a fixed Cd, and now says `correlation="fixed"`. Their printed numbers move:
+    - `flow_regime_comparison.py`: the network's inlet pressure now matches the direct `cb.orifice_mdot` calculation it is compared with to 0.02-0.11%. It was 2.8-7.8% (incompressible) and 1.2-24.7% (compressible) off.
+    - `combustor_network_example.py`: combustor Pt 130.9 -> 120.5 kPa.
+    - `combustor_pressure_loss_example.py`: burner Pt 4.951 -> 4.846 bar.
+    - `axial_staging_combustor_network_example.py`: the zones' Tt 2003.69 -> 2001.82 K.
+    - `network_from_grid.py`: the largest grid's inlet pressure 1.5 -> 1.3 bar.
+    - `combustor_liner_cooling_network.py`: its near-lossless exits (Cd 0.98 at 95% of the pipe bore) are also `in_pipe=False` now, lumped restrictions. In the pipe, a Cd of 0.98 at beta 0.95 left the coupled solve unconverged. Its printed results are unchanged; the coupled case's coolant dP rises 0.08%.
+    - The benchmarks and the `docs/API_PYTHON.md` snippets are updated the same way.
+  - **GUI:** a node keeps its `Cd` field whatever its correlation, and the Inspector shows it for "Manual / Fixed Value" only. The backend now passes `Cd` for `"fixed"` alone. A saved file with both a `Cd` and a correlation still loads and solves as before; its `Cd` is not used, as it never was.

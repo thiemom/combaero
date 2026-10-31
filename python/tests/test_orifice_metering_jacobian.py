@@ -46,9 +46,7 @@ def _net(regime: str, correlation: str) -> FlowNetwork:
     g.add_node(PlenumNode("hp"))
     g.add_node(PressureBoundary("ho", Pt=1.0e5, Tt=300.0))
     for eid, a, b, d in (("o1", "hi", "hp", 0.02), ("o2", "hp", "ho", 0.015)):
-        g.add_element(
-            OrificeElement(eid, a, b, Cd=0.8, diameter=d, regime=regime, correlation=correlation)
-        )
+        g.add_element(OrificeElement(eid, a, b, diameter=d, regime=regime, correlation=correlation))
     return g
 
 
