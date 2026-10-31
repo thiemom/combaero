@@ -1,0 +1,14 @@
+# Source: Hylton et al. 1983, NASA CR-168015, Table III (coords, PDF p.19), Table IV (PDF p.21), Fig. 7 (holes, PDF p.23).
+# Hole centres mapped from Fig. 7 (U,V) to Table III (x,y): V along the pressure-side bitangent through points 71 and 39, V=0 at the LE tangent normal to it, U normal into the vane.
+# Bitangent angle from +x: -55.47 deg; profile extent along it 14.512 cm (Table IV true chord 14.493).
+hole,x_cm,y_cm,D_cm
+1,2.0754,11.9861,0.630
+2,1.1143,11.0542,0.630
+3,2.7740,10.2722,0.630
+4,3.6554,8.9911,0.630
+5,4.4179,7.6853,0.630
+6,5.1378,6.2809,0.630
+7,5.7720,4.9111,0.630
+8,6.3681,3.4713,0.310
+9,6.9266,2.0421,0.310
+10,7.4562,0.5809,0.198

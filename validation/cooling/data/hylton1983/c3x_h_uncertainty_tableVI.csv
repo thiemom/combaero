@@ -1,0 +1,22 @@
+# Hylton et al. 1983, NASA CR-168015, Table VI "Uncertainty in heat transfer coefficient measurements for C3X cascade", PDF p.34 (report p.27).
+# Transcribed from page image (130 dpi). Measurement uncertainty band (Kline-McClintock) of the external h, per percent-of-surface-arc region; based on minimum wall thickness in each region (text PDF p.31).
+surface,s_pct_from,s_pct_to,h_uncertainty_pct
+PS,0,16,6.8
+PS,16,23,6.3
+PS,23,34,6.6
+PS,34,45,7.3
+PS,45,55,8.9
+PS,55,66,13.3
+PS,66,78,11.6
+PS,78,89,20.1
+PS,89,100,23.5
+SS,0,8,6.8
+SS,8,31,6.7
+SS,31,39,6.2
+SS,39,49,6.5
+SS,49,58,7.1
+SS,58,67,8.6
+SS,67,76,11.9
+SS,76,85,10.9
+SS,85,94,15.8
+SS,94,100,23.5
