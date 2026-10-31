@@ -92,13 +92,11 @@ std::tuple<double, double> tap_positions(OrificeTap tap, double D) {
 
 namespace {
 
-// Reader-Harris/Gallagher, ISO 5167-2:2003 Eq. (4), and its exact d/dRe_D.
-// Below the Re_D floor of 1 the value is held and the derivative is 0.
-std::tuple<double, double> rhg_and_dRe(double beta, double Re_D, double D,
-                                       OrificeTap tap) {
+// Reader-Harris/Gallagher, ISO 5167-2:2003 Eq. (4), and its exact d/dRe_D,
+// as printed: no hold and no cap. Only evaluated at Re >= its lower bound.
+std::tuple<double, double> rhg_raw_and_dRe(double beta, double Re, double D,
+                                           OrificeTap tap) {
     namespace R = reader_harris;
-    const bool floored = Re_D < 1.0;
-    const double Re = floored ? 1.0 : Re_D;
 
     // beta is held at 0.98 for stability near d -> D; ISO's range ends at
     // 0.75 (metering_cd_in_range says so).
@@ -138,14 +136,12 @@ std::tuple<double, double> rhg_and_dRe(double beta, double Re_D, double D,
 
     const double dC = -R::C3_exp * t3 / Re + b35 * (R::C4b * dA * X + (R::C4a + R::C4b * A) * dX) -
                       up * R::C5_A_coef * dA;
-    // The 1.5 cap (a numerical bound for lossless bypass recovery) holds Cd.
-    if (C >= 1.5) {
-        return {1.5, 0.0};
-    }
-    return {C, floored ? 0.0 : dC};
+    return {C, dC};
 }
 
-// Stolz, ISO 5167:1980, and its exact d/dRe_D.
+// Stolz, ISO 5167:1980, and its exact d/dRe_D. Below the Re_D floor of 1
+// the value is held and the derivative is 0. No #873 hold: ISO 5167:1980's
+// lower Re_D bound is not held as a source (validation/sources.yaml, wanted).
 std::tuple<double, double> stolz_and_dRe(double beta, double Re_D, double D,
                                          OrificeTap tap) {
     namespace S = stolz;
@@ -164,6 +160,51 @@ std::tuple<double, double> stolz_and_dRe(double beta, double Re_D, double D,
         return {1.5, 0.0};
     }
     return {C, floored ? 0.0 : -S::C3_re * t3 / Re};
+}
+
+// Lower Re_D bound of Reader-Harris/Gallagher, ISO 5167-2:2003 5.3.1.
+double rhg_re_min(double beta, double D, OrificeTap tap) {
+    namespace R = reader_harris;
+    if (tap == OrificeTap::Flange) {
+        return std::max(R::range_re_min, R::range_re_flange * beta * beta * D * 1000.0);
+    }
+    return beta <= R::range_beta_split ? R::range_re_min : R::range_re_beta2 * beta * beta;
+}
+
+// The #873 hold: the correlation at Re_D >= Re_b (untouched, so bit-identical
+// there), its slope ramped linearly in ln Re_D to 0 over w = blend_ln_re
+// below Re_b, and held below that. The form and its derivative are in
+// orifice.h at metering_cd_and_dRe. raw(Re) is (C, dC/dRe) as printed.
+template <class Raw>
+std::tuple<double, double> held_below_bound(const Raw& raw, double Re_D, double Re_b) {
+    if (Re_D >= Re_b) {
+        return raw(Re_D);
+    }
+    const auto [C_b, dC_b] = raw(Re_b);
+    const double s = dC_b * Re_b;  // dC/d(ln Re_D) at the bound
+    const double w = metering_hold::blend_ln_re;
+    // Also catches Re_D <= 0 (no flow, reverse-flow iterates). A NaN Re_D
+    // falls through to the blend and stays NaN.
+    if (Re_D <= Re_b * std::exp(-w)) {
+        return {C_b - 0.5 * s * w, 0.0};
+    }
+    const double t = 1.0 + std::log(Re_D / Re_b) / w;
+    return {C_b + 0.5 * s * w * (t * t - 1.0), s * t / Re_D};
+}
+
+std::tuple<double, double> rhg_and_dRe(double beta, double Re_D, double D, OrificeTap tap) {
+    const auto [C, dC] = held_below_bound(
+        [&](double Re) { return rhg_raw_and_dRe(beta, Re, D, tap); }, Re_D,
+        rhg_re_min(beta, D, tap));
+    // The 1.5 cap (a numerical bound for lossless bypass recovery) stays for
+    // geometry far outside ISO's: with the hold it is out of reach for corner
+    // and D-D/2 taps (the network's), but flange taps in a pipe below ~32 mm
+    // sit many diameters from the plate, where Eq. (4)'s downstream term
+    // grows without bound at ANY Re_D (#873 scan).
+    if (C >= 1.5) {
+        return {1.5, 0.0};
+    }
+    return {C, dC};
 }
 
 } // namespace
@@ -440,6 +481,26 @@ std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
         "formula; a Constant or UserFunction Cd belongs to the caller");
 }
 
+double metering_cd_re_min(MeteringCdCorrelation id, const OrificeGeometry& geom) {
+    if (!geom.is_valid()) {
+        throw std::invalid_argument("Invalid orifice geometry");
+    }
+    switch (id) {
+        case MeteringCdCorrelation::ReaderHarrisGallagher:
+            return orifice::rhg_re_min(geom.beta(), geom.D, geom.tap);
+        case MeteringCdCorrelation::Stolz:
+            throw std::invalid_argument(
+                "metering_cd_re_min: Stolz has no encoded Reynolds range (ISO "
+                "5167:1980 is not held, #873) and no low-Re hold");
+        case MeteringCdCorrelation::Constant:
+        case MeteringCdCorrelation::UserFunction:
+            break;
+    }
+    throw std::invalid_argument(
+        "metering_cd_re_min: only ReaderHarrisGallagher carries a Reynolds "
+        "range; a Constant or UserFunction Cd belongs to the caller");
+}
+
 bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D) {
     namespace R = orifice::reader_harris;
@@ -449,17 +510,15 @@ bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
     if (!geom.is_valid()) {
         return false;
     }
+    // The bound the hold starts at (#873), defined once.
+    if (!(Re_D >= metering_cd_re_min(id, geom))) {
+        return false;
+    }
     const double d_mm = geom.d * 1000.0;
     const double D_mm = geom.D * 1000.0;
     const double b = geom.beta();
-    if (d_mm < R::range_d_min_mm || D_mm < R::range_D_min_mm || D_mm > R::range_D_max_mm ||
-        b < R::range_beta_min || b > R::range_beta_max || Re_D < R::range_re_min) {
-        return false;
-    }
-    if (geom.tap == OrificeTap::Flange) {
-        return Re_D >= R::range_re_flange * b * b * D_mm;
-    }
-    return b <= R::range_beta_split || Re_D >= R::range_re_beta2 * b * b;
+    return !(d_mm < R::range_d_min_mm || D_mm < R::range_D_min_mm || D_mm > R::range_D_max_mm ||
+             b < R::range_beta_min || b > R::range_beta_max);
 }
 
 std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C) {

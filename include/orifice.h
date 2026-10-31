@@ -185,9 +185,9 @@ enum class DischargeCdCorrelation {
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);
 
 // The same Cd and its exact derivative in Re_D (the Re-correction, the
-// A-dependent and the tap terms); 0 below the Re_D floor of 1 and above the
-// 1.5 cap. For the network orifice's Jacobian: the metering Cd moves with the
-// flow through Re_D, a column the row used to miss.
+// A-dependent and the tap terms), held below ISO's lower Re_D bound as
+// metering_cd_and_dRe describes. For the network orifice's Jacobian: the
+// metering Cd moves with the flow through Re_D, a column the row used to miss.
 std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& geom,
                                                        const OrificeState& state);
 
@@ -195,17 +195,44 @@ std::tuple<double, double> Cd_sharp_thin_plate_and_dRe(const OrificeGeometry& ge
 // one entry point the network element calls, so no metering formula lives in
 // Python. ReaderHarrisGallagher and Stolz only; Constant and UserFunction
 // carry no formula of their own and are refused (std::invalid_argument).
+//
+// ReaderHarrisGallagher: below its lower Re_D bound Re_b (metering_cd_re_min)
+// Eq. (4) is not evaluated: its Re terms grow without bound as Re_D falls
+// (Cd 1.16 at Re_D 100 on a 4 mm pipe), while a real sharp orifice loses Cd
+// in laminar flow. Cd is HELD instead (#873), entered C1 in
+// x = ln Re_D over orifice::metering_hold::blend_ln_re = w just below Re_b:
+//   Re_D >= Re_b:          the correlation itself (bit-identical to 0.7),
+//   Re_b e^-w < Re_D < Re_b: C = C_b + s w (t^2 - 1) / 2,  dC/dRe_D = s t / Re_D,
+//   Re_D <= Re_b e^-w:     C = C_b - s w / 2,           dC/dRe_D = 0,
+// with t = 1 + ln(Re_D / Re_b) / w, C_b and s = Re_b dC/dRe_D the
+// correlation's value and log-slope at Re_b. The slope ramps linearly in
+// ln Re_D from s to 0, so Cd is monotone and Cd, dCd/dRe_D are continuous.
+// The hold is an out-of-range placeholder; metering_cd_in_range says so.
+// The 1.5 cap stays for flange taps in pipes below D ~32 mm.
+//
+// Stolz: NO hold. ISO 5167:1980's lower Re_D bound is not held as a source
+// (validation/sources.yaml, wanted; follow-up of #873), so the equation is
+// evaluated as before: held at its Re_D = 1 value below Re_D 1 (derivative
+// 0) and capped at 1.5.
 std::tuple<double, double> metering_cd_and_dRe(MeteringCdCorrelation id,
                                                const OrificeGeometry& geom,
                                                double Re_D);
+
+// The lower Re_D bound Re_b of Reader-Harris/Gallagher's stated range for
+// this geometry: the Re_D below which metering_cd_and_dRe holds Cd (see
+// there). ISO 5167-2:2003 5.3.1:
+//   corner / D-D/2 taps: 5000 (beta <= 0.56), 16000 beta^2 (beta > 0.56);
+//   flange taps:         max(5000, 170 beta^2 D[mm]).
+// Refuses (std::invalid_argument) an invalid geometry and every other
+// correlation: Stolz, whose ISO 5167:1980 bound is not encoded (no source
+// held, no hold), and Constant / UserFunction, whose Cd is the caller's.
+double metering_cd_re_min(MeteringCdCorrelation id, const OrificeGeometry& geom);
 
 // Is the plate inside the correlation's stated range? A diagnostic flag,
 // never a selector or a refusal.
 //   ReaderHarrisGallagher, ISO 5167-2:2003 5.3.1: d >= 12.5 mm,
 //     50 <= D <= 1000 mm, 0.1 <= beta <= 0.75, and
-//       corner / D-D/2 taps: Re_D >= 5000 (beta <= 0.56),
-//                            Re_D >= 16000 beta^2 (beta > 0.56);
-//       flange taps:         Re_D >= 5000 and Re_D >= 170 beta^2 D[mm].
+//     Re_D >= metering_cd_re_min.
 //   Stolz: ISO 5167:1980's limits are not encoded, so this returns true.
 bool metering_cd_in_range(MeteringCdCorrelation id, const OrificeGeometry& geom,
                           double Re_D);
@@ -313,7 +340,23 @@ constexpr double C4_sat  = 0.039;    // ... with C4 L1 held at this for L1 >= L1
 constexpr double L1_sat  = 0.4333;
 constexpr double C5      = 0.0337;   // downstream tap: C5 L2' b^3
 constexpr double C5_beta = 3.0;
+// ISO 5167:1980's limits of use (d, D, beta, Re_D) are not encoded: the text
+// is not held (validation/sources.yaml, wanted), so Stolz has no #873 hold.
 } // namespace stolz
+
+// The C1 hold of the RHG Cd below its lower Re_D bound (#873); the form
+// is in metering_cd_and_dRe. blend_ln_re is the width w in ln Re_D over
+// which the slope ramps to zero (Re_b e^-0.1 = 0.905 Re_b to Re_b). The held
+// value sits s w / 2 above C_b, so w is the trade between that offset (~w)
+// and the blend's curvature (~1/w). It is fixed ONCE by the offset: at most
+// half of ISO 5167-2:2003 5.3.3.1's stated uncertainty of C at the bound,
+// over every in-range RHG geometry. The worst is flange taps, D 50 mm, beta
+// 0.75: |s|/C_b = 0.070 against 0.75%, so w <= 0.107; 0.1 is the round value
+// under it (offset 0.35% there, <= 0.17% at beta <= 0.6). Never tuned to a
+// score.
+namespace metering_hold {
+constexpr double blend_ln_re = 0.1;
+} // namespace metering_hold
 
 // Thickness correction (Idelchik model)
 namespace thickness {
@@ -779,7 +822,7 @@ std::tuple<double, double> tap_positions(OrificeTap tap, double D);
 
 // Reader-Harris/Gallagher (1998) - ISO 5167-2:2003 Eq. (4), with the
 // small-pipe term for D < 71.12 mm. The standard correlation for sharp-edged
-// orifices.
+// orifices. Held below its lower Re_D bound (metering_cd_and_dRe, #873).
 double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D,
                                 OrificeTap tap = OrificeTap::Flange);
 
