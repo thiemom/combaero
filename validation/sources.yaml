@@ -3850,12 +3850,13 @@ wanted:
   checked: false
   issues:
   - 873
+  - 876
   priority: later
   question: 'The Stolz equation''s limits of use. #873 holds Reader-Harris/Gallagher Cd below its ISO 5167-2
     lower Re_D bound, but Stolz has NO low-Re hold: its bound is known only from memory, so none is encoded
     and metering_cd_re_min refuses Stolz. The text is needed to add the hold (its lower Re_D bound per tap)
-    and the d, D and beta limits that metering_cd_in_range does not encode for Stolz. Follow-up of #873
-    (issue to be filed).'
+    and the d, D and beta limits that metering_cd_in_range does not encode for Stolz. Tracked in #876, which
+    deprecates Stolz instead unless this text (or Stolz 1988, NSFMW paper 3.1) turns up first.'
   where: ISO (withdrawn standard; national-library or university copy).
 - citation: Reader-Harris, M. J. (1998). The equation for the expansibility factor for orifice plates. Proc.
     FLOMEKO 98, Lund. (citation as recalled)
