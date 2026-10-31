@@ -3160,13 +3160,17 @@ documents:
     conductivity, specific heat, mean thermal expansion, dynamic modulus) tabulated RT to 1000 C, plus
     mechanical, oxidation and fabrication data.
   status: implemented
-  verdict: 'The primary table for k_haynes230 (#761). Thermal conductivity, metric column: 8.9 W/m C at RT,
-    10.4 at 100 C, then +2.0 per 100 C to 28.4 at 1000 C, i.e. exactly k = 8.4 + 0.020 T[C]. The quadratic
-    shipped before was +37% at RT, +2-6% at liner temperatures. The table stops at 1000 C (1273 K),
-    and so does the valid range of k_haynes230 (it used to run to 1400 K). Note the specific-heat
-    column prints 5595 J/kg C at 800 C, an obvious misprint (574 at 700 C, 609 at 900 C) -- not used.'
-  read_for: ['#761 Haynes 230 conductivity']
-  issues: [761]
+  verdict: 'The primary table for k_haynes230. Since #881 it is k = alpha cp rho from the brochure''s own
+    thermal-diffusivity and specific-heat columns and its density (8.97 g/cm3), 25-1000 C, interpolated
+    linearly; the 800 C row is skipped because its specific heat prints 5595 J/kg C (574 at 700 C, 609 at
+    900 C), a misprint. The printed conductivity column (8.9 W/m C at RT, then +2.0 per 100 C to 28.4 at
+    1000 C, exactly 8.4 + 0.020 T[C]; shipped by #761) is a smoothed line that does not match the product:
+    +3% at RT, +13% at 500 C, +6% at 1000 C. Gen3 CSP (registered) measures 16.02 +- 1.01 W/m K at 500 C:
+    the product (16.33) is inside its band, the column (18.4) is not, at 1.7-2.8 bands from 340 to 600 C.
+    Gen3 CSP diffusivity agrees with the brochure''s within 2.5% to 620 C; both show the 600-700 C step
+    that follows the specific heat.'
+  read_for: ['#761 Haynes 230 conductivity', '#881 built-in materials vs Gen3 CSP']
+  issues: [761, 881]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
   notes: Supplied by the user 2026-10-28 (the haynesintl.com PDF links return 403 to automated fetches).
@@ -3332,9 +3336,14 @@ documents:
   status: implemented
   verdict: 'k_inconel625 interpolates Table 3 (metric column, Battelle measurements on material annealed
     2100 F / 1 h) linearly, exact at every printed point: 7.2 W/m C at -157 C to 25.2 at 982 C; valid 116-1255 K.
-    The 1093 C row prints no conductivity, so the range stops at 982 C.'
-  read_for: ['liner / duct / bellows alloy conductivity']
-  issues: [761]
+    The 1093 C row prints no conductivity, so the range stops at 982 C. #881: Gen3 CSP (registered) measures
+    14% more at 260-580 C (about -2 of its bands) and 25% more at 620-700 C, where its specific heat steps
+    up (aging). The gap is the diffusivity (Gen3 22-40% above the alpha implied by Table 3 with Table 2''s
+    cp and density), not the specific heat (Gen3 3-15% lower). Kept: condition stated here (annealed),
+    not by Gen3; a third source is wanted. ORNL/TM-9616 reprints these BMI values above 117 K, so it is
+    not independent.'
+  read_for: ['liner / duct / bellows alloy conductivity', '#881 built-in materials vs Gen3 CSP']
+  issues: [761, 881]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
   notes: Supplied by the user 2026-10-29.
@@ -3697,15 +3706,18 @@ documents:
     The database itself (held as per-material xlsx exports in the same folder: SS310, SS316, Inconel625,
     Inconel740H, HaynesHR120, Haynes233, Haynes230, HastC276, HastelloyN, Ni201, KanthalAPM, KanthalAF) gives
     alpha, cp and k with bands at ~260-900 C.'
-  status: screened
+  status: implemented
   verdict: 'Independent measured k(T) with stated measurement bands for alloys we ship -- the reference for
     #881. 310 SS: 17.13 +- 0.81 W/m K at 260 C, 20.55 +- 1.06 at 500 C, 25.12 +- 2.46 at 800 C. The bands are
     measurement bands (usable as such under the validation policy). Range starts ~260 C: no room-temperature
-    point.'
+    point. #881: k_stainless_steel_316 and k_stainless_steel_310 are its SS316 and SS310 tables (xlsx means,
+    0.01 W/m K), valid over the measured range only; checked haynes230 (shipped column 1.7-2.8 bands high,
+    replaced by the brochure''s alpha cp rho, inside the band) and inconel625 (about -2 bands, kept, a third
+    source wanted).'
   read_for: ['#881 built-in materials vs Gen3 CSP', 310 SS conductivity for the C3X example]
   issues: [881, 882]
-  records: []
-  code: [scripts/gen3csp.py]
+  records: [python/tests/test_materials.py]
+  code: [scripts/gen3csp.py, src/materials.cpp, include/materials.h]
   notes: 'Fetched 2026-10-31 via the WordPress media API and the /compare/ page (scripts/gen3csp.py, skill
     materials-data); xlsx are not published for every material, the compare page carries the data inline.'
 - file: sources/materials/gatech_gen3csp/Measurement-Acceptance-Criteria.pdf
@@ -3759,6 +3771,15 @@ documents:
   notes: Supplied by the user 2026-10-31 (public OSTI report).
 
 wanted:
+- citation: Haynes International. HAYNES 625 alloy brochure (physical properties, thermal conductivity and
+    diffusivity RT-1000 C).
+  checked: false
+  issues: [881]
+  priority: later
+  question: 'A third Inconel 625 conductivity: Special Metals Table 3 (Battelle, annealed; shipped) and Gen3
+    CSP disagree by 14-25% at 260-700 C, from the diffusivity. A brochure printing alpha and cp would show
+    which (and, like the Haynes 230 brochure, whether its k column matches its own alpha cp rho).'
+  where: haynes.com (the PDF links return 403 to automated fetches; the user supplies it).
 - citation: Dunn, M. G., et al. (1986). Stage heat-flux measurements on a full-stage rotating turbine
     (Calspan shock tunnel), ASME. Exact title ? -- cited in Han's textbook.
   checked: false

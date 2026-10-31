@@ -45,10 +45,12 @@ double k_inconel718(double T);
 
 // Haynes 230 (Ni-Cr-W-Mo alloy)
 // Source: HAYNES 230 alloy brochure H-3000O (Haynes International, 2021),
-// Physical Properties table: 8.9 W/m K at RT, 10.4 at 100 C rising 2.0 per
-// 100 C to 28.4 at 1000 C.
-// Valid: 300-1273 K, where the table ends
-// Linear: k = 8.4 + 0.020*T_C, exact at every printed point (#761)
+// Physical Properties: k = alpha * cp * rho from its thermal-diffusivity and
+// specific-heat columns and its density (8.97 g/cm3), 25-1000 C (#881). The
+// brochure's printed conductivity column (8.9 + 2.0 per 100 C) is 13% above
+// that product at 500 C; Gen3 CSP's measurement (Georgia Tech, 340-780 C)
+// agrees with the product within its 95% band and not with the column.
+// Valid: 298-1273 K, where the table ends
 double k_haynes230(double T);
 
 // Combustor liner / transition-piece alloys. Source: the manufacturers'
@@ -72,6 +74,9 @@ double k_haynes263(double T);
 // HAYNES 25 (L-605, Co-Cr-W-Ni), brochure table 25-1000 C. Valid: 298-1273 K.
 double k_haynes25(double T);
 // INCONEL 625 (Ni-Cr-Mo-Nb), Special Metals Table 3, -157 to 982 C. Valid: 116-1255 K.
+// Battelle measurements on annealed material. Gen3 CSP (Georgia Tech) measures
+// 14% higher at 260-580 C and 25% higher at 620-700 C, from a higher
+// diffusivity; unresolved without a third source (#881), so kept.
 double k_inconel625(double T);
 // NIMONIC 75 (Ni-Cr-Ti), Virgamet N75 table 20-1000 C. Valid: 293-1273 K.
 double k_nimonic75(double T);
@@ -92,10 +97,16 @@ double k_bondcoat_nicocraly(double T);
 // -------------------------------------------------------------
 
 // Stainless Steel 316 (austenitic)
-// Source: NIST, ASM Handbook
-// Valid: 300-1200 K
-// Quadratic fit: k = 13.5 + 0.015*T_C - 2.1e-6*T_C^2
+// Source: Georgia Tech Gen3 CSP thermophysical property database, measured
+// k (laser-flash alpha * cp * rho), 260-820 C, 95% bands 0.9-2.7 W/m K (#881).
+// Valid: 533-1093 K (the measured range)
 double k_stainless_steel_316(double T);
+
+// Stainless Steel 310 (austenitic, 25Cr-20Ni)
+// Source: Georgia Tech Gen3 CSP thermophysical property database, measured
+// k, 260-800 C, 95% bands 0.8-2.5 W/m K (#881).
+// Valid: 533-1073 K (the measured range)
+double k_stainless_steel_310(double T);
 
 // Aluminum 6061-T6
 // Source: ASM Handbook, Aluminum Association

@@ -6781,8 +6781,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Ni-Cr-W-Mo alloy with high-temperature oxidation resistance.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
-        "Valid range: 300-1273 K (the brochure table ends at 1000 C)\n"
-        "Source: HAYNES 230 brochure H-3000O (Haynes International, 2021)\n\n"
+        "Valid range: 298-1273 K (the brochure table ends at 1000 C)\n"
+        "Source: HAYNES 230 brochure H-3000O (Haynes International, 2021):\n"
+        "k = alpha * cp * rho from its diffusivity and specific-heat columns\n"
+        "(#881). Its printed conductivity column is 13% above that at 500 C and\n"
+        "outside Gen3 CSP's measured band; the product is inside it.\n\n"
         "extrapolate : bool, default False. True continues the end slope linearly\n"
         "outside the valid range instead of raising (unsourced; opt-in).");
 
@@ -6808,7 +6811,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "outside the valid range instead of raising (unsourced; opt-in).");
   m.def("k_inconel625", material_k(&combaero::materials::k_inconel625, "inconel625"), py::arg("T"), py::arg("extrapolate") = false,
         "Inconel 625 thermal conductivity [W/(m*K)] from the Special Metals\n"
-        "INCONEL alloy 625 Table 3, interpolated linearly. Valid 116-1255 K.\n\n"
+        "INCONEL alloy 625 Table 3 (Battelle, annealed), interpolated linearly.\n"
+        "Valid 116-1255 K. Gen3 CSP (Georgia Tech) measures 14-25% more at\n"
+        "260-700 C, from a higher diffusivity; kept until a third source settles\n"
+        "it (#881).\n\n"
         "extrapolate : bool, default False. True continues the end slope linearly\n"
         "outside the valid range instead of raising (unsourced; opt-in).");
   m.def("k_nimonic75", material_k(&combaero::materials::k_nimonic75, "nimonic75"), py::arg("T"), py::arg("extrapolate") = false,
@@ -6842,8 +6848,23 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Austenitic stainless steel with corrosion resistance.\n\n"
         "Parameters:\n"
         "  T : temperature [K]\n\n"
-        "Valid range: 300-1200 K\n"
-        "Source: NIST, ASM Handbook\n\n"
+        "Valid range: 533-1093 K (260-820 C, the measured range)\n"
+        "Source: Georgia Tech Gen3 CSP thermophysical property database, measured\n"
+        "k with a 95% band of 0.9-2.7 W/(m*K) (#881), interpolated linearly.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+
+  m.def("k_stainless_steel_310", material_k(&combaero::materials::k_stainless_steel_310, "ss310"),
+        py::arg("T"), py::arg("extrapolate") = false,
+        "Thermal conductivity of Stainless Steel 310 [W/(m*K)].\n\n"
+        "Austenitic 25Cr-20Ni heat-resisting stainless steel.\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n\n"
+        "Valid range: 533-1073 K (260-800 C, the measured range)\n"
+        "Source: Georgia Tech Gen3 CSP thermophysical property database, measured\n"
+        "k with a 95% band of 0.8-2.5 W/(m*K) (#881), interpolated linearly. Not\n"
+        "joined to a room-temperature value: NIST's cryogenic fit (11.6 at 300 K)\n"
+        "is a different sample.\n\n"
         "extrapolate : bool, default False. True continues the end slope linearly\n"
         "outside the valid range instead of raising (unsourced; opt-in).");
 
@@ -6896,7 +6917,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "  >>> print(materials)\n"
         "  ['al6061', 'alumina', 'copper', 'hastelloy_x', 'haynes188', 'haynes230',\n"
         "   'haynes25', 'haynes263', 'inconel625', 'inconel718', 'nicocraly', 'nimonic75',\n"
-        "   'ss316', 'x22crmov12_1', 'ysz']");
+        "   'ss310', 'ss316', 'x22crmov12_1', 'ysz']");
 
   m.def(
       "get_material_conductivity",
