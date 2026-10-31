@@ -16,7 +16,7 @@ import combaero as cb
 
 from . import second_law_view, validity_view
 from .graph_builder import build_network_from_schema
-from .messages import humanize
+from .messages import deprecations, humanize
 from .resolve_preview import resolve_preview
 from .runner import NetworkResult, _build_result_objects, _schema_maps
 from .schemas import (
@@ -286,6 +286,7 @@ async def solve(schema: NetworkGraphSchema):
             lm_started_at_eval=diag.get("lm_started_at_eval"),
             second_law_failures=second_law_view.failures(result, net, gui_ids),
             incompressible_warnings=validity_view.warnings(result, net, gui_ids),
+            deprecations=deprecations(schema),
             ledger=second_law_view.ledger(result, net, gui_ids),
         )
     except TimeoutError:

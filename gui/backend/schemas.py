@@ -357,8 +357,8 @@ class OrificeData(BaseModel):
         if isinstance(data, dict) and data.get("correlation") == "Miller":
             raise ValueError(
                 "The 'Miller' orifice correlation was removed: no published "
-                "source matched its formula. Pick 'Stolz' or "
-                "'ReaderHarrisGallagher' for this orifice."
+                "source matched its formula. Pick 'ReaderHarrisGallagher' for "
+                "this orifice (Stolz, which 'Miller' had computed, is deprecated, #876)."
             )
         return data
 
@@ -918,6 +918,9 @@ class SolveResponse(BaseModel):
     #: Report only (#588): elements on an incompressible closure running above
     #: the solver's Mach limit, each attributed to its canvas node.
     incompressible_warnings: list[IncompressibleFlag] = []
+    #: Deprecated settings the network uses (#876), one note each. Report
+    #: only: the solve is unchanged.
+    deprecations: list[str] = []
     #: Mass and energy over the network's control volume (empty if the root
     #: finder did not converge).
     ledger: dict = {}

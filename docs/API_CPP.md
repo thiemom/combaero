@@ -1437,6 +1437,12 @@ enum class MeteringCdCorrelation {
     ReaderHarrisGallagher, Stolz,   // ISO 5167-2:2003 and ISO 5167:1980
     Constant, UserFunction
 };
+// Stolz is DEPRECATED in 0.8.0, removed in 0.9.0 (#876): ISO replaced it with
+// Reader-Harris/Gallagher (ISO 5167-1:1991/Amd 1:1998, ISO 5167-2:2003), and
+// its limits of use are not held, so metering_cd_in_range cannot flag it.
+// Cd_Stolz is [[deprecated]]; the enum value is deprecated in comments only
+// (an attribute on it would fire inside the library's own dispatch). The
+// Python bindings warn (DeprecationWarning) whenever they are handed Stolz.
 
 // Reader-Harris/Gallagher at geom.tap, with the small-pipe term below 71.12 mm.
 double Cd_sharp_thin_plate(const OrificeGeometry& geom, const OrificeState& state);

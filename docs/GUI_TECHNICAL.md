@@ -66,6 +66,7 @@ Elements are defined by edges in the graph but carry their own physical paramete
 - `diameter`: Orifice diameter [m]
 - `Cd`: Discharge coefficient (if using "fixed" correlation)
 - `correlation`: "ReaderHarrisGallagher", "Stolz", "IdelchikThick", "IdelchikBeveled", "IdelchikRounded", "McGreehanSchotsch", "Lichtarowicz", or "fixed".
+  - "Stolz" is deprecated (#876), removed in 0.9.0. A saved file with it still loads and solves; the Inspector labels it deprecated and `/solve` returns a note for each such orifice in `SolveResponse.deprecations`, shown on the solver status badge.
 - `regime`: "default", "incompressible", or "compressible".
 
 #### Channel Element (`channel`)

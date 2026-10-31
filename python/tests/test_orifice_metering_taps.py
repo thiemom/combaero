@@ -32,6 +32,10 @@ from combaero.network import (
     PressureBoundary,
 )
 
+# Stolz is deprecated (#876): its DeprecationWarning is tested in
+# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
+pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
+
 M = cb.MeteringCdCorrelation
 T = cb.OrificeTap
 
@@ -230,7 +234,7 @@ def test_a_saved_gui_file_naming_miller_says_what_to_pick() -> None:
 
     from gui.backend.schemas import OrificeData
 
-    with pytest.raises(ValidationError, match="Pick 'Stolz' or 'ReaderHarrisGallagher'"):
+    with pytest.raises(ValidationError, match="Pick 'ReaderHarrisGallagher'"):
         OrificeData(correlation="Miller")
     assert OrificeData(correlation="Stolz").correlation == "Stolz"
 

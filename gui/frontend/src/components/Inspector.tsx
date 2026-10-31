@@ -997,7 +997,9 @@ const Inspector = () => {
 										<option value="ReaderHarrisGallagher">
 											Reader-Harris/Gallagher (Sharp)
 										</option>
-										<option value="Stolz">Stolz (ISO 5167:1980)</option>
+										<option value="Stolz">
+											Stolz (ISO 5167:1980, deprecated)
+										</option>
 										<option value="IdelchikThick">
 											Deep Hole in Wall (Idelchik 4-18a)
 										</option>
@@ -1015,6 +1017,13 @@ const Inspector = () => {
 										</option>
 										<option value="fixed">Manual / Fixed Value</option>
 									</select>
+									{selectedNode.data.correlation === "Stolz" && (
+										<span className="text-[10px] text-amber-700">
+											Deprecated (#876), removed in 0.9.0: ISO 5167 replaced
+											Stolz with Reader-Harris/Gallagher, which has a sourced
+											range of use.
+										</span>
+									)}
 								</div>
 
 								{/* Conditional Inputs based on correlation */}
