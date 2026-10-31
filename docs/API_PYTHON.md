@@ -272,7 +272,10 @@ print(f"Specific impulse: {thrust.specific_impulse} s")
 geom.tap = cb.OrificeTap.Corner  # Corner, D_D2 or Flange (default)
 Cd = cb.Cd_sharp_thin_plate(geom, state)  # Reader-Harris/Gallagher at geom.tap
 Cd, dCd_dRe = cb.Cd_sharp_thin_plate_and_dRe(geom, state)  # analytic Re_D derivative
-Cd, dCd_dRe = cb.metering_cd_and_dRe(cb.MeteringCdCorrelation.Stolz, geom, Re_D)
+Cd, dCd_dRe = cb.metering_cd_and_dRe(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom, Re_D)
+# MeteringCdCorrelation.Stolz (ISO 5167:1980) is deprecated, removed in 0.9.0
+# (#876): metering_cd_and_dRe, metering_cd_in_range, solve_orifice_mdot,
+# orifice_flow and orifice_flow_state emit a DeprecationWarning when handed it.
 ok = cb.metering_cd_in_range(cb.MeteringCdCorrelation.ReaderHarrisGallagher, geom, Re_D)
 # RHG's lower Re_D bound (ISO 5167-2 5.3.1). Below it the RHG Cd is HELD (#873,
 # 0.8.0), entered C1 in ln Re_D over 0.1 just below the bound; metering_cd_in_range
@@ -1433,6 +1436,7 @@ from combaero.network.mpce_element import ConstantKTeeElement, MultiPortChamberE
 # Cd is the "fixed" correlation's value only (#872, 0.8.0): with any other
 # correlation (default "ReaderHarrisGallagher") the correlation computes it and a
 # Cd given too raises ValueError; "fixed" without a Cd raises as well.
+# correlation="Stolz" is deprecated (#876), removed in 0.9.0: a DeprecationWarning.
 orifice = OrificeElement("orifice", "node1", "node2", diameter=0.011284, regime="compressible")
 measured = OrificeElement("measured", "node1", "node2", Cd=0.65, diameter=0.011284, correlation="fixed")
 # The bore against the pipe it sits in (#788, 0.8.0): equal (to
@@ -3250,6 +3254,25 @@ A residual's Jacobian names a node's stagnation-T column `"<node>.Tt"`, the
 quantity it is (#782). A custom element that still keys it `"<node>.T"`, the
 0.7 name, gets the same Jacobian with one `DeprecationWarning`; the old name
 is removed in 0.9.0.
+
+### The Stolz metering Cd (#876)
+
+The Stolz correlation (ISO 5167:1980) is deprecated in 0.8.0 and removed in
+0.9.0. ISO replaced it with Reader-Harris/Gallagher in ISO 5167-1:1991/Amd
+1:1998 (and ISO 5167-2:2003, 2022). Reader-Harris/Gallagher has a sourced range
+of use (`metering_cd_in_range`) and fits the EEC/API database better over
+Stolz's own range (Reader-Harris & Sattary 1996, Table 10: s 0.245 % against
+0.390 %). Stolz's limits of use are not held, so `metering_cd_in_range` cannot
+flag a Stolz plate outside them.
+
+| Deprecated (removed in 0.9.0) | Use | Warns |
+|---|---|---|
+| `OrificeElement(correlation="Stolz")` | `correlation="ReaderHarrisGallagher"` (the default) | once per element, at construction |
+| `cb.MeteringCdCorrelation.Stolz` in `metering_cd_and_dRe`, `metering_cd_in_range`, `solve_orifice_mdot`, `orifice_flow`, `orifice_flow_state` | `cb.MeteringCdCorrelation.ReaderHarrisGallagher` | every call |
+| GUI orifice "Stolz (ISO 5167:1980, deprecated)" | Reader-Harris/Gallagher | a note in `/solve`'s `deprecations` |
+
+Results are unchanged until removal. The cooling plates, which refuse the whole
+ISO 5167 family, refuse Stolz without the warning.
 
 ---
 

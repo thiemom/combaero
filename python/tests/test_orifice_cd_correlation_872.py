@@ -34,6 +34,10 @@ from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.runner import NetworkRunner
 from gui.backend.schemas import NetworkGraphSchema
 
+# Stolz is deprecated (#876): its DeprecationWarning is tested in
+# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
+pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
+
 _REPO = Path(__file__).resolve().parents[2]
 _ISO_GUI = _REPO / "gui" / "examples" / "iso5167_orifice_metering.json"
 

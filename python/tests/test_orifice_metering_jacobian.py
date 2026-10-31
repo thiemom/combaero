@@ -22,6 +22,10 @@ from combaero.network import (
     PressureBoundary,
 )
 
+# Stolz is deprecated (#876): its DeprecationWarning is tested in
+# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
+pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
+
 
 # 5.5e3, not 5e3: Re_D 5000 is the lower bound of this plate, a C1 point
 # (#873) where a central difference straddles two curvatures. 500 is held.

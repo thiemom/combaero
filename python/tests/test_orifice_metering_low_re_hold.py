@@ -22,6 +22,9 @@ import pytest
 import combaero as cb
 from combaero.network import FlowNetwork, NetworkSolver, OrificeElement, PressureBoundary
 
+# Stolz is deprecated (#876); its unchanged values are still pinned here.
+pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
+
 M = cb.MeteringCdCorrelation
 T = cb.OrificeTap
 W = 0.1  # orifice::metering_hold::blend_ln_re

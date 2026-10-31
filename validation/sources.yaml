@@ -3584,6 +3584,25 @@ documents:
   code: [src/orifice.cpp, include/orifice.h]
   notes: Supplied by the user 2026-10-31 (moved here from the wanted list). NEL report scan, 23 pages.
 
+- file: sources/orifices/reader-harris_2022_iso5167_past_and_present.pdf
+  citation: 'Reader-Harris, M. (2022). ISO 5167: Past and Present. Global Flow Measurement Workshop, 25-27
+    October 2022, Technical Paper. TUV SUD National Engineering Laboratory (NEL).'
+  topic: [orifice]
+  content: 'History of ISO 5167: first edition 1980 (orifice plates, nozzles, Venturi tubes) with the Stolz
+    orifice-plate C equation; a minor revision in 1991 (Stolz [1]); the Reader-Harris/Gallagher (1998) equation
+    by ISO 5167-1:1991/Amd 1:1998; a major revision in 2003; RHG kept in ISO 5167-2:2003 and 2022. Plate
+    edge-thickness data (Beitler and others, Figs. 1-2): ISO 5167-2:2022 adds e/d <= 0.1 to 0.005 <= e/D <=
+    0.02. Prints no limits of use for Stolz.'
+  status: screened
+  verdict: 'Read for #876: confirms that ISO replaced Stolz with RHG (Amd 1:1998) and kept RHG in 2003 and 2022,
+    the basis of the Stolz deprecation (0.8.0, removed in 0.9.0). Holds no Stolz range of use; its ref. [1],
+    Stolz 1988 (NSFMW paper 3.1), may (wanted list). The 2022 e/d <= 0.1 plate limit is not encoded in
+    metering_cd_in_range (which follows ISO 5167-2:2003 5.3.1).'
+  read_for: ['#876 Stolz deprecation']
+  issues: [876]
+  records: [python/tests/test_stolz_deprecation_876.py]
+  code: [python/combaero/network/components.py, python/combaero/_core.cpp, include/orifice.h]
+
 - file: sources/orifices/jobson_1955_PIMechE_169_767_compressible_orifice.pdf
   citation: Jobson, D. A. (1955). On the flow of a compressible fluid through orifices. Proc. Instn Mech. Engrs
     169, 767-776. doi:10.1243/PIME_PROC_1955_169_077_02
@@ -3887,3 +3906,13 @@ wanted:
   question: All three ISO 5167-2 closures (C, expansibility, pressure loss) with derivations and the data behind
     them in one source; an alternative to the three papers above.
   where: Springer book; often through library access.
+- citation: Stolz, J. (1988). The first revision of ISO 5167. Proc. 6th North Sea Flow Measurement Workshop,
+    East Kilbride, Glasgow, National Engineering Laboratory, Paper 3.1.
+  checked: true
+  issues:
+  - 876
+  priority: later
+  question: Stolz's limits of use (beta, D, Re_D) for the ISO 5167:1980/1991 C equation, which combaero does not
+    hold, so metering_cd_in_range cannot flag a Stolz plate (#876 deprecated Stolz instead). Citation checked
+    against ref. [1] of Reader-Harris 2022 (held).
+  where: North Sea Flow Measurement Workshop archive (NFOGM / TUV SUD NEL), usually free.

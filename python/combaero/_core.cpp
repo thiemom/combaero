@@ -94,6 +94,24 @@ static void warn_al6061_deprecated() {
   }
 }
 
+// The Stolz metering Cd (ISO 5167:1980) is deprecated, removed in 0.9.0
+// (#876). Every public binding that takes a MeteringCdCorrelation warns when
+// handed Stolz; the network element warns once at construction instead and
+// evaluates through the quiet _metering_* bindings.
+static constexpr const char *kStolzDeprecated =
+    "MeteringCdCorrelation.Stolz (ISO 5167:1980) is deprecated and will be removed "
+    "in 0.9.0: use MeteringCdCorrelation.ReaderHarrisGallagher. ISO replaced Stolz "
+    "with Reader-Harris/Gallagher in ISO 5167-1:1991/Amd 1:1998 (and ISO "
+    "5167-2:2003); Stolz's limits of use are not held, so metering_cd_in_range "
+    "cannot flag it.";
+
+static void warn_if_stolz(MeteringCdCorrelation c) {
+  if (c == MeteringCdCorrelation::Stolz &&
+      PyErr_WarnEx(PyExc_DeprecationWarning, kStolzDeprecated, 1) < 0) {
+    throw py::error_already_set();
+  }
+}
+
 PYBIND11_MODULE(_core, m) {
 
   // ---------------------------------------------------------------------
@@ -5337,7 +5355,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "its circuit, use DischargeCdCorrelation instead.")
       .value("ReaderHarrisGallagher", MeteringCdCorrelation::ReaderHarrisGallagher,
              "ISO 5167-2 / ASME MFC-3M")
-      .value("Stolz", MeteringCdCorrelation::Stolz, "ISO 5167:1980 (older)")
+      .value("Stolz", MeteringCdCorrelation::Stolz,
+             "ISO 5167:1980. Deprecated (#876), removed in 0.9.0: use "
+             "ReaderHarrisGallagher")
       .value("Constant", MeteringCdCorrelation::Constant,
              "Fixed Cd, 0.61 (orifice::defaults::metering_cd)")
       .value("UserFunction", MeteringCdCorrelation::UserFunction,
@@ -6133,18 +6153,24 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Discharge coefficient for sharp thin-plate orifice (ISO 5167-2).\n\n"
         "Uses Reader-Harris/Gallagher at the taps geom.tap, with the\n"
         "small-pipe term below D = 71.12 mm. Range: metering_cd_in_range.");
-  m.def("metering_cd_and_dRe", &metering_cd_and_dRe, py::arg("correlation"),
-        py::arg("geom"), py::arg("Re_D"),
-        "(Cd, dCd/dRe_D) of a metering correlation at the taps geom.tap.\n\n"
-        "ReaderHarrisGallagher (ISO 5167-2:2003) or Stolz (ISO 5167:1980).\n"
-        "ReaderHarrisGallagher: below the lower Re_D bound Re_b\n"
-        "(metering_cd_re_min) Cd is HELD, entered C1 in ln Re_D over 0.1 just\n"
-        "below Re_b (#873): the slope ramps linearly to 0, so Cd and\n"
-        "dCd/dRe_D stay continuous and values at Re_D >= Re_b are Eq. (4)'s\n"
-        "own. metering_cd_in_range is False there. Stolz: no hold (its 1980\n"
-        "bound is not held as a source); held at its Re_D = 1 value below 1\n"
-        "and capped at 1.5, as before. Constant and UserFunction raise\n"
-        "ValueError: their Cd is the caller's.");
+  m.def(
+      "metering_cd_and_dRe",
+      [](MeteringCdCorrelation c, const OrificeGeometry &geom, double Re_D) {
+        warn_if_stolz(c);
+        return metering_cd_and_dRe(c, geom, Re_D);
+      },
+      py::arg("correlation"), py::arg("geom"), py::arg("Re_D"),
+      "(Cd, dCd/dRe_D) of a metering correlation at the taps geom.tap.\n\n"
+      "ReaderHarrisGallagher (ISO 5167-2:2003) or Stolz (ISO 5167:1980;\n"
+      "deprecated, DeprecationWarning, removed in 0.9.0, #876).\n"
+      "ReaderHarrisGallagher: below the lower Re_D bound Re_b\n"
+      "(metering_cd_re_min) Cd is HELD, entered C1 in ln Re_D over 0.1 just\n"
+      "below Re_b (#873): the slope ramps linearly to 0, so Cd and\n"
+      "dCd/dRe_D stay continuous and values at Re_D >= Re_b are Eq. (4)'s\n"
+      "own. metering_cd_in_range is False there. Stolz: no hold (its 1980\n"
+      "bound is not held as a source); held at its Re_D = 1 value below 1\n"
+      "and capped at 1.5, as before. Constant and UserFunction raise\n"
+      "ValueError: their Cd is the caller's.");
   m.def("metering_cd_re_min", &metering_cd_re_min, py::arg("correlation"), py::arg("geom"),
         "Lower Re_D bound of Reader-Harris/Gallagher's stated range for this\n"
         "geometry, where metering_cd_and_dRe's hold begins (ISO 5167-2:2003\n"
@@ -6152,12 +6178,25 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "max(5000, 170 beta^2 D[mm]). ValueError for every other correlation:\n"
         "Stolz has no encoded bound (ISO 5167:1980 is not held) and no hold;\n"
         "Constant/UserFunction carry no formula.");
-  m.def("metering_cd_in_range", &metering_cd_in_range, py::arg("correlation"),
+  m.def(
+      "metering_cd_in_range",
+      [](MeteringCdCorrelation c, const OrificeGeometry &geom, double Re_D) {
+        warn_if_stolz(c);
+        return metering_cd_in_range(c, geom, Re_D);
+      },
+      py::arg("correlation"), py::arg("geom"), py::arg("Re_D"),
+      "Is the plate inside the correlation's stated range? A diagnostic,\n"
+      "never a selector. ReaderHarrisGallagher: ISO 5167-2:2003 5.3.1 (d,\n"
+      "D, beta and Re_D >= metering_cd_re_min). Stolz (deprecated, #876):\n"
+      "always True, its 1980 limits are not encoded.");
+  // Internal (#876): the same two without the Stolz warning, for the network
+  // element, which warns once at construction rather than per residual.
+  m.def("_metering_cd_and_dRe", &metering_cd_and_dRe, py::arg("correlation"),
         py::arg("geom"), py::arg("Re_D"),
-        "Is the plate inside the correlation's stated range? A diagnostic,\n"
-        "never a selector. ReaderHarrisGallagher: ISO 5167-2:2003 5.3.1 (d,\n"
-        "D, beta and Re_D >= metering_cd_re_min). Stolz: always True, its\n"
-        "1980 limits are not encoded.");
+        "Internal: metering_cd_and_dRe without the Stolz DeprecationWarning.");
+  m.def("_metering_cd_in_range", &metering_cd_in_range, py::arg("correlation"),
+        py::arg("geom"), py::arg("Re_D"),
+        "Internal: metering_cd_in_range without the Stolz DeprecationWarning.");
   m.def("permanent_loss_ratio_and_dC", &permanent_loss_ratio_and_dC, py::arg("beta"),
         py::arg("C"),
         "(k, dk/dC): ISO 5167-2:2003 5.4.1's permanent loss of an orifice\n"
@@ -6416,8 +6455,15 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "Analytic throughout. L/d and r/d are geometry and never enter the\n"
       "Jacobian; a Constant correlation returns exactly (Cd, 0, 0).");
 
-  m.def("solve_orifice_mdot", &solve_orifice_mdot, py::arg("geom"),
-        py::arg("dP"), py::arg("rho"), py::arg("mu"),
+  m.def("solve_orifice_mdot",
+        [](const OrificeGeometry &geom, double dP, double rho, double mu,
+           double P_upstream, double kappa, MeteringCdCorrelation correlation,
+           double tol, int max_iter) {
+          warn_if_stolz(correlation);
+          return solve_orifice_mdot(geom, dP, rho, mu, P_upstream, kappa,
+                                    correlation, tol, max_iter);
+        },
+        py::arg("geom"), py::arg("dP"), py::arg("rho"), py::arg("mu"),
         py::arg("P_upstream") = 101325.0, py::arg("kappa") = 0.0,
         py::arg("correlation") = MeteringCdCorrelation::ReaderHarrisGallagher,
         py::arg("tol") = 1e-6, py::arg("max_iter") = 20,
@@ -6541,7 +6587,14 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       });
 
   m.def(
-      "orifice_flow", &orifice_flow, py::arg("geom"), py::arg("dP"),
+      "orifice_flow",
+      [](const OrificeGeometry &geom, double dP, double T, double P, double mu,
+         double Z, const std::vector<double> &X, double kappa,
+         MeteringCdCorrelation correlation) {
+        warn_if_stolz(correlation);
+        return orifice_flow(geom, dP, T, P, mu, Z, X, kappa, correlation);
+      },
+      py::arg("geom"), py::arg("dP"),
       py::arg("T"), py::arg("P"), py::arg("mu"), py::arg("Z") = 1.0,
       py::arg("X") = std::vector<double>(), py::arg("kappa") = 0.0,
       py::arg("correlation") = MeteringCdCorrelation::ReaderHarrisGallagher,
@@ -6589,6 +6642,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       [](const OrificeGeometry &geom, double dP, double T, double P,
          py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
          double Z, double kappa, MeteringCdCorrelation correlation) {
+        warn_if_stolz(correlation);
         auto X = to_vec(X_arr);
         double mu = viscosity(T, P, X);
         return orifice_flow(geom, dP, T, P, mu, Z, X, kappa, correlation);

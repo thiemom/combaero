@@ -99,3 +99,18 @@ def humanize(message: str, schema: NetworkGraphSchema) -> str:
         out = out.replace(raw, shown)
     hints = [hint for trigger, hint in HINTS if trigger in out]
     return "\n".join([out, *hints])
+
+
+def deprecations(schema: NetworkGraphSchema) -> list[str]:
+    """The deprecated settings a network uses, one note each (#876).
+
+    Report only: the network still builds and solves as before. A saved file
+    keeps loading until the setting is removed.
+    """
+    return [
+        f"{node_name(schema, n.id)}: the Stolz Cd (ISO 5167:1980) is deprecated "
+        "and will be removed in 0.9.0. Pick Reader-Harris/Gallagher, which "
+        "replaced it in ISO 5167."
+        for n in schema.nodes
+        if n.type == "orifice" and (n.data or {}).get("correlation") == "Stolz"
+    ]

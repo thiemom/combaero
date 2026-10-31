@@ -50,6 +50,10 @@ friction_and_jacobian_petukhov = _core.friction_and_jacobian_petukhov
 friction_and_jacobian_serghides = _core.friction_and_jacobian_serghides
 lossless_pressure_and_jacobian = _core.lossless_pressure_and_jacobian
 mach_number_and_jacobian_v = _core.mach_number_and_jacobian_v
+# metering_cd_and_dRe / metering_cd_in_range without the Stolz
+# DeprecationWarning (#876): the network element warns once at construction.
+metering_cd_and_dRe_quiet = _core._metering_cd_and_dRe
+metering_cd_in_range_quiet = _core._metering_cd_in_range
 mixer_from_streams_and_jacobians = _core.mixer_from_streams_and_jacobians
 momentum_chamber_residual_and_jacobian = _core.momentum_chamber_residual_and_jacobian
 nusselt_and_jacobian_dittus_boelter = _core.nusselt_and_jacobian_dittus_boelter

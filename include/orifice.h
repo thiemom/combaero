@@ -126,7 +126,7 @@ struct OrificeState {
 enum class MeteringCdCorrelation {
     // Sharp thin-plate correlations
     ReaderHarrisGallagher,  // ISO 5167-2:2003 / ASME MFC-3M (most accurate)
-    Stolz,                  // ISO 5167:1980 (older, simpler)
+    Stolz,                  // ISO 5167:1980; DEPRECATED (#876), removed in 0.9.0
 
     // Special
     Constant,               // Fixed Cd value (for testing/simple cases)
@@ -827,6 +827,11 @@ double Cd_ReaderHarrisGallagher(double beta, double Re_D, double D,
                                 OrificeTap tap = OrificeTap::Flange);
 
 // Stolz (1978) - ISO 5167:1980. Corner taps by default, which need no D.
+// Deprecated in 0.8.0, removed in 0.9.0 (#876): ISO replaced Stolz with
+// Reader-Harris/Gallagher (ISO 5167-1:1991/Amd 1:1998, ISO 5167-2:2003).
+// Use Cd_ReaderHarrisGallagher.
+[[deprecated("Stolz (ISO 5167:1980) is deprecated, removed in 0.9.0 (#876): "
+             "use Cd_ReaderHarrisGallagher")]]
 double Cd_Stolz(double beta, double Re_D, double D = 0.0,
                 OrificeTap tap = OrificeTap::Corner);
 

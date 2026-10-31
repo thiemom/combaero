@@ -36,6 +36,10 @@ from gui.backend.graph_builder import build_network_from_schema
 from gui.backend.resolve_preview import resolve_preview
 from gui.backend.schemas import NetworkGraphSchema
 
+# Stolz is deprecated (#876): its DeprecationWarning is tested in
+# test_stolz_deprecation_876.py; here Stolz is exercised for its values.
+pytestmark = pytest.mark.filterwarnings("ignore:.*Stolz.*:DeprecationWarning")
+
 INCOMPRESSIBLE_REFERENCED = {
     "ReaderHarrisGallagher": {},
     "IdelchikThick": {"plate_thickness": 0.01},

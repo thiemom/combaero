@@ -12,7 +12,8 @@ using namespace combaero;
 // Orifice Example
 //
 // Demonstrates:
-// 1. Cd correlations: Reader-Harris/Gallagher (flange and corner taps), Stolz
+// 1. Cd correlations: Reader-Harris/Gallagher (flange and corner taps).
+//    Stolz (ISO 5167:1980) is deprecated (#876), removed in 0.9.0.
 // 2. Thick-plate and rounded-entry corrections
 // 3. Iterative Cd-Re solver (solve_orifice_mdot)
 // 4. Full orifice_flow bundle (OrificeFlowResult)
@@ -41,9 +42,8 @@ int main()
               << std::setw(10) << "Re_D"
               << std::setw(12) << "RHG flange"
               << std::setw(12) << "RHG corner"
-              << std::setw(10) << "Stolz"
               << "\n";
-    std::cout << std::string(52, '-') << "\n";
+    std::cout << std::string(42, '-') << "\n";
 
     for (double beta : {0.3, 0.5, 0.65, 0.75}) {
         for (double Re_D : {1.0e4, 1.0e5, 1.0e6}) {
@@ -60,13 +60,11 @@ int main()
             const double cd_rhg   = orifice::Cd_ReaderHarrisGallagher(beta, Re_D, D_pipe);
             const double cd_rhg_c = orifice::Cd_ReaderHarrisGallagher(beta, Re_D, D_pipe,
                                                                       OrificeTap::Corner);
-            const double cd_stolz = orifice::Cd_Stolz(beta, Re_D);
 
             std::cout << std::setw(8)  << beta
                       << std::setw(10) << static_cast<int>(Re_D)
                       << std::setw(12) << cd_rhg
                       << std::setw(12) << cd_rhg_c
-                      << std::setw(10) << cd_stolz
                       << "\n";
         }
     }
