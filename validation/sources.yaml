@@ -3560,6 +3560,29 @@ documents:
   code: [src/orifice.cpp, include/orifice.h, src/solver_interface.cpp]
   notes: Supplied by the user 2026-10-29 (moved here from the wanted list). The 2022 edition was only available
     as the free preview (stops in 5.2) and was not kept.
+- file: sources/orifices/reader-harris_sattary_1996_rhg_equation_iso5167-1.pdf
+  citation: 'Reader-Harris, M. J., Sattary, J. A. (1996). The orifice plate discharge coefficient equation --
+    the equation for ISO 5167-1. National Engineering Laboratory, East Kilbride (paper 24, 14th North Sea Flow
+    Measurement Workshop).'
+  topic: [orifice]
+  content: 'Derivation of the "Agreed Equation" (RHG) on the EEC/API database (16522 points, D 50-600 mm,
+    beta 0.1-0.75, corner/flange/D-D/2 taps, Re_D 10 to 1e8). Eq. (10) is the full form fitted to all data,
+    including Re_D < 4000 (a max(...) branch in the beta^3.5 term and a 1 + 8 max(log10(3700/Re_D), 0) factor
+    on the downstream tapping term); Eq. (11a)+(11b) is its Re_D >= 4000 form, the one in ISO 5167-2 Eq. (4).
+    Residual tables 2-8 by beta, D, Re_D and taps (s = 0.259 % for Re_D >= 4000; 0.59 % in the Re_D 10-4000 bin,
+    470 points, mostly beta <= 0.375); Table 10 compares Stolz ISO 5167-1:1991 over its range (s 0.390 %)
+    without stating that range; Eqs. (12)-(21) show the expansibility choice moves C by <= 0.04 %.'
+  status: implemented
+  verdict: 'Read 2026-10-31. Primary of the implemented RHG: our metering_cd_and_dRe is Eq. (11a)+(11b), already
+    checked against the held ISO 5167-2 Annex A. Eq. (10) is a published, data-fitted extension below Re_D 4000
+    that rises faster than Eq. (11) (beta 0.5, D 50 mm: 0.735 vs 0.684 at Re_D 1000); it is C0 but not C1 at
+    Re_D ~ 3700 and still unbounded as Re_D -> 0. Not implemented; #873 holds Cd below the ISO bound instead.
+    Does not give the Stolz limits of use (#873 wanted entry for ISO 5167:1980 stays open).'
+  read_for: ['#854 RHG primary', '#873 low-Re hold']
+  issues: [854, 873]
+  records: []
+  code: [src/orifice.cpp, include/orifice.h]
+  notes: Supplied by the user 2026-10-31 (moved here from the wanted list). NEL report scan, 23 pages.
 
 - file: sources/orifices/jobson_1955_PIMechE_169_767_compressible_orifice.pdf
   citation: Jobson, D. A. (1955). On the flow of a compressible fluid through orifices. Proc. Instn Mech. Engrs
@@ -3834,16 +3857,6 @@ wanted:
     and the d, D and beta limits that metering_cd_in_range does not encode for Stolz. Follow-up of #873
     (issue to be filed).'
   where: ISO (withdrawn standard; national-library or university copy).
-- citation: Reader-Harris, M. J., Sattary, J. A. (1996). The orifice plate discharge coefficient equation --
-    the equation for ISO 5167-1. Proc. 14th North Sea Flow Measurement Workshop. (citation as recalled)
-  checked: false
-  issues:
-  - 854
-  priority: now
-  question: The primary of the Reader-Harris/Gallagher discharge coefficient (ISO 5167-2 Eq. 4), with the
-    database it was fitted to. combaero's RHG reproduces Annex A of ISO 5167-2:2003 (held) to rounding, so this
-    adds the data behind the equation, not a check of the code.
-  where: North Sea Flow Measurement Workshop archive (NFOGM), usually free.
 - citation: Reader-Harris, M. J. (1998). The equation for the expansibility factor for orifice plates. Proc.
     FLOMEKO 98, Lund. (citation as recalled)
   checked: false
