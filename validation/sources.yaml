@@ -3170,10 +3170,11 @@ documents:
     Gen3 CSP diffusivity agrees with the brochure''s within 2.5% to 620 C; both show the 600-700 C step
     that follows the specific heat.'
   read_for: ['#761 Haynes 230 conductivity', '#881 built-in materials vs Gen3 CSP']
-  issues: [761, 881]
+  issues: [761, 881, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
-  notes: Supplied by the user 2026-10-28 (the haynesintl.com PDF links return 403 to automated fetches).
+  notes: Supplied by the user 2026-10-28 (the haynesintl.com PDF links return 403 to automated fetches). Melting range 1301-1371 C gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/combustion/gordon_mcbride_1994_NASA_RP-1311_part1_analysis.pdf
   citation: Gordon, S., McBride, B. J. (1994). Computer program for calculation of complex chemical equilibrium
     compositions and applications. I. Analysis. NASA RP-1311.
@@ -3230,10 +3231,11 @@ documents:
     (9.2 W/m C at 25 C to 26.7 at 900 C; the metric rows jump from 200 to 600 C as printed), with 400 C and
     1000 C from the manufacturer''s data sheet (registered); valid 300-1273 K. Convenience data per the materials policy.'
   read_for: ['liner / transition-piece alloy conductivity']
-  issues: [761]
+  issues: [761, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
-  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads).
+  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads). Melting range 1260-1355 C gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/materials/haynes_188_alloy_brochure.pdf
   citation: Haynes International. HAYNES 188 (UNS R30188) alloy, product brochure (web edition, accessed 2026-10-29).
   topic: [other]
@@ -3243,10 +3245,11 @@ documents:
   verdict: 'k_haynes188 interpolates the metric thermal-conductivity column linearly, exact at every printed point
     (10.4 W/m C at RT to 27.6 at 1000 C); valid 300-1273 K. Convenience data per the materials policy.'
   read_for: ['liner / transition-piece alloy conductivity']
-  issues: [761]
+  issues: [761, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
-  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads).
+  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads). Melting range 1315-1410 C gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/materials/haynes_263_alloy_brochure.pdf
   citation: Haynes International. HAYNES 263 (UNS N07263) alloy, product brochure (web edition, accessed 2026-10-29).
   topic: [other]
@@ -3256,10 +3259,11 @@ documents:
   verdict: 'k_haynes263 interpolates the metric thermal-conductivity column linearly, exact at every printed point
     (11.7 W/m C at RT to 28.5 at 1000 C); valid 300-1273 K. Convenience data per the materials policy.'
   read_for: ['liner / transition-piece alloy conductivity']
-  issues: [761]
+  issues: [761, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
-  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads).
+  notes: Supplied by the user 2026-10-29 (the manufacturer's site blocks automated downloads). Melting range 1300-1355 C gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/materials/zhu_miller_1999_NASA_TM-1999-209069_TBC_conductivity_modulus.pdf
   citation: Zhu, D., Miller, R. A. (1999). Thermal conductivity and elastic modulus evolution of thermal barrier
     coatings under high heat flux conditions. NASA/TM-1999-209069.
@@ -3324,10 +3328,11 @@ documents:
   verdict: 'k_haynes25 interpolates the metric thermal-conductivity column linearly, exact at every printed point
     (10.5 W/m C at 25 C to 27.5 at 1000 C); valid 298-1273 K. Convenience data per the materials policy.'
   read_for: ['Co-base combustor / turbine alloy conductivity']
-  issues: [761]
+  issues: [761, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
-  notes: Supplied by the user 2026-10-29.
+  notes: Supplied by the user 2026-10-29. Melting range 1330-1410 C gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/materials/special_metals_inconel_625.pdf
   citation: Special Metals Corporation. INCONEL alloy 625, product data sheet (2013).
   topic: [other]
@@ -3343,10 +3348,11 @@ documents:
     not by Gen3; a third source is wanted. ORNL/TM-9616 reprints these BMI values above 117 K, so it is
     not independent.'
   read_for: ['liner / duct / bellows alloy conductivity', '#881 built-in materials vs Gen3 CSP']
-  issues: [761, 881]
+  issues: [761, 881, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
-  notes: Supplied by the user 2026-10-29.
+  notes: Supplied by the user 2026-10-29. Melting range 1290-1350 C (Table 2) gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/materials/special_metals_nimonic_75_SMC-058.pdf
   citation: Special Metals Corporation. NIMONIC alloy 75, publication SMC-058 (2004).
   topic: [other]
@@ -3355,9 +3361,10 @@ documents:
   verdict: 'Prints conductivity only at 20 C: 11.7 W/m C. The Virgamet table that k_nimonic75 uses gives the
     same value there; the manufacturer gives nothing at temperature to cross-check the rest.'
   read_for: ['Nimonic 75 conductivity']
-  issues: [761]
+  issues: [761, 882]
   records: [python/tests/test_materials.py]
-  notes: Supplied by the user 2026-10-29.
+  notes: Supplied by the user 2026-10-29. Melting range 1340-1380 C gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/materials/virgamet_nimonic_75_alloy_N75.pdf
   citation: 'Virgamet. Nimonic 75, Alloy N75, 2.4630, 2.4951 - nickel alloy, product data page (web, accessed
     2026-10-29).'
@@ -3476,10 +3483,10 @@ documents:
     temperature-dependent k_aluminum_6061, which is deprecated (#761). Kept as the reference for room-temperature
     conductivity of nonferrous alloys (copper alloys, titanium, nickel) if one is needed.'
   read_for: ['Al 6061 conductivity provenance']
-  issues: [761]
+  issues: [761, 882]
   records: []
   notes: Supplied by the user 2026-10-29. 3470 pages; the 6061 data sheet is in "Properties of Wrought Aluminum and
-    Aluminum Alloys".
+    Aluminum Alloys". Melting range 1083 C (C10100/C10200 solidus), for copper gives T_solidus, the cap of the issue 882 k(T) envelope.
 
 - file: sources/combustor_network/gouws_2007_MEng_UP_T56_network_solver_cfd.pdf
   citation: Gouws, J. J. (2007). Combining a one-dimensional empirical and network solver with computational
@@ -3745,9 +3752,10 @@ documents:
   status: screened
   verdict: Above the Gen3 CSP band from ~540 C (about +15 % there). Not the primary 310 source.
   read_for: [310 SS conductivity for the C3X example, '#881']
-  issues: [881]
+  issues: [881, 882]
   records: []
-  notes: Supplied by the user 2026-10-31.
+  notes: Supplied by the user 2026-10-31. Melting range 2470-2555 F, 1354-1402 C, for ss310 gives T_solidus, the cap of the issue 882 k(T) envelope.
+
 - file: sources/materials/thyssenkrupp_1.4845_310S_datasheet.pdf
   citation: thyssenkrupp Materials (UK) (?). Stainless steel 1.4845, material data sheet.
   topic: [other]
@@ -3772,6 +3780,23 @@ documents:
   issues: [882]
   records: []
   notes: Supplied by the user 2026-10-31 (public OSTI report).
+- file: sources/materials/special_metals_inconel_718.pdf
+  citation: Special Metals Corporation (?). INCONEL alloy 718 (UNS N07718/W.Nr. 2.4668), technical bulletin.
+  topic: [other]
+  content: Composition, Table 2 physical constants (density, melting range 1260-1336 C, specific heat at 21 C),
+    Table 5 thermal properties (conductivity, resistivity, expansion, -320 to 2000 F, annealed and annealed +
+    aged), heat treatment, mechanical and corrosion data.
+  status: implemented
+  verdict: 'T_solidus of inconel718 (1260 C, the lower end of the printed melting range) for the #882
+    envelope cap. Table 5''s conductivity is calculated from resistivity (its footnote a), annealed and
+    annealed + aged: 77-79 Btu in/ft2 h F at 70 F (11.1-11.4 W/m K) to 196-199 at 2000 F. The shipped
+    k_inconel718 (11.4 + 0.0146 T_C, no cited document) lies within about 5% of it; checking it against this
+    table is a separate item.'
+  read_for: ['#882 solidus caps', inconel718 conductivity source]
+  issues: [882]
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: Fetched from specialmetals.com 2026-10-31 (public technical bulletin).
 
 wanted:
 - citation: Haynes International. HAYNES 625 alloy brochure (physical properties, thermal conductivity and

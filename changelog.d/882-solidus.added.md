@@ -1,0 +1,3 @@
+- **Each material's solidus, and `get_material_info(name)` (#882).** The database records the solidus its source prints, the lower end of the melting range, together with that source. Ten materials have one: Haynes 230, 188, 263 and 25, Hastelloy X, Inconel 625 and 718, Nimonic 75, 310 and copper. ss316, x22crmov12_1, nicocraly, alumina, ysz and al6061 do not: no held document prints a value, so it is NaN.
+  - `get_material_info` returns a material's sourced conductivity range, source, notes, solidus and solidus source.
+  - Data only: no conductivity changes. The solidus becomes the hot end of the k(T) envelope that #882 adds next.

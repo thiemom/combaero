@@ -120,6 +120,8 @@ inline constexpr Entry function_units[] = {
     {"list_materials", "-", "list[str]"},
     {"get_material_conductivity", "name: str, T: K, extrapolate: bool (default False)",
      "W/(m*K)"},
+    {"get_material_info", "name: str",
+     "dict: T_min, T_max, T_solidus [K]; source, notes, solidus_source"},
 
     // -------------------------------------------------------------------------
     // cooling_correlations.h - Advanced Cooling Correlations

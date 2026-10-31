@@ -2337,6 +2337,10 @@ k_tbc = cb.k_tbc_ysz
 k = cb.k_hastelloy_x(1400.0, extrapolate=True)
 k = cb.get_material_conductivity("hastelloy_x", 1400.0)                    # = k at 1273.15 K
 k = cb.get_material_conductivity("hastelloy_x", 1400.0, extrapolate=True)  # end slope
+
+# The record: sourced range, source, and the solidus [K] its source prints
+# (NaN where none does), the hot end of the #882 envelope.
+info = cb.get_material_info("haynes230")  # T_min, T_max, T_solidus = 1574.15, solidus_source, ...
 ```
 
 ### Advanced Geometry Functions

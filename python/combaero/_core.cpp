@@ -6939,6 +6939,27 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "1e-3 for numerical stability. Raises RuntimeError for an unknown material\n"
       "or a non-finite T.");
 
+  m.def(
+      "get_material_info",
+      [](const std::string &name) {
+        const auto &mat = combaero::materials::get_material(name);
+        py::dict d;
+        d["name"] = mat.name;
+        d["T_min"] = mat.T_min;
+        d["T_max"] = mat.T_max;
+        d["source"] = mat.source;
+        d["notes"] = mat.notes;
+        d["T_solidus"] = mat.T_solidus;
+        d["solidus_source"] = mat.solidus_source;
+        return d;
+      },
+      py::arg("name"),
+      "A database material's record: its sourced conductivity range T_min..T_max\n"
+      "[K] and source, notes, and its solidus T_solidus [K] -- the lower end of\n"
+      "the melting range its source prints -- with that source (#882). T_solidus\n"
+      "is NaN where no held source prints one. Raises RuntimeError for an\n"
+      "unknown material.");
+
   // =========================================================================
   // Advanced Cooling Correlations
   // =========================================================================

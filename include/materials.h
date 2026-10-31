@@ -1,9 +1,10 @@
 #ifndef MATERIALS_H
 #define MATERIALS_H
 
+#include <functional>
+#include <limits>
 #include <string>
 #include <vector>
-#include <functional>
 
 namespace combaero::materials {
 
@@ -19,6 +20,11 @@ struct ThermalMaterial {
     double T_max;                               // Maximum valid temperature [K]
     std::string source;                         // Data source reference
     std::string notes;                          // Additional information
+    // Solidus (lower end of the printed melting range) [K] and the document it
+    // is from (#882): the hot end of the material's k(T) envelope. NaN where no
+    // held source prints one; the envelope then decides the cap.
+    double T_solidus = std::numeric_limits<double>::quiet_NaN();
+    std::string solidus_source;
 };
 
 // Database access functions
