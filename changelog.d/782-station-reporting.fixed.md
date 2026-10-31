@@ -1,5 +1,0 @@
-- **Crossflow stations and area combustors report their moving state (#782 audit).** These nodes hold Pt = P while their gas moves, so they reported `.T` = Tt, `.Pt` = static P and `.mach` = 0. In one impingement network, a station at Mach 0.42 reported a Pt 12.8% low and a T 20 K high.
-  - A station now reports the static T and Mach of the station's mean flow, the state its half-drops use, and its true Pt.
-  - The crossflow segment leaving or entering a station reports that Pt, together with `dPt` and `pr_total`. A plate's or hole's jets discharging into the station keep their drop to its static pressure, the pressure the jets see.
-  - A combustor with an `area` reports the static T at G = m / area.
-  - Reporting only: residual vector and Jacobian bit-identical on all 560 stress networks; scorecards byte-identical.

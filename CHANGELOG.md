@@ -7,6 +7,364 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-31
+
+### Highlights
+
+The 0.8 release of the breaking changes announced in 0.7 (61 commits since
+0.7.1); the sections below are the record. What changes numbers or code on
+upgrade:
+
+- **`T` is static, `Tt` total, everywhere (#782).** Network results report the
+  static temperature under `T`, as they already did for `P`; stagnation inputs
+  are spelled `Tt`/`Pt` across the Python and C++ API. The old spellings warn
+  and are removed in 0.9.0. Four kernels that needed a static T now get one.
+- **Results tables change shape (#774, #784).** Every CSV/`to_dataframe()`
+  quantity column carries its unit (`<key> [<unit>]`), exports carry the
+  case's inputs, and `NetworkRunner.sweep()` returns one row per case with
+  `(kind, entity, quantity)` columns. `load_results()` reads old and new.
+- **Orifices (#788, #861, #872, #873).** `jobson1955` is the default
+  compressible model for incompressible-referenced Cd; a bore against its pipe
+  follows a rule instead of a silent wall-hole fallback; `Cd` is accepted only
+  with the `"fixed"` correlation; Reader-Harris/Gallagher is held below its
+  Re_D bound. Stolz is deprecated (#876).
+- **Impingement and crossflow (#800, #802, #813).** Jet Cd depends on the
+  crossflow by default, crossflow stations take the jets' axial momentum, and
+  segments run Fanno from the true stagnation state.
+- **The 0.7 deprecations are removed**, among them `BorderCarnotLossElement`,
+  `VortexElement(r_c=, n=, omega_rpm=)`, `smr_wgs_equilibrium` and
+  `init_strategy='incompressible_warmstart'`.
+
+New: worked examples from papers (scripts and GUI networks), a set-outlet-T
+heat source, tapered crossflow segments, opt-in compressible orifice models,
+sourced liner/transition alloys with opt-in conductivity extrapolation, and a
+stall handover for far-from-root crawls.
+
+### Added
+
+- **Opt-in extrapolation for material conductivity** (#761). The table-backed `k_*` functions, `get_material_conductivity` and `WallLayer` take `extrapolate=False`.
+  - **Default (unchanged):** outside its valid range a `k_*` function raises, and the database lookup holds the end value.
+  - **`extrapolate=True`:** continues the end slope linearly. On a table this is the end segment; on a fitted polynomial it is the tangent. It raises if that reaches k <= 0 or T <= 0.
+  - The continuation is unsourced; the user asks for it explicitly.
+  - `k_tbc_ysz` keeps its own range.
+
+- **Liner and transition-piece alloys, and a TBC bond coat, in the materials database.** Each is a function and a `get_material_conductivity` / `list_materials` entry.
+  - `k_hastelloy_x`, `k_haynes188` and `k_haynes263` (300-1273 K) interpolate the manufacturers' tables (Haynes International) linearly, so they are exact at every printed point.
+  - `k_bondcoat_nicocraly` (848-1373 K) is the NiCoCrAlY line from Zhu & Miller 1999 (NASA/TM-1999-209069, Fig. 2), limited to the range it is drawn over.
+  - `k_haynes25` (298-1273 K, Haynes), `k_inconel625` (116-1255 K, Special Metals) and `k_nimonic75` (293-1273 K, Virgamet; its 20 C value matches Special Metals) interpolate the published tables the same way.
+  - `k_copper` (high purity, 100-1200 K) and `k_alumina` (dense Al2O3, 100-2000 K) are the NSRDS-NBS 8 recommended values (Powell, Ho & Liley 1966).
+  - `k_x22crmov12_1` (1.4923, 293-923 K) is the straight line between the data sheet's 20 C and 650 C values.
+  - These are convenience data. A user with qualified properties supplies their own conductivity.
+
+- **Results table for solved networks, one row per case (`gui.backend.results`, #784).** `load_results(path_or_df)` reads a GUI CSV export, a `to_dataframe()` frame, a `NetworkResult`, a table saved with `df.to_csv()` or a 0.7 full-detail sweep frame into one shape: columns a 3-level MultiIndex `(kind, entity, quantity)` with kind `inputs` or `outputs`, so `df["outputs"]["liner", "Tt"]` is a quantity across cases. `append_case(df, result, name=None)` adds a case and reads the full network's inputs from the result itself; `varied_inputs(df)` returns the inputs that differ between rows.
+  - **Inputs** are what defines the case: boundary conditions, geometry, element and mixture settings, and the network-wide physics settings under `_network`. Initial guesses, the warm start and the solver options are not inputs; they are kept in `df.attrs`.
+  - **Units** travel in `df.attrs["units"]`, keyed by column, so quantity names stay unit-free. The solve status is under the `_solve` entity of `outputs`.
+  - Entities are named by label, falling back to the id; two entities with the same name are refused with a message naming both ids. Inputs are the values the network file gives (a field left at its default is absent); an unlabelled entity is named by its id; `_solve` and `_network` are reserved names.
+  - **Every numeric input carries a unit** (`INPUT_UNIT_MAP` / `input_unit` in `gui/backend/units.py`: lengths `m`, areas `m^2`, angles `deg`, coefficients and ratios `-`, ...); text inputs are bare. A test fails on any numeric schema field without one.
+
+- **A heat source with a set outlet temperature, and a GUI Heat Source node (#792).**
+  - **`EnergyBoundary(Tt_target=...)`** sets the TOTAL temperature of the plenum, momentum chamber or combustor it is on; the heat flow becomes a solver unknown, `{id}.Q` [W], closed by one temperature row. Its Jacobian column is the existing C++ `dT_mix/dQ`, relayed downstream. On a combustor it is the heat taken out (or put in) after the reaction to reach that exit Tt; the fuel flow is unchanged.
+  - **Refused (`ValueError`):** `Tt_target` together with a nonzero `Q` or `fraction` on one boundary, two `Tt_target` on one node, and a `Tt_target` on any other node type. A node with no through-flow does not succeed: its heat is undetermined, reported as NaN and listed in `__heat_undetermined__`.
+  - **Reported in every mode:** `{id}.Q` per boundary (set, solved, or its share of the fraction heat) and `{node}.Q`, their sum. The second-law check and the balance ledger now count the solved heat.
+  - **GUI:** a Heat Source node, wired by one edge to a plenum, momentum chamber or combustor, sets Q (default 1 kW), a fraction, or an outlet Tt (total). The Inspector shows the heat applied (the solved Q in the outlet-Tt mode) beside the node's total temperature.
+
+- **Worked examples from papers, as scripts and as GUI networks** (#793). Each rebuilds a published case, solves it and compares with the source's own values, labelled per the validation policy.
+  - **Florschuetz, Truman & Metzger 1981 jet array** (`python/examples/papers/florschuetz1981_jet_array.py`): the ten-row crossflow build-up against the paper's Eq. 8 and row-by-row Nu/Nu1 against the measured Fig. 6 points. Fidelity: 2.1% mean error at B(5,4)I z/d 2; +4.0% bias and 6.9% mean error over all 242 points (`--all`). The script reads the committed digitised data, so it runs from a repo checkout.
+  - **ISO 5167-2 orifice metering run** (`python/examples/papers/iso5167_orifice_metering.py`): the flange-tap differential against the permanent loss at beta 0.3/0.5/0.7, checked against the standard's own equations (C, flow equation, 5.4.1 loss). This is fidelity to the equations; there are no measurements.
+  - **GUI:** a new **Examples** menu loads the same networks (`gui/examples/*.json`, shipped as combaero-gui package data, served by `/examples`). Each opens with a dismissible panel giving the source, what is reproduced, where to look and the validation label.
+
+- **Tapered crossflow segments (#812).** `CrossflowSegmentElement(area=A_from, area_to=A_to)` models a tapering annulus or a growing liner. Each end's station half-drop, joining jets and static-to-total closure use that end's own section, and friction uses the mean section. Total pressure carries across the segment apart from friction, so the area change is isentropic.
+  - **Incompressible:** a from-end station adds Bernoulli's area term, C++ `segment_area_change_drop`, with analytic partials.
+  - **Unchanged:** without `area_to`, or with `area_to` equal to `area`, a segment is bit-identical.
+  - **Checks:**
+    - A frictionless taper passes Bernoulli's flow to 3e-3.
+    - The two regimes agree to O(M^2) at low Mach.
+    - Tapered chains pass the second law in both directions. A constant section standing in for the taper used to read sigma_norm of about -0.06.
+
+- **Two opt-in compressible orifice models** (#854). `OrificeElement(compressible_model=...)` picks how the compressible regime expands the flow; the GUI Inspector has the same selector. The default (`"nozzle"`, the isentropic nozzle) is unchanged.
+  - **`"jobson1955"`:** Jobson (1955), Proc. IMechE 169, 767. A sharp-edged jet widens as the pressure ratio falls, so the flow keeps rising past choke instead of going flat. Its only input is the incompressible contraction Ci from the element's Cd correlation, with `Cd = Cv * Ci` (`Cv` defaults to 1). In a pipe, it adds an approach-velocity term that is not in the paper: f = 1/Ci - 1/(2 Ci^2) - Cv beta^2 + Cv^2 beta^4/2. It works subcritical and choked, and is C1 through the critical ratio. It reproduces Jobson's Table 2 to the printed digits. Cross-source, it lies inside ISO 5167-2's stated expansibility uncertainty for beta 0.2-0.75 and p2/p1 0.75-0.98.
+  - **`"iso5167"`:** ISO 5167-2:2003 Eq. (1) with Eq. (5)'s expansibility. It needs the Reader-Harris/Gallagher correlation. Below p2/p1 = 0.75, Eq. (5) is extrapolated and the `model_in_range` diagnostic reads 0.
+  - **New functions:** `jobson_force_defect`, `jobson_ci_from_cd`, `jobson_contraction_coefficient` and `jobson_expansibility`. The solver kernels are `orifice_jobson_residuals_and_jacobian` and `orifice_iso5167_residuals_and_jacobian`, which return an `OrificeModelResult` with analytic derivatives.
+  - **New diagnostics:** `compressible_model`, `Ci`, `contraction_C`, `expansibility`, `model_in_range` and `Cv`.
+
+- Validation: Schiller's (1933) superheated-steam orifice tests, digitised from Jobson (1955) Fig. 5b, score `jobson1955` as a second choked series (cross-source, 9 points: Jobson RMS 1.9 % vs the isentropic nozzle's 19.8 % at the same Cd) (#861).
+
+- **Stall handover can be turned off (#864).** `NetworkSolver.solve(stall_handover=False)` turns off the stall handover for that call. Without it, a cold rung does not cut itself short when it stalls: hybr does not hand over to the LM fallback early, and the LM fallback does not hand over to the warm-start retry early. Each cold rung runs to its own share of the budget. The retries and nested solves of the call are covered too. The default (`True`) is unchanged.
+  - **GUI:** a "Stall handover" checkbox in Solver Configuration, saved with the drawing. A file saved without the setting loads with it on.
+  - **Results table:** the setting is stored with the solver options as `solver:stall_handover` (#784). It is not an input.
+
+### Changed
+
+- **`k_tbc_ysz` (plasma-sprayed) follows Zhu & Miller 2000, NASA/TM-2000-210237 (#761).**
+  - **As sprayed:** k = 1.0 W/m K at every temperature, the paper's "about 1 W/m-K". It used to rise from 0.81 to 1.39 W/m K, which the literature does not support.
+  - **Sintering:** their Eq. 1, with t in seconds. At 1320 C the conductivity rises about 44% within hours, against +3.8% after 1000 h before. There is no 1073 K on/off gate any more, so k is continuous in T.
+  - **Fully sintered limit:** k_inf = 1.74 W/m K, inferred from their Fig. 4 plateaus and flagged as unconfirmed.
+  - **Caveat:** the measured k is an effective through-thickness value for a 254 um coating under a strong gradient. Users with a characterised coating should supply its conductivity.
+  - **EB-PVD:** keeps its as-deposited fit, now marked uncited, with no sintering.
+
+- **Breaking (0.8.0): every quantity column of the CSV export and of `NetworkRunner.to_dataframe()` / full-detail `sweep()` now carries its unit (#774).** About 130 result keys used to have a unit in the GUI only and kept a bare column; they are now labelled `<key> [<unit>]`, which renames them. Code that reads one of them by name must use the new header, e.g. `df["entrainment_ratio"]` becomes `df["entrainment_ratio [-]"]`.
+  - **Renamed:** every key formerly in `GUI_ONLY_UNITS` (now merged into `UNIT_MAP` in `gui/backend/units.py`; the separate map is gone), for example `entrainment_ratio [-]`, `m_dot_primary [kg/s]`, `P_c_star [Pa]`, `dP_tap [Pa]`, `dP_permanent [Pa]`, `UA [W/K]`, `NTU [-]`, `sigma_norm [-]`, `T_static [K]`.
+  - **Patterns:** the junction ports `port_<i>_<quantity>` (e.g. `port_0_P [Pa]`, `port_1_m_dot [kg/s]`), the tee's hidden steps `step_<common|straight|branch>_<quantity>` (e.g. `step_branch_dPt [Pa]`), and the arrays' per-row lists `rows_<key>`, which take `<key>`'s unit (e.g. `rows_T_hot [K]`, `rows_m_dot [kg/s]`).
+  - **Newly given a unit:** `bypass_fraction`, `eta_r`, `eta_r_extrapolated`, `Cd_own`, `rows_P_backside` and `rows_unresolved`, which had none anywhere.
+  - **Unchanged:** the meta columns (`id`, `label`, `type`, `kind`, the solve status, ...), the text-valued keys (`area_source`, `port_<i>_area_source`, `second_law`, `tap`, ...), and `sweep(..., metrics=[...])`, whose columns are the metric strings passed in. A test now exports one network per palette kind and fails on any column with no unit.
+
+- **GUI node cards show curated rows per element kind (#775).** A card used to show the first Display Fields keys its result carried, in discovery order, so a channel card read `m_dot`, `Dh`, `M_exit_duct`. Each kind now has a short default list, most useful first: for example channel `m_dot`, `dP`, `mach_out`; orifice `m_dot`, `dP`, `Cd`; plenum `P`, `Tt`. The list lives in `gui/frontend/src/utils/cardRows.ts`, and a test checks every key against the backend's per-kind key list.
+  - **Changing them:** a pin next to each Live Telemetry field adds it to (or removes it from) the cards of that kind. A new pin goes first, so it shows on a one-row card. "Reset card rows" restores the default.
+  - **Fits the card:** the discrete loss card shows two rows (`m_dot`, `dPt`). A long Telemetry label gets a shorter card label (`ΔPt`, `ΔP`, `ṁs/ṁp`, `ṁp`, `ṁs`, `ṁbr/ṁcom`), and a test keeps every default row within the 21 characters a card shows.
+  - **Not changed:** the Live Telemetry still shows every selected Display Field. The Display Fields panel no longer affects the cards.
+
+- **The film density ratio takes the gas's static temperature (#782 audit).** `DR = rho_c / rho_g` is formed where the jets meet the gas. The gas moves at G_gas, so `rho_g` is at the static T of the duct closure at (T_gas, Pt, G_gas), as the effusion path's chamber density already was; it was at the gas Tt.
+  - The coolant leaves a plenum and keeps its Tt.
+  - Film effectiveness moves by under 0.7% at a gas Mach of 0.3 or less, and up to 2% at Mach 0.5. In the film test network, DR moves by -0.35%.
+  - The scorecards are unchanged: none runs a film through `film_on_wall_side`.
+
+- **Stagnation inputs are spelled `Tt`/`Pt` across the public API (#782).** The P/Pt rule of #773 (P static, Pt total) now holds for temperature: `T` is static, `Tt` total. Keywords `T0`/`P0` became `Tt`/`Pt` in `nozzle_flow`, `nozzle_cd`, `nozzle_thrust_cd`, `solve_A_eff_from_mdot`, `solve_P_back_from_mdot`, `critical_pressure_ratio`, `mach_from_pressure_ratio`, `mass_flux_isentropic`, `duct_static_state`, `duct_htc_static_state`, `duct_htc_static_state_dY`, `T_from_stagnation`, `P_from_stagnation` and the solver tools `sonic_static_pressure` and `orifice_compressible_mdot_and_jacobian`; `compressible.nozzle_flow(T, P, ...)` takes `(Tt, Pt, ...)`; `heat_entropy_flux` takes `Tt_in`/`Tt_out`; `approach_static_pressure` takes `(Pt, Tt, ...)`; the orifice and channel residual kernels take `Tt_up`. Functions `T0_from_static`, `T0_from_static_v`, `P0_from_static`, `solve_P0_from_mdot` and `T0_/P0_from_static_and_jacobian_M` are now `Tt_from_static`, `Tt_from_static_v`, `Pt_from_static`, `solve_Pt_from_mdot` and `Tt_/Pt_from_static_and_jacobian_M`. Fields: `MixtureState.Tt`/`.Pt` (were `T_total`/`P_total`), `MassStream.Tt`/`.Pt` (were `T`/`P_total`), `StreamJacobian.d_Tt`/`.d_Pt`, `NozzleSolution.Tt`/`.Pt`, `DuctStaticState.dT_dTt` and the other `d*_dTt`/`d*_dPt` partials, `SonicStatic.dP_dTt`, `OrificeResult.d_mdot_dTt_up`, `ChannelSolverResult.d_dP_dTt_up`. Positional calls are unchanged and every result is bit-identical. The old Python spellings still work until 0.9.0 (see Deprecated).
+- **C++:** the same struct fields are renamed in `solver::Stream`, `solver::StreamJacobian`, `MixtureState`, `NozzleSolution`, `DuctStaticState`, `SonicStatic`, `OrificeResult` and `ChannelResult`, without an alias; the renamed free functions keep `[[deprecated]]` inline forwarders until 0.9.0.
+- **Kept:** `Pt0`/`Tt0` of the Fanno and area-change functions (the `t` says total, the `0` is the inlet station beside `Tt_exit`), and the `T_from_stagnation`/`P_from_stagnation` names. Network result keys and `NetworkMixtureState` are not part of this change.
+
+- **Network results report the STATIC temperature under `T` (#782), as they already did for `P`.** The same key name changed meaning.
+  - `"<node>.T"` and every element's `T_in`/`T_out` are the static temperature. Until 0.7 they held the stagnation temperature, which is now `"<node>.Tt"` (on every node) and `Tt_in`/`Tt_out`.
+  - A momentum chamber's `"<chamber>.T"` is the static T its closure solved, formerly `"<chamber>.T_static"`.
+  - The static T is regime-aware. A plenum (`P = Pt`) and an incompressible node report `T = Tt`. A moving compressible node's `T` lies on the isentrope through (`Tt`, `Pt`) at its static `P`.
+  - Reading such a key on a `solve()` result warns once (`FutureWarning`) where its value differs from the `Tt` one.
+  - Solutions are unchanged: no residual reads `T` (#825). The residual vector and Jacobian are bit-identical on all 560 stress networks.
+  - `extract_complete_states()` now pairs the static `P` with the static `T`.
+- **`NetworkMixtureState.T` is a computed property, the static temperature.** The constructor takes `incompressible=` for a node in that regime.
+- **GUI:** node cards show `Tt` by default; `T`, `T_in` and `T_out` are labelled static.
+
+- **Breaking (0.8.0): the CSV export and `NetworkResult.to_dataframe()` carry the case's inputs (#784),** so an export reads back into the full results table with `load_results(path)` alone. The result rows and their `<key> [<unit>]` columns (#774) are unchanged; after them come `input:<key> [<unit>]` columns (each entity's node or edge data, nested fields dotted: `input:L [m]`, `input:composition.source`), `initial_guess:<key>` columns, and on a new row of `type` `network` (id `_network`) the network-wide settings and the solver options as `solver:<key>`. An edge with inputs and no result row gets a row of `type` `edge`. A reader that iterates over every row now meets the `network` row: filter on `type`. Format: `docs/GUI_TECHNICAL.md`, "CSV Export".
+
+- **Breaking (0.8.0): `NetworkRunner.sweep()` returns the results table, one row per case (#784).** It used to return a flat frame: with `metrics`, the override columns, `success`, `final_norm` and one column per metric string; without, `to_dataframe()` stacked per case with a `_sweep_index` column. It now returns `(kind, entity, quantity)` columns, each case's full inputs included, with the row labels taken from the index of `params`. Update readers: `sweep_df["combustor.Tt"]` becomes `sweep_df["outputs"]["combustor", "Tt"]`, `sweep_df["success"]` becomes `sweep_df["outputs"]["_solve", "success"]`, and an override column `sweep_df["air_inlet.Pt"]` becomes `sweep_df["inputs"]["air_inlet", "Pt"]`. `metrics` now selects which outputs to keep. `load_results()` reads an old full-detail sweep frame into the new shape.
+
+- **An orifice's bore against its pipe has a rule; the silent wall-hole fallback is gone (#788). Breaking in 0.8.0.**
+  - **Before:** a bore at or above the pipe it sat in silently became a wall hole (beta = 0), per direction, with only a warning on the forward side. That is how the stress `random` family, several test networks and the grid example wrote a lumped Cd*A restriction.
+  - **Now:** a bore equal to its pipe (to `ORIFICE_BORE_PIPE_RTOL` = 1e-6 relative, on either side) is **no orifice**: zero loss, the row is `Pt_in - Pt_out = 0` (row kind "p"), the flow passes unchanged. It is how an orifice is switched off without editing the network. A bore larger than its pipe is refused with a `ValueError`.
+  - **Migration:** write a lumped Cd*A restriction as `OrificeElement(..., in_pipe=False)` (GUI: untick "In a pipe"; JSON: `"in_pipe": false`). It has no pipe diameter, so beta = 0 in both directions and there is no pressure recovery. It is the old fallback, now stated instead of inferred. Its forward rows match the old fallback bit for bit. Two cases differ: an orifice that was in-pipe in one direction and a wall hole in the other is now a wall hole both ways, and a metering correlation (Reader-Harris/Gallagher, Stolz) evaluates its Cd at the plenum convention D = 1 m instead of D = 10 d.
+  - **Branch selection and the under-expanded junction exit stay open under #788.**
+
+- **Messages are ASCII** (#791): `bernoulli_v2` now says `(v2^2 < 0)`, the quarter-wave resonator's cutoff error says `kL = ... > pi`, the GUI backend's boundary-swap and unconnected-node errors use `--` for the dash, and the C++ material database's `al6061` notes read `<300degC`. Display units in `units_data.h`, the `_core` docstrings and the GUI's unit table keep their UTF-8 symbols. Every C++ and Python source is now checked by the `ascii-only` pre-commit hook with no exclusions.
+
+- **Impingement jet holes take a crossflow-dependent Cd by default (#800).** A strong crossflow along the gap bends the jets over and lowers their discharge coefficient. `ImpingementPlateElement` and `ImpingementArray` gain `cd_crossflow`, also exposed in the GUI:
+  - `'rogers_hersh_1976'` (the new default): Rogers & Hersh (1976, NASA CR-2681) measured single-hole fits. It applies to any plate and stays capped at the hole's own Cd below Gc/Gj ~1.5.
+  - `'florschuetz_metzger_su_1982'`: CR-3630 Table 4.1, the authors' own law for the plates they tested, and the one behind Table D.1's flows.
+  - `'none'`: the previous constant Cd.
+
+  C++ `rogers_hersh_1976_cd` and `florschuetz_metzger_su_1982_cd` return the Cd with analytic derivatives. The law is written in terms of the ideal jet velocity, so the hole's flow goes as dP^1.07 under a strong crossflow instead of sqrt(dP).
+  - **Unchanged:** every Florschuetz (1981) array is bit-identical, since its Gc/Gj stays at or below 0.77, so the Eq. 8 flow model and the Nu chain (MAE 6.88%) do not move.
+  - **CR-3630 Table D.1 (cross-source law):**
+    - The stagnant upstream rows of B(5,4,1) at mc/mj 0.99 no longer alternate in sign (#799); they now rise monotonically, as the data do.
+    - Worst-row Gj/Gj_mean improves: z/d >= 2 max 0.111 -> 0.085, z/d = 1 max 0.269 -> 0.231.
+    - P/P0 mean error improves 0.0075 -> 0.0073.
+  - **CR-3630 Table D.2:**
+    - eta is unchanged (bias +0.013, RMSE 0.077).
+    - Nu is unchanged inside the correlation's range.
+    - Starved rows go from 8 to 11, with Nu at -81% (-95% before): there is still no channel-flow floor (#467).
+  - **Solver:** a cold solve that fails on such a network is retried once from the constant-Cd root. CR-3630 D.2 B(5,4,1) at mc/mj 1.01 with a heated bypass needs it.
+
+- **Crossflow-segment stations take the axial momentum of the jets that join them (#813).** A merge chamber already credited each side stream with m w cos(theta), using the injecting element's `injection_angle_deg` (an `EffusionPlateElement`'s `angle_deg`). A `CrossflowSegmentElement` station ignored the hole's angle and took the side stream's axial velocity as `kappa` times the receiving duct's own. Both now read the same declaration: an inclined hole joining a crossflow chain pushes the crossflow, ejector-like, instead of entering normal to it.
+  - **Unchanged:** normal jets (90 deg, the default, and every impingement row) declare no momentum, so every existing `ImpingementArray` and `EffusionLiner` solves bit-identically, including the Florschuetz and CR-3630 scorecards.
+  - **Second law:** a hole whose jet brings axial momentum is grouped with the chain's control volume, entering at its supply's total pressure. Closed at the station's Pt instead, the jet's momentum read as pressure the chain created, and a jet-pumped chain was demoted to inconsistent.
+
+- **The combustor head loss is total-total, as in Lefebvre's pressure-loss factor (#782 audit).**
+  - `ConstantHeadLoss`/`LinearThetaHeadLoss` evaluate the inlet dynamic head at the inlet stagnation state (`Tt_in`, `Pt_in`) and divide by `Pt_in`. They used the inlet's static P with Tt, which overstated the loss at a moving inlet: +8% at M 0.3, +24% at M 0.5.
+  - At a plenum inlet (P = Pt) nothing changes: residual vector and Jacobian bit-identical on all 560 stress networks; scorecards byte-identical.
+  - The loss context is a `PressureLossContext` carrying `Tt_in`/`Pt_in`. `combustor_head_loss` takes `Tt_in`/`Pt_in`, and `CombustorLossResult` reports `dxi_dTt_in`/`dxi_dPt_in`.
+
+- **Copyrighted third-party documents live in a top-level `sources/`, never in git (#846).** Papers, handbooks, scans, figure crops and supplementary archives used to sit in gitignored folders under `docs/`, protected by a per-folder and per-extension denylist that leaked for every new file type or folder.
+  - `sources/` is ignored whatever the file type; `sources/.gitignore` is a second lock.
+  - `docs/` is an allowlist: only directories and `.md` files are un-ignored, so a new file type or folder there stays out of git until someone allows it.
+  - A `no-sources` pre-commit hook and a CI step (`scripts/check_no_sources.py`) reject any committed `sources/` path and any document, archive, office or image file outside an allowlist of directories holding images we made. This catches `git add -f`, `--no-verify` and web edits.
+  - `validation/sources.yaml` entries point at `sources/<topic>/...`; `scripts/sources.py check` takes `--sources` (was `--docs`) and reports register entries outside `sources/`, unregistered documents and any file there git would track.
+  - `scripts/migrate_docs_to_sources.py` moves an existing checkout's untracked `docs/` files to `sources/` (dry run unless `--apply`; `docs/sources/` scans become `sources/scans/`). Run it once after pulling this change: an untracked `.md` left in a `docs/` subfolder is no longer ignored.
+
+- **GUI: a probe keeps the solve, and shows its target by a dotted link (#856).** A probe is display-only (the backend drops it before solving), so adding, removing, pasting or retargeting one no longer clears every node and wall result and the solve status; a probe dropped onto a solved network reads its target as soon as it is pointed at one. Drag from the probe's right-hand dot onto a node or a thermal wall (its path or label box) to attach it; the attachment is drawn as a thin dotted, muted link to the node's border or the wall's label. Select the link and press Delete to detach the probe; picking a target in the Inspector moves it. The link is derived from the probe's `target_id`, so saved files are unchanged. Selecting or moving a node no longer clears the solve status either, which used to take the Inspector's second-law and Mach flags with it.
+
+- **A sharp-edged orifice now expands like one: `jobson1955` is the default compressible model for incompressible-referenced Cd correlations (#861). Breaking in 0.8.0.**
+  - **Before:** every `OrificeElement` used the isentropic nozzle unless `compressible_model` was set. A sharp plate's jet widens as the pressure ratio falls; the nozzle's flow is flat past choke and 3-9% low at 10-20% pressure drop.
+  - **Now:** `compressible_model` defaults to `None`, and the element selects a model ONCE at build from its correlation and geometry, never per iterate. `"jobson1955"` for a Cd referenced to incompressible flow (`ReaderHarrisGallagher`, `IdelchikThick`/`Beveled`/`Rounded`, `Lichtarowicz`, `McGreehanSchotsch`) on a sharp-edged bore (`edge_radius = 0`, `bevel_depth = 0`) at beta <= `JOBSON_1955_BETA_MAX` (0.75) in both flow directions. `"nozzle"` otherwise: `"fixed"` (the measurement basis of your Cd is unknown), `"Stolz"` (ISO 5167:1980 not held), a rounded or beveled edge, a wider bore. The cooling-plate and connection subclasses (`EffusionPlateElement`, `FilmCoolingElement`, `SlotFilmElement`, `ImpingementPlateElement`, `EffectiveAreaConnectionElement`, `DiameterDischargeCoefficientConnectionElement`) keep the nozzle; McGreehan-Schotsch's crossflow term is Rohde-fitted and nozzle-referenced. A Ci above Jobson's 0.7 is flagged by `model_in_range`, not refused. The incompressible regime is unaffected.
+  - **Which results move:** compressible networks with a plain `OrificeElement` on one of those correlations, including the default `ReaderHarrisGallagher`. Its flow rises by about the gap the nozzle left: through a default element, Perry's air (Jobson 1955 Fig. 5a) goes from RMS 20.8% to 1.3% and Schiller's steam (Fig. 5b) from 20.0% to 2.1% (cross-source). The #852 ISO 5167 metering example reads its own flow back within 0.1% instead of 0.8-0.9% high. Networks whose orifices keep the nozzle are bit-identical.
+  - **To keep the old numbers:** pass `compressible_model="nozzle"`. A `Cv` other than 1 now needs `compressible_model="jobson1955"` set explicitly.
+  - **GUI:** the Inspector's "Compressible Model" gains "Default (selected at build)" and shows what it selected. A saved file without the key, or with `"default"`, gets the new selection; a file that stored an explicit `"nozzle"`, `"jobson1955"` or `"iso5167"` keeps it.
+  - **New constant:** `JOBSON_1955_BETA_MAX` (0.75), from C++'s `orifice::jobson1955::beta_max`.
+
+- **Stall handover catches far-from-root crawls that cannot finish in time (#864).** A cold hybr or LM-fallback phase more than 100x tol from the root now also hands over to the next rung when the time to tolerance projected from its recent rate (over the last 5 s) is more than 3x the time left in the attempt, or 3 x 60 s without a timeout. Before, such a crawl improving just over 10 % per 5 s ran to the timeout. Example: `jet_chain` 32 under `jobson1955` failed at 20 s; it now converges in about 6 s through the warm-start retry.
+  - **Measured:** serial runs on 14 stress families x 80 seeds and the 96-case audit set, under both orifice models. No success was lost, one was gained, and total time fell by 2-3 %.
+  - **Opt-out:** `solve(stall_handover=False)` or the GUI checkbox turns it off with the rest of the handover.
+
+- GUI: a node's position is now its card centre, and the canvas snaps to a 10 px grid. Cards of different heights placed on one row now line up their flow handles, so a main path runs straight. Saved networks are written as file version 1.2. Older files and the autosave are converted on load and land where they were drawn; the bundled examples are re-laid on one centre line (#865).
+
+- **`Cd` on an orifice-family element is the `"fixed"` correlation's value only; a `Cd` given with any other correlation raises (#872). Breaking in 0.8.0.**
+  - **Before:** `OrificeElement`, `EffusionPlateElement`, `FilmCoolingElement`, `SlotFilmElement`, `ImpingementPlateElement` and `ImpingementArray` took `Cd=0.6` (0.79 on the impingement elements) by default and, under any correlation but `"fixed"`, used it only as the solver's start guess. `OrificeElement(..., Cd=0.8)` ran the default `ReaderHarrisGallagher` Cd, about 0.6, with no warning.
+  - **Now:** `Cd` defaults to `None`. `Cd` with a correlation other than `"fixed"` raises `ValueError` naming `correlation="fixed"`; `"fixed"` without a `Cd` raises too, except on `ImpingementPlateElement`/`ImpingementArray`, whose documented `"fixed"` default stays Florschuetz's 0.79. The connection elements (`EffectiveAreaConnectionElement`, `DiameterDischargeCoefficientConnectionElement`) are `"fixed"` with a Cd already and are unaffected.
+  - **To migrate:** for a measured or assumed Cd add `correlation="fixed"`; to use the correlation drop `Cd`. Dropping it gives the numbers you had before. Adding `"fixed"` gives the Cd you wrote, so the results move.
+  - **Start guess:** with a correlation it still assumes Cd 0.6 (0.79 on an impingement plate), so a network that never passed a `Cd` with a correlation solves bit-identically.
+  - **Examples:** every example that passed a `Cd` with the default correlation meant a fixed Cd, and now says `correlation="fixed"`. Their printed numbers move:
+    - `flow_regime_comparison.py`: the network's inlet pressure now matches the direct `cb.orifice_mdot` calculation it is compared with to 0.02-0.11%. It was 2.8-7.8% (incompressible) and 1.2-24.7% (compressible) off.
+    - `combustor_network_example.py`: combustor Pt 130.9 -> 120.5 kPa.
+    - `combustor_pressure_loss_example.py`: burner Pt 4.951 -> 4.846 bar.
+    - `axial_staging_combustor_network_example.py`: the zones' Tt 2003.69 -> 2001.82 K.
+    - `network_from_grid.py`: the largest grid's inlet pressure 1.5 -> 1.3 bar.
+    - `combustor_liner_cooling_network.py`: its near-lossless exits (Cd 0.98 at 95% of the pipe bore) are also `in_pipe=False` now, lumped restrictions. In the pipe, a Cd of 0.98 at beta 0.95 left the coupled solve unconverged. Its printed results are unchanged; the coupled case's coolant dP rises 0.08%.
+    - The benchmarks and the `docs/API_PYTHON.md` snippets are updated the same way.
+  - **GUI:** a node keeps its `Cd` field whatever its correlation, and the Inspector shows it for "Manual / Fixed Value" only. The backend now passes `Cd` for `"fixed"` alone. A saved file with both a `Cd` and a correlation still loads and solves as before; its `Cd` is not used, as it never was.
+
+- **Reader-Harris/Gallagher Cd is held below its lower Re_D bound instead of climbing to 1.5 (#873). Behaviour change in 0.8.0.**
+  - **Before:** `metering_cd_and_dRe` evaluated ISO 5167-2 Eq. (4) far below its Re_D range. Its Re terms grow without bound as Re_D falls, so Cd rose until a 1.5 cap, with a Re_D < 1 floor under it. Both were derivative kinks. Example, D 4 mm, beta 0.5, D-D/2 taps: 1.5 at Re_D 1-40, 1.162 at 100, 0.687 at 1000. A near-zero-flow plain orifice ran at A_eff = 1.5 A.
+  - **Now:** below the bound Re_b = `metering_cd_re_min(ReaderHarrisGallagher, geom)`, Cd is held at the correlation's value near Re_b. Over ln(Re_D/Re_b) in [-0.1, 0] the slope dCd/d ln Re_D ramps linearly to 0, so Cd and dCd/dRe_D stay continuous (C1) and Cd is monotone. The held value is C(Re_b) - s w/2, with w = 0.1 and s the log-slope at Re_b. It sits within half of ISO 5167-2 5.3.3.1's stated uncertainty of C, for every in-range geometry; that bound is what fixed w. The same example now reads 0.6345 everywhere below Re_D 4520. Another: D 100 mm, beta 0.6 goes from 0.728 at Re_D 1000 to 0.640.
+  - **Bounds:** ISO 5167-2:2003 5.3.1: 5000, or 16000 beta^2 above beta 0.56; flange taps take max(5000, 170 beta^2 D[mm]). These are the ones `metering_cd_in_range` already used, now defined once; it still returns False below the bound, since the hold is an out-of-range placeholder (real sharp orifices lose Cd in laminar flow).
+  - **Stolz is unchanged, bit for bit**, Re_D < 1 floor and 1.5 cap included. ISO 5167:1980's lower Re_D bound is not held as a source, so Stolz gets no hold and `metering_cd_re_min(Stolz, ...)` raises `ValueError` (C++: `std::invalid_argument`). Stolz is handled in #876.
+  - **Unchanged:** every RHG Cd at Re_D >= Re_b, bit for bit. ISO 5167-2 Annex A (about 4800 entries) still matches to rounding. The F/J hashes of the 560 stress networks are identical with their own (fixed-Cd) orifices. With plain orifices forced to RHG, 130 differ, every one with a Cd call below the bound.
+  - **Removed:** RHG's Re_D < 1 floor, which can no longer be reached. The 1.5 cap stays for geometry far outside the standard's: flange taps in pipes below D ~32 mm.
+  - **New:** `metering_cd_re_min` (C++ and Python; Reader-Harris/Gallagher only), plus the constant `orifice::metering_hold::blend_ln_re`.
+  - **Which results move:** a `ReaderHarrisGallagher` orifice running below its bound. A plenum-fed or `in_pipe=False` one evaluates Re_D on the D = 1 m stand-in pipe, so it is usually below. There, Cd is now close to the high-Re value and no longer follows the flow.
+
+### Deprecated
+
+- **`k_aluminum_6061` and the `al6061` material are deprecated, to be removed in 0.9.0** (#761).
+  - Its 167 W/(m K) is the ASM Handbook Vol. 2 room-temperature value for T6 (O temper 180, T4 154, both at 25 C), but the falling temperature dependence has no source. The NIST cryogenic fit rises up to 300 K and gives 155 there.
+  - Both names now emit a `DeprecationWarning` and still return the old values until removal.
+  - Give the wall layer its conductivity directly (`material="custom"`) instead.
+
+- **More stagnation quantities still spelled the pre-#782 way are renamed, with the old spellings deprecated until 0.9.0.** Each old keyword or field still works and returns the replacement's result bit for bit, with a `DeprecationWarning` that names its replacement; passing an old keyword together with its replacement raises `TypeError`.
+  - `chamber_merge_face_state(T_main=, T=)` -> `Tt_main=`, `Tt=` (both always were stagnation temperatures; the docstring called `T_main` static).
+  - Internal solver tools: `momentum_chamber_residual_and_jacobian(P_total=, T=)` -> `Pt=`, `Tt=`; `orifice_tap_pressure_and_jacobian(P_total_up=, P_total_down=)` -> `Pt_up=`, `Pt_down=`; the `p0=`/`t0=` keywords of `ejector_choked_mass_flow_and_jacobian`, `ejector_cd_nozzle_mass_flow_and_jacobian` and `ejector_cd_nozzle_exit_static_and_jacobian` -> `Pt=`, `Tt=`.
+  - `MixerResult.T_mix`, `.P_total_mix`, `.dT_mix_d_stream`, `.dP_total_mix_d_stream`, `.dT_mix_d_delta_h`, `.dT_mix_dQ` -> `Tt_mix`, `Pt_mix`, `dTt_mix_d_stream`, `dPt_mix_d_stream`, `dTt_mix_d_delta_h`, `dTt_mix_dQ` (the mixed TOTAL state).
+  - C++ only, renamed without an alias: `ChamberStaticState::lnP0P` -> `lnPtP` (and `ChamberStaticStateDX::dlnP0P_dX` -> `dlnPtP_dX`); the `MixerResult` fields above.
+
+- **A residual Jacobian keyed `"<node>.T"` is deprecated; the node's stagnation-T column is `"<node>.Tt"` (#782).**
+  - Every built-in element now uses `"<node>.Tt"`. The residual vector and Jacobian are bit-identical on all 560 stress networks.
+  - A custom element that returns the 0.7 name `"<node>.T"` gets the same Jacobian, with one `DeprecationWarning` per process. The old name is removed in 0.9.0.
+
+- **The `T0`/`P0`, `T_total`/`P_total` and stagnation `T`/`T_up` spellings renamed in #782 are deprecated and will be removed in 0.9.0.** Each old keyword, function name and struct field still works and returns the replacement's result bit for bit, with a `DeprecationWarning` that names its replacement; passing an old keyword together with its replacement raises `TypeError`. `docs/API_PYTHON.md` ("Stagnation names") lists them all; `python/tests/test_deprecations.py` checks each one.
+
+- **`"<chamber>.T_static"`, `NetworkMixtureState(T=...)` (and the positional `T` of `(P, Pt, T, Tt, m_dot, Y)`), and assigning `state.T` are deprecated and will be removed in 0.9.0 (#782).**
+  - `"<chamber>.T_static"` returns the same value as `"<chamber>.T"`.
+  - The constructor argument and the assignment set `Tt`, which is what `T` held until 0.7.
+  - Each warns with a `DeprecationWarning`.
+  - The 0.8 `FutureWarning` on reading a changed `T` key goes in 0.9.0 too.
+
+- **`PressureLossContext.T_in`/`.P_in`, `combustor_head_loss(T_in=, P_in=)` and `CombustorLossResult.dxi_dT_in`/`dxi_dP_in` are deprecated and will be removed in 0.9.0 (#782 audit).** Each reads or forwards to its `Tt_in`/`Pt_in` replacement with a `DeprecationWarning`. A hand-built 0.7 context with only `T_in`/`P_in` still evaluates the built-in correlations; note that its `P_in` is now taken as the inlet TOTAL pressure.
+
+- **The Stolz metering discharge coefficient (ISO 5167:1980) is deprecated and will be removed in 0.9.0 (#876).** ISO replaced Stolz with Reader-Harris/Gallagher in ISO 5167-1:1991/Amd 1:1998 (and ISO 5167-2:2003, 2022). Reader-Harris/Gallagher has a sourced range of use and a bounded low-Re hold (#873), and fits the EEC/API database better over Stolz's own range (Reader-Harris & Sattary 1996, Table 10: s 0.245 % against 0.390 %). Stolz's limits of use are not held, so `metering_cd_in_range` cannot flag a plate outside them. Results are unchanged until removal.
+  - `OrificeElement(correlation="Stolz")` emits a `DeprecationWarning` naming `'ReaderHarrisGallagher'`, once per element at construction (not per residual). The cooling plates that refuse the whole ISO 5167 family refuse Stolz without the warning.
+  - `cb.MeteringCdCorrelation.Stolz` passed to `metering_cd_and_dRe`, `metering_cd_in_range`, `solve_orifice_mdot`, `orifice_flow` or `orifice_flow_state` emits a `DeprecationWarning`.
+  - C++: `orifice::Cd_Stolz` is `[[deprecated]]`; `MeteringCdCorrelation::Stolz` is marked deprecated in comments. The orifice example dropped its Stolz column.
+  - GUI: the option reads "Stolz (ISO 5167:1980, deprecated)" with a note under it. A saved network with a Stolz orifice still loads and solves, and the solver status shows a deprecation note for it (`SolveResponse.deprecations`).
+  - Migration: use `correlation="ReaderHarrisGallagher"` (the `OrificeElement` default) or `MeteringCdCorrelation.ReaderHarrisGallagher`.
+
+### Removed
+
+- **`standard_dry_air_composition()`** is removed (Python and the `_core` binding). Use `species.dry_air()`.
+- **`smr_wgs_equilibrium` / `smr_wgs_equilibrium_adiabatic`** are removed: Python, the bindings, the C++ functions and their `units_data.h` entries. Use `reforming_equilibrium` / `reforming_equilibrium_adiabatic`, which agree with them on CH4-only input; the C++ and Python tests now run those cases against the replacements, with the removed solver's values pinned as golden data.
+- **`combaero.network.ConstantLoss` / `LinearThetaLoss`** are removed, with the module `__getattr__` that warned on them. Use `ConstantFractionLoss` / `LinearThetaFractionLoss`.
+- **`BorderCarnotLossElement`** is removed, with its C++ backing (`border_carnot_loss_residual_and_jacobian`, `BorderCarnotLossResult`, and `include/multi_port_chamber.h` with `border_carnot_L` and `HAGER_FRACTION`). Use `PressureLossElement(id, from_node, to_node, correlation=ConstantHeadLoss(zeta=4 * (1 - cos(0.75 * delta)) ** 2, area=area), area=area)`, with `delta` in radians, which reproduced it to round-off. Never put one on a `MultiPortChamberElement` or `ConstantKTeeElement` port (#272). The GUI never offered it.
+- **`VortexElement(omega_rpm=...)` and `VortexElement.omega_rpm`** are removed. Use `shaft_speed_rpm` (#773). A GUI file saved with `omega_rpm` still loads.
+- **`VortexElement(r_c=..., n=...)`** are removed: the free vortex (#661) ignored them. Passing either is now a `TypeError`. The `cb.vatistas_*` functions are unchanged.
+- **The Mynard / constant-K tee's old `initial_guess` key `{id}.P_jct`** no longer seeds the junction total. Use `{id}.Pt_jct` (#773). `legacy_unknown_names()` is gone. A saved GUI file's tee guess is still moved to `Pt_jct` on load.
+- **`init_strategy='incompressible_warmstart'`** is removed and raises `ValueError` listing the valid strategies. Use `'outletref_warmstart'`, or leave the default. Its only knob, `NetworkSolver.solve(warmstart_maxfev=...)`, went with it. The GUI backend maps a saved `incompressible_warmstart` to `outletref_warmstart`, as the frontend already did.
+
+### Fixed
+
+- **Rich equilibrium no longer stalls once the steam is used up (#759).** `combustion_equilibrium`, `reforming_equilibrium(_adiabatic)` and `combustion_equilibrium_and_jacobian` solve the steam-reforming extent of each hydrocarbon and the water-gas shift jointly -- Newton on ln Q - ln K = 0 with the analytic Jacobian, rounds of single-reaction solves only as the start, an element-potential restart (Gordon and McBride, NASA RP-1311) where Newton makes no headway -- instead of repeating rounds until nothing moves (#755).
+  - **Before:** rich propane at phi >= 2.5 burned to a mixture with no steam left; the rounds got it back through reverse shift a sliver per round and stopped after 2000, `converged=False`, 124 / 229 / 320 K above Cantera's HP equilibrium at phi 2.5 / 2.75 / 3.0 (300 K inlet), and the derivatives chained the unconverged rounds (dT/dT_in 1.5 % off).
+  - **Now:** converged, within 1.5 K of Cantera (gri30) and 1e-4 in mole fraction for CH4 and C3H8 over phi 1.5-3.0; the derivatives are one implicit-function solve on the converged system and match central differences to 3e-7. Unchanged elsewhere: the #755 reforming cases move by under 3e-13 in mole fraction and 1.2e-10 K, CH4 and lean/moderate propane by round-off. The steam-starved solve takes 1-4 ms instead of 0.2-0.3 s.
+
+- **`k_haynes230` follows the manufacturer's table (#761).** Its conductivity now matches the HAYNES 230 brochure H-3000O: 8.9 W/m K at room temperature, rising 2.0 per 100 C to 28.4 at 1000 C, which is exactly k = 8.4 + 0.020 T[C]. The quadratic it replaced was 37% high at room temperature and 2-6% high at liner metal temperatures (900-1200 K). The valid range now ends where the table does, at 1000 C (1273 K) instead of 1400 K: beyond it `k_haynes230` raises and the database lookup holds 28.4.
+
+- **GUI: a cleared Max Solver Time is no limit, and a timed-out solve no longer seeds continuation (#762).**
+  - The empty Max Solver Time field now reads "No limit" (it read "None").
+  - `timeout: null` on `/solve` and `/export` now sets no request deadline either; the route used to substitute 180 s and answer 504 at 190 s. `timeout: 0` bounds the request at what the solver itself gets (0 s, it times out at once) plus the 10 s grace, instead of 180 + 10 s.
+  - The 504 now names the Max Solver Time and the grace it waited, and suggests raising it or clearing it for no limit. It is only sent when a limit was set.
+  - A worker thread that finishes after its request answered 504 can no longer write the continuation state: each request holds a token while it waits, and the state is stored only while that token is live. The thread itself still cannot be cancelled and runs to completion in the background.
+
+- **NaN input is refused instead of answered (#769).** Domain checks written `if (x <= 0) throw` let NaN through, because every comparison with NaN is false: the function returned NaN, or after a clamp a plausible number. They now use NaN-safe predicates from a new public header, `input_validation.h` (`combaero::validation::is_finite_positive`, `require_finite_positive<E>`, ...), so NaN and +/-inf raise. Each function keeps the exception type it already raised (`ValueError`, `RuntimeError`, or `IndexError` for the saturation-pressure range).
+  - **Humid air:** `saturation_vapor_pressure`, `vapor_pressure`, `humidity_ratio`, `water_vapor_mole_fraction`, `dewpoint`, `relative_humidity_from_dewpoint`, the functions built on them, and `HumidAir.set_TP_RH` / `set_TP_omega`. `humidity_ratio` and `water_vapor_mole_fraction` now check P (finite and > 0, `RuntimeError`).
+  - **Materials:** the `k_*` functions; `get_material_conductivity(name, nan)` returned 1e-3 W/(m K) (clamped and floored) and now raises `RuntimeError`. A finite T outside the range is still clamped.
+  - **Acoustics:** Helmholtz, tube and annulus modes, Q and layer thicknesses, `wavelength`, `strouhal`, `acoustic_properties`, `orifice_impedance_with_flow` (all arguments, including the bias and grazing velocities) and `is_whistling_risk`.
+  - **Geometry:** `annular_area`, `hydraulic_diameter*`, `circular_area`, `cylinder_volume`, residence time and space velocity. The `Tube`, `Annulus` and `CanAnnularFlowGeometry` methods did not validate at all -- a swapped annulus returned a negative area -- and now raise `ValueError` unless D_outer > D_inner >= 0 and the sizes they read are finite and positive.
+  - **The same pattern elsewhere:** existing checks in the incompressible, orifice, stagnation, compressible, friction, heat-transfer, cooling, combustion, thermo, transport, state and Vatistas functions. +inf stays accepted where it is a physical limit (NTU, a film coefficient h, YSZ aging hours). Converged network solves are unchanged.
+
+- **The compressible orifice's back-pressure derivative near choke (#772).** `orifice_compressible_mdot_and_jacobian` scaled d(mdot)/dP_back by a cubic blend over 0.01 in pressure ratio either side of the critical ratio, but returned the unblended flow, so in that band the Jacobian was not the derivative of the value.
+  - **Before:** d(mdot)/dP_back up to 46% off a central difference of mdot at P* + 50 Pa (the blend weight reached 1.5 at the band's upper edge and dropped back to 1 there), and d(mdot)/dPt, which reuses it, up to 0.3% off.
+  - **Now:** the exact derivative of the value as written: (M^2 - 1)/v on the isentrope when unchoked, zero when choked. The flow is already C1 through P* (the mass flux peaks there), so no blend is needed. Flows are unchanged; converged networks agree to round-off.
+
+- **Two reported Reynolds numbers now take the viscosity at the local static temperature.** Diagnostics only: no flow, loss or solver result changes.
+  - `fanno_channel` (constant f) stored each profile station's `Re` with the inlet viscosity: 1.9 % off at the outlet of an air duct from 900 K, M 0.5 to M 0.66. The rough overload already used the local one.
+  - `area_change_loss`, conical branch: `Re` used mu at the stagnation `Tt0`, 4 % low at M 0.62; it now uses the closure station's static T, as the sharp branch and `area_change_flow` do.
+
+- **Kernels documented as taking a static T now get one (#782).** A network node carries its stagnation temperature, and four kernels that form a density from the static P beside them were handed it: the compressible tee's `BranchInput.T` (`TeeJunctionElement`), `station_half_drop` and `channel_entry_drop` (`CrossflowSegmentElement`, used by `EffusionLiner` and `ImpingementArray`), and `crossflow_velocity_ratio` (a duct-fed `EffusionPlateElement`).
+  - **Before:** each density was low by Tt/T - 1: about 2 % at M = 0.3, 5-10 % at M ~ 0.5-0.6.
+  - **Now:** each gets the static T of its node's moving gas, from the momentum chamber closure at the arm's or the station's mean flow (a plenum or boundary port is at rest: static = total), consistent with the kernels' documented static inputs. The Jacobians chain the static T onto the node's T0, static P, composition and flows analytically.
+  - **CR-3630 Table D.1 (fidelity):** the worst-row Gj/Gj_mean error at z/d >= 2 moves from median 0.0205 to 0.0212 and max 0.100 to 0.111, inside the report's +/-2 % measurement band on Gj/Gj_mean (0.04 at that row); P/P0 mean error unchanged at 0.007.
+  - **B(5,4,1) mc/mj=0.99 (D.1) is no longer reported as solved:** there was no root before -- the reported |F| 1.9e-4 was the overshoot past a false Fanno choke at the exit segment (#802: a station's static P is fed to the kernel as P0). With this change a regular root exists, but a cold start still stalls on that choke, as it now does for the D.2 test B(5,4,1) mc/mj=1.01. Both are strict xfails until #802 (#799).
+
+- **Crossflow stations and area combustors report their moving state (#782 audit).** These nodes hold Pt = P while their gas moves, so they reported `.T` = Tt, `.Pt` = static P and `.mach` = 0. In one impingement network, a station at Mach 0.42 reported a Pt 12.8% low and a T 20 K high.
+  - A station now reports the static T and Mach of the station's mean flow, the state its half-drops use, and its true Pt.
+  - The crossflow segment leaving or entering a station reports that Pt, together with `dPt` and `pr_total`. A plate's or hole's jets discharging into the station keep their drop to its static pressure, the pressure the jets see.
+  - A combustor with an `area` reports the static T at G = m / area.
+  - Reporting only: residual vector and Jacobian bit-identical on all 560 stress networks; scorecards byte-identical.
+
+- **Duct-fed effusion panels below McGreehan-Schotsch's Re floor now have an exact Jacobian (#760, #801).** An `EffusionPlateElement` (or any discharge-hole orifice) solves its own flow consistently, m* = Cd(Re(m*)) K, and its row's sensitivities divide by 1 - K dCd/dm. Below the correlation's Re floor (1e4 for McGreehan-Schotsch, 25 for Idelchik) the Cd value is held, but that denominator used the slope C++ continues past the floor as a Newton aid.
+  - **Before:** every panel row of a duct-fed `EffusionLiner` was uniformly 0.987x the finite differences (1.26e-2 in the row-scaled metric, the GUI palette's effusion liner) and 0.97x at duct Mach 0.5 (2.98e-2), at every FD step.
+  - **Now:** the sensitivities take the held value's zero slope, and the panel rows agree with finite differences to under 1e-8. Converged solutions are unchanged; only Newton's path can differ.
+  - New `discharge_cd_re_floor(correlation)`: the hole Reynolds number below which the Cd value is held.
+
+- **Crossflow segments run their Fanno duct from the true stagnation state, not a station's static pressure (#802).** `CrossflowSegmentElement`, used by `ImpingementArray` and `EffusionLiner`, fed a station node's pressure to the compressible Fanno kernel as the duct's P0. That pressure is the channel's static pressure, so P0 was a dynamic head too low and exit segments choked far too early.
+  - **Before:** CR-3630 D.2 B(5,4,1) at mc/mj 1.01 ran its exit segment at 99.7% of that false choke (81% of the true one). D.1's B(5,4,1) at mc/mj 0.99 had no root, and both cases stalled from a cold start. A 6-row array that passes 0.041 kg/s raised out of `solve()` once its free exit pressure ran negative on the choke plateau. The diagnostics reported every exit segment choked (`M_exit_duct` 1.0) even at M ~ 0.35.
+  - **Now:** the station half-drops move the duct's end STATIC pressures. The kernel runs between those statics' stagnation pressures at the segment's flux, from the momentum chamber closure, with analytic partials. A terminal end feeding the segment keeps its own Pt. A plenum or boundary the segment discharges into keeps static continuity, and an end below the sonic static is held on the subsonic branch. `choked`, `M_in_duct` and `M_exit_duct` report the duct the row solves.
+  - **CR-3630 Table D.1 (fidelity):** no row of the 41 tests that solved before moves by more than 3e-4 in Gj/Gj_mean (band +/-2%) or 1e-4 in P/P0 (print floor 0.005). B(5,4,1) mc/mj 0.99 now solves cold and returns to the score. Its worst row is 0.269 (row 4, a stagnant row, #799), and the score over all 42 tests has P/P0 mean error 0.0075.
+  - **CR-3630 Table D.2 (cross-source):** B(5,4,1) mc/mj 1.01 solves cold and returns to the score. eta over 300 rows has bias +0.013 and RMSE 0.078; the 290 rows without that test are unchanged at +0.010 / 0.075. Nu counts are back to 196 inside, 104 outside and 8 starved.
+  - **Florschuetz 1981 Fig. 6 chain:** MAE 6.88% -> 6.88%. **Effusion liner** (no data, model only): inlet flow changes by -0.1% at duct M ~ 0.09, -1.0% at M ~ 0.3 and +0.8 to +1.3% at M ~ 0.6, where the bleed fraction falls from 7.2% to 6.2% (4 stations).
+  - **Reversed out of an exit plenum or boundary, the incompressible regime now charges the same acceleration (#802).** A crossflow segment whose flow reverses out of an exit node at rest drew it as a reservoir in the compressible regime but paid friction only in the incompressible one, so the incompressible reversed flow ran about 5x the compressible one. It now pays one dynamic head (no entry loss), and the regimes agree within 0.5% on a 1 kPa reversed draw.
+
+- `NetworkSolver.solve()` no longer raises out of a solve that ends on a node at or below zero pressure (#810). A root the residuals close with a node pressure at or below zero (seen on a crossflow array's Fanno continuation, the free exit at -113 kPa) is now reported INCONSISTENT and listed in the new `__P_nonpositive__`, before any diagnostics evaluate it. Previously, element diagnostics raised `ValueError: pressure must be positive` there before the second-law check could demote the root. On a failed solve, a diagnostics error is recorded in `__caught_exceptions__` (phase `diagnostics`) instead of being dropped silently; on a successful solve it still raises.
+
+- **Crossflow stations hold for reversed flow (#815).** `station_half_drop` used m|m| for the channel's momentum flux. The flux, m u = m^2/(rho A), is positive whichever way the gas moves, so the drop now uses m^2. Forward flow is unchanged.
+  - **Before, with reversed flow** through a station:
+    - a merge in a reversed chain RAISED the static pressure along the flow, acting as a pump: a mirrored chain ran 1.7x the flow, with its stations below the exit pressure;
+    - a station the flow leaves both ways (a side stream splitting) had no physical root. Incompressible did not converge, and compressible landed on a root the second law rejected.
+  - **Now:**
+    - a reversed chain is its forward mirror: identical compressible, within 0.5% incompressible;
+    - a split station solves symmetrically and passes the second law.
+  - **Validation:** every scorecard is unchanged (CR-3630 D.1 and D.2, Florschuetz 1981), since their channel flows run forward.
+
+- **`jet_impulse` returns analytic partials (#816).** The jet's streamwise momentum J = m w, read by merge chambers (#471), crossflow stations (#814) and duct-fed holes' U1/Vi (`crossflow_velocity_ratio`), took its dJ/dPt, dJ/dTt and dJ/dP from central differences inside C++.
+  - **Before:** choked, they were about 1% off. The sonic point came from a golden-section mass-flux maximum, accurate only to about 1e-8 of Pt on its flat peak, and that noise sat inside a Pt*1e-7 step.
+  - **Now:** they are exact on the variable-cp ideal-gas isentrope, unchoked and choked, and C1 across choking. The sonic point is located on that isentrope at M = 1 (T* from h(Tt) - h(T*) = a(T*)^2/2, P* = Pt exp((s0(T*) - s0(Tt))/R)); it agrees with `critical_pressure_ratio` to about 1e-8.
+  - The values do not move beyond that last digit. A choked angled jet into a crossflow chain now passes a 1e-6 FD Jacobian check.
+
+- **Element diagnostics are evaluated at the static state of their end nodes (#824).** An element's reported inlet/outlet `rho`, speed of sound, Mach and transport properties were formed at (`Tt`, static `P`). At a moving compressible node, T was up to 11% below Tt, so they were off by about that much.
+  - A junction's `port_<i>_T` is now the port's static T; the stagnation T is the new `port_<i>_Tt`.
+  - The ejector's `mach_jet` takes the primary's static speed of sound.
+  - Solutions are unchanged: residual vector and Jacobian bit-identical on all 560 stress networks.
+
+- **`orifice_flow` evaluates the density of the composition it is given (#829).** It formed rho from air's molar mass for every `X`, so its mass flow was off by sqrt(MW/MW_air) for any other gas: -26% for methane, for example. An empty `X` is dry air, as documented, now from the library's dry-air composition and gas constant instead of literals. That moves the air default by 0.02%.
+
+- **A discharge-hole orifice now always solves its Cd(Re) flow to a root (#861).** `OrificeElement` solves m* = Cd(Re(m*)) |K| itself for a discharge-hole correlation (#582). Where Cd rises steeply with Re (Lichtarowicz, a long hole at low Re), the loop takes the slow fixed-point step, and its 50 iterations could end short of the root. That stop was returned silently.
+  - **Before:** on the stress networks with Lichtarowicz forced on their orifices, 73 such stops were more than 1e-6 off, up to 1.7%. In one captured case the row's m* was 2.34e-5 kg/s against a root of 1.93e-5. No converged outcome changed in that sample.
+  - **Now:** a stop at the cap that is no root is re-solved on a bracket, the same way as the in-pipe own-flow solve (#863). That solve can now also complete a one-sided bracket by probing, which the merged version could not.
+  - **Unchanged:** every solve that met its root. The F and J hashes of all 560 stress networks are identical, the stress outcomes are identical, and no test result moved.
+
+- **An orifice in a pipe now always solves its own flow to a root (#861).** `OrificeElement` solves m* = m_calc(m*, x) itself when its drive reads its own flow through the approach pipe (#651). Where m_calc(m) has a kink, Newton went back and forth across it until the 60-iteration cap, and the value it stopped at was not a root. The solver was never told.
+  - **Where it showed:** two cases.
+    - The approach pipe's choke at beta 0.95 (any `compressible_model`).
+    - Jobson's held discriminant past its stated beta (`compressible_model="jobson1955"`, beta 0.84).
+  - **Now:** when the cap is reached with |a - m_calc(a)| above 1e-9 relative, the root is solved by Brent's method on the bracket that Newton crossed. A solve that already met its root is unchanged bit for bit:
+    - On the stress families the bracket solve never runs for the default nozzle.
+    - The F and J hashes of all 560 stress networks are identical.
+  - **Changed result: the GUI combustor -> channel -> orifice regression net** (`test_supersonic_chamber_root.py`; 33 kg/s through a 95 mm orifice in a 100 mm channel).
+    - **Before:** the first attempt "converged" with the channel-to-orifice junction at Mach 1.46 and was refused as supersonic. The retry reported Mach 0.63 at junction Pt 56.7 bar. Both points carried an orifice row that was not a root: the orifice's consistent flow at 56.7 bar is about 38 kg/s, not 33.
+    - **Now:** the solve converges directly to the network's consistent root, junction Pt 49.6 bar, Mach 0.86, and the combustor upstream at 52.1 bar instead of 58.3. The supersonic-root refusal itself is unchanged and is still exercised by the junction runner's Wang cases.
+  - **Jobson stress bleed station (seeds 6 and 39):**
+    - **Before:** the orifice row was 6-12% off and its Pt column 6% off a central difference. LM took 685 evaluations where the nozzle took 437, and both seeds ran out of their 20 s.
+    - **Now:** both converge in 8.7 s.
+
+- **A network solve no longer depends on the process's string-hash seed.** Three near-zero-flow blends (`OrificeElement` reverse flow, `PortDischargeElement`, the incompressible `ChannelElement` reversal) built their Jacobian dicts from a set union. A set of names iterates in hash order, which Python randomises per process, and the key order set how coinciding Jacobian terms were summed: a 1-ulp change that moved the Newton path. Affected networks reached the same root but differed from one run to the next within solver tolerance (up to about 4e-8 relative; final norms 1e-12 to 7e-4). The geometry-inference fallback that picked a neighbour's area from a set union is ordered too.
+
+### Documentation
+
+- **`k_tbc_ysz`'s docstring now describes the shipped model** (#761). It still cited the untraceable "NASA TM-2010-216765" and the replaced APS/EB-PVD behaviour. It now gives Zhu & Miller 2000 Eq. 1 and records the model's fidelity on the paper's own Fig. 4 at 32 h: it matches the 1320 C curve, and is 2% high at 1100 C and 3% high at 990 C. Eq. 1 is kept as printed.
+
 ## [0.7.1] - 2026-10-27
 
 ### Fixed
@@ -5872,7 +6230,8 @@ continuation retries; geometry inheritance and autosave in the GUI.
 - State property units mismatch in example runner
 - Solver stability under degenerate initial conditions
 
-[Unreleased]: https://github.com/thiemom/combaero/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/thiemom/combaero/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/thiemom/combaero/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/thiemom/combaero/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/thiemom/combaero/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/thiemom/combaero/compare/v0.5.0...v0.6.0

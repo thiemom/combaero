@@ -1,1 +1,0 @@
-- Validation: Schiller's (1933) superheated-steam orifice tests, digitised from Jobson (1955) Fig. 5b, score `jobson1955` as a second choked series (cross-source, 9 points: Jobson RMS 1.9 % vs the isentropic nozzle's 19.8 % at the same Cd) (#861).

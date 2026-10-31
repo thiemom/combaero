@@ -1,4 +1,0 @@
-- **`jet_impulse` returns analytic partials (#816).** The jet's streamwise momentum J = m w, read by merge chambers (#471), crossflow stations (#814) and duct-fed holes' U1/Vi (`crossflow_velocity_ratio`), took its dJ/dPt, dJ/dTt and dJ/dP from central differences inside C++.
-  - **Before:** choked, they were about 1% off. The sonic point came from a golden-section mass-flux maximum, accurate only to about 1e-8 of Pt on its flat peak, and that noise sat inside a Pt*1e-7 step.
-  - **Now:** they are exact on the variable-cp ideal-gas isentrope, unchoked and choked, and C1 across choking. The sonic point is located on that isentrope at M = 1 (T* from h(Tt) - h(T*) = a(T*)^2/2, P* = Pt exp((s0(T*) - s0(Tt))/R)); it agrees with `critical_pressure_ratio` to about 1e-8.
-  - The values do not move beyond that last digit. A choked angled jet into a crossflow chain now passes a 1e-6 FD Jacobian check.
