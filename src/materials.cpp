@@ -275,7 +275,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Haynes International, Special Metals Corporation",
         "Ni-based superalloy, common in turbine applications",
         1260.0 + 273.15,
-        "INCONEL alloy 718 (Special Metals) Table 2, melting range 1260-1336 C"
+        "INCONEL alloy 718 (Special Metals) Table 2, melting range 1260-1336 C",
+        false
     }},
     {"haynes230", {
         "haynes230",
@@ -284,7 +285,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "HAYNES 230 brochure H-3000O (Haynes International, 2021): alpha * cp * rho, 25-1000 C",
         "Ni-Cr-W-Mo alloy; table to 1000 C",
         1301.0 + 273.15,
-        "HAYNES 230 brochure H-3000O, melting 1301-1371 C"
+        "HAYNES 230 brochure H-3000O, melting 1301-1371 C",
+        false
     }},
     {"hastelloy_x", {
         "hastelloy_x",
@@ -293,7 +295,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "HASTELLOY X brochure + data sheet (Haynes International), table to 1000 C",
         "Ni-Cr-Fe-Mo combustor liner alloy",
         1260.0 + 273.15,
-        "HASTELLOY X brochure, melting range 1260-1355 C"
+        "HASTELLOY X brochure, melting range 1260-1355 C",
+        false
     }},
     {"haynes188", {
         "haynes188",
@@ -302,7 +305,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "HAYNES 188 alloy brochure (Haynes International), table to 1000 C",
         "Co-Ni-Cr-W liner / transition-piece alloy",
         1315.0 + 273.15,
-        "HAYNES 188 brochure, melting 1315-1410 C"
+        "HAYNES 188 brochure, melting 1315-1410 C",
+        false
     }},
     {"haynes263", {
         "haynes263",
@@ -311,7 +315,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "HAYNES 263 alloy brochure (Haynes International), table to 1000 C",
         "Ni-Co-Cr-Mo age-hardenable liner / transition-piece alloy",
         1300.0 + 273.15,
-        "HAYNES 263 brochure, melting range 1300-1355 C"
+        "HAYNES 263 brochure, melting range 1300-1355 C",
+        false
     }},
     {"haynes25", {
         "haynes25",
@@ -320,7 +325,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "HAYNES 25 alloy brochure (Haynes International), table to 1000 C",
         "Co-Cr-W-Ni (L-605) combustor / turbine alloy",
         1330.0 + 273.15,
-        "HAYNES 25 brochure, melting range 1330-1410 C"
+        "HAYNES 25 brochure, melting range 1330-1410 C",
+        false
     }},
     {"inconel625", {
         "inconel625",
@@ -329,7 +335,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "INCONEL alloy 625 (Special Metals) Table 3, -157 to 982 C",
         "Ni-Cr-Mo-Nb liner / duct / bellows alloy",
         1290.0 + 273.15,
-        "INCONEL alloy 625 (Special Metals) Table 2, melting range 1290-1350 C"
+        "INCONEL alloy 625 (Special Metals) Table 2, melting range 1290-1350 C",
+        false
     }},
     {"nimonic75", {
         "nimonic75",
@@ -338,7 +345,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Virgamet Alloy N75 data page; 20 C value = Special Metals sheet",
         "Ni-Cr-Ti liner / sheet alloy",
         1340.0 + 273.15,
-        "NIMONIC alloy 75 (Special Metals SMC-058), melting range 1340-1380 C"
+        "NIMONIC alloy 75 (Special Metals SMC-058), melting range 1340-1380 C",
+        false
     }},
     {"copper", {
         "copper",
@@ -347,7 +355,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "NSRDS-NBS 8 (Powell, Ho & Liley 1966) Table 2b",
         "High-purity copper; alloyed or cold-worked copper conducts less",
         1083.0 + 273.15,
-        "ASM Handbook Vol. 2 (1990), C10100/C10200: solidus 1083 C"
+        "ASM Handbook Vol. 2 (1990), C10100/C10200: solidus 1083 C",
+        false
     }},
     {"alumina", {
         "alumina",
@@ -356,7 +365,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "NSRDS-NBS 8 (Powell, Ho & Liley 1966) Table 14",
         "Dense polycrystalline Al2O3 (sheaths, insulators); porous grades conduct less",
         NO_SOLIDUS,
-        ""
+        "",
+        true
     }},
     {"x22crmov12_1", {
         "x22crmov12_1",
@@ -365,7 +375,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Edelstahlwerke Suedwestfalen 1.4923 data sheet (20 and 650 C)",
         "12% Cr martensitic steel (steam turbine casings, bolts)",
         NO_SOLIDUS,
-        ""
+        "",
+        false
     }},
     {"nicocraly", {
         "nicocraly",
@@ -374,7 +385,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Zhu & Miller 1999, NASA/TM-1999-209069 Fig. 2 (literature values)",
         "NiCoCrAlY TBC bond coat; fit drawn over 575-1100 C only",
         NO_SOLIDUS,
-        ""
+        "",
+        false
     }},
     {"ss316", {
         "ss316",
@@ -383,7 +395,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Georgia Tech Gen3 CSP database, measured 260-820 C",
         "Austenitic stainless steel, corrosion resistant",
         NO_SOLIDUS,
-        ""
+        "",
+        false
     }},
     {"ss310", {
         "ss310",
@@ -392,7 +405,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Georgia Tech Gen3 CSP database, measured 260-800 C",
         "Austenitic 25Cr-20Ni heat-resisting stainless steel (cascade vanes, furnace parts)",
         (2470.0 - 32.0) / 1.8 + 273.15,
-        "Rolled Alloys 310 data sheet, melting range 2470-2555 F"
+        "Rolled Alloys 310 data sheet, melting range 2470-2555 F",
+        false
     }},
     {"al6061", {
         "al6061",
@@ -401,7 +415,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "ASM Handbook, Aluminum Association",
         "Aluminum alloy, limited to <300degC due to T6 temper",
         NO_SOLIDUS,
-        ""
+        "",
+        true
     }},
     {"ysz", {
         "ysz",
@@ -410,7 +425,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
         "Zhu & Miller 2000, NASA/TM-2000-210237 (plasma-sprayed, as sprayed)",
         "7-8 wt% Y2O3 stabilized zirconia, thermal barrier coating",
         NO_SOLIDUS,
-        ""
+        "",
+        true
     }}
 };
 
@@ -422,6 +438,45 @@ const ThermalMaterial& get_material(const std::string& name) {
     return it->second;
 }
 
+namespace {
+
+// k at the end of the data and the end slope dk/dT there, from a one-sided
+// difference inside the range: exact on a table's end segment (every
+// segment is longer than h), the tangent to O(h) on a fitted polynomial.
+struct DataEnd {
+    double T;
+    double k;
+    double slope;
+};
+
+DataEnd data_end(const ThermalMaterial& mat, bool below) {
+    constexpr double h = 1e-2;
+    const double T_end = below ? mat.T_min : mat.T_max;
+    const double T_in = below ? mat.T_min + h : mat.T_max - h;
+    const double k_end = mat.k_func(T_end);
+    return {T_end, k_end, (k_end - mat.k_func(T_in)) / (T_end - T_in)};
+}
+
+} // namespace
+
+double envelope_T_min(const ThermalMaterial& mat) {
+    return mat.T_min < ENVELOPE_T_LOW ? mat.T_min : ENVELOPE_T_LOW;
+}
+
+double envelope_T_max(const ThermalMaterial& mat) {
+    if (mat.hot_cap_at_data_end) {
+        return mat.T_max;
+    }
+    const double cap = std::isfinite(mat.T_solidus) ? mat.T_solidus : GENERIC_METAL_SOLIDUS;
+    return cap > mat.T_max ? cap : mat.T_max;
+}
+
+bool material_in_range(const std::string& name, double T) {
+    const auto& mat = get_material(name);
+    validation::require_finite<std::runtime_error>(T, "material_in_range: T must be finite");
+    return T >= mat.T_min && T <= mat.T_max;
+}
+
 double material_conductivity(const std::string& name, double T, bool extrapolate) {
     const auto& mat = get_material(name);
     // NaN would fail both range tests below and come out as the clamped end
@@ -430,25 +485,28 @@ double material_conductivity(const std::string& name, double T, bool extrapolate
     if (T >= mat.T_min && T <= mat.T_max) {
         return mat.k_func(T);
     }
-    if (!extrapolate) {
-        return mat.k_func(T < mat.T_min ? mat.T_min : mat.T_max);
-    }
     if (!(T > 0.0)) {
         throw std::runtime_error("material_conductivity: T must be > 0 K for " + name +
                                  ", got " + std::to_string(T));
     }
-    // End slope from a one-sided difference inside the range: exact on a
-    // table's end segment (every segment is longer than h), the tangent to
-    // O(h) on a fitted polynomial.
-    constexpr double h = 1e-2;
     const bool below = T < mat.T_min;
-    const double T_end = below ? mat.T_min : mat.T_max;
-    const double T_in = below ? mat.T_min + h : mat.T_max - h;
-    const double k_end = mat.k_func(T_end);
-    const double slope = (k_end - mat.k_func(T_in)) / (T_end - T_in);
-    const double k = k_end + slope * (T - T_end);
+    const DataEnd end = data_end(mat, below);
+    double k = 0.0;
+    if (extrapolate) {
+        // The linear continuation of the end slope (opt-in, unbounded).
+        k = end.k + end.slope * (T - end.T);
+    } else {
+        // The envelope (#882): the end slope ramped linearly to 0 over
+        // ENVELOPE_FADE, then flat; held beyond the envelope's ends.
+        const double T_edge = below ? envelope_T_min(mat) : envelope_T_max(mat);
+        const double T_c = below ? (T > T_edge ? T : T_edge) : (T < T_edge ? T : T_edge);
+        const double d = below ? end.T - T_c : T_c - end.T;  // >= 0, into the envelope
+        const double w = ENVELOPE_FADE;
+        const double reach = d < w ? d - d * d / (2.0 * w) : 0.5 * w;
+        k = end.k + (below ? -end.slope : end.slope) * reach;
+    }
     if (!(k > 0.0)) {
-        throw std::runtime_error("material_conductivity: extrapolating " + name + " to " +
+        throw std::runtime_error("material_conductivity: continuing " + name + " to " +
                                  std::to_string(T) + " K gives k = " + std::to_string(k) +
                                  " W/(m*K) <= 0");
     }

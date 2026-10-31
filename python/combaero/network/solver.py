@@ -5852,6 +5852,11 @@ class NetworkSolver:
                 # compute_coupling just placed for these inputs (k(T) at its
                 # fixed point, h floored as the coupling floors it).
                 sol_dict[f"{wid}.T_interface"] = list(wall._last_profile or [])
+                # 1 when every layer's k came from its material's sourced range,
+                # 0 when any followed the k(T) envelope (#882).
+                sol_dict[f"{wid}.material_in_range"] = float(
+                    all(layer.in_range for layer in wall.layers)
+                )
 
         # Heat an energy boundary gives a node that the node does not take up:
         # below a 1 mg/s floor the heat taken up fades to none at zero flow

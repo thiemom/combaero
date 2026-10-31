@@ -269,11 +269,11 @@ def test_swapped_annulus_is_refused() -> None:
         cb.annular_area(0.5, 0.8)
 
 
-def test_get_material_conductivity_still_clamps_finite_T() -> None:
-    # Finite T outside the range is still clamped for solver robustness; only
-    # NaN, which used to come out as the 1e-3 floor, is refused.
+def test_get_material_conductivity_still_answers_finite_T() -> None:
+    # Finite T outside the range follows the envelope (#882), flat below
+    # 200 K; only NaN, which used to come out as the 1e-3 floor, is refused.
     k_lo = cb.get_material_conductivity("inconel718", 1.0)
-    assert k_lo == pytest.approx(cb.k_inconel718(300.0))
+    assert k_lo == pytest.approx(cb.k_inconel718(300.0) - 50.0 * 0.0146, rel=1e-6)
     with pytest.raises(RuntimeError):
         cb.get_material_conductivity("inconel718", NAN)
 

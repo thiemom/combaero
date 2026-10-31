@@ -117,19 +117,19 @@ TUNE_RUN = 158
 # regenerates them; test_paper_examples pins that they still reproduce it).
 TUNED = {
     "PS0_h2": 2.2380,
-    "PS1_h3": 1.8266,
-    "PS2_h4": 1.4553,
-    "PS3_h5": 1.4799,
+    "PS1_h3": 1.8129,
+    "PS2_h4": 1.4483,
+    "PS3_h5": 1.4757,
     "PS4_h6": 1.2201,
     "PS5_h7": 1.4412,
     "PS6_h8": 1.4107,
     "PS7_h9": 1.0367,
     "PS8_h10": 0.9023,
-    "SS0_h2": 2.1936,
+    "SS0_h2": 2.1937,
     "SS1_h1": 0.8686,
     "SS2_h3": 1.1570,
-    "SS3_h4": 1.0934,
-    "SS4_h5": 1.1658,
+    "SS3_h4": 1.0933,
+    "SS4_h5": 1.1657,
     "SS5_h6": 1.0407,
     "SS6_h7": 1.1157,
     "SS7_h8": 1.1328,
@@ -581,7 +581,7 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
             "label_note": (
                 f"Tuned to run 158 ({s['n']} Nu multipliers for {s['n']} measured Tw; none left "
                 "over). Untuned, the smooth-channel network misses run 158 by MAE 28 K (bias -23 K, "
-                "worst -86 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with "
+                "worst -85 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with "
                 "these multipliers: MAE 12 K, bias +11 K. The report's h is inferred by its own FE "
                 "model, not measured, and is not a target."
             ),

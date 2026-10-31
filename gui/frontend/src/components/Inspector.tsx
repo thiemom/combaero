@@ -4168,6 +4168,13 @@ const Inspector = () => {
 									})()} K
 								</span>
 							</div>
+							{selectedEdge.data.result.material_in_range === 0 && (
+								<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+									A layer's k is outside its material's sourced range: it
+									follows the k(T) envelope (continued from the data,
+									unsourced).
+								</div>
+							)}
 							<div className="grid grid-cols-4 gap-1 pt-2 border-t border-stone-100">
 								<div className="flex flex-col">
 									<span className="text-[7px] text-stone-400 uppercase">

@@ -25,18 +25,44 @@ struct ThermalMaterial {
     // held source prints one; the envelope then decides the cap.
     double T_solidus = std::numeric_limits<double>::quiet_NaN();
     std::string solidus_source;
+    // No hot extension of the envelope: it ends at T_max. For the ceramics
+    // (no solidus held, and the generic metal cap does not apply to them) and
+    // for al6061, whose data end far below the generic metal cap (#882).
+    bool hot_cap_at_data_end = false;
 };
+
+// The k(T) envelope (#882). Outside a material's sourced range [T_min, T_max]
+// the database continues k(T) from the end of the data, with the end slope
+// ramped linearly to 0 over ENVELOPE_FADE (C1, so the Jacobian stays
+// continuous; k moves at most |slope| ENVELOPE_FADE / 2 past the data), down
+// to ENVELOPE_T_LOW and up to the envelope's hot end, and holds the end value
+// beyond those. The continuation is not sourced; material_in_range reports it.
+// 200 K is the lower bound of the NASA-9 gas data, for consistency with the
+// gas side, not a property of any material.
+constexpr double ENVELOPE_T_LOW = 200.0;   // [K]
+constexpr double ENVELOPE_FADE = 100.0;    // [K]
+// The hot end for a metal whose source prints no solidus: the lowest sourced
+// solidus in the database (HASTELLOY X and INCONEL 718, 1260 C).
+constexpr double GENERIC_METAL_SOLIDUS = 1260.0 + 273.15;  // [K]
 
 // Database access functions
 const ThermalMaterial& get_material(const std::string& name);
 std::vector<std::string> list_materials();
 
 // k(T) of a database material [W/(m*K)]. Inside [T_min, T_max] this is
-// k_func(T). Outside it, extrapolate = false holds the end value (T is
-// clamped to the range) and extrapolate = true continues the end slope
-// linearly: an opt-in, unsourced continuation the caller asks for. Throws
-// for a non-finite T, T <= 0 or a continued k <= 0.
+// k_func(T). Outside it, extrapolate = false (the default) follows the
+// envelope above; extrapolate = true continues the end slope linearly,
+// unbounded (opt-in). Neither is sourced. Throws for a non-finite T, T <= 0
+// or a continued k <= 0.
 double material_conductivity(const std::string& name, double T, bool extrapolate);
+
+// The envelope's ends [K]: min(ENVELOPE_T_LOW, T_min), and the solidus, the
+// generic metal cap, or T_max (hot_cap_at_data_end), never below T_max.
+double envelope_T_min(const ThermalMaterial& mat);
+double envelope_T_max(const ThermalMaterial& mat);
+
+// Whether T lies in the material's sourced range [T_min, T_max] (#882).
+bool material_in_range(const std::string& name, double T);
 
 // -------------------------------------------------------------
 // Superalloys - Thermal Conductivity k(T)

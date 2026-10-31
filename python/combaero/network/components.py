@@ -1200,14 +1200,19 @@ class WallLayer:
     material : str
         Material name (e.g., 'inconel718', 'haynes230', or 'custom').
     extrapolate : bool
-        Outside the material's valid range: False (default) holds the end
-        value, True continues the end slope linearly (unsourced; opt-in).
+        Outside the material's sourced range: False (default) follows the k(T)
+        envelope (#882), True continues the end slope linearly. Neither is
+        sourced; ``in_range`` says whether the last evaluation was.
+    in_range : bool
+        Whether the layer's last conductivity came from its material's sourced
+        range (always True for a 'custom' layer). Set by update_conductivity.
     """
 
     thickness: float
     conductivity: float
     material: str = "custom"
     extrapolate: bool = False
+    in_range: bool = field(default=True, init=False, compare=False)
 
     def __post_init__(self) -> None:
         # An unknown name used to be swallowed at every evaluation, so a typo
@@ -1225,12 +1230,14 @@ class WallLayer:
 
         # 'generic' is legacy, 'custom' is new name for manual input
         if self.material.lower() not in ("generic", "custom"):
-            # By default the binding clamps T to the material's valid range and
-            # k > 0, so a known material does not raise at any finite T. extrapolate
-            # continues the end slope and raises if that reaches k <= 0.
+            # By default the binding follows the material's k(T) envelope (#882),
+            # bounded and C1, so a known material does not raise at any finite
+            # T > 0. extrapolate continues the end slope and raises if that
+            # reaches k <= 0.
             self.conductivity = cb.get_material_conductivity(
                 self.material, T, extrapolate=self.extrapolate
             )
+            self.in_range = bool(cb.material_in_range(self.material, T))
 
     @property
     def r_val(self) -> float:
@@ -1395,6 +1402,13 @@ class ThermalWall:
                 prof = profile(t_over_k_layers)
                 if change < 1e-12:
                     break
+            # Whether each layer's k came from its material's sourced range at
+            # its mean temperature in the profile just placed (#882).
+            for i, layer in enumerate(self.layers):
+                if layer.material.lower() not in ("generic", "custom"):
+                    layer.in_range = bool(
+                        cb.material_in_range(layer.material, 0.5 * (prof[i] + prof[i + 1]))
+                    )
 
         res = _solver_tools.wall_exchange_and_jacobian(
             h_a,

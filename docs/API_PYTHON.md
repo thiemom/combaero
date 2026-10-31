@@ -2328,15 +2328,19 @@ k_1_4923 = cb.k_x22crmov12_1  # X22CrMoV12-1 data sheet, 20 and 650 C, 293-923 K
 k_bc = cb.k_bondcoat_nicocraly  # NiCoCrAlY bond coat (Zhu & Miller 1999), 848-1373 K
 k_tbc = cb.k_tbc_ysz
 # Out-of-range or NaN T raises RuntimeError. get_material_conductivity(name, T)
-# clamps a finite T to the material range (solver robustness) and raises
-# RuntimeError for NaN or inf T.
+# answers any finite T > 0 (solver robustness) and raises for NaN or inf T.
 
 # Outside its valid range a k_* function raises; extrapolate=True opts into a
 # linear continuation of the end slope instead (unsourced). The database lookup
-# holds the end value by default and takes the same flag; so does WallLayer.
+# (and WallLayer) follows the k(T) envelope by default (#882): the end slope
+# ramped linearly to 0 over 100 K, then flat, from 200 K (or T_min, if lower) to
+# the solidus (1533.15 K where none is printed; T_max for alumina, ysz, al6061),
+# held beyond. Not sourced: material_in_range says which part is data, and a
+# wall reports "<wall>.material_in_range" (0 when any layer is outside).
 k = cb.k_hastelloy_x(1400.0, extrapolate=True)
-k = cb.get_material_conductivity("hastelloy_x", 1400.0)                    # = k at 1273.15 K
-k = cb.get_material_conductivity("hastelloy_x", 1400.0, extrapolate=True)  # end slope
+k = cb.get_material_conductivity("hastelloy_x", 1400.0)                    # envelope: 29.70
+k = cb.get_material_conductivity("hastelloy_x", 1400.0, extrapolate=True)  # end slope: 31.24
+cb.material_in_range("hastelloy_x", 1400.0)                                 # False
 
 # The record: sourced range, source, and the solidus [K] its source prints
 # (NaN where none does), the hot end of the #882 envelope.

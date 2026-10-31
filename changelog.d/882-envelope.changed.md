@@ -1,0 +1,6 @@
+- **Breaking (0.9.0): outside a material's sourced range, the database follows a k(T) envelope instead of holding the end value (#882).** This applies to `get_material_conductivity(name, T)` and to a `WallLayer` with a named material.
+  - The old clamp kinked k(T) at the end of the data, and nothing reported it.
+  - Now the end slope continues, ramped linearly to zero over 100 K and then flat. k(T) is C1, and it moves at most |slope| x 50 K past the data, about 1 W/m K for the superalloys.
+  - The envelope runs from 200 K, the NASA-9 lower bound (or T_min, if that is lower), up to the material's solidus. Where no solidus is printed, the cap is the generic 1533.15 K (1260 C, the lowest sourced solidus). Alumina, ysz and al6061 are capped at T_max. k is held beyond the envelope.
+  - Results change only where a wall layer's temperature leaves its material's range; inside the range they are bit-identical. `extrapolate=True` (linear, unbounded) is unchanged.
+- **New flag: `material_in_range(name, T)`, and `"<wall>.material_in_range"` in network results** (0 when any layer's k came from the envelope). The GUI wall panel says so. `get_material_info` also reports `T_envelope_min` / `T_envelope_max`.

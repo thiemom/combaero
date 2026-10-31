@@ -470,27 +470,28 @@ All functions use consistent units to avoid conversion errors.
 
 ### materials.h - Material Thermal Conductivity
 
-| Function                    | Input Units                                                | Output Unit                                                      |
-|-----------------------------|------------------------------------------------------------|------------------------------------------------------------------|
-| `k_inconel718`              | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_haynes230`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_hastelloy_x`             | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_haynes188`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_haynes263`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_haynes25`                | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_inconel625`              | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_nimonic75`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_copper`                  | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_alumina`                 | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_x22crmov12_1`            | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_bondcoat_nicocraly`      | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_stainless_steel_310`     | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_stainless_steel_316`     | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                          |
-| `k_aluminum_6061`           | T: K                                                       | W/(m*K)                                                          |
-| `k_tbc_ysz`                 | T: K, hours: h (default 0), is_ebpvd: bool (default False) | W/(m*K)                                                          |
-| `list_materials`            | -                                                          | list[str]                                                        |
-| `get_material_conductivity` | name: str, T: K, extrapolate: bool (default False)         | W/(m*K)                                                          |
-| `get_material_info`         | name: str                                                  | dict: T_min, T_max, T_solidus [K]; source, notes, solidus_source |
+| Function                    | Input Units                                                | Output Unit                                                                                      |
+|-----------------------------|------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| `k_inconel718`              | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_haynes230`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_hastelloy_x`             | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_haynes188`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_haynes263`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_haynes25`                | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_inconel625`              | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_nimonic75`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_copper`                  | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_alumina`                 | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_x22crmov12_1`            | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_bondcoat_nicocraly`      | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_stainless_steel_310`     | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_stainless_steel_316`     | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_aluminum_6061`           | T: K                                                       | W/(m*K)                                                                                          |
+| `k_tbc_ysz`                 | T: K, hours: h (default 0), is_ebpvd: bool (default False) | W/(m*K)                                                                                          |
+| `list_materials`            | -                                                          | list[str]                                                                                        |
+| `get_material_conductivity` | name: str, T: K, extrapolate: bool (default False)         | W/(m*K)                                                                                          |
+| `get_material_info`         | name: str                                                  | dict: T_min, T_max, T_solidus, T_envelope_min, T_envelope_max [K]; source, notes, solidus_source |
+| `material_in_range`         | name: str, T: K                                            | bool                                                                                             |
 
 ### cooling_correlations.h - Advanced Cooling Correlations
 
