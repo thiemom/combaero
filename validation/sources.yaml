@@ -3566,7 +3566,9 @@ documents:
     Measurement Workshop).'
   topic: [orifice]
   content: 'Derivation of the "Agreed Equation" (RHG) on the EEC/API database (16522 points, D 50-600 mm,
-    beta 0.1-0.75, corner/flange/D-D/2 taps, Re_D 10 to 1e8). Eq. (10) is the full form fitted to all data,
+    beta 0.1-0.75, corner/flange/D-D/2 taps; Table 4 bins Re_D from "10 to 4000" up to "1e7 to 1e8" --
+    bin edges, not data limits: no lowest Re_D is stated anywhere in the text or tables). Eq. (10) is the full
+    form fitted to all data,
     including Re_D < 4000 (a max(...) branch in the beta^3.5 term and a 1 + 8 max(log10(3700/Re_D), 0) factor
     on the downstream tapping term); Eq. (11a)+(11b) is its Re_D >= 4000 form, the one in ISO 5167-2 Eq. (4).
     Residual tables 2-8 by beta, D, Re_D and taps (s = 0.259 % for Re_D >= 4000; 0.59 % in the Re_D 10-4000 bin,
@@ -3577,9 +3579,16 @@ documents:
     checked against the held ISO 5167-2 Annex A. Eq. (10) is a published, data-fitted extension below Re_D 4000
     that rises faster than Eq. (11) (beta 0.5, D 50 mm: 0.735 vs 0.684 at Re_D 1000); it is C0 but not C1 at
     Re_D ~ 3700 and still unbounded as Re_D -> 0. Not implemented; #873 holds Cd below the ISO bound instead.
-    Does not give the Stolz limits of use (#873 wanted entry for ISO 5167:1980 stays open).'
-  read_for: ['#854 RHG primary', '#873 low-Re hold']
-  issues: [854, 873]
+    Does not give the Stolz limits of use (#873 wanted entry for ISO 5167:1980 stays open).
+    #878 (2026-10-31) tried Eq. (10) below Re_D 4000 against pre-registered criteria and DROPPED it on
+    criterion 3: the paper gives no data floor (lowest Re_D) at any beta, so the hold Eq. (10) would need has
+    no sourced start. Fidelity passes (transcription term by term; equals Eq. (11) to 0 for Re_D >= 3687.2,
+    the max() crossing; the log10 switch is at 3700). The gap between Eq. (10) and the #873 hold exceeds the
+    cell''s rms about Eq. (10) only below Re_D ~2500-3700 for beta 0.1-0.57 (everywhere in the bin at beta
+    0.66, 5 points), and the tables do not say where in 10-4000 the 470 points lie. Those rms values are
+    in-sample (the data shaped the low-Re terms). Numbers in #878.'
+  read_for: ['#854 RHG primary', '#873 low-Re hold', '#878 Eq. (10) below Re_D 4000']
+  issues: [854, 873, 878]
   records: []
   code: [src/orifice.cpp, include/orifice.h]
   notes: Supplied by the user 2026-10-31 (moved here from the wanted list). NEL report scan, 23 pages.
@@ -3897,6 +3906,17 @@ wanted:
   question: The primary of ISO 5167-2 5.4 Eq. (7), the permanent pressure loss (implemented as
     permanent_loss_ratio_and_dC, matching the held standard's equation).
   where: Elsevier journal (short note, paywalled).
+- citation: Reader-Harris, M. J., Sattary, J. A., Spearman, E. P. (1995). The orifice plate discharge
+    coefficient equation - further work. Flow Measurement and Instrumentation 6, 101-114.
+  checked: false
+  issues:
+  - 878
+  priority: later
+  question: 'The lowest Re_D of the EEC/API data per beta (and D, taps), which Reader-Harris & Sattary 1996
+    (its ref. 10) does not state. Without it Eq. (10) has no sourced data floor and #878 dropped it; with it
+    Eq. (10) could be re-tried below Re_D 4000 with a hold at that floor. The NEL report PR14 (EUEC/17,
+    1992, ref. 8) or Reader-Harris 2015 (below) may carry the same data.'
+  where: Elsevier journal (paywalled); NEL report PR14 via TUV SUD NEL.
 - citation: Reader-Harris, M. J. (2015). Orifice Plates and Venturi Tubes. Springer (Experimental Fluid
     Mechanics). (citation as recalled)
   checked: false
