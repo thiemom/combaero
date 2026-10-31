@@ -183,18 +183,19 @@ def test_c3x_gui_file_is_current(c3x: ModuleType) -> None:
 
 
 def test_c3x_panel_numbers(c3x: ModuleType) -> None:
-    """The panel quotes: untuned run 158 MAE 28 K, bias -23 K, worst 86 K at the
+    """The panel quotes: untuned run 158 MAE 28 K, bias -23 K, worst 85 K at the
     leading edge; run 149 with run 158's multipliers MAE 12 K, bias +11 K
-    (measured 2026-10-31: 28.5 / -23.4 / 85.7 and 11.7 / +11.3)."""
+    (measured 2026-10-31 with the #882 k(T) envelope: 28.2 / -23.1 / 85.1 and
+    11.7 / +11.2)."""
     untuned = c3x.wall_temperatures(158, c3x.solve(158)[0])
     s = c3x.summary(untuned)
-    assert s["mae"] == pytest.approx(28.5, abs=0.5)
-    assert s["bias"] == pytest.approx(-23.4, abs=0.5)
+    assert s["mae"] == pytest.approx(28.2, abs=0.5)
+    assert s["bias"] == pytest.approx(-23.1, abs=0.5)
     worst = max(untuned, key=lambda r: abs(r["Tw_network"] - r["Tw_measured"]))
     assert worst["s0"] == 0.0 and abs(worst["Tw_network"] - worst["Tw_measured"]) > 80.0
     moved = c3x.summary(c3x.wall_temperatures(149, c3x.solve(149, c3x.TUNED)[0]))
     assert moved["mae"] == pytest.approx(11.7, abs=0.5)
-    assert moved["bias"] == pytest.approx(11.3, abs=0.5)
+    assert moved["bias"] == pytest.approx(11.2, abs=0.5)
 
 
 def test_c3x_coolant_multiplier_is_geometry(c3x: ModuleType) -> None:
