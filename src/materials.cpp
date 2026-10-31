@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -263,118 +264,153 @@ double k_tbc_ysz(double T, double hours, bool is_ebpvd) {
 // Material Database
 // -------------------------------------------------------------
 
+// No held source prints this material's solidus (#882).
+constexpr double NO_SOLIDUS = std::numeric_limits<double>::quiet_NaN();
+
 static const std::map<std::string, ThermalMaterial> material_database = {
     {"inconel718", {
         "inconel718",
         k_inconel718,
         300.0, 1200.0,
         "Haynes International, Special Metals Corporation",
-        "Ni-based superalloy, common in turbine applications"
+        "Ni-based superalloy, common in turbine applications",
+        1260.0 + 273.15,
+        "INCONEL alloy 718 (Special Metals) Table 2, melting range 1260-1336 C"
     }},
     {"haynes230", {
         "haynes230",
         k_haynes230,
         25.0 + 273.15, 1000.0 + 273.15,
         "HAYNES 230 brochure H-3000O (Haynes International, 2021): alpha * cp * rho, 25-1000 C",
-        "Ni-Cr-W-Mo alloy; table to 1000 C"
+        "Ni-Cr-W-Mo alloy; table to 1000 C",
+        1301.0 + 273.15,
+        "HAYNES 230 brochure H-3000O, melting 1301-1371 C"
     }},
     {"hastelloy_x", {
         "hastelloy_x",
         k_hastelloy_x,
         300.0, 1273.15,
         "HASTELLOY X brochure + data sheet (Haynes International), table to 1000 C",
-        "Ni-Cr-Fe-Mo combustor liner alloy"
+        "Ni-Cr-Fe-Mo combustor liner alloy",
+        1260.0 + 273.15,
+        "HASTELLOY X brochure, melting range 1260-1355 C"
     }},
     {"haynes188", {
         "haynes188",
         k_haynes188,
         300.0, 1273.15,
         "HAYNES 188 alloy brochure (Haynes International), table to 1000 C",
-        "Co-Ni-Cr-W liner / transition-piece alloy"
+        "Co-Ni-Cr-W liner / transition-piece alloy",
+        1315.0 + 273.15,
+        "HAYNES 188 brochure, melting 1315-1410 C"
     }},
     {"haynes263", {
         "haynes263",
         k_haynes263,
         300.0, 1273.15,
         "HAYNES 263 alloy brochure (Haynes International), table to 1000 C",
-        "Ni-Co-Cr-Mo age-hardenable liner / transition-piece alloy"
+        "Ni-Co-Cr-Mo age-hardenable liner / transition-piece alloy",
+        1300.0 + 273.15,
+        "HAYNES 263 brochure, melting range 1300-1355 C"
     }},
     {"haynes25", {
         "haynes25",
         k_haynes25,
         25.0 + 273.15, 1000.0 + 273.15,
         "HAYNES 25 alloy brochure (Haynes International), table to 1000 C",
-        "Co-Cr-W-Ni (L-605) combustor / turbine alloy"
+        "Co-Cr-W-Ni (L-605) combustor / turbine alloy",
+        1330.0 + 273.15,
+        "HAYNES 25 brochure, melting range 1330-1410 C"
     }},
     {"inconel625", {
         "inconel625",
         k_inconel625,
         -157.0 + 273.15, 982.0 + 273.15,
         "INCONEL alloy 625 (Special Metals) Table 3, -157 to 982 C",
-        "Ni-Cr-Mo-Nb liner / duct / bellows alloy"
+        "Ni-Cr-Mo-Nb liner / duct / bellows alloy",
+        1290.0 + 273.15,
+        "INCONEL alloy 625 (Special Metals) Table 2, melting range 1290-1350 C"
     }},
     {"nimonic75", {
         "nimonic75",
         k_nimonic75,
         20.0 + 273.15, 1000.0 + 273.15,
         "Virgamet Alloy N75 data page; 20 C value = Special Metals sheet",
-        "Ni-Cr-Ti liner / sheet alloy"
+        "Ni-Cr-Ti liner / sheet alloy",
+        1340.0 + 273.15,
+        "NIMONIC alloy 75 (Special Metals SMC-058), melting range 1340-1380 C"
     }},
     {"copper", {
         "copper",
         k_copper,
         100.0, 1200.0,
         "NSRDS-NBS 8 (Powell, Ho & Liley 1966) Table 2b",
-        "High-purity copper; alloyed or cold-worked copper conducts less"
+        "High-purity copper; alloyed or cold-worked copper conducts less",
+        1083.0 + 273.15,
+        "ASM Handbook Vol. 2 (1990), C10100/C10200: solidus 1083 C"
     }},
     {"alumina", {
         "alumina",
         k_alumina,
         100.0, 2000.0,
         "NSRDS-NBS 8 (Powell, Ho & Liley 1966) Table 14",
-        "Dense polycrystalline Al2O3 (sheaths, insulators); porous grades conduct less"
+        "Dense polycrystalline Al2O3 (sheaths, insulators); porous grades conduct less",
+        NO_SOLIDUS,
+        ""
     }},
     {"x22crmov12_1", {
         "x22crmov12_1",
         k_x22crmov12_1,
         20.0 + 273.15, 650.0 + 273.15,
         "Edelstahlwerke Suedwestfalen 1.4923 data sheet (20 and 650 C)",
-        "12% Cr martensitic steel (steam turbine casings, bolts)"
+        "12% Cr martensitic steel (steam turbine casings, bolts)",
+        NO_SOLIDUS,
+        ""
     }},
     {"nicocraly", {
         "nicocraly",
         k_bondcoat_nicocraly,
         848.15, 1373.15,
         "Zhu & Miller 1999, NASA/TM-1999-209069 Fig. 2 (literature values)",
-        "NiCoCrAlY TBC bond coat; fit drawn over 575-1100 C only"
+        "NiCoCrAlY TBC bond coat; fit drawn over 575-1100 C only",
+        NO_SOLIDUS,
+        ""
     }},
     {"ss316", {
         "ss316",
         k_stainless_steel_316,
         260.0 + 273.15, 820.0 + 273.15,
         "Georgia Tech Gen3 CSP database, measured 260-820 C",
-        "Austenitic stainless steel, corrosion resistant"
+        "Austenitic stainless steel, corrosion resistant",
+        NO_SOLIDUS,
+        ""
     }},
     {"ss310", {
         "ss310",
         k_stainless_steel_310,
         260.0 + 273.15, 800.0 + 273.15,
         "Georgia Tech Gen3 CSP database, measured 260-800 C",
-        "Austenitic 25Cr-20Ni heat-resisting stainless steel (cascade vanes, furnace parts)"
+        "Austenitic 25Cr-20Ni heat-resisting stainless steel (cascade vanes, furnace parts)",
+        (2470.0 - 32.0) / 1.8 + 273.15,
+        "Rolled Alloys 310 data sheet, melting range 2470-2555 F"
     }},
     {"al6061", {
         "al6061",
         k_aluminum_6061,
         200.0, 600.0,
         "ASM Handbook, Aluminum Association",
-        "Aluminum alloy, limited to <300degC due to T6 temper"
+        "Aluminum alloy, limited to <300degC due to T6 temper",
+        NO_SOLIDUS,
+        ""
     }},
     {"ysz", {
         "ysz",
         [](double T) { return k_tbc_ysz(T, 0.0); },  // Default: as-sprayed
         300.0, 1700.0,
         "Zhu & Miller 2000, NASA/TM-2000-210237 (plasma-sprayed, as sprayed)",
-        "7-8 wt% Y2O3 stabilized zirconia, thermal barrier coating"
+        "7-8 wt% Y2O3 stabilized zirconia, thermal barrier coating",
+        NO_SOLIDUS,
+        ""
     }}
 };
 

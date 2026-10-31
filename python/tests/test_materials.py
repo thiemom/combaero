@@ -555,3 +555,49 @@ class TestOptInExtrapolation:
         continued = WallLayer(thickness=1e-3, conductivity=1.0, material="copper", extrapolate=True)
         continued.update_conductivity(1300.0)
         assert continued.conductivity == pytest.approx(334.0, rel=1e-9)
+
+
+class TestSolidus:
+    """#882: the solidus each material's source prints, the hot end of its envelope."""
+
+    SOURCED = {
+        "haynes230": 1301.0,
+        "hastelloy_x": 1260.0,
+        "haynes188": 1315.0,
+        "haynes263": 1300.0,
+        "haynes25": 1330.0,
+        "inconel625": 1290.0,
+        "inconel718": 1260.0,
+        "nimonic75": 1340.0,
+        "ss310": (2470.0 - 32.0) / 1.8,
+        "copper": 1083.0,
+    }
+    UNPRINTED = ("ss316", "x22crmov12_1", "nicocraly", "alumina", "ysz", "al6061")
+
+    def test_sourced_solidus_is_the_printed_value(self) -> None:
+        for name, t_c in self.SOURCED.items():
+            info = cb.get_material_info(name)
+            assert info["T_solidus"] == pytest.approx(t_c + 273.15, rel=1e-12), name
+            assert info["solidus_source"], name
+
+    def test_no_solidus_where_no_source_prints_one(self) -> None:
+        for name in self.UNPRINTED:
+            info = cb.get_material_info(name)
+            assert math.isnan(info["T_solidus"]), name
+            assert info["solidus_source"] == "", name
+
+    def test_every_material_is_covered_once(self) -> None:
+        assert set(self.SOURCED) | set(self.UNPRINTED) == set(cb.list_materials())
+
+    def test_solidus_lies_above_the_sourced_range(self) -> None:
+        for name in self.SOURCED:
+            info = cb.get_material_info(name)
+            assert info["T_max"] < info["T_solidus"], name
+
+    def test_info_carries_the_conductivity_range(self) -> None:
+        info = cb.get_material_info("ss310")
+        assert info["T_min"] == pytest.approx(533.15)
+        assert info["T_max"] == pytest.approx(1073.15)
+        assert "Gen3 CSP" in info["source"]
+        with pytest.raises(RuntimeError):
+            cb.get_material_info("unobtainium")
