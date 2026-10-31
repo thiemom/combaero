@@ -2,7 +2,10 @@
 // gui/examples/ carries an `example` key next to nodes/edges; the panel
 // above the canvas shows it once the example loads.
 
-export type ValidationLabel = "fidelity" | "cross-source";
+// "tuned": the network carries tuners fitted to the source's own data (the
+// user's job per docs/VALIDATION_POLICY.md); its untuned error is reported
+// beside it, cross-source.
+export type ValidationLabel = "fidelity" | "cross-source" | "tuned";
 
 export interface ExampleInfo {
 	title: string;
@@ -32,7 +35,9 @@ export const parseExampleInfo = (raw: unknown): ExampleInfo | null => {
 	const title = text(r.title);
 	if (!title) return null;
 	const label =
-		r.label === "fidelity" || r.label === "cross-source" ? r.label : null;
+		r.label === "fidelity" || r.label === "cross-source" || r.label === "tuned"
+			? r.label
+			: null;
 	if (!label) return null;
 	return {
 		title,
@@ -46,8 +51,11 @@ export const parseExampleInfo = (raw: unknown): ExampleInfo | null => {
 };
 
 /** What the badge says, per docs/VALIDATION_POLICY.md: fidelity is judged on
- *  the author's own data, accuracy only cross-source. */
+ *  the author's own data, accuracy only cross-source, and a tuned network
+ *  matches its rig because it was fitted to it. */
 export const labelText = (label: ValidationLabel): string =>
 	label === "fidelity"
 		? "Fidelity: the source's own data"
-		: "Cross-source: accuracy";
+		: label === "tuned"
+			? "Tuned: fitted to the source's data"
+			: "Cross-source: accuracy";

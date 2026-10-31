@@ -9,7 +9,12 @@ const ExamplePanel = () => {
 	const info = useStore((s) => s.exampleInfo);
 	const dismiss = useStore((s) => s.dismissExampleInfo);
 	if (!info) return null;
-	const fidelity = info.label === "fidelity";
+	const badge =
+		info.label === "fidelity"
+			? "bg-emerald-100 text-emerald-800"
+			: info.label === "tuned"
+				? "bg-violet-100 text-violet-800"
+				: "bg-amber-100 text-amber-800";
 	return (
 		<section
 			aria-label="Example description"
@@ -20,11 +25,7 @@ const ExamplePanel = () => {
 				<div className="flex items-center gap-3 flex-wrap">
 					<span className="text-sm font-bold text-slate-900">{info.title}</span>
 					<span
-						className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-							fidelity
-								? "bg-emerald-100 text-emerald-800"
-								: "bg-amber-100 text-amber-800"
-						}`}
+						className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${badge}`}
 					>
 						{labelText(info.label)}
 					</span>

@@ -1,0 +1,6 @@
+- **Worked example: the Hylton 1983 C3X cooled vane** (NASA CR-168015), as a script (`python/examples/papers/hylton1983_c3x_vane.py`) and a GUI network (Examples -> "Hylton 1983 C3X cooled vane").
+  - The vane surface is split into 19 segments, one per nearest cooling hole. Each has a gas channel from the inlet total state to the measured local static pressure, an ss310 wall, and the hole's share of its coolant.
+  - The gas-side Nu multipliers are fitted to run 158's measured wall temperatures.
+  - Untuned, the smooth-channel network misses run 158 by MAE 28 K (worst -86 K at the leading edge), labelled cross-source. Run 149 with run 158's multipliers gives MAE 12 K: the multipliers absorb the run's 8.3 % turbulence, and run 149 has 6.5 %.
+  - The report's h is inferred by its own FE model, so it is shown for comparison and not used as a target.
+- **A third example label, "tuned"** (GUI example panel): the network carries tuners fitted to the source's own data, and its untuned error is reported beside it.
