@@ -3671,15 +3671,18 @@ documents:
     chord 7.816 cm), Fig. 7 the ten radial cooling holes, Table IX the run conditions (M2 0.9-1.05, Tt1 ~800 K,
     Tu 6.5/8.3 %), Table VI the h uncertainty, and Appendix A per run: Ps/Pt, Tw/811 K and h/1135 W/m2 K on
     both surfaces, and flow, Re and mean T per hole. ASTM 310 stainless; no conductivity value is printed.'
-  status: screened
+  status: extracted
   verdict: 'Candidate for a worked NGV example (external channel chains with per-station tuners, ten coolant
     channels, ThermalWall per pair). TRAP: the external h is inferred by 2-D FE conduction from the measured Tw
     with an internal h from Nu = Cr 0.022 Pr^0.5 Re^0.8, so feeding h back to predict Tw is circular; Tw and
     Ps are the measured quantities. Transcription errors found: point 29 y is printed 0.4115 for 0.0411;
-    Table IX''s "Pa" column is psia x 133.3; the throat computed from Table III is 2.8 % above Table IV.'
+    Table IX''s "Pa" column is psia x 133.3; the throat computed from Table III is 2.8 % above Table IV.
+    Transcribed 2026-10-31 (Tables III, IV, VI, IX, Fig. 7, Appendix A runs 149 and 158) into
+    validation/cooling/data/hylton1983/ with derive_geometry.py; user check of the pages pending.'
   read_for: [NGV worked example (C3X), cooled-vane wall temperature, accuracy]
   issues: []
-  records: []
+  records: [validation/cooling/extractions/hylton_1983_cr168015_c3x.md, validation/cooling/data/hylton1983/c3x_coordinates.csv,
+    python/tests/test_hylton1983_c3x_data.py]
   notes: Fetched from NTRS (open, government public use) 2026-10-31. OCR is poor; transcribe from page images
     (run 149 = PDF p.191-192, run 158 = p.201-202).
 - file: sources/heat_transfer/vanes/hylton1988_NASA_CR-182133_C3X_film_cooled_vane.pdf

@@ -1,0 +1,12 @@
+# Hylton et al. 1983, NASA CR-168015, Table IV "Cascade geometry", C3X column, PDF p.21 (report p.14).
+# Transcribed from page image (150 dpi); cm and inch values cross-checked (cm/2.54).
+quantity,value,unit,value_in
+setting_angle,59.89,deg,
+air_exit_angle,72.38,deg,
+throat,3.292,cm,1.296
+vane_height,7.620,cm,3.000
+vane_spacing_pitch,11.773,cm,4.635
+suction_surface_arc,17.782,cm,7.001
+pressure_surface_arc,13.723,cm,5.403
+true_chord,14.493,cm,5.706
+axial_chord,7.816,cm,3.077

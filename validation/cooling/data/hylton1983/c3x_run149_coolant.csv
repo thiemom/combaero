@@ -1,0 +1,14 @@
+# Hylton et al. 1983, NASA CR-168015, Appendix A, run 149 "coolant flow data", PDF p.192. Transcribed from page image (400 dpi).
+# T_avg = average coolant temperature in the hole at the midspan measurement plane (linear rise inlet->exit assumed by the report, PDF p.28).
+# Re_D printed as "RED x(10E-4)": column Re_D_e4 is Re_D/1e4. Flow rate printed in lbm/s and kg/s. D from Fig. 7. Checks: F->K, lbm->kg (0.4536) and Re_D recomputed (Sutherland air) agree; see report.
+hole,D_cm,T_avg_F,T_avg_K,Re_D_e4,mdot_lbm_s,mdot_kg_s
+1,0.630,273.65,407.40,6.932,0.175E-01,0.793E-02
+2,0.630,275.51,408.43,6.160,0.156E-01,0.706E-02
+3,0.630,237.43,387.28,6.346,0.154E-01,0.700E-02
+4,0.630,252.96,395.90,6.427,0.159E-01,0.721E-02
+5,0.630,213.82,374.16,6.945,0.165E-01,0.747E-02
+6,0.630,326.55,436.79,6.135,0.163E-01,0.738E-02
+7,0.630,245.09,391.53,6.271,0.154E-01,0.697E-02
+8,0.310,321.09,433.76,4.184,0.546E-02,0.248E-02
+9,0.310,400.39,477.81,2.169,0.303E-02,0.137E-02
+10,0.198,489.71,527.43,1.841,0.174E-02,0.789E-03

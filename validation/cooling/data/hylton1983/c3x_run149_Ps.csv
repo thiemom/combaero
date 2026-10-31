@@ -1,0 +1,33 @@
+# Hylton et al. 1983, NASA CR-168015, Appendix A, run 149 (code 4312), surface static pressure, PDF p.192. Transcribed from page image (400 dpi).
+# Ps_over_Pt1 = local surface static / cascade inlet total pressure (Table IX PT1). s_over_arc = fraction of that surface arc (PS 13.723 cm, SS 17.782 cm); x_over_cax = fraction of axial chord 7.816 cm.
+# s_signed: PS negative, SS positive (report convention in Figs. 19/20: pressure side plotted left of the LE origin).
+surface,s_over_arc,s_signed,x_over_cax,Ps_over_Pt1,note
+LE,.0001,+0.0000,0.0000,.9980,listed first in the PS block (stagnation tap)
+PS,.0525,-0.0525,0.0276,.9875,
+PS,.1027,-0.1027,0.0937,.9896,
+PS,.1527,-0.1527,0.1632,.9860,
+PS,.2029,-0.2029,0.2302,.9854,
+PS,.2894,-0.2894,0.3384,.9811,
+PS,.3751,-0.3751,0.4369,.9728,
+PS,.4603,-0.4603,0.5265,.9603,
+PS,.6422,-0.6422,0.6949,.9099,
+PS,.7179,-0.7179,0.7570,.8587,
+PS,.7414,-0.7414,0.7755,.8443,
+PS,.8073,-0.8073,0.8255,.7895,
+PS,.8894,-0.8894,0.8843,.6955,
+PS,.9745,-0.9745,0.9416,.6425,
+SS,.0393,+0.0393,0.0246,.9799,
+SS,.0781,+0.0781,0.0697,.9409,
+SS,.1176,+0.1176,0.1342,.8571,
+SS,.1569,+0.1569,0.2181,.6747,
+SS,.1962,+0.1962,0.3058,.6025,
+SS,.2358,+0.2358,0.3816,.5321,
+SS,.2750,+0.2750,0.4409,.5001,
+SS,.3447,+0.3447,0.5200,.5388,
+SS,.4145,+0.4145,0.5844,.5294,
+SS,.5534,+0.5534,0.6963,.5859,
+SS,.6233,+0.6233,0.7485,.5819,
+SS,.7626,+0.7626,0.8488,,station not listed for this run
+SS,.8166,+0.8166,0.8863,.5579,
+SS,.9020,+0.9020,0.9427,.5627,
+SS,.9505,+0.9505,0.9723,.5575,
