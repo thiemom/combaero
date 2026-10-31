@@ -6925,19 +6925,28 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         if (name == "al6061") {
           warn_al6061_deprecated();
         }
-        // Outside the valid range: the end value by default (T clamped, for
-        // solver robustness), the linear end-slope continuation on request.
+        // Outside the valid range: the #882 envelope by default, the linear
+        // end-slope continuation on request.
         const double k = combaero::materials::material_conductivity(name, T, extrapolate);
         return std::max(1e-3, k);
       },
       py::arg("name"), py::arg("T"), py::arg("extrapolate") = false,
       "Get thermal conductivity [W/(m*K)] for a named material at temperature T "
       "[K].\n"
-      "Outside the material's valid range, extrapolate=False (default) holds the\n"
-      "end value (T is clamped); extrapolate=True continues the end slope linearly\n"
-      "(unsourced; opt-in) and raises if that reaches k <= 0. k is floored at\n"
-      "1e-3 for numerical stability. Raises RuntimeError for an unknown material\n"
-      "or a non-finite T.");
+      "Outside the material's sourced range, extrapolate=False (default) follows\n"
+      "the envelope (#882): the end slope ramped linearly to 0 over 100 K, then\n"
+      "flat, from 200 K (or T_min, if lower) up to the material's solidus (the\n"
+      "generic metal cap 1533.15 K where none is printed; T_max for alumina, ysz\n"
+      "and al6061), and held beyond. extrapolate=True continues the end slope\n"
+      "linearly instead. Neither is sourced: material_in_range(name, T) says\n"
+      "which part is data. Raises if k reaches <= 0; floored at 1e-3. Raises\n"
+      "RuntimeError for an unknown material or a non-finite T.");
+
+  m.def("material_in_range", &combaero::materials::material_in_range, py::arg("name"),
+        py::arg("T"),
+        "Whether T [K] lies in the material's sourced conductivity range\n"
+        "[T_min, T_max] (#882). Outside it, get_material_conductivity follows the\n"
+        "envelope. Raises RuntimeError for an unknown material or a non-finite T.");
 
   m.def(
       "get_material_info",
@@ -6951,14 +6960,17 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         d["notes"] = mat.notes;
         d["T_solidus"] = mat.T_solidus;
         d["solidus_source"] = mat.solidus_source;
+        d["T_envelope_min"] = combaero::materials::envelope_T_min(mat);
+        d["T_envelope_max"] = combaero::materials::envelope_T_max(mat);
         return d;
       },
       py::arg("name"),
       "A database material's record: its sourced conductivity range T_min..T_max\n"
       "[K] and source, notes, and its solidus T_solidus [K] -- the lower end of\n"
       "the melting range its source prints -- with that source (#882). T_solidus\n"
-      "is NaN where no held source prints one. Raises RuntimeError for an\n"
-      "unknown material.");
+      "is NaN where no held source prints one. T_envelope_min/T_envelope_max [K]\n"
+      "are the ends of its k(T) envelope. Raises RuntimeError for an unknown\n"
+      "material.");
 
   // =========================================================================
   // Advanced Cooling Correlations

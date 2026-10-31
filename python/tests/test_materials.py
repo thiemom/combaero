@@ -91,8 +91,12 @@ class TestStructuralAlloys:
             cb.k_stainless_steel_316(300.0)
         with pytest.raises(RuntimeError):
             cb.k_stainless_steel_316(1200.0)
-        # The database lookup holds the end values.
-        assert cb.get_material_conductivity("ss316", 300.0) == pytest.approx(17.83, rel=1e-12)
+        # The database lookup follows the envelope (#882): 233 K below the data,
+        # past the 100 K fade, so k = k_end - slope * 50 K.
+        slope = (18.32 - 17.83) / 40.0
+        assert cb.get_material_conductivity("ss316", 300.0) == pytest.approx(
+            17.83 - 50.0 * slope, rel=1e-9
+        )
 
     def test_ss310_is_the_gen3csp_table(self):
         """Georgia Tech Gen3 CSP measured k, 260-800 C (#881)."""
@@ -488,22 +492,32 @@ class TestFurtherAlloysCopperAlumina:
             )
 
     @pytest.mark.parametrize(("func", "unit", "T_min", "T_max", "table"), TABLES)
-    def test_the_database_clamps_to_the_table_ends(
+    def test_the_database_is_flat_beyond_the_envelope(
         self, func: str, unit: str, T_min: float, T_max: float, table: list
     ) -> None:
         name = func.removeprefix("k_")
-        assert cb.get_material_conductivity(name, 1.0) == pytest.approx(table[0][1], rel=1e-12)
-        assert cb.get_material_conductivity(name, 5000.0) == pytest.approx(table[-1][1], rel=1e-12)
+        info = cb.get_material_info(name)
+        lo, hi = info["T_envelope_min"], info["T_envelope_max"]
+        assert cb.get_material_conductivity(name, 1.0) == pytest.approx(
+            cb.get_material_conductivity(name, lo), rel=1e-12
+        )
+        assert cb.get_material_conductivity(name, 5000.0) == pytest.approx(
+            cb.get_material_conductivity(name, hi), rel=1e-12
+        )
+        assert not cb.material_in_range(name, 1.0) and not cb.material_in_range(name, 5000.0)
 
 
 class TestOptInExtrapolation:
-    """Outside the valid range a k_* function raises and the database holds
-    the end value; extrapolate=True continues the end slope linearly."""
+    """Outside the valid range a k_* function raises and the database follows
+    the envelope (#882); extrapolate=True continues the end slope linearly."""
 
-    def test_default_refuses_or_holds_the_end_value(self) -> None:
+    def test_default_refuses_or_follows_the_envelope(self) -> None:
         with pytest.raises(RuntimeError):
             cb.k_copper(1300.0)
-        assert cb.get_material_conductivity("copper", 1300.0) == pytest.approx(342.0, rel=1e-12)
+        # Copper 1100 -> 1200 K: slope -0.08 per K; 100 K past the data the
+        # faded slope has covered 50 K of it.
+        assert cb.get_material_conductivity("copper", 1300.0) == pytest.approx(338.0, rel=1e-9)
+        # Alumina's data start at 100 K, below 200 K: no cold envelope, held.
         assert cb.get_material_conductivity("alumina", 50.0) == pytest.approx(133.0, rel=1e-12)
 
     def test_a_table_continues_its_end_segment(self) -> None:
@@ -533,7 +547,10 @@ class TestOptInExtrapolation:
         assert cb.k_haynes230(1100.0 + 273.15, extrapolate=True) == pytest.approx(
             26.68 + (26.68 - 24.25), rel=1e-9
         )
-        assert cb.get_material_conductivity("haynes230", 1400.0) == pytest.approx(26.68, rel=1e-12)
+        # The database follows the envelope: 127 K past 1000 C, beyond the fade.
+        assert cb.get_material_conductivity("haynes230", 1400.0) == pytest.approx(
+            26.68 + 0.5 * 100.0 * (26.68 - 24.25) / 100.0, rel=1e-9
+        )
 
     def test_it_refuses_where_the_continuation_is_unphysical(self) -> None:
         with pytest.raises(RuntimeError, match="<= 0"):
@@ -549,9 +566,12 @@ class TestOptInExtrapolation:
     def test_a_wall_layer_opts_in(self) -> None:
         from combaero.network.components import WallLayer
 
-        held = WallLayer(thickness=1e-3, conductivity=1.0, material="copper")
-        held.update_conductivity(1300.0)
-        assert held.conductivity == pytest.approx(342.0, rel=1e-12)
+        enveloped = WallLayer(thickness=1e-3, conductivity=1.0, material="copper")
+        enveloped.update_conductivity(1300.0)
+        assert enveloped.conductivity == pytest.approx(338.0, rel=1e-9)
+        assert enveloped.in_range is False
+        enveloped.update_conductivity(1000.0)
+        assert enveloped.in_range is True
         continued = WallLayer(thickness=1e-3, conductivity=1.0, material="copper", extrapolate=True)
         continued.update_conductivity(1300.0)
         assert continued.conductivity == pytest.approx(334.0, rel=1e-9)
@@ -601,3 +621,64 @@ class TestSolidus:
         assert "Gen3 CSP" in info["source"]
         with pytest.raises(RuntimeError):
             cb.get_material_info("unobtainium")
+
+
+class TestEnvelope:
+    """#882: outside the sourced range k follows the end slope, ramped linearly
+    to 0 over 100 K, from 200 K (or T_min) to the solidus, and is held beyond."""
+
+    W = 100.0
+
+    @pytest.mark.parametrize("name", [n for n in cb.list_materials() if n != "al6061"])
+    def test_c1_at_the_data_ends_and_bounded(self, name: str) -> None:
+        info = cb.get_material_info(name)
+        for T_end, sign in ((info["T_min"], -1.0), (info["T_max"], 1.0)):
+            edge = info["T_envelope_min"] if sign < 0 else info["T_envelope_max"]
+            if abs(edge - T_end) < 1e-9:
+                continue
+            h = 1e-3
+            inside = (
+                cb.get_material_conductivity(name, T_end)
+                - cb.get_material_conductivity(name, T_end - sign * h)
+            ) / h
+            outside = (
+                cb.get_material_conductivity(name, T_end + sign * h)
+                - cb.get_material_conductivity(name, T_end)
+            ) / h
+            assert outside == pytest.approx(inside, rel=1e-2, abs=1e-6), (name, T_end)
+            k_end = cb.get_material_conductivity(name, T_end)
+            far = cb.get_material_conductivity(name, edge)
+            assert abs(far - k_end) <= 0.5 * self.W * abs(inside) * 1.01 + 1e-9, (name, T_end)
+            assert not cb.material_in_range(name, T_end + sign * 1.0)
+            assert cb.material_in_range(name, T_end)
+
+    def test_the_fade_is_the_873_ramp(self) -> None:
+        """Hastelloy X past 1000 C: slope (28.7 - 26.7) / 100 K, reach d - d^2/(2w)."""
+        s = (28.7 - 26.7) / 100.0
+        for d in (10.0, 50.0, 100.0, 200.0):
+            reach = d - d * d / (2 * self.W) if d < self.W else 0.5 * self.W
+            assert cb.get_material_conductivity("hastelloy_x", 1273.15 + d) == pytest.approx(
+                28.7 + s * reach, rel=1e-9
+            )
+
+    def test_the_envelope_ends(self) -> None:
+        assert cb.get_material_info("haynes230")["T_envelope_max"] == pytest.approx(1301 + 273.15)
+        assert cb.get_material_info("ss316")["T_envelope_max"] == pytest.approx(1260 + 273.15)
+        assert cb.get_material_info("alumina")["T_envelope_max"] == pytest.approx(2000.0)
+        assert cb.get_material_info("haynes230")["T_envelope_min"] == pytest.approx(200.0)
+        assert cb.get_material_info("copper")["T_envelope_min"] == pytest.approx(100.0)
+
+    def test_every_material_stays_positive_everywhere(self) -> None:
+        for name in cb.list_materials():
+            if name == "al6061":
+                continue
+            for T in (1.0, 150.0, 250.0, 2500.0, 1e4):
+                assert cb.get_material_conductivity(name, T) > 0.0, (name, T)
+
+    def test_a_wall_reports_whether_its_k_is_sourced(self) -> None:
+        from combaero.network import ThermalWall, WallLayer
+
+        wall = ThermalWall("w", "a", "b", layers=[WallLayer(0.002, 20.0, material="ss310")])
+        for T_aw_a, expected in ((800.0, True), (450.0, False)):
+            wall.compute_coupling(1000.0, T_aw_a, 1.0, 1000.0, T_aw_a - 20.0, 1.0)
+            assert wall.layers[0].in_range is expected, T_aw_a

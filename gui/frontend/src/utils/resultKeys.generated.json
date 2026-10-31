@@ -703,7 +703,8 @@
 			"counterflow",
 			"effectiveness",
 			"h_a",
-			"h_b"
+			"h_b",
+			"material_in_range"
 		],
 		"vortex": [
 			"M_theta_in",
@@ -1022,6 +1023,7 @@
 		"mach_out": "-",
 		"mach_throat": "-",
 		"mass_flow_ratio": "kg/kg",
+		"material_in_range": "-",
 		"model_in_range": "-",
 		"mu": "Pa\u00b7s",
 		"mu_ref": "Pa\u00b7s",

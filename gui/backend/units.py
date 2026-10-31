@@ -114,6 +114,7 @@ UNIT_MAP: dict[str, str] = {
     "Gc_Gj": "-",
     "Gc_Gj_closed_form": "-",
     "surface_extrapolated": "-",
+    "material_in_range": "-",
     "dP_momentum": "Pa",
     # --- Effusion plate wall (#471) ---
     "h_internal_plate_area": "W/m\u00b2/K",
