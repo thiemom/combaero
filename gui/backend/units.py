@@ -113,6 +113,7 @@ UNIT_MAP: dict[str, str] = {
     "Re_j": "-",
     "Gc_Gj": "-",
     "Gc_Gj_closed_form": "-",
+    "St": "-",
     "surface_extrapolated": "-",
     "material_in_range": "-",
     "dP_momentum": "Pa",

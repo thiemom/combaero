@@ -60,7 +60,7 @@ ELEMENT_TRANSPORT_REF_FIELDS: tuple[str, ...] = (
 )
 
 # Convective heat transfer block - present only when an element computes HTC.
-HEAT_TRANSFER_FIELDS: tuple[str, ...] = ("Nu", "htc", "T_aw")
+HEAT_TRANSFER_FIELDS: tuple[str, ...] = ("Nu", "St", "htc", "T_aw")
 
 # Minimum pressure block for lossless / geometry-free elements.
 LOSSLESS_ELEMENT_FIELDS: tuple[str, ...] = (
