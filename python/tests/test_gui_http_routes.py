@@ -135,7 +135,9 @@ def test_examples_lists_every_shipped_example() -> None:
     listed = {e["id"]: e for e in r.json()["examples"]}
     shipped = {p.stem for p in (_REPO / "gui" / "examples").glob("*.json")}
     assert set(listed) == shipped and len(shipped) >= 2
-    assert all(e["title"] and e["label"] in ("fidelity", "cross-source") for e in listed.values())
+    assert all(
+        e["title"] and e["label"] in ("fidelity", "cross-source", "tuned") for e in listed.values()
+    )
 
 
 def test_an_example_is_served_as_a_network_file() -> None:

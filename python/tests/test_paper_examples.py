@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import sys
 import tomllib
 from pathlib import Path
@@ -45,8 +46,19 @@ def _gui(name: str) -> dict:
     return {k: v.model_dump() for k, v in res._element_results.items()}
 
 
-def test_the_two_decided_examples_ship() -> None:
-    assert _CASES == ["florschuetz1981_jet_array", "iso5167_orifice_metering"]
+def _gui_edges(name: str) -> dict:
+    data = json.loads((_GUI_EXAMPLES / f"{name}.json").read_text())
+    res = NetworkRunner.from_dict(data).solve(timeout=300.0)
+    assert res.success, name
+    return res._edge_results
+
+
+def test_the_decided_examples_ship() -> None:
+    assert _CASES == [
+        "florschuetz1981_jet_array",
+        "hylton1983_c3x_vane",
+        "iso5167_orifice_metering",
+    ]
 
 
 @pytest.mark.parametrize("name", _CASES)
@@ -54,7 +66,7 @@ def test_each_gui_example_has_its_script(name: str) -> None:
     info = json.loads((_GUI_EXAMPLES / f"{name}.json").read_text())["example"]
     assert info["script"] == f"python/examples/papers/{name}.py"
     assert (_REPO / info["script"]).is_file()
-    assert info["label"] in ("fidelity", "cross-source")
+    assert info["label"] in ("fidelity", "cross-source", "tuned")
 
 
 @pytest.mark.parametrize(
@@ -65,6 +77,10 @@ def test_each_gui_example_has_its_script(name: str) -> None:
             "sources/heat_transfer/flohrshuetz/flohrshuetz_truman_metzger_1981.pdf",
         ),
         ("iso5167_orifice_metering", "ISO 5167-2:2003"),
+        (
+            "hylton1983_c3x_vane",
+            "sources/heat_transfer/vanes/hylton1983_NASA_CR-168015_C3X_MarkII_vane_heat_transfer.pdf",
+        ),
     ],
 )
 def test_each_script_names_its_source_register_entry(name: str, register_key: str) -> None:
@@ -132,3 +148,62 @@ def test_iso_incompressible_reads_back_exactly(beta: float) -> None:
     assert q == pytest.approx(r["m_dot"], rel=1e-5)
     dp_dd2 = r["dP_tap"] * (C_fl / r["Cd"]) ** 2
     assert r["dP_permanent"] == pytest.approx(mod.iso_loss_ratio(beta, r["Cd"]) * dp_dd2, rel=1e-6)
+
+
+@pytest.fixture(scope="module")
+def c3x() -> ModuleType:
+    return _script("hylton1983_c3x_vane")
+
+
+def test_c3x_gui_file_is_the_scripts_tuned_network(c3x: ModuleType) -> None:
+    """Same wall temperatures as the script's tuned run 158, and those are the
+    measured Tw (the tuning target). 0.01 K is the hole inlet temperature
+    iteration's tolerance: the file stores the iterated inlet temperatures."""
+    walls = {k: v for k, v in _gui_edges("hylton1983_c3x_vane").items() if k.startswith("w_")}
+    sol, _ = c3x.solve(158, c3x.TUNED)
+    rows = c3x.wall_temperatures(158, sol)
+    assert len(walls) == len(rows) == 19
+    for r in rows:
+        assert walls[f"w_{r['id']}"]["T_hot"] == pytest.approx(r["Tw_network"], abs=0.01), r["id"]
+        assert r["Tw_network"] == pytest.approx(r["Tw_measured"], abs=0.05), r["id"]
+
+
+def test_c3x_gui_file_is_current(c3x: ModuleType) -> None:
+    """The shipped file is what --write-gui writes from the script now."""
+    shipped = json.loads((_GUI_EXAMPLES / "hylton1983_c3x_vane.json").read_text())
+    fresh = json.loads(json.dumps(c3x.gui_document()))
+    assert shipped["example"] == fresh["example"]
+    assert [n["id"] for n in shipped["nodes"]] == [n["id"] for n in fresh["nodes"]]
+    for a, b in zip(shipped["nodes"], fresh["nodes"], strict=True):
+        for k, v in a["data"].items():
+            if isinstance(v, float):
+                assert v == pytest.approx(b["data"][k], rel=1e-9, abs=1e-6), (a["id"], k)
+            else:
+                assert v == b["data"][k], (a["id"], k)
+
+
+def test_c3x_panel_numbers(c3x: ModuleType) -> None:
+    """The panel quotes: untuned run 158 MAE 28 K, bias -23 K, worst 86 K at the
+    leading edge; run 149 with run 158's multipliers MAE 12 K, bias +11 K
+    (measured 2026-10-31: 28.5 / -23.4 / 85.7 and 11.7 / +11.3)."""
+    untuned = c3x.wall_temperatures(158, c3x.solve(158)[0])
+    s = c3x.summary(untuned)
+    assert s["mae"] == pytest.approx(28.5, abs=0.5)
+    assert s["bias"] == pytest.approx(-23.4, abs=0.5)
+    worst = max(untuned, key=lambda r: abs(r["Tw_network"] - r["Tw_measured"]))
+    assert worst["s0"] == 0.0 and abs(worst["Tw_network"] - worst["Tw_measured"]) > 80.0
+    moved = c3x.summary(c3x.wall_temperatures(149, c3x.solve(149, c3x.TUNED)[0]))
+    assert moved["mae"] == pytest.approx(11.7, abs=0.5)
+    assert moved["bias"] == pytest.approx(11.3, abs=0.5)
+
+
+def test_c3x_coolant_multiplier_is_geometry(c3x: ModuleType) -> None:
+    """Each coolant sub-channel's Nu_multiplier is its share of the hole
+    perimeter over its segment's length, not a fitted number."""
+    holes = c3x.coolant(158)
+    net = c3x.build(158, c3x.TUNED, {})
+    for g in c3x.segments(158):
+        el = net.elements[f"c{g['hole']}_{g['id']}"]
+        expected = g["f"] * math.pi * holes[g["hole"]]["D"] / g["L"]
+        assert el.surface.Nu_multiplier == pytest.approx(expected, rel=1e-12)
+        assert 0.1 < expected < 1.0

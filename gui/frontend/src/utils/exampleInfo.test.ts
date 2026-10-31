@@ -39,9 +39,16 @@ describe("parseExampleInfo", () => {
 		expect(parseExampleInfo({ title: "x" })).toBeNull();
 	});
 
-	it("names the two labels as the validation policy does", () => {
+	it("names the three labels as the validation policy does", () => {
 		expect(labelText("fidelity")).toMatch(/own data/);
 		expect(labelText("cross-source")).toMatch(/Cross-source/);
+		expect(labelText("tuned")).toMatch(/Tuned/);
+	});
+
+	it("accepts a tuned example", () => {
+		expect(parseExampleInfo({ title: "x", label: "tuned" })?.label).toBe(
+			"tuned",
+		);
 	});
 });
 

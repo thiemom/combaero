@@ -21,6 +21,10 @@ A miss here is the *model's* limitation, not ours.
 `Nu_multiplier` and `f_multiplier` exist and work. Choosing them for a
 specific machine, and validating that choice, is the user's work on the
 user's data. **The harness never scores, recommends or applies a tuner.**
+A worked example (`python/examples/papers/`) may show that workflow on a
+rig. It is then labelled **tuned** and reports its untuned error beside the
+tuned result, labelled cross-source. The C3X vane (Hylton 1983) is one; its
+multipliers are a demonstration, not recommended values.
 
 They fail differently, so one number covering both is neither. "We match the
 paper and the paper disagrees with the data" and "we do not match the paper"

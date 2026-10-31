@@ -26,7 +26,7 @@ KNOWN_BROKEN: dict[str, str] = {}
 # 82-116 s on CI against the 120 s default and timed out once, and the exact
 # wall composition relay (#717) adds about 10% more relay passes.
 DEFAULT_TIMEOUT = 120
-SLOW_EXAMPLES: dict[str, int] = {"network_from_grid.py": 300}
+SLOW_EXAMPLES: dict[str, int] = {"network_from_grid.py": 300, "hylton1983_c3x_vane.py": 300}
 
 
 def run_example(example_path: Path, timeout: int = DEFAULT_TIMEOUT) -> ExampleResult:
