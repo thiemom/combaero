@@ -3651,7 +3651,145 @@ documents:
 # `citation` here is as recalled unless `checked` is true; confirm it from
 # the document. priority: now (blocks or settles an open item) or later
 # (only when that work resumes).
+- file: sources/heat_transfer/vanes/hylton1983_NASA_CR-168015_C3X_MarkII_vane_heat_transfer.pdf
+  citation: Hylton, L. D., Mihelc, M. S., Turner, E. R., Nealy, D. A., York, R. E. (1983). Analytical and
+    experimental evaluation of the heat transfer distribution over the surfaces of turbine vanes. NASA
+    CR-168015 (Allison, contract NAS3-22761).
+  id: NTRS 19830020105
+  topic: [channel, other]
+  content: 'Two internally cooled linear-cascade vanes, Mark II and C3X. For C3X: Table III profile
+    coordinates (78 points), Table IV cascade geometry (span 7.62 cm, pitch 11.773 cm, throat 3.292 cm, axial
+    chord 7.816 cm), Fig. 7 the ten radial cooling holes, Table IX the run conditions (M2 0.9-1.05, Tt1 ~800 K,
+    Tu 6.5/8.3 %), Table VI the h uncertainty, and Appendix A per run: Ps/Pt, Tw/811 K and h/1135 W/m2 K on
+    both surfaces, and flow, Re and mean T per hole. ASTM 310 stainless; no conductivity value is printed.'
+  status: screened
+  verdict: 'Candidate for a worked NGV example (external channel chains with per-station tuners, ten coolant
+    channels, ThermalWall per pair). TRAP: the external h is inferred by 2-D FE conduction from the measured Tw
+    with an internal h from Nu = Cr 0.022 Pr^0.5 Re^0.8, so feeding h back to predict Tw is circular; Tw and
+    Ps are the measured quantities. Transcription errors found: point 29 y is printed 0.4115 for 0.0411;
+    Table IX''s "Pa" column is psia x 133.3; the throat computed from Table III is 2.8 % above Table IV.'
+  read_for: [NGV worked example (C3X), cooled-vane wall temperature, accuracy]
+  issues: []
+  records: []
+  notes: Fetched from NTRS (open, government public use) 2026-10-31. OCR is poor; transcribe from page images
+    (run 149 = PDF p.191-192, run 158 = p.201-202).
+- file: sources/heat_transfer/vanes/hylton1988_NASA_CR-182133_C3X_film_cooled_vane.pdf
+  citation: Hylton, L. D., Nirmalan, V., Sultanian, B. K., Kaufman, R. M. (1988). The effects of leading edge
+    and downstream film cooling on turbine vane heat transfer. NASA CR-182133 (Allison EDR 13481, contract
+    NAS3-24619).
+  id: NTRS 19890004383
+  topic: [film, other]
+  content: Film-cooled follow-up of the C3X vane of CR-168015 (same cascade), with leading-edge showerhead and
+    downstream film rows.
+  status: unscreened
+  verdict: Not read yet. Would extend a C3X example to film cooling.
+  read_for: [NGV worked example (C3X), film cooling on a vane]
+  issues: []
+  records: []
+  notes: Fetched from NTRS (open, government public use) 2026-10-31.
+- file: sources/materials/gatech_gen3csp/Measurement-Uncertainty.pdf
+  citation: Gunawan, A. (?). Uncertainty analysis and error propagation methodology for reporting
+    thermophysical properties measurement of Gen3 CSP materials. Georgia Institute of Technology, Gen3 CSP
+    thermophysical property database (gen3csp.gatech.edu).
+  topic: [other]
+  content: 'The uncertainty method behind the Gen3 CSP database: laser-flash diffusivity (NETZSCH LFA 467 HT,
+    3 samples x 3 shots per temperature), k = alpha cp rho, 95 % bands following ASME PTC 19.1 / NIST TN 1297.
+    The database itself (held as per-material xlsx exports in the same folder: SS310, SS316, Inconel625,
+    Inconel740H, HaynesHR120, Haynes233, Haynes230, HastC276, HastelloyN, Ni201, KanthalAPM, KanthalAF) gives
+    alpha, cp and k with bands at ~260-900 C.'
+  status: screened
+  verdict: 'Independent measured k(T) with stated measurement bands for alloys we ship -- the reference for
+    #881. 310 SS: 17.13 +- 0.81 W/m K at 260 C, 20.55 +- 1.06 at 500 C, 25.12 +- 2.46 at 800 C. The bands are
+    measurement bands (usable as such under the validation policy). Range starts ~260 C: no room-temperature
+    point.'
+  read_for: ['#881 built-in materials vs Gen3 CSP', 310 SS conductivity for the C3X example]
+  issues: [881, 882]
+  records: []
+  code: [scripts/gen3csp.py]
+  notes: 'Fetched 2026-10-31 via the WordPress media API and the /compare/ page (scripts/gen3csp.py, skill
+    materials-data); xlsx are not published for every material, the compare page carries the data inline.'
+- file: sources/materials/gatech_gen3csp/Measurement-Acceptance-Criteria.pdf
+  citation: 'Georgia Institute of Technology (?). Measurement acceptance criteria: standards, principles, and
+    required documentation. Gen3 CSP thermophysical property database.'
+  topic: [other]
+  content: What a dataset needs to enter the Gen3 CSP database -- material identification, conditions,
+    per-point uncertainty (< 15 % preferred), a measurement standard or peer-reviewed method, and review by
+    senior personnel.
+  status: screened
+  verdict: Supports reading the Gen3 CSP values as curated measurements with their own uncertainty, not
+    vendor data.
+  read_for: ['#881 built-in materials vs Gen3 CSP']
+  issues: [881]
+  records: []
+  notes: Fetched with Measurement-Uncertainty.pdf 2026-10-31.
+- file: sources/materials/rolled_alloys_310_datasheet.pdf
+  citation: Rolled Alloys (?). 310 stainless steel (UNS S31008/S31009, W.Nr. 1.4845), data sheet.
+  topic: [other]
+  content: Composition, specifications, physical properties including thermal conductivity vs temperature
+    (13.2 W/m K at 21 C, 23.5 at 538 C, to 34.6 at 982 C), mechanical and corrosion data.
+  status: screened
+  verdict: Above the Gen3 CSP band from ~540 C (about +15 % there). Not the primary 310 source.
+  read_for: [310 SS conductivity for the C3X example, '#881']
+  issues: [881]
+  records: []
+  notes: Supplied by the user 2026-10-31.
+- file: sources/materials/thyssenkrupp_1.4845_310S_datasheet.pdf
+  citation: thyssenkrupp Materials (UK) (?). Stainless steel 1.4845, material data sheet.
+  topic: [other]
+  content: Composition, application, mechanical and physical properties; thermal conductivity 15 W/m K at 20 C
+    and 19 at 500 C.
+  status: screened
+  verdict: Slightly below the Gen3 CSP band at 500 C. Two points only. Not the primary 310 source.
+  read_for: [310 SS conductivity for the C3X example, '#881']
+  issues: [881]
+  records: []
+  notes: Supplied by the user 2026-10-31.
+- file: sources/materials/pawel_williams_1985_ORNL-TM-9616_alloy_physical_properties.pdf
+  citation: Pawel, R. E., Williams, R. K. (1985). Survey of physical property data for several alloys.
+    ORNL/TM-9616, Oak Ridge National Laboratory.
+  topic: [other]
+  content: Compiled physical properties (thermal conductivity, expansion, specific heat, resistivity, elastic
+    constants) of Inconel 625, 718 and X-750, Nitronic 33, and copper alloys C10400 and C17510, about 4-500 K.
+  status: screened
+  verdict: 'A low-temperature companion to Gen3 CSP for the #882 envelope (Inconel 625 and 718 below
+    300 K). Many tabulated values are estimates, marked "b" in the tables -- use only the measured ones.'
+  read_for: ['#882 low-temperature material envelope']
+  issues: [882]
+  records: []
+  notes: Supplied by the user 2026-10-31 (public OSTI report).
+
 wanted:
+- citation: Dunn, M. G., et al. (1986). Stage heat-flux measurements on a full-stage rotating turbine
+    (Calspan shock tunnel), ASME. Exact title ? -- cited in Han's textbook.
+  checked: false
+  issues: []
+  priority: later
+  question: Vane surface pressure and Stanton number on a full-scale stage -- a second NGV example or a
+    cross-source check of a C3X example. Geometry detail may be insufficient (user, Han's textbook).
+  where: ASME journals; Han, Dutta & Ekkad, Gas Turbine Heat Transfer and Cooling Technology, cites it.
+- citation: Blair, M. F., et al. (1989). Heat transfer in a large-scale rotating turbine model, Part I
+    (UTRC large-scale rotating rig), J. Turbomachinery. Exact title ? -- cited in Han's textbook.
+  checked: false
+  issues: []
+  priority: later
+  question: Stage-vane Ps and St data for an NGV example; the rotor data need rotation, which is not modelled.
+  where: ASME J. Turbomachinery; UTRC / NASA CR reports of the same rig.
+- citation: Blumm, J., Lindemann, A., Niedrig, B., Campbell, R. (2007). Measurement of selected thermophysical
+    properties of the NPL certified reference material stainless steel 310. Int. J. Thermophys. 28, 681 (as cited by Gen3 CSP).
+  checked: false
+  issues: [881]
+  priority: later
+  question: 'Room temperature to ~1000 C k(T) of the NPL SS310 reference material: closes the room-T end that
+    Gen3 CSP (from ~260 C) lacks, for an ss310 material.'
+  where: Springer (Int. J. Thermophys.).
+- citation: Touloukian, Y. S., Powell, R. W., Ho, C. Y., Klemens, P. G. (1970). Thermophysical properties of
+    matter, Vol. 1, Thermal conductivity -- metallic elements and alloys. IFI/Plenum (TPRC).
+  checked: false
+  issues: [881, 882]
+  priority: later
+  question: 'The recommended-curve reference for alloy k(T) over the full range; would settle the #882 envelope
+    shape and the cross-check of the shipped tables.'
+  where: DTIC hosts TPRC volumes (AD numbers); university libraries.
 - citation: A public EB-PVD YSZ conductivity source (as deposited and after sintering), e.g. a NASA Glenn
     laser-heat-flux report on EB-PVD ZrO2-8wt%Y2O3.
   checked: false

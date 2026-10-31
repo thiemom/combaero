@@ -26,6 +26,22 @@ uv run --no-project scripts/migrate_docs_to_sources.py [--root DIR] [--apply]  #
 documents themselves are not there, so CI checks the schema and that every
 record and code path it names exists).
 
+### gen3csp.py, nist_cryo.py
+
+Fetch public materials data into `sources/materials/` (skill
+`.claude/skills/materials-data/`): Georgia Tech's Gen3 CSP measured k, cp
+and alpha with 95 % bands (~260-900 C), and the NIST cryogenic fit
+coefficients (~4-300 K). Downloads are third-party data: they stay in
+`sources/` and get a register entry.
+
+```bash
+uv run scripts/gen3csp.py list                       # material ids
+uv run scripts/gen3csp.py fetch ss310 inconel625     # CSV per material, with provenance header
+uv run scripts/nist_cryo.py list
+uv run scripts/nist_cryo.py fetch "Steel 310"       # JSON: coefficients, units, ranges, fit form
+uv run scripts/nist_cryo.py eval "Steel 310" "Thermal Conductivity" 77 300
+```
+
 ## Code Quality Scripts
 
 ### check-source-style.sh
