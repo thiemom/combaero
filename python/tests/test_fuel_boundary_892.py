@@ -16,9 +16,10 @@ from combaero.network import (
     LosslessConnectionElement,
     MassFlowBoundary,
     NetworkSolver,
+    PlenumNode,
     PressureBoundary,
 )
-from combaero.network.components import OrificeElement
+from combaero.network.components import ChannelElement, OrificeElement
 
 AIR = list(cb.species.humid_air_mass(288.15, 101325.0, 0.6))
 CH4 = list(cb.species.to_mass(cb.species.pure_species("CH4")))
@@ -338,3 +339,88 @@ def test_no_oxidizer_flow_is_named() -> None:
     _, r = _solve(_with_fuel(_adiabatic_base(m_air=0.0), "fuel"))
     assert not r["__success__"]
     assert "gets no oxidizer flow" in r["__message__"]
+
+
+# -- fuel routes: the boundary names its combustor, like a probe -------------
+
+
+def _routed(route: str, target: float = 1400.0) -> FlowNetwork:
+    """Adiabatic, fixed air flow, the fuel reaching the burner by `route`:
+    "direct" (one lossless injector), "premix" (a plenum the air also enters,
+    then the burner), "line" (a friction fuel line into the burner)."""
+    n = FlowNetwork()
+    n.add_node(MassFlowBoundary("air", m_dot=0.3, Tt=T_AIR, Y=AIR))
+    n.add_node(FuelBoundary("fuel", combustor="burner", Tt_target=target, Tt=300.0, Y=CH4))
+    n.add_node(CombustorNode("burner"))
+    n.add_node(PressureBoundary("out", Pt=2.0e5, Tt=target, Y=AIR))
+    if route == "premix":
+        n.add_node(PlenumNode("premix"))
+        n.add_element(LosslessConnectionElement("a_in", "air", "premix"))
+        n.add_element(LosslessConnectionElement("inj", "fuel", "premix"))
+        n.add_element(LosslessConnectionElement("mix_out", "premix", "burner"))
+    else:
+        n.add_element(LosslessConnectionElement("a_in", "air", "burner"))
+        if route == "line":
+            n.add_node(PlenumNode("manifold"))
+            n.add_element(ChannelElement("line", "fuel", "manifold", length=0.5, diameter=0.004))
+            n.add_element(LosslessConnectionElement("inj", "manifold", "burner"))
+        else:
+            n.add_element(LosslessConnectionElement("inj", "fuel", "burner"))
+    n.add_element(
+        OrificeElement(
+            "exit", "burner", "out", diameter=0.05, Cd=0.8, correlation="fixed", in_pipe=False
+        )
+    )
+    return n
+
+
+@pytest.mark.parametrize("route", ["premix", "line"])
+@pytest.mark.parametrize(("target", "branch"), [(1400.0, "lean"), (2000.0, "rich")])
+def test_the_fuel_route_does_not_change_the_answer(route: str, target: float, branch: str) -> None:
+    """Adiabatic at a fixed air flow the fuel flow is set by the energy
+    balance alone: through a premix plenum or a lossy fuel line it is the
+    direct-injection answer."""
+    ref_net = _routed("direct", target)
+    ref_net.nodes["fuel"].branch = branch
+    _, ref = _solve(ref_net)
+    assert ref["__success__"], ref["__message__"]
+    net = _routed(route, target)
+    net.nodes["fuel"].branch = branch
+    _, r = _solve(net)
+    assert r["__success__"], r["__message__"]
+    assert r["burner.Tt"] == pytest.approx(target, abs=1e-3)
+    assert r["fuel.m_dot"] == pytest.approx(ref["fuel.m_dot"], rel=1e-6)
+    assert r["fuel.phi"] == pytest.approx(ref["fuel.phi"], rel=1e-6)
+    assert r["fuel.Tt_without_fuel"] == pytest.approx(ref["fuel.Tt_without_fuel"], abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("target", "says"),
+    [(350.0, "reaches with no injected fuel, 389.2 K"), (3000.0, "is above the peak")],
+)
+def test_a_premix_plenum_names_an_unreachable_target(target: float, says: str) -> None:
+    """Through a premix plenum the failed point need not close its mass rows;
+    the reason still names the network's oxidizer, not 'no oxidizer'."""
+    _, r = _solve(_routed("premix", target))
+    assert not r["__success__"]
+    assert says in r["__message__"]
+    assert "no oxidizer" not in r["__message__"]
+
+
+def test_fuel_that_can_bypass_the_combustor_is_refused() -> None:
+    """A split that sends part of the fuel past the burner leaves the fuel
+    the target controls undetermined by the boundary alone: refused."""
+    n = _routed("premix")
+    n.add_element(LosslessConnectionElement("leak", "premix", "out"))
+    with pytest.raises(ValueError, match="part of its fuel can reach"):
+        NetworkSolver(n).solve()
+
+
+def test_fuel_with_no_path_to_its_combustor_is_refused() -> None:
+    n = _routed("direct")
+    n.elements.pop("inj")
+    n.add_node(PlenumNode("dump"))
+    n.add_element(LosslessConnectionElement("inj", "fuel", "dump"))
+    n.add_element(LosslessConnectionElement("dump_out", "dump", "out"))
+    with pytest.raises(ValueError, match="fuel"):
+        NetworkSolver(n).solve()

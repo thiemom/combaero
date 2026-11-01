@@ -3158,8 +3158,12 @@ class FuelBoundary(MassFlowBoundary):
     below the unfuelled mixture's Tt or above the peak has no root and is
     refused with the reason.
 
-    The fuel enters the combustor named by ``combustor``; it must reach it
-    directly (one element from this boundary to the combustor).
+    ``combustor`` names the combustor it controls, like a probe names what it
+    reads: the fuel may reach it by any route -- an injector, a fuel line, a
+    premix plenum the air also enters -- as long as all of it does. A route
+    that lets part of the fuel reach another node without passing the
+    combustor, and a second controller or a ``Tt_target`` heat boundary on the
+    same combustor, are refused.
     """
 
     def __init__(
@@ -3187,6 +3191,8 @@ class FuelBoundary(MassFlowBoundary):
         self._target_Tt: float | None = None
         #: Why the start could not be put on the requested branch, if it could not.
         self._guess_note = ""
+        #: The oxidizer at the start state [(m_dot, Tt, Y)], for diagnosing a failed solve.
+        self._start_oxidizer: list[tuple[float, float, list[float]]] = []
 
     @property
     def m_dot_unknown(self) -> str:
@@ -3249,16 +3255,45 @@ class FuelBoundary(MassFlowBoundary):
                 f"FuelBoundary '{self.id}': combustor {self.combustor!r} also has a Tt_target "
                 "heat boundary: both would set its Tt. Keep one."
             )
-        feeds = [
-            e
-            for e in graph.elements.values()
-            if e.from_node == self.id and e.to_node == self.combustor
-        ]
-        if len(feeds) != 1:
+        # Any route, as long as ALL of the fuel reaches the combustor: then the
+        # target pins the fuel flow, and the solver can tell the combustor's
+        # oxidizer from its inflow less the fuel. A path that leaves for
+        # anywhere else (a bypass, a second burner) is refused.
+        stack, seen, reaches = [self.id], {self.id}, False
+        while stack:
+            nid = stack.pop()
+            downstream = graph.get_downstream_elements(nid)
+            if nid != self.id and not downstream:
+                raise ValueError(
+                    f"FuelBoundary '{self.id}': part of its fuel can reach {nid!r} without "
+                    f"passing {self.combustor!r}; all of it must reach the combustor it controls."
+                )
+            for e in downstream:
+                if e.to_node == self.combustor:
+                    reaches = True
+                    continue
+                if e.to_node not in seen:
+                    seen.add(e.to_node)
+                    stack.append(e.to_node)
+        if not reaches:
             raise ValueError(
-                f"FuelBoundary '{self.id}': needs exactly one element from it to "
-                f"{self.combustor!r} (found {len(feeds)})"
+                f"FuelBoundary '{self.id}': no flow path from it to {self.combustor!r}"
             )
+
+    def _fuel_path_elements(self, graph: "FlowNetwork") -> set[str]:
+        """The elements that carry fuel only: from this boundary through
+        nodes no other flow enters, up to the combustor or the first node
+        where the fuel meets other streams (a premix plenum's air)."""
+        out: set[str] = set()
+        stack = [self.id]
+        while stack:
+            nid = stack.pop()
+            for e in graph.get_downstream_elements(nid):
+                out.add(e.id)
+                to = e.to_node
+                if to != self.combustor and len(graph.get_upstream_elements(to)) == 1:
+                    stack.append(to)
+        return out
 
 
 class WallNode(NetworkNode):
