@@ -252,6 +252,7 @@ std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C);
 // ISO 5167-1 velocity-of-approach factor E = 1 / sqrt(1 - beta^4). Returns 1
 // outside 0 < beta < 1, the network's convention for "no correction": no
 // single approach pipe (beta = 0), or a bore at least as wide as the pipe.
+// A NaN or inf beta throws std::invalid_argument (#769).
 double velocity_of_approach_factor(double beta);
 
 
