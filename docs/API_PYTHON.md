@@ -1271,7 +1271,7 @@ results = solver.solve(method="hybr", init_strategy="homotopy")
 ### Network Nodes
 ```python
 from combaero.network import (
-    PressureBoundary, MassFlowBoundary, WallNode, PlenumNode,
+    PressureBoundary, MassFlowBoundary, FuelBoundary, WallNode, PlenumNode,
     CombustorNode, MomentumChamberNode, EnergyBoundary
 )
 
@@ -1279,6 +1279,13 @@ from combaero.network import (
 inlet = PressureBoundary("inlet", Pt=2e5, Tt=300, Y=air)
 outlet = PressureBoundary("outlet", Pt=1e5, Tt=300, Y=air)
 mass_in = MassFlowBoundary("mass_in", m_dot=0.1, Tt=400, Y=air)
+
+# Fuel controller (#892): the fuel flow that puts combustor "burner" at a
+# target exit Tt. The flow is a solver unknown; two roots exist (lean, rich).
+# branch="lean" is the default, "rich" for RQL or reformers. A root on the other
+# side of stoichiometric, a target not above the oxidizer's Tt, or a target
+# above the peak is refused with the reason. Reports fuel.m_dot and fuel.phi.
+fuel = FuelBoundary("fuel", combustor="burner", Tt_target=1500.0, branch="lean", Tt=300, Y=ch4)
 
 # Closed-end boundary (zero mass flow)
 # Typical use: symmetry plane of a ring manifold, or any dead-end branch.

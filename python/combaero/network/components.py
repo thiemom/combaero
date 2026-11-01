@@ -3137,6 +3137,95 @@ class MassFlowBoundary(NetworkNode):
         pass
 
 
+FuelBranchLiteral = Literal["lean", "rich"]
+
+
+class FuelBoundary(MassFlowBoundary):
+    """A fuel supply whose mass flow puts a combustor's exit at a target total
+    temperature (#892): a fuel controller.
+
+    The fuel mass flow is a solver unknown (as ``{id}.ln_m_dot``, so it stays
+    positive), closed by one
+    temperature row, ``Tt(combustor) - Tt_target = 0`` [K]. Its column comes
+    through the solver's relay of the combustor's derived Tt, the
+    combustor's own d(Tt)/d(inflow) from C++, so the Jacobian is analytic.
+
+    With reaction the exit Tt rises with the equivalence ratio to a peak near
+    stoichiometric, then falls: a reachable target has two roots, and
+    ``branch`` chooses one -- "lean" (the default) or "rich" (rich-quench-lean
+    staging, reformers). The start is on that branch, and a solution found on
+    the other side of stoichiometric is refused, never returned. A target
+    below the unfuelled mixture's Tt or above the peak has no root and is
+    refused with the reason.
+
+    The fuel enters the combustor named by ``combustor``; it must reach it
+    directly (one element from this boundary to the combustor).
+    """
+
+    def __init__(
+        self,
+        id: str,
+        combustor: str,
+        Tt_target: float,
+        branch: FuelBranchLiteral = "lean",
+        Tt: float = 300.0,
+        Y: list[float] | None = None,
+        m_dot_guess: float | None = None,
+    ) -> None:
+        if branch not in ("lean", "rich"):
+            raise ValueError(
+                f"FuelBoundary '{id}': branch must be 'lean' or 'rich', not {branch!r}"
+            )
+        if not (math.isfinite(Tt_target) and Tt_target > 0.0):
+            raise ValueError(f"FuelBoundary '{id}': Tt_target must be a positive temperature [K]")
+        super().__init__(id, m_dot=0.0 if m_dot_guess is None else float(m_dot_guess), Tt=Tt, Y=Y)
+        self.combustor = combustor
+        self.Tt_target = float(Tt_target)
+        self.branch: FuelBranchLiteral = branch
+        self.m_dot_guess = m_dot_guess
+        #: The combustor's current Tt, written by the solver before residuals.
+        self._target_Tt: float | None = None
+        #: Why the start could not be put on the requested branch, if it could not.
+        self._guess_note = ""
+
+    @property
+    def m_dot_unknown(self) -> str:
+        """The unknown is ln(m_dot) [ln(kg/s)]: the fuel flow stays positive
+        through every Newton step (the solver has no bounds), and a step is
+        a ratio, which suits flows that span decades."""
+        return f"{self.id}.ln_m_dot"
+
+    def unknowns(self) -> list[str]:
+        return [*super().unknowns(), self.m_dot_unknown]
+
+    def residuals(
+        self, state: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        res, jac = super().residuals(state)
+        Tt = self._target_Tt if self._target_Tt is not None else self.Tt_target
+        jac[len(res)] = {f"{self.combustor}.Tt": 1.0}
+        res.append(float(Tt) - self.Tt_target)
+        return res, jac
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        node = graph.nodes.get(self.combustor)
+        if not isinstance(node, CombustorNode):
+            raise ValueError(
+                f"FuelBoundary '{self.id}': combustor {self.combustor!r} is not a CombustorNode "
+                "in this network"
+            )
+        feeds = [
+            e
+            for e in graph.elements.values()
+            if e.from_node == self.id and e.to_node == self.combustor
+        ]
+        if len(feeds) != 1:
+            raise ValueError(
+                f"FuelBoundary '{self.id}': needs exactly one element from it to "
+                f"{self.combustor!r} (found {len(feeds)})"
+            )
+
+
 class WallNode(NetworkNode):
     """Closed-end boundary that imposes zero mass flow.
 
