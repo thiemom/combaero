@@ -152,7 +152,23 @@ def test_iso_incompressible_reads_back_exactly(beta: float) -> None:
 
 @pytest.fixture(scope="module")
 def c3x() -> ModuleType:
-    return _script("hylton1983_c3x_vane")
+    """The script, with its solve memoised for this module: each solve
+    iterates the burner and the hole temperatures (about 10 network solves),
+    and several tests ask for the same run."""
+    mod = _script("hylton1983_c3x_vane")
+    plain = mod.solve
+    memo: dict = {}
+
+    def solve(run, multipliers=None, start=None):
+        key = (run, tuple(sorted((multipliers or {}).items())))
+        if start is not None:
+            return plain(run, multipliers, start)
+        if key not in memo:
+            memo[key] = plain(run, multipliers)
+        return memo[key]
+
+    mod.solve = solve
+    return mod
 
 
 def test_c3x_gui_file_is_the_scripts_tuned_network(c3x: ModuleType) -> None:
@@ -177,20 +193,22 @@ def test_c3x_gui_file_is_current(c3x: ModuleType) -> None:
     for a, b in zip(shipped["nodes"], fresh["nodes"], strict=True):
         for k, v in a["data"].items():
             if isinstance(v, float):
-                assert v == pytest.approx(b["data"][k], rel=1e-9, abs=1e-6), (a["id"], k)
+                # The fuel flow and hole inlet temperatures are iterated to
+                # 0.01 K of their targets: equal to that, not to round-off.
+                assert v == pytest.approx(b["data"][k], rel=1e-4, abs=1e-6), (a["id"], k)
             else:
                 assert v == b["data"][k], (a["id"], k)
 
 
 def test_c3x_panel_numbers(c3x: ModuleType) -> None:
-    """The panel quotes: untuned run 158 MAE 28 K, bias -23 K, worst 85 K at the
+    """The panel quotes: untuned run 158 MAE 27 K, bias -21 K, worst 83 K at the
     leading edge; run 149 with run 158's multipliers MAE 12 K, bias +11 K
-    (measured 2026-10-31 with the #882 k(T) envelope: 28.2 / -23.1 / 85.1 and
-    11.7 / +11.2)."""
+    (measured 2026-11-01, burner products, #882 envelope: 26.9 / -21.0 / 82.9
+    and 11.7 / +11.2)."""
     untuned = c3x.wall_temperatures(158, c3x.solve(158)[0])
     s = c3x.summary(untuned)
-    assert s["mae"] == pytest.approx(28.2, abs=0.5)
-    assert s["bias"] == pytest.approx(-23.1, abs=0.5)
+    assert s["mae"] == pytest.approx(26.9, abs=0.5)
+    assert s["bias"] == pytest.approx(-21.0, abs=0.5)
     worst = max(untuned, key=lambda r: abs(r["Tw_network"] - r["Tw_measured"]))
     assert worst["s0"] == 0.0 and abs(worst["Tw_network"] - worst["Tw_measured"]) > 80.0
     moved = c3x.summary(c3x.wall_temperatures(149, c3x.solve(149, c3x.TUNED)[0]))
@@ -202,9 +220,68 @@ def test_c3x_coolant_multiplier_is_geometry(c3x: ModuleType) -> None:
     """Each coolant sub-channel's Nu_multiplier is its share of the hole
     perimeter over its segment's length, not a fitted number."""
     holes = c3x.coolant(158)
-    net = c3x.build(158, c3x.TUNED, {})
+    net = c3x.build(158, c3x.TUNED, {}, 0.0)
     for g in c3x.segments(158):
         el = net.elements[f"c{g['hole']}_{g['id']}"]
         expected = g["f"] * math.pi * holes[g["hole"]]["D"] / g["L"]
         assert el.surface.Nu_multiplier == pytest.approx(expected, rel=1e-12)
         assert 0.1 < expected < 1.0
+
+
+def test_c3x_burner_puts_the_cascade_inlet_at_the_measured_state(c3x: ModuleType) -> None:
+    """The rig upstream (#892/#893 stand-ins): compressed humid air burns CH4
+    so that the one cascade inlet is at Table IX's Tt1 and Pt1."""
+    cond = c3x.run_conditions(158)
+    sol, start = c3x.solve(158, c3x.TUNED)
+    assert sol["cascade_inlet.Tt"] == pytest.approx(cond["Tt1"], abs=0.02)
+    assert sol["cascade_inlet.Pt"] == pytest.approx(cond["Pt1"], rel=1e-6)
+    far = start["m_fuel"] / sol["burner_loss.m_dot"]
+    assert 0.007 < far < 0.012  # lean: ~400 K of rise on natural gas
+    # Compressor exit against the ideal-gas estimate T1 (1 + (PR^((g-1)/g) - 1)/eta).
+    P2, T2 = c3x.burner_supply(158)
+    ideal = c3x.AMBIENT_T * (1 + ((P2 / c3x.AMBIENT_P) ** (0.4 / 1.4) - 1) / c3x.COMPRESSOR_ETA)
+    assert pytest.approx(ideal, rel=0.01) == T2
+
+
+def _frontend_handles() -> dict[str, tuple[set[str | None], bool]]:
+    """Per node type: the handle ids its frontend component defines (None for
+    a handle without an id), and whether any id is computed (not checkable)."""
+    import re
+
+    comps = _REPO / "gui" / "frontend" / "src" / "components"
+    flow_types = (comps / "flowTypes.ts").read_text()
+    imports = dict(re.findall(r'import (\w+) from "\./nodes/(\w+)(?:\.tsx)?";', flow_types))
+    block = flow_types[flow_types.index("export const nodeTypes") :]
+    block = block[: block.index("};")]
+    out: dict[str, tuple[set[str | None], bool]] = {}
+    for kind, comp in re.findall(r"^\s*(\w+): (\w+),", block, re.M):
+        src = (comps / "nodes" / f"{imports[comp]}.tsx").read_text()
+        ids: set[str | None] = set()
+        dynamic = False
+        for h in re.findall(r"<Handle\b(.*?)/>", src, re.S):
+            m = re.search(r'\bid="([^"]+)"', h)
+            if m:
+                ids.add(m.group(1))
+            elif re.search(r"\bid=\{", h):
+                dynamic = True
+            else:
+                ids.add(None)
+        out[kind] = (ids, dynamic)
+    return out
+
+
+@pytest.mark.parametrize("name", _CASES)
+def test_every_example_edge_uses_a_handle_its_nodes_have(name: str) -> None:
+    """The canvas draws an edge only between existing handles; the backend
+    solves it regardless, so a wrong handle id shows as a disconnected node
+    in the GUI and nowhere else (the C3X cascade inlet plenum, 2026-11-01)."""
+    handles = _frontend_handles()
+    data = json.loads((_GUI_EXAMPLES / f"{name}.json").read_text())
+    kind = {n["id"]: n["type"] for n in data["nodes"]}
+    for e in data["edges"]:
+        if e.get("type") == "thermal":
+            continue
+        for end, key in (("source", "sourceHandle"), ("target", "targetHandle")):
+            ids, dynamic = handles[kind[e[end]]]
+            if not dynamic:
+                assert e.get(key) in ids, (name, e["id"], key, e.get(key), sorted(map(str, ids)))
