@@ -1,0 +1,6 @@
+- **`CompressorElement` and `TurbineElement` (#893).** Network elements at a fixed total-to-total pressure ratio: Pt_out = PR·Pt_in for a compressor, Pt_in/PR for a turbine. The network sets the flow. Each takes exactly one of `eta_poly` and `eta_is`.
+  - **Outlet state:** the stream reaches the downstream node at `cb.compression` / `cb.expansion`'s outlet Tt. The Jacobian chains Tt_out through the inlet Tt and composition, so a turbine fed by a burner's products is exact.
+  - **Reported:** `power` [W] > 0 (absorbed by a compressor, delivered by a turbine), `dh` [J/kg] signed into the flow, `Tt_out`, `Tt_out_isentropic`, both efficiencies and `pressure_ratio`.
+  - **Energy accounting:** the network energy ledger and the second-law check count the shaft work as enthalpy with no entropy (`__ledger__["W_shaft"]`). An ideal machine generates no entropy; a real one generates some.
+  - **Refused, with the reason:** a root with the flow reversed (a surging compressor, a turbine driven backwards); a machine between two pressure boundaries (nothing sets its flow); a pressure ratio below 1; an efficiency outside (0, 1]; neither or both efficiencies.
+  - **Tested:** a Brayton cycle (compressor, burner on a `FuelBoundary`, turbine, nozzle) closes its energy balance, and every Jacobian row matches central differences.

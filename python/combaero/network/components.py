@@ -7375,6 +7375,143 @@ class LosslessConnectionElement(NetworkElement):
         return 1
 
 
+class TurbomachineElement(NetworkElement):
+    """A compressor or turbine at a fixed total-to-total pressure ratio (#893).
+
+    The pressure ratio is a parameter and the network sets the flow: one
+    unknown, ``m_dot``, and one row, ``Pt_out - f Pt_in = 0`` (f = PR for a
+    compressor, 1/PR for a turbine). The stream leaves at the outlet total
+    temperature of ``cb.compression`` / ``cb.expansion`` with exactly one of
+    ``eta_poly`` and ``eta_is``: the solver delivers it to the downstream node
+    at that Tt (``outlet_stagnation``), with the Jacobian of Tt_out in Tt_in
+    and the composition. At a fixed PR the outlet Tt does not depend on the
+    pressure level, so it has no pressure column. The composition is frozen.
+
+    Reported: ``power`` [W] > 0 (absorbed by a compressor, delivered by a
+    turbine), ``dh`` [J/kg] signed into the flow, ``Tt_out``, both efficiencies
+    and ``pressure_ratio``. A root with the flow reversed (surge, a turbine
+    driven backwards) is refused, never returned. Between two pressure
+    boundaries nothing sets the flow: refused.
+    """
+
+    #: RESIDUAL-ROW-SCALING: a total-pressure relation, Pa.
+    residual_scale_kind = "p"
+    #: True for a turbine (expansion, PR = P_in / P_out).
+    expansion = False
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        pressure_ratio: float,
+        eta_poly: float | None = None,
+        eta_is: float | None = None,
+    ) -> None:
+        super().__init__(id, from_node, to_node)
+        kind = type(self).__name__
+        if (eta_poly is None) == (eta_is is None):
+            raise ValueError(f"{kind} '{id}': give exactly one of eta_poly and eta_is")
+        eta = eta_poly if eta_poly is not None else eta_is
+        if not (0.0 < float(eta) <= 1.0):
+            raise ValueError(
+                f"{kind} '{id}': efficiency {eta} is outside (0, 1]: above 1 the "
+                "machine would destroy entropy"
+            )
+        if not (float(pressure_ratio) >= 1.0):
+            raise ValueError(
+                f"{kind} '{id}': pressure_ratio {pressure_ratio} < 1 (it is Pt_out/Pt_in "
+                "for a compressor, Pt_in/Pt_out for a turbine)"
+            )
+        self.pressure_ratio = float(pressure_ratio)
+        self.eta_poly = None if eta_poly is None else float(eta_poly)
+        self.eta_is = None if eta_is is None else float(eta_is)
+        self.area: float | None = None
+
+    @property
+    def pt_factor(self) -> float:
+        """Pt_out / Pt_in."""
+        return 1.0 / self.pressure_ratio if self.expansion else self.pressure_ratio
+
+    def path(self, Tt_in: float, Y: list[float]) -> Any:
+        """The C++ path (cb.compression / cb.expansion) from Tt_in, Y (mass)."""
+        fn = cb.expansion if self.expansion else cb.compression
+        return fn(
+            float(Tt_in),
+            list(cb.mass_to_mole(list(Y))),
+            self.pressure_ratio,
+            eta_poly=self.eta_poly,
+            eta_is=self.eta_is,
+        )
+
+    def outlet_stagnation(
+        self, state_in: NetworkMixtureState
+    ) -> tuple[float, float, list[float], float]:
+        """(Tt_out, dTt_out/dTt_in, dTt_out/dY, Pt_out/Pt_in) of the stream
+        this element delivers: the solver mixes it into the outlet node."""
+        p = self.path(state_in.Tt, state_in.Y)
+        return float(p.T2), float(p.dT2_dT1), list(p.dT2_dY), self.pt_factor
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        if isinstance(graph.nodes.get(self.from_node), PressureBoundary) and isinstance(
+            graph.nodes.get(self.to_node), PressureBoundary
+        ):
+            raise ValueError(
+                f"{type(self).__name__} '{self.id}' runs between two pressure boundaries: "
+                "it fixes their pressure ratio, so nothing sets its flow. Put a lossy "
+                "element (orifice, channel) or a mass-flow boundary in its path."
+            )
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
+    def residuals(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        f = self.pt_factor
+        res = [state_out.Pt - f * state_in.Pt]
+        jac = {0: {f"{self.to_node}.Pt": 1.0, f"{self.from_node}.Pt": -f}}
+        return res, jac
+
+    def diagnostics(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> dict[str, float | str]:
+        if state_in.Tt <= 0.0:
+            return {}
+        p = self.path(state_in.Tt, state_in.Y)
+        m = float(state_in.m_dot)
+        return {
+            "m_dot": m,
+            "pressure_ratio": self.pressure_ratio,
+            "Tt_in": float(state_in.Tt),
+            "Tt_out": float(p.T2),
+            "Tt_out_isentropic": float(p.T2s),
+            "dh": float(p.dh),
+            "power": abs(m * float(p.dh)),
+            "eta_poly": float(p.eta_poly),
+            "eta_is": float(p.eta_is),
+            "Pt_in": float(state_in.Pt),
+            "Pt_out": float(state_out.Pt),
+        }
+
+    def n_equations(self) -> int:
+        return 1
+
+
+class CompressorElement(TurbomachineElement):
+    """A compressor (#893): Pt_out = PR Pt_in, Tt_out from cb.compression.
+    See TurbomachineElement."""
+
+    expansion = False
+
+
+class TurbineElement(TurbomachineElement):
+    """A turbine (#893): Pt_out = Pt_in / PR, Tt_out from cb.expansion.
+    See TurbomachineElement."""
+
+    expansion = True
+
+
 class PortDischargeElement(NetworkElement):
     """A junction port's momentum chamber discharging into a PressureBoundary.
 
