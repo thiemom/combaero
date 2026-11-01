@@ -1,0 +1,4 @@
+- **GUI frontend lockfile refreshed against `pnpm audit`.** The audit found 12 advisories (7 high), all in transitive packages that Dependabot's grouped updates do not move; 1 moderate remains.
+  - Shipped-dependency side, now clean under `pnpm audit --prod`: follow-redirects 1.16.0 → 1.16.2 (under axios) and source-map-js 1.2.1 → 1.2.2.
+  - Dev tooling: zod 4.3.6 → 4.6.7, brace-expansion 5.0.9 → 5.0.12, @babel/core 7.29.0 → 7.29.7, and vitest ^4.1.11 → ^4.1.12 (which brings @vitest/mocker 4.1.12).
+  - Left as is: minimatch 10.2.6 under eslint (a moderate ReDoS). Even the newest eslint requires minimatch ^10, and the fix is in 11. It only globs this repository's own files.
