@@ -2,6 +2,7 @@
 
 #include "composition.h"
 #include "dual_number.h"
+#include "input_validation.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
 #include "thermo.h"
 #include "transport.h"
@@ -390,8 +391,13 @@ struct Branch {
 
 Branch make_branch(double F_in, double F_out, const std::string& model, double length,
                    double D_h) {
-    if (!(F_in > 0.0) || !(F_out > 0.0)) {
-        throw std::invalid_argument("area_change: areas must be positive");
+    if (!validation::is_finite_positive(F_in) || !validation::is_finite_positive(F_out)) {
+        throw std::invalid_argument("area_change: areas must be positive and finite");
+    }
+    // D_h <= 0 selects the equivalent-circle diameter below; NaN used to
+    // select it too (#769).
+    if (!validation::is_finite(D_h)) {
+        throw std::invalid_argument("area_change: D_h must be finite");
     }
     if (model != "sharp" && model != "conical") {
         throw std::invalid_argument("area_change: model must be 'sharp' or 'conical'");
@@ -412,7 +418,7 @@ Branch make_branch(double F_in, double F_out, const std::string& model, double l
     if (b.expansion) {
         b.step = b.n;
         if (!b.sharp) {
-            if (!(length > 0.0)) {
+            if (!validation::is_finite_positive(length)) {
                 throw std::invalid_argument("area_change: a conical model needs length > 0");
             }
             const double dr = std::sqrt(F_large / M_PI) - std::sqrt(b.F_small / M_PI);
@@ -424,7 +430,7 @@ Branch make_branch(double F_in, double F_out, const std::string& model, double l
         if (b.sharp) {
             b.zeta_inc = 0.5 * (1.0 - b.n);
         } else {
-            if (!(length > 0.0)) {
+            if (!validation::is_finite_positive(length)) {
                 throw std::invalid_argument("area_change: a conical model needs length > 0");
             }
             const double D_small = std::sqrt(4.0 * b.F_small / M_PI);

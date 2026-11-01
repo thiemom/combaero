@@ -1,6 +1,7 @@
 #include "../include/fanno_mach.h"
 
 #include "../include/composition.h"
+#include "../include/input_validation.h"
 #include "../include/solver_interface.h"
 #include "../include/stagnation.h"
 #include "../include/thermo.h"
@@ -227,8 +228,17 @@ FluxSlopes isentropic_flux_slopes(double Pt, double Tt, double M, const std::vec
 }
 
 void check_duct(double L, double D) {
-  if (!(L > 0.0) || !(D > 0.0)) {
-    throw std::invalid_argument("fanno (Mach): L and D must be positive");
+  if (!validation::is_finite_positive(L) || !validation::is_finite_positive(D)) {
+    throw std::invalid_argument("fanno (Mach): L and D must be positive and finite");
+  }
+}
+
+// NaN or inf roughness or f_multiplier used to vanish inside the root
+// finders and return a plausible flux (#769). Finite values keep their
+// existing meaning (f_multiplier = 0 with "fixed" is frictionless).
+void check_friction(double roughness, double f_multiplier) {
+  if (!validation::is_finite(roughness) || !validation::is_finite(f_multiplier)) {
+    throw std::invalid_argument("fanno (Mach): roughness and f_multiplier must be finite");
   }
 }
 
@@ -252,6 +262,10 @@ FannoMachState fanno_state_at_mach(double G, double Tt, double M,
 double fanno_dx_dmach(double G, double Tt, double M, const std::vector<double>& X,
                       double D, double roughness, const std::string& friction_model,
                       double f_multiplier) {
+  if (!validation::is_finite(D)) {
+    throw std::invalid_argument("fanno_dx_dmach: D must be finite");
+  }
+  check_friction(roughness, f_multiplier);
   const FannoMachState s = fanno_state_at_mach(G, Tt, M, X);
   const double R = specific_gas_constant(X);
   const double a2 = s.a * s.a;
@@ -272,6 +286,10 @@ double fanno_length_between(double G, double Tt, double M1, double M2,
   if (!(M1 > 0.0) || !(M2 >= M1) || !(M2 <= 1.0)) {
     throw std::invalid_argument("fanno_length_between: need 0 < M1 <= M2 <= 1");
   }
+  if (!validation::is_finite(D)) {
+    throw std::invalid_argument("fanno_length_between: D must be finite");
+  }
+  check_friction(roughness, f_multiplier);
   if (M2 == M1) {
     return 0.0;
   }
@@ -328,6 +346,7 @@ FannoDuctResult fanno_duct(double Pt, double Tt, double G, const std::vector<dou
                            double L, double D, double roughness,
                            const std::string& friction_model, double f_multiplier) {
   check_duct(L, D);
+  check_friction(roughness, f_multiplier);
   if (!(G > 0.0)) {
     throw std::invalid_argument("fanno_duct: G must be positive");
   }
@@ -366,6 +385,7 @@ double fanno_choked_mass_flux(double Pt, double Tt, const std::vector<double>& X
                               double L, double D, double roughness,
                               const std::string& friction_model, double f_multiplier) {
   check_duct(L, D);
+  check_friction(roughness, f_multiplier);
   const double G_max = fanno_sonic_mass_flux(Pt, Tt, X);
   // L*(G) falls monotonically from infinity (G -> 0) to 0 (G -> G_max).
   auto excess = [&](double logG) {
@@ -709,6 +729,7 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
                                     const std::vector<std::vector<double>>& dY_directions,
                                     bool with_derivatives) {
   check_duct(L, D);
+  check_friction(roughness, f_multiplier);
   FannoChannelFlow out;
   const double drive = Pt0 - P_target;
   static const std::vector<std::vector<double>> kNoDirections;
@@ -1180,7 +1201,9 @@ FannoRayleighMarch fanno_rayleigh_march(double G, double Pt0, double Tt0, double
                                         double roughness, const std::string& friction_model,
                                         double f_multiplier) {
   check_duct(L, D);
-  if (!(G > 0.0) || !(Pt0 > 0.0) || !(Tt0 > 0.0) || !(Tt_exit > 0.0)) {
+  check_friction(roughness, f_multiplier);
+  if (!validation::is_finite_positive(G) || !validation::is_finite_positive(Pt0) ||
+      !validation::is_finite_positive(Tt0) || !validation::is_finite_positive(Tt_exit)) {
     throw std::invalid_argument("fanno_rayleigh_march: G, Pt0, Tt0 and Tt_exit must be positive");
   }
   const RayleighDuct d{G, Tt0, Tt_exit, L, D, roughness, f_multiplier, &X, &friction_model};
@@ -1202,6 +1225,12 @@ double fanno_rayleigh_choked_mass_flux(double Pt0, double Tt0, double Tt_exit,
                                        double roughness, const std::string& friction_model,
                                        double f_multiplier) {
   check_duct(L, D);
+  check_friction(roughness, f_multiplier);
+  if (!validation::is_finite(Pt0) || !validation::is_finite(Tt0) ||
+      !validation::is_finite(Tt_exit)) {
+    throw std::invalid_argument(
+        "fanno_rayleigh_choked_mass_flux: Pt0, Tt0 and Tt_exit must be finite");
+  }
   static const std::vector<std::vector<double>> kNone;
   const RayleighProblem pb{Pt0, Tt0, Tt_exit, 0.0, L, D, roughness, f_multiplier, &X,
                            &friction_model, false, -1.0, &kNone, false};
@@ -1214,6 +1243,7 @@ FannoChannelFlow fanno_rayleigh_channel_flow(
     double f_multiplier, double G_guess, const std::vector<std::vector<double>>& dY_directions,
     bool with_derivatives) {
   check_duct(L, D);
+  check_friction(roughness, f_multiplier);
   FannoChannelFlow out;
   const double drive = Pt0 - P_target;
   static const std::vector<std::vector<double>> kNoDirections;

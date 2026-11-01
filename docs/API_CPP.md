@@ -54,6 +54,17 @@ void require_finite_in_range(double x, double lo, double hi, const char* message
 Where +inf is a physical limit rather than bad input (NTU, a film coefficient
 h, YSZ aging hours) the check refuses NaN only.
 
+A clamp, a root finder or a "no correction" branch can also turn NaN into a
+plausible number without any comparison in sight (`std::max(NaN, x)` is `x`
+for one argument order). Such arguments refuse non-finite values too, while
+finite values keep their existing meaning: `velocity_of_approach_factor` is
+still 1 for a finite beta outside (0, 1), `D_h <= 0` still selects the
+equivalent-circle diameter in the area-change closures, `m_ref <= 0` still
+switches the combustor low-flow ramp off. Solver-iterate arguments of the
+residual kernels (mass flows, pressures, temperatures of a network state)
+are not checked: their "no flow" branches are solver robustness, not input
+validation.
+
 ---
 
 ## Thermodynamics (thermo.h)

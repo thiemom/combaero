@@ -538,6 +538,11 @@ std::tuple<double, double> permanent_loss_ratio_and_dC(double beta, double C) {
 }
 
 double velocity_of_approach_factor(double beta) {
+    // A finite beta outside (0, 1) means "no correction"; NaN used to be
+    // read the same way (#769).
+    if (!combaero::validation::is_finite(beta)) {
+        throw std::invalid_argument("velocity_of_approach_factor: beta must be finite");
+    }
     if (!(beta > 0.0 && beta < 1.0)) {
         return 1.0;
     }
@@ -1510,6 +1515,10 @@ double expansibility_factor(double beta, double dP, double P_upstream, double ka
         throw std::invalid_argument("expansibility_factor: dP must be non-negative");
     }
 
+    if (!combaero::validation::is_finite(kappa)) {
+        throw std::invalid_argument("expansibility_factor: kappa must be finite");
+    }
+
     // Incompressible limit: kappa <= 1 or no pressure drop
     if (kappa <= 1.0 || dP <= 0.0) {
         return 1.0;
@@ -1727,16 +1736,24 @@ void check_jobson_inputs(const char* who, double Ci, double beta, double n) {
 } // namespace
 
 double jobson_force_defect(double Ci, double beta, double Cv) {
-    if (!(Ci > 0.0) || !(Cv > 0.0)) {
+    if (!combaero::validation::is_finite_positive(Ci) ||
+        !combaero::validation::is_finite_positive(Cv)) {
         throw std::invalid_argument("jobson_force_defect: Ci and Cv must be > 0");
+    }
+    if (!combaero::validation::is_finite(beta)) {
+        throw std::invalid_argument("jobson_force_defect: beta must be finite");
     }
     const double b2 = (beta > 0.0 && beta < 1.0) ? beta * beta : 0.0;
     return 1.0 / Ci - 0.5 / (Ci * Ci) - Cv * b2 + 0.5 * Cv * Cv * b2 * b2;
 }
 
 double jobson_ci_from_cd(double Cd, double beta, double Cv) {
-    if (!(Cd > 0.0) || !(Cv > 0.0)) {
+    if (!combaero::validation::is_finite_positive(Cd) ||
+        !combaero::validation::is_finite_positive(Cv)) {
         throw std::invalid_argument("jobson_ci_from_cd: Cd and Cv must be > 0");
+    }
+    if (!combaero::validation::is_finite(beta)) {
+        throw std::invalid_argument("jobson_ci_from_cd: beta must be finite");
     }
     return combaero::orifice_jobson::ci_from_cd(J1::constant(Cd), beta, Cv).v;
 }
