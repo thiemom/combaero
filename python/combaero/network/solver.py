@@ -17,6 +17,7 @@ import combaero as cb
 from combaero import _renamed, _solver_tools
 
 from .components import (
+    FLOW_REVERSAL_M_SCALE,
     RAYLEIGH_EXIT_PREFIX,
     ChannelElement,
     CombustorNode,
@@ -31,6 +32,7 @@ from .components import (
     OrificeElement,
     PlenumNode,
     PressureBoundary,
+    TurbomachineElement,
     WallNode,
     film_discharge_node,
     film_on_wall_side,
@@ -2602,9 +2604,11 @@ class NetworkSolver:
         n_species = self._n_species
         # Iterate over stream_info (one entry per upstream stream, including
         # multiple entries for multi-port elements like TeeJunctionElement).
-        for i, (_, elem, src_nid, coeffs) in enumerate(stream_info):
+        for i, (s_up, elem, src_nid, coeffs) in enumerate(stream_info):
             if elem is None:
                 continue  # a fixed injection: nothing to relay
+            # A turbomachine's stream arrives at Tt_out(Tt_in, Y), f Pt_in (#893).
+            tm = getattr(s_up, "_turbomachine", None)
             t_jac = mix_res.dTt_mix_d_stream[i]
             pt_jac = mix_res.dPt_mix_d_stream[i]
             # dY_mix_d_stream is indexed by [species][stream]
@@ -2637,10 +2641,18 @@ class NetworkSolver:
 
             # 2. Recursive dependency on upstream P/T/Y via src_nid relay
             if src_nid in relay:
-                for idx, sens_up in up(src_nid).items():
+                for idx, sens_src in up(src_nid).items():
                     node_relay = out.setdefault(
                         idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                     )
+                    sens_up = sens_src
+                    if tm is not None:
+                        dT_dT, dT_dY, f_pt = tm
+                        sens_up = {
+                            "T": dT_dT * sens_src["T"] + float(np.dot(dT_dY, sens_src["Y"])),
+                            "Y": sens_src["Y"],
+                            "Pt": f_pt * sens_src.get("Pt", 0.0),
+                        }
                     # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
                     node_relay["T"] += t_jac.d_Tt * sens_up["T"]
                     # Note: stagnation Pt doesn't usually have T/Y dependency, but we relay it if present
@@ -2928,6 +2940,14 @@ class NetworkSolver:
                         state_up._element_id = elem.id
                         state_up._m_dot_jac_names = elem_jac_names
                     state_up._src_node = src_nid
+                    if isinstance(elem, TurbomachineElement):
+                        # A compressor or turbine delivers its stream at its
+                        # outlet stagnation state (#893); _relay_mix chains
+                        # Tt_out through Tt_in and Y, and Pt_out through Pt_in.
+                        Tt_out, dT_dT, dT_dY, f_pt = elem.outlet_stagnation(state_up)
+                        state_up.Tt = Tt_out
+                        state_up.Pt = f_pt * float(state_up.Pt)
+                        state_up._turbomachine = (dT_dT, np.asarray(dT_dY, dtype=float), f_pt)
                     stream_info.append((state_up, elem, src_nid, None))
             # A reversed element delivers -m_dot from its to_node (#481).
             for elem in rev_in:
@@ -6588,6 +6608,29 @@ class NetworkSolver:
                 if text:
                     message = f"{message} {text}"
             warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
+
+        # Compressors and turbines (#893): a root with the flow reversed is a
+        # surging compressor or a turbine driven backwards, which the fixed
+        # pressure ratio cannot describe: refused, never returned.
+        for eid, el in self.network.elements.items():
+            if not isinstance(el, TurbomachineElement):
+                continue
+            m_tm = float(sol_dict.get(f"{eid}.m_dot", 0.0))
+            if converged and m_tm < -FLOW_REVERSAL_M_SCALE:
+                # The cause first: the ledger and second law, which price the
+                # machine forward, may already have demoted this root.
+                kind = "compressor" if not el.expansion else "turbine"
+                why = (
+                    f"{type(el).__name__} '{eid}': the flow through it is reversed "
+                    f"({m_tm:.4g} kg/s); a {kind} at a fixed pressure ratio "
+                    f"{el.pressure_ratio:g} has no reversed operating point "
+                    "(surge, or driven backwards). Check what drives the flow."
+                )
+                message = why if success else f"{why} {message}"
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                warnings.warn(f"NetworkSolver: {why}", stacklevel=2)
 
         # Fuel controllers (#892): report the fuel flow and the equivalence ratio
         # the combustor reached, and refuse a root on the other side of
