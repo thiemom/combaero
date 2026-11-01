@@ -14,7 +14,7 @@
       "id": "compressor_exit",
       "type": "pressure_boundary",
       "position": {
-        "x": -900,
+        "x": -900.0,
         "y": 1400.0
       },
       "data": {
@@ -23,11 +23,15 @@
         "Pt": 253593.75,
         "Tt": 389.2440071278308,
         "composition": {
-          "source": "humid_air",
-          "mode": "mole",
-          "relative_humidity": 0.6,
-          "ambient_T": 288.15,
-          "ambient_P": 101325.0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7503752762214034,
+            "O2": 0.22996960995806398,
+            "AR": 0.012745050981113537,
+            "CO2": 0.0006039000686137417,
+            "H2O": 0.006306162770805507
+          }
         }
       }
     },
@@ -35,7 +39,7 @@
       "id": "fuel",
       "type": "mass_boundary",
       "position": {
-        "x": -900,
+        "x": -900.0,
         "y": 1640.0
       },
       "data": {
@@ -44,67 +48,34 @@
         "m_dot": 0.17033361686052115,
         "Tt": 300.0,
         "composition": {
-          "source": "fuel",
-          "mode": "mole"
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "CH4": 1.0
+          }
         }
-      }
-    },
-    {
-      "id": "burner_loss",
-      "type": "discrete_loss",
-      "position": {
-        "x": -680,
-        "y": 1400.0
-      },
-      "data": {
-        "id": "burner_loss",
-        "label": "Burner loss 4% of Pt",
-        "correlation_type": "constant_fraction",
-        "xi": 0.04
-      }
-    },
-    {
-      "id": "fuel_injection",
-      "type": "lossless_connection",
-      "position": {
-        "x": -680,
-        "y": 1640.0
-      },
-      "data": {
-        "id": "fuel_injection",
-        "label": "Fuel injection"
       }
     },
     {
       "id": "burner",
       "type": "combustor",
       "position": {
-        "x": -460,
+        "x": -460.0,
         "y": 1520.0
       },
       "data": {
         "id": "burner",
         "label": "Burner",
-        "method": "complete"
-      }
-    },
-    {
-      "id": "to_cascade",
-      "type": "lossless_connection",
-      "position": {
-        "x": -300,
-        "y": 1520.0
-      },
-      "data": {
-        "id": "to_cascade",
-        "label": "Duct to the cascade"
+        "method": "complete",
+        "Nu_multiplier": 1.0,
+        "f_multiplier": 1.0
       }
     },
     {
       "id": "cascade_inlet",
       "type": "plenum",
       "position": {
-        "x": -150,
+        "x": -150.0,
         "y": 1520.0
       },
       "data": {
@@ -113,28 +84,10 @@
       }
     },
     {
-      "id": "SS0_h2",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 0.0
-      },
-      "data": {
-        "id": "SS0_h2",
-        "label": "SS s/arc 0.00-0.08 (hole 2), tuned",
-        "L": 0.01464006037491933,
-        "D": 0.07045697273976305,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 2.1483,
-        "f_multiplier": 1
-      }
-    },
-    {
       "id": "SS0_h2_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 0.0
       },
       "data": {
@@ -143,9 +96,14 @@
         "Pt": 237964.5137749108,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -153,7 +111,7 @@
       "id": "c2_SS0_h2_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 70.0
       },
       "data": {
@@ -162,36 +120,22 @@
         "m_dot": 0.005813800917071058,
         "Tt": 349.6127807941051,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c2_SS0_h2",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 70.0
-      },
-      "data": {
-        "id": "c2_SS0_h2",
-        "label": "hole 2 share; Nu x 0.452 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.0036416315529900567,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.4517087072401224,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c2_SS0_h2_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 70.0
       },
       "data": {
@@ -200,35 +144,22 @@
         "Pt": 200000.0,
         "Tt": 359.37,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS1_h1",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 160.0
-      },
-      "data": {
-        "id": "SS1_h1",
-        "label": "SS s/arc 0.08-0.30 (hole 1), tuned",
-        "L": 0.039040160999784884,
-        "D": 0.05396324791033938,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.8513,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS1_h1_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 160.0
       },
       "data": {
@@ -237,9 +168,14 @@
         "Pt": 148836.58498080246,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -247,7 +183,7 @@
       "id": "c1_SS1_h1_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 230.0
       },
       "data": {
@@ -256,36 +192,22 @@
         "m_dot": 0.0167,
         "Tt": 348.1896257774812,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c1_SS1_h1",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 230.0
-      },
-      "data": {
-        "id": "c1_SS1_h1",
-        "label": "hole 1 share; Nu x 0.507 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.0063,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.5069659860707222,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c1_SS1_h1_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 230.0
       },
       "data": {
@@ -294,35 +216,22 @@
         "Pt": 200000.0,
         "Tt": 358.14,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS2_h3",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 320.0
-      },
-      "data": {
-        "id": "SS2_h3",
-        "label": "SS s/arc 0.30-0.38 (hole 3), tuned",
-        "L": 0.014196422181739958,
-        "D": 0.04724119606373563,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.1338,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS2_h3_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 320.0
       },
       "data": {
@@ -331,9 +240,14 @@
         "Pt": 130364.14797578294,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -341,7 +255,7 @@
       "id": "c3_SS2_h3_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 390.0
       },
       "data": {
@@ -350,36 +264,22 @@
         "m_dot": 0.008783111747735856,
         "Tt": 341.8930989159226,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c3_SS2_h3",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 390.0
-      },
-      "data": {
-        "id": "c3_SS2_h3",
-        "label": "hole 3 share; Nu x 0.827 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.004853263775526762,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.8273670268169386,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c3_SS2_h3_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 390.0
       },
       "data": {
@@ -388,35 +288,22 @@
         "Pt": 200000.0,
         "Tt": 349.97,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS3_h4",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 480.0
-      },
-      "data": {
-        "id": "SS3_h4",
-        "label": "SS s/arc 0.38-0.47 (hole 4), tuned",
-        "L": 0.01641461314763683,
-        "D": 0.04801009589532926,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.0715,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS3_h4_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 480.0
       },
       "data": {
@@ -425,9 +312,14 @@
         "Pt": 130115.43936591639,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -435,7 +327,7 @@
       "id": "c4_SS3_h4_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 550.0
       },
       "data": {
@@ -444,36 +336,22 @@
         "m_dot": 0.008685637213505367,
         "Tt": 342.74610512816383,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c4_SS3_h4",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 550.0
-      },
-      "data": {
-        "id": "c4_SS3_h4",
-        "label": "hole 4 share; Nu x 0.635 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.004570875793039627,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.6347131725545668,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c4_SS3_h4_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 550.0
       },
       "data": {
@@ -482,35 +360,22 @@
         "Pt": 200000.0,
         "Tt": 351.51,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS4_h5",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 640.0
-      },
-      "data": {
-        "id": "SS4_h5",
-        "label": "SS s/arc 0.47-0.56 (hole 5), tuned",
-        "L": 0.015970974954457446,
-        "D": 0.05406621632626624,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.1427,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS4_h5_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 640.0
       },
       "data": {
@@ -519,9 +384,14 @@
         "Pt": 138462.8236705948,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -529,7 +399,7 @@
       "id": "c5_SS4_h5_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 710.0
       },
       "data": {
@@ -538,36 +408,22 @@
         "m_dot": 0.008987114259229302,
         "Tt": 333.18128386019106,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c5_SS4_h5",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 710.0
-      },
-      "data": {
-        "id": "c5_SS4_h5",
-        "label": "hole 5 share; Nu x 0.636 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.004514728689515246,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360605,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c5_SS4_h5_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 710.0
       },
       "data": {
@@ -576,35 +432,22 @@
         "Pt": 200000.0,
         "Tt": 342.56,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS5_h6",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 800.0
-      },
-      "data": {
-        "id": "SS5_h6",
-        "label": "SS s/arc 0.56-0.65 (hole 6), tuned",
-        "L": 0.01597097495445746,
-        "D": 0.06250223425790499,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.0201,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS5_h6_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 800.0
       },
       "data": {
@@ -613,9 +456,14 @@
         "Pt": 141416.26555864597,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -623,7 +471,7 @@
       "id": "c6_SS5_h6_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 870.0
       },
       "data": {
@@ -632,36 +480,22 @@
         "m_dot": 0.008473564872987631,
         "Tt": 362.72017217250925,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c6_SS5_h6",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 870.0
-      },
-      "data": {
-        "id": "c6_SS5_h6",
-        "label": "hole 6 share; Nu x 0.636 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.004514728689515248,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360603,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c6_SS5_h6_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 870.0
       },
       "data": {
@@ -670,35 +504,22 @@
         "Pt": 200000.0,
         "Tt": 371.85,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS6_h7",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 960.0
-      },
-      "data": {
-        "id": "SS6_h7",
-        "label": "SS s/arc 0.65-0.75 (hole 7), tuned",
-        "L": 0.016858251340816203,
-        "D": 0.07108588937214008,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.0936,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS6_h7_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 960.0
       },
       "data": {
@@ -707,9 +528,14 @@
         "Pt": 139089.6522104727,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -717,7 +543,7 @@
       "id": "c7_SS6_h7_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 1030.0
       },
       "data": {
@@ -726,36 +552,22 @@
         "m_dot": 0.008208102464630645,
         "Tt": 340.6855063346012,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c7_SS6_h7",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1030.0
-      },
-      "data": {
-        "id": "c7_SS6_h7",
-        "label": "hole 7 share; Nu x 0.599 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.004498306008423121,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.5985422210821968,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c7_SS6_h7_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1030.0
       },
       "data": {
@@ -764,35 +576,22 @@
         "Pt": 200000.0,
         "Tt": 351.85,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS7_h8",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1120.0
-      },
-      "data": {
-        "id": "SS7_h8",
-        "label": "SS s/arc 0.75-0.83 (hole 8), tuned",
-        "L": 0.014640060374919344,
-        "D": 0.0783631755352255,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.1102,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS7_h8_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1120.0
       },
       "data": {
@@ -801,9 +600,14 @@
         "Pt": 136989.79653110364,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -811,7 +615,7 @@
       "id": "c8_SS7_h8_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 1190.0
       },
       "data": {
@@ -820,36 +624,22 @@
         "m_dot": 0.002771985237825221,
         "Tt": 360.6260518752037,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c8_SS7_h8",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1190.0
-      },
-      "data": {
-        "id": "c8_SS7_h8",
-        "label": "hole 8 share; Nu x 0.335 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.0022007758192179898,
-        "Dh": 0.0031,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.3352717199691696,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c8_SS7_h8_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1190.0
       },
       "data": {
@@ -858,35 +648,22 @@
         "Pt": 200000.0,
         "Tt": 385.96,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS8_h9",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1280.0
-      },
-      "data": {
-        "id": "SS8_h9",
-        "label": "SS s/arc 0.83-0.92 (hole 9), tuned",
-        "L": 0.015527336761278059,
-        "D": 0.08444532984152639,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.9227,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS8_h9_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1280.0
       },
       "data": {
@@ -895,9 +672,14 @@
         "Pt": 137423.31701956532,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -905,7 +687,7 @@
       "id": "c9_SS8_h9_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 1350.0
       },
       "data": {
@@ -914,36 +696,22 @@
         "m_dot": 0.0017271317588859747,
         "Tt": 383.5272485227125,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c9_SS8_h9",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1350.0
-      },
-      "data": {
-        "id": "c9_SS8_h9",
-        "label": "hole 9 share; Nu x 0.310 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.002180779296246681,
-        "Dh": 0.0031,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.3103949433280521,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c9_SS8_h9_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1350.0
       },
       "data": {
@@ -952,35 +720,22 @@
         "Pt": 200000.0,
         "Tt": 413.22,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "SS9_h10",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1440.0
-      },
-      "data": {
-        "id": "SS9_h10",
-        "label": "SS s/arc 0.92-1.00 (hole 10), tuned",
-        "L": 0.014196422181739958,
-        "D": 0.08968455596349488,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.7872,
-        "f_multiplier": 1
       }
     },
     {
       "id": "SS9_h10_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1440.0
       },
       "data": {
@@ -989,9 +744,14 @@
         "Pt": 136526.75999999998,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -999,7 +759,7 @@
       "id": "c10_SS9_h10_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 1510.0
       },
       "data": {
@@ -1008,36 +768,22 @@
         "m_dot": 0.0008706068214972006,
         "Tt": 411.6741546021206,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c10_SS9_h10",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1510.0
-      },
-      "data": {
-        "id": "c10_SS9_h10",
-        "label": "hole 10 share; Nu x 0.223 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.0014127918076671723,
-        "Dh": 0.00198,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.22308075828975477,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c10_SS9_h10_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1510.0
       },
       "data": {
@@ -1046,35 +792,22 @@
         "Pt": 200000.0,
         "Tt": 454.87,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS0_h2",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1600.0
-      },
-      "data": {
-        "id": "PS0_h2",
-        "label": "PS s/arc 0.00-0.21 (hole 2), tuned",
-        "L": 0.029175862144135662,
-        "D": 0.06415228969701244,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 2.1919,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS0_h2_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1600.0
       },
       "data": {
@@ -1083,9 +816,14 @@
         "Pt": 240780.59288039614,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1093,7 +831,7 @@
       "id": "c2_PS0_h2_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 1670.0
       },
       "data": {
@@ -1102,36 +840,22 @@
         "m_dot": 0.011586199082928942,
         "Tt": 349.6127807941051,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c2_PS0_h2",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1670.0
-      },
-      "data": {
-        "id": "c2_PS0_h2",
-        "label": "hole 2 share; Nu x 0.452 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.005140867595286541,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.4517087072401224,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c2_PS0_h2_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1670.0
       },
       "data": {
@@ -1140,35 +864,22 @@
         "Pt": 200000.0,
         "Tt": 359.37,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS1_h3",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1760.0
-      },
-      "data": {
-        "id": "PS1_h3",
-        "label": "PS s/arc 0.21-0.28 (hole 3), tuned",
-        "L": 0.009725287381378555,
-        "D": 0.04976107526433514,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.7756,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS1_h3_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1760.0
       },
       "data": {
@@ -1177,9 +888,14 @@
         "Pt": 239219.4791645499,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1187,7 +903,7 @@
       "id": "c3_PS1_h3_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 1830.0
       },
       "data": {
@@ -1196,36 +912,22 @@
         "m_dot": 0.006016888252264144,
         "Tt": 341.8930989159226,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c3_PS1_h3",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1830.0
-      },
-      "data": {
-        "id": "c3_PS1_h3",
-        "label": "hole 3 share; Nu x 0.827 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.004016942957668147,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.8273670268169389,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c3_PS1_h3_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1830.0
       },
       "data": {
@@ -1234,35 +936,22 @@
         "Pt": 200000.0,
         "Tt": 349.97,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS2_h4",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1920.0
-      },
-      "data": {
-        "id": "PS2_h4",
-        "label": "PS s/arc 0.28-0.39 (hole 4), tuned",
-        "L": 0.014768028986537807,
-        "D": 0.04730285331367737,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.4185,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS2_h4_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1920.0
       },
       "data": {
@@ -1271,9 +960,14 @@
         "Pt": 237576.14279447496,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1281,7 +975,7 @@
       "id": "c4_PS2_h4_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 1990.0
       },
       "data": {
@@ -1290,36 +984,22 @@
         "m_dot": 0.007814362786494632,
         "Tt": 342.74610512816383,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c4_PS2_h4",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 1990.0
-      },
-      "data": {
-        "id": "c4_PS2_h4",
-        "label": "hole 4 share; Nu x 0.635 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.00433556161121075,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.6347131725545668,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c4_PS2_h4_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 1990.0
       },
       "data": {
@@ -1328,35 +1008,22 @@
         "Pt": 200000.0,
         "Tt": 351.51,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS3_h5",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2080.0
-      },
-      "data": {
-        "id": "PS3_h5",
-        "label": "PS s/arc 0.39-0.50 (hole 5), tuned",
-        "L": 0.015128224815477759,
-        "D": 0.04869791696218232,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.4454,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS3_h5_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2080.0
       },
       "data": {
@@ -1365,9 +1032,14 @@
         "Pt": 234155.97879114453,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1375,7 +1047,7 @@
       "id": "c5_PS3_h5_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 2150.0
       },
       "data": {
@@ -1384,36 +1056,22 @@
         "m_dot": 0.0085128857407707,
         "Tt": 333.18128386019106,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c5_PS3_h5",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2150.0
-      },
-      "data": {
-        "id": "c5_PS3_h5",
-        "label": "hole 5 share; Nu x 0.636 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.004393998732369861,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360605,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c5_PS3_h5_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2150.0
       },
       "data": {
@@ -1422,35 +1080,22 @@
         "Pt": 200000.0,
         "Tt": 342.56,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS4_h6",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2240.0
-      },
-      "data": {
-        "id": "PS4_h6",
-        "label": "PS s/arc 0.50-0.61 (hole 6), tuned",
-        "L": 0.015128224815477759,
-        "D": 0.05747284827874068,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.195,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS4_h6_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2240.0
       },
       "data": {
@@ -1459,9 +1104,14 @@
         "Pt": 227217.50242559757,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1469,7 +1119,7 @@
       "id": "c6_PS4_h6_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 2310.0
       },
       "data": {
@@ -1478,36 +1128,22 @@
         "m_dot": 0.00802643512701237,
         "Tt": 362.72017217250925,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c6_PS4_h6",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2310.0
-      },
-      "data": {
-        "id": "c6_PS4_h6",
-        "label": "hole 6 share; Nu x 0.636 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.00439399873236986,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360602,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c6_PS4_h6_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2310.0
       },
       "data": {
@@ -1516,35 +1152,22 @@
         "Pt": 200000.0,
         "Tt": 371.85,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS5_h7",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2400.0
-      },
-      "data": {
-        "id": "PS5_h7",
-        "label": "PS s/arc 0.61-0.73 (hole 7), tuned",
-        "L": 0.0162088123022976,
-        "D": 0.06831485425532538,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.4116,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS5_h7_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2400.0
       },
       "data": {
@@ -1553,9 +1176,14 @@
         "Pt": 217525.48356553848,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1563,7 +1191,7 @@
       "id": "c7_PS5_h7_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 2470.0
       },
       "data": {
@@ -1572,36 +1200,22 @@
         "m_dot": 0.007891897535369353,
         "Tt": 340.6855063346012,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c7_PS5_h7",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2470.0
-      },
-      "data": {
-        "id": "c7_PS5_h7",
-        "label": "hole 7 share; Nu x 0.599 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.00441080979578404,
-        "Dh": 0.0063,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.5985422210821968,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c7_PS5_h7_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2470.0
       },
       "data": {
@@ -1610,35 +1224,22 @@
         "Pt": 200000.0,
         "Tt": 351.85,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS6_h8",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2560.0
-      },
-      "data": {
-        "id": "PS6_h8",
-        "label": "PS s/arc 0.73-0.83 (hole 8), tuned",
-        "L": 0.014407833157597855,
-        "D": 0.07777231251462234,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.3817,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS6_h8_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2560.0
       },
       "data": {
@@ -1647,9 +1248,14 @@
         "Pt": 196614.5085782199,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1657,7 +1263,7 @@
       "id": "c8_PS6_h8_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 2630.0
       },
       "data": {
@@ -1666,36 +1272,22 @@
         "m_dot": 0.002728014762174779,
         "Tt": 360.6260518752037,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c8_PS6_h8",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2630.0
-      },
-      "data": {
-        "id": "c8_PS6_h8",
-        "label": "hole 8 share; Nu x 0.335 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.0021832511979947215,
-        "Dh": 0.0031,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.3352717199691696,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c8_PS6_h8_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2630.0
       },
       "data": {
@@ -1704,35 +1296,22 @@
         "Pt": 200000.0,
         "Tt": 385.96,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS7_h9",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2720.0
-      },
-      "data": {
-        "id": "PS7_h9",
-        "label": "PS s/arc 0.83-0.95 (hole 9), tuned",
-        "L": 0.015848616473357634,
-        "D": 0.0856389517461667,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 1.0156,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS7_h9_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2720.0
       },
       "data": {
@@ -1741,9 +1320,14 @@
         "Pt": 165177.00256940865,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1751,7 +1335,7 @@
       "id": "c9_PS7_h9_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 2790.0
       },
       "data": {
@@ -1760,36 +1344,22 @@
         "m_dot": 0.0017628682411140253,
         "Tt": 383.5272485227125,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c9_PS7_h9",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2790.0
-      },
-      "data": {
-        "id": "c9_PS7_h9",
-        "label": "hole 9 share; Nu x 0.310 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.002203225286043583,
-        "Dh": 0.0031,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.31039494332805206,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c9_PS7_h9_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2790.0
       },
       "data": {
@@ -1798,35 +1368,22 @@
         "Pt": 200000.0,
         "Tt": 413.22,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "PS8_h10",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2880.0
-      },
-      "data": {
-        "id": "PS8_h10",
-        "label": "PS s/arc 0.95-1.05 (hole 10), tuned",
-        "L": 0.013687441499717979,
-        "D": 0.09203726039746081,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.884,
-        "f_multiplier": 1
       }
     },
     {
       "id": "PS8_h10_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2880.0
       },
       "data": {
@@ -1835,9 +1392,14 @@
         "Pt": 156660.07499999998,
         "Tt": 808.0,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
       }
     },
@@ -1845,7 +1407,7 @@
       "id": "c10_PS8_h10_in",
       "type": "mass_boundary",
       "position": {
-        "x": 0,
+        "x": 0.0,
         "y": 2950.0
       },
       "data": {
@@ -1854,36 +1416,22 @@
         "m_dot": 0.0008393931785027993,
         "Tt": 411.6741546021206,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
-      }
-    },
-    {
-      "id": "c10_PS8_h10",
-      "type": "channel",
-      "position": {
-        "x": 220,
-        "y": 2950.0
-      },
-      "data": {
-        "id": "c10_PS8_h10",
-        "label": "hole 10 share; Nu x 0.223 = hole/segment area",
-        "L": 0.0762,
-        "D": 0.0013872344099641282,
-        "Dh": 0.00198,
-        "roughness": 0.0,
-        "regime": "compressible",
-        "Nu_multiplier": 0.2230807582897548,
-        "f_multiplier": 1
       }
     },
     {
       "id": "c10_PS8_h10_out",
       "type": "pressure_boundary",
       "position": {
-        "x": 440,
+        "x": 440.0,
         "y": 2950.0
       },
       "data": {
@@ -1892,10 +1440,795 @@
         "Pt": 200000.0,
         "Tt": 454.87,
         "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
+          "source": "custom",
+          "mode": "mass",
+          "custom_fractions": {
+            "N2": 0.7551372949174585,
+            "O2": 0.23142903914882754,
+            "AR": 0.012825933404852044,
+            "CO2": 0.0006077325288618577
+          }
         }
+      }
+    },
+    {
+      "id": "burner_loss",
+      "type": "discrete_loss",
+      "position": {
+        "x": -680.0,
+        "y": 1400.0
+      },
+      "data": {
+        "id": "burner_loss",
+        "label": "Burner loss 4% of Pt",
+        "correlation_type": "constant_fraction",
+        "xi": 0.04,
+        "Nu_multiplier": 1.0,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "fuel_injection",
+      "type": "lossless_connection",
+      "position": {
+        "x": -680.0,
+        "y": 1640.0
+      },
+      "data": {
+        "id": "fuel_injection",
+        "label": "Fuel injection"
+      }
+    },
+    {
+      "id": "to_cascade",
+      "type": "lossless_connection",
+      "position": {
+        "x": -300.0,
+        "y": 1520.0
+      },
+      "data": {
+        "id": "to_cascade",
+        "label": "Duct to the cascade"
+      }
+    },
+    {
+      "id": "SS0_h2",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 0.0
+      },
+      "data": {
+        "id": "SS0_h2",
+        "label": "SS s/arc 0.00-0.08 (hole 2), tuned",
+        "L": 0.01464006037491933,
+        "D": 0.07045697273976305,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 2.1483,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c2_SS0_h2",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 70.0
+      },
+      "data": {
+        "id": "c2_SS0_h2",
+        "label": "hole 2 share; Nu x 0.452 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.0036416315529900567,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.4517087072401224,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "SS1_h1",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 160.0
+      },
+      "data": {
+        "id": "SS1_h1",
+        "label": "SS s/arc 0.08-0.30 (hole 1), tuned",
+        "L": 0.039040160999784884,
+        "D": 0.05396324791033938,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.8513,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c1_SS1_h1",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 230.0
+      },
+      "data": {
+        "id": "c1_SS1_h1",
+        "label": "hole 1 share; Nu x 0.507 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.0063,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.5069659860707222,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "SS2_h3",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 320.0
+      },
+      "data": {
+        "id": "SS2_h3",
+        "label": "SS s/arc 0.30-0.38 (hole 3), tuned",
+        "L": 0.014196422181739958,
+        "D": 0.04724119606373563,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.1338,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c3_SS2_h3",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 390.0
+      },
+      "data": {
+        "id": "c3_SS2_h3",
+        "label": "hole 3 share; Nu x 0.827 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.004853263775526762,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.8273670268169386,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "SS3_h4",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 480.0
+      },
+      "data": {
+        "id": "SS3_h4",
+        "label": "SS s/arc 0.38-0.47 (hole 4), tuned",
+        "L": 0.01641461314763683,
+        "D": 0.04801009589532926,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.0715,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c4_SS3_h4",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 550.0
+      },
+      "data": {
+        "id": "c4_SS3_h4",
+        "label": "hole 4 share; Nu x 0.635 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.004570875793039627,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.6347131725545668,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "SS4_h5",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 640.0
+      },
+      "data": {
+        "id": "SS4_h5",
+        "label": "SS s/arc 0.47-0.56 (hole 5), tuned",
+        "L": 0.015970974954457446,
+        "D": 0.05406621632626624,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.1427,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c5_SS4_h5",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 710.0
+      },
+      "data": {
+        "id": "c5_SS4_h5",
+        "label": "hole 5 share; Nu x 0.636 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.004514728689515246,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.6364161735360605,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "SS5_h6",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 800.0
+      },
+      "data": {
+        "id": "SS5_h6",
+        "label": "SS s/arc 0.56-0.65 (hole 6), tuned",
+        "L": 0.01597097495445746,
+        "D": 0.06250223425790499,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.0201,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c6_SS5_h6",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 870.0
+      },
+      "data": {
+        "id": "c6_SS5_h6",
+        "label": "hole 6 share; Nu x 0.636 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.004514728689515248,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.6364161735360603,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "SS6_h7",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 960.0
+      },
+      "data": {
+        "id": "SS6_h7",
+        "label": "SS s/arc 0.65-0.75 (hole 7), tuned",
+        "L": 0.016858251340816203,
+        "D": 0.07108588937214008,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.0936,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c7_SS6_h7",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1030.0
+      },
+      "data": {
+        "id": "c7_SS6_h7",
+        "label": "hole 7 share; Nu x 0.599 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.004498306008423121,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.5985422210821968,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "SS7_h8",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1120.0
+      },
+      "data": {
+        "id": "SS7_h8",
+        "label": "SS s/arc 0.75-0.83 (hole 8), tuned",
+        "L": 0.014640060374919344,
+        "D": 0.0783631755352255,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.1102,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c8_SS7_h8",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1190.0
+      },
+      "data": {
+        "id": "c8_SS7_h8",
+        "label": "hole 8 share; Nu x 0.335 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.0022007758192179898,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.3352717199691696,
+        "f_multiplier": 1.0,
+        "Dh": 0.0031
+      }
+    },
+    {
+      "id": "SS8_h9",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1280.0
+      },
+      "data": {
+        "id": "SS8_h9",
+        "label": "SS s/arc 0.83-0.92 (hole 9), tuned",
+        "L": 0.015527336761278059,
+        "D": 0.08444532984152639,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.9227,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c9_SS8_h9",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1350.0
+      },
+      "data": {
+        "id": "c9_SS8_h9",
+        "label": "hole 9 share; Nu x 0.310 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.002180779296246681,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.3103949433280521,
+        "f_multiplier": 1.0,
+        "Dh": 0.0031
+      }
+    },
+    {
+      "id": "SS9_h10",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1440.0
+      },
+      "data": {
+        "id": "SS9_h10",
+        "label": "SS s/arc 0.92-1.00 (hole 10), tuned",
+        "L": 0.014196422181739958,
+        "D": 0.08968455596349488,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.7872,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c10_SS9_h10",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1510.0
+      },
+      "data": {
+        "id": "c10_SS9_h10",
+        "label": "hole 10 share; Nu x 0.223 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.0014127918076671723,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.22308075828975477,
+        "f_multiplier": 1.0,
+        "Dh": 0.00198
+      }
+    },
+    {
+      "id": "PS0_h2",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1600.0
+      },
+      "data": {
+        "id": "PS0_h2",
+        "label": "PS s/arc 0.00-0.21 (hole 2), tuned",
+        "L": 0.029175862144135662,
+        "D": 0.06415228969701244,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 2.1919,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c2_PS0_h2",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1670.0
+      },
+      "data": {
+        "id": "c2_PS0_h2",
+        "label": "hole 2 share; Nu x 0.452 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.005140867595286541,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.4517087072401224,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "PS1_h3",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1760.0
+      },
+      "data": {
+        "id": "PS1_h3",
+        "label": "PS s/arc 0.21-0.28 (hole 3), tuned",
+        "L": 0.009725287381378555,
+        "D": 0.04976107526433514,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.7756,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c3_PS1_h3",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1830.0
+      },
+      "data": {
+        "id": "c3_PS1_h3",
+        "label": "hole 3 share; Nu x 0.827 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.004016942957668147,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.8273670268169389,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "PS2_h4",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1920.0
+      },
+      "data": {
+        "id": "PS2_h4",
+        "label": "PS s/arc 0.28-0.39 (hole 4), tuned",
+        "L": 0.014768028986537807,
+        "D": 0.04730285331367737,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.4185,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c4_PS2_h4",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 1990.0
+      },
+      "data": {
+        "id": "c4_PS2_h4",
+        "label": "hole 4 share; Nu x 0.635 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.00433556161121075,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.6347131725545668,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "PS3_h5",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2080.0
+      },
+      "data": {
+        "id": "PS3_h5",
+        "label": "PS s/arc 0.39-0.50 (hole 5), tuned",
+        "L": 0.015128224815477759,
+        "D": 0.04869791696218232,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.4454,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c5_PS3_h5",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2150.0
+      },
+      "data": {
+        "id": "c5_PS3_h5",
+        "label": "hole 5 share; Nu x 0.636 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.004393998732369861,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.6364161735360605,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "PS4_h6",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2240.0
+      },
+      "data": {
+        "id": "PS4_h6",
+        "label": "PS s/arc 0.50-0.61 (hole 6), tuned",
+        "L": 0.015128224815477759,
+        "D": 0.05747284827874068,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.195,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c6_PS4_h6",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2310.0
+      },
+      "data": {
+        "id": "c6_PS4_h6",
+        "label": "hole 6 share; Nu x 0.636 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.00439399873236986,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.6364161735360602,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "PS5_h7",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2400.0
+      },
+      "data": {
+        "id": "PS5_h7",
+        "label": "PS s/arc 0.61-0.73 (hole 7), tuned",
+        "L": 0.0162088123022976,
+        "D": 0.06831485425532538,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.4116,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c7_PS5_h7",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2470.0
+      },
+      "data": {
+        "id": "c7_PS5_h7",
+        "label": "hole 7 share; Nu x 0.599 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.00441080979578404,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.5985422210821968,
+        "f_multiplier": 1.0,
+        "Dh": 0.0063
+      }
+    },
+    {
+      "id": "PS6_h8",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2560.0
+      },
+      "data": {
+        "id": "PS6_h8",
+        "label": "PS s/arc 0.73-0.83 (hole 8), tuned",
+        "L": 0.014407833157597855,
+        "D": 0.07777231251462234,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.3817,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c8_PS6_h8",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2630.0
+      },
+      "data": {
+        "id": "c8_PS6_h8",
+        "label": "hole 8 share; Nu x 0.335 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.0021832511979947215,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.3352717199691696,
+        "f_multiplier": 1.0,
+        "Dh": 0.0031
+      }
+    },
+    {
+      "id": "PS7_h9",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2720.0
+      },
+      "data": {
+        "id": "PS7_h9",
+        "label": "PS s/arc 0.83-0.95 (hole 9), tuned",
+        "L": 0.015848616473357634,
+        "D": 0.0856389517461667,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 1.0156,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c9_PS7_h9",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2790.0
+      },
+      "data": {
+        "id": "c9_PS7_h9",
+        "label": "hole 9 share; Nu x 0.310 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.002203225286043583,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.31039494332805206,
+        "f_multiplier": 1.0,
+        "Dh": 0.0031
+      }
+    },
+    {
+      "id": "PS8_h10",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2880.0
+      },
+      "data": {
+        "id": "PS8_h10",
+        "label": "PS s/arc 0.95-1.05 (hole 10), tuned",
+        "L": 0.013687441499717979,
+        "D": 0.09203726039746081,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.884,
+        "f_multiplier": 1.0
+      }
+    },
+    {
+      "id": "c10_PS8_h10",
+      "type": "channel",
+      "position": {
+        "x": 220.0,
+        "y": 2950.0
+      },
+      "data": {
+        "id": "c10_PS8_h10",
+        "label": "hole 10 share; Nu x 0.223 = hole/segment area",
+        "L": 0.0762,
+        "D": 0.0013872344099641282,
+        "roughness": 0.0,
+        "friction_model": "haaland",
+        "regime": "compressible",
+        "Nu_multiplier": 0.2230807582897548,
+        "f_multiplier": 1.0,
+        "Dh": 0.00198
       }
     }
   ],
@@ -1991,27 +2324,6 @@
       "data": {}
     },
     {
-      "id": "w_SS0_h2",
-      "source": "SS0_h2",
-      "sourceHandle": "thermal-source",
-      "target": "c2_SS0_h2",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.009412658636754305,
-        "conductivity": 20.0,
-        "area": 0.001115572600568853,
-        "layers": [
-          {
-            "thickness": 0.009412658636754305,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_SS1_h1",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2046,27 +2358,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_SS1_h1",
-      "source": "SS1_h1",
-      "sourceHandle": "thermal-source",
-      "target": "c1_SS1_h1",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.009452807595920903,
-        "conductivity": 20.0,
-        "area": 0.0029748602681836083,
-        "layers": [
-          {
-            "thickness": 0.009452807595920903,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_SS2_h3",
@@ -2105,27 +2396,6 @@
       "data": {}
     },
     {
-      "id": "w_SS2_h3",
-      "source": "SS2_h3",
-      "sourceHandle": "thermal-source",
-      "target": "c3_SS2_h3",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.012414822866255816,
-        "conductivity": 20.0,
-        "area": 0.0010817673702485848,
-        "layers": [
-          {
-            "thickness": 0.012414822866255816,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_SS3_h4",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2160,27 +2430,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_SS3_h4",
-      "source": "SS3_h4",
-      "sourceHandle": "thermal-source",
-      "target": "c4_SS3_h4",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.009839515611198174,
-        "conductivity": 20.0,
-        "area": 0.0012507935218499266,
-        "layers": [
-          {
-            "thickness": 0.009839515611198174,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_SS4_h5",
@@ -2219,27 +2468,6 @@
       "data": {}
     },
     {
-      "id": "w_SS4_h5",
-      "source": "SS4_h5",
-      "sourceHandle": "thermal-source",
-      "target": "c5_SS4_h5",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.007348191103906363,
-        "conductivity": 20.0,
-        "area": 0.0012169882915296574,
-        "layers": [
-          {
-            "thickness": 0.007348191103906363,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_SS5_h6",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2274,27 +2502,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_SS5_h6",
-      "source": "SS5_h6",
-      "sourceHandle": "thermal-source",
-      "target": "c6_SS5_h6",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.00543146173273559,
-        "conductivity": 20.0,
-        "area": 0.0012169882915296585,
-        "layers": [
-          {
-            "thickness": 0.00543146173273559,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_SS6_h7",
@@ -2333,27 +2540,6 @@
       "data": {}
     },
     {
-      "id": "w_SS6_h7",
-      "source": "SS6_h7",
-      "sourceHandle": "thermal-source",
-      "target": "c7_SS6_h7",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.0041387100152508296,
-        "conductivity": 20.0,
-        "area": 0.0012845987521701947,
-        "layers": [
-          {
-            "thickness": 0.0041387100152508296,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_SS7_h8",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2388,27 +2574,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_SS7_h8",
-      "source": "SS7_h8",
-      "sourceHandle": "thermal-source",
-      "target": "c8_SS7_h8",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.0044187893481313495,
-        "conductivity": 20.0,
-        "area": 0.001115572600568854,
-        "layers": [
-          {
-            "thickness": 0.0044187893481313495,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_SS8_h9",
@@ -2447,27 +2612,6 @@
       "data": {}
     },
     {
-      "id": "w_SS8_h9",
-      "source": "SS8_h9",
-      "sourceHandle": "thermal-source",
-      "target": "c9_SS8_h9",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.003772844965744753,
-        "conductivity": 20.0,
-        "area": 0.0011831830612093882,
-        "layers": [
-          {
-            "thickness": 0.003772844965744753,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_SS9_h10",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2502,27 +2646,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_SS9_h10",
-      "source": "SS9_h10",
-      "sourceHandle": "thermal-source",
-      "target": "c10_SS9_h10",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.003358955791139091,
-        "conductivity": 20.0,
-        "area": 0.0010817673702485848,
-        "layers": [
-          {
-            "thickness": 0.003358955791139091,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_PS0_h2",
@@ -2561,27 +2684,6 @@
       "data": {}
     },
     {
-      "id": "w_PS0_h2",
-      "source": "PS0_h2",
-      "sourceHandle": "thermal-source",
-      "target": "c2_PS0_h2",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.008301896645978937,
-        "conductivity": 20.0,
-        "area": 0.0022232006953831376,
-        "layers": [
-          {
-            "thickness": 0.008301896645978937,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_PS1_h3",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2616,27 +2718,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_PS1_h3",
-      "source": "PS1_h3",
-      "sourceHandle": "thermal-source",
-      "target": "c3_PS1_h3",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.011835286157581783,
-        "conductivity": 20.0,
-        "area": 0.0007410668984610459,
-        "layers": [
-          {
-            "thickness": 0.011835286157581783,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_PS2_h4",
@@ -2675,27 +2756,6 @@
       "data": {}
     },
     {
-      "id": "w_PS2_h4",
-      "source": "PS2_h4",
-      "sourceHandle": "thermal-source",
-      "target": "c4_PS2_h4",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.00964320331410948,
-        "conductivity": 20.0,
-        "area": 0.001125323808774181,
-        "layers": [
-          {
-            "thickness": 0.00964320331410948,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_PS3_h5",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2730,27 +2790,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_PS3_h5",
-      "source": "PS3_h5",
-      "sourceHandle": "thermal-source",
-      "target": "c5_PS3_h5",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.007250244679385102,
-        "conductivity": 20.0,
-        "area": 0.0011527707309394054,
-        "layers": [
-          {
-            "thickness": 0.007250244679385102,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_PS4_h6",
@@ -2789,27 +2828,6 @@
       "data": {}
     },
     {
-      "id": "w_PS4_h6",
-      "source": "PS4_h6",
-      "sourceHandle": "thermal-source",
-      "target": "c6_PS4_h6",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.00528387400855159,
-        "conductivity": 20.0,
-        "area": 0.0011527707309394054,
-        "layers": [
-          {
-            "thickness": 0.00528387400855159,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_PS5_h7",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2844,27 +2862,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_PS5_h7",
-      "source": "PS5_h7",
-      "sourceHandle": "thermal-source",
-      "target": "c7_PS5_h7",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.003997435797222388,
-        "conductivity": 20.0,
-        "area": 0.0012351114974350772,
-        "layers": [
-          {
-            "thickness": 0.003997435797222388,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_PS6_h8",
@@ -2903,27 +2900,6 @@
       "data": {}
     },
     {
-      "id": "w_PS6_h8",
-      "source": "PS6_h8",
-      "sourceHandle": "thermal-source",
-      "target": "c8_PS6_h8",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.0041199198322299626,
-        "conductivity": 20.0,
-        "area": 0.0010978768866089566,
-        "layers": [
-          {
-            "thickness": 0.0041199198322299626,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
-    },
-    {
       "id": "e_cascade_inlet_PS7_h9",
       "source": "cascade_inlet",
       "sourceHandle": "flow-right",
@@ -2958,27 +2934,6 @@
       "targetHandle": "flow-target",
       "type": "default",
       "data": {}
-    },
-    {
-      "id": "w_PS7_h9",
-      "source": "PS7_h9",
-      "sourceHandle": "thermal-source",
-      "target": "c9_PS7_h9",
-      "targetHandle": "thermal-target",
-      "type": "thermal",
-      "data": {
-        "type": "thermal",
-        "thickness": 0.0036535565815879172,
-        "conductivity": 20.0,
-        "area": 0.0012076645752698517,
-        "layers": [
-          {
-            "thickness": 0.0036535565815879172,
-            "conductivity": 20.0,
-            "material": "ss310"
-          }
-        ]
-      }
     },
     {
       "id": "e_cascade_inlet_PS8_h10",
@@ -3017,6 +2972,420 @@
       "data": {}
     },
     {
+      "id": "w_SS0_h2",
+      "source": "SS0_h2",
+      "sourceHandle": "thermal-source",
+      "target": "c2_SS0_h2",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.009412658636754305,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.001115572600568853,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.009412658636754305,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS1_h1",
+      "source": "SS1_h1",
+      "sourceHandle": "thermal-source",
+      "target": "c1_SS1_h1",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.009452807595920903,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0029748602681836083,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.009452807595920903,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS2_h3",
+      "source": "SS2_h3",
+      "sourceHandle": "thermal-source",
+      "target": "c3_SS2_h3",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.012414822866255816,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0010817673702485848,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.012414822866255816,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS3_h4",
+      "source": "SS3_h4",
+      "sourceHandle": "thermal-source",
+      "target": "c4_SS3_h4",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.009839515611198174,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0012507935218499266,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.009839515611198174,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS4_h5",
+      "source": "SS4_h5",
+      "sourceHandle": "thermal-source",
+      "target": "c5_SS4_h5",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.007348191103906363,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0012169882915296574,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.007348191103906363,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS5_h6",
+      "source": "SS5_h6",
+      "sourceHandle": "thermal-source",
+      "target": "c6_SS5_h6",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.00543146173273559,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0012169882915296585,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.00543146173273559,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS6_h7",
+      "source": "SS6_h7",
+      "sourceHandle": "thermal-source",
+      "target": "c7_SS6_h7",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.0041387100152508296,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0012845987521701947,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.0041387100152508296,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS7_h8",
+      "source": "SS7_h8",
+      "sourceHandle": "thermal-source",
+      "target": "c8_SS7_h8",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.0044187893481313495,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.001115572600568854,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.0044187893481313495,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS8_h9",
+      "source": "SS8_h9",
+      "sourceHandle": "thermal-source",
+      "target": "c9_SS8_h9",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.003772844965744753,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0011831830612093882,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.003772844965744753,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_SS9_h10",
+      "source": "SS9_h10",
+      "sourceHandle": "thermal-source",
+      "target": "c10_SS9_h10",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.003358955791139091,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0010817673702485848,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.003358955791139091,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS0_h2",
+      "source": "PS0_h2",
+      "sourceHandle": "thermal-source",
+      "target": "c2_PS0_h2",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.008301896645978937,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0022232006953831376,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.008301896645978937,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS1_h3",
+      "source": "PS1_h3",
+      "sourceHandle": "thermal-source",
+      "target": "c3_PS1_h3",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.011835286157581783,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0007410668984610459,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.011835286157581783,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS2_h4",
+      "source": "PS2_h4",
+      "sourceHandle": "thermal-source",
+      "target": "c4_PS2_h4",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.00964320331410948,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.001125323808774181,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.00964320331410948,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS3_h5",
+      "source": "PS3_h5",
+      "sourceHandle": "thermal-source",
+      "target": "c5_PS3_h5",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.007250244679385102,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0011527707309394054,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.007250244679385102,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS4_h6",
+      "source": "PS4_h6",
+      "sourceHandle": "thermal-source",
+      "target": "c6_PS4_h6",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.00528387400855159,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0011527707309394054,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.00528387400855159,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS5_h7",
+      "source": "PS5_h7",
+      "sourceHandle": "thermal-source",
+      "target": "c7_PS5_h7",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.003997435797222388,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0012351114974350772,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.003997435797222388,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS6_h8",
+      "source": "PS6_h8",
+      "sourceHandle": "thermal-source",
+      "target": "c8_PS6_h8",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.0041199198322299626,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0010978768866089566,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.0041199198322299626,
+        "conductivity": 20.0
+      }
+    },
+    {
+      "id": "w_PS7_h9",
+      "source": "PS7_h9",
+      "sourceHandle": "thermal-source",
+      "target": "c9_PS7_h9",
+      "targetHandle": "thermal-target",
+      "type": "thermal",
+      "data": {
+        "type": "thermal",
+        "layers": [
+          {
+            "thickness": 0.0036535565815879172,
+            "conductivity": 20.0,
+            "material": "ss310"
+          }
+        ],
+        "area": 0.0012076645752698517,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.0036535565815879172,
+        "conductivity": 20.0
+      }
+    },
+    {
       "id": "w_PS8_h10",
       "source": "PS8_h10",
       "sourceHandle": "thermal-source",
@@ -3025,16 +3394,18 @@
       "type": "thermal",
       "data": {
         "type": "thermal",
-        "thickness": 0.003244084852710431,
-        "conductivity": 20.0,
-        "area": 0.00104298304227851,
         "layers": [
           {
             "thickness": 0.003244084852710431,
             "conductivity": 20.0,
             "material": "ss310"
           }
-        ]
+        ],
+        "area": 0.00104298304227851,
+        "R_fouling": 0.0,
+        "orientation": "aligned",
+        "thickness": 0.003244084852710431,
+        "conductivity": 20.0
       }
     }
   ]

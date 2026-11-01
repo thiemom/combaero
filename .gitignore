@@ -115,6 +115,7 @@ TODO.md
 !.claude/skills/model-provenance/
 !.claude/skills/write-pr/
 !.claude/skills/materials-data/
+!.claude/skills/gui-network/
 
 # Copyrighted third-party material (#846). Papers, handbooks, scans, figure
 # crops and supplementary files live in sources/, which is ignored whatever
