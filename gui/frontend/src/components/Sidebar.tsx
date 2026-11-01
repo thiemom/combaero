@@ -193,6 +193,17 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "fuel_boundary")}
+				title="The fuel flow that sets a combustor's exit Tt (solved)"
+				draggable
+			>
+				<NodeIcon type="fuel_boundary" size={18} />
+				<span>Fuel Boundary</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "plenum")}
 				draggable
 			>

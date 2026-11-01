@@ -12,7 +12,8 @@ What is built
     through ten radial holes, in burner exhaust at about 800 K and exit Mach
     0.9. Upstream, as in the rig (Allison's facility: a natural-gas burner and
     a duct to the cascade): ambient humid air compressed to the burner inlet,
-    a CH4 burner whose fuel flow puts the cascade inlet at the measured Tt1,
+    a CH4 burner whose fuel flow puts the cascade inlet at the measured Tt1
+    (a FuelBoundary: the fuel flow is solved in the network, #892),
     and its pressure loss to Pt1. The compressor efficiency, the ambient air
     and the burner loss are not printed in the report; they are assumptions
     (the constants below). The vane surface is split into one segment per
@@ -72,8 +73,8 @@ What is NOT reproduced
         but the throat segments cannot reach their Ps without choking
         (Fanno), and the joint network can land on supersonic chamber roots
         (#899). It waits for design targets (#897).
-    - The compressor and the fuel flow are computed in this script: there is
-      no compressor element (#893) and no fuel controller (#892).
+    - The compressor is computed in this script: there is no compressor
+      element (#893).
 
 Validation label
     TUNED (docs/VALIDATION_POLICY.md: matching a specific rig is the user's
@@ -115,6 +116,7 @@ from combaero.network import (
     ChannelElement,
     CombustorNode,
     FlowNetwork,
+    FuelBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
     NetworkSolver,
@@ -141,8 +143,8 @@ TUNE_RUN = 158
 # burner and a constant-section duct to the cascade). None of these is printed;
 # each is an assumption, stated here. Compressor: ambient humid air to the
 # burner's inlet pressure at this isentropic efficiency (#893: no compressor
-# element yet). Burner: complete combustion of CH4, its fuel flow set so the
-# cascade inlet is at Tt1 (#892: no fuel controller yet), with this fraction of
+# element yet). Burner: complete combustion of CH4, its fuel flow solved so the
+# cascade inlet is at Tt1 (a FuelBoundary, #892, lean), with this fraction of
 # total pressure lost to the cascade inlet.
 AMBIENT_T = 288.15  # [K]
 AMBIENT_P = 101325.0  # [Pa]
@@ -150,7 +152,6 @@ AMBIENT_RH = 0.6  # [-]
 COMPRESSOR_ETA = 0.85  # [-] isentropic
 BURNER_LOSS = 0.04  # [-] of Pt
 FUEL_T = 300.0  # [K]
-CH4_LHV_GUESS = 50.0e6  # [J/kg] only the fuel loop's first guess
 
 # Gas-side Nu multipliers fitted to run 158's measured Tw (``--tune``
 # regenerates them; test_paper_examples pins that they still reproduce it).
@@ -318,11 +319,10 @@ def coolant(run: int) -> dict[int, dict[str, float]]:
     }
 
 
-def build(
-    run: int, multipliers: dict[str, float], T_in: dict[int, float], m_fuel: float = 0.0
-) -> FlowNetwork:
-    """The network of one run, with the given gas-side Nu multipliers, hole
-    inlet temperatures and burner fuel flow [kg/s]."""
+def build(run: int, multipliers: dict[str, float], T_in: dict[int, float]) -> FlowNetwork:
+    """The network of one run, with the given gas-side Nu multipliers and hole
+    inlet temperatures. The burner's fuel flow is solved: it puts the burner
+    exit, and with it the cascade inlet, at the measured Tt1."""
     cond = run_conditions(run)
     holes = coolant(run)
     Y = _air()
@@ -330,7 +330,9 @@ def build(
     net = FlowNetwork()
     # The rig upstream of the cascade: compressor exit -> burner -> inlet.
     net.add_node(PressureBoundary("compressor_exit", Pt=P2, Tt=T2, Y=_ambient_air()))
-    net.add_node(MassFlowBoundary("fuel", m_dot=m_fuel, Tt=FUEL_T, Y=_methane()))
+    net.add_node(
+        FuelBoundary("fuel", combustor="burner", Tt_target=cond["Tt1"], Tt=FUEL_T, Y=_methane())
+    )
     net.add_node(CombustorNode("burner", method="complete"))
     net.add_node(PlenumNode("cascade_inlet"))
     net.add_element(
@@ -409,30 +411,28 @@ def solve(
     multipliers: dict[str, float] | None = None,
     start: dict[str, Any] | None = None,
 ) -> tuple[dict[str, float], dict[str, Any]]:
-    """Solve one run. Two values are iterated with it (the outer loops #892
-    and #897 would close in the network): the burner's fuel flow, until the
-    cascade inlet is at Tt1 (secant), and the hole inlet temperatures, until
-    each hole's midspan temperature is the report's average (the report
-    assumes a linear rise along the span). ``start`` carries both from a
-    previous solve; the second return value is them, converged."""
+    """Solve one run. The hole inlet temperatures are iterated with it (the
+    outer loop #897 would close in the network), until each hole's midspan
+    temperature is the report's average (the report assumes a linear rise
+    along the span); the burner's fuel flow is solved in the network
+    (FuelBoundary, #892). ``start`` carries the temperatures from a previous
+    solve; the second return value is them, converged."""
     multipliers = multipliers or {}
     cond = run_conditions(run)
     holes = coolant(run)
     start = start or {}
     T_in = dict(start.get("T_in", {}))
-    m_fuel = float(start.get("m_fuel", 0.0))
     # Each outer step changes values, not unknowns: start each network solve
     # from the last one (a cold start of this network takes ~10x longer).
     x0 = start.get("x")
-    history: list[tuple[float, float]] = []
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         for _ in range(20):
-            sol = NetworkSolver(build(run, multipliers, T_in, m_fuel)).solve(x0=x0)
+            sol = NetworkSolver(build(run, multipliers, T_in)).solve(x0=x0)
             if not sol.get("__success__", True) and x0 is not None:
-                sol = NetworkSolver(build(run, multipliers, T_in, m_fuel)).solve()
+                sol = NetworkSolver(build(run, multipliers, T_in)).solve()
             if not sol.get("__success__", True):
-                raise RuntimeError(f"run {run}: the network did not solve")
+                raise RuntimeError(f"run {run}: the network did not solve: {sol['__message__']}")
             x0 = np.asarray(sol["__x_solution__"], dtype=float)
             change = 0.0
             for i, hole in holes.items():
@@ -446,28 +446,14 @@ def solve(
                 new = hole["T_avg"] - 0.5 * rise
                 change = max(change, abs(new - T_in.get(i, hole["T_avg"])))
                 T_in[i] = new
-            err = sol["cascade_inlet.Tt"] - cond["Tt1"]
-            history.append((m_fuel, err))
-            if change < 0.01 and abs(err) < 0.01:
+            if change < 0.01:
                 break
-            if abs(err) < 0.01:
-                continue
-            if len(history) >= 2 and history[-1][1] != history[-2][1]:
-                (f0, e0), (f1, e1) = history[-2], history[-1]
-                m_fuel = f1 - e1 * (f1 - f0) / (e1 - e0)
-            elif m_fuel > 0.0:
-                # The rise over the supply temperature is nearly linear in fuel.
-                rise = sol["cascade_inlet.Tt"] - burner_supply(run)[1]
-                m_fuel *= 1.0 - err / rise
-            else:
-                # First guess from the energy balance at zero fuel: the rise to
-                # Tt1 over a lower heating value of natural gas (a starting
-                # value only; the secant does the rest).
-                cp = float(cb.cp(cond["Tt1"], list(cb.mass_to_mole(_ambient_air()))))
-                m_fuel = sol["burner_loss.m_dot"] * cp * (-err) / CH4_LHV_GUESS
         else:
-            raise RuntimeError(f"run {run}: the burner or the hole temperatures did not settle")
-    return sol, {"T_in": T_in, "m_fuel": m_fuel, "x": x0}
+            raise RuntimeError(f"run {run}: the hole temperatures did not settle")
+    # The fuel controller sets the burner exit; the duct to the cascade is
+    # lossless and adiabatic, so the cascade inlet is at Tt1 too.
+    assert abs(sol["cascade_inlet.Tt"] - cond["Tt1"]) < 1e-3, sol["cascade_inlet.Tt"]
+    return sol, {"T_in": T_in, "x": x0}
 
 
 def wall_temperatures(run: int, sol: dict[str, float]) -> list[dict[str, Any]]:
@@ -545,7 +531,7 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
 
     multipliers = TUNED if multipliers is None else multipliers
     _, start = solve(run, multipliers)
-    net = build(run, multipliers, start["T_in"], start["m_fuel"])
+    net = build(run, multipliers, start["T_in"])
     holes = coolant(run)
     # The rig upstream of the cascade, left of the rows; one row per segment.
     mid = 80.0 * len(segments(run))
@@ -560,7 +546,7 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
     }
     labels = {
         "compressor_exit": f"Compressor exit: ambient humid air at eta {COMPRESSOR_ETA}",
-        "fuel": "Natural gas (CH4), set so the inlet is at Tt1",
+        "fuel": "Natural gas (CH4): its flow is solved so the inlet is at Tt1",
         "burner_loss": f"Burner loss {BURNER_LOSS:.0%} of Pt",
         "fuel_injection": "Fuel injection",
         "burner": "Burner",

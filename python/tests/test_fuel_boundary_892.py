@@ -427,3 +427,43 @@ def test_fuel_with_no_path_to_its_combustor_is_refused() -> None:
     n.add_element(LosslessConnectionElement("dump_out", "dump", "out"))
     with pytest.raises(ValueError, match="fuel"):
         NetworkSolver(n).solve()
+
+
+# -- the fuel-fixed staged retry ---------------------------------------------
+
+
+def test_the_fuel_fixed_stage_reaches_the_direct_root() -> None:
+    """The retry a failed cold solve takes (the C3X rig's burner: 27 kg/s of
+    air against a 0.01 kg/s reference start): flows first with the fuel held
+    at its start, then the fuel re-sized on that root's oxidizer, then the
+    controller. Called directly here -- a small network converges without
+    it -- it must land on the direct solve's root, and leave no fuel held."""
+    _, ref = _solve(_net(1500.0))
+    assert ref["__success__"], ref["__message__"]
+    n = _net(1500.0)
+    s = NetworkSolver(n)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = s._solve_fuel_fixed_staged(
+            [n.nodes["fuel"]], {"__message__": "primary"}, "hybr", None, None, True, 0.0
+        )
+    assert r is not None and r["__success__"]
+    assert "from the fuel-fixed solution" in r["__message__"]
+    # Another path to the same root: equal to solver tolerance (1.1e-5 measured).
+    assert r["fuel.m_dot"] == pytest.approx(ref["fuel.m_dot"], rel=1e-4)
+    assert r["burner.Tt"] == pytest.approx(1500.0, abs=1e-3)
+    assert n.nodes["fuel"]._frozen_ln_m is None
+
+
+def test_a_held_fuel_row_holds_the_flow() -> None:
+    """Stage 1's row: ln(m_dot) held, in kelvin (Tt_target per unit ln m)."""
+    import math
+
+    f = FuelBoundary("f", combustor="c", Tt_target=1500.0)
+    f.m_dot = 0.02
+    f._frozen_ln_m = math.log(0.01)
+    from types import SimpleNamespace
+
+    res, jac = f.residuals(SimpleNamespace(Pt=2.0e5, P=2.0e5))  # type: ignore[arg-type]
+    assert res[-1] == pytest.approx(math.log(2.0) * 1500.0)
+    assert jac[len(res) - 1] == {"f.ln_m_dot": 1500.0}

@@ -496,6 +496,144 @@ const Inspector = () => {
 					</>
 				)}
 
+				{selectedNode.type === "fuel_boundary" &&
+					(() => {
+						// #892: the fuel flow is solved, set by the target Tt.
+						const d = selectedNode.data;
+						const combustors = nodes.filter((n) => n.type === "combustor");
+						const res = d.result?.state;
+						return (
+							<div className="flex flex-col gap-3">
+								<div className="text-[10px] text-stone-500 leading-snug">
+									The fuel flow is solved: it puts the combustor&apos;s exit at
+									the target Tt. A target has a lean and a rich root; the one
+									asked for is the answer, the other is refused. A target not
+									above the combustor&apos;s Tt without this fuel, or above the
+									stoichiometric peak, is refused with the reason.
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`fb_comb_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Combustor
+									</label>
+									<select
+										id={`fb_comb_${selectedNode.id}`}
+										value={d.combustor_id ?? ""}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												combustor_id: e.target.value || undefined,
+											})
+										}
+										className="p-2 border rounded text-sm"
+									>
+										<option value="">(none)</option>
+										{combustors.map((c) => (
+											<option key={c.id} value={c.id}>
+												{c.data?.label || c.id}
+											</option>
+										))}
+									</select>
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`fb_Ttt_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Target Tt (K)
+									</label>
+									<NumericInput
+										id={`fb_Ttt_${selectedNode.id}`}
+										value={d.Tt_target ?? 1500}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { Tt_target: val })
+										}
+										className="p-2 border rounded"
+									/>
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`fb_branch_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Branch
+									</label>
+									<select
+										id={`fb_branch_${selectedNode.id}`}
+										value={d.branch ?? "lean"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												branch: e.target.value,
+											})
+										}
+										className="p-2 border rounded text-sm"
+									>
+										<option value="lean">Lean (phi &lt; 1)</option>
+										<option value="rich">
+											Rich (phi &gt; 1; RQL, reformers)
+										</option>
+									</select>
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`fb_Tt_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Fuel Tt (K)
+									</label>
+									<NumericInput
+										id={`fb_Tt_${selectedNode.id}`}
+										value={d.Tt ?? 300}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { Tt: val })
+										}
+										className="p-2 border rounded"
+									/>
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`fb_guess_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Fuel flow guess (kg/s, optional)
+									</label>
+									<NumericInput
+										id={`fb_guess_${selectedNode.id}`}
+										value={d.m_dot_guess ?? null}
+										placeholder="from the target"
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { m_dot_guess: val })
+										}
+										onClear={() =>
+											updateNodeData(selectedNode.id, {
+												m_dot_guess: undefined,
+											})
+										}
+										className="p-2 border rounded"
+									/>
+								</div>
+								{res && typeof res.m_dot === "number" && (
+									<div className="text-[11px] font-mono text-stone-600 leading-snug">
+										m_dot {res.m_dot.toPrecision(5)} kg/s
+										{typeof res.phi === "number"
+											? `, phi ${res.phi.toFixed(4)}`
+											: ""}
+										{typeof res.Tt_without_fuel === "number"
+											? `; ${res.Tt_without_fuel.toFixed(1)} K without it`
+											: ""}
+									</div>
+								)}
+								<CompositionEditor
+									key={selectedNode.id}
+									nodeId={selectedNode.id}
+									data={selectedNode.data}
+								/>
+								<InitialGuessEditor node={selectedNode} />
+							</div>
+						);
+					})()}
+
 				{selectedNode.type === "pressure_boundary" && (
 					<>
 						<UnitInput
@@ -4317,6 +4455,7 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		// inlet). Short key "P" is broadcast to both by the backend; we show
 		// it only where at least one of the two is actually an unknown.
 		mass_boundary: [{ key: "P", unit: "Pa" }],
+		fuel_boundary: [{ key: "P", unit: "Pa" }],
 		// Elements (edges in React Flow but still nodes here): m_dot only.
 		channel: [{ key: "m_dot", unit: "kg/s" }],
 		orifice: [{ key: "m_dot", unit: "kg/s" }],

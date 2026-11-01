@@ -1287,6 +1287,8 @@ mass_in = MassFlowBoundary("mass_in", m_dot=0.1, Tt=400, Y=air)
 # above the peak is refused with the reason. Reports fuel.m_dot and fuel.phi.
 # `combustor` names the controlled node, like a probe: the fuel may reach it
 # through any elements (fuel line, premix plenum), as long as all of it does.
+# Air through a pressure boundary: a cold solve first holds the fuel at its
+# start, solves the flows, re-sizes the fuel on that air, then the controller.
 fuel = FuelBoundary("fuel", combustor="burner", Tt_target=1500.0, branch="lean", Tt=300, Y=ch4)
 
 # Closed-end boundary (zero mass flow)

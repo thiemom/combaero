@@ -3,6 +3,7 @@ import { BaseEdge, useStore as useFlowStore } from "reactflow";
 import {
 	borderPoint,
 	edgeLabelPoint,
+	FUEL_LINK_COLOR,
 	nodeRect,
 	type Point,
 	PROBE_LINK_COLOR,
@@ -10,6 +11,7 @@ import {
 } from "../utils/probeLink";
 
 const SELECTED_COLOR = "#57534e";
+const FUEL_SELECTED_COLOR = "#854d0e";
 
 /**
  * A probe's link to its target (#856), derived from the probe's target_id
@@ -17,6 +19,9 @@ const SELECTED_COLOR = "#57534e";
  * as a heat source's dashed link. It runs border to border between the probe
  * and a target node, or to a thermal wall's label box. Selecting it and
  * pressing Delete clears the probe's target.
+ *
+ * A fuel boundary's link to the combustor it controls (#892) is the same
+ * line, dashed and in the fuel's yellow: it sets, where a probe reads.
  */
 export default function ProbeLinkEdge({
 	id,
@@ -55,7 +60,14 @@ export default function ProbeLinkEdge({
 		end = borderPoint(nodeRect(a), probeCentre);
 	}
 	const start = borderPoint(probeBox, end);
-	const color = selected ? SELECTED_COLOR : PROBE_LINK_COLOR;
+	const control = data.kind === "node" && data.control === true;
+	const color = control
+		? selected
+			? FUEL_SELECTED_COLOR
+			: FUEL_LINK_COLOR
+		: selected
+			? SELECTED_COLOR
+			: PROBE_LINK_COLOR;
 
 	return (
 		<>
@@ -65,8 +77,8 @@ export default function ProbeLinkEdge({
 				interactionWidth={12}
 				style={{
 					stroke: color,
-					strokeWidth: selected ? 1.5 : 1,
-					strokeDasharray: "1 3",
+					strokeWidth: (selected ? 1.5 : 1) * (control ? 1.25 : 1),
+					strokeDasharray: control ? "5 3" : "1 3",
 					strokeLinecap: "round",
 				}}
 			/>

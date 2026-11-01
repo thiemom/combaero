@@ -14,6 +14,7 @@ from combaero.network import (
     ChannelElement,
     CombustorNode,
     FlowNetwork,
+    FuelBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
@@ -60,7 +61,8 @@ def test_handles_match_the_generated_table() -> None:
     )
     for kind, (out, inp) in FLOW_HANDLES.items():
         assert out in table[kind]["outlets"], kind
-        assert inp in table[kind]["inlets"], kind
+        # None on a kind with no inlets at all: it only supplies (a fuel boundary).
+        assert inp in table[kind]["inlets"] or (inp is None and not table[kind]["inlets"]), kind
     assert "side-target" in table["momentum_chamber"]["inlets"]
 
 
@@ -241,3 +243,35 @@ def test_layouts() -> None:
     assert next(n for n in given["nodes"] if n["id"] == "c")["data"]["label"] == "Pipe"
     with pytest.raises(ValueError, match="no position"):
         network_to_gui(net, layout={"a": (0, 0)})
+
+
+@pytest.mark.parametrize(("target", "branch"), [(1500.0, "lean"), (2000.0, "rich")])
+def test_a_fuel_controller_round_trips(target: float, branch: str) -> None:
+    """#892: exported as a fuel boundary naming its combustor -- not as the
+    MassFlowBoundary it subclasses, which would fix the fuel flow -- and the
+    GUI solve finds the same fuel flow on the same branch."""
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("air", Pt=2.5e5, Tt=600.0, Y=AIR))
+    net.add_node(
+        FuelBoundary("fuel", combustor="burner", Tt_target=target, branch=branch, Tt=300.0, Y=CH4)
+    )
+    net.add_node(CombustorNode("burner"))
+    net.add_node(PressureBoundary("out", Pt=2.3e5, Tt=target, Y=AIR))
+    net.add_element(
+        OrificeElement(
+            "inlet", "air", "burner", diameter=0.06, Cd=0.8, correlation="fixed", in_pipe=False
+        )
+    )
+    net.add_element(LosslessConnectionElement("inj", "fuel", "burner"))
+    net.add_element(
+        OrificeElement(
+            "exit", "burner", "out", diameter=0.05, Cd=0.8, correlation="fixed", in_pipe=False
+        )
+    )
+    doc, direct, gui = _both(net)
+    fuel = next(n for n in doc["nodes"] if n["id"] == "fuel")
+    assert fuel["type"] == "fuel_boundary"
+    assert fuel["data"]["combustor_id"] == "burner"
+    assert fuel["data"]["branch"] == branch
+    _same(direct, gui, ["fuel.m_dot", "fuel.phi", "burner.Tt", "inlet.m_dot"])
+    assert gui["burner.Tt"] == pytest.approx(target, abs=1e-3)

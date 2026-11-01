@@ -197,6 +197,23 @@ class MassBoundaryData(BaseModel):
     label: str | None = None
 
 
+class FuelBoundaryData(BaseModel):
+    """A fuel controller (#892): the fuel flow that puts ``combustor_id``'s
+    exit at ``Tt_target``, on the ``branch`` asked for."""
+
+    model_config = ConfigDict(extra="ignore")
+    combustor_id: str | None = None
+    Tt_target: float = 1500.0
+    branch: Literal["lean", "rich"] = "lean"
+    Tt: float = 300.0
+    composition: CompositionData = Field(
+        default_factory=lambda: CompositionData(source="fuel", mode="mole")
+    )
+    m_dot_guess: float | None = None
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
+
+
 class PressureBoundaryData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     Pt: float = 101325.0

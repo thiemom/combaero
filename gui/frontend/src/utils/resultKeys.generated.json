@@ -377,6 +377,32 @@
 			"u_ref",
 			"velocity"
 		],
+		"fuel_boundary": [
+			"state.P",
+			"state.Pr",
+			"state.Pt",
+			"state.T",
+			"state.Tt",
+			"state.Tt_target",
+			"state.Tt_without_fuel",
+			"state.a",
+			"state.cp",
+			"state.cv",
+			"state.gamma",
+			"state.h",
+			"state.k",
+			"state.ln_m_dot",
+			"state.m_dot",
+			"state.mach",
+			"state.mu",
+			"state.mw",
+			"state.nu",
+			"state.phi",
+			"state.rho",
+			"state.rich_branch",
+			"state.s",
+			"state.u"
+		],
 		"heat_source": [
 			"Q",
 			"Tt_target",
@@ -797,6 +823,9 @@
 		"film_cooling": [
 			"palette"
 		],
+		"fuel_boundary": [
+			"palette"
+		],
 		"heat_source": [
 			"palette",
 			"outlet Tt (total)",
@@ -926,6 +955,7 @@
 		"Tt_in": "K",
 		"Tt_out": "K",
 		"Tt_target": "K",
+		"Tt_without_fuel": "K",
 		"U1_over_Vi_max": "-",
 		"UA": "W/K",
 		"U_gas": "m/s",
@@ -1010,6 +1040,7 @@
 		"jet_flow_nonuniformity": "-",
 		"k": "W/m/K",
 		"k_ref": "W/m/K",
+		"ln_m_dot": "-",
 		"loss_ratio": "-",
 		"m_dot": "kg/s",
 		"m_dot_bleed": "kg/s",
@@ -1086,6 +1117,7 @@
 		"regime_incompressible": "-",
 		"rho": "kg/m\u00b3",
 		"rho_ref": "kg/m\u00b3",
+		"rich_branch": "-",
 		"s": "J/kg/K",
 		"s_choke": "-",
 		"s_ref": "J/kg/K",

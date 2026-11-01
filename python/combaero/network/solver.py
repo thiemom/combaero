@@ -1551,23 +1551,7 @@ class NetworkSolver:
         ]
         m_air_guessed = sum(abs(mdot_guess.get(e.id, ref["m_dot"])) for e in inflow)
         m_air = m_air_guessed or ref["m_dot"]
-        # The oxidizer's sources: every flow boundary upstream of the
-        # combustor that is not the fuel (a premix plenum's air, or direct).
-        seen: set[str] = set()
-        stack = [comb]
-        sources = []
-        while stack:
-            nid = stack.pop()
-            for e in self.network.get_upstream_elements(nid):
-                up = e.from_node
-                if up in seen or up == node.id:
-                    continue
-                seen.add(up)
-                upn = self.network.nodes[up]
-                if isinstance(upn, (PressureBoundary, MassFlowBoundary)):
-                    sources.append(upn)
-                else:
-                    stack.append(up)
+        sources = self._fuel_oxidizer_sources(node)
         # Known before the solve: no source can supply oxidizer -- none
         # upstream, or only fixed flows of zero. Every flow could then vanish
         # and the Tt row be met by an undetermined state (a "root" Linux CI
@@ -1614,6 +1598,26 @@ class NetworkSolver:
                 "complete combustion)."
             )
             return 0.01 * m_air
+
+    def _fuel_oxidizer_sources(self, node: "FuelBoundary") -> list[NetworkNode]:
+        """The oxidizer's sources: every flow boundary upstream of the
+        combustor that is not this fuel (a premix plenum's air, or direct)."""
+        seen: set[str] = set()
+        stack = [node.combustor]
+        sources: list[NetworkNode] = []
+        while stack:
+            nid = stack.pop()
+            for e in self.network.get_upstream_elements(nid):
+                up = e.from_node
+                if up in seen or up == node.id:
+                    continue
+                seen.add(up)
+                upn = self.network.nodes[up]
+                if isinstance(upn, (PressureBoundary, MassFlowBoundary)):
+                    sources.append(upn)
+                else:
+                    stack.append(up)
+        return sources
 
     def _fuel_flow_for(
         self,
@@ -4048,6 +4052,32 @@ class NetworkSolver:
             heated = self._rayleigh_heated_elements()
             if heated:
                 return self._solve_rayleigh_staged(heated, kw)
+        staged_first: list[Any] = []
+        if x0 is None and auto_retry and not getattr(self, "_in_fuel_fixed_stage", False):
+            # A fuel controller whose oxidizer comes through a pressure
+            # boundary (#892): its start is sized on a guessed air flow, which
+            # can be decades off, so the fuel-fixed stage runs FIRST and the
+            # plain cold chain only if it fails -- after a failed cold attempt
+            # the C3X rig network (GUI budget 30 s) had 0.2 s left.
+            self.network.resolve_all_topology()
+            guessed = [
+                n
+                for n in self.network.nodes.values()
+                if isinstance(n, FuelBoundary)
+                and n.m_dot_guess is None
+                and any(isinstance(b, PressureBoundary) for b in self._fuel_oxidizer_sources(n))
+            ]
+            if guessed:
+                staged_first = guessed
+                _t0 = time.time()
+                staged = self._solve_fuel_fixed_staged(
+                    guessed, {"__message__": ""}, method, timeout, options, use_jac, _t0
+                )
+                if staged is not None:
+                    return self._with_caught(staged)
+                if timeout is not None:
+                    kw["timeout"] = max(timeout - (time.time() - _t0), 1.0)
+                    timeout = kw["timeout"]
         self._caught_exceptions = []
         self._caught_count = 0
         _t0 = time.time()
@@ -4063,6 +4093,18 @@ class NetworkSolver:
         )
         if sol.get("__success__", False) or not auto_retry or x0 is not None:
             return self._with_caught(sol)
+        if not getattr(self, "_in_fuel_fixed_stage", False):
+            fuels = [
+                n
+                for n in self.network.nodes.values()
+                if isinstance(n, FuelBoundary) and n not in staged_first
+            ]
+            if fuels:
+                staged = self._solve_fuel_fixed_staged(
+                    fuels, sol, method, timeout, options, use_jac, _t0
+                )
+                if staged is not None:
+                    return self._with_caught(staged)
         if not getattr(self, "_in_constant_cd_stage", False):
             plates = self._crossflow_cd_plates()
             if plates:
@@ -4141,6 +4183,77 @@ class NetworkSolver:
             for el in self.network.elements.values()
             if isinstance(el, ImpingementPlateElement) and el.cd_crossflow != "none"
         ]
+
+    def _solve_fuel_fixed_staged(
+        self,
+        fuels: list["FuelBoundary"],
+        failed: dict[str, Any],
+        method: str,
+        timeout: float | None,
+        options: dict[str, Any] | None,
+        use_jac: bool,
+        t0: float,
+    ) -> dict[str, Any] | None:
+        """Retry of a failed cold solve with fuel controllers (#892): first
+        with each fuel flow held at its start (the full retry chain), then the
+        fuel re-sized on the oxidizer that root carries, and the controllers
+        solved from there. None if either stage fails.
+
+        A fuel start is sized on the guessed oxidizer flow, which can be
+        decades off: the C3X rig's burner carries 27 kg/s against the generic
+        0.01 kg/s reference, so the controller started 2700x lean and the cold
+        solve stalled at |F| 5e4, where the same network with its fuel fixed
+        solves.
+        """
+
+        def left() -> float | None:
+            return None if timeout is None else max(timeout - (time.time() - t0), 1.0)
+
+        if timeout is not None and timeout - (time.time() - t0) <= 1.0:
+            return None
+        x_start = self._build_x0()
+        idx = {n: i for i, n in enumerate(self.unknown_names)}
+        self._in_fuel_fixed_stage = True
+        was = [f._frozen_ln_m for f in fuels]
+        try:
+            for f in fuels:
+                f._frozen_ln_m = float(x_start[idx[f.m_dot_unknown]])
+            seed = self.solve(method=method, timeout=left(), options=options, use_jac=use_jac)
+        finally:
+            for f, v in zip(fuels, was, strict=True):
+                f._frozen_ln_m = v
+            self._in_fuel_fixed_stage = False
+        if not seed.get("__success__", False) or seed.get("__x_solution__") is None:
+            return None
+        x = np.asarray(seed["__x_solution__"], dtype=float).copy()
+        idx = {n: i for i, n in enumerate(self.unknown_names)}
+        # The node states at the seed, for the oxidizer each fuel burns with.
+        self._residuals_and_jacobian(x, compute_jacobian=False)
+        for f in fuels:
+            streams, Y_f = self._fuel_inflows(f, x, seed)
+            if not streams:
+                return None
+            m_ox, T_ox, Y_ox = streams[0]
+            try:
+                m = max(self._fuel_flow_for(f, m_ox, T_ox, Y_ox, Y_f), 1e-9 * m_ox)
+            except (ValueError, RuntimeError):
+                return None  # no root on its branch: the primary's reason stands
+            x[idx[f.m_dot_unknown]] = math.log(m)
+            for eid in f._fuel_path_elements(self.network):
+                k = idx.get(f"{eid}.m_dot")
+                if k is not None:
+                    x[k] = m
+        sol = self.solve(method=method, timeout=left(), options=options, use_jac=use_jac, x0=x)
+        if not sol.get("__success__", False):
+            return None
+        primary_msg = str(failed.get("__message__", "")).strip()
+        why = f"; the primary attempt failed with: {primary_msg}" if primary_msg else ""
+        sol["__message__"] = (
+            f"{str(sol.get('__message__', '')).strip()} [from the fuel-fixed solution: "
+            "the flows solved with each fuel flow held at its start, then the fuel "
+            f"controllers{why}]"
+        )
+        return sol
 
     def _solve_constant_cd_staged(
         self,

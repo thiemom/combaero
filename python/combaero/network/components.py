@@ -3193,6 +3193,9 @@ class FuelBoundary(MassFlowBoundary):
         self._guess_note = ""
         #: The oxidizer at the start state [(m_dot, Tt, Y)], for diagnosing a failed solve.
         self._start_oxidizer: list[tuple[float, float, list[float]]] = []
+        #: ln(m_dot) the flow is held at instead of the target, while the
+        #: solver's fuel-fixed stage solves the flows first (None: the target).
+        self._frozen_ln_m: float | None = None
 
     @property
     def m_dot_unknown(self) -> str:
@@ -3208,6 +3211,13 @@ class FuelBoundary(MassFlowBoundary):
         self, state: NetworkMixtureState
     ) -> tuple[list[float], dict[int, dict[str, float]]]:
         res, jac = super().residuals(state)
+        if self._frozen_ln_m is not None:
+            # The fuel-fixed stage: the flow held, the row kept in kelvin.
+            jac[len(res)] = {self.m_dot_unknown: self.Tt_target}
+            res.append(
+                (math.log(max(float(self.m_dot), 1e-300)) - self._frozen_ln_m) * self.Tt_target
+            )
+            return res, jac
         Tt = self._target_Tt if self._target_Tt is not None else self.Tt_target
         jac[len(res)] = {f"{self.combustor}.Tt": 1.0}
         res.append(float(Tt) - self.Tt_target)

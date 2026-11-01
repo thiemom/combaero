@@ -3,6 +3,10 @@
 // the one source of truth; the link is derived from it on every render and
 // never stored, so saved files need no migration and the backend never sees
 // it (graph_builder drops probes before the solve anyway).
+//
+// A fuel boundary (#892) draws the same derived link, dashed, to the combustor
+// whose exit Tt it sets: its data.combustor_id. That one IS solved -- the
+// backend builds the controller from it -- so changing it is structural.
 
 import {
 	type Edge,
@@ -24,6 +28,16 @@ export const PROBE_LINK_HANDLE = "probe-out";
 export const PROBE_LINK_TYPE = "probe_link";
 /** Muted stone, apart from flow (dark grey) and heat or thermal (orange/red). */
 export const PROBE_LINK_COLOR = "#a8a29e";
+/** A fuel boundary's link to the combustor it controls: the fuel's yellow. */
+export const FUEL_LINK_COLOR = "#ca8a04";
+
+/** The node kinds that draw a derived link, and the data field naming the
+ *  link's target. Both carry the two link handles (PROBE_HANDLE and
+ *  PROBE_LINK_HANDLE), so a drag from either works the same way. */
+export const LINK_FIELD: Readonly<Record<string, string>> = {
+	probe: "target_id",
+	fuel_boundary: "combustor_id",
+};
 
 const LINK_PREFIX = "probe-link:";
 
@@ -45,7 +59,8 @@ export function probeOfLink(edgeId: string): string | null {
 const isThermal = (e: Edge): boolean => e.data?.type === "thermal";
 
 /** Whether a probe may read this node or edge: any node but a probe, or a
- *  thermal wall (the only edges a solve gives results for). */
+ *  thermal wall (the only edges a solve gives results for). A fuel boundary
+ *  may control a combustor, nothing else. */
 export function isProbeTarget(
 	probeId: string,
 	targetId: string,
@@ -54,6 +69,8 @@ export function isProbeTarget(
 ): boolean {
 	if (targetId === probeId) return false;
 	const node = nodes.find((n) => n.id === targetId);
+	const from = nodes.find((n) => n.id === probeId);
+	if (from?.type === "fuel_boundary") return node?.type === "combustor";
 	if (node) return !DISPLAY_ONLY_KINDS.has(node.type ?? "");
 	const edge = edges.find((e) => e.id === targetId);
 	return !!edge && isThermal(edge);
@@ -62,7 +79,7 @@ export function isProbeTarget(
 /** What a link edge carries: the target node, or the wall's ends and box
  *  offset so the link can find the wall's label point. */
 export type ProbeLinkData =
-	| { kind: "node"; targetId: string }
+	| { kind: "node"; targetId: string; control?: boolean }
 	| {
 			kind: "edge";
 			targetId: string;
@@ -88,12 +105,18 @@ export function probeLinkEdges(
 	const edgeById = new Map(edges.map((e) => [e.id, e]));
 	const links: Edge<ProbeLinkData>[] = [];
 	for (const p of nodes) {
-		if (p.type !== "probe") continue;
-		const targetId: string | undefined = p.data?.target_id;
+		const field = LINK_FIELD[p.type ?? ""];
+		if (!field) continue;
+		const targetId: string | undefined = p.data?.[field];
 		if (!targetId || targetId === p.id) continue;
+		const control = p.type === "fuel_boundary";
 		let data: ProbeLinkData | null = null;
 		if (nodeIds.has(targetId)) {
-			data = { kind: "node", targetId };
+			data = control
+				? { kind: "node", targetId, control }
+				: { kind: "node", targetId };
+		} else if (control) {
+			continue;
 		} else {
 			const wall = edgeById.get(targetId);
 			if (wall) {
