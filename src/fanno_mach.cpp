@@ -1,6 +1,7 @@
 #include "../include/fanno_mach.h"
 
 #include "../include/composition.h"
+#include "../include/inner_solve.h"
 #include "../include/solver_interface.h"
 #include "../include/stagnation.h"
 #include "../include/thermo.h"
@@ -10,6 +11,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -58,7 +60,8 @@ double static_T(double Tt, double M, const std::vector<double>& X, double T_gues
     const double g = isentropic_expansion_coefficient(Tt, X);
     T = Tt / (1.0 + 0.5 * (g - 1.0) * M * M);
   }
-  for (int it = 0; it < 100; ++it) {
+  constexpr int kMaxIter = 100;
+  for (int it = 0; it < kMaxIter; ++it) {
     const double f = F(T);
     if (f > 0.0) {
       hi = T;
@@ -75,7 +78,11 @@ double static_T(double Tt, double M, const std::vector<double>& X, double T_gues
     }
     T = T_new;
   }
-  return T;
+  // A cap exit is a root only if the bracket has closed onto it (#868).
+  if (inner_solve::cap_exit_is_root(hi - lo, T)) {
+    return T;
+  }
+  inner_solve::throw_no_convergence("fanno static_T", kMaxIter, "h residual [J/kg]", F(T));
 }
 
 double friction(double Re, double e_D, const std::string& model, double f_mult) {
@@ -120,9 +127,19 @@ double composite_gl(const Fn& f, double a, double b) {
   return total;
 }
 
-// Brent's method for a sign change of fn on [a, b].
+// Brent's method for a sign change of fn on [a, b]. Without one there is no
+// root to converge to and it throws: the bracket searches before each call
+// stop at a budget (60 e-folds of flux, for example), and an interval they
+// leave unbracketed used to return a point of it as the root (#868).
 template <typename Fn>
 double brent(const Fn& fn, double a, double b, double fa, double fb, double rel_tol) {
+  if (fa != 0.0 && fb != 0.0 && (fa > 0.0) == (fb > 0.0)) {
+    char buf[160];
+    std::snprintf(buf, sizeof buf,
+                  "fanno (Mach) brent: no sign change on [%.6e, %.6e] (f = %.6e, %.6e)", a, b,
+                  fa, fb);
+    throw std::runtime_error(buf);
+  }
   double c = a, fc = fa, d = b - a, e = d;
   for (int it = 0; it < 200; ++it) {
     if ((fb > 0.0) == (fc > 0.0)) {
@@ -303,7 +320,8 @@ double fanno_inlet_mach(double Pt, double Tt, double G, const std::vector<double
   auto fn = [&](double M) { return isentropic_flux(Pt, Tt, M, X) - G; };
   double lo = 0.0, hi = 1.0;
   double M = std::min(G / G_max, 0.9);
-  for (int it = 0; it < 60; ++it) {
+  constexpr int kMaxIter = 60;
+  for (int it = 0; it < kMaxIter; ++it) {
     const double f = fn(M);
     if (f > 0.0) {
       hi = M;
@@ -311,7 +329,11 @@ double fanno_inlet_mach(double Pt, double Tt, double G, const std::vector<double
       lo = M;
     }
     const double h = 1e-7 * std::max(M, 1e-3);
-    const double fp = (fn(std::min(M + h, 1.0)) - fn(M - h)) / (std::min(M + h, 1.0) - (M - h));
+    // The stencil stays at M > 0: the flux is 0 for M <= 0, so a central
+    // difference across it read half the slope below M = h (G < ~1e-10 of the
+    // sonic flux), and Newton 2-cycled about the root (#868).
+    const double M_minus = (M - h > 0.0) ? M - h : M;
+    const double fp = (fn(std::min(M + h, 1.0)) - fn(M_minus)) / (std::min(M + h, 1.0) - M_minus);
     double M_new = (fp > 0.0) ? M - f / fp : 0.5 * (lo + hi);
     if (!(M_new > lo && M_new < hi)) {
       M_new = 0.5 * (lo + hi);
@@ -321,7 +343,12 @@ double fanno_inlet_mach(double Pt, double Tt, double G, const std::vector<double
     }
     M = M_new;
   }
-  return M;
+  // A cap exit is a root only if the bracket has closed onto it (#868).
+  if (inner_solve::cap_exit_is_root(hi - lo, M)) {
+    return M;
+  }
+  inner_solve::throw_no_convergence("fanno_inlet_mach", kMaxIter, "relative flux residual",
+                                    fn(M) / G);
 }
 
 FannoDuctResult fanno_duct(double Pt, double Tt, double G, const std::vector<double>& X,

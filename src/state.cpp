@@ -2,6 +2,7 @@
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include "../include/input_validation.h"
+#include "../include/inner_solve.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -112,13 +113,21 @@ State &State::set_VH_mass(double v_new, double h_new) {
   // h = u + Pv = u + RT => find T such that u(T) + RT = h_target
   // This is slightly more complex, but for ideal gas we can iterate
   double T_guess = T;
-  for (int i = 0; i < 20; ++i) {
+  bool converged = false;
+  double dT = 0.0;
+  for (int i = 0; i < inner_solve::kSetVHMaxIter; ++i) {
     double f = u_mass(T_guess, X) + R() * T_guess - h_new;
     double df = cv_mass(T_guess, X) + R();
-    double dT = f / df;
+    dT = f / df;
     T_guess -= dT;
-    if (std::abs(dT) < 1e-4)
+    if (std::abs(dT) < inner_solve::kSetVHTolK) {
+      converged = true;
       break;
+    }
+  }
+  if (!converged) {
+    inner_solve::throw_no_convergence("State::set_VH_mass", inner_solve::kSetVHMaxIter,
+                                      "step [K]", dT);
   }
   T = T_guess;
   P = R() * T / v_new;

@@ -126,7 +126,8 @@ tails below keep cp > 0), so each inverse has one root: safeguarded Newton
 (factor-4 steps until bracketed, bisection when a step leaves the bracket,
 converged only on a Newton step). They throw `std::runtime_error` when they do
 not converge -- a target no positive T reaches -- rather than return the last
-iterate (#606). `calc_T_from_cp` is unchanged.
+iterate (#606). `calc_T_from_cp` (plain Newton clamped to [200, 6000] K, cp
+is not monotone) throws too when it does not converge in `max_iter` (#868).
 
 ### Species Thermo Beyond the Data (#606)
 Every species' NASA-9 data starts at 200 K and ends at 20 000 K (N2, O2, AR,
@@ -657,6 +658,19 @@ double fanno_max_length(double T_in, double P_in, double u_in,
                        double D, double f, const std::vector<double>& X,
                        double tol = 1e-6, std::size_t max_iter = 100);
 ```
+
+Inner solves that reach their iteration cap without converging throw
+`std::runtime_error` naming the function and the last residual, rather than
+return the last iterate (#868): the isentropic and Fanno-march static-T
+Newtons, the Fanno marches themselves (step budget), `Tt_from_static_v`,
+`T_from_stagnation`, `chamber_static_state`, `sonic_static_state`, the merge
+face fixed point, `friction_colebrook`, and the bracketed solves (Fanno
+`static_T`, `fanno_inlet_mach`, area-change, `pipe_equivalent_c`,
+`jobson_expansibility`) unless their bracket or last step has closed to
+`inner_solve::kCapAcceptRel` (1e-10, `inner_solve.h`). The `T_FLOOR` clamp is
+unchanged (a root below the floor returns the floor). The Fanno-Mach `brent`
+throws when called without a sign change. Audit and the solves left as they
+are: `docs/archive/AUDIT_868_INNER_SOLVES.md`.
 
 The inverse solvers refuse non-positive inputs (`std::invalid_argument`);
 `solve_P_back_from_mdot` throws `std::runtime_error` above the choked flow and

@@ -1,5 +1,7 @@
 #include "crossflow_cd.h"
 
+#include "inner_solve.h"
+
 #include <cmath>
 #include <stdexcept>
 
@@ -139,7 +141,7 @@ CrossflowCd florschuetz_metzger_su_1982_cd(double xn_d, double yn_d, double z_d,
   if (!on_line) {
     double cd = plate->cd0;
     const double cd_max = 4.0 * plate->cd0;
-    for (int it = 0; it < 100; ++it) {
+    for (int it = 0;; ++it) {
       const double x = 1.0 / (cd * q);
       const double z = m * std::pow(x + x0, -n);
       const double dz_dx = -n * z / (x + x0);
@@ -152,9 +154,17 @@ CrossflowCd florschuetz_metzger_su_1982_cd(double xn_d, double yn_d, double z_d,
         next = cd_max;
       }
       const bool done = std::abs(next - cd) <= 1e-15 * plate->cd0;
+      const double step = next - cd;
       cd = next;
       if (done) {
         break;
+      }
+      if (it + 1 == inner_solve::kCrossflowCdMaxIter) {
+        if (inner_solve::cap_exit_is_root(step, plate->cd0)) {
+          break;
+        }
+        inner_solve::throw_no_convergence("crossflow_cd (falling branch)",
+                                          inner_solve::kCrossflowCdMaxIter, "Cd step", step);
       }
     }
     const double x = 1.0 / (cd * q);

@@ -6,6 +6,7 @@
 
 #include "composition.h"
 #include "compressible.h"
+#include "inner_solve.h"
 #include "solver_interface.h"
 #include "stagnation.h"
 #include "thermo.h"
@@ -168,7 +169,7 @@ MergeFaceState chamber_merge_face_state(double m_main, double Tt_main,
   double P_f = Pi;
   bool choked = false;
   ChamberStaticState fs{};
-  for (int it = 0; it < 100; ++it) {
+  for (int it = 0;; ++it) {
     const double D_raw = Pi * Pi - 4.0 * c * T_f;
     const double D_min = MERGE_DISCRIMINANT_FLOOR * Pi * Pi;
     choked = D_raw < D_min;
@@ -178,6 +179,15 @@ MergeFaceState chamber_merge_face_state(double m_main, double Tt_main,
     T_f = fs.T;
     if (std::abs(dT) <= 1e-12 * Tt_main) {
       break;
+    }
+    if (it + 1 == inner_solve::kMergeFaceMaxIter) {
+      if (inner_solve::cap_exit_is_root(dT, Tt_main)) {
+        break;
+      }
+      // A fixed point that has not contracted: (P_f, T_f) is not the face
+      // state, and the implicit derivatives below would describe a non-root.
+      inner_solve::throw_no_convergence("merge face state (side_stream_momentum)",
+                                        inner_solve::kMergeFaceMaxIter, "T step [K]", dT);
     }
   }
   MergeFaceState out;

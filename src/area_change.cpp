@@ -2,6 +2,7 @@
 
 #include "composition.h"
 #include "dual_number.h"
+#include "inner_solve.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
 #include "thermo.h"
 #include "transport.h"
@@ -585,7 +586,7 @@ double solve_param(bool inc, double drive, double hi, double guess, double Pt0, 
     double u_hi = std::log(p_hi);
     double u = std::log(std::clamp(guess, p_lo, p_hi));
     const double ln_drive = std::log(drive);
-    for (int it = 0; it < 200; ++it) {
+    for (int it = 0; it < inner_solve::kAreaChangeMaxIter; ++it) {
         const double p = std::exp(u);
         const double f = std::log(loss_at(inc, p, Pt0, Tt0, b, gas)) - ln_drive;
         if (f > 0.0) {
@@ -603,7 +604,12 @@ double solve_param(bool inc, double drive, double hi, double guess, double Pt0, 
         }
         u = u_new;
     }
-    return std::exp(u);
+    // A cap exit is a root only if the bracket (in ln p) has closed (#868).
+    if (inner_solve::cap_exit_is_root(u_hi - u_lo, std::max(1.0, std::abs(u)))) {
+        return std::exp(u);
+    }
+    inner_solve::throw_no_convergence("area_change (solve_param)", inner_solve::kAreaChangeMaxIter,
+                                      "bracket width in ln p", u_hi - u_lo);
 }
 
 // The flow at a drive >= 0, without a floor. dm/d(drive) and dm/dPt0 at
@@ -763,7 +769,7 @@ AreaChangeLoss area_change_loss(double m_dot_abs, double Pt0, double Tt0,
             double lo = 0.0;
             double hi = 1.0;
             double M = std::min(Ga / flux(1.0), 0.9);
-            for (int it = 0; it < 200; ++it) {
+            for (int it = 0;; ++it) {
                 using D1 = DualN<1>;
                 const auto e = eval_compressible<D1>(D1::seed(M, 0), D1::constant(Pt0),
                                                      D1::constant(Tt0), D1::constant(gas.g),
@@ -785,6 +791,14 @@ AreaChangeLoss area_change_loss(double m_dot_abs, double Pt0, double Tt0,
                     break;
                 }
                 M = M_new;
+                if (it + 1 == inner_solve::kAreaChangeMaxIter) {
+                    if (inner_solve::cap_exit_is_root(hi - lo, M)) {
+                        break;
+                    }
+                    inner_solve::throw_no_convergence(
+                        "area_change_loss (Mach)", inner_solve::kAreaChangeMaxIter,
+                        "bracket width", hi - lo);
+                }
             }
             p = M;
         }

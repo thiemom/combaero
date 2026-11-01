@@ -7,6 +7,7 @@
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include "../include/input_validation.h"
+#include "../include/inner_solve.h"
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
@@ -72,11 +73,15 @@ double Tt_from_static_v(double T, double v, const std::vector<double>& X,
 
     constexpr double T_MIN = thermo::T_FLOOR;  // as compressible.cpp solve_T_isentropic
 
+    double F = 0.0;
     for (std::size_t it = 0; it < max_iter; ++it) {
-        double F = h_mass_at(T0, X) - h0;
+        F = h_mass_at(T0, X) - h0;
         double dF = cp_mass_at(T0, X);
 
         if (std::abs(dF) < 1e-30) break;
+        // Held at the floor with the root below it: every further step is
+        // clamped back to T_MIN, the value the cap returned before (#868).
+        if (T0 == T_MIN && F > 0.0) return T0;
 
         double dT = -F / dF;
         double max_step = 0.5 * T0;
@@ -90,7 +95,7 @@ double Tt_from_static_v(double T, double v, const std::vector<double>& X,
             return T0;
         }
     }
-    return T0;
+    inner_solve::throw_no_convergence("Tt_from_static_v", max_iter, "h residual [J/kg]", F);
 }
 
 double Tt_from_static(double T, double M, const std::vector<double>& X,
@@ -123,14 +128,19 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
 
     constexpr double T_MIN = thermo::T_FLOOR;  // as compressible.cpp solve_T_isentropic
 
+    double F = 0.0;
     for (std::size_t it = 0; it < max_iter; ++it) {
         double a_val = speed_of_sound(T, X);
         double v = M * a_val;
-        double F = h_mass_at(T, X) + 0.5 * v * v - h0;
+        F = h_mass_at(T, X) + 0.5 * v * v - h0;
         // dF/dT ~ cp + M^2 * a^2 / (2T)
         double dF = cp_mass_at(T, X) + M * M * a_val * a_val / (2.0 * T);
 
         if (std::abs(dF) < 1e-30) break;
+        // Held at the floor with the root below it: every further step is
+        // clamped back to T_MIN, so the floor is the answer the cap would
+        // have returned (#868).
+        if (T == T_MIN && F > 0.0) return T;
 
         double dT = -F / dF;
         double max_step = 0.5 * T;
@@ -144,7 +154,7 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
             return T;
         }
     }
-    return T;
+    inner_solve::throw_no_convergence("T_from_stagnation", max_iter, "h residual [J/kg]", F);
 }
 
 // -------------------------------------------------------------
@@ -311,13 +321,20 @@ ChamberStaticState chamber_static_state(double Tt, double P, double G,
   auto cp_over_T = [&](double t) { return cp_mass(t, X) / t; };
   // f(T) = [h(Tt) - h(T)] - k T^2 / 2, the enthalpy difference integrated.
   double T = Tt;
-  for (int it = 0; it < 100; ++it) {
+  for (int it = 0;; ++it) {
     const double f = gl8_split(cp_of, T, Tt) - 0.5 * k * T * T;
     const double fT = -cp_mass(T, X) - k * T;
     const double step = f / fT;
     T -= step;
     if (std::abs(step) <= 1e-13 * Tt) {
       break;
+    }
+    if (it + 1 == inner_solve::kStaticStateMaxIter) {
+      if (inner_solve::cap_exit_is_root(step, Tt)) {
+        break;
+      }
+      inner_solve::throw_no_convergence("chamber_static_state", inner_solve::kStaticStateMaxIter,
+                                        "step [K]", step);
     }
   }
   ChamberStaticState out{};
@@ -388,7 +405,7 @@ SonicStaticState sonic_static_state(double Tt, double G,
   const double g0 = gamma_and_d(Tt, dg0);
   double T = 2.0 * Tt / (g0 + 1.0);
   double dFdT = -1.0;
-  for (int it = 0; it < 100; ++it) {
+  for (int it = 0;; ++it) {
     double dg = 0.0;
     const double g = gamma_and_d(T, dg);
     const double F = gl8_split(cp_m, T, Tt) - 0.5 * g * R * T;
@@ -397,6 +414,13 @@ SonicStaticState sonic_static_state(double Tt, double G,
     T -= step;
     if (std::abs(step) <= 1e-13 * Tt) {
       break;
+    }
+    if (it + 1 == inner_solve::kStaticStateMaxIter) {
+      if (inner_solve::cap_exit_is_root(step, Tt)) {
+        break;
+      }
+      inner_solve::throw_no_convergence("sonic_static_state", inner_solve::kStaticStateMaxIter,
+                                        "step [K]", step);
     }
   }
   double dg = 0.0;

@@ -7,6 +7,7 @@
 
 #include "friction.h"
 #include "input_validation.h"
+#include "inner_solve.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -87,6 +88,7 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
   const double ln10 = std::log(10.0);
   double x = 1.0 / std::sqrt(f);
 
+  double dx = 0.0;
   for (int iter = 0; iter < max_iter; ++iter) {
     double arg = e_D / serghides::coeff_roughness +
                  serghides::coeff_reynolds_BC * x / Re;
@@ -100,18 +102,20 @@ double friction_colebrook(double Re, double e_D, double tol, int max_iter) {
     if (std::abs(dF) < 1e-30)
       break;
 
-    double dx = -F / dF;
+    dx = -F / dF;
     x += dx;
 
     if (x <= 0.0)
       x = 0.1;
 
     if (std::abs(dx) < tol * std::abs(x)) {
-      break;
+      return 1.0 / (x * x);
     }
   }
-
-  return 1.0 / (x * x);
+  // Newton from Serghides (0.3% off) meets 1e-10 in about three steps; a cap
+  // exit is not a root (#868).
+  combaero::inner_solve::throw_no_convergence("friction_colebrook", max_iter,
+                                              "relative step in 1/sqrt(f)", dx / x);
 }
 
 // -------------------------------------------------------------
