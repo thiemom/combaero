@@ -1408,6 +1408,98 @@ class NetworkSolver:
         m_map = {e.id: float(mi) for e, mi in zip(els, m, strict=True)}
         return p_map, m_map
 
+    def _fuel_inflows(
+        self, fnode: "FuelBoundary", x: np.ndarray, sol_dict: dict[str, Any]
+    ) -> tuple[list[tuple[float, float, list[float]]], list[float]]:
+        """(m_dot, Tt, Y) of each forward inflow of the fuel's combustor other
+        than the fuel, and the fuel's own Y."""
+        streams = []
+        for e in self.network.elements.values():
+            if e.to_node != fnode.combustor or e.from_node == fnode.id:
+                continue
+            m = float(sol_dict.get(f"{e.id}.m_dot", 0.0))
+            if m <= 0.0:
+                continue
+            st = self._report_state(self.network.nodes[e.from_node], x)
+            streams.append((m, float(st.Tt), list(st.Y)))
+        Y_f = fnode.Y if fnode.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
+        return streams, list(Y_f)
+
+    def _fuel_oxidizer_mix_T(
+        self, fnode: "FuelBoundary", x: np.ndarray, sol_dict: dict[str, Any]
+    ) -> float:
+        """The adiabatic mixing T of the oxidizer inflows, unburnt."""
+        streams, _ = self._fuel_inflows(fnode, x, sol_dict)
+        if not streams:
+            return float("nan")
+        mix = cb.mix([self._as_stream(m, T, Y) for m, T, Y in streams])
+        return float(mix.T)
+
+    @staticmethod
+    def _as_stream(m: float, T: float, Y: list[float]) -> Any:
+        st = cb.Stream()
+        st.set_T(T)
+        st.set_P(101325.0)
+        st.set_X(list(cb.mass_to_mole(Y)))
+        st.set_mdot(m)
+        return st
+
+    def _fuel_peak_T(self, fnode: "FuelBoundary", x: np.ndarray, sol_dict: dict[str, Any]) -> float:
+        """The combustor's Tt with exactly the stoichiometric injected fuel:
+        the peak of the reachable window (complete combustion)."""
+        streams, Y_f = self._fuel_inflows(fnode, x, sol_dict)
+        if not streams:
+            return float("nan")
+        try:
+            ox = cb.mix([self._as_stream(m, T, Y) for m, T, Y in streams])
+            Y_ox = list(cb.mole_to_mass(list(ox.X)))
+            o2_spare = Y_ox[list(cb.species.names).index("O2")] - float(
+                cb.oxygen_required_per_kg_mixture(list(ox.X))
+            )
+            need_f = float(cb.oxygen_required_per_kg_mixture(list(cb.mass_to_mole(Y_f))))
+            if o2_spare <= 0.0 or need_f <= 0.0:
+                return float("nan")
+            m_st = float(ox.mdot) * o2_spare / need_f
+            mixed = cb.mix([ox, self._as_stream(m_st, float(fnode.Tt), Y_f)])
+            return float(cb.complete_combustion(mixed.T, list(mixed.X), mixed.P).T)
+        except (ValueError, RuntimeError):
+            return float("nan")
+
+    def _fuel_reactant_view(
+        self, fnode: "FuelBoundary", x: np.ndarray, sol_dict: dict[str, Any]
+    ) -> tuple[float, float]:
+        """(phi, Tt with no injected fuel) at the combustor, from the unburnt
+        reactants (#892).
+
+        phi = O2 required by the reactants' combustible species / O2 they
+        carry (oxygen_required_per_kg_mixture over Y_O2). The products'
+        elemental phi would count the H of water vapour in humid air as fuel
+        (0.026 at 60% RH). The Tt with no injected fuel is the oxidizer
+        inflows burnt alone -- above their mixing T when they carry fuel."""
+        streams, Y_f = self._fuel_inflows(fnode, x, sol_dict)
+        if not streams:
+            return float("nan"), float("nan")
+        try:
+            names = list(cb.species.names)
+            i_o2 = names.index("O2")
+            m_f = float(fnode.m_dot)
+            m_tot = sum(m for m, _, _ in streams) + m_f
+            Y_u = [
+                (sum(m * Y[k] for m, _, Y in streams) + m_f * Y_f[k]) / m_tot
+                for k in range(len(names))
+            ]
+            o2_have = Y_u[i_o2]
+            o2_need = float(cb.oxygen_required_per_kg_mixture(list(cb.mass_to_mole(Y_u))))
+            phi = o2_need / o2_have if o2_have > 0.0 else float("inf")
+            ox = cb.mix([self._as_stream(m, T, Y) for m, T, Y in streams])
+            if float(cb.oxygen_required_per_kg_mixture(list(ox.X))) > 0.0:
+                T_without = float(cb.complete_combustion(ox.T, list(ox.X), ox.P).T)
+            else:
+                T_without = float(ox.T)
+        except (ValueError, RuntimeError):
+            return float("nan"), float("nan")
+        return phi, T_without
+
     def _fuel_guess(
         self, node: "FuelBoundary", mdot_guess: dict[str, float], ref: dict[str, Any]
     ) -> float:
@@ -1434,29 +1526,68 @@ class NetworkSolver:
             else list(cb.species.to_mass(cb.species.pure_species("CH4")))
         )
         try:
-            ox = cb.Stream()
-            ox.set_T(T_ox)
-            ox.set_P(ref["P"])
-            ox.set_X(list(cb.mass_to_mole(Y_ox)))
-            ox.set_mdot(m_air)
-            fuel = cb.Stream()
-            fuel.set_T(float(node.Tt))
-            fuel.set_P(ref["P"])
-            fuel.set_X(list(cb.mass_to_mole(Y_f)))
-            found = cb.set_fuel_stream_for_Tad(
-                node.Tt_target, fuel, ox, lean=(node.branch == "lean")
-            )
+            m = self._fuel_flow_for(node, m_air, T_ox, list(Y_ox), list(Y_f))
             node._guess_note = ""
-            return float(found.mdot)
-        except Exception as exc:
+            # The unknown is ln(m_dot): a start at ~0 leaves Newton no slope.
+            return max(m, 1e-9 * m_air)
+        except (ValueError, RuntimeError) as exc:
             # No root on that branch at the guessed oxidizer state: start lean
-            # and small; the solve then reports whether the target is reachable,
-            # with this reason.
+            # and small; the solve then reports whether the target is
+            # reachable, with this reason.
             node._guess_note = (
                 f"No {node.branch} root at the start ({exc}; oxidizer {T_ox:.1f} K, "
-                f"complete combustion, phi up to 10)."
+                "complete combustion)."
             )
             return 0.01 * m_air
+
+    def _fuel_flow_for(
+        self,
+        node: "FuelBoundary",
+        m_air: float,
+        T_ox: float,
+        Y_ox: list[float],
+        Y_f: list[float],
+    ) -> float:
+        """The fuel flow that burns ``m_air`` of oxidizer to the target on the
+        node's branch by the combustor's own model (mix, then
+        complete_combustion with its smooth phi blending): bisection, exact to
+        1e-6 K; lean on [0, stoichiometric], rich on [stoichiometric, 10 x].
+        It finds a target a fraction of a kelvin above the no-fuel Tt, which
+        a coarse search returns as no fuel."""
+        ox = self._as_stream(m_air, T_ox, Y_ox)
+        X_ox = list(ox.X)
+        own = float(cb.oxygen_required_per_kg_mixture(X_ox))
+        o2 = Y_ox[list(cb.species.names).index("O2")] - own
+        need = float(cb.oxygen_required_per_kg_mixture(list(cb.mass_to_mole(Y_f))))
+        if o2 <= 0.0 or need <= 0.0:
+            raise ValueError("no oxygen to spare, or nothing to burn")
+        m_st = m_air * o2 / need
+
+        def burnt(m: float) -> float:
+            if m <= 0.0:
+                if own > 0.0:
+                    return float(cb.complete_combustion(ox.T, X_ox, ox.P).T)
+                return float(ox.T)
+            mixed = cb.mix([ox, self._as_stream(m, float(node.Tt), Y_f)])
+            return float(cb.complete_combustion(mixed.T, list(mixed.X), mixed.P).T)
+
+        lo, hi = (0.0, m_st) if node.branch == "lean" else (m_st, 10.0 * m_st)
+        f_lo = burnt(lo) - node.Tt_target
+        f_hi = burnt(hi) - node.Tt_target
+        if f_lo * f_hi > 0.0:
+            raise ValueError(
+                f"target outside [{burnt(lo):.1f}, {burnt(hi):.1f}] K on the {node.branch} side"
+            )
+        for _ in range(200):
+            mid = 0.5 * (lo + hi)
+            f_mid = burnt(mid) - node.Tt_target
+            if abs(f_mid) < 1e-6 or hi - lo <= 1e-15 * m_st:
+                return mid
+            if (f_mid > 0.0) == (f_lo > 0.0):
+                lo, f_lo = mid, f_mid
+            else:
+                hi = mid
+        return 0.5 * (lo + hi)
 
     def _build_x0(self) -> np.ndarray:
         """
@@ -6130,15 +6261,11 @@ class NetworkSolver:
         for fid, fnode in self.network.nodes.items():
             if not isinstance(fnode, FuelBoundary):
                 continue
-            comb_node = self.network.nodes[fnode.combustor]
-            try:
-                cstate = self._report_state(comb_node, final_x)
-                phi = float(cb.equivalence_ratio(list(cstate.X)))
-            except (ValueError, RuntimeError):
-                phi = float("nan")
+            phi, T_without = self._fuel_reactant_view(fnode, final_x, sol_dict)
             sol_dict[f"{fid}.m_dot"] = float(fnode.m_dot)
             sol_dict[f"{fid}.phi"] = phi
             sol_dict[f"{fid}.Tt_target"] = float(fnode.Tt_target)
+            sol_dict[f"{fid}.Tt_without_fuel"] = T_without
             sol_dict[f"{fid}.rich_branch"] = 1.0 if fnode.branch == "rich" else 0.0
             other = (fnode.branch == "lean" and phi > 1.0 + 1e-6) or (
                 fnode.branch == "rich" and phi < 1.0 - 1e-6
@@ -6158,30 +6285,33 @@ class NetworkSolver:
                     message = f"{message} {note}"
                 warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
             if not success:
-                feeds = [
-                    self.network.nodes[e.from_node]
-                    for e in self.network.elements.values()
-                    if e.to_node == fnode.combustor and e.from_node != fid
-                ]
-                temps = [float(n.Tt) for n in feeds if getattr(n, "Tt", None) is not None]
-                reached = sol_dict.get(f"{fnode.combustor}.Tt")
-                if (
-                    reached is not None
-                    and fnode.Tt_target > float(reached)
-                    and math.isfinite(phi)
-                    and abs(phi - 1.0) < 0.1
-                ):
+                streams, _ = self._fuel_inflows(fnode, final_x, sol_dict)
+                m_ox = sum(m for m, _, _ in streams)
+                if m_ox <= max(1e-9, 1e-6 * float(fnode.m_dot)):
                     message = (
-                        f"{message} FuelBoundary '{fid}': the target {fnode.Tt_target:.1f} K is "
-                        f"above the peak: the solve stopped at {float(reached):.1f} K near "
-                        f"stoichiometric (phi {phi:.3f}), the hottest this oxidizer burns."
+                        f"{message} FuelBoundary '{fid}': the combustor {fnode.combustor!r} gets no "
+                        "oxidizer flow at this point: the fuel has nothing to burn with."
                     )
-                if temps and fnode.Tt_target <= min(temps):
+                elif math.isfinite(T_without) and fnode.Tt_target <= T_without:
+                    carries = (
+                        " (the oxidizer carries fuel of its own)"
+                        if T_without > self._fuel_oxidizer_mix_T(fnode, final_x, sol_dict) + 1.0
+                        else ""
+                    )
                     message = (
-                        f"{message} FuelBoundary '{fid}': the target {fnode.Tt_target:.1f} K is "
-                        f"not above the oxidizer's {min(temps):.1f} K: no reacting root (it "
-                        "would need fuel as a coolant, combustion efficiency ~ 0)."
+                        f"{message} FuelBoundary '{fid}': the target {fnode.Tt_target:.1f} K is not "
+                        f"above what the combustor reaches with no injected fuel, "
+                        f"{T_without:.1f} K{carries}: no reacting root (it would need fuel as "
+                        "a coolant, combustion efficiency ~ 0)."
                     )
+                else:
+                    T_peak = self._fuel_peak_T(fnode, final_x, sol_dict)
+                    if math.isfinite(T_peak) and fnode.Tt_target > T_peak:
+                        message = (
+                            f"{message} FuelBoundary '{fid}': the target {fnode.Tt_target:.1f} K "
+                            f"is above the peak, {T_peak:.1f} K at stoichiometric: the hottest "
+                            "this fuel burns in this oxidizer (complete combustion)."
+                        )
 
         # Incompressible validity (#588): each element on an incompressible
         # closure against one Mach limit. REPORTED only.

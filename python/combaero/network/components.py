@@ -3208,11 +3208,46 @@ class FuelBoundary(MassFlowBoundary):
         return res, jac
 
     def resolve_topology(self, graph: "FlowNetwork") -> None:
+        # Something to burn (#892): a composition with no combustible species
+        # has no root at any target; say so before a solve wanders.
+        Y = self.Y if self.Y is not None else list(cb.mole_to_mass(cb.species.dry_air()))
+        X = list(cb.mass_to_mole(Y))
+        if float(cb.oxygen_required_per_kg_mixture(X)) <= 0.0:
+            names = [n for n, x in zip(cb.species.names, X, strict=True) if x > 1e-12]
+            what = (
+                "an oxidizer, not a fuel"
+                if "O2" in names and len(names) == 1
+                else "nothing combustible"
+            )
+            raise ValueError(
+                f"FuelBoundary '{self.id}': its composition ({', '.join(names)}) is {what}: "
+                "no fuel flow can raise the combustor's Tt. Give it a fuel (e.g. CH4, H2)."
+            )
         node = graph.nodes.get(self.combustor)
         if not isinstance(node, CombustorNode):
             raise ValueError(
                 f"FuelBoundary '{self.id}': combustor {self.combustor!r} is not a CombustorNode "
                 "in this network"
+            )
+        # One temperature target per combustor: a second FuelBoundary would
+        # leave the split between them free (a "converged" answer with an
+        # arbitrary pilot/main ratio), a Tt_target heat boundary a second
+        # equation for the same Tt.
+        others = [
+            n.id
+            for n in graph.nodes.values()
+            if isinstance(n, FuelBoundary) and n is not self and n.combustor == self.combustor
+        ]
+        if others:
+            raise ValueError(
+                f"FuelBoundary '{self.id}': combustor {self.combustor!r} already has a fuel "
+                f"controller ({', '.join(others)}). One target Tt has one fuel flow: feed the "
+                "other fuels as MassFlowBoundary (a set flow, or a set share of this one)."
+            )
+        if target_energy_boundaries(node):
+            raise ValueError(
+                f"FuelBoundary '{self.id}': combustor {self.combustor!r} also has a Tt_target "
+                "heat boundary: both would set its Tt. Keep one."
             )
         feeds = [
             e

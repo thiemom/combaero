@@ -121,7 +121,7 @@ def test_the_other_root_is_refused_with_the_reason() -> None:
 def test_a_target_below_the_oxidizer_is_refused() -> None:
     _, r = _solve(_net(350.0))
     assert not r["__success__"]
-    assert "not above the oxidizer's 389.2 K" in r["__message__"]
+    assert "reaches with no injected fuel, 389.2 K" in r["__message__"]
 
 
 def test_a_target_above_the_peak_is_refused() -> None:
@@ -168,3 +168,173 @@ def test_it_must_feed_a_combustor_directly() -> None:
         NetworkSolver(n).solve()
     with pytest.raises(ValueError, match="branch must be"):
         FuelBoundary("f", combustor="c", Tt_target=1000.0, branch="stoich")
+
+
+# -- every species as the fuel (user sweep, 2026-11-01) ----------------------
+
+_FUELS = [n for n in cb.species.names if n not in ("N2", "O2", "AR", "CO2", "H2O")]
+
+
+def _adiabatic(Y_fuel: list[float], target: float, branch: str, Y_ox: list[float] = AIR):
+    n = FlowNetwork()
+    n.add_node(MassFlowBoundary("air", m_dot=0.3, Tt=T_AIR, Y=Y_ox))
+    n.add_node(FuelBoundary("fuel", combustor="burner", Tt_target=target, branch=branch, Y=Y_fuel))
+    n.add_node(CombustorNode("burner"))
+    n.add_node(PressureBoundary("out", Pt=2.0e5, Tt=target, Y=AIR))
+    n.add_element(LosslessConnectionElement("a_in", "air", "burner"))
+    n.add_element(LosslessConnectionElement("inj", "fuel", "burner"))
+    n.add_element(
+        OrificeElement(
+            "exit", "burner", "out", diameter=0.05, Cd=0.8, correlation="fixed", in_pipe=False
+        )
+    )
+    return _solve(n)[1]
+
+
+def _burnt(Y_ox: list[float], Y_fuel: list[float], m_fuel: float) -> float:
+    def stream(T: float, Y: list[float], m: float) -> cb.Stream:
+        st = cb.Stream()
+        st.set_T(T)
+        st.set_P(2.0e5)
+        st.set_X(list(cb.mass_to_mole(Y)))
+        st.set_mdot(m)
+        return st
+
+    mixed = cb.mix([stream(T_AIR, Y_ox, 0.3), stream(300.0, Y_fuel, m_fuel)])
+    return float(cb.complete_combustion(mixed.T, list(mixed.X), mixed.P).T)
+
+
+@pytest.mark.parametrize("name", _FUELS)
+@pytest.mark.parametrize(("target", "branch"), [(1200.0, "lean"), (1500.0, "rich")])
+def test_every_fuel_species_meets_the_target(name: str, target: float, branch: str) -> None:
+    """Hydrocarbons, CO, H2 and NH3, both branches: the target, on its side of
+    stoichiometric, and the combustor's own model burns that fuel to it."""
+    Y = list(cb.species.to_mass(cb.species.pure_species(name)))
+    r = _adiabatic(Y, target, branch)
+    assert r["__success__"], (name, r["__message__"])
+    assert r["burner.Tt"] == pytest.approx(target, abs=1e-3)
+    assert (r["fuel.phi"] < 1.0) if branch == "lean" else (r["fuel.phi"] > 1.0)
+    assert _burnt(AIR, Y, r["fuel.m_dot"]) == pytest.approx(target, abs=1e-3)
+
+
+@pytest.mark.parametrize(
+    ("name", "what"),
+    [
+        ("N2", "nothing combustible"),
+        ("AR", "nothing combustible"),
+        ("CO2", "nothing combustible"),
+        ("H2O", "nothing combustible"),
+        ("O2", "an oxidizer, not a fuel"),
+    ],
+)
+def test_a_non_fuel_is_refused_by_name(name: str, what: str) -> None:
+    Y = list(cb.species.to_mass(cb.species.pure_species(name)))
+    with pytest.raises(ValueError, match=f"\\({name}\\) is {what}"):
+        _adiabatic(Y, 1200.0, "lean")
+
+
+def test_phi_does_not_count_water_vapour_as_fuel() -> None:
+    """Humid air carries H in its water; the reported phi is the reactants'
+    combustibles over their O2, so it starts from 0, not from 0.026."""
+    Y = list(cb.species.to_mass(cb.species.pure_species("CH4")))
+    r = _adiabatic(Y, 1200.0, "lean")
+    names = list(cb.species.names)
+    Y_u = [
+        (0.3 * a + r["fuel.m_dot"] * f) / (0.3 + r["fuel.m_dot"])
+        for a, f in zip(AIR, Y, strict=True)
+    ]
+    need = cb.oxygen_required_per_kg_mixture(list(cb.mass_to_mole(Y_u)))
+    assert r["fuel.phi"] == pytest.approx(need / Y_u[names.index("O2")], rel=1e-9)
+
+
+def _premixed(x_ch4: float) -> list[float]:
+    X = [v * (1.0 - x_ch4) for v in cb.mass_to_mole(AIR)]
+    X[list(cb.species.names).index("CH4")] += x_ch4
+    return list(cb.mole_to_mass(X))
+
+
+def test_air_carrying_fuel_still_meets_a_target_above_its_own_burn() -> None:
+    """3% CH4 in the air burns alone to ~1130 K: a 1430 K target needs only
+    the rest, and the model burns air + injected fuel to it."""
+    CH4 = list(cb.species.to_mass(cb.species.pure_species("CH4")))
+    Y_ox = _premixed(0.03)
+    r = _adiabatic(CH4, 1430.0, "lean", Y_ox)
+    assert r["__success__"], r["__message__"]
+    assert r["fuel.Tt_without_fuel"] == pytest.approx(1130.0, abs=1.0)
+    assert _burnt(Y_ox, CH4, r["fuel.m_dot"]) == pytest.approx(1430.0, abs=1e-3)
+
+
+def test_air_carrying_fuel_refuses_a_target_below_its_own_burn() -> None:
+    CH4 = list(cb.species.to_mass(cb.species.pure_species("CH4")))
+    r = _adiabatic(CH4, 1030.0, "lean", _premixed(0.03))
+    assert not r["__success__"]
+    assert "reaches with no injected fuel" in r["__message__"]
+    assert "the oxidizer carries fuel of its own" in r["__message__"]
+
+
+# -- edge cases (2026-11-01) --------------------------------------------------
+
+
+def _with_fuel(n: FlowNetwork, fid: str, target: float = 1200.0, **kw) -> FlowNetwork:
+    n.add_node(FuelBoundary(fid, combustor="burner", Tt_target=target, Y=CH4, **kw))
+    n.add_element(LosslessConnectionElement(f"{fid}_inj", fid, "burner"))
+    return n
+
+
+def _adiabatic_base(m_air: float = 0.3, method: str = "complete") -> FlowNetwork:
+    n = FlowNetwork()
+    n.add_node(MassFlowBoundary("air", m_dot=m_air, Tt=T_AIR, Y=AIR))
+    n.add_node(CombustorNode("burner", method=method))
+    n.add_node(PressureBoundary("out", Pt=2.0e5, Tt=1200.0, Y=AIR))
+    n.add_element(LosslessConnectionElement("a_in", "air", "burner"))
+    n.add_element(
+        OrificeElement(
+            "exit", "burner", "out", diameter=0.05, Cd=0.8, correlation="fixed", in_pipe=False
+        )
+    )
+    return n
+
+
+def test_two_controllers_on_one_combustor_are_refused() -> None:
+    """Two targets for one Tt would leave the pilot/main split free: a
+    'converged' answer with an arbitrary ratio."""
+    n = _with_fuel(_with_fuel(_adiabatic_base(), "fuel"), "pilot")
+    with pytest.raises(ValueError, match="already has a fuel controller"):
+        NetworkSolver(n).solve()
+
+
+def test_a_controller_and_a_tt_target_heat_boundary_are_refused() -> None:
+    from combaero.network import EnergyBoundary
+
+    n = _with_fuel(_adiabatic_base(), "fuel")
+    n.nodes["burner"].add_energy_boundary(EnergyBoundary("q", Tt_target=1150.0))
+    with pytest.raises(ValueError, match="also has a Tt_target heat boundary"):
+        NetworkSolver(n).solve()
+
+
+@pytest.mark.parametrize("above", [0.01, 1.0])
+def test_a_target_just_above_the_no_fuel_tt_is_met(above: float) -> None:
+    """Micrograms per second of fuel: the start is found by the combustor's own
+    model, not a 1 K search that returns no fuel."""
+    _, r = _solve(_with_fuel(_adiabatic_base(), "fuel", target=T_AIR + above))
+    assert r["__success__"], r["__message__"]
+    assert r["burner.Tt"] == pytest.approx(T_AIR + above, abs=1e-4)
+    assert 0.0 < r["fuel.m_dot"] < 1e-4
+
+
+@pytest.mark.parametrize(
+    ("target", "branch"), [(1200.0, "lean"), (1500.0, "rich"), (2000.0, "rich")]
+)
+def test_an_equilibrium_combustor_is_controlled_too(target: float, branch: str) -> None:
+    _, r = _solve(
+        _with_fuel(_adiabatic_base(method="equilibrium"), "fuel", target=target, branch=branch)
+    )
+    assert r["__success__"], r["__message__"]
+    assert r["burner.Tt"] == pytest.approx(target, abs=1e-3)
+    assert (r["fuel.phi"] < 1.0) if branch == "lean" else (r["fuel.phi"] > 1.0)
+
+
+def test_no_oxidizer_flow_is_named() -> None:
+    _, r = _solve(_with_fuel(_adiabatic_base(m_air=0.0), "fuel"))
+    assert not r["__success__"]
+    assert "gets no oxidizer flow" in r["__message__"]
