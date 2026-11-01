@@ -4991,6 +4991,7 @@ class OrificeElement(NetworkElement):
                 return [0.0, m0, 2.0 * m0, 4.0 * m0]
 
             a = _root_on_bracket(h_of, a, lo, hi, probes)
+        a = self._drive_signed_root(evaluate, a, float(state_in.Pt) - float(state_out.Pt))
         # Sensitivities of the HELD Cd below its Re floor (#760).
         m_star, slope, part, dm_dcd, dcd = evaluate(a, continued=False)
         hp = 1.0 - slope
@@ -5005,6 +5006,46 @@ class OrificeElement(NetworkElement):
         for name, dc in cd_cols.items():
             row[name] = row.get(name, 0.0) - dm_dcd * dc / hp
         return [float(state_in.m_dot) - m_star], {0: row}
+
+    @staticmethod
+    def _drive_signed_root(
+        evaluate: Callable[[float], tuple[float, ...]],
+        a: float,
+        dPt: float,
+    ) -> float:
+        """The consistent flow on the half-line of its drive (#875).
+
+        m_calc reads |m| through the approach pipe, so h(a) = a - m_calc(a)
+        has a second, spurious root against the drive: an iterate above the
+        flux where the approach static falls to the downstream pressure
+        gives m_calc < 0, the solve follows it below zero, and the approach
+        pipe's choke (flat m_calc there) holds it at a reversed flow tens of
+        times the true one, where the row reads no pressure at all. The
+        physical root has the sign of m0 = m_calc(0), the flow at zero
+        approach velocity. Tested only where a disagrees with the
+        stagnation difference ``dPt`` (cheap), m0 decides; a root of m0's
+        sign keeps its bits. Otherwise h is solved on [0, ...] probing out
+        from m0, where h(0) = -m0 and the approach only lowers m_calc."""
+        if a != 0.0 and (a > 0.0) == (dPt > 0.0):
+            return a
+        m0 = float(evaluate(0.0)[0])
+        if m0 == 0.0 or a == 0.0 or (a > 0.0) == (m0 > 0.0):
+            return a
+
+        def h(t: float) -> float:
+            return t - float(evaluate(t)[0])
+
+        end = 0.0
+        for k in (1.0, 2.0, 4.0, 8.0, 16.0):
+            t = k * m0
+            ht = h(t)
+            if ht == 0.0:
+                return t
+            if (ht > 0.0) == (m0 > 0.0):
+                lo, hi = (end, t) if m0 > 0.0 else (t, end)
+                return float(_brentq(h, lo, hi, xtol=1e-13 * max(abs(t), 1e-30)))
+            end = t
+        return a
 
     def n_equations(self) -> int:
         return 1
