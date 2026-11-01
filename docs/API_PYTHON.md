@@ -2251,6 +2251,44 @@ for node in schema["nodes"]:
 runner = NetworkRunner.from_dict(schema)
 ```
 
+### From a script to the GUI (#902)
+
+`network_to_gui` turns a `FlowNetwork` built in Python into a GUI network
+file. The GUI then opens it, and it solves to the same results.
+
+```python
+import json
+from gui.backend.export import network_to_gui, UnsupportedForGUIError
+
+doc = network_to_gui(
+    net,
+    layout="rows",                     # or {id: (x, y)}, or a callable id -> (x, y)
+    labels={"burner": "Burner"},       # optional card labels
+)
+with open("my_network.json", "w") as f:
+    json.dump(doc, f, indent=2)
+```
+
+- **Supported (phase 1):**
+  - nodes: `PressureBoundary`, `MassFlowBoundary`, `PlenumNode`,
+    `MomentumChamberNode` (side streams on its side inlet), `CombustorNode`;
+  - elements: `ChannelElement`, `OrificeElement`, `PressureLossElement` (all
+    four correlations), `LosslessConnectionElement`;
+  - `ThermalWall`;
+  - smooth convective surfaces only.
+- **Compositions** are written as exact mass fractions.
+- **Anything without a GUI form** raises `UnsupportedForGUIError`, which lists
+  every object and why; nothing is dropped. Examples:
+  - a ribbed or pin-fin surface;
+  - a channel with an explicit convective area (the GUI derives it);
+  - a head-loss area different from the element's area (the GUI has one);
+  - a static-coupled `PressureBoundary`;
+  - an element type not listed above.
+- `layout="rows"` places each node in a column by its flow depth.
+- Handles follow each node type (a plenum's `flow-left` / `flow-right`, a
+  lossless connection's id-less handles, a merge chamber's `side-target`), so
+  the canvas draws every edge (#901).
+
 ### NetworkResult attributes
 
 | Attribute | Type | Description |

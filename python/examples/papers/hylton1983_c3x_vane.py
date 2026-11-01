@@ -539,203 +539,63 @@ def _line(label: str, s: dict[str, float]) -> None:
 
 
 def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = None) -> dict:
-    """The tuned network of one run as a GUI file (one row per segment)."""
+    """The tuned network of one run as a GUI file (one row per segment):
+    this script's own network, exported by ``gui.backend.export`` (#902)."""
+    from gui.backend.export import network_to_gui  # the GUI package, for --write-gui only
+
     multipliers = TUNED if multipliers is None else multipliers
     _, start = solve(run, multipliers)
-    T_in = start["T_in"]
-    cond = run_conditions(run)
+    net = build(run, multipliers, start["T_in"], start["m_fuel"])
     holes = coolant(run)
-    P2, T2 = burner_supply(run)
-    air = {"source": "dry_air", "mode": "mole", "relative_humidity": 0}
-    ambient = {
-        "source": "humid_air",
-        "mode": "mole",
-        "relative_humidity": AMBIENT_RH,
-        "ambient_T": AMBIENT_T,
-        "ambient_P": AMBIENT_P,
-    }
-    nodes: list[dict] = []
-    edges: list[dict] = []
-    kinds: dict[str, str] = {}
-
-    def node(nid: str, kind: str, x: float, y: float, data: dict) -> None:
-        kinds[nid] = kind
-        nodes.append(
-            {"id": nid, "type": kind, "position": {"x": x, "y": y}, "data": {"id": nid, **data}}
-        )
-
-    # The canvas draws an edge only between handles its node types have: a
-    # plenum's are flow-right (out) / flow-left (in), a lossless connection's
-    # have no id, every other node used here has flow-source / flow-target.
-
-    def handle(nid: str, out: bool) -> str | None:
-        kind = kinds[nid]
-        if kind == "plenum":
-            return "flow-right" if out else "flow-left"
-        if kind == "lossless_connection":
-            return None
-        return "flow-source" if out else "flow-target"
-
-    def flow(a: str, b: str) -> None:
-        edges.append(
-            {
-                "id": f"e_{a}_{b}",
-                "source": a,
-                "sourceHandle": handle(a, True),
-                "target": b,
-                "targetHandle": handle(b, False),
-                "type": "default",
-                "data": {},
-            }
-        )
-
-    # The rig upstream of the cascade, left of the rows.
+    # The rig upstream of the cascade, left of the rows; one row per segment.
     mid = 80.0 * len(segments(run))
-    node(
-        "compressor_exit",
-        "pressure_boundary",
-        -900,
-        mid - 120,
-        {
-            "label": f"Compressor exit: ambient humid air at eta {COMPRESSOR_ETA}",
-            "Pt": P2,
-            "Tt": T2,
-            "composition": ambient,
-        },
-    )
-    node(
-        "fuel",
-        "mass_boundary",
-        -900,
-        mid + 120,
-        {
-            "label": "Natural gas (CH4), set so the inlet is at Tt1",
-            "m_dot": start["m_fuel"],
-            "Tt": FUEL_T,
-            "composition": {"source": "fuel", "mode": "mole"},
-        },
-    )
-    node(
-        "burner_loss",
-        "discrete_loss",
-        -680,
-        mid - 120,
-        {
-            "label": f"Burner loss {BURNER_LOSS:.0%} of Pt",
-            "correlation_type": "constant_fraction",
-            "xi": BURNER_LOSS,
-        },
-    )
-    node("fuel_injection", "lossless_connection", -680, mid + 120, {"label": "Fuel injection"})
-    node("burner", "combustor", -460, mid, {"label": "Burner", "method": "complete"})
-    node("to_cascade", "lossless_connection", -300, mid, {"label": "Duct to the cascade"})
-    node("cascade_inlet", "plenum", -150, mid, {"label": "Cascade inlet (Pt1, Tt1)"})
-    flow("compressor_exit", "burner_loss")
-    flow("burner_loss", "burner")
-    flow("fuel", "fuel_injection")
-    flow("fuel_injection", "burner")
-    flow("burner", "to_cascade")
-    flow("to_cascade", "cascade_inlet")
-
+    pos: dict[str, tuple[float, float]] = {
+        "compressor_exit": (-900, mid - 120),
+        "fuel": (-900, mid + 120),
+        "burner_loss": (-680, mid - 120),
+        "fuel_injection": (-680, mid + 120),
+        "burner": (-460, mid),
+        "to_cascade": (-300, mid),
+        "cascade_inlet": (-150, mid),
+    }
+    labels = {
+        "compressor_exit": f"Compressor exit: ambient humid air at eta {COMPRESSOR_ETA}",
+        "fuel": "Natural gas (CH4), set so the inlet is at Tt1",
+        "burner_loss": f"Burner loss {BURNER_LOSS:.0%} of Pt",
+        "fuel_injection": "Fuel injection",
+        "burner": "Burner",
+        "to_cascade": "Duct to the cascade",
+        "cascade_inlet": "Cascade inlet (Pt1, Tt1)",
+    }
     for k, g in enumerate(segments(run)):
         e, i = g["id"], g["hole"]
         c = f"c{i}_{e}"
-        hole = holes[i]
         y = 160.0 * k
-        node(
-            e,
-            "channel",
-            220,
-            y,
+        pos.update(
             {
-                "label": f"{g['side']} s/arc {g['s0']:.2f}-{g['s1']:.2f} (hole {i}), tuned",
-                "L": g["L"],
-                "D": g["Dh"],
-                "roughness": 0.0,
-                "regime": "compressible",
-                "Nu_multiplier": multipliers.get(e, 1.0),
-                "f_multiplier": 1,
-            },
+                e: (220, y),
+                f"{e}_out": (440, y),
+                f"{c}_in": (0, y + 70),
+                c: (220, y + 70),
+                f"{c}_out": (440, y + 70),
+            }
         )
-        node(
-            f"{e}_out",
-            "pressure_boundary",
-            440,
-            y,
+        labels.update(
             {
-                "label": f"{e} measured Ps = {g['Ps_over_Pt1']:.3f} Pt1",
-                "Pt": g["Ps_over_Pt1"] * cond["Pt1"],
-                "Tt": cond["Tt1"],
-                "composition": air,
-            },
-        )
-        node(
-            f"{c}_in",
-            "mass_boundary",
-            0,
-            y + 70,
-            {
-                "label": f"hole {i}, share {g['f']:.2f}",
-                "m_dot": g["f"] * hole["m_dot"],
-                "Tt": T_in[i],
-                "composition": air,
-            },
-        )
-        node(
-            c,
-            "channel",
-            220,
-            y + 70,
-            {
-                "label": f"hole {i} share; Nu x {area_ratio(g, hole['D']):.3f} = hole/segment area",
-                "L": SPAN,
-                "D": hole["D"] * math.sqrt(g["f"]),
-                "Dh": hole["D"],
-                "roughness": 0.0,
-                "regime": "compressible",
-                "Nu_multiplier": area_ratio(g, hole["D"]),
-                "f_multiplier": 1,
-            },
-        )
-        node(
-            f"{c}_out",
-            "pressure_boundary",
-            440,
-            y + 70,
-            {
-                "label": f"hole {i} exit",
-                "Pt": P_COOLANT_EXIT,
-                "Tt": hole["T_avg"],
-                "composition": air,
-            },
-        )
-        flow("cascade_inlet", e)
-        flow(e, f"{e}_out")
-        flow(f"{c}_in", c)
-        flow(c, f"{c}_out")
-        layer = {"thickness": g["thickness"], "conductivity": 20.0, "material": MATERIAL}
-        edges.append(
-            {
-                "id": f"w_{e}",
-                "source": e,
-                "sourceHandle": "thermal-source",
-                "target": c,
-                "targetHandle": "thermal-target",
-                "type": "thermal",
-                "data": {
-                    "type": "thermal",
-                    "thickness": g["thickness"],
-                    "conductivity": 20.0,
-                    "area": g["L"] * SPAN,
-                    "layers": [layer],
-                },
+                e: f"{g['side']} s/arc {g['s0']:.2f}-{g['s1']:.2f} (hole {i}), tuned",
+                f"{e}_out": f"{e} measured Ps = {g['Ps_over_Pt1']:.3f} Pt1",
+                f"{c}_in": f"hole {i}, share {g['f']:.2f}",
+                c: f"hole {i} share; Nu x {area_ratio(g, holes[i]['D']):.3f} = hole/segment area",
+                f"{c}_out": f"hole {i} exit",
             }
         )
     rows = wall_temperatures(run, solve(run, multipliers, start)[0])
     s = summary(rows)
-    return {
-        "version": "1.2",
-        "example": {
+    return network_to_gui(
+        net,
+        layout=pos,
+        labels=labels,
+        example={
             "title": "Hylton 1983 C3X cooled vane",
             "source": (
                 "Hylton, Mihelc, Turner, Nealy and York (1983), NASA CR-168015: the C3X "
@@ -767,9 +627,7 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
             ),
             "script": "python/examples/papers/hylton1983_c3x_vane.py",
         },
-        "nodes": nodes,
-        "edges": edges,
-    }
+    )
 
 
 def main() -> None:
