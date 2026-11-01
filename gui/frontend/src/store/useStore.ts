@@ -13,6 +13,7 @@ import {
 import { create } from "zustand";
 import { exportResults, isBackendReachable, resolvePreview } from "../api";
 import { discoverFields } from "../utils/diagnostics";
+import { repairEdgeHandles } from "../utils/edgeHandles";
 import { type ExampleInfo, parseExampleInfo } from "../utils/exampleInfo";
 import { HEAT_SOURCE_HANDLE, heatSourceEdgeProps } from "../utils/heatSource";
 import type { PreviewItems } from "../utils/inheritance";
@@ -592,10 +593,31 @@ const useStore = create<RFState>((set, get) => ({
 			}
 			// A wall on a node with no convective surface (#720): the solver
 			// refuses it and the node has no handle to draw it from.
-			const { edges: keptEdges, dropped } = dropSurfacelessWalls(
+			const { edges: wallChecked, dropped } = dropSurfacelessWalls(
 				data.nodes,
 				data.edges,
 			);
+			// A flow edge naming a handle its node lacks is drawn disconnected
+			// though it solves (#901): move it, or say so.
+			const {
+				edges: keptEdges,
+				repaired,
+				unresolved,
+			} = repairEdgeHandles(data.nodes, wallChecked);
+			if (repaired.length > 0 || unresolved.length > 0) {
+				console.warn("loadNetwork: edge handles", { repaired, unresolved });
+			}
+			const notices = [
+				dropped.length > 0
+					? `Removed ${dropped.length} thermal wall(s) on an orifice, area change, plenum or hole element (${dropped.join(", ")}): it has no surface to exchange heat. Wall a channel, loss element or chamber instead.`
+					: null,
+				repaired.length > 0
+					? `Reconnected ${repaired.length} flow edge end(s) that named a handle their node does not have (${repaired.join("; ")}).`
+					: null,
+				unresolved.length > 0
+					? `${unresolved.length} flow edge end(s) name a port their node does not have and are drawn disconnected; reconnect them by hand (${unresolved.join("; ")}).`
+					: null,
+			].filter((m): m is string => m !== null);
 			set({
 				// Up to file version 1.1 positions were top-left corners (#865).
 				nodes: migrateNodePositions(data.nodes, data.version).map((n: any) => ({
@@ -611,10 +633,7 @@ const useStore = create<RFState>((set, get) => ({
 				selectedProbeLinks: [],
 				restoredAt: null,
 				exampleInfo: parseExampleInfo(data.example),
-				loadNotice:
-					dropped.length > 0
-						? `Removed ${dropped.length} thermal wall(s) on an orifice, area change, plenum or hole element (${dropped.join(", ")}): it has no surface to exchange heat. Wall a channel, loss element or chamber instead.`
-						: null,
+				loadNotice: notices.length > 0 ? notices.join(" ") : null,
 			});
 		}
 	},

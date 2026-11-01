@@ -4,7 +4,8 @@
 		"ignoreUnknown": true,
 		"includes": [
 			"gui/frontend/src/**",
-			"!gui/frontend/src/utils/resultKeys.generated.json"
+			"!gui/frontend/src/utils/resultKeys.generated.json",
+			"!gui/frontend/src/utils/nodeHandles.generated.json"
 		]
 	},
 	"formatter": {
