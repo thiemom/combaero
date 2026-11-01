@@ -1568,6 +1568,20 @@ class NetworkSolver:
                     sources.append(upn)
                 else:
                     stack.append(up)
+        # Known before the solve: no source can supply oxidizer -- none
+        # upstream, or only fixed flows of zero. Every flow could then vanish
+        # and the Tt row be met by an undetermined state (a "root" Linux CI
+        # returned as a success), so it is refused here.
+        if all(
+            isinstance(n, MassFlowBoundary)
+            and not isinstance(n, FuelBoundary)
+            and abs(float(n.m_dot)) <= _FUEL_MIN_OXIDIZER_FLOW
+            for n in sources
+        ):
+            raise ValueError(
+                f"FuelBoundary '{node.id}': the combustor {comb!r} gets no oxidizer flow "
+                "(no source upstream of it supplies any): the fuel has nothing to burn with."
+            )
         temps = [float(n.Tt) for n in sources if getattr(n, "Tt", None) is not None]
         T_ox = float(np.mean(temps)) if temps else float(ref["T"])
         Y_ox = next((n.Y for n in sources if getattr(n, "Y", None) is not None), ref["Y"])

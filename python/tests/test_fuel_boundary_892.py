@@ -336,13 +336,12 @@ def test_an_equilibrium_combustor_is_controlled_too(target: float, branch: str) 
 
 
 @pytest.mark.parametrize("guess", [None, 1e-6, 1e-10, 1e-14])
-def test_no_oxidizer_flow_is_named(guess: float | None) -> None:
+def test_no_oxidizer_flow_is_refused_before_the_solve(guess: float | None) -> None:
     """With no air every flow can vanish and the Tt row is then met by an
-    undetermined state: from a 1e-10 start (and on Linux CI from the default
-    one) the solve reaches tolerance. Refused at any start, never returned."""
-    _, r = _solve(_with_fuel(_adiabatic_base(m_air=0.0), "fuel", m_dot_guess=guess))
-    assert not r["__success__"]
-    assert "gets no oxidizer flow" in r["__message__"]
+    undetermined state: Linux CI reached tolerance on it from the default
+    start. Known from the sources, so refused before the solve at any start."""
+    with pytest.raises(ValueError, match="gets no oxidizer flow"):
+        NetworkSolver(_with_fuel(_adiabatic_base(m_air=0.0), "fuel", m_dot_guess=guess)).solve()
 
 
 # -- fuel routes: the boundary names its combustor, like a probe -------------
