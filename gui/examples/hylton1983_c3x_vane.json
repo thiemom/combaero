@@ -1923,14 +1923,14 @@
       "source": "fuel",
       "sourceHandle": "flow-source",
       "target": "fuel_injection",
-      "targetHandle": "flow-target",
+      "targetHandle": null,
       "type": "default",
       "data": {}
     },
     {
       "id": "e_fuel_injection_burner",
       "source": "fuel_injection",
-      "sourceHandle": "flow-source",
+      "sourceHandle": null,
       "target": "burner",
       "targetHandle": "flow-target",
       "type": "default",
@@ -1941,23 +1941,23 @@
       "source": "burner",
       "sourceHandle": "flow-source",
       "target": "to_cascade",
-      "targetHandle": "flow-target",
+      "targetHandle": null,
       "type": "default",
       "data": {}
     },
     {
       "id": "e_to_cascade_cascade_inlet",
       "source": "to_cascade",
-      "sourceHandle": "flow-source",
+      "sourceHandle": null,
       "target": "cascade_inlet",
-      "targetHandle": "flow-target",
+      "targetHandle": "flow-left",
       "type": "default",
       "data": {}
     },
     {
       "id": "e_cascade_inlet_SS0_h2",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS0_h2",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2014,7 +2014,7 @@
     {
       "id": "e_cascade_inlet_SS1_h1",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS1_h1",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2071,7 +2071,7 @@
     {
       "id": "e_cascade_inlet_SS2_h3",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS2_h3",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2128,7 +2128,7 @@
     {
       "id": "e_cascade_inlet_SS3_h4",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS3_h4",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2185,7 +2185,7 @@
     {
       "id": "e_cascade_inlet_SS4_h5",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS4_h5",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2242,7 +2242,7 @@
     {
       "id": "e_cascade_inlet_SS5_h6",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS5_h6",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2299,7 +2299,7 @@
     {
       "id": "e_cascade_inlet_SS6_h7",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS6_h7",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2356,7 +2356,7 @@
     {
       "id": "e_cascade_inlet_SS7_h8",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS7_h8",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2413,7 +2413,7 @@
     {
       "id": "e_cascade_inlet_SS8_h9",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS8_h9",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2470,7 +2470,7 @@
     {
       "id": "e_cascade_inlet_SS9_h10",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "SS9_h10",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2527,7 +2527,7 @@
     {
       "id": "e_cascade_inlet_PS0_h2",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS0_h2",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2584,7 +2584,7 @@
     {
       "id": "e_cascade_inlet_PS1_h3",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS1_h3",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2641,7 +2641,7 @@
     {
       "id": "e_cascade_inlet_PS2_h4",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS2_h4",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2698,7 +2698,7 @@
     {
       "id": "e_cascade_inlet_PS3_h5",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS3_h5",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2755,7 +2755,7 @@
     {
       "id": "e_cascade_inlet_PS4_h6",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS4_h6",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2812,7 +2812,7 @@
     {
       "id": "e_cascade_inlet_PS5_h7",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS5_h7",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2869,7 +2869,7 @@
     {
       "id": "e_cascade_inlet_PS6_h8",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS6_h8",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2926,7 +2926,7 @@
     {
       "id": "e_cascade_inlet_PS7_h9",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS7_h9",
       "targetHandle": "flow-target",
       "type": "default",
@@ -2983,7 +2983,7 @@
     {
       "id": "e_cascade_inlet_PS8_h10",
       "source": "cascade_inlet",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "PS8_h10",
       "targetHandle": "flow-target",
       "type": "default",

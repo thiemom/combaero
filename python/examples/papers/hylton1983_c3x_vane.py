@@ -556,20 +556,34 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
     }
     nodes: list[dict] = []
     edges: list[dict] = []
+    kinds: dict[str, str] = {}
 
     def node(nid: str, kind: str, x: float, y: float, data: dict) -> None:
+        kinds[nid] = kind
         nodes.append(
             {"id": nid, "type": kind, "position": {"x": x, "y": y}, "data": {"id": nid, **data}}
         )
+
+    # The canvas draws an edge only between handles its node types have: a
+    # plenum's are flow-right (out) / flow-left (in), a lossless connection's
+    # have no id, every other node used here has flow-source / flow-target.
+
+    def handle(nid: str, out: bool) -> str | None:
+        kind = kinds[nid]
+        if kind == "plenum":
+            return "flow-right" if out else "flow-left"
+        if kind == "lossless_connection":
+            return None
+        return "flow-source" if out else "flow-target"
 
     def flow(a: str, b: str) -> None:
         edges.append(
             {
                 "id": f"e_{a}_{b}",
                 "source": a,
-                "sourceHandle": "flow-source",
+                "sourceHandle": handle(a, True),
                 "target": b,
-                "targetHandle": "flow-target",
+                "targetHandle": handle(b, False),
                 "type": "default",
                 "data": {},
             }
