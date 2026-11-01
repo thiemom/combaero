@@ -104,6 +104,19 @@ uv run python scripts/gui_result_keys.py          # rewrite
 uv run python scripts/gui_result_keys.py --check  # exit 1 when stale
 ```
 
+### gui_node_handles.py
+
+Regenerate `gui/frontend/src/utils/nodeHandles.generated.json`: per node type, the handle ids its frontend component defines. The table lists flow inlets (`type="target"`), flow outlets (`type="source"`) and thermal handles, and flags types whose ids are computed. It is read from `flowTypes.ts` and `nodes/*.tsx`.
+
+The canvas draws a flow edge only between handles its nodes define, while the backend solves an edge regardless. So a wrong handle id shows as a node drawn disconnected. On load, `utils/edgeHandles.ts` repairs such an edge from this table (#901).
+
+Rerun the script after changing a node component's handles. `test_gui_node_handles_sync.py` fails while the file is stale.
+
+```bash
+uv run python scripts/gui_node_handles.py          # rewrite
+uv run python scripts/gui_node_handles.py --check  # exit 1 when stale
+```
+
 ## Stress Testing
 
 ### stress/ (run.py, summarize.py, networks.py)

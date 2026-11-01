@@ -1,0 +1,227 @@
+{
+	"area_change": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"channel": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": [
+			"thermal-target",
+			"thermal-source"
+		]
+	},
+	"combustor": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": [
+			"thermal-target",
+			"thermal-source"
+		]
+	},
+	"discrete_loss": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": [
+			"thermal-target",
+			"thermal-source"
+		]
+	},
+	"effusion_liner": {
+		"dynamic": false,
+		"inlets": [
+			"port-coolantin-target"
+		],
+		"outlets": [
+			"port-coolantout-source",
+			"port-discharge-source"
+		],
+		"thermal": []
+	},
+	"effusion_plate": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"ejector": {
+		"dynamic": false,
+		"inlets": [
+			"port-primary-target",
+			"port-secondary-target"
+		],
+		"outlets": [
+			"port-outlet-source"
+		],
+		"thermal": []
+	},
+	"film_cooling": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"heat_source": {
+		"dynamic": true,
+		"inlets": [],
+		"outlets": [],
+		"thermal": []
+	},
+	"impingement_array": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target",
+			"port-bypass-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": [
+			"thermal-target",
+			"thermal-source"
+		]
+	},
+	"lossless_connection": {
+		"dynamic": false,
+		"inlets": [
+			null
+		],
+		"outlets": [
+			null
+		],
+		"thermal": []
+	},
+	"mass_boundary": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"momentum_chamber": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target",
+			"side-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": [
+			"thermal-target",
+			"thermal-source"
+		]
+	},
+	"mpce_tee": {
+		"dynamic": false,
+		"inlets": [
+			"port-straight-target",
+			"port-common-target",
+			"port-branch-target"
+		],
+		"outlets": [
+			"port-straight-source",
+			"port-common-source",
+			"port-branch-source"
+		],
+		"thermal": []
+	},
+	"orifice": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"plenum": {
+		"dynamic": false,
+		"inlets": [
+			"flow-left",
+			"flow-top"
+		],
+		"outlets": [
+			"flow-right",
+			"flow-bottom"
+		],
+		"thermal": []
+	},
+	"pressure_boundary": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"probe": {
+		"dynamic": true,
+		"inlets": [],
+		"outlets": [],
+		"thermal": []
+	},
+	"slot_film": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"vortex": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"wall": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [],
+		"thermal": []
+	}
+}
