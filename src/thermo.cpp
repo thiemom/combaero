@@ -5,6 +5,7 @@
 #include "../include/thermo_transport_data.h"
 #include "../include/transport.h"
 #include "../include/input_validation.h"
+#include "../include/inner_solve.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -766,7 +767,10 @@ double calc_T_from_cp(double cp_target, const std::vector<double> &X,
     if (std::abs(delta_T) < tol || std::abs(cp_val - cp_target) < tol)
       return T;
   }
-  return T;
+  // A target cp the clamped range [200, 6000] K does not reach, or a cp(T)
+  // the steps cannot follow, ends here: not a root (#868).
+  inner_solve::throw_no_convergence("calc_T_from_cp", max_iter, "cp residual [J/(mol K)]",
+                                    cp(T, X) - cp_target);
 }
 
 double calc_T_from_u(double u_target, const std::vector<double> &X, double T_guess, double tol, std::size_t max_iter) {

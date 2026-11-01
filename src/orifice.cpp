@@ -6,6 +6,7 @@
 #include "../include/orifice.h"
 #include "../include/orifice_jobson.h"
 #include "../include/input_validation.h"
+#include "../include/inner_solve.h"
 #include "../include/thermo.h"
 #include <algorithm>
 #include <cmath>
@@ -1303,7 +1304,7 @@ double pipe_equivalent_c(double beta, double z0) {
     double hi = 1e3;
     double c = 1.0 / std::sqrt(z0);
     c = std::min(std::max(c, lo), hi);
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < combaero::inner_solve::kPipeEquivalentCMaxIter; ++i) {
         double dg = 0.0;
         const double f = g(c, dg);
         if (f > 0.0) {
@@ -1320,7 +1321,13 @@ double pipe_equivalent_c(double beta, double z0) {
         }
         c = next;
     }
-    return c;
+    // A cap exit is a root only if the bracket has closed onto it (#868).
+    if (combaero::inner_solve::cap_exit_is_root(hi - lo, c)) {
+        return c;
+    }
+    combaero::inner_solve::throw_no_convergence(
+        "pipe_equivalent_c", combaero::inner_solve::kPipeEquivalentCMaxIter, "bracket width",
+        hi - lo);
 }
 
 } // namespace
@@ -1769,7 +1776,7 @@ double jobson_expansibility(double r, double beta, double Ci, double n) {
     // stagnation state the jet expands from, V1 = g beta^2 / rho1, so solve
     // g = flux(p0(g), rho0(g)) by fixed point (the approach term is O(b^4)).
     double g = 0.0;
-    for (int it = 0; it < 200; ++it) {
+    for (int it = 0;; ++it) {
         const double V1 = g * b2;
         const double tau = 1.0 + V1 * V1 * (n - 1.0) / (2.0 * n);  // T0/T1
         const double p0 = std::pow(tau, n / (n - 1.0));
@@ -1780,9 +1787,20 @@ double jobson_expansibility(double r, double beta, double Ci, double n) {
                                            J1::constant(Ci), J1::constant(n), beta)
                 .g.v;
         const bool done = std::abs(g_new - g) <= 1e-15 * std::abs(g_new);
+        const double step = g_new - g;
         g = g_new;
         if (done) {
             break;
+        }
+        // The fixed point can cycle in its last bits (3e-14 seen at r = 0.98):
+        // a root to rounding. A step wider than that is not one (#868).
+        if (it + 1 == combaero::inner_solve::kJobsonExpansibilityMaxIter) {
+            if (combaero::inner_solve::cap_exit_is_root(step, g)) {
+                break;
+            }
+            combaero::inner_solve::throw_no_convergence(
+                "jobson_expansibility", combaero::inner_solve::kJobsonExpansibilityMaxIter,
+                "flux step", step);
         }
     }
     const double b4 = b2 * b2;
