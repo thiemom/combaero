@@ -9,6 +9,7 @@
 #include "transport.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
 #include "input_validation.h"
+#include "inner_solve.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -36,14 +37,20 @@ double solve_T_isentropic(double P, double s0, double T_init,
     // read a 6872 K plenum's density at 6000 K and passed 3.6x its flow (#626).
     constexpr double T_MIN = thermo::T_FLOOR;
 
+    double F = 0.0;
     for (std::size_t it = 0; it < max_iter; ++it) {
         double s_curr = s_mass(T, X, P);
-        double F = s_curr - s0;
+        F = s_curr - s0;
 
         // ds/dT at constant P = cp_mass/T
         double dF = cp_mass(T, X) / T;
 
         if (std::abs(dF) < 1e-30) break;
+        // Held at the floor with the root below it (an expansion to a static
+        // T under T_MIN, P/Pt ~ 1e-5 and below): every further step is
+        // clamped back to T_MIN, so the floor is the answer, as it was when
+        // the loop ran on to its cap (#868).
+        if (T == T_MIN && F > 0.0) return T;
 
         double dT = -F / dF;
 
@@ -62,8 +69,8 @@ double solve_T_isentropic(double P, double s0, double T_init,
             return T;
         }
     }
-
-    return T;
+    inner_solve::throw_no_convergence("solve_T_isentropic", max_iter, "s residual [J/(kg K)]",
+                                      F);
 }
 
 // Compute mass flux G = rho * v for isentropic expansion from (Tt, Pt) to P
@@ -450,6 +457,8 @@ double solve_T_from_energy(
     constexpr double T_MIN = thermo::T_FLOOR;  // see solve_T_isentropic
     double mw_g = mw_kg * 1000.0;  // g/mol for enthalpy conversion
 
+    bool converged = false;
+    double F = 0.0;
     for (std::size_t iter = 0; iter < max_iter; ++iter) {
         // Density from ideal gas: rho = P * mw / (R * T), mw in kg/mol
         double rho = std::max(P, 1.0) * mw_kg / (R_GAS * T);
@@ -464,7 +473,7 @@ double solve_T_from_energy(
         double h_mass = h_mol / mw_g * 1000.0;  // J/kg
 
         // Energy equation residual: h + u^2/2 - h0 = 0
-        double F = h_mass + 0.5 * u * u - h0_mass;
+        F = h_mass + 0.5 * u * u - h0_mass;
 
         // Derivative: dF/dT = dh/dT + u * du/dT
         // dh/dT = cp (mass basis)
@@ -476,6 +485,12 @@ double solve_T_from_energy(
         double dF = cp_mass + u * du_dT;
 
         if (std::abs(dF) < 1e-30) break;
+        // Held at the floor with the root below it: the floor is the answer
+        // the cap returned before (#868).
+        if (T == T_MIN && F > 0.0) {
+            converged = true;
+            break;
+        }
 
         double dT = -F / dF;
 
@@ -489,8 +504,13 @@ double solve_T_from_energy(
         T = std::max(T, T_MIN);
 
         if (std::abs(dT) < tol * T) {
+            converged = true;
             break;
         }
+    }
+    if (!converged) {
+        inner_solve::throw_no_convergence("fanno_channel (solve_T_from_energy)", max_iter,
+                                          "h residual [J/kg]", F);
     }
 
     // Final values
@@ -736,6 +756,11 @@ FannoSolution fanno_channel(
         }
     }
 
+    if (!sol.choked && x < L - 1e-14) {
+        throw std::runtime_error("fanno_channel: the march stopped at x = " +
+                                 std::to_string(x) + " m of L = " + std::to_string(L) +
+                                 " m (step budget kFannoMaxSteps exhausted)");
+    }
     // Set outlet state
     sol.outlet.T = T;
     sol.outlet.P = P;
@@ -977,6 +1002,11 @@ FannoSolution fanno_channel_rough(
         if (gap_now > 0.5 && dx < dx_nominal) {
             dx = std::min(dx * 2.0, dx_nominal);
         }
+    }
+    if (!sol.choked && x < L - 1e-14) {
+        throw std::runtime_error("fanno_channel_rough: the march stopped at x = " +
+                                 std::to_string(x) + " m of L = " + std::to_string(L) +
+                                 " m (step budget kFannoMaxSteps exhausted)");
     }
 
     sol.outlet.T = T;
