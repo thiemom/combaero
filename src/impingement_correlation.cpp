@@ -1,5 +1,7 @@
 #include "impingement_correlation.h"
 
+#include "input_validation.h"
+
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -290,6 +292,10 @@ ImpingementEtaR impingement_eta_r(double Gc_Gj, double xn_d, double yn_d,
   if (!(z_d > 0.0) || !std::isfinite(z_d) || !std::isfinite(Gc_Gj)) {
     throw std::invalid_argument(
         "impingement_eta_r: z_d must be positive and Gc_Gj finite");
+  }
+  // xn_d and yn_d only set the extrapolation flag, which NaN cleared (#769).
+  if (!validation::is_finite(xn_d) || !validation::is_finite(yn_d)) {
+    throw std::invalid_argument("impingement_eta_r: xn_d and yn_d must be finite");
   }
   using R = ImpingementEtaRRange;
   const auto outside = [](double v, double lo, double hi) {

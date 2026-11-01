@@ -190,7 +190,7 @@ void check_inputs(double x_over_D, double M, double P, double alpha_deg,
         throw std::invalid_argument(
             "film_effectiveness_baldauf_2002: M, P and s/D must be positive");
     }
-    if (Tu <= 0.0) {
+    if (!validation::is_finite_positive(Tu)) {
         // Eq. (34) carries exp(-0.0012/Tu^2), which underflows to a
         // different branch rather than erroring, so catch it here.
         throw std::invalid_argument(

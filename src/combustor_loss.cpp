@@ -1,5 +1,6 @@
 #include "../include/combustor_loss.h"
 
+#include "../include/input_validation.h"
 #include "../include/thermo.h"
 #include "../include/thermo_transport_data.h"
 
@@ -12,6 +13,10 @@ namespace combaero {
 
 CombustorLossResult combustor_fraction_loss(double theta, double mdot, double k,
                                             double xi0, double m_ref) {
+  // m_ref <= 0 switches the low-flow ramp off; NaN used to as well (#769).
+  if (!validation::is_finite(m_ref)) {
+    throw std::invalid_argument("combustor_fraction_loss: m_ref must be finite");
+  }
   CombustorLossResult r;
   const double base = k * theta + xi0;
   double g = 1.0;

@@ -213,6 +213,10 @@ double recovery_factor(double Pr, bool turbulent) {
 double T_adiabatic_wall(double T_static, double v,
                          double T, double P, const std::vector<double>& X,
                          bool turbulent) {
+    // The 10 K floor below turned a NaN T_static into 10 K at v = 0 (#769).
+    if (!validation::is_finite(T_static) || !validation::is_finite(v)) {
+        throw std::invalid_argument("T_adiabatic_wall: T_static and v must be finite");
+    }
     double T_safe = std::max(T_static, 10.0);
     double v_abs = std::abs(v);
     if (v_abs < 1e-12) return T_safe;
