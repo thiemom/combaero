@@ -11,6 +11,7 @@
 
 #include "acoustics.h"
 #include "area_change.h"
+#include "turbomachinery.h"
 #include "can_annular_solvers.h"
 #include "combustion.h"
 #include "combustor_loss.h"
@@ -2036,6 +2037,69 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         py::arg("with_derivatives") = true,
         "The area change element's flow from node a (face F_a) to node b, both\n"
         "directions blended C1 through zero drive. Returns AreaChangeElementFlow.");
+
+  // Compression and expansion along a path of given efficiency (#893).
+  py::class_<combaero::TurbomachinePath>(
+      m, "TurbomachinePath",
+      "Outlet state of a compression or expansion at a total-to-total pressure\n"
+      "ratio, with its Jacobian (#893).")
+      .def_readonly("T2", &combaero::TurbomachinePath::T2)
+      .def_readonly("dh", &combaero::TurbomachinePath::dh)
+      .def_readonly("eta_poly", &combaero::TurbomachinePath::eta_poly)
+      .def_readonly("eta_is", &combaero::TurbomachinePath::eta_is)
+      .def_readonly("T2s", &combaero::TurbomachinePath::T2s)
+      .def_readonly("dT2_dT1", &combaero::TurbomachinePath::dT2_dT1)
+      .def_readonly("dT2_dPR", &combaero::TurbomachinePath::dT2_dPR)
+      .def_readonly("dT2_deta", &combaero::TurbomachinePath::dT2_deta)
+      .def_readonly("dT2_dY", &combaero::TurbomachinePath::dT2_dY)
+      .def_readonly("ddh_dT1", &combaero::TurbomachinePath::ddh_dT1)
+      .def_readonly("ddh_dPR", &combaero::TurbomachinePath::ddh_dPR)
+      .def_readonly("ddh_deta", &combaero::TurbomachinePath::ddh_deta)
+      .def_readonly("ddh_dY", &combaero::TurbomachinePath::ddh_dY);
+
+  {
+    // Exactly one efficiency: the polytropic one is the path's own, the
+    // isentropic one the textbook end-state form.
+    auto path = [](double T1, const std::vector<double>& X, double PR,
+                   std::optional<double> eta_poly, std::optional<double> eta_is,
+                   bool expansion) {
+      if (eta_poly.has_value() == eta_is.has_value()) {
+        throw py::value_error(std::string(expansion ? "expansion" : "compression") +
+                              ": give exactly one of eta_poly and eta_is");
+      }
+      const bool poly = eta_poly.has_value();
+      return combaero::turbomachine_path(T1, X, PR, poly ? *eta_poly : *eta_is, poly,
+                                         expansion);
+    };
+    m.def(
+        "compression",
+        [path](double T1, const std::vector<double>& X, double PR,
+               std::optional<double> eta_poly, std::optional<double> eta_is) {
+          return path(T1, X, PR, eta_poly, eta_is, false);
+        },
+        py::arg("T1"), py::arg("X"), py::arg("PR"), py::kw_only(),
+        py::arg("eta_poly") = py::none(), py::arg("eta_is") = py::none(),
+        "Compression from total temperature T1 [K], mole fractions X, at the\n"
+        "total pressure ratio PR = P2/P1 >= 1, with exactly one of eta_poly or\n"
+        "eta_is in (0, 1]. Polytropic: S(T2) - S(T1) = (R/eta_poly) ln PR,\n"
+        "exact for a variable cp. Isentropic: h2 = h1 + (h2s - h1)/eta_is. The\n"
+        "composition is frozen. Returns TurbomachinePath (T2, dh > 0, both\n"
+        "efficiencies, T2s, and the Jacobian of T2 and dh in T1, PR, eta, Y).");
+    m.def(
+        "expansion",
+        [path](double T1, const std::vector<double>& X, double PR,
+               std::optional<double> eta_poly, std::optional<double> eta_is) {
+          return path(T1, X, PR, eta_poly, eta_is, true);
+        },
+        py::arg("T1"), py::arg("X"), py::arg("PR"), py::kw_only(),
+        py::arg("eta_poly") = py::none(), py::arg("eta_is") = py::none(),
+        "Expansion from total temperature T1 [K], mole fractions X, at the\n"
+        "total pressure ratio PR = P1/P2 >= 1, with exactly one of eta_poly or\n"
+        "eta_is in (0, 1]. Polytropic: S(T2) - S(T1) = -eta_poly R ln PR, exact\n"
+        "for a variable cp. Isentropic: h2 = h1 - eta_is (h1 - h2s). The\n"
+        "composition is frozen. Returns TurbomachinePath (T2, dh < 0, both\n"
+        "efficiencies, T2s, and the Jacobian of T2 and dh in T1, PR, eta, Y).");
+  }
 
   py::class_<combaero::AreaChangeResult>(
       m, "AreaChangeResult",

@@ -248,6 +248,7 @@ try:
         AreaChangeLoss,
         AreaChangeFlow,
         AreaChangeElementFlow,
+        TurbomachinePath,
         BordaCarnotStep,
         State,
         Stream,
@@ -597,6 +598,8 @@ try:
         area_change_loss,
         area_change_flow,
         area_change_element_flow,
+        compression,
+        expansion,
         complete_combustion_products_and_jacobian,
         combustion_equilibrium_and_jacobian,
         CompleteCombustionJacobian,
@@ -758,11 +761,14 @@ except (ModuleNotFoundError, ImportError) as e:
     area_change_loss = _core.area_change_loss
     area_change_flow = _core.area_change_flow
     area_change_element_flow = _core.area_change_element_flow
+    compression = _core.compression
+    expansion = _core.expansion
     complete_combustion_products_and_jacobian = _core.complete_combustion_products_and_jacobian
     combustion_equilibrium_and_jacobian = _core.combustion_equilibrium_and_jacobian
     CompleteCombustionJacobian = _core.CompleteCombustionJacobian
     EquilibriumJacobian = _core.EquilibriumJacobian
     AreaChangeElementFlow = _core.AreaChangeElementFlow
+    TurbomachinePath = _core.TurbomachinePath
     # Compressible flow
     CompressibleFlowSolution = _core.CompressibleFlowSolution
     NozzleStation = _core.NozzleStation
@@ -984,11 +990,14 @@ except (ModuleNotFoundError, ImportError) as e:
     area_change_loss = _core.area_change_loss
     area_change_flow = _core.area_change_flow
     area_change_element_flow = _core.area_change_element_flow
+    compression = _core.compression
+    expansion = _core.expansion
     complete_combustion_products_and_jacobian = _core.complete_combustion_products_and_jacobian
     combustion_equilibrium_and_jacobian = _core.combustion_equilibrium_and_jacobian
     CompleteCombustionJacobian = _core.CompleteCombustionJacobian
     EquilibriumJacobian = _core.EquilibriumJacobian
     AreaChangeElementFlow = _core.AreaChangeElementFlow
+    TurbomachinePath = _core.TurbomachinePath
 
 # Terminology aliases - always available
 try:
@@ -1655,11 +1664,14 @@ __all__ = [
     "area_change_loss",
     "area_change_flow",
     "area_change_element_flow",
+    "compression",
+    "expansion",
     "complete_combustion_products_and_jacobian",
     "combustion_equilibrium_and_jacobian",
     "CompleteCombustionJacobian",
     "EquilibriumJacobian",
     "AreaChangeElementFlow",
+    "TurbomachinePath",
     # Vatistas n-vortex model
     "vatistas_v0_bar",
     "vatistas_dv0_bar_drbar",
