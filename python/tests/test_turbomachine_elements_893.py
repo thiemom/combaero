@@ -218,3 +218,27 @@ def test_the_second_law_sees_the_work_as_entropy_free() -> None:
         sig[eta] = r["__second_law__"]["m"]["sigma_norm"]
     assert abs(sig[1.0]) < 1e-8
     assert sig[0.8] > 1e-3
+
+
+def test_the_cold_start_sees_through_a_machine_with_a_fixed_end() -> None:
+    """The pressure guess carries the pressure ratio across a machine, and
+    the resistance seed treats the end it fixes as fixed: a compressor fed
+    from a pressure boundary keeps the seed (it used to switch it off for the
+    whole network: the C3X rig's cold GUI solve then ran past its budget)."""
+    n = FlowNetwork()
+    n.add_node(PressureBoundary("amb", Pt=1.0e5, Tt=288.15, Y=AIR))
+    n.add_node(PlenumNode("b"))
+    n.add_node(PressureBoundary("out", Pt=3.0e5, Tt=288.15, Y=AIR))
+    n.add_element(CompressorElement("m", "amb", "b", 4.0, eta_poly=0.88))
+    n.add_element(_orifice("o", "b", "out"))
+    s = NetworkSolver(n)
+    n.resolve_all_topology()
+    ref = s._infer_reference_state()
+    assert s._propagate_pressure_guess(ref)["b"] == pytest.approx(4.0e5)
+    seeded = s._resistance_network_guess(ref)
+    assert seeded is not None
+    p, m = seeded
+    assert p["b"] == pytest.approx(4.0e5)
+    assert m["m"] == pytest.approx(m["o"], rel=1e-12) and m["o"] > 0.0
+    _, r = _solve(n)
+    assert r["__success__"], r["__message__"]
