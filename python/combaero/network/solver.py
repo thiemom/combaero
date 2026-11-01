@@ -224,6 +224,11 @@ SOLVER_STRICT_ENV = "COMBAERO_SOLVER_STRICT"
 #: bugs, never states: they always raise.
 _STATE_EXCEPTIONS = (RuntimeError, ValueError, ArithmeticError)
 
+# A FuelBoundary's combustor with less oxidizer than this [kg/s] has nothing
+# to burn with (#892). With every flow vanishing, the Tt row is met by an
+# undetermined state, so such a "root" is refused, never returned.
+_FUEL_MIN_OXIDIZER_FLOW = 1e-9
+
 #: Default wall-clock budget [s] (``NetworkSolver.homotopy_budget``) of the
 #: Newton-homotopy last retry (#642), within the
 #: caller's timeout. Inside the solver its stress rescues took 1.2-4.2 s; every
@@ -1544,7 +1549,8 @@ class NetworkSolver:
         inflow = [
             e for e in self.network.elements.values() if e.to_node == comb and e.id not in fuel_path
         ]
-        m_air = sum(abs(mdot_guess.get(e.id, ref["m_dot"])) for e in inflow) or ref["m_dot"]
+        m_air_guessed = sum(abs(mdot_guess.get(e.id, ref["m_dot"])) for e in inflow)
+        m_air = m_air_guessed or ref["m_dot"]
         # The oxidizer's sources: every flow boundary upstream of the
         # combustor that is not the fuel (a premix plenum's air, or direct).
         seen: set[str] = set()
@@ -1573,7 +1579,11 @@ class NetworkSolver:
         # Kept for the diagnosis of a failed solve: at a point where the mass
         # rows do not close (a premix plenum), the at-point oxidizer is not
         # the network's.
-        node._start_oxidizer = [(m_air, T_ox, list(Y_ox))] if sources else []
+        node._start_oxidizer = (
+            [(m_air_guessed, T_ox, list(Y_ox))]
+            if sources and m_air_guessed > _FUEL_MIN_OXIDIZER_FLOW
+            else []
+        )
         if node.m_dot_guess is not None:
             return float(node.m_dot_guess)
         try:
@@ -6320,6 +6330,18 @@ class NetworkSolver:
             other = (fnode.branch == "lean" and phi > 1.0 + 1e-6) or (
                 fnode.branch == "rich" and phi < 1.0 - 1e-6
             )
+            if success and not other:
+                streams, _ = self._fuel_inflows(fnode, final_x, sol_dict)
+                if sum(m for m, _, _ in streams) <= _FUEL_MIN_OXIDIZER_FLOW:
+                    success = False
+                    consistent = False
+                    outcome = SolveOutcome.INCONSISTENT
+                    message = (
+                        f"FuelBoundary '{fid}': the combustor {fnode.combustor!r} gets no "
+                        "oxidizer flow at this root: the fuel has nothing to burn with, and "
+                        "the target is met only by vanishing flows."
+                    )
+                    warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
             if success and other:
                 success = False
                 consistent = False
@@ -6339,7 +6361,7 @@ class NetworkSolver:
                 m_ox = sum(m for m, _, _ in streams)
                 where = ""
                 start_ox = getattr(fnode, "_start_oxidizer", [])
-                if m_ox <= max(1e-9, 1e-6 * float(fnode.m_dot)) and start_ox:
+                if m_ox <= max(_FUEL_MIN_OXIDIZER_FLOW, 1e-6 * float(fnode.m_dot)) and start_ox:
                     # No oxidizer at this point, but the network has one: the
                     # point is far from closing its mass rows. Diagnose with
                     # the oxidizer at the start state.
@@ -6349,7 +6371,7 @@ class NetworkSolver:
                         T_without = self._fuel_T_without(streams)
                     except (ValueError, RuntimeError):
                         T_without = float("nan")
-                if m_ox <= max(1e-9, 1e-6 * float(fnode.m_dot)):
+                if m_ox <= max(_FUEL_MIN_OXIDIZER_FLOW, 1e-6 * float(fnode.m_dot)):
                     message = (
                         f"{message} FuelBoundary '{fid}': the combustor {fnode.combustor!r} gets no "
                         "oxidizer flow at this point: the fuel has nothing to burn with."

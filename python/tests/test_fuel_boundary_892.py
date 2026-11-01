@@ -335,8 +335,12 @@ def test_an_equilibrium_combustor_is_controlled_too(target: float, branch: str) 
     assert (r["fuel.phi"] < 1.0) if branch == "lean" else (r["fuel.phi"] > 1.0)
 
 
-def test_no_oxidizer_flow_is_named() -> None:
-    _, r = _solve(_with_fuel(_adiabatic_base(m_air=0.0), "fuel"))
+@pytest.mark.parametrize("guess", [None, 1e-6, 1e-10, 1e-14])
+def test_no_oxidizer_flow_is_named(guess: float | None) -> None:
+    """With no air every flow can vanish and the Tt row is then met by an
+    undetermined state: from a 1e-10 start (and on Linux CI from the default
+    one) the solve reaches tolerance. Refused at any start, never returned."""
+    _, r = _solve(_with_fuel(_adiabatic_base(m_air=0.0), "fuel", m_dot_guess=guess))
     assert not r["__success__"]
     assert "gets no oxidizer flow" in r["__message__"]
 
