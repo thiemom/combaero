@@ -57,10 +57,11 @@ What is NOT reproduced
       which is why they differ between runs of different Tu.
     - 2-D conduction around each hole, and conduction between segments.
     - The spanwise variation: the data are midspan.
-    - A segment's duct starts at the inlet plenum, and its heat-transfer
-      reference is that plenum's state, so the recovery temperature on the
-      near-sonic suction side is about 5 K high (#888). That is a few kelvin
-      of Tw, small beside the untuned error, and the tuners absorb it.
+    - A segment's duct starts at the inlet plenum. Its heat transfer is
+      evaluated at the duct's own inlet static state (#636), not the
+      plenum's; only on the near-sonic suction side does the correlation's
+      sonic margin (#551) hold the state below Mach ~0.97, about 0.3 K of
+      recovery temperature (#888).
     - Two closer-to-the-rig variants were tried and left out:
       * ONE coolant supply temperature for all holes (each fed its measured
         flow), tuned to a zero mean midspan error: the large holes come out

@@ -1527,6 +1527,17 @@ channel = ChannelElement("channel", "node2", "node3", length=2.0, diameter=0.05,
 # enters the receiving node does the duct fall back to adiabatic Fanno flow,
 # reporting the omitted first-order Rayleigh change ("rayleigh_omitted_frac",
 # flag "rayleigh_omitted").
+# At an end on a PressureBoundary or MassFlowBoundary (#888), "mach_in" /
+# "mach_out" and the inlet reference block ("velocity", "Re", "rho_ref",
+# "mu_ref", ...) are the duct's own state there, not the boundary's (a
+# reservoir's P = Pt, T = Tt; an outflow's static P with the arriving Tt):
+# compressible, the Fanno station at that end's Mach (so they equal
+# "M_in_duct" / "M_exit_duct"); incompressible, the residual's density state,
+# Tt at the approach static P where the boundary holds a total pressure. An
+# interior end reports its node's state; ribbed / pin-fin surfaces and
+# CrossflowSegmentElement keep the node states. "P_in" ... "Tt_out" stay the
+# nodes'. Reporting only; the heat-transfer correlation was already at the
+# duct's inlet static state (#636).
 
 # Effusion (multi-perforated) wall panel. Geometry is given the way a plate
 # is designed -- pitch, hole diameter, wall thickness, inclination -- and the
