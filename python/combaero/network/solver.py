@@ -1045,7 +1045,7 @@ class NetworkSolver:
         lossy = [
             e
             for e in self.network.elements.values()
-            if not isinstance(e, LosslessConnectionElement)
+            if not isinstance(e, (LosslessConnectionElement, TurbomachineElement))
         ]
         if len(seed_pressures) >= 2:
             dp_est = (max(seed_pressures) - min(seed_pressures)) / max(len(lossy), 1)
@@ -1072,13 +1072,22 @@ class NetworkSolver:
             for elem in self.network.get_downstream_elements(nid):
                 to_id = elem.to_node
                 if to_id not in visited:
-                    p_guess[to_id] = p_guess[nid] - hop(elem)
+                    # A compressor or turbine sets its pressure ratio (#893).
+                    p_guess[to_id] = (
+                        p_guess[nid] * elem.pt_factor
+                        if isinstance(elem, TurbomachineElement)
+                        else p_guess[nid] - hop(elem)
+                    )
                     visited.add(to_id)
                     queue.append(to_id)
             for elem in self.network.get_upstream_elements(nid):
                 from_id = elem.from_node
                 if from_id not in visited:
-                    p_guess[from_id] = p_guess[nid] + hop(elem)
+                    p_guess[from_id] = (
+                        p_guess[nid] / elem.pt_factor
+                        if isinstance(elem, TurbomachineElement)
+                        else p_guess[nid] + hop(elem)
+                    )
                     visited.add(from_id)
                     queue.append(from_id)
 
@@ -1095,7 +1104,11 @@ class NetworkSolver:
         ):
             from .ejector_element import EjectorElement
 
-            if not any(isinstance(e, EjectorElement) for e in self.network.elements.values()):
+            # Nor when an ejector or a compressor (#893) can raise a node above them.
+            if not any(
+                isinstance(e, (EjectorElement, TurbomachineElement))
+                for e in self.network.elements.values()
+            ):
                 lo, hi = min(seed_pressures), max(seed_pressures)
                 for nid in p_guess:
                     if not isinstance(self.network.nodes[nid], PressureBoundary):
@@ -1423,6 +1436,25 @@ class NetworkSolver:
         els = [
             e for e in net.elements.values() if e.from_node not in walls and e.to_node not in walls
         ]
+        # A compressor or turbine (#893) is a pressure ratio, not a resistance:
+        # with one end at a fixed pressure it fixes the other (in a chain, in
+        # turn), and it leaves the linear network; its flow is the balance at
+        # the end it fixed. With neither end fixed the seed does not apply.
+        machines = [e for e in els if isinstance(e, TurbomachineElement)]
+        boundary = set(fixed)
+        changed = True
+        while changed:
+            changed = False
+            for e in machines:
+                if e.from_node in fixed and e.to_node not in fixed:
+                    fixed[e.to_node] = fixed[e.from_node] * e.pt_factor
+                    changed = True
+                elif e.to_node in fixed and e.from_node not in fixed:
+                    fixed[e.from_node] = fixed[e.to_node] / e.pt_factor
+                    changed = True
+        if any(e.from_node not in fixed or e.to_node not in fixed for e in machines):
+            return None
+        els = [e for e in els if not isinstance(e, TurbomachineElement)]
         if not els:
             return None
         P_ref = float(np.mean(list(fixed.values())))
@@ -1441,7 +1473,7 @@ class NetworkSolver:
         K[K == 0.0] = SEED_LOSSLESS_FRACTION * K[K > 0.0].min()
 
         free = [nid for nid in net.nodes if nid not in fixed and nid not in walls]
-        if not free:
+        if not free and not machines:
             return None
         idx = {nid: i for i, nid in enumerate(free)}
         inj = np.zeros(len(free))
@@ -1457,7 +1489,12 @@ class NetworkSolver:
 
         m = np.full(len(els), m_ref)
         p = np.full(len(free), P_ref)
-        for _ in range(SEED_MAX_ITER):
+        if not free:
+            # Every pressure fixed (by boundaries and machines): each element's
+            # flow follows from its own drop, dPt = K m |m|.
+            dp = a_fix - b_fix
+            m = np.sign(dp) * np.sqrt(np.abs(dp) / K)
+        for _ in range(SEED_MAX_ITER if free else 0):
             G = 1.0 / (K * (np.abs(m) + SEED_MDOT_FLOOR))
             L = np.zeros((len(free), len(free)))
             b = inj.copy()
@@ -1500,6 +1537,16 @@ class NetworkSolver:
         p_floor = 0.5 * min(fixed.values())
         p_map = {nid: max(float(p[idx[nid]]), p_floor) for nid in free}
         m_map = {e.id: float(mi) for e, mi in zip(els, m, strict=True)}
+        for nid, P in fixed.items():
+            if nid not in boundary:
+                p_map[nid] = P  # set by a machine's pressure ratio
+        for e in machines:
+            # Its flow: the balance at an end it fixed that is no boundary.
+            end = e.to_node if e.to_node not in boundary else e.from_node
+            sign = 1.0 if end == e.to_node else -1.0
+            out = sum(m_map.get(d.id, 0.0) for d in net.get_downstream_elements(end) if d is not e)
+            into = sum(m_map.get(u.id, 0.0) for u in net.get_upstream_elements(end) if u is not e)
+            m_map[e.id] = sign * (out - into)
         return p_map, m_map
 
     def _fuel_out(self, fnode: "FuelBoundary", sol_dict: dict[str, Any]) -> float:
