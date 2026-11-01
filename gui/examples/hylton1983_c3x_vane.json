@@ -3,30 +3,113 @@
   "example": {
     "title": "Hylton 1983 C3X cooled vane",
     "source": "Hylton, Mihelc, Turner, Nealy and York (1983), NASA CR-168015: the C3X radially cooled vane cascade, run 158 (Appendix A), Tables III, IV, IX, Fig. 7.",
-    "reproduced": "Each row is one stretch of vane surface and the cooling hole nearest to it: hot gas from the cascade inlet total state to the measured local static pressure, a ss310 wall as thick as the mean distance to the hole, and the hole's share of its coolant flow. The gas-side Nu multipliers are fitted to the measured midspan wall temperature.",
+    "reproduced": "Ambient humid air, compressed, burns CH4 so that the cascade inlet is at the measured Tt1 and Pt1 (as in the rig's natural-gas burner). Each row is one stretch of vane surface and the cooling hole nearest to it: burner gas from the cascade inlet to the measured local static pressure, a ss310 wall as thick as the mean distance to the hole, and the hole's share of its coolant flow. The gas-side Nu multipliers are fitted to the measured midspan wall temperature.",
     "where_to_look": "Solve, then select a wall edge: T_hot is the gas-side wall temperature, equal to the measured Tw of that segment (the tuning target). The gas channels' Nu_multiplier is the fitted tuner (0.8-1.2 mid-chord suction side, about 2.2 at the leading edge, where a channel correlation has no stagnation flow). The coolant channels' Nu_multiplier is geometry: the hole's area over the segment's.",
     "label": "tuned",
-    "label_note": "Tuned to run 158 (19 Nu multipliers for 19 measured Tw; none left over). Untuned, the smooth-channel network misses run 158 by MAE 28 K (bias -23 K, worst -85 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with these multipliers: MAE 12 K, bias +11 K. The report's h is inferred by its own FE model, not measured, and is not a target.",
+    "label_note": "Tuned to run 158 (19 Nu multipliers for 19 measured Tw; none left over). Untuned, the smooth-channel network misses run 158 by MAE 27 K (bias -21 K, worst -83 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with these multipliers: MAE 12 K, bias +11 K. The report's h is inferred by its own FE model, not measured, and is not a target.",
     "script": "python/examples/papers/hylton1983_c3x_vane.py"
   },
   "nodes": [
     {
-      "id": "SS0_h2_in",
+      "id": "compressor_exit",
       "type": "pressure_boundary",
       "position": {
-        "x": 0,
-        "y": 0.0
+        "x": -900,
+        "y": 1400.0
       },
       "data": {
-        "id": "SS0_h2_in",
-        "label": "SS0_h2 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
+        "id": "compressor_exit",
+        "label": "Compressor exit: ambient humid air at eta 0.85",
+        "Pt": 253593.75,
+        "Tt": 389.2440071278308,
         "composition": {
-          "source": "dry_air",
+          "source": "humid_air",
           "mode": "mole",
-          "relative_humidity": 0
+          "relative_humidity": 0.6,
+          "ambient_T": 288.15,
+          "ambient_P": 101325.0
         }
+      }
+    },
+    {
+      "id": "fuel",
+      "type": "mass_boundary",
+      "position": {
+        "x": -900,
+        "y": 1640.0
+      },
+      "data": {
+        "id": "fuel",
+        "label": "Natural gas (CH4), set so the inlet is at Tt1",
+        "m_dot": 0.17033361686052115,
+        "Tt": 300.0,
+        "composition": {
+          "source": "fuel",
+          "mode": "mole"
+        }
+      }
+    },
+    {
+      "id": "burner_loss",
+      "type": "discrete_loss",
+      "position": {
+        "x": -680,
+        "y": 1400.0
+      },
+      "data": {
+        "id": "burner_loss",
+        "label": "Burner loss 4% of Pt",
+        "correlation_type": "constant_fraction",
+        "xi": 0.04
+      }
+    },
+    {
+      "id": "fuel_injection",
+      "type": "lossless_connection",
+      "position": {
+        "x": -680,
+        "y": 1640.0
+      },
+      "data": {
+        "id": "fuel_injection",
+        "label": "Fuel injection"
+      }
+    },
+    {
+      "id": "burner",
+      "type": "combustor",
+      "position": {
+        "x": -460,
+        "y": 1520.0
+      },
+      "data": {
+        "id": "burner",
+        "label": "Burner",
+        "method": "complete"
+      }
+    },
+    {
+      "id": "to_cascade",
+      "type": "lossless_connection",
+      "position": {
+        "x": -300,
+        "y": 1520.0
+      },
+      "data": {
+        "id": "to_cascade",
+        "label": "Duct to the cascade"
+      }
+    },
+    {
+      "id": "cascade_inlet",
+      "type": "plenum",
+      "position": {
+        "x": -150,
+        "y": 1520.0
+      },
+      "data": {
+        "id": "cascade_inlet",
+        "label": "Cascade inlet (Pt1, Tt1)"
       }
     },
     {
@@ -43,7 +126,7 @@
         "D": 0.07045697273976305,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 2.1937,
+        "Nu_multiplier": 2.1483,
         "f_multiplier": 1
       }
     },
@@ -77,7 +160,7 @@
         "id": "c2_SS0_h2_in",
         "label": "hole 2, share 0.33",
         "m_dot": 0.005813800917071058,
-        "Tt": 349.612761875441,
+        "Tt": 349.6127807941051,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -124,25 +207,6 @@
       }
     },
     {
-      "id": "SS1_h1_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 160.0
-      },
-      "data": {
-        "id": "SS1_h1_in",
-        "label": "SS1_h1 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS1_h1",
       "type": "channel",
       "position": {
@@ -156,7 +220,7 @@
         "D": 0.05396324791033938,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 0.8686,
+        "Nu_multiplier": 0.8513,
         "f_multiplier": 1
       }
     },
@@ -190,7 +254,7 @@
         "id": "c1_SS1_h1_in",
         "label": "hole 1, share 1.00",
         "m_dot": 0.0167,
-        "Tt": 348.18968621939473,
+        "Tt": 348.1896257774812,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -237,25 +301,6 @@
       }
     },
     {
-      "id": "SS2_h3_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 320.0
-      },
-      "data": {
-        "id": "SS2_h3_in",
-        "label": "SS2_h3 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS2_h3",
       "type": "channel",
       "position": {
@@ -269,7 +314,7 @@
         "D": 0.04724119606373563,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.157,
+        "Nu_multiplier": 1.1338,
         "f_multiplier": 1
       }
     },
@@ -303,7 +348,7 @@
         "id": "c3_SS2_h3_in",
         "label": "hole 3, share 0.59",
         "m_dot": 0.008783111747735856,
-        "Tt": 341.89295598872314,
+        "Tt": 341.8930989159226,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -350,25 +395,6 @@
       }
     },
     {
-      "id": "SS3_h4_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 480.0
-      },
-      "data": {
-        "id": "SS3_h4_in",
-        "label": "SS3_h4 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS3_h4",
       "type": "channel",
       "position": {
@@ -382,7 +408,7 @@
         "D": 0.04801009589532926,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.0933,
+        "Nu_multiplier": 1.0715,
         "f_multiplier": 1
       }
     },
@@ -416,7 +442,7 @@
         "id": "c4_SS3_h4_in",
         "label": "hole 4, share 0.53",
         "m_dot": 0.008685637213505367,
-        "Tt": 342.7462019231913,
+        "Tt": 342.74610512816383,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -463,25 +489,6 @@
       }
     },
     {
-      "id": "SS4_h5_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 640.0
-      },
-      "data": {
-        "id": "SS4_h5_in",
-        "label": "SS4_h5 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS4_h5",
       "type": "channel",
       "position": {
@@ -495,7 +502,7 @@
         "D": 0.05406621632626624,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.1657,
+        "Nu_multiplier": 1.1427,
         "f_multiplier": 1
       }
     },
@@ -529,7 +536,7 @@
         "id": "c5_SS4_h5_in",
         "label": "hole 5, share 0.51",
         "m_dot": 0.008987114259229302,
-        "Tt": 333.18160944073406,
+        "Tt": 333.18128386019106,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -576,25 +583,6 @@
       }
     },
     {
-      "id": "SS5_h6_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 800.0
-      },
-      "data": {
-        "id": "SS5_h6_in",
-        "label": "SS5_h6 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS5_h6",
       "type": "channel",
       "position": {
@@ -608,7 +596,7 @@
         "D": 0.06250223425790499,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.0407,
+        "Nu_multiplier": 1.0201,
         "f_multiplier": 1
       }
     },
@@ -642,7 +630,7 @@
         "id": "c6_SS5_h6_in",
         "label": "hole 6, share 0.51",
         "m_dot": 0.008473564872987631,
-        "Tt": 362.72021924646316,
+        "Tt": 362.72017217250925,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -689,25 +677,6 @@
       }
     },
     {
-      "id": "SS6_h7_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 960.0
-      },
-      "data": {
-        "id": "SS6_h7_in",
-        "label": "SS6_h7 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS6_h7",
       "type": "channel",
       "position": {
@@ -721,7 +690,7 @@
         "D": 0.07108588937214008,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.1157,
+        "Nu_multiplier": 1.0936,
         "f_multiplier": 1
       }
     },
@@ -755,7 +724,7 @@
         "id": "c7_SS6_h7_in",
         "label": "hole 7, share 0.51",
         "m_dot": 0.008208102464630645,
-        "Tt": 340.685533075321,
+        "Tt": 340.6855063346012,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -802,25 +771,6 @@
       }
     },
     {
-      "id": "SS7_h8_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 1120.0
-      },
-      "data": {
-        "id": "SS7_h8_in",
-        "label": "SS7_h8 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS7_h8",
       "type": "channel",
       "position": {
@@ -834,7 +784,7 @@
         "D": 0.0783631755352255,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.1328,
+        "Nu_multiplier": 1.1102,
         "f_multiplier": 1
       }
     },
@@ -868,7 +818,7 @@
         "id": "c8_SS7_h8_in",
         "label": "hole 8, share 0.50",
         "m_dot": 0.002771985237825221,
-        "Tt": 360.6258961826638,
+        "Tt": 360.6260518752037,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -915,25 +865,6 @@
       }
     },
     {
-      "id": "SS8_h9_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 1280.0
-      },
-      "data": {
-        "id": "SS8_h9_in",
-        "label": "SS8_h9 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS8_h9",
       "type": "channel",
       "position": {
@@ -947,7 +878,7 @@
         "D": 0.08444532984152639,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 0.9416,
+        "Nu_multiplier": 0.9227,
         "f_multiplier": 1
       }
     },
@@ -981,7 +912,7 @@
         "id": "c9_SS8_h9_in",
         "label": "hole 9, share 0.49",
         "m_dot": 0.0017271317588859747,
-        "Tt": 383.52849668079335,
+        "Tt": 383.5272485227125,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1028,25 +959,6 @@
       }
     },
     {
-      "id": "SS9_h10_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 1440.0
-      },
-      "data": {
-        "id": "SS9_h10_in",
-        "label": "SS9_h10 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "SS9_h10",
       "type": "channel",
       "position": {
@@ -1060,7 +972,7 @@
         "D": 0.08968455596349488,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 0.8034,
+        "Nu_multiplier": 0.7872,
         "f_multiplier": 1
       }
     },
@@ -1094,7 +1006,7 @@
         "id": "c10_SS9_h10_in",
         "label": "hole 10, share 0.51",
         "m_dot": 0.0008706068214972006,
-        "Tt": 411.677043363309,
+        "Tt": 411.6741546021206,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1141,25 +1053,6 @@
       }
     },
     {
-      "id": "PS0_h2_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 1600.0
-      },
-      "data": {
-        "id": "PS0_h2_in",
-        "label": "PS0_h2 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS0_h2",
       "type": "channel",
       "position": {
@@ -1173,7 +1066,7 @@
         "D": 0.06415228969701244,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 2.238,
+        "Nu_multiplier": 2.1919,
         "f_multiplier": 1
       }
     },
@@ -1207,7 +1100,7 @@
         "id": "c2_PS0_h2_in",
         "label": "hole 2, share 0.67",
         "m_dot": 0.011586199082928942,
-        "Tt": 349.612761875441,
+        "Tt": 349.6127807941051,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1254,25 +1147,6 @@
       }
     },
     {
-      "id": "PS1_h3_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 1760.0
-      },
-      "data": {
-        "id": "PS1_h3_in",
-        "label": "PS1_h3 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS1_h3",
       "type": "channel",
       "position": {
@@ -1286,7 +1160,7 @@
         "D": 0.04976107526433514,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.8129,
+        "Nu_multiplier": 1.7756,
         "f_multiplier": 1
       }
     },
@@ -1320,7 +1194,7 @@
         "id": "c3_PS1_h3_in",
         "label": "hole 3, share 0.41",
         "m_dot": 0.006016888252264144,
-        "Tt": 341.89295598872314,
+        "Tt": 341.8930989159226,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1367,25 +1241,6 @@
       }
     },
     {
-      "id": "PS2_h4_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 1920.0
-      },
-      "data": {
-        "id": "PS2_h4_in",
-        "label": "PS2_h4 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS2_h4",
       "type": "channel",
       "position": {
@@ -1399,7 +1254,7 @@
         "D": 0.04730285331367737,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.4483,
+        "Nu_multiplier": 1.4185,
         "f_multiplier": 1
       }
     },
@@ -1433,7 +1288,7 @@
         "id": "c4_PS2_h4_in",
         "label": "hole 4, share 0.47",
         "m_dot": 0.007814362786494632,
-        "Tt": 342.7462019231913,
+        "Tt": 342.74610512816383,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1480,25 +1335,6 @@
       }
     },
     {
-      "id": "PS3_h5_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 2080.0
-      },
-      "data": {
-        "id": "PS3_h5_in",
-        "label": "PS3_h5 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS3_h5",
       "type": "channel",
       "position": {
@@ -1512,7 +1348,7 @@
         "D": 0.04869791696218232,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.4757,
+        "Nu_multiplier": 1.4454,
         "f_multiplier": 1
       }
     },
@@ -1546,7 +1382,7 @@
         "id": "c5_PS3_h5_in",
         "label": "hole 5, share 0.49",
         "m_dot": 0.0085128857407707,
-        "Tt": 333.18160944073406,
+        "Tt": 333.18128386019106,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1593,25 +1429,6 @@
       }
     },
     {
-      "id": "PS4_h6_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 2240.0
-      },
-      "data": {
-        "id": "PS4_h6_in",
-        "label": "PS4_h6 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS4_h6",
       "type": "channel",
       "position": {
@@ -1625,7 +1442,7 @@
         "D": 0.05747284827874068,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.2201,
+        "Nu_multiplier": 1.195,
         "f_multiplier": 1
       }
     },
@@ -1659,7 +1476,7 @@
         "id": "c6_PS4_h6_in",
         "label": "hole 6, share 0.49",
         "m_dot": 0.00802643512701237,
-        "Tt": 362.72021924646316,
+        "Tt": 362.72017217250925,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1706,25 +1523,6 @@
       }
     },
     {
-      "id": "PS5_h7_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 2400.0
-      },
-      "data": {
-        "id": "PS5_h7_in",
-        "label": "PS5_h7 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS5_h7",
       "type": "channel",
       "position": {
@@ -1738,7 +1536,7 @@
         "D": 0.06831485425532538,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.4412,
+        "Nu_multiplier": 1.4116,
         "f_multiplier": 1
       }
     },
@@ -1772,7 +1570,7 @@
         "id": "c7_PS5_h7_in",
         "label": "hole 7, share 0.49",
         "m_dot": 0.007891897535369353,
-        "Tt": 340.685533075321,
+        "Tt": 340.6855063346012,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1819,25 +1617,6 @@
       }
     },
     {
-      "id": "PS6_h8_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 2560.0
-      },
-      "data": {
-        "id": "PS6_h8_in",
-        "label": "PS6_h8 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS6_h8",
       "type": "channel",
       "position": {
@@ -1851,7 +1630,7 @@
         "D": 0.07777231251462234,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.4107,
+        "Nu_multiplier": 1.3817,
         "f_multiplier": 1
       }
     },
@@ -1885,7 +1664,7 @@
         "id": "c8_PS6_h8_in",
         "label": "hole 8, share 0.50",
         "m_dot": 0.002728014762174779,
-        "Tt": 360.6258961826638,
+        "Tt": 360.6260518752037,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -1932,25 +1711,6 @@
       }
     },
     {
-      "id": "PS7_h9_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 2720.0
-      },
-      "data": {
-        "id": "PS7_h9_in",
-        "label": "PS7_h9 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS7_h9",
       "type": "channel",
       "position": {
@@ -1964,7 +1724,7 @@
         "D": 0.0856389517461667,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 1.0367,
+        "Nu_multiplier": 1.0156,
         "f_multiplier": 1
       }
     },
@@ -1998,7 +1758,7 @@
         "id": "c9_PS7_h9_in",
         "label": "hole 9, share 0.51",
         "m_dot": 0.0017628682411140253,
-        "Tt": 383.52849668079335,
+        "Tt": 383.5272485227125,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -2045,25 +1805,6 @@
       }
     },
     {
-      "id": "PS8_h10_in",
-      "type": "pressure_boundary",
-      "position": {
-        "x": 0,
-        "y": 2880.0
-      },
-      "data": {
-        "id": "PS8_h10_in",
-        "label": "PS8_h10 inlet (Pt1, Tt1)",
-        "Pt": 243450.0,
-        "Tt": 808.0,
-        "composition": {
-          "source": "dry_air",
-          "mode": "mole",
-          "relative_humidity": 0
-        }
-      }
-    },
-    {
       "id": "PS8_h10",
       "type": "channel",
       "position": {
@@ -2077,7 +1818,7 @@
         "D": 0.09203726039746081,
         "roughness": 0.0,
         "regime": "compressible",
-        "Nu_multiplier": 0.9023,
+        "Nu_multiplier": 0.884,
         "f_multiplier": 1
       }
     },
@@ -2111,7 +1852,7 @@
         "id": "c10_PS8_h10_in",
         "label": "hole 10, share 0.49",
         "m_dot": 0.0008393931785027993,
-        "Tt": 411.677043363309,
+        "Tt": 411.6741546021206,
         "composition": {
           "source": "dry_air",
           "mode": "mole",
@@ -2160,8 +1901,62 @@
   ],
   "edges": [
     {
-      "id": "e_SS0_h2_in_SS0_h2",
-      "source": "SS0_h2_in",
+      "id": "e_compressor_exit_burner_loss",
+      "source": "compressor_exit",
+      "sourceHandle": "flow-source",
+      "target": "burner_loss",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_burner_loss_burner",
+      "source": "burner_loss",
+      "sourceHandle": "flow-source",
+      "target": "burner",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_fuel_fuel_injection",
+      "source": "fuel",
+      "sourceHandle": "flow-source",
+      "target": "fuel_injection",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_fuel_injection_burner",
+      "source": "fuel_injection",
+      "sourceHandle": "flow-source",
+      "target": "burner",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_burner_to_cascade",
+      "source": "burner",
+      "sourceHandle": "flow-source",
+      "target": "to_cascade",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_to_cascade_cascade_inlet",
+      "source": "to_cascade",
+      "sourceHandle": "flow-source",
+      "target": "cascade_inlet",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_cascade_inlet_SS0_h2",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS0_h2",
       "targetHandle": "flow-target",
@@ -2217,8 +2012,8 @@
       }
     },
     {
-      "id": "e_SS1_h1_in_SS1_h1",
-      "source": "SS1_h1_in",
+      "id": "e_cascade_inlet_SS1_h1",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS1_h1",
       "targetHandle": "flow-target",
@@ -2274,8 +2069,8 @@
       }
     },
     {
-      "id": "e_SS2_h3_in_SS2_h3",
-      "source": "SS2_h3_in",
+      "id": "e_cascade_inlet_SS2_h3",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS2_h3",
       "targetHandle": "flow-target",
@@ -2331,8 +2126,8 @@
       }
     },
     {
-      "id": "e_SS3_h4_in_SS3_h4",
-      "source": "SS3_h4_in",
+      "id": "e_cascade_inlet_SS3_h4",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS3_h4",
       "targetHandle": "flow-target",
@@ -2388,8 +2183,8 @@
       }
     },
     {
-      "id": "e_SS4_h5_in_SS4_h5",
-      "source": "SS4_h5_in",
+      "id": "e_cascade_inlet_SS4_h5",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS4_h5",
       "targetHandle": "flow-target",
@@ -2445,8 +2240,8 @@
       }
     },
     {
-      "id": "e_SS5_h6_in_SS5_h6",
-      "source": "SS5_h6_in",
+      "id": "e_cascade_inlet_SS5_h6",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS5_h6",
       "targetHandle": "flow-target",
@@ -2502,8 +2297,8 @@
       }
     },
     {
-      "id": "e_SS6_h7_in_SS6_h7",
-      "source": "SS6_h7_in",
+      "id": "e_cascade_inlet_SS6_h7",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS6_h7",
       "targetHandle": "flow-target",
@@ -2559,8 +2354,8 @@
       }
     },
     {
-      "id": "e_SS7_h8_in_SS7_h8",
-      "source": "SS7_h8_in",
+      "id": "e_cascade_inlet_SS7_h8",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS7_h8",
       "targetHandle": "flow-target",
@@ -2616,8 +2411,8 @@
       }
     },
     {
-      "id": "e_SS8_h9_in_SS8_h9",
-      "source": "SS8_h9_in",
+      "id": "e_cascade_inlet_SS8_h9",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS8_h9",
       "targetHandle": "flow-target",
@@ -2673,8 +2468,8 @@
       }
     },
     {
-      "id": "e_SS9_h10_in_SS9_h10",
-      "source": "SS9_h10_in",
+      "id": "e_cascade_inlet_SS9_h10",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "SS9_h10",
       "targetHandle": "flow-target",
@@ -2730,8 +2525,8 @@
       }
     },
     {
-      "id": "e_PS0_h2_in_PS0_h2",
-      "source": "PS0_h2_in",
+      "id": "e_cascade_inlet_PS0_h2",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS0_h2",
       "targetHandle": "flow-target",
@@ -2787,8 +2582,8 @@
       }
     },
     {
-      "id": "e_PS1_h3_in_PS1_h3",
-      "source": "PS1_h3_in",
+      "id": "e_cascade_inlet_PS1_h3",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS1_h3",
       "targetHandle": "flow-target",
@@ -2844,8 +2639,8 @@
       }
     },
     {
-      "id": "e_PS2_h4_in_PS2_h4",
-      "source": "PS2_h4_in",
+      "id": "e_cascade_inlet_PS2_h4",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS2_h4",
       "targetHandle": "flow-target",
@@ -2901,8 +2696,8 @@
       }
     },
     {
-      "id": "e_PS3_h5_in_PS3_h5",
-      "source": "PS3_h5_in",
+      "id": "e_cascade_inlet_PS3_h5",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS3_h5",
       "targetHandle": "flow-target",
@@ -2958,8 +2753,8 @@
       }
     },
     {
-      "id": "e_PS4_h6_in_PS4_h6",
-      "source": "PS4_h6_in",
+      "id": "e_cascade_inlet_PS4_h6",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS4_h6",
       "targetHandle": "flow-target",
@@ -3015,8 +2810,8 @@
       }
     },
     {
-      "id": "e_PS5_h7_in_PS5_h7",
-      "source": "PS5_h7_in",
+      "id": "e_cascade_inlet_PS5_h7",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS5_h7",
       "targetHandle": "flow-target",
@@ -3072,8 +2867,8 @@
       }
     },
     {
-      "id": "e_PS6_h8_in_PS6_h8",
-      "source": "PS6_h8_in",
+      "id": "e_cascade_inlet_PS6_h8",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS6_h8",
       "targetHandle": "flow-target",
@@ -3129,8 +2924,8 @@
       }
     },
     {
-      "id": "e_PS7_h9_in_PS7_h9",
-      "source": "PS7_h9_in",
+      "id": "e_cascade_inlet_PS7_h9",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS7_h9",
       "targetHandle": "flow-target",
@@ -3186,8 +2981,8 @@
       }
     },
     {
-      "id": "e_PS8_h10_in_PS8_h10",
-      "source": "PS8_h10_in",
+      "id": "e_cascade_inlet_PS8_h10",
+      "source": "cascade_inlet",
       "sourceHandle": "flow-source",
       "target": "PS8_h10",
       "targetHandle": "flow-target",

@@ -3686,8 +3686,9 @@ documents:
     Transcribed 2026-10-31 (Tables III, IV, VI, IX, Fig. 7, Appendix A runs 149 and 158) into
     validation/cooling/data/hylton1983/ with derive_geometry.py; user check of the pages pending.
     Worked example (tuned; python/examples/papers/hylton1983_c3x_vane.py): 19 hole-assigned segments,
-    smooth-channel h on both sides, ss310 wall. Untuned, cross-source: run 158 MAE 28.2 K (bias -23.1 K,
-    worst -85 K at the leading edge), run 149 MAE 22.8 K. Gas-side Nu multipliers fitted to run 158''s Tw
+    smooth-channel h on both sides, ss310 wall. Since 2026-11-01 on burner gas (compressed humid air + CH4
+    to Tt1, as the rig). Untuned, cross-source: run 158 MAE 26.9 K (bias -21.0 K, worst -83 K at the leading
+    edge), run 149 MAE 22.2 K. Gas-side Nu multipliers fitted to run 158''s Tw
     (0.8-1.2 mid-chord suction side, 1.0-1.8 pressure side, 2.2 at the leading edge); run 149 with them
     MAE 11.7 K, bias +11.2 K (its Tu is 6.5 % against 8.3 %). The tuned h lands near the report''s h.'
   read_for: [NGV worked example (C3X), cooled-vane wall temperature, accuracy]
