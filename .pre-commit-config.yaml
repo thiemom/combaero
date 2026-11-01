@@ -92,5 +92,9 @@ repos:
     rev: v0.6.1
     hooks:
       - id: biome-check
-        additional_dependencies: ["@biomejs/biome@2.6.2"]
+        # Node for the hook env: nodeenv 1.10 takes the first entry of
+        # nodejs.org/dist/index.json as "latest", and a prerelease there
+        # (v27.0.0-alpha, 2026-10-29) failed every fresh env build.
+        language_version: lts
+        additional_dependencies: ["@biomejs/biome@2.6.4"]
         files: ^gui/frontend/
