@@ -107,8 +107,9 @@ rule here when the user corrects a layout or a network, with the reason given.
   design is rich). It only supplies: one `flow-source` handle. The link to
   its combustor is derived from `combustor_id`; write no edge for it. With
   air through a pressure boundary, the cold solve stages itself (fuel held,
-  flows, then the controller): C3X takes 23.8 s of the GUI's 30 s, against
-  15 s with a fixed fuel flow. Check the solve time against that budget.
+  flows, then the controller): C3X takes about 15 s of the GUI's 30 s, the
+  same as with a fixed fuel flow (#899). Check the solve time against that
+  budget.
 
 ## Check
 

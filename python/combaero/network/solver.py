@@ -927,7 +927,12 @@ class NetworkSolver:
                 Y = getattr(node, "Y", None)
                 if Y is not None:
                     compositions.append(list(Y))
-                total_mdot += getattr(node, "m_dot", 0.0)
+                # A FuelBoundary's flow is solved, not given (#892): its
+                # m_dot here is whatever the last start left in it, and
+                # counted it set the reference from that (#899): the C3X
+                # burner's cold solve 21 s, without it 15 s.
+                if not isinstance(node, FuelBoundary):
+                    total_mdot += getattr(node, "m_dot", 0.0)
 
         ref_P = float(min(pressures)) if pressures else 101325.0
         ref_T = float(np.mean(temperatures)) if temperatures else 300.0
