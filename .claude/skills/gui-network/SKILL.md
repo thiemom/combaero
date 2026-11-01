@@ -110,6 +110,11 @@ rule here when the user corrects a layout or a network, with the reason given.
   flows, then the controller): C3X takes about 15 s of the GUI's 30 s, the
   same as with a fixed fuel flow (#899). Check the solve time against that
   budget.
+- **A compressor or turbine is a `compressor` / `turbine` element node**
+  (#893): `pressure_ratio`, `efficiency_type`, `efficiency`. Feed it from a
+  fixed-pressure end (an ambient PressureBoundary) where the rig has one:
+  then the cold start's resistance seed sees through it. Between two pressure
+  boundaries alone it is refused.
 
 ## Check
 

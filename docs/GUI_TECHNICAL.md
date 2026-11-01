@@ -88,6 +88,20 @@ Elements are defined by edges in the graph but carry their own physical paramete
   - "Stolz" is deprecated (#876), removed in 0.9.0. A saved file with it still loads and solves; the Inspector labels it deprecated and `/solve` returns a note for each such orifice in `SolveResponse.deprecations`, shown on the solver status badge.
 - `regime`: "default", "incompressible", or "compressible".
 
+#### Compressor and Turbine (`compressor`, `turbine`)
+A `CompressorElement` / `TurbineElement` at a fixed total-to-total pressure
+ratio (#893): Pt_out = PR x Pt_in (compressor) or Pt_in / PR (turbine); the
+network sets the flow. One inlet (`flow-target`) and one outlet
+(`flow-source`); no surface, so no thermal handles.
+- `pressure_ratio`: >= 1 (Default: 4 compressor, 3 turbine)
+- `efficiency_type`: `"polytropic"` (default) or `"isentropic"`
+- `efficiency`: in (0, 1] (Default: 0.88 compressor, 0.9 turbine)
+
+Its result carries `power` [W] > 0 (absorbed / delivered), `dh` [J/kg] signed
+into the flow, `Tt_in`, `Tt_out`, `Tt_out_isentropic`, `eta_poly`, `eta_is`,
+`pressure_ratio`. A reversed-flow root is refused; a machine between two
+pressure boundaries is refused (nothing sets its flow).
+
 #### Channel Element (`channel`)
 - `L`: Length [m]
 - `D`: Hydraulic diameter [m]

@@ -634,6 +634,80 @@ const Inspector = () => {
 						);
 					})()}
 
+				{(selectedNode.type === "compressor" ||
+					selectedNode.type === "turbine") &&
+					(() => {
+						// #893: a fixed total-to-total pressure ratio.
+						const d = selectedNode.data;
+						const isTurbine = selectedNode.type === "turbine";
+						const res = d.result;
+						return (
+							<div className="flex flex-col gap-3">
+								<div className="text-[10px] text-stone-500 leading-snug">
+									{isTurbine
+										? "Pt_out = Pt_in / PR. The stream leaves at the expansion's outlet Tt; the network sets the flow."
+										: "Pt_out = PR x Pt_in. The stream leaves at the compression's outlet Tt; the network sets the flow."}{" "}
+									A reversed flow (surge) is refused.
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`tm_pr_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Pressure ratio (-)
+									</label>
+									<NumericInput
+										id={`tm_pr_${selectedNode.id}`}
+										value={d.pressure_ratio ?? (isTurbine ? 3 : 4)}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { pressure_ratio: val })
+										}
+										className="p-2 border rounded"
+									/>
+								</div>
+								<div className="flex flex-col gap-2">
+									<label
+										htmlFor={`tm_et_${selectedNode.id}`}
+										className="text-xs font-bold text-gray-500 uppercase"
+									>
+										Efficiency
+									</label>
+									<select
+										id={`tm_et_${selectedNode.id}`}
+										value={d.efficiency_type ?? "polytropic"}
+										onChange={(e) =>
+											updateNodeData(selectedNode.id, {
+												efficiency_type: e.target.value,
+											})
+										}
+										className="p-2 border rounded text-sm"
+									>
+										<option value="polytropic">Polytropic</option>
+										<option value="isentropic">Isentropic</option>
+									</select>
+									<NumericInput
+										id={`tm_eta_${selectedNode.id}`}
+										value={d.efficiency ?? (isTurbine ? 0.9 : 0.88)}
+										onChange={(val) =>
+											updateNodeData(selectedNode.id, { efficiency: val })
+										}
+										className="p-2 border rounded"
+									/>
+								</div>
+								{res && typeof res.power === "number" && (
+									<div className="text-[11px] font-mono text-stone-600 leading-snug">
+										power {(res.power / 1000).toPrecision(5)} kW; Tt{" "}
+										{Number(res.Tt_in).toFixed(1)} {"->"}{" "}
+										{Number(res.Tt_out).toFixed(1)} K; eta_poly{" "}
+										{Number(res.eta_poly).toFixed(4)}, eta_is{" "}
+										{Number(res.eta_is).toFixed(4)}
+									</div>
+								)}
+								<InitialGuessEditor node={selectedNode} />
+							</div>
+						);
+					})()}
+
 				{selectedNode.type === "pressure_boundary" && (
 					<>
 						<UnitInput
@@ -4459,6 +4533,8 @@ const InitialGuessEditor = ({ node }: { node: any }) => {
 		// Elements (edges in React Flow but still nodes here): m_dot only.
 		channel: [{ key: "m_dot", unit: "kg/s" }],
 		orifice: [{ key: "m_dot", unit: "kg/s" }],
+		compressor: [{ key: "m_dot", unit: "kg/s" }],
+		turbine: [{ key: "m_dot", unit: "kg/s" }],
 		discrete_loss: [{ key: "m_dot", unit: "kg/s" }],
 		area_change: [{ key: "m_dot", unit: "kg/s" }],
 		// MPCE tee: the only element-owned unknown is the junction pressure,

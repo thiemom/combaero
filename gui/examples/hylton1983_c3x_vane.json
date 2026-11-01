@@ -11,17 +11,17 @@
   },
   "nodes": [
     {
-      "id": "compressor_exit",
+      "id": "ambient",
       "type": "pressure_boundary",
       "position": {
-        "x": -900.0,
+        "x": -1260.0,
         "y": 1400.0
       },
       "data": {
-        "id": "compressor_exit",
-        "label": "Compressor exit: ambient humid air at eta 0.85",
-        "Pt": 253593.75,
-        "Tt": 389.2440071278308,
+        "id": "ambient",
+        "label": "Ambient humid air",
+        "Pt": 101325.0,
+        "Tt": 288.15,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -33,6 +33,18 @@
             "H2O": 0.006306162770805507
           }
         }
+      }
+    },
+    {
+      "id": "compressor_exit",
+      "type": "plenum",
+      "position": {
+        "x": -900.0,
+        "y": 1400.0
+      },
+      "data": {
+        "id": "compressor_exit",
+        "label": "Compressor exit"
       }
     },
     {
@@ -120,7 +132,7 @@
         "id": "c2_SS0_h2_in",
         "label": "hole 2, share 0.33",
         "m_dot": 0.005813800917071058,
-        "Tt": 349.6127791208601,
+        "Tt": 349.61277912085933,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -264,7 +276,7 @@
         "id": "c3_SS2_h3_in",
         "label": "hole 3, share 0.59",
         "m_dot": 0.008783111747735856,
-        "Tt": 341.89309764558857,
+        "Tt": 341.8930976455886,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -336,7 +348,7 @@
         "id": "c4_SS3_h4_in",
         "label": "hole 4, share 0.53",
         "m_dot": 0.008685637213505367,
-        "Tt": 342.7461037181445,
+        "Tt": 342.74610371814447,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -408,7 +420,7 @@
         "id": "c5_SS4_h5_in",
         "label": "hole 5, share 0.51",
         "m_dot": 0.008987114259229302,
-        "Tt": 333.18128236449985,
+        "Tt": 333.1812823644998,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -552,7 +564,7 @@
         "id": "c7_SS6_h7_in",
         "label": "hole 7, share 0.51",
         "m_dot": 0.008208102464630645,
-        "Tt": 340.68550430846363,
+        "Tt": 340.6855043084636,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -696,7 +708,7 @@
         "id": "c9_SS8_h9_in",
         "label": "hole 9, share 0.49",
         "m_dot": 0.0017271317588859747,
-        "Tt": 383.5271990565113,
+        "Tt": 383.5271990565114,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -840,7 +852,7 @@
         "id": "c2_PS0_h2_in",
         "label": "hole 2, share 0.67",
         "m_dot": 0.011586199082928942,
-        "Tt": 349.6127791208601,
+        "Tt": 349.61277912085933,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -912,7 +924,7 @@
         "id": "c3_PS1_h3_in",
         "label": "hole 3, share 0.41",
         "m_dot": 0.006016888252264144,
-        "Tt": 341.89309764558857,
+        "Tt": 341.8930976455886,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -984,7 +996,7 @@
         "id": "c4_PS2_h4_in",
         "label": "hole 4, share 0.47",
         "m_dot": 0.007814362786494632,
-        "Tt": 342.7461037181445,
+        "Tt": 342.74610371814447,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1056,7 +1068,7 @@
         "id": "c5_PS3_h5_in",
         "label": "hole 5, share 0.49",
         "m_dot": 0.0085128857407707,
-        "Tt": 333.18128236449985,
+        "Tt": 333.1812823644998,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1200,7 +1212,7 @@
         "id": "c7_PS5_h7_in",
         "label": "hole 7, share 0.49",
         "m_dot": 0.007891897535369353,
-        "Tt": 340.68550430846363,
+        "Tt": 340.6855043084636,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1344,7 +1356,7 @@
         "id": "c9_PS7_h9_in",
         "label": "hole 9, share 0.51",
         "m_dot": 0.0017628682411140253,
-        "Tt": 383.5271990565113,
+        "Tt": 383.5271990565114,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1451,6 +1463,21 @@
             "CO2": 0.0006077325288618577
           }
         }
+      }
+    },
+    {
+      "id": "compressor",
+      "type": "compressor",
+      "position": {
+        "x": -1080.0,
+        "y": 1400.0
+      },
+      "data": {
+        "id": "compressor",
+        "label": "Compressor, eta_is 0.85 (assumed)",
+        "pressure_ratio": 2.5027757216876387,
+        "efficiency_type": "isentropic",
+        "efficiency": 0.85
       }
     },
     {
@@ -2236,9 +2263,27 @@
   ],
   "edges": [
     {
+      "id": "e_ambient_compressor",
+      "source": "ambient",
+      "sourceHandle": "flow-source",
+      "target": "compressor",
+      "targetHandle": "flow-target",
+      "type": "default",
+      "data": {}
+    },
+    {
+      "id": "e_compressor_compressor_exit",
+      "source": "compressor",
+      "sourceHandle": "flow-source",
+      "target": "compressor_exit",
+      "targetHandle": "flow-left",
+      "type": "default",
+      "data": {}
+    },
+    {
       "id": "e_compressor_exit_burner_loss",
       "source": "compressor_exit",
-      "sourceHandle": "flow-source",
+      "sourceHandle": "flow-right",
       "target": "burner_loss",
       "targetHandle": "flow-target",
       "type": "default",

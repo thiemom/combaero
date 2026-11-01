@@ -168,6 +168,13 @@ UNIT_MAP: dict[str, str] = {
     # --- Fuel controller (#892); its Tt_target shares the heat source's ---
     "Tt_without_fuel": "K",
     "rich_branch": "-",
+    # --- Compressor / turbine (#893) ---
+    "power": "W",
+    "dh": "J/kg",
+    "Tt_out_isentropic": "K",
+    "eta_poly": "-",
+    "eta_is": "-",
+    "pressure_ratio": "-",
     "ln_m_dot": "-",
     # --- Per-row lists of the arrays (``rows_<key>``, unit of <key>) ---
     "rows_P_backside": "Pa",  # effusion liner: each panel's P_in
@@ -396,6 +403,8 @@ INPUT_UNIT_MAP: dict[str, str] = {
     "Tt_target": "K",
     "fraction": "-",
     "m_dot_guess": "kg/s",  # fuel boundary (#892)
+    "pressure_ratio": "-",  # compressor / turbine (#893)
+    "efficiency": "-",
     # Composition and ambient
     "relative_humidity": "-",
     "ambient_T": "K",

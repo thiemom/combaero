@@ -129,6 +129,22 @@
 			"state.u",
 			"state.velocity"
 		],
+		"compressor": [
+			"Pt_in",
+			"Pt_out",
+			"Tt_in",
+			"Tt_out",
+			"Tt_out_isentropic",
+			"dh",
+			"eta_is",
+			"eta_poly",
+			"m_dot",
+			"power",
+			"pressure_ratio",
+			"sigma_norm",
+			"sigma_norm_high",
+			"sigma_norm_low"
+		],
 		"discrete_loss": [
 			"Nu",
 			"P_in",
@@ -736,6 +752,22 @@
 			"h_b",
 			"material_in_range"
 		],
+		"turbine": [
+			"Pt_in",
+			"Pt_out",
+			"Tt_in",
+			"Tt_out",
+			"Tt_out_isentropic",
+			"dh",
+			"eta_is",
+			"eta_poly",
+			"m_dot",
+			"power",
+			"pressure_ratio",
+			"sigma_norm",
+			"sigma_norm_high",
+			"sigma_norm_low"
+		],
 		"vortex": [
 			"M_theta_in",
 			"M_theta_out",
@@ -799,6 +831,9 @@
 		"combustor": [
 			"palette",
 			"equilibrium"
+		],
+		"compressor": [
+			"palette"
 		],
 		"discrete_loss": [
 			"palette",
@@ -873,6 +908,9 @@
 			"palette"
 		],
 		"slot_film": [
+			"palette"
+		],
+		"turbine": [
 			"palette"
 		],
 		"vortex": [
@@ -954,6 +992,7 @@
 		"Tt": "K",
 		"Tt_in": "K",
 		"Tt_out": "K",
+		"Tt_out_isentropic": "K",
 		"Tt_target": "K",
 		"Tt_without_fuel": "K",
 		"U1_over_Vi_max": "-",
@@ -994,13 +1033,16 @@
 		"dPt": "Pa",
 		"dPt_loss": "Pa",
 		"density_ratio": "-",
+		"dh": "J/kg",
 		"diameter": "m",
 		"effectiveness": "-",
 		"efficiency": "-",
 		"entrainment_ratio": "-",
 		"entrainment_ratio_critical": "-",
 		"eta_film": "-",
+		"eta_is": "-",
 		"eta_overall": "-",
+		"eta_poly": "-",
 		"expansibility": "-",
 		"expansion": "-",
 		"f": "-",
@@ -1107,8 +1149,10 @@
 		"port_2_outer_area": "m\u00b2",
 		"port_2_sign": "-",
 		"port_area_mismatch": "-",
+		"power": "W",
 		"pr_static": "-",
 		"pr_total": "-",
+		"pressure_ratio": "-",
 		"pressure_recovery": "-",
 		"q_wall": "W/m\u00b2",
 		"r_gas": "J/kg/K",

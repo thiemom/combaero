@@ -19,6 +19,7 @@ import PlenumNode from "./nodes/PlenumNode";
 import PressureBoundaryNode from "./nodes/PressureBoundaryNode";
 import ProbeNode from "./nodes/ProbeNode";
 import SlotFilmNode from "./nodes/SlotFilmNode";
+import TurbomachineNode from "./nodes/TurbomachineNode";
 import VortexNode from "./nodes/VortexNode";
 import WallNode from "./nodes/WallNode";
 import ProbeLinkEdge from "./ProbeLinkEdge";
@@ -31,6 +32,8 @@ export const nodeTypes = {
 	pressure_boundary: PressureBoundaryNode,
 	channel: ChannelNode,
 	orifice: OrificeNode,
+	compressor: TurbomachineNode,
+	turbine: TurbomachineNode,
 	impingement_array: ImpingementArrayNode,
 	effusion_plate: EffusionPlateNode,
 	film_cooling: FilmCoolingNode,
