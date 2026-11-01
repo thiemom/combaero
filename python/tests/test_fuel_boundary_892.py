@@ -467,3 +467,15 @@ def test_a_held_fuel_row_holds_the_flow() -> None:
     res, jac = f.residuals(SimpleNamespace(Pt=2.0e5, P=2.0e5))  # type: ignore[arg-type]
     assert res[-1] == pytest.approx(math.log(2.0) * 1500.0)
     assert jac[len(res) - 1] == {"f.ln_m_dot": 1500.0}
+
+
+def test_the_reference_flow_does_not_read_a_fuel_flow() -> None:
+    """#899: a FuelBoundary's m_dot is solved; whatever a previous start left
+    in it must not set the cold start's reference flow (counted, the C3X
+    burner's cold solve took 21 s, not 15)."""
+    refs = []
+    for leftover in (0.0, 1e-6, 5.0):
+        n = _routed("direct")
+        n.nodes["fuel"].m_dot = leftover
+        refs.append(NetworkSolver(n)._infer_reference_state()["m_dot"])
+    assert refs[0] == refs[1] == refs[2]
