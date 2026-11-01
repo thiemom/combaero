@@ -81,6 +81,7 @@ export const handleStyle = (
 const TYPE_LABEL: Record<string, string> = {
 	mpce_tee: "Tee",
 	heat_source: "Heat Source",
+	fuel_boundary: "Fuel Boundary",
 };
 
 /** User-facing name for a node type: "mpce_tee" -> "Tee", else underscores to spaces. */

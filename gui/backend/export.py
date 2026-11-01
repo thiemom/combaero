@@ -6,7 +6,7 @@ a script opens in the GUI, and ``NetworkRunner.from_dict(network_to_gui(net))``
 solves to the same results. Anything without a GUI form is refused with the
 list of what and why -- never dropped.
 
-Phase 1 covers the boundaries, plenum, momentum chamber, combustor, channel,
+Phase 1 covers the boundaries (the fuel controller too), plenum, momentum chamber, combustor, channel,
 orifice, pressure loss (all four correlations), lossless connection and the
 thermal wall, with smooth convective surfaces.
 """
@@ -21,6 +21,7 @@ from combaero.network import (
     ChannelElement,
     CombustorNode,
     FlowNetwork,
+    FuelBoundary,
     LosslessConnectionElement,
     MassFlowBoundary,
     MomentumChamberNode,
@@ -46,6 +47,8 @@ FILE_VERSION = "1.2"
 FLOW_HANDLES: dict[str, tuple[str | None, str | None]] = {
     "pressure_boundary": ("flow-source", "flow-target"),
     "mass_boundary": ("flow-source", "flow-target"),
+    # A fuel controller (#892) only supplies: no inlet.
+    "fuel_boundary": ("flow-source", None),
     "plenum": ("flow-right", "flow-left"),
     "momentum_chamber": ("flow-source", "flow-target"),
     "combustor": ("flow-source", "flow-target"),
@@ -60,6 +63,7 @@ SIDE_INLET = "side-target"
 SUPPORTED = (
     "PressureBoundary",
     "MassFlowBoundary",
+    "FuelBoundary",
     "PlenumNode",
     "MomentumChamberNode",
     "CombustorNode",
@@ -150,6 +154,19 @@ def _node(nid: str, node: Any, problems: list[str]) -> tuple[str, dict[str, Any]
             "Tt": float(node.Tt),
             "composition": _composition(node.Y),
         }
+    # Before MassFlowBoundary, its base: exported as one it would lose the
+    # controller and fix the fuel flow at whatever it last was.
+    if isinstance(node, FuelBoundary):
+        d = {
+            "combustor_id": node.combustor,
+            "Tt_target": float(node.Tt_target),
+            "branch": node.branch,
+            "Tt": float(node.Tt),
+            "composition": _composition(node.Y),
+        }
+        if node.m_dot_guess is not None:
+            d["m_dot_guess"] = float(node.m_dot_guess)
+        return "fuel_boundary", d
     if isinstance(node, MassFlowBoundary):
         return "mass_boundary", {
             "m_dot": float(node.m_dot),

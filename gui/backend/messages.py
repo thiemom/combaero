@@ -33,6 +33,7 @@ KIND_NAME = {
     "mpce_tee": "Tee",
     "momentum_chamber": "Momentum Chamber",
     "mass_boundary": "Mass Flow Boundary",
+    "fuel_boundary": "Fuel Boundary",
     "pressure_boundary": "Pressure Boundary",
 }
 

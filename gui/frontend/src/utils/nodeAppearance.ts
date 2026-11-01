@@ -17,6 +17,7 @@ import {
 	Crosshair,
 	Database,
 	Flame,
+	Fuel,
 	Gauge,
 	Grip,
 	Heater,
@@ -43,6 +44,7 @@ export interface NodeAppearance {
 
 export const NODE_APPEARANCE = {
 	mass_boundary: { icon: LogIn, colour: "text-orange-600" },
+	fuel_boundary: { icon: Fuel, colour: "text-yellow-600" },
 	pressure_boundary: { icon: Gauge, colour: "text-blue-600" },
 	plenum: { icon: Database, colour: "text-amber-600" },
 	wall: { icon: Square, colour: "text-stone-600", extra: "fill-stone-600" },

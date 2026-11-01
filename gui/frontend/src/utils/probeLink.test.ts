@@ -220,3 +220,43 @@ describe("link geometry", () => {
 		expect(edgeLabelPoint(a, b, null, null)).toEqual({ x: 150, y: 70 });
 	});
 });
+
+describe("a fuel boundary's link to the combustor it controls (#892)", () => {
+	it("is derived from combustor_id and marked as a control link", () => {
+		const nodes = [
+			node("cb", "combustor"),
+			node("f", "fuel_boundary", { combustor_id: "cb" }),
+			node("g", "fuel_boundary", {}),
+			node("h", "fuel_boundary", { combustor_id: "gone" }),
+		];
+		const links = probeLinkEdges(nodes, []);
+		expect(links.map((l) => l.id)).toEqual([probeLinkId("f")]);
+		expect(links[0].data).toEqual({
+			kind: "node",
+			targetId: "cb",
+			control: true,
+		});
+		expect(probeOfLink(links[0].id)).toBe("f");
+	});
+
+	it("may point at a combustor only", () => {
+		const nodes = [
+			node("cb", "combustor"),
+			node("pl", "plenum"),
+			node("f", "fuel_boundary"),
+		];
+		expect(isProbeTarget("f", "cb", nodes, [wall])).toBe(true);
+		expect(isProbeTarget("f", "pl", nodes, [wall])).toBe(false);
+		expect(isProbeTarget("f", "w", nodes, [wall])).toBe(false);
+		expect(isProbeTarget("f", "f", nodes, [wall])).toBe(false);
+	});
+
+	it("is structural: adding a fuel boundary changes the solved system", () => {
+		expect(
+			isStructuralNodeChange(
+				[{ type: "add", item: node("f", "fuel_boundary") }],
+				[],
+			),
+		).toBe(true);
+	});
+});

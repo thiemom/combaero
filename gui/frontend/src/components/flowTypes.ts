@@ -7,6 +7,7 @@ import EffusionLinerNode from "./nodes/EffusionLinerNode";
 import EffusionPlateNode from "./nodes/EffusionPlateNode";
 import EjectorNode from "./nodes/EjectorNode";
 import FilmCoolingNode from "./nodes/FilmCoolingNode";
+import FuelBoundaryNode from "./nodes/FuelBoundaryNode";
 import HeatSourceNode from "./nodes/HeatSourceNode";
 import ImpingementArrayNode from "./nodes/ImpingementArrayNode";
 import LosslessNode from "./nodes/LosslessNode";
@@ -26,6 +27,7 @@ import ThermalEdge from "./ThermalEdge";
 export const nodeTypes = {
 	plenum: PlenumNode,
 	mass_boundary: MassBoundaryNode,
+	fuel_boundary: FuelBoundaryNode,
 	pressure_boundary: PressureBoundaryNode,
 	channel: ChannelNode,
 	orifice: OrificeNode,

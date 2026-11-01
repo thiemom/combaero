@@ -220,7 +220,7 @@ def test_c3x_coolant_multiplier_is_geometry(c3x: ModuleType) -> None:
     """Each coolant sub-channel's Nu_multiplier is its share of the hole
     perimeter over its segment's length, not a fitted number."""
     holes = c3x.coolant(158)
-    net = c3x.build(158, c3x.TUNED, {}, 0.0)
+    net = c3x.build(158, c3x.TUNED, {})
     for g in c3x.segments(158):
         el = net.elements[f"c{g['hole']}_{g['id']}"]
         expected = g["f"] * math.pi * holes[g["hole"]]["D"] / g["L"]
@@ -229,13 +229,15 @@ def test_c3x_coolant_multiplier_is_geometry(c3x: ModuleType) -> None:
 
 
 def test_c3x_burner_puts_the_cascade_inlet_at_the_measured_state(c3x: ModuleType) -> None:
-    """The rig upstream (#892/#893 stand-ins): compressed humid air burns CH4
-    so that the one cascade inlet is at Table IX's Tt1 and Pt1."""
+    """The rig upstream (#893 stand-in for the compressor): compressed humid
+    air burns CH4, its flow set by a FuelBoundary (#892), so that the one
+    cascade inlet is at Table IX's Tt1 and Pt1."""
     cond = c3x.run_conditions(158)
-    sol, start = c3x.solve(158, c3x.TUNED)
-    assert sol["cascade_inlet.Tt"] == pytest.approx(cond["Tt1"], abs=0.02)
+    sol, _ = c3x.solve(158, c3x.TUNED)
+    assert sol["cascade_inlet.Tt"] == pytest.approx(cond["Tt1"], abs=1e-3)
     assert sol["cascade_inlet.Pt"] == pytest.approx(cond["Pt1"], rel=1e-6)
-    far = start["m_fuel"] / sol["burner_loss.m_dot"]
+    assert sol["fuel.phi"] < 1.0  # the default branch
+    far = sol["fuel.m_dot"] / sol["burner_loss.m_dot"]
     assert 0.007 < far < 0.012  # lean: ~400 K of rise on natural gas
     # Compressor exit against the ideal-gas estimate T1 (1 + (PR^((g-1)/g) - 1)/eta).
     P2, T2 = c3x.burner_supply(158)

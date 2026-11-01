@@ -102,6 +102,13 @@ rule here when the user corrects a layout or a network, with the reason given.
   result is demoted, and the outcome is "inconsistent". Until #899 is fixed,
   a cold solve of such a network can be slow or wrong where a warm one is
   fine.
+- **A combustor exit Tt is a `fuel_boundary`, not a hand-tuned fuel flow**
+  (#892). Give it `combustor_id`, `Tt_target` and `branch` ("lean" unless the
+  design is rich). It only supplies: one `flow-source` handle. The link to
+  its combustor is derived from `combustor_id`; write no edge for it. With
+  air through a pressure boundary, the cold solve stages itself (fuel held,
+  flows, then the controller): C3X takes 23.8 s of the GUI's 30 s, against
+  15 s with a fixed fuel flow. Check the solve time against that budget.
 
 ## Check
 

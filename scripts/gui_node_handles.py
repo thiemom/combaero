@@ -62,6 +62,8 @@ def handles_of(path: Path) -> dict[str, Any]:
         if hid is not None and hid.startswith("thermal"):
             thermal.append(hid)
             continue
+        if hid is not None and hid.startswith("probe-"):
+            continue  # a derived link's anchor (utils/probeLink.ts), never a flow edge
         if kind is None:
             dynamic = True  # a handle whose role is computed
             continue

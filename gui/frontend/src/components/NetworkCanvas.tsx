@@ -75,6 +75,16 @@ const NetworkCanvas = () => {
 					Tt: 300,
 					composition: { source: "humid_air", mode: "mole" },
 				} as any;
+			} else if (type === "fuel_boundary") {
+				// #892: CH4 to 1500 K, lean. The combustor is chosen by
+				// connecting the fuel to it or dragging its link handle there.
+				data = {
+					...data,
+					Tt_target: 1500,
+					branch: "lean",
+					Tt: 300,
+					composition: { source: "fuel", mode: "mole" },
+				} as any;
 			} else if (type === "pressure_boundary") {
 				data = {
 					...data,

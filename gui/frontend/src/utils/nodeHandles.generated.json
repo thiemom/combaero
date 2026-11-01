@@ -90,6 +90,14 @@
 		],
 		"thermal": []
 	},
+	"fuel_boundary": {
+		"dynamic": false,
+		"inlets": [],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
 	"heat_source": {
 		"dynamic": true,
 		"inlets": [],

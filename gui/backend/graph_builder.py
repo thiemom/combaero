@@ -14,6 +14,7 @@ from combaero.network import (
     EnergyBoundary,
     FilmCoolingElement,
     FlowNetwork,
+    FuelBoundary,
     ImpingementArray,
     ImpingementModel,
     LinearThetaFractionLoss,
@@ -54,6 +55,7 @@ from .schemas import (
     EffusionPlateData,
     EjectorData,
     FilmCoolingData,
+    FuelBoundaryData,
     HeatSourceData,
     ImpingementArrayData,
     ImpingementModelData,
@@ -676,6 +678,26 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             if not node.initial_guess:
                 node.initial_guess = _guess_from_prior_result(node_data, node_id)
+            net.add_node(node)
+            nodes_map[node_id] = node
+        elif node_type == "fuel_boundary":
+            data = _parse(FuelBoundaryData, node_data, node_id)
+            if not data.combustor_id:
+                raise ValueError(
+                    f"Fuel boundary '{node_id}': no combustor to control. Connect it to "
+                    "one, or drag its link handle onto the combustor it sets."
+                )
+            Y = resolve_composition(data.composition, data.Tt, 101325.0, schema.solver_settings)
+            node = FuelBoundary(
+                node_id,
+                combustor=data.combustor_id,
+                Tt_target=data.Tt_target,
+                branch=data.branch,
+                Tt=data.Tt,
+                Y=Y,
+                m_dot_guess=data.m_dot_guess,
+            )
+            node.initial_guess = _expand_initial_guess(data.initial_guess, node_id)
             net.add_node(node)
             nodes_map[node_id] = node
         elif node_type == "pressure_boundary":

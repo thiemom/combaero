@@ -25,6 +25,7 @@ const CARD_SIZE: Record<string, [number, number]> = {
 	probe: [140, 96],
 	plenum: [160, 72],
 	mass_boundary: [144, 56],
+	fuel_boundary: [150, 64],
 	pressure_boundary: [128, 56],
 	channel: [140, 56],
 	orifice: [140, 48],

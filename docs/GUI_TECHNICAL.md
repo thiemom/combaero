@@ -59,6 +59,25 @@ Its result (`node_results[<id>]`) carries `Q` [W], the heat it applied in
 every mode (NaN when no through-flow determines it), `Tt_target` in that mode,
 `heated_node`, and the heated node's `state`.
 
+#### Fuel Boundary (`fuel_boundary`)
+A fuel controller (#892): a `FuelBoundary` whose fuel flow is SOLVED so that
+the combustor named by `combustor_id` is at `Tt_target`. It only supplies
+(one outlet handle, `flow-source`). The canvas draws a dashed yellow link to
+its combustor, derived from `combustor_id` like a probe's from `target_id`
+(never stored as an edge); drag from its link handle (`probe-out`) onto a
+combustor to choose one, or connect the fuel straight to a combustor, which
+links it when it names none. Changing the combustor is a structural edit.
+The backend refuses a fuel boundary with no `combustor_id`.
+- `combustor_id`: the combustor it controls (required)
+- `Tt_target`: Combustor exit total temperature [K] (Default: 1500.0)
+- `branch`: `"lean"` (default) or `"rich"`
+- `Tt`: Fuel total temperature [K] (Default: 300.0)
+- `composition`: as a boundary's (Default: source `fuel`, CH4)
+- `m_dot_guess`: optional start [kg/s]; otherwise sized on the target
+
+Its result `state` carries `m_dot`, `phi`, `Tt_target`, `Tt_without_fuel`
+and `rich_branch`.
+
 ### Element Data Schemas
 Elements are defined by edges in the graph but carry their own physical parameters.
 

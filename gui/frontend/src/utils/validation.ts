@@ -17,7 +17,20 @@ export function validateNetwork(nodes: Node[]): string[] {
 	}
 
 	for (const node of nodes) {
-		if (node.type === "pressure_boundary" || node.type === "mass_boundary") {
+		if (node.type === "fuel_boundary") {
+			const comb = nodes.find((n) => n.id === node.data.combustor_id);
+			if (comb?.type !== "combustor")
+				errors.push(
+					`${node.id}: Fuel boundary controls no combustor (connect it to one, or drag its link handle onto one)`,
+				);
+			if ((node.data.Tt_target || 0) <= 0)
+				errors.push(`${node.id}: Target Tt must be > 0`);
+		}
+		if (
+			node.type === "pressure_boundary" ||
+			node.type === "mass_boundary" ||
+			node.type === "fuel_boundary"
+		) {
 			if ((node.data.Pt || 0) <= 0 && node.type === "pressure_boundary") {
 				errors.push(`${node.id}: Total Pressure must be > 0`);
 			}

@@ -23,8 +23,10 @@ import {
 	NETWORK_FILE_VERSION,
 } from "../utils/nodeOrigin";
 import {
+	DISPLAY_ONLY_KINDS,
 	isProbeTarget,
 	isStructuralNodeChange,
+	LINK_FIELD,
 	PROBE_HANDLE,
 	PROBE_LINK_HANDLE,
 	probeOfLink,
@@ -234,15 +236,26 @@ const useStore = create<RFState>((set, get) => ({
 		const { nodes, edges } = get();
 		if (targetId !== null && !isProbeTarget(probeId, targetId, nodes, edges))
 			return;
+		const owner = nodes.find((n) => n.id === probeId);
+		const field = LINK_FIELD[owner?.type ?? ""];
+		if (!owner || !field) return;
+		const next = nodes.map((n) => {
+			if (n.id !== probeId) return n;
+			if (targetId === null) {
+				const { [field]: _old, ...rest } = n.data ?? {};
+				return { ...n, data: rest };
+			}
+			return { ...n, data: { ...n.data, [field]: targetId } };
+		});
+		if (DISPLAY_ONLY_KINDS.has(owner.type ?? "")) {
+			set({ nodes: next });
+			return;
+		}
+		// A fuel boundary's combustor (#892) is solved: a structural edit.
 		set({
-			nodes: nodes.map((n) => {
-				if (n.id !== probeId || n.type !== "probe") return n;
-				if (targetId === null) {
-					const { target_id: _old, ...rest } = n.data ?? {};
-					return { ...n, data: rest };
-				}
-				return { ...n, data: { ...n.data, target_id: targetId } };
-			}),
+			nodes: stripResults(next),
+			edges: stripResults(edges),
+			solveResults: null,
 		});
 	},
 
@@ -307,9 +320,26 @@ const useStore = create<RFState>((set, get) => ({
 				: {},
 		} as Edge;
 
+		// A fuel boundary (#892) connected straight to a combustor controls
+		// that one unless it already names another.
+		const nodes = get().nodes;
+		const src = nodes.find((n) => n.id === connection.source);
+		const tgt = nodes.find((n) => n.id === connection.target);
+		const autoLink =
+			src?.type === "fuel_boundary" &&
+			!src.data?.combustor_id &&
+			tgt?.type === "combustor";
 		set({
 			edges: stripResults(addEdge(edge, get().edges)),
-			nodes: stripResults(get().nodes),
+			nodes: stripResults(
+				autoLink
+					? nodes.map((n) =>
+							n.id === src.id
+								? { ...n, data: { ...n.data, combustor_id: tgt.id } }
+								: n,
+						)
+					: nodes,
+			),
 			solveResults: null,
 		});
 	},
