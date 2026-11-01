@@ -807,9 +807,88 @@ class NetworkSolver:
         # mass conserved), where every element offers a seed resistance
         # (``_seed_resistance``); other networks keep the propagated start.
         self.resistance_seed: bool = True
+        # The reference Tt of the flow component whose cold start is being
+        # estimated, set per thermal group by _build_x0 (#899); None outside.
+        self._ref_T_override: float | None = None
         # solve(stall_handover=False) turns this off for the duration of the
         # call, nested solves and the wall-free seed solver included (#864).
         self._stall_handover: bool = True
+
+    def _flow_components(self) -> list[tuple[list[str], list[str]]]:
+        """(node ids, element ids) of each connected flow component, in the
+        network's insertion order (#899). Only elements connect: a thermal
+        wall, a film provider or a node a FuelBoundary names couples no flow.
+        Insertion order, never a set's: a set of ids iterates by hash(str),
+        which Python randomises per process (see _propagate_pressure_guess)."""
+        net = self.network
+        seen: set[str] = set()
+        comps: list[tuple[list[str], list[str]]] = []
+        for nid in net.nodes:
+            if nid in seen:
+                continue
+            members = net._reachable_from(nid)
+            seen |= members
+            nodes = [n for n in net.nodes if n in members]
+            elems = [
+                eid
+                for eid, e in net.elements.items()
+                if any(n in members for n in (*e.all_source_nodes(), *e.all_sink_nodes()))
+            ]
+            comps.append((nodes, elems))
+        return comps
+
+    def _thermal_group_T(self, comps: list[tuple[list[str], list[str]]]) -> dict[int, float]:
+        """Per flow component (by index in ``comps``): the mean boundary Tt
+        of its thermal group, the components joined by thermal walls (#899).
+        A component no wall touches is a group of its own. A wall endpoint
+        names an element or a node."""
+        comp_of: dict[str, int] = {}
+        for ci, (ns, es) in enumerate(comps):
+            for i in (*ns, *es):
+                comp_of[i] = ci
+        parent = list(range(len(comps)))
+
+        def find(i: int) -> int:
+            while parent[i] != i:
+                i = parent[i]
+            return i
+
+        if self.network.thermal_coupling_enabled:
+            for w in self.network.walls.values():
+                a, b = comp_of.get(w.element_a), comp_of.get(w.element_b)
+                if a is not None and b is not None:
+                    parent[find(a)] = find(b)
+        temps: dict[int, list[float]] = {}
+        for ci, (ns, _) in enumerate(comps):
+            for nid in ns:
+                n = self.network.nodes[nid]
+                if (
+                    isinstance(n, (PressureBoundary, MassFlowBoundary))
+                    and getattr(n, "Tt", None) is not None
+                ):
+                    temps.setdefault(find(ci), []).append(float(n.Tt))
+        return {
+            ci: float(np.mean(temps[find(ci)])) for ci in range(len(comps)) if find(ci) in temps
+        }
+
+    @contextlib.contextmanager
+    def _component_view(self, node_ids: list[str], elem_ids: list[str]) -> Any:
+        """``self.network`` as one flow component while the cold-start
+        estimates are made (#899): the same node and element objects in a
+        topology of their own, no walls. Topology is not re-resolved."""
+        full = self.network
+        sub = FlowNetwork()
+        for nid in node_ids:
+            sub.add_node(full.nodes[nid])
+        for eid in elem_ids:
+            sub.add_element(full.elements[eid])
+        sub.thermal_coupling_enabled = full.thermal_coupling_enabled
+        sub.film_providers = full.film_providers
+        self.network = sub
+        try:
+            yield
+        finally:
+            self.network = full
 
     def _infer_reference_state(self) -> dict[str, Any]:
         """Derive sensible default values for unknowns from boundary nodes.
@@ -852,6 +931,9 @@ class NetworkSolver:
 
         ref_P = float(min(pressures)) if pressures else 101325.0
         ref_T = float(np.mean(temperatures)) if temperatures else 300.0
+        # Per thermal group in a network of several flow components (#899).
+        if getattr(self, "_ref_T_override", None) is not None:
+            ref_T = float(self._ref_T_override)
         if compositions:
             ref_Y = [float(v) for v in np.mean(compositions, axis=0)]
         else:
@@ -1668,23 +1750,15 @@ class NetworkSolver:
                 hi = mid
         return 0.5 * (lo + hi)
 
-    def _build_x0(self) -> np.ndarray:
-        """
-        Constructs the initial guess vector by gathering all unknowns.
-
-        Pressure unknowns are initialised via topological propagation
-        from boundary nodes with an estimated per-element drop.
-        Temperature and composition are averaged across boundaries.
-        Mass-flow is propagated from ``MassFlowBoundary`` nodes through
-        the topology, with conservative capping for compressible elements.
-
-        Returns a flat numpy array.
-        """
-        self.unknown_names = []
-        self._unknown_indices = {}
-        x0_list = []
-
-        # --- Infer sensible defaults from boundary nodes ----------------
+    def _guess_start(
+        self,
+    ) -> tuple[
+        dict[str, Any], dict[str, float], dict[str, float], dict[str, float], dict[str, float]
+    ]:
+        """The cold start's estimates for the network ``self.network`` holds:
+        (reference state, node pressures, element mass flows, FuelBoundary
+        starts, tee branch flows). ``_build_x0`` runs it once per flow
+        component (#899)."""
         ref = self._infer_reference_state()
         p_guess = self._propagate_pressure_guess(ref)
         mdot_guess = self._propagate_mdot_guess(ref)
@@ -1769,6 +1843,58 @@ class NetworkSolver:
                 mdot_guess[_eid] * 0.75,
             )
             _tee_branch_guess[_eid] = max(_bernoulli_br, mdot_guess[_eid] * 0.25)
+        return ref, p_guess, mdot_guess, fuel_start, _tee_branch_guess
+
+    def _build_x0(self) -> np.ndarray:
+        """
+        Constructs the initial guess vector by gathering all unknowns.
+
+        Pressure unknowns are initialised via topological propagation
+        from boundary nodes with an estimated per-element drop.
+        Temperature and composition are averaged across boundaries.
+        Mass-flow is propagated from ``MassFlowBoundary`` nodes through
+        the topology, with conservative capping for compressible elements.
+
+        Returns a flat numpy array.
+        """
+        self.unknown_names = []
+        self._unknown_indices = {}
+        x0_list = []
+
+        # --- Infer sensible defaults from boundary nodes ----------------
+        # Per flow component (#899): a part no element connects to the rest
+        # -- a coolant supply -- gets its own reference state. One global
+        # reference mixed them: a disconnected 358 K coolant duct beside 19
+        # near-sonic 808 K gas paths pulled the reference to 583 K, every gas
+        # path started 18% high (density), and the solve landed nine chambers
+        # on the supersonic root. The reference TEMPERATURE is per thermal
+        # group (components joined by walls): a stream heated
+        # through a wall ends between its own and its partner's boundary
+        # temperatures. Its own alone made the cold stream of a hot/cold pair
+        # too dense, its Bernoulli start 60% high, and its solve 4-7x slower
+        # (stress hotcold seeds 10, 18, 26). A network of one component takes
+        # the global path unchanged.
+        comps = self._flow_components()
+        ref_of: dict[str, dict[str, Any]] = {}
+        if len(comps) <= 1:
+            ref, p_guess, mdot_guess, fuel_start, _tee_branch_guess = self._guess_start()
+        else:
+            p_guess, mdot_guess, fuel_start, _tee_branch_guess = {}, {}, {}, {}
+            group_T = self._thermal_group_T(comps)
+            for ci, (node_ids, elem_ids) in enumerate(comps):
+                self._ref_T_override = group_T.get(ci)
+                try:
+                    with self._component_view(node_ids, elem_ids):
+                        r, pg, mg, fs, tb = self._guess_start()
+                finally:
+                    self._ref_T_override = None
+                p_guess.update(pg)
+                mdot_guess.update(mg)
+                fuel_start.update(fs)
+                _tee_branch_guess.update(tb)
+                for i in (*node_ids, *elem_ids):
+                    ref_of[i] = r
+            ref = ref_of[comps[0][0][0]]
 
         # EnergyBoundary(Tt_target) heat unknowns (#792): {name: (node, eb)}
         target_q = {
@@ -1782,6 +1908,7 @@ class NetworkSolver:
             if not isinstance(node, PressureBoundary):
                 unknowns = node.unknowns()
                 if unknowns:
+                    R = ref_of.get(node_id, ref)
                     start_idx = len(x0_list)
                     for unk in unknowns:
                         self.unknown_names.append(unk)
@@ -1791,25 +1918,26 @@ class NetworkSolver:
                         elif unk in self._init_overrides:
                             x0_list.append(self._init_overrides[unk])
                         elif unk.endswith(".P") or unk.endswith(".Pt"):
-                            x0_list.append(p_guess.get(node_id, ref["P"]))
+                            x0_list.append(p_guess.get(node_id, R["P"]))
                         elif unk.endswith(".T") or unk.endswith(".Tt"):
-                            x0_list.append(ref["T"])
+                            x0_list.append(R["T"])
                         elif ".Y[" in unk:
                             idx = int(unk.split(".Y[")[1].replace("]", ""))
-                            x0_list.append(ref["Y"][idx])
+                            x0_list.append(R["Y"][idx])
                         elif unk in target_q:
                             # Refined below, from the propagated start.
                             x0_list.append(0.0)
                         elif isinstance(node, FuelBoundary) and unk == node.m_dot_unknown:
                             x0_list.append(math.log(max(fuel_start[node_id], 1e-12)))
                         else:
-                            x0_list.append(ref["m_dot"])
+                            x0_list.append(R["m_dot"])
                     self._unknown_indices[node_id] = list(range(start_idx, len(x0_list)))
 
         # Iterate through elements and gather unknowns (m_dot)
         for elem_id, element in self.network.elements.items():
             unknowns = element.unknowns()
             if unknowns:
+                R = ref_of.get(elem_id, ref)
                 start_idx = len(x0_list)
                 for unk in unknowns:
                     self.unknown_names.append(unk)
@@ -1819,11 +1947,11 @@ class NetworkSolver:
                     elif unk in self._init_overrides:
                         x0_list.append(self._init_overrides[unk])
                     elif unk.endswith(".m_dot") or unk.endswith(".m_dot_com"):
-                        x0_list.append(mdot_guess.get(elem_id, ref["m_dot"]))
+                        x0_list.append(mdot_guess.get(elem_id, R["m_dot"]))
                     elif unk.endswith(".m_dot_branch"):
                         x0_list.append(
                             _tee_branch_guess.get(
-                                elem_id, mdot_guess.get(elem_id, ref["m_dot"]) * 0.5
+                                elem_id, mdot_guess.get(elem_id, R["m_dot"]) * 0.5
                             )
                         )
                     elif unk.endswith(".P_jct") or unk.endswith(".Pt_jct"):
@@ -1831,7 +1959,7 @@ class NetworkSolver:
                         # ambient port static pressure. Use the max boundary Pt
                         # as a stand-in (P_jct >= Pt at every port since the
                         # impulse equation gives P_jct = Pt + q with q >= 0).
-                        x0_list.append(ref["P"])
+                        x0_list.append(R["P"])
                     else:
                         x0_list.append(1.0)
                 self._unknown_indices[elem_id] = list(range(start_idx, len(x0_list)))
@@ -5136,8 +5264,23 @@ class NetworkSolver:
         # regular _build_x0 path via self._init_overrides. _build_x0 reads
         # the dict once and clears it, so no cross-solve leakage.
         if x0 is None and init_strategy == "analytical_pt_prop":
-            _ref = self._infer_reference_state()
-            self._init_overrides = self._propagate_analytical_pt_prop(_ref)
+            comps = self._flow_components()
+            if len(comps) <= 1:
+                _ref = self._infer_reference_state()
+                self._init_overrides = self._propagate_analytical_pt_prop(_ref)
+            else:
+                # Per flow component, as _build_x0's reference state (#899).
+                self._init_overrides = {}
+                group_T = self._thermal_group_T(comps)
+                for ci, (node_ids, elem_ids) in enumerate(comps):
+                    self._ref_T_override = group_T.get(ci)
+                    try:
+                        with self._component_view(node_ids, elem_ids):
+                            self._init_overrides.update(
+                                self._propagate_analytical_pt_prop(self._infer_reference_state())
+                            )
+                    finally:
+                        self._ref_T_override = None
         else:
             self._init_overrides = {}
 
