@@ -2769,7 +2769,7 @@ are crossflow.
   stagnant rows of CR-3630 B(5,4,1) (#799). Diagnostics add `Cd` (the one
   used) beside `Cd_own`. A cold solve that fails is retried once from the
   constant-Cd root (`NetworkSolver`, "[from the constant-Cd solution]").
-- Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `htc`, `T_aw`, `eta_r`,
+- Diagnostics: `n_holes`, `Re_j`, `Gc_Gj`, `Nu`, `St`, `htc`, `T_aw`, `eta_r`,
   `bypass_fraction`, `eta_r_extrapolated`, `surface_extrapolated`, and
   `Gc_Gj_closed_form` (Eq. 8) when `row` is given.
 - `cb.impingement_eta_r(Gc_Gj, xn_d, yn_d, z_d)` returns `eta`,

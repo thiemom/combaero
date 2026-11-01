@@ -459,6 +459,18 @@ ChannelModel = (
 )
 
 
+def _stanton(res: Any) -> float:
+    """St = Nu / (Re Pr) of a heat-transfer result, at the correlation's own Re
+    and Pr (the jet Re for impingement, the pin Re for pin fins), so it is the
+    Stanton number of the h it reports (#895). 0 without a defined Re Pr."""
+    if res is None:
+        return 0.0
+    re = float(getattr(res, "Re", 0.0) or 0.0)
+    pr = float(getattr(res, "Pr", 0.0) or 0.0)
+    nu = float(getattr(res, "Nu", 0.0) or 0.0)
+    return nu / (re * pr) if re > 0.0 and pr > 0.0 and math.isfinite(nu) else 0.0
+
+
 @dataclass
 class ConvectiveSurface:
     """Convective surface description attached to a NetworkElement.
@@ -2886,6 +2898,7 @@ class MomentumChamberNode(NetworkNode):
         Tt, Pt = (state.Tt, state.Pt)
 
         nu_val = 0.0
+        st_val = 0.0
         htc_val = 0.0
         t_aw_val = float(state.Tt)
         if self.has_convective_surface:
@@ -2894,6 +2907,7 @@ class MomentumChamberNode(NetworkNode):
                 nu_val = h_res.Nu
                 htc_val = h_res.h
                 t_aw_val = h_res.T_aw
+                st_val = _stanton(h_res)
 
         return {
             "Tt": float(Tt),
@@ -2917,6 +2931,7 @@ class MomentumChamberNode(NetworkNode):
             "velocity": u,
             "mach": mach,
             "Nu": nu_val,
+            "St": st_val,
             "htc": htc_val,
             "T_aw": t_aw_val,
             "area": float(self.area or 0.0),
@@ -3331,6 +3346,7 @@ class CombustorNode(NetworkNode):
         Tt, Pt = (state.Tt, state.Pt)
 
         nu_val = 0.0
+        st_val = 0.0
         htc_val = 0.0
         t_aw_val = float(state.Tt)
         if self.has_convective_surface:
@@ -3339,6 +3355,7 @@ class CombustorNode(NetworkNode):
                 nu_val = h_res.Nu
                 htc_val = h_res.h
                 t_aw_val = h_res.T_aw
+                st_val = _stanton(h_res)
 
         try:
             phi = float(cb.equivalence_ratio(state.X))
@@ -3375,6 +3392,7 @@ class CombustorNode(NetworkNode):
             "velocity": u,
             "mach": mach,
             "Nu": nu_val,
+            "St": st_val,
             "htc": htc_val,
             "T_aw": t_aw_val,
             "phi": phi,
@@ -6918,6 +6936,7 @@ class ImpingementPlateElement(OrificeElement):
             "Cd_own": float(own_cd),
             "Re_j": float(r.Re),
             "Nu": float(r.Nu),
+            "St": _stanton(r),
             "htc": float(r.h),
             "T_aw": float(r.T_aw),
             "Gc_Gj": float(r.Gc_Gj),
@@ -7836,6 +7855,7 @@ class PressureLossElement(NetworkElement):
             h_res = self.htc_and_T(state_in)
             if h_res is not None:
                 diag["Nu"] = float(h_res.Nu)
+                diag["St"] = _stanton(h_res)
                 diag["htc"] = float(h_res.h)
                 diag["T_aw"] = float(h_res.T_aw)
                 diag["f"] = float(h_res.f)
@@ -8516,6 +8536,7 @@ class ChannelElement(NetworkElement):
             "diameter": float(self.diameter or 0.0),
             "area_source": self._area_source,
             "Nu": float(Nu),
+            "St": _stanton(h_res),
             "htc": float(htc),
             "T_aw": float(T_aw),
             "f": float(f),
