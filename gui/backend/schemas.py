@@ -567,6 +567,18 @@ class LosslessConnectionData(BaseModel):
     pass
 
 
+class TurbomachineData(BaseModel):
+    """A compressor or turbine at a fixed total-to-total pressure ratio (#893):
+    Pt_out / Pt_in = pressure_ratio (compressor) or its inverse (turbine)."""
+
+    model_config = ConfigDict(extra="ignore")
+    pressure_ratio: float = Field(4.0, ge=1.0)
+    efficiency_type: Literal["polytropic", "isentropic"] = "polytropic"
+    efficiency: float = Field(0.88, gt=0.0, le=1.0)
+    initial_guess: dict[str, float] = Field(default_factory=dict)
+    label: str | None = None
+
+
 class MPCETeeData(BaseModel):
     """Mynard-based multi-port chamber tee element with constrained topology.
 

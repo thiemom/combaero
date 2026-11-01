@@ -103,6 +103,22 @@ const NetworkCanvas = () => {
 					Nu_multiplier: 1.0,
 					f_multiplier: 1.0,
 				} as any;
+			} else if (type === "compressor") {
+				// #893: a fixed total-to-total pressure ratio; the network sets
+				// the flow. Polytropic efficiency by default.
+				data = {
+					...data,
+					pressure_ratio: 4,
+					efficiency_type: "polytropic",
+					efficiency: 0.88,
+				} as any;
+			} else if (type === "turbine") {
+				data = {
+					...data,
+					pressure_ratio: 3,
+					efficiency_type: "polytropic",
+					efficiency: 0.9,
+				} as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
 			} else if (type === "effusion_liner") {

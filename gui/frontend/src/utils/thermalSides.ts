@@ -23,6 +23,8 @@ interface EdgeLike {
 export const NO_THERMAL_SIDE: ReadonlySet<string> = new Set([
 	"plenum",
 	"orifice",
+	"compressor",
+	"turbine",
 	"area_change",
 	"effusion_plate",
 	"film_cooling",

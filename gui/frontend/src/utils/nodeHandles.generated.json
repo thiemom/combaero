@@ -35,6 +35,16 @@
 			"thermal-source"
 		]
 	},
+	"compressor": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
 	"discrete_loss": {
 		"dynamic": false,
 		"inlets": [
@@ -205,6 +215,16 @@
 		"thermal": []
 	},
 	"slot_film": {
+		"dynamic": false,
+		"inlets": [
+			"flow-target"
+		],
+		"outlets": [
+			"flow-source"
+		],
+		"thermal": []
+	},
+	"turbine": {
 		"dynamic": false,
 		"inlets": [
 			"flow-target"

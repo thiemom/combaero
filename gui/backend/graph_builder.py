@@ -6,6 +6,7 @@ from combaero.network import (
     AreaChangeElement,
     ChannelElement,
     CombustorNode,
+    CompressorElement,
     ConstantFractionLoss,
     ConstantHeadLoss,
     ConvectiveSurface,
@@ -34,6 +35,7 @@ from combaero.network import (
     SlotFilmElement,
     SmoothModel,
     ThermalWall,
+    TurbineElement,
     VortexElement,
     WallLayer,
     WallNode,
@@ -74,6 +76,7 @@ from .schemas import (
     SlotFilmData,
     SmoothModelData,
     ThermalWallData,
+    TurbomachineData,
     VortexData,
     WallData,
     removed_surface_message,
@@ -109,6 +112,8 @@ ELEMENT_KINDS = frozenset(
         "mpce_tee",
         "ejector",
         "effusion_liner",
+        "compressor",
+        "turbine",
     }
 )
 
@@ -1415,6 +1420,25 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             net.add_element(elem)
         elif elem_type == "lossless_connection":
             elem = LosslessConnectionElement(elem_id, from_node=source_id, to_node=target_id)
+            net.add_element(elem)
+        elif elem_type in ("compressor", "turbine"):
+            data = _parse(TurbomachineData, elem_data, elem_id, "Element")
+            cls = CompressorElement if elem_type == "compressor" else TurbineElement
+            eta = (
+                {"eta_poly": data.efficiency}
+                if data.efficiency_type == "polytropic"
+                else {"eta_is": data.efficiency}
+            )
+            elem = cls(
+                elem_id,
+                from_node=source_id,
+                to_node=target_id,
+                pressure_ratio=data.pressure_ratio,
+                **eta,
+            )
+            elem.initial_guess = _expand_initial_guess(data.initial_guess, elem_id)
+            if not elem.initial_guess:
+                elem.initial_guess = _guess_from_prior_result(elem_data, elem_id)
             net.add_element(elem)
         elif elem_type == "discrete_loss":
             data = _parse(DiscreteLossData, elem_data, elem_id)

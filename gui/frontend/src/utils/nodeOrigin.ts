@@ -29,6 +29,8 @@ const CARD_SIZE: Record<string, [number, number]> = {
 	pressure_boundary: [128, 56],
 	channel: [140, 56],
 	orifice: [140, 48],
+	compressor: [140, 56],
+	turbine: [140, 56],
 	impingement_array: [172, 48],
 	effusion_plate: [140, 48],
 	film_cooling: [140, 48],

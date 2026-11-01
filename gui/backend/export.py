@@ -29,6 +29,7 @@ from combaero.network import (
     PressureBoundary,
     PressureLossElement,
     ThermalWall,
+    TurbomachineElement,
 )
 from combaero.network.components import OrificeElement, SmoothModel
 from combaero.network.pressure_loss import (
@@ -56,6 +57,8 @@ FLOW_HANDLES: dict[str, tuple[str | None, str | None]] = {
     "orifice": ("flow-source", "flow-target"),
     "discrete_loss": ("flow-source", "flow-target"),
     "lossless_connection": (None, None),
+    "compressor": ("flow-source", "flow-target"),
+    "turbine": ("flow-source", "flow-target"),
 }
 #: A merge chamber's side streams arrive at this handle (graph_builder).
 SIDE_INLET = "side-target"
@@ -71,6 +74,8 @@ SUPPORTED = (
     "OrificeElement",
     "PressureLossElement",
     "LosslessConnectionElement",
+    "CompressorElement",
+    "TurbineElement",
     "ThermalWall",
 )
 
@@ -254,6 +259,13 @@ def _element(eid: str, el: Any, problems: list[str]) -> tuple[str, dict[str, Any
         return "discrete_loss", d
     if isinstance(el, LosslessConnectionElement):
         return "lossless_connection", {}
+    if isinstance(el, TurbomachineElement):
+        polytropic = el.eta_poly is not None
+        return ("turbine" if el.expansion else "compressor"), {
+            "pressure_ratio": float(el.pressure_ratio),
+            "efficiency_type": "polytropic" if polytropic else "isentropic",
+            "efficiency": float(el.eta_poly if polytropic else el.eta_is),
+        }
     problems.append(f"{eid}: element type {type(el).__name__}")
     return None
 

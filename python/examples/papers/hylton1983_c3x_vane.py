@@ -73,8 +73,8 @@ What is NOT reproduced
         but the throat segments cannot reach their Ps without choking
         (Fanno), and the joint network can land on supersonic chamber roots
         (#899). It waits for design targets (#897).
-    - The compressor is computed in this script: there is no compressor
-      element (#893).
+    - The compressor is one fixed pressure ratio at an assumed isentropic
+      efficiency (a CompressorElement, #893): no map, no shaft.
 
 Validation label
     TUNED (docs/VALIDATION_POLICY.md: matching a specific rig is the user's
@@ -115,6 +115,7 @@ from combaero.heat_transfer import ConvectiveSurface, SmoothModel
 from combaero.network import (
     ChannelElement,
     CombustorNode,
+    CompressorElement,
     FlowNetwork,
     FuelBoundary,
     LosslessConnectionElement,
@@ -141,9 +142,9 @@ TUNE_RUN = 158
 
 # The rig upstream of the cascade (CR-168015: Allison's facility, a natural-gas
 # burner and a constant-section duct to the cascade). None of these is printed;
-# each is an assumption, stated here. Compressor: ambient humid air to the
-# burner's inlet pressure at this isentropic efficiency (#893: no compressor
-# element yet). Burner: complete combustion of CH4, its fuel flow solved so the
+# each is an assumption, stated here. Compressor: a CompressorElement (#893)
+# taking ambient humid air to the burner's inlet pressure at this isentropic
+# efficiency. Burner: complete combustion of CH4, its fuel flow solved so the
 # cascade inlet is at Tt1 (a FuelBoundary, #892, lean), with this fraction of
 # total pressure lost to the cascade inlet.
 AMBIENT_T = 288.15  # [K]
@@ -199,13 +200,9 @@ def _methane() -> list[float]:
 
 def compressor_exit(P2: float) -> float:
     """Total temperature [K] of ambient humid air compressed to P2 at
-    COMPRESSOR_ETA: isentropic T2s from s(T, P), then h2 = h1 + (h2s - h1)/eta."""
-    Y = _ambient_air()
-    X = list(cb.mass_to_mole(Y))
-    s1 = cb.s(AMBIENT_T, X, AMBIENT_P)
-    T2s = cb.calc_T_from_s(s1, P2, X, T_guess=AMBIENT_T * (P2 / AMBIENT_P) ** 0.2857)
-    h1 = cb.h(AMBIENT_T, X)
-    return float(cb.calc_T_from_h(h1 + (cb.h(T2s, X) - h1) / COMPRESSOR_ETA, X, T_guess=T2s))
+    COMPRESSOR_ETA (isentropic): the CompressorElement's own outlet."""
+    X = list(cb.mass_to_mole(_ambient_air()))
+    return float(cb.compression(AMBIENT_T, X, P2 / AMBIENT_P, eta_is=COMPRESSOR_ETA).T2)
 
 
 def burner_supply(run: int) -> tuple[float, float]:
@@ -326,10 +323,20 @@ def build(run: int, multipliers: dict[str, float], T_in: dict[int, float]) -> Fl
     cond = run_conditions(run)
     holes = coolant(run)
     Y = _air()
-    P2, T2 = burner_supply(run)
+    P2, _ = burner_supply(run)
     net = FlowNetwork()
-    # The rig upstream of the cascade: compressor exit -> burner -> inlet.
-    net.add_node(PressureBoundary("compressor_exit", Pt=P2, Tt=T2, Y=_ambient_air()))
+    # The rig upstream of the cascade: ambient -> compressor -> burner -> inlet.
+    net.add_node(PressureBoundary("ambient", Pt=AMBIENT_P, Tt=AMBIENT_T, Y=_ambient_air()))
+    net.add_node(PlenumNode("compressor_exit"))
+    net.add_element(
+        CompressorElement(
+            "compressor",
+            from_node="ambient",
+            to_node="compressor_exit",
+            pressure_ratio=P2 / AMBIENT_P,
+            eta_is=COMPRESSOR_ETA,
+        )
+    )
     net.add_node(
         FuelBoundary("fuel", combustor="burner", Tt_target=cond["Tt1"], Tt=FUEL_T, Y=_methane())
     )
@@ -536,6 +543,8 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
     # The rig upstream of the cascade, left of the rows; one row per segment.
     mid = 80.0 * len(segments(run))
     pos: dict[str, tuple[float, float]] = {
+        "ambient": (-1260, mid - 120),
+        "compressor": (-1080, mid - 120),
         "compressor_exit": (-900, mid - 120),
         "fuel": (-900, mid + 120),
         "burner_loss": (-680, mid - 120),
@@ -545,7 +554,9 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
         "cascade_inlet": (-150, mid),
     }
     labels = {
-        "compressor_exit": f"Compressor exit: ambient humid air at eta {COMPRESSOR_ETA}",
+        "ambient": "Ambient humid air",
+        "compressor": f"Compressor, eta_is {COMPRESSOR_ETA} (assumed)",
+        "compressor_exit": "Compressor exit",
         "fuel": "Natural gas (CH4): its flow is solved so the inlet is at Tt1",
         "burner_loss": f"Burner loss {BURNER_LOSS:.0%} of Pt",
         "fuel_injection": "Fuel injection",
