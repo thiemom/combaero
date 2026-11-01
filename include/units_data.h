@@ -742,6 +742,26 @@ inline constexpr Entry function_units[] = {
      "AreaChangeElementFlow (m_dot: kg/s, choked: bool, mach: -, Re: -, zeta: -, "
      "dm_dPt_a: kg/(s*Pa), dm_dTt_a: kg/(s*K), dm_dPt_b: kg/(s*Pa), "
      "dm_dTt_b: kg/(s*K), dm_dY_a: kg/s, dm_dY_b: kg/s)"},
+    // turbomachinery.h - compression and expansion (#893)
+    {"compression",
+     "T1: K, X: mol/mol, PR: -, eta_poly: -, eta_is: -",
+     "TurbomachinePath (T2: K, dh: J/kg, eta_poly: -, eta_is: -, T2s: K, dT2_dT1: -, dT2_dPR: K, dT2_deta: K, dT2_dY: K, ddh_dT1: J/(kg*K), ddh_dPR: J/kg, ddh_deta: J/kg, ddh_dY: J/kg)"},
+    {"expansion",
+     "T1: K, X: mol/mol, PR: -, eta_poly: -, eta_is: -",
+     "TurbomachinePath (T2: K, dh: J/kg, eta_poly: -, eta_is: -, T2s: K, dT2_dT1: -, dT2_dPR: K, dT2_deta: K, dT2_dY: K, ddh_dT1: J/(kg*K), ddh_dPR: J/kg, ddh_deta: J/kg, ddh_dY: J/kg)"},
+    {"TurbomachinePath::T2", "-", "K"},
+    {"TurbomachinePath::dh", "-", "J/kg"},
+    {"TurbomachinePath::eta_poly", "-", "-"},
+    {"TurbomachinePath::eta_is", "-", "-"},
+    {"TurbomachinePath::T2s", "-", "K"},
+    {"TurbomachinePath::dT2_dT1", "-", "-"},
+    {"TurbomachinePath::dT2_dPR", "-", "K"},
+    {"TurbomachinePath::dT2_deta", "-", "K"},
+    {"TurbomachinePath::dT2_dY", "-", "K"},
+    {"TurbomachinePath::ddh_dT1", "-", "J/(kg*K)"},
+    {"TurbomachinePath::ddh_dPR", "-", "J/kg"},
+    {"TurbomachinePath::ddh_deta", "-", "J/kg"},
+    {"TurbomachinePath::ddh_dY", "-", "J/kg"},
     {"sharp_area_change",
      "m_dot: kg/s, rho: kg/m^3, mu: Pa*s, F0: m^2, F1: m^2, "
      "m_scale: kg/s, D_h: m",

@@ -115,6 +115,36 @@ Before, the end polynomials ran on: cp/R -25 for CH4 at 50 K, -241 for H2O at
 `RuntimeError` for a target no positive T reaches instead of returning the last
 iterate.
 
+### Compression and Expansion (#893)
+The outlet total temperature of a compressor or turbine at a total-to-total
+pressure ratio, with exactly one efficiency in (0, 1]. The composition is frozen.
+
+```python
+r = cb.compression(T1, X, PR, eta_poly=0.9)   # PR = P2/P1 >= 1
+r = cb.compression(T1, X, PR, eta_is=0.86)
+t = cb.expansion(T1, X, PR, eta_poly=0.9)     # PR = P1/P2 >= 1
+r.T2, r.dh        # outlet Tt [K]; h_mass(T2) - h_mass(T1) [J/kg], > 0 compressing
+r.eta_poly, r.eta_is, r.T2s   # both efficiencies of the path; the isentropic T2
+r.dT2_dT1, r.dT2_dPR, r.dT2_deta, r.dT2_dY    # the Jacobian of T2 (and ddh_*)
+```
+
+- **Polytropic is exact** for combaero's variable cp, with no path
+  integration: S(T2) − S(T1) = (R/η_p) ln PR for compression and
+  −η_p R ln PR for expansion, with S = Σ X_k s_k at the reference pressure.
+- **Isentropic** uses the end states: h2 = h1 + (h2s − h1)/η_s for
+  compression and h1 − η_s (h1 − h2s) for expansion.
+- **The pressure level drops out.** At a fixed PR, T2 does not depend on
+  the inlet pressure.
+- **Refused:** PR < 1, an efficiency outside (0, 1] (above 1 the path would
+  destroy entropy), and neither or both efficiencies given.
+
+Checked against:
+- Cantera on the same NASA-9 data. Isentropic, through Cantera's SP/HP setters:
+  3e-8 on humid air at PR 2-40 and on combustion products at PR 2-20.
+  Polytropic, against the path ODE on Cantera's cp: 1.6e-9.
+- The constant-gamma closed forms on argon (cp = 5/2 R).
+- The limit of n isentropic stages, which converges at first order.
+
 
 ---
 
