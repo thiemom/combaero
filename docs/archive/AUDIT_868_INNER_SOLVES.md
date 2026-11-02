@@ -61,17 +61,17 @@ Line numbers are on the branch.
 | T1 | thermo.cpp:388 | `solve_increasing_T` (`calc_T_from_h/s/u/sv`) | rtsafe Newton | 50 (caller) | 1e-6 K abs step, or bracket < tol | throws | factor-4 search, then bisection when Newton leaves or fails to halve | safe | none |
 | T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 |
 | S1 | state.cpp:118 | `State::set_VH_mass` | Newton on u + R T = h | 20 | 1e-4 K abs step | silent | none (monotone) | latent | fixed: throws. rec R5 |
-| G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor. R1 fixed (#935): no floor, the root is returned |
-| G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3. R1 fixed (#935): no floor |
+| G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor. R1 fixed (#935, PR #949): no floor, the root is returned |
+| G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3. R1 fixed (#935, PR #949): no floor |
 | G3 | stagnation.cpp:324 | `chamber_static_state` | Newton from Tt | 100 | 1e-13 Tt step | silent; implicit J then evaluated at the non-root | none (f falls in T, one root) | bug (48 probe hits at Tt = -1.4e19 K) | fixed: cap rule; R4 fixed (#937): Tt <= 0 or non-finite refused |
 | G4 | stagnation.cpp:408 | `sonic_static_state` | Newton | 100 | 1e-13 Tt step | silent, implicit J at non-root | none | latent | fixed: cap rule |
 | G5 | stagnation.cpp:489 | `duct_static_state` | Newton in ln P on [ln P*, ln Pt] | 100 | 1e-15 abs step in ln P | silent | bisection when Newton leaves the bracket | safe | R9 fixed (#941): cap rule |
-| C1 | compressible.cpp:41 | `solve_T_isentropic` (`nozzle_flow`, `mass_flux_isentropic`, `mach_from_pressure_ratio`, `critical_pressure_ratio`, the solves below) | Newton, step <= 0.5 T, floor | 50 (caller) | 1e-8 (1 + T) step | silent; 148 849 hits, all at the floor | none (s monotone) | latent (floor hits are the documented clamp) | fixed: a root below the floor returns the floor at once (same value; the 49 clamped repeats are skipped), any other cap exit throws. rec R1. R1 fixed (#935): no floor; below 10 K the step is in ln T |
+| C1 | compressible.cpp:41 | `solve_T_isentropic` (`nozzle_flow`, `mass_flux_isentropic`, `mach_from_pressure_ratio`, `critical_pressure_ratio`, the solves below) | Newton, step <= 0.5 T, floor | 50 (caller) | 1e-8 (1 + T) step | silent; 148 849 hits, all at the floor | none (s monotone) | latent (floor hits are the documented clamp) | fixed: a root below the floor returns the floor at once (same value; the 49 clamped repeats are skipped), any other cap exit throws. rec R1. R1 fixed (#935, PR #949): no floor; below 10 K the step is in ln T |
 | C2 | compressible.cpp:120 | `find_critical_pressure` | golden section on [0.3, 0.99] Pt | >= 200 | width < tol (1 + a + b) | silent, bracket 0.618^200 | fixed bracket (P*/Pt 0.49-0.61 for gamma 1.67-1) | safe | none |
 | C3 | compressible.cpp:292 | `solve_P_back_from_mdot` | bisection on [P*, Pt] | >= 200 | G within tol, width tol (Pt - P) | silent; 1 hit at 1 ulp | bracket | safe | none |
 | C4 | compressible.cpp:341 | `solve_Pt_from_mdot` bracket | x10 expansion | 12 | | throws if not bracketed | | safe | none |
 | C5 | compressible.cpp:358 | `solve_Pt_from_mdot` | bisection | >= 200 | as C3 | silent; 1 hit at 1 ulp | bracket | safe | none |
-| C6 | compressible.cpp:462 | `solve_T_from_energy` (Fanno marches) | Newton, step <= 0.3 T, floor | 50 | 1e-8 T step | silent | none (F rises in T: u grows with T at fixed P) | latent | fixed: throws, floor kept. R1 fixed (#935): no floor (no root for h0 < h(0 K): throws) |
+| C6 | compressible.cpp:462 | `solve_T_from_energy` (Fanno marches) | Newton, step <= 0.3 T, floor | 50 | 1e-8 T step | silent | none (F rises in T: u grows with T at fixed P) | latent | fixed: throws, floor kept. R1 fixed (#935, PR #949): no floor (no root for h0 < h(0 K): throws) |
 | C7 | compressible.cpp:647 | `fanno_channel` march | adaptive RK4 | `kFannoMaxSteps` = 2e5 | | silent: outlet at x < L reported unchoked | step halving near M = 1 | latent | fixed: throws |
 | C8 | compressible.cpp:894 | `fanno_channel_rough` march | adaptive RK4 | 2e5 | | silent, as C7 | | latent | fixed: throws |
 | C9 | compressible.cpp:1094 | `solve_station_state` | Newton | caller | tol T step | returns `false` | | safe (reports); `[[maybe_unused]]`, no caller | R10 fixed (#942): deleted |
@@ -185,7 +185,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
 ## Recommendations left for a decision
 
 - **R1 (C1, G1, G2, C6) The `T_FLOOR` return is not a root.** FIXED (#935,
-  decision 2026-11-02 "can go to zero"; section below). An expansion
+  PR #949, decision 2026-11-02 "can go to zero"; section below). An expansion
   to P/Pt below ~1e-5 returns the 10 K floor as its static T, silently; the
   mass flux and Mach built on it are then the floor's. Kept (it is the
   documented clamp, and 148 849 calls in the suite end there, all from
@@ -289,7 +289,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   in (1, 5/3] it is clamped only for A_p1/A_t above ~7.8e3 (gamma 5/3) to
   ~1.5e6 (gamma 1.4), which no stress draw reaches (#948: 1786 ejector element evaluations over the 40 stress seeds, 0 flagged).
 
-## R1 fixed: the static T goes to its root (#935)
+## R1 fixed: the static T goes to its root (#935, PR #949)
 
 Decision (2026-11-02): "R1 -> can go to zero". The gas is ideal to 0 K
 (#626, the C2 tails keep cp > 0 at every T), so a static-T solve returns its
