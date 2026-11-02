@@ -1274,7 +1274,8 @@ JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
 ```cpp
 // Every ejector function throws std::invalid_argument for non-finite input and
 // out-of-domain parameters (gamma > 1, r_gas > 0, efficiencies in (0, 1],
-// recovery > 0, 1 < A_p1/A_t <= A_3/A_t, positive areas, A_exit >= A_throat,
+// recovery in (0, 1] (above 1: a gain beyond lossless mixing), 1 < A_p1/A_t
+// <= A_3/A_t, positive areas, A_exit >= A_throat,
 // losses and eps_frac >= 0, blend windows lo < hi); the standalone closures
 // also need a finite, positive supply state. The two whole-element residual
 // functions check their Newton iterates for finiteness only (#769).

@@ -94,6 +94,16 @@ void check_nozzle(const char* who, double Pt, double Tt, double area_throat, dou
   }
 }
 
+// A recovery on the lossless mixed stagnation pressure: 0 < recovery <= 1.
+// Above 1 the ejector would gain pressure beyond lossless mixing.
+void check_recovery(const char* who, double recovery, const char* name) {
+  if (!validation::is_finite_in_range(recovery, 0.0, 1.0) || !(recovery > 0.0)) {
+    throw std::invalid_argument(std::string(who) + ": " + name +
+                                " must be finite and in (0, 1]; above 1 is a pressure gain "
+                                "beyond lossless mixing");
+  }
+}
+
 void check_window(const char* who, double lo, double hi, const char* what) {
   if (!validation::is_finite(lo) || !validation::is_finite(hi) || !(lo < hi)) refuse(who, what);
 }
@@ -780,7 +790,7 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   check_gas(who, gamma, r_gas);
   check_efficiency(who, eta_primary, "eta_primary must be finite and in (0, 1]");
   check_efficiency(who, eta_secondary, "eta_secondary must be finite and in (0, 1]");
-  require_positive_arg(who, recovery_efficiency, "recovery_efficiency must be finite and > 0");
+  check_recovery(who, recovery_efficiency, "recovery_efficiency");
   if (!validation::is_finite_nonnegative(eps_frac)) refuse(who, "eps_frac must be finite and >= 0");
   check_window(who, s_choke_lo, s_choke_hi, "need finite s_choke_lo < s_choke_hi");
   check_window(who, s_sub_lo, s_sub_hi, "need finite s_sub_lo < s_sub_hi");
@@ -952,7 +962,7 @@ EjectorJetPumpIncompressibleResult ejector_jetpump_incompressible_residuals_and_
       refuse(who, "k_nozzle, k_suction, k_throat and k_diffuser must be finite and >= 0");
     }
   }
-  require_positive_arg(who, recovery, "recovery must be finite and > 0");
+  check_recovery(who, recovery, "recovery");
   using D = DualN<9>;
   const D Mp = D::seed(mp, 0), Ms = D::seed(ms, 1), Mo = D::seed(mo, 2);
   const D Ptp = D::seed(pt_p, 3), Vp = D::seed(v_p, 4);
@@ -1022,7 +1032,7 @@ void check_closure(const char* who, double p_g, double t_g, double p_e, double t
   check_supplies(who, p_g, t_g, p_e, t_e);
   check_geometry(who, geom);
   check_gas(who, gamma, r_gas);
-  require_positive_arg(who, recovery_efficiency, "recovery_efficiency must be finite and > 0");
+  check_recovery(who, recovery_efficiency, "recovery_efficiency");
 }
 } // namespace
 
@@ -1068,7 +1078,7 @@ EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
   require_positive_arg(who, p_py, "p_py must be finite and > 0");
   if (!validation::is_finite_nonnegative(omega)) refuse(who, "omega must be finite and >= 0");
   check_gamma(who, gamma);
-  require_positive_arg(who, recovery_efficiency, "recovery_efficiency must be finite and > 0");
+  check_recovery(who, recovery_efficiency, "recovery_efficiency");
   check_efficiency(who, eta_primary, "eta_primary must be finite and in (0, 1]");
   check_efficiency(who, eta_secondary, "eta_secondary must be finite and in (0, 1]");
   return ejector_jetpump_discharge_and_jacobian_raw(p_g, t_g, p_e, t_e, p_py, omega, gamma,

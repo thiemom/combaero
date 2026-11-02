@@ -60,9 +60,10 @@
 // Input validation (#769). Every function below throws std::invalid_argument
 // (Python ValueError) for non-finite input and for parameters outside their
 // physical domain: gamma > 1, r_gas > 0, nozzle efficiencies in (0, 1],
-// recovery > 0, 1 < area_ratio_nozzle <= area_ratio_mix, positive areas,
-// area_exit >= area_throat, loss coefficients and eps_frac >= 0, smootherstep
-// windows lo < hi. The standalone closures also need finite, positive supply
+// recovery in (0, 1] (above 1 is a pressure gain beyond lossless mixing),
+// 1 < area_ratio_nozzle <= area_ratio_mix, positive areas, area_exit >=
+// area_throat, loss coefficients and eps_frac >= 0, smootherstep windows
+// lo < hi. The standalone closures also need finite, positive supply
 // stagnation states. The two whole-element residual functions take Newton
 // iterates and check those for finiteness only: a trial point can carry a
 // negative pressure or a reversed flow, which the closures continue through

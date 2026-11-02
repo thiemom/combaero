@@ -1747,7 +1747,7 @@ ejector = EjectorElement(
     nozzle_exit_area=1.0e-4,  # primary nozzle exit area A_p1 [m^2], must exceed throat_area
     mixing_area=8.0e-4,       # mixing section A_3 [m^2], > nozzle_exit_area; None = inherit
                               # from the outlet pipe (else DEFAULT_EJECTOR_MIXING_AREA)
-    recovery_efficiency=1.0,  # multiplies the lossless mixed stagnation pressure; not fitted to data
+    recovery_efficiency=1.0,  # in (0, 1]: multiplies the lossless mixed stagnation P; not fitted
     regime="compressible",    # default DEFAULT_REGIME ("compressible" since #585), see below
     anchor_closure="huang1999",  # the (P_c*, P_b0) pair (default): Huang's printed P_c*
                               # chain + the sudden-expansion dead head, 2-3x lower curve

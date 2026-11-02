@@ -3134,6 +3134,7 @@ const Inspector = () => {
 									updateNodeData(selectedNode.id, { recovery_efficiency: val })
 								}
 								min={0}
+								max={1}
 								placeholder="1.0"
 							/>
 							<span className="text-[9px] text-stone-400">

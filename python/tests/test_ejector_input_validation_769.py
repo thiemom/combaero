@@ -325,3 +325,59 @@ def test_element_constructor_refuses_non_finite(kw: dict[str, float]) -> None:
     _element()  # the valid element builds
     with pytest.raises(ValueError):
         _element(**kw)
+
+
+ABOVE_ONE = math.nextafter(1.0, 2.0)
+
+# (id, function, valid arguments, index of the recovery argument)
+RECOVERY: list[tuple[str, Callable[..., Any], tuple[Any, ...], int]] = [
+    *[(n, getattr(_core, n), CLOSURE, 8) for n in CLOSURES_9],
+    (
+        "ejector_jetpump_discharge_and_jacobian",
+        _core.ejector_jetpump_discharge_and_jacobian,
+        (700000.0, 440.0, 22800.0, 280.0, 6840.0, 0.79, 1.401, 1.0, 0.95, 0.85),
+        7,
+    ),
+    (
+        "ejector_element_residuals_and_jacobian",
+        _core.ejector_element_residuals_and_jacobian,
+        ELEMENT_ARGS,
+        18,
+    ),
+    (
+        "ejector_jetpump_incompressible_residuals_and_jacobian",
+        _core.ejector_jetpump_incompressible_residuals_and_jacobian,
+        INCOMPRESSIBLE_ARGS,
+        16,
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("fn", "args", "index"), [pytest.param(fn, a, i, id=n) for n, fn, a, i in RECOVERY]
+)
+def test_recovery_above_one_is_refused(
+    fn: Callable[..., Any], args: tuple[Any, ...], index: int
+) -> None:
+    # Recovery multiplies the lossless mixed stagnation pressure: above 1 the
+    # ejector would gain pressure beyond lossless mixing. 1 itself answers.
+    fn(*_with(args, index, 1.0))
+    with pytest.raises(ValueError, match="recovery"):
+        fn(*_with(args, index, ABOVE_ONE))
+
+
+def test_element_constructor_caps_recovery_at_one() -> None:
+    assert _element(recovery_efficiency=1.0).recovery_efficiency == 1.0
+    with pytest.raises(ValueError, match="recovery_efficiency"):
+        _element(recovery_efficiency=ABOVE_ONE)
+
+
+def test_gui_schema_caps_recovery_at_one() -> None:
+    from pydantic import ValidationError
+
+    from gui.backend.schemas import EjectorData
+
+    assert EjectorData(recovery_efficiency=1.0).recovery_efficiency == 1.0
+    for bad in (ABOVE_ONE, 0.0, NAN):
+        with pytest.raises(ValidationError, match="recovery_efficiency"):
+            EjectorData(recovery_efficiency=bad)
