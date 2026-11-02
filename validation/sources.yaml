@@ -4100,6 +4100,40 @@ documents:
   issues: [876]
   records: [python/tests/test_stolz_deprecation_876.py]
   code: [python/combaero/network/components.py, python/combaero/_core.cpp, include/orifice.h]
+  notes: Its ref. [1], Stolz 1988, is now held (next entry).
+- file: sources/orifices/stolz_1988_NSFMW_paper_3.1_first_revision_of_ISO_5167.pdf
+  citation: Stolz, J. (1988). The first revision of ISO 5167. North Sea Flow Measurement Workshop 1988, 18-20
+    October 1988, National Engineering Laboratory, East Kilbride, Glasgow, Paper 3.1.
+  id: NSFMW 1988 paper 3.1 (NFOGM archive item 1988-10)
+  topic: [orifice]
+  content: '7 pp. (4 of text), scanned with a poor OCR layer; read from page images. Lists "without comments"
+    the technical changes ISO/TC30/SC2 decided for the revision of ISO 5167:1980 (published as ISO 5167-1:1991),
+    clause by clause of the 1980 text. Orifice plates: beta range 0.20-0.75 for all three tappings (7.1.7.1);
+    tap diameter max 0.13 D or 13 mm (was 0.08 D or 12 mm); flange-tap position 25.4 +- 0.5 mm when beta > 0.6
+    and D < 150 mm, else +- 1 mm; plate thickness 3.2 mm allowed above 0.05 D; bevel 45 +- 15 deg; eccentricity
+    limit 0.0025 D/(0.1 + 2.3 beta^4) (was 0.0005). 7.3.1 LIMITS OF USE, now common to all tappings except Re_D,
+    d and D in mm: "d <= 12.5" (printed so; almost certainly d >= 12.5, as in later editions), 50 <= D <= 1000,
+    0.20 <= beta <= 0.75; corner taps Re_D >= 5000 for beta <= 0.45 and Re_D >= 10 000 for beta > 0.45;
+    flange and D-D/2 taps Re_D >= 1260 beta^2 D; the upper Re_D limit deleted; pipe roughness criteria k/D
+    unified (most severe kept; k table moved to an annex). 7.4: pressure loss between ~1D upstream and 6D
+    downstream, with a simpler alternative dw/dp = 1 - beta^1.9 (orifice plates). C tables gain Re_D = 1e8 and
+    infinity columns; new annex on iterative computation. The C equation itself is NOT printed, and the 1980
+    limits are given only where a change is stated (old values for tap diameter, eccentricity, inspection D).'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #876/#873. Gives the Stolz equation''s limits of use as revised for ISO
+    5167-1:1991 (above) -- the revised standard, not the 1980 edition the shipped Cd_Stolz is labelled with
+    (orifice.h: "ISO 5167:1980"; Reader-Harris 2022 calls the 1991 change to the equation minor). So it can
+    source a Stolz lower Re_D hold and metering_cd_in_range limits for an ISO 5167-1:1991 Stolz, but the
+    ISO 5167:1980 limits (separate per tapping, with an upper Re_D limit) remain unsourced. Moot for the code
+    path: Stolz is deprecated in 0.8.0 and removed in 0.9.0 (#876), so the recommendation is to cite these
+    limits in the deprecation note rather than implement a hold. The 1 - beta^1.9 loss is an older, simpler
+    form than the ISO 5167-2:2003 Eq. (7) combaero ships (not compared). Not implemented.'
+  read_for: ['#876 Stolz limits of use', '#873 Stolz low-Re hold']
+  issues: [873, 876]
+  records: []
+  notes: Fetched 2026-11-02 from the NFOGM North Sea Flow Measurement Workshop archive (nfogm.no, 1988 item 10,
+    free). The same archive holds Reader-Harris 1988 "A new type of formula for the orifice plate discharge
+    coefficient" (item 11) and Hobbs, "The NEL orifice plate project" (item 16), not fetched.
 
 - file: sources/orifices/jobson_1955_PIMechE_169_767_compressible_orifice.pdf
   citation: Jobson, D. A. (1955). On the flow of a compressible fluid through orifices. Proc. Instn Mech. Engrs
@@ -4364,7 +4398,9 @@ wanted:
   priority: later
   question: 'The recommended-curve reference for alloy k(T) over the full range; would settle the #882 envelope
     shape and the cross-check of the shipped tables.'
-  where: DTIC hosts TPRC volumes (AD numbers); university libraries.
+  where: 'DTIC hosts TPRC volumes as scans (Vol. 2 ADA951936, Vol. 3 ADA951937, Vol. 5 ADA951939 per a web
+    search 2026-11-02); no DTIC record for Vol. 1 was found, so its AD number is unknown. apps.dtic.mil returns
+    403 to automated fetches, so nothing was downloaded. University libraries.'
 - citation: A public EB-PVD YSZ conductivity k(T) curve (as deposited and after sintering), beyond Zhu et al.
     2000 TM-2000-210238 (held; one condition, 0.13 mm, absolute k only there).
   checked: true
@@ -4468,7 +4504,9 @@ wanted:
   question: 'Operating conditions and geometry behind Lefebvre Fig. 8.5 (GE F101 measured liner wall temperature
     against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
     radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
-  where: DTIC (public, ADA-numbered).
+  where: 'DTIC AD-A151 464 (https://apps.dtic.mil/sti/pdfs/ADA151464.pdf, public; identified 2026-11-02 by a web
+    search showing its front matter: Lefebvre, Purdue, AFWAL-TR-84-2104). apps.dtic.mil returns 403 to automated
+    fetches, so it was not downloaded: the user can fetch it in a browser.'
 - citation: Hay, N., Spencer, A. (1992). Discharge coefficients of cooling holes with radiused and chamfered
     inlets. ASME J. Turbomachinery 114(4), 701-706.
   checked: false
@@ -4543,7 +4581,8 @@ wanted:
   question: The standard film-hole Cd correction for external crossflow (inclination via sin phi), to check the
     film element's hole Cd against; Sargison 2001 (held) measured Cd with crossflow on 35 deg holes and
     compares with it.
-  where: ASME Digital Collection (paywalled); the thesis via Oxford ORA.
+  where: 'ASME Digital Collection (paywalled). The Rowbury (1998) DPhil thesis was not found on Oxford ORA by a web
+    search (2026-11-02); the 2000/2001 paper is listed on the Univ. of Bath research portal (not checked for a full text).'
 - citation: Ballal, D. R., Lefebvre, A. H. (1973). Film-cooling effectiveness in the near-slot region. ASME
     J. Heat Transfer 95(2), 265-266. doi:10.1115/1.3450039
   checked: true
@@ -4569,7 +4608,8 @@ wanted:
     lower Re_D bound, but Stolz has NO low-Re hold: its bound is known only from memory, so none is encoded
     and metering_cd_re_min refuses Stolz. The text is needed to add the hold (its lower Re_D bound per tap)
     and the d, D and beta limits that metering_cd_in_range does not encode for Stolz. Tracked in #876, which
-    deprecates Stolz instead unless this text (or Stolz 1988, NSFMW paper 3.1) turns up first.'
+    deprecates Stolz instead unless this text turns up first. Stolz 1988 (held since 2026-11-02) gives
+    only the REVISED ISO 5167-1:1991 limits, not the 1980 ones.'
   where: ISO (withdrawn standard; national-library or university copy).
 - citation: Reader-Harris, M. J. (1998). The equation for the expansibility factor for orifice plates. Proc.
     FLOMEKO 98, Lund. (citation as recalled)
@@ -4581,7 +4621,9 @@ wanted:
     gas). #854 found the compressible kernel applies the isentropic NOZZLE expansion to sharp plates: -0.9% at
     p2/p1 0.97, -7 to -9% at 0.80 against Eq. (5). The data decide the scope of a fix and whether Eq. (5) can be
     stretched below p2/p1 = 0.75.'
-  where: FLOMEKO / IMEKO proceedings, often free.
+  where: 'FLOMEKO 98, Lund, Sweden, June 1998, pp. 209-214 (page range from the citation in Pistun & Lesovoy
+    2016). No free copy found by a web search (2026-11-02); the IMEKO site hosts later TC9 proceedings, not
+    FLOMEKO 98 as far as searched.'
 - citation: Urner, G. (1997). Pressure loss of orifice plates according to ISO 5167. Flow Meas. Instrum. 8(1),
     39-41. (citation as recalled)
   checked: false
@@ -4611,13 +4653,3 @@ wanted:
   question: All three ISO 5167-2 closures (C, expansibility, pressure loss) with derivations and the data behind
     them in one source; an alternative to the three papers above.
   where: Springer book; often through library access.
-- citation: Stolz, J. (1988). The first revision of ISO 5167. Proc. 6th North Sea Flow Measurement Workshop,
-    East Kilbride, Glasgow, National Engineering Laboratory, Paper 3.1.
-  checked: true
-  issues:
-  - 876
-  priority: later
-  question: Stolz's limits of use (beta, D, Re_D) for the ISO 5167:1980/1991 C equation, which combaero does not
-    hold, so metering_cd_in_range cannot flag a Stolz plate (#876 deprecated Stolz instead). Citation checked
-    against ref. [1] of Reader-Harris 2022 (held).
-  where: North Sea Flow Measurement Workshop archive (NFOGM / TUV SUD NEL), usually free.
