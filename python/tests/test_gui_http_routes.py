@@ -744,9 +744,17 @@ def _slow_then_real(delay: float, done: threading.Event):
     return slow
 
 
+@pytest.fixture
+def _export_solves(monkeypatch: pytest.MonkeyPatch) -> None:
+    """For the tests of /export's own solve (timeouts, continuation): no
+    cached displayed result (#783) may stand in for it."""
+    backend._SOLVE_CACHE.clear()
+    monkeypatch.setattr(backend, "_remember_solve", lambda schema, solved: None)
+
+
 @pytest.mark.parametrize("route", ["/solve", "/export"])
 def test_no_timeout_means_no_hard_timeout_either(
-    route: str, monkeypatch: pytest.MonkeyPatch
+    _export_solves: None, route: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`timeout: null` is no limit (#762). The route used to substitute
     180 s and cut the request at 190 s. With the margin shrunk to 0.05 s a
@@ -774,7 +782,9 @@ def test_hard_timeout_follows_the_solver_timeout() -> None:
 
 
 @pytest.mark.parametrize("route", ["/solve", "/export"])
-def test_zero_timeout_times_out_at_once(route: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_zero_timeout_times_out_at_once(
+    _export_solves: None, route: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """`timeout: 0` reaches the solver as 0 (out of time at its first
     residual) and bounds the request at the margin, not at 180 + margin."""
     r = _post(route, _pipe(timeout=0))
@@ -795,7 +805,9 @@ def test_zero_timeout_times_out_at_once(route: str, monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.parametrize("route", ["/solve", "/export"])
-def test_a_result_after_the_504_does_not_land(route: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_result_after_the_504_does_not_land(
+    _export_solves: None, route: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The worker outlives its request (#762). When it converges after the
     route answered 504, its state must not become the continuation seed: the
     user was told that solve failed."""

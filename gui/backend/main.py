@@ -1,10 +1,13 @@
 import asyncio
+import hashlib
 import io
 import itertools
 import json
 import math
 import threading
+from collections import OrderedDict
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
@@ -48,6 +51,29 @@ app.add_middleware(
 # =HYPERLINK("http://...") would run when a colleague opens the export. A
 # leading apostrophe makes the cell text (OWASP "CSV injection").
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _json_finite(v: Any) -> Any:
+    """A list cell's value for JSON: non-finite floats (NaN, inf) as null."""
+    if isinstance(v, (list, tuple)):
+        return [_json_finite(x) for x in v]
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    return v
+
+
+def _lists_as_json(df: pd.DataFrame) -> pd.DataFrame:
+    """List cells (`rows_*`, `T_interface`) written as strict JSON arrays for
+    the CSV (#783): ``pd.read_csv(..., converters={col: json.loads})`` reads
+    them, where Python's repr wrote nan / inf that JSON does not accept. The
+    DataFrame itself keeps real lists."""
+    out = df.copy()
+    for col in out.columns:
+        if out[col].map(lambda v: isinstance(v, (list, tuple))).any():
+            out[col] = out[col].map(
+                lambda v: json.dumps(_json_finite(v)) if isinstance(v, (list, tuple)) else v
+            )
+    return out
 
 
 def _neutralise_formulas(df: pd.DataFrame) -> pd.DataFrame:
@@ -191,6 +217,61 @@ def _timeout_detail(what: str, timeout: float | None) -> str:
     )
 
 
+#: Data keys that change how the canvas looks, not what it solves (#783): the
+#: cache key leaves them out, so an export after relabelling, moving or
+#: re-solving a node still finds the displayed result.
+_DISPLAY_KEYS = frozenset({"result", "label", "rotation", "label_offset", "selected"})
+#: Solves kept for /export, most recent last (#783).
+_SOLVE_CACHE: OrderedDict[str, tuple] = OrderedDict()
+_SOLVE_CACHE_SIZE = 4
+
+
+def _solve_key(schema: NetworkGraphSchema) -> str:
+    """SHA-256 of what a solve depends on: the drawn nodes and edges without
+    their display-only data, and the solver settings (#783). Probes are
+    display-only too."""
+
+    def data(d: dict | None) -> dict:
+        return {k: v for k, v in (d or {}).items() if k not in _DISPLAY_KEYS}
+
+    payload = {
+        "nodes": sorted(
+            (
+                {"id": n.id, "type": n.type, "data": data(n.data)}
+                for n in schema.nodes
+                if n.type != "probe"
+            ),
+            key=lambda n: n["id"],
+        ),
+        "edges": sorted(
+            (
+                {
+                    "id": e.id,
+                    "source": e.source,
+                    "target": e.target,
+                    "sourceHandle": e.sourceHandle,
+                    "targetHandle": e.targetHandle,
+                    "type": e.type,
+                    "data": data(e.data),
+                }
+                for e in schema.edges
+            ),
+            key=lambda e: e["id"],
+        ),
+        "solver_settings": schema.solver_settings.model_dump(mode="json"),
+    }
+    text = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def _remember_solve(schema: NetworkGraphSchema, solved: tuple) -> None:
+    key = _solve_key(schema)
+    _SOLVE_CACHE[key] = solved
+    _SOLVE_CACHE.move_to_end(key)
+    while len(_SOLVE_CACHE) > _SOLVE_CACHE_SIZE:
+        _SOLVE_CACHE.popitem(last=False)
+
+
 def _solve_sync(schema: NetworkGraphSchema, token: int | None = None):
     """
     Synchronous helper to build and solve the network.
@@ -271,6 +352,8 @@ async def solve(schema: NetworkGraphSchema):
     try:
         # Offload CPU-bound C++ solver to a worker thread
         result, node_results, element_results, edge_results, net, diag = await _run_solve(schema)
+        # What the GUI displays next, for /export to write as it is (#783).
+        _remember_solve(schema, (result, node_results, element_results, edge_results, net, diag))
 
         gui_ids = {n.id for n in schema.nodes}
         return SolveResponse(
@@ -361,7 +444,18 @@ async def export_results(schema: NetworkGraphSchema):
         # (expected 5)" -- for three and a half months, because `to_dataframe`
         # is unit-tested but the route that calls it was not. Named rather
         # than discarded with `*_` so the next addition breaks loudly here too.
-        raw, node_results, element_results, edge_results, net, _diag = await _run_solve(schema)
+        # The displayed result (#783): the solve /solve kept for this network
+        # (same nodes, edges, inputs and settings; labels and layout aside).
+        # Only on a miss -- an edited canvas, a restarted backend -- does the
+        # export solve, and it says so.
+        cached = _SOLVE_CACHE.get(_solve_key(schema))
+        if cached is not None:
+            raw, node_results, element_results, edge_results, net, _diag = cached
+            source = "displayed"
+        else:
+            raw, node_results, element_results, edge_results, net, _diag = await _run_solve(schema)
+            _remember_solve(schema, (raw, node_results, element_results, edge_results, net, _diag))
+            source = "solved"
 
         id_to_label, id_to_kind, id_to_method = _schema_maps(schema)
         result_obj = NetworkResult(
@@ -379,7 +473,7 @@ async def export_results(schema: NetworkGraphSchema):
 
         # Stream as CSV
         stream = io.StringIO()
-        _neutralise_formulas(df).to_csv(stream, index=False)
+        _neutralise_formulas(_lists_as_json(df)).to_csv(stream, index=False)
 
         return StreamingResponse(
             iter([stream.getvalue()]),
@@ -390,6 +484,9 @@ async def export_results(schema: NetworkGraphSchema):
                 # parsing the file; every row carries the same columns.
                 "X-Combaero-Success": "true" if result_obj.success else "false",
                 "X-Combaero-Outcome": result_obj.outcome,
+                # "displayed": the result on screen; "solved": no displayed
+                # result matched, so the export solved the canvas (#783).
+                "X-Combaero-Export-Source": source,
             },
         )
     except TimeoutError:

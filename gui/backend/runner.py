@@ -82,6 +82,54 @@ def _schema_maps(
     return id_to_label, id_to_kind, id_to_method
 
 
+# Builder-internal ids (#783): what each part of an array or liner is, by its
+# suffix, per parent kind (impingement_array.py, effusion_liner.py).
+_ARRAY_ROLES: dict[str, dict[str, str]] = {
+    "impingement_array": {"p": "plate row", "x": "crossflow segment", "c": "crossflow node"},
+    "effusion_liner": {"b": "duct station", "s": "duct segment", "p": "panel"},
+}
+
+
+def _synthetic_meta(
+    item_id: str, schema: NetworkGraphSchema, id_to_label: dict[str, str]
+) -> tuple[str, str, str] | None:
+    """(kind, label, parent) of an id the builder made, not one the user drew
+    (#783): the junction between two drawn elements, a junction's port
+    chamber, an auto link, or a row / panel / segment of an array. None for a
+    drawn id or an unknown pattern. The parent is the drawn node or edge it
+    belongs to; the label is derived from the parent's."""
+
+    def name(i: str) -> str:
+        return id_to_label.get(i) or i
+
+    def edge_between(a: str, b: str) -> str:
+        return next((e.id for e in schema.edges if e.source == a and e.target == b), "")
+
+    if item_id.startswith("__junction__"):
+        a, _, b = item_id[len("__junction__") :].partition("__")
+        return "junction", f"junction {name(a)} -> {name(b)}", edge_between(a, b)
+    if item_id.startswith("__auto_link__"):
+        a, _, b = item_id[len("__auto_link__") :].partition("__")
+        edge = edge_between(a, b)
+        label = id_to_label.get(edge) or f"link {name(a)} -> {name(b)}"
+        return "lossless_connection", label, edge
+    if item_id.startswith("__tee_jct__"):
+        rest = item_id[len("__tee_jct__") :]
+        drawn = sorted((n.id for n in schema.nodes if rest.startswith(n.id + "_")), key=len)
+        if drawn:
+            jct = drawn[-1]
+            port = rest[len(jct) + 1 :]
+            return "port_chamber", f"{name(jct)} {port} port", jct
+        return None
+    parent, sep, part = item_id.rpartition("__")
+    if sep and part[:1] and part[1:].isdigit():
+        kind = next((n.type for n in schema.nodes if n.id == parent), None)
+        role = _ARRAY_ROLES.get(kind or "", {}).get(part[:1])
+        if role:
+            return role.replace(" ", "_"), f"{name(parent)} {role} {part[1:]}", parent
+    return None
+
+
 def _build_result_objects(
     result: dict,
     net,
@@ -431,7 +479,23 @@ class NetworkResult:
         )
         data.extend(input_rows)
 
+        # Builder-internal rows (#783) say what they are and which drawn item
+        # they belong to; a drawn row's parent is empty.
+        for row in data:
+            meta = _synthetic_meta(str(row["id"]), self._schema, self._id_to_label)
+            if meta is not None:
+                kind, label, parent = meta
+                row["kind"] = row.get("kind") or kind
+                row["label"] = row.get("label") or label
+                row["parent"] = parent
+            else:
+                row.setdefault("parent", "")
+
         df = pd.DataFrame(data)
+        if "parent" in df.columns and "label" in df.columns:
+            cols = list(df.columns)
+            cols.insert(cols.index("label") + 1, cols.pop(cols.index("parent")))
+            df = df[cols]
         # The solve's own status on EVERY row, beside the label: a timed-out or
         # rejected solve exports numbers that look valid, and a filtered or
         # pivoted frame must still say which solve its rows came from. Element

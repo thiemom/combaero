@@ -562,6 +562,7 @@ _META_COLUMNS: frozenset[str] = frozenset(
     {
         "id",
         "label",
+        "parent",
         "type",
         "kind",
         "success",

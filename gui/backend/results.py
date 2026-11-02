@@ -50,6 +50,7 @@ pandas is a combaero-gui dependency only; core combaero never imports this.
 import ast
 import copy
 import csv
+import json
 import math
 import re
 from collections.abc import Iterable
@@ -82,7 +83,7 @@ SOLVER_PREFIX = "solver:"
 _STATUS = ("success", "converged", "consistent", "outcome", "final_norm")
 # Columns of the long export that describe a row rather than a quantity.
 _LONG_META = frozenset(
-    {"type", "kind", "is_boundary", "combustion_method", "id", "label", *_STATUS}
+    {"type", "kind", "is_boundary", "combustion_method", "id", "label", "parent", *_STATUS}
 )
 # Node/edge data keys that are not inputs: names, and the initial guess
 # (recorded in attrs instead).
@@ -633,6 +634,17 @@ def _clean(v: Any, csv_text: bool) -> Any:
             return v
         s = v.strip()
         if s.startswith("[") and s.endswith("]"):
+            # JSON since #783 (null for NaN / inf); Python's repr before, whose
+            # nan / inf neither json nor literal_eval accepts: map them to the
+            # NaN / Infinity tokens Python's json reads.
+            try:
+                return _nan_for_null(json.loads(s))
+            except ValueError:
+                pass
+            try:
+                return json.loads(_REPR_NONFINITE.sub(lambda m: _REPR_TOKENS[m.group(0)], s))
+            except ValueError:
+                pass
             try:
                 return ast.literal_eval(s)
             except (ValueError, SyntaxError):
@@ -646,6 +658,18 @@ def _clean(v: Any, csv_text: bool) -> Any:
         except (ValueError, AttributeError):
             return v
     return v
+
+
+#: Python repr's non-finite floats in a pre-#783 list cell, as JSON tokens.
+_REPR_TOKENS = {"nan": "NaN", "inf": "Infinity", "-inf": "-Infinity"}
+_REPR_NONFINITE = re.compile(r"-?\binf\b|\bnan\b")
+
+
+def _nan_for_null(v: Any) -> Any:
+    """A JSON list cell's null (a non-finite value, #783) back to NaN."""
+    if isinstance(v, list):
+        return [_nan_for_null(x) for x in v]
+    return float("nan") if v is None else v
 
 
 def _unneutralise(text: str) -> str:

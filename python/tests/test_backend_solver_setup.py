@@ -16,10 +16,20 @@ import pandas as pd
 import pytest
 from test_network_runner import _SIMPLE
 
+import gui.backend.main as backend
 from combaero.network import NetworkSolver
 from gui.backend.main import export_results, solve
 from gui.backend.runner import NetworkRunner
 from gui.backend.schemas import NetworkGraphSchema
+
+
+@pytest.fixture(autouse=True)
+def _export_solves(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests check what /export's own solve is given: no cached
+    displayed result (#783) may stand in for it."""
+    backend._SOLVE_CACHE.clear()
+    monkeypatch.setattr(backend, "_remember_solve", lambda schema, solved: None)
+
 
 _MACH_LIMIT = 0.17
 

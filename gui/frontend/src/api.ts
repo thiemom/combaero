@@ -80,10 +80,13 @@ export const resolvePreview = async (
 
 export interface ExportResponse {
 	blob: Blob;
-	// The export solves the canvas itself; whether THAT solve succeeded
-	// (every CSV row carries the same status columns).
+	// Whether the exported solve succeeded (every CSV row carries the same
+	// status columns).
 	success: boolean;
 	outcome: string;
+	// "displayed": the result on screen; "solved": no displayed result
+	// matched the canvas, so the export solved it (#783).
+	source: string;
 }
 
 export const exportResults = async (
@@ -97,6 +100,8 @@ export const exportResults = async (
 			blob: response.data,
 			success: response.headers["x-combaero-success"] !== "false",
 			outcome: response.headers["x-combaero-outcome"] ?? "",
+			// "displayed": the result on screen; "solved": none matched (#783).
+			source: response.headers["x-combaero-export-source"] ?? "",
 		};
 	} catch (err) {
 		// With responseType "blob" an error body arrives as a Blob too: decode
