@@ -12,10 +12,19 @@ namespace combaero::materials {
 // Material Property Database
 // -------------------------------------------------------------
 
+// k [W/(m*K)] and its analytic slope dk/dT [W/(m*K^2)] (#932).
+struct ConductivityAndSlope {
+    double k;
+    double dk_dT;
+};
+
 // Material thermal property data structure
 struct ThermalMaterial {
     std::string name;                           // Material identifier
-    std::function<double(double)> k_func;       // k(T) function [W/(m*K)]
+    // k(T) and dk/dT inside [T_min, T_max]: the source's fit or table (linear
+    // interpolation, so dk/dT is the segment's slope, the left one at a
+    // printed point).
+    std::function<ConductivityAndSlope(double)> kd_func;
     double T_min;                               // Minimum valid temperature [K]
     double T_max;                               // Maximum valid temperature [K]
     std::string source;                         // Data source reference
@@ -50,11 +59,18 @@ const ThermalMaterial& get_material(const std::string& name);
 std::vector<std::string> list_materials();
 
 // k(T) of a database material [W/(m*K)]. Inside [T_min, T_max] this is
-// k_func(T). Outside it, extrapolate = false (the default) follows the
+// kd_func(T).k. Outside it, extrapolate = false (the default) follows the
 // envelope above; extrapolate = true continues the end slope linearly,
 // unbounded (opt-in). Neither is sourced. Throws for a non-finite T, T <= 0
 // or a continued k <= 0.
 double material_conductivity(const std::string& name, double T, bool extrapolate);
+
+// material_conductivity and its analytic slope dk/dT (#932), on every path:
+// the data's, the envelope's (the end slope times the fade's 1 - d/FADE, 0
+// where it holds) and the linear continuation's (the end slope). k is
+// bit-identical to material_conductivity's. Same refusals.
+ConductivityAndSlope material_conductivity_and_slope(const std::string& name, double T,
+                                                     bool extrapolate);
 
 // The envelope's ends [K]: min(ENVELOPE_T_LOW, T_min), and the solidus, the
 // generic metal cap, or T_max (hot_cap_at_data_end), never below T_max.

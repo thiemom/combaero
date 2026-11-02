@@ -75,6 +75,7 @@ viscosity_and_jacobians = _core.viscosity_and_jacobians
 wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
 wall_coupling_and_jacobian_multilayer = _core.wall_coupling_and_jacobian_multilayer
 wall_exchange_and_jacobian = _core.wall_exchange_and_jacobian
+wall_resistance_fixed_point_derivatives = _core.wall_resistance_fixed_point_derivatives
 
 __all__ = [
     "P0_from_static_and_jacobian_M",
@@ -127,4 +128,5 @@ __all__ = [
     "wall_coupling_and_jacobian",
     "wall_coupling_and_jacobian_multilayer",
     "wall_exchange_and_jacobian",
+    "wall_resistance_fixed_point_derivatives",
 ]

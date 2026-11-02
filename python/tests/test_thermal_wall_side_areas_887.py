@@ -131,10 +131,9 @@ def _solve(net: FlowNetwork) -> tuple[NetworkSolver, dict]:
 
 
 def test_a_network_with_a_per_side_wall_has_exact_rows() -> None:
-    """A constant-k layer: with a k(T) material the wall's Q also moves with
-    the wall temperatures through k, which the Jacobian leaves out for one
-    area and per-side areas alike (8.6e-5 / 7.1e-5 scaled, measured), so it
-    would not isolate what this change adds."""
+    """A constant-k layer, to isolate the per-side areas; the k(T) path
+    through the wall temperatures (#932) has its own rows in
+    test_wall_kT_jacobian_932.py."""
     s, r = _solve(_pair(material="generic", area_a=0.03, area_b=0.009))
     assert r["__success__"], r["__message__"]
     x = np.array(r["__x_solution__"])

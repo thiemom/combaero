@@ -1,6 +1,7 @@
 #ifndef HEAT_TRANSFER_H
 #define HEAT_TRANSFER_H
 
+#include <array>
 #include <limits>
 #include <string>
 #include <utility>
@@ -656,6 +657,10 @@ struct WallCouplingResult {
   double dQ_dC_b = 0.0;      // dQ/dC_b [K]
   double UA = 0.0;           // overall conductance [W/K]
   double effectiveness = 0.0;  // Q / (C_min dT) [-] (0 when C_min dT = 0)
+  // dQ/d(t/k) of any one layer, = dQ/dR_fouling [W^2/(m^2*K)] (#932): Q moves
+  // with the layers' resistances only through their sum. A caller whose t/k
+  // depends on temperature (k(T)) chains it through this.
+  double dQ_dR_wall = 0.0;
 };
 
 // Wall coupling uses h as given at or above this [W/(m^2 K)]; below it a C1,
@@ -719,6 +724,26 @@ WallCouplingResult wall_exchange_and_jacobian(
     double A,
     double R_fouling,
     bool counterflow);
+
+// The total derivatives of a k(T) wall's conductive resistance R_wall =
+// sum_i r_i (r_i = t_i/k_i) at the fixed point r_i = g_i(Tm_i(r, p)) (#932):
+// each layer's resistance evaluated at its mean temperature Tm_i, the mean of
+// its two faces in wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, r,
+// R_fouling), p = (T_hot, T_cold, h_hot, h_cold). Implicit differentiation:
+//   (I - G dTm/dr) dr/dp = G dTm/dp,   G = diag(dg_i/dTm_i),
+// with the profile's derivatives analytic (q = (T_hot - T_cold) / R_total,
+// Tm_i = T_hot - q c_i, c_i = 1/h_hot + sum_{j<i} r_j + r_i/2).
+//   t_over_k : the converged r_i [m^2*K/W]
+//   dr_dTm   : dg_i/dTm_i [m^2/W], e.g. -t_i (dk_i/dT) / k_i^2; 0 for a
+//              constant-k layer
+// Returns d(R_wall)/d(T_hot, T_cold, h_hot, h_cold) [m^2/W, m^2/W,
+// m^4*K^2/W^2, m^4*K^2/W^2]. All zero when every dr_dTm is 0. Throws as
+// wall_temperature_profile does, or when (I - G dTm/dr) is singular (no
+// isolated fixed point).
+std::array<double, 4> wall_resistance_fixed_point_derivatives(
+    double T_hot, double T_cold, double h_hot, double h_cold,
+    const std::vector<double> &t_over_k, double R_fouling,
+    const std::vector<double> &dr_dTm);
 
 // -------------------------------------------------------------
 // High-level channel functions -- each returns a ChannelResult

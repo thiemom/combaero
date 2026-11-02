@@ -1260,26 +1260,33 @@ class WallLayer:
 
 
 class _WallCoupling:
-    """A WallCouplingResult read through per-side areas (#887): the kernel's
-    fields as they are, but dQ/dh_b in side B's own h (the kernel saw
-    h_b A_b / A_a)."""
+    """A WallCouplingResult read through per-side areas (#887) and k(T)
+    layers (#932): the kernel's fields as they are, plus ``kT`` -- the part of
+    dQ/d(T_aw_a, T_aw_b, h_a, h_b) that moves through the layers' k(T) -- and
+    dQ/dh_b in side B's own h (the kernel saw h_b A_b / A_a)."""
 
     _FIELDS = (
         "Q",
         "T_hot",
-        "dQ_dh_a",
-        "dQ_dT_aw_a",
-        "dQ_dT_aw_b",
         "dQ_dC_a",
         "dQ_dC_b",
         "UA",
         "effectiveness",
+        "dQ_dR_wall",
     )
 
-    def __init__(self, res: Any, dQ_dh_b_factor: float) -> None:
+    def __init__(
+        self,
+        res: Any,
+        dQ_dh_b_factor: float = 1.0,
+        kT: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
+    ) -> None:
         for name in self._FIELDS:
             setattr(self, name, getattr(res, name))
-        self.dQ_dh_b = res.dQ_dh_b * dQ_dh_b_factor
+        self.dQ_dT_aw_a = res.dQ_dT_aw_a + kT[0]
+        self.dQ_dT_aw_b = res.dQ_dT_aw_b + kT[1]
+        self.dQ_dh_a = res.dQ_dh_a + kT[2]
+        self.dQ_dh_b = (res.dQ_dh_b + kT[3]) * dQ_dh_b_factor
 
 
 @dataclass
@@ -1519,6 +1526,7 @@ class ThermalWall:
 
         t_over_k_layers = resistances()
         prof = profile(t_over_k_layers)
+        kT: tuple[float, float, float, float] | None = None
         if any(L.material.lower() not in ("generic", "custom") for L in self.layers):
             # k(T) at THIS call's wall temperatures, iterated to its fixed
             # point, so Q depends on the inputs alone. It used to be lagged
@@ -1543,6 +1551,31 @@ class ThermalWall:
                     layer.in_range = bool(
                         cb.material_in_range(layer.material, 0.5 * (prof[i] + prof[i + 1]))
                     )
+            # The Jacobian through k(T) (#932): Q moves with each layer's
+            # t/k, and t/k with the layer's mean temperature, itself a
+            # function of the inputs and of every t/k. The C++ side
+            # differentiates the fixed point; here only each layer's
+            # d(t/k)/dT = -t (A_a/A_m) (dk/dT) / k^2 from the material's
+            # analytic slope (envelope included), 0 for a constant k.
+            dr_dTm: list[float] = []
+            for i, (layer, f) in enumerate(zip(self.layers, layer_scale, strict=True)):
+                if layer.material.lower() in ("generic", "custom"):
+                    dr_dTm.append(0.0)
+                    continue
+                k, dk = cb.get_material_conductivity_and_slope(
+                    layer.material, 0.5 * (prof[i] + prof[i + 1]), extrapolate=layer.extrapolate
+                )
+                dr_dTm.append(-float(layer.thickness) * f * dk / (k * k))
+            dR = _solver_tools.wall_resistance_fixed_point_derivatives(
+                T_aw_a, T_aw_b, h_pa, h_pb, t_over_k_layers, self.R_fouling, dr_dTm
+            )
+            # The profile saw h at the WALL_HTC_KNEE floor: flat below it.
+            kT = (
+                float(dR[0]),
+                float(dR[1]),
+                float(dR[2]) if float(h_a) >= cb.WALL_HTC_KNEE else 0.0,
+                float(dR[3]) if float(h_b) >= cb.WALL_HTC_KNEE else 0.0,
+            )
 
         res = _solver_tools.wall_exchange_and_jacobian(
             h_a,
@@ -1557,8 +1590,13 @@ class ThermalWall:
             counterflow,
         )
         self._last_profile = prof
-        if per_side:
-            return _WallCoupling(res, dQ_dh_b_factor=r_b)
+        if kT is not None:
+            g = res.dQ_dR_wall
+            kT = (g * kT[0], g * kT[1], g * kT[2], g * kT[3])
+        if per_side or kT is not None:
+            return _WallCoupling(
+                res, dQ_dh_b_factor=r_b if per_side else 1.0, kT=kT or (0.0, 0.0, 0.0, 0.0)
+            )
         return res
 
 

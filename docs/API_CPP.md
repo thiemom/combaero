@@ -1362,6 +1362,21 @@ WallCouplingResult wall_exchange_and_jacobian(
     double h_b, double T_aw_b, double C_b,
     const std::vector<double>& t_over_k_layers, double A,
     double R_fouling, bool counterflow);
+// Both forms also give dQ_dR_wall = dQ/d(t/k) of any one layer (#932).
+
+// A k(T) wall (#932): each layer's t/k at its mean temperature in
+// wall_temperature_profile, iterated to a fixed point by the caller. The total
+// derivatives of R_wall = sum t/k through that fixed point, by implicit
+// differentiation, dr_dTm = d(t/k)_i/dTm_i (0 for a constant k):
+std::array<double, 4> wall_resistance_fixed_point_derivatives(
+    double T_hot, double T_cold, double h_hot, double h_cold,
+    const std::vector<double>& t_over_k, double R_fouling,
+    const std::vector<double>& dr_dTm);  // dR_wall/d(T_hot, T_cold, h_hot, h_cold)
+
+// materials.h: k and its analytic dk/dT on every path of
+// material_conductivity (data, #882 envelope fade, linear continuation).
+ConductivityAndSlope material_conductivity_and_slope(
+    const std::string& name, double T, bool extrapolate);  // {k, dk_dT}
 ```
 
 ### Data Structures

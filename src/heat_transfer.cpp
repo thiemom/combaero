@@ -11,12 +11,15 @@
 #include "../include/transport.h" // viscosity, thermal_conductivity, prandtl
 #include "../include/input_validation.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 
 
@@ -1236,6 +1239,8 @@ WallCouplingResult wall_coupling_and_jacobian(
   result.dQ_dh_b = (factor_b * factor_b) * A * dT * dhb;
 
   result.dQ_dT_aw_b = -U * A;
+  // dQ/dR_wall = -A dT / R_total^2.
+  result.dQ_dR_wall = -U * U * A * dT;
 
   return result;
 }
@@ -1355,10 +1360,99 @@ WallCouplingResult wall_exchange_and_jacobian(
   result.dQ_dh_b = dT * k.dK_dUA * unit.dQ_dh_b;
   result.dQ_dC_a = dT * k.dK_dCa;
   result.dQ_dC_b = dT * k.dK_dCb;
+  result.dQ_dR_wall = dT * k.dK_dUA * unit.dQ_dR_wall;
   result.UA = UA;
   const double C_min = std::min(C_a, C_b);
   result.effectiveness = (C_min > 0.0 && std::isfinite(C_min)) ? k.K / C_min : 0.0;
   return result;
+}
+
+std::array<double, 4> wall_resistance_fixed_point_derivatives(
+    double T_hot, double T_cold, double h_hot, double h_cold,
+    const std::vector<double> &t_over_k, double R_fouling,
+    const std::vector<double> &dr_dTm) {
+  const std::size_t n = t_over_k.size();
+  if (dr_dTm.size() != n) {
+    throw std::invalid_argument(
+        "wall_resistance_fixed_point_derivatives: dr_dTm needs one entry per layer");
+  }
+  std::array<double, 4> out{0.0, 0.0, 0.0, 0.0};
+  if (std::all_of(dr_dTm.begin(), dr_dTm.end(), [](double g) { return g == 0.0; })) {
+    return out;
+  }
+  double q = 0.0;
+  // Validates the inputs and gives q exactly as the caller's profile.
+  (void)wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k, R_fouling, q);
+  double R_total = 1.0 / h_hot + 1.0 / h_cold + R_fouling;
+  for (double r : t_over_k) {
+    R_total += r;
+  }
+  // c_i: the resistance from the hot fluid to layer i's middle.
+  std::vector<double> c(n);
+  double acc = 1.0 / h_hot;
+  for (std::size_t i = 0; i < n; ++i) {
+    c[i] = acc + 0.5 * t_over_k[i];
+    acc += t_over_k[i];
+  }
+  // Augmented system [I - G M | G P], M = dTm/dr (n x n), P = dTm/dp (n x 4).
+  const std::size_t cols = n + 4;
+  std::vector<double> a(n * cols, 0.0);
+  const double hh2 = h_hot * h_hot;
+  const double hc2 = h_cold * h_cold;
+  for (std::size_t i = 0; i < n; ++i) {
+    const double g = dr_dTm[i];
+    double *row = &a[i * cols];
+    for (std::size_t j = 0; j < n; ++j) {
+      const double dc = j < i ? 1.0 : (j == i ? 0.5 : 0.0);
+      const double M_ij = -q * dc + q * c[i] / R_total;  // dq/dr_j = -q / R_total
+      row[j] = (i == j ? 1.0 : 0.0) - g * M_ij;
+    }
+    const double f = c[i] / R_total;
+    row[n + 0] = g * (1.0 - f);                    // dTm_i/dT_hot
+    row[n + 1] = g * f;                            // dTm_i/dT_cold
+    row[n + 2] = g * (q / hh2) * (1.0 - f);        // dTm_i/dh_hot
+    row[n + 3] = g * (-q * f / hc2);               // dTm_i/dh_cold
+  }
+  // Gaussian elimination with partial pivoting (n is the layer count).
+  for (std::size_t k = 0; k < n; ++k) {
+    std::size_t piv = k;
+    for (std::size_t i = k + 1; i < n; ++i) {
+      if (std::abs(a[i * cols + k]) > std::abs(a[piv * cols + k])) {
+        piv = i;
+      }
+    }
+    if (!(std::abs(a[piv * cols + k]) > 0.0) || !std::isfinite(a[piv * cols + k])) {
+      throw std::runtime_error(
+          "wall_resistance_fixed_point_derivatives: the k(T) fixed point is not isolated");
+    }
+    if (piv != k) {
+      for (std::size_t j = 0; j < cols; ++j) {
+        std::swap(a[k * cols + j], a[piv * cols + j]);
+      }
+    }
+    for (std::size_t i = k + 1; i < n; ++i) {
+      const double m = a[i * cols + k] / a[k * cols + k];
+      for (std::size_t j = k; j < cols; ++j) {
+        a[i * cols + j] -= m * a[k * cols + j];
+      }
+    }
+  }
+  for (std::size_t col = 0; col < 4; ++col) {
+    std::vector<double> x(n);
+    for (std::size_t ii = n; ii-- > 0;) {
+      double v = a[ii * cols + n + col];
+      for (std::size_t j = ii + 1; j < n; ++j) {
+        v -= a[ii * cols + j] * x[j];
+      }
+      x[ii] = v / a[ii * cols + ii];
+    }
+    double sum = 0.0;
+    for (double v : x) {
+      sum += v;
+    }
+    out[col] = sum;
+  }
+  return out;
 }
 
 } // namespace combaero

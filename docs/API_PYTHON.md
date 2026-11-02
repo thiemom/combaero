@@ -2511,6 +2511,9 @@ k = cb.k_hastelloy_x(1400.0, extrapolate=True)
 k = cb.get_material_conductivity("hastelloy_x", 1400.0)                    # envelope: 29.70
 k = cb.get_material_conductivity("hastelloy_x", 1400.0, extrapolate=True)  # end slope: 31.24
 cb.material_in_range("hastelloy_x", 1400.0)                                 # False
+# k and its analytic dk/dT [W/(m*K^2)] on the same paths (#932): the table
+# segment's slope in range, the envelope's fade outside, 0 where it holds.
+k, dk_dT = cb.get_material_conductivity_and_slope("ss310", 900.0)
 
 # The record: sourced range, source, and the solidus [K] its source prints
 # (NaN where none does), the hot end of the #882 envelope.
