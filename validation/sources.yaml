@@ -643,6 +643,43 @@ documents:
   issues: [714, 763, 793]
   records: []
   notes: Arrived 2026-11-02 in sources/new/ (from the user). Not implemented.
+- file: sources/heat_transfer/film/Caciolli_PhD_Florence_XXV_combustor_aerothermal.pdf
+  citation: Caciolli, G. (cycle XXV, 2010-2012). A close investigation on the aerothermal behaviour of modern
+    aeroengine combustors. PhD thesis, University of Florence, DIEF (tutor B. Facchini; defence year not printed).
+  topic: [film, combustion]
+  content: 'Born-digital LaTeX, 298 pp. (only the title page is a scan); data in figures. Ch. 3: Therm1D,
+    the Florence 1-D liner procedure (Icons1D coolant network + Cowl gas-side Lefebvre radiation/convection,
+    Kretschmer-Odgers, + 1-D FDM wall), applied to the NEWAC combustor; results normalised (T/Tref), so not
+    reproducible. Ch. 4 (the useful part): 3:1 model of the NEWAC liner, TLC, steady state. 29 staggered
+    effusion rows, d 1.65 mm, alpha 30 deg, L/d 5.5, Sx/d 6.0, Sy/d 7.6, starter slot upstream (BR_sl ~1.5),
+    dilution hole after row 14; Re_main ~75,000, M 0.04-0.05, low Tu. BR_eff 1.5/3/5/7 with air (DR ~1) and
+    CO2 (DR ~1.7), with and without slot: 48 tests. Measured: Cd ~0.73 constant; spanwise-averaged HTC/HTC0
+    (HTC0 = the same plate unblown) row by row (Fig. 4.12) and plate-averaged vs BR and VR (Fig. 4.13); eta_aw
+    maps and averages (Figs. 4.14-4.16); NHFR and overall effectiveness (Figs. 4.20/4.21). Fig. 4.13(b) PRINTS
+    the fit HTC/HTC0 = 0.4296 VR_eff + 1.0478 (VR ~1.5-7; max error ~10%, mean 4.5%), with air and CO2
+    collapsing on VR, not BR. Bands (Table 4.2, 95%): HTC +/-10 W/m2K, eta_aw +/-0.05, BR/VR 5%. Table 4.3
+    gives L''Ecuyer-Soechting and Baldauf validity ranges; Fig. 4.17 compares both with the data. Ch. 6-8:
+    FACTOR hot-streak sector rig (1:1); Table 6.1 effusion patches (d 0.5 mm, L/d 2-3.5, alpha 30/60 deg);
+    Table 8.1 patch permeability from flow checks at an assumed Cd 0.70; swirler effective area 1545 mm2.
+    App. A: MobRig Therm1D network, normalised. App. B: hot streaks on the HP vane.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Candidate SOURCED closure for the effusion plate''s gas-side augmentation,
+    which EffusionPlateElement leaves to the user (`gas_augmentation`, #476): the printed Fig. 4.13(b) fit
+    gives 1.69 at VR 1.5 to 4.06 at VR 7 -- the band Andrews 88-GT-290 plates needed (1.6-4.3) -- on a
+    baseline measured on the same unblown plate. Limits: one geometry, low mainstream Tu, plate average with
+    a starter slot and a dilution hole in it, laboratory scale. Would ship as a declared, single-geometry
+    set with its validity box, never a default. Same lab as Andrei 2014 (held), different study and
+    geometry: cross-source to it. Eta_aw curves are outside every shipped film correlation (BR up to 7).
+    Ch. 3/App. A results are normalised and not usable as examples; Ch. 5-8 hot streaks are out of scope.'
+  read_for: ['#476 effusion gas-side augmentation', '#387 effusion eta_aw at combustor BR/DR', effusion
+      Cd at combustor conditions, '#793 1-D liner procedure (methodology only)']
+  issues: [387, 476, 793]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ (from the user) as Caciolli_PhD_final_frontespizio.pdf. Leads
+    from its bibliography: Andreini et al. 2011 JEGTP 133 021901 (effusion Cd numerical correlation, used for
+    App. A); Facchini et al. GT2010-22936 (HTC on a real liner, slot + effusion + dilution); Kretschmer &
+    Odgers 78-GT-90; Ceccherini 2009 PhD (Therm1D). The Ch. 4 data are likely also in an Andreini/Caciolli
+    journal paper (not verified).'
 - file: sources/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
   citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
     experimental and computational methods for modelling multiple row effusion cooling performance. Int.
