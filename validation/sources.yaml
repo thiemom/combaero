@@ -3100,15 +3100,53 @@ documents:
     liner heat balance and luminous emissivity, Kadoya air properties Table 1) on a small annular combustor
     at atmospheric rig conditions (Table 3: P3 101.2 kPa, T3 404 K, dP/P 5%, 0.2 kg/s). Measured outer-liner
     temperature by thermal paint (scale Table 2) and three thermocouples, plotted against prediction (Fig.
-    12); peak 953 K predicted vs 969 K paint.'
+    12); peak 953 K predicted vs 969 K paint. Re-read 2026-11-02 from page images (equations are vector Cambria
+    Math missing from the text layer, readable on the page): Odgers eta_PZ,max = 0.72 + 0.29 tanh[1.5475e-3 (Ta +
+    108 ln Pa - 1863)] and eta_SZ,max with 0.80 (Eqs. 1-2); Lefebvre R1 = 0.5 sigma (1 + eps_w) eps_g Tg^1.5 (Tg^2.5
+    - Tw^2.5), C1 = 0.020 k_g/D_L^0.2 (m/(A_L mu_g))^0.8 (Tg - Tw), R2 = sigma eps_w eps_c/(eps_c + eps_w (1 -
+    eps_c)(A_w/A_c)) (Tw^4 - T3^4), C2 = 0.020 k_a/D_an^0.2 (m/(A_an mu_a))^0.8 (Tw - T3) (Eqs. 3-6), eps_g = 1 -
+    exp(-290 P L (q l_b)^0.5 Tg^-1.5) (Eq. 7); thin uncoated wall (Tw1 = Tw2, no conduction term). Fig. 7 PLOTS the
+    flow-path radii against axial position (0-86 mm): outer liner r ~67 mm contracting to ~52 mm from x ~35 to
+    ~78 mm, inner liner ~28 mm, outer casing ~74 to ~69 mm, inner casing ~14 mm stepping to ~25/20 mm at x ~70-80
+    mm; holes only in a CAD sketch (no sizes, counts or positions). Plain holes, no film slots ("future study").
+    Fuel not named (kerosene look-up tables, air-blast atomiser); fuel flow and FAR not printed; luminosity factor
+    L and the near-wall radial temperature factor (from Topal 2013) not given. Fig. 9: mean gas T to ~1650 K,
+    near-wall to ~1950 K. Fig. 12 (absolute K, not normalised): ~15 paint points (about 600 K at x 3 mm rising to
+    969 K at 60 mm, 770 K at 83 mm) and 3 thermocouples (~810, ~915, ~860 K at x ~32, 48, 67 mm). The paint''s
+    first colour change is 490 C (763 K), so the paint points below it are not threshold readings. Thermocouple and
+    paint uncertainty not stated.'
   status: screened
-  verdict: 'No #793 example: liner and hole geometry are not given (Fig. 7 only), and the equations are
-    images. Measured liner temperatures exist but cannot be reproduced without the geometry. Correlation
-    pointers only (Kaddah 1964 / Freeman 1965 liner-hole Cd -- see the Adkins-Gueroui wanted entry).'
+  verdict: 'No #793 example (re-confirmed 2026-11-02): the radii are plotted (Fig. 7) but the hole sizes, counts
+    and positions, the fuel flow (or FAR), L and the near-wall temperature factor are not printed, so neither the
+    flow split nor the gas temperature can be rebuilt; measured liner temperatures exist (absolute, ~18 points)
+    but would be compared with assumed inputs. Even with the geometry, combaero cannot rebuild it today: near-wall
+    gas reaches ~1950 K, so R1 dominates and combaero has no gas radiation (same blocker as the Lefebvre & Ballal
+    Ch. 8 examples); conduction is absent here (thin wall) and both convective sides map onto existing Re^0.8
+    forms. Correlation pointers only (Kaddah 1964 / Freeman 1965 liner-hole Cd -- see the Adkins-Gueroui wanted
+    entry). The earlier "equations are images" was wrong: they are printed and legible on the page images, and
+    match Lefebvre''s set (no new correlation).'
   read_for: ['#793 worked example candidate']
   issues: [793]
   records: []
-  notes: Arrived 2026-10-27 as docs/new/CONV14_1D-HT-GTCC-r1.pdf.
+  notes: Arrived 2026-10-27 as docs/new/CONV14_1D-HT-GTCC-r1.pdf. A second copy arrived 2026-11-02 (next entry).
+- file: sources/combustor_network/topal2014_CONV14_1D_heat_transfer_combustor_2016_copy.pdf
+  citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional heat
+    transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp. on
+    Convective Heat and Mass Transfer, Turkey, paper CONV-14-123 (a 2016 re-export of the same paper).'
+  id: CONV-14-123 (second copy)
+  topic: [combustion]
+  content: 'The same 15-page paper as the previous entry: the text layers are identical word for word (4418
+    words); the only differences are the PDF producer and date (2016-08-16 against 2014-09-26) and figure
+    layout on pages 9-13 (text-layer line positions); the figures and equations of this copy (pp. 4-6, 10, 12,
+    13 viewed) are the same as the held copy''s. Not compared pixel by pixel.'
+  status: screened
+  verdict: 'Duplicate; adds nothing. All findings are recorded on topal2014_CONV14_1D_heat_transfer_combustor.pdf
+    (re-screened 2026-11-02 when this copy arrived). Candidate for deletion (kept pending the user''s decision).'
+  read_for: ['#793 worked example candidate (duplicate)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user) as One_Dimensional_Heat_Transfer_Analysis_a.pdf,
+    presented as new.
 - file: sources/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf
   citation: 'Gouws, J. J., Morris, R. M., Visser, J. A. (2006). Modelling of a gas turbine combustor using
     a network solver. S. Afr. J. Science 102, 533-536 (with online supplementary Tables 2-4).'
