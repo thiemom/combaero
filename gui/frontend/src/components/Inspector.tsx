@@ -658,7 +658,7 @@ const Inspector = () => {
 									</label>
 									<NumericInput
 										id={`tm_pr_${selectedNode.id}`}
-										value={d.pressure_ratio ?? (isTurbine ? 3 : 4)}
+										value={d.pressure_ratio ?? (isTurbine ? 3.8 : 4)}
 										onChange={(val) =>
 											updateNodeData(selectedNode.id, { pressure_ratio: val })
 										}

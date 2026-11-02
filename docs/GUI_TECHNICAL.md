@@ -93,7 +93,7 @@ A `CompressorElement` / `TurbineElement` at a fixed total-to-total pressure
 ratio (#893): Pt_out = PR x Pt_in (compressor) or Pt_in / PR (turbine); the
 network sets the flow. One inlet (`flow-target`) and one outlet
 (`flow-source`); no surface, so no thermal handles.
-- `pressure_ratio`: >= 1 (Default: 4 compressor, 3 turbine)
+- `pressure_ratio`: >= 1 (Default: 4 compressor, 3.8 turbine: a compressor and a turbine dropped together leave 5 % of Pt for the combustor and ducts between them)
 - `efficiency_type`: `"polytropic"` (default) or `"isentropic"`
 - `efficiency`: in (0, 1] (Default: 0.88 compressor, 0.9 turbine)
 

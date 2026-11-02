@@ -115,7 +115,7 @@ const NetworkCanvas = () => {
 			} else if (type === "turbine") {
 				data = {
 					...data,
-					pressure_ratio: 3,
+					pressure_ratio: 3.8,
 					efficiency_type: "polytropic",
 					efficiency: 0.9,
 				} as any;
