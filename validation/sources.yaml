@@ -5171,6 +5171,59 @@ wanted:
   priority: later
   question: Short-pin friction and Nu from a non-NASA rig.
   where: ASME Turbo Expo proceedings.
+- citation: 'Alberti, M., Weber, R., Mancini, M. (2018). Gray gas emissivities for H2O-CO2-CO-N2 mixtures. J.
+    Quant. Spectrosc. Radiat. Transfer 219, 274-291 (doi:10.1016/j.jqsrt.2018.08.008); and the same authors''
+    2020 follow-up, JQSRT 255, 107227.'
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'The pressure-capable, composition-based non-luminous gas emissivity (300-3000 K, 0.1-100 atm, pure
+    H2O through CO2-rich) that Howell et al. 7th ed. App. F reproduces (held) -- the shippable alternative to
+    Reeves (Lefebvre Eq. 8.9) and to Bordbar 2021 (non-commercial licence). Needed: the fit coefficients and
+    their licence. Covers the H2/NH3 limit (H2O only) that Bordbar does not.'
+  where: Elsevier journal (paywalled); check whether the authors publish the coefficients openly (the Howell
+    appendix mentions a spreadsheet).
+- citation: Kretschmer, D., Odgers, J. (1978). A simple method for the prediction of wall temperatures in gas
+    turbines. ASME Paper 78-GT-90.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: Primary of the Kretschmer-Odgers luminosity factor L = 0.0691 (C/H - 1.82)^2.71 (Lefebvre Eq. 8.14)
+    and of the 1-D wall-temperature method the Florence Therm1D tool builds on (Caciolli PhD, held); which data L
+    was fitted to.
+  where: ASME Digital Collection (paywalled).
+- citation: Stuttaford, P. J., Rubini, P. A. (1998). Assessment of a radiative heat transfer model for gas turbine
+    combustor preliminary design. J. Propulsion and Power 14(1), 66-73.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: Radiation inside a combustor flow-network solver, the architecture combaero would use; how a
+    zone-wise radiation model couples to a network and what it was validated against.
+  where: AIAA (paywalled).
+- citation: Srivatsa, S. K. (1982). Computations of soot and NOx emissions from gas turbine combustors. NASA
+    CR-167930 (NTRS 19820021901, May 1982).
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'The JT8D tubular-can geometry behind Humenik/Claus TM-83436 and TM-83538 (held; they print no liner
+    geometry): liner diameter and length, louvers, hole areas, air split. With it the NASA can becomes a full
+    liner network case for a radiation model, not only an L ratio test. Alternatives that may print it: Claus
+    1981 NASA TP-1722; Claus, Humenik & Neely 1983 NASA CP-2268.'
+  where: NTRS (public; not yet searched).
+- citation: 'Wright, L. M., et al. (2011). Effects of density ratio and free-stream turbulence on fan-shaped and
+    laidback fan-shaped film cooling holes. (Title, authors and venue not verified: Hassan 2013 cites it only as
+    "Wright et al. (2011)" in the text; likely ASME J. Turbomach. or Turbo Expo.)'
+  checked: false
+  issues:
+  - 386
+  priority: later
+  question: The fan-shaped hole geometry (area ratio, P/D, t/P) behind Hassan 2013's tabulated flat-plate eta
+    (held, Tables A.2/A.3), needed before those tables can score the Colban 2011 shaped-hole kernel.
+  where: ASME Digital Collection (paywalled).
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
   checked: false
@@ -5309,7 +5362,7 @@ wanted:
   checked: false
   issues:
   - 854
-  priority: now
+  priority: later
   question: 'The primary of ISO 5167-2 Eq. (5), the orifice expansibility, and its data (air, steam, natural
     gas). #854 found the compressible kernel applies the isentropic NOZZLE expansion to sharp plates: -0.9% at
     p2/p1 0.97, -7 to -9% at 0.80 against Eq. (5). The data decide the scope of a fix and whether Eq. (5) can be
