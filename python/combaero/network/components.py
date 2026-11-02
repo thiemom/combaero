@@ -2139,6 +2139,14 @@ class NetworkNode(ABC):
     #: still a flow boundary: it injects its stream into the network.
     is_flow_boundary: bool = False
 
+    #: The node's own definition holds its gas at rest, Pt = P: a plenum, a
+    #: combustor, a wall node, and the boundaries (a reservoir at an inflow,
+    #: a static exit pressure at an outflow). Its state is not the state in a
+    #: duct meeting it, so a ChannelElement reports its own duct state at
+    #: such an end (#888). A momentum chamber carries its moving static state
+    #: (Pt > P) and keeps False.
+    state_at_rest: bool = False
+
     def __init__(self, id: str):
         self.id = id
 
@@ -2436,6 +2444,8 @@ class PlenumNode(NetworkNode):
     For Phase 1: pressure-only node.
     For Phase 2+: automatically handles mixing when multiple upstream connections exist.
     """
+
+    state_at_rest: bool = True  # Pt = P by definition
 
     def __init__(self, id: str):
         super().__init__(id)
@@ -3013,6 +3023,7 @@ class PressureBoundary(NetworkNode):
 
     is_boundary: bool = True
     is_flow_boundary: bool = True
+    state_at_rest: bool = True
 
     def __init__(
         self,
@@ -3088,6 +3099,7 @@ class MassFlowBoundary(NetworkNode):
 
     is_boundary: bool = True
     is_flow_boundary: bool = True
+    state_at_rest: bool = True
 
     def __init__(
         self,
@@ -3315,6 +3327,7 @@ class WallNode(NetworkNode):
     """
 
     is_boundary: bool = True
+    state_at_rest: bool = True
 
     def __init__(self, id: str) -> None:
         super().__init__(id)
@@ -3361,6 +3374,8 @@ class CombustorNode(NetworkNode):
     correlations (``LinearThetaFractionLoss`` / ``LinearThetaHeadLoss``)
     automatically pick up ``_T_unburned`` / ``_T_burned`` from this node.
     """
+
+    state_at_rest: bool = True  # Pt = P by definition
 
     # Supplies theta = T_burned / T_unburned - 1 to adjacent PressureLossElement.
     has_theta: bool = True
@@ -8250,11 +8265,11 @@ class ChannelElement(NetworkElement):
 
     # The duct at both ends; the higher one decides.
     validity_mach_keys = ("mach_in", "mach_out")
-    #: Whether diagnostics read the duct's own state at a flow-boundary end
-    #: (#888, ``_boundary_end_states``), from the node-to-node Fanno solution.
+    #: Whether diagnostics read the duct's own state at an end on a node at
+    #: rest (#888, ``_rest_end_states``), from the node-to-node Fanno solution.
     #: A crossflow segment solves its duct between its own station states
     #: (#802), so it keeps the node states there.
-    _boundary_end_state_from_duct: bool = True
+    _rest_end_state_from_duct: bool = True
 
     def __init__(
         self,
@@ -8787,41 +8802,44 @@ class ChannelElement(NetworkElement):
             row[k] = row.get(k, 0.0) - v
         return res, {0: row}
 
-    def _boundary_end_states(
+    def _rest_end_states(
         self,
         state_in: NetworkMixtureState,
         state_out: NetworkMixtureState,
         flow: Any,
     ) -> list[tuple[float, float, list[float]] | None]:
-        """The duct's own static (T, P, X) at each end that is a flow boundary
+        """The duct's own static (T, P, X) at each end on a node at rest
         (#888): [from end, to end], None where the end keeps its node state.
 
-        A PressureBoundary or MassFlowBoundary state is the boundary's own: a
-        reservoir at an inflow (P = Pt, T = Tt), the static exit pressure with
-        the arriving Tt at an outflow. Read as the duct's end state it put
-        mach_in at the reservoir density (0.58 where the duct carries 0.89)
-        and mach_out above 1 in an unchoked duct. At such an end the
-        diagnostics read the state the duct's own residual solves instead:
+        A node whose own definition holds its gas at rest (``state_at_rest``,
+        Pt = P: a plenum, a combustor, a PressureBoundary or MassFlowBoundary)
+        reports a state that is not the duct's: a reservoir (P = Pt, T = Tt)
+        where the duct leaves it, a static pressure with the arriving Tt where
+        it enters. Read as the duct's end state it put mach_in at the
+        reservoir density (0.58 where the duct carries 0.89) and mach_out
+        above 1 in an unchoked duct. At such an end the diagnostics read the
+        state the duct's own residual solves instead:
 
         * compressible: the Fanno station at that end's Mach (M_in at the
           kernel's source, M_exit at its exit) for the kernel's flux and the
           duct's stagnation temperature there (its exit Tt when the wall heat
           is in the momentum), so the reported Mach is the kernel's;
         * incompressible: the residual's own density state (#651), (Tt, the
-          approach static P at the flux) where the boundary holds a total
-          pressure; where it takes the flow at its static pressure (an
-          outflow losing its head) the boundary state is the duct face's.
+          approach static P at the flux) where the node holds a total
+          pressure; where a boundary takes the flow at its static pressure
+          (an outflow losing its head) its state is the duct face's.
 
-        An end that is not a flow boundary carries its own node state and is
-        left alone, as is a ribbed or pin-fin surface (its residual reads the
-        node state). Reporting only: no residual reads this.
+        An end on a moving node (a momentum chamber, Pt > P) carries its own
+        static state and is left alone, as is a ribbed or pin-fin surface
+        (its residual reads the node state). Reporting only: no residual
+        reads this.
         """
         ends: list[tuple[float, float, list[float]] | None] = [None, None]
         nodes = (getattr(self, "_upstream_node", None), getattr(self, "_downstream_node", None))
-        is_boundary = [bool(getattr(n, "is_flow_boundary", False)) for n in nodes]
+        at_rest = [bool(getattr(n, "state_at_rest", False)) for n in nodes]
         m = float(state_in.m_dot)
         area = self.area or 0.0
-        if not self._boundary_end_state_from_duct or not any(is_boundary):
+        if not self._rest_end_state_from_duct or not any(at_rest):
             return ends
         if area <= 0.0 or m == 0.0:
             return ends
@@ -8843,7 +8861,7 @@ class ChannelElement(NetworkElement):
                     exit_Tt = float(rx[0])
             X = list(src.X)
             for i in (0, 1):
-                if not is_boundary[i]:
+                if not at_rest[i]:
                     continue
                 at_src = (i == 0) == forward
                 M, Tt = (
@@ -8856,7 +8874,7 @@ class ChannelElement(NetworkElement):
             return ends
         G = abs(m) / area
         for i, st in enumerate((state_in, state_out)):
-            if not is_boundary[i]:
+            if not at_rest[i]:
                 continue
             outflow = (i == 1) == (m >= 0.0)
             node = nodes[i]
@@ -8870,12 +8888,12 @@ class ChannelElement(NetworkElement):
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> dict[str, float | str]:
         # The duct's own Fanno solution (compressible): its end states at a
-        # boundary (#888) and the M_in/M_exit_duct keys below.
+        # node at rest (#888) and the M_in/M_exit_duct keys below.
         flow = None
         if self.regime == "compressible":
             f_mult = self.surface.f_multiplier if self.surface else 1.0
             _, _, flow = self._compressible_flow(state_in, state_out, f_mult, derivatives=False)
-        end_in, end_out = self._boundary_end_states(state_in, state_out, flow)
+        end_in, end_out = self._rest_end_states(state_in, state_out, flow)
         cs_in = (
             cb.complete_state(*end_in)
             if end_in is not None
@@ -8943,9 +8961,9 @@ class ChannelElement(NetworkElement):
         duct: dict[str, float] = {}
         if flow is not None:
             # The duct's own Fanno solution: inlet and exit Mach inside the
-            # duct (an interior end node's state is its own, a plenum's at
-            # rest), and whether it is choked -- its flow then independent of
-            # the back pressure.
+            # duct (mach_in / mach_out at an end on a node at rest), and
+            # whether it is choked -- its flow then independent of the back
+            # pressure.
             duct = {
                 "choked": float(flow.choked),
                 "M_in_duct": float(flow.M_in),
@@ -9322,7 +9340,7 @@ class CrossflowSegmentElement(ChannelElement):
         return ChannelElement.residual_scale_kind.fget(self)
 
     # Its duct runs between its own station states (#802): see ChannelElement.
-    _boundary_end_state_from_duct = False
+    _rest_end_state_from_duct = False
 
     def __init__(
         self,

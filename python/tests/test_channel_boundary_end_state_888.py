@@ -1,14 +1,15 @@
-"""A channel's end state at a flow boundary is the duct's own (#888).
+"""A channel's end state at a node at rest is the duct's own (#888).
 
-A PressureBoundary or MassFlowBoundary state is the boundary's: a reservoir
-at an inflow (P = Pt, T = Tt), the static exit pressure at an outflow. Read
+A node at rest (Pt = P: a plenum, a combustor, a PressureBoundary or
+MassFlowBoundary) holds a state that is not the duct's: a reservoir where
+the duct leaves it (P = Pt, T = Tt), a static pressure where it enters. Read
 as the duct's end state it put ``mach_in`` at the reservoir density (0.58 in
 a 1 mm duct carrying Mach 0.89) and ``mach_out`` above 1 in an unchoked duct.
-At a boundary end the diagnostics now read the Fanno station the duct's own
+At such an end the diagnostics now read the Fanno station the duct's own
 residual solves (compressible) or the residual's own density state
-(incompressible). Interior ends keep their node state, and no residual
-changes: the heat-transfer correlation was already at the duct's inlet static
-state (#636).
+(incompressible). A moving node (a momentum chamber) keeps its state, and no
+residual changes: the heat-transfer correlation was already at the duct's
+inlet static state (#636).
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from combaero.network import (
     ConvectiveSurface,
     FlowNetwork,
     MassFlowBoundary,
+    MomentumChamberNode,
     NetworkSolver,
     PlenumNode,
     PressureBoundary,
@@ -123,12 +125,10 @@ def test_an_incompressible_duct_reads_its_residuals_density_state() -> None:
     assert d["mach_out"] == pytest.approx(v_out / cb.speed_of_sound(TT, X_AIR), rel=1e-9)
 
 
-def test_an_interior_end_keeps_its_node_state() -> None:
-    """Between two ducts a plenum's state is its own: the second duct's
-    mach_in is still read at the plenum's (T, P)."""
+def _two_ducts(mid: object) -> tuple[NetworkSolver, dict]:
     g = FlowNetwork()
     g.add_node(PressureBoundary("in", Pt=PT, Tt=TT, Y=Y_AIR))
-    g.add_node(PlenumNode("p"))
+    g.add_node(mid)
     g.add_node(PressureBoundary("out", Pt=0.8 * PT, Tt=TT, Y=Y_AIR))
     for name, a, b in (("c1", "in", "p"), ("c2", "p", "out")):
         g.add_element(
@@ -136,13 +136,35 @@ def test_an_interior_end_keeps_its_node_state() -> None:
                 name, a, b, length=0.05, diameter=D, roughness=0.0, regime="compressible"
             )
         )
-    s, r = _solve(g)
+    return _solve(g)
+
+
+def test_a_plenum_end_reports_the_ducts_state() -> None:
+    """A plenum holds its gas at rest (Pt = P): both ducts at it report
+    their own Fanno station there, the case the C3X segments hit."""
+    _, r = _two_ducts(PlenumNode("p"))
+    d = r["__element_diag__"]
+    assert PlenumNode.state_at_rest
+    for name in ("c1", "c2"):
+        assert d[name]["mach_in"] == pytest.approx(d[name]["M_in_duct"], rel=1e-6)
+        assert d[name]["mach_out"] == pytest.approx(d[name]["M_exit_duct"], rel=1e-6)
+    assert d["c2"]["mach_in"] > 0.3
+
+
+def test_a_moving_node_end_keeps_its_node_state() -> None:
+    """A momentum chamber carries its own moving static state (Pt > P), here
+    at twice the duct's area: the duct leaving it still reads mach_in at the
+    chamber's (T, P), not its own inlet station."""
+    s, r = _two_ducts(MomentumChamberNode("p", area=2.0 * AREA))
+    assert not MomentumChamberNode.state_at_rest
     d = r["__element_diag__"]
     x = np.array(r["__x_solution__"])
     st = s._report_state(s.network.nodes["p"], x)
+    assert st.Pt > st.P
     cs = cb.complete_state(st.T, st.P, list(st.X))
     v = d["c2"]["m_dot"] / (cs.thermo.rho * AREA)
     assert d["c2"]["mach_in"] == pytest.approx(v / cs.thermo.a, rel=1e-12)
+    assert abs(d["c2"]["mach_in"] - d["c2"]["M_in_duct"]) > 0.01  # not the duct's
     assert d["c1"]["mach_in"] == pytest.approx(d["c1"]["M_in_duct"], rel=1e-6)
 
 
