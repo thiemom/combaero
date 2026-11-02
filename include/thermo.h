@@ -42,9 +42,21 @@ constexpr double TAIL_FRACTION_HIGH = 0.1;
 constexpr double CP_R_RIGID_ATOM = 2.5;
 constexpr double CP_R_RIGID_LINEAR = 3.5;
 constexpr double CP_R_RIGID_NONLINEAR = 4.0;
-// s_R and h_RT hold their value at this T below it (ln T, 1/T); cp_R and the
-// dimensional h are defined at every T.
+// h_RT (and g_over_RT, the equilibrium's g/RT) holds its value at this T
+// below it (1/T); the kernels' stagnation-T inputs are floored here for an
+// unphysical solver probe. Not a floor on any solved static T: those go to
+// their root, however small (#935).
 constexpr double T_FLOOR = 10.0;
+// s_R holds its value below this T [K] (ln T), so that a non-positive probe
+// T keeps s finite. It lies far below any isentropic root a double can carry
+// (T/Tt = (P/Pt)^(R/cp) >= (1e-308)^(1/2.5) ~ 1e-123), so s is exact at every
+// T a solve can reach.
+constexpr double S_R_T_MIN = 1e-300;
+// Below this T [K] the isentropic static-T Newton (solve_T_isentropic) steps
+// in ln T, where s is ~ cp ln T and one step nearly lands on the root; above
+// it the steps (and so the results) are those of the T Newton (#935). Equal
+// to the former floor, so no iterate that stayed above it changes.
+constexpr double T_LOG_STEP = 10.0;
 // Pressure floor of the duct-state kernels [Pa]: an unphysical solver
 // iterate (P <= 0) is evaluated there, finite, instead of returning NaN.
 constexpr double P_FLOOR = 1.0;

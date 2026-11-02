@@ -518,7 +518,7 @@ Pt_from_static_and_jacobian_M(double P, double T, double M,
   double dT0_dMeff = (cp_T0 > 1.0) ? (M_eff * a * a / cp_T0) : 0.0;
 
   // dP0/dT0 = P0 * (+cp_mass(T0) / T0) / R_specific
-  double dP0_dT0 = (T0_val > 1.0 && R_spec > 1.0)
+  double dP0_dT0 = (T0_val > 0.0 && R_spec > 1.0)
                        ? P0 * (cp_T0 / T0_val) / R_spec
                        : 0.0;
 

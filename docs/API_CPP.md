@@ -162,7 +162,10 @@ slope and curvature matched) and levels off; h and s are its exact integrals.
   (0.1) T_hi at the constant it reaches. Solver plumbing, not physics: no
   dissociation.
 
-Below `thermo::T_FLOOR` (10 K) s_R and h_RT hold their value (ln T, 1/T).
+s_R is exact at every T > 0 (s -> -inf as cp ln T at 0 K) and holds its value
+only below `thermo::S_R_T_MIN` (1e-300 K, below any root a solve can reach), so a
+non-positive probe T stays finite. h_RT and g_over_RT hold below
+`thermo::T_FLOOR` (10 K) (1/T; the equilibrium floors its T there) (#935).
 
 ### Complete State Functions
 ```cpp
@@ -587,10 +590,12 @@ struct FannoSolution {
 
 ### Solvers
 ```cpp
-// The isentropic static T may fall to thermo::T_FLOOR (it was held at
+// The isentropic static T goes to its root however small (#935; it was held
+// at thermo::T_FLOOR = 10 K, not a root, below P/Pt ~ 1e-5, and before that at
 // 200 K, which zeroed the flow from a stagnation state at or below 200 K, #552)
 // and has no upper bound (a 6000 K cap read a hotter stream's density at
-// 6000 K, #626); likewise the stagnation conversions (stagnation.h).
+// 6000 K, #626); likewise the stagnation conversions (stagnation.h). Below
+// thermo::T_LOG_STEP the Newton steps in ln T.
 CompressibleFlowSolution nozzle_flow(double Tt, double Pt, double P_back,
                                      double A_eff, const std::vector<double>& X,
                                      double tol = 1e-8, std::size_t max_iter = 50);
@@ -681,8 +686,8 @@ Newtons, the Fanno marches themselves (step budget), `Tt_from_static_v`,
 face fixed point, `friction_colebrook`, and the bracketed solves (Fanno
 `static_T`, `fanno_inlet_mach`, area-change, `pipe_equivalent_c`,
 `jobson_expansibility`) unless their bracket or last step has closed to
-`inner_solve::kCapAcceptRel` (1e-10, `inner_solve.h`). The `T_FLOOR` clamp is
-unchanged (a root below the floor returns the floor). The Fanno-Mach `brent`
+`inner_solve::kCapAcceptRel` (1e-10, `inner_solve.h`). The static-T solves have
+no floor: a root below the former 10 K `T_FLOOR` is returned as such (#935). The Fanno-Mach `brent`
 throws when called without a sign change. Audit and the solves left as they
 are: `docs/archive/AUDIT_868_INNER_SOLVES.md`.
 

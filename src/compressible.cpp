@@ -28,14 +28,21 @@ double solve_T_isentropic(double P, double s0, double T_init,
                           double tol, std::size_t max_iter) {
     double T = T_init;
 
-    // The iterate is held at or above T_FLOOR (where s_R is held), with no
-    // upper bound: the steps are limited to half of T, so T stays positive,
-    // and h and s are monotone at every T. The floor was 200 K, the end of the
-    // NASA-9 data: an expansion from Tt <= 200 K then could not cool, dh <= 0,
-    // and the orifice kernel returned zero flow under any drive (#552). A
-    // 6000 K cap held every static T of a hotter stream there, so an orifice
-    // read a 6872 K plenum's density at 6000 K and passed 3.6x its flow (#626).
-    constexpr double T_MIN = thermo::T_FLOOR;
+    // No floor and no upper bound: the gas is ideal to 0 K (#626) and s falls
+    // to -inf there as cp ln T, so every P > 0 has a root T > 0, and a root
+    // below the former 10 K floor is returned as such (#935; the floor
+    // returned 10 K, not a root, below P/Pt ~ 1e-5). Steps are limited to half
+    // of T, so T stays positive. A step that would land below T_LOG_STEP is
+    // taken in ln T instead (dlnT = -F / (T dF/dT) = -F / cp): s is nearly
+    // linear in ln T there, so the root at P/Pt = 1e-9 (~1 K) or 1e-100 is
+    // reached in a few steps, not one halving per iteration. Above it the
+    // iterates are the T Newton's, unchanged. The earlier floor was 200 K, the
+    // end of the NASA-9 data: an expansion from Tt <= 200 K then could not
+    // cool, dh <= 0, and the orifice kernel returned zero flow under any drive
+    // (#552). A 6000 K cap held every static T of a hotter stream there, so an
+    // orifice read a 6872 K plenum's density at 6000 K and passed 3.6x its
+    // flow (#626).
+    constexpr double T_LOG = thermo::T_LOG_STEP;
 
     double F = 0.0;
     for (std::size_t it = 0; it < max_iter; ++it) {
@@ -43,14 +50,10 @@ double solve_T_isentropic(double P, double s0, double T_init,
         F = s_curr - s0;
 
         // ds/dT at constant P = cp_mass/T
-        double dF = cp_mass(T, X) / T;
+        const double cp_curr = cp_mass(T, X);
+        double dF = cp_curr / T;
 
         if (std::abs(dF) < 1e-30) break;
-        // Held at the floor with the root below it (an expansion to a static
-        // T under T_MIN, P/Pt ~ 1e-5 and below): every further step is
-        // clamped back to T_MIN, so the floor is the answer, as it was when
-        // the loop ran on to its cap (#868).
-        if (T == T_MIN && F > 0.0) return T;
 
         double dT = -F / dF;
 
@@ -60,12 +63,17 @@ double solve_T_isentropic(double P, double s0, double T_init,
             dT = (dT > 0) ? max_step : -max_step;
         }
 
-        T += dT;
+        if (T + dT < T_LOG) {
+            const double T_new = T * std::exp(-F / cp_curr);
+            dT = T_new - T;
+            T = T_new;
+        } else {
+            T += dT;
+        }
 
-        // Clamp temperature to reasonable bounds
-        T = std::max(T, T_MIN);
-
-        if (std::abs(dT) < tol * (1.0 + std::abs(T))) {
+        // Relative below 1 K (2T <= 1 + T there): an absolute 1e-8 K step is
+        // no tolerance at a 1e-6 K root.
+        if (std::abs(dT) < tol * std::min(1.0 + T, 2.0 * T)) {
             return T;
         }
     }
@@ -148,7 +156,7 @@ CompressibleFlowSolution nozzle_flow(
     const std::vector<double>& X,
     double tol, std::size_t max_iter) {
 
-    Tt = std::max(Tt, 10.0);
+    Tt = std::max(Tt, thermo::T_FLOOR);  // a probe's input floor
     Pt = std::max(Pt, 1.0);
     P_back = std::max(P_back, 1.0);
     if (!validation::is_finite_positive(A_eff)) {
@@ -453,8 +461,11 @@ double solve_T_from_energy(
     double& u_out, double& rho_out,
     double tol = 1e-8, std::size_t max_iter = 50)
 {
+    // No floor (#935): F rises in T (u grows with T at fixed P) to F(0) =
+    // h(0 K) - h0, so for h0 above h(0 K) the root is positive and the steps,
+    // at most 0.3 T, keep the iterate positive. For h0 below h(0 K) there is
+    // no root and the loop throws on its cap (the 10 K floor returned 10 K).
     double T = T_guess;
-    constexpr double T_MIN = thermo::T_FLOOR;  // see solve_T_isentropic
     double mw_g = mw_kg * 1000.0;  // g/mol for enthalpy conversion
 
     bool converged = false;
@@ -485,12 +496,6 @@ double solve_T_from_energy(
         double dF = cp_mass + u * du_dT;
 
         if (std::abs(dF) < 1e-30) break;
-        // Held at the floor with the root below it: the floor is the answer
-        // the cap returned before (#868).
-        if (T == T_MIN && F > 0.0) {
-            converged = true;
-            break;
-        }
 
         double dT = -F / dF;
 
@@ -501,9 +506,9 @@ double solve_T_from_energy(
         }
 
         T += dT;
-        T = std::max(T, T_MIN);
 
-        if (std::abs(dT) < tol * T) {
+        // Absolute below 1 K (h's rounding, see Tt_from_static_v).
+        if (std::abs(dT) < tol * std::max(T, 1.0)) {
             converged = true;
             break;
         }
@@ -559,7 +564,7 @@ FannoSolution fanno_channel(
 {
     // Validate inputs
     // Robustness clamping
-    T_in = std::max(T_in, 10.0);
+    T_in = std::max(T_in, thermo::T_FLOOR);  // a probe's input floor
     P_in = std::max(P_in, 1.0);
 
     if (!validation::is_finite_positive(L)) {
@@ -807,7 +812,7 @@ FannoSolution fanno_channel_rough(
     bool store_profile)
 {
     // Robustness clamping
-    T_in = std::max(T_in, 10.0);
+    T_in = std::max(T_in, thermo::T_FLOOR);  // a probe's input floor
     P_in = std::max(P_in, 1.0);
 
     if (!validation::is_finite_positive(L))

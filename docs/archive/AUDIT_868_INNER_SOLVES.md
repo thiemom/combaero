@@ -61,17 +61,17 @@ Line numbers are on the branch.
 | T1 | thermo.cpp:388 | `solve_increasing_T` (`calc_T_from_h/s/u/sv`) | rtsafe Newton | 50 (caller) | 1e-6 K abs step, or bracket < tol | throws | factor-4 search, then bisection when Newton leaves or fails to halve | safe | none |
 | T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 |
 | S1 | state.cpp:118 | `State::set_VH_mass` | Newton on u + R T = h | 20 | 1e-4 K abs step | silent | none (monotone) | latent | fixed: throws. rec R5 |
-| G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor |
-| G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3 |
+| G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor. R1 fixed (#935, PR #949): no floor, the root is returned |
+| G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3. R1 fixed (#935, PR #949): no floor |
 | G3 | stagnation.cpp:324 | `chamber_static_state` | Newton from Tt | 100 | 1e-13 Tt step | silent; implicit J then evaluated at the non-root | none (f falls in T, one root) | bug (48 probe hits at Tt = -1.4e19 K) | fixed: cap rule; R4 fixed (#937): Tt <= 0 or non-finite refused |
 | G4 | stagnation.cpp:408 | `sonic_static_state` | Newton | 100 | 1e-13 Tt step | silent, implicit J at non-root | none | latent | fixed: cap rule |
 | G5 | stagnation.cpp:489 | `duct_static_state` | Newton in ln P on [ln P*, ln Pt] | 100 | 1e-15 abs step in ln P | silent | bisection when Newton leaves the bracket | safe | R9 fixed (#941): cap rule |
-| C1 | compressible.cpp:41 | `solve_T_isentropic` (`nozzle_flow`, `mass_flux_isentropic`, `mach_from_pressure_ratio`, `critical_pressure_ratio`, the solves below) | Newton, step <= 0.5 T, floor | 50 (caller) | 1e-8 (1 + T) step | silent; 148 849 hits, all at the floor | none (s monotone) | latent (floor hits are the documented clamp) | fixed: a root below the floor returns the floor at once (same value; the 49 clamped repeats are skipped), any other cap exit throws. rec R1 |
+| C1 | compressible.cpp:41 | `solve_T_isentropic` (`nozzle_flow`, `mass_flux_isentropic`, `mach_from_pressure_ratio`, `critical_pressure_ratio`, the solves below) | Newton, step <= 0.5 T, floor | 50 (caller) | 1e-8 (1 + T) step | silent; 148 849 hits, all at the floor | none (s monotone) | latent (floor hits are the documented clamp) | fixed: a root below the floor returns the floor at once (same value; the 49 clamped repeats are skipped), any other cap exit throws. rec R1. R1 fixed (#935, PR #949): no floor; below 10 K the step is in ln T |
 | C2 | compressible.cpp:120 | `find_critical_pressure` | golden section on [0.3, 0.99] Pt | >= 200 | width < tol (1 + a + b) | silent, bracket 0.618^200 | fixed bracket (P*/Pt 0.49-0.61 for gamma 1.67-1) | safe | none |
 | C3 | compressible.cpp:292 | `solve_P_back_from_mdot` | bisection on [P*, Pt] | >= 200 | G within tol, width tol (Pt - P) | silent; 1 hit at 1 ulp | bracket | safe | none |
 | C4 | compressible.cpp:341 | `solve_Pt_from_mdot` bracket | x10 expansion | 12 | | throws if not bracketed | | safe | none |
 | C5 | compressible.cpp:358 | `solve_Pt_from_mdot` | bisection | >= 200 | as C3 | silent; 1 hit at 1 ulp | bracket | safe | none |
-| C6 | compressible.cpp:462 | `solve_T_from_energy` (Fanno marches) | Newton, step <= 0.3 T, floor | 50 | 1e-8 T step | silent | none (F rises in T: u grows with T at fixed P) | latent | fixed: throws, floor kept |
+| C6 | compressible.cpp:462 | `solve_T_from_energy` (Fanno marches) | Newton, step <= 0.3 T, floor | 50 | 1e-8 T step | silent | none (F rises in T: u grows with T at fixed P) | latent | fixed: throws, floor kept. R1 fixed (#935, PR #949): no floor (no root for h0 < h(0 K): throws) |
 | C7 | compressible.cpp:647 | `fanno_channel` march | adaptive RK4 | `kFannoMaxSteps` = 2e5 | | silent: outlet at x < L reported unchoked | step halving near M = 1 | latent | fixed: throws |
 | C8 | compressible.cpp:894 | `fanno_channel_rough` march | adaptive RK4 | 2e5 | | silent, as C7 | | latent | fixed: throws |
 | C9 | compressible.cpp:1094 | `solve_station_state` | Newton | caller | tol T step | returns `false` | | safe (reports); `[[maybe_unused]]`, no caller | R10 fixed (#942): deleted |
@@ -122,7 +122,8 @@ Five of them are bracketed with bisection (F1, A2, A3, O1, O3), so a cap exit
 there sits in a bracket that is small in practice; the other 15 had no such
 guarantee. Reached in the suite with a non-root: T2 (by its caller's target),
 G3, F2/F7, F3. All 20 now throw or apply the cap rule. Left silent by
-decision: C10/C11, E1/E2, J1/J2, H1 and the `T_FLOOR` return (R1).
+decision: C10/C11, E1/E2, J1/J2, H1 and the `T_FLOOR` return (R1, since
+fixed: #935).
 
 **2. Brackets and safeguards.** The bracketed solves (T1, G5, F1, F3, A2, A3,
 O1, H2, E2) fall back to bisection when Newton leaves the bracket; only T1
@@ -183,7 +184,8 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
 
 ## Recommendations left for a decision
 
-- **R1 (C1, G1, G2, C6) The `T_FLOOR` return is not a root.** An expansion
+- **R1 (C1, G1, G2, C6) The `T_FLOOR` return is not a root.** FIXED (#935,
+  PR #949, decision 2026-11-02 "can go to zero"; section below). An expansion
   to P/Pt below ~1e-5 returns the 10 K floor as its static T, silently; the
   mass flux and Mach built on it are then the floor's. Kept (it is the
   documented clamp, and 148 849 calls in the suite end there, all from
@@ -286,6 +288,102 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   checked at the element and, since #923, at the public entry); with gamma
   in (1, 5/3] it is clamped only for A_p1/A_t above ~7.8e3 (gamma 5/3) to
   ~1.5e6 (gamma 1.4), which no stress draw reaches (#948: 1786 ejector element evaluations over the 40 stress seeds, 0 flagged).
+
+## R1 fixed: the static T goes to its root (#935, PR #949)
+
+Decision (2026-11-02): "R1 -> can go to zero". The gas is ideal to 0 K
+(#626, the C2 tails keep cp > 0 at every T), so a static-T solve returns its
+root however small. T stays positive: an isentrope at P > 0 has a positive
+root, and so do the energy solves when h0 > h(0 K).
+
+**What changed.**
+
+- C1 `solve_T_isentropic`: no floor. The step limit is still half of T. A
+  step that would land below `thermo::T_LOG_STEP` (10 K, the former floor) is
+  taken in ln T, as T exp(-F/cp). s is nearly cp ln T there, so P/Pt = 1e-300
+  converges within the 50-step budget. A plain floor removal would need one
+  halving per iteration and threw beyond P/Pt ~ 1e-20. Above 10 K the iterates
+  are the T Newton's, so every solve that never reached the floor is
+  unchanged. The step test is relative below 1 K (min(1 + T, 2 T)), which is
+  bit-identical above 1 K.
+- G1 `Tt_from_static_v`, G2 `T_from_stagnation`, C6 `solve_T_from_energy`:
+  no floor. Their step limits (0.5 T, 0.3 T) keep the iterate positive, and
+  their starts are close to the root. The tests stay absolute below 1 K. h
+  carries the heat of formation, so its rounding resolves T only to ~1e-12 K,
+  and a relative test cycled there. C6 has no root for h0 < h(0 K). It now
+  throws on its cap, where it returned 10 K. That case cannot be reached from
+  `fanno_channel`, whose h0 is an inlet state's.
+- `s_R` held its value below 10 K, so s was flat there while ds/dT = cp/T was
+  not. That hold is what made the floor the only answer. s_R is now exact for
+  T > 0 and held only below `thermo::S_R_T_MIN` = 1e-300 K, so a non-positive
+  probe T stays finite. That is far below any root a double can carry: T/Tt =
+  (P/Pt)^(R/cp) >= ~1e-123. The low tail's `tail_S_R` took its end-value
+  branch (-inf at T_end = 0 K) once t rounded to 1, which returned NaN below
+  ~1e-14 K. It now keeps the fade branch there.
+- `Pt_from_static_and_jacobian_M` zeroed dP0/dT0 for T0 < 1 K. The guard is
+  now T0 > 0, which is unchanged above 1 K.
+
+**Every `T_FLOOR` (and literal 10 K) use, decided.**
+
+| Use | What it is | Decision |
+|---|---|---|
+| `solve_T_isentropic` (C1), `Tt_from_static_v` (G1), `T_from_stagnation` (G2), `solve_T_from_energy` (C6) | root clamp | fixed (above) |
+| `s_R` hold (thermo.cpp) | property hold that made the root unreachable | fixed: hold moved to `S_R_T_MIN` |
+| `h_RT` hold, `g_over_RT` (thermo.cpp) | property floor of g/RT for the equilibrium constants (1/T); every equilibrium caller floors its T at 10 K | kept; `g_over_RT` now holds both terms at `T_FLOOR` explicitly, so it is bit-identical to before |
+| `complete_adiabatic`, `adiabatic_T_equilibrium_and_jacobians`, the combustor's equilibrium input (solver_interface.cpp) | input floor on a probe's inlet T, derivative zeroed when clamped | kept: combustion at < 10 K is a probe, not a state |
+| `duct_static_state`, `duct_htc_static_state(_dY)` (stagnation.cpp) | input floor on a probe's Tt (with `P_FLOOR`), partials zeroed | kept: an input guard, not a root |
+| `nozzle_flow` Tt, `fanno_channel(_rough)` T_in (literal `10.0`, now `thermo::T_FLOOR`) | input floor on a probe's stagnation or inlet T | kept (named, bit-identical) |
+| `nozzle_quasi1d` station T clamp [T_FLOOR, Tt] (C11) | clamp in a best-effort profile | kept: R7, left as it is by decision |
+| `solve_station_state` (C9) | dead code | kept: R10 deletes it |
+| `T_adiabatic_wall` at v = 0 (literal 10 K), the leaky 10 K property floors in solver_interface.cpp (`T_eff = 10 + 0.1 (T - 10)`) | property and probe guards, no solve; the v = 0 value is pinned by `test_nan_guards_769` | kept, not R1 |
+| side_stream_momentum.cpp, impingement_correlation.cpp, rib_correlation.cpp | no temperature floor: `MERGE_DISCRIMINANT_FLOOR`, `JET_ROW_MDOT_FLOOR`, `RE_FLOOR`, `BRACKET_FLOOR`, `EPLUS_FLOOR` | not R1 |
+
+**Evidence.**
+
+- *Kernel sweep, bit identity* (56 700 calls). The kernels are
+  `mass_flux_isentropic`, `mach_from_pressure_ratio`, `nozzle_flow`,
+  `critical_pressure_ratio`, `orifice_compressible_mdot_and_jacobian`,
+  `T_from_stagnation`, `P_from_stagnation`, `Tt_from_static`,
+  `Tt_from_static_v`, `Pt_from_static`, `stagnation_from_static`, both
+  `*_and_jacobian_M`, `s`, and `fanno_channel`. The ranges are P/Pt 1e-9 to 1
+  (115 ratios), Tt 100-2500 K, M 0.01-1000, static T 1-2500 K, and air, burnt
+  gas, CH4, H2 and Ar. A throwaway counter marked every call whose old path
+  touched the floor: an iterate below 10 K, or s at a T below 10 K. Of the
+  calls that never touched it, 0 changed (44 683 identical). Calls that touched
+  it: 11 908 changed and 109 came out identical.
+- *The new values are roots.* Over 1800 isentropic points (P/Pt 1e-9 to 1,
+  four Tt, five gases), the mass flux and Mach agree with an independent
+  inverse (`calc_T_from_s_mass`, rtsafe) to 7e-14. The lowest static T is
+  3e-4 K. An example: 300 K air at P/Pt = 1e-8 gives ~1.5 K, where it gave
+  10 K. The stagnation residuals are below 1.4e-8 cp T. That is G2's linear
+  convergence (R3), the same as above 10 K. Tt_from_static is below 1e-12.
+- *Derivatives consistent* (FD). The isentropic identity dG/dP = (M^2 - 1)/v
+  holds against a central difference of `mass_flux_isentropic` to 2.1e-8 for
+  P/Pt from 0.99 down to 1e-9. `Tt_from_static_and_jacobian_M` and
+  `Pt_from_static_and_jacobian_M` agree to 6.7e-5 for static T down to 1 K
+  and M 0.01-1000. The worst case is at M = 0.01, where dT0 is ~1e-9 K per
+  step and the inner tolerance limits the difference.
+- *Network F and J* (SHA-256 at x0 + 3 seeded perturbations, all 14 families
+  x seeds 0-39, 2240 evaluations): all identical to main.
+- *Stress outcome A/B* (all 14 families x seeds 0-39, `--jobs 4`, serial,
+  main then branch). 0 seeds lost convergence. Four seeds gained it:
+  bleed_station 2, impingement 1, random 3 and random 34 (residual_too_large,
+  timeout, timeout, no_progress on main). Rerun alone (`--jobs 1`), all four
+  converge on main as well, with the same final norm to the bit. All four are
+  wall-clock flips, not the fix. 15 seeds had the same outcome but a different
+  final norm. Rerun alone, main's own final norms move as much between runs
+  (the stall detector and the timeouts are wall-clock). Converged counts per
+  family (branch run): bleed_station 37, effusion 40, ejector 30, hotcold 40,
+  hotcold_mild 40, ideal_nport 40, impingement 40, impingement_bypass 40,
+  jet_chain 38, legacy_tee 32, pin_fin 40, random 32, series 40, tee3 32.
+- *Tests.* `tests/test_inner_solve_cap_868.cpp` drops the old pin of the
+  floor return and adds two cases. The first checks that the static T goes to
+  its root (T_from_stagnation at M = 50, Tt_from_static from 5 K, the
+  isentrope to P/Pt = 1e-8 against `calc_T_from_s_mass`, and P/Pt = 1e-300).
+  The second checks that s is exact and finite to 1e-20 K and at a
+  non-positive T. Both fail on main. The second also fails with the tail
+  branch fix reverted (NaN). The full suite (6808 passed), ctest (53) and the
+  paper examples pass.
 
 ## Not verified
 
