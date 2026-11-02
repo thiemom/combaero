@@ -729,8 +729,9 @@ documents:
     support for treating dense effusion as a slot with a potential core. Its value is the leads: Simon 1986
     NASA TP-2655 (slot film with free-stream and coolant turbulence, the #714 Tu closure), Hatch & Papell
     1959 and Papell 1960 (NASA TN D-130, D-299), Kirollos & Povey 2015 (energy-consistent superposition, #387),
-    Sturgess 1980/1986, Goldstein, Shavit & Chen 1965 (porous section); Simon 1986 and Kirollos & Povey 2015
-    are now held (own entries), the others wanted or noted here. The data are Wambersie, Ireland & Mayo 2021, IJTPP 6(2) 16 (open access, not held).'
+    Sturgess 1980/1986, Goldstein, Shavit & Chen 1965 (porous section); Simon 1986, Hatch & Papell 1959, Papell
+    1960 and Kirollos & Povey 2015 are now held (own entries), the others wanted or noted here. The data
+    are Wambersie, Ireland & Mayo 2021, IJTPP 6(2) 16 (open access, not held).'
   read_for: ['#714 slot film leads (turbulence closure, core length)', '#387 superposition alternatives',
     transpiration / high-porosity film]
   issues: [387, 714]
@@ -1048,6 +1049,70 @@ documents:
     mainstream Tu), Sturgess 1980 (J. Eng. Power 102, 524, film/coolant Tu), Sturgess & Pfeifer 1986 (J. Eng.
     Gas Turbines Power 108, 361, film initial region), Ko & Liu 1980 (AIAA J. 18, 907), Marek 1973 (NASA TM
     X-2809, film effectiveness independent of pressure 1-20 atm), Juhasz & Marek 1971 (TN D-6360).'
+- file: sources/heat_transfer/film/Hatch_Papell_1959_NASA_TN_D-130_slot_film_heat_sink_model.pdf
+  citation: Hatch, J. E., Papell, S. S. (1959). Use of a theoretical flow model to correlate data for film cooling
+    or heating an adiabatic wall by tangential injection of gases of different fluid properties. NASA TN D-130,
+    Lewis Research Center, November 1959.
+  id: NASA TN D-130 (NTRS 19890068390)
+  topic: [film]
+  content: 'Scan with an OCR text layer (exponents unreliable; equations read from page images), 44 pp.
+    Tangential slot film on an adiabatic wall. Model: coolant a discrete unmixed layer heated by the main gas
+    with the duct h = 0.0265 (k_f/D_h) Re_f^0.8 Pr_f^0.3 (properties at the mean of gas and slot-exit static
+    temperature, D_h of the duct), giving eta = (T_ad - t_w)/(T_ad - t_c) = exp[-h L (x - x'')/(w cp)_c] (Eq.
+    4), eta = 1 for x <= x''. Fitted: x'' = 0.04 (w cp)_c/(h L) (Eqs. 6, 8). Final correlation Eq. 12: ln eta =
+    -[h L x/(w cp)_c - 0.04] (S V_g/alpha_c)^0.125 f(V_g/V_c), for h L x/(w cp)_c > 0.04 (eta = 1 below, Eq.
+    12a); alpha_c the coolant diffusivity at slot-exit static temperature, V_g used in place of V_c in the
+    0.125 group; f = 1 + 0.4 arctan(V_g/V_c - 1) for V_g/V_c >= 1 (Eq. 10, radians), f = (V_c/V_g)^(1.5
+    (V_c/V_g - 1)) for V_g/V_c <= 1 (Eq. 11). L is the cooled perimeter (width), w the coolant flow. Data:
+    NASA 8 x 8 in. duct with AIR (from Papell & Trout 1959, TN D-9, not held; Figs. 6-9, S 1/16-1/2 in.) and
+    HELIUM (new, Figs. 10-12, TABLE I printed, S 1/8-1/2 in.); General Electric 18 in. square duct, S 0.106
+    in. (Chin et al. 1958, ASME 58-A-107; Figs. 13-14, film heating included). Range (NASA + GE): T_g 502-1965
+    R, V_g 104-1040 ft/s, V_g/V_c 0.45-33.3, T_c 530-980 R, S 0.063-0.50 in. Accuracy (Fig. 15): wall
+    temperature within about +-5%; coolant flow up to 60% off near the eta -> 1 end (Fig. 16). The authors say
+    Eq. 12 is pessimistic below eta ~0.3. Free-stream turbulence not measured or mentioned. Eq. 13 + a worked
+    example invert it for coolant flow.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #714. The heat-sink slot-film model that Wambersie & Ireland 2023 build on,
+    in its original printed form (the wanted entry''s exp[-hL(x - x'')/(m cp)] is Eq. 4, the
+    un-corrected model; the usable correlation is Eq. 12 with the 0.04 offset, the (S V_g/alpha_c)^0.125 group
+    and f(V_g/V_c)). Not a turbulence closure: no Tu input at all, so it cannot calibrate Marek-Tacina''s C_m(Tu)
+    and is not interchangeable with it (its decay is exponential in an h-based length, Marek-Tacina''s is
+    algebraic in x/(M S)). Its value: (1) the HELIUM-coolant TABLE I is a printed, strongly property-different
+    slot-film dataset (coolant density and cp very different from air) -- a candidate cross-source ACCURACY
+    check of the slot-film element''s property handling, but Marek-Tacina needs a Tu the NASA rig did not
+    report, so any score carries an assumed Tu; (2) a declared alternative closure family (heat-sink) for low
+    or unknown turbulence, never a default. Fidelity of an Eq. 12 implementation would be judged on Table I
+    (helium); the air data are in TN D-9 (not held). Not implemented.'
+  read_for: ['#714 slot film: heat-sink model and property-ratio (helium) data']
+  issues: [714]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (19890068390, public). Sequel Papell 1960 TN D-299 (held). Air data
+    primary Papell & Trout 1959 NASA TN D-9 (on NTRS, not fetched).
+- file: sources/heat_transfer/film/Papell_1960_NASA_TN_D-299_angled_slots_normal_holes.pdf
+  citation: Papell, S. S. (1960). Effect on gaseous film cooling of coolant injection through angled slots and
+    normal holes. NASA TN D-299 (E-689), Lewis Research Center, September 1960.
+  id: NASA TN D-299 (NTRS 19980231068)
+  topic: [film]
+  content: 'Scan with OCR layer, 30 pp. Same 8 x 8 in. NASA duct, adiabatic top wall, T_g 1500 R. Slots at
+    nominal 30/60/90 deg discharging (water check) at i = 45/80/90 deg, slot height 1/4 in. normal to the guide
+    walls, M_g 0.2-0.7, V_g/V_c 0.53-17.5; and two or four staggered rows of 1/4 in. NORMAL holes on 1/2 in.
+    centres (M_g 0.3-0.7, V_g/V_c 0.49-21.8). Effective angle Eq. 1: i_eff = arctan[sin i/(cos i + (rho V)_g/
+    (rho V)_c)]. Slot correlation Eq. 2 = Hatch-Papell Eq. 12 + ln cos(0.8 i_eff). Holes: effective slot height
+    S'' = A_c/y (total hole area over the first row''s width; 0.403 in. four rows, 0.223 in. two rows, Eq. 3,
+    "strictly empirical") and Eq. 4 adds -0.08 V_g/V_c for V_g > V_c. Table I(a) slots, I(b) holes PRINTED
+    (faint scan). Fig. 8: an optimum coolant flow for angled slots (eta max 0.83 for the 60 deg slot at x =
+    6.5 in.) -- more coolant lifts off and lowers eta.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Extends Hatch-Papell to angled slots and normal-hole rows with empirical
+    corrections fitted on its own data (no other lab). No gap plugged: combaero''s slot film is tangential, and
+    its hole films are Baldauf/Colban (inclined holes at turbine-like geometry); normal holes at 1/4 in. on 1/2
+    in. pitch in a 1500 R duct are an old, coarse configuration. The printed Table I is a possible cross-source
+    set for a normal-injection effusion row at high V_g/V_c, after rebuilding S'' -- not planned. Not
+    implemented.'
+  read_for: ['#714 slot film (sequel of TN D-130: angled slots, normal holes)']
+  issues: [714]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (19980231068, public).
 - file: sources/heat_transfer/film/oct23/19770014416.pdf
   citation: Rousar, D. C., Ewen, R. L. (1977). Combustion effects on film cooling. NASA CR-135052, Aerojet
     Liquid Rocket Co., Sacramento.
@@ -4312,16 +4377,6 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
-- citation: Hatch, J. E., Papell, S. S. (1959). Use of a theoretical flow model to correlate data for film cooling
-    or heating an adiabatic wall by tangential injection of gases of different fluid properties. NASA TN D-130.
-    Papell, S. S. (1960), NASA TN D-299 (angled slots and normal holes) is its sequel.
-  checked: false
-  issues:
-  - 714
-  priority: later
-  question: The heat-sink film model eta = exp[-h L (x - x')/(m cp)] that Wambersie & Ireland 2023 build on, and
-    its data with different coolant properties (a density/property-ratio check on the slot film).
-  where: NTRS (free).
 - citation: 'Rowbury, D. A., Oldfield, M. L. G., Lock, G. D. (2000). A method for correlating the influence of
     external crossflow on the discharge coefficients of film cooling holes. ASME Paper 2000-GT-0294 (also J.
     Turbomach. 123, 2001). Background: Rowbury (1998) DPhil thesis, Oxford.'
