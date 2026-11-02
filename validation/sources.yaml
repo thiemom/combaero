@@ -3670,6 +3670,39 @@ documents:
   code: [src/materials.cpp, include/materials.h]
   notes: Arrived 2026-10-29 in docs/new twice (19990047263.pdf and zhu1999.pdf, same report); title and authors
     checked on NTRS.
+- file: sources/materials/zhu_miller_nagaraj_bruce_2000_NASA_TM-2000-210238_EBPVD_conductivity.pdf
+  citation: Zhu, D., Miller, R. A., Nagaraj, B. A., Bruce, R. W. (2000). Thermal conductivity of EB-PVD thermal
+    barrier coatings evaluated by a steady-state laser heat flux technique. NASA/TM-2000-210238 (E-12357);
+    International Conference on Metallurgical Coatings and Thin Films, San Diego, April 2000.
+  id: NASA/TM-2000-210238 (NTRS 20000088491)
+  topic: [other]
+  content: 'Scan with OCR layer, 24 pp. GE-made EB-PVD ZrO2-8wt%Y2O3 on Rene N5 disks with a PtAl bond coat
+    (flat or laser-grooved), top coat 0.13, 0.25 and 1.0 mm. Steady-state laser heat-flux rig, 1-D model with
+    a T-dependent substrate k (Fig. 2 shows the interface-temperature error a constant metal k causes;
+    the error grows for thin, high-conductance coatings). Table 1 conditions: 0.13 mm, 2 h cyclic, 220 W/cm2,
+    T_surface 1280 C / T_interface 1095 C; 0.25 mm isothermal, 143 W/cm2, 1250/1020 C; 1.0 mm isothermal, 69
+    W/cm2, 1350/860 C. ABSOLUTE conductivity is plotted only for the 0.13 mm coatings (Fig. 3b): about 1.55-1.65
+    W/m K at the start, rising to about 1.7 in 50 h with fluctuations from micro-delamination; Fig. 4 (0.13 mm
+    grooved, 200 h) is NORMALISED to an assumed initial 1.5 W/m K ("typical EB-PVD"), ending near 1.8. Fig. 3a
+    (0.25, 1.0 mm) is k/k0 only, rising to ~1.05-1.10 in 25 h. Fig. 5: ln[(k - k0)/(k_inf - k0)] = 3.07 -
+    24881/T_ave (T_ave in K, R2 0.983, four points, 1e4/T 6.85-7.4); k_inf and the time units are not stated.
+    Sintering strain at the surface fitted as 0.40757 + 0.41 t^0.2 (% , t in h; Fig. 7, as printed). Intrinsic
+    ZrO2-8Y2O3 k quoted as about 2.5 W/m K. No table of k values.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #761. A public NASA EB-PVD conductivity source, but a weak one for citing
+    k_tbc_ysz(is_ebpvd=True): absolute values only for 0.13 mm coatings at one condition (mean coating
+    temperature ~1190 C), about 1.55-1.65 W/m K as deposited -- below the legacy fit''s 1.5 + 0.0002 x 1190 =
+    1.74 (my arithmetic), within the measurement''s thin-coating uncertainty the authors themselves flag; no
+    k(T) curve (each thickness was tested at one temperature level); the Fig. 5 Arrhenius fit lacks k_inf and
+    time units, so an aging model cannot be built from it alone. Supports the order of magnitude (1.5-1.8 W/m
+    K over 0-200 h at ~1100-1300 C) and the direction (sintering raises k, delamination lowers it). Not a
+    replacement for the uncited fit; Zhu & Miller''s later EB-PVD 7YSZ study (2003 Cocoa Beach, "thermal
+    conductivity and temperature limits", NTRS 20050212118) gives k vs temperature and time per its abstract
+    but NTRS holds the abstract only. Not implemented.'
+  read_for: ['#761 public EB-PVD YSZ conductivity (as deposited and after sintering)']
+  issues: [761]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (20000088491, public).
 - file: sources/materials/planques_2017_OxidMet_88_133_plasma_TBC_property_survey.pdf
   citation: Planques, P., Vidal, V., Lours, P., Proton, V., Crabos, F., Huez, J., Viguier, B. (2017). Mechanical and
     thermo-physical properties of plasma-sprayed thermal barrier coatings -- a literature survey. Oxidation of
@@ -4233,15 +4266,17 @@ wanted:
   question: 'The recommended-curve reference for alloy k(T) over the full range; would settle the #882 envelope
     shape and the cross-check of the shipped tables.'
   where: DTIC hosts TPRC volumes (AD numbers); university libraries.
-- citation: A public EB-PVD YSZ conductivity source (as deposited and after sintering), e.g. a NASA Glenn
-    laser-heat-flux report on EB-PVD ZrO2-8wt%Y2O3.
-  checked: false
+- citation: A public EB-PVD YSZ conductivity k(T) curve (as deposited and after sintering), beyond Zhu et al.
+    2000 TM-2000-210238 (held; one condition, 0.13 mm, absolute k only there).
+  checked: true
   issues:
   - 761
   priority: later
-  question: 'k_tbc_ysz(is_ebpvd=True) is an uncited legacy fit (1.5 + 0.0002 T_C, as deposited, no sintering);
-    Zhu & Miller 2000 (held) gives no EB-PVD conductivity. A public source would let it be cited and aged.'
-  where: NASA NTRS (Zhu/Miller laser-rig series), or a journal paper.
+  question: 'k_tbc_ysz(is_ebpvd=True) is an uncited legacy fit (1.5 + 0.0002 T_C, as deposited, no sintering).
+    TM-2000-210238 (fetched 2026-11-02) gives ~1.55-1.65 W/m K at ~1190 C mean for 0.13 mm only and an
+    aging fit without k_inf; a k(T) curve and a usable aging law are still missing.'
+  where: 'NTRS 20050212118 (Zhu & Miller, EB-PVD ZrO2-7wt%Y2O3 conductivity and temperature limits, 2003 Cocoa
+    Beach) is abstract-only on NTRS; its proceedings version was not looked for. A journal paper otherwise.'
 - citation: Laws, E. M., Livesey, J. L. (1978). Flow through screens. Annu. Rev. Fluid Mech. 10, 247-266.
   checked: false
   issues:
