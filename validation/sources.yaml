@@ -680,6 +680,36 @@ documents:
     App. A); Facchini et al. GT2010-22936 (HTC on a real liner, slot + effusion + dilution); Kretschmer &
     Odgers 78-GT-90; Ceccherini 2009 PhD (Therm1D). The Ch. 4 data are likely also in an Andreini/Caciolli
     journal paper (not verified).'
+- file: sources/heat_transfer/film/Sargison_2001_DPhil_Oxford_console_film_cooling.pdf
+  citation: Sargison, J. E. (2001). Development of a novel film cooling hole geometry. DPhil thesis, University
+    of Oxford, Department of Engineering Science (Hilary Term 2001).
+  topic: [film, orifice]
+  content: 'Word-generated text layer, 262 pp.; data in figures. The console (converging slot-hole) against
+    cylindrical holes (d 4 mm, p/d 3), fan-shaped holes (p/d 3.5) and a 35 deg slot at equal throat area per
+    width (Fig. 5.2). Ch. 5: low-speed flat plate, DR ~1, v_m 26 m/s, I_ideal 0.5/1.1/1.5, steady TLC:
+    laterally averaged eta_aw and h (Figs. 5.27-5.34), net heat flux reduction, and the hole Cd with and
+    without crossflow vs Re_h for all four shapes (Figs. 5.38-5.41; with crossflow ~10% below Rowbury''s 40
+    deg holes, attributed to the 35 deg inclination). Slot and cylindrical eta and h checked against published
+    data (Figs. 5.8-5.11). Ch. 6: transonic annular NGV cascade (CHTT), engine Re/M, foreign gas for DR,
+    console vs fan rows, h and eta. Ch. 7: aerodynamic loss. Ch. 9 PRINTS: the Eckert-Drake line-source slot
+    model (Eq. 9.1, the Goldstein-Haji-Sheikh form) and point-source hole model (Eq. 9.2), flat-plate Nu
+    (9.4/9.5), and two Forth-Jones-parameter fits on her data: console eta = -0.1899 ln[(x/s) I^-2/3] + 1.25
+    for 30 < (x/s) I^-2/3 < 200 (Eq. 9.6) and fan-shaped eta = -0.1778 ln[(x/d) I^-2/3] + 0.90 for 4 <
+    (x/d) I^-2/3 < 50 (Eq. 9.7), I the actual momentum flux ratio.'
+  status: screened
+  verdict: 'Screened 2026-11-02. No gap plugged outright. Candidate uses: (a) the fan-shaped eta data and Eq.
+    9.7 as a cross-source accuracy check of the shipped Colban 2011 shaped-hole kernel (one geometry, DR 1,
+    laterally averaged); (b) the 35 deg slot eta and h as slot-film data, but inclined, not tangential, so not
+    a Marek-Tacina check; (c) the Cd-with-crossflow curves as a film-hole Cd cross-check; (d) laterally
+    averaged h with injection against the unblown plate (film-hole gas-side augmentation). All figure-only:
+    digitising needed. The console is a proprietary-style shape combaero has no element for. Its Cd lead:
+    Rowbury, Oldfield & Lock 2000 (crossflow Cd correlation, wanted).'
+  read_for: ['#386 shaped-hole eta cross-source (Colban)', film-hole Cd with crossflow, '#714 inclined slot
+      data', film-hole gas-side h augmentation]
+  issues: [386, 714]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ as ThesisJES%5B1%5D.pdf (from the user). Journal versions exist
+    (Sargison et al. 2002, J. Turbomach. 124, console papers), not held.
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
@@ -4192,6 +4222,17 @@ wanted:
   question: The heat-sink film model eta = exp[-h L (x - x')/(m cp)] that Wambersie & Ireland 2023 build on, and
     its data with different coolant properties (a density/property-ratio check on the slot film).
   where: NTRS (free).
+- citation: 'Rowbury, D. A., Oldfield, M. L. G., Lock, G. D. (2000). A method for correlating the influence of
+    external crossflow on the discharge coefficients of film cooling holes. ASME Paper 2000-GT-0294 (also J.
+    Turbomach. 123, 2001). Background: Rowbury (1998) DPhil thesis, Oxford.'
+  checked: false
+  issues:
+  - 386
+  priority: later
+  question: The standard film-hole Cd correction for external crossflow (inclination via sin phi), to check the
+    film element's hole Cd against; Sargison 2001 (held) measured Cd with crossflow on 35 deg holes and
+    compares with it.
+  where: ASME Digital Collection (paywalled); the thesis via Oxford ORA.
 - citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
     film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122607.
   checked: false
