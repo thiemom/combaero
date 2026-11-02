@@ -915,6 +915,19 @@ wall = ThermalWall(
 
 # Add to network
 network.add_wall(wall)
+
+# A wall whose two faces differ (#887): a hole in a thick wall, a finned face,
+# a curved wall. Each side's convective resistance is on its own face; the
+# layers conduct on wall_area's area: "log_mean" (default; the area runs
+# linearly through the stack and each layer takes the log mean of its faces,
+# exact for a thick cylinder, layer by layer), "slab_a" or "slab_b".
+# 1/UA = 1/(h_a A_a) + sum t/(k A_m) + R_fouling/A_a + 1/(h_b A_b).
+# Both areas or neither, and not with contact_area.
+tube = ThermalWall(
+    id="tube_wall", element_a="gas", element_b="coolant",
+    layers=[WallLayer(thickness=0.015, conductivity=20.0)],
+    area_a=2 * 3.14159 * 0.025 * 0.3, area_b=2 * 3.14159 * 0.010 * 0.3,
+)
 ```
 
 **The heat is the two streams' exchange (#627)**: the epsilon-NTU integral

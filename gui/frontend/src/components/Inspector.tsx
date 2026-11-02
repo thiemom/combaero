@@ -4042,12 +4042,76 @@ const Inspector = () => {
 					/>
 					Show label in graph
 				</label>
-				<AreaInput
-					id={`area_edge_${selectedEdge.id}`}
-					label="Contact Area"
-					value={selectedEdge.data.area ?? 0.05}
-					onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
-				/>
+				{/* Per-side areas (#887): a wall whose two faces differ (a hole
+				    in a thick wall, a fin, a curved wall). */}
+				<label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+					<input
+						type="checkbox"
+						checked={selectedEdge.data.area_a != null}
+						onChange={(e) => {
+							const A = selectedEdge.data.area ?? 0.05;
+							updateEdgeData(
+								selectedEdge.id,
+								e.target.checked
+									? { area_a: A, area_b: A }
+									: { area_a: undefined, area_b: undefined },
+							);
+						}}
+						className="rounded"
+					/>
+					Per-side areas (faces differ)
+				</label>
+				{selectedEdge.data.area_a != null ? (
+					<>
+						<AreaInput
+							id={`area_a_edge_${selectedEdge.id}`}
+							label="Area, side A (source)"
+							value={selectedEdge.data.area_a}
+							onChange={(val) =>
+								updateEdgeData(selectedEdge.id, { area_a: val })
+							}
+						/>
+						<AreaInput
+							id={`area_b_edge_${selectedEdge.id}`}
+							label="Area, side B (target)"
+							value={selectedEdge.data.area_b ?? selectedEdge.data.area_a}
+							onChange={(val) =>
+								updateEdgeData(selectedEdge.id, { area_b: val })
+							}
+						/>
+						<div className="flex flex-col gap-2">
+							<label
+								htmlFor={`wall_area_${selectedEdge.id}`}
+								className="text-xs font-bold text-gray-500 uppercase"
+							>
+								Conduction area
+							</label>
+							<select
+								id={`wall_area_${selectedEdge.id}`}
+								value={selectedEdge.data.wall_area ?? "log_mean"}
+								onChange={(e) =>
+									updateEdgeData(selectedEdge.id, {
+										wall_area: e.target.value,
+									})
+								}
+								className="p-2 border rounded text-sm"
+							>
+								<option value="log_mean">
+									Log mean (curved wall; exact for a cylinder)
+								</option>
+								<option value="slab_a">Slab on side A</option>
+								<option value="slab_b">Slab on side B</option>
+							</select>
+						</div>
+					</>
+				) : (
+					<AreaInput
+						id={`area_edge_${selectedEdge.id}`}
+						label="Contact Area"
+						value={selectedEdge.data.area ?? 0.05}
+						onChange={(val) => updateEdgeData(selectedEdge.id, { area: val })}
+					/>
+				)}
 
 				<div className="flex flex-col gap-2">
 					<label className="text-xs font-bold text-gray-500 uppercase">

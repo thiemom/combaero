@@ -1259,6 +1259,29 @@ class WallLayer:
         return self.thickness / k_safe
 
 
+class _WallCoupling:
+    """A WallCouplingResult read through per-side areas (#887): the kernel's
+    fields as they are, but dQ/dh_b in side B's own h (the kernel saw
+    h_b A_b / A_a)."""
+
+    _FIELDS = (
+        "Q",
+        "T_hot",
+        "dQ_dh_a",
+        "dQ_dT_aw_a",
+        "dQ_dT_aw_b",
+        "dQ_dC_a",
+        "dQ_dC_b",
+        "UA",
+        "effectiveness",
+    )
+
+    def __init__(self, res: Any, dQ_dh_b_factor: float) -> None:
+        for name in self._FIELDS:
+            setattr(self, name, getattr(res, name))
+        self.dQ_dh_b = res.dQ_dh_b * dQ_dh_b_factor
+
+
 @dataclass
 class ThermalWall:
     """Thermal coupling between two elements through a shared multi-layer wall.
@@ -1275,6 +1298,21 @@ class ThermalWall:
         Stack of wall layers ordered from side A to side B.
     contact_area : float | None
         Override effective area [m^2]. If None, uses min(A_conv_a, A_conv_b).
+    area_a, area_b : float | None
+        Per-side areas [m^2] (#887): the wall's face on side A and on side B,
+        for a wall whose two faces differ -- a hole in a thick wall, a finned
+        face, a curved wall. Both or neither; not with ``contact_area``. Each
+        side's convective resistance is formed on its own face, the layers'
+        conduction on ``wall_area``'s area, and the fouling on side A's:
+        ``1/UA = 1/(h_a A_a) + sum t/(k A_m) + R_fouling/A_a + 1/(h_b A_b)``.
+        Neither (the default): one area for all, as before.
+    wall_area : {"log_mean", "slab_a", "slab_b"}
+        The conduction area of each layer with per-side areas. "log_mean"
+        (the default): the area runs linearly through the stack from A_a to
+        A_b (as a cylinder's does with its radius) and each layer conducts on
+        the log mean of its two faces, which is exact for a thick cylinder,
+        ``Q = 2 pi k L dT / ln(r_o / r_i)``, layer by layer. "slab_a" /
+        "slab_b": a plain slab on side A's or side B's area.
     R_fouling : float
         Additional fouling resistance [m^2*K/W] (applied to cold side).
     orientation : {"aligned", "opposed"}
@@ -1308,6 +1346,9 @@ class ThermalWall:
     element_b: str
     layers: list[WallLayer] = field(default_factory=list)
     contact_area: float | None = None
+    area_a: float | None = None
+    area_b: float | None = None
+    wall_area: Literal["log_mean", "slab_a", "slab_b"] = "log_mean"
     R_fouling: float = 0.0
     orientation: Literal["aligned", "opposed"] = "aligned"
     film: str | None = None
@@ -1319,6 +1360,25 @@ class ThermalWall:
     _last_profile: list[float] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        if (self.area_a is None) != (self.area_b is None):
+            raise ValueError(
+                f"ThermalWall '{self.id}': give both area_a and area_b (the wall's two "
+                "faces), or neither"
+            )
+        if self.area_a is not None:
+            if self.contact_area is not None:
+                raise ValueError(
+                    f"ThermalWall '{self.id}': contact_area and per-side areas (area_a, "
+                    "area_b) are two descriptions of the same wall; give one"
+                )
+            for name, a in (("area_a", self.area_a), ("area_b", self.area_b)):
+                if not (math.isfinite(float(a)) and float(a) > 0.0):
+                    raise ValueError(f"ThermalWall '{self.id}': {name} must be > 0, not {a}")
+        if self.wall_area not in ("log_mean", "slab_a", "slab_b"):
+            raise ValueError(
+                f"ThermalWall '{self.id}': wall_area must be 'log_mean', 'slab_a' or "
+                f"'slab_b', not {self.wall_area!r}"
+            )
         if self.orientation not in ("aligned", "opposed"):
             raise ValueError(
                 f"ThermalWall '{self.id}': orientation must be 'aligned' or 'opposed', "
@@ -1341,6 +1401,30 @@ class ThermalWall:
         if self.film is None:
             return None
         return self.element_a if self.film_side == "a" else self.element_b
+
+    def _layer_area_ratios(self) -> list[float]:
+        """A_a / A_m per layer (#887): side A's area over the area the layer
+        conducts on. With the area linear in depth from A_a to A_b, a layer
+        between faces A_i and A_o conducts on their log mean (exact for a
+        cylinder); a zero-thickness stack or equal faces give the slab."""
+        A_a, A_b = float(self.area_a), float(self.area_b)
+        if self.wall_area == "slab_a" or A_a == A_b:
+            return [1.0] * len(self.layers)
+        if self.wall_area == "slab_b":
+            return [A_a / A_b] * len(self.layers)
+        total = sum(float(L.thickness) for L in self.layers)
+        out: list[float] = []
+        depth = 0.0
+        for L in self.layers:
+            if total <= 0.0:
+                out.append(1.0)
+                continue
+            A_i = A_a + (A_b - A_a) * depth / total
+            depth += float(L.thickness)
+            A_o = A_a + (A_b - A_a) * depth / total
+            A_m = A_i if A_o == A_i else (A_o - A_i) / math.log(A_o / A_i)
+            out.append(A_a / A_m)
+        return out
 
     def is_counterflow(self, sign_a: float, sign_b: float) -> bool:
         """Whether streams of these flow signs (along each element's declared
@@ -1381,7 +1465,20 @@ class ThermalWall:
         WallCouplingResult
             Object containing Q [W], T_hot [K], and analytical Jacobians.
         """
-        A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
+        # Per-side areas (#887): everything per unit of side A's area. Side B's
+        # convective resistance 1/(h_b A_b) is 1/(h_b' A_a) with h_b' = h_b
+        # A_b/A_a, and a layer's t/(k A_m) is (t/k)(A_a/A_m) / A_a, so the one-
+        # area kernel gives the exact Q, wall temperatures and Jacobian
+        # (dQ/dh_b = dQ/dh_b' A_b/A_a). Without them, the one area as before.
+        per_side = self.area_a is not None
+        if per_side:
+            A_eff = float(self.area_a)
+            r_b = float(self.area_b) / A_eff
+            h_b = float(h_b) * r_b
+            layer_scale = self._layer_area_ratios()
+        else:
+            A_eff = self.contact_area if self.contact_area is not None else min(A_conv_a, A_conv_b)
+            layer_scale = [1.0] * len(self.layers)
 
         # The profile only places the layer temperatures; it refuses h <= 0,
         # which a correlation past its range can return at a solver iterate,
@@ -1395,7 +1492,10 @@ class ThermalWall:
             )
             return [float(tp) for tp in prof]
 
-        t_over_k_layers = [L.r_val for L in self.layers]
+        def resistances() -> list[float]:
+            return [L.r_val * f for L, f in zip(self.layers, layer_scale, strict=True)]
+
+        t_over_k_layers = resistances()
         prof = profile(t_over_k_layers)
         if any(L.material.lower() not in ("generic", "custom") for L in self.layers):
             # k(T) at THIS call's wall temperatures, iterated to its fixed
@@ -1405,7 +1505,7 @@ class ThermalWall:
             for _ in range(30):
                 for i, layer in enumerate(self.layers):
                     layer.update_conductivity(0.5 * (prof[i] + prof[i + 1]))
-                new = [L.r_val for L in self.layers]
+                new = resistances()
                 change = max(
                     abs(a - b) / max(abs(b), 1e-300)
                     for a, b in zip(new, t_over_k_layers, strict=True)
@@ -1435,6 +1535,8 @@ class ThermalWall:
             counterflow,
         )
         self._last_profile = prof
+        if per_side:
+            return _WallCoupling(res, dQ_dh_b_factor=r_b)
         return res
 
 

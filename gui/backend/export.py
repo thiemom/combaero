@@ -271,7 +271,7 @@ def _element(eid: str, el: Any, problems: list[str]) -> tuple[str, dict[str, Any
 
 
 def _wall(w: ThermalWall, problems: list[str]) -> dict[str, Any]:
-    if w.contact_area is None:
+    if w.contact_area is None and w.area_a is None:
         problems.append(
             f"{w.id}: a wall without contact_area (the GUI stores the area; give it explicitly)"
         )
@@ -290,6 +290,11 @@ def _wall(w: ThermalWall, problems: list[str]) -> dict[str, Any]:
         "layers": layers,
         "area": float(w.contact_area) if w.contact_area is not None else None,
         "R_fouling": float(w.R_fouling),
+        **(
+            {"area_a": float(w.area_a), "area_b": float(w.area_b), "wall_area": w.wall_area}
+            if w.area_a is not None
+            else {}
+        ),
         "orientation": w.orientation,
     }
     if layers:

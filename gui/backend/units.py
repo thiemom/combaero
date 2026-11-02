@@ -403,6 +403,8 @@ INPUT_UNIT_MAP: dict[str, str] = {
     "Tt_target": "K",
     "fraction": "-",
     "m_dot_guess": "kg/s",  # fuel boundary (#892)
+    "area_a": "m^2",  # thermal wall faces (#887)
+    "area_b": "m^2",
     "pressure_ratio": "-",  # compressor / turbine (#893)
     "efficiency": "-",
     # Composition and ambient

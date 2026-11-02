@@ -1609,7 +1609,14 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                     element_a=edge.source,
                     element_b=edge.target,
                     layers=layers,
-                    contact_area=data.area,
+                    # Per-side areas (#887), when both are given, replace the one
+                    # area; ThermalWall refuses one without the other, by name.
+                    contact_area=(
+                        data.area if data.area_a is None and data.area_b is None else None
+                    ),
+                    area_a=data.area_a,
+                    area_b=data.area_b,
+                    wall_area=data.wall_area,
                     R_fouling=data.R_fouling,
                     orientation=data.orientation,
                     film=data.film or None,
