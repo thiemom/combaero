@@ -680,6 +680,33 @@ documents:
     App. A); Facchini et al. GT2010-22936 (HTC on a real liner, slot + effusion + dilution); Kretschmer &
     Odgers 78-GT-90; Ceccherini 2009 PhD (Therm1D). The Ch. 4 data are likely also in an Andreini/Caciolli
     journal paper (not verified).'
+- file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
+  citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
+    blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
+  topic: [film, review]
+  content: 'Open access (euroturbo.eu, copyright the authors), 13 pp. High-porosity (P/d ~2, porosity ~20%)
+    staggered film panels on a turbine blade in a high-speed cascade (Oxford). Review of slot and transpiration
+    film models with equations: Goldstein & Haji-Sheikh heat-sink correlation (Eqs. 3-5, porous sections and
+    slots), Sturgess 1986 three-region slot model (Eq. 6, form only), Hatch & Papell 1959 (Eq. 7), Sellers
+    superposition (Eq. 8) and the Kirollos-Povey correction (cited), Goldstein 1971 point-sink hole model (Eq.
+    9). New: Eq. 10, eta = exp[-(C2 h x d/(m cp) + C1)] exp[-0.693 (y/h)^2] per hole with Sellers superposition,
+    h the flat-plate h at the hole (Eq. 11 turbulent, Eq. 12 laminar). C1 (vs VR) and C2 (vs BR) are fitted
+    per geometry and PLOTTED only (Figs. 8, 9, 11, 12; legends partly unlabelled), suction and pressure surface
+    and Courtis 2021 flat plate. R2 0.985-0.999 per geometry, 0.92-0.99 with spline-fitted C1/C2.'
+  status: screened
+  verdict: 'Screened 2026-11-02. No shippable closure: C1/C2 are per-geometry fits shown only as plots, on
+    curved blade surfaces at P/d ~2, a regime combaero has no element for (transpiration panels). Qualitative
+    support for treating dense effusion as a slot with a potential core. Its value is the leads: Simon 1986
+    NASA TP-2655 (slot film with free-stream and coolant turbulence, the #714 Tu closure), Hatch & Papell
+    1959 and Papell 1960 (NASA TN D-130, D-299), Kirollos & Povey 2015 (energy-consistent superposition, #387),
+    Sturgess 1980/1986, Goldstein, Shavit & Chen 1965 (porous section); all now in the wanted list or noted
+    here. The data are Wambersie, Ireland & Mayo 2021, IJTPP 6(2) 16 (open access, not held).'
+  read_for: ['#714 slot film leads (turbulence closure, core length)', '#387 superposition alternatives',
+    transpiration / high-porosity film]
+  issues: [387, 714]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). Murray et al. 2018 IJTPP 3(1) 4 (multi-row effusion,
+    high-resolution data and model; open access) is another lead it cites.
 - file: sources/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
   citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
     experimental and computational methods for modelling multiple row effusion cooling performance. Int.
@@ -4145,6 +4172,35 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
+- citation: Simon, F. F. (1986). Jet model for slot film cooling with effect of free-stream and coolant turbulence.
+    NASA Technical Paper 2655.
+  checked: false
+  issues:
+  - 714
+  priority: now
+  question: The slot film's turbulence closure (#714 stage 2, Marek-Tacina C_m(Tu) pending), from a core plus
+    developed-region jet model with free-stream AND coolant turbulence; also the core length that the near-slot
+    region needs. Cited by Wambersie & Ireland 2023 (held).
+  where: NTRS (free).
+- citation: Hatch, J. E., Papell, S. S. (1959). Use of a theoretical flow model to correlate data for film cooling
+    or heating an adiabatic wall by tangential injection of gases of different fluid properties. NASA TN D-130.
+    Papell, S. S. (1960), NASA TN D-299 (angled slots and normal holes) is its sequel.
+  checked: false
+  issues:
+  - 714
+  priority: later
+  question: The heat-sink film model eta = exp[-h L (x - x')/(m cp)] that Wambersie & Ireland 2023 build on, and
+    its data with different coolant properties (a density/property-ratio check on the slot film).
+  where: NTRS (free).
+- citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
+    film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122607.
+  checked: false
+  issues:
+  - 387
+  priority: later
+  question: An energy-consistent alternative to the Sellers superposition the effusion plate uses; how far Sellers
+    over-predicts at combustor row counts.
+  where: ASME Digital Collection (paywalled).
 - citation: Ballal, D. R., Lefebvre, A. H. (1973). Film-cooling effectiveness in the near-slot region. ASME
     J. Heat Transfer 95(2), 265-266. doi:10.1115/1.3450039
   checked: true
