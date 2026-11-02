@@ -94,8 +94,8 @@ Line numbers are on the branch.
 | H1 | humidair.cpp:205 | `dewpoint` | Newton, FD slope, clamped [T_lo, T] | 100 | 1e-6 K | throws; RH > 1 would put the root above T (Newton on the clamp, "converged" to T), but `vapor_pressure` refuses RH > 1 first | clamp | safe | R12 (#944): documented |
 | H2 | humidair.cpp:317 | `wet_bulb_temperature` | Newton in a bracket | 200 | 1e-6 K | throws | bisection | safe | none |
 | R1 | friction.cpp:92 | `friction_colebrook` | Newton from Serghides | 20 (caller) | 1e-10 relative | silent (also on a flat slope) | none (monotone) | latent (reachable by the caller) | fixed: throws |
-| E1 | equilibrium.cpp:80 | `newton_damped` (WGS extent at 165, 276, 441, 845; adiabatic T at 217, 972) | damped Newton, FD slope eps = 1e-6 max(1, abs x), clamped | 40 / 50 | abs 1e-12 on f, or xtol_rel | silent on cap and on a flat slope | clamps only | bug (787 + 42 hits) | rec R2 |
-| E2 | equilibrium.cpp:386 | `solve_reforming_isothermal` | Newton in a bracket | 200 | abs 1e-12 on F, width 1e-15 span | silent; a non-finite F breaks to a silent clamp | bisection | latent | rec R9 |
+| E1 | equilibrium.cpp:80 | `newton_damped` (WGS extent at 165, 276, 441, 845; adiabatic T at 217, 972) | damped Newton, FD slope eps = 1e-6 max(1, abs x), clamped | 40 / 50 | abs 1e-12 on f, or xtol_rel | silent on cap and on a flat slope | clamps only | bug (787 + 42 hits) | fixed #950 (R2): rtsafe on ln Q with the analytic slope; adiabatic T bracketed + Brent; cap rule |
+| E2 | equilibrium.cpp:386 | `solve_reforming_isothermal` | Newton in a bracket | 200 | abs 1e-12 on F, width 1e-15 span | silent; a non-finite F breaks to a silent clamp | bisection | latent | fixed #950 (R9): +-inf at a bracket end bisects, NaN and cap throw |
 | E3 | equilibrium.cpp:605, 672 | `joint_newton` + line search | scaled Newton, curved step, backtracking | `REFORMING_NEWTON_*_IT` / 60 | `REFORMING_NEWTON_FTOL` | returns false -> `EquilibriumResult.converged` | fraction to the boundary | safe (reports) | rec R2 (one caller drops the flag) |
 | E4 | equilibrium.cpp:~750 | `element_potential_start` | Gordon-McBride Newton | `REFORMING_NEWTON_MAX_IT` | 1e-9 | returns false | RP-1311 damping | safe | none |
 | B1 | combustion.cpp:1104 | `bisection_solve` (fuel/oxidizer stream inverses) | Brent | 100 (caller) | tol_f, 1e-10 rel width | silent (returns b); unreachable with its checked bracket | throws if not bracketed | safe | none |
@@ -203,6 +203,17 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   interval (xi_min = xi_max = 0), where 0 is the answer: an early return
   would only save time. `ReformingAdiabaticFun` also drops
   `solve_reforming_wgs_isothermal`'s converged flag.
+  **Fixed in #950 (#927).** Both classes were larger than stated here: (a)
+  where the equilibrium lies away from the trace the whole shift is missed
+  (CO 7e-7 instead of 0.015 from CO 1e-8 at 800 K); (b) the 1729 is J/g
+  (`h/mwmix`), and the root is 924.18 K, 466 K below the 1390 K returned
+  (Cantera HP on the same species: 923.85 K). The WGS extent is now rtsafe on
+  ln Q - ln Kp with the analytic slope (empty interval returns 0), the
+  adiabatic T a bracket from the guess plus Brent on [T_FLOOR, 4500] K, the
+  inner converged flag is propagated, and every non-root exit throws. Cap
+  exits: suite 787 -> 0, Cantera validation 42 -> 0; every other suite and
+  Cantera-validation equilibrium result unchanged to 5e-12 K and 3e-15 in
+  mole fraction, Cantera deviations per test identical.
 - **R3 (G2) `T_from_stagnation`'s derivative.** dF/dT drops the
   T dgamma/dT term, so Newton converges linearly and stops ~1e-8 T short;
   the exact slope (as `fanno_mach.cpp`'s `sound_speed_sq_dT`) makes it
@@ -237,7 +248,9 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   uniformity. E2's non-finite break returns a clamped extent silently.
   **G5 fixed (#941, #948):** `duct_static_state` applies the cap rule on its last
   ln P step (`inner_solve::kDuctStaticStateMaxIter` = 100, unchanged). Not
-  reached: network F and J bit-identical (below). E2 is in its own PR.
+  reached: network F and J bit-identical (below). **E2 fixed (#950):** an
+  amount rounded to zero at a bracket end is F's +-inf limit (bisect); a NaN
+  and the cap throw.
 - **R10 (C9) Delete `solve_station_state`.** Dead code (`[[maybe_unused]]`).
   **Fixed (#942, #948):** deleted; nothing else used only it.
 - **R11 (O3) Jobson tolerance.** 1e-15 relative cycles in the last bits
