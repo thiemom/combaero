@@ -3224,7 +3224,63 @@ documents:
   issues: [800, 807, 813]
   records: []
   notes: Arrived 2026-10-28 as docs/new/Effect_of_a_Crossflow_at_the_Entrance_to_a_Film-Co.pdf. Cites Gritsch,
-    Schulz & Wittig 1997 ASME 97-GT-165 (expanded exits, wanted) and Leylek & Zerkle 1994 (entrance separation).
+    Schulz & Wittig 1997 ASME 97-GT-165 (expanded exits; held since 2026-11-02 as its journal version, J.
+    Turbomach. 120, 557, next entry) and Leylek & Zerkle 1994 (entrance separation).
+- file: sources/orifices/gritsch_schulz_wittig_1998_JT_120_557_expanded_exit_hole_cd.pdf
+  citation: 'Gritsch, M., Schulz, A., Wittig, S. (1998). Discharge coefficient measurements of film-cooling holes
+    with expanded exits. ASME J. Turbomachinery 120(3), 557-563 (ASME 97-GT-165).'
+  id: ASME 97-GT-165
+  topic: [orifice, film]
+  content: '7 pp., ASME Digital Collection copy; clean text layer except the figures (read from page images).
+    Karlsruhe (ITS) rig, same lab and supply channel as Thole et al. 1997 (held): single scaled-up holes, D 10 mm,
+    L/D 6, alpha 30 deg, sharp-edged, smooth; supply channel 20 x 60 mm, COFLOWING (parallel to the main flow).
+    Three holes: cylindrical; fan-shaped (14 deg lateral expansion, 30 mm exit width, A_exit/A_inlet 3.0);
+    laidback fan-shaped (plus 15 deg layback, 40 mm exit length, AR 3.1); 2D cylindrical inlet length on both
+    shaped holes. Table 1: Pt_c up to 2 bar, Tt_c 290 K, Tt_c/Tt_m 1 (0.54-1 tested: no effect at matched Ma_m),
+    PR Pt_c/p_m 1-2, Ma_c 0 / 0.3 / 0.6, Ma_m 0 / 0.3 / 0.6 / 1.2, Re_D to 2.5e5 internal, Tu_c 1%, Tu_m < 1.5%.
+    Cd DEFINITION (p. 559, equation printed): measured flow over the compressible isentropic 1-D flow from the
+    coolant TOTAL pressure Pt_c (1D upstream, 2D off the channel centreline) to the mainstream STATIC p_m (side
+    wall 10D upstream; top wall opposite the exit at Ma_m 1.2), on the CYLINDRICAL inlet area pi D^2/4 for all
+    three holes, so shaped-hole Cd can exceed 1. Uncertainty (Kline-McClintock): flow 2.5% by orifice, Cd below
+    2% in most cases, up to 4.5% at low PR and flow. DATA PLOTTED ONLY, no table and no correlation (the
+    correlation is Gritsch et al. 1997, ISABE, not held): Figs. 3-5 cylindrical Cd vs PR at Ma_c 0/0.3/0.6, four
+    Ma_m curves each (~8-15 points per curve, markers cleanly separable except near PR 1); Fig. 6 cylindrical Cd
+    vs Ma_c at Ma_m 0, PR 1.11/1.24/1.42/1.63 (~10-13 points each); Figs. 7-10 fan-shaped and 11-14 laidback
+    (same layout); Figs. 15-18 the three holes overlaid per Ma_m. Read off the page images: cylindrical at Ma_c 0,
+    Ma_m 0: Cd 0.72 at PR 1.05 rising about 10% to 0.80 at PR 2.2 (Fig. 3); Ma_m 1.2 drops Cd to ~0.2 at PR
+    1.2-1.3, recovering to ~0.78 by PR 2; Fig. 6: Cd 0.74-0.77 at Ma_c 0 rises to a 0.85-0.86 optimum at Ma_c
+    0.2-0.35 (lower Ma_c,opt at lower PR), then collapses (0.66 at Ma_c 0.36, PR 1.11). Fan-shaped at Ma_c 0, Ma_m
+    0: 0.80-0.82 nearly flat in PR (Fig. 7); with Ma_c 0.3 Cd > 1, peak ~1.13-1.15 at PR 1.07-1.09 (40% above Ma_c
+    0, Fig. 10), plateau ~0.90 at high PR; at Ma_c 0.6 an unstable double-bend regime near PR 1.2-1.4 (Figs. 9,
+    13). Layback changes Cd negligibly.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (#807, #813; was wanted). NO combaero closure is built from it, so nothing here is
+    fidelity: every use is cross-source ACCURACY, labelled as such. What it could score: (1) the McGreehan-Schotsch
+    Eq. 17 U1/Vi term (orifice::mcgreehan_schotsch::cd, used by EffusionPlateElement when duct-fed via
+    crossflow_velocity_ratio) against Fig. 6 (cylindrical, Ma_m 0, ~45 points) and Figs. 3-5 Ma_m 0 curves; but
+    two conversions first -- Gritsch references the coolant TOTAL pressure while combaero builds Vi from the
+    supply STATIC (orifice.h, item 22), and the hole is 30 deg COFLOW-inclined where McGreehan-Schotsch''s term
+    is a tangential (normal-hole, rotation) velocity: the shapes already differ (Gritsch +15% to Ma_c ~0.3, then
+    collapse; McGreehan-Schotsch peaks +5.7% at U1/Vi 0.09, then falls), so expect a regime miss, not a tuning
+    target (Hay et al. 1983, held, show the same coflow rise). (2) The zero-crossflow Cd(PR) of a plenum-fed L/D 6
+    hole (Fig. 3, Ma_m 0: 0.72-0.80) against FilmCoolingElement''s default IdelchikThick or the McGreehan-Schotsch
+    chain at L/d 6 (not computed here; the main .venv build is stale). (3) Exit-side grazing flow (Figs. 3-5, Ma_m
+    0.3-1.2): combaero has NO exit-side crossflow Cd for film or effusion holes; Rogers-Hersh (#800/#818) is wired
+    only into ImpingementPlateElement and is a static-referenced, incompressible, M <= 0.25, normal L/D 1 fit, so
+    only the Ma_m 0.3 curves sit near its envelope, and even those need the total/static conversion. (4) Shaped
+    holes: FilmCoolingElement hole_type "shaped" takes the METERING diameter -- the same area basis as this Cd --
+    but the plain-hole Cd, so it under-predicts shaped-hole flow by up to ~10% without supply crossflow and by up to
+    ~40-50% at Ma_c 0.3 and low PR (Figs. 15-18). A real gap, not closable from this paper (no correlation; the
+    1997 ISABE correlation is wanted). Data are plotted only: digitise Figs. 3 and 6 first (cleanest); fidelity on
+    overplotted near-PR-1 points would be an upper bound.'
+  read_for: ['#807/#813 inlet-crossflow Cd of duct-fed holes vs McGreehan-Schotsch U1/Vi', 'exit-side crossflow Cd
+      to Ma_m 1.2', shaped-hole (fan, laidback) Cd for FilmCoolingElement hole_type shaped]
+  issues: [386, 807, 813]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ (from the user) as 557_1.pdf; moved from the wanted list. Companion
+    papers (not held): Gritsch et al. 1998 J. Turbomach. 120, 549 (adiabatic effectiveness of the same holes); Thole
+    et al. 1998 J. Turbomach. 120, 327 (flowfields); Hay & Lampard 1995 ASME 95-GT-15 (flared-hole Cd, Ma_m <= 0.3).
+    Not checked: the per-curve point counts are approximate (counted off 110 dpi page images); no digitisation done.'
 - file: sources/orifices/yan_et_al_2026_aerospace_13_555_rotating_inclined_orifice_cd.pdf
   citation: 'Yan, J., Wei, S., Mao, J., Yang, Z., Han, F., Wang, L. (2026). A model for accurate prediction of
     discharge coefficients in rotating orifices with different wall inclination angles. Aerospace 13, 555.
@@ -4539,17 +4595,20 @@ wanted:
     prints the set in full (Eqs. 8.4-8.15) and suffices to implement it; this paper would add the data
     behind the luminosity factor.
   where: Elsevier journal.
-- citation: Gritsch, M., Schulz, A., Wittig, S. (1998). Discharge coefficient measurements of film-cooling holes
-    with expanded exits. ASME J. Turbomachinery 120(3), 557-563 (ASME 97-GT-165).
+- citation: 'Gritsch, M., Schulz, A., Wittig, S. (1997). A method of correlating the discharge coefficient of
+    film-cooling holes with crossflows at hole entry and exit. 13th Int. Symp. on Airbreathing Engines (ISABE),
+    Chattanooga, TN, 8-12 Sept. 1997.'
   checked: false
   issues:
+  - 386
   - 807
   - 813
   priority: later
-  question: 'Cd of a cylindrical reference hole and expanded-exit holes under inlet (internal) crossflow up to
-    about Mach 0.6 and external crossflow -- the duct-fed liner/effusion hole regime McGreehan-Schotsch covers
-    only at modest crossflow. Cited by Thole et al. 1997 (held). As recalled, unverified.'
-  where: ASME Digital Collection.
+  question: 'The correlation behind the Cd data of Gritsch, Schulz & Wittig 1998 (held): cylindrical and
+    fan-shaped 30 deg holes under supply crossflow to Ma 0.6 and exit crossflow to Ma 1.2. combaero has no
+    shaped-hole Cd (FilmCoolingElement "shaped" uses the plain-hole Cd on the metering diameter) and no exit-side
+    Cd for film or effusion holes. Citation as printed in the 1998 paper''s reference list; paper number unknown.'
+  where: ISABE 1997 proceedings (AIAA distributes later ISABE volumes; not searched).
 - citation: Van Niekerk, J. E., Morris, R. M. (2005). (T56 combustor isothermal flow split measurement.) ISABE
     2005.
   checked: false
