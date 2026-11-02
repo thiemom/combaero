@@ -1447,7 +1447,10 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("drho_dT", &solver::MomentumChamberResult::drho_dT)
       .def_readonly("drho_dmdot", &solver::MomentumChamberResult::drho_dmdot)
       .def_readonly("drho_dY", &solver::MomentumChamberResult::drho_dY)
-      .def_readonly("dT_static_dY", &solver::MomentumChamberResult::dT_static_dY);
+      .def_readonly("dT_static_dY", &solver::MomentumChamberResult::dT_static_dY)
+      .def_readonly("bounded", &solver::MomentumChamberResult::bounded)
+      .def_readonly("P_sonic", &solver::MomentumChamberResult::P_sonic)
+      .def_readonly("Pt_sonic", &solver::MomentumChamberResult::Pt_sonic);
 
   m.def("orifice_residuals_and_jacobian",
         &solver::orifice_residuals_and_jacobian, py::arg("m_dot"),

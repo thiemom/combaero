@@ -220,17 +220,35 @@ def test_closure_holds_at_an_exact_stagnation_state(M: float) -> None:
     P = cb.P_from_stagnation(Pt, T0, M, _X_AIR)
     m = cb.density(T, P, _X_AIR) * M * cb.speed_of_sound(T, _X_AIR) * A
     r = _closure(P, Pt, m, T0, _Y_AIR, A)
-    assert r.residual == pytest.approx(0.0, abs=1e-9 * Pt)
     assert r.T_static == pytest.approx(T, rel=1e-9)
     mach = r.M
     assert mach == pytest.approx(M, rel=1e-8)
     assert r.rho_static == pytest.approx(cb.density(T, P, _X_AIR), rel=1e-9)
-    # The dynamic head, returned without cancellation against P.
-    assert r.q_dyn == pytest.approx(Pt - r.residual - P, rel=1e-12)
+    if M <= 1.0:
+        assert r.residual == pytest.approx(0.0, abs=1e-9 * Pt)
+        # The dynamic head, returned without cancellation against P.
+        assert r.q_dyn == pytest.approx(Pt - r.residual - P, rel=1e-12)
+        return
+    # Supersonic: no root (#788). The closure is continued past the sonic
+    # point by its mirror image 2 Pt* - Pt_cl(P), and at this state Pt_cl = Pt,
+    # so the residual is Pt - (2 Pt* - Pt) = 2 (Pt - Pt*) > 0. The static
+    # state fields stay the closure's at P.
+    assert r.bounded
+    # The sonic state of the same flux G = m / A and T0: P* = G R T* / a*,
+    # on the isentrope Pt* / P* = Pt / P(M = 1).
+    T_s = cb.T_from_stagnation(T0, 1.0, _X_AIR)
+    R = cb.specific_gas_constant(_X_AIR)
+    P_star = (m / A) * R * T_s / cb.speed_of_sound(T_s, _X_AIR)
+    Pt_star = P_star * Pt / cb.P_from_stagnation(Pt, T0, 1.0, _X_AIR)
+    assert r.P_sonic == pytest.approx(P_star, rel=1e-8)
+    assert r.Pt_sonic == pytest.approx(Pt_star, rel=1e-8)
+    assert r.Pt_sonic < Pt
+    assert r.residual == pytest.approx(2.0 * (Pt - r.Pt_sonic), rel=1e-8)
+    assert r.q_dyn == pytest.approx(Pt - P, rel=1e-9)
 
 
 def test_closure_passes_the_true_choked_flux() -> None:
-    """At fixed (Pt, T0) the largest mass flux the closure admits, over the
+    """At fixed (Pt, T0) the largest mass flux the closure admits subsonically, over the
     static pressure, is the choked flux rho* a* A. T0 read as static capped
     it at 92.0% (peak at M 0.913), and Newton stalled on any chamber asked to
     carry more -- an ejector outlet pipe of about A_3 (#567)."""
@@ -238,16 +256,28 @@ def test_closure_passes_the_true_choked_flux() -> None:
 
     T0, Pt, A = 300.0, 2.0e5, 1.0e-3
 
-    def m_at(P: float) -> float:
-        f = lambda m: _closure(P, Pt, m, T0, _Y_AIR, A).residual  # noqa: E731
-        return brentq(f, 0.0, 10.0, xtol=1e-13)
-
     T_star = cb.T_from_stagnation(T0, 1.0, _X_AIR)
     P_star = cb.P_from_stagnation(Pt, T0, 1.0, _X_AIR)
     m_star = cb.density(T_star, P_star, _X_AIR) * cb.speed_of_sound(T_star, _X_AIR) * A
-    peak = max(m_at(P_star * s) for s in (0.97, 0.99, 1.0, 1.01, 1.03))
+
+    def m_at(P: float) -> float:
+        # Bracketed below the flux where the continued closure turns back
+        # (#788: past the sonic point it is 2 Pt* - Pt_cl, not monotone in m
+        # at fixed P).
+        f = lambda m: _closure(P, Pt, m, T0, _Y_AIR, A).residual  # noqa: E731
+        return brentq(f, 0.0, 1.1 * m_star, xtol=1e-13)
+
+    peak = max(m_at(P_star * s) for s in (1.0, 1.01, 1.03))
     assert peak == pytest.approx(m_star, rel=1e-6)
     assert m_at(P_star) == pytest.approx(m_star, rel=1e-9)
+    # Below P* the closure is continued past the sonic point (#788): its root
+    # there carries MORE than the choked flux, and says so (bounded) -- the
+    # flux a choked duct forces into a chamber that cannot carry it at Pt.
+    for s in (0.97, 0.99):
+        f = lambda m, s=s: _closure(P_star * s, Pt, m, T0, _Y_AIR, A).residual  # noqa: E731
+        m = brentq(f, 0.5 * m_star, 1.1 * m_star, xtol=1e-13)
+        assert m > m_star
+        assert _closure(P_star * s, Pt, m, T0, _Y_AIR, A).bounded
 
 
 @pytest.mark.parametrize("M", [0.05, 0.5, 0.95, 1.4])

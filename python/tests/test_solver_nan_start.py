@@ -60,8 +60,11 @@ def _ejector_net() -> FlowNetwork:
 @pytest.fixture
 def no_ejector_warm_start(monkeypatch: pytest.MonkeyPatch) -> None:
     """With its own warm start (EjectorElement.seed_warm_start) this cold
-    solve converges; the NaN path needs the cold attempt to fail and the
-    incompressible proxy to seed the retry, so the seed is switched off."""
+    solve converges; the NaN path needs the incompressible proxy to seed the
+    compressible solve, so the seed is switched off. Since #788 (a momentum
+    chamber's closure has one root) the cold solve converges even without
+    it, so the tests ask for the proxy seed directly
+    (init_strategy="outletref_warmstart", the auto-retry's seed)."""
     monkeypatch.setattr(EjectorElement, "seed_warm_start", lambda self, graph: None)
 
 
@@ -70,7 +73,7 @@ def test_a_nan_start_is_not_reported_converged() -> None:
     s = NetworkSolver(_ejector_net())
     s.raise_internal_errors = False
     with pytest.warns(RuntimeWarning):
-        r = s.solve(timeout=30.0)
+        r = s.solve(timeout=30.0, init_strategy="outletref_warmstart")
     if r["__success__"]:
         res = s._residuals(np.array(r["__x_solution__"]))
         assert np.all(np.isfinite(res)), "converged at a NaN residual"
@@ -86,11 +89,8 @@ def test_a_nan_start_is_not_reported_converged() -> None:
 def test_a_strict_solve_raises_on_a_nan_start() -> None:
     s = NetworkSolver(_ejector_net())
     s.raise_internal_errors = True
-    with (
-        pytest.raises(FloatingPointError, match="non-finite residual"),
-        pytest.warns(RuntimeWarning),
-    ):
-        s.solve(timeout=30.0)
+    with pytest.raises(FloatingPointError, match="non-finite residual"):
+        s.solve(timeout=30.0, init_strategy="outletref_warmstart")
 
 
 def test_an_explicit_nan_start_ends_with_outcome_error() -> None:

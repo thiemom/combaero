@@ -2729,6 +2729,10 @@ class MomentumChamberNode(NetworkNode):
         self.t_hot = t_hot
         self.upstream_elements = []
         self.energy_boundaries: list[EnergyBoundary] = []
+        #: Set by the solver on a converged root where this chamber is a
+        #: choked-bounded junction (#788): the reported static state, else
+        #: None. Reporting only; no residual reads it.
+        self._choked_bounded: dict[str, float] | None = None
 
     @property
     def has_convective_surface(self) -> bool:
@@ -3012,6 +3016,10 @@ class MomentumChamberNode(NetworkNode):
         m_dot_total = getattr(self, "_total_m_dot", 0.0)
         if self.area <= 0 or m_dot_total <= 1e-12:
             return 0.0
+        if getattr(self, "_choked_bounded", None) is not None:
+            # A choked-bounded junction (#788) is reported as the plenum its
+            # root is: the choked jet's excess lost in it, the gas at rest.
+            return 0.0
 
         # The closure solves the static state from the chamber's stagnation
         # state.Tt, and its Mach is the one the residual used (#576).
@@ -3058,12 +3066,19 @@ class MomentumChamberNode(NetworkNode):
         # Properties at the STATIC state the closure solved from the
         # chamber's stagnation state.Tt (#576).
         T_static = float(state.Tt)
-        if self.area > 0:
+        bounded = getattr(self, "_choked_bounded", None)
+        if bounded is None and self.area > 0:
             T_static = float(self._closure(state, m_dot_total).T_static)
+        # A choked-bounded junction (#788) is reported as the plenum its root
+        # is (the solver reports P = Pt): the gas at rest, T = Tt.
         cs = cb.complete_state(T_static, state.P, state.X)
 
         rho = cs.thermo.rho
-        u = (abs(m_dot_total)) / ((rho) * (self.area)) if rho > 0 and self.area > 0 else 0.0
+        u = (
+            (abs(m_dot_total)) / ((rho) * (self.area))
+            if rho > 0 and self.area > 0 and bounded is None
+            else 0.0
+        )
         diameter = self.Dh if self.Dh is not None else math.sqrt(4.0 * self.area / math.pi)
         re = (u) * (diameter) / (cs.transport.mu) if u > 0 and cs.transport.mu > 0 else 0.0
         mach = u / cs.thermo.a if cs.thermo.a > 0 else 0.0
@@ -3073,15 +3088,27 @@ class MomentumChamberNode(NetworkNode):
         st_val = 0.0
         htc_val = 0.0
         t_aw_val = float(state.Tt)
-        if self.has_convective_surface:
+        # A choked-bounded junction has no surface state of its area: its
+        # surface correlation is not evaluated (and no wall may read it, or
+        # the junction is refused, #788).
+        if self.has_convective_surface and bounded is None:
             h_res = self.htc_and_T(state)
             if h_res is not None:
                 nu_val = h_res.Nu
                 htc_val = h_res.h
                 t_aw_val = h_res.T_aw
                 st_val = _stanton(h_res)
+        extra: dict[str, float] = {}
+        if bounded is not None:
+            extra = {
+                "choked_bounded": 1.0,
+                "P_sonic": float(bounded["P_sonic"]),
+                "Pt_sonic": float(bounded["Pt_sonic"]),
+                "expansion_loss": float(bounded["Pt_sonic"]) - float(Pt),
+            }
 
         return {
+            **extra,
             "Tt": float(Tt),
             "Pt": float(Pt),
             "T_static": T_static,
@@ -8905,6 +8932,30 @@ class ChannelElement(NetworkElement):
                     derivs[f"{src_id}.Y[{k}]"] = sign * A * gk
         return sign * A * flow.G, derivs, flow
 
+    def choked_discharge_into(
+        self, nid: str, state_in: NetworkMixtureState, state_out: NetworkMixtureState
+    ) -> str:
+        """The empty string when this channel discharges CHOKED into node ``nid`` -- its
+        Fanno flow at the choked flux, independent of the pressure it
+        discharges against -- else why not (#788, a choked-bounded junction).
+        Only the plain compressible channel: a crossflow segment solves
+        between stations, and a ribbed or pin-fin channel's drop is a
+        correlation with no choke."""
+        if type(self) is not ChannelElement:
+            return f"'{self.id}' ({type(self).__name__}) feeds it, not a plain channel"
+        if self.regime != "compressible":
+            return f"'{self.id}' is incompressible"
+        if self.surface and isinstance(self.surface.model, (RibbedModel, PinFinModel)):
+            return f"'{self.id}' carries a ribbed or pin-fin drop, not a Fanno flow"
+        f_mult = self.surface.f_multiplier if self.surface else 1.0
+        _, _, flow = self._compressible_flow(state_in, state_out, f_mult, derivatives=False)
+        into = self.to_node if state_in.Pt >= state_out.Pt else self.from_node
+        if into != nid:
+            return f"'{self.id}' does not discharge into it"
+        if not bool(flow.choked):
+            return f"'{self.id}' is not choked"
+        return ""
+
     def residuals(
         self, state_in: NetworkMixtureState, state_out: NetworkMixtureState
     ) -> list[float]:
@@ -9098,7 +9149,13 @@ class ChannelElement(NetworkElement):
         """
         ends: list[tuple[float, float, list[float]] | None] = [None, None]
         nodes = (getattr(self, "_upstream_node", None), getattr(self, "_downstream_node", None))
-        at_rest = [bool(getattr(n, "state_at_rest", False)) for n in nodes]
+        # A choked-bounded junction (#788) is reported as a plenum (at rest):
+        # that end reads the duct's own Fanno exit, as at a node at rest.
+        at_rest = [
+            bool(getattr(n, "state_at_rest", False))
+            or getattr(n, "_choked_bounded", None) is not None
+            for n in nodes
+        ]
         m = float(state_in.m_dot)
         area = self.area or 0.0
         if not self._rest_end_state_from_duct or not any(at_rest):

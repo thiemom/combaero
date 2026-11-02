@@ -1633,6 +1633,34 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
   res.d_res_dmdot = (area > 1e-12) ? -Pt_cl * st.dln_dG * sgn / area : 0.0;
   res.d_res_dT = -Pt_cl * st.dln_dTt;
 
+  // Branch selection (#788). At fixed (T0, G) the closure Pt_cl(P) falls to
+  // its minimum Pt* at the sonic static pressure P* and rises again below it,
+  // so one Pt above Pt* has two static roots: the subsonic one and a
+  // supersonic one. No element here accelerates a stream past Mach 1 into a
+  // chamber, and Newton landed on the supersonic root ("converged" junctions
+  // at Mach 1.46). Below P* the closure is therefore continued by its mirror
+  // image about Pt*, g(P) = 2 Pt* - Pt_cl(P): g rises monotonically through
+  // P* (C1 there, both slopes zero), so every Pt has exactly ONE root, the
+  // subsonic one when Pt >= Pt*. A Pt below Pt* (more flow than the chamber's
+  // area carries at that stagnation pressure, a choked duct discharging into
+  // it) roots on the continuation: P < P*, M > 1, `bounded`. Such a root is
+  // the choked-bounded junction the solver reports as such, or refuses.
+  // Pt*'s partials need no dP*/dx: dPt_cl/dP = 0 at P* (the envelope
+  // theorem), so dPt*/dx is the closure's own partial at P*.
+  res.bounded = st.M > 1.0;
+  if (res.bounded) {
+    const combaero::SonicStaticState son = combaero::sonic_static_state(Tt, G, X);
+    const ChamberStaticState ss = chamber_static_state(Tt, son.P, G, X);
+    const double Pt_star = son.P * std::exp(ss.lnPtP);
+    res.P_sonic = son.P;
+    res.Pt_sonic = Pt_star;
+    res.residual = Pt - (2.0 * Pt_star - Pt_cl);
+    res.d_res_dP = -res.d_res_dP;
+    res.d_res_dmdot =
+        (area > 1e-12) ? (Pt_cl * st.dln_dG - 2.0 * Pt_star * ss.dln_dG) * sgn / area : 0.0;
+    res.d_res_dT = Pt_cl * st.dln_dTt - 2.0 * Pt_star * ss.dln_dTt;
+  }
+
   // Composition, analytic (#743): Y moves R, h, cp and s together, and the
   // relay reaches this row only through these entries (#517, which used a
   // central difference here). chamber_static_state_dX gives the static T and
@@ -1648,6 +1676,14 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
       const double W = combaero::species_molar_mass(k) / 1000.0;
       g_res[k] = -Pt_cl * cx.dlnPtP_dX[k];
       g_rho[k] = rho * (W / MW - cx.dT_dX[k] / st.T);
+    }
+    if (res.bounded) {
+      // The continuation 2 Pt* - Pt_cl: Pt* moves with X at fixed P*
+      // (envelope, as above).
+      const ChamberStaticStateDX cs = chamber_static_state_dX(Tt, res.P_sonic, G, X);
+      for (std::size_t k = 0; k < X.size(); ++k) {
+        g_res[k] = Pt_cl * cx.dlnPtP_dX[k] - 2.0 * res.Pt_sonic * cs.dlnPtP_dX[k];
+      }
     }
     res.d_res_dY = combaero::mole_gradient_to_mass(X, g_res);
     res.drho_dY = combaero::mole_gradient_to_mass(X, g_rho);
