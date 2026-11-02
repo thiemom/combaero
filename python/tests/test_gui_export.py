@@ -275,3 +275,32 @@ def test_a_fuel_controller_round_trips(target: float, branch: str) -> None:
     assert fuel["data"]["branch"] == branch
     _same(direct, gui, ["fuel.m_dot", "fuel.phi", "burner.Tt", "inlet.m_dot"])
     assert gui["burner.Tt"] == pytest.approx(target, abs=1e-3)
+
+
+@pytest.mark.parametrize("eta", [{"eta_poly": 0.88}, {"eta_is": 0.85}])
+def test_a_compressor_and_turbine_round_trip(eta: dict) -> None:
+    """#893: exported as compressor / turbine nodes with their pressure ratio
+    and efficiency; the GUI solve gives the direct solve's flow, Tt and power."""
+    from combaero.network import CompressorElement, TurbineElement
+
+    net = FlowNetwork()
+    net.add_node(PressureBoundary("in", Pt=1.0e5, Tt=300.0, Y=AIR))
+    net.add_node(PlenumNode("a"))
+    net.add_node(PlenumNode("b"))
+    net.add_node(PlenumNode("c"))
+    net.add_node(PressureBoundary("out", Pt=1.6e5, Tt=300.0, Y=AIR))
+    net.add_element(
+        OrificeElement("o1", "in", "a", diameter=0.05, Cd=0.8, correlation="fixed", in_pipe=False)
+    )
+    net.add_element(CompressorElement("comp", "a", "b", 4.0, **eta))
+    net.add_element(TurbineElement("turb", "b", "c", 2.0, **eta))
+    net.add_element(
+        OrificeElement("o2", "c", "out", diameter=0.05, Cd=0.8, correlation="fixed", in_pipe=False)
+    )
+    doc, direct, gui = _both(net)
+    kinds = {n["id"]: n["type"] for n in doc["nodes"]}
+    assert kinds["comp"] == "compressor" and kinds["turb"] == "turbine"
+    comp = next(n for n in doc["nodes"] if n["id"] == "comp")["data"]
+    assert comp["pressure_ratio"] == 4.0
+    assert comp["efficiency_type"] == ("polytropic" if "eta_poly" in eta else "isentropic")
+    _same(direct, gui, ["comp.m_dot", "b.Tt", "c.Tt", "comp.power", "turb.power"])

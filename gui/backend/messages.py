@@ -34,6 +34,8 @@ KIND_NAME = {
     "momentum_chamber": "Momentum Chamber",
     "mass_boundary": "Mass Flow Boundary",
     "fuel_boundary": "Fuel Boundary",
+    "compressor": "Compressor",
+    "turbine": "Turbine",
     "pressure_boundary": "Pressure Boundary",
 }
 

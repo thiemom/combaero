@@ -300,6 +300,28 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "compressor")}
+				title="Fixed pressure ratio Pt_out / Pt_in, polytropic or isentropic efficiency"
+				draggable
+			>
+				<NodeIcon type="compressor" size={18} />
+				<span>Compressor</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "turbine")}
+				title="Fixed pressure ratio Pt_in / Pt_out, polytropic or isentropic efficiency"
+				draggable
+			>
+				<NodeIcon type="turbine" size={18} />
+				<span>Turbine</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "impingement_array")}
 				draggable
 				title="Jet plate impinging on a target; spent air exits down the gap (Florschuetz 1981)"

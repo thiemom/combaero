@@ -56,6 +56,13 @@ export function validateNetwork(nodes: Node[]): string[] {
 			if ((node.data.L || 0) <= 0)
 				errors.push(`${node.id}: Channel length must be > 0`);
 		}
+		if (node.type === "compressor" || node.type === "turbine") {
+			if (!((node.data.pressure_ratio ?? 4) >= 1))
+				errors.push(`${node.id}: Pressure ratio must be >= 1`);
+			const eta = node.data.efficiency ?? 0.88;
+			if (!(eta > 0 && eta <= 1))
+				errors.push(`${node.id}: Efficiency must be in (0, 1]`);
+		}
 		if (node.type === "orifice") {
 			// null diameter means "use default 0.08 m" — only flag explicit non-positive values
 			if (node.data.diameter != null && node.data.diameter <= 0)

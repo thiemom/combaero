@@ -449,6 +449,24 @@ def _palette_network(kind: str) -> dict:
         else:
             nodes.append(_node("x", kind, data))
             edges += [_edge("e2", "c1", "x"), _edge("e4", "x", "c2")]
+    elif kind in ("compressor", "turbine"):
+        # A fixed pressure ratio (#893) between two channels: the channels set
+        # the flow (between two boundaries alone nothing would).
+        # A few percent of the drive in the channels: moderate Mach.
+        pin, pout = (1.0e5, 3.8e5) if kind == "compressor" else (3.15e5, 1.0e5)
+        nodes = [
+            _node("in", pb, {"Pt": pin, "Tt": 300.0 if kind == "compressor" else 900.0}),
+            _node("c1", "channel", {"L": 0.5, "D": 0.05}),
+            _node("x", kind, data),
+            _node("c2", "channel", {"L": 0.5, "D": 0.05}),
+            _node("out", pb, {"Pt": pout, "Tt": 300.0}),
+        ]
+        edges = [
+            _edge("e1", "in", "c1"),
+            _edge("e2", "c1", "x"),
+            _edge("e3", "x", "c2"),
+            _edge("e4", "c2", "out"),
+        ]
     elif kind == "fuel_boundary":
         # The fuel controller (#892) sets a combustor between two channels.
         nodes = [
@@ -482,7 +500,7 @@ def _palette_network(kind: str) -> dict:
 
 def test_the_palette_list_is_what_this_file_knows() -> None:
     """A new palette kind needs a network in `_palette_network`."""
-    assert len(_palette_kinds()) == 22, _palette_kinds()
+    assert len(_palette_kinds()) == 24, _palette_kinds()
 
 
 @pytest.mark.parametrize("kind", _palette_kinds())
