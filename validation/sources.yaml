@@ -4589,13 +4589,34 @@ wanted:
   issues:
   - 714
   - 763
-  priority: now
-  question: 'The near-slot (potential-core) region of thick-lip slot films, where the Ballal-Lefebvre 1972
-    correlation (reprinted in Lefebvre & Ballal Ch. 8, held) is weakest; liner cooling rings are short, so much
-    of each segment is near-slot. The 1972 method is now held as its Cranfield report version (SME No. 4,
-    1973, screened 2026-11-02); the thick-lip film and film-side Nu are NOT implemented (only Marek-Tacina
-    ships; the earlier "implemented from the book" note here was wrong).'
-  where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled).
+  priority: later
+  question: 'The near-slot (potential-core) region of thin-lip slot films. The 1972 method is held as its
+    Cranfield report version (SME No. 4, 1973, screened 2026-11-02); the thick-lip film and film-side Nu are
+    NOT implemented (only Marek-Tacina ships). Page 1 seen 2026-11-02 (a preview from the user): its Eq. 4,
+    eta = 0.6 (x/ms)^-0.3 (Re_s m mu_c/mu_m)^0.15 (+/-5% on the data compiled in its ref. 5), matches Lefebvre &
+    Ballal Eq. 8.34, so the book reprint is faithful there. Page 2 would add the validity table, the wall-jet
+    branch (book Eqs. 8.35/8.36) and the Fig. 1 points (other labs'' data: fit reproduction, not accuracy). It
+    does not settle the film-side Nu discrepancy (0.090 vs 0.069), which is a heat-transfer coefficient (see the
+    Seban 1960 entry). Moved from now to later (user, 2026-11-02): obtain when the Ballal-Lefebvre slot-film
+    branches are implemented.'
+  where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled; the user can obtain it).
+- citation: Seban, R. A. (1960). Heat transfer and effectiveness for turbulent boundary layers with tangential
+    fluid injection. ASME J. Heat Transfer 82(4), 303-313 (November 1960). Companions -- Seban, R. A., Back, L.
+    H. (1962), J. Heat Transfer 84, 45-54 and 235-242.
+  checked: true
+  issues:
+  - 714
+  - 763
+  priority: later
+  question: 'Settles the near-slot film-side Nu for m < 1.3: Ballal & Lefebvre''s Cranfield SME4 (held) prints
+    Nu = 0.090 [Re_s x/s]^0.7 (its Eq. 3, credited to Seban) while Lefebvre & Ballal Eq. 8.41 prints 0.069 (30%
+    lower). Needed before that branch is implemented. Alternative: the ASME print of Ballal, D. R., Lefebvre,
+    A. H. (1972), A proposed method for calculating film-cooled wall temperatures in gas turbine combustion
+    chambers, ASME Paper 72-WA/HT-24 (Winter Annual Meeting, New York, Nov. 1972), if it differs from the
+    held report.'
+  where: 'ASME Digital Collection (paywalled); citation as printed in Cranfield SME4 ref. 4, checked 2026-11-02.
+    72-WA/HT-24: ASME conference papers of that era are often only in libraries (ASME archive / British
+    Library).'
 - citation: ISO 5167:1980 (or its restatement ISO 5167-1:1991). Measurement of fluid flow by means of
     orifice plates, nozzles and Venturi tubes inserted in circular cross-section conduits running full.
     International Organization for Standardization. (citation as recalled)
