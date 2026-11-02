@@ -2213,9 +2213,11 @@ df = result.to_dataframe()
 df = df[df["success"]]
 ```
 
-The GUI's **Export CSV** writes this frame, solved again from the canvas. Its
-response headers `X-Combaero-Success` / `X-Combaero-Outcome` repeat the status
-(the GUI warns when the export's solve failed), and any text cell that starts
+The GUI's **Export CSV** writes this frame for the displayed result (#783):
+it solves again only when no solve of the canvas is held, and the header
+`X-Combaero-Export-Source` (`displayed` / `solved`) says which. Its response
+headers `X-Combaero-Success` / `X-Combaero-Outcome` repeat the status (the
+GUI warns when the exported solve failed), and any text cell that starts
 with `= + - @`, a tab or a carriage return gets a leading `'` so a spreadsheet
 does not run it as a formula. Unit labels are ASCII (`kg/m^3`, `Pa*s`).
 
@@ -2240,6 +2242,13 @@ own:
   `input:` columns and the solver options (and warm start) as `solver:<key>`.
 - a row of `type` `edge` for an edge with inputs and no result row; a flow
   edge's inputs go on its auto-linked element row.
+
+Rows the builder made (junctions, port chambers, auto links, an array's rows
+and segments) carry a derived `kind` and `label` and a `parent` column naming
+the drawn node or edge they belong to (#783). List-valued cells (`rows_*`,
+`T_interface`) are lists in the frame and strict JSON arrays in the CSV
+(`null` for a non-finite value): `pd.read_csv(path, converters={col:
+json.loads})` reads them.
 
 The result rows and their `<key> [<unit>]` columns are unchanged; a reader
 that iterates over all rows now also meets the `network` row (filter on

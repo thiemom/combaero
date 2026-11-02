@@ -141,12 +141,20 @@ After a solve, the backend returns a `SolveResponse`.
   - `m_dot`: Mass flow rate [kg/s]
 
 ## CSV Export
-`POST /export` solves the network and returns `NetworkResult.to_dataframe()`
-as CSV (ASCII, UTF-8 without BOM). The format is one row per entity:
+`POST /export` returns `NetworkResult.to_dataframe()` of the DISPLAYED result
+as CSV (ASCII, UTF-8 without BOM, #783). `/solve` keeps its last few solves
+keyed by what a solve depends on: the nodes and edges without their
+display-only data (`result`, `label`, `rotation`, `label_offset`,
+`selected`), probes left out, and the solver settings. An export of the same
+network, at any layout and with any labels, writes that solve with the
+current labels and does not solve again. Only where none matches (the canvas
+changed since the solve, or the backend restarted) does it solve; the header
+`X-Combaero-Export-Source` says `displayed` or `solved`, and the GUI shows a
+notice for `solved`. The format is one row per entity:
 
 | Columns | Rows | Content |
 |---|---|---|
-| `type`, `kind`, `is_boundary`, `combustion_method`, `id`, `label` | all | what the row is |
+| `type`, `kind`, `is_boundary`, `combustion_method`, `id`, `label`, `parent` | all | what the row is |
 | `success`, `converged`, `consistent`, `outcome`, `final_norm` | all | the solve's status |
 | `<key> [<unit>]` (`T [K]`, `m_dot [kg/s]`, `Y[N2] [-]`, ...) | result rows | results (#774) |
 | `input:<key> [<unit>]` (`input:L [m]`, `input:composition.source`) | entity rows | the case's inputs, nested fields dotted (#784) |
@@ -162,6 +170,21 @@ edge's inputs go on its auto-linked element row. Every numeric input carries
 its unit (`INPUT_UNIT_MAP` in `gui/backend/units.py`); text inputs are bare.
 A text cell starting with `= + - @`, a tab or a carriage return gets a
 leading `'`.
+
+**Rows the builder made** (#783) are kept: they are real solved state. The
+junction between two drawn elements (`__junction__a__b`), a junction's port
+chamber (`__tee_jct__x_port`), an auto link (`__auto_link__a__b`), and an
+array's rows and segments (`x__p1`, `x__c2`, ...) each get a `kind`
+(`junction`, `port_chamber`, `lossless_connection`, `plate_row`,
+`crossflow_segment`, `panel`, ...), a label derived from their parent's
+(`junction c1 -> x`, `Jets plate row 1`) and a `parent`: the drawn node or
+edge they belong to. A drawn row's `parent` is empty.
+
+**List cells** (`rows_*`, `T_interface`): the DataFrame holds real lists; the
+CSV writes each as a strict JSON array, a non-finite value as `null`.
+`pd.read_csv(path, converters={col: json.loads})` reads them, and
+`load_results` reads them back (and the Python-repr lists of an export made
+before #783).
 
 `gui.backend.results.load_results("combaero_results.csv")` reads the file back
 into the one-row-per-case results table, inputs included; see

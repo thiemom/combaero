@@ -703,19 +703,25 @@ const useStore = create<RFState>((set, get) => ({
 		set({ isExporting: true });
 
 		try {
-			const { blob, success, outcome } = await exportResults({
+			const { blob, success, outcome, source } = await exportResults({
 				nodes,
 				edges,
 				solver_settings: solverSettings,
 			});
-			// The export solves the canvas again. A failed or rejected solve
-			// still writes a CSV (every row says so in its `success` and
-			// `outcome` columns); say it here too, before anyone trusts it.
-			if (!success) {
-				set({
-					loadNotice: `Exported, but the export's solve did not succeed (${outcome || "unknown outcome"}): the CSV's rows carry success = False. Check the solve before using these numbers.`,
-				});
-			}
+			// The export writes the displayed result (#783). Where none matched
+			// the canvas (edited since the solve, or the backend restarted) it
+			// solved, and the CSV is that solve: say so. A failed or rejected
+			// solve still writes a CSV (every row carries success = False).
+			const notes: string[] = [];
+			if (source === "solved")
+				notes.push(
+					"Exported from a fresh solve: no displayed result matched this canvas (it changed since the last solve, or the backend restarted).",
+				);
+			if (!success)
+				notes.push(
+					`The exported solve did not succeed (${outcome || "unknown outcome"}): the CSV's rows carry success = False. Check the solve before using these numbers.`,
+				);
+			if (notes.length > 0) set({ loadNotice: notes.join(" ") });
 
 			// 1. Try Native "Save As" Dialog (Chrome/Edge)
 			if ("showSaveFilePicker" in window) {
