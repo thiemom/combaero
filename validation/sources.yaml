@@ -1553,14 +1553,38 @@ documents:
     definition not stated.
   status: screened
   verdict: Clean cross-source accuracy dataset for Metzger Nu (by eye 5-14%) and evidence of a real spanwise
-    friction effect (with Damerow). Not yet digitised or scored; f needs its definition (Lawson MS thesis)
-    before use.
+    friction effect (with Damerow). Not yet digitised or scored; f needs its definition before use, which
+    is in Thrift's MS thesis (wanted), not Lawson's (held, no pressure-loss content).
   read_for: ['#335 cross-source accuracy of Metzger Nu and f', '#335 spanwise friction effect']
   issues: [335]
   records: [validation/cooling/extractions/pin_fin_sources.md]
   code: ['include/pin_fin_correlation.h: comments only (Re basis, Metzger accuracy note)']
   notes: 'Earlier mis-cited on #335 as ''Lawson, Thrift, Wright & Thole''; file renamed. Figs. 15/16 (~40
     clean points) on the digitising list for #335 PR C.'
+- file: sources/heat_transfer/pin_fin/Lawson_2007_MS_thesis_VirginiaTech_multiple_row.pdf
+  citation: Lawson, S. A. (2007). Heat transfer from multiple row arrays of low aspect ratio pin fins. MS
+    thesis, Virginia Polytechnic Institute and State University, Blacksburg (chair K. A. Thole), February
+    8, 2007.
+  topic: [pin_fin]
+  content: 'The heat-transfer half of the rig behind Lawson et al. 2011 (two-paper manuscript thesis). Staggered
+    arrays S1/d 2 and 4 (spanwise), S2/d 1.73 and 3.46 (streamwise), H/d 1 and 0.5, flow incidence 0/15/30
+    deg; Re_d on U_max and d, 5,000-30,000; h on local bulk T. PRINTS Table 1.4 / 2.2: Nu_d = a Re_d^b per
+    geometry for pin, endwall and array average; and Eq. 1.3, the array-average fit Nu = [0.128 (S1/d)^0.165
+    (S2/d)^(-0.310 S1/d + 1.182)] Re_d^[0.680 (S1/d)^-0.023 (S2/d)^(0.048 S1/d - 0.224)], 2 <= S1/d <=
+    4, 1.73 <= S2/d <= 3.46, H/d 1, Re 5,000-25,000 (p. 22; read from the page image, reproduces Table 1.4
+    at S1/d 2, S2/d 1.73). Array-average Nu uncertainty < 8% (App. A). NO friction factor or pressure-loss
+    data: those are Thrift''s thesis.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Supplies printed per-geometry Nu fits and a spacing-dependent closed form
+    (Eq. 1.3) for the arrays that the 2011 paper only plots: a candidate cross-source accuracy reference
+    for the Metzger Nu set and a possible Lawson Nu set (narrow box: H/d 1, two spacings each). Its own
+    stated agreement with Metzger 1982a is within 6-10% and with Chyu 1998 within 7%. Does NOT answer the
+    question it was wanted for (the 2011 f definition); that moves to Thrift 2007.'
+  read_for: ['#335 Lawson 2011 friction-factor definition -- not here', '#335 per-geometry Nu fits']
+  issues: [335]
+  records: []
+  notes: Open access, VTechWorks handle 10919/31190 (file EntireThesisDraft9.pdf, the later of two uploads;
+    106 pp.). In Copyright (rightsstatements InC). Fetched 2026-11-02 at the user's request.
 - file: sources/heat_transfer/pin_fin/Lyall_2006_MS_thesis_VirginiaTech_single_row.pdf
   citation: Lyall, M. E. (2006). Heat transfer from low aspect ratio pin fins. MS thesis, Virginia Polytechnic
     Institute and State University, Blacksburg.
@@ -3927,17 +3951,17 @@ wanted:
   priority: later
   question: Short-pin friction and Nu from a non-NASA rig.
   where: ASME Turbo Expo proceedings.
-- citation: Lawson, S. A. (2007). Heat transfer from multiple row arrays of low aspect ratio pin fins. MS
-    thesis, Virginia Tech, Blacksburg (chair K. A. Thole).
-  checked: false
+- citation: Thrift, A. A. (2007). Aerodynamic force and pressure loss measurements on low aspect ratio pin
+    fin arrays. MS thesis, Virginia Polytechnic Institute and State University, Blacksburg (chair K. A. Thole),
+    February 9, 2007.
+  checked: true
   issues:
   - 335
   priority: later
-  question: The friction-factor definition and per-geometry fits behind Lawson, Thrift, Thole & Kohli 2011
-    (local).
-  where: 'Virginia Tech ETD repository (VTechWorks), NOT Penn State as first recorded: institution, date and
-    title are from the vita in Lawson''s 2011 Penn State PhD (held, sources/heat_transfer/film/Lawson_2011_PhD_PennState_particle_deposition_film_cooling.pdf),
-    which is not this thesis.'
+  question: The friction-factor definition and per-geometry f data behind Lawson, Thrift, Thole & Kohli 2011
+    Fig. 16 (local), needed before those points can score the friction sets; also pin drag vs spanwise
+    spacing. Lawson's own thesis (held) has no pressure-loss content.
+  where: Open access, VTechWorks handle 10919/31189 (Thesis_ETD2.pdf); located 2026-11-02, not yet fetched.
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
   checked: false
