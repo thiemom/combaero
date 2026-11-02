@@ -1562,7 +1562,7 @@ ThrustResult nozzle_thrust(const NozzleSolution& sol, double P_amb)
     ThrustResult result;
 
     if (sol.profile.empty()) {
-        throw std::runtime_error("nozzle_thrust: empty nozzle solution");
+        throw std::invalid_argument("nozzle_thrust: empty nozzle solution");
     }
 
     // Get exit conditions from last station

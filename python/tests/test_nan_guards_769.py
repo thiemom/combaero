@@ -3,11 +3,10 @@
 A check written ``if (x <= 0) throw`` lets NaN through, because every
 comparison with NaN is false: the function answered with NaN or, after a
 clamp, a plausible number. Each public function below is called with NaN (and
-+inf) in each numeric argument and must raise. The exception type is the one
-the function already used for that argument's domain check -- ValueError
-(std::invalid_argument), RuntimeError (std::runtime_error) or IndexError
-(std::out_of_range, the saturation-pressure range check) -- so callers that
-catch it keep working.
++inf) in each numeric argument and must raise. The exception type is
+ValueError (std::invalid_argument), the type for invalid input everywhere
+(#928), or IndexError (std::out_of_range, the saturation-pressure range
+check).
 """
 
 import math
@@ -30,7 +29,7 @@ INF = math.inf
 # exception for all, indices skipped with the reason in the comment)
 Case = tuple[str, Callable[..., Any], tuple[Any, ...], Any, tuple[int, ...]]
 
-_HUMID_TPR = {0: IndexError, 1: RuntimeError, 2: RuntimeError}
+_HUMID_TPR = {0: IndexError, 1: ValueError, 2: ValueError}
 
 
 def _method(cls: type, name: str) -> Callable[..., Any]:
@@ -45,7 +44,7 @@ def _method(cls: type, name: str) -> Callable[..., Any]:
 CASES: list[Case] = [
     # -- humid air ---------------------------------------------------------
     ("saturation_vapor_pressure", cb.saturation_vapor_pressure, (300.0,), IndexError, ()),
-    ("vapor_pressure", cb.vapor_pressure, (300.0, 0.5), {0: IndexError, 1: RuntimeError}, ()),
+    ("vapor_pressure", cb.vapor_pressure, (300.0, 0.5), {0: IndexError, 1: ValueError}, ()),
     ("humidity_ratio", cb.humidity_ratio, (300.0, 101325.0, 0.5), _HUMID_TPR, ()),
     (
         "water_vapor_mole_fraction",
@@ -71,7 +70,7 @@ CASES: list[Case] = [
         "HumidAir.set_TP_RH",
         lambda T, P, RH: cb.HumidAir().set_TP_RH(T, P, RH),
         (300.0, 101325.0, 0.5),
-        {0: IndexError, 1: RuntimeError, 2: ValueError},
+        {0: IndexError, 1: ValueError, 2: ValueError},
         (),
     ),
     (
@@ -82,18 +81,18 @@ CASES: list[Case] = [
         (),
     ),
     # -- materials ---------------------------------------------------------
-    ("k_inconel718", cb.k_inconel718, (800.0,), RuntimeError, ()),
-    ("k_haynes230", cb.k_haynes230, (800.0,), RuntimeError, ()),
-    ("k_stainless_steel_310", cb.k_stainless_steel_310, (800.0,), RuntimeError, ()),
-    ("k_stainless_steel_316", cb.k_stainless_steel_316, (800.0,), RuntimeError, ()),
-    ("k_aluminum_6061", cb.k_aluminum_6061, (400.0,), RuntimeError, ()),
+    ("k_inconel718", cb.k_inconel718, (800.0,), ValueError, ()),
+    ("k_haynes230", cb.k_haynes230, (800.0,), ValueError, ()),
+    ("k_stainless_steel_310", cb.k_stainless_steel_310, (800.0,), ValueError, ()),
+    ("k_stainless_steel_316", cb.k_stainless_steel_316, (800.0,), ValueError, ()),
+    ("k_aluminum_6061", cb.k_aluminum_6061, (400.0,), ValueError, ()),
     # hours = +inf is the fully sintered limit, so only NaN is refused there.
-    ("k_tbc_ysz", cb.k_tbc_ysz, (1200.0, 100.0), RuntimeError, ()),
+    ("k_tbc_ysz", cb.k_tbc_ysz, (1200.0, 100.0), ValueError, ()),
     (
         "get_material_conductivity",
         lambda T: cb.get_material_conductivity("inconel718", T),
         (800.0,),
-        RuntimeError,
+        ValueError,
         (),
     ),
     # -- acoustics ---------------------------------------------------------
@@ -165,10 +164,10 @@ CASES: list[Case] = [
         "orifice_impedance_with_flow",
         cb.orifice_impedance_with_flow,
         (500.0, 1.0, 1.0, 1e-3, 1e-3, 0.05, 0.7, 1.2, 340.0),
-        RuntimeError,
+        ValueError,
         (),
     ),
-    ("is_whistling_risk", cb.is_whistling_risk, (500.0, 5.0, 1e-3), RuntimeError, ()),
+    ("is_whistling_risk", cb.is_whistling_risk, (500.0, 5.0, 1e-3), ValueError, ()),
     # -- geometry ----------------------------------------------------------
     ("hydraulic_diameter", cb.hydraulic_diameter, (1e-3, 0.1), ValueError, ()),
     ("hydraulic_diameter_rect", cb.hydraulic_diameter_rect, (0.02, 0.05), ValueError, ()),
@@ -592,7 +591,7 @@ def test_get_material_conductivity_still_answers_finite_T() -> None:
     # 200 K; only NaN, which used to come out as the 1e-3 floor, is refused.
     k_lo = cb.get_material_conductivity("inconel718", 1.0)
     assert k_lo == pytest.approx(cb.k_inconel718(300.0) - 50.0 * 0.0146, rel=1e-6)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError):
         cb.get_material_conductivity("inconel718", NAN)
 
 

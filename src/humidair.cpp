@@ -83,7 +83,7 @@ double saturation_vapor_pressure(double T) {
 double vapor_pressure(double T, double RH) {
   // Validate inputs
   if (!is_finite_in_range(RH, 0.0, 1.0)) {
-    throw std::runtime_error("Relative humidity must be between 0 and 1");
+    throw std::invalid_argument("Relative humidity must be between 0 and 1");
   }
 
   return RH * saturation_vapor_pressure(T);
@@ -91,14 +91,14 @@ double vapor_pressure(double T, double RH) {
 
 // Calculate humidity ratio (kg water vapor per kg dry air)
 double humidity_ratio(double T, double P, double RH) {
-  require_finite_positive<std::runtime_error>(
+  require_finite_positive(
       P, "humidity_ratio: P must be finite and > 0");
   // Calculate vapor pressure
   double P_w = vapor_pressure(T, RH);
 
   // Check that vapor pressure is not greater than total pressure
   if (P_w >= P) {
-    throw std::runtime_error("Vapor pressure cannot exceed total pressure");
+    throw std::invalid_argument("Vapor pressure cannot exceed total pressure");
   }
 
   // Calculate humidity ratio
@@ -109,14 +109,14 @@ double humidity_ratio(double T, double P, double RH) {
 
 // Calculate mole fraction of water vapor in humid air
 double water_vapor_mole_fraction(double T, double P, double RH) {
-  require_finite_positive<std::runtime_error>(
+  require_finite_positive(
       P, "water_vapor_mole_fraction: P must be finite and > 0");
   // Calculate vapor pressure
   double P_w = vapor_pressure(T, RH);
 
   // Check that vapor pressure is not greater than total pressure
   if (P_w >= P) {
-    throw std::runtime_error("Vapor pressure cannot exceed total pressure");
+    throw std::invalid_argument("Vapor pressure cannot exceed total pressure");
   }
 
   // Calculate mole fraction of water vapor (P_w / P)

@@ -113,5 +113,5 @@ def test_dewpoint_below_minus_100C_is_not_pinned_to_the_clamp() -> None:
 def test_dewpoint_outside_svp_range_raises() -> None:
     # A dewpoint below the saturation-pressure extrapolation limit cannot be
     # represented; it must refuse, not return the limit.
-    with pytest.raises((ValueError, IndexError, RuntimeError)):
+    with pytest.raises(IndexError):
         dewpoint(170.0, 101325.0, 1e-4)

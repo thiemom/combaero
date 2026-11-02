@@ -22,7 +22,7 @@ double pure_species_enthalpy(std::size_t idx,
 
 void validate_fuel_mole_fractions(const std::vector<double> &X_fuel) {
   if (X_fuel.size() != species_names.size()) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "fuel_lhv_*: mixture size does not match number of species");
   }
   for (double x : X_fuel) {
@@ -33,7 +33,7 @@ void validate_fuel_mole_fractions(const std::vector<double> &X_fuel) {
   }
   const double sum = std::accumulate(X_fuel.begin(), X_fuel.end(), 0.0);
   if (std::abs(sum - 1.0) > 1.0e-5) {
-    throw std::runtime_error("fuel_lhv_*: mole fractions must sum to 1.0");
+    throw std::invalid_argument("fuel_lhv_*: mole fractions must sum to 1.0");
   }
 }
 
@@ -73,7 +73,7 @@ void require_physical_state(const State &in, const char *what) {
 double oxygen_required_per_mol_fuel(std::size_t fuel_index) {
   // Validate fuel index
   if (fuel_index >= molecular_structures.size()) {
-    throw std::runtime_error("Invalid fuel index");
+    throw std::invalid_argument("Invalid fuel index");
   }
 
   // Get molecular structure
@@ -95,7 +95,7 @@ double oxygen_required_per_mol_fuel(std::size_t fuel_index) {
 double oxygen_required_per_kg_fuel(std::size_t fuel_index) {
   // Validate fuel index
   if (fuel_index >= molar_masses.size()) {
-    throw std::runtime_error("Invalid fuel index");
+    throw std::invalid_argument("Invalid fuel index");
   }
 
   // Get molar masses
@@ -119,7 +119,7 @@ double oxygen_required_per_mol_mixture(const std::vector<double> &X) {
   // Check if mole fractions sum to approximately 1.0
   double sum = std::accumulate(X.begin(), X.end(), 0.0);
   if (std::abs(sum - 1.0) > 1.0e-5) {
-    throw std::runtime_error("Mole fractions must sum to 1.0");
+    throw std::invalid_argument("Mole fractions must sum to 1.0");
   }
 
   double total_oxygen_required = 0.0;
@@ -146,7 +146,7 @@ double oxygen_required_per_kg_mixture(const std::vector<double> &X) {
   // Check if mole fractions sum to approximately 1.0
   double sum = std::accumulate(X.begin(), X.end(), 0.0);
   if (std::abs(sum - 1.0) > 1.0e-5) {
-    throw std::runtime_error("Mole fractions must sum to 1.0");
+    throw std::invalid_argument("Mole fractions must sum to 1.0");
   }
 
   // Calculate mixture molecular weight
@@ -172,7 +172,7 @@ double oxygen_required_per_kg_mixture(const std::vector<double> &X) {
 double equivalence_ratio(const std::vector<double> &X) {
   // Guard for malformed input vector size
   if (X.size() != molecular_structures.size()) {
-    throw std::runtime_error("equivalence_ratio: input vector size (" +
+    throw std::invalid_argument("equivalence_ratio: input vector size (" +
                              std::to_string(X.size()) +
                              ") does not match species table (" +
                              std::to_string(molecular_structures.size()) + ")");
@@ -266,7 +266,7 @@ double fuel_lhv_mass(const std::vector<double> &X_fuel,
   validate_fuel_mole_fractions(X_fuel);
   const double mw_fuel = mwmix(X_fuel); // [g/mol]
   if (!validation::is_finite_positive(mw_fuel)) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "fuel_lhv_mass: fuel molecular weight must be positive");
   }
   return fuel_lhv_molar(X_fuel, reference_temperature) * 1000.0 /
@@ -287,7 +287,7 @@ double dryair_required_per_mol_fuel(std::size_t fuel_index) {
 // Calculate dry air required for complete combustion [kg air/kg fuel]
 double dryair_required_per_kg_fuel(std::size_t fuel_index) {
   if (fuel_index >= molar_masses.size()) {
-    throw std::runtime_error("Invalid fuel index");
+    throw std::invalid_argument("Invalid fuel index");
   }
 
   double fuel_mw = molar_masses[fuel_index]; // g/mol
@@ -352,10 +352,10 @@ CompleteCombustionCore complete_combustion_core(const std::vector<double> &X,
   require_finite_fractions(X, "complete_combustion");
   const double sum = std::accumulate(X.begin(), X.end(), 0.0);
   if (std::abs(sum - 1.0) > tol_sum) {
-    throw std::runtime_error("Mole fractions must sum to 1.0");
+    throw std::invalid_argument("Mole fractions must sum to 1.0");
   }
   if (X.size() != molecular_structures.size()) {
-    throw std::runtime_error("Mixture size does not match number of species");
+    throw std::invalid_argument("Mixture size does not match number of species");
   }
   const std::size_t ns = X.size();
   const std::size_t idx_O2 = species_index.at("O2");
@@ -559,14 +559,14 @@ static double stoich_f_over_o_mole(const std::vector<double> &X_fuel,
 
   const double X_O2_ox = X_ox[species_index.at("O2")];
   if (!validation::is_finite_positive(X_O2_ox)) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "stoich_f_over_o_mole: oxidizer has zero O2 mole fraction");
   }
 
   // moles O2 required per mole of fuel mixture
   const double nu_O2_req = oxygen_required_per_mol_mixture(X_fuel);
   if (!validation::is_finite_positive(nu_O2_req)) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "stoich_f_over_o_mole: oxygen_required_per_mol_mixture returned "
         "non-positive");
   }
@@ -629,7 +629,7 @@ static double actual_f_over_o_mole(const std::vector<double> &X_mix,
   }
 
   if (!found) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "actual_f_over_o_mole: could not determine mixing ratio "
         "from X_mix, X_fuel, X_ox (mixture not on mixing line?)");
   }
@@ -684,7 +684,7 @@ set_equivalence_ratio_mole(double phi, const std::vector<double> &X_fuel,
   // Renormalize to guard against small numerical drifts
   double sum = std::accumulate(X_mix.begin(), X_mix.end(), 0.0);
   if (!validation::is_finite_positive(sum)) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "set_equivalence_ratio_mole: resulting mixture has non-positive sum");
   }
   for (double &x : X_mix) {
@@ -713,7 +713,7 @@ static double stoich_f_over_o_mass(const std::vector<double> &Y_fuel,
 
   const double Y_O2_ox = Y_ox[species_index.at("O2")];
   if (!validation::is_finite_positive(Y_O2_ox)) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "stoich_f_over_o_mass: oxidizer has zero O2 mass fraction");
   }
 
@@ -724,7 +724,7 @@ static double stoich_f_over_o_mass(const std::vector<double> &Y_fuel,
   // kg O2 per kg fuel mixture
   const double m_O2_req = oxygen_required_per_kg_mixture(X_fuel);
   if (!validation::is_finite_positive(m_O2_req)) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "stoich_f_over_o_mass: oxygen_required_per_kg_mixture returned "
         "non-positive");
   }
@@ -789,7 +789,7 @@ static double actual_f_over_o_mass(const std::vector<double> &Y_mix,
   }
 
   if (!found) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "actual_f_over_o_mass: could not determine mixing ratio "
         "from Y_mix, Y_fuel, Y_ox (mixture not on mixing line?)");
   }
@@ -848,7 +848,7 @@ set_equivalence_ratio_mass(double phi, const std::vector<double> &Y_fuel,
   // Renormalize to guard against any small numerical drift
   double sum = std::accumulate(Y_mix.begin(), Y_mix.end(), 0.0);
   if (!validation::is_finite_positive(sum)) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "set_equivalence_ratio_mass: resulting mixture has non-positive sum");
   }
   for (double &y : Y_mix) {
@@ -865,7 +865,7 @@ double bilger_stoich_mixture_fraction_mass(const std::vector<double> &Y_F,
   const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
 
   if (!validation::is_finite_positive(r_st)) {
-    throw std::runtime_error("bilger_stoich_mixture_fraction_mass: r_st <= 0");
+    throw std::invalid_argument("bilger_stoich_mixture_fraction_mass: r_st <= 0");
   }
 
   // For 2-stream fuel/oxidizer mixing we always have:
@@ -893,7 +893,7 @@ double bilger_Z_from_equivalence_ratio_mass(double phi,
 
   const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
   if (!validation::is_finite_positive(r_st)) {
-    throw std::runtime_error("bilger_Z_from_equivalence_ratio_mass: r_st <= 0");
+    throw std::invalid_argument("bilger_Z_from_equivalence_ratio_mass: r_st <= 0");
   }
 
   // r = (F/O)_act (mass) = phi * r_st
@@ -914,7 +914,7 @@ double equivalence_ratio_from_bilger_Z_mass(double Z,
 
   const double r_st = stoich_f_over_o_mass(Y_F, Y_O);
   if (!validation::is_finite_positive(r_st)) {
-    throw std::runtime_error("equivalence_ratio_from_bilger_Z_mass: r_st <= 0");
+    throw std::invalid_argument("equivalence_ratio_from_bilger_Z_mass: r_st <= 0");
   }
 
   // Invert Z = r / (1 + r) -> r = Z / (1 - Z)
@@ -990,7 +990,7 @@ double bilger_mixture_fraction(const std::vector<double> &Y,
 
   const double denom = beta_F - beta_O;
   if (std::abs(denom) < 1e-16) {
-    throw std::runtime_error("bilger_mixture_fraction: fuel and oxidizer have "
+    throw std::invalid_argument("bilger_mixture_fraction: fuel and oxidizer have "
                              "identical Bilger scalar (denominator ~ 0)");
   }
 

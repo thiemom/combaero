@@ -195,7 +195,7 @@ class TestParameterValidation:
         geom.radius_plenum = 0.5
         geom.area_plenum = 0.02
 
-        with pytest.raises(RuntimeError, match="cans must be positive"):
+        with pytest.raises(ValueError, match="cans must be positive"):
             cb.can_annular_eigenmodes(geom, 500, 500, 1.0, 1.0, f_max=1000)
 
     def test_invalid_geometry(self):
@@ -207,7 +207,7 @@ class TestParameterValidation:
         geom.radius_plenum = 0.5
         geom.area_plenum = 0.02
 
-        with pytest.raises(RuntimeError, match="dimensions must be positive"):
+        with pytest.raises(ValueError, match="dimensions must be positive"):
             cb.can_annular_eigenmodes(geom, 500, 500, 1.0, 1.0, f_max=1000)
 
     def test_invalid_sound_speed(self):
@@ -219,7 +219,7 @@ class TestParameterValidation:
         geom.radius_plenum = 0.5
         geom.area_plenum = 0.02
 
-        with pytest.raises(RuntimeError, match="Speed of sound"):
+        with pytest.raises(ValueError, match="Speed of sound"):
             cb.can_annular_eigenmodes(geom, -500, 500, 1.0, 1.0, f_max=1000)
 
     def test_invalid_density(self):
@@ -231,7 +231,7 @@ class TestParameterValidation:
         geom.radius_plenum = 0.5
         geom.area_plenum = 0.02
 
-        with pytest.raises(RuntimeError, match="Density"):
+        with pytest.raises(ValueError, match="Density"):
             cb.can_annular_eigenmodes(geom, 500, 500, -1.0, 1.0, f_max=1000)
 
 

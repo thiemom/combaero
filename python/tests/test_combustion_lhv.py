@@ -40,5 +40,5 @@ def test_fuel_lhv_reference_temperature_argument_changes_result() -> None:
 
 def test_fuel_lhv_input_validation() -> None:
     """LHV helpers should validate fuel mole fractions."""
-    with pytest.raises(RuntimeError, match="sum"):
+    with pytest.raises(ValueError, match="sum"):
         cb.fuel_lhv_molar([0.2] * cb.num_species())

@@ -93,8 +93,8 @@ class TestCoolingWorkflowHelpers:
 
     def test_cooling_workflow_helper_validation(self):
         """Helper functions should validate parameters and fail clearly."""
-        with pytest.raises(RuntimeError, match="eta"):
+        with pytest.raises(ValueError, match="eta"):
             cb.adiabatic_wall_temperature(1700.0, 700.0, 1.2)
 
-        with pytest.raises(RuntimeError, match="Heat transfer coefficients"):
+        with pytest.raises(ValueError, match="Heat transfer coefficients"):
             cb.cooled_wall_heat_flux(1700.0, 700.0, -10.0, 500.0, 0.2, 0.002, 20.0)

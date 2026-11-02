@@ -2494,7 +2494,7 @@ k_al2o3 = cb.k_alumina        # dense Al2O3, NSRDS-NBS 8 Table 14, 100-2000 K
 k_1_4923 = cb.k_x22crmov12_1  # X22CrMoV12-1 data sheet, 20 and 650 C, 293-923 K
 k_bc = cb.k_bondcoat_nicocraly  # NiCoCrAlY bond coat (Zhu & Miller 1999), 848-1373 K
 k_tbc = cb.k_tbc_ysz
-# Out-of-range or NaN T raises RuntimeError. get_material_conductivity(name, T)
+# Out-of-range or NaN T raises ValueError. get_material_conductivity(name, T)
 # answers any finite T > 0 (solver robustness) and raises for NaN or inf T.
 
 # Outside its valid range a k_* function raises; extrapolate=True opts into a

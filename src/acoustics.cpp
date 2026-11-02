@@ -527,7 +527,7 @@ std::complex<double> liner_sdof_impedance_norm(
     const AcousticMedium& medium
 ) {
     if (!is_finite_positive(cavity.depth)) {
-        throw std::runtime_error("Cavity depth must be positive");
+        throw std::invalid_argument("Cavity depth must be positive");
     }
 
     const std::complex<double> z_neck = orifice_impedance_with_flow(
@@ -586,7 +586,7 @@ std::complex<double> liner_2dof_serial_impedance_norm(
     const AcousticMedium& medium
 ) {
     if (!is_finite_positive(depth_1) || !is_finite_positive(depth_2)) {
-        throw std::runtime_error("Serial cavity depths must be positive");
+        throw std::invalid_argument("Serial cavity depths must be positive");
     }
 
     const std::complex<double> z_face = orifice_impedance_with_flow(
@@ -694,35 +694,35 @@ std::complex<double> orifice_impedance_with_flow(
 ) {
     // Validate parameters
     if (!is_finite_positive(freq)) {
-        throw std::runtime_error("Frequency must be positive, got " + std::to_string(freq));
+        throw std::invalid_argument("Frequency must be positive, got " + std::to_string(freq));
     }
     if (!is_finite_positive(d_orifice) || !is_finite_positive(l_orifice)) {
-        throw std::runtime_error("Orifice dimensions must be positive");
+        throw std::invalid_argument("Orifice dimensions must be positive");
     }
     if (!is_finite_positive(porosity) || porosity > 0.5) {
-        throw std::runtime_error("Porosity must be in range (0, 0.5], got " + std::to_string(porosity));
+        throw std::invalid_argument("Porosity must be in range (0, 0.5], got " + std::to_string(porosity));
     }
     if (!is_finite_positive(Cd) || Cd > 1.0) {
-        throw std::runtime_error("Discharge coefficient must be in range (0, 1], got " + std::to_string(Cd));
+        throw std::invalid_argument("Discharge coefficient must be in range (0, 1], got " + std::to_string(Cd));
     }
     if (!is_finite_positive(c)) {
-        throw std::runtime_error("Speed of sound must be positive and finite, got " + std::to_string(c));
+        throw std::invalid_argument("Speed of sound must be positive and finite, got " + std::to_string(c));
     }
     if (!is_finite_positive(rho)) {
-        throw std::runtime_error("Density must be positive and finite, got " + std::to_string(rho));
+        throw std::invalid_argument("Density must be positive and finite, got " + std::to_string(rho));
     }
     if (!is_finite(u_bias) || !is_finite(u_grazing)) {
-        throw std::runtime_error("Bias and grazing velocities must be finite");
+        throw std::invalid_argument("Bias and grazing velocities must be finite");
     }
 
     // Check Mach numbers (should be << 1 for acoustic theory)
     double M_bias = std::abs(u_bias) / c;
     double M_grazing = std::abs(u_grazing) / c;
     if (M_bias > 0.3) {
-        throw std::runtime_error("Bias Mach number too high: " + std::to_string(M_bias) + " > 0.3");
+        throw std::invalid_argument("Bias Mach number too high: " + std::to_string(M_bias) + " > 0.3");
     }
     if (M_grazing > 0.3) {
-        throw std::runtime_error("Grazing Mach number too high: " + std::to_string(M_grazing) + " > 0.3");
+        throw std::invalid_argument("Grazing Mach number too high: " + std::to_string(M_grazing) + " > 0.3");
     }
 
     double omega = 2.0 * M_PI * freq;
@@ -773,17 +773,17 @@ TransferMatrix quarter_wave_resonator_tmm(
 ) {
     // Validate parameters
     if (!is_finite_positive(L_tube)) {
-        throw std::runtime_error("Tube length must be positive, got " + std::to_string(L_tube));
+        throw std::invalid_argument("Tube length must be positive, got " + std::to_string(L_tube));
     }
     if (!is_finite_positive(A_duct) || !is_finite_positive(A_tube)) {
-        throw std::runtime_error("Areas must be positive");
+        throw std::invalid_argument("Areas must be positive");
     }
 
     double k = (2.0 * M_PI * freq) / c;
 
     // Check that we're below cutoff (kL < pi for quarter-wave)
     if (k * L_tube > M_PI) {
-        throw std::runtime_error("Frequency too high: kL = " + std::to_string(k * L_tube) +
+        throw std::invalid_argument("Frequency too high: kL = " + std::to_string(k * L_tube) +
                                  " > pi (above quarter-wave cutoff)");
     }
 
@@ -830,10 +830,10 @@ bool is_whistling_risk(
 ) {
     // Validate inputs
     if (!is_finite_nonnegative(freq) || !is_finite_positive(d_orifice)) {
-        throw std::runtime_error("Invalid parameters for whistling risk assessment");
+        throw std::invalid_argument("Invalid parameters for whistling risk assessment");
     }
     if (!is_finite(u_bias)) {
-        throw std::runtime_error("Invalid parameters for whistling risk assessment");
+        throw std::invalid_argument("Invalid parameters for whistling risk assessment");
     }
 
     // No flow, no whistling
@@ -1085,22 +1085,22 @@ std::vector<BlochMode> can_annular_eigenmodes(
 ) {
     // Validate inputs
     if (geom.n_cans < 1) {
-        throw std::runtime_error("Number of cans must be positive");
+        throw std::invalid_argument("Number of cans must be positive");
     }
     if (!is_finite_positive(geom.length_can) || !is_finite_positive(geom.area_can)) {
-        throw std::runtime_error("Can dimensions must be positive");
+        throw std::invalid_argument("Can dimensions must be positive");
     }
     if (!is_finite_positive(geom.radius_plenum) || !is_finite_positive(geom.area_plenum)) {
-        throw std::runtime_error("Plenum dimensions must be positive");
+        throw std::invalid_argument("Plenum dimensions must be positive");
     }
     if (!is_finite_positive(c_can) || !is_finite_positive(c_plenum)) {
-        throw std::runtime_error("Speed of sound must be positive");
+        throw std::invalid_argument("Speed of sound must be positive");
     }
     if (!is_finite_positive(rho_can) || !is_finite_positive(rho_plenum)) {
-        throw std::runtime_error("Density must be positive");
+        throw std::invalid_argument("Density must be positive");
     }
     if (!is_finite_positive(f_max)) {
-        throw std::runtime_error("Maximum frequency must be positive");
+        throw std::invalid_argument("Maximum frequency must be positive");
     }
 
     // Delegate to the canonical magnitude-minimization solver.
