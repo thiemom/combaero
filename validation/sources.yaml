@@ -2868,6 +2868,38 @@ documents:
   issues: [793]
   records: []
   notes: Fetched from NTRS 20040082327 (public) on 2026-10-27 during the docs/new screening.
+- file: sources/flow_network/meitner1990_NASA_TP-2985_CPF_coolant_passage_flow_code.pdf
+  citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
+    NASA Technical Paper 2985, AVSCOM Technical Report 89-C-008 (E-5186), Lewis Research Center, September 1990.
+  id: NASA TP-2985 (NTRS 19900018406)
+  topic: [channel]
+  content: 'Scan with OCR layer, 40 pp. The Coolant Passage Flow (CPF) code manual: ONE passage, one inlet and
+    one exit (plus a tip-cap bleed and a bypass that leaves and re-enters the same channel), 1-D momentum and
+    energy marched along nodes/intervals/slices with area change, mass addition/removal, pumping (radius
+    change, rotating frame, relative totals) and heat addition; subsonic except a choked exit (and bypass /
+    tip-cap). Friction per interval: user value, trip-strip correlation, input f(Re) curves (pin fin, finned,
+    plain), roughened plain-passage correlation, or a total-pressure K factor; heat transfer: internal
+    correlations or input curves, a rotation correction (Rayleigh-number based) and user multipliers.
+    Derivations in App. B/D, inputs App. C, Rayleigh-line heat-generation option App. E. Examples: (1) a cooled
+    radial-turbine flow path (input/output listing); (2) 2:1 area increase and decrease against isentropic
+    flow, accuracy vs slice count (converged above ~40 slices; advises < 10% area change per slice); (3)
+    constant-area duct, 10 cm2 (d 3.568 cm), Tt 300 K, Pt 100 N/cm2, 0.7874 kg/s (M_in 0.20): Fanno with
+    Fanning f 0.10 to M 0.75 needs L = 36.0143 d (128.508 cm), matched at 150 slices; Rayleigh case matched
+    in T and p with slice-dependent path lengths.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (#793). The single-passage code behind the 2004 network procedure (held).
+    Its only checks are against closed-form isentropic, Fanno and Rayleigh lines (Tables II-III), which
+    combaero''s Fanno-Rayleigh kernel already reproduces from first principles -- so it adds a code-to-code
+    benchmark with printed numbers (Example 3 is directly reproducible: Fanning f 0.10, M 0.20 -> 0.75 over
+    36.0143 d; my check of the Fanno function with gamma 1.4 and Fanning f gives 36.015 d), not data. Example 1 (radial-turbine passage with pumping) needs rotation, which combaero does
+    not model. Friction/heat-transfer correlations are cited, not new. No measured case; no closure to
+    implement.'
+  read_for: ['#793 single-passage compressible code-to-code check (friction, area change, heat transfer)']
+  issues: [793]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (19900018406, public). The report number is AVSCOM TR 89-C-008 (the
+    wanted entry said "AVSCOM TP"). Its ref. 5, the preliminary CPF report, is Kumar, Roelke & Meitner 1989,
+    NASA TM-102079 (NTRS 19890013491, not fetched).
 - file: sources/combustor_network/andreini2007_CEAS-2007-026_liner_temperature.pdf
   citation: 'Andreini, A., Carcasci, C., Ceccherini, A., Facchini, B., Surace, M., Coutandin, D., Gori,
     S., Peschiulli, A. (2007). Combustor liner temperature prediction: a preliminary tool development and
@@ -4315,16 +4347,6 @@ wanted:
     McGreehan-Schotsch. The pressure-reference question is answered by Thole et al. 1997 (held: Cd referenced
     to the supply TOTAL pressure). Content as recalled, unverified.'
   where: ASME Digital Collection (paywalled).
-- citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
-    NASA TP-2985, AVSCOM TP 89-C-008.
-  checked: false
-  issues:
-  - 793
-  priority: later
-  question: The single-passage CPF code behind the 2004 network procedure (its governing equations and
-    any sample cases); a further code-to-code check of one compressible passage with friction, area change
-    and heat transfer.
-  where: NTRS (NASA Technical Paper).
 - citation: Jin, H., Riddle, A., Cooke, L. (2008). A compressible flow network analysis for design upgrade
     of industrial aero derivative HP turbine blades. ASME GT2008-50431.
   checked: false
