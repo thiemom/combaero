@@ -729,8 +729,8 @@ documents:
     support for treating dense effusion as a slot with a potential core. Its value is the leads: Simon 1986
     NASA TP-2655 (slot film with free-stream and coolant turbulence, the #714 Tu closure), Hatch & Papell
     1959 and Papell 1960 (NASA TN D-130, D-299), Kirollos & Povey 2015 (energy-consistent superposition, #387),
-    Sturgess 1980/1986, Goldstein, Shavit & Chen 1965 (porous section); all now in the wanted list or noted
-    here. The data are Wambersie, Ireland & Mayo 2021, IJTPP 6(2) 16 (open access, not held).'
+    Sturgess 1980/1986, Goldstein, Shavit & Chen 1965 (porous section); Simon 1986 and Kirollos & Povey 2015
+    are now held (own entries), the others wanted or noted here. The data are Wambersie, Ireland & Mayo 2021, IJTPP 6(2) 16 (open access, not held).'
   read_for: ['#714 slot film leads (turbulence closure, core length)', '#387 superposition alternatives',
     transpiration / high-porosity film]
   issues: [387, 714]
@@ -989,7 +989,65 @@ documents:
   code: ['include/cooling_correlations.h: slot_film_effectiveness_marek_tacina_1975, slot_film_effectiveness_marek_tacina_1975_and_derivatives', 'include/cooling_correlations.h: slot_film_span_average_marek_tacina_1975',
     'python/combaero/network/components.py: SlotFilmElement (#749)']
   notes: Also fidelity-scored (validation/cooling/fidelity.py); 'implemented' chosen as the higher status.
-    No text layer on p.1 (scan). Element design and Tu closure (stage 2) pending.
+    No text layer on p.1 (scan). Element design and Tu closure (stage 2) pending. Simon 1986 (NASA TP-2655,
+    held) re-correlates this report's data with a wall-jet model (lateral Tu, M, T ratio, coolant Tu).
+- file: sources/heat_transfer/film/Simon_1986_NASA_TP-2655_slot_film_jet_model_turbulence.pdf
+  citation: Simon, F. F. (1986). Jet model for slot film cooling with effect of free-stream and coolant
+    turbulence. NASA Technical Paper 2655 (E-2961), Lewis Research Center, October 1986.
+  id: NASA TP-2655 (NTRS 19870008601)
+  topic: [film, combustion]
+  content: 'Scan, no text layer, 21 pp. (equations and tables read from page images). Wall-jet model of a 2-D
+    slot film: an initial region x < x1 (zone II coolant core being entrained into, zone I mixing layer) and a
+    fully developed region x >= x1 (adiabatic wall = mixed jet temperature). Composition, cp and T_inf constant,
+    no radiation. General form Eq. 32: eta = 1/(1 + (x/(M S)) C_M''), C_M'' = (C_M - beta/(x/(M S)))/(1 + beta)
+    (Eq. 33); beta = 0 and C_M'' = C_M for x >= x1, so the developed region IS the Juhasz-Marek / Marek-Tacina
+    form eta = 1/(1 + C_M x/(M S)) (Eq. 9). Mixing coefficient from Abramovich jet growth db/dx ~ a_o v''/U*
+    with U* the density-weighted velocity (Eqs. 14-21): C_M = a_o (I_v omega)^N, omega = (1 + T_inf/T_s)/(1 +
+    M) (Eq. 41). FITTED (Figs. 3-4): N = 0.65, a_o = 0.177, i.e. C_M = 0.177 (I_v omega)^0.65 (Eqs. 29/35/39)
+    for I_v,inf = 0.026-0.13, both regions; at I_v,inf = 0.244 the developed region uses C_M = [0.245 (1 -
+    x1/x) + 0.177 x1/x] (I_v omega)^0.65 (Eqs. 30/40). Effective lateral intensity I_v = I_v,inf + 0.4
+    |I_v,inf - I_v,s| (Eqs. 23/42, after Ko & Liu 1980), capped at no more than both I_v,inf and I_v,s (as
+    printed); I_v = v''/U_inf is the TRANSVERSE (lateral, wall-normal) intensity referred to the free-stream
+    velocity, NOT the axial Tu Marek-Tacina use. Initial region: beta (Eq. 34) = [C_M x/(M S) + x/x1 - 13.7
+    I*_v,s (T_s/T_aw,x1) ln(1/(1 - x/x1))] psi, psi = (T_aw,x1 - T_aw)/(T_inf - T_s), I*_v,s = v''_s/U_s the
+    coolant intensity on coolant velocity (A50); C_o = 13.7 fitted with I*_v,s = 0.089 (one value, from a
+    1985 personal communication with Marek). Core length Eq. 36: x1 = 1/((C_M/S) F(R)), F(R) = 1/(1/((T_s/
+    T_aw,x1)(0.416 + 0.134 R)) - 1), R = U_inf/U_s (Abramovich), iterated (App. B flow chart, start x1 = 20 M
+    S). Table I prints x1 (cm) and x1/(M S) calculated vs experimental (calc. 12.4-41.9; exp. 8 to 39, several
+    only bounds ">16"); Table II prints per run M, I_v,s, I_v, d phi/dx, omega. DATA: none new -- all of it is
+    Marek & Tacina 1975 (TN D-7958, ref. 3; 62 m/s, 590 K, 1 atm, coolant ambient, 10.5 x 37 cm duct, 8 of 9
+    stations, the 9th dropped for conduction), I_v,inf = 0.026/0.08/0.13/0.244 for its four blockage plates,
+    M 0.41-1.86. Jet I_v,s measured only at M = 1.85 (0.119), the other M assume a constant exit intensity
+    (0.033-0.090). Fig. 5: prediction vs data, average deviation +-4% (the abstract says: lateral Tu up to 24%,
+    M up to 1.9). Fig. 7: coolant Tu (I*_v,s 0.01 vs 0.09) changes eta only in the initial region, more at low
+    free-stream Tu.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #714 stage 2. It is the ONLY printed turbulence closure for this slot film
+    beyond Marek-Tacina Eq. 5, but it does NOT plug the gap as an independent source: its constants (a_o 0.177,
+    N 0.65, 0.245, C_o 13.7) are fitted to the SAME D-7958 data the shipped kernel is fitted to, so the +-4% is
+    a fit residual on the fitting set, not cross-source accuracy (and D-7958 Table I is the only data it can be
+    scored on -- a fidelity check of an implementation, never an accuracy claim). What it adds over Eq. 5: (1)
+    a blowing-ratio and temperature-ratio dependence of C_M through omega (my arithmetic from its Table II: at
+    the 0% plate C_M 0.027 at M 0.45 vs 0.030 at M 1.85; at the 90% plate 0.103 vs 0.072, against Eq. 5''s
+    single 0.0175 and 0.0875 at axial Tu 7%/35%); (2) the coolant turbulence term, but only through the
+    initial region and with one assumed coolant intensity; (3) a printed potential-core length x1 (x1/(M S)
+    ~12-42 calculated, longer than much of the D-7958 span), which the kernel lacks. Can it replace or calibrate
+    C_m(Tu)? Not directly: its input is LATERAL I_v = v''/U_inf (0.026-0.244 on the plates whose AXIAL Tu is
+    7-35%, ratio ~0.37-0.70, rig-specific), which a user rarely knows, plus T_inf/T_s and I_v,s; an axial-to-
+    lateral conversion would be a tuning assumption. Usable as a declared alternative closure on D-7958 Table I
+    (the one dataset it was built on), with the Marek-Tacina Tu box; the cross-source accuracy question for
+    either closure stays open (needs another lab''s slot data with measured Tu: Ballal & Lefebvre 1973 SME 4,
+    Sturgess 1977/1980). Not checked: whether D-7958 itself prints the lateral intensities (Simon''s I_v,inf
+    values were not traced in it); the asymmetry between Eq. 7 ((x1 - x)/x1) and Eq. 13 ((x1 - x)/x) is as
+    printed, Eq. 34 uses the Eq. 31 simplification. Not implemented.'
+  read_for: ['#714 stage 2 slot-film turbulence closure (free-stream and coolant Tu)', '#714 near-slot
+      potential-core length']
+  issues: [714]
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (19870008601, public). Leads: Sturgess & Lenertz 1977 (ASME 77-HT-10,
+    mainstream Tu), Sturgess 1980 (J. Eng. Power 102, 524, film/coolant Tu), Sturgess & Pfeifer 1986 (J. Eng.
+    Gas Turbines Power 108, 361, film initial region), Ko & Liu 1980 (AIAA J. 18, 907), Marek 1973 (NASA TM
+    X-2809, film effectiveness independent of pressure 1-20 atm), Juhasz & Marek 1971 (TN D-6360).'
 - file: sources/heat_transfer/film/oct23/19770014416.pdf
   citation: Rousar, D. C., Ewen, R. L. (1977). Combustion effects on film cooling. NASA CR-135052, Aerojet
     Liquid Rocket Co., Sacramento.
@@ -4228,16 +4286,6 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
-- citation: Simon, F. F. (1986). Jet model for slot film cooling with effect of free-stream and coolant turbulence.
-    NASA Technical Paper 2655.
-  checked: false
-  issues:
-  - 714
-  priority: now
-  question: The slot film's turbulence closure (#714 stage 2, Marek-Tacina C_m(Tu) pending), from a core plus
-    developed-region jet model with free-stream AND coolant turbulence; also the core length that the near-slot
-    region needs. Cited by Wambersie & Ireland 2023 (held).
-  where: NTRS (free).
 - citation: Hatch, J. E., Papell, S. S. (1959). Use of a theoretical flow model to correlate data for film cooling
     or heating an adiabatic wall by tangential injection of gases of different fluid properties. NASA TN D-130.
     Papell, S. S. (1960), NASA TN D-299 (angled slots and normal holes) is its sequel.
