@@ -34,6 +34,7 @@ ejector_huang_critical_back_pressure_and_jacobian = (
     _core.ejector_huang_critical_back_pressure_and_jacobian
 )
 ejector_huang_mixing_coefficient = _core.ejector_huang_mixing_coefficient
+ejector_nozzle_exit_mach = _core.ejector_nozzle_exit_mach
 ejector_sudden_expansion_dead_head_and_jacobian = (
     _core.ejector_sudden_expansion_dead_head_and_jacobian
 )
@@ -97,6 +98,7 @@ __all__ = [
     "ejector_jetpump_incompressible_residuals_and_jacobian",
     "ejector_entrainment_ratio_and_jacobian",
     "ejector_jetpump_discharge_and_jacobian",
+    "ejector_nozzle_exit_mach",
     "enthalpy_and_jacobian",
     "friction_and_jacobian",
     "friction_and_jacobian_colebrook",

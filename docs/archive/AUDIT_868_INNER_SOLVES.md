@@ -63,9 +63,9 @@ Line numbers are on the branch.
 | S1 | state.cpp:118 | `State::set_VH_mass` | Newton on u + R T = h | 20 | 1e-4 K abs step | silent | none (monotone) | latent | fixed: throws. rec R5 |
 | G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor |
 | G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3 |
-| G3 | stagnation.cpp:324 | `chamber_static_state` | Newton from Tt | 100 | 1e-13 Tt step | silent; implicit J then evaluated at the non-root | none (f falls in T, one root) | bug (48 probe hits at Tt = -1.4e19 K) | fixed: cap rule. rec R4 |
+| G3 | stagnation.cpp:324 | `chamber_static_state` | Newton from Tt | 100 | 1e-13 Tt step | silent; implicit J then evaluated at the non-root | none (f falls in T, one root) | bug (48 probe hits at Tt = -1.4e19 K) | fixed: cap rule; R4 fixed (#937): Tt <= 0 or non-finite refused |
 | G4 | stagnation.cpp:408 | `sonic_static_state` | Newton | 100 | 1e-13 Tt step | silent, implicit J at non-root | none | latent | fixed: cap rule |
-| G5 | stagnation.cpp:489 | `duct_static_state` | Newton in ln P on [ln P*, ln Pt] | 100 | 1e-15 abs step in ln P | silent | bisection when Newton leaves the bracket | safe | none. rec R9 |
+| G5 | stagnation.cpp:489 | `duct_static_state` | Newton in ln P on [ln P*, ln Pt] | 100 | 1e-15 abs step in ln P | silent | bisection when Newton leaves the bracket | safe | R9 fixed (#941): cap rule |
 | C1 | compressible.cpp:41 | `solve_T_isentropic` (`nozzle_flow`, `mass_flux_isentropic`, `mach_from_pressure_ratio`, `critical_pressure_ratio`, the solves below) | Newton, step <= 0.5 T, floor | 50 (caller) | 1e-8 (1 + T) step | silent; 148 849 hits, all at the floor | none (s monotone) | latent (floor hits are the documented clamp) | fixed: a root below the floor returns the floor at once (same value; the 49 clamped repeats are skipped), any other cap exit throws. rec R1 |
 | C2 | compressible.cpp:120 | `find_critical_pressure` | golden section on [0.3, 0.99] Pt | >= 200 | width < tol (1 + a + b) | silent, bracket 0.618^200 | fixed bracket (P*/Pt 0.49-0.61 for gamma 1.67-1) | safe | none |
 | C3 | compressible.cpp:292 | `solve_P_back_from_mdot` | bisection on [P*, Pt] | >= 200 | G within tol, width tol (Pt - P) | silent; 1 hit at 1 ulp | bracket | safe | none |
@@ -74,7 +74,7 @@ Line numbers are on the branch.
 | C6 | compressible.cpp:462 | `solve_T_from_energy` (Fanno marches) | Newton, step <= 0.3 T, floor | 50 | 1e-8 T step | silent | none (F rises in T: u grows with T at fixed P) | latent | fixed: throws, floor kept |
 | C7 | compressible.cpp:647 | `fanno_channel` march | adaptive RK4 | `kFannoMaxSteps` = 2e5 | | silent: outlet at x < L reported unchoked | step halving near M = 1 | latent | fixed: throws |
 | C8 | compressible.cpp:894 | `fanno_channel_rough` march | adaptive RK4 | 2e5 | | silent, as C7 | | latent | fixed: throws |
-| C9 | compressible.cpp:1094 | `solve_station_state` | Newton | caller | tol T step | returns `false` | | safe (reports); `[[maybe_unused]]`, no caller | rec R10 |
+| C9 | compressible.cpp:1094 | `solve_station_state` | Newton | caller | tol T step | returns `false` | | safe (reports); `[[maybe_unused]]`, no caller | R10 fixed (#942): deleted |
 | C10 | compressible.cpp:1320 | `nozzle_quasi1d` area-Mach | Newton, M clamped to [0.001, 0.999] subsonic, <= 10 | 50 | abs 1e-10 in A/A* | silent; 57 hits where A < A*_eff (no subsonic root; at a choked throat the root is M = 1, held at 0.999) | clamps | best effort by design | rec R7 |
 | C11 | compressible.cpp:1372 | `nozzle_quasi1d` (T, P) per station | sequential Newton, approximate da/dT, clamps | 50 (caller) | tol relative on s and h | silent | clamps T <= Tt, P in [100, Pt] | latent | rec R7 |
 | F1 | fanno_mach.cpp:64 | `static_T` | Newton in a bracket | 100 | 1e-14 T step | silent | bisection when Newton leaves | safe | fixed: cap rule |
@@ -91,7 +91,7 @@ Line numbers are on the branch.
 | O1 | orifice.cpp:1307 | `pipe_equivalent_c` | Newton in [1e-6, 1e3] | 100 | 1e-14 C step | silent | bisection | safe | fixed: cap rule |
 | O2 | orifice.cpp:1462 | `solve_orifice_mdot` | fixed point on Cd(Re) | caller | rel change < tol | throws | | safe | none |
 | O3 | orifice.cpp:1778 | `jobson_expansibility` | fixed point (approach term O(beta^4)) | 200 | 1e-15 relative | silent; 2 hits at 3e-14 / 4e-15 (rounding cycle) | | safe at the hits | fixed: cap rule (the hits are kept, bit-identical). rec R11 |
-| H1 | humidair.cpp:205 | `dewpoint` | Newton, FD slope, clamped [T_lo, T] | 100 | 1e-6 K | throws; but RH > 1 puts the root above T, Newton sits on the clamp and "converges" to T | clamp | latent | rec R12 |
+| H1 | humidair.cpp:205 | `dewpoint` | Newton, FD slope, clamped [T_lo, T] | 100 | 1e-6 K | throws; RH > 1 would put the root above T (Newton on the clamp, "converged" to T), but `vapor_pressure` refuses RH > 1 first | clamp | safe | R12 (#944): documented |
 | H2 | humidair.cpp:317 | `wet_bulb_temperature` | Newton in a bracket | 200 | 1e-6 K | throws | bisection | safe | none |
 | R1 | friction.cpp:92 | `friction_colebrook` | Newton from Serghides | 20 (caller) | 1e-10 relative | silent (also on a flat slope) | none (monotone) | latent (reachable by the caller) | fixed: throws |
 | E1 | equilibrium.cpp:80 | `newton_damped` (WGS extent at 165, 276, 441, 845; adiabatic T at 217, 972) | damped Newton, FD slope eps = 1e-6 max(1, abs x), clamped | 40 / 50 | abs 1e-12 on f, or xtol_rel | silent on cap and on a flat slope | clamps only | bug (787 + 42 hits) | rec R2 |
@@ -102,8 +102,8 @@ Line numbers are on the branch.
 | M1 | acoustics.cpp:1041 | `refine_root_muller` | Muller | `kMullerMaxIter` = 50 | 1e-6 rad/s | returns last iterate by design | | safe: both callers (can_annular_solvers.cpp:188, 316) accept a mode only if abs(D) < `kDispersionTolerance` y_scale | none |
 | M2 | can_annular_solvers.cpp:432 | `refine_root_muller_annular` | Muller | 50 | 1e-6 | as M1 | | safe: caller (549) checks abs(D) | none |
 | X1 | crossflow_cd.cpp:144 | `florschuetz_metzger_su_1982_cd` falling branch | Newton, clamped (0, 4 cd0] | 100 | 1e-15 cd0 step | silent; implicit dCd/dq then at a non-root | none (one root, dF/dCd > 0) | latent | fixed: cap rule |
-| J1 | ejector.cpp:25 | `ejector_mach_from_area_ratio_supersonic` | bisection on [1 + 1e-12, 50] | 200 | | silent end point for an area ratio outside [1, A/A*(50)] | | latent | rec R13 |
-| J2 | ejector.cpp:168 | `ejector_cd_nozzle_exit_static_and_jacobian` | bisection on [P*, Pt (1 - 1e-12)] | 200 | | silent end point (and implicit J there) for m_dot outside the nozzle's range | | latent | rec R13 |
+| J1 | ejector.cpp:25 | `ejector_mach_from_area_ratio_supersonic` | bisection on [1 + 1e-12, 50] | 200 | | silent end point for an area ratio outside [1, A/A*(50)] | | latent | R13 fixed (#945): flag and clamp |
+| J2 | ejector.cpp:168 | `ejector_cd_nozzle_exit_static_and_jacobian` | bisection on [P*, Pt (1 - 1e-12)] | 200 | | silent end point (and implicit J there) for m_dot outside the nozzle's range | | latent | R13 fixed (#945): flag and clamp, J of the clamp |
 | M3 | side_stream_momentum.cpp:172 | `chamber_merge_face_state` | fixed point (quadratic in P_f, then static T) | 100 | 1e-12 Tt step | silent; implicit (P_f, T_f) derivatives at a non-root | discriminant floor | latent | fixed: cap rule |
 
 Not solves, checked and excluded: the fixed-grid RK4 `march_zeta`
@@ -211,6 +211,11 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   negative Tt (garbage from an upstream state) and, when the Newton happens
   to converge, returns a negative T. `duct_static_state` floors its inputs;
   this one could refuse Tt <= 0. Behaviour change for probes.
+  **Fixed (#937, #948):** Tt <= 0 or non-finite raises `std::runtime_error` (the
+  cap exit's type). Main returned T = -1.00001 K at Tt = -1 K and 0 at 0. The
+  cascaded branching manifold (`test_tee_network`, xfail) now records its
+  garbage-Tt probes (-4.3e18 K) as rejected node evaluations instead of
+  Newton cap exits; it ends at the same |F| = 1.910e4 as main.
 - **R5 (S1) `set_VH_mass` is `calc_T_from_h_mass`.** For an ideal gas
   u + R T = h, so the hand Newton (20 steps, 1e-4 K) is the safeguarded
   enthalpy inverse at a coarser tolerance; switching moves results by up to
@@ -230,17 +235,44 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
 - **R9 (G5, E2) Cap rule for the remaining bracketed solves.** Not reached
   and bracketed with bisection; the same rule could be applied for
   uniformity. E2's non-finite break returns a clamped extent silently.
+  **G5 fixed (#941, #948):** `duct_static_state` applies the cap rule on its last
+  ln P step (`inner_solve::kDuctStaticStateMaxIter` = 100, unchanged). Not
+  reached: network F and J bit-identical (below). E2 is in its own PR.
 - **R10 (C9) Delete `solve_station_state`.** Dead code (`[[maybe_unused]]`).
+  **Fixed (#942, #948):** deleted; nothing else used only it.
 - **R11 (O3) Jobson tolerance.** 1e-15 relative cycles in the last bits
   (2 cap exits at 3e-14); 1e-13 would end those calls ~190 iterations sooner
   with no change beyond 3e-14.
 - **R12 (H1) `dewpoint` with RH > 1.** Supersaturated input returns T (the
   clamp) as the dewpoint; refuse RH > 1, or document dewpoint = T.
+  **Done (#944, #948), and the finding was narrower than stated:** the public
+  `dewpoint` never reaches the Newton with RH > 1, because `vapor_pressure`
+  refuses RH outside [0, 1] (on main too: `dewpoint(300, 101325, 1.0000001)`
+  raises; `std::invalid_argument` since #928). Only RH = 1 lands on the clamp,
+  where T is the right answer. Documented as such (header, binding,
+  API_CPP.md, API_PYTHON.md); no behaviour change.
 - **R13 (J1, J2) Ejector bisections outside their range.** An area ratio
   below 1 (or above A/A*(50)) and an m_dot above the C-D nozzle's choked flow
   (or below its near-zero end) return a bracket end silently, J2 with its
   implicit Jacobian there. Clamp or refuse is a modelling decision for the
   ejector element.
+  **Fixed (#945, #948), flag and clamp (user decision):** both keep the bisection's
+  value. J2 (`ejector_cd_nozzle_exit_static_and_jacobian`) sets
+  `out_of_range` (+1 above the flow at P*, -1 below the flow at
+  Pt (1 - 1e-12)) and returns the clamped function's partials
+  (dP/dm_dot, dP/dPt, dP/dTt) = (0, k, 0), k = r_crit or 1 - 1e-12,
+  FD-verified. J1 is reported by the new internal `ejector_nozzle_exit_mach`
+  and `EjectorElementResidualJacobian.nozzle_exit_mach_out_of_range`;
+  `EjectorElement.diagnostics` reports `<id>.nozzle_exit_mach_out_of_range`.
+  M_p1 is a constant in every Newton unknown, so its clamp's zero derivative
+  is what the chain already used; the element rows FD-check at a clamped
+  point (A_p1/A_t = 1e4, gamma 5/3) to 6e-7. Which paths reach them: J2 has
+  no caller inside the library (the element solves P_py as an unknown; the
+  Python `cd_nozzle_exit_static` is a value-only twin), so only a direct
+  call can be out of range. J1's area ratio is a fixed parameter (> 1,
+  checked at the element and, since #923, at the public entry); with gamma
+  in (1, 5/3] it is clamped only for A_p1/A_t above ~7.8e3 (gamma 5/3) to
+  ~1.5e6 (gamma 1.4), which no stress draw reaches (#948: 1786 ejector element evaluations over the 40 stress seeds, 0 flagged).
 
 ## Not verified
 

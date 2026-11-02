@@ -1294,6 +1294,15 @@ JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
 // also need a finite, positive supply state. The two whole-element residual
 // functions check their Newton iterates for finiteness only (#769).
 //
+// Flag and clamp (#945): the two bisections return their bracket end for a
+// target outside the bracket and say so. The nozzle-exit Mach (bracket
+// M in [1, 50]) by ejector_nozzle_exit_mach and the element result's
+// nozzle_exit_mach_out_of_range; the C-D nozzle exit-static inverse
+// (P_py in [P*, Pt (1 - 1e-12)]) by EjectorCDExitStaticJacobian::out_of_range,
+// with the clamped function's partials (0, k, 0). -1 below, +1 above, 0 in.
+struct EjectorNozzleExitMach { double mach; int out_of_range; };
+EjectorNozzleExitMach ejector_nozzle_exit_mach(double area_ratio, double gamma);
+//
 // Ejector operating anchors (P_c*, P_b0): the end of the critical plateau and
 // the far end of the subcritical droop. Two closure families, selected as a
 // pair by ejector_element_residuals_and_jacobian's anchor_closure argument:
@@ -1942,7 +1951,7 @@ using AnnularDuctGeometry [[deprecated]] = Annulus;  // since v0.2.0, no removal
 
 ```cpp
 double humidity_ratio(double T, double P, double RH);
-double dewpoint(double T, double P, double RH);
+double dewpoint(double T, double P, double RH);  // RH in (0, 1]; RH = 1 -> T; RH > 1, RH <= 0 or non-finite throw invalid_argument
 double humid_air_density(double T, double P, double RH);
 
 struct HumidAir {

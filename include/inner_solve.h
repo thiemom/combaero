@@ -22,6 +22,7 @@ constexpr double kCapAcceptRel = 1e-10;
 // (the audit table, docs/archive/AUDIT_868_INNER_SOLVES.md, lists them all).
 // Values unchanged from the literals they replace.
 constexpr int kStaticStateMaxIter = 100;          // chamber_ / sonic_static_state
+constexpr int kDuctStaticStateMaxIter = 100;      // duct_static_state, Newton in ln P
 constexpr int kSetVHMaxIter = 20;                 // State::set_VH_mass
 constexpr double kSetVHTolK = 1e-4;               // State::set_VH_mass step [K]
 constexpr int kMergeFaceMaxIter = 100;            // side-stream merge face fixed point

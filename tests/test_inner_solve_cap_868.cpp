@@ -33,10 +33,11 @@ TEST(InnerSolveCap868, CapExitIsRootRejectsNaNAndWideSteps) {
 
 // A solver probe with a garbage stagnation T (-1.4e19 K, from the cascaded tee
 // manifold test) ran chamber_static_state's Newton to its cap and returned
-// T = 1e11 K as the static state.
+// T = 1e11 K as the static state. Since #937 it is refused up front, as an
+// invalid argument.
 TEST(InnerSolveCap868, ChamberStaticStateThrowsOnAProbeItCannotSolve) {
   const std::vector<double> X = dry_air();
-  EXPECT_THROW(chamber_static_state(-1.393e19, 7.734e4, 85.02, X), std::runtime_error);
+  EXPECT_THROW(chamber_static_state(-1.393e19, 7.734e4, 85.02, X), std::invalid_argument);
   const ChamberStaticState cs = chamber_static_state(400.0, 1.0e5, 150.0, X);
   const double R = specific_gas_constant(X);
   const double v = 150.0 * R * cs.T / 1.0e5;

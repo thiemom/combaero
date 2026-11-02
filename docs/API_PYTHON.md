@@ -1837,9 +1837,12 @@ ejector = EjectorElement(
 # live at the entrained-flow choking plane. The whole 4-row (f, J) is assembled in
 # C++ (full analytic Jacobian, no FD fallback). diagnostics() reports the actual
 # entrainment_ratio = ms/mp (Huang's omega; the internal API keeps that name),
-# a critical_mode flag, and (in critical mode) P_c_star and
-# entrainment_ratio_critical. Pressure keys follow P = static, Pt = total
-# (#773): P_jct is the mixing-plane static P_py, Pt_out the outlet total;
+# a critical_mode flag, nozzle_exit_mach_out_of_range (#945: +1 or -1 when
+# area_ratio_nozzle lies outside A/A* of the nozzle-exit Mach bisection's
+# bracket [1, 50], so M_p1 is that bracket end, clamped; 0 otherwise), and (in
+# critical mode) P_c_star and entrainment_ratio_critical. Pressure keys
+# follow P = static, Pt = total (#773): P_jct is the mixing-plane static P_py,
+# Pt_out the outlet total;
 # there is no Pt_jct, as the plane carries two streams at one static
 # pressure and different velocities, hence no single total.
 # verify_solution_consistent(sol) returns True unconditionally now that every
@@ -3462,3 +3465,8 @@ print(f"Humidity ratio: {air.humidity_ratio} kg/kg")
 print(f"Dewpoint: {air.dewpoint} K")
 print(f"Underlying state P: {air.state.P} Pa")
 ```
+
+`cb.dewpoint(T, P, RH)` returns the dewpoint [K] for RH in (0, 1]; at RH = 1
+it is the dry-bulb `T` itself. A supersaturated RH > 1 raises `ValueError`
+(the vapour-pressure step refuses it; the dewpoint solve, clamped to T, would
+otherwise return `T`), as do RH <= 0 and a non-finite RH.

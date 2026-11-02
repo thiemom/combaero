@@ -8,9 +8,11 @@
 #include "../include/transport.h"
 #include "../include/input_validation.h"
 #include "../include/inner_solve.h"
-#include <cmath>
-#include <stdexcept>
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <stdexcept>
+#include <string>
 
 namespace combaero {
 
@@ -319,6 +321,17 @@ double gl8_split(F f, double a, double b) {
 
 ChamberStaticState chamber_static_state(double Tt, double P, double G,
                                         const std::vector<double> &X) {
+  // A non-positive or non-finite Tt (garbage from an upstream state at a
+  // solver probe) has no static state: refuse it (#868 R4). The Newton below
+  // either ran to its cap on it or, when it happened to converge, returned a
+  // negative T. An invalid argument (ValueError, #928), unlike the cap exit;
+  // the solver rejects the probe either way.
+  if (!validation::is_finite_positive(Tt)) {
+    char buf[64];
+    std::snprintf(buf, sizeof buf, "%.6e", Tt);
+    throw std::invalid_argument(
+        std::string("chamber_static_state: Tt must be finite and > 0 K (got ") + buf + ")");
+  }
   const double R = specific_gas_constant(X);
   const double k = (G * R / P) * (G * R / P);  // v^2 = k T^2
   auto cp_of = [&](double t) { return cp_mass(t, X); };
@@ -490,7 +503,7 @@ DuctStaticState duct_static_state(double Tt, double Pt, double G,
   }
   double u = u_hi;
   double L = eval(u, cs);
-  for (int it = 0; it < 100 && L != 0.0; ++it) {
+  for (int it = 0; L != 0.0; ++it) {
     if (L > 0.0) {
       u_hi = u;
     } else {
@@ -501,11 +514,22 @@ DuctStaticState duct_static_state(double Tt, double Pt, double G,
     if (!(u_new > u_lo && u_new < u_hi)) {
       u_new = 0.5 * (u_lo + u_hi);
     }
-    const bool done = std::abs(u_new - u) <= 1e-15 * std::abs(lnP0) + 1e-15;
+    const double step = u_new - u;
+    const bool done = std::abs(step) <= 1e-15 * std::abs(lnP0) + 1e-15;
     u = u_new;
     L = eval(u, cs);
     if (done) {
       break;
+    }
+    if (it + 1 == inner_solve::kDuctStaticStateMaxIter) {
+      // Cap rule (#868 R9): the last step closed to rounding is a root;
+      // anything wider is not, and the implicit derivatives below would
+      // describe a non-root.
+      if (inner_solve::cap_exit_is_root(step, std::max(1.0, std::abs(u)))) {
+        break;
+      }
+      inner_solve::throw_no_convergence("duct_static_state", inner_solve::kDuctStaticStateMaxIter,
+                                        "ln P step", step);
     }
   }
   const double P = std::exp(u);

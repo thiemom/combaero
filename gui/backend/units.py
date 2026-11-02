@@ -281,6 +281,7 @@ UNIT_MAP: dict[str, str] = {
     "entrainment_ratio": "-",  # m_dot_secondary / m_dot_primary (#773)
     "entrainment_ratio_critical": "-",
     "critical_mode": "-",
+    "nozzle_exit_mach_out_of_range": "-",  # M_p1 clamped: +1 above, -1 below (#945)
     "s_choke": "-",
     "r_gas": "J/kg/K",
     "P_c_star": "Pa",

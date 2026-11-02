@@ -1723,7 +1723,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("p_py", &solver::EjectorCDExitStaticJacobian::p_py)
       .def_readonly("dp_py_dm_dot", &solver::EjectorCDExitStaticJacobian::dp_py_dm_dot)
       .def_readonly("dp_py_dp0", &solver::EjectorCDExitStaticJacobian::dp_py_dp0)
-      .def_readonly("dp_py_dt0", &solver::EjectorCDExitStaticJacobian::dp_py_dt0);
+      .def_readonly("dp_py_dt0", &solver::EjectorCDExitStaticJacobian::dp_py_dt0)
+      .def_readonly("out_of_range", &solver::EjectorCDExitStaticJacobian::out_of_range,
+                    "+1: m_dot above the flow at P* (P_py clamped to P*); -1: below the\n"
+                    "flow at Pt (1 - 1e-12) (P_py clamped there); 0: in range. A clamped\n"
+                    "result's partials are the clamped function's (0, k, 0).");
 
   py::class_<solver::EjectorJetPumpDischargeJacobian>(
       m, "EjectorJetPumpDischargeJacobian",
@@ -1735,6 +1739,19 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("dp03_dt_e", &solver::EjectorJetPumpDischargeJacobian::dp03_dt_e)
       .def_readonly("dp03_dp_py", &solver::EjectorJetPumpDischargeJacobian::dp03_dp_py)
       .def_readonly("dp03_domega", &solver::EjectorJetPumpDischargeJacobian::dp03_domega);
+
+  py::class_<solver::EjectorNozzleExitMach>(
+      m, "EjectorNozzleExitMach",
+      "Supersonic nozzle-exit Mach M_p1 from A/A* plus its out-of-range flag")
+      .def_readonly("mach", &solver::EjectorNozzleExitMach::mach)
+      .def_readonly("out_of_range", &solver::EjectorNozzleExitMach::out_of_range);
+
+  m.def("ejector_nozzle_exit_mach", &solver::ejector_nozzle_exit_mach, py::arg("area_ratio"),
+        py::arg("gamma"),
+        "Supersonic root M of A/A*(M) = area_ratio on the bisection bracket\n"
+        "[1 + 1e-12, 50]. An area ratio outside A/A*(bracket) returns the\n"
+        "bracket end (clamp) with out_of_range = -1 (below) or +1 (above).\n\n"
+        "Returns: EjectorNozzleExitMach (mach, out_of_range)");
 
   m.def("ejector_choked_mass_flow_and_jacobian",
         &solver::ejector_choked_mass_flow_and_jacobian, py::arg("Pt"),
@@ -1863,7 +1880,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "R1, R2, R3]; `jacobian` is jacobian[row][seed] over the 9 unknowns "
       "(mp, ms, mdot_out, p_g, t_g, p_e, t_e, p_out, p_py).")
       .def_readonly("residuals", &solver::EjectorElementResidualJacobian::residuals)
-      .def_readonly("jacobian", &solver::EjectorElementResidualJacobian::jacobian);
+      .def_readonly("jacobian", &solver::EjectorElementResidualJacobian::jacobian)
+      .def_readonly("nozzle_exit_mach_out_of_range",
+                    &solver::EjectorElementResidualJacobian::nozzle_exit_mach_out_of_range,
+                    "Nonzero when the nozzle-exit Mach M_p1 is a clamped bracket end:\n"
+                    "+1 area_ratio_nozzle above A/A*(M = 50), -1 below A/A*(M = 1).");
 
   m.def(
       "ejector_element_residuals_and_jacobian",
@@ -2865,7 +2886,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
 
   m.def("dewpoint", &dewpoint, py::arg("T"), py::arg("P"), py::arg("RH"),
         "Dewpoint temperature [K] for ambient T [K], pressure P [Pa], and RH "
-        "(0-1).");
+        "(0-1).\n\n"
+        "RH in (0, 1]; RH = 1 returns T (saturated). RH > 1 (supersaturated), RH <= 0 "
+        "or non-finite RH raises ValueError.");
 
   m.def("relative_humidity_from_dewpoint", &relative_humidity_from_dewpoint,
         py::arg("T"), py::arg("Tdp"), py::arg("P"),
