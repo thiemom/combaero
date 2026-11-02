@@ -1046,6 +1046,39 @@ documents:
   records: []
   notes: 'Fetched 2026-11-02 by the lead from NTRS (19760011294, open access, authorised by the user). A
     duplicate copy from the user was removed. Not checked: the run-by-run table transcription (typed scan).'
+- file: sources/heat_transfer/film/Crawford_Kays_Moffat_1976_NASA_CR-2786_full_coverage_30deg_slant_injection.pdf
+  citation: Crawford, M. E., Kays, W. M., Moffat, R. J. (1976). Heat transfer to a full-coverage film-cooled
+    surface with 30 deg slant-hole injection. NASA CR-2786 (Stanford Report HMT-25), December 1976, NAS 3-14336.
+  id: NASA CR-2786 (NTRS 19770008401)
+  topic: [film, effusion]
+  content: 'Scan with a usable text layer, 247 pp. (245 per the form); printed page = PDF page - 16. The full
+    report behind the slant-hole data summarised in CR-2648: staggered holes inclined 30 deg downstream, P/D 5 and
+    10, injection mass flux ratio 0.1-1.3, Re_x 1.5e5-5e6, U_inf 9.8-34.2 m/s (32-112 ft/s), air, theta = 0
+    and theta = 1 with superposition. Ch. 3: St data vs blowing ratio, initial momentum/enthalpy thickness,
+    mainstream velocity and P/D; spanwise velocity and temperature profiles. Ch. 4: correlation of the theta =
+    1 data with the Couette-flow variables used for transpiration cooling (Sec. 4.2) and a differential
+    prediction model (2-D boundary layer, injection at each row, mixing length augmented and keyed to a jet
+    penetration distance). Appendix I (printed pp. 112-180) TABULATES every run in the CR-2642 format (St at
+    theta = 0 and 1, ETA, STCR, STHR, F) with the initial profiles; App. II spanwise profiles; App. IV-V initial
+    rows and an asymptotic St / jet coalescence; App. VI shear-stress and mixing-length profiles.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The primary for the Stanford 30 deg slant-hole set, the most combustor-relevant
+    geometry of the programme. Findings as printed (Ch. 5): with injectant at plate temperature the lowest St is
+    at a blowing ratio of about 0.4; higher ratios raise it, and above ~1.5 St could exceed the unblown value;
+    upstream-condition effects are confined to the first rows; P/D 10 gives less effect at equal blowing ratio;
+    in the recovery region (60 D past the last row) low ratios recover toward unblown St at once while high
+    ratios stay flat or keep falling. Uses as for CR-2642/CR-2648: STCR = St(theta=0)/St_o as measured gas-side
+    augmentation (#476) and ETA over 11 rows for superposition (#387), tabulated, no digitising. Caveats: DR ~1,
+    low mainstream Tu, low speed, so cross-source accuracy only. The prediction model''s augmentation constants
+    are fitted to these data (tuning).'
+  read_for: ['#476 effusion gas-side augmentation (30 deg slant, tabulated)', '#387 multi-row effectiveness and
+      superposition']
+  issues: [387, 476]
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (19770008401, open access, authorised by the user). Two earlier downloads
+    were truncated (HTTP/2 stream reset at ~4-5 MB, no byte-range resume); a fresh `curl --http1.1` fetch got the
+    full 14,299,063 bytes in under a minute. Not checked: the Ch. 4 Couette-flow correlation constants and the
+    Appendix I transcription.'
 - file: sources/heat_transfer/film/Crawford_Kays_Moffat_1980_NASA_CR-3219_full_coverage_three_geometries_STANCOOL.pdf
   citation: Crawford, M. E., Kays, W. M., Moffat, R. J. (1980). Full-coverage film cooling on flat, isothermal
     surfaces -- a summary report on data and predictions. NASA CR-3219 (Stanford Report HMT-23), January 1980,
