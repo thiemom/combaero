@@ -30,6 +30,9 @@ constexpr int kCrossflowCdMaxIter = 100;          // crossflow Cd, falling branc
 constexpr int kAreaChangeMaxIter = 200;           // area_change Mach / flux solves
 constexpr int kPipeEquivalentCMaxIter = 100;      // orifice pipe-equivalent C
 constexpr int kJobsonExpansibilityMaxIter = 200;  // Jobson expansibility fixed point
+constexpr int kWgsExtentMaxIter = 100;            // WGS extent, rtsafe (#927)
+constexpr int kAdiabaticMaxIter = 100;            // equilibrium adiabatic T, bracket + Brent
+constexpr int kReformingExtentMaxIter = 200;      // single-reaction reforming extent
 
 // True when a cap exit is a root to rounding: last step or bracket width
 // within kCapAcceptRel of the iterate's magnitude (false for a NaN).
