@@ -1,10 +1,12 @@
 #include "../include/equilibrium.h"
 #include "../include/combustion.h"
+#include "../include/inner_solve.h"
 #include "thermo.h"
 #include "composition.h"
 #include "thermo_transport_data.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -55,144 +57,12 @@ static inline void molefractions(const std::vector<double> &n,
   }
 }
 
-static inline double kp_wgs_from_indices(double T, std::size_t i_CO2,
-                                         std::size_t i_H2, std::size_t i_CO,
-                                         std::size_t i_H2O) {
-  double d_gRT = (g_over_RT(i_CO2, T) + g_over_RT(i_H2, T)) -
-                 (g_over_RT(i_CO, T) + g_over_RT(i_H2O, T));
-  return std::exp(-d_gRT);
+// ln Kp of WGS, taken directly (exp then log overflows at a cold T).
+static inline double lnKp_WGS(double T, const WgsConfig &cfg) {
+  const double d_gRT = (g_over_RT(cfg.i_CO2, T) + g_over_RT(cfg.i_H2, T)) -
+                       (g_over_RT(cfg.i_CO, T) + g_over_RT(cfg.i_H2O, T));
+  return -d_gRT;
 }
-
-static inline double Kp_WGS(double T, const WgsConfig &cfg) {
-  return kp_wgs_from_indices(T, cfg.i_CO2, cfg.i_H2, cfg.i_CO, cfg.i_H2O);
-}
-
-// -------------------------------------------------------------
-// Newton with damping
-// -------------------------------------------------------------
-
-// xtol_rel > 0 also stops once a step moves x by no more than xtol_rel |x|.
-template <typename Fun>
-static double newton_damped(Fun &&F, double x0, double xmin, double xmax,
-                            std::size_t maxIt = 40, double xtol_rel = 0.0) {
-  double x = x0;
-
-  for (std::size_t it = 0; it < maxIt; ++it) {
-    double f0 = F.f(x);
-
-    // Converged?
-    if (std::abs(f0) < 1e-12)
-      return clamp(x, xmin, xmax);
-
-    // Finite diff derivative
-    double eps = 1e-6 * std::max(1.0, std::abs(x));
-    double f1 = F.f(x + eps);
-    double df = (f1 - f0) / eps;
-
-    if (std::abs(df) < 1e-14)
-      return clamp(x, xmin, xmax);
-
-    double dx = -f0 / df;
-    double x_trial = x + dx;
-
-    // Damping if outside bounds
-    double lambda = 1.0;
-    while ((x_trial < xmin || x_trial > xmax) && lambda > 1e-6) {
-      lambda *= 0.5;
-      x_trial = x + lambda * dx;
-    }
-
-    const double x_new = clamp(x_trial, xmin, xmax);
-    if (xtol_rel > 0.0 && std::abs(x_new - x) <= xtol_rel * std::abs(x)) {
-      return x_new;
-    }
-    x = x_new;
-  }
-
-  return clamp(x, xmin, xmax);
-}
-
-// -------------------------------------------------------------
-// Solve WGS equilibrium at fixed T
-// -------------------------------------------------------------
-
-struct WgsIsothermalFun {
-  const std::vector<double> &n0;
-  WgsConfig cfg;
-  double lnKp;
-  mutable std::vector<double> n;
-
-  WgsIsothermalFun(const std::vector<double> &n0_, double T,
-                   const WgsConfig &cfg_)
-      : n0(n0_), cfg(cfg_), n(n0_.size()) {
-    lnKp = std::log(Kp_WGS(T, cfg));
-  }
-
-  double f(double xi) const {
-    composition_from_xi(n0, xi, cfg, n);
-
-    double nt = 0.0;
-    for (double v : n)
-      nt += v;
-
-    // Avoid divisions by zero
-    const double tiny = 1e-300;
-    double yCO2 = std::max(n[cfg.i_CO2] / nt, tiny);
-    double yH2 = std::max(n[cfg.i_H2] / nt, tiny);
-    double yCO = std::max(n[cfg.i_CO] / nt, tiny);
-    double yH2O = std::max(n[cfg.i_H2O] / nt, tiny);
-
-    double Q = (yCO2 * yH2) / (yCO * yH2O);
-    return std::log(Q) - lnKp;
-  }
-};
-
-static double solve_wgs_isothermal(const std::vector<double> &n0, double T,
-                                   const WgsConfig &cfg) {
-  WgsIsothermalFun F{n0, T, cfg};
-
-  // Determine xi bounds from non-negativity constraints
-  // Reaction: CO + H2O -> CO2 + H2 (forward: xi > 0)
-  //
-  // n[CO]  = n0[CO]  - xi  >= 0  =>  xi <= n0[CO]
-  // n[H2O] = n0[H2O] - xi  >= 0  =>  xi <= n0[H2O]
-  // n[CO2] = n0[CO2] + xi  >= 0  =>  xi >= -n0[CO2]
-  // n[H2]  = n0[H2]  + xi  >= 0  =>  xi >= -n0[H2]
-
-  double xi_min = std::max(-n0[cfg.i_CO2], -n0[cfg.i_H2]);
-  double xi_max = std::min(n0[cfg.i_CO], n0[cfg.i_H2O]);
-
-  return newton_damped(F, 0.0, xi_min, xi_max, 40);
-}
-
-// -------------------------------------------------------------
-// Adiabatic solver
-// -------------------------------------------------------------
-
-struct AdiabaticFun {
-  const std::vector<double> &n_in;
-  double H_mass_target;
-  WgsConfig cfg;
-
-  mutable std::vector<double> n;
-  mutable std::vector<double> X;
-
-  AdiabaticFun(const std::vector<double> &n_in_, double H_mass_target_,
-               const WgsConfig &cfg_)
-      : n_in(n_in_), H_mass_target(H_mass_target_), cfg(cfg_), n(n_in_.size()),
-        X(n_in_.size()) {}
-
-  double f(double T) const {
-    // Inner: solve xi(T)
-    double xi = solve_wgs_isothermal(n_in, T, cfg);
-
-    composition_from_xi(n_in, xi, cfg, n);
-    molefractions(n, X);
-
-    double H_mass = h(T, X) / mwmix(X);
-    return H_mass - H_mass_target;
-  }
-};
 
 // Build WgsConfig from species names
 static WgsConfig make_wgs_config() {
@@ -204,18 +74,270 @@ static WgsConfig make_wgs_config() {
   return cfg;
 }
 
-// Solve for adiabatic T with WGS partial equilibrium (internal)
-static double solve_adiabatic_T_wgs(const std::vector<double> &n_in,
-                                    double H_mass_target, double T_guess,
-                                    const WgsConfig &cfg) {
-  AdiabaticFun F{n_in, H_mass_target, cfg};
+// -------------------------------------------------------------
+// Solve WGS equilibrium at fixed T
+// -------------------------------------------------------------
 
-  // Bracket temperature physically
-  double Tmin = 300.0;
-  double Tmax = 4500.0;
-
-  return newton_damped(F, T_guess, Tmin, Tmax, 50);
+// Extent xi of CO + H2O <-> CO2 + H2 at T from the amounts n0 (#927).
+// F(xi) = ln Q - ln Kp with
+//   ln Q = ln(n_CO2 + xi) + ln(n_H2 + xi) - ln(n_CO - xi) - ln(n_H2O - xi)
+// (no change in moles, so the total cancels) rises from -inf at the lower
+// bound (CO2 or H2 used up) to +inf at the upper (CO or H2O used up), with the
+// analytic slope
+//   dF/dxi = 1/n_CO2 + 1/n_H2 + 1/n_CO + 1/n_H2O.
+// Safeguarded Newton (rtsafe) in the bracket, bisecting where a step leaves it
+// or does not halve. The former damped Newton took a 1e-6 finite-difference
+// step: with CO or H2O a trace the admissible interval is 3e-9..2e-7 wide, the
+// stencil read past the bound (a 1e-300 floor made F jump there) and it
+// stopped at ln(Q/K) = 12-14: where the shift runs away from the trace, a
+// whole shift short (CO 7e-7 instead of 0.015 from CO 1e-8 at 800 K).
+static double solve_wgs_extent(const std::vector<double> &n0, double T, const WgsConfig &cfg) {
+  const double a_CO2 = n0[cfg.i_CO2];
+  const double a_H2 = n0[cfg.i_H2];
+  const double a_CO = n0[cfg.i_CO];
+  const double a_H2O = n0[cfg.i_H2O];
+  const double xi_min = std::max(-a_CO2, -a_H2);
+  const double xi_max = std::min(a_CO, a_H2O);
+  if (!(xi_max > xi_min)) {
+    // Empty interval (a reactant and a product side both absent): nothing can
+    // move, and 0 is the answer.
+    return clamp(0.0, xi_min, xi_max);
+  }
+  const double lnKp = lnKp_WGS(T, cfg);
+  if (!std::isfinite(lnKp)) {
+    inner_solve::throw_no_convergence("solve_wgs_extent", 0, "ln Kp", lnKp);
+  }
+  const double inf = std::numeric_limits<double>::infinity();
+  const double eps = std::numeric_limits<double>::epsilon();
+  // F and dF/dxi at xi; noise is F's rounding error (each amount n0 +- xi is
+  // rounded to eps (|n0| + |xi|), relative to the amount).
+  auto eval = [&](double xi, double &dF, double &noise) {
+    const double p_CO2 = a_CO2 + xi;
+    const double p_H2 = a_H2 + xi;
+    const double r_CO = a_CO - xi;
+    const double r_H2O = a_H2O - xi;
+    if (!(p_CO2 > 0.0 && p_H2 > 0.0)) return -inf;
+    if (!(r_CO > 0.0 && r_H2O > 0.0)) return inf;
+    dF = 1.0 / p_CO2 + 1.0 / p_H2 + 1.0 / r_CO + 1.0 / r_H2O;
+    const double ax = std::abs(xi);
+    noise = eps * ((std::abs(a_CO2) + ax) / p_CO2 + (std::abs(a_H2) + ax) / p_H2 +
+                   (std::abs(a_CO) + ax) / r_CO + (std::abs(a_H2O) + ax) / r_H2O +
+                   std::abs(lnKp));
+    return std::log(p_CO2) + std::log(p_H2) - std::log(r_CO) - std::log(r_H2O) - lnKp;
+  };
+  double lo = xi_min;
+  double hi = xi_max;
+  double xi = (lo < 0.0 && 0.0 < hi) ? 0.0 : 0.5 * (lo + hi);
+  double dx_old = hi - lo;
+  double dx = dx_old;
+  double F = 0.0;
+  for (int it = 0; it < inner_solve::kWgsExtentMaxIter; ++it) {
+    double dF = 0.0;
+    double noise = 0.0;
+    F = eval(xi, dF, noise);
+    if (std::isnan(F)) {
+      inner_solve::throw_no_convergence("solve_wgs_extent", it, "ln(Q/K)", F);
+    }
+    // A root to the tolerance, or to F's rounding (a trace amount at the root
+    // carries only eps |n0| / n of relative precision).
+    if (std::abs(F) <= EQUILIBRIUM_WGS_FTOL ||
+        std::abs(F) <= EQUILIBRIUM_WGS_NOISE_FACTOR * noise) {
+      return xi;
+    }
+    if (F > 0.0) {
+      hi = xi;
+    } else {
+      lo = xi;
+    }
+    double xi_new = 0.0;
+    const bool newton_ok = std::isfinite(F) && dF > 0.0 && std::isfinite(dF);
+    const double step = newton_ok ? -F / dF : 0.0;
+    if (newton_ok && xi + step > lo && xi + step < hi &&
+        std::abs(2.0 * step) <= std::abs(dx_old)) {
+      dx_old = dx;
+      dx = step;
+      xi_new = xi + step;
+    } else {
+      dx_old = dx;
+      dx = 0.5 * (hi - lo);
+      xi_new = lo + dx;
+    }
+    // The bracket cannot be split further: a root to rounding.
+    if (!(xi_new > lo && xi_new < hi)) {
+      return xi;
+    }
+    xi = xi_new;
+  }
+  if (inner_solve::cap_exit_is_root(hi - lo, xi)) {
+    return xi;
+  }
+  inner_solve::throw_no_convergence("solve_wgs_extent", inner_solve::kWgsExtentMaxIter,
+                                    "ln(Q/K)", F);
 }
+
+// -------------------------------------------------------------
+// Adiabatic temperature
+// -------------------------------------------------------------
+
+// Root of the energy residual F(T) = H(T, X_eq(T)) - H_target on
+// [EQUILIBRIUM_T_MIN, EQUILIBRIUM_T_MAX] (#927). F rises with T (the
+// equilibrium heat capacity is positive), so it is bracketed from T_guess --
+// the first step is the frozen-composition Newton step, which the equilibrium
+// shift makes an overshoot, then twice the secant estimate -- and solved by Brent's method to a
+// bracket of EQUILIBRIUM_T_XTOL_REL T. The former damped Newton with a
+// finite-difference slope cycled on the S-shaped F of a rich reforming case
+// (1500 K burned, the root at 924 K) and stopped at 1390 K after 50
+// iterations, reported converged.
+//
+// Fun provides f(T, conv) (the residual [J/kg] or any consistent unit, conv =
+// whether the inner equilibrium converged) and slope_frozen() (dF/dT at the
+// composition of its last f). conv_out is false if an inner solve at either
+// end of the final bracket did not converge.
+template <typename Fun>
+static double solve_adiabatic_T(const Fun &Fn, double T_guess, bool &conv_out) {
+  const char *fn = "solve_adiabatic_T";
+  auto eval = [&](double T, bool &c) {
+    const double f = Fn.f(T, c);
+    if (!std::isfinite(f)) {
+      inner_solve::throw_no_convergence(fn, 0, "energy residual", f);
+    }
+    return f;
+  };
+  double a = clamp(T_guess, EQUILIBRIUM_T_MIN, EQUILIBRIUM_T_MAX);
+  bool ca = true;
+  double fa = eval(a, ca);
+  conv_out = ca;
+  if (fa == 0.0) return a;
+  double step = std::abs(fa) / Fn.slope_frozen();
+  if (!(std::isfinite(step) && step > 0.0)) step = EQUILIBRIUM_T_BRACKET_STEP;
+  const double dir = fa > 0.0 ? -1.0 : 1.0;
+  double b = a;
+  double fb = fa;
+  bool cb = ca;
+  for (int k = 0;; ++k) {
+    b = clamp(a + dir * step, EQUILIBRIUM_T_MIN, EQUILIBRIUM_T_MAX);
+    fb = eval(b, cb);
+    if (fb == 0.0) {
+      conv_out = cb;
+      return b;
+    }
+    if ((fa > 0.0) != (fb > 0.0)) break;
+    if (b == EQUILIBRIUM_T_MIN || b == EQUILIBRIUM_T_MAX || k >= inner_solve::kAdiabaticMaxIter) {
+      // The root at the limit itself, to the T tolerance (no fuel at
+      // EQUILIBRIUM_T_MIN: F is rounding there).
+      if (std::abs(fb) <= Fn.slope_frozen() * EQUILIBRIUM_T_XTOL_REL * b) {
+        conv_out = cb;
+        return b;
+      }
+      inner_solve::throw_no_convergence(fn, k + 1, "energy residual at the T limit", fb);
+    }
+    // Next step: twice the secant estimate of the remaining distance (an
+    // overshoot that brackets the root when the estimate is good); doubling
+    // if the secant is not usable. kAdiabaticMaxIter bounds the search.
+    const double secant = std::abs(fb) * std::abs(b - a) / std::abs(fa - fb);
+    const bool secant_ok = std::isfinite(secant) && std::abs(fb) < std::abs(fa);
+    step = secant_ok ? 2.0 * secant : 2.0 * std::abs(b - a);
+    if (!(step > 0.0)) step = EQUILIBRIUM_T_BRACKET_STEP;
+    a = b;
+    fa = fb;
+    ca = cb;
+  }
+  // Brent (1973), as zbrent in Numerical Recipes: b is the best iterate, c
+  // keeps the bracket [b, c].
+  double c = a;
+  double fc = fa;
+  bool cc = ca;
+  double d = b - a;
+  double e = d;
+  const double eps = std::numeric_limits<double>::epsilon();
+  for (int it = 0; it < inner_solve::kAdiabaticMaxIter; ++it) {
+    if ((fb > 0.0) == (fc > 0.0)) {
+      c = a;
+      fc = fa;
+      cc = ca;
+      d = b - a;
+      e = d;
+    }
+    if (std::abs(fc) < std::abs(fb)) {
+      a = b;
+      b = c;
+      c = a;
+      fa = fb;
+      fb = fc;
+      fc = fa;
+      std::swap(cb, cc);
+      ca = cc;
+    }
+    const double tol1 = 2.0 * eps * std::abs(b) + 0.5 * EQUILIBRIUM_T_XTOL_REL * std::abs(b);
+    const double xm = 0.5 * (c - b);
+    if (std::abs(xm) <= tol1 || fb == 0.0) {
+      conv_out = cb && cc;
+      return b;
+    }
+    if (std::abs(e) >= tol1 && std::abs(fa) > std::abs(fb)) {
+      // Inverse quadratic interpolation (secant when a == c).
+      const double s = fb / fa;
+      double p = 0.0;
+      double q = 0.0;
+      if (a == c) {
+        p = 2.0 * xm * s;
+        q = 1.0 - s;
+      } else {
+        const double qq = fa / fc;
+        const double r = fb / fc;
+        p = s * (2.0 * xm * qq * (qq - r) - (b - a) * (r - 1.0));
+        q = (qq - 1.0) * (r - 1.0) * (s - 1.0);
+      }
+      if (p > 0.0) q = -q;
+      p = std::abs(p);
+      const double min1 = 3.0 * xm * q - std::abs(tol1 * q);
+      const double min2 = std::abs(e * q);
+      if (2.0 * p < std::min(min1, min2)) {
+        e = d;
+        d = p / q;
+      } else {
+        d = xm;
+        e = d;
+      }
+    } else {
+      d = xm;
+      e = d;
+    }
+    a = b;
+    fa = fb;
+    ca = cb;
+    b += std::abs(d) > tol1 ? d : (xm > 0.0 ? tol1 : -tol1);
+    fb = eval(b, cb);
+  }
+  inner_solve::throw_no_convergence(fn, inner_solve::kAdiabaticMaxIter, "bracket [K]", c - b);
+}
+
+struct AdiabaticFun {
+  const std::vector<double> &n_in;
+  double H_mass_target;
+  WgsConfig cfg;
+
+  mutable std::vector<double> n;
+  mutable std::vector<double> X;
+  mutable double T_last = 0.0;
+
+  AdiabaticFun(const std::vector<double> &n_in_, double H_mass_target_,
+               const WgsConfig &cfg_)
+      : n_in(n_in_), H_mass_target(H_mass_target_), cfg(cfg_), n(n_in_.size()),
+        X(n_in_.size()) {}
+
+  double f(double T, bool &conv) const {
+    // Inner: solve xi(T) (throws if it does not converge)
+    const double xi = solve_wgs_extent(n_in, T, cfg);
+    conv = true;
+    composition_from_xi(n_in, xi, cfg, n);
+    molefractions(n, X);
+    T_last = T;
+    return h(T, X) / mwmix(X) - H_mass_target;
+  }
+
+  double slope_frozen() const { return cp(T_last, X) / mwmix(X); }
+};
 
 // -------------------------------------------------------------
 // General Steam Reforming + WGS configuration
@@ -267,13 +389,7 @@ EquilibriumResult wgs_equilibrium(const State &in) {
   WgsConfig cfg = make_wgs_config();
 
   // Solve for extent of reaction at fixed T
-  WgsIsothermalFun F{in.X, in.T, cfg};
-
-  // Bounds from non-negativity (same logic as solve_wgs_isothermal)
-  double xi_min = std::max(-in.X[cfg.i_CO2], -in.X[cfg.i_H2]);
-  double xi_max = std::min(in.X[cfg.i_CO], in.X[cfg.i_H2O]);
-
-  double xi = newton_damped(F, 0.0, xi_min, xi_max, 40);
+  const double xi = solve_wgs_extent(in.X, in.T, cfg);
 
   // Build output composition
   std::vector<double> n_out;
@@ -295,14 +411,16 @@ EquilibriumResult wgs_equilibrium_adiabatic(const State &in) {
   double H_mass_target = h(in.T, in.X) / mwmix(in.X);
 
   // Solve for adiabatic temperature
-  double T_ad = solve_adiabatic_T_wgs(in.X, H_mass_target, in.T, cfg);
+  AdiabaticFun F{in.X, H_mass_target, cfg};
+  bool conv = true;
+  const double T_ad = solve_adiabatic_T(F, in.T, conv);
 
   // Get equilibrium composition at T_ad
   State at_T_ad;
   at_T_ad.set_TPX(T_ad, in.P, in.X);
 
   EquilibriumResult inner = wgs_equilibrium(at_T_ad);
-  return EquilibriumResult{inner.state, in.T, inner.state.T - in.T, true};
+  return EquilibriumResult{inner.state, in.T, inner.state.T - in.T, conv};
 }
 
 // -------------------------------------------------------------
@@ -313,8 +431,9 @@ EquilibriumResult wgs_equilibrium_adiabatic(const State &in) {
 // (n+m/2)*H2 Kp = (y_CO^n * y_H2^(n+m/2)) / (y_CnHm * y_H2O^n) *
 // (P/P0)^(delta_n) where delta_n = n + (n+m/2) - 1 - n = m/2 - 1 + n = (m-2)/2
 // + n
-static double Kp_reforming(double T, std::size_t i_hc, int n_C, int n_H,
-                           const ReformingConfig &cfg) {
+// (returned as ln Kp: exp then log overflows at a cold T)
+static double lnKp_reforming(double T, std::size_t i_hc, int n_C, int n_H,
+                             const ReformingConfig &cfg) {
   double g_hc = g_over_RT(i_hc, T);
   double g_H2O = g_over_RT(cfg.i_H2O, T);
   double g_CO = g_over_RT(cfg.i_CO, T);
@@ -325,7 +444,7 @@ static double Kp_reforming(double T, std::size_t i_hc, int n_C, int n_H,
 
   // Delta_G/RT = n*g_CO + (n+m/2)*g_H2 - g_CnHm - n*g_H2O
   double d_gRT = n_C * g_CO + n_H2_prod * g_H2 - g_hc - n_C * g_H2O;
-  return std::exp(-d_gRT);
+  return -d_gRT;
 }
 
 // Solve single hydrocarbon reforming equilibrium at fixed T
@@ -348,8 +467,7 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
     return 0.0; // Nothing can move either way
   }
 
-  double Kp = Kp_reforming(T, i_hc, n_C, n_H, cfg);
-  double lnKp = std::log(Kp);
+  const double lnKp = lnKp_reforming(T, i_hc, n_C, n_H, cfg);
 
   // delta_n = products - reactants = (n + (n+m/2)) - (1 + n) = n + m/2 - 1
   double delta_n = n_C + 0.5 * n_H - 1.0;
@@ -373,6 +491,9 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
     const double n_CO = n0[cfg.i_CO] + n_C * xi;
     const double n_H2 = n0[cfg.i_H2] + m_H2 * xi;
     const double nt = nt0 + delta_n * xi;
+    // An amount rounded to zero at a bracket end: F's limit there (#927).
+    if (!(n_CO > 0.0 && n_H2 > 0.0)) return -std::numeric_limits<double>::infinity();
+    if (!(n_hc > 0.0 && n_H2O > 0.0)) return std::numeric_limits<double>::infinity();
     const double lnQ = n_C * std::log(n_CO) + m_H2 * std::log(n_H2) - std::log(n_hc) -
                        n_C * std::log(n_H2O) - delta_n * std::log(nt) +
                        delta_n * std::log(P / EQUILIBRIUM_P_REF);
@@ -383,11 +504,13 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
   double lo = xi_lo;
   double hi = xi_hi;
   double xi = 0.5 * (xi_lo + xi_hi);
-  for (int it = 0; it < 200; ++it) {
+  double F = 0.0;
+  for (int it = 0; it < inner_solve::kReformingExtentMaxIter; ++it) {
     double dF = 0.0;
-    const double F = eval(xi, dF);
-    if (!std::isfinite(F)) {
-      break;
+    F = eval(xi, dF);
+    if (std::isnan(F)) {
+      // Formerly a silent break to the clamped extent (#868 R9, E2).
+      inner_solve::throw_no_convergence("solve_reforming_isothermal", it, "ln(Q/K)", F);
     }
     if (std::abs(F) < 1e-12) {
       return xi;
@@ -397,7 +520,8 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
     } else {
       lo = xi;
     }
-    double xi_new = (dF > 0.0 && std::isfinite(dF)) ? xi - F / dF : 0.5 * (lo + hi);
+    double xi_new =
+        (std::isfinite(F) && dF > 0.0 && std::isfinite(dF)) ? xi - F / dF : 0.5 * (lo + hi);
     if (!(xi_new > lo && xi_new < hi)) {
       xi_new = 0.5 * (lo + hi);
     }
@@ -406,7 +530,11 @@ static double solve_reforming_isothermal(const std::vector<double> &n0,
     }
     xi = xi_new;
   }
-  return std::max(xi_lo, std::min(xi, xi_hi));
+  if (inner_solve::cap_exit_is_root(hi - lo, xi)) {
+    return xi;
+  }
+  inner_solve::throw_no_convergence("solve_reforming_isothermal",
+                                    inner_solve::kReformingExtentMaxIter, "ln(Q/K)", F);
 }
 
 // Apply reforming extent to composition
@@ -437,8 +565,7 @@ static void reforming_wgs_round(std::vector<double> &n_out, double T, double P,
   double xi_max = std::min(n_out[wgs_cfg.i_CO], n_out[wgs_cfg.i_H2O]);
 
   if (xi_max > xi_min + 1e-15) {
-    WgsIsothermalFun F{n_out, T, wgs_cfg};
-    double xi_wgs = newton_damped(F, 0.0, xi_min, xi_max, 40);
+    const double xi_wgs = solve_wgs_extent(n_out, T, wgs_cfg);
 
     n_out[wgs_cfg.i_CO] -= xi_wgs;
     n_out[wgs_cfg.i_H2O] -= xi_wgs;
@@ -841,8 +968,7 @@ static bool solve_reforming_wgs_joint(const std::vector<double> &n0, double T, d
       const double lo = std::max(-n[w.i_CO2], -n[w.i_H2]);
       const double hi = std::min(n[w.i_CO], n[w.i_H2O]);
       if (hi > lo + 1e-15) {
-        WgsIsothermalFun Fw{n, T, w};
-        const double xi = newton_damped(Fw, 0.0, lo, hi, 40);
+        const double xi = solve_wgs_extent(n, T, w);
         n[w.i_CO] -= xi;
         n[w.i_H2O] -= xi;
         n[w.i_CO2] += xi;
@@ -903,18 +1029,23 @@ struct ReformingAdiabaticFun {
 
   mutable std::vector<double> n;
   mutable std::vector<double> X;
+  mutable double T_last = 0.0;
 
   ReformingAdiabaticFun(const std::vector<double> &n_in_, double H_mass_target_,
                         double P_, const ReformingConfig &cfg_)
       : n_in(n_in_), H_mass_target(H_mass_target_), P(P_), cfg(cfg_),
         n(n_in_.size()), X(n_in_.size()) {}
 
-  double f(double T) const {
-    solve_reforming_wgs_isothermal(n_in, T, P, cfg, n);
+  // conv: whether the inner equilibrium at T converged (its flag was dropped
+  // before #927).
+  double f(double T, bool &conv) const {
+    conv = solve_reforming_wgs_isothermal(n_in, T, P, cfg, n);
     molefractions(n, X);
-    double H_mass = h(T, X) / mwmix(X);
-    return H_mass - H_mass_target;
+    T_last = T;
+    return h(T, X) / mwmix(X) - H_mass_target;
   }
+
+  double slope_frozen() const { return cp(T_last, X) / mwmix(X); }
 };
 
 // Public API: General reforming + WGS equilibrium (isothermal)
@@ -969,11 +1100,12 @@ EquilibriumResult reforming_equilibrium_adiabatic(const State &in) {
 
   // Solve for adiabatic temperature
   ReformingAdiabaticFun F{in.X, H_mass_target, in.P, cfg};
-  double T_ad = newton_damped(F, in.T, 300.0, 4500.0, 50, REFORMING_T_XTOL_REL);
+  bool conv_T = true;
+  const double T_ad = solve_adiabatic_T(F, in.T, conv_T);
 
   // Get equilibrium composition at T_ad
   std::vector<double> n_out;
-  const bool conv = solve_reforming_wgs_isothermal(in.X, T_ad, in.P, cfg, n_out);
+  const bool conv = solve_reforming_wgs_isothermal(in.X, T_ad, in.P, cfg, n_out) && conv_T;
 
   std::vector<double> X_out;
   molefractions(n_out, X_out);

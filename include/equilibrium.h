@@ -4,6 +4,7 @@
 #include "state.h"
 #include <vector>
 #include "combustion.h"
+#include "thermo.h"
 
 namespace combaero {
 
@@ -52,9 +53,21 @@ constexpr double REFORMING_TRACE_FRACTION = 1e-4;
 // taken and the solve repeated, up to REFORMING_JOINT_RESTARTS times.
 constexpr double REFORMING_JOINT_CHECK_RTOL = 1e-10;
 constexpr int REFORMING_JOINT_RESTARTS = 10;
-// The adiabatic temperature iteration stops once a step moves T by no more
-// than this of T (it ran all 50 iterations: |dH| never fell below 1e-12 J/kg).
-constexpr double REFORMING_T_XTOL_REL = 1e-14;
+// The adiabatic temperature (WGS and reforming) is bracketed in
+// [EQUILIBRIUM_T_MIN, EQUILIBRIUM_T_MAX] K from its guess (the low end the
+// thermo floor: the former 300 K returned 300 K for a colder unreacting inlet) -- the first step the
+// frozen-composition Newton step, then EQUILIBRIUM_T_BRACKET_STEP if that is
+// not finite, doubling -- and solved by Brent's method to a bracket of
+// EQUILIBRIUM_T_XTOL_REL T (#927). No root in the range throws.
+constexpr double EQUILIBRIUM_T_MIN = thermo::T_FLOOR;
+constexpr double EQUILIBRIUM_T_MAX = 4500.0;
+constexpr double EQUILIBRIUM_T_BRACKET_STEP = 100.0;
+constexpr double EQUILIBRIUM_T_XTOL_REL = 1e-14;
+// The WGS extent is converged when |ln Q - ln Kp| is below EQUILIBRIUM_WGS_FTOL
+// or below EQUILIBRIUM_WGS_NOISE_FACTOR times its rounding error (a trace
+// amount at the root carries only eps |n0| / n of relative precision).
+constexpr double EQUILIBRIUM_WGS_FTOL = 1e-12;
+constexpr double EQUILIBRIUM_WGS_NOISE_FACTOR = 8.0;
 // Reference pressure of the equilibrium constants [Pa].
 constexpr double EQUILIBRIUM_P_REF = 101325.0;
 EquilibriumResult reforming_equilibrium(const State &in);
