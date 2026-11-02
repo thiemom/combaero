@@ -1815,7 +1815,8 @@ double jobson_expansibility(double r, double beta, double Ci, double n) {
                                            J1::constant(1.0), J1::constant(r),
                                            J1::constant(Ci), J1::constant(n), beta)
                 .g.v;
-        const bool done = std::abs(g_new - g) <= 1e-15 * std::abs(g_new);
+        const bool done = std::abs(g_new - g) <=
+            combaero::inner_solve::kJobsonExpansibilityRelTol * std::abs(g_new);
         const double step = g_new - g;
         g = g_new;
         if (done) {

@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -754,30 +755,97 @@ double calc_T_from_s(double s_target, double P, const std::vector<double> &X, do
 
 double calc_T_from_cp(double cp_target, const std::vector<double> &X,
                       double T_guess, double tol, std::size_t max_iter) {
-  double T = T_guess;
-  for (std::size_t i = 0; i < max_iter; ++i) {
-    double cp_val = cp(T, X);
-    double dcp_dT_val = dcp_dT(T, X);
-    if (std::abs(dcp_dT_val) < 1.0e-10) {
-      T *= (cp_val < cp_target) ? 1.1 : 0.9;
-      if (T < 200.0) T = 200.0;
-      if (T > 6000.0) T = 6000.0;
-      continue;
-    }
-    double delta_T = (cp_target - cp_val) / dcp_dT_val;
-    double max_step = 0.1 * T;
-    if (std::abs(delta_T) > max_step)
-      delta_T = (delta_T > 0) ? max_step : -max_step;
-    T += delta_T;
-    if (T < 200.0) T = 200.0;
-    if (T > 6000.0) T = 6000.0;
-    if (std::abs(delta_T) < tol || std::abs(cp_val - cp_target) < tol)
-      return T;
+  // cp(T) need not be monotone, so the root is a branch choice: the one
+  // nearest T_guess inside [CP_INVERSE_T_MIN, CP_INVERSE_T_MAX] (thermo.h),
+  // found by an outward scan and polished on its bracket (#868 R6).
+  if (!validation::is_finite_positive(cp_target)) {
+    throw std::invalid_argument("calc_T_from_cp: cp_target must be positive and finite");
   }
-  // A target cp the clamped range [200, 6000] K does not reach, or a cp(T)
-  // the steps cannot follow, ends here: not a root (#868).
+  if (!validation::is_finite_positive(T_guess)) {
+    throw std::invalid_argument("calc_T_from_cp: T_guess must be positive and finite");
+  }
+  if (!validation::is_finite_positive(tol)) {
+    throw std::invalid_argument("calc_T_from_cp: tol must be positive and finite");
+  }
+  constexpr double T_min = thermo::CP_INVERSE_T_MIN;
+  constexpr double T_max = thermo::CP_INVERSE_T_MAX;
+  auto f = [&](double T) { return cp(T, X) - cp_target; };
+  const double T0 = std::clamp(T_guess, T_min, T_max);
+  const double f0 = f(T0);
+  if (f0 == 0.0) {
+    return T0;
+  }
+  // Outward scan, one step on each side per round: the first segment whose
+  // ends differ in sign brackets the root nearest T0 (to within a step).
+  double a = 0.0, b = 0.0, fa = 0.0, fb = 0.0;
+  bool bracketed = false;
+  double lo = T0, f_lo = f0, hi = T0, f_hi = f0;
+  while (lo > T_min || hi < T_max) {
+    if (hi < T_max) {
+      const double T_next = std::min(hi + thermo::CP_INVERSE_SCAN_STEP, T_max);
+      const double f_next = f(T_next);
+      if (f_next == 0.0) {
+        return T_next;
+      }
+      if ((f_next > 0.0) != (f_hi > 0.0)) {
+        a = hi, fa = f_hi, b = T_next, fb = f_next;
+        bracketed = true;
+        break;
+      }
+      hi = T_next, f_hi = f_next;
+    }
+    if (lo > T_min) {
+      const double T_next = std::max(lo - thermo::CP_INVERSE_SCAN_STEP, T_min);
+      const double f_next = f(T_next);
+      if (f_next == 0.0) {
+        return T_next;
+      }
+      if ((f_next > 0.0) != (f_lo > 0.0)) {
+        a = T_next, fa = f_next, b = lo, fb = f_lo;
+        bracketed = true;
+        break;
+      }
+      lo = T_next, f_lo = f_next;
+    }
+  }
+  if (!bracketed) {
+    char buf[256];
+    std::snprintf(buf, sizeof buf,
+                  "calc_T_from_cp: no root in [%g, %g] K (cp_target %.6g J/(mol K), cp "
+                  "%.6g at %g K, %.6g at %g K)",
+                  T_min, T_max, cp_target, f_lo + cp_target, lo, f_hi + cp_target, hi);
+    throw std::runtime_error(buf);
+  }
+  // Newton kept inside the bracket (bisection when a step leaves it);
+  // converged on a Newton step below tol or a bracket narrower than tol.
+  double T = a - fa * (b - a) / (fb - fa);
+  for (std::size_t i = 0; i < max_iter; ++i) {
+    const double fT = f(T);
+    if (fT == 0.0) {
+      return T;
+    }
+    if ((fT > 0.0) == (fa > 0.0)) {
+      a = T, fa = fT;
+    } else {
+      b = T;
+    }
+    if (b - a <= tol) {
+      return 0.5 * (a + b);
+    }
+    const double d = dcp_dT(T, X);
+    const double T_newton = (d != 0.0 && std::isfinite(d)) ? T - fT / d : a - 1.0;
+    if (T_newton > a && T_newton < b) {
+      const double step = std::abs(T_newton - T);
+      T = T_newton;
+      if (step < tol) {
+        return T;
+      }
+    } else {
+      T = 0.5 * (a + b);
+    }
+  }
   inner_solve::throw_no_convergence("calc_T_from_cp", max_iter, "cp residual [J/(mol K)]",
-                                    cp(T, X) - cp_target);
+                                    f(T));
 }
 
 double calc_T_from_u(double u_target, const std::vector<double> &X, double T_guess, double tol, std::size_t max_iter) {

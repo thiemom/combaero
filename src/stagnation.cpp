@@ -123,9 +123,12 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
 
     // Newton iteration: find T such that h(T) + M^2*a(T)^2/2 = h0
     // F(T) = h(T) + M^2*a(T)^2/2 - h0
-    // dF/dT = cp(T) + M^2 * a * da/dT
-    // da/dT = (1/(2a)) * d(gamma*R*T)/dT  -- approximate as a/(2T) for ideal gas
+    // dF/dT = cp(T) + (M^2/2) d(a^2)/dT, with a^2 = gamma R T and
+    // d(a^2)/dT = R (gamma + T dgamma/dT), dgamma/dT = -R_u cp'/cv^2 (molar),
+    // exact as fanno_mach.cpp's sound_speed_sq_dT. Dropping T dgamma/dT
+    // made the convergence linear: it stopped ~1e-8 T short (#868 R3).
     double T = Tt / (1.0 + 0.2 * M * M);  // calorically perfect gas initial guess
+    const double R_specific = specific_gas_constant(X);  // J/(kg*K)
 
     // No floor (#935): F(0) = h(0 K) - h0 < 0 < F(Tt), so the root is
     // positive, and steps of at most half the iterate keep it so. The 10 K
@@ -135,8 +138,12 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
         double a_val = speed_of_sound(T, X);
         double v = M * a_val;
         F = h_mass_at(T, X) + 0.5 * v * v - h0;
-        // dF/dT ~ cp + M^2 * a^2 / (2T)
-        double dF = cp_mass_at(T, X) + M * M * a_val * a_val / (2.0 * T);
+        const double cp_mol = cp(T, X);
+        const double cv_mol = cp_mol - thermo::R_GAS;
+        const double gamma = cp_mol / cv_mol;
+        const double dgamma_dT = -thermo::R_GAS * dcp_dT(T, X) / (cv_mol * cv_mol);
+        const double da2_dT = R_specific * (gamma + T * dgamma_dT);
+        double dF = cp_mass_at(T, X) + 0.5 * M * M * da2_dT;
 
         if (std::abs(dF) < 1e-30) break;
 

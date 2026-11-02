@@ -23,13 +23,14 @@ constexpr double kCapAcceptRel = 1e-10;
 // Values unchanged from the literals they replace.
 constexpr int kStaticStateMaxIter = 100;          // chamber_ / sonic_static_state
 constexpr int kDuctStaticStateMaxIter = 100;      // duct_static_state, Newton in ln P
-constexpr int kSetVHMaxIter = 20;                 // State::set_VH_mass
-constexpr double kSetVHTolK = 1e-4;               // State::set_VH_mass step [K]
 constexpr int kMergeFaceMaxIter = 100;            // side-stream merge face fixed point
 constexpr int kCrossflowCdMaxIter = 100;          // crossflow Cd, falling branch
 constexpr int kAreaChangeMaxIter = 200;           // area_change Mach / flux solves
 constexpr int kPipeEquivalentCMaxIter = 100;      // orifice pipe-equivalent C
 constexpr int kJobsonExpansibilityMaxIter = 200;  // Jobson expansibility fixed point
+// Its relative step tolerance (#868 R11): 1e-15 cycled in the last bits
+// (to 3e-14) until the cap; 1e-13 ends there with no change beyond 3e-14.
+constexpr double kJobsonExpansibilityRelTol = 1e-13;
 constexpr int kWgsExtentMaxIter = 100;            // WGS extent, rtsafe (#927)
 constexpr int kAdiabaticMaxIter = 100;            // equilibrium adiabatic T, bracket + Brent
 constexpr int kReformingExtentMaxIter = 200;      // single-reaction reforming extent
