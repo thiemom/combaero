@@ -73,17 +73,15 @@ double Tt_from_static_v(double T, double v, const std::vector<double>& X,
     // F(T0) = h(T0) - h0 = 0,  dF/dT0 = cp(T0)
     double T0 = T + 0.5 * v * v / cp_mass_at(T, X);  // ideal-gas initial guess
 
-    constexpr double T_MIN = thermo::T_FLOOR;  // as compressible.cpp solve_T_isentropic
-
+    // No floor (#935): the root is at or above T > 0 (h0 >= h(T), h rising),
+    // and steps of at most half the iterate keep it positive. The 10 K floor
+    // returned 10 K for a static T below it at low speed, not a root.
     double F = 0.0;
     for (std::size_t it = 0; it < max_iter; ++it) {
         F = h_mass_at(T0, X) - h0;
         double dF = cp_mass_at(T0, X);
 
         if (std::abs(dF) < 1e-30) break;
-        // Held at the floor with the root below it: every further step is
-        // clamped back to T_MIN, the value the cap returned before (#868).
-        if (T0 == T_MIN && F > 0.0) return T0;
 
         double dT = -F / dF;
         double max_step = 0.5 * T0;
@@ -91,8 +89,9 @@ double Tt_from_static_v(double T, double v, const std::vector<double>& X,
             dT = (dT > 0.0) ? max_step : -max_step;
         }
         T0 += dT;
-        T0 = std::max(T0, T_MIN);
 
+        // Absolute below 1 K: h carries the heat of formation, so its
+        // rounding resolves T only to ~1e-12 K (a relative test cycled there).
         if (std::abs(dT) < tol * (1.0 + std::abs(T0))) {
             return T0;
         }
@@ -128,8 +127,9 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
     // da/dT = (1/(2a)) * d(gamma*R*T)/dT  -- approximate as a/(2T) for ideal gas
     double T = Tt / (1.0 + 0.2 * M * M);  // calorically perfect gas initial guess
 
-    constexpr double T_MIN = thermo::T_FLOOR;  // as compressible.cpp solve_T_isentropic
-
+    // No floor (#935): F(0) = h(0 K) - h0 < 0 < F(Tt), so the root is
+    // positive, and steps of at most half the iterate keep it so. The 10 K
+    // floor returned 10 K for a hypersonic static T below it, not a root.
     double F = 0.0;
     for (std::size_t it = 0; it < max_iter; ++it) {
         double a_val = speed_of_sound(T, X);
@@ -139,10 +139,6 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
         double dF = cp_mass_at(T, X) + M * M * a_val * a_val / (2.0 * T);
 
         if (std::abs(dF) < 1e-30) break;
-        // Held at the floor with the root below it: every further step is
-        // clamped back to T_MIN, so the floor is the answer the cap would
-        // have returned (#868).
-        if (T == T_MIN && F > 0.0) return T;
 
         double dT = -F / dF;
         double max_step = 0.5 * T;
@@ -150,9 +146,8 @@ double T_from_stagnation(double Tt, double M, const std::vector<double>& X,
             dT = (dT > 0.0) ? max_step : -max_step;
         }
         T += dT;
-        T = std::max(T, T_MIN);
 
-        if (std::abs(dT) < tol * (1.0 + std::abs(T))) {
+        if (std::abs(dT) < tol * (1.0 + std::abs(T))) {  // absolute below 1 K, as above
             return T;
         }
     }

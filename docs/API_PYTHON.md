@@ -130,8 +130,11 @@ choke searches (`fanno_rayleigh_channel_flow` with no sign change to bracket).
 With the defaults these exits are not reached on physical inputs: what raises
 is a caller's own small `max_iter`, an unreachable target, or a solver probe at
 an unphysical state, which the network solver already treats as a rejected
-step. The `T_FLOOR` (10 K) clamp of the static temperature is unchanged: an
-expansion whose isentropic T lies below it still returns the floor.
+step. The static temperature has no floor (#935): an
+expansion whose isentropic T lies below the former 10 K `T_FLOOR` (P/Pt below
+~1e-5 from 300 K) returns that root, not 10 K, and so do `T_from_stagnation`
+at hypersonic M and `Tt_from_static` from a static T below 10 K; the mass flux
+and Mach built on it follow.
 `fanno_inlet_mach` below ~1e-10 of the sonic flux now returns the root (it was
 up to 73 % high: the slope stencil crossed M = 0). The audit of every inner
 solve, with what was left unchanged: `docs/archive/AUDIT_868_INNER_SOLVES.md`.

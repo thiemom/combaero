@@ -91,12 +91,55 @@ TEST(InnerSolveCap868, CallerBudgetsAreReported) {
   EXPECT_THROW(T_from_stagnation(900.0, 2.0, X, 1e-8, 1), std::runtime_error);
 }
 
-// The documented T_FLOOR clamp is unchanged: an expansion whose isentropic
-// static T lies below the floor returns the floor (now without running on to
-// the cap), it does not throw.
-TEST(InnerSolveCap868, TemperatureFloorIsStillTheAnswerBelowIt) {
+// The static-T solves go to their root below the former 10 K floor (#935):
+// the gas is ideal to 0 K, so a deep expansion has a positive static T
+// however small. On main each of these returned 10 K.
+TEST(InnerSolveCap868, StaticTemperatureGoesToItsRootBelowTheFormerFloor) {
   const std::vector<double> X = dry_air();
-  EXPECT_EQ(T_from_stagnation(300.0, 50.0, X), thermo::T_FLOOR);
-  EXPECT_TRUE(std::isfinite(mach_from_pressure_ratio(300.0, 1.0e5, 1.0e-3, X)));
-  EXPECT_GT(mass_flux_isentropic(300.0, 1.0e5, 1.0e-3, X), 0.0);
+  // Hypersonic stagnation inverse: T ~ Tt / (0.2 M^2) = 0.6 K.
+  const double M = 50.0;
+  const double T = T_from_stagnation(300.0, M, X);
+  EXPECT_LT(T, 1.0);
+  EXPECT_GT(T, 0.0);
+  const double a = speed_of_sound(T, X);
+  const double res = h_mass(T, X) + 0.5 * M * M * a * a - h_mass(300.0, X);
+  EXPECT_LT(std::abs(res), 1e-6 * cp_mass(T, X) * T);
+  // Static to stagnation from a 5 K static state.
+  const double T0 = Tt_from_static(5.0, 0.5, X);
+  EXPECT_GT(T0, 5.0);
+  EXPECT_LT(T0, thermo::T_FLOOR);
+  // The isentrope to P/Pt = 1e-8 (static T ~ 1.5 K), against the independent
+  // safeguarded inverse of s.
+  const double Tt = 300.0, Pt = 1.0e5, P = 1.0e-3;
+  const double s0 = s_mass(Tt, X, Pt);
+  const double T_ref = calc_T_from_s_mass(s0, P, X, 1.0, 1e-13, 200);
+  EXPECT_LT(T_ref, 2.0);
+  const double v_ref = std::sqrt(2.0 * (h_mass(Tt, X) - h_mass(T_ref, X)));
+  const double G_ref = density(T_ref, P, X) * v_ref;
+  EXPECT_NEAR(mass_flux_isentropic(Tt, Pt, P, X) / G_ref, 1.0, 1e-10);
+  EXPECT_NEAR(mach_from_pressure_ratio(Tt, Pt, P, X) / (v_ref / speed_of_sound(T_ref, X)), 1.0,
+              1e-10);
+  // Steps in ln T reach a root many decades down within the budget.
+  const double G_deep = mass_flux_isentropic(Tt, Pt, 1.0e-295, X);
+  EXPECT_TRUE(std::isfinite(G_deep));
+  EXPECT_GT(G_deep, 0.0);
+}
+
+// s is exact (and finite) at every T > 0 down to S_R_T_MIN: the low tail
+// keeps its fade branch where t rounds to 1 (it returned NaN from 1e-14 K);
+// a non-positive probe T is held, finite.
+TEST(InnerSolveCap868, EntropyIsExactBelowTheFormerFloor) {
+  const std::vector<double> X = dry_air();
+  const double s5 = s_mass(5.0, X, 1.0e5);
+  const double s_20 = s_mass(1.0e-20, X, 1.0e5);
+  const double s_19 = s_mass(1.0e-19, X, 1.0e5);
+  EXPECT_TRUE(std::isfinite(s_20));
+  EXPECT_LT(s_20, s_19);
+  EXPECT_LT(s_19, s5);
+  EXPECT_LT(s5, s_mass(thermo::T_FLOOR, X, 1.0e5));
+  // One decade in T at cp = 7/2 R (rigid diatomic): ds = cp ln 10.
+  const double cp_low = cp_mass(1.0e-20, X);
+  EXPECT_NEAR((s_19 - s_20) / (cp_low * std::log(10.0)), 1.0, 1e-9);
+  EXPECT_TRUE(std::isfinite(s_mass(0.0, X, 1.0e5)));
+  EXPECT_TRUE(std::isfinite(s_mass(-5.0, X, 1.0e5)));
 }

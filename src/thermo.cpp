@@ -246,11 +246,13 @@ double tail_H_R(const Tail& tl, double T) {
   return tl.H0 + tl.w * tail_p_int(tl, t);
 }
 
-// T > 0 (s_R holds T >= T_FLOOR), so the low tail, whose fade ends at 0 K, is
-// always on t < 1.
+// T > 0 (s_R holds T >= S_R_T_MIN), so the low tail, whose fade ends at 0 K,
+// is on t < 1; t rounds to 1 below ~1e-14 T0, where the fade's own branch
+// (Q_int(t) + r ln(T/T0), finite at t = 1) still applies, not the end value
+// (-inf at T_end = 0 K).
 double tail_S_R(const Tail& tl, double T) {
   const double t = (T - tl.T0) / tl.w;
-  if (t >= 1.0) {
+  if (t >= 1.0 && tl.T_end > 0.0) {
     return tl.S_end + tl.cp_inf * std::log(T / tl.T_end);
   }
   return tl.S0 + tail_Q_int(tl, t) + tl.r * std::log(T / tl.T0);
@@ -468,7 +470,9 @@ double s_R(std::size_t species_idx, double T) {
   if (species_idx >= species_names.size()) {
     throw std::out_of_range("s_R: species index out of bounds");
   }
-  T = std::max(T, thermo::T_FLOOR);
+  // Exact at every T > 0 (the low tail runs to 0 K, s -> -inf as cp ln T);
+  // held only below S_R_T_MIN, which no solved T reaches (#935).
+  T = std::max(T, thermo::S_R_T_MIN);
   if (const Tail* tl = active_tail(species_idx, T)) {
     return tail_S_R(*tl, T);
   }
@@ -480,7 +484,10 @@ double s_R(std::size_t species_idx, double T) {
   return nasa_S_R(a, T);
 }
 
+// Both terms held at T_FLOOR, as they were: g/RT feeds the equilibrium
+// constants, whose callers floor their temperature there.
 double g_over_RT(std::size_t species_idx, double T) {
+  T = std::max(T, thermo::T_FLOOR);
   return h_RT(species_idx, T) - s_R(species_idx, T);
 }
 
