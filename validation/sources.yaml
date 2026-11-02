@@ -4156,6 +4156,60 @@ documents:
   issues: []
   records: []
   notes: Fetched from NTRS (open, government public use) 2026-10-31.
+- file: sources/heat_transfer/vanes/dring_blair_1987_NASA_CR-4079_UTRC_rotating_rig_vol1_final.pdf
+  citation: Dring, R. P., Blair, M. F., Joslyn, H. D., Power, G. D., Verdon, J. M. (1987). The effects of inlet
+    turbulence and rotor/stator interactions on the aerodynamics and heat transfer of a large-scale rotating
+    turbine model, Volume I -- Final report. NASA CR-4079 (UTRC R86-956480-1, contract NAS3-23717).
+  id: NASA CR-4079 (NTRS 19890004385)
+  topic: [other]
+  content: 'Scan with a poor OCR layer, 172 pp. The UTRC Large-Scale Rotating Rig (~5x engine, ambient
+    temperature), single stage and stage-and-a-half. Heat transfer from low-conductivity airfoils with a thin
+    electrically heated skin and welded thermocouples; Stanton number on exit speed and axial chord. Variables:
+    inlet Tu grid out vs grid in (9.8% at X/Bx = -23%, integral scale 0.80 in., near-isotropic, von Karman
+    spectrum), stator 1/rotor axial gap 15% and 65%, Reynolds number, flow coefficient (rotor incidence),
+    stator 1/stator 2 clocking. Tables 1a-c etc.: airfoil coordinates for each row (first stator hub/midspan/
+    tip: pitch, LE/TE radius, metal and wedge angles, X-YL-YU points); Table 5 inter-row unsteadiness; Table 6
+    uncertainty (St +-4%, Cp +-2%, Re +-2%, flow angles +-0.5 deg). Figures: midspan surface pressure
+    distributions per row (e.g. Fig. 13 first stator Cp), St distributions, leading-edge Froessling numbers,
+    spanwise St, cascade-vs-rotor comparisons, and STAN5-type boundary-layer predictions (laminar, turbulent,
+    transition) plus an unsteady boundary-layer analysis.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (partially: summary, contents, test conditions, tables; the figures were not
+    digitised). This is the rig and dataset of the wanted "Blair et al. 1989, J. Turbomach." -- Blair, Dring &
+    Joslyn, ASME 88-GT-125 / J. Turbomach. 1989, "The effects of turbulence and stator/rotor interactions on
+    turbine heat transfer, Part I: design operating conditions" (NTRS record 19880067009, journal version not
+    held) -- in its full contractor-report form. The FIRST STATOR is a candidate NGV example: printed
+    coordinates, midspan Cp (figure), St with a stated +-4% measurement band, at two inlet Tu levels, so a
+    vane gas-side h check (accuracy, cross-source to any correlation) is possible once combaero has a gas-side
+    airfoil kernel (it has none; same blocker as the C3X example). Ambient temperature and a heated skin: no
+    film cooling, no internal cooling, so no network example. Rotor data need rotation (not modelled). Not
+    implemented.'
+  read_for: [NGV worked example (stage vane Ps and St), first-stator St vs inlet turbulence]
+  issues: []
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (public). The first download truncated; re-fetched whole (172 pp, 14 MB).
+    Companion volumes: Vol. II heat transfer data tabulation, 15% axial spacing (NASA CR-179467, held); Vol. III
+    65% spacing (CR-179468, NTRS 19880019546) and Vol. IV aerodynamic data tabulation (CR-179469, NTRS
+    19880014572) not fetched. The grid-out inlet Tu is mis-OCR''d in the text layer and was not read from the
+    page image.'
+- file: sources/heat_transfer/vanes/dring_blair_1988_NASA_CR-179467_UTRC_rotating_rig_vol2_heat_transfer_15pct.pdf
+  citation: Dring, R. P., Blair, M. F., Joslyn, H. D. (1986, released May 1988). The effects of inlet turbulence
+    and rotor/stator interactions on the aerodynamics and heat transfer of a large-scale rotating turbine model,
+    Volume II -- Heat transfer data tabulation, 15% axial spacing. NASA CR-179467 (UTRC R86-956480-2).
+  id: NASA CR-179467 (NTRS 19880020420)
+  topic: [other]
+  content: Scan with a poor OCR layer, 242 pp. Short description of the rig, airfoil coordinates (Table 1,
+    first stator midspan pitch 7.71118 in., LE radius 0.44484 in.), inlet turbulence, instrumentation and a
+    guide to the data, then tabulated Stanton numbers per gauge for every 15%-gap run (first stator, rotor,
+    second stator; grid in/out, Re, flow coefficient).
+  status: screened
+  verdict: 'Screened 2026-11-02 (front matter only; the tabulations were not read). The printed St values
+    behind CR-4079''s figures for the 15% gap -- the form to use for a first-stator example without
+    digitising. Same verdict and blocker as CR-4079 (no gas-side airfoil kernel).'
+  read_for: [NGV worked example (stage vane St tabulated)]
+  issues: []
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (public). Vol. I is CR-4079 (held).
 - file: sources/materials/gatech_gen3csp/Measurement-Uncertainty.pdf
   citation: Gunawan, A. (?). Uncertainty analysis and error propagation methodology for reporting
     thermophysical properties measurement of Gen3 CSP materials. Georgia Institute of Technology, Gen3 CSP
@@ -4266,13 +4320,6 @@ wanted:
   question: Vane surface pressure and Stanton number on a full-scale stage -- a second NGV example or a
     cross-source check of a C3X example. Geometry detail may be insufficient (user, Han's textbook).
   where: ASME journals; Han, Dutta & Ekkad, Gas Turbine Heat Transfer and Cooling Technology, cites it.
-- citation: Blair, M. F., et al. (1989). Heat transfer in a large-scale rotating turbine model, Part I
-    (UTRC large-scale rotating rig), J. Turbomachinery. Exact title ? -- cited in Han's textbook.
-  checked: false
-  issues: []
-  priority: later
-  question: Stage-vane Ps and St data for an NGV example; the rotor data need rotation, which is not modelled.
-  where: ASME J. Turbomachinery; UTRC / NASA CR reports of the same rig.
 - citation: Blumm, J., Lindemann, A., Niedrig, B., Campbell, R. (2007). Measurement of selected thermophysical
     properties of the NPL certified reference material stainless steel 310. Int. J. Thermophys. 28, 681 (as cited by Gen3 CSP).
   checked: false
