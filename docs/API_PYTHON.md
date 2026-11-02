@@ -3467,6 +3467,6 @@ print(f"Underlying state P: {air.state.P} Pa")
 ```
 
 `cb.dewpoint(T, P, RH)` returns the dewpoint [K] for RH in (0, 1]; at RH = 1
-it is the dry-bulb `T` itself. A supersaturated RH > 1 raises `RuntimeError`
+it is the dry-bulb `T` itself. A supersaturated RH > 1 raises `ValueError`
 (the vapour-pressure step refuses it; the dewpoint solve, clamped to T, would
-otherwise return `T`), and RH <= 0 or a non-finite RH raises `ValueError`.
+otherwise return `T`), as do RH <= 0 and a non-finite RH.

@@ -247,8 +247,8 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   clamp) as the dewpoint; refuse RH > 1, or document dewpoint = T.
   **Done (#944, #948), and the finding was narrower than stated:** the public
   `dewpoint` never reaches the Newton with RH > 1, because `vapor_pressure`
-  refuses RH outside [0, 1] with `std::runtime_error` (on main too:
-  `dewpoint(300, 101325, 1.0000001)` raises). Only RH = 1 lands on the clamp,
+  refuses RH outside [0, 1] (on main too: `dewpoint(300, 101325, 1.0000001)`
+  raises; `std::invalid_argument` since #928). Only RH = 1 lands on the clamp,
   where T is the right answer. Documented as such (header, binding,
   API_CPP.md, API_PYTHON.md); no behaviour change.
 - **R13 (J1, J2) Ejector bisections outside their range.** An area ratio

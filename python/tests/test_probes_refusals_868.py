@@ -33,7 +33,7 @@ def _cd(f, x0: list[float], i: int, eps_rel: float = 1e-6) -> float:
 @pytest.mark.parametrize("Tt", [-1.0, 0.0, -1.393e19, math.nan, math.inf])
 def test_chamber_static_state_refuses_a_garbage_stagnation_T(Tt: float) -> None:
     # Before: Tt = -1 K returned a static T of -1.00001 K, Tt = 0 returned 0.
-    with pytest.raises(RuntimeError, match="chamber_static_state: Tt must be finite and > 0"):
+    with pytest.raises(ValueError, match="chamber_static_state: Tt must be finite and > 0"):
         st.momentum_chamber_residual_and_jacobian(1.0e5, 1.01e5, 0.5, Tt, Y_AIR, 0.01)
 
 
@@ -64,7 +64,7 @@ def test_a_probe_with_a_garbage_chamber_Tt_is_rejected_not_a_crash() -> None:
         if "chamber_static_state: Tt must be finite and > 0" in e["message"]
     ]
     assert refused
-    assert all(e["phase"] == "probe" and e["type"] == "RuntimeError" for e in refused)
+    assert all(e["phase"] == "probe" and e["type"] == "ValueError" for e in refused)
 
 
 # --- R12 (#944) --------------------------------------------------------------
@@ -73,9 +73,7 @@ def test_a_probe_with_a_garbage_chamber_Tt_is_rejected_not_a_crash() -> None:
 def test_dewpoint_rh_range_is_as_documented() -> None:
     assert cb.dewpoint(300.0, 101325.0, 1.0) == 300.0
     assert cb.dewpoint(300.0, 101325.0, 0.5) < 300.0
-    with pytest.raises(RuntimeError):
-        cb.dewpoint(300.0, 101325.0, 1.5)
-    for rh in (0.0, -0.1, math.nan):
+    for rh in (1.5, 0.0, -0.1, math.nan):
         with pytest.raises(ValueError):
             cb.dewpoint(300.0, 101325.0, rh)
 

@@ -324,12 +324,12 @@ ChamberStaticState chamber_static_state(double Tt, double P, double G,
   // A non-positive or non-finite Tt (garbage from an upstream state at a
   // solver probe) has no static state: refuse it (#868 R4). The Newton below
   // either ran to its cap on it or, when it happened to converge, returned a
-  // negative T. std::runtime_error, as the cap exit: the solver rejects the
-  // probe either way.
+  // negative T. An invalid argument (ValueError, #928), unlike the cap exit;
+  // the solver rejects the probe either way.
   if (!validation::is_finite_positive(Tt)) {
     char buf[64];
     std::snprintf(buf, sizeof buf, "%.6e", Tt);
-    throw std::runtime_error(
+    throw std::invalid_argument(
         std::string("chamber_static_state: Tt must be finite and > 0 K (got ") + buf + ")");
   }
   const double R = specific_gas_constant(X);

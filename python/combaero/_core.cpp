@@ -2887,8 +2887,8 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   m.def("dewpoint", &dewpoint, py::arg("T"), py::arg("P"), py::arg("RH"),
         "Dewpoint temperature [K] for ambient T [K], pressure P [Pa], and RH "
         "(0-1).\n\n"
-        "RH in (0, 1]; RH = 1 returns T (saturated). RH > 1 (supersaturated) "
-        "raises RuntimeError, RH <= 0 or non-finite ValueError.");
+        "RH in (0, 1]; RH = 1 returns T (saturated). RH > 1 (supersaturated), RH <= 0 "
+        "or non-finite RH raises ValueError.");
 
   m.def("relative_humidity_from_dewpoint", &relative_humidity_from_dewpoint,
         py::arg("T"), py::arg("Tdp"), py::arg("P"),

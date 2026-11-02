@@ -1951,7 +1951,7 @@ using AnnularDuctGeometry [[deprecated]] = Annulus;  // since v0.2.0, no removal
 
 ```cpp
 double humidity_ratio(double T, double P, double RH);
-double dewpoint(double T, double P, double RH);  // RH in (0, 1]; RH = 1 -> T; RH > 1 throws runtime_error
+double dewpoint(double T, double P, double RH);  // RH in (0, 1]; RH = 1 -> T; RH > 1, RH <= 0 or non-finite throw invalid_argument
 double humid_air_density(double T, double P, double RH);
 
 struct HumidAir {
