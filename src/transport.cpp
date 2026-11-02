@@ -528,7 +528,7 @@ double prandtl(double T, double P, const std::vector<double>& X)
     double mu_mix = wilke_viscosity(X, ps.mu);
     double k_mix  = mixture_conductivity(X, ps.k);
     if (!validation::is_finite_positive(k_mix)) {
-        throw std::runtime_error("prandtl: thermal conductivity must be positive");
+        throw std::invalid_argument("prandtl: thermal conductivity must be positive");
     }
     const double MW      = mwmix(X) / 1000.0;   // kg/mol
     const double cp_mass = cp(T, X) / MW;        // J/(kg*K)
@@ -557,7 +557,7 @@ double reynolds(double T, double P, const std::vector<double>& X, double V, doub
     const double rho_val = density(T, P, X);
     const double mu      = viscosity(T, P, X);
     if (!validation::is_finite_positive(mu)) {
-        throw std::runtime_error("reynolds: viscosity must be positive");
+        throw std::invalid_argument("reynolds: viscosity must be positive");
     }
     return (rho_val * V * L) / mu;
 }
@@ -567,7 +567,7 @@ double peclet(double T, double P, const std::vector<double>& X, double V, double
 {
     const double alpha = thermal_diffusivity(T, P, X);
     if (!validation::is_finite_positive(alpha)) {
-        throw std::runtime_error("peclet: thermal diffusivity must be positive");
+        throw std::invalid_argument("peclet: thermal diffusivity must be positive");
     }
     return (V * L) / alpha;
 }

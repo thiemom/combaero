@@ -484,16 +484,16 @@ std::vector<AnnularMode> annular_duct_eigenmodes(
 ) {
     // Validate inputs
     if (!(geom.L > 0.0)) {
-        throw std::runtime_error("Duct length must be positive");
+        throw std::invalid_argument("Duct length must be positive");
     }
     if (!(geom.radius_inner() >= 0.0 && geom.radius_outer() > geom.radius_inner())) {
-        throw std::runtime_error("Invalid annular geometry");
+        throw std::invalid_argument("Invalid annular geometry");
     }
     if (!(c > 0.0 && rho > 0.0)) {
-        throw std::runtime_error("Speed of sound and density must be positive");
+        throw std::invalid_argument("Speed of sound and density must be positive");
     }
     if (!(f_max > 0.0) || !std::isfinite(f_max)) {
-        throw std::runtime_error("Maximum frequency must be positive and finite");
+        throw std::invalid_argument("Maximum frequency must be positive and finite");
     }
 
     std::vector<AnnularMode> modes;
@@ -576,16 +576,16 @@ std::vector<AnnularMode> annular_duct_modes_analytical(
     BoundaryCondition bc_ends
 ) {
     if (!(geom.L > 0.0)) {
-        throw std::runtime_error("Duct length must be positive");
+        throw std::invalid_argument("Duct length must be positive");
     }
     if (!(geom.radius_inner() >= 0.0 && geom.radius_outer() > geom.radius_inner())) {
-        throw std::runtime_error("Invalid annular geometry");
+        throw std::invalid_argument("Invalid annular geometry");
     }
     if (!(c > 0.0)) {
-        throw std::runtime_error("Speed of sound must be positive");
+        throw std::invalid_argument("Speed of sound must be positive");
     }
     if (!(f_max > 0.0) || !std::isfinite(f_max)) {
-        throw std::runtime_error("Maximum frequency must be positive and finite");
+        throw std::invalid_argument("Maximum frequency must be positive and finite");
     }
 
     std::vector<AnnularMode> modes;

@@ -232,19 +232,19 @@ class TestDimensional:
 
 class TestValidation:
     def test_n_below_one_raises(self):
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises(ValueError):
             cb.vatistas_v_theta(0.05, 1.0, 0.05, 0.5)
 
     def test_gamma_zero_raises(self):
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises(ValueError):
             cb.vatistas_v_theta(0.05, 0.0, 0.05, 2.0)
 
     def test_gamma_negative_raises(self):
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises(ValueError):
             cb.vatistas_v_theta(0.05, -1.0, 0.05, 2.0)
 
     def test_rc_zero_raises(self):
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises(ValueError):
             cb.vatistas_v_theta(0.05, 1.0, 0.0, 2.0)
 
     def test_vortex_class_n_below_one_raises(self):

@@ -175,7 +175,7 @@ def test_orifice_inertia_uses_both_face_end_corrections() -> None:
 
 def test_orifice_impedance_refuses_nonpositive_sound_speed() -> None:
     for c in (0.0, -343.0, float("nan")):
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.orifice_impedance_with_flow(500.0, 0.0, 0.0, 1e-3, 1e-3, 0.05, 0.7, 1.2, c)
 
 

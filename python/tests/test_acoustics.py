@@ -108,17 +108,17 @@ class TestTransferMatrixMethod:
     def test_orifice_impedance_parameter_validation(self):
         """Test parameter validation for orifice impedance."""
         # Mach number too high
-        with pytest.raises(RuntimeError, match="Mach"):
+        with pytest.raises(ValueError, match="Mach"):
             cb.orifice_impedance_with_flow(100, 150, 5, 0.01, 0.005, 0.1, 0.61, 1.2, 343)
 
         # Invalid porosity
-        with pytest.raises(RuntimeError, match="Porosity"):
+        with pytest.raises(ValueError, match="Porosity"):
             cb.orifice_impedance_with_flow(100, 10, 5, 0.01, 0.005, 0.6, 0.61, 1.2, 343)
 
     def test_qw_tmm_cutoff_validation(self):
         """Test that quarter-wave TMM rejects frequencies above cutoff."""
         # kL > pi should fail
-        with pytest.raises(RuntimeError, match="cutoff"):
+        with pytest.raises(ValueError, match="cutoff"):
             cb.quarter_wave_resonator_tmm(
                 freq=1000,
                 L_tube=0.85,

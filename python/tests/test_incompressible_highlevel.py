@@ -102,7 +102,7 @@ class TestChannelFlow:
 
     def test_invalid_T(self) -> None:
         _, P, X = air_at_300()
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises(ValueError):
             cb.channel_flow(-1.0, P, X, u=10.0, L=1.0, D=0.05, f=0.02)
 
 

@@ -146,15 +146,15 @@ class TestToAcousticGeometry:
         )
 
         # Invalid n_cans
-        with pytest.raises((RuntimeError, ValueError)):
+        with pytest.raises(ValueError):
             cb.to_acoustic_geometry(flow_geom, n_cans=0, L_can=0.5, D_can=0.1)
 
         # Invalid L_can
-        with pytest.raises((RuntimeError, ValueError)):
+        with pytest.raises(ValueError):
             cb.to_acoustic_geometry(flow_geom, n_cans=24, L_can=0.0, D_can=0.1)
 
         # Invalid D_can
-        with pytest.raises((RuntimeError, ValueError)):
+        with pytest.raises(ValueError):
             cb.to_acoustic_geometry(flow_geom, n_cans=24, L_can=0.5, D_can=0.0)
 
     def test_edge_cases(self):

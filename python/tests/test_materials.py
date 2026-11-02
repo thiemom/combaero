@@ -41,10 +41,10 @@ class TestSuperalloys:
         assert cb.k_inconel718(1200) > 0
 
         # Out of range should raise error
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_inconel718(250)
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_inconel718(1300)
 
     def test_haynes230_is_alpha_cp_rho_from_the_brochure(self):
@@ -67,10 +67,10 @@ class TestSuperalloys:
         """Valid 25-1000 C, where the brochure table ends."""
         assert cb.k_haynes230(1000.0 + 273.15) == pytest.approx(26.68, rel=1e-12)
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_haynes230(250)
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_haynes230(1274.15)
 
 
@@ -87,9 +87,9 @@ class TestStructuralAlloys:
         )
 
     def test_ss316_refuses_outside_the_measured_range(self):
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_stainless_steel_316(300.0)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_stainless_steel_316(1200.0)
         # The database lookup follows the envelope (#882): 233 K below the data,
         # past the 100 K fade, so k = k_end - slope * 50 K.
@@ -106,9 +106,9 @@ class TestStructuralAlloys:
         assert cb.get_material_conductivity("ss310", 600.0 + 273.15) == pytest.approx(
             0.5 * (22.08 + 23.08), rel=1e-12
         )
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_stainless_steel_310(300.0)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_stainless_steel_310(800.0 + 273.15 + 1.0)
 
     def test_aluminum_6061_is_deprecated_but_still_answers(self):
@@ -117,7 +117,7 @@ class TestStructuralAlloys:
             assert cb.k_aluminum_6061(300.0) == pytest.approx(167.0 - 0.012 * 26.85, rel=1e-12)
         with pytest.warns(DeprecationWarning, match="al6061"):
             assert cb.get_material_conductivity("al6061", 300.0) > 0
-        with pytest.warns(DeprecationWarning), pytest.raises(RuntimeError):
+        with pytest.warns(DeprecationWarning), pytest.raises(ValueError):
             cb.k_aluminum_6061(700.0)
 
 
@@ -172,9 +172,9 @@ class TestThermalBarrierCoatings:
     def test_ysz_temperature_range(self):
         assert cb.k_tbc_ysz(300) > 0
         assert cb.k_tbc_ysz(1700) > 0
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_tbc_ysz(250)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_tbc_ysz(1800)
 
     def test_ysz_negative_hours_treated_as_zero(self):
@@ -324,7 +324,7 @@ class TestLinerAlloysAndBondCoat:
             (cb.k_haynes263, 1273.15),
         ):
             assert f(T_max) > 0
-            with pytest.raises(RuntimeError):
+            with pytest.raises(ValueError):
                 f(T_max + 1.0)
 
     def test_the_bond_coat_is_the_zhu_miller_line_over_its_drawn_range(self) -> None:
@@ -332,9 +332,9 @@ class TestLinerAlloysAndBondCoat:
             assert cb.k_bondcoat_nicocraly(T_C + 273.15) == pytest.approx(
                 6.729572 + 0.02344 * T_C, rel=1e-12
             )
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_bondcoat_nicocraly(500.0 + 273.15)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_bondcoat_nicocraly(1200.0 + 273.15)
 
     def test_they_are_in_the_material_database(self) -> None:
@@ -478,9 +478,9 @@ class TestFurtherAlloysCopperAlumina:
         assert f(0.5 * (x0 + x1) + to_K) == pytest.approx(0.5 * (k0 + k1), rel=1e-12)
         assert f(T_min) == pytest.approx(table[0][1], rel=1e-12)
         assert f(T_max) == pytest.approx(table[-1][1], rel=1e-12)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             f(T_min - 1.0)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             f(T_max + 1.0)
 
     def test_they_are_in_the_material_database(self) -> None:
@@ -512,7 +512,7 @@ class TestOptInExtrapolation:
     the envelope (#882); extrapolate=True continues the end slope linearly."""
 
     def test_default_refuses_or_follows_the_envelope(self) -> None:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.k_copper(1300.0)
         # Copper 1100 -> 1200 K: slope -0.08 per K; 100 K past the data the
         # faded slope has covered 50 K of it.
@@ -553,14 +553,14 @@ class TestOptInExtrapolation:
         )
 
     def test_it_refuses_where_the_continuation_is_unphysical(self) -> None:
-        with pytest.raises(RuntimeError, match="<= 0"):
+        with pytest.raises(ValueError, match="<= 0"):
             cb.k_copper(6000.0, extrapolate=True)
-        with pytest.raises(RuntimeError, match="> 0 K"):
+        with pytest.raises(ValueError, match="> 0 K"):
             cb.k_copper(0.0, extrapolate=True)
         for bad in (float("nan"), float("inf")):
-            with pytest.raises(RuntimeError, match="finite"):
+            with pytest.raises(ValueError, match="finite"):
                 cb.k_copper(bad, extrapolate=True)
-            with pytest.raises(RuntimeError, match="finite"):
+            with pytest.raises(ValueError, match="finite"):
                 cb.get_material_conductivity("copper", bad, extrapolate=True)
 
     def test_a_wall_layer_opts_in(self) -> None:
@@ -619,7 +619,7 @@ class TestSolidus:
         assert info["T_min"] == pytest.approx(533.15)
         assert info["T_max"] == pytest.approx(1073.15)
         assert "Gen3 CSP" in info["source"]
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             cb.get_material_info("unobtainium")
 
 

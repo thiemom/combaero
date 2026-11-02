@@ -46,7 +46,7 @@ std::vector<double> mole_to_mass(const std::vector<double>& X) {
         denom += X[k] * molar_masses[k];
     }
     if (!validation::is_finite_positive(denom)) {
-        throw std::runtime_error("mole_to_mass: non-positive denominator");
+        throw std::invalid_argument("mole_to_mass: non-positive denominator");
     }
 
     std::vector<double> Y(X.size());
@@ -70,7 +70,7 @@ std::vector<double> mass_to_mole(const std::vector<double>& Y) {
         denom += Y[k] / Wk;
     }
     if (!validation::is_finite_positive(denom)) {
-        throw std::runtime_error("mass_to_mole: non-positive denominator");
+        throw std::invalid_argument("mass_to_mole: non-positive denominator");
     }
 
     std::vector<double> X(Y.size());

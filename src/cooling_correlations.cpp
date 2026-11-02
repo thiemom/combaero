@@ -32,7 +32,7 @@ double thermal_performance_factor(double Nu_ratio, double f_ratio) {
 
 double adiabatic_wall_temperature(double T_hot, double T_coolant, double eta) {
     if (!validation::is_finite_nonnegative(eta) || eta > 1.0) {
-        throw std::runtime_error(
+        throw std::invalid_argument(
             "Cooling effectiveness eta must be in range [0, 1], got " + std::to_string(eta)
         );
     }
@@ -44,10 +44,10 @@ double cooled_wall_heat_flux(double T_hot, double T_coolant,
                              double eta,
                              double t_wall, double k_wall) {
     if (!validation::is_finite_positive(h_hot) || !validation::is_finite_positive(h_coolant)) {
-        throw std::runtime_error("Heat transfer coefficients must be positive");
+        throw std::invalid_argument("Heat transfer coefficients must be positive");
     }
     if (!validation::is_finite_nonnegative(t_wall) || !validation::is_finite_positive(k_wall)) {
-        throw std::runtime_error("Wall thickness must be non-negative and conductivity positive");
+        throw std::invalid_argument("Wall thickness must be non-negative and conductivity positive");
     }
 
     const double T_aw = adiabatic_wall_temperature(T_hot, T_coolant, eta);

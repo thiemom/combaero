@@ -203,7 +203,7 @@ class TestParameterValidation:
         geom.radius_outer = 0.5
         geom.n_azimuthal_max = 3
 
-        with pytest.raises(RuntimeError, match="length must be positive"):
+        with pytest.raises(ValueError, match="length must be positive"):
             cb.annular_duct_eigenmodes(geom, 500, 1.2, f_max=1000)
 
     def test_invalid_radii(self):
@@ -214,7 +214,7 @@ class TestParameterValidation:
         geom.radius_outer = 0.2  # Invalid: inner > outer
         geom.n_azimuthal_max = 3
 
-        with pytest.raises(RuntimeError, match="Invalid annular geometry"):
+        with pytest.raises(ValueError, match="Invalid annular geometry"):
             cb.annular_duct_eigenmodes(geom, 500, 1.2, f_max=1000)
 
     def test_invalid_sound_speed(self):
@@ -225,7 +225,7 @@ class TestParameterValidation:
         geom.radius_outer = 0.5
         geom.n_azimuthal_max = 3
 
-        with pytest.raises(RuntimeError, match="Speed of sound"):
+        with pytest.raises(ValueError, match="Speed of sound"):
             cb.annular_duct_eigenmodes(geom, -500, 1.2, f_max=1000)
 
 

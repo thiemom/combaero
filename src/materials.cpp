@@ -18,7 +18,7 @@ namespace combaero::materials {
 
 void validate_temperature(const std::string& material_name, double T, double T_min, double T_max) {
     if (!validation::is_finite_in_range(T, T_min, T_max)) {
-        throw std::runtime_error(
+        throw std::invalid_argument(
             "Temperature " + std::to_string(T) + " K is outside valid range [" +
             std::to_string(T_min) + ", " + std::to_string(T_max) + "] K for " + material_name
         );
@@ -228,10 +228,10 @@ double k_aluminum_6061(double T) {
 
 double k_tbc_ysz(double T, double hours, bool is_ebpvd) {
     if (!validation::is_finite_in_range(T, YSZ_T_MIN, YSZ_T_MAX)) {
-        throw std::runtime_error("k_tbc_ysz: Temperature must be in range [300, 1700] K, got " + std::to_string(T));
+        throw std::invalid_argument("k_tbc_ysz: Temperature must be in range [300, 1700] K, got " + std::to_string(T));
     }
     if (std::isnan(hours)) {
-        throw std::runtime_error("k_tbc_ysz: hours must not be NaN");
+        throw std::invalid_argument("k_tbc_ysz: hours must not be NaN");
     }
 
     if (is_ebpvd) {
@@ -433,7 +433,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
 const ThermalMaterial& get_material(const std::string& name) {
     auto it = material_database.find(name);
     if (it == material_database.end()) {
-        throw std::runtime_error("Material '" + name + "' not found in database");
+        throw std::invalid_argument("Material '" + name + "' not found in database");
     }
     return it->second;
 }
@@ -473,7 +473,7 @@ double envelope_T_max(const ThermalMaterial& mat) {
 
 bool material_in_range(const std::string& name, double T) {
     const auto& mat = get_material(name);
-    validation::require_finite<std::runtime_error>(T, "material_in_range: T must be finite");
+    validation::require_finite(T, "material_in_range: T must be finite");
     return T >= mat.T_min && T <= mat.T_max;
 }
 
@@ -481,12 +481,12 @@ double material_conductivity(const std::string& name, double T, bool extrapolate
     const auto& mat = get_material(name);
     // NaN would fail both range tests below and come out as the clamped end
     // value (#769): refuse a non-finite T on every path.
-    validation::require_finite<std::runtime_error>(T, "material_conductivity: T must be finite");
+    validation::require_finite(T, "material_conductivity: T must be finite");
     if (T >= mat.T_min && T <= mat.T_max) {
         return mat.k_func(T);
     }
     if (!(T > 0.0)) {
-        throw std::runtime_error("material_conductivity: T must be > 0 K for " + name +
+        throw std::invalid_argument("material_conductivity: T must be > 0 K for " + name +
                                  ", got " + std::to_string(T));
     }
     const bool below = T < mat.T_min;
@@ -506,7 +506,7 @@ double material_conductivity(const std::string& name, double T, bool extrapolate
         k = end.k + (below ? -end.slope : end.slope) * reach;
     }
     if (!(k > 0.0)) {
-        throw std::runtime_error("material_conductivity: continuing " + name + " to " +
+        throw std::invalid_argument("material_conductivity: continuing " + name + " to " +
                                  std::to_string(T) + " K gives k = " + std::to_string(k) +
                                  " W/(m*K) <= 0");
     }

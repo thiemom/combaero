@@ -3349,7 +3349,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
          double P) {
         auto X_in = to_vec(X_in_arr);
         if (X_in.empty())
-          throw std::runtime_error("X_in must be non-empty");
+          throw std::invalid_argument("X_in must be non-empty");
 
         State in;
         in.T = T_in;
@@ -6822,7 +6822,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
   // =========================================================================
 
   // Material thermal conductivity functions
-  // Range-checked by default (a RuntimeError outside the source's range);
+  // Range-checked by default (a ValueError outside the source's range);
   // extrapolate=True opts into the database's linear continuation of the end
   // slope (materials::material_conductivity).
   const auto material_k = [](double (*fn)(double), const char *db_name) {
@@ -7004,13 +7004,13 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "and al6061), and held beyond. extrapolate=True continues the end slope\n"
       "linearly instead. Neither is sourced: material_in_range(name, T) says\n"
       "which part is data. Raises if k reaches <= 0; floored at 1e-3. Raises\n"
-      "RuntimeError for an unknown material or a non-finite T.");
+      "ValueError for an unknown material or a non-finite T.");
 
   m.def("material_in_range", &combaero::materials::material_in_range, py::arg("name"),
         py::arg("T"),
         "Whether T [K] lies in the material's sourced conductivity range\n"
         "[T_min, T_max] (#882). Outside it, get_material_conductivity follows the\n"
-        "envelope. Raises RuntimeError for an unknown material or a non-finite T.");
+        "envelope. Raises ValueError for an unknown material or a non-finite T.");
 
   m.def(
       "get_material_info",
@@ -7033,7 +7033,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "[K] and source, notes, and its solidus T_solidus [K] -- the lower end of\n"
       "the melting range its source prints -- with that source (#882). T_solidus\n"
       "is NaN where no held source prints one. T_envelope_min/T_envelope_max [K]\n"
-      "are the ends of its k(T) envelope. Raises RuntimeError for an unknown\n"
+      "are the ends of its k(T) envelope. Raises ValueError for an unknown\n"
       "material.");
 
   // =========================================================================

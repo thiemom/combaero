@@ -7,10 +7,11 @@
 // clamp, a plausible number. The predicates below are written so that NaN
 // and +/-inf fail them, and the require_* helpers throw when they fail.
 //
-// The exception type is a template parameter so that each function keeps the
-// type it already throws (std::invalid_argument -> Python ValueError,
-// std::runtime_error -> Python RuntimeError, std::out_of_range -> Python
-// IndexError). The default is std::invalid_argument.
+// Invalid input throws std::invalid_argument (Python ValueError), the default,
+// everywhere (#928); std::runtime_error (Python RuntimeError) is kept for a
+// solve that fails on valid input (inner_solve.h). The exception type is a
+// template parameter, defaulting to std::invalid_argument; no call site
+// overrides it.
 //
 // The require_* helpers take a C string so that a passing check builds no
 // std::string. A message that formats the offending value should test the

@@ -192,7 +192,7 @@ double k_tbc_ysz(double T, double hours = 0.0, bool is_ebpvd = false);
 // -------------------------------------------------------------
 
 // Validate temperature is within material's valid range
-// Throws std::runtime_error if out of range
+// Throws std::invalid_argument if out of range
 void validate_temperature(const std::string& material_name, double T, double T_min, double T_max);
 
 } // namespace combaero::materials
