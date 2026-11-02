@@ -3874,13 +3874,47 @@ documents:
     14% more at 260-580 C (about -2 of its bands) and 25% more at 620-700 C, where its specific heat steps
     up (aging). The gap is the diffusivity (Gen3 22-40% above the alpha implied by Table 3 with Table 2''s
     cp and density), not the specific heat (Gen3 3-15% lower). Kept: condition stated here (annealed),
-    not by Gen3; a third source is wanted. ORNL/TM-9616 reprints these BMI values above 117 K, so it is
-    not independent.'
+    not by Gen3; an independent third source is still wanted (Touloukian Vol. 1). ORNL/TM-9616 reprints these
+    BMI values above 117 K, and the Haynes 625 brochure (held since 2026-11-02, next entry) prints the same
+    customary k and cp columns, so neither is independent.'
   read_for: ['liner / duct / bellows alloy conductivity', '#881 built-in materials vs Gen3 CSP']
   issues: [761, 881, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
   notes: Supplied by the user 2026-10-29. Melting range 1290-1350 C (Table 2) gives T_solidus, the cap of the issue 882 k(T) envelope.
+- file: sources/materials/haynes_625_alloy_brochure.pdf
+  citation: Haynes International. HAYNES 625 (UNS N06625) alloy, product brochure (web edition, 29 pp., generated
+    2026-11-02).
+  topic: [other]
+  content: 'Composition, mechanical, oxidation, corrosion and fabrication data; Physical Properties table (pp.
+    11-12; checked on the rendered page) in customary and metric columns: density 8.44 g/cm3 (0.305 lb/in3);
+    melting range 1288-1349 C (2350-2460 F); thermal conductivity, W/m C: 9.8 (RT), 10.9 (100 C), 12.5 (200),
+    13.9 (300), 15.3 (400), 16.9 (500), 18.3 (600), 19.8 (700), 21.5 (800), 23.4 (900), 25.6 (1000); specific
+    heat, J/kg C: 410, 428, 455, 477, 503, 527, 552, 576, 600, 625, 648 at the same temperatures; electrical
+    resistivity, mean expansion (25 C to T), dynamic modulus. NO thermal-diffusivity column (unlike the Haynes
+    230 brochure). The customary columns are at RT and 200-1800 F; the metric ones are re-tabulated at round
+    100 C steps, with a 1000 C row that has no customary counterpart.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #881 (was wanted). It does NOT settle the Inconel 625 conductivity dispute,
+    because it is not independent: its customary k column (68, 75, 87, 98, 109, 121, 132, 144, 158, 175
+    Btu-in/ft2-h-F at RT-1800 F), cp column (0.098-0.154 Btu/lb F, which Special Metals marks "calculated")
+    and density are the Special Metals Table 2/3 values digit for digit (resistivity matches in level, printed
+    in other units), i.e. the same Battelle (BMI) conductivity dataset that k_inconel625 ships. Its metric k agrees with the shipped interpolation within 0.7% at 25-900 C (1000 C: 25.6 against the
+    shipped table''s last row 25.2 at 982 C -- an extension past the Battelle range, provenance unstated).
+    Consistency check k = alpha cp rho: NOT POSSIBLE, no diffusivity is printed. The implied alpha = k/(rho
+    cp) is 2.83 mm2/s at RT to 4.68 at 1000 C; Gen3 CSP measures 22% (300 C) to 40% (700 C) more, and 28-30%
+    at 800-1000 C, while Gen3 cp is 5-15% below the brochure -- the same diffusivity-driven gap already
+    recorded, so Gen3 sits 16-17% above this k at 300-500 C (-1.6 to -2.0 of its 95% bands), 25-33% at
+    600-700 C (-2.1 to -2.5 bands) and 10% at 1000 C (-0.6 band). Supports the shipped (Special Metals) side
+    only in the sense that a second manufacturer reprints it; the dispute stays open until an independent
+    measurement (Touloukian/TPRC recommended curve, wanted) is held. Shipped material data unchanged.'
+  read_for: ['#881 third Inconel 625 conductivity (Special Metals vs Gen3 CSP)', '#882 solidus cap']
+  issues: [881, 882]
+  records: []
+  notes: 'Supplied by the user 2026-11-02 as sources/new/haynes-625.pdf (dompdf web export, no document number).
+    Melting range 1288-1349 C is the Special Metals 2350-2460 F converted (Special Metals rounds to 1290-1350 C).
+    Not checked: the mechanical, corrosion and fabrication sections; the expansion and modulus columns against
+    Special Metals Table 3/4.'
 
 - file: sources/materials/special_metals_nimonic_75_SMC-058.pdf
   citation: Special Metals Corporation. NIMONIC alloy 75, publication SMC-058 (2004).
@@ -4345,8 +4379,9 @@ documents:
     measurement bands (usable as such under the validation policy). Range starts ~260 C: no room-temperature
     point. #881: k_stainless_steel_316 and k_stainless_steel_310 are its SS316 and SS310 tables (xlsx means,
     0.01 W/m K), valid over the measured range only; checked haynes230 (shipped column 1.7-2.8 bands high,
-    replaced by the brochure''s alpha cp rho, inside the band) and inconel625 (about -2 bands, kept, a third
-    source wanted).'
+    replaced by the brochure''s alpha cp rho, inside the band) and inconel625 (about -2 bands, kept; the Haynes
+    625 brochure, held since 2026-11-02, reprints the shipped Battelle data and prints no diffusivity, so an
+    independent third source is still wanted).'
   read_for: ['#881 built-in materials vs Gen3 CSP', 310 SS conductivity for the C3X example]
   issues: [881, 882]
   records: [python/tests/test_materials.py]
@@ -4422,15 +4457,6 @@ documents:
   notes: Fetched from specialmetals.com 2026-10-31 (public technical bulletin).
 
 wanted:
-- citation: Haynes International. HAYNES 625 alloy brochure (physical properties, thermal conductivity and
-    diffusivity RT-1000 C).
-  checked: false
-  issues: [881]
-  priority: later
-  question: 'A third Inconel 625 conductivity: Special Metals Table 3 (Battelle, annealed; shipped) and Gen3
-    CSP disagree by 14-25% at 260-700 C, from the diffusivity. A brochure printing alpha and cp would show
-    which (and, like the Haynes 230 brochure, whether its k column matches its own alpha cp rho).'
-  where: haynes.com (the PDF links return 403 to automated fetches; the user supplies it).
 - citation: Dunn, M. G., et al. (1986). Stage heat-flux measurements on a full-stage rotating turbine
     (Calspan shock tunnel), ASME. Exact title ? -- cited in Han's textbook.
   checked: false
@@ -4453,7 +4479,9 @@ wanted:
   issues: [881, 882]
   priority: later
   question: 'The recommended-curve reference for alloy k(T) over the full range; would settle the #882 envelope
-    shape and the cross-check of the shipped tables.'
+    shape and the cross-check of the shipped tables, and could give the independent third Inconel 625
+    conductivity #881 still lacks (whether Vol. 1 covers alloy 625 is unverified) (Special Metals/Battelle vs Gen3 CSP, 16-33% apart at 300-700 C; the Haynes 625 brochure, held,
+    reprints the Battelle data).'
   where: 'DTIC hosts TPRC volumes as scans (Vol. 2 ADA951936, Vol. 3 ADA951937, Vol. 5 ADA951939 per a web
     search 2026-11-02); no DTIC record for Vol. 1 was found, so its AD number is unknown. apps.dtic.mil returns
     403 to automated fetches, so nothing was downloaded. University libraries.'
