@@ -1553,8 +1553,9 @@ documents:
     definition not stated.
   status: screened
   verdict: Clean cross-source accuracy dataset for Metzger Nu (by eye 5-14%) and evidence of a real spanwise
-    friction effect (with Damerow). Not yet digitised or scored; f needs its definition before use, which
-    is in Thrift's MS thesis (wanted), not Lawson's (held, no pressure-loss content).
+    friction effect (with Damerow). Not yet digitised or scored. Its f is the canonical dP / (2 rho U_max^2
+    N), static pressure (defined in Thrift 2007 Eq. 7, held; Lawson 2007 has no pressure-loss content),
+    so Fig. 16 can score the friction sets with no basis conversion.
   read_for: ['#335 cross-source accuracy of Metzger Nu and f', '#335 spanwise friction effect']
   issues: [335]
   records: [validation/cooling/extractions/pin_fin_sources.md]
@@ -1579,12 +1580,36 @@ documents:
     (Eq. 1.3) for the arrays that the 2011 paper only plots: a candidate cross-source accuracy reference
     for the Metzger Nu set and a possible Lawson Nu set (narrow box: H/d 1, two spacings each). Its own
     stated agreement with Metzger 1982a is within 6-10% and with Chyu 1998 within 7%. Does NOT answer the
-    question it was wanted for (the 2011 f definition); that moves to Thrift 2007.'
+    question it was wanted for (the 2011 f definition); Thrift 2007 (held) does.'
   read_for: ['#335 Lawson 2011 friction-factor definition -- not here', '#335 per-geometry Nu fits']
   issues: [335]
   records: []
   notes: Open access, VTechWorks handle 10919/31190 (file EntireThesisDraft9.pdf, the later of two uploads;
     106 pp.). In Copyright (rightsstatements InC). Fetched 2026-11-02 at the user's request.
+- file: sources/heat_transfer/pin_fin/Thrift_2007_MS_thesis_VirginiaTech_pressure_loss.pdf
+  citation: Thrift, A. A. (2007). Aerodynamic force and pressure loss measurements on low aspect ratio pin
+    fin arrays. MS thesis, Virginia Polytechnic Institute and State University, Blacksburg (chair K. A. Thole),
+    February 9, 2007.
+  topic: [pin_fin]
+  content: 'The pressure-loss half of the rig behind Lawson et al. 2011. Pin drag/lift (force balance) and
+    array friction for single and staggered multiple-row arrays (N 7), S1/d 2 and 4, S2/d 1.73 and 3.46,
+    H/d 1 and 0.5, incidence 0-30 deg, Re_d 5,000-30,000 on U_max. Eq. 7 DEFINES f_array = dP_array / (2
+    rho U_max^2 N): static taps, extrapolated to S2/2 up/downstream of the array, empty-channel loss (Kakac
+    Eqs. 1-2, checked to 2.5%) subtracted. Fig. 15 PRINTS the S1/d 4, S2/d 3.46 fits f = 0.135 Re_d^-0.071
+    (Re_d < 17,500) and 1.13 Re_d^-0.287 (> 17,500), +/-3% (read from the page image, p. 50). Table 1 (95%):
+    f_array uncertainty 15-21% at Re ~9,300, 7-7.6% at Re ~32,000.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Settles the Lawson 2011 f definition: it is our canonical basis (Metzger),
+    so Fig. 16 needs no conversion. Its own S1/d 4 fit sits 28% (Re_d 5,000) to 12% (30,000) below Metzger 1982b (which it attributes
+    to spanwise spacing), consistent with the note in pin_fin_correlation.h. The stated measurement band
+    (Table 1) is the band to score against: wide (~15-20%) at low Re. A possible Thrift friction set
+    (one geometry) or cross-source accuracy check for Metzger/Damerow friction; nothing implemented.'
+  read_for: ['#335 Lawson 2011 friction-factor definition', '#335 spanwise friction effect', '#335 measurement
+      band for f']
+  issues: [335]
+  records: []
+  notes: Open access, VTechWorks handle 10919/31189 (Thesis_ETD2.pdf, 113 pp.). In Copyright. Fetched 2026-11-02
+    at the user's request.
 - file: sources/heat_transfer/pin_fin/Lyall_2006_MS_thesis_VirginiaTech_single_row.pdf
   citation: Lyall, M. E. (2006). Heat transfer from low aspect ratio pin fins. MS thesis, Virginia Polytechnic
     Institute and State University, Blacksburg.
@@ -3951,17 +3976,6 @@ wanted:
   priority: later
   question: Short-pin friction and Nu from a non-NASA rig.
   where: ASME Turbo Expo proceedings.
-- citation: Thrift, A. A. (2007). Aerodynamic force and pressure loss measurements on low aspect ratio pin
-    fin arrays. MS thesis, Virginia Polytechnic Institute and State University, Blacksburg (chair K. A. Thole),
-    February 9, 2007.
-  checked: true
-  issues:
-  - 335
-  priority: later
-  question: The friction-factor definition and per-geometry f data behind Lawson, Thrift, Thole & Kohli 2011
-    Fig. 16 (local), needed before those points can score the friction sets; also pin drag vs spanwise
-    spacing. Lawson's own thesis (held) has no pressure-loss content.
-  where: Open access, VTechWorks handle 10919/31189 (Thesis_ETD2.pdf); located 2026-11-02, not yet fetched.
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
   checked: false
