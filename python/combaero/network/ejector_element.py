@@ -943,6 +943,14 @@ class EjectorElement(MultiPortChamberBase):
         diag["gamma"] = gamma
         diag["r_gas"] = r_gas
         diag["Pt_out"] = float(outlet.Pt)
+        # Flag and clamp (#945): the nozzle-exit Mach M_p1 the closures use is
+        # the supersonic root of A/A* = area_ratio_nozzle on the bracket
+        # [1, 50]. Outside it the bisection returns the bracket end; +1 (area
+        # ratio above A/A*(M = 50)) or -1 (below) says the result rests on a
+        # clamped M_p1, 0 that it does not.
+        diag["nozzle_exit_mach_out_of_range"] = float(
+            _solver_tools.ejector_nozzle_exit_mach(self.area_ratio_nozzle, gamma).out_of_range
+        )
 
         # Operating regime: s_choke = smootherstep(mp/cap), reported so the GUI
         # can label critical (1) / jet-pump (0) / transition, plus the actual

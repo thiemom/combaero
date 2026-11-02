@@ -89,6 +89,13 @@ constexpr double phi_m_lower_area_ratio = 6.9;
 // mixed flow chokes (M_3 = 1). Same value as _DEAD_HEAD_DISCRIMINANT_FLOOR in
 // _ejector_huang1999.py.
 constexpr double dead_head_discriminant_floor = 1e-12;
+// Bracket of the supersonic area-Mach bisection (nozzle-exit Mach M_p1) and
+// the bisections' iteration count (bracket / 2^200: exact to rounding).
+constexpr double kSupersonicMachLo = 1.0 + 1e-12;
+constexpr double kSupersonicMachHi = 50.0;
+constexpr int kBisectionIterations = 200;
+// The C-D nozzle exit-static inverse brackets P_py in [P*, Pt (1 - gap)].
+constexpr double kExitStaticTopGap = 1e-12;
 } // namespace ejector
 
 namespace combaero::solver {
@@ -109,6 +116,19 @@ double ejector_area_over_astar(double mach, double gamma);
 // A/A* is monotonically increasing for M > 1, so bisection is
 // unconditionally convergent.
 double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma);
+
+// The same root with an out-of-range flag (#945, flag and clamp). The
+// bisection's bracket is [ejector::kSupersonicMachLo, kSupersonicMachHi]; an
+// area ratio outside its image A/A*(bracket) has no root there and returns the
+// bracket end: out_of_range = -1 below A/A*(kSupersonicMachLo), +1 above
+// A/A*(kSupersonicMachHi) (e.g. ~7.8e3 at gamma = 5/3), else 0. M_p1 is a
+// constant in every Newton unknown, so the clamp's derivative is zero, as the
+// element's chain already uses.
+struct EjectorNozzleExitMach {
+  double mach;      // M_p1, or the bracket end it is clamped to
+  int out_of_range; // -1 below, +1 above the bracket's area-ratio range, 0 in it
+};
+EjectorNozzleExitMach ejector_nozzle_exit_mach(double area_ratio, double gamma);
 
 // Choked (sonic-throat) mass flow rate (Huang 1999 Eqs. 1 and 7).
 //
@@ -198,6 +218,11 @@ struct EjectorCDExitStaticJacobian {
   double dp_py_dm_dot; // d/d(mass flow)
   double dp_py_dp0;    // d/d(primary stagnation pressure)
   double dp_py_dt0;    // d/d(primary stagnation temperature)
+  // Flag and clamp (#945): +1 when m_dot is above the flow at P_py = P* (the
+  // choked end; P_py is held at P*), -1 when below the flow at Pt (1 - gap)
+  // (P_py held there), 0 in range. A clamped result's partials are those of
+  // the clamped function k Pt: (0, k, 0).
+  int out_of_range;
 };
 
 // Inverse of the C-D nozzle: the exit static P_py that passes m_dot, with its
@@ -206,6 +231,7 @@ struct EjectorCDExitStaticJacobian {
 // 6b); 1:1 with cd_nozzle_exit_static in _ejector_huang1999.py. The partials
 // are ratios of the C-D nozzle's own Jacobian at the solved P_py:
 //   dP_py/dm_dot = 1/(dmdot/dP_py),  dP_py/dPt = -(dmdot/dPt)/(dmdot/dP_py), ...
+// An m_dot outside the nozzle's range is clamped and flagged (out_of_range).
 EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
     double m_dot, double Pt, double Tt, double area_throat, double area_exit,
     double gamma, double r_gas, double eta, double eps_frac);
@@ -346,6 +372,10 @@ EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian(
 struct EjectorElementResidualJacobian {
   std::array<double, 4> residuals;               // R0..R3
   std::array<std::array<double, 9>, 4> jacobian; // jacobian[row][seed]
+  // ejector_nozzle_exit_mach's out_of_range at (area_ratio_nozzle, gamma):
+  // nonzero when the nozzle-exit Mach the closures use is a clamped bracket
+  // end (#945).
+  int nozzle_exit_mach_out_of_range = 0;
 };
 
 EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(

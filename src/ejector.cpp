@@ -117,10 +117,22 @@ static double ejector_area_over_astar_raw(double mach, double gamma) {
          std::pow((2.0 / gp1) * (1.0 + 0.5 * gm1 * mach * mach), gp1 / (2.0 * gm1));
 }
 
-static double ejector_mach_from_area_ratio_supersonic_raw(double area_ratio, double gamma) {
-  double lo = 1.0 + 1e-12;
-  double hi = 50.0;
-  for (int i = 0; i < 200; ++i) {
+// Supersonic root of A/A* = area_ratio by bisection on the Mach bracket
+// [kSupersonicMachLo, kSupersonicMachHi]. An area ratio outside the bracket's
+// image has no root there: the bisection then ends on the bracket end
+// (clamp), and out_of_range says which side (#945). The Mach is a constant
+// in every Newton unknown, so the clamped value's derivative (zero) is the
+// one the element's chain already uses.
+static EjectorNozzleExitMach ejector_nozzle_exit_mach_raw(double area_ratio, double gamma) {
+  double lo = ejector::kSupersonicMachLo;
+  double hi = ejector::kSupersonicMachHi;
+  EjectorNozzleExitMach out{};
+  if (area_ratio < ejector_area_over_astar_raw(lo, gamma)) {
+    out.out_of_range = -1;
+  } else if (area_ratio > ejector_area_over_astar_raw(hi, gamma)) {
+    out.out_of_range = 1;
+  }
+  for (int i = 0; i < ejector::kBisectionIterations; ++i) {
     double mid = 0.5 * (lo + hi);
     if (ejector_area_over_astar_raw(mid, gamma) < area_ratio) {
       lo = mid;
@@ -128,7 +140,12 @@ static double ejector_mach_from_area_ratio_supersonic_raw(double area_ratio, dou
       hi = mid;
     }
   }
-  return 0.5 * (lo + hi);
+  out.mach = 0.5 * (lo + hi);
+  return out;
+}
+
+static double ejector_mach_from_area_ratio_supersonic_raw(double area_ratio, double gamma) {
+  return ejector_nozzle_exit_mach_raw(area_ratio, gamma).mach;
 }
 
 static double ejector_choked_mass_flow_raw(double Pt, double Tt, double area_throat,
@@ -268,9 +285,22 @@ EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
   double gp1 = gamma + 1.0;
   double r_crit = std::pow(2.0 / gp1, gamma / gm1);
   // cd_nozzle_mass_flow is monotone decreasing in P_py: bisect for the root.
+  const double hi_frac = 1.0 - ejector::kExitStaticTopGap;
   double lo = Pt * r_crit;
-  double hi = Pt * (1.0 - 1e-12);
-  for (int i = 0; i < 200; ++i) {
+  double hi = Pt * hi_frac;
+  // An m_dot outside [flow(hi), flow(lo)] has no root in the bracket: the
+  // bisection ends on the bracket end it is pushed to (flag and clamp, #945).
+  const double m_lo_end = ejector_cd_nozzle_mass_flow_raw(Pt, Tt, lo, area_throat, area_exit,
+                                                          gamma, r_gas, eta, eps_frac);
+  const double m_hi_end = ejector_cd_nozzle_mass_flow_raw(Pt, Tt, hi, area_throat, area_exit,
+                                                          gamma, r_gas, eta, eps_frac);
+  int out_of_range = 0;
+  if (m_dot > m_lo_end) {
+    out_of_range = 1;  // above the choked end: P_py held at P*
+  } else if (m_dot < m_hi_end) {
+    out_of_range = -1;  // below the near-zero end: P_py held at Pt (1 - gap)
+  }
+  for (int i = 0; i < ejector::kBisectionIterations; ++i) {
     double mid = 0.5 * (lo + hi);
     double f = ejector_cd_nozzle_mass_flow_raw(Pt, Tt, mid, area_throat, area_exit, gamma, r_gas,
                                            eta, eps_frac);
@@ -281,12 +311,20 @@ EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
     }
   }
   double p_py = 0.5 * (lo + hi);
+  if (out_of_range != 0) {
+    // The clamped function is the bracket end, k Pt (k = r_crit or 1 - gap):
+    // flat in m_dot and Tt, so its Jacobian is (0, k, 0), consistent with
+    // the value. The implicit-function partials below would describe a root
+    // that does not exist.
+    const double k = out_of_range > 0 ? r_crit : hi_frac;
+    return {p_py, 0.0, k, 0.0, out_of_range};
+  }
   // Implicit function theorem: F(P_py) = cd_nozzle(P_py) - m_dot = 0, so
   // dP_py/dx = -(dF/dx)/(dF/dP_py), using the C-D nozzle's own Jacobian.
   EjectorCDNozzleJacobian j = ejector_cd_nozzle_mass_flow_and_jacobian_raw(
       Pt, Tt, p_py, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
   double inv = 1.0 / j.dmdot_dp_py;
-  return {p_py, inv, -j.dmdot_dp0 * inv, -j.dmdot_dt0 * inv};
+  return {p_py, inv, -j.dmdot_dp0 * inv, -j.dmdot_dt0 * inv, 0};
 }
 
 static EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian_raw(
@@ -936,6 +974,9 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   D r3 = lhs - discharge;
 
   EjectorElementResidualJacobian out;
+  // The closures above take M_p1 from the same bisection; report its clamp.
+  out.nozzle_exit_mach_out_of_range =
+      ejector_nozzle_exit_mach_raw(geom.area_ratio_nozzle, gamma).out_of_range;
   const D rows[4] = {r0, r1, r2, r3};
   for (int i = 0; i < 4; ++i) {
     out.residuals[i] = rows[i].v;
@@ -1014,6 +1055,15 @@ double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma) 
   }
   check_gamma(who, gamma);
   return ejector_mach_from_area_ratio_supersonic_raw(area_ratio, gamma);
+}
+
+EjectorNozzleExitMach ejector_nozzle_exit_mach(double area_ratio, double gamma) {
+  constexpr const char* who = "ejector_nozzle_exit_mach";
+  if (!validation::is_finite(area_ratio) || !(area_ratio >= 1.0)) {
+    refuse(who, "area_ratio must be finite and >= 1");
+  }
+  check_gamma(who, gamma);
+  return ejector_nozzle_exit_mach_raw(area_ratio, gamma);
 }
 
 namespace {

@@ -41,6 +41,11 @@ humid_air_composition(double T, double P,
                       double RH); // T in K, P in Pa, RH as fraction (0-1)
 
 // Calculate dewpoint temperature from T, P, RH [K]
+// RH in (0, 1]. RH = 1 returns T (saturated: the dewpoint is the dry-bulb
+// T). The Newton is clamped to Tdp <= T, so a supersaturated RH > 1 would
+// also return T, but it never reaches the solve: vapor_pressure refuses it
+// with std::runtime_error. RH <= 0 and non-finite RH throw std::invalid_argument
+// (#944: documented, no behaviour change).
 double dewpoint(double T, double P,
                 double RH); // T in K, P in Pa, RH as fraction (0-1)
 
