@@ -216,16 +216,21 @@ def test_c3x_panel_numbers(c3x: ModuleType) -> None:
     assert moved["bias"] == pytest.approx(11.2, abs=0.5)
 
 
-def test_c3x_coolant_multiplier_is_geometry(c3x: ModuleType) -> None:
-    """Each coolant sub-channel's Nu_multiplier is its share of the hole
-    perimeter over its segment's length, not a fitted number."""
+def test_c3x_wall_faces_are_the_segment_and_the_hole_share(c3x: ModuleType) -> None:
+    """Each wall carries its two faces (#887): the segment's area on the gas
+    side and the hole's share of its perimeter on the coolant side, so the
+    coolant channel needs no area factor on its h."""
     holes = c3x.coolant(158)
     net = c3x.build(158, c3x.TUNED, {})
     for g in c3x.segments(158):
+        wall = net.walls[f"w_{g['id']}"]
+        ratio = g["f"] * math.pi * holes[g["hole"]]["D"] / g["L"]
+        assert wall.area_a == pytest.approx(g["L"] * c3x.SPAN, rel=1e-12)
+        assert wall.area_b == pytest.approx(ratio * g["L"] * c3x.SPAN, rel=1e-12)
+        assert wall.contact_area is None and wall.wall_area == "slab_a"
+        assert 0.1 < ratio < 1.0
         el = net.elements[f"c{g['hole']}_{g['id']}"]
-        expected = g["f"] * math.pi * holes[g["hole"]]["D"] / g["L"]
-        assert el.surface.Nu_multiplier == pytest.approx(expected, rel=1e-12)
-        assert 0.1 < expected < 1.0
+        assert el.surface.Nu_multiplier == 1.0
 
 
 def test_c3x_burner_puts_the_cascade_inlet_at_the_measured_state(c3x: ModuleType) -> None:

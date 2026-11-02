@@ -740,6 +740,11 @@ class ThermalWallData(BaseModel):
     conductivity: float | None = None
     layers: list[WallLayerData] | None = None
     area: float | None = 0.05
+    # Per-side areas (#887): the wall's two faces [m^2], both or neither;
+    # set, they replace `area`, and `wall_area` is the layers' conduction area.
+    area_a: float | None = Field(default=None, gt=0.0)
+    area_b: float | None = Field(default=None, gt=0.0)
+    wall_area: Literal["log_mean", "slab_a", "slab_b"] = "log_mean"
     R_fouling: float = 0.0
     # How the two elements lie along the wall, from_node -> to_node: with the
     # flow signs it decides parallel or counter flow (ThermalWall, #627).

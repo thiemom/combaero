@@ -30,11 +30,11 @@ What is built
       (diameter D sqrt(f), Dh = D). The inlet temperature is set so that the
       midspan temperature is the report's average hole temperature.
     - Wall: a ThermalWall of ss310 (Gen3 CSP, #881), as thick as the mean
-      distance from the segment to the hole's perimeter. A ThermalWall has
-      one area -- the segment's -- so the hole side's smaller area enters as
-      the factor f pi D / L on its h (``Nu_multiplier`` of the coolant
-      sub-channel). That factor is geometry, not a tuner (per-side wall
-      areas would carry it directly: #887).
+      distance from the segment to the hole's perimeter, with its two faces
+      (#887): the segment's area L x span on the gas side and the hole's share
+      of its perimeter f pi D x span on the coolant side. It conducts on the
+      segment's area (``wall_area="slab_a"``), the wall's mean depth being
+      measured from that face.
 
 What is reproduced
     1. Untuned: the measured midspan wall temperature Tw of each segment
@@ -392,9 +392,7 @@ def build(run: int, multipliers: dict[str, float], T_in: dict[int, float]) -> Fl
                 Dh=hole["D"],
                 roughness=0.0,
                 regime="compressible",
-                surface=ConvectiveSurface(
-                    model=SmoothModel(), Nu_multiplier=area_ratio(g, hole["D"])
-                ),
+                surface=ConvectiveSurface(model=SmoothModel()),
             )
         )
         net.add_wall(
@@ -403,14 +401,19 @@ def build(run: int, multipliers: dict[str, float], T_in: dict[int, float]) -> Fl
                 element_a=e,
                 element_b=c,
                 layers=[WallLayer(thickness=g["thickness"], conductivity=20.0, material=MATERIAL)],
-                contact_area=g["L"] * SPAN,
+                # The segment's face on the gas side, the hole's share of its
+                # perimeter on the coolant side (#887).
+                area_a=g["L"] * SPAN,
+                area_b=area_ratio(g, hole["D"]) * g["L"] * SPAN,
+                wall_area="slab_a",
             )
         )
     return net
 
 
 def area_ratio(g: dict[str, Any], D: float) -> float:
-    """Hole-side area over the segment's: the wall has one area (the segment's)."""
+    """Hole-side face over the segment's: the share f of the hole's perimeter
+    pi D over the segment's length L."""
     return g["f"] * math.pi * D / g["L"]
 
 
@@ -583,7 +586,7 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
                 e: f"{g['side']} s/arc {g['s0']:.2f}-{g['s1']:.2f} (hole {i}), tuned",
                 f"{e}_out": f"{e} measured Ps = {g['Ps_over_Pt1']:.3f} Pt1",
                 f"{c}_in": f"hole {i}, share {g['f']:.2f}",
-                c: f"hole {i} share; Nu x {area_ratio(g, holes[i]['D']):.3f} = hole/segment area",
+                c: f"hole {i} share; wall face {area_ratio(g, holes[i]['D']):.3f} x the segment's",
                 f"{c}_out": f"hole {i} exit",
             }
         )
@@ -612,8 +615,9 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
                 "Solve, then select a wall edge: T_hot is the gas-side wall temperature, equal "
                 "to the measured Tw of that segment (the tuning target). The gas channels' "
                 "Nu_multiplier is the fitted tuner (0.8-1.2 mid-chord suction side, about 2.2 at "
-                "the leading edge, where a channel correlation has no stagnation flow). The "
-                "coolant channels' Nu_multiplier is geometry: the hole's area over the segment's."
+                "the leading edge, where a channel correlation has no stagnation flow). Each wall "
+                "has its two faces: the segment's area on the gas side, the hole's share of its "
+                "perimeter on the coolant side."
             ),
             "label": "tuned",
             "label_note": (

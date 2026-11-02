@@ -4,7 +4,7 @@
     "title": "Hylton 1983 C3X cooled vane",
     "source": "Hylton, Mihelc, Turner, Nealy and York (1983), NASA CR-168015: the C3X radially cooled vane cascade, run 158 (Appendix A), Tables III, IV, IX, Fig. 7.",
     "reproduced": "Ambient humid air, compressed, burns CH4 so that the cascade inlet is at the measured Tt1 and Pt1 (as in the rig's natural-gas burner). Each row is one stretch of vane surface and the cooling hole nearest to it: burner gas from the cascade inlet to the measured local static pressure, a ss310 wall as thick as the mean distance to the hole, and the hole's share of its coolant flow. The gas-side Nu multipliers are fitted to the measured midspan wall temperature.",
-    "where_to_look": "Solve, then select a wall edge: T_hot is the gas-side wall temperature, equal to the measured Tw of that segment (the tuning target). The gas channels' Nu_multiplier is the fitted tuner (0.8-1.2 mid-chord suction side, about 2.2 at the leading edge, where a channel correlation has no stagnation flow). The coolant channels' Nu_multiplier is geometry: the hole's area over the segment's.",
+    "where_to_look": "Solve, then select a wall edge: T_hot is the gas-side wall temperature, equal to the measured Tw of that segment (the tuning target). The gas channels' Nu_multiplier is the fitted tuner (0.8-1.2 mid-chord suction side, about 2.2 at the leading edge, where a channel correlation has no stagnation flow). Each wall has its two faces: the segment's area on the gas side, the hole's share of its perimeter on the coolant side.",
     "label": "tuned",
     "label_note": "Tuned to run 158 (19 Nu multipliers for 19 measured Tw; none left over). Untuned, the smooth-channel network misses run 158 by MAE 27 K (bias -21 K, worst -83 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with these multipliers: MAE 12 K, bias +11 K. The report's h is inferred by its own FE model, not measured, and is not a target.",
     "script": "python/examples/papers/hylton1983_c3x_vane.py"
@@ -132,7 +132,7 @@
         "id": "c2_SS0_h2_in",
         "label": "hole 2, share 0.33",
         "m_dot": 0.005813800917071058,
-        "Tt": 349.61277912085933,
+        "Tt": 349.6127791208593,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -204,7 +204,7 @@
         "id": "c1_SS1_h1_in",
         "label": "hole 1, share 1.00",
         "m_dot": 0.0167,
-        "Tt": 348.1896240385884,
+        "Tt": 348.18962403858836,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -276,7 +276,7 @@
         "id": "c3_SS2_h3_in",
         "label": "hole 3, share 0.59",
         "m_dot": 0.008783111747735856,
-        "Tt": 341.8930976455886,
+        "Tt": 341.89309764558857,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -348,7 +348,7 @@
         "id": "c4_SS3_h4_in",
         "label": "hole 4, share 0.53",
         "m_dot": 0.008685637213505367,
-        "Tt": 342.74610371814447,
+        "Tt": 342.74610371814435,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -420,7 +420,7 @@
         "id": "c5_SS4_h5_in",
         "label": "hole 5, share 0.51",
         "m_dot": 0.008987114259229302,
-        "Tt": 333.1812823644998,
+        "Tt": 333.18128236449974,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -492,7 +492,7 @@
         "id": "c6_SS5_h6_in",
         "label": "hole 6, share 0.51",
         "m_dot": 0.008473564872987631,
-        "Tt": 362.7201705813258,
+        "Tt": 362.72017058132576,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -708,7 +708,7 @@
         "id": "c9_SS8_h9_in",
         "label": "hole 9, share 0.49",
         "m_dot": 0.0017271317588859747,
-        "Tt": 383.5271990565114,
+        "Tt": 383.5271990565113,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -852,7 +852,7 @@
         "id": "c2_PS0_h2_in",
         "label": "hole 2, share 0.67",
         "m_dot": 0.011586199082928942,
-        "Tt": 349.61277912085933,
+        "Tt": 349.6127791208593,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -924,7 +924,7 @@
         "id": "c3_PS1_h3_in",
         "label": "hole 3, share 0.41",
         "m_dot": 0.006016888252264144,
-        "Tt": 341.8930976455886,
+        "Tt": 341.89309764558857,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -996,7 +996,7 @@
         "id": "c4_PS2_h4_in",
         "label": "hole 4, share 0.47",
         "m_dot": 0.007814362786494632,
-        "Tt": 342.74610371814447,
+        "Tt": 342.74610371814435,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1068,7 +1068,7 @@
         "id": "c5_PS3_h5_in",
         "label": "hole 5, share 0.49",
         "m_dot": 0.0085128857407707,
-        "Tt": 333.1812823644998,
+        "Tt": 333.18128236449974,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1140,7 +1140,7 @@
         "id": "c6_PS4_h6_in",
         "label": "hole 6, share 0.49",
         "m_dot": 0.00802643512701237,
-        "Tt": 362.7201705813258,
+        "Tt": 362.72017058132576,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1356,7 +1356,7 @@
         "id": "c9_PS7_h9_in",
         "label": "hole 9, share 0.51",
         "m_dot": 0.0017628682411140253,
-        "Tt": 383.5271990565114,
+        "Tt": 383.5271990565113,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1548,13 +1548,13 @@
       },
       "data": {
         "id": "c2_SS0_h2",
-        "label": "hole 2 share; Nu x 0.452 = hole/segment area",
+        "label": "hole 2 share; wall face 0.452 x the segment's",
         "L": 0.0762,
         "D": 0.0036416315529900567,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.4517087072401224,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -1587,13 +1587,13 @@
       },
       "data": {
         "id": "c1_SS1_h1",
-        "label": "hole 1 share; Nu x 0.507 = hole/segment area",
+        "label": "hole 1 share; wall face 0.507 x the segment's",
         "L": 0.0762,
         "D": 0.0063,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.5069659860707222,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0
       }
     },
@@ -1625,13 +1625,13 @@
       },
       "data": {
         "id": "c3_SS2_h3",
-        "label": "hole 3 share; Nu x 0.827 = hole/segment area",
+        "label": "hole 3 share; wall face 0.827 x the segment's",
         "L": 0.0762,
         "D": 0.004853263775526762,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.8273670268169386,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -1664,13 +1664,13 @@
       },
       "data": {
         "id": "c4_SS3_h4",
-        "label": "hole 4 share; Nu x 0.635 = hole/segment area",
+        "label": "hole 4 share; wall face 0.635 x the segment's",
         "L": 0.0762,
         "D": 0.004570875793039627,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.6347131725545668,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -1703,13 +1703,13 @@
       },
       "data": {
         "id": "c5_SS4_h5",
-        "label": "hole 5 share; Nu x 0.636 = hole/segment area",
+        "label": "hole 5 share; wall face 0.636 x the segment's",
         "L": 0.0762,
         "D": 0.004514728689515246,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360605,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -1742,13 +1742,13 @@
       },
       "data": {
         "id": "c6_SS5_h6",
-        "label": "hole 6 share; Nu x 0.636 = hole/segment area",
+        "label": "hole 6 share; wall face 0.636 x the segment's",
         "L": 0.0762,
         "D": 0.004514728689515248,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360603,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -1781,13 +1781,13 @@
       },
       "data": {
         "id": "c7_SS6_h7",
-        "label": "hole 7 share; Nu x 0.599 = hole/segment area",
+        "label": "hole 7 share; wall face 0.599 x the segment's",
         "L": 0.0762,
         "D": 0.004498306008423121,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.5985422210821968,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -1820,13 +1820,13 @@
       },
       "data": {
         "id": "c8_SS7_h8",
-        "label": "hole 8 share; Nu x 0.335 = hole/segment area",
+        "label": "hole 8 share; wall face 0.335 x the segment's",
         "L": 0.0762,
         "D": 0.0022007758192179898,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.3352717199691696,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0031
       }
@@ -1859,13 +1859,13 @@
       },
       "data": {
         "id": "c9_SS8_h9",
-        "label": "hole 9 share; Nu x 0.310 = hole/segment area",
+        "label": "hole 9 share; wall face 0.310 x the segment's",
         "L": 0.0762,
         "D": 0.002180779296246681,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.3103949433280521,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0031
       }
@@ -1898,13 +1898,13 @@
       },
       "data": {
         "id": "c10_SS9_h10",
-        "label": "hole 10 share; Nu x 0.223 = hole/segment area",
+        "label": "hole 10 share; wall face 0.223 x the segment's",
         "L": 0.0762,
         "D": 0.0014127918076671723,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.22308075828975477,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.00198
       }
@@ -1937,13 +1937,13 @@
       },
       "data": {
         "id": "c2_PS0_h2",
-        "label": "hole 2 share; Nu x 0.452 = hole/segment area",
+        "label": "hole 2 share; wall face 0.452 x the segment's",
         "L": 0.0762,
         "D": 0.005140867595286541,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.4517087072401224,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -1976,13 +1976,13 @@
       },
       "data": {
         "id": "c3_PS1_h3",
-        "label": "hole 3 share; Nu x 0.827 = hole/segment area",
+        "label": "hole 3 share; wall face 0.827 x the segment's",
         "L": 0.0762,
         "D": 0.004016942957668147,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.8273670268169389,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -2015,13 +2015,13 @@
       },
       "data": {
         "id": "c4_PS2_h4",
-        "label": "hole 4 share; Nu x 0.635 = hole/segment area",
+        "label": "hole 4 share; wall face 0.635 x the segment's",
         "L": 0.0762,
         "D": 0.00433556161121075,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.6347131725545668,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -2054,13 +2054,13 @@
       },
       "data": {
         "id": "c5_PS3_h5",
-        "label": "hole 5 share; Nu x 0.636 = hole/segment area",
+        "label": "hole 5 share; wall face 0.636 x the segment's",
         "L": 0.0762,
         "D": 0.004393998732369861,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360605,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -2093,13 +2093,13 @@
       },
       "data": {
         "id": "c6_PS4_h6",
-        "label": "hole 6 share; Nu x 0.636 = hole/segment area",
+        "label": "hole 6 share; wall face 0.636 x the segment's",
         "L": 0.0762,
         "D": 0.00439399873236986,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.6364161735360602,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -2132,13 +2132,13 @@
       },
       "data": {
         "id": "c7_PS5_h7",
-        "label": "hole 7 share; Nu x 0.599 = hole/segment area",
+        "label": "hole 7 share; wall face 0.599 x the segment's",
         "L": 0.0762,
         "D": 0.00441080979578404,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.5985422210821968,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0063
       }
@@ -2171,13 +2171,13 @@
       },
       "data": {
         "id": "c8_PS6_h8",
-        "label": "hole 8 share; Nu x 0.335 = hole/segment area",
+        "label": "hole 8 share; wall face 0.335 x the segment's",
         "L": 0.0762,
         "D": 0.0021832511979947215,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.3352717199691696,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0031
       }
@@ -2210,13 +2210,13 @@
       },
       "data": {
         "id": "c9_PS7_h9",
-        "label": "hole 9 share; Nu x 0.310 = hole/segment area",
+        "label": "hole 9 share; wall face 0.310 x the segment's",
         "L": 0.0762,
         "D": 0.002203225286043583,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.31039494332805206,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.0031
       }
@@ -2249,13 +2249,13 @@
       },
       "data": {
         "id": "c10_PS8_h10",
-        "label": "hole 10 share; Nu x 0.223 = hole/segment area",
+        "label": "hole 10 share; wall face 0.223 x the segment's",
         "L": 0.0762,
         "D": 0.0013872344099641282,
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.2230807582897548,
+        "Nu_multiplier": 1.0,
         "f_multiplier": 1.0,
         "Dh": 0.00198
       }
@@ -3034,8 +3034,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.001115572600568853,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.001115572600568853,
+        "area_b": 0.000503913857235458,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.009412658636754305,
         "conductivity": 20.0
@@ -3057,8 +3060,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0029748602681836083,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0029748602681836083,
+        "area_b": 0.001508152969282316,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.009452807595920903,
         "conductivity": 20.0
@@ -3080,8 +3086,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0010817673702485848,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0010817673702485848,
+        "area_b": 0.0008950186528301502,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.012414822866255816,
         "conductivity": 20.0
@@ -3103,8 +3112,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0012507935218499266,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0012507935218499266,
+        "area_b": 0.0007938951244640668,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.009839515611198174,
         "conductivity": 20.0
@@ -3126,8 +3138,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0012169882915296574,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0012169882915296574,
+        "area_b": 0.0007745110317334922,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.007348191103906363,
         "conductivity": 20.0
@@ -3149,8 +3164,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0012169882915296585,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0012169882915296585,
+        "area_b": 0.0007745110317334926,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.00543146173273559,
         "conductivity": 20.0
@@ -3172,8 +3190,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0012845987521701947,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0012845987521701947,
+        "area_b": 0.0007688865903233668,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.0041387100152508296,
         "conductivity": 20.0
@@ -3195,8 +3216,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.001115572600568854,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.001115572600568854,
+        "area_b": 0.0003740199445431991,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.0044187893481313495,
         "conductivity": 20.0
@@ -3218,8 +3242,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0011831830612093882,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0011831830612093882,
+        "area_b": 0.00036725403923079924,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.003772844965744753,
         "conductivity": 20.0
@@ -3241,8 +3268,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0010817673702485848,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0010817673702485848,
+        "area_b": 0.00024132148524816821,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.003358955791139091,
         "conductivity": 20.0
@@ -3264,8 +3294,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0022232006953831376,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0022232006953831376,
+        "area_b": 0.0010042391120468582,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.008301896645978937,
         "conductivity": 20.0
@@ -3287,8 +3320,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0007410668984610459,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0007410668984610459,
+        "area_b": 0.0006131343164521659,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.011835286157581783,
         "conductivity": 20.0
@@ -3310,8 +3346,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.001125323808774181,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.001125323808774181,
+        "area_b": 0.0007142578448182491,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.00964320331410948,
         "conductivity": 20.0
@@ -3333,8 +3372,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0011527707309394054,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0011527707309394054,
+        "area_b": 0.0007336419375488238,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.007250244679385102,
         "conductivity": 20.0
@@ -3356,8 +3398,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0011527707309394054,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0011527707309394054,
+        "area_b": 0.0007336419375488236,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.00528387400855159,
         "conductivity": 20.0
@@ -3379,8 +3424,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0012351114974350772,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0012351114974350772,
+        "area_b": 0.0007392663789589491,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.003997435797222388,
         "conductivity": 20.0
@@ -3402,8 +3450,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0010978768866089566,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0010978768866089566,
+        "area_b": 0.0003680870720877819,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.0041199198322299626,
         "conductivity": 20.0
@@ -3425,8 +3476,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.0012076645752698517,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.0012076645752698517,
+        "area_b": 0.0003748529774001817,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.0036535565815879172,
         "conductivity": 20.0
@@ -3448,8 +3502,11 @@
             "material": "ss310"
           }
         ],
-        "area": 0.00104298304227851,
+        "area": null,
         "R_fouling": 0.0,
+        "area_a": 0.00104298304227851,
+        "area_b": 0.0002326694479548454,
+        "wall_area": "slab_a",
         "orientation": "aligned",
         "thickness": 0.003244084852710431,
         "conductivity": 20.0
