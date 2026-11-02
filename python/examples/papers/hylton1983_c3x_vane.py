@@ -33,8 +33,10 @@ What is built
       distance from the segment to the hole's perimeter, with its two faces
       (#887): the segment's area L x span on the gas side and the hole's share
       of its perimeter f pi D x span on the coolant side. It conducts on the
-      segment's area (``wall_area="slab_a"``), the wall's mean depth being
-      measured from that face.
+      log mean of the two (``wall_area="log_mean"``): the metal narrows from
+      the segment's face to the hole's, as a thick cylinder wall does. Each
+      wall conducts straight through, segment to hole only: nothing flows
+      along the metal to the neighbouring segments (#898).
 
 What is reproduced
     1. Untuned: the measured midspan wall temperature Tw of each segment
@@ -158,25 +160,25 @@ FUEL_T = 300.0  # [K]
 # Gas-side Nu multipliers fitted to run 158's measured Tw (``--tune``
 # regenerates them; test_paper_examples pins that they still reproduce it).
 TUNED = {
-    "PS0_h2": 2.1919,
-    "PS1_h3": 1.7756,
-    "PS2_h4": 1.4185,
-    "PS3_h5": 1.4454,
-    "PS4_h6": 1.1950,
-    "PS5_h7": 1.4116,
-    "PS6_h8": 1.3817,
-    "PS7_h9": 1.0156,
-    "PS8_h10": 0.8840,
-    "SS0_h2": 2.1483,
-    "SS1_h1": 0.8513,
-    "SS2_h3": 1.1338,
-    "SS3_h4": 1.0715,
-    "SS4_h5": 1.1427,
-    "SS5_h6": 1.0201,
-    "SS6_h7": 1.0936,
-    "SS7_h8": 1.1102,
-    "SS8_h9": 0.9227,
-    "SS9_h10": 0.7872,
+    "PS0_h2": 1.9902,
+    "PS1_h3": 1.7070,
+    "PS2_h4": 1.3156,
+    "PS3_h5": 1.3571,
+    "PS4_h6": 1.1390,
+    "PS5_h7": 1.3566,
+    "PS6_h8": 1.2718,
+    "PS7_h9": 0.9613,
+    "PS8_h10": 0.8286,
+    "SS0_h2": 1.9359,
+    "SS1_h1": 0.7743,
+    "SS2_h3": 1.0897,
+    "SS3_h4": 0.9948,
+    "SS4_h5": 1.0739,
+    "SS5_h6": 0.9723,
+    "SS6_h7": 1.0500,
+    "SS7_h8": 1.0162,
+    "SS8_h9": 0.8716,
+    "SS9_h10": 0.7359,
 }
 
 
@@ -405,7 +407,7 @@ def build(run: int, multipliers: dict[str, float], T_in: dict[int, float]) -> Fl
                 # perimeter on the coolant side (#887).
                 area_a=g["L"] * SPAN,
                 area_b=area_ratio(g, hole["D"]) * g["L"] * SPAN,
-                wall_area="slab_a",
+                wall_area="log_mean",
             )
         )
     return net
@@ -614,17 +616,17 @@ def gui_document(run: int = TUNE_RUN, multipliers: dict[str, float] | None = Non
             "where_to_look": (
                 "Solve, then select a wall edge: T_hot is the gas-side wall temperature, equal "
                 "to the measured Tw of that segment (the tuning target). The gas channels' "
-                "Nu_multiplier is the fitted tuner (0.8-1.2 mid-chord suction side, about 2.2 at "
-                "the leading edge, where a channel correlation has no stagnation flow). Each wall "
+                "Nu_multiplier is the fitted tuner (0.7-1.1 mid-chord suction side, about 1.9-2.0 "
+                "at the leading edge, where a channel correlation has no stagnation flow). Each wall "
                 "has its two faces: the segment's area on the gas side, the hole's share of its "
                 "perimeter on the coolant side."
             ),
             "label": "tuned",
             "label_note": (
                 f"Tuned to run 158 ({s['n']} Nu multipliers for {s['n']} measured Tw; none left "
-                "over). Untuned, the smooth-channel network misses run 158 by MAE 27 K (bias -21 K, "
-                "worst -83 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with "
-                "these multipliers: MAE 12 K, bias +11 K. The report's h is inferred by its own FE "
+                "over). Untuned, the smooth-channel network misses run 158 by MAE 24 K (bias -14 K, "
+                "worst -73 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with "
+                "these multipliers: MAE 10 K, bias +9 K. The report's h is inferred by its own FE "
                 "model, not measured, and is not a target."
             ),
             "script": "python/examples/papers/hylton1983_c3x_vane.py",
