@@ -133,7 +133,6 @@ def create_cooling_network(
             to_node="cool_outlet",
             Cd=0.98,
             correlation="fixed",
-            in_pipe=False,
             diameter=D_ch * 0.95,
             regime="incompressible",
         )
@@ -193,7 +192,6 @@ def create_coupled_wall_network(
             to_node="hot_outlet",
             Cd=0.98,
             correlation="fixed",
-            in_pipe=False,
             diameter=D_ann * 0.95,
             regime="incompressible",
         )
