@@ -211,7 +211,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   negative Tt (garbage from an upstream state) and, when the Newton happens
   to converge, returns a negative T. `duct_static_state` floors its inputs;
   this one could refuse Tt <= 0. Behaviour change for probes.
-  **Fixed (#937):** Tt <= 0 or non-finite raises `std::runtime_error` (the
+  **Fixed (#937, #948):** Tt <= 0 or non-finite raises `std::runtime_error` (the
   cap exit's type). Main returned T = -1.00001 K at Tt = -1 K and 0 at 0. The
   cascaded branching manifold (`test_tee_network`, xfail) now records its
   garbage-Tt probes (-4.3e18 K) as rejected node evaluations instead of
@@ -235,17 +235,17 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
 - **R9 (G5, E2) Cap rule for the remaining bracketed solves.** Not reached
   and bracketed with bisection; the same rule could be applied for
   uniformity. E2's non-finite break returns a clamped extent silently.
-  **G5 fixed (#941):** `duct_static_state` applies the cap rule on its last
+  **G5 fixed (#941, #948):** `duct_static_state` applies the cap rule on its last
   ln P step (`inner_solve::kDuctStaticStateMaxIter` = 100, unchanged). Not
   reached: network F and J bit-identical (below). E2 is in its own PR.
 - **R10 (C9) Delete `solve_station_state`.** Dead code (`[[maybe_unused]]`).
-  **Fixed (#942):** deleted; nothing else used only it.
+  **Fixed (#942, #948):** deleted; nothing else used only it.
 - **R11 (O3) Jobson tolerance.** 1e-15 relative cycles in the last bits
   (2 cap exits at 3e-14); 1e-13 would end those calls ~190 iterations sooner
   with no change beyond 3e-14.
 - **R12 (H1) `dewpoint` with RH > 1.** Supersaturated input returns T (the
   clamp) as the dewpoint; refuse RH > 1, or document dewpoint = T.
-  **Done (#944), and the finding was narrower than stated:** the public
+  **Done (#944, #948), and the finding was narrower than stated:** the public
   `dewpoint` never reaches the Newton with RH > 1, because `vapor_pressure`
   refuses RH outside [0, 1] with `std::runtime_error` (on main too:
   `dewpoint(300, 101325, 1.0000001)` raises). Only RH = 1 lands on the clamp,
@@ -256,7 +256,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   (or below its near-zero end) return a bracket end silently, J2 with its
   implicit Jacobian there. Clamp or refuse is a modelling decision for the
   ejector element.
-  **Fixed (#945), flag and clamp (user decision):** both keep the bisection's
+  **Fixed (#945, #948), flag and clamp (user decision):** both keep the bisection's
   value. J2 (`ejector_cd_nozzle_exit_static_and_jacobian`) sets
   `out_of_range` (+1 above the flow at P*, -1 below the flow at
   Pt (1 - 1e-12)) and returns the clamped function's partials
@@ -272,7 +272,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   call can be out of range. J1's area ratio is a fixed parameter (> 1,
   checked at the element and, since #923, at the public entry); with gamma
   in (1, 5/3] it is clamped only for A_p1/A_t above ~7.8e3 (gamma 5/3) to
-  ~1.5e6 (gamma 1.4), which no stress draw reaches (see the PR).
+  ~1.5e6 (gamma 1.4), which no stress draw reaches (#948: 1786 ejector element evaluations over the 40 stress seeds, 0 flagged).
 
 ## Not verified
 
