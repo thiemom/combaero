@@ -5213,7 +5213,8 @@ wanted:
     geometry): liner diameter and length, louvers, hole areas, air split. With it the NASA can becomes a full
     liner network case for a radiation model, not only an L ratio test. Alternatives that may print it: Claus
     1981 NASA TP-1722; Claus, Humenik & Neely 1983 NASA CP-2268.'
-  where: NTRS (public; not yet searched).
+  where: 'NTRS 19820021901, public: https://ntrs.nasa.gov/api/citations/19820021901/downloads/19820021901.pdf
+    (7.8 MB). Scripted downloads stop at 5.0 MB and resume is refused (2026-11-02); fetch it in a browser.'
 - citation: 'Wright, L. M., et al. (2011). Effects of density ratio and free-stream turbulence on fan-shaped and
     laidback fan-shaped film cooling holes. (Title, authors and venue not verified: Hassan 2013 cites it only as
     "Wright et al. (2011)" in the text; likely ASME J. Turbomach. or Turbo Expo.)'
