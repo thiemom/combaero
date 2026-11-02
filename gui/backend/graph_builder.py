@@ -15,6 +15,7 @@ from combaero.network import (
     EnergyBoundary,
     FilmCoolingElement,
     FlowNetwork,
+    FlowSplitter,
     FuelBoundary,
     ImpingementArray,
     ImpingementModel,
@@ -57,6 +58,7 @@ from .schemas import (
     EffusionPlateData,
     EjectorData,
     FilmCoolingData,
+    FlowSplitterData,
     FuelBoundaryData,
     HeatSourceData,
     ImpingementArrayData,
@@ -114,8 +116,57 @@ ELEMENT_KINDS = frozenset(
         "effusion_liner",
         "compressor",
         "turbine",
+        "flow_splitter",
     }
 )
+
+
+#: A flow splitter's (#903) per-outlet results, reported on its canvas node as
+#: ``rows_<key>`` lists in port order (out0, out1, ...).
+SPLITTER_ROW_KEYS = (
+    "m_dot",
+    "fraction",
+    "fraction_achieved",
+    "valve_dPt",
+    "valve_CdA",
+    "valve_Cd",
+    "valve_zeta",
+    "valve_needs_pump",
+)
+
+
+class GuiFlowSplitter:
+    """A ``FlowSplitter`` as one canvas node (#903): ``summarize`` gives the
+    runner its result, scalars plus a ``rows_<key>`` list per outlet in port
+    order, None where an outlet has no such value (the open reference has no
+    metering; Cd and zeta need a reference area)."""
+
+    def __init__(self, splitter: FlowSplitter) -> None:
+        self.splitter = splitter
+
+    def summarize(self, element_diag: dict[str, dict]) -> dict:
+        s = self.splitter.summarize(element_diag)
+        outs = list(self.splitter.outlets)
+        rows = [s["outlets"][o] for o in outs]
+        out: dict = {
+            "m_dot": float(s["m_dot"]),
+            "n_outlets": float(len(outs)),
+            "reference_outlet": float(outs.index(s["reference"])),
+            "n_needs_pump": float(len(s["needs_pump"])),
+        }
+        for key in SPLITTER_ROW_KEYS:
+            out[f"rows_{key}"] = [float(r[key]) if r.get(key) is not None else None for r in rows]
+        dpt = [float(r["valve_dPt"]) for r in rows if "valve_dPt" in r]
+        if dpt:
+            out["valve_dPt_max"] = max(dpt)
+        err = [
+            abs(float(r["fraction_achieved"]) - float(r["fraction"]))
+            for r in rows
+            if "fraction_achieved" in r
+        ]
+        if err:
+            out["fraction_error_max"] = max(err)
+        return out
 
 
 #: The heat source canvas kind (#792) and the kinds it may heat.
@@ -799,12 +850,19 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
     # the tee; primary/secondary/outlet for the ejector). Both get the same
     # per-port MomentumChamberNode auto-insertion below.
     junction_ids = {
-        node.id for node in element_nodes if node.type in ("mpce_tee", "ejector", "effusion_liner")
+        node.id
+        for node in element_nodes
+        if node.type in ("mpce_tee", "ejector", "effusion_liner", "flow_splitter")
     }
     # An effusion liner's ports are a reservoir, a dump and a discharge that
     # N panels merge into: plenum semantics. A momentum chamber there would
     # refuse the N inflows and mis-state the reservoir (#471).
     liner_ids = {node.id for node in element_nodes if node.type == "effusion_liner"}
+    # A flow splitter's (#903) inlet is the node its N outlets draw from, and
+    # each outlet a valve discharging into a node at rest: plenum ports too. A
+    # momentum chamber has one bulk velocity and refuses a split.
+    splitter_ids = {node.id for node in element_nodes if node.type == "flow_splitter"}
+    plenum_port_ids = liner_ids | splitter_ids
 
     # 1b. Create implicit junction nodes for element -> element visual links.
     # For direct element<->element connections we auto-insert a MomentumChamberNode.
@@ -843,7 +901,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if port and (edge.source, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.source}_{port}"
                 if jid not in nodes_map:
-                    jn = PlenumNode(jid) if edge.source in liner_ids else MomentumChamberNode(jid)
+                    jn = (
+                        PlenumNode(jid)
+                        if edge.source in plenum_port_ids
+                        else MomentumChamberNode(jid)
+                    )
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.source, port)] = jid
@@ -855,7 +917,11 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             if port and (edge.target, port) not in tee_port_node_map:
                 jid = f"__tee_jct__{edge.target}_{port}"
                 if jid not in nodes_map:
-                    jn = PlenumNode(jid) if edge.target in liner_ids else MomentumChamberNode(jid)
+                    jn = (
+                        PlenumNode(jid)
+                        if edge.target in plenum_port_ids
+                        else MomentumChamberNode(jid)
+                    )
                     net.add_node(jn)
                     nodes_map[jid] = jn
                 tee_port_node_map[(edge.target, port)] = jid
@@ -871,7 +937,23 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             jct, other = (edge.source, edge.target) if src_tee else (edge.target, edge.source)
             handle = edge.sourceHandle if src_tee else edge.targetHandle
             port = _port_from_handle(handle)
-            if (
+            if jct in splitter_ids:
+                # A plenum or boundary is used as it is. A momentum chamber
+                # at the inlet would carry the split itself: it feeds an
+                # inserted plenum through a lossless link instead.
+                if (
+                    port == "in"
+                    and isinstance(nodes_map[other], MomentumChamberNode)
+                    and (jct, port) not in tee_port_node_map
+                ):
+                    jid = f"__tee_jct__{jct}_{port}"
+                    if jid not in nodes_map:
+                        jn = PlenumNode(jid)
+                        net.add_node(jn)
+                        nodes_map[jid] = jn
+                    tee_port_node_map[(jct, port)] = jid
+                    port_node_links.append((other, jid))
+            elif (
                 port
                 and jct not in liner_ids
                 and not isinstance(nodes_map[other], MomentumChamberNode)
@@ -1207,6 +1289,55 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
             )
             liner.add_to(net, _ends[0], _ends[1], _ends[2])
             gui_arrays[elem_id] = liner
+            continue
+
+        # Flow splitter (#903): one inlet and N outlet ports, expanded into one
+        # SplitterOutletElement per outlet.
+        if elem_type == "flow_splitter":
+            _sd = _parse(FlowSplitterData, elem_data, elem_id)
+            _n = len(_sd.fractions)
+            _sports = ("in", *(f"out{i}" for i in range(_n)))
+            _ends = [
+                _find_junction_port(
+                    schema.edges,
+                    elem_id,
+                    port,
+                    nodes_map,
+                    tee_port_node_map,
+                    _wall_edge_remap,
+                    all_ports=_sports,
+                )
+                for port in _sports
+            ]
+            _inlet, _outs = _ends[0], _ends[1:]
+            _dup = sorted({o for o in _outs if _outs.count(o) > 1})
+            if _dup:
+                raise ValueError(
+                    f"Flow splitter '{elem_id}': outlets {', '.join(_dup)} are wired to "
+                    "the same node; give each outlet its own node."
+                )
+            _ref = _sd.reference
+            if _ref is None and None not in _sd.fractions:
+                raise ValueError(
+                    f"Flow splitter '{elem_id}': choose the reference outlet (its valve "
+                    "open), or make one outlet the remainder."
+                )
+            try:
+                splitter = FlowSplitter(
+                    elem_id,
+                    _inlet,
+                    dict(zip(_outs, _sd.fractions, strict=True)),
+                    reference=_outs[_ref] if _ref is not None else None,
+                    areas={
+                        o: a for o, a in zip(_outs, _sd.areas or [], strict=False) if a is not None
+                    },
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    str(exc).replace(f"FlowSplitter {elem_id!r}", f"Flow splitter '{elem_id}'")
+                ) from exc
+            splitter.add_to(net)
+            gui_arrays[elem_id] = GuiFlowSplitter(splitter)
             continue
 
         source_id = None
@@ -1561,6 +1692,10 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 "inlets; it needs exactly one main inlet on its flow handle."
             )
         src = main[0].source
+        if src in splitter_ids:
+            # a splitter outlet wired straight to the chamber (#903)
+            nodes_map[nid].main_inlet = f"{src}__{nid}"
+            continue
         nodes_map[nid].main_inlet = src if src in net.elements else f"__auto_link__{src}__{nid}"
 
     # 4. Fourth Pass: Thermal Walls

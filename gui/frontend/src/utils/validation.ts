@@ -7,6 +7,7 @@
  */
 
 import type { Node } from "reactflow";
+import { validateSplitter } from "./splitter";
 
 export function validateNetwork(nodes: Node[]): string[] {
 	const errors: string[] = [];
@@ -62,6 +63,10 @@ export function validateNetwork(nodes: Node[]): string[] {
 			const eta = node.data.efficiency ?? 0.88;
 			if (!(eta > 0 && eta <= 1))
 				errors.push(`${node.id}: Efficiency must be in (0, 1]`);
+		}
+		if (node.type === "flow_splitter") {
+			for (const e of validateSplitter(node.data))
+				errors.push(`${node.id}: Flow splitter ${e}`);
 		}
 		if (node.type === "orifice") {
 			// null diameter means "use default 0.08 m" — only flag explicit non-positive values

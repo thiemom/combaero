@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from .schemas import NetworkGraphSchema
+from .schemas import SPLITTER_MAX_OUTLETS, NetworkGraphSchema
 
 #: handle port name -> the letter the node draws next to that port
 PORT_TAG = {
@@ -26,6 +26,9 @@ PORT_TAG = {
     "coolantin": "coolant in",
     "coolantout": "coolant out",
     "discharge": "discharge",
+    # A flow splitter's (#903) inlet and outlets, drawn unlabelled.
+    "in": "in",
+    **{f"out{i}": f"outlet {i + 1}" for i in range(SPLITTER_MAX_OUTLETS)},
 }
 
 #: node type -> the name the palette uses, where the type string differs
@@ -35,6 +38,7 @@ KIND_NAME = {
     "mass_boundary": "Mass Flow Boundary",
     "fuel_boundary": "Fuel Boundary",
     "compressor": "Compressor",
+    "flow_splitter": "Flow Splitter",
     "turbine": "Turbine",
     "pressure_boundary": "Pressure Boundary",
 }

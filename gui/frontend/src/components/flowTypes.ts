@@ -7,6 +7,7 @@ import EffusionLinerNode from "./nodes/EffusionLinerNode";
 import EffusionPlateNode from "./nodes/EffusionPlateNode";
 import EjectorNode from "./nodes/EjectorNode";
 import FilmCoolingNode from "./nodes/FilmCoolingNode";
+import FlowSplitterNode from "./nodes/FlowSplitterNode";
 import FuelBoundaryNode from "./nodes/FuelBoundaryNode";
 import HeatSourceNode from "./nodes/HeatSourceNode";
 import ImpingementArrayNode from "./nodes/ImpingementArrayNode";
@@ -46,6 +47,7 @@ export const nodeTypes = {
 	probe: ProbeNode,
 	area_change: AreaChangeNode,
 	mpce_tee: MPCETeeNode,
+	flow_splitter: FlowSplitterNode,
 	ejector: EjectorNode,
 	vortex: VortexNode,
 	wall: WallNode,

@@ -28,6 +28,8 @@ back pressure); a failure is a finding to triage, not automatically a bug.
   series        vortex, connection, loss and orifice elements in series
   jet_chain     a crossflow chain fed by inclined jets (#813), from a reservoir
                 or a closed end
+  splitter      a flow splitter (#903), 2-6 outlets at drawn fractions, fed
+                from a reservoir through an orifice or at a fixed flow
 """
 
 from __future__ import annotations
@@ -50,6 +52,7 @@ from combaero.network import (
     EffusionPlateElement,
     EnergyBoundary,
     FlowNetwork,
+    FlowSplitter,
     IdealMomentumTeeElement,
     ImpingementArray,
     LosslessConnectionElement,
@@ -1015,6 +1018,62 @@ def series(seed: int) -> tuple[FlowNetwork, list[str]]:
     return g, ["series", *sorted(set(kinds))]
 
 
+def splitter(seed: int) -> tuple[FlowNetwork, list[str]]:
+    """A flow splitter (#903): 2-6 outlets at drawn fractions (sometimes one
+    the remainder), each through an orifice or a channel to the sink. The
+    reference is the path the incompressible seed estimate says needs the
+    most pressure at its fraction; a draw where the estimate is wrong is
+    refused by the second-law check (a finding to triage). Fed from a
+    reservoir through an orifice, or at a fixed flow sized for a reference
+    drop of 5-50% of the sink pressure."""
+    r = random.Random(seed)
+    g = FlowNetwork()
+    regime = r.choice(["compressible", "incompressible"])
+    supply = r.choice(["pressure", "mass"])
+    n = r.randint(2, 6)
+    T = r.choice([300.0, 700.0])
+    P_out = r.choice([1e5, 3e5])
+    _pb(g, "out", P_out)
+    w = [r.uniform(0.2, 1.0) for _ in range(n)]
+    fr = [x / sum(w) for x in w]
+    outs = [f"o{i}" for i in range(n)]
+    arms = []
+    for i, o in enumerate(outs):
+        g.add_node(PlenumNode(o))
+        D = r.choice([0.005, 0.01, 0.02])
+        el, kind = _arm(r, f"a{i}", o, "out", D, regime)
+        if kind == "lossless":  # something must take the drop
+            el = OrificeElement(
+                f"a{i}", o, "out", Cd=0.8, diameter=D, correlation="fixed", regime=regime
+            )
+        if isinstance(el, OrificeElement):
+            el.in_pipe = False  # a lumped restriction, whatever channels share the sink
+        g.add_element(el)
+        arms.append(el)
+    rho = float(cb.density(T, P_out, cb.species.dry_air()))
+    K = [float(e._seed_resistance(rho, P_out, 0.01) or 0.0) for e in arms]
+    ref = max(range(n), key=lambda i: K[i] * fr[i] ** 2)
+    remainder = r.random() < 0.5
+    fractions: dict[str, float | None] = dict(zip(outs, fr, strict=True))
+    if remainder:
+        fractions[outs[ref]] = None
+    if supply == "pressure":
+        _pb(g, "res", P_out * r.uniform(1.05, 1.6), T)
+        g.add_node(PlenumNode("in"))
+        g.add_element(
+            OrificeElement(
+                "feed", "res", "in", Cd=0.8, diameter=0.02, correlation="fixed", regime=regime
+            )
+        )
+    else:
+        dP = P_out * r.uniform(0.05, 0.5)
+        m_ref = math.sqrt(dP / K[ref]) if K[ref] > 0.0 else 0.01
+        g.add_node(MassFlowBoundary("in", m_dot=m_ref / fr[ref], Tt=T, Y=Y_AIR))
+    FlowSplitter("sp", "in", fractions, reference=outs[ref]).add_to(g)
+    tags = ["splitter", supply, regime, f"outlets:{n}"]
+    return g, tags + (["remainder"] if remainder else [])
+
+
 FAMILIES: dict[str, Builder] = {
     "random": layered_random,
     "hotcold": hot_cold,
@@ -1030,4 +1089,5 @@ FAMILIES: dict[str, Builder] = {
     "bleed_station": bleed_station,
     "series": series,
     "jet_chain": jet_chain,
+    "splitter": splitter,
 }

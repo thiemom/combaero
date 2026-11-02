@@ -467,6 +467,24 @@ def _palette_network(kind: str) -> dict:
             _edge("e3", "x", "c2"),
             _edge("e4", "c2", "out"),
         ]
+    elif kind == "flow_splitter":
+        # Half each way (#903); the remainder, outlet 2, is the reference and
+        # takes the narrower channel, the path needing the most pressure.
+        nodes = [
+            _node("in", pb, hi),
+            _node("x", kind, data),
+            _node("c1", "channel", {"L": 0.5, "D": 0.05}),
+            _node("c2", "channel", {"L": 0.5, "D": 0.02}),
+            _node("o1", pb, lo),
+            _node("o2", pb, lo),
+        ]
+        edges = [
+            _edge("e1", "in", "x", th="port-in-target"),
+            _edge("e2", "x", "c1", sh="port-out0-source"),
+            _edge("e3", "c1", "o1"),
+            _edge("e4", "x", "c2", sh="port-out1-source"),
+            _edge("e5", "c2", "o2"),
+        ]
     elif kind == "fuel_boundary":
         # The fuel controller (#892) sets a combustor between two channels.
         nodes = [
@@ -500,7 +518,7 @@ def _palette_network(kind: str) -> dict:
 
 def test_the_palette_list_is_what_this_file_knows() -> None:
     """A new palette kind needs a network in `_palette_network`."""
-    assert len(_palette_kinds()) == 24, _palette_kinds()
+    assert len(_palette_kinds()) == 25, _palette_kinds()
 
 
 @pytest.mark.parametrize("kind", _palette_kinds())

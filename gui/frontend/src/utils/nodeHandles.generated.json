@@ -100,6 +100,14 @@
 		],
 		"thermal": []
 	},
+	"flow_splitter": {
+		"dynamic": true,
+		"inlets": [
+			"port-in-target"
+		],
+		"outlets": [],
+		"thermal": []
+	},
 	"fuel_boundary": {
 		"dynamic": false,
 		"inlets": [],

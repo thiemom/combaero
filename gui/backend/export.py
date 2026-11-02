@@ -7,8 +7,9 @@ solves to the same results. Anything without a GUI form is refused with the
 list of what and why -- never dropped.
 
 Phase 1 covers the boundaries (the fuel controller too), plenum, momentum chamber, combustor, channel,
-orifice, pressure loss (all four correlations), lossless connection and the
-thermal wall, with smooth convective surfaces.
+orifice, pressure loss (all four correlations), lossless connection, the
+compressor and turbine, the flow splitter (#903: one node over its outlet
+elements) and the thermal wall, with smooth convective surfaces.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from combaero.network import (
     PlenumNode,
     PressureBoundary,
     PressureLossElement,
+    SplitterOutletElement,
     ThermalWall,
     TurbomachineElement,
 )
@@ -60,6 +62,9 @@ FLOW_HANDLES: dict[str, tuple[str | None, str | None]] = {
     "compressor": ("flow-source", "flow-target"),
     "turbine": ("flow-source", "flow-target"),
 }
+#: A flow splitter's (#903) ports: one inlet, outlet i at SPLITTER_OUT.format(i).
+SPLITTER_IN = "port-in-target"
+SPLITTER_OUT = "port-out{}-source"
 #: A merge chamber's side streams arrive at this handle (graph_builder).
 SIDE_INLET = "side-target"
 
@@ -76,6 +81,7 @@ SUPPORTED = (
     "LosslessConnectionElement",
     "CompressorElement",
     "TurbineElement",
+    "SplitterOutletElement",
     "ThermalWall",
 )
 
@@ -270,6 +276,36 @@ def _element(eid: str, el: Any, problems: list[str]) -> tuple[str, dict[str, Any
     return None
 
 
+def _splitters(
+    net: FlowNetwork, problems: list[str]
+) -> dict[str, tuple[str, list[str], dict[str, Any]]]:
+    """The flow splitters (#903) as GUI nodes: {splitter id: (inlet node, the
+    outlet nodes in port order, the node's data)}. Each is one canvas node
+    over its SplitterOutletElements, in the order of their ``outlets``."""
+    out: dict[str, tuple[str, list[str], dict[str, Any]]] = {}
+    for el in net.elements.values():
+        if not isinstance(el, SplitterOutletElement) or el.splitter in out:
+            continue
+        sid = el.splitter
+        if sid in net.nodes or sid in net.elements:
+            problems.append(f"{sid}: a flow splitter whose id is also a node or element id")
+            continue
+        members = [net.elements.get(eid) for eid in el.outlets]
+        if not all(isinstance(m, SplitterOutletElement) for m in members):
+            problems.append(f"{sid}: a flow splitter whose outlets are not all in the network")
+            continue
+        refs = [i for i, m in enumerate(members) if m.reference]
+        areas = [None if m.area is None else float(m.area) for m in members]
+        data: dict[str, Any] = {
+            "fractions": [float(m.fraction) for m in members],
+            "reference": refs[0] if len(refs) == 1 else None,
+        }
+        if any(a is not None for a in areas):
+            data["areas"] = areas
+        out[sid] = (el.from_node, [m.to_node for m in members], data)
+    return out
+
+
 def _wall(w: ThermalWall, problems: list[str]) -> dict[str, Any]:
     if w.contact_area is None and w.area_a is None:
         problems.append(
@@ -358,7 +394,12 @@ def network_to_gui(
         r = _node(nid, node, problems)
         if r:
             kinds[nid], data[nid] = r
+    splitters = _splitters(net, problems)
+    for sid, (_, _, sdata) in splitters.items():
+        kinds[sid], data[sid] = "flow_splitter", sdata
     for eid, el in net.elements.items():
+        if isinstance(el, SplitterOutletElement):
+            continue  # its splitter's node (above)
         r = _element(eid, el, problems)
         if r:
             kinds[eid], data[eid] = r
@@ -375,13 +416,24 @@ def network_to_gui(
         )
 
     flow: list[tuple[str, str, str | None, str | None]] = []
+    for sid, (inlet, outs, _) in splitters.items():
+        flow.append((inlet, sid, FLOW_HANDLES[kinds[inlet]][0], SPLITTER_IN))
+        for i, b in enumerate(outs):
+            th = SIDE_INLET if side_inlet(f"{sid}__{b}", b) else FLOW_HANDLES[kinds[b]][1]
+            flow.append((sid, b, SPLITTER_OUT.format(i), th))
     for eid, el in net.elements.items():
+        if isinstance(el, SplitterOutletElement):
+            continue
         a, b = el.from_node, el.to_node
         flow.append((a, eid, FLOW_HANDLES[kinds[a]][0], FLOW_HANDLES[kinds[eid]][1]))
         th = SIDE_INLET if side_inlet(eid, b) else FLOW_HANDLES[kinds[b]][1]
         flow.append((eid, b, FLOW_HANDLES[kinds[eid]][0], th))
 
-    order = list(net.nodes) + list(net.elements)
+    order = (
+        list(net.nodes)
+        + list(splitters)
+        + [e for e, el in net.elements.items() if not isinstance(el, SplitterOutletElement)]
+    )
     if layout == "rows":
         pos = _rows_layout(order, [(a, b) for a, b, _, _ in flow])
     elif callable(layout):

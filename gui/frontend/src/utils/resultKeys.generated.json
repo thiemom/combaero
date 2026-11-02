@@ -394,6 +394,14 @@
 			"u_ref",
 			"velocity"
 		],
+		"flow_splitter": [
+			"fraction_error_max",
+			"m_dot",
+			"n_needs_pump",
+			"n_outlets",
+			"reference_outlet",
+			"valve_dPt_max"
+		],
 		"fuel_boundary": [
 			"state.P",
 			"state.Pr",
@@ -859,6 +867,9 @@
 		"film_cooling": [
 			"palette"
 		],
+		"flow_splitter": [
+			"palette"
+		],
 		"fuel_boundary": [
 			"palette"
 		],
@@ -1049,6 +1060,7 @@
 		"f": "-",
 		"f_surface": "-",
 		"film_extrapolated": "-",
+		"fraction_error_max": "-",
 		"gamma": "-",
 		"gamma_ref": "-",
 		"gas_augmentation": "-",
@@ -1109,6 +1121,8 @@
 		"mw": "g/mol",
 		"mw_ref": "g/mol",
 		"n_holes": "-",
+		"n_needs_pump": "-",
+		"n_outlets": "-",
 		"n_ports": "-",
 		"n_reversed_ports": "-",
 		"n_rows": "-",
@@ -1160,6 +1174,7 @@
 		"r_gas": "J/kg/K",
 		"rayleigh_in_momentum": "-",
 		"recovery_in_range": "-",
+		"reference_outlet": "-",
 		"regime_incompressible": "-",
 		"rho": "kg/m\u00b3",
 		"rho_ref": "kg/m\u00b3",
@@ -1181,6 +1196,7 @@
 		"u_ref": "J/kg",
 		"v_theta_in": "m/s",
 		"v_theta_out": "m/s",
+		"valve_dPt_max": "Pa",
 		"velocity": "m/s",
 		"velocity_ratio": "-",
 		"wall_conductivity": "W/m/K",

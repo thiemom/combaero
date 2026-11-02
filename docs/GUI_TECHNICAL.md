@@ -102,6 +102,35 @@ into the flow, `Tt_in`, `Tt_out`, `Tt_out_isentropic`, `eta_poly`, `eta_is`,
 `pressure_ratio`. A reversed-flow root is refused; a machine between two
 pressure boundaries is refused (nothing sets its flow).
 
+#### Flow Splitter (`flow_splitter`)
+A `FlowSplitter` (#903): one inlet (`port-in-target`) to N outlets
+(`port-out<i>-source`, i = 0 .. N-1, top to bottom), each a mass-flow
+controller at its fraction of the inlet flow. The card grows with its
+outlets; the Inspector edits the fractions and adds or removes the last
+outlet (with its connection). No surface, so no thermal handles.
+- `fractions`: one per outlet, each in (0, 1); at most one `null`, the
+  remainder (1 minus the others). Without a remainder they must sum to 1
+  within 1e-9; the solve is refused otherwise, never renormalised.
+  (Default: `[0.5, null]`.)
+- `reference`: the index of the outlet whose valve is open (Pt_out = Pt_in),
+  `null` for the remainder. Make it the path that needs the most pressure: a
+  metered outlet that would need a pump is refused by the second-law check,
+  and the message names the outlet to make the reference.
+- `areas`: optional valve reference area [m^2] per outlet, for `valve_Cd`
+  and `valve_zeta`.
+
+A port wired to an element meets it at an inserted plenum, as do an
+effusion liner's; a plenum or boundary wired straight to a port is used as
+it is; a momentum chamber at the inlet feeds an inserted plenum through a
+lossless link (it refuses a split). Each outlet carries the inlet's Tt and
+composition. The result carries `m_dot` (the throughput), `n_outlets`,
+`reference_outlet`, `n_needs_pump`, `valve_dPt_max`, `fraction_error_max`
+and per outlet the lists `rows_m_dot`, `rows_fraction`,
+`rows_fraction_achieved`, `rows_valve_dPt`, `rows_valve_CdA`, `rows_valve_Cd`,
+`rows_valve_zeta`, `rows_valve_needs_pump` (`null` where an outlet has no
+value: the open reference has no metering). `network_to_gui` exports a
+script's splitter as one such node.
+
 #### Channel Element (`channel`)
 - `L`: Length [m]
 - `D`: Hydraulic diameter [m]

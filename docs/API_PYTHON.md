@@ -1647,6 +1647,39 @@ area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "nod
 comp = CompressorElement("comp", "inlet_plenum", "burner", pressure_ratio=8.0, eta_poly=0.88)
 turb = TurbineElement("turb", "burner", "turbine_exit", pressure_ratio=4.0, eta_is=0.9)
 
+# Flow splitter (#903): one inlet node to N outlet nodes in given mass-flow
+# fractions, each outlet a mass-flow controller. A configuration, not an
+# element: add_to adds one SplitterOutletElement per outlet ("{id}__{outlet}"),
+# a two-port from the inlet node. Each carries one unknown, its m_dot, and one
+# row: a metered outlet m_i - f_i sum_j m_j = 0 (linear, exact Jacobian 1 - f_i
+# and -f_i), which holds no pressure, so its drop Pt_in - Pt_out is free and
+# reported as the valve the rig would need; the REFERENCE outlet Pt_out = Pt_in,
+# its valve open (only N - 1 fractions are independent: with a valve on every
+# outlet the total flow, or the inlet pressure at a fixed supply, would have
+# no equation). Make the reference the path needing the most pressure: a
+# metered outlet needing more would need a pump, the second-law check refuses
+# that root and the message names the outlet to make the reference. Each
+# outlet carries the inlet's Tt and Y; Pt follows its own path. One outlet may
+# be the remainder (None, 1 - the others; the default reference); fractions
+# must lie in (0, 1) and sum to 1 within SPLITTER_FRACTION_SUM_TOL (1e-9),
+# never renormalised. Without a remainder, reference= is required.
+# Diagnostics per outlet: fraction, fraction_achieved, m_dot_splitter (the
+# throughput), is_reference, valve_dPt [Pa], valve_needs_pump (dPt below
+# -SIGMA_TOL Pt_in), and through a positive drop valve_CdA [m^2] (an
+# isentropic jet from the inlet's (Tt, Pt) to the outlet's static P, held at
+# the sonic pressure: valve_choked), with areas= also valve_Cd = CdA / area and
+# valve_zeta = 1 / Cd^2 (the K over the dynamic head at that area).
+from combaero.network import FlowSplitter
+split = FlowSplitter(
+    "split", inlet="coolant_supply",
+    outlets={"hole1": 0.2, "hole2": 0.3, "hole3": None},   # hole3: the remainder
+    reference="hole1",                    # default: the remainder
+    areas={"hole2": 2e-4, "hole3": 2e-4},  # optional, for valve_Cd / valve_zeta
+)
+split.add_to(net)                          # the nodes must be in net already
+# split.summarize(result["__element_diag__"]) -> {"m_dot", "reference",
+# "needs_pump", "outlets": {node: {m_dot, fraction, valve_dPt, valve_CdA, ...}}}
+
 # Three-port tee junction (Unified0D compressible model, Mynard & Valen-Sendstad 2015)
 import math
 # Merging tee: two inlets (straight_node, branch_node) -> one outlet (common_node)

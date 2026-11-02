@@ -119,6 +119,10 @@ const NetworkCanvas = () => {
 					efficiency_type: "polytropic",
 					efficiency: 0.9,
 				} as any;
+			} else if (type === "flow_splitter") {
+				// #903: two outlets, half each; the second takes the rest and
+				// is the reference (its valve open).
+				data = { ...data, fractions: [0.5, null], reference: null } as any;
 			} else if (type === "orifice") {
 				data = { ...data, diameter: 0.08, Cd: 0.6 } as any;
 			} else if (type === "effusion_liner") {

@@ -417,6 +417,17 @@ const Sidebar = () => {
 			<button
 				type="button"
 				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
+				onDragStart={(event) => onDragStart(event, "flow_splitter")}
+				title="One inlet to N outlets at given flow fractions; each outlet's valve drop is reported"
+				draggable
+			>
+				<NodeIcon type="flow_splitter" size={18} />
+				<span>Flow Splitter</span>
+			</button>
+
+			<button
+				type="button"
+				className="flex items-center gap-2 p-2 border rounded cursor-grab hover:bg-stone-50 transition-colors w-full text-left bg-white"
 				onDragStart={(event) => onDragStart(event, "ejector")}
 				draggable
 			>
