@@ -828,6 +828,36 @@ documents:
   records: []
   notes: Supplied by the user 2026-11-02. The appended papers (GT2010 Kinell et al. fan-shaped vs cylindrical
     holes on the same vane rig) are not held and not wanted.
+- file: sources/heat_transfer/film/Schneider_2015_NASA_TM-2015-218738_Coolit_cooling_flow_factor.pdf
+  citation: Schneider, S. J. (2015). Analysis of turbine blade relative cooling flow factor used in the subroutine
+    Coolit based on film cooling correlations. NASA/TM-2015-218738 (E-19070), Glenn Research Center.
+  id: NASA/TM-2015-218738 (NTRS 20150011643)
+  topic: [film, review]
+  content: '30 pp., Word-generated text layer. Explores the Coolit relative cooling flow factor (FAC; Gauntner''s
+    NASA TM-81453 algorithm for turbine cooling flow and the efficiency penalty) with flat-plate correlations.
+    Convection-cooled blade: turbulent flat-plate gas side and Dittus-Boelter 0.023 Re^0.8 Pr^0.4 coolant
+    passages. Film-cooled blade: Lefebvre''s Ch. 8 slot set -- Nu = 0.069 [Re_s x/s]^0.7 for 0.5 < m < 1.3
+    (its Eq. 19), eta = 0.6 (x/ms)^-0.3 (Re_s m mu_c/mu_g)^0.15 for x/s < 150 (its Eq. 24), and the wall-jet
+    set; the appended Fortran also switches to eta = 1/(0.6 + 0.05 x/(ms)) (its Eq. 30). Wall model: zero wall
+    thickness, no axial conduction. Inputs echo the Lefebvre worked example (gas 2280 K, coolant 880 K, gas
+    Mach 0.6). Results: wall temperature against the film split of the total cooling flow; no film (all
+    convection) cannot control the blade temperature, and below ~25% in convection the design nears the
+    convection limit (thermal effectiveness eta_conv, Esgar et al. TN D-5992). Coolit''s own cooling-
+    effectiveness curve (its Eq. 1) is a curve fit to Livingood et al. TM X-2384 Fig. 23 (a full-coverage
+    film-cooled vane).'
+  status: screened
+  verdict: 'Screened 2026-11-02. All its correlations are secondary: it reprints the Lefebvre book (its ref. 4,
+    Gas Turbine Combustion, 1983, Ch. 8). Its 0.069 agrees with the book and with Seban Eq. 13 x Pr 0.69 (see
+    the Seban 1960 entry) -- a third copy, not independent evidence. No data. Value: context for cycle-level
+    turbine cooling-flow estimation, a possible future link to TurbomachineElement (#893). Not a closure
+    source.'
+  read_for: ['#793 / #714 slot-film set as used by NASA (secondary)', 'cycle-level turbine cooling flow (Coolit)
+      context']
+  issues: [714]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ (from the user); NTRS 20150011643, open access. Leads (free on NTRS,
+    noted, not wanted unless an issue needs them): Gauntner 1980 NASA TM-81453 (the Coolit algorithm); Esgar,
+    Colladay & Kaufman 1970 NASA TN D-5992 (turbine air-cooling capabilities and limits).'
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
