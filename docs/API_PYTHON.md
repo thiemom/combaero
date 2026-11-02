@@ -115,6 +115,27 @@ Before, the end polynomials ran on: cp/R -25 for CH4 at 50 K, -241 for H2O at
 `RuntimeError` for a target no positive T reaches instead of returning the last
 iterate.
 
+### Inner Solves Report a Cap Exit (#868)
+A kernel's inner iterative solve that reaches its iteration cap without
+meeting its tolerance raises `RuntimeError` (naming the function and its last
+residual) instead of returning the last iterate as if it were a root:
+`calc_T_from_cp` (a target cp the clamped [200, 6000] K range never reaches
+used to return the clamp), `Tt_from_static` / `Tt_from_static_v`,
+`T_from_stagnation`, `Pt_from_static`, `P_from_stagnation`,
+`stagnation_from_static`, the isentropic expansion behind
+`mach_from_pressure_ratio`, `mass_flux_isentropic` and `nozzle_flow`,
+`friction_colebrook`, `fanno_channel` / `fanno_channel_rough`, the static-state
+and merge-face kernels the network elements call, and the Fanno/Rayleigh
+choke searches (`fanno_rayleigh_channel_flow` with no sign change to bracket).
+With the defaults these exits are not reached on physical inputs: what raises
+is a caller's own small `max_iter`, an unreachable target, or a solver probe at
+an unphysical state, which the network solver already treats as a rejected
+step. The `T_FLOOR` (10 K) clamp of the static temperature is unchanged: an
+expansion whose isentropic T lies below it still returns the floor.
+`fanno_inlet_mach` below ~1e-10 of the sonic flux now returns the root (it was
+up to 73 % high: the slope stencil crossed M = 0). The audit of every inner
+solve, with what was left unchanged: `docs/archive/AUDIT_868_INNER_SOLVES.md`.
+
 ### Compression and Expansion (#893)
 The outlet total temperature of a compressor or turbine at a total-to-total
 pressure ratio, with exactly one efficiency in (0, 1]. The composition is frozen.
