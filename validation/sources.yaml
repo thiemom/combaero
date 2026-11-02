@@ -800,6 +800,34 @@ documents:
     density ratio on flat plate film cooling with shaped holes using PSP, J. Turbomach. 133, 041011 (thesis
     ref. 69; companion ref. 70, Tu effect, 133, 041023) -- gives the hole geometry and higher-DR data. Not checked:
     the thesis''s stated uncertainties (the values are missing from the text layer).'
+- file: sources/heat_transfer/film/Bradley_2013_LicThesis_Linkoping_CFD_film_cooling_reduced_models.pdf
+  citation: Bradley, A. (2013). CFD simulations for film cooling reduced models at engine like conditions.
+    Licentiate thesis No. 1593, Linkoping University (Siemens Industrial Turbomachinery AB / Swedish Energy
+    Agency).
+  id: ISBN 978-97-7519-608-4 (as printed; the Swedish prefix would be 978-91, not verified)
+  topic: [film, review]
+  content: 'Born-digital, 60 pp. -- the summary chapters (kappa) only: the appended Papers I-III (Kinell et al. ASME GT2010; Bradley
+    et al. and Nadali Najafabadi et al., AIAA ASM 2011) are listed but NOT in this copy. Ch. 3-4: film-cooling
+    parameter review. Ch. 5: correlation comparison (Brown-Saluja, L''Ecuyer-Soechting, Baldauf 2002, Bunker''s
+    slot-origin form eta = C1/(x/(M s) + C2) with equivalent slot s = (pi/4) D AR/(P/D), Baldauf-Scheurlen,
+    Colban 2011 Eq. 5) against Yuen''s flat-plate data at M 0.5 and high M (Figs. 2-5: large spread between
+    correlations and between experiments). Sec. 5.2.2: Siemens Finspang single-guide-vane rig (3 kg/s, IR
+    camera, transient least-squares fit of h and eta, Eq. 8). Ch. 6: RANS (rke, SST) on full, narrow and short
+    vane domains, cooled and uncooled; Figs. 8/11/15/18 plot "Normalized HTC" against "Normalized vane distance
+    S"; Figs. 16/19 eta at M 0.6 (experiment) vs SST at M 0.5/0.7/1. Appendix: the experimental HTC was revised
+    upward after a re-measured vane conductivity.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Low value. CFD methodology for reduced (narrow/short) vane domains; the vane HTC
+    data are NORMALISED (confirmed: axes "Normalized HTC" and normalised surface distance, Figs. 8/11/15/18) and
+    the vane geometry is not given, so nothing can be rebuilt; combaero has no gas-side airfoil kernel anyway
+    (blocked). The eta curves are absolute but on an unspecified vane at one M. Any CFD-derived correction counts
+    as tuning under the validation policy. The Ch. 5 review only reprints correlations combaero already holds in
+    the primary (Baldauf 2002, Colban 2011) or knows (Bunker''s slot-origin form). Not used.'
+  read_for: ['#386 film correlation inventory (secondary)']
+  issues: [386]
+  records: []
+  notes: Supplied by the user 2026-11-02. The appended papers (GT2010 Kinell et al. fan-shaped vs cylindrical
+    holes on the same vane rig) are not held and not wanted.
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
