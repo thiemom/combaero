@@ -4,27 +4,115 @@
 #include "ejector.h"
 
 #include "dual_number.h"
+#include "input_validation.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <initializer_list>
+#include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace combaero::solver {
 
-double ejector_area_over_astar(double mach, double gamma) {
+// -----------------------------------------------------------------------------
+// Input validation (#769). Every public entry point refuses non-finite input
+// and parameters outside their physical domain with std::invalid_argument
+// (Python ValueError, which the network solver treats as a failed
+// evaluation). Two classes of argument:
+//   - parameters (geometry, gamma, r_gas, efficiencies, recovery, smoothing
+//     widths, loss coefficients): finite and in their physical domain;
+//   - state: in the standalone closures the supply stagnation state must be
+//     finite and positive; in the two whole-element residual functions, which
+//     take Newton iterates, only finite. A trial point legitimately carries a
+//     negative pressure or a reversed flow there (measured on the 'ejector'
+//     stress family), and the closures continue through C1 floors (#481).
+// The element functions call the unchecked *_raw closures below, so a probe
+// outside the closures' physical domain is not refused by them.
+// -----------------------------------------------------------------------------
+namespace {
+
+[[noreturn]] void refuse(const char* who, const char* what) {
+  throw std::invalid_argument(std::string(who) + ": " + what);
+}
+
+void require_finite_arg(const char* who, double x, const char* what) {
+  if (!validation::is_finite(x)) refuse(who, what);
+}
+
+void require_positive_arg(const char* who, double x, const char* what) {
+  if (!validation::is_finite_positive(x)) refuse(who, what);
+}
+
+void check_gamma(const char* who, double gamma) {
+  if (!validation::is_finite(gamma) || !(gamma > 1.0)) {
+    refuse(who, "gamma must be finite and > 1");
+  }
+}
+
+void check_gas(const char* who, double gamma, double r_gas) {
+  check_gamma(who, gamma);
+  require_positive_arg(who, r_gas, "r_gas must be finite and > 0");
+}
+
+// A nozzle efficiency on kinetic energy: 0 < eta <= 1.
+void check_efficiency(const char* who, double eta, const char* what) {
+  if (!validation::is_finite_in_range(eta, 0.0, 1.0) || !(eta > 0.0)) refuse(who, what);
+}
+
+void check_geometry(const char* who, const EjectorGeometry& geom) {
+  if (!validation::is_finite(geom.area_ratio_nozzle) || !(geom.area_ratio_nozzle > 1.0)) {
+    refuse(who, "area_ratio_nozzle (A_p1/A_t) must be finite and > 1");
+  }
+  if (!validation::is_finite(geom.area_ratio_mix) ||
+      !(geom.area_ratio_mix >= geom.area_ratio_nozzle)) {
+    // A_3 = A_p1 (no suction annulus) is the closures' normal-shock limit.
+    refuse(who, "area_ratio_mix (A_3/A_t) must be finite and >= area_ratio_nozzle");
+  }
+}
+
+// Supply stagnation states of the standalone closures.
+void check_supplies(const char* who, double p_g, double t_g, double p_e, double t_e) {
+  if (!validation::is_finite_positive(p_g) || !validation::is_finite_positive(t_g) ||
+      !validation::is_finite_positive(p_e) || !validation::is_finite_positive(t_e)) {
+    refuse(who, "p_g, t_g, p_e and t_e must be finite and > 0");
+  }
+}
+
+void check_nozzle(const char* who, double Pt, double Tt, double area_throat, double area_exit,
+                  double gamma, double r_gas, double eta, double eps_frac) {
+  require_positive_arg(who, Pt, "Pt must be finite and > 0");
+  require_positive_arg(who, Tt, "Tt must be finite and > 0");
+  require_positive_arg(who, area_throat, "area_throat must be finite and > 0");
+  if (!validation::is_finite(area_exit) || !(area_exit >= area_throat)) {
+    refuse(who, "area_exit must be finite and >= area_throat");
+  }
+  check_gas(who, gamma, r_gas);
+  check_efficiency(who, eta, "eta must be finite and in (0, 1]");
+  if (!validation::is_finite_nonnegative(eps_frac)) {
+    refuse(who, "eps_frac must be finite and >= 0");
+  }
+}
+
+void check_window(const char* who, double lo, double hi, const char* what) {
+  if (!validation::is_finite(lo) || !validation::is_finite(hi) || !(lo < hi)) refuse(who, what);
+}
+
+} // namespace
+
+static double ejector_area_over_astar_raw(double mach, double gamma) {
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
   return (1.0 / mach) *
          std::pow((2.0 / gp1) * (1.0 + 0.5 * gm1 * mach * mach), gp1 / (2.0 * gm1));
 }
 
-double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma) {
+static double ejector_mach_from_area_ratio_supersonic_raw(double area_ratio, double gamma) {
   double lo = 1.0 + 1e-12;
   double hi = 50.0;
   for (int i = 0; i < 200; ++i) {
     double mid = 0.5 * (lo + hi);
-    if (ejector_area_over_astar(mid, gamma) < area_ratio) {
+    if (ejector_area_over_astar_raw(mid, gamma) < area_ratio) {
       lo = mid;
     } else {
       hi = mid;
@@ -33,7 +121,7 @@ double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma) 
   return 0.5 * (lo + hi);
 }
 
-double ejector_choked_mass_flow(double Pt, double Tt, double area_throat,
+static double ejector_choked_mass_flow_raw(double Pt, double Tt, double area_throat,
                                 double gamma, double r_gas, double eta) {
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
@@ -41,10 +129,10 @@ double ejector_choked_mass_flow(double Pt, double Tt, double area_throat,
   return (Pt * area_throat / std::sqrt(Tt)) * choke_const * std::sqrt(eta);
 }
 
-std::tuple<double, double, double>
-ejector_choked_mass_flow_and_jacobian(double Pt, double Tt, double area_throat,
+static std::tuple<double, double, double>
+ejector_choked_mass_flow_and_jacobian_raw(double Pt, double Tt, double area_throat,
                                       double gamma, double r_gas, double eta) {
-  double mdot = ejector_choked_mass_flow(Pt, Tt, area_throat, gamma, r_gas, eta);
+  double mdot = ejector_choked_mass_flow_raw(Pt, Tt, area_throat, gamma, r_gas, eta);
   // mdot = C * Pt / sqrt(Tt)  =>  d/dPt = mdot/Pt,  d/dTt = -mdot/(2*Tt)
   return {mdot, mdot / Pt, -0.5 * mdot / Tt};
 }
@@ -56,7 +144,7 @@ namespace {
 double cd_nozzle_forward(double p_up, double Tt, double p_down, double area_throat,
                          double area_exit, double gamma, double r_gas, double eta,
                          double eps_frac) {
-  double cap = ejector_choked_mass_flow(p_up, Tt, area_throat, gamma, r_gas, eta);
+  double cap = ejector_choked_mass_flow_raw(p_up, Tt, area_throat, gamma, r_gas, eta);
   double exit_flux = 0.0;
   double r = p_down / p_up;
   if (r < 1.0) {
@@ -78,7 +166,7 @@ double cd_nozzle_forward(double p_up, double Tt, double p_down, double area_thro
 
 } // namespace
 
-double ejector_cd_nozzle_mass_flow(double Pt, double Tt, double p_static_down,
+static double ejector_cd_nozzle_mass_flow_raw(double Pt, double Tt, double p_static_down,
                                    double area_throat, double area_exit,
                                    double gamma, double r_gas, double eta,
                                    double eps_frac) {
@@ -91,7 +179,7 @@ double ejector_cd_nozzle_mass_flow(double Pt, double Tt, double p_static_down,
   // r = 1 value so the flow is continuous there. The former zero exit flux
   // was flat in P_py, which let zero flow at any P_py above both supplies
   // close the ejector rows (a spurious root at P_py ~ 1e13 Pa).
-  double cap = ejector_choked_mass_flow(Pt, Tt, area_throat, gamma, r_gas, eta);
+  double cap = ejector_choked_mass_flow_raw(Pt, Tt, area_throat, gamma, r_gas, eta);
   double eps = eps_frac * cap;
   double offset = std::sqrt(cap * cap + eps * eps) - cap;
   return -cd_nozzle_forward(p_static_down, Tt, Pt, area_throat, area_exit, gamma, r_gas, eta,
@@ -100,6 +188,10 @@ double ejector_cd_nozzle_mass_flow(double Pt, double Tt, double p_static_down,
 }
 
 double ejector_q_lambda(double lam, double gamma) {
+  if (!validation::is_finite_nonnegative(lam)) {
+    refuse("ejector_q_lambda", "lambda must be finite and >= 0");
+  }
+  check_gamma("ejector_q_lambda", gamma);
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
   return std::pow(1.0 - (gm1 / gp1) * lam * lam, 1.0 / gm1) * std::pow(gp1 / 2.0, 1.0 / gm1) * lam;
@@ -110,7 +202,7 @@ double ejector_q_lambda(double lam, double gamma) {
 // rather than a second copy (issue #271). The fixed 4-seed Dual4 above is
 // deliberately left here: it backs the validated critical-mode path.
 
-EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
+static EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian_raw(
     double Pt_val, double Tt_val, double p_py_val, double area_throat,
     double area_exit, double gamma, double r_gas, double eta, double eps_frac) {
   // Seeds: 0 = p0 (Pt), 1 = t0 (Tt), 2 = p_py.
@@ -159,6 +251,9 @@ EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
 EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
     double m_dot, double Pt, double Tt, double area_throat, double area_exit,
     double gamma, double r_gas, double eta, double eps_frac) {
+  constexpr const char* who = "ejector_cd_nozzle_exit_static_and_jacobian";
+  if (!validation::is_finite_nonnegative(m_dot)) refuse(who, "m_dot must be finite and >= 0");
+  check_nozzle(who, Pt, Tt, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
   double gm1 = gamma - 1.0;
   double gp1 = gamma + 1.0;
   double r_crit = std::pow(2.0 / gp1, gamma / gm1);
@@ -167,7 +262,7 @@ EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
   double hi = Pt * (1.0 - 1e-12);
   for (int i = 0; i < 200; ++i) {
     double mid = 0.5 * (lo + hi);
-    double f = ejector_cd_nozzle_mass_flow(Pt, Tt, mid, area_throat, area_exit, gamma, r_gas,
+    double f = ejector_cd_nozzle_mass_flow_raw(Pt, Tt, mid, area_throat, area_exit, gamma, r_gas,
                                            eta, eps_frac);
     if (f > m_dot) {
       lo = mid; // too much flow -> raise P_py
@@ -178,13 +273,13 @@ EjectorCDExitStaticJacobian ejector_cd_nozzle_exit_static_and_jacobian(
   double p_py = 0.5 * (lo + hi);
   // Implicit function theorem: F(P_py) = cd_nozzle(P_py) - m_dot = 0, so
   // dP_py/dx = -(dF/dx)/(dF/dP_py), using the C-D nozzle's own Jacobian.
-  EjectorCDNozzleJacobian j = ejector_cd_nozzle_mass_flow_and_jacobian(
+  EjectorCDNozzleJacobian j = ejector_cd_nozzle_mass_flow_and_jacobian_raw(
       Pt, Tt, p_py, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
   double inv = 1.0 / j.dmdot_dp_py;
   return {p_py, inv, -j.dmdot_dp0 * inv, -j.dmdot_dt0 * inv};
 }
 
-EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
+static EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian_raw(
     double p_g_val, double t_g_val, double p_e_val, double t_e_val,
     double p_py_val, double omega_val, double gamma, double recovery_efficiency,
     double eta_primary, double eta_secondary) {
@@ -347,7 +442,7 @@ constexpr double kAreaFloorFrac = 1e-6;  // of the mixing area ratio
 
 } // namespace
 
-EjectorEntrainmentJacobian ejector_entrainment_ratio_and_jacobian(
+static EjectorEntrainmentJacobian ejector_entrainment_ratio_and_jacobian_raw(
     double p_g_val, double t_g_val, double p_e_val, double t_e_val,
     const EjectorGeometry& geom, double gamma) {
   double gm1 = gamma - 1.0;
@@ -361,7 +456,7 @@ EjectorEntrainmentJacobian ejector_entrainment_ratio_and_jacobian(
 
   // Primary flow: nozzle-exit Mach (Eq. 2) -- exact zero derivative w.r.t.
   // p_g/t_g/p_e/t_e, see include/ejector.h's header comment.
-  double mach_p1_val = ejector_mach_from_area_ratio_supersonic(geom.area_ratio_nozzle, gamma);
+  double mach_p1_val = ejector_mach_from_area_ratio_supersonic_raw(geom.area_ratio_nozzle, gamma);
   Dual4 mach_p1 = Dual4::constant(mach_p1_val);
 
   Dual4 p_p1 = p_g / dpow(1.0 + 0.5 * gm1 * mach_p1 * mach_p1, g_over_gm1);
@@ -415,7 +510,7 @@ EjectorCriticalPressureJacobian mixed_stagnation_from_yy(
   Dual4 p_e{p_e_val, 0.0, 0.0, 1.0, 0.0};
   Dual4 t_e{t_e_val, 0.0, 0.0, 0.0, 1.0};
 
-  double mach_p1_val = ejector_mach_from_area_ratio_supersonic(geom.area_ratio_nozzle, gamma);
+  double mach_p1_val = ejector_mach_from_area_ratio_supersonic_raw(geom.area_ratio_nozzle, gamma);
   Dual4 mach_p1 = Dual4::constant(mach_p1_val);
 
   Dual4 p_p1 = p_g / dpow(1.0 + 0.5 * gm1 * mach_p1 * mach_p1, g_over_gm1);
@@ -482,14 +577,14 @@ EjectorCriticalPressureJacobian mixed_stagnation_from_yy(
 
 } // namespace
 
-EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
+static EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian_raw(
     double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom,
     double gamma, double r_gas, double recovery_efficiency) {
   return mixed_stagnation_from_yy(p_g, t_g, p_e, t_e, geom, gamma, r_gas, recovery_efficiency,
                                   false);
 }
 
-EjectorCriticalPressureJacobian ejector_dead_head_back_pressure_and_jacobian(
+static EjectorCriticalPressureJacobian ejector_dead_head_back_pressure_and_jacobian_raw(
     double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom,
     double gamma, double r_gas, double recovery_efficiency) {
   return mixed_stagnation_from_yy(p_g, t_g, p_e, t_e, geom, gamma, r_gas, recovery_efficiency,
@@ -516,7 +611,7 @@ YYState4 critical_yy_state4(double p_g_val, double t_g_val, double p_e_val, doub
   s.t_g = Dual4{t_g_val, 0.0, 1.0, 0.0, 0.0};
   s.p_e = Dual4{p_e_val, 0.0, 0.0, 1.0, 0.0};
   s.t_e = Dual4{t_e_val, 0.0, 0.0, 0.0, 1.0};
-  const double mach_p1 = ejector_mach_from_area_ratio_supersonic(geom.area_ratio_nozzle, gamma);
+  const double mach_p1 = ejector_mach_from_area_ratio_supersonic_raw(geom.area_ratio_nozzle, gamma);
   const double exit_factor = 1.0 + 0.5 * gm1 * mach_p1 * mach_p1;
   Dual4 p_p1 = s.p_g / std::pow(exit_factor, g_over_gm1);
   s.p_py = s.p_e / std::pow(gp1 / 2.0, g_over_gm1);
@@ -533,7 +628,7 @@ YYState4 critical_yy_state4(double p_g_val, double t_g_val, double p_e_val, doub
 
 } // namespace
 
-double ejector_huang_mixing_coefficient(double area_ratio_mix) {
+static double ejector_huang_mixing_coefficient_raw(double area_ratio_mix) {
   if (area_ratio_mix > ejector::phi_m_upper_area_ratio) {
     return ejector::phi_m_large;
   }
@@ -541,7 +636,7 @@ double ejector_huang_mixing_coefficient(double area_ratio_mix) {
                                                            : ejector::phi_m_small;
 }
 
-EjectorCriticalPressureJacobian ejector_huang_critical_back_pressure_and_jacobian(
+static EjectorCriticalPressureJacobian ejector_huang_critical_back_pressure_and_jacobian_raw(
     double p_g_val, double t_g_val, double p_e_val, double t_e_val, const EjectorGeometry& geom,
     double gamma, double r_gas, double recovery_efficiency) {
   const double gm1 = gamma - 1.0;
@@ -555,7 +650,7 @@ EjectorCriticalPressureJacobian ejector_huang_critical_back_pressure_and_jacobia
   Dual4 v_sy = dsqrt(gamma * r_gas * t_sy);  // M_sy = 1
 
   // Constant-pressure mixing with phi_m (Eq. 11) and energy (Eq. 12).
-  const double phi_m = ejector_huang_mixing_coefficient(geom.area_ratio_mix);
+  const double phi_m = ejector_huang_mixing_coefficient_raw(geom.area_ratio_mix);
   Dual4 v_m = phi_m * (v_py + s.omega * v_sy) / (1.0 + s.omega);
   const double cp = gamma * r_gas / gm1;
   Dual4 t03 = (s.t_g + s.omega * s.t_e) / (1.0 + s.omega);
@@ -580,7 +675,7 @@ EjectorCriticalPressureJacobian ejector_huang_critical_back_pressure_and_jacobia
           recovery_efficiency * p_c.dpe, recovery_efficiency * p_c.dte};
 }
 
-EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian(
+static EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian_raw(
     double p_g_val, double t_g_val, double p_e_val, double t_e_val, const EjectorGeometry& geom,
     double gamma, double r_gas, double recovery_efficiency) {
   (void)t_e_val;  // the secondary is dead-headed
@@ -593,7 +688,7 @@ EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian(
   Dual4 t_g{t_g_val, 0.0, 1.0, 0.0, 0.0};
   Dual4 p_e{p_e_val, 0.0, 0.0, 1.0, 0.0};
 
-  const double mach_p1 = ejector_mach_from_area_ratio_supersonic(a1, gamma);
+  const double mach_p1 = ejector_mach_from_area_ratio_supersonic_raw(a1, gamma);
   Dual4 p_p1 = p_g / std::pow(1.0 + k * mach_p1 * mach_p1, gamma / gm1);
   // Choked primary mass flow per unit throat area (isentropic).
   Dual4 m = p_g * dsqrt(gamma / (r_gas * t_g)) * std::pow(2.0 / gp1, gp1 / (2.0 * gm1));
@@ -673,6 +768,22 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
     double eta_secondary, double recovery_efficiency, double eps_frac,
     double s_choke_lo, double s_choke_hi, double s_sub_lo, double s_sub_hi,
     EjectorAnchorClosure anchor_closure) {
+  constexpr const char* who = "ejector_element_residuals_and_jacobian";
+  // Newton iterates: finite only (see the validation note at the top).
+  for (double x : {mp_v, ms_v, mo_v, p_g_v, t_g_v, p_e_v, t_e_v, p_out_v, p_py_v}) {
+    require_finite_arg(who, x, "the flows, pressures and temperatures must be finite");
+  }
+  check_geometry(who, geom);
+  require_positive_arg(who, area_throat, "area_throat must be finite and > 0");
+  require_positive_arg(who, area_nozzle_exit, "area_nozzle_exit must be finite and > 0");
+  require_positive_arg(who, area_secondary, "area_secondary must be finite and > 0");
+  check_gas(who, gamma, r_gas);
+  check_efficiency(who, eta_primary, "eta_primary must be finite and in (0, 1]");
+  check_efficiency(who, eta_secondary, "eta_secondary must be finite and in (0, 1]");
+  require_positive_arg(who, recovery_efficiency, "recovery_efficiency must be finite and > 0");
+  if (!validation::is_finite_nonnegative(eps_frac)) refuse(who, "eps_frac must be finite and >= 0");
+  check_window(who, s_choke_lo, s_choke_hi, "need finite s_choke_lo < s_choke_hi");
+  check_window(who, s_sub_lo, s_sub_hi, "need finite s_sub_lo < s_sub_hi");
   using D = DualN<9>;
   const bool huang = anchor_closure == EjectorAnchorClosure::huang1999;
 
@@ -689,12 +800,12 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
 
   // s_choke = smootherstep(mp / cap), cap = choked_mass_flow(Pt_p).
   auto [cap_v, dcap_dp0, dcap_dt0] =
-      ejector_choked_mass_flow_and_jacobian(p_g_v, t_g_v, area_throat, gamma, r_gas, eta_primary);
+      ejector_choked_mass_flow_and_jacobian_raw(p_g_v, t_g_v, area_throat, gamma, r_gas, eta_primary);
   D cap = ejector_chain<9>(cap_v, {{dcap_dp0, p_g}, {dcap_dt0, t_g}});
   D s = ejector_smootherstep<9>(mp / cap, s_choke_lo, s_choke_hi);
 
   // R0: primary C-D nozzle (choked/unchoked via the closure's own smooth-min).
-  auto cd = ejector_cd_nozzle_mass_flow_and_jacobian(
+  auto cd = ejector_cd_nozzle_mass_flow_and_jacobian_raw(
       p_g_v, t_g_v, p_py_v, area_throat, area_nozzle_exit, gamma, r_gas, eta_primary, eps_frac);
   D cd_d = ejector_chain<9>(
       cd.mdot, {{cd.dmdot_dp0, p_g}, {cd.dmdot_dt0, t_g}, {cd.dmdot_dp_py, p_py}});
@@ -725,15 +836,15 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   D p03_dead = D::constant(0.0);
   D s_b0 = D::constant(1.0);
   if (crit_active) {
-    auto entr = ejector_entrainment_ratio_and_jacobian(p_g_v, t_g_v, p_e_v, t_e_v, geom, gamma);
+    auto entr = ejector_entrainment_ratio_and_jacobian_raw(p_g_v, t_g_v, p_e_v, t_e_v, geom, gamma);
     omega_crit = ejector_chain<9>(entr.value.omega,
                                   {{entr.domega_dp_g, p_g},
                                    {entr.domega_dt_g, t_g},
                                    {entr.domega_dp_e, p_e},
                                    {entr.domega_dt_e, t_e}});
-    auto pc = huang ? ejector_huang_critical_back_pressure_and_jacobian(
+    auto pc = huang ? ejector_huang_critical_back_pressure_and_jacobian_raw(
                           p_g_v, t_g_v, p_e_v, t_e_v, geom, gamma, r_gas, 1.0)
-                    : ejector_critical_back_pressure_and_jacobian(p_g_v, t_g_v, p_e_v, t_e_v,
+                    : ejector_critical_back_pressure_and_jacobian_raw(p_g_v, t_g_v, p_e_v, t_e_v,
                                                                   geom, gamma, r_gas, 1.0);
     p03_crit = ejector_chain<9>(pc.value.p_mixed_stagnation_pa,
                                 {{pc.dpc_dp_g, p_g},
@@ -746,9 +857,9 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
     // corner (an unchoked primary, the jet pump's). d fades the droop out
     // there, back to the plateau-and-pin-at-P_c* form, continuously: P_b0
     // depends on Newton unknowns, so a hard switch would be a jump in F.
-    auto pb = huang ? ejector_sudden_expansion_dead_head_and_jacobian(
+    auto pb = huang ? ejector_sudden_expansion_dead_head_and_jacobian_raw(
                           p_g_v, t_g_v, p_e_v, t_e_v, geom, gamma, r_gas, 1.0)
-                    : ejector_dead_head_back_pressure_and_jacobian(p_g_v, t_g_v, p_e_v, t_e_v,
+                    : ejector_dead_head_back_pressure_and_jacobian_raw(p_g_v, t_g_v, p_e_v, t_e_v,
                                                                    geom, gamma, r_gas, 1.0);
     D p03_b0 = ejector_chain<9>(pb.value.p_mixed_stagnation_pa,
                                 {{pb.dpc_dp_g, p_g},
@@ -777,12 +888,12 @@ EjectorElementResidualJacobian ejector_element_residuals_and_jacobian(
   D ms_sec = D::constant(0.0);
   D p03_jet = D::constant(0.0);
   if (jet_active) {
-    auto sec = ejector_cd_nozzle_mass_flow_and_jacobian(
+    auto sec = ejector_cd_nozzle_mass_flow_and_jacobian_raw(
         p_e_v, t_e_v, p_py_v, area_secondary, area_secondary, gamma, r_gas, eta_secondary,
         eps_frac);
     ms_sec = ejector_chain<9>(
         sec.mdot, {{sec.dmdot_dp0, p_e}, {sec.dmdot_dt0, t_e}, {sec.dmdot_dp_py, p_py}});
-    auto jp = ejector_jetpump_discharge_and_jacobian(
+    auto jp = ejector_jetpump_discharge_and_jacobian_raw(
         p_g_v, t_g_v, p_e_v, t_e_v, p_py_v, omega_eff.v, gamma, 1.0, eta_primary,
         eta_secondary);
     p03_jet = ejector_chain<9>(jp.p03,
@@ -828,6 +939,20 @@ EjectorJetPumpIncompressibleResult ejector_jetpump_incompressible_residuals_and_
     double v_s, double pt_o, double p3, double area_nozzle_exit,
     double area_secondary, double area_mixing, double k_nozzle,
     double k_suction, double k_throat, double k_diffuser, double recovery) {
+  constexpr const char* who = "ejector_jetpump_incompressible_residuals_and_jacobian";
+  // Newton iterates (v = 1/rho from the port closures included): finite only.
+  for (double x : {mp, ms, mo, pt_p, v_p, pt_s, v_s, pt_o, p3}) {
+    require_finite_arg(who, x, "the flows, pressures and specific volumes must be finite");
+  }
+  require_positive_arg(who, area_nozzle_exit, "area_nozzle_exit must be finite and > 0");
+  require_positive_arg(who, area_secondary, "area_secondary must be finite and > 0");
+  require_positive_arg(who, area_mixing, "area_mixing must be finite and > 0");
+  for (double k : {k_nozzle, k_suction, k_throat, k_diffuser}) {
+    if (!validation::is_finite_nonnegative(k)) {
+      refuse(who, "k_nozzle, k_suction, k_throat and k_diffuser must be finite and >= 0");
+    }
+  }
+  require_positive_arg(who, recovery, "recovery must be finite and > 0");
   using D = DualN<9>;
   const D Mp = D::seed(mp, 0), Ms = D::seed(ms, 1), Mo = D::seed(mo, 2);
   const D Ptp = D::seed(pt_p, 3), Vp = D::seed(v_p, 4);
@@ -860,6 +985,148 @@ EjectorJetPumpIncompressibleResult ejector_jetpump_incompressible_residuals_and_
   out.p4 = p4.v;
   out.q4 = q4.v;
   return out;
+}
+
+// -----------------------------------------------------------------------------
+// Checked public entry points of the closures the element calls unchecked.
+// -----------------------------------------------------------------------------
+
+double ejector_area_over_astar(double mach, double gamma) {
+  require_positive_arg("ejector_area_over_astar", mach, "mach must be finite and > 0");
+  check_gamma("ejector_area_over_astar", gamma);
+  return ejector_area_over_astar_raw(mach, gamma);
+}
+
+double ejector_mach_from_area_ratio_supersonic(double area_ratio, double gamma) {
+  constexpr const char* who = "ejector_mach_from_area_ratio_supersonic";
+  if (!validation::is_finite(area_ratio) || !(area_ratio >= 1.0)) {
+    refuse(who, "area_ratio must be finite and >= 1");
+  }
+  check_gamma(who, gamma);
+  return ejector_mach_from_area_ratio_supersonic_raw(area_ratio, gamma);
+}
+
+namespace {
+void check_choked(const char* who, double Pt, double Tt, double area_throat, double gamma,
+                  double r_gas, double eta) {
+  require_positive_arg(who, Pt, "Pt must be finite and > 0");
+  require_positive_arg(who, Tt, "Tt must be finite and > 0");
+  require_positive_arg(who, area_throat, "area_throat must be finite and > 0");
+  check_gas(who, gamma, r_gas);
+  check_efficiency(who, eta, "eta must be finite and in (0, 1]");
+}
+
+void check_closure(const char* who, double p_g, double t_g, double p_e, double t_e,
+                   const EjectorGeometry& geom, double gamma, double r_gas,
+                   double recovery_efficiency) {
+  check_supplies(who, p_g, t_g, p_e, t_e);
+  check_geometry(who, geom);
+  check_gas(who, gamma, r_gas);
+  require_positive_arg(who, recovery_efficiency, "recovery_efficiency must be finite and > 0");
+}
+} // namespace
+
+double ejector_choked_mass_flow(double Pt, double Tt, double area_throat, double gamma,
+                                double r_gas, double eta) {
+  check_choked("ejector_choked_mass_flow", Pt, Tt, area_throat, gamma, r_gas, eta);
+  return ejector_choked_mass_flow_raw(Pt, Tt, area_throat, gamma, r_gas, eta);
+}
+
+std::tuple<double, double, double>
+ejector_choked_mass_flow_and_jacobian(double Pt, double Tt, double area_throat, double gamma,
+                                      double r_gas, double eta) {
+  check_choked("ejector_choked_mass_flow_and_jacobian", Pt, Tt, area_throat, gamma, r_gas, eta);
+  return ejector_choked_mass_flow_and_jacobian_raw(Pt, Tt, area_throat, gamma, r_gas, eta);
+}
+
+// p_static_down above Pt is reverse flow (#619), so it is only checked > 0.
+double ejector_cd_nozzle_mass_flow(double Pt, double Tt, double p_static_down,
+                                   double area_throat, double area_exit, double gamma,
+                                   double r_gas, double eta, double eps_frac) {
+  constexpr const char* who = "ejector_cd_nozzle_mass_flow";
+  check_nozzle(who, Pt, Tt, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
+  require_positive_arg(who, p_static_down, "p_static_down must be finite and > 0");
+  return ejector_cd_nozzle_mass_flow_raw(Pt, Tt, p_static_down, area_throat, area_exit, gamma,
+                                         r_gas, eta, eps_frac);
+}
+
+EjectorCDNozzleJacobian ejector_cd_nozzle_mass_flow_and_jacobian(
+    double Pt, double Tt, double p_py, double area_throat, double area_exit, double gamma,
+    double r_gas, double eta, double eps_frac) {
+  constexpr const char* who = "ejector_cd_nozzle_mass_flow_and_jacobian";
+  check_nozzle(who, Pt, Tt, area_throat, area_exit, gamma, r_gas, eta, eps_frac);
+  require_positive_arg(who, p_py, "p_py must be finite and > 0");
+  return ejector_cd_nozzle_mass_flow_and_jacobian_raw(Pt, Tt, p_py, area_throat, area_exit,
+                                                      gamma, r_gas, eta, eps_frac);
+}
+
+EjectorJetPumpDischargeJacobian ejector_jetpump_discharge_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, double p_py, double omega, double gamma,
+    double recovery_efficiency, double eta_primary, double eta_secondary) {
+  constexpr const char* who = "ejector_jetpump_discharge_and_jacobian";
+  check_supplies(who, p_g, t_g, p_e, t_e);
+  require_positive_arg(who, p_py, "p_py must be finite and > 0");
+  if (!validation::is_finite_nonnegative(omega)) refuse(who, "omega must be finite and >= 0");
+  check_gamma(who, gamma);
+  require_positive_arg(who, recovery_efficiency, "recovery_efficiency must be finite and > 0");
+  check_efficiency(who, eta_primary, "eta_primary must be finite and in (0, 1]");
+  check_efficiency(who, eta_secondary, "eta_secondary must be finite and in (0, 1]");
+  return ejector_jetpump_discharge_and_jacobian_raw(p_g, t_g, p_e, t_e, p_py, omega, gamma,
+                                                    recovery_efficiency, eta_primary,
+                                                    eta_secondary);
+}
+
+EjectorEntrainmentJacobian ejector_entrainment_ratio_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom, double gamma) {
+  constexpr const char* who = "ejector_entrainment_ratio_and_jacobian";
+  check_supplies(who, p_g, t_g, p_e, t_e);
+  check_geometry(who, geom);
+  check_gamma(who, gamma);
+  return ejector_entrainment_ratio_and_jacobian_raw(p_g, t_g, p_e, t_e, geom, gamma);
+}
+
+EjectorCriticalPressureJacobian ejector_critical_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom, double gamma,
+    double r_gas, double recovery_efficiency) {
+  check_closure("ejector_critical_back_pressure_and_jacobian", p_g, t_g, p_e, t_e, geom, gamma,
+                r_gas, recovery_efficiency);
+  return ejector_critical_back_pressure_and_jacobian_raw(p_g, t_g, p_e, t_e, geom, gamma, r_gas,
+                                                         recovery_efficiency);
+}
+
+EjectorCriticalPressureJacobian ejector_dead_head_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom, double gamma,
+    double r_gas, double recovery_efficiency) {
+  check_closure("ejector_dead_head_back_pressure_and_jacobian", p_g, t_g, p_e, t_e, geom, gamma,
+                r_gas, recovery_efficiency);
+  return ejector_dead_head_back_pressure_and_jacobian_raw(p_g, t_g, p_e, t_e, geom, gamma, r_gas,
+                                                          recovery_efficiency);
+}
+
+double ejector_huang_mixing_coefficient(double area_ratio_mix) {
+  if (!validation::is_finite(area_ratio_mix) || !(area_ratio_mix > 1.0)) {
+    refuse("ejector_huang_mixing_coefficient", "area_ratio_mix must be finite and > 1");
+  }
+  return ejector_huang_mixing_coefficient_raw(area_ratio_mix);
+}
+
+EjectorCriticalPressureJacobian ejector_huang_critical_back_pressure_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom, double gamma,
+    double r_gas, double recovery_efficiency) {
+  check_closure("ejector_huang_critical_back_pressure_and_jacobian", p_g, t_g, p_e, t_e, geom,
+                gamma, r_gas, recovery_efficiency);
+  return ejector_huang_critical_back_pressure_and_jacobian_raw(p_g, t_g, p_e, t_e, geom, gamma,
+                                                               r_gas, recovery_efficiency);
+}
+
+EjectorCriticalPressureJacobian ejector_sudden_expansion_dead_head_and_jacobian(
+    double p_g, double t_g, double p_e, double t_e, const EjectorGeometry& geom, double gamma,
+    double r_gas, double recovery_efficiency) {
+  // t_e is unused (the secondary is dead-headed) but still a supply state.
+  check_closure("ejector_sudden_expansion_dead_head_and_jacobian", p_g, t_g, p_e, t_e, geom,
+                gamma, r_gas, recovery_efficiency);
+  return ejector_sudden_expansion_dead_head_and_jacobian_raw(p_g, t_g, p_e, t_e, geom, gamma,
+                                                             r_gas, recovery_efficiency);
 }
 
 } // namespace combaero::solver

@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "input_validation.h"
 #include "math_constants.h"  // MSVC compatibility for M_PI
 
 namespace combaero {
@@ -165,6 +166,17 @@ PinFinEfficiency pin_fin_array_efficiency(double h, double k_pin, double D,
   // z = m L with L = H / 2 and m = sqrt(4 h / (k D)), so z^2 = H^2 h / (k D).
   // d eta_fin / dh = (z sech^2 z - tanh z) H^2 / (2 k D z^3), whose h -> 0
   // limit is -H^2 / (3 k D).
+  // NaN used to reach the "no fin model" branch below and answer eta = 1
+  // (#769). +inf k_pin (an isothermal pin) and +inf h are limits and stay.
+  const auto finite_or_pos_inf = [](double x) {
+    return std::isfinite(x) || (std::isinf(x) && x > 0.0);
+  };
+  if (!finite_or_pos_inf(h) || !finite_or_pos_inf(k_pin) || !validation::is_finite(D) ||
+      !validation::is_finite(H) || !validation::is_finite(A_f_over_A_t)) {
+    throw std::invalid_argument(
+        "pin_fin_array_efficiency: h and k_pin must be finite or +inf; D, H and "
+        "A_f_over_A_t finite");
+  }
   if (!(k_pin > 0.0) || !(D > 0.0) || !std::isfinite(k_pin) ||
       !(H >= 0.0)) {
     return out;  // no fin model: eta = 1

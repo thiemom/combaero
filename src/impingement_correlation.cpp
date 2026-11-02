@@ -215,6 +215,13 @@ JetArrayImpingementResult jet_array_impingement_nu(
 
 double crossflow_to_jet_ratio_at_x(double yn_d, double z_d, double C_D,
                                    double x_over_xn) {
+  // The "return 0" guards below keep their meaning for finite input; NaN
+  // and inf used to land in them too (#769).
+  if (!validation::is_finite(yn_d) || !validation::is_finite(z_d) ||
+      !validation::is_finite(C_D) || !validation::is_finite(x_over_xn)) {
+    throw std::invalid_argument(
+        "crossflow_to_jet_ratio_at_x: yn_d, z_d, C_D and x/xn must be finite");
+  }
   const double beta = crossflow_beta(yn_d, z_d, C_D);
   if (!(C_D > 0.0) || !std::isfinite(C_D)) {
     return 0.0;

@@ -1,5 +1,7 @@
 #include "crossflow_cd.h"
 
+#include "input_validation.h"
+
 #include <cmath>
 #include <stdexcept>
 
@@ -58,6 +60,10 @@ CrossflowCd rogers_hersh_1976_cd(double Cd0, double G_ideal, double G_c, bool su
   if (!(Cd0 > 0.0)) {
     throw std::invalid_argument("rogers_hersh_1976_cd: Cd0 must be positive");
   }
+  // G_c <= 0 means no crossflow and G_ideal <= 0 no jet; NaN meant them too.
+  if (!validation::is_finite(G_ideal) || !validation::is_finite(G_c)) {
+    throw std::invalid_argument("rogers_hersh_1976_cd: G_ideal and G_c must be finite");
+  }
   if (!(G_c > 0.0)) {
     return capped(Cd0);
   }
@@ -99,6 +105,10 @@ CrossflowCd florschuetz_metzger_su_1982_cd(double xn_d, double yn_d, double z_d,
     throw std::invalid_argument(
         "florschuetz_metzger_su_1982_cd: CR-3630 Table 4.1 covers the B(5,4,1), "
         "B(5,4,2), B(5,4,3), B(5,8,1), B(10,4,1) and B(10,8,1) plates only");
+  }
+  if (!validation::is_finite(G_ideal) || !validation::is_finite(G_c)) {
+    throw std::invalid_argument(
+        "florschuetz_metzger_su_1982_cd: G_ideal and G_c must be finite");
   }
   if (!(G_c > 0.0)) {
     return capped(plate->cd0);

@@ -373,12 +373,19 @@ double critical_pressure_ratio(double gamma) {
 }
 
 double expansion_orifice(double S, double gamma) {
+    if (!combaero::validation::is_finite(S) || !combaero::validation::is_finite(gamma)) {
+        throw std::invalid_argument("expansion_orifice: S and gamma must be finite");
+    }
     // Eq. (4). Written as (1 - S)/gamma, identical to the printed
     // (P_t1 - P_s2)/(gamma P_t1).
     return 1.0 - y_orifice_coef * (1.0 - S) / gamma;
 }
 
 double expansion_nozzle(double S, double gamma) {
+    // NaN S used to fall through to the 0 branch below (#769).
+    if (!combaero::validation::is_finite(S) || !combaero::validation::is_finite(gamma)) {
+        throw std::invalid_argument("expansion_nozzle: S and gamma must be finite");
+    }
     // Eq. (5). The bracket is 0/0 at S = 1; the limit of
     // (1 - S^((g-1)/g))/(1 - S) there is (g-1)/g, which makes Y_n(1) = 1.
     if (S >= 1.0) return 1.0;
@@ -401,6 +408,11 @@ double expansion_blend_weight(double cd, double eps) {
 }
 
 double expansion_factor(double cd, double S, double gamma, double eps) {
+    // gamma <= 1 still means "no expansion correction"; NaN meant it too (#769).
+    if (!combaero::validation::is_finite(cd) || !combaero::validation::is_finite(S) ||
+        !combaero::validation::is_finite(gamma) || !combaero::validation::is_finite(eps)) {
+        throw std::invalid_argument("expansion_factor: cd, S, gamma and eps must be finite");
+    }
     if (!(gamma > 1.0)) return 1.0;
 
     // Below the critical pressure ratio the isentropic form turns over and

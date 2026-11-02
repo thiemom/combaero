@@ -734,6 +734,11 @@ FannoChannelFlow fanno_channel_flow(double Pt0, double Tt0, const std::vector<do
   const double drive = Pt0 - P_target;
   static const std::vector<std::vector<double>> kNoDirections;
   const std::vector<std::vector<double>>& dirs = with_derivatives ? dY_directions : kNoDirections;
+  // The no-flow branch is for finite states; NaN used to answer G = 0 (#769).
+  if (!validation::is_finite(Pt0) || !validation::is_finite(Tt0) ||
+      !validation::is_finite(P_target)) {
+    throw std::invalid_argument("fanno_channel_flow: Pt0, Tt0 and P_target must be finite");
+  }
   if (!(drive > 0.0) || !(Pt0 > 0.0) || !(Tt0 > 0.0)) {
     out.dG_ddir.assign(dirs.size(), 0.0);
     return out;
@@ -1248,6 +1253,11 @@ FannoChannelFlow fanno_rayleigh_channel_flow(
   const double drive = Pt0 - P_target;
   static const std::vector<std::vector<double>> kNoDirections;
   const std::vector<std::vector<double>>& dirs = with_derivatives ? dY_directions : kNoDirections;
+  if (!validation::is_finite(Pt0) || !validation::is_finite(Tt0) ||
+      !validation::is_finite(Tt_exit) || !validation::is_finite(P_target)) {
+    throw std::invalid_argument(
+        "fanno_rayleigh_channel_flow: Pt0, Tt0, Tt_exit and P_target must be finite");
+  }
   if (!(drive > 0.0) || !(Pt0 > 0.0) || !(Tt0 > 0.0) || !(Tt_exit > 0.0)) {
     out.dG_ddir.assign(dirs.size(), 0.0);
     return out;

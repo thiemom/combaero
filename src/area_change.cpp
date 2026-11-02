@@ -749,6 +749,11 @@ AreaChangeLoss area_change_loss(double m_dot_abs, double Pt0, double Tt0,
     const Branch b = make_branch(F_in, F_out, model, length, D_h);
     AreaChangeLoss out;
     out.expansion = b.expansion;
+    // Zero flow answers zero loss; NaN used to as well (#769).
+    if (!validation::is_finite(m_dot_abs) || !validation::is_finite(Pt0) ||
+        !validation::is_finite(Tt0)) {
+        throw std::invalid_argument("area_change_loss: m_dot_abs, Pt0 and Tt0 must be finite");
+    }
     if (!(m_dot_abs > 0.0)) {
         return out;
     }

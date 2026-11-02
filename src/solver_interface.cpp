@@ -1969,6 +1969,12 @@ OrificeModelResult orifice_jobson_residuals_and_jacobian(
   if (!validation::is_finite(beta)) {
     throw std::invalid_argument("orifice_jobson_residuals_and_jacobian: beta must be finite");
   }
+  // The kernel's no-flow branch is for finite states; NaN used to land in it.
+  if (!validation::is_finite(P_total_up) || !validation::is_finite(P_static_up) ||
+      !validation::is_finite(Tt_up) || !validation::is_finite(P_static_down)) {
+    throw std::invalid_argument(
+        "orifice_jobson_residuals_and_jacobian: pressures and Tt_up must be finite");
+  }
   return model_result(
       [&](const std::vector<double>& X) {
         return jobson_eval(P_total_up, P_static_up, Tt_up, P_static_down, Cd, area, beta, Cv,
@@ -1987,6 +1993,11 @@ OrificeModelResult orifice_iso5167_residuals_and_jacobian(
   }
   if (!validation::is_finite(beta)) {
     throw std::invalid_argument("orifice_iso5167_residuals_and_jacobian: beta must be finite");
+  }
+  if (!validation::is_finite(P_total_up) || !validation::is_finite(P_static_up) ||
+      !validation::is_finite(Tt_up) || !validation::is_finite(P_static_down)) {
+    throw std::invalid_argument(
+        "orifice_iso5167_residuals_and_jacobian: pressures and Tt_up must be finite");
   }
   return model_result(
       [&](const std::vector<double>& X) {
