@@ -8354,6 +8354,18 @@ class PressureLossElement(NetworkElement):
 SEED_FRICTION_FACTOR = 0.02
 
 
+class _SurfaceFeed(NamedTuple):
+    """The duct's static (T, P, rho) a ribbed or pin-fin drop reads at a
+    reservoir end (#926), each with its partials keyed by unknown name."""
+
+    T: float
+    P: float
+    rho: float
+    drho: dict[str, float]
+    dT: dict[str, float]
+    dP: dict[str, float]
+
+
 class ChannelElement(NetworkElement):
     """Duct with frictional pressure drop and optional convective surface.
 
@@ -8446,6 +8458,58 @@ class ChannelElement(NetworkElement):
     def unknowns(self) -> list[str]:
         return [f"{self.id}.m_dot"]
 
+    def _surface_rest_feed(
+        self, state_in: NetworkMixtureState, m_dot: float, area: float
+    ) -> "_SurfaceFeed | None":
+        """The duct's static state a ribbed or pin-fin drop reads where the
+        channel leaves a node at rest (#926), else None (the node state).
+
+        Those residuals read the from node's (Tt, P). On a node whose gas is
+        at rest (``state_at_rest``: a plenum, a combustor, a PressureBoundary
+        or MassFlowBoundary) that is the reservoir, P = Pt: its density is
+        rho(Tt, Pt), about M^2 / 2 above the duct's static density (13% at
+        Mach 0.5, 46% at 0.9), and the drop came out low by as much. Here the
+        surface reads the duct's own inlet static state instead: the
+        isentropic acceleration from the node's (Tt, Pt) to the duct's mass
+        flux |m| / A (C++ ``duct_htc_static_state``, the state its heat
+        transfer already reads, #636). Partials in m_dot, the node's Tt and
+        Pt, and its mass fractions are the state's own analytic ones. An end
+        where a boundary takes the flow at its static pressure (an outflow
+        losing its head) keeps the node state, as ``_rest_end_states`` does;
+        a moving node (a momentum chamber) carries its own static state and
+        keeps it too. A crossflow segment solves between its own stations.
+        """
+        node = getattr(self, "_upstream_node", None)
+        if not self._rest_end_state_from_duct or area <= 0.0:
+            return None
+        if not bool(getattr(node, "state_at_rest", False)):
+            return None
+        if m_dot < 0.0 and hasattr(node, "exit_head_lost") and bool(node.exit_head_lost(True)):
+            return None
+        G = abs(float(m_dot)) / area
+        X = list(state_in.X)
+        s = cb.duct_htc_static_state(float(state_in.Tt), float(state_in.Pt), G, X)
+        sd = cb.duct_htc_static_state_dY(float(state_in.Tt), float(state_in.Pt), G, X, s)
+        dG_dm = (1.0 if m_dot >= 0.0 else -1.0) / area
+        m_key = f"{self.id}.m_dot"
+        t_key, p_key = f"{self.from_node}.Tt", f"{self.from_node}.Pt"
+
+        def chain(d_dG: float, d_dTt: float, d_dPt: float, d_dY: Any) -> dict[str, float]:
+            out = {m_key: d_dG * dG_dm, t_key: d_dTt, p_key: d_dPt}
+            for i, v in enumerate(d_dY):
+                if v != 0.0:
+                    out[f"{self.from_node}.Y[{i}]"] = float(v)
+            return out
+
+        return _SurfaceFeed(
+            T=float(s.T),
+            P=float(s.P),
+            rho=float(s.rho),
+            drho=chain(s.drho_dG, s.drho_dTt, s.drho_dPt, sd.drho_dY),
+            dT=chain(s.dT_dG, s.dT_dTt, s.dT_dPt, sd.dT_dY),
+            dP=chain(s.dP_dG, s.dP_dTt, s.dP_dPt, sd.dP_dY),
+        )
+
     def _ribbed_residuals(self, state_in: NetworkMixtureState, state_out: NetworkMixtureState):
         """Ribbed channel: the correlation owns the friction factor.
 
@@ -8478,18 +8542,31 @@ class ChannelElement(NetworkElement):
         weight remains an accepted gap -- no correlation-level Jacobian for
         it exists yet, and no other channel-friction path in this file
         exposes one either.
+
+        Where the channel leaves a node at rest (a plenum or a boundary
+        reservoir), rho and mu are the duct's own static state there, not the
+        node's (#926, ``_surface_rest_feed``): rho then moves with m_dot and
+        the node's Tt and Pt (and its Y, through the static state).
         """
         m_dot = state_in.m_dot
         model = self.surface.model
         f_mult = self.surface.f_multiplier
 
-        rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
-            state_in.Tt, state_in.P, state_in.X
-        )
-        rho, drho_draw = _safe_rho(rho_raw)
-        drho_dT = drho_draw * drho_raw_dT
-        drho_dP = drho_draw * drho_raw_dP
         area = self.area or 0.0
+        feed = self._surface_rest_feed(state_in, m_dot, area)
+        if feed is None:
+            rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
+                state_in.Tt, state_in.P, state_in.X
+            )
+            rho, drho_draw = _safe_rho(rho_raw)
+            drho = {
+                f"{self.from_node}.Tt": drho_draw * drho_raw_dT,
+                f"{self.from_node}.P": drho_draw * drho_raw_dP,
+            }
+        else:
+            # The duct's own static state at a reservoir end (#926).
+            rho, drho_draw = _safe_rho(feed.rho)
+            drho = {k: drho_draw * v for k, v in feed.drho.items()}
         if area <= 0.0:
             return [state_in.Pt - state_out.Pt], {
                 0: {
@@ -8499,7 +8576,10 @@ class ChannelElement(NetworkElement):
             }
 
         dh = self.Dh or self.diameter or 1.0
-        mu = cb.complete_state(state_in.Tt, state_in.P, state_in.X).transport.mu
+        if feed is None:
+            mu = cb.complete_state(state_in.Tt, state_in.P, state_in.X).transport.mu
+        else:
+            mu = cb.complete_state(feed.T, feed.P, state_in.X).transport.mu
         Re = abs(m_dot) * dh / (area * mu) if mu > 0.0 else 0.0
         Re = math.copysign(Re, m_dot)
 
@@ -8524,20 +8604,17 @@ class ChannelElement(NetworkElement):
         # dP = K * mdot|mdot| / rho for K independent of rho (the exit head
         # too), so d(dP)/d(rho) = -dP/rho.
         d_dP_drho = -dP / rho if rho > 0.0 else 0.0
-        d_dP_dT = d_dP_drho * drho_dT
-        d_dP_dP_static = d_dP_drho * drho_dP
 
         res = [state_in.Pt - state_out.Pt - dP]
-        jac = {
-            0: {
-                f"{self.id}.m_dot": -d_dP_d_mdot,
-                f"{self.from_node}.Pt": 1.0,
-                f"{self.to_node}.Pt": -1.0,
-                f"{self.from_node}.Tt": -d_dP_dT,
-                f"{self.from_node}.P": -d_dP_dP_static,
-            }
+        row: dict[str, float] = {
+            f"{self.id}.m_dot": -d_dP_d_mdot,
+            f"{self.from_node}.Pt": 1.0,
+            f"{self.to_node}.Pt": -1.0,
         }
-        return res, jac
+        for k, v in drho.items():
+            d = d_dP_drho * v
+            row[k] = row[k] - d if k in row else -d
+        return res, {0: row}
 
     def _pin_fin_residuals(self, state_in: NetworkMixtureState, state_out: NetworkMixtureState):
         """Pin-fin array: the correlation owns the drop, per row.
@@ -8558,18 +8635,31 @@ class ChannelElement(NetworkElement):
         property derivatives (``density_and_jacobians``,
         ``viscosity_and_jacobians``). Composition sensitivity is the same
         accepted gap as every other channel-friction path here.
+
+        Where the channel leaves a node at rest (a plenum or a boundary
+        reservoir), rho and mu are the duct's own static state there, not the
+        node's (#926, ``_surface_rest_feed``), chained onto m_dot and the
+        node's Tt, Pt and Y (mu's direct composition term stays the gap).
         """
         m_dot = state_in.m_dot
         model = self.surface.model
         f_mult = self.surface.f_multiplier
 
-        rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
-            state_in.Tt, state_in.P, state_in.X
-        )
-        rho, drho_draw = _safe_rho(rho_raw)
-        drho_dT = drho_draw * drho_raw_dT
-        drho_dP = drho_draw * drho_raw_dP
         area = self.area or 0.0
+        feed = self._surface_rest_feed(state_in, m_dot, area)
+        if feed is None:
+            rho_raw, drho_raw_dT, drho_raw_dP = _solver_tools.density_and_jacobians(
+                state_in.Tt, state_in.P, state_in.X
+            )
+            rho, drho_draw = _safe_rho(rho_raw)
+            drho = {
+                f"{self.from_node}.Tt": drho_draw * drho_raw_dT,
+                f"{self.from_node}.P": drho_draw * drho_raw_dP,
+            }
+        else:
+            # The duct's own static state at a reservoir end (#926).
+            rho, drho_draw = _safe_rho(feed.rho)
+            drho = {k: drho_draw * v for k, v in feed.drho.items()}
         if area <= 0.0:
             return [state_in.Pt - state_out.Pt], {
                 0: {
@@ -8578,9 +8668,20 @@ class ChannelElement(NetworkElement):
                 }
             }
 
-        mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
-            state_in.Tt, state_in.P, state_in.X
-        )
+        if feed is None:
+            mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
+                state_in.Tt, state_in.P, state_in.X
+            )
+            dmu = {f"{self.from_node}.Tt": dmu_dT, f"{self.from_node}.P": dmu_dP}
+        else:
+            mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(feed.T, feed.P, state_in.X)
+            # mu at the duct's static (T, P), both functions of the feed's
+            # Tt, Pt, the flux and the composition. mu's own composition
+            # dependence at fixed (T, P) is the accepted gap below.
+            dmu = {
+                k: dmu_dT * feed.dT.get(k, 0.0) + dmu_dP * feed.dP.get(k, 0.0)
+                for k in dict.fromkeys([*feed.dT, *feed.dP])
+            }
         D = model.pin_diameter
         a_min = area * cb.pin_fin_amin_over_afrontal(model.geometry())
         Re = m_dot * D / (a_min * mu) if mu > 0.0 else 0.0
@@ -8602,20 +8703,17 @@ class ChannelElement(NetworkElement):
         # mu in Re (the pin friction only).
         d_dP_drho = -dP / rho if rho > 0.0 else 0.0
         d_dP_dmu = coeff * m_dot * abs(m_dot) * df_dRe * (-Re / mu) if mu > 0.0 else 0.0
-        d_dP_dT = d_dP_drho * drho_dT + d_dP_dmu * dmu_dT
-        d_dP_dP_static = d_dP_drho * drho_dP + d_dP_dmu * dmu_dP
 
         res = [state_in.Pt - state_out.Pt - dP]
-        jac = {
-            0: {
-                f"{self.id}.m_dot": -d_dP_d_mdot,
-                f"{self.from_node}.Pt": 1.0,
-                f"{self.to_node}.Pt": -1.0,
-                f"{self.from_node}.Tt": -d_dP_dT,
-                f"{self.from_node}.P": -d_dP_dP_static,
-            }
+        row: dict[str, float] = {
+            f"{self.id}.m_dot": -d_dP_d_mdot,
+            f"{self.from_node}.Pt": 1.0,
+            f"{self.to_node}.Pt": -1.0,
         }
-        return res, jac
+        for k in dict.fromkeys([*drho, *dmu]):
+            d = d_dP_drho * drho.get(k, 0.0) + d_dP_dmu * dmu.get(k, 0.0)
+            row[k] = row[k] - d if k in row else -d
+        return res, {0: row}
 
     @property
     def residual_scale_kind(self) -> str:
@@ -8953,10 +9051,12 @@ class ChannelElement(NetworkElement):
           pressure; where a boundary takes the flow at its static pressure
           (an outflow losing its head) its state is the duct face's.
 
+        * ribbed or pin-fin surface: the from end's state its own drop reads
+          (``_surface_rest_feed``, #926); the to end keeps the node state.
+
         An end on a moving node (a momentum chamber, Pt > P) carries its own
-        static state and is left alone, as is a ribbed or pin-fin surface
-        (its residual reads the node state). Reporting only: no residual
-        reads this.
+        static state and is left alone. Reporting only: no residual reads
+        this.
         """
         ends: list[tuple[float, float, list[float]] | None] = [None, None]
         nodes = (getattr(self, "_upstream_node", None), getattr(self, "_downstream_node", None))
@@ -8968,6 +9068,11 @@ class ChannelElement(NetworkElement):
         if area <= 0.0 or m == 0.0:
             return ends
         if self.surface is not None and isinstance(self.surface.model, (RibbedModel, PinFinModel)):
+            # The state its drop reads at the from end (#926); the to end,
+            # which its residual does not read, keeps the node state.
+            feed = self._surface_rest_feed(state_in, m, area)
+            if feed is not None:
+                ends[0] = (feed.T, feed.P, list(state_in.X))
             return ends
         if self.regime == "compressible":
             if flow is None or not float(flow.G) > 0.0:
