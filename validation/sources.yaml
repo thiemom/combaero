@@ -615,6 +615,207 @@ documents:
     folder andrews_88-GT-290_fig10_data/ (renamed 2026-10-25 from andrews_86-GT-290_fig10_data/; the CSVs
     inside keep their andrews_86-GT-290_ prefix) and andrews_88-GT-290_fig_10.png. Title from the repo record
     (not in p.1 text layer). Local only (gitignored).'
+- file: sources/heat_transfer/film/Ballal_Lefebvre_1973_Cranfield_SME4_film_cooled_wall_T.pdf
+  citation: Ballal, D. R., Lefebvre, A. H. (1973). A proposed method for calculating film-cooled wall temperatures
+    in gas turbine combustion chambers. Cranfield Institute of Technology, Report SME No. 4, June 1973 (the
+    report version of ASME Paper 72-WA/HT-24, same title and authors).
+  topic: [film, combustion]
+  content: 'Typed scan, 20 pp. (TU Delft library copy); the text layer garbles exponents, read equations from
+    page images. Film-side heat transfer: Colburn far field Eq. 2 (x/s > 50), Seban near-slot Nu = 0.090
+    [Re_s x/s]^0.7 for m < 1.3 (Eq. 3, Fig. 1), Myers wall-jet Stanton form Eq. 4 reduced at theta = 2 to Nu
+    = 0.10 Re_s^0.8 (x/s)^0.44 for m > 1.3 (Eqs. 5-6, Fig. 2 with Cranfield''s own rig data and Pai-Whitelaw).
+    Lip-thickness correction factor Eq. 7 and the thick-lip effectiveness eta = 1.10 m^0.65 (mu_c/mu_m)^0.15
+    (x/s)^-0.2 (t/s)^-0.2 (Eq. 8, 0.5 < m < 1.3) and eta = 1.28 (mu_c/mu_m)^0.15 (x/s)^-0.2 (t/s)^-0.2 (Eq.
+    9, 1.3 < m < 4.0); Figs. 3/4 plot the fitted points (Kacker-Whitelaw, Sivasegaram-Whitelaw, t/s 0.13-1.9).
+    Liner balance R1 + C1 = R2 + C2 (Eqs. 10-13) with film C1 (Eqs. 14/15). Worked appendix at x/s 18, t/s
+    0.4, m 2.54, 30 atm, 880 K: eta 0.785, Tw,ad 1180 K, h 1.96 kW/m2K, e_m 0.60. Figs. 5/6: thermal-paint
+    wall-temperature ranges vs prediction at 22 and 30 atm, combustion efficiency 85-99% by zone.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The primary behind Lefebvre & Ballal Ch. 8 Eqs. 8.37/8.38 (thick-lip eta,
+    constants identical) and 8.41-8.44 (film-side Nu), and of its film-cooled worked example. DISCREPANCY: the
+    near-slot Nu for m < 1.3 is 0.090 here (Eq. 3, credited to Seban) but 0.069 in the book (Eq. 8.41), 30%
+    lower; the m > 1.3 form agrees (0.10). Which is right needs Seban 1960 or the ASME 72-WA/HT-24 print. The
+    worked example gives eta 0.785 where the book prints 0.789. Plugs a real gap: combaero ships only
+    Marek-Tacina (m 0.41-1.87) and no film-side h. Figs. 3/4 are other labs'' points, so they test reproduction
+    of the fit; Figs. 5/6 are weak validation (gas T from an assumed efficiency, geometry not given).'
+  read_for: ['#714 / #763 thick-lip slot film above m 1.3', '#793 film-side Nu for the liner wall balance',
+    'provenance of Lefebvre & Ballal Eqs. 8.37-8.44']
+  issues: [714, 763, 793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). Not implemented.
+- file: sources/heat_transfer/film/Caciolli_PhD_Florence_XXV_combustor_aerothermal.pdf
+  citation: Caciolli, G. (cycle XXV, 2010-2012). A close investigation on the aerothermal behaviour of modern
+    aeroengine combustors. PhD thesis, University of Florence, DIEF (tutor B. Facchini; defence year not printed).
+  topic: [film, combustion]
+  content: 'Born-digital LaTeX, 298 pp. (only the title page is a scan); data in figures. Ch. 3: Therm1D,
+    the Florence 1-D liner procedure (Icons1D coolant network + Cowl gas-side Lefebvre radiation/convection,
+    Kretschmer-Odgers, + 1-D FDM wall), applied to the NEWAC combustor; results normalised (T/Tref), so not
+    reproducible. Ch. 4 (the useful part): 3:1 model of the NEWAC liner, TLC, steady state. 29 staggered
+    effusion rows, d 1.65 mm, alpha 30 deg, L/d 5.5, Sx/d 6.0, Sy/d 7.6, starter slot upstream (BR_sl ~1.5),
+    dilution hole after row 14; Re_main ~75,000, M 0.04-0.05, low Tu. BR_eff 1.5/3/5/7 with air (DR ~1) and
+    CO2 (DR ~1.7), with and without slot: 48 tests. Measured: Cd ~0.73 constant; spanwise-averaged HTC/HTC0
+    (HTC0 = the same plate unblown) row by row (Fig. 4.12) and plate-averaged vs BR and VR (Fig. 4.13); eta_aw
+    maps and averages (Figs. 4.14-4.16); NHFR and overall effectiveness (Figs. 4.20/4.21). Fig. 4.13(b) PRINTS
+    the fit HTC/HTC0 = 0.4296 VR_eff + 1.0478 (VR ~1.5-7; max error ~10%, mean 4.5%), with air and CO2
+    collapsing on VR, not BR. Bands (Table 4.2, 95%): HTC +/-10 W/m2K, eta_aw +/-0.05, BR/VR 5%. Table 4.3
+    gives L''Ecuyer-Soechting and Baldauf validity ranges; Fig. 4.17 compares both with the data. Ch. 6-8:
+    FACTOR hot-streak sector rig (1:1); Table 6.1 effusion patches (d 0.5 mm, L/d 2-3.5, alpha 30/60 deg);
+    Table 8.1 patch permeability from flow checks at an assumed Cd 0.70; swirler effective area 1545 mm2.
+    App. A: MobRig Therm1D network, normalised. App. B: hot streaks on the HP vane.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Candidate SOURCED closure for the effusion plate''s gas-side augmentation,
+    which EffusionPlateElement leaves to the user (`gas_augmentation`, #476): the printed Fig. 4.13(b) fit
+    gives 1.69 at VR 1.5 to 4.06 at VR 7 -- the band Andrews 88-GT-290 plates needed (1.6-4.3) -- on a
+    baseline measured on the same unblown plate. Limits: one geometry, low mainstream Tu, plate average with
+    a starter slot and a dilution hole in it, laboratory scale. Would ship as a declared, single-geometry
+    set with its validity box, never a default. Same lab as Andrei 2014 (held), different study and
+    geometry: cross-source to it. Eta_aw curves are outside every shipped film correlation (BR up to 7).
+    Ch. 3/App. A results are normalised and not usable as examples; Ch. 5-8 hot streaks are out of scope.'
+  read_for: ['#476 effusion gas-side augmentation', '#387 effusion eta_aw at combustor BR/DR', effusion
+      Cd at combustor conditions, '#793 1-D liner procedure (methodology only)']
+  issues: [387, 476, 793]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ (from the user) as Caciolli_PhD_final_frontespizio.pdf. Leads
+    from its bibliography: Andreini et al. 2011 JEGTP 133 021901 (effusion Cd numerical correlation, used for
+    App. A); Facchini et al. GT2010-22936 (HTC on a real liner, slot + effusion + dilution); Kretschmer &
+    Odgers 78-GT-90; Ceccherini 2009 PhD (Therm1D). The Ch. 4 data are likely also in an Andreini/Caciolli
+    journal paper (not verified).'
+- file: sources/heat_transfer/film/Sargison_2001_DPhil_Oxford_console_film_cooling.pdf
+  citation: Sargison, J. E. (2001). Development of a novel film cooling hole geometry. DPhil thesis, University
+    of Oxford, Department of Engineering Science (Hilary Term 2001).
+  topic: [film, orifice]
+  content: 'Word-generated text layer, 262 pp.; data in figures. The console (converging slot-hole) against
+    cylindrical holes (d 4 mm, p/d 3), fan-shaped holes (p/d 3.5) and a 35 deg slot at equal throat area per
+    width (Fig. 5.2). Ch. 5: low-speed flat plate, DR ~1, v_m 26 m/s, I_ideal 0.5/1.1/1.5, steady TLC:
+    laterally averaged eta_aw and h (Figs. 5.27-5.34), net heat flux reduction, and the hole Cd with and
+    without crossflow vs Re_h for all four shapes (Figs. 5.38-5.41; with crossflow ~10% below Rowbury''s 40
+    deg holes, attributed to the 35 deg inclination). Slot and cylindrical eta and h checked against published
+    data (Figs. 5.8-5.11). Ch. 6: transonic annular NGV cascade (CHTT), engine Re/M, foreign gas for DR,
+    console vs fan rows, h and eta. Ch. 7: aerodynamic loss. Ch. 9 PRINTS: the Eckert-Drake line-source slot
+    model (Eq. 9.1, the Goldstein-Haji-Sheikh form) and point-source hole model (Eq. 9.2), flat-plate Nu
+    (9.4/9.5), and two Forth-Jones-parameter fits on her data: console eta = -0.1899 ln[(x/s) I^-2/3] + 1.25
+    for 30 < (x/s) I^-2/3 < 200 (Eq. 9.6) and fan-shaped eta = -0.1778 ln[(x/d) I^-2/3] + 0.90 for 4 <
+    (x/d) I^-2/3 < 50 (Eq. 9.7), I the actual momentum flux ratio.'
+  status: screened
+  verdict: 'Screened 2026-11-02. No gap plugged outright. Candidate uses: (a) the fan-shaped eta data and Eq.
+    9.7 as a cross-source accuracy check of the shipped Colban 2011 shaped-hole kernel (one geometry, DR 1,
+    laterally averaged); (b) the 35 deg slot eta and h as slot-film data, but inclined, not tangential, so not
+    a Marek-Tacina check; (c) the Cd-with-crossflow curves as a film-hole Cd cross-check; (d) laterally
+    averaged h with injection against the unblown plate (film-hole gas-side augmentation). All figure-only:
+    digitising needed. The console is a proprietary-style shape combaero has no element for. Its Cd lead:
+    Rowbury, Oldfield & Lock 2000 (crossflow Cd correlation, wanted).'
+  read_for: ['#386 shaped-hole eta cross-source (Colban)', film-hole Cd with crossflow, '#714 inclined slot
+      data', film-hole gas-side h augmentation]
+  issues: [386, 714]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ as ThesisJES%5B1%5D.pdf (from the user). Journal versions exist
+    (Sargison et al. 2002, J. Turbomach. 124, console papers), not held.
+- file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
+  citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
+    blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
+  topic: [film, review]
+  content: 'Open access (euroturbo.eu, copyright the authors), 13 pp. High-porosity (P/d ~2, porosity ~20%)
+    staggered film panels on a turbine blade in a high-speed cascade (Oxford). Review of slot and transpiration
+    film models with equations: Goldstein & Haji-Sheikh heat-sink correlation (Eqs. 3-5, porous sections and
+    slots), Sturgess 1986 three-region slot model (Eq. 6, form only), Hatch & Papell 1959 (Eq. 7), Sellers
+    superposition (Eq. 8) and the Kirollos-Povey correction (cited), Goldstein 1971 point-sink hole model (Eq.
+    9). New: Eq. 10, eta = exp[-(C2 h x d/(m cp) + C1)] exp[-0.693 (y/h)^2] per hole with Sellers superposition,
+    h the flat-plate h at the hole (Eq. 11 turbulent, Eq. 12 laminar). C1 (vs VR) and C2 (vs BR) are fitted
+    per geometry and PLOTTED only (Figs. 8, 9, 11, 12; legends partly unlabelled), suction and pressure surface
+    and Courtis 2021 flat plate. R2 0.985-0.999 per geometry, 0.92-0.99 with spline-fitted C1/C2.'
+  status: screened
+  verdict: 'Screened 2026-11-02. No shippable closure: C1/C2 are per-geometry fits shown only as plots, on
+    curved blade surfaces at P/d ~2, a regime combaero has no element for (transpiration panels). Qualitative
+    support for treating dense effusion as a slot with a potential core. Its value is the leads: Simon 1986
+    NASA TP-2655 (slot film with free-stream and coolant turbulence, the #714 Tu closure), Hatch & Papell
+    1959 and Papell 1960 (NASA TN D-130, D-299), Kirollos & Povey 2015 (energy-consistent superposition, #387),
+    Sturgess 1980/1986, Goldstein, Shavit & Chen 1965 (porous section); Simon 1986, Hatch & Papell 1959, Papell
+    1960 and Kirollos & Povey 2015 are now held (own entries), the others wanted or noted here. The data
+    are Wambersie, Wong, Ireland & Mayo 2021, IJTPP 6(2) 16 (held since 2026-11-02).'
+  read_for: ['#714 slot film leads (turbulence closure, core length)', '#387 superposition alternatives',
+    transpiration / high-porosity film]
+  issues: [387, 714]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). Murray et al. 2018 IJTPP 3(1) 4 (multi-row effusion,
+    high-resolution data and model; open access) is another lead it cites -- already held (the
+    c32eeeb88f... entry below, the murray2018 accuracy set). Wambersie et al. 2021 now held (next entry).
+- file: sources/heat_transfer/film/Wambersie_Wong_Ireland_Mayo_2021_IJTPP_6_16_transpiration_panel_film.pdf
+  citation: Wambersie, A., Wong, H., Ireland, P., Mayo, I. (2021). Experiments of transpiration cooling inspired
+    panel cooling on a turbine blade yielding film effectiveness levels over 95%. Int. J. Turbomach. Propuls.
+    Power 6(2), 16.
+  id: doi:10.3390/ijtpp6020016
+  topic: [film, effusion]
+  content: 'Open access (CC BY), 12 pp., the Oxford ORA copy (its text layer interleaves the published and a
+    peer-review version; figures and tables read from page images). Oxford high-speed HP blade cascade at
+    engine Re and Mach distribution, mainstream 1.43 kg/s; 3-D printed hollow blades, panels of 0.5 mm holes at
+    45 deg to the surface, L/d 6, 60 x 18 mm, square pitch. Table 1: seven panels -- pitch/d 2.1 (porosity
+    ~25%) on SS at 0.1 and 0.64 of chord and PS at 0.1 and 0.33 (Panels 1-4), pitch/d 2.4 and 1.8 (20%, 30%)
+    and a staggered 2.1 panel on SS at 0.1. Eight coolant flows 5-25 g/s (0.58-2.91% of mainstream), plenum
+    to mainstream total-pressure ratio printed per map. PSP adiabatic effectiveness maps (Figs. 2-5) and
+    spanwise-averaged eta vs x/d over the central 120 z/d (Figs. 6+); average panel BR does not exceed ~0.3;
+    eta above 0.95 behind suction-side panels. Uncertainty by reference to Gurram et al. (not restated). Film
+    lift-off behind the last rows, recovering in ~15 d; strong ingestion at low plenum pressure.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The dataset behind Wambersie & Ireland 2023 (held), which fits its C1/C2 to
+    these panels. Outside every combaero element: pitch/d 1.8-2.4 transpiration-like panels on curved,
+    accelerating blade surfaces with mainstream pressure gradient, where the authors stress that single-hole
+    models do not extrapolate. EffusionPlateElement (flat liner plates, p/d ~5-10) cannot be scored on it,
+    not even as cross-source accuracy without a curvature/pressure-gradient term; figure-only data. Not
+    implemented.'
+  read_for: ['#387 dense-array film effectiveness (high porosity)', 'data behind Wambersie & Ireland 2023']
+  issues: [387]
+  records: []
+  notes: Fetched 2026-11-02 from Oxford ORA (uuid:4a84aefb-dfa5-4994-ae6e-fa3ebd544af4); the MDPI PDF URL
+    returned 403 to an automated fetch. Extended version of an ETC 2021 paper.
+- file: sources/heat_transfer/film/Kirollos_Povey_2015_JEGTP_137_122608_energy_based_film_superposition.pdf
+  citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
+    film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122608.
+  id: doi:10.1115/1.4030907
+  topic: [film]
+  content: '7 pp., text layer good. Reviews additive models: Sellers (Eq. 1) and its recursive form (Eq. 4); Le
+    Grives & Nicolas, two staggered rows at p/D < 4 (Eq. 6); the a(M), b(M) weighted two-row form (Eq. 7). It
+    then proposes an energy-conserving stratified-layer model. The entrained mainstream mass per layer is m_ei =
+    m_ci (1/eta_i - 1) (Eq. 8), from each row''s single-row eta_i(x). Entrainment into lower layers is at the
+    temperature of the layer above. The layer total temperatures follow from integral relations (Eqs. 10-13).
+    The model needs each row''s coolant mass flow, as well as its eta_i(x).'
+  status: screened
+  verdict: 'Screened 2026-11-02. Sellers does not conserve energy, and it under-predicts the combined
+    effectiveness for n > 2 rows; the gap grows with n. In their test it is below for x/D > 50. The energy model
+    always predicts a higher eta than Sellers for n > 2. The test case is CFD only (6 staggered rows in a
+    converging duct), with no experiment. The paper says data for validation are scarce, and it is copyright
+    Rolls-Royce plc. Relevance: EffusionPlateElement uses Sellers superposition over many rows (29 rows in
+    Caciolli, combustor liners). Our film runner on Andrei 2014 (Baldauf + Sellers) has an MAE of 45.5%, and its
+    error changes sign with BR. So the energy model is a candidate alternative superposition for high row
+    counts. Implementing it means integrating Eqs. 10-13 per row with analytic derivatives. It is not
+    implemented, and it has not been checked against our effusion data.'
+  read_for: ['#387 superposition over many effusion rows (Sellers vs energy-based)']
+  issues: [387]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). The former wanted entry gave the article number as
+    122607; the page prints 122608.
+- file: sources/heat_transfer/film/Lee_Cho_2008_AIAA-2008-5175_ramjet_multislot_film.pdf
+  citation: Lee, K. W., Song, J., Oh, M. G., Yu, M. S., Cho, H. H., Ham, H. C., Hwang, K. Y. (2008). Heat transfer
+    measurement on slot film cooling of ramjet combustor. 44th AIAA/ASME/SAE/ASEE Joint Propulsion Conference,
+    AIAA 2008-5175.
+  topic: [film]
+  content: '9 pp., text layer good, data in figures only. Rig: a low-speed (U 15 m/s) model of a pre-diffuser
+    ramjet combustor wall with three tangential slots (alpha 0 deg). Table 1: slot 1, s 2 mm, t/s 1, under the
+    recirculation zone; slot 2, s 3 mm, t/s 0.67; slot 3, s 8 mm, t/s 0.25, no recirculation. Blowing rate M
+    0.5/1.0/1.5/2.0; coolant-to-mainstream dT about 20 C, so DR about 1. Hot-wire velocity and turbulence
+    profiles at the slot exits. Steady TLC adiabatic effectiveness plotted against x/s; dimensionless
+    temperature fields. Despite the title, no heat transfer coefficient is reported.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Low value. Slots 1 and 2 sit in a recirculation zone that combaero does not
+    model. Slot 3 (t/s 0.25, M 0.5-2) is the only clean tangential thick-lip case, but it is downstream of
+    slots 1-2, so it is not an isolated-slot check of Ballal-Lefebvre Eqs. 8/9 (Cranfield SME4, held) or of
+    Marek-Tacina unless the upstream coolant can be accounted for. Qualitative: a thicker lip lowers eta near
+    the slot through lip-wake eddies, consistent with Ballal-Lefebvre''s (t/s)^-0.2 term. Figure-only; AIAA
+    copyright.'
+  read_for: ['#714 / #763 thick-lip slot film data (cross-source)']
+  issues: [714, 763]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). Its references cite Folayan & Whitelaw and
+    Sivasegaram (the lip-thickness data behind Ballal-Lefebvre Figs. 3/4).
 - file: sources/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
   citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
     experimental and computational methods for modelling multiple row effusion cooling performance. Int.
@@ -841,7 +1042,129 @@ documents:
   code: ['include/cooling_correlations.h: slot_film_effectiveness_marek_tacina_1975, slot_film_effectiveness_marek_tacina_1975_and_derivatives', 'include/cooling_correlations.h: slot_film_span_average_marek_tacina_1975',
     'python/combaero/network/components.py: SlotFilmElement (#749)']
   notes: Also fidelity-scored (validation/cooling/fidelity.py); 'implemented' chosen as the higher status.
-    No text layer on p.1 (scan). Element design and Tu closure (stage 2) pending.
+    No text layer on p.1 (scan). Element design and Tu closure (stage 2) pending. Simon 1986 (NASA TP-2655,
+    held) re-correlates this report's data with a wall-jet model (lateral Tu, M, T ratio, coolant Tu).
+- file: sources/heat_transfer/film/Simon_1986_NASA_TP-2655_slot_film_jet_model_turbulence.pdf
+  citation: Simon, F. F. (1986). Jet model for slot film cooling with effect of free-stream and coolant
+    turbulence. NASA Technical Paper 2655 (E-2961), Lewis Research Center, October 1986.
+  id: NASA TP-2655 (NTRS 19870008601)
+  topic: [film, combustion]
+  content: 'Scan, no text layer, 21 pp. (equations and tables read from page images). Wall-jet model of a 2-D
+    slot film: an initial region x < x1 (zone II coolant core being entrained into, zone I mixing layer) and a
+    fully developed region x >= x1 (adiabatic wall = mixed jet temperature). Composition, cp and T_inf constant,
+    no radiation. General form Eq. 32: eta = 1/(1 + (x/(M S)) C_M''), C_M'' = (C_M - beta/(x/(M S)))/(1 + beta)
+    (Eq. 33); beta = 0 and C_M'' = C_M for x >= x1, so the developed region IS the Juhasz-Marek / Marek-Tacina
+    form eta = 1/(1 + C_M x/(M S)) (Eq. 9). Mixing coefficient from Abramovich jet growth db/dx ~ a_o v''/U*
+    with U* the density-weighted velocity (Eqs. 14-21): C_M = a_o (I_v omega)^N, omega = (1 + T_inf/T_s)/(1 +
+    M) (Eq. 41). FITTED (Figs. 3-4): N = 0.65, a_o = 0.177, i.e. C_M = 0.177 (I_v omega)^0.65 (Eqs. 29/35/39)
+    for I_v,inf = 0.026-0.13, both regions; at I_v,inf = 0.244 the developed region uses C_M = [0.245 (1 -
+    x1/x) + 0.177 x1/x] (I_v omega)^0.65 (Eqs. 30/40). Effective lateral intensity I_v = I_v,inf + 0.4
+    |I_v,inf - I_v,s| (Eqs. 23/42, after Ko & Liu 1980), capped at no more than both I_v,inf and I_v,s (as
+    printed); I_v = v''/U_inf is the TRANSVERSE (lateral, wall-normal) intensity referred to the free-stream
+    velocity, NOT the axial Tu Marek-Tacina use. Initial region: beta (Eq. 34) = [C_M x/(M S) + x/x1 - 13.7
+    I*_v,s (T_s/T_aw,x1) ln(1/(1 - x/x1))] psi, psi = (T_aw,x1 - T_aw)/(T_inf - T_s), I*_v,s = v''_s/U_s the
+    coolant intensity on coolant velocity (A50); C_o = 13.7 fitted with I*_v,s = 0.089 (one value, from a
+    1985 personal communication with Marek). Core length Eq. 36: x1 = 1/((C_M/S) F(R)), F(R) = 1/(1/((T_s/
+    T_aw,x1)(0.416 + 0.134 R)) - 1), R = U_inf/U_s (Abramovich), iterated (App. B flow chart, start x1 = 20 M
+    S). Table I prints x1 (cm) and x1/(M S) calculated vs experimental (calc. 12.4-41.9; exp. 8 to 39, several
+    only bounds ">16"); Table II prints per run M, I_v,s, I_v, d phi/dx, omega. DATA: none new -- all of it is
+    Marek & Tacina 1975 (TN D-7958, ref. 3; 62 m/s, 590 K, 1 atm, coolant ambient, 10.5 x 37 cm duct, 8 of 9
+    stations, the 9th dropped for conduction), I_v,inf = 0.026/0.08/0.13/0.244 for its four blockage plates,
+    M 0.41-1.86. Jet I_v,s measured only at M = 1.85 (0.119), the other M assume a constant exit intensity
+    (0.033-0.090). Fig. 5: prediction vs data, average deviation +-4% (the abstract says: lateral Tu up to 24%,
+    M up to 1.9). Fig. 7: coolant Tu (I*_v,s 0.01 vs 0.09) changes eta only in the initial region, more at low
+    free-stream Tu.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #714 stage 2. It is the ONLY printed turbulence closure for this slot film
+    beyond Marek-Tacina Eq. 5, but it does NOT plug the gap as an independent source: its constants (a_o 0.177,
+    N 0.65, 0.245, C_o 13.7) are fitted to the SAME D-7958 data the shipped kernel is fitted to, so the +-4% is
+    a fit residual on the fitting set, not cross-source accuracy (and D-7958 Table I is the only data it can be
+    scored on -- a fidelity check of an implementation, never an accuracy claim). What it adds over Eq. 5: (1)
+    a blowing-ratio and temperature-ratio dependence of C_M through omega (my arithmetic from its Table II: at
+    the 0% plate C_M 0.027 at M 0.45 vs 0.030 at M 1.85; at the 90% plate 0.103 vs 0.072, against Eq. 5''s
+    single 0.0175 and 0.0875 at axial Tu 7%/35%); (2) the coolant turbulence term, but only through the
+    initial region and with one assumed coolant intensity; (3) a printed potential-core length x1 (x1/(M S)
+    ~12-42 calculated, longer than much of the D-7958 span), which the kernel lacks. Can it replace or calibrate
+    C_m(Tu)? Not directly: its input is LATERAL I_v = v''/U_inf (0.026-0.244 on the plates whose AXIAL Tu is
+    7-35%, ratio ~0.37-0.70, rig-specific), which a user rarely knows, plus T_inf/T_s and I_v,s; an axial-to-
+    lateral conversion would be a tuning assumption. Usable as a declared alternative closure on D-7958 Table I
+    (the one dataset it was built on), with the Marek-Tacina Tu box; the cross-source accuracy question for
+    either closure stays open (needs another lab''s slot data with measured Tu: Ballal & Lefebvre 1973 SME 4,
+    Sturgess 1977/1980). Not checked: whether D-7958 itself prints the lateral intensities (Simon''s I_v,inf
+    values were not traced in it); the asymmetry between Eq. 7 ((x1 - x)/x1) and Eq. 13 ((x1 - x)/x) is as
+    printed, Eq. 34 uses the Eq. 31 simplification. Not implemented.'
+  read_for: ['#714 stage 2 slot-film turbulence closure (free-stream and coolant Tu)', '#714 near-slot
+      potential-core length']
+  issues: [714]
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (19870008601, public). Leads: Sturgess & Lenertz 1977 (ASME 77-HT-10,
+    mainstream Tu), Sturgess 1980 (J. Eng. Power 102, 524, film/coolant Tu), Sturgess & Pfeifer 1986 (J. Eng.
+    Gas Turbines Power 108, 361, film initial region), Ko & Liu 1980 (AIAA J. 18, 907), Marek 1973 (NASA TM
+    X-2809, film effectiveness independent of pressure 1-20 atm), Juhasz & Marek 1971 (TN D-6360).'
+- file: sources/heat_transfer/film/Hatch_Papell_1959_NASA_TN_D-130_slot_film_heat_sink_model.pdf
+  citation: Hatch, J. E., Papell, S. S. (1959). Use of a theoretical flow model to correlate data for film cooling
+    or heating an adiabatic wall by tangential injection of gases of different fluid properties. NASA TN D-130,
+    Lewis Research Center, November 1959.
+  id: NASA TN D-130 (NTRS 19890068390)
+  topic: [film]
+  content: 'Scan with an OCR text layer (exponents unreliable; equations read from page images), 44 pp.
+    Tangential slot film on an adiabatic wall. Model: coolant a discrete unmixed layer heated by the main gas
+    with the duct h = 0.0265 (k_f/D_h) Re_f^0.8 Pr_f^0.3 (properties at the mean of gas and slot-exit static
+    temperature, D_h of the duct), giving eta = (T_ad - t_w)/(T_ad - t_c) = exp[-h L (x - x'')/(w cp)_c] (Eq.
+    4), eta = 1 for x <= x''. Fitted: x'' = 0.04 (w cp)_c/(h L) (Eqs. 6, 8). Final correlation Eq. 12: ln eta =
+    -[h L x/(w cp)_c - 0.04] (S V_g/alpha_c)^0.125 f(V_g/V_c), for h L x/(w cp)_c > 0.04 (eta = 1 below, Eq.
+    12a); alpha_c the coolant diffusivity at slot-exit static temperature, V_g used in place of V_c in the
+    0.125 group; f = 1 + 0.4 arctan(V_g/V_c - 1) for V_g/V_c >= 1 (Eq. 10, radians), f = (V_c/V_g)^(1.5
+    (V_c/V_g - 1)) for V_g/V_c <= 1 (Eq. 11). L is the cooled perimeter (width), w the coolant flow. Data:
+    NASA 8 x 8 in. duct with AIR (from Papell & Trout 1959, TN D-9, not held; Figs. 6-9, S 1/16-1/2 in.) and
+    HELIUM (new, Figs. 10-12, TABLE I printed, S 1/8-1/2 in.); General Electric 18 in. square duct, S 0.106
+    in. (Chin et al. 1958, ASME 58-A-107; Figs. 13-14, film heating included). Range (NASA + GE): T_g 502-1965
+    R, V_g 104-1040 ft/s, V_g/V_c 0.45-33.3, T_c 530-980 R, S 0.063-0.50 in. Accuracy (Fig. 15): wall
+    temperature within about +-5%; coolant flow up to 60% off near the eta -> 1 end (Fig. 16). The authors say
+    Eq. 12 is pessimistic below eta ~0.3. Free-stream turbulence not measured or mentioned. Eq. 13 + a worked
+    example invert it for coolant flow.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #714. The heat-sink slot-film model that Wambersie & Ireland 2023 build on,
+    in its original printed form (the wanted entry''s exp[-hL(x - x'')/(m cp)] is Eq. 4, the
+    un-corrected model; the usable correlation is Eq. 12 with the 0.04 offset, the (S V_g/alpha_c)^0.125 group
+    and f(V_g/V_c)). Not a turbulence closure: no Tu input at all, so it cannot calibrate Marek-Tacina''s C_m(Tu)
+    and is not interchangeable with it (its decay is exponential in an h-based length, Marek-Tacina''s is
+    algebraic in x/(M S)). Its value: (1) the HELIUM-coolant TABLE I is a printed, strongly property-different
+    slot-film dataset (coolant density and cp very different from air) -- a candidate cross-source ACCURACY
+    check of the slot-film element''s property handling, but Marek-Tacina needs a Tu the NASA rig did not
+    report, so any score carries an assumed Tu; (2) a declared alternative closure family (heat-sink) for low
+    or unknown turbulence, never a default. Fidelity of an Eq. 12 implementation would be judged on Table I
+    (helium); the air data are in TN D-9 (not held). Not implemented.'
+  read_for: ['#714 slot film: heat-sink model and property-ratio (helium) data']
+  issues: [714]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (19890068390, public). Sequel Papell 1960 TN D-299 (held). Air data
+    primary Papell & Trout 1959 NASA TN D-9 (on NTRS, not fetched).
+- file: sources/heat_transfer/film/Papell_1960_NASA_TN_D-299_angled_slots_normal_holes.pdf
+  citation: Papell, S. S. (1960). Effect on gaseous film cooling of coolant injection through angled slots and
+    normal holes. NASA TN D-299 (E-689), Lewis Research Center, September 1960.
+  id: NASA TN D-299 (NTRS 19980231068)
+  topic: [film]
+  content: 'Scan with OCR layer, 30 pp. Same 8 x 8 in. NASA duct, adiabatic top wall, T_g 1500 R. Slots at
+    nominal 30/60/90 deg discharging (water check) at i = 45/80/90 deg, slot height 1/4 in. normal to the guide
+    walls, M_g 0.2-0.7, V_g/V_c 0.53-17.5; and two or four staggered rows of 1/4 in. NORMAL holes on 1/2 in.
+    centres (M_g 0.3-0.7, V_g/V_c 0.49-21.8). Effective angle Eq. 1: i_eff = arctan[sin i/(cos i + (rho V)_g/
+    (rho V)_c)]. Slot correlation Eq. 2 = Hatch-Papell Eq. 12 + ln cos(0.8 i_eff). Holes: effective slot height
+    S'' = A_c/y (total hole area over the first row''s width; 0.403 in. four rows, 0.223 in. two rows, Eq. 3,
+    "strictly empirical") and Eq. 4 adds -0.08 V_g/V_c for V_g > V_c. Table I(a) slots, I(b) holes PRINTED
+    (faint scan). Fig. 8: an optimum coolant flow for angled slots (eta max 0.83 for the 60 deg slot at x =
+    6.5 in.) -- more coolant lifts off and lowers eta.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Extends Hatch-Papell to angled slots and normal-hole rows with empirical
+    corrections fitted on its own data (no other lab). No gap plugged: combaero''s slot film is tangential, and
+    its hole films are Baldauf/Colban (inclined holes at turbine-like geometry); normal holes at 1/4 in. on 1/2
+    in. pitch in a 1500 R duct are an old, coarse configuration. The printed Table I is a possible cross-source
+    set for a normal-injection effusion row at high V_g/V_c, after rebuilding S'' -- not planned. Not
+    implemented.'
+  read_for: ['#714 slot film (sequel of TN D-130: angled slots, normal holes)']
+  issues: [714]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (19980231068, public).
 - file: sources/heat_transfer/film/oct23/19770014416.pdf
   citation: Rousar, D. C., Ewen, R. L. (1977). Combustion effects on film cooling. NASA CR-135052, Aerojet
     Liquid Rocket Co., Sacramento.
@@ -1553,14 +1876,63 @@ documents:
     definition not stated.
   status: screened
   verdict: Clean cross-source accuracy dataset for Metzger Nu (by eye 5-14%) and evidence of a real spanwise
-    friction effect (with Damerow). Not yet digitised or scored; f needs its definition (Lawson MS thesis)
-    before use.
+    friction effect (with Damerow). Not yet digitised or scored. Its f is the canonical dP / (2 rho U_max^2
+    N), static pressure (defined in Thrift 2007 Eq. 7, held; Lawson 2007 has no pressure-loss content),
+    so Fig. 16 can score the friction sets with no basis conversion.
   read_for: ['#335 cross-source accuracy of Metzger Nu and f', '#335 spanwise friction effect']
   issues: [335]
   records: [validation/cooling/extractions/pin_fin_sources.md]
   code: ['include/pin_fin_correlation.h: comments only (Re basis, Metzger accuracy note)']
   notes: 'Earlier mis-cited on #335 as ''Lawson, Thrift, Wright & Thole''; file renamed. Figs. 15/16 (~40
     clean points) on the digitising list for #335 PR C.'
+- file: sources/heat_transfer/pin_fin/Lawson_2007_MS_thesis_VirginiaTech_multiple_row.pdf
+  citation: Lawson, S. A. (2007). Heat transfer from multiple row arrays of low aspect ratio pin fins. MS
+    thesis, Virginia Polytechnic Institute and State University, Blacksburg (chair K. A. Thole), February
+    8, 2007.
+  topic: [pin_fin]
+  content: 'The heat-transfer half of the rig behind Lawson et al. 2011 (two-paper manuscript thesis). Staggered
+    arrays S1/d 2 and 4 (spanwise), S2/d 1.73 and 3.46 (streamwise), H/d 1 and 0.5, flow incidence 0/15/30
+    deg; Re_d on U_max and d, 5,000-30,000; h on local bulk T. PRINTS Table 1.4 / 2.2: Nu_d = a Re_d^b per
+    geometry for pin, endwall and array average; and Eq. 1.3, the array-average fit Nu = [0.128 (S1/d)^0.165
+    (S2/d)^(-0.310 S1/d + 1.182)] Re_d^[0.680 (S1/d)^-0.023 (S2/d)^(0.048 S1/d - 0.224)], 2 <= S1/d <=
+    4, 1.73 <= S2/d <= 3.46, H/d 1, Re 5,000-25,000 (p. 22; read from the page image, reproduces Table 1.4
+    at S1/d 2, S2/d 1.73). Array-average Nu uncertainty < 8% (App. A). NO friction factor or pressure-loss
+    data: those are Thrift''s thesis.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Supplies printed per-geometry Nu fits and a spacing-dependent closed form
+    (Eq. 1.3) for the arrays that the 2011 paper only plots: a candidate cross-source accuracy reference
+    for the Metzger Nu set and a possible Lawson Nu set (narrow box: H/d 1, two spacings each). Its own
+    stated agreement with Metzger 1982a is within 6-10% and with Chyu 1998 within 7%. Does NOT answer the
+    question it was wanted for (the 2011 f definition); Thrift 2007 (held) does.'
+  read_for: ['#335 Lawson 2011 friction-factor definition -- not here', '#335 per-geometry Nu fits']
+  issues: [335]
+  records: []
+  notes: Open access, VTechWorks handle 10919/31190 (file EntireThesisDraft9.pdf, the later of two uploads;
+    106 pp.). In Copyright (rightsstatements InC). Fetched 2026-11-02 at the user's request.
+- file: sources/heat_transfer/pin_fin/Thrift_2007_MS_thesis_VirginiaTech_pressure_loss.pdf
+  citation: Thrift, A. A. (2007). Aerodynamic force and pressure loss measurements on low aspect ratio pin
+    fin arrays. MS thesis, Virginia Polytechnic Institute and State University, Blacksburg (chair K. A. Thole),
+    February 9, 2007.
+  topic: [pin_fin]
+  content: 'The pressure-loss half of the rig behind Lawson et al. 2011. Pin drag/lift (force balance) and
+    array friction for single and staggered multiple-row arrays (N 7), S1/d 2 and 4, S2/d 1.73 and 3.46,
+    H/d 1 and 0.5, incidence 0-30 deg, Re_d 5,000-30,000 on U_max. Eq. 7 DEFINES f_array = dP_array / (2
+    rho U_max^2 N): static taps, extrapolated to S2/2 up/downstream of the array, empty-channel loss (Kakac
+    Eqs. 1-2, checked to 2.5%) subtracted. Fig. 15 PRINTS the S1/d 4, S2/d 3.46 fits f = 0.135 Re_d^-0.071
+    (Re_d < 17,500) and 1.13 Re_d^-0.287 (> 17,500), +/-3% (read from the page image, p. 50). Table 1 (95%):
+    f_array uncertainty 15-21% at Re ~9,300, 7-7.6% at Re ~32,000.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Settles the Lawson 2011 f definition: it is our canonical basis (Metzger),
+    so Fig. 16 needs no conversion. Its own S1/d 4 fit sits 28% (Re_d 5,000) to 12% (30,000) below Metzger 1982b (which it attributes
+    to spanwise spacing), consistent with the note in pin_fin_correlation.h. The stated measurement band
+    (Table 1) is the band to score against: wide (~15-20%) at low Re. A possible Thrift friction set
+    (one geometry) or cross-source accuracy check for Metzger/Damerow friction; nothing implemented.'
+  read_for: ['#335 Lawson 2011 friction-factor definition', '#335 spanwise friction effect', '#335 measurement
+      band for f']
+  issues: [335]
+  records: []
+  notes: Open access, VTechWorks handle 10919/31189 (Thesis_ETD2.pdf, 113 pp.). In Copyright. Fetched 2026-11-02
+    at the user's request.
 - file: sources/heat_transfer/pin_fin/Lyall_2006_MS_thesis_VirginiaTech_single_row.pdf
   citation: Lyall, M. E. (2006). Heat transfer from low aspect ratio pin fins. MS thesis, Virginia Polytechnic
     Institute and State University, Blacksburg.
@@ -1786,6 +2158,52 @@ documents:
   issues: [385, 390, 392, 394, 403]
   records: [validation/cooling/extractions/lau_1990_v_ribs.md, validation/cooling/data/lau1990/metadata.yaml]
   notes: Volume and end page not printed in the PDF text; the extraction record gives IJHMT 34(7), 1605-1616.
+- file: sources/heat_transfer/Forsyth_McGilvray_Gillespie_2017_ExpFluids_58_5_ribbed_developing_flow.pdf
+  citation: 'Forsyth, P., McGilvray, M., Gillespie, D. R. H. (2017). Secondary flow and heat transfer coefficient
+    distributions in the developing flow region of ribbed turbine blade cooling passages. Experiments in Fluids
+    58, 5. doi:10.1007/s00348-016-2286-6 (first presented as ASME GT2014-26737).'
+  id: doi:10.1007/s00348-016-2286-6
+  topic: [rib]
+  content: 'Open access (CC BY 4.0), 15 pp., clean text layer; figures read from page images. Oxford (Osney)
+    low-speed suction tunnel, about 20x engine scale, stationary. Passage 75 x 150 mm (AR 1:2, width/height), Dh
+    100 mm, 1400 mm long, after a 500 mm square settling length and a 2:1 contraction; ~1500 mm (~15 Dh) smooth
+    development upstream of the first rib. Ribs 6 x 6 mm square, 53 mm long, on the two NARROW (75 mm) walls,
+    staggered by half a pitch, spanning only the MIDDLE HALF of the wall: e/Dh 0.06, P/e 10, alpha 45 deg. Re 1e5
+    (smooth-passage Dh). Ribs added upstream of a fixed instrumented pair, 1 to 12 pairs; transient liquid
+    crystal (three crystals 35/40/45 C, heater-mesh gas step, ~20 K driving difference) on the suction (ribbed)
+    surface and leading edge (smooth), hybrid lumped-capacity brass ribs; four-hole probe secondary-flow maps after
+    3/6/9/12 rib pairs. Nu = q Dh / (k (T_gas - T_wall)) with T_gas the CENTRELINE temperature one pitch upstream
+    (not bulk) and k 0.0279 fixed (Eq. 10). HTC uncertainty 5.7-7.1% (Table 1); test-to-test concatenation needed
+    linear scaling of 8.4% (ribbed) and 5.8% (smooth) area averages. Results PLOTTED only: Fig. 13 Nu maps, Fig. 14
+    circumferentially averaged Nu vs rib number, separate traces for the ribbed and smooth wall, experiment and
+    RANS (realizable k-epsilon). Read off Fig. 14: ribbed wall ~200-260 at rib 1, pitch means ~300-330 from rib 4
+    on (within-pitch swing ~250-380); smooth leading edge ~140 at ribs 1-3 rising to ~210-220 by rib 9. Text:
+    averaged Nu 1.4-1.5x higher at rib 12 than rib 1; flow develops over the first 5-6 pitches; ribbed wall peaks
+    after ~5 pitches (~1.5x the entrance level), 1.4x at exit; centreline gas T drops 4 K after rib 9 as the
+    vortices fill the passage. CFD 7.6% high over ribs 1-10, 17% high overall. No tables, no correlation, no
+    friction.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Rib heat-transfer data from a second lab outside Texas A&M (after UTRC, CR-4396)
+    and the first in the register resolved by rib count through the developing region. What it offers combaero:
+    (1) an ENTRY EFFECT the model lacks -- RibbedModel and every set in rib_correlation.h are fully developed (no
+    x/D or rib-count term); here, after a ~15 Dh hydrodynamically developed smooth approach (the gas-temperature
+    step starts at the heater mesh further upstream), the ribbed-wall augmentation GROWS from ~0.65-0.8 of its
+    developed level at rib 1 to the plateau by ribs 5-6 -- the opposite sign of a thermal-entry decay (Han & Park
+    1988, held, Texas A&M, short channels L/D 10-15). So a fully developed R overstates the first few pitches of a
+    rib run fed by a long smooth duct; one geometry cannot size a closure, but it bounds the effect (~20-35% at
+    rib 1). (2) Cross-source ACCURACY of a developed ribbed-wall Nu (ribs >= 6, Nu/Nu0 ~1.5-1.6 against
+    Dittus-Boelter 200 at Re 1e5), but with caveats that may dominate the score: partial-span ribs (middle half;
+    every shipped set is full-span), W/H 0.5 in Han''s convention (the han_1989_narrow_channel domain) but Re 1e5
+    above every shipped set''s Re range (10,000-60,000; Han-Zhang-Lee 15,000-90,000), a centreline (not bulk)
+    reference temperature, and concatenation scaling of 6-8%. Not fidelity for anything (no shipped closure is
+    built from it). Fig. 14 is continuous traces, digitisable; nothing tabulated.'
+  read_for: [rib entry/developing-region effect (rib-count dependence of augmentation), 'cross-source
+      (non-Texas-A&M) ribbed-wall Nu accuracy, partial-span 45 deg ribs']
+  issues: []
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user) as s00348-016-2286-6.pdf. Not checked against the
+    conference version GT2014-26737 (not held). Nu0 = 200 is computed here (Dittus-Boelter, Pr 0.71), not printed.
+    Fig. 14 values are read by eye from a 110 dpi page image, not digitised.
 - file: sources/heat_transfer/Webb_Eckert_Goldstein_1971_IJHMT_14_pp601-617.pdf
   citation: Webb, R. L., Eckert, E. R. G., Goldstein, R. J. (1971). Heat transfer and friction in tubes
     with repeated-rib roughness. Int. J. Heat Mass Transfer 14, 601-617.
@@ -2423,7 +2841,7 @@ documents:
     Lefebvre exposes: gas radiation with luminosity (primary Lefebvre-Herbert 1960, wanted); plunged-hole
     Cd and Kaddah''s Cd(K, alpha) for liner holes (secondary, primaries are Cranfield MSc theses; NACA TN
     3663, now registered, instead); thick-lip and high-M slot film plus film-side Nu (primary Ballal-Lefebvre 1972,
-    wanted, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
+    held since 2026-11-02 as Cranfield SME Report 4, which prints 0.090 where Eq. 8.41 prints 0.069, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
     penetration (secondary, Holdeman already registered is the better source). LinearThetaHeadLoss in
     network/pressure_loss.py is Eqs. 4.8-4.10 in form (k = 1 is Eq. 4.9''s low-Mach constant-area value)
     but cites no source. Book errata found while reproducing: Eq. 8.29 prints C2 = 291(Tw2 - 880) for
@@ -2548,6 +2966,38 @@ documents:
   issues: [793]
   records: []
   notes: Fetched from NTRS 20040082327 (public) on 2026-10-27 during the docs/new screening.
+- file: sources/flow_network/meitner1990_NASA_TP-2985_CPF_coolant_passage_flow_code.pdf
+  citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
+    NASA Technical Paper 2985, AVSCOM Technical Report 89-C-008 (E-5186), Lewis Research Center, September 1990.
+  id: NASA TP-2985 (NTRS 19900018406)
+  topic: [channel]
+  content: 'Scan with OCR layer, 40 pp. The Coolant Passage Flow (CPF) code manual: ONE passage, one inlet and
+    one exit (plus a tip-cap bleed and a bypass that leaves and re-enters the same channel), 1-D momentum and
+    energy marched along nodes/intervals/slices with area change, mass addition/removal, pumping (radius
+    change, rotating frame, relative totals) and heat addition; subsonic except a choked exit (and bypass /
+    tip-cap). Friction per interval: user value, trip-strip correlation, input f(Re) curves (pin fin, finned,
+    plain), roughened plain-passage correlation, or a total-pressure K factor; heat transfer: internal
+    correlations or input curves, a rotation correction (Rayleigh-number based) and user multipliers.
+    Derivations in App. B/D, inputs App. C, Rayleigh-line heat-generation option App. E. Examples: (1) a cooled
+    radial-turbine flow path (input/output listing); (2) 2:1 area increase and decrease against isentropic
+    flow, accuracy vs slice count (converged above ~40 slices; advises < 10% area change per slice); (3)
+    constant-area duct, 10 cm2 (d 3.568 cm), Tt 300 K, Pt 100 N/cm2, 0.7874 kg/s (M_in 0.20): Fanno with
+    Fanning f 0.10 to M 0.75 needs L = 36.0143 d (128.508 cm), matched at 150 slices; Rayleigh case matched
+    in T and p with slice-dependent path lengths.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (#793). The single-passage code behind the 2004 network procedure (held).
+    Its only checks are against closed-form isentropic, Fanno and Rayleigh lines (Tables II-III), which
+    combaero''s Fanno-Rayleigh kernel already reproduces from first principles -- so it adds a code-to-code
+    benchmark with printed numbers (Example 3 is directly reproducible: Fanning f 0.10, M 0.20 -> 0.75 over
+    36.0143 d; my check of the Fanno function with gamma 1.4 and Fanning f gives 36.015 d), not data. Example 1 (radial-turbine passage with pumping) needs rotation, which combaero does
+    not model. Friction/heat-transfer correlations are cited, not new. No measured case; no closure to
+    implement.'
+  read_for: ['#793 single-passage compressible code-to-code check (friction, area change, heat transfer)']
+  issues: [793]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (19900018406, public). The report number is AVSCOM TR 89-C-008 (the
+    wanted entry said "AVSCOM TP"). Its ref. 5, the preliminary CPF report, is Kumar, Roelke & Meitner 1989,
+    NASA TM-102079 (NTRS 19890013491, not fetched).
 - file: sources/combustor_network/andreini2007_CEAS-2007-026_liner_temperature.pdf
   citation: 'Andreini, A., Carcasci, C., Ceccherini, A., Facchini, B., Surace, M., Coutandin, D., Gori,
     S., Peschiulli, A. (2007). Combustor liner temperature prediction: a preliminary tool development and
@@ -2571,6 +3021,42 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/ceas-2007-026.pdf. PDF metadata creation date is wrong (1999); the conference is 2007.
+    Its validation plate is Andreini et al. ICAS 2006 (held, screened 2026-11-02).
+- file: sources/heat_transfer/film/Andreini_et_al_2006_ICAS2006-5.8.3_effusion_liner_THALIE.pdf
+  citation: Andreini, A., Champion, J. L., Facchini, B., Mercier, E., Surace, M. (2006). Advanced liner cooling
+    numerical analysis for low emission combustors. 25th ICAS Congress, Hamburg, paper ICAS 2006-5.8.3.
+  id: ICAS 2006-5.8.3 (icas.org archive 181.PDF)
+  topic: [effusion, film, combustion]
+  content: 'Open access (icas.org archive), 12 pp., Word text layer. INTELLECT D.M. effusion plate on the
+    LCD-CNRS Poitiers THALIE rig: kerosene burner hot side (T1 ~1000 K, p1 3 bar, Re1 56,000, main duct 123 x
+    72 mm), coolant T2 273 K (cold duct 100 x 20 mm, Re2 56,000-75,000), Dp/p < 5%, Mh < 0.2, a bleed (Q3) at
+    the coolant exit. Plate 2 mm thick with TWO patterns (Fig. 2): D 0.6 mm, X/D 6.5, Y/D 6.6; then D 0.4 mm,
+    X/D 9.25, Y/D 10. Hole inclination is NOT printed (an input to the CFD, value not given); row counts not
+    printed. MEASURED: adiabatic effectiveness only, as a CO2 mass-transfer analogue eta_ad = (C1 - C_wall)/C1
+    from gas sampling with a 0.5 mm probe (error < 5%), along x (Figs. 7, 8, 19, plotted only); total
+    coolant flow 39.6 g/s measured vs 37.1 g/s from SNECMA CFD. Wall temperatures are NOT reported as
+    measurements. Overall effectiveness (Figs. 15, 22) and hot-side wall temperature (Fig. 16) are CALCULATED
+    only: SNECMA N3S-Natur porosity CFD + ABAQUS, the Florence SRBC 1-D network (L''Ecuyer-Soechting rows +
+    Sellers superposition) + ANSYS 2-D wall in six variants (Cd 0.9, Cd 0.73, heat sink off, film off), and
+    STAR-CD 3-D conjugate CFD of the first eight rows. Table 3 (network result): effusion mass flow "0.937
+    kg/s", BR 7.3, VR 2.1 -- the 0.937 kg/s is inconsistent with the 39.6 g/s measured and Table 2''s Q2 "0.1"
+    (units as printed g/s); not resolved.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Does NOT give what the wanted entry hoped for: there is no measured overall
+    effectiveness or wall temperature, so it is not a second-lab overall-effectiveness set for
+    EffusionPlateElement beside Andrews 88-GT-290 -- the overall-effectiveness curves are code-to-code only.
+    What it holds is a plotted eta_ad(x) on a two-pattern combustor plate at BR ~7 (network value) and DR ~3.7
+    (T1/T2), measured by CO2 sampling at one probe height; with hole angle and row count missing the plate
+    cannot be rebuilt, so even the eta_ad curve is at most a qualitative cross-source check (Florence/CNRS
+    rig, different lab from Andrews and from Andrei 2014). Its methodology part (SRBC + 2-D FEM, the six
+    sensitivity variants: heat sink dominates the first part of the plate, film the last) is the same
+    procedure CEAS-2007-026 and Caciolli (held) document. No closure, no implementation.'
+  read_for: ['#793 effusion plate with measured overall effectiveness (cross-source for EffusionPlateElement)']
+  issues: [793]
+  records: []
+  notes: Fetched 2026-11-02 from icas.org (ICAS_ARCHIVE/ICAS2006/PAPERS/181.PDF). The rig is THALIE, ref. [23]
+    of the paper; the CNRS/Poitiers group's own papers on it might carry the hole angle and wall temperatures
+    (not searched).
 - file: sources/radiation/bordbar_et_al_2021_IJHMT_173_121207_pressure_dependent_WSGG.pdf
   citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Pressure-dependent
     weighted-sum-of-gray-gases models for heterogeneous CO2-H2O mixtures at sub- and super-atmospheric pressure.
@@ -2660,15 +3146,53 @@ documents:
     liner heat balance and luminous emissivity, Kadoya air properties Table 1) on a small annular combustor
     at atmospheric rig conditions (Table 3: P3 101.2 kPa, T3 404 K, dP/P 5%, 0.2 kg/s). Measured outer-liner
     temperature by thermal paint (scale Table 2) and three thermocouples, plotted against prediction (Fig.
-    12); peak 953 K predicted vs 969 K paint.'
+    12); peak 953 K predicted vs 969 K paint. Re-read 2026-11-02 from page images (equations are vector Cambria
+    Math missing from the text layer, readable on the page): Odgers eta_PZ,max = 0.72 + 0.29 tanh[1.5475e-3 (Ta +
+    108 ln Pa - 1863)] and eta_SZ,max with 0.80 (Eqs. 1-2); Lefebvre R1 = 0.5 sigma (1 + eps_w) eps_g Tg^1.5 (Tg^2.5
+    - Tw^2.5), C1 = 0.020 k_g/D_L^0.2 (m/(A_L mu_g))^0.8 (Tg - Tw), R2 = sigma eps_w eps_c/(eps_c + eps_w (1 -
+    eps_c)(A_w/A_c)) (Tw^4 - T3^4), C2 = 0.020 k_a/D_an^0.2 (m/(A_an mu_a))^0.8 (Tw - T3) (Eqs. 3-6), eps_g = 1 -
+    exp(-290 P L (q l_b)^0.5 Tg^-1.5) (Eq. 7); thin uncoated wall (Tw1 = Tw2, no conduction term). Fig. 7 PLOTS the
+    flow-path radii against axial position (0-86 mm): outer liner r ~67 mm contracting to ~52 mm from x ~35 to
+    ~78 mm, inner liner ~28 mm, outer casing ~74 to ~69 mm, inner casing ~14 mm stepping to ~25/20 mm at x ~70-80
+    mm; holes only in a CAD sketch (no sizes, counts or positions). Plain holes, no film slots ("future study").
+    Fuel not named (kerosene look-up tables, air-blast atomiser); fuel flow and FAR not printed; luminosity factor
+    L and the near-wall radial temperature factor (from Topal 2013) not given. Fig. 9: mean gas T to ~1650 K,
+    near-wall to ~1950 K. Fig. 12 (absolute K, not normalised): ~15 paint points (about 600 K at x 3 mm rising to
+    969 K at 60 mm, 770 K at 83 mm) and 3 thermocouples (~810, ~915, ~860 K at x ~32, 48, 67 mm). The paint''s
+    first colour change is 490 C (763 K), so the paint points below it are not threshold readings. Thermocouple and
+    paint uncertainty not stated.'
   status: screened
-  verdict: 'No #793 example: liner and hole geometry are not given (Fig. 7 only), and the equations are
-    images. Measured liner temperatures exist but cannot be reproduced without the geometry. Correlation
-    pointers only (Kaddah 1964 / Freeman 1965 liner-hole Cd -- see the Adkins-Gueroui wanted entry).'
+  verdict: 'No #793 example (re-confirmed 2026-11-02): the radii are plotted (Fig. 7) but the hole sizes, counts
+    and positions, the fuel flow (or FAR), L and the near-wall temperature factor are not printed, so neither the
+    flow split nor the gas temperature can be rebuilt; measured liner temperatures exist (absolute, ~18 points)
+    but would be compared with assumed inputs. Even with the geometry, combaero cannot rebuild it today: near-wall
+    gas reaches ~1950 K, so R1 dominates and combaero has no gas radiation (same blocker as the Lefebvre & Ballal
+    Ch. 8 examples); conduction is absent here (thin wall) and both convective sides map onto existing Re^0.8
+    forms. Correlation pointers only (Kaddah 1964 / Freeman 1965 liner-hole Cd -- see the Adkins-Gueroui wanted
+    entry). The earlier "equations are images" was wrong: they are printed and legible on the page images, and
+    match Lefebvre''s set (no new correlation).'
   read_for: ['#793 worked example candidate']
   issues: [793]
   records: []
-  notes: Arrived 2026-10-27 as docs/new/CONV14_1D-HT-GTCC-r1.pdf.
+  notes: Arrived 2026-10-27 as docs/new/CONV14_1D-HT-GTCC-r1.pdf. A second copy arrived 2026-11-02 (next entry).
+- file: sources/combustor_network/topal2014_CONV14_1D_heat_transfer_combustor_2016_copy.pdf
+  citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional heat
+    transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp. on
+    Convective Heat and Mass Transfer, Turkey, paper CONV-14-123 (a 2016 re-export of the same paper).'
+  id: CONV-14-123 (second copy)
+  topic: [combustion]
+  content: 'The same 15-page paper as the previous entry: the text layers are identical word for word (4418
+    words); the only differences are the PDF producer and date (2016-08-16 against 2014-09-26) and figure
+    layout on pages 9-13 (text-layer line positions); the figures and equations of this copy (pp. 4-6, 10, 12,
+    13 viewed) are the same as the held copy''s. Not compared pixel by pixel.'
+  status: screened
+  verdict: 'Duplicate; adds nothing. All findings are recorded on topal2014_CONV14_1D_heat_transfer_combustor.pdf
+    (re-screened 2026-11-02 when this copy arrived). Candidate for deletion (kept pending the user''s decision).'
+  read_for: ['#793 worked example candidate (duplicate)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user) as One_Dimensional_Heat_Transfer_Analysis_a.pdf,
+    presented as new.
 - file: sources/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf
   citation: 'Gouws, J. J., Morris, R. M., Visser, J. A. (2006). Modelling of a gas turbine combustor using
     a network solver. S. Afr. J. Science 102, 533-536 (with online supplementary Tables 2-4).'
@@ -2784,7 +3308,63 @@ documents:
   issues: [800, 807, 813]
   records: []
   notes: Arrived 2026-10-28 as docs/new/Effect_of_a_Crossflow_at_the_Entrance_to_a_Film-Co.pdf. Cites Gritsch,
-    Schulz & Wittig 1997 ASME 97-GT-165 (expanded exits, wanted) and Leylek & Zerkle 1994 (entrance separation).
+    Schulz & Wittig 1997 ASME 97-GT-165 (expanded exits; held since 2026-11-02 as its journal version, J.
+    Turbomach. 120, 557, next entry) and Leylek & Zerkle 1994 (entrance separation).
+- file: sources/orifices/gritsch_schulz_wittig_1998_JT_120_557_expanded_exit_hole_cd.pdf
+  citation: 'Gritsch, M., Schulz, A., Wittig, S. (1998). Discharge coefficient measurements of film-cooling holes
+    with expanded exits. ASME J. Turbomachinery 120(3), 557-563 (ASME 97-GT-165).'
+  id: ASME 97-GT-165
+  topic: [orifice, film]
+  content: '7 pp., ASME Digital Collection copy; clean text layer except the figures (read from page images).
+    Karlsruhe (ITS) rig, same lab and supply channel as Thole et al. 1997 (held): single scaled-up holes, D 10 mm,
+    L/D 6, alpha 30 deg, sharp-edged, smooth; supply channel 20 x 60 mm, COFLOWING (parallel to the main flow).
+    Three holes: cylindrical; fan-shaped (14 deg lateral expansion, 30 mm exit width, A_exit/A_inlet 3.0);
+    laidback fan-shaped (plus 15 deg layback, 40 mm exit length, AR 3.1); 2D cylindrical inlet length on both
+    shaped holes. Table 1: Pt_c up to 2 bar, Tt_c 290 K, Tt_c/Tt_m 1 (0.54-1 tested: no effect at matched Ma_m),
+    PR Pt_c/p_m 1-2, Ma_c 0 / 0.3 / 0.6, Ma_m 0 / 0.3 / 0.6 / 1.2, Re_D to 2.5e5 internal, Tu_c 1%, Tu_m < 1.5%.
+    Cd DEFINITION (p. 559, equation printed): measured flow over the compressible isentropic 1-D flow from the
+    coolant TOTAL pressure Pt_c (1D upstream, 2D off the channel centreline) to the mainstream STATIC p_m (side
+    wall 10D upstream; top wall opposite the exit at Ma_m 1.2), on the CYLINDRICAL inlet area pi D^2/4 for all
+    three holes, so shaped-hole Cd can exceed 1. Uncertainty (Kline-McClintock): flow 2.5% by orifice, Cd below
+    2% in most cases, up to 4.5% at low PR and flow. DATA PLOTTED ONLY, no table and no correlation (the
+    correlation is Gritsch et al. 1997, ISABE, not held): Figs. 3-5 cylindrical Cd vs PR at Ma_c 0/0.3/0.6, four
+    Ma_m curves each (~8-15 points per curve, markers cleanly separable except near PR 1); Fig. 6 cylindrical Cd
+    vs Ma_c at Ma_m 0, PR 1.11/1.24/1.42/1.63 (~10-13 points each); Figs. 7-10 fan-shaped and 11-14 laidback
+    (same layout); Figs. 15-18 the three holes overlaid per Ma_m. Read off the page images: cylindrical at Ma_c 0,
+    Ma_m 0: Cd 0.72 at PR 1.05 rising about 10% to 0.80 at PR 2.2 (Fig. 3); Ma_m 1.2 drops Cd to ~0.2 at PR
+    1.2-1.3, recovering to ~0.78 by PR 2; Fig. 6: Cd 0.74-0.77 at Ma_c 0 rises to a 0.85-0.86 optimum at Ma_c
+    0.2-0.35 (lower Ma_c,opt at lower PR), then collapses (0.66 at Ma_c 0.36, PR 1.11). Fan-shaped at Ma_c 0, Ma_m
+    0: 0.80-0.82 nearly flat in PR (Fig. 7); with Ma_c 0.3 Cd > 1, peak ~1.13-1.15 at PR 1.07-1.09 (40% above Ma_c
+    0, Fig. 10), plateau ~0.90 at high PR; at Ma_c 0.6 an unstable double-bend regime near PR 1.2-1.4 (Figs. 9,
+    13). Layback changes Cd negligibly.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (#807, #813; was wanted). NO combaero closure is built from it, so nothing here is
+    fidelity: every use is cross-source ACCURACY, labelled as such. What it could score: (1) the McGreehan-Schotsch
+    Eq. 17 U1/Vi term (orifice::mcgreehan_schotsch::cd, used by EffusionPlateElement when duct-fed via
+    crossflow_velocity_ratio) against Fig. 6 (cylindrical, Ma_m 0, ~45 points) and Figs. 3-5 Ma_m 0 curves; but
+    two conversions first -- Gritsch references the coolant TOTAL pressure while combaero builds Vi from the
+    supply STATIC (orifice.h, item 22), and the hole is 30 deg COFLOW-inclined where McGreehan-Schotsch''s term
+    is a tangential (normal-hole, rotation) velocity: the shapes already differ (Gritsch +15% to Ma_c ~0.3, then
+    collapse; McGreehan-Schotsch peaks +5.7% at U1/Vi 0.09, then falls), so expect a regime miss, not a tuning
+    target (Hay et al. 1983, held, show the same coflow rise). (2) The zero-crossflow Cd(PR) of a plenum-fed L/D 6
+    hole (Fig. 3, Ma_m 0: 0.72-0.80) against FilmCoolingElement''s default IdelchikThick or the McGreehan-Schotsch
+    chain at L/d 6 (not computed here; the main .venv build is stale). (3) Exit-side grazing flow (Figs. 3-5, Ma_m
+    0.3-1.2): combaero has NO exit-side crossflow Cd for film or effusion holes; Rogers-Hersh (#800/#818) is wired
+    only into ImpingementPlateElement and is a static-referenced, incompressible, M <= 0.25, normal L/D 1 fit, so
+    only the Ma_m 0.3 curves sit near its envelope, and even those need the total/static conversion. (4) Shaped
+    holes: FilmCoolingElement hole_type "shaped" takes the METERING diameter -- the same area basis as this Cd --
+    but the plain-hole Cd, so it under-predicts shaped-hole flow by up to ~10% without supply crossflow and by up to
+    ~40-50% at Ma_c 0.3 and low PR (Figs. 15-18). A real gap, not closable from this paper (no correlation; the
+    1997 ISABE correlation is wanted). Data are plotted only: digitise Figs. 3 and 6 first (cleanest); fidelity on
+    overplotted near-PR-1 points would be an upper bound.'
+  read_for: ['#807/#813 inlet-crossflow Cd of duct-fed holes vs McGreehan-Schotsch U1/Vi', 'exit-side crossflow Cd
+      to Ma_m 1.2', shaped-hole (fan, laidback) Cd for FilmCoolingElement hole_type shaped]
+  issues: [386, 807, 813]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ (from the user) as 557_1.pdf; moved from the wanted list. Companion
+    papers (not held): Gritsch et al. 1998 J. Turbomach. 120, 549 (adiabatic effectiveness of the same holes); Thole
+    et al. 1998 J. Turbomach. 120, 327 (flowfields); Hay & Lampard 1995 ASME 95-GT-15 (flared-hole Cd, Ma_m <= 0.3).
+    Not checked: the per-curve point counts are approximate (counted off 110 dpi page images); no digitisation done.'
 - file: sources/orifices/yan_et_al_2026_aerospace_13_555_rotating_inclined_orifice_cd.pdf
   citation: 'Yan, J., Wei, S., Mao, J., Yang, Z., Han, F., Wang, L. (2026). A model for accurate prediction of
     discharge coefficients in rotating orifices with different wall inclination angles. Aerospace 13, 555.
@@ -3282,6 +3862,39 @@ documents:
   code: [src/materials.cpp, include/materials.h]
   notes: Arrived 2026-10-29 in docs/new twice (19990047263.pdf and zhu1999.pdf, same report); title and authors
     checked on NTRS.
+- file: sources/materials/zhu_miller_nagaraj_bruce_2000_NASA_TM-2000-210238_EBPVD_conductivity.pdf
+  citation: Zhu, D., Miller, R. A., Nagaraj, B. A., Bruce, R. W. (2000). Thermal conductivity of EB-PVD thermal
+    barrier coatings evaluated by a steady-state laser heat flux technique. NASA/TM-2000-210238 (E-12357);
+    International Conference on Metallurgical Coatings and Thin Films, San Diego, April 2000.
+  id: NASA/TM-2000-210238 (NTRS 20000088491)
+  topic: [other]
+  content: 'Scan with OCR layer, 24 pp. GE-made EB-PVD ZrO2-8wt%Y2O3 on Rene N5 disks with a PtAl bond coat
+    (flat or laser-grooved), top coat 0.13, 0.25 and 1.0 mm. Steady-state laser heat-flux rig, 1-D model with
+    a T-dependent substrate k (Fig. 2 shows the interface-temperature error a constant metal k causes;
+    the error grows for thin, high-conductance coatings). Table 1 conditions: 0.13 mm, 2 h cyclic, 220 W/cm2,
+    T_surface 1280 C / T_interface 1095 C; 0.25 mm isothermal, 143 W/cm2, 1250/1020 C; 1.0 mm isothermal, 69
+    W/cm2, 1350/860 C. ABSOLUTE conductivity is plotted only for the 0.13 mm coatings (Fig. 3b): about 1.55-1.65
+    W/m K at the start, rising to about 1.7 in 50 h with fluctuations from micro-delamination; Fig. 4 (0.13 mm
+    grooved, 200 h) is NORMALISED to an assumed initial 1.5 W/m K ("typical EB-PVD"), ending near 1.8. Fig. 3a
+    (0.25, 1.0 mm) is k/k0 only, rising to ~1.05-1.10 in 25 h. Fig. 5: ln[(k - k0)/(k_inf - k0)] = 3.07 -
+    24881/T_ave (T_ave in K, R2 0.983, four points, 1e4/T 6.85-7.4); k_inf and the time units are not stated.
+    Sintering strain at the surface fitted as 0.40757 + 0.41 t^0.2 (% , t in h; Fig. 7, as printed). Intrinsic
+    ZrO2-8Y2O3 k quoted as about 2.5 W/m K. No table of k values.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #761. A public NASA EB-PVD conductivity source, but a weak one for citing
+    k_tbc_ysz(is_ebpvd=True): absolute values only for 0.13 mm coatings at one condition (mean coating
+    temperature ~1190 C), about 1.55-1.65 W/m K as deposited -- below the legacy fit''s 1.5 + 0.0002 x 1190 =
+    1.74 (my arithmetic), within the measurement''s thin-coating uncertainty the authors themselves flag; no
+    k(T) curve (each thickness was tested at one temperature level); the Fig. 5 Arrhenius fit lacks k_inf and
+    time units, so an aging model cannot be built from it alone. Supports the order of magnitude (1.5-1.8 W/m
+    K over 0-200 h at ~1100-1300 C) and the direction (sintering raises k, delamination lowers it). Not a
+    replacement for the uncited fit; Zhu & Miller''s later EB-PVD 7YSZ study (2003 Cocoa Beach, "thermal
+    conductivity and temperature limits", NTRS 20050212118) gives k vs temperature and time per its abstract
+    but NTRS holds the abstract only. Not implemented.'
+  read_for: ['#761 public EB-PVD YSZ conductivity (as deposited and after sintering)']
+  issues: [761]
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (20000088491, public).
 - file: sources/materials/planques_2017_OxidMet_88_133_plasma_TBC_property_survey.pdf
   citation: Planques, P., Vidal, V., Lours, P., Proton, V., Crabos, F., Huez, J., Viguier, B. (2017). Mechanical and
     thermo-physical properties of plasma-sprayed thermal barrier coatings -- a literature survey. Oxidation of
@@ -3345,13 +3958,47 @@ documents:
     14% more at 260-580 C (about -2 of its bands) and 25% more at 620-700 C, where its specific heat steps
     up (aging). The gap is the diffusivity (Gen3 22-40% above the alpha implied by Table 3 with Table 2''s
     cp and density), not the specific heat (Gen3 3-15% lower). Kept: condition stated here (annealed),
-    not by Gen3; a third source is wanted. ORNL/TM-9616 reprints these BMI values above 117 K, so it is
-    not independent.'
+    not by Gen3; an independent third source is still wanted (Touloukian Vol. 1). ORNL/TM-9616 reprints these
+    BMI values above 117 K, and the Haynes 625 brochure (held since 2026-11-02, next entry) prints the same
+    customary k and cp columns, so neither is independent.'
   read_for: ['liner / duct / bellows alloy conductivity', '#881 built-in materials vs Gen3 CSP']
   issues: [761, 881, 882]
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
   notes: Supplied by the user 2026-10-29. Melting range 1290-1350 C (Table 2) gives T_solidus, the cap of the issue 882 k(T) envelope.
+- file: sources/materials/haynes_625_alloy_brochure.pdf
+  citation: Haynes International. HAYNES 625 (UNS N06625) alloy, product brochure (web edition, 29 pp., generated
+    2026-11-02).
+  topic: [other]
+  content: 'Composition, mechanical, oxidation, corrosion and fabrication data; Physical Properties table (pp.
+    11-12; checked on the rendered page) in customary and metric columns: density 8.44 g/cm3 (0.305 lb/in3);
+    melting range 1288-1349 C (2350-2460 F); thermal conductivity, W/m C: 9.8 (RT), 10.9 (100 C), 12.5 (200),
+    13.9 (300), 15.3 (400), 16.9 (500), 18.3 (600), 19.8 (700), 21.5 (800), 23.4 (900), 25.6 (1000); specific
+    heat, J/kg C: 410, 428, 455, 477, 503, 527, 552, 576, 600, 625, 648 at the same temperatures; electrical
+    resistivity, mean expansion (25 C to T), dynamic modulus. NO thermal-diffusivity column (unlike the Haynes
+    230 brochure). The customary columns are at RT and 200-1800 F; the metric ones are re-tabulated at round
+    100 C steps, with a 1000 C row that has no customary counterpart.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #881 (was wanted). It does NOT settle the Inconel 625 conductivity dispute,
+    because it is not independent: its customary k column (68, 75, 87, 98, 109, 121, 132, 144, 158, 175
+    Btu-in/ft2-h-F at RT-1800 F), cp column (0.098-0.154 Btu/lb F, which Special Metals marks "calculated")
+    and density are the Special Metals Table 2/3 values digit for digit (resistivity matches in level, printed
+    in other units), i.e. the same Battelle (BMI) conductivity dataset that k_inconel625 ships. Its metric k agrees with the shipped interpolation within 0.7% at 25-900 C (1000 C: 25.6 against the
+    shipped table''s last row 25.2 at 982 C -- an extension past the Battelle range, provenance unstated).
+    Consistency check k = alpha cp rho: NOT POSSIBLE, no diffusivity is printed. The implied alpha = k/(rho
+    cp) is 2.83 mm2/s at RT to 4.68 at 1000 C; Gen3 CSP measures 22% (300 C) to 40% (700 C) more, and 28-30%
+    at 800-1000 C, while Gen3 cp is 5-15% below the brochure -- the same diffusivity-driven gap already
+    recorded, so Gen3 sits 16-17% above this k at 300-500 C (-1.6 to -2.0 of its 95% bands), 25-33% at
+    600-700 C (-2.1 to -2.5 bands) and 10% at 1000 C (-0.6 band). Supports the shipped (Special Metals) side
+    only in the sense that a second manufacturer reprints it; the dispute stays open until an independent
+    measurement (Touloukian/TPRC recommended curve, wanted) is held. Shipped material data unchanged.'
+  read_for: ['#881 third Inconel 625 conductivity (Special Metals vs Gen3 CSP)', '#882 solidus cap']
+  issues: [881, 882]
+  records: []
+  notes: 'Supplied by the user 2026-11-02 as sources/new/haynes-625.pdf (dompdf web export, no document number).
+    Melting range 1288-1349 C is the Special Metals 2350-2460 F converted (Special Metals rounds to 1290-1350 C).
+    Not checked: the mechanical, corrosion and fabrication sections; the expansion and modulus columns against
+    Special Metals Table 3/4.'
 
 - file: sources/materials/special_metals_nimonic_75_SMC-058.pdf
   citation: Special Metals Corporation. NIMONIC alloy 75, publication SMC-058 (2004).
@@ -3627,6 +4274,40 @@ documents:
   issues: [876]
   records: [python/tests/test_stolz_deprecation_876.py]
   code: [python/combaero/network/components.py, python/combaero/_core.cpp, include/orifice.h]
+  notes: Its ref. [1], Stolz 1988, is now held (next entry).
+- file: sources/orifices/stolz_1988_NSFMW_paper_3.1_first_revision_of_ISO_5167.pdf
+  citation: Stolz, J. (1988). The first revision of ISO 5167. North Sea Flow Measurement Workshop 1988, 18-20
+    October 1988, National Engineering Laboratory, East Kilbride, Glasgow, Paper 3.1.
+  id: NSFMW 1988 paper 3.1 (NFOGM archive item 1988-10)
+  topic: [orifice]
+  content: '7 pp. (4 of text), scanned with a poor OCR layer; read from page images. Lists "without comments"
+    the technical changes ISO/TC30/SC2 decided for the revision of ISO 5167:1980 (published as ISO 5167-1:1991),
+    clause by clause of the 1980 text. Orifice plates: beta range 0.20-0.75 for all three tappings (7.1.7.1);
+    tap diameter max 0.13 D or 13 mm (was 0.08 D or 12 mm); flange-tap position 25.4 +- 0.5 mm when beta > 0.6
+    and D < 150 mm, else +- 1 mm; plate thickness 3.2 mm allowed above 0.05 D; bevel 45 +- 15 deg; eccentricity
+    limit 0.0025 D/(0.1 + 2.3 beta^4) (was 0.0005). 7.3.1 LIMITS OF USE, now common to all tappings except Re_D,
+    d and D in mm: "d <= 12.5" (printed so; almost certainly d >= 12.5, as in later editions), 50 <= D <= 1000,
+    0.20 <= beta <= 0.75; corner taps Re_D >= 5000 for beta <= 0.45 and Re_D >= 10 000 for beta > 0.45;
+    flange and D-D/2 taps Re_D >= 1260 beta^2 D; the upper Re_D limit deleted; pipe roughness criteria k/D
+    unified (most severe kept; k table moved to an annex). 7.4: pressure loss between ~1D upstream and 6D
+    downstream, with a simpler alternative dw/dp = 1 - beta^1.9 (orifice plates). C tables gain Re_D = 1e8 and
+    infinity columns; new annex on iterative computation. The C equation itself is NOT printed, and the 1980
+    limits are given only where a change is stated (old values for tap diameter, eccentricity, inspection D).'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #876/#873. Gives the Stolz equation''s limits of use as revised for ISO
+    5167-1:1991 (above) -- the revised standard, not the 1980 edition the shipped Cd_Stolz is labelled with
+    (orifice.h: "ISO 5167:1980"; Reader-Harris 2022 calls the 1991 change to the equation minor). So it can
+    source a Stolz lower Re_D hold and metering_cd_in_range limits for an ISO 5167-1:1991 Stolz, but the
+    ISO 5167:1980 limits (separate per tapping, with an upper Re_D limit) remain unsourced. Moot for the code
+    path: Stolz is deprecated in 0.8.0 and removed in 0.9.0 (#876), so the recommendation is to cite these
+    limits in the deprecation note rather than implement a hold. The 1 - beta^1.9 loss is an older, simpler
+    form than the ISO 5167-2:2003 Eq. (7) combaero ships (not compared). Not implemented.'
+  read_for: ['#876 Stolz limits of use', '#873 Stolz low-Re hold']
+  issues: [873, 876]
+  records: []
+  notes: Fetched 2026-11-02 from the NFOGM North Sea Flow Measurement Workshop archive (nfogm.no, 1988 item 10,
+    free). The same archive holds Reader-Harris 1988 "A new type of formula for the orifice plate discharge
+    coefficient" (item 11) and Hobbs, "The NEL orifice plate project" (item 16), not fetched.
 
 - file: sources/orifices/jobson_1955_PIMechE_169_767_compressible_orifice.pdf
   citation: Jobson, D. A. (1955). On the flow of a compressible fluid through orifices. Proc. Instn Mech. Engrs
@@ -3712,6 +4393,60 @@ documents:
   issues: []
   records: []
   notes: Fetched from NTRS (open, government public use) 2026-10-31.
+- file: sources/heat_transfer/vanes/dring_blair_1987_NASA_CR-4079_UTRC_rotating_rig_vol1_final.pdf
+  citation: Dring, R. P., Blair, M. F., Joslyn, H. D., Power, G. D., Verdon, J. M. (1987). The effects of inlet
+    turbulence and rotor/stator interactions on the aerodynamics and heat transfer of a large-scale rotating
+    turbine model, Volume I -- Final report. NASA CR-4079 (UTRC R86-956480-1, contract NAS3-23717).
+  id: NASA CR-4079 (NTRS 19890004385)
+  topic: [other]
+  content: 'Scan with a poor OCR layer, 172 pp. The UTRC Large-Scale Rotating Rig (~5x engine, ambient
+    temperature), single stage and stage-and-a-half. Heat transfer from low-conductivity airfoils with a thin
+    electrically heated skin and welded thermocouples; Stanton number on exit speed and axial chord. Variables:
+    inlet Tu grid out vs grid in (9.8% at X/Bx = -23%, integral scale 0.80 in., near-isotropic, von Karman
+    spectrum), stator 1/rotor axial gap 15% and 65%, Reynolds number, flow coefficient (rotor incidence),
+    stator 1/stator 2 clocking. Tables 1a-c etc.: airfoil coordinates for each row (first stator hub/midspan/
+    tip: pitch, LE/TE radius, metal and wedge angles, X-YL-YU points); Table 5 inter-row unsteadiness; Table 6
+    uncertainty (St +-4%, Cp +-2%, Re +-2%, flow angles +-0.5 deg). Figures: midspan surface pressure
+    distributions per row (e.g. Fig. 13 first stator Cp), St distributions, leading-edge Froessling numbers,
+    spanwise St, cascade-vs-rotor comparisons, and STAN5-type boundary-layer predictions (laminar, turbulent,
+    transition) plus an unsteady boundary-layer analysis.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (partially: summary, contents, test conditions, tables; the figures were not
+    digitised). This is the rig and dataset of the wanted "Blair et al. 1989, J. Turbomach." -- Blair, Dring &
+    Joslyn, ASME 88-GT-125 / J. Turbomach. 1989, "The effects of turbulence and stator/rotor interactions on
+    turbine heat transfer, Part I: design operating conditions" (NTRS record 19880067009, journal version not
+    held) -- in its full contractor-report form. The FIRST STATOR is a candidate NGV example: printed
+    coordinates, midspan Cp (figure), St with a stated +-4% measurement band, at two inlet Tu levels, so a
+    vane gas-side h check (accuracy, cross-source to any correlation) is possible once combaero has a gas-side
+    airfoil kernel (it has none; same blocker as the C3X example). Ambient temperature and a heated skin: no
+    film cooling, no internal cooling, so no network example. Rotor data need rotation (not modelled). Not
+    implemented.'
+  read_for: [NGV worked example (stage vane Ps and St), first-stator St vs inlet turbulence]
+  issues: []
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (public). The first download truncated; re-fetched whole (172 pp, 14 MB).
+    Companion volumes: Vol. II heat transfer data tabulation, 15% axial spacing (NASA CR-179467, held); Vol. III
+    65% spacing (CR-179468, NTRS 19880019546) and Vol. IV aerodynamic data tabulation (CR-179469, NTRS
+    19880014572) not fetched. The grid-out inlet Tu is mis-OCR''d in the text layer and was not read from the
+    page image.'
+- file: sources/heat_transfer/vanes/dring_blair_1988_NASA_CR-179467_UTRC_rotating_rig_vol2_heat_transfer_15pct.pdf
+  citation: Dring, R. P., Blair, M. F., Joslyn, H. D. (1986, released May 1988). The effects of inlet turbulence
+    and rotor/stator interactions on the aerodynamics and heat transfer of a large-scale rotating turbine model,
+    Volume II -- Heat transfer data tabulation, 15% axial spacing. NASA CR-179467 (UTRC R86-956480-2).
+  id: NASA CR-179467 (NTRS 19880020420)
+  topic: [other]
+  content: Scan with a poor OCR layer, 242 pp. Short description of the rig, airfoil coordinates (Table 1,
+    first stator midspan pitch 7.71118 in., LE radius 0.44484 in.), inlet turbulence, instrumentation and a
+    guide to the data, then tabulated Stanton numbers per gauge for every 15%-gap run (first stator, rotor,
+    second stator; grid in/out, Re, flow coefficient).
+  status: screened
+  verdict: 'Screened 2026-11-02 (front matter only; the tabulations were not read). The printed St values
+    behind CR-4079''s figures for the 15% gap -- the form to use for a first-stator example without
+    digitising. Same verdict and blocker as CR-4079 (no gas-side airfoil kernel).'
+  read_for: [NGV worked example (stage vane St tabulated)]
+  issues: []
+  records: []
+  notes: Fetched 2026-11-02 from NTRS (public). Vol. I is CR-4079 (held).
 - file: sources/materials/gatech_gen3csp/Measurement-Uncertainty.pdf
   citation: Gunawan, A. (?). Uncertainty analysis and error propagation methodology for reporting
     thermophysical properties measurement of Gen3 CSP materials. Georgia Institute of Technology, Gen3 CSP
@@ -3728,8 +4463,9 @@ documents:
     measurement bands (usable as such under the validation policy). Range starts ~260 C: no room-temperature
     point. #881: k_stainless_steel_316 and k_stainless_steel_310 are its SS316 and SS310 tables (xlsx means,
     0.01 W/m K), valid over the measured range only; checked haynes230 (shipped column 1.7-2.8 bands high,
-    replaced by the brochure''s alpha cp rho, inside the band) and inconel625 (about -2 bands, kept, a third
-    source wanted).'
+    replaced by the brochure''s alpha cp rho, inside the band) and inconel625 (about -2 bands, kept; the Haynes
+    625 brochure, held since 2026-11-02, reprints the shipped Battelle data and prints no diffusivity, so an
+    independent third source is still wanted).'
   read_for: ['#881 built-in materials vs Gen3 CSP', 310 SS conductivity for the C3X example]
   issues: [881, 882]
   records: [python/tests/test_materials.py]
@@ -3805,15 +4541,6 @@ documents:
   notes: Fetched from specialmetals.com 2026-10-31 (public technical bulletin).
 
 wanted:
-- citation: Haynes International. HAYNES 625 alloy brochure (physical properties, thermal conductivity and
-    diffusivity RT-1000 C).
-  checked: false
-  issues: [881]
-  priority: later
-  question: 'A third Inconel 625 conductivity: Special Metals Table 3 (Battelle, annealed; shipped) and Gen3
-    CSP disagree by 14-25% at 260-700 C, from the diffusivity. A brochure printing alpha and cp would show
-    which (and, like the Haynes 230 brochure, whether its k column matches its own alpha cp rho).'
-  where: haynes.com (the PDF links return 403 to automated fetches; the user supplies it).
 - citation: Dunn, M. G., et al. (1986). Stage heat-flux measurements on a full-stage rotating turbine
     (Calspan shock tunnel), ASME. Exact title ? -- cited in Han's textbook.
   checked: false
@@ -3822,13 +4549,6 @@ wanted:
   question: Vane surface pressure and Stanton number on a full-scale stage -- a second NGV example or a
     cross-source check of a C3X example. Geometry detail may be insufficient (user, Han's textbook).
   where: ASME journals; Han, Dutta & Ekkad, Gas Turbine Heat Transfer and Cooling Technology, cites it.
-- citation: Blair, M. F., et al. (1989). Heat transfer in a large-scale rotating turbine model, Part I
-    (UTRC large-scale rotating rig), J. Turbomachinery. Exact title ? -- cited in Han's textbook.
-  checked: false
-  issues: []
-  priority: later
-  question: Stage-vane Ps and St data for an NGV example; the rotor data need rotation, which is not modelled.
-  where: ASME J. Turbomachinery; UTRC / NASA CR reports of the same rig.
 - citation: Blumm, J., Lindemann, A., Niedrig, B., Campbell, R. (2007). Measurement of selected thermophysical
     properties of the NPL certified reference material stainless steel 310. Int. J. Thermophys. 28, 681 (as cited by Gen3 CSP).
   checked: false
@@ -3843,17 +4563,23 @@ wanted:
   issues: [881, 882]
   priority: later
   question: 'The recommended-curve reference for alloy k(T) over the full range; would settle the #882 envelope
-    shape and the cross-check of the shipped tables.'
-  where: DTIC hosts TPRC volumes (AD numbers); university libraries.
-- citation: A public EB-PVD YSZ conductivity source (as deposited and after sintering), e.g. a NASA Glenn
-    laser-heat-flux report on EB-PVD ZrO2-8wt%Y2O3.
-  checked: false
+    shape and the cross-check of the shipped tables, and could give the independent third Inconel 625
+    conductivity #881 still lacks (whether Vol. 1 covers alloy 625 is unverified) (Special Metals/Battelle vs Gen3 CSP, 16-33% apart at 300-700 C; the Haynes 625 brochure, held,
+    reprints the Battelle data).'
+  where: 'DTIC hosts TPRC volumes as scans (Vol. 2 ADA951936, Vol. 3 ADA951937, Vol. 5 ADA951939 per a web
+    search 2026-11-02); no DTIC record for Vol. 1 was found, so its AD number is unknown. apps.dtic.mil returns
+    403 to automated fetches, so nothing was downloaded. University libraries.'
+- citation: A public EB-PVD YSZ conductivity k(T) curve (as deposited and after sintering), beyond Zhu et al.
+    2000 TM-2000-210238 (held; one condition, 0.13 mm, absolute k only there).
+  checked: true
   issues:
   - 761
   priority: later
-  question: 'k_tbc_ysz(is_ebpvd=True) is an uncited legacy fit (1.5 + 0.0002 T_C, as deposited, no sintering);
-    Zhu & Miller 2000 (held) gives no EB-PVD conductivity. A public source would let it be cited and aged.'
-  where: NASA NTRS (Zhu/Miller laser-rig series), or a journal paper.
+  question: 'k_tbc_ysz(is_ebpvd=True) is an uncited legacy fit (1.5 + 0.0002 T_C, as deposited, no sintering).
+    TM-2000-210238 (fetched 2026-11-02) gives ~1.55-1.65 W/m K at ~1190 C mean for 0.13 mm only and an
+    aging fit without k_inf; a k(T) curve and a usable aging law are still missing.'
+  where: 'NTRS 20050212118 (Zhu & Miller, EB-PVD ZrO2-7wt%Y2O3 conductivity and temperature limits, 2003 Cocoa
+    Beach) is abstract-only on NTRS; its proceedings version was not looked for. A journal paper otherwise.'
 - citation: Laws, E. M., Livesey, J. L. (1978). Flow through screens. Annu. Rev. Fluid Mech. 10, 247-266.
   checked: false
   issues:
@@ -3927,17 +4653,6 @@ wanted:
   priority: later
   question: Short-pin friction and Nu from a non-NASA rig.
   where: ASME Turbo Expo proceedings.
-- citation: Lawson, S. A. (2007). Heat transfer from multiple row arrays of low aspect ratio pin fins. MS
-    thesis, Virginia Tech, Blacksburg (chair K. A. Thole).
-  checked: false
-  issues:
-  - 335
-  priority: later
-  question: The friction-factor definition and per-geometry fits behind Lawson, Thrift, Thole & Kohli 2011
-    (local).
-  where: 'Virginia Tech ETD repository (VTechWorks), NOT Penn State as first recorded: institution, date and
-    title are from the vita in Lawson''s 2011 Penn State PhD (held, sources/heat_transfer/film/Lawson_2011_PhD_PennState_particle_deposition_film_cooling.pdf),
-    which is not this thesis.'
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
   checked: false
@@ -3948,17 +4663,6 @@ wanted:
     (Lefebvre Eqs. 8.7, 8.11, 8.12) -- the radiation combaero lacks entirely; what data L was fitted to and
     over what pressure and fuel range.'
   where: SAGE (Proc. IMechE archive).
-- citation: Ballal, D. R., Lefebvre, A. H. (1972). A proposed method for calculating film-cooled wall temperatures
-    in gas turbine combustion chambers. ASME Paper 72-WA/HT-24.
-  checked: false
-  issues:
-  - 763
-  priority: later
-  question: 'Primary for the thick-lip slot-film effectiveness (Lefebvre Eqs. 8.37/8.38, blowing ratio up to 4
-    where Marek-Tacina stops at 1.87) and the film-side Nusselt numbers (Eqs. 8.41/8.43) that combaero''s film
-    path lacks -- with the data they were fitted to. Companion: Ballal and Lefebvre (1973) J. Heat Transfer 95,
-    265-266 (near-slot region).'
-  where: Not found by the user (2026-10-29); the book reprint (Lefebvre & Ballal Ch. 8, held) is implemented meanwhile. ASME Digital Collection.
 - citation: Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
     AFWAL-TR-84-2104.
   checked: false
@@ -3968,7 +4672,9 @@ wanted:
   question: 'Operating conditions and geometry behind Lefebvre Fig. 8.5 (GE F101 measured liner wall temperature
     against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
     radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
-  where: DTIC (public, ADA-numbered).
+  where: 'DTIC AD-A151 464 (https://apps.dtic.mil/sti/pdfs/ADA151464.pdf, public; identified 2026-11-02 by a web
+    search showing its front matter: Lefebvre, Purdue, AFWAL-TR-84-2104). apps.dtic.mil returns 403 to automated
+    fetches, so it was not downloaded: the user can fetch it in a browser.'
 - citation: Hay, N., Spencer, A. (1992). Discharge coefficients of cooling holes with radiused and chamfered
     inlets. ASME J. Turbomachinery 114(4), 701-706.
   checked: false
@@ -3981,16 +4687,6 @@ wanted:
     McGreehan-Schotsch. The pressure-reference question is answered by Thole et al. 1997 (held: Cd referenced
     to the supply TOTAL pressure). Content as recalled, unverified.'
   where: ASME Digital Collection (paywalled).
-- citation: Meitner, P. L. (1990). Computer code for predicting coolant flow and heat transfer in turbomachinery.
-    NASA TP-2985, AVSCOM TP 89-C-008.
-  checked: false
-  issues:
-  - 793
-  priority: later
-  question: The single-passage CPF code behind the 2004 network procedure (its governing equations and
-    any sample cases); a further code-to-code check of one compressible passage with friction, area change
-    and heat transfer.
-  where: NTRS (NASA Technical Paper).
 - citation: Jin, H., Riddle, A., Cooke, L. (2008). A compressible flow network analysis for design upgrade
     of industrial aero derivative HP turbine blades. ASME GT2008-50431.
   checked: false
@@ -4011,27 +4707,20 @@ wanted:
     prints the set in full (Eqs. 8.4-8.15) and suffices to implement it; this paper would add the data
     behind the luminosity factor.
   where: Elsevier journal.
-- citation: Andreini, A., Champion, J. L., Facchini, B., Mercier, E., Surace, M. (2006). Advanced liner cooling
-    numerical analysis for low emission combustors. 25th ICAS Congress, Hamburg.
+- citation: 'Gritsch, M., Schulz, A., Wittig, S. (1997). A method of correlating the discharge coefficient of
+    film-cooling holes with crossflows at hole entry and exit. 13th Int. Symp. on Airbreathing Engines (ISABE),
+    Chattanooga, TN, 8-12 Sept. 1997.'
   checked: false
   issues:
-  - 793
-  priority: later
-  question: The effusion flat plate with measured overall effectiveness that CEAS-2007-026 validates against;
-    a second-lab cross-source set for EffusionPlateElement beside Andrews 88-GT-290, if the plate geometry
-    and conditions are printed.
-  where: ICAS 2006 proceedings (icas.org archive, open).
-- citation: Gritsch, M., Schulz, A., Wittig, S. (1998). Discharge coefficient measurements of film-cooling holes
-    with expanded exits. ASME J. Turbomachinery 120(3), 557-563 (ASME 97-GT-165).
-  checked: false
-  issues:
+  - 386
   - 807
   - 813
   priority: later
-  question: 'Cd of a cylindrical reference hole and expanded-exit holes under inlet (internal) crossflow up to
-    about Mach 0.6 and external crossflow -- the duct-fed liner/effusion hole regime McGreehan-Schotsch covers
-    only at modest crossflow. Cited by Thole et al. 1997 (held). As recalled, unverified.'
-  where: ASME Digital Collection.
+  question: 'The correlation behind the Cd data of Gritsch, Schulz & Wittig 1998 (held): cylindrical and
+    fan-shaped 30 deg holes under supply crossflow to Ma 0.6 and exit crossflow to Ma 1.2. combaero has no
+    shaped-hole Cd (FilmCoolingElement "shaped" uses the plain-hole Cd on the metering diameter) and no exit-side
+    Cd for film or effusion holes. Citation as printed in the 1998 paper''s reference list; paper number unknown.'
+  where: ISABE 1997 proceedings (AIAA distributes later ISABE volumes; not searched).
 - citation: Van Niekerk, J. E., Morris, R. M. (2005). (T56 combustor isothermal flow split measurement.) ISABE
     2005.
   checked: false
@@ -4053,18 +4742,52 @@ wanted:
     parameter, with the jet angle): measured liner-hole Cd at combustor bleed ratios, the regime of #807. Title
     as recalled, unverified.'
   where: Cranfield University library.
+- citation: 'Rowbury, D. A., Oldfield, M. L. G., Lock, G. D. (2000). A method for correlating the influence of
+    external crossflow on the discharge coefficients of film cooling holes. ASME Paper 2000-GT-0294 (also J.
+    Turbomach. 123, 2001). Background: Rowbury (1998) DPhil thesis, Oxford.'
+  checked: false
+  issues:
+  - 386
+  priority: later
+  question: The standard film-hole Cd correction for external crossflow (inclination via sin phi), to check the
+    film element's hole Cd against; Sargison 2001 (held) measured Cd with crossflow on 35 deg holes and
+    compares with it.
+  where: 'ASME Digital Collection (paywalled). The Rowbury (1998) DPhil thesis was not found on Oxford ORA by a web
+    search (2026-11-02); the 2000/2001 paper is listed on the Univ. of Bath research portal (not checked for a full text).'
 - citation: Ballal, D. R., Lefebvre, A. H. (1973). Film-cooling effectiveness in the near-slot region. ASME
     J. Heat Transfer 95(2), 265-266. doi:10.1115/1.3450039
   checked: true
   issues:
   - 714
   - 763
-  priority: now
-  question: 'The near-slot (potential-core) region of thick-lip slot films, where the Ballal-Lefebvre 1972
-    correlation (reprinted in Lefebvre & Ballal Ch. 8, held) is weakest; liner cooling rings are short, so much
-    of each segment is near-slot. The 1972 primary could not be found (2026-10-29); the thick-lip film and
-    film-side Nu are implemented from the book (a reprint, checked only against its worked example).'
-  where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled).
+  priority: later
+  question: 'The near-slot (potential-core) region of thin-lip slot films. The 1972 method is held as its
+    Cranfield report version (SME No. 4, 1973, screened 2026-11-02); the thick-lip film and film-side Nu are
+    NOT implemented (only Marek-Tacina ships). Page 1 seen 2026-11-02 (a preview from the user): its Eq. 4,
+    eta = 0.6 (x/ms)^-0.3 (Re_s m mu_c/mu_m)^0.15 (+/-5% on the data compiled in its ref. 5), matches Lefebvre &
+    Ballal Eq. 8.34, so the book reprint is faithful there. Page 2 would add the validity table, the wall-jet
+    branch (book Eqs. 8.35/8.36) and the Fig. 1 points (other labs'' data: fit reproduction, not accuracy). It
+    does not settle the film-side Nu discrepancy (0.090 vs 0.069), which is a heat-transfer coefficient (see the
+    Seban 1960 entry). Moved from now to later (user, 2026-11-02): obtain when the Ballal-Lefebvre slot-film
+    branches are implemented.'
+  where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled; the user can obtain it).
+- citation: Seban, R. A. (1960). Heat transfer and effectiveness for turbulent boundary layers with tangential
+    fluid injection. ASME J. Heat Transfer 82(4), 303-313 (November 1960). Companions -- Seban, R. A., Back, L.
+    H. (1962), J. Heat Transfer 84, 45-54 and 235-242.
+  checked: true
+  issues:
+  - 714
+  - 763
+  priority: later
+  question: 'Settles the near-slot film-side Nu for m < 1.3: Ballal & Lefebvre''s Cranfield SME4 (held) prints
+    Nu = 0.090 [Re_s x/s]^0.7 (its Eq. 3, credited to Seban) while Lefebvre & Ballal Eq. 8.41 prints 0.069 (30%
+    lower). Needed before that branch is implemented. Alternative: the ASME print of Ballal, D. R., Lefebvre,
+    A. H. (1972), A proposed method for calculating film-cooled wall temperatures in gas turbine combustion
+    chambers, ASME Paper 72-WA/HT-24 (Winter Annual Meeting, New York, Nov. 1972), if it differs from the
+    held report.'
+  where: 'ASME Digital Collection (paywalled); citation as printed in Cranfield SME4 ref. 4, checked 2026-11-02.
+    72-WA/HT-24: ASME conference papers of that era are often only in libraries (ASME archive / British
+    Library).'
 - citation: ISO 5167:1980 (or its restatement ISO 5167-1:1991). Measurement of fluid flow by means of
     orifice plates, nozzles and Venturi tubes inserted in circular cross-section conduits running full.
     International Organization for Standardization. (citation as recalled)
@@ -4077,7 +4800,8 @@ wanted:
     lower Re_D bound, but Stolz has NO low-Re hold: its bound is known only from memory, so none is encoded
     and metering_cd_re_min refuses Stolz. The text is needed to add the hold (its lower Re_D bound per tap)
     and the d, D and beta limits that metering_cd_in_range does not encode for Stolz. Tracked in #876, which
-    deprecates Stolz instead unless this text (or Stolz 1988, NSFMW paper 3.1) turns up first.'
+    deprecates Stolz instead unless this text turns up first. Stolz 1988 (held since 2026-11-02) gives
+    only the REVISED ISO 5167-1:1991 limits, not the 1980 ones.'
   where: ISO (withdrawn standard; national-library or university copy).
 - citation: Reader-Harris, M. J. (1998). The equation for the expansibility factor for orifice plates. Proc.
     FLOMEKO 98, Lund. (citation as recalled)
@@ -4089,7 +4813,9 @@ wanted:
     gas). #854 found the compressible kernel applies the isentropic NOZZLE expansion to sharp plates: -0.9% at
     p2/p1 0.97, -7 to -9% at 0.80 against Eq. (5). The data decide the scope of a fix and whether Eq. (5) can be
     stretched below p2/p1 = 0.75.'
-  where: FLOMEKO / IMEKO proceedings, often free.
+  where: 'FLOMEKO 98, Lund, Sweden, June 1998, pp. 209-214 (page range from the citation in Pistun & Lesovoy
+    2016). No free copy found by a web search (2026-11-02); the IMEKO site hosts later TC9 proceedings, not
+    FLOMEKO 98 as far as searched.'
 - citation: Urner, G. (1997). Pressure loss of orifice plates according to ISO 5167. Flow Meas. Instrum. 8(1),
     39-41. (citation as recalled)
   checked: false
@@ -4119,13 +4845,3 @@ wanted:
   question: All three ISO 5167-2 closures (C, expansibility, pressure loss) with derivations and the data behind
     them in one source; an alternative to the three papers above.
   where: Springer book; often through library access.
-- citation: Stolz, J. (1988). The first revision of ISO 5167. Proc. 6th North Sea Flow Measurement Workshop,
-    East Kilbride, Glasgow, National Engineering Laboratory, Paper 3.1.
-  checked: true
-  issues:
-  - 876
-  priority: later
-  question: Stolz's limits of use (beta, D, Re_D) for the ISO 5167:1980/1991 C equation, which combaero does not
-    hold, so metering_cd_in_range cannot flag a Stolz plate (#876 deprecated Stolz instead). Citation checked
-    against ref. [1] of Reader-Harris 2022 (held).
-  where: North Sea Flow Measurement Workshop archive (NFOGM / TUV SUD NEL), usually free.
