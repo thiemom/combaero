@@ -737,6 +737,32 @@ documents:
   records: []
   notes: Arrived 2026-11-02 in sources/new/ (from the user). Murray et al. 2018 IJTPP 3(1) 4 (multi-row effusion,
     high-resolution data and model; open access) is another lead it cites.
+- file: sources/heat_transfer/film/Kirollos_Povey_2015_JEGTP_137_122608_energy_based_film_superposition.pdf
+  citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
+    film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122608.
+  id: doi:10.1115/1.4030907
+  topic: [film]
+  content: '7 pp., text layer good. Reviews additive models: Sellers (Eq. 1) and its recursive form (Eq. 4); Le
+    Grives & Nicolas, two staggered rows at p/D < 4 (Eq. 6); the a(M), b(M) weighted two-row form (Eq. 7). It
+    then proposes an energy-conserving stratified-layer model. The entrained mainstream mass per layer is m_ei =
+    m_ci (1/eta_i - 1) (Eq. 8), from each row''s single-row eta_i(x). Entrainment into lower layers is at the
+    temperature of the layer above. The layer total temperatures follow from integral relations (Eqs. 10-13).
+    The model needs each row''s coolant mass flow, as well as its eta_i(x).'
+  status: screened
+  verdict: 'Screened 2026-11-02. Sellers does not conserve energy, and it under-predicts the combined
+    effectiveness for n > 2 rows; the gap grows with n. In their test it is below for x/D > 50. The energy model
+    always predicts a higher eta than Sellers for n > 2. The test case is CFD only (6 staggered rows in a
+    converging duct), with no experiment. The paper says data for validation are scarce, and it is copyright
+    Rolls-Royce plc. Relevance: EffusionPlateElement uses Sellers superposition over many rows (29 rows in
+    Caciolli, combustor liners). Our film runner on Andrei 2014 (Baldauf + Sellers) has an MAE of 45.5%, and its
+    error changes sign with BR. So the energy model is a candidate alternative superposition for high row
+    counts. Implementing it means integrating Eqs. 10-13 per row with analytic derivatives. It is not
+    implemented, and it has not been checked against our effusion data.'
+  read_for: ['#387 superposition over many effusion rows (Sellers vs energy-based)']
+  issues: [387]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). The former wanted entry gave the article number as
+    122607; the page prints 122608.
 - file: sources/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
   citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
     experimental and computational methods for modelling multiple row effusion cooling performance. Int.
@@ -4233,15 +4259,6 @@ wanted:
     film element's hole Cd against; Sargison 2001 (held) measured Cd with crossflow on 35 deg holes and
     compares with it.
   where: ASME Digital Collection (paywalled); the thesis via Oxford ORA.
-- citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
-    film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122607.
-  checked: false
-  issues:
-  - 387
-  priority: later
-  question: An energy-consistent alternative to the Sellers superposition the effusion plate uses; how far Sellers
-    over-predicts at combustor row counts.
-  where: ASME Digital Collection (paywalled).
 - citation: Ballal, D. R., Lefebvre, A. H. (1973). Film-cooling effectiveness in the near-slot region. ASME
     J. Heat Transfer 95(2), 265-266. doi:10.1115/1.3450039
   checked: true
