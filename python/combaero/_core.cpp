@@ -7029,6 +7029,26 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "which part is data. Raises if k reaches <= 0; floored at 1e-3. Raises\n"
       "ValueError for an unknown material or a non-finite T.");
 
+  m.def(
+      "get_material_conductivity_and_slope",
+      [](const std::string &name, double T, bool extrapolate) {
+        if (name == "al6061") {
+          warn_al6061_deprecated();
+        }
+        const auto r = combaero::materials::material_conductivity_and_slope(name, T, extrapolate);
+        // The same floor as get_material_conductivity; flat where it acts.
+        if (!(r.k > 1e-3)) {
+          return std::make_tuple(1e-3, 0.0);
+        }
+        return std::make_tuple(r.k, r.dk_dT);
+      },
+      py::arg("name"), py::arg("T"), py::arg("extrapolate") = false,
+      "(k [W/(m*K)], dk/dT [W/(m*K^2)]) of a named material at T [K] (#932):\n"
+      "get_material_conductivity's k, bit for bit, and its analytic slope on\n"
+      "every path -- the data's (a table's segment slope, the left one at a\n"
+      "printed point), the #882 envelope's fade, 0 where it holds or the\n"
+      "1e-3 floor acts, the end slope with extrapolate=True.");
+
   m.def("material_in_range", &combaero::materials::material_in_range, py::arg("name"),
         py::arg("T"),
         "Whether T [K] lies in the material's sourced conductivity range\n"
@@ -7929,6 +7949,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       .def_readonly("effectiveness", &WallCouplingResult::effectiveness,
                     "Q / (C_min dT) [-] (wall_exchange_and_jacobian; 0 without "
                     "a finite C_min)")
+      .def_readonly("dQ_dR_wall", &WallCouplingResult::dQ_dR_wall,
+                    "Jacobian: dQ/d(t/k) of any one layer, = dQ/dR_fouling "
+                    "[W^2/(m^2*K)] (#932)")
       .def("__repr__",
            [](const WallCouplingResult &r) {
              auto fmt = [](double v) {
@@ -7987,6 +8010,17 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "  counterflow : the streams run opposite ways along the wall\n\n"
         "Returns: WallCouplingResult with Q and analytic Jacobians, including\n"
         "dQ_dC_a and dQ_dC_b.");
+
+  m.def("wall_resistance_fixed_point_derivatives",
+        &wall_resistance_fixed_point_derivatives, py::arg("T_hot"),
+        py::arg("T_cold"), py::arg("h_hot"), py::arg("h_cold"),
+        py::arg("t_over_k"), py::arg("R_fouling"), py::arg("dr_dTm"),
+        "Total derivatives of a k(T) wall's R_wall = sum t_i/k_i at its fixed\n"
+        "point (#932): each layer's t/k at its mean temperature in\n"
+        "wall_temperature_profile(T_hot, T_cold, h_hot, h_cold, t_over_k,\n"
+        "R_fouling), dr_dTm the layers' d(t/k)/dT [m^2/W] there (0 for a\n"
+        "constant k). Returns dR_wall/d(T_hot, T_cold, h_hot, h_cold) by\n"
+        "implicit differentiation; analytic.");
 
   // -----------------------------------------------------------------
   // channel_smooth

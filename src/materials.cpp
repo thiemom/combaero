@@ -29,15 +29,19 @@ namespace {
 
 // Linear interpolation in a manufacturer's k(T_C) table: exact at every
 // printed point. T_C must lie within the table (the callers validate T).
+// Also returns the segment's slope dk/dt (#932): the analytic derivative of
+// the interpolant, the left segment's at a printed point.
 template <std::size_t N>
-double table_k(const std::array<double, N>& T_C, const std::array<double, N>& k, double t) {
+ConductivityAndSlope table_kd(const std::array<double, N>& T_C, const std::array<double, N>& k,
+                              double t) {
     for (std::size_t i = 1; i < N; ++i) {
         if (t <= T_C[i]) {
             const double w = (t - T_C[i - 1]) / (T_C[i] - T_C[i - 1]);
-            return k[i - 1] + w * (k[i] - k[i - 1]);
+            return {k[i - 1] + w * (k[i] - k[i - 1]),
+                    (k[i] - k[i - 1]) / (T_C[i] - T_C[i - 1])};
         }
     }
-    return k[N - 1];
+    return {k[N - 1], 0.0};
 }
 
 } // namespace
@@ -46,16 +50,20 @@ double table_k(const std::array<double, N>& T_C, const std::array<double, N>& k,
 // Superalloys
 // -------------------------------------------------------------
 
-double k_inconel718(double T) {
+static ConductivityAndSlope kd_inconel718(double T) {
     constexpr double T_min = 300.0;
     constexpr double T_max = 1200.0;
     validate_temperature("Inconel 718", T, T_min, T_max);
 
     double T_C = T - 273.15;
-    return 11.4 + 0.0146 * T_C;
+    return {11.4 + 0.0146 * T_C, 0.0146};
 }
 
-double k_haynes230(double T) {
+double k_inconel718(double T) {
+    return kd_inconel718(T).k;
+}
+
+static ConductivityAndSlope kd_haynes230(double T) {
     validate_temperature("Haynes 230", T, 25.0 + 273.15, 1000.0 + 273.15);
     // HAYNES 230 brochure H-3000O (2021), Physical Properties: k = alpha cp
     // rho from its diffusivity and specific-heat columns, rho = 8970 kg/m3
@@ -68,14 +76,18 @@ double k_haynes230(double T) {
                                                    500.0, 600.0, 700.0, 900.0, 1000.0};
     static constexpr std::array<double, 10> k = {8.62, 10.07, 11.67, 13.22, 14.89,
                                                  16.33, 18.27, 22.14, 24.25, 26.68};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
+}
+
+double k_haynes230(double T) {
+    return kd_haynes230(T).k;
 }
 
 // Combustor liner / transition-piece alloys: the manufacturers' Physical
 // Properties tables, metric column, interpolated linearly. "RT" is taken
 // as 25 C. Brochures accessed 2026-10-29 (sources.yaml).
 
-double k_hastelloy_x(double T) {
+static ConductivityAndSlope kd_hastelloy_x(double T) {
     validate_temperature("Hastelloy X", T, 300.0, 1273.15);
     // HASTELLOY X brochure (25-900 C; its metric rows jump from 200 to 600 C),
     // with 400 C and 1000 C from the manufacturer's data sheet "sheet, tested
@@ -87,40 +99,56 @@ double k_hastelloy_x(double T) {
                                                    700.0, 750.0, 800.0, 850.0, 900.0, 1000.0};
     static constexpr std::array<double, 12> k = {9.2, 11.2, 14.1, 16.9, 20.9, 21.9,
                                                  22.8, 23.8, 24.7, 25.7, 26.7, 28.7};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
 }
 
-double k_haynes188(double T) {
+double k_hastelloy_x(double T) {
+    return kd_hastelloy_x(T).k;
+}
+
+static ConductivityAndSlope kd_haynes188(double T) {
     validate_temperature("Haynes 188", T, 300.0, 1273.15);
     static constexpr std::array<double, 11> T_C = {25.0, 100.0, 200.0, 300.0, 400.0, 500.0,
                                                    600.0, 700.0, 800.0, 900.0, 1000.0};
     static constexpr std::array<double, 11> k = {10.4, 12.2, 14.3, 15.9, 17.5, 19.3,
                                                  21.1, 23.0, 24.8, 25.5, 27.6};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
 }
 
-double k_haynes263(double T) {
+double k_haynes188(double T) {
+    return kd_haynes188(T).k;
+}
+
+static ConductivityAndSlope kd_haynes263(double T) {
     validate_temperature("Haynes 263", T, 300.0, 1273.15);
     static constexpr std::array<double, 11> T_C = {25.0, 100.0, 200.0, 300.0, 400.0, 500.0,
                                                    600.0, 700.0, 800.0, 900.0, 1000.0};
     static constexpr std::array<double, 11> k = {11.7, 13.0, 14.7, 16.3, 18.0, 19.7,
                                                  21.4, 23.0, 24.7, 26.8, 28.5};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
+}
+
+double k_haynes263(double T) {
+    return kd_haynes263(T).k;
 }
 
 // -------------------------------------------------------------
 // Further alloys, copper and alumina (#761): tables interpolated linearly
 // -------------------------------------------------------------
 
-double k_haynes25(double T) {
+static ConductivityAndSlope kd_haynes25(double T) {
     // HAYNES 25 (L-605) brochure, Haynes International.
     validate_temperature("Haynes 25", T, 25.0 + 273.15, 1000.0 + 273.15);
     static constexpr std::array<double, 11> T_C = {25.0, 100.0, 200.0, 300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0};
     static constexpr std::array<double, 11> k = {10.5, 12.0, 14.0, 15.9, 17.7, 19.5, 21.2, 22.9, 24.5, 26.0, 27.5};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
 }
 
-double k_inconel625(double T) {
+double k_haynes25(double T) {
+    return kd_haynes25(T).k;
+}
+
+static ConductivityAndSlope kd_inconel625(double T) {
     // INCONEL alloy 625, Special Metals, Table 3 (Battelle measurements,
     // annealed 2100 F / 1 h); the 1093 C row prints no conductivity. Gen3 CSP
     // measures 14% more at 260-580 C (its diffusivity is 22-40% higher, its
@@ -129,61 +157,85 @@ double k_inconel625(double T) {
     validate_temperature("Inconel 625", T, -157.0 + 273.15, 982.0 + 273.15);
     static constexpr std::array<double, 15> T_C = {-157.0, -129.0, -73.0, -18.0, 21.0, 38.0, 93.0, 204.0, 316.0, 427.0, 538.0, 649.0, 760.0, 871.0, 982.0};
     static constexpr std::array<double, 15> k = {7.2, 7.5, 8.4, 9.2, 9.8, 10.1, 10.8, 12.5, 14.1, 15.7, 17.5, 19.0, 20.8, 22.8, 25.2};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
 }
 
-double k_nimonic75(double T) {
+double k_inconel625(double T) {
+    return kd_inconel625(T).k;
+}
+
+static ConductivityAndSlope kd_nimonic75(double T) {
     // Virgamet data page for Alloy N75 / 2.4951; the 20 C value equals
     // the Special Metals NIMONIC 75 sheet (11.7), which prints no other.
     validate_temperature("Nimonic 75", T, 20.0 + 273.15, 1000.0 + 273.15);
     static constexpr std::array<double, 7> T_C = {20.0, 400.0, 600.0, 700.0, 800.0, 900.0, 1000.0};
     static constexpr std::array<double, 7> k = {11.7, 18.6, 22.7, 24.7, 26.5, 28.4, 30.1};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
 }
 
-double k_copper(double T) {
+double k_nimonic75(double T) {
+    return kd_nimonic75(T).k;
+}
+
+static ConductivityAndSlope kd_copper(double T) {
     // High-purity copper, NSRDS-NBS 8 (Powell, Ho & Liley 1966) Table 2b;
     // printed in W/(cm K), x100 here; the extrapolated 1300 K value is not used.
     validate_temperature("Copper", T, 100.0, 1200.0);
     static constexpr std::array<double, 16> T_K = {100.0, 150.0, 200.0, 250.0, 273.0, 300.0, 350.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1100.0, 1200.0};
     static constexpr std::array<double, 16> k = {483.0, 428.0, 413.0, 404.0, 401.0, 398.0, 394.0, 392.0, 388.0, 383.0, 377.0, 371.0, 364.0, 357.0, 350.0, 342.0};
-    return table_k(T_K, k, T);
+    return table_kd(T_K, k, T);
 }
 
-double k_alumina(double T) {
+double k_copper(double T) {
+    return kd_copper(T).k;
+}
+
+static ConductivityAndSlope kd_alumina(double T) {
     // Al2O3 99.5% pure, 98% dense, polycrystalline: NSRDS-NBS 8 Table 14;
     // printed in W/(cm K), x100 here; the extrapolated 2100 K value is not used.
     validate_temperature("Alumina", T, 100.0, 2000.0);
     static constexpr std::array<double, 24> T_K = {100.0, 150.0, 200.0, 250.0, 273.0, 300.0, 350.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1100.0, 1200.0, 1300.0, 1400.0, 1500.0, 1600.0, 1700.0, 1800.0, 1900.0, 2000.0};
     static constexpr std::array<double, 24> k = {133.0, 77.0, 55.0, 43.4, 39.7, 36.0, 30.7, 26.4, 20.2, 15.8, 12.6, 10.4, 8.9, 7.85, 7.1, 6.55, 6.13, 5.85, 5.66, 5.56, 5.54, 5.59, 5.74, 6.0};
-    return table_k(T_K, k, T);
+    return table_kd(T_K, k, T);
 }
 
-double k_x22crmov12_1(double T) {
+double k_alumina(double T) {
+    return kd_alumina(T).k;
+}
+
+static ConductivityAndSlope kd_x22crmov12_1(double T) {
     // Edelstahlwerke Suedwestfalen 1.4923 data sheet: 24 W/m K at 20 C and
     // 29 at 650 C, the only two values it prints; linear between them.
     validate_temperature("X22CrMoV12-1 (1.4923)", T, 20.0 + 273.15, 650.0 + 273.15);
     static constexpr std::array<double, 2> T_C = {20.0, 650.0};
     static constexpr std::array<double, 2> k = {24.0, 29.0};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
+}
+
+double k_x22crmov12_1(double T) {
+    return kd_x22crmov12_1(T).k;
 }
 
 // -------------------------------------------------------------
 // Bond coat
 // -------------------------------------------------------------
 
-double k_bondcoat_nicocraly(double T) {
+static ConductivityAndSlope kd_bondcoat_nicocraly(double T) {
     // Zhu & Miller 1999, NASA/TM-1999-209069, Fig. 2 (literature values):
     // k = 6.729572 + 0.02344 T_C, the line drawn over about 575-1100 C.
     validate_temperature("NiCoCrAlY bond coat", T, 848.15, 1373.15);
-    return 6.729572 + 0.02344 * (T - 273.15);
+    return {6.729572 + 0.02344 * (T - 273.15), 0.02344};
+}
+
+double k_bondcoat_nicocraly(double T) {
+    return kd_bondcoat_nicocraly(T).k;
 }
 
 // -------------------------------------------------------------
 // Structural Alloys
 // -------------------------------------------------------------
 
-double k_stainless_steel_316(double T) {
+static ConductivityAndSlope kd_stainless_steel_316(double T) {
     // Georgia Tech Gen3 CSP database, SS316 measured k (laser-flash alpha
     // times cp times a constant rho), 95% band 0.9 W/m K at 260 C to 2.7 at
     // 820 C (#881). The quadratic shipped before (unsourced) lay inside the
@@ -195,10 +247,14 @@ double k_stainless_steel_316(double T) {
     static constexpr std::array<double, 15> k = {17.83, 18.32, 18.90, 19.37, 19.83,
                                                  20.33, 20.78, 21.16, 21.78, 22.50,
                                                  22.79, 22.97, 22.87, 22.90, 23.12};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
 }
 
-double k_stainless_steel_310(double T) {
+double k_stainless_steel_316(double T) {
+    return kd_stainless_steel_316(T).k;
+}
+
+static ConductivityAndSlope kd_stainless_steel_310(double T) {
     // Georgia Tech Gen3 CSP database, SS310 measured k, 95% band 0.8 W/m K
     // at 260 C to 2.5 at 800 C (#881). Not joined to NIST's cryogenic fit
     // (11.6 at 300 K): this data's trend runs back to about 13.7 there, so
@@ -210,16 +266,24 @@ double k_stainless_steel_310(double T) {
     static constexpr std::array<double, 15> k = {17.13, 17.72, 18.31, 18.91, 19.47,
                                                  20.04, 20.55, 21.11, 22.08, 23.08,
                                                  23.58, 24.13, 24.55, 24.83, 25.12};
-    return table_k(T_C, k, T - 273.15);
+    return table_kd(T_C, k, T - 273.15);
 }
 
-double k_aluminum_6061(double T) {
+double k_stainless_steel_310(double T) {
+    return kd_stainless_steel_310(T).k;
+}
+
+static ConductivityAndSlope kd_aluminum_6061(double T) {
     constexpr double T_min = 200.0;
     constexpr double T_max = 600.0;
     validate_temperature("Aluminum 6061", T, T_min, T_max);
 
     double T_C = T - 273.15;
-    return 167.0 - 0.012 * T_C;
+    return {167.0 - 0.012 * T_C, -0.012};
+}
+
+double k_aluminum_6061(double T) {
+    return kd_aluminum_6061(T).k;
 }
 
 // -------------------------------------------------------------
@@ -270,7 +334,7 @@ constexpr double NO_SOLIDUS = std::numeric_limits<double>::quiet_NaN();
 static const std::map<std::string, ThermalMaterial> material_database = {
     {"inconel718", {
         "inconel718",
-        k_inconel718,
+        kd_inconel718,
         300.0, 1200.0,
         "Haynes International, Special Metals Corporation",
         "Ni-based superalloy, common in turbine applications",
@@ -280,7 +344,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"haynes230", {
         "haynes230",
-        k_haynes230,
+        kd_haynes230,
         25.0 + 273.15, 1000.0 + 273.15,
         "HAYNES 230 brochure H-3000O (Haynes International, 2021): alpha * cp * rho, 25-1000 C",
         "Ni-Cr-W-Mo alloy; table to 1000 C",
@@ -290,7 +354,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"hastelloy_x", {
         "hastelloy_x",
-        k_hastelloy_x,
+        kd_hastelloy_x,
         300.0, 1273.15,
         "HASTELLOY X brochure + data sheet (Haynes International), table to 1000 C",
         "Ni-Cr-Fe-Mo combustor liner alloy",
@@ -300,7 +364,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"haynes188", {
         "haynes188",
-        k_haynes188,
+        kd_haynes188,
         300.0, 1273.15,
         "HAYNES 188 alloy brochure (Haynes International), table to 1000 C",
         "Co-Ni-Cr-W liner / transition-piece alloy",
@@ -310,7 +374,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"haynes263", {
         "haynes263",
-        k_haynes263,
+        kd_haynes263,
         300.0, 1273.15,
         "HAYNES 263 alloy brochure (Haynes International), table to 1000 C",
         "Ni-Co-Cr-Mo age-hardenable liner / transition-piece alloy",
@@ -320,7 +384,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"haynes25", {
         "haynes25",
-        k_haynes25,
+        kd_haynes25,
         25.0 + 273.15, 1000.0 + 273.15,
         "HAYNES 25 alloy brochure (Haynes International), table to 1000 C",
         "Co-Cr-W-Ni (L-605) combustor / turbine alloy",
@@ -330,7 +394,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"inconel625", {
         "inconel625",
-        k_inconel625,
+        kd_inconel625,
         -157.0 + 273.15, 982.0 + 273.15,
         "INCONEL alloy 625 (Special Metals) Table 3, -157 to 982 C",
         "Ni-Cr-Mo-Nb liner / duct / bellows alloy",
@@ -340,7 +404,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"nimonic75", {
         "nimonic75",
-        k_nimonic75,
+        kd_nimonic75,
         20.0 + 273.15, 1000.0 + 273.15,
         "Virgamet Alloy N75 data page; 20 C value = Special Metals sheet",
         "Ni-Cr-Ti liner / sheet alloy",
@@ -350,7 +414,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"copper", {
         "copper",
-        k_copper,
+        kd_copper,
         100.0, 1200.0,
         "NSRDS-NBS 8 (Powell, Ho & Liley 1966) Table 2b",
         "High-purity copper; alloyed or cold-worked copper conducts less",
@@ -360,7 +424,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"alumina", {
         "alumina",
-        k_alumina,
+        kd_alumina,
         100.0, 2000.0,
         "NSRDS-NBS 8 (Powell, Ho & Liley 1966) Table 14",
         "Dense polycrystalline Al2O3 (sheaths, insulators); porous grades conduct less",
@@ -370,7 +434,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"x22crmov12_1", {
         "x22crmov12_1",
-        k_x22crmov12_1,
+        kd_x22crmov12_1,
         20.0 + 273.15, 650.0 + 273.15,
         "Edelstahlwerke Suedwestfalen 1.4923 data sheet (20 and 650 C)",
         "12% Cr martensitic steel (steam turbine casings, bolts)",
@@ -380,7 +444,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"nicocraly", {
         "nicocraly",
-        k_bondcoat_nicocraly,
+        kd_bondcoat_nicocraly,
         848.15, 1373.15,
         "Zhu & Miller 1999, NASA/TM-1999-209069 Fig. 2 (literature values)",
         "NiCoCrAlY TBC bond coat; fit drawn over 575-1100 C only",
@@ -390,7 +454,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"ss316", {
         "ss316",
-        k_stainless_steel_316,
+        kd_stainless_steel_316,
         260.0 + 273.15, 820.0 + 273.15,
         "Georgia Tech Gen3 CSP database, measured 260-820 C",
         "Austenitic stainless steel, corrosion resistant",
@@ -400,7 +464,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"ss310", {
         "ss310",
-        k_stainless_steel_310,
+        kd_stainless_steel_310,
         260.0 + 273.15, 800.0 + 273.15,
         "Georgia Tech Gen3 CSP database, measured 260-800 C",
         "Austenitic 25Cr-20Ni heat-resisting stainless steel (cascade vanes, furnace parts)",
@@ -410,7 +474,7 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"al6061", {
         "al6061",
-        k_aluminum_6061,
+        kd_aluminum_6061,
         200.0, 600.0,
         "ASM Handbook, Aluminum Association",
         "Aluminum alloy, limited to <300degC due to T6 temper",
@@ -420,7 +484,8 @@ static const std::map<std::string, ThermalMaterial> material_database = {
     }},
     {"ysz", {
         "ysz",
-        [](double T) { return k_tbc_ysz(T, 0.0); },  // Default: as-sprayed
+        // Default: as sprayed (hours = 0), k = YSZ_APS_K0 flat in T.
+        [](double T) { return ConductivityAndSlope{k_tbc_ysz(T, 0.0), 0.0}; },
         300.0, 1700.0,
         "Zhu & Miller 2000, NASA/TM-2000-210237 (plasma-sprayed, as sprayed)",
         "7-8 wt% Y2O3 stabilized zirconia, thermal barrier coating",
@@ -453,8 +518,8 @@ DataEnd data_end(const ThermalMaterial& mat, bool below) {
     constexpr double h = 1e-2;
     const double T_end = below ? mat.T_min : mat.T_max;
     const double T_in = below ? mat.T_min + h : mat.T_max - h;
-    const double k_end = mat.k_func(T_end);
-    return {T_end, k_end, (k_end - mat.k_func(T_in)) / (T_end - T_in)};
+    const double k_end = mat.kd_func(T_end).k;
+    return {T_end, k_end, (k_end - mat.kd_func(T_in).k) / (T_end - T_in)};
 }
 
 } // namespace
@@ -477,13 +542,14 @@ bool material_in_range(const std::string& name, double T) {
     return T >= mat.T_min && T <= mat.T_max;
 }
 
-double material_conductivity(const std::string& name, double T, bool extrapolate) {
+ConductivityAndSlope material_conductivity_and_slope(const std::string& name, double T,
+                                                     bool extrapolate) {
     const auto& mat = get_material(name);
     // NaN would fail both range tests below and come out as the clamped end
     // value (#769): refuse a non-finite T on every path.
     validation::require_finite(T, "material_conductivity: T must be finite");
     if (T >= mat.T_min && T <= mat.T_max) {
-        return mat.k_func(T);
+        return mat.kd_func(T);
     }
     if (!(T > 0.0)) {
         throw std::invalid_argument("material_conductivity: T must be > 0 K for " + name +
@@ -492,25 +558,35 @@ double material_conductivity(const std::string& name, double T, bool extrapolate
     const bool below = T < mat.T_min;
     const DataEnd end = data_end(mat, below);
     double k = 0.0;
+    double dk_dT = 0.0;
     if (extrapolate) {
         // The linear continuation of the end slope (opt-in, unbounded).
         k = end.k + end.slope * (T - end.T);
+        dk_dT = end.slope;
     } else {
         // The envelope (#882): the end slope ramped linearly to 0 over
         // ENVELOPE_FADE, then flat; held beyond the envelope's ends.
         const double T_edge = below ? envelope_T_min(mat) : envelope_T_max(mat);
+        const bool held = below ? !(T > T_edge) : !(T < T_edge);
         const double T_c = below ? (T > T_edge ? T : T_edge) : (T < T_edge ? T : T_edge);
         const double d = below ? end.T - T_c : T_c - end.T;  // >= 0, into the envelope
         const double w = ENVELOPE_FADE;
         const double reach = d < w ? d - d * d / (2.0 * w) : 0.5 * w;
         k = end.k + (below ? -end.slope : end.slope) * reach;
+        // dk/dT = slope (1 - d/w) inside the fade on either side (dd/dT is
+        // -1 below, +1 above), 0 once flat or held.
+        dk_dT = (d < w && !held) ? end.slope * (1.0 - d / w) : 0.0;
     }
     if (!(k > 0.0)) {
         throw std::invalid_argument("material_conductivity: continuing " + name + " to " +
                                  std::to_string(T) + " K gives k = " + std::to_string(k) +
                                  " W/(m*K) <= 0");
     }
-    return k;
+    return {k, dk_dT};
+}
+
+double material_conductivity(const std::string& name, double T, bool extrapolate) {
+    return material_conductivity_and_slope(name, T, extrapolate).k;
 }
 
 std::vector<std::string> list_materials() {

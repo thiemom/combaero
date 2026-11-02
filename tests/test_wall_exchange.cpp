@@ -135,6 +135,10 @@ TEST(WallExchange, DerivativesMatchCentralDifferences) {
             [&](double v) { return exchange(c.C_a, c.C_b, cf, kHa, kHb, v); });
       check(r.dQ_dT_aw_b, kTb,
             [&](double v) { return exchange(c.C_a, c.C_b, cf, kHa, kHb, kTa, v); });
+      // #932: dQ/d(t/k) of the layer.
+      check(r.dQ_dR_wall, kLayers[0], [&](double v) {
+        return wall_exchange_and_jacobian(kHa, kTa, c.C_a, kHb, kTb, c.C_b, {v}, kA, 0.0, cf);
+      });
     }
   }
 }
