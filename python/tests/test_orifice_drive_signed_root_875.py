@@ -6,8 +6,9 @@ iterate above the flux at which that static falls to the outlet pressure
 gives m_calc < 0; the inner solve then followed the mirrored branch down to
 the approach pipe's choke and stopped on a spurious reversed root tens of
 times the true flow, where the row has no pressure column at all. A fixed Cd
-0.98 at beta 0.95 (the liner-cooling example's exits before #874) hit it and
-the coupled solve stopped making progress.
+0.98 at beta 0.95 (the liner-cooling example's exits, lumped by #874 as a
+workaround and back in their pipes since) hit it and the coupled solve
+stopped making progress; test_combustor_liner_cooling_coupled covers them.
 
 On the mirrored side the slope of m_calc at |a| = m* is +x^2 with
 x = C E beta^2 (the jet's effective area over the pipe's): it is the
@@ -18,9 +19,7 @@ at x = 1.10 and 1.28x at x = 2.05 (Cd 0.98, beta 0.95).
 """
 
 import math
-import sys
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -123,21 +122,6 @@ def test_inner_root_has_the_sign_of_the_drive(regime: str, ratio: float) -> None
     r1 = ratio * root - _row(e, ratio * root, DPT + h)[0]
     assert d_an == pytest.approx((r1 - r0) / h, rel=1e-4)
     assert d_an < -1e-3
-
-
-def test_liner_example_exits_in_pipe_converge(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The liner-cooling example with its two exits back in their pipes
-    (in_pipe=True, as before #874's workaround) converges."""
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
-    import combustor_liner_cooling_network as liner
-    import test_combustor_liner_cooling_coupled as coupled
-
-    def in_pipe_orifice(*args: object, **kwargs: object) -> OrificeElement:
-        kwargs["in_pipe"] = True
-        return OrificeElement(*args, **kwargs)
-
-    monkeypatch.setattr(liner, "OrificeElement", in_pipe_orifice)
-    coupled.test_coupled_combustor_network_converges_without_warning()
 
 
 def _cd_at(beta: float, x: float) -> float:
