@@ -615,6 +615,34 @@ documents:
     folder andrews_88-GT-290_fig10_data/ (renamed 2026-10-25 from andrews_86-GT-290_fig10_data/; the CSVs
     inside keep their andrews_86-GT-290_ prefix) and andrews_88-GT-290_fig_10.png. Title from the repo record
     (not in p.1 text layer). Local only (gitignored).'
+- file: sources/heat_transfer/film/Ballal_Lefebvre_1973_Cranfield_SME4_film_cooled_wall_T.pdf
+  citation: Ballal, D. R., Lefebvre, A. H. (1973). A proposed method for calculating film-cooled wall temperatures
+    in gas turbine combustion chambers. Cranfield Institute of Technology, Report SME No. 4, June 1973 (the
+    report version of ASME Paper 72-WA/HT-24, same title and authors).
+  topic: [film, combustion]
+  content: 'Typed scan, 20 pp. (TU Delft library copy); the text layer garbles exponents, read equations from
+    page images. Film-side heat transfer: Colburn far field Eq. 2 (x/s > 50), Seban near-slot Nu = 0.090
+    [Re_s x/s]^0.7 for m < 1.3 (Eq. 3, Fig. 1), Myers wall-jet Stanton form Eq. 4 reduced at theta = 2 to Nu
+    = 0.10 Re_s^0.8 (x/s)^0.44 for m > 1.3 (Eqs. 5-6, Fig. 2 with Cranfield''s own rig data and Pai-Whitelaw).
+    Lip-thickness correction factor Eq. 7 and the thick-lip effectiveness eta = 1.10 m^0.65 (mu_c/mu_m)^0.15
+    (x/s)^-0.2 (t/s)^-0.2 (Eq. 8, 0.5 < m < 1.3) and eta = 1.28 (mu_c/mu_m)^0.15 (x/s)^-0.2 (t/s)^-0.2 (Eq.
+    9, 1.3 < m < 4.0); Figs. 3/4 plot the fitted points (Kacker-Whitelaw, Sivasegaram-Whitelaw, t/s 0.13-1.9).
+    Liner balance R1 + C1 = R2 + C2 (Eqs. 10-13) with film C1 (Eqs. 14/15). Worked appendix at x/s 18, t/s
+    0.4, m 2.54, 30 atm, 880 K: eta 0.785, Tw,ad 1180 K, h 1.96 kW/m2K, e_m 0.60. Figs. 5/6: thermal-paint
+    wall-temperature ranges vs prediction at 22 and 30 atm, combustion efficiency 85-99% by zone.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The primary behind Lefebvre & Ballal Ch. 8 Eqs. 8.37/8.38 (thick-lip eta,
+    constants identical) and 8.41-8.44 (film-side Nu), and of its film-cooled worked example. DISCREPANCY: the
+    near-slot Nu for m < 1.3 is 0.090 here (Eq. 3, credited to Seban) but 0.069 in the book (Eq. 8.41), 30%
+    lower; the m > 1.3 form agrees (0.10). Which is right needs Seban 1960 or the ASME 72-WA/HT-24 print. The
+    worked example gives eta 0.785 where the book prints 0.789. Plugs a real gap: combaero ships only
+    Marek-Tacina (m 0.41-1.87) and no film-side h. Figs. 3/4 are other labs'' points, so they test reproduction
+    of the fit; Figs. 5/6 are weak validation (gas T from an assumed efficiency, geometry not given).'
+  read_for: ['#714 / #763 thick-lip slot film above m 1.3', '#793 film-side Nu for the liner wall balance',
+    'provenance of Lefebvre & Ballal Eqs. 8.37-8.44']
+  issues: [714, 763, 793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). Not implemented.
 - file: sources/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
   citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
     experimental and computational methods for modelling multiple row effusion cooling performance. Int.
@@ -2472,7 +2500,7 @@ documents:
     Lefebvre exposes: gas radiation with luminosity (primary Lefebvre-Herbert 1960, wanted); plunged-hole
     Cd and Kaddah''s Cd(K, alpha) for liner holes (secondary, primaries are Cranfield MSc theses; NACA TN
     3663, now registered, instead); thick-lip and high-M slot film plus film-side Nu (primary Ballal-Lefebvre 1972,
-    wanted, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
+    held since 2026-11-02 as Cranfield SME Report 4, which prints 0.090 where Eq. 8.41 prints 0.069, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
     penetration (secondary, Holdeman already registered is the better source). LinearThetaHeadLoss in
     network/pressure_loss.py is Eqs. 4.8-4.10 in form (k = 1 is Eq. 4.9''s low-Mach constant-area value)
     but cites no source. Book errata found while reproducing: Eq. 8.29 prints C2 = 291(Tw2 - 880) for
@@ -3986,17 +4014,6 @@ wanted:
     (Lefebvre Eqs. 8.7, 8.11, 8.12) -- the radiation combaero lacks entirely; what data L was fitted to and
     over what pressure and fuel range.'
   where: SAGE (Proc. IMechE archive).
-- citation: Ballal, D. R., Lefebvre, A. H. (1972). A proposed method for calculating film-cooled wall temperatures
-    in gas turbine combustion chambers. ASME Paper 72-WA/HT-24.
-  checked: false
-  issues:
-  - 763
-  priority: later
-  question: 'Primary for the thick-lip slot-film effectiveness (Lefebvre Eqs. 8.37/8.38, blowing ratio up to 4
-    where Marek-Tacina stops at 1.87) and the film-side Nusselt numbers (Eqs. 8.41/8.43) that combaero''s film
-    path lacks -- with the data they were fitted to. Companion: Ballal and Lefebvre (1973) J. Heat Transfer 95,
-    265-266 (near-slot region).'
-  where: Not found by the user (2026-10-29); the book reprint (Lefebvre & Ballal Ch. 8, held) is implemented meanwhile. ASME Digital Collection.
 - citation: Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
     AFWAL-TR-84-2104.
   checked: false
@@ -4100,8 +4117,9 @@ wanted:
   priority: now
   question: 'The near-slot (potential-core) region of thick-lip slot films, where the Ballal-Lefebvre 1972
     correlation (reprinted in Lefebvre & Ballal Ch. 8, held) is weakest; liner cooling rings are short, so much
-    of each segment is near-slot. The 1972 primary could not be found (2026-10-29); the thick-lip film and
-    film-side Nu are implemented from the book (a reprint, checked only against its worked example).'
+    of each segment is near-slot. The 1972 method is now held as its Cranfield report version (SME No. 4,
+    1973, screened 2026-11-02); the thick-lip film and film-side Nu are NOT implemented (only Marek-Tacina
+    ships; the earlier "implemented from the book" note here was wrong).'
   where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled).
 - citation: ISO 5167:1980 (or its restatement ISO 5167-1:1991). Measurement of fluid flow by means of
     orifice plates, nozzles and Venturi tubes inserted in circular cross-section conduits running full.
