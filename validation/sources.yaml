@@ -983,6 +983,100 @@ documents:
   records: []
   notes: Fetched 2026-11-02 from Oxford ORA (uuid:4a84aefb-dfa5-4994-ae6e-fa3ebd544af4); the MDPI PDF URL
     returned 403 to an automated fetch. Extended version of an ETC 2021 paper.
+- file: sources/heat_transfer/film/Choe_Kays_Moffat_1976_NASA_CR-2642_full_coverage_normal_injection.pdf
+  citation: Choe, H., Kays, W. M., Moffat, R. J. (1976). Turbulent boundary layer on a full-coverage film-cooled
+    surface -- an experimental heat transfer study with normal injection. NASA CR-2642 (Stanford Report HMT-22),
+    January 1976, NAS 3-14336.
+  id: NASA CR-2642
+  topic: [film, effusion]
+  content: 'Scan, 298 pp. (296 per the report form); the text layer is garbled, the page images read cleanly.
+    Full-coverage film cooling with NORMAL (90 deg) injection: staggered holes D = 1.03 cm (0.406 in.), P/D 5
+    and 10 (10 by plugging), 11 blown rows on plates 2-12 of a 36-plate copper test surface (plates 13-36 the
+    recovery region), air, M 0.1-1.0, Re_x 1.7e5-5e6, U_inf 9.1-33.5 m/s (30-110 ft/s). Data at theta = 0 and
+    theta = 1 (injectant at mainstream and at wall temperature), combined by linear superposition, h on the
+    mainstream-to-wall difference. Appendix A (from PDF p. 165; nomenclature p. 153) TABULATES run by run and
+    plate by plate: REXCOL/REXHOT, Re_Delta2, St(theta=0), St(theta=1), ETA = 1 - St(theta=1)/St(theta=0) (the
+    superposition effectiveness), STCR = St(theta=0)/St_o and STHR = St(theta=1)/St_o (the St/St0 ratios,
+    St_o the unblown flat-plate reference), F-COL / F-HOT (blowing fraction F) and PHI-1, plus velocity and
+    temperature profiles at the start of blowing. Example (runs 073073/070573, U ~53 ft/s, F ~0.003): ETA
+    0.20-0.36 over plates 2-12, STCR 0.90-1.14 in the blown region. Chapter V: a 2-D boundary-layer prediction
+    with jet penetration and augmented mixing.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (lead''s screening, columns confirmed on pp. 153/158). Uses: (a) STCR =
+    St(theta=0)/St_o is a measured gas-side augmentation of a multi-row array relative to the unblown plate --
+    the quantity EffusionPlateElement leaves to the user (`gas_augmentation`, #476); (b) ETA over 11 rows is
+    multi-row effectiveness data bearing on the Sellers vs Kirollos-Povey superposition question (#387). NOT
+    combustor-like: normal 90 deg holes, DR ~1, low speed; for combustor liners the 30 deg slant data of CR-2648
+    / CR-2786 (own entries) are the relevant set, and a cross-source accuracy use must say so. The tables are
+    typed computer output in a scan: transcription needs page-image reading (the text layer is unusable).
+    Not checked: Chapter V prediction constants; the velocity/temperature profile tables.'
+  read_for: ['#476 effusion gas-side augmentation (St/St0 measured)', '#387 multi-row superposition (11 rows)']
+  issues: [387, 476]
+  records: []
+  notes: 'Supplied by the lead 2026-11-02 (NTRS, open access). The NAS 3-14336 series: CR-2642 (this), CR-2648
+    (summary, normal + 30 deg slant), CR-2786 (30 deg slant), CR-3103 (compound angle, Kim et al. 1979, not
+    held), CR-3104 (Yavuzkurt et al. 1979, hydrodynamics, not held), CR-3219 (1980 summary).'
+- file: sources/heat_transfer/film/Crawford_Choe_Kays_Moffat_1976_NASA_CR-2648_full_coverage_normal_and_30deg_slant_summary.pdf
+  citation: Crawford, M. E., Choe, H., Kays, W. M., Moffat, R. J. (1976). Full-coverage film cooling heat transfer
+    study -- summary of data for normal-hole injection and 30 deg slant-hole injection. NASA CR-2648 (Stanford
+    Report HMT-19), March 1976, NAS 3-14336.
+  id: NASA CR-2648 (NTRS 19760011294)
+  topic: [film, effusion]
+  content: 'Scan with a usable text layer, 146 pp. (145 per the form). Two test sections, 11 staggered rows of D =
+    1.03 cm holes at P/D 5 (and 10 by plugging): NORMAL holes and holes SLANTED 30 deg to the surface in the
+    downstream direction. M 0 to 1.3; initial Re_delta2 500-5000, Re_Delta2 100-1800; Re_D 6000-22,000; initial
+    boundary layer 0.5-2.0 D; U_inf 9-33 m/s (slant series mostly 16.8 m/s, thin-boundary-layer runs 11.7 m/s);
+    air, theta = 0 and theta = 1 with superposition, unheated or heated starting length. Figs. 8-49 plot St vs
+    Re_x and Re_Delta2; the Appendix TABULATES every run in the CR-2642 format (St(theta=0), St(theta=1), ETA,
+    STCR, STHR, F-COL/F-HOT, LOGB, plates 1-36), with St_o = 0.0295 Pr^-0.4 Re_x^-0.2 [1 - (xi/(x -
+    x_vo))^0.9]^(-1/9) printed under each table. Example, slant P/D 5, M 0.4 (runs 080174, p. 120): ETA rises
+    to 0.58-0.60 by the last blown rows with STCR 0.83-1.04; M 0.6 (p. 121): ETA ~0.55, STCR up to 1.16.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The summary data report of the Stanford programme, and the first source of the
+    30 deg SLANT-hole data, the most combustor-relevant of the series (combustor effusion is ~20-30 deg).
+    Findings as printed: slant injection gives a considerably lower St than normal injection; with injectant
+    at wall temperature (theta = 1) M ~0.4 gives the minimum St throughout the blown region (M 0.18 over the
+    first three plates), M ~1.2 raises St above the unblown curve; P/D 10 strongly reduces the film-cooling
+    effect for both geometries. Uses as for CR-2642 -- STCR as measured gas-side augmentation (#476), ETA over
+    11 rows for the superposition question (#387) -- now at 30 deg; still DR ~1, low Tu, low speed, P/D 5/10
+    (combustor effusion is often P/D 5-8), so cross-source accuracy only, labelled so. Tabulated: no digitising.'
+  read_for: ['#476 effusion gas-side augmentation (30 deg slant, tabulated)', '#387 multi-row effectiveness and
+      superposition']
+  issues: [387, 476]
+  records: []
+  notes: 'Fetched 2026-11-02 by the lead from NTRS (19760011294, open access, authorised by the user). A
+    duplicate copy from the user was removed. Not checked: the run-by-run table transcription (typed scan).'
+- file: sources/heat_transfer/film/Crawford_Kays_Moffat_1980_NASA_CR-3219_full_coverage_three_geometries_STANCOOL.pdf
+  citation: Crawford, M. E., Kays, W. M., Moffat, R. J. (1980). Full-coverage film cooling on flat, isothermal
+    surfaces -- a summary report on data and predictions. NASA CR-3219 (Stanford Report HMT-23), January 1980,
+    NAS 3-14336.
+  id: NASA CR-3219 (NTRS 19800007104)
+  topic: [film, effusion]
+  content: 'Scan with a usable text layer, 117 pp. Summary of the 1971-1977 Stanford programme over THREE
+    geometries, all 11 rows, P/D 5 (and 10): normal (90 deg), slant (30 deg downstream) and compound angle (30
+    deg slant skewed 45 deg). Ch. III: St vs M after rows 3, 6 and 10 for all three (Figs. 3-4, plotted;
+    theta = 0 and 1, theta = 1.5 by superposition Eq. 3), initial conditions, number of rows (6 vs 11, slant),
+    hole spacing. Ch. IV: local (spanwise-resolved) heat flux for slant injection. Ch. V: STANCOOL, the STAN5
+    boundary-layer code with an injection model (DELMR) and a turbulence-augmentation mixing-length model
+    (ALAM) whose constants are fitted per heated-starting-length P/D 5 data set (Figs. 14+). Appendix B
+    TABULATES previously unreported slant data: 11 rows blowing at M 0.20, 0.6, 0.75, 0.90 and 1.33, and 6 rows
+    at M 0.4 and 0.9, each theta = 1, theta = 0 and the superposed table.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The programme summary: as printed, normal injection gives the highest St, both
+    angled geometries show a St minimum near M 0.4-0.5, at row 3 high blowing can push St above the unblown
+    value even at theta = 1, and past the initial region compound-angle injection gives the lowest St (near
+    zero surface heat flux at row 10 for M 0.4-0.6); 11 rows protect far longer downstream than 6; P/D 10 gives
+    much less protection. Its Appendix B extends the CR-2648/CR-2786 slant set (tabulated, adds M 0.75 and
+    1.33 and a 6-row case), the most useful part for #476/#387 cross-source checks. STANCOOL constants are fitted
+    per data set: tuning, not a closure for combaero. Same DR ~1 / low-speed caveats as CR-2648.'
+  read_for: ['#476 effusion gas-side augmentation (slant, compound, tabulated)', '#387 multi-row effectiveness;
+      row-count effect']
+  issues: [387, 476]
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (19800007104, open access, authorised by the user). Leads in its
+    references, not held: Kim et al. 1979 NASA CR-3103 (compound angle, HMT-28); Yavuzkurt et al. 1979 NASA
+    CR-3104 (turbulence structure, HMT-27); Crawford & Kays 1976 NASA CR-2742 (STAN5). Not checked: the Ch. IV
+    local data and the STANCOOL constants table.'
 - file: sources/heat_transfer/film/Kirollos_Povey_2015_JEGTP_137_122608_energy_based_film_superposition.pdf
   citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
     film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122608.
