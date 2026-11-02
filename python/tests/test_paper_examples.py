@@ -201,19 +201,19 @@ def test_c3x_gui_file_is_current(c3x: ModuleType) -> None:
 
 
 def test_c3x_panel_numbers(c3x: ModuleType) -> None:
-    """The panel quotes: untuned run 158 MAE 27 K, bias -21 K, worst 83 K at the
-    leading edge; run 149 with run 158's multipliers MAE 12 K, bias +11 K
-    (measured 2026-11-01, burner products, #882 envelope: 26.9 / -21.0 / 82.9
-    and 11.7 / +11.2)."""
+    """The panel quotes: untuned run 158 MAE 24 K, bias -14 K, worst 73 K at the
+    leading edge; run 149 with run 158's multipliers MAE 10 K, bias +9 K
+    (measured 2026-11-02, log-mean wall areas #887: 23.8 / -14.3 / 72.8 and
+    9.6 / +8.9)."""
     untuned = c3x.wall_temperatures(158, c3x.solve(158)[0])
     s = c3x.summary(untuned)
-    assert s["mae"] == pytest.approx(26.9, abs=0.5)
-    assert s["bias"] == pytest.approx(-21.0, abs=0.5)
+    assert s["mae"] == pytest.approx(23.8, abs=0.5)
+    assert s["bias"] == pytest.approx(-14.3, abs=0.5)
     worst = max(untuned, key=lambda r: abs(r["Tw_network"] - r["Tw_measured"]))
-    assert worst["s0"] == 0.0 and abs(worst["Tw_network"] - worst["Tw_measured"]) > 80.0
+    assert worst["s0"] == 0.0 and abs(worst["Tw_network"] - worst["Tw_measured"]) > 70.0
     moved = c3x.summary(c3x.wall_temperatures(149, c3x.solve(149, c3x.TUNED)[0]))
-    assert moved["mae"] == pytest.approx(11.7, abs=0.5)
-    assert moved["bias"] == pytest.approx(11.2, abs=0.5)
+    assert moved["mae"] == pytest.approx(9.6, abs=0.5)
+    assert moved["bias"] == pytest.approx(8.9, abs=0.5)
 
 
 def test_c3x_wall_faces_are_the_segment_and_the_hole_share(c3x: ModuleType) -> None:
@@ -227,7 +227,7 @@ def test_c3x_wall_faces_are_the_segment_and_the_hole_share(c3x: ModuleType) -> N
         ratio = g["f"] * math.pi * holes[g["hole"]]["D"] / g["L"]
         assert wall.area_a == pytest.approx(g["L"] * c3x.SPAN, rel=1e-12)
         assert wall.area_b == pytest.approx(ratio * g["L"] * c3x.SPAN, rel=1e-12)
-        assert wall.contact_area is None and wall.wall_area == "slab_a"
+        assert wall.contact_area is None and wall.wall_area == "log_mean"
         assert 0.1 < ratio < 1.0
         el = net.elements[f"c{g['hole']}_{g['id']}"]
         assert el.surface.Nu_multiplier == 1.0

@@ -4,9 +4,9 @@
     "title": "Hylton 1983 C3X cooled vane",
     "source": "Hylton, Mihelc, Turner, Nealy and York (1983), NASA CR-168015: the C3X radially cooled vane cascade, run 158 (Appendix A), Tables III, IV, IX, Fig. 7.",
     "reproduced": "Ambient humid air, compressed, burns CH4 so that the cascade inlet is at the measured Tt1 and Pt1 (as in the rig's natural-gas burner). Each row is one stretch of vane surface and the cooling hole nearest to it: burner gas from the cascade inlet to the measured local static pressure, a ss310 wall as thick as the mean distance to the hole, and the hole's share of its coolant flow. The gas-side Nu multipliers are fitted to the measured midspan wall temperature.",
-    "where_to_look": "Solve, then select a wall edge: T_hot is the gas-side wall temperature, equal to the measured Tw of that segment (the tuning target). The gas channels' Nu_multiplier is the fitted tuner (0.8-1.2 mid-chord suction side, about 2.2 at the leading edge, where a channel correlation has no stagnation flow). Each wall has its two faces: the segment's area on the gas side, the hole's share of its perimeter on the coolant side.",
+    "where_to_look": "Solve, then select a wall edge: T_hot is the gas-side wall temperature, equal to the measured Tw of that segment (the tuning target). The gas channels' Nu_multiplier is the fitted tuner (0.7-1.1 mid-chord suction side, about 1.9-2.0 at the leading edge, where a channel correlation has no stagnation flow). Each wall has its two faces: the segment's area on the gas side, the hole's share of its perimeter on the coolant side.",
     "label": "tuned",
-    "label_note": "Tuned to run 158 (19 Nu multipliers for 19 measured Tw; none left over). Untuned, the smooth-channel network misses run 158 by MAE 27 K (bias -21 K, worst -83 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with these multipliers: MAE 12 K, bias +11 K. The report's h is inferred by its own FE model, not measured, and is not a target.",
+    "label_note": "Tuned to run 158 (19 Nu multipliers for 19 measured Tw; none left over). Untuned, the smooth-channel network misses run 158 by MAE 24 K (bias -14 K, worst -73 K at the leading edge): cross-source. Run 149 (Tu 6.5% vs 8.3%) with these multipliers: MAE 10 K, bias +9 K. The report's h is inferred by its own FE model, not measured, and is not a target.",
     "script": "python/examples/papers/hylton1983_c3x_vane.py"
   },
   "nodes": [
@@ -132,7 +132,7 @@
         "id": "c2_SS0_h2_in",
         "label": "hole 2, share 0.33",
         "m_dot": 0.005813800917071058,
-        "Tt": 349.6127791208593,
+        "Tt": 350.5175261346,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -204,7 +204,7 @@
         "id": "c1_SS1_h1_in",
         "label": "hole 1, share 1.00",
         "m_dot": 0.0167,
-        "Tt": 348.18962403858836,
+        "Tt": 349.07209825204893,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -276,7 +276,7 @@
         "id": "c3_SS2_h3_in",
         "label": "hole 3, share 0.59",
         "m_dot": 0.008783111747735856,
-        "Tt": 341.89309764558857,
+        "Tt": 342.2015131135195,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -348,7 +348,7 @@
         "id": "c4_SS3_h4_in",
         "label": "hole 4, share 0.53",
         "m_dot": 0.008685637213505367,
-        "Tt": 342.74610371814435,
+        "Tt": 343.3656618038068,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -420,7 +420,7 @@
         "id": "c5_SS4_h5_in",
         "label": "hole 5, share 0.51",
         "m_dot": 0.008987114259229302,
-        "Tt": 333.18128236449974,
+        "Tt": 333.73927299156827,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -492,7 +492,7 @@
         "id": "c6_SS5_h6_in",
         "label": "hole 6, share 0.51",
         "m_dot": 0.008473564872987631,
-        "Tt": 362.72017058132576,
+        "Tt": 363.1398534815765,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -564,7 +564,7 @@
         "id": "c7_SS6_h7_in",
         "label": "hole 7, share 0.51",
         "m_dot": 0.008208102464630645,
-        "Tt": 340.6855043084636,
+        "Tt": 341.1159742983911,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -636,7 +636,7 @@
         "id": "c8_SS7_h8_in",
         "label": "hole 8, share 0.50",
         "m_dot": 0.002771985237825221,
-        "Tt": 360.62602791611596,
+        "Tt": 362.60073319574553,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -708,7 +708,7 @@
         "id": "c9_SS8_h9_in",
         "label": "hole 9, share 0.49",
         "m_dot": 0.0017271317588859747,
-        "Tt": 383.5271990565113,
+        "Tt": 385.03827070161253,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -780,7 +780,7 @@
         "id": "c10_SS9_h10_in",
         "label": "hole 10, share 0.51",
         "m_dot": 0.0008706068214972006,
-        "Tt": 411.67408329700777,
+        "Tt": 414.16045079009916,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -852,7 +852,7 @@
         "id": "c2_PS0_h2_in",
         "label": "hole 2, share 0.67",
         "m_dot": 0.011586199082928942,
-        "Tt": 349.6127791208593,
+        "Tt": 350.5175261346,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -924,7 +924,7 @@
         "id": "c3_PS1_h3_in",
         "label": "hole 3, share 0.41",
         "m_dot": 0.006016888252264144,
-        "Tt": 341.89309764558857,
+        "Tt": 342.2015131135195,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -996,7 +996,7 @@
         "id": "c4_PS2_h4_in",
         "label": "hole 4, share 0.47",
         "m_dot": 0.007814362786494632,
-        "Tt": 342.74610371814435,
+        "Tt": 343.3656618038068,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1068,7 +1068,7 @@
         "id": "c5_PS3_h5_in",
         "label": "hole 5, share 0.49",
         "m_dot": 0.0085128857407707,
-        "Tt": 333.18128236449974,
+        "Tt": 333.73927299156827,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1140,7 +1140,7 @@
         "id": "c6_PS4_h6_in",
         "label": "hole 6, share 0.49",
         "m_dot": 0.00802643512701237,
-        "Tt": 362.72017058132576,
+        "Tt": 363.1398534815765,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1212,7 +1212,7 @@
         "id": "c7_PS5_h7_in",
         "label": "hole 7, share 0.49",
         "m_dot": 0.007891897535369353,
-        "Tt": 340.6855043084636,
+        "Tt": 341.1159742983911,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1284,7 +1284,7 @@
         "id": "c8_PS6_h8_in",
         "label": "hole 8, share 0.50",
         "m_dot": 0.002728014762174779,
-        "Tt": 360.62602791611596,
+        "Tt": 362.60073319574553,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1356,7 +1356,7 @@
         "id": "c9_PS7_h9_in",
         "label": "hole 9, share 0.51",
         "m_dot": 0.0017628682411140253,
-        "Tt": 383.5271990565113,
+        "Tt": 385.03827070161253,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1428,7 +1428,7 @@
         "id": "c10_PS8_h10_in",
         "label": "hole 10, share 0.49",
         "m_dot": 0.0008393931785027993,
-        "Tt": 411.67408329700777,
+        "Tt": 414.16045079009916,
         "composition": {
           "source": "custom",
           "mode": "mass",
@@ -1535,7 +1535,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 2.1483,
+        "Nu_multiplier": 1.9359,
         "f_multiplier": 1.0
       }
     },
@@ -1574,7 +1574,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.8513,
+        "Nu_multiplier": 0.7743,
         "f_multiplier": 1.0
       }
     },
@@ -1612,7 +1612,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.1338,
+        "Nu_multiplier": 1.0897,
         "f_multiplier": 1.0
       }
     },
@@ -1651,7 +1651,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.0715,
+        "Nu_multiplier": 0.9948,
         "f_multiplier": 1.0
       }
     },
@@ -1690,7 +1690,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.1427,
+        "Nu_multiplier": 1.0739,
         "f_multiplier": 1.0
       }
     },
@@ -1729,7 +1729,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.0201,
+        "Nu_multiplier": 0.9723,
         "f_multiplier": 1.0
       }
     },
@@ -1768,7 +1768,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.0936,
+        "Nu_multiplier": 1.05,
         "f_multiplier": 1.0
       }
     },
@@ -1807,7 +1807,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.1102,
+        "Nu_multiplier": 1.0162,
         "f_multiplier": 1.0
       }
     },
@@ -1846,7 +1846,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.9227,
+        "Nu_multiplier": 0.8716,
         "f_multiplier": 1.0
       }
     },
@@ -1885,7 +1885,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.7872,
+        "Nu_multiplier": 0.7359,
         "f_multiplier": 1.0
       }
     },
@@ -1924,7 +1924,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 2.1919,
+        "Nu_multiplier": 1.9902,
         "f_multiplier": 1.0
       }
     },
@@ -1963,7 +1963,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.7756,
+        "Nu_multiplier": 1.707,
         "f_multiplier": 1.0
       }
     },
@@ -2002,7 +2002,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.4185,
+        "Nu_multiplier": 1.3156,
         "f_multiplier": 1.0
       }
     },
@@ -2041,7 +2041,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.4454,
+        "Nu_multiplier": 1.3571,
         "f_multiplier": 1.0
       }
     },
@@ -2080,7 +2080,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.195,
+        "Nu_multiplier": 1.139,
         "f_multiplier": 1.0
       }
     },
@@ -2119,7 +2119,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.4116,
+        "Nu_multiplier": 1.3566,
         "f_multiplier": 1.0
       }
     },
@@ -2158,7 +2158,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.3817,
+        "Nu_multiplier": 1.2718,
         "f_multiplier": 1.0
       }
     },
@@ -2197,7 +2197,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 1.0156,
+        "Nu_multiplier": 0.9613,
         "f_multiplier": 1.0
       }
     },
@@ -2236,7 +2236,7 @@
         "roughness": 0.0,
         "friction_model": "haaland",
         "regime": "compressible",
-        "Nu_multiplier": 0.884,
+        "Nu_multiplier": 0.8286,
         "f_multiplier": 1.0
       }
     },
@@ -3038,7 +3038,7 @@
         "R_fouling": 0.0,
         "area_a": 0.001115572600568853,
         "area_b": 0.000503913857235458,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.009412658636754305,
         "conductivity": 20.0
@@ -3064,7 +3064,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0029748602681836083,
         "area_b": 0.001508152969282316,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.009452807595920903,
         "conductivity": 20.0
@@ -3090,7 +3090,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0010817673702485848,
         "area_b": 0.0008950186528301502,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.012414822866255816,
         "conductivity": 20.0
@@ -3116,7 +3116,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0012507935218499266,
         "area_b": 0.0007938951244640668,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.009839515611198174,
         "conductivity": 20.0
@@ -3142,7 +3142,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0012169882915296574,
         "area_b": 0.0007745110317334922,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.007348191103906363,
         "conductivity": 20.0
@@ -3168,7 +3168,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0012169882915296585,
         "area_b": 0.0007745110317334926,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.00543146173273559,
         "conductivity": 20.0
@@ -3194,7 +3194,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0012845987521701947,
         "area_b": 0.0007688865903233668,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.0041387100152508296,
         "conductivity": 20.0
@@ -3220,7 +3220,7 @@
         "R_fouling": 0.0,
         "area_a": 0.001115572600568854,
         "area_b": 0.0003740199445431991,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.0044187893481313495,
         "conductivity": 20.0
@@ -3246,7 +3246,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0011831830612093882,
         "area_b": 0.00036725403923079924,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.003772844965744753,
         "conductivity": 20.0
@@ -3272,7 +3272,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0010817673702485848,
         "area_b": 0.00024132148524816821,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.003358955791139091,
         "conductivity": 20.0
@@ -3298,7 +3298,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0022232006953831376,
         "area_b": 0.0010042391120468582,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.008301896645978937,
         "conductivity": 20.0
@@ -3324,7 +3324,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0007410668984610459,
         "area_b": 0.0006131343164521659,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.011835286157581783,
         "conductivity": 20.0
@@ -3350,7 +3350,7 @@
         "R_fouling": 0.0,
         "area_a": 0.001125323808774181,
         "area_b": 0.0007142578448182491,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.00964320331410948,
         "conductivity": 20.0
@@ -3376,7 +3376,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0011527707309394054,
         "area_b": 0.0007336419375488238,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.007250244679385102,
         "conductivity": 20.0
@@ -3402,7 +3402,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0011527707309394054,
         "area_b": 0.0007336419375488236,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.00528387400855159,
         "conductivity": 20.0
@@ -3428,7 +3428,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0012351114974350772,
         "area_b": 0.0007392663789589491,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.003997435797222388,
         "conductivity": 20.0
@@ -3454,7 +3454,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0010978768866089566,
         "area_b": 0.0003680870720877819,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.0041199198322299626,
         "conductivity": 20.0
@@ -3480,7 +3480,7 @@
         "R_fouling": 0.0,
         "area_a": 0.0012076645752698517,
         "area_b": 0.0003748529774001817,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.0036535565815879172,
         "conductivity": 20.0
@@ -3506,7 +3506,7 @@
         "R_fouling": 0.0,
         "area_a": 0.00104298304227851,
         "area_b": 0.0002326694479548454,
-        "wall_area": "slab_a",
+        "wall_area": "log_mean",
         "orientation": "aligned",
         "thickness": 0.003244084852710431,
         "conductivity": 20.0
