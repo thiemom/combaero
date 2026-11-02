@@ -2826,6 +2826,42 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/ceas-2007-026.pdf. PDF metadata creation date is wrong (1999); the conference is 2007.
+    Its validation plate is Andreini et al. ICAS 2006 (held, screened 2026-11-02).
+- file: sources/heat_transfer/film/Andreini_et_al_2006_ICAS2006-5.8.3_effusion_liner_THALIE.pdf
+  citation: Andreini, A., Champion, J. L., Facchini, B., Mercier, E., Surace, M. (2006). Advanced liner cooling
+    numerical analysis for low emission combustors. 25th ICAS Congress, Hamburg, paper ICAS 2006-5.8.3.
+  id: ICAS 2006-5.8.3 (icas.org archive 181.PDF)
+  topic: [effusion, film, combustion]
+  content: 'Open access (icas.org archive), 12 pp., Word text layer. INTELLECT D.M. effusion plate on the
+    LCD-CNRS Poitiers THALIE rig: kerosene burner hot side (T1 ~1000 K, p1 3 bar, Re1 56,000, main duct 123 x
+    72 mm), coolant T2 273 K (cold duct 100 x 20 mm, Re2 56,000-75,000), Dp/p < 5%, Mh < 0.2, a bleed (Q3) at
+    the coolant exit. Plate 2 mm thick with TWO patterns (Fig. 2): D 0.6 mm, X/D 6.5, Y/D 6.6; then D 0.4 mm,
+    X/D 9.25, Y/D 10. Hole inclination is NOT printed (an input to the CFD, value not given); row counts not
+    printed. MEASURED: adiabatic effectiveness only, as a CO2 mass-transfer analogue eta_ad = (C1 - C_wall)/C1
+    from gas sampling with a 0.5 mm probe (error < 5%), along x (Figs. 7, 8, 19, plotted only); total
+    coolant flow 39.6 g/s measured vs 37.1 g/s from SNECMA CFD. Wall temperatures are NOT reported as
+    measurements. Overall effectiveness (Figs. 15, 22) and hot-side wall temperature (Fig. 16) are CALCULATED
+    only: SNECMA N3S-Natur porosity CFD + ABAQUS, the Florence SRBC 1-D network (L''Ecuyer-Soechting rows +
+    Sellers superposition) + ANSYS 2-D wall in six variants (Cd 0.9, Cd 0.73, heat sink off, film off), and
+    STAR-CD 3-D conjugate CFD of the first eight rows. Table 3 (network result): effusion mass flow "0.937
+    kg/s", BR 7.3, VR 2.1 -- the 0.937 kg/s is inconsistent with the 39.6 g/s measured and Table 2''s Q2 "0.1"
+    (units as printed g/s); not resolved.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Does NOT give what the wanted entry hoped for: there is no measured overall
+    effectiveness or wall temperature, so it is not a second-lab overall-effectiveness set for
+    EffusionPlateElement beside Andrews 88-GT-290 -- the overall-effectiveness curves are code-to-code only.
+    What it holds is a plotted eta_ad(x) on a two-pattern combustor plate at BR ~7 (network value) and DR ~3.7
+    (T1/T2), measured by CO2 sampling at one probe height; with hole angle and row count missing the plate
+    cannot be rebuilt, so even the eta_ad curve is at most a qualitative cross-source check (Florence/CNRS
+    rig, different lab from Andrews and from Andrei 2014). Its methodology part (SRBC + 2-D FEM, the six
+    sensitivity variants: heat sink dominates the first part of the plate, film the last) is the same
+    procedure CEAS-2007-026 and Caciolli (held) document. No closure, no implementation.'
+  read_for: ['#793 effusion plate with measured overall effectiveness (cross-source for EffusionPlateElement)']
+  issues: [793]
+  records: []
+  notes: Fetched 2026-11-02 from icas.org (ICAS_ARCHIVE/ICAS2006/PAPERS/181.PDF). The rig is THALIE, ref. [23]
+    of the paper; the CNRS/Poitiers group's own papers on it might carry the hole angle and wall temperatures
+    (not searched).
 - file: sources/radiation/bordbar_et_al_2021_IJHMT_173_121207_pressure_dependent_WSGG.pdf
   citation: 'Bordbar, H., Coelho, F. R., Fraga, G. C., Franca, F. H. R., Hostikka, S. (2021). Pressure-dependent
     weighted-sum-of-gray-gases models for heterogeneous CO2-H2O mixtures at sub- and super-atmospheric pressure.
@@ -4244,16 +4280,6 @@ wanted:
     prints the set in full (Eqs. 8.4-8.15) and suffices to implement it; this paper would add the data
     behind the luminosity factor.
   where: Elsevier journal.
-- citation: Andreini, A., Champion, J. L., Facchini, B., Mercier, E., Surace, M. (2006). Advanced liner cooling
-    numerical analysis for low emission combustors. 25th ICAS Congress, Hamburg.
-  checked: false
-  issues:
-  - 793
-  priority: later
-  question: The effusion flat plate with measured overall effectiveness that CEAS-2007-026 validates against;
-    a second-lab cross-source set for EffusionPlateElement beside Andrews 88-GT-290, if the plate geometry
-    and conditions are printed.
-  where: ICAS 2006 proceedings (icas.org archive, open).
 - citation: Gritsch, M., Schulz, A., Wittig, S. (1998). Discharge coefficient measurements of film-cooling holes
     with expanded exits. ASME J. Turbomachinery 120(3), 557-563 (ASME 97-GT-165).
   checked: false
