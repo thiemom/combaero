@@ -731,13 +731,42 @@ documents:
     1959 and Papell 1960 (NASA TN D-130, D-299), Kirollos & Povey 2015 (energy-consistent superposition, #387),
     Sturgess 1980/1986, Goldstein, Shavit & Chen 1965 (porous section); Simon 1986, Hatch & Papell 1959, Papell
     1960 and Kirollos & Povey 2015 are now held (own entries), the others wanted or noted here. The data
-    are Wambersie, Ireland & Mayo 2021, IJTPP 6(2) 16 (open access, not held).'
+    are Wambersie, Wong, Ireland & Mayo 2021, IJTPP 6(2) 16 (held since 2026-11-02).'
   read_for: ['#714 slot film leads (turbulence closure, core length)', '#387 superposition alternatives',
     transpiration / high-porosity film]
   issues: [387, 714]
   records: []
   notes: Arrived 2026-11-02 in sources/new/ (from the user). Murray et al. 2018 IJTPP 3(1) 4 (multi-row effusion,
-    high-resolution data and model; open access) is another lead it cites.
+    high-resolution data and model; open access) is another lead it cites -- already held (the
+    c32eeeb88f... entry below, the murray2018 accuracy set). Wambersie et al. 2021 now held (next entry).
+- file: sources/heat_transfer/film/Wambersie_Wong_Ireland_Mayo_2021_IJTPP_6_16_transpiration_panel_film.pdf
+  citation: Wambersie, A., Wong, H., Ireland, P., Mayo, I. (2021). Experiments of transpiration cooling inspired
+    panel cooling on a turbine blade yielding film effectiveness levels over 95%. Int. J. Turbomach. Propuls.
+    Power 6(2), 16.
+  id: doi:10.3390/ijtpp6020016
+  topic: [film, effusion]
+  content: 'Open access (CC BY), 12 pp., the Oxford ORA copy (its text layer interleaves the published and a
+    peer-review version; figures and tables read from page images). Oxford high-speed HP blade cascade at
+    engine Re and Mach distribution, mainstream 1.43 kg/s; 3-D printed hollow blades, panels of 0.5 mm holes at
+    45 deg to the surface, L/d 6, 60 x 18 mm, square pitch. Table 1: seven panels -- pitch/d 2.1 (porosity
+    ~25%) on SS at 0.1 and 0.64 of chord and PS at 0.1 and 0.33 (Panels 1-4), pitch/d 2.4 and 1.8 (20%, 30%)
+    and a staggered 2.1 panel on SS at 0.1. Eight coolant flows 5-25 g/s (0.58-2.91% of mainstream), plenum
+    to mainstream total-pressure ratio printed per map. PSP adiabatic effectiveness maps (Figs. 2-5) and
+    spanwise-averaged eta vs x/d over the central 120 z/d (Figs. 6+); average panel BR does not exceed ~0.3;
+    eta above 0.95 behind suction-side panels. Uncertainty by reference to Gurram et al. (not restated). Film
+    lift-off behind the last rows, recovering in ~15 d; strong ingestion at low plenum pressure.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The dataset behind Wambersie & Ireland 2023 (held), which fits its C1/C2 to
+    these panels. Outside every combaero element: pitch/d 1.8-2.4 transpiration-like panels on curved,
+    accelerating blade surfaces with mainstream pressure gradient, where the authors stress that single-hole
+    models do not extrapolate. EffusionPlateElement (flat liner plates, p/d ~5-10) cannot be scored on it,
+    not even as cross-source accuracy without a curvature/pressure-gradient term; figure-only data. Not
+    implemented.'
+  read_for: ['#387 dense-array film effectiveness (high porosity)', 'data behind Wambersie & Ireland 2023']
+  issues: [387]
+  records: []
+  notes: Fetched 2026-11-02 from Oxford ORA (uuid:4a84aefb-dfa5-4994-ae6e-fa3ebd544af4); the MDPI PDF URL
+    returned 403 to an automated fetch. Extended version of an ETC 2021 paper.
 - file: sources/heat_transfer/film/Kirollos_Povey_2015_JEGTP_137_122608_energy_based_film_superposition.pdf
   citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
     film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122608.
