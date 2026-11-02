@@ -858,6 +858,44 @@ documents:
   notes: 'Arrived 2026-11-02 in sources/new/ (from the user); NTRS 20150011643, open access. Leads (free on NTRS,
     noted, not wanted unless an issue needs them): Gauntner 1980 NASA TM-81453 (the Coolit algorithm); Esgar,
     Colladay & Kaufman 1970 NASA TN D-5992 (turbine air-cooling capabilities and limits).'
+- file: sources/heat_transfer/film/Arnold_Suslov_Haidn_2009_JPP_25_2_rocket_film_cooling_accelerated_flow.pdf
+  citation: Arnold, R., Suslov, D., Haidn, O. J. (2009). Film cooling of accelerated flow in a subscale combustion
+    chamber. J. Propulsion and Power 25(2), 443-451.
+  id: doi:10.2514/1.39308
+  topic: [film, combustion]
+  content: '9 pp., publisher PDF (text layer usable, equations read from page images). DLR Lampoldshausen P8,
+    subscale chamber E: 50 mm cylindrical segment, 33 mm throat, LOX/GH2, water-cooled copper liner. Film
+    injector between cylinder and nozzle segment, 52.5 mm upstream of the throat: 40 slots, s = 0.2 mm, b = 3.0
+    mm, injection angle 15 deg, thin lip (t ~ 0), GH2 coolant at T2 ~ 307-341 K. Table 2: p_cc 12 / 8 / 5 MPa,
+    ROF 6.0, m_tot 4.22 / 2.93 / 1.84 kg/s, nine intervals; Table 3: film 0.82-2.04% of total flow, blowing rate
+    M 0.71-1.73, u2/u_cc 0.45-1.00. Hot gas accelerates ~8x over x/s 100-270 (sub-, trans- and supersonic;
+    Fig. 6). Measured: wall thermocouples 1 mm inside the copper (and surface thermocouples) at x/s 117-327.5,
+    no heat flux (inverse method abandoned), no adiabatic wall. Effectiveness is therefore a non-adiabatic wall
+    ratio, Theta*_(d>0) = (T_W,0 - T_W,f)/T_W,0 (Eq. 14), PLOTTED only (Figs. 9-10: 0.01-0.20). Model: the
+    DLR-modified Goldstein & Haji-Sheikh heat-sink form, Eq. 11, Theta = 0.83 Pr^(2/3) / (1.11 + 0.329
+    (cp_cc/cp_2) xi^1.43 Re_2s^-0.25) with xi = (x/s)(1/M), times a measurement-depth correction f(dTheta*) =
+    1 - (a1 + a2/(x/s)^0.5) (Eq. 16; a1, a2 depend on M and are NOT printed) and an acceleration factor f(Ma) =
+    ((Ma_(x/s=0) + Ma)/Ma)^1.5 (Eq. 18), product Eq. 19. Also reprints Tribus-Klein, Kutateladze-Leontev,
+    Librizzi-Cresci, Goldstein-Haji-Sheikh (Eqs. 4-10) and Hartnett''s velocity-ratio acceleration factor (Eq.
+    12). Reproducibility: T_W within 2-3% run to run (Table 5); Theta* error 0.002-0.03 (wall TC), up to 0.06
+    (surface TC).'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #714. Different regime, not usable as slot-film accuracy data: rocket chamber,
+    H2 film into O2/H2 combustion gas (up to almost 3800 K, cp ratio far from 1), 12 MPa, strongly accelerating
+    flow through a throat, and a NON-adiabatic effectiveness measured 1 mm inside a water-cooled copper wall
+    against the uncooled wall temperature -- not eta_aw, and not convertible to it without the liner heat flux
+    the paper does not give. Marek-Tacina (590 K gas, ambient coolant, constant-area duct), Simon 1986 and Ballal-Lefebvre are
+    all adiabatic-wall, near-zero pressure gradient. The acceleration factor f(Ma) (Eq. 18) is an empirical fit
+    to this rig with unprinted depth constants, so it cannot be implemented as published (fidelity would need
+    a1, a2) and would count as tuning to one rig. Does quantify an acceleration effect qualitatively: measured
+    Theta* above the non-accelerated model near injection (x/s 100-200), and the authors find (x/s)^-1.4 decay
+    fits better than the usual -0.8. Not used; combaero has no accelerating-film or liquid/H2 film path.'
+  read_for: ['#714 slot film under strong acceleration (rocket subscale chamber)']
+  issues: [714]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ (from the user) as Arnold-Suslov-Haidn_JPP-09.pdf. Its ref. 24
+    (Arnold et al., the DLR modified Goldstein-Haji-Sheikh Eq. 11 for the cylindrical segment) is the primary
+    of Eq. 11; Goldstein & Haji-Sheikh 1967 is its base. Not checked: the Fig. 9-10 points (not digitised).'
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
