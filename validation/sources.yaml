@@ -765,6 +765,41 @@ documents:
   records: []
   notes: Arrived 2026-11-02 in sources/new/ as ThesisJES%5B1%5D.pdf (from the user). Journal versions exist
     (Sargison et al. 2002, J. Turbomach. 124, console papers), not held.
+- file: sources/heat_transfer/film/Hassan_2013_PhD_Concordia_micro_tangential_jet_film.pdf
+  citation: Hassan, O. (2013). Thermal and flow field investigations of a micro-tangential-jet film cooling
+    scheme on gas turbine components. PhD thesis, Concordia University, Montreal (June 2013).
+  topic: [film]
+  content: 'Born-digital, 218 pp. A micro-tangential-jet (MTJ) shaped film scheme (35 deg inclination, lateral
+    expansion, near-tangential exit; Fig. 6.1) on a vane (pressure and suction sides, linear cascade after
+    Chappell et al. 2010) and on a flat plate; transient TLC eta and HTC, 2-D/3-D PIV. Main finding: no
+    significant HTC augmentation for BR < 1; the MTJ film behaves 2-D, slot-like. Flat-plate rig: 99 x 54 mm
+    duct, 550 mm long, schemes 200 mm from the inlet, Tu 8-8.5% (grid), DR close to unity, Br based on the
+    scheme BASE (metering) area in the validation (Brb). Appendix A TABULATES (pp. 163-165, read from the text
+    layer, which is clean): Table A.1 centreline and laterally averaged eta behind one row of CYLINDRICAL holes
+    at Re 1.24e5, Brb 0.5 and 1.0, x/d 1-23; Tables A.2 (Re 1.24e5) and A.3 (Re 0.7e5) the same for one row of
+    FAN-SHAPED holes, x/d 1-25. These are a re-measurement of Wright et al. 2011
+    (PSP), compared in Figs. 3.6/3.7. Example, A.2 laterally averaged at x/d 1/10/25: 0.317/0.151/0.070 (Brb 0.5),
+    0.301/0.153/0.108 (Brb 1.0). Tables A.5/A.8: vane suction- and pressure-side eta and HTC; A.4/A.7 Mach
+    distributions; A.6 PIV.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Useful part: Tables A.2/A.3, fan-shaped-hole laterally averaged eta TABULATED
+    (no digitising), a candidate cross-source ACCURACY check of the shipped Colban 2011 shaped-hole kernel --
+    but outside its fitted box on two counts the kernel range-checks: DR ~1 (Colban fitted 1.7-2.0) and Tu
+    8-8.5% (Colban 0.2-4%). Blocking gap: the thesis does NOT state the validation holes'' geometry (d,
+    inclination, p/d, area ratio, breakout width); the "10 deg lateral expansion" it mentions is Goldstein
+    1974''s fan (lit. review), and the Ch. 6 circular row is 35 deg at p/d 3. Colban needs AR, P/D and t/P, so
+    those must come from Wright et al. 2011 (not held) before any score. Data-quality flags in the tables:
+    A.1 rows x/d 7 and 8 are identical (copy error); A.2 centreline Brb 0.5 and 1.0 are identical at x/d 1-4;
+    the authors attribute the near-hole mismatch with Wright (x/d < 3, and at low Re) to the TLC-sheet edge and
+    a gap in front of the holes, so x/d < 3 should be excluded. Tables A.5/A.8 are vane data: blocked, combaero
+    has no gas-side airfoil kernel. The MTJ scheme itself has no combaero element.'
+  read_for: ['#386 shaped-hole eta cross-source (Colban), tabulated']
+  issues: [386]
+  records: []
+  notes: 'Supplied by the user 2026-11-02. Lead: Wright, McClain & Clemenson 2011, Effect of
+    density ratio on flat plate film cooling with shaped holes using PSP, J. Turbomach. 133, 041011 (thesis
+    ref. 69; companion ref. 70, Tu effect, 133, 041023) -- gives the hole geometry and higher-DR data. Not checked:
+    the thesis''s stated uncertainties (the values are missing from the text layer).'
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
