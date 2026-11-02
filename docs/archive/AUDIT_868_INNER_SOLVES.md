@@ -59,10 +59,10 @@ Line numbers are on the branch.
 | # | file:line | function | method | cap | tolerance | exit on cap (main) | bracket / safeguard | verdict | action |
 |---|---|---|---|---|---|---|---|---|---|
 | T1 | thermo.cpp:388 | `solve_increasing_T` (`calc_T_from_h/s/u/sv`) | rtsafe Newton | 50 (caller) | 1e-6 K abs step, or bracket < tol | throws | factor-4 search, then bisection when Newton leaves or fails to halve | safe | none |
-| T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 fixed (#939, PR #PRNUM): the root nearest T_guess in [200, 6000] K, outward scan + bracketed Newton, no root in range throws |
-| S1 | state.cpp:118 | `State::set_VH_mass` | Newton on u + R T = h | 20 | 1e-4 K abs step | silent | none (monotone) | latent | fixed: throws. rec R5 fixed (#938, PR #PRNUM): `calc_T_from_h_mass` |
+| T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 fixed (#939, PR #954): the root nearest T_guess in [200, 6000] K, outward scan + bracketed Newton, no root in range throws |
+| S1 | state.cpp:118 | `State::set_VH_mass` | Newton on u + R T = h | 20 | 1e-4 K abs step | silent | none (monotone) | latent | fixed: throws. rec R5 fixed (#938, PR #954): `calc_T_from_h_mass` |
 | G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor. R1 fixed (#935, PR #949): no floor, the root is returned |
-| G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3. R1 fixed (#935, PR #949): no floor. R3 fixed (#936, PR #PRNUM): exact slope, quadratic |
+| G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3. R1 fixed (#935, PR #949): no floor. R3 fixed (#936, PR #954): exact slope, quadratic |
 | G3 | stagnation.cpp:324 | `chamber_static_state` | Newton from Tt | 100 | 1e-13 Tt step | silent; implicit J then evaluated at the non-root | none (f falls in T, one root) | bug (48 probe hits at Tt = -1.4e19 K) | fixed: cap rule; R4 fixed (#937): Tt <= 0 or non-finite refused |
 | G4 | stagnation.cpp:408 | `sonic_static_state` | Newton | 100 | 1e-13 Tt step | silent, implicit J at non-root | none | latent | fixed: cap rule |
 | G5 | stagnation.cpp:489 | `duct_static_state` | Newton in ln P on [ln P*, ln Pt] | 100 | 1e-15 abs step in ln P | silent | bisection when Newton leaves the bracket | safe | R9 fixed (#941): cap rule |
@@ -79,7 +79,7 @@ Line numbers are on the branch.
 | C11 | compressible.cpp:1372 | `nozzle_quasi1d` (T, P) per station | sequential Newton, approximate da/dT, clamps | 50 (caller) | tol relative on s and h | silent | clamps T <= Tt, P in [100, Pt] | latent | rec R7 |
 | F1 | fanno_mach.cpp:64 | `static_T` | Newton in a bracket | 100 | 1e-14 T step | silent | bisection when Newton leaves | safe | fixed: cap rule |
 | F2 | fanno_mach.cpp:135 | `brent` | Brent | 200 | caller rel_tol (1e-13, 1e-14, `kFannoMachRelTol`) | silent at cap (unreachable with a bracket); NO check for a sign change | Brent's bisection fallback | bug: called unbracketed 55 times (F7) | fixed: throws without a sign change |
-| F3 | fanno_mach.cpp:323 | `fanno_inlet_mach` | Newton, central FD slope h = 1e-7 max(M, 1e-3), in [0, 1] | 60 | 1e-15 M step | silent; 995 hits at G < 1.4e-11 G_max, M up to 73% high | bisection when Newton leaves | bug: below M = h the stencil crossed M = 0, where the flux is held at 0, read half the slope, and Newton 2-cycled | fixed: one-sided stencil when M - h <= 0 (only those iterations change), cap rule. rec R8 fixed (#940, PR #PRNUM): exact slope from `isentropic_flux_slopes` |
+| F3 | fanno_mach.cpp:323 | `fanno_inlet_mach` | Newton, central FD slope h = 1e-7 max(M, 1e-3), in [0, 1] | 60 | 1e-15 M step | silent; 995 hits at G < 1.4e-11 G_max, M up to 73% high | bisection when Newton leaves | bug: below M = h the stencil crossed M = 0, where the flux is held at 0, read half the slope, and Newton 2-cycled | fixed: one-sided stencil when M - h <= 0 (only those iterations change), cap rule. rec R8 fixed (#940, PR #954): exact slope from `isentropic_flux_slopes` |
 | F4 | fanno_mach.cpp:384 | `fanno_duct` exit Mach | `brent` on [M_in, 1] | | `kFannoMachRelTol` | | f(M_in) = -L < 0 < L* - L by construction | safe | none |
 | F5 | fanno_mach.cpp:410 | `fanno_choked_mass_flux` | 60 e-fold search, then `brent` | 30 | 1e-14 | unbracketed `brent` possible | L* -> inf as G -> 0 | safe (and F2 now throws) | none |
 | F6 | fanno_mach.cpp:610, 636 | `raw_flow` exit Mach | widening from the guess, halving to 1e-6, `brent` | | 1e-13 | unbracketed `brent` possible | psi > 0 at low Me | safe (F2 guards) | none |
@@ -90,7 +90,7 @@ Line numbers are on the branch.
 | A3 | area_change.cpp:772 | `area_change_loss` Mach | Newton in [0, 1] | 200 | 1e-15 M step | silent | bisection | safe | fixed: cap rule |
 | O1 | orifice.cpp:1307 | `pipe_equivalent_c` | Newton in [1e-6, 1e3] | 100 | 1e-14 C step | silent | bisection | safe | fixed: cap rule |
 | O2 | orifice.cpp:1462 | `solve_orifice_mdot` | fixed point on Cd(Re) | caller | rel change < tol | throws | | safe | none |
-| O3 | orifice.cpp:1778 | `jobson_expansibility` | fixed point (approach term O(beta^4)) | 200 | 1e-15 relative | silent; 2 hits at 3e-14 / 4e-15 (rounding cycle) | | safe at the hits | fixed: cap rule (the hits are kept, bit-identical). rec R11 fixed (#943, PR #PRNUM): 1e-13 |
+| O3 | orifice.cpp:1778 | `jobson_expansibility` | fixed point (approach term O(beta^4)) | 200 | 1e-15 relative | silent; 2 hits at 3e-14 / 4e-15 (rounding cycle) | | safe at the hits | fixed: cap rule (the hits are kept, bit-identical). rec R11 fixed (#943, PR #954): 1e-13 |
 | H1 | humidair.cpp:205 | `dewpoint` | Newton, FD slope, clamped [T_lo, T] | 100 | 1e-6 K | throws; RH > 1 would put the root above T (Newton on the clamp, "converged" to T), but `vapor_pressure` refuses RH > 1 first | clamp | safe | R12 (#944): documented |
 | H2 | humidair.cpp:317 | `wet_bulb_temperature` | Newton in a bracket | 200 | 1e-6 K | throws | bisection | safe | none |
 | R1 | friction.cpp:92 | `friction_colebrook` | Newton from Serghides | 20 (caller) | 1e-10 relative | silent (also on a flat slope) | none (monotone) | latent (reachable by the caller) | fixed: throws |
@@ -220,7 +220,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   T dgamma/dT term, so Newton converges linearly and stops ~1e-8 T short;
   the exact slope (as `fanno_mach.cpp`'s `sound_speed_sq_dT`) makes it
   quadratic and moves results at ~1e-9 relative.
-  **Fixed (#936, PR #PRNUM):** see "R3, R5, R6, R8, R11 fixed" below.
+  **Fixed (#936, PR #954):** see "R3, R5, R6, R8, R11 fixed" below.
 - **R4 (G3) Input validation for `chamber_static_state`.** It accepts a
   negative Tt (garbage from an upstream state) and, when the Newton happens
   to converge, returns a negative T. `duct_static_state` floors its inputs;
@@ -234,12 +234,12 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   u + R T = h, so the hand Newton (20 steps, 1e-4 K) is the safeguarded
   enthalpy inverse at a coarser tolerance; switching moves results by up to
   1e-4 K.
-  **Fixed (#938, PR #PRNUM):** measured 2.2e-8 K at most (below).
+  **Fixed (#938, PR #954):** measured 2.2e-8 K at most (below).
 - **R6 (T2) `calc_T_from_cp` branch.** cp(T) is not monotone for every
   mixture, so the root depends on `T_guess`, and the [200, 6000] K clamp
   predates the #606 tails. A bracketed solve over a stated range would make
   the branch explicit.
-  **Fixed (#939, PR #PRNUM):** the root nearest `T_guess` in [200, 6000] K
+  **Fixed (#939, PR #954):** the root nearest `T_guess` in [200, 6000] K
   (below).
 - **R7 (C10, C11) `nozzle_quasi1d` is a best-effort profile.** Where
   A < A*_eff the area-Mach Newton has no subsonic root and holds the 0.999
@@ -249,7 +249,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
 - **R8 (F3) Exact slope in `fanno_inlet_mach`.** `isentropic_flux_slopes`
   already gives d flux/dM exactly; using it instead of the FD stencil moves
   converged results at rounding level (not bit-identical, so not done here).
-  **Fixed (#940, PR #PRNUM)** (below).
+  **Fixed (#940, PR #954)** (below).
 - **R9 (G5, E2) Cap rule for the remaining bracketed solves.** Not reached
   and bracketed with bisection; the same rule could be applied for
   uniformity. E2's non-finite break returns a clamped extent silently.
@@ -263,7 +263,7 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
 - **R11 (O3) Jobson tolerance.** 1e-15 relative cycles in the last bits
   (2 cap exits at 3e-14); 1e-13 would end those calls ~190 iterations sooner
   with no change beyond 3e-14.
-  **Fixed (#943, PR #PRNUM)** (below).
+  **Fixed (#943, PR #954)** (below).
 - **R12 (H1) `dewpoint` with RH > 1.** Supersaturated input returns T (the
   clamp) as the dewpoint; refuse RH > 1, or document dewpoint = T.
   **Done (#944, #948), and the finding was narrower than stated:** the public
@@ -391,7 +391,7 @@ root, and so do the energy solves when h0 > h(0 K).
   branch fix reverted (NaN). The full suite (6808 passed), ctest (53) and the
   paper examples pass.
 
-## R3, R5, R6, R8, R11 fixed (#936, #938, #939, #940, #943, PR #PRNUM)
+## R3, R5, R6, R8, R11 fixed (#936, #938, #939, #940, #943, PR #954)
 
 Decision (2026-11-02): the R-items are fixed. These five move results
 slightly. None is bit-identical.
@@ -495,7 +495,7 @@ slightly. None is bit-identical.
 - The Fanno marches' step budget (C7, C8) and most "latent" cap exits could
   not be reached with constructed inputs; their throws are untested beyond
   compilation and the unchanged suite.
-- R3/R5/R6/R8/R11 (PR #PRNUM): the `calc_T_from_cp` scan can miss two roots
+- R3/R5/R6/R8/R11 (PR #954): the `calc_T_from_cp` scan can miss two roots
   closer than 10 K (a cp extremum within 10 K of the target).
   `jobson_expansibility` fails to converge on valid input at high beta Ci and
   low r: 108 of the 1800 sweep calls, the same on main. It is not fixed here.
