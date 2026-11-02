@@ -4,7 +4,8 @@ The network is the control volume. Enthalpy enters with every stream that
 leaves a boundary and leaves with every stream that enters one, at the state
 of the node the stream comes FROM -- by the sign of its flow, not the
 element's declared direction. Heat enters through the user's
-EnergyBoundaries (Q, and ``{node}.Q_fraction`` for 'fraction'), leaves
+EnergyBoundaries (Q, and ``{node}.Q_fraction`` for 'fraction') and the shaft
+work of compressors and turbines (``{elem}.dh``, #893), leaves
 through walls that put heat on a boundary (``{node}.Q_wall_out``), and is
 not taken up where a node cannot absorb it (``{node}.Q_withheld``):
 
@@ -79,7 +80,13 @@ def closure(solver: Any, result: dict) -> dict[str, float] | None:
                 e_in += q * h[up]
                 thermal += q * cpT[up]
             if down in bnd:
-                e_out += q * h[up]
+                h_leave = h[up]
+                if getattr(e, "outlet_stagnation", None) is not None and m >= 0.0:
+                    # through a compressor or turbine: at its outlet Tt (#893)
+                    st = state[up]
+                    Tt_out = float(e.outlet_stagnation(st)[0])
+                    h_leave = float(cb.h_mass(Tt_out, cb.mass_to_mole(list(st.Y))))
+                e_out += q * h_leave
                 thermal += q * cpT[up]
             imbalance[down] += q
             imbalance[up] -= q
@@ -121,6 +128,10 @@ def closure(solver: Any, result: dict) -> dict[str, float] | None:
         if eb.id != f"_wall_{nid}"
     )
     q_user += sum(v for k, v in result.items() if isinstance(k, str) and k.endswith(".Q_fraction"))
+    # Shaft work into the flow (#893): m dh of each compressor and turbine.
+    for eid, e in net.elements.items():
+        if getattr(e, "outlet_stagnation", None) is not None and eid in two:
+            q_user += abs(float(x[two[eid]])) * float(result.get(f"{eid}.dh", 0.0))
     q_wall_out = sum(
         v for k, v in result.items() if isinstance(k, str) and k.endswith(".Q_wall_out")
     )

@@ -1467,6 +1467,7 @@ panel = EffusionPlateElement("eff", "coolant", "liner", hole_diameter=0.8e-3,
 
 ```python
 from combaero.network import (
+    CompressorElement, TurbineElement,
     OrificeElement, ChannelElement, EffectiveAreaConnectionElement,
     LosslessConnectionElement, PortDischargeElement, DiameterDischargeCoefficientConnectionElement,
     TeeJunctionElement, VortexElement, EffusionPlateElement,
@@ -1552,6 +1553,17 @@ lossless = LosslessConnectionElement("lossless", "node4", "node5")
 # junction port is wired straight to a boundary.
 discharge = PortDischargeElement("discharge", "chamber", "outlet_boundary")
 area_cd = DiameterDischargeCoefficientConnectionElement("area_cd", "node5", "node6", diameter=0.011284, Cd=0.7)
+
+# Compressor and turbine at a fixed total-to-total pressure ratio (#893):
+# Pt_out = PR Pt_in (compressor) or Pt_in / PR (turbine); the network sets the
+# flow. The stream leaves at cb.compression / cb.expansion's outlet Tt, with
+# exactly one of eta_poly and eta_is. Reports power [W] > 0 (absorbed /
+# delivered), dh [J/kg] signed into the flow, Tt_out, eta_poly, eta_is. The
+# ledger and the second law count the work as enthalpy with no entropy. A
+# reversed-flow root (surge) is refused; between two pressure boundaries
+# nothing sets the flow, so that is refused too.
+comp = CompressorElement("comp", "inlet_plenum", "burner", pressure_ratio=8.0, eta_poly=0.88)
+turb = TurbineElement("turb", "burner", "turbine_exit", pressure_ratio=4.0, eta_is=0.9)
 
 # Three-port tee junction (Unified0D compressible model, Mynard & Valen-Sendstad 2015)
 import math

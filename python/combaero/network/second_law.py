@@ -68,6 +68,7 @@ Not checked: elements without a solved flow, the legacy
 from __future__ import annotations
 
 import copy
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -105,6 +106,14 @@ class _Stream:
     #: (Pt - P) / P of the node whose Pt the stream carries when that node is
     #: on the incompressible closure, else 0 (see ``_sigma``, #598).
     x_inc: float = 0.0
+
+
+class _Probe:
+    """The (Tt, Y) of a stream, as a turbomachine's outlet_stagnation reads them."""
+
+    def __init__(self, stream: Any) -> None:
+        self.Tt = stream.Tt
+        self.Y = stream.Y
 
 
 @dataclass
@@ -310,6 +319,11 @@ class SecondLawReport:
         inflow = self._stream_at(up, m)
         Q = self._wall_heat_into(eid)
         Tt_out = self._heated(inflow, Q)
+        if getattr(element, "outlet_stagnation", None) is not None and forward:
+            # A compressor or turbine (#893): shaft work enters as enthalpy and
+            # carries no entropy, so the outlet is the machine's own Tt_out.
+            # sigma >= 0 then holds for an efficiency <= 1.
+            Tt_out = float(element.outlet_stagnation(_Probe(inflow))[0])
         outflow = _Stream(
             m,
             Tt_out,
@@ -618,6 +632,12 @@ class SecondLawReport:
                     m_far += m_src
                     H_far += m_src * float(cb.h_mass(float(st.Tt), _X(st.Y)))
                 H = abs(m) * H_far / m_far if m_far > 0.0 else 0.0
+                if getattr(element, "outlet_stagnation", None) is not None and m_far > 0.0:
+                    # Leaving through a compressor or turbine (#893): at its
+                    # outlet Tt, not at the enthalpy of what feeds it.
+                    st = self._state(far[0])
+                    Tt_out = float(element.outlet_stagnation(st)[0])
+                    H = abs(m) * float(cb.h_mass(Tt_out, _X(st.Y)))
                 rows.append({"node": nid, "via": element.id, "m_dot_in": -abs(m), "H_in": -H})
 
         q_given = 0.0
@@ -626,6 +646,16 @@ class SecondLawReport:
                 if eb.id != f"_wall_{nid}":
                     q_given += float(eb.heat)  # the SOLVED heat of a Tt_target (#792)
             q_given += float(self.sol.get(f"{nid}.Q_fraction", 0.0))
+        # Shaft work into the flow (#893): m dh of every compressor (> 0) and
+        # turbine (< 0), an energy input like a given heat, with no entropy.
+        w_shaft = 0.0
+        for eid, element in self.net.elements.items():
+            if getattr(element, "outlet_stagnation", None) is None:
+                continue
+            m = self._flow(eid)
+            dh = self.sol.get(f"{eid}.dh")
+            if m is not None and dh is not None and math.isfinite(float(dh)):
+                w_shaft += abs(float(m)) * float(dh)
         q_out = sum(float(v) for k, v in self.sol.items() if k.endswith(".Q_wall_out"))
         q_withheld = sum(float(v) for k, v in self.sol.items() if k.endswith(".Q_withheld"))
 
@@ -633,7 +663,7 @@ class SecondLawReport:
         m_out = -sum(r["m_dot_in"] for r in rows if r["m_dot_in"] < 0.0)
         H_in = sum(r["H_in"] for r in rows if r["m_dot_in"] > 0.0)
         H_out = -sum(r["H_in"] for r in rows if r["m_dot_in"] < 0.0)
-        energy = H_in + q_given - H_out - q_out - q_withheld
+        energy = H_in + q_given + w_shaft - H_out - q_out - q_withheld
         h_scale = max(abs(H_in), abs(H_out), sum(abs(r["H_in"]) for r in rows), 1.0)
         return {
             "streams": rows,
@@ -644,6 +674,7 @@ class SecondLawReport:
             "H_in": H_in,
             "H_out": H_out,
             "Q_given": q_given,
+            "W_shaft": w_shaft,
             "Q_wall_out": q_out,
             "Q_withheld": q_withheld,
             "energy_closure": energy,

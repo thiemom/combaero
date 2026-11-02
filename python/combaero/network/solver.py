@@ -17,6 +17,7 @@ import combaero as cb
 from combaero import _renamed, _solver_tools
 
 from .components import (
+    FLOW_REVERSAL_M_SCALE,
     RAYLEIGH_EXIT_PREFIX,
     ChannelElement,
     CombustorNode,
@@ -31,6 +32,7 @@ from .components import (
     OrificeElement,
     PlenumNode,
     PressureBoundary,
+    TurbomachineElement,
     WallNode,
     film_discharge_node,
     film_on_wall_side,
@@ -1043,7 +1045,7 @@ class NetworkSolver:
         lossy = [
             e
             for e in self.network.elements.values()
-            if not isinstance(e, LosslessConnectionElement)
+            if not isinstance(e, (LosslessConnectionElement, TurbomachineElement))
         ]
         if len(seed_pressures) >= 2:
             dp_est = (max(seed_pressures) - min(seed_pressures)) / max(len(lossy), 1)
@@ -1070,13 +1072,22 @@ class NetworkSolver:
             for elem in self.network.get_downstream_elements(nid):
                 to_id = elem.to_node
                 if to_id not in visited:
-                    p_guess[to_id] = p_guess[nid] - hop(elem)
+                    # A compressor or turbine sets its pressure ratio (#893).
+                    p_guess[to_id] = (
+                        p_guess[nid] * elem.pt_factor
+                        if isinstance(elem, TurbomachineElement)
+                        else p_guess[nid] - hop(elem)
+                    )
                     visited.add(to_id)
                     queue.append(to_id)
             for elem in self.network.get_upstream_elements(nid):
                 from_id = elem.from_node
                 if from_id not in visited:
-                    p_guess[from_id] = p_guess[nid] + hop(elem)
+                    p_guess[from_id] = (
+                        p_guess[nid] / elem.pt_factor
+                        if isinstance(elem, TurbomachineElement)
+                        else p_guess[nid] + hop(elem)
+                    )
                     visited.add(from_id)
                     queue.append(from_id)
 
@@ -1093,7 +1104,11 @@ class NetworkSolver:
         ):
             from .ejector_element import EjectorElement
 
-            if not any(isinstance(e, EjectorElement) for e in self.network.elements.values()):
+            # Nor when an ejector or a compressor (#893) can raise a node above them.
+            if not any(
+                isinstance(e, (EjectorElement, TurbomachineElement))
+                for e in self.network.elements.values()
+            ):
                 lo, hi = min(seed_pressures), max(seed_pressures)
                 for nid in p_guess:
                     if not isinstance(self.network.nodes[nid], PressureBoundary):
@@ -1421,6 +1436,25 @@ class NetworkSolver:
         els = [
             e for e in net.elements.values() if e.from_node not in walls and e.to_node not in walls
         ]
+        # A compressor or turbine (#893) is a pressure ratio, not a resistance:
+        # with one end at a fixed pressure it fixes the other (in a chain, in
+        # turn), and it leaves the linear network; its flow is the balance at
+        # the end it fixed. With neither end fixed the seed does not apply.
+        machines = [e for e in els if isinstance(e, TurbomachineElement)]
+        boundary = set(fixed)
+        changed = True
+        while changed:
+            changed = False
+            for e in machines:
+                if e.from_node in fixed and e.to_node not in fixed:
+                    fixed[e.to_node] = fixed[e.from_node] * e.pt_factor
+                    changed = True
+                elif e.to_node in fixed and e.from_node not in fixed:
+                    fixed[e.from_node] = fixed[e.to_node] / e.pt_factor
+                    changed = True
+        if any(e.from_node not in fixed or e.to_node not in fixed for e in machines):
+            return None
+        els = [e for e in els if not isinstance(e, TurbomachineElement)]
         if not els:
             return None
         P_ref = float(np.mean(list(fixed.values())))
@@ -1439,7 +1473,7 @@ class NetworkSolver:
         K[K == 0.0] = SEED_LOSSLESS_FRACTION * K[K > 0.0].min()
 
         free = [nid for nid in net.nodes if nid not in fixed and nid not in walls]
-        if not free:
+        if not free and not machines:
             return None
         idx = {nid: i for i, nid in enumerate(free)}
         inj = np.zeros(len(free))
@@ -1455,7 +1489,12 @@ class NetworkSolver:
 
         m = np.full(len(els), m_ref)
         p = np.full(len(free), P_ref)
-        for _ in range(SEED_MAX_ITER):
+        if not free:
+            # Every pressure fixed (by boundaries and machines): each element's
+            # flow follows from its own drop, dPt = K m |m|.
+            dp = a_fix - b_fix
+            m = np.sign(dp) * np.sqrt(np.abs(dp) / K)
+        for _ in range(SEED_MAX_ITER if free else 0):
             G = 1.0 / (K * (np.abs(m) + SEED_MDOT_FLOOR))
             L = np.zeros((len(free), len(free)))
             b = inj.copy()
@@ -1498,6 +1537,16 @@ class NetworkSolver:
         p_floor = 0.5 * min(fixed.values())
         p_map = {nid: max(float(p[idx[nid]]), p_floor) for nid in free}
         m_map = {e.id: float(mi) for e, mi in zip(els, m, strict=True)}
+        for nid, P in fixed.items():
+            if nid not in boundary:
+                p_map[nid] = P  # set by a machine's pressure ratio
+        for e in machines:
+            # Its flow: the balance at an end it fixed that is no boundary.
+            end = e.to_node if e.to_node not in boundary else e.from_node
+            sign = 1.0 if end == e.to_node else -1.0
+            out = sum(m_map.get(d.id, 0.0) for d in net.get_downstream_elements(end) if d is not e)
+            into = sum(m_map.get(u.id, 0.0) for u in net.get_upstream_elements(end) if u is not e)
+            m_map[e.id] = sign * (out - into)
         return p_map, m_map
 
     def _fuel_out(self, fnode: "FuelBoundary", sol_dict: dict[str, Any]) -> float:
@@ -2602,9 +2651,11 @@ class NetworkSolver:
         n_species = self._n_species
         # Iterate over stream_info (one entry per upstream stream, including
         # multiple entries for multi-port elements like TeeJunctionElement).
-        for i, (_, elem, src_nid, coeffs) in enumerate(stream_info):
+        for i, (s_up, elem, src_nid, coeffs) in enumerate(stream_info):
             if elem is None:
                 continue  # a fixed injection: nothing to relay
+            # A turbomachine's stream arrives at Tt_out(Tt_in, Y), f Pt_in (#893).
+            tm = getattr(s_up, "_turbomachine", None)
             t_jac = mix_res.dTt_mix_d_stream[i]
             pt_jac = mix_res.dPt_mix_d_stream[i]
             # dY_mix_d_stream is indexed by [species][stream]
@@ -2637,10 +2688,18 @@ class NetworkSolver:
 
             # 2. Recursive dependency on upstream P/T/Y via src_nid relay
             if src_nid in relay:
-                for idx, sens_up in up(src_nid).items():
+                for idx, sens_src in up(src_nid).items():
                     node_relay = out.setdefault(
                         idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt_mix": 0.0}
                     )
+                    sens_up = sens_src
+                    if tm is not None:
+                        dT_dT, dT_dY, f_pt = tm
+                        sens_up = {
+                            "T": dT_dT * sens_src["T"] + float(np.dot(dT_dY, sens_src["Y"])),
+                            "Y": sens_src["Y"],
+                            "Pt": f_pt * sens_src.get("Pt", 0.0),
+                        }
                     # dT/dx = sum_i( dT/dT_in_i * dT_in_i/dx + dT/dP_in_i * dP_in_i/dx + dT/dY_in_i * dY_in_i/dx )
                     node_relay["T"] += t_jac.d_Tt * sens_up["T"]
                     # Note: stagnation Pt doesn't usually have T/Y dependency, but we relay it if present
@@ -2928,6 +2987,14 @@ class NetworkSolver:
                         state_up._element_id = elem.id
                         state_up._m_dot_jac_names = elem_jac_names
                     state_up._src_node = src_nid
+                    if isinstance(elem, TurbomachineElement):
+                        # A compressor or turbine delivers its stream at its
+                        # outlet stagnation state (#893); _relay_mix chains
+                        # Tt_out through Tt_in and Y, and Pt_out through Pt_in.
+                        Tt_out, dT_dT, dT_dY, f_pt = elem.outlet_stagnation(state_up)
+                        state_up.Tt = Tt_out
+                        state_up.Pt = f_pt * float(state_up.Pt)
+                        state_up._turbomachine = (dT_dT, np.asarray(dT_dY, dtype=float), f_pt)
                     stream_info.append((state_up, elem, src_nid, None))
             # A reversed element delivers -m_dot from its to_node (#481).
             for elem in rev_in:
@@ -6588,6 +6655,29 @@ class NetworkSolver:
                 if text:
                     message = f"{message} {text}"
             warnings.warn(f"NetworkSolver: {message}", stacklevel=2)
+
+        # Compressors and turbines (#893): a root with the flow reversed is a
+        # surging compressor or a turbine driven backwards, which the fixed
+        # pressure ratio cannot describe: refused, never returned.
+        for eid, el in self.network.elements.items():
+            if not isinstance(el, TurbomachineElement):
+                continue
+            m_tm = float(sol_dict.get(f"{eid}.m_dot", 0.0))
+            if converged and m_tm < -FLOW_REVERSAL_M_SCALE:
+                # The cause first: the ledger and second law, which price the
+                # machine forward, may already have demoted this root.
+                kind = "compressor" if not el.expansion else "turbine"
+                why = (
+                    f"{type(el).__name__} '{eid}': the flow through it is reversed "
+                    f"({m_tm:.4g} kg/s); a {kind} at a fixed pressure ratio "
+                    f"{el.pressure_ratio:g} has no reversed operating point "
+                    "(surge, or driven backwards). Check what drives the flow."
+                )
+                message = why if success else f"{why} {message}"
+                success = False
+                consistent = False
+                outcome = SolveOutcome.INCONSISTENT
+                warnings.warn(f"NetworkSolver: {why}", stacklevel=2)
 
         # Fuel controllers (#892): report the fuel flow and the equivalence ratio
         # the combustor reached, and refuse a root on the other side of
