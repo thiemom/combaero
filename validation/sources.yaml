@@ -800,34 +800,6 @@ documents:
     density ratio on flat plate film cooling with shaped holes using PSP, J. Turbomach. 133, 041011 (thesis
     ref. 69; companion ref. 70, Tu effect, 133, 041023) -- gives the hole geometry and higher-DR data. Not checked:
     the thesis''s stated uncertainties (the values are missing from the text layer).'
-- file: sources/heat_transfer/film/Bradley_2013_LicThesis_Linkoping_CFD_film_cooling_reduced_models.pdf
-  citation: Bradley, A. (2013). CFD simulations for film cooling reduced models at engine like conditions.
-    Licentiate thesis No. 1593, Linkoping University (Siemens Industrial Turbomachinery AB / Swedish Energy
-    Agency).
-  id: ISBN 978-97-7519-608-4 (as printed; the Swedish prefix would be 978-91, not verified)
-  topic: [film, review]
-  content: 'Born-digital, 60 pp. -- the summary chapters (kappa) only: the appended Papers I-III (Kinell et al. ASME GT2010; Bradley
-    et al. and Nadali Najafabadi et al., AIAA ASM 2011) are listed but NOT in this copy. Ch. 3-4: film-cooling
-    parameter review. Ch. 5: correlation comparison (Brown-Saluja, L''Ecuyer-Soechting, Baldauf 2002, Bunker''s
-    slot-origin form eta = C1/(x/(M s) + C2) with equivalent slot s = (pi/4) D AR/(P/D), Baldauf-Scheurlen,
-    Colban 2011 Eq. 5) against Yuen''s flat-plate data at M 0.5 and high M (Figs. 2-5: large spread between
-    correlations and between experiments). Sec. 5.2.2: Siemens Finspang single-guide-vane rig (3 kg/s, IR
-    camera, transient least-squares fit of h and eta, Eq. 8). Ch. 6: RANS (rke, SST) on full, narrow and short
-    vane domains, cooled and uncooled; Figs. 8/11/15/18 plot "Normalized HTC" against "Normalized vane distance
-    S"; Figs. 16/19 eta at M 0.6 (experiment) vs SST at M 0.5/0.7/1. Appendix: the experimental HTC was revised
-    upward after a re-measured vane conductivity.'
-  status: screened
-  verdict: 'Screened 2026-11-02. Low value. CFD methodology for reduced (narrow/short) vane domains; the vane HTC
-    data are NORMALISED (confirmed: axes "Normalized HTC" and normalised surface distance, Figs. 8/11/15/18) and
-    the vane geometry is not given, so nothing can be rebuilt; combaero has no gas-side airfoil kernel anyway
-    (blocked). The eta curves are absolute but on an unspecified vane at one M. Any CFD-derived correction counts
-    as tuning under the validation policy. The Ch. 5 review only reprints correlations combaero already holds in
-    the primary (Baldauf 2002, Colban 2011) or knows (Bunker''s slot-origin form). Not used.'
-  read_for: ['#386 film correlation inventory (secondary)']
-  issues: [386]
-  records: []
-  notes: Supplied by the user 2026-11-02. The appended papers (GT2010 Kinell et al. fan-shaped vs cylindrical
-    holes on the same vane rig) are not held and not wanted.
 - file: sources/heat_transfer/film/Schneider_2015_NASA_TM-2015-218738_Coolit_cooling_flow_factor.pdf
   citation: Schneider, S. J. (2015). Analysis of turbine blade relative cooling flow factor used in the subroutine
     Coolit based on film cooling correlations. NASA/TM-2015-218738 (E-19070), Glenn Research Center.
@@ -858,74 +830,6 @@ documents:
   notes: 'Arrived 2026-11-02 in sources/new/ (from the user); NTRS 20150011643, open access. Leads (free on NTRS,
     noted, not wanted unless an issue needs them): Gauntner 1980 NASA TM-81453 (the Coolit algorithm); Esgar,
     Colladay & Kaufman 1970 NASA TN D-5992 (turbine air-cooling capabilities and limits).'
-- file: sources/heat_transfer/film/Arnold_Suslov_Haidn_2009_JPP_25_2_rocket_film_cooling_accelerated_flow.pdf
-  citation: Arnold, R., Suslov, D., Haidn, O. J. (2009). Film cooling of accelerated flow in a subscale combustion
-    chamber. J. Propulsion and Power 25(2), 443-451.
-  id: doi:10.2514/1.39308
-  topic: [film, combustion]
-  content: '9 pp., publisher PDF (text layer usable, equations read from page images). DLR Lampoldshausen P8,
-    subscale chamber E: 50 mm cylindrical segment, 33 mm throat, LOX/GH2, water-cooled copper liner. Film
-    injector between cylinder and nozzle segment, 52.5 mm upstream of the throat: 40 slots, s = 0.2 mm, b = 3.0
-    mm, injection angle 15 deg, thin lip (t ~ 0), GH2 coolant at T2 ~ 307-341 K. Table 2: p_cc 12 / 8 / 5 MPa,
-    ROF 6.0, m_tot 4.22 / 2.93 / 1.84 kg/s, nine intervals; Table 3: film 0.82-2.04% of total flow, blowing rate
-    M 0.71-1.73, u2/u_cc 0.45-1.00. Hot gas accelerates ~8x over x/s 100-270 (sub-, trans- and supersonic;
-    Fig. 6). Measured: wall thermocouples 1 mm inside the copper (and surface thermocouples) at x/s 117-327.5,
-    no heat flux (inverse method abandoned), no adiabatic wall. Effectiveness is therefore a non-adiabatic wall
-    ratio, Theta*_(d>0) = (T_W,0 - T_W,f)/T_W,0 (Eq. 14), PLOTTED only (Figs. 9-10: 0.01-0.20). Model: the
-    DLR-modified Goldstein & Haji-Sheikh heat-sink form, Eq. 11, Theta = 0.83 Pr^(2/3) / (1.11 + 0.329
-    (cp_cc/cp_2) xi^1.43 Re_2s^-0.25) with xi = (x/s)(1/M), times a measurement-depth correction f(dTheta*) =
-    1 - (a1 + a2/(x/s)^0.5) (Eq. 16; a1, a2 depend on M and are NOT printed) and an acceleration factor f(Ma) =
-    ((Ma_(x/s=0) + Ma)/Ma)^1.5 (Eq. 18), product Eq. 19. Also reprints Tribus-Klein, Kutateladze-Leontev,
-    Librizzi-Cresci, Goldstein-Haji-Sheikh (Eqs. 4-10) and Hartnett''s velocity-ratio acceleration factor (Eq.
-    12). Reproducibility: T_W within 2-3% run to run (Table 5); Theta* error 0.002-0.03 (wall TC), up to 0.06
-    (surface TC).'
-  status: screened
-  verdict: 'Screened 2026-11-02 for #714. Different regime, not usable as slot-film accuracy data: rocket chamber,
-    H2 film into O2/H2 combustion gas (up to almost 3800 K, cp ratio far from 1), 12 MPa, strongly accelerating
-    flow through a throat, and a NON-adiabatic effectiveness measured 1 mm inside a water-cooled copper wall
-    against the uncooled wall temperature -- not eta_aw, and not convertible to it without the liner heat flux
-    the paper does not give. Marek-Tacina (590 K gas, ambient coolant, constant-area duct), Simon 1986 and Ballal-Lefebvre are
-    all adiabatic-wall, near-zero pressure gradient. The acceleration factor f(Ma) (Eq. 18) is an empirical fit
-    to this rig with unprinted depth constants, so it cannot be implemented as published (fidelity would need
-    a1, a2) and would count as tuning to one rig. Does quantify an acceleration effect qualitatively: measured
-    Theta* above the non-accelerated model near injection (x/s 100-200), and the authors find (x/s)^-1.4 decay
-    fits better than the usual -0.8. Not used; combaero has no accelerating-film or liquid/H2 film path.'
-  read_for: ['#714 slot film under strong acceleration (rocket subscale chamber)']
-  issues: [714]
-  records: []
-  notes: 'Arrived 2026-11-02 in sources/new/ (from the user) as Arnold-Suslov-Haidn_JPP-09.pdf. Its ref. 24
-    (Arnold et al., the DLR modified Goldstein-Haji-Sheikh Eq. 11 for the cylindrical segment) is the primary
-    of Eq. 11; Goldstein & Haji-Sheikh 1967 is its base. Not checked: the Fig. 9-10 points (not digitised).'
-- file: sources/heat_transfer/film/Sikarwar_Bhadauria_Ranjan_2016_IJE_29_4_integral_BL_liquid_film_model.pdf
-  citation: Sikarwar, B. S., Bhadauria, A., Ranjan, P. (2016). Towards an analytical model for film cooling
-    prediction using integral turbulent boundary layer. Int. J. Engineering (IJE), Trans. A 29(4), 554-562.
-  id: doi:10.5829/idosi.ije.2016.29.04a.15
-  topic: [film]
-  content: '9 pp. (the PDF metadata title, "Image Quality Enhancement Using Pixel-Wise Gamma Correction", is
-    wrong; read from page images). LIQUID film cooling of a rocket chamber: momentum and energy integral
-    equations of an axisymmetric compressible turbulent boundary layer with wall mass transfer (Eqs. 1-10,
-    19-20), 1/7-power velocity and temperature profiles, Tetervin''s Reynolds analogy with pressure gradient
-    (Eqs. 13-15), Cole/Blasius-type Cf = 0.256 Re_dM^-0.25 (T_ref/T_e)^-0.6 with an Eckert reference
-    temperature (Eqs. 16-17). Liquid zone: evaporation G_v = (q_conv + q_r)/h_fg (Eq. 18). Gas-film zone: a
-    mixing energy balance, eta = 1/(1 + m_ent cp_e/(m_c cp_c)) (Eq. 26), with the entrainment rate from the
-    integral solution (no closure printed separately). Results: liquid-film cooled length vs coolant flow,
-    compared with Kinney et al. (water film, gasoline-air combustion gas, 2.14 bar, 1105 K) and Shembharkar &
-    Pai''s numerical model (Fig. 2, Table 1); then a "post-validation" rocket case (20 bar, 1500-3200 K, Table
-    2) with wall heat flux and gas-film eta curves (Figs. 3-6), no data.'
-  status: screened
-  verdict: 'Screened 2026-11-02. Low value; a candidate for deletion (the user''s call). It is a liquid-film rocket
-    model, and its only validation is the liquid-film cooled length against one water-film data set (Kinney
-    et al.), plotted, with the model 23-35% above the data at m_c 0.08-0.16 kg/s m. The gas-film effectiveness -- the
-    only part that would bear on combaero''s slot film -- is NOT validated against any data; Eq. 26 is the
-    standard entrainment heat-sink form already behind the Goldstein-type and Stollery-El-Ehwany models held,
-    and adds nothing over Seban 1960, Simon 1986 or Marek-Tacina. Internal inconsistencies: the film cooled
-    length is 0.2-0.7 m in Fig. 2 but 2-9 mm in Fig. 5 for similar coolant rates, and the text says gas-film
-    eta decreases with increasing coolant flow while Fig. 6 shows it increasing; delta_m = 0.00002 mm in
-    Figs. 3-6. Not used.'
-  read_for: ['#714 slot-film model inventory']
-  issues: [714]
-  records: []
-  notes: Arrived 2026-11-02 in sources/new/ (from the user) as "IJE_Volume 29_Issue 4_Pages 554-562.pdf".
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
@@ -3520,24 +3424,6 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/CONV14_1D-HT-GTCC-r1.pdf. A second copy arrived 2026-11-02 (next entry).
-- file: sources/combustor_network/topal2014_CONV14_1D_heat_transfer_combustor_2016_copy.pdf
-  citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional heat
-    transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp. on
-    Convective Heat and Mass Transfer, Turkey, paper CONV-14-123 (a 2016 re-export of the same paper).'
-  id: CONV-14-123 (second copy)
-  topic: [combustion]
-  content: 'The same 15-page paper as the previous entry: the text layers are identical word for word (4418
-    words); the only differences are the PDF producer and date (2016-08-16 against 2014-09-26) and figure
-    layout on pages 9-13 (text-layer line positions); the figures and equations of this copy (pp. 4-6, 10, 12,
-    13 viewed) are the same as the held copy''s. Not compared pixel by pixel.'
-  status: screened
-  verdict: 'Duplicate; adds nothing. All findings are recorded on topal2014_CONV14_1D_heat_transfer_combustor.pdf
-    (re-screened 2026-11-02 when this copy arrived). Candidate for deletion (kept pending the user''s decision).'
-  read_for: ['#793 worked example candidate (duplicate)']
-  issues: [793]
-  records: []
-  notes: Arrived 2026-11-02 in sources/new/ (from the user) as One_Dimensional_Heat_Transfer_Analysis_a.pdf,
-    presented as new.
 - file: sources/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf
   citation: 'Gouws, J. J., Morris, R. M., Visser, J. A. (2006). Modelling of a gas turbine combustor using
     a network solver. S. Afr. J. Science 102, 533-536 (with online supplementary Tables 2-4).'
@@ -4926,6 +4812,240 @@ documents:
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
   notes: Fetched from specialmetals.com 2026-10-31 (public technical bulletin).
+- file: sources/radiation/Rudey_Graham_1984_NASA-TM-83341_combustor_turbine_heat_transfer_review.pdf
+  citation: 'Rudey, R. A., Graham, R. W. (1984). A review of NASA combustor and turbine heat transfer research.
+    NASA TM-83341, prepared for the 29th ASME International Gas Turbine Conference, Amsterdam, 3-7 June 1984.'
+  id: NASA-TM-83341 (NTRS 19840006078, N84-14146)
+  topic: [radiation, combustion, review]
+  content: 'Open access (NTRS), 26 pp., CASI scan with a usable text layer. Programme review of NASA Lewis/HOST
+    hot-section heat transfer. Combustor part (pp. 3-5): the two factors that set liner heat load are inlet
+    pressure and flame luminosity. Fig. 4(a) CALCULATED liner heat loads (radiation, convection, net) for Jet A
+    and a low-hydrogen fuel against P3 0-20 MPa (radiation to ~23 W/cm2 at 20 MPa); Fig. 4(b) h against
+    pressure 0.3-1.5 MPa, points and an "estimated" line. Fig. 5 (from Humenik, Claus & Neely, NASA TM-83436)
+    MEASURED vs PREDICTED radiant heat flux at three axial stations (primary, secondary, tertiary) of a
+    tubular-can combustor at idle (F/A 0.007, T3 400 K, P3 269 kPa), cruise (0.014, 620 K, 700 kPa) and take-off
+    (0.018, 715 K, 1740 kPa); measured roughly 5, 45/40/20 and 80/75/20 W/cm2 (read from the plot, not
+    digitised); the predictions (Srivatsa, NASA CR-167930) are up to two-fold high in the secondary zone. Text:
+    spectral radiometry shows soot dominates radiant energy, and a fuel ~2 percentage points lower in H content
+    than Jet A gives markedly higher flame temperature and radiance. Fig. 9: a GE contract rig for liner cooling
+    concepts x flame radiation (data base planned, no report number given). Turbine part not relevant here.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Secondary; no closure. Its value is the pointer: the measured tubular-can
+    radiation and liner data it summarises are NASA TM-83436 (Humenik, Claus & Neely 1983) and NASA TM-83538 /
+    AIAA 84-0443 (Claus, Neely & Humenik), both public on NTRS -- 0.34-2.07 MPa, 533-700 K, F/A 0.008-0.021,
+    Jet A (13.9% H) and ERBS (12.9% H), total and spectral radiometers at three stations plus liner
+    temperatures. That pair is the best candidate seen so far to FALSIFY a combaero luminous-radiation model
+    (measured radiant flux against pressure and fuel H content; cross-source for Lefebvre''s L = 336/H^2).
+    Fig. 5 here is too coarse to score against (three stations, read by eye, no geometry). Not checked: the
+    turbine sections.'
+  read_for: ['#793 measured combustor radiant heat flux (validation candidate for a luminous gas-radiation model)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as 19840006078.pdf. Ref. 2 (AIAA 84-0443) and ref. 3 (TM-83436)
+    are the primaries; NTRS 19840005120 (TM-83538) and 19830020966 (TM-83436) have PDF downloads.
+- file: sources/radiation/Howell_Menguc_Daun_Siegel_2021_TRHT7_online_appendices.pdf
+  citation: 'Howell, J. R., Menguc, M. P., Daun, K., Siegel, R. (2021). On-line appendices to Thermal Radiation
+    Heat Transfer, 7th ed., Taylor and Francis / CRC Press (appendix file dated 2024-07-05).'
+  id: TRHT 7th ed. on-line appendices A-R
+  topic: [radiation, review]
+  content: 'Free on-line supplement to the textbook, 200 pp., Word text layer. Relevant parts. App. B (pp. B.1-B.16):
+    derivation of geometric mean beam lengths (hemisphere, cylinder top/side to base centre, sphere, parallel
+    plates, rectangles; Tables B.1/B.2 Dunkle 1964 beam-length ratios), and Example B.2 using the usual Le =
+    0.9 x 4V/A. App. F (pp. F.1-F.13): Alberti, Weber & Mancini 2018 HITEMP-2010 emittance charts for H2O, CO2
+    and CO with pressure and overlap corrections, 300-3000 K and 0.1-100 atm; mixture eps = eps_H2O + eps_CO2 +
+    eps_CO - overlaps (Eq. F.1); equivalent pressures P_E,H2O = P (1 + 5.00 x_H2O), P_E,CO2 = P (1 + 0.28
+    x_CO2) (Eq. F.2); said to be within 1% of LBL; Example F.1 (Le 2.4 m) gives 0.401. App. K (pp. K.1-K.4):
+    flame radiation, mostly qualitative; Example K.1 (ethane, 100% excess air, 1853 K, 1 atm, 4 m x 2 m
+    cylinder, Le = 0.9 x 4V/A = 1.44 m, eps_g 0.1451, Q 3050 kW); Table K.1 adiabatic flame temperatures; cites
+    Lefebvre 1984 IJHMT and Taylor & Foster 1974 for luminous flames. App. H: RTE benchmark tables (cube,
+    cylinder). App. A: Edwards wide-band model. Main-text equations (Ch. 9 gas properties, Eq. 11.104 Le) are
+    referenced but not in this file.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background and a strong lead, no closure of its own. Mean beam length: the
+    appendix derives the geometric factors; the engineering value combaero needs (Le = 0.9 x 4V/A, i.e. 3.6
+    V/A, against Lefebvre Eq. 8.10''s 3.4 V/A after Fishenden & Saunders) is the textbook''s, so either value is
+    sourced; the 6% difference is a model choice to state. App. F names the pressure-capable, closed-form
+    alternative to Bordbar 2021 that is NOT under a non-commercial licence as far as seen: Alberti, Weber &
+    Mancini 2018/2020 (JQSRT 219, 274-291; JQSRT 255, 107227) curve fits to 100 atm, with a public
+    spreadsheet -- wanted. The charts themselves are not digitised and should not be (curve fits exist).
+    Example K.1 is a one-number check of a gas-emissivity kernel (accuracy, not fidelity: Alberti spreadsheet
+    vs whatever combaero implements). Not checked: Apps. C-E, G, I, J, L-R.'
+  read_for: ['#793 mean beam length', '#793 non-luminous emissivity at pressure (lead to Alberti et al.)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as "On-line appxs 7th ed 7-5-2024.pdf". Copyrighted
+    though freely posted; keep in sources/ only.
+- file: sources/radiation/Liu_et_al_2020_Fuel_281_118555_radiation_turbulent_flames_review.pdf
+  citation: 'Liu, F., Consalvi, J.-L., Coelho, P. J., Andre, F., Gu, M., Solovjov, V., Webb, B. W. (2020). The
+    impact of radiative heat transfer in combustion processes and its modeling -- with a focus on turbulent
+    flames. Fuel 281, 118555.'
+  id: doi:10.1016/j.fuel.2020.118555 (HAL hal-02986492, author manuscript)
+  topic: [radiation, combustion, review]
+  content: 'Open access author manuscript (HAL), 59 pp. Review of gas and soot radiative properties (LBL, SNB,
+    WSGG, SLW, FSCK; WSGG called the most used but the least accurate, with recent HITEMP refits), RTE solvers,
+    turbulence-radiation interaction, and applications. Soot absorption coefficient in the Rayleigh limit
+    kappa_s = 6 pi E(m) f_s / lambda (Eqs. 26-28), proportional to soot volume fraction, uncertainty dominated by
+    E(m). Section 7.3 combustors: LES with radiation and wall conduction (Berger et al. 2016 helicopter
+    combustor vs thermocolour paint; Koren et al. confined premixed swirl flame wall temperature). No
+    coefficient tables for a total-emissivity model; no pressure-dependent closure printed.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background only: an authoritative map of which gas-property models exist and
+    their accuracy ranking, useful to justify choosing a WSGG/total-emissivity kernel for a 0-D/1-D network
+    (combaero cannot use SLW/FSCK without an RTE solver). The soot relation is only useful if combaero ever
+    carries a soot volume fraction, which it does not; Lefebvre''s luminosity factor remains the practical
+    luminous term. Pointer: Berger et al. 2016 (Appl. Therm. Eng. 103, 1450-1459) measured helicopter-combustor
+    wall temperature by thermocolour -- geometry probably proprietary (not checked).'
+  read_for: ['#793 choice of gas-radiation model class', soot absorption coefficient]
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as JFUE2020_FinalVersion.pdf.
+- file: sources/radiation/Fu_et_al_2026_ATE_307_133288_ammonia_flame_radiation_review.pdf
+  citation: 'Fu, Z., Davies, J., Mashruk, S., Alnajideen, M., Xiao, H., Valera-Medina, A. (2026). Combustion
+    radiation in ammonia-based fuels: progress and challenges. Applied Thermal Engineering 307, 133288.'
+  id: doi:10.1016/j.applthermaleng.2026.133288
+  topic: [radiation, combustion, review]
+  content: 'Open access (CC BY 4.0), 22 pp. Review of radiation from NH3, NH3/H2, cracked NH3, NH3/hydrocarbon and
+    NH3/solid-fuel flames: pure NH3 and NH3/H2 flames radiate mainly from H2O (no CO2, no soot), with minor NH3
+    and NO bands; hydrocarbon blending restores CO2 and possibly soot. Tables 1-6 compare fuel properties,
+    literature coverage, measured radiative heat-flux trends and model applicability (optically thin, WSGG, SNB,
+    FSCK, LBL). States that conventional WSGG fits are made for H2O/CO2 mixtures and may be unreliable for
+    NH3-rich flames, and that elevated-pressure radiation data for ammonia are scarce. Mostly furnace and
+    burner scale at about 1 atm.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background for the carbon-free limit of a combaero emissivity kernel: combaero''s
+    species set includes NH3 and H2, and their products have Mr = H2O/CO2 -> infinity, outside Bordbar 2014/2021
+    (Mr 0.1-4). A kernel must therefore either cap Mr with a stated refusal or carry a pure-H2O set (Alberti et al.
+    handle single gases; Bordbar-type pure-H2O WSGG sets exist but are not held). No closure or validation case
+    here (no gas-turbine-pressure data). Not checked: the individual cited heat-flux studies.'
+  read_for: ['#793 gas emissivity for H2- and NH3-fired products (Mr outside 0.1-4)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as 1-s2.0-S1359431126035969-main.pdf.
+- file: sources/radiation/Geigle_et_al_2015_PCI_35_3373_soot_pressurized_swirl_flames.pdf
+  citation: 'Geigle, K. P., Koehler, M., O''Loughlin, W., Meier, W. (2015). Investigation of soot formation in
+    pressurized swirl flames by laser measurements of temperature, flame structures and soot concentrations.
+    Proc. Combust. Inst. 35, 3373-3380.'
+  id: doi:10.1016/j.proci.2014.05.135 (DLR author manuscript)
+  topic: [radiation, combustion]
+  content: 'Author manuscript, 23 pp. DLR sooting gas-turbine model combustor: C2H4/air, radial double swirler
+    (central 8 channels S 0.82, ring 12 channels S 0.79), 68 x 68 mm chamber 120 mm high with quartz windows
+    (inner surface estimated 500-900 C), four 5 mm secondary-air jets at h = 80 mm. Table 1: p 3 bar, phi 1.2,
+    32.2 kW, no oxidation air; 3 bar and 5 bar with oxidation air 0.4 x Qair (phi_global 0.86, 38.6 / 64.4 kW).
+    CARS temperature pdfs, OH-PLIF, LII soot volume fraction (calibration in Geigle et al. 2011), plotted only.
+    No wall heat flux, no wall or liner temperature, no radiometry.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background: shows where and how much soot forms in a rich-primary/oxidation-air
+    aero-type flame at 3-5 bar (the regime that makes Lefebvre''s luminosity factor matter), but gives nothing a
+    0-D/1-D model consumes -- combaero does not predict soot volume fraction, and the flame has no radiant-flux
+    or wall measurement to score a luminous term against. Kept only as the reference soot data set for gaseous
+    fuel at pressure if a soot-based luminous term is ever considered.'
+  read_for: ['#793 luminous radiation: soot levels in a pressurised gas-turbine model combustor']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as 2015_geigle_pci_final_author.pdf.
+- file: sources/radiation/Humenik_Claus_Neely_1983_NASA_TM-83436_tubular_can_flame_radiation.pdf
+  citation: 'Humenik, F. M., Claus, R. W., Neely, G. M. (1983). Parametric study of flame radiation
+    characteristics of a tubular-can combustor. NASA TM-83436, prepared for the ASME Joint Power Generation
+    Conference, Indianapolis, 25-29 September 1983 (ASME 83-JPGC-GT-11).'
+  id: NASA-TM-83436 (NTRS 19830020966, N83-29237)
+  topic: [radiation, film]
+  content: 'Open access (NTRS), 12 pp., CASI scan; text layer unusable, read from page images. NASA Lewis rig:
+    one P&W JT8D tubular can in a 25.4 cm (10 in) nominal pipe housing (facility 25 atm, 870 K, 10 kg/s). NO
+    liner geometry: no liner diameter or length, no louver/slot/hole dimensions or open areas, no annulus
+    gap, no air split, no pressure drop. Printed stations only (Fig. 4): Gardon-type water-cooled, N2-purged
+    total radiant heat flux gauges (stem through an air hole to the liner inner surface) at x = 12.7 / 18.5 /
+    28.7 cm, theta 32 / 0 / 0 deg (zones 1-3 = primary, secondary, tertiary); spectral radiometer windows
+    (sapphire, InSb detector, 1.5-5.5 um, one scanning head moved between ports) at x = 7.4 / 22.1 / 34.0 cm,
+    theta 300 deg. Liner: 24 Chromel-Alumel thermocouples, 4 on the dome, the rest two per cooling louver on
+    opposite sides, on the OUTSIDE (annulus side) of each louver (implies 10 louvers; not dimensioned).
+    Table I: P3 0.34 / 0.69 / 1.38 / 2.07 MPa at T3 533 K (1.69 / 3.37 / 6.75 / 10.12 kg/s); 0.69 / 1.38 /
+    2.07 MPa at 616 K (3.14 / 6.28 / 9.42); 0.69 / 2.07 MPa at 700 K (2.95 / 8.84); constant flow parameter
+    m sqrt(T3)/P3 ~ 113 kg K^0.5/(s MPa); f/a nominally 0.008-0.021 (sweep 0.0087-0.0212). Table II: Jet A H
+    13.9 mass %, aromatics 17.2 vol %, SG 0.8142, LHV 43304 J/g, S 0.020 %; ERBS H 12.9 %, aromatics 28.8 %,
+    SG 0.8381, LHV 42200 J/g, S 0.065 %; distillation, freezing point and viscosity also printed (C/H not
+    printed; 6.19 and 6.75 by difference). Data, all PLOTTED, none tabulated: Fig. 6 total radiant flux vs
+    f/a for two fuel nozzles (FN-1 standard, FN-2 substitute, both dual orifice), Jet A, 533 K, 0.69 and 2.07
+    MPa, 3 zones (FN-2 secondary zone 16 -> 80 W/cm2 over f/a 0.0089-0.0159 at 2.07 MPa); Fig. 7 spectral
+    radiance (W/cm2 sr um) 1.5-5.5 um, f/a 0.016, 533 K, Jet A vs ERBS, 0.34 and 0.69 MPa, 3 zones; Fig. 8
+    total flux vs P3 (f/a 0.016, FN-2, both fuels) at 533 K (Jet A zone 1/2/3 about 16/16/7 W/cm2 at 0.34 MPa
+    to 66/78/29 at 2.07 MPa) and 616 K; Fig. 9 total flux and liner (T_local - T3) per zone, f/a 0.016, 533
+    and 700 K, 0.69 and 2.07 MPa, both fuels (dT 150-300 K; ERBS up to 33 K hotter, zone 2, 0.69 MPa, 533 K).
+    No gas temperature, no emissivity, no measurement uncertainty, no exit temperature or NOx table.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Measured, but not a scorable liner case on its own. Accuracy (cross-source)
+    for Lefebvre''s luminosity factor L: the only quantity it can test without assumptions is the ERBS/Jet A
+    total-flux RATIO at equal P3, T3, f/a and nozzle (two H levels, 13.9 and 12.9 %, a 16 % step in L =
+    336/H^2), as a function of P3 0.34-2.07 MPa and zone. An absolute R1 test needs the zone gas temperature,
+    the local q and l_b (liner diameter), none of which is printed here; TM-83538 adds emissivity but not
+    those either. Not a network case: no liner geometry, no air split, no pressure drop, no annulus.
+    Overplotted digitising trap: Figs. 6, 8, 9 are 3-5 symbols per curve, so any score rests on about 4
+    cleanly sampled points per zone per fuel. The thermocouples are outer-wall (annulus-side) values,
+    reported as differences from T3 and averaged per zone, not per louver. The radiometers and the spectral
+    ports sit at DIFFERENT x stations.'
+  read_for: ['#793 measured liner radiant flux vs pressure and fuel H content (cross-source accuracy for L)', '#793 can geometry for a liner network case (absent)']
+  issues: [793]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ntrs_19830020966/ as 19830020966.pdf. Same rig, earlier series:
+    Claus 1981 NASA TP-1722 (spectral radiance, tubular can) and Claus, Humenik & Neely 1983 NASA CP-2268 pp.
+    199-206 -- wanted, may print geometry. Rudey & Graham 1984 Fig. 5 credits this TM but its idle /
+    take-off points (269 kPa 400 K, 1740 kPa 715 K) are outside Table I here, so that figure draws on
+    another series. ERBS is defined in Seng 1982, NASA TM-82883.'
+- file: sources/radiation/Claus_Neely_Humenik_1984_NASA_TM-83538_flame_radiation_liner_heat_transfer.pdf
+  citation: 'Claus, R. W., Neely, G. M., Humenik, F. M. (1984). Flame radiation and liner heat transfer in a
+    tubular-can combustor. NASA TM-83538, prepared for the 22nd AIAA Aerospace Sciences Meeting, Reno, 9-12
+    January 1984 (AIAA 84-0443).'
+  id: NASA-TM-83538 (NTRS 19840005120, N84-13188)
+  topic: [radiation, film]
+  content: 'Open access (NTRS), 22 pp., CASI scan; text layer unusable, read from page images. Same JT8D can,
+    housing, instruments, stations (Fig. 4: total x 12.7 / 18.5 / 28.7 cm, spectral x 7.4 / 22.1 / 34.0 cm),
+    Table I and Table II as TM-83436 (reprinted identically). New: test at constant reference velocity 15
+    m/s (consistent with the 25.4 cm housing area: 3.37 kg/s at 0.69 MPa, 533 K gives 14.7 m/s); field of
+    view 0.9 rad (total gauge) and 0.3 mrad (spectral); the 1.5-5.5 um band holds about 70 % of the total.
+    Its own 1-D liner balance (after NREC 1980 design manual, ref. 9): Eq. 1 R1 + C1 = KC = R2 + C2; Eq. 2
+    R2 = eps_w eps_c/(eps_c + eps_w (1 - eps_c) A_w/A_c) (T_WA^4 - T_c^4) (sigma missing in the print); Eq. 3
+    C2 = h2 (T_WA - T_c); Eq. 4 h2 = 0.02 (k/D)_an Re_an^0.8 Pr_an^0.33; Eqs. 5-6 KC through a ceramic TBC
+    on Hastelloy (thicknesses and k not printed); Eq. 7 C1 = h1 (T_F - T_WH); Eq. 8 h1 = 0.023 (k_f/D_ft)
+    Re_f^0.8 Pr_f^0.4; Eq. 9 film F = (T_HG - T_F)/(T_HG - T_an) = 1/(1 + C_m x/(M s)) with C_m = 0.05 (ref. 10,
+    Marek 1973 TM X-2809); Eq. 10 M = rho_s U_s/(rho_H U_H); Eq. 11 R1 = alpha_w R_measured, alpha_w = 0.4
+    (Liebert 1978 NASA TP-1190 TBC; the NREC wall-absorptivity correction over-predicted). T_HG from the 4.5
+    um CO2 band, eps_f from the spectrum assumed gray -- neither tabulated. Fig. 7 (only emissivity data):
+    eps_f vs P3, Jet A, 533 K, f/a 0.016, 3 zones x 4 pressures (read by eye: primary about 0.25 / 0.68 / 0.87
+    / 0.77, secondary 0.16 / 0.34 / 0.53 / 0.67 at 0.34 / 0.68 / 1.4 / 2.0 MPa); curves labelled luminous
+    eps_f = 1 - exp[-0.286 Lu P (f/a l_b)^0.5 Tg^-1.5] (ref. 9, "Lefebvre") and non-luminous (Reeves, ref. 2)
+    eps_f = 1 - exp[-7.1e2 P (l_b/(f/a))^0.5 Tg^-1.5]; Lu, l_b, Tg and units not printed. Plotted only: Fig.
+    6 total flux vs x at an unstated condition (integrated spectral and gauge, peak about 65 W/cm2 at x about
+    18 cm; zone boundaries about 15 and 26 cm); Fig. 8 spectra vs P3; Figs. 9-10 R_T and dT = T_liner - T3 vs
+    P3 and T3 (zone 1 R_T 67 -> 86 W/cm2 and dT 185 -> 220 K for T3 533 -> 700 K at 2.0 MPa); Fig. 11 spectra
+    vs T3; Figs. 12-14 Jet A vs ERBS (primary +56 % at 0.34 MPa, +6 % at 2.0 MPa; tertiary none); Fig. 15
+    CALCULATED R1, C1, R2 + C2 (secondary zone, about 23 / 17 / 7 W/cm2 at 2 MPa; C1 is heat from wall to film,
+    plotted as magnitude) and inferred h1 0.02-0.12 W/cm2 K vs Eq. 8; Fig. 16 extrapolated liner T to engine
+    PR 7-60 (about 1170 K at PR 40, 1240 K at PR 60). No measurement uncertainty stated.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The only measured flame emissivity in the radiation collection, but thin:
+    12 plotted points (Fig. 7), Jet A only, one T3 and f/a, derived from a gray extension of a 1.5-5.5 um
+    spectrum taken at a different x than the total gauge. Own-model fidelity: the luminous form tracks the
+    primary and secondary points to about 1.5 MPa and over-predicts by 15-25 % at 2.0 MPa (blamed on nozzle
+    atomisation); Reeves over-predicts the tertiary zone at high P3. Not reproducible by us, since Lu, l_b
+    and Tg are not printed. Discrepancies with Lefebvre & Ballal: the luminous coefficient 0.286 with P in
+    Pa is 1.4 % below L&B''s 290 with P in kPa (or a different edition); the non-luminous form prints
+    (l_b/(f/a))^0.5 and 710, not Reeves'' (q l_b)^0.5 with L = 1 -- likely a typo, unusable as printed. Its
+    R1 uses a measured flux times alpha_w 0.4 (TBC), so the liner surface is NOT the bare-metal eps_w 0.7-0.8
+    of L&B; any liner-temperature comparison must model the TBC. The film form (Eq. 9) is the Juhasz-Marek /
+    Marek-Tacina developed-region law combaero ships; C_m 0.05 equals Marek-Tacina C_m = 0.25 Tu/100 at Tu
+    20 %. Fig. 15 closes (R1 - C1 about equal to R2 + C2) but is a calculation, not data. Accuracy use: the
+    ERBS/Jet A ratio test of L (with the paper''s statement that the 4.5 um band, i.e. Tg, is unchanged
+    between fuels) and the shape of eps_f vs P3 against Reeves x L with an assumed l_b. Not a full liner
+    network case (no geometry, slots, air split, dp, annulus, wall build-up).'
+  read_for: ['#793 measured flame emissivity vs pressure (cross-source accuracy for Reeves eps_g x L)', '#793 a published 1-D liner balance with a Marek film term (method check)']
+  issues: [793]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ntrs_19840005120/ as 19840005120.pdf. Screening estimate (not a
+    record): with Fig. 7 Jet A eps and eps_ERBS = 1 - (1 - eps_JetA)^(L_E/L_J), the predicted ERBS/Jet A ratio
+    at 0.34 MPa primary is 1.14 for L = 336/H^2, 1.32 for 3 (C/H - 5.2)^0.75, 1.31 for Kretschmer-Odgers and
+    1.50 for 7.53 (C/H - 5.5)^0.84 against 1.56 measured; at 2.0 MPa 1.06 / 1.13 / 1.13 / 1.18 against 1.045. No
+    form fits both ends. Leads for geometry and closures (wanted): Srivatsa NASA CR-167930 (predicted this rig,
+    Rudey & Graham Fig. 5), NREC 1344-2 (1980) design manual (ref. 9), Liebert 1978 NASA TP-1190 (alpha_w),
+    Marek 1973 NASA TM X-2809 (C_m at pressure), Claus 1981 NASA TP-1722.'
 
 wanted:
 - citation: Dunn, M. G., et al. (1986). Stage heat-flux measurements on a full-stage rotating turbine
