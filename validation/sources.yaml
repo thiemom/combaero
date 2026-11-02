@@ -896,6 +896,36 @@ documents:
   notes: 'Arrived 2026-11-02 in sources/new/ (from the user) as Arnold-Suslov-Haidn_JPP-09.pdf. Its ref. 24
     (Arnold et al., the DLR modified Goldstein-Haji-Sheikh Eq. 11 for the cylindrical segment) is the primary
     of Eq. 11; Goldstein & Haji-Sheikh 1967 is its base. Not checked: the Fig. 9-10 points (not digitised).'
+- file: sources/heat_transfer/film/Sikarwar_Bhadauria_Ranjan_2016_IJE_29_4_integral_BL_liquid_film_model.pdf
+  citation: Sikarwar, B. S., Bhadauria, A., Ranjan, P. (2016). Towards an analytical model for film cooling
+    prediction using integral turbulent boundary layer. Int. J. Engineering (IJE), Trans. A 29(4), 554-562.
+  id: doi:10.5829/idosi.ije.2016.29.04a.15
+  topic: [film]
+  content: '9 pp. (the PDF metadata title, "Image Quality Enhancement Using Pixel-Wise Gamma Correction", is
+    wrong; read from page images). LIQUID film cooling of a rocket chamber: momentum and energy integral
+    equations of an axisymmetric compressible turbulent boundary layer with wall mass transfer (Eqs. 1-10,
+    19-20), 1/7-power velocity and temperature profiles, Tetervin''s Reynolds analogy with pressure gradient
+    (Eqs. 13-15), Cole/Blasius-type Cf = 0.256 Re_dM^-0.25 (T_ref/T_e)^-0.6 with an Eckert reference
+    temperature (Eqs. 16-17). Liquid zone: evaporation G_v = (q_conv + q_r)/h_fg (Eq. 18). Gas-film zone: a
+    mixing energy balance, eta = 1/(1 + m_ent cp_e/(m_c cp_c)) (Eq. 26), with the entrainment rate from the
+    integral solution (no closure printed separately). Results: liquid-film cooled length vs coolant flow,
+    compared with Kinney et al. (water film, gasoline-air combustion gas, 2.14 bar, 1105 K) and Shembharkar &
+    Pai''s numerical model (Fig. 2, Table 1); then a "post-validation" rocket case (20 bar, 1500-3200 K, Table
+    2) with wall heat flux and gas-film eta curves (Figs. 3-6), no data.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Low value; a candidate for deletion (the user''s call). It is a liquid-film rocket
+    model, and its only validation is the liquid-film cooled length against one water-film data set (Kinney
+    et al.), plotted, with the model 23-35% above the data at m_c 0.08-0.16 kg/s m. The gas-film effectiveness -- the
+    only part that would bear on combaero''s slot film -- is NOT validated against any data; Eq. 26 is the
+    standard entrainment heat-sink form already behind the Goldstein-type and Stollery-El-Ehwany models held,
+    and adds nothing over Seban 1960, Simon 1986 or Marek-Tacina. Internal inconsistencies: the film cooled
+    length is 0.2-0.7 m in Fig. 2 but 2-9 mm in Fig. 5 for similar coolant rates, and the text says gas-film
+    eta decreases with increasing coolant flow while Fig. 6 shows it increasing; delta_m = 0.00002 mm in
+    Figs. 3-6. Not used.'
+  read_for: ['#714 slot-film model inventory']
+  issues: [714]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user) as "IJE_Volume 29_Issue 4_Pages 554-562.pdf".
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
