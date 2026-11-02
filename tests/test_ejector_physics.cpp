@@ -9,6 +9,7 @@
 #include "validation/ejector/data/huang1999_reference_data.h"
 #include <cmath>
 #include <gtest/gtest.h>
+#include <stdexcept>
 
 using namespace combaero::solver;
 using combaero::validation::ejector::kHuangCases;
@@ -120,4 +121,24 @@ TEST(EjectorPhysics, CDNozzleMassFlowMatchesPythonReference) {
     EXPECT_NEAR(mdot, c.expected, 1e-9 * c.expected)
         << "cd_nozzle mismatch at p_py=" << c.p_py;
   }
+}
+
+// Recovery multiplies the lossless mixed stagnation pressure: 0 < r <= 1.
+// Above 1 would be a pressure gain beyond lossless mixing (#769).
+TEST(EjectorPhysics, RecoveryEfficiencyIsCappedAtOne) {
+  const EjectorGeometry geom{1.86, 5.30};
+  const double above = std::nextafter(1.0, 2.0);
+  auto pc = [&](double r) {
+    return ejector_critical_back_pressure_and_jacobian(5.0e5, 293.15, 1.0e5, 293.15, geom, 1.4,
+                                                       287.0, r);
+  };
+  EXPECT_NO_THROW(pc(1.0));
+  EXPECT_THROW(pc(above), std::invalid_argument);
+  EXPECT_THROW(pc(0.0), std::invalid_argument);
+  EXPECT_THROW(ejector_sudden_expansion_dead_head_and_jacobian(5.0e5, 293.15, 1.0e5, 293.15, geom,
+                                                               1.4, 287.0, above),
+               std::invalid_argument);
+  EXPECT_THROW(ejector_jetpump_discharge_and_jacobian(7.0e5, 440.0, 2.28e4, 280.0, 6840.0, 0.79,
+                                                      1.4, above, 0.95, 0.85),
+               std::invalid_argument);
 }

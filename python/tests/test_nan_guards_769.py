@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 
 import combaero as cb
+from combaero import _core
 
 Annulus = cb.geometry.Annulus
 CanAnnularFlowGeometry = cb.geometry.CanAnnularFlowGeometry
@@ -255,6 +256,323 @@ def test_non_finite_argument_is_refused(
     bad_args[index] = bad
     with pytest.raises(exc):
         fn(*bad_args)
+
+
+# -- follow-up: NaN that a clamp, a root finder or a "no correction" branch
+# turned into a plausible finite number. Found by replaying every numeric
+# _core call the suite makes with NaN in each argument. Only the listed
+# argument indices are refused; finite values keep their existing meaning
+# (beta outside (0, 1) is still "no correction", D_h <= 0 still selects the
+# equivalent circle, m_ref <= 0 still switches the ramp off).
+AIR = cb.dry_air()
+
+# (name, function, valid arguments, refused argument indices)
+FollowUp = tuple[str, Callable[..., Any], tuple[Any, ...], tuple[int, ...]]
+
+FOLLOW_UP: list[FollowUp] = [
+    (
+        "fanno_duct",
+        lambda Pt, Tt, G, L, D, e, fm: cb.fanno_duct(Pt, Tt, G, AIR, L, D, e, "haaland", fm),
+        (200000.0, 300.0, 278.0, 1.0, 0.02, 1e-5, 1.0),
+        (3, 4, 5, 6),
+    ),
+    (
+        "fanno_choked_mass_flux",
+        lambda L, D, e, fm: cb.fanno_choked_mass_flux(200000.0, 300.0, AIR, L, D, e, "haaland", fm),
+        (1.0, 0.02, 1e-5, 1.0),
+        (0, 1, 2, 3),
+    ),
+    (
+        "fanno_rayleigh_choked_mass_flux",
+        lambda Pt0, Tt0, Tte, L, D, e, fm: cb.fanno_rayleigh_choked_mass_flux(
+            Pt0, Tt0, Tte, AIR, L, D, e, "fixed", fm
+        ),
+        (200000.0, 600.0, 900.0, 0.5, 0.01, 0.0, 0.02),
+        (0, 1, 2, 3, 4, 5, 6),
+    ),
+    (
+        "fanno_rayleigh_march",
+        lambda G, Pt0, Tt0, Tte, e, fm: cb.fanno_rayleigh_march(
+            G, Pt0, Tt0, Tte, AIR, 0.5, 0.01, e, "fixed", fm
+        ),
+        (150.0, 200000.0, 600.0, 900.0, 0.0, 0.02),
+        (0, 1, 2, 3, 4, 5),
+    ),
+    (
+        "fanno_length_between",
+        lambda D, e, fm: cb.fanno_length_between(
+            100.0, 300.0, 0.125, 1.0, AIR, D, e, "haaland", fm
+        ),
+        (0.02, 1e-5, 1.0),
+        (0, 1, 2),
+    ),
+    (
+        "fanno_dx_dmach",
+        lambda D, e, fm: cb.fanno_dx_dmach(300.0, 300.0, 0.2, AIR, D, e, "haaland", fm),
+        (0.02, 1e-5, 1.0),
+        (0, 1, 2),
+    ),
+    (
+        "fanno_channel_flow",
+        lambda L, D, e, fm: cb.fanno_channel_flow(
+            104000.0, 600.0, AIR, 103980.0, True, L, D, e, "haaland", fm
+        ),
+        (0.019, 0.076, 0.0, 1.0),
+        (0, 1, 2, 3),
+    ),
+    (
+        "fanno_rayleigh_channel_flow",
+        lambda L, D, e, fm: cb.fanno_rayleigh_channel_flow(
+            102000.0, 1200.0, 1184.0, AIR, 100000.0, False, L, D, e, "haaland", fm
+        ),
+        (0.127, 0.05, 1e-5, 1.0),
+        (0, 1, 2, 3),
+    ),
+    ("velocity_of_approach_factor", cb.velocity_of_approach_factor, (0.5,), (0,)),
+    ("expansibility_factor kappa", cb.expansibility_factor, (0.5, 1000.0, 101325.0, 1.4), (3,)),
+    ("jobson_force_defect", cb.jobson_force_defect, (0.6, 0.5, 1.0), (0, 1, 2)),
+    ("jobson_ci_from_cd", cb.jobson_ci_from_cd, (0.6, 0.2, 1.0), (0, 1, 2)),
+    (
+        "orifice_jobson_residuals_and_jacobian",
+        lambda Cd, A, beta, Cv: _core.orifice_jobson_residuals_and_jacobian(
+            0.0, 300000.0, 300000.0, 400.0, AIR, 152730.0, Cd, A, beta, Cv
+        ),
+        (0.61, 1e-4, 0.0, 0.98),
+        (0, 1, 2, 3),
+    ),
+    (
+        "orifice_iso5167_residuals_and_jacobian",
+        lambda Cd, A, beta: _core.orifice_iso5167_residuals_and_jacobian(
+            0.0, 200000.0, 200000.0, 600.0, AIR, 180000.0, Cd, A, beta
+        ),
+        (0.61, 1e-4, 0.0),
+        (0, 1, 2),
+    ),
+    (
+        "film_effectiveness_baldauf_2002 Tu",
+        cb.film_effectiveness_baldauf_2002,
+        (20.0, 2.0, 1.2, 30.0, 3.0, 0.015),
+        (5,),
+    ),
+    (
+        "film_effectiveness_baldauf_2002_and_derivatives Tu",
+        cb.film_effectiveness_baldauf_2002_and_derivatives,
+        (20.0, 2.0, 1.2, 30.0, 3.0, 0.015),
+        (5,),
+    ),
+    (
+        "film_span_average_baldauf_2002 Tu",
+        cb.film_span_average_baldauf_2002,
+        (10, 7.5, 0.0, 62.5, 2.1, 1.9, 30.0, 7.5, 0.05),
+        (8,),
+    ),
+    # v = 0 is the branch where the 10 K floor answered for a NaN T_static.
+    (
+        "T_adiabatic_wall v=0",
+        lambda Ts, v: cb.T_adiabatic_wall(Ts, v, 300.0, 101325.0, AIR),
+        (300.0, 0.0),
+        (0, 1),
+    ),
+    (
+        "T_adiabatic_wall",
+        lambda Ts, v: cb.T_adiabatic_wall(Ts, v, 300.0, 101325.0, AIR),
+        (300.0, 50.0),
+        (0, 1),
+    ),
+    (
+        "area_change_loss conical",
+        lambda F_in, F_out, L, D_h: cb.area_change_loss(
+            0.264, 103643.0, 300.0, AIR, F_in, F_out, "conical", L, D_h, False
+        ),
+        (0.00196, 0.00503, 0.05, 0.0),
+        (0, 1, 2, 3),
+    ),
+    (
+        "area_change_flow",
+        lambda F_in, F_out, D_h: cb.area_change_flow(
+            200000.0, 300.0, AIR, 199000.0, F_in=F_in, F_out=F_out, model="sharp", D_h=D_h
+        ),
+        (0.001, 0.004, 0.0),
+        (0, 1, 2),
+    ),
+    ("impingement_eta_r", cb.impingement_eta_r, (2.71, 5.0, 4.0, 1.0), (1, 2)),
+    ("omega22_and_derivative delta_star", cb.omega22_and_derivative, (0.3, 0.0), (1,)),
+    (
+        "combustor_fraction_loss m_ref, mdot",
+        cb.combustor_fraction_loss,
+        (0.0, 0.0005, 0.001, 0.02, 0.001),
+        (1, 4),
+    ),
+    # -- neutral answers: NaN used to land in a documented "no model" / "no
+    # flow" branch and answer its finite neutral value. The branch keeps its
+    # meaning for finite input (see test_neutral_conventions_are_kept).
+    (
+        "crossflow_to_jet_ratio_at_x",
+        cb.crossflow_to_jet_ratio_at_x,
+        (4.0, 2.0, 0.79, 2.5),
+        (0, 1, 2, 3),
+    ),
+    (
+        "crossflow_to_jet_ratio_at_row",
+        lambda yn, z, cd: cb.crossflow_to_jet_ratio_at_row(yn, z, cd, 3),
+        (4.0, 2.0, 0.79),
+        (0, 1, 2),
+    ),
+    (
+        "mcgreehan_schotsch_1988_expansion_factor",
+        cb.mcgreehan_schotsch_1988_expansion_factor,
+        (0.9, 0.7, 1.4, 0.02),
+        (0, 1, 2, 3),
+    ),
+    (
+        "mcgreehan_schotsch_1988_expansion_nozzle",
+        cb.mcgreehan_schotsch_1988_expansion_nozzle,
+        (0.99, 1.4),
+        (0, 1),
+    ),
+    (
+        "mcgreehan_schotsch_1988_expansion_orifice",
+        cb.mcgreehan_schotsch_1988_expansion_orifice,
+        (0.9, 1.4),
+        (0, 1),
+    ),
+    (
+        "fanno_channel_flow state",
+        lambda Pt0, Tt0, P: cb.fanno_channel_flow(
+            Pt0, Tt0, AIR, P, True, 0.019, 0.076, 0.0, "haaland", 1.0
+        ),
+        (104000.0, 600.0, 103980.0),
+        (0, 1, 2),
+    ),
+    (
+        "fanno_rayleigh_channel_flow state",
+        lambda Pt0, Tt0, Tte, P: cb.fanno_rayleigh_channel_flow(
+            Pt0, Tt0, Tte, AIR, P, False, 0.127, 0.05, 1e-5, "haaland", 1.0
+        ),
+        (102000.0, 1200.0, 1184.0, 100000.0),
+        (0, 1, 2, 3),
+    ),
+    (
+        "area_change_loss state",
+        lambda m, Pt0, Tt0: cb.area_change_loss(
+            m, Pt0, Tt0, AIR, 0.00196, 0.00503, "conical", 0.05, 0.0, False
+        ),
+        (0.264, 103643.0, 300.0),
+        (0, 1, 2),
+    ),
+    (
+        "jet_impulse",
+        lambda m, Pt, Tt, P: cb.jet_impulse(m, Pt, Tt, P, AIR),
+        (0.00337, 103000.0, 600.0, 100161.0),
+        (0, 1, 2, 3),
+    ),
+    (
+        "crossflow_velocity_ratio P_down",
+        lambda P_down: cb.crossflow_velocity_ratio(
+            0.0528, 0.0459, 103830.0, 599.8, AIR, P_down, 0.00456
+        ),
+        (100000.0,),
+        (0,),
+    ),
+    (
+        "rogers_hersh_1976_cd",
+        lambda Gi, Gc: cb.rogers_hersh_1976_cd(0.79, Gi, Gc, True),
+        (14.1, 16.4),
+        (0, 1),
+    ),
+    (
+        "florschuetz_metzger_su_1982_cd",
+        lambda Gi, Gc: cb.florschuetz_metzger_su_1982_cd(5, 4, 1, Gi, Gc),
+        (2.43, 152.0),
+        (0, 1),
+    ),
+    (
+        "orifice_jobson_residuals_and_jacobian state",
+        lambda Pt, Ps, Tt, Pd: _core.orifice_jobson_residuals_and_jacobian(
+            0.0, Pt, Ps, Tt, AIR, Pd, 0.61, 1e-4, 0.0, 0.98
+        ),
+        (300000.0, 300000.0, 400.0, 152730.0),
+        (0, 1, 2, 3),
+    ),
+    (
+        "orifice_iso5167_residuals_and_jacobian state",
+        lambda Pt, Ps, Tt, Pd: _core.orifice_iso5167_residuals_and_jacobian(
+            0.0, Pt, Ps, Tt, AIR, Pd, 0.61, 1e-4, 0.0
+        ),
+        (200000.0, 200000.0, 600.0, 180000.0),
+        (0, 1, 2, 3),
+    ),
+]
+
+# pin_fin_array_efficiency: +inf k_pin (isothermal pin) and +inf h are limits.
+PIN_FIN_REFUSED = [(0, NAN), (0, -INF), (1, NAN), (1, -INF)] + [
+    (i, bad) for i in (2, 3, 4) for bad in (NAN, INF, -INF)
+]
+
+
+def _follow_up_params() -> list[Any]:
+    out = []
+    for name, fn, args, refused in FOLLOW_UP:
+        for i in refused:
+            for bad in (NAN, INF, -INF):
+                out.append(pytest.param(fn, args, i, bad, id=f"{name}[{i}]={bad}"))
+    return out
+
+
+@pytest.mark.parametrize(("fn", "args", "index", "bad"), _follow_up_params())
+def test_non_finite_argument_is_refused_follow_up(
+    fn: Callable[..., Any], args: tuple[Any, ...], index: int, bad: float
+) -> None:
+    fn(*args)  # the valid point itself answers
+    bad_args = list(args)
+    bad_args[index] = bad
+    with pytest.raises(ValueError):
+        fn(*bad_args)
+
+
+def test_finite_conventions_are_kept() -> None:
+    # Finite values outside the formal range keep their documented meaning;
+    # only non-finite values are new refusals.
+    assert cb.velocity_of_approach_factor(0.0) == 1.0
+    assert cb.velocity_of_approach_factor(1.5) == 1.0
+    assert cb.expansibility_factor(0.5, 1000.0, 101325.0, 1.0) == 1.0
+    a = cb.area_change_flow(200000.0, 300.0, AIR, 199000.0, F_in=0.001, F_out=0.004, D_h=0.0)
+    b = cb.area_change_flow(
+        200000.0, 300.0, AIR, 199000.0, F_in=0.001, F_out=0.004, D_h=(4 * 0.001 / math.pi) ** 0.5
+    )
+    assert a.m_dot == pytest.approx(b.m_dot, rel=1e-12)
+    off = cb.combustor_fraction_loss(0.0, 0.0005, 0.001, 0.02, 0.0)
+    assert off.xi == pytest.approx(0.02)
+    assert cb.T_adiabatic_wall(5.0, 0.0, 300.0, 101325.0, AIR) == 10.0  # the 10 K floor
+
+
+@pytest.mark.parametrize(("index", "bad"), PIN_FIN_REFUSED)
+def test_pin_fin_efficiency_refuses_non_finite(index: int, bad: float) -> None:
+    args = [1957.5, 20.0, 5e-3, 5e-3, 0.22]
+    args[index] = bad
+    with pytest.raises(ValueError):
+        cb.pin_fin_array_efficiency(*args)
+
+
+def test_neutral_conventions_are_kept() -> None:
+    # The neutral branches still answer for the finite input they document.
+    assert cb.pin_fin_array_efficiency(1957.5, INF, 5e-3, 5e-3, 0.22).eta_fin == 1.0
+    assert cb.pin_fin_array_efficiency(1957.5, 0.0, 5e-3, 5e-3, 0.22).eta_fin == 1.0
+    assert cb.pin_fin_array_efficiency(INF, 20.0, 5e-3, 5e-3, 0.22).eta_fin == 0.0
+    assert cb.crossflow_to_jet_ratio_at_x(4.0, 2.0, 0.0, 2.5) == 0.0
+    assert cb.crossflow_to_jet_ratio_at_row(4.0, 2.0, 0.79, 1) == 0.0
+    assert cb.mcgreehan_schotsch_1988_expansion_factor(0.9, 0.7, 1.0) == 1.0
+    assert cb.mcgreehan_schotsch_1988_expansion_nozzle(1.2, 1.4) == 1.0
+    no_drive = cb.fanno_channel_flow(
+        100000.0, 600.0, AIR, 100000.0, True, 0.019, 0.076, 0.0, "haaland", 1.0
+    )
+    assert no_drive.G == 0.0
+    assert (
+        cb.area_change_loss(0.0, 1e5, 300.0, AIR, 1e-3, 4e-3, "sharp", 0.0, 0.0, False).dPt == 0.0
+    )
+    assert cb.jet_impulse(0.01, 1e5, 300.0, 1.1e5, AIR).J == 0.0  # no jet: P above Pt
+    off = cb.combustor_fraction_loss(0.0, 0.0005, 0.001, 0.02, 0.0)
+    assert off.xi == pytest.approx(0.02)
 
 
 def test_swapped_annulus_is_refused() -> None:

@@ -8,6 +8,7 @@
 #include "../include/equilibrium.h"
 #include "../include/friction.h"
 #include "../include/heat_transfer.h"
+#include "../include/input_validation.h"
 #include "../include/registry.h"
 #include "../include/quadrature.h"
 #include "../include/stagnation.h"
@@ -1960,9 +1961,19 @@ OrificeModelResult orifice_jobson_residuals_and_jacobian(
     const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
     double beta, double Cv) {
   (void)m_dot;
-  if (!(Cd > 0.0) || !(Cv > 0.0) || !(area > 0.0)) {
+  if (!validation::is_finite_positive(Cd) || !validation::is_finite_positive(Cv) ||
+      !validation::is_finite_positive(area)) {
     throw std::invalid_argument(
         "orifice_jobson_residuals_and_jacobian: Cd, Cv and area must be > 0");
+  }
+  if (!validation::is_finite(beta)) {
+    throw std::invalid_argument("orifice_jobson_residuals_and_jacobian: beta must be finite");
+  }
+  // The kernel's no-flow branch is for finite states; NaN used to land in it.
+  if (!validation::is_finite(P_total_up) || !validation::is_finite(P_static_up) ||
+      !validation::is_finite(Tt_up) || !validation::is_finite(P_static_down)) {
+    throw std::invalid_argument(
+        "orifice_jobson_residuals_and_jacobian: pressures and Tt_up must be finite");
   }
   return model_result(
       [&](const std::vector<double>& X) {
@@ -1977,8 +1988,16 @@ OrificeModelResult orifice_iso5167_residuals_and_jacobian(
     const std::vector<double>& Y_up, double P_static_down, double Cd, double area,
     double beta) {
   (void)m_dot;
-  if (!(Cd > 0.0) || !(area > 0.0)) {
+  if (!validation::is_finite_positive(Cd) || !validation::is_finite_positive(area)) {
     throw std::invalid_argument("orifice_iso5167_residuals_and_jacobian: Cd and area must be > 0");
+  }
+  if (!validation::is_finite(beta)) {
+    throw std::invalid_argument("orifice_iso5167_residuals_and_jacobian: beta must be finite");
+  }
+  if (!validation::is_finite(P_total_up) || !validation::is_finite(P_static_up) ||
+      !validation::is_finite(Tt_up) || !validation::is_finite(P_static_down)) {
+    throw std::invalid_argument(
+        "orifice_iso5167_residuals_and_jacobian: pressures and Tt_up must be finite");
   }
   return model_result(
       [&](const std::vector<double>& X) {

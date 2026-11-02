@@ -54,6 +54,20 @@ void require_finite_in_range(double x, double lo, double hi, const char* message
 Where +inf is a physical limit rather than bad input (NTU, a film coefficient
 h, YSZ aging hours) the check refuses NaN only.
 
+A clamp, a root finder or a "no correction" branch can also turn NaN into a
+plausible number without any comparison in sight (`std::max(NaN, x)` is `x`
+for one argument order). Such arguments refuse non-finite values too, while
+finite values keep their existing meaning: `velocity_of_approach_factor` is
+still 1 for a finite beta outside (0, 1), `D_h <= 0` still selects the
+equivalent-circle diameter in the area-change closures, `m_ref <= 0` still
+switches the combustor low-flow ramp off. The same holds for the "neutral
+answer" branches (no fin model in `pin_fin_array_efficiency`, Gc/Gj = 0 in
+`crossflow_to_jet_ratio_at_x`, Y = 1 for gamma <= 1 in the McGreehan-Schotsch
+expansion factors, zero flow in the channel, area-change, jet-impulse,
+crossflow-Cd and orifice kernels): finite input keeps them, NaN and inf are
+refused. Solver-iterate arguments are refused only when non-finite; their
+negative or zero values keep the kernels' no-flow and floor branches.
+
 ---
 
 ## Thermodynamics (thermo.h)
@@ -1258,6 +1272,14 @@ JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
 ```
 
 ```cpp
+// Every ejector function throws std::invalid_argument for non-finite input and
+// out-of-domain parameters (gamma > 1, r_gas > 0, efficiencies in (0, 1],
+// recovery in (0, 1] (above 1: a gain beyond lossless mixing), 1 < A_p1/A_t
+// <= A_3/A_t, positive areas, A_exit >= A_throat,
+// losses and eps_frac >= 0, blend windows lo < hi); the standalone closures
+// also need a finite, positive supply state. The two whole-element residual
+// functions check their Newton iterates for finiteness only (#769).
+//
 // Ejector operating anchors (P_c*, P_b0): the end of the critical plateau and
 // the far end of the subcritical droop. Two closure families, selected as a
 // pair by ejector_element_residuals_and_jacobian's anchor_closure argument:

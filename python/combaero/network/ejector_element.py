@@ -225,8 +225,9 @@ class EjectorElement(MultiPortChamberBase):
                 The inlet faces never inherit: the nozzle exit and the suction
                 annulus are internal geometry, not the feed pipes' areas.
             recovery_efficiency: Multiplies the lossless mixed stagnation
-                pressure to give the critical back pressure P_c*. Defaults
-                to 1.0 (no artificial loss); see this module's and
+                pressure to give the critical back pressure P_c*, in (0, 1]:
+                above 1 the ejector would gain pressure beyond lossless
+                mixing. Defaults to 1.0 (no artificial loss); see this module's and
                 ``_ejector_huang1999``'s docstrings for why that default is
                 not fitted to any reference dataset. The incompressible
                 closure applies it the same way, to the outlet's stagnation
@@ -260,15 +261,19 @@ class EjectorElement(MultiPortChamberBase):
         """
         # Validate geometry BEFORE super().__init__ so the port-face areas
         # passed below are guaranteed positive.
-        if throat_area <= 0.0:
-            raise ValueError(f"EjectorElement '{id}': throat_area must be positive.")
-        if nozzle_exit_area <= throat_area:
+        # Written "not (x > y)" so NaN fails them too (#769); inf is refused
+        # explicitly.
+        if not (throat_area > 0.0) or not math.isfinite(throat_area):
+            raise ValueError(f"EjectorElement '{id}': throat_area must be positive and finite.")
+        if not (nozzle_exit_area > throat_area) or not math.isfinite(nozzle_exit_area):
             raise ValueError(
                 f"EjectorElement '{id}': nozzle_exit_area ({nozzle_exit_area}) must "
                 f"exceed throat_area ({throat_area}) -- the primary nozzle must "
                 f"diverge to expand supersonically."
             )
-        if mixing_area is not None and mixing_area <= nozzle_exit_area:
+        if mixing_area is not None and (
+            not (mixing_area > nozzle_exit_area) or not math.isfinite(mixing_area)
+        ):
             raise ValueError(
                 f"EjectorElement '{id}': mixing_area ({mixing_area}) must exceed "
                 f"nozzle_exit_area ({nozzle_exit_area}) -- the constant-area section "
@@ -279,10 +284,10 @@ class EjectorElement(MultiPortChamberBase):
                 f"EjectorElement '{id}': anchor_closure must be one of "
                 f"{ANCHOR_CLOSURES}, got {anchor_closure!r}."
             )
-        if recovery_efficiency <= 0.0:
+        if not (0.0 < recovery_efficiency <= 1.0):
             raise ValueError(
-                f"EjectorElement '{id}': recovery_efficiency must be positive, "
-                f"got {recovery_efficiency}."
+                f"EjectorElement '{id}': recovery_efficiency must be positive and at most 1 "
+                f"(above 1 is a pressure gain beyond lossless mixing), got {recovery_efficiency}."
             )
         if k_nozzle is None:
             k_nozzle = 1.0 / ETA_P - 1.0
@@ -294,8 +299,8 @@ class EjectorElement(MultiPortChamberBase):
             ("k_throat", k_throat),
             ("k_diffuser", k_diffuser),
         ):
-            if k < 0.0:
-                raise ValueError(f"EjectorElement '{id}': {name} must be >= 0, got {k}.")
+            if not (k >= 0.0) or not math.isfinite(k):
+                raise ValueError(f"EjectorElement '{id}': {name} must be finite and >= 0, got {k}.")
         # Port-face areas from the ejector's OWN geometry (ordered
         # inlet_nodes + outlet_nodes = [primary, secondary, outlet]). Unlike a
         # generic tee, the ejector always knows these, so it supplies them
@@ -362,7 +367,7 @@ class EjectorElement(MultiPortChamberBase):
             elif self.mixing_area is None:
                 self.mixing_area = DEFAULT_EJECTOR_MIXING_AREA
                 self._mixing_source = "default"
-            if self.mixing_area <= self.nozzle_exit_area:
+            if not (self.mixing_area > self.nozzle_exit_area):
                 raise ValueError(
                     f"EjectorElement '{self.id}': the mixing area inherited from "
                     f"the outlet pipe ({self.mixing_area:.4g} m^2, {self._mixing_source}) "

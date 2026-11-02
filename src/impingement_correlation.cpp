@@ -1,5 +1,7 @@
 #include "impingement_correlation.h"
 
+#include "input_validation.h"
+
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -213,6 +215,13 @@ JetArrayImpingementResult jet_array_impingement_nu(
 
 double crossflow_to_jet_ratio_at_x(double yn_d, double z_d, double C_D,
                                    double x_over_xn) {
+  // The "return 0" guards below keep their meaning for finite input; NaN
+  // and inf used to land in them too (#769).
+  if (!validation::is_finite(yn_d) || !validation::is_finite(z_d) ||
+      !validation::is_finite(C_D) || !validation::is_finite(x_over_xn)) {
+    throw std::invalid_argument(
+        "crossflow_to_jet_ratio_at_x: yn_d, z_d, C_D and x/xn must be finite");
+  }
   const double beta = crossflow_beta(yn_d, z_d, C_D);
   if (!(C_D > 0.0) || !std::isfinite(C_D)) {
     return 0.0;
@@ -290,6 +299,10 @@ ImpingementEtaR impingement_eta_r(double Gc_Gj, double xn_d, double yn_d,
   if (!(z_d > 0.0) || !std::isfinite(z_d) || !std::isfinite(Gc_Gj)) {
     throw std::invalid_argument(
         "impingement_eta_r: z_d must be positive and Gc_Gj finite");
+  }
+  // xn_d and yn_d only set the extrapolation flag, which NaN cleared (#769).
+  if (!validation::is_finite(xn_d) || !validation::is_finite(yn_d)) {
+    throw std::invalid_argument("impingement_eta_r: xn_d and yn_d must be finite");
   }
   using R = ImpingementEtaRRange;
   const auto outside = [](double v, double lo, double hi) {

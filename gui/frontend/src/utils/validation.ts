@@ -152,8 +152,11 @@ export function validateNetwork(nodes: Node[]): string[] {
 				errors.push(
 					`${node.id}: Ejector mixing_area must exceed nozzle_exit_area`,
 				);
-			if (eta <= 0)
-				errors.push(`${node.id}: Ejector recovery_efficiency must be > 0`);
+			// Above 1 is a pressure gain beyond lossless mixing (#769).
+			if (!(eta > 0 && eta <= 1))
+				errors.push(
+					`${node.id}: Ejector recovery_efficiency must be in (0, 1]`,
+				);
 		}
 		if (node.type === "area_change") {
 			// null F0/F1 means "inherit from connected channels" — only flag explicit non-positive values

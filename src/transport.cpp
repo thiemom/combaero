@@ -131,6 +131,11 @@ void column_ln_omega(int c, double lx, double& ln_om, double& dln) {
 
 Omega22Result omega22_and_derivative(double T_star, double delta_star)
 {
+    // The clamp below turned a NaN delta_star into 0 (#769). A NaN T_star
+    // propagates to a NaN Omega on its own.
+    if (!validation::is_finite(delta_star)) {
+        throw std::invalid_argument("omega22_and_derivative: delta_star must be finite");
+    }
     constexpr int nD = collision::kNumDelta;
     const double ts = std::max(T_star, 1e-6);
     const double ds = std::max(0.0, std::min(delta_star, collision::kDelta[nD - 1]));

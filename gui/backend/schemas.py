@@ -645,8 +645,10 @@ class EjectorData(BaseModel):
 
     Geometry is three absolute areas (the ratios are computed by the
     element). Validation (throat > 0, nozzle_exit > throat, mixing >
-    nozzle_exit, recovery_efficiency > 0) is enforced by the element
+    nozzle_exit, 0 < recovery_efficiency <= 1) is enforced by the element
     constructor at build time; the frontend mirrors it for early feedback.
+    The recovery bound is also declared on the field, so a request is refused
+    by name before the network is built.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -657,8 +659,9 @@ class EjectorData(BaseModel):
     # the outlet pipe, else EjectorElement.DEFAULT_EJECTOR_MIXING_AREA (#559).
     mixing_area: float | None = None
     # Multiplies the lossless mixed stagnation pressure to give the critical
-    # back pressure P_c*. 1.0 = no artificial loss (not fitted to data).
-    recovery_efficiency: float = 1.0
+    # back pressure P_c*. 1.0 = no artificial loss (not fitted to data); above
+    # 1 is a pressure gain beyond lossless mixing (#769).
+    recovery_efficiency: float = Field(default=1.0, gt=0.0, le=1.0)
     # The (P_c*, P_b0) pair ending the plateau and the droop (compressible):
     # Kracik & Dvorak's lossless mixing, or Huang 1999's printed chain with the
     # sudden-expansion dead head (validation/ejector/README.md).

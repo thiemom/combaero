@@ -45,3 +45,27 @@ describe("tee loss factor", () => {
 		expect(errs(f)).toHaveLength(1);
 	});
 });
+
+// Ejector recovery multiplies the lossless mixed stagnation pressure: above 1
+// is a pressure gain beyond lossless mixing, the same bound as the backend's
+// EjectorData field and EjectorElement (#769).
+describe("ejector recovery efficiency", () => {
+	const ejector = (recovery_efficiency: number): Node => ({
+		id: "ej",
+		type: "ejector",
+		position: { x: 0, y: 0 },
+		data: { recovery_efficiency },
+	});
+	const errs = (r: number) =>
+		validateNetwork([ejector(r)]).filter((e) =>
+			e.includes("recovery_efficiency"),
+		);
+
+	it.each([1.0, 0.9, 1e-3])("accepts %s", (r) => {
+		expect(errs(r)).toHaveLength(0);
+	});
+
+	it.each([1.0000001, 2, 0, -0.5, Number.NaN])("refuses %s", (r) => {
+		expect(errs(r)).toHaveLength(1);
+	});
+});

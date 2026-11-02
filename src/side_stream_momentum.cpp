@@ -6,6 +6,7 @@
 
 #include "composition.h"
 #include "compressible.h"
+#include "input_validation.h"
 #include "solver_interface.h"
 #include "stagnation.h"
 #include "thermo.h"
@@ -354,6 +355,11 @@ JetW jet_w(double Pt, double Tt, double P, const std::vector<double>& X) {
 
 JetImpulse jet_impulse(double m, double Pt, double Tt, double P,
                        const std::vector<double>& X) {
+  // jet_w's "no jet" branch is for finite states; NaN used to answer J = 0.
+  if (!validation::is_finite(m) || !validation::is_finite(Pt) || !validation::is_finite(Tt) ||
+      !validation::is_finite(P)) {
+    throw std::invalid_argument("jet_impulse: m, Pt, Tt and P must be finite");
+  }
   const JetW base = jet_w(Pt, Tt, P, X);
   JetImpulse out;
   out.J = m * base.w;
