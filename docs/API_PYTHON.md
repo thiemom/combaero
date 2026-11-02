@@ -900,6 +900,26 @@ pins = ConvectiveSurface(
 #### ThermalWall
 Thermal coupling between two network elements through a shared wall.
 
+**What it represents.** One shared wall *patch* with two sides: element A's
+fluid on one face, element B's on the other, the heat crossing the metal
+straight through (1-D, normal to the wall, through its layers).
+
+- **Area:** the shared part of each element's perimeter, not its whole wetted
+  perimeter -- `contact_area`, or `area_a` / `area_b` when the faces differ
+  (#887, below).
+- **Several walls per element:** one per face it shares (a rectangular duct
+  has four faces; a round one may share part of its perimeter). A face with no
+  wall is adiabatic.
+- **h:** each side uses its element's own h (the channel correlation's
+  perimeter-mean, with its `Nu_multiplier`), applied to this patch; there is
+  no face-by-face h.
+- **Not modelled: conduction along the metal.** Walls of elements in series
+  (a duct and the next one downstream) exchange heat only through the fluid.
+  That axial path conducts on the metal's cross-section (thickness x width)
+  over the distance between segments, `G ~ k t w / dx` -- usually
+  negligible, but not for thick metal, short segments or a steep gradient
+  (#898).
+
 ```python
 from combaero.network import ThermalWall, WallLayer
 

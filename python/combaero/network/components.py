@@ -1286,6 +1286,28 @@ class _WallCoupling:
 class ThermalWall:
     """Thermal coupling between two elements through a shared multi-layer wall.
 
+    What it represents. One shared wall PATCH with two sides: element A's
+    fluid wets one face, element B's the other, and the heat crosses the metal
+    straight through, normal to the wall (1-D, through the layers).
+
+    - Its area is the shared part of each element's perimeter, not the whole
+      wetted perimeter: ``contact_area``, or per-side ``area_a`` / ``area_b``
+      when the two faces differ (#887).
+    - An element may carry several walls, one per face it shares (the four
+      faces of a rectangular duct, or part of a round one's perimeter). A
+      face with no wall is adiabatic.
+    - Each side's h is its element's own (the channel correlation's
+      perimeter-mean h, its ``Nu_multiplier`` included), applied to this
+      patch: there is no face-by-face h.
+    - Along the wall the exchange is the two streams' epsilon-NTU integral
+      (below); parallel or counter flow follows from ``orientation`` and the
+      flow signs.
+    - No heat flows ALONG the metal: walls of elements in series (a duct and
+      the next one downstream) exchange heat only through the fluid. Their
+      axial path would conduct on the metal's cross-section, thickness x width,
+      over the distance between segments -- usually negligible, but not for
+      thick metal, short segments or a steep gradient (#898).
+
     Attributes
     ----------
     id : str
