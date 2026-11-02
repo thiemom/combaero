@@ -764,6 +764,29 @@ documents:
   records: []
   notes: Arrived 2026-11-02 in sources/new/ (from the user). The former wanted entry gave the article number as
     122607; the page prints 122608.
+- file: sources/heat_transfer/film/Lee_Cho_2008_AIAA-2008-5175_ramjet_multislot_film.pdf
+  citation: Lee, K. W., Song, J., Oh, M. G., Yu, M. S., Cho, H. H., Ham, H. C., Hwang, K. Y. (2008). Heat transfer
+    measurement on slot film cooling of ramjet combustor. 44th AIAA/ASME/SAE/ASEE Joint Propulsion Conference,
+    AIAA 2008-5175.
+  topic: [film]
+  content: '9 pp., text layer good, data in figures only. Rig: a low-speed (U 15 m/s) model of a pre-diffuser
+    ramjet combustor wall with three tangential slots (alpha 0 deg). Table 1: slot 1, s 2 mm, t/s 1, under the
+    recirculation zone; slot 2, s 3 mm, t/s 0.67; slot 3, s 8 mm, t/s 0.25, no recirculation. Blowing rate M
+    0.5/1.0/1.5/2.0; coolant-to-mainstream dT about 20 C, so DR about 1. Hot-wire velocity and turbulence
+    profiles at the slot exits. Steady TLC adiabatic effectiveness plotted against x/s; dimensionless
+    temperature fields. Despite the title, no heat transfer coefficient is reported.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Low value. Slots 1 and 2 sit in a recirculation zone that combaero does not
+    model. Slot 3 (t/s 0.25, M 0.5-2) is the only clean tangential thick-lip case, but it is downstream of
+    slots 1-2, so it is not an isolated-slot check of Ballal-Lefebvre Eqs. 8/9 (Cranfield SME4, held) or of
+    Marek-Tacina unless the upstream coolant can be accounted for. Qualitative: a thicker lip lowers eta near
+    the slot through lip-wake eddies, consistent with Ballal-Lefebvre''s (t/s)^-0.2 term. Figure-only; AIAA
+    copyright.'
+  read_for: ['#714 / #763 thick-lip slot film data (cross-source)']
+  issues: [714, 763]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). Its references cite Folayan & Whitelaw and
+    Sivasegaram (the lip-thickness data behind Ballal-Lefebvre Figs. 3/4).
 - file: sources/heat_transfer/film/c32eeeb88f403f5f28556753359153c1b85b.pdf
   citation: Murray, A. V., Ireland, P. T., Wong, T. H., Tang, S. W., Rawlinson, A. J. (2018). High resolution
     experimental and computational methods for modelling multiple row effusion cooling performance. Int.
