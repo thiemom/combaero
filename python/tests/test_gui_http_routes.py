@@ -453,7 +453,7 @@ def _palette_network(kind: str) -> dict:
         # A fixed pressure ratio (#893) between two channels: the channels set
         # the flow (between two boundaries alone nothing would).
         # A few percent of the drive in the channels: moderate Mach.
-        pin, pout = (1.0e5, 3.8e5) if kind == "compressor" else (3.15e5, 1.0e5)
+        pin, pout = (1.0e5, 3.8e5) if kind == "compressor" else (3.99e5, 1.0e5)
         nodes = [
             _node("in", pb, {"Pt": pin, "Tt": 300.0 if kind == "compressor" else 900.0}),
             _node("c1", "channel", {"L": 0.5, "D": 0.05}),
