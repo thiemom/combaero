@@ -2158,6 +2158,52 @@ documents:
   issues: [385, 390, 392, 394, 403]
   records: [validation/cooling/extractions/lau_1990_v_ribs.md, validation/cooling/data/lau1990/metadata.yaml]
   notes: Volume and end page not printed in the PDF text; the extraction record gives IJHMT 34(7), 1605-1616.
+- file: sources/heat_transfer/Forsyth_McGilvray_Gillespie_2017_ExpFluids_58_5_ribbed_developing_flow.pdf
+  citation: 'Forsyth, P., McGilvray, M., Gillespie, D. R. H. (2017). Secondary flow and heat transfer coefficient
+    distributions in the developing flow region of ribbed turbine blade cooling passages. Experiments in Fluids
+    58, 5. doi:10.1007/s00348-016-2286-6 (first presented as ASME GT2014-26737).'
+  id: doi:10.1007/s00348-016-2286-6
+  topic: [rib]
+  content: 'Open access (CC BY 4.0), 15 pp., clean text layer; figures read from page images. Oxford (Osney)
+    low-speed suction tunnel, about 20x engine scale, stationary. Passage 75 x 150 mm (AR 1:2, width/height), Dh
+    100 mm, 1400 mm long, after a 500 mm square settling length and a 2:1 contraction; ~1500 mm (~15 Dh) smooth
+    development upstream of the first rib. Ribs 6 x 6 mm square, 53 mm long, on the two NARROW (75 mm) walls,
+    staggered by half a pitch, spanning only the MIDDLE HALF of the wall: e/Dh 0.06, P/e 10, alpha 45 deg. Re 1e5
+    (smooth-passage Dh). Ribs added upstream of a fixed instrumented pair, 1 to 12 pairs; transient liquid
+    crystal (three crystals 35/40/45 C, heater-mesh gas step, ~20 K driving difference) on the suction (ribbed)
+    surface and leading edge (smooth), hybrid lumped-capacity brass ribs; four-hole probe secondary-flow maps after
+    3/6/9/12 rib pairs. Nu = q Dh / (k (T_gas - T_wall)) with T_gas the CENTRELINE temperature one pitch upstream
+    (not bulk) and k 0.0279 fixed (Eq. 10). HTC uncertainty 5.7-7.1% (Table 1); test-to-test concatenation needed
+    linear scaling of 8.4% (ribbed) and 5.8% (smooth) area averages. Results PLOTTED only: Fig. 13 Nu maps, Fig. 14
+    circumferentially averaged Nu vs rib number, separate traces for the ribbed and smooth wall, experiment and
+    RANS (realizable k-epsilon). Read off Fig. 14: ribbed wall ~200-260 at rib 1, pitch means ~300-330 from rib 4
+    on (within-pitch swing ~250-380); smooth leading edge ~140 at ribs 1-3 rising to ~210-220 by rib 9. Text:
+    averaged Nu 1.4-1.5x higher at rib 12 than rib 1; flow develops over the first 5-6 pitches; ribbed wall peaks
+    after ~5 pitches (~1.5x the entrance level), 1.4x at exit; centreline gas T drops 4 K after rib 9 as the
+    vortices fill the passage. CFD 7.6% high over ribs 1-10, 17% high overall. No tables, no correlation, no
+    friction.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Rib heat-transfer data from a second lab outside Texas A&M (after UTRC, CR-4396)
+    and the first in the register resolved by rib count through the developing region. What it offers combaero:
+    (1) an ENTRY EFFECT the model lacks -- RibbedModel and every set in rib_correlation.h are fully developed (no
+    x/D or rib-count term); here, after a ~15 Dh hydrodynamically developed smooth approach (the gas-temperature
+    step starts at the heater mesh further upstream), the ribbed-wall augmentation GROWS from ~0.65-0.8 of its
+    developed level at rib 1 to the plateau by ribs 5-6 -- the opposite sign of a thermal-entry decay (Han & Park
+    1988, held, Texas A&M, short channels L/D 10-15). So a fully developed R overstates the first few pitches of a
+    rib run fed by a long smooth duct; one geometry cannot size a closure, but it bounds the effect (~20-35% at
+    rib 1). (2) Cross-source ACCURACY of a developed ribbed-wall Nu (ribs >= 6, Nu/Nu0 ~1.5-1.6 against
+    Dittus-Boelter 200 at Re 1e5), but with caveats that may dominate the score: partial-span ribs (middle half;
+    every shipped set is full-span), W/H 0.5 in Han''s convention (the han_1989_narrow_channel domain) but Re 1e5
+    above every shipped set''s Re range (10,000-60,000; Han-Zhang-Lee 15,000-90,000), a centreline (not bulk)
+    reference temperature, and concatenation scaling of 6-8%. Not fidelity for anything (no shipped closure is
+    built from it). Fig. 14 is continuous traces, digitisable; nothing tabulated.'
+  read_for: [rib entry/developing-region effect (rib-count dependence of augmentation), 'cross-source
+      (non-Texas-A&M) ribbed-wall Nu accuracy, partial-span 45 deg ribs']
+  issues: []
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/ (from the user) as s00348-016-2286-6.pdf. Not checked against the
+    conference version GT2014-26737 (not held). Nu0 = 200 is computed here (Dittus-Boelter, Pr 0.71), not printed.
+    Fig. 14 values are read by eye from a 110 dpi page image, not digitised.
 - file: sources/heat_transfer/Webb_Eckert_Goldstein_1971_IJHMT_14_pp601-617.pdf
   citation: Webb, R. L., Eckert, E. R. G., Goldstein, R. J. (1971). Heat transfer and friction in tubes
     with repeated-rib roughness. Int. J. Heat Mass Transfer 14, 601-617.
