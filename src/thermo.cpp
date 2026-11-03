@@ -784,6 +784,41 @@ double cp_scan_down(double T) {
   return std::max(T * (1.0 - kCpScanRatio), thermo::CP_INVERSE_T_MIN);
 }
 
+// Newton kept inside the bracket [a, b] of cp - cp_target (fa, fb of opposite
+// sign; bisection when a step leaves it); converged on a Newton step below
+// tol or a bracket narrower than tol.
+double polish_cp_root(double cp_target, const std::vector<double> &X, double a, double fa,
+                      double b, double fb, double tol, std::size_t max_iter, const char *fn) {
+  auto f = [&](double T) { return cp(T, X) - cp_target; };
+  double T = a - fa * (b - a) / (fb - fa);
+  for (std::size_t i = 0; i < max_iter; ++i) {
+    const double fT = f(T);
+    if (fT == 0.0) {
+      return T;
+    }
+    if ((fT > 0.0) == (fa > 0.0)) {
+      a = T, fa = fT;
+    } else {
+      b = T;
+    }
+    if (b - a <= tol) {
+      return 0.5 * (a + b);
+    }
+    const double d = dcp_dT(T, X);
+    const double T_newton = (d != 0.0 && std::isfinite(d)) ? T - fT / d : a - 1.0;
+    if (T_newton > a && T_newton < b) {
+      const double step = std::abs(T_newton - T);
+      T = T_newton;
+      if (step < tol) {
+        return T;
+      }
+    } else {
+      T = 0.5 * (a + b);
+    }
+  }
+  inner_solve::throw_no_convergence(fn, max_iter, "cp residual [J/(mol K)]", f(T));
+}
+
 }  // namespace
 
 double calc_T_from_cp(double cp_target, const std::vector<double> &X,
@@ -852,36 +887,158 @@ double calc_T_from_cp(double cp_target, const std::vector<double> &X,
                   T_min, T_max, cp_target, f_lo + cp_target, lo, f_hi + cp_target, hi);
     throw std::runtime_error(buf);
   }
-  // Newton kept inside the bracket (bisection when a step leaves it);
-  // converged on a Newton step below tol or a bracket narrower than tol.
-  double T = a - fa * (b - a) / (fb - fa);
-  for (std::size_t i = 0; i < max_iter; ++i) {
-    const double fT = f(T);
-    if (fT == 0.0) {
-      return T;
-    }
-    if ((fT > 0.0) == (fa > 0.0)) {
-      a = T, fa = fT;
-    } else {
-      b = T;
-    }
-    if (b - a <= tol) {
-      return 0.5 * (a + b);
-    }
-    const double d = dcp_dT(T, X);
-    const double T_newton = (d != 0.0 && std::isfinite(d)) ? T - fT / d : a - 1.0;
-    if (T_newton > a && T_newton < b) {
-      const double step = std::abs(T_newton - T);
-      T = T_newton;
-      if (step < tol) {
-        return T;
+  return polish_cp_root(cp_target, X, a, fa, b, fb, tol, max_iter, "calc_T_from_cp");
+}
+
+std::vector<CpRoot> calc_T_from_cp_roots(double cp_target, const std::vector<double> &X,
+                                         double T_min, double T_max, double tol,
+                                         std::size_t max_iter) {
+  // Every root in [T_min, T_max] (#963). cp is split at its extrema into
+  // monotone pieces, which the scan nodes subdivide; each sign change of
+  // cp - cp_target between neighbouring points is one root.
+  if (!validation::is_finite_positive(cp_target)) {
+    throw std::invalid_argument("calc_T_from_cp_roots: cp_target must be positive and finite");
+  }
+  if (!validation::is_finite_positive(tol)) {
+    throw std::invalid_argument("calc_T_from_cp_roots: tol must be positive and finite");
+  }
+  if (!std::isfinite(T_min) || !std::isfinite(T_max) || T_min < thermo::CP_INVERSE_T_MIN ||
+      T_max > thermo::CP_INVERSE_T_MAX || !(T_min < T_max)) {
+    char buf[160];
+    std::snprintf(buf, sizeof buf,
+                  "calc_T_from_cp_roots: need %g <= T_min < T_max <= %g K (got %g, %g)",
+                  thermo::CP_INVERSE_T_MIN, thermo::CP_INVERSE_T_MAX, T_min, T_max);
+    throw std::invalid_argument(buf);
+  }
+  auto sign = [](double v) { return (v > 0.0) - (v < 0.0); };
+  auto dcp = [&](double T) { return dcp_dT(T, X); };
+  // Bisect dcp/dT to adjacent doubles between a (sign sa) and b (not sa); the
+  // more extreme end of cp: a maximum when cp was rising (sa > 0).
+  auto extremum = [&](double a, int sa, double b) {
+    for (double m = 0.5 * (a + b); m > a && m < b; m = 0.5 * (a + b)) {
+      if (sign(dcp(m)) == sa) {
+        a = m;
+      } else {
+        b = m;
       }
-    } else {
-      T = 0.5 * (a + b);
+    }
+    return (cp(a, X) > cp(b, X)) == (sa > 0) ? a : b;
+  };
+  // Scan nodes from T_min up, and dcp/dT on them.
+  std::vector<double> pts;
+  std::vector<double> ds;
+  for (double T = T_min;; T = std::min(cp_scan_up(T), T_max)) {
+    pts.push_back(T);
+    ds.push_back(dcp(T));
+    if (T >= T_max) {
+      break;
     }
   }
-  inner_solve::throw_no_convergence("calc_T_from_cp", max_iter, "cp residual [J/(mol K)]",
-                                    f(T));
+  const std::size_t n = pts.size();
+  std::vector<double> ext;
+  // Sign changes of dcp/dT between nodes (a node where it is exactly 0, as on
+  // argon's constant cp, is passed over): one extremum each.
+  std::size_t k_last = n;
+  for (std::size_t k = 0; k < n; ++k) {
+    const int s = sign(ds[k]);
+    if (s == 0) {
+      continue;
+    }
+    if (k_last < n && s != sign(ds[k_last])) {
+      ext.push_back(extremum(pts[k_last], sign(ds[k_last]), pts[k]));
+    }
+    k_last = k;
+  }
+  // An extremum pair inside one step leaves no sign change on the nodes, but
+  // |dcp/dT| dips there: at a node where it is a local minimum (the range
+  // ends included) with one sign around it, search the window of the
+  // neighbouring nodes for the opposite sign (golden section on sign*dcp/dT)
+  // and, when found, bisect on both sides of it.
+  constexpr double kInvPhi = 0.6180339887498949;  // (sqrt(5) - 1) / 2
+  for (std::size_t k = 0; k < n; ++k) {
+    const std::size_t lo = k > 0 ? k - 1 : k;
+    const std::size_t hi = k + 1 < n ? k + 1 : k;
+    const int s = sign(ds[k]);
+    if (s == 0 || sign(ds[lo]) != s || sign(ds[hi]) != s || lo == hi ||
+        !(k == lo || std::abs(ds[k]) < std::abs(ds[lo])) ||
+        !(k == hi || std::abs(ds[k]) <= std::abs(ds[hi]))) {
+      continue;
+    }
+    auto g = [&](double T) { return s * dcp(T); };
+    double a = pts[lo], b = pts[hi];
+    double c = b - kInvPhi * (b - a), d = a + kInvPhi * (b - a);
+    double gc = g(c), gd = g(d);
+    double m = std::numeric_limits<double>::quiet_NaN();
+    for (int i = 0; i < thermo::CP_ROOTS_DIP_ITER; ++i) {
+      if (gc < 0.0 || gd < 0.0) {
+        m = gc < 0.0 ? c : d;
+        break;
+      }
+      if (gc < gd) {
+        b = d, d = c, gd = gc;
+        c = b - kInvPhi * (b - a);
+        gc = g(c);
+      } else {
+        a = c, c = d, gc = gd;
+        d = a + kInvPhi * (b - a);
+        gd = g(d);
+      }
+    }
+    if (!std::isnan(m)) {
+      ext.push_back(extremum(pts[lo], s, m));
+      ext.push_back(extremum(m, -s, pts[hi]));
+    }
+  }
+  std::sort(ext.begin(), ext.end());
+  // Merge the extrema in (an extremum on a node replaces it).
+  std::vector<bool> is_ext(pts.size(), false);
+  for (double e : ext) {
+    const auto it = std::lower_bound(pts.begin(), pts.end(), e);
+    const auto k = static_cast<std::size_t>(it - pts.begin());
+    if (it != pts.end() && *it == e) {
+      is_ext[k] = true;
+    } else {
+      pts.insert(it, e);
+      is_ext.insert(is_ext.begin() + static_cast<std::ptrdiff_t>(k), true);
+    }
+  }
+  std::vector<double> fs(pts.size());
+  for (std::size_t k = 0; k < pts.size(); ++k) {
+    fs[k] = cp(pts[k], X) - cp_target;
+    if (is_ext[k] && std::abs(fs[k]) <= thermo::CP_ROOTS_DOUBLE_REL * cp_target) {
+      fs[k] = 0.0;
+    }
+  }
+  std::vector<CpRoot> roots;
+  for (std::size_t k = 0; k < pts.size(); ++k) {
+    if (k > 0 && fs[k - 1] != 0.0 && fs[k] != 0.0 && sign(fs[k - 1]) != sign(fs[k])) {
+      const double T = polish_cp_root(cp_target, X, pts[k - 1], fs[k - 1], pts[k], fs[k], tol,
+                                      max_iter, "calc_T_from_cp_roots");
+      roots.push_back({T, 1.0 / dcp_dT(T, X), false});
+    }
+    if (fs[k] == 0.0) {
+      if (k > 0 && fs[k - 1] == 0.0) {
+        std::size_t lo = k - 1, hi = k;
+        while (lo > 0 && fs[lo - 1] == 0.0) {
+          --lo;
+        }
+        while (hi + 1 < pts.size() && fs[hi + 1] == 0.0) {
+          ++hi;
+        }
+        char buf[200];
+        std::snprintf(buf, sizeof buf,
+                      "calc_T_from_cp_roots: cp equals cp_target %.6g J/(mol K) at every scan "
+                      "node in [%g, %g] K; the roots are not isolated",
+                      cp_target, pts[lo], pts[hi]);
+        throw std::domain_error(buf);
+      }
+      roots.push_back({pts[k],
+                       is_ext[k] ? std::numeric_limits<double>::quiet_NaN()
+                                 : 1.0 / dcp_dT(pts[k], X),
+                       is_ext[k]});
+    }
+  }
+  return roots;
 }
 
 double calc_T_from_u(double u_target, const std::vector<double> &X, double T_guess, double tol, std::size_t max_iter) {

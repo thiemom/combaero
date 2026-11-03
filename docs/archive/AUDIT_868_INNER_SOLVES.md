@@ -575,6 +575,107 @@ also reached at 189.9 K: from a 20 K guess the alternation returned 189.9 K).
   the tail tests, 10 K steps below 100 K fail the CO2 test, and one step per
   side per round fails the O2 test.
 
+## #963: every root of cp(T) = target (2026-11-03)
+
+Decision (2026-11-03): `calc_T_from_cp` stays nearest-to-guess; finding every
+root is a separate, opt-in call.
+
+**The call.** `calc_T_from_cp_roots(cp_target, X, T_min = 1 K, T_max = 6000 K,
+tol, max_iter)` returns every root in the range, sorted, as `CpRoot {T,
+dT_dcp, double_root}`; an empty list when there is none (a query: no throw).
+The range must lie in [`CP_INVERSE_T_MIN`, `CP_INVERSE_T_MAX`].
+
+**Method.**
+
+- dcp/dT (analytic, `dcp_dT`) is evaluated on `calc_T_from_cp`'s scan nodes,
+  from `T_min` up. Each sign change between nodes is bisected to adjacent
+  doubles: a cp extremum. Nodes where dcp/dT is exactly 0 (argon's constant
+  cp) are passed over.
+- An extremum pair inside one step leaves no sign change on the nodes. Such
+  pairs exist: an N2/O2 blend at 77.28 % N2 has a maximum at 156.1 K and a
+  minimum at 159.3 K, born at ~77.275 % N2 near 157.7 K, so for blends just
+  above that the pair is arbitrarily close. |dcp/dT| dips there, so at every node where it is
+  a local minimum among the nodes (the range ends included) and has one sign
+  on both neighbours, a golden-section search
+  (`thermo::CP_ROOTS_DIP_ITER` = 60 steps over the two steps) looks for the
+  opposite sign. When it finds it, both sides are bisected.
+- Between neighbouring nodes and extrema cp is then monotone, so each sign
+  change of cp - target is one root, polished by the same bracketed Newton
+  as `calc_T_from_cp` (now a shared helper; see bit-identity below).
+  `dT_dcp` = 1 / (dcp/dT) at the root.
+- An extremum whose cp is within `thermo::CP_ROOTS_DOUBLE_REL` = 1e-13 of the
+  target is one double root (`double_root`, `dT_dcp` NaN). The share is
+  rounding level for cp, and two roots that a slightly different target gives
+  are then separated by far more than `tol`.
+- cp equal to the target at two consecutive scan points (argon below ~950 K,
+  cp exactly 5/2 R) throws `std::domain_error`: the roots are not isolated.
+- Not covered: three or more extrema within two steps, which no case below
+  has.
+- Cost: ~44 us for air (calc_T_from_cp: 3.5 us).
+
+**Evidence.**
+
+- *Sweep against an independent reference.* 31 compositions: 14 pure species
+  without Ar, air, a burnt gas, 10 random mixtures (Dirichlet, seed 963), and
+  N2/O2 blends at 77.28, 77.285, 77.29, 77.3 and 77.5 % N2 around the pair's
+  birth. The targets:
+  - cp(T) for the #961 sweep's T: 60 log-spaced in [1, 199] K and 81 in
+    [200, 5990] K;
+  - at each of the 20 extrema, cp_e and cp_e (1 +- d) for d = 1e-4 to 1e-14;
+  - cp at both range ends.
+
+  In all, 4693 calls per thermo model. The reference uses cp only, never
+  dcp/dT. It takes the sign changes of cp - target on 610001 points (20001
+  log in [1, 100] K, 10 mK steps above), each refined by brentq. Around each
+  discrete local extremum of cp on that grid, it runs a golden-section
+  search of cp itself, so it also finds pairs closer than a grid step.
+  - NASA9_C2 (default) and NASA9 alike: 5212 reference roots, 5212 found,
+    with the same count in every call. Nothing is missing and nothing is
+    spurious.
+  - Root error: up to 9.8e-8 K for the cp(T) targets and 1.2e-6 K for
+    targets 1e-10 to 1e-14 from an extremum, where dT/dcp is ~1e6.
+    |cp(T) - target| / target <= 2.8e-15.
+  - Double roots: 60 (20 extrema x the targets within 1e-13), flagged in the
+    reference too. The location agrees with the reference's golden section to
+    1.02 times the width that rounding of cp limits that search to,
+    sqrt(2 eps cp / |cp''|) (e.g. 1.2e-4 K at the blends' extrema). At the
+    double root dcp/dT is ~1e-19, and cp is as extreme as the reference's to
+    2.4e-16.
+  - Falsified with the dip search off (`CP_ROOTS_DIP_ITER` = 0): 36 roots are
+    missed in 24 calls, all at the 77.28 and 77.285 % blends, whose pairs lie
+    inside the 150-160 K step.
+  - The #961-style "no root" cases. The cp(T) targets x 13 guesses (1 to
+    9000 K) make 36 calls where `calc_T_from_cp` throws "no root" although
+    roots exist: O2 at 120.76 / 127.07 K, H2O at 116.16 / 117.64 K, CO2 at
+    6.02 / 6.33 K. (#961 counted 37 over its own random mixtures.) Counting
+    the near-extremum targets as well, there are 529 such calls.
+    `calc_T_from_cp_roots` returns the reference roots in every one.
+  - Argon: 200 targets cp(T), T in [1, 5990] K. 32 throw "not isolated"
+    (T <= ~950 K). The other 168 agree with the reference in count, to
+    4.1e-4 K, because Ar's cp above 1000 K is flat to data noise (dT/dcp up
+    to ~1e9, ten extrema).
+- *Bit-identity of `calc_T_from_cp`* (its polish loop moved into the shared
+  helper): the 4693 targets x 13 guesses x both thermo models, 122018 calls,
+  against origin/main (d0885b91) in a second worktree. Every result and every
+  exception message is identical.
+- *Network F and J* (SHA-256 at x0 + 3 seeded perturbations, 15 families x
+  seeds 0-39): 600 of 600 identical to main. No network code calls either
+  function.
+- *Tests* (`test_inner_solve_cap_868.py` / `.cpp`):
+  - N2's three roots of cp(205 K), and two with `T_min` = 200 K;
+  - O2's pair within one step, where `calc_T_from_cp` throws;
+  - the 77.28 % blend's three roots of cp(157.7 K);
+  - N2's 127 K maximum as one double root at cp_e and at cp_e (1 +- 5e-14),
+    and as two roots 1e-9 below it;
+  - an empty list for unreachable targets;
+  - invalid input and range, and argon's plateau.
+
+  Falsified in C++ and Python:
+  - the dip search off fails the blend test;
+  - no split at the extrema fails the O2 and double-root tests;
+  - `CP_ROOTS_DOUBLE_REL` = 0 fails the double-root test;
+  - no plateau check fails the argon test.
+
 ## Not verified
 
 - The stress families were evaluated at x0 and perturbations (F, J hashes),
@@ -587,6 +688,13 @@ also reached at 189.9 K: from a 20 K guess the alternation returned 189.9 K).
 - R3/R5/R6/R8/R11 (PR #954): the `calc_T_from_cp` scan can miss two roots
   closer than a step (a cp extremum within it of the target): 10 K, or
   10 % of T below 100 K since the range reaches 1 K; then it throws "no root".
+  **Answered in #963:** `calc_T_from_cp` is unchanged (nearest to the guess,
+  decision 2026-11-03); the opt-in `calc_T_from_cp_roots` returns every root
+  and finds these pairs (see "#963: every root of cp(T) = target" below).
+- #963: `calc_T_from_cp_roots` is not shown to find three or more extrema
+  within two scan steps, nor a pair whose dip of |dcp/dT| is not unimodal over
+  the search window; no composition in its sweep has either. The sweep's
+  random mixtures are 10; mixtures in general are not exhausted.
   Below 1 K and for a mixture whose tail cubic cancels, the root is
   ill-conditioned (not measured beyond the sweep above).
   `jobson_expansibility` fails to converge on valid input at high beta Ci and

@@ -313,6 +313,8 @@ try:
         bilger_Z_from_equivalence_ratio_mass,
         bulk_T_from_edge_T_and_q,
         calc_T_from_cp,
+        calc_T_from_cp_roots,
+        CpRoot,
         calc_T_from_h,
         calc_T_from_h_mass,
         calc_T_from_s,
@@ -730,6 +732,8 @@ except (ModuleNotFoundError, ImportError) as e:
     calc_T_from_s = _core.calc_T_from_s
     calc_T_from_s_mass = _core.calc_T_from_s_mass
     calc_T_from_cp = _core.calc_T_from_cp
+    calc_T_from_cp_roots = _core.calc_T_from_cp_roots
+    CpRoot = _core.CpRoot
     calc_T_from_u = _core.calc_T_from_u
     calc_T_from_u_mass = _core.calc_T_from_u_mass
     calc_T_from_sv_mass = _core.calc_T_from_sv_mass
@@ -1428,6 +1432,8 @@ __all__ = [
     "calc_T_from_s",
     "calc_T_from_s_mass",
     "calc_T_from_cp",
+    "calc_T_from_cp_roots",
+    "CpRoot",
     "calc_T_from_u",
     "calc_T_from_u_mass",
     "calc_T_from_sv_mass",

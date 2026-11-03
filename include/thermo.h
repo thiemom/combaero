@@ -64,7 +64,8 @@ constexpr double P_FLOOR = 1.0;
 // outward from T_guess, each step on the side whose next node is nearer it,
 // and polishes the first sign change of cp - target: the root nearest T_guess
 // in K, to within the local step. Two roots closer than a step (a cp extremum
-// within it of the target) can be missed (#868 R6).
+// within it of the target) can be missed (#868 R6); calc_T_from_cp_roots,
+// which returns every root, finds them (#963).
 //   Above the data (6000 K for H2O, NH3, CH4 and the alkanes, the shortest)
 //   the high tail levels cp off at a constant that is not physics, so the
 //   range ends there. Below the data (200 K) the low tail is the ideal gas
@@ -89,6 +90,15 @@ constexpr double CP_INVERSE_T_MAX = 6000.0;
 constexpr double CP_INVERSE_T_DATA = 200.0;
 constexpr double CP_INVERSE_SCAN_STEP = 10.0;
 constexpr double CP_INVERSE_LOG_SCAN_T = 100.0;
+// calc_T_from_cp_roots reports a cp extremum as a double root when cp there
+// is within this share of cp_target: rounding level for cp, and far wider
+// than tol in cp, so the two roots a slightly lower (higher) target would
+// give are separated by much more than tol when they are reported apart (#963).
+constexpr double CP_ROOTS_DOUBLE_REL = 1.0e-13;
+// Golden-section steps of calc_T_from_cp_roots' search for an extremum pair
+// hidden inside one scan step (a dip of |dcp/dT| between nodes): the window
+// of two steps shrinks by 0.618 per step, to ~1e-11 K for 10 K steps.
+constexpr int CP_ROOTS_DIP_ITER = 60;
 
 } // namespace combaero::thermo
 
@@ -191,6 +201,32 @@ double calc_T_from_s(double s_target, double P, const std::vector<double>& X, do
 // CP_INVERSE_T_MAX] = [1, 6000] K (see there); std::runtime_error when none lies in it,
 // std::invalid_argument for a non-finite or non-positive input (#868 R6).
 double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+// One root of cp(T) = cp_target (calc_T_from_cp_roots).
+struct CpRoot {
+  double T = 0.0;       // [K]
+  double dT_dcp = 0.0;  // 1 / (dcp/dT) at T [K/(J/(mol K))]; NaN for a double root
+  bool double_root = false;  // T is a cp extremum and cp there is the target
+};
+// Every root of cp(T) = cp_target in [T_min, T_max], sorted (#963); the
+// opt-in alternative to calc_T_from_cp's nearest-to-guess branch. Empty when
+// there is none. Method: dcp/dT is evaluated on calc_T_from_cp's scan nodes
+// (from T_min up, clamped at T_max); each sign change is bisected to the
+// last bit, a cp extremum. An extremum pair inside one step leaves no sign
+// change, but |dcp/dT| dips there: at each node where it is a local minimum
+// with one sign around it, a golden-section search of the two neighbouring
+// steps looks for the opposite sign (CP_ROOTS_DIP_ITER). Between neighbouring
+// nodes and extrema cp is then monotone (barring three or more extrema within
+// two steps), so each sign change of cp - target there is one root, polished
+// as calc_T_from_cp polishes its bracket. An extremum whose cp is within
+// CP_ROOTS_DOUBLE_REL of the target
+// is one double root (dT_dcp NaN). std::invalid_argument for a non-finite or
+// non-positive cp_target or tol, or a range outside [CP_INVERSE_T_MIN,
+// CP_INVERSE_T_MAX] or with T_min >= T_max; std::domain_error when cp equals
+// the target on an interval (argon's constant cp: the roots are not isolated).
+std::vector<CpRoot> calc_T_from_cp_roots(double cp_target, const std::vector<double>& X,
+                                         double T_min = thermo::CP_INVERSE_T_MIN,
+                                         double T_max = thermo::CP_INVERSE_T_MAX,
+                                         double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_u(double u_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 
 // Inverse calculations for mass-specific targets

@@ -150,7 +150,14 @@ into it), each step on the side whose next node is nearer it, 10 K apart and
 10 % of T below 100 K, and the first sign change polished. No root in the
 range raises `RuntimeError` ("no root in [1, 6000] K"); a non-finite or
 non-positive `cp_target`, `T_guess` or `tol`
-raises `ValueError`. The audit of every inner solve, with what was left
+raises `ValueError`. To get every root instead,
+`calc_T_from_cp_roots(cp_target, X, T_min=1.0, T_max=6000.0)` returns a sorted
+list of `CpRoot` (`T` [K], `dT_dcp` = 1/(dcp/dT) [K/(J/(mol K))],
+`double_root`), empty when there is none (#963). It splits cp at its extrema
+(including a pair inside one scan step), so it finds the close pairs the
+nearest-root scan misses; a target equal to cp at an extremum (to 1e-13) is
+one root with `double_root=True` and `dT_dcp` NaN. An invalid input or range,
+and argon's exactly constant cp (roots not isolated), raise `ValueError`. The audit of every inner solve, with what was left
 unchanged: `docs/archive/AUDIT_868_INNER_SOLVES.md`.
 
 ### Compression and Expansion (#893)
@@ -3635,7 +3642,8 @@ dg_dT = cb.dg_over_RT_dT(T=300, X=air)
 # Molar-basis inverses (targets in J/mol or J/(mol*K))
 T_from_h   = cb.calc_T_from_h(h_target=3e5, X=air)            # J/mol -> K
 T_from_s   = cb.calc_T_from_s(s_target=7000, P=101325, X=air) # J/(mol*K), Pa -> K
-T_from_cp  = cb.calc_T_from_cp(cp_target=29, X=air)           # J/(mol*K) -> K
+T_from_cp  = cb.calc_T_from_cp(cp_target=29.1, X=air)         # J/(mol*K) -> K (29 is below air's cp)
+roots_cp   = cb.calc_T_from_cp_roots(cp_target=29.1, X=air)  # every root: [CpRoot(T=...), ...]
 T_from_u   = cb.calc_T_from_u(u_target=2.2e5, X=air)          # J/mol -> K
 
 # Mass-specific inverses (targets in J/kg or J/(kg*K))
