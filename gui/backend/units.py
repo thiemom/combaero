@@ -326,6 +326,16 @@ UNIT_MAP: dict[str, str] = {
     "NTU": "-",
     "effectiveness": "-",
     "counterflow": "-",
+    # Thermal wall radiation (#793), per face: flux on that face, rate,
+    # surface temperature, gas emissivity
+    "q_rad_a": "W/m²",
+    "q_rad_b": "W/m²",
+    "Q_rad_a": "W",
+    "Q_rad_b": "W",
+    "T_surface_a": "K",
+    "T_surface_b": "K",
+    "eps_g_a": "-",
+    "eps_g_b": "-",
 }
 
 # Per-port keys of the junctions, ``port_<i>_<quantity>`` (i = the element's

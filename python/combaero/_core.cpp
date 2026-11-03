@@ -36,6 +36,7 @@
 #include "incompressible.h"
 #include "ideal_junction.h"
 #include "mpce_junction.h"
+#include "liner_radiation.h"
 #include "materials.h"
 #include "orifice.h"
 #include "registry.h"
@@ -8026,6 +8027,140 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "R_fouling), dr_dTm the layers' d(t/k)/dT [m^2/W] there (0 for a\n"
         "constant k). Returns dR_wall/d(T_hot, T_cold, h_hot, h_cold) by\n"
         "implicit differentiation; analytic.");
+
+  // -----------------------------------------------------------------
+  // Liner radiation (#793): Lefebvre & Ballal Ch. 8, Eqs. 8.7-8.17
+  // -----------------------------------------------------------------
+  m.attr("STEFAN_BOLTZMANN") = STEFAN_BOLTZMANN;
+  m.attr("REEVES_EMISSIVITY_COEFF") = REEVES_EMISSIVITY_COEFF;
+  m.attr("LUMINOSITY_HYDROGEN_COEFF") = LUMINOSITY_HYDROGEN_COEFF;
+  m.attr("BEAM_LENGTH_COEFF_LEFEBVRE") = BEAM_LENGTH_COEFF_LEFEBVRE;
+  m.attr("BEAM_LENGTH_COEFF_HOWELL") = BEAM_LENGTH_COEFF_HOWELL;
+
+  py::class_<GasEmissivityResult>(
+      m, "GasEmissivityResult",
+      "Gas emissivity (Lefebvre & Ballal Eq. 8.11) and its partials.")
+      .def_readonly("eps", &GasEmissivityResult::eps, "eps_g [-]")
+      .def_readonly("deps_dT", &GasEmissivityResult::deps_dT,
+                    "d eps_g / d T_g [1/K]")
+      .def_readonly("deps_dP", &GasEmissivityResult::deps_dP,
+                    "d eps_g / d P [1/Pa]")
+      .def_readonly("deps_dq", &GasEmissivityResult::deps_dq,
+                    "d eps_g / d q [-]")
+      .def_readonly("deps_dl_b", &GasEmissivityResult::deps_dl_b,
+                    "d eps_g / d l_b [1/m]")
+      .def_readonly("deps_dL", &GasEmissivityResult::deps_dL,
+                    "d eps_g / d L [-]")
+      .def("__iter__", [](const GasEmissivityResult &r) {
+        return py::iter(py::make_tuple(r.eps, r.deps_dT, r.deps_dP, r.deps_dq,
+                                       r.deps_dl_b, r.deps_dL));
+      });
+
+  m.def("gas_emissivity_luminous", &gas_emissivity_luminous, py::arg("T_g"),
+        py::arg("P"), py::arg("q"), py::arg("l_b"), py::arg("L") = 1.0,
+        "Luminous gas emissivity, Lefebvre & Ballal Eq. 8.11 (Reeves Eq. 8.9\n"
+        "with L = 1):\n"
+        "  eps_g = 1 - exp[-290 (P/1000) L (q l_b)^0.5 T_g^-1.5]\n\n"
+        "  T_g : mean gas temperature [K]\n"
+        "  P   : gas pressure [Pa] (the book's kPa formed internally)\n"
+        "  q   : fuel/air mass ratio [-]\n"
+        "  l_b : mean beam length [m]\n"
+        "  L   : luminosity factor [-] (1: non-luminous)\n\n"
+        "A kerosine-product fit (Reeves 1956): gray, single-zone; not a\n"
+        "composition-based emissivity. Returns GasEmissivityResult with the\n"
+        "analytic partials in T_g, P, q, l_b and L.");
+
+  m.def("luminosity_factor_hydrogen", &luminosity_factor_hydrogen,
+        py::arg("H_mass_percent"),
+        "Luminosity factor L = 336 / H^2 (Lefebvre & Ballal Eq. 8.15), H the\n"
+        "fuel hydrogen content in mass percent. Returns (L, dL/dH). The\n"
+        "alternatives Eqs. 8.12-8.14 (in the fuel C/H ratio) are not shipped;\n"
+        "pass L directly to use one.");
+
+  py::class_<LinerGasRadiationResult>(
+      m, "LinerGasRadiationResult",
+      "Gas-to-liner radiation flux R1 (Lefebvre & Ballal Eq. 8.7) and its\n"
+      "partials at fixed eps_g.")
+      .def_readonly("R1", &LinerGasRadiationResult::R1,
+                    "R1 [W/m^2], positive gas -> wall")
+      .def_readonly("dR1_dT_g", &LinerGasRadiationResult::dR1_dT_g,
+                    "dR1/dT_g at fixed eps_g [W/(m^2 K)]")
+      .def_readonly("dR1_dT_w", &LinerGasRadiationResult::dR1_dT_w,
+                    "dR1/dT_w [W/(m^2 K)]")
+      .def_readonly("dR1_deps_g", &LinerGasRadiationResult::dR1_deps_g,
+                    "dR1/deps_g [W/m^2]")
+      .def_readonly("dR1_deps_w", &LinerGasRadiationResult::dR1_deps_w,
+                    "dR1/deps_w [W/m^2]")
+      .def("__iter__", [](const LinerGasRadiationResult &r) {
+        return py::iter(py::make_tuple(r.R1, r.dR1_dT_g, r.dR1_dT_w,
+                                       r.dR1_deps_g, r.dR1_deps_w));
+      });
+
+  m.def("liner_gas_radiation", &liner_gas_radiation, py::arg("T_g"),
+        py::arg("T_w"), py::arg("eps_g"), py::arg("eps_w"),
+        "Gas-to-liner radiation flux, Lefebvre & Ballal Eq. 8.7:\n"
+        "  R1 = 0.5 sigma (1 + eps_w) eps_g T_g^1.5 (T_g^2.5 - T_w^2.5)\n"
+        "[W/m^2]. eps_g from gas_emissivity_luminous. Returns\n"
+        "LinerGasRadiationResult (partials at fixed eps_g).");
+
+  m.def("liner_casing_radiation", &liner_casing_radiation, py::arg("T_w"),
+        py::arg("T_c"), py::arg("eps_w"), py::arg("eps_c"),
+        py::arg("area_ratio"),
+        "Liner-to-casing radiation flux per unit liner area, Lefebvre &\n"
+        "Ballal Eq. 8.17 (gray two-surface enclosure, view factor 1):\n"
+        "  R2 = sigma eps_w eps_c / (eps_c + eps_w (1 - eps_c) A_w/A_c)\n"
+        "       (T_w^4 - T_c^4)\n"
+        "area_ratio = A_w/A_c. Returns (R2, dR2/dT_w, dR2/dT_c).");
+
+  m.def("liner_casing_exchange_factor", &liner_casing_exchange_factor,
+        py::arg("eps_w"), py::arg("eps_c"), py::arg("area_ratio"),
+        "sigma eps_w eps_c / (eps_c + eps_w (1 - eps_c) A_w/A_c)\n"
+        "[W/(m^2 K^4)], the exchange factor of Eq. 8.17.");
+
+  m.def("mean_beam_length", &mean_beam_length, py::arg("volume"),
+        py::arg("area"), py::arg("coeff") = BEAM_LENGTH_COEFF_LEFEBVRE,
+        "Mean beam length l_b = coeff V / A [m]: 3.4 (Lefebvre & Ballal\n"
+        "Eq. 8.10, default) or BEAM_LENGTH_COEFF_HOWELL = 3.6 (0.9 x 4 V/A,\n"
+        "the textbook value).");
+
+  m.def(
+      "elemental_fuel_air_ratio",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> Y) {
+        return elemental_fuel_air_ratio(to_vec(Y));
+      },
+      py::arg("Y"),
+      "Fuel/air mass ratio from the elements: mass of C and H atoms over the\n"
+      "rest, q = w / (1 - w). The same for reactants and products. Water\n"
+      "vapour's H counts as fuel; a fuel's own O or N counts as air.\n"
+      "Returns (q, dq/dY) in the mass fractions Y.");
+
+  py::class_<WallRadiationSides>(
+      m, "WallRadiationSides",
+      "A wall's local balance with radiation on its faces (#793), folded\n"
+      "into effective sides (H, T) per face. d / dq_rad: total derivatives\n"
+      "in [T_aw_a, h_a, T_aw_b, h_b, R_wall, T_src_a, k_a, T_src_b, k_b].")
+      .def_readonly("H_a", &WallRadiationSides::H_a)
+      .def_readonly("T_a", &WallRadiationSides::T_a)
+      .def_readonly("H_b", &WallRadiationSides::H_b)
+      .def_readonly("T_b", &WallRadiationSides::T_b)
+      .def_readonly("T_s_a", &WallRadiationSides::T_s_a)
+      .def_readonly("T_s_b", &WallRadiationSides::T_s_b)
+      .def_readonly("h_r_a", &WallRadiationSides::h_r_a)
+      .def_readonly("h_r_b", &WallRadiationSides::h_r_b)
+      .def_readonly("q_rad_a", &WallRadiationSides::q_rad_a)
+      .def_readonly("q_rad_b", &WallRadiationSides::q_rad_b)
+      .def_readonly("q", &WallRadiationSides::q)
+      .def_readonly("iterations", &WallRadiationSides::iterations)
+      .def_readonly("d", &WallRadiationSides::d)
+      .def_readonly("dq_rad", &WallRadiationSides::dq_rad);
+
+  m.def("wall_radiation_sides", &wall_radiation_sides, py::arg("T_aw_a"),
+        py::arg("h_a"), py::arg("T_aw_b"), py::arg("h_b"), py::arg("R_wall"),
+        py::arg("kind_a"), py::arg("T_src_a"), py::arg("k_a"),
+        py::arg("kind_b"), py::arg("T_src_b"), py::arg("k_b"),
+        "Solve a wall's two surface temperatures with radiation on either\n"
+        "face (kind 0 none, 1 gas Eq. 8.7, 2 surface Eq. 8.17) and fold it\n"
+        "into effective (H, T) per side; analytic total derivatives.");
 
   // -----------------------------------------------------------------
   // channel_smooth

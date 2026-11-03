@@ -18,6 +18,7 @@ This document provides the technical reference for the CombAero C++ library. For
   - [Overall Heat Transfer](#overall-heat-transfer)
   - [Channel Flow Models](#channel-flow-models)
   - [Wall Coupling](#wall-coupling)
+  - [Liner Radiation](#liner-radiation-liner_radiationh-793)
   - [Data Structures](#data-structures)
 - [Geometry Utilities (geometry.h)](#geometry-utilities-geometryh)
 - [Orifice Flow (orifice.h)](#orifice-flow-orificeh)
@@ -1388,6 +1389,56 @@ std::array<double, 4> wall_resistance_fixed_point_derivatives(
 // material_conductivity (data, #882 envelope fade, linear continuation).
 ConductivityAndSlope material_conductivity_and_slope(
     const std::string& name, double T, bool extrapolate);  // {k, dk_dT}
+```
+
+### Liner Radiation (`liner_radiation.h`, #793)
+
+Lefebvre & Ballal (2010) Ch. 8: gray, lumped liner radiation. The header's
+comment block holds the equations, the book's errata (Eq. 8.9 prints
+"2 - exp") and the alternatives that are not shipped (L Eqs. 8.12-8.14;
+beam length 3.6 V/A). Each kernel returns its value with analytic partials.
+
+```cpp
+// Constants: STEFAN_BOLTZMANN (CODATA 2018), REEVES_EMISSIVITY_COEFF = 290
+// [kPa^-1 m^-0.5 K^1.5], LUMINOSITY_HYDROGEN_COEFF = 336,
+// BEAM_LENGTH_COEFF_LEFEBVRE = 3.4, BEAM_LENGTH_COEFF_HOWELL = 3.6.
+
+// Eq. 8.11: eps_g = 1 - exp[-290 (P/1000) L (q l_b)^0.5 Tg^-1.5], P in Pa.
+GasEmissivityResult gas_emissivity_luminous(double T_g, double P, double q,
+                                            double l_b, double L = 1.0);
+// {eps, deps_dT, deps_dP, deps_dq, deps_dl_b, deps_dL}
+
+std::tuple<double, double> luminosity_factor_hydrogen(double H_mass_percent);
+// Eq. 8.15: (L = 336/H^2, dL/dH)
+
+// Eq. 8.7: R1 = 0.5 sigma (1 + eps_w) eps_g Tg^1.5 (Tg^2.5 - Tw^2.5)
+LinerGasRadiationResult liner_gas_radiation(double T_g, double T_w,
+                                            double eps_g, double eps_w);
+// {R1, dR1_dT_g (fixed eps_g), dR1_dT_w, dR1_deps_g, dR1_deps_w}
+
+// Eq. 8.17 per unit liner area: (R2, dR2/dT_w, dR2/dT_c)
+std::tuple<double, double, double> liner_casing_radiation(
+    double T_w, double T_c, double eps_w, double eps_c, double area_ratio);
+double liner_casing_exchange_factor(double eps_w, double eps_c, double area_ratio);
+
+double mean_beam_length(double volume, double area,
+                        double coeff = BEAM_LENGTH_COEFF_LEFEBVRE);  // Eq. 8.10
+
+// q = m(C + H atoms) / m(rest), and dq/dY: the same for reactants and products.
+std::tuple<double, std::vector<double>> elemental_fuel_air_ratio(
+    const std::vector<double>& Y);
+
+// A wall's local balance with radiation on a face (kind 0 none, 1 gas
+// Eq. 8.7 with k = 0.5 sigma (1 + eps_w) eps_g, 2 surface Eq. 8.17 with k the
+// exchange factor): Newton on the two surface temperatures, folded into
+// effective sides H = h + h_r, T* = (h T_aw + h_r T_src) / H, where h_r is
+// the radiation written exactly as a conductance (a divided difference,
+// finite at T_s = T_src). Total derivatives by implicit differentiation
+// (DualN) in [T_aw_a, h_a, T_aw_b, h_b, R_wall, T_src_a, k_a, T_src_b, k_b].
+WallRadiationSides wall_radiation_sides(
+    double T_aw_a, double h_a, double T_aw_b, double h_b, double R_wall,
+    int kind_a, double T_src_a, double k_a,
+    int kind_b, double T_src_b, double k_b);
 ```
 
 ### Data Structures

@@ -881,6 +881,41 @@ h = cb.htc_from_nusselt(Nu, k=0.026, L=0.05)
 temps, q = cb.wall_temperature_profile(T_hot=1200, T_cold=300, h_hot=200, h_cold=20, t_over_k=[0.01/50, 0.05/0.5])
 ```
 
+#### Liner radiation kernels (#793)
+
+Lefebvre & Ballal (2010), *Gas Turbine Combustion* 3rd ed., Ch. 8. Each
+returns its value with analytic partials (the solver's (f, J) rule).
+
+```python
+# Luminous gas emissivity, Eq. 8.11 (Reeves Eq. 8.9 with L = 1). P in Pa.
+e = cb.gas_emissivity_luminous(T_g=2280.0, P=3.04e6, q=0.0588, l_b=0.0792, L=1.7)
+e.eps, e.deps_dT, e.deps_dP, e.deps_dq, e.deps_dl_b, e.deps_dL   # 0.609, ...
+
+L, dL_dH = cb.luminosity_factor_hydrogen(13.9)   # Eq. 8.15, 336 / H^2 (H mass %)
+l_b = cb.mean_beam_length(V, A)                   # Eq. 8.10, 3.4 V/A
+l_b = cb.mean_beam_length(V, A, cb.BEAM_LENGTH_COEFF_HOWELL)   # 3.6 V/A
+
+# Gas to liner, Eq. 8.7, partials at fixed eps_g
+r = cb.liner_gas_radiation(T_g=2280.0, T_w=1640.0, eps_g=e.eps, eps_w=0.7)
+r.R1, r.dR1_dT_g, r.dR1_dT_w, r.dR1_deps_g, r.dR1_deps_w
+
+# Liner to casing, Eq. 8.17 (view factor 1), per unit liner area
+R2, dR2_dTw, dR2_dTc = cb.liner_casing_radiation(T_w=1603.0, T_c=880.0,
+                                                  eps_w=0.7, eps_c=0.4, area_ratio=0.7)
+
+# Fuel/air ratio from the elements (C + H over the rest), and dq/dY
+q, dq_dY = cb.elemental_fuel_air_ratio(Y)
+```
+
+`cb.STEFAN_BOLTZMANN`, `cb.REEVES_EMISSIVITY_COEFF` (290),
+`cb.LUMINOSITY_HYDROGEN_COEFF` (336), `cb.BEAM_LENGTH_COEFF_LEFEBVRE` (3.4)
+and `cb.BEAM_LENGTH_COEFF_HOWELL` (3.6) are the constants. The luminosity
+alternatives, Eqs. 8.12-8.14 in the fuel C/H ratio (Lefebvre & Herbert
+7.53 (C/H - 5.5)^0.84, its later 3 (C/H - 5.2)^0.75, Kretschmer & Odgers
+0.0691 (C/H - 1.82)^2.71), are not shipped: they disagree with each other
+and with Eq. 8.15, so pass `L` directly to use one. On a ThermalWall, see
+"Radiation (liner)" below.
+
 ### Network Heat Transfer
 
 #### ConvectiveSurface
@@ -1015,6 +1050,88 @@ every cooling configuration).
 
 Every converged solve in the test suite is also checked for this balance
 (`python/tests/conftest.py`, `_closure_check.py`).
+
+##### Radiation (liner) (#793)
+
+Off by default. A face can carry radiation: `radiation_a` / `radiation_b`.
+
+```python
+from combaero.network import CasingRadiation, GasRadiation
+
+net.add_wall(ThermalWall(
+    id="liner", element_a="primary_zone", element_b="annulus",
+    layers=[WallLayer(0.0012, 26.0)],
+    # gas -> liner, Lefebvre Eq. 8.7 with eps_g from Eq. 8.11
+    radiation_a=GasRadiation(beam_length=0.08, emissivity_wall=0.7,
+                             luminosity=cb.luminosity_factor_hydrogen(13.9)[0]),
+    # liner -> casing, Eq. 8.17
+    radiation_b=CasingRadiation(area_ratio=0.7, emissivity_wall=0.7,
+                                emissivity_casing=0.4),
+))
+```
+
+**What it represents.** The Lefebvre-Herbert liner method as Lefebvre &
+Ballal print it (Ch. 8):
+
+- `GasRadiation`: `R1 = 0.5 sigma (1 + eps_w) eps_g Tg^1.5 (Tg^2.5 - Tw^2.5)`
+  into the face, with `eps_g = 1 - exp[-290 P L (q l_b)^0.5 Tg^-1.5]` (P in
+  kPa). `Tg` is the side's stream Tt, `P` its static pressure and `q` its
+  fuel/air ratio from its elements (`cb.elemental_fuel_air_ratio`), unless
+  `T_gas`, `pressure` or `fuel_air_ratio` is given.
+- `CasingRadiation`: `R2 = sigma eps_w eps_c / (eps_c + eps_w (1 - eps_c)
+  A_w/A_c) (Tw^4 - Tc^4)` out of the face, to a casing at the side's stream
+  Tt (the book's T3) unless `T_casing` is given. The heat goes into that
+  side's stream: in steady state a casing that loses nothing outward hands
+  what it absorbs to the annulus air.
+- Each face's radiation adds to its convection in the local wall balance,
+  `h (T_aw - T_s) + R1 = conduction = h (T_s - T_aw) + R2`, solved for the
+  two surface temperatures at the streams' inlet states. It is then folded
+  into each side's conductance and driving temperature, `H = h + h_r`,
+  `T* = (h T_aw + h_r T_src) / H` (`h_r` is the radiation written exactly as
+  a conductance), and the streams' epsilon-NTU exchange runs on those.
+  Between two reservoirs `Q / A` is the book's balance exactly; with finite
+  capacity rates the linearised radiation integrates along the wall like the
+  convection.
+- k(T) layers and the radiation share one fixed point; the Jacobian is
+  analytic through both (the gas Tt, P and composition included).
+- **Reported:** `{wall}.q_rad_a` / `q_rad_b` [W/m^2 of that face],
+  `Q_rad_a` / `Q_rad_b` [W], `T_surface_a` / `T_surface_b` [K], and
+  `eps_g_a` / `eps_g_b` for a gas face. `{wall}.UA` includes the radiative
+  conductances.
+
+**What it does not represent.**
+
+- **Gray and lumped.** One mean gas temperature, one beam length, one
+  emissivity per surface. No spectral bands, no zoning (Hottel), no
+  wall-to-wall view factors inside the liner, no axial radiation between
+  segments. `alpha_g / eps_g = (Tg/Tw)^1.5` (Eq. 8.6) and the wall's
+  `0.5 (1 + eps_w)` (Eq. 8.5) are the book's approximations.
+- **A kerosine-product law.** Eq. 8.9 is Reeves' (1956) fit for an
+  industrial gas turbine burning kerosine, written in `q`, with no stated
+  range. It is not a composition-based emissivity and does not carry over to
+  natural gas, hydrogen or ammonia products (no CO2, or much more H2O per
+  `q`). A pure-hydrogen flame has `q` from its H alone.
+- **No soot model.** Luminosity enters only through `L`. The default `L = 1`
+  is the non-luminous form; `cb.luminosity_factor_hydrogen(H)` gives
+  Lefebvre's engine fit (Eq. 8.15). The C/H forms (Eqs. 8.12-8.14) disagree
+  with it and with each other.
+- **Your geometry and your emissivities.** `beam_length` (3.4 V/A of the
+  gas volume the face sees, `cb.mean_beam_length`; 0.6-0.9 D_L for tubular
+  liners, 1.0/1.2 D_L for annular inner/outer liners per the book; the
+  textbook value is 3.6 V/A), `area_ratio`, `emissivity_wall` (0.7 Nimonic,
+  0.8 stainless steel; a TBC surface differs) and `emissivity_casing` are
+  inputs the user owns. The defaults are the book's example values, not a
+  recommendation.
+
+Fidelity (printed quantities): the book's three chained examples -- uncooled
+1640/1603 K, film-cooled at x/s 18 1283/1265 K, 0.5 mm TBC 1304/1236/1220 K
+-- are reproduced from their printed inputs through `ThermalWall`
+(`python/tests/test_liner_radiation_793.py`; the uncooled case comes out
+1.6 K above print, the book having rounded `eps_g` to 0.61 before solving).
+As a network with combaero's own convection (Gnielinski, h 523 against the
+book's 565 W/m^2K) the uncooled liner is 1633/1597 K: a method comparison,
+not fidelity. The film and TBC cases need the Ballal-Lefebvre film-side h
+(Eq. 8.44), which combaero does not have.
 
 ##### A film on one side (#386)
 
