@@ -3106,6 +3106,45 @@ documents:
     replicate) and Fig. 13(f) F-3/F-4 (about 30 points each, 0.125 in) for the #807 crossflow set; for a
     louver/scoop closure Figs. 13(b) (B-1/B-2, B-8 via Fig. 7) and 13(c)/(d) plus Fig. 12 (zero-flow Phi vs h)
     and Fig. 9 (delta* vs Phi). Render at 130 dpi or more; several figures are rotated 90 deg in the scan.'
+- file: sources/lefebvre/Lefebvre_1985_AFWAL-TR-84-2104_fuel_properties_combustion.pdf
+  citation: 'Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
+    AFWAL-TR-84-2104, Purdue University (Thermal Science and Propulsion Center), final report, January 1985.
+    DTIC AD-A151464, approved for public release.'
+  id: AFWAL-TR-84-2104 (DTIC AD-A151464)
+  topic: [combustion, radiation]
+  content: 'Public, 156 pp., poor scan (equations and figures read from page images; PDF page = printed page + 11
+    around Section VI). A re-analysis of six USAF engine fuel-effects programs (refs 1-6) for J79-17A, J79-17C,
+    F101, TF41, TF39, J85, TF33 and F100. Table 1 (p.4, TABULATED): 13 fuels, H 12.0-14.5 mass %, LHV and
+    properties. Section VI liner wall temperature: R1 Eq. 19 (as shipped); eps_g Eq. 21 (P in kPa); L =
+    336/(percent H)^2 Eq. 22 QUOTED from ref. 7 (AFWAL-TR-83-2004), with no fit, scatter or fitted quantity
+    printed; R2 = 0.4 sigma (Tw^4 - T3^4) Eq. 23; C1/C2 0.017/0.020 Re^0.8; no film term; combined Eq. 26 with
+    97440 = 290 x 336. Figs. 38-41 (PLOTTED only): liner wall T against fuel H at idle/cruise/take-off/dash for
+    J79-17A, J79-17C, F101 and TF41, measured against CALCULATED UNCOOLED Tw. F101 (Fig. 40) by eye: dash about
+    1300 K, take-off 1285-1295 K, cruise 1000-1015 K, idle 640-700 K, cluster spread about 60 K, faired lines
+    flat or slightly rising with H. F101 envelope P3 386-1266 kPa, T3 464-850 K, m_A 8.5-20.5 kg/s; a 54 deg
+    sector rig. Other engine-fitted closures (per-engine constants; geometry not tabulated): combustion
+    efficiency Eqs. 8-9; LBO Eq. 15 with Table 2 constants (TABULATED); NOx Eq. 27; CO Eq. 28; UHC Eq. 29; soot
+    Eq. 34 with Table 3 C3/C4 (TABULATED) and the smoke-number conversion (TABULATED); pattern factor Eqs.
+    36-37. No liner geometry, air split, cooling geometry, per-point conditions, radiation or emissivity data,
+    or measurement uncertainty.'
+  status: screened
+  verdict: 'Screened 2026-11-03 (was wanted). It does NOT contain the data or fit behind L = 336/H^2: Eq. 22 is
+    quoted from ref. 7 (AFWAL-TR-83-2004, now wanted), fitted over refs 1-6 (H 12.0-14.5 %, P3 about
+    250-1870 kPa, T3 413-850 K; on that range L = 1.60-2.33, and L = 1 only at H = 18.3 %, so gas fuels are an
+    extrapolation). No pressure-dependent L; p.128 only says pressure acts through soot concentration. F101
+    (Fig. 40, the likely source of L&B Fig. 8.5) is NOT a combaero case. It is not fidelity, because its
+    calculated lines are uncooled; and it is not accuracy, because it lacks geometry, air split, cooling and
+    per-point conditions, and is overplotted. Its measured Tw against H is flat to slightly rising, opposite to
+    the radiation model and to the report''s own Conclusion 4 (Section IX.4 calls the chemical effect small).
+    Use: confirms the shipped R1 and Eq. 26 constants; tabulated fuel properties; leads to the primaries (ref. 7
+    for L, ref. 2 Gleason et al. 1979 AFAPL-TR-79-2018 for F101; both wanted).'
+  read_for: ['#793 origin, data and range of L = 336/H^2', '#793 F101 liner wall temperature as a liner case (not buildable)', '#793 pressure dependence of L (none offered)']
+  issues: [793]
+  records: []
+  notes: 'Fetched 2026-11-03 via the Internet Archive DTIC mirror (archive.org/download/DTIC_ADA151464), since
+    apps.dtic.mil refuses scripted downloads. Screening arithmetic, not a record: the soot factor (18 - %H)^1.5
+    gives a 12.9/13.9 % H ratio of 1.39 against 1.16 for (13.9/12.9)^2, cf. the NASA JT8D 0.34 MPa flux ratio of
+    1.56: a lead only, not a validated L.'
 - file: sources/lefebvre/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf
   citation: 'Lefebvre, A. H., Ballal, D. R. (2010). Gas Turbine Combustion: Alternative Fuels and Emissions,
     3rd ed. CRC Press, Boca Raton.'
@@ -5315,18 +5354,28 @@ wanted:
     (Lefebvre Eqs. 8.7, 8.11, 8.12) -- the radiation combaero lacks entirely; what data L was fitted to and
     over what pressure and fuel range.'
   where: SAGE (Proc. IMechE archive).
-- citation: Lefebvre, A. H. (1985). Influence of fuel properties on gas turbine combustion performance.
-    AFWAL-TR-84-2104.
+- citation: Lefebvre, A. H. (1984). Fuel effects on gas turbine combustion. AFWAL-TR-83-2004, Purdue University
+    (the report version; journal version Lefebvre 1984, J. Aircraft 21(11), 887-898).
   checked: false
   issues:
   - 793
   priority: later
-  question: 'Operating conditions and geometry behind Lefebvre Fig. 8.5 (GE F101 measured liner wall temperature
-    against fuel hydrogen content, idle to dash) -- a measured, cross-source liner-temperature case once a
-    radiation model exists; also the source of L = 336/H^2 (Eq. 8.15).'
-  where: 'DTIC AD-A151 464 (https://apps.dtic.mil/sti/pdfs/ADA151464.pdf, public; identified 2026-11-02 by a web
-    search showing its front matter: Lefebvre, Purdue, AFWAL-TR-84-2104). apps.dtic.mil returns 403 to automated
-    fetches, so it was not downloaded: the user can fetch it in a browser.'
+  question: 'Where L = 336/H^2 (Lefebvre & Ballal Eq. 8.15, shipped as the default luminosity factor) was fitted:
+    which quantity was fitted, over which engines and conditions, and with what scatter. AFWAL-TR-84-2104 (held)
+    only quotes it as from this report, fitted over the six USAF programs (H 12.0-14.5 %, P3 about 250-1870 kPa).'
+  where: 'DTIC (AD number not yet identified); try the Internet Archive DTIC mirror
+    (archive.org/download/DTIC_<AD>/DTIC_<AD>.pdf), which served AD-A151464 on 2026-11-03.'
+- citation: Gleason, C. C., Oller, T. L., Shayeson, M. W., Bahr, D. W. (1979). Evaluation of fuel character effects
+    on the F101 engine combustion system. AFAPL-TR-79-2018, General Electric. (citation as quoted in
+    AFWAL-TR-84-2104, ref. 2)
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'The F101 liner-wall-temperature data behind Lefebvre & Ballal Fig. 8.5 / AFWAL-TR-84-2104 Fig. 40:
+    combustor geometry, air split, cooling, per-point P3/T3/f/a and the thermocouple locations and values that
+    AFWAL-TR-84-2104 lacks. With them F101 could become a cross-source liner case for #960 radiation.'
+  where: 'DTIC (AD number not yet identified); try the Internet Archive DTIC mirror.'
 - citation: Hay, N., Spencer, A. (1992). Discharge coefficients of cooling holes with radiused and chamfered
     inlets. ASME J. Turbomachinery 114(4), 701-706.
   checked: false
