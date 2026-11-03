@@ -779,6 +779,51 @@ documents:
   records: []
   notes: Arrived 2026-11-02 in sources/new/ as ThesisJES%5B1%5D.pdf (from the user). Journal versions exist
     (Sargison et al. 2002, J. Turbomach. 124, console papers), not held.
+- file: sources/heat_transfer/film/Goldstein_Eckert_Eriksen_Ramsey_1969_NASA_CR-72612_inclined_holes_eta.pdf
+  citation: Goldstein, R. J., Eckert, E. R. G., Eriksen, V. L., Ramsey, J. W. (1969). Film cooling following
+    injection through inclined circular tubes. NASA CR-72612 (HTL TR 91), University of Minnesota, summary report.
+  id: NASA CR-72612
+  topic: [film]
+  content: 'Open (NTRS 19700009085), 56 pp., scan. Adiabatic film-cooling effectiveness behind heated air jets
+    (about 55 K above the mainstream, so DR near 1): a single 35 deg hole, a row of 35 deg holes at P/D 3 (five
+    tubes), and single holes with lateral (compound) angles 15 and 35 deg. D 1.18 cm, U 30.5-61 m/s, boundary
+    layer displacement thickness 0.078-0.146 cm at injection, blowing ratio M 0.1-2.0. Centreline and laterally
+    averaged eta, plus a superposition comparison of the row against single holes. Data in figures.'
+  status: screened
+  verdict: 'Screened 2026-11-03. The classic Minnesota round-hole data (the basis of Goldstein et al. journal
+    papers, folded into later correlations such as Baldauf 2002). Possible cross-source accuracy points for the
+    shipped round-hole effectiveness at 35 deg, P/D 3, DR about 1, M 0.1-2 (figure-only, digitising needed).
+    The row is notably better than single-hole superposition at high M (the row of jets blocks the mainstream),
+    a caution for single-hole superposition. Compound-angle holes: combaero has no compound-angle closure.
+    Superseded for h by Eriksen 1971 (CR-72991, held), the same lab with heat-transfer data.'
+  read_for: ['#386 round-hole film effectiveness, cross-source', 'row vs single-hole superposition']
+  issues: [386]
+  records: []
+  notes: Fetched 2026-11-03 at the user's request (NTRS link).
+- file: sources/heat_transfer/film/Eriksen_1971_NASA_CR-72991_holes_eta_and_h.pdf
+  citation: Eriksen, V. L. (1971). Film cooling effectiveness and heat transfer with injection through holes. NASA
+    CR-72991 (HTL TR 102), University of Minnesota (PhD thesis work, adviser R. J. Goldstein).
+  id: NASA CR-72991
+  topic: [film]
+  content: 'Open (NTRS 19720007295), 184 pp., scan. Local film effectiveness AND heat transfer coefficient
+    downstream of air injection: a single 90 deg hole, a single 35 deg hole, and a row of 35 deg holes at P/D 3,
+    on a flat plate, two mainstream velocities (30.5 and 61 m/s), M 0.1-2.0. h is defined on (T_w - T_aw)
+    (eqns 1, 2, 10), with h0 the no-injection value fitted with an unheated starting length (Table I: starting
+    lengths and fit deviations). Table II (p. 160) TABULATES the heat transfer coefficient based on laterally
+    averaged wall temperatures. Appendix A gives uncertainties (Tables A.I-A.III). Also CO2-water fog flow
+    visualisation at 90 deg.'
+  status: screened
+  verdict: 'Screened 2026-11-03. The primary of the Eriksen & Goldstein (1974) heat-transfer-with-film data:
+    measured h/h0 behind discrete holes, i.e. the gas-side augmentation the film element and the effusion plate
+    take as a user input (gas_augmentation, #476). Table II is tabulated (no digitising) for the row of 35 deg
+    holes at P/D 3: a candidate cross-source accuracy check for an augmentation closure, and context for
+    Caciolli''s HTC/HTC0 fit (held). Limits: DR about 1, flat plate, low Tu, one row, P/D 3 (effusion plates
+    run P/D 5-8). Not implemented.'
+  read_for: ['#476 gas-side augmentation behind holes (h/h0)', '#386 round-hole film h and eta']
+  issues: [386, 476]
+  records: []
+  notes: Fetched 2026-11-03 at the user's request (NTRS link). Table II page not yet transcribed; read it from
+    page images (scan) before use.
 - file: sources/heat_transfer/film/Hassan_2013_PhD_Concordia_micro_tangential_jet_film.pdf
   citation: Hassan, O. (2013). Thermal and flow field investigations of a micro-tangential-jet film cooling
     scheme on gas turbine components. PhD thesis, Concordia University, Montreal (June 2013).
