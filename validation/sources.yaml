@@ -630,30 +630,36 @@ documents:
     Liner balance R1 + C1 = R2 + C2 (Eqs. 10-13) with film C1 (Eqs. 14/15). Worked appendix at x/s 18, t/s
     0.4, m 2.54, 30 atm, 880 K: eta 0.785, Tw,ad 1180 K, h 1.96 kW/m2K, e_m 0.60. Figs. 5/6: thermal-paint
     wall-temperature ranges vs prediction at 22 and 30 atm, combustion efficiency 85-99% by zone.'
-  status: screened
-  verdict: 'Screened 2026-11-02. The primary behind Lefebvre & Ballal Ch. 8 Eqs. 8.37/8.38 (thick-lip eta,
-    constants identical) and 8.41-8.44 (film-side Nu), and of its film-cooled worked example. DISCREPANCY,
-    resolved 2026-11-02 on the printed record: the near-slot Nu for m < 1.3 is 0.090 here (Eq. 3, credited to
-    Seban) but 0.069 in the book (Eq. 8.41). Seban 1960 (held, own entry) Eq. 13 converts to Nu_x = 0.10 Pr
-    [Re_s x/s]^0.7 = 0.069 at Pr 0.69, so the book is the faithful conversion; 0.090 would need Pr 0.90. Fig.
-    1 here is drawn at 0.090 (Nu ~57 at Re_s x/s 1e4, ~1000 near 6e5), so the report carries the error
-    consistently; probable error, unproven without the ASME 72-WA/HT-24 print. Seban fitted Eq. 13 on m > 1
-    and x/s < 40 (for m < 1 he finds the flat-plate h), so its use for 0.5 < m < 1.3 stretches it; implement
-    Seban''s Stanton form on slot-fluid properties, which avoids the Pr question. The m > 1.3 form agrees
-    (0.10). FIDELITY POINT, m > 1.3 (Fig. 2, p. 17, read from the page image): judged on the authors'' OWN data,
-    Eq. 6 over-predicts the film-side h. Eq. 6 is the solid line (theta = 2.0, Nu = 0.10 X^0.8, X = Re_s
-    (x/s)^0.55); only the Pai & Whitelaw points (ref. 7, m 2.3-3.5, open circles) sit on it. The Cranfield
-    rig points (m 1.4-3.5, squares and triangles) lie 20-67% below it at X 2e4-6e4 -- squares near the theta
-    1.0-1.6 lines, triangles at or below theta 1.0 -- and close to 0-30% below near X 1e5-1.5e5. Resolve
-    before implementing the wall-jet branch. The worked example gives eta 0.785 where the book prints 0.789.
-    Plugs a real gap: combaero ships only Marek-Tacina (m 0.41-1.87) and no film-side h. Figs. 3/4 are other
-    labs'' points, so they test reproduction of the fit; Figs. 5/6 are weak validation (gas T from an assumed
-    efficiency, geometry not given).'
+  status: implemented
+  verdict: 'Screened 2026-11-02; Fig. 1 digitised and Eq. 6 implemented 2026-11-03 (#962). The primary behind
+    Lefebvre & Ballal Ch. 8 Eqs. 8.37/8.38 (thick-lip eta, constants identical) and 8.41-8.44 (film-side Nu),
+    and of its film-cooled worked example. THE 0.090 IS EXPLAINED (2026-11-03, #962): it is Seban''s curve B
+    AS DRAWN and his data (0.134-0.135 in the Stanton form) times Pr 0.69 = 0.090-0.093, not a misprint;
+    it is Seban''s printed Eq. 13 constant 0.10 that is the misprint (see the Seban 1960 entry), and the
+    book''s 0.069 = 0.10 x 0.69 carries it. Fig. 1 digitised (61 points: 20 Hartnett, Birkebak & Eckert
+    1961, 41 Pai & Whitelaw 1971; 59 clean): the data-based Nu constant is 0.0909 pooled (0.0869 Pai &
+    Whitelaw, 0.0996 Hartnett; bootstrap 90 % CI 0.0881-0.0938), its own drawn Eq. 3 line 0.0891 at slope
+    0.7 (drawn slope 0.73). As a CROSS-SOURCE accuracy set for Seban''s curve B (other labs, m < 1.3, mostly
+    below Seban''s m > 1 box): bias -2.5 %, RMS 18 % at Pr 0.69; these data lie 32 % above 0.069.
+    FIDELITY POINT, m > 1.3 (Fig. 2, p. 17, read from the page image, not digitised): judged on the
+    authors'' OWN data, Eq. 6 over-predicts the film-side h. Eq. 6 is the solid line (theta = 2.0, Nu =
+    0.10 X^0.8, X = Re_s (x/s)^0.55); only the Pai & Whitelaw points (ref. 7, m 2.3-3.5, open circles) sit
+    on it. The Cranfield rig points (m 1.4-3.5, squares and triangles) lie 20-67% below it at X 2e4-6e4 --
+    squares near the theta 1.0-1.6 lines, triangles at or below theta 1.0 -- and close to 0-30% below near
+    X 1e5-1.5e5. So Eq. 6 ships only as the named option slot_film_htc_ballal_lefebvre_1973 (it reproduces
+    the book''s 1926 W/m2K from the book''s k_a and Re_s); Seban is the default for all m > 1. The worked
+    example gives eta 0.785 where the book prints 0.789. Figs. 3/4 are other labs'' points, so they test
+    reproduction of the fit; Figs. 5/6 are weak validation (gas T from an assumed efficiency, geometry not
+    given).'
   read_for: ['#714 / #763 thick-lip slot film above m 1.3', '#793 film-side Nu for the liner wall balance',
     'provenance of Lefebvre & Ballal Eqs. 8.37-8.44']
-  issues: [714, 763, 793]
-  records: []
-  notes: Arrived 2026-11-02 in sources/new/ (from the user). Not implemented.
+  issues: [714, 763, 793, 962]
+  records: [validation/cooling/data/ballal_lefebvre1973/sme4_fig1_near_slot_nu.csv, validation/cooling/data/ballal_lefebvre1973/sme4_fig1_eq3_line.csv,
+    validation/cooling/data/seban1960/near_slot_constant_robustness.csv, validation/cooling/extractions/seban_1960_slot_film_h.md]
+  code: ['include/slot_film_htc.h: ballal_lefebvre1973 (Eq. 6 wall jet, named option)', 'python/combaero/network/components.py:
+      SlotFilmElement film_htc="ballal_lefebvre1973"', 'python/tests/test_slot_film_htc_validation_962.py: Fig. 1 cross-source
+      score, the book worked examples']
+  notes: Arrived 2026-11-02 in sources/new/ (from the user). Fig. 1 digitised 2026-11-03 (user sign-off, two overlay passes; scans and overlays local only).
 - file: sources/heat_transfer/film/Seban_1960_JHT_82_303_tangential_slot_film_h_and_eta.pdf
   citation: Seban, R. A. (1960). Heat transfer and effectiveness for a turbulent boundary layer with tangential
     fluid injection. ASME J. Heat Transfer 82(4), 303-313 (November 1960; ASME Paper 59-A-177).
@@ -675,25 +681,33 @@ documents:
     convenience" (a single 0.6-power law with a shifted origin would fit most of the data); Jakob''s wall-jet
     h = 0.15 Re_s^-0.2 (x/s)^-0.6 (Eq. 15), on the maximum boundary-layer temperature, plotted alongside.
     At m ~ 1 h drops to flat-plate values almost at once; at m = 2 it stays above them over the plate.'
-  status: screened
-  verdict: 'Screened 2026-11-02 (was wanted). SETTLES the Ballal-Lefebvre film-side Nu question on the
-    printed record: Eq. 13 as a Nusselt number is Nu_x = h x/k = St_s Re_s Pr (x/s) = 0.10 Pr [Re_s x/s]^0.7,
-    i.e. 0.069 at Pr 0.69 (0.070-0.071 for air at 0.70-0.71), exactly Lefebvre & Ballal Eq. 8.41 (held). The
-    Cranfield SME4 report''s 0.090 (its Eq. 3, credited to Seban) matches no plausible Pr (it needs Pr 0.90),
-    yet its Fig. 1 line is drawn at 0.090 (Nu ~57 at Re_s x/s 1e4, 1000 near 6e5; 0.069 reaches 1000 only at
-    8.8e5), so the report is internally consistent with its own error. Book 0.069 = faithful conversion;
-    report 0.090 = probable error, not proven without the ASME 72-WA/HT-24 print. Applicability: Eq. 13 was
-    fitted on m > 1 runs (heat-transfer runs m 1.06-8.91) at x/s < 40; for m < 1 Seban finds h = the plain
-    flat-plate value (Eq. 9) once past the near-slot region (x/s ~ 10-70), so Ballal-Lefebvre''s use of it for
-    0.5 < m < 1.3 extends it below its data. For an implementation use Seban''s Stanton form on slot-fluid
-    properties directly, which removes the Pr ambiguity. Fidelity data (the author''s own): Figs. 3/5/8/10-12,
-    plotted only (digitising needed), Tables 1/2 give the run conditions. As an accuracy source for
-    Marek-Tacina it is cross-source (different lab), but tangential thin-lip, low-Tu, DR ~1. Not checked:
-    Fig. 12 point scatter against Eqs. 13/14 (not digitised); the Seban & Back 1962 companions.'
+  status: implemented
+  verdict: 'Screened 2026-11-02 (was wanted); Fig. 12 digitised and implemented 2026-11-03 (#962). THE PRINTED
+    Eq. 13 CONSTANT 0.10 IS A MISPRINT; the curve B Seban DREW is 0.135 (user sign-off 2026-11-03). Three
+    independent checks: (1) the drawn B and C cross at x/s 37 ((0.40/0.135)^(1/0.3) = 37.4), where the
+    text switches from Eq. 13 to Eq. 14 ("x/s = 40"); the printed pair would cross at 110 and leave a 26 %
+    step at 40; (2) Fig. 9 back-solves to 0.140-0.144; (3) the digitised Fig. 12 points (38 at x/s 4.8-38.4,
+    5 clean, 26 stacked, 7 ambiguous) fit 0.1336 at the fixed -0.3 slope, every data variant 0.1296-0.1339
+    (bootstrap 90 % CI 0.127-0.139). Curve C is 0.400 on the trace against the printed 0.41. Consequences:
+    the Cranfield SME4 report''s 0.090 is this curve/data x Pr 0.69 (0.090-0.093), not an error; Lefebvre &
+    Ballal Eq. 8.41''s 0.069 = printed 0.10 x Pr 0.69 inherits the misprint. Run 128 (the one identified
+    run near m = 1, m 1.10) sits on 0.069, 25 % below curve B, consistent with h falling to flat-plate
+    values as m -> 1 (Fig. 8: plain flat-plate h for m < 1). IMPLEMENTED as the default film-side h
+    (slot_film_htc_seban_1960; SlotFilmElement film_htc="seban1960"): St_s on slot-fluid properties, curves
+    B (0.135) and C (0.40) C1-blended over +-0.1 decade at their crossing, span-mean over the wall, handing
+    back to the duct h past x/s 300 and below m = 1.0; box (flagged): x/s 4-300, m 1.06-8.91, Re_s
+    1.4e3-8e3. FIDELITY on his own Fig. 12 (upper bound, overplotted): bias -1.0 %, RMS 11 %; the printed
+    0.10 is 25 % low on the same points. Curve C (x/s > 40) not scored: no point beyond 40 digitised. As
+    an accuracy source for Marek-Tacina it is cross-source (different lab), but tangential thin-lip,
+    low-Tu, DR ~1.'
   read_for: ['#714 / #763 slot-film effectiveness for m < 1 and m > 1', '#793 film-side Nu (Lefebvre & Ballal
-      Eq. 8.41 vs Cranfield SME4 Eq. 3)']
-  issues: [714, 763, 793]
-  records: []
+      Eq. 8.41 vs Cranfield SME4 Eq. 3)', '#962 film-side h near a slot (implemented)']
+  issues: [714, 763, 793, 962]
+  records: [validation/cooling/data/seban1960/fig12_h_m_gt_1.csv, validation/cooling/data/seban1960/near_slot_constant_robustness.csv,
+    validation/cooling/extractions/seban_1960_slot_film_h.md]
+  code: ['include/slot_film_htc.h: seban1960 (Fig. 12 curves B and C as drawn, box, hand-back)', 'src/slot_film_htc.cpp:
+      slot_film_stanton_seban_1960, slot_film_htc_seban_1960', 'python/combaero/network/components.py: SlotFilmElement
+      film_htc, _FilmSideHtc', 'python/tests/test_slot_film_htc_validation_962.py: Fig. 12 fidelity', 'tests/test_slot_film_htc.cpp']
   notes: 'Supplied by the user 2026-11-02 (moved from wanted). A note on the lead''s reading: the h of Eqs. 13/14
     is on the adiabatic-wall temperature (Eq. 3); the "maximum boundary-layer temperature" basis is Jakob''s
     Eq. 15, which Seban notes is subject to the same question as Jakob''s effectiveness. Companions not held:
@@ -3106,17 +3120,25 @@ documents:
     from their printed inputs give 1641.6/1604.4 (the book rounds eps_g to 0.61 and C1 to 1 280 500 - 562
     Tw1 first), 1283.0/1264.5 and 1304.0/1236.6/1220.4 K. As a network with combaero''s own convection
     (Gnielinski h 523 vs the book''s 565) the uncooled liner is 1632.9/1596.6 K, a method comparison. The
-    film and TBC cases cannot be networks: both need the Ballal-Lefebvre film-side h (Eq. 8.44).'
+    film and TBC cases became networks with #962''s film-side h (2026-11-03): Eq. 8.41''s
+    0.069 is Seban''s printed Eq. 13 (0.10) x Pr 0.69 and inherits its misprint (Seban drew 0.135; see the
+    Seban 1960 entry). Eq. 8.44 (the m > 1.3 wall jet) ships as the named option; with the book''s k_a and
+    Re_s it gives the printed 1926. As networks with #960''s radiation and combaero''s Marek-Tacina eta
+    (0.801 against the book''s 0.789), a METHOD COMPARISON, not fidelity: Eq. 8.44 on combaero''s slot air
+    (h 2068, k_a 0.060) 1269.2/1251.6 and 1288.3/1224.0/1208.6 K; Seban (the default, h 1632, Re_s 1.8e4
+    above his runs) 1285.1/1266.7 and 1308.1/1240.5/1224.3 K, against the printed 1283/1265 and
+    1304/1236/1220.'
   read_for: ['#793 worked examples: liner wall temperature (radiation + convection + film + TBC)', '#793
       worked examples: pressure-loss factor, liner effective hole area, flow split', liner-hole Cd vs
       annulus crossflow (Kaddah/Freeman) against the shipped McGreehan-Schotsch crossflow Cd, '#714 slot
       film: Ballal-Lefebvre thick-lip and wall-jet effectiveness against Marek-Tacina', flame radiation
       and luminosity factor, pattern factor correlation, provenance of LinearThetaHeadLoss]
-  issues: [714, 793]
+  issues: [714, 793, 962]
   records: []
   code: ['include/liner_radiation.h: Eqs. 8.7, 8.10, 8.11, 8.15, 8.17', 'python/combaero/network/components.py:
       GasRadiation, CasingRadiation on ThermalWall', 'python/tests/test_liner_radiation_793.py: the three worked
-      examples', 'tests/test_liner_radiation.cpp: LefebvreWorkedExamples']
+      examples', 'tests/test_liner_radiation.cpp: LefebvreWorkedExamples', 'python/tests/test_slot_film_htc_validation_962.py:
+      the film and TBC examples as networks (#962)']
   notes: A byte-identical copy at docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf was deleted 2026-10-25.
     The earlier "no text layer" note was wrong. Secondary throughout Ch. 4 and 8 except the liner-wall
     method, Eqs. 4.30/4.31 and Eq. 8.15 (Lefebvre's own); figures reprinted from theses (Kaddah, Freeman,

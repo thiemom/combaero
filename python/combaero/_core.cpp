@@ -40,6 +40,7 @@
 #include "materials.h"
 #include "orifice.h"
 #include "registry.h"
+#include "slot_film_htc.h"
 #include "solver_interface.h"
 #include "tee_junction.h"
 #include "vatistas.h"
@@ -8164,6 +8165,121 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Solve a wall's two surface temperatures with radiation on either\n"
         "face (kind 0 none, 1 gas Eq. 8.7, 2 surface Eq. 8.17) and fold it\n"
         "into effective (H, T) per side; analytic total derivatives.");
+
+  // -----------------------------------------------------------------
+  // Film-side h downstream of a slot (#962): Seban 1960, Ballal-Lefebvre
+  // -----------------------------------------------------------------
+  m.attr("SEBAN1960_C_NEAR") = seban1960::C_near;
+  m.attr("SEBAN1960_C_NEAR_PRINTED") = seban1960::C_near_printed;
+  m.attr("SEBAN1960_C_FAR") = seban1960::C_far;
+  m.attr("SEBAN1960_C_FAR_PRINTED") = seban1960::C_far_printed;
+  m.attr("SLOT_FILM_HTC_HANDBACK_BAND") = SLOT_FILM_HTC_HANDBACK_BAND;
+  m.attr("SLOT_FILM_BRANCH_NEAR") = SLOT_FILM_BRANCH_NEAR;
+  m.attr("SLOT_FILM_BRANCH_BLEND") = SLOT_FILM_BRANCH_BLEND;
+  m.attr("SLOT_FILM_BRANCH_FAR") = SLOT_FILM_BRANCH_FAR;
+  m.attr("SLOT_FILM_BRANCH_WALL_JET") = SLOT_FILM_BRANCH_WALL_JET;
+  m.attr("SLOT_FILM_BRANCH_NONE") = SLOT_FILM_BRANCH_NONE;
+
+  py::class_<SlotFilmStanton>(
+      m, "SlotFilmStanton",
+      "Seban (1960) slot-film Stanton number, span mean over the in-box part.")
+      .def_readonly("St", &SlotFilmStanton::St, "mean St_s [-]")
+      .def_readonly("dSt_dRe", &SlotFilmStanton::dSt_dRe, "d St / d Re_s")
+      .def_readonly("fraction_in_box", &SlotFilmStanton::fraction_in_box,
+                    "share of the span at x/s <= x_over_s_max")
+      .def_readonly("branch", &SlotFilmStanton::branch,
+                    "SLOT_FILM_BRANCH_* code")
+      .def_readonly("x_in_box", &SlotFilmStanton::x_in_box)
+      .def_readonly("Re_in_box", &SlotFilmStanton::Re_in_box);
+
+  m.def("slot_film_stanton_seban_1960", &slot_film_stanton_seban_1960,
+        py::arg("x_start_over_s"), py::arg("x_end_over_s"), py::arg("Re_s"),
+        py::arg("C_near") = seban1960::C_near,
+        py::arg("C_far") = seban1960::C_far,
+        "Seban (1960) Fig. 12 slot-film Stanton number on slot-fluid\n"
+        "properties, St_s = h/(rho_s u_s cp_s), span mean over\n"
+        "[x_start_over_s, x_end_over_s] (equal: the point value):\n"
+        "  curve B: 0.135 Re_s^-0.3 (x/s)^-0.3 (Eq. 13 as drawn; printed 0.10)\n"
+        "  curve C: 0.40 Re_s^-0.3 (x/s)^-0.6  (Eq. 14 as drawn; printed 0.41)\n"
+        "joined by a C1 blend over +-0.1 decade around their crossing\n"
+        "(x/s 37.4). Only the part at x/s <= 300 is averaged; fraction_in_box\n"
+        "is its share of the span.");
+
+  py::class_<SlotFilmNusselt>(
+      m, "SlotFilmNusselt",
+      "Ballal & Lefebvre (1973) wall-jet h s / k_s, span mean over the in-box "
+      "part.")
+      .def_readonly("Nu_s", &SlotFilmNusselt::Nu_s, "mean h s / k_s [-]")
+      .def_readonly("dNu_dRe", &SlotFilmNusselt::dNu_dRe, "d Nu_s / d Re_s")
+      .def_readonly("fraction_in_box", &SlotFilmNusselt::fraction_in_box)
+      .def_readonly("branch", &SlotFilmNusselt::branch)
+      .def_readonly("x_in_box", &SlotFilmNusselt::x_in_box);
+
+  m.def("slot_film_nusselt_ballal_lefebvre_1973",
+        &slot_film_nusselt_ballal_lefebvre_1973, py::arg("x_start_over_s"),
+        py::arg("x_end_over_s"), py::arg("Re_s"),
+        "Ballal & Lefebvre (1973) SME4 Eq. 6 (Lefebvre & Ballal Eq. 8.43),\n"
+        "the m > 1.3 wall-jet form Nu_x = 0.10 Re_s^0.8 (x/s)^0.44, as\n"
+        "h s / k_s = 0.10 Re_s^0.8 (x/s)^-0.56, span mean over the part at\n"
+        "x/s <= 50. Over-predicts the Cranfield rig's own data by 20-67 % at\n"
+        "low Re (SME4 Fig. 2): a named option, not the default.");
+
+  py::class_<SlotFilmHtc>(
+      m, "SlotFilmHtc",
+      "A wall side's h under a slot film (#962): film h over its in-box span,\n"
+      "the duct's h past it and below the hand-back mass-velocity ratio.")
+      .def_readonly("h", &SlotFilmHtc::h, "the side's h [W/(m^2 K)]")
+      .def_readonly("dh_dG_s", &SlotFilmHtc::dh_dG_s,
+                    "d h / d G_s at fixed M")
+      .def_readonly("dh_dT_s", &SlotFilmHtc::dh_dT_s,
+                    "d h / d T_s (slot-fluid properties)")
+      .def_readonly("dh_dM", &SlotFilmHtc::dh_dM,
+                    "d h / d M (hand-back weight)")
+      .def_readonly("dh_dh_duct", &SlotFilmHtc::dh_dh_duct, "1 - w f_x")
+      .def_readonly("h_film", &SlotFilmHtc::h_film,
+                    "the film's own span-mean h over its in-box part")
+      .def_readonly("Re_s", &SlotFilmHtc::Re_s)
+      .def_readonly("fraction_in_box", &SlotFilmHtc::fraction_in_box)
+      .def_readonly("weight_M", &SlotFilmHtc::weight_M)
+      .def_readonly("branch", &SlotFilmHtc::branch)
+      .def_readonly("x_in_box", &SlotFilmHtc::x_in_box)
+      .def_readonly("Re_in_box", &SlotFilmHtc::Re_in_box)
+      .def_readonly("M_in_box", &SlotFilmHtc::M_in_box);
+
+  m.def(
+      "slot_film_htc_seban_1960",
+      [](double x_start, double x_end, double s, double G_s, double M,
+         double h_duct, double T_s, double P_s,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_s) {
+        return slot_film_htc_seban_1960(x_start, x_end, s, G_s, M, h_duct,
+                                        T_s, P_s, to_vec(X_s));
+      },
+      py::arg("x_start"), py::arg("x_end"), py::arg("s"), py::arg("G_s"),
+      py::arg("M"), py::arg("h_duct"), py::arg("T_s"), py::arg("P_s"),
+      py::arg("X_s"),
+      "A wall side's h under a slot film, Seban (1960) (the default):\n"
+      "  h = h_duct + w(M) f_x (h_film - h_duct)\n"
+      "h_film the span mean of St_s G_s cp_s over [x_start, x_end] [m] at\n"
+      "x/s <= 300, f_x its share of the span, w(M) a C1 step from 0 at\n"
+      "M = 1.0 to 1 at 1.1 (Seban: flat-plate h below m = 1). Slot-fluid\n"
+      "properties at T_s [K], P_s [Pa], X_s (mole fractions); G_s the slot\n"
+      "mass flux [kg/(m^2 s)], M = G_s / G_gas, h_duct [W/(m^2 K)].");
+
+  m.def(
+      "slot_film_htc_ballal_lefebvre_1973",
+      [](double x_start, double x_end, double s, double G_s, double M,
+         double h_duct, double T_s, double P_s,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_s) {
+        return slot_film_htc_ballal_lefebvre_1973(x_start, x_end, s, G_s, M,
+                                                  h_duct, T_s, P_s,
+                                                  to_vec(X_s));
+      },
+      py::arg("x_start"), py::arg("x_end"), py::arg("s"), py::arg("G_s"),
+      py::arg("M"), py::arg("h_duct"), py::arg("T_s"), py::arg("P_s"),
+      py::arg("X_s"),
+      "As slot_film_htc_seban_1960 with the Ballal & Lefebvre (1973) wall-jet\n"
+      "Eq. 6 (book Eq. 8.44), h_film = 0.10 (k_s/s) Re_s^0.8 (x/s)^-0.56, at\n"
+      "x/s <= 50 and handing back below M = 1.3. The named option.");
 
   // -----------------------------------------------------------------
   // channel_smooth
