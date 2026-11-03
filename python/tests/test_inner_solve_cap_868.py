@@ -5,6 +5,8 @@ same conditions through the Python API. Each failed on main: the solve
 returned a value that was not a root. See docs/archive/AUDIT_868_INNER_SOLVES.md.
 """
 
+import math
+
 import pytest
 
 import combaero as cb
@@ -91,6 +93,119 @@ def test_calc_t_from_cp_refuses_invalid_input(cp_target: float, t_guess: float) 
     """A negative T_guess returned 530 K on main; invalid input is ValueError (#928)."""
     with pytest.raises(ValueError, match="calc_T_from_cp"):
         cb.calc_T_from_cp(cp_target, X_AIR, t_guess)
+
+
+def _cp_extremum(x: list[float], lo: float, hi: float) -> float:
+    """dcp/dT's sign change in [lo, hi], bisected to adjacent doubles."""
+    s_lo = cb.dcp_dT(lo, x) > 0.0
+    while True:
+        mid = 0.5 * (lo + hi)
+        if not lo < mid < hi:
+            return lo
+        if (cb.dcp_dT(mid, x) > 0.0) == s_lo:
+            lo = mid
+        else:
+            hi = mid
+
+
+def _check_roots(roots: list, target: float, x: list[float]) -> None:
+    ts = [r.T for r in roots]
+    assert ts == sorted(ts)
+    for r in roots:
+        if not r.double_root:
+            assert abs(cb.cp(r.T, x) - target) <= 1e-14 * target
+            assert r.dT_dcp == 1.0 / cb.dcp_dT(r.T, x)
+
+
+def test_calc_t_from_cp_roots_returns_every_root_sorted() -> None:
+    """N2's cp has a tail maximum at 127 K and a minimum at 215 K, so cp(205 K)
+    is reached three times; calc_T_from_cp returns one of them (#963)."""
+    x = _pure("N2")
+    target = cb.cp(205.0, x)
+    roots = cb.calc_T_from_cp_roots(target, x)
+    assert [r.T for r in roots] == pytest.approx([37.41129, 205.0, 226.73870], abs=1e-5)
+    assert not any(r.double_root for r in roots)
+    _check_roots(roots, target, x)
+    assert cb.calc_T_from_cp(target, x, 213.0) == pytest.approx(roots[1].T, abs=1e-9)
+    upper = cb.calc_T_from_cp_roots(target, x, T_min=200.0)
+    assert [r.T for r in upper] == pytest.approx([205.0, 226.73870], abs=1e-5)
+
+
+def test_calc_t_from_cp_roots_finds_a_pair_within_one_step() -> None:
+    """O2's cp(127 K) is reached again at 120.8 K, inside one 10 K step:
+    calc_T_from_cp sees no sign change and throws; splitting at the 124 K
+    minimum finds both."""
+    x = _pure("O2")
+    target = cb.cp(127.0, x)
+    with pytest.raises(RuntimeError, match="no root"):
+        cb.calc_T_from_cp(target, x, 300.0)
+    roots = cb.calc_T_from_cp_roots(target, x)
+    assert [r.T for r in roots] == pytest.approx([120.83142, 127.0], abs=1e-5)
+    _check_roots(roots, target, x)
+
+
+def test_calc_t_from_cp_roots_finds_an_extremum_pair_within_one_step() -> None:
+    """N2/O2 at 77.28/22.72 has a maximum at 156.1 K and a minimum at 159.3 K,
+    both inside the 150-160 K step, so dcp/dT has one sign on every node: the
+    dip of |dcp/dT| is searched, and cp(157.7 K) has three roots."""
+    x = [0.0] * cb.num_species()
+    x[cb.species_index_from_name("N2")] = 0.7728
+    x[cb.species_index_from_name("O2")] = 0.2272
+    target = cb.cp(157.7, x)
+    roots = cb.calc_T_from_cp_roots(target, x)
+    assert [r.T for r in roots] == pytest.approx([154.94551, 157.7, 160.51748], abs=1e-5)
+    _check_roots(roots, target, x)
+
+
+def test_calc_t_from_cp_roots_reports_a_double_root_once() -> None:
+    """A target equal to cp at the 127 K maximum of N2, to rounding (here 5e-14
+    above it, where strictly there is no root near 127 K), is one double root
+    (dT_dcp undefined); a target 1e-9 below it is two roots 0.1 K apart."""
+    x = _pure("N2")
+    t_max = _cp_extremum(x, 120.0, 135.0)
+    for rel in (0.0, 5e-14, -5e-14):
+        roots = cb.calc_T_from_cp_roots(cb.cp(t_max, x) * (1.0 + rel), x)
+        assert len(roots) == 2
+        assert roots[0].double_root
+        assert pytest.approx(t_max, abs=1e-9) == roots[0].T
+        assert math.isnan(roots[0].dT_dcp)
+        assert not roots[1].double_root
+        assert pytest.approx(334.16406, abs=1e-5) == roots[1].T
+    below = cb.calc_T_from_cp_roots(cb.cp(t_max, x) * (1.0 - 1e-9), x)
+    assert [r.T for r in below] == pytest.approx([126.63728, 126.74086, 334.16402], abs=1e-5)
+    assert not any(r.double_root for r in below)
+
+
+def test_calc_t_from_cp_roots_is_empty_without_a_root() -> None:
+    """A query: no root in the range is an empty list, not an exception."""
+    assert cb.calc_T_from_cp_roots(1.0e3, X_AIR) == []
+    assert cb.calc_T_from_cp_roots(20.0, X_AIR) == []
+    assert cb.calc_T_from_cp_roots(cb.cp(205.0, _pure("N2")), _pure("N2"), 300.0, 6000.0) == []
+
+
+@pytest.mark.parametrize(
+    ("cp_target", "t_min", "t_max"),
+    [
+        (float("nan"), 1.0, 6000.0),
+        (-1.0, 1.0, 6000.0),
+        (30.0, 0.5, 6000.0),
+        (30.0, 1.0, 7000.0),
+        (30.0, 500.0, 500.0),
+        (30.0, float("nan"), 6000.0),
+    ],
+)
+def test_calc_t_from_cp_roots_refuses_invalid_input(
+    cp_target: float, t_min: float, t_max: float
+) -> None:
+    with pytest.raises(ValueError, match="calc_T_from_cp_roots"):
+        cb.calc_T_from_cp_roots(cp_target, X_AIR, t_min, t_max)
+
+
+def test_calc_t_from_cp_roots_refuses_a_constant_cp() -> None:
+    """Argon's cp is exactly 5/2 R up to ~950 K: every T there is a root."""
+    x = _pure("AR")
+    with pytest.raises(ValueError, match="not isolated"):
+        cb.calc_T_from_cp_roots(cb.cp(300.0, x), x)
 
 
 @pytest.mark.parametrize("mach", [1.7782794100389228, 3.1622776601683795, 5.623413251903491])

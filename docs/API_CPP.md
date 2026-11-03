@@ -130,6 +130,8 @@ double isentropic_expansion_coefficient(double T, const std::vector<double>& X);
 double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+struct CpRoot { double T; double dT_dcp; bool double_root; };
+std::vector<CpRoot> calc_T_from_cp_roots(double cp_target, const std::vector<double>& X, double T_min = thermo::CP_INVERSE_T_MIN, double T_max = thermo::CP_INVERSE_T_MAX, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_u(double u_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_h_mass(double h_mass_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_s_mass(double s_mass_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
@@ -156,6 +158,25 @@ grows as 1/T^3: at 1 K, CO's T is fixed to ~5e-7 relative, at 0.1 K only to
 ~5e-4 (see the constants' comment in `thermo.h`). No root in the range, or no
 convergence in `max_iter`, throws `std::runtime_error`; a non-finite or
 non-positive `cp_target`, `T_guess` or `tol` throws `std::invalid_argument`.
+
+`calc_T_from_cp_roots` is the opt-in alternative: every root in
+[`T_min`, `T_max`] (within [1, 6000] K), sorted, empty when there is none
+(#963). It needs no guess, so it also finds the pairs closer than a scan step
+that `calc_T_from_cp` misses (O2's cp(127 K), again at 120.8 K). dcp/dT is
+evaluated on the same scan nodes (from `T_min` up); each sign change is
+bisected to the last bit, a cp extremum, and where |dcp/dT| has a local
+minimum on the nodes without a sign change, a golden-section search
+(`thermo::CP_ROOTS_DIP_ITER` steps) looks for an extremum pair inside one step.
+Between neighbouring nodes and extrema cp is then monotone, and each sign
+change of cp - target is one root, polished as in `calc_T_from_cp`. Each
+`CpRoot` carries `dT_dcp` = 1 / (dcp/dT) at the root. An extremum whose cp is
+within `thermo::CP_ROOTS_DOUBLE_REL` = 1e-13 of the target is returned once
+as a double root (`double_root`, `dT_dcp` NaN). Not covered: three or more
+extrema within two steps. A non-finite or non-positive `cp_target` or `tol`,
+or a range outside [1, 6000] K or with `T_min >= T_max`, throws
+`std::invalid_argument`; cp equal to the target at consecutive scan points
+(argon's exactly constant cp up to ~950 K: the roots are not isolated) throws
+`std::domain_error`; no convergence in `max_iter` throws `std::runtime_error`.
 
 ### Species Thermo Beyond the Data (#606)
 Every species' NASA-9 data starts at 200 K and ends at 20 000 K (N2, O2, AR,

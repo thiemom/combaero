@@ -3182,8 +3182,42 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       "nearest T_guess in [1, 6000] K (cp is not monotone). Below the 200 K NASA-9\n"
       "data the ideal-gas tail applies; cp - cp(0 K) ~ T^3 there, so a root near\n"
       "1 K is ill-conditioned (~5e-7 relative for CO). The scan steps 10 K, and\n"
-      "10 % of T below 100 K. RuntimeError when no root lies in the range,\n"
-      "ValueError for a non-finite or non-positive input.");
+      "10 % of T below 100 K, so two roots within one step can be missed;\n"
+      "calc_T_from_cp_roots returns every root. RuntimeError when no root lies in\n"
+      "the range, ValueError for a non-finite or non-positive input.");
+
+  py::class_<CpRoot>(m, "CpRoot")
+      .def_readonly("T", &CpRoot::T)
+      .def_readonly("dT_dcp", &CpRoot::dT_dcp)
+      .def_readonly("double_root", &CpRoot::double_root)
+      .def("__repr__", [](const CpRoot &r) {
+        return "CpRoot(T=" + py::repr(py::float_(r.T)).cast<std::string>() +
+               ", dT_dcp=" + py::repr(py::float_(r.dT_dcp)).cast<std::string>() +
+               ", double_root=" + (r.double_root ? "True" : "False") + ")";
+      });
+
+  m.def(
+      "calc_T_from_cp_roots",
+      [](double cp_target,
+         py::array_t<double, py::array::c_style | py::array::forcecast> X_arr,
+         double T_min, double T_max, double tol, std::size_t max_iter) {
+        auto X = to_vec(X_arr);
+        return calc_T_from_cp_roots(cp_target, X, T_min, T_max, tol, max_iter);
+      },
+      py::arg("cp_target"), py::arg("X"), py::arg("T_min") = thermo::CP_INVERSE_T_MIN,
+      py::arg("T_max") = thermo::CP_INVERSE_T_MAX, py::arg("tol") = 1.0e-6,
+      py::arg("max_iter") = 50,
+      "Every root T of cp(T) = cp_target [J/(mol K)] in [T_min, T_max] K, sorted,\n"
+      "as a list of CpRoot (T [K], dT_dcp = 1/(dcp/dT) [K/(J/(mol K))],\n"
+      "double_root); empty when there is none. The opt-in alternative to\n"
+      "calc_T_from_cp, which returns the root nearest T_guess. cp is split at its\n"
+      "extrema (sign changes of dcp/dT on calc_T_from_cp's scan nodes, bisected,\n"
+      "and a pair inside one step, searched where |dcp/dT| dips between nodes)\n"
+      "into monotone pieces, so roots closer together than a scan step are found.\n"
+      "A target equal to cp at an extremum (to 1e-13 relative) is one root with\n"
+      "double_root=True and dT_dcp NaN. The range must lie in [1, 6000] K.\n"
+      "ValueError for a non-finite or non-positive input or an invalid range, and\n"
+      "when cp equals the target on an interval (argon: not isolated roots).");
 
   m.def(
       "calc_T_from_u",

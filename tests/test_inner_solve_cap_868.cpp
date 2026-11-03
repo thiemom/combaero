@@ -108,6 +108,89 @@ TEST(InnerSolveCap868, CalcTFromCpNearestIsInKelvin) {
   EXPECT_NEAR(calc_T_from_cp(cp(1.5, X), X, 20.0), 1.5, 1e-8);
 }
 
+// calc_T_from_cp_roots returns every root, sorted (#963). N2's cp(205 K) is
+// reached three times (tail maximum 127 K, minimum 215 K); O2's cp(127 K)
+// again at 120.8 K, inside one 10 K step, where calc_T_from_cp finds no sign
+// change and throws.
+TEST(InnerSolveCap868, CalcTFromCpRootsReturnsEveryRoot) {
+  const std::vector<double> N2 = pure_species("N2");
+  const double target = cp(205.0, N2);
+  const std::vector<CpRoot> r = calc_T_from_cp_roots(target, N2);
+  ASSERT_EQ(r.size(), 3u);
+  EXPECT_NEAR(r[0].T, 37.41129, 1e-5);
+  EXPECT_NEAR(r[1].T, 205.0, 1e-9);
+  EXPECT_NEAR(r[2].T, 226.73870, 1e-5);
+  for (const CpRoot& x : r) {
+    EXPECT_FALSE(x.double_root);
+    EXPECT_LE(std::abs(cp(x.T, N2) - target), 1e-14 * target);
+    EXPECT_EQ(x.dT_dcp, 1.0 / dcp_dT(x.T, N2));
+  }
+  EXPECT_EQ(calc_T_from_cp_roots(target, N2, 200.0, 6000.0).size(), 2u);
+  EXPECT_TRUE(calc_T_from_cp_roots(1.0e3, N2).empty());
+
+  const std::vector<double> O2 = pure_species("O2");
+  EXPECT_THROW(calc_T_from_cp(cp(127.0, O2), O2, 300.0), std::runtime_error);
+  const std::vector<CpRoot> p = calc_T_from_cp_roots(cp(127.0, O2), O2);
+  ASSERT_EQ(p.size(), 2u);
+  EXPECT_NEAR(p[0].T, 120.83142, 1e-5);
+  EXPECT_NEAR(p[1].T, 127.0, 1e-9);
+}
+
+// N2/O2 at 77.28/22.72 has a maximum at 156.1 K and a minimum at 159.3 K, both
+// inside the 150-160 K step: dcp/dT has one sign on every node, and only the
+// search of |dcp/dT|'s dip finds the pair, so cp(157.7 K) has three roots.
+TEST(InnerSolveCap868, CalcTFromCpRootsFindsAnExtremumPairWithinOneStep) {
+  std::vector<double> X(num_species(), 0.0);
+  X[species_index_from_name("N2")] = 0.7728;
+  X[species_index_from_name("O2")] = 0.2272;
+  const std::vector<CpRoot> r = calc_T_from_cp_roots(cp(157.7, X), X);
+  ASSERT_EQ(r.size(), 3u);
+  EXPECT_NEAR(r[0].T, 154.94551, 1e-5);
+  EXPECT_NEAR(r[1].T, 157.7, 1e-6);
+  EXPECT_NEAR(r[2].T, 160.51748, 1e-5);
+}
+
+// A target equal to cp at N2's 127 K maximum, to rounding (5e-14 above it,
+// where strictly there is no root near 127 K), is one double root, flagged,
+// dT_dcp NaN; 1e-9 below it, two roots 0.1 K apart.
+TEST(InnerSolveCap868, CalcTFromCpRootsReportsADoubleRootOnce) {
+  const std::vector<double> N2 = pure_species("N2");
+  double a = 120.0, b = 135.0;
+  for (double m = 0.5 * (a + b); m > a && m < b; m = 0.5 * (a + b)) {
+    if (dcp_dT(m, N2) > 0.0) {
+      a = m;
+    } else {
+      b = m;
+    }
+  }
+  for (const double rel : {0.0, 5e-14, -5e-14}) {
+    const std::vector<CpRoot> r = calc_T_from_cp_roots(cp(a, N2) * (1.0 + rel), N2);
+    ASSERT_EQ(r.size(), 2u);
+    EXPECT_TRUE(r[0].double_root);
+    EXPECT_NEAR(r[0].T, a, 1e-9);
+    EXPECT_TRUE(std::isnan(r[0].dT_dcp));
+    EXPECT_FALSE(r[1].double_root);
+  }
+  const std::vector<CpRoot> below = calc_T_from_cp_roots(cp(a, N2) * (1.0 - 1e-9), N2);
+  ASSERT_EQ(below.size(), 3u);
+  EXPECT_NEAR(below[0].T, 126.63728, 1e-5);
+  EXPECT_NEAR(below[1].T, 126.74086, 1e-5);
+}
+
+TEST(InnerSolveCap868, CalcTFromCpRootsRefusesInvalidInput) {
+  const std::vector<double> X = dry_air();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(calc_T_from_cp_roots(nan, X), std::invalid_argument);
+  EXPECT_THROW(calc_T_from_cp_roots(-1.0, X), std::invalid_argument);
+  EXPECT_THROW(calc_T_from_cp_roots(30.0, X, 0.5, 6000.0), std::invalid_argument);
+  EXPECT_THROW(calc_T_from_cp_roots(30.0, X, 1.0, 7000.0), std::invalid_argument);
+  EXPECT_THROW(calc_T_from_cp_roots(30.0, X, 500.0, 500.0), std::invalid_argument);
+  EXPECT_THROW(calc_T_from_cp_roots(30.0, X, nan, 6000.0), std::invalid_argument);
+  // Argon's cp is exactly 5/2 R up to ~950 K: every T there is a root.
+  const std::vector<double> AR = pure_species("AR");
+  EXPECT_THROW(calc_T_from_cp_roots(cp(300.0, AR), AR), std::domain_error);
+}
+
 // T_from_stagnation's slope dropped T dgamma/dT, so Newton converged
 // linearly and stopped with |F| up to 8e-10 cp T at 2500 K (#868 R3).
 TEST(InnerSolveCap868, TFromStagnationMeetsTheEnergyEquation) {
