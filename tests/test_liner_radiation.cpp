@@ -121,7 +121,9 @@ TEST(LinerRadiation, R1AndR2Derivatives) {
               1e-6, "dR2/dTc");
   }
   // Equal temperatures exchange nothing; black parallel surfaces give sigma.
-  EXPECT_EQ(liner_gas_radiation(1500.0, 1500.0, 0.5, 0.7).R1, 0.0);
+  // (to round-off: GCC may contract Tg15 Tg - Tw15 Tw into an FMA)
+  EXPECT_NEAR(liner_gas_radiation(1500.0, 1500.0, 0.5, 0.7).R1, 0.0,
+              1e-12 * liner_gas_radiation(1500.0, 0.0, 0.5, 0.7).R1);
   EXPECT_NEAR(liner_casing_exchange_factor(1.0, 1.0, 0.7), STEFAN_BOLTZMANN, 1e-22);
   EXPECT_THROW(liner_casing_radiation(1000.0, 800.0, 0.0, 0.4, 0.7), std::invalid_argument);
 }
