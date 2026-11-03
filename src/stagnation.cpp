@@ -479,22 +479,36 @@ DuctStaticState duct_static_state(double Tt, double Pt, double G,
   double u_lo = std::log(P_star);
   double u_hi = lnP0;
   if (eval(u_lo, cs) > 0.0) {
-    // Beyond choke: the sonic state, at the choked flux.
-    const double G_star = mass_flux_isentropic(Tt, Pt, P_star, X);
-    cs = chamber_static_state(Tt, P_star, G_star, X);
-    out.T = cs.T;
-    out.P = P_star;
-    out.rho = P_star / (R * cs.T);
-    out.M = cs.M;
+    // Beyond choke: the sonic state, independent of G. T* from the energy
+    // balance at M = 1 (sonic_static_state, Newton to 1e-13 Tt) and P* on
+    // the isentrope through (Tt, Pt), ln(Pt / P*) = (s(Tt) - s(T*)) / R --
+    // the subsonic branch's own entropy integral, so the two meet at G*.
+    // P_star above (golden section on G(P), ~1e-8 relative) only decides
+    // the branch: as the value its noise read as a derivative error, and
+    // its Tt dependence (cp varies) was dropped, which put the in-pipe
+    // orifice's Tt column, and the flow columns it reaches, wrong past the
+    // approach pipe's sonic limit (#958).
+    const SonicStaticState son = sonic_static_state(Tt, G, X);
+    const double T_s = son.T;
+    const double cp_Tt = cp_mass(Tt, X);
+    const double cp_Ts = cp_mass(T_s, X);
+    auto cp_over_T = [&](double t) { return cp_mass(t, X) / t; };
+    const double P_s = Pt * std::exp(-gl8_split(cp_over_T, T_s, Tt) / R);
+    // d ln P* / d Tt = -(cp(Tt) / Tt - cp(T*) / T* dT*/dTt) / R.
+    const double dlnP_dTt = -(cp_Tt / Tt - cp_Ts / T_s * son.dT_dTt) / R;
+    out.T = T_s;
+    out.P = P_s;
+    out.rho = P_s / (R * T_s);
+    out.M = 1.0;
     out.choked = true;
     out.G_eff = G;
     out.dGeff_dG = 1.0;
-    const double r = P_star / Pt;
-    out.dP_dPt = r;
-    out.dT_dTt = cs.dT_dTt;
-    out.dT_dPt = cs.dT_dP * r;
-    out.drho_dTt = -out.rho * out.dT_dTt / out.T;
-    out.drho_dPt = out.rho * (out.dP_dPt / out.P - out.dT_dPt / out.T);
+    out.dP_dPt = P_s / Pt;
+    out.dP_dTt = P_s * dlnP_dTt;
+    out.dT_dTt = son.dT_dTt;
+    out.dT_dPt = 0.0;
+    out.drho_dTt = out.rho * (dlnP_dTt - out.dT_dTt / out.T);
+    out.drho_dPt = out.rho / Pt;
     if (T0_floored) {
       out.dT_dTt = out.dP_dTt = out.drho_dTt = 0.0;
     }

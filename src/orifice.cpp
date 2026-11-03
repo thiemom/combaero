@@ -1802,35 +1802,85 @@ double jobson_expansibility(double r, double beta, double Ci, double n) {
     }
     const double b2 = beta * beta;
     // Upstream static state p1 = rho1 = 1; the approach velocity raises the
-    // stagnation state the jet expands from, V1 = g beta^2 / rho1, so solve
-    // g = flux(p0(g), rho0(g)) by fixed point (the approach term is O(b^4)).
-    double g = 0.0;
-    for (int it = 0;; ++it) {
-        const double V1 = g * b2;
-        const double tau = 1.0 + V1 * V1 * (n - 1.0) / (2.0 * n);  // T0/T1
-        const double p0 = std::pow(tau, n / (n - 1.0));
-        const double rho0 = std::pow(tau, 1.0 / (n - 1.0));
-        const double g_new =
-            combaero::orifice_jobson::flux(J1::constant(p0), J1::constant(rho0),
-                                           J1::constant(1.0), J1::constant(r),
-                                           J1::constant(Ci), J1::constant(n), beta)
-                .g.v;
-        const bool done = std::abs(g_new - g) <=
-            combaero::inner_solve::kJobsonExpansibilityRelTol * std::abs(g_new);
-        const double step = g_new - g;
+    // stagnation state the jet expands from, V1 = g beta^2 / rho1, so g solves
+    // h(g) = F(g) - g = 0, F(g) = flux(p0(g), rho0(g)). F falls with g (every
+    // point of the #957 sweep), so the root is unique and h' = F' - 1 < -1.
+    // At high beta Ci, F' < -1 at the root, where the fixed point g = F(g)
+    // cycled instead of converging (#957). Bracketed Newton (rtsafe) with F'
+    // by forward mode: h(0) = F(0) > 0, and the upper end doubles from F(0)
+    // until h < 0.
+    using combaero::inner_solve::kJobsonExpansibilityMaxIter;
+    using combaero::inner_solve::kJobsonExpansibilityRelTol;
+    auto h_of = [&](double g, double& dh) {
+        const J1 V1 = J1::seed(g, 0) * b2;
+        const J1 tau = 1.0 + V1 * V1 * (n - 1.0) / (2.0 * n);  // T0/T1
+        const J1 p0 = combaero::solver::dpow(tau, n / (n - 1.0));
+        const J1 rho0 = combaero::solver::dpow(tau, 1.0 / (n - 1.0));
+        const J1 F = combaero::orifice_jobson::flux(p0, rho0, J1::constant(1.0),
+                                                    J1::constant(r), J1::constant(Ci),
+                                                    J1::constant(n), beta)
+                         .g;
+        dh = F.d[0] - 1.0;
+        return F.v - g;
+    };
+    double dh = 0.0;
+    double lo = 0.0;
+    double hi = h_of(0.0, dh);  // F(0) > 0 for r < 1
+    double h_hi = h_of(hi, dh);
+    for (int k = 0; h_hi > 0.0; ++k) {
+        if (k == kJobsonExpansibilityMaxIter || !std::isfinite(h_hi)) {
+            combaero::inner_solve::throw_no_convergence(
+                "jobson_expansibility", k, "upper bracket residual", h_hi);
+        }
+        lo = hi;
+        hi *= 2.0;
+        h_hi = h_of(hi, dh);
+    }
+    double g = hi;
+    double h = h_hi;
+    double dx_old = hi - lo;
+    double dx = dx_old;
+    for (int it = 0; it < kJobsonExpansibilityMaxIter; ++it) {
+        if (!std::isfinite(h)) {
+            combaero::inner_solve::throw_no_convergence("jobson_expansibility", it,
+                                                        "residual F(g) - g", h);
+        }
+        if (h == 0.0) {
+            break;
+        }
+        if (h > 0.0) {
+            lo = g;
+        } else {
+            hi = g;
+        }
+        const bool newton_ok = std::isfinite(dh) && dh < 0.0;
+        const double step = newton_ok ? -h / dh : 0.0;
+        double g_new = 0.0;
+        if (newton_ok && g + step > lo && g + step < hi &&
+            std::abs(2.0 * step) <= std::abs(dx_old)) {
+            dx_old = dx;
+            dx = step;
+            g_new = g + step;
+        } else {
+            dx_old = dx;
+            dx = 0.5 * (hi - lo);
+            g_new = lo + dx;
+        }
+        // A step at the tolerance, or a bracket that cannot be split further:
+        // the root to rounding.
+        const bool done = std::abs(g_new - g) <= kJobsonExpansibilityRelTol * std::abs(g_new) ||
+                          !(g_new > lo && g_new < hi);
         g = g_new;
         if (done) {
             break;
         }
-        // The fixed point can cycle in its last bits (3e-14 seen at r = 0.98):
-        // a root to rounding. A step wider than that is not one (#868).
-        if (it + 1 == combaero::inner_solve::kJobsonExpansibilityMaxIter) {
-            if (combaero::inner_solve::cap_exit_is_root(step, g)) {
+        h = h_of(g, dh);
+        if (it + 1 == kJobsonExpansibilityMaxIter) {
+            if (combaero::inner_solve::cap_exit_is_root(hi - lo, g)) {
                 break;
             }
             combaero::inner_solve::throw_no_convergence(
-                "jobson_expansibility", combaero::inner_solve::kJobsonExpansibilityMaxIter,
-                "flux step", step);
+                "jobson_expansibility", kJobsonExpansibilityMaxIter, "residual F(g) - g", h);
         }
     }
     const double b4 = b2 * b2;

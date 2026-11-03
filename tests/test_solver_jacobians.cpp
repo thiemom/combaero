@@ -1273,3 +1273,34 @@ TEST(ApproachStatic, DerivativesAreExactAndItIsTheChambersState) {
     EXPECT_NEAR(r.residual, 0.0, 1e-7 * x0[0]) << inc;
   }
 }
+
+// Past the approach pipe's sonic limit (#958): the compressible state is the
+// sonic one, P* = P*(Pt, Tt), flat in G. Its Tt column was 0 (cp varies, so
+// P*/Pt moves with Tt) and its value carried the golden-section noise of
+// critical_pressure_ratio, which central differences read as a derivative.
+TEST(ApproachStatic, BeyondTheSonicLimitTheDerivativesMatchTheValue) {
+  std::vector<double> Y(combaero::num_species(), 0.0);
+  Y[combaero::species_index_from_name("N2")] = 0.767;
+  Y[combaero::species_index_from_name("O2")] = 0.233;
+  for (double Tt : {400.0, 1900.0}) {
+    const double x0[3] = {40e5, Tt, 1e5};
+    auto P = [&](const double *x) {
+      return approach_static_pressure(x[0], x[1], x[2], Y, false).P;
+    };
+    const auto a = approach_static_pressure(x0[0], x0[1], x0[2], Y, false);
+    ASSERT_TRUE(a.choked);
+    EXPECT_EQ(a.dP_dG, 0.0);
+    EXPECT_GT(std::abs(a.dP_dTt), 0.0);
+    const double analytic[2] = {a.dP_dPt, a.dP_dTt};
+    for (int i = 0; i < 2; ++i) {
+      double up[3], dn[3];
+      std::copy(x0, x0 + 3, up);
+      std::copy(x0, x0 + 3, dn);
+      const double h = 1e-6 * x0[i];
+      up[i] += h;
+      dn[i] -= h;
+      const double fd = (P(up) - P(dn)) / (2.0 * h);
+      EXPECT_NEAR(analytic[i], fd, 1e-6 * std::abs(fd)) << Tt << " " << i;
+    }
+  }
+}
