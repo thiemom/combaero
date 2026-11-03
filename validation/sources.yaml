@@ -4491,13 +4491,16 @@ documents:
     (accessed 2026-10-29).'
   topic: [other]
   content: log10-polynomial fits for conductivity, specific heat, modulus and expansion, 4-300 K.
-  status: screened
-  verdict: 'Cryogenic only (k = 15.3 W/m K at 300 K). Not implemented: a 304 function that refuses above 300 K
-    would not serve casings or rig hardware; it needs an elevated-temperature source to pair with.'
-  read_for: ['304 stainless conductivity']
+  status: accuracy
+  verdict: 'Cryogenic only (k = 15.3 W/m K at 300 K, fit error 2%). Not the ss304 source; the independent
+    low-temperature cross-check of the shipped ss304 (CINDAS Report 45 Table 2): NIST/CINDAS -2.0% at 200 K,
+    +0.6% at 250 K, +1.4% at 273 K, +2.5% at 293 K, +2.8% at 300 K -- inside CINDAS''s stated 5%.'
+  read_for: ['304 stainless conductivity', ss304 low-temperature cross-check]
   issues: [761]
   records: []
-  notes: Supplied by the user 2026-10-29.
+  notes: 'Supplied by the user 2026-10-29. Coefficients re-fetched 2026-11-03 with scripts/nist_cryo.py fetch
+    "Stainless Steel 304" -> sources/materials/nist_cryogenics/Stainless_Steel_304.json (page
+    https://trc.nist.gov/cryogenics/materials/304Stainless/304Stainless_rev.htm, data 4-300 K).'
 - file: sources/materials/nist_cryogenic_310_stainless.pdf
   citation: 'NIST Cryogenics Technologies Group. Material Properties: 310 Stainless (UNS S31000), web page
     (accessed 2026-10-29).'
@@ -4510,6 +4513,61 @@ documents:
   issues: [761]
   records: []
   notes: Supplied by the user 2026-10-29.
+- file: sources/materials/ho_chu_1977_CINDAS-45_DTIC-ADA129160_AISI_stainless_resistivity_conductivity.pdf
+  citation: 'Ho, C. Y., Chu, T. K. (1977). Electrical resistivity and thermal conductivity of nine selected AISI
+    stainless steels. CINDAS Report 45, Purdue University, prepared for the American Iron and Steel Institute.
+    DTIC ADA129160 (distribution unlimited).'
+  topic: [other]
+  content: 'Critically evaluated recommended electrical resistivity and thermal conductivity of AISI 303, 304,
+    304L, 316, 317, 321, 347, 410 and 430, from about 1 K to above the melting range (Tables 1-9, Figures
+    1-9), with the data sets each recommendation rests on and the effects of cold work. Stated uncertainty
+    about 5% (15% at and above melting). Scanned with a usable text layer.'
+  status: implemented
+  verdict: 'k_stainless_steel_304 / ss304 is Table 2 (AISI 304, pdf page 22, report p. 15) from 200 K to
+    1672 K, the lower end of the printed melting range 1672-1727 K, which is also the ss304 solidus. Twenty
+    304 and seven 304L data sets, judged "virtually the same". OCR checked against a 150 dpi render. Cross-
+    checks: NIST cryogenic fit -2.0% to +2.8% at 200-300 K; Cleveland-Cliffs bulletin +0.2% at 100 C, -3.7%
+    at 500 C; Kim 1975 (ANL-75-55, 304L) -13% at 300 K narrowing to -1% at 1200 K (Kim is the outlier: also
+    15% below NIST at 300 K). Table 4 (AISI 316) agrees with Gen3 CSP''s measured SS316 (shipped ss316)
+    within -2.9% to +2.0% at 260-660 C and +6.4%/+9.7% at 740/820 C, inside Gen3''s 95% band at every
+    point -- support for the evaluation''s footing. CINDAS 304 runs 5-7% above Gen3 316 at 260-660 C, as
+    its own 304/316 tables do (+5% to +8%).'
+  read_for: [ss304 conductivity, 'ss316 cross-check']
+  issues: []
+  records: [python/tests/test_materials.py]
+  code: [src/materials.cpp, include/materials.h]
+  notes: 'Fetched 2026-11-03 from the Internet Archive mirror of the DTIC scan
+    (https://archive.org/download/DTIC_ADA129160/DTIC_ADA129160.pdf); apps.dtic.mil returns 403 to scripts.
+    Other tables (303, 316, 317, 321, 347, 410, 430) are there if those steels are needed.'
+- file: sources/materials/kim_1975_ANL-75-55_stainless_steel_thermophysical_properties.pdf
+  citation: 'Kim, C. S. (1975). Thermophysical properties of stainless steels. ANL-75-55, Argonne National
+    Laboratory. doi:10.2172/4152287.'
+  topic: [other]
+  content: 'Recommended enthalpy, specific heat, density, expansion, conductivity, diffusivity and viscosity
+    of 304L and 316L, 300-3000 K. Solid k: straight lines through the data, extended to the melting range
+    (Eq. 28, 304L: k = 0.08116 + 1.618e-4 T W/cm K; Table 10). Diffusivity is derived from that k, so
+    alpha cp rho reproduces k by construction (no independent check).'
+  status: accuracy
+  verdict: 'Cross-check of ss304 only, not the source: 13% below CINDAS 45 at 300 K, 10% at 600 K, 4% at
+    1000 K, 1% at 1200 K, +4% at 1600 K; 15% below NIST''s fit at 300 K. A single line through 304L data
+    extended to melting -- CINDAS evaluates 27 data sets and is preferred.'
+  read_for: [ss304 conductivity]
+  issues: []
+  records: []
+  notes: Fetched 2026-11-03 from OSTI (https://www.osti.gov/servlets/purl/4152287), public.
+- file: sources/materials/cleveland_cliffs_304_304L_product_data_bulletin_2021.pdf
+  citation: Cleveland-Cliffs (2021). 304/304L stainless steel, product data bulletin (05/2021).
+  topic: [other]
+  content: 'Composition, physical properties (density 8.03 g/cm3, conductivity 16.2 W/m K at 100 C and 21.4
+    at 500 C, specific heat 0.50 kJ/kg K at 0-100 C, melting range 1399-1454 C), mechanical data. No
+    diffusivity, so no alpha cp rho check.'
+  status: accuracy
+  verdict: 'Mill-sheet cross-check of ss304: +0.2% at 100 C and -3.7% at 500 C against CINDAS 45 Table 2. Its
+    melting range starts at 1399 C = 1672 K, the CINDAS solidus.'
+  read_for: [ss304 conductivity, ss304 solidus]
+  issues: []
+  records: []
+  notes: Fetched 2026-11-03 from the Cleveland-Cliffs document CDN (public link).
 
 - file: sources/materials/asm_handbook_vol2_1990_nonferrous_alloys.pdf
   citation: 'ASM International. Metals Handbook, 10th ed., Vol. 2: Properties and Selection: Nonferrous Alloys and
@@ -5210,7 +5268,9 @@ wanted:
     between; Maglic 1994, wanted, is the closer tie-breaker).'
   where: 'DTIC hosts TPRC volumes as scans (Vol. 2 ADA951936, Vol. 3 ADA951937, Vol. 5 ADA951939 per a web
     search 2026-11-02); no DTIC record for Vol. 1 was found, so its AD number is unknown. apps.dtic.mil returns
-    403 to automated fetches, so nothing was downloaded. University libraries.'
+    403 to automated fetches, but the Internet Archive mirrors many DTIC scans as
+    archive.org/download/DTIC_<AD>/DTIC_<AD>.pdf (CINDAS Report 45 came that way, 2026-11-03). University
+    libraries.'
 - citation: A public EB-PVD YSZ conductivity k(T) curve (as deposited and after sintering), beyond Zhu et al.
     2000 TM-2000-210238 (held; one condition, 0.13 mm, absolute k only there).
   checked: true

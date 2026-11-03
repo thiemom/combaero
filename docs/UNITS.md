@@ -489,6 +489,7 @@ All functions use consistent units to avoid conversion errors.
 | `k_alumina`                           | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
 | `k_x22crmov12_1`                      | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
 | `k_bondcoat_nicocraly`                | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
+| `k_stainless_steel_304`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
 | `k_stainless_steel_310`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
 | `k_stainless_steel_316`               | T: K, extrapolate: bool (default False)                    | W/(m*K)                                                                                          |
 | `k_aluminum_6061`                     | T: K                                                       | W/(m*K)                                                                                          |

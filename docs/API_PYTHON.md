@@ -2802,6 +2802,7 @@ materials = cb.list_materials()
 k_al = cb.k_aluminum_6061      # deprecated (no cited source), removed in 0.9.0
 k_ss = cb.k_stainless_steel_316  # Gen3 CSP measured, 533-1093 K
 k_310 = cb.k_stainless_steel_310  # Gen3 CSP measured, 533-1073 K
+k_304 = cb.k_stainless_steel_304  # CINDAS Report 45 Table 2 (Ho & Chu 1977), 200-1672 K (solidus)
 k_inconel = cb.k_inconel718
 k_haynes = cb.k_haynes230     # HAYNES 230 brochure alpha*cp*rho, 298-1273 K
 k_hx = cb.k_hastelloy_x       # HASTELLOY X brochure + data sheet, 300-1273 K

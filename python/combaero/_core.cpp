@@ -6999,6 +6999,18 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "extrapolate : bool, default False. True continues the end slope linearly\n"
         "outside the valid range instead of raising (unsourced; opt-in).");
 
+  m.def("k_stainless_steel_304", material_k(&combaero::materials::k_stainless_steel_304, "ss304"),
+        py::arg("T"), py::arg("extrapolate") = false,
+        "Thermal conductivity of Stainless Steel 304 (and 304L) [W/(m*K)].\n\n"
+        "Austenitic 18-8 stainless steel.\n\n"
+        "Parameters:\n"
+        "  T : temperature [K]\n\n"
+        "Valid range: 200-1672 K (to the solidus, the table's melting range 1672-1727 K)\n"
+        "Source: Ho & Chu 1977, CINDAS Report 45 (DTIC ADA129160) Table 2,\n"
+        "recommended values (uncertainty about +-5%), interpolated linearly.\n\n"
+        "extrapolate : bool, default False. True continues the end slope linearly\n"
+        "outside the valid range instead of raising (unsourced; opt-in).");
+
   m.def(
       "k_aluminum_6061",
       [](double T) {
@@ -7048,7 +7060,7 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "  >>> print(materials)\n"
         "  ['al6061', 'alumina', 'copper', 'hastelloy_x', 'haynes188', 'haynes230',\n"
         "   'haynes25', 'haynes263', 'inconel625', 'inconel718', 'nicocraly', 'nimonic75',\n"
-        "   'ss310', 'ss316', 'x22crmov12_1', 'ysz']");
+        "   'ss304', 'ss310', 'ss316', 'x22crmov12_1', 'ysz']");
 
   m.def(
       "get_material_conductivity",
