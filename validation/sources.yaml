@@ -632,17 +632,72 @@ documents:
     wall-temperature ranges vs prediction at 22 and 30 atm, combustion efficiency 85-99% by zone.'
   status: screened
   verdict: 'Screened 2026-11-02. The primary behind Lefebvre & Ballal Ch. 8 Eqs. 8.37/8.38 (thick-lip eta,
-    constants identical) and 8.41-8.44 (film-side Nu), and of its film-cooled worked example. DISCREPANCY: the
-    near-slot Nu for m < 1.3 is 0.090 here (Eq. 3, credited to Seban) but 0.069 in the book (Eq. 8.41), 30%
-    lower; the m > 1.3 form agrees (0.10). Which is right needs Seban 1960 or the ASME 72-WA/HT-24 print. The
-    worked example gives eta 0.785 where the book prints 0.789. Plugs a real gap: combaero ships only
-    Marek-Tacina (m 0.41-1.87) and no film-side h. Figs. 3/4 are other labs'' points, so they test reproduction
-    of the fit; Figs. 5/6 are weak validation (gas T from an assumed efficiency, geometry not given).'
+    constants identical) and 8.41-8.44 (film-side Nu), and of its film-cooled worked example. DISCREPANCY,
+    resolved 2026-11-02 on the printed record: the near-slot Nu for m < 1.3 is 0.090 here (Eq. 3, credited to
+    Seban) but 0.069 in the book (Eq. 8.41). Seban 1960 (held, own entry) Eq. 13 converts to Nu_x = 0.10 Pr
+    [Re_s x/s]^0.7 = 0.069 at Pr 0.69, so the book is the faithful conversion; 0.090 would need Pr 0.90. Fig.
+    1 here is drawn at 0.090 (Nu ~57 at Re_s x/s 1e4, ~1000 near 6e5), so the report carries the error
+    consistently; probable error, unproven without the ASME 72-WA/HT-24 print. Seban fitted Eq. 13 on m > 1
+    and x/s < 40 (for m < 1 he finds the flat-plate h), so its use for 0.5 < m < 1.3 stretches it; implement
+    Seban''s Stanton form on slot-fluid properties, which avoids the Pr question. The m > 1.3 form agrees
+    (0.10). FIDELITY POINT, m > 1.3 (Fig. 2, p. 17, read from the page image): judged on the authors'' OWN data,
+    Eq. 6 over-predicts the film-side h. Eq. 6 is the solid line (theta = 2.0, Nu = 0.10 X^0.8, X = Re_s
+    (x/s)^0.55); only the Pai & Whitelaw points (ref. 7, m 2.3-3.5, open circles) sit on it. The Cranfield
+    rig points (m 1.4-3.5, squares and triangles) lie 20-67% below it at X 2e4-6e4 -- squares near the theta
+    1.0-1.6 lines, triangles at or below theta 1.0 -- and close to 0-30% below near X 1e5-1.5e5. Resolve
+    before implementing the wall-jet branch. The worked example gives eta 0.785 where the book prints 0.789.
+    Plugs a real gap: combaero ships only Marek-Tacina (m 0.41-1.87) and no film-side h. Figs. 3/4 are other
+    labs'' points, so they test reproduction of the fit; Figs. 5/6 are weak validation (gas T from an assumed
+    efficiency, geometry not given).'
   read_for: ['#714 / #763 thick-lip slot film above m 1.3', '#793 film-side Nu for the liner wall balance',
     'provenance of Lefebvre & Ballal Eqs. 8.37-8.44']
   issues: [714, 763, 793]
   records: []
   notes: Arrived 2026-11-02 in sources/new/ (from the user). Not implemented.
+- file: sources/heat_transfer/film/Seban_1960_JHT_82_303_tangential_slot_film_h_and_eta.pdf
+  citation: Seban, R. A. (1960). Heat transfer and effectiveness for a turbulent boundary layer with tangential
+    fluid injection. ASME J. Heat Transfer 82(4), 303-313 (November 1960; ASME Paper 59-A-177).
+  topic: [film]
+  content: 'ASME Digital Collection download, 10 pp.; equations and tables read from page images. Tangential
+    slot at the leading edge of a 12 in. wide, 18 in. long bakelite plate (top wall of a 4.5 x 12 in. tunnel),
+    air into air, slot heights s = 0.250, 0.125 and 0.063 in. (lip 0.020 in.), free stream 50-150 ft/s (most
+    runs 118-123 ft/s), injection 0-70 F above the free stream (rho_1/rho_s 1.06-1.14, so velocity ratio ~
+    mass-velocity ratio m). Adiabatic runs give eta = t_a/t_s; heated runs (five nichrome ribbons) give h =
+    q/(t_o - t_a) on the ADIABATIC-WALL temperature of the same flow (Eq. 3; flux error up to 4-5%). Tables 1/2
+    PRINT per run s, m, u_s, u_1 and Re_s = u_s s/nu_s (m 0.18-0.88 and 1.06-20.75). m < 1: power-law region
+    from (x/s)_1 = 56 m^1.5 (Eq. 4), eta = 25 m^1.2 (x/s)^-0.8 (Eq. 5, Fig. 5); h equals the plain flat-plate
+    Colburn value h_0/(rho_1 u_1 cp) = 0.037 Re_x^-0.2 (Eq. 9) within about 70 slot heights (Fig. 8, h/h_0 ~ 1
+    from x/s ~ 10-70; near the slot separation, maximum at x/s ~ 6, Fig. 9). m > 1: Chin''s group B with eta =
+    3.93 B^-0.40 (Eq. 10, Chin''s fit, 1.21 < u_s/u_1 < 1.65), Seban''s eta = 3.63 B^-0.56 for m > 2.5, B > 20
+    (Eq. 11) and eta = 1.09 C^-0.5, C = (rho_1/rho_s)^1.5 ((u_s - u_1)/u_s)^0.5 Re_s^-0.3 (x/s), for all m >=
+    1.08 including the wall jet (Eq. 12, Fig. 11). Heat transfer for m > 1 (Fig. 12): h/(rho_s u_s cp) = 0.10
+    Re_s^-0.3 (x/s)^-0.3 for x/s < 40 (Eq. 13) and 0.41 Re_s^-0.3 (x/s)^-0.6 for x/s > 40 (Eq. 14), called "a
+    convenience" (a single 0.6-power law with a shifted origin would fit most of the data); Jakob''s wall-jet
+    h = 0.15 Re_s^-0.2 (x/s)^-0.6 (Eq. 15), on the maximum boundary-layer temperature, plotted alongside.
+    At m ~ 1 h drops to flat-plate values almost at once; at m = 2 it stays above them over the plate.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (was wanted). SETTLES the Ballal-Lefebvre film-side Nu question on the
+    printed record: Eq. 13 as a Nusselt number is Nu_x = h x/k = St_s Re_s Pr (x/s) = 0.10 Pr [Re_s x/s]^0.7,
+    i.e. 0.069 at Pr 0.69 (0.070-0.071 for air at 0.70-0.71), exactly Lefebvre & Ballal Eq. 8.41 (held). The
+    Cranfield SME4 report''s 0.090 (its Eq. 3, credited to Seban) matches no plausible Pr (it needs Pr 0.90),
+    yet its Fig. 1 line is drawn at 0.090 (Nu ~57 at Re_s x/s 1e4, 1000 near 6e5; 0.069 reaches 1000 only at
+    8.8e5), so the report is internally consistent with its own error. Book 0.069 = faithful conversion;
+    report 0.090 = probable error, not proven without the ASME 72-WA/HT-24 print. Applicability: Eq. 13 was
+    fitted on m > 1 runs (heat-transfer runs m 1.06-8.91) at x/s < 40; for m < 1 Seban finds h = the plain
+    flat-plate value (Eq. 9) once past the near-slot region (x/s ~ 10-70), so Ballal-Lefebvre''s use of it for
+    0.5 < m < 1.3 extends it below its data. For an implementation use Seban''s Stanton form on slot-fluid
+    properties directly, which removes the Pr ambiguity. Fidelity data (the author''s own): Figs. 3/5/8/10-12,
+    plotted only (digitising needed), Tables 1/2 give the run conditions. As an accuracy source for
+    Marek-Tacina it is cross-source (different lab), but tangential thin-lip, low-Tu, DR ~1. Not checked:
+    Fig. 12 point scatter against Eqs. 13/14 (not digitised); the Seban & Back 1962 companions.'
+  read_for: ['#714 / #763 slot-film effectiveness for m < 1 and m > 1', '#793 film-side Nu (Lefebvre & Ballal
+      Eq. 8.41 vs Cranfield SME4 Eq. 3)']
+  issues: [714, 763, 793]
+  records: []
+  notes: 'Supplied by the user 2026-11-02 (moved from wanted). A note on the lead''s reading: the h of Eqs. 13/14
+    is on the adiabatic-wall temperature (Eq. 3); the "maximum boundary-layer temperature" basis is Jakob''s
+    Eq. 15, which Seban notes is subject to the same question as Jakob''s effectiveness. Companions not held:
+    Seban & Back 1962, J. Heat Transfer 84, 45-54 and 235-242.'
 - file: sources/heat_transfer/film/Caciolli_PhD_Florence_XXV_combustor_aerothermal.pdf
   citation: Caciolli, G. (cycle XXV, 2010-2012). A close investigation on the aerothermal behaviour of modern
     aeroengine combustors. PhD thesis, University of Florence, DIEF (tutor B. Facchini; defence year not printed).
@@ -710,6 +765,71 @@ documents:
   records: []
   notes: Arrived 2026-11-02 in sources/new/ as ThesisJES%5B1%5D.pdf (from the user). Journal versions exist
     (Sargison et al. 2002, J. Turbomach. 124, console papers), not held.
+- file: sources/heat_transfer/film/Hassan_2013_PhD_Concordia_micro_tangential_jet_film.pdf
+  citation: Hassan, O. (2013). Thermal and flow field investigations of a micro-tangential-jet film cooling
+    scheme on gas turbine components. PhD thesis, Concordia University, Montreal (June 2013).
+  topic: [film]
+  content: 'Born-digital, 218 pp. A micro-tangential-jet (MTJ) shaped film scheme (35 deg inclination, lateral
+    expansion, near-tangential exit; Fig. 6.1) on a vane (pressure and suction sides, linear cascade after
+    Chappell et al. 2010) and on a flat plate; transient TLC eta and HTC, 2-D/3-D PIV. Main finding: no
+    significant HTC augmentation for BR < 1; the MTJ film behaves 2-D, slot-like. Flat-plate rig: 99 x 54 mm
+    duct, 550 mm long, schemes 200 mm from the inlet, Tu 8-8.5% (grid), DR close to unity, Br based on the
+    scheme BASE (metering) area in the validation (Brb). Appendix A TABULATES (pp. 163-165, read from the text
+    layer, which is clean): Table A.1 centreline and laterally averaged eta behind one row of CYLINDRICAL holes
+    at Re 1.24e5, Brb 0.5 and 1.0, x/d 1-23; Tables A.2 (Re 1.24e5) and A.3 (Re 0.7e5) the same for one row of
+    FAN-SHAPED holes, x/d 1-25. These are a re-measurement of Wright et al. 2011
+    (PSP), compared in Figs. 3.6/3.7. Example, A.2 laterally averaged at x/d 1/10/25: 0.317/0.151/0.070 (Brb 0.5),
+    0.301/0.153/0.108 (Brb 1.0). Tables A.5/A.8: vane suction- and pressure-side eta and HTC; A.4/A.7 Mach
+    distributions; A.6 PIV.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Useful part: Tables A.2/A.3, fan-shaped-hole laterally averaged eta TABULATED
+    (no digitising), a candidate cross-source ACCURACY check of the shipped Colban 2011 shaped-hole kernel --
+    but outside its fitted box on two counts the kernel range-checks: DR ~1 (Colban fitted 1.7-2.0) and Tu
+    8-8.5% (Colban 0.2-4%). Blocking gap: the thesis does NOT state the validation holes'' geometry (d,
+    inclination, p/d, area ratio, breakout width); the "10 deg lateral expansion" it mentions is Goldstein
+    1974''s fan (lit. review), and the Ch. 6 circular row is 35 deg at p/d 3. Colban needs AR, P/D and t/P, so
+    those must come from Wright et al. 2011 (not held) before any score. Data-quality flags in the tables:
+    A.1 rows x/d 7 and 8 are identical (copy error); A.2 centreline Brb 0.5 and 1.0 are identical at x/d 1-4;
+    the authors attribute the near-hole mismatch with Wright (x/d < 3, and at low Re) to the TLC-sheet edge and
+    a gap in front of the holes, so x/d < 3 should be excluded. Tables A.5/A.8 are vane data: blocked, combaero
+    has no gas-side airfoil kernel. The MTJ scheme itself has no combaero element.'
+  read_for: ['#386 shaped-hole eta cross-source (Colban), tabulated']
+  issues: [386]
+  records: []
+  notes: 'Supplied by the user 2026-11-02. Lead: Wright, McClain & Clemenson 2011, Effect of
+    density ratio on flat plate film cooling with shaped holes using PSP, J. Turbomach. 133, 041011 (thesis
+    ref. 69; companion ref. 70, Tu effect, 133, 041023) -- gives the hole geometry and higher-DR data. Not checked:
+    the thesis''s stated uncertainties (the values are missing from the text layer).'
+- file: sources/heat_transfer/film/Schneider_2015_NASA_TM-2015-218738_Coolit_cooling_flow_factor.pdf
+  citation: Schneider, S. J. (2015). Analysis of turbine blade relative cooling flow factor used in the subroutine
+    Coolit based on film cooling correlations. NASA/TM-2015-218738 (E-19070), Glenn Research Center.
+  id: NASA/TM-2015-218738 (NTRS 20150011643)
+  topic: [film, review]
+  content: '30 pp., Word-generated text layer. Explores the Coolit relative cooling flow factor (FAC; Gauntner''s
+    NASA TM-81453 algorithm for turbine cooling flow and the efficiency penalty) with flat-plate correlations.
+    Convection-cooled blade: turbulent flat-plate gas side and Dittus-Boelter 0.023 Re^0.8 Pr^0.4 coolant
+    passages. Film-cooled blade: Lefebvre''s Ch. 8 slot set -- Nu = 0.069 [Re_s x/s]^0.7 for 0.5 < m < 1.3
+    (its Eq. 19), eta = 0.6 (x/ms)^-0.3 (Re_s m mu_c/mu_g)^0.15 for x/s < 150 (its Eq. 24), and the wall-jet
+    set; the appended Fortran also switches to eta = 1/(0.6 + 0.05 x/(ms)) (its Eq. 30). Wall model: zero wall
+    thickness, no axial conduction. Inputs echo the Lefebvre worked example (gas 2280 K, coolant 880 K, gas
+    Mach 0.6). Results: wall temperature against the film split of the total cooling flow; no film (all
+    convection) cannot control the blade temperature, and below ~25% in convection the design nears the
+    convection limit (thermal effectiveness eta_conv, Esgar et al. TN D-5992). Coolit''s own cooling-
+    effectiveness curve (its Eq. 1) is a curve fit to Livingood et al. TM X-2384 Fig. 23 (a full-coverage
+    film-cooled vane).'
+  status: screened
+  verdict: 'Screened 2026-11-02. All its correlations are secondary: it reprints the Lefebvre book (its ref. 4,
+    Gas Turbine Combustion, 1983, Ch. 8). Its 0.069 agrees with the book and with Seban Eq. 13 x Pr 0.69 (see
+    the Seban 1960 entry) -- a third copy, not independent evidence. No data. Value: context for cycle-level
+    turbine cooling-flow estimation, a possible future link to TurbomachineElement (#893). Not a closure
+    source.'
+  read_for: ['#793 / #714 slot-film set as used by NASA (secondary)', 'cycle-level turbine cooling flow (Coolit)
+      context']
+  issues: [714]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ (from the user); NTRS 20150011643, open access. Leads (free on NTRS,
+    noted, not wanted unless an issue needs them): Gauntner 1980 NASA TM-81453 (the Coolit algorithm); Esgar,
+    Colladay & Kaufman 1970 NASA TN D-5992 (turbine air-cooling capabilities and limits).'
 - file: sources/heat_transfer/film/Wambersie_Ireland_2023_ETC2023-295_transpiration_film_correlations.pdf
   citation: Wambersie, A., Ireland, P. T. (2023). Transpiration cooling film effectiveness correlations for turbine
     blade applications. Proc. 15th European Turbomachinery Conference, ETC2023-295, Budapest.
@@ -767,6 +887,133 @@ documents:
   records: []
   notes: Fetched 2026-11-02 from Oxford ORA (uuid:4a84aefb-dfa5-4994-ae6e-fa3ebd544af4); the MDPI PDF URL
     returned 403 to an automated fetch. Extended version of an ETC 2021 paper.
+- file: sources/heat_transfer/film/Choe_Kays_Moffat_1976_NASA_CR-2642_full_coverage_normal_injection.pdf
+  citation: Choe, H., Kays, W. M., Moffat, R. J. (1976). Turbulent boundary layer on a full-coverage film-cooled
+    surface -- an experimental heat transfer study with normal injection. NASA CR-2642 (Stanford Report HMT-22),
+    January 1976, NAS 3-14336.
+  id: NASA CR-2642
+  topic: [film, effusion]
+  content: 'Scan, 298 pp. (296 per the report form); the text layer is garbled, the page images read cleanly.
+    Full-coverage film cooling with NORMAL (90 deg) injection: staggered holes D = 1.03 cm (0.406 in.), P/D 5
+    and 10 (10 by plugging), 11 blown rows on plates 2-12 of a 36-plate copper test surface (plates 13-36 the
+    recovery region), air, M 0.1-1.0, Re_x 1.7e5-5e6, U_inf 9.1-33.5 m/s (30-110 ft/s). Data at theta = 0 and
+    theta = 1 (injectant at mainstream and at wall temperature), combined by linear superposition, h on the
+    mainstream-to-wall difference. Appendix A (from PDF p. 165; nomenclature p. 153) TABULATES run by run and
+    plate by plate: REXCOL/REXHOT, Re_Delta2, St(theta=0), St(theta=1), ETA = 1 - St(theta=1)/St(theta=0) (the
+    superposition effectiveness), STCR = St(theta=0)/St_o and STHR = St(theta=1)/St_o (the St/St0 ratios,
+    St_o the unblown flat-plate reference), F-COL / F-HOT (blowing fraction F) and PHI-1, plus velocity and
+    temperature profiles at the start of blowing. Example (runs 073073/070573, U ~53 ft/s, F ~0.003): ETA
+    0.20-0.36 over plates 2-12, STCR 0.90-1.14 in the blown region. Chapter V: a 2-D boundary-layer prediction
+    with jet penetration and augmented mixing.'
+  status: screened
+  verdict: 'Screened 2026-11-02 (lead''s screening, columns confirmed on pp. 153/158). Uses: (a) STCR =
+    St(theta=0)/St_o is a measured gas-side augmentation of a multi-row array relative to the unblown plate --
+    the quantity EffusionPlateElement leaves to the user (`gas_augmentation`, #476); (b) ETA over 11 rows is
+    multi-row effectiveness data bearing on the Sellers vs Kirollos-Povey superposition question (#387). NOT
+    combustor-like: normal 90 deg holes, DR ~1, low speed; for combustor liners the 30 deg slant data of CR-2648
+    / CR-2786 (own entries) are the relevant set, and a cross-source accuracy use must say so. The tables are
+    typed computer output in a scan: transcription needs page-image reading (the text layer is unusable).
+    Not checked: Chapter V prediction constants; the velocity/temperature profile tables.'
+  read_for: ['#476 effusion gas-side augmentation (St/St0 measured)', '#387 multi-row superposition (11 rows)']
+  issues: [387, 476]
+  records: []
+  notes: 'Supplied by the lead 2026-11-02 (NTRS, open access). The NAS 3-14336 series: CR-2642 (this), CR-2648
+    (summary, normal + 30 deg slant), CR-2786 (30 deg slant), CR-3103 (compound angle, Kim et al. 1979, not
+    held), CR-3104 (Yavuzkurt et al. 1979, hydrodynamics, not held), CR-3219 (1980 summary).'
+- file: sources/heat_transfer/film/Crawford_Choe_Kays_Moffat_1976_NASA_CR-2648_full_coverage_normal_and_30deg_slant_summary.pdf
+  citation: Crawford, M. E., Choe, H., Kays, W. M., Moffat, R. J. (1976). Full-coverage film cooling heat transfer
+    study -- summary of data for normal-hole injection and 30 deg slant-hole injection. NASA CR-2648 (Stanford
+    Report HMT-19), March 1976, NAS 3-14336.
+  id: NASA CR-2648 (NTRS 19760011294)
+  topic: [film, effusion]
+  content: 'Scan with a usable text layer, 146 pp. (145 per the form). Two test sections, 11 staggered rows of D =
+    1.03 cm holes at P/D 5 (and 10 by plugging): NORMAL holes and holes SLANTED 30 deg to the surface in the
+    downstream direction. M 0 to 1.3; initial Re_delta2 500-5000, Re_Delta2 100-1800; Re_D 6000-22,000; initial
+    boundary layer 0.5-2.0 D; U_inf 9-33 m/s (slant series mostly 16.8 m/s, thin-boundary-layer runs 11.7 m/s);
+    air, theta = 0 and theta = 1 with superposition, unheated or heated starting length. Figs. 8-49 plot St vs
+    Re_x and Re_Delta2; the Appendix TABULATES every run in the CR-2642 format (St(theta=0), St(theta=1), ETA,
+    STCR, STHR, F-COL/F-HOT, LOGB, plates 1-36), with St_o = 0.0295 Pr^-0.4 Re_x^-0.2 [1 - (xi/(x -
+    x_vo))^0.9]^(-1/9) printed under each table. Example, slant P/D 5, M 0.4 (runs 080174, p. 120): ETA rises
+    to 0.58-0.60 by the last blown rows with STCR 0.83-1.04; M 0.6 (p. 121): ETA ~0.55, STCR up to 1.16.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The summary data report of the Stanford programme, and the first source of the
+    30 deg SLANT-hole data, the most combustor-relevant of the series (combustor effusion is ~20-30 deg).
+    Findings as printed: slant injection gives a considerably lower St than normal injection; with injectant
+    at wall temperature (theta = 1) M ~0.4 gives the minimum St throughout the blown region (M 0.18 over the
+    first three plates), M ~1.2 raises St above the unblown curve; P/D 10 strongly reduces the film-cooling
+    effect for both geometries. Uses as for CR-2642 -- STCR as measured gas-side augmentation (#476), ETA over
+    11 rows for the superposition question (#387) -- now at 30 deg; still DR ~1, low Tu, low speed, P/D 5/10
+    (combustor effusion is often P/D 5-8), so cross-source accuracy only, labelled so. Tabulated: no digitising.'
+  read_for: ['#476 effusion gas-side augmentation (30 deg slant, tabulated)', '#387 multi-row effectiveness and
+      superposition']
+  issues: [387, 476]
+  records: []
+  notes: 'Fetched 2026-11-02 by the lead from NTRS (19760011294, open access, authorised by the user). A
+    duplicate copy from the user was removed. Not checked: the run-by-run table transcription (typed scan).'
+- file: sources/heat_transfer/film/Crawford_Kays_Moffat_1976_NASA_CR-2786_full_coverage_30deg_slant_injection.pdf
+  citation: Crawford, M. E., Kays, W. M., Moffat, R. J. (1976). Heat transfer to a full-coverage film-cooled
+    surface with 30 deg slant-hole injection. NASA CR-2786 (Stanford Report HMT-25), December 1976, NAS 3-14336.
+  id: NASA CR-2786 (NTRS 19770008401)
+  topic: [film, effusion]
+  content: 'Scan with a usable text layer, 247 pp. (245 per the form); printed page = PDF page - 16. The full
+    report behind the slant-hole data summarised in CR-2648: staggered holes inclined 30 deg downstream, P/D 5 and
+    10, injection mass flux ratio 0.1-1.3, Re_x 1.5e5-5e6, U_inf 9.8-34.2 m/s (32-112 ft/s), air, theta = 0
+    and theta = 1 with superposition. Ch. 3: St data vs blowing ratio, initial momentum/enthalpy thickness,
+    mainstream velocity and P/D; spanwise velocity and temperature profiles. Ch. 4: correlation of the theta =
+    1 data with the Couette-flow variables used for transpiration cooling (Sec. 4.2) and a differential
+    prediction model (2-D boundary layer, injection at each row, mixing length augmented and keyed to a jet
+    penetration distance). Appendix I (printed pp. 112-180) TABULATES every run in the CR-2642 format (St at
+    theta = 0 and 1, ETA, STCR, STHR, F) with the initial profiles; App. II spanwise profiles; App. IV-V initial
+    rows and an asymptotic St / jet coalescence; App. VI shear-stress and mixing-length profiles.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The primary for the Stanford 30 deg slant-hole set, the most combustor-relevant
+    geometry of the programme. Findings as printed (Ch. 5): with injectant at plate temperature the lowest St is
+    at a blowing ratio of about 0.4; higher ratios raise it, and above ~1.5 St could exceed the unblown value;
+    upstream-condition effects are confined to the first rows; P/D 10 gives less effect at equal blowing ratio;
+    in the recovery region (60 D past the last row) low ratios recover toward unblown St at once while high
+    ratios stay flat or keep falling. Uses as for CR-2642/CR-2648: STCR = St(theta=0)/St_o as measured gas-side
+    augmentation (#476) and ETA over 11 rows for superposition (#387), tabulated, no digitising. Caveats: DR ~1,
+    low mainstream Tu, low speed, so cross-source accuracy only. The prediction model''s augmentation constants
+    are fitted to these data (tuning).'
+  read_for: ['#476 effusion gas-side augmentation (30 deg slant, tabulated)', '#387 multi-row effectiveness and
+      superposition']
+  issues: [387, 476]
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (19770008401, open access, authorised by the user). Two earlier downloads
+    were truncated (HTTP/2 stream reset at ~4-5 MB, no byte-range resume); a fresh `curl --http1.1` fetch got the
+    full 14,299,063 bytes in under a minute. Not checked: the Ch. 4 Couette-flow correlation constants and the
+    Appendix I transcription.'
+- file: sources/heat_transfer/film/Crawford_Kays_Moffat_1980_NASA_CR-3219_full_coverage_three_geometries_STANCOOL.pdf
+  citation: Crawford, M. E., Kays, W. M., Moffat, R. J. (1980). Full-coverage film cooling on flat, isothermal
+    surfaces -- a summary report on data and predictions. NASA CR-3219 (Stanford Report HMT-23), January 1980,
+    NAS 3-14336.
+  id: NASA CR-3219 (NTRS 19800007104)
+  topic: [film, effusion]
+  content: 'Scan with a usable text layer, 117 pp. Summary of the 1971-1977 Stanford programme over THREE
+    geometries, all 11 rows, P/D 5 (and 10): normal (90 deg), slant (30 deg downstream) and compound angle (30
+    deg slant skewed 45 deg). Ch. III: St vs M after rows 3, 6 and 10 for all three (Figs. 3-4, plotted;
+    theta = 0 and 1, theta = 1.5 by superposition Eq. 3), initial conditions, number of rows (6 vs 11, slant),
+    hole spacing. Ch. IV: local (spanwise-resolved) heat flux for slant injection. Ch. V: STANCOOL, the STAN5
+    boundary-layer code with an injection model (DELMR) and a turbulence-augmentation mixing-length model
+    (ALAM) whose constants are fitted per heated-starting-length P/D 5 data set (Figs. 14+). Appendix B
+    TABULATES previously unreported slant data: 11 rows blowing at M 0.20, 0.6, 0.75, 0.90 and 1.33, and 6 rows
+    at M 0.4 and 0.9, each theta = 1, theta = 0 and the superposed table.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The programme summary: as printed, normal injection gives the highest St, both
+    angled geometries show a St minimum near M 0.4-0.5, at row 3 high blowing can push St above the unblown
+    value even at theta = 1, and past the initial region compound-angle injection gives the lowest St (near
+    zero surface heat flux at row 10 for M 0.4-0.6); 11 rows protect far longer downstream than 6; P/D 10 gives
+    much less protection. Its Appendix B extends the CR-2648/CR-2786 slant set (tabulated, adds M 0.75 and
+    1.33 and a 6-row case), the most useful part for #476/#387 cross-source checks. STANCOOL constants are fitted
+    per data set: tuning, not a closure for combaero. Same DR ~1 / low-speed caveats as CR-2648.'
+  read_for: ['#476 effusion gas-side augmentation (slant, compound, tabulated)', '#387 multi-row effectiveness;
+      row-count effect']
+  issues: [387, 476]
+  records: []
+  notes: 'Fetched 2026-11-02 from NTRS (19800007104, open access, authorised by the user). Leads in its
+    references, not held: Kim et al. 1979 NASA CR-3103 (compound angle, HMT-28); Yavuzkurt et al. 1979 NASA
+    CR-3104 (turbulence structure, HMT-27); Crawford & Kays 1976 NASA CR-2742 (STAN5). Not checked: the Ch. IV
+    local data and the STANCOOL constants table.'
 - file: sources/heat_transfer/film/Kirollos_Povey_2015_JEGTP_137_122608_energy_based_film_superposition.pdf
   citation: Kirollos, B., Povey, T. (2015). An energy-based method for predicting the additive effect of multiple
     film cooling rows. ASME J. Eng. Gas Turbines Power 137(12), 122608.
@@ -2841,7 +3088,9 @@ documents:
     Lefebvre exposes: gas radiation with luminosity (primary Lefebvre-Herbert 1960, wanted); plunged-hole
     Cd and Kaddah''s Cd(K, alpha) for liner holes (secondary, primaries are Cranfield MSc theses; NACA TN
     3663, now registered, instead); thick-lip and high-M slot film plus film-side Nu (primary Ballal-Lefebvre 1972,
-    held since 2026-11-02 as Cranfield SME Report 4, which prints 0.090 where Eq. 8.41 prints 0.069, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
+    held since 2026-11-02 as Cranfield SME Report 4, which prints 0.090 where Eq. 8.41 prints 0.069; Seban 1960,
+    held, Eq. 13 x Pr 0.69 gives 0.069, so Eq. 8.41 is the faithful conversion and the report''s 0.090 a probable
+    error, #714); pattern factor Eqs. 4.30/4.31 (Lefebvre primary, no combaero counterpart); jet
     penetration (secondary, Holdeman already registered is the better source). LinearThetaHeadLoss in
     network/pressure_loss.py is Eqs. 4.8-4.10 in form (k = 1 is Eq. 4.9''s low-Mach constant-area value)
     but cites no source. Book errata found while reproducing: Eq. 8.29 prints C2 = 291(Tw2 - 880) for
@@ -3175,24 +3424,6 @@ documents:
   issues: [793]
   records: []
   notes: Arrived 2026-10-27 as docs/new/CONV14_1D-HT-GTCC-r1.pdf. A second copy arrived 2026-11-02 (next entry).
-- file: sources/combustor_network/topal2014_CONV14_1D_heat_transfer_combustor_2016_copy.pdf
-  citation: 'Topal, A., Catori, C., Cagan, L., Uslu, S., Turan, O., Piskin, A. (2014). One-dimensional heat
-    transfer analysis and experimental investigation of a gas turbine combustor. CONV-14 Int. Symp. on
-    Convective Heat and Mass Transfer, Turkey, paper CONV-14-123 (a 2016 re-export of the same paper).'
-  id: CONV-14-123 (second copy)
-  topic: [combustion]
-  content: 'The same 15-page paper as the previous entry: the text layers are identical word for word (4418
-    words); the only differences are the PDF producer and date (2016-08-16 against 2014-09-26) and figure
-    layout on pages 9-13 (text-layer line positions); the figures and equations of this copy (pp. 4-6, 10, 12,
-    13 viewed) are the same as the held copy''s. Not compared pixel by pixel.'
-  status: screened
-  verdict: 'Duplicate; adds nothing. All findings are recorded on topal2014_CONV14_1D_heat_transfer_combustor.pdf
-    (re-screened 2026-11-02 when this copy arrived). Candidate for deletion (kept pending the user''s decision).'
-  read_for: ['#793 worked example candidate (duplicate)']
-  issues: [793]
-  records: []
-  notes: Arrived 2026-11-02 in sources/new/ (from the user) as One_Dimensional_Heat_Transfer_Analysis_a.pdf,
-    presented as new.
 - file: sources/combustor_network/gouws2006_SAJS_combustor_network_solver.pdf
   citation: 'Gouws, J. J., Morris, R. M., Visser, J. A. (2006). Modelling of a gas turbine combustor using
     a network solver. S. Afr. J. Science 102, 533-536 (with online supplementary Tables 2-4).'
@@ -3958,7 +4189,10 @@ documents:
     14% more at 260-580 C (about -2 of its bands) and 25% more at 620-700 C, where its specific heat steps
     up (aging). The gap is the diffusivity (Gen3 22-40% above the alpha implied by Table 3 with Table 2''s
     cp and density), not the specific heat (Gen3 3-15% lower). Kept: condition stated here (annealed),
-    not by Gen3; an independent third source is still wanted (Touloukian Vol. 1). ORNL/TM-9616 reprints these
+    not by Gen3. Independent measurements as of 2026-11-02: Gen3 CSP highest; Du et al. 2025 (held, binder-jet
+    AM, laser flash) intermediate, alpha +7% at 500 C and +14% at 700 C over the Battelle-implied value; Maglic
+    et al. 1994 (wanted) as plotted by Du lies 4-9% above Battelle at 200-600 C. Shipped data unchanged; Maglic
+    1994 is the wanted tie-breaker, Touloukian Vol. 1 a second. ORNL/TM-9616 reprints these
     BMI values above 117 K, and the Haynes 625 brochure (held since 2026-11-02, next entry) prints the same
     customary k and cp columns, so neither is independent.'
   read_for: ['liner / duct / bellows alloy conductivity', '#881 built-in materials vs Gen3 CSP']
@@ -3990,8 +4224,11 @@ documents:
     at 800-1000 C, while Gen3 cp is 5-15% below the brochure -- the same diffusivity-driven gap already
     recorded, so Gen3 sits 16-17% above this k at 300-500 C (-1.6 to -2.0 of its 95% bands), 25-33% at
     600-700 C (-2.1 to -2.5 bands) and 10% at 1000 C (-0.6 band). Supports the shipped (Special Metals) side
-    only in the sense that a second manufacturer reprints it; the dispute stays open until an independent
-    measurement (Touloukian/TPRC recommended curve, wanted) is held. Shipped material data unchanged.'
+    only in the sense that a second manufacturer reprints it. Independent measurements since held or located
+    (2026-11-02): Du et al. 2025 (held, AM laser flash) alpha 7% above this brochure''s implied alpha at 500 C
+    and 14% at 700 C, between this table and Gen3 CSP; Maglic et al. 1994 (wanted) plotted by Du 4-9% above
+    it at 200-600 C. The dispute narrows but stays open until Maglic 1994 (or Touloukian/TPRC) is read.
+    Shipped material data unchanged.'
   read_for: ['#881 third Inconel 625 conductivity (Special Metals vs Gen3 CSP)', '#882 solidus cap']
   issues: [881, 882]
   records: []
@@ -3999,6 +4236,41 @@ documents:
     Melting range 1288-1349 C is the Special Metals 2350-2460 F converted (Special Metals rounds to 1290-1350 C).
     Not checked: the mechanical, corrosion and fabrication sections; the expansion and modulus columns against
     Special Metals Table 3/4.'
+- file: sources/materials/Du_2025_MaterDes_251_113333_binder_jet_IN625_LFA.pdf
+  citation: Du, W., Hayes, J., Myers, A., Barua, B., Yu, X., Singh, D. (2025). Development of a high-temperature
+    Inconel 625 heat exchanger by model design and binder jetting additive manufacturing. Materials & Design 251,
+    113333.
+  topic: [other]
+  content: 'Open access (CC BY-NC), 15 pp. Binder-jet Inconel 625, sintered at 1305 C to 8.40 g/cm3 (99.5% of
+    8.44; Table 3). Laser-flash diffusivity (TA DXF 900, flowing N2) of sintered disks at 25/250/500/700 C:
+    2.72 +- 0.01, ~3.35, ~4.07 and 4.63 +- 0.05 mm2/s (25 and 700 C printed in the text; 250 and 500 C read
+    from Fig. 11 p. 9, where those points sit at about 240 and 495 C). k = alpha rho cp gives 9.4 +- 0.02 W/m K
+    at 25 C to 22.5 +- 0.22 at 700 C, with cp BORROWED from High Temp Metals tech data (ref. 27) and the
+    measured density, so only alpha is independent. Fig. 11 also plots literature k: High Temp Metals (ref.
+    27), Special Metals (ref. 35, the Battelle data) and Maglic, Perovic & Stanimirovic 1994 (ref. 34). Rest of
+    the paper: powder, binder, printing and sintering, a sCO2 / molten-salt channel model (MOOSE) and a
+    printed prototype HX test.'
+  status: screened
+  verdict: 'Screened 2026-11-02 for #881 (Inconel 625 conductivity, Special Metals/Battelle vs Gen3 CSP). An
+    INDEPENDENT diffusivity measurement, on additively made material. Against the shipped k_inconel625 data
+    (Special Metals Table 3, Battelle, as reprinted by Haynes): alpha_Battelle = k/(rho cp), rho 8440, is 2.83 /
+    3.36 / 3.80 / 4.07 mm2/s at 25 / 250 / 500 / 700 C, so measured/Battelle = 0.96 / 1.00 / 1.07 / 1.14. The
+    measurement rises above Battelle from 500 C, the same direction as Gen3 CSP (+25-33% in k at 600-700 C,
+    diffusivity-driven) but about half the size. Maglic 1994 as plotted in Fig. 11 (read from the 500-dpi page
+    image, triangles): about 13.0 / 14.5 / 16.2 / 17.8 / 19.9 W/m K at 200 / 300 / 400 / 500 / 600 C, i.e. 4-9%
+    above Battelle (12.5 / 13.9 / 15.3 / 16.9 / 18.3) and on this paper''s own k line (which uses the High
+    Temp Metals cp), not on the Battelle points (Special Metals diamonds 16.8 at 500 C, 19.9 at 700 C).
+    Caveats: AM microstructure (residual porosity of ~0.5% would LOWER k, so the excess is not a porosity
+    artefact), only 4 temperatures, cp not measured. Ordering of the independent measurements: Gen3 CSP
+    highest, this paper intermediate (+14% in alpha at 700 C), Maglic 1994 as plotted slightly above Battelle
+    (a direct read of Maglic is wanted). Shipped material data unchanged: the dispute narrows (two independent
+    sets above Battelle at 500-700 C, by 7-14% and 25-33%) but no single replacement is better sourced.'
+  read_for: ['#881 independent Inconel 625 diffusivity / conductivity (third source)']
+  issues: [881]
+  records: []
+  notes: 'Supplied by the user 2026-11-02. Leads: Maglic, Perovic & Stanimirovic 1994 (Int. J. Thermophys. 15,
+    741-755; wanted, the tie-breaker); High Temp Metals tech data (vendor web page, ref. 27; its k points in
+    Fig. 11 lie above Battelle from ~300 C, provenance unstated). Not checked: the HX model and test sections.'
 
 - file: sources/materials/special_metals_nimonic_75_SMC-058.pdf
   citation: Special Metals Corporation. NIMONIC alloy 75, publication SMC-058 (2004).
@@ -4464,8 +4736,9 @@ documents:
     point. #881: k_stainless_steel_316 and k_stainless_steel_310 are its SS316 and SS310 tables (xlsx means,
     0.01 W/m K), valid over the measured range only; checked haynes230 (shipped column 1.7-2.8 bands high,
     replaced by the brochure''s alpha cp rho, inside the band) and inconel625 (about -2 bands, kept; the Haynes
-    625 brochure, held since 2026-11-02, reprints the shipped Battelle data and prints no diffusivity, so an
-    independent third source is still wanted).'
+    625 brochure, held since 2026-11-02, reprints the shipped Battelle data and prints no diffusivity; the
+    independent Du et al. 2025, held, measures alpha between Battelle and Gen3 -- +7% at 500 C, +14% at 700 C
+    over Battelle -- and Maglic 1994, wanted, is the tie-breaker).'
   read_for: ['#881 built-in materials vs Gen3 CSP', 310 SS conductivity for the C3X example]
   issues: [881, 882]
   records: [python/tests/test_materials.py]
@@ -4539,6 +4812,240 @@ documents:
   records: [python/tests/test_materials.py]
   code: [src/materials.cpp, include/materials.h]
   notes: Fetched from specialmetals.com 2026-10-31 (public technical bulletin).
+- file: sources/radiation/Rudey_Graham_1984_NASA-TM-83341_combustor_turbine_heat_transfer_review.pdf
+  citation: 'Rudey, R. A., Graham, R. W. (1984). A review of NASA combustor and turbine heat transfer research.
+    NASA TM-83341, prepared for the 29th ASME International Gas Turbine Conference, Amsterdam, 3-7 June 1984.'
+  id: NASA-TM-83341 (NTRS 19840006078, N84-14146)
+  topic: [radiation, combustion, review]
+  content: 'Open access (NTRS), 26 pp., CASI scan with a usable text layer. Programme review of NASA Lewis/HOST
+    hot-section heat transfer. Combustor part (pp. 3-5): the two factors that set liner heat load are inlet
+    pressure and flame luminosity. Fig. 4(a) CALCULATED liner heat loads (radiation, convection, net) for Jet A
+    and a low-hydrogen fuel against P3 0-20 MPa (radiation to ~23 W/cm2 at 20 MPa); Fig. 4(b) h against
+    pressure 0.3-1.5 MPa, points and an "estimated" line. Fig. 5 (from Humenik, Claus & Neely, NASA TM-83436)
+    MEASURED vs PREDICTED radiant heat flux at three axial stations (primary, secondary, tertiary) of a
+    tubular-can combustor at idle (F/A 0.007, T3 400 K, P3 269 kPa), cruise (0.014, 620 K, 700 kPa) and take-off
+    (0.018, 715 K, 1740 kPa); measured roughly 5, 45/40/20 and 80/75/20 W/cm2 (read from the plot, not
+    digitised); the predictions (Srivatsa, NASA CR-167930) are up to two-fold high in the secondary zone. Text:
+    spectral radiometry shows soot dominates radiant energy, and a fuel ~2 percentage points lower in H content
+    than Jet A gives markedly higher flame temperature and radiance. Fig. 9: a GE contract rig for liner cooling
+    concepts x flame radiation (data base planned, no report number given). Turbine part not relevant here.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Secondary; no closure. Its value is the pointer: the measured tubular-can
+    radiation and liner data it summarises are NASA TM-83436 (Humenik, Claus & Neely 1983) and NASA TM-83538 /
+    AIAA 84-0443 (Claus, Neely & Humenik), both public on NTRS -- 0.34-2.07 MPa, 533-700 K, F/A 0.008-0.021,
+    Jet A (13.9% H) and ERBS (12.9% H), total and spectral radiometers at three stations plus liner
+    temperatures. That pair is the best candidate seen so far to FALSIFY a combaero luminous-radiation model
+    (measured radiant flux against pressure and fuel H content; cross-source for Lefebvre''s L = 336/H^2).
+    Fig. 5 here is too coarse to score against (three stations, read by eye, no geometry). Not checked: the
+    turbine sections.'
+  read_for: ['#793 measured combustor radiant heat flux (validation candidate for a luminous gas-radiation model)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as 19840006078.pdf. Ref. 2 (AIAA 84-0443) and ref. 3 (TM-83436)
+    are the primaries; NTRS 19840005120 (TM-83538) and 19830020966 (TM-83436) have PDF downloads.
+- file: sources/radiation/Howell_Menguc_Daun_Siegel_2021_TRHT7_online_appendices.pdf
+  citation: 'Howell, J. R., Menguc, M. P., Daun, K., Siegel, R. (2021). On-line appendices to Thermal Radiation
+    Heat Transfer, 7th ed., Taylor and Francis / CRC Press (appendix file dated 2024-07-05).'
+  id: TRHT 7th ed. on-line appendices A-R
+  topic: [radiation, review]
+  content: 'Free on-line supplement to the textbook, 200 pp., Word text layer. Relevant parts. App. B (pp. B.1-B.16):
+    derivation of geometric mean beam lengths (hemisphere, cylinder top/side to base centre, sphere, parallel
+    plates, rectangles; Tables B.1/B.2 Dunkle 1964 beam-length ratios), and Example B.2 using the usual Le =
+    0.9 x 4V/A. App. F (pp. F.1-F.13): Alberti, Weber & Mancini 2018 HITEMP-2010 emittance charts for H2O, CO2
+    and CO with pressure and overlap corrections, 300-3000 K and 0.1-100 atm; mixture eps = eps_H2O + eps_CO2 +
+    eps_CO - overlaps (Eq. F.1); equivalent pressures P_E,H2O = P (1 + 5.00 x_H2O), P_E,CO2 = P (1 + 0.28
+    x_CO2) (Eq. F.2); said to be within 1% of LBL; Example F.1 (Le 2.4 m) gives 0.401. App. K (pp. K.1-K.4):
+    flame radiation, mostly qualitative; Example K.1 (ethane, 100% excess air, 1853 K, 1 atm, 4 m x 2 m
+    cylinder, Le = 0.9 x 4V/A = 1.44 m, eps_g 0.1451, Q 3050 kW); Table K.1 adiabatic flame temperatures; cites
+    Lefebvre 1984 IJHMT and Taylor & Foster 1974 for luminous flames. App. H: RTE benchmark tables (cube,
+    cylinder). App. A: Edwards wide-band model. Main-text equations (Ch. 9 gas properties, Eq. 11.104 Le) are
+    referenced but not in this file.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background and a strong lead, no closure of its own. Mean beam length: the
+    appendix derives the geometric factors; the engineering value combaero needs (Le = 0.9 x 4V/A, i.e. 3.6
+    V/A, against Lefebvre Eq. 8.10''s 3.4 V/A after Fishenden & Saunders) is the textbook''s, so either value is
+    sourced; the 6% difference is a model choice to state. App. F names the pressure-capable, closed-form
+    alternative to Bordbar 2021 that is NOT under a non-commercial licence as far as seen: Alberti, Weber &
+    Mancini 2018/2020 (JQSRT 219, 274-291; JQSRT 255, 107227) curve fits to 100 atm, with a public
+    spreadsheet -- wanted. The charts themselves are not digitised and should not be (curve fits exist).
+    Example K.1 is a one-number check of a gas-emissivity kernel (accuracy, not fidelity: Alberti spreadsheet
+    vs whatever combaero implements). Not checked: Apps. C-E, G, I, J, L-R.'
+  read_for: ['#793 mean beam length', '#793 non-luminous emissivity at pressure (lead to Alberti et al.)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as "On-line appxs 7th ed 7-5-2024.pdf". Copyrighted
+    though freely posted; keep in sources/ only.
+- file: sources/radiation/Liu_et_al_2020_Fuel_281_118555_radiation_turbulent_flames_review.pdf
+  citation: 'Liu, F., Consalvi, J.-L., Coelho, P. J., Andre, F., Gu, M., Solovjov, V., Webb, B. W. (2020). The
+    impact of radiative heat transfer in combustion processes and its modeling -- with a focus on turbulent
+    flames. Fuel 281, 118555.'
+  id: doi:10.1016/j.fuel.2020.118555 (HAL hal-02986492, author manuscript)
+  topic: [radiation, combustion, review]
+  content: 'Open access author manuscript (HAL), 59 pp. Review of gas and soot radiative properties (LBL, SNB,
+    WSGG, SLW, FSCK; WSGG called the most used but the least accurate, with recent HITEMP refits), RTE solvers,
+    turbulence-radiation interaction, and applications. Soot absorption coefficient in the Rayleigh limit
+    kappa_s = 6 pi E(m) f_s / lambda (Eqs. 26-28), proportional to soot volume fraction, uncertainty dominated by
+    E(m). Section 7.3 combustors: LES with radiation and wall conduction (Berger et al. 2016 helicopter
+    combustor vs thermocolour paint; Koren et al. confined premixed swirl flame wall temperature). No
+    coefficient tables for a total-emissivity model; no pressure-dependent closure printed.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background only: an authoritative map of which gas-property models exist and
+    their accuracy ranking, useful to justify choosing a WSGG/total-emissivity kernel for a 0-D/1-D network
+    (combaero cannot use SLW/FSCK without an RTE solver). The soot relation is only useful if combaero ever
+    carries a soot volume fraction, which it does not; Lefebvre''s luminosity factor remains the practical
+    luminous term. Pointer: Berger et al. 2016 (Appl. Therm. Eng. 103, 1450-1459) measured helicopter-combustor
+    wall temperature by thermocolour -- geometry probably proprietary (not checked).'
+  read_for: ['#793 choice of gas-radiation model class', soot absorption coefficient]
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as JFUE2020_FinalVersion.pdf.
+- file: sources/radiation/Fu_et_al_2026_ATE_307_133288_ammonia_flame_radiation_review.pdf
+  citation: 'Fu, Z., Davies, J., Mashruk, S., Alnajideen, M., Xiao, H., Valera-Medina, A. (2026). Combustion
+    radiation in ammonia-based fuels: progress and challenges. Applied Thermal Engineering 307, 133288.'
+  id: doi:10.1016/j.applthermaleng.2026.133288
+  topic: [radiation, combustion, review]
+  content: 'Open access (CC BY 4.0), 22 pp. Review of radiation from NH3, NH3/H2, cracked NH3, NH3/hydrocarbon and
+    NH3/solid-fuel flames: pure NH3 and NH3/H2 flames radiate mainly from H2O (no CO2, no soot), with minor NH3
+    and NO bands; hydrocarbon blending restores CO2 and possibly soot. Tables 1-6 compare fuel properties,
+    literature coverage, measured radiative heat-flux trends and model applicability (optically thin, WSGG, SNB,
+    FSCK, LBL). States that conventional WSGG fits are made for H2O/CO2 mixtures and may be unreliable for
+    NH3-rich flames, and that elevated-pressure radiation data for ammonia are scarce. Mostly furnace and
+    burner scale at about 1 atm.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background for the carbon-free limit of a combaero emissivity kernel: combaero''s
+    species set includes NH3 and H2, and their products have Mr = H2O/CO2 -> infinity, outside Bordbar 2014/2021
+    (Mr 0.1-4). A kernel must therefore either cap Mr with a stated refusal or carry a pure-H2O set (Alberti et al.
+    handle single gases; Bordbar-type pure-H2O WSGG sets exist but are not held). No closure or validation case
+    here (no gas-turbine-pressure data). Not checked: the individual cited heat-flux studies.'
+  read_for: ['#793 gas emissivity for H2- and NH3-fired products (Mr outside 0.1-4)']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as 1-s2.0-S1359431126035969-main.pdf.
+- file: sources/radiation/Geigle_et_al_2015_PCI_35_3373_soot_pressurized_swirl_flames.pdf
+  citation: 'Geigle, K. P., Koehler, M., O''Loughlin, W., Meier, W. (2015). Investigation of soot formation in
+    pressurized swirl flames by laser measurements of temperature, flame structures and soot concentrations.
+    Proc. Combust. Inst. 35, 3373-3380.'
+  id: doi:10.1016/j.proci.2014.05.135 (DLR author manuscript)
+  topic: [radiation, combustion]
+  content: 'Author manuscript, 23 pp. DLR sooting gas-turbine model combustor: C2H4/air, radial double swirler
+    (central 8 channels S 0.82, ring 12 channels S 0.79), 68 x 68 mm chamber 120 mm high with quartz windows
+    (inner surface estimated 500-900 C), four 5 mm secondary-air jets at h = 80 mm. Table 1: p 3 bar, phi 1.2,
+    32.2 kW, no oxidation air; 3 bar and 5 bar with oxidation air 0.4 x Qair (phi_global 0.86, 38.6 / 64.4 kW).
+    CARS temperature pdfs, OH-PLIF, LII soot volume fraction (calibration in Geigle et al. 2011), plotted only.
+    No wall heat flux, no wall or liner temperature, no radiometry.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Background: shows where and how much soot forms in a rich-primary/oxidation-air
+    aero-type flame at 3-5 bar (the regime that makes Lefebvre''s luminosity factor matter), but gives nothing a
+    0-D/1-D model consumes -- combaero does not predict soot volume fraction, and the flame has no radiant-flux
+    or wall measurement to score a luminous term against. Kept only as the reference soot data set for gaseous
+    fuel at pressure if a soot-based luminous term is ever considered.'
+  read_for: ['#793 luminous radiation: soot levels in a pressurised gas-turbine model combustor']
+  issues: [793]
+  records: []
+  notes: Arrived 2026-11-02 in sources/new/radiation/ as 2015_geigle_pci_final_author.pdf.
+- file: sources/radiation/Humenik_Claus_Neely_1983_NASA_TM-83436_tubular_can_flame_radiation.pdf
+  citation: 'Humenik, F. M., Claus, R. W., Neely, G. M. (1983). Parametric study of flame radiation
+    characteristics of a tubular-can combustor. NASA TM-83436, prepared for the ASME Joint Power Generation
+    Conference, Indianapolis, 25-29 September 1983 (ASME 83-JPGC-GT-11).'
+  id: NASA-TM-83436 (NTRS 19830020966, N83-29237)
+  topic: [radiation, film]
+  content: 'Open access (NTRS), 12 pp., CASI scan; text layer unusable, read from page images. NASA Lewis rig:
+    one P&W JT8D tubular can in a 25.4 cm (10 in) nominal pipe housing (facility 25 atm, 870 K, 10 kg/s). NO
+    liner geometry: no liner diameter or length, no louver/slot/hole dimensions or open areas, no annulus
+    gap, no air split, no pressure drop. Printed stations only (Fig. 4): Gardon-type water-cooled, N2-purged
+    total radiant heat flux gauges (stem through an air hole to the liner inner surface) at x = 12.7 / 18.5 /
+    28.7 cm, theta 32 / 0 / 0 deg (zones 1-3 = primary, secondary, tertiary); spectral radiometer windows
+    (sapphire, InSb detector, 1.5-5.5 um, one scanning head moved between ports) at x = 7.4 / 22.1 / 34.0 cm,
+    theta 300 deg. Liner: 24 Chromel-Alumel thermocouples, 4 on the dome, the rest two per cooling louver on
+    opposite sides, on the OUTSIDE (annulus side) of each louver (implies 10 louvers; not dimensioned).
+    Table I: P3 0.34 / 0.69 / 1.38 / 2.07 MPa at T3 533 K (1.69 / 3.37 / 6.75 / 10.12 kg/s); 0.69 / 1.38 /
+    2.07 MPa at 616 K (3.14 / 6.28 / 9.42); 0.69 / 2.07 MPa at 700 K (2.95 / 8.84); constant flow parameter
+    m sqrt(T3)/P3 ~ 113 kg K^0.5/(s MPa); f/a nominally 0.008-0.021 (sweep 0.0087-0.0212). Table II: Jet A H
+    13.9 mass %, aromatics 17.2 vol %, SG 0.8142, LHV 43304 J/g, S 0.020 %; ERBS H 12.9 %, aromatics 28.8 %,
+    SG 0.8381, LHV 42200 J/g, S 0.065 %; distillation, freezing point and viscosity also printed (C/H not
+    printed; 6.19 and 6.75 by difference). Data, all PLOTTED, none tabulated: Fig. 6 total radiant flux vs
+    f/a for two fuel nozzles (FN-1 standard, FN-2 substitute, both dual orifice), Jet A, 533 K, 0.69 and 2.07
+    MPa, 3 zones (FN-2 secondary zone 16 -> 80 W/cm2 over f/a 0.0089-0.0159 at 2.07 MPa); Fig. 7 spectral
+    radiance (W/cm2 sr um) 1.5-5.5 um, f/a 0.016, 533 K, Jet A vs ERBS, 0.34 and 0.69 MPa, 3 zones; Fig. 8
+    total flux vs P3 (f/a 0.016, FN-2, both fuels) at 533 K (Jet A zone 1/2/3 about 16/16/7 W/cm2 at 0.34 MPa
+    to 66/78/29 at 2.07 MPa) and 616 K; Fig. 9 total flux and liner (T_local - T3) per zone, f/a 0.016, 533
+    and 700 K, 0.69 and 2.07 MPa, both fuels (dT 150-300 K; ERBS up to 33 K hotter, zone 2, 0.69 MPa, 533 K).
+    No gas temperature, no emissivity, no measurement uncertainty, no exit temperature or NOx table.'
+  status: screened
+  verdict: 'Screened 2026-11-02. Measured, but not a scorable liner case on its own. Accuracy (cross-source)
+    for Lefebvre''s luminosity factor L: the only quantity it can test without assumptions is the ERBS/Jet A
+    total-flux RATIO at equal P3, T3, f/a and nozzle (two H levels, 13.9 and 12.9 %, a 16 % step in L =
+    336/H^2), as a function of P3 0.34-2.07 MPa and zone. An absolute R1 test needs the zone gas temperature,
+    the local q and l_b (liner diameter), none of which is printed here; TM-83538 adds emissivity but not
+    those either. Not a network case: no liner geometry, no air split, no pressure drop, no annulus.
+    Overplotted digitising trap: Figs. 6, 8, 9 are 3-5 symbols per curve, so any score rests on about 4
+    cleanly sampled points per zone per fuel. The thermocouples are outer-wall (annulus-side) values,
+    reported as differences from T3 and averaged per zone, not per louver. The radiometers and the spectral
+    ports sit at DIFFERENT x stations.'
+  read_for: ['#793 measured liner radiant flux vs pressure and fuel H content (cross-source accuracy for L)', '#793 can geometry for a liner network case (absent)']
+  issues: [793]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ntrs_19830020966/ as 19830020966.pdf. Same rig, earlier series:
+    Claus 1981 NASA TP-1722 (spectral radiance, tubular can) and Claus, Humenik & Neely 1983 NASA CP-2268 pp.
+    199-206 -- wanted, may print geometry. Rudey & Graham 1984 Fig. 5 credits this TM but its idle /
+    take-off points (269 kPa 400 K, 1740 kPa 715 K) are outside Table I here, so that figure draws on
+    another series. ERBS is defined in Seng 1982, NASA TM-82883.'
+- file: sources/radiation/Claus_Neely_Humenik_1984_NASA_TM-83538_flame_radiation_liner_heat_transfer.pdf
+  citation: 'Claus, R. W., Neely, G. M., Humenik, F. M. (1984). Flame radiation and liner heat transfer in a
+    tubular-can combustor. NASA TM-83538, prepared for the 22nd AIAA Aerospace Sciences Meeting, Reno, 9-12
+    January 1984 (AIAA 84-0443).'
+  id: NASA-TM-83538 (NTRS 19840005120, N84-13188)
+  topic: [radiation, film]
+  content: 'Open access (NTRS), 22 pp., CASI scan; text layer unusable, read from page images. Same JT8D can,
+    housing, instruments, stations (Fig. 4: total x 12.7 / 18.5 / 28.7 cm, spectral x 7.4 / 22.1 / 34.0 cm),
+    Table I and Table II as TM-83436 (reprinted identically). New: test at constant reference velocity 15
+    m/s (consistent with the 25.4 cm housing area: 3.37 kg/s at 0.69 MPa, 533 K gives 14.7 m/s); field of
+    view 0.9 rad (total gauge) and 0.3 mrad (spectral); the 1.5-5.5 um band holds about 70 % of the total.
+    Its own 1-D liner balance (after NREC 1980 design manual, ref. 9): Eq. 1 R1 + C1 = KC = R2 + C2; Eq. 2
+    R2 = eps_w eps_c/(eps_c + eps_w (1 - eps_c) A_w/A_c) (T_WA^4 - T_c^4) (sigma missing in the print); Eq. 3
+    C2 = h2 (T_WA - T_c); Eq. 4 h2 = 0.02 (k/D)_an Re_an^0.8 Pr_an^0.33; Eqs. 5-6 KC through a ceramic TBC
+    on Hastelloy (thicknesses and k not printed); Eq. 7 C1 = h1 (T_F - T_WH); Eq. 8 h1 = 0.023 (k_f/D_ft)
+    Re_f^0.8 Pr_f^0.4; Eq. 9 film F = (T_HG - T_F)/(T_HG - T_an) = 1/(1 + C_m x/(M s)) with C_m = 0.05 (ref. 10,
+    Marek 1973 TM X-2809); Eq. 10 M = rho_s U_s/(rho_H U_H); Eq. 11 R1 = alpha_w R_measured, alpha_w = 0.4
+    (Liebert 1978 NASA TP-1190 TBC; the NREC wall-absorptivity correction over-predicted). T_HG from the 4.5
+    um CO2 band, eps_f from the spectrum assumed gray -- neither tabulated. Fig. 7 (only emissivity data):
+    eps_f vs P3, Jet A, 533 K, f/a 0.016, 3 zones x 4 pressures (read by eye: primary about 0.25 / 0.68 / 0.87
+    / 0.77, secondary 0.16 / 0.34 / 0.53 / 0.67 at 0.34 / 0.68 / 1.4 / 2.0 MPa); curves labelled luminous
+    eps_f = 1 - exp[-0.286 Lu P (f/a l_b)^0.5 Tg^-1.5] (ref. 9, "Lefebvre") and non-luminous (Reeves, ref. 2)
+    eps_f = 1 - exp[-7.1e2 P (l_b/(f/a))^0.5 Tg^-1.5]; Lu, l_b, Tg and units not printed. Plotted only: Fig.
+    6 total flux vs x at an unstated condition (integrated spectral and gauge, peak about 65 W/cm2 at x about
+    18 cm; zone boundaries about 15 and 26 cm); Fig. 8 spectra vs P3; Figs. 9-10 R_T and dT = T_liner - T3 vs
+    P3 and T3 (zone 1 R_T 67 -> 86 W/cm2 and dT 185 -> 220 K for T3 533 -> 700 K at 2.0 MPa); Fig. 11 spectra
+    vs T3; Figs. 12-14 Jet A vs ERBS (primary +56 % at 0.34 MPa, +6 % at 2.0 MPa; tertiary none); Fig. 15
+    CALCULATED R1, C1, R2 + C2 (secondary zone, about 23 / 17 / 7 W/cm2 at 2 MPa; C1 is heat from wall to film,
+    plotted as magnitude) and inferred h1 0.02-0.12 W/cm2 K vs Eq. 8; Fig. 16 extrapolated liner T to engine
+    PR 7-60 (about 1170 K at PR 40, 1240 K at PR 60). No measurement uncertainty stated.'
+  status: screened
+  verdict: 'Screened 2026-11-02. The only measured flame emissivity in the radiation collection, but thin:
+    12 plotted points (Fig. 7), Jet A only, one T3 and f/a, derived from a gray extension of a 1.5-5.5 um
+    spectrum taken at a different x than the total gauge. Own-model fidelity: the luminous form tracks the
+    primary and secondary points to about 1.5 MPa and over-predicts by 15-25 % at 2.0 MPa (blamed on nozzle
+    atomisation); Reeves over-predicts the tertiary zone at high P3. Not reproducible by us, since Lu, l_b
+    and Tg are not printed. Discrepancies with Lefebvre & Ballal: the luminous coefficient 0.286 with P in
+    Pa is 1.4 % below L&B''s 290 with P in kPa (or a different edition); the non-luminous form prints
+    (l_b/(f/a))^0.5 and 710, not Reeves'' (q l_b)^0.5 with L = 1 -- likely a typo, unusable as printed. Its
+    R1 uses a measured flux times alpha_w 0.4 (TBC), so the liner surface is NOT the bare-metal eps_w 0.7-0.8
+    of L&B; any liner-temperature comparison must model the TBC. The film form (Eq. 9) is the Juhasz-Marek /
+    Marek-Tacina developed-region law combaero ships; C_m 0.05 equals Marek-Tacina C_m = 0.25 Tu/100 at Tu
+    20 %. Fig. 15 closes (R1 - C1 about equal to R2 + C2) but is a calculation, not data. Accuracy use: the
+    ERBS/Jet A ratio test of L (with the paper''s statement that the 4.5 um band, i.e. Tg, is unchanged
+    between fuels) and the shape of eps_f vs P3 against Reeves x L with an assumed l_b. Not a full liner
+    network case (no geometry, slots, air split, dp, annulus, wall build-up).'
+  read_for: ['#793 measured flame emissivity vs pressure (cross-source accuracy for Reeves eps_g x L)', '#793 a published 1-D liner balance with a Marek film term (method check)']
+  issues: [793]
+  records: []
+  notes: 'Arrived 2026-11-02 in sources/new/ntrs_19840005120/ as 19840005120.pdf. Screening estimate (not a
+    record): with Fig. 7 Jet A eps and eps_ERBS = 1 - (1 - eps_JetA)^(L_E/L_J), the predicted ERBS/Jet A ratio
+    at 0.34 MPa primary is 1.14 for L = 336/H^2, 1.32 for 3 (C/H - 5.2)^0.75, 1.31 for Kretschmer-Odgers and
+    1.50 for 7.53 (C/H - 5.5)^0.84 against 1.56 measured; at 2.0 MPa 1.06 / 1.13 / 1.13 / 1.18 against 1.045. No
+    form fits both ends. Leads for geometry and closures (wanted): Srivatsa NASA CR-167930 (predicted this rig,
+    Rudey & Graham Fig. 5), NREC 1344-2 (1980) design manual (ref. 9), Liebert 1978 NASA TP-1190 (alpha_w),
+    Marek 1973 NASA TM X-2809 (C_m at pressure), Claus 1981 NASA TP-1722.'
 
 wanted:
 - citation: Dunn, M. G., et al. (1986). Stage heat-flux measurements on a full-stage rotating turbine
@@ -4557,15 +5064,26 @@ wanted:
   question: 'Room temperature to ~1000 C k(T) of the NPL SS310 reference material: closes the room-T end that
     Gen3 CSP (from ~260 C) lacks, for an ss310 material.'
   where: Springer (Int. J. Thermophys.).
+- citation: Maglic, K. D., Perovic, N. L., Stanimirovic, A. M. (1994). Calorimetric and transport properties of
+    Zircalloy 2, Zircalloy 4, and Inconel 625. Int. J. Thermophys. 15, 741-755. doi:10.1007/BF01563797
+  checked: false
+  issues: [881]
+  priority: later
+  question: 'The independent measured tie-breaker for the Inconel 625 conductivity dispute (#881): Special
+    Metals/Battelle (shipped) vs Gen3 CSP (+16-33% at 300-700 C) vs Du et al. 2025 (held; alpha +7% at 500 C,
+    +14% at 700 C). As plotted in Du 2025 Fig. 11 its k sits 4-9% above Battelle at 200-600 C; the paper itself
+    (calorimetric and transport properties) would say what was measured and on what material condition.'
+  where: Springer (Int. J. Thermophys.), paywalled. DOI as printed in Du et al. 2025 ref. 34 (not resolved here).
 - citation: Touloukian, Y. S., Powell, R. W., Ho, C. Y., Klemens, P. G. (1970). Thermophysical properties of
     matter, Vol. 1, Thermal conductivity -- metallic elements and alloys. IFI/Plenum (TPRC).
   checked: false
   issues: [881, 882]
   priority: later
   question: 'The recommended-curve reference for alloy k(T) over the full range; would settle the #882 envelope
-    shape and the cross-check of the shipped tables, and could give the independent third Inconel 625
-    conductivity #881 still lacks (whether Vol. 1 covers alloy 625 is unverified) (Special Metals/Battelle vs Gen3 CSP, 16-33% apart at 300-700 C; the Haynes 625 brochure, held,
-    reprints the Battelle data).'
+    shape and the cross-check of the shipped tables, and could give a recommended Inconel 625 curve for #881
+    (whether Vol. 1 covers alloy 625 is unverified) (Special Metals/Battelle vs Gen3 CSP, 16-33% apart at
+    300-700 C; the Haynes 625 brochure, held, reprints the Battelle data; Du et al. 2025, held, measures in
+    between; Maglic 1994, wanted, is the closer tie-breaker).'
   where: 'DTIC hosts TPRC volumes as scans (Vol. 2 ADA951936, Vol. 3 ADA951937, Vol. 5 ADA951939 per a web
     search 2026-11-02); no DTIC record for Vol. 1 was found, so its AD number is unknown. apps.dtic.mil returns
     403 to automated fetches, so nothing was downloaded. University libraries.'
@@ -4653,6 +5171,60 @@ wanted:
   priority: later
   question: Short-pin friction and Nu from a non-NASA rig.
   where: ASME Turbo Expo proceedings.
+- citation: 'Alberti, M., Weber, R., Mancini, M. (2018). Gray gas emissivities for H2O-CO2-CO-N2 mixtures. J.
+    Quant. Spectrosc. Radiat. Transfer 219, 274-291 (doi:10.1016/j.jqsrt.2018.08.008); and the same authors''
+    2020 follow-up, JQSRT 255, 107227.'
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'The pressure-capable, composition-based non-luminous gas emissivity (300-3000 K, 0.1-100 atm, pure
+    H2O through CO2-rich) that Howell et al. 7th ed. App. F reproduces (held) -- the shippable alternative to
+    Reeves (Lefebvre Eq. 8.9) and to Bordbar 2021 (non-commercial licence). Needed: the fit coefficients and
+    their licence. Covers the H2/NH3 limit (H2O only) that Bordbar does not.'
+  where: Elsevier journal (paywalled); check whether the authors publish the coefficients openly (the Howell
+    appendix mentions a spreadsheet).
+- citation: Kretschmer, D., Odgers, J. (1978). A simple method for the prediction of wall temperatures in gas
+    turbines. ASME Paper 78-GT-90.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: Primary of the Kretschmer-Odgers luminosity factor L = 0.0691 (C/H - 1.82)^2.71 (Lefebvre Eq. 8.14)
+    and of the 1-D wall-temperature method the Florence Therm1D tool builds on (Caciolli PhD, held); which data L
+    was fitted to.
+  where: ASME Digital Collection (paywalled).
+- citation: Stuttaford, P. J., Rubini, P. A. (1998). Assessment of a radiative heat transfer model for gas turbine
+    combustor preliminary design. J. Propulsion and Power 14(1), 66-73.
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: Radiation inside a combustor flow-network solver, the architecture combaero would use; how a
+    zone-wise radiation model couples to a network and what it was validated against.
+  where: AIAA (paywalled).
+- citation: Srivatsa, S. K. (1982). Computations of soot and NOx emissions from gas turbine combustors. NASA
+    CR-167930 (NTRS 19820021901, May 1982).
+  checked: false
+  issues:
+  - 793
+  priority: later
+  question: 'The JT8D tubular-can geometry behind Humenik/Claus TM-83436 and TM-83538 (held; they print no liner
+    geometry): liner diameter and length, louvers, hole areas, air split. With it the NASA can becomes a full
+    liner network case for a radiation model, not only an L ratio test. Alternatives that may print it: Claus
+    1981 NASA TP-1722; Claus, Humenik & Neely 1983 NASA CP-2268.'
+  where: 'NTRS 19820021901, public: https://ntrs.nasa.gov/api/citations/19820021901/downloads/19820021901.pdf
+    (7.8 MB). Scripted downloads stop at 5.0 MB and resume is refused (2026-11-02); fetch it in a browser.'
+- citation: 'Wright, L. M., et al. (2011). Effects of density ratio and free-stream turbulence on fan-shaped and
+    laidback fan-shaped film cooling holes. (Title, authors and venue not verified: Hassan 2013 cites it only as
+    "Wright et al. (2011)" in the text; likely ASME J. Turbomach. or Turbo Expo.)'
+  checked: false
+  issues:
+  - 386
+  priority: later
+  question: The fan-shaped hole geometry (area ratio, P/D, t/P) behind Hassan 2013's tabulated flat-plate eta
+    (held, Tables A.2/A.3), needed before those tables can score the Colban 2011 shaped-hole kernel.
+  where: ASME Digital Collection (paywalled).
 - citation: Lefebvre, A. H., Herbert, M. V. (1960). Heat-transfer processes in gas-turbine combustion chambers.
     Proc. IMechE 174(12), 463-473.
   checked: false
@@ -4766,28 +5338,11 @@ wanted:
     NOT implemented (only Marek-Tacina ships). Page 1 seen 2026-11-02 (a preview from the user): its Eq. 4,
     eta = 0.6 (x/ms)^-0.3 (Re_s m mu_c/mu_m)^0.15 (+/-5% on the data compiled in its ref. 5), matches Lefebvre &
     Ballal Eq. 8.34, so the book reprint is faithful there. Page 2 would add the validity table, the wall-jet
-    branch (book Eqs. 8.35/8.36) and the Fig. 1 points (other labs'' data: fit reproduction, not accuracy). It
-    does not settle the film-side Nu discrepancy (0.090 vs 0.069), which is a heat-transfer coefficient (see the
-    Seban 1960 entry). Moved from now to later (user, 2026-11-02): obtain when the Ballal-Lefebvre slot-film
+    branch (book Eqs. 8.35/8.36) and the Fig. 1 points (other labs'' data: fit reproduction, not accuracy). The
+    film-side Nu discrepancy (0.090 vs 0.069) is not in this paper; Seban 1960 (held since 2026-11-02) resolves
+    it in favour of the book''s 0.069. Moved from now to later (user, 2026-11-02): obtain when the Ballal-Lefebvre slot-film
     branches are implemented.'
   where: ASME Digital Collection (DOI verified by the user, 2026-10-29; paywalled; the user can obtain it).
-- citation: Seban, R. A. (1960). Heat transfer and effectiveness for turbulent boundary layers with tangential
-    fluid injection. ASME J. Heat Transfer 82(4), 303-313 (November 1960). Companions -- Seban, R. A., Back, L.
-    H. (1962), J. Heat Transfer 84, 45-54 and 235-242.
-  checked: true
-  issues:
-  - 714
-  - 763
-  priority: later
-  question: 'Settles the near-slot film-side Nu for m < 1.3: Ballal & Lefebvre''s Cranfield SME4 (held) prints
-    Nu = 0.090 [Re_s x/s]^0.7 (its Eq. 3, credited to Seban) while Lefebvre & Ballal Eq. 8.41 prints 0.069 (30%
-    lower). Needed before that branch is implemented. Alternative: the ASME print of Ballal, D. R., Lefebvre,
-    A. H. (1972), A proposed method for calculating film-cooled wall temperatures in gas turbine combustion
-    chambers, ASME Paper 72-WA/HT-24 (Winter Annual Meeting, New York, Nov. 1972), if it differs from the
-    held report.'
-  where: 'ASME Digital Collection (paywalled); citation as printed in Cranfield SME4 ref. 4, checked 2026-11-02.
-    72-WA/HT-24: ASME conference papers of that era are often only in libraries (ASME archive / British
-    Library).'
 - citation: ISO 5167:1980 (or its restatement ISO 5167-1:1991). Measurement of fluid flow by means of
     orifice plates, nozzles and Venturi tubes inserted in circular cross-section conduits running full.
     International Organization for Standardization. (citation as recalled)
@@ -4808,7 +5363,7 @@ wanted:
   checked: false
   issues:
   - 854
-  priority: now
+  priority: later
   question: 'The primary of ISO 5167-2 Eq. (5), the orifice expansibility, and its data (air, steam, natural
     gas). #854 found the compressible kernel applies the isentropic NOZZLE expansion to sharp plates: -0.9% at
     p2/p1 0.97, -7 to -9% at 0.80 against Eq. (5). The data decide the scope of a fix and whether Eq. (5) can be
