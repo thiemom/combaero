@@ -8522,6 +8522,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
         "Returns: tuple(mu [Pa*s], d_mu_d_T [(Pa*s)/K], d_mu_d_P "
         "[(Pa*s)/Pa])");
 
+  m.def("_viscosity_mass_gradient", &solver::viscosity_mass_gradient, py::arg("T"),
+        py::arg("P"), py::arg("X"),
+        "Internal (#964): d(mu)/dY_k [Pa*s] at fixed (T, P), analytic (Wilke's "
+        "rule chained to the mass fractions). X: mole fractions of the state.");
+
   m.def(
       "equivalence_ratio",
       [](py::array_t<double, py::array::c_style | py::array::forcecast> X_arr) {

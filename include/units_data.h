@@ -557,6 +557,7 @@ inline constexpr Entry function_units[] = {
     // -------------------------------------------------------------------------
     {"viscosity", "T: K, P: Pa, X: mol/mol", "Pa*s"},
     {"viscosity_dX", "T: K, P: Pa, X: mol/mol", "Pa*s (per species)"},
+    {"viscosity_mass_gradient", "T: K, P: Pa, X: mol/mol", "Pa*s (per unit mass fraction)"},
     {"transport_and_dT", "T: K, P: Pa, X: mol/mol", "TransportDerivatives"},
     {"TransportDerivatives::mu", "-", "Pa*s"},
     {"TransportDerivatives::dmu_dT", "-", "Pa*s/K"},
