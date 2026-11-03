@@ -224,10 +224,10 @@ def test_a_choked_channel_into_a_junction_is_choked_bounded(
     assert r["ch.m_dot"] == pytest.approx(33.0, rel=1e-9)
     assert r["ch.choked"] == 1.0 and r["ch.mach_out"] == pytest.approx(1.0, abs=1e-6)
     assert r["cmb.Pt"] == pytest.approx(choked_reference["cmb.Pt"], rel=1e-7)
-    # The plenum in its place: the same root.
+    # The plenum in its place: the same root, to the solves' tolerance.
     _, rp = _solve(_net(bore, correlation=correlation, in_pipe=in_pipe, junction="plenum"))
     assert rp["__success__"]
-    assert r[f"{JCT}.Pt"] == pytest.approx(rp[f"{JCT}.Pt"], rel=1e-7)
+    assert r[f"{JCT}.Pt"] == pytest.approx(rp[f"{JCT}.Pt"], rel=1e-6)
     assert r["ox.m_dot"] == pytest.approx(rp["ox.m_dot"], rel=1e-9)
     # Reported as a plenum: P = Pt, at rest; the sonic state of the flux and
     # the expansion loss beside it.
@@ -339,3 +339,38 @@ def test_a_junction_whose_static_pressure_is_read_is_refused() -> None:
     assert r["__choked_bounded_junctions__"] == []
     assert r["__supersonic_chambers__"] == [JCT]
     assert "['rb.m_dot'] read its static pressure" in r["__message__"]
+
+
+@pytest.mark.parametrize("correlation", ["fixed", "ReaderHarrisGallagher"])
+def test_a_bore_equal_to_the_pipe_converges_cold(correlation: str) -> None:
+    """No orifice at the junction (bore == pipe passes the flow unchanged), so
+    the outlet's 20 bar fixes the junction's Pt far below the sonic Pt* of the
+    pipe's flux. The start's P = Pt is then past the sonic point, and the
+    first Newton step crossed the closure's zero-slope fold to a negative P:
+    no_progress without retries. The start is seeded on the closure's root
+    (_seed_chambers_past_sonic), and the plain cold solve converges."""
+    s = NetworkSolver(_net(0.1, correlation=correlation))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = s.solve(auto_retry=False)
+    assert r["__success__"], r["__message__"]
+    assert r["__choked_bounded_junctions__"] == [JCT]
+    assert r[f"{JCT}.Pt"] == pytest.approx(P_OUT, rel=1e-9)
+
+
+def test_a_start_on_the_subsonic_side_is_not_moved() -> None:
+    """The seed moves only a chamber that starts past its sonic point; the
+    bore = pipe start is moved onto its root (its Pt from the outlet)."""
+    for bore, moved in ((0.08, False), (0.1, True)):
+        net = _net(bore)
+        net.resolve_all_topology()
+        s = NetworkSolver(net)
+        x0 = s._build_x0()
+        s._propagate_states(x0, with_relay=False)
+        st = s._get_node_state(net.nodes[JCT], x0)
+        assert net.nodes[JCT].area > 0.0
+        c = net.nodes[JCT]._closure(st)
+        if moved:
+            assert c.bounded and abs(c.residual) < 1e-6 * st.Pt
+        else:
+            assert st.Pt == st.P and not c.bounded

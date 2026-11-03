@@ -75,12 +75,9 @@ alongside.
 
 ## Gaps left (measured)
 
-- **Bore == pipe (pass-through), cold solve without retries.** The default
-  `x0` puts P on the wrong side of the fold, and the solve still stalls
-  (no_progress). The Newton-homotopy retry (on in the GUI and the stress
-  harness) reaches the root in 0.5 s. A seed P below P* converges cold.
+- **Bore == pipe (pass-through), cold solve.** The default x0 put the junction P past the fold, and the first step overshot to a negative P. This is fixed by `NetworkSolver._seed_chambers_past_sonic`, which moves only a start past the sonic point onto the closure's root. Its probe propagation is undone, because lagged reads would otherwise make the first residual depend on it.
 - **In-pipe orifice downstream of a choked-bounded junction.** The orifice
   reads its approach from the junction Pt at the pipe's flux, and past the
   pipe's own sonic limit its row's flow columns have a Jacobian error
-  (FD 4.4 vs 7.4). The same error appears with a `PlenumNode` junction and
+  (FD 4.4 vs 7.4), issue #958. The same error appears with a `PlenumNode` junction and
   on main. It belongs to the orifice row, not to this change.

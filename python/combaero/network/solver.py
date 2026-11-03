@@ -2060,9 +2060,81 @@ class NetworkSolver:
         self._target_q_columns = {
             nid: [(eb, self._name_to_index[name])] for name, (nid, eb) in target_q.items()
         }
+        self._seed_chambers_past_sonic(x0)
         if target_q:
             self._seed_target_heat(x0, target_q)
         return x0
+
+    def _seed_chambers_past_sonic(self, x0: np.ndarray) -> None:
+        """Start a compressible momentum chamber whose start lies past its
+        sonic point on its closure's root (#788).
+
+        The closure is monotone in P with ONE root per Pt, but its slope is
+        zero at the sonic static pressure P*. A start with P = Pt that the
+        flux puts below P* (a choked channel into a junction whose
+        downstream fixes a low Pt: a bore equal to the pipe) made the first
+        Newton step cross that fold and overshoot to a negative P, and the
+        cold solve stalled. Only such a start moves; a chamber with a user
+        initial guess for P, or a start on the subsonic side, keeps its x0.
+        """
+        chambers = [
+            (nid, node)
+            for nid, node in self.network.nodes.items()
+            if isinstance(node, MomentumChamberNode)
+            and node.regime != "incompressible"
+            and node.area
+            and f"{nid}.P" in self._name_to_index
+            and f"{nid}.P" not in getattr(node, "initial_guess", {})
+        ]
+        if not chambers:
+            return
+        # The probe propagation must leave no trace: a network with a
+        # back-edge reads the previous pass's states (lagged reads), so the
+        # first residual would otherwise depend on this probe.
+        _kept = ("_derived_states", "_prev_derived_states", "_film_inf_states")
+        _kept += ("_prev_film_inf_states", "_rev_junctions")
+        saved = {k: self.__dict__[k] for k in _kept if k in self.__dict__}
+        try:
+            self._propagate_states(x0, with_relay=False)
+            self._seed_chamber_roots(x0, chambers)
+        except Exception:  # noqa: BLE001 -- a start estimate never breaks a solve
+            pass
+        finally:
+            for k in _kept:
+                if k in saved:
+                    self.__dict__[k] = saved[k]
+                else:
+                    self.__dict__.pop(k, None)
+
+    def _seed_chamber_roots(
+        self, x0: np.ndarray, chambers: list[tuple[str, MomentumChamberNode]]
+    ) -> None:
+        """``_seed_chambers_past_sonic`` on the propagated start."""
+        from scipy.optimize import brentq
+
+        for nid, node in chambers:
+            try:
+                state = self._get_node_state(node, x0)
+                c = node._closure(state)
+                Pt = float(state.Pt)
+                if not c.bounded or not (math.isfinite(Pt) and Pt > 0.0):
+                    continue
+                P_star = float(c.P_sonic)
+
+                def r(
+                    lnP: float,
+                    state: NetworkMixtureState = state,
+                    node: MomentumChamberNode = node,
+                ) -> float:
+                    state.P = math.exp(lnP)
+                    return float(node._closure(state).residual)
+
+                lo, hi = math.log(1e-4 * P_star), math.log(max(Pt, P_star))
+                if not (r(lo) > 0.0 > r(hi)):
+                    continue
+                x0[self._name_to_index[f"{nid}.P"]] = math.exp(brentq(r, lo, hi, xtol=1e-10))
+            except (ValueError, RuntimeError):
+                continue
 
     def _seed_target_heat(
         self, x0: np.ndarray, target_q: dict[str, tuple[str, EnergyBoundary]]
