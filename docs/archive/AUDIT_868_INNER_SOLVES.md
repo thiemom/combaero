@@ -59,7 +59,7 @@ Line numbers are on the branch.
 | # | file:line | function | method | cap | tolerance | exit on cap (main) | bracket / safeguard | verdict | action |
 |---|---|---|---|---|---|---|---|---|---|
 | T1 | thermo.cpp:388 | `solve_increasing_T` (`calc_T_from_h/s/u/sv`) | rtsafe Newton | 50 (caller) | 1e-6 K abs step, or bracket < tol | throws | factor-4 search, then bisection when Newton leaves or fails to halve | safe | none |
-| T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 fixed (#939, PR #954): the root nearest T_guess in [200, 6000] K, outward scan + bracketed Newton, no root in range throws; range extended to [1, 6000] K (2026-11-03, below) |
+| T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 fixed (#939, PR #954): the root nearest T_guess in [200, 6000] K, outward scan + bracketed Newton, no root in range throws; range extended to [1, 6000] K (PR #961, below) |
 | S1 | state.cpp:118 | `State::set_VH_mass` | Newton on u + R T = h | 20 | 1e-4 K abs step | silent | none (monotone) | latent | fixed: throws. rec R5 fixed (#938, PR #954): `calc_T_from_h_mass` |
 | G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor. R1 fixed (#935, PR #949): no floor, the root is returned |
 | G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3. R1 fixed (#935, PR #949): no floor. R3 fixed (#936, PR #954): exact slope, quadratic |
@@ -487,7 +487,7 @@ slightly. None is bit-identical.
   by 1.5, since the bracket keeps Newton on the root. The full suite (6901
   passed), ctest (54) and the paper examples pass.
 
-## R6 range extended below 200 K (2026-11-03)
+## R6 range extended below 200 K (2026-11-03, PR #961)
 
 Decision (2026-11-03): `calc_T_from_cp` searches below 200 K. No issue; it
 follows #939 (closed by PR #954).
