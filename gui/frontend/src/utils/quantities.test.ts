@@ -145,6 +145,7 @@ const NON_SCALAR_READS = new Set([
 	"rows_Nu",
 	"rows_htc",
 	"rows_Gc_Gj",
+	"rows_valve_dPt", // flow splitter (#903): the drop at each outlet
 	"h_gas_unblown_model",
 ]);
 

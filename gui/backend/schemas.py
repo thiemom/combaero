@@ -13,6 +13,9 @@ from pydantic import (
 
 from combaero.network.components import DEFAULT_REGIME
 
+#: Outlets a GUI flow splitter may have (#903); its ports are out0 ... out31.
+SPLITTER_MAX_OUTLETS = 32
+
 
 class SmoothModelData(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -577,6 +580,40 @@ class TurbomachineData(BaseModel):
     efficiency: float = Field(0.88, gt=0.0, le=1.0)
     initial_guess: dict[str, float] = Field(default_factory=dict)
     label: str | None = None
+
+
+class FlowSplitterData(BaseModel):
+    """A flow splitter (#903): one inlet ("port-in-target") to N outlets
+    ("port-out<i>-source"), outlet i at fractions[i] of the throughput.
+
+    At most one fraction is None: the remainder, 1 - the others. The rest
+    are in (0, 1) and, without a remainder, sum to 1 within
+    SPLITTER_FRACTION_SUM_TOL; FlowSplitter refuses anything else, never
+    renormalising. ``reference`` is the index of the outlet whose valve is
+    open (Pt_out = Pt_in) to start from: the remainder when None, else the
+    first guess. With ``auto_reference`` (default) the solve moves it to the
+    outlet needing the most pressure when the start is infeasible. ``areas[i]`` is outlet
+    i's valve reference area [m^2] for the reported Cd and zeta (None: the
+    effective area CdA only).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+    fractions: list[float | None] = Field(
+        default_factory=lambda: [0.5, None], min_length=2, max_length=SPLITTER_MAX_OUTLETS
+    )
+    reference: int | None = Field(default=None, ge=0)
+    areas: list[float | None] | None = None
+    auto_reference: bool = True
+    label: str | None = None
+
+    @model_validator(mode="after")
+    def _indices_fit(self) -> "FlowSplitterData":
+        n = len(self.fractions)
+        if self.reference is not None and self.reference >= n:
+            raise ValueError(f"reference {self.reference} is not an outlet (0 to {n - 1})")
+        if self.areas is not None and len(self.areas) != n:
+            raise ValueError(f"areas has {len(self.areas)} entries for {n} outlets")
+        return self
 
 
 class MPCETeeData(BaseModel):

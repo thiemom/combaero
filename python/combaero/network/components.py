@@ -7620,6 +7620,280 @@ class LosslessConnectionElement(NetworkElement):
         return 1
 
 
+#: |sum of a flow splitter's fractions - 1| above which the set is refused
+#: (#903), never renormalised. A tolerance for the round-off of typed decimal
+#: fractions (0.1 + 0.2 + 0.7 is 1 + 2.2e-16), not for a mis-typed set.
+SPLITTER_FRACTION_SUM_TOL = 1e-9
+
+
+class SplitterOutletElement(NetworkElement):
+    """One outlet of a flow splitter (#903): a mass-flow controller.
+
+    A splitter takes one inlet node's flow to N outlet nodes in given
+    fractions f_i (summing to 1). ``FlowSplitter`` builds it as N of these
+    two-port elements, all from the inlet node, so the solver, the state
+    propagation, the second-law check and the ledger see plain two-ports.
+    Each outlet carries one unknown, its flow ``m_dot``, and one row:
+
+    * a **metered** outlet: ``m_i - f_i sum_j m_j = 0`` over the splitter's
+      own outlets, linear, with the exact Jacobian ``1 - f_i`` on its own flow
+      and ``-f_i`` on each sibling's. The row holds no pressure, so the
+      outlet's total-pressure drop ``Pt_in - Pt_out`` is free: it is whatever
+      the path downstream leaves to the valve, and it is reported as the
+      metering the valve would need (``valve_dPt``, ``valve_CdA`` and, with
+      an ``area``, ``valve_Cd`` and ``valve_zeta``).
+    * the **reference** outlet: ``Pt_in - Pt_out = 0``, its valve fully open.
+      Of N fractions summing to 1 only N - 1 are independent; with a valve on
+      every outlet the total flow (or, fed at a fixed flow, the inlet
+      pressure) would have no equation. The reference's own fraction follows
+      from the others. It must be the most resistive path: a metered outlet
+      that needs MORE total pressure than the reference delivers needs a pump
+      (``valve_dPt < 0``), and the second-law check refuses that root. With
+      ``auto_reference`` the solve then moves the reference
+      (``flow_splitter.solve_with_reference_swaps``); without, or when no
+      reference works, the refusal names the outlet to make the reference.
+
+    Each outlet carries the inlet's Tt and composition (a two-port moves its
+    upstream state); Pt follows each outlet's own path.
+
+    Args:
+        id: Element id (``FlowSplitter`` uses ``{splitter}__{outlet node}``).
+        from_node: The splitter's inlet node, shared by all its outlets.
+        to_node: This outlet's node.
+        fraction: f_i in (0, 1), of the splitter's throughput.
+        outlets: Ids of all the splitter's outlet elements, this one included.
+        reference: True for the one unmetered outlet (``Pt_out = Pt_in``).
+        area: Valve reference area [m^2] for ``valve_Cd`` and ``valve_zeta``;
+            None reports the effective area ``valve_CdA`` only.
+        splitter: The splitter's id, for messages and reports.
+        auto_reference: Let ``NetworkSolver.solve`` move the reference to the
+            outlet that needs the most pressure when a solve is refused for a
+            pump at a metered outlet (``flow_splitter.solve_with_reference_swaps``).
+            The same for every outlet of one splitter.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        from_node: str,
+        to_node: str,
+        fraction: float,
+        outlets: list[str],
+        reference: bool = False,
+        area: float | None = None,
+        splitter: str | None = None,
+        auto_reference: bool = True,
+    ):
+        super().__init__(id, from_node, to_node)
+        self.auto_reference = bool(auto_reference)
+        self.fraction = float(fraction)
+        self.outlets = list(outlets)
+        self.reference = bool(reference)
+        self.area = area
+        self.splitter = splitter if splitter is not None else id
+        #: {outlet element id: its to_node}, resolved in resolve_topology.
+        self._outlet_nodes: dict[str, str] = {}
+        self._reference_id: str = ""
+
+    @property
+    def residual_scale_kind(self) -> str:
+        """RESIDUAL-ROW-SCALING: a metered outlet's row is a mass-flow
+        balance (kg/s); the reference's a total-pressure equality (Pa)."""
+        return "p" if self.reference else "mdot"
+
+    def _seed_resistance(self, rho: float, P_ref: float, m_ref: float) -> float | None:
+        """Start guess: no loss, as a lossless connection. The fractions are
+        linear rows, which the first Newton step meets exactly."""
+        return 0.0
+
+    def unknowns(self) -> list[str]:
+        return [f"{self.id}.m_dot"]
+
+    def n_equations(self) -> int:
+        return 1
+
+    def _siblings(self) -> list[str]:
+        return [eid for eid in self.outlets if eid != self.id]
+
+    def network_flow_inputs(self) -> list[tuple[str, str]]:
+        """The sibling outlets' flows, at the shared inlet node."""
+        return [(eid, self.from_node) for eid in self._siblings()]
+
+    def validate(self) -> None:
+        where = f"SplitterOutletElement '{self.id}' (splitter '{self.splitter}')"
+        if not (math.isfinite(self.fraction) and 0.0 < self.fraction < 1.0):
+            raise ValueError(
+                f"{where}: fraction must be in (0, 1), got {self.fraction}. An outlet "
+                "that carries nothing is no outlet: remove it."
+            )
+        if len(set(self.outlets)) != len(self.outlets) or len(self.outlets) < 2:
+            raise ValueError(f"{where}: needs at least two distinct outlets, got {self.outlets}.")
+        if self.id not in self.outlets:
+            raise ValueError(f"{where}: its own id is not among the splitter's outlets.")
+        if self.area is not None and not (math.isfinite(self.area) and self.area > 0.0):
+            raise ValueError(f"{where}: area must be positive, got {self.area}.")
+
+    def resolve_topology(self, graph: "FlowNetwork") -> None:
+        """Check the splitter as a whole: its outlets exist, share this inlet
+        and outlet list, hold exactly one reference, and their fractions sum
+        to 1 (within SPLITTER_FRACTION_SUM_TOL, never renormalised)."""
+        where = f"Flow splitter '{self.splitter}'"
+        members: list[SplitterOutletElement] = []
+        for eid in self.outlets:
+            e = graph.elements.get(eid)
+            if not isinstance(e, SplitterOutletElement):
+                raise ValueError(
+                    f"{where}: outlet element '{eid}' is not in the network as a "
+                    "SplitterOutletElement."
+                )
+            if (
+                e.from_node != self.from_node
+                or e.outlets != self.outlets
+                or e.auto_reference != self.auto_reference
+            ):
+                raise ValueError(
+                    f"{where}: outlet '{eid}' does not share the inlet '{self.from_node}', "
+                    "the outlet list and the auto_reference setting of the others."
+                )
+            members.append(e)
+        refs = [e.id for e in members if e.reference]
+        if len(refs) != 1:
+            raise ValueError(
+                f"{where}: needs exactly one reference outlet (its valve open, "
+                f"Pt_out = Pt_in), found {len(refs)}: {refs}."
+            )
+        total = math.fsum(e.fraction for e in members)
+        if not abs(total - 1.0) <= SPLITTER_FRACTION_SUM_TOL:
+            raise ValueError(
+                f"{where}: the fractions sum to {total!r}, not 1 (tolerance "
+                f"{SPLITTER_FRACTION_SUM_TOL:g}); they are not renormalised. "
+                "Declare one outlet the remainder to take what the others leave."
+            )
+        self._outlet_nodes = {e.id: e.to_node for e in members}
+        self._reference_id = refs[0]
+
+    def _throughput(self, m_self: float, flows: dict[str, float] | None) -> tuple[float, list[str]]:
+        """(sum of the splitter's outlet flows, the sibling ids)."""
+        sibs = self._siblings()
+        flows = flows or {}
+        missing = [eid for eid in sibs if eid not in flows]
+        if missing:
+            raise ValueError(
+                f"SplitterOutletElement '{self.id}': the flows of its sibling outlets "
+                f"{missing} were not passed (flows=); the solver passes them."
+            )
+        return m_self + math.fsum(float(flows[eid]) for eid in sibs), sibs
+
+    def residuals(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> tuple[list[float], dict[int, dict[str, float]]]:
+        if self.reference:
+            # The open valve: no loss, Pt_in - Pt_out = 0.
+            res = [state_in.Pt - state_out.Pt]
+            jac = {0: {f"{self.from_node}.Pt": 1.0, f"{self.to_node}.Pt": -1.0}}
+            return res, jac
+        m_self = float(state_in.m_dot)
+        M, sibs = self._throughput(m_self, flows)
+        f = self.fraction
+        row: dict[str, float] = {f"{self.id}.m_dot": 1.0 - f}
+        for eid in sibs:
+            row[f"{eid}.m_dot"] = -f
+        return [m_self - f * M], {0: row}
+
+    def valve(
+        self, state_in: NetworkMixtureState, state_out: NetworkMixtureState, m_dot: float
+    ) -> dict[str, float]:
+        """The metering this outlet's valve would need at the solved state.
+
+        ``valve_dPt`` = Pt_in - Pt_out [Pa]. With flow through a drop,
+        ``valve_CdA`` [m^2] is the effective area of an isentropic jet from
+        the inlet's stagnation state (Tt_in, Pt_in) to the outlet's static
+        pressure, held at the sonic pressure below it (``valve_choked``), the
+        flux from C++ ``mass_flux_isentropic``. With an ``area``, ``valve_Cd``
+        = CdA / area and ``valve_zeta`` = 1 / Cd^2 (``cb.zeta_from_Cd``), which
+        at low Mach is dPt over the dynamic head at that area.
+        """
+        from .second_law import SIGMA_TOL
+
+        dPt = float(state_in.Pt - state_out.Pt)
+        # A rise in Pt is a pump where the second-law check sees one: an
+        # adiabatic two-port's sigma_norm is -ln(Pt_out / Pt_in) ~ dPt / Pt_in.
+        pump = not self.reference and state_in.Pt > 0.0 and dPt < -SIGMA_TOL * state_in.Pt
+        out: dict[str, float] = {"valve_dPt": dPt, "valve_needs_pump": 1.0 if pump else 0.0}
+        if self.reference or not (dPt > 0.0 and m_dot > 0.0):
+            return out
+        Tt, Pt, X = float(state_in.Tt), float(state_in.Pt), state_in.X
+        P_star = float(cb.critical_pressure_ratio(Tt, Pt, X)) * Pt
+        P_exit = float(state_out.P)
+        choked = P_exit <= P_star
+        G = float(cb.mass_flux_isentropic(Tt, Pt, max(P_exit, P_star), X))
+        if not G > 0.0:
+            return out
+        CdA = m_dot / G
+        out["valve_CdA"] = CdA
+        out["valve_choked"] = 1.0 if choked else 0.0
+        if self.area is not None:
+            Cd = CdA / float(self.area)
+            out["valve_Cd"] = Cd
+            out["valve_zeta"] = float(cb.zeta_from_Cd(Cd))
+        return out
+
+    def diagnostics(
+        self,
+        state_in: NetworkMixtureState,
+        state_out: NetworkMixtureState,
+        flows: dict[str, float] | None = None,
+    ) -> dict[str, float | str]:
+        if state_in.P <= 0 or state_in.Tt <= 0:
+            return {}
+        m = float(state_in.m_dot)
+        cs_in = cb.complete_state(state_in.T, state_in.P, state_in.X)
+        ref = _element_reference_block(
+            cs_in, m_dot=m, area=self.area or 0.0, Dh=None, location="inlet"
+        )
+        out: dict[str, float | str] = {
+            "m_dot": m,
+            **_element_pressure_block(state_in, state_out, mach_in=0.0, mach_out=0.0),
+            **ref,
+            "fraction": self.fraction,
+            "is_reference": 1.0 if self.reference else 0.0,
+            **self.valve(state_in, state_out, m),
+        }
+        if flows is not None:
+            M, _ = self._throughput(m, flows)
+            out["m_dot_splitter"] = M
+            if M != 0.0:
+                out["fraction_achieved"] = m / M
+        return out
+
+    def second_law_hint(self, sol: dict[str, Any]) -> str:
+        """Why the second-law check refused this outlet: it needs its total
+        pressure raised to carry its fraction (a pump, not a valve). Names the
+        outlet that should be the reference: the one needing the most."""
+        if self.reference:
+            return ""
+        Pt_in = sol.get(f"{self.from_node}.Pt")
+        Pt_out = sol.get(f"{self.to_node}.Pt")
+        if Pt_in is None or Pt_out is None or not float(Pt_out) > float(Pt_in):
+            return ""
+        need = {
+            eid: float(sol.get(f"{nid}.Pt", float("nan")))
+            for eid, nid in self._outlet_nodes.items()
+        }
+        worst = max(need, key=lambda k: need[k] if math.isfinite(need[k]) else -math.inf)
+        ref_node = self._outlet_nodes.get(self._reference_id, self._reference_id)
+        return (
+            f"Flow splitter '{self.splitter}': outlet '{self.to_node}' needs its total "
+            f"pressure raised by {float(Pt_out) - float(Pt_in):.4g} Pa to carry fraction "
+            f"{self.fraction:g}, which no valve does. The reference outlet "
+            f"'{ref_node}' is not the most resistive path; make "
+            f"'{self._outlet_nodes.get(worst, worst)}' the reference."
+        )
+
+
 class TurbomachineElement(NetworkElement):
     """A compressor or turbine at a fixed total-to-total pressure ratio (#893).
 

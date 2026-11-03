@@ -27,6 +27,13 @@ import {
 	THERMAL_WALL_KIND,
 } from "../utils/quantities";
 import { describeElement, failuresFor } from "../utils/secondLaw";
+import {
+	resolvedFractions,
+	SPLITTER_MAX_OUTLETS,
+	splitterFractions,
+	splitterReference,
+	validateSplitter,
+} from "../utils/splitter";
 import { bassettDesignK, designNetLoss } from "../utils/teeK";
 import { validateNetwork } from "../utils/validation";
 import {
@@ -630,6 +637,271 @@ const Inspector = () => {
 									data={selectedNode.data}
 								/>
 								<InitialGuessEditor node={selectedNode} />
+							</div>
+						);
+					})()}
+
+				{selectedNode.type === "flow_splitter" &&
+					(() => {
+						// #903: one inlet to N outlets at given fractions.
+						const d = selectedNode.data;
+						const fractions = splitterFractions(d);
+						const n = fractions.length;
+						const shown = resolvedFractions(fractions);
+						const ref = splitterReference(d);
+						const areas: (number | null)[] =
+							d.areas ?? fractions.map(() => null);
+						const set = (patch: Record<string, unknown>) =>
+							updateNodeData(selectedNode.id, patch);
+						const setFraction = (i: number, val: number) =>
+							set({ fractions: fractions.map((f, j) => (j === i ? val : f)) });
+						const makeRest = (i: number) =>
+							// The old remainder keeps the share it had.
+							set({
+								fractions: fractions.map((f, j) =>
+									j === i ? null : f == null ? shown[j] : f,
+								),
+							});
+						const addOutlet = () => {
+							if (n >= SPLITTER_MAX_OUTLETS) return;
+							const hasRest = fractions.includes(null);
+							set({
+								fractions: [...fractions, hasRest ? 0.1 : null],
+								...(d.areas ? { areas: [...areas, null] } : {}),
+							});
+						};
+						const removeOutlet = () => {
+							if (n <= 2) return;
+							const last = n - 1;
+							const { edges, setEdges } = useStore.getState();
+							setEdges(
+								edges.filter(
+									(e) =>
+										!(
+											e.source === selectedNode.id &&
+											e.sourceHandle === `port-out${last}-source`
+										),
+								),
+							);
+							set({
+								fractions: fractions.slice(0, last),
+								...(d.reference === last ? { reference: null } : {}),
+								...(d.areas ? { areas: areas.slice(0, last) } : {}),
+							});
+						};
+						const r = d.result;
+						const errors = validateSplitter(d);
+						const auto = d.auto_reference ?? true;
+						// The outlet whose valve the solve left open (1-based in the
+						// result), and the one it started from.
+						const inUse =
+							typeof r?.reference_outlet === "number"
+								? r.reference_outlet - 1
+								: null;
+						const started =
+							typeof r?.reference_start === "number"
+								? r.reference_start - 1
+								: null;
+						const { unitPreferences } = useStore.getState();
+						const mm2 = unitPreferences.area === "mm²";
+						const aScale = mm2 ? 1e6 : 1;
+						return (
+							<div className="flex flex-col gap-3">
+								<div className="text-[10px] text-stone-500 leading-snug">
+									Each outlet takes its fraction of the inlet flow, a mass-flow
+									controller: its valve takes whatever drop the path downstream
+									leaves (shown after a solve). Fractions sum to 1; "Rest" takes
+									what the others leave. One valve stays open: it has to be on
+									the path that needs the most pressure, and the solve moves it
+									there when it starts elsewhere.
+								</div>
+								<table className="text-[11px]">
+									<thead>
+										<tr className="text-gray-500 text-[10px] uppercase">
+											<th className="text-left">#</th>
+											<th className="text-left">Fraction</th>
+											<th>Rest</th>
+											<th title="The outlet whose valve is open; the solve starts here">
+												Open
+											</th>
+											<th className="text-left">
+												Valve area {mm2 ? "mm²" : "m²"}
+											</th>
+										</tr>
+									</thead>
+									<tbody>
+										{fractions.map((f, i) => (
+											<tr key={`out_${i + 1}`}>
+												<td>{i + 1}</td>
+												<td>
+													{f == null ? (
+														<span className="font-mono text-gray-500">
+															{shown[i].toPrecision(4)}
+														</span>
+													) : (
+														<NumericInput
+															id={`fs_f_${selectedNode.id}_${i}`}
+															value={f}
+															min={0}
+															max={1}
+															onChange={(val) => setFraction(i, val)}
+															className="p-1 border rounded w-20"
+														/>
+													)}
+												</td>
+												<td className="text-center">
+													<input
+														type="radio"
+														name={`fs_rest_${selectedNode.id}`}
+														aria-label={`Outlet ${i + 1} takes the rest`}
+														checked={f == null}
+														onChange={() => makeRest(i)}
+													/>
+												</td>
+												<td className="text-center">
+													<input
+														type="radio"
+														name={`fs_ref_${selectedNode.id}`}
+														aria-label={`Outlet ${i + 1} starts with its valve open`}
+														checked={ref === i}
+														onChange={() => set({ reference: i })}
+													/>
+												</td>
+												<td>
+													<NumericInput
+														id={`fs_a_${selectedNode.id}_${i}`}
+														value={areas[i] == null ? null : areas[i] * aScale}
+														min={0}
+														placeholder="CdA only"
+														onChange={(val) =>
+															set({
+																areas: areas.map((a, j) =>
+																	j === i ? val / aScale : a,
+																),
+															})
+														}
+														onClear={() =>
+															set({
+																areas: areas.map((a, j) =>
+																	j === i ? null : a,
+																),
+															})
+														}
+														className="p-1 border rounded w-20"
+													/>
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+								<div className="flex gap-2">
+									<button
+										type="button"
+										className="px-2 py-1 border rounded text-xs bg-white hover:bg-stone-50"
+										onClick={addOutlet}
+										disabled={n >= SPLITTER_MAX_OUTLETS}
+									>
+										+ Outlet
+									</button>
+									<button
+										type="button"
+										className="px-2 py-1 border rounded text-xs bg-white hover:bg-stone-50"
+										onClick={removeOutlet}
+										disabled={n <= 2}
+										title="Removes the last outlet and its connection"
+									>
+										- Last outlet
+									</button>
+								</div>
+								<label className="flex items-center gap-2 text-[11px] text-stone-600">
+									<input
+										type="checkbox"
+										checked={auto}
+										onChange={(e) => set({ auto_reference: e.target.checked })}
+									/>
+									Move the open valve to the path needing the most pressure
+								</label>
+								{errors.length > 0 && (
+									<div className="text-[10px] text-red-600 leading-snug">
+										{errors.join("; ")}
+									</div>
+								)}
+								{inUse != null && started != null && inUse !== started && (
+									<div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 leading-snug flex flex-col gap-1">
+										<span>
+											The solve moved the open valve from outlet {started + 1}{" "}
+											to outlet {inUse + 1}: its path needs the most pressure.
+										</span>
+										<button
+											type="button"
+											className="self-start px-2 py-0.5 border rounded bg-white hover:bg-stone-50"
+											onClick={() => set({ reference: inUse })}
+										>
+											Start from outlet {inUse + 1}
+										</button>
+									</div>
+								)}
+								{r && Array.isArray(r.rows_m_dot) && (
+									<div className="flex flex-col gap-1">
+										<label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+											Per Outlet ({Number(r.m_dot).toPrecision(4)} kg/s in)
+										</label>
+										<table className="text-[10px] font-mono">
+											<thead>
+												<tr className="text-gray-500">
+													<th className="text-left">#</th>
+													<th className="text-right">m g/s</th>
+													<th className="text-right">frac</th>
+													<th className="text-right">dPt kPa</th>
+													<th className="text-right">CdA mm2</th>
+													<th className="text-right">zeta</th>
+												</tr>
+											</thead>
+											<tbody>
+												{(r.rows_m_dot as number[]).map((m, i) => {
+													const cda = r.rows_valve_CdA?.[i];
+													const zeta = r.rows_valve_zeta?.[i];
+													return (
+														<tr key={`res_${i + 1}`}>
+															<td>{i + 1}</td>
+															<td className="text-right">
+																{(1000 * m).toFixed(3)}
+															</td>
+															<td className="text-right">
+																{Number(r.rows_fraction_achieved?.[i]).toFixed(
+																	4,
+																)}
+															</td>
+															<td className="text-right">
+																{i === inUse
+																	? "open"
+																	: (
+																			Number(r.rows_valve_dPt?.[i]) / 1000
+																		).toFixed(3)}
+															</td>
+															<td className="text-right">
+																{typeof cda === "number"
+																	? (1e6 * cda).toPrecision(4)
+																	: "-"}
+															</td>
+															<td className="text-right">
+																{typeof zeta === "number"
+																	? zeta.toPrecision(4)
+																	: "-"}
+															</td>
+														</tr>
+													);
+												})}
+											</tbody>
+										</table>
+										{r.n_needs_pump > 0 && (
+											<div className="text-[10px] text-red-600">
+												An outlet needs more pressure than the open one gets:
+												open the valve on the most demanding path instead.
+											</div>
+										)}
+									</div>
+								)}
 							</div>
 						);
 					})()}

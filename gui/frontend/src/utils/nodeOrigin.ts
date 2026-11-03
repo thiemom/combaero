@@ -1,4 +1,5 @@
 import type { Node, XYPosition } from "reactflow";
+import { SPLITTER_WIDTH, splitterFractions, splitterHeight } from "./splitter";
 
 /**
  * A node's `position` is its card CENTRE (#865): cards of different heights
@@ -49,6 +50,11 @@ const CARD_SIZE: Record<string, [number, number]> = {
 const FALLBACK_SIZE: [number, number] = [140, 48];
 
 export function cardSize(n: Node): [number, number] {
+	if (n.type === "flow_splitter") {
+		// It grows with its outlets (#903).
+		const rows = splitterFractions(n.data ?? {}).length;
+		return [n.width ?? SPLITTER_WIDTH, n.height ?? splitterHeight(rows)];
+	}
 	const [w, h] = CARD_SIZE[n.type ?? ""] ?? FALLBACK_SIZE;
 	return [n.width ?? w, n.height ?? h];
 }

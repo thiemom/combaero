@@ -176,6 +176,25 @@ UNIT_MAP: dict[str, str] = {
     "eta_is": "-",
     "pressure_ratio": "-",
     "ln_m_dot": "-",
+    # --- Flow splitter (#903): per outlet, and the node's own ---
+    "fraction": "-",
+    "fraction_achieved": "-",
+    "m_dot_splitter": "kg/s",
+    "is_reference": "-",
+    "valve_dPt": "Pa",
+    "valve_CdA": "m\u00b2",
+    "valve_Cd": "-",
+    "valve_zeta": "-",
+    "valve_choked": "-",
+    "valve_needs_pump": "-",
+    "n_outlets": "-",
+    "reference_outlet": "-",
+    "reference_start": "-",
+    "reference_swapped": "-",
+    "reference_swaps": "-",
+    "n_needs_pump": "-",
+    "valve_dPt_max": "Pa",
+    "fraction_error_max": "-",
     # --- Per-row lists of the arrays (``rows_<key>``, unit of <key>) ---
     "rows_P_backside": "Pa",  # effusion liner: each panel's P_in
     "rows_unresolved": "-",  # impingement array: 1.0 marks a starved row
@@ -519,6 +538,11 @@ INPUT_UNIT_MAP: dict[str, str] = {
     "row": "-",
     "is_staggered": "-",
     "in_pipe": "-",
+    # Flow splitter (#903): fractions[i], the reference outlet's index, areas[i]
+    "fractions": "-",
+    "reference": "-",
+    "auto_reference": "-",
+    "areas": "m^2",
 }
 
 

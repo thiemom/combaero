@@ -25,6 +25,7 @@ export const NO_THERMAL_SIDE: ReadonlySet<string> = new Set([
 	"orifice",
 	"compressor",
 	"turbine",
+	"flow_splitter",
 	"area_change",
 	"effusion_plate",
 	"film_cooling",

@@ -171,6 +171,27 @@ _SPECS: dict[str, DiagnosticSpec] = {
     "LosslessConnectionElement": DiagnosticSpec(
         required=LOSSLESS_ELEMENT_FIELDS,
     ),
+    # A flow splitter's outlet (#903): the valve's metering is reported only
+    # where it is defined (flow through a positive drop; Cd and zeta with an
+    # area), the achieved fraction where the splitter carries flow.
+    "SplitterOutletElement": DiagnosticSpec(
+        required=(
+            *LOSSLESS_ELEMENT_FIELDS,
+            "fraction",
+            "is_reference",
+            "valve_dPt",
+            "valve_needs_pump",
+        ),
+        optional=(
+            "m_dot_splitter",
+            "fraction_achieved",
+            "valve_CdA",
+            "valve_choked",
+            "valve_Cd",
+            "valve_zeta",
+            "reference_swaps",
+        ),
+    ),
     # -- Nodes --
     "PlenumNode": DiagnosticSpec(
         required=NODE_UNIVERSAL_FIELDS,

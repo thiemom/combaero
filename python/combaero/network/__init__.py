@@ -12,6 +12,7 @@ from .components import (
     ImpingementPlateElement,
     EnergyBoundary,
     LosslessConnectionElement,
+    SplitterOutletElement,
     CompressorElement,
     TurbineElement,
     TurbomachineElement,
@@ -50,6 +51,7 @@ from .combustion import (
 from .graph import FlowNetwork
 from .impingement_array import ImpingementArray
 from .effusion_liner import EffusionLiner
+from .flow_splitter import FlowSplitter
 from .pressure_loss import (
     ConstantFractionLoss,
     ConstantHeadLoss,
@@ -79,6 +81,8 @@ __all__: list[str] = [
     "ImpingementArray",
     "EffusionLiner",
     "LosslessConnectionElement",
+    "FlowSplitter",
+    "SplitterOutletElement",
     "CompressorElement",
     "TurbineElement",
     "TurbomachineElement",
