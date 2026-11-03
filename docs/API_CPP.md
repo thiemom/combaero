@@ -2092,6 +2092,25 @@ ChannelResult restriction_residuals_and_jacobian(
     const std::vector<double>& Y_up, double P_static_down, double K);
 ```
 
+### Momentum Chamber Closure
+```cpp
+// Pt = Pt_cl(P, Tt, |m_dot| / A), the isentropic stagnation pressure of the
+// static state solved from h(Tt) = h(T) + v^2 / 2 (#357, #576); the low-Mach
+// Pt = P + G^2 / (2 rho) when incompressible (#588). Residual Pt - Pt_cl with
+// analytic partials in P, Pt, m_dot, Tt and Y, plus the static state
+// (T_static, M, rho_static, q_dyn) and its partials.
+//
+// One root per Pt (#788): below the sonic static pressure P* of the flux the
+// compressible closure is continued by its mirror image about its minimum,
+// 2 Pt* - Pt_cl(P), monotone in P and C1 through P*. `bounded` is true there
+// (Pt < Pt* at the root: the area cannot carry the flux at that Pt), with
+// P_sonic = P*, Pt_sonic = Pt* [Pa] (zero otherwise); the static-state
+// fields stay the closure's at P.
+MomentumChamberResult momentum_chamber_residual_and_jacobian(
+    double P, double Pt, double m_dot, double Tt,
+    const std::vector<double>& Y, double area, bool incompressible = false);
+```
+
 ### Compressible Flow Components
 ```cpp
 // Compressible orifice flow using isentropic nozzle model

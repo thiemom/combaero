@@ -713,6 +713,16 @@ struct MomentumChamberResult {
   double drho_dT = 0.0;     // d/dTt
   double drho_dmdot = 0.0;
   std::vector<double> drho_dY;
+  // Branch selection (#788): true when P is below the sonic static pressure
+  // P* of the chamber's flux, where the closure is continued by its mirror
+  // image about Pt*, 2 Pt* - Pt_cl(P), so that each Pt has one root. Such a
+  // root has Pt < Pt*: the chamber cannot carry its flux at that stagnation
+  // pressure (a choked duct discharging into it). The static state fields
+  // above stay those of the closure at P. P_sonic / Pt_sonic are P* and Pt*
+  // [Pa], set only when bounded. Always false in the incompressible limit.
+  bool bounded = false;
+  double P_sonic = 0.0;
+  double Pt_sonic = 0.0;
 };
 
 // incompressible (#588): the low-Mach limit of the same closure, for a

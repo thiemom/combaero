@@ -358,11 +358,14 @@ _STALL_PROJ_HORIZON_S = 60.0
 # made (in a driven net, the hotter the node the less it flows), not the
 # network's. A dead end's root takes up < 1e-12 of its heat (#626).
 _HEAT_FADE_TOL = 1e-6
-# A compressible momentum chamber's closure Pt = P0(P, T0, |m|/A) has two
+# A compressible momentum chamber's closure Pt = P0(P, T0, |m|/A) had two
 # static roots for one (Pt, m): the subsonic one and a supersonic one below the
 # sonic P*. No element here accelerates a stream past Mach 1 (a constant-area
 # channel chokes at 1; an orifice discharges at the chamber's static P), so a
-# chamber on the supersonic root is an artifact of the root finder, not a flow.
+# chamber on the supersonic root was an artifact of the root finder, not a
+# flow. Since #788 the closure is continued past P* so that each Pt has one
+# root; a chamber past its sonic point (Mach above 1 by more than this) has a
+# Pt below the sonic Pt* of its flux: a choked-bounded junction, or refused.
 _SUPERSONIC_CHAMBER_TOL = 1e-6
 
 
@@ -2057,9 +2060,81 @@ class NetworkSolver:
         self._target_q_columns = {
             nid: [(eb, self._name_to_index[name])] for name, (nid, eb) in target_q.items()
         }
+        self._seed_chambers_past_sonic(x0)
         if target_q:
             self._seed_target_heat(x0, target_q)
         return x0
+
+    def _seed_chambers_past_sonic(self, x0: np.ndarray) -> None:
+        """Start a compressible momentum chamber whose start lies past its
+        sonic point on its closure's root (#788).
+
+        The closure is monotone in P with ONE root per Pt, but its slope is
+        zero at the sonic static pressure P*. A start with P = Pt that the
+        flux puts below P* (a choked channel into a junction whose
+        downstream fixes a low Pt: a bore equal to the pipe) made the first
+        Newton step cross that fold and overshoot to a negative P, and the
+        cold solve stalled. Only such a start moves; a chamber with a user
+        initial guess for P, or a start on the subsonic side, keeps its x0.
+        """
+        chambers = [
+            (nid, node)
+            for nid, node in self.network.nodes.items()
+            if isinstance(node, MomentumChamberNode)
+            and node.regime != "incompressible"
+            and node.area
+            and f"{nid}.P" in self._name_to_index
+            and f"{nid}.P" not in getattr(node, "initial_guess", {})
+        ]
+        if not chambers:
+            return
+        # The probe propagation must leave no trace: a network with a
+        # back-edge reads the previous pass's states (lagged reads), so the
+        # first residual would otherwise depend on this probe.
+        _kept = ("_derived_states", "_prev_derived_states", "_film_inf_states")
+        _kept += ("_prev_film_inf_states", "_rev_junctions")
+        saved = {k: self.__dict__[k] for k in _kept if k in self.__dict__}
+        try:
+            self._propagate_states(x0, with_relay=False)
+            self._seed_chamber_roots(x0, chambers)
+        except Exception:  # noqa: BLE001 -- a start estimate never breaks a solve
+            pass
+        finally:
+            for k in _kept:
+                if k in saved:
+                    self.__dict__[k] = saved[k]
+                else:
+                    self.__dict__.pop(k, None)
+
+    def _seed_chamber_roots(
+        self, x0: np.ndarray, chambers: list[tuple[str, MomentumChamberNode]]
+    ) -> None:
+        """``_seed_chambers_past_sonic`` on the propagated start."""
+        from scipy.optimize import brentq
+
+        for nid, node in chambers:
+            try:
+                state = self._get_node_state(node, x0)
+                c = node._closure(state)
+                Pt = float(state.Pt)
+                if not c.bounded or not (math.isfinite(Pt) and Pt > 0.0):
+                    continue
+                P_star = float(c.P_sonic)
+
+                def r(
+                    lnP: float,
+                    state: NetworkMixtureState = state,
+                    node: MomentumChamberNode = node,
+                ) -> float:
+                    state.P = math.exp(lnP)
+                    return float(node._closure(state).residual)
+
+                lo, hi = math.log(1e-4 * P_star), math.log(max(Pt, P_star))
+                if not (r(lo) > 0.0 > r(hi)):
+                    continue
+                x0[self._name_to_index[f"{nid}.P"]] = math.exp(brentq(r, lo, hi, xtol=1e-10))
+            except (ValueError, RuntimeError):
+                continue
 
     def _seed_target_heat(
         self, x0: np.ndarray, target_q: dict[str, tuple[str, EnergyBoundary]]
@@ -3618,13 +3693,93 @@ class NetworkSolver:
 
     def _report_state(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
         """``_get_node_state`` with the reported static T of a moving node
-        that holds Pt = P (``_report_moving_nodes``). For diagnostics only:
-        no residual reads ``T``."""
+        that holds Pt = P (``_report_moving_nodes``), and the reported static
+        P of a choked-bounded junction (#788, ``_choked_bounded_junction``).
+        For diagnostics only: no residual reads either."""
         state = self._get_node_state(node, x)
+        bounded = getattr(node, "_choked_bounded", None)
+        if bounded is not None:
+            state.P = float(bounded["P"])
         T_s = getattr(self, "_report_T", {}).get(node.id)
         if T_s is not None:
             state.__dict__["_T_static"] = T_s
         return state
+
+    def _choked_bounded_junction(
+        self, nid: str, x: np.ndarray
+    ) -> tuple[dict[str, float] | None, str]:
+        """(report, "") when momentum chamber ``nid``, at a root past its
+        sonic limit, is a CHOKED-BOUNDED junction (#788); (None, why not)
+        otherwise.
+
+        The chamber's Pt is below the sonic Pt* of its mass flux at its area:
+        no state of that area carries the flow at that Pt. It is the
+        under-expanded exit of a choked duct when
+          * exactly one element discharges into it, a plain compressible
+            channel (the Fanno flow), choked (``choked_discharge_into``), of
+            no larger area than the chamber: its sonic exit has Pt* at least
+            the chamber's, and the jet loses the excess as it expands, as at
+            a pressure boundary taking a choked duct ("choked bounded",
+            #636); and
+          * no row but the chamber's own reads its static pressure (its
+            Jacobian column): the static P is then the closure's alone, the
+            network's other rows are those of a plenum in its place, and the
+            root is the plenum's.
+        Mass and Tt pass the chamber unchanged; the loss Pt* - Pt sits in the
+        channel's control volume (sigma = m R ln(Pt_in / Pt) > 0).
+
+        The report states the chamber as the plenum its root is: P = Pt,
+        the gas at rest, with the sonic state of its flux (P*, Pt*) and the
+        expansion loss Pt* - Pt beside it. The channel reports its own
+        choked exit (mach_out 1).
+        """
+        node = self.network.nodes[nid]
+        two = self._two_port_mdot_indices()
+        feeds = []
+        for e in self.network.get_upstream_elements(nid) + self.network.get_downstream_elements(
+            nid
+        ):
+            idx = two.get(e.id)
+            if idx is None:
+                return None, f"'{e.id}' ({type(e).__name__}) is not a two-port element"
+            m = float(x[idx])
+            if (e.to_node == nid and m > 0.0) or (e.from_node == nid and m < 0.0):
+                feeds.append(e)
+        if len(feeds) != 1:
+            return None, f"{len(feeds)} elements discharge into it, not one choked channel"
+        feed = feeds[0]
+        if not isinstance(feed, ChannelElement):
+            return None, f"'{feed.id}' ({type(feed).__name__}) feeds it, not a choked channel"
+        st_in = self._get_node_state(self.network.nodes[feed.from_node], x)
+        st_out = self._get_node_state(self.network.nodes[feed.to_node], x)
+        st_in.m_dot = st_out.m_dot = float(x[two[feed.id]])
+        why = feed.choked_discharge_into(nid, st_in, st_out)
+        if why:
+            return None, why
+        if not float(feed.area or 0.0) <= node.area * (1.0 + 1e-9):
+            return None, (
+                f"'{feed.id}' ({float(feed.area or 0.0):.4g} m^2) is wider than the "
+                f"chamber ({node.area:.4g} m^2), which would choke first"
+            )
+        _, J = self._residuals_and_jacobian(x)
+        col = self.unknown_names.index(f"{nid}.P")
+        column = J.tocsc()[:, col] if sp.issparse(J) else sp.csc_matrix(np.asarray(J)[:, [col]])
+        own = set(self._unknown_indices.get(nid, []))
+        readers = sorted(
+            {self.unknown_names[i] for i, v in zip(column.indices, column.data, strict=True) if v}
+            - {self.unknown_names[i] for i in own}
+        )
+        if readers:
+            return None, f"row(s) {readers} read its static pressure"
+        state = self._get_node_state(node, x)
+        c = node._closure(state)
+        if not c.bounded or not c.Pt_sonic > 0.0 or not state.Pt > 0.0:
+            return None, "no sonic state at its flux"
+        return {
+            "P": float(state.Pt),
+            "P_sonic": float(c.P_sonic),
+            "Pt_sonic": float(c.Pt_sonic),
+        }, ""
 
     def _get_node_state(self, node: NetworkNode, x: np.ndarray) -> NetworkMixtureState:
         """Constructs a NetworkMixtureState for a given node based on the current solver vector x."""
@@ -4068,6 +4223,7 @@ class NetworkSolver:
             "__T_clamped__": [],
             "__heat_faded__": [],
             "__supersonic_chambers__": [],
+            "__choked_bounded_junctions__": [],
             "__outcome__": SolveOutcome.ERROR,
             "__final_norm__": float("inf"),
             "__worst_residuals__": [],
@@ -6167,8 +6323,21 @@ class NetworkSolver:
         # junction before a wide orifice: the junction at Mach 1.46, the
         # channel "leaving" at Mach 1.67 unchoked, the orifice's static
         # pressure rising across it -- reported as converged and consistent.
+        #
+        # Since #788 the closure has ONE root per Pt (continued past the sonic
+        # point, C++ momentum_chamber_residual_and_jacobian), so a chamber is
+        # only ever there when its Pt is below the sonic Pt* of its flow: its
+        # area cannot carry the flow at that stagnation pressure. That is a
+        # CHOKED-BOUNDED junction, the under-expanded exit a pressure boundary
+        # takes as "choked bounded" (#636), when a choked duct of no larger
+        # area discharges into it and nothing reads its static pressure; it is
+        # accepted and reported as such. Anything else is refused.
         _supersonic: list[str] = []
         _supersonic_notes: list[str] = []
+        _choked_bounded: list[str] = []
+        for node in self.network.nodes.values():
+            if isinstance(node, MomentumChamberNode):
+                node._choked_bounded = None
         if success:
             for nid, node in self.network.nodes.items():
                 if (
@@ -6180,20 +6349,27 @@ class NetworkSolver:
                     continue
                 M = float(node.mach(self._get_node_state(node, final_x)))
                 if M > 1.0 + _SUPERSONIC_CHAMBER_TOL:
-                    feeds = sorted(e.id for e in self.network.get_upstream_elements(nid))
+                    bounded, why = self._choked_bounded_junction(nid, final_x)
+                    if bounded is not None:
+                        _choked_bounded.append(nid)
+                        node._choked_bounded = bounded
+                        continue
                     _supersonic.append(nid)
-                    _supersonic_notes.append(f"'{nid}' at Mach {M:.3g} (fed by {feeds})")
+                    _supersonic_notes.append(f"'{nid}' ({why})")
             if _supersonic:
                 success = False
                 consistent = False
                 outcome = SolveOutcome.INCONSISTENT
                 message = (
-                    f"Converged with momentum chamber(s) {', '.join(_supersonic_notes)} on the "
-                    "supersonic root of the chamber closure: its static pressure is below "
-                    "the sonic pressure of its flow, which no element here produces (a "
-                    "constant-area channel chokes at Mach 1). Usually the element "
-                    "downstream is no restriction for that flow -- check its geometry -- "
-                    "and the duct feeding the chamber is choked."
+                    f"Converged with momentum chamber(s) {', '.join(_supersonic_notes)} "
+                    "below the sonic limit of its area: its total pressure is less than "
+                    "the least any flow of its mass flux has at its area (the sonic "
+                    "Pt*), so the chamber has no subsonic state, and none is a choked "
+                    "duct's under-expanded exit (a choked-bounded junction: one choked "
+                    "compressible channel of no larger area feeding the chamber, and no "
+                    "element reading its static pressure). Usually the element downstream "
+                    "is no restriction for that flow -- check its geometry -- or the "
+                    "chamber's area is smaller than the flow it is given needs."
                 )
 
         if not success:
@@ -6254,6 +6430,11 @@ class NetworkSolver:
         }
 
         sol_dict = dict(zip(self.unknown_names, final_x, strict=False))
+        # A choked-bounded junction reports as the plenum its root is (P = Pt);
+        # its P unknown is the closure's continuation past the sonic point
+        # (#788), which no other row reads. __x_solution__ keeps the unknown.
+        for nid in _choked_bounded:
+            sol_dict[f"{nid}.P"] = float(self.network.nodes[nid]._choked_bounded["P"])
 
         # Ensure _derived_states matches final_x (best iterate), not the
         # last trial point the solver happened to evaluate.  This is cheap:
@@ -6793,6 +6974,7 @@ class NetworkSolver:
         sol_dict["__heat_faded__"] = list(_heat_faded)
         sol_dict["__heat_undetermined__"] = list(_target_stagnant)
         sol_dict["__supersonic_chambers__"] = list(_supersonic)
+        sol_dict["__choked_bounded_junctions__"] = list(_choked_bounded)
         sol_dict["__outcome__"] = outcome
         # The rows carrying the residual, largest first. Already computed for
         # the diagnostic payload; a failed solve is far easier to read with
