@@ -90,7 +90,7 @@ Line numbers are on the branch.
 | A3 | area_change.cpp:772 | `area_change_loss` Mach | Newton in [0, 1] | 200 | 1e-15 M step | silent | bisection | safe | fixed: cap rule |
 | O1 | orifice.cpp:1307 | `pipe_equivalent_c` | Newton in [1e-6, 1e3] | 100 | 1e-14 C step | silent | bisection | safe | fixed: cap rule |
 | O2 | orifice.cpp:1462 | `solve_orifice_mdot` | fixed point on Cd(Re) | caller | rel change < tol | throws | | safe | none |
-| O3 | orifice.cpp:1778 | `jobson_expansibility` | fixed point (approach term O(beta^4)) | 200 | 1e-15 relative | silent; 2 hits at 3e-14 / 4e-15 (rounding cycle) | | safe at the hits | fixed: cap rule (the hits are kept, bit-identical). rec R11 fixed (#943, PR #954): 1e-13 |
+| O3 | orifice.cpp:1778 | `jobson_expansibility` | fixed point (approach term O(beta^4)) | 200 | 1e-15 relative | silent; 2 hits at 3e-14 / 4e-15 (rounding cycle) | | safe at the hits | fixed: cap rule (the hits are kept, bit-identical). rec R11 fixed (#943, PR #954): 1e-13. Fixed point replaced by a bracketed Newton (#957): it cycled to the cap at high beta Ci |
 | H1 | humidair.cpp:205 | `dewpoint` | Newton, FD slope, clamped [T_lo, T] | 100 | 1e-6 K | throws; RH > 1 would put the root above T (Newton on the clamp, "converged" to T), but `vapor_pressure` refuses RH > 1 first | clamp | safe | R12 (#944): documented |
 | H2 | humidair.cpp:317 | `wet_bulb_temperature` | Newton in a bracket | 200 | 1e-6 K | throws | bisection | safe | none |
 | R1 | friction.cpp:92 | `friction_colebrook` | Newton from Serghides | 20 (caller) | 1e-10 relative | silent (also on a flat slope) | none (monotone) | latent (reachable by the caller) | fixed: throws |
@@ -591,3 +591,85 @@ also reached at 189.9 K: from a 20 K guess the alternation returned 189.9 K).
   ill-conditioned (not measured beyond the sweep above).
   `jobson_expansibility` fails to converge on valid input at high beta Ci and
   low r: 108 of the 1800 sweep calls, the same on main. It is not fixed here.
+  **Fixed in #957** (see "#957: Jobson expansibility past the fixed point's
+  reach" below).
+
+## #957: Jobson expansibility past the fixed point's reach
+
+**Finding: a root exists.** Jobson's paper is reservoir-fed, so it has no
+inner solve. The inner solve comes from our beta extension. With the upstream
+static state p1 = rho1 = 1, the jet flux per bore area g solves
+h(g) = F(g) - g = 0. Here F is the flux from the stagnation state that the
+approach velocity V1 = g beta^2 raises. F falls with g, so the root is unique:
+
+- a dense sign scan of h on [0, 4 F(0)] finds exactly one sign change at every
+  point of a 33000-point grid (r 0.02-0.999, beta 0-0.9, Ci 0.5-1, n 1.1-1.667);
+- F never rises along the scan.
+
+The fixed point g <- F(g) converges only where |F'| < 1 at the root:
+
+- where it converged, F' was between -0.80 and 0;
+- at every point where it failed, F' < -1, down to -1500 next to the
+  discriminant kink. There the iteration falls into a period-2 cycle, which is
+  the -2.3 step seen at the cap.
+
+The failures are not a "low r" region. They form a band in r for each
+(beta, Ci), and the band moves to lower r as beta Ci grows: at n = 1.4,
+r 0.52-0.72 at beta 0.8, Ci 1, and r 0.83-1 at beta 0.8, Ci 0.7. In all,
+2747 of the 33000 grid points failed. Every one of them is outside the
+jobson1955 range (Ci <= 0.7, beta <= 0.75); inside it, all 9600 converged.
+
+**Fix.** `jobson_expansibility` now runs a bracketed Newton (rtsafe) on h, with
+F' by DualN forward mode through the same `orifice_jobson::flux`. The
+bracket is [0, F(0)], and its upper end doubles until h < 0. The tolerance is
+the same (`kJobsonExpansibilityRelTol`), and so is the cap rule.
+
+**Evidence.**
+
+- *Sweep (33000 calls), main against the branch.*
+  - Main: 30253 converged, 2747 threw. Branch: 33000 converged, 0 refused.
+  - Where main converged, 10296 values are identical and 19957 changed. The
+    largest change is 2.3e-13 relative for r < 0.9, and 3.7e-11 at
+    r >= 0.9. Of the 81 changes above 1e-13, the branch is closer to the
+    40-digit root in 77.
+  - The 2747 former failures, against a 40-digit bisection of the same
+    equation (mpmath, independent of the C++ code): 2683 agree to 1e-13, and
+    all 64 above that are at r >= 0.966 (worst 3.8e-12 at r = 0.999). There,
+    1 - re^((n-1)/n) cancels and F carries that rounding.
+- *Degenerate branch, unchanged.* At high beta Ci and higher r the root lies
+  where the momentum quadratic has no real root. There the closure holds its
+  discriminant at zero, the `degenerate` flag the network kernel reports as
+  `in_range` false. This covers 1983 grid points that converged on main and
+  77 former failures. At beta 0.8, Ci 1, n 1.4 this sets in at r ~ 0.72,
+  where eps(r) has a slope kink.
+- *Network.* The orifice element's kernel (`orifice_jobson_residuals_and_jacobian`)
+  never calls `jobson_expansibility`. It takes the approach static state from
+  the network, with no inner solve. Network F and J at x0 plus 3 perturbations,
+  14 families x seeds 0-39: 560 of 560 SHA-256 identical to origin/main. A
+  central-difference check of every kernel column (Pt, P1, Tt, Pb, Cd) covered
+  1440 points: beta 0.5-0.8, Cd 0.6-0.9, approach Mach 0.05-0.35, r 0.3-0.99.
+  30 entries miss by more than 1e-5 (relative, times the variable's scale).
+  In 28 of them the analytic value lies between the two one-sided
+  differences, so the miss is curvature, not a wrong derivative. The other
+  two, d/dPt and d/dP1, are at one point next to the discriminant's zero
+  (beta 0.8, Cd 0.9, approach Mach 0.35, r 0.66). There the miss shrinks
+  with the step: from a factor of 3 (d/dPt) and 0.64 (d/dP1) at h = 0.2 Pa
+  to 3e-6 and 1e-6 at h = 1e-5 Pa.
+
+- *Stress outcome A/B* (14 families x seeds 0-39, `--jobs 4`, serial, main
+  then branch). One seed changed outcome: random 4 timed out on main and
+  converged on the branch. Re-run alone with `--jobs 1`, it times out on
+  both, with the same final norm (0.414). The flip is the wall-clock
+  timeout, which fits the identical F and J. Converged per family: random 33
+  (32 on main, from that seed), and the rest the same on both: bleed_station
+  38, effusion 40, ejector 30, hotcold 40, hotcold_mild 40, ideal_nport 40,
+  impingement 40, impingement_bypass 40, jet_chain 38, legacy_tee 32,
+  pin_fin 40, series 40, tee3 32.
+- *Tests.* `python/tests/test_jobson_expansibility_957.py` and the C++
+  test `Jobson1955.ExpansibilityConvergesWhereTheFixedPointCycled` check
+  four former failures and one control point against the 40-digit root
+  (1e-13 relative). The Python file also checks that eps(r) through the
+  former band at beta 0.8, Ci 1 is finite, monotone and has no jumps.
+  Falsified with origin/main's `src/orifice.cpp`: the C++ test throws at the
+  cap, and 5 of 6 Python tests fail (the control passes, as intended).
+  Full suite (6907 passed) and ctest (54) pass.

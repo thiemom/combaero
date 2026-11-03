@@ -359,6 +359,7 @@ f = cb.jobson_force_defect(Ci, beta=0.0, Cv=1.0)  # 1/Ci - 1/(2 Ci^2) - Cv b^2 +
 Ci = cb.jobson_ci_from_cd(Cd, beta, Cv=1.0)  # Cv Ci / sqrt(1 - (Cv Ci)^2 b^4) = Cd E
 C = cb.jobson_contraction_coefficient(r, Ci, n=1.4)  # Eqs. 11 / 15, r = p/p0, reservoir-fed
 eps = cb.jobson_expansibility(r, beta, Ci, 1.4)  # vs ISO 5167-2 Eq. (5), r = p2/p1
+# (approach-velocity consistency by bracketed Newton: any r in (0, 1], #957)
 
 # Discharge hole in a wall -- no pipe, no beta. Separate selector, separate
 # geometry. Idelchik (1966) diagrams 4-17/4-18, valid Re 25 to 1e6.

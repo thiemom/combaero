@@ -4612,9 +4612,13 @@ documents:
     (#861), cross-source: N = 9, bias +1.1%, RMS 1.9%, worst +5.1% (r = 0.89, steep slope); nozzle RMS 19.8%.
     Since 0.8.0 (#861) the build-time default for an incompressible-referenced Cd (RHG, Idelchik, Lichtarowicz,
     McGreehan-Schotsch baseline) on a sharp-edged bore at beta <= 0.75; the nozzle stays for fixed Cd, Stolz and
-    the McGreehan-Schotsch crossflow term.'
-  read_for: ['#854 compressible orifice expansion']
-  issues: [854, 861]
+    the McGreehan-Schotsch crossflow term. The paper is reservoir-fed (no inner solve); the beta extension''s
+    jobson_expansibility has a unique root at every r in (0, 1] (#957, 33000-point sweep): its old fixed point
+    cycled where the flux slope at the root is below -1 (beta 0.5-0.9, Ci 0.6-1, all outside Ci <= 0.7, beta
+    <= 0.75), now a bracketed Newton. At high beta Ci and higher r the momentum quadratic has no real root and
+    the closure holds its discriminant at zero (degenerate, in_range false), unchanged.'
+  read_for: ['#854 compressible orifice expansion', '#957 expansibility r range']
+  issues: [854, 861, 957]
   records: [validation/cooling/data/jobson1955/metadata.yaml, validation/cooling/orifice_runner.py,
     tests/test_orifice_jobson.cpp, python/tests/test_orifice_jobson_854.py, python/tests/test_jobson1955_fig5.py,
     python/tests/test_orifice_default_model_861.py]

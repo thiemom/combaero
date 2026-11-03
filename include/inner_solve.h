@@ -14,7 +14,7 @@ namespace combaero::inner_solve {
 // A loop that reaches its cap still returns its last iterate when the last
 // step (or its bracket) is within this fraction of the iterate: a tolerance
 // set at 1e-13..1e-15 can cycle in the last bits of a root it has found
-// (the Jobson expansibility fixed point does, at 3e-14). A wider exit is not
+// (the former Jobson expansibility fixed point did, at 3e-14). A wider exit is not
 // a root and throws.
 constexpr double kCapAcceptRel = 1e-10;
 
@@ -27,9 +27,9 @@ constexpr int kMergeFaceMaxIter = 100;            // side-stream merge face fixe
 constexpr int kCrossflowCdMaxIter = 100;          // crossflow Cd, falling branch
 constexpr int kAreaChangeMaxIter = 200;           // area_change Mach / flux solves
 constexpr int kPipeEquivalentCMaxIter = 100;      // orifice pipe-equivalent C
-constexpr int kJobsonExpansibilityMaxIter = 200;  // Jobson expansibility fixed point
-// Its relative step tolerance (#868 R11): 1e-15 cycled in the last bits
-// (to 3e-14) until the cap; 1e-13 ends there with no change beyond 3e-14.
+constexpr int kJobsonExpansibilityMaxIter = 200;  // Jobson expansibility, rtsafe (#957)
+// Its relative step tolerance (#868 R11; kept for the bracketed Newton that
+// replaced the fixed point in #957).
 constexpr double kJobsonExpansibilityRelTol = 1e-13;
 constexpr int kWgsExtentMaxIter = 100;            // WGS extent, rtsafe (#927)
 constexpr int kAdiabaticMaxIter = 100;            // equilibrium adiabatic T, bracket + Brent

@@ -159,3 +159,24 @@ TEST(Iso5167Kernel, IsEq1WithEq5AndFlagsBelowItsRange) {
     EXPECT_EQ(res.in_range, r >= orifice::iso5167_expansibility::min_pressure_ratio);
   }
 }
+
+TEST(Jobson1955, ExpansibilityConvergesWhereTheFixedPointCycled) {
+  // #957: at high beta Ci the flux map F(g) has slope below -1 at its root,
+  // so the old fixed point g = F(g) cycled to its cap and threw. The root
+  // is unique (F falls with g); references are the same equation solved by
+  // bisection in 40-digit arithmetic (mpmath), independent of this code.
+  struct Case {
+    double r, beta, Ci, n, eps;
+  };
+  const Case kCases[] = {
+      {0.6, 0.8, 1.0, 1.4, 0.58374822830105710},
+      {0.7, 0.75, 0.9, 1.4, 0.74605852644370772},
+      {0.9, 0.8, 0.75, 1.4, 0.94770239954065802},
+      {0.5, 0.9, 0.8, 1.667, 0.72983987911184448},
+      {0.3, 0.8, 1.0, 1.4, 0.46813846063356227},  // converged before as well
+  };
+  for (const auto& c : kCases) {
+    const double eps = jobson_expansibility(c.r, c.beta, c.Ci, c.n);
+    EXPECT_NEAR(eps, c.eps, 1e-13 * c.eps) << c.r << " " << c.beta << " " << c.Ci;
+  }
+}

@@ -1617,7 +1617,8 @@ double jobson_ci_from_cd(double Cd, double beta = 0.0, double Cv = 1.0);
 // The paper's C(r), reservoir-fed: Eq. (11) for r >= r_c, Eq. (15) below.
 double jobson_contraction_coefficient(double r, double Ci, double n);
 // mdot / mdot_inc at the same upstream static state, r = p2/p1, the beta
-// extension solved to consistency: comparable with ISO 5167-2 Eq. (5).
+// extension solved to consistency (bracketed Newton, unique root, any r in
+// (0, 1], #957): comparable with ISO 5167-2 Eq. (5).
 double jobson_expansibility(double r, double beta, double Ci, double n);
 
 // Fixed Cd from an explicit value. make_correlation(MeteringCdCorrelation::Constant)

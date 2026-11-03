@@ -1266,7 +1266,11 @@ double jobson_contraction_coefficient(double r, double Ci, double n);
 // 5167-2's eps: mdot / mdot_inc at the same upstream STATIC state (p1, rho1)
 // and the same Ci, with mdot_inc = Ci A sqrt(2 rho1 dp) / sqrt(1 - Ci^2 b^4).
 // r = p2/p1; the approach velocity's stagnation rise is solved to
-// consistency. Subcritical and choked alike.
+// consistency (a bracketed Newton on the jet flux per bore area; the root is
+// unique, #957). Subcritical and choked alike, any r in (0, 1]. Where the
+// momentum quadratic has no real root (high beta Ci, outside jobson1955's
+// range) the closure holds its discriminant at zero, as the network kernel
+// does (in_range false there).
 double jobson_expansibility(double r, double beta, double Ci, double n);
 
 #endif // ORIFICE_H
