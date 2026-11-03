@@ -398,6 +398,12 @@ density_and_jacobians(double T, double P, const std::vector<double> &X) {
   return {rho, d_rho_d_T, d_rho_d_P};
 }
 
+std::vector<double> viscosity_mass_gradient(double T, double P,
+                                            const std::vector<double> &X) {
+  const double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
+  return combaero::mole_gradient_to_mass(X, combaero::viscosity_dX(T_eff, P, X));
+}
+
 std::tuple<double, double> enthalpy_and_jacobian(double T,
                                                   const std::vector<double> &X) {
   double T_eff = (T > 10.0) ? T : (10.0 + 0.1 * (T - 10.0));
@@ -1391,17 +1397,19 @@ OrificeResult orifice_residuals_and_jacobian(double m_dot, double P_total_up,
   res.d_mdot_dP_rho_ref = own_rho_ref ? d_rho_term : 0.0;
   res.d_mdot_dTt_up = dmdot_drho * drho_dT;
 
-  // Analytical Y derivatives via chain rule: d(mdot)/d(Y[i]) = d(mdot)/d(rho) * d(rho)/d(Y[i])
-  // Compute d(rho)/d(Y[i]) using finite differences (no analytical drho_dY available)
+  // Composition, analytic (#964; a forward difference until then, off a
+  // central one by up to 1e-5 of the row): d(mdot)/dY = d(mdot)/d(rho)
+  // d(rho)/dY. rho = P MW / (R_u T) with MW = sum X_k W_k, so at fixed (T, P)
+  // d(rho)/dX_j = rho W_j / MW, chained to the mass fractions.
+  std::vector<double> drho_dX(X_up.size(), 0.0);
+  const double mw = combaero::mwmix(X_up);
+  for (std::size_t j = 0; j < X_up.size(); ++j) {
+    drho_dX[j] = rho * combaero::species_molar_mass(j) / mw;
+  }
+  const std::vector<double> drho_dY = combaero::mole_gradient_to_mass(X_up, drho_dX);
   res.d_mdot_dY_up.resize(Y_up.size(), 0.0);
-  const double eps_Y = 1e-6;
   for (std::size_t i = 0; i < Y_up.size(); ++i) {
-    std::vector<double> Y_plus = Y_up;
-    Y_plus[i] += eps_Y;
-    auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
-    double rho_plus = std::get<0>(density_and_jacobians(Tt_up, P_rho, X_plus));
-    double drho_dY = (rho_plus - rho) / eps_Y;
-    res.d_mdot_dY_up[i] = dmdot_drho * drho_dY;
+    res.d_mdot_dY_up[i] = dmdot_drho * drho_dY[i];
   }
 
   return res;
@@ -1703,10 +1711,59 @@ MomentumChamberResult momentum_chamber_residual_and_jacobian(
 // Compressible Flow Components
 // -----------------------------------------------------------------------------
 
-std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
+namespace {
+
+// d(mdot)/dX_j of the isentropic nozzle at fixed (T0, P0, P_out), the mole
+// fractions taken unnormalised (chain with mole_gradient_to_mass) (#964).
+// mdot_fwd > 0 is the forward flow, T the outlet temperature at P_out.
+//   Outlet on the isentrope through (T0, P0): the mixing entropy is the same
+//   at both ends, so sum_k X_k [s_k(T) - s_k(T0)] = R_u ln(P_out / P0) and
+//     dT/dX_j = -(s_j(T) - s_j(T0)) T / cp(T)               (molar cp);
+//   a j-independent term (the pressure ratio's) drops out of the chain.
+//   mdot = A_eff rho v, rho = P_out MW / (R_u T), v = sqrt(2 dH),
+//   dH = sum_k X_k [h_k(T0) - h_k(T)] / MW:
+//     d ln rho / dX_j = W_j / MW - (dT/dX_j) / T,
+//     d dH / dX_j = (dh_j - dH W_j) / MW - cp_mass(T) dT/dX_j.
+// Choked, P_out = P* maximises G = rho v over the outlet pressure, so
+// dG*/dX = dG/dX at fixed P* (envelope theorem): the same expression at the
+// throat, and nozzle_flow's golden-section P* enters only at second order.
+std::vector<double> nozzle_mdot_dX(double mdot_fwd, double T0, double T,
+                                   const std::vector<double>& X) {
+  const std::size_t n = X.size();
+  std::vector<double> out(n, 0.0);
+  if (!(mdot_fwd > 0.0)) {
+    return out;
+  }
+  const double MW = combaero::mwmix(X);  // g/mol, as species_molar_mass
+  const double cp_T = combaero::cp(T, X);  // J/(mol K)
+  std::vector<double> dh(n, 0.0);
+  double dH = 0.0;  // J/mol of mixture
+  for (std::size_t j = 0; j < n; ++j) {
+    dh[j] = combaero::h_species(j, T0) - combaero::h_species(j, T);
+    dH += X[j] * dh[j];
+  }
+  if (!(dH > 0.0)) {
+    return out;
+  }
+  // Per mole of mixture throughout: dH / MW is the mass-specific drop and
+  // cp_T / MW the mass cp, so the MW factors cancel in d ln dH.
+  for (std::size_t j = 0; j < n; ++j) {
+    const double W = combaero::species_molar_mass(j);
+    const double dT =
+        -(combaero::s_species(j, T) - combaero::s_species(j, T0)) * T / cp_T;
+    const double dln_rho = W / MW - dT / T;
+    const double dln_dH = (dh[j] - dH * W / MW - cp_T * dT) / dH;
+    out[j] = mdot_fwd * (dln_rho + 0.5 * dln_dH);
+  }
+  return out;
+}
+
+// orifice_compressible_mdot_and_jacobian, with the composition gradient of
+// its flow (nozzle_mdot_dX, unnormalised X) when dm_dX is given.
+std::tuple<double, double, double, double> orifice_compressible_mdot_impl(
     double Tt, double Pt, double P_back,
     const std::vector<double>& X,
-    double Cd, double area, double beta) {
+    double Cd, double area, double beta, std::vector<double>* dm_dX) {
 
   // Compute effective area with velocity-of-approach factor
   const double E = velocity_of_approach_factor(beta);
@@ -1779,7 +1836,26 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
     d_mdot_dT0 = -d_mdot_dT0;
   }
 
+  if (dm_dX != nullptr) {
+    // nozzle_flow evaluates at its floored stagnation state.
+    *dm_dX = nozzle_mdot_dX(sol.mdot, sol.stagnation.T, T_outlet, X);
+    if (reverse_flow) {
+      for (double& v : *dm_dX) {
+        v = -v;
+      }
+    }
+  }
+
   return {mdot, d_mdot_dP0, d_mdot_dP_back, d_mdot_dT0};
+}
+
+}  // namespace
+
+std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobian(
+    double Tt, double Pt, double P_back,
+    const std::vector<double>& X,
+    double Cd, double area, double beta) {
+  return orifice_compressible_mdot_impl(Tt, Pt, P_back, X, Cd, area, beta, nullptr);
 }
 
 OrificeResult orifice_compressible_residuals_and_jacobian(
@@ -1825,8 +1901,9 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   }
 
   // Get mass flow and Jacobians from low-level function
+  std::vector<double> dm_dX;
   auto [mdot_calc, dmdot_dP0, dmdot_dP_back, dmdot_dT0] =
-      orifice_compressible_mdot_and_jacobian(T1, P0, P_static_down, X_up, Cd, area, beta);
+      orifice_compressible_mdot_impl(T1, P0, P_static_down, X_up, Cd, area, beta, &dm_dX);
 
   OrificeResult res;
   res.m_dot_calc = mdot_calc;
@@ -1836,17 +1913,20 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
   res.d_mdot_dP_rho_ref = 0.0;
   res.d_mdot_dTt_up = dmdot_dT0 * dT1_dTt;
 
-  // Compute d(mdot)/d(Y[i]) using finite differences
-  res.d_mdot_dY_up.resize(Y_up.size(), 0.0);
-  const double eps_Y = 1e-6;
-  for (std::size_t i = 0; i < Y_up.size(); ++i) {
-    std::vector<double> Y_plus = Y_up;
-    Y_plus[i] += eps_Y;
-    auto X_plus = combaero::mass_to_mole(combaero::normalize_fractions(Y_plus));
-    auto [mdot_plus, dummy1, dummy2, dummy3] = orifice_compressible_mdot_and_jacobian(
-        static_T(X_plus), P0, P_static_down, X_plus, Cd, area, beta);
-    res.d_mdot_dY_up[i] = (mdot_plus - mdot_calc) / eps_Y;
+  // Composition, analytic (#964; a forward difference until then, off a
+  // central one by up to 7e-4 of the row): the nozzle's own gradient at fixed
+  // (T1, P0, Pb), plus T1's where it is the approach static temperature. On
+  // the isentrope through (Tt_up, P_total_up), as nozzle_mdot_dX,
+  //   dT1/dX_j = -(s_j(T1) - s_j(Tt_up)) T1 / cp(T1).
+  if (from_static && P_static_up != P_total_up) {
+    const double c1 = combaero::cp(T1, X_up);
+    for (std::size_t j = 0; j < X_up.size(); ++j) {
+      const double dT1 =
+          -(combaero::s_species(j, T1) - combaero::s_species(j, Tt_up)) * T1 / c1;
+      dm_dX[j] += dmdot_dT0 * dT1;
+    }
   }
+  res.d_mdot_dY_up = combaero::mole_gradient_to_mass(X_up, dm_dX);
 
   return res;
 }
@@ -1857,18 +1937,23 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 
 namespace {
 
-using MD = DualN<5>;
 // Partial indices: upstream total and approach static pressure, upstream total
-// temperature, back pressure, the element's incompressible coefficient.
-enum : int { kMdPt = 0, kMdP1 = 1, kMdTt = 2, kMdPb = 3, kMdCd = 4 };
+// temperature, back pressure, the element's incompressible coefficient, and
+// the two numbers composition enters by: the jet exponent n = gamma(Tt) and
+// the specific gas constant R (#964).
+enum : int { kMdPt = 0, kMdP1 = 1, kMdTt = 2, kMdPb = 3, kMdCd = 4, kMdN = 5, kMdR = 6,
+             kMdCount = 7 };
+using MD = DualN<kMdCount>;
 
 // gamma(Tt) carrying d/dTt: gamma = cp / (cp - R), so
 // dgamma/dT = -R cp'(T) / (cp - R)^2 (molar cp; R the universal constant).
+// Seeded in its own direction too: the composition chain (model_result).
 MD gamma_of_Tt(double Tt, const std::vector<double>& X) {
   const double c = combaero::cp(Tt, X);
   const double cv = c - combaero::thermo::R_GAS;
   MD n = MD::constant(c / cv);
   n.d[kMdTt] = -combaero::thermo::R_GAS * combaero::dcp_dT(Tt, X) / (cv * cv);
+  n.d[kMdN] = 1.0;
   return n;
 }
 
@@ -1892,7 +1977,7 @@ ModelEval jobson_eval(double Pt, double P1, double Tt, double Pb, double Cd, dou
   // The drive: the approach static with E, the reservoir's total without.
   const MD pd = from_static ? MD::seed(P1, kMdP1) : pt;
   const MD n = gamma_of_Tt(Tt, X);
-  const double R = combaero::specific_gas_constant(X);
+  const MD R = MD::seed(combaero::specific_gas_constant(X), kMdR);
   const MD ci = orifice_jobson::ci_from_cd(cd, b, Cv);
   const double E = velocity_of_approach_factor(b);
 
@@ -1933,7 +2018,7 @@ ModelEval iso5167_eval(double Pt, double P1, double Tt, double Pb, double Cd, do
   const MD pb = MD::seed(Pb, kMdPb);
   const MD pd = from_static ? MD::seed(P1, kMdP1) : pt;
   const MD n = gamma_of_Tt(Tt, X);
-  const double R = combaero::specific_gas_constant(X);
+  const MD R = MD::seed(combaero::specific_gas_constant(X), kMdR);
   const MD rho0 = pt / (R * tt);
   const MD rho1 = rho0 * orifice_jobson::pow_dd(pd / pt, 1.0 / n);
 
@@ -1951,7 +2036,7 @@ ModelEval iso5167_eval(double Pt, double P1, double Tt, double Pb, double Cd, do
   // 1 Pa regularisation of the drive.
   const auto [k1, dk_ddp, dk_drho] = orifice_mdot_and_jacobian(pd.v - pb.v, rho_up.v, 1.0, area, b);
   MD m_inc = MD::constant(Cd * k1);
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < kMdCount; ++i) {
     m_inc.d[i] = Cd * (dk_ddp * (pd.d[i] - pb.d[i]) + dk_drho * rho_up.d[i]);
   }
   m_inc.d[kMdCd] += k1;
@@ -1961,11 +2046,10 @@ ModelEval iso5167_eval(double Pt, double P1, double Tt, double Pb, double Cd, do
 }
 
 template <typename Eval>
-OrificeModelResult model_result(const Eval& eval, const std::vector<double>& Y_up) {
-  const auto X_of = [](const std::vector<double>& Y) {
-    return combaero::mass_to_mole(combaero::normalize_fractions(Y));
-  };
-  const ModelEval e = eval(X_of(Y_up));
+OrificeModelResult model_result(const Eval& eval, const std::vector<double>& Y_up, double Tt) {
+  const std::vector<double> X =
+      combaero::mass_to_mole(combaero::normalize_fractions(Y_up));
+  const ModelEval e = eval(X);
   OrificeModelResult res;
   res.m_dot_calc = e.m.v;
   res.d_mdot_dP_total_up = e.m.d[kMdPt];
@@ -1979,14 +2063,24 @@ OrificeModelResult model_result(const Eval& eval, const std::vector<double>& Y_u
   res.expansibility = e.eps.v;
   res.choked = e.choked;
   res.in_range = e.in_range;
-  // Composition: a forward difference, as the other orifice kernels.
-  res.d_mdot_dY_up.assign(Y_up.size(), 0.0);
-  const double eps_Y = 1e-6;
-  for (std::size_t i = 0; i < Y_up.size(); ++i) {
-    std::vector<double> Y_plus = Y_up;
-    Y_plus[i] += eps_Y;
-    res.d_mdot_dY_up[i] = (eval(X_of(Y_plus)).m.v - e.m.v) / eps_Y;
+  // Composition, analytic (#964; a forward difference until then). It enters
+  // both models through n = gamma(Tt) = cp / (cp - R_u) (molar cp = sum_k X_k
+  // cp_k(Tt)) and R = R_u / MW (MW = sum_k X_k W_k) only, whose own partials
+  // the DualN carries (kMdN, kMdR):
+  //   dn/dX_j = -R_u cp_j(Tt) / (cp - R_u)^2,  dR/dX_j = -R W_j / MW,
+  // the mole fractions unnormalised, chained to the mass fractions.
+  const std::size_t n = X.size();
+  std::vector<double> dm_dX(n, 0.0);
+  const double c = combaero::cp(Tt, X);
+  const double cv = c - combaero::thermo::R_GAS;
+  const double R = combaero::specific_gas_constant(X);
+  const double MW = combaero::mwmix(X);
+  for (std::size_t j = 0; j < n; ++j) {
+    const double dn = -combaero::thermo::R_GAS * combaero::cp_species(j, Tt) / (cv * cv);
+    const double dR = -R * combaero::species_molar_mass(j) / MW;
+    dm_dX[j] = e.m.d[kMdN] * dn + e.m.d[kMdR] * dR;
   }
+  res.d_mdot_dY_up = combaero::mole_gradient_to_mass(X, dm_dX);
   return res;
 }
 
@@ -2016,7 +2110,7 @@ OrificeModelResult orifice_jobson_residuals_and_jacobian(
         return jobson_eval(P_total_up, P_static_up, Tt_up, P_static_down, Cd, area, beta, Cv,
                            X);
       },
-      Y_up);
+      Y_up, Tt_up);
 }
 
 OrificeModelResult orifice_iso5167_residuals_and_jacobian(
@@ -2039,7 +2133,7 @@ OrificeModelResult orifice_iso5167_residuals_and_jacobian(
       [&](const std::vector<double>& X) {
         return iso5167_eval(P_total_up, P_static_up, Tt_up, P_static_down, Cd, area, beta, X);
       },
-      Y_up);
+      Y_up, Tt_up);
 }
 
 SonicStatic sonic_static_pressure(double Tt, double G, const std::vector<double>& Y) {
@@ -2062,52 +2156,105 @@ SonicStatic sonic_static_pressure(double Tt, double G, const std::vector<double>
   return out;
 }
 
+namespace {
+
+// d P* / dX_j of duct_static_state's choked branch (#964), the mole fractions
+// unnormalised (chain with mole_gradient_to_mass). T* solves the M = 1 energy
+// balance F(T, X) = dH(T) - gamma R T / 2 = 0 (mass basis, dH = sum_k X_k
+// [h_k(Tt) - h_k(T)] / MW), and ln P* = ln Pt - sum_k X_k [s_k(Tt) - s_k(T*)]
+// / R_u on the isentrope through (Tt, Pt). With gamma = cp / (cp - R_u)
+// (molar cp) and R = R_u / MW:
+//   dF/dX_j = (dh_j - dH W_j) / MW - (T/2) (R dgamma/dX_j + gamma dR/dX_j),
+//   dgamma/dX_j = -R_u cp_j(T) / (cp - R_u)^2,  dR/dX_j = -R W_j / MW,
+//   dT*/dX_j = -(dF/dX_j) / (dF/dT),
+//   dlnP*/dX_j = -(s_j(Tt) - s_j(T*)) / R_u + cp(T*) / (R_u T*) dT*/dX_j.
+std::vector<double> choked_duct_dP_dX(double Tt, double T, double P,
+                                      const std::vector<double>& X) {
+  const std::size_t n = X.size();
+  const double Ru = combaero::thermo::R_GAS;
+  const double MWg = combaero::mwmix(X);  // g/mol
+  const double MW = MWg / 1000.0;         // kg/mol
+  const double R = Ru / MW;
+  const double c = combaero::cp(T, X);  // molar
+  const double cv = c - Ru;
+  const double g = c / cv;
+  const double dg_dT = -Ru * combaero::dcp_dT(T, X) / (cv * cv);
+  const double cp_mass = c / MW;
+  const double dF_dT = -cp_mass - 0.5 * R * (g + T * dg_dT);
+  std::vector<double> dh(n, 0.0);
+  double dH = 0.0;
+  for (std::size_t j = 0; j < n; ++j) {
+    dh[j] = combaero::h_species(j, Tt) - combaero::h_species(j, T);
+    dH += X[j] * dh[j];
+  }
+  dH /= MW;
+  std::vector<double> out(n, 0.0);
+  for (std::size_t j = 0; j < n; ++j) {
+    const double W = combaero::species_molar_mass(j) / 1000.0;
+    const double dg = -Ru * combaero::cp_species(j, T) / (cv * cv);
+    const double dR = -R * W / MW;
+    const double dF = (dh[j] - dH * W) / MW - 0.5 * T * (R * dg + g * dR);
+    const double dT = -dF / dF_dT;
+    const double dlnP =
+        -(combaero::s_species(j, Tt) - combaero::s_species(j, T)) / Ru + c / (Ru * T) * dT;
+    out[j] = P * dlnP;
+  }
+  return out;
+}
+
+}  // namespace
+
 ApproachStatic approach_static_pressure(double Pt, double Tt, double G,
                                         const std::vector<double>& Y,
                                         bool incompressible) {
-  auto X_of = [](const std::vector<double>& Yv) {
-    return combaero::mass_to_mole(combaero::normalize_fractions(Yv));
-  };
-  // P and its (Pt, Tt, G) derivatives at one composition.
-  auto eval = [&](const std::vector<double>& X, ApproachStatic& out) {
-    if (incompressible) {
-      const double R = combaero::specific_gas_constant(X);
-      const double c = 2.0 * G * G * R * Tt;
-      const double disc = Pt * Pt - c;
-      out.choked = !(disc > 0.0);
-      if (out.choked) {
-        out.P = 0.5 * Pt;
-        out.dP_dPt = 0.5;
-        out.dP_dTt = 0.0;
-        out.dP_dG = 0.0;
-        return;
-      }
+  const std::vector<double> X = combaero::mass_to_mole(combaero::normalize_fractions(Y));
+  ApproachStatic out{};
+  // Composition moves R (and, compressible, cp). Analytic (#964; a forward
+  // difference until then): dP_dX in unnormalised mole fractions, chained to
+  // the mass fractions below.
+  std::vector<double> dP_dX(X.size(), 0.0);
+  if (incompressible) {
+    const double R = combaero::specific_gas_constant(X);
+    const double c = 2.0 * G * G * R * Tt;
+    const double disc = Pt * Pt - c;
+    out.choked = !(disc > 0.0);
+    if (out.choked) {
+      out.P = 0.5 * Pt;
+      out.dP_dPt = 0.5;
+      out.dP_dTt = 0.0;
+      out.dP_dG = 0.0;
+    } else {
       const double r = std::sqrt(disc);
       out.P = 0.5 * (Pt + r);
       out.dP_dPt = 0.5 * (1.0 + Pt / r);
       out.dP_dTt = -0.5 * (G * G * R) / r;
       out.dP_dG = -(G * R * Tt) / r;
-      return;
+      // dP/dR = -G^2 Tt / (2 r), dR/dX_j = -R W_j / MW.
+      const double dP_dR = -0.5 * G * G * Tt / r;
+      const double mw = combaero::mwmix(X);
+      for (std::size_t j = 0; j < X.size(); ++j) {
+        dP_dX[j] = dP_dR * (-R * combaero::species_molar_mass(j) / mw);
+      }
     }
-    const auto st = combaero::duct_static_state(Tt, Pt, G, X);
-    out.P = st.P;
-    out.dP_dPt = st.dP_dPt;
-    out.dP_dTt = st.dP_dTt;
-    out.dP_dG = st.dP_dG;
-    out.choked = st.choked;
-  };
-  ApproachStatic out{};
-  eval(X_of(Y), out);
-  // Composition moves R (and, compressible, cp): a forward difference, as
-  // the orifice kernels take their Y columns.
-  out.dP_dY.assign(Y.size(), 0.0);
-  const double eps_Y = 1e-6;
-  for (std::size_t i = 0; i < Y.size(); ++i) {
-    std::vector<double> Y_plus = Y;
-    Y_plus[i] += eps_Y;
-    ApproachStatic probe{};
-    eval(X_of(Y_plus), probe);
-    out.dP_dY[i] = (probe.P - out.P) / eps_Y;
+    out.dP_dY = combaero::mole_gradient_to_mass(X, dP_dX);
+    return out;
+  }
+  const auto st = combaero::duct_static_state(Tt, Pt, G, X);
+  out.P = st.P;
+  out.dP_dPt = st.dP_dPt;
+  out.dP_dTt = st.dP_dTt;
+  out.dP_dG = st.dP_dG;
+  out.choked = st.choked;
+  const bool floored = !(Tt > combaero::thermo::T_FLOOR) || !(Pt > combaero::thermo::P_FLOOR);
+  if (floored) {
+    // Evaluated at the floors: no composition column, as no Tt or Pt one.
+    out.dP_dY.assign(Y.size(), 0.0);
+  } else if (st.choked) {
+    out.dP_dY = combaero::mole_gradient_to_mass(X, choked_duct_dP_dX(Tt, st.T, st.P, X));
+  } else {
+    // Subsonic: the implicit-function gradient of the same two equations
+    // duct_static_state solves (G_eff = G, so nothing is solved again).
+    out.dP_dY = combaero::duct_htc_static_state_dY(Tt, Pt, G, X, st).dP_dY;
   }
   return out;
 }

@@ -5024,16 +5024,22 @@ class OrificeElement(NetworkElement):
         """d(Re)/d(upstream T, P) through mu: Re ~ |m| / mu, so
         dRe/dx = -Re dmu/dx / mu. The Cd's temperature column, missing until
         a heated plenum feeding a Re-dependent orifice showed its row 1e-3 off
-        in the column that moves the plenum's T. Empty where Re used the mu
+        in the column that moves the plenum's T. And through mu's composition
+        (Wilke's rule, analytic in C++): the mass-fraction columns, missing
+        until #964 -- with a Reader-Harris/Gallagher Cd behind a combustor
+        the row's fuel-flow column was 7e-4 off. Empty where Re used the mu
         fallback."""
-        mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(
-            state_in.Tt, state_in.P, list(state_in.X)
-        )
+        X = list(state_in.X)
+        mu, dmu_dT, dmu_dP = _solver_tools.viscosity_and_jacobians(state_in.Tt, state_in.P, X)
         if not mu > 0.0:
             return {}
         out = {f"{self.from_node}.Tt": -Re * float(dmu_dT) / mu}
         if dmu_dP != 0.0:
             out[f"{self.from_node}.P"] = -Re * float(dmu_dP) / mu
+        dmu_dY = _solver_tools.viscosity_mass_gradient(state_in.Tt, state_in.P, X)
+        for k, d in enumerate(dmu_dY):
+            if d != 0.0:
+                out[f"{self.from_node}.Y[{k}]"] = -Re * float(d) / mu
         return out
 
     def _metering_dCd_dnames(self, state_in: "NetworkMixtureState") -> dict[str, float]:
@@ -7622,6 +7628,13 @@ class ImpingementPlateElement(OrificeElement):
         add(f"{down_id}.P", -dcd_dGi * dGi_ddP)
         add(f"{up_id}.Tt", dcd_dGi * dGi_drho * float(drho_dT))
         add(f"{up_id}.P", dcd_dGi * dGi_drho * float(drho_dP))
+        # rho = P MW / (R_u T) through the composition (#964): at fixed (T, P)
+        # d(rho)/dY_k = rho (1 - MW / W_k) on the normalised mass fractions
+        # the kernels differentiate (the same along any sum-preserving change).
+        W = float(cb.mwmix(up.X))
+        c_rho = dcd_dGi * dGi_drho * rho
+        for k in range(len(up.Y)):
+            add(f"{up_id}.Y[{k}]", c_rho * (1.0 - W / float(cb.species_molar_mass(k))))
         if m_c != 0.0:
             dcd_dmc = float(r.dCd_dG_c) * (1.0 if m_c > 0.0 else -1.0) / self.channel_area
             for eid in self._crossflow_sources:

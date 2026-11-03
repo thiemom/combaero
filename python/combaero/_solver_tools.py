@@ -72,6 +72,7 @@ approach_static_pressure = _core.approach_static_pressure
 sonic_static_pressure = _core.sonic_static_pressure
 pressure_loss_and_jacobian = _core.pressure_loss_and_jacobian
 viscosity_and_jacobians = _core.viscosity_and_jacobians
+viscosity_mass_gradient = _core._viscosity_mass_gradient
 wall_coupling_and_jacobian = _core.wall_coupling_and_jacobian
 wall_coupling_and_jacobian_multilayer = _core.wall_coupling_and_jacobian_multilayer
 wall_exchange_and_jacobian = _core.wall_exchange_and_jacobian
@@ -127,6 +128,7 @@ __all__ = [
     "sonic_static_pressure",
     "pressure_loss_and_jacobian",
     "viscosity_and_jacobians",
+    "viscosity_mass_gradient",
     "wall_coupling_and_jacobian",
     "wall_coupling_and_jacobian_multilayer",
     "wall_exchange_and_jacobian",

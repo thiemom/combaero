@@ -250,8 +250,9 @@ struct OrificeModelResult : OrificeResult {
 // n = gamma(Tt_up). Back pressure above the drive: the mirrored flow from
 // a reservoir at P_static_down (the raw kernel's reverse band; the network
 // evaluates reversed flow from the other node). Analytic (Pt, P1, Tt, Pb,
-// Cd) columns by DualN; composition by a forward difference, as the other
-// orifice kernels. in_range: jobson1955::ci_min <= Ci <= ci_max, beta <=
+// Cd) columns by DualN; composition analytic too (#964), through the two
+// numbers it enters by, n = gamma(Tt_up) and R, carried as DualN directions.
+// in_range: jobson1955::ci_min <= Ci <= ci_max, beta <=
 // beta_max and a real root.
 OrificeModelResult orifice_jobson_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double Tt_up,
@@ -290,11 +291,14 @@ OrificeModelResult orifice_iso5167_residuals_and_jacobian(
 // momentum chamber's closure). Incompressible: the chamber's low-Mach form
 // Pt = P + G^2 R Tt / (2 P), whose subsonic root is
 // P = [Pt + sqrt(Pt^2 - 2 G^2 R Tt)] / 2; past its maximum flux it holds
-// P = Pt / 2 (choked = true, derivatives of that branch).
+// P = Pt / 2 (choked = true, derivatives of that branch). dP_dY analytic
+// (#964): the low-Mach root through R; subsonic, the implicit-function gradient
+// of duct_static_state's two equations (duct_htc_static_state_dY); past
+// choke, that of its sonic point (M = 1 energy balance and the isentrope).
 // The sonic static pressure P* of a chamber at stagnation Tt and mass flux G
 // (#637): the floor its static pressure cannot go below while it discharges
 // into a reservoir (combaero::sonic_static_state). dP_dY by a forward
-// difference, as approach_static_pressure.
+// difference (approach_static_pressure's is analytic since #964).
 struct SonicStatic {
   double P;
   double T;
@@ -489,6 +493,13 @@ std::tuple<double, double> enthalpy_and_jacobian(double T,
 //   d_mu_d_P : Jacobian gradient w.r.t Pressure [(Pa*s)/Pa]
 std::tuple<double, double, double>
 viscosity_and_jacobians(double T, double P, const std::vector<double> &X);
+
+// d(mu)/dY_k [Pa*s per unit mass fraction] at fixed (T, P), analytic (Wilke's
+// rule, combaero::viscosity_dX chained to the mass fractions), at the same
+// T >= 10 K leaky floor as viscosity_and_jacobians (#964). X are the mole
+// fractions of the state whose mass fractions are differentiated. For the
+// Re-dependent orifice Cd: Re ~ 1/mu, so dRe/dY = -Re dmu/dY / mu.
+std::vector<double> viscosity_mass_gradient(double T, double P, const std::vector<double> &X);
 
 // -----------------------------------------------------------------------------
 // 5. Stagnation State Conversions

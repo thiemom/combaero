@@ -971,10 +971,17 @@ protected:
         // states no Re dependence; the curve is for Re >= 1e5. Below that the
         // source gives no beveled branch, so the value is held rather than
         // borrowed from the sharp one.
+        //
+        // Only the VALUE of the interpolant: its derivative is dzeta/d(l/Dh),
+        // a geometry slope, and zeta()'s derivative is read as dzeta/dRe.
+        // Returned as such it gave a Cd constant in Re a dCd/dRe of 0.83,
+        // and the self-consistent row (m - m*, #582) a denominator 1 - K
+        // dCd/dm of order -1e5: every column but the flow's ~0 (#964).
         (void)flow;
-        return pchip(orifice::idelchik::beveled_l_over_d,
-                     orifice::idelchik::beveled_zeta,
-                     orifice::idelchik::beveled_n, hole.bevel_over_d());
+        return {pchip(orifice::idelchik::beveled_l_over_d,
+                      orifice::idelchik::beveled_zeta,
+                      orifice::idelchik::beveled_n, hole.bevel_over_d()).value,
+                0.0};
     }
 };
 
@@ -988,10 +995,13 @@ public:
 protected:
     Interpolated zeta(const DischargeHoleGeometry& hole,
                       const DischargeHoleState& flow) const override {
+        // No Re dependence: the interpolant's derivative is d/d(r/Dh), a
+        // geometry slope, not dzeta/dRe (see the beveled class, #964).
         (void)flow;
-        return pchip(orifice::idelchik::rounded_r_over_d,
-                     orifice::idelchik::rounded_zeta,
-                     orifice::idelchik::rounded_n, hole.r_over_d());
+        return {pchip(orifice::idelchik::rounded_r_over_d,
+                      orifice::idelchik::rounded_zeta,
+                      orifice::idelchik::rounded_n, hole.r_over_d()).value,
+                0.0};
     }
 };
 

@@ -217,6 +217,32 @@ TEST(IdelchikWallOrifice, AnalyticDerivativeAgreesWithFiniteDifferences) {
     }
 }
 
+TEST(IdelchikWallOrifice, BeveledAndRoundedHaveNoReynoldsSlope) {
+    // Diagrams 4-18b and 4-18c tabulate zeta against the edge geometry only,
+    // so Cd is constant in Re and dCd/dRe is 0. Their interpolant's slope is
+    // d/d(edge/Dh); it was returned as the Re slope (0.83 and 1.53 here),
+    // which made the network row's flow columns vanish (#964). Mid-table
+    // geometry, where that geometry slope is not zero.
+    const struct {
+        DischargeCdCorrelation id;
+        DischargeHoleGeometry hole;
+    } cases[] = {
+        {DischargeCdCorrelation::Idelchik1966Beveled, wall_hole(1e-2, 0.0, 0.0, 1e-3)},
+        {DischargeCdCorrelation::Idelchik1966Rounded, wall_hole(1e-2, 0.0, 1e-3, 0.0)},
+    };
+    for (const auto& k : cases) {
+        auto c = make_discharge_correlation(k.id);
+        for (double Re : {1.0e3, 3.0e4, 2.7e5}) {
+            const double h = Re * 1e-6;
+            const double fd = (c->Cd(k.hole, wall_flow(Re + h))
+                             - c->Cd(k.hole, wall_flow(Re - h))) / (2.0 * h);
+            EXPECT_EQ(fd, 0.0) << c->name();
+            EXPECT_EQ(std::get<1>(c->Cd_and_derivatives(k.hole, wall_flow(Re))), 0.0)
+                << c->name() << " at Re = " << Re;
+        }
+    }
+}
+
 TEST(IdelchikWallOrifice, CrossflowDerivativeIsExactlyZeroNotApproximately) {
     // Idelchik's geometry is plenum to plenum: there is no approach velocity,
     // so the absence of a crossflow term is a property of the source, not a

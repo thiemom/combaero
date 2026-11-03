@@ -2131,11 +2131,17 @@ struct MixerResult {
 inline bool approach_from_static(double beta);
 
 // Orifice flow with discharge coefficient. Density at P_static_up, or at
-// P_rho_ref when > 0 (its derivative is then d_mdot_dP_rho_ref).
+// P_rho_ref when > 0 (its derivative is then d_mdot_dP_rho_ref). Composition
+// columns analytic through rho = P MW / (R_u T) (#964).
 OrificeResult orifice_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
     double area, double beta = 0.0, double P_rho_ref = -1.0);
+
+// d(mu)/dY_k [Pa*s] at fixed (T, P), analytic (Wilke's rule chained to the
+// mass fractions; X the state's mole fractions): the composition column of a
+// Reynolds-dependent orifice Cd, Re ~ 1 / mu (#964).
+std::vector<double> viscosity_mass_gradient(double T, double P, const std::vector<double>& X);
 
 // Channel flow with Darcy friction; exit_head_lost adds the exit dynamic
 // head m|m| / (2 rho A^2), dissipated at a stagnant sink (#588)
@@ -2181,7 +2187,9 @@ std::tuple<double, double, double, double> orifice_compressible_mdot_and_jacobia
 // upstream stagnation temperature. The nozzle expands from the state
 // approach_from_static picks: (Tt_up, P_total_up) without E; with E the
 // upstream static state, P_static_up at the isentrope's temperature through
-// (Tt_up, P_total_up).
+// (Tt_up, P_total_up). Composition columns analytic (#964): the nozzle's
+// isentrope at fixed (T0, P0, Pb) -- choked, at fixed P* by the envelope
+// theorem -- plus the approach static temperature's on its isentrope.
 OrificeResult orifice_compressible_residuals_and_jacobian(
     double m_dot, double P_total_up, double P_static_up, double Tt_up,
     const std::vector<double>& Y_up, double P_static_down, double Cd,
@@ -2190,8 +2198,9 @@ OrificeResult orifice_compressible_residuals_and_jacobian(
 // Opt-in compressible orifice models (#854). OrificeResult's columns plus
 // d_mdot_dCd (Jobson is not linear in Cd), Ci, contraction (Jobson's C),
 // expansibility (mdot / Cd E A sqrt(2 rho1 dp)), choked and in_range (a flag).
-// Analytic (Pt, P1, Tt, Pb, Cd) columns by DualN; composition by a forward
-// difference like the other orifice kernels. Jet polytropic, n = gamma(Tt_up).
+// Analytic (Pt, P1, Tt, Pb, Cd) columns by DualN, and composition through
+// n = gamma(Tt_up) and R as two more DualN directions (#964). Jet polytropic,
+// n = gamma(Tt_up).
 struct OrificeModelResult : OrificeResult { /* d_mdot_dCd, Ci, contraction,
     expansibility, choked, in_range */ };
 // Jobson (1955) with the approach-velocity extension, sub- and supercritical
@@ -2218,6 +2227,7 @@ SonicStatic sonic_static_pressure(double Tt, double G, const std::vector<double>
 // derivatives. Compressible: duct_static_state. Incompressible: the
 // momentum chamber's low-Mach closure Pt = P + G^2 R Tt / (2 P), root
 // [Pt + sqrt(Pt^2 - 2 G^2 R Tt)] / 2; past its maximum flux P = Pt / 2, choked.
+// dP_dY analytic (#964), subsonic and past the sonic limit.
 ApproachStatic approach_static_pressure(double Pt, double Tt, double G,
                                         const std::vector<double>& Y,
                                         bool incompressible);

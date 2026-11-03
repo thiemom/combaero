@@ -1304,3 +1304,122 @@ TEST(ApproachStatic, BeyondTheSonicLimitTheDerivativesMatchTheValue) {
     }
   }
 }
+
+// #964: the orifice kernels' and the approach state's composition columns are
+// analytic; they were forward differences, off a central one by up to 7e-4 of
+// the row. Checked against a central difference in each mass fraction (a
+// one-sided second-order one for an absent species, which cannot go below 0).
+namespace {
+
+std::vector<double> burnt_mass_fractions() {
+  std::vector<double> X(combaero::num_species(), 0.0);
+  X[combaero::species_index_from_name("N2")] = 0.72;
+  X[combaero::species_index_from_name("O2")] = 0.10;
+  X[combaero::species_index_from_name("CO2")] = 0.06;
+  X[combaero::species_index_from_name("H2O")] = 0.11;
+  X[combaero::species_index_from_name("AR")] = 0.009;
+  X[combaero::species_index_from_name("CH4")] = 0.001;
+  return combaero::mole_to_mass(combaero::normalize_fractions(X));
+}
+
+template <typename F>
+double y_difference(const F &f, const std::vector<double> &Y, std::size_t k) {
+  const double h = 1e-6;
+  std::vector<double> a = Y, b = Y;
+  if (Y[k] > 2.0 * h) {
+    a[k] += h;
+    b[k] -= h;
+    return (f(a) - f(b)) / (2.0 * h);
+  }
+  a[k] += h;
+  b[k] += 2.0 * h;
+  return (-3.0 * f(Y) + 4.0 * f(a) - f(b)) / (2.0 * h);
+}
+
+// Every column within tol of the largest central difference.
+template <typename F>
+void expect_y_columns(const F &f, const std::vector<double> &Y,
+                      const std::vector<double> &analytic, double tol,
+                      const std::string &what) {
+  ASSERT_EQ(analytic.size(), Y.size()) << what;
+  std::vector<double> fd(Y.size());
+  double scale = 0.0;
+  for (std::size_t k = 0; k < Y.size(); ++k) {
+    fd[k] = y_difference(f, Y, k);
+    scale = std::max(scale, std::abs(fd[k]));
+  }
+  ASSERT_GT(scale, 0.0) << what;
+  for (std::size_t k = 0; k < Y.size(); ++k) {
+    EXPECT_NEAR(analytic[k], fd[k], tol * scale) << what << " Y[" << k << "]";
+  }
+}
+
+} // namespace
+
+TEST(OrificeKernels, CompositionColumnsMatchCentralDifferences) {
+  const std::vector<double> Y = burnt_mass_fractions();
+  const double Pt = 10e5;
+  const double Tt = 900.0;
+  const double A = 7.85e-5;
+  const double tol = 1e-6;
+  {
+    const double P1 = 9.5e5, Pb = 7e5, beta = 0.5;
+    auto m = [&](const std::vector<double> &y) {
+      return orifice_residuals_and_jacobian(0.0, Pt, P1, Tt, y, Pb, 0.62, A, beta)
+          .m_dot_calc;
+    };
+    expect_y_columns(
+        m, Y, orifice_residuals_and_jacobian(0.0, Pt, P1, Tt, Y, Pb, 0.62, A, beta).d_mdot_dY_up,
+        tol, "incompressible");
+  }
+  // Compressible nozzle: plenum-fed and from the approach static state,
+  // subsonic, choked and reversed.
+  for (double beta : {0.0, 0.6}) {
+    for (double Pb : {7e5, 3e5, 11e5}) {
+      const double P1 = beta > 0.0 ? 9.5e5 : Pt;
+      auto m = [&](const std::vector<double> &y) {
+        return orifice_compressible_residuals_and_jacobian(0.0, Pt, P1, Tt, y, Pb, 0.62, A, beta)
+            .m_dot_calc;
+      };
+      const auto r = orifice_compressible_residuals_and_jacobian(0.0, Pt, P1, Tt, Y, Pb, 0.62, A,
+                                                                 beta);
+      expect_y_columns(m, Y, r.d_mdot_dY_up, tol,
+                       "nozzle beta " + std::to_string(beta) + " Pb " + std::to_string(Pb));
+    }
+  }
+  // Jobson and ISO 5167, composition through gamma(Tt) and R.
+  for (double Pb : {7e5, 3e5}) {
+    const double P1 = 9.5e5, beta = 0.5;
+    auto mj = [&](const std::vector<double> &y) {
+      return orifice_jobson_residuals_and_jacobian(0.0, Pt, P1, Tt, y, Pb, 0.62, A, beta)
+          .m_dot_calc;
+    };
+    expect_y_columns(
+        mj, Y,
+        orifice_jobson_residuals_and_jacobian(0.0, Pt, P1, Tt, Y, Pb, 0.62, A, beta).d_mdot_dY_up,
+        tol, "jobson Pb " + std::to_string(Pb));
+    auto mi = [&](const std::vector<double> &y) {
+      return orifice_iso5167_residuals_and_jacobian(0.0, Pt, P1, Tt, y, Pb, 0.62, A, beta)
+          .m_dot_calc;
+    };
+    expect_y_columns(
+        mi, Y,
+        orifice_iso5167_residuals_and_jacobian(0.0, Pt, P1, Tt, Y, Pb, 0.62, A, beta).d_mdot_dY_up,
+        tol, "iso5167 Pb " + std::to_string(Pb));
+  }
+  // The approach pipe's static pressure: low-Mach closure, subsonic, choked.
+  for (bool incompressible : {true, false}) {
+    for (double G : {300.0, 1000.0, 1e5}) {
+      if (incompressible && G > 2000.0) {
+        continue;
+      }
+      auto p = [&](const std::vector<double> &y) {
+        return approach_static_pressure(Pt, Tt, G, y, incompressible).P;
+      };
+      const auto a = approach_static_pressure(Pt, Tt, G, Y, incompressible);
+      EXPECT_EQ(a.choked, G > 2000.0) << G;
+      expect_y_columns(p, Y, a.dP_dY, tol,
+                       "approach G " + std::to_string(G) + " inc " + std::to_string(incompressible));
+    }
+  }
+}
