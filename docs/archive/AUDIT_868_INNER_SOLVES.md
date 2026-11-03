@@ -90,7 +90,7 @@ Line numbers are on the branch.
 | A3 | area_change.cpp:772 | `area_change_loss` Mach | Newton in [0, 1] | 200 | 1e-15 M step | silent | bisection | safe | fixed: cap rule |
 | O1 | orifice.cpp:1307 | `pipe_equivalent_c` | Newton in [1e-6, 1e3] | 100 | 1e-14 C step | silent | bisection | safe | fixed: cap rule |
 | O2 | orifice.cpp:1462 | `solve_orifice_mdot` | fixed point on Cd(Re) | caller | rel change < tol | throws | | safe | none |
-| O3 | orifice.cpp:1778 | `jobson_expansibility` | fixed point (approach term O(beta^4)) | 200 | 1e-15 relative | silent; 2 hits at 3e-14 / 4e-15 (rounding cycle) | | safe at the hits | fixed: cap rule (the hits are kept, bit-identical). rec R11 fixed (#943, PR #954): 1e-13. Fixed point replaced by a bracketed Newton (#957): it cycled to the cap at high beta Ci |
+| O3 | orifice.cpp:1778 | `jobson_expansibility` | fixed point (approach term O(beta^4)) | 200 | 1e-15 relative | silent; 2 hits at 3e-14 / 4e-15 (rounding cycle) | | safe at the hits | fixed: cap rule (the hits are kept, bit-identical). rec R11 fixed (#943, PR #954): 1e-13. Fixed point replaced by a bracketed Newton (#957, PR #959): it cycled to the cap at high beta Ci |
 | H1 | humidair.cpp:205 | `dewpoint` | Newton, FD slope, clamped [T_lo, T] | 100 | 1e-6 K | throws; RH > 1 would put the root above T (Newton on the clamp, "converged" to T), but `vapor_pressure` refuses RH > 1 first | clamp | safe | R12 (#944): documented |
 | H2 | humidair.cpp:317 | `wet_bulb_temperature` | Newton in a bracket | 200 | 1e-6 K | throws | bisection | safe | none |
 | R1 | friction.cpp:92 | `friction_colebrook` | Newton from Serghides | 20 (caller) | 1e-10 relative | silent (also on a flat slope) | none (monotone) | latent (reachable by the caller) | fixed: throws |
@@ -591,10 +591,10 @@ also reached at 189.9 K: from a 20 K guess the alternation returned 189.9 K).
   ill-conditioned (not measured beyond the sweep above).
   `jobson_expansibility` fails to converge on valid input at high beta Ci and
   low r: 108 of the 1800 sweep calls, the same on main. It is not fixed here.
-  **Fixed in #957** (see "#957: Jobson expansibility past the fixed point's
+  **Fixed in #957, PR #959** (see "#957: Jobson expansibility past the fixed point's
   reach" below).
 
-## #957: Jobson expansibility past the fixed point's reach
+## #957: Jobson expansibility past the fixed point's reach (PR #959)
 
 **Finding: a root exists.** Jobson's paper is reservoir-fed, so it has no
 inner solve. The inner solve comes from our beta extension. With the upstream
