@@ -60,17 +60,35 @@ constexpr double T_LOG_STEP = 10.0;
 // Pressure floor of the duct-state kernels [Pa]: an unphysical solver
 // iterate (P <= 0) is evaluated there, finite, instead of returning NaN.
 constexpr double P_FLOOR = 1.0;
-// calc_T_from_cp searches [CP_INVERSE_T_MIN, CP_INVERSE_T_MAX] K: the span
-// every species has NASA-9 data for (from 200 K; to 6000 K for H2O, NH3, CH4
-// and the alkanes, the shortest). Beyond it the tails (#606/#607) level cp
-// off toward a constant, so cp no longer identifies T. It scans outward from
-// T_guess in steps of CP_INVERSE_SCAN_STEP K (both sides alternately) and
-// polishes the first sign change of cp - target, the root nearest T_guess to
-// within a step. Two roots closer than a step (a cp extremum within it of the
-// target) can be missed (#868 R6).
-constexpr double CP_INVERSE_T_MIN = 200.0;
+// calc_T_from_cp searches [CP_INVERSE_T_MIN, CP_INVERSE_T_MAX] K. It scans
+// outward from T_guess, each step on the side whose next node is nearer it,
+// and polishes the first sign change of cp - target: the root nearest T_guess
+// in K, to within the local step. Two roots closer than a step (a cp extremum
+// within it of the target) can be missed (#868 R6).
+//   Above the data (6000 K for H2O, NH3, CH4 and the alkanes, the shortest)
+//   the high tail levels cp off at a constant that is not physics, so the
+//   range ends there. Below the data (200 K) the low tail is the ideal gas
+//   down to 0 K (#606), so cp identifies T there too; but the fade has zero
+//   slope and curvature at 0 K, so cp - cp(0 K) ~ T^3 and the root's
+//   condition number grows as 1/T^3. At CP_INVERSE_T_MIN = 1 K the least
+//   sensitive species, CO (cp/R within 6e-10 of 7/2 at 1 K), still fixes T to
+//   ~5e-7 relative from cp rounded to the last bit; at 0.1 K only to ~5e-4,
+//   and below 1 K every species' cp is within 3e-6 relative of its 0 K value
+//   (a mixture can cancel further). The tail's own extrema (near 100-130 K
+//   for N2, O2, H2O, CH4, CO, NH3; 6.2 K for CO2) are scanned like the data's.
+//   Down to CP_INVERSE_LOG_SCAN_T the nodes are CP_INVERSE_SCAN_STEP K apart;
+//   below it, the same step relative to T (a factor 1 - SCAN_STEP /
+//   LOG_SCAN_T = 0.9 per node, continuous at the switch), so that each step
+//   spans a like share of the T^3 approach to 0 K (44 nodes from 100 K to
+//   1 K). The downward scan steps onto CP_INVERSE_T_DATA, the data's lower end
+//   where the tail joins, so for a guess in [200, 6000] K and a target with no
+//   root below 200 K the nodes, the bracket and the result are those of the
+//   former [200, 6000] K scan.
+constexpr double CP_INVERSE_T_MIN = 1.0;
 constexpr double CP_INVERSE_T_MAX = 6000.0;
+constexpr double CP_INVERSE_T_DATA = 200.0;
 constexpr double CP_INVERSE_SCAN_STEP = 10.0;
+constexpr double CP_INVERSE_LOG_SCAN_T = 100.0;
 
 } // namespace combaero::thermo
 
@@ -170,7 +188,7 @@ double dg_over_RT_dT(double T, const std::vector<double>& X);
 double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 // cp(T) is not monotone: the root nearest T_guess in [CP_INVERSE_T_MIN,
-// CP_INVERSE_T_MAX] (see there); std::runtime_error when none lies in it,
+// CP_INVERSE_T_MAX] = [1, 6000] K (see there); std::runtime_error when none lies in it,
 // std::invalid_argument for a non-finite or non-positive input (#868 R6).
 double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_u(double u_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);

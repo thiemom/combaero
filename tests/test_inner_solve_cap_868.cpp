@@ -45,7 +45,7 @@ TEST(InnerSolveCap868, ChamberStaticStateThrowsOnAProbeItCannotSolve) {
 }
 
 // A target cp the clamped range [200, 6000] K never reaches returned 6000 K.
-// Since R6 the scan of that range finds no sign change and says so; invalid
+// Since R6 the scan of the range finds no sign change and says so; invalid
 // input is std::invalid_argument (#928).
 TEST(InnerSolveCap868, CalcTFromCpThrowsOnAnUnreachableTarget) {
   const std::vector<double> X = dry_air();
@@ -56,17 +56,56 @@ TEST(InnerSolveCap868, CalcTFromCpThrowsOnAnUnreachableTarget) {
   EXPECT_NEAR(calc_T_from_cp(cp(800.0, X), X, 300.0), 800.0, 1e-9);
 }
 
+namespace {
+std::vector<double> pure_species(const char* name) {
+  std::vector<double> X(num_species(), 0.0);
+  X[species_index_from_name(name)] = 1.0;
+  return X;
+}
+}  // namespace
+
 // cp of N2 has a minimum near 214 K, so cp(205 K) has a second root near
 // 226.7 K: the one returned is the root nearest T_guess (#868 R6).
 TEST(InnerSolveCap868, CalcTFromCpTakesTheRootNearestTheGuess) {
-  std::vector<double> X(num_species(), 0.0);
-  X[species_index_from_name("N2")] = 1.0;
+  const std::vector<double> X = pure_species("N2");
   const double target = cp(205.0, X);
   EXPECT_NEAR(calc_T_from_cp(target, X, 213.0), 205.0, 1e-9);
   const double upper = calc_T_from_cp(target, X, 218.0);
   EXPECT_GT(upper, 226.0);
   EXPECT_LT(upper, 227.5);
   EXPECT_NEAR(cp(upper, X) / target, 1.0, 1e-13);
+}
+
+// The search reaches down to CP_INVERSE_T_MIN = 1 K on the ideal-gas tail:
+// these targets lie only below the 200 K data, and threw on the [200, 6000] K
+// range.
+TEST(InnerSolveCap868, CalcTFromCpReachesTheLowTail) {
+  EXPECT_DOUBLE_EQ(thermo::CP_INVERSE_T_MIN, 1.0);
+  const std::vector<double> H2 = pure_species("H2");
+  EXPECT_NEAR(calc_T_from_cp(cp(50.0, H2), H2, 300.0), 50.0, 1e-9);
+  const std::vector<double> C3H8 = pure_species("C3H8");
+  EXPECT_NEAR(calc_T_from_cp(cp(1.5, C3H8), C3H8, 300.0), 1.5, 1e-8);
+}
+
+// Below CP_INVERSE_LOG_SCAN_T the scan steps 10 % of T: CO2's cp has a
+// minimum at 6.2 K, so cp(4 K) is also reached at 7.6 K. A 10 K step spans
+// both roots (no sign change); the relative step separates them.
+TEST(InnerSolveCap868, CalcTFromCpResolvesRootsBelowTheLogScanSwitch) {
+  const std::vector<double> X = pure_species("CO2");
+  const double target = cp(4.0, X);
+  EXPECT_NEAR(calc_T_from_cp(target, X, 3.0), 4.0, 1e-8);
+  const double upper = calc_T_from_cp(target, X, 9.0);
+  EXPECT_GT(upper, 7.5);
+  EXPECT_LT(upper, 7.7);
+}
+
+// The scan advances the side whose next node is nearer T_guess, so the
+// short relative steps below 100 K do not lose to the 10 K steps above it:
+// O2's cp(1.5 K) is also reached at 189.9 K, and from 20 K the root at
+// 1.5 K is the nearer (one step per side per round returned 189.9 K).
+TEST(InnerSolveCap868, CalcTFromCpNearestIsInKelvin) {
+  const std::vector<double> X = pure_species("O2");
+  EXPECT_NEAR(calc_T_from_cp(cp(1.5, X), X, 20.0), 1.5, 1e-8);
 }
 
 // T_from_stagnation's slope dropped T dgamma/dT, so Newton converged

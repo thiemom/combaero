@@ -753,6 +753,39 @@ double calc_T_from_s(double s_target, double P, const std::vector<double> &X, do
       T_guess, tol, max_iter, "calc_T_from_s");
 }
 
+namespace {
+
+// calc_T_from_cp's scan nodes (thermo.h): CP_INVERSE_SCAN_STEP K apart down
+// to CP_INVERSE_LOG_SCAN_T, the same share of T below it; downward they step
+// onto CP_INVERSE_T_DATA and CP_INVERSE_LOG_SCAN_T, and both ends clamp.
+constexpr double kCpScanRatio = thermo::CP_INVERSE_SCAN_STEP / thermo::CP_INVERSE_LOG_SCAN_T;
+// Relative slack in the nearer-node comparison: T0 + 10 - T0 and T0 - (T0 - 10)
+// differ in the last bits, and an equal-step tie must go up.
+constexpr double kCpScanTieRel = 1.0e-12;
+static_assert(thermo::CP_INVERSE_T_MIN < thermo::CP_INVERSE_LOG_SCAN_T &&
+                  thermo::CP_INVERSE_LOG_SCAN_T < thermo::CP_INVERSE_T_DATA &&
+                  thermo::CP_INVERSE_T_DATA < thermo::CP_INVERSE_T_MAX && kCpScanRatio < 1.0,
+              "calc_T_from_cp scan nodes out of order");
+
+double cp_scan_up(double T) {
+  if (T < thermo::CP_INVERSE_LOG_SCAN_T) {
+    return std::min(T / (1.0 - kCpScanRatio), thermo::CP_INVERSE_LOG_SCAN_T);
+  }
+  return std::min(T + thermo::CP_INVERSE_SCAN_STEP, thermo::CP_INVERSE_T_MAX);
+}
+
+double cp_scan_down(double T) {
+  if (T > thermo::CP_INVERSE_T_DATA) {
+    return std::max(T - thermo::CP_INVERSE_SCAN_STEP, thermo::CP_INVERSE_T_DATA);
+  }
+  if (T > thermo::CP_INVERSE_LOG_SCAN_T) {
+    return std::max(T - thermo::CP_INVERSE_SCAN_STEP, thermo::CP_INVERSE_LOG_SCAN_T);
+  }
+  return std::max(T * (1.0 - kCpScanRatio), thermo::CP_INVERSE_T_MIN);
+}
+
+}  // namespace
+
 double calc_T_from_cp(double cp_target, const std::vector<double> &X,
                       double T_guess, double tol, std::size_t max_iter) {
   // cp(T) need not be monotone, so the root is a branch choice: the one
@@ -775,37 +808,40 @@ double calc_T_from_cp(double cp_target, const std::vector<double> &X,
   if (f0 == 0.0) {
     return T0;
   }
-  // Outward scan, one step on each side per round: the first segment whose
-  // ends differ in sign brackets the root nearest T0 (to within a step).
+  // Outward scan: each step advances the side whose next node is nearer T0
+  // (a tie goes up; within rounding, so that equal steps alternate up, down,
+  // as the [200, 6000] K scan did). The first segment whose ends differ in
+  // sign brackets the root nearest T0, to within the local step.
   double a = 0.0, b = 0.0, fa = 0.0, fb = 0.0;
   bool bracketed = false;
   double lo = T0, f_lo = f0, hi = T0, f_hi = f0;
   while (lo > T_min || hi < T_max) {
-    if (hi < T_max) {
-      const double T_next = std::min(hi + thermo::CP_INVERSE_SCAN_STEP, T_max);
-      const double f_next = f(T_next);
+    const double up = hi < T_max ? cp_scan_up(hi) : T_max;
+    const double down = lo > T_min ? cp_scan_down(lo) : T_min;
+    const bool go_up =
+        hi < T_max && (lo <= T_min || up - T0 <= (T0 - down) * (1.0 + kCpScanTieRel));
+    if (go_up) {
+      const double f_next = f(up);
       if (f_next == 0.0) {
-        return T_next;
+        return up;
       }
       if ((f_next > 0.0) != (f_hi > 0.0)) {
-        a = hi, fa = f_hi, b = T_next, fb = f_next;
+        a = hi, fa = f_hi, b = up, fb = f_next;
         bracketed = true;
         break;
       }
-      hi = T_next, f_hi = f_next;
-    }
-    if (lo > T_min) {
-      const double T_next = std::max(lo - thermo::CP_INVERSE_SCAN_STEP, T_min);
-      const double f_next = f(T_next);
+      hi = up, f_hi = f_next;
+    } else {
+      const double f_next = f(down);
       if (f_next == 0.0) {
-        return T_next;
+        return down;
       }
       if ((f_next > 0.0) != (f_lo > 0.0)) {
-        a = T_next, fa = f_next, b = lo, fb = f_lo;
+        a = down, fa = f_next, b = lo, fb = f_lo;
         bracketed = true;
         break;
       }
-      lo = T_next, f_lo = f_next;
+      lo = down, f_lo = f_next;
     }
   }
   if (!bracketed) {

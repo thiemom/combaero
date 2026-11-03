@@ -24,8 +24,9 @@ def test_fanno_inlet_mach_is_linear_at_vanishing_flux(ratio: float) -> None:
 
 def test_calc_t_from_cp_refuses_an_unreachable_target() -> None:
     """The 6000 K clamp was returned for a cp no T in [200, 6000] K has
-    (#924 made it a cap exit; since R6 the scan reports no root in range)."""
-    with pytest.raises(RuntimeError, match=r"calc_T_from_cp: no root in \[200, 6000\] K"):
+    (#924 made it a cap exit; since R6 the scan reports no root in range,
+    now [1, 6000] K)."""
+    with pytest.raises(RuntimeError, match=r"calc_T_from_cp: no root in \[1, 6000\] K"):
         cb.calc_T_from_cp(1.0e3, X_AIR, 300.0)
     with pytest.raises(RuntimeError, match="no root"):
         cb.calc_T_from_cp(20.0, X_AIR, 300.0)
@@ -48,9 +49,39 @@ def test_calc_t_from_cp_takes_the_root_nearest_the_guess() -> None:
     assert lower == pytest.approx(205.0, abs=1e-9)
     assert 226.0 < upper < 227.5
     assert cb.cp(upper, x) == pytest.approx(target, rel=1e-13)
-    # A guess outside the range starts the scan at its end.
-    assert cb.calc_T_from_cp(target, x, 50.0) == pytest.approx(205.0, abs=1e-9)
+    # A guess above the range starts the scan at its end.
     assert cb.calc_T_from_cp(target, x, 9000.0) == pytest.approx(upper, abs=1e-9)
+    # The tail below the data has a maximum near 127 K, so cp(205 K) is also
+    # reached at ~37.4 K, the root nearest a 50 K guess.
+    low = cb.calc_T_from_cp(target, x, 50.0)
+    assert 37.0 < low < 38.0
+    assert cb.cp(low, x) == pytest.approx(target, rel=1e-13)
+
+
+@pytest.mark.parametrize(("species", "t_true"), [("H2", 50.0), ("C3H8", 1.5), ("NC7H16", 10.0)])
+def test_calc_t_from_cp_reaches_the_low_tail(species: str, t_true: float) -> None:
+    """Targets only the tail below the 200 K data reaches (the [200, 6000] K
+    range threw): the search goes down to CP_INVERSE_T_MIN = 1 K."""
+    x = _pure(species)
+    assert cb.calc_T_from_cp(cb.cp(t_true, x), x, 300.0) == pytest.approx(t_true, rel=1e-8)
+
+
+def test_calc_t_from_cp_resolves_roots_below_the_log_scan_switch() -> None:
+    """CO2's cp has a minimum at 6.2 K, so cp(4 K) is also reached at ~7.6 K:
+    below 100 K the scan steps 10 % of T, which separates the two roots that
+    one 10 K step would span."""
+    x = _pure("CO2")
+    target = cb.cp(4.0, x)
+    assert cb.calc_T_from_cp(target, x, 3.0) == pytest.approx(4.0, abs=1e-8)
+    assert 7.5 < cb.calc_T_from_cp(target, x, 9.0) < 7.7
+
+
+def test_calc_t_from_cp_nearest_is_in_kelvin() -> None:
+    """O2's cp(1.5 K) is also reached at ~189.9 K. From a 20 K guess the
+    1.5 K root is nearer: the scan advances the side whose next node is
+    nearer the guess (one step per side per round returned 189.9 K)."""
+    x = _pure("O2")
+    assert cb.calc_T_from_cp(cb.cp(1.5, x), x, 20.0) == pytest.approx(1.5, abs=1e-8)
 
 
 @pytest.mark.parametrize(
