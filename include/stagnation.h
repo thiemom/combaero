@@ -248,7 +248,9 @@ SonicStaticState sonic_static_state(double Tt, double G, const std::vector<doubl
 // L is monotone on the subsonic branch [P*, Pt], P* the sonic pressure, so a
 // bracketed Newton finds the unique subsonic root. A G above the choked
 // mass flux has no subsonic state: the sonic state at P* is returned, with
-// choked = true and no G dependence. A heat-transfer correlation needs this
+// choked = true and no G dependence: T* from the M = 1 energy balance and P*
+// on the isentrope through (Tt, Pt), with their Tt and Pt partials (#958).
+// A heat-transfer correlation needs this
 // state: a plenum's T is the stagnation T, and reading it as the duct's
 // static T put T_aw above Tt by about (1 + r) (Tt - T).
 // Partials with respect to Tt, Pt and G, by the implicit function theorem.
