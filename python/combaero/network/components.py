@@ -6810,6 +6810,33 @@ class SlotFilmElement(OrificeElement):
     hydraulic diameter 2 S W/(S + W), and as the number of such holes that
     carries its area, so the hole Reynolds number is the slot's own. A
     measured slot Cd is better given with correlation='fixed'.
+
+    FILM-SIDE h (#962), opt-in with ``film_htc``. By default ("none") the
+    film only lowers the filmed side's driving temperature to T_aw and the
+    side keeps its duct's own h. Near a slot the boundary layer is the slot
+    fluid's, with its own, higher h, so with ``film_htc`` the filmed wall
+    side uses the film's h, the mean over the wall's span [film_start,
+    film_end] of h(x) (an element mean, as every ThermalWall side's h), on
+    T_aw from the film effectiveness:
+
+    - "seban1960" (recommended): Seban (1960) Fig. 12 on slot-fluid
+      properties, St_s = h/(G_s cp_s) = 0.135 Re_s^-0.3 (x/s)^-0.3 near the
+      slot (curve B as drawn; Eq. 13 prints 0.10, which contradicts his own
+      curve and data) and 0.40 Re_s^-0.3 (x/s)^-0.6 beyond (curve C),
+      joined by a C1 blend at their crossing (x/s 37). His data: x/s about
+      4-300, m 1.06-8.91, Re_s about 1.4e3-8e3, air into air.
+    - "ballal_lefebvre1973": the m > 1.3 wall-jet Nu_x = 0.10 Re_s^0.8
+      (x/s)^0.44 (Cranfield SME4 Eq. 6, Lefebvre & Ballal Eq. 8.44), the
+      book's own method. It sits 20-67 % above the Cranfield rig's own data
+      at low Re (SME4 Fig. 2), so it is a named option for reproducing the
+      book, not a recommendation.
+
+    Past the form's far end (x/s 300; 50 for the wall jet) and below its
+    hand-back mass-velocity ratio (m 1.0, Seban's flat-plate finding; 1.3
+    for the wall jet; a C1 step over 0.1 in m) the side hands back to the
+    duct's own h. The wall reports which branch and box state applied
+    (``film_h_*``). Matching a specific rig is the user's job; the duct's
+    ``Nu_multiplier`` does not act on the film's h.
     """
 
     _selects_compressible_model = False  # keeps the nozzle (#861)
@@ -6828,8 +6855,14 @@ class SlotFilmElement(OrificeElement):
         correlation: str = "IdelchikThick",
         Cd: float | None = None,
         edge_radius: float = 0.0,
+        film_htc: Literal["none", "seban1960", "ballal_lefebvre1973"] = "none",
     ) -> None:
         name = f"SlotFilmElement {id!r}"
+        if film_htc not in SLOT_FILM_HTC_MODELS:
+            raise ValueError(
+                f"{name}: film_htc must be one of {sorted(SLOT_FILM_HTC_MODELS)}, not {film_htc!r}"
+            )
+        self.film_htc = film_htc
         if slot_height <= 0.0 or span <= 0.0 or lip_thickness <= 0.0:
             raise ValueError(f"{name}: slot_height, span and lip_thickness must be positive")
         if slot_height > span:
@@ -6903,6 +6936,31 @@ class SlotFilmElement(OrificeElement):
             self.C_m_multiplier,
         )
 
+    def film_side_htc(
+        self,
+        x_start: float,
+        x_end: float,
+        G_s: float,
+        M: float,
+        h_duct: float,
+        T_s: float,
+        P_s: float,
+        X_s: list[float],
+    ) -> Any:
+        """The filmed side's h (#962) over [x_start, x_end] [m] downstream of
+        the slot lip, or None with ``film_htc="none"``: C++'s SlotFilmHtc
+        (h, dh/dG_s, dh/dT_s, dh/dM, dh/dh_duct and the box state). G_s is
+        the slot's mass flux, M = G_s / G_gas, T_s, P_s, X_s the slot fluid's
+        state (its supply plenum's)."""
+        if self.film_htc == "none":
+            return None
+        kernel = (
+            cb.slot_film_htc_seban_1960
+            if self.film_htc == "seban1960"
+            else cb.slot_film_htc_ballal_lefebvre_1973
+        )
+        return kernel(x_start, x_end, self.slot_height, G_s, M, h_duct, T_s, P_s, X_s)
+
     def diagnostics(
         self,
         state_in: NetworkMixtureState,
@@ -6922,6 +6980,11 @@ class SlotFilmElement(OrificeElement):
             }
         )
         return base
+
+
+# SlotFilmElement.film_htc choices (#962): the duct's own h, Seban 1960
+# (recommended), Ballal & Lefebvre 1973 wall jet (the book's method).
+SLOT_FILM_HTC_MODELS = frozenset({"none", "seban1960", "ballal_lefebvre1973"})
 
 
 class FilmSource(NamedTuple):
@@ -7078,6 +7141,64 @@ class _FilmedHtc:
         return sorted(set(dir(self._r)) | set(self.__slots__))
 
 
+class _FilmSideHtc:
+    """A filmed wall side with the film's own h (#962): the slot kernel's
+
+        h = h_duct + w(M) f_x (h_film - h_duct),
+
+    h_film from the slot flow (G_s = m_c / A_slot) and the slot fluid's T,
+    M = G_s / G_gas. The duct's h partials scale by dh/dh_duct = 1 - w f_x;
+    the gas flow also enters through M (dM/dm_gas = -M / m_gas). Each
+    source's flow and coolant temperature come back as ``dh_dfilm_mdot`` and
+    ``dh_dT_coolant`` for the solver to relay, as the film's T_aw does. The
+    slot fluid's composition is not chained (as the density ratio's is not).
+    T_aw and the rest are the filmed side's."""
+
+    __slots__ = (
+        "_r",
+        "_kd",
+        "h",
+        "dh_dT",
+        "dh_dmdot",
+        "dh_dP",
+        "dh_dPt",
+        "dh_dfilm_mdot",
+        "dh_dT_coolant",
+    )
+
+    def __init__(
+        self, r: Any, res: Any, M: float, m_c: float, m_gas: float, hole_area: float
+    ) -> None:
+        self._r = r
+        kd = float(res.dh_dh_duct)
+        self._kd = kd
+        self.h = float(res.h)
+        self.dh_dT = kd * float(r.dh_dT)
+        self.dh_dmdot = kd * float(r.dh_dmdot) - float(res.dh_dM) * M / m_gas
+        self.dh_dP = kd * float(getattr(r, "dh_dP", 0.0))
+        self.dh_dPt = kd * float(getattr(r, "dh_dPt", 0.0))
+        self.dh_dfilm_mdot = [float(res.dh_dG_s) / hole_area + float(res.dh_dM) * M / m_c]
+        self.dh_dT_coolant = [float(res.dh_dT_s)]
+
+    @property
+    def dh_dY(self) -> list[float]:
+        """The duct h's composition gradient, scaled by dh/dh_duct."""
+        return [self._kd * float(v) for v in (getattr(self._r, "dh_dY", None) or [])]
+
+    @property
+    def dh_dsources(self) -> dict[str, float] | None:
+        own = getattr(self._r, "dh_dsources", None)
+        if not own:
+            return own
+        return {k: self._kd * float(v) for k, v in own.items()}
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._r, name)
+
+    def __dir__(self) -> list[str]:
+        return sorted(set(dir(self._r)) | set(self.__slots__))
+
+
 def film_on_wall_side(
     provider: Any,
     side: Any,
@@ -7156,7 +7277,36 @@ def film_on_wall_side(
         "T_aw_unfilmed": float(r.T_aw) + (T_shift or 0.0),
         "film_gas_undiluted": float(T_shift is not None),
     }
-    return _FilmedHtc(r, f, M, DR, T_c, m_c, mg, dlnTs, film, T_shift)
+    filmed = _FilmedHtc(r, f, M, DR, T_c, m_c, mg, dlnTs, film, T_shift)
+    side_htc = getattr(provider, "film_side_htc", None)
+    if side_htc is None or len(sources) != 1:
+        return filmed
+    st_c = coolant[0][0]
+    G_s = m_c[0] / sources[0].hole_area
+    res = side_htc(
+        x_start, x_end, G_s, M[0], float(r.h), float(st_c.Tt), float(st_c.P), list(st_c.X)
+    )
+    if res is None:
+        return filmed
+    # Which branch and box state applied (#962): the side's h with the film,
+    # the duct's own, the film's span mean over its in-box part, its share of
+    # the span, the hand-back weight in m, Re_s and the in-box flags.
+    film.update(
+        {
+            "film_h": float(res.h),
+            "film_h_duct": float(r.h),
+            "film_h_film": float(res.h_film),
+            "film_h_fraction_in_box": float(res.fraction_in_box),
+            "film_h_weight_M": float(res.weight_M),
+            "film_h_Re_s": float(res.Re_s),
+            "film_h_branch": float(res.branch),
+            "film_h_in_box": float(bool(res.x_in_box and res.Re_in_box and res.M_in_box)),
+            "film_h_x_in_box": float(bool(res.x_in_box)),
+            "film_h_Re_in_box": float(bool(res.Re_in_box)),
+            "film_h_M_in_box": float(bool(res.M_in_box)),
+        }
+    )
+    return _FilmSideHtc(filmed, res, M[0], m_c[0], mg, sources[0].hole_area)
 
 
 @dataclass

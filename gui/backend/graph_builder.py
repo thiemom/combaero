@@ -1507,6 +1507,7 @@ def build_network_from_schema(schema: NetworkGraphSchema) -> FlowNetwork:
                 C_m_multiplier=data.C_m_multiplier,
                 correlation=data.correlation,
                 Cd=_fixed_cd(data),
+                film_htc=data.film_htc,
             )
             net.add_element(elem)
         elif elem_type == "impingement_array":

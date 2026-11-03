@@ -1419,6 +1419,40 @@ ConductivityAndSlope material_conductivity_and_slope(
     const std::string& name, double T, bool extrapolate);  // {k, dk_dT}
 ```
 
+### Slot Film-Side h (`slot_film_htc.h`, #962)
+
+The heat transfer coefficient under a 2-D slot film, on the adiabatic-wall
+temperature. Default: Seban (1960) Fig. 12 as DRAWN, `St_s = 0.135 Re_s^-0.3
+(x/s)^-0.3` (curve B; Eq. 13 prints 0.10) and `0.40 Re_s^-0.3 (x/s)^-0.6`
+(curve C; printed 0.41), C1-blended over +-0.1 decade at their x/s-37
+crossing. Named option: Ballal & Lefebvre (1973) Eq. 6 = Lefebvre & Ballal
+Eq. 8.44, `Nu_x = 0.10 Re_s^0.8 (x/s)^0.44`. The constants live in
+`namespace seban1960` / `namespace ballal_lefebvre1973`, the validity box
+included. The header comment gives the derivation and the misprint
+evidence.
+
+```cpp
+#include "slot_film_htc.h"
+
+// Span means over [x_start, x_end] / s, the in-box part (x/s <= 300 / 50)
+SlotFilmStanton slot_film_stanton_seban_1960(double x_start_over_s,
+    double x_end_over_s, double Re_s, double C_near = seban1960::C_near,
+    double C_far = seban1960::C_far);   // St, dSt_dRe, fraction_in_box, branch, flags
+SlotFilmNusselt slot_film_nusselt_ballal_lefebvre_1973(double x_start_over_s,
+    double x_end_over_s, double Re_s);  // Nu_s = h s / k_s, dNu_dRe, ...
+
+// A wall side's h: h_duct + w(M) f_x (h_film - h_duct), slot-fluid properties
+// at (T_s, P_s, X_s), G_s = m_s / A_slot, M = G_s / G_gas. Hands back to the
+// duct below M_handback (1.0 / 1.3, C1 over SLOT_FILM_HTC_HANDBACK_BAND = 0.1)
+// and past x/s max.
+SlotFilmHtc slot_film_htc_seban_1960(double x_start, double x_end, double s,
+    double G_s, double M, double h_duct, double T_s, double P_s,
+    const std::vector<double>& X_s);
+SlotFilmHtc slot_film_htc_ballal_lefebvre_1973(/* same */);
+// SlotFilmHtc: h, dh_dG_s, dh_dT_s, dh_dM, dh_dh_duct (analytic), h_film,
+// Re_s, fraction_in_box, weight_M, branch, x_in_box, Re_in_box, M_in_box
+```
+
 ### Liner Radiation (`liner_radiation.h`, #793)
 
 Lefebvre & Ballal (2010) Ch. 8: gray, lumped liner radiation. The header's

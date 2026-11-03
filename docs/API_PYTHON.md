@@ -559,6 +559,92 @@ C_m from Eq. (5) at the measured Tu the eta RMS is 0.070, 57 of 140 inside
 the authors' +-0.04 measurement band. See
 `validation/cooling/extractions/marek_tacina_1975_d7958.md`.
 
+#### Film-side h near a slot: Seban (1960) (#962)
+
+The heat transfer coefficient UNDER a slot film, on the adiabatic-wall
+temperature of the same flow (`q = h (T_aw - T_w)`, T_aw from the film
+effectiveness). Near the slot the boundary layer is the slot fluid's, so h
+follows the slot flow and the distance from the lip, not the duct's flow.
+
+```python
+# Seban 1960 Fig. 12, St_s = h/(rho_s u_s cp_s), span mean over [x_start, x_end]/s
+st = cb.slot_film_stanton_seban_1960(0.0, 25.0, Re_s=5000.0)
+st.St, st.dSt_dRe, st.branch, st.fraction_in_box, st.x_in_box, st.Re_in_box
+
+# The wall side's h, dimensional, with the hand-back to the duct's h
+r = cb.slot_film_htc_seban_1960(x_start=0.0, x_end=0.05, s=2e-3, G_s=60.0, M=2.0,
+        h_duct=150.0, T_s=600.0, P_s=1e6, X_s=cb.species.dry_air())
+r.h, r.dh_dG_s, r.dh_dT_s, r.dh_dM, r.dh_dh_duct, r.h_film, r.Re_s, r.weight_M
+
+# The book's m > 1.3 wall jet (named option): h s / k_s, and dimensional
+n = cb.slot_film_nusselt_ballal_lefebvre_1973(18.0, 18.0, Re_s=1.81e4)
+r = cb.slot_film_htc_ballal_lefebvre_1973(0.0261, 0.0261, 1.45e-3, 485.7, 2.54,
+        0.0, 880.0, 3.04e6, cb.species.dry_air())
+```
+
+**What it represents.** Seban's two curves on slot-fluid properties
+(`Re_s = rho_s u_s s / mu_s`):
+
+- near the slot, curve B: `St_s = 0.135 Re_s^-0.3 (x/s)^-0.3`;
+- downstream, curve C: `St_s = 0.40 Re_s^-0.3 (x/s)^-0.6`;
+- joined by a C1 blend in `ln(x/s)` over +-0.1 decade around their crossing
+  (x/s 37.4), within 1.5 % of the lower curve there.
+
+**0.135, not the printed 0.10.** Seban's Eq. 13 prints 0.10 and Eq. 14 0.41.
+The 0.10 contradicts his own curve B, his Fig. 9 and his data. The drawn
+B and C cross at x/s 37, where his text switches; the printed pair would
+cross at 110. Fig. 9 back-solves to 0.140-0.144, and the digitised Fig. 12
+points fit 0.134. So the constants are the curves as DRAWN:
+`cb.SEBAN1960_C_NEAR` 0.135 and `cb.SEBAN1960_C_FAR` 0.40. The printed
+values are `..._PRINTED`, and passing them reproduces the print.
+Lefebvre & Ballal's Eq. 8.41, `Nu_x = 0.069 [Re_s x/s]^0.7`, is the printed
+0.10 times Pr 0.69, so it inherits the misprint. The Cranfield SME4
+report's 0.090 is Seban's curve and data times 0.69. See
+`validation/cooling/extractions/seban_1960_slot_film_h.md`.
+
+**Validity box** (Seban's heat-transfer runs; not stated as limits):
+
+- x/s about 4-300;
+- mass-velocity ratio m 1.06-8.91;
+- Re_s about 1.4e3-8e3;
+- air into air at a small temperature ratio.
+
+Where the form stops, h hands back to the duct's own h:
+
+- **Past the far end** (x/s 300; for the wall jet x/s 50, where Ballal &
+  Lefebvre switch to Colburn), the span is mixed by length:
+  `h = f_x h_film + (1 - f_x) h_duct`.
+- **Below the hand-back m**: m 1.0 for Seban, who found plain flat-plate h
+  below m = 1 (his Fig. 8; his one identified run near 1, m 1.10, already
+  sits 25 % below curve B); m 1.3 for the wall jet. The step is a C1
+  smoothstep over 0.1 in m. That band is numerical, not physics.
+- **Elsewhere outside the box** (x/s < 4, Re_s, m above 8.91) the form is
+  applied and flagged (`x_in_box`, `Re_in_box`, `M_in_box`).
+
+`h_film` is the span MEAN of h(x) over the wall's span: the curve is
+integrated, not a point value. `x_start == x_end` is the point value; the
+point at the lip is refused.
+
+**The wall-jet option** (`slot_film_*_ballal_lefebvre_1973`) is the book's
+Eq. 8.43/8.44 (SME4 Eq. 6), `Nu_x = 0.10 Re_s^0.8 (x/s)^0.44` with k of the
+slot fluid. It reproduces the book's 1926 W/m^2K from the book's own k_a and
+Re_s. It sits 20-67 % ABOVE the Cranfield rig's own data at low Re (SME4
+Fig. 2), and only Pai & Whitelaw lie on it. Seban's curves were fitted for m
+up to 8.9 and his Fig. 12 is the high-injection data, so Seban is the
+recommended form for all m > 1. Where the film is cooler than the wall
+(radiation-heated liners), a high h is not conservative.
+
+**Scored** (`python/tests/test_slot_film_htc_validation_962.py`):
+
+- *Fidelity*, on Seban's own Fig. 12 points (38, of which 5 are clean;
+  overplotted, so this is an upper bound): bias -1.0 %, RMS 11 %. The
+  printed 0.10 is 25 % low on the same points.
+- *Accuracy, cross-source*, on SME4 Fig. 1 (Hartnett et al. and Pai &
+  Whitelaw, 61 points, m < 1.3): curve B at Pr 0.69 gives bias -2.5 % and
+  RMS 18 %. These data lie 32 % above 0.069.
+
+Matching a specific rig is the user's job.
+
 #### Film a downstream wall sees (#386)
 
 ```python
@@ -1142,8 +1228,23 @@ Fidelity (printed quantities): the book's three chained examples -- uncooled
 1.6 K above print, the book having rounded `eps_g` to 0.61 before solving).
 As a network with combaero's own convection (Gnielinski, h 523 against the
 book's 565 W/m^2K) the uncooled liner is 1633/1597 K: a method comparison,
-not fidelity. The film and TBC cases need the Ballal-Lefebvre film-side h
-(Eq. 8.44), which combaero does not have.
+not fidelity. The film and TBC cases are networks too, with a slot's
+film-side h (#962, `SlotFilmElement(film_htc=...)`; see the slot film
+below). They are a method comparison, not fidelity
+(`python/tests/test_slot_film_htc_validation_962.py`):
+
+| Case | Book (printed) | Seban, the default | Eq. 8.44, named option |
+|---|---|---|---|
+| Film-cooled, x/s 18 | 1283/1265 K | 1285/1267 K | 1269/1252 K |
+| With a 0.5 mm TBC | 1304/1236/1220 K | 1308/1240/1224 K | 1288/1224/1209 K |
+
+- The book uses the wall jet (Eq. 8.44) at m = 2.54, with h = 1926.
+- Seban's h on combaero's slot air is 1632, which puts the wall about 10 K
+  hotter at the book's T_aw.
+- Eq. 8.44 on combaero's properties gives 2068 (k_a 0.060 against the
+  book's 0.0553), about 4 K cooler.
+- combaero's Marek-Tacina eta (0.801 against the book's 0.789) lowers T_aw
+  by 18 K.
 
 ##### A film on one side (#386)
 
@@ -1187,6 +1288,28 @@ net.add_wall(ThermalWall(
   net.add_element(SlotFilmElement("ring", "annulus", "gas",
       slot_height=2e-3, span=0.25, lip_thickness=1e-3, turbulence_intensity=0.14))
   ```
+- **A slot's film-side h** (opt-in, #962): `SlotFilmElement(...,
+  film_htc="seban1960")` gives the filmed wall side the film's own h, the
+  mean of Seban's curve over the wall's span (`film_end > 0`), in place of
+  the duct's. The film's h comes from the slot flow and the slot fluid's
+  properties at its supply plenum's state. It hands back to the duct's h
+  past x/s 300 and below m = 1 (kernel section above).
+  `"ballal_lefebvre1973"` is the book's m > 1.3 wall jet (Eq. 8.44), a named
+  option. `"none"` (the default) keeps the duct's h. The duct's
+  `Nu_multiplier` does not act on the film's h. The Jacobian reaches the slot
+  flow, its coolant temperature (through mu, cp, k) and the gas flow
+  (through m). The slot fluid's composition is not chained, as the density
+  ratio's is not. **Reported:** `{wall}.film_h` (the side's h),
+  `film_h_duct`, `film_h_film` (the film's span mean over its in-box
+  part), `film_h_fraction_in_box`, `film_h_weight_M`, `film_h_Re_s`,
+  `film_h_branch` (`cb.SLOT_FILM_BRANCH_*`: 0 curve B, 1 the B/C blend, 2
+  curve C, 3 wall jet, -1 none), `film_h_in_box` and its parts
+  `film_h_x_in_box` / `film_h_Re_in_box` / `film_h_M_in_box`.
+
+  ```python
+  net.add_element(SlotFilmElement("ring", "annulus", "gas",
+      slot_height=2e-3, span=0.25, lip_thickness=1e-3, film_htc="seban1960"))
+  ```
 - **An effusion panel is a provider too** (`film="<panel id>"`, needs
   `panel_length`): its rows, Baldauf each `pitch_x` apart and Sellers over
   them, read past its LAST row. Naming it selects that film whatever the
@@ -1198,9 +1321,10 @@ net.add_wall(ThermalWall(
   and station temperature reach the Jacobian; `{wall}.T_coolant_film` is the
   film's weighted coolant temperature and `{wall}.film_blowing_ratio` /
   `film_density_ratio` the flow-weighted means.
-- **Only the driving temperature changes.** The covered side's T_aw becomes
-  `T_aw - eta_bar (T_aw - T_coolant)`; its h, stream capacity and heat
-  booking stay the duct's. `eta_bar` is `cb.film_span_average_*` over the
+- **By default only the driving temperature changes.** The covered side's
+  T_aw becomes `T_aw - eta_bar (T_aw - T_coolant)`; its h, stream capacity
+  and heat booking stay the duct's. A slot can also carry its own h
+  (below). `eta_bar` is `cb.film_span_average_*` over the
   wall's span: the hole type's kernel per row, Sellers over the rows.
 - **Blowing ratio** is the metering mass flux over the duct's gas mass flux;
   **density ratio** is `(W_c/W_g)(T_g/T_c)` at a common static pressure.

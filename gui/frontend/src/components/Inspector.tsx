@@ -2243,6 +2243,24 @@ const Inspector = () => {
 									</select>
 								</div>
 								{d.correlation === "fixed" && num("Cd", "Fixed Cd Value", 0.6)}
+								<div className="flex flex-col gap-1">
+									<label className="text-xs font-bold text-gray-500 uppercase">
+										Film-Side h on the Filmed Wall
+									</label>
+									<select
+										className="p-2 border rounded bg-white text-xs border-stone-200"
+										value={d.film_htc || "none"}
+										onChange={(e) => set({ film_htc: e.target.value })}
+									>
+										<option value="none">None (the duct's own h)</option>
+										<option value="seban1960">
+											Seban 1960 (slot flow; recommended)
+										</option>
+										<option value="ballal_lefebvre1973">
+											Ballal-Lefebvre wall jet (book Eq. 8.44, m &gt; 1.3)
+										</option>
+									</select>
+								</div>
 							</>
 						);
 					})()}
