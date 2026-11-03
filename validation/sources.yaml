@@ -812,18 +812,18 @@ documents:
     lengths and fit deviations). Table II (p. 160) TABULATES the heat transfer coefficient based on laterally
     averaged wall temperatures. Appendix A gives uncertainties (Tables A.I-A.III). Also CO2-water fog flow
     visualisation at 90 deg.'
-  status: screened
+  status: extracted
   verdict: 'Screened 2026-11-03. The primary of the Eriksen & Goldstein (1974) heat-transfer-with-film data:
     measured h/h0 behind discrete holes, i.e. the gas-side augmentation the film element and the effusion plate
     take as a user input (gas_augmentation, #476). Table II is tabulated (no digitising) for the row of 35 deg
     holes at P/D 3: a candidate cross-source accuracy check for an augmentation closure, and context for
-    Caciolli''s HTC/HTC0 fit (held). Limits: DR about 1, flat plate, low Tu, one row, P/D 3 (effusion plates
-    run P/D 5-8). Not implemented.'
+    Caciolli''s HTC/HTC0 fit (held). Limits: DR 1.0 (unheated) or about 0.85 (heated), flat plate, low Tu, one
+    row, P/D 3 (effusion plates run P/D 5-8). Not implemented.'
   read_for: ['#476 gas-side augmentation behind holes (h/h0)', '#386 round-hole film h and eta']
   issues: [386, 476]
-  records: []
-  notes: Fetched 2026-11-03 at the user's request (NTRS link). Table II page not yet transcribed; read it from
-    page images (scan) before use.
+  records: [validation/cooling/extractions/eriksen_1971_table2_h_over_h0.md, validation/cooling/data/eriksen1971/table2_ha_over_h0_long.csv]
+  notes: 'Fetched 2026-11-03 at the user''s request (NTRS link). Table II transcribed 2026-11-03 (user sign-off;
+    0 read disagreements; block B''s printed Re_D 0.44e5 is a misprint for 0.22e5, per Fig. 68 and the text).'
 - file: sources/heat_transfer/film/Hassan_2013_PhD_Concordia_micro_tangential_jet_film.pdf
   citation: Hassan, O. (2013). Thermal and flow field investigations of a micro-tangential-jet film cooling
     scheme on gas turbine components. PhD thesis, Concordia University, Montreal (June 2013).
