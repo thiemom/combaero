@@ -1279,14 +1279,19 @@ documents:
     in the exhaust stream of a gas turbine combustor. NASA TN D-7156, Lewis Research Center.
   id: NASA TN D-7156
   topic: [film, combustion]
-  content: Film plus back-side convection on one plate in combustor exhaust; Table II 62 runs x 10 thermocouples
-    PRINTED; best-fit C_m 0.03; authors' combined model off by up to 30%.
-  status: screened
-  verdict: 'Network-level validation case (film + coolant channel + wall) for #714 once the element exists;
-    not a kernel source.'
-  read_for: ['#714 network validation case']
-  issues: [714, 742]
-  records: []
+  content: Film plus back-side convection on one plate in combustor exhaust; Table II 62 runs x 10 hot-face
+    thermocouples PRINTED (SI and US); best-fit C_m 0.03 (fitted here); hot-side h 0.0365 Re^0.8 Pr^0.33
+    tuned to this rig; authors' combined model under-predicts by up to 80 K. SI wall k misprinted (x1/17).
+  status: accuracy
+  verdict: 'Network-level cross-source accuracy case (#764; same lab as D-7958, different study): slot film
+    + backside passage + wall, staged convection/film/combined against the +-11 K band. Signed off 2026-11-03.
+    Bias convection -49 K (duct h low for a leading-edge plate), film +25 K, combined +2 K (RMS 44 K;
+    m >= 1 +37 K, m < 1 -22 K). Never fidelity; the authors'' C_m and h not imported.'
+  read_for: ['#714 network validation case', '#764 staged wall-temperature accuracy', '#962 film-side
+      h method comparison']
+  issues: [714, 742, 764]
+  records: [validation/cooling/extractions/marek_juhasz_1973_d7156.md, validation/cooling/data/marek_juhasz1973/,
+    validation/cooling/marek_juhasz_network_runner.py, python/tests/test_marek_juhasz_d7156_network.py]
 - file: sources/heat_transfer/film/oct23/19750017021.pdf
   citation: Marek, C. J., Tacina, R. R. (1975). Effect of free-stream turbulence on film cooling. NASA
     TN D-7958, Lewis Research Center.

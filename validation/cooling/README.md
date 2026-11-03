@@ -312,3 +312,84 @@ failed. A series without one is not loaded.
 Source scans stay gitignored under `sources/heat_transfer/`. Only the
 digitised coordinates are committed; they are measurements, the scans are
 copyrighted.
+
+## A network case: NASA TN D-7156 (#764)
+
+Marek and Juhasz (1973) put a plate into a combustor's exhaust and cooled it
+in one of three ways: a slot film on its hot face, a parallel-flow convection
+passage under it, or both. They measured 62 runs, each with 10 hot-face
+thermocouples. `marek_juhasz_network_runner.py` builds each run as a combaero
+network:
+
+- a hot duct carrying vitiated air;
+- a `SlotFilmElement` with `film_htc="seban1960"`;
+- ten `ThermalWall` segments, one per thermocouple, each carrying the film;
+- a ten-segment backside `ChannelElement` chain.
+
+The runner scores the wall temperatures per stage. The extraction is
+`extractions/marek_juhasz_1973_d7156.md`, and the pins are in
+`python/tests/test_marek_juhasz_d7156_network.py`.
+
+```bash
+uv run python -m validation.cooling.marek_juhasz_network_runner [--per-run]
+```
+
+Every number is **cross-source accuracy**: the same lab as D-7958's kernel,
+but a different study. Nothing is tuned to these data:
+
+- the film runs at the element's default Tu of 0.14, not the authors' fitted
+  C_m of 0.03;
+- the hot-side h is combaero's duct h, not their rig-tuned 0.0365 Re^0.8;
+- the module docstring lists every labelled assumption.
+
+Wall T is predicted minus measured; the band is +-11 K (p. 13).
+
+| stage | runs | bias | RMS | TC 1-3 bias | TC 4-10 bias |
+|---|---|---|---|---|---|
+| convection only | 15 | -49.2 K | 59.1 K | -28.7 K | -58.0 K |
+| film only (adiabatic backside) | 28 | +24.8 K | 34.8 K | +13.6 K | +29.6 K |
+| combined | 17 | +2.4 K | 43.9 K | +23.9 K | -6.9 K |
+| combined, m >= 1 (29-32, 37, 54, 62) | 7 | +36.6 K | 38.8 K | +28.4 K | +40.1 K |
+| combined, m < 1 | 10 | -21.5 K | 47.1 K | +20.8 K | -39.7 K |
+
+How to read the table:
+
+- **Convection only:** the wall reads cold, so the duct h is too low: -26 K
+  at 589 K and -61 K at 1033 K. This plate's boundary layer starts at its own
+  leading edge, 6 cm upstream, which is why the authors tuned their hot-side
+  h to this rig. The convection air's exit temperature (an energy-balance
+  check) reads 12 K low.
+- **Film only:** the backside is adiabatic, so this stage scores the film
+  effectiveness alone.
+  - The 589 K runs read +12 K, which is about the band.
+  - The 1033 K runs read +36 K, and up to +104 K downstream. That fits a
+    real wall that lost heat downwards, which the adiabatic backside leaves
+    out. In these runs the stagnant passage's inlet thermocouple reads
+    351-455 K, against coolant at 300-316 K, so heat did reach the passage.
+  - At Tu 0.12, the authors' fitted C_m (a diagnostic, never adopted), the
+    bias is +11.5 K.
+- **TC 1-3** sit where conduction into the slot lip acts. The authors saw it
+  to 3.8 cm. combaero models neither axial conduction nor the lip, so these
+  thermocouples are reported separately.
+- **Combined runs:** the near-zero pooled bias is two opposite errors
+  cancelling, as the m split shows.
+
+**Method comparison** (combined stage, film-side h):
+
+| film_htc | bias | RMS | m >= 1 bias | m >= 1 RMS |
+|---|---|---|---|---|
+| seban1960 | +2.4 K | 43.9 K | +36.6 K | 38.8 K |
+| none | -7.8 K | 37.3 K | +11.8 K | 14.4 K |
+| ballal_lefebvre1973 | +0.7 K | 44.2 K | +32.5 K | 39.6 K |
+
+All three agree at m < 1, where the film-side h hands back to the duct's.
+`none` scores better at m >= 1, but that is not evidence for it. It pairs
+the duct h, which the convection stage shows is too low, with a film whose
+T_aw the film stage shows is too hot.
+
+Diagnostics that moved little:
+
+- a constant wall k of 13.8 or 22.5 W/m K instead of ss316 k(T): 0.3 K;
+- the hot gas as plain air instead of vitiated: 3 K;
+- the slot's flow joining after the wall, so the gas over it is undiluted:
+  0.4 K.
