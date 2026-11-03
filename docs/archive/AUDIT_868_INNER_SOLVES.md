@@ -59,7 +59,7 @@ Line numbers are on the branch.
 | # | file:line | function | method | cap | tolerance | exit on cap (main) | bracket / safeguard | verdict | action |
 |---|---|---|---|---|---|---|---|---|---|
 | T1 | thermo.cpp:388 | `solve_increasing_T` (`calc_T_from_h/s/u/sv`) | rtsafe Newton | 50 (caller) | 1e-6 K abs step, or bracket < tol | throws | factor-4 search, then bisection when Newton leaves or fails to halve | safe | none |
-| T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 fixed (#939, PR #954): the root nearest T_guess in [200, 6000] K, outward scan + bracketed Newton, no root in range throws |
+| T2 | thermo.cpp:751 | `calc_T_from_cp` | Newton, step <= 0.1 T, clamped [200, 6000] K | 50 (caller) | 1e-6 abs on step or cp | silent: returns the clamp for an unreachable target (6000 K for cp = 1000 J/(mol K)) | none; cp(T) need not be monotone | bug (reachable by the caller) | fixed: throws. rec R6 fixed (#939, PR #954): the root nearest T_guess in [200, 6000] K, outward scan + bracketed Newton, no root in range throws; range extended to [1, 6000] K (PR #961, below) |
 | S1 | state.cpp:118 | `State::set_VH_mass` | Newton on u + R T = h | 20 | 1e-4 K abs step | silent | none (monotone) | latent | fixed: throws. rec R5 fixed (#938, PR #954): `calc_T_from_h_mass` |
 | G1 | stagnation.cpp:77 | `Tt_from_static_v` (and `Tt_from_static`, `Pt_from_static`, `stagnation_from_static`) | Newton, step <= 0.5 T, floor `T_FLOOR` | 50 (caller) | 1e-8 (1 + T) step | silent (also on a flat derivative) | none (h monotone) | latent (reachable by the caller) | fixed: throws; a root below the floor still returns the floor. R1 fixed (#935, PR #949): no floor, the root is returned |
 | G2 | stagnation.cpp:132 | `T_from_stagnation` (and `P_from_stagnation`) | Newton with approximate dF/dT (gamma' dropped), floor | 50 (caller) | 1e-8 (1 + T) step | silent | none | latent | fixed: throws, floor kept. rec R3. R1 fixed (#935, PR #949): no floor. R3 fixed (#936, PR #954): exact slope, quadratic |
@@ -240,7 +240,8 @@ mixture is not monotone everywhere, so `T_guess` picks the branch (R6).
   predates the #606 tails. A bracketed solve over a stated range would make
   the branch explicit.
   **Fixed (#939, PR #954):** the root nearest `T_guess` in [200, 6000] K
-  (below).
+  (below). **Range extended to [1, 6000] K** (decision 2026-11-03; "R6 range
+  extended below 200 K" below).
 - **R7 (C10, C11) `nozzle_quasi1d` is a best-effort profile.** Where
   A < A*_eff the area-Mach Newton has no subsonic root and holds the 0.999
   clamp (57 stations in one test); at a choked throat the root is M = 1
@@ -407,7 +408,7 @@ slightly. None is bit-identical.
   From 6000 K (H2O, NH3, CH4, the alkanes) the #606/#607 tails level cp off
   toward a constant, so cp no longer identifies T. Below 200 K the low tail
   fades cp to the rigid-rotor value; extending the range below 200 K was not
-  done. The branch rule: scan outward from `T_guess`, clamped into the range,
+  done here (it was later: "R6 range extended below 200 K"). The branch rule: scan outward from `T_guess`, clamped into the range,
   10 K at a time on both sides, then run a bracketed Newton on the first sign
   change, so the root returned is the one nearest the guess to within a step.
   N2 is the case that needs it: cp has a minimum near 214 K, so cp(205 K) is
@@ -486,6 +487,94 @@ slightly. None is bit-identical.
   by 1.5, since the bracket keeps Newton on the root. The full suite (6901
   passed), ctest (54) and the paper examples pass.
 
+## R6 range extended below 200 K (2026-11-03, PR #961)
+
+Decision (2026-11-03): `calc_T_from_cp` searches below 200 K. No issue; it
+follows #939 (closed by PR #954).
+
+**The tail below 200 K.** Below the NASA-9 data (200 K for every species)
+the #606 low tail is a quintic in t = (200 K - T)/200 K: C2 with the data at
+200 K, cp/R = the rigid-rotor value (5/2 atom and H2, 7/2 linear, 4
+nonlinear) at 0 K, with zero slope and curvature there. So the gas is ideal
+down to 0 K (no lower validity limit; #626 retired the composition floors),
+cp is continuous, and cp - cp(0 K) ~ (T/200 K)^3 near 0 K. cp/R on
+[1e-3, 200] K, 20001 log points:
+
+| species | cp/R at 0 K | cp/R - cp/R(0) at 1 K | at 10 K | extrema below 200 K |
+|---|---|---|---|---|
+| N2 | 3.5 | +1.7e-8 | +1.6e-5 | max 3.50568 at 127 K |
+| O2 | 3.5 | -4.8e-8 | -4.4e-5 | min 3.48491 at 124 K |
+| CO | 3.5 | -5.7e-10 | -5.2e-7 | min 3.49988 at 101 K |
+| CO2 | 3.5 | -4.0e-9 | +9.5e-7 | min 3.5 - 2.7e-7 at 6.2 K |
+| H2O | 4 | -5.1e-8 | -4.7e-5 | min 3.98602 at 117 K |
+| CH4 | 4 | -1.5e-7 | -1.4e-4 | min 3.95224 at 123 K |
+| NH3 | 4 | -8.7e-8 | -7.9e-5 | min 3.97829 at 111 K |
+| H2 | 2.5 | +6.5e-7 | +6.1e-4 | none (increasing) |
+| C2H6 .. NC7H16 | 4 | +4.8e-7 .. +1.1e-5 | +4.6e-4 .. +1.0e-2 | none (increasing) |
+| AR | 2.5 | 0 | 0 | constant |
+
+**The lower bound: `thermo::CP_INVERSE_T_MIN` = 1 K.** The tail has no
+validity limit of its own, so the bound is set by conditioning: a root's
+relative error from cp rounded to the last bit is ~eps cp / (3 |cp - cp(0)|).
+For CO, the flattest species, that is ~5e-7 at 1 K and ~5e-4 at 0.1 K; below
+1 K every species' cp is within 3e-6 relative of its 0 K value. A mixture can
+cancel the cubic further (air: +3.5e-9 at 1 K, N2 and O2 of opposite sign).
+
+**The scan.** Nodes are 10 K apart (`CP_INVERSE_SCAN_STEP`) down to
+`thermo::CP_INVERSE_LOG_SCAN_T` = 100 K, and a factor 0.9 apart below it (the
+same step relative to T, continuous at the switch; 44 nodes from 100 K to
+1 K), so that each step spans a like share of the T^3 approach and roots a
+few K apart near 0 K are separated (CO2's cp(4 K) is also reached at 7.6 K,
+within one 10 K step). The downward scan steps onto `thermo::CP_INVERSE_T_DATA`
+= 200 K. Each step advances the side whose next node is nearer `T_guess` (a
+tie, within 1e-12 relative, goes up), so the root returned is nearest in K
+to within the local step. With equal 10 K steps on both sides this is the
+former up-then-down alternation; one step per side per round would have made
+the 10 % steps below 100 K lose to the 10 K steps above (O2's cp(1.5 K) is
+also reached at 189.9 K: from a 20 K guess the alternation returned 189.9 K).
+
+**Evidence.**
+
+- *Sweep, branch vs main* (45825 calls): 24 compositions (14 pure species
+  without Ar, air, 10 random mixtures), targets cp(T) for 60 T log-spaced in
+  [1, 199] K and 81 T in [200, 5990] K, 13 guesses from 1 to 9000 K. An
+  independent reference finds every root in [1, 6000] K (sign changes on
+  40000 log-spaced points, brentq to 1e-14 K).
+  - Targets with roots only below 200 K (19240 calls): main throws on all.
+    The branch returns a root on 19203. Every result is a reference root to
+    1.0e-7 relative (CO near 1 K, the conditioning above) and has
+    |cp(T) - target| / target <= 3.0e-15. It is the nearest root on 19190;
+    on 13 it is not, by at most 0.97 of the local step. 37 throw "no root":
+    the target sits within a step of a tail extremum, so both roots lie
+    inside one step (O2 at 127.07 K and 120.76 K, H2O near 116 K, CO2 near
+    6.0 K): the documented miss.
+  - Targets with roots only at or above 200 K (26143 calls): for a guess in
+    [200, 9000] K all 14077 are bit-identical to main. For a guess below
+    200 K, 10303 are bit-identical (the scan reaches 200 K on main's nodes)
+    and 1763, all at a 199 K guess, differ: main clamped the guess to 200 K,
+    so the nodes are offset by 1 K; same roots.
+  - Targets with roots on both sides (442 calls): 248 differ from main (a tail
+    root nearer the guess, or a guess below 200 K); 427 are the nearest root and
+    15 are not (N2 near its 127 K tail maximum, two roots 0.76 K apart, and
+    a near-tie at 210/220 K, within the step).
+- *Network F and J* (SHA-256 at x0 + 3 seeded perturbations, 14 families x
+  seeds 0-39): 560 of 560 identical to main. No network code calls
+  `calc_T_from_cp`.
+- *Stress outcome A/B* (all 14 families x seeds 0-39, `--jobs 4`, serial,
+  main then branch): 6 seeds changed outcome (bleed_station 2, 18; jet_chain
+  1, 19; random 3 lost, random 34 gained). Rerun one at a time (`--jobs 1`,
+  load average ~30 from other agents) they are wall-clock flips: each ends at
+  ~20 s (the stall and timeout budgets), and bleed_station 2 converged on the
+  branch on the second rerun, with the same final norm as main
+  (8.13e-12). Since F and J are identical, the solve is the same.
+- *Tests* (`test_inner_solve_cap_868.py` / `.cpp`): the tail is reached (H2
+  at 50 K, C3H8 at 1.5 K, NC7H16 at 10 K, guess 300 K); CO2's two roots near
+  its 6.2 K minimum are separated; the nearer-node rule (O2, 1.5 K from a
+  20 K guess); N2's tail root (37.4 K) from a 50 K guess; no root in
+  [1, 6000] K. Falsified in Python and C++: `CP_INVERSE_T_MIN` = 199 K fails
+  the tail tests, 10 K steps below 100 K fail the CO2 test, and one step per
+  side per round fails the O2 test.
+
 ## Not verified
 
 - The stress families were evaluated at x0 and perturbations (F, J hashes),
@@ -496,6 +585,9 @@ slightly. None is bit-identical.
   not be reached with constructed inputs; their throws are untested beyond
   compilation and the unchanged suite.
 - R3/R5/R6/R8/R11 (PR #954): the `calc_T_from_cp` scan can miss two roots
-  closer than 10 K (a cp extremum within 10 K of the target).
+  closer than a step (a cp extremum within it of the target): 10 K, or
+  10 % of T below 100 K since the range reaches 1 K; then it throws "no root".
+  Below 1 K and for a mixture whose tail cubic cancels, the root is
+  ill-conditioned (not measured beyond the sweep above).
   `jobson_expansibility` fails to converge on valid input at high beta Ci and
   low r: 108 of the 1800 sweep calls, the same on main. It is not fixed here.

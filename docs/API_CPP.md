@@ -143,12 +143,19 @@ converged only on a Newton step). They throw `std::runtime_error` when they do
 not converge -- a target no positive T reaches -- rather than return the last
 iterate (#606). cp is not monotone, so `calc_T_from_cp` returns the root
 nearest `T_guess` in [`thermo::CP_INVERSE_T_MIN`, `thermo::CP_INVERSE_T_MAX`]
-= [200, 6000] K (the span every species has NASA-9 data for; the tails level cp
-off beyond it): an outward scan from the guess (clamped into the range) in
-`thermo::CP_INVERSE_SCAN_STEP` = 10 K steps, then bracketed Newton on the first
-sign change (#868 R6). No root in the range, or no convergence in `max_iter`,
-throws `std::runtime_error`; a non-finite or non-positive `cp_target`,
-`T_guess` or `tol` throws `std::invalid_argument`.
+= [1, 6000] K: an outward scan from the guess (clamped into the range), each
+step on the side whose next node is nearer the guess, then bracketed Newton on
+the first sign change (#868 R6). Nodes are `thermo::CP_INVERSE_SCAN_STEP` =
+10 K apart down to `thermo::CP_INVERSE_LOG_SCAN_T` = 100 K and 10 % of T below
+it, and the downward scan steps onto `thermo::CP_INVERSE_T_DATA` = 200 K, so
+a guess in [200, 6000] K and a target with no root below 200 K give the result
+of the former [200, 6000] K range bit for bit. Above 6000 K the high tail
+levels cp off at a constant that is not physics. Below 200 K the low tail is
+the ideal gas to 0 K, but cp - cp(0 K) ~ T^3, so the root's condition number
+grows as 1/T^3: at 1 K, CO's T is fixed to ~5e-7 relative, at 0.1 K only to
+~5e-4 (see the constants' comment in `thermo.h`). No root in the range, or no
+convergence in `max_iter`, throws `std::runtime_error`; a non-finite or
+non-positive `cp_target`, `T_guess` or `tol` throws `std::invalid_argument`.
 
 ### Species Thermo Beyond the Data (#606)
 Every species' NASA-9 data starts at 200 K and ends at 20 000 K (N2, O2, AR,

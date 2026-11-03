@@ -140,12 +140,16 @@ exact flux slope. `T_from_stagnation` (and `P_from_stagnation`) keeps the
 T dgamma/dT term in its slope and converges to rounding (results move by up to
 ~1e-9 relative); `State.set_VH_mass` is the enthalpy inverse (u + R T = h, as
 `set_HP_mass`). `calc_T_from_cp` returns the root nearest `T_guess` in
-[200, 6000] K -- the span every species has NASA-9 data for; beyond it the
-tails level cp off, so cp no longer identifies T. cp(T) need not be monotone
-(N2 has a minimum near 214 K), so the guess picks the branch: the range is
-scanned outward from the guess (clamped into it) in 10 K steps and the first
-sign change polished. No root in the range raises `RuntimeError` ("no root in
-[200, 6000] K"); a non-finite or non-positive `cp_target`, `T_guess` or `tol`
+[1, 6000] K. Above 6000 K the tails level cp off at a constant, so cp no longer
+identifies T; below the 200 K NASA-9 data the ideal-gas tail applies (#606),
+where cp - cp(0 K) ~ T^3, so a root near 1 K is ill-conditioned (~5e-7
+relative for CO, ~5e-4 at 0.1 K, hence the 1 K end). cp(T) need not be
+monotone (N2 has a minimum near 214 K and a tail maximum near 127 K), so the
+guess picks the branch: the range is scanned outward from the guess (clamped
+into it), each step on the side whose next node is nearer it, 10 K apart and
+10 % of T below 100 K, and the first sign change polished. No root in the
+range raises `RuntimeError` ("no root in [1, 6000] K"); a non-finite or
+non-positive `cp_target`, `T_guess` or `tol`
 raises `ValueError`. The audit of every inner solve, with what was left
 unchanged: `docs/archive/AUDIT_868_INNER_SOLVES.md`.
 

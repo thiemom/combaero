@@ -3179,8 +3179,11 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       py::arg("cp_target"), py::arg("X"), py::arg("T_guess") = 300.0,
       py::arg("tol") = 1.0e-6, py::arg("max_iter") = 50,
       "Solve for temperature T given target Cp cp_target and composition X: the root\n"
-      "nearest T_guess in [200, 6000] K (cp is not monotone); RuntimeError when none\n"
-      "lies there, ValueError for a non-finite or non-positive input.");
+      "nearest T_guess in [1, 6000] K (cp is not monotone). Below the 200 K NASA-9\n"
+      "data the ideal-gas tail applies; cp - cp(0 K) ~ T^3 there, so a root near\n"
+      "1 K is ill-conditioned (~5e-7 relative for CO). The scan steps 10 K, and\n"
+      "10 % of T below 100 K. RuntimeError when no root lies in the range,\n"
+      "ValueError for a non-finite or non-positive input.");
 
   m.def(
       "calc_T_from_u",
