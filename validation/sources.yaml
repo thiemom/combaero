@@ -3072,7 +3072,7 @@ documents:
     1640/1603 K), the same liner film-cooled at x/s = 18 (pp. 338-340, 1283/1265 K), and with a 0.5 mm TBC
     (pp. 350-351, 1304/1236/1220 K). Only two blocks in the book are headed "Example"; the third (TBC)
     continues the second.'
-  status: screened
+  status: implemented
   verdict: 'Screened 2026-10-27 for #793 worked examples and missing liner correlations. BEST #793 CASE:
     the Ch. 8 liner-wall-temperature trio. Re-solving the printed equations reproduces all three printed
     answers within 1 K (1640.8/1603.7, 1282.8/1264.4, 1303.8/1236.4/1220.3), so the book''s own chain is
@@ -3100,7 +3100,13 @@ documents:
     K (0.0553) is 8% below combaero''s 0.060 and standard tables; its product k at 2280 K (0.157) is 14%
     above combaero''s frozen 0.138. combaero''s complete combustion of n-heptane at q = 0.050, 880 K gives
     dT = 1592 K against the book''s dissociated kerosine 1455 K, so an example must take Tg = 2280 K as
-    the book''s input, not recompute it.'
+    the book''s input, not recompute it. IMPLEMENTED 2026-11-03 (#793, opt-in liner radiation): Eqs. 8.7,
+    8.10, 8.11 (with the Eq. 8.9 erratum), 8.15 and 8.17 as C++ kernels with analytic partials, and on a
+    ThermalWall face (GasRadiation / CasingRadiation). Fidelity on printed quantities: the three examples
+    from their printed inputs give 1641.6/1604.4 (the book rounds eps_g to 0.61 and C1 to 1 280 500 - 562
+    Tw1 first), 1283.0/1264.5 and 1304.0/1236.6/1220.4 K. As a network with combaero''s own convection
+    (Gnielinski h 523 vs the book''s 565) the uncooled liner is 1632.9/1596.6 K, a method comparison. The
+    film and TBC cases cannot be networks: both need the Ballal-Lefebvre film-side h (Eq. 8.44).'
   read_for: ['#793 worked examples: liner wall temperature (radiation + convection + film + TBC)', '#793
       worked examples: pressure-loss factor, liner effective hole area, flow split', liner-hole Cd vs
       annulus crossflow (Kaddah/Freeman) against the shipped McGreehan-Schotsch crossflow Cd, '#714 slot
@@ -3108,6 +3114,9 @@ documents:
       and luminosity factor, pattern factor correlation, provenance of LinearThetaHeadLoss]
   issues: [714, 793]
   records: []
+  code: ['include/liner_radiation.h: Eqs. 8.7, 8.10, 8.11, 8.15, 8.17', 'python/combaero/network/components.py:
+      GasRadiation, CasingRadiation on ThermalWall', 'python/tests/test_liner_radiation_793.py: the three worked
+      examples', 'tests/test_liner_radiation.cpp: LefebvreWorkedExamples']
   notes: A byte-identical copy at docs/GAS_Turbine_Combustion_THIRD_EDITION_Alt.pdf was deleted 2026-10-25.
     The earlier "no text layer" note was wrong. Secondary throughout Ch. 4 and 8 except the liner-wall
     method, Eqs. 4.30/4.31 and Eq. 8.15 (Lefebvre's own); figures reprinted from theses (Kaddah, Freeman,

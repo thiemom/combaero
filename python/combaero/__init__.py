@@ -181,6 +181,20 @@ try:
         STATION_KAPPA_MERGE_NORMAL,
         STATION_KAPPA_BLEED_BASSETT,
         WALL_HTC_KNEE,
+        STEFAN_BOLTZMANN,
+        REEVES_EMISSIVITY_COEFF,
+        LUMINOSITY_HYDROGEN_COEFF,
+        BEAM_LENGTH_COEFF_LEFEBVRE,
+        BEAM_LENGTH_COEFF_HOWELL,
+        GasEmissivityResult,
+        LinerGasRadiationResult,
+        gas_emissivity_luminous,
+        luminosity_factor_hydrogen,
+        liner_gas_radiation,
+        liner_casing_radiation,
+        liner_casing_exchange_factor,
+        mean_beam_length,
+        elemental_fuel_air_ratio,
         MIXER_HEAT_MDOT_FLOOR,
         mixer_heat_per_unit_flow,
         SENSIBLE_ENTHALPY_REF_T,
@@ -827,6 +841,20 @@ except (ModuleNotFoundError, ImportError) as e:
     heat_transfer_area = _core.heat_transfer_area
     heat_transfer_dT = _core.heat_transfer_dT
     wall_temperature_profile = _core.wall_temperature_profile
+    STEFAN_BOLTZMANN = _core.STEFAN_BOLTZMANN
+    REEVES_EMISSIVITY_COEFF = _core.REEVES_EMISSIVITY_COEFF
+    LUMINOSITY_HYDROGEN_COEFF = _core.LUMINOSITY_HYDROGEN_COEFF
+    BEAM_LENGTH_COEFF_LEFEBVRE = _core.BEAM_LENGTH_COEFF_LEFEBVRE
+    BEAM_LENGTH_COEFF_HOWELL = _core.BEAM_LENGTH_COEFF_HOWELL
+    GasEmissivityResult = _core.GasEmissivityResult
+    LinerGasRadiationResult = _core.LinerGasRadiationResult
+    gas_emissivity_luminous = _core.gas_emissivity_luminous
+    luminosity_factor_hydrogen = _core.luminosity_factor_hydrogen
+    liner_gas_radiation = _core.liner_gas_radiation
+    liner_casing_radiation = _core.liner_casing_radiation
+    liner_casing_exchange_factor = _core.liner_casing_exchange_factor
+    mean_beam_length = _core.mean_beam_length
+    elemental_fuel_air_ratio = _core.elemental_fuel_air_ratio
 
     ntu = _core.ntu
     capacity_ratio = _core.capacity_ratio
@@ -1253,6 +1281,20 @@ __all__ = [
     "STATION_KAPPA_MERGE_NORMAL",
     "STATION_KAPPA_BLEED_BASSETT",
     "WALL_HTC_KNEE",
+    "STEFAN_BOLTZMANN",
+    "REEVES_EMISSIVITY_COEFF",
+    "LUMINOSITY_HYDROGEN_COEFF",
+    "BEAM_LENGTH_COEFF_LEFEBVRE",
+    "BEAM_LENGTH_COEFF_HOWELL",
+    "GasEmissivityResult",
+    "LinerGasRadiationResult",
+    "gas_emissivity_luminous",
+    "luminosity_factor_hydrogen",
+    "liner_gas_radiation",
+    "liner_casing_radiation",
+    "liner_casing_exchange_factor",
+    "mean_beam_length",
+    "elemental_fuel_air_ratio",
     "MIXER_HEAT_MDOT_FLOOR",
     "mixer_heat_per_unit_flow",
     "SENSIBLE_ENTHALPY_REF_T",

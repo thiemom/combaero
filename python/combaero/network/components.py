@@ -1290,6 +1290,174 @@ class _WallCoupling:
 
 
 @dataclass
+class GasRadiation:
+    """Gas-to-wall radiation on one ThermalWall face (#793): Lefebvre & Ballal
+    (2010) Eq. 8.7, ``R1 = 0.5 sigma (1 + eps_w) eps_g Tg^1.5 (Tg^2.5 -
+    Tw^2.5)``, with the luminous emissivity of Eq. 8.11, ``eps_g = 1 -
+    exp[-290 P L (q l_b)^0.5 Tg^-1.5]`` (P in kPa).
+
+    Gray and lumped: one gas temperature, one beam length, one emissivity per
+    surface. Eq. 8.11 is Reeves' kerosine-product fit times a luminosity
+    factor; it is not a composition-based emissivity.
+
+    Attributes
+    ----------
+    beam_length : float
+        Mean beam length l_b [m] of the gas volume the face sees,
+        ``cb.mean_beam_length(V, A)`` (3.4 V/A, Eq. 8.10). The user's geometry.
+    emissivity_wall : float
+        The face's emissivity eps_w (Lefebvre: about 0.7 Nimonic, 0.8
+        stainless steel at liner temperatures).
+    luminosity : float
+        Luminosity factor L (1: non-luminous, Eq. 8.9). For a liquid fuel,
+        ``cb.luminosity_factor_hydrogen(H)[0]`` = 336/H^2 (Eq. 8.15).
+    T_gas : float | None
+        Mean gas temperature [K]; None (default): the side's stream Tt.
+    fuel_air_ratio : float | None
+        q [-]; None (default): the side's composition, by its elements
+        (``cb.elemental_fuel_air_ratio``).
+    pressure : float | None
+        Gas pressure [Pa]; None (default): the side's static pressure.
+    """
+
+    beam_length: float
+    emissivity_wall: float = 0.7
+    luminosity: float = 1.0
+    T_gas: float | None = None
+    fuel_air_ratio: float | None = None
+    pressure: float | None = None
+
+    def __post_init__(self) -> None:
+        if not (math.isfinite(self.beam_length) and self.beam_length > 0.0):
+            raise ValueError(f"GasRadiation: beam_length must be > 0, not {self.beam_length}")
+        if not 0.0 < self.emissivity_wall <= 1.0:
+            raise ValueError("GasRadiation: emissivity_wall must be in (0, 1]")
+        if not (math.isfinite(self.luminosity) and self.luminosity >= 0.0):
+            raise ValueError("GasRadiation: luminosity must be >= 0")
+        if self.T_gas is not None and not self.T_gas > 0.0:
+            raise ValueError("GasRadiation: T_gas must be > 0")
+        if self.fuel_air_ratio is not None and not self.fuel_air_ratio >= 0.0:
+            raise ValueError("GasRadiation: fuel_air_ratio must be >= 0")
+        if self.pressure is not None and not self.pressure >= 0.0:
+            raise ValueError("GasRadiation: pressure must be >= 0")
+
+
+@dataclass
+class CasingRadiation:
+    """Wall-to-casing radiation on one ThermalWall face (#793): Lefebvre &
+    Ballal (2010) Eq. 8.17, a gray two-surface enclosure with view factor 1,
+    ``R2 = sigma eps_w eps_c / (eps_c + eps_w (1 - eps_c) A_w/A_c) (Tw^4 -
+    Tc^4)`` per unit wall area.
+
+    The heat goes into the face's stream: in steady state a casing that loses
+    nothing outward hands what it absorbs to the annulus air.
+
+    Attributes
+    ----------
+    area_ratio : float
+        A_w / A_c, wall over casing area (tubular: the diameter ratio;
+        tubo-annular about 0.8). The user's geometry.
+    emissivity_wall : float
+        The face's emissivity eps_w (0.7 Nimonic, 0.8 stainless steel).
+    emissivity_casing : float
+        eps_c (Lefebvre's example: 0.4, aluminium casing).
+    T_casing : float | None
+        Casing temperature [K]; None (default): the side's stream Tt, as the
+        book takes T3.
+    """
+
+    area_ratio: float
+    emissivity_wall: float = 0.7
+    emissivity_casing: float = 0.4
+    T_casing: float | None = None
+
+    def __post_init__(self) -> None:
+        if not (math.isfinite(self.area_ratio) and self.area_ratio > 0.0):
+            raise ValueError(f"CasingRadiation: area_ratio must be > 0, not {self.area_ratio}")
+        for name in ("emissivity_wall", "emissivity_casing"):
+            if not 0.0 < getattr(self, name) <= 1.0:
+                raise ValueError(f"CasingRadiation: {name} must be in (0, 1]")
+        if self.T_casing is not None and not self.T_casing >= 0.0:
+            raise ValueError("CasingRadiation: T_casing must be >= 0")
+
+
+@dataclass
+class _RadiationFace:
+    """One face's radiation, ready for cb's wall_radiation_sides: kind, the
+    source temperature, the coefficient k (in side A's area units), and
+    their partials in the side's stream (Tt, P, Y)."""
+
+    kind: int = 0
+    T_src: float = 0.0
+    k: float = 0.0
+    dTsrc_dTt: float = 0.0
+    dk_dTt: float = 0.0
+    dk_dP: float = 0.0
+    dk_dY: Any = None
+    eps_g: float = math.nan
+
+
+def _radiation_face(
+    spec: "GasRadiation | CasingRadiation | None",
+    gas: "tuple[float, float, Any] | None",
+    scale: float,
+) -> _RadiationFace:
+    """A face's radiation spec at its stream state ``gas`` = (Tt, P, Y);
+    ``scale`` = this face's area over side A's (per-side areas, #887)."""
+    if spec is None:
+        return _RadiationFace()
+    needs_gas = (
+        (spec.T_gas is None or spec.fuel_air_ratio is None or spec.pressure is None)
+        if isinstance(spec, GasRadiation)
+        else spec.T_casing is None
+    )
+    if needs_gas and gas is None:
+        raise ValueError("ThermalWall radiation: the face's stream state is needed")
+    if isinstance(spec, GasRadiation):
+        Tt, P, Y = gas if gas is not None else (math.nan, math.nan, None)
+        T_g = float(spec.T_gas) if spec.T_gas is not None else float(Tt)
+        P_g = float(spec.pressure) if spec.pressure is not None else float(P)
+        if spec.fuel_air_ratio is not None:
+            q, dq_dY = float(spec.fuel_air_ratio), None
+        else:
+            q, dq_dY = cb.elemental_fuel_air_ratio(list(Y))
+        e = cb.gas_emissivity_luminous(T_g, P_g, q, spec.beam_length, spec.luminosity)
+        c = 0.5 * cb.STEFAN_BOLTZMANN * (1.0 + spec.emissivity_wall) * scale
+        from_stream = spec.T_gas is None
+        return _RadiationFace(
+            kind=1,
+            T_src=T_g,
+            k=c * e.eps,
+            dTsrc_dTt=1.0 if from_stream else 0.0,
+            dk_dTt=c * e.deps_dT if from_stream else 0.0,
+            dk_dP=c * e.deps_dP if spec.pressure is None else 0.0,
+            dk_dY=None if dq_dY is None else [c * e.deps_dq * float(v) for v in dq_dY],
+            eps_g=float(e.eps),
+        )
+    T_c = float(spec.T_casing) if spec.T_casing is not None else float(gas[0])
+    F = cb.liner_casing_exchange_factor(
+        spec.emissivity_wall, spec.emissivity_casing, spec.area_ratio
+    )
+    return _RadiationFace(
+        kind=2,
+        T_src=T_c,
+        k=F * scale,
+        dTsrc_dTt=1.0 if spec.T_casing is None else 0.0,
+    )
+
+
+class _RadiativeWallCoupling:
+    """A wall's coupling with radiation on a face (#793): the kernel's result
+    on the effective sides, with dQ/d(T_aw, h) back in the convective inputs
+    and the radiation's own partials in each side's stream: ``rad_dQ_dTt_a``,
+    ``rad_dQ_dP_a``, ``rad_dQ_dY_a`` (None when the composition does not
+    enter), and side B's. ``radiation`` holds the reported values."""
+
+    def __init__(self, **kw: Any) -> None:
+        self.__dict__.update(kw)
+
+
+@dataclass
 class ThermalWall:
     """Thermal coupling between two elements through a shared multi-layer wall.
 
@@ -1363,6 +1531,14 @@ class ThermalWall:
         The wall's span along the gas path [m], measured downstream of the
         provider's LAST row; eta_bar is the film averaged over it.
         ``film_end`` defaults to ``film_start`` (the point value).
+    radiation_a, radiation_b : GasRadiation | CasingRadiation | None
+        Radiation on side A's / side B's face (#793), default None (none):
+        ``GasRadiation`` from that side's gas to the wall (Lefebvre Eq. 8.7)
+        or ``CasingRadiation`` from the wall to a casing (Eq. 8.17). Each
+        adds to its face's convection in the local wall balance, solved for
+        the two surface temperatures; the exchange then runs on each side's
+        combined conductance and driving temperature. All of it is booked to
+        the two streams: side A's gives it up, side B's takes it.
 
     The heat is the two streams' exchange, the epsilon-NTU integral along the
     wall at each stream's inlet temperature (``wall_exchange_and_jacobian``):
@@ -1384,6 +1560,8 @@ class ThermalWall:
     film_side: Literal["a", "b"] = "a"
     film_start: float = 0.0
     film_end: float | None = None
+    radiation_a: GasRadiation | CasingRadiation | None = None
+    radiation_b: GasRadiation | CasingRadiation | None = None
 
     # Internal cache for temperature-dependent property iteration
     _last_profile: list[float] | None = field(default=None, init=False, repr=False)
@@ -1422,6 +1600,13 @@ class ThermalWall:
                 raise ValueError(
                     f"ThermalWall '{self.id}': the film span needs "
                     "0 <= film_start <= film_end [m, downstream of the last row]"
+                )
+        for name in ("radiation_a", "radiation_b"):
+            spec = getattr(self, name)
+            if spec is not None and not isinstance(spec, (GasRadiation, CasingRadiation)):
+                raise ValueError(
+                    f"ThermalWall '{self.id}': {name} must be a GasRadiation, a "
+                    f"CasingRadiation or None, not {type(spec).__name__}"
                 )
 
     @property
@@ -1471,6 +1656,8 @@ class ThermalWall:
         C_a: float = math.inf,
         C_b: float = math.inf,
         counterflow: bool = False,
+        gas_a: "tuple[float, float, Any] | None" = None,
+        gas_b: "tuple[float, float, Any] | None" = None,
     ) -> cb.WallCouplingResult:
         """Compute heat transfer rate and wall temperature using analytical Jacobians.
 
@@ -1488,6 +1675,9 @@ class ThermalWall:
             reservoir. Two reservoirs give the linear U A dT.
         counterflow : bool
             The streams run opposite ways along the wall (``is_counterflow``).
+        gas_a, gas_b : tuple | None
+            Each side's stream state (Tt [K], P [Pa], Y), read by that side's
+            radiation (``radiation_a`` / ``radiation_b``) only.
 
         Returns
         -------
@@ -1514,6 +1704,24 @@ class ThermalWall:
         # so it sees the coupling's own floor (WALL_HTC_KNEE).
         h_pa = max(float(h_a), cb.WALL_HTC_KNEE)
         h_pb = max(float(h_b), cb.WALL_HTC_KNEE)
+
+        if self.radiation_a is not None or self.radiation_b is not None:
+            return self._radiative_coupling(
+                h_a,
+                T_aw_a,
+                h_b,
+                T_aw_b,
+                h_pa,
+                h_pb,
+                C_a,
+                C_b,
+                counterflow,
+                A_eff,
+                layer_scale,
+                r_b if per_side else 1.0,
+                gas_a,
+                gas_b,
+            )
 
         def profile(t_over_k: list[float]) -> list[float]:
             prof, _q = cb.wall_temperature_profile(
@@ -1598,6 +1806,181 @@ class ThermalWall:
                 res, dQ_dh_b_factor=r_b if per_side else 1.0, kT=kT or (0.0, 0.0, 0.0, 0.0)
             )
         return res
+
+    def _radiative_coupling(
+        self,
+        h_a: float,
+        T_aw_a: float,
+        h_b: float,
+        T_aw_b: float,
+        h_pa: float,
+        h_pb: float,
+        C_a: float,
+        C_b: float,
+        counterflow: bool,
+        A_eff: float,
+        layer_scale: list[float],
+        r_b: float,
+        gas_a: "tuple[float, float, Any] | None",
+        gas_b: "tuple[float, float, Any] | None",
+    ) -> _RadiativeWallCoupling:
+        """compute_coupling with radiation on a face (#793), per unit of side
+        A's area (h_b, and side B's radiation coefficient, scaled by r_b).
+
+        The local balance at the streams' inlet states gives the two surface
+        temperatures and, per side, the effective conductance H = h + h_r and
+        driving temperature T* (cb wall_radiation_sides); the exchange is
+        wall_exchange_and_jacobian on those, so between two reservoirs Q / A
+        is the face's convection plus R1 (or R2) exactly. With k(T) layers
+        the conductive resistance R_wall and the radiation share one fixed
+        point; they couple only through the scalar R_wall, so the total
+        derivative is the radiation's plus a scalar implicit term."""
+        face_a = _radiation_face(self.radiation_a, gas_a, 1.0)
+        face_b = _radiation_face(self.radiation_b, gas_b, r_b)
+
+        def resistances() -> list[float]:
+            return [L.r_val * f for L, f in zip(self.layers, layer_scale, strict=True)]
+
+        def solve(R_wall: float) -> Any:
+            return _solver_tools.wall_radiation_sides(
+                T_aw_a,
+                h_pa,
+                T_aw_b,
+                h_pb,
+                R_wall,
+                face_a.kind,
+                face_a.T_src,
+                face_a.k,
+                face_b.kind,
+                face_b.T_src,
+                face_b.k,
+            )
+
+        def profile(rad: Any, t_over_k: list[float]) -> list[float]:
+            prof, _q = cb.wall_temperature_profile(
+                rad.T_a, rad.T_b, rad.H_a, rad.H_b, t_over_k, self.R_fouling
+            )
+            return [float(tp) for tp in prof]
+
+        t_over_k_layers = resistances()
+        rad = solve(sum(t_over_k_layers) + self.R_fouling)
+        prof = profile(rad, t_over_k_layers)
+        kT_dR: list[float] | None = None
+        if any(L.material.lower() not in ("generic", "custom") for L in self.layers):
+            # k(T) at this call's wall temperatures, iterated jointly with the
+            # radiation's surface temperatures to their common fixed point.
+            for _ in range(60):
+                for i, layer in enumerate(self.layers):
+                    layer.update_conductivity(0.5 * (prof[i] + prof[i + 1]))
+                new = resistances()
+                change = max(
+                    abs(a - b) / max(abs(b), 1e-300)
+                    for a, b in zip(new, t_over_k_layers, strict=True)
+                )
+                t_over_k_layers = new
+                rad = solve(sum(t_over_k_layers) + self.R_fouling)
+                prof = profile(rad, t_over_k_layers)
+                if change < 1e-12:
+                    break
+            for i, layer in enumerate(self.layers):
+                if layer.material.lower() not in ("generic", "custom"):
+                    layer.in_range = bool(
+                        cb.material_in_range(layer.material, 0.5 * (prof[i] + prof[i + 1]))
+                    )
+            dr_dTm: list[float] = []
+            for i, (layer, f) in enumerate(zip(self.layers, layer_scale, strict=True)):
+                if layer.material.lower() in ("generic", "custom"):
+                    dr_dTm.append(0.0)
+                    continue
+                k, dk = cb.get_material_conductivity_and_slope(
+                    layer.material, 0.5 * (prof[i] + prof[i + 1]), extrapolate=layer.extrapolate
+                )
+                dr_dTm.append(-float(layer.thickness) * f * dk / (k * k))
+            # dR_wall/d(T_hot, T_cold, h_hot, h_cold) at fixed effective sides.
+            kT_dR = list(
+                _solver_tools.wall_resistance_fixed_point_derivatives(
+                    rad.T_a, rad.T_b, rad.H_a, rad.H_b, t_over_k_layers, self.R_fouling, dr_dTm
+                )
+            )
+
+        res = _solver_tools.wall_exchange_and_jacobian(
+            rad.H_a,
+            rad.T_a,
+            C_a,
+            rad.H_b,
+            rad.T_b,
+            C_b,
+            t_over_k_layers,
+            A_eff,
+            self.R_fouling,
+            counterflow,
+        )
+        self._last_profile = prof
+
+        # Chain: Q(s, R_wall), s = (H_a, T*_a, H_b, T*_b) = S(p, R_wall),
+        # p = [T_aw_a, h_a, T_aw_b, h_b, R_wall, T_src_a, k_a, T_src_b, k_b].
+        S = [list(row) for row in rad.d]
+        dQ_ds = [res.dQ_dh_a, res.dQ_dT_aw_a, res.dQ_dh_b, res.dQ_dT_aw_b]
+        n_p = len(S[0])
+        dR_dp = [0.0] * n_p
+        if kT_dR is not None:
+            # R_wall = K(s) with s = S(p, R_wall): dR/dp = K.S_p / (1 - K.S_R).
+            K = [kT_dR[2], kT_dR[0], kT_dR[3], kT_dR[1]]
+            KS_R = sum(K[i] * S[i][4] for i in range(4))
+            for j in range(n_p):
+                if j != 4:
+                    dR_dp[j] = sum(K[i] * S[i][j] for i in range(4)) / (1.0 - KS_R)
+        dQ_dp = [0.0] * n_p
+        for j in range(n_p):
+            if j == 4:
+                continue
+            ds = [S[i][j] + S[i][4] * dR_dp[j] for i in range(4)]
+            dQ_dp[j] = sum(dQ_ds[i] * ds[i] for i in range(4)) + res.dQ_dR_wall * dR_dp[j]
+
+        def stream_partials(face: _RadiationFace, j_src: int, j_k: int) -> tuple:
+            d_src, d_k = dQ_dp[j_src], dQ_dp[j_k]
+            dY = None
+            if face.dk_dY is not None:
+                dY = [d_k * v for v in face.dk_dY]
+            return d_src * face.dTsrc_dTt + d_k * face.dk_dTt, d_k * face.dk_dP, dY
+
+        dTt_a, dP_a, dY_a = stream_partials(face_a, 5, 6)
+        dTt_b, dP_b, dY_b = stream_partials(face_b, 7, 8)
+        # The radiative fluxes: per unit of each face's own area, and in W.
+        radiation: dict[str, float] = {}
+        if face_a.kind:
+            radiation["q_rad_a"] = float(rad.q_rad_a)
+            radiation["Q_rad_a"] = float(rad.q_rad_a) * A_eff
+            radiation["T_surface_a"] = float(rad.T_s_a)
+            if face_a.kind == 1:
+                radiation["eps_g_a"] = face_a.eps_g
+        if face_b.kind:
+            radiation["q_rad_b"] = float(rad.q_rad_b) / r_b
+            radiation["Q_rad_b"] = float(rad.q_rad_b) * A_eff
+            radiation["T_surface_b"] = float(rad.T_s_b)
+            if face_b.kind == 1:
+                radiation["eps_g_b"] = face_b.eps_g
+        return _RadiativeWallCoupling(
+            Q=res.Q,
+            T_hot=res.T_hot,
+            dQ_dC_a=res.dQ_dC_a,
+            dQ_dC_b=res.dQ_dC_b,
+            UA=res.UA,
+            effectiveness=res.effectiveness,
+            dQ_dR_wall=res.dQ_dR_wall,
+            dQ_dT_aw_a=dQ_dp[0],
+            # The profile saw h at the WALL_HTC_KNEE floor: flat below it.
+            dQ_dh_a=dQ_dp[1] if float(h_a) >= cb.WALL_HTC_KNEE else 0.0,
+            dQ_dT_aw_b=dQ_dp[2],
+            dQ_dh_b=(dQ_dp[3] if float(h_b) >= cb.WALL_HTC_KNEE else 0.0) * r_b,
+            rad_dQ_dTt_a=dTt_a,
+            rad_dQ_dP_a=dP_a,
+            rad_dQ_dY_a=dY_a,
+            rad_dQ_dTt_b=dTt_b,
+            rad_dQ_dP_b=dP_b,
+            rad_dQ_dY_b=dY_b,
+            radiation=radiation,
+        )
 
 
 class EnergyBoundary:
@@ -6077,7 +6460,9 @@ class EffusionPlateElement(OrificeElement):
           flag, but the data refuse it offered alone.
         * anything else (a plenum) has a state but no flow, so no
           coefficient: the gas side is the imposed `gas_heat_flux` [W/m^2],
-          0 by default (adiabatic). Radiation is not modelled.
+          0 by default (adiabatic). Radiation is not modelled on the plate: a
+          ThermalWall face can carry it (GasRadiation, #793), this element
+          cannot.
 
         WALL: one layer, `wall_thickness / wall_conductivity`, through C++'s
         wall_coupling_and_jacobian. Returns {} without coolant flow.

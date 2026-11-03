@@ -2235,6 +2235,19 @@ class NetworkSolver:
             self._wall_ebs[nid] = eb
             node.add_energy_boundary(eb)
 
+    @staticmethod
+    def _wall_gas(
+        wall: Any, state_a: NetworkMixtureState, state_b: NetworkMixtureState
+    ) -> dict[str, tuple[float, float, list[float]]]:
+        """The streams' (Tt, P, Y) a wall's radiation reads (#793); nothing
+        for a wall without radiation, whose coupling call stays as it was."""
+        if wall.radiation_a is None and wall.radiation_b is None:
+            return {}
+        return {
+            "gas_a": (float(state_a.Tt), float(state_a.P), list(state_a.Y)),
+            "gas_b": (float(state_b.Tt), float(state_b.P), list(state_b.Y)),
+        }
+
     def _wall_capacity(
         self, eid: str, state: NetworkMixtureState, T_other: float
     ) -> tuple[float, float, float, float, float, Callable[[], np.ndarray] | None]:
@@ -2383,6 +2396,7 @@ class NetworkSolver:
                     C_a,
                     C_b,
                     wall.is_counterflow(sign_a, sign_b),
+                    **self._wall_gas(wall, state_a, state_b),
                 )
 
                 # Convention: Q > 0 means heat flows A->B
@@ -2832,8 +2846,17 @@ class NetworkSolver:
                         )
                     )
                     # And its composition (#717): h, T_aw and C move with Y.
+                    # The radiation's gas temperature, from the stream (#793)
+                    rad_T_a = getattr(wall_result, "rad_dQ_dTt_a", 0.0)
+                    if rad_T_a:
+                        factor_T_a += dTt_mix_dQ * sign * rad_T_a
                     ups_a = up(from_a)
                     factor_Y_a = self._wall_side_dQ_dY(wall_result, ch_a, dCa_dYa, side_a=True)
+                    # and its fuel/air ratio, from the composition (#793)
+                    rad_Y_a = getattr(wall_result, "rad_dQ_dY_a", None)
+                    if rad_Y_a is not None:
+                        arr = np.asarray(rad_Y_a, dtype=float)
+                        factor_Y_a = arr if factor_Y_a is None else factor_Y_a + arr
                     for idx, sens_up in ups_a.items():
                         nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                         nr["T"] += factor_T_a * sens_up["T"]
@@ -2875,6 +2898,10 @@ class NetworkSolver:
                 dQ_dP_a = wall_result.dQ_dT_aw_a * getattr(
                     ch_a, "dT_aw_dP", 0.0
                 ) + wall_result.dQ_dh_a * getattr(ch_a, "dh_dP", 0.0)
+                # The radiation's gas pressure (#793)
+                rad_P_a = getattr(wall_result, "rad_dQ_dP_a", 0.0)
+                if rad_P_a:
+                    dQ_dP_a += rad_P_a
                 if idx_P_a is not None and dQ_dP_a != 0.0:
                     nr = out.setdefault(idx_P_a, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                     nr["T"] += dTt_mix_dQ * sign * dQ_dP_a
@@ -2904,8 +2931,17 @@ class NetworkSolver:
                             + wall_result.dQ_dC_a * dCa_dTb
                         )
                     )
+                    # The radiation's gas temperature, from the stream (#793)
+                    rad_T_b = getattr(wall_result, "rad_dQ_dTt_b", 0.0)
+                    if rad_T_b:
+                        factor_T_b += dTt_mix_dQ * sign * rad_T_b
                     ups_b = up(from_b)
                     factor_Y_b = self._wall_side_dQ_dY(wall_result, ch_b, dCb_dYb, side_a=False)
+                    # and its fuel/air ratio, from the composition (#793)
+                    rad_Y_b = getattr(wall_result, "rad_dQ_dY_b", None)
+                    if rad_Y_b is not None:
+                        arr = np.asarray(rad_Y_b, dtype=float)
+                        factor_Y_b = arr if factor_Y_b is None else factor_Y_b + arr
                     for idx, sens_up in ups_b.items():
                         nr = out.setdefault(idx, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                         nr["T"] += factor_T_b * sens_up["T"]
@@ -2944,6 +2980,10 @@ class NetworkSolver:
                 dQ_dP_b = wall_result.dQ_dT_aw_b * getattr(
                     ch_b, "dT_aw_dP", 0.0
                 ) + wall_result.dQ_dh_b * getattr(ch_b, "dh_dP", 0.0)
+                # The radiation's gas pressure (#793)
+                rad_P_b = getattr(wall_result, "rad_dQ_dP_b", 0.0)
+                if rad_P_b:
+                    dQ_dP_b += rad_P_b
                 if idx_P_b is not None and dQ_dP_b != 0.0:
                     nr = out.setdefault(idx_P_b, {"T": 0.0, "Y": np.zeros(n_species), "Pt": 0.0})
                     nr["T"] += dTt_mix_dQ * sign * dQ_dP_b
@@ -6648,6 +6688,7 @@ class NetworkSolver:
                     C_a,
                     C_b,
                     counterflow,
+                    **self._wall_gas(wall, state_a, state_b),
                 )
 
                 sol_dict[f"{wid}.Q"] = float(wall_res.Q)
@@ -6691,6 +6732,10 @@ class NetworkSolver:
                 for ch in (ch_result_a, ch_result_b):
                     for key, val in (getattr(ch, "film", None) or {}).items():
                         sol_dict[f"{wid}.{key}"] = float(val)
+                # The radiation on its faces (#793): q_rad [W/m^2 of that
+                # face], Q_rad [W], the face's surface T and eps_g.
+                for key, val in (getattr(wall_res, "radiation", None) or {}).items():
+                    sol_dict[f"{wid}.{key}"] = float(val)
 
                 # Temperature profile [K], side A to side B: the one
                 # compute_coupling just placed for these inputs (k(T) at its
