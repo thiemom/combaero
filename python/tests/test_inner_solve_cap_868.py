@@ -23,10 +23,67 @@ def test_fanno_inlet_mach_is_linear_at_vanishing_flux(ratio: float) -> None:
 
 
 def test_calc_t_from_cp_refuses_an_unreachable_target() -> None:
-    """main returned the 6000 K clamp for a cp no T in [200, 6000] K has."""
-    with pytest.raises(RuntimeError, match="calc_T_from_cp: no convergence"):
+    """The 6000 K clamp was returned for a cp no T in [200, 6000] K has
+    (#924 made it a cap exit; since R6 the scan reports no root in range)."""
+    with pytest.raises(RuntimeError, match=r"calc_T_from_cp: no root in \[200, 6000\] K"):
         cb.calc_T_from_cp(1.0e3, X_AIR, 300.0)
-    assert cb.calc_T_from_cp(cb.cp(800.0, X_AIR), X_AIR, 300.0) == pytest.approx(800.0, abs=1e-6)
+    with pytest.raises(RuntimeError, match="no root"):
+        cb.calc_T_from_cp(20.0, X_AIR, 300.0)
+    assert cb.calc_T_from_cp(cb.cp(800.0, X_AIR), X_AIR, 300.0) == pytest.approx(800.0, abs=1e-9)
+
+
+def _pure(name: str) -> list[float]:
+    x = [0.0] * cb.num_species()
+    x[cb.species_index_from_name(name)] = 1.0
+    return x
+
+
+def test_calc_t_from_cp_takes_the_root_nearest_the_guess() -> None:
+    """cp of N2 has a minimum at ~214 K, so cp(205 K) is also reached at
+    ~226.7 K: the root is the one nearest T_guess (#868 R6)."""
+    x = _pure("N2")
+    target = cb.cp(205.0, x)
+    lower = cb.calc_T_from_cp(target, x, 213.0)
+    upper = cb.calc_T_from_cp(target, x, 218.0)
+    assert lower == pytest.approx(205.0, abs=1e-9)
+    assert 226.0 < upper < 227.5
+    assert cb.cp(upper, x) == pytest.approx(target, rel=1e-13)
+    # A guess outside the range starts the scan at its end.
+    assert cb.calc_T_from_cp(target, x, 50.0) == pytest.approx(205.0, abs=1e-9)
+    assert cb.calc_T_from_cp(target, x, 9000.0) == pytest.approx(upper, abs=1e-9)
+
+
+@pytest.mark.parametrize(
+    ("cp_target", "t_guess"), [(float("nan"), 300.0), (-1.0, 300.0), (30.0, -1.0), (30.0, 0.0)]
+)
+def test_calc_t_from_cp_refuses_invalid_input(cp_target: float, t_guess: float) -> None:
+    """A negative T_guess returned 530 K on main; invalid input is ValueError (#928)."""
+    with pytest.raises(ValueError, match="calc_T_from_cp"):
+        cb.calc_T_from_cp(cp_target, X_AIR, t_guess)
+
+
+@pytest.mark.parametrize("mach", [1.7782794100389228, 3.1622776601683795, 5.623413251903491])
+def test_t_from_stagnation_meets_the_energy_equation(mach: float) -> None:
+    """The exact slope (T dgamma/dT kept) converges quadratically: main's
+    approximate slope stopped with |F| up to 8e-10 cp T here (#868 R3)."""
+    tt = 2500.0
+    t = cb.T_from_stagnation(tt, mach, X_AIR)
+    v = mach * cb.speed_of_sound(t, X_AIR)
+    f = cb.h_mass(t, X_AIR) + 0.5 * v * v - cb.h_mass(tt, X_AIR)
+    assert abs(f) / (cb.cp_mass(t, X_AIR) * t) < 1e-13
+
+
+def test_set_vh_mass_is_the_enthalpy_inverse() -> None:
+    """u + R T = h: set_VH_mass is calc_T_from_h_mass from the current T
+    (its hand Newton stopped at 1e-4 K, #868 R5)."""
+    st = cb.State()
+    st.X = X_AIR
+    st.TP = (1234.5, 3.0e5)
+    h, v = st.h, 1.0 / st.rho
+    st.TP = (400.0, 1.0e5)
+    st.set_VH_mass(v, h)
+    assert cb.calc_T_from_h_mass(h, X_AIR, 400.0) == st.T
+    assert pytest.approx(3.0e5, rel=1e-9) == st.P
 
 
 def test_rayleigh_choke_search_without_a_sign_change_raises() -> None:

@@ -346,12 +346,10 @@ double fanno_inlet_mach(double Pt, double Tt, double G, const std::vector<double
     } else {
       lo = M;
     }
-    const double h = 1e-7 * std::max(M, 1e-3);
-    // The stencil stays at M > 0: the flux is 0 for M <= 0, so a central
-    // difference across it read half the slope below M = h (G < ~1e-10 of the
-    // sonic flux), and Newton 2-cycled about the root (#868).
-    const double M_minus = (M - h > 0.0) ? M - h : M;
-    const double fp = (fn(std::min(M + h, 1.0)) - fn(M_minus)) / (std::min(M + h, 1.0) - M_minus);
+    // The exact d flux/dM (#868 R8). The finite-difference stencil it
+    // replaces carried ~1e-8 relative rounding, and below M = h it crossed
+    // M = 0, read half the slope, and Newton 2-cycled.
+    const double fp = isentropic_flux_slopes(Pt, Tt, M, X).dM;
     double M_new = (fp > 0.0) ? M - f / fp : 0.5 * (lo + hi);
     if (!(M_new > lo && M_new < hi)) {
       M_new = 0.5 * (lo + hi);

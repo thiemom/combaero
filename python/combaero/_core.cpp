@@ -3174,7 +3174,9 @@ number runs linearly in Tt from M_in to M_out. Variable cp throughout.)doc");
       },
       py::arg("cp_target"), py::arg("X"), py::arg("T_guess") = 300.0,
       py::arg("tol") = 1.0e-6, py::arg("max_iter") = 50,
-      "Solve for temperature T given target Cp cp_target and composition X.");
+      "Solve for temperature T given target Cp cp_target and composition X: the root\n"
+      "nearest T_guess in [200, 6000] K (cp is not monotone); RuntimeError when none\n"
+      "lies there, ValueError for a non-finite or non-positive input.");
 
   m.def(
       "calc_T_from_u",

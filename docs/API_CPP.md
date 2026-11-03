@@ -140,8 +140,14 @@ tails below keep cp > 0), so each inverse has one root: safeguarded Newton
 (factor-4 steps until bracketed, bisection when a step leaves the bracket,
 converged only on a Newton step). They throw `std::runtime_error` when they do
 not converge -- a target no positive T reaches -- rather than return the last
-iterate (#606). `calc_T_from_cp` (plain Newton clamped to [200, 6000] K, cp
-is not monotone) throws too when it does not converge in `max_iter` (#868).
+iterate (#606). cp is not monotone, so `calc_T_from_cp` returns the root
+nearest `T_guess` in [`thermo::CP_INVERSE_T_MIN`, `thermo::CP_INVERSE_T_MAX`]
+= [200, 6000] K (the span every species has NASA-9 data for; the tails level cp
+off beyond it): an outward scan from the guess (clamped into the range) in
+`thermo::CP_INVERSE_SCAN_STEP` = 10 K steps, then bracketed Newton on the first
+sign change (#868 R6). No root in the range, or no convergence in `max_iter`,
+throws `std::runtime_error`; a non-finite or non-positive `cp_target`,
+`T_guess` or `tol` throws `std::invalid_argument`.
 
 ### Species Thermo Beyond the Data (#606)
 Every species' NASA-9 data starts at 200 K and ends at 20 000 K (N2, O2, AR,

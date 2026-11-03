@@ -119,8 +119,7 @@ iterate.
 A kernel's inner iterative solve that reaches its iteration cap without
 meeting its tolerance raises `RuntimeError` (naming the function and its last
 residual) instead of returning the last iterate as if it were a root:
-`calc_T_from_cp` (a target cp the clamped [200, 6000] K range never reaches
-used to return the clamp), `Tt_from_static` / `Tt_from_static_v`,
+`Tt_from_static` / `Tt_from_static_v`,
 `T_from_stagnation`, `Pt_from_static`, `P_from_stagnation`,
 `stagnation_from_static`, the isentropic expansion behind
 `mach_from_pressure_ratio`, `mass_flux_isentropic` and `nozzle_flow`,
@@ -136,8 +135,19 @@ expansion whose isentropic T lies below the former 10 K `T_FLOOR` (P/Pt below
 at hypersonic M and `Tt_from_static` from a static T below 10 K; the mass flux
 and Mach built on it follow.
 `fanno_inlet_mach` below ~1e-10 of the sonic flux now returns the root (it was
-up to 73 % high: the slope stencil crossed M = 0). The audit of every inner
-solve, with what was left unchanged: `docs/archive/AUDIT_868_INNER_SOLVES.md`.
+up to 73 % high: the slope stencil crossed M = 0); its Newton now takes the
+exact flux slope. `T_from_stagnation` (and `P_from_stagnation`) keeps the
+T dgamma/dT term in its slope and converges to rounding (results move by up to
+~1e-9 relative); `State.set_VH_mass` is the enthalpy inverse (u + R T = h, as
+`set_HP_mass`). `calc_T_from_cp` returns the root nearest `T_guess` in
+[200, 6000] K -- the span every species has NASA-9 data for; beyond it the
+tails level cp off, so cp no longer identifies T. cp(T) need not be monotone
+(N2 has a minimum near 214 K), so the guess picks the branch: the range is
+scanned outward from the guess (clamped into it) in 10 K steps and the first
+sign change polished. No root in the range raises `RuntimeError` ("no root in
+[200, 6000] K"); a non-finite or non-positive `cp_target`, `T_guess` or `tol`
+raises `ValueError`. The audit of every inner solve, with what was left
+unchanged: `docs/archive/AUDIT_868_INNER_SOLVES.md`.
 
 ### Compression and Expansion (#893)
 The outlet total temperature of a compressor or turbine at a total-to-total

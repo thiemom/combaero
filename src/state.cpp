@@ -2,7 +2,6 @@
 #include "../include/thermo.h"
 #include "../include/transport.h"
 #include "../include/input_validation.h"
-#include "../include/inner_solve.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -110,26 +109,10 @@ State &State::set_UP_mass(double u_new, double P_new) {
 State &State::set_VH_mass(double v_new, double h_new) {
   if (!validation::is_finite_positive(v_new))
     throw std::invalid_argument("Specific volume must be positive");
-  // h = u + Pv = u + RT => find T such that u(T) + RT = h_target
-  // This is slightly more complex, but for ideal gas we can iterate
-  double T_guess = T;
-  bool converged = false;
-  double dT = 0.0;
-  for (int i = 0; i < inner_solve::kSetVHMaxIter; ++i) {
-    double f = u_mass(T_guess, X) + R() * T_guess - h_new;
-    double df = cv_mass(T_guess, X) + R();
-    dT = f / df;
-    T_guess -= dT;
-    if (std::abs(dT) < inner_solve::kSetVHTolK) {
-      converged = true;
-      break;
-    }
-  }
-  if (!converged) {
-    inner_solve::throw_no_convergence("State::set_VH_mass", inner_solve::kSetVHMaxIter,
-                                      "step [K]", dT);
-  }
-  T = T_guess;
+  // h = u + Pv = u + RT for an ideal gas: h fixes T alone, so this is the
+  // enthalpy inverse (safeguarded, 1e-6 K), as set_HP_mass. The hand Newton
+  // it replaces stopped at 1e-4 K (#868 R5).
+  T = calc_T_from_h_mass(h_new, X, T);
   P = R() * T / v_new;
   return *this;
 }

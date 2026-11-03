@@ -60,6 +60,17 @@ constexpr double T_LOG_STEP = 10.0;
 // Pressure floor of the duct-state kernels [Pa]: an unphysical solver
 // iterate (P <= 0) is evaluated there, finite, instead of returning NaN.
 constexpr double P_FLOOR = 1.0;
+// calc_T_from_cp searches [CP_INVERSE_T_MIN, CP_INVERSE_T_MAX] K: the span
+// every species has NASA-9 data for (from 200 K; to 6000 K for H2O, NH3, CH4
+// and the alkanes, the shortest). Beyond it the tails (#606/#607) level cp
+// off toward a constant, so cp no longer identifies T. It scans outward from
+// T_guess in steps of CP_INVERSE_SCAN_STEP K (both sides alternately) and
+// polishes the first sign change of cp - target, the root nearest T_guess to
+// within a step. Two roots closer than a step (a cp extremum within it of the
+// target) can be missed (#868 R6).
+constexpr double CP_INVERSE_T_MIN = 200.0;
+constexpr double CP_INVERSE_T_MAX = 6000.0;
+constexpr double CP_INVERSE_SCAN_STEP = 10.0;
 
 } // namespace combaero::thermo
 
@@ -158,6 +169,9 @@ double dg_over_RT_dT(double T, const std::vector<double>& X);
 // not converge in max_iter, rather than return the last iterate.
 double calc_T_from_h(double h_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_s(double s_target, double P, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
+// cp(T) is not monotone: the root nearest T_guess in [CP_INVERSE_T_MIN,
+// CP_INVERSE_T_MAX] (see there); std::runtime_error when none lies in it,
+// std::invalid_argument for a non-finite or non-positive input (#868 R6).
 double calc_T_from_cp(double cp_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 double calc_T_from_u(double u_target, const std::vector<double>& X, double T_guess = 300.0, double tol = 1.0e-6, std::size_t max_iter = 50);
 

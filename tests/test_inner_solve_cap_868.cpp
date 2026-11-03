@@ -45,10 +45,41 @@ TEST(InnerSolveCap868, ChamberStaticStateThrowsOnAProbeItCannotSolve) {
 }
 
 // A target cp the clamped range [200, 6000] K never reaches returned 6000 K.
+// Since R6 the scan of that range finds no sign change and says so; invalid
+// input is std::invalid_argument (#928).
 TEST(InnerSolveCap868, CalcTFromCpThrowsOnAnUnreachableTarget) {
   const std::vector<double> X = dry_air();
   EXPECT_THROW(calc_T_from_cp(1.0e3, X, 300.0), std::runtime_error);
-  EXPECT_NEAR(calc_T_from_cp(cp(800.0, X), X, 300.0), 800.0, 1e-6);
+  EXPECT_THROW(calc_T_from_cp(20.0, X, 300.0), std::runtime_error);
+  EXPECT_THROW(calc_T_from_cp(-1.0, X, 300.0), std::invalid_argument);
+  EXPECT_THROW(calc_T_from_cp(30.0, X, -1.0), std::invalid_argument);
+  EXPECT_NEAR(calc_T_from_cp(cp(800.0, X), X, 300.0), 800.0, 1e-9);
+}
+
+// cp of N2 has a minimum near 214 K, so cp(205 K) has a second root near
+// 226.7 K: the one returned is the root nearest T_guess (#868 R6).
+TEST(InnerSolveCap868, CalcTFromCpTakesTheRootNearestTheGuess) {
+  std::vector<double> X(num_species(), 0.0);
+  X[species_index_from_name("N2")] = 1.0;
+  const double target = cp(205.0, X);
+  EXPECT_NEAR(calc_T_from_cp(target, X, 213.0), 205.0, 1e-9);
+  const double upper = calc_T_from_cp(target, X, 218.0);
+  EXPECT_GT(upper, 226.0);
+  EXPECT_LT(upper, 227.5);
+  EXPECT_NEAR(cp(upper, X) / target, 1.0, 1e-13);
+}
+
+// T_from_stagnation's slope dropped T dgamma/dT, so Newton converged
+// linearly and stopped with |F| up to 8e-10 cp T at 2500 K (#868 R3).
+TEST(InnerSolveCap868, TFromStagnationMeetsTheEnergyEquation) {
+  const std::vector<double> X = dry_air();
+  const double Tt = 2500.0;
+  for (double M : {1.7782794100389228, 3.1622776601683795, 5.623413251903491}) {
+    const double T = T_from_stagnation(Tt, M, X);
+    const double v = M * speed_of_sound(T, X);
+    const double F = h_mass(T, X) + 0.5 * v * v - h_mass(Tt, X);
+    EXPECT_LT(std::abs(F) / (cp_mass(T, X) * T), 1e-13) << "M = " << M;
+  }
 }
 
 // Below G ~ 1e-10 of the sonic flux the central-difference stencil crossed
